@@ -4070,6 +4070,12 @@ public class MatchController : MonoBehaviour
             currentLayer = SortingLayer.IDToName(renderer.sortingLayerID);
         }
 
+        bool playerTurn = activeTeamId >= 0
+            && Enum.IsDefined(typeof(TeamId), activeTeamId)
+            && !IsPlayerAI((TeamId)activeTeamId);
+        cursorController?.ApplyFogOfWarSorting(playerTurn);
+        turnStateManager?.ApplyMovementRangeFogOfWarSorting(playerTurn);
+
         if (fogSortingLayerValidated)
             return;
         fogSortingLayerValidated = true;

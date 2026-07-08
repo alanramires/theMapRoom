@@ -10,7 +10,7 @@ using UnityEngine.InputSystem;
 public partial class TurnStateManager
 {
     [Header("Helper - Inspection")]
-    [SerializeField] [Range(0.5f, 20f)] private float inspectedHelperDurationSeconds = 4f;
+    private const float InspectedHelperDurationSeconds = 6f;
     [Header("Helper - Turn Start Autonomy")]
     [SerializeField] [Range(0.5f, 20f)] private float turnStartAutonomyHelperDurationFallbackSeconds = 6f;
 
@@ -64,6 +64,8 @@ public partial class TurnStateManager
         public string UnitStatsLocalLabel;
         public Sprite UnitStatsLocalSprite;
         public Color UnitStatsLocalColor = Color.white;
+        public Sprite UnitStatsStructureSprite;
+        public Color UnitStatsStructureColor = Color.white;
         public int UnitStatsDefensePoints;
         public string TerrainStatsName;
         public string TerrainStatsDescription;
@@ -582,6 +584,26 @@ public partial class TurnStateManager
         sprite = board.GetSprite(cell);
     }
 
+    // Estruturas de rede sao desenhadas como uma segunda camada sobre o terreno no helper.
+    // Construcoes continuam usando apenas o proprio sprite, pois ocupam visualmente o hex.
+    private void ResolveCellLocalStructureVisual(Vector3Int cell, out Sprite sprite, out Color color)
+    {
+        cell.z = 0;
+        sprite = null;
+        color = Color.white;
+
+        Tilemap board = terrainTilemap;
+        if (board == null || ConstructionOccupancyRules.GetConstructionAtCell(board, cell) != null)
+            return;
+
+        StructureData structure = ResolveStructureAtCell(cell);
+        if (structure == null || structure.roadSegmentSprite == null)
+            return;
+
+        sprite = structure.roadSegmentSprite;
+        color = structure.roadColor;
+    }
+
     private StructureData ResolveStructureAtCell(Vector3Int cell)
     {
         if (cachedRoadNetworks == null)
@@ -707,7 +729,9 @@ public partial class TurnStateManager
         ResolveUnitActiveLocalVisual(unit, unitCell,
             out data.UnitStatsLocalLabel,
             out data.UnitStatsLocalSprite,
-            out data.UnitStatsLocalColor);
+            out data.UnitStatsLocalColor,
+            out data.UnitStatsStructureSprite,
+            out data.UnitStatsStructureColor);
         data.UnitStatsDefensePoints = Mathf.Max(0, ResolveDpqAtUnitPosition(unit, null).points);
 
         int hpCurrent = Mathf.Max(0, unit.CurrentHP);
@@ -769,11 +793,15 @@ public partial class TurnStateManager
         Vector3Int cell,
         out string label,
         out Sprite sprite,
-        out Color color)
+        out Color color,
+        out Sprite structureSprite,
+        out Color structureColor)
     {
         label = string.Empty;
         sprite = null;
         color = Color.white;
+        structureSprite = null;
+        structureColor = Color.white;
 
         if (unit != null && dpqAirHeightConfig != null)
         {
@@ -812,6 +840,7 @@ public partial class TurnStateManager
 
         label = ResolveCellTerrainLabel(cell);
         ResolveCellLocalVisual(cell, out sprite, out color);
+        ResolveCellLocalStructureVisual(cell, out structureSprite, out structureColor);
     }
 
     private static void AppendUnitVisionDetailedLines(List<string> lines, UnitManager unit)
@@ -1026,6 +1055,7 @@ public partial class TurnStateManager
         constructionCell.z = 0;
         data.UnitStatsLocalLabel = ResolveCellTerrainLabel(constructionCell);
         ResolveCellLocalVisual(constructionCell, out data.UnitStatsLocalSprite, out data.UnitStatsLocalColor);
+        ResolveCellLocalStructureVisual(constructionCell, out data.UnitStatsStructureSprite, out data.UnitStatsStructureColor);
         data.UnitStatsDefensePoints = ResolveCellDefensePoints(constructionCell);
         data.ConstructionStatsLines.Add($"Dono Atual: {TeamUtils.GetName(construction.TeamId)} ({(int)construction.TeamId})");
         data.ConstructionStatsLines.Add($"Capture: {construction.CurrentCapturePoints}/{construction.CapturePointsMax}");
@@ -1112,6 +1142,7 @@ public partial class TurnStateManager
             ? "LOCAL"
             : data.UnitStatsLocalLabel;
         ResolveCellLocalVisual(cell, out data.UnitStatsLocalSprite, out data.UnitStatsLocalColor);
+        ResolveCellLocalStructureVisual(cell, out data.UnitStatsStructureSprite, out data.UnitStatsStructureColor);
         data.UnitStatsDefensePoints = ResolveCellDefensePoints(cell);
         data.TerrainStatsDescription = ResolveCellLocationDescription(cell);
         return !string.IsNullOrWhiteSpace(data.UnitStatsLocalLabel) || data.UnitStatsLocalSprite != null;
@@ -1152,8 +1183,16 @@ public partial class TurnStateManager
             return constructionData.description ?? string.Empty;
 
         StructureData structure = ResolveStructureAtCell(cell);
-        if (structure != null && !string.IsNullOrWhiteSpace(structure.description))
-            return structure.description;
+        if (structure != null)
+        {
+            TerrainTypeData structureTerrain = null;
+            if (terrainDatabase != null)
+                terrainDatabase.TryGetByPaletteTile(board.GetTile(cell), out structureTerrain);
+
+            string structureDescription = structure.GetDescription(structureTerrain);
+            if (!string.IsNullOrWhiteSpace(structureDescription))
+                return structureDescription;
+        }
 
         if (terrainDatabase != null &&
             terrainDatabase.TryGetByPaletteTile(board.GetTile(cell), out TerrainTypeData terrain) && terrain != null)
@@ -1173,7 +1212,7 @@ public partial class TurnStateManager
         inspectedHelperTerrain = true;
         ClearEnemyThreatLayersOverlay();
         ClearInspectedThreatOverlay();
-        inspectedHelperVisibleUntil = Time.time + Mathf.Max(0.1f, inspectedHelperDurationSeconds);
+        inspectedHelperVisibleUntil = Time.time + InspectedHelperDurationSeconds;
         inspectedHelperActivatedFrame = Time.frameCount;
         inspectedHelperCursorCell = cell;
     }
@@ -1219,16 +1258,12 @@ public partial class TurnStateManager
 
     private float GetInspectUnitHelperDurationSeconds()
     {
-        if (animationManager != null)
-            return animationManager.InspectUnitDisplayDuration;
-        return Mathf.Max(0.1f, inspectedHelperDurationSeconds);
+        return InspectedHelperDurationSeconds;
     }
 
     private float GetInspectConstructionHelperDurationSeconds()
     {
-        if (animationManager != null)
-            return animationManager.InspectConstructionDisplayDuration;
-        return Mathf.Max(0.1f, inspectedHelperDurationSeconds);
+        return InspectedHelperDurationSeconds;
     }
 
     private void ClearInspectedHelper()

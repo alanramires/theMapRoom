@@ -161,6 +161,7 @@ public class PanelHelperController : MonoBehaviour
     private const float AimConfirmDetailsHeight = 172f;
     private GameObject unitStatsLocalRoot;
     private Image unitStatsLocalIcon;
+    private Image unitStatsStructureIcon;
     private TMP_Text unitStatsLocalText;
     private TMP_Text unitStatsDefenseText;
     private bool unitStatsLocalAtBottom;
@@ -1783,6 +1784,9 @@ public class PanelHelperController : MonoBehaviour
         unitStatsLocalIcon.sprite = data.UnitStatsLocalSprite;
         unitStatsLocalIcon.enabled = data.UnitStatsLocalSprite != null;
         unitStatsLocalIcon.color = data.UnitStatsLocalColor;
+        unitStatsStructureIcon.sprite = data.UnitStatsStructureSprite;
+        unitStatsStructureIcon.enabled = data.UnitStatsStructureSprite != null;
+        unitStatsStructureIcon.color = data.UnitStatsStructureColor;
         unitStatsLocalText.color = currentTeamColor;
         unitStatsDefenseText.color = currentTeamColor;
         RectTransform localRect = unitStatsLocalRoot.GetComponent<RectTransform>();
@@ -1833,6 +1837,20 @@ public class PanelHelperController : MonoBehaviour
         unitStatsLocalIcon = iconObject.GetComponent<Image>();
         unitStatsLocalIcon.preserveAspect = true;
         unitStatsLocalIcon.raycastTarget = false;
+
+        GameObject structureIconObject = new GameObject("local_structure_icon", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+        RectTransform structureIconRect = structureIconObject.GetComponent<RectTransform>();
+        structureIconRect.SetParent(iconObject.transform, false);
+        // A estrutura fica estreita e centralizada, deixando o terreno-base legivel.
+        structureIconRect.anchorMin = new Vector2(0.30f, 0f);
+        structureIconRect.anchorMax = new Vector2(0.70f, 1f);
+        structureIconRect.offsetMin = Vector2.zero;
+        structureIconRect.offsetMax = Vector2.zero;
+        unitStatsStructureIcon = structureIconObject.GetComponent<Image>();
+        // Mantem a altura integral e comprime somente a largura da estrutura.
+        unitStatsStructureIcon.preserveAspect = false;
+        unitStatsStructureIcon.raycastTarget = false;
+        unitStatsStructureIcon.enabled = false;
 
         GameObject textObject = new GameObject("local_details", typeof(RectTransform), typeof(VerticalLayoutGroup), typeof(LayoutElement));
         textObject.transform.SetParent(rootRect, false);

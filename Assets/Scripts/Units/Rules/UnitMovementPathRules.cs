@@ -612,8 +612,10 @@ public static class UnitMovementPathRules
             baseCost = GetAutonomyCostWithSkillOverrides(construction.GetBaseMovementCost(), construction.GetSkillCostOverrides(), unit);
         else if (structure != null)
         {
-            baseCost = GetAutonomyCostWithSkillOverrides(structure.baseMovementCost, structure.GetSkillCostOverrides(terrainData), unit);
-            baseCost = GetAutonomyCostWithSkillOverrides(baseCost, terrainData != null ? terrainData.skillCostOverrides : null, unit);
+            // O terreno fornece o custo geral; o par Estrutura+Terreno e mais
+            // especifico e, portanto, precisa ser aplicado por ultimo.
+            baseCost = GetAutonomyCostWithSkillOverrides(structure.baseMovementCost, terrainData != null ? terrainData.skillCostOverrides : null, unit);
+            baseCost = GetAutonomyCostWithSkillOverrides(baseCost, structure.GetSkillCostOverrides(terrainData), unit);
         }
         else if (terrainData != null)
             baseCost = GetAutonomyCostWithSkillOverrides(terrainData.basicAutonomyCost, terrainData.skillCostOverrides, unit);
@@ -994,7 +996,8 @@ public static class UnitMovementPathRules
         public bool IsRoadBoostCell(Vector3Int cell)
         {
             StructureData structure = GetStructureAtCell(cell);
-            return structure != null && structure.roadBoost;
+            TerrainTypeData terrain = ResolveTerrainAtCell(cell);
+            return structure != null && structure.IsRoadBoostEnabled(terrain);
         }
 
         public bool HasAnyRouteStructureAtCellAllowingUnit(Vector3Int cell, UnitManager unit)

@@ -1093,8 +1093,8 @@ public sealed class SectorManager : MonoBehaviour
             if (!UnitDataPassesSkillRules(unitData, structure.GetRequiredSkillsToEnter(terrain), structure.GetBlockedSkillsToEnter(terrain)))
                 return false;
 
-            cost = GetCostWithUnitDataSkillOverrides(structure.baseMovementCost, structure.GetSkillCostOverrides(terrain), unitData);
-            cost = GetCostWithUnitDataSkillOverrides(cost, terrain != null ? terrain.skillCostOverrides : null, unitData);
+            cost = GetCostWithUnitDataSkillOverrides(structure.baseMovementCost, terrain != null ? terrain.skillCostOverrides : null, unitData);
+            cost = GetCostWithUnitDataSkillOverrides(cost, structure.GetSkillCostOverrides(terrain), unitData);
             cost = Mathf.Max(1, cost);
             return true;
         }

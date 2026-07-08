@@ -39,7 +39,7 @@ public class StructureDataEditor : Editor
         EditorGUILayout.LabelField("Road Routes", EditorStyles.boldLabel);
         EditorGUILayout.HelpBox(
             "As rotas de estrada deste mapa agora sao centralizadas no StructureDatabase (catalogo), nao no StructureData.\n" +
-            "Use: Tools > Logistica > Road Route Painter para editar.",
+            "Use: Tools > Transporte > Road Route Painter para editar.",
             MessageType.Info);
 
         serializedObject.ApplyModifiedProperties();

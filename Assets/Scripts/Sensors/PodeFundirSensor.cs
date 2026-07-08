@@ -392,8 +392,8 @@ public static class PodeFundirSensor
                 return false;
             }
 
-            cost = GetAutonomyCostWithSkillOverrides(structure.baseMovementCost, structure.GetSkillCostOverrides(terrain), mover);
-            cost = GetAutonomyCostWithSkillOverrides(cost, terrain.skillCostOverrides, mover);
+            cost = GetAutonomyCostWithSkillOverrides(structure.baseMovementCost, terrain.skillCostOverrides, mover);
+            cost = GetAutonomyCostWithSkillOverrides(cost, structure.GetSkillCostOverrides(terrain), mover);
             cost = Mathf.Max(1, cost);
             return true;
         }

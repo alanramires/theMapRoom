@@ -47,6 +47,20 @@ public class StructureSkillTerrainRule
     public List<TerrainSkillCostOverride> skillCostOverrides = new List<TerrainSkillCostOverride>();
 }
 
+[System.Serializable]
+public class StructureTerrainDescription
+{
+    [Tooltip("Terreno base deste par Estrutura+Terreno.")]
+    public TerrainTypeData terrainData;
+
+    [TextArea]
+    [Tooltip("Descricao exibida para esta estrutura quando estiver sobre este terreno.")]
+    public string description;
+
+    [Tooltip("Se marcado, desativa o Road Boost especificamente neste par Estrutura+Terreno.")]
+    public bool roadBoostOff;
+}
+
 [CreateAssetMenu(menuName = "Game/Structures/Structure Data", fileName = "StructureData_")]
 public class StructureData : ScriptableObject
 {
@@ -59,6 +73,9 @@ public class StructureData : ScriptableObject
 
     [TextArea]
     public string description;
+
+    [Tooltip("Descricoes especificas por par Estrutura+Terreno. Se nao houver par correspondente, usa Description.")]
+    public List<StructureTerrainDescription> descriptionsByTerrain = new List<StructureTerrainDescription>();
 
     [Tooltip("Prioridade de sobreposicao da estrutura. Maior valor vence em hex com conflito.")]
     public int priorityOrder = 0;
@@ -129,6 +146,8 @@ public class StructureData : ScriptableObject
     {
         if (requiredSkillsToEnter == null)
             requiredSkillsToEnter = new List<SkillData>();
+        if (descriptionsByTerrain == null)
+            descriptionsByTerrain = new List<StructureTerrainDescription>();
         if (blockedSkills == null)
             blockedSkills = new List<SkillData>();
         if (skillCostOverrides == null)
@@ -199,6 +218,39 @@ public class StructureData : ScriptableObject
             return rule.requiredSkillsToEnter;
 
         return requiredSkillsToEnter;
+    }
+
+    public string GetDescription(TerrainTypeData terrain)
+    {
+        if (terrain != null && descriptionsByTerrain != null)
+        {
+            for (int i = 0; i < descriptionsByTerrain.Count; i++)
+            {
+                StructureTerrainDescription pair = descriptionsByTerrain[i];
+                if (pair != null && pair.terrainData == terrain && !string.IsNullOrWhiteSpace(pair.description))
+                    return pair.description;
+            }
+        }
+
+        return description ?? string.Empty;
+    }
+
+    public bool IsRoadBoostEnabled(TerrainTypeData terrain)
+    {
+        if (!roadBoost)
+            return false;
+
+        if (terrain != null && descriptionsByTerrain != null)
+        {
+            for (int i = 0; i < descriptionsByTerrain.Count; i++)
+            {
+                StructureTerrainDescription pair = descriptionsByTerrain[i];
+                if (pair != null && pair.terrainData == terrain && pair.roadBoostOff)
+                    return false;
+            }
+        }
+
+        return true;
     }
 
     public IReadOnlyList<SkillData> GetBlockedSkillsToEnter(TerrainTypeData terrain)

@@ -216,9 +216,9 @@ public class AnimationManager : MonoBehaviour
     [SerializeField] [Range(0.05f, 5f)] private float moneyUpdateFadeDuration = 1.2f;
     [Header("Inspect")]
     [Tooltip("Tempo de exibicao do panel helper ao inspecionar unidade.")]
-    [SerializeField] [Range(0.5f, 20f)] private float inspectUnitDisplayDuration = 4f;
+    [SerializeField] [Range(0.5f, 20f)] private float inspectUnitDisplayDuration = 6f;
     [Tooltip("Tempo de exibicao do panel helper ao inspecionar construcao.")]
-    [SerializeField] [Range(0.5f, 20f)] private float inspectConstructionDisplayDuration = 4f;
+    [SerializeField] [Range(0.5f, 20f)] private float inspectConstructionDisplayDuration = 6f;
     [Header("Turn Start Helper")]
     [Tooltip("Tempo de exibicao do texto do helper de consumo de autonomia no inicio do turno.")]
     [SerializeField] [Range(0.5f, 20f)] private float turnStartAutonomyHelperTextDuration = 6f;

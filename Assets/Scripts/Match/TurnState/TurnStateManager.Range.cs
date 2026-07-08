@@ -41,6 +41,22 @@ public partial class TurnStateManager
     private MovementRangeCacheKey? movementRangeCacheKey;
     private Dictionary<Vector3Int, List<Vector3Int>> movementRangeCache;
 
+    public void ApplyMovementRangeFogOfWarSorting(bool playerTurn)
+    {
+        if (rangeMapTilemap == null)
+            rangeMapTilemap = FindRangeMapTilemap();
+
+        TilemapRenderer renderer = rangeMapTilemap != null
+            ? rangeMapTilemap.GetComponent<TilemapRenderer>()
+            : null;
+        if (renderer == null)
+            return;
+
+        renderer.sortingLayerName = playerTurn ? "FogOfWar" : "SFX";
+        // Acima da nevoa no turno humano, mas abaixo do cursor (ordem 100).
+        renderer.sortingOrder = playerTurn ? 50 : 0;
+    }
+
     private void PaintSelectedUnitMovementRange()
     {
         double perfStart = Time.realtimeSinceStartupAsDouble;

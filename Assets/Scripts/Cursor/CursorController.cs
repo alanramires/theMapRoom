@@ -777,6 +777,19 @@ public class CursorController : MonoBehaviour
         cursorRenderer.enabled = true;
     }
 
+    public void ApplyFogOfWarSorting(bool playerTurn)
+    {
+        if (cursorRenderer == null)
+            TryAutoAssignReferences();
+        if (cursorRenderer == null)
+            return;
+
+        cursorRenderer.sortingLayerName = playerTurn ? "FogOfWar" : "SFX";
+        // No turno humano o cursor compartilha a layer da nevoa, mas precisa ficar
+        // acima dos tiles pretos. No turno da IA volta ao plano normal de efeitos.
+        cursorRenderer.sortingOrder = playerTurn ? 100 : 20;
+    }
+
     private void SnapToCell(Vector3Int cell)
     {
         if (boardTilemap == null)

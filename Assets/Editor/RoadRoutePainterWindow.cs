@@ -15,7 +15,7 @@ public class RoadRoutePainterWindow : EditorWindow
     private bool autoConnectAB = true;
     private Vector2 scroll;
 
-    [MenuItem("Tools/Logistica/Road Route Painter")]
+    [MenuItem("Tools/Transporte/Road Route Painter")]
     public static void OpenWindow()
     {
         RoadRoutePainterWindow window = GetWindow<RoadRoutePainterWindow>("Road Route Painter");

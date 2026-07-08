@@ -1003,7 +1003,7 @@ public class DebugManager : MonoBehaviour
             "change altitude <dominio>/<altura>\n" +
             "land unit\n" +
             "landing | emerge | submerge | take off | fast take off\n" +
-            "fow on|off|partial\n" +
+            "fow on|off|partial | set fow <0-100>\n" +
             "ai pause | pause ai\n" +
             "ai resume | resume ai\n" +
             "ai shopping pause | pause ai shopping\n" +
@@ -1410,7 +1410,7 @@ public class DebugManager : MonoBehaviour
             return false;
 
         string trimmed = rawCommand.Trim();
-        const string prefix = "set fog ";
+        const string prefix = "set fow ";
         if (!trimmed.StartsWith(prefix, System.StringComparison.OrdinalIgnoreCase))
             return false;
 
