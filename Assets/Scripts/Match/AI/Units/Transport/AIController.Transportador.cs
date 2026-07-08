@@ -276,15 +276,24 @@ public partial class AIController
         HashSet<Vector3Int> occupied,
         TeamId aiTeam)
     {
+        using var perf = new AIDecisionPerfScope(unit, "transportMove");
         // Reverse cost map: how many MP does this unit need to go from pressureTarget to each cell?
         // Keep this horizon generous: transport objectives can require long detours around
         // terrain chokepoints, and a short horizon looks like a false blockade.
-        Dictionary<Vector3Int, int> costFromTarget =
-            UnitMovementPathRules.CalculateMovementCostMap(boardTilemap, unit, pressureTarget, 120, terrainDatabase);
+        Dictionary<Vector3Int, int> costFromTarget;
+        using (new AIDecisionPerfScope(unit, "transportReverseCostMap"))
+        {
+            costFromTarget = UnitMovementPathRules.CalculateMovementCostMap(
+                boardTilemap, unit, pressureTarget, 120, terrainDatabase);
+        }
         // Forward cost map from origin (no road bonus — cells reachable only via the free road step
         // will be absent and handled as full-budget cost in TryScoreTwoTurnProgression).
-        Dictionary<Vector3Int, int> costFromOrigin =
-            UnitMovementPathRules.CalculateMovementCostMap(boardTilemap, unit, fromCell, unit.RemainingMovementPoints, terrainDatabase);
+        Dictionary<Vector3Int, int> costFromOrigin;
+        using (new AIDecisionPerfScope(unit, "transportOriginCostMap"))
+        {
+            costFromOrigin = UnitMovementPathRules.CalculateMovementCostMap(
+                boardTilemap, unit, fromCell, unit.RemainingMovementPoints, terrainDatabase);
+        }
 
         float GetCost(Vector3Int c) =>
             costFromTarget.TryGetValue(c, out int v) ? (float)v : float.MaxValue;
@@ -300,38 +309,8 @@ public partial class AIController
         bool foundHorizonMove = false;
 
         const float eps = 0.01f;
-
-        if (TryFindBestToolProgressionCell(
-                unit,
-                new AIWorldSnapshot { AITeam = aiTeam },
-                fromCell,
-                pressureTarget,
-                paths,
-                occupied,
-                ToolProgressionIntent.TransportDelivery,
-                out Vector3Int toolTransportCell,
-                out ToolProgressionCandidate toolTransportCandidate,
-                out string toolTransportReason,
-                allowCell: cell => !IsNonTeamConstruction(cell, aiTeam),
-                tacticalScore: (cell, candidate) =>
-                {
-                    float threat = CalculateThreatLevel(cell, aiTeam);
-                    bool isNonTeamBldg = IsNonTeamConstruction(cell, aiTeam);
-                    float trafficPenalty = ScoreTransportTrafficPenalty(unit, cell, pressureTarget, aiTeam);
-                    return -threat * 0.5f
-                        - trafficPenalty
-                        - (isNonTeamBldg ? 300f : 0f);
-                }))
-        {
-            bool hasToolProgress = toolTransportCandidate.ToolScore > 0
-                || toolTransportCandidate.FirstTurnProgress > 0f
-                || toolTransportCandidate.TwoTurnProgress > 0f;
-            if (hasToolProgress)
-            {
-                Debug.Log($"{TL("Progressao2")} transporte {unit.InstanceId} alvo={pressureTarget} via {toolTransportCell} (progressao {toolTransportReason})");
-                return toolTransportCell;
-            }
-        }
+        float originRouteCost = GetCost(fromCell);
+        int nextTurnBudget = Mathf.Max(0, unit.RemainingMovementPoints);
 
         foreach (Vector3Int cell in paths.Keys)
         {
@@ -344,11 +323,36 @@ public partial class AIController
             if (dist < float.MaxValue)
                 foundReachableRoute = true;
 
-            if (TryScoreTwoTurnProgression(unit, fromCell, pressureTarget, cell, paths[cell], occupied, out float horizonScore, out _, costFromOrigin))
+            // O mapa reverso já responde quanto falta deste candidato até o alvo. Antes o APC era
+            // movido virtualmente para CADA célula e uma nova BFS era executada dali (duas vezes em
+            // alguns fluxos). Para transporte, a projeção de 2T pode ser derivada diretamente:
+            // distância restante após o próximo turno = max(0, custoAtéAlvo - orçamentoDoTurno).
+            if (dist < float.MaxValue && originRouteCost < float.MaxValue)
             {
+                float firstTurnProgress = originRouteCost - dist;
+                float distanceAfterNextTurn = Mathf.Max(0f, dist - nextTurnBudget);
+                float twoTurnProgress = originRouteCost - distanceAfterNextTurn;
+                float lineDeviation = DistanceFromHexLine(cell, fromCell, pressureTarget);
+                int firstMoveCost = costFromOrigin.TryGetValue(cell, out int realCost)
+                    ? realCost
+                    : nextTurnBudget;
+                bool usedRoadBonus = paths.TryGetValue(cell, out List<Vector3Int> candidatePath)
+                    && candidatePath != null
+                    && UnitMovementPathRules.DidUseRoadFullMoveBonus(
+                        boardTilemap, unit, candidatePath, terrainDatabase);
+
+                float toolScore = Mathf.Round(
+                    twoTurnProgress * 10f
+                    + firstTurnProgress * 6f
+                    - lineDeviation);
+                float horizonScore = toolScore * 1000f
+                    + (usedRoadBonus ? 650f : 0f);
                 horizonScore -= threat * 0.5f;
                 horizonScore -= ScoreTransportTrafficPenalty(unit, cell, pressureTarget, aiTeam);
                 horizonScore -= isNonTeamBldg ? 300f : 0f;
+                // Desempate suave: entre candidatos com a mesma progressão inteira, prefere gastar
+                // menos MP. Não compete com um ponto real de progressão (1000 no score principal).
+                horizonScore -= firstMoveCost * 0.01f;
                 if (horizonScore > bestHorizonScore)
                 {
                     bestHorizonScore = horizonScore;

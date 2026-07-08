@@ -10,10 +10,14 @@ public partial class AIController
     private UnitManager aiThreatEnvelopeUnit;
     private UnitThreatEnvelope aiThreatEnvelope;
     private bool aiThreatEnvelopeResolved;
+    private readonly Dictionary<Vector3Int, PositionDpqForAttackDecision> aiDpqByCell =
+        new Dictionary<Vector3Int, PositionDpqForAttackDecision>();
 
     private void PrepareAIThreatEnvelope(UnitManager unit)
     {
         aiAttackTargetsByOrigin.Clear();
+        aiDpqByCell.Clear();
+        aiThreatEnemyCellsByTeam.Clear();
         aiThreatEnvelopeUnit = unit;
         aiThreatEnvelope = null;
         aiThreatEnvelopeResolved = false;
@@ -685,6 +689,17 @@ public partial class AIController
     }
 
     private PositionDpqForAttackDecision ResolveDpqForAttackDecision(Vector3Int cell)
+    {
+        cell.z = 0;
+        if (aiDpqByCell.TryGetValue(cell, out PositionDpqForAttackDecision cached))
+            return cached;
+
+        PositionDpqForAttackDecision resolved = ResolveDpqForAttackDecisionUncached(cell);
+        aiDpqByCell[cell] = resolved;
+        return resolved;
+    }
+
+    private PositionDpqForAttackDecision ResolveDpqForAttackDecisionUncached(Vector3Int cell)
     {
         cell.z = 0;
 

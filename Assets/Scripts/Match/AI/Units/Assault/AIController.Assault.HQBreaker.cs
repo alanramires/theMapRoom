@@ -299,25 +299,10 @@ public partial class AIController
         HashSet<Vector3Int> occupied,
         out string reason)
     {
+        using var perf = new AIDecisionPerfScope(unit, "assaultPressureMove");
         reason = "sem progresso";
         float fromDist = SectorManager.HexDistance(fromCell, pressureTarget);
         bool fromRouteFound = TryCalculateRouteDistance(unit, fromCell, pressureTarget, out float fromRouteDist);
-        if (TryFindBestToolProgressionCell(
-                unit,
-                snapshot,
-                fromCell,
-                pressureTarget,
-                paths,
-                occupied,
-                ToolProgressionIntent.AssaultPressure,
-                out Vector3Int toolCell,
-                out ToolProgressionCandidate toolCandidate,
-                out string toolReason)
-            && toolCandidate.ToolScore > 0)
-        {
-            reason = toolReason;
-            return toolCell;
-        }
 
         Vector3Int bestCell = fromCell;
         Vector3Int bestFallbackCell = fromCell;
@@ -325,10 +310,12 @@ public partial class AIController
         float bestLine = float.MinValue;
         int bestPathCost = int.MinValue;
         float bestThreat = float.MaxValue;
+        float bestDpq = float.MinValue;
         float bestFallbackProgress = float.MinValue;
         float bestFallbackLine = float.MinValue;
         int bestFallbackPathCost = int.MinValue;
         float bestFallbackThreat = float.MaxValue;
+        float bestFallbackDpq = float.MinValue;
         bool foundMove = false;
 
         foreach (Vector3Int cell in paths.Keys)
@@ -338,8 +325,12 @@ public partial class AIController
 
             float dist = SectorManager.HexDistance(cell, pressureTarget);
             bool cellRouteFound = TryCalculateRouteDistance(unit, cell, pressureTarget, out float routeDist);
-            float dpq = GetTerrainDpqPontos(cell);
-            float threat = CalculateThreatLevel(cell, snapshot.AITeam);
+            float dpq;
+            using (new AIDecisionPerfScope(unit, "assaultPressureDpq"))
+                dpq = GetTerrainDpqPontos(cell);
+            float threat;
+            using (new AIDecisionPerfScope(unit, "assaultPressureThreat"))
+                threat = CalculateThreatLevel(cell, snapshot.AITeam);
             // Bonus forte para células que avançam; penalidade leve para as que regridem
             float routeProgress = fromRouteFound && cellRouteFound ? fromRouteDist - routeDist : 0f;
             bool recoversMissingRoute = !fromRouteFound && cellRouteFound;
@@ -350,12 +341,13 @@ public partial class AIController
             int pathCost = GetPathStepCount(paths, cell);
 
             if (IsBetterAssaultPressureMove(progress, line, pathCost, threat, dpq,
-                    bestFallbackProgress, bestFallbackLine, bestFallbackPathCost, bestFallbackThreat, GetTerrainDpqPontos(bestFallbackCell)))
+                    bestFallbackProgress, bestFallbackLine, bestFallbackPathCost, bestFallbackThreat, bestFallbackDpq))
             {
                 bestFallbackProgress = progress;
                 bestFallbackLine = line;
                 bestFallbackPathCost = pathCost;
                 bestFallbackThreat = threat;
+                bestFallbackDpq = dpq;
                 bestFallbackCell = cell;
             }
 
@@ -365,12 +357,13 @@ public partial class AIController
             if (!movesCloser) continue;
 
             if (IsBetterAssaultPressureMove(progress, line, pathCost, threat, dpq,
-                    bestProgress, bestLine, bestPathCost, bestThreat, GetTerrainDpqPontos(bestCell)))
+                    bestProgress, bestLine, bestPathCost, bestThreat, bestDpq))
             {
                 bestProgress = progress;
                 bestLine = line;
                 bestPathCost = pathCost;
                 bestThreat = threat;
+                bestDpq = dpq;
                 bestCell = cell;
                 foundMove = true;
             }

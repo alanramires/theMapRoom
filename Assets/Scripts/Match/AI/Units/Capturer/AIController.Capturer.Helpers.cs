@@ -3,6 +3,9 @@ using UnityEngine;
 
 public partial class AIController
 {
+    private readonly Dictionary<TeamId, List<Vector3Int>> aiThreatEnemyCellsByTeam =
+        new Dictionary<TeamId, List<Vector3Int>>();
+
     // -------------------------------------------------------------------------
     // Helpers de captura: sensor, atribuição e seleção de alvos
     // -------------------------------------------------------------------------
@@ -12,12 +15,26 @@ public partial class AIController
     {
         float threat = 0f;
         Vector3Int cellXY = cell; cellXY.z = 0;
-        MatchController mc = GetMatchController();
-        foreach (UnitManager enemy in UnitManager.AllActive)
+        if (!aiThreatEnemyCellsByTeam.TryGetValue(aiTeam, out List<Vector3Int> enemyCells))
         {
-            if (enemy.TeamId == aiTeam || enemy.IsDead || enemy.IsEmbarked) continue;
-            if (mc != null && !mc.IsUnitVisibleForTeam(enemy, aiTeam)) continue;
-            Vector3Int ec = enemy.CurrentCellPosition; ec.z = 0;
+            enemyCells = new List<Vector3Int>();
+            MatchController mc = GetMatchController();
+            foreach (UnitManager enemy in UnitManager.AllActive)
+            {
+                if (enemy == null || enemy.TeamId == aiTeam || enemy.IsDead || enemy.IsEmbarked)
+                    continue;
+                if (mc != null && !mc.IsUnitVisibleForTeam(enemy, aiTeam))
+                    continue;
+                Vector3Int enemyCell = enemy.CurrentCellPosition;
+                enemyCell.z = 0;
+                enemyCells.Add(enemyCell);
+            }
+            aiThreatEnemyCellsByTeam[aiTeam] = enemyCells;
+        }
+
+        for (int i = 0; i < enemyCells.Count; i++)
+        {
+            Vector3Int ec = enemyCells[i];
             float dist = SectorManager.HexDistance(cellXY, ec);
             if (dist <= ThreatRadius)
                 threat += (ThreatRadius - dist + 1f) * 10f;

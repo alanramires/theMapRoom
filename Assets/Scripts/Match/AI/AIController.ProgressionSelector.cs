@@ -52,6 +52,7 @@ public partial class AIController
         Func<Vector3Int, bool> allowCell = null,
         Func<Vector3Int, ToolProgressionCandidate, float> tacticalScore = null)
     {
+        using var perf = new AIDecisionPerfScope(unit, $"toolProgression.{intent}");
         bestCell = fromCell;
         bestCandidate = new ToolProgressionCandidate();
         reason = "";
