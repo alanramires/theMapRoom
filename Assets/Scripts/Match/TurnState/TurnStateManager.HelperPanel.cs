@@ -1368,6 +1368,7 @@ public partial class TurnStateManager
     public void ClearThreatLayerHotzoneCache()
     {
         ClearEnemyThreatLayersOverlay();
+        UnitThreatEnvelopeService.ClearCache();
         threatOverlayCacheByUnitInstanceId.Clear();
         threatOverlayCacheMetricsByUnitInstanceId.Clear();
         threatOverlayCacheTotalHits = 0;
@@ -1562,6 +1563,25 @@ public partial class TurnStateManager
         lineCells = null;
         if (unit == null || boardMap == null)
             return false;
+
+        if (UnitThreatEnvelopeService.TryGet(
+                unit,
+                boardMap,
+                terrainDatabase,
+                UnitThreatEnvelopeMovement.Potential,
+                dpqAirHeightConfig,
+                enableLdt,
+                enableLos,
+                enableSpotter,
+                out UnitThreatEnvelope sharedEnvelope,
+                out bool sharedCacheHit))
+        {
+            int sharedCacheIndex = ResolveThreatOverlayCacheIndex(unit);
+            RegisterThreatOverlayCacheResult(unit, sharedCacheIndex, sharedCacheHit);
+            rangeCells = sharedEnvelope.RangeCells;
+            lineCells = sharedEnvelope.LineCells;
+            return true;
+        }
 
         ThreatOverlayCacheKey key = BuildThreatOverlayCacheKey(unit, boardMap, enableLdt, enableLos, enableSpotter);
         int cacheIndex = ResolveThreatOverlayCacheIndex(unit);

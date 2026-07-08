@@ -4,6 +4,46 @@ using UnityEngine.Tilemaps;
 
 public partial class AIController
 {
+    private readonly Dictionary<(int unitId, Vector3Int cell, SensorMovementMode mode), HashSet<int>>
+        aiAttackTargetsByOrigin =
+            new Dictionary<(int unitId, Vector3Int cell, SensorMovementMode mode), HashSet<int>>();
+    private UnitManager aiThreatEnvelopeUnit;
+    private UnitThreatEnvelope aiThreatEnvelope;
+    private bool aiThreatEnvelopeResolved;
+
+    private void PrepareAIThreatEnvelope(UnitManager unit)
+    {
+        aiAttackTargetsByOrigin.Clear();
+        aiThreatEnvelopeUnit = unit;
+        aiThreatEnvelope = null;
+        aiThreatEnvelopeResolved = false;
+    }
+
+    private UnitThreatEnvelope GetAIThreatEnvelope(UnitManager unit)
+    {
+        if (unit == aiThreatEnvelopeUnit && aiThreatEnvelopeResolved)
+            return aiThreatEnvelope;
+
+        using var perf = new AIDecisionPerfScope(unit, "threatEnvelopeBuild");
+        UnitThreatEnvelopeService.TryGet(
+            unit,
+            boardTilemap,
+            terrainDatabase,
+            UnitThreatEnvelopeMovement.CurrentTurn,
+            turnStateManager != null ? turnStateManager.DpqAirHeightConfigRef : null,
+            enableLdt: true,
+            enableLos: true,
+            enableSpotter: true,
+            out UnitThreatEnvelope envelope,
+            out _);
+        if (unit == aiThreatEnvelopeUnit)
+        {
+            aiThreatEnvelope = envelope;
+            aiThreatEnvelopeResolved = true;
+        }
+        return envelope;
+    }
+
     // -------------------------------------------------------------------------
     // Helpers de combate e posicionamento de ataque (capturadores)
     // -------------------------------------------------------------------------
@@ -165,9 +205,24 @@ public partial class AIController
     private bool CanAttackTargetFrom(Vector3Int fromCell, Vector3Int toCell,
         UnitManager unit, UnitManager target)
     {
+        if (unit == null || target == null)
+            return false;
+
+        Vector3Int targetCell = target.CurrentCellPosition;
+        targetCell.z = 0;
+        UnitThreatEnvelope envelope = GetAIThreatEnvelope(unit);
+        if (envelope != null && !envelope.CanThreaten(targetCell))
+            return false;
+
+        toCell.z = 0;
         SensorMovementMode mode = toCell != fromCell
             ? SensorMovementMode.MoveuAndando
             : SensorMovementMode.MoveuParado;
+
+        int cacheUnitId = unit.InstanceId > 0 ? unit.InstanceId : unit.GetInstanceID();
+        var cacheKey = (cacheUnitId, toCell, mode);
+        if (aiAttackTargetsByOrigin.TryGetValue(cacheKey, out HashSet<int> cachedTargets))
+            return cachedTargets.Contains(target.InstanceId);
 
         var targets = new List<PodeMirarTargetOption>();
         bool hasAny = PodeMirarSensor.CollectTargets(
@@ -179,10 +234,15 @@ public partial class AIController
             dpqAirHeightConfig: turnStateManager != null ? turnStateManager.DpqAirHeightConfigRef : null,
             fromCell: toCell);
 
+        cachedTargets = new HashSet<int>();
+        aiAttackTargetsByOrigin[cacheKey] = cachedTargets;
         if (!hasAny) return false;
         foreach (PodeMirarTargetOption opt in targets)
-            if (opt?.targetUnit == target) return true;
-        return false;
+        {
+            if (opt?.targetUnit != null)
+                cachedTargets.Add(opt.targetUnit.InstanceId);
+        }
+        return cachedTargets.Contains(target.InstanceId);
     }
 
     private bool TryFindBetterDpqAttackCellForTarget(
@@ -244,6 +304,7 @@ public partial class AIController
         HashSet<Vector3Int> occupied,
         out PlayerAction action)
     {
+        using var perf = new AIDecisionPerfScope(unit, "defensiveAttack");
         action = null;
         if (unit == null || snapshot == null || assigned == null || paths == null || paths.Count == 0)
             return false;
@@ -758,6 +819,7 @@ public partial class AIController
 
     private static bool TryCalculateRouteDistance(UnitManager unit, Vector3Int fromCell, Vector3Int targetCell, out float distance)
     {
+        using var perf = new AIDecisionPerfScope(unit, "routeDistance");
         distance = 0f;
         fromCell.z = 0;
         targetCell.z = 0;

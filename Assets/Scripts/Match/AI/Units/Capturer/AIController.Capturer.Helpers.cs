@@ -52,6 +52,7 @@ public partial class AIController
         bool excludeCurrentCell = false,
         HashSet<Vector3Int> skippedCaptureCells = null)
     {
+        using var perf = new AIDecisionPerfScope(unit, "opportunistic");
         captureCell = Vector3Int.zero;
         Vector3Int currentCell = unit.CurrentCellPosition; currentCell.z = 0;
         foreach (Vector3Int cell in paths.Keys)

@@ -266,9 +266,16 @@ public partial class AIController
         }
 
         int macroOwnForce = snapshot.MyUnits != null ? snapshot.MyUnits.Count : 0;
-        int macroEnemyForce = CountLiveEnemyUnits(aiTeam);
-        AIMacroTerritoryContext macro = BuildMacroTerritoryContext(aiTeam, allSectors, maxObj, macroOwnForce, macroEnemyForce);
-        string macroForceTxt = $"força={macro.OwnForce}v{macro.EnemyForce} fr={macro.ForceRatio:P0}";
+        int knownEnemyForce = CountLiveEnemyUnits(aiTeam);
+        // HARD: projeta a ONDA de produção inimiga do próximo turno — o inimigo compra em cada produtor
+        // antes da AI agir de novo, então a análise de força reage à ameaça de AMANHÃ, não só à foto de
+        // hoje. Normal/Easy ficam no retrato atual (comportamento validado, INTOCADO).
+        int enemyProducers = hardMode ? CountEnemyProductionBuildings(aiTeam) : 0;
+        int macroEnemyForce = knownEnemyForce + enemyProducers;
+        AIMacroTerritoryContext macro = BuildMacroTerritoryContext(aiTeam, allSectors, maxObj, macroOwnForce, macroEnemyForce, enemyProducers);
+        string macroForceTxt = enemyProducers > 0
+            ? $"força={macro.OwnForce}v{macro.EnemyForce}(conhec={knownEnemyForce}+{enemyProducers}prod) fr={macro.ForceRatio:P0}"
+            : $"força={macro.OwnForce}v{macro.EnemyForce} fr={macro.ForceRatio:P0}";
         if (macro.AppliesCap)
         {
             int beforeMacroCap = maxObj;

@@ -26,6 +26,7 @@ public partial class AIController
         bool hasRecommendedAdvanceCell,
         out PlayerAction action)
     {
+        using var perf = new AIDecisionPerfScope(unit, "explorer");
         action = null;
         // Explorador: ocupante invisível no alvo → DPQ mais elevado + ataque lateral oportunista
         {

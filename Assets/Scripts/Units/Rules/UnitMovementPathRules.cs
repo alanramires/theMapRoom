@@ -13,6 +13,7 @@ public static class UnitMovementPathRules
         int maxSteps,
         TerrainDatabase terrainDatabase = null)
     {
+        using var perf = new AIDecisionPerfScope(unit, "validPaths");
         Dictionary<Vector3Int, List<Vector3Int>> pathsByDestination = new Dictionary<Vector3Int, List<Vector3Int>>();
         if (terrainTilemap == null || unit == null || maxSteps < 0)
             return pathsByDestination;

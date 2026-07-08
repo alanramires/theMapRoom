@@ -199,12 +199,16 @@ public class ShoppingPressureWindow : EditorWindow
                 + $"{macro.DisputedControlPoints} em disputa",
                 _subtle);
         }
+        string enemyForceTxt = macro.EnemyProducersProjected > 0
+            ? $"{macro.EnemyForce} inimigas ({macro.EnemyForce - macro.EnemyProducersProjected} conhec + {macro.EnemyProducersProjected} projeção Hard)"
+            : $"{macro.EnemyForce} inimigas conhecidas";
         EditorGUILayout.LabelField(
-            $"força: {macro.OwnForce} suas / {macro.EnemyForce} inimigas conhecidas  ({macro.ForceRatio:P0})",
+            $"força: {macro.OwnForce} suas / {enemyForceTxt}  ({macro.ForceRatio:P0})",
             _subtle);
 
         EditorGUILayout.Space(5f);
         EditorGUILayout.LabelField("ORDENS GERAIS", EditorStyles.boldLabel);
+        DrawRecrutamentoForcado(macro);
         DrawEliteReserveOverride(snapshot, demands, macro.Losing);
 
         EditorGUILayout.Space(4f);
@@ -218,6 +222,21 @@ public class ShoppingPressureWindow : EditorWindow
         DrawGoGreenHeader(plan, invasion);
 
         EditorGUILayout.EndVertical();
+    }
+
+    private void DrawRecrutamentoForcado(AIController.MacroTerritoryInspection macro)
+    {
+        Color prev = GUI.color;
+        if (macro.Losing)
+        {
+            GUI.color = new Color(1f, 0.6f, 0.3f);
+            EditorGUILayout.LabelField("RECRUTAMENTO FORÇADO: ATIVO (Perdendo)", EditorStyles.boldLabel);
+        }
+        else
+        {
+            EditorGUILayout.LabelField("recrutamento: normal", _subtle);
+        }
+        GUI.color = prev;
     }
 
     private void DrawEliteReserveOverride(

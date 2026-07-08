@@ -365,6 +365,26 @@ public partial class AIController
         return Mathf.Max(1, count);
     }
 
+    // Produtores INIMIGOS (ground-truth, igual à força macro que ignora névoa). Usado no Hard pra
+    // projetar a onda de produção inimiga do próximo turno na análise de força.
+    private static int CountEnemyProductionBuildings(TeamId aiTeam)
+    {
+        int count = 0;
+        if (ConstructionManager.AllActive == null)
+            return 0;
+        foreach (ConstructionManager b in ConstructionManager.AllActive)
+        {
+            if (b == null)
+                continue;
+            TeamId t = b.TeamId;
+            if (t == aiTeam || t == TeamId.Neutral)
+                continue;
+            if (b.CanProduceUnitsForTeam(t))
+                count++;
+        }
+        return count;
+    }
+
     private static bool IsCaptureProgressStatus(ObjectiveStatus status)
     {
         return status == ObjectiveStatus.Pending

@@ -874,6 +874,7 @@ MonoBehaviour:
   teamId: -1
   slotIndex: -1
   sector: 0
+  eixoOverrides: []
   constructionId: hq
   instanceId: 0
   currentPosition: {x: 0, y: 0, z: 0}

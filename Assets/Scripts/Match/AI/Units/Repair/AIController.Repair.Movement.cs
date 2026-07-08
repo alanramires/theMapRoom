@@ -175,7 +175,8 @@ public partial class AIController
         Vector3Int fromCell,
         Dictionary<Vector3Int, List<Vector3Int>> paths,
         HashSet<Vector3Int> occupied,
-        out PlayerAction action)
+        out PlayerAction action,
+        bool avoidBaseClusterCells = false)
     {
         action = null;
         if (snapshot == null || snapshot.MyHQ == null || paths == null || paths.Count == 0)
@@ -185,7 +186,12 @@ public partial class AIController
         Vector3Int hqCell = snapshot.MyHQ.CurrentCellPosition;
         hqCell.z = 0;
 
-        bool safeNearHQ = SectorManager.HexDistance(fromCell, hqCell) <= DefenseEnemyRange
+        // Não-elite sob pressão não pode SEGURAR em cima de uma construção do cluster da base:
+        // se está numa, tem que sair pros arredores (loop abaixo já exclui essas células).
+        bool fromOnBaseCluster = avoidBaseClusterCells && IsOwnBaseClusterCell(fromCell, aiTeam);
+
+        bool safeNearHQ = !fromOnBaseCluster
+            && SectorManager.HexDistance(fromCell, hqCell) <= DefenseEnemyRange
             && !HasNearbyVisibleEnemy(fromCell, aiTeam, DefenseEnemyRange)
             && !HasNearbyVisibleEnemy(hqCell, aiTeam, DefenseEnemyRange);
         if (safeNearHQ)
@@ -200,6 +206,8 @@ public partial class AIController
         foreach (Vector3Int cell in paths.Keys)
         {
             if (cell != fromCell && occupied.Contains(cell)) continue;
+            // Recolhe pros ARREDORES do HQ sem parar em base/âncora/HQ (deixa a produção livre).
+            if (avoidBaseClusterCells && cell != fromCell && IsOwnBaseClusterCell(cell, aiTeam)) continue;
 
             float dist = SectorManager.HexDistance(cell, hqCell);
             float threat = CalculateThreatLevel(cell, aiTeam);
@@ -218,7 +226,7 @@ public partial class AIController
     }
 
 
-    private ConstructionManager FindRepairConstruction(UnitManager unit, Vector3Int fromCell, TeamId aiTeam, HashSet<Vector3Int> occupied)
+    private ConstructionManager FindRepairConstruction(UnitManager unit, Vector3Int fromCell, TeamId aiTeam, HashSet<Vector3Int> occupied, bool rejectBaseCluster = false)
     {
         ConstructionManager best = null;
         float bestScore = float.MinValue;
@@ -232,6 +240,11 @@ public partial class AIController
             Vector3Int cc = c.CurrentCellPosition; cc.z = 0;
             float dist = SectorManager.HexDistance(fromCell, cc);
             bool isHomeRepair = IsRepairHomeConstruction(c, aiTeam);
+            if (rejectBaseCluster && IsBaseClusterConstruction(c))
+            {
+                Debug.Log($"[Repair] skip {cc} base/âncora/HQ fechado p/ não-elite sob pressão dist={dist:F1}");
+                continue;
+            }
             bool isAircraftFacility = IsAircraftRepairConstruction(c);
             bool isPreferredAircraftFacility = IsPreferredAircraftRepairConstruction(c, aiTeam);
             if (restrictToPreferredAircraftFacility && !isPreferredAircraftFacility)

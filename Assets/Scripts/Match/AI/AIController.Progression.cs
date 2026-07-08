@@ -19,6 +19,7 @@ public partial class AIController
         out float bestDistanceAfterNextMove,
         Dictionary<Vector3Int, int> costFromOrigin = null)
     {
+        using var perf = new AIDecisionPerfScope(unit, "twoTurnProgression");
         score = 0f;
         bestDistanceAfterNextMove = float.MaxValue;
         if (unit == null || boardTilemap == null)
@@ -212,4 +213,3 @@ public partial class AIController
         return true;
     }
 }
-

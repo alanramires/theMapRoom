@@ -9,6 +9,7 @@ public partial class AIController
 
     private bool TryDecideCapturerPursuerCurrent(UnitManager unit, AIWorldSnapshot snapshot, SectorObjective assigned, Vector3Int fromCell, Vector3Int targetCell, Dictionary<Vector3Int, List<Vector3Int>> paths, HashSet<Vector3Int> occupied, out PlayerAction action)
     {
+        using var perf = new AIDecisionPerfScope(unit, "pursuerCurrent");
         action = null;
 
         TeamObjectivePlan activePlanDef = ObjectiveManager.GetPlanForTeam(snapshot.AITeam);

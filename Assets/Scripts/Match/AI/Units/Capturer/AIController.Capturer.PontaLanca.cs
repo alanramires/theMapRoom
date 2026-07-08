@@ -9,6 +9,7 @@ public partial class AIController
 
     private bool TryDecideCapturerSpearheadArrival(UnitManager unit, AIWorldSnapshot snapshot, SectorObjective assigned, Vector3Int fromCell, Vector3Int targetCell, Dictionary<Vector3Int, List<Vector3Int>> paths, HashSet<Vector3Int> occupied, out PlayerAction action)
     {
+        using var perf = new AIDecisionPerfScope(unit, "spearhead");
         action = null;
         // Já está no hex alvo
         if (fromCell == targetCell)

@@ -28,8 +28,9 @@ public partial class AIController
         public int DisputedControlPoints;
         public float OwnedRatio;
         public int OwnForce;       // minhas unidades
-        public int EnemyForce;     // unidades inimigas conhecidas (intel/jogadas)
-        public float ForceRatio;   // minhas / (minhas + inimigas conhecidas)
+        public int EnemyForce;     // força inimiga usada no ratio (conhecidas + projeção Hard)
+        public int EnemyProducersProjected; // Hard: produtores inimigos somados como onda projetada (0 se normal/easy)
+        public float ForceRatio;   // minhas / (minhas + EnemyForce)
         public int OffensiveCap;
         public bool AppliesCap;
     }
@@ -44,7 +45,8 @@ public partial class AIController
         IReadOnlyList<SectorManager.SectorInfo> sectors,
         int defaultOffensiveCap,
         int ownForce,
-        int enemyForce)
+        int enemyForce,
+        int enemyProducersProjected = 0)
     {
         AIMacroTerritoryContext ctx = new AIMacroTerritoryContext
         {
@@ -53,6 +55,7 @@ public partial class AIController
             OwnedRatio = 0.5f,
             OwnForce = ownForce,
             EnemyForce = enemyForce,
+            EnemyProducersProjected = enemyProducersProjected,
             // Sem inimigo conhecido => 1.0 (não arrasta nada pra baixo); senão minhas/(minhas+deles).
             ForceRatio = (ownForce + enemyForce) > 0 ? ownForce / (float)(ownForce + enemyForce) : 0.5f
         };
@@ -103,7 +106,7 @@ public partial class AIController
 
         // Decisão por território E força: usa o PIOR dos dois (min). PERDENDO se território OU força
         // <= 40% (defesa sensível ao perigo: basta uma das duas estar ruim); GANHANDO só quando AMBOS
-        // >= 60%. Faixa 40-60% = Empatado. Ex.: 38% setores -> Perdendo; 63% setores + 79% força -> 0.63 -> Ganhando.
+        // >= 60%. Faixa 40-60% = Empatado. Ex.: 38% setores -> Perdendo; 63% setores + 79% força -> Ganhando.
         float decisionRatio = Mathf.Min(ctx.OwnedRatio, ctx.ForceRatio);
 
         if (decisionRatio <= 0.40f)
@@ -170,8 +173,9 @@ public partial class AIController
         public int DisputedControlPoints;
         public float OwnedRatio;
         public int OwnForce;       // minhas unidades
-        public int EnemyForce;     // unidades inimigas conhecidas
-        public float ForceRatio;   // minhas / (minhas + conhecidas)
+        public int EnemyForce;     // força inimiga usada no ratio (conhecidas + projeção Hard)
+        public int EnemyProducersProjected; // Hard: parcela projetada (produtores inimigos); 0 se normal/easy
+        public float ForceRatio;   // minhas / (minhas + EnemyForce)
         public string PhaseLabel;  // "Perdendo" / "Empatado" / "Ganhando" / "Início"
         public string PhaseRaw;    // nome cru do enum (referência)
         public bool Losing;
@@ -206,6 +210,7 @@ public partial class AIController
             OwnedRatio     = ctx.OwnedRatio,
             OwnForce       = ctx.OwnForce,
             EnemyForce     = ctx.EnemyForce,
+            EnemyProducersProjected = ctx.EnemyProducersProjected,
             ForceRatio     = ctx.ForceRatio,
             PhaseLabel     = label,
             PhaseRaw       = ctx.Phase.ToString(),

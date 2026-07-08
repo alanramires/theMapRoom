@@ -83,6 +83,62 @@ public partial class AIController
         return count;
     }
 
+    // -------------------------------------------------------------------------
+    // Política de reparo sob pressão à base: a infantaria NÃO-elite não ocupa
+    // base/âncora/HQ para manutenção — libera as células de produção e vira tela.
+    // -------------------------------------------------------------------------
+
+    private const int BaseRepairPressureRange = 3;
+
+    private static bool IsEliteRepairUnit(UnitManager unit)
+        => unit != null && unit.TryGetUnitData(out UnitData d) && d != null && d.eliteLevel >= 1;
+
+    // Base "cluster": QG, setor de base, ou âncora — as construções que devem estar livres pra
+    // produzir em massa quando a base está sob pressão.
+    private static bool IsBaseClusterConstruction(ConstructionManager c)
+        => c != null && (c.IsPlayerHeadQuarter
+            || ConstructionSectorHelper.IsBase(c.Sector)
+            || c.IsAnchorSector);
+
+    // Célula ocupada por uma construção do cluster da base do próprio time (base/âncora/HQ).
+    private bool IsOwnBaseClusterCell(Vector3Int cell, TeamId aiTeam)
+    {
+        ConstructionManager at = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, cell);
+        return at != null && at.TeamId == aiTeam && IsBaseClusterConstruction(at);
+    }
+
+    // Pressão à base: macro Perdendo OU inimigo VISÍVEL perto de uma base/HQ/âncora própria.
+    private bool IsBaseUnderPressureForRepair(AIWorldSnapshot snapshot)
+    {
+        if (snapshot == null)
+            return false;
+        if (GetMacroTerritoryForInspection(snapshot.AITeam).Losing)
+            return true;
+        return HasVisibleEnemyNearOwnBaseCluster(snapshot, BaseRepairPressureRange);
+    }
+
+    private bool HasVisibleEnemyNearOwnBaseCluster(AIWorldSnapshot snapshot, int range)
+    {
+        if (snapshot?.EnemyUnits == null)
+            return false;
+        foreach (ConstructionManager c in ConstructionManager.AllActive)
+        {
+            if (c == null || c.TeamId != snapshot.AITeam || !IsBaseClusterConstruction(c))
+                continue;
+            Vector3Int cc = c.CurrentCellPosition; cc.z = 0;
+            foreach (UnitManager e in snapshot.EnemyUnits)
+            {
+                if (e == null || e.IsDead)
+                    continue;
+                Vector3Int ec = e.CurrentCellPosition; ec.z = 0;
+                if (SectorManager.HexDistance(cc, ec) <= range)
+                    return true;
+            }
+        }
+        return false;
+    }
+
+
     private bool TryBuildRepairFireSupportHoldAttack(
         UnitManager unit,
         AIWorldSnapshot snapshot,
@@ -169,6 +225,11 @@ public partial class AIController
         HashSet<Vector3Int> repairDestinationOccupied = aircraftRepair ? BuildOccupied(unit) : occupied;
         ConstructionManager currentBldg = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, fromCell);
 
+        // Sob pressão à base (macro Perdendo OU inimigo visível perto de base/HQ/âncora própria), a
+        // infantaria NÃO-elite fica PROIBIDA de usar base/âncora/HQ para manutenção. Pode reparar em
+        // qualquer OUTRO prédio aliado normalmente; só esses três tipos ficam fechados. Elite mantém.
+        bool rejectBaseCluster = !IsEliteRepairUnit(unit) && IsBaseUnderPressureForRepair(snapshot);
+
         if (TryReleaseAirTransportRepairPassengers(
                 unit,
                 snapshot,
@@ -207,7 +268,8 @@ public partial class AIController
 
         // 1. Prédio conquistado: verifica segurança e presença de substituto
         if (currentBldg != null && currentBldg.IsCapturable
-            && currentBldg.TeamId == aiTeam && currentBldg.CurrentCapturePoints >= currentBldg.CapturePointsMax)
+            && currentBldg.TeamId == aiTeam && currentBldg.CurrentCapturePoints >= currentBldg.CapturePointsMax
+            && !(rejectBaseCluster && IsBaseClusterConstruction(currentBldg)))
         {
             bool safe = IsRepairConstructionSectorSafe(currentBldg, aiTeam)
                 && !HasNearbyVisibleEnemy(fromCell, aiTeam, DefenseEnemyRange);
@@ -495,10 +557,12 @@ public partial class AIController
             return roadRecovery;
         }
 
-        ConstructionManager repairDest = FindRepairConstruction(unit, fromCell, aiTeam, occupiedForRepair);
+        ConstructionManager repairDest = FindRepairConstruction(unit, fromCell, aiTeam, occupiedForRepair, rejectBaseCluster);
         if (repairDest == null)
         {
-            if (TryDecideRepairFallbackToHQ(unit, snapshot, fromCell, paths, occupied, out PlayerAction hqFallback))
+            // Não-elite sob pressão: recolhe pros ARREDORES do HQ sem ocupar célula de construção
+            // (base/âncora/HQ), em vez de zanzar pelo mapa. Elite/normal usa o HQ direto.
+            if (TryDecideRepairFallbackToHQ(unit, snapshot, fromCell, paths, occupied, out PlayerAction hqFallback, rejectBaseCluster))
                 return hqFallback;
 
             if (TryBuildStationaryLogisticsSupplyAction(unit, snapshot, fromCell, paths, occupied, out PlayerAction noDestSupply, out string noDestSupplyReason))

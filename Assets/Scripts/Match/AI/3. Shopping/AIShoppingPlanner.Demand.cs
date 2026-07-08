@@ -1250,6 +1250,19 @@ public partial class AIShoppingPlanner
         // Collapsing aumenta o peso defensivo, mas nao invalida sozinho um compromisso
         // persistente. Apenas uma demanda urgente pode romper a reserva estrategica.
         bool macroLosing = AIController.GetMacroTerritoryForInspection(snapshot.AITeam).Losing;
+
+        // RECRUTAMENTO FORÇADO (só HARD): sob pressão/Perdendo (no Hard, dirigido pela projeção de
+        // força), corpo vem antes do elite. Enche cada produtor livre com o corpo mais BARATO (massa),
+        // e o elite comprometido só entra no ÚLTIMO produtor se ainda couber no caixa depois da massa —
+        // o resto vira reserva. Normal/Easy seguem o fluxo validado (retrato de hoje), intocados.
+        if (AIController.Instance != null && AIController.Instance.HardMode && macroLosing)
+        {
+            RecruitmentSurgeFill(snapshot, orders, usedBuildings, occupied, ref remaining, demands, eliteCommitment);
+            Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] RECRUTAMENTO FORÇADO: "
+                + $"massa nos produtores primeiro, elite só no leftover — restante(reserva)={remaining}");
+            return orders;
+        }
+
         int expansionCapturerTarget = ComputeExpansionCapturerCartTarget(snapshot, demands);
         AIShoppingDemand reserveBreakingEmergency = FindReserveBreakingEmergency(demands);
         bool breakStrategicReserve = macroLosing && reserve > 0
@@ -2704,6 +2717,133 @@ public partial class AIShoppingPlanner
             && data.unitClass == GameUnitClass.Armored
             && UnitRoleCompatibility.ResolveCompositionRole(data) == UnitRole.Assalto
             && (data.roles == null || !data.roles.Contains(UnitRole.FogoIndireto));
+    }
+
+    // RECRUTAMENTO FORÇADO (Hard, Perdendo): enche cada produtor livre com o corpo mais BARATO (massa)
+    // — no Hard o básico de assalto/artilharia é banido, então cai no capturador/soldado barato. O
+    // elite COMPROMETIDO é comprado só no ÚLTIMO produtor, e apenas se ainda couber no caixa depois de
+    // encher os outros com massa (o "no último, se sobrar"). O que não for gasto fica de reserva. O
+    // compromisso persiste se o elite não couber (compra num turno que dê pra pagar massa + elite).
+    private static void RecruitmentSurgeFill(
+        AIWorldSnapshot snapshot, List<ShoppingOrder> orders,
+        HashSet<ConstructionManager> usedBuildings, HashSet<Vector3Int> occupied,
+        ref int remaining, List<AIShoppingDemand> demands, AIElitePurchaseCommitment eliteCommitment)
+    {
+        if (snapshot?.MyBuildings == null)
+            return;
+
+        var freeProducers = new List<ConstructionManager>();
+        foreach (ConstructionManager b in snapshot.MyBuildings)
+        {
+            if (b == null || usedBuildings.Contains(b)
+                || !b.CanProduceUnitsForTeam(snapshot.AITeam) || b.OfferedUnits == null)
+                continue;
+            Vector3Int cell = b.CurrentCellPosition; cell.z = 0;
+            if (occupied.Contains(cell))
+                continue;
+            freeProducers.Add(b);
+        }
+        if (freeProducers.Count == 0)
+            return;
+
+        // Elite QUERIDO e o produtor que o constrói: o compromisso (obus reativo) OU o mais valioso
+        // elite que atende uma demanda pendente (ex.: o MBT/dream, mesmo vindo da reserva blitz). Esse
+        // produtor fica RESERVADO pro fim; os outros enchem de massa; e o elite só entra se sobrar.
+        UnitData eliteUnit = null;
+        ConstructionManager eliteProducer = null;
+        bool eliteCommitted = false;
+        foreach (ConstructionManager p in freeProducers)
+        {
+            foreach (UnitData u in p.OfferedUnits)
+            {
+                if (u == null || u.eliteLevel < 1 || u.cost <= 0 || u.militaryForce == MilitaryForce.Navy)
+                    continue;
+                if (!IsRolePurchaseAllowed(u, snapshot.Stance, emergency: true) || !IsEliteChainAvailable(u, snapshot))
+                    continue;
+                bool committed = eliteCommitment != null && !string.IsNullOrEmpty(eliteCommitment.unitId)
+                    && string.Equals(u.id, eliteCommitment.unitId, System.StringComparison.Ordinal);
+                if (!committed && !DemandWantsUnit(demands, u))
+                    continue;
+                // Prefere o comprometido; senão o mais caro (o "dream", ex.: MBT sobre obus).
+                if (eliteUnit == null
+                    || (committed && !eliteCommitted)
+                    || (committed == eliteCommitted && u.cost > eliteUnit.cost))
+                {
+                    eliteUnit = u; eliteProducer = p; eliteCommitted = committed;
+                }
+            }
+        }
+
+        // Massa nos produtores (menos o reservado pro elite).
+        foreach (ConstructionManager building in freeProducers)
+        {
+            if (eliteUnit != null && building == eliteProducer)
+                continue;
+            BuySurgeMassBody(snapshot, orders, usedBuildings, occupied, ref remaining, building);
+        }
+
+        // Por último, o produtor reservado: se sobrou pro elite, compra; senão, mais massa.
+        if (eliteProducer != null)
+        {
+            if (eliteUnit != null && eliteUnit.cost <= remaining)
+            {
+                Vector3Int ec = eliteProducer.CurrentCellPosition; ec.z = 0;
+                int idxE = IndexOf(eliteProducer.OfferedUnits, eliteUnit);
+                orders.Add(new ShoppingOrder { Building = eliteProducer, UnitToBuy = eliteUnit, SelectedIndex = idxE });
+                remaining -= eliteUnit.cost;
+                usedBuildings.Add(eliteProducer);
+                occupied.Add(ec);
+                if (eliteCommitted)
+                    AIIntelLedger.ClearElitePurchaseCommitment(snapshot.AITeam);
+                Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] recrutamento forçado: "
+                    + $"último produtor {eliteProducer.ConstructionDisplayName} compra elite {eliteUnit.displayName} "
+                    + $"${eliteUnit.cost} (sobrou) restante={remaining}");
+            }
+            else
+            {
+                BuySurgeMassBody(snapshot, orders, usedBuildings, occupied, ref remaining, eliteProducer);
+            }
+        }
+    }
+
+    // Compra o corpo mais BARATO (massa) num produtor livre — igual ao filler de prédio vazio.
+    private static void BuySurgeMassBody(
+        AIWorldSnapshot snapshot, List<ShoppingOrder> orders,
+        HashSet<ConstructionManager> usedBuildings, HashSet<Vector3Int> occupied,
+        ref int remaining, ConstructionManager building)
+    {
+        UnitData pick = null;
+        foreach (UnitData u in building.OfferedUnits)
+        {
+            if (u == null || u.cost <= 0 || u.cost > remaining
+                || u.militaryForce == MilitaryForce.Navy
+                || !IsRolePurchaseAllowed(u, snapshot.Stance, emergency: true))
+                continue;
+            if (pick == null || IsBetterEmptyBuildingFiller(u, pick))
+                pick = u;
+        }
+        if (pick == null)
+            return;
+
+        Vector3Int cell = building.CurrentCellPosition; cell.z = 0;
+        int idx = IndexOf(building.OfferedUnits, pick);
+        orders.Add(new ShoppingOrder { Building = building, UnitToBuy = pick, SelectedIndex = idx });
+        remaining -= pick.cost;
+        usedBuildings.Add(building);
+        occupied.Add(cell);
+        Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] recrutamento forçado: "
+            + $"{building.ConstructionDisplayName} massa {pick.displayName} ${pick.cost} restante={remaining}");
+    }
+
+    // Verdadeiro se alguma demanda pendente (Count>0) é atendida por esta unidade.
+    private static bool DemandWantsUnit(List<AIShoppingDemand> demands, UnitData unit)
+    {
+        if (demands == null || unit == null)
+            return false;
+        foreach (AIShoppingDemand d in demands)
+            if (d != null && d.Count > 0 && DoesUnitMeetShoppingDemand(unit, d))
+                return true;
+        return false;
     }
 
     private static void FillIdleProductionBuildings(

@@ -15,6 +15,7 @@ public partial class AIController
         HashSet<Vector3Int> occupied,
         out PlayerAction action)
     {
+        using var perf = new AIDecisionPerfScope(unit, "aggressive");
         action = null;
         if (unit == null || snapshot == null || assigned == null || paths == null)
             return false;

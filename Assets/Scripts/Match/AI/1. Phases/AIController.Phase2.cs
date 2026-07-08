@@ -67,6 +67,12 @@ public partial class AIController
 
         // ---- Loop por unidade: decisão + execução ----
         var deferredUnitIds = new HashSet<int>();
+        var perfSamples = new List<Phase2UnitPerfSample>();
+        float perfDecisionTotalMs = 0f;
+        float perfExecutionTotalMs = 0f;
+        float perfSnapshotTotalMs = 0f;
+        float perfDelayTotalMs = 0f;
+        int perfDecisionCount = 0;
         int cursor = 0;
         bool secondPass = false;
 
@@ -98,7 +104,14 @@ public partial class AIController
             }
 
             UnitManager unit = units[cursor];
+            AIDecisionPerf.Begin();
+            float decisionStartedAt = Time.realtimeSinceStartup;
+            PrepareAIThreatEnvelope(unit);
             PlayerAction action = DecideUnitAction(unit, current);
+            float decisionMs = (Time.realtimeSinceStartup - decisionStartedAt) * 1000f;
+            string decisionBreakdown = AIDecisionPerf.End();
+            perfDecisionTotalMs += decisionMs;
+            perfDecisionCount++;
 
             if (!secondPass
                 && ShouldDeferCapturerForAirTransportVacate(unit, action, activePlan, aiTeam,
@@ -171,7 +184,10 @@ public partial class AIController
 
             bool unitMoved    = action.HasMoveTo && action.MoveTo != action.MoveFrom;
             bool unitAttacked = !string.IsNullOrEmpty(action.TargetInstanceId);
+            float executionStartedAt = Time.realtimeSinceStartup;
             yield return ExecuteAIBatchWithDebugStep(action);
+            float executionMs = (Time.realtimeSinceStartup - executionStartedAt) * 1000f;
+            perfExecutionTotalMs += executionMs;
             JogadasManager.RegistrarPlayerAction(action);
             if (ShouldStopAIForMatchEnd("phase2_apos_batch"))
                 yield break;
@@ -187,13 +203,39 @@ public partial class AIController
             }
 
             // Reconstrói o snapshot para a próxima decisão (hexes ocupados mudam após cada ação)
+            float snapshotStartedAt = Time.realtimeSinceStartup;
             current = AIWorldSnapshot.BuildLight(aiTeam, matchController);
+            float snapshotMs = (Time.realtimeSinceStartup - snapshotStartedAt) * 1000f;
+            perfSnapshotTotalMs += snapshotMs;
 
             float delay = GetBatchDelay();
-            if (delay > 0f) yield return new WaitForSecondsRealtime(delay);
+            float delayMs = 0f;
+            if (delay > 0f)
+            {
+                float delayStartedAt = Time.realtimeSinceStartup;
+                yield return new WaitForSecondsRealtime(delay);
+                delayMs = (Time.realtimeSinceStartup - delayStartedAt) * 1000f;
+                perfDelayTotalMs += delayMs;
+            }
+
+            var perfSample = new Phase2UnitPerfSample(
+                unit, GetPhase2ActionKind(action), decisionMs, executionMs, snapshotMs, delayMs,
+                decisionBreakdown);
+            perfSamples.Add(perfSample);
+            LogPhase2UnitPerf(snapshot.TurnNumber, aiTeam, perfSample);
 
             cursor++;
         }
+
+        LogPhase2PerfSummary(
+            snapshot.TurnNumber,
+            aiTeam,
+            perfDecisionCount,
+            perfDecisionTotalMs,
+            perfExecutionTotalMs,
+            perfSnapshotTotalMs,
+            perfDelayTotalMs,
+            perfSamples);
 
         _initLogBuilder.Clear();
         int idleCount = 0;
@@ -211,6 +253,89 @@ public partial class AIController
         else
             Debug.Log($"{TL()} Fase2 concluída — todas as {units.Count} unidades agiram.");
         _initLogBuilder.Clear();
+    }
+
+    private static string GetPhase2ActionKind(PlayerAction action)
+    {
+        if (action == null) return "null";
+        if (!string.IsNullOrEmpty(action.TargetInstanceId)) return "attack";
+        if (!string.IsNullOrEmpty(action.TargetConstructionId)) return "construction";
+        if (action.HasMoveTo && action.HasMoveFrom)
+            return action.MoveTo == action.MoveFrom ? "wait" : "move";
+        return action.SensorAction.ToString();
+    }
+
+    private void LogPhase2UnitPerf(int turnNumber, TeamId aiTeam, Phase2UnitPerfSample sample)
+    {
+        Debug.Log($"[AI Perf][Unit][T{turnNumber}][{aiTeam}] {sample.UnitLabel} " +
+                  $"action={sample.ActionKind} decision={sample.DecisionMs:F0}ms " +
+                  $"execution={sample.ExecutionMs:F0}ms snapshot={sample.SnapshotMs:F0}ms " +
+                  $"delay={sample.DelayMs:F0}ms total={sample.TotalMs:F0}ms {sample.DecisionBreakdown}");
+    }
+
+    private void LogPhase2PerfSummary(
+        int turnNumber,
+        TeamId aiTeam,
+        int decisionCount,
+        float decisionTotalMs,
+        float executionTotalMs,
+        float snapshotTotalMs,
+        float delayTotalMs,
+        List<Phase2UnitPerfSample> samples)
+    {
+        samples.Sort((a, b) => b.TotalMs.CompareTo(a.TotalMs));
+        _initLogBuilder.Clear();
+        _initLogBuilder.AppendLine(
+            $"[AI Perf][Phase2 Breakdown][T{turnNumber}][{aiTeam}] " +
+            $"decisions={decisionCount} completed={samples.Count}");
+        _initLogBuilder.AppendLine(
+            $"  decision={decisionTotalMs:F0}ms execution={executionTotalMs:F0}ms " +
+            $"snapshot={snapshotTotalMs:F0}ms delay={delayTotalMs:F0}ms " +
+            $"measuredTotal={decisionTotalMs + executionTotalMs + snapshotTotalMs + delayTotalMs:F0}ms");
+
+        int topCount = Mathf.Min(5, samples.Count);
+        for (int i = 0; i < topCount; i++)
+        {
+            Phase2UnitPerfSample sample = samples[i];
+            _initLogBuilder.AppendLine(
+                $"  #{i + 1} {sample.UnitLabel} action={sample.ActionKind} total={sample.TotalMs:F0}ms " +
+                $"decision={sample.DecisionMs:F0} execution={sample.ExecutionMs:F0} " +
+                $"snapshot={sample.SnapshotMs:F0} delay={sample.DelayMs:F0}");
+        }
+
+        Debug.Log(_initLogBuilder.ToString());
+        _initLogBuilder.Clear();
+    }
+
+    private sealed class Phase2UnitPerfSample
+    {
+        public readonly string UnitLabel;
+        public readonly string ActionKind;
+        public readonly float DecisionMs;
+        public readonly float ExecutionMs;
+        public readonly float SnapshotMs;
+        public readonly float DelayMs;
+        public readonly string DecisionBreakdown;
+
+        public float TotalMs => DecisionMs + ExecutionMs + SnapshotMs + DelayMs;
+
+        public Phase2UnitPerfSample(
+            UnitManager unit,
+            string actionKind,
+            float decisionMs,
+            float executionMs,
+            float snapshotMs,
+            float delayMs,
+            string decisionBreakdown)
+        {
+            UnitLabel = unit != null ? $"{unit.UnitDisplayName}#{unit.InstanceId}" : "unit=null";
+            ActionKind = actionKind;
+            DecisionMs = decisionMs;
+            ExecutionMs = executionMs;
+            SnapshotMs = snapshotMs;
+            DelayMs = delayMs;
+            DecisionBreakdown = decisionBreakdown;
+        }
     }
 
     private static bool IsNoOpUnitAction(PlayerAction action)
@@ -713,5 +838,70 @@ public partial class AIController
         }
 
         return false;
+    }
+}
+
+internal static class AIDecisionPerf
+{
+    private sealed class Entry
+    {
+        public float Milliseconds;
+        public int Calls;
+    }
+
+    private static readonly Dictionary<string, Entry> Entries = new Dictionary<string, Entry>();
+    private static bool active;
+
+    public static void Begin()
+    {
+        Entries.Clear();
+        active = true;
+    }
+
+    public static void Add(string stage, float milliseconds)
+    {
+        if (!active || string.IsNullOrEmpty(stage)) return;
+        if (!Entries.TryGetValue(stage, out Entry entry))
+        {
+            entry = new Entry();
+            Entries.Add(stage, entry);
+        }
+        entry.Milliseconds += milliseconds;
+        entry.Calls++;
+    }
+
+    public static string End()
+    {
+        active = false;
+        if (Entries.Count == 0) return "stages=-";
+
+        var ordered = new List<KeyValuePair<string, Entry>>(Entries);
+        ordered.Sort((a, b) => b.Value.Milliseconds.CompareTo(a.Value.Milliseconds));
+        var sb = new System.Text.StringBuilder("stages=");
+        for (int i = 0; i < ordered.Count; i++)
+        {
+            if (i > 0) sb.Append(',');
+            sb.Append(ordered[i].Key)
+              .Append(':').Append(ordered[i].Value.Milliseconds.ToString("F0"))
+              .Append("ms/").Append(ordered[i].Value.Calls);
+        }
+        return sb.ToString();
+    }
+}
+
+internal readonly struct AIDecisionPerfScope : System.IDisposable
+{
+    private readonly string stage;
+    private readonly float startedAt;
+
+    public AIDecisionPerfScope(UnitManager unit, string stage)
+    {
+        this.stage = stage;
+        startedAt = Time.realtimeSinceStartup;
+    }
+
+    public void Dispose()
+    {
+        AIDecisionPerf.Add(stage, (Time.realtimeSinceStartup - startedAt) * 1000f);
     }
 }
