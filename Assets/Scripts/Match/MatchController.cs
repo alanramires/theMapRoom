@@ -2784,7 +2784,8 @@ public class MatchController : MonoBehaviour
             activePlayerListIndex = gameplayPlayerIndex;
             fogPresentationGameplayTeamId = int.MinValue;
             // O refresh visual usa temporariamente o time humano. Reaplica a layer
-            // depois de restaurar o turno real para a nevoa subir apenas no turno da IA.
+            // depois de restaurar o turno real. Em Total FoW a nevoa fica na layer
+            // FogOfWar durante toda a partida (a oclusao e sempre do overlay).
             ValidateFogOfWarSortingLayer();
         }
     }
@@ -3890,7 +3891,7 @@ public class MatchController : MonoBehaviour
                     visible = false;
             }
 
-            unit.SetFogOfWarVisibility(fogOverlayOwnsWorldOcclusion || visible);
+            unit.SetFogOfWarVisibility(ResolveFogRenderVisibility(unit, visible, fogOverlayOwnsWorldOcclusion));
         }
     }
 
@@ -4083,9 +4084,57 @@ public class MatchController : MonoBehaviour
 
     private bool UsesFogOverlayForWorldOcclusion()
     {
-        // A nevoa sobe acima do mundo apenas enquanto a IA joga e a partida
-        // precisa continuar sendo apresentada pela perspectiva do humano.
-        return ShouldUseHumanFogPresentation(out _);
+        // Em Total FoW a nevoa preta cobre o mundo na sorting layer FogOfWar durante
+        // TODA a partida (turno humano incluso). Enquanto ela for opaca e cobrir o
+        // mundo, e ela quem faz a oclusao visual: os renderers de unidade/HUD ficam
+        // ligados e a unidade so "surge" pela propria animacao ao cruzar a fronteira
+        // revelada. Assim nao ocorre o aparecimento magico de religar renderers ja na
+        // posicao final apos o refresh de FoW.
+        //
+        // O hardcode de SetSpriteVisible/SetHudVisible continua como fallback para
+        // nevoa parcial/transparente, modos sem overlay opaco, E para o caso em que a
+        // celula da unidade esta revelada (sem tile de nevoa) mas a unidade continua
+        // logicamente invisivel (ex.: terreno revelado por raio de visao, mas unidade
+        // nao spottada/stealth/sem LoS). Ali o overlay NAO cobre o mundo, entao a
+        // oclusao precisa vir do hide individual -> ver ResolveFogRenderVisibility.
+        // A visibilidade logica (fogUnitVisibilityByCache / IsUnitVisibleForTeam)
+        // segue valendo para selecao, sensores e regras, independente disto.
+        //
+        // NOTE: independente de qual time esta ativo. A perspectiva apresentada e
+        // decidida por ShouldUseHumanFogPresentation; a posse da oclusao nao.
+        if (!Application.isPlaying || !debugFogOfWarEnabled || debugFogOfWarPartial)
+            return false;
+        if (!enableTotalWar || gameSetup != GameSetupPreset.FogOfWarTotal)
+            return false;
+        return fogOfWarTilemap != null;
+    }
+
+    // Resolve o estado final do renderer sob Total FoW.
+    //
+    // - Se o PodeDetectar disser que a unidade e visivel para o observador
+    //   (logicallyVisible), renderiza: o sensor e a fonte de verdade da deteccao.
+    // - Caso contrario, so mantem o renderer ligado quando o overlay opaco de fato
+    //   COBRE a celula da unidade. Ai a nevoa preta em world-space faz a oclusao e o
+    //   renderer pode ficar ligado para a animacao de travessia da fronteira funcionar
+    //   sem o "religa renderer na posicao final" (teleporte).
+    //
+    // Em celula revelada (sem tile de nevoa) o overlay nao cobre nada, entao a unidade
+    // invisivel volta a ser ocultada pelo hide individual do sensor -- evitando que ela
+    // apareca flutuando em terreno revelado mas nao spottado (raio de visao vs spot).
+    //
+    // A cobertura da celula usa a API oficial do proprio FoW (mesma que decide quais
+    // tiles pretos sao limpos), sem logica paralela.
+    private bool ResolveFogRenderVisibility(UnitManager unit, bool logicallyVisible, bool fogOverlayOwnsWorldOcclusion)
+    {
+        if (logicallyVisible)
+            return true;
+        if (!fogOverlayOwnsWorldOcclusion || unit == null)
+            return false;
+
+        Vector3Int cell = unit.CurrentCellPosition;
+        cell.z = 0;
+        // Coberta pela nevoa = nao visivel na apresentacao atual.
+        return !IsCellVisibleInFogPresentation(cell);
     }
 
     private Tilemap ResolveFogBoardTilemap()
@@ -4655,7 +4704,7 @@ public class MatchController : MonoBehaviour
             bool visible = unit.TeamId == observerTeam
                 || ComputeIsUnitVisibleForTeamWithoutCache(unit, observerTeam);
             fogUnitVisibilityByCacheIndex[ResolveFogCacheIndex(unit)] = visible;
-            unit.SetFogOfWarVisibility(fogOverlayOwnsWorldOcclusion || visible);
+            unit.SetFogOfWarVisibility(ResolveFogRenderVisibility(unit, visible, fogOverlayOwnsWorldOcclusion));
         }
     }
 
@@ -4677,7 +4726,7 @@ public class MatchController : MonoBehaviour
 
             bool visible = !useConservativeFog || (int)unit.TeamId == activeTeamId;
             fogUnitVisibilityByCacheIndex[ResolveFogCacheIndex(unit)] = visible;
-            unit.SetFogOfWarVisibility(fogOverlayOwnsWorldOcclusion || visible);
+            unit.SetFogOfWarVisibility(ResolveFogRenderVisibility(unit, visible, fogOverlayOwnsWorldOcclusion));
         }
     }
 
