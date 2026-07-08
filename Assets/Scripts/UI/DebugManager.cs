@@ -20,7 +20,7 @@ public class DebugManager : MonoBehaviour
     [SerializeField] private GameObject commandInputObject;
 
     [Header("AI Debug Shortcuts")]
-    [Tooltip("F12 = AI Resume  |  F10 = AI Pause  |  F11 = AI Step")]
+    [Tooltip("F12 = AI Resume | F10 = AI Pause | F11 = AI Step. Tambem controla o atalho de abertura do Panel_Debug.")]
     [SerializeField] private bool aiDebugShortcutsEnabled;
     [Tooltip("Quando ativo, 'AI Stage 1' limpa o plano antes de rodar (força nova atribuição A+B).")]
     [SerializeField] private bool resetPlanOnDebugStage;
@@ -76,6 +76,11 @@ public class DebugManager : MonoBehaviour
     public static bool IsDebugCommandInputFocused()
     {
         return instance != null && instance.IsCommandInputFocused();
+    }
+
+    public static bool AreAIDebugShortcutsEnabled()
+    {
+        return instance != null && instance.aiDebugShortcutsEnabled;
     }
 
     public static bool TryConsumeDebugToggleCharacterFromInput()

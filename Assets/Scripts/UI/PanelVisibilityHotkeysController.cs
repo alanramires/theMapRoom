@@ -96,7 +96,8 @@ public class PanelVisibilityHotkeysController : MonoBehaviour
 
         // Com o painel aberto, o proprio campo de comando captura foco. O atalho
         // precisa furar esse bloqueio para funcionar como toggle e fechar de novo.
-        if (WasDebugTogglePressedThisFrame() && (debugPanelOpen || !textInputFocused || debugInputFocused))
+        bool canToggleDebugPanel = debugPanelOpen || DebugManager.AreAIDebugShortcutsEnabled();
+        if (canToggleDebugPanel && WasDebugTogglePressedThisFrame() && (debugPanelOpen || !textInputFocused || debugInputFocused))
             TogglePanelDebug();
 
         if (!textInputFocused && WasHotkeysTogglePressedThisFrame())
@@ -580,13 +581,16 @@ public class PanelVisibilityHotkeysController : MonoBehaviour
         if (Keyboard.current == null)
             return false;
 
+        bool controlPressed = Keyboard.current.leftCtrlKey.isPressed || Keyboard.current.rightCtrlKey.isPressed;
         return Keyboard.current.quoteKey.wasPressedThisFrame
             || Keyboard.current.semicolonKey.wasPressedThisFrame
-            || Keyboard.current.backquoteKey.wasPressedThisFrame;
+            || Keyboard.current.backquoteKey.wasPressedThisFrame
+            || (controlPressed && Keyboard.current.dKey.wasPressedThisFrame);
 #else
         return Input.GetKeyDown(KeyCode.Quote)
             || Input.GetKeyDown(KeyCode.Semicolon)
-            || Input.GetKeyDown(KeyCode.BackQuote);
+            || Input.GetKeyDown(KeyCode.BackQuote)
+            || ((Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl)) && Input.GetKeyDown(KeyCode.D));
 #endif
     }
 

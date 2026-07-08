@@ -1217,7 +1217,11 @@ public partial class TurnStateManager
         inspectedHelperCursorCell = cell;
     }
 
-    private void BeginInspectedHelper(UnitManager unit, bool paintThreatOverlay = true, bool triggerEvents = true)
+    private void BeginInspectedHelper(
+        UnitManager unit,
+        bool paintThreatOverlay = true,
+        bool triggerEvents = true,
+        bool nextTurnHotZone = false)
     {
         if (unit == null || cursorController == null)
             return;
@@ -1227,7 +1231,7 @@ public partial class TurnStateManager
         inspectedHelperTerrain = false;
         ClearEnemyThreatLayersOverlay();
         if (paintThreatOverlay)
-            ApplyInspectedThreatOverlay(unit);
+            ApplyInspectedThreatOverlay(unit, nextTurnHotZone);
         else
             ClearInspectedThreatOverlay();
         inspectedHelperVisibleUntil = Time.time + Mathf.Max(0.1f, GetInspectUnitHelperDurationSeconds());
@@ -1286,11 +1290,17 @@ public partial class TurnStateManager
             Retreat("ExitInspectStateToNeutral");
     }
 
-    private void ApplyInspectedThreatOverlay(UnitManager unit)
+    private void ApplyInspectedThreatOverlay(UnitManager unit, bool nextTurnHotZone = false)
     {
         ClearInspectedThreatOverlay();
         ClearLineOfFireArea();
-        PaintThreatOverlayForUnit(unit, inspectedThreatRangeCells, inspectedThreatRangeLookup, inspectedThreatLineCells, inspectedThreatLineLookup);
+        PaintThreatOverlayForUnit(
+            unit,
+            inspectedThreatRangeCells,
+            inspectedThreatRangeLookup,
+            inspectedThreatLineCells,
+            inspectedThreatLineLookup,
+            nextTurnHotZone ? 0.55f : 1f);
     }
 
     private bool EnterThreatLayerTeamSelection()
@@ -1507,7 +1517,8 @@ public partial class TurnStateManager
         List<Vector3Int> targetRangeCells,
         HashSet<Vector3Int> targetRangeLookup,
         List<Vector3Int> targetLineCells,
-        HashSet<Vector3Int> targetLineLookup)
+        HashSet<Vector3Int> targetLineLookup,
+        float alphaMultiplier = 1f)
     {
         if (unit == null || targetRangeCells == null || targetRangeLookup == null || targetLineCells == null || targetLineLookup == null)
             return;
@@ -1549,7 +1560,8 @@ public partial class TurnStateManager
             return;
         }
 
-        Color movementColor = new Color(teamColor.r, teamColor.g, teamColor.b, Mathf.Clamp01(movementRangeAlpha));
+        float safeAlphaMultiplier = Mathf.Clamp01(alphaMultiplier);
+        Color movementColor = new Color(teamColor.r, teamColor.g, teamColor.b, Mathf.Clamp01(movementRangeAlpha * safeAlphaMultiplier));
         if (rangeMapTilemap != null && rangeOverlayTile != null)
         {
             for (int i = 0; i < cachedRangeCells.Count; i++)
@@ -1568,7 +1580,7 @@ public partial class TurnStateManager
 
         if (cachedLineCells.Count <= 0)
             return;
-        Color threatColor = new Color(teamColor.r, teamColor.g, teamColor.b, Mathf.Clamp01(lineOfFireAlpha));
+        Color threatColor = new Color(teamColor.r, teamColor.g, teamColor.b, Mathf.Clamp01(lineOfFireAlpha * safeAlphaMultiplier));
         for (int i = 0; i < cachedLineCells.Count; i++)
         {
             Vector3Int cell = cachedLineCells[i];

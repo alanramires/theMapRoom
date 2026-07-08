@@ -423,7 +423,7 @@ public partial class TurnStateManager
             if (unit.HasActed)
             {
                 Debug.Log($"debug: inspecionando aliado que ja agiu (unit={unit.name}, unitTeam={(int)unit.TeamId}, activeTeam={activeTeam}, hasActed={unit.HasActed})");
-                BeginInspectedHelper(unit, paintThreatOverlay: false);
+                BeginInspectedHelper(unit, paintThreatOverlay: true, nextTurnHotZone: true);
                 Advance(CursorState.InspectingUnit, "HandleConfirmFromNeutralLikeState: acted ally inspect");
                 DialogManager.Instance?.MarkHintLearned((TeamId)activeTeam, HelpHintId.Inspect);
                 return ActionSfx.Confirm;
