@@ -130,6 +130,7 @@ public partial class TurnStateManager
     private UnitManager inspectedHelperUnit;
     private ConstructionManager inspectedHelperConstruction;
     private bool inspectedHelperTerrain;
+    private bool inspectedHelperCurrentWeaponRange;
     private readonly List<Vector3Int> inspectedThreatRangeCells = new List<Vector3Int>();
     private readonly HashSet<Vector3Int> inspectedThreatRangeLookup = new HashSet<Vector3Int>();
     private readonly List<Vector3Int> inspectedThreatLineCells = new List<Vector3Int>();
@@ -1210,6 +1211,7 @@ public partial class TurnStateManager
         inspectedHelperUnit = null;
         inspectedHelperConstruction = null;
         inspectedHelperTerrain = true;
+        inspectedHelperCurrentWeaponRange = false;
         ClearEnemyThreatLayersOverlay();
         ClearInspectedThreatOverlay();
         inspectedHelperVisibleUntil = Time.time + InspectedHelperDurationSeconds;
@@ -1229,6 +1231,7 @@ public partial class TurnStateManager
         inspectedHelperUnit = unit;
         inspectedHelperConstruction = null;
         inspectedHelperTerrain = false;
+        inspectedHelperCurrentWeaponRange = false;
         ClearEnemyThreatLayersOverlay();
         if (paintThreatOverlay)
             ApplyInspectedThreatOverlay(unit, nextTurnHotZone);
@@ -1250,6 +1253,7 @@ public partial class TurnStateManager
         inspectedHelperConstruction = construction;
         inspectedHelperUnit = null;
         inspectedHelperTerrain = false;
+        inspectedHelperCurrentWeaponRange = false;
         ClearEnemyThreatLayersOverlay();
         ClearInspectedThreatOverlay();
         inspectedHelperVisibleUntil = Time.time + Mathf.Max(0.1f, GetInspectConstructionHelperDurationSeconds());
@@ -1275,6 +1279,7 @@ public partial class TurnStateManager
         inspectedHelperUnit = null;
         inspectedHelperConstruction = null;
         inspectedHelperTerrain = false;
+        inspectedHelperCurrentWeaponRange = false;
         ClearInspectedThreatOverlay();
         inspectedHelperVisibleUntil = -1f;
         inspectedHelperActivatedFrame = -1;
@@ -1301,6 +1306,65 @@ public partial class TurnStateManager
             inspectedThreatLineCells,
             inspectedThreatLineLookup,
             nextTurnHotZone ? 0.55f : 1f);
+    }
+
+    private bool TryShowInspectedCurrentWeaponRange()
+    {
+        if (inspectedHelperUnit == null || inspectedHelperCurrentWeaponRange)
+            return false;
+
+        // A classificacao da unidade e a fonte de verdade. Artilheiros ja exibem
+        // seu alcance estacionario na primeira visualizacao.
+        if (inspectedHelperUnit.CombatClassification == UnitCombatClassification.Artilheiro)
+            return false;
+
+        Tilemap boardMap = terrainTilemap != null ? terrainTilemap : inspectedHelperUnit.BoardTilemap;
+        if (boardMap == null || lineOfFireOverlayTile == null)
+            return false;
+        if (lineOfFireMapTilemap == null)
+            lineOfFireMapTilemap = FindLineOfFireMapTilemap();
+        if (lineOfFireMapTilemap == null)
+            return false;
+
+        ClearInspectedThreatOverlay();
+        ClearLineOfFireArea();
+
+        bool enableLdt = matchController != null ? matchController.EnableLdtValidation : true;
+        bool enableLos = matchController != null ? matchController.EnableLosValidation : true;
+        bool enableSpotter = matchController != null ? matchController.EnableSpotter : true;
+        HashSet<Vector3Int> fireCells = new HashSet<Vector3Int>();
+        PodeMirarSensor.CollectValidFireCellsFromOrigin(
+            inspectedHelperUnit,
+            boardMap,
+            terrainDatabase,
+            SensorMovementMode.MoveuParado,
+            inspectedHelperUnit.CurrentCellPosition,
+            fireCells,
+            dpqAirHeightConfig,
+            enableLdt,
+            enableLos,
+            enableSpotter);
+
+        Color teamColor = TeamUtils.GetColor(inspectedHelperUnit.TeamId);
+        Color rangeColor = new Color(teamColor.r, teamColor.g, teamColor.b, Mathf.Clamp01(lineOfFireAlpha));
+        foreach (Vector3Int rawCell in fireCells)
+        {
+            Vector3Int cell = rawCell;
+            cell.z = 0;
+            if (boardMap.GetTile(cell) == null || inspectedThreatLineLookup.Contains(cell))
+                continue;
+
+            lineOfFireMapTilemap.SetTile(cell, lineOfFireOverlayTile);
+            lineOfFireMapTilemap.SetTileFlags(cell, TileFlags.None);
+            lineOfFireMapTilemap.SetColor(cell, rangeColor);
+            inspectedThreatLineCells.Add(cell);
+            inspectedThreatLineLookup.Add(cell);
+        }
+
+        inspectedHelperCurrentWeaponRange = true;
+        inspectedHelperVisibleUntil = Time.time + InspectedHelperDurationSeconds;
+        inspectedHelperActivatedFrame = Time.frameCount;
+        return true;
     }
 
     private bool EnterThreatLayerTeamSelection()
@@ -1849,7 +1913,7 @@ public partial class TurnStateManager
         int instanceId = unit.InstanceId;
         if (instanceId > 0)
             return instanceId;
-        return unit.GetInstanceID();
+        return unit.GetEntityId().GetHashCode();
     }
 
     private static ThreatOverlayCacheKey BuildThreatOverlayCacheKey(UnitManager unit, Tilemap boardMap, bool enableLdt, bool enableLos, bool enableSpotter)
@@ -1885,7 +1949,7 @@ public partial class TurnStateManager
             hash = (hash * 31) + (unit.IsAircraftGrounded ? 1 : 0);
             hash = (hash * 31) + Mathf.Max(0, unit.CurrentFuel);
             hash = (hash * 31) + Mathf.Max(0, unit.MaxMovementPoints);
-            hash = (hash * 31) + (boardMap != null ? boardMap.GetInstanceID() : 0);
+            hash = (hash * 31) + (boardMap != null ? boardMap.GetEntityId().GetHashCode() : 0);
 
             IReadOnlyList<UnitEmbarkedWeapon> weapons = unit.GetEmbarkedWeapons();
             int weaponCount = weapons != null ? weapons.Count : 0;
@@ -1900,7 +1964,7 @@ public partial class TurnStateManager
                 }
 
                 WeaponData weaponData = runtimeWeapon.weapon;
-                hash = (hash * 31) + (weaponData != null ? weaponData.GetInstanceID() : 0);
+                hash = (hash * 31) + (weaponData != null ? weaponData.GetEntityId().GetHashCode() : 0);
                 hash = (hash * 31) + Mathf.Max(0, runtimeWeapon.squadAmmunition);
                 hash = (hash * 31) + (int)runtimeWeapon.selectedTrajectory;
                 hash = (hash * 31) + runtimeWeapon.GetRangeMin();
@@ -2078,8 +2142,30 @@ public partial class TurnStateManager
         }
 
         bool anyInput = WasAnyInputPressedThisFrame();
-        if (anyInput)
+        bool inspectionCycleInput = inspectedHelperUnit != null && WasInspectionCycleInputPressedThisFrame();
+        if (anyInput && !inspectionCycleInput)
             ExitInspectStateToNeutral();
+    }
+
+    private static bool WasInspectionCycleInputPressedThisFrame()
+    {
+#if ENABLE_INPUT_SYSTEM
+        Keyboard keyboard = Keyboard.current;
+        if (keyboard != null &&
+            (keyboard.enterKey.wasPressedThisFrame || keyboard.numpadEnterKey.wasPressedThisFrame))
+            return true;
+
+        Mouse mouse = Mouse.current;
+        if (mouse != null && mouse.leftButton.wasPressedThisFrame)
+            return true;
+
+        Touchscreen touchscreen = Touchscreen.current;
+        return touchscreen != null && touchscreen.primaryTouch.press.wasPressedThisFrame;
+#else
+        return Input.GetKeyDown(KeyCode.Return) ||
+               Input.GetKeyDown(KeyCode.KeypadEnter) ||
+               Input.GetMouseButtonDown(0);
+#endif
     }
 
     private void UpdateHoverInspection()

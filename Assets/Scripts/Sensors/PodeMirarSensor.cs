@@ -2310,7 +2310,7 @@ public static class UnitThreatEnvelopeService
 
     private static int ResolveUnitIndex(UnitManager unit)
     {
-        return unit.InstanceId > 0 ? unit.InstanceId : unit.GetInstanceID();
+        return unit.InstanceId > 0 ? unit.InstanceId : unit.GetEntityId().GetHashCode();
     }
 
     private static int BuildKeyHash(
@@ -2332,7 +2332,7 @@ public static class UnitThreatEnvelopeService
             hash = hash * 31 + (int)unit.GetDomain();
             hash = hash * 31 + (int)unit.GetHeightLevel();
             hash = hash * 31 + (unit.IsAircraftGrounded ? 1 : 0);
-            hash = hash * 31 + map.GetInstanceID();
+            hash = hash * 31 + map.GetEntityId().GetHashCode();
             hash = hash * 31 + ThreatRevisionTracker.GlobalBoardRevision;
             hash = hash * 31 + ThreatRevisionTracker.GetTeamObserverRevision(unit.TeamId);
             hash = hash * 31 + ThreatRevisionTracker.MatchFlagsHash;
@@ -2351,7 +2351,7 @@ public static class UnitThreatEnvelopeService
                     hash = hash * 31 + 7;
                     continue;
                 }
-                hash = hash * 31 + (embarked.weapon != null ? embarked.weapon.GetInstanceID() : 0);
+                hash = hash * 31 + (embarked.weapon != null ? embarked.weapon.GetEntityId().GetHashCode() : 0);
                 hash = hash * 31 + embarked.squadAmmunition;
                 hash = hash * 31 + (int)embarked.selectedTrajectory;
             }

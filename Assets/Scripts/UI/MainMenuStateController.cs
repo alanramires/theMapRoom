@@ -29,6 +29,7 @@ public class MainMenuStateController : MonoBehaviour
     [Header("References")]
     [SerializeField] private PanelMenu panelMenu;
     [SerializeField] private MainMenuLoadPanelController loadPanelController;
+    [SerializeField] private MainMenuTutorialPanelController tutorialPanelController;
     [SerializeField] private MainMenuCinematicController cinematicController;
 
     private bool _referencesResolved;
@@ -141,6 +142,10 @@ public class MainMenuStateController : MonoBehaviour
                 loadPanelController?.ExitLoadMenu(stateDriven: true);
                 break;
 
+            case MainMenuState.Tutorial:
+                tutorialPanelController?.ExitTutorialMenu(stateDriven: true);
+                break;
+
             case MainMenuState.Cinematic:
                 cinematicController?.ExitToNeutral();
                 break;
@@ -171,7 +176,7 @@ public class MainMenuStateController : MonoBehaviour
                 break;
 
             case MainMenuState.Tutorial:
-                EnterSimplePanelState(panelTutorialRoot);
+                EnterTutorialMenu();
                 break;
 
             case MainMenuState.Config:
@@ -248,6 +253,21 @@ public class MainMenuStateController : MonoBehaviour
             loadPanelController.EnterLoadMenu();
     }
 
+    private void EnterTutorialMenu()
+    {
+        EnsureSharedMenuContainerVisible();
+        SetPanelMenuVisible(false);
+        SetPanelActive(panelNewGameRoot, false);
+        SetPanelActive(panelLoadRoot, false);
+        SetPanelActive(panelConfigRoot, false);
+        SetPanelActive(panelTutorialRoot, true);
+
+        if (tutorialPanelController != null)
+            tutorialPanelController.EnterTutorialMenu();
+        else if (EventSystem.current != null)
+            EventSystem.current.sendNavigationEvents = true;
+    }
+
     private void EnterCinematic()
     {
         EnsureSharedMenuContainerVisible();
@@ -285,6 +305,10 @@ public class MainMenuStateController : MonoBehaviour
 
             case MainMenuState.LoadMenu:
                 RouteLoadMenuInput();
+                break;
+
+            case MainMenuState.Tutorial:
+                RouteTutorialMenuInput();
                 break;
 
             case MainMenuState.Cinematic:
@@ -458,6 +482,42 @@ public class MainMenuStateController : MonoBehaviour
             loadPanelController.CloseLoadPanel();
     }
 
+    private void RouteTutorialMenuInput()
+    {
+        if (tutorialPanelController == null || !tutorialPanelController.IsOpen)
+            return;
+
+        UiInputBlocker.SuppressGameplayInputForFrames(1);
+        if (Time.frameCount <= ignoreInputUntilFrame)
+            return;
+        if (IsAnyTextInputFocusedInUi())
+            return;
+
+        if (WasUpPressed() || WasLeftPressed())
+        {
+            tutorialPanelController.Navigate(-1);
+            return;
+        }
+
+        if (WasDownPressed() || WasRightPressed())
+        {
+            tutorialPanelController.Navigate(+1);
+            return;
+        }
+
+        if (WasConfirmPressed())
+        {
+            UiInputBlocker.SuppressGameplayInputForFrames(2);
+            tutorialPanelController.ConfirmCurrentSelection();
+            return;
+        }
+
+        if (WasCancelPressed())
+            // Passa por CloseTutorialPanel (nao ChangeState direto) para tocar o cancel.mp3,
+            // igual ao botao "Voltar". A transicao de estado e a mesma (RequestState -> RootMenu).
+            tutorialPanelController.CloseTutorialPanel();
+    }
+
     private bool CanAdvanceFromNeutral()
     {
         if (enteredNeutralFrame < 0)
@@ -480,6 +540,8 @@ public class MainMenuStateController : MonoBehaviour
             panelMenu = FindInActiveScene<PanelMenu>();
         if (loadPanelController == null)
             loadPanelController = FindInActiveScene<MainMenuLoadPanelController>();
+        if (tutorialPanelController == null)
+            tutorialPanelController = FindInActiveScene<MainMenuTutorialPanelController>();
         if (cinematicController == null)
             cinematicController = FindInActiveScene<MainMenuCinematicController>();
 

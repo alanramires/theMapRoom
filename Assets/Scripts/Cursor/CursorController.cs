@@ -202,7 +202,6 @@ public class CursorController : MonoBehaviour
     private void OnValidate()
     {
         TryAutoAssignReferences();
-        SnapToCell(currentCell);
     }
 #endif
 
@@ -576,6 +575,22 @@ public class CursorController : MonoBehaviour
             if (PanelHelperController.IsPointerOverHelperPanel(pointerScreenPosition) ||
                 IsScreenPointOverClickableUI(pointerScreenPosition))
                 return;
+
+            Camera inspectCamera = cameraController != null ? cameraController.GetComponent<Camera>() : Camera.main;
+            if (inspectCamera != null && boardTilemap != null)
+            {
+                Vector3 inspectScreen = pointerScreenPosition;
+                inspectScreen.z = -inspectCamera.transform.position.z;
+                Vector3 inspectWorld = inspectCamera.ScreenToWorldPoint(inspectScreen);
+                Vector3Int inspectCell = boardTilemap.WorldToCell(inspectWorld);
+                inspectCell.z = 0;
+                if (inspectCell == currentCell)
+                {
+                    TurnStateManager.ActionSfx inspectFeedback = turnStateManager.HandleConfirm();
+                    PlayActionFeedback(inspectFeedback);
+                    return;
+                }
+            }
 
             TryCancelCurrentActionFromPointer();
             return;
@@ -1114,13 +1129,19 @@ public class CursorController : MonoBehaviour
 
         if (WasAdvanceTurnPressedThisFrame())
         {
-            // Atalho R = caminho rápido: passa a vez direto de Neutral, sem confirmação
-            // (mesmo comportamento da IA em modo rápido). Os botões de fim de turno
-            // (menu Rodada e HUD flutuante) é que abrem a confirmação.
+            // R e exclusivo do jogador humano. Por padrao abre a mesma confirmacao
+            // dos botoes; a partida pode optar pelo encerramento direto.
+            TryAutoAssignMatchController();
+            if (matchController != null && matchController.IsActiveTeamAI())
+                return;
             if (turnStateManager != null && turnStateManager.CurrentCursorState != TurnStateManager.CursorState.Neutral)
                 return;
             turnStateManager?.TryCloseThreatLayerHotzone();
-            if (!TryExecuteEndTurnFromMenu())
+            bool skipConfirmation = matchController != null && matchController.PassarTurnoSemConfirmacao;
+            bool handled = skipConfirmation
+                ? TryExecuteEndTurnFromMenu()
+                : RequestEndTurnConfirmation();
+            if (!handled)
                 PlayErrorSfx();
             return;
         }
@@ -1181,7 +1202,8 @@ public class CursorController : MonoBehaviour
     /// Abre a confirmação de Passar a Vez (estado EndingTurn + prompt de confirmação) a
     /// partir de Neutral e arma o pending para o próximo confirmar/cancelar do jogador.
     /// Caminho canônico dos botões humanos de fim de turno (menu Rodada e HUD
-    /// flutuante). O atalho R usa o caminho direto, sem confirmação.
+    /// flutuante). O atalho R tambem usa este caminho, salvo quando a partida
+    /// habilita Passar Turno Sem Confirmacao.
     /// Retorna false se não deu para abrir.
     /// </summary>
     public bool RequestEndTurnConfirmation()

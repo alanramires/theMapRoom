@@ -15,7 +15,7 @@ MonoBehaviour:
   id: hq
   displayName: HQ
   sufixo: HQ
-  description: Quartel General, se capturado vc perde.
+  description: "Base principal.\nSe capturado, voc\xEA perde."
   isAirport: 0
   isHarbor: 0
   isCity: 0

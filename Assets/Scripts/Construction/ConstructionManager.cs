@@ -1,4 +1,4 @@
-Ôªøusing System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Serialization;
 using UnityEngine.Tilemaps;
@@ -30,9 +30,9 @@ public class ConstructionManager : MonoBehaviour
     [SerializeField] private TeamId teamId = TeamId.Green;
     [Tooltip("Slot do MatchController que controla este time. -1 = Neutral fixo (sem slot).")]
     [SerializeField] private int slotIndex = -1;
-    [Tooltip("Setor estrat√©gico ao qual esta constru√ß√£o pertence. Use Base0-Base3 para areas de base de cada jogador.")]
+    [Tooltip("Setor estratÈgico ao qual esta construÁ„o pertence. Use Base0-Base3 para areas de base de cada jogador.")]
     [SerializeField] private ConstructionSector sector = ConstructionSector.None;
-    [Tooltip("Overrides manuais de eixo, POR SLOT. O mesmo setor pode ser n√≥ do leque de um slot e rally de outro, ent√£o cada entrada for√ßa o eixo para um slot (ou -1 = todos). Sobrep√µe o c√°lculo por √¢ngulo do InvasionAxisMap.")]
+    [Tooltip("Overrides manuais de eixo, POR SLOT. O mesmo setor pode ser nÛ do leque de um slot e rally de outro, ent„o cada entrada forÁa o eixo para um slot (ou -1 = todos). Sobrepıe o c·lculo por ‚ngulo do InvasionAxisMap.")]
     [SerializeField] private System.Collections.Generic.List<EixoOverrideEntry> eixoOverrides = new System.Collections.Generic.List<EixoOverrideEntry>();
     [SerializeField] private string constructionId;
     [SerializeField] private int instanceId;
@@ -58,15 +58,15 @@ public class ConstructionManager : MonoBehaviour
     [SerializeField] private ConstructionHudController hudController;
     [SerializeField] private MatchController matchController;
     [Header("Tactical Role")]
-    [Tooltip("Este pr√©dio serve como ponto de observa√ß√£o avan√ßada (Forward Observer) para artilharia.")]
+    [Tooltip("Este prÈdio serve como ponto de observaÁ„o avanÁada (Forward Observer) para artilharia.")]
     [SerializeField] private bool isForwardObserverSpot;
     [Tooltip("Operational gera interesse da AI. Reveal Only participa apenas da visibilidade. Disabled preserva a configuracao sem ativar o spot.")]
     [SerializeField] private ForwardObserverSpotUsage forwardObserverSpotUsage = ForwardObserverSpotUsage.Operational;
-    [Tooltip("Este pr√©dio serve como ponto de reuni√£o (Rally Point) para unidades rec√©m-compradas.")]
+    [Tooltip("Este prÈdio serve como ponto de reuni„o (Rally Point) para unidades recÈm-compradas.")]
     [SerializeField] private bool isRallyPoint;
-    [Tooltip("Slot que usa este Rally Point como ponto de invas√£o. -1 = nenhum slot.")]
+    [Tooltip("Slot que usa este Rally Point como ponto de invas„o. -1 = nenhum slot.")]
     [SerializeField] private int rallyOwnerSlotIndex = -1;
-    [Tooltip("Este pr√©dio marca o setor como funda√ß√£o econ√¥mica/territorial para a AI de um slot.")]
+    [Tooltip("Este prÈdio marca o setor como fundaÁ„o econÙmica/territorial para a AI de um slot.")]
     [SerializeField] private bool isAnchorSector;
     [Tooltip("Slot da AI para o qual este setor funciona como Anchor Sector. -1 = nenhum slot.")]
     [SerializeField] private int anchorSectorSlotIndex = -1;
@@ -101,8 +101,8 @@ public class ConstructionManager : MonoBehaviour
     public System.Collections.Generic.IReadOnlyList<EixoOverrideEntry> EixoOverrides => eixoOverrides;
     public bool HasEixoOverride => eixoOverrides != null && eixoOverrides.Count > 0;
 
-    // Resolve o eixo for√ßado para um slot: a entrada do slot exato tem preced√™ncia sobre a de -1
-    // (todos). Retorna false se n√£o h√° override aplic√°vel a esse slot.
+    // Resolve o eixo forÁado para um slot: a entrada do slot exato tem precedÍncia sobre a de -1
+    // (todos). Retorna false se n„o h· override aplic·vel a esse slot.
     public bool TryGetEixoOverride(int slot, out int eixo)
     {
         eixo = 0;
@@ -597,9 +597,9 @@ public class ConstructionManager : MonoBehaviour
         RefreshRuntimeVisualState(force: true);
     }
 
-    // Debug/runtime: troca a regra de venda do pr√©dio. Para OriginalOwner/FirstOwner, ownerSlot >= 0
-    // define (e marca como inicializado) o slot dono correspondente, que √© quem `CanProduceUnitsForTeam`
-    // usa pra liberar a produ√ß√£o. Para FreeMarket/Disabled o ownerSlot √© ignorado.
+    // Debug/runtime: troca a regra de venda do prÈdio. Para OriginalOwner/FirstOwner, ownerSlot >= 0
+    // define (e marca como inicializado) o slot dono correspondente, que È quem `CanProduceUnitsForTeam`
+    // usa pra liberar a produÁ„o. Para FreeMarket/Disabled o ownerSlot È ignorado.
     public void DebugSetSellingRule(ConstructionUnitMarketRule rule, int ownerSlot)
     {
         if (siteRuntime == null)
@@ -1208,10 +1208,10 @@ public class ConstructionManager : MonoBehaviour
         bool hasState = AIController.TryGetRallyHudState(
             rallyOwnerSlotIndex, sector, out AIRallyAssemblyState state, out _, out isMain);
 
-        // A luz segue a OPERA√á√ÉO, n√£o a massa parada no ancoradouro: enquanto a invas√£o lan√ßada
-        // est√° em voo (supress√£o ativa), mostra verde ‚Äî mesmo sem rally objective ativo e mesmo
-        // ap√≥s um load (a supress√£o √© persistida). Quando a opera√ß√£o falha, o monitor limpa o
-        // GoGreen, a supress√£o solta e a luz volta ao estado real da re-montagem (amarelo).
+        // A luz segue a OPERA«√O, n„o a massa parada no ancoradouro: enquanto a invas„o lanÁada
+        // est· em voo (supress„o ativa), mostra verde ó mesmo sem rally objective ativo e mesmo
+        // apÛs um load (a supress„o È persistida). Quando a operaÁ„o falha, o monitor limpa o
+        // GoGreen, a supress„o solta e a luz volta ao estado real da re-montagem (amarelo).
         TryAutoAssignMatchController();
         int turn = matchController != null ? matchController.CurrentTurn : -1;
         if (turn >= 0 && AIController.IsRallyGoGreenSuppressedForHud(teamId, sector, turn))
@@ -1226,7 +1226,7 @@ public class ConstructionManager : MonoBehaviour
         RefreshVictoryBuildingOverlayVisual();
 
         UnitManager occupant = TryGetOccupantOnTop();
-        int occupantId = occupant != null ? occupant.GetInstanceID() : 0;
+        int occupantId = occupant != null ? occupant.GetEntityId().GetHashCode() : 0;
         bool occupantVisible = IsOccupantVisibleForHud(occupant);
         bool shouldDarken = ShouldDarkenForOccupant(occupant);
         bool showFlagThreatOutline = occupant != null

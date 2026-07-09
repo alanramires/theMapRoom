@@ -14,7 +14,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::StructureData
   id: trilho
   displayName: Trilho
-  description: Trilhos de Trem
+  description: "Caminho exclusivo do trem.\nMove carga por trilhos.\nN\xE3o d\xE1
+    b\xF4nus de estrada."
+  descriptionsByTerrain: []
   priorityOrder: 3
   domain: 0
   heightLevel: 3

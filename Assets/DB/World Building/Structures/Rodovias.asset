@@ -14,8 +14,17 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::StructureData
   id: road
   displayName: Rodovia
-  description: rodovia para veiculos +1 se full move (apenas unidades com 4 ou mais
-    de movimento)
+  description: "Ve\xEDculos Mov. 4+: +1 passo.\nExige trajeto por rodovias.\nSem
+    cobertura."
+  descriptionsByTerrain:
+  - terrainData: {fileID: 11400000, guid: f8bd8dc9dbe197d4f828ad72d3d90df6, type: 2}
+    description: "Ve\xEDculos r\xE1pidos: +1 passo.\nSem cobertura da floresta.\nPouso
+      bloqueado."
+    roadBoostOff: 0
+  - terrainData: {fileID: 11400000, guid: 75d32a51167ec98409039b6f5d4d287f, type: 2}
+    description: "Passagem para ve\xEDculos.\nCusto +1. Sem b\xF4nus de estrada.\nPouso
+      bloqueado."
+    roadBoostOff: 1
   priorityOrder: 3
   domain: 0
   heightLevel: 3

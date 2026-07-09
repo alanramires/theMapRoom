@@ -15,14 +15,21 @@ MonoBehaviour:
   id: estacao
   displayName: "Esta\xE7\xE3o de Trem"
   sufixo: Station
-  description: "Esta\xE7\xE3o de Trem para transporte de carga e unidades"
+  description: 'Move carga por trilhos.
+
+    Transporta unidades.
+
+    Revela os
+    arredores.'
   isAirport: 0
   isHarbor: 0
+  isCity: 0
   spriteDefault: {fileID: 21300000, guid: a7b162bc180581b428ddac3618f1dd33, type: 3}
   spriteGreen: {fileID: 0}
   spriteRed: {fileID: 0}
   spriteBlue: {fileID: 0}
   spriteYellow: {fileID: 0}
+  visao: 0
   baseMovementCost: 1
   isFakeBuilding: 0
   dpqData: {fileID: 11400000, guid: 1ff1954ba402c104b837d28d29e3d69d, type: 2}

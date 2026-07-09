@@ -18,7 +18,9 @@ public class AutomataDatabase : ScriptableObject
             AutomataData entry = entries[i];
             if (entry == null)
                 continue;
-            if (entry.teamId != activeTeam)
+            // Neutral funciona como curinga: a entrada vale para qualquer time.
+            // Necessario quando a cor do inimigo pode mudar (escolha de cor no tutorial).
+            if (entry.teamId != TeamId.Neutral && entry.teamId != activeTeam)
                 continue;
             if (!TutorialMatches(entry, tutorialId))
                 continue;

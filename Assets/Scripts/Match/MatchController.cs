@@ -72,11 +72,21 @@ public class MatchController : MonoBehaviour
     }
 
 
+    // Override manual da orientacao (flipX) de um slot. Auto segue o calculo
+    // automatico por posicao do HQ; Normal/Espelhado forcam o valor.
+    public enum FlipXOverrideMode
+    {
+        Auto = 0,
+        Normal = 1,
+        Espelhado = 2
+    }
+
     [System.Serializable]
     private struct PlayerEntry
     {
         public TeamId teamId;
         [HideInInspector] public bool flipX;
+        public FlipXOverrideMode flipXOverride;
         public bool isAI;
         public bool commandServiceAutomatic;
         public bool defeated;
@@ -128,6 +138,8 @@ public class MatchController : MonoBehaviour
     [SerializeField] private bool enableTotalWar = true;
     [Tooltip("Permite inferir acoes contextuais a partir de cliques no mapa.")]
     [SerializeField] private bool atalhoContextual = false;
+    [Tooltip("Se ativo, o atalho R encerra diretamente o turno humano. Se desativado, R abre a confirmacao normal.")]
+    [SerializeField] private bool passarTurnoSemConfirmacao = false;
     [Tooltip("Se false, o time com 0 unidades nao e eliminado automaticamente. Util para testes sem unidades.")]
     [SerializeField] private bool allowDefeatForZeroUnits = true;
     [Tooltip("Se true, capturar o QG (isPlayerHeadQuarter) de um time o elimina imediatamente e pode encerrar a partida.")]
@@ -155,11 +167,12 @@ public class MatchController : MonoBehaviour
     [SerializeField, HideInInspector] private bool hasVictoryWinner;
     [SerializeField, HideInInspector] private TeamId victoryWinnerTeam = TeamId.Neutral;
     [Header("Fog Of War")]
+    [SerializeField] private FogOfWarController fogOfWarController;
     [SerializeField] private Tilemap fogOfWarTilemap;
     [SerializeField] private TileBase fogOfWarOverlayTile;
     [SerializeField] private TerrainDatabase fogOfWarTerrainDatabase;
     [SerializeField] private DPQAirHeightConfig fogOfWarDpqAirHeightConfig;
-    [SerializeField] [Range(0f, 1f)] private float fogOfWarAlpha = 0.65f;
+    [SerializeField, HideInInspector] [Range(0f, 1f)] private float fogOfWarAlpha = 0.65f;
     [SerializeField] private FogOfWarVisionMode fogOfWarVisionMode = FogOfWarVisionMode.All;
     [Header("Victory Overlay")]
     [SerializeField] private bool showVictoryOverlay = true;
@@ -247,6 +260,8 @@ public class MatchController : MonoBehaviour
 
     public int CurrentTurn => currentTurn;
     public int ActiveTeamId => activeTeamId;
+    public bool PassarTurnoSemConfirmacao => passarTurnoSemConfirmacao;
+    public float LegacyFogOfWarAlpha => Mathf.Clamp01(fogOfWarAlpha);
     public int VisualContrastActiveTeamId => fogPresentationGameplayTeamId != int.MinValue
         ? fogPresentationGameplayTeamId
         : activeTeamId;
@@ -620,6 +635,15 @@ public class MatchController : MonoBehaviour
         bool includeNeutral)
     {
         includeNeutralTeam = includeNeutral;
+        // O override de flipX pertence ao slot logico da cena (como a economia):
+        // preserva o valor autorado ao reconstruir a lista.
+        List<FlipXOverrideMode> previousOverrides = new List<FlipXOverrideMode>();
+        if (players != null)
+        {
+            for (int i = 0; i < players.Count; i++)
+                previousOverrides.Add(players[i].flipXOverride);
+        }
+
         if (players == null)
             players = new List<PlayerEntry>();
         else
@@ -636,6 +660,7 @@ public class MatchController : MonoBehaviour
             {
                 teamId = team,
                 flipX = GetValueOrDefault(flipXs, i, GetDefaultFlipX(team)),
+                flipXOverride = i < previousOverrides.Count ? previousOverrides[i] : FlipXOverrideMode.Auto,
                 isAI = GetValueOrDefault(isAIs, i, false),
                 startMoney = Mathf.Max(0, GetValueOrDefault(startMoneys, i, 0)),
                 actualMoney = Mathf.Max(0, GetValueOrDefault(actualMoneys, i, 0)),
@@ -754,6 +779,8 @@ public class MatchController : MonoBehaviour
             PartidaConfig.Apply(this);
             PartidaConfig.Clear();
         }
+        if (PartidaConfig.TryConsumeTutorialPlayerTeam(out TeamId tutorialPlayerTeam))
+            ApplyTutorialPlayerTeamChoice(tutorialPlayerTeam);
         ApplyGameSetupPreset();
         SyncThreatRevisionFlags();
         NormalizeState();
@@ -784,6 +811,7 @@ public class MatchController : MonoBehaviour
             FindAnyObjectByType<ReplayManager>()?.CleanupReplayArtifactsForMatchStart();
             if (autoFlipXFromHqPositions)
                 AutoComputeFlipXFromHqPositions();
+            ApplyFlipXOverridesToPlayers();
             ResetUnfundedStartMoneyFlagsForFreshMatch();
             ApplyActiveTeamIfChanged(force: true);
             // Hard-code de observacao: em partidas AI vs AI, mantenha a apresentacao
@@ -806,6 +834,43 @@ public class MatchController : MonoBehaviour
         }
         TryBootstrapInitialStealthDetection();
         RunTurnStartStillObservedForActiveTeamStealthUnits();
+    }
+
+    // Recolore o slot 0 (jogador) com a cor escolhida na Tela de Entrada para o tutorial.
+    // Se outro slot ja usa a cor escolhida, os dois slots trocam de cor entre si.
+    // Economia, flip e isAI pertencem ao slot logico e nao se movem (mesma regra do
+    // PartidaConfig.Apply). So tem efeito visivel em cenas cujas unidades/construcoes
+    // usam slotIndex (>= 0); conteudo com time fixo (slotIndex -1) nao acompanha.
+    private void ApplyTutorialPlayerTeamChoice(TeamId chosenTeam)
+    {
+        if (chosenTeam == TeamId.Neutral)
+            return;
+
+        List<int> teamIds = new List<int>();
+        List<bool> flipXs = new List<bool>();
+        List<bool> isAIs = new List<bool>();
+        List<int> startMoneys = new List<int>();
+        List<int> actualMoneys = new List<int>();
+        List<int> incomePerTurns = new List<int>();
+        List<bool> startMoneyApplied = new List<bool>();
+        ExportPlayersState(teamIds, flipXs, isAIs, startMoneys, actualMoneys, incomePerTurns, startMoneyApplied);
+
+        if (teamIds.Count <= 0 || teamIds[0] == (int)chosenTeam)
+            return;
+
+        int previousSlot0Team = teamIds[0];
+        for (int i = 1; i < teamIds.Count; i++)
+        {
+            if (teamIds[i] == (int)chosenTeam)
+            {
+                teamIds[i] = previousSlot0Team;
+                break;
+            }
+        }
+        teamIds[0] = (int)chosenTeam;
+
+        ImportPlayersState(teamIds, flipXs, isAIs, startMoneys, actualMoneys, incomePerTurns, startMoneyApplied, false);
+        SetActiveTeamIdWithoutTurnStart(teamIds[0]);
     }
 
     private bool AreAllPlayerSlotsAI()
@@ -851,6 +916,7 @@ public class MatchController : MonoBehaviour
         ScheduleFogOfWarClearInEditor();
         if (autoFlipXFromHqPositions)
             AutoComputeFlipXFromHqPositions();
+        ApplyFlipXOverridesToPlayers();
         ApplyActiveTeamIfChanged(force: false);
         ApplyTeamFlipSettingsToSceneObjects();
         OnSlotConfigChanged?.Invoke();
@@ -2211,6 +2277,24 @@ public class MatchController : MonoBehaviour
         }
     }
 
+    // Aplica o override manual de orientacao por slot por cima do calculo automatico
+    // (ou do valor serializado, se o auto estiver desligado). Auto = nao mexe.
+    public void ApplyFlipXOverridesToPlayers()
+    {
+        if (players == null)
+            return;
+
+        for (int i = 0; i < players.Count; i++)
+        {
+            PlayerEntry entry = players[i];
+            if (entry.flipXOverride == FlipXOverrideMode.Auto)
+                continue;
+
+            entry.flipX = entry.flipXOverride == FlipXOverrideMode.Espelhado;
+            players[i] = entry;
+        }
+    }
+
     private float GetMapCenterWorldX()
     {
         if (fogOfWarTilemap != null)
@@ -2595,6 +2679,10 @@ public class MatchController : MonoBehaviour
 
     private void TryAutoAssignFogOfWarReferences()
     {
+        if (fogOfWarController == null)
+            fogOfWarController = FindAnyObjectByType<FogOfWarController>();
+        fogOfWarController?.InitializeAlphaFromLegacy(fogOfWarAlpha);
+
         if (fogOfWarTilemap == null)
             fogOfWarTilemap = FindTilemapByName("FogOfWar");
 
@@ -2652,8 +2740,8 @@ public class MatchController : MonoBehaviour
         {
             int signature = 17;
             signature = (signature * 31) + (showVictoryOverlay ? 1 : 0);
-            signature = (signature * 31) + (victoryOverlayTilemap != null ? victoryOverlayTilemap.GetInstanceID() : 0);
-            signature = (signature * 31) + (victoryOverlayTile != null ? victoryOverlayTile.GetInstanceID() : 0);
+            signature = (signature * 31) + (victoryOverlayTilemap != null ? victoryOverlayTilemap.GetEntityId().GetHashCode() : 0);
+            signature = (signature * 31) + (victoryOverlayTile != null ? victoryOverlayTile.GetEntityId().GetHashCode() : 0);
             signature = (signature * 31) + Mathf.RoundToInt(Mathf.Clamp01(victoryOverlayAlpha) * 1000f);
             return signature;
         }
@@ -4015,7 +4103,7 @@ public class MatchController : MonoBehaviour
             if (target == null)
                 continue;
 
-            int targetId = target.InstanceId > 0 ? target.InstanceId : target.GetInstanceID();
+            int targetId = target.InstanceId > 0 ? target.InstanceId : target.GetEntityId().GetHashCode();
             if (!contributorIdsByTarget.TryGetValue(targetId, out HashSet<int> contributors))
             {
                 contributors = new HashSet<int>();
@@ -4229,7 +4317,7 @@ public class MatchController : MonoBehaviour
         }
 
         fogOfWarTilemap.ClearAllTiles();
-        Color fogColor = new Color(0f, 0f, 0f, Mathf.Clamp01(fogOfWarAlpha));
+        Color fogColor = new Color(0f, 0f, 0f, ResolveFogOfWarAlpha());
         for (int i = 0; i < fogBoardCellsBuffer.Count; i++)
         {
             Vector3Int cell = fogBoardCellsBuffer[i];
@@ -4270,7 +4358,7 @@ public class MatchController : MonoBehaviour
             BuildFogDisplayVisibleCellsForMode(boardMap, fogOfWarVisionMode, fogDisplayVisibleCellsBuffer);
 
         fogOfWarTilemap.ClearAllTiles();
-        Color fogColor = new Color(0f, 0f, 0f, Mathf.Clamp01(fogOfWarAlpha));
+        Color fogColor = new Color(0f, 0f, 0f, ResolveFogOfWarAlpha());
         for (int i = 0; i < fogBoardCellsBuffer.Count; i++)
         {
             Vector3Int cell = fogBoardCellsBuffer[i];
@@ -4526,7 +4614,7 @@ public class MatchController : MonoBehaviour
 
             fogOfWarTilemap.SetTile(cell, tile);
             fogOfWarTilemap.SetTileFlags(cell, TileFlags.None);
-            fogOfWarTilemap.SetColor(cell, new Color(0f, 0f, 0f, Mathf.Clamp01(fogOfWarAlpha)));
+            fogOfWarTilemap.SetColor(cell, new Color(0f, 0f, 0f, ResolveFogOfWarAlpha()));
         }
     }
 
@@ -4766,17 +4854,28 @@ public class MatchController : MonoBehaviour
     public void SetFogOfWarAlphaPercent(int alphaPercent)
     {
         int clampedPercent = Mathf.Clamp(alphaPercent, 0, 100);
-        fogOfWarAlpha = clampedPercent / 100f;
+        TryAutoAssignFogOfWarReferences();
+        if (fogOfWarController != null)
+            fogOfWarController.SetAlphaPercent(clampedPercent);
+        else
+            fogOfWarAlpha = clampedPercent / 100f;
         if (fogOfWarTilemap == null)
             return;
 
-        Color fogColor = new Color(0f, 0f, 0f, fogOfWarAlpha);
+        Color fogColor = new Color(0f, 0f, 0f, ResolveFogOfWarAlpha());
         BoundsInt bounds = fogOfWarTilemap.cellBounds;
         foreach (Vector3Int cell in bounds.allPositionsWithin)
         {
             if (fogOfWarTilemap.HasTile(cell))
                 fogOfWarTilemap.SetColor(cell, fogColor);
         }
+    }
+
+    private float ResolveFogOfWarAlpha()
+    {
+        return fogOfWarController != null
+            ? fogOfWarController.FogOfWarAlpha
+            : Mathf.Clamp01(fogOfWarAlpha);
     }
 
     public void SetFogOfWarDebugPartial()
@@ -4835,7 +4934,7 @@ public class MatchController : MonoBehaviour
         int instanceId = unit.InstanceId;
         if (instanceId > 0)
             return instanceId;
-        return unit.GetInstanceID();
+        return unit.GetEntityId().GetHashCode();
     }
 
     private FogOfWarUnitCacheKey BuildFogUnitCacheKey(UnitManager unit, Tilemap boardMap)
@@ -4863,11 +4962,11 @@ public class MatchController : MonoBehaviour
             hash = (hash * 31) + (int)unit.GetHeightLevel();
             hash = (hash * 31) + (unit.IsEmbarked ? 1 : 0);
             hash = (hash * 31) + Mathf.Max(1, unit.Visao);
-            hash = (hash * 31) + (boardMap != null ? boardMap.GetInstanceID() : 0);
+            hash = (hash * 31) + (boardMap != null ? boardMap.GetEntityId().GetHashCode() : 0);
             TerrainDatabase fogTerrainDb = ResolveFogTerrainDatabase();
             DPQAirHeightConfig fogAirConfig = ResolveFogDpqAirHeightConfig();
-            hash = (hash * 31) + (fogTerrainDb != null ? fogTerrainDb.GetInstanceID() : 0);
-            hash = (hash * 31) + (fogAirConfig != null ? fogAirConfig.GetInstanceID() : 0);
+            hash = (hash * 31) + (fogTerrainDb != null ? fogTerrainDb.GetEntityId().GetHashCode() : 0);
+            hash = (hash * 31) + (fogAirConfig != null ? fogAirConfig.GetEntityId().GetHashCode() : 0);
             return hash;
         }
     }

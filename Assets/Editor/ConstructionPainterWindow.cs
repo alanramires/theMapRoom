@@ -313,7 +313,7 @@ public class ConstructionPainterWindow : EditorWindow
 
     private void SyncBrushWithSelection(ConstructionData selectedConstruction)
     {
-        int selectedId = selectedConstruction != null ? selectedConstruction.GetInstanceID() : 0;
+        int selectedId = selectedConstruction != null ? selectedConstruction.GetEntityId().GetHashCode() : 0;
         if (selectedId == lastSelectionInstanceId)
             return;
 

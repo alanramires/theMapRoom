@@ -15,7 +15,8 @@ MonoBehaviour:
   id: aeroporto
   displayName: Aeroporto
   sufixo: Air Field
-  description: "Aeroporto: para manuten\xE7\xE3o de aeronaves, compras e reposi\xE7\xE3o"
+  description: "Produz aeronaves.\nAeronaves pousam para servi\xE7os.\nRevela os
+    arredores."
   isAirport: 1
   isHarbor: 0
   isCity: 0

@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::TerrainTypeData
   id: sea
   displayName: Mar
-  description: 
+  description: "\xC1guas abertas.\nSubmarinos operam no fundo.\nN\xE3o permite desembarque."
   paletteTile: {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
   domain: 1
   heightLevel: 3
@@ -22,6 +22,7 @@ MonoBehaviour:
   - domain: 2
     heightLevel: 2
   alwaysAllowAirDomain: 1
+  allowDisembark: 1
   allowAircraftTakeoffAndLanding: 1
   allowedLandingClasses: 
   requiredLandingSkills:
@@ -29,10 +30,13 @@ MonoBehaviour:
   requireAtLeastOneLandingSkill: 0
   allowedTakeoffModes: 
   forceEndMovementOnTerrainDomainForDomains: []
+  forceDetectOnForcedEndMovementDomains: 0
+  forceDetectUnitsWithFollowingStealthSkills: []
   basicAutonomyCost: 1
   dpqData: {fileID: 11400000, guid: 151bdc82ef06071449424d30a1d567a5, type: 2}
   ev: 0
   shooterInheritsTerrainEv: 0
+  shooterInheritedEvOverride: -1
   blockLoS: 1
   constructionVisionOverrides: []
   structureVisionOverrides: []

@@ -5,6 +5,10 @@ using UnityEngine.Tilemaps;
 
 public class TutorialManager : MonoBehaviour
 {
+    // Disparado quando um objetivo normal completa (nao dispara para condicoes de derrota).
+    // Consumido pelo PanelDialogTutorialController para liberar os gates do roteiro.
+    public static event System.Action<TutorialObjective> OnObjectiveCompleted;
+
     [SerializeField] private TerrainDatabase terrainDatabase;
     [SerializeField] private MatchController matchController;
     [SerializeField] private TurnStateManager turnStateManager;
@@ -74,6 +78,7 @@ public class TutorialManager : MonoBehaviour
         TurnStateManager.OnUnitDestroyed += HandleUnitDestroyed;
         TurnStateManager.OnUnitRevealedFromFog += HandleUnitRevealedFromFog;
         TurnStateManager.OnUnitMovementExecuted += HandleUnitMoved;
+        TurnStateManager.OnUnitHeldPosition += HandleUnitHeldPosition;
         TurnStateManager.OnUnitSelected += HandleUnitSelected;
         TurnStateManager.OnUnitEmbarked += HandleUnitEmbarked;
         TurnStateManager.OnUnitDisembarked += HandleUnitDisembarked;
@@ -91,6 +96,7 @@ public class TutorialManager : MonoBehaviour
         TurnStateManager.OnUnitDestroyed -= HandleUnitDestroyed;
         TurnStateManager.OnUnitRevealedFromFog -= HandleUnitRevealedFromFog;
         TurnStateManager.OnUnitMovementExecuted -= HandleUnitMoved;
+        TurnStateManager.OnUnitHeldPosition -= HandleUnitHeldPosition;
         TurnStateManager.OnUnitSelected -= HandleUnitSelected;
         TurnStateManager.OnUnitEmbarked -= HandleUnitEmbarked;
         TurnStateManager.OnUnitDisembarked -= HandleUnitDisembarked;
@@ -141,6 +147,7 @@ public class TutorialManager : MonoBehaviour
             CursorController cursor = FindAnyObjectByType<CursorController>();
             if (cursor != null) cursor.PlayBeepSfx();
 
+            OnObjectiveCompleted?.Invoke(obj);
             CheckTutorialCompletion();
         }
 
@@ -247,13 +254,23 @@ public class TutorialManager : MonoBehaviour
     {
         // Formato esperado: spawn:TEAM_ID UNIT_TOKEN X,Y
         // Exemplo: spawn:1 SD 5,6
+        // TEAM_ID tambem aceita slot logico ("slot0", "slot1"): resolve a cor atual do slot.
+        // Prefira slots em cenas de tutorial — a cor do jogador pode ser escolhida na Tela de Entrada.
         try
         {
             string raw = obj.parameters.Substring(6).Trim(); // Remove "spawn:"
             string[] parts = raw.Split(' ');
             if (parts.Length < 3) return false;
 
-            if (!int.TryParse(parts[0], out int teamId)) return false;
+            int teamId;
+            if (parts[0].StartsWith("slot", System.StringComparison.OrdinalIgnoreCase))
+            {
+                if (!int.TryParse(parts[0].Substring(4), out int slotIndex)) return false;
+                if (matchController == null) return false;
+                teamId = (int)matchController.GetTeamIdForSlot(slotIndex);
+                if (teamId == (int)TeamId.Neutral) return false;
+            }
+            else if (!int.TryParse(parts[0], out teamId)) return false;
             string unitToken = parts[1];
             string coords = parts[2];
 
@@ -320,10 +337,38 @@ public class TutorialManager : MonoBehaviour
     {
         if (matchController != null && unit != null)
         {
-            // Apenas unidades inimigas
             if ((int)unit.TeamId != matchController.ActiveTeamId)
-            {
                 MarkObjectiveCompleteById("INSPECT_ENEMY_UNIT");
+            else
+                MarkObjectiveCompleteById("INSPECT_ALLY_UNIT");
+        }
+    }
+
+    private void HandleUnitHeldPosition(UnitManager unit)
+    {
+        if (unit == null)
+            return;
+
+        TutorialData tutorial = GetActiveTutorial();
+        if (tutorial == null || tutorial.objectives == null)
+            return;
+
+        // So o gesto do jogador conta: o automata inimigo tambem confirma no proprio hex.
+        if (matchController != null && unit.TeamId != matchController.GetTeamIdForSlot(0))
+            return;
+
+        for (int i = 0; i < tutorial.objectives.Count; i++)
+        {
+            TutorialObjective obj = tutorial.objectives[i];
+            if (obj == null || obj.id != "HOLD_POSITION" || !obj.isVisible || !IsObjectivePending(obj))
+                continue;
+
+            // parameters opcional: token da unidade (ex.: SD) ou expressao de coords no formato do UNIT_AT_HEX.
+            if (string.IsNullOrWhiteSpace(obj.parameters) ||
+                UnitMatchesTargetToken(unit, obj.parameters.Trim()) ||
+                IsUnitAtCoordinates(unit, obj.parameters))
+            {
+                MarkObjectiveComplete(obj);
             }
         }
     }
@@ -762,7 +807,8 @@ public class TutorialManager : MonoBehaviour
         TutorialData tutorial = GetActiveTutorial();
         if (tutorial != null)
         {
-            TutorialRules.CheckTurnStartRules(tutorial.id, teamId);
+            int playerTeamId = matchController != null ? (int)matchController.GetTeamIdForSlot(0) : 0;
+            TutorialRules.CheckTurnStartRules(tutorial.id, teamId, playerTeamId);
 
             // NOVO: Verifica UNIT_DEAD por autonomia em todas as unidades ativas no inicio do turno
             if (tutorial.objectives != null)
@@ -791,9 +837,11 @@ public class TutorialManager : MonoBehaviour
     {
         if (!enableTutorialAutomata || automataDatabase == null)
             return;
-        if (activeTeam != TeamId.Red)
-            return;
+        // O automata dirige qualquer time que nao seja o do jogador (slot 0).
+        // Nao comparar com cor fixa: a cor do jogador pode ter sido escolhida na Tela de Entrada.
         if (matchController == null || matchController.HasVictoryWinner)
+            return;
+        if (activeTeam == TeamId.Neutral || activeTeam == matchController.GetTeamIdForSlot(0))
             return;
 
         StopTutorialAutomataRoutine();
@@ -842,7 +890,24 @@ public class TutorialManager : MonoBehaviour
             if (preSelectDelay > 0f)
                 yield return new WaitForSeconds(preSelectDelay);
 
-            if (!turnStateManager.TryAutomatedSelectUnitAndEnterMoveuParado(unit))
+            // Avanco scriptado: caminha em direcao ao hex alvo antes de atacar/finalizar.
+            bool enteredViaMove = false;
+            if (automata.moveTowardsTarget && TryFindAutomataAdvanceCell(unit, automata, out Vector3Int advanceCell))
+            {
+                if (turnStateManager.TryAutomatedSelectUnitOnly(unit) &&
+                    turnStateManager.TryAutomatedMoveSelectedUnitToCell(advanceCell))
+                {
+                    yield return turnStateManager.WaitUntilMovementAnimationDone(timeoutSeconds: 10f);
+                    enteredViaMove = true;
+                }
+                else
+                {
+                    turnStateManager.HandleCancel();
+                    yield return null;
+                }
+            }
+
+            if (!enteredViaMove && !turnStateManager.TryAutomatedSelectUnitAndEnterMoveuParado(unit))
             {
                 turnStateManager.HandleCancel();
                 yield return null;
@@ -891,6 +956,58 @@ public class TutorialManager : MonoBehaviour
 
         // Garante 1 frame extra para UI/musica/fog estabilizarem apos a transicao.
         yield return null;
+    }
+
+    // Escolhe a celula alcancavel neste turno que mais aproxima a unidade do alvo do automata,
+    // respeitando custo de terreno e ocupacao (fonte de verdade: UnitMovementPathRules).
+    // Retorna false se ja esta na distancia de parada ou se nenhuma celula aproxima.
+    private bool TryFindAutomataAdvanceCell(UnitManager unit, AutomataData automata, out Vector3Int advanceCell)
+    {
+        advanceCell = default;
+        if (unit == null || automata == null || unit.BoardTilemap == null)
+            return false;
+
+        Vector3Int target = automata.moveTargetCell;
+        target.z = 0;
+        Vector3Int current = NormalizeCell(unit.CurrentCellPosition);
+        int stopDistance = Mathf.Max(0, automata.stopDistance);
+        int currentDistance = Mathf.RoundToInt(SectorManager.HexDistance(current, target));
+        if (currentDistance <= stopDistance)
+            return false;
+
+        Dictionary<Vector3Int, List<Vector3Int>> paths = UnitMovementPathRules.CalcularCaminhosValidos(
+            unit.BoardTilemap, unit, Mathf.Max(0, unit.RemainingMovementPoints), terrainDatabase);
+        if (paths == null || paths.Count <= 0)
+            return false;
+
+        int bestDistance = currentDistance;
+        int bestCost = int.MaxValue;
+        bool found = false;
+        foreach (KeyValuePair<Vector3Int, List<Vector3Int>> entry in paths)
+        {
+            Vector3Int cell = NormalizeCell(entry.Key);
+            if (cell == current)
+                continue;
+
+            // O caminho pode atravessar aliado, mas nao pode terminar em hex ocupado.
+            if (UnitOccupancyRules.GetUnitAtCell(unit.BoardTilemap, cell) != null)
+                continue;
+
+            int distance = Mathf.RoundToInt(SectorManager.HexDistance(cell, target));
+            if (distance < stopDistance)
+                continue;
+
+            int cost = entry.Value != null ? entry.Value.Count : int.MaxValue;
+            if (distance < bestDistance || (distance == bestDistance && found && cost < bestCost))
+            {
+                bestDistance = distance;
+                bestCost = cost;
+                advanceCell = cell;
+                found = true;
+            }
+        }
+
+        return found;
     }
 
     private List<UnitManager> CollectAutomataUnitsForTeam(TeamId team)

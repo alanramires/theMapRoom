@@ -14,7 +14,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::TerrainTypeData
   id: beach
   displayName: Praia
-  description: 
+  description: 'Zona de desembarque.
+
+    Submarinos emergem.
+
+    Sem cobertura.'
   paletteTile: {fileID: 11400000, guid: 384d099216329d140a7af40e2d9be860, type: 2}
   domain: 1
   heightLevel: 3
@@ -37,6 +41,7 @@ MonoBehaviour:
   dpqData: {fileID: 11400000, guid: 24e0fd1ecd7c6bf4eb8f3d8c215d14ef, type: 2}
   ev: 0
   shooterInheritsTerrainEv: 0
+  shooterInheritedEvOverride: -1
   blockLoS: 1
   constructionVisionOverrides: []
   structureVisionOverrides: []

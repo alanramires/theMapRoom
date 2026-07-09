@@ -19,6 +19,8 @@ public partial class TurnStateManager : MonoBehaviour
     public static event Action<UnitManager> OnUnitRevealedFromFog;
     public static event Action<UnitManager> OnUnitDestroyed;
     public static event Action<UnitManager> OnUnitMovementExecuted;
+    // Confirmou a propria celula (MANTER POSICAO ou confirmar sem mover).
+    public static event Action<UnitManager> OnUnitHeldPosition;
     public static event Action<UnitManager> OnUnitSelected;
     public static event Action<UnitManager, UnitManager> OnUnitEmbarked;
     public static event Action<UnitManager, UnitManager> OnUnitDisembarked;
@@ -108,6 +110,9 @@ public partial class TurnStateManager : MonoBehaviour
     [Header("Turn Transition")]
     [SerializeField] [Range(0f, 2f)] private float advanceTurnPreDelay = 0.1f;
     [SerializeField] [Range(0f, 2f)] private float advanceTurnPostDelay = 0f;
+    [Header("AI Presentation")]
+    [SerializeField] private bool concealAutomatedAiCursorTravelInFog = true;
+    [SerializeField] [Range(2, 100)] private int visibleFogCursorTravelPenalty = 24;
     [Header("FSM Debug UI")]
     [SerializeField] private UIDocument fsmDebugDocument;
     [SerializeField] private string fsmDebugElementName = "FSM";
@@ -1762,6 +1767,9 @@ public partial class TurnStateManager : MonoBehaviour
             return path;
         }
 
+        if (ShouldConcealAutomatedAiCursorTravelInFog())
+            return BuildFogConcealedCursorTravelPath(board, fromCell, toCell);
+
         Queue<Vector3Int> queue = new Queue<Vector3Int>();
         HashSet<Vector3Int> visited = new HashSet<Vector3Int>();
         Dictionary<Vector3Int, Vector3Int> cameFrom = new Dictionary<Vector3Int, Vector3Int>();
@@ -1822,6 +1830,195 @@ public partial class TurnStateManager : MonoBehaviour
             path.Add(reversed[i]);
 
         return path;
+    }
+
+    private List<Vector3Int> BuildFogConcealedCursorTravelPath(Tilemap board, Vector3Int fromCell, Vector3Int toCell)
+    {
+        List<Vector3Int> path = new List<Vector3Int>();
+        if (board == null)
+        {
+            path.Add(toCell);
+            return path;
+        }
+
+        List<Vector3Int> open = new List<Vector3Int> { fromCell };
+        HashSet<Vector3Int> closed = new HashSet<Vector3Int>();
+        Dictionary<Vector3Int, Vector3Int> cameFrom = new Dictionary<Vector3Int, Vector3Int>();
+        Dictionary<Vector3Int, int> costByCell = new Dictionary<Vector3Int, int>
+        {
+            [fromCell] = 0
+        };
+        List<Vector3Int> neighbors = new List<Vector3Int>(6);
+
+        bool found = false;
+        int guard = 0;
+        const int maxVisited = 8192;
+        while (open.Count > 0 && guard++ < maxVisited)
+        {
+            int bestOpenIndex = FindBestFogCursorOpenIndex(open, costByCell, toCell);
+            Vector3Int current = open[bestOpenIndex];
+            open.RemoveAt(bestOpenIndex);
+
+            if (!closed.Add(current))
+                continue;
+
+            if (current == toCell)
+            {
+                found = true;
+                break;
+            }
+
+            neighbors.Clear();
+            UnitMovementPathRules.GetImmediateHexNeighbors(board, current, neighbors);
+            for (int i = 0; i < neighbors.Count; i++)
+            {
+                Vector3Int next = NormalizeTurnStartCursorCell(neighbors[i]);
+                if (!board.HasTile(next) || closed.Contains(next))
+                    continue;
+
+                int stepCost = GetFogConcealedCursorTravelStepCost(next, toCell);
+                int nextCost = costByCell[current] + stepCost;
+                if (costByCell.TryGetValue(next, out int existingCost) && existingCost <= nextCost)
+                    continue;
+
+                costByCell[next] = nextCost;
+                cameFrom[next] = current;
+                if (!open.Contains(next))
+                    open.Add(next);
+            }
+        }
+
+        if (!found)
+        {
+            return BuildShortestCursorTravelPath(board, fromCell, toCell);
+        }
+
+        List<Vector3Int> reversed = new List<Vector3Int>();
+        Vector3Int walk = toCell;
+        while (walk != fromCell)
+        {
+            reversed.Add(walk);
+            if (!cameFrom.TryGetValue(walk, out Vector3Int previous))
+            {
+                return BuildShortestCursorTravelPath(board, fromCell, toCell);
+            }
+
+            walk = previous;
+        }
+
+        for (int i = reversed.Count - 1; i >= 0; i--)
+            path.Add(reversed[i]);
+
+        return path;
+    }
+
+    private List<Vector3Int> BuildShortestCursorTravelPath(Tilemap board, Vector3Int fromCell, Vector3Int toCell)
+    {
+        List<Vector3Int> path = new List<Vector3Int>();
+        if (board == null)
+        {
+            path.Add(toCell);
+            return path;
+        }
+
+        Queue<Vector3Int> queue = new Queue<Vector3Int>();
+        HashSet<Vector3Int> visited = new HashSet<Vector3Int>();
+        Dictionary<Vector3Int, Vector3Int> cameFrom = new Dictionary<Vector3Int, Vector3Int>();
+        List<Vector3Int> neighbors = new List<Vector3Int>(6);
+
+        queue.Enqueue(fromCell);
+        visited.Add(fromCell);
+
+        bool found = false;
+        int guard = 0;
+        const int maxVisited = 8192;
+        while (queue.Count > 0 && guard++ < maxVisited)
+        {
+            Vector3Int current = queue.Dequeue();
+            if (current == toCell)
+            {
+                found = true;
+                break;
+            }
+
+            neighbors.Clear();
+            UnitMovementPathRules.GetImmediateHexNeighbors(board, current, neighbors);
+            for (int i = 0; i < neighbors.Count; i++)
+            {
+                Vector3Int next = NormalizeTurnStartCursorCell(neighbors[i]);
+                if (!board.HasTile(next))
+                    continue;
+                if (!visited.Add(next))
+                    continue;
+
+                cameFrom[next] = current;
+                queue.Enqueue(next);
+            }
+        }
+
+        if (!found)
+        {
+            path.Add(toCell);
+            return path;
+        }
+
+        List<Vector3Int> reversed = new List<Vector3Int>();
+        Vector3Int walk = toCell;
+        while (walk != fromCell)
+        {
+            reversed.Add(walk);
+            if (!cameFrom.TryGetValue(walk, out Vector3Int previous))
+            {
+                reversed.Clear();
+                reversed.Add(toCell);
+                break;
+            }
+
+            walk = previous;
+        }
+
+        for (int i = reversed.Count - 1; i >= 0; i--)
+            path.Add(reversed[i]);
+
+        return path;
+    }
+
+    private int FindBestFogCursorOpenIndex(List<Vector3Int> open, Dictionary<Vector3Int, int> costByCell, Vector3Int toCell)
+    {
+        int bestIndex = 0;
+        int bestScore = int.MaxValue;
+        for (int i = 0; i < open.Count; i++)
+        {
+            Vector3Int cell = open[i];
+            int cost = costByCell.TryGetValue(cell, out int knownCost) ? knownCost : int.MaxValue / 4;
+            int score = cost + Mathf.Max(0, Mathf.RoundToInt(SectorManager.HexDistance(cell, toCell)));
+            if (score < bestScore)
+            {
+                bestScore = score;
+                bestIndex = i;
+            }
+        }
+
+        return bestIndex;
+    }
+
+    private int GetFogConcealedCursorTravelStepCost(Vector3Int cell, Vector3Int targetCell)
+    {
+        if (cell == targetCell)
+            return 1;
+        if (matchController == null)
+            return 1;
+
+        return matchController.IsCellVisibleInFogPresentation(cell)
+            ? Mathf.Max(2, visibleFogCursorTravelPenalty)
+            : 1;
+    }
+
+    private bool ShouldConcealAutomatedAiCursorTravelInFog()
+    {
+        return concealAutomatedAiCursorTravelInFog
+            && matchController != null
+            && matchController.ShouldHideActiveAiActionPresentation();
     }
 
     private static Vector3Int NormalizeTurnStartCursorCell(Vector3Int cell)

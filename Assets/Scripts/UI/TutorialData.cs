@@ -15,6 +15,19 @@ public class TutorialObjective
     public bool hasFailed = false;
 }
 
+[System.Serializable]
+public class TutorialDialogEntry
+{
+    [Tooltip("Se >= 0, esta fala so aparece depois que o objetivo neste INDICE da lista de objectives completar. -1 = segue na sequencia pelo botao avancar.")]
+    public int waitObjectiveIndex = -1;
+
+    [TextArea(2, 10)]
+    public string text;
+
+    [Tooltip("Narracao gravada da fala (opcional). Toca ao exibir.")]
+    public AudioClip voice;
+}
+
 [CreateAssetMenu(fileName = "Novo TutorialData", menuName = "Game/Tutorial/Tutorial Data")]
 public class TutorialData : ScriptableObject
 {
@@ -26,6 +39,10 @@ public class TutorialData : ScriptableObject
 
     [Tooltip("Lista de objetivos deste tutorial")]
     public List<TutorialObjective> objectives = new List<TutorialObjective>();
+
+    [Header("Roteiro")]
+    [Tooltip("Falas do panel_dialog_tutorial, em ordem. Gates por waitObjectiveIndex pausam o roteiro ate a tarefa completar.")]
+    public List<TutorialDialogEntry> script = new List<TutorialDialogEntry>();
 
     [Header("Victory")]
     [Tooltip("Dialogo exibido ao completar todos os objetivos.")]

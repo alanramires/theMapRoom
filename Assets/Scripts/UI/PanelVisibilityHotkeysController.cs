@@ -61,7 +61,7 @@ public class PanelVisibilityHotkeysController : MonoBehaviour
     private float hotkeysTargetAnchoredX;
     private Button hotkeysToggleButtonHookedTarget;
     private bool debugPanelInitializedForScene;
-    private int lastInitializedSceneHandle = int.MinValue;
+    private ulong lastInitializedSceneHandle = ulong.MaxValue;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void EnsureBootstrap()
@@ -117,10 +117,11 @@ public class PanelVisibilityHotkeysController : MonoBehaviour
     private void RefreshReferences(bool forceSceneInit)
     {
         Scene active = SceneManager.GetActiveScene();
-        if (forceSceneInit || active.handle != lastInitializedSceneHandle)
+        ulong activeSceneHandle = active.handle.GetRawData();
+        if (forceSceneInit || activeSceneHandle != lastInitializedSceneHandle)
         {
             debugPanelInitializedForScene = false;
-            lastInitializedSceneHandle = active.handle;
+            lastInitializedSceneHandle = activeSceneHandle;
             hotkeysRetractStateInitialized = false;
             UnhookHotkeysToggleButton();
         }

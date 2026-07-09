@@ -1761,8 +1761,9 @@ public class BattleMapMenuRootController : MonoBehaviour
         return Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter);
     }
 
-    // Cancelar (ESC/Backspace) OU clique direito curto (o CursorController trata direito=ESC).
-    // Assim o jogador de mouse abre/fecha o menu com o botao direito, igual ao ESC.
+    // Cancelar (ESC/Backspace), pausa de simulacao (P) OU clique direito curto
+    // (o CursorController trata direito=ESC). Durante a IA, P usa o player pause:
+    // termina o batch atual e abre o menu somente no proximo ponto seguro.
     private bool WasCancelRequestedThisFrame()
     {
         return WasCancelShortcutPressedThisFrame() ||
@@ -1777,10 +1778,13 @@ public class BattleMapMenuRootController : MonoBehaviour
         if (Keyboard.current != null)
         {
             return Keyboard.current.escapeKey.wasPressedThisFrame ||
-                   Keyboard.current.backspaceKey.wasPressedThisFrame;
+                   Keyboard.current.backspaceKey.wasPressedThisFrame ||
+                   Keyboard.current.pKey.wasPressedThisFrame;
         }
 #endif
-        return Input.GetKeyDown(KeyCode.Escape) || Input.GetKeyDown(KeyCode.Backspace);
+        return Input.GetKeyDown(KeyCode.Escape) ||
+               Input.GetKeyDown(KeyCode.Backspace) ||
+               Input.GetKeyDown(KeyCode.P);
     }
 
     private static bool WasLetterPressedThisFrame(char letter)

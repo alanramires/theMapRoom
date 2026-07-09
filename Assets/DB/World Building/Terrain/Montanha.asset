@@ -14,7 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::TerrainTypeData
   id: mountain
   displayName: Montanha
-  description: 
+  description: "Melhor defesa e visada.\nInfantaria sobe devagar.\nPoucos ve\xEDculos
+    escalam."
   paletteTile: {fileID: 11400000, guid: 989688aecc1c71149bf0412799bbfe7a, type: 2}
   domain: 0
   heightLevel: 3

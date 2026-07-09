@@ -55,5 +55,8 @@ MonoBehaviour:
       - {x: -3, y: 3, z: 0}
       - {x: -3, y: 4, z: 0}
       - {x: -4, y: 5, z: 0}
+    - routeName: Test Drive
+      ownerDatabase: {fileID: 11400000}
+      cells: []
   - structure: {fileID: 11400000, guid: 7933d65148f7b884c895240966ea81b1, type: 2}
     routes: []

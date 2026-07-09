@@ -30,13 +30,14 @@ public static class TutorialRules
 
     /// <summary>
     /// Verifica se uma mudança de turno/time ativo dispara alguma regra especial.
+    /// playerTeamId é o time do slot 0 (a cor do jogador pode ser escolhida na Tela de Entrada).
     /// </summary>
-    public static void CheckTurnStartRules(string tutorialId, int teamId)
+    public static void CheckTurnStartRules(string tutorialId, int teamId, int playerTeamId)
     {
         if (tutorialId == TUTORIAL_ID_SOLDADO)
         {
-            // Início da rodada (Time 0)
-            if (pendingHpResetTutorial1 && teamId == 0)
+            // Início da rodada (turno do jogador)
+            if (pendingHpResetTutorial1 && teamId == playerTeamId)
             {
                 ExecuteRestoreAllUnitsHp(10, "TUTORIAL: A diferença entre terrenos foi aplicada!");
                 pendingHpResetTutorial1 = false;

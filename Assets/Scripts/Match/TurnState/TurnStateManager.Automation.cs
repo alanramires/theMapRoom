@@ -94,6 +94,21 @@ public partial class TurnStateManager
         return selectedUnit == unit && CurrentCursorState == CursorState.UnitSelected;
     }
 
+    // Move a unidade selecionada (estado UnitSelected) ate destCell via confirm de cursor.
+    // O movimento e assincrono (animacao); aguarde com WaitUntilMovementAnimationDone.
+    public bool TryAutomatedMoveSelectedUnitToCell(Vector3Int destCell)
+    {
+        if (CurrentCursorState != CursorState.UnitSelected || selectedUnit == null || cursorController == null)
+            return false;
+
+        destCell.z = 0;
+        if (!cursorController.SetCell(destCell, playMoveSfx: false))
+            return false;
+
+        HandleConfirm();
+        return CurrentCursorState != CursorState.UnitSelected || IsMovementAnimationRunning();
+    }
+
     public bool TryAutomatedSelectUnitByInstanceId(string unitInstanceId, Vector3Int expectedCell)
     {
         if (cursorController == null || string.IsNullOrWhiteSpace(unitInstanceId))
@@ -775,7 +790,8 @@ public partial class TurnStateManager
                 ? Mathf.Max(0f, replayManager.GetEffectiveCursorTravelStepDelayForRuntimeMotion())
                 : 0.08f);
 
-        if (TryBuildAutomatedTravelPathForSelectedUnit(targetCell, out List<Vector3Int> selectedUnitPath)
+        if (!ShouldConcealAutomatedAiCursorTravelInFog()
+            && TryBuildAutomatedTravelPathForSelectedUnit(targetCell, out List<Vector3Int> selectedUnitPath)
             && selectedUnitPath != null
             && selectedUnitPath.Count > 0)
         {
@@ -1332,7 +1348,6 @@ public partial class TurnStateManager
         return true;
     }
 }
-
 
 
 

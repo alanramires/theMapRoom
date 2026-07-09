@@ -460,6 +460,8 @@ MonoBehaviour:
   combatDeathStartDelay: 0.2
   combatBumpDistance: 0.12
   combatBumpDuration: 0.1
+  aiPhaseDuration: 0.5
+  aiUnitSelectDelay: 0.12
   rangedAttackDefenderAnimDuration: 0.55
   rangedAttackSquareExtent: 2
   rangedAttackSquareBarThickness: 1.2
@@ -962,21 +964,28 @@ Tilemap:
   m_Tiles: {}
   m_AnimatedTiles: {}
   m_TileAssetArray:
-  - m_RefCount: 0
+  - serializedVersion: 2
+    m_RefCount: 0
     m_Data: {fileID: 0}
-  - m_RefCount: 0
+  - serializedVersion: 2
+    m_RefCount: 0
     m_Data: {fileID: 0}
-  - m_RefCount: 0
+  - serializedVersion: 2
+    m_RefCount: 0
     m_Data: {fileID: 0}
   m_TileSpriteArray:
-  - m_RefCount: 0
+  - serializedVersion: 2
+    m_RefCount: 0
     m_Data: {fileID: 0}
-  - m_RefCount: 0
+  - serializedVersion: 2
+    m_RefCount: 0
     m_Data: {fileID: 0}
-  - m_RefCount: 0
+  - serializedVersion: 2
+    m_RefCount: 0
     m_Data: {fileID: 0}
   m_TileMatrixArray:
-  - m_RefCount: 0
+  - serializedVersion: 2
+    m_RefCount: 0
     m_Data:
       e00: -0.00008665491
       e01: 0
@@ -995,9 +1004,11 @@ Tilemap:
       e32: 8.23e-43
       e33: 8.2e-43
   m_TileColorArray:
-  - m_RefCount: 0
+  - serializedVersion: 2
+    m_RefCount: 0
     m_Data: {r: 0.00000016101922, g: 0.00000016101922, b: 0.00000016101922, a: 0.00000016101922}
-  - m_RefCount: 0
+  - serializedVersion: 2
+    m_RefCount: 0
     m_Data: {r: 1e-45, g: 1e-45, b: 1e-45, a: 1e-45}
   m_TileObjectToInstantiateArray: []
   m_AnimationFrameRate: 1
@@ -1035,7 +1046,7 @@ GameObject:
   - component: {fileID: 108569885}
   - component: {fileID: 108569884}
   m_Layer: 0
-  m_Name: Pvt.Ryan_T0_U8
+  m_Name: Pvt. Ryan_T0_U8
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -1081,10 +1092,14 @@ MonoBehaviour:
   hasActed: 0
   hasFiredThisTurn: 0
   receivedSuppliesThisTurn: 0
+  tookOffRecently: 0
+  isUnderRepair: 0
   hasMerged: 0
+  aiForcedToRepair: 0
   mergedWhenTurn: -1
   mergedWithUnit: 
   teamId: 0
+  slotIndex: 0
   unitId: Soldado
   instanceId: 8
   currentPosition: {x: 6.9278126, y: 9, z: 0}
@@ -1103,6 +1118,7 @@ MonoBehaviour:
   flagIsEmbarked: 0
   flagEmbarkedAtUnit: 
   flagReceivedSupplies: 0
+  flagTookOffRecently: 0
   flagHasMerged: 0
   flagMergedWhenTurn: -1
   flagMergedWithUnit: 
@@ -1123,6 +1139,10 @@ MonoBehaviour:
     lastSyncedWeapon: {fileID: 0}
   embarkedResourcesRuntime: []
   embarkedServicesRuntime: []
+  supplyTop: {fileID: 0}
+  supplyMiddle: {fileID: 0}
+  supplyBottom: {fileID: 0}
+  supplierStockAlertThreshold: 0.5
   appliedHasActed: 0
   appliedActiveTeamId: 0
   isEmbarked: 0
@@ -1161,6 +1181,17 @@ MonoBehaviour:
   embarkedTransporter: {fileID: 0}
   embarkedTransporterSlotIndex: -1
   currentlyObservedByTeamIds: 
+  aiHasAssignedPlan: 0
+  aiAssignedPlanKey: 
+  aiAssignedPlanName: 
+  aiAssignedPlanBadge: 
+  aiAssignedPlanRole: 0
+  aiAssignedPlanBadgeVisible: 0
+  aiEixo: 0
+  aiHasStance: 0
+  aiStance: 0
+  aiStanceVisible: 0
+  aiMaintenanceActive: 0
 --- !u!212 &108569885
 SpriteRenderer:
   serializedVersion: 2
@@ -1212,7 +1243,7 @@ SpriteRenderer:
   m_MaskInteraction: 0
   m_Sprite: {fileID: 21300000, guid: 7a4e98efb59da8447b1de4d056a57e79, type: 3}
   m_Color: {r: 0.5647059, g: 0.93333334, b: 0.5647059, a: 1}
-  m_FlipX: 0
+  m_FlipX: 1
   m_FlipY: 0
   m_DrawMode: 0
   m_Size: {x: 1, y: 1}
@@ -1307,7 +1338,7 @@ GameObject:
   - component: {fileID: 135776554}
   - component: {fileID: 135776553}
   m_Layer: 0
-  m_Name: PontodeEncontro_T0_C352
+  m_Name: Flag_T0_C352
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -1348,10 +1379,14 @@ MonoBehaviour:
   autoSnapWhenMovedInEditor: 1
   currentCellPosition: {x: 7, y: 10, z: 0}
   teamId: 0
+  slotIndex: 0
+  sector: -1
+  eixoOverrides: []
   constructionId: flag
   instanceId: 352
   currentPosition: {x: 6.0618362, y: 7.5, z: 0}
-  constructionDisplayName: Ponto de Encontro
+  constructionDisplayName: Flag
+  isVisible: 1
   autoApplyOnStart: 1
   siteRuntime:
     isPlayerHeadQuarter: 0
@@ -1368,13 +1403,19 @@ MonoBehaviour:
   hasSiteRuntimeOverride: 1
   currentCapturePoints: 20
   hasInfiniteSuppliesOverride: 0
-  originalOwnerTeamId: 0
+  originalOwnerSlotIndex: 0
   originalOwnerInitialized: 1
-  firstOwnerTeamId: 0
-  firstOwnerInitialized: 0
+  firstOwnerSlotIndex: 0
+  firstOwnerInitialized: 1
   occupiedByReadyUnitDarkenFactor: 0.4
   hudController: {fileID: 713275819}
   matchController: {fileID: 327617512}
+  isForwardObserverSpot: 0
+  forwardObserverSpotUsage: 0
+  isRallyPoint: 0
+  rallyOwnerSlotIndex: -1
+  isAnchorSector: 0
+  anchorSectorSlotIndex: -1
   victoryBuildingOverlayRenderer: {fileID: 0}
   victoryBuildingOverlaySprite: {fileID: 0}
   victoryBuildingOverlayColor: {r: 1, g: 0.84, b: 0.22, a: 1}
@@ -1433,7 +1474,7 @@ SpriteRenderer:
   m_MaskInteraction: 0
   m_Sprite: {fileID: 21300000, guid: 78ce03294baece64981d4fe73df1856f, type: 3}
   m_Color: {r: 0.5647059, g: 0.93333334, b: 0.5647059, a: 1}
-  m_FlipX: 0
+  m_FlipX: 1
   m_FlipY: 0
   m_DrawMode: 0
   m_Size: {x: 1, y: 1}
@@ -1541,29 +1582,40 @@ Tilemap:
   m_Tiles: {}
   m_AnimatedTiles: {}
   m_TileAssetArray:
-  - m_RefCount: 0
+  - serializedVersion: 2
+    m_RefCount: 0
     m_Data: {fileID: 0}
-  - m_RefCount: 0
+  - serializedVersion: 2
+    m_RefCount: 0
     m_Data: {fileID: 0}
-  - m_RefCount: 0
+  - serializedVersion: 2
+    m_RefCount: 0
     m_Data: {fileID: 0}
-  - m_RefCount: 0
+  - serializedVersion: 2
+    m_RefCount: 0
     m_Data: {fileID: 0}
-  - m_RefCount: 0
+  - serializedVersion: 2
+    m_RefCount: 0
     m_Data: {fileID: 0}
   m_TileSpriteArray:
-  - m_RefCount: 0
+  - serializedVersion: 2
+    m_RefCount: 0
     m_Data: {fileID: 0}
-  - m_RefCount: 0
+  - serializedVersion: 2
+    m_RefCount: 0
     m_Data: {fileID: 0}
-  - m_RefCount: 0
+  - serializedVersion: 2
+    m_RefCount: 0
     m_Data: {fileID: 0}
-  - m_RefCount: 0
+  - serializedVersion: 2
+    m_RefCount: 0
     m_Data: {fileID: 0}
-  - m_RefCount: 0
+  - serializedVersion: 2
+    m_RefCount: 0
     m_Data: {fileID: 0}
   m_TileMatrixArray:
-  - m_RefCount: 0
+  - serializedVersion: 2
+    m_RefCount: 0
     m_Data:
       e00: 0
       e01: 0
@@ -1582,9 +1634,11 @@ Tilemap:
       e32: 6.68e-43
       e33: 6.66e-43
   m_TileColorArray:
-  - m_RefCount: 0
+  - serializedVersion: 2
+    m_RefCount: 0
     m_Data: {r: 0.00000016101922, g: 0.00000016101922, b: 0.00000016101922, a: 0.00000016101922}
-  - m_RefCount: 0
+  - serializedVersion: 2
+    m_RefCount: 0
     m_Data: {r: -1.0288065e+20, g: -1.0288065e+20, b: -1.0288065e+20, a: -1.0288065e+20}
   m_TileObjectToInstantiateArray: []
   m_AnimationFrameRate: 1
@@ -1830,7 +1884,7 @@ MonoBehaviour:
   m_PreserveAspect: 0
   m_FillCenter: 1
   m_FillMethod: 0
-  m_FillAmount: 0.22222222
+  m_FillAmount: 0.4
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
@@ -1942,6 +1996,7 @@ Canvas:
   m_OverridePixelPerfect: 0
   m_SortingBucketNormalizedSize: 0
   m_VertexColorAlwaysGammaSpace: 0
+  m_UseReflectionProbes: 0
   m_AdditionalShaderChannelsFlag: 25
   m_UpdateRectTransformForStandalone: 0
   m_SortingLayerID: 519888321
@@ -2476,7 +2531,6 @@ MonoBehaviour:
   animateRetract: 1
   retractLerpSpeed: 14
   tutorialToggleKey: 287
-  fullscreenToggleKey: 292
   preferExclusiveFullscreen: 1
 --- !u!114 &234411759
 MonoBehaviour:
@@ -3244,6 +3298,7 @@ Canvas:
   m_OverridePixelPerfect: 0
   m_SortingBucketNormalizedSize: 0
   m_VertexColorAlwaysGammaSpace: 0
+  m_UseReflectionProbes: 0
   m_AdditionalShaderChannelsFlag: 0
   m_UpdateRectTransformForStandalone: 0
   m_SortingLayerID: 0
@@ -3434,20 +3489,38 @@ MonoBehaviour:
   activeTeamId: 0
   players:
   - teamId: 0
-    flipX: 0
+    flipX: 1
+    flipXOverride: 0
+    isAI: 0
+    commandServiceAutomatic: 0
+    defeated: 0
     startMoney: 4200
+    actualMoney: 0
+    incomePerTurn: 0
+    startMoneyApplied: 0
+  - teamId: 1
+    flipX: 0
+    flipXOverride: 0
+    isAI: 0
+    commandServiceAutomatic: 0
+    defeated: 0
+    startMoney: 0
     actualMoney: 0
     incomePerTurn: 0
     startMoneyApplied: 0
   includeNeutralTeam: 0
   economyEnabled: 1
   fogOfWar: 1
+  autoFlipXFromHqPositions: 1
   gameSetup: 4
   enableLdtValidation: 1
   enableLosValidation: 1
   enableSpotter: 1
   enableStealthValidation: 1
   enableTotalWar: 1
+  atalhoContextual: 0
+  allowDefeatForZeroUnits: 1
+  allowDefeatForHeadQuarterCapture: 1
   maxUnitsPerTeam: 60
   activeTutorial: {fileID: 0}
   autonomyDatabase: {fileID: 11400000, guid: 7e05fa3ec99c4ef09a32a3f4f31d8e4c, type: 2}
@@ -3463,6 +3536,8 @@ MonoBehaviour:
   victoryStarsByTeam:
   - teamId: 0
     stars: 0
+  - teamId: 1
+    stars: 0
   hasVictoryWinner: 0
   victoryWinnerTeam: -1
   fogOfWarTilemap: {fileID: 2015085660}
@@ -3470,6 +3545,7 @@ MonoBehaviour:
   fogOfWarTerrainDatabase: {fileID: 11400000, guid: af24f1a2f28971f498767ede9f9cfba1, type: 2}
   fogOfWarDpqAirHeightConfig: {fileID: 11400000, guid: 74c8a09efff211941b27a37f6bb948f1, type: 2}
   fogOfWarAlpha: 0.8
+  fogOfWarVisionMode: 0
   showVictoryOverlay: 1
   victoryOverlayTilemap: {fileID: 1323160040}
   victoryOverlayTile: {fileID: 11400000, guid: dd2174cfa0a10cc4a9cb658af194727c, type: 2}
@@ -3478,7 +3554,7 @@ MonoBehaviour:
   appliedActiveTeamId: 0
   pendingTurnStartUpkeep: 1
   pendingTurnStartEconomy: 1
-  cachedConstructionIncomeSignature: -2081879405
+  cachedConstructionIncomeSignature: -426568175
   cachedConstructionIncomeCount: 2
   constructionIncomeRefreshIntervalSeconds: 0.35
   continuousEditorRefresh: 0
@@ -3496,6 +3572,7 @@ MonoBehaviour:
   enableServicoDoComandoSensorLogs: 0
   enablePodePousarSensorLogs: 0
   enablePodeDecolarSensorLogs: 0
+  enablePodeEmergirSensorLogs: 0
   enableAindaMeVeRuntimeLogs: 0
   enablePodeDetectarRuntimeLogs: 0
   enablePodeEnxergarRuntimeLogs: 0
@@ -3665,6 +3742,12 @@ MonoBehaviour:
   team1Track: {fileID: 8300000, guid: a7bbc1a67b1e8494f8409da3c773cd8a, type: 3}
   team2Track: {fileID: 8300000, guid: b231f99cf0cbeef48827091689424b08, type: 3}
   team3Track: {fileID: 8300000, guid: dfba9aaa915b9164fbae2ffca78465d3, type: 3}
+  gameOpenTrack: {fileID: 0}
+  gameOpenMusicVolume: 1
+  playGameOpenOnStart: 1
+  playGameOpenOnlyInSpecificScene: 1
+  gameOpenSceneName: Tela de Entrada
+  menuLoadTransitionMusicVolume: 0.1
   previewTeamId: 0
   previewLoop: 1
 --- !u!1 &348386386
@@ -3782,17 +3865,21 @@ MonoBehaviour:
   cursorController: {fileID: 2105919121}
   replayManager: {fileID: 0}
   planningManager: {fileID: 0}
+  aiController: {fileID: 0}
   enableHotkeys: 1
   quickSaveKey: 105
   quickLoadKey: 111
   fileNameDefault: quicksave
   useSceneSpecificSlot: 1
-  customSaveDirectory: C:\Users\Alan\Documents\The Map Room\Saved Games
+  customSaveDirectory: C:/Users/Alan/AppData/LocalLow/Sistemas Info/The Map Room
   blockCrossSceneLoad: 1
   verboseLogs: 1
   forceLoadWhenBusy: 1
   saveReplayData: 1
   enableThreatCacheWarmupOnLoad: 0
+  enableLoadPerfLogs: 1
+  enablePromptPerfLogs: 0
+  promptPerfWarnThresholdMs: 50
 --- !u!1 &352161021
 GameObject:
   m_ObjectHideFlags: 0
@@ -5018,7 +5105,7 @@ Camera:
   m_Enabled: 1
   serializedVersion: 2
   m_ClearFlags: 2
-  m_BackGroundColor: {r: 0, g: 0, b: 0, a: 1}
+  m_BackGroundColor: {r: 0.1, g: 0.1, b: 0.1, a: 1}
   m_projectionMatrixMode: 1
   m_GateFitMode: 2
   m_FOVAxisMode: 0
@@ -5089,6 +5176,8 @@ MonoBehaviour:
   tilemap: {fileID: 1566606925}
   recalcBoundsOnStart: 1
   clampCollider: {fileID: 1566606923}
+  autoFindTilemapIfMissing: 1
+  logNoBoundsFallbackMessages: 0
   zoomSpeed: 300
   defaultOrthoSize: 2
   minOrthoSize: 1
@@ -5477,25 +5566,34 @@ Tilemap:
   m_Tiles: {}
   m_AnimatedTiles: {}
   m_TileAssetArray:
-  - m_RefCount: 0
+  - serializedVersion: 2
+    m_RefCount: 0
     m_Data: {fileID: 0}
-  - m_RefCount: 0
+  - serializedVersion: 2
+    m_RefCount: 0
     m_Data: {fileID: 0}
-  - m_RefCount: 0
+  - serializedVersion: 2
+    m_RefCount: 0
     m_Data: {fileID: 0}
-  - m_RefCount: 0
+  - serializedVersion: 2
+    m_RefCount: 0
     m_Data: {fileID: 0}
   m_TileSpriteArray:
-  - m_RefCount: 0
+  - serializedVersion: 2
+    m_RefCount: 0
     m_Data: {fileID: 0}
-  - m_RefCount: 0
+  - serializedVersion: 2
+    m_RefCount: 0
     m_Data: {fileID: 0}
-  - m_RefCount: 0
+  - serializedVersion: 2
+    m_RefCount: 0
     m_Data: {fileID: 0}
-  - m_RefCount: 0
+  - serializedVersion: 2
+    m_RefCount: 0
     m_Data: {fileID: 0}
   m_TileMatrixArray:
-  - m_RefCount: 0
+  - serializedVersion: 2
+    m_RefCount: 0
     m_Data:
       e00: 1e-45
       e01: 0
@@ -5513,7 +5611,8 @@ Tilemap:
       e31: 0
       e32: 1.016e-42
       e33: 1.013e-42
-  - m_RefCount: 0
+  - serializedVersion: 2
+    m_RefCount: 0
     m_Data:
       e00: -1.7376238e+20
       e01: 0
@@ -5531,7 +5630,8 @@ Tilemap:
       e31: 0
       e32: 1.016e-42
       e33: 1.013e-42
-  - m_RefCount: 0
+  - serializedVersion: 2
+    m_RefCount: 0
     m_Data:
       e00: -1.7618347e-19
       e01: 0
@@ -5549,7 +5649,8 @@ Tilemap:
       e31: 0
       e32: 7.1e-43
       e33: 7.08e-43
-  - m_RefCount: 0
+  - serializedVersion: 2
+    m_RefCount: 0
     m_Data:
       e00: -1.7618347e-19
       e01: 0
@@ -5567,7 +5668,8 @@ Tilemap:
       e31: 0
       e32: 7.1e-43
       e33: 7.08e-43
-  - m_RefCount: 0
+  - serializedVersion: 2
+    m_RefCount: 0
     m_Data:
       e00: -1.051656e-34
       e01: 0
@@ -5585,7 +5687,8 @@ Tilemap:
       e31: 0
       e32: 9.16e-43
       e33: 9.14e-43
-  - m_RefCount: 0
+  - serializedVersion: 2
+    m_RefCount: 0
     m_Data:
       e00: -1.051656e-34
       e01: 0
@@ -5603,7 +5706,8 @@ Tilemap:
       e31: 0
       e32: 9.16e-43
       e33: 9.14e-43
-  - m_RefCount: 0
+  - serializedVersion: 2
+    m_RefCount: 0
     m_Data:
       e00: -1.051656e-34
       e01: 0
@@ -5621,7 +5725,8 @@ Tilemap:
       e31: 0
       e32: 9.16e-43
       e33: 9.14e-43
-  - m_RefCount: 0
+  - serializedVersion: 2
+    m_RefCount: 0
     m_Data:
       e00: -1.051656e-34
       e01: 0
@@ -5639,7 +5744,8 @@ Tilemap:
       e31: 0
       e32: 9.16e-43
       e33: 9.14e-43
-  - m_RefCount: 0
+  - serializedVersion: 2
+    m_RefCount: 0
     m_Data:
       e00: -1.051656e-34
       e01: 0
@@ -5657,7 +5763,8 @@ Tilemap:
       e31: 0
       e32: 9.16e-43
       e33: 9.14e-43
-  - m_RefCount: 0
+  - serializedVersion: 2
+    m_RefCount: 0
     m_Data:
       e00: -1.051656e-34
       e01: 0
@@ -5676,7 +5783,8 @@ Tilemap:
       e32: 9.16e-43
       e33: 9.14e-43
   m_TileColorArray:
-  - m_RefCount: 0
+  - serializedVersion: 2
+    m_RefCount: 0
     m_Data: {r: -6.2780424e-22, g: -6.2780424e-22, b: -6.2780424e-22, a: -6.2780424e-22}
   m_TileObjectToInstantiateArray: []
   m_AnimationFrameRate: 1
@@ -7204,6 +7312,7 @@ MonoBehaviour:
   heartSprite: {fileID: 21300000, guid: f57def376d2a5e04c9920b624aa8a7d0, type: 3}
   halfHeartSprite: {fileID: 21300000, guid: 9c5f4d0b3482e0a4e8a3e550723122a9, type: 3}
   emptyHeartSprite: {fileID: 21300000, guid: 4c29d13173e6e014595c0415e8ece2da, type: 3}
+  deadHeartSprite: {fileID: 0}
   ammoPips:
     worldPips: []
     uiPips: []
@@ -7238,7 +7347,21 @@ MonoBehaviour:
   altitudeLowSprite: {fileID: 21300000, guid: 3505315c0b82f4a468bca8a040429274, type: 3}
   altitudeSubmergedSprite: {fileID: 21300000, guid: 8b13116408a07fa468aabc08c23c5f85, type: 3}
   transportIndicatorRoot: {fileID: 741298871}
+  transportIndicatorImage: {fileID: 741298872}
+  transportSingleSprite: {fileID: 0}
+  transportMultiSprite: {fileID: 0}
   detectedIndicatorRoot: {fileID: 124864613}
+  stanceIconImage: {fileID: 0}
+  maintenanceIconImage: {fileID: 0}
+  planDebugRoot: {fileID: 0}
+  planDebugText: {fileID: 0}
+  planDebugLegacyText: {fileID: 0}
+  eixoRoot: {fileID: 0}
+  eixoImage: {fileID: 0}
+  eixoSprites:
+  - {fileID: 21300000, guid: 91c68547898718044a274b3a284d7f89, type: 3}
+  - {fileID: 21300000, guid: e85639b7cd5e70f4096ba414d04a220e, type: 3}
+  - {fileID: 21300000, guid: 90e1e8314c827c6409e4c1ec4e0ec6c9, type: 3}
   applyHudSorting: 1
   hudSortingLayerName: SFX
   hudSortingOrder: 500
@@ -7310,6 +7433,15 @@ MonoBehaviour:
   flagThreatPulseMinDuration: 0.8
   flagThreatPulseMaxDuration: 1.2
   flagThreatOutlineDistance: {x: 1, y: -1}
+  sectorBadge: {fileID: 0}
+  rallyTrafficImage: {fileID: 0}
+  rallyOffSprite: {fileID: 0}
+  rallyRedSprite: {fileID: 0}
+  rallyYellowSprite: {fileID: 0}
+  rallyGreenSprite: {fileID: 0}
+  rallyMainRedSprite: {fileID: 0}
+  rallyMainYellowSprite: {fileID: 0}
+  rallyMainGreenSprite: {fileID: 0}
   applyHudSorting: 1
   hudSortingLayerName: SFX
   hudSortingOrder: 60
@@ -8810,6 +8942,15 @@ MonoBehaviour:
   flagThreatPulseMinDuration: 0.8
   flagThreatPulseMaxDuration: 1.2
   flagThreatOutlineDistance: {x: 1, y: -1}
+  sectorBadge: {fileID: 0}
+  rallyTrafficImage: {fileID: 0}
+  rallyOffSprite: {fileID: 0}
+  rallyRedSprite: {fileID: 0}
+  rallyYellowSprite: {fileID: 0}
+  rallyGreenSprite: {fileID: 0}
+  rallyMainRedSprite: {fileID: 0}
+  rallyMainYellowSprite: {fileID: 0}
+  rallyMainGreenSprite: {fileID: 0}
   applyHudSorting: 1
   hudSortingLayerName: SFX
   hudSortingOrder: 60
@@ -9860,6 +10001,7 @@ Canvas:
   m_OverridePixelPerfect: 0
   m_SortingBucketNormalizedSize: 0
   m_VertexColorAlwaysGammaSpace: 0
+  m_UseReflectionProbes: 0
   m_AdditionalShaderChannelsFlag: 25
   m_UpdateRectTransformForStandalone: 0
   m_SortingLayerID: 0
@@ -10925,6 +11067,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ReplayPanelUI
   replayManager: {fileID: 1942499702}
+  turnStateManager: {fileID: 0}
   panelCanvasGroup: {fileID: 0}
   textReplay: {fileID: 627980614}
   turnText: {fileID: 2112341081}
@@ -11989,6 +12132,7 @@ Canvas:
   m_OverridePixelPerfect: 0
   m_SortingBucketNormalizedSize: 0
   m_VertexColorAlwaysGammaSpace: 0
+  m_UseReflectionProbes: 0
   m_AdditionalShaderChannelsFlag: 25
   m_UpdateRectTransformForStandalone: 0
   m_SortingLayerID: 519888321
@@ -12840,6 +12984,8 @@ MonoBehaviour:
   contextHelpEnabled: 1
   hoverHelpDelay: 1
   dialogHelpDuration: 3
+  useTeamColor: 1
+  fallbackDialogTextColor: {r: 1, g: 1, b: 1, a: 1}
   matchController: {fileID: 0}
 --- !u!1 &1502004366
 GameObject:
@@ -12973,10 +13119,14 @@ MonoBehaviour:
   autoSnapWhenMovedInEditor: 1
   currentCellPosition: {x: 0, y: 0, z: 0}
   teamId: 0
+  slotIndex: 0
+  sector: -1
+  eixoOverrides: []
   constructionId: hq
   instanceId: 350
   currentPosition: {x: 0, y: 0, z: 0}
   constructionDisplayName: HQ
+  isVisible: 1
   autoApplyOnStart: 1
   siteRuntime:
     isPlayerHeadQuarter: 1
@@ -13003,13 +13153,19 @@ MonoBehaviour:
   hasSiteRuntimeOverride: 1
   currentCapturePoints: 40
   hasInfiniteSuppliesOverride: 0
-  originalOwnerTeamId: 0
+  originalOwnerSlotIndex: 0
   originalOwnerInitialized: 1
-  firstOwnerTeamId: 0
+  firstOwnerSlotIndex: 0
   firstOwnerInitialized: 1
   occupiedByReadyUnitDarkenFactor: 0.4
   hudController: {fileID: 903423517}
   matchController: {fileID: 327617512}
+  isForwardObserverSpot: 0
+  forwardObserverSpotUsage: 0
+  isRallyPoint: 0
+  rallyOwnerSlotIndex: -1
+  isAnchorSector: 0
+  anchorSectorSlotIndex: -1
   victoryBuildingOverlayRenderer: {fileID: 0}
   victoryBuildingOverlaySprite: {fileID: 0}
   victoryBuildingOverlayColor: {r: 1, g: 0.84, b: 0.22, a: 1}
@@ -13068,7 +13224,7 @@ SpriteRenderer:
   m_MaskInteraction: 0
   m_Sprite: {fileID: 21300000, guid: c090fb273a5237f4b9aef7fb2304a715, type: 3}
   m_Color: {r: 0.5647059, g: 0.93333334, b: 0.5647059, a: 1}
-  m_FlipX: 0
+  m_FlipX: 1
   m_FlipY: 0
   m_DrawMode: 0
   m_Size: {x: 1, y: 1}
@@ -13311,6 +13467,10 @@ MonoBehaviour:
   textMax: {fileID: 261549439}
   textUnidade: {fileID: 0}
   textCap: {fileID: 2097318644}
+  textCamada: {fileID: 0}
+  buttonRodada: {fileID: 0}
+  cursorController: {fileID: 0}
+  turnStateManager: {fileID: 0}
 --- !u!1 &1566606921
 GameObject:
   m_ObjectHideFlags: 0
@@ -14260,33 +14420,46 @@ Tilemap:
       m_AllTileFlags: 1073741825
   m_AnimatedTiles: {}
   m_TileAssetArray:
-  - m_RefCount: 0
+  - serializedVersion: 2
+    m_RefCount: 0
     m_Data: {fileID: 0}
-  - m_RefCount: 0
+  - serializedVersion: 2
+    m_RefCount: 0
     m_Data: {fileID: 0}
-  - m_RefCount: 0
+  - serializedVersion: 2
+    m_RefCount: 0
     m_Data: {fileID: 0}
-  - m_RefCount: 3
+  - serializedVersion: 2
+    m_RefCount: 3
     m_Data: {fileID: 11400000, guid: 474aa6f1deb7f064fbbe2a7ff46a4dfe, type: 2}
-  - m_RefCount: 48
+  - serializedVersion: 2
+    m_RefCount: 48
     m_Data: {fileID: 11400000, guid: 989688aecc1c71149bf0412799bbfe7a, type: 2}
-  - m_RefCount: 30
+  - serializedVersion: 2
+    m_RefCount: 30
     m_Data: {fileID: 11400000, guid: 8e8a1b5164a85a542aa94afb63767c2d, type: 2}
   m_TileSpriteArray:
-  - m_RefCount: 0
+  - serializedVersion: 2
+    m_RefCount: 0
     m_Data: {fileID: 0}
-  - m_RefCount: 0
+  - serializedVersion: 2
+    m_RefCount: 0
     m_Data: {fileID: 0}
-  - m_RefCount: 0
+  - serializedVersion: 2
+    m_RefCount: 0
     m_Data: {fileID: 0}
-  - m_RefCount: 3
+  - serializedVersion: 2
+    m_RefCount: 3
     m_Data: {fileID: 21300000, guid: d20bb1a1afca80945a51508ec460f907, type: 3}
-  - m_RefCount: 48
+  - serializedVersion: 2
+    m_RefCount: 48
     m_Data: {fileID: 21300000, guid: a2e4edc57c7cb044b936dcf5bd68af31, type: 3}
-  - m_RefCount: 30
+  - serializedVersion: 2
+    m_RefCount: 30
     m_Data: {fileID: 21300000, guid: 012c16dcc3f28014fb342a4ab5175e20, type: 3}
   m_TileMatrixArray:
-  - m_RefCount: 81
+  - serializedVersion: 2
+    m_RefCount: 81
     m_Data:
       e00: 1
       e01: 0
@@ -14305,9 +14478,11 @@ Tilemap:
       e32: 0
       e33: 1
   m_TileColorArray:
-  - m_RefCount: 0
+  - serializedVersion: 2
+    m_RefCount: 0
     m_Data: {r: 7.1511e-41, g: 7.1511e-41, b: 7.1511e-41, a: 7.1511e-41}
-  - m_RefCount: 81
+  - serializedVersion: 2
+    m_RefCount: 81
     m_Data: {r: 1, g: 1, b: 1, a: 1}
   m_TileObjectToInstantiateArray: []
   m_AnimationFrameRate: 1
@@ -15541,6 +15716,11 @@ MonoBehaviour:
   matchController: {fileID: 327617512}
   turnStateManager: {fileID: 1900915756}
   animationManager: {fileID: 58026847}
+  saveGameManager: {fileID: 350734195}
+  mainMenuLoadPanelController: {fileID: 0}
+  mainMenuTutorialPanelController: {fileID: 0}
+  mainMenuPanel: {fileID: 0}
+  battleMapMenuController: {fileID: 0}
   helperDatabase: {fileID: 11400000, guid: fb010f58d3e345008491c9af88bf5355, type: 2}
   panelHelper: {fileID: 1790144347}
   helperTitle: {fileID: 1873194583}
@@ -15934,6 +16114,8 @@ MonoBehaviour:
   textProgress: {fileID: 875300337}
   starSilverSprite: {fileID: 0}
   starGoldSprite: {fileID: 0}
+  hqShortcut: {fileID: 0}
+  hqShortcutImage: {fileID: 0}
   prefix: '$ '
   moneyGainColor: {r: 0.35, g: 1, b: 0.35, a: 1}
   moneyLossColor: {r: 1, g: 0.35, b: 0.35, a: 1}
@@ -16501,7 +16683,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d652fffb479dc454fb6e1cab3dd00f6d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TurnStateManager
-  inspectedHelperDurationSeconds: 4
   turnStartAutonomyHelperDurationFallbackSeconds: 6
   enableTurnStateRuntimeLogs: 0
   enableRangeCacheDebugLogs: 0
@@ -16526,12 +16707,13 @@ MonoBehaviour:
   terrainTilemap: {fileID: 1566606925}
   rangeOverlayTile: {fileID: 11400000, guid: 76862f510fb26994298ea8f029a29645, type: 2}
   lineOfFireOverlayTile: {fileID: 11400000, guid: bf500774380b265448563869142a18a4, type: 2}
-  cursorState: 0
   selectedUnit: {fileID: 0}
   movementRangeAlpha: 0.8
   lineOfFireAlpha: 0.8
   advanceTurnPreDelay: 1
   advanceTurnPostDelay: 1.5
+  fsmDebugDocument: {fileID: 0}
+  fsmDebugElementName: FSM
 --- !u!1 &1905426597
 GameObject:
   m_ObjectHideFlags: 0
@@ -16702,6 +16884,8 @@ MonoBehaviour:
   cursorController: {fileID: 2105919121}
   sendButton: {fileID: 103820276}
   commandInputObject: {fileID: 1714758815}
+  aiDebugShortcutsEnabled: 0
+  resetPlanOnDebugStage: 0
 --- !u!1 &1914342285
 GameObject:
   m_ObjectHideFlags: 0
@@ -16828,11 +17012,6 @@ MonoBehaviour:
   boardTilemap: {fileID: 1566606925}
   spawnWithHasActedFalse: 0
   spawnParent: {fileID: 1040389035}
-  manualTeamId: 0
-  manualUnitId: Soldado
-  manualCellPosition: {x: 9, y: -6, z: 0}
-  spawnMapListOnStart: 0
-  mapSpawnEntries: []
 --- !u!1 &1941195758
 GameObject:
   m_ObjectHideFlags: 0
@@ -16878,18 +17057,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ConstructionSpawner
   constructionDatabase: {fileID: 11400000, guid: 669ddb2de0ba99b42a78b64737255dd8, type: 2}
-  constructionFieldDatabase: {fileID: 0}
   matchController: {fileID: 327617512}
   currentId: 353
   constructionPrefab: {fileID: 6576751892175530090, guid: 13117a41645b28b4fba41de10ae420eb, type: 3}
   boardTilemap: {fileID: 1566606925}
   spawnParent: {fileID: 1888992690}
-  manualTeamId: 0
-  manualConstructionId: cidade
-  manualCellPosition: {x: 1, y: 0, z: 0}
-  spawnMapListOnStart: 0
-  mapSpawnEntries: []
-  spawnFieldDatabaseOnStart: 0
 --- !u!1 &1942499700
 GameObject:
   m_ObjectHideFlags: 0
@@ -16957,22 +17129,17 @@ MonoBehaviour:
       HasMoveFrom: 0
       MoveTo: {x: 0, y: 0, z: 0}
       HasMoveTo: 0
+      MovementPath: []
       LayerBefore:
         domain: 0
         heightLevel: 0
         spriteDefault: {fileID: 0}
-        spriteGreen: {fileID: 0}
-        spriteRed: {fileID: 0}
-        spriteBlue: {fileID: 0}
-        spriteYellow: {fileID: 0}
+        teamVariantSprites: []
       LayerAfter:
         domain: 0
         heightLevel: 0
         spriteDefault: {fileID: 0}
-        spriteGreen: {fileID: 0}
-        spriteRed: {fileID: 0}
-        spriteBlue: {fileID: 0}
-        spriteYellow: {fileID: 0}
+        teamVariantSprites: []
       SensorAction: 0
       TargetInstanceId: 
       TargetConstructionId: 
@@ -16983,6 +17150,7 @@ MonoBehaviour:
       SubStepLabel: 
       SubSteps: []
       Confirmed: 0
+      IsAIGenerated: 0
       Snapshot:
         TurnNumber: 0
         ActiveTeam: 0
@@ -16994,22 +17162,40 @@ MonoBehaviour:
           unitId: 
           isActiveInHierarchy: 0
           teamId: 0
+          slotIndex: -1
           cellX: 0
           cellY: 0
           worldX: 0
           worldY: 0
           currentHP: 0
           isDead: 0
+          deadWhenTurn: -1
+          deadByReason: 
+          diedByUnit: 
+          hasMerged: 0
+          mergedWhenTurn: -1
+          mergedWithUnit: 
           currentAmmo: 0
           currentFuel: 0
           remainingMovementPoints: 0
           hasActed: 0
           receivedSuppliesThisTurn: 0
+          tookOffRecently: 0
+          isUnderRepair: 0
           isEmbarked: 0
           transporterInstanceId: 0
           transporterSlotIndex: 0
           domain: 0
           heightLevel: 0
+          isAircraftGrounded: 0
+          aircraftOperationLockTurns: 0
+          aiHasAssignedPlan: 0
+          aiAssignedPlanKey: 
+          aiAssignedPlanName: 
+          aiAssignedPlanBadge: 
+          aiAssignedPlanRole: 0
+          aiAssignedPlanBadgeVisible: 0
+          aiEixo: 0
           embarkedWeaponAmmo: 00000000
           embarkedSupplies:
           - supplyId: 
@@ -17018,15 +17204,24 @@ MonoBehaviour:
         - instanceId: 0
           constructionId: 
           isActiveInHierarchy: 0
+          isVisible: 1
+          isForwardObserverSpot: 0
+          forwardObserverSpotUsage: 0
+          isRallyPoint: 0
           teamId: 0
+          slotIndex: -1
+          sector: 0
+          rallyOwnerSlotIndex: -1
+          isAnchorSector: 0
+          anchorSectorSlotIndex: -1
           cellX: 0
           cellY: 0
           worldX: 0
           worldY: 0
           currentCapturePoints: 0
-          originalOwnerTeamId: 0
+          originalOwnerSlotIndex: -1
           hasOriginalOwner: 0
-          firstOwnerTeamId: 0
+          firstOwnerSlotIndex: -1
           hasFirstOwner: 0
           hasInfiniteSuppliesOverride: 0
           siteRuntime:
@@ -17064,22 +17259,17 @@ MonoBehaviour:
     HasMoveFrom: 0
     MoveTo: {x: 0, y: 0, z: 0}
     HasMoveTo: 0
+    MovementPath: []
     LayerBefore:
       domain: 0
       heightLevel: 0
       spriteDefault: {fileID: 0}
-      spriteGreen: {fileID: 0}
-      spriteRed: {fileID: 0}
-      spriteBlue: {fileID: 0}
-      spriteYellow: {fileID: 0}
+      teamVariantSprites: []
     LayerAfter:
       domain: 0
       heightLevel: 0
       spriteDefault: {fileID: 0}
-      spriteGreen: {fileID: 0}
-      spriteRed: {fileID: 0}
-      spriteBlue: {fileID: 0}
-      spriteYellow: {fileID: 0}
+      teamVariantSprites: []
     SensorAction: 0
     TargetInstanceId: 
     TargetConstructionId: 
@@ -17090,6 +17280,7 @@ MonoBehaviour:
     SubStepLabel: 
     SubSteps: []
     Confirmed: 0
+    IsAIGenerated: 0
     Snapshot:
       TurnNumber: 0
       ActiveTeam: 0
@@ -17144,9 +17335,14 @@ MonoBehaviour:
   animateCursorTravelBetweenActions: 1
   cursorTravelStepDelay: 0.15
   sensorSubstepDelay: 0.4
+  unitSelectionHoldDelay: 0.3
+  beforeConfirmDelay: 0.15
+  sensorListNavDelay: 0.12
   replayConfirmVisualDelay: 0.15
   replayTransitionMinDisplaySeconds: 3
   shoppingNavDelay: 0.12
+  shoppingMenuOpenDelay: 0.25
+  playerMenuStepDelay: 0.2
   fastReplayMode: 0
   snapshotTelemetryEnabled: 1
   snapshotTelemetryLogEvery: 20
@@ -17665,57 +17861,15 @@ Tilemap:
   m_Enabled: 1
   m_Tiles: {}
   m_AnimatedTiles: {}
-  m_TileAssetArray:
-  - m_RefCount: 0
-    m_Data: {fileID: 0}
-  - m_RefCount: 0
-    m_Data: {fileID: 0}
-  - m_RefCount: 0
-    m_Data: {fileID: 0}
-  - m_RefCount: 0
-    m_Data: {fileID: 0}
-  - m_RefCount: 0
-    m_Data: {fileID: 0}
-  m_TileSpriteArray:
-  - m_RefCount: 0
-    m_Data: {fileID: 0}
-  - m_RefCount: 0
-    m_Data: {fileID: 0}
-  - m_RefCount: 0
-    m_Data: {fileID: 0}
-  - m_RefCount: 0
-    m_Data: {fileID: 0}
-  - m_RefCount: 0
-    m_Data: {fileID: 0}
-  m_TileMatrixArray:
-  - m_RefCount: 0
-    m_Data:
-      e00: -1.051656e-34
-      e01: 0
-      e02: -6.2781716e-22
-      e03: -8.194636e-39
-      e10: 4.5907e-41
-      e11: 0
-      e12: 2.94e-43
-      e13: 9.12e-43
-      e20: -3.4289538e-34
-      e21: 0
-      e22: 2.0998596e+20
-      e23: 1.1670812e-16
-      e30: 4.5907e-41
-      e31: 0
-      e32: 9.16e-43
-      e33: 9.14e-43
-  m_TileColorArray:
-  - m_RefCount: 0
-    m_Data: {r: -6.2780424e-22, g: -6.2780424e-22, b: -6.2780424e-22, a: -6.2780424e-22}
-  - m_RefCount: 0
-    m_Data: {r: -3.4289538e-34, g: -3.4289538e-34, b: -3.4289538e-34, a: -3.4289538e-34}
+  m_TileAssetArray: []
+  m_TileSpriteArray: []
+  m_TileMatrixArray: []
+  m_TileColorArray: []
   m_TileObjectToInstantiateArray: []
   m_AnimationFrameRate: 1
   m_Color: {r: 1, g: 1, b: 1, a: 1}
-  m_Origin: {x: 0, y: -59, z: 0}
-  m_Size: {x: 60, y: 61, z: 1}
+  m_Origin: {x: 0, y: 0, z: 0}
+  m_Size: {x: 0, y: 0, z: 1}
   m_TileAnchor: {x: 0, y: 0, z: 0}
   m_TileOrientation: 0
   m_TileOrientationMatrix:
@@ -18669,10 +18823,18 @@ MonoBehaviour:
   explosionSfxVolume: 1
   endingTurnSfxVolume: 1
   skillSfxVolume: 1
+  cursorRenderer: {fileID: 0}
+  cursorColorA: {r: 1, g: 1, b: 1, a: 1}
+  cursorColorB: {r: 0, g: 0, b: 0, a: 1}
+  cursorBlinkInterval: 0.4
+  useActiveTeamColor: 0
   turnStateManager: {fileID: 1900915756}
   matchController: {fileID: 327617512}
   replayManager: {fileID: 1942499702}
+  battleMapMenuRootController: {fileID: 0}
   enableNeutralLeftClickTeleport: 1
+  rightClickActsAsCancel: 1
+  rightClickTapMaxTravelPixels: 0
 --- !u!212 &2105919122
 SpriteRenderer:
   serializedVersion: 2
@@ -19329,9 +19491,10 @@ Canvas:
   m_OverridePixelPerfect: 0
   m_SortingBucketNormalizedSize: 0
   m_VertexColorAlwaysGammaSpace: 0
+  m_UseReflectionProbes: 0
   m_AdditionalShaderChannelsFlag: 25
   m_UpdateRectTransformForStandalone: 0
-  m_SortingLayerID: -1721051581
+  m_SortingLayerID: 519888321
   m_SortingOrder: 500
   m_TargetDisplay: 0
 --- !u!1 &2134258353

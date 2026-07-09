@@ -325,6 +325,7 @@ public class MatchControllerEditor : Editor
 
             SerializedProperty teamProp = player.FindPropertyRelative("teamId");
             SerializedProperty flipXProp = player.FindPropertyRelative("flipX");
+            SerializedProperty flipXOverrideProp = player.FindPropertyRelative("flipXOverride");
             SerializedProperty isAIProp = player.FindPropertyRelative("isAI");
             SerializedProperty commandServiceAutomaticProp = player.FindPropertyRelative("commandServiceAutomatic");
             SerializedProperty startMoneyProp = player.FindPropertyRelative("startMoney");
@@ -347,8 +348,18 @@ public class MatchControllerEditor : Editor
                 EditorGUILayout.PropertyField(teamProp, new GUIContent("Team"));
             if (flipXProp != null)
             {
+                EditorGUILayout.BeginHorizontal();
                 using (new EditorGUI.DisabledScope(true))
                     EditorGUILayout.PropertyField(flipXProp, new GUIContent("Flip X (auto)"));
+                if (flipXOverrideProp != null)
+                {
+                    EditorGUILayout.PropertyField(flipXOverrideProp, GUIContent.none, GUILayout.Width(110f));
+                }
+                EditorGUILayout.EndHorizontal();
+            }
+            else if (flipXOverrideProp != null)
+            {
+                EditorGUILayout.PropertyField(flipXOverrideProp, new GUIContent("Flip X Override"));
             }
             if (isAIProp != null)
                 EditorGUILayout.PropertyField(isAIProp, new GUIContent("Is AI"));

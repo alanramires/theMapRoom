@@ -68,7 +68,7 @@ public class ReplayManager : MonoBehaviour
     private readonly HashSet<UnitManager> replaySpawnedUnits = new HashSet<UnitManager>();
     private readonly Dictionary<int, TurnStartSnapshot> stepSnapshots = new Dictionary<int, TurnStartSnapshot>();
     private bool replayPoolsInitialized;
-    private int replayPoolSceneHandle = -1;
+    private ulong replayPoolSceneHandle = ulong.MaxValue;
     private Coroutine restoreFogRefreshRoutine;
     private Coroutine attackStepExecutionRoutine;
     private Coroutine actionStepExecutionRoutine;
@@ -163,7 +163,7 @@ public class ReplayManager : MonoBehaviour
         replayUnitPool.Clear();
         replayConstructionPool.Clear();
         replayPoolsInitialized = false;
-        replayPoolSceneHandle = -1;
+        replayPoolSceneHandle = ulong.MaxValue;
     }
 
     private void OnEnable()
@@ -3375,7 +3375,8 @@ public class ReplayManager : MonoBehaviour
     private void EnsureReplayPoolsInitialized()
     {
         Scene activeScene = SceneManager.GetActiveScene();
-        if (replayPoolsInitialized && replayPoolSceneHandle == activeScene.handle)
+        ulong activeSceneHandle = activeScene.handle.GetRawData();
+        if (replayPoolsInitialized && replayPoolSceneHandle == activeSceneHandle)
             return;
 
         replayUnitPool.Clear();
@@ -3423,7 +3424,7 @@ public class ReplayManager : MonoBehaviour
         }
 
         replayPoolsInitialized = true;
-        replayPoolSceneHandle = activeScene.handle;
+        replayPoolSceneHandle = activeSceneHandle;
     }
 
     private void RegisterUnitInPool(UnitManager unit)

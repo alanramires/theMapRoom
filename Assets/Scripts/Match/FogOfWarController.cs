@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Text;
 using UnityEngine;
 
@@ -15,6 +15,9 @@ public class FogOfWarController : MonoBehaviour
     }
 
     [SerializeField] private MatchController matchController;
+    [Header("Presentation")]
+    [SerializeField] [Range(0f, 1f)] private float fogOfWarAlpha = 0.65f;
+    [SerializeField, HideInInspector] private bool fogOfWarAlphaInitialized;
     [SerializeField] private bool autoRefreshOnFogUpdate = false;
     [SerializeField] private bool includeInvisibleTargets = true;
     [SerializeField] [TextArea(2, 20)] private string lastDump;
@@ -24,9 +27,11 @@ public class FogOfWarController : MonoBehaviour
 
     public IReadOnlyList<FogUnitContributorsView> Snapshot => snapshot;
     public string LastDump => lastDump;
+    public float FogOfWarAlpha => Mathf.Clamp01(fogOfWarAlpha);
 
     private void OnEnable()
     {
+        EnsureAlphaMigrated();
         MatchController.OnFogOfWarUpdated += HandleFogOfWarUpdated;
     }
 
@@ -39,6 +44,29 @@ public class FogOfWarController : MonoBehaviour
     {
         if (matchController == null)
             matchController = FindAnyObjectByType<MatchController>();
+        EnsureAlphaMigrated();
+    }
+
+    public void InitializeAlphaFromLegacy(float legacyAlpha)
+    {
+        if (fogOfWarAlphaInitialized)
+            return;
+
+        fogOfWarAlpha = Mathf.Clamp01(legacyAlpha);
+        fogOfWarAlphaInitialized = true;
+    }
+
+    public void SetAlphaPercent(int alphaPercent)
+    {
+        fogOfWarAlpha = Mathf.Clamp(alphaPercent, 0, 100) / 100f;
+        fogOfWarAlphaInitialized = true;
+    }
+
+    private void EnsureAlphaMigrated()
+    {
+        if (fogOfWarAlphaInitialized || matchController == null)
+            return;
+        InitializeAlphaFromLegacy(matchController.LegacyFogOfWarAlpha);
     }
 
     public void RebuildSnapshot()
@@ -65,7 +93,7 @@ public class FogOfWarController : MonoBehaviour
 
             FogUnitContributorsView row = new FogUnitContributorsView();
             row.targetUnit = ResolveUnitLabel(info.targetUnit);
-            row.targetInstanceId = info.targetUnit.InstanceId > 0 ? info.targetUnit.InstanceId : info.targetUnit.GetInstanceID();
+            row.targetInstanceId = info.targetUnit.InstanceId > 0 ? info.targetUnit.InstanceId : info.targetUnit.GetEntityId().GetHashCode();
             row.visibleForActiveTeam = info.isVisibleForActiveTeam;
             row.contributorsCount = info.contributors != null ? info.contributors.Count : 0;
             row.contributors = BuildContributorsLine(info.contributors);
@@ -144,7 +172,7 @@ public class FogOfWarController : MonoBehaviour
             if (builder.Length > 0)
                 builder.Append(" | ");
             builder.Append(ResolveUnitLabel(unit));
-            int id = unit.InstanceId > 0 ? unit.InstanceId : unit.GetInstanceID();
+            int id = unit.InstanceId > 0 ? unit.InstanceId : unit.GetEntityId().GetHashCode();
             builder.Append(" (#").Append(id).Append(')');
         }
 

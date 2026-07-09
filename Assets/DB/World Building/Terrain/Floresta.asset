@@ -14,7 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::TerrainTypeData
   id: forest
   displayName: Floresta
-  description: 
+  description: "Boa cobertura para infantaria.\nBloqueia vis\xE3o atr\xE1s dela.\nVe\xEDculos
+    avan\xE7am devagar."
   paletteTile: {fileID: 11400000, guid: 474aa6f1deb7f064fbbe2a7ff46a4dfe, type: 2}
   domain: 0
   heightLevel: 3
@@ -27,10 +28,13 @@ MonoBehaviour:
   requireAtLeastOneLandingSkill: 0
   allowedTakeoffModes: 
   forceEndMovementOnTerrainDomainForDomains: []
+  forceDetectOnForcedEndMovementDomains: 0
+  forceDetectUnitsWithFollowingStealthSkills: []
   basicAutonomyCost: 2
   dpqData: {fileID: 11400000, guid: 1ff1954ba402c104b837d28d29e3d69d, type: 2}
   ev: 1
   shooterInheritsTerrainEv: 0
+  shooterInheritedEvOverride: -1
   blockLoS: 1
   constructionVisionOverrides: []
   structureVisionOverrides: []

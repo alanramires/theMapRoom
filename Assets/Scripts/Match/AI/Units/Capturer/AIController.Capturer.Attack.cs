@@ -223,7 +223,7 @@ public partial class AIController
             ? SensorMovementMode.MoveuAndando
             : SensorMovementMode.MoveuParado;
 
-        int cacheUnitId = unit.InstanceId > 0 ? unit.InstanceId : unit.GetInstanceID();
+        int cacheUnitId = unit.InstanceId > 0 ? unit.InstanceId : unit.GetEntityId().GetHashCode();
         var cacheKey = (cacheUnitId, toCell, mode);
         if (aiAttackTargetsByOrigin.TryGetValue(cacheKey, out HashSet<int> cachedTargets))
             return cachedTargets.Contains(target.InstanceId);

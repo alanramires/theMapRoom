@@ -384,8 +384,11 @@ public partial class TurnStateManager
     private ActionSfx HandleConfirmWhileInspecting()
     {
         LogStateStep("HandleConfirmWhileInspecting");
+        if (TryShowInspectedCurrentWeaponRange())
+            return ActionSfx.Confirm;
+
         ExitInspectStateToNeutral();
-        return HandleConfirmFromNeutralLikeState();
+        return ActionSfx.Cancel;
     }
 
     private ActionSfx HandleConfirmFromNeutralLikeState()
@@ -742,6 +745,7 @@ public partial class TurnStateManager
             }
 
             EnterSensorsState(CursorState.MoveuParado);
+            OnUnitHeldPosition?.Invoke(selectedUnit);
             Debug.Log("moveu no mesmo lugar");
             return ActionSfx.Confirm;
         }

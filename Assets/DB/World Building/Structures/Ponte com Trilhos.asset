@@ -13,8 +13,10 @@ MonoBehaviour:
   m_Name: Ponte com Trilhos
   m_EditorClassIdentifier: Assembly-CSharp::StructureData
   id: trainBridge
-  displayName: Ponte para Trem
-  description: ponte para trem
+  displayName: "Ponte Ferrovi\xE1ria"
+  description: "Trens cruzam por cima.\nNavios passam por baixo.\nSem b\xF4nus de
+    vis\xE3o."
+  descriptionsByTerrain: []
   priorityOrder: 2
   domain: 0
   heightLevel: 3

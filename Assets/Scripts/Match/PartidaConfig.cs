@@ -28,6 +28,25 @@ public static class PartidaConfig
         return false;
     }
 
+    // Cor escolhida pelo jogador ao iniciar um tutorial pela Tela de Entrada.
+    // Canal separado do Set/Apply: o tutorial preserva toda a config serializada da
+    // cena (preset, economia, isAI) e apenas recolore o slot 0 (com swap se colidir).
+    private static TeamId? pendingTutorialPlayerTeam;
+
+    public static void SetTutorialPlayerTeam(TeamId team) => pendingTutorialPlayerTeam = team;
+
+    public static bool TryConsumeTutorialPlayerTeam(out TeamId team)
+    {
+        if (pendingTutorialPlayerTeam.HasValue)
+        {
+            team = pendingTutorialPlayerTeam.Value;
+            pendingTutorialPlayerTeam = null;
+            return true;
+        }
+        team = TeamId.Neutral;
+        return false;
+    }
+
     public static int PlayerCount { get; private set; }
     public static TeamId[] Teams { get; private set; }
     public static bool[] IsAI { get; private set; }

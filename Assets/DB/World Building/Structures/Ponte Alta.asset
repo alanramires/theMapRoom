@@ -14,7 +14,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::StructureData
   id: bridges
   displayName: Pontes
-  description: 
+  description: "Terrestres cruzam por cima.\nNavios passam por baixo.\nN\xE3o d\xE1
+    vis\xE3o elevada."
+  descriptionsByTerrain: []
   priorityOrder: 2
   domain: 0
   heightLevel: 3
@@ -30,6 +32,7 @@ MonoBehaviour:
   blockedSkills:
   - {fileID: 11400000, guid: 44c13554a7f731f418bad4395bf10e52, type: 2}
   skillCostOverrides: []
+  skillRulesByTerrain: []
   canAlsoBeBuiltOnTheFollowDomains:
   - domain: 1
     heightLevel: 3
@@ -47,6 +50,8 @@ MonoBehaviour:
   forceEndMovementOnTerrainDomainForDomains:
   - domain: 2
     heightLevel: 2
+  forceDetectOnForcedEndMovementDomains: 0
+  forceDetectUnitsWithFollowingStealthSkills: []
   roadRoutes:
   - routeName: Ponte Hudson
     ownerDatabase: {fileID: 11400000, guid: e7a21940dac0b9443a34ab7f4e469f23, type: 2}

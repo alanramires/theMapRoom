@@ -764,9 +764,9 @@ public class PodeTransferirSensorDebugWindow : EditorWindow
     private static string BuildEndpointKey(UnitManager unit, ConstructionManager construction)
     {
         if (unit != null)
-            return $"unit:{unit.GetInstanceID()}";
+            return $"unit:{unit.GetEntityId().GetHashCode()}";
         if (construction != null)
-            return $"construction:{construction.GetInstanceID()}";
+            return $"construction:{construction.GetEntityId().GetHashCode()}";
         return string.Empty;
     }
 
@@ -785,7 +785,7 @@ public class PodeTransferirSensorDebugWindow : EditorWindow
                 UnitManager[] units = Object.FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
                 for (int i = 0; i < units.Length; i++)
                 {
-                    if (units[i] != null && units[i].GetInstanceID() == id)
+                    if (units[i] != null && units[i].GetEntityId().GetHashCode() == id)
                     {
                         unit = units[i];
                         return;
@@ -803,7 +803,7 @@ public class PodeTransferirSensorDebugWindow : EditorWindow
                 ConstructionManager[] constructions = Object.FindObjectsByType<ConstructionManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
                 for (int i = 0; i < constructions.Length; i++)
                 {
-                    if (constructions[i] != null && constructions[i].GetInstanceID() == id)
+                    if (constructions[i] != null && constructions[i].GetEntityId().GetHashCode() == id)
                     {
                         construction = constructions[i];
                         return;

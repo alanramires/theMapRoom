@@ -53,7 +53,8 @@
       "Bash(grep -viE \"^\\\\+\\\\s*//|^\\\\+\\\\s*$\")",
       "Bash(xargs -0 git rm --cached --quiet)",
       "Bash(ls Assembly-CSharp.csproj)",
-      "Bash(which dotnet *)"
+      "Bash(which dotnet *)",
+      "Bash(awk '/--- !u!114 &1073542090/,/^--- !u!/{print NR\": \"$0}' \"Assets/Scenes/Tela de Entrada.unity\")"
     ],
     "additionalDirectories": [
       "d:\\Unity Projects\\The Map Room\\Assets\\Scripts\\Match\\AI\\Units\\Assault"

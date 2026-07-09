@@ -80,7 +80,7 @@ public partial class TurnStateManager
 
             MovementRangeCacheKey cacheKey = new MovementRangeCacheKey
             {
-                unitInstanceId = selectedUnit.GetInstanceID(),
+                unitInstanceId = selectedUnit.GetEntityId().GetHashCode(),
                 remainingMovementPoints = Mathf.Max(0, selectedUnit.RemainingMovementPoints),
                 currentFuel = Mathf.Max(0, selectedUnit.CurrentFuel),
                 globalBoardRevision = ThreatRevisionTracker.GlobalBoardRevision

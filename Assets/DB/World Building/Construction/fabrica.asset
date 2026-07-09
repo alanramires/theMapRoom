@@ -15,7 +15,12 @@ MonoBehaviour:
   id: fabrica
   displayName: "F\xE1brica"
   sufixo: Factory
-  description: "F\xE1brica, produz unidades militares"
+  description: 'Produz tropas terrestres.
+
+    Gera renda por turno.
+
+    Revela
+    os arredores.'
   isAirport: 0
   isHarbor: 0
   isCity: 0

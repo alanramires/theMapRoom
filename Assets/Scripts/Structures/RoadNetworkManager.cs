@@ -653,16 +653,16 @@ public class RoadNetworkManager : MonoBehaviour
         unchecked
         {
             int hash = 17;
-            hash = hash * 31 + (structureDatabase != null ? structureDatabase.GetInstanceID() : 0);
-            hash = hash * 31 + (boardTilemap != null ? boardTilemap.GetInstanceID() : 0);
-            hash = hash * 31 + (terrainDatabase != null ? terrainDatabase.GetInstanceID() : 0);
+            hash = hash * 31 + (structureDatabase != null ? structureDatabase.GetEntityId().GetHashCode() : 0);
+            hash = hash * 31 + (boardTilemap != null ? boardTilemap.GetEntityId().GetHashCode() : 0);
+            hash = hash * 31 + (terrainDatabase != null ? terrainDatabase.GetEntityId().GetHashCode() : 0);
             hash = hash * 31 + (enforceLandSurfaceCells ? 1 : 0);
             hash = hash * 31 + (int)(roadWidth * 1000f);
             hash = hash * 31 + (int)(segmentOverlap * 1000f);
             hash = hash * 31 + sortingLayer.Id;
             hash = hash * 31 + sortingOrder;
             hash = hash * 31 + roadColor.GetHashCode();
-            hash = hash * 31 + (roadSegmentSprite != null ? roadSegmentSprite.GetInstanceID() : 0);
+            hash = hash * 31 + (roadSegmentSprite != null ? roadSegmentSprite.GetEntityId().GetHashCode() : 0);
 
             if (structureDatabase == null || structureDatabase.Structures == null)
                 return hash;
@@ -678,8 +678,8 @@ public class RoadNetworkManager : MonoBehaviour
                     continue;
                 }
 
-                hash = hash * 31 + structure.GetInstanceID();
-                hash = hash * 31 + (structure.roadSegmentSprite != null ? structure.roadSegmentSprite.GetInstanceID() : 0);
+                hash = hash * 31 + structure.GetEntityId().GetHashCode();
+                hash = hash * 31 + (structure.roadSegmentSprite != null ? structure.roadSegmentSprite.GetEntityId().GetHashCode() : 0);
                 hash = hash * 31 + structure.roadColor.GetHashCode();
                 hash = hash * 31 + (int)(structure.roadWidth * 1000f);
                 hash = hash * 31 + (int)(structure.segmentOverlap * 1000f);

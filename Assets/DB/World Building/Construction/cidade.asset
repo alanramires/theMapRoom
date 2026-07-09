@@ -15,7 +15,8 @@ MonoBehaviour:
   id: cidade
   displayName: Cidade
   sufixo: City
-  description: Cidades que fornecem dinheiro por turno
+  description: "Gera dinheiro por turno.\nMarca alvos no pr\xF3prio hex.\nRevela
+    os arredores."
   isAirport: 0
   isHarbor: 0
   isCity: 1

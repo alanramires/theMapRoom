@@ -15,7 +15,12 @@ MonoBehaviour:
   id: porto
   displayName: Porto Naval
   sufixo: Harbor
-  description: 
+  description: 'Produz navios e submarinos.
+
+    Submersos emergem.
+
+    Terrestres
+    podem andar aqui.'
   isAirport: 0
   isHarbor: 1
   isCity: 0

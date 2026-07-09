@@ -63,9 +63,9 @@ public static class PodeDetectarSensor
             observerCellX = observerCell.x;
             observerCellY = observerCell.y;
             observerTeamId = observer != null ? (int)observer.TeamId : -1;
-            boardMapInstanceId = boardMap != null ? boardMap.GetInstanceID() : 0;
-            terrainDatabaseInstanceId = terrainDatabase != null ? terrainDatabase.GetInstanceID() : 0;
-            dpqConfigInstanceId = dpqAirHeightConfig != null ? dpqAirHeightConfig.GetInstanceID() : 0;
+            boardMapInstanceId = boardMap != null ? boardMap.GetEntityId().GetHashCode() : 0;
+            terrainDatabaseInstanceId = terrainDatabase != null ? terrainDatabase.GetEntityId().GetHashCode() : 0;
+            dpqConfigInstanceId = dpqAirHeightConfig != null ? dpqAirHeightConfig.GetEntityId().GetHashCode() : 0;
             this.maxRange = maxRange;
             this.observerLayerRangeFloor = observerLayerRangeFloor;
             this.forcedDetectionRangeOverride = forcedDetectionRangeOverride;
@@ -227,7 +227,7 @@ public static class PodeDetectarSensor
             TerrainDatabase terrainDatabase,
             DPQAirHeightConfig dpqAirHeightConfig)
         {
-            boardMapInstanceId = boardMap != null ? boardMap.GetInstanceID() : 0;
+            boardMapInstanceId = boardMap != null ? boardMap.GetEntityId().GetHashCode() : 0;
             observerInstanceId = ResolveUnitCacheInstanceId(observer);
             observerCellX = observerCell.x;
             observerCellY = observerCell.y;
@@ -236,8 +236,8 @@ public static class PodeDetectarSensor
             this.detectionRange = detectionRange;
             this.targetDomain = targetDomain;
             this.targetHeight = targetHeight;
-            terrainDatabaseInstanceId = terrainDatabase != null ? terrainDatabase.GetInstanceID() : 0;
-            dpqConfigInstanceId = dpqAirHeightConfig != null ? dpqAirHeightConfig.GetInstanceID() : 0;
+            terrainDatabaseInstanceId = terrainDatabase != null ? terrainDatabase.GetEntityId().GetHashCode() : 0;
+            dpqConfigInstanceId = dpqAirHeightConfig != null ? dpqAirHeightConfig.GetEntityId().GetHashCode() : 0;
         }
 
         public bool Equals(LosCacheKey other)
@@ -2179,7 +2179,7 @@ public static class PodeDetectarSensor
             return false;
 
         cell.z = 0;
-        TerrainCellCacheKey cacheKey = new TerrainCellCacheKey(terrainTilemap.GetInstanceID(), cell.x, cell.y);
+        TerrainCellCacheKey cacheKey = new TerrainCellCacheKey(terrainTilemap.GetEntityId().GetHashCode(), cell.x, cell.y);
         if (terrainCacheForRefresh.TryGetValue(cacheKey, out TerrainTypeData cachedTerrain))
         {
             terrain = cachedTerrain;
@@ -2226,7 +2226,7 @@ public static class PodeDetectarSensor
         if (grid == null)
             return Array.Empty<Tilemap>();
 
-        int gridId = grid.GetInstanceID();
+        int gridId = grid.GetEntityId().GetHashCode();
         if (gridTilemapsCache.TryGetValue(gridId, out Tilemap[] cached) &&
             cached != null &&
             cached.Length > 0)
@@ -2440,7 +2440,7 @@ public static class PodeDetectarSensor
         if (tilemap == null)
             return false;
 
-        int tilemapId = tilemap.GetInstanceID();
+        int tilemapId = tilemap.GetEntityId().GetHashCode();
         if (tilemapOddRowOffsetCache.TryGetValue(tilemapId, out bool cached))
         {
             oddRowOffset = cached;
@@ -2556,7 +2556,7 @@ public static class PodeDetectarSensor
         int instanceId = unit.InstanceId;
         if (instanceId > 0)
             return instanceId;
-        return unit.GetInstanceID();
+        return unit.GetEntityId().GetHashCode();
     }
 
     private static void InvalidateCollectVisibleCellsCacheIfNeeded(int globalBoardRevision)

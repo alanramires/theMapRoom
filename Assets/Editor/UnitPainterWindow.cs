@@ -121,16 +121,31 @@ public class UnitPainterWindow : EditorWindow
 
     private void OnSceneGUI(SceneView sceneView)
     {
+        Event e = Event.current;
+        // Diagnostico: clique com o paint armado nunca deve falhar em silencio.
+        bool isClick = e != null && e.type == EventType.MouseDown && (e.button == 0 || e.button == 1);
+
         if (!isPainting || unitSpawner == null || unitDatabase == null)
+        {
+            if (isClick && isPainting)
+                Debug.LogWarning($"[UnitPainter] Clique ignorado: unitSpawner={(unitSpawner != null ? unitSpawner.name : "<null>")} unitDatabase={(unitDatabase != null ? unitDatabase.name : "<null>")}.");
             return;
+        }
 
         Tilemap tilemap = GetSpawnerBoardTilemap();
         if (tilemap == null)
+        {
+            if (isClick)
+                Debug.LogWarning("[UnitPainter] Clique ignorado: board tilemap nao resolvido (procuro um Tilemap chamado 'TileMap' na cena ativa).");
             return;
+        }
         if (!TryGetSelectedUnit(out UnitData selectedUnit) || selectedUnit == null)
+        {
+            if (isClick)
+                Debug.LogWarning($"[UnitPainter] Clique ignorado: unidade selecionada invalida (indice {selectedUnitIndex} do database '{unitDatabase.name}' e nula ou sem id).");
             return;
+        }
 
-        Event e = Event.current;
         HandleUtility.AddDefaultControl(GUIUtility.GetControlID(FocusType.Passive));
 
         if (e.type != EventType.MouseDown)
@@ -143,6 +158,7 @@ public class UnitPainterWindow : EditorWindow
         cell.z = 0;
         if (!IsCellPaintedOnGrid(tilemap, cell))
         {
+            Debug.LogWarning($"[UnitPainter] Hex invalido (sem tile) em ({cell.x},{cell.y}) no tilemap '{tilemap.name}'.");
             ShowNotification(new GUIContent("Hex invalido (sem tile)"));
             e.Use();
             return;
@@ -188,6 +204,7 @@ public class UnitPainterWindow : EditorWindow
         }
         else
         {
+            Debug.LogWarning($"[UnitPainter] Spawn falhou para '{selectedUnit.id}' em ({cell.x},{cell.y}) — veja o warning do UnitSpawner acima para o motivo.");
             ShowNotification(new GUIContent("Spawn falhou"));
         }
 
