@@ -184,11 +184,20 @@ Bom. Você chegou.
 
 Não foi bonito, mas foi útil.
 
+Sargento:
+Sua unidade já agiu neste turno.
+Quem age, espera. Quem ainda não agiu, recebe ordem.
+[ordem]Encerre o turno, recruta.[/ordem]
+
+<esta fala destrava o passar a vez (unlockEndTurn) e revela `hist_1_06 END_TURN`>
+<o jogador passa a vez; o turno inimigo (vazio) retorna sozinho via automata>
+
 ---
 
 ## Step 4 — Manter posição
 
-Objetivo do sistema: ensinar que confirmar sem mover também é ação válida.
+Objetivo do sistema: `hist_1_07 HOLD_POSITION` — ensinar que confirmar sem mover também é ação válida
+(evento `OnUnitHeldPosition`: MANTER POSIÇÃO ou confirmar na própria célula).
 
 Sargento:
 Agora aprenda uma coisa importante: nem toda ordem é avanço.
@@ -209,13 +218,20 @@ Muito bem.
 Manter posição não é ficar parado por medo.
 É segurar o ponto certo até a hora certa.
 
+Sargento:
+Sua unidade segurou o ponto. [ordem]Agora encerre o turno de novo.[/ordem]
+Quem age, espera.
+
+<revela `hist_1_08 END_TURN`; ao passar a vez, a próxima fala revela `hist_1_09 ATTACK_UNIT`,
+cujo `spawn:slot1 SD x,y` faz o inimigo nascer na estrada (done.mp3) — **célula ainda `0,0` no asset**>
+
 ---
 
 ## Step 5 — Primeiro alvo
 
-Objetivo do sistema: revelar/spawnar inimigo simples em alcance válido.
-
-<um inimigo simples aparece em um hex próximo, em alcance válido>
+Objetivo do sistema: inimigo spawna na estrada e marcha até a floresta adjacente à montanha
+(AutomataData com `moveTowardsTarget` → célula da montanha, `stopDistance 1`, `preferAttack false` —
+**entrada no AutomataDatabase ainda pendente**).
 
 Sargento:
 Contato à frente e ele ainda não te viu.
@@ -257,7 +273,8 @@ Depois do tiro, não existe "foi sem querer".
 
 ## Step 7 — Confirmar ataque
 
-Objetivo do sistema: executar o primeiro combate.
+Objetivo do sistema: `hist_1_09 ATTACK_UNIT` — executar o primeiro combate (valida no ataque resolvido;
+Steps 5 e 6 são guiados só por diálogo).
 
 Sargento:
 Confirme o ataque.
