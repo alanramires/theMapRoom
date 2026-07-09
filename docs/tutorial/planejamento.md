@@ -120,26 +120,76 @@ Base existente: `História 5 - Defenda a Ponte`.
 
 Quando o comportamento precisa ser didático, é preferível limitar objetivos, unidades disponíveis e espaço do mapa em vez de criar uma segunda lógica artificial exclusiva para tutorial.
 
-## Estrutura técnica sugerida
+## Estrutura técnica (implementada — 09/07/2026)
 
-- `TutorialData` define tarefas, ordem, textos, condições opcionais e derrota.
-- `TutorialManager` escuta eventos reais do jogo e conclui objetivos.
-- `TutorialRules` fica reservado para exceções didáticas inevitáveis.
-- Spawns e diálogos devem ser declarativos sempre que possível.
-- A cena define mapa, forças iniciais, construções e dificuldade da AI.
-- Objetivos concluídos não devem depender de nomes de GameObjects quando puderem usar ID, time, tipo de unidade ou coordenada.
+A base proposta virou sistema. O que existe hoje:
 
-## Pontos para conversa
+### TutorialData (asset por História)
+- `objectives`: tarefas com `id` = **tipo de evento** (`UNIT_AT_HEX`, `END_TURN`...) e `key` =
+  **identidade única** no padrão `hist_Y_XX` (ex.: `hist_1_04`). Gates/reveals referenciam a key —
+  inserir tarefa no meio não renumera nada.
+- `script`: roteiro do panel_dialog_tutorial. Cada fala tem `text` (com markup), `voice` (AudioClip),
+  `waitObjectiveKey` (gate: só aparece quando a tarefa completa), `revealObjectiveKey` (a ordem do
+  Sargento faz a tarefa pingar na task list), `spawnCommand`, `statCommand`, `unlockEndTurn`.
+- Comandos declarativos nas falas:
+  - `spawnCommand`: `slot0 SD 1,3 name=Ryan cursor` — slot lógico (respeita escolha de cor), `acted`
+    (nasce "já agiu"), `name=` (renomeia), `cursor` (cursor desliza até a unidade); done.mp3 por lote.
+  - `statCommand`: `Mathias hp=4; Dias fuel=15; Dias ammo=0` — demonstrações vivas das barras.
+- Bloqueios por cena: `blockCommandService` (X), `blockRemoveUnit` (U), `blockSurrender`,
+  `blockStatusSummary` — recusa vira **bronca do Sargento** no balão + error.mp3.
+- Markup nas falas: `[ordem]` (amarelo+negrito = o que fazer), `[enfase]` (laranja = o que fixar),
+  `[azul]/[amarelo]/[vermelho]` (apontar elementos da UI).
 
-- O tutorial deve bloquear ações ainda não ensinadas ou apenas orientar?
-- O jogador pode falhar e continuar experimentando ou a cena reinicia?
-- As cinco cenas formam uma campanha obrigatória ou ficam disponíveis separadamente?
-- Devemos manter nomes e narrativa inspirados em Ryan/Ramelle?
-- Quais tarefas precisam de diálogo e quais bastam no `panel_helper`?
-- A Cena 5 termina por objetivo tutorial ou pelas regras normais de vitória?
-- O progresso entre cenas deve ser salvo?
+### TutorialManager
+- Escuta eventos reais (fonte de verdade = sensores/TurnStateManager). Validações disponíveis:
+  `CAMERA_ZOOM`, `CAMERA_PAN` (com célula alvo), `INSPECT_ALLY_UNIT` / `INSPECT_ENEMY_UNIT`,
+  `UNIT_SELECTED`, `UNIT_AT_HEX`, `HOLD_POSITION` (novo evento `OnUnitHeldPosition`), `END_TURN`,
+  `ATTACK_UNIT` (+ variantes de terreno), `PURCHASE_UNIT`, `HAS_EMBARKED_UNIT`, `SUPPLY_UNIT`,
+  `USED_ROAD_BOOST`, `UNIT_DEAD` (com `AUT=`), `FOW_REVEAL_UNIT`, `DESTROY_ENEMY_UNIT`.
+- Task list dirigida pelo roteiro: com qualquer `reveal` no script, o painel começa vazio
+  ("Aguardando próximo objetivo...") e as tarefas aparecem quando o Sargento ordena.
+- Trava de passar a vez (`unlockEndTurn`) cobrindo R, botão do panel_remaining e menu.
+- Automata ganhou marcha: `AutomataData.moveTowardsTarget/moveTargetCell/stopDistance` — avança com
+  custos reais de terreno e para adjacente ao alvo (ex.: inimigo marcha da estrada até o morro).
+  `teamId: Neutral` no AutomataData = curinga (compatível com escolha de cor).
 
-## Próximo passo sugerido
+### panel_dialog_tutorial (PanelDialogTutorialController)
+- Retrato do Sargento + balão center-left, Avançar/Voltar (confirm/cancel.mp3), histórico navegável,
+  voz por fala, esconde nos gates e reaparece sozinho quando a tarefa completa.
+- Bronca transiente para ações bloqueadas (o painel aparece, xinga e some) com retrato de bronca
+  opcional (`Scold Portrait Sprite`).
 
-Revisar a Cena 1 e definir uma sequência final de aproximadamente **seis a oito tarefas**. Depois, ligar a cena ao `TutorialData` atual e verificar quais eventos já funcionam sem código novo.
+### Menu e cena
+- Tela de Entrada: painel Tutorial com as 5 Histórias (2–5 desabilitadas por `historiasLiberadas = 1`),
+  passo "ESCOLHA SUA COR" antes de carregar (recolore o slot 0; requer unidades da cena com slotIndex).
+- Painel de tarefas é prefab (`Assets/Prefab/Panel_tutorial.prefab`) — precisa estar DENTRO do Canvas.
+- Inspect coerente com classificação: `Civil` = inspect básico (quase terreno); militar sem munição =
+  ficha + raio de movimento, sem camada de mira nem segundo clique.
+- `TutorialRules` segue reservado para exceções (a regra de reset de HP do tutorial antigo está inerte).
+
+## Pontos para conversa (respostas até aqui)
+
+- **Bloquear ou orientar?** Orientar como regra; travas pontuais e narradas (passar a vez até a ordem;
+  X/U/render/situação a cena toda) com bronca do Sargento — o bloqueio faz parte da encenação.
+- **Falhar e continuar?** Experimentação livre; `isDefeatCondition` reservado para o que quebra a
+  narrativa (ex.: Ryan morrer nas cenas seguintes).
+- **Campanha ou avulsas?** Desbloqueio sequencial, rejogáveis. Por ora `historiasLiberadas` no
+  inspector; progressão salva (PlayerPrefs) fica para quando a Cena 2 existir.
+- **Ryan/Ramelle?** Mantidos — e ampliados: recrutas Mathias e Dias viraram personagens de demonstração.
+- **Diálogo vs panel_helper?** Diálogo para conceito novo e narrativa; task list para o que fazer;
+  panel_helper segue com as confirmações padrão do jogo.
+- **Cena 5 termina como?** Pelas regras normais de vitória (decisão mantida).
+- **Progresso salvo?** Ainda aberto (ver campanha acima).
+
+## Estado das cenas
+
+| Cena | Status |
+|------|--------|
+| 1 — Aprendendo a Atirar | Roteiro completo no asset; mapa novo; faltam coordenadas finais (montanha, spawn do inimigo), entrada no AutomataDatabase, vozes. Ver `cena1.md`. |
+| 2 a 5 | Aguardando fechamento da Cena 1. Cenas antigas serão refeitas com o sistema novo (keys, reveals, spawns declarativos). |
+
+## Próximo passo
+
+Fechar as pendências da Cena 1 (lista no fim de `cena1.md`) e rodar o primeiro playtest completo
+de ponta a ponta. Depois: sessão com a sobrinha, e só então Cena 2.
 
