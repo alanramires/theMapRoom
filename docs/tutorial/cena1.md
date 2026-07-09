@@ -314,3 +314,39 @@ Amanhã a gente descobre se você consegue fazer isso sem eu gritar no seu ouvid
 No chão, recruta! Paga 20!
 
 <toca vitoria.mp3>
+
+---
+
+## Status de implementação (09/07/2026)
+
+### Pronto e funcionando
+- **panel_dialog_tutorial** (`PanelDialogTutorialController`): retrato + balão center-left, Avançar
+  (confirm.mp3) / Voltar (cancel.mp3) com histórico, voz por fala (campo `voice`), gates por objetivo.
+- **Markup nas falas**: `[ordem]` (amarelo+negrito = fazer), `[enfase]` (laranja = fixar),
+  `[azul]/[amarelo]/[vermelho]` (cores puras para apontar UI).
+- **Task list dirigida pelo roteiro**: painel começa vazio; cada ordem do Sargento revela a tarefa
+  (`revealObjectiveKey`). Objetivos identificados por key `hist_1_01..09` — inserir tarefa no meio
+  não quebra mais nada.
+- **Comandos de fala no asset**: `spawnCommand` (slot0/slot1, `acted`, `name=`, `cursor` + done.mp3),
+  `statCommand` (hp/fuel/ammo — demonstrações do Mathias/Dias), `unlockEndTurn`.
+- **Eventos/validações novas**: `CAMERA_ZOOM`, `CAMERA_PAN`, `INSPECT_ALLY_UNIT`, `HOLD_POSITION`
+  (evento `OnUnitHeldPosition` no confirm da própria célula).
+- **Travas com bronca do Sargento** (balão troca texto por ~2,6s + error.mp3; retrato de bronca
+  opcional via `Scold Portrait Sprite`): passar a vez até o destrave; Reabastecer (X), dispensar (U),
+  render-se e Situação a cena inteira (flags `block*` no TutorialData).
+- **Automata com marcha**: `AutomataData.moveTowardsTarget/moveTargetCell/stopDistance` — inimigo anda
+  com custos reais e para adjacente ao alvo.
+- **Inspect coerente**: `Civil` = inspect básico; militar sem munição = ficha + raio de movimento,
+  sem camada de mira nem segundo clique.
+
+### Pendências para o primeiro playtest completo
+1. Coordenada da montanha no `UNIT_AT_HEX` (`hist_1_05`) — hoje `0,0`.
+2. Célula do spawn do inimigo na estrada (`hist_1_09`, `spawn:slot1 SD 0,0`) — 3–4 hexes do morro
+   para a marcha ser visível.
+3. Entrada do soldado inimigo no **AutomataDatabase** (`SD`, `teamId Neutral`, História 1,
+   `moveTowardsTarget` → célula da montanha, `stopDistance 1`, `preferAttack false`).
+4. Gravar as vozes do Sargento e arrastar nos campos `voice`.
+5. Sprite de bronca do Sargento (opcional, campo já existe).
+6. Conferir limiar de amarelo da barra de autonomia (fala promete amarelo com fuel 40/70).
+7. Corrida no fim: vitória dispara no `ATTACK_UNIT` junto com as falas finais — avaliar no playtest
+   (opções: mover Fechamento pro victoryDialog ou segurar a vitória até o roteiro acabar).
