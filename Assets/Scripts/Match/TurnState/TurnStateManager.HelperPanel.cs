@@ -1305,7 +1305,8 @@ public partial class TurnStateManager
             inspectedThreatRangeLookup,
             inspectedThreatLineCells,
             inspectedThreatLineLookup,
-            nextTurnHotZone ? 0.55f : 1f);
+            nextTurnHotZone ? 0.55f : 1f,
+            splitHybridStaticThreat: true);
     }
 
     private bool TryShowInspectedCurrentWeaponRange()
@@ -1316,6 +1317,11 @@ public partial class TurnStateManager
         // A classificacao da unidade e a fonte de verdade. Artilheiros ja exibem
         // seu alcance estacionario na primeira visualizacao.
         if (inspectedHelperUnit.CombatClassification == UnitCombatClassification.Artilheiro)
+            return false;
+
+        // Sem municao (ou civil) nao ha camada de mira a mostrar: o segundo clique
+        // do inspect encerra a inspecao em vez de pintar ameaca inexistente.
+        if (!HasAnyArmedWeapon(inspectedHelperUnit))
             return false;
 
         Tilemap boardMap = terrainTilemap != null ? terrainTilemap : inspectedHelperUnit.BoardTilemap;
@@ -1582,7 +1588,8 @@ public partial class TurnStateManager
         HashSet<Vector3Int> targetRangeLookup,
         List<Vector3Int> targetLineCells,
         HashSet<Vector3Int> targetLineLookup,
-        float alphaMultiplier = 1f)
+        float alphaMultiplier = 1f,
+        bool splitHybridStaticThreat = false)
     {
         if (unit == null || targetRangeCells == null || targetRangeLookup == null || targetLineCells == null || targetLineLookup == null)
             return;
@@ -1615,6 +1622,7 @@ public partial class TurnStateManager
                 threatProfile,
                 includeStaticThreat,
                 includeMovementThreat,
+                splitHybridStaticThreat,
                 enableLdt,
                 enableLos,
                 enableSpotter,
@@ -1664,6 +1672,7 @@ public partial class TurnStateManager
         InspectedThreatProfile threatProfile,
         bool includeStaticThreat,
         bool includeMovementThreat,
+        bool splitHybridStaticThreat,
         bool enableLdt,
         bool enableLos,
         bool enableSpotter,
@@ -1675,7 +1684,8 @@ public partial class TurnStateManager
         if (unit == null || boardMap == null)
             return false;
 
-        if (UnitThreatEnvelopeService.TryGet(
+        bool splitHybrid = splitHybridStaticThreat && threatProfile == InspectedThreatProfile.Hybrid;
+        if (!splitHybrid && UnitThreatEnvelopeService.TryGet(
                 unit,
                 boardMap,
                 terrainDatabase,
@@ -1694,7 +1704,7 @@ public partial class TurnStateManager
             return true;
         }
 
-        ThreatOverlayCacheKey key = BuildThreatOverlayCacheKey(unit, boardMap, enableLdt, enableLos, enableSpotter);
+        ThreatOverlayCacheKey key = BuildThreatOverlayCacheKey(unit, boardMap, enableLdt, enableLos, enableSpotter, splitHybrid);
         int cacheIndex = ResolveThreatOverlayCacheIndex(unit);
         if (threatOverlayCacheByUnitInstanceId.TryGetValue(cacheIndex, out ThreatOverlayCacheEntry existing) &&
             existing != null &&
@@ -1764,7 +1774,7 @@ public partial class TurnStateManager
 
                 foreach (Vector3Int cell in movementCells)
                 {
-                    if (threatProfile == InspectedThreatProfile.Hybrid && staticThreatCells.Contains(cell))
+                    if (threatProfile == InspectedThreatProfile.Hybrid && !splitHybrid && staticThreatCells.Contains(cell))
                         continue;
                     finalRangeCells.Add(cell);
                 }
@@ -1799,11 +1809,14 @@ public partial class TurnStateManager
             }
         }
 
-        HashSet<Vector3Int> threatCells = new HashSet<Vector3Int>(staticThreatCells);
-        threatCells.UnionWith(mobileThreatCells);
+        HashSet<Vector3Int> threatCells = splitHybrid
+            ? new HashSet<Vector3Int>(mobileThreatCells)
+            : new HashSet<Vector3Int>(staticThreatCells);
+        if (!splitHybrid)
+            threatCells.UnionWith(mobileThreatCells);
         foreach (Vector3Int cell in threatCells)
         {
-            if (threatProfile == InspectedThreatProfile.Hybrid)
+            if (threatProfile == InspectedThreatProfile.Hybrid && !splitHybrid)
             {
                 bool isStaticThreat = staticThreatCells.Contains(cell);
                 if (!isStaticThreat && movementCells.Contains(cell))
@@ -1898,6 +1911,7 @@ public partial class TurnStateManager
             threatProfile,
             includeStaticThreat,
             includeMovementThreat,
+            splitHybridStaticThreat: false,
             enableLdt,
             enableLos,
             enableSpotter,
@@ -1916,7 +1930,7 @@ public partial class TurnStateManager
         return unit.GetEntityId().GetHashCode();
     }
 
-    private static ThreatOverlayCacheKey BuildThreatOverlayCacheKey(UnitManager unit, Tilemap boardMap, bool enableLdt, bool enableLos, bool enableSpotter)
+    private static ThreatOverlayCacheKey BuildThreatOverlayCacheKey(UnitManager unit, Tilemap boardMap, bool enableLdt, bool enableLos, bool enableSpotter, bool splitHybridStaticThreat)
     {
         int snapshotHash = BuildUnitSnapshotHash(unit, boardMap);
         int globalBoardRevision = ThreatRevisionTracker.GlobalBoardRevision;
@@ -1924,7 +1938,7 @@ public partial class TurnStateManager
         int matchFlagsHash = ThreatRevisionTracker.MatchFlagsHash;
 
         // Mantem consistencia mesmo em contextos antigos sem sincronizacao externa.
-        int requestedFlagsHash = BuildThreatFlagsHash(enableLdt, enableLos, enableSpotter);
+        int requestedFlagsHash = BuildThreatFlagsHash(enableLdt, enableLos, enableSpotter, splitHybridStaticThreat);
         if (matchFlagsHash != requestedFlagsHash)
             matchFlagsHash = requestedFlagsHash;
 
@@ -1975,7 +1989,7 @@ public partial class TurnStateManager
         }
     }
 
-    private static int BuildThreatFlagsHash(bool enableLdt, bool enableLos, bool enableSpotter)
+    private static int BuildThreatFlagsHash(bool enableLdt, bool enableLos, bool enableSpotter, bool splitHybridStaticThreat)
     {
         unchecked
         {
@@ -1983,6 +1997,7 @@ public partial class TurnStateManager
             hash = hash * 31 + (enableLdt ? 1 : 0);
             hash = hash * 31 + (enableLos ? 1 : 0);
             hash = hash * 31 + (enableSpotter ? 1 : 0);
+            hash = hash * 31 + (splitHybridStaticThreat ? 1 : 0);
             return hash;
         }
     }
@@ -2074,14 +2089,40 @@ public partial class TurnStateManager
         Hybrid = 3
     }
 
+    // True se a unidade tem ao menos uma arma com municao (civis nunca contam).
+    private static bool HasAnyArmedWeapon(UnitManager unit)
+    {
+        if (unit == null || unit.CombatClassification == UnitCombatClassification.Civil)
+            return false;
+
+        IReadOnlyList<UnitEmbarkedWeapon> weapons = unit.GetEmbarkedWeapons();
+        if (weapons == null)
+            return false;
+
+        for (int i = 0; i < weapons.Count; i++)
+        {
+            UnitEmbarkedWeapon embarked = weapons[i];
+            if (embarked != null && embarked.weapon != null && embarked.squadAmmunition > 0)
+                return true;
+        }
+
+        return false;
+    }
+
     private static InspectedThreatProfile ResolveInspectedThreatProfile(UnitManager unit)
     {
         if (unit == null)
             return InspectedThreatProfile.None;
 
+        // A classificacao de combate e a fonte de verdade, nao a municao do momento.
+        // Civil nao projeta ameaca: inspect basico (quase terreno) e intencional.
+        if (unit.CombatClassification == UnitCombatClassification.Civil)
+            return InspectedThreatProfile.None;
+
+        // Militar sem armas ainda se move: mostra o alcance de movimento.
         IReadOnlyList<UnitEmbarkedWeapon> weapons = unit.GetEmbarkedWeapons();
         if (weapons == null || weapons.Count <= 0)
-            return InspectedThreatProfile.None;
+            return InspectedThreatProfile.Movement;
 
         bool hasOneToOne = false;
         bool hasGreaterThanOne = false;
@@ -2110,7 +2151,10 @@ public partial class TurnStateManager
             return InspectedThreatProfile.DistanceStatic;
         if (hasOneToOne)
             return InspectedThreatProfile.Movement;
-        return InspectedThreatProfile.None;
+
+        // Militar com armas mas sem municao (ex.: Dias com ammo=0): nao ameaca,
+        // mas continua unidade — pinta o alcance de movimento ("anda mas nao atira").
+        return InspectedThreatProfile.Movement;
     }
 
     private void UpdateInspectedHelperAutoDismiss()

@@ -138,8 +138,9 @@ public class MatchController : MonoBehaviour
     [SerializeField] private bool enableTotalWar = true;
     [Tooltip("Permite inferir acoes contextuais a partir de cliques no mapa.")]
     [SerializeField] private bool atalhoContextual = false;
-    [Tooltip("Se ativo, o atalho R encerra diretamente o turno humano. Se desativado, R abre a confirmacao normal.")]
-    [SerializeField] private bool passarTurnoSemConfirmacao = false;
+    [FormerlySerializedAs("passarTurnoSemConfirmacao")]
+    [Tooltip("Se ativo, o atalho R abre a confirmacao/validacao do panel_helper. Se desativado, R encerra o turno diretamente.")]
+    [SerializeField] private bool atalhoRPassarTurnoUsaConfirmacao = false;
     [Tooltip("Se false, o time com 0 unidades nao e eliminado automaticamente. Util para testes sem unidades.")]
     [SerializeField] private bool allowDefeatForZeroUnits = true;
     [Tooltip("Se true, capturar o QG (isPlayerHeadQuarter) de um time o elimina imediatamente e pode encerrar a partida.")]
@@ -260,7 +261,7 @@ public class MatchController : MonoBehaviour
 
     public int CurrentTurn => currentTurn;
     public int ActiveTeamId => activeTeamId;
-    public bool PassarTurnoSemConfirmacao => passarTurnoSemConfirmacao;
+    public bool AtalhoRPassarTurnoUsaConfirmacao => atalhoRPassarTurnoUsaConfirmacao;
     public float LegacyFogOfWarAlpha => Mathf.Clamp01(fogOfWarAlpha);
     public int VisualContrastActiveTeamId => fogPresentationGameplayTeamId != int.MinValue
         ? fogPresentationGameplayTeamId

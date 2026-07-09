@@ -9,6 +9,50 @@ public class TutorialManager : MonoBehaviour
     // Consumido pelo PanelDialogTutorialController para liberar os gates do roteiro.
     public static event System.Action<TutorialObjective> OnObjectiveCompleted;
 
+    private static TutorialManager activeInstance;
+    private bool endTurnLockedByScript;
+
+    // Passar a vez travado pelo roteiro do tutorial (ate a fala com unlockEndTurn aparecer).
+    // Sem TutorialManager na cena => nunca trava (partidas normais ilesas).
+    public static bool IsEndTurnLockedByTutorial =>
+        activeInstance != null && activeInstance.endTurnLockedByScript;
+
+    public static void UnlockEndTurnFromScript()
+    {
+        if (activeInstance != null && activeInstance.endTurnLockedByScript)
+        {
+            activeInstance.endTurnLockedByScript = false;
+            Debug.Log("[TutorialManager] Passar a vez liberado pelo roteiro.");
+        }
+    }
+
+    // Bloqueios declarados no TutorialData ativo (valem a cena inteira, nao destravam
+    // com o roteiro). Sem TutorialManager/tutorial na cena => nada bloqueado.
+    public static bool IsCommandServiceBlockedByTutorial
+    {
+        get { TutorialData t = GetActiveTutorialStatic(); return t != null && t.blockCommandService; }
+    }
+
+    public static bool IsRemoveUnitBlockedByTutorial
+    {
+        get { TutorialData t = GetActiveTutorialStatic(); return t != null && t.blockRemoveUnit; }
+    }
+
+    public static bool IsSurrenderBlockedByTutorial
+    {
+        get { TutorialData t = GetActiveTutorialStatic(); return t != null && t.blockSurrender; }
+    }
+
+    public static bool IsStatusSummaryBlockedByTutorial
+    {
+        get { TutorialData t = GetActiveTutorialStatic(); return t != null && t.blockStatusSummary; }
+    }
+
+    private static TutorialData GetActiveTutorialStatic()
+    {
+        return activeInstance != null ? activeInstance.GetActiveTutorial() : null;
+    }
+
     [SerializeField] private TerrainDatabase terrainDatabase;
     [SerializeField] private MatchController matchController;
     [SerializeField] private TurnStateManager turnStateManager;
@@ -18,17 +62,189 @@ public class TutorialManager : MonoBehaviour
 
     private readonly HashSet<string> spawnedObjectiveIds = new HashSet<string>();
     private Coroutine tutorialAutomataRoutine;
+    private Camera zoomCamera;
+    private float zoomBaselineOrthoSize = -1f;
+    private const float ZoomDetectionEpsilon = 0.05f;
+    private Vector3 panBaselinePosition;
+    private bool panBaselineCaptured;
+    private const float PanDetectionMinDelta = 0.75f;
 
     private void Awake()
     {
+        activeInstance = this;
         ResolveReferences();
+    }
+
+    private void OnDestroy()
+    {
+        if (activeInstance == this)
+            activeInstance = null;
     }
 
     private void Start()
     {
         ResolveReferences();
         ResetTutorialObjectives();
+        InitializeEndTurnLockFromScript();
         ProcessObjectiveSpawns();
+    }
+
+    private void Update()
+    {
+        CheckCameraZoomObjective();
+        CheckCameraPanObjective();
+    }
+
+    // Objetivo CAMERA_PAN: completa quando a camera se desloca do baseline (arrasto
+    // com dedo/botao direito, ou seguindo o cursor). Com parameters "x,y", exige
+    // tambem que o centro da camera chegue perto daquela celula (ex.: focar o Ryan).
+    private void CheckCameraPanObjective()
+    {
+        TutorialData tutorial = GetActiveTutorial();
+        if (tutorial == null || tutorial.objectives == null)
+            return;
+
+        TutorialObjective panObjective = null;
+        for (int i = 0; i < tutorial.objectives.Count; i++)
+        {
+            TutorialObjective obj = tutorial.objectives[i];
+            if (obj != null && obj.id == "CAMERA_PAN" && obj.isVisible && IsObjectivePending(obj))
+            {
+                panObjective = obj;
+                break;
+            }
+        }
+
+        if (panObjective == null)
+            return;
+
+        if (!TryResolveZoomCamera())
+            return;
+
+        if (!panBaselineCaptured)
+        {
+            panBaselinePosition = zoomCamera.transform.position;
+            panBaselineCaptured = true;
+            return;
+        }
+
+        Vector3 position = zoomCamera.transform.position;
+        float moved = Vector2.Distance(position, panBaselinePosition);
+        if (moved <= PanDetectionMinDelta)
+            return;
+
+        if (!string.IsNullOrWhiteSpace(panObjective.parameters))
+        {
+            if (!TryGetCellWorldCenter(panObjective.parameters, out Vector3 target, out float hexSpacing))
+                return;
+
+            // Perto o suficiente = ~2.5 hexes do alvo.
+            if (Vector2.Distance(position, target) > hexSpacing * 2.5f)
+                return;
+        }
+
+        MarkObjectiveComplete(panObjective);
+    }
+
+    private bool TryResolveZoomCamera()
+    {
+        if (zoomCamera != null)
+            return true;
+
+        zoomCamera = Camera.main;
+        if (zoomCamera == null)
+            zoomCamera = FindAnyObjectByType<Camera>();
+        return zoomCamera != null;
+    }
+
+    // Converte "x,y" para o centro da celula em mundo, usando o tilemap de qualquer
+    // unidade ativa. Tambem devolve a largura de um hex para escalar tolerancias.
+    private static bool TryGetCellWorldCenter(string coords, out Vector3 worldCenter, out float hexSpacing)
+    {
+        worldCenter = Vector3.zero;
+        hexSpacing = 1f;
+
+        string[] xy = coords.Split(',');
+        if (xy.Length < 2)
+            return false;
+        if (!int.TryParse(xy[0].Trim(), out int x) || !int.TryParse(xy[1].Trim(), out int y))
+            return false;
+
+        Tilemap tilemap = null;
+        List<UnitManager> units = UnitManager.AllActive;
+        for (int i = 0; i < units.Count; i++)
+        {
+            if (units[i] != null && units[i].BoardTilemap != null)
+            {
+                tilemap = units[i].BoardTilemap;
+                break;
+            }
+        }
+
+        if (tilemap == null)
+            return false;
+
+        Vector3Int cell = new Vector3Int(x, y, 0);
+        worldCenter = HexCoordinates.GetCellCenterWorld(tilemap, cell);
+        Vector3 neighbor = HexCoordinates.GetCellCenterWorld(tilemap, new Vector3Int(x + 1, y, 0));
+        hexSpacing = Mathf.Max(0.1f, Vector2.Distance(worldCenter, neighbor));
+        return true;
+    }
+
+    // Objetivo CAMERA_ZOOM: completa quando o orthographicSize muda em relacao ao
+    // baseline capturado no primeiro frame em que a tarefa esta ativa (cobre a
+    // bolinha do mouse e a pinca no toque, que mexem no mesmo valor).
+    private void CheckCameraZoomObjective()
+    {
+        TutorialData tutorial = GetActiveTutorial();
+        if (tutorial == null || tutorial.objectives == null)
+            return;
+
+        TutorialObjective zoomObjective = null;
+        for (int i = 0; i < tutorial.objectives.Count; i++)
+        {
+            TutorialObjective obj = tutorial.objectives[i];
+            if (obj != null && obj.id == "CAMERA_ZOOM" && obj.isVisible && IsObjectivePending(obj))
+            {
+                zoomObjective = obj;
+                break;
+            }
+        }
+
+        if (zoomObjective == null)
+            return;
+
+        if (!TryResolveZoomCamera())
+            return;
+
+        if (zoomBaselineOrthoSize < 0f)
+        {
+            zoomBaselineOrthoSize = zoomCamera.orthographicSize;
+            return;
+        }
+
+        if (Mathf.Abs(zoomCamera.orthographicSize - zoomBaselineOrthoSize) > ZoomDetectionEpsilon)
+            MarkObjectiveComplete(zoomObjective);
+    }
+
+    // A cena comeca com o passar a vez travado apenas se o roteiro declara um ponto
+    // de destrave (alguma fala com unlockEndTurn). Roteiros sem a flag nao travam nada.
+    private void InitializeEndTurnLockFromScript()
+    {
+        endTurnLockedByScript = false;
+        TutorialData tutorial = GetActiveTutorial();
+        if (tutorial == null || tutorial.script == null)
+            return;
+
+        for (int i = 0; i < tutorial.script.Count; i++)
+        {
+            TutorialDialogEntry entry = tutorial.script[i];
+            if (entry != null && entry.unlockEndTurn)
+            {
+                endTurnLockedByScript = true;
+                return;
+            }
+        }
     }
 
     private void ResolveReferences()
@@ -235,7 +451,12 @@ public class TutorialManager : MonoBehaviour
         if (tutorial == null || tutorial.objectives == null || tutorial.objectives.Count <= 0)
             return;
 
-        // Progressao linear: sempre revela o primeiro objetivo normal pendente.
+        // Roteiro com reveals explicitos assume o controle: o manager nao revela
+        // nada sozinho e a task list comeca vazia ("Aguardando proximo objetivo...").
+        if (ScriptControlsObjectiveReveal(tutorial))
+            return;
+
+        // Progressao linear (legado): sempre revela o primeiro objetivo normal pendente.
         for (int i = 0; i < tutorial.objectives.Count; i++)
         {
             TutorialObjective obj = tutorial.objectives[i];
@@ -250,17 +471,96 @@ public class TutorialManager : MonoBehaviour
         }
     }
 
+    private static bool ScriptControlsObjectiveReveal(TutorialData tutorial)
+    {
+        if (tutorial == null || tutorial.script == null)
+            return false;
+
+        for (int i = 0; i < tutorial.script.Count; i++)
+        {
+            TutorialDialogEntry entry = tutorial.script[i];
+            if (entry != null && (entry.revealObjectiveIndex >= 0 || !string.IsNullOrWhiteSpace(entry.revealObjectiveKey)))
+                return true;
+        }
+
+        return false;
+    }
+
+    // Chamado pelo PanelDialogTutorialController quando uma fala com reveal aparece:
+    // a tarefa entra na task list e spawns pendentes dela sao processados.
+    public static void RevealObjectiveFromScript(int objectiveIndex)
+    {
+        if (activeInstance == null)
+            return;
+
+        TutorialData tutorial = activeInstance.GetActiveTutorial();
+        if (tutorial == null || tutorial.objectives == null)
+            return;
+        if (objectiveIndex < 0 || objectiveIndex >= tutorial.objectives.Count)
+            return;
+
+        TutorialObjective obj = tutorial.objectives[objectiveIndex];
+        if (obj == null || obj.isVisible)
+            return;
+
+        obj.isVisible = true;
+        activeInstance.ProcessObjectiveSpawns();
+    }
+
     private bool ExecuteObjectiveSpawn(TutorialObjective obj)
     {
-        // Formato esperado: spawn:TEAM_ID UNIT_TOKEN X,Y
-        // Exemplo: spawn:1 SD 5,6
-        // TEAM_ID tambem aceita slot logico ("slot0", "slot1"): resolve a cor atual do slot.
-        // Prefira slots em cenas de tutorial — a cor do jogador pode ser escolhida na Tela de Entrada.
+        string raw = obj.parameters.Substring(6).Trim(); // Remove "spawn:"
+        return ExecuteSpawnCommands(raw);
+    }
+
+    // Executa um ou mais comandos de spawn separados por ';'.
+    // Formato de cada comando: TEAM_ID UNIT_TOKEN X,Y [acted]
+    // TEAM_ID aceita numero ("1") ou slot logico ("slot0", "slot1") — prefira slots em
+    // cenas de tutorial, pois a cor do jogador pode ser escolhida na Tela de Entrada.
+    // O sufixo "acted" marca a unidade como "ja agiu" ao nascer.
+    // Usado pelos objetivos (prefixo "spawn:") e pelas falas do roteiro (spawnCommand).
+    public bool ExecuteSpawnCommands(string commands)
+    {
+        if (string.IsNullOrWhiteSpace(commands))
+            return false;
+
+        bool allSucceeded = true;
+        bool anySucceeded = false;
+        string[] list = commands.Split(';');
+        for (int i = 0; i < list.Length; i++)
+        {
+            string command = list[i].Trim();
+            if (command.Length <= 0)
+                continue;
+            if (TryExecuteSingleSpawnCommand(command))
+                anySucceeded = true;
+            else
+                allSucceeded = false;
+        }
+
+        // Feedback sonoro de "unidade entrou em campo": mesmo done.mp3 da compra
+        // na gameplay oficial. Um toque por lote (dois NPCs juntos nao tocam dobrado).
+        if (anySucceeded)
+        {
+            CursorController cursor = FindAnyObjectByType<CursorController>();
+            if (cursor != null) cursor.PlayDoneSfx();
+        }
+
+        return allSucceeded;
+    }
+
+    private bool TryExecuteSingleSpawnCommand(string command)
+    {
         try
         {
-            string raw = obj.parameters.Substring(6).Trim(); // Remove "spawn:"
-            string[] parts = raw.Split(' ');
-            if (parts.Length < 3) return false;
+            if (turnStateManager == null)
+                ResolveReferences();
+            if (turnStateManager == null)
+                return false;
+
+            string[] parts = command.Split(new[] { ' ' }, System.StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length < 3)
+                return false;
 
             int teamId;
             if (parts[0].StartsWith("slot", System.StringComparison.OrdinalIgnoreCase))
@@ -271,31 +571,179 @@ public class TutorialManager : MonoBehaviour
                 if (teamId == (int)TeamId.Neutral) return false;
             }
             else if (!int.TryParse(parts[0], out teamId)) return false;
+
             string unitToken = parts[1];
             string coords = parts[2];
 
+            // Opcionais apos as coordenadas: "acted" (nasce ja agiu), "name=Ryan"
+            // (renomeia; use _ para espacos, ex.: name=Recruta_Ryan) e "cursor"
+            // (move o cursor ate a unidade spawnada, com travel animado).
+            bool markActed = false;
+            bool moveCursorToSpawn = false;
+            string customName = null;
+            for (int i = 3; i < parts.Length; i++)
+            {
+                string option = parts[i];
+                if (option.Equals("acted", System.StringComparison.OrdinalIgnoreCase))
+                    markActed = true;
+                else if (option.Equals("cursor", System.StringComparison.OrdinalIgnoreCase))
+                    moveCursorToSpawn = true;
+                else if (option.StartsWith("name=", System.StringComparison.OrdinalIgnoreCase))
+                    customName = option.Substring(5).Replace('_', ' ');
+            }
+
             string[] xy = coords.Split(',');
             if (xy.Length < 2) return false;
+            if (!int.TryParse(xy[0].Trim(), out int x) || !int.TryParse(xy[1].Trim(), out int y))
+                return false;
 
-            if (int.TryParse(xy[0].Trim(), out int x) && int.TryParse(xy[1].Trim(), out int y))
+            Vector3Int cell = new Vector3Int(x, y, 0);
+            if (turnStateManager.TrySpawnUnitAtCell(unitToken, teamId, cell, out string message))
             {
-                Vector3Int cell = new Vector3Int(x, y, 0);
-                if (turnStateManager.TrySpawnUnitAtCell(unitToken, teamId, cell, out string message))
+                if (markActed || !string.IsNullOrWhiteSpace(customName))
                 {
-                    Debug.Log($"[TutorialManager] Spawn executado: {message}");
-                    return true;
+                    UnitManager spawned = FindActiveUnitAtCell(cell);
+                    if (spawned != null)
+                    {
+                        if (markActed)
+                            spawned.MarkAsActed();
+                        if (!string.IsNullOrWhiteSpace(customName))
+                            spawned.SetUnitDisplayName(customName);
+                    }
                 }
-                else
-                {
-                    Debug.LogWarning($"[TutorialManager] Falha no spawn: {message}");
-                }
+                if (moveCursorToSpawn)
+                    StartCoroutine(turnStateManager.MoveCursorToCellWithAutomatedTravel(cell));
+                Debug.Log($"[TutorialManager] Spawn executado: {message}");
+                return true;
             }
+
+            Debug.LogWarning($"[TutorialManager] Falha no spawn: {message}");
         }
         catch (System.Exception e)
         {
-            Debug.LogError($"[TutorialManager] Erro ao processar spawn do objetivo {obj.id}: {e.Message}");
+            Debug.LogError($"[TutorialManager] Erro ao processar spawn '{command}': {e.Message}");
         }
         return false;
+    }
+
+    // Executa ajustes de status vindos do roteiro: "NOME stat=valor" separados por ';'.
+    // Stats: hp, fuel (autonomia), ammo (municao). NOME casa por nome/apelido/id.
+    public bool ExecuteStatCommands(string commands)
+    {
+        if (string.IsNullOrWhiteSpace(commands))
+            return false;
+
+        bool allSucceeded = true;
+        string[] list = commands.Split(';');
+        for (int i = 0; i < list.Length; i++)
+        {
+            string command = list[i].Trim();
+            if (command.Length <= 0)
+                continue;
+            if (!TryExecuteSingleStatCommand(command))
+                allSucceeded = false;
+        }
+
+        return allSucceeded;
+    }
+
+    private bool TryExecuteSingleStatCommand(string command)
+    {
+        string[] parts = command.Split(new[] { ' ' }, System.StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length < 2)
+        {
+            Debug.LogWarning($"[TutorialManager] statCommand invalido: '{command}' (esperado 'NOME stat=valor').");
+            return false;
+        }
+
+        string token = parts[0];
+        string assignment = parts[1];
+        int equals = assignment.IndexOf('=');
+        if (equals <= 0 || equals >= assignment.Length - 1)
+        {
+            Debug.LogWarning($"[TutorialManager] statCommand invalido: '{command}' (esperado 'NOME stat=valor').");
+            return false;
+        }
+
+        string stat = assignment.Substring(0, equals).Trim().ToLowerInvariant();
+        if (!int.TryParse(assignment.Substring(equals + 1).Trim(), out int value))
+        {
+            Debug.LogWarning($"[TutorialManager] statCommand invalido: '{command}' (valor nao numerico).");
+            return false;
+        }
+
+        UnitManager unit = FindActiveUnitByToken(token);
+        if (unit == null)
+        {
+            Debug.LogWarning($"[TutorialManager] statCommand: unidade '{token}' nao encontrada em campo.");
+            return false;
+        }
+
+        switch (stat)
+        {
+            case "hp":
+                unit.SetCurrentHP(value);
+                return true;
+            case "fuel":
+            case "autonomia":
+                unit.SetCurrentFuel(value);
+                return true;
+            case "ammo":
+            case "municao":
+            {
+                // A barra azul le a municao das armas embarcadas (squadAmmunition),
+                // nao o agregado do UnitManager — mesmo caminho do debug "set ammo".
+                unit.SetCurrentAmmo(value);
+                IReadOnlyList<UnitEmbarkedWeapon> weapons = unit.GetEmbarkedWeapons();
+                if (weapons != null)
+                {
+                    for (int w = 0; w < weapons.Count; w++)
+                    {
+                        if (weapons[w] != null)
+                            weapons[w].squadAmmunition = Mathf.Max(0, value);
+                    }
+                }
+                unit.RefreshRuntimeVisualState();
+                return true;
+            }
+            default:
+                Debug.LogWarning($"[TutorialManager] statCommand: stat '{stat}' desconhecido (use hp, fuel ou ammo).");
+                return false;
+        }
+    }
+
+    private UnitManager FindActiveUnitByToken(string token)
+    {
+        List<UnitManager> units = UnitManager.AllActive;
+        for (int i = 0; i < units.Count; i++)
+        {
+            UnitManager unit = units[i];
+            if (unit == null || unit.IsDead || unit.IsEmbarked)
+                continue;
+            if (UnitMatchesTargetToken(unit, token))
+                return unit;
+        }
+
+        return null;
+    }
+
+    private static UnitManager FindActiveUnitAtCell(Vector3Int cell)
+    {
+        cell.z = 0;
+        List<UnitManager> units = UnitManager.AllActive;
+        for (int i = 0; i < units.Count; i++)
+        {
+            UnitManager unit = units[i];
+            if (unit == null || unit.IsDead || unit.IsEmbarked)
+                continue;
+
+            Vector3Int unitCell = unit.CurrentCellPosition;
+            unitCell.z = 0;
+            if (unitCell == cell)
+                return unit;
+        }
+
+        return null;
     }
 
     private void CheckTutorialCompletion()

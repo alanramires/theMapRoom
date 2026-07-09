@@ -157,6 +157,15 @@ public class UnitManager : MonoBehaviour
     public int InstanceId => instanceId;
     public Vector3 CurrentPosition => currentPosition;
     public string UnitDisplayName => unitDisplayName;
+    // Renomeia a unidade (ex.: "Ryan" no tutorial). Chamar depois do Apply(data),
+    // que sobrescreve unitDisplayName com o displayName do UnitData.
+    public void SetUnitDisplayName(string displayName)
+    {
+        if (string.IsNullOrWhiteSpace(displayName))
+            return;
+        unitDisplayName = displayName.Trim();
+        UpdateDynamicName();
+    }
     public int CurrentHP => currentHP;
     public bool IsDead => isDead;
     public int DeadWhenTurn => deadWhenTurn;

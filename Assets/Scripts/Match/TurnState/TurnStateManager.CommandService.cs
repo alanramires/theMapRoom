@@ -124,6 +124,13 @@ public partial class TurnStateManager
         if (!WasLetterPressedThisFrame('X'))
             return;
 
+        if (TutorialManager.IsCommandServiceBlockedByTutorial)
+        {
+            PanelDialogTutorialController.ShowBlockedActionMessage("Serviço do Comando? Você ainda não ganhou esse brinquedo, recruta.");
+            cursorController?.PlayErrorSfx();
+            return;
+        }
+
         if (CurrentCursorState == CursorState.CommandService)
         {
             if (!IsCommandServiceExecutionRunning)
@@ -143,6 +150,12 @@ public partial class TurnStateManager
     public bool TryOpenCommandServiceFromMenu(out string message)
     {
         message = string.Empty;
+
+        if (TutorialManager.IsCommandServiceBlockedByTutorial)
+        {
+            PanelDialogTutorialController.ShowBlockedActionMessage("Serviço do Comando? Você ainda não ganhou esse brinquedo, recruta.");
+            return false;
+        }
 
         if (replayManager != null && replayManager.IsReplaying)
         {

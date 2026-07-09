@@ -427,7 +427,7 @@ public class SaveGameManager : MonoBehaviour
             return;
         }
 
-        if (WasKeyPressedThisFrame(KeyCode.Escape))
+        if (WasPersistencePromptCancelPressedThisFrame())
         {
             if (promptState == SlotPromptState.SaveConfirmOverwrite)
             {
@@ -445,6 +445,13 @@ public class SaveGameManager : MonoBehaviour
                 cursorController?.PlayCancelSfx();
             }
         }
+    }
+
+    private bool WasPersistencePromptCancelPressedThisFrame()
+    {
+        return WasKeyPressedThisFrame(KeyCode.Escape) ||
+               RemoteInput.CancelDownThisFrame() ||
+               RemoteInput.RightClickCancelDownThisFrame();
     }
 
     private void HandleSlotChosen(int slotIndex)

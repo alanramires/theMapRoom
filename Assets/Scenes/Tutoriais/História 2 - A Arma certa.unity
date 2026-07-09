@@ -1580,7 +1580,7 @@ Transform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!212 &157535642
 SpriteRenderer:
-  serializedVersion: 2
+  serializedVersion: 3
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -1637,6 +1637,7 @@ SpriteRenderer:
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 0
   m_SpriteSortPoint: 0
+  m_BlendShapeWeights: []
 --- !u!1 &166249821
 GameObject:
   m_ObjectHideFlags: 0
@@ -3415,6 +3416,7 @@ MonoBehaviour:
   enableStealthValidation: 1
   enableTotalWar: 1
   atalhoContextual: 0
+  atalhoRPassarTurnoUsaConfirmacao: 0
   allowDefeatForZeroUnits: 1
   allowDefeatForHeadQuarterCapture: 1
   maxUnitsPerTeam: 60
@@ -3436,6 +3438,7 @@ MonoBehaviour:
     stars: 0
   hasVictoryWinner: 0
   victoryWinnerTeam: -1
+  fogOfWarController: {fileID: 984791707}
   fogOfWarTilemap: {fileID: 2015085660}
   fogOfWarOverlayTile: {fileID: 11400000, guid: a9d34637cfec5f34f85ff83701fe1885, type: 2}
   fogOfWarTerrainDatabase: {fileID: 11400000, guid: af24f1a2f28971f498767ede9f9cfba1, type: 2}
@@ -3450,7 +3453,7 @@ MonoBehaviour:
   appliedActiveTeamId: 0
   pendingTurnStartUpkeep: 1
   pendingTurnStartEconomy: 1
-  cachedConstructionIncomeSignature: -426552676
+  cachedConstructionIncomeSignature: 35222114
   cachedConstructionIncomeCount: 2
   constructionIncomeRefreshIntervalSeconds: 0.35
   continuousEditorRefresh: 0
@@ -3885,7 +3888,7 @@ MonoBehaviour:
   continuousEditorVisualRefresh: 0
 --- !u!212 &411444901
 SpriteRenderer:
-  serializedVersion: 2
+  serializedVersion: 3
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -3942,6 +3945,7 @@ SpriteRenderer:
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
   m_SpriteSortPoint: 0
+  m_BlendShapeWeights: []
 --- !u!1 &413198320
 GameObject:
   m_ObjectHideFlags: 0
@@ -8408,7 +8412,7 @@ MonoBehaviour:
   hudSortingOrder: 60
 --- !u!212 &903423518
 SpriteRenderer:
-  serializedVersion: 2
+  serializedVersion: 3
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -8465,6 +8469,7 @@ SpriteRenderer:
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
   m_SpriteSortPoint: 0
+  m_BlendShapeWeights: []
 --- !u!1 &959095921
 GameObject:
   m_ObjectHideFlags: 0
@@ -8750,6 +8755,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FogOfWarController
   matchController: {fileID: 327617512}
+  fogOfWarAlpha: 0.8
+  fogOfWarAlphaInitialized: 1
   autoRefreshOnFogUpdate: 0
   includeInvisibleTargets: 1
   lastDump: 
@@ -10520,7 +10527,7 @@ MonoBehaviour:
   aiMaintenanceActive: 0
 --- !u!212 &1161941806
 SpriteRenderer:
-  serializedVersion: 2
+  serializedVersion: 3
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -10577,6 +10584,7 @@ SpriteRenderer:
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
   m_SpriteSortPoint: 0
+  m_BlendShapeWeights: []
 --- !u!1 &1184836944
 GameObject:
   m_ObjectHideFlags: 0
@@ -10993,7 +11001,7 @@ MonoBehaviour:
   hudSortingOrder: 60
 --- !u!212 &1229210713
 SpriteRenderer:
-  serializedVersion: 2
+  serializedVersion: 3
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -11050,6 +11058,7 @@ SpriteRenderer:
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
   m_SpriteSortPoint: 0
+  m_BlendShapeWeights: []
 --- !u!1 &1251878217
 GameObject:
   m_ObjectHideFlags: 0
@@ -12874,7 +12883,7 @@ MonoBehaviour:
   continuousEditorVisualRefresh: 0
 --- !u!212 &1520770438
 SpriteRenderer:
-  serializedVersion: 2
+  serializedVersion: 3
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -12931,6 +12940,7 @@ SpriteRenderer:
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
   m_SpriteSortPoint: 0
+  m_BlendShapeWeights: []
 --- !u!1 &1562029185
 GameObject:
   m_ObjectHideFlags: 0
@@ -16400,6 +16410,8 @@ MonoBehaviour:
   lineOfFireAlpha: 0.8
   advanceTurnPreDelay: 1
   advanceTurnPostDelay: 1.5
+  concealAutomatedAiCursorTravelInFog: 1
+  visibleFogCursorTravelPenalty: 24
   fsmDebugDocument: {fileID: 0}
   fsmDebugElementName: FSM
 --- !u!1 &1907704221
@@ -18726,7 +18738,7 @@ MonoBehaviour:
   rightClickTapMaxTravelPixels: 0
 --- !u!212 &2105919122
 SpriteRenderer:
-  serializedVersion: 2
+  serializedVersion: 3
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -18783,6 +18795,7 @@ SpriteRenderer:
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
   m_SpriteSortPoint: 0
+  m_BlendShapeWeights: []
 --- !u!82 &2105919123
 AudioSource:
   m_ObjectHideFlags: 0

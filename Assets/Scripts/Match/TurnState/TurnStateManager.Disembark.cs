@@ -1310,6 +1310,8 @@ public partial class TurnStateManager
     {
         if (unit == null)
             return "(unidade)";
+        if (!string.IsNullOrWhiteSpace(unit.UnitDisplayName))
+            return unit.UnitDisplayName.Trim();
         if (unit.TryGetUnitData(out UnitData data) && data != null)
             return ResolveUnitName(data);
         return string.IsNullOrWhiteSpace(unit.name) ? "(unidade)" : unit.name;

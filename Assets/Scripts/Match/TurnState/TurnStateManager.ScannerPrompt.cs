@@ -447,6 +447,13 @@ public partial class TurnStateManager
         if (!WasLetterPressedThisFrame('U'))
             return;
 
+        if (TutorialManager.IsRemoveUnitBlockedByTutorial)
+        {
+            PanelDialogTutorialController.ShowBlockedActionMessage("Dispensar unidade? Ninguém dispensa ninguém sem a minha ordem, recruta.");
+            cursorController?.PlayErrorSfx();
+            return;
+        }
+
         if (UiInputBlocker.IsTextInputFocused())
             return;
 
@@ -484,6 +491,12 @@ public partial class TurnStateManager
     public bool TryOpenDestroyUnitPromptFromMenu(out string message)
     {
         message = string.Empty;
+
+        if (TutorialManager.IsRemoveUnitBlockedByTutorial)
+        {
+            PanelDialogTutorialController.ShowBlockedActionMessage("Dispensar unidade? Ninguém dispensa ninguém sem a minha ordem, recruta.");
+            return false;
+        }
 
         if (replayManager != null && replayManager.IsReplaying)
         {

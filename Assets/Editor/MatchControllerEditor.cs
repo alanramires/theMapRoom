@@ -16,6 +16,7 @@ public class MatchControllerEditor : Editor
     private SerializedProperty enableStealthValidationProp;
     private SerializedProperty enableTotalWarProp;
     private SerializedProperty atalhoContextualProp;
+    private SerializedProperty atalhoRPassarTurnoUsaConfirmacaoProp;
     private SerializedProperty maxUnitsPerTeamProp;
     private SerializedProperty autonomyDatabaseProp;
     private SerializedProperty activePlayerListIndexProp;
@@ -72,6 +73,7 @@ public class MatchControllerEditor : Editor
         enableStealthValidationProp = serializedObject.FindProperty("enableStealthValidation");
         enableTotalWarProp = serializedObject.FindProperty("enableTotalWar");
         atalhoContextualProp = serializedObject.FindProperty("atalhoContextual");
+        atalhoRPassarTurnoUsaConfirmacaoProp = serializedObject.FindProperty("atalhoRPassarTurnoUsaConfirmacao");
         maxUnitsPerTeamProp = serializedObject.FindProperty("maxUnitsPerTeam");
         autonomyDatabaseProp = serializedObject.FindProperty("autonomyDatabase");
         activePlayerListIndexProp = serializedObject.FindProperty("activePlayerListIndex");
@@ -169,6 +171,8 @@ public class MatchControllerEditor : Editor
         }
         if (atalhoContextualProp != null)
             EditorGUILayout.PropertyField(atalhoContextualProp, new GUIContent("Atalho Contextual"));
+        if (atalhoRPassarTurnoUsaConfirmacaoProp != null)
+            EditorGUILayout.PropertyField(atalhoRPassarTurnoUsaConfirmacaoProp, new GUIContent("Atalho R Usa Confirmacao"));
         if (maxUnitsPerTeamProp != null)
             EditorGUILayout.PropertyField(maxUnitsPerTeamProp, new GUIContent("Max Units Per Team"));
 

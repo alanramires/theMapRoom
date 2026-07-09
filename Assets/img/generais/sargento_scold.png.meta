@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: ab92efc24844919419e139f8108230f2
+guid: a77ca3f7279edc44998c1a088f452218
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: 8372472312265930973
-    second: amarelo_0
+      213: -5743486080739086982
+    second: sargento_scold_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -96,30 +96,17 @@ TextureImporter:
     ignorePlatformSupport: 0
     androidETC2FallbackOverride: 0
     forceMaximumCompressionQuality_BC6H_BC7: 0
-  - serializedVersion: 4
-    buildTarget: WebGL
-    maxTextureSize: 2048
-    resizeAlgorithm: 0
-    textureFormat: -1
-    textureCompression: 1
-    compressionQuality: 50
-    crunchedCompression: 0
-    allowsAlphaSplitting: 0
-    overridden: 0
-    ignorePlatformSupport: 0
-    androidETC2FallbackOverride: 0
-    forceMaximumCompressionQuality_BC6H_BC7: 0
   spriteSheet:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: amarelo_0
+      name: sargento_scold_0
       rect:
         serializedVersion: 2
-        x: 60
+        x: 0
         y: 0
-        width: 430
-        height: 500
+        width: 1023
+        height: 1430
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -128,8 +115,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: dd87760753ff03470800000000000000
-      internalID: 8372472312265930973
+      spriteID: a7d652107d90b40b0800000000000000
+      internalID: -5743486080739086982
       vertices: []
       indices: 
       edges: []
@@ -148,7 +135,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      amarelo_0: 8372472312265930973
+      sargento_scold_0: -5743486080739086982
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

@@ -124,7 +124,8 @@ public class PanelRemainingController : MonoBehaviour
                             turnStateManager.CurrentCursorState == TurnStateManager.CursorState.Neutral &&
                             !matchController.HasVictoryWinner &&
                             !matchController.IsTurnTransitionInProgress &&
-                            !matchController.IsPlayerInputLockedByActiveAI();
+                            !matchController.IsPlayerInputLockedByActiveAI() &&
+                            !TutorialManager.IsEndTurnLockedByTutorial;
         buttonRodada.interactable = interactable;
     }
 

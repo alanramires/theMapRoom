@@ -40,6 +40,9 @@ public class MainMenuTutorialPanelController : MonoBehaviour
     [Tooltip("Pergunta a cor do jogador (ESCOLHA SUA COR) antes de carregar a historia. So tem efeito em cenas com unidades ligadas por slotIndex.")]
     [SerializeField] private bool askPlayerColor = true;
 
+    [Tooltip("Quantas historias estao liberadas no menu. Botoes alem deste numero ficam desabilitados. Temporario ate existir progressao salva.")]
+    [SerializeField] [Range(1, 5)] private int historiasLiberadas = 1;
+
     private static readonly TeamId[] TutorialTeams = { TeamId.Green, TeamId.Red, TeamId.Blue, TeamId.Yellow };
 
     private int selectedIndex;
@@ -395,7 +398,10 @@ public class MainMenuTutorialPanelController : MonoBehaviour
                 continue;
 
             string sceneName = GetStorySceneName(i);
-            button.interactable = !string.IsNullOrWhiteSpace(sceneName) && Application.CanStreamedLevelBeLoaded(sceneName);
+            bool unlocked = i <= Mathf.Clamp(historiasLiberadas, 1, 5);
+            button.interactable = unlocked &&
+                !string.IsNullOrWhiteSpace(sceneName) &&
+                Application.CanStreamedLevelBeLoaded(sceneName);
         }
     }
 

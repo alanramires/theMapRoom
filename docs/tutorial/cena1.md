@@ -1,16 +1,25 @@
 # História 1 — Aprendendo a Atirar
 
+> **Fonte de verdade em jogo:** `Assets/DB/Tutorial/Tutorial Data/História 1 - Aprendendo a Atirar.asset`
+> (falas, gates, spawns e demonstrações vivem no asset — editar texto lá, não aqui).
+> Este doc é o roteiro de referência. Status de implementação no fim do arquivo.
+
 ## Abertura
+
+Mapa começa vazio (sem unidades). Painel de tarefas aberto e vazio ("Aguardando próximo objetivo...").
+Passar a vez travado (R, botão flutuante e menu) até o Sargento autorizar no Step "Encerrar turno".
+Reabastecer (X), dispensar unidade (U), render-se e Situação travados a cena inteira — tentar dispara
+bronca do Sargento no próprio balão + error.mp3.
 
 Sargento:
 Bem-vindo, recruta. Já encheu o bucho com a comida da caserna e tomou o chá brochante do tonel de óleo diesel?
 
-<o sistema revela/spawna o Soldado do jogador>
+<ao avançar: spawn do Ryan em 1,3 (`slot0 SD 1,3 name=Ryan cursor`) — toca done.mp3 e o cursor desliza até ele>
 
 Sargento:
 Recruta Ryan, certo? Muito bem. Você é o número 17. Em fila, soldado.
 
-<dois outros soldados aparecem ao lado, com nomes aleatórios. Eles já estão marcados como "já agiram". A barra de passar turno permanece desativada.>
+<ao avançar: spawn dos recrutas **Mathias** (0,3) e **Dias** (2,3) com `acted` — nascem "já agiram". A barra de passar turno permanece desativada.>
 
 Sargento:
 Esses dois aí já cumpriram a parte deles. Agora é você.
@@ -19,10 +28,12 @@ Enquanto eu estiver falando, ninguém passa turno, ninguém dá uma de turista e
 
 ---
 
-## Step 1 — Conhecer a unidade
+## Step 1 — Conhecer a unidade (câmera + barras + inspeção)
 
-Objetivo do sistema: fazer o jogador observar a unidade e inspecionar um aliado.
-Validação: inspecionar uma unidade aliada (evento de inspeção — o zoom é só ambientação, não valida).
+Objetivos do sistema (validados por eventos, revelados na task list quando o Sargento dá cada ordem):
+1. `hist_1_01 CAMERA_ZOOM` — aproximar o zoom (mudança do orthographicSize, bolinha ou pinça).
+2. `hist_1_02 CAMERA_PAN` — arrastar a câmera até o Ryan (dedo/botão direito; câmera perto da célula 1,3).
+3. `hist_1_03 INSPECT_ALLY_UNIT` — inspecionar um aliado (evento real de inspeção).
 
 Sargento:
 Antes de puxar o gatilho, primeiro é preciso conhecer a si mesmo.
@@ -30,9 +41,9 @@ Antes de puxar o gatilho, primeiro é preciso conhecer a si mesmo.
 Meu Velho falava algo nessa linha, mas ele provavelmente não precisava lidar com recruta sonolento.
 
 Olhe bem para você e seus companheiros.
-Aproxime o zoom usando a bolinha do mouse ou o toque do celular.
+[ordem]Aproxime o zoom usando a bolinha do mouse ou o toque do celular.[/ordem]
 
-<o sistema aguarda a bolinha do mouse?>
+<gate: espera CAMERA_ZOOM completar>
 
 Sargento:
 Essa informação é persistente. Ela mostra os dados importantes do combatente.
@@ -42,17 +53,38 @@ Está vendo o coração?
 Ele indica sua capacidade de luta.
 Quando está cheio, o esquadrão combate com força total.
 Quando esvazia, sua força de tiro cai junto.
+[ordem]Arraste a tela com o botão direito do mouse ou com o toque.[/ordem]
 
+<gate: espera CAMERA_PAN completar>
+
+Sargento:
 A sua figura em campo não representa um soldado sozinho.
 Ela representa 10 soldados lutando juntos no mesmo setor.
 
 Menos soldados atirando, menos chumbo indo para o outro lado.
+
+<demonstração viva: `Mathias hp=4`>
+
+Sargento:
+Uma unidade ferida luta com menos força, entendido?
+Mathias ainda luta, mas ferido desse jeito não vai conseguir fazer as coisas direito.
 
 Sargento:
 Agora olhe a barra laranja.
 
 Essa é sua autonomia, sua capacidade de marcha.
 Se isso zerar, você não morre, mas fica estacionário no campo, feito poste com capacete.
+
+<demonstração viva: `Mathias fuel=40`>
+
+Sargento:
+Quando a autonomia estiver próxima da metade, ela muda pra amarelo. Olha o Mathias.
+
+<demonstração viva: `Dias fuel=15`>
+
+Sargento:
+O recruta Dias já tá na capa da gaita pra marchar longas distâncias.
+Pelotão faminto não anda.
 
 Sargento:
 E essa barra azul é munição.
@@ -62,12 +94,21 @@ E soldado sem munição vira decoração de cemitério.
 
 Caixão e vela preta.
 
+<demonstração viva: `Mathias ammo=2; Dias ammo=0`>
+
+Sargento:
+Olha os cintos agora: Mathias com a munição no fim e o Dias sem nada pra atirar.
+Em batalha, preste atenção na munição antes de precisar dela, entendido?
+
 Sargento:
 Mas olhar por cima não é conhecer.
 
-Inspecione um dos seus companheiros de fila. Abra a ficha dele.
+[ordem]Inspecione um dos seus companheiros de fila. Abra a ficha dele.[/ordem]
 
-<o sistema espera o jogador inspecionar uma unidade aliada>
+<gate: espera INSPECT_ALLY_UNIT completar>
+
+Nota de sistema: inspecionar o Dias (sem munição) mostra a ficha + só o raio de movimento — sem camada
+de mira e sem o segundo clique do inspect ("anda mas não atira"). Unidades `Civil` têm inspect básico.
 
 Sargento:
 Essa é a ficha completa do combatente: arma, alcance, capacidade de marcha. Tudo o que ele é está aí. Note que o soldado move 3, e o rifle tem alcance de 1, por isso tem esse simbolo de mira na quarta casa, indica o alcance maximo de onde ele combate em 1 rodada. mas você pode atacar qualquer alvo estando parado. Isso é útil pra vc saber onde se posicionar com segurança em relação ao inimigo que vc está caçando ok?
@@ -84,7 +125,7 @@ Muito bem. Você já sabe olhar para uma unidade sem babar no mapa.
 
 ## Step 2 — Selecionar Ryan
 
-Objetivo do sistema: jogador clicar/tocar no Soldado Ryan.
+Objetivo do sistema: `hist_1_04 UNIT_SELECTED` (parâmetro `SD && (1,3)`) — clicar/tocar no Soldado Ryan.
 
 Sargento:
 Agora selecione você mesmo, recruta Ryan.
@@ -107,7 +148,8 @@ Marchar cansa, soldado. Até no treinamento de fuga e evasão da AMAN.
 
 ## Step 3 — Movimento e terreno
 
-Objetivo do sistema: mover Ryan até a bandeira no morro.
+Objetivo do sistema: `hist_1_05 UNIT_AT_HEX` — mover Ryan até a bandeira no morro.
+(Coordenada da montanha ainda como `0,0` no asset — **preencher com a célula real**.)
 
 <o sistema marca uma bandeira em um hex de montanha ou terreno elevado>
 

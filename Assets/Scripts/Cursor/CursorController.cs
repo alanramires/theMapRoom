@@ -1129,18 +1129,18 @@ public class CursorController : MonoBehaviour
 
         if (WasAdvanceTurnPressedThisFrame())
         {
-            // R e exclusivo do jogador humano. Por padrao abre a mesma confirmacao
-            // dos botoes; a partida pode optar pelo encerramento direto.
+            // R e exclusivo do jogador humano. Por padrao e o atalho rapido;
+            // a partida pode exigir a mesma confirmacao/validacao dos botoes.
             TryAutoAssignMatchController();
             if (matchController != null && matchController.IsActiveTeamAI())
                 return;
             if (turnStateManager != null && turnStateManager.CurrentCursorState != TurnStateManager.CursorState.Neutral)
                 return;
             turnStateManager?.TryCloseThreatLayerHotzone();
-            bool skipConfirmation = matchController != null && matchController.PassarTurnoSemConfirmacao;
-            bool handled = skipConfirmation
-                ? TryExecuteEndTurnFromMenu()
-                : RequestEndTurnConfirmation();
+            bool useHelperConfirmation = matchController != null && matchController.AtalhoRPassarTurnoUsaConfirmacao;
+            bool handled = useHelperConfirmation
+                ? RequestEndTurnConfirmation()
+                : TryExecuteEndTurnFromMenu();
             if (!handled)
                 PlayErrorSfx();
             return;
@@ -1202,8 +1202,8 @@ public class CursorController : MonoBehaviour
     /// Abre a confirmação de Passar a Vez (estado EndingTurn + prompt de confirmação) a
     /// partir de Neutral e arma o pending para o próximo confirmar/cancelar do jogador.
     /// Caminho canônico dos botões humanos de fim de turno (menu Rodada e HUD
-    /// flutuante). O atalho R tambem usa este caminho, salvo quando a partida
-    /// habilita Passar Turno Sem Confirmacao.
+    /// flutuante). O atalho R tambem usa este caminho quando a partida habilita
+    /// Atalho R Passar Turno Usa Confirmacao.
     /// Retorna false se não deu para abrir.
     /// </summary>
     public bool RequestEndTurnConfirmation()

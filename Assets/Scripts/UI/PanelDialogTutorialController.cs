@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
@@ -14,6 +15,8 @@ public class PanelDialogTutorialController : MonoBehaviour
 {
     [Header("References")]
     [SerializeField] private MatchController matchController;
+    [SerializeField] private TutorialManager tutorialManager;
+    [SerializeField] private CursorController cursorController;
     [SerializeField] private GameObject panelRoot;
     [SerializeField] private TMP_Text speechText;
     [SerializeField] private Button advanceButton;
@@ -21,8 +24,20 @@ public class PanelDialogTutorialController : MonoBehaviour
     [SerializeField] private AudioSource voiceSource;
     [SerializeField] private CanvasGroup panelCanvasGroup;
 
+    [Header("Bronca")]
+    [Tooltip("Retrato do Sargento (Image). Auto-resolve por nome 'image_retrato' se vazio.")]
+    [SerializeField] private Image portraitImage;
+    [Tooltip("Sprite de expressao de bronca (opcional). Troca o retrato durante a mensagem de acao bloqueada e volta ao normal depois.")]
+    [SerializeField] private Sprite scoldPortraitSprite;
+
+    private static PanelDialogTutorialController activeInstance;
+
     private List<TutorialDialogEntry> script;
     private readonly HashSet<int> completedObjectiveIndices = new HashSet<int>();
+    private readonly HashSet<int> executedSpawnEntries = new HashSet<int>();
+    private readonly HashSet<int> executedStatEntries = new HashSet<int>();
+    private Coroutine scoldRoutine;
+    private Sprite normalPortraitSprite;
     private int currentIndex = -1;
     private int furthestShownIndex = -1;
     private bool waitingGate;
@@ -30,8 +45,15 @@ public class PanelDialogTutorialController : MonoBehaviour
 
     private void Awake()
     {
+        activeInstance = this;
         ResolveReferences();
         BindButtons();
+    }
+
+    private void OnDestroy()
+    {
+        if (activeInstance == this)
+            activeInstance = null;
     }
 
     private void OnEnable()
@@ -64,6 +86,10 @@ public class PanelDialogTutorialController : MonoBehaviour
     {
         if (matchController == null)
             matchController = FindAnyObjectByType<MatchController>();
+        if (tutorialManager == null)
+            tutorialManager = FindAnyObjectByType<TutorialManager>();
+        if (cursorController == null)
+            cursorController = FindAnyObjectByType<CursorController>();
 
         if (panelRoot == null)
         {
@@ -80,6 +106,8 @@ public class PanelDialogTutorialController : MonoBehaviour
             advanceButton = FindComponentByName<Button>("button_avancar");
         if (backButton == null)
             backButton = FindComponentByName<Button>("button_voltar");
+        if (portraitImage == null)
+            portraitImage = FindComponentByName<Image>("image_retrato");
         if (voiceSource == null && panelRoot != null)
             voiceSource = panelRoot.GetComponent<AudioSource>();
 
@@ -113,6 +141,7 @@ public class PanelDialogTutorialController : MonoBehaviour
 
         // Evita que o clique/Enter vaze para o cursor de gameplay no mesmo frame.
         UiInputBlocker.SuppressGameplayInputForFrames(2);
+        cursorController?.PlayConfirmSfx();
 
         // Navegando historico: apenas volta para frente sem reprocessar gates.
         if (currentIndex < furthestShownIndex)
@@ -130,6 +159,7 @@ public class PanelDialogTutorialController : MonoBehaviour
             return;
 
         UiInputBlocker.SuppressGameplayInputForFrames(2);
+        cursorController?.PlayCancelSfx();
         ShowEntry(currentIndex - 1);
     }
 
@@ -148,9 +178,8 @@ public class PanelDialogTutorialController : MonoBehaviour
         }
 
         TutorialDialogEntry entry = script[next];
-        if (entry != null &&
-            entry.waitObjectiveIndex >= 0 &&
-            !completedObjectiveIndices.Contains(entry.waitObjectiveIndex))
+        int waitIndex = ResolveWaitIndex(entry);
+        if (waitIndex >= 0 && !completedObjectiveIndices.Contains(waitIndex))
         {
             // Gate pendente: esconde o painel e deixa o jogador cumprir a tarefa.
             waitingGate = true;
@@ -174,7 +203,34 @@ public class PanelDialogTutorialController : MonoBehaviour
 
         TutorialDialogEntry entry = script[index];
         if (speechText != null)
-            speechText.text = entry != null ? entry.text : string.Empty;
+            speechText.text = FormatSpeechText(entry != null ? entry.text : string.Empty);
+
+        // Spawns amarrados a fala executam uma unica vez (voltar no historico nao duplica).
+        if (entry != null && !string.IsNullOrWhiteSpace(entry.spawnCommand) && !executedSpawnEntries.Contains(index))
+        {
+            executedSpawnEntries.Add(index);
+            if (tutorialManager == null)
+                tutorialManager = FindAnyObjectByType<TutorialManager>();
+            tutorialManager?.ExecuteSpawnCommands(entry.spawnCommand);
+        }
+
+        // Ajustes de status amarrados a fala (demonstracoes do Sargento) — uma unica vez.
+        if (entry != null && !string.IsNullOrWhiteSpace(entry.statCommand) && !executedStatEntries.Contains(index))
+        {
+            executedStatEntries.Add(index);
+            if (tutorialManager == null)
+                tutorialManager = FindAnyObjectByType<TutorialManager>();
+            tutorialManager?.ExecuteStatCommands(entry.statCommand);
+        }
+
+        // O Sargento autorizou: libera o passar a vez (uma vez liberado, nao trava de novo).
+        if (entry != null && entry.unlockEndTurn)
+            TutorialManager.UnlockEndTurnFromScript();
+
+        // O Sargento deu a ordem: a tarefa entra na task list (idempotente).
+        int revealIndex = ResolveRevealIndex(entry);
+        if (revealIndex >= 0)
+            TutorialManager.RevealObjectiveFromScript(revealIndex);
 
         if (voiceSource != null)
         {
@@ -199,10 +255,8 @@ public class PanelDialogTutorialController : MonoBehaviour
             bool nextGated = false;
             if (atFrontier && script != null && currentIndex + 1 < script.Count)
             {
-                TutorialDialogEntry next = script[currentIndex + 1];
-                nextGated = next != null &&
-                            next.waitObjectiveIndex >= 0 &&
-                            !completedObjectiveIndices.Contains(next.waitObjectiveIndex);
+                int nextWaitIndex = ResolveWaitIndex(script[currentIndex + 1]);
+                nextGated = nextWaitIndex >= 0 && !completedObjectiveIndices.Contains(nextWaitIndex);
             }
 
             advanceButton.interactable = !nextGated;
@@ -226,6 +280,46 @@ public class PanelDialogTutorialController : MonoBehaviour
         }
     }
 
+    // Key (hist_Y_XX) tem precedencia sobre o indice legado. Key inexistente e erro
+    // barulhento no Console — falha silenciosa em gate ja nos custou caro.
+    private int ResolveWaitIndex(TutorialDialogEntry entry)
+    {
+        if (entry == null)
+            return -1;
+
+        if (!string.IsNullOrWhiteSpace(entry.waitObjectiveKey))
+        {
+            int index = ResolveKeyToIndex(entry.waitObjectiveKey);
+            if (index < 0)
+                Debug.LogError($"[PanelDialogTutorial] waitObjectiveKey '{entry.waitObjectiveKey}' nao existe nos objectives do tutorial ativo.");
+            return index;
+        }
+
+        return entry.waitObjectiveIndex;
+    }
+
+    private int ResolveRevealIndex(TutorialDialogEntry entry)
+    {
+        if (entry == null)
+            return -1;
+
+        if (!string.IsNullOrWhiteSpace(entry.revealObjectiveKey))
+        {
+            int index = ResolveKeyToIndex(entry.revealObjectiveKey);
+            if (index < 0)
+                Debug.LogError($"[PanelDialogTutorial] revealObjectiveKey '{entry.revealObjectiveKey}' nao existe nos objectives do tutorial ativo.");
+            return index;
+        }
+
+        return entry.revealObjectiveIndex;
+    }
+
+    private int ResolveKeyToIndex(string key)
+    {
+        TutorialData tutorial = matchController != null ? matchController.ActiveTutorial : null;
+        return tutorial != null ? tutorial.FindObjectiveIndexByKey(key) : -1;
+    }
+
     private int ResolveObjectiveIndex(TutorialObjective objective)
     {
         TutorialData tutorial = matchController != null ? matchController.ActiveTutorial : null;
@@ -233,6 +327,99 @@ public class PanelDialogTutorialController : MonoBehaviour
             return -1;
 
         return tutorial.objectives.IndexOf(objective);
+    }
+
+    // ── Bronca do Sargento (mensagem de acao bloqueada) ─────────────────────
+    // O panel_dialog fica atras deste painel, entao mensagens de bloqueio no
+    // tutorial viram fala transiente do proprio Sargento: o balao troca o texto
+    // (aparecendo, se estava escondido num gate), segura alguns segundos e restaura.
+
+    public static void ShowBlockedActionMessage(string text)
+    {
+        if (activeInstance != null && activeInstance.TryShowScold(text, 2.6f))
+            return;
+
+        // Sem painel de tutorial na cena: cai no panel_dialog normal.
+        PanelDialogController.TrySetTransientText(text, 2.6f);
+    }
+
+    private bool TryShowScold(string text, float duration)
+    {
+        if (script == null || speechText == null || string.IsNullOrWhiteSpace(text))
+            return false;
+
+        if (scoldRoutine != null)
+            StopCoroutine(scoldRoutine);
+        scoldRoutine = StartCoroutine(RunScold(text, duration));
+        return true;
+    }
+
+    private IEnumerator RunScold(string text, float duration)
+    {
+        SetPanelVisible(true);
+        speechText.text = text;
+        ApplyScoldPortrait(true);
+        yield return new WaitForSeconds(duration);
+        scoldRoutine = null;
+        RestoreAfterScold();
+    }
+
+    private void RestoreAfterScold()
+    {
+        ApplyScoldPortrait(false);
+
+        // Volta ao estado que o roteiro pedia antes da bronca.
+        if (scriptFinished || waitingGate)
+        {
+            SetPanelVisible(false);
+            return;
+        }
+
+        if (script != null && currentIndex >= 0 && currentIndex < script.Count && speechText != null)
+        {
+            TutorialDialogEntry entry = script[currentIndex];
+            speechText.text = FormatSpeechText(entry != null ? entry.text : string.Empty);
+        }
+    }
+
+    // Markup leve do roteiro, sem exigir tags do TMP dentro do asset:
+    // [ordem]...[/ordem]     = o que FAZER (amarelo + negrito)
+    // [enfase]...[/enfase]   = o que FIXAR (laranja, conceito que o Sargento realca)
+    // Cores puras (realce visual de elementos da UI, sem negrito):
+    // [azul], [amarelo], [vermelho]
+    private static string FormatSpeechText(string text)
+    {
+        if (string.IsNullOrEmpty(text))
+            return string.Empty;
+
+        return text
+            .Replace("[ordem]", "<color=#FFD84D><b>")
+            .Replace("[/ordem]", "</b></color>")
+            .Replace("[enfase]", "<color=#FF8C3B>")
+            .Replace("[/enfase]", "</color>")
+            .Replace("[azul]", "<color=#5CB3FF>")
+            .Replace("[/azul]", "</color>")
+            .Replace("[amarelo]", "<color=#FFD84D>")
+            .Replace("[/amarelo]", "</color>")
+            .Replace("[vermelho]", "<color=#FF5C5C>")
+            .Replace("[/vermelho]", "</color>");
+    }
+
+    private void ApplyScoldPortrait(bool scolding)
+    {
+        if (portraitImage == null || scoldPortraitSprite == null)
+            return;
+
+        if (scolding)
+        {
+            if (normalPortraitSprite == null)
+                normalPortraitSprite = portraitImage.sprite;
+            portraitImage.sprite = scoldPortraitSprite;
+        }
+        else if (normalPortraitSprite != null)
+        {
+            portraitImage.sprite = normalPortraitSprite;
+        }
     }
 
     private void SetPanelVisible(bool visible)

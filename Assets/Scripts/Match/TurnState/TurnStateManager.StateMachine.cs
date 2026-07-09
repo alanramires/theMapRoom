@@ -1210,6 +1210,12 @@ public partial class TurnStateManager
     public bool TryOpenEndingTurnConfirmation(out string message)
     {
         message = string.Empty;
+        if (TutorialManager.IsEndTurnLockedByTutorial)
+        {
+            // Bronca no balao do Sargento (o panel_dialog fica atras dele no tutorial).
+            PanelDialogTutorialController.ShowBlockedActionMessage("Eu ainda estou falando, recruta! Aguarde a ordem para passar a vez.");
+            return false;
+        }
         if (CurrentCursorState != CursorState.Neutral)
         {
             message = $"Ending Turn exige cursor em Neutral (atual: {CurrentCursorState}).";
@@ -1249,6 +1255,12 @@ public partial class TurnStateManager
     public bool TryExecuteEndingTurnFromMenu(out string message)
     {
         message = string.Empty;
+        if (TutorialManager.IsEndTurnLockedByTutorial)
+        {
+            // Bronca no balao do Sargento (o panel_dialog fica atras dele no tutorial).
+            PanelDialogTutorialController.ShowBlockedActionMessage("Eu ainda estou falando, recruta! Aguarde a ordem para passar a vez.");
+            return false;
+        }
         if (CurrentCursorState != CursorState.PlayerMenu && CurrentCursorState != CursorState.Neutral)
         {
             message = $"Passar a vez exige PlayerMenu/Neutral (atual: {CurrentCursorState}).";

@@ -675,11 +675,11 @@ public class BattleMapMenuRootController : MonoBehaviour
     private void RefreshButtonInteractability()
     {
         bool isAiTurn = matchController != null && matchController.IsPlayerInputLockedByActiveAI();
-        SetButtonInteractable(btnStatus,   !isAiTurn);
-        SetButtonInteractable(btnComando,  !isAiTurn);
-        SetButtonInteractable(btnRodada,   !isAiTurn);
-        SetButtonInteractable(btnDestruir, !isAiTurn);
-        SetButtonInteractable(btnRender,   !isAiTurn);
+        SetButtonInteractable(btnStatus,   !isAiTurn && !TutorialManager.IsStatusSummaryBlockedByTutorial);
+        SetButtonInteractable(btnComando,  !isAiTurn && !TutorialManager.IsCommandServiceBlockedByTutorial);
+        SetButtonInteractable(btnRodada,   !isAiTurn && !TutorialManager.IsEndTurnLockedByTutorial);
+        SetButtonInteractable(btnDestruir, !isAiTurn && !TutorialManager.IsRemoveUnitBlockedByTutorial);
+        SetButtonInteractable(btnRender,   !isAiTurn && !TutorialManager.IsSurrenderBlockedByTutorial);
     }
 
     private static void SetButtonInteractable(Button button, bool interactable)
@@ -1088,6 +1088,12 @@ public class BattleMapMenuRootController : MonoBehaviour
         switch (action)
         {
             case MenuAction.Status:
+                if (TutorialManager.IsStatusSummaryBlockedByTutorial)
+                {
+                    PanelDialogTutorialController.ShowBlockedActionMessage("Estatística é para depois. Foco na lição, recruta.");
+                    cursorController?.PlayErrorSfx();
+                    break;
+                }
                 ShowStatusSummary();
                 break;
             case MenuAction.Comando:
@@ -1152,6 +1158,12 @@ public class BattleMapMenuRootController : MonoBehaviour
                 }
                 break;
             case MenuAction.Render:
+                if (TutorialManager.IsSurrenderBlockedByTutorial)
+                {
+                    PanelDialogTutorialController.ShowBlockedActionMessage("Render-se?! No meu treinamento?! Nem pensar, recruta.");
+                    cursorController?.PlayErrorSfx();
+                    break;
+                }
                 surrenderConfirmOpen = true;
                 surrenderConfirmFocusIndex = 0;
                 HideMenuForModalPrompt();

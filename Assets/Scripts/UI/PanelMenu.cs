@@ -566,10 +566,10 @@ public class PanelMenu : MonoBehaviour
         List<Button> list = new List<Button>(7);
         AddIfActive(list, buttonNew);
         AddIfActive(list, buttonLoad);
-        AddIfActive(list, buttonTutorial);
         AddIfActive(list, buttonConfig);
         AddIfActive(list, buttonCinematic);
         AddIfActive(list, buttonFullscreen);
+        AddIfActive(list, buttonTutorial);
         AddIfActive(list, buttonSair);
         return list;
     }
