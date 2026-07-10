@@ -746,6 +746,8 @@ public partial class TurnStateManager
         int fuelMax = Mathf.Max(1, unit.GetMaxFuel());
 
         // 1. Basic Stats
+        if (unit.TryGetUnitData(out UnitData unitData) && unitData != null)
+            data.UnitStatsLines.Add(GameUnitClassLabels.GetPortugueseName(unitData.unitClass));
         data.UnitStatsLines.Add($"HP: {hpCurrent}/{hpMax}");
         data.UnitStatsLines.Add($"MOV: {movement}");
         data.UnitStatsLines.Add($"AUT: {fuelCurrent}/{fuelMax}");
@@ -969,7 +971,8 @@ public partial class TurnStateManager
             int min = embarked.GetRangeMin();
             int max = embarked.GetRangeMax();
             string range = min == max ? min.ToString() : $"{min} ~ {max}";
-            lines.Add($"{weaponCounter}: {weaponName} ({ammo}) R:{range}");
+            string categoryAlias = WeaponCategoryLabels.GetAlias(embarked.weapon.WeaponCategory);
+            lines.Add($"{weaponCounter}: {weaponName} ({ammo}) R:{range} {{{categoryAlias}}}");
         }
     }
 

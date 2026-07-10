@@ -799,19 +799,7 @@ public partial class TurnStateManager
 
     private static string ResolveGameUnitClassName(GameUnitClass gameUnitClass)
     {
-        switch (gameUnitClass)
-        {
-            case GameUnitClass.Infantry: return "Infantaria";
-            case GameUnitClass.Vehicle: return "Veiculo";
-            case GameUnitClass.Artillery: return "Artilharia";
-            case GameUnitClass.Armored: return "Blindado";
-            case GameUnitClass.Jet: return "Jato";
-            case GameUnitClass.Helicopter: return "Helicoptero";
-            case GameUnitClass.Plane: return "Aviao";
-            case GameUnitClass.Submarine: return "Submarino";
-            case GameUnitClass.Ship: return "Navio";
-            default: return gameUnitClass.ToString();
-        }
+        return GameUnitClassLabels.GetPortugueseName(gameUnitClass);
     }
 
     private static Sprite ResolveShoppingPreviewSprite(UnitData unit, TeamId team, out Color tint)

@@ -3221,7 +3221,8 @@ public class PanelHelperController : MonoBehaviour
         if (keepPositionControlRoot.activeSelf != active)
             keepPositionControlRoot.SetActive(active);
         if (keepPositionButton != null)
-            keepPositionButton.interactable = active;
+            // Tutorial: antes da ordem de marcha, o MANTER POSICAO fica cinza.
+            keepPositionButton.interactable = active && !TutorialManager.IsMovementLockedByTutorial;
         if (active)
         {
             TintScriptButtonToTeamIdle(keepPositionButton);

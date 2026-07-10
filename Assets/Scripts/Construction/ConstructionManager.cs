@@ -38,6 +38,7 @@ public class ConstructionManager : MonoBehaviour
     [SerializeField] private int instanceId;
     [SerializeField] private Vector3 currentPosition = Vector3.zero;
     [SerializeField] private string constructionDisplayName;
+    [SerializeField, HideInInspector] private string lastAutoConstructionDisplayName;
     [Tooltip("Override visual desta construcao na cena. Quando desligado, o objeto continua existindo para regras, mas sprite/HUD/overlay ficam ocultos.")]
     [SerializeField] private bool isVisible = true;
     [SerializeField] private bool autoApplyOnStart = true;
@@ -378,8 +379,15 @@ public class ConstructionManager : MonoBehaviour
         if (data == null)
             return;
 
+        string defaultDisplayName = string.IsNullOrWhiteSpace(data.displayName) ? data.id : data.displayName;
+        bool shouldUseDefaultDisplayName =
+            string.IsNullOrWhiteSpace(constructionDisplayName) ||
+            string.Equals(constructionDisplayName, lastAutoConstructionDisplayName, System.StringComparison.Ordinal);
+
         constructionId = data.id;
-        constructionDisplayName = string.IsNullOrWhiteSpace(data.displayName) ? data.id : data.displayName;
+        if (shouldUseDefaultDisplayName)
+            constructionDisplayName = defaultDisplayName;
+        lastAutoConstructionDisplayName = defaultDisplayName;
 
         if (spriteRenderer == null)
             spriteRenderer = ResolvePrimarySpriteRenderer();
@@ -1562,4 +1570,5 @@ public class ConstructionManager : MonoBehaviour
         return null;
     }
 }
+
 

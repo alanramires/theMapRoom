@@ -54,7 +54,8 @@
       "Bash(xargs -0 git rm --cached --quiet)",
       "Bash(ls Assembly-CSharp.csproj)",
       "Bash(which dotnet *)",
-      "Bash(awk '/--- !u!114 &1073542090/,/^--- !u!/{print NR\": \"$0}' \"Assets/Scenes/Tela de Entrada.unity\")"
+      "Bash(awk '/--- !u!114 &1073542090/,/^--- !u!/{print NR\": \"$0}' \"Assets/Scenes/Tela de Entrada.unity\")",
+      "Bash(python -)"
     ],
     "additionalDirectories": [
       "d:\\Unity Projects\\The Map Room\\Assets\\Scripts\\Match\\AI\\Units\\Assault"

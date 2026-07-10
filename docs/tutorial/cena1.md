@@ -175,7 +175,15 @@ Agora mova até a bandeira.
 Um, dois! Um, dois!
 Acelerado, recruta!
 
-<o sistema espera o jogador mover Ryan até o hex indicado>
+Sargento:
+A bandeira está longe — suas pernas não chegam lá num turno só.
+Marche o que der e, quando a tropa cansar, [ordem]encerre o turno[/ordem].
+Amanhã se continua.
+
+<esta fala destrava o passar a vez (unlockEndTurn) e revela `hist_1_06 END_TURN` —
+a marcha é desenhada para levar 2 turnos; o gate da chegada atravessa a passagem de turno>
+
+<o sistema espera o jogador mover Ryan até o hex indicado (2 turnos de marcha)>
 
 Ao chegar:
 
@@ -189,8 +197,8 @@ Sua unidade já agiu neste turno.
 Quem age, espera. Quem ainda não agiu, recebe ordem.
 [ordem]Encerre o turno, recruta.[/ordem]
 
-<esta fala destrava o passar a vez (unlockEndTurn) e revela `hist_1_06 END_TURN`>
-<o jogador passa a vez; o turno inimigo (vazio) retorna sozinho via automata>
+<orientação pura: o destrave e a tarefa END_TURN já aconteceram no meio da marcha;
+este segundo passe não é rastreado como tarefa — o jogador passa a vez guiado pelo diálogo>
 
 ---
 

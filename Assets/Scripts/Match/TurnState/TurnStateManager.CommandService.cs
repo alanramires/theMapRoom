@@ -126,7 +126,7 @@ public partial class TurnStateManager
 
         if (TutorialManager.IsCommandServiceBlockedByTutorial)
         {
-            PanelDialogTutorialController.ShowBlockedActionMessage("Serviço do Comando? Você ainda não ganhou esse brinquedo, recruta.");
+            TutorialManager.ShowBlockedActionScold(TutorialScoldKind.CommandService);
             cursorController?.PlayErrorSfx();
             return;
         }
@@ -153,7 +153,7 @@ public partial class TurnStateManager
 
         if (TutorialManager.IsCommandServiceBlockedByTutorial)
         {
-            PanelDialogTutorialController.ShowBlockedActionMessage("Serviço do Comando? Você ainda não ganhou esse brinquedo, recruta.");
+            TutorialManager.ShowBlockedActionScold(TutorialScoldKind.CommandService);
             return false;
         }
 

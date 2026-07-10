@@ -24,7 +24,8 @@ MonoBehaviour:
   fieldEntries:
   - id: HQ_T0_C1
     construction: {fileID: 11400000, guid: 872d2cdd8cf954541b315a21c0ba6296, type: 2}
-    initialTeamId: 0
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: -4, y: 5, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 0
@@ -54,7 +55,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
   - id: "F\xE1brica_T0_C2"
     construction: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
-    initialTeamId: 0
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: -5, y: 5, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 0
@@ -84,7 +86,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: "F\xE1brica_T0_C3"
     construction: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
-    initialTeamId: 0
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: -3, y: 6, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 0
@@ -114,7 +117,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C8
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 4, y: 0, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 0
@@ -142,7 +146,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C10
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: -3, y: 0, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 0
@@ -170,7 +175,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C11
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: -2, y: -5, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 0
@@ -198,7 +204,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: HQ_T1_C13
     construction: {fileID: 11400000, guid: 872d2cdd8cf954541b315a21c0ba6296, type: 2}
-    initialTeamId: 1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 4, y: -5, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 0
@@ -228,7 +235,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
   - id: "F\xE1brica_T1_C14"
     construction: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
-    initialTeamId: 1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 5, y: -5, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 0
@@ -258,7 +266,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: "F\xE1brica_T1_C15"
     construction: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
-    initialTeamId: 1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 4, y: -6, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 0
@@ -288,7 +297,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C19
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: -8, y: 3, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 0
@@ -316,7 +326,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Aeroporto_T-1_C20
     construction: {fileID: 11400000, guid: 98dfc90eb1ac05849a3c30f308a5acbc, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 8, y: -11, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 0
@@ -353,7 +364,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Aeroporto_T-1_C21
     construction: {fileID: 11400000, guid: 98dfc90eb1ac05849a3c30f308a5acbc, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 5, y: -6, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 0
@@ -390,7 +402,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Aeroporto_T0_C22
     construction: {fileID: 11400000, guid: 98dfc90eb1ac05849a3c30f308a5acbc, type: 2}
-    initialTeamId: 0
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: -4, y: 6, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 0
@@ -427,7 +440,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Aeroporto_T-1_C23
     construction: {fileID: 11400000, guid: 98dfc90eb1ac05849a3c30f308a5acbc, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: -8, y: 10, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 0
@@ -464,7 +478,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C24
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: -11, y: 9, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 0
@@ -492,7 +507,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C26
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: -8, y: 8, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 0
@@ -520,7 +536,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C27
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: -9, y: 11, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 0
@@ -548,7 +565,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C28
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 2, y: 3, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 0
@@ -576,7 +594,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C29
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 11, y: -10, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 0
@@ -604,7 +623,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C30
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 8, y: -9, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 0
@@ -632,7 +652,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C31
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 9, y: -12, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 0
@@ -660,7 +681,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T0_C32
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: 0
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: -4, y: 3, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -688,7 +710,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C33
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 3, y: -4, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -716,7 +739,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C34
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: -2, y: 4, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -744,7 +768,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: PortoNaval_T0_C35
     construction: {fileID: 11400000, guid: 18336762152ab4246bb4cd0fb463da45, type: 2}
-    initialTeamId: 0
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: -9, y: 12, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 0
@@ -775,7 +800,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: PortoNaval_T1_C36
     construction: {fileID: 11400000, guid: 18336762152ab4246bb4cd0fb463da45, type: 2}
-    initialTeamId: 1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 8, y: -13, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 0
@@ -806,7 +832,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C38
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: -10, y: -11, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 0
@@ -834,7 +861,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C40
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: -8, y: -12, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 0
@@ -862,7 +890,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C41
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: -8, y: -13, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 0
@@ -890,7 +919,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: PortoNaval_T-1_C46
     construction: {fileID: 11400000, guid: 18336762152ab4246bb4cd0fb463da45, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 13, y: 10, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -921,7 +951,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C49
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 10, y: 10, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -949,7 +980,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Aeroporto_T-1_C53
     construction: {fileID: 11400000, guid: 98dfc90eb1ac05849a3c30f308a5acbc, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: -2, y: -2, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -986,7 +1018,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: "F\xE1brica_T1_C54"
     construction: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
-    initialTeamId: 1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 8, y: -10, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 0
@@ -1016,7 +1049,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: "F\xE1brica_T1_C55"
     construction: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
-    initialTeamId: 1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 7, y: -10, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 0
@@ -1046,7 +1080,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Aeroporto_T1_C56
     construction: {fileID: 11400000, guid: 98dfc90eb1ac05849a3c30f308a5acbc, type: 2}
-    initialTeamId: 1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 6, y: -9, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 0
@@ -1083,7 +1118,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: "F\xE1brica_T0_C57"
     construction: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
-    initialTeamId: 0
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: -9, y: 9, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 0
@@ -1113,7 +1149,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: "F\xE1brica_T0_C58"
     construction: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
-    initialTeamId: 0
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: -8, y: 9, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 0
@@ -1143,7 +1180,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Aeroporto_T0_C59
     construction: {fileID: 11400000, guid: 98dfc90eb1ac05849a3c30f308a5acbc, type: 2}
-    initialTeamId: 0
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: -9, y: 10, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 0
@@ -1180,7 +1218,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C60
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 0, y: 6, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -1208,7 +1247,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C61
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 2, y: -7, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -1236,7 +1276,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: "F\xE1brica_T3_C62"
     construction: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
-    initialTeamId: 3
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 11, y: 12, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 0
@@ -1266,7 +1307,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C64
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 11, y: 4, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -1294,7 +1336,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C65
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 10, y: 3, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -1322,7 +1365,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C66
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 11, y: 2, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -1350,7 +1394,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C67
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: -10, y: -6, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -1378,7 +1423,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C68
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: -10, y: -5, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -1406,7 +1452,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C69
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: -10, y: -4, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -1434,7 +1481,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: "F\xE1brica_T2_C70"
     construction: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
-    initialTeamId: 2
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: -11, y: -11, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -1464,7 +1512,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: "F\xE1brica_T2_C71"
     construction: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
-    initialTeamId: 2
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: -9, y: -14, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -1494,7 +1543,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: "F\xE1brica_T2_C72"
     construction: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
-    initialTeamId: 2
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: -11, y: -13, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -1524,7 +1574,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: "F\xE1brica_T2_C73"
     construction: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
-    initialTeamId: 2
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: -7, y: -14, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -1554,7 +1605,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: HQ_T2_C74
     construction: {fileID: 11400000, guid: 872d2cdd8cf954541b315a21c0ba6296, type: 2}
-    initialTeamId: 2
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: -11, y: -14, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -1584,7 +1636,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
   - id: Aeroporto_T2_C75
     construction: {fileID: 11400000, guid: 98dfc90eb1ac05849a3c30f308a5acbc, type: 2}
-    initialTeamId: 2
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: -7, y: -13, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -1621,7 +1674,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Aeroporto_T2_C76
     construction: {fileID: 11400000, guid: 98dfc90eb1ac05849a3c30f308a5acbc, type: 2}
-    initialTeamId: 2
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: -9, y: -12, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -1658,7 +1712,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: PortoNaval_T2_C77
     construction: {fileID: 11400000, guid: 18336762152ab4246bb4cd0fb463da45, type: 2}
-    initialTeamId: 2
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: -12, y: -11, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -1689,7 +1744,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: HQ_T3_C78
     construction: {fileID: 11400000, guid: 872d2cdd8cf954541b315a21c0ba6296, type: 2}
-    initialTeamId: 3
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 12, y: 12, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -1719,7 +1775,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
   - id: "F\xE1brica_T3_C79"
     construction: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
-    initialTeamId: 3
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 10, y: 12, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -1749,7 +1806,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: "F\xE1brica_T3_C81"
     construction: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
-    initialTeamId: 3
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 12, y: 10, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -1779,7 +1837,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: "F\xE1brica_T3_C82"
     construction: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
-    initialTeamId: 3
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 11, y: 9, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -1809,7 +1868,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Aeroporto_T3_C83
     construction: {fileID: 11400000, guid: 98dfc90eb1ac05849a3c30f308a5acbc, type: 2}
-    initialTeamId: 3
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 12, y: 9, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -1846,7 +1906,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Aeroporto_T3_C85
     construction: {fileID: 11400000, guid: 98dfc90eb1ac05849a3c30f308a5acbc, type: 2}
-    initialTeamId: 3
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 9, y: 11, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -1883,7 +1944,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: "F\xE1brica_T3_C86"
     construction: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
-    initialTeamId: 3
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 8, y: 11, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -1913,7 +1975,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: PortoNaval_T3_C87
     construction: {fileID: 11400000, guid: 18336762152ab4246bb4cd0fb463da45, type: 2}
-    initialTeamId: 3
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 13, y: 9, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -1944,7 +2007,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: PortoNaval_T-1_C88
     construction: {fileID: 11400000, guid: 18336762152ab4246bb4cd0fb463da45, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: -6, y: -1, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -1975,7 +2039,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: PortoNaval_T-1_C89
     construction: {fileID: 11400000, guid: 18336762152ab4246bb4cd0fb463da45, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 5, y: 1, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -2006,7 +2071,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: HQ_T0_C90
     construction: {fileID: 11400000, guid: 872d2cdd8cf954541b315a21c0ba6296, type: 2}
-    initialTeamId: 0
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 2, y: -2, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -2036,7 +2102,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
   - id: "F\xE1brica_T0_C91"
     construction: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
-    initialTeamId: 0
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 1, y: -2, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -2066,38 +2133,9 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: "F\xE1brica_T0_C92"
     construction: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
-    initialTeamId: 0
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 1, y: -1, z: 0}
-    initialCapturePoints: -1
-    useConstructionConfigurationOverride: 1
-    constructionConfiguration:
-      isPlayerHeadQuarter: 0
-      isVictoryBuilding: 0
-      isCapturable: 1
-      capturePointsMax: 30
-      capturedIncoming: 1500
-      sellingRule: 1
-      legacyCanProduceAndSellUnits: 
-      offeredUnits:
-      - {fileID: 11400000, guid: a5d9d72a15e061a4cbaf125b2b6b9d48, type: 2}
-      - {fileID: 11400000, guid: 784e1b5ab74d4d34fa6c3ef79ba6219e, type: 2}
-      canProvideSupplies: 1
-      offeredSupplies:
-      - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
-        quantity: 2147483647
-      - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
-        quantity: 2147483647
-      - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
-        quantity: 2147483647
-      offeredServices:
-      - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
-      - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
-      - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
-      - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
-  - id: "F\xE1brica_T0_C93"
-    construction: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
-    initialTeamId: 0
-    cellPosition: {x: 2, y: -1, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
     constructionConfiguration:
@@ -2126,7 +2164,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: "F\xE1brica_T0_C94"
     construction: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
-    initialTeamId: 0
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 3, y: -2, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -2156,7 +2195,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: "F\xE1brica_T0_C95"
     construction: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
-    initialTeamId: 0
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 2, y: -3, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -2186,7 +2226,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Aeroporto_T0_C98
     construction: {fileID: 11400000, guid: 98dfc90eb1ac05849a3c30f308a5acbc, type: 2}
-    initialTeamId: 0
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 3, y: -1, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -2223,7 +2264,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Aeroporto_T0_C99
     construction: {fileID: 11400000, guid: 98dfc90eb1ac05849a3c30f308a5acbc, type: 2}
-    initialTeamId: 0
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 4, y: -2, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -2260,7 +2302,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Aeroporto_T0_C100
     construction: {fileID: 11400000, guid: 98dfc90eb1ac05849a3c30f308a5acbc, type: 2}
-    initialTeamId: 0
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 3, y: -3, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -2297,7 +2340,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: HQ_T1_C103
     construction: {fileID: 11400000, guid: 872d2cdd8cf954541b315a21c0ba6296, type: 2}
-    initialTeamId: 1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 2, y: -56, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -2327,7 +2371,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
   - id: "F\xE1brica_T1_C104"
     construction: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
-    initialTeamId: 1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 1, y: -56, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -2357,7 +2402,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: "F\xE1brica_T1_C106"
     construction: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
-    initialTeamId: 1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 2, y: -55, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -2387,7 +2433,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: "F\xE1brica_T1_C107"
     construction: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
-    initialTeamId: 1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 3, y: -56, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -2417,7 +2464,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: "F\xE1brica_T1_C108"
     construction: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
-    initialTeamId: 1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 2, y: -57, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -2447,7 +2495,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: "F\xE1brica_T1_C109"
     construction: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
-    initialTeamId: 1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 1, y: -57, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -2477,7 +2526,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Aeroporto_T1_C110
     construction: {fileID: 11400000, guid: 98dfc90eb1ac05849a3c30f308a5acbc, type: 2}
-    initialTeamId: 1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 3, y: -55, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -2514,7 +2564,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Aeroporto_T1_C111
     construction: {fileID: 11400000, guid: 98dfc90eb1ac05849a3c30f308a5acbc, type: 2}
-    initialTeamId: 1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 4, y: -56, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -2551,7 +2602,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Aeroporto_T1_C112
     construction: {fileID: 11400000, guid: 98dfc90eb1ac05849a3c30f308a5acbc, type: 2}
-    initialTeamId: 1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 3, y: -57, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -2588,7 +2640,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: HQ_T2_C119
     construction: {fileID: 11400000, guid: 872d2cdd8cf954541b315a21c0ba6296, type: 2}
-    initialTeamId: 2
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 56, y: -56, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -2618,7 +2671,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
   - id: "F\xE1brica_T2_C120"
     construction: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
-    initialTeamId: 2
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 56, y: -57, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -2648,7 +2702,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: "F\xE1brica_T2_C121"
     construction: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
-    initialTeamId: 2
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 57, y: -56, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -2678,7 +2733,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: "F\xE1brica_T2_C122"
     construction: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
-    initialTeamId: 2
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 56, y: -55, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -2708,7 +2764,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: "F\xE1brica_T2_C123"
     construction: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
-    initialTeamId: 2
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 55, y: -55, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -2738,7 +2795,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: "F\xE1brica_T2_C125"
     construction: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
-    initialTeamId: 2
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 55, y: -57, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -2768,7 +2826,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Aeroporto_T2_C126
     construction: {fileID: 11400000, guid: 98dfc90eb1ac05849a3c30f308a5acbc, type: 2}
-    initialTeamId: 2
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 54, y: -55, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -2805,7 +2864,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Aeroporto_T2_C127
     construction: {fileID: 11400000, guid: 98dfc90eb1ac05849a3c30f308a5acbc, type: 2}
-    initialTeamId: 2
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 55, y: -54, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -2842,7 +2902,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Aeroporto_T2_C128
     construction: {fileID: 11400000, guid: 98dfc90eb1ac05849a3c30f308a5acbc, type: 2}
-    initialTeamId: 2
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 56, y: -54, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -2879,7 +2940,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: HQ_T3_C129
     construction: {fileID: 11400000, guid: 872d2cdd8cf954541b315a21c0ba6296, type: 2}
-    initialTeamId: 3
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 56, y: -2, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -2909,7 +2971,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
   - id: "F\xE1brica_T3_C130"
     construction: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
-    initialTeamId: 3
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 57, y: -2, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -2939,7 +3002,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: "F\xE1brica_T3_C131"
     construction: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
-    initialTeamId: 3
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 56, y: -1, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -2969,7 +3033,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: "F\xE1brica_T3_C132"
     construction: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
-    initialTeamId: 3
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 55, y: -1, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -2999,7 +3064,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: "F\xE1brica_T3_C134"
     construction: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
-    initialTeamId: 3
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 55, y: -3, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -3029,7 +3095,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: "F\xE1brica_T3_C135"
     construction: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
-    initialTeamId: 3
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 56, y: -3, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -3059,7 +3126,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Aeroporto_T3_C136
     construction: {fileID: 11400000, guid: 98dfc90eb1ac05849a3c30f308a5acbc, type: 2}
-    initialTeamId: 3
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 56, y: -4, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -3096,7 +3164,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Aeroporto_T3_C137
     construction: {fileID: 11400000, guid: 98dfc90eb1ac05849a3c30f308a5acbc, type: 2}
-    initialTeamId: 3
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 55, y: -4, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -3133,7 +3202,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Aeroporto_T3_C138
     construction: {fileID: 11400000, guid: 98dfc90eb1ac05849a3c30f308a5acbc, type: 2}
-    initialTeamId: 3
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 54, y: -3, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -3170,7 +3240,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Aeroporto_T-1_C158
     construction: {fileID: 11400000, guid: 98dfc90eb1ac05849a3c30f308a5acbc, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 3, y: -21, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -3207,7 +3278,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: PortoNaval_T-1_C161
     construction: {fileID: 11400000, guid: 18336762152ab4246bb4cd0fb463da45, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 54, y: -20, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -3238,7 +3310,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: PortoNaval_T-1_C162
     construction: {fileID: 11400000, guid: 18336762152ab4246bb4cd0fb463da45, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 54, y: -38, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -3269,7 +3342,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C170
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 57, y: -40, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -3297,7 +3371,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C177
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 56, y: -18, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -3325,7 +3400,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C192
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 3, y: -15, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -3353,7 +3429,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C196
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 6, y: -3, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -3381,7 +3458,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C198
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 11, y: -37, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -3409,7 +3487,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C199
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 12, y: -22, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -3437,7 +3516,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C208
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 2, y: -43, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -3465,7 +3545,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C213
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 29, y: -29, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -3493,7 +3574,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C214
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 28, y: -24, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -3521,7 +3603,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C215
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 29, y: -24, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -3549,7 +3632,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C216
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 28, y: -34, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -3577,7 +3661,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C217
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 29, y: -34, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -3605,7 +3690,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C220
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 37, y: -28, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -3633,7 +3719,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C221
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 37, y: -30, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -3661,7 +3748,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C222
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 26, y: -29, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -3689,7 +3777,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: PortoNaval_T1_C227
     construction: {fileID: 11400000, guid: 18336762152ab4246bb4cd0fb463da45, type: 2}
-    initialTeamId: 1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 16, y: -55, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -3720,7 +3809,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: PortoNaval_T0_C228
     construction: {fileID: 11400000, guid: 18336762152ab4246bb4cd0fb463da45, type: 2}
-    initialTeamId: 0
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 16, y: -3, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -3751,7 +3841,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: PortoNaval_T3_C230
     construction: {fileID: 11400000, guid: 18336762152ab4246bb4cd0fb463da45, type: 2}
-    initialTeamId: 3
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 39, y: -5, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -3782,7 +3873,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: PortoNaval_T2_C233
     construction: {fileID: 11400000, guid: 18336762152ab4246bb4cd0fb463da45, type: 2}
-    initialTeamId: 2
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 39, y: -53, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -3813,7 +3905,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: PortoNaval_T-1_C237
     construction: {fileID: 11400000, guid: 18336762152ab4246bb4cd0fb463da45, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 10, y: -51, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -3844,7 +3937,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: PortoNaval_T-1_C238
     construction: {fileID: 11400000, guid: 18336762152ab4246bb4cd0fb463da45, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 10, y: -52, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -3875,7 +3969,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C243
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 5, y: -3, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -3903,7 +3998,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C244
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 7, y: -6, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -3931,7 +4027,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C245
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 13, y: -3, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -3959,7 +4056,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C246
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 13, y: -8, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -3987,7 +4085,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C247
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 9, y: -8, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -4015,7 +4114,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C248
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 2, y: -9, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -4043,7 +4143,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C249
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 14, y: -12, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -4071,7 +4172,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C250
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 5, y: -14, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -4099,7 +4201,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C251
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 1, y: -15, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -4127,7 +4230,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C253
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 13, y: -17, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -4155,7 +4259,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C254
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 7, y: -19, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -4183,7 +4288,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C256
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 5, y: -37, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -4211,7 +4317,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C258
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 4, y: -43, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -4239,7 +4346,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C259
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 1, y: -43, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -4267,7 +4375,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C260
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 5, y: -45, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -4295,7 +4404,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C261
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 13, y: -41, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -4323,7 +4433,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C263
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 14, y: -46, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -4351,7 +4462,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C264
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 11, y: -49, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -4379,7 +4491,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C265
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 7, y: -51, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -4407,7 +4520,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C266
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 1, y: -49, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -4435,7 +4549,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C267
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 14, y: -53, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -4463,7 +4578,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C268
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 7, y: -54, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -4491,7 +4607,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C269
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 42, y: -57, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -4519,7 +4636,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C270
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 46, y: -57, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -4547,7 +4665,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C271
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 45, y: -50, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -4575,7 +4694,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C272
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 44, y: -49, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -4603,7 +4723,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C273
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 54, y: -50, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -4631,7 +4752,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C274
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 49, y: -49, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -4659,7 +4781,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C275
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 50, y: -46, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -4687,7 +4810,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C277
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 58, y: -44, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -4715,7 +4839,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C278
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 40, y: -48, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -4743,7 +4868,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C280
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 44, y: -40, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -4771,7 +4897,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C282
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 59, y: -34, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -4799,7 +4926,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C283
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 59, y: -24, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -4827,7 +4955,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C285
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 45, y: -17, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -4855,7 +4984,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C288
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 49, y: -10, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -4883,7 +5013,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C289
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 40, y: -11, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -4911,7 +5042,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C290
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 45, y: -9, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -4939,7 +5071,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C291
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 45, y: -8, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -4967,7 +5100,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C292
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 49, y: -6, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -4995,7 +5129,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C293
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 46, y: -2, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -5023,7 +5158,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C295
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 42, y: -2, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -5051,7 +5187,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C296
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 28, y: -21, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -5079,7 +5216,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C297
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 29, y: -25, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -5107,7 +5245,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C298
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 26, y: -25, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -5135,7 +5274,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C299
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 24, y: -29, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -5163,7 +5303,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C300
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 28, y: -29, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -5191,7 +5332,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C301
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 31, y: -29, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -5219,7 +5361,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C302
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 29, y: -33, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -5247,7 +5390,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C303
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 26, y: -33, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -5275,7 +5419,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C304
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 28, y: -37, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -5303,7 +5448,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Cidade_T-1_C305
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 38, y: -29, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -5331,7 +5477,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Aeroporto_T-1_C306
     construction: {fileID: 11400000, guid: 98dfc90eb1ac05849a3c30f308a5acbc, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 48, y: -19, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -5368,7 +5515,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Aeroporto_T-1_C307
     construction: {fileID: 11400000, guid: 98dfc90eb1ac05849a3c30f308a5acbc, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 48, y: -39, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -5405,7 +5553,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Aeroporto_T-1_C308
     construction: {fileID: 11400000, guid: 98dfc90eb1ac05849a3c30f308a5acbc, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 2, y: -37, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -5442,7 +5591,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Aeroporto_T-1_C309
     construction: {fileID: 11400000, guid: 98dfc90eb1ac05849a3c30f308a5acbc, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 3, y: -22, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -5479,7 +5629,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Aeroporto_T-1_C310
     construction: {fileID: 11400000, guid: 98dfc90eb1ac05849a3c30f308a5acbc, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 35, y: -29, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -5516,7 +5667,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Aeroporto_T-1_C313
     construction: {fileID: 11400000, guid: 98dfc90eb1ac05849a3c30f308a5acbc, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 30, y: -38, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -5553,7 +5705,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: Aeroporto_T-1_C314
     construction: {fileID: 11400000, guid: 98dfc90eb1ac05849a3c30f308a5acbc, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 30, y: -20, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -5590,7 +5743,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: PortoNaval_T-1_C315
     construction: {fileID: 11400000, guid: 18336762152ab4246bb4cd0fb463da45, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 39, y: -29, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -5621,7 +5775,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: PortoNaval_T-1_C316
     construction: {fileID: 11400000, guid: 18336762152ab4246bb4cd0fb463da45, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 23, y: -29, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -5652,7 +5807,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: PortoNaval_T-1_C317
     construction: {fileID: 11400000, guid: 18336762152ab4246bb4cd0fb463da45, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 40, y: -6, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -5683,7 +5839,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: PortoNaval_T-1_C318
     construction: {fileID: 11400000, guid: 18336762152ab4246bb4cd0fb463da45, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 55, y: -20, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -5714,7 +5871,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: PortoNaval_T-1_C319
     construction: {fileID: 11400000, guid: 18336762152ab4246bb4cd0fb463da45, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 55, y: -38, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -5745,7 +5903,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: PortoNaval_T-1_C320
     construction: {fileID: 11400000, guid: 18336762152ab4246bb4cd0fb463da45, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 40, y: -52, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -5776,7 +5935,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: PortoNaval_T-1_C321
     construction: {fileID: 11400000, guid: 18336762152ab4246bb4cd0fb463da45, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 16, y: -54, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -5807,7 +5967,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: PortoNaval_T-1_C322
     construction: {fileID: 11400000, guid: 18336762152ab4246bb4cd0fb463da45, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 8, y: -35, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -5838,7 +5999,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: PortoNaval_T-1_C323
     construction: {fileID: 11400000, guid: 18336762152ab4246bb4cd0fb463da45, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 8, y: -23, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -5869,7 +6031,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: PortoNaval_T-1_C324
     construction: {fileID: 11400000, guid: 18336762152ab4246bb4cd0fb463da45, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 16, y: -4, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -5900,7 +6063,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - id: "Esta\xE7\xE3odeTrem_T0_C325"
     construction: {fileID: 11400000, guid: a385afd73b91aa64297b44d032cac9c4, type: 2}
-    initialTeamId: 0
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 2, y: -4, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 0
@@ -5943,7 +6107,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
   - id: "Esta\xE7\xE3odeTrem_T1_C326"
     construction: {fileID: 11400000, guid: a385afd73b91aa64297b44d032cac9c4, type: 2}
-    initialTeamId: 1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 2, y: -54, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 0
@@ -5986,7 +6151,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
   - id: "Esta\xE7\xE3odeTrem_T2_C327"
     construction: {fileID: 11400000, guid: a385afd73b91aa64297b44d032cac9c4, type: 2}
-    initialTeamId: 2
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 54, y: -56, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 0
@@ -6029,7 +6195,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
   - id: "Esta\xE7\xE3odeTrem_T3_C328"
     construction: {fileID: 11400000, guid: a385afd73b91aa64297b44d032cac9c4, type: 2}
-    initialTeamId: 3
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 54, y: -2, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 0
@@ -6072,7 +6239,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
   - id: "Esta\xE7\xE3odeTrem_T3_C329"
     construction: {fileID: 11400000, guid: a385afd73b91aa64297b44d032cac9c4, type: 2}
-    initialTeamId: 3
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 55, y: -2, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 0
@@ -6115,7 +6283,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
   - id: "Esta\xE7\xE3odeTrem_T0_C330"
     construction: {fileID: 11400000, guid: a385afd73b91aa64297b44d032cac9c4, type: 2}
-    initialTeamId: 0
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 1, y: -3, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 0
@@ -6158,7 +6327,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
   - id: "Esta\xE7\xE3odeTrem_T1_C331"
     construction: {fileID: 11400000, guid: a385afd73b91aa64297b44d032cac9c4, type: 2}
-    initialTeamId: 1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 1, y: -55, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 0
@@ -6201,7 +6371,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
   - id: "Esta\xE7\xE3odeTrem_T2_C332"
     construction: {fileID: 11400000, guid: a385afd73b91aa64297b44d032cac9c4, type: 2}
-    initialTeamId: 2
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 55, y: -56, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 0
@@ -6244,7 +6415,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
   - id: "Esta\xE7\xE3odeTrem_T-1_C333"
     construction: {fileID: 11400000, guid: a385afd73b91aa64297b44d032cac9c4, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 56, y: -38, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -6287,7 +6459,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
   - id: "Esta\xE7\xE3odeTrem_T-1_C334"
     construction: {fileID: 11400000, guid: a385afd73b91aa64297b44d032cac9c4, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 43, y: -44, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -6330,7 +6503,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
   - id: "Esta\xE7\xE3odeTrem_T-1_C335"
     construction: {fileID: 11400000, guid: a385afd73b91aa64297b44d032cac9c4, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 56, y: -20, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -6373,7 +6547,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
   - id: "Esta\xE7\xE3odeTrem_T-1_C336"
     construction: {fileID: 11400000, guid: a385afd73b91aa64297b44d032cac9c4, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 43, y: -14, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -6416,7 +6591,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
   - id: "Esta\xE7\xE3odeTrem_T-1_C337"
     construction: {fileID: 11400000, guid: a385afd73b91aa64297b44d032cac9c4, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 19, y: -16, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -6459,7 +6635,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
   - id: "Esta\xE7\xE3odeTrem_T-1_C338"
     construction: {fileID: 11400000, guid: a385afd73b91aa64297b44d032cac9c4, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 9, y: -22, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -6502,7 +6679,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
   - id: "Esta\xE7\xE3odeTrem_T-1_C339"
     construction: {fileID: 11400000, guid: a385afd73b91aa64297b44d032cac9c4, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 9, y: -36, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -6545,7 +6723,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
   - id: "Esta\xE7\xE3odeTrem_T-1_C340"
     construction: {fileID: 11400000, guid: a385afd73b91aa64297b44d032cac9c4, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 19, y: -42, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -6588,7 +6767,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
   - id: Aeroporto_T-1_C341
     construction: {fileID: 11400000, guid: 98dfc90eb1ac05849a3c30f308a5acbc, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 15, y: -5, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -6624,7 +6804,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
   - id: Aeroporto_T-1_C342
     construction: {fileID: 11400000, guid: 98dfc90eb1ac05849a3c30f308a5acbc, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 40, y: -5, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -6660,7 +6841,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
   - id: Aeroporto_T-1_C343
     construction: {fileID: 11400000, guid: 98dfc90eb1ac05849a3c30f308a5acbc, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 40, y: -53, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -6696,7 +6878,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
   - id: Aeroporto_T-1_C344
     construction: {fileID: 11400000, guid: 98dfc90eb1ac05849a3c30f308a5acbc, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 15, y: -53, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -6732,7 +6915,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
   - id: Cidade_T-1_C346
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 8, y: -19, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -6759,7 +6943,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
   - id: Cidade_T-1_C347
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 7, y: -37, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -6786,7 +6971,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
   - id: Cidade_T-1_C348
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 54, y: -9, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -6813,7 +6999,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
   - id: Cidade_T-1_C349
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 55, y: -50, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -6840,7 +7027,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
   - id: HQ_T0_C350
     construction: {fileID: 11400000, guid: 872d2cdd8cf954541b315a21c0ba6296, type: 2}
-    initialTeamId: 0
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 0, y: 0, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 0
@@ -6883,7 +7071,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
   - id: Flag_T0_C351
     construction: {fileID: 11400000, guid: 225c257a62190524d829aa7aeb50a6da, type: 2}
-    initialTeamId: 0
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 2, y: 2, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 0
@@ -6910,7 +7099,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
   - id: Flag_T-1_C352
     construction: {fileID: 11400000, guid: 225c257a62190524d829aa7aeb50a6da, type: 2}
-    initialTeamId: -1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 7, y: 10, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 0
@@ -6937,7 +7127,8 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
   - id: HQ_T1_C353
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: 1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 8, y: 1, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -6955,7 +7146,8 @@ MonoBehaviour:
       offeredServices: []
   - id: HQ_T1_C354
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: 1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 6, y: -1, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -6973,7 +7165,8 @@ MonoBehaviour:
       offeredServices: []
   - id: HQ_T1_C355
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: 1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 7, y: -1, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -6991,7 +7184,8 @@ MonoBehaviour:
       offeredServices: []
   - id: HQ_T0_C356
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: 0
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 23, y: 1, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -7009,7 +7203,8 @@ MonoBehaviour:
       offeredServices: []
   - id: HQ_T1_C357
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: 1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 14, y: 1, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -7027,7 +7222,8 @@ MonoBehaviour:
       offeredServices: []
   - id: HQ_T1_C358
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: 1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 17, y: 1, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -7045,7 +7241,8 @@ MonoBehaviour:
       offeredServices: []
   - id: HQ_T1_C359
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: 1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 15, y: -1, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -7063,7 +7260,8 @@ MonoBehaviour:
       offeredServices: []
   - id: HQ_T1_C360
     construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialTeamId: 1
+    initialSlotIndex: -1
+    sector: 0
     cellPosition: {x: 6, y: 0, z: 0}
     initialCapturePoints: -1
     useConstructionConfigurationOverride: 1
@@ -7079,3 +7277,31 @@ MonoBehaviour:
       canProvideSupplies: 0
       offeredSupplies: []
       offeredServices: []
+  - id: Flag_S0_C351
+    construction: {fileID: 11400000, guid: 225c257a62190524d829aa7aeb50a6da, type: 2}
+    initialSlotIndex: 0
+    sector: 0
+    cellPosition: {x: 2, y: -1, z: 0}
+    initialCapturePoints: -1
+    useConstructionConfigurationOverride: 0
+    constructionConfiguration:
+      isPlayerHeadQuarter: 0
+      isVictoryBuilding: 0
+      isCapturable: 0
+      capturePointsMax: 0
+      capturedIncoming: 0
+      sellingRule: 3
+      legacyCanProduceAndSellUnits: 
+      offeredUnits: []
+      canProvideSupplies: 1
+      offeredSupplies:
+      - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+        quantity: 20
+      - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+        quantity: 50
+      - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+        quantity: 12
+      offeredServices:
+      - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+      - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+      - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}

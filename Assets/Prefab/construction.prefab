@@ -881,6 +881,7 @@ MonoBehaviour:
   instanceId: 0
   currentPosition: {x: 0, y: 0, z: 0}
   constructionDisplayName: HQ
+  lastAutoConstructionDisplayName: 
   isVisible: 1
   autoApplyOnStart: 1
   siteRuntime:

@@ -396,6 +396,9 @@ public class MatchController : MonoBehaviour
     public bool EnableStealthValidation => enableStealthValidation;
     public bool EnableTotalWar => enableTotalWar;
     public bool AtalhoContextual => atalhoContextual;
+    // Tutorial desliga o atalho contextual no inicio da aula (o jogador pode religar
+    // nas preferencias) — clique inferindo acao driblaria as travas do roteiro.
+    public void SetAtalhoContextual(bool value) => atalhoContextual = value;
     public bool EnableSensorsRuntimeLogs => enableSensorsRuntimeLogs;
     public bool EnablePodeMirarSensorLogs => enableSensorsRuntimeLogs || enablePodeMirarSensorLogs;
     public bool EnablePodeEmbarcarSensorLogs => enableSensorsRuntimeLogs || enablePodeEmbarcarSensorLogs;

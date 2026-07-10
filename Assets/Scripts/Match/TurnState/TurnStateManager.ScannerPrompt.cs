@@ -449,7 +449,7 @@ public partial class TurnStateManager
 
         if (TutorialManager.IsRemoveUnitBlockedByTutorial)
         {
-            PanelDialogTutorialController.ShowBlockedActionMessage("Dispensar unidade? Ninguém dispensa ninguém sem a minha ordem, recruta.");
+            TutorialManager.ShowBlockedActionScold(TutorialScoldKind.RemoveUnit);
             cursorController?.PlayErrorSfx();
             return;
         }
@@ -494,7 +494,7 @@ public partial class TurnStateManager
 
         if (TutorialManager.IsRemoveUnitBlockedByTutorial)
         {
-            PanelDialogTutorialController.ShowBlockedActionMessage("Dispensar unidade? Ninguém dispensa ninguém sem a minha ordem, recruta.");
+            TutorialManager.ShowBlockedActionScold(TutorialScoldKind.RemoveUnit);
             return false;
         }
 
@@ -1392,6 +1392,14 @@ public partial class TurnStateManager
 
     private void HandleMoveOnlyActionRequested()
     {
+        // Tutorial: o "M" (apenas mover) tambem respeita a ordem de marcha.
+        if (TutorialManager.IsMovementLockedByTutorial)
+        {
+            TutorialManager.ShowBlockedActionScold(TutorialScoldKind.MovementLocked);
+            cursorController?.PlayErrorSfx();
+            return;
+        }
+
         bool finished = TryFinalizeSelectedUnitActionFromDebug();
         if (finished)
         {

@@ -11,6 +11,7 @@ public class TutorialManager : MonoBehaviour
 
     private static TutorialManager activeInstance;
     private bool endTurnLockedByScript;
+    private bool movementLockedByScript;
 
     // Passar a vez travado pelo roteiro do tutorial (ate a fala com unlockEndTurn aparecer).
     // Sem TutorialManager na cena => nunca trava (partidas normais ilesas).
@@ -23,6 +24,31 @@ public class TutorialManager : MonoBehaviour
         {
             activeInstance.endTurnLockedByScript = false;
             Debug.Log("[TutorialManager] Passar a vez liberado pelo roteiro.");
+        }
+    }
+
+    // Movimento travado pelo roteiro (ate a fala com unlockMovement — a "ordem de marcha").
+    // So vale no turno do jogador (slot 0): o automata inimigo se move normalmente.
+    public static bool IsMovementLockedByTutorial
+    {
+        get
+        {
+            if (activeInstance == null || !activeInstance.movementLockedByScript)
+                return false;
+
+            MatchController mc = activeInstance.matchController;
+            if (mc == null)
+                return true;
+            return mc.ActiveTeamId == (int)mc.GetTeamIdForSlot(0);
+        }
+    }
+
+    public static void UnlockMovementFromScript()
+    {
+        if (activeInstance != null && activeInstance.movementLockedByScript)
+        {
+            activeInstance.movementLockedByScript = false;
+            Debug.Log("[TutorialManager] Movimento liberado pelo roteiro (ordem de marcha).");
         }
     }
 
@@ -51,6 +77,46 @@ public class TutorialManager : MonoBehaviour
     private static TutorialData GetActiveTutorialStatic()
     {
         return activeInstance != null ? activeInstance.GetActiveTutorial() : null;
+    }
+
+    // Ponto unico das broncas de acao bloqueada: texto/voz vem do TutorialData ativo
+    // (secao "Broncas do Sargento"); texto vazio cai no padrao daqui.
+    public static void ShowBlockedActionScold(TutorialScoldKind kind)
+    {
+        string text = GetDefaultScoldText(kind);
+        AudioClip voice = null;
+
+        TutorialData tutorial = GetActiveTutorialStatic();
+        TutorialScoldEntry entry = tutorial != null ? tutorial.GetScold(kind) : null;
+        if (entry != null)
+        {
+            if (!string.IsNullOrWhiteSpace(entry.text))
+                text = entry.text;
+            voice = entry.voice;
+        }
+
+        PanelDialogTutorialController.ShowBlockedActionMessage(text, voice);
+    }
+
+    private static string GetDefaultScoldText(TutorialScoldKind kind)
+    {
+        switch (kind)
+        {
+            case TutorialScoldKind.EndTurnLocked:
+                return "Eu ainda estou falando, recruta! Aguarde a ordem para passar a vez.";
+            case TutorialScoldKind.CommandService:
+                return "Serviço do Comando? Você ainda não ganhou esse brinquedo, recruta.";
+            case TutorialScoldKind.RemoveUnit:
+                return "Dispensar unidade? Ninguém dispensa ninguém sem a minha ordem, recruta.";
+            case TutorialScoldKind.Surrender:
+                return "Render-se?! No meu treinamento?! Nem pensar, recruta.";
+            case TutorialScoldKind.StatusSummary:
+                return "Estatística é para depois. Foco na lição, recruta.";
+            case TutorialScoldKind.MovementLocked:
+                return "Quem mandou marchar, recruta?! Eu ainda não dei ordem de movimento.";
+            default:
+                return "O Sargento não autorizou isso, recruta.";
+        }
     }
 
     [SerializeField] private TerrainDatabase terrainDatabase;
@@ -89,10 +155,54 @@ public class TutorialManager : MonoBehaviour
         ProcessObjectiveSpawns();
     }
 
+    private float unitAtHexPollTimer;
+
     private void Update()
     {
         CheckCameraZoomObjective();
         CheckCameraPanObjective();
+
+        // UNIT_AT_HEX e checado por poll espacado (resolve nomes de construcao,
+        // que custam FindObjectsByType) — 4x por segundo e mais que suficiente.
+        unitAtHexPollTimer += Time.deltaTime;
+        if (unitAtHexPollTimer >= 0.25f)
+        {
+            unitAtHexPollTimer = 0f;
+            CheckUnitAtHexObjectives();
+        }
+    }
+
+    // UNIT_AT_HEX valida no FIM da acao (HasActed na celula): chegar com a animacao
+    // e ainda poder cancelar (rollback) nao conta. O poll cobre mover, mover+atacar,
+    // "apenas mover" e desembarque — e so unidades do time do jogador contam.
+    private void CheckUnitAtHexObjectives()
+    {
+        TutorialData tutorial = GetActiveTutorial();
+        if (tutorial == null || tutorial.objectives == null || matchController == null)
+            return;
+
+        TeamId playerTeam = matchController.GetTeamIdForSlot(0);
+        for (int i = 0; i < tutorial.objectives.Count; i++)
+        {
+            TutorialObjective obj = tutorial.objectives[i];
+            if (obj == null || obj.id != "UNIT_AT_HEX" || !obj.isVisible || !IsObjectivePending(obj))
+                continue;
+
+            List<UnitManager> units = UnitManager.AllActive;
+            for (int u = 0; u < units.Count; u++)
+            {
+                UnitManager unit = units[u];
+                if (unit == null || unit.IsDead || unit.IsEmbarked || !unit.HasActed)
+                    continue;
+                if (unit.TeamId != playerTeam)
+                    continue;
+                if (!IsUnitAtCoordinates(unit, obj.parameters))
+                    continue;
+
+                MarkObjectiveComplete(obj);
+                break;
+            }
+        }
     }
 
     // Objetivo CAMERA_PAN: completa quando a camera se desloca do baseline (arrasto
@@ -227,23 +337,34 @@ public class TutorialManager : MonoBehaviour
             MarkObjectiveComplete(zoomObjective);
     }
 
-    // A cena comeca com o passar a vez travado apenas se o roteiro declara um ponto
-    // de destrave (alguma fala com unlockEndTurn). Roteiros sem a flag nao travam nada.
+    // As travas iniciais so existem se o roteiro declara o ponto de destrave
+    // correspondente (unlockEndTurn / unlockMovement). Roteiros sem flags nao travam nada.
+    // Aulas com roteiro tambem desligam o atalho contextual (clique inferindo acao),
+    // senao o jogador dribla as travas — ele pode religar nas preferencias se quiser.
     private void InitializeEndTurnLockFromScript()
     {
         endTurnLockedByScript = false;
+        movementLockedByScript = false;
         TutorialData tutorial = GetActiveTutorial();
         if (tutorial == null || tutorial.script == null)
             return;
 
+        bool hasScript = tutorial.script.Count > 0;
         for (int i = 0; i < tutorial.script.Count; i++)
         {
             TutorialDialogEntry entry = tutorial.script[i];
-            if (entry != null && entry.unlockEndTurn)
-            {
+            if (entry == null)
+                continue;
+            if (entry.unlockEndTurn)
                 endTurnLockedByScript = true;
-                return;
-            }
+            if (entry.unlockMovement)
+                movementLockedByScript = true;
+        }
+
+        if (hasScript && matchController != null && matchController.AtalhoContextual)
+        {
+            matchController.SetAtalhoContextual(false);
+            Debug.Log("[TutorialManager] Atalho contextual desativado para a aula.");
         }
     }
 
@@ -652,9 +773,27 @@ public class TutorialManager : MonoBehaviour
         string[] parts = command.Split(new[] { ' ' }, System.StringSplitOptions.RemoveEmptyEntries);
         if (parts.Length < 2)
         {
-            Debug.LogWarning($"[TutorialManager] statCommand invalido: '{command}' (esperado 'NOME stat=valor').");
+            Debug.LogWarning($"[TutorialManager] statCommand invalido: '{command}' (esperado 'NOME stat=valor' ou 'wake ...').");
             return false;
         }
+
+        // "wake 1,3" ou "wake SD 1,3" ou "wake Ryan": reativa a unidade (mesmo efeito
+        // do debug "wake unit" — limpa fusao e o estado de "ja agiu").
+        if (parts[0].Equals("wake", System.StringComparison.OrdinalIgnoreCase))
+            return TryExecuteWakeCommand(command, parts);
+
+        // "show Bandeira" / "hide Bandeira" / "show 5,4": alterna o isVisible de uma
+        // construcao (ex.: revelar a bandeira da montanha no momento certo do roteiro).
+        if (parts[0].Equals("show", System.StringComparison.OrdinalIgnoreCase))
+            return TryExecuteConstructionVisibilityCommand(command, parts, visible: true);
+        if (parts[0].Equals("hide", System.StringComparison.OrdinalIgnoreCase))
+            return TryExecuteConstructionVisibilityCommand(command, parts, visible: false);
+
+        // "pan 5,4" / "pan Bandeira" / "pan Ryan": desliza SO A CAMERA ate a celula/
+        // unidade/construcao (FocusOn). O cursor nao se move — com unidade selecionada
+        // ele e preso a area de movimento, e o pan nao pode violar essa regra.
+        if (parts[0].Equals("pan", System.StringComparison.OrdinalIgnoreCase))
+            return TryExecutePanCommand(command, parts);
 
         string token = parts[0];
         string assignment = parts[1];
@@ -710,6 +849,169 @@ public class TutorialManager : MonoBehaviour
                 Debug.LogWarning($"[TutorialManager] statCommand: stat '{stat}' desconhecido (use hp, fuel ou ammo).");
                 return false;
         }
+    }
+
+    private bool TryExecuteWakeCommand(string command, string[] parts)
+    {
+        UnitManager unit = null;
+
+        // Ultimo argumento com virgula = celula; o argumento do meio (se houver) e token de conferencia.
+        string last = parts[parts.Length - 1];
+        if (last.Contains(","))
+        {
+            string[] xy = last.Split(',');
+            if (xy.Length < 2 ||
+                !int.TryParse(xy[0].Trim(), out int x) ||
+                !int.TryParse(xy[1].Trim(), out int y))
+            {
+                Debug.LogWarning($"[TutorialManager] wake invalido: '{command}' (celula ilegivel).");
+                return false;
+            }
+
+            unit = FindActiveUnitAtCell(new Vector3Int(x, y, 0));
+            if (unit != null && parts.Length > 2 && !UnitMatchesTargetToken(unit, parts[1]))
+            {
+                Debug.LogWarning($"[TutorialManager] wake: unidade em {last} nao casa com o token '{parts[1]}'.");
+                return false;
+            }
+        }
+        else
+        {
+            unit = FindActiveUnitByToken(parts[1]);
+        }
+
+        if (unit == null)
+        {
+            Debug.LogWarning($"[TutorialManager] wake: unidade nao encontrada para '{command}'.");
+            return false;
+        }
+
+        // Mesmo efeito do debug "wake unit".
+        if (unit.HasMerged)
+            unit.ClearMergeAudit();
+        unit.ResetActed();
+        Debug.Log($"[TutorialManager] wake: {unit.name} reativada.");
+        return true;
+    }
+
+    private CameraController panCameraController;
+
+    // Pan de camera puro (FocusOn, com clamp de borda): nao mexe no cursor.
+    private bool TryExecutePanCommand(string command, string[] parts)
+    {
+        Vector3 target;
+        string arg = parts[1].Trim();
+
+        if (arg.Contains(","))
+        {
+            if (!TryGetCellWorldCenter(arg, out target, out _))
+            {
+                Debug.LogWarning($"[TutorialManager] pan invalido: '{command}' (celula ilegivel ou sem tilemap).");
+                return false;
+            }
+        }
+        else
+        {
+            UnitManager unit = FindActiveUnitByToken(arg);
+            if (unit != null)
+            {
+                target = unit.transform.position;
+            }
+            else
+            {
+                ConstructionManager construction = FindConstructionByName(arg);
+                if (construction == null)
+                {
+                    Debug.LogWarning($"[TutorialManager] pan: alvo '{arg}' nao encontrado (unidade ou construcao).");
+                    return false;
+                }
+                target = construction.transform.position;
+            }
+        }
+
+        if (panCameraController == null)
+            panCameraController = FindAnyObjectByType<CameraController>();
+        if (panCameraController == null)
+        {
+            Debug.LogWarning("[TutorialManager] pan: CameraController nao encontrado na cena.");
+            return false;
+        }
+
+        panCameraController.FocusOn(target);
+        return true;
+    }
+
+    private static ConstructionManager FindConstructionByName(string token)
+    {
+        ConstructionManager[] constructions =
+            FindObjectsByType<ConstructionManager>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        for (int i = 0; i < constructions.Length; i++)
+        {
+            ConstructionManager cm = constructions[i];
+            if (cm != null && cm.name.Contains(token, System.StringComparison.OrdinalIgnoreCase))
+                return cm;
+        }
+
+        return null;
+    }
+
+    private bool TryExecuteConstructionVisibilityCommand(string command, string[] parts, bool visible)
+    {
+        ConstructionManager target = null;
+        string arg = parts[1].Trim();
+
+        ConstructionManager[] constructions =
+            FindObjectsByType<ConstructionManager>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+
+        if (arg.Contains(","))
+        {
+            string[] xy = arg.Split(',');
+            if (xy.Length < 2 ||
+                !int.TryParse(xy[0].Trim(), out int x) ||
+                !int.TryParse(xy[1].Trim(), out int y))
+            {
+                Debug.LogWarning($"[TutorialManager] {parts[0]} invalido: '{command}' (celula ilegivel).");
+                return false;
+            }
+
+            Vector3Int cell = new Vector3Int(x, y, 0);
+            for (int i = 0; i < constructions.Length; i++)
+            {
+                ConstructionManager cm = constructions[i];
+                if (cm == null)
+                    continue;
+
+                Vector3Int cmCell = cm.CurrentCellPosition;
+                cmCell.z = 0;
+                if (cmCell == cell)
+                {
+                    target = cm;
+                    break;
+                }
+            }
+        }
+        else
+        {
+            for (int i = 0; i < constructions.Length; i++)
+            {
+                ConstructionManager cm = constructions[i];
+                if (cm != null && cm.name.Contains(arg, System.StringComparison.OrdinalIgnoreCase))
+                {
+                    target = cm;
+                    break;
+                }
+            }
+        }
+
+        if (target == null)
+        {
+            Debug.LogWarning($"[TutorialManager] {parts[0]}: construcao nao encontrada para '{command}'.");
+            return false;
+        }
+
+        target.SetVisible(visible);
+        Debug.Log($"[TutorialManager] {parts[0]}: construcao '{target.name}' visivel={visible}.");
+        return true;
     }
 
     private UnitManager FindActiveUnitByToken(string token)
@@ -864,17 +1166,12 @@ public class TutorialManager : MonoBehaviour
         TutorialData tutorial = GetActiveTutorial();
         if (tutorial == null || tutorial.objectives == null) return;
 
+        // UNIT_AT_HEX nao valida aqui: OnUnitMovementExecuted dispara antes da
+        // confirmacao (rollback ainda possivel) — o poll CheckUnitAtHexObjectives cobre.
         for (int i = 0; i < tutorial.objectives.Count; i++)
         {
             TutorialObjective obj = tutorial.objectives[i];
-            if (obj.id == "UNIT_AT_HEX" && obj.isVisible && IsObjectivePending(obj))
-            {
-                if (IsUnitAtCoordinates(unit, obj.parameters))
-                {
-                    MarkObjectiveComplete(obj);
-                }
-            }
-            else if (obj.id == "USED_ROAD_BOOST" && obj.isVisible && IsObjectivePending(obj))
+            if (obj.id == "USED_ROAD_BOOST" && obj.isVisible && IsObjectivePending(obj))
             {
                 // Parameters esperado: token da unidade (ex.: APC). Vazio = qualquer unidade.
                 if (unit.UsedRoadBoostOnLastMove &&
@@ -936,22 +1233,8 @@ public class TutorialManager : MonoBehaviour
 
     private void HandleUnitDisembarked(UnitManager passenger, UnitManager transporter)
     {
-        if (passenger == null) return;
-
-        TutorialData tutorial = GetActiveTutorial();
-        if (tutorial == null || tutorial.objectives == null) return;
-
-        for (int i = 0; i < tutorial.objectives.Count; i++)
-        {
-            TutorialObjective obj = tutorial.objectives[i];
-            if (obj.id == "UNIT_AT_HEX" && obj.isVisible && IsObjectivePending(obj))
-            {
-                if (IsUnitAtCoordinates(passenger, obj.parameters))
-                {
-                    MarkObjectiveComplete(obj);
-                }
-            }
-        }
+        // UNIT_AT_HEX por desembarque tambem e coberto pelo poll CheckUnitAtHexObjectives
+        // (passageiro desembarcado fica HasActed na celula de destino).
     }
 
     private void HandleUnitSupplied(UnitManager supplier, UnitManager target)
@@ -1060,13 +1343,35 @@ public class TutorialManager : MonoBehaviour
         string[] coords = coordsExpression.Split(new[] { "||" }, System.StringSplitOptions.RemoveEmptyEntries);
         for (int i = 0; i < coords.Length; i++)
         {
-            if (!TryParseCoordinate(coords[i], out Vector2Int cell))
+            // Segmento pode ser "x,y" ou o nome de uma construcao (ex.: "Bandeira"),
+            // que resolve para a celula onde ela esta.
+            if (!TryResolveCellReference(coords[i], out Vector2Int cell))
                 continue;
             if (cell.x == targetCell.x && cell.y == targetCell.y)
                 return true;
         }
 
         return false;
+    }
+
+    // "x,y" vira celula direto; qualquer outro texto tenta casar uma construcao
+    // pelo nome e usa a celula dela. Mantem os assets sem coordenada hardcoded.
+    private static bool TryResolveCellReference(string reference, out Vector2Int cell)
+    {
+        if (TryParseCoordinate(reference, out cell))
+            return true;
+
+        string token = reference != null ? reference.Trim() : string.Empty;
+        if (token.Length <= 0)
+            return false;
+
+        ConstructionManager construction = FindConstructionByName(token);
+        if (construction == null)
+            return false;
+
+        Vector3Int constructionCell = construction.CurrentCellPosition;
+        cell = new Vector2Int(constructionCell.x, constructionCell.y);
+        return true;
     }
 
     private static bool TryParseTokenAndCoordinate(string segment, out string token, out Vector2Int cell)
@@ -1279,11 +1584,47 @@ public class TutorialManager : MonoBehaviour
         }
 
         TryStartTutorialAutomata((TeamId)teamId, tutorial);
+        TryMarkAlwaysActedUnits((TeamId)teamId, tutorial);
+    }
+
+    // Figurantes (ex.: Mathias e Dias na fila): amanhecem "ja agiram" em todo turno
+    // do jogador. Sem cursor, sem eventos — so o MarkAsActed depois da transicao
+    // de turno (que e quem reseta o HasActed do time).
+    private void TryMarkAlwaysActedUnits(TeamId activeTeam, TutorialData tutorial)
+    {
+        if (tutorial == null || string.IsNullOrWhiteSpace(tutorial.alwaysActedUnits))
+            return;
+        if (matchController == null || activeTeam != matchController.GetTeamIdForSlot(0))
+            return;
+
+        StartCoroutine(RunMarkAlwaysActedUnits(tutorial.alwaysActedUnits));
+    }
+
+    private IEnumerator RunMarkAlwaysActedUnits(string tokens)
+    {
+        // Espera a transicao terminar para marcar DEPOIS do reset de HasActed do turno.
+        yield return WaitForTurnTransitionGate(timeoutSeconds: 6f);
+        yield return null;
+
+        string[] list = tokens.Split(';');
+        for (int i = 0; i < list.Length; i++)
+        {
+            string token = list[i].Trim();
+            if (token.Length <= 0)
+                continue;
+
+            UnitManager unit = FindActiveUnitByToken(token);
+            if (unit != null)
+                unit.MarkAsActed();
+        }
     }
 
     private void TryStartTutorialAutomata(TeamId activeTeam, TutorialData tutorial)
     {
-        if (!enableTutorialAutomata || automataDatabase == null)
+        // A rotina roda para qualquer turno nao-jogador mesmo SEM AutomataDatabase:
+        // e ela quem devolve o turno (senao um time vermelho vazio pendura a partida).
+        // O database so da comportamento as unidades — sem ele, ficam paradas.
+        if (!enableTutorialAutomata)
             return;
         // O automata dirige qualquer time que nao seja o do jogador (slot 0).
         // Nao comparar com cor fixa: a cor do jogador pode ter sido escolhida na Tela de Entrada.
@@ -1330,7 +1671,9 @@ public class TutorialManager : MonoBehaviour
             if (!IsUnitValidForAutomata(unit, activeTeam))
                 continue;
 
-            if (!automataDatabase.TryResolve(unit, activeTeam, tutorialId, out AutomataData automata) || automata == null)
+            if (automataDatabase == null ||
+                !automataDatabase.TryResolve(unit, activeTeam, tutorialId, out AutomataData automata) ||
+                automata == null)
                 continue;
 
             Vector3Int unitCell = NormalizeCell(unit.CurrentCellPosition);

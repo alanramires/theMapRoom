@@ -38,6 +38,8 @@ public class PanelDialogTutorialController : MonoBehaviour
     private readonly HashSet<int> executedStatEntries = new HashSet<int>();
     private Coroutine scoldRoutine;
     private Sprite normalPortraitSprite;
+    private bool turnStartGateArmed;
+    private bool turnStartGateSatisfied;
     private int currentIndex = -1;
     private int furthestShownIndex = -1;
     private bool waitingGate;
@@ -59,11 +61,38 @@ public class PanelDialogTutorialController : MonoBehaviour
     private void OnEnable()
     {
         TutorialManager.OnObjectiveCompleted += HandleObjectiveCompleted;
+        MatchController.OnActiveTeamChanged += HandleActiveTeamChanged;
     }
 
     private void OnDisable()
     {
         TutorialManager.OnObjectiveCompleted -= HandleObjectiveCompleted;
+        MatchController.OnActiveTeamChanged -= HandleActiveTeamChanged;
+    }
+
+    private void Update()
+    {
+        // Gate por estado (nao ha evento): "todas as unidades do jogador agiram".
+        // Roda tanto com o painel escondido no gate quanto visivel na fronteira —
+        // o jogador pode cumprir a ordem sem nunca ter clicado Avancar.
+        if (script == null || scriptFinished)
+            return;
+        if (currentIndex < furthestShownIndex)
+            return;
+
+        int next = currentIndex + 1;
+        if (next >= script.Count)
+            return;
+
+        TutorialDialogEntry entry = script[next];
+        if (entry == null || !entry.waitAllUnitsActed)
+            return;
+
+        if (!IsEntryGateBlocked(entry))
+        {
+            waitingGate = false;
+            TryAdvanceToNext();
+        }
     }
 
     private void Start()
@@ -178,16 +207,88 @@ public class PanelDialogTutorialController : MonoBehaviour
         }
 
         TutorialDialogEntry entry = script[next];
-        int waitIndex = ResolveWaitIndex(entry);
-        if (waitIndex >= 0 && !completedObjectiveIndices.Contains(waitIndex))
+        if (IsEntryGateBlocked(entry))
         {
-            // Gate pendente: esconde o painel e deixa o jogador cumprir a tarefa.
+            // Gate pendente: esconde o painel e deixa o jogador cumprir a condicao.
+            // O gate de turno e edge-triggered: arma agora e so um turno NOVO satisfaz.
+            if (entry != null && entry.waitPlayerTurnStart && !turnStartGateArmed)
+            {
+                turnStartGateArmed = true;
+                turnStartGateSatisfied = false;
+            }
+
             waitingGate = true;
             SetPanelVisible(false);
             return;
         }
 
+        turnStartGateArmed = false;
         ShowEntry(next);
+    }
+
+    // Uma fala pode combinar gates: objetivo (key/indice), todas-unidades-agiram
+    // e inicio de novo turno do jogador. Todos precisam estar satisfeitos.
+    private bool IsEntryGateBlocked(TutorialDialogEntry entry)
+    {
+        if (entry == null)
+            return false;
+
+        int waitIndex = ResolveWaitIndex(entry);
+        if (waitIndex >= 0 && !completedObjectiveIndices.Contains(waitIndex))
+            return true;
+
+        if (entry.waitAllUnitsActed && CountPlayerUnitsToAct() > 0)
+            return true;
+
+        if (entry.waitPlayerTurnStart && !turnStartGateSatisfied)
+            return true;
+
+        return false;
+    }
+
+    private int CountPlayerUnitsToAct()
+    {
+        if (matchController == null)
+            return 0;
+
+        TeamId playerTeam = matchController.GetTeamIdForSlot(0);
+        int count = 0;
+        List<UnitManager> units = UnitManager.AllActive;
+        for (int i = 0; i < units.Count; i++)
+        {
+            UnitManager unit = units[i];
+            if (unit == null || unit.IsDead || unit.IsEmbarked)
+                continue;
+            if (unit.TeamId != playerTeam || unit.HasActed)
+                continue;
+            count++;
+        }
+
+        return count;
+    }
+
+    private void HandleActiveTeamChanged(int teamId)
+    {
+        if (matchController == null || teamId != (int)matchController.GetTeamIdForSlot(0))
+            return;
+
+        turnStartGateSatisfied = true;
+        if (waitingGate)
+        {
+            waitingGate = false;
+            TryAdvanceToNext();
+            return;
+        }
+
+        // Auto-avanco com o painel visivel na fronteira: o turno novo comecou e a
+        // proxima fala esperava exatamente isso.
+        if (script != null && !scriptFinished &&
+            currentIndex >= furthestShownIndex && currentIndex + 1 < script.Count)
+        {
+            TutorialDialogEntry next = script[currentIndex + 1];
+            if (next != null && next.waitPlayerTurnStart && !IsEntryGateBlocked(next))
+                TryAdvanceToNext();
+        }
     }
 
     private void ShowEntry(int index)
@@ -227,6 +328,10 @@ public class PanelDialogTutorialController : MonoBehaviour
         if (entry != null && entry.unlockEndTurn)
             TutorialManager.UnlockEndTurnFromScript();
 
+        // Ordem de marcha: libera mover/manter posicao.
+        if (entry != null && entry.unlockMovement)
+            TutorialManager.UnlockMovementFromScript();
+
         // O Sargento deu a ordem: a tarefa entra na task list (idempotente).
         int revealIndex = ResolveRevealIndex(entry);
         if (revealIndex >= 0)
@@ -254,10 +359,7 @@ public class PanelDialogTutorialController : MonoBehaviour
             bool atFrontier = currentIndex >= furthestShownIndex;
             bool nextGated = false;
             if (atFrontier && script != null && currentIndex + 1 < script.Count)
-            {
-                int nextWaitIndex = ResolveWaitIndex(script[currentIndex + 1]);
-                nextGated = nextWaitIndex >= 0 && !completedObjectiveIndices.Contains(nextWaitIndex);
-            }
+                nextGated = IsEntryGateBlocked(script[currentIndex + 1]);
 
             advanceButton.interactable = !nextGated;
         }
@@ -273,11 +375,23 @@ public class PanelDialogTutorialController : MonoBehaviour
         {
             waitingGate = false;
             TryAdvanceToNext();
+            return;
         }
-        else
+
+        // Avanco automatico: o jogador cumpriu a ordem da fala atual sem clicar
+        // Avancar (ex.: deu zoom enquanto o Sargento ainda estava na tela). Se a
+        // PROXIMA fala esperava exatamente este objetivo, segue sozinho.
+        if (currentIndex >= furthestShownIndex && script != null && currentIndex + 1 < script.Count)
         {
-            RefreshButtons();
+            TutorialDialogEntry next = script[currentIndex + 1];
+            if (next != null && index >= 0 && ResolveWaitIndex(next) == index && !IsEntryGateBlocked(next))
+            {
+                TryAdvanceToNext();
+                return;
+            }
         }
+
+        RefreshButtons();
     }
 
     // Key (hist_Y_XX) tem precedencia sobre o indice legado. Key inexistente e erro
@@ -334,31 +448,45 @@ public class PanelDialogTutorialController : MonoBehaviour
     // tutorial viram fala transiente do proprio Sargento: o balao troca o texto
     // (aparecendo, se estava escondido num gate), segura alguns segundos e restaura.
 
-    public static void ShowBlockedActionMessage(string text)
+    public static void ShowBlockedActionMessage(string text, AudioClip voice = null)
     {
-        if (activeInstance != null && activeInstance.TryShowScold(text, 2.6f))
+        if (activeInstance != null && activeInstance.TryShowScold(text, voice))
             return;
 
         // Sem painel de tutorial na cena: cai no panel_dialog normal.
         PanelDialogController.TrySetTransientText(text, 2.6f);
     }
 
-    private bool TryShowScold(string text, float duration)
+    private bool TryShowScold(string text, AudioClip voice)
     {
         if (script == null || speechText == null || string.IsNullOrWhiteSpace(text))
             return false;
 
         if (scoldRoutine != null)
             StopCoroutine(scoldRoutine);
-        scoldRoutine = StartCoroutine(RunScold(text, duration));
+
+        // Com voz gravada, o balao segura ate a fala terminar.
+        float duration = 2.6f;
+        if (voice != null)
+            duration = Mathf.Max(duration, voice.length + 0.4f);
+
+        scoldRoutine = StartCoroutine(RunScold(text, voice, duration));
         return true;
     }
 
-    private IEnumerator RunScold(string text, float duration)
+    private IEnumerator RunScold(string text, AudioClip voice, float duration)
     {
         SetPanelVisible(true);
-        speechText.text = text;
+        speechText.text = FormatSpeechText(text);
         ApplyScoldPortrait(true);
+
+        if (voiceSource != null)
+        {
+            voiceSource.Stop();
+            if (voice != null)
+                voiceSource.PlayOneShot(voice);
+        }
+
         yield return new WaitForSeconds(duration);
         scoldRoutine = null;
         RestoreAfterScold();

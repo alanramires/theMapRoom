@@ -19,6 +19,28 @@ public class TutorialObjective
     public bool hasFailed = false;
 }
 
+// Acao bloqueada que dispara bronca do Sargento no tutorial.
+public enum TutorialScoldKind
+{
+    EndTurnLocked = 0,
+    CommandService = 1,
+    RemoveUnit = 2,
+    Surrender = 3,
+    StatusSummary = 4,
+    MovementLocked = 5
+}
+
+[System.Serializable]
+public class TutorialScoldEntry
+{
+    [TextArea(2, 5)]
+    [Tooltip("Texto da bronca. Vazio = usa o texto padrao do codigo.")]
+    public string text;
+
+    [Tooltip("Voz gravada da bronca (opcional). Toca junto com o balao.")]
+    public AudioClip voice;
+}
+
 [System.Serializable]
 public class TutorialDialogEntry
 {
@@ -27,6 +49,12 @@ public class TutorialDialogEntry
 
     [Tooltip("LEGADO (prefira waitObjectiveKey). Se >= 0, esta fala so aparece depois que o objetivo neste INDICE completar. -1 = segue na sequencia.")]
     public int waitObjectiveIndex = -1;
+
+    [Tooltip("Gate extra: esta fala so aparece quando TODAS as unidades do jogador ja agiram (ex.: logo apos executar o movimento ordenado).")]
+    public bool waitAllUnitsActed;
+
+    [Tooltip("Gate extra: esta fala so aparece quando um NOVO turno do jogador comecar (depois da IA jogar).")]
+    public bool waitPlayerTurnStart;
 
     [TextArea(2, 10)]
     public string text;
@@ -37,11 +65,14 @@ public class TutorialDialogEntry
     [Tooltip("Spawns executados quando esta fala aparece (uma unica vez). Formato: 'slot0 SD 1,3' ou '1 SD 5,6'. Opcoes apos as coordenadas: 'acted' (nasce ja agiu), 'name=Ryan' (renomeia, _ vira espaco), 'cursor' (move o cursor ate a unidade). Multiplos separados por ';'. Ex.: slot0 SD 1,3 name=Ryan cursor")]
     public string spawnCommand;
 
-    [Tooltip("Ajustes de status executados quando esta fala aparece (uma unica vez). Formato: 'NOME stat=valor' com stats hp, fuel e ammo; NOME casa por nome/apelido/id da unidade. Multiplos separados por ';'. Ex.: Mathias hp=4; Dias fuel=15")]
+    [Tooltip("Ajustes executados quando esta fala aparece (uma unica vez). Formatos: 'NOME stat=valor' (hp/fuel/ammo); 'wake 1,3' / 'wake Ryan' (reativa unidade); 'show Bandeira' / 'hide Bandeira' / 'show 5,4' (isVisible de construcao); 'pan Bandeira' / 'pan Ryan' / 'pan 5,4' (desliza SO a camera, cursor intocado). Multiplos separados por ';'. Ex.: show Bandeira; pan Bandeira")]
     public string statCommand;
 
     [Tooltip("Se true, o passar a vez (R, panel_remaining, menu) e liberado a partir desta fala. Se QUALQUER fala do roteiro tiver esta flag, a cena comeca com o passar a vez travado.")]
     public bool unlockEndTurn;
+
+    [Tooltip("Se true, mover/manter posicao e liberado a partir desta fala (ordem de marcha). Se QUALQUER fala do roteiro tiver esta flag, a cena comeca com o movimento travado (selecionar e ver alcance continua livre).")]
+    public bool unlockMovement;
 
     [Tooltip("Se preenchido, revela o objetivo com esta KEY (ex.: hist_1_04) quando esta fala aparece. Tem precedencia sobre revealObjectiveIndex. Se QUALQUER fala do roteiro usar reveal (key ou indice), o manager para de revelar tarefas sozinho e o painel comeca vazio.")]
     public string revealObjectiveKey;
@@ -65,6 +96,43 @@ public class TutorialData : ScriptableObject
     [Header("Roteiro")]
     [Tooltip("Falas do panel_dialog_tutorial, em ordem. Gates por waitObjectiveIndex pausam o roteiro ate a tarefa completar.")]
     public List<TutorialDialogEntry> script = new List<TutorialDialogEntry>();
+
+    [Header("Broncas do Sargento (acoes bloqueadas)")]
+    [Tooltip("Bronca ao tentar passar a vez antes da ordem.")]
+    public TutorialScoldEntry scoldEndTurnLocked = new TutorialScoldEntry();
+
+    [Tooltip("Bronca ao tentar o Servico do Comando (Reabastecer, X).")]
+    public TutorialScoldEntry scoldCommandService = new TutorialScoldEntry();
+
+    [Tooltip("Bronca ao tentar dispensar/destruir unidade (U).")]
+    public TutorialScoldEntry scoldRemoveUnit = new TutorialScoldEntry();
+
+    [Tooltip("Bronca ao tentar render-se.")]
+    public TutorialScoldEntry scoldSurrender = new TutorialScoldEntry();
+
+    [Tooltip("Bronca ao tentar abrir a Situacao (estatisticas).")]
+    public TutorialScoldEntry scoldStatusSummary = new TutorialScoldEntry();
+
+    [Tooltip("Bronca ao tentar mover/manter posicao antes da ordem de marcha (unlockMovement).")]
+    public TutorialScoldEntry scoldMovementLocked = new TutorialScoldEntry();
+
+    public TutorialScoldEntry GetScold(TutorialScoldKind kind)
+    {
+        switch (kind)
+        {
+            case TutorialScoldKind.EndTurnLocked: return scoldEndTurnLocked;
+            case TutorialScoldKind.CommandService: return scoldCommandService;
+            case TutorialScoldKind.RemoveUnit: return scoldRemoveUnit;
+            case TutorialScoldKind.Surrender: return scoldSurrender;
+            case TutorialScoldKind.StatusSummary: return scoldStatusSummary;
+            case TutorialScoldKind.MovementLocked: return scoldMovementLocked;
+            default: return null;
+        }
+    }
+
+    [Header("Figurantes")]
+    [Tooltip("Unidades que amanhecem 'ja agiram' em todo turno do jogador (tokens separados por ';'). Ex.: Mathias; Dias — ficam na fila sem nunca poder agir.")]
+    public string alwaysActedUnits;
 
     [Header("Bloqueios")]
     [Tooltip("Bloqueia o Servico do Comando (Reabastecer, atalho X) durante este tutorial.")]

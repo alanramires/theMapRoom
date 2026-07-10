@@ -693,6 +693,14 @@ public partial class TurnStateManager
         if (cursorController == null || selectedUnit == null)
             return ActionSfx.None;
 
+        // Tutorial: antes da ordem de marcha, selecionar e ver o alcance e livre,
+        // mas confirmar movimento/manter posicao leva bronca do Sargento.
+        if (TutorialManager.IsMovementLockedByTutorial)
+        {
+            TutorialManager.ShowBlockedActionScold(TutorialScoldKind.MovementLocked);
+            return ActionSfx.Error;
+        }
+
         Vector3Int cursorCell = cursorController.CurrentCell;
         Tilemap occupancyMap = terrainTilemap != null ? terrainTilemap : selectedUnit.BoardTilemap;
 
@@ -1213,7 +1221,7 @@ public partial class TurnStateManager
         if (TutorialManager.IsEndTurnLockedByTutorial)
         {
             // Bronca no balao do Sargento (o panel_dialog fica atras dele no tutorial).
-            PanelDialogTutorialController.ShowBlockedActionMessage("Eu ainda estou falando, recruta! Aguarde a ordem para passar a vez.");
+            TutorialManager.ShowBlockedActionScold(TutorialScoldKind.EndTurnLocked);
             return false;
         }
         if (CurrentCursorState != CursorState.Neutral)
@@ -1258,7 +1266,7 @@ public partial class TurnStateManager
         if (TutorialManager.IsEndTurnLockedByTutorial)
         {
             // Bronca no balao do Sargento (o panel_dialog fica atras dele no tutorial).
-            PanelDialogTutorialController.ShowBlockedActionMessage("Eu ainda estou falando, recruta! Aguarde a ordem para passar a vez.");
+            TutorialManager.ShowBlockedActionScold(TutorialScoldKind.EndTurnLocked);
             return false;
         }
         if (CurrentCursorState != CursorState.PlayerMenu && CurrentCursorState != CursorState.Neutral)

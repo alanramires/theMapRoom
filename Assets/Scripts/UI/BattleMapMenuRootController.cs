@@ -1090,7 +1090,7 @@ public class BattleMapMenuRootController : MonoBehaviour
             case MenuAction.Status:
                 if (TutorialManager.IsStatusSummaryBlockedByTutorial)
                 {
-                    PanelDialogTutorialController.ShowBlockedActionMessage("Estatística é para depois. Foco na lição, recruta.");
+                    TutorialManager.ShowBlockedActionScold(TutorialScoldKind.StatusSummary);
                     cursorController?.PlayErrorSfx();
                     break;
                 }
@@ -1160,7 +1160,7 @@ public class BattleMapMenuRootController : MonoBehaviour
             case MenuAction.Render:
                 if (TutorialManager.IsSurrenderBlockedByTutorial)
                 {
-                    PanelDialogTutorialController.ShowBlockedActionMessage("Render-se?! No meu treinamento?! Nem pensar, recruta.");
+                    TutorialManager.ShowBlockedActionScold(TutorialScoldKind.Surrender);
                     cursorController?.PlayErrorSfx();
                     break;
                 }
