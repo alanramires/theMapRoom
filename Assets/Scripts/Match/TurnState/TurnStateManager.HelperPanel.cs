@@ -113,6 +113,8 @@ public partial class TurnStateManager
         public bool ThreatLayerSelectionActive;
         public int ThreatLayerInspectedTeamId = int.MinValue;
         public int SubjectTeamId = int.MinValue;
+        public bool ShowTimeoutProgress;
+        public float TimeoutProgress01;
     }
 
     private float commandServiceHelperVisibleUntil = -1f;
@@ -721,6 +723,8 @@ public partial class TurnStateManager
         data.Kind = HelperPanelKind.UnitStats;
         data.UnitStatsName = ResolveUnitRuntimeName(unit);
         data.SubjectTeamId = (int)unit.TeamId;
+        if (unit == inspectedHelperUnit)
+            PopulateInspectionTimeoutProgress(data);
         data.UnitStatsShowKeepPositionAimHint =
             CurrentCursorState == CursorState.UnitSelected &&
             HasEmbarkedLongRangeWeapon(unit);
@@ -1054,6 +1058,7 @@ public partial class TurnStateManager
 
         data.Kind = HelperPanelKind.ConstructionStats;
         data.SubjectTeamId = (int)construction.TeamId;
+        PopulateInspectionTimeoutProgress(data);
         data.ConstructionStatsName = constructionName;
         Vector3Int constructionCell = construction.CurrentCellPosition;
         constructionCell.z = 0;
@@ -1133,6 +1138,16 @@ public partial class TurnStateManager
             Time.time <= inspectedHelperVisibleUntil;
     }
 
+    private void PopulateInspectionTimeoutProgress(HelperPanelData data)
+    {
+        if (data == null || !IsInspectedHelperActive())
+            return;
+
+        data.ShowTimeoutProgress = true;
+        data.TimeoutProgress01 = Mathf.Clamp01(
+            (inspectedHelperVisibleUntil - Time.time) / InspectedHelperDurationSeconds);
+    }
+
     private bool TryBuildTerrainStatsHelperPanelData(HelperPanelData data)
     {
         if (data == null || !inspectedHelperTerrain || !IsInspectedHelperActive())
@@ -1141,6 +1156,7 @@ public partial class TurnStateManager
         Vector3Int cell = inspectedHelperCursorCell;
         cell.z = 0;
         data.Kind = HelperPanelKind.TerrainStats;
+        PopulateInspectionTimeoutProgress(data);
         data.UnitStatsLocalLabel = ResolveCellTerrainLabel(cell);
         data.TerrainStatsName = string.IsNullOrWhiteSpace(data.UnitStatsLocalLabel)
             ? "LOCAL"

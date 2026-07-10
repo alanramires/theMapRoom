@@ -53,18 +53,6 @@ public class PanelTutorialController : MonoBehaviour
         RefreshPanel();
     }
 
-    private void Start()
-    {
-        // Diagnostico de visibilidade: painel de tarefas fora de Canvas ou sem
-        // tutorial ativo falha em silencio — este log denuncia o motivo no Play.
-        MatchController match = ResolveMatchController();
-        Canvas parentCanvas = GetComponentInParent<Canvas>();
-        RectTransform rect = GetComponent<RectTransform>();
-        Debug.Log(
-            $"[PanelTutorial] Start | match={(match != null)} | tutorialAtivo={(match != null && match.IsTutorialMode)} | " +
-            $"panelVisivel={panelVisivel} | canvasPai={(parentCanvas != null ? parentCanvas.name : "<FORA DE CANVAS>")} | " +
-            $"dockHelper={PanelHelperController.IsDockedCenterLeft()} | anchoredPos={(rect != null ? rect.anchoredPosition.ToString() : "<sem rect>")}");
-    }
 
     private void OnDisable()
     {

@@ -65,39 +65,19 @@ MonoBehaviour:
     isOptional: 0
     isDefeatCondition: 0
     hasFailed: 0
-  - id: END_TURN
-    key: hist_1_06
-    parameters: 
-    description: Encerrar o turno
-    startHidden: 1
-    isVisible: 1
-    isCompleted: 1
-    isOptional: 0
-    isDefeatCondition: 0
-    hasFailed: 0
   - id: HOLD_POSITION
-    key: hist_1_07
-    parameters: SD
+    key: hist_1_06
+    parameters: SD && Bandeira
     description: Manter posicao na montanha
     startHidden: 1
-    isVisible: 0
-    isCompleted: 0
-    isOptional: 0
-    isDefeatCondition: 0
-    hasFailed: 0
-  - id: END_TURN
-    key: hist_1_08
-    parameters: 
-    description: Encerrar o turno
-    startHidden: 1
-    isVisible: 0
+    isVisible: 1
     isCompleted: 0
     isOptional: 0
     isDefeatCondition: 0
     hasFailed: 0
   - id: ATTACK_UNIT
-    key: hist_1_09
-    parameters: spawn:slot1 SD 0,0
+    key: hist_1_07
+    parameters:
     description: Atacar o soldado inimigo
     startHidden: 1
     isVisible: 0
@@ -106,42 +86,62 @@ MonoBehaviour:
     isDefeatCondition: 0
     hasFailed: 0
   script:
-  - waitObjectiveKey: 
+  - advance: 0
+    objectiveKey: 
+    revealObjective: 0
+    waitObjectiveKey: 
     waitObjectiveIndex: -1
+    waitAllUnitsActed: 0
+    waitPlayerTurnStart: 0
     text: "Bem-vindo, recruta. J\xE1 encheu o bucho com a comida da caserna e tomou
       o ch\xE1 brochante do tonel de \xF3leo diesel?"
     voice: {fileID: 0}
     spawnCommand: 
     statCommand: 
-    unlockEndTurn: 0
+    turn: 1
     unlockMovement: 0
     revealObjectiveKey: 
     revealObjectiveIndex: -1
-  - waitObjectiveKey: 
+  - advance: 0
+    objectiveKey: 
+    revealObjective: 0
+    waitObjectiveKey: 
     waitObjectiveIndex: -1
+    waitAllUnitsActed: 0
+    waitPlayerTurnStart: 0
     text: "Recruta Ryan, certo? Muito bem. Voc\xEA \xE9 o n\xFAmero 17. Em fila,
       soldado."
     voice: {fileID: 0}
     spawnCommand: slot0 SD 1,3 name=Ryan cursor
     statCommand: 
-    unlockEndTurn: 0
+    turn: 0
     unlockMovement: 0
     revealObjectiveKey: 
     revealObjectiveIndex: -1
-  - waitObjectiveKey: 
+  - advance: 0
+    objectiveKey: 
+    revealObjective: 0
+    waitObjectiveKey: 
     waitObjectiveIndex: -1
+    waitAllUnitsActed: 0
+    waitPlayerTurnStart: 0
     text: "Esses dois a\xED j\xE1 cumpriram a parte deles. Agora \xE9 voc\xEA.\n\nEnquanto
       eu estiver falando, ningu\xE9m passa turno, ningu\xE9m d\xE1 uma de turista
       e ningu\xE9m aperta bot\xE3o por curiosidade. Entendido?"
     voice: {fileID: 0}
     spawnCommand: slot0 SD 0,3 acted name=Mathias; slot0 SD 2,3 acted name=Dias
     statCommand: 
-    unlockEndTurn: 0
+    turn: 0
     unlockMovement: 0
     revealObjectiveKey: 
     revealObjectiveIndex: -1
-  - waitObjectiveKey: 
+  - advance: 1
+    objectiveKey: hist_1_01
+    revealObjective: 1
+    waitObjectiveKey: 
     waitObjectiveIndex: -1
+    waitAllUnitsActed: 0
+    waitPlayerTurnStart: 0
     text: "Antes de puxar o gatilho, primeiro \xE9 preciso conhecer a si mesmo.\n\nMeu
       Velho falava algo nessa linha, mas ele provavelmente n\xE3o precisava lidar
       com recruta sonolento.\n\nOlhe bem para voc\xEA e seus companheiros.\n\n[ordem]Aproxime
@@ -149,12 +149,17 @@ MonoBehaviour:
     voice: {fileID: 0}
     spawnCommand: 
     statCommand: 
-    unlockEndTurn: 0
+    turn: 0
     unlockMovement: 0
     revealObjectiveKey: hist_1_01
     revealObjectiveIndex: -1
-  - waitObjectiveKey: hist_1_01
+  - advance: 1
+    objectiveKey: hist_1_02
+    revealObjective: 1
+    waitObjectiveKey: hist_1_01
     waitObjectiveIndex: -1
+    waitAllUnitsActed: 0
+    waitPlayerTurnStart: 0
     text: "Essa informa\xE7\xE3o junto da unidade \xE9 persistente. Ela mostra os
       dados importantes do combatente.\n\nEst\xE1 vendo o [vermelho]cora\xE7\xE3o[/vermelho]
       acima de sua unidade? Ele indica sua capacidade de luta.\n\nQuando est\xE1
@@ -164,60 +169,85 @@ MonoBehaviour:
     voice: {fileID: 0}
     spawnCommand: 
     statCommand: 
-    unlockEndTurn: 0
+    turn: 0
     unlockMovement: 0
     revealObjectiveKey: hist_1_02
     revealObjectiveIndex: -1
-  - waitObjectiveKey: hist_1_02
+  - advance: 0
+    objectiveKey: 
+    revealObjective: 0
+    waitObjectiveKey: hist_1_02
     waitObjectiveIndex: -1
+    waitAllUnitsActed: 0
+    waitPlayerTurnStart: 0
     text: "A sua figura em campo n\xE3o representa um soldado sozinho. \nEla representa
       [enfase]10 soldados[/enfase] lutando juntos no mesmo setor. \n\nMenos soldados
       atirando, menos chumbo indo para o outro lado."
     voice: {fileID: 0}
     spawnCommand: 
     statCommand: 
-    unlockEndTurn: 0
+    turn: 0
     unlockMovement: 0
     revealObjectiveKey: 
     revealObjectiveIndex: -1
-  - waitObjectiveKey: 
+  - advance: 0
+    objectiveKey: 
+    revealObjective: 0
+    waitObjectiveKey: 
     waitObjectiveIndex: -1
+    waitAllUnitsActed: 0
+    waitPlayerTurnStart: 0
     text: "Uma unidade ferida luta com menos for\xE7a, entendido?\n\nMathias ainda
       luta, mas ferido desse jeito n\xE3o vai conseguir fazer as coisas direito.\n\n[enfase]Observe
       seu companheiro a esquerda com 4 de hp[/enfase]"
     voice: {fileID: 0}
     spawnCommand: 
     statCommand: Mathias hp=4
-    unlockEndTurn: 0
+    turn: 0
     unlockMovement: 0
     revealObjectiveKey: 
     revealObjectiveIndex: -1
-  - waitObjectiveKey: 
+  - advance: 0
+    objectiveKey: 
+    revealObjective: 0
+    waitObjectiveKey: 
     waitObjectiveIndex: -1
+    waitAllUnitsActed: 0
+    waitPlayerTurnStart: 0
     text: "Agora olhe a [enfase]barra laranja.[/enfase]\n\nEssa \xE9 sua autonomia,
       sua capacidade de marcha.\nSe isso zerar, voc\xEA n\xE3o morre, mas fica estacion\xE1rio
       no campo, feito poste com capacete."
     voice: {fileID: 0}
     spawnCommand: 
     statCommand: 
-    unlockEndTurn: 0
+    turn: 0
     unlockMovement: 0
     revealObjectiveKey: 
     revealObjectiveIndex: -1
-  - waitObjectiveKey: 
+  - advance: 0
+    objectiveKey: 
+    revealObjective: 0
+    waitObjectiveKey: 
     waitObjectiveIndex: -1
+    waitAllUnitsActed: 0
+    waitPlayerTurnStart: 0
     text: "Quando a autonomia estiver abaixo da metade, ela muda pra [amarelo]amarelo.[/amarelo]\n\nOlha
       o soldado Mathias cansado ap\xF3s a corridinha mixuruca\n[enfase]Seu companheiro
       a esquerda com 30 de autonomia[/enfase]"
     voice: {fileID: 0}
     spawnCommand: 
     statCommand: Mathias fuel=30
-    unlockEndTurn: 0
+    turn: 0
     unlockMovement: 0
     revealObjectiveKey: 
     revealObjectiveIndex: -1
-  - waitObjectiveKey: 
+  - advance: 0
+    objectiveKey: 
+    revealObjective: 0
+    waitObjectiveKey: 
     waitObjectiveIndex: -1
+    waitAllUnitsActed: 0
+    waitPlayerTurnStart: 0
     text: "O recruta Dias j\xE1 t\xE1 na capa da gaita pra marchar longas dist\xE2ncias.
       A autonomia dele j\xE1 est\xE1 no [vermelho]vermelho.[/vermelho] O que indica
       que ele tem menos de 25% de autonomia restante.\n\nPelot\xE3o faminto n\xE3o
@@ -225,24 +255,34 @@ MonoBehaviour:
     voice: {fileID: 0}
     spawnCommand: 
     statCommand: Dias fuel=15
-    unlockEndTurn: 0
+    turn: 0
     unlockMovement: 0
     revealObjectiveKey: 
     revealObjectiveIndex: -1
-  - waitObjectiveKey: 
+  - advance: 0
+    objectiveKey: 
+    revealObjective: 0
+    waitObjectiveKey: 
     waitObjectiveIndex: -1
+    waitAllUnitsActed: 0
+    waitPlayerTurnStart: 0
     text: "E essa [azul]barra azul[/azul] \xE9 muni\xE7\xE3o.\n\nSe ela zerar, voc\xEA
       n\xE3o atira.\nE soldado sem muni\xE7\xE3o vira decora\xE7\xE3o de cemit\xE9rio.\n\nCaix\xE3o
       e vela preta."
     voice: {fileID: 0}
     spawnCommand: 
     statCommand: 
-    unlockEndTurn: 0
+    turn: 0
     unlockMovement: 0
     revealObjectiveKey: 
     revealObjectiveIndex: -1
-  - waitObjectiveKey: 
+  - advance: 0
+    objectiveKey: 
+    revealObjective: 0
+    waitObjectiveKey: 
     waitObjectiveIndex: -1
+    waitAllUnitsActed: 0
+    waitPlayerTurnStart: 0
     text: "Olha os cintos agora: Mathias com a muni\xE7\xE3o no fim e o Dias sem
       cartuchos pra atirar.\n\nEm batalha, preste aten\xE7\xE3o na [azul]muni\xE7\xE3o[/azul]
       antes de precisar dela, entendido? Sem muni\xE7\xE3o voc\xEA n\xE3o atira e
@@ -250,23 +290,33 @@ MonoBehaviour:
     voice: {fileID: 0}
     spawnCommand: 
     statCommand: Mathias ammo=2; Dias ammo=0
-    unlockEndTurn: 0
+    turn: 0
     unlockMovement: 0
     revealObjectiveKey: 
     revealObjectiveIndex: -1
-  - waitObjectiveKey: 
+  - advance: 1
+    objectiveKey: hist_1_03
+    revealObjective: 1
+    waitObjectiveKey: 
     waitObjectiveIndex: -1
+    waitAllUnitsActed: 0
+    waitPlayerTurnStart: 0
     text: "Mas olhar por cima n\xE3o \xE9 conhecer. Inspecione um de seu aliados.\n\n[ordem]Inspecione
       um dos seus companheiros de fila. Abra a ficha dele.[/ordem]"
     voice: {fileID: 0}
     spawnCommand: 
     statCommand: 
-    unlockEndTurn: 0
+    turn: 0
     unlockMovement: 0
     revealObjectiveKey: hist_1_03
     revealObjectiveIndex: -1
-  - waitObjectiveKey: hist_1_03
+  - advance: 0
+    objectiveKey: 
+    revealObjective: 0
+    waitObjectiveKey: hist_1_03
     waitObjectiveIndex: -1
+    waitAllUnitsActed: 0
+    waitPlayerTurnStart: 0
     text: "Essa \xE9 a ficha completa do combatente: arma, alcance, capacidade de
       marcha. Tudo o que ele \xE9 est\xE1 a\xED.\n\nNote que o soldado move 3 e o
       rifle tem alcance 1 - por isso o s\xEDmbolo de mira na quarta casa: \xE9 o
@@ -277,12 +327,17 @@ MonoBehaviour:
     voice: {fileID: 0}
     spawnCommand: 
     statCommand: 
-    unlockEndTurn: 0
+    turn: 0
     unlockMovement: 0
     revealObjectiveKey: 
     revealObjectiveIndex: -1
-  - waitObjectiveKey: 
+  - advance: 0
+    objectiveKey: 
+    revealObjective: 0
+    waitObjectiveKey: 
     waitObjectiveIndex: -1
+    waitAllUnitsActed: 0
+    waitPlayerTurnStart: 0
     text: "Inspecione novamente com um [enfase]segundo clique na mesma unidade[/enfase]
       para ver como atira se ficar parado. \xC9 sempre \xFAtil saber o alcance das
       armas de seus aliados e inimigos.\n\nE repare: esses dois j\xE1 agiram neste
@@ -291,49 +346,69 @@ MonoBehaviour:
     voice: {fileID: 0}
     spawnCommand: 
     statCommand: 
-    unlockEndTurn: 0
+    turn: 0
     unlockMovement: 0
     revealObjectiveKey: 
     revealObjectiveIndex: -1
-  - waitObjectiveKey: 
+  - advance: 0
+    objectiveKey: 
+    revealObjective: 0
+    waitObjectiveKey: 
     waitObjectiveIndex: -1
+    waitAllUnitsActed: 0
+    waitPlayerTurnStart: 0
     text: "Muito bem. Voc\xEA j\xE1 sabe olhar para uma unidade sem babar no mapa.\n\nUnidades
       sem muni\xE7\xE3o tambem podem ser inspecionadas, s\xF3 n\xE3o ter\xE3o a \xE1rea
       de tiro a mostra.\n\n\xC9 um come\xE7o."
     voice: {fileID: 0}
     spawnCommand: 
     statCommand: 
-    unlockEndTurn: 0
+    turn: 0
     unlockMovement: 0
     revealObjectiveKey: 
     revealObjectiveIndex: -1
-  - waitObjectiveKey: 
+  - advance: 1
+    objectiveKey: hist_1_04
+    revealObjective: 1
+    waitObjectiveKey: 
     waitObjectiveIndex: -1
+    waitAllUnitsActed: 0
+    waitPlayerTurnStart: 0
     text: "Pois muito bem, \xE9 hora da a\xE7\xE3o. \n\nRyan! um passo a frente recruta.\n\n[ordem]Selecione
       voc\xEA mesmo, recruta Ryan.[/ordem] Ele come\xE7ar\xE1 a piscar no tabuleiro
       indicando que foi selecionado."
     voice: {fileID: 0}
     spawnCommand: 
     statCommand: wake Ryan
-    unlockEndTurn: 0
+    turn: 0
     unlockMovement: 0
     revealObjectiveKey: hist_1_04
     revealObjectiveIndex: -1
-  - waitObjectiveKey: hist_1_04
+  - advance: 0
+    objectiveKey: 
+    revealObjective: 0
+    waitObjectiveKey: hist_1_04
     waitObjectiveIndex: -1
+    waitAllUnitsActed: 0
+    waitPlayerTurnStart: 0
     text: "Est\xE1 vendo essa \xE1rea marcada ao redor dele? Ela mostra at\xE9 onde
-      voc\xEA pode ir neste turno. Assim com ovoc\xEA viu durante a inspe\xE7\xE3o.\n\nVoc\xEA
+      voc\xEA pode ir neste turno. Assim como voc\xEA viu durante a inspe\xE7\xE3o.\n\nVoc\xEA
       anda 3 casas em terreno normal.\nMas cada movimento consome autonomia.\n\nMarchar
       cansa, soldado. At\xE9 no treinamento de fuga e evas\xE3o da AMAN."
     voice: {fileID: 0}
     spawnCommand: 
     statCommand: 
-    unlockEndTurn: 0
+    turn: 0
     unlockMovement: 0
     revealObjectiveKey: 
     revealObjectiveIndex: -1
-  - waitObjectiveKey: 
+  - advance: 0
+    objectiveKey: 
+    revealObjective: 0
+    waitObjectiveKey: 
     waitObjectiveIndex: -1
+    waitAllUnitsActed: 0
+    waitPlayerTurnStart: 0
     text: "Est\xE1 vendo aquela [amarelo]bandeira[/amarelo] em cima da montanha?\n\n\xE9
       seu objetivo recruta.\n\nMas preste aten\xE7\xE3o: terreno diferente cobra
       pre\xE7o diferente. Mover-se em plan\xEDcies \xE9 f\xE1cil. [enfase]1 ponto
@@ -341,12 +416,17 @@ MonoBehaviour:
     voice: {fileID: 0}
     spawnCommand: 
     statCommand: show Bandeira; pan Bandeira
-    unlockEndTurn: 0
+    turn: 0
     unlockMovement: 0
     revealObjectiveKey: 
     revealObjectiveIndex: -1
-  - waitObjectiveKey: 
+  - advance: 0
+    objectiveKey: 
+    revealObjective: 0
+    waitObjectiveKey: 
     waitObjectiveIndex: -1
+    waitAllUnitsActed: 0
+    waitPlayerTurnStart: 0
     text: "Floresta atrasa ve\xEDculos, mas n\xE3o influencia a infantaria. [amarelo]Movemos
       na floresta como quem se move em planicies[/amarelo]. Aqui \xE9 CIGS!\n\nMontanha
       cobra mais da perna.\nPara a infantaria, subir montanha custa mais esfor\xE7o.\n[enfase]Uma
@@ -355,109 +435,175 @@ MonoBehaviour:
     voice: {fileID: 0}
     spawnCommand: 
     statCommand: 
-    unlockEndTurn: 0
+    turn: 0
     unlockMovement: 0
     revealObjectiveKey: 
     revealObjectiveIndex: -1
-  - waitObjectiveKey: 
+  - advance: 2
+    objectiveKey: hist_1_05
+    revealObjective: 1
+    waitObjectiveKey: 
     waitObjectiveIndex: -1
+    waitAllUnitsActed: 0
+    waitPlayerTurnStart: 0
     text: "[ordem]Agora mova at\xE9 a bandeira.[/ordem]\n\nUm, dois! Um, dois!\nAcelerado,
       recruta!\n\nselecione um hexagono pr\xF3ximo da montanha e no painel lateral
       escolha \"apenas mover\""
     voice: {fileID: 0}
     spawnCommand: 
     statCommand: 
-    unlockEndTurn: 0
-    unlockMovement: 1
+    turn: 0
+    movement: 3
+    unlockMovement: 0
     revealObjectiveKey: hist_1_05
     revealObjectiveIndex: -1
-  - waitObjectiveKey:
+  - advance: 3
+    objectiveKey:
+    revealObjective: 0
+    waitObjectiveKey:
     waitObjectiveIndex: -1
     waitAllUnitsActed: 1
+    waitPlayerTurnStart: 0
     text: "A bandeira est\xE1 longe \u2014 suas pernas n\xE3o chegam l\xE1 num turno
       s\xF3.\n\nMarche o que der e, quando a tropa cansar, [ordem]encerre o turno[/ordem].\n\nAmanh\xE3
-      se continua."
+      continuamos. \n\nMontar Acampamento recruta! quero ver esse poncho muito bem
+      amarrado entre as \xE1rvores!"
     voice: {fileID: 0}
-    spawnCommand:
-    statCommand:
-    unlockEndTurn: 1
+    spawnCommand: 
+    statCommand: 
+    turn: 2
     unlockMovement: 0
     revealObjectiveKey: hist_1_06
     revealObjectiveIndex: -1
-  - waitObjectiveKey:
+  - advance: 1
+    objectiveKey: hist_1_05
+    revealObjective: 0
+    waitObjectiveKey: 
     waitObjectiveIndex: -1
+    waitAllUnitsActed: 0
     waitPlayerTurnStart: 1
-    text: "Dia novo, pernas descansadas.\n\n[ordem]Selecione sua unidade novamente
-      e suba o morro at\xE9 a bandeira, recruta.[/ordem]"
+    text: "Dia novo, pernas descansadas. Esquadr\xE3o Delta SENTIDO!\n\nOrdin\xE1rio...
+      MARCHE!\n\nUm, dois, INFA!\nTr\xEAs, quatro, SELVA!\n\n[ordem]Selecione sua
+      unidade novamente e suba o morro at\xE9 a bandeira, recruta.[/ordem]"
     voice: {fileID: 0}
-    spawnCommand:
-    statCommand:
-    unlockEndTurn: 0
+    spawnCommand: 
+    statCommand: 
+    turn: 0
+    unlockMovement: 0
+    revealObjectiveKey: 
+    revealObjectiveIndex: -1
+  - advance: 4
+    objectiveKey:
+    revealObjective: 0
+    waitObjectiveKey: hist_1_05
+    waitObjectiveIndex: -1
+    waitAllUnitsActed: 0
+    waitPlayerTurnStart: 0
+    text: "Miss\xE3o dada \xE9 miss\xE3o cumprida 17!\n\nAgora, pegue essa bandeira
+      e traga ela pra mim!\n\n[ordem] Passe a vez para retirar a bandeira do mastro
+      [/ordem]"
+    voice: {fileID: 0}
+    spawnCommand: 
+    statCommand: 
+    turn: 0
+    unlockMovement: 0
+    revealObjectiveKey: 
+    revealObjectiveIndex: -1
+  - advance: 3
+    objectiveKey:
+    revealObjective: 0
+    waitObjectiveKey:
+    waitObjectiveIndex: -1
+    waitAllUnitsActed: 0
+    waitPlayerTurnStart: 0
+    text:
+    voice: {fileID: 0}
+    spawnCommand: slot1 SD 7,-2 acted
+    statCommand: pan 7,-2
+    turn: 0
+    movement: 0
     unlockMovement: 0
     revealObjectiveKey:
     revealObjectiveIndex: -1
-  - waitObjectiveKey: hist_1_05
+  - advance: 0
+    objectiveKey:
+    revealObjective: 0
+    waitObjectiveKey:
     waitObjectiveIndex: -1
-    text: "Bom. Voc\xEA chegou.\n\nN\xE3o foi bonito, mas foi \xFAtil."
+    waitAllUnitsActed: 0
+    waitPlayerTurnStart: 0
+    text: "Espere!\nEstou vendo movimento na estrada. Soldados!"
     voice: {fileID: 0}
-    spawnCommand: 
-    statCommand: 
-    unlockEndTurn: 0
+    spawnCommand:
+    statCommand: pan 7,-2
+    turn: 0
+    movement: 0
     unlockMovement: 0
-    revealObjectiveKey: 
+    revealObjectiveKey:
     revealObjectiveIndex: -1
-  - waitObjectiveKey: 
+  - advance: 1
+    objectiveKey: hist_1_06
+    revealObjective: 1
+    waitObjectiveKey:
     waitObjectiveIndex: -1
-    text: "Sua unidade j\xE1 agiu neste turno.\n\nQuem age, espera. Quem ainda n\xE3o
-      agiu, recebe ordem.\n\n[ordem]Encerre o turno, recruta.[/ordem]"
+    waitAllUnitsActed: 0
+    waitPlayerTurnStart: 0
+    text: "Em posi\xE7\xE3o defensiva!\n\nVoc\xEA tem a montanha — ningu\xE9m
+      desce desse morro.\n\n[ordem]Segure sua posi\xE7\xE3o na montanha sem se mover.
+      Use \"Manter posi\xE7\xE3o\".[/ordem]"
     voice: {fileID: 0}
-    spawnCommand: 
-    statCommand: 
-    unlockEndTurn: 0
+    spawnCommand:
+    statCommand:
+    turn: 0
+    movement: 2
     unlockMovement: 0
-    revealObjectiveKey: 
+    revealObjectiveKey:
     revealObjectiveIndex: -1
-  - waitObjectiveKey: hist_1_06
+  - advance: 0
+    objectiveKey:
+    revealObjective: 0
+    waitObjectiveKey:
     waitObjectiveIndex: -1
+    waitAllUnitsActed: 0
+    waitPlayerTurnStart: 0
+    text: "Muito bem.\n\nManter posi\xE7\xE3o n\xE3o \xE9 ficar parado por medo.\n\xC9
+      segurar o ponto certo at\xE9 a hora certa."
+    voice: {fileID: 0}
+    spawnCommand:
+    statCommand:
+    turn: 0
+    movement: 0
+    unlockMovement: 0
+    revealObjectiveKey:
+    revealObjectiveIndex: -1
+  - advance: 3
+    objectiveKey:
+    revealObjective: 0
+    waitObjectiveKey:
+    waitObjectiveIndex: -1
+    waitAllUnitsActed: 0
+    waitPlayerTurnStart: 0
     text: "Agora aprenda uma coisa importante: nem toda ordem \xE9 avan\xE7o.\n\n\xC0s
       vezes, a melhor decis\xE3o \xE9 manter posi\xE7\xE3o.\nVoc\xEA j\xE1 est\xE1
       onde precisa estar. N\xE3o invente moda.\n\nFique a\xED parado e aprenda: soldado
       que anda demais morre cansado.\nSoldado que segura o ponto obriga o inimigo
-      a pensar.\n\n[ordem]Confirme sua posi\xE7\xE3o atual.[/ordem]"
+      a pensar.\n\n[ordem]Passe a vez e observe a infantaria inimiga.[/ordem]\n\nQuem
+      age, espera."
     voice: {fileID: 0}
-    spawnCommand: 
-    statCommand: 
-    unlockEndTurn: 0
+    spawnCommand:
+    statCommand:
+    turn: 0
+    movement: 0
     unlockMovement: 0
-    revealObjectiveKey: hist_1_07
+    revealObjectiveKey:
     revealObjectiveIndex: -1
-  - waitObjectiveKey: hist_1_07
+  - advance: 0
+    objectiveKey: hist_1_07
+    revealObjective: 1
+    waitObjectiveKey:
     waitObjectiveIndex: -1
-    text: "Muito bem.\n\nManter posi\xE7\xE3o n\xE3o \xE9 ficar parado por medo.\n\xC9
-      segurar o ponto certo at\xE9 a hora certa."
-    voice: {fileID: 0}
-    spawnCommand: 
-    statCommand: 
-    unlockEndTurn: 0
-    unlockMovement: 0
-    revealObjectiveKey: 
-    revealObjectiveIndex: -1
-  - waitObjectiveKey: 
-    waitObjectiveIndex: -1
-    text: 'Sua unidade segurou o ponto. [ordem]Agora encerre o turno de novo.[/ordem]
-
-
-      Quem
-      age, espera.'
-    voice: {fileID: 0}
-    spawnCommand: 
-    statCommand: 
-    unlockEndTurn: 0
-    unlockMovement: 0
-    revealObjectiveKey: hist_1_08
-    revealObjectiveIndex: -1
-  - waitObjectiveKey: hist_1_08
-    waitObjectiveIndex: -1
+    waitAllUnitsActed: 0
+    waitPlayerTurnStart: 0
     text: "Contato \xE0 frente - e ele ainda n\xE3o te viu.\n\nEsse alvo est\xE1
       no seu alcance.\n\nN\xE3o precisa fazer discurso.\nN\xE3o precisa odiar o sujeito.\nVoc\xEA
       s\xF3 precisa confirmar se sua arma alcan\xE7a.\n\n[ordem]Abra o comando de
@@ -465,44 +611,64 @@ MonoBehaviour:
     voice: {fileID: 0}
     spawnCommand: 
     statCommand: 
-    unlockEndTurn: 0
+    turn: 0
     unlockMovement: 0
-    revealObjectiveKey: hist_1_09
+    revealObjectiveKey:
     revealObjectiveIndex: -1
-  - waitObjectiveKey: 
+  - advance: 0
+    objectiveKey: 
+    revealObjective: 0
+    waitObjectiveKey: 
     waitObjectiveIndex: -1
+    waitAllUnitsActed: 0
+    waitPlayerTurnStart: 0
     text: "O scanner mostrou um alvo v\xE1lido.\n\nIsso significa que voc\xEA tem
       alcance, muni\xE7\xE3o e condi\xE7\xE3o de disparo.\n\nEscolha o alvo."
     voice: {fileID: 0}
     spawnCommand: 
     statCommand: 
-    unlockEndTurn: 0
+    turn: 0
     unlockMovement: 0
     revealObjectiveKey: 
     revealObjectiveIndex: -1
-  - waitObjectiveKey: 
+  - advance: 0
+    objectiveKey: 
+    revealObjective: 0
+    waitObjectiveKey: 
     waitObjectiveIndex: -1
+    waitAllUnitsActed: 0
+    waitPlayerTurnStart: 0
     text: "Alvo selecionado.\n\nAgora leia antes de confirmar.\nDepois do tiro, n\xE3o
       existe \"foi sem querer\"."
     voice: {fileID: 0}
     spawnCommand: 
     statCommand: 
-    unlockEndTurn: 0
+    turn: 0
     unlockMovement: 0
     revealObjectiveKey: 
     revealObjectiveIndex: -1
-  - waitObjectiveKey: 
+  - advance: 1
+    objectiveKey: hist_1_07
+    revealObjective: 0
+    waitObjectiveKey: 
     waitObjectiveIndex: -1
+    waitAllUnitsActed: 0
+    waitPlayerTurnStart: 0
     text: '[ordem]Confirme o ataque.[/ordem]'
     voice: {fileID: 0}
     spawnCommand: 
     statCommand: 
-    unlockEndTurn: 0
+    turn: 0
     unlockMovement: 0
     revealObjectiveKey: 
     revealObjectiveIndex: -1
-  - waitObjectiveKey: hist_1_09
+  - advance: 0
+    objectiveKey: 
+    revealObjective: 0
+    waitObjectiveKey:
     waitObjectiveIndex: -1
+    waitAllUnitsActed: 0
+    waitPlayerTurnStart: 0
     text: "Resultado registrado.\n\nAqui n\xE3o tem dado escondido, sorte milagrosa
       ou desculpa de azar.\n\nSe acertou, havia motivo.\nSe falhou, tamb\xE9m.\n\nVoc\xEA
       estava em posi\xE7\xE3o, tinha muni\xE7\xE3o, tinha alcance e recebeu ordem
@@ -510,12 +676,17 @@ MonoBehaviour:
     voice: {fileID: 0}
     spawnCommand: 
     statCommand: 
-    unlockEndTurn: 0
+    turn: 0
     unlockMovement: 0
     revealObjectiveKey: 
     revealObjectiveIndex: -1
-  - waitObjectiveKey: 
+  - advance: 0
+    objectiveKey: 
+    revealObjective: 0
+    waitObjectiveKey: 
     waitObjectiveIndex: -1
+    waitAllUnitsActed: 0
+    waitPlayerTurnStart: 0
     text: "Primeira li\xE7\xE3o conclu\xEDda.\n\nVoc\xEA aprendeu a olhar uma unidade,
       inspecionar um companheiro, selecionar, mover, entender terreno, manter posi\xE7\xE3o,
       escolher alvo, atacar e encerrar o turno.\n\nAinda n\xE3o \xE9 estrat\xE9gia.\n\n\xC9
@@ -524,10 +695,11 @@ MonoBehaviour:
     voice: {fileID: 0}
     spawnCommand: 
     statCommand: 
-    unlockEndTurn: 0
+    turn: 0
     unlockMovement: 0
     revealObjectiveKey: 
     revealObjectiveIndex: -1
+  dialogFlowMigrated: 1
   scoldEndTurnLocked:
     text: Eu ainda estou falando, recruta! Aguarde a ordem para passar a vez.
     voice: {fileID: 0}

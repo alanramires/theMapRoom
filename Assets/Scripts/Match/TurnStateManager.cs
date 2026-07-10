@@ -1056,6 +1056,16 @@ public partial class TurnStateManager : MonoBehaviour
         }
 
         EnsureDebugSpawnRegisteredInAllActive(spawned);
+
+        // Mesmo pos-passo do Unit Painter: re-assenta slot e flip do MatchController
+        // depois de todo o setup do spawn (no editor, o OnValidate faz isso pela cena).
+        UnitManager spawnedUnit = spawned.GetComponent<UnitManager>();
+        if (spawnedUnit != null && matchController != null)
+        {
+            spawnedUnit.SetSlotIndex(matchController.GetSlotIndexForTeam(resolvedTeam));
+            spawnedUnit.ApplyTeamVisualFlipX(matchController.GetTeamFlipX(resolvedTeam));
+        }
+
         message = $"Spawnado: {unitToken} em {cell} para team {TeamUtils.GetName(resolvedTeam)}.";
         return true;
     }

@@ -702,6 +702,21 @@ public partial class TurnStateManager
         }
 
         Vector3Int cursorCell = cursorController.CurrentCell;
+
+        // Tutorial (Hold Only): manter posicao/atacar parado e livre, mas sair da
+        // propria celula leva bronca — "ninguem desce do morro sem ordem".
+        if (TutorialManager.IsLeaveCellLockedByTutorial)
+        {
+            Vector3Int unitCell = selectedUnit.CurrentCellPosition;
+            unitCell.z = 0;
+            Vector3Int flatCursor = cursorCell;
+            flatCursor.z = 0;
+            if (flatCursor != unitCell)
+            {
+                TutorialManager.ShowBlockedActionScold(TutorialScoldKind.HoldPosition);
+                return ActionSfx.Error;
+            }
+        }
         Tilemap occupancyMap = terrainTilemap != null ? terrainTilemap : selectedUnit.BoardTilemap;
 
         if (OccupancyResolver.IsLayerAwareRulesActive)

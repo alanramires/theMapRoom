@@ -95,6 +95,9 @@ public class PanelHelperController : MonoBehaviour
     private static readonly Color FooterLabelIdleColor = new Color(0.65f, 1f, 0.65f, 1f);
     // Cor do time ativo neste frame, resolvida no refresh e aplicada a todos os botoes de script.
     private Color currentTeamColor = Color.white;
+    private GameObject timeoutProgressRoot;
+    private Image timeoutProgressFill;
+    private RectTransform timeoutProgressFillRect;
 
     // Fundo do botao = tint escuro da cor do time; foco = tint mais claro. Rotulo = cor do time;
     // foco = clareada rumo ao branco (destaque legivel em qualquer cor de time).
@@ -338,6 +341,7 @@ public class PanelHelperController : MonoBehaviour
         EnsureKeepPositionControl();
         EnsureShoppingActionsRoot();
         EnsurePersistenceActionsRoot();
+        EnsureTimeoutProgressBar();
 
 #if UNITY_EDITOR
         if (helperDatabase == null)
@@ -1499,6 +1503,7 @@ public class PanelHelperController : MonoBehaviour
 
         // Cor do time ativo deste frame — aplicada a todos os botoes gerados via script abaixo.
         currentTeamColor = ResolveActiveTeamColor(data);
+        RefreshTimeoutProgressBar(panelVisible, data);
         RefreshCancelControl(panelVisible);
         RefreshKeepPositionControl(panelVisible, data);
         RefreshExecuteCommandServiceControl(panelVisible);
@@ -1516,6 +1521,60 @@ public class PanelHelperController : MonoBehaviour
         lastPanelVisible = panelVisible;
         lastTitle = title ?? string.Empty;
         lastBody = body ?? string.Empty;
+    }
+
+    private void EnsureTimeoutProgressBar()
+    {
+        if (!Application.isPlaying || timeoutProgressRoot != null || helperRect == null)
+            return;
+
+        timeoutProgressRoot = new GameObject("helper_timeout_progress", typeof(RectTransform), typeof(Image));
+        RectTransform rootRect = timeoutProgressRoot.GetComponent<RectTransform>();
+        rootRect.SetParent(helperRect, false);
+        rootRect.anchorMin = new Vector2(0.02f, 1f);
+        rootRect.anchorMax = new Vector2(0.98f, 1f);
+        rootRect.pivot = new Vector2(0.5f, 1f);
+        rootRect.anchoredPosition = new Vector2(0f, -31f);
+        rootRect.sizeDelta = new Vector2(0f, 5f);
+        rootRect.SetAsLastSibling();
+
+        Image background = timeoutProgressRoot.GetComponent<Image>();
+        background.color = new Color(0f, 0f, 0f, 0.65f);
+        background.raycastTarget = false;
+
+        GameObject fillObject = new GameObject("fill", typeof(RectTransform), typeof(Image));
+        timeoutProgressFillRect = fillObject.GetComponent<RectTransform>();
+        timeoutProgressFillRect.SetParent(rootRect, false);
+        timeoutProgressFillRect.anchorMin = Vector2.zero;
+        timeoutProgressFillRect.anchorMax = Vector2.one;
+        timeoutProgressFillRect.offsetMin = Vector2.zero;
+        timeoutProgressFillRect.offsetMax = Vector2.zero;
+
+        timeoutProgressFill = fillObject.GetComponent<Image>();
+        timeoutProgressFill.type = Image.Type.Simple;
+        timeoutProgressFill.raycastTarget = false;
+        timeoutProgressRoot.SetActive(false);
+    }
+
+    private void RefreshTimeoutProgressBar(
+        bool panelVisible,
+        TurnStateManager.HelperPanelData data)
+    {
+        EnsureTimeoutProgressBar();
+        if (timeoutProgressRoot == null || timeoutProgressFill == null || timeoutProgressFillRect == null)
+            return;
+
+        bool visible = panelVisible && data != null && data.ShowTimeoutProgress;
+        timeoutProgressRoot.SetActive(visible);
+        if (!visible)
+            return;
+
+        TeamId activeTeam = matchController != null ? matchController.ActiveTeam : TeamId.Neutral;
+        timeoutProgressFill.color = TeamUtils.GetColor(activeTeam);
+        float progress = Mathf.Clamp01(data.TimeoutProgress01);
+        timeoutProgressFillRect.anchorMax = new Vector2(progress, 1f);
+        timeoutProgressFillRect.offsetMin = Vector2.zero;
+        timeoutProgressFillRect.offsetMax = Vector2.zero;
     }
 
     private void RefreshDynamicPanelHeight(bool panelVisible, bool contentChanged)

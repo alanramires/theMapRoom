@@ -11,45 +11,64 @@ public class TutorialManager : MonoBehaviour
 
     private static TutorialManager activeInstance;
     private bool endTurnLockedByScript;
-    private bool movementLockedByScript;
+    private TutorialMovementEffect movementState = TutorialMovementEffect.NoEffect;
 
-    // Passar a vez travado pelo roteiro do tutorial (ate a fala com unlockEndTurn aparecer).
+    // Passar a vez travado pelo estado persistente definido no roteiro do tutorial.
     // Sem TutorialManager na cena => nunca trava (partidas normais ilesas).
     public static bool IsEndTurnLockedByTutorial =>
         activeInstance != null && activeInstance.endTurnLockedByScript;
 
-    public static void UnlockEndTurnFromScript()
+    public static void ApplyEndTurnEffectFromScript(TutorialEndTurnEffect effect)
     {
-        if (activeInstance != null && activeInstance.endTurnLockedByScript)
-        {
-            activeInstance.endTurnLockedByScript = false;
-            Debug.Log("[TutorialManager] Passar a vez liberado pelo roteiro.");
-        }
+        if (activeInstance == null || effect == TutorialEndTurnEffect.NoEffect)
+            return;
+
+        bool locked = effect == TutorialEndTurnEffect.Locked;
+        if (activeInstance.endTurnLockedByScript == locked)
+            return;
+
+        activeInstance.endTurnLockedByScript = locked;
+        Debug.Log(locked
+            ? "[TutorialManager] Passar a vez travado pelo roteiro."
+            : "[TutorialManager] Passar a vez liberado pelo roteiro.");
     }
 
-    // Movimento travado pelo roteiro (ate a fala com unlockMovement — a "ordem de marcha").
+    // Movimento controlado pelo roteiro em tres niveis (ver TutorialMovementEffect).
     // So vale no turno do jogador (slot 0): o automata inimigo se move normalmente.
-    public static bool IsMovementLockedByTutorial
-    {
-        get
-        {
-            if (activeInstance == null || !activeInstance.movementLockedByScript)
-                return false;
+    // Locked: nem mover nem manter posicao. HoldOnly: manter/atacar parado sim, sair nao.
+    public static bool IsMovementLockedByTutorial =>
+        IsMovementStateActive(TutorialMovementEffect.Locked);
 
-            MatchController mc = activeInstance.matchController;
-            if (mc == null)
-                return true;
-            return mc.ActiveTeamId == (int)mc.GetTeamIdForSlot(0);
-        }
+    public static bool IsLeaveCellLockedByTutorial =>
+        IsMovementStateActive(TutorialMovementEffect.Locked) ||
+        IsMovementStateActive(TutorialMovementEffect.HoldOnly);
+
+    private static bool IsMovementStateActive(TutorialMovementEffect state)
+    {
+        if (activeInstance == null || activeInstance.movementState != state)
+            return false;
+
+        MatchController mc = activeInstance.matchController;
+        if (mc == null)
+            return true;
+        return mc.ActiveTeamId == (int)mc.GetTeamIdForSlot(0);
     }
 
+    public static void ApplyMovementEffectFromScript(TutorialMovementEffect effect)
+    {
+        if (activeInstance == null || effect == TutorialMovementEffect.NoEffect)
+            return;
+        if (activeInstance.movementState == effect)
+            return;
+
+        activeInstance.movementState = effect;
+        Debug.Log($"[TutorialManager] Movimento agora: {effect} (pelo roteiro).");
+    }
+
+    // LEGADO (entradas com o bool unlockMovement): equivale a movement=Unlocked.
     public static void UnlockMovementFromScript()
     {
-        if (activeInstance != null && activeInstance.movementLockedByScript)
-        {
-            activeInstance.movementLockedByScript = false;
-            Debug.Log("[TutorialManager] Movimento liberado pelo roteiro (ordem de marcha).");
-        }
+        ApplyMovementEffectFromScript(TutorialMovementEffect.Unlocked);
     }
 
     // Bloqueios declarados no TutorialData ativo (valem a cena inteira, nao destravam
@@ -114,6 +133,8 @@ public class TutorialManager : MonoBehaviour
                 return "Estatística é para depois. Foco na lição, recruta.";
             case TutorialScoldKind.MovementLocked:
                 return "Quem mandou marchar, recruta?! Eu ainda não dei ordem de movimento.";
+            case TutorialScoldKind.HoldPosition:
+                return "Ninguém desce desse morro, recruta! A ordem é SEGURAR a posição.";
             default:
                 return "O Sargento não autorizou isso, recruta.";
         }
@@ -337,14 +358,13 @@ public class TutorialManager : MonoBehaviour
             MarkObjectiveComplete(zoomObjective);
     }
 
-    // As travas iniciais so existem se o roteiro declara o ponto de destrave
-    // correspondente (unlockEndTurn / unlockMovement). Roteiros sem flags nao travam nada.
+    // End Turn comeca livre e muda de estado conforme cada fala aparece.
+    // Movimento preserva o modelo legado: se existe um destrave, comeca travado.
     // Aulas com roteiro tambem desligam o atalho contextual (clique inferindo acao),
     // senao o jogador dribla as travas — ele pode religar nas preferencias se quiser.
     private void InitializeEndTurnLockFromScript()
     {
-        endTurnLockedByScript = false;
-        movementLockedByScript = false;
+        movementState = TutorialMovementEffect.NoEffect;
         TutorialData tutorial = GetActiveTutorial();
         if (tutorial == null || tutorial.script == null)
             return;
@@ -355,10 +375,8 @@ public class TutorialManager : MonoBehaviour
             TutorialDialogEntry entry = tutorial.script[i];
             if (entry == null)
                 continue;
-            if (entry.unlockEndTurn)
-                endTurnLockedByScript = true;
-            if (entry.unlockMovement)
-                movementLockedByScript = true;
+            if (entry.unlockMovement || entry.movement == TutorialMovementEffect.Unlocked)
+                movementState = TutorialMovementEffect.Locked;
         }
 
         if (hasScript && matchController != null && matchController.AtalhoContextual)
@@ -597,10 +615,12 @@ public class TutorialManager : MonoBehaviour
         if (tutorial == null || tutorial.script == null)
             return false;
 
+        tutorial.MigrateLegacyDialogFlow();
+
         for (int i = 0; i < tutorial.script.Count; i++)
         {
             TutorialDialogEntry entry = tutorial.script[i];
-            if (entry != null && (entry.revealObjectiveIndex >= 0 || !string.IsNullOrWhiteSpace(entry.revealObjectiveKey)))
+            if (entry != null && entry.revealObjective)
                 return true;
         }
 
@@ -684,10 +704,12 @@ public class TutorialManager : MonoBehaviour
                 return false;
 
             int teamId;
+            int logicalSlotIndex = -1;
             if (parts[0].StartsWith("slot", System.StringComparison.OrdinalIgnoreCase))
             {
                 if (!int.TryParse(parts[0].Substring(4), out int slotIndex)) return false;
                 if (matchController == null) return false;
+                logicalSlotIndex = slotIndex;
                 teamId = (int)matchController.GetTeamIdForSlot(slotIndex);
                 if (teamId == (int)TeamId.Neutral) return false;
             }
@@ -721,16 +743,17 @@ public class TutorialManager : MonoBehaviour
             Vector3Int cell = new Vector3Int(x, y, 0);
             if (turnStateManager.TrySpawnUnitAtCell(unitToken, teamId, cell, out string message))
             {
-                if (markActed || !string.IsNullOrWhiteSpace(customName))
+                UnitManager spawned = FindNewestActiveUnitAtCell(cell, (TeamId)teamId);
+                if (spawned != null)
                 {
-                    UnitManager spawned = FindActiveUnitAtCell(cell);
-                    if (spawned != null)
-                    {
-                        if (markActed)
-                            spawned.MarkAsActed();
-                        if (!string.IsNullOrWhiteSpace(customName))
-                            spawned.SetUnitDisplayName(customName);
-                    }
+                    if (logicalSlotIndex >= 0)
+                        spawned.SetSlotIndex(logicalSlotIndex);
+                    if (markActed)
+                        spawned.MarkAsActed();
+                    if (!string.IsNullOrWhiteSpace(customName))
+                        spawned.SetUnitDisplayName(customName);
+                    if (logicalSlotIndex >= 0)
+                        spawned.ApplyTeamVisualFlipX(matchController.GetSlotFlipX(logicalSlotIndex));
                 }
                 if (moveCursorToSpawn)
                     StartCoroutine(turnStateManager.MoveCursorToCellWithAutomatedTravel(cell));
@@ -1037,6 +1060,25 @@ public class TutorialManager : MonoBehaviour
         {
             UnitManager unit = units[i];
             if (unit == null || unit.IsDead || unit.IsEmbarked)
+                continue;
+
+            Vector3Int unitCell = unit.CurrentCellPosition;
+            unitCell.z = 0;
+            if (unitCell == cell)
+                return unit;
+        }
+
+        return null;
+    }
+
+    private static UnitManager FindNewestActiveUnitAtCell(Vector3Int cell, TeamId team)
+    {
+        cell.z = 0;
+        List<UnitManager> units = UnitManager.AllActive;
+        for (int i = units.Count - 1; i >= 0; i--)
+        {
+            UnitManager unit = units[i];
+            if (unit == null || unit.IsDead || unit.IsEmbarked || unit.TeamId != team)
                 continue;
 
             Vector3Int unitCell = unit.CurrentCellPosition;

@@ -1400,6 +1400,10 @@ public partial class TurnStateManager
             return;
         }
 
+        // Tutorial (Hold Only): o "M" finaliza a unidade onde ela ja esta (nao
+        // move ao cursor), entao nunca viola a ordem de segurar posicao — sair da
+        // celula ja e barrado no confirm (HandleConfirmWhileUnitSelected).
+
         bool finished = TryFinalizeSelectedUnitActionFromDebug();
         if (finished)
         {

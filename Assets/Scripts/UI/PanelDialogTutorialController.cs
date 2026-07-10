@@ -38,11 +38,15 @@ public class PanelDialogTutorialController : MonoBehaviour
     private readonly HashSet<int> executedStatEntries = new HashSet<int>();
     private Coroutine scoldRoutine;
     private Sprite normalPortraitSprite;
-    private bool turnStartGateArmed;
-    private bool turnStartGateSatisfied;
+    // Gate de "novo turno": conta os inicios de turno (jogador e inimigo em separado)
+    // e carimba o valor quando cada fala da fronteira aparece — o gate so satisfaz
+    // com turno INICIADO DEPOIS da fala, imune a eventos antigos/da carga da cena.
+    private int playerTurnStartCount;
+    private int turnStartCountAtFrontierShow;
+    private int enemyTurnStartCount;
+    private int enemyTurnCountAtFrontierShow;
     private int currentIndex = -1;
     private int furthestShownIndex = -1;
-    private bool waitingGate;
     private bool scriptFinished;
 
     private void Awake()
@@ -80,19 +84,15 @@ public class PanelDialogTutorialController : MonoBehaviour
         if (currentIndex < furthestShownIndex)
             return;
 
-        int next = currentIndex + 1;
-        if (next >= script.Count)
+        if (currentIndex < 0 || currentIndex >= script.Count)
             return;
 
-        TutorialDialogEntry entry = script[next];
-        if (entry == null || !entry.waitAllUnitsActed)
+        TutorialDialogEntry entry = script[currentIndex];
+        if (entry == null || entry.advance != TutorialAdvanceCondition.AllUnitsActed)
             return;
 
-        if (!IsEntryGateBlocked(entry))
-        {
-            waitingGate = false;
+        if (!IsAdvanceBlocked(entry))
             TryAdvanceToNext();
-        }
     }
 
     private void Start()
@@ -108,6 +108,7 @@ public class PanelDialogTutorialController : MonoBehaviour
         }
 
         script = tutorial.script;
+        tutorial.MigrateLegacyDialogFlow();
         TryAdvanceToNext();
     }
 
@@ -165,7 +166,7 @@ public class PanelDialogTutorialController : MonoBehaviour
 
     public void OnAdvanceClicked()
     {
-        if (scriptFinished || waitingGate)
+        if (scriptFinished)
             return;
 
         // Evita que o clique/Enter vaze para o cursor de gameplay no mesmo frame.
@@ -173,23 +174,50 @@ public class PanelDialogTutorialController : MonoBehaviour
         cursorController?.PlayConfirmSfx();
 
         // Navegando historico: apenas volta para frente sem reprocessar gates.
+        // Falas mudas nao entram no historico visivel — pula, sem passar da fronteira.
         if (currentIndex < furthestShownIndex)
         {
-            ShowEntry(currentIndex + 1);
+            int target = FindNonMuteIndex(currentIndex + 1, +1);
+            if (target < 0 || target > furthestShownIndex)
+                target = furthestShownIndex;
+            ShowEntry(target);
             return;
         }
+
+        if (currentIndex >= 0 && currentIndex < script.Count && IsAdvanceBlocked(script[currentIndex]))
+            return;
 
         TryAdvanceToNext();
     }
 
     public void OnBackClicked()
     {
-        if (scriptFinished || waitingGate || currentIndex <= 0)
+        if (scriptFinished || currentIndex <= 0)
             return;
 
         UiInputBlocker.SuppressGameplayInputForFrames(2);
         cursorController?.PlayCancelSfx();
-        ShowEntry(currentIndex - 1);
+
+        int previous = FindNonMuteIndex(currentIndex - 1, -1);
+        if (previous >= 0)
+            ShowEntry(previous);
+    }
+
+    // Procura a partir de start, na direcao dada, a primeira fala com texto.
+    // Retorna -1 se so houver falas mudas no caminho.
+    private int FindNonMuteIndex(int start, int direction)
+    {
+        if (script == null)
+            return -1;
+
+        for (int i = start; i >= 0 && i < script.Count; i += direction)
+        {
+            TutorialDialogEntry entry = script[i];
+            if (entry != null && !string.IsNullOrWhiteSpace(entry.text))
+                return i;
+        }
+
+        return -1;
     }
 
     private void TryAdvanceToNext()
@@ -206,44 +234,30 @@ public class PanelDialogTutorialController : MonoBehaviour
             return;
         }
 
-        TutorialDialogEntry entry = script[next];
-        if (IsEntryGateBlocked(entry))
-        {
-            // Gate pendente: esconde o painel e deixa o jogador cumprir a condicao.
-            // O gate de turno e edge-triggered: arma agora e so um turno NOVO satisfaz.
-            if (entry != null && entry.waitPlayerTurnStart && !turnStartGateArmed)
-            {
-                turnStartGateArmed = true;
-                turnStartGateSatisfied = false;
-            }
-
-            waitingGate = true;
-            SetPanelVisible(false);
-            return;
-        }
-
-        turnStartGateArmed = false;
         ShowEntry(next);
     }
 
     // Uma fala pode combinar gates: objetivo (key/indice), todas-unidades-agiram
     // e inicio de novo turno do jogador. Todos precisam estar satisfeitos.
-    private bool IsEntryGateBlocked(TutorialDialogEntry entry)
+    private bool IsAdvanceBlocked(TutorialDialogEntry entry)
     {
         if (entry == null)
             return false;
 
-        int waitIndex = ResolveWaitIndex(entry);
-        if (waitIndex >= 0 && !completedObjectiveIndices.Contains(waitIndex))
-            return true;
-
-        if (entry.waitAllUnitsActed && CountPlayerUnitsToAct() > 0)
-            return true;
-
-        if (entry.waitPlayerTurnStart && !turnStartGateSatisfied)
-            return true;
-
-        return false;
+        switch (entry.advance)
+        {
+            case TutorialAdvanceCondition.ObjectiveCompleted:
+                int objectiveIndex = ResolveObjectiveKey(entry.objectiveKey);
+                return objectiveIndex < 0 || !completedObjectiveIndices.Contains(objectiveIndex);
+            case TutorialAdvanceCondition.AllUnitsActed:
+                return CountPlayerUnitsToAct() > 0;
+            case TutorialAdvanceCondition.PlayerTurnStarted:
+                return playerTurnStartCount <= turnStartCountAtFrontierShow;
+            case TutorialAdvanceCondition.EnemyTurnStarted:
+                return enemyTurnStartCount <= enemyTurnCountAtFrontierShow;
+            default:
+                return false;
+        }
     }
 
     private int CountPlayerUnitsToAct()
@@ -269,24 +283,29 @@ public class PanelDialogTutorialController : MonoBehaviour
 
     private void HandleActiveTeamChanged(int teamId)
     {
-        if (matchController == null || teamId != (int)matchController.GetTeamIdForSlot(0))
+        if (matchController == null)
             return;
 
-        turnStartGateSatisfied = true;
-        if (waitingGate)
+        bool playerTurn = teamId == (int)matchController.GetTeamIdForSlot(0);
+        TutorialAdvanceCondition satisfied;
+        if (playerTurn)
         {
-            waitingGate = false;
-            TryAdvanceToNext();
-            return;
+            playerTurnStartCount++;
+            satisfied = TutorialAdvanceCondition.PlayerTurnStarted;
+        }
+        else
+        {
+            enemyTurnStartCount++;
+            satisfied = TutorialAdvanceCondition.EnemyTurnStarted;
         }
 
-        // Auto-avanco com o painel visivel na fronteira: o turno novo comecou e a
-        // proxima fala esperava exatamente isso.
+        // Auto-avanco na fronteira: o turno novo comecou e a fala atual esperava
+        // exatamente isso (inclui falas mudas seguradas em gate de turno).
         if (script != null && !scriptFinished &&
-            currentIndex >= furthestShownIndex && currentIndex + 1 < script.Count)
+            currentIndex >= furthestShownIndex && currentIndex >= 0 && currentIndex < script.Count)
         {
-            TutorialDialogEntry next = script[currentIndex + 1];
-            if (next != null && next.waitPlayerTurnStart && !IsEntryGateBlocked(next))
+            TutorialDialogEntry current = script[currentIndex];
+            if (current != null && current.advance == satisfied && !IsAdvanceBlocked(current))
                 TryAdvanceToNext();
         }
     }
@@ -300,9 +319,20 @@ public class PanelDialogTutorialController : MonoBehaviour
         if (index > furthestShownIndex)
             furthestShownIndex = index;
 
-        SetPanelVisible(true);
-
         TutorialDialogEntry entry = script[index];
+
+        // Fala muda (texto vazio): direcao de cena — executa os comandos sem abrir
+        // o balao (ex.: spawn do inimigo + pan durante o turno da IA).
+        bool mute = entry == null || string.IsNullOrWhiteSpace(entry.text);
+        SetPanelVisible(!mute);
+
+        if (index >= furthestShownIndex && entry != null)
+        {
+            if (entry.advance == TutorialAdvanceCondition.PlayerTurnStarted)
+                turnStartCountAtFrontierShow = playerTurnStartCount;
+            else if (entry.advance == TutorialAdvanceCondition.EnemyTurnStarted)
+                enemyTurnCountAtFrontierShow = enemyTurnStartCount;
+        }
         if (speechText != null)
             speechText.text = FormatSpeechText(entry != null ? entry.text : string.Empty);
 
@@ -324,16 +354,22 @@ public class PanelDialogTutorialController : MonoBehaviour
             tutorialManager?.ExecuteStatCommands(entry.statCommand);
         }
 
-        // O Sargento autorizou: libera o passar a vez (uma vez liberado, nao trava de novo).
-        if (entry != null && entry.unlockEndTurn)
-            TutorialManager.UnlockEndTurnFromScript();
+        // Muda o estado persistente do passar a vez quando a fala pede isso.
+        if (entry != null)
+            TutorialManager.ApplyEndTurnEffectFromScript(entry.turn);
 
-        // Ordem de marcha: libera mover/manter posicao.
+        // Estado do movimento (Locked / Hold Only / Unlocked) definido pela fala.
+        if (entry != null)
+            TutorialManager.ApplyMovementEffectFromScript(entry.movement);
+
+        // LEGADO: ordem de marcha via bool antigo.
         if (entry != null && entry.unlockMovement)
             TutorialManager.UnlockMovementFromScript();
 
         // O Sargento deu a ordem: a tarefa entra na task list (idempotente).
-        int revealIndex = ResolveRevealIndex(entry);
+        int revealIndex = entry != null && entry.revealObjective
+            ? ResolveObjectiveKey(entry.objectiveKey)
+            : -1;
         if (revealIndex >= 0)
             TutorialManager.RevealObjectiveFromScript(revealIndex);
 
@@ -345,6 +381,10 @@ public class PanelDialogTutorialController : MonoBehaviour
         }
 
         RefreshButtons();
+
+        // Fala muda sem gate proprio: executa e segue direto para a proxima.
+        if (mute && entry != null && entry.advance == TutorialAdvanceCondition.Immediate)
+            TryAdvanceToNext();
     }
 
     private void RefreshButtons()
@@ -357,11 +397,10 @@ public class PanelDialogTutorialController : MonoBehaviour
             // No fim do historico com gate pendente na proxima fala, o avancar
             // fica desabilitado — o resto do fluxo esconde o painel de qualquer forma.
             bool atFrontier = currentIndex >= furthestShownIndex;
-            bool nextGated = false;
-            if (atFrontier && script != null && currentIndex + 1 < script.Count)
-                nextGated = IsEntryGateBlocked(script[currentIndex + 1]);
+            bool blocked = atFrontier && script != null && currentIndex >= 0 &&
+                currentIndex < script.Count && IsAdvanceBlocked(script[currentIndex]);
 
-            advanceButton.interactable = !nextGated;
+            advanceButton.interactable = !blocked;
         }
     }
 
@@ -371,20 +410,14 @@ public class PanelDialogTutorialController : MonoBehaviour
         if (index >= 0)
             completedObjectiveIndices.Add(index);
 
-        if (waitingGate)
-        {
-            waitingGate = false;
-            TryAdvanceToNext();
-            return;
-        }
-
         // Avanco automatico: o jogador cumpriu a ordem da fala atual sem clicar
         // Avancar (ex.: deu zoom enquanto o Sargento ainda estava na tela). Se a
         // PROXIMA fala esperava exatamente este objetivo, segue sozinho.
-        if (currentIndex >= furthestShownIndex && script != null && currentIndex + 1 < script.Count)
+        if (currentIndex >= furthestShownIndex && script != null && currentIndex >= 0 && currentIndex < script.Count)
         {
-            TutorialDialogEntry next = script[currentIndex + 1];
-            if (next != null && index >= 0 && ResolveWaitIndex(next) == index && !IsEntryGateBlocked(next))
+            TutorialDialogEntry current = script[currentIndex];
+            if (current != null && current.advance == TutorialAdvanceCondition.ObjectiveCompleted &&
+                index >= 0 && ResolveObjectiveKey(current.objectiveKey) == index && !IsAdvanceBlocked(current))
             {
                 TryAdvanceToNext();
                 return;
@@ -392,6 +425,17 @@ public class PanelDialogTutorialController : MonoBehaviour
         }
 
         RefreshButtons();
+    }
+
+    private int ResolveObjectiveKey(string key)
+    {
+        if (string.IsNullOrWhiteSpace(key))
+            return -1;
+
+        int index = ResolveKeyToIndex(key);
+        if (index < 0)
+            Debug.LogError($"[PanelDialogTutorial] objectiveKey '{key}' nao existe nos objectives do tutorial ativo.");
+        return index;
     }
 
     // Key (hist_Y_XX) tem precedencia sobre o indice legado. Key inexistente e erro
@@ -497,7 +541,7 @@ public class PanelDialogTutorialController : MonoBehaviour
         ApplyScoldPortrait(false);
 
         // Volta ao estado que o roteiro pedia antes da bronca.
-        if (scriptFinished || waitingGate)
+        if (scriptFinished)
         {
             SetPanelVisible(false);
             return;
@@ -507,6 +551,10 @@ public class PanelDialogTutorialController : MonoBehaviour
         {
             TutorialDialogEntry entry = script[currentIndex];
             speechText.text = FormatSpeechText(entry != null ? entry.text : string.Empty);
+
+            // Fala muda em espera: a bronca abriu o painel; volta a esconder.
+            if (entry == null || string.IsNullOrWhiteSpace(entry.text))
+                SetPanelVisible(false);
         }
     }
 

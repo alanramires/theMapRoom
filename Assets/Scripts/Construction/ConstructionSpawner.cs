@@ -17,8 +17,10 @@ public class ConstructionSpawner : MonoBehaviour
     private void Start()
     {
         TryAutoAssignMatchController();
+        // RecomputeTeamFlips (nao AutoCompute direto): o auto cru sobrescrevia o
+        // override manual de flip configurado no MatchController.
         if (matchController != null)
-            matchController.AutoComputeFlipXFromHqPositions();
+            matchController.RecomputeTeamFlips();
     }
 
     public GameObject Spawn(string constructionId, TeamId teamId, Vector3 position, Quaternion rotation)

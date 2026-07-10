@@ -766,6 +766,14 @@ public class MatchController : MonoBehaviour
         return GetDefaultFlipX(teamId);
     }
 
+    public bool GetSlotFlipX(int slotIndex)
+    {
+        if (players == null || slotIndex < 0 || slotIndex >= players.Count)
+            return false;
+
+        return players[slotIndex].flipX;
+    }
+
     private void OnEnable()
     {
         TurnStateManager.OnUnitDestroyed += HandleUnitDestroyed;
@@ -813,9 +821,7 @@ public class MatchController : MonoBehaviour
         if (Application.isPlaying)
         {
             FindAnyObjectByType<ReplayManager>()?.CleanupReplayArtifactsForMatchStart();
-            if (autoFlipXFromHqPositions)
-                AutoComputeFlipXFromHqPositions();
-            ApplyFlipXOverridesToPlayers();
+            RecomputeTeamFlips();
             ResetUnfundedStartMoneyFlagsForFreshMatch();
             ApplyActiveTeamIfChanged(force: true);
             // Hard-code de observacao: em partidas AI vs AI, mantenha a apresentacao
@@ -903,6 +909,9 @@ public class MatchController : MonoBehaviour
         if (Application.isPlaying)
         {
             SyncThreatRevisionFlags();
+            // Flip editado DURANTE o Play (auto/override) precisa refletir na hora
+            // nas unidades em campo — sem isso o early-return engolia a mudanca.
+            RecomputeTeamFlips();
             return;
         }
 
@@ -918,9 +927,7 @@ public class MatchController : MonoBehaviour
         if (enableTotalWar)
             TryAutoAssignFogOfWarReferences();
         ScheduleFogOfWarClearInEditor();
-        if (autoFlipXFromHqPositions)
-            AutoComputeFlipXFromHqPositions();
-        ApplyFlipXOverridesToPlayers();
+        RecomputeTeamFlips();
         ApplyActiveTeamIfChanged(force: false);
         ApplyTeamFlipSettingsToSceneObjects();
         OnSlotConfigChanged?.Invoke();
@@ -2259,9 +2266,21 @@ public class MatchController : MonoBehaviour
         }
     }
 
+    // PONTO UNICO de recomputacao do flip: auto (se habilitado) + overrides por slot
+    // + aplicacao nos objetos em campo. Chame ISTO, nunca AutoCompute direto —
+    // auto sem overrides ja sobrescreveu escolha manual uma vez (ConstructionSpawner).
+    public void RecomputeTeamFlips()
+    {
+        if (autoFlipXFromHqPositions)
+            AutoComputeFlipXFromHqPositions();
+        ApplyFlipXOverridesToPlayers();
+        ApplyTeamFlipSettingsToSceneObjects();
+    }
+
     // Calcula flipX de cada slot comparando a posicao X do HQ com o centro do mapa.
     // HQ a direita do centro => flipX true. A esquerda => flipX false.
-    public void AutoComputeFlipXFromHqPositions()
+    // PRIVADO de proposito: sozinho ele ignora os overrides — use RecomputeTeamFlips().
+    private void AutoComputeFlipXFromHqPositions()
     {
         if (players == null || players.Count == 0)
             return;
