@@ -464,6 +464,23 @@ dirigido → tiro → fechamento com vitória.
 3. Retrato de bronca opcional.
 4. Teste com uma pessoa novata antes da História 2.
 
+### Broncas do Sargento (roteiro de gravação)
+
+Falas transientes de ação bloqueada — balão troca o texto + error.mp3 (com voz, segura até o áudio
+terminar). Texto e voz editáveis na seção "Broncas do Sargento" do asset; campo vazio usa o padrão
+do código (marcado abaixo).
+
+| Gatilho | Fala |
+|---|---|
+| Passar a vez travado (R/botão/menu) | Eu ainda estou falando, recruta! Aguarde a ordem para passar a vez. |
+| Serviço do Comando (X) | Serviço do Comando? Você ainda não ganhou esse brinquedo, recruta. |
+| Dispensar unidade (U) | Dispensar unidade? Ninguém dispensa ninguém sem a minha ordem, recruta. |
+| Render-se | Render-se?! No meu treinamento?! Nem pensar, recruta. |
+| Situação (estatísticas) | Estatística é para depois. Foco na lição, recruta. |
+| Mover antes da ordem de marcha | Quem mandou marchar, recruta?! Eu ainda não dei ordem de movimento. |
+| Sair da célula sob `Hold Only` *(padrão do código — asset vazio)* | Ninguém desce desse morro, recruta! A ordem é SEGURAR a posição. |
+| "Apenas mover"/M sob `Attack Only` *(padrão do código — asset vazio)* | A ordem é MIRAR, recruta! Abra o comando de ataque e escolha o alvo. |
+
 ### Protocolo de edição do asset
 
 Edição do TutorialData em disco com o inspector aberto na Unity descarta o que só existia em memória
