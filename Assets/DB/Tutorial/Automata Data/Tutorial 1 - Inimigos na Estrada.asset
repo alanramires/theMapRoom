@@ -15,9 +15,10 @@ MonoBehaviour:
   id: walking down the road
   unitToken: SD
   teamId: 1
-  preferAttack: 1
+  preferAttack: 0
   fallbackMove: 1
-  moveTowardsTarget: 0
-  moveTargetCell: {x: 0, y: 0, z: 0}
-  stopDistance: 0
-  tutorials: []
+  moveTowardsTarget: 1
+  moveTargetCell: {x: 3, y: -2, z: 0}
+  stopDistance: 1
+  tutorials:
+  - {fileID: 11400000, guid: 161cb573a5e6fba4fb379d0286f28866, type: 2}

@@ -210,6 +210,10 @@ public class PanelTutorialController : MonoBehaviour
         if (text_tarefaas != null)
             text_tarefaas.ForceMeshUpdate(ignoreActiveState: true);
 
+        // Atualiza os retângulos antes de medir o texto. Isso evita usar a altura
+        // antiga do painel quando uma nova tarefa acabou de ser adicionada.
+        Canvas.ForceUpdateCanvases();
+
         float titleWidth = ResolveTextWidth(text_titulo, panelRect.rect.width);
         float bodyWidth = ResolveTextWidth(text_tarefaas, panelRect.rect.width);
         float titleHeight = text_titulo != null
@@ -283,8 +287,8 @@ public class PanelTutorialController : MonoBehaviour
         if (!baseLayoutCached || titleRect == null || bodyRect == null)
             return;
 
-        float clampedTitleHeight = Mathf.Max(baseTitleHeight, titleHeight);
-        float clampedBodyHeight = Mathf.Max(baseBodyHeight, bodyHeight);
+        float clampedTitleHeight = Mathf.Max(1f, titleHeight);
+        float clampedBodyHeight = Mathf.Max(1f, bodyHeight);
         float topInset = Mathf.Max(0f, -titleBaseAnchoredPosition.y);
         float reserved = topInset + clampedTitleHeight + baseBodySpacingFromTitle + Mathf.Max(0f, verticalPadding * 0.5f);
         float bodyViewportHeight = Mathf.Max(1f, panelHeight - reserved);

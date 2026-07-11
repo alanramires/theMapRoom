@@ -11,12 +11,26 @@ public class TutorialManager : MonoBehaviour
 
     private static TutorialManager activeInstance;
     private bool endTurnLockedByScript;
+    private bool automataCommandInProgress;
     private TutorialMovementEffect movementState = TutorialMovementEffect.NoEffect;
 
     // Passar a vez travado pelo estado persistente definido no roteiro do tutorial.
     // Sem TutorialManager na cena => nunca trava (partidas normais ilesas).
     public static bool IsEndTurnLockedByTutorial =>
-        activeInstance != null && activeInstance.endTurnLockedByScript;
+        activeInstance != null &&
+        (activeInstance.endTurnLockedByScript || activeInstance.automataCommandInProgress);
+
+    private void BeginAutomataCommand()
+    {
+        automataCommandInProgress = true;
+        Debug.Log("[TutorialManager] Comando automata em andamento: passar a vez permanece bloqueado.");
+    }
+
+    private void EndAutomataCommand()
+    {
+        automataCommandInProgress = false;
+        Debug.Log("[TutorialManager] Comando automata concluido: passar a vez pode seguir o roteiro.");
+    }
 
     public static void ApplyEndTurnEffectFromScript(TutorialEndTurnEffect effect)
     {
@@ -41,7 +55,13 @@ public class TutorialManager : MonoBehaviour
 
     public static bool IsLeaveCellLockedByTutorial =>
         IsMovementStateActive(TutorialMovementEffect.Locked) ||
-        IsMovementStateActive(TutorialMovementEffect.HoldOnly);
+        IsMovementStateActive(TutorialMovementEffect.HoldOnly) ||
+        IsMovementStateActive(TutorialMovementEffect.AttackOnly);
+
+    // Ordem de ataque (movement=Attack Only): finalizar parado ("apenas mover"/M)
+    // desperdicaria a acao — o caminho liberado e o Mirar.
+    public static bool IsFinalizeInPlaceBlockedByTutorial =>
+        IsMovementStateActive(TutorialMovementEffect.AttackOnly);
 
     private static bool IsMovementStateActive(TutorialMovementEffect state)
     {
@@ -135,6 +155,8 @@ public class TutorialManager : MonoBehaviour
                 return "Quem mandou marchar, recruta?! Eu ainda não dei ordem de movimento.";
             case TutorialScoldKind.HoldPosition:
                 return "Ninguém desce desse morro, recruta! A ordem é SEGURAR a posição.";
+            case TutorialScoldKind.AttackOrdered:
+                return "A ordem é MIRAR, recruta! Abra o comando de ataque e escolha o alvo.";
             default:
                 return "O Sargento não autorizou isso, recruta.";
         }
@@ -794,6 +816,10 @@ public class TutorialManager : MonoBehaviour
     private bool TryExecuteSingleStatCommand(string command)
     {
         string[] parts = command.Split(new[] { ' ' }, System.StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length >= 4 && parts[0].StartsWith("slot", System.StringComparison.OrdinalIgnoreCase) &&
+            parts[2].Equals("move", System.StringComparison.OrdinalIgnoreCase))
+            return TryExecuteMoveCommand(command, parts);
+
         if (parts.Length < 2)
         {
             Debug.LogWarning($"[TutorialManager] statCommand invalido: '{command}' (esperado 'NOME stat=valor' ou 'wake ...').");
@@ -804,6 +830,13 @@ public class TutorialManager : MonoBehaviour
         // do debug "wake unit" — limpa fusao e o estado de "ja agiu").
         if (parts[0].Equals("wake", System.StringComparison.OrdinalIgnoreCase))
             return TryExecuteWakeCommand(command, parts);
+
+        // "complete hist_1_08": completa um objetivo por KEY a partir do roteiro.
+        // E o fim de tutorial scriptado: tarefas sem evento de jogo (ex.: ENDING)
+        // sao dadas por cumpridas pelo proprio Sargento; se for a ultima pendente,
+        // dispara a vitoria do tutorial normalmente.
+        if (parts[0].Equals("complete", System.StringComparison.OrdinalIgnoreCase))
+            return TryExecuteCompleteCommand(command, parts);
 
         // "show Bandeira" / "hide Bandeira" / "show 5,4": alterna o isVisible de uma
         // construcao (ex.: revelar a bandeira da montanha no momento certo do roteiro).
@@ -872,6 +905,135 @@ public class TutorialManager : MonoBehaviour
                 Debug.LogWarning($"[TutorialManager] statCommand: stat '{stat}' desconhecido (use hp, fuel ou ammo).");
                 return false;
         }
+    }
+
+    private bool TryExecuteMoveCommand(string command, string[] parts)
+    {
+        if (matchController == null || turnStateManager == null || automataDatabase == null)
+        {
+            Debug.LogWarning($"[TutorialManager] moveCommand sem referencias: '{command}'.");
+            return false;
+        }
+
+        if (!int.TryParse(parts[0].Substring(4), out int slotIndex) || slotIndex < 0)
+        {
+            Debug.LogWarning($"[TutorialManager] moveCommand invalido: '{command}' (slot ilegivel).");
+            return false;
+        }
+
+        if (!TryParseTutorialCell(parts[3], out Vector3Int fromCell))
+        {
+            Debug.LogWarning($"[TutorialManager] moveCommand invalido: '{command}' (origem ilegivel).");
+            return false;
+        }
+
+        TeamId team = matchController.GetTeamIdForSlot(slotIndex);
+        UnitManager unit = FindActiveUnitAtCell(fromCell);
+        if (unit == null || unit.TeamId != team || !UnitMatchesTargetToken(unit, parts[1]))
+        {
+            Debug.LogWarning($"[TutorialManager] moveCommand: unidade '{parts[1]}' nao encontrada em {fromCell} no slot {slotIndex}.");
+            return false;
+        }
+
+        TutorialData tutorial = GetActiveTutorial();
+        if (!automataDatabase.TryResolve(unit, team, tutorial != null ? tutorial.id : string.Empty, out AutomataData automata) || automata == null)
+        {
+            Debug.LogWarning($"[TutorialManager] moveCommand: AutomataData nao encontrado para '{parts[1]}'.");
+            return false;
+        }
+
+        Vector3Int destination;
+        if (parts.Length >= 5)
+        {
+            if (!TryParseTutorialCell(parts[4], out destination))
+            {
+                Debug.LogWarning($"[TutorialManager] moveCommand invalido: '{command}' (destino ilegivel).");
+                return false;
+            }
+        }
+        else if (!TryFindAutomataAdvanceCell(unit, automata, out destination))
+        {
+            Debug.LogWarning($"[TutorialManager] moveCommand: nenhuma celula alcancavel para '{parts[1]}'.");
+            return false;
+        }
+
+        BeginAutomataCommand();
+        StartCoroutine(ExecuteTutorialAutomataMoveAndAttack(unit, team, destination, automata, parts[1]));
+        return true;
+    }
+
+    private IEnumerator ExecuteTutorialAutomataMoveAndAttack(
+        UnitManager unit,
+        TeamId team,
+        Vector3Int destination,
+        AutomataData automata,
+        string unitToken)
+    {
+        try
+        {
+            bool succeeded = false;
+            yield return ExecuteTutorialAutomataMoveBatch(unit, team, destination, value => succeeded = value);
+            if (!succeeded || automata == null || !automata.preferAttack)
+                yield break;
+
+            if (!turnStateManager.TryAutomatedSelectUnitAndEnterMoveuParado(unit))
+            {
+                Debug.LogWarning($"[TutorialManager] moveCommand: nao foi possivel re-selecionar '{unitToken}' para ataque.");
+                yield break;
+            }
+
+            if (!turnStateManager.TryExecuteAutomatedAttackFirstTarget())
+            {
+                turnStateManager.HandleCancel();
+                Debug.Log($"[TutorialManager] moveCommand: '{unitToken}' chegou ao destino sem alvo valido.");
+                yield break;
+            }
+
+            yield return turnStateManager.WaitUntilAutomatedNeutralReady(timeoutSeconds: 12f);
+        }
+        finally
+        {
+            EndAutomataCommand();
+        }
+    }
+
+    private static bool TryParseTutorialCell(string value, out Vector3Int cell)
+    {
+        cell = default;
+        if (string.IsNullOrWhiteSpace(value))
+            return false;
+
+        string[] coordinates = value.Trim().Split(',');
+        if (coordinates.Length < 2 ||
+            !int.TryParse(coordinates[0], out int x) ||
+            !int.TryParse(coordinates[1], out int y))
+            return false;
+
+        cell = new Vector3Int(x, y, 0);
+        return true;
+    }
+
+    private bool TryExecuteCompleteCommand(string command, string[] parts)
+    {
+        TutorialData tutorial = GetActiveTutorial();
+        if (tutorial == null || tutorial.objectives == null)
+        {
+            Debug.LogWarning($"[TutorialManager] complete: sem tutorial ativo para '{command}'.");
+            return false;
+        }
+
+        int index = tutorial.FindObjectiveIndexByKey(parts[1]);
+        if (index < 0)
+        {
+            Debug.LogWarning($"[TutorialManager] complete: objetivo com key '{parts[1]}' nao existe no tutorial ativo.");
+            return false;
+        }
+
+        TutorialObjective objective = tutorial.objectives[index];
+        // Garante o check visivel na task list mesmo se o roteiro nao revelou antes.
+        objective.isVisible = true;
+        MarkObjectiveComplete(objective);
+        return true;
     }
 
     private bool TryExecuteWakeCommand(string command, string[] parts)
@@ -960,8 +1122,19 @@ public class TutorialManager : MonoBehaviour
             return false;
         }
 
-        panCameraController.FocusOn(target);
+        // O MatchController reposiciona o foco no HQ logo depois de disparar
+        // OnActiveTeamChanged. Aplicar no proximo frame deixa o foco do roteiro
+        // vencer sem alterar o comportamento global de inicio de turno.
+        StartCoroutine(ApplyTutorialPanNextFrame(target));
         return true;
+    }
+
+    private IEnumerator ApplyTutorialPanNextFrame(Vector3 target)
+    {
+        yield return null;
+        if (panCameraController == null)
+            panCameraController = FindAnyObjectByType<CameraController>();
+        panCameraController?.FocusOn(target);
     }
 
     private static ConstructionManager FindConstructionByName(string token)
@@ -1699,10 +1872,31 @@ public class TutorialManager : MonoBehaviour
         yield return WaitForTurnTransitionGate(timeoutSeconds: 6f);
         yield return turnStateManager.WaitUntilAutomatedNeutralReady(timeoutSeconds: 3f);
 
-        List<UnitManager> units = CollectAutomataUnitsForTeam(activeTeam);
+        // Movimento scriptado da fala muda tem prioridade: espera concluir antes
+        // de decidir pelas unidades — senao os dois disputam a mesma unidade
+        // (a rotina confirmaria o soldado parado no meio do comando de marcha).
+        float commandDeadline = Time.time + 20f;
+        while (automataCommandInProgress && Time.time < commandDeadline)
+            yield return null;
+
         string tutorialId = tutorial != null ? tutorial.id : string.Empty;
         float preSelectDelay = turnStateManager.GetAutomatedPreSelectDelay();
         float betweenUnitsDelay = turnStateManager.GetAutomatedBetweenUnitsDelay();
+
+        // Falas mudas podem criar a unidade no mesmo ciclo da troca de turno.
+        // Aguarda esse comando terminar antes de congelar a lista do automata.
+        List<UnitManager> units = null;
+        float collectDeadline = Time.time + 2.5f;
+        while (Time.time < collectDeadline)
+        {
+            units = CollectAutomataUnitsForTeam(activeTeam);
+            if (units.Count > 0)
+                break;
+            if (matchController == null || matchController.ActiveTeam != activeTeam || matchController.HasVictoryWinner)
+                break;
+            yield return null;
+        }
+        units ??= new List<UnitManager>();
 
         for (int i = 0; i < units.Count; i++)
         {
@@ -1727,17 +1921,7 @@ public class TutorialManager : MonoBehaviour
             bool enteredViaMove = false;
             if (automata.moveTowardsTarget && TryFindAutomataAdvanceCell(unit, automata, out Vector3Int advanceCell))
             {
-                if (turnStateManager.TryAutomatedSelectUnitOnly(unit) &&
-                    turnStateManager.TryAutomatedMoveSelectedUnitToCell(advanceCell))
-                {
-                    yield return turnStateManager.WaitUntilMovementAnimationDone(timeoutSeconds: 10f);
-                    enteredViaMove = true;
-                }
-                else
-                {
-                    turnStateManager.HandleCancel();
-                    yield return null;
-                }
+                yield return ExecuteTutorialAutomataMoveBatch(unit, activeTeam, advanceCell, value => enteredViaMove = value);
             }
 
             if (!enteredViaMove && !turnStateManager.TryAutomatedSelectUnitAndEnterMoveuParado(unit))
@@ -1776,6 +1960,73 @@ public class TutorialManager : MonoBehaviour
             matchController.AdvanceTurnWithTransition();
 
         tutorialAutomataRoutine = null;
+    }
+
+    private IEnumerator ExecuteTutorialAutomataMoveBatch(
+        UnitManager unit,
+        TeamId activeTeam,
+        Vector3Int destination,
+        System.Action<bool> completed)
+    {
+        completed?.Invoke(false);
+        if (unit == null || turnStateManager == null)
+        {
+            Debug.LogWarning("[TutorialManager] Automata batch cancelado: unidade/TurnStateManager ausente.");
+            yield break;
+        }
+
+        // Cena de tutorial nao tem AIController: o batch de movimento vai direto
+        // no ReplayManager (mesmo executor do ExecuteLiveAIBatch da IA oficial).
+        ReplayManager replay = FindAnyObjectByType<ReplayManager>();
+        if (replay == null)
+        {
+            Debug.LogWarning("[TutorialManager] Automata batch cancelado: ReplayManager nao encontrado na cena.");
+            yield break;
+        }
+
+        // O comando anterior pode ter acabado visualmente em MoveuParado, mas
+        // o batch seguinte só pode começar com a FSM realmente neutra. Caso
+        // contrário, confirmar a origem vira "manter posição" em vez de
+        // selecionar a unidade.
+        yield return turnStateManager.WaitUntilAutomatedNeutralReady(timeoutSeconds: 6f);
+        if (turnStateManager.CurrentCursorState != TurnStateManager.CursorState.Neutral)
+        {
+            Debug.LogWarning($"[TutorialManager] Automata batch cancelado: FSM nao ficou Neutral antes da selecao (state={turnStateManager.CurrentCursorState}).");
+            yield break;
+        }
+
+        Vector3Int origin = NormalizeCell(unit.CurrentCellPosition);
+        destination = NormalizeCell(destination);
+        Debug.Log($"[TutorialManager] Automata batch: unidade={unit.InstanceId} origem={origin} destino={destination}");
+        yield return new WaitForSeconds(2f);
+        turnStateManager.SuppressNextNeutralConfirm();
+
+        // Mesmo formato do AIController.BuildMoveBatch (MovementPath nulo: o
+        // executor do replay resolve o caminho real).
+        PlayerAction batch = new PlayerAction
+        {
+            IsAIGenerated  = true,
+            ActionType     = PlayerActionType.UnitAction,
+            ActingTeam     = activeTeam,
+            TurnNumber     = matchController != null ? matchController.CurrentTurn : 0,
+            CursorHex      = origin, HasCursorHex = true,
+            UnitInstanceId = unit.InstanceId.ToString(),
+            MoveFrom       = origin, HasMoveFrom = true,
+            MoveTo         = destination, HasMoveTo = true,
+            SensorAction   = SensorActionType.None,
+            MovementPath   = null,
+            DebugLabel     = $"Tutorial Move {unit.InstanceId} → {destination}",
+        };
+
+        replay.ExecuteLiveAIBatch(batch, fastAI: false);
+        yield return new WaitUntil(() => !replay.IsStepExecutionBusy);
+        yield return turnStateManager.WaitUntilAutomatedNeutralReady(timeoutSeconds: 6f);
+
+        bool succeeded = turnStateManager.CurrentCursorState == TurnStateManager.CursorState.Neutral &&
+                         NormalizeCell(unit.CurrentCellPosition) == destination;
+        completed?.Invoke(succeeded);
+        if (!succeeded)
+            Debug.LogWarning($"[TutorialManager] Automata batch falhou: state={turnStateManager.CurrentCursorState} atual={unit.CurrentCellPosition} destino={destination}");
     }
 
     private IEnumerator WaitForTurnTransitionGate(float timeoutSeconds)

@@ -5,6 +5,10 @@ using UnityEngine.Tilemaps;
 
 public partial class TurnStateManager
 {
+    public void SuppressNextNeutralConfirm()
+    {
+        suppressNextNeutralConfirm = true;
+    }
     public bool HandleAutomatedSensorActionRequested(SensorActionType action)
     {
         switch (action)
@@ -1348,6 +1352,5 @@ public partial class TurnStateManager
         return true;
     }
 }
-
 
 

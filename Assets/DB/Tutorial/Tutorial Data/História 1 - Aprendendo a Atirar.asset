@@ -71,17 +71,27 @@ MonoBehaviour:
     description: Manter posicao na montanha
     startHidden: 1
     isVisible: 1
-    isCompleted: 0
+    isCompleted: 1
     isOptional: 0
     isDefeatCondition: 0
     hasFailed: 0
   - id: ATTACK_UNIT
     key: hist_1_07
-    parameters:
+    parameters: 
     description: Atacar o soldado inimigo
     startHidden: 1
-    isVisible: 0
-    isCompleted: 0
+    isVisible: 1
+    isCompleted: 1
+    isOptional: 0
+    isDefeatCondition: 0
+    hasFailed: 0
+  - id: ENDING
+    key: hist_1_08
+    parameters: 
+    description: "Voc\xEA aprendeu o b\xE1sico"
+    startHidden: 1
+    isVisible: 1
+    isCompleted: 1
     isOptional: 0
     isDefeatCondition: 0
     hasFailed: 0
@@ -99,6 +109,7 @@ MonoBehaviour:
     spawnCommand: 
     statCommand: 
     turn: 1
+    movement: 0
     unlockMovement: 0
     revealObjectiveKey: 
     revealObjectiveIndex: -1
@@ -115,6 +126,7 @@ MonoBehaviour:
     spawnCommand: slot0 SD 1,3 name=Ryan cursor
     statCommand: 
     turn: 0
+    movement: 0
     unlockMovement: 0
     revealObjectiveKey: 
     revealObjectiveIndex: -1
@@ -132,6 +144,7 @@ MonoBehaviour:
     spawnCommand: slot0 SD 0,3 acted name=Mathias; slot0 SD 2,3 acted name=Dias
     statCommand: 
     turn: 0
+    movement: 0
     unlockMovement: 0
     revealObjectiveKey: 
     revealObjectiveIndex: -1
@@ -150,6 +163,7 @@ MonoBehaviour:
     spawnCommand: 
     statCommand: 
     turn: 0
+    movement: 0
     unlockMovement: 0
     revealObjectiveKey: hist_1_01
     revealObjectiveIndex: -1
@@ -170,6 +184,7 @@ MonoBehaviour:
     spawnCommand: 
     statCommand: 
     turn: 0
+    movement: 0
     unlockMovement: 0
     revealObjectiveKey: hist_1_02
     revealObjectiveIndex: -1
@@ -187,6 +202,7 @@ MonoBehaviour:
     spawnCommand: 
     statCommand: 
     turn: 0
+    movement: 0
     unlockMovement: 0
     revealObjectiveKey: 
     revealObjectiveIndex: -1
@@ -204,6 +220,7 @@ MonoBehaviour:
     spawnCommand: 
     statCommand: Mathias hp=4
     turn: 0
+    movement: 0
     unlockMovement: 0
     revealObjectiveKey: 
     revealObjectiveIndex: -1
@@ -221,6 +238,7 @@ MonoBehaviour:
     spawnCommand: 
     statCommand: 
     turn: 0
+    movement: 0
     unlockMovement: 0
     revealObjectiveKey: 
     revealObjectiveIndex: -1
@@ -238,6 +256,7 @@ MonoBehaviour:
     spawnCommand: 
     statCommand: Mathias fuel=30
     turn: 0
+    movement: 0
     unlockMovement: 0
     revealObjectiveKey: 
     revealObjectiveIndex: -1
@@ -256,6 +275,7 @@ MonoBehaviour:
     spawnCommand: 
     statCommand: Dias fuel=15
     turn: 0
+    movement: 0
     unlockMovement: 0
     revealObjectiveKey: 
     revealObjectiveIndex: -1
@@ -273,6 +293,7 @@ MonoBehaviour:
     spawnCommand: 
     statCommand: 
     turn: 0
+    movement: 0
     unlockMovement: 0
     revealObjectiveKey: 
     revealObjectiveIndex: -1
@@ -291,6 +312,7 @@ MonoBehaviour:
     spawnCommand: 
     statCommand: Mathias ammo=2; Dias ammo=0
     turn: 0
+    movement: 0
     unlockMovement: 0
     revealObjectiveKey: 
     revealObjectiveIndex: -1
@@ -307,6 +329,7 @@ MonoBehaviour:
     spawnCommand: 
     statCommand: 
     turn: 0
+    movement: 0
     unlockMovement: 0
     revealObjectiveKey: hist_1_03
     revealObjectiveIndex: -1
@@ -328,6 +351,7 @@ MonoBehaviour:
     spawnCommand: 
     statCommand: 
     turn: 0
+    movement: 0
     unlockMovement: 0
     revealObjectiveKey: 
     revealObjectiveIndex: -1
@@ -347,6 +371,7 @@ MonoBehaviour:
     spawnCommand: 
     statCommand: 
     turn: 0
+    movement: 0
     unlockMovement: 0
     revealObjectiveKey: 
     revealObjectiveIndex: -1
@@ -364,6 +389,7 @@ MonoBehaviour:
     spawnCommand: 
     statCommand: 
     turn: 0
+    movement: 0
     unlockMovement: 0
     revealObjectiveKey: 
     revealObjectiveIndex: -1
@@ -381,6 +407,7 @@ MonoBehaviour:
     spawnCommand: 
     statCommand: wake Ryan
     turn: 0
+    movement: 0
     unlockMovement: 0
     revealObjectiveKey: hist_1_04
     revealObjectiveIndex: -1
@@ -399,6 +426,7 @@ MonoBehaviour:
     spawnCommand: 
     statCommand: 
     turn: 0
+    movement: 0
     unlockMovement: 0
     revealObjectiveKey: 
     revealObjectiveIndex: -1
@@ -417,6 +445,7 @@ MonoBehaviour:
     spawnCommand: 
     statCommand: show Bandeira; pan Bandeira
     turn: 0
+    movement: 0
     unlockMovement: 0
     revealObjectiveKey: 
     revealObjectiveIndex: -1
@@ -436,6 +465,7 @@ MonoBehaviour:
     spawnCommand: 
     statCommand: 
     turn: 0
+    movement: 0
     unlockMovement: 0
     revealObjectiveKey: 
     revealObjectiveIndex: -1
@@ -458,9 +488,9 @@ MonoBehaviour:
     revealObjectiveKey: hist_1_05
     revealObjectiveIndex: -1
   - advance: 3
-    objectiveKey:
+    objectiveKey: 
     revealObjective: 0
-    waitObjectiveKey:
+    waitObjectiveKey: 
     waitObjectiveIndex: -1
     waitAllUnitsActed: 1
     waitPlayerTurnStart: 0
@@ -472,6 +502,7 @@ MonoBehaviour:
     spawnCommand: 
     statCommand: 
     turn: 2
+    movement: 0
     unlockMovement: 0
     revealObjectiveKey: hist_1_06
     revealObjectiveIndex: -1
@@ -487,13 +518,14 @@ MonoBehaviour:
       unidade novamente e suba o morro at\xE9 a bandeira, recruta.[/ordem]"
     voice: {fileID: 0}
     spawnCommand: 
-    statCommand: 
+    statCommand: pan Ryan
     turn: 0
+    movement: 0
     unlockMovement: 0
     revealObjectiveKey: 
     revealObjectiveIndex: -1
   - advance: 4
-    objectiveKey:
+    objectiveKey: 
     revealObjective: 0
     waitObjectiveKey: hist_1_05
     waitObjectiveIndex: -1
@@ -506,101 +538,103 @@ MonoBehaviour:
     spawnCommand: 
     statCommand: 
     turn: 0
+    movement: 0
     unlockMovement: 0
     revealObjectiveKey: 
     revealObjectiveIndex: -1
   - advance: 3
-    objectiveKey:
+    objectiveKey: 
     revealObjective: 0
-    waitObjectiveKey:
+    waitObjectiveKey: 
     waitObjectiveIndex: -1
     waitAllUnitsActed: 0
     waitPlayerTurnStart: 0
-    text:
+    text: 
     voice: {fileID: 0}
     spawnCommand: slot1 SD 7,-2 acted
     statCommand: pan 7,-2
     turn: 0
     movement: 0
     unlockMovement: 0
-    revealObjectiveKey:
+    revealObjectiveKey: 
     revealObjectiveIndex: -1
   - advance: 0
-    objectiveKey:
+    objectiveKey: 
     revealObjective: 0
-    waitObjectiveKey:
+    waitObjectiveKey: 
     waitObjectiveIndex: -1
     waitAllUnitsActed: 0
     waitPlayerTurnStart: 0
-    text: "Espere!\nEstou vendo movimento na estrada. Soldados!"
+    text: 'Espere!
+
+      Estou vendo movimento na estrada. Soldados inimigos a vista!'
     voice: {fileID: 0}
-    spawnCommand:
+    spawnCommand: 
     statCommand: pan 7,-2
-    turn: 0
+    turn: 1
     movement: 0
     unlockMovement: 0
-    revealObjectiveKey:
+    revealObjectiveKey: 
     revealObjectiveIndex: -1
   - advance: 1
     objectiveKey: hist_1_06
     revealObjective: 1
-    waitObjectiveKey:
+    waitObjectiveKey: 
     waitObjectiveIndex: -1
     waitAllUnitsActed: 0
     waitPlayerTurnStart: 0
-    text: "Em posi\xE7\xE3o defensiva!\n\nVoc\xEA tem a montanha — ningu\xE9m
-      desce desse morro.\n\n[ordem]Segure sua posi\xE7\xE3o na montanha sem se mover.
-      Use \"Manter posi\xE7\xE3o\".[/ordem]"
+    text: "Em posi\xE7\xE3o defensiva!\n\nVoc\xEA tem a montanha \u2014 ningu\xE9m
+      desce desse morro. Manter posi\xE7\xE3o n\xE3o \xE9 ficar parado por medo.\n\xC9
+      segurar o ponto certo at\xE9 a hora certa.\n\n[ordem]Segure sua posi\xE7\xE3o
+      na montanha sem se mover. Use \"Manter posi\xE7\xE3o\".[/ordem]"
     voice: {fileID: 0}
-    spawnCommand:
-    statCommand:
+    spawnCommand: 
+    statCommand: pan Ryan
     turn: 0
     movement: 2
     unlockMovement: 0
-    revealObjectiveKey:
+    revealObjectiveKey: 
     revealObjectiveIndex: -1
-  - advance: 0
-    objectiveKey:
+  - advance: 4
+    objectiveKey: 
     revealObjective: 0
-    waitObjectiveKey:
+    waitObjectiveKey: 
     waitObjectiveIndex: -1
     waitAllUnitsActed: 0
     waitPlayerTurnStart: 0
-    text: "Muito bem.\n\nManter posi\xE7\xE3o n\xE3o \xE9 ficar parado por medo.\n\xC9
-      segurar o ponto certo at\xE9 a hora certa."
-    voice: {fileID: 0}
-    spawnCommand:
-    statCommand:
-    turn: 0
-    movement: 0
-    unlockMovement: 0
-    revealObjectiveKey:
-    revealObjectiveIndex: -1
-  - advance: 3
-    objectiveKey:
-    revealObjective: 0
-    waitObjectiveKey:
-    waitObjectiveIndex: -1
-    waitAllUnitsActed: 0
-    waitPlayerTurnStart: 0
-    text: "Agora aprenda uma coisa importante: nem toda ordem \xE9 avan\xE7o.\n\n\xC0s
-      vezes, a melhor decis\xE3o \xE9 manter posi\xE7\xE3o.\nVoc\xEA j\xE1 est\xE1
+    text: "Muito bem. Agora aprenda uma coisa importante: nem toda ordem \xE9 avan\xE7o.\n\n\xC0s
+      vezes, a melhor decis\xE3o \xE9 manter posi\xE7\xE3o. Voc\xEA j\xE1 est\xE1
       onde precisa estar. N\xE3o invente moda.\n\nFique a\xED parado e aprenda: soldado
       que anda demais morre cansado.\nSoldado que segura o ponto obriga o inimigo
-      a pensar.\n\n[ordem]Passe a vez e observe a infantaria inimiga.[/ordem]\n\nQuem
-      age, espera."
+      a pensar.\n\n[ordem]Passe a vez e observe a infantaria inimiga.[/ordem]"
     voice: {fileID: 0}
-    spawnCommand:
-    statCommand:
+    spawnCommand: 
+    statCommand: 
+    turn: 2
+    movement: 0
+    unlockMovement: 0
+    revealObjectiveKey: 
+    revealObjectiveIndex: -1
+  - advance: 3
+    objectiveKey: 
+    revealObjective: 0
+    waitObjectiveKey: 
+    waitObjectiveIndex: -1
+    waitAllUnitsActed: 0
+    waitPlayerTurnStart: 0
+    text: 
+    voice: {fileID: 0}
+    spawnCommand: 
+    statCommand: slot1 SD move 7,-2 4,-2
     turn: 0
     movement: 0
     unlockMovement: 0
-    revealObjectiveKey:
+    revealObjectiveKey: 
     revealObjectiveIndex: -1
-  - advance: 0
+  - advance: 5
     objectiveKey: hist_1_07
     revealObjective: 1
-    waitObjectiveKey:
+    waitObjectiveKey: 
     waitObjectiveIndex: -1
     waitAllUnitsActed: 0
     waitPlayerTurnStart: 0
@@ -610,40 +644,9 @@ MonoBehaviour:
       ataque.[/ordem]"
     voice: {fileID: 0}
     spawnCommand: 
-    statCommand: 
-    turn: 0
-    unlockMovement: 0
-    revealObjectiveKey:
-    revealObjectiveIndex: -1
-  - advance: 0
-    objectiveKey: 
-    revealObjective: 0
-    waitObjectiveKey: 
-    waitObjectiveIndex: -1
-    waitAllUnitsActed: 0
-    waitPlayerTurnStart: 0
-    text: "O scanner mostrou um alvo v\xE1lido.\n\nIsso significa que voc\xEA tem
-      alcance, muni\xE7\xE3o e condi\xE7\xE3o de disparo.\n\nEscolha o alvo."
-    voice: {fileID: 0}
-    spawnCommand: 
-    statCommand: 
-    turn: 0
-    unlockMovement: 0
-    revealObjectiveKey: 
-    revealObjectiveIndex: -1
-  - advance: 0
-    objectiveKey: 
-    revealObjective: 0
-    waitObjectiveKey: 
-    waitObjectiveIndex: -1
-    waitAllUnitsActed: 0
-    waitPlayerTurnStart: 0
-    text: "Alvo selecionado.\n\nAgora leia antes de confirmar.\nDepois do tiro, n\xE3o
-      existe \"foi sem querer\"."
-    voice: {fileID: 0}
-    spawnCommand: 
-    statCommand: 
-    turn: 0
+    statCommand: pan Ryan
+    turn: 1
+    movement: 4
     unlockMovement: 0
     revealObjectiveKey: 
     revealObjectiveIndex: -1
@@ -654,18 +657,22 @@ MonoBehaviour:
     waitObjectiveIndex: -1
     waitAllUnitsActed: 0
     waitPlayerTurnStart: 0
-    text: '[ordem]Confirme o ataque.[/ordem]'
+    text: "O scanner mostrou um alvo v\xE1lido.\n\nIsso significa que voc\xEA tem
+      alcance, muni\xE7\xE3o e condi\xE7\xE3o de disparo.\n\nEscolha o alvo. como
+      s\xF3 tem 1 oponente, ele j\xE1 vai direto para a confirma\xE7\xE3o.\n\n[ordem]Confirme
+      o ataque.[/ordem]"
     voice: {fileID: 0}
     spawnCommand: 
     statCommand: 
     turn: 0
+    movement: 0
     unlockMovement: 0
     revealObjectiveKey: 
     revealObjectiveIndex: -1
   - advance: 0
-    objectiveKey: 
-    revealObjective: 0
-    waitObjectiveKey:
+    objectiveKey: hist_1_08
+    revealObjective: 1
+    waitObjectiveKey: 
     waitObjectiveIndex: -1
     waitAllUnitsActed: 0
     waitPlayerTurnStart: 0
@@ -676,7 +683,8 @@ MonoBehaviour:
     voice: {fileID: 0}
     spawnCommand: 
     statCommand: 
-    turn: 0
+    turn: 2
+    movement: 0
     unlockMovement: 0
     revealObjectiveKey: 
     revealObjectiveIndex: -1
@@ -693,11 +701,28 @@ MonoBehaviour:
       alfabetiza\xE7\xE3o de comando.\n\nAmanh\xE3 a gente descobre se voc\xEA consegue
       fazer isso sem eu gritar no seu ouvido.\n\nNo ch\xE3o, recruta! Paga 20!"
     voice: {fileID: 0}
-    spawnCommand: 
-    statCommand: 
+    spawnCommand:
+    statCommand:
     turn: 0
+    movement: 0
     unlockMovement: 0
-    revealObjectiveKey: 
+    revealObjectiveKey:
+    revealObjectiveIndex: -1
+  - advance: 0
+    objectiveKey:
+    revealObjective: 0
+    waitObjectiveKey:
+    waitObjectiveIndex: -1
+    waitAllUnitsActed: 0
+    waitPlayerTurnStart: 0
+    text:
+    voice: {fileID: 0}
+    spawnCommand:
+    statCommand: complete hist_1_08
+    turn: 0
+    movement: 0
+    unlockMovement: 0
+    revealObjectiveKey:
     revealObjectiveIndex: -1
   dialogFlowMigrated: 1
   scoldEndTurnLocked:
@@ -717,6 +742,12 @@ MonoBehaviour:
     voice: {fileID: 0}
   scoldMovementLocked:
     text: "Quem mandou marchar, recruta?! Eu ainda n\xE3o dei ordem de movimento."
+    voice: {fileID: 0}
+  scoldHoldPosition:
+    text: 
+    voice: {fileID: 0}
+  scoldAttackOrder:
+    text: 
     voice: {fileID: 0}
   alwaysActedUnits: Mathias; Dias
   blockCommandService: 1

@@ -518,5 +518,3 @@ public partial class TurnStateManager
     }
 }
 
-
-

@@ -193,3 +193,90 @@ A base proposta virou sistema. O que existe hoje:
 Fechar as pendências da Cena 1 (lista no fim de `cena1.md`) e rodar o primeiro playtest completo
 de ponta a ponta. Depois: sessão com a sobrinha, e só então Cena 2.
 
+## Atualização consolidada após v4.0.29b (10/07/2026)
+
+Esta seção substitui as descrições técnicas e o estado de implementação anteriores quando houver
+divergência. O roteiro autoral continua válido como referência, mas o asset `TutorialData` é a fonte
+de verdade em jogo.
+
+### Fluxo atual das falas
+
+- Cada fala controla o próprio avanço pelo campo `advance`: `Immediate`, `Objective Completed`,
+  `All Units Acted`, `Player Turn Started` ou `Enemy Turn Started`.
+- `objectiveKey` identifica a tarefa usada pela fala; `revealObjective` decide se ela aparece na task
+  list. O gate não fica mais escondido na fala seguinte.
+- `turn` é persistente e reversível: `No Effect`, `Locked` ou `Unlocked`.
+- `movement` também é persistente: `No Effect`, `Locked`, `Hold Only` ou `Unlocked`.
+- Falas sem texto executam comandos sem abrir o balão. O histórico ignora essas falas mudas.
+- Os campos antigos de wait/reveal permanecem escondidos apenas para migração de assets legados.
+
+### Comandos e direção de cena
+
+- `spawnCommand` aceita slots lógicos e opções como `acted`, `name=` e `cursor`.
+- Unidades criadas por `slotN` recebem explicitamente o `slotIndex`; o flip visual vem diretamente
+  do slot no `MatchController`, sem espelhar ou alterar a coordenada escrita no comando.
+- `statCommand` cobre HP, autonomia e munição, além de `wake`, `show`, `hide` e `pan`.
+- `Enemy Turn Started`, falas mudas e `TutorialEnemyTurnIndicator` permitem dirigir o turno da AI
+  sem criar uma segunda lógica de combate exclusiva do tutorial.
+
+### Panel Helper e leitura da unidade
+
+- O inspect exibe nome, classe traduzida, HP, movimento e autonomia.
+- Classes usam rótulos em português; armas exibem categoria curta (`anti-inf`, `anti-tanque`,
+  `antiaérea`, `antinavio`).
+- O inspect temporário de 6 segundos possui barra regressiva abaixo do título, colorida pelo time
+  ativo e alimentada pelo mesmo timer que fecha o painel.
+- O nome de construção editado manualmente não deve mais ser sobrescrito pelo padrão do catálogo.
+
+### Ajustes posteriores ao commit
+
+- O flip de unidades criadas pelo roteiro é aplicado depois de `acted` e `name`, consultando o
+  `MatchController` pelo slot lógico. A coordenada escrita no `spawnCommand` permanece absoluta.
+- O inspect temporário mantém a barra regressiva sincronizada com o mesmo prazo de 6 segundos que
+  encerra a inspeção; o preenchimento diminui visualmente e usa a cor do time ativo.
+- A identificação da unidade foi reorganizada para mostrar classe traduzida antes de HP, e as armas
+  agora exibem a categoria curta em português.
+
+### Estado das cenas
+
+| Cena | Estado atual |
+|------|--------------|
+| 1 — Aprendendo a Atirar | Roteiro e contato implementados; spawn em `7,-2`, marcha até `4,-2`, Automata cadastrado e turno inimigo apresentado. Faltam playtest integral, vozes e acabamento. |
+| 2 a 5 | Aguardam o fechamento e a validação da Cena 1. |
+
+### Próximo passo atualizado
+
+Executar a Cena 1 de ponta a ponta, com atenção especial a gates de turno, `Hold Only`, spawn e flip
+por slot, marcha da AI, sequência final depois do ataque e corrida entre falas finais e vitória. Depois
+do playtest interno, validar com uma pessoa novata antes de iniciar a Cena 2.
+
+## Atualização consolidada após v4.0.29c (10/07/2026)
+
+### Motor de roteiro — capacidades novas
+
+- `advance` ganhou **`Aim Opened (Mirar)`**: a fala avança quando o jogador abre o comando de ataque
+  (evento `OnUnitAimOpened`, só jogador — automata filtrado).
+- `movement` ganhou **`Attack Only`**: manter posição/atacar parado sim; sair da célula e finalizar
+  parado ("apenas mover"/M) levam bronca (`scoldAttackOrder`). Impede queimar a ação sem atirar.
+- `statCommand` ganhou dois verbos:
+  - **`move`** (`slot1 SD move 7,-2 4,-2`): marcha scriptada pelo executor real de batches
+    (`ReplayManager.ExecuteLiveAIBatch` direto — cena de tutorial não precisa de AIController).
+    A rotina do automata espera o comando concluir; passar a vez fica travado durante a execução.
+  - **`complete`** (`complete hist_1_08`): completa objetivo por key a partir do roteiro — é o fim
+    de tutorial scriptado (tarefas sem evento de jogo, ex.: `ENDING`).
+- `HOLD_POSITION` valida na **finalização** da ação (fim da FSM), não na entrada do MoveuParado.
+- Vitória de tutorial usa o **Panel_vitoria oficial** via `ShowVictoryPanel` (ponto único no
+  MatchController); painel ausente gera warning.
+
+### Padrão de fechamento de História
+
+Última tarefa = objetivo `ENDING` (`hist_Y_XX`) revelado nas falas finais e completado por
+`complete <key>` numa fala muda depois do último Avançar. Garante que a vitória nunca atropela o
+discurso do Sargento — vale como padrão para as Cenas 2–5.
+
+### Estado das cenas
+
+| Cena | Estado atual |
+|------|--------------|
+| 1 — Aprendendo a Atirar | **Completa de ponta a ponta no asset** (abertura → tiro → ENDING → vitória). Faltam: playtest integral, vozes, retrato de bronca, conferir Panel_vitoria na cena. |
+| 2 a 5 | Aguardam validação da Cena 1; herdarão o padrão ENDING/`complete` e os níveis de `movement`. |

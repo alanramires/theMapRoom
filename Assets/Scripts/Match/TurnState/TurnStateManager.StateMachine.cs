@@ -393,6 +393,13 @@ public partial class TurnStateManager
 
     private ActionSfx HandleConfirmFromNeutralLikeState()
     {
+        if (suppressNextNeutralConfirm)
+        {
+            suppressNextNeutralConfirm = false;
+            RuntimeLog("[FSM] Confirm neutro suprimido apos batch automatico.");
+            return ActionSfx.None;
+        }
+
         if (CurrentCursorState != CursorState.Neutral)
             ExecuteAndReset("HandleConfirmFromNeutralLikeState: normalize");
 
@@ -768,7 +775,7 @@ public partial class TurnStateManager
             }
 
             EnterSensorsState(CursorState.MoveuParado);
-            OnUnitHeldPosition?.Invoke(selectedUnit);
+            pendingHeldPositionCompletion = true;
             Debug.Log("moveu no mesmo lugar");
             return ActionSfx.Confirm;
         }
@@ -976,6 +983,7 @@ public partial class TurnStateManager
     private ActionSfx HandleCancelWhileMoveuParado()
     {
         LogStateStep("HandleCancelWhileMoveuParado", rollback: true);
+        pendingHeldPositionCompletion = false;
         RestoreForcedLayerAfterRollbackIfNeeded();
         Retreat("HandleCancelWhileMoveuParado");
         ClearSensorResults();
@@ -1396,4 +1404,3 @@ public partial class TurnStateManager
         Retreat("TryExitReplayStateToNeutral");
     }
 }
-

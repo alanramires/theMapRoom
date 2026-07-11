@@ -14,7 +14,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::AutomataData
   id: scan and fire
   unitToken: OL
-  teamId: -1
+  teamId: 1
   preferAttack: 1
   fallbackMove: 1
+  moveTowardsTarget: 0
+  moveTargetCell: {x: 0, y: 0, z: 0}
+  stopDistance: 0
   tutorials: []

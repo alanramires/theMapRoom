@@ -212,6 +212,17 @@ public partial class AIController
         debugStepPendingAction = null;
     }
 
+    public IEnumerator ExecuteTutorialMoveBatch(UnitManager unit, TeamId team, Vector3Int from, Vector3Int to)
+    {
+        if (unit == null || replayManager == null)
+            yield break;
+
+        from.z = 0;
+        to.z = 0;
+        PlayerAction batch = BuildMoveBatch(unit, team, from, to);
+        yield return ExecuteAIBatchWithDebugStep(batch);
+    }
+
     private void ShowDebugStepPreview(PlayerAction action)
     {
         string description = BuildDebugStepDescription(action);

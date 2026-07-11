@@ -1036,6 +1036,9 @@ public partial class TurnStateManager
         suppressInitialMirandoAutoFocus = automatedSelection;
         EnterMirandoState();
 
+        if (!automatedSelection)
+            OnUnitAimOpened?.Invoke(selectedUnit);
+
         // O clique em um alvo e apenas uma preferencia de entrada. A lista e a validacao
         // continuam sendo as oficiais do PodeMirar, reconstruidas ao entrar em Mirando.
         if (preferredTarget != null)
@@ -1392,6 +1395,16 @@ public partial class TurnStateManager
 
     private void HandleMoveOnlyActionRequested()
     {
+        // M so finaliza uma acao depois que a FSM ja entrou no fluxo de
+        // movimento e sensores. Em UnitSelected, ainda falta confirmar o
+        // destino; finalizar ali gera replay sem destino e adianta tutorial.
+        if (CurrentCursorState != CursorState.MoveuAndando &&
+            CurrentCursorState != CursorState.MoveuParado)
+        {
+            RuntimeLog($"[Acao] Apenas Mover ignorado fora do fluxo de movimento: state={CurrentCursorState}");
+            return;
+        }
+
         // Tutorial: o "M" (apenas mover) tambem respeita a ordem de marcha.
         if (TutorialManager.IsMovementLockedByTutorial)
         {
@@ -1400,11 +1413,19 @@ public partial class TurnStateManager
             return;
         }
 
+        // Tutorial (Attack Only): finalizar parado desperdicaria a acao — a ordem e mirar.
+        if (TutorialManager.IsFinalizeInPlaceBlockedByTutorial)
+        {
+            TutorialManager.ShowBlockedActionScold(TutorialScoldKind.AttackOrdered);
+            cursorController?.PlayErrorSfx();
+            return;
+        }
+
         // Tutorial (Hold Only): o "M" finaliza a unidade onde ela ja esta (nao
         // move ao cursor), entao nunca viola a ordem de segurar posicao — sair da
         // celula ja e barrado no confirm (HandleConfirmWhileUnitSelected).
 
-        bool finished = TryFinalizeSelectedUnitActionFromDebug();
+        bool finished = TryFinalizeSelectedUnitActionFromDebug(completeHeldPosition: true);
         if (finished)
         {
             cursorController?.PlayDoneSfx();

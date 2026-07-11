@@ -45,6 +45,9 @@ public class PanelDialogTutorialController : MonoBehaviour
     private int turnStartCountAtFrontierShow;
     private int enemyTurnStartCount;
     private int enemyTurnCountAtFrontierShow;
+    // Gate "abriu o Mirar": rearmado sempre que uma fala com advance=AimOpened
+    // chega na fronteira — so satisfaz com um Mirar DEPOIS da fala aparecer.
+    private bool aimOpenedAtFrontier;
     private int currentIndex = -1;
     private int furthestShownIndex = -1;
     private bool scriptFinished;
@@ -66,12 +69,14 @@ public class PanelDialogTutorialController : MonoBehaviour
     {
         TutorialManager.OnObjectiveCompleted += HandleObjectiveCompleted;
         MatchController.OnActiveTeamChanged += HandleActiveTeamChanged;
+        TurnStateManager.OnUnitAimOpened += HandleAimOpened;
     }
 
     private void OnDisable()
     {
         TutorialManager.OnObjectiveCompleted -= HandleObjectiveCompleted;
         MatchController.OnActiveTeamChanged -= HandleActiveTeamChanged;
+        TurnStateManager.OnUnitAimOpened -= HandleAimOpened;
     }
 
     private void Update()
@@ -255,6 +260,8 @@ public class PanelDialogTutorialController : MonoBehaviour
                 return playerTurnStartCount <= turnStartCountAtFrontierShow;
             case TutorialAdvanceCondition.EnemyTurnStarted:
                 return enemyTurnStartCount <= enemyTurnCountAtFrontierShow;
+            case TutorialAdvanceCondition.AimOpened:
+                return !aimOpenedAtFrontier;
             default:
                 return false;
         }
@@ -332,6 +339,8 @@ public class PanelDialogTutorialController : MonoBehaviour
                 turnStartCountAtFrontierShow = playerTurnStartCount;
             else if (entry.advance == TutorialAdvanceCondition.EnemyTurnStarted)
                 enemyTurnCountAtFrontierShow = enemyTurnStartCount;
+            else if (entry.advance == TutorialAdvanceCondition.AimOpened)
+                aimOpenedAtFrontier = false;
         }
         if (speechText != null)
             speechText.text = FormatSpeechText(entry != null ? entry.text : string.Empty);
@@ -425,6 +434,25 @@ public class PanelDialogTutorialController : MonoBehaviour
         }
 
         RefreshButtons();
+    }
+
+    // Jogador abriu o Mirar: satisfaz o gate AimOpened e avanca sozinho se a fala
+    // da fronteira esperava exatamente isso (mesmo padrao do objetivo completado).
+    private void HandleAimOpened(UnitManager unit)
+    {
+        if (matchController == null ||
+            matchController.ActiveTeamId != (int)matchController.GetTeamIdForSlot(0))
+            return;
+
+        aimOpenedAtFrontier = true;
+
+        if (script != null && !scriptFinished &&
+            currentIndex >= furthestShownIndex && currentIndex >= 0 && currentIndex < script.Count)
+        {
+            TutorialDialogEntry current = script[currentIndex];
+            if (current != null && current.advance == TutorialAdvanceCondition.AimOpened && !IsAdvanceBlocked(current))
+                TryAdvanceToNext();
+        }
     }
 
     private int ResolveObjectiveKey(string key)

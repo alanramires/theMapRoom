@@ -358,3 +358,114 @@ No chão, recruta! Paga 20!
 6. Conferir limiar de amarelo da barra de autonomia (fala promete amarelo com fuel 40/70).
 7. Corrida no fim: vitória dispara no `ATTACK_UNIT` junto com as falas finais — avaliar no playtest
    (opções: mover Fechamento pro victoryDialog ou segurar a vitória até o roteiro acabar).
+
+## Estado consolidado após v4.0.29b (10/07/2026)
+
+Esta seção substitui o status e as pendências antigas acima quando houver divergência. O asset da
+História 1 permanece como fonte de verdade para texto, ordem das falas e configuração dos eventos.
+
+### Estrutura atual do roteiro
+
+- A fala que dá uma ordem também declara quando avança. `Advance: Objective Completed` +
+  `Objective Key` substitui o antigo gate colocado no Element seguinte.
+- `Reveal Objective` usa a mesma key e controla a entrada da tarefa na task list.
+- Passar turno usa `Turn: No Effect / Locked / Unlocked`, com estado persistente entre falas.
+- Movimento usa `Movement: No Effect / Locked / Hold Only / Unlocked`. Durante `Hold Only`, Ryan
+  pode manter posição e atacar parado, mas não pode sair do morro.
+- `All Units Acted`, `Player Turn Started` e `Enemy Turn Started` avançam a fala atual.
+- Falas mudas executam spawn, pan e mudanças de estado sem abrir o painel do Sargento.
+
+### Sequência implementada do contato
+
+1. Ryan chega à bandeira e recebe ordem para passar a vez.
+2. No início do turno inimigo, uma fala muda cria o soldado em `slot1 SD 7,-2 acted`.
+3. No turno do jogador, a câmera apresenta o movimento na estrada.
+4. Ryan recebe ordem de usar `MANTER POSIÇÃO`; a tarefa de hold é revelada e o movimento entra em
+   `Hold Only`.
+5. Depois de segurar o morro, o jogador passa a vez para observar o inimigo.
+6. No turno da AI, o Automata `Tutorial 1 - Inimigos na Estrada` marcha de `7,-2` até `4,-2`, para
+   adjacente ao Ryan e não atira.
+7. No turno seguinte, a tarefa de ataque é revelada e Ryan executa o primeiro tiro parado no morro.
+
+Os objetivos ativos foram consolidados em `hist_1_01..hist_1_07`. As antigas tarefas de passar turno
+e as keys `hist_1_08/09` foram removidas; passar a vez agora é direção de cena, não uma tarefa.
+
+### Spawn e flip
+
+- Coordenadas do `spawnCommand` são absolutas e nunca são espelhadas pelo código.
+- Quando o comando usa `slotN`, a unidade recebe o mesmo `slotIndex` usado pelo Unit Painter.
+- A orientação consulta diretamente `MatchController.GetSlotFlipX(slotIndex)` depois de aplicar
+  `acted` e `name`, preservando o flip configurado no slot.
+- `cursor` move o cursor até a célula original do comando; recrutas sem essa opção não puxam o cursor.
+
+### Inspect usado nesta aula
+
+- A ficha mostra nome, classe em português, HP, movimento e autonomia antes da lista de armas.
+- Armas exibem a categoria curta em português, por exemplo `R:1 {anti-inf}`.
+- A inspeção temporária tem uma barra regressiva de 6 segundos, na cor do time ativo.
+- O segundo clique separa alcance com movimento e alcance parado; unidades sem munição não exibem
+  uma camada de tiro inexistente.
+
+### Ajustes posteriores ao commit
+
+- O spawn por `slotN` preserva a coordenada absoluta do comando e aplica o flip diretamente do
+  `MatchController` depois de configurar `acted` e o nome da unidade.
+- Ryan usa `cursor` no spawn inicial; Mathias e Dias nascem sem puxar o cursor para eles.
+- A ficha do inspect mostra a classe traduzida antes de HP e as armas com apelido de categoria,
+  como `R:1 {anti-inf}`.
+- A inspeção de 6 segundos mostra uma barra que diminui continuamente e usa a cor do time ativo.
+
+### Pendências reais para o próximo playtest
+
+1. Rodar toda a História 1 sem atalhos e validar todos os modos de `Advance`.
+2. Confirmar que `Turn` trava e destrava R, panel_remaining e menu nos pontos corretos.
+3. Confirmar `Hold Only`: manter posição e atacar parado funcionam; sair da célula recebe bronca.
+4. Validar spawn em `7,-2`, flip visual por slot, pan da câmera e marcha da AI até `4,-2`.
+5. Avaliar a corrida entre o fechamento do Sargento e a tela de vitória após `ATTACK_UNIT`.
+6. Gravar e atribuir as vozes; escolher o retrato de bronca opcional.
+7. Fazer o primeiro teste com uma pessoa novata antes de iniciar a História 2.
+
+## Estado consolidado após v4.0.29c (10/07/2026)
+
+Esta seção substitui as anteriores quando houver divergência. A História 1 está completa de ponta a
+ponta no asset: abertura → câmera/barras/inspeção → seleção → marcha em 2 turnos → hold → contato
+dirigido → tiro → fechamento com vitória.
+
+### Contato e ataque (Steps 4–7, forma final)
+
+1. Ryan chega à bandeira; "Missão dada... passe a vez" avança no **turno do inimigo**.
+2. Fala muda no turno da IA: `slot1 SD 7,-2 acted` + `pan 7,-2` — o soldado aparece e não se move.
+3. Turno do jogador: Sargento reage ("Espere!", com passar a vez travado), pan até o inimigo.
+4. Ordem de segurar o morro: revela `hist_1_06 HOLD_POSITION`, `movement: Hold Only`. O hold valida
+   na **finalização** da ação (FSM completa), não no clique de "Manter posição".
+5. Após o hold: "Passe a vez e observe" (advance no turno inimigo).
+6. Fala muda no turno da IA: `slot1 SD move 7,-2 4,-2` — marcha scriptada pelo executor real de
+   batches (ReplayManager direto; cena de tutorial não precisa de AIController). A rotina do automata
+   espera o comando concluir antes de mexer nas unidades.
+7. Turno do jogador: "Contato à frente" revela `hist_1_07 ATTACK_UNIT` com `advance: Aim Opened`
+   (avança quando o jogador abre o Mirar) e `movement: Attack Only` (sair da célula = bronca;
+   "apenas mover"/M = bronca "A ordem é MIRAR, recruta!" — não queima a ação sem atirar).
+8. Tiro → "Resultado registrado" revela `hist_1_08 ENDING` e destrava o turno → "Primeira lição
+   concluída... Paga 20!" → fala muda final com `complete hist_1_08` → vitória.
+
+### Fim de tutorial e vitória
+
+- Objetivo `ENDING` (`hist_1_08`, "Você aprendeu o básico") é completado por comando de roteiro
+  (`statCommand: complete <key>`) — o Sargento dá a missão por cumprida; sem corrida com as falas.
+- `DeclareTutorialVictory` usa o **Panel_vitoria oficial** (mesmo da partida normal): "VITÓRIA!" na
+  cor do time do jogador + "TIME <cor> — TREINAMENTO CONCLUÍDO" (customizável via
+  `victoryDialog.message`). Painel ausente na cena gera warning no Console.
+- **Conferir que o Panel_vitoria existe na cena da História 1** (pode estar desativado).
+
+### Pendências finais
+
+1. Playtest integral sem atalhos (todos os modos de `Advance`, travas, marcha, vitória).
+2. Vozes do Sargento (falas + broncas, incluindo as novas `scoldHoldPosition` e `scoldAttackOrder`).
+3. Retrato de bronca opcional.
+4. Teste com uma pessoa novata antes da História 2.
+
+### Protocolo de edição do asset
+
+Edição do TutorialData em disco com o inspector aberto na Unity descarta o que só existia em memória
+(já perdemos o `move` e um `advance` assim). Antes de pedir edição externa: salvar na Unity; depois
+dela: focar a Unity para reimportar antes de voltar ao inspector.

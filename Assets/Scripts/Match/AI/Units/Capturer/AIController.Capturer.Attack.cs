@@ -707,7 +707,7 @@ public partial class AIController
             return PositionDpqForAttackDecision.None;
 
         ConstructionManager construction = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, cell);
-        if (construction != null
+        if (construction != null && !construction.IsForwardObserverSpot
             && construction.TryResolveConstructionData(out ConstructionData constructionData)
             && constructionData != null
             && constructionData.dpqData != null)

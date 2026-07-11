@@ -21,6 +21,8 @@ public partial class TurnStateManager : MonoBehaviour
     public static event Action<UnitManager> OnUnitMovementExecuted;
     // Confirmou a propria celula (MANTER POSICAO ou confirmar sem mover).
     public static event Action<UnitManager> OnUnitHeldPosition;
+    // Jogador abriu o comando de ataque ("Mirar") — nao dispara para o automata.
+    public static event Action<UnitManager> OnUnitAimOpened;
     public static event Action<UnitManager> OnUnitSelected;
     public static event Action<UnitManager, UnitManager> OnUnitEmbarked;
     public static event Action<UnitManager, UnitManager> OnUnitDisembarked;
@@ -105,6 +107,8 @@ public partial class TurnStateManager : MonoBehaviour
 
     [Header("State")]
     [SerializeField] private UnitManager selectedUnit;
+    private bool pendingHeldPositionCompletion;
+    private bool suppressNextNeutralConfirm;
     [SerializeField] [Range(0.05f, 1f)] private float movementRangeAlpha = 0.6f;
     [SerializeField] [Range(0.05f, 1f)] private float lineOfFireAlpha = 0.45f;
     [Header("Turn Transition")]
@@ -475,16 +479,21 @@ public partial class TurnStateManager : MonoBehaviour
         return IsInspectingState(CurrentCursorState);
     }
 
-    public bool TryFinalizeSelectedUnitActionFromDebug()
+    public bool TryFinalizeSelectedUnitActionFromDebug(bool completeHeldPosition = false)
     {
         if (selectedUnit == null)
             return false;
 
+        UnitManager finalizedUnit = selectedUnit;
+        bool completedHeldPosition = completeHeldPosition && pendingHeldPositionCompletion;
+        pendingHeldPositionCompletion = false;
         string finalizedUnitId = selectedUnit.InstanceId.ToString();
         CommitPreparedFuelCost();
         selectedUnit.MarkAsActed();
         ClearSelectionAndReturnToNeutral(keepPreparedFuelCost: true);
         replayManager?.PromoteCurrentBuffer($"UnitAction: {finalizedUnitId}");
+        if (completedHeldPosition)
+            OnUnitHeldPosition?.Invoke(finalizedUnit);
         return true;
     }
 

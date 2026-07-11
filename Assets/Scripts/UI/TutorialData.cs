@@ -29,7 +29,8 @@ public enum TutorialScoldKind
     Surrender = 3,
     StatusSummary = 4,
     MovementLocked = 5,
-    HoldPosition = 6
+    HoldPosition = 6,
+    AttackOrdered = 7
 }
 
 public enum TutorialEndTurnEffect
@@ -51,7 +52,9 @@ public enum TutorialAdvanceCondition
     [InspectorName("Player Turn Started")]
     PlayerTurnStarted = 3,
     [InspectorName("Enemy Turn Started")]
-    EnemyTurnStarted = 4
+    EnemyTurnStarted = 4,
+    [InspectorName("Aim Opened (Mirar)")]
+    AimOpened = 5
 }
 
 // Estado persistente do movimento do jogador definido pelo roteiro.
@@ -66,7 +69,9 @@ public enum TutorialMovementEffect
     [InspectorName("Hold Only (manter/atacar sim, sair nao)")]
     HoldOnly = 2,
     [InspectorName("Unlocked")]
-    Unlocked = 3
+    Unlocked = 3,
+    [InspectorName("Attack Only (mirar sim, finalizar parado nao)")]
+    AttackOnly = 4
 }
 
 [System.Serializable]
@@ -237,6 +242,9 @@ public class TutorialData : ScriptableObject
     [Tooltip("Bronca ao tentar SAIR da celula sob ordem de segurar posicao (movement=Hold Only). Manter posicao/atacar parado continua livre.")]
     public TutorialScoldEntry scoldHoldPosition = new TutorialScoldEntry();
 
+    [Tooltip("Bronca ao tentar finalizar parado ('apenas mover'/M) sob ordem de ataque (movement=Attack Only). O caminho liberado e Mirar.")]
+    public TutorialScoldEntry scoldAttackOrder = new TutorialScoldEntry();
+
     public TutorialScoldEntry GetScold(TutorialScoldKind kind)
     {
         switch (kind)
@@ -248,6 +256,7 @@ public class TutorialData : ScriptableObject
             case TutorialScoldKind.StatusSummary: return scoldStatusSummary;
             case TutorialScoldKind.MovementLocked: return scoldMovementLocked;
             case TutorialScoldKind.HoldPosition: return scoldHoldPosition;
+            case TutorialScoldKind.AttackOrdered: return scoldAttackOrder;
             default: return null;
         }
     }

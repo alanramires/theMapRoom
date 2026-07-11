@@ -1526,45 +1526,28 @@ public class MatchController : MonoBehaviour
     {
         if (hasVictoryWinner) return;
 
+        TeamId winnerTeam = GetTeamIdForSlot(0);
         hasVictoryWinner = true;
-        victoryWinnerTeam = (TeamId)activeTeamId;
-        
+        victoryWinnerTeam = winnerTeam;
+
+        Debug.Log($"[Victory] Tutorial concluido: vitoria do {TeamUtils.GetName(winnerTeam)}.");
+
         // Parar musica permanentemente
         if (matchMusicAudioManager != null)
-        {
-            matchMusicAudioManager.StopPlaybackPermanently(); 
-        }
-        
+            matchMusicAudioManager.StopPlaybackPermanently();
+
         // Tocar victory SFX
         CursorController cursor = FindAnyObjectByType<CursorController>();
         if (cursor != null)
-        {
             cursor.PlayVictorySfx();
-        }
 
-        // Mostrar Dialogo de Vitoria (FIXO e IMUTÝVEL)
-        string fallback = (tutorial != null && tutorial.victoryDialog != null && !string.IsNullOrWhiteSpace(tutorial.victoryDialog.message)) 
-            ? tutorial.victoryDialog.message 
-            : "TUTORIAL CONCLUÝDO! VITÓRIA!";
-
-        string victoryMsg = PanelDialogController.ResolveDialogMessage("panel_dialog.victory", fallback);
-        PanelDialogController.TrySetExternalText(victoryMsg);
-
-        // Solução simples e robusta: busca o painel mesmo que esteja desativado na cena
-        foreach (GameObject go in Resources.FindObjectsOfTypeAll<GameObject>())
-        {
-            if (go.name == "Panel_endGame" && go.scene.name != null)
-            {
-                go.SetActive(true);
-                // Tenta trocar o texto
-                var textComponent = go.GetComponentInChildren<TMPro.TextMeshProUGUI>(true);
-                if (textComponent != null && textComponent.name == "text_endgame")
-                {
-                    textComponent.text = "VITÓRIA!";
-                }
-                break;
-            }
-        }
+        // Mesmo Panel_vitoria da partida normal, com motivo do tutorial
+        // (customizavel pelo victoryDialog.message do TutorialData).
+        string motivo = (tutorial != null && tutorial.victoryDialog != null && !string.IsNullOrWhiteSpace(tutorial.victoryDialog.message))
+            ? tutorial.victoryDialog.message
+            : "TREINAMENTO CONCLUÍDO";
+        string descricao = $"TIME {ColorizeTeamName(winnerTeam)} — {motivo}";
+        ShowVictoryPanel("VITÓRIA!", TeamUtils.GetColor(winnerTeam), descricao);
     }
 
     private void DeclareDefeat()
@@ -2080,6 +2063,13 @@ public class MatchController : MonoBehaviour
             ? (defeatedTeam != TeamId.Neutral ? TeamUtils.GetColor(defeatedTeam) : new Color(0.85f, 0.25f, 0.25f))
             : winnerColor;
 
+        ShowVictoryPanel(titulo, tituloColor, descricao);
+    }
+
+    // Ativa o Panel_vitoria da cena (mesmo desativado) e preenche titulo/descricao.
+    // Ponto unico usado pela vitoria de partida e pela vitoria de tutorial.
+    private void ShowVictoryPanel(string titulo, Color tituloColor, string descricao)
+    {
         foreach (GameObject go in Resources.FindObjectsOfTypeAll<GameObject>())
         {
             if (go.name == "Panel_vitoria" && go.scene.IsValid())
@@ -2098,9 +2088,11 @@ public class MatchController : MonoBehaviour
                         t.color = tituloColor;
                     }
                 }
-                break;
+                return;
             }
         }
+
+        Debug.LogWarning("[Victory] Panel_vitoria nao encontrado na cena — a vitoria foi declarada sem painel visual.");
     }
 
     // Nome do time em maiusculas, pintado com a cor do time via rich text do TMP.

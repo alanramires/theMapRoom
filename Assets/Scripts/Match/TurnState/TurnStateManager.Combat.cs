@@ -491,7 +491,7 @@ public partial class TurnStateManager
     private static bool TryGetConstructionDpq(ConstructionManager construction, out DPQData dpq)
     {
         dpq = null;
-        if (construction == null)
+        if (construction == null || construction.IsForwardObserverSpot)
             return false;
 
         ConstructionDatabase db = construction.ConstructionDatabase;
