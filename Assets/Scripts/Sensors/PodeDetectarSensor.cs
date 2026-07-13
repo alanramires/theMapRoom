@@ -438,6 +438,11 @@ public static class PodeDetectarSensor
         observer.TryGetUnitData(out observerData);
         Domain observerDomain = observer.GetDomain();
         HeightLevel observerHeight = observer.GetHeightLevel();
+        if (forceVirtualTargetLayer && observerData != null &&
+            observerData.ResolveVisionFor(forcedVirtualTargetDomain, forcedVirtualTargetHeight) <= 0)
+        {
+            return;
+        }
         int observerLayerRangeFloor = preserveObserverLayerRangeForHexVisibility
             ? ResolveDetectionRange(observer, observerData, null, observerDomain, observerHeight)
             : 0;
@@ -1283,7 +1288,7 @@ public static class PodeDetectarSensor
     {
         if (observerData != null)
         {
-            return Mathf.Max(1, observerData.ResolveVisionFor(targetDomain, targetHeight));
+            return Mathf.Max(0, observerData.ResolveVisionFor(targetDomain, targetHeight));
         }
         if (observer != null)
             return Mathf.Max(1, observer.Visao);
@@ -1441,7 +1446,7 @@ public static class PodeDetectarSensor
     private static int GetObservationRangeHexes(UnitManager unit, UnitManager target)
     {
         if (target != null && unit != null && unit.TryGetUnitData(out UnitData data) && data != null)
-            return Mathf.Max(1, data.ResolveVisionFor(target.GetDomain(), target.GetHeightLevel()));
+            return Mathf.Max(0, data.ResolveVisionFor(target.GetDomain(), target.GetHeightLevel()));
         if (unit != null)
             return Mathf.Max(1, unit.Visao);
 
@@ -1451,7 +1456,7 @@ public static class PodeDetectarSensor
     private static int GetObservationRangeHexes(UnitManager unit)
     {
         if (unit != null && unit.TryGetUnitData(out UnitData data) && data != null)
-            return Mathf.Max(1, data.ResolveVisionFor(unit.GetDomain(), unit.GetHeightLevel()));
+            return Mathf.Max(0, data.ResolveVisionFor(unit.GetDomain(), unit.GetHeightLevel()));
         if (unit != null)
             return Mathf.Max(1, unit.Visao);
 

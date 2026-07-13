@@ -2,6 +2,12 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Mandatory transactional-action invariant
+
+**Nothing in the game is definitive until the player commits the action.** Every board action starts in `CursorState.Neutral` and ends in `CursorState.Neutral`. Intermediate movement, animation, menus and sensor states are provisional and cancelable. They must not permanently refresh FOW, reveal units/terrain, update detection or AI intelligence, consume resources, mutate confirmed occupancy/revisions, or mark a unit as acted. After explicit commitment, return to `Neutral` and only then recalculate the confirmed board.
+
+Read `docs/arquitetura/acoes_transacionais.md` before changing TurnState, movement, FOW, sensors, combat, capture, transport, supply, merge, replay or AI action execution.
+
 ## Build & Run
 
 This is a Unity project — there is no CLI build. Open in Unity Editor (Windows) and use Play mode to test. Scripts auto-compile when files are saved. Check the Unity Console for compilation errors and runtime logs.

@@ -116,10 +116,6 @@ public partial class TurnStateManager
     private void HandleMovementAnimationCompleted(CursorState onCompleteState)
     {
         LogStateStep($"HandleMovementAnimationCompleted(target={onCompleteState})", rollback: onCompleteState == CursorState.UnitSelected);
-        // O movimento altera a origem de todas as visoes da unidade. No modo ALL o overlay
-        // precisa ser reconstruido aqui tambem; trocar de camada nao pode ser necessario
-        // para corrigir uma apresentacao que ficou presa na posicao anterior.
-        matchController?.RefreshFogOfWarForActiveTeam();
         if (selectedUnit != null)
         {
             if (onCompleteState == CursorState.UnitSelected)

@@ -3854,6 +3854,10 @@ public partial class TurnStateManager
         if (!attacker.TrySetCurrentLayerMode(revealDomain, revealHeight))
             return;
 
+        // Mesmo som de movimento da unidade (por MovementCategory), tocado ao
+        // emergir para reforcar que ela mudou de camada, nao so de sprite.
+        cursorController?.PlayUnitMovementSfx(attacker.GetMovementCategory());
+
         // Iguala a janela de exposicao da emersao voluntaria (atacar) a da
         // emersao forcada por dano (Layer Force After Hit): sem o lock, o
         // submarino mergulhava de volta no proprio proximo movimento (so 1

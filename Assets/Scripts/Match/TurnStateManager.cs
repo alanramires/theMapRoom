@@ -299,6 +299,7 @@ public partial class TurnStateManager : MonoBehaviour
         HandleStateStackReset(previous, reason);
         ValidateStateStack(reason);
         RefreshFsmDebugText();
+        matchController?.NotifyTurnStateReturnedToNeutral();
     }
 
     private void EnsureStateStackInitialized()

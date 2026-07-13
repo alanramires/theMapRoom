@@ -244,6 +244,8 @@ public class MatchController : MonoBehaviour
     [System.NonSerialized] private int fogCachedTeamId = int.MinValue;
     [System.NonSerialized] private bool fogOverlayInitialized;
     [System.NonSerialized] private bool initialStealthDetectionBootstrapped;
+    [System.NonSerialized] private bool pendingCommittedBoardRefresh;
+    [System.NonSerialized] private UnitManager pendingCommittedActedUnit;
     [System.NonSerialized] private bool debugFogOfWarEnabled = true;
     [System.NonSerialized] private bool debugFogOfWarPartial;
     [System.NonSerialized] private int fogPresentationGameplayTeamId = int.MinValue;
@@ -3199,6 +3201,15 @@ public class MatchController : MonoBehaviour
         if ((int)unit.TeamId != activeTeamId)
             return;
 
+        // HasActed confirma a acao, mas o snapshot definitivo so pode ser publicado
+        // depois que a maquina de estados voltar a Neutral.
+        if (turnStateManager != null && turnStateManager.CurrentCursorState != TurnStateManager.CursorState.Neutral)
+        {
+            pendingCommittedBoardRefresh = true;
+            pendingCommittedActedUnit = unit;
+            return;
+        }
+
         if (fogOfWarTilemap == null)
             TryAutoAssignFogOfWarReferences();
         if (fogOfWarTilemap == null)
@@ -3218,6 +3229,10 @@ public class MatchController : MonoBehaviour
         }
 
         UpdateFogVisibilityForUnit(unit, boardMap, out _, out _, out _);
+        // MarkAsActed e o ponto de compromisso da acao. A uniao especializada do modo ALL
+        // so pode revelar o novo ponto de observacao agora, nunca ao fim do movimento provisório.
+        if (fogOfWarVisionMode == FogOfWarVisionMode.All)
+            RenderFogOverlayFromRuntimeCache(boardMap);
         RefreshRuntimeUnitFogVisibility();
         AIIntelLedger.RecordVisibleContactsForTeam(ActiveTeam, currentTurn, this);
         TryPlaySkillDetectionSfxForActedUnit(unit, boardMap);
@@ -4816,6 +4831,24 @@ public class MatchController : MonoBehaviour
         if (fogOfWarVisionMode != FogOfWarVisionMode.All)
             RenderFogOverlayFromRuntimeCache(boardMap);
         OnFogOfWarUpdated?.Invoke();
+    }
+
+    public void NotifyTurnStateReturnedToNeutral()
+    {
+        if (!pendingCommittedBoardRefresh)
+            return;
+
+        UnitManager actedUnit = pendingCommittedActedUnit;
+        pendingCommittedBoardRefresh = false;
+        pendingCommittedActedUnit = null;
+
+        RefreshFogOfWarForActiveTeam(FogOfWarRefreshMode.FullVisual);
+        Tilemap boardMap = ResolveFogBoardTilemap();
+        if (actedUnit != null && boardMap != null)
+        {
+            TryPlaySkillDetectionSfxForActedUnit(actedUnit, boardMap);
+            TryRefreshDetectedPersistenceForActedUnit(actedUnit, boardMap);
+        }
     }
 
     private void RemoveFogSpecializedViewCacheForUnit(int unitIndex)
