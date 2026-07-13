@@ -80,6 +80,12 @@ public class MatchMusicAudioManager : MonoBehaviour
 
     private void Start()
     {
+        if (matchController != null && matchController.IsHotSeatGateActive)
+        {
+            if (audioSource != null) audioSource.Stop();
+            return;
+        }
+
         if (TryPlayGameOpenTrackForMenuScene())
             return;
 
@@ -98,6 +104,11 @@ public class MatchMusicAudioManager : MonoBehaviour
     private void Update()
     {
         HandleToggleShortcut();
+        if (matchController != null && matchController.IsHotSeatGateActive)
+        {
+            if (audioSource != null && audioSource.isPlaying) audioSource.Stop();
+            return;
+        }
         if (isPausedByUser || suppressPlaybackForTurnTransition)
             return;
 

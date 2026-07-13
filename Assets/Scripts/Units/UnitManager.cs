@@ -82,6 +82,13 @@ public class UnitManager : MonoBehaviour
     [SerializeField] private bool isSelected;
     [SerializeField, HideInInspector] private bool isPreviewDimmed;
     [SerializeField, HideInInspector] private bool hasTemporarySortingOverride;
+    [System.NonSerialized] private bool temporaryFogTraversalVisual;
+    [System.NonSerialized] private int temporaryFogSpriteLayerId;
+    [System.NonSerialized] private int temporaryFogSpriteOrder;
+    [System.NonSerialized] private bool temporaryFogWasHidden;
+    [System.NonSerialized] private Canvas[] temporaryFogHudCanvases;
+    [System.NonSerialized] private int[] temporaryFogHudLayerIds;
+    [System.NonSerialized] private int[] temporaryFogHudOrders;
     [SerializeField, HideInInspector] private bool hiddenByFogOfWar;
     [SerializeField, HideInInspector] private int cachedSpriteSortingOrder;
     [SerializeField, HideInInspector] private int cachedActedLockSortingOrder;
@@ -820,6 +827,63 @@ public class UnitManager : MonoBehaviour
         hasTemporarySortingOverride = false;
     }
 
+    public void BeginTemporaryFogTraversalVisual()
+    {
+        if (temporaryFogTraversalVisual) return;
+        if (spriteRenderer == null) spriteRenderer = GetComponentInChildren<SpriteRenderer>();
+        if (spriteRenderer == null) return;
+
+        temporaryFogTraversalVisual = true;
+        temporaryFogSpriteLayerId = spriteRenderer.sortingLayerID;
+        temporaryFogSpriteOrder = spriteRenderer.sortingOrder;
+        temporaryFogWasHidden = hiddenByFogOfWar;
+        int fogLayerId = SortingLayer.NameToID("FogOfWar");
+        spriteRenderer.sortingLayerID = fogLayerId;
+        spriteRenderer.sortingOrder = 90;
+
+        temporaryFogHudCanvases = GetComponentsInChildren<Canvas>(true);
+        temporaryFogHudLayerIds = new int[temporaryFogHudCanvases.Length];
+        temporaryFogHudOrders = new int[temporaryFogHudCanvases.Length];
+        for (int i = 0; i < temporaryFogHudCanvases.Length; i++)
+        {
+            Canvas canvas = temporaryFogHudCanvases[i];
+            temporaryFogHudLayerIds[i] = canvas.sortingLayerID;
+            temporaryFogHudOrders[i] = canvas.sortingOrder;
+            canvas.overrideSorting = true;
+            canvas.sortingLayerID = fogLayerId;
+            canvas.sortingOrder = 91 + i;
+        }
+
+        hiddenByFogOfWar = false;
+        ApplyFogOfWarVisibility();
+    }
+
+    public void EndTemporaryFogTraversalVisual()
+    {
+        if (!temporaryFogTraversalVisual) return;
+        if (spriteRenderer != null)
+        {
+            spriteRenderer.sortingLayerID = temporaryFogSpriteLayerId;
+            spriteRenderer.sortingOrder = temporaryFogSpriteOrder;
+        }
+        if (temporaryFogHudCanvases != null)
+        {
+            for (int i = 0; i < temporaryFogHudCanvases.Length; i++)
+            {
+                Canvas canvas = temporaryFogHudCanvases[i];
+                if (canvas == null) continue;
+                canvas.sortingLayerID = temporaryFogHudLayerIds[i];
+                canvas.sortingOrder = temporaryFogHudOrders[i];
+            }
+        }
+        temporaryFogTraversalVisual = false;
+        hiddenByFogOfWar = temporaryFogWasHidden;
+        ApplyFogOfWarVisibility();
+        temporaryFogHudCanvases = null;
+        temporaryFogHudLayerIds = null;
+        temporaryFogHudOrders = null;
+    }
+
     public void MarkAsActed()
     {
         if (hasActed)
@@ -1373,7 +1437,9 @@ public class UnitManager : MonoBehaviour
 
         if (data.unitClass == GameUnitClass.Helicopter)
             return AircraftType.Helicopter;
-        if (data.unitClass == GameUnitClass.Jet || data.unitClass == GameUnitClass.Plane)
+        // Classificacao estrutural: qualquer unidade que suporte Domain.Air e aeronave.
+        // Evita excluir hidroavioes e futuras unidades hibridas por depender de nome/classe.
+        if (data.IsAircraft())
             return AircraftType.FixedWing;
         return AircraftType.None;
     }

@@ -126,10 +126,6 @@ public class BasicMapGeneratorWindow : EditorWindow
     [SerializeField] [Range(0f, 1f)] private float zoneLandRatio = 0.5f;
     [SerializeField] private bool archipelagoSymmetricMode = true;
     [SerializeField] private bool autoMirrorDuringEdit;
-    [SerializeField] private int autoMirrorXMin = 0;
-    [SerializeField] private int autoMirrorXMax = 59;
-    [SerializeField] private int autoMirrorYMin = 0;
-    [SerializeField] private int autoMirrorYMax = 59;
     [SerializeField] private bool showMirrorAxisInScene = true;
     [SerializeField] private bool zonePreviewEnabled = true;
 
@@ -153,9 +149,9 @@ public class BasicMapGeneratorWindow : EditorWindow
     private void OnEnable()
     {
         autoMirrorDuringEdit = TilemapAutoMirrorDuringEdit.Enabled;
-        TilemapAutoMirrorDuringEdit.GetBounds(out autoMirrorXMin, out autoMirrorXMax, out autoMirrorYMin, out autoMirrorYMax);
         SceneView.duringSceneGui += OnSceneGUI;
         AutoDetectContext(force: false);
+        TilemapAutoMirrorDuringEdit.SetTarget(terrainTilemap);
     }
 
     private void OnDisable()
@@ -180,6 +176,7 @@ public class BasicMapGeneratorWindow : EditorWindow
             MessageType.Info);
 
         terrainTilemap = (Tilemap)EditorGUILayout.ObjectField("Terrain Tilemap", terrainTilemap, typeof(Tilemap), true);
+        TilemapAutoMirrorDuringEdit.SetTarget(terrainTilemap);
         terrainDatabase = (TerrainDatabase)EditorGUILayout.ObjectField("Terrain Database", terrainDatabase, typeof(TerrainDatabase), false);
         mode = (GeneratorMode)EditorGUILayout.EnumPopup("Modo", mode);
 
@@ -309,26 +306,9 @@ public class BasicMapGeneratorWindow : EditorWindow
             SceneView.RepaintAll();
         }
 
-        using (new EditorGUI.DisabledScope(!autoMirrorDuringEdit))
-        {
-            using (new EditorGUILayout.HorizontalScope())
-            {
-                autoMirrorXMin = EditorGUILayout.IntField("xMin", autoMirrorXMin);
-                autoMirrorXMax = EditorGUILayout.IntField("xMax", autoMirrorXMax);
-            }
-
-            using (new EditorGUILayout.HorizontalScope())
-            {
-                autoMirrorYMin = EditorGUILayout.IntField("yMin", autoMirrorYMin);
-                autoMirrorYMax = EditorGUILayout.IntField("yMax", autoMirrorYMax);
-            }
-
-            if (GUILayout.Button("Aplicar Bounds do Auto Mirror"))
-            {
-                TilemapAutoMirrorDuringEdit.SetBounds(autoMirrorXMin, autoMirrorXMax, autoMirrorYMin, autoMirrorYMax);
-                status = $"Auto Mirror bounds aplicados: x[{Mathf.Min(autoMirrorXMin, autoMirrorXMax)}..{Mathf.Max(autoMirrorXMin, autoMirrorXMax)}], y[{Mathf.Min(autoMirrorYMin, autoMirrorYMax)}..{Mathf.Max(autoMirrorYMin, autoMirrorYMax)}].";
-            }
-        }
+        EditorGUILayout.HelpBox(
+            $"Espelhamento hexagonal sem limites; a coluna compensada depende da paridade da linha. A linha y=0 nao e espelhada.\nTilemap monitorada: {(terrainTilemap != null ? terrainTilemap.name : "NENHUMA")}",
+            MessageType.Info);
 
         bool nextShowMirrorAxis = EditorGUILayout.ToggleLeft("Mostrar eixo do mirror no Scene", showMirrorAxisInScene);
         if (nextShowMirrorAxis != showMirrorAxisInScene)
@@ -1741,27 +1721,25 @@ public class BasicMapGeneratorWindow : EditorWindow
         if (!TilemapAutoMirrorDuringEdit.Enabled)
             return;
 
-        TilemapAutoMirrorDuringEdit.GetBounds(out int xMin, out int xMax, out int yMin, out int yMax);
-        if (xMin > xMax || yMin > yMax)
-            return;
-
-        int centerY = (yMin + yMax) / 2;
-        Vector3 leftWorld = terrainTilemap.GetCellCenterWorld(new Vector3Int(xMin, -centerY, 0));
-        Vector3 rightWorld = terrainTilemap.GetCellCenterWorld(new Vector3Int(xMax, -centerY, 0));
+        BoundsInt bounds = terrainTilemap.cellBounds;
+        int xMin = Mathf.Min(bounds.xMin, -1);
+        int xMax = Mathf.Max(bounds.xMax - 1, 0);
+        Vector3 leftWorld = terrainTilemap.GetCellCenterWorld(new Vector3Int(xMin, 0, 0));
+        Vector3 rightWorld = terrainTilemap.GetCellCenterWorld(new Vector3Int(xMax, 0, 0));
 
         Handles.zTest = UnityEngine.Rendering.CompareFunction.Always;
         Handles.color = new Color(1f, 0.2f, 0.2f, 0.95f);
         Handles.DrawAAPolyLine(3f, leftWorld, rightWorld);
         for (int x = xMin; x <= xMax; x++)
         {
-            Vector3 p = terrainTilemap.GetCellCenterWorld(new Vector3Int(x, -centerY, 0));
+            Vector3 p = terrainTilemap.GetCellCenterWorld(new Vector3Int(x, 0, 0));
             float radius = HandleUtility.GetHandleSize(p) * 0.06f;
             Handles.DrawSolidDisc(p, Vector3.forward, radius);
         }
 
         Vector3 labelPos = Vector3.Lerp(leftWorld, rightWorld, 0.5f) + new Vector3(0.15f, 0.15f, 0f);
         if (IsVisibleInSceneCamera(labelPos))
-            Handles.Label(labelPos, $"Mirror Line Y={centerY} | x[{xMin}..{xMax}] | espelha cima/baixo");
+            Handles.Label(labelPos, "Linha neutra y=0 | mirror hexagonal por paridade da linha");
     }
 
     private static bool IsVisibleInSceneCamera(Vector3 world)
@@ -1781,19 +1759,13 @@ public class BasicMapGeneratorWindow : EditorWindow
 public static class TilemapAutoMirrorDuringEdit
 {
     private const string EnabledKey = "MapGen.AutoMirror.Enabled";
-    private const string BoundsXMinKey = "MapGen.AutoMirror.BoundsXMin";
-    private const string BoundsXMaxKey = "MapGen.AutoMirror.BoundsXMax";
-    private const string BoundsYMinKey = "MapGen.AutoMirror.BoundsYMin";
-    private const string BoundsYMaxKey = "MapGen.AutoMirror.BoundsYMax";
-    private const int DefaultXMin = 0;
-    private const int DefaultXMax = 59;
-    private const int DefaultYMin = 0;
-    private const int DefaultYMax = 59;
 
     private static readonly Dictionary<Vector3Int, TileBase> Snapshot = new Dictionary<Vector3Int, TileBase>(4096);
 
     private static double lastScanTime;
     private static bool isApplyingMirror;
+    private static bool snapshotInitialized;
+    private static Tilemap explicitTarget;
 
     static TilemapAutoMirrorDuringEdit()
     {
@@ -1810,21 +1782,12 @@ public static class TilemapAutoMirrorDuringEdit
         }
     }
 
-    public static void SetBounds(int xMin, int xMax, int yMin, int yMax)
+    public static void SetTarget(Tilemap tilemap)
     {
-        EditorPrefs.SetInt(BoundsXMinKey, Mathf.Min(xMin, xMax));
-        EditorPrefs.SetInt(BoundsXMaxKey, Mathf.Max(xMin, xMax));
-        EditorPrefs.SetInt(BoundsYMinKey, Mathf.Min(yMin, yMax));
-        EditorPrefs.SetInt(BoundsYMaxKey, Mathf.Max(yMin, yMax));
+        if (explicitTarget == tilemap)
+            return;
+        explicitTarget = tilemap;
         ResetSnapshot();
-    }
-
-    public static void GetBounds(out int xMin, out int xMax, out int yMin, out int yMax)
-    {
-        xMin = EditorPrefs.GetInt(BoundsXMinKey, DefaultXMin);
-        xMax = EditorPrefs.GetInt(BoundsXMaxKey, DefaultXMax);
-        yMin = EditorPrefs.GetInt(BoundsYMinKey, DefaultYMin);
-        yMax = EditorPrefs.GetInt(BoundsYMaxKey, DefaultYMax);
     }
 
     private static void OnEditorUpdate()
@@ -1843,21 +1806,26 @@ public static class TilemapAutoMirrorDuringEdit
         if (tilemap == null)
             return;
 
-        GetBounds(out int xMin, out int xMax, out int yMin, out int yMax);
-        if (xMin > xMax || yMin > yMax)
-            return;
-
         List<Vector3Int> changed = new List<Vector3Int>(32);
-        for (int y = yMin; y <= yMax; y++)
+        HashSet<Vector3Int> cellsToScan = new HashSet<Vector3Int>(Snapshot.Keys);
+        foreach (Vector3Int cell in tilemap.cellBounds.allPositionsWithin)
         {
-            for (int x = xMin; x <= xMax; x++)
-            {
-                Vector3Int cell = new Vector3Int(x, -y, 0);
-                TileBase tile = tilemap.GetTile(cell);
-                if (!Snapshot.TryGetValue(cell, out TileBase previous) || previous != tile)
-                    changed.Add(cell);
-            }
+            if (cell.z == 0 && tilemap.HasTile(cell))
+                cellsToScan.Add(cell);
         }
+
+        if (!snapshotInitialized)
+        {
+            Snapshot.Clear();
+            foreach (Vector3Int cell in cellsToScan)
+                Snapshot[cell] = tilemap.GetTile(cell);
+            snapshotInitialized = true;
+            return;
+        }
+
+        foreach (Vector3Int cell in cellsToScan)
+            if (!Snapshot.TryGetValue(cell, out TileBase previous) || previous != tilemap.GetTile(cell))
+                changed.Add(cell);
 
         if (changed.Count == 0)
             return;
@@ -1872,7 +1840,7 @@ public static class TilemapAutoMirrorDuringEdit
             {
                 Vector3Int src = changed[i];
                 TileBase srcTile = tilemap.GetTile(src);
-                if (!TryResolveMirroredCell(tilemap, src, xMin, xMax, yMin, yMax, out Vector3Int dst))
+                if (!TryResolveMirroredCell(src, out Vector3Int dst))
                     continue;
                 if (dst == src)
                     continue;
@@ -1886,13 +1854,10 @@ public static class TilemapAutoMirrorDuringEdit
             }
 
             Snapshot.Clear();
-            for (int y = yMin; y <= yMax; y++)
+            foreach (Vector3Int cell in tilemap.cellBounds.allPositionsWithin)
             {
-                for (int x = xMin; x <= xMax; x++)
-                {
-                    Vector3Int cell = new Vector3Int(x, -y, 0);
+                if (cell.z == 0 && tilemap.HasTile(cell))
                     Snapshot[cell] = tilemap.GetTile(cell);
-                }
             }
 
             if (changedAnyTile)
@@ -1910,6 +1875,9 @@ public static class TilemapAutoMirrorDuringEdit
 
     private static Tilemap ResolveTilemap()
     {
+        if (explicitTarget != null)
+            return explicitTarget;
+
         TurnStateManager tsm = UnityEngine.Object.FindAnyObjectByType<TurnStateManager>();
         if (tsm != null)
         {
@@ -1950,39 +1918,17 @@ public static class TilemapAutoMirrorDuringEdit
     private static void ResetSnapshot()
     {
         Snapshot.Clear();
+        snapshotInitialized = false;
         lastScanTime = 0d;
     }
 
-    private static bool TryResolveMirroredCell(
-        Tilemap tilemap,
-        Vector3Int srcCell,
-        int xMin,
-        int xMax,
-        int yMin,
-        int yMax,
-        out Vector3Int dstCell)
+    private static bool TryResolveMirroredCell(Vector3Int srcCell, out Vector3Int dstCell)
     {
         dstCell = srcCell;
-        if (tilemap == null)
+        if (srcCell.y == 0)
             return false;
-
-        int srcMapY = -srcCell.y;
-        int centerMapY = (yMin + yMax) / 2;
-        if (srcMapY == centerMapY)
-            return false;
-
-        // Espelha acima/abaixo em torno da linha central horizontal.
-        Vector3 axisWorld = tilemap.GetCellCenterWorld(new Vector3Int(xMin, -centerMapY, 0));
-        Vector3 srcWorld = tilemap.GetCellCenterWorld(srcCell);
-        Vector3 mirroredWorld = new Vector3(srcWorld.x, (2f * axisWorld.y) - srcWorld.y, srcWorld.z);
-        Vector3Int candidate = tilemap.WorldToCell(mirroredWorld);
-        candidate.z = 0;
-
-        int candidateMapY = -candidate.y;
-        if (candidate.x < xMin || candidate.x > xMax || candidateMapY < yMin || candidateMapY > yMax)
-            return false;
-
-        dstCell = candidate;
+        int oddRowOffset = Mathf.Abs(srcCell.y) & 1;
+        dstCell = new Vector3Int(-srcCell.x - oddRowOffset, -srcCell.y, 0);
         return true;
     }
 }

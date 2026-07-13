@@ -262,6 +262,8 @@ do playtest interno, validar com uma pessoa novata antes de iniciar a Cena 2.
   - **`move`** (`slot1 SD move 7,-2 4,-2`): marcha scriptada pelo executor real de batches
     (`ReplayManager.ExecuteLiveAIBatch` direto — cena de tutorial não precisa de AIController).
     A rotina do automata espera o comando concluir; passar a vez fica travado durante a execução.
+    Só ataca após chegar com a opção explícita `attack` no fim do comando — o `preferAttack` do
+    AutomataData vale apenas para a rotina de turno (ex.: contra-ataque no passe opcional).
   - **`complete`** (`complete hist_1_08`): completa objetivo por key a partir do roteiro — é o fim
     de tutorial scriptado (tarefas sem evento de jogo, ex.: `ENDING`).
 - `HOLD_POSITION` valida na **finalização** da ação (fim da FSM), não na entrada do MoveuParado.

@@ -429,6 +429,7 @@ public static class PodeDetectarSensor
         if (observer == null || observer.IsEmbarked)
             return;
 
+
         Tilemap boardMap = map != null ? map : observer.BoardTilemap;
         if (boardMap == null)
             return;
@@ -572,7 +573,8 @@ public static class PodeDetectarSensor
 
                 bool effectiveLosValidation = ResolveEffectiveLosValidation(observerData, targetDomain, targetHeight, enableLosValidation);
                 bool bypassLosByPolicy = !effectiveLosValidation;
-                bool skipLosForCurrentTarget = useRangeOnlyForAirHighWhenConfigured &&
+                bool skipLosForCurrentTarget = observer.GetDomain() == Domain.Air &&
+                    useRangeOnlyForAirHighWhenConfigured &&
                     IsAirHighRangeOnlyVision(dpqAirHeightConfig, targetDomain, targetHeight);
                 bool hasDirectLos = skipLosForCurrentTarget || HasValidStraightObservationLine(
                     boardMap,
@@ -680,6 +682,7 @@ public static class PodeDetectarSensor
         if (observerData == null || observerData.visionSpecializations == null || observerData.visionSpecializations.Count <= 0)
             return false;
 
+
         HashSet<int> seen = new HashSet<int>();
         for (int i = 0; i < observerData.visionSpecializations.Count; i++)
         {
@@ -747,7 +750,8 @@ public static class PodeDetectarSensor
 
         bool effectiveLosValidation = ResolveEffectiveLosValidation(observerData, targetDomain, targetHeight, enableLosValidation);
         bool bypassLosByPolicy = !effectiveLosValidation;
-        bool skipLosForCurrentTarget = useRangeOnlyForAirHighWhenConfigured &&
+        bool skipLosForCurrentTarget = observer != null && observer.GetDomain() == Domain.Air &&
+            useRangeOnlyForAirHighWhenConfigured &&
             IsAirHighRangeOnlyVision(dpqAirHeightConfig, targetDomain, targetHeight);
         bool hasDirectLos = skipLosForCurrentTarget ||
             TryGetDirectLosCachedForRefresh(
@@ -920,7 +924,8 @@ public static class PodeDetectarSensor
                 Vector3Int blockedCell = Vector3Int.zero;
                 bool effectiveLosValidation = ResolveEffectiveLosValidation(observerData, targetDomain, targetHeight, enableLosValidation);
                 bool bypassLosByPolicy = !effectiveLosValidation;
-                bool skipLosForCurrentTarget = IsAirHighRangeOnlyVision(dpqAirHeightConfig, targetDomain, targetHeight);
+                bool skipLosForCurrentTarget = observer.GetDomain() == Domain.Air &&
+                    IsAirHighRangeOnlyVision(dpqAirHeightConfig, targetDomain, targetHeight);
                 bool hasDirectLos = skipLosForCurrentTarget || HasValidStraightObservationLine(
                     boardMap,
                     terrainDatabase,
@@ -1277,7 +1282,9 @@ public static class PodeDetectarSensor
         HeightLevel targetHeight)
     {
         if (observerData != null)
+        {
             return Mathf.Max(1, observerData.ResolveVisionFor(targetDomain, targetHeight));
+        }
         if (observer != null)
             return Mathf.Max(1, observer.Visao);
 
@@ -1697,7 +1704,8 @@ public static class PodeDetectarSensor
 
         bool effectiveLosValidation = ResolveEffectiveLosValidation(observerData, targetDomain, targetHeight, enableLosValidation);
         bool bypassLosByPolicy = !effectiveLosValidation;
-        bool skipLosForCurrentTarget = IsAirHighRangeOnlyVision(dpqAirHeightConfig, targetDomain, targetHeight);
+        bool skipLosForCurrentTarget = observer.GetDomain() == Domain.Air &&
+            IsAirHighRangeOnlyVision(dpqAirHeightConfig, targetDomain, targetHeight);
         bool hasDirectLos = skipLosForCurrentTarget || HasValidStraightObservationLine(
             boardMap,
             terrainDatabase,

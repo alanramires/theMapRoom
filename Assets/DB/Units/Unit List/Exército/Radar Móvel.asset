@@ -44,7 +44,7 @@ MonoBehaviour:
   - domain: 3
     allHeights: 0
     heightLevel: 4
-    vision: 5
+    vision: 4
     detectUnitsWithFollowingSkills: []
     losPolicy: 0
   movementCategory: 6
@@ -54,6 +54,7 @@ MonoBehaviour:
   roles: 06000000
   aiInitiative: 0
   aiPurchaseMode: 0
+  bannedOnHardMode: 0
   aiTargetPreferenceByClass: []
   aiSensorPriority: 02000000
   prioritizeDpqAtBattle: 0
@@ -95,6 +96,9 @@ MonoBehaviour:
   preferredAirHeight: 4
   useExplicitPreferredNavalHeight: 0
   preferredNavalHeight: 2
+  emergesToAttack: 0
+  emergeAfterAttackDomain: 1
+  emergeAfterAttackHeight: 3
   skills:
   - {fileID: 11400000, guid: ef10c9e820afc074b99ea8e0b709c2f4, type: 2}
   stealthSkills: []

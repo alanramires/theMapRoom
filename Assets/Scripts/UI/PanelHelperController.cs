@@ -386,6 +386,7 @@ public class PanelHelperController : MonoBehaviour
         RefreshDockByCursorProximity();
     }
 
+
     private void BuildHelperText(TurnStateManager.HelperPanelData data, out string title, out string body)
     {
         title = string.Empty;
@@ -2612,10 +2613,11 @@ public class PanelHelperController : MonoBehaviour
         bool battleExitActive = battleMapMenuController != null && battleMapMenuController.IsExitConfirmationOpen;
         bool battleSurrenderActive = battleMapMenuController != null && battleMapMenuController.IsSurrenderConfirmationOpen;
         bool battleEndTurnActive = battleMapMenuController != null && battleMapMenuController.IsEndTurnConfirmationOpen;
+        bool battleLayerActive = battleMapMenuController != null && battleMapMenuController.IsLayerSelectionOpen;
         bool savePromptActive = saveGameManager != null &&
                                 (saveGameManager.IsPersistenceSlotSelectionActive ||
                                  saveGameManager.IsPersistenceOverwriteConfirmationActive);
-        bool active = panelVisible && (menuDeleteActive || menuQuitActive || newGameWizardActive || tutorialColorActive || battleExitActive || battleSurrenderActive || battleEndTurnActive || savePromptActive);
+        bool active = panelVisible && (menuDeleteActive || menuQuitActive || newGameWizardActive || tutorialColorActive || battleExitActive || battleSurrenderActive || battleEndTurnActive || battleLayerActive || savePromptActive);
         if (!active)
         {
             if (persistenceActionsRoot != null)
@@ -2632,13 +2634,14 @@ public class PanelHelperController : MonoBehaviour
             battleExitActive ? "battle_exit" :
             battleSurrenderActive ? "battle_surrender" :
             battleEndTurnActive ? "battle_end_turn" :
+            battleLayerActive ? "battle_layer" :
             saveGameManager.IsPersistenceOverwriteConfirmationActive
             ? "overwrite"
             : string.Join("|", saveGameManager.GetPersistenceSlotButtonLabel(1),
                 saveGameManager.GetPersistenceSlotButtonLabel(2), saveGameManager.GetPersistenceSlotButtonLabel(3));
         if (signature != persistenceActionsSignature)
         {
-            RebuildPersistenceActionButtons(menuDeleteActive, menuQuitActive, newGameWizardActive, tutorialColorActive, battleExitActive, battleSurrenderActive, battleEndTurnActive);
+            RebuildPersistenceActionButtons(menuDeleteActive, menuQuitActive, newGameWizardActive, tutorialColorActive, battleExitActive, battleSurrenderActive, battleEndTurnActive, battleLayerActive);
             persistenceActionsSignature = signature;
         }
 
@@ -2676,7 +2679,7 @@ public class PanelHelperController : MonoBehaviour
         persistenceActionsRoot.SetActive(false);
     }
 
-    private void RebuildPersistenceActionButtons(bool menuDeleteActive, bool menuQuitActive, bool newGameWizardActive, bool tutorialColorActive, bool battleExitActive, bool battleSurrenderActive, bool battleEndTurnActive)
+    private void RebuildPersistenceActionButtons(bool menuDeleteActive, bool menuQuitActive, bool newGameWizardActive, bool tutorialColorActive, bool battleExitActive, bool battleSurrenderActive, bool battleEndTurnActive, bool battleLayerActive)
     {
         // Destroi todos os filhos (botoes, spacers de rodape e detalhes de confirmacao) de uma vez.
         RectTransform persistenceRootRect = persistenceActionsRoot.GetComponent<RectTransform>();
@@ -2749,6 +2752,18 @@ public class PanelHelperController : MonoBehaviour
             CreatePersistenceButton("PASSAR A VEZ", () => battleMapMenuController?.InvokeEndTurnConfirmationOption(0));
             CreatePersistenceButton("CANCELAR", () => battleMapMenuController?.InvokeEndTurnConfirmationOption(1));
         }
+        else if (battleLayerActive)
+        {
+            int count = battleMapMenuController.GetLayerSelectionOptionCount();
+            for (int i = 0; i < count; i++)
+            {
+                if (i == count - 1)
+                    CreatePersistenceFooterSpacer(PersistenceFooterGap);
+                int selected = i;
+                CreatePersistenceButton(battleMapMenuController.GetLayerSelectionOptionLabel(i),
+                    () => battleMapMenuController?.InvokeLayerSelectionOption(selected));
+            }
+        }
         else if (saveGameManager.IsPersistenceOverwriteConfirmationActive)
         {
             CreatePersistenceButton("CONFIRMAR SOBRESCRITA", () => saveGameManager.TryConfirmPersistenceOverwriteFromPointer());
@@ -2814,7 +2829,9 @@ public class PanelHelperController : MonoBehaviour
                             ? battleMapMenuController.SurrenderConfirmationFocusIndex
                             : (battleMapMenuController != null && battleMapMenuController.IsEndTurnConfirmationOpen
                                 ? battleMapMenuController.EndTurnConfirmationFocusIndex
-                                : (saveGameManager != null ? saveGameManager.PersistencePromptFocusIndex : -1)))))));
+                                : (battleMapMenuController != null && battleMapMenuController.IsLayerSelectionOpen
+                                    ? battleMapMenuController.LayerSelectionFocusIndex
+                                : (saveGameManager != null ? saveGameManager.PersistencePromptFocusIndex : -1))))))));
         for (int i = 0; i < persistenceActionButtons.Count; i++)
         {
             Image image = i < persistenceActionImages.Count ? persistenceActionImages[i] : null;

@@ -104,7 +104,7 @@ MonoBehaviour:
     waitAllUnitsActed: 0
     waitPlayerTurnStart: 0
     text: "Bem-vindo, recruta. J\xE1 encheu o bucho com a comida da caserna e tomou
-      o ch\xE1 brochante do tonel de \xF3leo diesel?"
+      o caf\xE9 que parece \xF3leo diesel?"
     voice: {fileID: 0}
     spawnCommand: 
     statCommand: 
@@ -158,7 +158,7 @@ MonoBehaviour:
     text: "Antes de puxar o gatilho, primeiro \xE9 preciso conhecer a si mesmo.\n\nMeu
       Velho falava algo nessa linha, mas ele provavelmente n\xE3o precisava lidar
       com recruta sonolento.\n\nOlhe bem para voc\xEA e seus companheiros.\n\n[ordem]Aproxime
-      o zoom usando a bolinha do mouse ou o toque do celular.[/ordem]"
+      a c\xE2mera com a roda do mouse ou fazendo o gesto de pin\xE7a na tela.[/ordem]"
     voice: {fileID: 0}
     spawnCommand: 
     statCommand: 
@@ -174,12 +174,11 @@ MonoBehaviour:
     waitObjectiveIndex: -1
     waitAllUnitsActed: 0
     waitPlayerTurnStart: 0
-    text: "Essa informa\xE7\xE3o junto da unidade \xE9 persistente. Ela mostra os
-      dados importantes do combatente.\n\nEst\xE1 vendo o [vermelho]cora\xE7\xE3o[/vermelho]
-      acima de sua unidade? Ele indica sua capacidade de luta.\n\nQuando est\xE1
-      cheio, o esquadr\xE3o combate com for\xE7a total.\nQuando esvazia, sua for\xE7a
-      de tiro cai junto.\n[ordem]Arraste a tela com o bot\xE3o direito do mouse ou
-      com o toque.[/ordem]"
+    text: "Est\xE1 vendo o [vermelho]cora\xE7\xE3o[/vermelho] acima de sua unidade?
+      Ele indica sua capacidade de luta. Quando est\xE1 cheio, o esquadr\xE3o combate
+      com for\xE7a total. Quando esvazia, sua for\xE7a de tiro cai junto.\n\nMenos
+      soldados atirando, menos chumbo indo para o outro lado.\n\n[ordem]Arraste o
+      mapa com o bot\xE3o direito do mouse ou com um dedo na tela.[/ordem]"
     voice: {fileID: 0}
     spawnCommand: 
     statCommand: 
@@ -340,13 +339,10 @@ MonoBehaviour:
     waitObjectiveIndex: -1
     waitAllUnitsActed: 0
     waitPlayerTurnStart: 0
-    text: "Essa \xE9 a ficha completa do combatente: arma, alcance, capacidade de
-      marcha. Tudo o que ele \xE9 est\xE1 a\xED.\n\nNote que o soldado move 3 e o
-      rifle tem alcance 1 - por isso o s\xEDmbolo de mira na quarta casa: \xE9 o
-      alcance m\xE1ximo de onde ele pode mover e combater em uma rodada. Mas voc\xEA
-      pode atacar qualquer estando parado tambem.\n\nBem \xFAtil pra saber onde se
-      posicionar com seguran\xE7a em rela\xE7\xE3o ao inimigo que voc\xEA est\xE1
-      ca\xE7ando."
+    text: "Essa \xE9 a ficha completa do combatente: condi\xE7\xE3o, movimento, autonomia
+      e armas.\n\nRyan pode mover 3 casas. O rifle alcan\xE7a 1 casa al\xE9m da posi\xE7\xE3o
+      onde ele terminar o movimento. Por isso a mira chega at\xE9 a quarta casa:
+      tr\xEAs de movimento e uma de alcance."
     voice: {fileID: 0}
     spawnCommand: 
     statCommand: 
@@ -364,9 +360,9 @@ MonoBehaviour:
     waitPlayerTurnStart: 0
     text: "Inspecione novamente com um [enfase]segundo clique na mesma unidade[/enfase]
       para ver como atira se ficar parado. \xC9 sempre \xFAtil saber o alcance das
-      armas de seus aliados e inimigos.\n\nE repare: esses dois j\xE1 agiram neste
-      turno, mas a ficha continua aberta para leitura durante algum tempo ou at\xE9
-      voc\xEA clicar fora.\n\nInforma\xE7\xE3o n\xE3o tira folga, recruta."
+      armas de seus aliados e inimigos.\n\nSe voc\xEA n\xE3o mover, tamb\xE9m pode
+      atacar qualquer inimigo que j\xE1 esteja dentro do alcance. Use essa \xE1rea
+      para descobrir onde o inimigo pode chegar \u2014 e onde voc\xEA estar\xE1 seguro."
     voice: {fileID: 0}
     spawnCommand: 
     statCommand: 
@@ -405,7 +401,7 @@ MonoBehaviour:
       indicando que foi selecionado."
     voice: {fileID: 0}
     spawnCommand: 
-    statCommand: wake Ryan
+    statCommand: wake Ryan; pan Ryan
     turn: 0
     movement: 0
     unlockMovement: 0
@@ -421,7 +417,7 @@ MonoBehaviour:
     text: "Est\xE1 vendo essa \xE1rea marcada ao redor dele? Ela mostra at\xE9 onde
       voc\xEA pode ir neste turno. Assim como voc\xEA viu durante a inspe\xE7\xE3o.\n\nVoc\xEA
       anda 3 casas em terreno normal.\nMas cada movimento consome autonomia.\n\nMarchar
-      cansa, soldado. At\xE9 no treinamento de fuga e evas\xE3o da AMAN."
+      cansa, soldado. At\xE9 no treinamento de fuga e evas\xE3o da Academia."
     voice: {fileID: 0}
     spawnCommand: 
     statCommand: 
@@ -457,7 +453,7 @@ MonoBehaviour:
     waitAllUnitsActed: 0
     waitPlayerTurnStart: 0
     text: "Floresta atrasa ve\xEDculos, mas n\xE3o influencia a infantaria. [amarelo]Movemos
-      na floresta como quem se move em planicies[/amarelo]. Aqui \xE9 CIGS!\n\nMontanha
+      na floresta como quem se move em planicies[/amarelo]. Aqui \xE9 Selva!\n\nMontanha
       cobra mais da perna.\nPara a infantaria, subir montanha custa mais esfor\xE7o.\n[enfase]Uma
       casa de montanha consome 2 de autonomia.[/enfase]\n\n\xC9 s\xF3 uma casa no
       mapa, mas suas pernas discordam."
@@ -487,7 +483,7 @@ MonoBehaviour:
     unlockMovement: 0
     revealObjectiveKey: hist_1_05
     revealObjectiveIndex: -1
-  - advance: 3
+  - advance: 4
     objectiveKey: 
     revealObjective: 0
     waitObjectiveKey: 
@@ -504,7 +500,23 @@ MonoBehaviour:
     turn: 2
     movement: 0
     unlockMovement: 0
-    revealObjectiveKey: hist_1_06
+    revealObjectiveKey: 
+    revealObjectiveIndex: -1
+  - advance: 3
+    objectiveKey: 
+    revealObjective: 0
+    waitObjectiveKey: 
+    waitObjectiveIndex: -1
+    waitAllUnitsActed: 0
+    waitPlayerTurnStart: 0
+    text: 
+    voice: {fileID: 0}
+    spawnCommand: 
+    statCommand: 
+    turn: 1
+    movement: 0
+    unlockMovement: 0
+    revealObjectiveKey: 
     revealObjectiveIndex: -1
   - advance: 1
     objectiveKey: hist_1_05
@@ -537,7 +549,7 @@ MonoBehaviour:
     voice: {fileID: 0}
     spawnCommand: 
     statCommand: 
-    turn: 0
+    turn: 2
     movement: 0
     unlockMovement: 0
     revealObjectiveKey: 
@@ -586,7 +598,7 @@ MonoBehaviour:
     text: "Em posi\xE7\xE3o defensiva!\n\nVoc\xEA tem a montanha \u2014 ningu\xE9m
       desce desse morro. Manter posi\xE7\xE3o n\xE3o \xE9 ficar parado por medo.\n\xC9
       segurar o ponto certo at\xE9 a hora certa.\n\n[ordem]Segure sua posi\xE7\xE3o
-      na montanha sem se mover. Use \"Manter posi\xE7\xE3o\".[/ordem]"
+      na montanha sem se mover. Selecione Ryan e Use \"Manter posi\xE7\xE3o\".[/ordem]"
     voice: {fileID: 0}
     spawnCommand: 
     statCommand: pan Ryan
@@ -605,7 +617,7 @@ MonoBehaviour:
     text: "Muito bem. Agora aprenda uma coisa importante: nem toda ordem \xE9 avan\xE7o.\n\n\xC0s
       vezes, a melhor decis\xE3o \xE9 manter posi\xE7\xE3o. Voc\xEA j\xE1 est\xE1
       onde precisa estar. N\xE3o invente moda.\n\nFique a\xED parado e aprenda: soldado
-      que anda demais morre cansado.\nSoldado que segura o ponto obriga o inimigo
+      que anda demais morre cansado. Soldado que segura o ponto obriga o inimigo
       a pensar.\n\n[ordem]Passe a vez e observe a infantaria inimiga.[/ordem]"
     voice: {fileID: 0}
     spawnCommand: 
@@ -640,8 +652,8 @@ MonoBehaviour:
     waitPlayerTurnStart: 0
     text: "Contato \xE0 frente - e ele ainda n\xE3o te viu.\n\nEsse alvo est\xE1
       no seu alcance.\n\nN\xE3o precisa fazer discurso.\nN\xE3o precisa odiar o sujeito.\nVoc\xEA
-      s\xF3 precisa confirmar se sua arma alcan\xE7a.\n\n[ordem]Abra o comando de
-      ataque.[/ordem]"
+      s\xF3 precisa confirmar se sua arma alcan\xE7a.\n\n[ordem]Selecione Ryan, Mantenha
+      Posi\xE7\xE3o e escolha Mirar.[/ordem]"
     voice: {fileID: 0}
     spawnCommand: 
     statCommand: pan Ryan
@@ -657,9 +669,9 @@ MonoBehaviour:
     waitObjectiveIndex: -1
     waitAllUnitsActed: 0
     waitPlayerTurnStart: 0
-    text: "O scanner mostrou um alvo v\xE1lido.\n\nIsso significa que voc\xEA tem
-      alcance, muni\xE7\xE3o e condi\xE7\xE3o de disparo.\n\nEscolha o alvo. como
-      s\xF3 tem 1 oponente, ele j\xE1 vai direto para a confirma\xE7\xE3o.\n\n[ordem]Confirme
+    text: "O comando de ataque mostrou um alvo v\xE1lido.\n\nIsso significa que voc\xEA
+      tem alcance, muni\xE7\xE3o e condi\xE7\xE3o de disparo.\n\nEscolha o alvo.
+      como s\xF3 tem 1 oponente, ele j\xE1 vai direto para a confirma\xE7\xE3o.\n\n[ordem]Confirme
       o ataque.[/ordem]"
     voice: {fileID: 0}
     spawnCommand: 
@@ -676,10 +688,10 @@ MonoBehaviour:
     waitObjectiveIndex: -1
     waitAllUnitsActed: 0
     waitPlayerTurnStart: 0
-    text: "Resultado registrado.\n\nAqui n\xE3o tem dado escondido, sorte milagrosa
-      ou desculpa de azar.\n\nSe acertou, havia motivo.\nSe falhou, tamb\xE9m.\n\nVoc\xEA
-      estava em posi\xE7\xE3o, tinha muni\xE7\xE3o, tinha alcance e recebeu ordem
-      de fogo.\n\nIsso \xE9 combate."
+    text: "Resultado registrado.\n\nAqui n\xE3o existe dado escondido, sorte milagrosa
+      ou desculpa de azar. O resultado veio da sua unidade, da arma e da posi\xE7\xE3o.\n\nIsso
+      \xE9 combate. \n\n[azul](Opcional) Passe a vez para ver como estar posicionado
+      na montanha \xE9 superior em combate[/azul]"
     voice: {fileID: 0}
     spawnCommand: 
     statCommand: 
@@ -695,34 +707,50 @@ MonoBehaviour:
     waitObjectiveIndex: -1
     waitAllUnitsActed: 0
     waitPlayerTurnStart: 0
-    text: "Primeira li\xE7\xE3o conclu\xEDda.\n\nVoc\xEA aprendeu a olhar uma unidade,
-      inspecionar um companheiro, selecionar, mover, entender terreno, manter posi\xE7\xE3o,
-      escolher alvo, atacar e encerrar o turno.\n\nAinda n\xE3o \xE9 estrat\xE9gia.\n\n\xC9
-      alfabetiza\xE7\xE3o de comando.\n\nAmanh\xE3 a gente descobre se voc\xEA consegue
-      fazer isso sem eu gritar no seu ouvido.\n\nNo ch\xE3o, recruta! Paga 20!"
+    text: "Primeira li\xE7\xE3o conclu\xEDda.\n\nVoc\xEA aprendeu a ler suas unidades,
+      marchar pelo terreno, segurar uma posi\xE7\xE3o e abrir fogo.\n"
     voice: {fileID: 0}
-    spawnCommand:
-    statCommand:
+    spawnCommand: 
+    statCommand: 
     turn: 0
     movement: 0
     unlockMovement: 0
-    revealObjectiveKey:
+    revealObjectiveKey: 
     revealObjectiveIndex: -1
   - advance: 0
-    objectiveKey:
+    objectiveKey: 
     revealObjective: 0
-    waitObjectiveKey:
+    waitObjectiveKey: 
     waitObjectiveIndex: -1
     waitAllUnitsActed: 0
     waitPlayerTurnStart: 0
-    text:
+    text: "Tamb\xE9m aprendeu que cada a\xE7\xE3o tem sua hora \u2014 inclusive encerrar
+      o turno. Ainda n\xE3o \xE9 estrat\xE9gia. \xC9 alfabetiza\xE7\xE3o de comando.\n\nAmanh\xE3
+      descobrimos se voc\xEA consegue fazer isso sem eu gritar no seu ouvido.\n\nNo
+      ch\xE3o, recruta! Paga vinte!"
     voice: {fileID: 0}
-    spawnCommand:
+    spawnCommand: 
+    statCommand: 
+    turn: 0
+    movement: 0
+    unlockMovement: 0
+    revealObjectiveKey: 
+    revealObjectiveIndex: -1
+  - advance: 0
+    objectiveKey: 
+    revealObjective: 0
+    waitObjectiveKey: 
+    waitObjectiveIndex: -1
+    waitAllUnitsActed: 0
+    waitPlayerTurnStart: 0
+    text: 
+    voice: {fileID: 0}
+    spawnCommand: 
     statCommand: complete hist_1_08
     turn: 0
     movement: 0
     unlockMovement: 0
-    revealObjectiveKey:
+    revealObjectiveKey: 
     revealObjectiveIndex: -1
   dialogFlowMigrated: 1
   scoldEndTurnLocked:
@@ -738,16 +766,17 @@ MonoBehaviour:
     text: Render-se?! No meu treinamento?! Nem pensar, recruta.
     voice: {fileID: 0}
   scoldStatusSummary:
-    text: "Estat\xEDstica \xE9 para depois. Foco na li\xE7\xE3o, recruta."
+    text: "Relat\xF3rio \xE9 depois da miss\xE3o. Agora preste aten\xE7\xE3o na li\xE7\xE3o,
+      recruta."
     voice: {fileID: 0}
   scoldMovementLocked:
     text: "Quem mandou marchar, recruta?! Eu ainda n\xE3o dei ordem de movimento."
     voice: {fileID: 0}
   scoldHoldPosition:
-    text: 
+    text: "Ningu\xE9m desce desse morro, recruta! A ordem \xE9 SEGURAR a posi\xE7\xE3o."
     voice: {fileID: 0}
   scoldAttackOrder:
-    text: 
+    text: "A ordem \xE9 MIRAR recruta!"
     voice: {fileID: 0}
   alwaysActedUnits: Mathias; Dias
   blockCommandService: 1

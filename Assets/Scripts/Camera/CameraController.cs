@@ -162,6 +162,22 @@ public class CameraController : MonoBehaviour
         return Mathf.Clamp(defaultOrthoSize, minOrthoSize, effectiveMax);
     }
 
+    // Direcao cinematografica dos roteiros de tutorial. Aplica o valor exato,
+    // inclusive abaixo de minOrthoSize, que continua valendo para o zoom manual.
+    public void SetTutorialZoom(float orthographicSize)
+    {
+        if (_cam == null)
+            _cam = GetComponent<Camera>();
+        if (_cam == null || !_cam.orthographic || orthographicSize <= 0f)
+            return;
+
+        _cam.orthographicSize = orthographicSize;
+        _quickZoomNearSize = orthographicSize;
+        _hasQuickZoomNearSize = true;
+        _quickZoomFarActive = false;
+        ClampCamera();
+    }
+
     void HandleZoom()
     {
         float scroll = GetMouseScrollY();

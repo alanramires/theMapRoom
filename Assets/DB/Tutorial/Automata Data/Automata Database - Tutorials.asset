@@ -13,5 +13,6 @@ MonoBehaviour:
   m_Name: Automata Database - Tutorials
   m_EditorClassIdentifier: Assembly-CSharp::AutomataDatabase
   entries:
-  - {fileID: 11400000, guid: 3720fc4c340be9241bb437276cb3f306, type: 2}
   - {fileID: 11400000, guid: a47e6fcb50e1d414a91d809f5562c0be, type: 2}
+  - {fileID: 11400000, guid: c2f2f5e95cd495847b76419d1d56c71f, type: 2}
+  - {fileID: 11400000, guid: 3720fc4c340be9241bb437276cb3f306, type: 2}

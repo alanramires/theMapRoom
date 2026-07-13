@@ -851,6 +851,16 @@ public class TutorialManager : MonoBehaviour
         if (parts[0].Equals("pan", System.StringComparison.OrdinalIgnoreCase))
             return TryExecutePanCommand(command, parts);
 
+        // "cursor Ryan" / "cursor Ramelle" / "cursor 3,1": move apenas o cursor
+        // cinematograficamente ate o alvo, sem executar clique ou selecionar nada.
+        if (parts[0].Equals("cursor", System.StringComparison.OrdinalIgnoreCase))
+            return TryExecuteCursorCommand(command, parts);
+
+        // "zoom 1.5" (tambem aceita "zoom 1,5"): define o orthographicSize exato
+        // da camera para enquadramentos cinematograficos do roteiro.
+        if (parts[0].Equals("zoom", System.StringComparison.OrdinalIgnoreCase))
+            return TryExecuteZoomCommand(command, parts);
+
         string token = parts[0];
         string assignment = parts[1];
         int equals = assignment.IndexOf('=');
@@ -907,6 +917,37 @@ public class TutorialManager : MonoBehaviour
         }
     }
 
+    private bool TryExecuteZoomCommand(string command, string[] parts)
+    {
+        if (parts.Length != 2)
+        {
+            Debug.LogWarning($"[TutorialManager] zoom invalido: '{command}' (use 'zoom 1.5').");
+            return false;
+        }
+
+        string rawValue = parts[1].Replace(',', '.');
+        if (!float.TryParse(
+                rawValue,
+                System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out float value) || value <= 0f)
+        {
+            Debug.LogWarning($"[TutorialManager] zoom invalido: '{command}' (valor ilegivel).");
+            return false;
+        }
+
+        if (panCameraController == null)
+            panCameraController = FindAnyObjectByType<CameraController>();
+        if (panCameraController == null)
+        {
+            Debug.LogWarning("[TutorialManager] zoom: CameraController nao encontrado na cena.");
+            return false;
+        }
+
+        panCameraController.SetTutorialZoom(value);
+        return true;
+    }
+
     private bool TryExecuteMoveCommand(string command, string[] parts)
     {
         if (matchController == null || turnStateManager == null || automataDatabase == null)
@@ -943,7 +984,7 @@ public class TutorialManager : MonoBehaviour
         }
 
         Vector3Int destination;
-        if (parts.Length >= 5)
+        if (parts.Length >= 5 && !parts[4].Equals("attack", System.StringComparison.OrdinalIgnoreCase))
         {
             if (!TryParseTutorialCell(parts[4], out destination))
             {
@@ -957,8 +998,14 @@ public class TutorialManager : MonoBehaviour
             return false;
         }
 
+        // O comando so ataca apos chegar se o roteiro pedir explicitamente
+        // ('... move 7,-2 4,-2 attack'). O preferAttack do AutomataData vale para
+        // a rotina de turno, nao para a marcha scriptada — senao o inimigo atira
+        // na chegada e quebra o "ele ainda nao te viu".
+        bool attackAfterMove = parts[parts.Length - 1].Equals("attack", System.StringComparison.OrdinalIgnoreCase);
+
         BeginAutomataCommand();
-        StartCoroutine(ExecuteTutorialAutomataMoveAndAttack(unit, team, destination, automata, parts[1]));
+        StartCoroutine(ExecuteTutorialAutomataMoveAndAttack(unit, team, destination, attackAfterMove, automata.targetPreference, parts[1]));
         return true;
     }
 
@@ -966,14 +1013,15 @@ public class TutorialManager : MonoBehaviour
         UnitManager unit,
         TeamId team,
         Vector3Int destination,
-        AutomataData automata,
+        bool attackAfterMove,
+        AutomataTargetPreference targetPreference,
         string unitToken)
     {
         try
         {
             bool succeeded = false;
             yield return ExecuteTutorialAutomataMoveBatch(unit, team, destination, value => succeeded = value);
-            if (!succeeded || automata == null || !automata.preferAttack)
+            if (!succeeded || !attackAfterMove)
                 yield break;
 
             if (!turnStateManager.TryAutomatedSelectUnitAndEnterMoveuParado(unit))
@@ -982,7 +1030,7 @@ public class TutorialManager : MonoBehaviour
                 yield break;
             }
 
-            if (!turnStateManager.TryExecuteAutomatedAttackFirstTarget())
+            if (!turnStateManager.TryExecuteAutomatedAttackWithPreference(targetPreference))
             {
                 turnStateManager.HandleCancel();
                 Debug.Log($"[TutorialManager] moveCommand: '{unitToken}' chegou ao destino sem alvo valido.");
@@ -1080,6 +1128,56 @@ public class TutorialManager : MonoBehaviour
     }
 
     private CameraController panCameraController;
+
+    private bool TryExecuteCursorCommand(string command, string[] parts)
+    {
+        if (parts.Length != 2)
+        {
+            Debug.LogWarning($"[TutorialManager] cursor invalido: '{command}' (use 'cursor Ryan', 'cursor Ramelle' ou 'cursor 3,1').");
+            return false;
+        }
+
+        Vector3Int targetCell;
+        string arg = parts[1].Trim();
+        if (arg.Contains(","))
+        {
+            if (!TryParseTutorialCell(arg, out targetCell))
+            {
+                Debug.LogWarning($"[TutorialManager] cursor invalido: '{command}' (celula ilegivel).");
+                return false;
+            }
+        }
+        else
+        {
+            UnitManager unit = FindActiveUnitByToken(arg);
+            if (unit != null)
+            {
+                targetCell = unit.CurrentCellPosition;
+            }
+            else
+            {
+                ConstructionManager construction = FindConstructionByName(arg);
+                if (construction == null)
+                {
+                    Debug.LogWarning($"[TutorialManager] cursor: alvo '{arg}' nao encontrado (unidade ou construcao).");
+                    return false;
+                }
+                targetCell = construction.CurrentCellPosition;
+            }
+        }
+
+        targetCell.z = 0;
+        if (turnStateManager == null)
+            turnStateManager = FindAnyObjectByType<TurnStateManager>();
+        if (turnStateManager == null)
+        {
+            Debug.LogWarning("[TutorialManager] cursor: TurnStateManager nao encontrado na cena.");
+            return false;
+        }
+
+        StartCoroutine(turnStateManager.MoveCursorToCellWithAutomatedTravel(targetCell));
+        return true;
+    }
 
     // Pan de camera puro (FocusOn, com clamp de borda): nao mexe no cursor.
     private bool TryExecutePanCommand(string command, string[] parts)
@@ -1912,6 +2010,12 @@ public class TutorialManager : MonoBehaviour
                 automata == null)
                 continue;
 
+            // Guarnicao (stationary): nunca se move e so age quando tem alvo no
+            // alcance parado. Sem alvo, nem seleciona — turno silencioso, sem
+            // passeio de cursor a cada turno vazio da marcha do jogador.
+            if (IsStationaryIdle(automata, unit))
+                continue;
+
             Vector3Int unitCell = NormalizeCell(unit.CurrentCellPosition);
             yield return turnStateManager.MoveCursorToCellWithAutomatedTravel(unitCell);
             if (preSelectDelay > 0f)
@@ -1919,7 +2023,7 @@ public class TutorialManager : MonoBehaviour
 
             // Avanco scriptado: caminha em direcao ao hex alvo antes de atacar/finalizar.
             bool enteredViaMove = false;
-            if (automata.moveTowardsTarget && TryFindAutomataAdvanceCell(unit, automata, out Vector3Int advanceCell))
+            if (!automata.stationary && automata.moveTowardsTarget && TryFindAutomataAdvanceCell(unit, automata, out Vector3Int advanceCell))
             {
                 yield return ExecuteTutorialAutomataMoveBatch(unit, activeTeam, advanceCell, value => enteredViaMove = value);
             }
@@ -1937,7 +2041,7 @@ public class TutorialManager : MonoBehaviour
 
             if (automata.preferAttack && hasAttack)
             {
-                handled = turnStateManager.TryExecuteAutomatedAttackFirstTarget();
+                handled = turnStateManager.TryExecuteAutomatedAttackWithPreference(automata.targetPreference);
                 if (!handled && automata.fallbackMove && hasMove)
                     handled = turnStateManager.HandleAutomatedSensorActionRequested(SensorActionType.None);
             }
@@ -1960,6 +2064,33 @@ public class TutorialManager : MonoBehaviour
             matchController.AdvanceTurnWithTransition();
 
         tutorialAutomataRoutine = null;
+    }
+
+    // Guarnicao ociosa: stationary e sem alvo (ou sem vocacao de ataque). Nao age
+    // neste turno e NAO pode impedir a devolucao do turno (ShouldAutoAdvanceTurn).
+    private bool IsStationaryIdle(AutomataData automata, UnitManager unit)
+    {
+        return automata != null && automata.stationary &&
+               (!automata.preferAttack || !HasStationaryAttackTarget(unit));
+    }
+
+    private readonly List<PodeMirarTargetOption> stationaryTargetsBuffer = new List<PodeMirarTargetOption>();
+
+    // Pre-check leve da guarnicao: ha alvo valido atacando PARADO da celula atual?
+    // Fonte de verdade: PodeMirarSensor — a mesma checagem que os sensores refarao
+    // oficialmente depois da selecao, entao nao ha risco de divergencia.
+    private bool HasStationaryAttackTarget(UnitManager unit)
+    {
+        if (unit == null || unit.BoardTilemap == null || terrainDatabase == null)
+            return false;
+
+        PodeMirarSensor.CollectTargets(
+            unit,
+            unit.BoardTilemap,
+            terrainDatabase,
+            SensorMovementMode.MoveuParado,
+            stationaryTargetsBuffer);
+        return stationaryTargetsBuffer.Count > 0;
     }
 
     private IEnumerator ExecuteTutorialAutomataMoveBatch(
@@ -2134,11 +2265,21 @@ public class TutorialManager : MonoBehaviour
         if (allUnits == null || allUnits.Count <= 0)
             return true;
 
+        TutorialData tutorial = GetActiveTutorial();
+        string tutorialId = tutorial != null ? tutorial.id : string.Empty;
         for (int i = 0; i < allUnits.Count; i++)
         {
             UnitManager unit = allUnits[i];
-            if (IsUnitValidForAutomata(unit, activeTeam))
-                return false;
+            if (!IsUnitValidForAutomata(unit, activeTeam))
+                continue;
+
+            // Guarnicao ociosa nao age de proposito — nao pode segurar o turno.
+            if (automataDatabase != null &&
+                automataDatabase.TryResolve(unit, activeTeam, tutorialId, out AutomataData automata) &&
+                IsStationaryIdle(automata, unit))
+                continue;
+
+            return false;
         }
 
         return true;

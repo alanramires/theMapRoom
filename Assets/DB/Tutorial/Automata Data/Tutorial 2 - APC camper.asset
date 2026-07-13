@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0197c2233c4fdc54c987141855cc99ba, type: 3}
+  m_Name: Tutorial 2 - APC camper
+  m_EditorClassIdentifier: Assembly-CSharp::AutomataData
+  id: apc camper guarnicao
+  unitToken: APC
+  teamId: 1
+  stationary: 1
+  preferAttack: 1
+  targetPreference: 1
+  fallbackMove: 0
+  moveTowardsTarget: 0
+  moveTargetCell: {x: 3, y: -2, z: 0}
+  stopDistance: 1
+  tutorials:
+  - {fileID: 11400000, guid: 8f0a552e498481247b7405c17f7d8a50, type: 2}

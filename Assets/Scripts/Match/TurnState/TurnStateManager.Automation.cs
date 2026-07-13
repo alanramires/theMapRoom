@@ -164,6 +164,92 @@ public partial class TurnStateManager
         return TryExecuteAutomatedAttackBestTarget(null);
     }
 
+    // Ataque automatizado com criterio "burro por escolha" (AutomataData.targetPreference):
+    // sem score tatico — ordem de spawn (fila do sensor), menor HP, maior HP ou aleatorio.
+    // Usado pelo automata de tutorial; a IA oficial continua no BestTarget.
+    public bool TryExecuteAutomatedAttackWithPreference(AutomataTargetPreference preference)
+    {
+        if (CurrentCursorState != CursorState.MoveuAndando && CurrentCursorState != CursorState.MoveuParado)
+            return false;
+        if (selectedUnit == null || selectedUnit.HasActed)
+            return false;
+        if (!HasAutomatedAttackAvailable())
+            return false;
+        if (!HandleAutomatedSensorActionRequested(SensorActionType.Attack))
+            return false;
+
+        if (cachedPodeMirarTargets == null || cachedPodeMirarTargets.Count <= 0)
+        {
+            HandleCancel();
+            return false;
+        }
+
+        List<(UnitManager target, int order)> candidates = new List<(UnitManager target, int order)>();
+        HashSet<UnitManager> seenTargets = new HashSet<UnitManager>();
+        for (int i = 0; i < cachedPodeMirarTargets.Count; i++)
+        {
+            PodeMirarTargetOption option = cachedPodeMirarTargets[i];
+            if (option == null || option.targetUnit == null)
+                continue;
+
+            UnitManager target = option.targetUnit;
+            if (!seenTargets.Add(target))
+                continue;
+            if (!IsAutomatedAttackCandidateStillValid(selectedUnit, target))
+                continue;
+
+            candidates.Add((target, i));
+        }
+
+        if (candidates.Count <= 0)
+        {
+            HandleCancel();
+            return false;
+        }
+
+        switch (preference)
+        {
+            case AutomataTargetPreference.LessHp:
+                candidates.Sort((a, b) => a.target.CurrentHP != b.target.CurrentHP
+                    ? a.target.CurrentHP.CompareTo(b.target.CurrentHP)
+                    : a.order.CompareTo(b.order));
+                break;
+            case AutomataTargetPreference.MoreHp:
+                candidates.Sort((a, b) => a.target.CurrentHP != b.target.CurrentHP
+                    ? b.target.CurrentHP.CompareTo(a.target.CurrentHP)
+                    : a.order.CompareTo(b.order));
+                break;
+            case AutomataTargetPreference.Random:
+                for (int i = candidates.Count - 1; i > 0; i--)
+                {
+                    int j = UnityEngine.Random.Range(0, i + 1);
+                    (candidates[i], candidates[j]) = (candidates[j], candidates[i]);
+                }
+                break;
+            // SpawnOrder: mantem a fila do sensor (ordem de registro/spawn).
+        }
+
+        for (int i = 0; i < candidates.Count; i++)
+        {
+            UnitManager target = candidates[i].target;
+            if (target == null || target.IsDead)
+                continue;
+            if (!IsAutomatedAttackCandidateStillValid(selectedUnit, target))
+                continue;
+
+            Vector3Int targetCell = target.CurrentCellPosition;
+            targetCell.z = 0;
+            if (TryExecuteAutomatedAttackReplayTarget(target.InstanceId.ToString(), targetCell))
+            {
+                Debug.Log($"[Automata][Attack] alvo por criterio {preference}: {target.name} (hp={target.CurrentHP}).");
+                return true;
+            }
+        }
+
+        HandleCancel();
+        return false;
+    }
+
     public bool TryExecuteAutomatedAttackBestTarget(UnitManager preferredTarget = null)
     {
         if (CurrentCursorState != CursorState.MoveuAndando && CurrentCursorState != CursorState.MoveuParado)

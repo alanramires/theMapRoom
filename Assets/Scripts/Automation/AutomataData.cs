@@ -1,6 +1,20 @@
 using System.Collections.Generic;
 using UnityEngine;
 
+// Criterio de escolha de alvo do automata — burro por escolha: nada de score
+// tatico, o designer decide o temperamento da unidade no asset.
+public enum AutomataTargetPreference
+{
+    [InspectorName("Spawn Order (default)")]
+    SpawnOrder = 0,
+    [InspectorName("Less HP")]
+    LessHp = 1,
+    [InspectorName("More HP")]
+    MoreHp = 2,
+    [InspectorName("Random")]
+    Random = 3
+}
+
 [CreateAssetMenu(fileName = "AutomataData", menuName = "Game/Automation/Automata Data")]
 public class AutomataData : ScriptableObject
 {
@@ -14,8 +28,14 @@ public class AutomataData : ScriptableObject
     public TeamId teamId = TeamId.Red;
 
     [Header("Behavior")]
+    [Tooltip("Guarnicao: a unidade NUNCA se move no proprio turno. So age quando ha alvo no alcance (ataca parada, se Prefer Attack); sem alvo, nem e selecionada — turno silencioso, sem passeio de cursor. Tem precedencia sobre Move Towards Target. Comandos scriptados do roteiro ('move ...') continuam valendo.")]
+    public bool stationary = false;
+
     [Tooltip("Se verdadeiro, tenta atacar antes de mover.")]
     public bool preferAttack = true;
+
+    [Tooltip("Com mais de um alvo valido: ordem de spawn (fila do sensor, padrao), menor HP, maior HP ou aleatorio.")]
+    public AutomataTargetPreference targetPreference = AutomataTargetPreference.SpawnOrder;
 
     [Tooltip("Se verdadeiro, faz fallback para M quando nao conseguir atacar.")]
     public bool fallbackMove = true;

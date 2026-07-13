@@ -36,7 +36,8 @@ public class BattleMapMenuRootController : MonoBehaviour
         Destruir = 11,
         Render = 12,
         Sair = 13,
-        VoltarGerenciar = 14
+        VoltarGerenciar = 14,
+        Camada = 15
     }
 
     [Header("Scene")]
@@ -58,6 +59,7 @@ public class BattleMapMenuRootController : MonoBehaviour
     [SerializeField] private Button btnRodada;
     [SerializeField] private Button btnOpcoes;
     [SerializeField] private Button btnVoltarMenu;
+    [SerializeField] private Button btnCamada;
 
     [SerializeField] private Button btnMinimapa;
     [SerializeField] private Button btnConfig;
@@ -97,6 +99,8 @@ public class BattleMapMenuRootController : MonoBehaviour
     private bool exitConfirmOpen;
     private int exitConfirmFocusIndex;
     private bool surrenderConfirmOpen;
+    private bool layerSelectionOpen;
+    private readonly List<FogOfWarVisionMode> layerSelectionModes = new List<FogOfWarVisionMode>();
     private int surrenderConfirmFocusIndex;
     private CanvasGroup modalMenuCanvasGroup;
     private float modalMenuPreviousAlpha = 1f;
@@ -106,6 +110,36 @@ public class BattleMapMenuRootController : MonoBehaviour
     public bool IsExitConfirmationOpen => exitConfirmOpen;
     public int ExitConfirmationFocusIndex => exitConfirmFocusIndex;
     public bool IsSurrenderConfirmationOpen => surrenderConfirmOpen;
+    public bool IsLayerSelectionOpen => layerSelectionOpen;
+    public int LayerSelectionFocusIndex => 0;
+
+    public int GetLayerSelectionOptionCount() => layerSelectionModes.Count + 1;
+
+    public string GetLayerSelectionOptionLabel(int index)
+    {
+        if (index >= 0 && index < layerSelectionModes.Count)
+            return layerSelectionModes[index] switch
+            {
+                FogOfWarVisionMode.Air => "AÉREA",
+                FogOfWarVisionMode.Surface => "SUPERFÍCIE",
+                FogOfWarVisionMode.Sub => "SUBMARINA",
+                _ => "TODAS"
+            };
+        return "CANCELAR";
+    }
+
+    public void InvokeLayerSelectionOption(int index)
+    {
+        if (!layerSelectionOpen)
+            return;
+        if (index >= 0 && index < layerSelectionModes.Count)
+            matchController?.SetFogOfWarVisionMode(layerSelectionModes[index]);
+        layerSelectionOpen = false;
+        layerSelectionModes.Clear();
+        PanelHelperController.ClearExternalText();
+        turnStateManager?.TryExitPlayerMenuStateToNeutral();
+        UiInputBlocker.SuppressGameplayInputForFrames(1);
+    }
     public int SurrenderConfirmationFocusIndex => surrenderConfirmFocusIndex;
 
     // Confirmacao de fim de turno (helper panel clicavel, mesmo tratamento de Render-se/Sair).
@@ -854,6 +888,7 @@ public class BattleMapMenuRootController : MonoBehaviour
         BindButton(btnRodada, MenuAction.Rodada);
         BindButton(btnOpcoes, MenuAction.Opcoes);
         BindButton(btnVoltarMenu, MenuAction.VoltarMenu);
+        BindButton(btnCamada, MenuAction.Camada);
 
         BindButton(btnMinimapa, MenuAction.Minimapa);
         BindButton(btnConfig, MenuAction.Config);
@@ -868,7 +903,8 @@ public class BattleMapMenuRootController : MonoBehaviour
         BindButton(btnVoltarGerenciar, MenuAction.VoltarGerenciar);
 
         panelButtons.Clear();
-        panelButtons[MenuPanel.Menu] = BuildPanelButtonsFromLayout(panelMenu, btnStatus, btnComando, btnRodada, btnOpcoes, btnVoltarMenu);
+        RefreshLayerButtonAvailability();
+        panelButtons[MenuPanel.Menu] = BuildPanelButtonsFromLayout(panelMenu, btnStatus, btnComando, btnRodada, btnCamada, btnOpcoes, btnVoltarMenu);
         panelButtons[MenuPanel.Options] = BuildPanelButtonsFromLayout(panelOptions, btnMinimapa, btnConfig, btnSave, btnLoad, btnGerenciar, btnVoltarOptions);
         panelButtons[MenuPanel.Gerenciar] = BuildPanelButtonsFromLayout(panelGerenciar, btnDestruir, btnRender, btnSair, btnVoltarGerenciar);
 
@@ -1049,6 +1085,7 @@ public class BattleMapMenuRootController : MonoBehaviour
                 if (name.Contains("status")) { action = MenuAction.Status; return true; }
                 if (name.Contains("comando")) { action = MenuAction.Comando; return true; }
                 if (name.Contains("rodada")) { action = MenuAction.Rodada; return true; }
+                if (name.Contains("camada") || name.Contains("layer")) { action = MenuAction.Camada; return true; }
                 if (name.Contains("opcoes") || name.Contains("opções")) { action = MenuAction.Opcoes; return true; }
                 if (name.Contains("voltar")) { action = MenuAction.VoltarMenu; return true; }
                 break;
@@ -1113,6 +1150,20 @@ public class BattleMapMenuRootController : MonoBehaviour
                 turnStateManager?.TryExitPlayerMenuStateToNeutral();
                 if (cursorController == null || !cursorController.RequestEndTurnConfirmation())
                     cursorController?.PlayErrorSfx();
+                break;
+            case MenuAction.Camada:
+                if (!TryCloseMenuForSaveLoadDispatch() || matchController == null)
+                    break;
+                layerSelectionModes.Clear();
+                matchController.GetAvailableFogOfWarVisionModes(layerSelectionModes);
+                if (layerSelectionModes.Count <= 1)
+                {
+                    turnStateManager?.TryExitPlayerMenuStateToNeutral();
+                    break;
+                }
+                layerSelectionOpen = true;
+                PanelDialogController.ClearExternalText();
+                PanelHelperController.TrySetExternalText("CAMADA (LAYER)", "Escolha a visualização:");
                 break;
             case MenuAction.Opcoes:
                 SetPanel(MenuPanel.Options, resetIndex: true);
@@ -1445,6 +1496,7 @@ public class BattleMapMenuRootController : MonoBehaviour
         if (btnRodada == null) btnRodada = FindButtonByNames(panelMenu, "btn_rodada", "button_rodada");
         if (btnOpcoes == null) btnOpcoes = FindButtonByNames(panelMenu, "btn_opcoes", "button_opcoes", "button_opções");
         if (btnVoltarMenu == null) btnVoltarMenu = FindButtonByNames(panelMenu, "btn_voltar", "button_voltar");
+        if (btnCamada == null) btnCamada = FindButtonByNames(panelMenu, "btn_camada", "button_camada", "button_layer");
 
         if (btnMinimapa == null) btnMinimapa = FindButtonByNames(panelOptions, "btn_minimapa", "button_minimapa", "button_miniMapa");
         if (btnConfig == null) btnConfig = FindButtonByNames(panelOptions, "btn_config", "button_config");
@@ -1464,6 +1516,17 @@ public class BattleMapMenuRootController : MonoBehaviour
         if (cameraController == null) cameraController = FindInActiveScene<CameraController>();
         if (matchController == null) matchController = FindInActiveScene<MatchController>();
         if (replayManager == null) replayManager = FindInActiveScene<ReplayManager>();
+    }
+
+    private void RefreshLayerButtonAvailability()
+    {
+        if (btnCamada == null)
+            return;
+        List<FogOfWarVisionMode> modes = new List<FogOfWarVisionMode>();
+        bool available = matchController != null && matchController.GetAvailableFogOfWarVisionModes(modes) > 1;
+        if (btnCamada.gameObject.activeSelf != available)
+            btnCamada.gameObject.SetActive(available);
+        btnCamada.interactable = available;
     }
 
     private void CacheOriginalDockLayoutIfNeeded()

@@ -3627,6 +3627,7 @@ public partial class TurnStateManager
 
         yield return ExecuteCombatProjectileExchange(option, attackerTrajectory, combat.counterExecuted);
         ApplyPostHitForcedLayerEffects(option, combat, attackerHpBeforeResolution, defenderHpBeforeResolution);
+        ApplyPostAttackSelfEmergeEffect(combat);
         ApplyPendingCombatHp(combat);
         JogadasManager.SetUltimoAtaqueResultado(
             attacker,
@@ -3824,6 +3825,53 @@ public partial class TurnStateManager
         {
             TryApplyForcedLayerEffectFromWeapon(attacker, option.defenderCounterWeapon);
         }
+    }
+
+    // Unidades como o submarino emergem ao atacar (perdem stealth e ficam
+    // travadas na camada revelada por emergeAfterAttackTurns, mesma janela do
+    // Layer Force After Hit). So mergulham de volta quando o lock expira e
+    // elas se movem de novo. Roda independente de acerto/erro: o gatilho e a
+    // propria acao de atacar, nao o resultado do combate.
+    private void ApplyPostAttackSelfEmergeEffect(CombatResolutionResult combat)
+    {
+        if (!combat.success)
+            return;
+
+        UnitManager attacker = combat.attackerUnit;
+        if (attacker == null || attacker.IsEmbarked || combat.attackerHpAfter <= 0)
+            return;
+        if (!attacker.TryGetUnitData(out UnitData attackerData) || attackerData == null || !attackerData.emergesToAttack)
+            return;
+
+        Domain currentDomain = attacker.GetDomain();
+        HeightLevel currentHeight = attacker.GetHeightLevel();
+        Domain revealDomain = attackerData.emergeAfterAttackDomain;
+        HeightLevel revealHeight = attackerData.emergeAfterAttackHeight;
+        if (currentDomain == revealDomain && currentHeight == revealHeight)
+            return;
+        if (!attacker.SupportsLayerMode(revealDomain, revealHeight))
+            return;
+        if (!attacker.TrySetCurrentLayerMode(revealDomain, revealHeight))
+            return;
+
+        // Iguala a janela de exposicao da emersao voluntaria (atacar) a da
+        // emersao forcada por dano (Layer Force After Hit): sem o lock, o
+        // submarino mergulhava de volta no proprio proximo movimento (so 1
+        // rodada de exposicao), enquanto ser atingido prendia por 2 rodadas —
+        // atacar ficava mais seguro do que ser pego.
+        attacker.SetForcedLayerLock(revealDomain, revealHeight, attackerData.emergeAfterAttackTurns);
+
+        string revealMessage = PanelDialogController.ResolveDialogMessage(
+            "layer.revealed.after_attack",
+            "<unit> emerge para <domain>/<height> apos atacar (<turns> turno(s)).",
+            new Dictionary<string, string>
+            {
+                { "unit", ResolveDebugUnitName(attacker) },
+                { "domain", revealDomain.ToString() },
+                { "height", revealHeight.ToString() },
+                { "turns", attackerData.emergeAfterAttackTurns.ToString() }
+            });
+        PushPanelUnitMessage(revealMessage, 2.6f);
     }
 
     private void TryApplyForcedLayerEffectFromWeapon(UnitManager target, WeaponData weapon)

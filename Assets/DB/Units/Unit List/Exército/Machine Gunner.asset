@@ -28,7 +28,7 @@ MonoBehaviour:
   movementCategory: 4
   militaryForce: 0
   unitClass: 0
-  combatClassification: 2
+  combatClassification: 0
   roles: 0c000000
   aiInitiative: 3
   aiPurchaseMode: 0
@@ -87,7 +87,7 @@ MonoBehaviour:
   - weapon: {fileID: 11400000, guid: 4d8e9d2a3dbc4a64f82d3c67c8ff0bb7, type: 2}
     squadAmmunition: 6
     operationRangeMin: 1
-    operationRangeMax: 2
+    operationRangeMax: 1
     selectedTrajectory: 0
     canBeFireOnlyAtDomainHeigh: []
     lastSyncedWeapon: {fileID: 11400000, guid: 4d8e9d2a3dbc4a64f82d3c67c8ff0bb7, type: 2}

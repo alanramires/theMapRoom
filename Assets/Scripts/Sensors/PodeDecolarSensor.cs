@@ -76,9 +76,11 @@ public static class PodeDecolarSensor
             return report;
         }
 
-        if (selectedUnit.GetDomain() != Domain.Land || selectedUnit.GetHeightLevel() != HeightLevel.Surface || !selectedUnit.IsAircraftGrounded)
+        // Aeronaves anfibias podem estar pousadas em Naval/Surface (ex.: hidroaviao).
+        // O AirOperationResolver abaixo decide se o terreno/estrutura autoriza a decolagem.
+        if (selectedUnit.GetDomain() == Domain.Air || selectedUnit.GetHeightLevel() != HeightLevel.Surface || !selectedUnit.IsAircraftGrounded)
         {
-            report.explicacao = "A aeronave precisa estar em Land/Surface (pousada) para avaliar decolagem.";
+            report.explicacao = "A aeronave precisa estar pousada em uma camada Surface para avaliar decolagem.";
             return report;
         }
 

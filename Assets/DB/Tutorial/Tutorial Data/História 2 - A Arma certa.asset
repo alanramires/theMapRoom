@@ -15,8 +15,305 @@ MonoBehaviour:
   id: tutorial 2 - Soldado vs APC
   description: "Defenda a posi\xE7\xE3o"
   objectives:
-  - id: DESTROY_ENEMY_UNIT
-    description: "Destrua o APC inimigo com qualquer meio necess\xE1rio"
+  - id: INSPECT_ALLY_UNIT
+    key: hist_2_01
+    parameters: 
+    description: Inspecione Mathias ou Dias e identifique sua arma
+    startHidden: 1
+    isVisible: 0
     isCompleted: 0
-    hintId: 0
+    isOptional: 0
+    isDefeatCondition: 0
+    hasFailed: 0
+  - id: INSPECT_ENEMY_UNIT
+    key: hist_2_02
+    parameters: 
+    description: Inspecione o APC inimigo
+    startHidden: 1
+    isVisible: 0
+    isCompleted: 0
+    isOptional: 0
+    isDefeatCondition: 0
+    hasFailed: 0
+  - id: DESTROY_ENEMY_UNIT
+    key: hist_2_03
+    parameters: 
+    description: "Destrua o APC inimigo com qualquer meio necess\xE1rio"
+    startHidden: 1
+    isVisible: 0
+    isCompleted: 0
+    isOptional: 0
+    isDefeatCondition: 0
+    hasFailed: 0
+  - id: ENDING
+    key: hist_2_04
+    parameters: 
+    description: "Conclua a segunda li\xE7\xE3o"
+    startHidden: 1
+    isVisible: 0
+    isCompleted: 0
+    isOptional: 0
+    isDefeatCondition: 0
+    hasFailed: 0
+  script:
+  - advance: 0
+    objectiveKey: 
+    revealObjective: 0
+    waitObjectiveKey: 
+    waitObjectiveIndex: -1
+    waitAllUnitsActed: 0
+    waitPlayerTurnStart: 0
+    text: "\xDAltima transmiss\xE3o de Ramelle.\n\nUm pelot\xE3o ferido ainda segura
+      a cidade, mas n\xE3o resistir\xE1 a outro ataque.\n\nEstamos longe demais para
+      impedir o pr\xF3ximo disparo."
+    voice: {fileID: 0}
+    spawnCommand: 
+    statCommand: zoom 1.5; pan Ramelle
+    turn: 1
+    movement: 0
+    unlockMovement: 0
+    revealObjectiveKey: 
+    revealObjectiveIndex: -1
+  - advance: 2
+    objectiveKey: 
+    revealObjective: 0
+    waitObjectiveKey: 
+    waitObjectiveIndex: -1
+    waitAllUnitsActed: 0
+    waitPlayerTurnStart: 0
+    text: "[ordem]Movam-se em dire\xE7\xE3o a Ramelle e fa\xE7am o que puderem neste
+      turno.[/ordem]"
+    voice: {fileID: 0}
+    spawnCommand: 
+    statCommand: pan Ryan
+    turn: 2
+    movement: 3
+    unlockMovement: 0
+    revealObjectiveKey: 
+    revealObjectiveIndex: -1
+  - advance: 4
+    objectiveKey: 
+    revealObjective: 0
+    waitObjectiveKey: 
+    waitObjectiveIndex: -1
+    waitAllUnitsActed: 0
+    waitPlayerTurnStart: 0
+    text: "N\xE3o chegaremos a tempo.\n\n[ordem]Encerre o turno e observe o combate
+      em Ramelle.[/ordem]"
+    voice: {fileID: 0}
+    spawnCommand: 
+    statCommand: pan Ramelle
+    turn: 2
+    movement: 0
+    unlockMovement: 0
+    revealObjectiveKey: 
+    revealObjectiveIndex: -1
+  - advance: 3
+    objectiveKey: 
+    revealObjective: 0
+    waitObjectiveKey: 
+    waitObjectiveIndex: -1
+    waitAllUnitsActed: 0
+    waitPlayerTurnStart: 0
+    text: 
+    voice: {fileID: 0}
+    spawnCommand: 
+    statCommand: pan Ramelle
+    turn: 1
+    movement: 0
+    unlockMovement: 0
+    revealObjectiveKey: 
+    revealObjectiveIndex: -1
+  - advance: 0
+    objectiveKey: 
+    revealObjective: 0
+    waitObjectiveKey: 
+    waitObjectiveIndex: -1
+    waitAllUnitsActed: 0
+    waitPlayerTurnStart: 0
+    text: "Ramelle caiu.\n\nO \xFAltimo pelot\xE3o n\xE3o arranhou a blindagem \u2014
+      e a metralhadora n\xE3o deixou sobreviventes.\n\nRyan, grave bem essa imagem.
+      Voc\xEA carrega o mesmo tipo de alvo que aquela arma foi feita para destruir."
+    voice: {fileID: 0}
+    spawnCommand: 
+    statCommand: pan Ramelle
+    turn: 1
+    movement: 0
+    unlockMovement: 0
+    revealObjectiveKey: 
+    revealObjectiveIndex: -1
+  - advance: 1
+    objectiveKey: hist_2_01
+    revealObjective: 1
+    waitObjectiveKey: 
+    waitObjectiveIndex: -1
+    waitAllUnitsActed: 0
+    waitPlayerTurnStart: 0
+    text: "Ryan continua com o fuzil: arma anti-infantaria, eficiente contra soldados
+      e inadequada contra blindagem.\n\nMathias e Dias carregam bazucas, armas anti-tanque
+      feitas para enfrentar ve\xEDculos.\n\n[ordem]Inspecione Mathias ou Dias e identifique
+      a arma que carregam.[/ordem]"
+    voice: {fileID: 0}
+    spawnCommand: 
+    statCommand: 
+    turn: 0
+    movement: 0
+    unlockMovement: 0
+    revealObjectiveKey: 
+    revealObjectiveIndex: -1
+  - advance: 1
+    objectiveKey: hist_2_02
+    revealObjective: 1
+    waitObjectiveKey: 
+    waitObjectiveIndex: -1
+    waitAllUnitsActed: 0
+    waitPlayerTurnStart: 0
+    text: "Os tr\xEAs pertencem \xE0 infantaria. O que muda \xE9 o armamento e a
+      fun\xE7\xE3o no combate.\n\nAgora conhe\xE7a o ocupante.\n\n[ordem]Inspecione
+      o APC inimigo.[/ordem]"
+    voice: {fileID: 0}
+    spawnCommand: 
+    statCommand: pan Ramelle
+    turn: 0
+    movement: 0
+    unlockMovement: 0
+    revealObjectiveKey: 
+    revealObjectiveIndex: -1
+  - advance: 0
+    objectiveKey: 
+    revealObjective: 0
+    waitObjectiveKey: 
+    waitObjectiveIndex: -1
+    waitAllUnitsActed: 0
+    waitPlayerTurnStart: 0
+    text: "APC: ve\xEDculo blindado, armado com metralhadora anti-infantaria e guarnecido
+      na cidade.\n\nMesmo com pouco combust\xEDvel e poucos cartuchos, ele ainda
+      \xE9 letal \u2014 especialmente contra Ryan."
+    voice: {fileID: 0}
+    spawnCommand: 
+    statCommand: 
+    turn: 0
+    movement: 0
+    unlockMovement: 0
+    revealObjectiveKey: 
+    revealObjectiveIndex: -1
+  - advance: 0
+    objectiveKey: 
+    revealObjective: 0
+    waitObjectiveKey: 
+    waitObjectiveIndex: -1
+    waitAllUnitsActed: 0
+    waitPlayerTurnStart: 0
+    text: "Antes de avan\xE7ar, inspecione a estrada e a plan\xEDcie ao redor de
+      Ramelle.\n\nCompare a prote\xE7\xE3o oferecida por cada terreno e escolha de
+      onde cada unidade iniciar\xE1 o ataque.\n\n[ordem]Inspecione os terrenos e
+      forme seu plano.[/ordem]"
+    voice: {fileID: 0}
+    spawnCommand: 
+    statCommand: 
+    turn: 0
+    movement: 0
+    unlockMovement: 0
+    revealObjectiveKey: 
+    revealObjectiveIndex: -1
+  - advance: 1
+    objectiveKey: hist_2_03
+    revealObjective: 1
+    waitObjectiveKey: 
+    waitObjectiveIndex: -1
+    waitAllUnitsActed: 0
+    waitPlayerTurnStart: 0
+    text: "O plano \xE9 seu. Minha recomenda\xE7\xE3o: aproximem-se juntos e deixem
+      as bazucas abrirem o combate.\n\n[ordem]Destrua o APC que ocupa Ramelle como
+      quiser.[/ordem]"
+    voice: {fileID: 0}
+    spawnCommand: 
+    statCommand: 
+    turn: 2
+    movement: 3
+    unlockMovement: 0
+    revealObjectiveKey: 
+    revealObjectiveIndex: -1
+  - advance: 0
+    objectiveKey: hist_2_04
+    revealObjective: 1
+    waitObjectiveKey: 
+    waitObjectiveIndex: -1
+    waitAllUnitsActed: 0
+    waitPlayerTurnStart: 0
+    text: "APC destru\xEDdo. Ramelle est\xE1 livre das armas inimigas.\n\nA arma
+      certa n\xE3o apaga o terreno, n\xE3o substitui for\xE7a suficiente e n\xE3o
+      corrige uma ordem ruim."
+    voice: {fileID: 0}
+    spawnCommand: 
+    statCommand: 
+    turn: 1
+    movement: 0
+    unlockMovement: 0
+    revealObjectiveKey: 
+    revealObjectiveIndex: -1
+  - advance: 0
+    objectiveKey: 
+    revealObjective: 0
+    waitObjectiveKey: 
+    waitObjectiveIndex: -1
+    waitAllUnitsActed: 0
+    waitPlayerTurnStart: 0
+    text: "Segunda li\xE7\xE3o conclu\xEDda.\n\nFuzil e metralhadora contra infantaria.
+      Bazuca contra ve\xEDculos e blindados.\n\nVencer \xE9 cumprir o objetivo. Vencer
+      bem \xE9 ainda possuir uma for\xE7a depois dele."
+    voice: {fileID: 0}
+    spawnCommand: 
+    statCommand: 
+    turn: 0
+    movement: 0
+    unlockMovement: 0
+    revealObjectiveKey: 
+    revealObjectiveIndex: -1
+  - advance: 0
+    objectiveKey: 
+    revealObjective: 0
+    waitObjectiveKey: 
+    waitObjectiveIndex: -1
+    waitAllUnitsActed: 0
+    waitPlayerTurnStart: 0
+    text: 
+    voice: {fileID: 0}
+    spawnCommand: 
+    statCommand: complete hist_2_04
+    turn: 0
+    movement: 0
+    unlockMovement: 0
+    revealObjectiveKey: 
+    revealObjectiveIndex: -1
+  dialogFlowMigrated: 1
+  scoldEndTurnLocked:
+    text: 
+    voice: {fileID: 0}
+  scoldCommandService:
+    text: 
+    voice: {fileID: 0}
+  scoldRemoveUnit:
+    text: 
+    voice: {fileID: 0}
+  scoldSurrender:
+    text: 
+    voice: {fileID: 0}
+  scoldStatusSummary:
+    text: 
+    voice: {fileID: 0}
+  scoldMovementLocked:
+    text: 
+    voice: {fileID: 0}
+  scoldHoldPosition:
+    text: 
+    voice: {fileID: 0}
+  scoldAttackOrder:
+    text: 
+    voice: {fileID: 0}
+  alwaysActedUnits: 
+  blockCommandService: 0
+  blockRemoveUnit: 0
+  blockSurrender: 0
+  blockStatusSummary: 0
   victoryDialog: {fileID: 0}

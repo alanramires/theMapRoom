@@ -1,4 +1,5 @@
 using TMPro;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -11,7 +12,9 @@ public class PanelRemainingController : MonoBehaviour
     [SerializeField] private TMP_Text textUnidade;
     [SerializeField] private TMP_Text textCap;
     [SerializeField] private TMP_Text textCamada;
+    [SerializeField] private TMP_Text labelCamada;
     [SerializeField] private Button buttonRodada;
+    [SerializeField] private Button buttonCamada;
     [SerializeField] private CursorController cursorController;
     [SerializeField] private TurnStateManager turnStateManager;
 
@@ -20,11 +23,13 @@ public class PanelRemainingController : MonoBehaviour
     private string lastCap = string.Empty;
     private string lastCamada = string.Empty;
     private Color lastColor = new Color(float.NaN, float.NaN, float.NaN, float.NaN);
+    private readonly List<FogOfWarVisionMode> availableVisionModes = new List<FogOfWarVisionMode>();
 
     private void Awake()
     {
         TryAutoAssignReferences();
         HookRoundButton();
+        HookLayerButton();
         Refresh(force: true);
         RefreshCamada(force: true);
     }
@@ -35,12 +40,15 @@ public class PanelRemainingController : MonoBehaviour
         Refresh(force: false);
         RefreshCamada(force: false);
         RefreshRoundButtonInteractability();
+        RefreshLayerButton();
     }
 
     private void OnDestroy()
     {
         if (buttonRodada != null)
             buttonRodada.onClick.RemoveListener(HandleRoundButtonClicked);
+        if (buttonCamada != null)
+            buttonCamada.onClick.RemoveListener(HandleLayerButtonClicked);
     }
 
 #if UNITY_EDITOR
@@ -78,6 +86,8 @@ public class PanelRemainingController : MonoBehaviour
 
         if (textCamada == null)
             textCamada = FindNamedTmpText("text_camada");
+        if (labelCamada == null)
+            labelCamada = FindNamedTmpText("label_camada");
 
         if (buttonRodada == null)
         {
@@ -88,6 +98,47 @@ public class PanelRemainingController : MonoBehaviour
                 HookRoundButton();
             }
         }
+
+        if (buttonCamada == null)
+        {
+            Transform buttonTransform = FindChildRecursive(transform, "button_camada");
+            if (buttonTransform != null)
+            {
+                buttonCamada = buttonTransform.GetComponent<Button>();
+                HookLayerButton();
+            }
+        }
+    }
+
+    private void HookLayerButton()
+    {
+        if (buttonCamada == null)
+            return;
+        buttonCamada.onClick.RemoveListener(HandleLayerButtonClicked);
+        buttonCamada.onClick.AddListener(HandleLayerButtonClicked);
+    }
+
+    private void HandleLayerButtonClicked()
+    {
+        TryAutoAssignReferences();
+        if (buttonCamada == null || !buttonCamada.interactable || matchController == null)
+            return;
+        matchController.CycleFogOfWarVisionMode();
+    }
+
+    private void RefreshLayerButton()
+    {
+        if (buttonCamada == null)
+            return;
+        int count = matchController != null
+            ? matchController.GetAvailableFogOfWarVisionModes(availableVisionModes)
+            : 0;
+        bool visible = count > 1;
+        if (buttonCamada.gameObject.activeSelf != visible)
+            buttonCamada.gameObject.SetActive(visible);
+        buttonCamada.interactable = visible && matchController != null &&
+            !matchController.HasVictoryWinner && !matchController.IsTurnTransitionInProgress &&
+            !matchController.IsPlayerInputLockedByActiveAI();
     }
 
     private void HookRoundButton()
@@ -135,6 +186,7 @@ public class PanelRemainingController : MonoBehaviour
         string label = GetFogOfWarVisionModeLabel(mode);
         if (textCamada != null)
             textCamada.text = label;
+        RefreshLayerLabel(mode, label);
         lastCamada = label;
     }
 
@@ -200,7 +252,18 @@ public class PanelRemainingController : MonoBehaviour
 
         if (textCamada != null)
             textCamada.text = label;
+        RefreshLayerLabel(mode, label);
         lastCamada = label;
+    }
+
+    private void RefreshLayerLabel(FogOfWarVisionMode mode, string modeLabel)
+    {
+        if (labelCamada == null)
+            return;
+        bool visible = mode != FogOfWarVisionMode.All;
+        labelCamada.gameObject.SetActive(visible);
+        if (visible)
+            labelCamada.text = $"Camada: {modeLabel}";
     }
 
     private static string GetFogOfWarVisionModeLabel(FogOfWarVisionMode mode)

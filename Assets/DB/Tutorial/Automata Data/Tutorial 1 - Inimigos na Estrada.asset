@@ -15,7 +15,7 @@ MonoBehaviour:
   id: walking down the road
   unitToken: SD
   teamId: 1
-  preferAttack: 0
+  preferAttack: 1
   fallbackMove: 1
   moveTowardsTarget: 1
   moveTargetCell: {x: 3, y: -2, z: 0}

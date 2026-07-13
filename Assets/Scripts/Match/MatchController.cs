@@ -158,6 +158,7 @@ public class MatchController : MonoBehaviour
     public DialogManager DialogManager => dialogManager;
     [Header("Turn Transition")]
     [SerializeField] private MatchMusicAudioManager matchMusicAudioManager;
+    [SerializeField] private PanelRodadaController panelRodada;
     [SerializeField] [Range(0f, 2f)] private float advanceTurnPreDelay = 0.1f;
     [SerializeField] [Range(0f, 2f)] private float advanceTurnPostDelay = 0f;
     [Header("Victory Stars")]
@@ -175,6 +176,7 @@ public class MatchController : MonoBehaviour
     [SerializeField] private DPQAirHeightConfig fogOfWarDpqAirHeightConfig;
     [SerializeField, HideInInspector] [Range(0f, 1f)] private float fogOfWarAlpha = 0.65f;
     [SerializeField] private FogOfWarVisionMode fogOfWarVisionMode = FogOfWarVisionMode.All;
+    [System.NonSerialized] private readonly Dictionary<int, FogOfWarVisionMode> fogVisionModeByPlayerIndex = new Dictionary<int, FogOfWarVisionMode>();
     [Header("Victory Overlay")]
     [SerializeField] private bool showVictoryOverlay = true;
     [SerializeField] private Tilemap victoryOverlayTilemap;
@@ -420,12 +422,14 @@ public class MatchController : MonoBehaviour
     public int MaxUnitsPerTeam => Mathf.Max(1, maxUnitsPerTeam);
     public AutonomyDatabase AutonomyDatabase => autonomyDatabase;
     public int ActivePlayerListIndex => activePlayerListIndex;
-    public bool IsTurnTransitionInProgress => advanceTurnTransitionRoutine != null;
+    public bool IsTurnTransitionInProgress => hotSeatGateActive || advanceTurnTransitionRoutine != null;
+    public bool IsHotSeatGateActive => hotSeatGateActive;
     public bool EnableVictoryStars => enableVictoryStars;
     public int VictoryStarsToWin => ClampVictoryStarsGoal(victoryStarsToWin);
     public bool HasVictoryWinner => hasVictoryWinner;
     public TeamId VictoryWinnerTeam => victoryWinnerTeam;
     private Coroutine advanceTurnTransitionRoutine;
+    private bool hotSeatGateActive;
 
     public int GetVictoryStars(TeamId team)
     {
@@ -786,6 +790,8 @@ public class MatchController : MonoBehaviour
 
     private void Awake()
     {
+        fogVisionModeByPlayerIndex.Clear();
+        fogOfWarVisionMode = FogOfWarVisionMode.All;
         if (PartidaConfig.HasPending)
         {
             PartidaConfig.Apply(this);
@@ -796,6 +802,7 @@ public class MatchController : MonoBehaviour
         ApplyGameSetupPreset();
         SyncThreatRevisionFlags();
         NormalizeState();
+        hotSeatGateActive = Application.isPlaying && AreAllPlayersHuman();
         TryRefreshIncomeFromConstructions(markDirtyInEditor: false);
         TryAutoAssignCursorController();
         TryAutoAssignTurnStateManager();
@@ -819,27 +826,39 @@ public class MatchController : MonoBehaviour
     private void Start()
     {
         if (Application.isPlaying)
+            StartCoroutine(InitializeMatchAfterHotSeatGate());
+        else
         {
-            FindAnyObjectByType<ReplayManager>()?.CleanupReplayArtifactsForMatchStart();
-            RecomputeTeamFlips();
-            ResetUnfundedStartMoneyFlagsForFreshMatch();
-            ApplyActiveTeamIfChanged(force: true);
-            // Hard-code de observacao: em partidas AI vs AI, mantenha a apresentacao
-            // de debug equivalente ao comando `fow partial` para acompanharmos ambos
-            // os times em suas proprias perspectivas.
-            if (AreAllPlayerSlotsAI())
-                SetFogOfWarDebugPartial();
-            TryAutoAssignTurnTransitionReferences();
-            matchMusicAudioManager?.PrepareForMatchStart(forceRestartPlayback: true);
-            
-            // Garante que o painel de fim de jogo comece oculto
-            foreach (GameObject go in Resources.FindObjectsOfTypeAll<GameObject>())
+            TryBootstrapInitialStealthDetection();
+            RunTurnStartStillObservedForActiveTeamStealthUnits();
+        }
+    }
+
+    private IEnumerator InitializeMatchAfterHotSeatGate()
+    {
+        // Esta e a barreira real de inicializacao: nenhum efeito de inicio de turno,
+        // camera, FoW ou musica da partida e liberado antes da confirmacao hot seat.
+        if (panelRodada == null)
+            panelRodada = FindAnyObjectByType<PanelRodadaController>(FindObjectsInactive.Include);
+        if (AreAllPlayersHuman() && panelRodada != null)
+            yield return panelRodada.Apresentar(ActiveTeam, 1, currentTurn);
+
+        FindAnyObjectByType<ReplayManager>()?.CleanupReplayArtifactsForMatchStart();
+        RecomputeTeamFlips();
+        ResetUnfundedStartMoneyFlagsForFreshMatch();
+        ApplyActiveTeamIfChanged(force: true);
+        if (AreAllPlayerSlotsAI())
+            SetFogOfWarDebugPartial();
+        TryAutoAssignTurnTransitionReferences();
+        hotSeatGateActive = false;
+        matchMusicAudioManager?.PrepareForMatchStart(forceRestartPlayback: true);
+
+        foreach (GameObject go in Resources.FindObjectsOfTypeAll<GameObject>())
+        {
+            if (go.name == "Panel_endGame" && go.scene.name != null)
             {
-                if (go.name == "Panel_endGame" && go.scene.name != null)
-                {
-                    go.SetActive(false);
-                    break;
-                }
+                go.SetActive(false);
+                break;
             }
         }
         TryBootstrapInitialStealthDetection();
@@ -1062,6 +1081,8 @@ public class MatchController : MonoBehaviour
             return;
 
         fogOfWarVisionMode = mode;
+        if (activePlayerListIndex >= 0)
+            fogVisionModeByPlayerIndex[activePlayerListIndex] = mode;
         if (Application.isPlaying && debugFogOfWarEnabled && enableTotalWar)
             RefreshFogOfWarForActiveTeam();
         Debug.Log($"[FogOfWar] VisionMode={fogOfWarVisionMode}");
@@ -1101,7 +1122,7 @@ public class MatchController : MonoBehaviour
         };
     }
 
-    private bool IsFogOfWarVisionModeAvailable(FogOfWarVisionMode mode)
+    public bool IsFogOfWarVisionModeAvailable(FogOfWarVisionMode mode)
     {
         if (mode == FogOfWarVisionMode.All)
             return true;
@@ -1234,7 +1255,34 @@ public class MatchController : MonoBehaviour
     // Bloqueio central de input humano durante o turno de um time controlado por IA.
     public bool IsPlayerInputLockedByActiveAI()
     {
-        return Application.isPlaying && IsActiveTeamAI() && !AIController.IsDebugPaused;
+        return Application.isPlaying && (hotSeatGateActive || (IsActiveTeamAI() && !AIController.IsDebugPaused));
+    }
+
+    public int GetAvailableFogOfWarVisionModes(List<FogOfWarVisionMode> output)
+    {
+        if (output == null)
+            return 0;
+
+        output.Clear();
+        FogOfWarVisionMode[] modes =
+        {
+            FogOfWarVisionMode.All,
+            FogOfWarVisionMode.Air,
+            FogOfWarVisionMode.Surface,
+            FogOfWarVisionMode.Sub
+        };
+        for (int i = 0; i < modes.Length; i++)
+            if (IsFogOfWarVisionModeAvailable(modes[i]))
+                output.Add(modes[i]);
+        return output.Count;
+    }
+
+    public bool AreAllPlayersHuman()
+    {
+        if (players == null || players.Count < 2) return false;
+        for (int i = 0; i < players.Count; i++)
+            if (players[i].isAI) return false;
+        return true;
     }
 
     public bool IsTeamDefeated(TeamId team)
@@ -1324,6 +1372,11 @@ public class MatchController : MonoBehaviour
     {
         if (freezeTurnAdvanceAfterVictory && hasVictoryWinner)
             return;
+        // Defesa contra qualquer preview de movimento que tenha sido interrompido:
+        // nenhuma unidade pode carregar a layer temporaria de FoW para outro turno.
+        UnitManager[] unitsBeforeTurnAdvance = FindObjectsByType<UnitManager>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        for (int i = 0; i < unitsBeforeTurnAdvance.Length; i++)
+            unitsBeforeTurnAdvance[i]?.EndTemporaryFogTraversalVisual();
         if (Application.isPlaying)
             OnBeforeAdvanceTurn?.Invoke();
         if (players.Count == 0)
@@ -1428,9 +1481,26 @@ public class MatchController : MonoBehaviour
         if (preDelay > 0f)
             yield return new WaitForSeconds(preDelay);
 
+        if (panelRodada == null)
+            panelRodada = FindAnyObjectByType<PanelRodadaController>(FindObjectsInactive.Include);
+
+        // O painel preto sobe antes de trocar time/FoW/camera, preservando o hot seat.
+        bool useHotSeatPanel = AreAllPlayersHuman() && panelRodada != null;
+        if (useHotSeatPanel)
+        {
+            panelRodada.gameObject.SetActive(true);
+            CanvasGroup privacy = panelRodada.GetComponent<CanvasGroup>();
+            if (privacy == null) privacy = panelRodada.gameObject.AddComponent<CanvasGroup>();
+            privacy.alpha = 1f;
+            privacy.blocksRaycasts = true;
+        }
+
         double advanceTurnStartMs = TurnPerfNowMs();
         AdvanceTurn();
         TurnPerfLog("AdvanceTurn", advanceTurnStartMs);
+
+        if (useHotSeatPanel && !hasVictoryWinner)
+            yield return panelRodada.Apresentar(ActiveTeam, activePlayerListIndex + 1, currentTurn);
 
         float postDelay = turnStateManager != null ? turnStateManager.AdvanceTurnPostDelay : advanceTurnPostDelay;
         if (postDelay > 0f)
@@ -2130,6 +2200,11 @@ public class MatchController : MonoBehaviour
         }
         activePlayerListIndex = index;
         activeTeamId = (int)players[index].teamId;
+        fogOfWarVisionMode = fogVisionModeByPlayerIndex.TryGetValue(index, out FogOfWarVisionMode savedMode)
+            && IsFogOfWarVisionModeAvailable(savedMode)
+            ? savedMode
+            : FogOfWarVisionMode.All;
+        UpdateFogOfWarVisionModePanel(fogOfWarVisionMode);
         ApplyActiveTeamIfChanged(force: forceApply);
     }
 
@@ -2137,6 +2212,8 @@ public class MatchController : MonoBehaviour
     {
         activePlayerListIndex = -1;
         activeTeamId = (int)TeamId.Neutral;
+        fogOfWarVisionMode = FogOfWarVisionMode.All;
+        UpdateFogOfWarVisionModePanel(fogOfWarVisionMode);
         ApplyActiveTeamIfChanged(force: false);
     }
 
@@ -3011,7 +3088,9 @@ public class MatchController : MonoBehaviour
         {
             RenderFogOverlayFromRuntimeCache(boardMap);
             if (Application.isPlaying)
+            {
                 OnFogOfWarUpdated?.Invoke();
+            }
         }
 
         if (enableFogStepPerfLogs)
@@ -3853,6 +3932,7 @@ public class MatchController : MonoBehaviour
         return fogVisibleContributorsByCell.TryGetValue(cell, out int contributors) && contributors > 0;
     }
 
+
     public bool ShouldHideActiveAiActionPresentation()
     {
         return ShouldUseHumanFogPresentation(out _);
@@ -4368,8 +4448,10 @@ public class MatchController : MonoBehaviour
     // Deve ser chamado apenas após todos os UpdateFogVisibilityForUnit do turno terem rodado.
     private void RenderFogOverlayFromRuntimeCache(Tilemap boardMap)
     {
-        bool useDisplayFilter = fogOfWarVisionMode != FogOfWarVisionMode.All;
-        if (useDisplayFilter)
+        bool useDisplayFilter = true;
+        if (fogOfWarVisionMode == FogOfWarVisionMode.All)
+            BuildFogDisplayVisibleCellsForAllModes(boardMap, fogDisplayVisibleCellsBuffer);
+        else
             BuildFogDisplayVisibleCellsForMode(boardMap, fogOfWarVisionMode, fogDisplayVisibleCellsBuffer);
 
         fogOfWarTilemap.ClearAllTiles();
@@ -4387,6 +4469,20 @@ public class MatchController : MonoBehaviour
             fogOfWarTilemap.SetTileFlags(cell, TileFlags.None);
             fogOfWarTilemap.SetColor(cell, fogColor);
         }
+    }
+
+    private void BuildFogDisplayVisibleCellsForAllModes(Tilemap boardMap, HashSet<Vector3Int> output)
+    {
+        if (output == null)
+            return;
+        output.Clear();
+
+        BuildFogDisplayVisibleCellsForMode(boardMap, FogOfWarVisionMode.Air, fogVisibleCellsBuffer);
+        output.UnionWith(fogVisibleCellsBuffer);
+        BuildFogDisplayVisibleCellsForMode(boardMap, FogOfWarVisionMode.Surface, fogVisibleCellsBuffer);
+        output.UnionWith(fogVisibleCellsBuffer);
+        BuildFogDisplayVisibleCellsForMode(boardMap, FogOfWarVisionMode.Sub, fogVisibleCellsBuffer);
+        output.UnionWith(fogVisibleCellsBuffer);
     }
 
     private void BuildFogDisplayVisibleCellsForMode(
@@ -4430,8 +4526,7 @@ public class MatchController : MonoBehaviour
             }
         }
 
-        // Construcoes aliadas fornecem vigilancia local em todas as camadas:
-        // somente o proprio hex, sem ampliar alcance nem atuar como spotter.
+        // Construcoes aliadas usam o mesmo alcance configurado em todas as camadas.
         AddFriendlyConstructionDisplayCells(boardMap, output);
     }
 
@@ -4491,8 +4586,19 @@ public class MatchController : MonoBehaviour
 
             Vector3Int cell = construction.CurrentCellPosition;
             cell.z = 0;
-            if (boardMap.GetTile(cell) != null)
-                output.Add(cell);
+            if (boardMap.GetTile(cell) == null)
+                continue;
+
+            int visionRange = 0;
+            if (construction.TryResolveConstructionData(out ConstructionData constructionData) &&
+                constructionData != null)
+            {
+                visionRange = Mathf.Max(0, constructionData.visao);
+            }
+
+            HashSet<Vector3Int> visibleCells = BuildCellsInRadius(boardMap, cell, visionRange);
+            foreach (Vector3Int visibleCell in visibleCells)
+                output.Add(visibleCell);
         }
     }
 

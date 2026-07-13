@@ -48,6 +48,7 @@ public partial class TurnStateManager
         Tilemap movementTilemap = terrainTilemap != null ? terrainTilemap : selectedUnit.BoardTilemap;
         List<Vector3Int> walkedTrail = new List<Vector3Int> { path[0] };
         DrawCommittedPathVisual(walkedTrail);
+        SetTemporaryFogTraversalUnit(selectedUnit);
         animationManager.PlayMovement(
             selectedUnit,
             movementTilemap,
@@ -96,6 +97,7 @@ public partial class TurnStateManager
             $"[Rollback] Iniciando animacao de retorno | from={destinationCell.x},{destinationCell.y} -> " +
             $"to={originCell.x},{originCell.y} | steps={reversePath.Count}");
         ClearCommittedPathVisual();
+        SetTemporaryFogTraversalUnit(selectedUnit);
         animationManager.PlayMovement(
             selectedUnit,
             movementTilemap,
@@ -118,6 +120,8 @@ public partial class TurnStateManager
             matchController.RefreshFogOfWarForActiveTeam();
         if (selectedUnit != null)
         {
+            if (onCompleteState == CursorState.UnitSelected)
+                ClearTemporaryFogTraversalVisual();
             animationManager?.ApplySelectionVisual(selectedUnit);
             ReapplyForcedUnitVisualForFog(selectedUnit);
         }
@@ -517,4 +521,3 @@ public partial class TurnStateManager
         cursorController.PlayUnitMovementSfx(unit.GetMovementCategory());
     }
 }
-

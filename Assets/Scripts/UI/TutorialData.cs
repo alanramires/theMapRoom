@@ -123,7 +123,7 @@ public class TutorialDialogEntry
     [Tooltip("Spawns executados quando esta fala aparece (uma unica vez). Formato: 'slot0 SD 1,3' ou '1 SD 5,6'. Opcoes apos as coordenadas: 'acted' (nasce ja agiu), 'name=Ryan' (renomeia, _ vira espaco), 'cursor' (move o cursor ate a unidade). Multiplos separados por ';'. Ex.: slot0 SD 1,3 name=Ryan cursor")]
     public string spawnCommand;
 
-    [Tooltip("Ajustes executados quando esta fala aparece (uma unica vez). Formatos: 'NOME stat=valor' (hp/fuel/ammo); 'wake 1,3' / 'wake Ryan' (reativa unidade); 'show Bandeira' / 'hide Bandeira' / 'show 5,4' (isVisible de construcao); 'pan Bandeira' / 'pan Ryan' / 'pan 5,4' (desliza SO a camera, cursor intocado). Multiplos separados por ';'. Ex.: show Bandeira; pan Bandeira")]
+    [Tooltip("Ajustes executados quando esta fala aparece (uma unica vez). Formatos: 'NOME stat=valor' (hp/fuel/ammo); 'wake 1,3' / 'wake Ryan' (reativa unidade); 'show Bandeira' / 'hide Bandeira' / 'show 5,4' (isVisible de construcao); 'pan Bandeira' / 'pan Ryan' / 'pan 5,4' (desliza SO a camera, cursor intocado); 'cursor Ryan' / 'cursor Ramelle' / 'cursor 3,1' (move apenas o cursor, sem selecionar); 'zoom 1.5' (orthographicSize exato). Multiplos separados por ';'. Ex.: pan Bandeira; cursor Bandeira; zoom 1.5")]
     public string statCommand;
 
     [FormerlySerializedAs("unlockEndTurn")]

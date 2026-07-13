@@ -164,6 +164,7 @@ public partial class TurnStateManager : MonoBehaviour
     private bool turnStartRallyExecutionInProgress;
     private readonly List<PlayerActionSubStep> turnStartFuelDepletionReplaySubSteps = new List<PlayerActionSubStep>();
     private readonly HashSet<int> debugTempMoveUnitInstanceIds = new HashSet<int>();
+    private UnitManager temporaryFogTraversalUnit;
     private readonly Stack<CursorState> stateStack = new Stack<CursorState>();
     private TextElement fsmDebugText;
 
@@ -2323,6 +2324,7 @@ public partial class TurnStateManager : MonoBehaviour
 
     private void ClearCommittedMovement()
     {
+        ClearTemporaryFogTraversalVisual();
         committedMovementPath.Clear();
         committedOriginCell = Vector3Int.zero;
         committedDestinationCell = Vector3Int.zero;
@@ -2330,6 +2332,21 @@ public partial class TurnStateManager : MonoBehaviour
         hasCommittedMovementLayerBefore = false;
         hasForcedLayerRollbackSnapshot = false;
         ClearCommittedPathVisual();
+    }
+
+    private void SetTemporaryFogTraversalUnit(UnitManager unit)
+    {
+        if (temporaryFogTraversalUnit != null && temporaryFogTraversalUnit != unit)
+            temporaryFogTraversalUnit.EndTemporaryFogTraversalVisual();
+        temporaryFogTraversalUnit = unit;
+        temporaryFogTraversalUnit?.BeginTemporaryFogTraversalVisual();
+    }
+
+    private void ClearTemporaryFogTraversalVisual()
+    {
+        if (temporaryFogTraversalUnit != null)
+            temporaryFogTraversalUnit.EndTemporaryFogTraversalVisual();
+        temporaryFogTraversalUnit = null;
     }
 
 #if UNITY_EDITOR

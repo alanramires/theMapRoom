@@ -231,6 +231,16 @@ public class UnitData : ScriptableObject
     public bool useExplicitPreferredNavalHeight = false;
     [Tooltip("Altura naval preferencial quando o override acima estiver ligado.")]
     public HeightLevel preferredNavalHeight = HeightLevel.Submerged;
+    [Header("Layer Reveal After Attacking")]
+    [Tooltip("Se ligado, ao atacar esta unidade e forcada para o dominio/altura abaixo (ex.: submarino que emerge para disparar), revelando-a. O retorno so acontece apos o lock abaixo expirar (mesmo comportamento do Layer Force After Hit).")]
+    public bool emergesToAttack = false;
+    [Tooltip("Dominio para o qual a unidade e forcada apos atacar, quando o campo acima estiver ligado.")]
+    public Domain emergeAfterAttackDomain = Domain.Naval;
+    [Tooltip("Altura para a qual a unidade e forcada apos atacar, quando o campo acima estiver ligado.")]
+    public HeightLevel emergeAfterAttackHeight = HeightLevel.Surface;
+    [Min(1)]
+    [Tooltip("Duracao do lock de camada (em turnos do dono da unidade) apos emergir por ataque. Mantenha igual ao 'turns' da arma que forca emersao por dano, senao atacar fica mais seguro que ser atingido.")]
+    public int emergeAfterAttackTurns = 2;
     [Header("Skills")]
     [Tooltip("Skills base da unidade. As instancias herdam essa lista ao aplicar o UnitData.")]
     public List<SkillData> skills = new List<SkillData>();

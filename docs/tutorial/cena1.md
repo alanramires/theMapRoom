@@ -12,7 +12,7 @@ Reabastecer (X), dispensar unidade (U), render-se e Situação travados a cena i
 bronca do Sargento no próprio balão + error.mp3.
 
 Sargento:
-Bem-vindo, recruta. Já encheu o bucho com a comida da caserna e tomou o chá brochante do tonel de óleo diesel?
+Bem-vindo, recruta. Já encheu o bucho com a comida da caserna e tomou o café que parece óleo diesel?
 
 <ao avançar: spawn do Ryan em 1,3 (`slot0 SD 1,3 name=Ryan cursor`) — toca done.mp3 e o cursor desliza até ele>
 
@@ -41,7 +41,7 @@ Antes de puxar o gatilho, primeiro é preciso conhecer a si mesmo.
 Meu Velho falava algo nessa linha, mas ele provavelmente não precisava lidar com recruta sonolento.
 
 Olhe bem para você e seus companheiros.
-[ordem]Aproxime o zoom usando a bolinha do mouse ou o toque do celular.[/ordem]
+[ordem]Aproxime a câmera com a roda do mouse ou fazendo o gesto de pinça na tela.[/ordem]
 
 <gate: espera CAMERA_ZOOM completar>
 
@@ -142,7 +142,7 @@ Ela mostra até onde você pode ir neste turno.
 Você anda 3 casas em terreno normal.
 Mas cada movimento consome autonomia.
 
-Marchar cansa, soldado. Até no treinamento de fuga e evasão da AMAN.
+Marchar cansa, soldado. Até no treinamento de fuga e evasão da Academia.
 
 ---
 
@@ -161,7 +161,7 @@ Vá até lá.
 Mas preste atenção: terreno diferente cobra preço diferente.
 
 Planície é fácil.
-Floresta atrasa veiculos, mas não influencia a infantaria. Aqui é CIGS!
+Floresta atrasa veiculos, mas não influencia a infantaria. Aqui é Selva!
 Montanha cobra mais da perna.
 
 Para a infantaria, subir montanha custa mais esforço.

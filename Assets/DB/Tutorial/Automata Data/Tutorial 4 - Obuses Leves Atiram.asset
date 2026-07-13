@@ -16,7 +16,7 @@ MonoBehaviour:
   unitToken: OL
   teamId: 1
   preferAttack: 1
-  fallbackMove: 1
+  fallbackMove: 0
   moveTowardsTarget: 0
   moveTargetCell: {x: 0, y: 0, z: 0}
   stopDistance: 0

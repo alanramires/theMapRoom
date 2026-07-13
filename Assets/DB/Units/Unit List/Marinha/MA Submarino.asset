@@ -103,6 +103,10 @@ MonoBehaviour:
   preferredAirHeight: 4
   useExplicitPreferredNavalHeight: 1
   preferredNavalHeight: 2
+  emergesToAttack: 1
+  emergeAfterAttackDomain: 1
+  emergeAfterAttackHeight: 3
+  emergeAfterAttackTurns: 2
   skills: []
   stealthSkills:
   - {fileID: 11400000, guid: bd65f7348de04da4681b0f7387af6998, type: 2}
