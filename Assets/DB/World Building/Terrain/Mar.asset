@@ -37,7 +37,7 @@ MonoBehaviour:
   ev: 0
   shooterInheritsTerrainEv: 0
   shooterInheritedEvOverride: -1
-  blockLoS: 1
+  blockLoS: 0
   constructionVisionOverrides: []
   structureVisionOverrides: []
   requiredSkillsToEnter: []

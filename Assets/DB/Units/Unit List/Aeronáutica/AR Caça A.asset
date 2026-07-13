@@ -35,6 +35,7 @@ MonoBehaviour:
   roles: 08000000
   aiInitiative: 1
   aiPurchaseMode: 2
+  bannedOnHardMode: 0
   aiTargetPreferenceByClass:
   - targetClass: 6
     priority: 2
@@ -90,11 +91,18 @@ MonoBehaviour:
   preferredAirHeight: 4
   useExplicitPreferredNavalHeight: 0
   preferredNavalHeight: 2
+  emergesToAttack: 0
+  emergeAfterAttackDomain: 1
+  emergeAfterAttackHeight: 3
+  emergeAfterAttackTurns: 2
   skills:
   - {fileID: 11400000, guid: 3f52a3b7c5d14c5ea1f0f9aa34d2be11, type: 2}
   - {fileID: 11400000, guid: e73850be27dc4e2e8c8f210db151b0b4, type: 2}
   stealthSkills: []
-  stealthSkillRules: []
+  stealthSkillRules:
+  - domain: 3
+    heightLevel: 5
+    skill: {fileID: 11400000, guid: 3ae2d2213e72ea144a307a743470d032, type: 2}
   autonomyData: {fileID: 11400000, guid: d52348f636f1466d95a6489891e176bf, type: 2}
   embarkedWeapons:
   - weapon: {fileID: 11400000, guid: 90f330ac8c9e6624fafb495e58bdba25, type: 2}

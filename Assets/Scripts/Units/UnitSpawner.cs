@@ -20,6 +20,8 @@ public class UnitSpawner : MonoBehaviour
 
     [SerializeField] private Transform spawnParent;
 
+    public UnitDatabase UnitDatabase => unitDatabase;
+
     private void Start()
     {
         TryAutoAssignBoardTilemap();

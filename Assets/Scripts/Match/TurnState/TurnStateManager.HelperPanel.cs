@@ -60,6 +60,7 @@ public partial class TurnStateManager
         public string ShoppingConstructionName;
         public string UnitStatsName;
         public readonly List<string> UnitStatsLines = new List<string>();
+        public readonly List<HelperTransportedUnitVisual> UnitStatsTransportedVisuals = new List<HelperTransportedUnitVisual>();
         public bool UnitStatsShowKeepPositionAimHint;
         public string UnitStatsLocalLabel;
         public Sprite UnitStatsLocalSprite;
@@ -115,6 +116,13 @@ public partial class TurnStateManager
         public int SubjectTeamId = int.MinValue;
         public bool ShowTimeoutProgress;
         public float TimeoutProgress01;
+    }
+
+    public sealed class HelperTransportedUnitVisual
+    {
+        public string unitName;
+        public Sprite sprite;
+        public int depth;
     }
 
     private float commandServiceHelperVisibleUntil = -1f;
@@ -790,7 +798,7 @@ public partial class TurnStateManager
         {
             data.UnitStatsLines.Add(string.Empty);
             data.UnitStatsLines.Add("SECTION:Transporting");
-            AppendTransportedUnitStatsLines(data.UnitStatsLines, unit, depth: 0);
+            AppendTransportedUnitStatsLines(data, unit, depth: 0);
         }
 
         // 4. Services
@@ -2356,16 +2364,16 @@ public partial class TurnStateManager
 #endif
     }
 
-    private void AppendTransportedUnitStatsLines(List<string> lines, UnitManager transporter, int depth)
+    private void AppendTransportedUnitStatsLines(HelperPanelData data, UnitManager transporter, int depth)
     {
-        if (lines == null || transporter == null)
+        if (data == null || transporter == null)
             return;
 
         IReadOnlyList<UnitTransportSeatRuntime> seats = transporter.TransportedUnitSlots;
         if (seats == null || seats.Count <= 0)
             return;
 
-        string indent = new string(' ', Mathf.Max(0, depth) * 4);
+        string indent = new string(' ', (Mathf.Max(0, depth) + 1) * 4);
         for (int i = 0; i < seats.Count; i++)
         {
             UnitManager passenger = seats[i] != null ? seats[i].embarkedUnit : null;
@@ -2374,8 +2382,23 @@ public partial class TurnStateManager
 
             string stats = BuildUnitStatInlineWithoutSupplies(passenger);
             string supplies = BuildUnitSuppliesInline(passenger);
-            lines.Add($"{indent}{ResolveUnitRuntimeName(passenger)} ({stats})||SUPPLIES||{supplies}");
-            AppendTransportedUnitStatsLines(lines, passenger, depth + 1);
+            string passengerName = ResolveUnitRuntimeName(passenger);
+            data.UnitStatsLines.Add($"{indent}{passengerName} ({stats})||SUPPLIES||{supplies}");
+            Sprite passengerSprite = null;
+            if (passenger.TryGetUnitData(out UnitData passengerData) && passengerData != null)
+                passengerSprite = TeamUtils.GetTeamSprite(passengerData, passenger.TeamId);
+            if (passengerSprite == null)
+            {
+                SpriteRenderer passengerRenderer = passenger.GetMainSpriteRenderer();
+                passengerSprite = passengerRenderer != null ? passengerRenderer.sprite : null;
+            }
+            data.UnitStatsTransportedVisuals.Add(new HelperTransportedUnitVisual
+            {
+                unitName = passengerName,
+                sprite = passengerSprite,
+                depth = depth
+            });
+            AppendTransportedUnitStatsLines(data, passenger, depth + 1);
         }
     }
 

@@ -169,6 +169,7 @@ public class PanelHelperController : MonoBehaviour
     private TMP_Text unitStatsLocalText;
     private TMP_Text unitStatsDefenseText;
     private bool unitStatsLocalAtBottom;
+    private readonly List<Image> unitStatsTransportedIcons = new List<Image>();
     private GameObject disembarkActionsRoot;
     private readonly List<Button> disembarkActionButtons = new List<Button>();
     private readonly List<int> disembarkActionFocusIndices = new List<int>();
@@ -1514,6 +1515,7 @@ public class PanelHelperController : MonoBehaviour
         RefreshAimFooterFocus(panelVisible, data);
         RefreshAimConfirmDetails(panelVisible, data);
         RefreshUnitStatsLocal(panelVisible, data);
+        RefreshUnitStatsTransportedIcons(panelVisible, data);
         RefreshDisembarkActionControls(panelVisible, data);
         RefreshShoppingActionControls(panelVisible, data);
         RefreshPersistenceActionControls(panelVisible);
@@ -1866,6 +1868,75 @@ public class PanelHelperController : MonoBehaviour
         unitStatsLocalAtBottom = data.Kind == TurnStateManager.HelperPanelKind.UnitStats ||
                                  data.Kind == TurnStateManager.HelperPanelKind.ConstructionStats;
         unitStatsLocalRoot.SetActive(true);
+    }
+
+    private void RefreshUnitStatsTransportedIcons(bool panelVisible, TurnStateManager.HelperPanelData data)
+    {
+        bool active = panelVisible && helperTxt != null && data != null &&
+                      data.Kind == TurnStateManager.HelperPanelKind.UnitStats &&
+                      data.UnitStatsTransportedVisuals != null && data.UnitStatsTransportedVisuals.Count > 0;
+        if (!active)
+        {
+            for (int i = 0; i < unitStatsTransportedIcons.Count; i++)
+                if (unitStatsTransportedIcons[i] != null) unitStatsTransportedIcons[i].gameObject.SetActive(false);
+            return;
+        }
+
+        helperTxt.ForceMeshUpdate();
+        string renderedText = helperTxt.text ?? string.Empty;
+        int searchStart = 0;
+        for (int i = 0; i < data.UnitStatsTransportedVisuals.Count; i++)
+        {
+            TurnStateManager.HelperTransportedUnitVisual visual = data.UnitStatsTransportedVisuals[i];
+            Image icon = EnsureUnitStatsTransportedIcon(i);
+            if (visual == null || visual.sprite == null || icon == null)
+            {
+                if (icon != null) icon.gameObject.SetActive(false);
+                continue;
+            }
+
+            int textIndex = renderedText.IndexOf(visual.unitName ?? string.Empty, searchStart, System.StringComparison.Ordinal);
+            if (textIndex < 0 || textIndex >= helperTxt.textInfo.characterCount)
+            {
+                icon.gameObject.SetActive(false);
+                continue;
+            }
+
+            searchStart = textIndex + Mathf.Max(1, (visual.unitName ?? string.Empty).Length);
+            TMP_CharacterInfo character = helperTxt.textInfo.characterInfo[textIndex];
+            RectTransform rect = icon.rectTransform;
+            rect.localPosition = new Vector3(
+                character.bottomLeft.x - 29f,
+                (character.bottomLeft.y + character.topRight.y) * 0.5f,
+                0f);
+            icon.sprite = visual.sprite;
+            icon.color = Color.white;
+            icon.gameObject.SetActive(true);
+        }
+
+        for (int i = data.UnitStatsTransportedVisuals.Count; i < unitStatsTransportedIcons.Count; i++)
+            if (unitStatsTransportedIcons[i] != null) unitStatsTransportedIcons[i].gameObject.SetActive(false);
+    }
+
+    private Image EnsureUnitStatsTransportedIcon(int index)
+    {
+        while (unitStatsTransportedIcons.Count <= index)
+        {
+            GameObject obj = new GameObject(
+                $"transported_unit_icon_{unitStatsTransportedIcons.Count}",
+                typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+            RectTransform rect = obj.GetComponent<RectTransform>();
+            rect.SetParent(helperTxt.transform, false);
+            rect.anchorMin = rect.anchorMax = rect.pivot = new Vector2(0.5f, 0.5f);
+            // Mesmo tamanho visual do icone do hex inspecionado (LOCAL).
+            rect.sizeDelta = new Vector2(52f, 52f);
+            Image image = obj.GetComponent<Image>();
+            image.preserveAspect = true;
+            image.raycastTarget = false;
+            unitStatsTransportedIcons.Add(image);
+        }
+
+        return unitStatsTransportedIcons[index];
     }
 
     private void EnsureUnitStatsLocalRoot()

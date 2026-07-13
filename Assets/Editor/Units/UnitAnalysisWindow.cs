@@ -15,6 +15,22 @@ using UnityEngine;
 /// </summary>
 public class UnitAnalysisWindow : EditorWindow
 {
+    [System.Flags]
+    private enum UnitClassFilter
+    {
+        None = 0,
+        Infantry = 1 << (int)GameUnitClass.Infantry,
+        Vehicle = 1 << (int)GameUnitClass.Vehicle,
+        Artillery = 1 << (int)GameUnitClass.Artillery,
+        Armored = 1 << (int)GameUnitClass.Armored,
+        Jet = 1 << (int)GameUnitClass.Jet,
+        Helicopter = 1 << (int)GameUnitClass.Helicopter,
+        Plane = 1 << (int)GameUnitClass.Plane,
+        Submarine = 1 << (int)GameUnitClass.Submarine,
+        Ship = 1 << (int)GameUnitClass.Ship,
+        All = (1 << 9) - 1
+    }
+
     [SerializeField] private UnitDatabase unitDatabase;
     [SerializeField] private RPSDatabase rpsDatabase;
     [SerializeField] private DPQMatchupDatabase dpqMatchupDatabase;
@@ -35,6 +51,7 @@ public class UnitAnalysisWindow : EditorWindow
     [SerializeField] private bool showMatrix = false;
     [SerializeField] private WeaponSlot weaponSlot = WeaponSlot.Auto;
     [SerializeField] private string outputRelativePath = "docs/UNIT_ANALYSIS.csv";
+    [SerializeField] private UnitClassFilter classFilter = UnitClassFilter.All;
 
     private readonly List<UnitData> units = new List<UnitData>();
     private readonly List<Row> rows = new List<Row>();
@@ -69,6 +86,16 @@ public class UnitAnalysisWindow : EditorWindow
         unitDatabase = (UnitDatabase)EditorGUILayout.ObjectField("Unit Database", unitDatabase, typeof(UnitDatabase), false);
         if (EditorGUI.EndChangeCheck())
             RefreshUnits();
+
+        EditorGUI.BeginChangeCheck();
+        classFilter = (UnitClassFilter)EditorGUILayout.EnumFlagsField("Classes", classFilter);
+        if (EditorGUI.EndChangeCheck())
+        {
+            RefreshUnits();
+            rows.Clear();
+            incomingRows.Clear();
+            matrixCells.Clear();
+        }
 
         rpsDatabase = (RPSDatabase)EditorGUILayout.ObjectField("RPS Database", rpsDatabase, typeof(RPSDatabase), false);
         dpqMatchupDatabase = (DPQMatchupDatabase)EditorGUILayout.ObjectField("DPQ Matchup DB", dpqMatchupDatabase, typeof(DPQMatchupDatabase), false);
@@ -763,13 +790,22 @@ public class UnitAnalysisWindow : EditorWindow
             UnitData u = unitDatabase.Units[i];
             if (u == null || string.IsNullOrWhiteSpace(u.id) || !seen.Add(u))
                 continue;
+            int classBit = 1 << (int)u.unitClass;
+            if (((int)classFilter & classBit) == 0)
+                continue;
             units.Add(u);
         }
+
+        attackerIndex = units.Count > 0 ? Mathf.Clamp(attackerIndex, 0, units.Count - 1) : 0;
     }
 
     private void AutoAssign()
     {
-        if (unitDatabase == null) unitDatabase = FindFirst<UnitDatabase>();
+        UnitSpawner spawner = Object.FindFirstObjectByType<UnitSpawner>(FindObjectsInactive.Include);
+        if (spawner != null && spawner.UnitDatabase != null)
+            unitDatabase = spawner.UnitDatabase;
+        else if (unitDatabase == null)
+            unitDatabase = FindFirst<UnitDatabase>();
         if (rpsDatabase == null) rpsDatabase = FindFirst<RPSDatabase>();
         if (dpqMatchupDatabase == null) dpqMatchupDatabase = FindFirst<DPQMatchupDatabase>();
         if (weaponPriorityData == null) weaponPriorityData = FindFirst<WeaponPriorityData>();

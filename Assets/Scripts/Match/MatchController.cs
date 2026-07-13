@@ -3182,9 +3182,14 @@ public class MatchController : MonoBehaviour
     }
     public void NotifyUnitReachedHasAct(UnitManager unit)
     {
+        ProcessCommittedActedUnitFog(unit, raiseActedEvent: true);
+    }
+
+    private void ProcessCommittedActedUnitFog(UnitManager unit, bool raiseActedEvent)
+    {
         if (!Application.isPlaying)
             return;
-        if (unit != null)
+        if (raiseActedEvent && unit != null)
             OnUnitActedStateChanged?.Invoke(unit);
         if (SuppressFogOfWarRefresh)
             return;
@@ -4842,13 +4847,9 @@ public class MatchController : MonoBehaviour
         pendingCommittedBoardRefresh = false;
         pendingCommittedActedUnit = null;
 
-        RefreshFogOfWarForActiveTeam(FogOfWarRefreshMode.FullVisual);
-        Tilemap boardMap = ResolveFogBoardTilemap();
-        if (actedUnit != null && boardMap != null)
-        {
-            TryPlaySkillDetectionSfxForActedUnit(actedUnit, boardMap);
-            TryRefreshDetectedPersistenceForActedUnit(actedUnit, boardMap);
-        }
+        // Ja estamos em Neutral: publique somente o delta da unidade comprometida.
+        // FullVisual apagaria os caches e escalaria com todas as unidades a cada acao.
+        ProcessCommittedActedUnitFog(actedUnit, raiseActedEvent: false);
     }
 
     private void RemoveFogSpecializedViewCacheForUnit(int unitIndex)

@@ -42,6 +42,7 @@ MonoBehaviour:
   roles: 0b000000
   aiInitiative: 2
   aiPurchaseMode: 0
+  bannedOnHardMode: 0
   aiTargetPreferenceByClass:
   - targetClass: 7
     priority: 2
@@ -93,6 +94,10 @@ MonoBehaviour:
   preferredAirHeight: 4
   useExplicitPreferredNavalHeight: 0
   preferredNavalHeight: 2
+  emergesToAttack: 0
+  emergeAfterAttackDomain: 1
+  emergeAfterAttackHeight: 3
+  emergeAfterAttackTurns: 2
   skills:
   - {fileID: 11400000, guid: e73850be27dc4e2e8c8f210db151b0b4, type: 2}
   - {fileID: 11400000, guid: 3f52a3b7c5d14c5ea1f0f9aa34d2be11, type: 2}
@@ -100,13 +105,13 @@ MonoBehaviour:
   stealthSkillRules: []
   autonomyData: {fileID: 11400000, guid: 4570edfd95d40d0438c040f364e8ec07, type: 2}
   embarkedWeapons:
-  - weapon: {fileID: 11400000, guid: f7bfd5005ca7dbd4aad1017263cfecb0, type: 2}
+  - weapon: {fileID: 11400000, guid: 5430f79fb5141ce41a424bd96250ed1b, type: 2}
     squadAmmunition: 8
     operationRangeMin: 1
     operationRangeMax: 1
     selectedTrajectory: 0
     canBeFireOnlyAtDomainHeigh: []
-    lastSyncedWeapon: {fileID: 11400000, guid: f7bfd5005ca7dbd4aad1017263cfecb0, type: 2}
+    lastSyncedWeapon: {fileID: 11400000, guid: 5430f79fb5141ce41a424bd96250ed1b, type: 2}
   - weapon: {fileID: 11400000, guid: afbb31a3d8a2c3645bf90df243540a74, type: 2}
     squadAmmunition: 4
     operationRangeMin: 1

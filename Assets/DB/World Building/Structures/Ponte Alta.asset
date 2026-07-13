@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Ponte Alta
   m_EditorClassIdentifier: Assembly-CSharp::StructureData
   id: bridges
-  displayName: Pontes
+  displayName: Ponte
   description: "Terrestres cruzam por cima.\nNavios passam por baixo.\nN\xE3o d\xE1
     vis\xE3o elevada."
   descriptionsByTerrain: []
