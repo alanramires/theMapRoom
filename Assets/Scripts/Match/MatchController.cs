@@ -50,6 +50,42 @@ public class MatchController : MonoBehaviour
         public readonly HashSet<Vector3Int> visibleCells = new HashSet<Vector3Int>();
     }
 
+    private readonly struct FogSpecializedViewCacheKey : IEquatable<FogSpecializedViewCacheKey>
+    {
+        public readonly int unitIndex;
+        public readonly int snapshotHash;
+        public readonly int sensorFlagsHash;
+        public readonly Domain domain;
+        public readonly HeightLevel height;
+
+        public FogSpecializedViewCacheKey(int unitIndex, int snapshotHash, int sensorFlagsHash, Domain domain, HeightLevel height)
+        {
+            this.unitIndex = unitIndex;
+            this.snapshotHash = snapshotHash;
+            this.sensorFlagsHash = sensorFlagsHash;
+            this.domain = domain;
+            this.height = height;
+        }
+
+        public bool Equals(FogSpecializedViewCacheKey other) =>
+            unitIndex == other.unitIndex && snapshotHash == other.snapshotHash &&
+            sensorFlagsHash == other.sensorFlagsHash && domain == other.domain && height == other.height;
+
+        public override bool Equals(object obj) => obj is FogSpecializedViewCacheKey other && Equals(other);
+
+        public override int GetHashCode()
+        {
+            unchecked
+            {
+                int hash = unitIndex;
+                hash = (hash * 397) ^ snapshotHash;
+                hash = (hash * 397) ^ sensorFlagsHash;
+                hash = (hash * 397) ^ (int)domain;
+                return (hash * 397) ^ (int)height;
+            }
+        }
+    }
+
     private readonly struct FogCollectPerfEntry
     {
         public readonly string unitName;
@@ -199,6 +235,7 @@ public class MatchController : MonoBehaviour
     [System.NonSerialized] private readonly HashSet<Vector3Int> fogVisibleCellsBuffer = new HashSet<Vector3Int>();
     [System.NonSerialized] private readonly HashSet<Vector3Int> fogDisplayVisibleCellsBuffer = new HashSet<Vector3Int>();
     [System.NonSerialized] private readonly Dictionary<int, FogOfWarUnitCacheEntry> fogVisibleCellsByUnit = new Dictionary<int, FogOfWarUnitCacheEntry>();
+    [System.NonSerialized] private readonly Dictionary<FogSpecializedViewCacheKey, HashSet<Vector3Int>> fogSpecializedViewCellsByUnit = new Dictionary<FogSpecializedViewCacheKey, HashSet<Vector3Int>>();
     [System.NonSerialized] private readonly Dictionary<Vector3Int, int> fogVisibleContributorsByCell = new Dictionary<Vector3Int, int>();
     [System.NonSerialized] private readonly Dictionary<int, bool> fogUnitVisibilityByCacheIndex = new Dictionary<int, bool>();
     [System.NonSerialized] private readonly HashSet<Vector3Int> fogUnitVisibleScratchBuffer = new HashSet<Vector3Int>();
@@ -4477,12 +4514,90 @@ public class MatchController : MonoBehaviour
             return;
         output.Clear();
 
-        BuildFogDisplayVisibleCellsForMode(boardMap, FogOfWarVisionMode.Air, fogVisibleCellsBuffer);
-        output.UnionWith(fogVisibleCellsBuffer);
-        BuildFogDisplayVisibleCellsForMode(boardMap, FogOfWarVisionMode.Surface, fogVisibleCellsBuffer);
-        output.UnionWith(fogVisibleCellsBuffer);
-        BuildFogDisplayVisibleCellsForMode(boardMap, FogOfWarVisionMode.Sub, fogVisibleCellsBuffer);
-        output.UnionWith(fogVisibleCellsBuffer);
+        // A visao comum ja foi calculada por UpdateFogVisibilityForUnit. Reaproveitar esse
+        // cache evita recalcular Air + Surface + Sub para toda unidade a cada spawn/refresh.
+        foreach (KeyValuePair<Vector3Int, int> entry in fogVisibleContributorsByCell)
+        {
+            if (entry.Value > 0)
+                output.Add(entry.Key);
+        }
+
+        TerrainDatabase terrainDatabase = ResolveFogTerrainDatabase();
+        DPQAirHeightConfig dpqConfig = ResolveFogDpqAirHeightConfig();
+        UnitManager[] units = FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        for (int i = 0; i < units.Length; i++)
+        {
+            UnitManager unit = units[i];
+            if (unit == null || !unit.gameObject.activeInHierarchy || unit.IsEmbarked ||
+                (int)unit.TeamId != activeTeamId || !IsUnitOnBoard(unit, boardMap) ||
+                !unit.TryGetUnitData(out UnitData unitData) || unitData == null ||
+                unitData.visionSpecializations == null || unitData.visionSpecializations.Count == 0)
+                continue;
+
+            bool airLowAdded = false;
+            bool airHighAdded = false;
+            bool surfaceLandAdded = false;
+            bool surfaceNavalAdded = false;
+            bool submergedAdded = false;
+            for (int j = 0; j < unitData.visionSpecializations.Count; j++)
+            {
+                UnitVisionException specialization = unitData.visionSpecializations[j];
+                if (specialization == null)
+                    continue;
+
+                Domain domain = specialization.domain;
+                HeightLevel height = specialization.heightLevel;
+                bool alreadyAdded =
+                    (domain == Domain.Air && height == HeightLevel.AirLow && airLowAdded) ||
+                    (domain == Domain.Air && height == HeightLevel.AirHigh && airHighAdded) ||
+                    (domain == Domain.Land && height == HeightLevel.Surface && surfaceLandAdded) ||
+                    (domain == Domain.Naval && height == HeightLevel.Surface && surfaceNavalAdded) ||
+                    (domain == Domain.Submarine && height == HeightLevel.Submerged && submergedAdded);
+                if (alreadyAdded)
+                    continue;
+
+                AddCachedFogLayerVisibleCellsForUnit(unit, boardMap, terrainDatabase, dpqConfig, domain, height, output);
+                if (domain == Domain.Air && height == HeightLevel.AirLow) airLowAdded = true;
+                else if (domain == Domain.Air && height == HeightLevel.AirHigh) airHighAdded = true;
+                else if (domain == Domain.Land && height == HeightLevel.Surface) surfaceLandAdded = true;
+                else if (domain == Domain.Naval && height == HeightLevel.Surface) surfaceNavalAdded = true;
+                else if (domain == Domain.Submarine && height == HeightLevel.Submerged) submergedAdded = true;
+            }
+        }
+
+        AddFriendlyConstructionDisplayCells(boardMap, output);
+    }
+
+    private void AddCachedFogLayerVisibleCellsForUnit(
+        UnitManager unit,
+        Tilemap boardMap,
+        TerrainDatabase terrainDatabase,
+        DPQAirHeightConfig dpqConfig,
+        Domain targetDomain,
+        HeightLevel targetHeight,
+        HashSet<Vector3Int> output)
+    {
+        FogSpecializedViewCacheKey key = new FogSpecializedViewCacheKey(
+            ResolveFogCacheIndex(unit),
+            BuildFogUnitSnapshotHash(unit, boardMap),
+            BuildFogSensorFlagsHash(enableLosValidation),
+            targetDomain,
+            targetHeight);
+
+        if (!fogSpecializedViewCellsByUnit.TryGetValue(key, out HashSet<Vector3Int> cachedCells))
+        {
+            // Limite defensivo: posicoes antigas deixam de ser uteis depois que as unidades se movem.
+            if (fogSpecializedViewCellsByUnit.Count >= 256)
+                fogSpecializedViewCellsByUnit.Clear();
+
+            fogVisibleCellsBuffer.Clear();
+            AddFogLayerVisibleCellsForUnit(
+                unit, boardMap, terrainDatabase, dpqConfig, targetDomain, targetHeight, fogVisibleCellsBuffer);
+            cachedCells = new HashSet<Vector3Int>(fogVisibleCellsBuffer);
+            fogSpecializedViewCellsByUnit[key] = cachedCells;
+        }
+
+        output.UnionWith(cachedCells);
     }
 
     private void BuildFogDisplayVisibleCellsForMode(
@@ -4641,6 +4756,7 @@ public class MatchController : MonoBehaviour
 
         if (!unit.gameObject.activeInHierarchy || unit.IsEmbarked || (int)unit.TeamId != activeTeamId)
         {
+            RemoveFogSpecializedViewCacheForUnit(cacheIndex);
             cacheEntry.key = nextKey;
             return;
         }
@@ -4684,6 +4800,7 @@ public class MatchController : MonoBehaviour
             return;
 
         int cacheIndex = ResolveFogCacheIndex(unit);
+        RemoveFogSpecializedViewCacheForUnit(cacheIndex);
         if (fogVisibleCellsByUnit.TryGetValue(cacheIndex, out FogOfWarUnitCacheEntry cacheEntry) &&
             cacheEntry != null &&
             cacheEntry.visibleCells.Count > 0)
@@ -4699,6 +4816,28 @@ public class MatchController : MonoBehaviour
         if (fogOfWarVisionMode != FogOfWarVisionMode.All)
             RenderFogOverlayFromRuntimeCache(boardMap);
         OnFogOfWarUpdated?.Invoke();
+    }
+
+    private void RemoveFogSpecializedViewCacheForUnit(int unitIndex)
+    {
+        if (fogSpecializedViewCellsByUnit.Count == 0)
+            return;
+
+        List<FogSpecializedViewCacheKey> keysToRemove = null;
+        foreach (FogSpecializedViewCacheKey key in fogSpecializedViewCellsByUnit.Keys)
+        {
+            if (key.unitIndex != unitIndex)
+                continue;
+
+            keysToRemove ??= new List<FogSpecializedViewCacheKey>();
+            keysToRemove.Add(key);
+        }
+
+        if (keysToRemove == null)
+            return;
+
+        for (int i = 0; i < keysToRemove.Count; i++)
+            fogSpecializedViewCellsByUnit.Remove(keysToRemove[i]);
     }
 
     private void ApplyFogContribution(Vector3Int cell, int delta, Tilemap boardMap, bool updateVisual = true)

@@ -18,6 +18,9 @@ public class PathManager : MonoBehaviour
     [SerializeField] private int committedPathSortingOrder = 50;
 
     private LineRenderer committedPathRenderer;
+    private bool committedPathTemporaryFogSorting;
+    private int committedPathSortingLayerBeforeFog;
+    private int committedPathSortingOrderBeforeFog;
     private static bool pathfindingDebugLogsEnabled;
 
     public static bool IsPathfindingDebugLogsEnabled => pathfindingDebugLogsEnabled;
@@ -53,6 +56,7 @@ public class PathManager : MonoBehaviour
         if (committedPathRenderer == null)
             return;
         ApplyRendererSorting(tilemap);
+        ApplyTemporaryFogSortingIfNeeded();
 
         committedPathRenderer.startWidth = committedPathWidth;
         committedPathRenderer.endWidth = committedPathWidth;
@@ -81,6 +85,40 @@ public class PathManager : MonoBehaviour
 
         committedPathRenderer.positionCount = 0;
         committedPathRenderer.enabled = false;
+    }
+
+    public void BeginTemporaryFogTraversalVisual()
+    {
+        EnsureCommittedPathRenderer();
+        if (committedPathRenderer == null || committedPathTemporaryFogSorting)
+            return;
+
+        committedPathTemporaryFogSorting = true;
+        committedPathSortingLayerBeforeFog = committedPathRenderer.sortingLayerID;
+        committedPathSortingOrderBeforeFog = committedPathRenderer.sortingOrder;
+        ApplyTemporaryFogSortingIfNeeded();
+    }
+
+    public void EndTemporaryFogTraversalVisual()
+    {
+        if (!committedPathTemporaryFogSorting)
+            return;
+
+        committedPathTemporaryFogSorting = false;
+        if (committedPathRenderer == null)
+            return;
+
+        committedPathRenderer.sortingLayerID = committedPathSortingLayerBeforeFog;
+        committedPathRenderer.sortingOrder = committedPathSortingOrderBeforeFog;
+    }
+
+    private void ApplyTemporaryFogSortingIfNeeded()
+    {
+        if (!committedPathTemporaryFogSorting || committedPathRenderer == null)
+            return;
+
+        committedPathRenderer.sortingLayerID = SortingLayer.NameToID("FogOfWar");
+        committedPathRenderer.sortingOrder = 1002;
     }
 
     private void EnsureCommittedPathRenderer()

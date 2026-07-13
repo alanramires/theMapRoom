@@ -2339,13 +2339,19 @@ public partial class TurnStateManager : MonoBehaviour
         if (temporaryFogTraversalUnit != null && temporaryFogTraversalUnit != unit)
             temporaryFogTraversalUnit.EndTemporaryFogTraversalVisual();
         temporaryFogTraversalUnit = unit;
-        temporaryFogTraversalUnit?.BeginTemporaryFogTraversalVisual();
+        bool isHumanTurn = matchController == null || !matchController.IsActiveTeamAI();
+        if (isHumanTurn)
+        {
+            temporaryFogTraversalUnit?.BeginTemporaryFogTraversalVisual();
+            pathManager?.BeginTemporaryFogTraversalVisual();
+        }
     }
 
     private void ClearTemporaryFogTraversalVisual()
     {
         if (temporaryFogTraversalUnit != null)
             temporaryFogTraversalUnit.EndTemporaryFogTraversalVisual();
+        pathManager?.EndTemporaryFogTraversalVisual();
         temporaryFogTraversalUnit = null;
     }
 

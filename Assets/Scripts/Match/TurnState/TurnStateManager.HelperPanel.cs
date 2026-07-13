@@ -535,7 +535,7 @@ public partial class TurnStateManager
     private RoadNetworkManager[] cachedRoadNetworks;
 
     // Descreve o hex do alvo: construcao (Cidade) tem prioridade; senao estrutura sobre terreno
-    // (Estrada na Floresta); senao so o terreno (Floresta). Tudo resolvido dos mesmos bancos/tilemap.
+    // (Rodovia na Floresta, Pontes sobre o Mar); senao so o terreno (Floresta).
     private string ResolveCellTerrainLabel(Vector3Int cell)
     {
         cell.z = 0;
@@ -556,9 +556,20 @@ public partial class TurnStateManager
         if (structure != null && !string.IsNullOrWhiteSpace(structure.displayName))
             return string.IsNullOrWhiteSpace(terrainName)
                 ? structure.displayName
-                : $"{structure.displayName} na {terrainName}";
+                : FormatStructureOnTerrain(structure.displayName, terrainName);
 
         return terrainName ?? string.Empty;
+    }
+
+    private static string FormatStructureOnTerrain(string structureName, string terrainName)
+    {
+        bool isBridge = structureName.IndexOf("Ponte", System.StringComparison.OrdinalIgnoreCase) >= 0;
+        bool masculineTerrain = terrainName.Equals("Mar", System.StringComparison.OrdinalIgnoreCase);
+
+        if (isBridge)
+            return $"{structureName} sobre {(masculineTerrain ? "o" : "a")} {terrainName}";
+
+        return $"{structureName} {(masculineTerrain ? "no" : "na")} {terrainName}";
     }
 
     // Visual do LOCAL: a construcao ocupa o hex visualmente e tem prioridade sobre o terreno.
