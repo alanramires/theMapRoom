@@ -148,6 +148,7 @@ public class BasicMapGeneratorWindow : EditorWindow
 
     private void OnEnable()
     {
+        TilemapAutoMirrorDuringEdit.SetWindowOpen(true);
         autoMirrorDuringEdit = TilemapAutoMirrorDuringEdit.Enabled;
         SceneView.duringSceneGui += OnSceneGUI;
         AutoDetectContext(force: false);
@@ -157,6 +158,8 @@ public class BasicMapGeneratorWindow : EditorWindow
     private void OnDisable()
     {
         SceneView.duringSceneGui -= OnSceneGUI;
+        TilemapAutoMirrorDuringEdit.SetTarget(null);
+        TilemapAutoMirrorDuringEdit.SetWindowOpen(false);
     }
 
     private void OnFocus()
@@ -1766,6 +1769,7 @@ public static class TilemapAutoMirrorDuringEdit
     private static bool isApplyingMirror;
     private static bool snapshotInitialized;
     private static Tilemap explicitTarget;
+    private static bool windowOpen;
 
     static TilemapAutoMirrorDuringEdit()
     {
@@ -1782,6 +1786,17 @@ public static class TilemapAutoMirrorDuringEdit
         }
     }
 
+    public static void SetWindowOpen(bool open)
+    {
+        if (windowOpen == open)
+            return;
+
+        windowOpen = open;
+        if (!windowOpen)
+            explicitTarget = null;
+        ResetSnapshot();
+    }
+
     public static void SetTarget(Tilemap tilemap)
     {
         if (explicitTarget == tilemap)
@@ -1792,7 +1807,9 @@ public static class TilemapAutoMirrorDuringEdit
 
     private static void OnEditorUpdate()
     {
-        if (!Enabled || isApplyingMirror)
+        // Trava fundamental: a preferencia pode continuar marcada entre sessoes, mas nenhuma
+        // edicao automatica e permitida sem a janela Map Generator efetivamente aberta.
+        if (!windowOpen || !Enabled || isApplyingMirror)
             return;
         if (EditorApplication.isPlayingOrWillChangePlaymode)
             return;

@@ -343,6 +343,13 @@ public class MainMenuStateController : MonoBehaviour
             out bool confirmPressed,
             out bool cancelPressed);
 
+        if (panelMenu.IsAboutOpen)
+        {
+            if (confirmPressed || cancelPressed)
+                panelMenu.CloseAbout();
+            return;
+        }
+
         if (panelMenu.IsNewGameWizardOpen)
         {
             if (upPressed || leftPressed) { panelMenu.NavigateNewGameWizard(-1); return; }

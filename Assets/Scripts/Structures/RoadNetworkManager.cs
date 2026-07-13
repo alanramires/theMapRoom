@@ -225,6 +225,10 @@ public class RoadNetworkManager : MonoBehaviour
         float overlap = ResolveSegmentOverlap(structure);
 
         GameObject routeRoot = new GameObject(GetRouteObjectName(structure, route, routeIndex));
+        // Visual derivado: nunca deve ser serializado dentro da cena. Alem de evitar milhares
+        // de linhas geradas no YAML, isso impede que uma reimportacao copie/regrave o preview
+        // de um mapa em outro. Awake/OnEnable sempre o reconstroem a partir do banco da cena.
+        routeRoot.hideFlags = HideFlags.DontSaveInEditor;
         routeRoot.transform.SetParent(transform, false);
 
         for (int i = 0; i < route.cells.Count - 1; i++)
@@ -550,14 +554,19 @@ public class RoadNetworkManager : MonoBehaviour
 
     private void TryAutoAssignBoardTilemap()
     {
-        if (boardTilemap != null)
+        // ExecuteAlways pode rodar durante build/import com varias cenas abertas. Uma referencia
+        // global ao "primeiro Tilemap hexagonal" mistura mundos; este manager so pode enxergar
+        // objetos pertencentes a sua propria cena.
+        if (boardTilemap != null && boardTilemap.gameObject.scene == gameObject.scene)
             return;
+
+        boardTilemap = null;
 
         Tilemap[] maps = FindObjectsByType<Tilemap>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
         for (int i = 0; i < maps.Length; i++)
         {
             Tilemap map = maps[i];
-            if (map == null)
+            if (map == null || map.gameObject.scene != gameObject.scene)
                 continue;
 
             GridLayout.CellLayout layout = map.layoutGrid != null ? map.layoutGrid.cellLayout : GridLayout.CellLayout.Rectangle;

@@ -613,17 +613,21 @@ public partial class TurnStateManager
         if (focusedUnit == null)
             return;
 
-        string preview = BuildShoppingDialogPreview(focusedUnit);
+        string header = BuildShoppingDialogHeader(focusedUnit);
+        string body = BuildShoppingDialogBody(focusedUnit);
         TeamId previewTeam = matchController != null && matchController.ActiveTeamId >= 0
             ? (TeamId)matchController.ActiveTeamId
             : (shoppingConstruction != null ? shoppingConstruction.TeamId : TeamId.Neutral);
         Sprite previewSprite = ResolveShoppingPreviewSprite(focusedUnit, previewTeam, out Color previewTint);
-        PanelDialogController.TrySetShoppingPreview(preview, previewSprite, previewTint);
+        PanelDialogController.TrySetShoppingPreview(header, body, previewSprite, previewTint);
         if (logOptions)
             LogConstructionShoppingPanel();
     }
 
-    private string BuildShoppingDialogPreview(UnitData unit)
+    // Cabecalho: fica ao lado da imagem da unidade (mesma "faixa" de altura dela).
+    // Armas/carga sao linhas curtas e cabem na coluna estreita; so a descricao
+    // (texto corrido) precisa da largura total, entao vai pro corpo.
+    private string BuildShoppingDialogHeader(UnitData unit)
     {
         if (unit == null)
             return string.Empty;
@@ -641,13 +645,16 @@ public partial class TurnStateManager
         AppendShoppingPreviewWeaponLines(sb, unit);
         AppendShoppingPreviewSupplyLines(sb, unit);
 
-        if (!string.IsNullOrWhiteSpace(unit.description))
-        {
-            sb.AppendLine();
-            sb.Append(unit.description.Trim());
-        }
-
         return sb.ToString().TrimEnd();
+    }
+
+    // Corpo: so a descricao, abaixo da imagem, em largura total.
+    private string BuildShoppingDialogBody(UnitData unit)
+    {
+        if (unit == null || string.IsNullOrWhiteSpace(unit.description))
+            return string.Empty;
+
+        return unit.description.Trim();
     }
 
 
@@ -744,7 +751,8 @@ public partial class TurnStateManager
 
             if (!hasAny)
             {
-                sb.AppendLine();
+                if (sb.Length > 0)
+                    sb.AppendLine();
                 sb.AppendLine("Armas");
                 hasAny = true;
             }
@@ -796,7 +804,8 @@ public partial class TurnStateManager
         if (segments.Count <= 0)
             return;
 
-        sb.AppendLine();
+        if (sb.Length > 0)
+            sb.AppendLine();
         sb.AppendLine("Carga:");
         sb.AppendLine($"    {string.Join(" | ", segments)}");
     }

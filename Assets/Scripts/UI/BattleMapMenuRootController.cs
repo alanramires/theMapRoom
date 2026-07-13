@@ -100,6 +100,7 @@ public class BattleMapMenuRootController : MonoBehaviour
     private int exitConfirmFocusIndex;
     private bool surrenderConfirmOpen;
     private bool layerSelectionOpen;
+    private int layerSelectionFocusIndex;
     private readonly List<FogOfWarVisionMode> layerSelectionModes = new List<FogOfWarVisionMode>();
     private int surrenderConfirmFocusIndex;
     private CanvasGroup modalMenuCanvasGroup;
@@ -111,7 +112,7 @@ public class BattleMapMenuRootController : MonoBehaviour
     public int ExitConfirmationFocusIndex => exitConfirmFocusIndex;
     public bool IsSurrenderConfirmationOpen => surrenderConfirmOpen;
     public bool IsLayerSelectionOpen => layerSelectionOpen;
-    public int LayerSelectionFocusIndex => 0;
+    public int LayerSelectionFocusIndex => layerSelectionFocusIndex;
 
     public int GetLayerSelectionOptionCount() => layerSelectionModes.Count + 1;
 
@@ -132,13 +133,53 @@ public class BattleMapMenuRootController : MonoBehaviour
     {
         if (!layerSelectionOpen)
             return;
-        if (index >= 0 && index < layerSelectionModes.Count)
-            matchController?.SetFogOfWarVisionMode(layerSelectionModes[index]);
+        if (index < 0 || index > layerSelectionModes.Count)
+            return;
+
+        layerSelectionFocusIndex = index;
+        if (index == layerSelectionModes.Count)
+        {
+            CancelLayerSelection();
+            return;
+        }
+
+        matchController?.SetFogOfWarVisionMode(layerSelectionModes[index]);
+        cursorController?.PlayBeepSfx();
         layerSelectionOpen = false;
+        layerSelectionFocusIndex = 0;
         layerSelectionModes.Clear();
         PanelHelperController.ClearExternalText();
         turnStateManager?.TryExitPlayerMenuStateToNeutral();
         UiInputBlocker.SuppressGameplayInputForFrames(1);
+    }
+
+    public bool NavigateLayerSelection(int direction)
+    {
+        int count = GetLayerSelectionOptionCount();
+        if (!layerSelectionOpen || direction == 0 || count <= 0)
+            return false;
+
+        layerSelectionFocusIndex = (layerSelectionFocusIndex + (direction > 0 ? 1 : -1) + count) % count;
+        cursorController?.PlayCursorMoveSfx();
+        return true;
+    }
+
+    public void CancelLayerSelection()
+    {
+        if (!layerSelectionOpen)
+            return;
+
+        layerSelectionOpen = false;
+        layerSelectionFocusIndex = 0;
+        layerSelectionModes.Clear();
+        PanelHelperController.ClearExternalText();
+        UiInputBlocker.SuppressGameplayInputForFrames(1);
+        PlayCancelSfx();
+
+        // Igual ao cancelamento de Save/Load: o estado PlayerMenu continuou na pilha
+        // enquanto o helper estava aberto, portanto cancelar restaura o MenuRoot e o
+        // foco anterior (Camada), em vez de encerrar tudo em Neutral.
+        RestoreMenuFromStateStack(TurnStateManager.CursorState.Neutral);
     }
     public int SurrenderConfirmationFocusIndex => surrenderConfirmFocusIndex;
 
@@ -257,6 +298,34 @@ public class BattleMapMenuRootController : MonoBehaviour
 
         if (menuRoot == null)
             return false;
+
+        // O seletor de camada usa o Panel Helper depois que o MenuRoot fecha, assim como
+        // Save/Load. Portanto ele precisa capturar sua navegacao antes do ramo !menuOpen.
+        if (layerSelectionOpen)
+        {
+            UiInputBlocker.SuppressGameplayInputForFrames(1);
+            if (WasUpPressedThisFrame() || WasLeftPressedThisFrame())
+            {
+                NavigateLayerSelection(-1);
+                return true;
+            }
+            if (WasDownPressedThisFrame() || WasRightPressedThisFrame())
+            {
+                NavigateLayerSelection(+1);
+                return true;
+            }
+            if (WasCancelRequestedThisFrame())
+            {
+                CancelLayerSelection();
+                return true;
+            }
+            if (WasConfirmPressedThisFrame())
+            {
+                InvokeLayerSelectionOption(layerSelectionFocusIndex);
+                return true;
+            }
+            return true;
+        }
 
         if (menuOpen)
         {
@@ -1162,6 +1231,7 @@ public class BattleMapMenuRootController : MonoBehaviour
                     break;
                 }
                 layerSelectionOpen = true;
+                layerSelectionFocusIndex = 0;
                 PanelDialogController.ClearExternalText();
                 PanelHelperController.TrySetExternalText("CAMADA (LAYER)", "Escolha a visualização:");
                 break;

@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Tanque A
   m_EditorClassIdentifier: Assembly-CSharp::UnitData
   id: tanqueA
-  displayName: MBT (Main Battle Tank)
+  displayName: Tanque Pesado
   apelido: TA
   description: "Blindado r\xE1pido e vers\xE1til, ideal para flanquear e explorar
     falhas na linha inimiga. Eficiente contra blindados e infantaria, mas vulner\xE1vel
@@ -88,6 +88,10 @@ MonoBehaviour:
   preferredAirHeight: 4
   useExplicitPreferredNavalHeight: 0
   preferredNavalHeight: 2
+  emergesToAttack: 0
+  emergeAfterAttackDomain: 1
+  emergeAfterAttackHeight: 3
+  emergeAfterAttackTurns: 2
   skills:
   - {fileID: 11400000, guid: ef10c9e820afc074b99ea8e0b709c2f4, type: 2}
   stealthSkills: []

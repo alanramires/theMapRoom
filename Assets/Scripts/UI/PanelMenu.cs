@@ -18,10 +18,12 @@ public class PanelMenu : MonoBehaviour
 {
     [Header("Menu Buttons")]
     [SerializeField] private Button buttonNew;
+    [SerializeField] private Button buttonHotseat;
     [SerializeField] private Button buttonLoad;
     [SerializeField] private Button buttonTutorial;
     [FormerlySerializedAs("buttonSobre")]
     [SerializeField] private Button buttonConfig;
+    [SerializeField] private Button buttonAbout;
     [SerializeField] private Button buttonCinematic;
     [SerializeField] private Button buttonFullscreen;
     [SerializeField] private Button buttonSair;
@@ -49,6 +51,7 @@ public class PanelMenu : MonoBehaviour
     private int lastConfirmSfxFrame = -1;
     private bool pendingInitialFocus;
     private bool quitConfirmOpen;
+    private bool aboutOpen;
     private int quitConfirmFocusIndex;
     private Vector2 previousUiMove;
     private bool previousUiSubmitPressed;
@@ -56,6 +59,7 @@ public class PanelMenu : MonoBehaviour
     private int ignoreInputUntilFrame = -1;
     private int lastLoadOpenRequestFrame = -1;
     private bool newGameWizardOpen;
+    private bool newGameHotSeat;
     private int newGameWizardStep;
     private int newGameWizardFocusIndex;
     private TeamId newGameHumanTeam = TeamId.Green;
@@ -81,17 +85,24 @@ public class PanelMenu : MonoBehaviour
     public bool IsNewGameWizardOpen => newGameWizardOpen;
     public int NewGameWizardFocusIndex => newGameWizardFocusIndex;
     public int NewGameWizardStep => newGameWizardStep;
+    public bool IsAboutOpen => aboutOpen;
+    public string AboutBody =>
+        "Um wargame tático em hexágonos, por turnos, onde nada é definitivo até você confirmar.\n\n" +
+        "Mova, mire, planeje e cancele quando quiser. Só quando você diz sim é que a guerra acontece.\n\n" +
+        "Comande infantaria, blindados, transportes e apoio de fogo através da neblina da guerra. " +
+        "Capture território, sustente sua logística e escolha entre golpes ousados ou avanços cautelosos.\n\n" +
+        "Enfrente uma IA com tática própria ou desafie um amigo no mesmo dispositivo em modo hot seat.";
 
     public string GetNewGameWizardConfirmationSummary()
     {
-        const string targetMap = "Battle Map 1 - Ground";
+        string targetMap = newGameHotSeat ? "Hot Seat 1 - Pvp" : "Battle Map 1 - Ground";
         string humanColor = ColorUtility.ToHtmlStringRGB(TeamUtils.GetColor(newGameHumanTeam));
         string aiColor = ColorUtility.ToHtmlStringRGB(TeamUtils.GetColor(newGameAiTeam));
         return $"MAPA: {targetMap}\n" +
                $"SETUP: {ResolvePresetLabel(newGamePreset)}\n" +
-               $"DIFICULDADE: {ResolveDifficultyLabel(newGameDifficulty)}\n" +
+               (newGameHotSeat ? string.Empty : $"DIFICULDADE: {ResolveDifficultyLabel(newGameDifficulty)}\n") +
                $"JOGADOR 1: <color=#{humanColor}>{ResolveTeamLabel(newGameHumanTeam)}</color>\n" +
-               $"JOGADOR 2: <color=#{aiColor}>{ResolveTeamLabel(newGameAiTeam)}</color> (IA)\n\n" +
+               $"JOGADOR 2: <color=#{aiColor}>{ResolveTeamLabel(newGameAiTeam)}</color>{(newGameHotSeat ? string.Empty : " (IA)")}\n\n" +
                $"REGRAS\n{NewGamePanelController.BuildDescricao(newGamePreset)}";
     }
 
@@ -116,7 +127,9 @@ public class PanelMenu : MonoBehaviour
         if (newGameWizardStep == 1)
         {
             List<TeamId> opponents = BuildAvailableOpponentTeams();
-            return index < opponents.Count ? $"IA {ResolveTeamLabel(opponents[index])}" : "VOLTAR";
+            return index < opponents.Count
+                ? $"{(newGameHotSeat ? "JOGADOR 2" : "IA")} {ResolveTeamLabel(opponents[index])}"
+                : "VOLTAR";
         }
         if (newGameWizardStep == 2)
             return index < NewGameDifficulties.Length ? ResolveDifficultyLabel(NewGameDifficulties[index]) : "VOLTAR";
@@ -166,7 +179,7 @@ public class PanelMenu : MonoBehaviour
         {
             List<TeamId> opponents = BuildAvailableOpponentTeams();
             if (index >= opponents.Count) { newGameWizardStep = 0; }
-            else { newGameAiTeam = opponents[index]; newGameWizardStep = 2; }
+            else { newGameAiTeam = opponents[index]; newGameWizardStep = newGameHotSeat ? 3 : 2; }
         }
         else if (newGameWizardStep == 2)
         {
@@ -175,7 +188,7 @@ public class PanelMenu : MonoBehaviour
         }
         else if (newGameWizardStep == 3)
         {
-            if (index >= NewGamePresets.Length) { newGameWizardStep = 2; }
+            if (index >= NewGamePresets.Length) { newGameWizardStep = newGameHotSeat ? 1 : 2; }
             else { newGamePreset = NewGamePresets[index]; newGameWizardStep = 4; }
         }
         else if (index == 0)
@@ -196,7 +209,13 @@ public class PanelMenu : MonoBehaviour
     {
         if (!newGameWizardOpen) return;
         if (newGameWizardStep <= 0) CloseNewGameWizard();
-        else { newGameWizardStep--; newGameWizardFocusIndex = 0; RefreshNewGameWizardHelper(); cursorController?.PlayCancelSfx(); }
+        else
+        {
+            newGameWizardStep = newGameHotSeat && newGameWizardStep == 3 ? 1 : newGameWizardStep - 1;
+            newGameWizardFocusIndex = 0;
+            RefreshNewGameWizardHelper();
+            cursorController?.PlayCancelSfx();
+        }
     }
 
     protected virtual void Awake()
@@ -265,6 +284,13 @@ public class PanelMenu : MonoBehaviour
             out bool rightPressed,
             out bool confirmPressed,
             out bool cancelPressed);
+
+        if (aboutOpen)
+        {
+            if (confirmPressed || cancelPressed)
+                CloseAbout();
+            return;
+        }
 
         if (newGameWizardOpen)
         {
@@ -563,14 +589,17 @@ public class PanelMenu : MonoBehaviour
 
     private List<Button> GetRootButtons()
     {
-        List<Button> list = new List<Button>(7);
+        List<Button> list = new List<Button>(9);
         AddIfActive(list, buttonNew);
+        AddIfActive(list, buttonHotseat);
         AddIfActive(list, buttonLoad);
         AddIfActive(list, buttonConfig);
+        AddIfActive(list, buttonAbout);
         AddIfActive(list, buttonCinematic);
         AddIfActive(list, buttonFullscreen);
         AddIfActive(list, buttonTutorial);
         AddIfActive(list, buttonSair);
+        list.Sort((a, b) => a.transform.GetSiblingIndex().CompareTo(b.transform.GetSiblingIndex()));
         return list;
     }
 
@@ -583,9 +612,11 @@ public class PanelMenu : MonoBehaviour
     private void ResolveMenuButtonsIfNeeded()
     {
         if (buttonNew == null) buttonNew = FindButtonByNames("button_new", "novo", "new");
+        if (buttonHotseat == null) buttonHotseat = FindButtonByNames("button_hotseat", "hotseat");
         if (buttonLoad == null) buttonLoad = FindButtonByNames("button_load", "carregar", "load");
         if (buttonTutorial == null) buttonTutorial = FindButtonByNames("button_tutorial", "tutorial");
-        if (buttonConfig == null) buttonConfig = FindButtonByNames("button_config", "button_sobre", "config", "sobre", "about");
+        if (buttonConfig == null) buttonConfig = FindButtonByNames("button_config", "config");
+        if (buttonAbout == null) buttonAbout = FindButtonByNames("button_sobre", "sobre", "about");
         if (buttonCinematic == null) buttonCinematic = FindButtonByNames("button_cinematic", "cinematic", "cinema");
         if (buttonFullscreen == null) buttonFullscreen = FindButtonByNames("button_TelaCheia", "tela_cheia", "fullscreen");
         if (buttonSair == null) buttonSair = FindButtonByNames("button_sair", "sair", "quit", "exit");
@@ -754,6 +785,12 @@ public class PanelMenu : MonoBehaviour
             buttonNew.onClick.AddListener(OnNewButtonClicked);
         }
 
+        if (buttonHotseat != null)
+        {
+            buttonHotseat.onClick.RemoveListener(OnHotseatButtonClicked);
+            buttonHotseat.onClick.AddListener(OnHotseatButtonClicked);
+        }
+
         if (buttonLoad != null)
         {
             buttonLoad.onClick.RemoveListener(OnLoadButtonClicked);
@@ -766,10 +803,10 @@ public class PanelMenu : MonoBehaviour
             buttonTutorial.onClick.AddListener(OnTutorialButtonClicked);
         }
 
-        if (buttonConfig != null)
+        if (buttonAbout != null)
         {
-            buttonConfig.onClick.RemoveListener(OnConfigButtonClicked);
-            buttonConfig.onClick.AddListener(OnConfigButtonClicked);
+            buttonAbout.onClick.RemoveListener(OnConfigButtonClicked);
+            buttonAbout.onClick.AddListener(OnConfigButtonClicked);
         }
 
         if (buttonCinematic != null)
@@ -795,6 +832,7 @@ public class PanelMenu : MonoBehaviour
 
         PlayConfirmSfxOncePerFrame();
 
+        newGameHotSeat = false;
         newGameWizardOpen = true;
         newGameWizardStep = 0;
         newGameWizardFocusIndex = 0;
@@ -805,15 +843,35 @@ public class PanelMenu : MonoBehaviour
         RefreshNewGameWizardHelper();
     }
 
+    private void OnHotseatButtonClicked()
+    {
+        if (buttonHotseat != null)
+            SyncCurrentIndexWithButton(buttonHotseat);
+
+        PlayConfirmSfxOncePerFrame();
+        newGameHotSeat = true;
+        newGameWizardOpen = true;
+        newGameWizardStep = 0;
+        newGameWizardFocusIndex = 0;
+        newGameHumanTeam = TeamId.Green;
+        newGameAiTeam = TeamId.Red;
+        newGamePreset = MatchController.GameSetupPreset.FogOfWarTotal;
+        RefreshNewGameWizardHelper();
+    }
+
     private void RefreshNewGameWizardHelper()
     {
         string title = newGameWizardStep == 0 ? "ESCOLHA SUA COR" :
-                       newGameWizardStep == 1 ? "ESCOLHA A IA ADVERSÁRIA" :
+                       newGameWizardStep == 1 ? (newGameHotSeat ? "ESCOLHA O JOGADOR 2" : "ESCOLHA A IA ADVERSÁRIA") :
                        newGameWizardStep == 2 ? "ESCOLHA A DIFICULDADE" :
                        newGameWizardStep == 3 ? "CONFIGURE O JOGO" : "CONFIRMAR PARTIDA";
         string body = newGameWizardStep == 4
-            ? $"Você: {ResolveTeamLabel(newGameHumanTeam)}\nIA adversária: {ResolveTeamLabel(newGameAiTeam)}\nDificuldade: {ResolveDifficultyLabel(newGameDifficulty)}\nRegras: {ResolvePresetLabel(newGamePreset)}"
-            : (newGameWizardStep == 1 ? "Slot 1 será controlado pela IA." : string.Empty);
+            ? (newGameHotSeat
+                ? $"Jogador 1: {ResolveTeamLabel(newGameHumanTeam)}\nJogador 2: {ResolveTeamLabel(newGameAiTeam)}\nRegras: {ResolvePresetLabel(newGamePreset)}"
+                : $"Você: {ResolveTeamLabel(newGameHumanTeam)}\nIA adversária: {ResolveTeamLabel(newGameAiTeam)}\nDificuldade: {ResolveDifficultyLabel(newGameDifficulty)}\nRegras: {ResolvePresetLabel(newGamePreset)}")
+            : (newGameWizardStep == 1
+                ? (newGameHotSeat ? "Escolha a cor do segundo jogador." : "Slot 1 será controlado pela IA.")
+                : string.Empty);
         PanelHelperController.TrySetExternalText(title, body);
     }
 
@@ -849,11 +907,11 @@ public class PanelMenu : MonoBehaviour
 
     private void StartConfiguredNewGame()
     {
-        const string target = "Battle Map 1 - Ground";
+        string target = newGameHotSeat ? "Hot Seat 1 - Pvp" : "Battle Map 1 - Ground";
         TeamId[] teams = { newGameHumanTeam, newGameAiTeam };
-        bool[] isAI = { false, true };
+        bool[] isAI = { false, !newGameHotSeat };
         bool[] flipX = { IsTeamFlipped(newGameHumanTeam), IsTeamFlipped(newGameAiTeam) };
-        bool[] cmdAuto = { false, true };
+        bool[] cmdAuto = { false, !newGameHotSeat };
         SaveGameManager.SetupForNewGame(string.Empty);
         PartidaConfig.Set(2, teams, isAI, flipX, newGamePreset, cmdAuto, target);
         PartidaConfig.SetDifficulty(newGameDifficulty);
@@ -924,17 +982,26 @@ public class PanelMenu : MonoBehaviour
 
     private void OnConfigButtonClicked()
     {
-        if (buttonConfig != null)
-            SyncCurrentIndexWithButton(buttonConfig);
+        if (buttonAbout != null)
+            SyncCurrentIndexWithButton(buttonAbout);
 
         PlayConfirmSfxOncePerFrame();
-        if (stateController != null)
-        {
-            stateController.RequestState(MainMenuState.Config);
-            return;
-        }
+        aboutOpen = true;
+        PanelHelperController.TrySetExternalText("Sobre o jogo", string.Empty);
+        PanelHelperController.SetExternalWideMode(true);
+    }
 
-        OpenPanelAndHideMenu(panelConfigRoot, "Panel_Config");
+    public void ConfirmAboutFromPointer() => CloseAbout();
+
+    public void CloseAbout()
+    {
+        if (!aboutOpen)
+            return;
+
+        aboutOpen = false;
+        PanelHelperController.SetExternalWideMode(false);
+        PanelHelperController.ClearExternalText();
+        cursorController?.PlayCancelSfx();
     }
 
     private void OnCinematicButtonSelected()

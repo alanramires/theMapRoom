@@ -30,6 +30,7 @@ public class PanelDialogController : MonoBehaviour
     private Color lastTextColor = new Color(float.NaN, float.NaN, float.NaN, float.NaN);
     private bool hasExternalOverrideText;
     private string externalOverrideText = string.Empty;
+    private string externalOverrideHeaderText = string.Empty;
     private float externalOverrideUntilUnscaledTime = -1f;
     private bool shoppingPreviewMode;
     private Sprite externalPreviewSprite;
@@ -68,6 +69,11 @@ public class PanelDialogController : MonoBehaviour
     private TMP_Text shoppingCounterText;
     private TMP_Text shoppingBuyText;
     private bool shoppingControlsBound;
+    private TMP_Text textUnitBody;
+    private ScrollRect shoppingBodyScrollRect;
+    private RectTransform shoppingBodyContentRect;
+    private Scrollbar shoppingBodyScrollbar;
+    private string lastShoppingBodyText = string.Empty;
 
     private void Awake()
     {
@@ -164,6 +170,7 @@ public class PanelDialogController : MonoBehaviour
         }
 
         EnsureShoppingControls();
+        EnsureShoppingBodyScroll();
 
 #if UNITY_EDITOR
         if (dialogDatabase == null)
@@ -179,6 +186,7 @@ public class PanelDialogController : MonoBehaviour
         {
             hasExternalOverrideText = false;
             externalOverrideText = string.Empty;
+            externalOverrideHeaderText = string.Empty;
             externalOverrideUntilUnscaledTime = -1f;
             shoppingPreviewMode = false;
             externalPreviewSprite = null;
@@ -194,7 +202,10 @@ public class PanelDialogController : MonoBehaviour
         if (hasExternalOverrideText)
         {
             Color overrideColor = ResolveActiveTeamColor();
-            SetVisible(panelVisible: true, textVisible: true, textValue: externalOverrideText, textColor: overrideColor, force: force);
+            // No modo shopping, textUnit vira o cabecalho (ao lado da imagem); o corpo
+            // completo vai para textUnitBody, montado em RefreshShoppingTextLayout.
+            string textUnitValue = shoppingPreviewMode ? externalOverrideHeaderText : externalOverrideText;
+            SetVisible(panelVisible: true, textVisible: true, textValue: textUnitValue, textColor: overrideColor, force: force);
             RefreshPreviewVisual();
             return;
         }
@@ -393,6 +404,7 @@ public class PanelDialogController : MonoBehaviour
         instance.shoppingPreviewMode = false;
         instance.externalPreviewSprite = null;
         instance.externalPreviewColor = Color.white;
+        instance.externalOverrideHeaderText = string.Empty;
         instance.SetExternalText(text);
         return true;
     }
@@ -404,6 +416,7 @@ public class PanelDialogController : MonoBehaviour
 
         instance.hasExternalOverrideText = false;
         instance.externalOverrideText = string.Empty;
+        instance.externalOverrideHeaderText = string.Empty;
         instance.externalOverrideUntilUnscaledTime = -1f;
         instance.shoppingPreviewMode = false;
         instance.externalPreviewSprite = null;
@@ -418,23 +431,17 @@ public class PanelDialogController : MonoBehaviour
         instance.shoppingPreviewMode = false;
         instance.externalPreviewSprite = null;
         instance.externalPreviewColor = Color.white;
+        instance.externalOverrideHeaderText = string.Empty;
         instance.SetExternalText(text, Mathf.Max(0.05f, durationSeconds), timed: true);
         return true;
     }
 
-    public static bool TrySetShoppingPreview(string text, Sprite previewSprite)
+    public static bool TrySetShoppingPreview(string headerText, string bodyText, Sprite previewSprite)
     {
-        if (instance == null)
-            return false;
-
-        instance.shoppingPreviewMode = true;
-        instance.externalPreviewSprite = previewSprite;
-        instance.externalPreviewColor = Color.white;
-        instance.SetExternalText(text, 0f, timed: false);
-        return true;
+        return TrySetShoppingPreview(headerText, bodyText, previewSprite, Color.white);
     }
 
-    public static bool TrySetShoppingPreview(string text, Sprite previewSprite, Color previewColor)
+    public static bool TrySetShoppingPreview(string headerText, string bodyText, Sprite previewSprite, Color previewColor)
     {
         if (instance == null)
             return false;
@@ -442,7 +449,14 @@ public class PanelDialogController : MonoBehaviour
         instance.shoppingPreviewMode = true;
         instance.externalPreviewSprite = previewSprite;
         instance.externalPreviewColor = previewColor;
-        instance.SetExternalText(text, 0f, timed: false);
+        instance.externalOverrideHeaderText = headerText ?? string.Empty;
+        instance.externalOverrideText = bodyText ?? string.Empty;
+        instance.externalOverrideUntilUnscaledTime = -1f;
+        // O corpo pode ficar vazio (unidade sem armas/carga/descricao); o cabecalho
+        // sozinho ja basta para considerar o preview ativo.
+        instance.hasExternalOverrideText =
+            !string.IsNullOrWhiteSpace(instance.externalOverrideHeaderText) ||
+            !string.IsNullOrWhiteSpace(instance.externalOverrideText);
         return true;
     }
 
@@ -451,7 +465,9 @@ public class PanelDialogController : MonoBehaviour
         if (instance == null)
             return false;
 
-        if (!instance.hasExternalOverrideText || string.IsNullOrWhiteSpace(instance.externalOverrideText))
+        bool hasAnyText = !string.IsNullOrWhiteSpace(instance.externalOverrideText) ||
+                          (instance.shoppingPreviewMode && !string.IsNullOrWhiteSpace(instance.externalOverrideHeaderText));
+        if (!instance.hasExternalOverrideText || !hasAnyText)
             return false;
 
         if (instance.externalOverrideUntilUnscaledTime > 0f &&
@@ -549,6 +565,98 @@ public class PanelDialogController : MonoBehaviour
         RefreshDockByHelperState(targetHeight);
         RefreshShoppingTextLayout();
         RefreshShoppingControls();
+    }
+
+    // Corpo do preview de shopping (a descricao) dentro de um ScrollRect: o texto
+    // pode ser mais alto que a area visivel, o jogador rola com mouse wheel ou
+    // arrastando a barra em vez de o texto ser truncado.
+    private void EnsureShoppingBodyScroll()
+    {
+        if (shoppingBodyScrollRect != null || panelRect == null)
+            return;
+
+        if (!Application.isPlaying)
+            return;
+
+#if UNITY_EDITOR
+        // Application.isPlaying pode continuar true quando o Inspector dispara
+        // OnValidate em um Prefab Asset durante o Play Mode.
+        if (EditorUtility.IsPersistent(panelRect.gameObject))
+            return;
+#endif
+
+        GameObject scrollRootObject = new GameObject(
+            "shopping_body_scroll", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(RectMask2D), typeof(ScrollRect));
+        RectTransform scrollRootRect = scrollRootObject.GetComponent<RectTransform>();
+        scrollRootRect.SetParent(panelRect, false);
+        scrollRootRect.anchorMin = new Vector2(0f, 1f);
+        scrollRootRect.anchorMax = new Vector2(0f, 1f);
+        scrollRootRect.pivot = new Vector2(0f, 1f);
+
+        // Precisa de um Graphic com raycastTarget para capturar scroll/drag do mouse.
+        Image raycastCatcher = scrollRootObject.GetComponent<Image>();
+        raycastCatcher.color = new Color(0f, 0f, 0f, 0.001f);
+        raycastCatcher.raycastTarget = true;
+
+        GameObject contentObject = new GameObject("content", typeof(RectTransform));
+        RectTransform contentRect = contentObject.GetComponent<RectTransform>();
+        contentRect.SetParent(scrollRootRect, false);
+        contentRect.anchorMin = new Vector2(0f, 1f);
+        contentRect.anchorMax = new Vector2(1f, 1f);
+        contentRect.pivot = new Vector2(0f, 1f);
+        contentRect.anchoredPosition = Vector2.zero;
+
+        GameObject bodyTextObject = new GameObject("text_unit_body", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
+        RectTransform bodyTextRect = bodyTextObject.GetComponent<RectTransform>();
+        bodyTextRect.SetParent(contentRect, false);
+        bodyTextRect.anchorMin = new Vector2(0f, 1f);
+        bodyTextRect.anchorMax = new Vector2(1f, 1f);
+        bodyTextRect.pivot = new Vector2(0f, 1f);
+        bodyTextRect.anchoredPosition = Vector2.zero;
+        bodyTextRect.offsetMin = new Vector2(0f, bodyTextRect.offsetMin.y);
+        bodyTextRect.offsetMax = new Vector2(0f, bodyTextRect.offsetMax.y);
+
+        textUnitBody = bodyTextObject.GetComponent<TMP_Text>();
+        textUnitBody.raycastTarget = false;
+
+        GameObject scrollbarObject = new GameObject(
+            "shopping_body_scrollbar", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Scrollbar));
+        RectTransform scrollbarRect = scrollbarObject.GetComponent<RectTransform>();
+        scrollbarRect.SetParent(panelRect, false);
+        scrollbarRect.anchorMin = new Vector2(0f, 1f);
+        scrollbarRect.anchorMax = new Vector2(0f, 1f);
+        scrollbarRect.pivot = new Vector2(0f, 1f);
+
+        Image scrollbarTrackImage = scrollbarObject.GetComponent<Image>();
+        scrollbarTrackImage.color = new Color(1f, 1f, 1f, 0.12f);
+
+        GameObject scrollbarHandleObject = new GameObject("handle", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+        RectTransform handleRect = scrollbarHandleObject.GetComponent<RectTransform>();
+        handleRect.SetParent(scrollbarRect, false);
+        handleRect.anchorMin = Vector2.zero;
+        handleRect.anchorMax = new Vector2(1f, 0.3f);
+        handleRect.offsetMin = Vector2.zero;
+        handleRect.offsetMax = Vector2.zero;
+        Image handleImage = scrollbarHandleObject.GetComponent<Image>();
+        handleImage.color = new Color(0.65f, 1f, 0.65f, 0.85f);
+
+        shoppingBodyScrollbar = scrollbarObject.GetComponent<Scrollbar>();
+        shoppingBodyScrollbar.direction = Scrollbar.Direction.TopToBottom;
+        shoppingBodyScrollbar.handleRect = handleRect;
+        shoppingBodyScrollbar.targetGraphic = handleImage;
+
+        shoppingBodyScrollRect = scrollRootObject.GetComponent<ScrollRect>();
+        shoppingBodyScrollRect.content = contentRect;
+        shoppingBodyScrollRect.horizontal = false;
+        shoppingBodyScrollRect.vertical = true;
+        shoppingBodyScrollRect.movementType = ScrollRect.MovementType.Clamped;
+        shoppingBodyScrollRect.verticalScrollbar = shoppingBodyScrollbar;
+        shoppingBodyScrollRect.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.Permanent;
+        shoppingBodyScrollRect.scrollSensitivity = 24f;
+
+        shoppingBodyContentRect = contentRect;
+        scrollRootObject.SetActive(false);
+        scrollbarObject.SetActive(false);
     }
 
     private void EnsureShoppingControls()
@@ -805,6 +913,27 @@ public class PanelDialogController : MonoBehaviour
             textUnit.overflowMode = TextOverflowModes.Truncate;
             textUnit.richText = false;
             textUnit.alignment = TextAlignmentOptions.TopLeft;
+
+            if (textUnitBody != null)
+            {
+                textUnitBody.enableAutoSizing = false;
+                textUnitBody.fontSize = Mathf.Max(10f, shoppingPreviewFontSize);
+                textUnitBody.textWrappingMode = TextWrappingModes.Normal;
+                // Sem truncar: o conteudo pode ser mais alto que a area visivel, o
+                // ScrollRect da conta de exibir o resto via rolagem.
+                textUnitBody.overflowMode = TextOverflowModes.Overflow;
+                textUnitBody.richText = false;
+                textUnitBody.alignment = TextAlignmentOptions.TopLeft;
+                textUnitBody.color = textUnit.color;
+                textUnitBody.text = externalOverrideText;
+            }
+
+            bool showBody = textUnitBody != null && !string.IsNullOrWhiteSpace(externalOverrideText);
+            if (shoppingBodyScrollRect != null && shoppingBodyScrollRect.gameObject.activeSelf != showBody)
+                shoppingBodyScrollRect.gameObject.SetActive(showBody);
+            if (shoppingBodyScrollbar != null && shoppingBodyScrollbar.gameObject.activeSelf != showBody)
+                shoppingBodyScrollbar.gameObject.SetActive(showBody);
+
             if (textRect != null && panelRect != null)
             {
                 // Os botoes laterais usam 15% da largura do painel. A reserva do
@@ -814,19 +943,63 @@ public class PanelDialogController : MonoBehaviour
                                       unitPreviewImage.gameObject.activeSelf &&
                                       unitPreviewImage.enabled;
                 float previewWidth = previewVisible ? Mathf.Max(0f, unitPreviewImage.rectTransform.rect.width) : 0f;
-                float leftInset = navigationColumnWidth + (previewVisible ? 14f + previewWidth + 10f : 14f);
+                float previewHeight = previewVisible ? Mathf.Max(0f, unitPreviewImage.rectTransform.rect.height) : 0f;
+
+                float headerLeftInset = navigationColumnWidth + (previewVisible ? 14f + previewWidth + 10f : 14f);
+                float bodyLeftInset = navigationColumnWidth + 14f;
                 float rightInset = navigationColumnWidth + 10f;
                 float topInset = 44f;
                 float bottomInset = shoppingControlsRoot != null && shoppingControlsRoot.activeSelf ? 58f : 10f;
-                float targetWidth = Mathf.Max(24f, panelRect.rect.width - leftInset - rightInset);
-                float targetHeight = Mathf.Max(24f, panelRect.rect.height - topInset - bottomInset);
+
+                float headerWidth = Mathf.Max(24f, panelRect.rect.width - headerLeftInset - rightInset);
+                float headerPreferredHeight = textUnit.GetPreferredValues(textUnit.text, headerWidth, 0f).y;
+                // Ponto de "retorno" do float: o corpo so volta a largura total depois
+                // que passa da imagem OU do cabecalho, o que for mais alto.
+                float floatHeight = Mathf.Max(previewHeight, headerPreferredHeight);
 
                 textRect.anchorMin = new Vector2(0f, 1f);
                 textRect.anchorMax = new Vector2(0f, 1f);
                 textRect.pivot = new Vector2(0f, 1f);
-                textRect.anchoredPosition = new Vector2(leftInset, -topInset);
-                textRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, targetWidth);
-                textRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, targetHeight);
+                textRect.anchoredPosition = new Vector2(headerLeftInset, -topInset);
+                textRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, headerWidth);
+                textRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, floatHeight);
+
+                if (shoppingBodyScrollRect != null && shoppingBodyContentRect != null)
+                {
+                    float bodyTop = topInset + floatHeight + 10f;
+                    float bodyTotalWidth = Mathf.Max(24f, panelRect.rect.width - bodyLeftInset - rightInset);
+                    float bodyHeight = Mathf.Max(24f, panelRect.rect.height - bodyTop - bottomInset);
+                    const float scrollbarWidth = 10f;
+                    const float scrollbarGap = 4f;
+                    float viewportWidth = Mathf.Max(24f, bodyTotalWidth - scrollbarWidth - scrollbarGap);
+
+                    RectTransform scrollRootRect = shoppingBodyScrollRect.GetComponent<RectTransform>();
+                    scrollRootRect.anchoredPosition = new Vector2(bodyLeftInset, -bodyTop);
+                    scrollRootRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, viewportWidth);
+                    scrollRootRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, bodyHeight);
+
+                    if (shoppingBodyScrollbar != null)
+                    {
+                        RectTransform scrollbarRect = shoppingBodyScrollbar.GetComponent<RectTransform>();
+                        scrollbarRect.anchoredPosition = new Vector2(bodyLeftInset + viewportWidth + scrollbarGap, -bodyTop);
+                        scrollbarRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, scrollbarWidth);
+                        scrollbarRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, bodyHeight);
+                    }
+
+                    // So reseta a rolagem pro topo quando o texto muda (nova unidade
+                    // selecionada) — senao o drag do jogador seria desfeito a cada frame.
+                    bool bodyTextChanged = lastShoppingBodyText != externalOverrideText;
+                    lastShoppingBodyText = externalOverrideText;
+
+                    float preferredBodyHeight = textUnitBody != null
+                        ? textUnitBody.GetPreferredValues(externalOverrideText ?? string.Empty, viewportWidth, 0f).y
+                        : 0f;
+                    float contentHeight = Mathf.Max(bodyHeight, preferredBodyHeight);
+                    shoppingBodyContentRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, contentHeight);
+
+                    if (bodyTextChanged)
+                        shoppingBodyScrollRect.verticalNormalizedPosition = 1f;
+                }
             }
             if (cachedPreviewRectDefaults && unitPreviewImage != null && panelRect != null)
             {
@@ -836,6 +1009,14 @@ public class PanelDialogController : MonoBehaviour
             }
             return;
         }
+
+        if (shoppingBodyScrollRect != null && shoppingBodyScrollRect.gameObject.activeSelf)
+            shoppingBodyScrollRect.gameObject.SetActive(false);
+        if (shoppingBodyScrollbar != null && shoppingBodyScrollbar.gameObject.activeSelf)
+            shoppingBodyScrollbar.gameObject.SetActive(false);
+        if (textUnitBody != null)
+            textUnitBody.text = string.Empty;
+        lastShoppingBodyText = string.Empty;
 
         if (!cachedTextLayoutDefaults)
             return;

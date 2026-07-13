@@ -12,7 +12,6 @@ public sealed class PanelRodadaController : MonoBehaviour
     [SerializeField] private AudioClip menuOpen;
     [SerializeField] private AudioClip menuClose;
     [SerializeField] private AudioClip aguardandoRodada;
-    [SerializeField] private AudioClip[] falasJogadores;
     [SerializeField, Min(0f)] private float atrasoAntesMenuOpen = 0.5f;
     [SerializeField, Min(0.05f)] private float duracaoAnimacao = 0.3f;
 
@@ -94,10 +93,6 @@ public sealed class PanelRodadaController : MonoBehaviour
             yield return new WaitForSecondsRealtime(atrasoAntesMenuOpen);
         yield return PlayClip(menuOpen, false);
         yield return AnimateContent(0f, 1f);
-
-        int falaIndex = numeroJogador - 1;
-        if (falasJogadores != null && falaIndex >= 0 && falaIndex < falasJogadores.Length)
-            yield return PlayClip(falasJogadores[falaIndex], false);
 
         aguardandoConfirmacao = true;
         if (botaoRodada != null)
