@@ -7,10 +7,37 @@ public partial class AIController
     {
         Vector3Int originalCell = unit.CurrentCellPosition;
         simCell.z = 0; originalCell.z = 0;
-        unit.SetCurrentCellPosition(simCell, enforceFinalOccupancyRule: false);
         var options = new List<PodeDesembarcarOption>();
-        PodeDesembarcarSensor.CollectOptions(unit, boardTilemap, terrainDatabase, options);
-        unit.SetCurrentCellPosition(originalCell, enforceFinalOccupancyRule: false);
+
+        // Nao experimente desembarque a partir de um destino ainda preto. O
+        // batch pode mover ate la, mas so podera desembarcar numa decisao futura,
+        // depois de o movimento ser comprometido e o FOW confirmado em Neutral.
+        if (simCell != originalCell
+            && (matchController == null || !matchController.IsCellVisibleForActiveTeam(simCell)))
+            return options;
+
+        try
+        {
+            unit.SetCurrentCellPosition(simCell, enforceFinalOccupancyRule: false);
+            PodeDesembarcarSensor.CollectOptions(unit, boardTilemap, terrainDatabase, options);
+        }
+        finally
+        {
+            unit.SetCurrentCellPosition(originalCell, enforceFinalOccupancyRule: false);
+        }
+
+        // Tambem nao revele, pela lista de opcoes, o terreno/ocupacao de uma
+        // celula de desembarque que o snapshot confirmado ainda nao enxerga.
+        if (matchController == null)
+            options.Clear();
+        else
+            options.RemoveAll(option =>
+            {
+                Vector3Int targetCell = option.disembarkCell;
+                targetCell.z = 0;
+                return !matchController.IsCellVisibleForActiveTeam(targetCell);
+            });
+
         return options;
     }
 

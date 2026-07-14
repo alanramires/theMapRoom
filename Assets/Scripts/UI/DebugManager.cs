@@ -25,6 +25,10 @@ public class DebugManager : MonoBehaviour
     [Tooltip("Quando ativo, 'AI Stage 1' limpa o plano antes de rodar (força nova atribuição A+B).")]
     [SerializeField] private bool resetPlanOnDebugStage;
 
+    [Header("Hot Seat Debug")]
+    [Tooltip("Quando ativo, pula a apresentação do Panel_Rodada em partidas hotseat (pvp), tanto no início da partida quanto na transição entre rodadas.")]
+    [SerializeField] private bool panelRodadaDesativadoPvpDebug;
+
     private Component resolvedCommandInputField;
     private PropertyInfo cachedTextProperty;
     private InputField resolvedLegacyInputField;
@@ -81,6 +85,11 @@ public class DebugManager : MonoBehaviour
     public static bool AreAIDebugShortcutsEnabled()
     {
         return instance != null && instance.aiDebugShortcutsEnabled;
+    }
+
+    public static bool IsPanelRodadaDisabledForHotSeat()
+    {
+        return instance != null && instance.panelRodadaDesativadoPvpDebug;
     }
 
     public static bool TryConsumeDebugToggleCharacterFromInput()

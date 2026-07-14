@@ -25,6 +25,7 @@ public class HexEnxergadoDebugWindow : EditorWindow
     [SerializeField] private bool enableLos = true;
     [SerializeField] private bool enableSpotter = true;
     [SerializeField] private FogOfWarVisionMode visionMode = FogOfWarVisionMode.All;
+    [SerializeField] private bool restrictToActiveTeam = true;
 
     private readonly List<ObserverEntry> observers = new List<ObserverEntry>();
     private readonly HashSet<Vector3Int> visibleCells = new HashSet<Vector3Int>();
@@ -69,6 +70,7 @@ public class HexEnxergadoDebugWindow : EditorWindow
         enableLos = EditorGUILayout.ToggleLeft("Validar linha de visão", enableLos);
         enableSpotter = EditorGUILayout.ToggleLeft("Considerar spotter", enableSpotter);
         visionMode = (FogOfWarVisionMode)EditorGUILayout.EnumPopup("Camada consultada", visionMode);
+        restrictToActiveTeam = EditorGUILayout.ToggleLeft("Somente observadores do time ativo", restrictToActiveTeam);
         autoRefresh = EditorGUILayout.ToggleLeft("Atualizar automaticamente", autoRefresh);
 
         EditorGUILayout.BeginHorizontal();
@@ -137,11 +139,16 @@ public class HexEnxergadoDebugWindow : EditorWindow
         if (!hasSelectedCell || boardTilemap == null)
             return;
 
+        MatchController match = FindAnyObjectByType<MatchController>();
+        TeamId activeTeam = match != null ? match.ActiveTeam : TeamId.Neutral;
+
         UnitManager[] units = FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
         for (int i = 0; i < units.Length; i++)
         {
             UnitManager unit = units[i];
             if (unit == null || !unit.gameObject.activeInHierarchy || unit.IsEmbarked)
+                continue;
+            if (restrictToActiveTeam && activeTeam != TeamId.Neutral && unit.TeamId != activeTeam)
                 continue;
             if (unit.BoardTilemap != null && unit.BoardTilemap != boardTilemap)
                 continue;
@@ -163,8 +170,6 @@ public class HexEnxergadoDebugWindow : EditorWindow
                 distance = HexDistanceOddR(observerCell, selectedCell)
             });
         }
-        MatchController match = FindAnyObjectByType<MatchController>();
-        TeamId activeTeam = match != null ? match.ActiveTeam : TeamId.Neutral;
         List<ConstructionManager> constructions = ConstructionManager.AllActive;
         for (int i = 0; i < constructions.Count; i++)
         {

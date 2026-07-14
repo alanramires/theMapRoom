@@ -64,6 +64,21 @@ public partial class TurnStateManager
                 PaintSelectedUnitMovementRange();
 
             Tilemap boardMap = terrainTilemap != null ? terrainTilemap : selectedUnit.BoardTilemap;
+
+            // Contrato transacional/FOW: a posicao runtime em MoveuAndando ainda e
+            // provisoria. Se o destino estava preto no snapshot confirmado, rodar
+            // sensores contextuais transformaria A/E/D/C/F/S/T em um oraculo de
+            // terreno, estrutura, ocupacao e unidades ocultas. Nesse caso o lado
+            // ativo pode apenas comprometer ou cancelar o movimento; depois do retorno a
+            // Neutral o FOW sera publicado a partir da posicao definitiva.
+            if (ShouldSuppressContextSensorsAtUnconfirmedDestination())
+            {
+                ClearSensorResults();
+                RuntimeLog("[Sensors] Destino provisório fora da visão confirmada: sensores contextuais suprimidos.");
+                NotifySensorsReady();
+                return;
+            }
+
             int remainingMovementPoints = ComputeRemainingMovementPointsForSensors(movementMode);
             SensorHandle.RunAll(
                 selectedUnit,
@@ -191,6 +206,22 @@ public partial class TurnStateManager
         {
             RegisterPerfSensorsDuration((Time.realtimeSinceStartupAsDouble - perfStart) * 1000d);
         }
+    }
+
+    private bool ShouldSuppressContextSensorsAtUnconfirmedDestination()
+    {
+        if (CurrentCursorState != CursorState.MoveuAndando || selectedUnit == null || matchController == null)
+            return false;
+
+        // A IA decide a acao completa antes de executar o batch. O conhecimento
+        // confirmado dela e validado no planner; esta barreira existe para a
+        // sondagem interativa/cancelavel feita pelo jogador humano.
+        if (matchController.IsActiveTeamAI())
+            return false;
+
+        Vector3Int destination = selectedUnit.CurrentCellPosition;
+        destination.z = 0;
+        return !matchController.IsCellVisibleForActiveTeam(destination);
     }
 
     private bool IsSelectedUnitInContestedHexTotalWar()

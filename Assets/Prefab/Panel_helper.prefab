@@ -369,6 +369,11 @@ MonoBehaviour:
   matchController: {fileID: 0}
   turnStateManager: {fileID: 0}
   animationManager: {fileID: 0}
+  saveGameManager: {fileID: 0}
+  mainMenuLoadPanelController: {fileID: 0}
+  mainMenuTutorialPanelController: {fileID: 0}
+  mainMenuPanel: {fileID: 0}
+  battleMapMenuController: {fileID: 0}
   helperDatabase: {fileID: 11400000, guid: fb010f58d3e345008491c9af88bf5355, type: 2}
   panelHelper: {fileID: 3683727019497552624}
   helperTitle: {fileID: 2934473528359920861}

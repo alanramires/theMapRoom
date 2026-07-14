@@ -879,7 +879,7 @@ public class MatchController : MonoBehaviour
         // camera, FoW ou musica da partida e liberado antes da confirmacao hot seat.
         if (panelRodada == null)
             panelRodada = FindAnyObjectByType<PanelRodadaController>(FindObjectsInactive.Include);
-        if (AreAllPlayersHuman() && panelRodada != null)
+        if (AreAllPlayersHuman() && panelRodada != null && !DebugManager.IsPanelRodadaDisabledForHotSeat())
             yield return panelRodada.Apresentar(ActiveTeam, 1, currentTurn);
 
         FindAnyObjectByType<ReplayManager>()?.CleanupReplayArtifactsForMatchStart();
@@ -1524,7 +1524,7 @@ public class MatchController : MonoBehaviour
             panelRodada = FindAnyObjectByType<PanelRodadaController>(FindObjectsInactive.Include);
 
         // O painel preto sobe antes de trocar time/FoW/camera, preservando o hot seat.
-        bool useHotSeatPanel = AreAllPlayersHuman() && panelRodada != null;
+        bool useHotSeatPanel = AreAllPlayersHuman() && panelRodada != null && !DebugManager.IsPanelRodadaDisabledForHotSeat();
         if (useHotSeatPanel)
         {
             panelRodada.gameObject.SetActive(true);
@@ -4710,6 +4710,49 @@ public class MatchController : MonoBehaviour
             forcedVirtualTargetDomain: targetDomain,
             forcedVirtualTargetHeight: targetHeight,
             useRangeOnlyForAirHighWhenConfigured: true);
+    }
+
+    /// <summary>
+    /// Consulta visual de uma unica unidade para o inspector. Nao publica FOW,
+    /// nao altera contatos e nao alimenta caches confirmados.
+    /// </summary>
+    public void CollectInspectionVisibleCells(
+        UnitManager unit,
+        Tilemap boardMap,
+        FogOfWarVisionMode mode,
+        HashSet<Vector3Int> output)
+    {
+        if (output == null)
+            return;
+
+        output.Clear();
+        if (unit == null || boardMap == null || unit.IsEmbarked)
+            return;
+
+        TerrainDatabase terrainDatabase = ResolveFogTerrainDatabase();
+        DPQAirHeightConfig dpqConfig = ResolveFogDpqAirHeightConfig();
+
+        if (mode == FogOfWarVisionMode.All || mode == FogOfWarVisionMode.Air)
+        {
+            AddFogLayerVisibleCellsForUnit(unit, boardMap, terrainDatabase, dpqConfig,
+                Domain.Air, HeightLevel.AirLow, output);
+            AddFogLayerVisibleCellsForUnit(unit, boardMap, terrainDatabase, dpqConfig,
+                Domain.Air, HeightLevel.AirHigh, output);
+        }
+
+        if (mode == FogOfWarVisionMode.All || mode == FogOfWarVisionMode.Surface)
+        {
+            AddFogLayerVisibleCellsForUnit(unit, boardMap, terrainDatabase, dpqConfig,
+                Domain.Land, HeightLevel.Surface, output);
+            AddFogLayerVisibleCellsForUnit(unit, boardMap, terrainDatabase, dpqConfig,
+                Domain.Naval, HeightLevel.Surface, output);
+        }
+
+        if (mode == FogOfWarVisionMode.All || mode == FogOfWarVisionMode.Sub)
+        {
+            AddFogLayerVisibleCellsForUnit(unit, boardMap, terrainDatabase, dpqConfig,
+                Domain.Submarine, HeightLevel.Submerged, output);
+        }
     }
 
     private void AddFriendlyConstructionDisplayCells(Tilemap boardMap, HashSet<Vector3Int> output)

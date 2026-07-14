@@ -387,6 +387,9 @@ public partial class TurnStateManager
         if (TryShowInspectedCurrentWeaponRange())
             return ActionSfx.Confirm;
 
+        if (TryShowInspectedVisionRange())
+            return ActionSfx.Confirm;
+
         ExitInspectStateToNeutral();
         return ActionSfx.Cancel;
     }

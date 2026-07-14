@@ -1478,8 +1478,11 @@ public class PanelHelperController : MonoBehaviour
 
     private void HideAll(bool force)
     {
-        if (isDockedCenterLeft)
+        // O arraste vale somente durante a exibicao atual. Quando o helper some,
+        // esquece a posicao manual e volta ao layout/dock original na proxima vez.
+        if (isDockedCenterLeft || manuallyPositioned)
             RestoreOriginalLayout();
+        manuallyPositioned = false;
         hasLastUndockedScreenRect = false;
         cursorNearUndockedDockRegion = false;
         ResetHelperScrollLayout();
@@ -1921,8 +1924,10 @@ public class PanelHelperController : MonoBehaviour
             searchStart = textIndex + Mathf.Max(1, (visual.unitName ?? string.Empty).Length);
             TMP_CharacterInfo character = helperTxt.textInfo.characterInfo[textIndex];
             RectTransform rect = icon.rectTransform;
+            float iconHalfWidth = rect.rect.width * 0.5f;
+            float minimumCenterX = helperTxt.rectTransform.rect.xMin + iconHalfWidth + 2f;
             rect.localPosition = new Vector3(
-                character.bottomLeft.x - 29f,
+                Mathf.Max(character.bottomLeft.x - 27f, minimumCenterX),
                 (character.bottomLeft.y + character.topRight.y) * 0.5f,
                 0f);
             icon.sprite = visual.sprite;
@@ -3778,6 +3783,18 @@ public class PanelHelperController : MonoBehaviour
 
     public void NotifyHelperPanelManuallyPositioned()
     {
+        // O dock automatico troca anchors/pivot. Antes de assumir controle manual,
+        // volta ao sistema de coordenadas original preservando a posicao visual;
+        // assim a memoria continua valida quando o painel some e reaparece.
+        if (helperRect != null && isDockedCenterLeft && layoutCached)
+        {
+            Vector3 worldPosition = helperRect.position;
+            helperRect.anchorMin = originalAnchorMin;
+            helperRect.anchorMax = originalAnchorMax;
+            helperRect.pivot = originalPivot;
+            helperRect.position = worldPosition;
+        }
+
         manuallyPositioned = true;
         isDockedCenterLeft = false;
         cursorNearUndockedDockRegion = false;
@@ -4268,9 +4285,6 @@ public class PanelHelperController : MonoBehaviour
 
 public sealed class PanelHelperDragHandle : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler
 {
-    private const string PositionXKey = "ui.panel_helper.position_x";
-    private const string PositionYKey = "ui.panel_helper.position_y";
-
     private RectTransform target;
     private PanelHelperController owner;
     private Canvas canvas;
@@ -4280,13 +4294,6 @@ public sealed class PanelHelperDragHandle : MonoBehaviour, IBeginDragHandler, ID
         target = dragTarget;
         owner = controller;
         canvas = target != null ? target.GetComponentInParent<Canvas>() : null;
-
-        if (target != null && PlayerPrefs.HasKey(PositionXKey) && PlayerPrefs.HasKey(PositionYKey))
-        {
-            target.anchoredPosition = new Vector2(PlayerPrefs.GetFloat(PositionXKey), PlayerPrefs.GetFloat(PositionYKey));
-            owner.NotifyHelperPanelManuallyPositioned();
-            ClampToCanvas();
-        }
     }
 
     public void OnBeginDrag(PointerEventData eventData)
@@ -4311,9 +4318,6 @@ public sealed class PanelHelperDragHandle : MonoBehaviour, IBeginDragHandler, ID
         if (target == null)
             return;
         ClampToCanvas();
-        PlayerPrefs.SetFloat(PositionXKey, target.anchoredPosition.x);
-        PlayerPrefs.SetFloat(PositionYKey, target.anchoredPosition.y);
-        PlayerPrefs.Save();
     }
 
     private void ClampToCanvas()

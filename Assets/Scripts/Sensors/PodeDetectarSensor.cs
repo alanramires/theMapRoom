@@ -493,6 +493,29 @@ public static class PodeDetectarSensor
         try
         {
             BuildDistanceMapInto(boardMap, observerCell, maxRange, workspace);
+            // O modo agregado (All) consulta a camada nativa do terreno primeiro.
+            // Mar costuma ser Naval/Surface com Submarine/Submerged adicional; portanto,
+            // a especializacao submarina precisa conservar sua propria distancia conectada
+            // e nao pode herdar a distancia hexagonal reta da superficie atravessando praia.
+            if (!forceVirtualTargetLayer &&
+                preserveObserverLayerRangeForHexVisibility &&
+                terrainDatabase != null &&
+                ResolveDetectionRange(
+                    observer,
+                    observerData,
+                    null,
+                    Domain.Submarine,
+                    HeightLevel.Submerged) > 0)
+            {
+                aquaticWorkspace = RentDistanceMapWorkspace();
+                BuildDistanceMapInto(
+                    boardMap,
+                    observerCell,
+                    maxRange,
+                    aquaticWorkspace,
+                    c => IsAquaticCellForSubmergedDetection(boardMap, terrainDatabase, c));
+            }
+
             foreach (KeyValuePair<Vector3Int, int> pair in workspace.distances)
             {
                 Vector3Int cell = pair.Key;
@@ -505,6 +528,21 @@ public static class PodeDetectarSensor
                 {
                     targetDomain = forcedVirtualTargetDomain;
                     targetHeight = forcedVirtualTargetHeight;
+
+                    // Uma camada virtual representa um filtro de exibicao, nao uma
+                    // conversao do terreno. Naval/Surface, por exemplo, so pode
+                    // contribuir em celulas que realmente aceitam Naval/Surface.
+                    // Ar permanece independente do terreno abaixo.
+                    if (targetDomain != Domain.Air &&
+                        !CellSupportsObservationLayer(
+                            boardMap,
+                            terrainDatabase,
+                            cell,
+                            targetDomain,
+                            targetHeight))
+                    {
+                        continue;
+                    }
                 }
                 else
                 {
@@ -560,7 +598,8 @@ public static class PodeDetectarSensor
                             targetHeight,
                             enableLosValidation,
                             enableSpotter,
-                            useRangeOnlyForAirHighWhenConfigured))
+                            useRangeOnlyForAirHighWhenConfigured,
+                            aquaticWorkspace))
                     {
                         collectVisibleCellsScratch.Add(cell);
                     }
@@ -664,7 +703,8 @@ public static class PodeDetectarSensor
         HeightLevel resolvedTargetHeight,
         bool enableLosValidation,
         bool enableSpotter,
-        bool useRangeOnlyForAirHighWhenConfigured)
+        bool useRangeOnlyForAirHighWhenConfigured,
+        DistanceMapWorkspace aquaticWorkspace)
     {
         if (CanObserveCellWithLayer(
                 observer,
@@ -710,6 +750,26 @@ public static class PodeDetectarSensor
             if (specIsAquatic != terrainIsAquatic)
                 continue;
 
+            // Uma especializacao alternativa so pode contribuir se o proprio
+            // TerrainTypeData do hex suportar essa camada. Sem isso, o alcance
+            // Submarine/Submerged:7 era reaplicado sobre praia Naval/Surface e
+            // fazia o modo All enxergar alem do Surface:3.
+            if (!TryResolveTerrainAtCell(boardMap, terrainDatabase, targetCell, out TerrainTypeData targetTerrain)
+                || !TerrainSupportsLayerMode(targetTerrain, domain, height))
+            {
+                continue;
+            }
+
+            int specializationDistance = distance;
+            if (domain == Domain.Submarine && height == HeightLevel.Submerged)
+            {
+                if (aquaticWorkspace == null ||
+                    !aquaticWorkspace.distances.TryGetValue(targetCell, out specializationDistance))
+                {
+                    continue;
+                }
+            }
+
             if (CanObserveCellWithLayer(
                     observer,
                     observerData,
@@ -718,7 +778,7 @@ public static class PodeDetectarSensor
                     dpqAirHeightConfig,
                     observerCell,
                     targetCell,
-                    distance,
+                    specializationDistance,
                     domain,
                     height,
                     enableLosValidation,
@@ -1629,8 +1689,11 @@ public static class PodeDetectarSensor
         if (!TryResolveTerrainAtCell(map, terrainDatabase, cell, out TerrainTypeData terrain) || terrain == null)
             return false;
 
-        return TerrainSupportsLayerMode(terrain, Domain.Submarine, HeightLevel.Submerged) ||
-            TerrainSupportsLayerMode(terrain, Domain.Naval, HeightLevel.Surface);
+        // Fundo do mar nao e sinonimo de todo terreno Naval/Surface. Praia, por
+        // exemplo, aceita navegacao na superficie mas nao Submarine/Submerged.
+        // A propria lista data-driven do terreno decide se o pulso submarino
+        // pode atravessar e revelar a celula.
+        return TerrainSupportsLayerMode(terrain, Domain.Submarine, HeightLevel.Submerged);
     }
 
     private static bool TerrainSupportsLayerMode(TerrainTypeData terrain, Domain domain, HeightLevel height)
@@ -1647,6 +1710,64 @@ public static class PodeDetectarSensor
         for (int i = 0; i < terrain.aditionalDomainsAllowed.Count; i++)
         {
             TerrainLayerMode mode = terrain.aditionalDomainsAllowed[i];
+            if (mode.domain == domain && mode.heightLevel == height)
+                return true;
+        }
+
+        return false;
+    }
+
+    private static bool CellSupportsObservationLayer(
+        Tilemap map,
+        TerrainDatabase terrainDatabase,
+        Vector3Int cell,
+        Domain domain,
+        HeightLevel height)
+    {
+        if (TryResolveConstructionAtCell(map, cell, out ConstructionData construction) &&
+            construction != null &&
+            SupportsLayerMode(
+                construction.domain,
+                construction.heightLevel,
+                construction.aditionalDomainsAllowed,
+                domain,
+                height))
+        {
+            return true;
+        }
+
+        StructureData structure = StructureOccupancyRules.GetStructureAtCell(map, cell);
+        if (structure != null &&
+            SupportsLayerMode(
+                structure.domain,
+                structure.heightLevel,
+                structure.aditionalDomainsAllowed,
+                domain,
+                height))
+        {
+            return true;
+        }
+
+        return TryResolveTerrainAtCell(map, terrainDatabase, cell, out TerrainTypeData terrain) &&
+            TerrainSupportsLayerMode(terrain, domain, height);
+    }
+
+    private static bool SupportsLayerMode(
+        Domain nativeDomain,
+        HeightLevel nativeHeight,
+        IReadOnlyList<TerrainLayerMode> additionalModes,
+        Domain domain,
+        HeightLevel height)
+    {
+        if (nativeDomain == domain && nativeHeight == height)
+            return true;
+
+        if (additionalModes == null)
+            return false;
+
+        for (int i = 0; i < additionalModes.Count; i++)
+        {
+            TerrainLayerMode mode = additionalModes[i];
             if (mode.domain == domain && mode.heightLevel == height)
                 return true;
         }

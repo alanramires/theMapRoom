@@ -142,6 +142,7 @@ public partial class TurnStateManager
     private ConstructionManager inspectedHelperConstruction;
     private bool inspectedHelperTerrain;
     private bool inspectedHelperCurrentWeaponRange;
+    private bool inspectedHelperVisionRange;
     private readonly List<Vector3Int> inspectedThreatRangeCells = new List<Vector3Int>();
     private readonly HashSet<Vector3Int> inspectedThreatRangeLookup = new HashSet<Vector3Int>();
     private readonly List<Vector3Int> inspectedThreatLineCells = new List<Vector3Int>();
@@ -1275,6 +1276,7 @@ public partial class TurnStateManager
         inspectedHelperConstruction = null;
         inspectedHelperTerrain = true;
         inspectedHelperCurrentWeaponRange = false;
+        inspectedHelperVisionRange = false;
         ClearEnemyThreatLayersOverlay();
         ClearInspectedThreatOverlay();
         inspectedHelperVisibleUntil = Time.time + InspectedHelperDurationSeconds;
@@ -1295,6 +1297,7 @@ public partial class TurnStateManager
         inspectedHelperConstruction = null;
         inspectedHelperTerrain = false;
         inspectedHelperCurrentWeaponRange = false;
+        inspectedHelperVisionRange = false;
         ClearEnemyThreatLayersOverlay();
         if (paintThreatOverlay)
             ApplyInspectedThreatOverlay(unit, nextTurnHotZone);
@@ -1317,6 +1320,7 @@ public partial class TurnStateManager
         inspectedHelperUnit = null;
         inspectedHelperTerrain = false;
         inspectedHelperCurrentWeaponRange = false;
+        inspectedHelperVisionRange = false;
         ClearEnemyThreatLayersOverlay();
         ClearInspectedThreatOverlay();
         inspectedHelperVisibleUntil = Time.time + Mathf.Max(0.1f, GetInspectConstructionHelperDurationSeconds());
@@ -1343,6 +1347,7 @@ public partial class TurnStateManager
         inspectedHelperConstruction = null;
         inspectedHelperTerrain = false;
         inspectedHelperCurrentWeaponRange = false;
+        inspectedHelperVisionRange = false;
         ClearInspectedThreatOverlay();
         inspectedHelperVisibleUntil = -1f;
         inspectedHelperActivatedFrame = -1;
@@ -1431,6 +1436,63 @@ public partial class TurnStateManager
         }
 
         inspectedHelperCurrentWeaponRange = true;
+        inspectedHelperVisibleUntil = Time.time + InspectedHelperDurationSeconds;
+        inspectedHelperActivatedFrame = Time.frameCount;
+        return true;
+    }
+
+    private bool TryShowInspectedVisionRange()
+    {
+        if (inspectedHelperUnit == null || inspectedHelperVisionRange || matchController == null)
+            return false;
+
+        Tilemap boardMap = terrainTilemap != null ? terrainTilemap : inspectedHelperUnit.BoardTilemap;
+        if (boardMap == null)
+            return false;
+        if (lineOfFireMapTilemap == null)
+            lineOfFireMapTilemap = FindLineOfFireMapTilemap();
+        if (lineOfFireMapTilemap == null)
+            return false;
+
+        TileBase spotTile = Resources.Load<TileBase>("white ring spot");
+        if (spotTile == null)
+        {
+            Debug.LogWarning("[Inspect] Tile Resources/white ring spot nao encontrado.");
+            return false;
+        }
+
+        ClearInspectedThreatOverlay();
+        ClearLineOfFireArea();
+
+        HashSet<Vector3Int> visibleCells = new HashSet<Vector3Int>();
+        matchController.CollectInspectionVisibleCells(
+            inspectedHelperUnit,
+            boardMap,
+            matchController.FogOfWarVisionMode,
+            visibleCells);
+
+        Color teamColor = TeamUtils.GetColor(inspectedHelperUnit.TeamId);
+        Color spotColor = new Color(
+            teamColor.r,
+            teamColor.g,
+            teamColor.b,
+            Mathf.Clamp01(lineOfFireAlpha));
+
+        foreach (Vector3Int rawCell in visibleCells)
+        {
+            Vector3Int cell = rawCell;
+            cell.z = 0;
+            if (boardMap.GetTile(cell) == null)
+                continue;
+
+            lineOfFireMapTilemap.SetTile(cell, spotTile);
+            lineOfFireMapTilemap.SetTileFlags(cell, TileFlags.None);
+            lineOfFireMapTilemap.SetColor(cell, spotColor);
+            inspectedThreatLineCells.Add(cell);
+            inspectedThreatLineLookup.Add(cell);
+        }
+
+        inspectedHelperVisionRange = true;
         inspectedHelperVisibleUntil = Time.time + InspectedHelperDurationSeconds;
         inspectedHelperActivatedFrame = Time.frameCount;
         return true;
@@ -2398,7 +2460,9 @@ public partial class TurnStateManager
         if (seats == null || seats.Count <= 0)
             return;
 
-        string indent = new string(' ', (Mathf.Max(0, depth) + 1) * 4);
+        // Reserva uma coluna completa para o icone 52x52 antes do nome.
+        // Cinco espacos na fonte monoespacada mantem o sprite dentro da mascara.
+        string indent = new string(' ', (Mathf.Max(0, depth) + 1) * 5);
         for (int i = 0; i < seats.Count; i++)
         {
             UnitManager passenger = seats[i] != null ? seats[i].embarkedUnit : null;

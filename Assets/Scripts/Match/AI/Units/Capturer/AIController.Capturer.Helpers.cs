@@ -236,6 +236,17 @@ public partial class AIController
         out ConstructionManager targetConstruction)
     {
         targetConstruction = null;
+        simulatedCell.z = 0;
+
+        // A simulacao da IA nao pode usar o sensor de captura como oraculo do
+        // mapa preto. A celula atual pertence ao snapshot confirmado da unidade;
+        // qualquer outro destino precisa estar visivel no cache confirmado.
+        Vector3Int currentCell = unit.CurrentCellPosition;
+        currentCell.z = 0;
+        if (simulatedCell != currentCell
+            && (matchController == null || !matchController.IsCellVisibleForActiveTeam(simulatedCell)))
+            return false;
+
         if (!unit.TryGetUnitData(out UnitData data)) return false;
         if (!UnitRoleCompatibility.CanSatisfy(data, UnitRole.Capturador)) return false;
         if (unit.TeamId == TeamId.Neutral) return false;

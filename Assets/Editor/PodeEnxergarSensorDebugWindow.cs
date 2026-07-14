@@ -57,6 +57,7 @@ public class PodeEnxergarSensorDebugWindow : EditorWindow
     [SerializeField] private TerrainDatabase terrainDatabase;
     [SerializeField] private DPQAirHeightConfig dpqAirHeightConfig;
     [SerializeField] private bool useGameplaySensorContext = true;
+    [SerializeField] private bool restrictToActiveTeam = true;
     [SerializeField] private bool logToConsole = true;
     [SerializeField] private bool forceVirtualTargetLayer = false;
     [SerializeField] private Domain forcedVirtualTargetDomain = Domain.Land;
@@ -105,6 +106,7 @@ public class PodeEnxergarSensorDebugWindow : EditorWindow
         terrainDatabase = (TerrainDatabase)EditorGUILayout.ObjectField("Terrain Database", terrainDatabase, typeof(TerrainDatabase), false);
         dpqAirHeightConfig = (DPQAirHeightConfig)EditorGUILayout.ObjectField("DPQ Air Height", dpqAirHeightConfig, typeof(DPQAirHeightConfig), false);
         useGameplaySensorContext = EditorGUILayout.ToggleLeft("Usar contexto do gameplay (MatchController)", useGameplaySensorContext);
+        restrictToActiveTeam = EditorGUILayout.ToggleLeft("Exigir unidade do time ativo", restrictToActiveTeam);
         logToConsole = EditorGUILayout.ToggleLeft("Log no Console", logToConsole);
         forceVirtualTargetLayer = EditorGUILayout.ToggleLeft("Forcar camada virtual alvo", forceVirtualTargetLayer);
         if (forceVirtualTargetLayer)
@@ -231,6 +233,16 @@ public class PodeEnxergarSensorDebugWindow : EditorWindow
         if (selectedUnit == null)
         {
             statusMessage = "Selecione uma unidade valida.";
+            return;
+        }
+
+        if (restrictToActiveTeam && matchController != null
+            && matchController.ActiveTeam != TeamId.Neutral
+            && selectedUnit.TeamId != matchController.ActiveTeam)
+        {
+            statusMessage =
+                $"Unidade pertence a {selectedUnit.TeamId}, mas o time ativo e {matchController.ActiveTeam}. " +
+                "Desmarque 'Exigir unidade do time ativo' apenas para diagnostico global.";
             return;
         }
 
