@@ -157,8 +157,8 @@ MonoBehaviour:
     waitPlayerTurnStart: 0
     text: "Antes de puxar o gatilho, primeiro \xE9 preciso conhecer a si mesmo.\n\nMeu
       Velho falava algo nessa linha, mas ele provavelmente n\xE3o precisava lidar
-      com recruta sonolento.\n\nOlhe bem para voc\xEA e seus companheiros.\n\n[ordem]Aproxime
-      a c\xE2mera com a roda do mouse ou fazendo o gesto de pin\xE7a na tela.[/ordem]"
+      com recruta sonolento. \n\n[ordem]Aproxime a c\xE2mera com a roda do mouse
+      ou fazendo o gesto de pin\xE7a na tela.[/ordem]"
     voice: {fileID: 0}
     spawnCommand: 
     statCommand: 
@@ -174,11 +174,8 @@ MonoBehaviour:
     waitObjectiveIndex: -1
     waitAllUnitsActed: 0
     waitPlayerTurnStart: 0
-    text: "Est\xE1 vendo o [vermelho]cora\xE7\xE3o[/vermelho] acima de sua unidade?
-      Ele indica sua capacidade de luta. Quando est\xE1 cheio, o esquadr\xE3o combate
-      com for\xE7a total. Quando esvazia, sua for\xE7a de tiro cai junto.\n\nMenos
-      soldados atirando, menos chumbo indo para o outro lado.\n\n[ordem]Arraste o
-      mapa com o bot\xE3o direito do mouse ou com um dedo na tela.[/ordem]"
+    text: "[ordem]Arraste o mapa com o bot\xE3o direito do mouse ou com um dedo na
+      tela.[/ordem]"
     voice: {fileID: 0}
     spawnCommand: 
     statCommand: 
@@ -188,15 +185,34 @@ MonoBehaviour:
     revealObjectiveKey: hist_1_02
     revealObjectiveIndex: -1
   - advance: 0
+    objectiveKey: hist_1_01
+    revealObjective: 0
+    waitObjectiveKey: 
+    waitObjectiveIndex: -1
+    waitAllUnitsActed: 0
+    waitPlayerTurnStart: 0
+    text: "Est\xE1 vendo o [vermelho]cora\xE7\xE3o[/vermelho] acima de sua unidade?
+      Ele indica sua capacidade de luta. Quando est\xE1 cheio, o esquadr\xE3o combate
+      com for\xE7a total. Quando esvazia, sua for\xE7a de tiro cai junto.\n\nMenos
+      soldados atirando, menos chumbo indo para o outro lado."
+    voice: {fileID: 0}
+    spawnCommand: 
+    statCommand: 
+    turn: 0
+    movement: 0
+    unlockMovement: 0
+    revealObjectiveKey: hist_1_01
+    revealObjectiveIndex: -1
+  - advance: 0
     objectiveKey: 
     revealObjective: 0
     waitObjectiveKey: hist_1_02
     waitObjectiveIndex: -1
     waitAllUnitsActed: 0
     waitPlayerTurnStart: 0
-    text: "A sua figura em campo n\xE3o representa um soldado sozinho. \nEla representa
-      [enfase]10 soldados[/enfase] lutando juntos no mesmo setor. \n\nMenos soldados
-      atirando, menos chumbo indo para o outro lado."
+    text: "A sua figura em campo n\xE3o representa um soldado sozinho. \n\nEla representa
+      [enfase]um esquadr\xE3o de 10 soldados[/enfase] lutando juntos no mesmo setor.
+      \n\nMenos soldados atirando, menos chumbo indo para o outro lado."
     voice: {fileID: 0}
     spawnCommand: 
     statCommand: 
@@ -217,7 +233,7 @@ MonoBehaviour:
       seu companheiro a esquerda com 4 de hp[/enfase]"
     voice: {fileID: 0}
     spawnCommand: 
-    statCommand: Mathias hp=4
+    statCommand: Mathias hp=4; pan Mathias
     turn: 0
     movement: 0
     unlockMovement: 0
@@ -253,7 +269,7 @@ MonoBehaviour:
       a esquerda com 30 de autonomia[/enfase]"
     voice: {fileID: 0}
     spawnCommand: 
-    statCommand: Mathias fuel=30
+    statCommand: Mathias fuel=30; pan Mathias
     turn: 0
     movement: 0
     unlockMovement: 0
@@ -272,7 +288,7 @@ MonoBehaviour:
       anda.\n[enfase]Seu companheiro a direita com 15 de autonomia[/enfase]"
     voice: {fileID: 0}
     spawnCommand: 
-    statCommand: Dias fuel=15
+    statCommand: Dias fuel=15; pan Dias
     turn: 0
     movement: 0
     unlockMovement: 0
@@ -454,7 +470,7 @@ MonoBehaviour:
     waitPlayerTurnStart: 0
     text: "Floresta atrasa ve\xEDculos, mas n\xE3o influencia a infantaria. [amarelo]Movemos
       na floresta como quem se move em planicies[/amarelo]. Aqui \xE9 Selva!\n\nMontanha
-      cobra mais da perna.\nPara a infantaria, subir montanha custa mais esfor\xE7o.\n[enfase]Uma
+      cobra mais da perna. Para a infantaria, subir montanha custa mais esfor\xE7o.\n[enfase]Uma
       casa de montanha consome 2 de autonomia.[/enfase]\n\n\xC9 s\xF3 uma casa no
       mapa, mas suas pernas discordam."
     voice: {fileID: 0}
@@ -491,7 +507,7 @@ MonoBehaviour:
     waitAllUnitsActed: 1
     waitPlayerTurnStart: 0
     text: "A bandeira est\xE1 longe \u2014 suas pernas n\xE3o chegam l\xE1 num turno
-      s\xF3.\n\nMarche o que der e, quando a tropa cansar, [ordem]encerre o turno[/ordem].\n\nAmanh\xE3
+      s\xF3.\n\nMarche o que der e, quando a tropa cansar, [ordem]passe a vez[/ordem].\n\nAmanh\xE3
       continuamos. \n\nMontar Acampamento recruta! quero ver esse poncho muito bem
       amarrado entre as \xE1rvores!"
     voice: {fileID: 0}
@@ -607,7 +623,7 @@ MonoBehaviour:
     unlockMovement: 0
     revealObjectiveKey: 
     revealObjectiveIndex: -1
-  - advance: 4
+  - advance: 0
     objectiveKey: 
     revealObjective: 0
     waitObjectiveKey: 
@@ -616,9 +632,25 @@ MonoBehaviour:
     waitPlayerTurnStart: 0
     text: "Muito bem. Agora aprenda uma coisa importante: nem toda ordem \xE9 avan\xE7o.\n\n\xC0s
       vezes, a melhor decis\xE3o \xE9 manter posi\xE7\xE3o. Voc\xEA j\xE1 est\xE1
-      onde precisa estar. N\xE3o invente moda.\n\nFique a\xED parado e aprenda: soldado
-      que anda demais morre cansado. Soldado que segura o ponto obriga o inimigo
-      a pensar.\n\n[ordem]Passe a vez e observe a infantaria inimiga.[/ordem]"
+      onde precisa estar. N\xE3o invente moda."
+    voice: {fileID: 0}
+    spawnCommand: 
+    statCommand: 
+    turn: 0
+    movement: 0
+    unlockMovement: 0
+    revealObjectiveKey: 
+    revealObjectiveIndex: -1
+  - advance: 4
+    objectiveKey: 
+    revealObjective: 0
+    waitObjectiveKey: 
+    waitObjectiveIndex: -1
+    waitAllUnitsActed: 0
+    waitPlayerTurnStart: 0
+    text: "Fique a\xED parado e aprenda: soldado que anda demais morre cansado. Soldado
+      que segura o ponto obriga o inimigo a pensar.\n\n[ordem]Passe a vez e observe
+      a infantaria inimiga.[/ordem]"
     voice: {fileID: 0}
     spawnCommand: 
     statCommand: 

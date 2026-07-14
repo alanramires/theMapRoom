@@ -2713,7 +2713,10 @@ public partial class TurnStateManager
             TryAddSensorLine(data, 'F', "fuse");
             TryAddSensorLine(data, 'S', "supply");
             TryAddSensorLine(data, 'T', "transfer");
-            TryAddSensorLine(data, 'M', "move_only", forceInclude: true);
+            string moveConfirmationSensorKey = CurrentCursorState == CursorState.MoveuParado
+                ? "confirm_position"
+                : "move_only";
+            TryAddSensorLine(data, 'M', moveConfirmationSensorKey, forceInclude: true);
         }
 
         if (isThreatLayerSelectionStep)

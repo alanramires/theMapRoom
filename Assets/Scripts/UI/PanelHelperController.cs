@@ -1426,6 +1426,8 @@ public class PanelHelperController : MonoBehaviour
                 return ResolveMessage("helper.sensors.label.threat_layers", "Threat Layers");
             case "move_only":
                 return ResolveMessage("helper.sensors.label.move_only", "Move Only");
+            case "confirm_position":
+                return ResolveMessage("helper.sensors.label.confirm_position", "Confirmar Posição");
             default:
                 return sensorKey ?? string.Empty;
         }
@@ -3783,7 +3785,10 @@ public class PanelHelperController : MonoBehaviour
 
     private void EnsureDragHandle()
     {
-        if (helperRect == null || dragHandleRoot != null)
+        // A alca e apresentacao runtime. OnValidate tambem passa por
+        // TryAutoAssignReferences ao inspecionar Prefab Assets; criar/reparentear
+        // objetos nesse contexto deixa GameObjects orfaos e pode corromper o prefab.
+        if (!Application.isPlaying || helperRect == null || dragHandleRoot != null)
             return;
 
         Transform existing = helperRect.Find("helper_drag_handle");
@@ -3804,6 +3809,8 @@ public class PanelHelperController : MonoBehaviour
         rect.SetAsLastSibling();
 
         Image image = dragHandleRoot.GetComponent<Image>();
+        if (image == null)
+            image = dragHandleRoot.AddComponent<Image>();
         image.color = new Color(0.08f, 0.08f, 0.06f, 0.92f);
         image.raycastTarget = true;
 
@@ -3826,6 +3833,8 @@ public class PanelHelperController : MonoBehaviour
         label.raycastTarget = false;
 
         PanelHelperDragHandle handle = dragHandleRoot.GetComponent<PanelHelperDragHandle>();
+        if (handle == null)
+            handle = dragHandleRoot.AddComponent<PanelHelperDragHandle>();
         handle.Configure(helperRect, this);
     }
 

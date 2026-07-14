@@ -6,7 +6,7 @@ Esta versão publica o fluxo inicial do modo PvP local em hot seat, atualiza a e
 
 ## PvP hot seat
 
-- Adicionado o botão **Jogador vs Jogador** na Tela de Entrada.
+- Adicionado o botão **Jogador vs Jogador** na Tela de Entrada. 100k para cada jogador comprar tudo o que quiser na primeira rodada.
 - Os dois slots da configuração são controlados por jogadores humanos.
 - O mapa inicial do modo foi fixado em **Hot Seat 1 - Pvp**.
 - A cena PvP foi adicionada às cenas da build.
