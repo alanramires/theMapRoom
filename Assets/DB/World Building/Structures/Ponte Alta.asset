@@ -47,9 +47,14 @@ MonoBehaviour:
     legacyRequiredLandingSkills: []
     requiredLandingSkillRules: []
     requireAtLeastOneLandingSkill: 0
-  forceEndMovementOnTerrainDomainForDomains:
-  - domain: 2
-    heightLevel: 2
+  navalOpsByTerrain:
+  - terrainData: {fileID: 11400000, guid: adc0bfc8c2e8f9a41be0abda3e29e582, type: 2}
+    forceEndMovementOnTerrainDomainForDomains:
+    - domain: 2
+      heightLevel: 2
+    forceDetectOnForcedEndMovementDomains: 0
+    forceDetectUnitsWithFollowingStealthSkills: []
+  forceEndMovementOnTerrainDomainForDomains: []
   forceDetectOnForcedEndMovementDomains: 0
   forceDetectUnitsWithFollowingStealthSkills: []
   roadRoutes:

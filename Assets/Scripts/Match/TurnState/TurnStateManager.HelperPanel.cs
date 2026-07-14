@@ -122,6 +122,7 @@ public partial class TurnStateManager
     {
         public string unitName;
         public Sprite sprite;
+        public Color color = Color.white;
         public int depth;
     }
 
@@ -500,10 +501,14 @@ public partial class TurnStateManager
                     data.AimConfirmTargetSprite = targetRenderer != null ? targetRenderer.sprite : null;
                     data.AimConfirmTargetColor = targetRenderer != null ? targetRenderer.color : Color.white;
                     data.AimConfirmHp = Mathf.Max(0, target.CurrentHP);
-                    data.AimConfirmTerrainLabel = ResolveCellTerrainLabel(targetCell);
-                    ResolveCellLocalVisual(targetCell,
+                    ResolveUnitActiveLocalVisual(
+                        target,
+                        targetCell,
+                        out data.AimConfirmTerrainLabel,
                         out data.AimConfirmLocalSprite,
-                        out data.AimConfirmLocalColor);
+                        out data.AimConfirmLocalColor,
+                        out _,
+                        out _);
                 }
             }
             return true;
@@ -521,7 +526,7 @@ public partial class TurnStateManager
                 isValid = entry.isValid,
                 isFocused = !mirandoCancelFocused && scannerSelectedTargetIndex == i,
                 hp = target != null ? Mathf.Max(0, target.CurrentHP) : 0,
-                terrainLabel = target != null ? ResolveCellTerrainLabel(target.CurrentCellPosition) : string.Empty,
+                terrainLabel = target != null ? ResolveUnitLocalLabel(target) : string.Empty,
                 unitSprite = renderer != null ? renderer.sprite : null,
                 unitColor = renderer != null ? renderer.color : Color.white
             });
@@ -541,6 +546,22 @@ public partial class TurnStateManager
     }
 
     private RoadNetworkManager[] cachedRoadNetworks;
+
+    private string ResolveUnitLocalLabel(UnitManager unit)
+    {
+        if (unit == null)
+            return string.Empty;
+
+        ResolveUnitActiveLocalVisual(
+            unit,
+            unit.CurrentCellPosition,
+            out string label,
+            out _,
+            out _,
+            out _,
+            out _);
+        return label;
+    }
 
     // Descreve o hex do alvo: construcao (Cidade) tem prioridade; senao estrutura sobre terreno
     // (Rodovia na Floresta, Pontes sobre o Mar); senao so o terreno (Floresta).
@@ -834,24 +855,28 @@ public partial class TurnStateManager
             Domain domain = unit.GetDomain();
             HeightLevel height = unit.GetHeightLevel();
             TileBase layerTile = null;
+            bool hasOperationalLayer = false;
 
             if (domain == Domain.Air && height == HeightLevel.AirLow)
             {
+                hasOperationalLayer = true;
                 label = dpqAirHeightConfig.airLowDisplayName;
                 layerTile = dpqAirHeightConfig.airLowTile;
             }
             else if (domain == Domain.Air && height == HeightLevel.AirHigh)
             {
+                hasOperationalLayer = true;
                 label = dpqAirHeightConfig.airHighDisplayName;
                 layerTile = dpqAirHeightConfig.airHighTile;
             }
             else if (domain == Domain.Submarine && height == HeightLevel.Submerged)
             {
+                hasOperationalLayer = true;
                 label = dpqAirHeightConfig.subDisplayName;
                 layerTile = dpqAirHeightConfig.subTile;
             }
 
-            if (layerTile != null)
+            if (hasOperationalLayer)
             {
                 if (layerTile is Tile tile)
                 {
@@ -859,7 +884,7 @@ public partial class TurnStateManager
                     color = tile.color;
                 }
                 if (string.IsNullOrWhiteSpace(label))
-                    label = layerTile.name;
+                    label = layerTile != null ? layerTile.name : $"{domain}/{height}";
                 return;
             }
         }
@@ -2396,6 +2421,9 @@ public partial class TurnStateManager
             {
                 unitName = passengerName,
                 sprite = passengerSprite,
+                color = passenger.GetMainSpriteRenderer() != null
+                    ? passenger.GetMainSpriteRenderer().color
+                    : Color.white,
                 depth = depth
             });
             AppendTransportedUnitStatsLines(data, passenger, depth + 1);
@@ -2920,7 +2948,7 @@ public partial class TurnStateManager
                     isValid = true,
                     isFocused = !embarkCancelFocused && isFocused,
                     hp = Mathf.Max(0, transporter.CurrentHP),
-                    terrainLabel = ResolveCellTerrainLabel(transporter.CurrentCellPosition),
+                    terrainLabel = ResolveUnitLocalLabel(transporter),
                     unitSprite = transporter.GetMainSpriteRenderer() != null
                         ? transporter.GetMainSpriteRenderer().sprite : null,
                     unitColor = transporter.GetMainSpriteRenderer() != null

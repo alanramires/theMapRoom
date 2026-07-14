@@ -48,6 +48,22 @@ public class StructureSkillTerrainRule
 }
 
 [System.Serializable]
+public class StructureNavalOpsTerrainRule
+{
+    [Tooltip("Terreno base que completa o par Estrutura+Terreno.")]
+    public TerrainTypeData terrainData;
+
+    [Tooltip("Unidades nestes dominios/alturas encerram o movimento e emergem neste par.")]
+    public List<TerrainLayerMode> forceEndMovementOnTerrainDomainForDomains = new List<TerrainLayerMode>();
+
+    [Tooltip("Quando ligado, unidades afetadas ficam livremente detectaveis neste par.")]
+    public bool forceDetectOnForcedEndMovementDomains = false;
+
+    [Tooltip("Se preenchido, somente unidades com estas Stealth Skills ficam livremente detectaveis neste par.")]
+    public List<SkillData> forceDetectUnitsWithFollowingStealthSkills = new List<SkillData>();
+}
+
+[System.Serializable]
 public class StructureTerrainDescription
 {
     [Tooltip("Terreno base deste par Estrutura+Terreno.")]
@@ -131,7 +147,9 @@ public class StructureData : ScriptableObject
     [Tooltip("Mapa de pares Estrutura+Terreno para air ops. Cada elemento define se o par atua como RoadRunway e skills exigidas.")]
     public List<StructureAirOpsTerrainRule> aircraftOpsByTerrain = new List<StructureAirOpsTerrainRule>();
     [Header("Naval Ops")]
-    [Tooltip("Unidades nesses dominios/alturas encerram movimento no dominio nativo do terreno quando estiverem neste par Estrutura+Terreno.")]
+    [Tooltip("Regras navais especificas por par Estrutura+Terreno.")]
+    public List<StructureNavalOpsTerrainRule> navalOpsByTerrain = new List<StructureNavalOpsTerrainRule>();
+    [Tooltip("LEGADO: regra global da estrutura. Prefira Naval Ops By Terrain.")]
     public List<TerrainLayerMode> forceEndMovementOnTerrainDomainForDomains = new List<TerrainLayerMode>();
     [Tooltip("Quando ligado, unidades nos dominios/alturas acima ficam livremente detectaveis neste par Estrutura+Terreno.")]
     public bool forceDetectOnForcedEndMovementDomains = false;
@@ -158,8 +176,25 @@ public class StructureData : ScriptableObject
             aircraftOpsByTerrain = new List<StructureAirOpsTerrainRule>();
         if (forceEndMovementOnTerrainDomainForDomains == null)
             forceEndMovementOnTerrainDomainForDomains = new List<TerrainLayerMode>();
+        if (navalOpsByTerrain == null)
+            navalOpsByTerrain = new List<StructureNavalOpsTerrainRule>();
         if (forceDetectUnitsWithFollowingStealthSkills == null)
             forceDetectUnitsWithFollowingStealthSkills = new List<SkillData>();
+
+        for (int i = navalOpsByTerrain.Count - 1; i >= 0; i--)
+        {
+            StructureNavalOpsTerrainRule rule = navalOpsByTerrain[i];
+            if (rule == null)
+            {
+                navalOpsByTerrain.RemoveAt(i);
+                continue;
+            }
+
+            if (rule.forceEndMovementOnTerrainDomainForDomains == null)
+                rule.forceEndMovementOnTerrainDomainForDomains = new List<TerrainLayerMode>();
+            if (rule.forceDetectUnitsWithFollowingStealthSkills == null)
+                rule.forceDetectUnitsWithFollowingStealthSkills = new List<SkillData>();
+        }
 
         for (int i = 0; i < aircraftOpsByTerrain.Count; i++)
         {
@@ -210,6 +245,25 @@ public class StructureData : ScriptableObject
             if (rule.skillCostOverrides == null)
                 rule.skillCostOverrides = new List<TerrainSkillCostOverride>();
         }
+    }
+
+    public bool TryGetNavalOpsRuleForTerrain(TerrainTypeData terrain, out StructureNavalOpsTerrainRule rule)
+    {
+        rule = null;
+        if (terrain == null || navalOpsByTerrain == null)
+            return false;
+
+        for (int i = 0; i < navalOpsByTerrain.Count; i++)
+        {
+            StructureNavalOpsTerrainRule candidate = navalOpsByTerrain[i];
+            if (candidate != null && candidate.terrainData == terrain)
+            {
+                rule = candidate;
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public IReadOnlyList<SkillData> GetRequiredSkillsToEnter(TerrainTypeData terrain)

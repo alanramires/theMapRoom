@@ -328,7 +328,12 @@ public partial class TurnStateManager
         bool hasTerrain = TryResolveTerrainAtCellForLayerForce(boardMap, terrainDb, cell, out TerrainTypeData terrain) && terrain != null;
         if (structure != null)
         {
-            bool forceByStructure = MatchesAnyLayerMode(structure.forceEndMovementOnTerrainDomainForDomains, currentDomain, currentHeight);
+            StructureNavalOpsTerrainRule pairRule = null;
+            bool hasPairRule = hasTerrain && structure.TryGetNavalOpsRuleForTerrain(terrain, out pairRule);
+            IReadOnlyList<TerrainLayerMode> structureModes = hasPairRule
+                ? pairRule.forceEndMovementOnTerrainDomainForDomains
+                : structure.forceEndMovementOnTerrainDomainForDomains;
+            bool forceByStructure = MatchesAnyLayerMode(structureModes, currentDomain, currentHeight);
             bool forceByTerrain = hasTerrain && MatchesAnyLayerMode(terrain.forceEndMovementOnTerrainDomainForDomains, currentDomain, currentHeight);
             if (!forceByStructure && !forceByTerrain)
                 return false;

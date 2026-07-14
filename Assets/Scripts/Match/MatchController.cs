@@ -3790,6 +3790,28 @@ public class MatchController : MonoBehaviour
         return ComputeIsUnitVisibleForActiveTeam(unit);
     }
 
+    /// <summary>
+    /// Consulta exclusivamente o snapshot de visibilidade ja publicado.
+    /// Durante uma acao provisoria, ausencia no cache significa oculto: nunca
+    /// recalcula usando a posicao runtime temporaria da unidade que esta movendo.
+    /// </summary>
+    public bool IsUnitVisibleForActiveTeamConfirmed(UnitManager unit)
+    {
+        if (!debugFogOfWarEnabled || !enableTotalWar)
+            return true;
+
+        if (unit == null || !unit.gameObject.activeInHierarchy || unit.IsEmbarked)
+            return false;
+
+        if ((int)unit.TeamId == activeTeamId)
+            return true;
+
+        int cacheIndex = ResolveFogCacheIndex(unit);
+        return fogCachedTeamId == activeTeamId &&
+               fogUnitVisibilityByCacheIndex.TryGetValue(cacheIndex, out bool cachedVisible) &&
+               cachedVisible;
+    }
+
     public bool IsUnitVisibleForTeam(UnitManager unit, TeamId observerTeam)
     {
         if (!debugFogOfWarEnabled)

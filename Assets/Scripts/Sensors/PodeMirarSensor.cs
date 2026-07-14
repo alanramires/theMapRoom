@@ -1165,10 +1165,17 @@ public static class PodeMirarSensor
         if (respectTotalWarVisibility &&
             cachedMatchController != null &&
             cachedMatchController.EnableTotalWar &&
-            cachedMatchController.ActiveTeamId == (int)attacker.TeamId &&
-            !cachedMatchController.IsUnitVisibleForActiveTeam(target))
+            cachedMatchController.ActiveTeamId == (int)attacker.TeamId)
         {
-            return false;
+            // O menu humano de ataque pode ser aberto enquanto a posicao do atacante
+            // ainda e provisoria. Nesse fluxo, somente o snapshot confirmado pode
+            // autorizar um alvo; o fallback dinamico revelaria unidades pelo destino
+            // ainda cancelavel. A IA continua usando a consulta propria do turno dela.
+            bool targetVisible = cachedMatchController.IsActiveTeamAI()
+                ? cachedMatchController.IsUnitVisibleForActiveTeam(target)
+                : cachedMatchController.IsUnitVisibleForActiveTeamConfirmed(target);
+            if (!targetVisible)
+                return false;
         }
 
         return attacker.TeamId != target.TeamId;
@@ -2012,20 +2019,31 @@ public static class PodeMirarSensor
                 return true;
         }
 
+        bool hasTerrain = TryResolveTerrainAtCell(boardMap, terrainDatabase, cell, out TerrainTypeData terrain) && terrain != null;
         StructureData structure = StructureOccupancyRules.GetStructureAtCell(boardMap, cell);
-        if (structure != null &&
-            MatchesAnyLayerMode(structure.forceEndMovementOnTerrainDomainForDomains, targetDomain, targetHeight))
+        if (structure != null)
         {
-            if (ShouldForceDetectByStealthSkills(
-                    structure.forceDetectUnitsWithFollowingStealthSkills,
-                    target))
-                return true;
+            StructureNavalOpsTerrainRule pairRule = null;
+            bool hasPairRule = hasTerrain && structure.TryGetNavalOpsRuleForTerrain(terrain, out pairRule);
+            IReadOnlyList<TerrainLayerMode> structureModes = hasPairRule
+                ? pairRule.forceEndMovementOnTerrainDomainForDomains
+                : structure.forceEndMovementOnTerrainDomainForDomains;
+            if (MatchesAnyLayerMode(structureModes, targetDomain, targetHeight))
+            {
+                IReadOnlyList<SkillData> detectionSkills = hasPairRule
+                    ? pairRule.forceDetectUnitsWithFollowingStealthSkills
+                    : structure.forceDetectUnitsWithFollowingStealthSkills;
+                if (ShouldForceDetectByStealthSkills(detectionSkills, target))
+                    return true;
 
-            if (structure.forceDetectOnForcedEndMovementDomains)
-                return true;
+                if (hasPairRule
+                    ? pairRule.forceDetectOnForcedEndMovementDomains
+                    : structure.forceDetectOnForcedEndMovementDomains)
+                    return true;
+            }
         }
 
-        if (!TryResolveTerrainAtCell(boardMap, terrainDatabase, cell, out TerrainTypeData terrain) || terrain == null)
+        if (!hasTerrain)
             return false;
 
         if (!MatchesAnyLayerMode(terrain.forceEndMovementOnTerrainDomainForDomains, targetDomain, targetHeight))

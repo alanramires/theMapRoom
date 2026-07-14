@@ -3837,43 +3837,49 @@ public partial class TurnStateManager
         if (!combat.success)
             return;
 
-        UnitManager attacker = combat.attackerUnit;
-        if (attacker == null || attacker.IsEmbarked || combat.attackerHpAfter <= 0)
+        TryApplySelfEmergeAfterFiring(combat.attackerUnit, combat.attackerHpAfter);
+        if (combat.counterExecuted)
+            TryApplySelfEmergeAfterFiring(combat.defenderUnit, combat.defenderHpAfter);
+    }
+
+    private void TryApplySelfEmergeAfterFiring(UnitManager firingUnit, int hpAfterCombat)
+    {
+        if (firingUnit == null || firingUnit.IsEmbarked || hpAfterCombat <= 0)
             return;
-        if (!attacker.TryGetUnitData(out UnitData attackerData) || attackerData == null || !attackerData.emergesToAttack)
+        if (!firingUnit.TryGetUnitData(out UnitData firingData) || firingData == null || !firingData.emergesToAttack)
             return;
 
-        Domain currentDomain = attacker.GetDomain();
-        HeightLevel currentHeight = attacker.GetHeightLevel();
-        Domain revealDomain = attackerData.emergeAfterAttackDomain;
-        HeightLevel revealHeight = attackerData.emergeAfterAttackHeight;
+        Domain currentDomain = firingUnit.GetDomain();
+        HeightLevel currentHeight = firingUnit.GetHeightLevel();
+        Domain revealDomain = firingData.emergeAfterAttackDomain;
+        HeightLevel revealHeight = firingData.emergeAfterAttackHeight;
         if (currentDomain == revealDomain && currentHeight == revealHeight)
             return;
-        if (!attacker.SupportsLayerMode(revealDomain, revealHeight))
+        if (!firingUnit.SupportsLayerMode(revealDomain, revealHeight))
             return;
-        if (!attacker.TrySetCurrentLayerMode(revealDomain, revealHeight))
+        if (!firingUnit.TrySetCurrentLayerMode(revealDomain, revealHeight))
             return;
 
         // Mesmo som de movimento da unidade (por MovementCategory), tocado ao
         // emergir para reforcar que ela mudou de camada, nao so de sprite.
-        cursorController?.PlayUnitMovementSfx(attacker.GetMovementCategory());
+        cursorController?.PlayUnitMovementSfx(firingUnit.GetMovementCategory());
 
         // Iguala a janela de exposicao da emersao voluntaria (atacar) a da
         // emersao forcada por dano (Layer Force After Hit): sem o lock, o
         // submarino mergulhava de volta no proprio proximo movimento (so 1
         // rodada de exposicao), enquanto ser atingido prendia por 2 rodadas —
         // atacar ficava mais seguro do que ser pego.
-        attacker.SetForcedLayerLock(revealDomain, revealHeight, attackerData.emergeAfterAttackTurns);
+        firingUnit.SetForcedLayerLock(revealDomain, revealHeight, firingData.emergeAfterAttackTurns);
 
         string revealMessage = PanelDialogController.ResolveDialogMessage(
             "layer.revealed.after_attack",
             "<unit> emerge para <domain>/<height> apos atacar (<turns> turno(s)).",
             new Dictionary<string, string>
             {
-                { "unit", ResolveDebugUnitName(attacker) },
+                { "unit", ResolveDebugUnitName(firingUnit) },
                 { "domain", revealDomain.ToString() },
                 { "height", revealHeight.ToString() },
-                { "turns", attackerData.emergeAfterAttackTurns.ToString() }
+                { "turns", firingData.emergeAfterAttackTurns.ToString() }
             });
         PushPanelUnitMessage(revealMessage, 2.6f);
     }

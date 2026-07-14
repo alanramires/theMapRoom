@@ -57,7 +57,8 @@ MonoBehaviour:
   - domain: 2
     heightLevel: 2
   forceDetectOnForcedEndMovementDomains: 0
-  forceDetectUnitsWithFollowingStealthSkills: []
+  forceDetectUnitsWithFollowingStealthSkills:
+  - {fileID: 11400000, guid: bd65f7348de04da4681b0f7387af6998, type: 2}
   isSupplier: 1
   supplierTier: 0
   maxUnitsServedPerTurn: 1

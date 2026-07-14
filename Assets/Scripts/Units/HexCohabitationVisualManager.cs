@@ -11,12 +11,21 @@ public static class HexCohabitationVisualManager
     // Espalhamento horizontal entre unidades da MESMA banda dividindo o hex
     // (ex.: dois caças de times diferentes em hex contestado).
     public static float IntraLayerSpread = 0.18f;
+    private static bool rescanWhenNeutralPending;
+    private static TurnStateManager cachedTurnStateManager;
+    private static MatchController cachedMatchController;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void Initialize()
     {
         UnitOccupancyRules.OnUnitOccupancyChanged -= OnOccupancyChanged;
         UnitOccupancyRules.OnUnitOccupancyChanged += OnOccupancyChanged;
+        CursorController.OnCursorReturnedToNeutral -= OnCursorReturnedToNeutral;
+        CursorController.OnCursorReturnedToNeutral += OnCursorReturnedToNeutral;
+        MatchController.OnFogOfWarUpdated -= OnFogOfWarUpdated;
+        MatchController.OnFogOfWarUpdated += OnFogOfWarUpdated;
+        MatchController.OnActiveTeamChanged -= OnActiveTeamChanged;
+        MatchController.OnActiveTeamChanged += OnActiveTeamChanged;
 
         // Scan no próximo frame para pegar unidades já posicionadas (load/start de cena)
         var bootstrap = new GameObject("[HexCohabitationBootstrap]");
@@ -26,6 +35,12 @@ public static class HexCohabitationVisualManager
 
     public static void ScanAllCells()
     {
+        if (!IsConfirmedNeutralState())
+        {
+            rescanWhenNeutralPending = true;
+            return;
+        }
+
         var visited = new HashSet<(Tilemap, Vector3Int)>();
         var all = UnitManager.AllActive;
 
@@ -56,6 +71,17 @@ public static class HexCohabitationVisualManager
         if (tilemap == null)
             return;
 
+        // A animacao atualiza CurrentCellPosition a cada hex. Enquanto a acao ainda
+        // e provisoria, consultar os demais ocupantes faria o tamanho/offset da unidade
+        // revelar algo escondido no FOW. A unidade movel pode usar seu visual normal;
+        // a coabitacao confirmada so sera reconstruida depois do retorno a Neutral.
+        if (!IsConfirmedNeutralState())
+        {
+            unit.ClearCohabitationVisual();
+            rescanWhenNeutralPending = true;
+            return;
+        }
+
         previousCell.z = 0;
         currentCell.z = 0;
 
@@ -76,6 +102,8 @@ public static class HexCohabitationVisualManager
         {
             UnitManager u = units[i];
             if (u == null || u.IsEmbarked || u.IsDead)
+                continue;
+            if (!IsVisibleForLocalObserver(u))
                 continue;
 
             HeightBand band = OccupancyResolver.GetHeightBand(u);
@@ -99,6 +127,45 @@ public static class HexCohabitationVisualManager
 
         ApplyLayerFan(airUnits, AirOffset);
         ApplyLayerFan(surfaceUnits, SurfaceOffset);
+    }
+
+    private static void OnCursorReturnedToNeutral()
+    {
+        // O evento ocorre antes de o MatchController publicar o delta confirmado de
+        // FOW. O bootstrap executa o scan no LateUpdate, depois desse processamento.
+        rescanWhenNeutralPending = true;
+    }
+
+    private static void OnFogOfWarUpdated()
+    {
+        if (IsConfirmedNeutralState())
+            rescanWhenNeutralPending = true;
+    }
+
+    private static void OnActiveTeamChanged(int teamId)
+    {
+        if (IsConfirmedNeutralState())
+            rescanWhenNeutralPending = true;
+    }
+
+    private static bool IsConfirmedNeutralState()
+    {
+        if (cachedTurnStateManager == null)
+            cachedTurnStateManager = Object.FindAnyObjectByType<TurnStateManager>();
+
+        return cachedTurnStateManager == null ||
+               cachedTurnStateManager.CurrentCursorState == TurnStateManager.CursorState.Neutral;
+    }
+
+    private static bool IsVisibleForLocalObserver(UnitManager unit)
+    {
+        if (unit == null)
+            return false;
+
+        if (cachedMatchController == null)
+            cachedMatchController = Object.FindAnyObjectByType<MatchController>();
+
+        return cachedMatchController == null || cachedMatchController.IsUnitVisibleForActiveTeam(unit);
     }
 
     // Distribui as unidades de uma mesma banda em leque horizontal ao redor do offset base.
@@ -128,7 +195,15 @@ public static class HexCohabitationVisualManager
         {
             yield return null; // espera um frame para todos os OnEnable rodarem
             ScanAllCells();
-            Destroy(gameObject);
+        }
+
+        private void LateUpdate()
+        {
+            if (!rescanWhenNeutralPending || !IsConfirmedNeutralState())
+                return;
+
+            rescanWhenNeutralPending = false;
+            ScanAllCells();
         }
     }
 }

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Text;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.EventSystems;
 using UnityEngine.Tilemaps;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
@@ -58,6 +59,8 @@ public class PanelHelperController : MonoBehaviour
     private RectTransform helperTitleRect;
     private RectTransform helperTxtRect;
     private RectMask2D helperMask;
+    private GameObject dragHandleRoot;
+    private bool manuallyPositioned;
     private Vector2 originalAnchorMin;
     private Vector2 originalAnchorMax;
     private Vector2 originalPivot;
@@ -346,6 +349,7 @@ public class PanelHelperController : MonoBehaviour
         EnsureShoppingActionsRoot();
         EnsurePersistenceActionsRoot();
         EnsureTimeoutProgressBar();
+        EnsureDragHandle();
 
 #if UNITY_EDITOR
         if (helperDatabase == null)
@@ -1627,7 +1631,7 @@ public class PanelHelperController : MonoBehaviour
         }
         else if (aimButtonsActive)
         {
-            bodyHeight = aimTargetButtons.Count * (AimTargetButtonHeight + 4f);
+            bodyHeight = GetAimTargetsPreferredHeight();
         }
         else if (aimConfirmActive)
         {
@@ -1753,7 +1757,11 @@ public class PanelHelperController : MonoBehaviour
         EnsureAimTargetsRoot();
         StringBuilder signatureBuilder = new StringBuilder();
         for (int i = 0; i < data.AimTargetLines.Count; i++)
-            signatureBuilder.Append(data.AimTargetLines[i].unitName).Append(data.AimTargetLines[i].isValid);
+            signatureBuilder
+                .Append(data.AimTargetLines[i].unitName)
+                .Append('|').Append(data.AimTargetLines[i].hp)
+                .Append('|').Append(data.AimTargetLines[i].terrainLabel)
+                .Append('|').Append(data.AimTargetLines[i].isValid);
         string signature = data.Kind + signatureBuilder.ToString();
         if (signature != aimTargetsSignature)
         {
@@ -1916,7 +1924,7 @@ public class PanelHelperController : MonoBehaviour
                 (character.bottomLeft.y + character.topRight.y) * 0.5f,
                 0f);
             icon.sprite = visual.sprite;
-            icon.color = Color.white;
+            icon.color = visual.color;
             icon.gameObject.SetActive(true);
         }
 
@@ -2584,11 +2592,38 @@ public class PanelHelperController : MonoBehaviour
             // Auto-encolhe se o nome for grande, pra nao estourar a largura do botao.
             label.enableAutoSizing = true; label.fontSizeMin = 12f; label.fontSizeMax = 20f;
             ConfigureMobileActionLabel(label);
+
+            // O texto pode ocupar mais de duas linhas (nome/HP + terreno comprido).
+            // Mede na largura real disponivel e deixa o VerticalLayoutGroup empurrar
+            // naturalmente os botoes seguintes, sem encolher a fonte.
+            float panelWidth = helperRect != null ? helperRect.rect.width : 320f;
+            float horizontalInset = line.unitSprite != null ? 48f : 0f;
+            float availableTextWidth = Mathf.Max(80f, panelWidth * 0.88f - horizontalInset);
+            float preferredTextHeight = label.GetPreferredValues(label.text, availableTextWidth, 0f).y;
+            float buttonHeight = Mathf.Max(AimTargetButtonHeight, preferredTextHeight + 12f);
+            element.minHeight = buttonHeight;
+            element.preferredHeight = buttonHeight;
             if (!isCancel && line.unitSprite != null)
                 CreateDisembarkRowIcon(obj.transform, "unit_icon", line.unitSprite, line.unitColor, true);
             aimTargetButtons.Add(button);
         }
-        aimTargetsRoot.GetComponent<RectTransform>().sizeDelta = new Vector2(0f, aimTargetButtons.Count * (AimTargetButtonHeight + 4f));
+        aimTargetsRoot.GetComponent<RectTransform>().sizeDelta = new Vector2(0f, GetAimTargetsPreferredHeight());
+    }
+
+    private float GetAimTargetsPreferredHeight()
+    {
+        float height = 0f;
+        for (int i = 0; i < aimTargetButtons.Count; i++)
+        {
+            Button button = aimTargetButtons[i];
+            if (button == null)
+                continue;
+            LayoutElement element = button.GetComponent<LayoutElement>();
+            height += element != null ? Mathf.Max(AimTargetButtonHeight, element.preferredHeight) : AimTargetButtonHeight;
+            if (i < aimTargetButtons.Count - 1)
+                height += 4f;
+        }
+        return height;
     }
 
     private void RefreshShoppingActionControls(bool panelVisible, TurnStateManager.HelperPanelData data)
@@ -3613,6 +3648,12 @@ public class PanelHelperController : MonoBehaviour
 
     private void RefreshDockByCursorProximity()
     {
+        if (manuallyPositioned)
+        {
+            cursorNearUndockedDockRegion = false;
+            return;
+        }
+
         if (helperRect == null || cursorController == null || panelHelper == null)
         {
             cursorNearUndockedDockRegion = false;
@@ -3731,6 +3772,61 @@ public class PanelHelperController : MonoBehaviour
         helperRect.pivot = originalPivot;
         helperRect.anchoredPosition = originalAnchoredPosition;
         isDockedCenterLeft = false;
+    }
+
+    public void NotifyHelperPanelManuallyPositioned()
+    {
+        manuallyPositioned = true;
+        isDockedCenterLeft = false;
+        cursorNearUndockedDockRegion = false;
+    }
+
+    private void EnsureDragHandle()
+    {
+        if (helperRect == null || dragHandleRoot != null)
+            return;
+
+        Transform existing = helperRect.Find("helper_drag_handle");
+        dragHandleRoot = existing != null ? existing.gameObject : new GameObject(
+            "helper_drag_handle",
+            typeof(RectTransform),
+            typeof(CanvasRenderer),
+            typeof(Image),
+            typeof(PanelHelperDragHandle));
+
+        RectTransform rect = dragHandleRoot.GetComponent<RectTransform>();
+        rect.SetParent(helperRect, false);
+        rect.anchorMin = new Vector2(1f, 1f);
+        rect.anchorMax = new Vector2(1f, 1f);
+        rect.pivot = new Vector2(1f, 1f);
+        rect.anchoredPosition = new Vector2(-8f, -8f);
+        rect.sizeDelta = new Vector2(46f, 38f);
+        rect.SetAsLastSibling();
+
+        Image image = dragHandleRoot.GetComponent<Image>();
+        image.color = new Color(0.08f, 0.08f, 0.06f, 0.92f);
+        image.raycastTarget = true;
+
+        Transform labelTransform = rect.Find("label");
+        GameObject labelRoot = labelTransform != null ? labelTransform.gameObject : new GameObject(
+            "label", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
+        RectTransform labelRect = labelRoot.GetComponent<RectTransform>();
+        labelRect.SetParent(rect, false);
+        labelRect.anchorMin = Vector2.zero;
+        labelRect.anchorMax = Vector2.one;
+        labelRect.offsetMin = Vector2.zero;
+        labelRect.offsetMax = Vector2.zero;
+
+        TMP_Text label = labelRoot.GetComponent<TMP_Text>();
+        label.text = "↔";
+        label.fontSize = 25f;
+        label.fontStyle = FontStyles.Bold;
+        label.alignment = TextAlignmentOptions.Center;
+        label.color = helperTitle != null ? helperTitle.color : Color.white;
+        label.raycastTarget = false;
+
+        PanelHelperDragHandle handle = dragHandleRoot.GetComponent<PanelHelperDragHandle>();
+        handle.Configure(helperRect, this);
     }
 
     private static Rect GetScreenRect(RectTransform rectTransform)
@@ -4159,4 +4255,75 @@ public class PanelHelperController : MonoBehaviour
         return null;
     }
 #endif
+}
+
+public sealed class PanelHelperDragHandle : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler
+{
+    private const string PositionXKey = "ui.panel_helper.position_x";
+    private const string PositionYKey = "ui.panel_helper.position_y";
+
+    private RectTransform target;
+    private PanelHelperController owner;
+    private Canvas canvas;
+
+    public void Configure(RectTransform dragTarget, PanelHelperController controller)
+    {
+        target = dragTarget;
+        owner = controller;
+        canvas = target != null ? target.GetComponentInParent<Canvas>() : null;
+
+        if (target != null && PlayerPrefs.HasKey(PositionXKey) && PlayerPrefs.HasKey(PositionYKey))
+        {
+            target.anchoredPosition = new Vector2(PlayerPrefs.GetFloat(PositionXKey), PlayerPrefs.GetFloat(PositionYKey));
+            owner.NotifyHelperPanelManuallyPositioned();
+            ClampToCanvas();
+        }
+    }
+
+    public void OnBeginDrag(PointerEventData eventData)
+    {
+        if (target == null)
+            return;
+        owner.NotifyHelperPanelManuallyPositioned();
+        target.SetAsLastSibling();
+    }
+
+    public void OnDrag(PointerEventData eventData)
+    {
+        if (target == null)
+            return;
+        float scale = canvas != null ? Mathf.Max(0.01f, canvas.scaleFactor) : 1f;
+        target.anchoredPosition += eventData.delta / scale;
+        ClampToCanvas();
+    }
+
+    public void OnEndDrag(PointerEventData eventData)
+    {
+        if (target == null)
+            return;
+        ClampToCanvas();
+        PlayerPrefs.SetFloat(PositionXKey, target.anchoredPosition.x);
+        PlayerPrefs.SetFloat(PositionYKey, target.anchoredPosition.y);
+        PlayerPrefs.Save();
+    }
+
+    private void ClampToCanvas()
+    {
+        if (target == null)
+            return;
+        RectTransform bounds = canvas != null ? canvas.transform as RectTransform : target.parent as RectTransform;
+        if (bounds == null)
+            return;
+
+        Vector3[] panelCorners = new Vector3[4];
+        Vector3[] boundsCorners = new Vector3[4];
+        target.GetWorldCorners(panelCorners);
+        bounds.GetWorldCorners(boundsCorners);
+        Vector3 correction = Vector3.zero;
+        if (panelCorners[0].x < boundsCorners[0].x) correction.x = boundsCorners[0].x - panelCorners[0].x;
+        else if (panelCorners[2].x > boundsCorners[2].x) correction.x = boundsCorners[2].x - panelCorners[2].x;
+        if (panelCorners[0].y < boundsCorners[0].y) correction.y = boundsCorners[0].y - panelCorners[0].y;
+        else if (panelCorners[2].y > boundsCorners[2].y) correction.y = boundsCorners[2].y - panelCorners[2].y;
+        if (correction.sqrMagnitude > 0f) target.position += correction;
+    }
 }

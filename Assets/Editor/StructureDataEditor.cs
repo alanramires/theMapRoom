@@ -13,6 +13,7 @@ public class StructureDataEditor : Editor
             "m_Script",
             "aircraftOpsByTerrain",
             "roadRoutes",
+            "navalOpsByTerrain",
             "forceEndMovementOnTerrainDomainForDomains");
 
         EditorGUILayout.Space();
@@ -31,9 +32,9 @@ public class StructureDataEditor : Editor
         EditorGUILayout.Space();
         EditorGUILayout.LabelField("Naval Ops", EditorStyles.boldLabel);
         EditorGUILayout.HelpBox(
-            "No par Estrutura+Terreno, unidades nesses dominios/alturas encerram movimento no dominio do terreno base.",
+            "Cada entrada cadastra um par Estrutura+Terreno. Somente nesse par as camadas listadas encerram o movimento e emergem.",
             MessageType.Info);
-        DrawIfExists(serializedObject.FindProperty("forceEndMovementOnTerrainDomainForDomains"), "The Units On The Follow Domain Are Forced To Emerge");
+        DrawIfExists(serializedObject.FindProperty("navalOpsByTerrain"), "Naval Ops By Terrain");
 
         EditorGUILayout.Space();
         EditorGUILayout.LabelField("Road Routes", EditorStyles.boldLabel);

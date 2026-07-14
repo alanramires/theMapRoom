@@ -10,13 +10,19 @@ public partial class TurnStateManager
         public int remainingMovementPoints;
         public int currentFuel;
         public int globalBoardRevision;
+        public Vector3Int unitCell;
+        public Domain domain;
+        public HeightLevel height;
 
         public bool Equals(MovementRangeCacheKey other)
         {
             return unitInstanceId == other.unitInstanceId &&
                    remainingMovementPoints == other.remainingMovementPoints &&
                    currentFuel == other.currentFuel &&
-                   globalBoardRevision == other.globalBoardRevision;
+                   globalBoardRevision == other.globalBoardRevision &&
+                   unitCell == other.unitCell &&
+                   domain == other.domain &&
+                   height == other.height;
         }
 
         public override bool Equals(object obj)
@@ -33,6 +39,9 @@ public partial class TurnStateManager
                 hash = hash * 31 + remainingMovementPoints;
                 hash = hash * 31 + currentFuel;
                 hash = hash * 31 + globalBoardRevision;
+                hash = hash * 31 + unitCell.GetHashCode();
+                hash = hash * 31 + (int)domain;
+                hash = hash * 31 + (int)height;
                 return hash;
             }
         }
@@ -40,6 +49,10 @@ public partial class TurnStateManager
 
     private MovementRangeCacheKey? movementRangeCacheKey;
     private Dictionary<Vector3Int, List<Vector3Int>> movementRangeCache;
+    private readonly Dictionary<MovementRangeCacheKey, Dictionary<Vector3Int, List<Vector3Int>>> movementRangeCacheByUnit =
+        new Dictionary<MovementRangeCacheKey, Dictionary<Vector3Int, List<Vector3Int>>>();
+    private int movementRangeCacheBoardRevision = int.MinValue;
+    private const int MaxMovementRangeCacheEntries = 16;
 
     public void ApplyMovementRangeFogOfWarSorting(bool playerTurn)
     {
@@ -83,8 +96,26 @@ public partial class TurnStateManager
                 unitInstanceId = selectedUnit.GetEntityId().GetHashCode(),
                 remainingMovementPoints = Mathf.Max(0, selectedUnit.RemainingMovementPoints),
                 currentFuel = Mathf.Max(0, selectedUnit.CurrentFuel),
-                globalBoardRevision = ThreatRevisionTracker.GlobalBoardRevision
+                globalBoardRevision = ThreatRevisionTracker.GlobalBoardRevision,
+                unitCell = selectedUnit.CurrentCellPosition,
+                domain = selectedUnit.GetDomain(),
+                height = selectedUnit.GetHeightLevel()
             };
+            cacheKey.unitCell.z = 0;
+
+            if (movementRangeCacheBoardRevision != cacheKey.globalBoardRevision)
+            {
+                movementRangeCacheByUnit.Clear();
+                movementRangeCacheBoardRevision = cacheKey.globalBoardRevision;
+            }
+
+            if (movementRangeCacheByUnit.TryGetValue(cacheKey, out Dictionary<Vector3Int, List<Vector3Int>> cachedPaths))
+            {
+                movementRangeCacheKey = cacheKey;
+                movementRangeCache = cachedPaths;
+                ApplyMovementRangePaint(cachedPaths);
+                return;
+            }
 
             if (movementRangeCacheKey.HasValue &&
                 movementRangeCache != null &&
@@ -153,6 +184,9 @@ public partial class TurnStateManager
 
             movementRangeCacheKey = cacheKey;
             movementRangeCache = validPaths;
+            if (movementRangeCacheByUnit.Count >= MaxMovementRangeCacheEntries)
+                movementRangeCacheByUnit.Clear();
+            movementRangeCacheByUnit[cacheKey] = validPaths;
             ApplyMovementRangePaint(validPaths);
         }
         finally
@@ -203,6 +237,9 @@ public partial class TurnStateManager
         Color teamColor = TeamUtils.GetColor(selectedUnit.TeamId);
         Color overlayColor = new Color(teamColor.r, teamColor.g, teamColor.b, Mathf.Clamp01(movementRangeAlpha));
         List<Vector3Int> paintCells = new List<Vector3Int>(pathsByDestination.Count);
+        Dictionary<Vector3Int, List<UnitManager>> occupantsByCell = OccupancyResolver.IsLayerAwareRulesActive
+            ? BuildRangeOccupancyIndex(selectedUnit)
+            : null;
 
         foreach (KeyValuePair<Vector3Int, List<Vector3Int>> pair in pathsByDestination)
         {
@@ -214,18 +251,21 @@ public partial class TurnStateManager
             if (OccupancyResolver.IsLayerAwareRulesActive)
             {
                 List<string> occupantDebug = null;
-                List<UnitManager> occupants = new List<UnitManager>();
-                foreach (UnitManager occupant in GetOccupantsAtCellForRange(cell, selectedUnit))
+                if (occupantsByCell == null || !occupantsByCell.TryGetValue(cell, out List<UnitManager> occupants))
+                    occupants = null;
+                if (occupants != null)
                 {
-                    if (occupant == null)
-                        continue;
-                    occupants.Add(occupant);
-
-                    if (PathManager.IsPathfindingDebugLogsEnabled && Application.isPlaying)
+                    for (int occupantIndex = 0; occupantIndex < occupants.Count; occupantIndex++)
                     {
-                        if (occupantDebug == null)
-                            occupantDebug = new List<string>(2);
-                        occupantDebug.Add($"{occupant.name}[team={(int)occupant.TeamId},band={OccupancyResolver.GetHeightBand(occupant)}]");
+                        UnitManager occupant = occupants[occupantIndex];
+                        if (occupant == null)
+                            continue;
+                        if (PathManager.IsPathfindingDebugLogsEnabled && Application.isPlaying)
+                        {
+                            if (occupantDebug == null)
+                                occupantDebug = new List<string>(2);
+                            occupantDebug.Add($"{occupant.name}[team={(int)occupant.TeamId},band={OccupancyResolver.GetHeightBand(occupant)}]");
+                        }
                     }
                 }
 
@@ -282,6 +322,34 @@ public partial class TurnStateManager
         }
     }
 
+    private Dictionary<Vector3Int, List<UnitManager>> BuildRangeOccupancyIndex(UnitManager exceptUnit)
+    {
+        Dictionary<Vector3Int, List<UnitManager>> result = new Dictionary<Vector3Int, List<UnitManager>>();
+        List<UnitManager> units = UnitManager.AllActive;
+        if (units == null || terrainTilemap == null)
+            return result;
+
+        for (int i = 0; i < units.Count; i++)
+        {
+            UnitManager unit = units[i];
+            if (unit == null || !unit.gameObject.activeInHierarchy || unit == exceptUnit || unit.IsEmbarked || unit.IsDead)
+                continue;
+            if (unit.BoardTilemap != terrainTilemap || unit.gameObject.scene != terrainTilemap.gameObject.scene)
+                continue;
+
+            Vector3Int cell = unit.CurrentCellPosition;
+            cell.z = 0;
+            if (!result.TryGetValue(cell, out List<UnitManager> occupants))
+            {
+                occupants = new List<UnitManager>(1);
+                result[cell] = occupants;
+            }
+            occupants.Add(unit);
+        }
+
+        return result;
+    }
+
     private static bool CanPaintMovementStopAtCell(UnitManager mover, Vector3Int cell, IEnumerable<UnitManager> occupants)
     {
         if (mover == null)
@@ -306,30 +374,6 @@ public partial class TurnStateManager
         }
 
         return true;
-    }
-
-    private IEnumerable<UnitManager> GetOccupantsAtCellForRange(Vector3Int cell, UnitManager exceptUnit)
-    {
-        cell.z = 0;
-        List<UnitManager> units = UnitManager.AllActive;
-        if (units == null || units.Count <= 0)
-            yield break;
-
-        for (int i = 0; i < units.Count; i++)
-        {
-            UnitManager unit = units[i];
-            if (unit == null || !unit.gameObject.activeInHierarchy || unit == exceptUnit || unit.IsEmbarked)
-                continue;
-            if (unit.BoardTilemap == null || unit.BoardTilemap != terrainTilemap)
-                continue;
-            if (unit.gameObject.scene != terrainTilemap.gameObject.scene)
-                continue;
-
-            Vector3Int occupiedCell = unit.CurrentCellPosition;
-            occupiedCell.z = 0;
-            if (occupiedCell == cell)
-                yield return unit;
-        }
     }
 
     private Tilemap FindRangeMapTilemap()
