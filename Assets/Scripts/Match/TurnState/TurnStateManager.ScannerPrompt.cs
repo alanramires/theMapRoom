@@ -1901,9 +1901,17 @@ public partial class TurnStateManager
                         landingDuration = GetEmbarkForcedLandingDuration();
                     }
 
-                    if (!selectedUnit.TrySetCurrentLayerMode(Domain.Land, HeightLevel.Surface))
+                    // Camada de pouso derivada do hex (hidroaviao pousa na agua
+                    // em Naval/Surface com o sprite proprio), nao Land/Surface fixo.
+                    Tilemap landingBoardMap = terrainTilemap != null ? terrainTilemap : selectedUnit.BoardTilemap;
+                    Vector3Int landingCell = selectedUnit.CurrentCellPosition;
+                    landingCell.z = 0;
+                    AircraftOperationRules.ResolveGroundedLayerForCell(
+                        selectedUnit, landingBoardMap, terrainDatabase, landingCell,
+                        out Domain landedDomain, out HeightLevel landedHeight);
+                    if (!selectedUnit.TrySetCurrentLayerMode(landedDomain, landedHeight))
                     {
-                        RuntimeLog("[Landing] Falha ao aplicar pouso (Land/Surface).");
+                        RuntimeLog($"[Landing] Falha ao aplicar pouso ({landedDomain}/{landedHeight}).");
                         scannerPromptStep = ScannerPromptStep.LandingCycleOption;
                         LogLandingSelectionPanel();
                         yield break;

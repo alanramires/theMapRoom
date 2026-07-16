@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Serialization;
 using UnityEngine.Tilemaps;
+using UnityEngine.UI;
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
@@ -28,11 +29,25 @@ public class ConstructionManager : MonoBehaviour
     [SerializeField] private bool autoSnapWhenMovedInEditor = true;
     [SerializeField] private Vector3Int currentCellPosition = Vector3Int.zero;
     [SerializeField] private TeamId teamId = TeamId.Green;
+    // Pilha de alerta de estoque (supply_top/middle/bottom no prefab), igual ao
+    // supridor-unidade â€” mas construcao nao tem teto de recursos (a logistica
+    // pode lotar a cidade a vontade), entao so existe o alerta de "acabou".
+    [Header("Supplier Stock Alerts")]
+    [SerializeField] private Image supplyTop;
+    [SerializeField] private Image supplyMiddle;
+    [SerializeField] private Image supplyBottom;
+    private int supplierStockAlertSignature = int.MinValue;
+    private bool supplyAlertSlotsResolved;
+    // Unidade em cima da construcao suprime a pilha: os mesmos icones aparecem
+    // em supridores-unidade, entao com um token no hex eles seriam lidos como
+    // estado DA UNIDADE ("soldado sem combustivel"). A informacao continua no
+    // painel de inspecao; o aviso ambiente volta quando o hex desocupa.
+    private bool alertsSuppressedByUnitOnTop;
     [Tooltip("Slot do MatchController que controla este time. -1 = Neutral fixo (sem slot).")]
     [SerializeField] private int slotIndex = -1;
-    [Tooltip("Setor estratégico ao qual esta construção pertence. Use Base0-Base3 para areas de base de cada jogador.")]
+    [Tooltip("Setor estratï¿½gico ao qual esta construï¿½ï¿½o pertence. Use Base0-Base3 para areas de base de cada jogador.")]
     [SerializeField] private ConstructionSector sector = ConstructionSector.None;
-    [Tooltip("Overrides manuais de eixo, POR SLOT. O mesmo setor pode ser nó do leque de um slot e rally de outro, então cada entrada força o eixo para um slot (ou -1 = todos). Sobrepõe o cálculo por ângulo do InvasionAxisMap.")]
+    [Tooltip("Overrides manuais de eixo, POR SLOT. O mesmo setor pode ser nï¿½ do leque de um slot e rally de outro, entï¿½o cada entrada forï¿½a o eixo para um slot (ou -1 = todos). Sobrepï¿½e o cï¿½lculo por ï¿½ngulo do InvasionAxisMap.")]
     [SerializeField] private System.Collections.Generic.List<EixoOverrideEntry> eixoOverrides = new System.Collections.Generic.List<EixoOverrideEntry>();
     [SerializeField] private string constructionId;
     [SerializeField] private int instanceId;
@@ -59,15 +74,15 @@ public class ConstructionManager : MonoBehaviour
     [SerializeField] private ConstructionHudController hudController;
     [SerializeField] private MatchController matchController;
     [Header("Tactical Role")]
-    [Tooltip("Este prédio serve como ponto de observação avançada (Forward Observer) para artilharia.")]
+    [Tooltip("Este prï¿½dio serve como ponto de observaï¿½ï¿½o avanï¿½ada (Forward Observer) para artilharia.")]
     [SerializeField] private bool isForwardObserverSpot;
     [Tooltip("Operational gera interesse da AI. Reveal Only participa apenas da visibilidade. Disabled preserva a configuracao sem ativar o spot.")]
     [SerializeField] private ForwardObserverSpotUsage forwardObserverSpotUsage = ForwardObserverSpotUsage.Operational;
-    [Tooltip("Este prédio serve como ponto de reunião (Rally Point) para unidades recém-compradas.")]
+    [Tooltip("Este prï¿½dio serve como ponto de reuniï¿½o (Rally Point) para unidades recï¿½m-compradas.")]
     [SerializeField] private bool isRallyPoint;
-    [Tooltip("Slot que usa este Rally Point como ponto de invasão. -1 = nenhum slot.")]
+    [Tooltip("Slot que usa este Rally Point como ponto de invasï¿½o. -1 = nenhum slot.")]
     [SerializeField] private int rallyOwnerSlotIndex = -1;
-    [Tooltip("Este prédio marca o setor como fundação econômica/territorial para a AI de um slot.")]
+    [Tooltip("Este prï¿½dio marca o setor como fundaï¿½ï¿½o econï¿½mica/territorial para a AI de um slot.")]
     [SerializeField] private bool isAnchorSector;
     [Tooltip("Slot da AI para o qual este setor funciona como Anchor Sector. -1 = nenhum slot.")]
     [SerializeField] private int anchorSectorSlotIndex = -1;
@@ -102,8 +117,8 @@ public class ConstructionManager : MonoBehaviour
     public System.Collections.Generic.IReadOnlyList<EixoOverrideEntry> EixoOverrides => eixoOverrides;
     public bool HasEixoOverride => eixoOverrides != null && eixoOverrides.Count > 0;
 
-    // Resolve o eixo forçado para um slot: a entrada do slot exato tem precedência sobre a de -1
-    // (todos). Retorna false se não há override aplicável a esse slot.
+    // Resolve o eixo forï¿½ado para um slot: a entrada do slot exato tem precedï¿½ncia sobre a de -1
+    // (todos). Retorna false se nï¿½o hï¿½ override aplicï¿½vel a esse slot.
     public bool TryGetEixoOverride(int slot, out int eixo)
     {
         eixo = 0;
@@ -295,11 +310,15 @@ public class ConstructionManager : MonoBehaviour
             ApplyFromDatabase();
 
         RefreshRuntimeVisualState(force: true);
+        TryAutoAssignSupplyAlertSlots();
+        RefreshSupplierStockAlerts(force: true);
     }
 
     private void Update()
     {
         RefreshRallyHudIfDirty();
+        if (Application.isPlaying)
+            RefreshSupplierStockAlerts(force: false);
     }
 
     private void OnEnable()
@@ -351,6 +370,8 @@ public class ConstructionManager : MonoBehaviour
         if (!ApplyFromDatabase())
             UpdateDynamicName();
         RefreshRuntimeVisualState(force: true);
+        TryAutoAssignSupplyAlertSlots();
+        RefreshSupplierStockAlerts(force: true);
     }
 #endif
 
@@ -484,7 +505,7 @@ public class ConstructionManager : MonoBehaviour
             firstOwnerInitialized = true;
         }
 
-        if (!ApplyFromDatabase())
+        if (!ApplyFromDatabasePreservingSiteRuntime())
             UpdateDynamicName();
         RefreshRuntimeVisualState(force: true);
         ThreatRevisionTracker.NotifyConstructionTeamChanged(previousTeam, teamId);
@@ -605,9 +626,9 @@ public class ConstructionManager : MonoBehaviour
         RefreshRuntimeVisualState(force: true);
     }
 
-    // Debug/runtime: troca a regra de venda do prédio. Para OriginalOwner/FirstOwner, ownerSlot >= 0
-    // define (e marca como inicializado) o slot dono correspondente, que é quem `CanProduceUnitsForTeam`
-    // usa pra liberar a produção. Para FreeMarket/Disabled o ownerSlot é ignorado.
+    // Debug/runtime: troca a regra de venda do prï¿½dio. Para OriginalOwner/FirstOwner, ownerSlot >= 0
+    // define (e marca como inicializado) o slot dono correspondente, que ï¿½ quem `CanProduceUnitsForTeam`
+    // usa pra liberar a produï¿½ï¿½o. Para FreeMarket/Disabled o ownerSlot ï¿½ ignorado.
     public void DebugSetSellingRule(ConstructionUnitMarketRule rule, int ownerSlot)
     {
         if (siteRuntime == null)
@@ -698,6 +719,131 @@ public class ConstructionManager : MonoBehaviour
         return false;
     }
 
+    private void TryAutoAssignSupplyAlertSlots()
+    {
+        supplyAlertSlotsResolved = true;
+        if (supplyTop == null) supplyTop = FindChildImageByName("supply_top");
+        if (supplyMiddle == null) supplyMiddle = FindChildImageByName("supply_middle");
+        if (supplyBottom == null) supplyBottom = FindChildImageByName("supply_bottom");
+        SupplierStockAlertView.ConfigureSlot(supplyTop);
+        SupplierStockAlertView.ConfigureSlot(supplyMiddle);
+        SupplierStockAlertView.ConfigureSlot(supplyBottom);
+    }
+
+    private Image FindChildImageByName(string objectName)
+    {
+        Image[] images = GetComponentsInChildren<Image>(true);
+        for (int i = 0; i < images.Length; i++)
+            if (images[i] != null && images[i].name == objectName)
+                return images[i];
+        return null;
+    }
+
+    // Espelho do alerta do supridor-unidade (UnitManager.RefreshSupplierStockAlerts),
+    // com a regra propria da construcao: sem teto de recursos nao existe razao/half â€”
+    // alerta somente o supply nao-infinito que ZEROU (spriteEmpty). Cobre tanto o
+    // catalogo do asset (o que a construcao deveria oferecer) quanto ofertas que a
+    // logistica trouxe em runtime e foram consumidas ate o fim.
+    private void RefreshSupplierStockAlerts(bool force)
+    {
+        if (!supplyAlertSlotsResolved)
+            TryAutoAssignSupplyAlertSlots();
+        if (supplyTop == null && supplyMiddle == null && supplyBottom == null)
+            return;
+
+        bool isSupplier = CanProvideSupplies && !hasInfiniteSuppliesOverride;
+        if (!isSupplier)
+        {
+            if (force || supplierStockAlertSignature != 0)
+            {
+                supplierStockAlertSignature = 0;
+                SupplierStockAlertView.HideStack(supplyBottom, supplyMiddle, supplyTop);
+            }
+            return;
+        }
+
+        IReadOnlyList<ConstructionSupplyOffer> offers = OfferedSupplies;
+        int signature = 17;
+        for (int i = 0; i < offers.Count; i++)
+        {
+            ConstructionSupplyOffer offer = offers[i];
+            signature = unchecked(signature * 31 + (offer != null ? offer.quantity : 0));
+            signature = unchecked(signature * 31 + (offer != null && offer.supply != null ? offer.supply.GetEntityId().GetHashCode() : 0));
+        }
+        if (!force && signature == supplierStockAlertSignature)
+            return;
+        supplierStockAlertSignature = signature;
+
+        List<SupplierStockAlert> alerts = new List<SupplierStockAlert>(3);
+        List<SupplyData> seenSupplies = new List<SupplyData>(4);
+
+        if (TryResolveConstructionData(out ConstructionData constructionData) &&
+            constructionData != null &&
+            constructionData.supplierResources != null)
+        {
+            for (int i = 0; i < constructionData.supplierResources.Count; i++)
+            {
+                ConstructionSupplierResourceCapacity entry = constructionData.supplierResources[i];
+                if (entry != null)
+                    TryAddConstructionEmptyAlert(entry.supply, seenSupplies, alerts);
+            }
+        }
+
+        for (int i = 0; i < offers.Count; i++)
+        {
+            ConstructionSupplyOffer offer = offers[i];
+            if (offer != null)
+                TryAddConstructionEmptyAlert(offer.supply, seenSupplies, alerts);
+        }
+
+        SupplierStockAlertView.SortMostCriticalFirst(alerts);
+        // Pilha enche de baixo pra cima: o primeiro/mais critico ocupa o bottom.
+        // Com unidade (visivel) em cima, suprime â€” senao os icones leem como
+        // estado da unidade; RefreshHud religa ao desocupar o hex.
+        if (alertsSuppressedByUnitOnTop)
+            SupplierStockAlertView.HideStack(supplyBottom, supplyMiddle, supplyTop);
+        else
+            SupplierStockAlertView.ApplyStack(supplyBottom, supplyMiddle, supplyTop, alerts);
+
+        // Diagnostico de ponto unico: so loga quando o estoque muda em play
+        // (signature nova), nunca por frame. Diz onde a pilha morre se o icone
+        // nao aparecer: slots nao achados, gate, ou alerts=0.
+        if (Application.isPlaying && !force)
+        {
+            Debug.Log($"[SupplyAlert] {name}: offers={offers.Count} alerts={alerts.Count} " +
+                      $"slots(top={(supplyTop != null)}, mid={(supplyMiddle != null)}, bot={(supplyBottom != null)}) " +
+                      $"provider={CanProvideSupplies} infiniteOverride={hasInfiniteSuppliesOverride}");
+        }
+    }
+
+    private void TryAddConstructionEmptyAlert(SupplyData supply, List<SupplyData> seenSupplies, List<SupplierStockAlert> alerts)
+    {
+        if (supply == null || seenSupplies.Contains(supply))
+            return;
+        seenSupplies.Add(supply);
+
+        if (HasInfiniteSuppliesFor(supply))
+            return;
+
+        int current = 0;
+        IReadOnlyList<ConstructionSupplyOffer> offers = OfferedSupplies;
+        for (int i = 0; i < offers.Count; i++)
+        {
+            ConstructionSupplyOffer offer = offers[i];
+            if (offer != null && offer.supply == supply)
+                current += Mathf.Max(0, offer.quantity);
+        }
+
+        if (current > 0)
+            return;
+
+        Sprite alertSprite = SupplierStockAlertView.ResolveAlertSprite(supply, empty: true);
+        if (alertSprite == null)
+            return;
+
+        alerts.Add(new SupplierStockAlert { ratio = 0f, empty = true, sprite = alertSprite });
+    }
+
     public bool ContainsOfferedSupply(SupplyData supply)
     {
         if (supply == null)
@@ -715,6 +861,77 @@ public class ConstructionManager : MonoBehaviour
         }
 
         return false;
+    }
+
+    // Debug/runtime: construcoes nao possuem teto de estoque. O comando define o
+    // total agregado do supply nas ofertas runtime e atualiza os alertas visuais.
+    public bool DebugSetOfferedSupplyAmount(
+        string supplyToken,
+        int requestedAmount,
+        out SupplyData matchedSupply,
+        out int before,
+        out int after)
+    {
+        matchedSupply = null;
+        before = 0;
+        after = 0;
+
+        if (siteRuntime == null || siteRuntime.offeredSupplies == null || string.IsNullOrWhiteSpace(supplyToken))
+            return false;
+
+        List<ConstructionSupplyOffer> matches = new List<ConstructionSupplyOffer>();
+        for (int i = 0; i < siteRuntime.offeredSupplies.Count; i++)
+        {
+            ConstructionSupplyOffer offer = siteRuntime.offeredSupplies[i];
+            if (offer == null || !DebugSupplyMatchesToken(offer.supply, supplyToken))
+                continue;
+
+            matches.Add(offer);
+            before += Mathf.Max(0, offer.quantity);
+            if (matchedSupply == null)
+                matchedSupply = offer.supply;
+        }
+
+        if (matches.Count <= 0)
+            return false;
+
+        int amount = Mathf.Max(0, requestedAmount);
+        matches[0].quantity = amount;
+        for (int i = 1; i < matches.Count; i++)
+            matches[i].quantity = 0;
+
+        after = amount;
+        RefreshRuntimeVisualState(force: true);
+        RefreshSupplierStockAlerts(force: true);
+        return true;
+    }
+
+    // Troca de proprietario precisa reaplicar sprite/cor/nome do ConstructionData,
+    // mas nunca pode recriar a configuracao runtime: estoque, servicos e mercado
+    // pertencem a esta instancia e sobrevivem a captura.
+    private bool ApplyFromDatabasePreservingSiteRuntime()
+    {
+        bool previousOverride = hasSiteRuntimeOverride;
+        hasSiteRuntimeOverride = true;
+        try
+        {
+            return ApplyFromDatabase();
+        }
+        finally
+        {
+            hasSiteRuntimeOverride = previousOverride;
+        }
+    }
+
+    private static bool DebugSupplyMatchesToken(SupplyData supply, string token)
+    {
+        if (supply == null || string.IsNullOrWhiteSpace(token))
+            return false;
+
+        string normalizedToken = token.Trim();
+        return string.Equals(supply.id, normalizedToken, System.StringComparison.OrdinalIgnoreCase)
+               || string.Equals(supply.displayName, normalizedToken, System.StringComparison.OrdinalIgnoreCase)
+               || string.Equals(supply.name, normalizedToken, System.StringComparison.OrdinalIgnoreCase);
     }
 
     public void SnapToCellCenter()
@@ -1110,6 +1327,11 @@ public class ConstructionManager : MonoBehaviour
 
         bool occupantVisible = IsOccupantVisibleForHud(occupant);
         bool hasUnitOnTop = occupant != null && occupantVisible;
+        if (hasUnitOnTop != alertsSuppressedByUnitOnTop)
+        {
+            alertsSuppressedByUnitOnTop = hasUnitOnTop;
+            RefreshSupplierStockAlerts(force: true);
+        }
         bool showFlagThreatOutline = occupant != null
             && occupantVisible
             && occupant.TeamId != teamId
@@ -1216,10 +1438,10 @@ public class ConstructionManager : MonoBehaviour
         bool hasState = AIController.TryGetRallyHudState(
             rallyOwnerSlotIndex, sector, out AIRallyAssemblyState state, out _, out isMain);
 
-        // A luz segue a OPERAÇÃO, não a massa parada no ancoradouro: enquanto a invasão lançada
-        // está em voo (supressão ativa), mostra verde — mesmo sem rally objective ativo e mesmo
-        // após um load (a supressão é persistida). Quando a operação falha, o monitor limpa o
-        // GoGreen, a supressão solta e a luz volta ao estado real da re-montagem (amarelo).
+        // A luz segue a OPERAï¿½ï¿½O, nï¿½o a massa parada no ancoradouro: enquanto a invasï¿½o lanï¿½ada
+        // estï¿½ em voo (supressï¿½o ativa), mostra verde ï¿½ mesmo sem rally objective ativo e mesmo
+        // apï¿½s um load (a supressï¿½o ï¿½ persistida). Quando a operaï¿½ï¿½o falha, o monitor limpa o
+        // GoGreen, a supressï¿½o solta e a luz volta ao estado real da re-montagem (amarelo).
         TryAutoAssignMatchController();
         int turn = matchController != null ? matchController.CurrentTurn : -1;
         if (turn >= 0 && AIController.IsRallyGoGreenSuppressedForHud(teamId, sector, turn))
@@ -1460,8 +1682,8 @@ public class ConstructionManager : MonoBehaviour
                 firstOwnerInitialized = true;
             }
 
-            if (!ApplyFromDatabase())
-                UpdateDynamicName();
+        if (!ApplyFromDatabase())
+            UpdateDynamicName();
 
             RefreshRuntimeVisualState(force: true);
 #if UNITY_EDITOR

@@ -760,8 +760,17 @@ public partial class TurnStateManager : MonoBehaviour
     public bool TrySetUnitEmbarkedSupplyUnderCursorFromDebug(string supplyToken, int amountValue, out string message)
     {
         message = string.Empty;
-        if (!TryGetUnitUnderCursorForDebug(out UnitManager target, out Vector3Int cursorCell, out message))
+        if (cursorController == null)
+        {
+            message = "CursorController nao encontrado.";
             return false;
+        }
+
+        Vector3Int cursorCell = cursorController.CurrentCell;
+        cursorCell.z = 0;
+        UnitManager target = FindUnitAtCell(cursorCell);
+        if (target == null)
+            return TrySetConstructionSupplyUnderCursorFromDebug(supplyToken, amountValue, out message);
 
         if (string.IsNullOrWhiteSpace(supplyToken))
         {
@@ -835,6 +844,41 @@ public partial class TurnStateManager : MonoBehaviour
 
         string supplyLabel = ResolveSupplyDisplayName(matchedSupply);
         message = $"Estoque atualizado: {ResolveDebugUnitName(target)} {supplyLabel} {before}->{after}/{Mathf.Max(0, max)} em {FormatMapCellWithZ(cursorCell)}.";
+        Debug.Log($"[Debug Command] {message}");
+        return true;
+    }
+
+    private bool TrySetConstructionSupplyUnderCursorFromDebug(string supplyToken, int amountValue, out string message)
+    {
+        message = string.Empty;
+        if (!TryGetConstructionUnderCursorForDebug(out ConstructionManager target, out Vector3Int cursorCell, out message))
+            return false;
+
+        if (!target.CanProvideSupplies)
+        {
+            message = $"{target.name} nao e uma construcao supridora.";
+            return false;
+        }
+
+        if (target.HasInfiniteSuppliesOverride)
+        {
+            message = $"{target.name} esta com estoque infinito; desative o override antes de definir {supplyToken}.";
+            return false;
+        }
+
+        if (!target.DebugSetOfferedSupplyAmount(
+                supplyToken,
+                amountValue,
+                out SupplyData matchedSupply,
+                out int before,
+                out int after))
+        {
+            message = $"{target.name} nao oferece supply \"{supplyToken}\".";
+            return false;
+        }
+
+        string supplyLabel = ResolveSupplyDisplayName(matchedSupply);
+        message = $"Estoque da construcao atualizado: {target.name} {supplyLabel} {before}->{after} em {FormatMapCellWithZ(cursorCell)}.";
         Debug.Log($"[Debug Command] {message}");
         return true;
     }
@@ -1584,6 +1628,61 @@ public partial class TurnStateManager : MonoBehaviour
 
         return null;
     }
+    // Legalidade do pouso de emergencia no hex atual, direto da fonte de verdade
+    // do sensor PodePousar (terreno/estrutura/construcao + ocupancia + locks).
+    private bool CanEmergencyLandAtTurnStart(UnitManager unit)
+    {
+        if (unit == null || unit.IsEmbarked)
+            return false;
+        if (unit.GetAircraftType() == AircraftType.None || unit.IsAircraftGrounded)
+            return false;
+
+        Tilemap boardMap = terrainTilemap != null ? terrainTilemap : unit.BoardTilemap;
+        if (boardMap == null || terrainDatabase == null)
+            return false;
+
+        AircraftOperationDecision decision = AircraftOperationRules.Evaluate(
+            unit, boardMap, terrainDatabase, SensorMovementMode.MoveuParado);
+        return decision.available && decision.action == AircraftOperationAction.Land;
+    }
+
+    // Apresentacao do pouso de emergencia: mesmo timing do pouso do fluxo de
+    // suprimento (SFX de movimento -> transicao -> troca de camada -> efeito
+    // VTOL -> settle). Nao marca hasActed: a unidade pousada com 0 de
+    // combustivel ja nao decola, e interagivel ela preserva os resgates
+    // (suprimento, embarque em transporte, comando de remover).
+    private IEnumerator ExecuteTurnStartEmergencyLandingPresentation(UnitManager unit)
+    {
+        if (unit == null)
+            yield break;
+
+        PlayMovementStartSfx(unit);
+
+        float transitionDuration = GetLayerOperationTransitionDuration();
+        if (transitionDuration > 0f)
+            yield return new WaitForSeconds(transitionDuration);
+
+        Tilemap boardMap = terrainTilemap != null ? terrainTilemap : unit.BoardTilemap;
+        if (!AircraftOperationRules.TryApplyOperation(
+                unit, boardMap, terrainDatabase, SensorMovementMode.MoveuParado, out _))
+        {
+            Debug.Log($"[FuelQueue] Pouso de emergencia falhou ao aplicar para {unit.name}; unidade permanece no ar.");
+            yield break;
+        }
+
+        Vector3Int landedCell = unit.CurrentCellPosition;
+        landedCell.z = 0;
+        Debug.Log($"[FuelQueue] Pouso de emergencia: {unit.name} pousou sem combustivel em ({landedCell.x},{landedCell.y}).");
+
+        float vtolFxDuration = animationManager != null ? animationManager.PlayVtolLandingEffect(unit) : 0f;
+        if (vtolFxDuration > 0f)
+            yield return new WaitForSeconds(vtolFxDuration);
+
+        float postTransitionDelay = GetLayerOperationAfterTransitionDelay();
+        if (postTransitionDelay > 0f)
+            yield return new WaitForSeconds(postTransitionDelay);
+    }
+
     private IEnumerator ExecuteTurnStartFuelDepletionDeathQueue()
     {
         if (turnStartFuelDepletionExecutionInProgress)
@@ -1622,6 +1721,31 @@ public partial class TurnStateManager : MonoBehaviour
                 string targetInstanceId = target.InstanceId.ToString();
 
                 yield return MoveCursorToCellLikeReplayAtTurnStart(targetCell, replayCursorStepDelay);
+
+                // Pouso de emergencia: se o hex atual permite pousar (regra do
+                // sensor PodePousar via AircraftOperationRules), a aeronave pousa
+                // em vez de cair — fica de motor desligado (decolar exige
+                // autonomia > 0) ate ser reabastecida ou removida. A decisao e
+                // tomada AQUI, por unidade, para que o replay (que re-enfileira
+                // os mesmos alvos) re-resolva deterministicamente pousar-ou-cair.
+                if (CanEmergencyLandAtTurnStart(target))
+                {
+                    turnStartFuelDepletionReplaySubSteps.Add(new PlayerActionSubStep
+                    {
+                        TargetHex = targetCell,
+                        HasTargetHex = true,
+                        TargetInstanceId = targetInstanceId,
+                        Label = "TurnStartEmergencyLandingConfirm"
+                    });
+
+                    PanelDialogController.TrySetTransientText("pouso de emergencia: sem combustivel", 2.6f);
+                    yield return ExecuteTurnStartEmergencyLandingPresentation(target);
+                    cursorController?.PlayLoadSfx();
+
+                    if (turnStartFuelDepletionDeathQueue.Count > 0 && betweenKillsDelay > 0f)
+                        yield return new WaitForSeconds(betweenKillsDelay);
+                    continue;
+                }
 
                 turnStartFuelDepletionReplaySubSteps.Add(new PlayerActionSubStep
                 {

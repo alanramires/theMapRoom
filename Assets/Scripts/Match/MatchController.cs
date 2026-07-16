@@ -879,7 +879,10 @@ public class MatchController : MonoBehaviour
         // camera, FoW ou musica da partida e liberado antes da confirmacao hot seat.
         if (panelRodada == null)
             panelRodada = FindAnyObjectByType<PanelRodadaController>(FindObjectsInactive.Include);
-        if (AreAllPlayersHuman() && panelRodada != null && !DebugManager.IsPanelRodadaDisabledForHotSeat())
+        bool skipHotSeatPanel = DebugManager.IsPanelRodadaDisabledForHotSeat();
+        if (skipHotSeatPanel && panelRodada != null)
+            panelRodada.gameObject.SetActive(false);
+        if (AreAllPlayersHuman() && panelRodada != null && !skipHotSeatPanel)
             yield return panelRodada.Apresentar(ActiveTeam, 1, currentTurn);
 
         FindAnyObjectByType<ReplayManager>()?.CleanupReplayArtifactsForMatchStart();
@@ -1524,7 +1527,10 @@ public class MatchController : MonoBehaviour
             panelRodada = FindAnyObjectByType<PanelRodadaController>(FindObjectsInactive.Include);
 
         // O painel preto sobe antes de trocar time/FoW/camera, preservando o hot seat.
-        bool useHotSeatPanel = AreAllPlayersHuman() && panelRodada != null && !DebugManager.IsPanelRodadaDisabledForHotSeat();
+        bool skipHotSeatPanel = DebugManager.IsPanelRodadaDisabledForHotSeat();
+        bool useHotSeatPanel = AreAllPlayersHuman() && panelRodada != null && !skipHotSeatPanel;
+        if (skipHotSeatPanel && panelRodada != null)
+            panelRodada.gameObject.SetActive(false);
         if (useHotSeatPanel)
         {
             panelRodada.gameObject.SetActive(true);
@@ -2588,6 +2594,11 @@ public class MatchController : MonoBehaviour
                             !unit.IsEmbarked;
                         if (isAirUnitInFlight && unit.gameObject.activeInHierarchy)
                         {
+                            // Marca para a fila de resolucao por combustivel. E a
+                            // FILA (TurnStateManager) que decide pousar-ou-cair por
+                            // unidade, com o cursor varrendo e apresentando cada
+                            // caso: pouso de emergencia quando o hex permite (regra
+                            // do sensor PodePousar) ou queda como antes.
                             turnStartUnitsMarkedForFuelDepletionDeath.Add(unit);
                             markedForFuelDepletionDeath = true;
                         }

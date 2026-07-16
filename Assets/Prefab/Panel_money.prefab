@@ -150,7 +150,6 @@ GameObject:
   - component: {fileID: 839765239825058414}
   - component: {fileID: 6500449872718064770}
   - component: {fileID: 6273792749082894581}
-  - component: {fileID: 52260570829858271}
   m_Layer: 5
   m_Name: tela_cheia
   m_TagString: Untagged
@@ -215,18 +214,6 @@ MonoBehaviour:
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 1
---- !u!114 &52260570829858271
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4036785703812687796}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: c62adcc9ec6148caada17585583293e7, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
 --- !u!1 &5217842817871102791
 GameObject:
   m_ObjectHideFlags: 0

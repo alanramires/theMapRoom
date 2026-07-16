@@ -73,7 +73,8 @@ public static class AircraftOperationRules
 
         if (unit.GetDomain() == Domain.Air && !unit.IsAircraftGrounded)
         {
-            if (!UnitOccupancyRules.CanEndLayerTransitionAtCell(referenceTilemap, cell, unit, Domain.Land, HeightLevel.Surface, out UnitManager blocker))
+            ResolveGroundedLayerForCell(unit, referenceTilemap, terrainDatabase, cell, out Domain landDomain, out HeightLevel landHeight);
+            if (!UnitOccupancyRules.CanEndLayerTransitionAtCell(referenceTilemap, cell, unit, landDomain, landHeight, out UnitManager blocker))
             {
                 string blockerName = blocker != null && !string.IsNullOrWhiteSpace(blocker.UnitDisplayName) ? blocker.UnitDisplayName : "aliado";
                 return Unavailable($"Pouso indisponivel: camada Surface ocupada por {blockerName}.");
@@ -123,10 +124,11 @@ public static class AircraftOperationRules
 
         if (decision.action == AircraftOperationAction.Land)
         {
-            if (!UnitOccupancyRules.CanEndLayerTransitionAtCell(referenceTilemap, cell, unit, Domain.Land, HeightLevel.Surface, out _))
+            ResolveGroundedLayerForCell(unit, referenceTilemap, terrainDatabase, cell, out Domain landDomain, out HeightLevel landHeight);
+            if (!UnitOccupancyRules.CanEndLayerTransitionAtCell(referenceTilemap, cell, unit, landDomain, landHeight, out _))
                 return false;
 
-            unit.TrySetCurrentLayerMode(Domain.Land, HeightLevel.Surface);
+            unit.TrySetCurrentLayerMode(landDomain, landHeight);
             unit.SetAircraftGrounded(true);
             unit.SetAircraftEmbarkedInCarrier(false);
             unit.SetAircraftOperationLockTurns(0);
@@ -143,6 +145,34 @@ public static class AircraftOperationRules
         unit.SetAircraftEmbarkedInCarrier(false);
         unit.SetAircraftOperationLockTurns(0);
         return true;
+    }
+
+    // Camada de pouso derivada do hex, nao mais Land/Surface fixo: Naval/Surface
+    // quando a unidade suporta o modo e o hex o aceita (hidroaviao pousa na agua
+    // ou praia de trem recolhido — a troca de camada aplica o sprite do modo
+    // Naval/Surface do UnitData); caso contrario, Land/Surface. A regra de hex e
+    // a mesma da emersao (CanSurfaceAtCell: construcao > estrutura > terreno +
+    // skills), mantendo uma unica fonte de verdade para "Naval/Surface cabe aqui".
+    public static void ResolveGroundedLayerForCell(
+        UnitManager unit,
+        Tilemap referenceTilemap,
+        TerrainDatabase terrainDatabase,
+        Vector3Int cell,
+        out Domain domain,
+        out HeightLevel height)
+    {
+        domain = Domain.Land;
+        height = HeightLevel.Surface;
+
+        if (unit == null || referenceTilemap == null)
+            return;
+
+        cell.z = 0;
+        if (unit.SupportsLayerMode(Domain.Naval, HeightLevel.Surface) &&
+            PodeEmergirSensor.CanSurfaceAtCell(unit, referenceTilemap, terrainDatabase, cell, out _))
+        {
+            domain = Domain.Naval;
+        }
     }
 
     private static AircraftOperationDecision EvaluateLanding(

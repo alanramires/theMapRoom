@@ -1489,7 +1489,20 @@ public class PanelHelperController : MonoBehaviour
     {
         bool textChanged = force || lastTitle != title || lastBody != body;
         if (force || panelVisible != lastPanelVisible)
+        {
+            // Qualquer sumico — inclusive o timeout da inspecao por hover, que
+            // nao passa pelo HideAll — esquece a posicao manual: o painel
+            // renasce no dock original, nao onde foi largado pelo drag.
+            if (!panelVisible && (isDockedCenterLeft || manuallyPositioned))
+            {
+                RestoreOriginalLayout();
+                manuallyPositioned = false;
+                hasLastUndockedScreenRect = false;
+                cursorNearUndockedDockRegion = false;
+            }
+
             SetPanelVisible(panelVisible);
+        }
 
         if (helperTitle != null)
         {
@@ -1514,6 +1527,7 @@ public class PanelHelperController : MonoBehaviour
         // Cor do time ativo deste frame — aplicada a todos os botoes gerados via script abaixo.
         currentTeamColor = ResolveActiveTeamColor(data);
         RefreshTimeoutProgressBar(panelVisible, data);
+        RefreshDragSurfaces(panelVisible);
         RefreshCancelControl(panelVisible);
         RefreshKeepPositionControl(panelVisible, data);
         RefreshCycleSelectionControl(panelVisible, data);
@@ -4148,6 +4162,9 @@ public class PanelHelperController : MonoBehaviour
         if (handle == null)
             handle = dragHandleRoot.AddComponent<PanelHelperDragHandle>();
         handle.Configure(helperRect, this);
+        // Mesma independencia de raycast da faixa do titulo: a alca do canto
+        // tambem deve arrastar (e nao vazar clique pro mapa) na inspecao em Neutral.
+        MakeRaycastIndependent(dragHandleRoot);
 
         EnsureTitleDragSurface();
     }
@@ -4188,7 +4205,49 @@ public class PanelHelperController : MonoBehaviour
         if (surfaceHandle == null)
             surfaceHandle = titleDragSurfaceRoot.AddComponent<PanelHelperDragHandle>();
         surfaceHandle.Configure(helperRect, this);
+
+        // Independente do CanvasGroup do painel: na inspecao em Neutral o painel
+        // desliga blocksRaycasts (cliques atravessam pro mapa) — sem isto, o
+        // clique no titulo viraria clique no hex atras e fecharia a inspecao.
+        MakeRaycastIndependent(titleDragSurfaceRoot);
     }
+
+    private static void MakeRaycastIndependent(GameObject target)
+    {
+        if (target == null)
+            return;
+        CanvasGroup group = target.GetComponent<CanvasGroup>();
+        if (group == null)
+            group = target.AddComponent<CanvasGroup>();
+        group.ignoreParentGroups = true;
+        group.interactable = true;
+        group.blocksRaycasts = true;
+    }
+
+    // Contrapartida do ignoreParentGroups: o sumico do painel (alpha 0 no grupo
+    // pai, ex.: timeout de 6s da inspecao por hover) nao alcanca a alca nem a
+    // faixa do titulo — sincroniza visibilidade e raycast delas a cada refresh.
+    private void RefreshDragSurfaces(bool panelVisible)
+    {
+        SyncDragSurfaceGroup(dragHandleRoot, panelVisible);
+        SyncDragSurfaceGroup(titleDragSurfaceRoot, panelVisible);
+    }
+
+    private static void SyncDragSurfaceGroup(GameObject target, bool panelVisible)
+    {
+        if (target == null)
+            return;
+        CanvasGroup group = target.GetComponent<CanvasGroup>();
+        if (group == null)
+            return;
+        group.alpha = panelVisible ? 1f : 0f;
+        group.blocksRaycasts = panelVisible;
+        group.interactable = panelVisible;
+    }
+
+    // Consultado pelo PanelHelperDragHandle: um drag em andamento morre se o
+    // painel sumir no meio do gesto (senao o jogador arrasta um painel fantasma).
+    public bool IsPanelVisibleForDrag => lastPanelVisible;
 
     private static Rect GetScreenRect(RectTransform rectTransform)
     {
@@ -4727,6 +4786,9 @@ public sealed class PanelHelperDragHandle : MonoBehaviour, IBeginDragHandler, ID
     {
         if (target == null)
             return;
+        // Painel invisivel (ex.: acabou de sumir por timeout) nao inicia drag.
+        if (owner != null && !owner.IsPanelVisibleForDrag)
+            return;
         owner.NotifyHelperPanelManuallyPositioned();
         target.SetAsLastSibling();
     }
@@ -4734,6 +4796,10 @@ public sealed class PanelHelperDragHandle : MonoBehaviour, IBeginDragHandler, ID
     public void OnDrag(PointerEventData eventData)
     {
         if (target == null)
+            return;
+        // Painel sumiu no meio do gesto (timeout da inspecao por hover): aborta
+        // o arrasto para nao mover um painel fantasma.
+        if (owner != null && !owner.IsPanelVisibleForDrag)
             return;
         float scale = canvas != null ? Mathf.Max(0.01f, canvas.scaleFactor) : 1f;
         target.anchoredPosition += eventData.delta / scale;

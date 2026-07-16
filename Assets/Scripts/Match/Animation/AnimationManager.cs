@@ -770,7 +770,7 @@ public class AnimationManager : MonoBehaviour
         if (weapon != null && weapon.useExplicitProjectileScale)
             projectileScale = Mathf.Clamp(weapon.projectileScale, 0.05f, 3f);
 
-        StartCoroutine(AnimateWeaponProjectileRoutine(from, to, sprite, trajectory, duration, projectileScale));
+        StartCoroutine(AnimateWeaponProjectileRoutine(from, to, sprite, trajectory, duration, projectileScale, rotateAlongTrajectory: true));
         return duration;
     }
 
@@ -781,7 +781,9 @@ public class AnimationManager : MonoBehaviour
         float duration = Mathf.Max(SupplyProjectileMinDuration, distance / speed);
         Sprite resolved = sprite != null ? sprite : GetWhiteSprite();
         float projectileScale = SupplyProjectileScale;
-        StartCoroutine(AnimateWeaponProjectileRoutine(from, to, resolved, WeaponTrajectoryType.Straight, duration, projectileScale));
+        // Galões, caixas e peças representam objetos transportados, não munição:
+        // percorrem a linha reta mantendo a orientação original do sprite.
+        StartCoroutine(AnimateWeaponProjectileRoutine(from, to, resolved, WeaponTrajectoryType.Straight, duration, projectileScale, rotateAlongTrajectory: false));
         return duration;
     }
 
@@ -884,7 +886,8 @@ public class AnimationManager : MonoBehaviour
         Sprite sprite,
         WeaponTrajectoryType trajectory,
         float duration,
-        float projectileScale)
+        float projectileScale,
+        bool rotateAlongTrajectory)
     {
         GameObject go = new GameObject("Combat Projectile FX");
         Transform t = go.transform;
@@ -899,7 +902,9 @@ public class AnimationManager : MonoBehaviour
         Vector2 flat = new Vector2(to.x - from.x, to.y - from.y);
         Vector2 dir = flat.sqrMagnitude > 0.0001f ? flat.normalized : Vector2.right;
         float angle = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
-        t.rotation = Quaternion.Euler(0f, 0f, angle);
+        t.rotation = rotateAlongTrajectory
+            ? Quaternion.Euler(0f, 0f, angle)
+            : Quaternion.identity;
 
         Vector3 control = Vector3.zero;
         if (trajectory == WeaponTrajectoryType.Parabolic)
@@ -952,7 +957,7 @@ public class AnimationManager : MonoBehaviour
                 ? QuadraticBezier(from, control, to, nextP)
                 : Vector3.Lerp(from, to, nextP);
             Vector2 look = new Vector2(nextPos.x - pos.x, nextPos.y - pos.y);
-            if (look.sqrMagnitude > 0.0001f)
+            if (rotateAlongTrajectory && look.sqrMagnitude > 0.0001f)
             {
                 float lookAngle = Mathf.Atan2(look.y, look.x) * Mathf.Rad2Deg;
                 t.rotation = Quaternion.Euler(0f, 0f, lookAngle);

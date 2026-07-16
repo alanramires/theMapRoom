@@ -1022,7 +1022,7 @@ public class DebugManager : MonoBehaviour
             "set move <v> (temporario, reseta ao virar rodada)\n" +
             "set move_remain <v> (alias de set move)\n" +
             "set ammo <v> | set ammo:<idx> <v>\n" +
-            "set galao <v> | set galoes <v> | set caixas <v> | set pecas <v>\n" +
+            "set galao <v> | set galoes <v> | set caixas <v> | set pecas <v> (unidade ou construcao no cursor)\n" +
             "refuel unit | rearm unit | repair unit\n" +
             "set construction team <x>\n" +
             "set owner <x> (alias, -1 neutro, 0 verde, 1 azul, 2 vermelho, 3 amarelo)\n" +
