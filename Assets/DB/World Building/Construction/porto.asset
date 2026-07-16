@@ -74,15 +74,15 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
   - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
   supplierResources:
-  - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
-    hasInfiniteSupply: 1
-    maxCapacity: 0
   - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
-    hasInfiniteSupply: 1
-    maxCapacity: 0
+    hasInfiniteSupply: 0
+    maxCapacity: 80
+  - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+    hasInfiniteSupply: 0
+    maxCapacity: 10
   - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
-    hasInfiniteSupply: 1
-    maxCapacity: 0
+    hasInfiniteSupply: 0
+    maxCapacity: 20
   constructionConfiguration:
     isPlayerHeadQuarter: 0
     isVictoryBuilding: 0
@@ -100,12 +100,15 @@ MonoBehaviour:
     - {fileID: 11400000, guid: 48d701c7c9ab09c45b17f58aa65a5de7, type: 2}
     canProvideSupplies: 1
     offeredSupplies:
-    - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
-      quantity: 2147483647
     - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
-      quantity: 2147483647
+      quantity: 80
+      peakQuantity: 80
+    - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+      quantity: 10
+      peakQuantity: 10
     - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
-      quantity: 2147483647
+      quantity: 20
+      peakQuantity: 20
     offeredServices:
     - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
     - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}

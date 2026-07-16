@@ -200,6 +200,8 @@ public class RuntimeSupplySaveData
 {
     public string supplyId;
     public int quantity;
+    // Marca d'agua do estoque (max dinamico das construcoes). Unidades ignoram.
+    public int peakQuantity;
 }
 
 [Serializable]

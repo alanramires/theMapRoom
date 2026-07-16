@@ -19,6 +19,7 @@ public class SaveGameManager : MonoBehaviour
     // Disparado apos o load ser concluido com sucesso (independente do time ativo).
     public static event Action OnAfterLoadSuccess;
     public static bool IsAnyLoadInProgress { get; private set; }
+    public static bool HasPendingMainMenuLoadRequest => mainMenuLoadTransitionActive || pendingMainMenuLoad != null;
 
     private sealed class PendingMainMenuLoadRequest
     {
@@ -27,6 +28,7 @@ public class SaveGameManager : MonoBehaviour
     }
 
     private static PendingMainMenuLoadRequest pendingMainMenuLoad;
+    private static bool mainMenuLoadTransitionActive;
     private static bool suppressNextLoadConfirmSfx;
     private static string pendingNewGameSaveDirectory;
 
@@ -48,6 +50,8 @@ public class SaveGameManager : MonoBehaviour
     [SerializeField] private PlanningManager planningManager;
 
     [SerializeField] private AIController aiController;
+    [SerializeField] private PanelRodadaController panelRodada;
+    [SerializeField] private MatchMusicAudioManager matchMusicAudioManager;
     
     // [SerializeField] private AIPlayerController aiPlayerController;
 
@@ -120,6 +124,7 @@ public class SaveGameManager : MonoBehaviour
     private const string SaveContainerJogadasEntry = "jogadas.json";
 
     private bool loadInProgress;
+    private bool lastLoadRoutineSucceeded;
     private bool promptUsingPersistenceState;
     private Coroutine postLoadThreatWarmupRoutine;
     private SlotPromptState promptState;
@@ -902,6 +907,7 @@ public class SaveGameManager : MonoBehaviour
             slotIndex = normalizedSlot,
             sceneName = targetScene
         };
+        mainMenuLoadTransitionActive = true;
         suppressNextLoadConfirmSfx = true;
 
         string currentScene = SceneManager.GetActiveScene().name;
@@ -923,6 +929,7 @@ public class SaveGameManager : MonoBehaviour
         catch (Exception ex)
         {
             pendingMainMenuLoad = null;
+            mainMenuLoadTransitionActive = false;
             suppressNextLoadConfirmSfx = false;
             Debug.LogError($"[SaveGame] Falha ao trocar para cena '{targetScene}': {ex.Message}");
             return false;
@@ -1144,6 +1151,18 @@ public class SaveGameManager : MonoBehaviour
     {
         loadInProgress = true;
         IsAnyLoadInProgress = true;
+        lastLoadRoutineSucceeded = false;
+        if (panelRodada == null)
+            panelRodada = FindAnyObjectByType<PanelRodadaController>(FindObjectsInactive.Include);
+        if (matchMusicAudioManager == null)
+            matchMusicAudioManager = FindAnyObjectByType<MatchMusicAudioManager>();
+        if (matchMusicAudioManager != null)
+        {
+            matchMusicAudioManager.BeginTurnTransition();
+            matchMusicAudioManager.StopForTurnTransition();
+        }
+        panelRodada?.BeginLoadingPresentation();
+        bool loadingPresentationReleased = false;
         double asyncStartMs = PerfNowMs();
         LogLoadPerf(normalizedSlot, "load_async.start", asyncStartMs, 0d);
         try
@@ -1219,6 +1238,8 @@ public class SaveGameManager : MonoBehaviour
                 yield break;
             }
 
+            panelRodada?.SetLoadingTeam((TeamId)data.activeTeamId, data.currentTurn);
+
             string currentScene = SceneManager.GetActiveScene().name;
             if (!string.IsNullOrWhiteSpace(data.sceneName) && !string.Equals(data.sceneName, currentScene, StringComparison.Ordinal))
             {
@@ -1242,13 +1263,28 @@ public class SaveGameManager : MonoBehaviour
             yield return StartCoroutine(LoadRoutine(data, normalizedSlot));
             RestoreReplayFromContainer(preprocess.replayJson);
             RestoreJogadasFromContainer(preprocess.jogadasJson);
+            if (lastLoadRoutineSucceeded && panelRodada != null)
+            {
+                int playerNumber = matchController != null ? matchController.ActivePlayerListIndex + 1 : 1;
+                yield return panelRodada.ReleaseLoadingPresentation(
+                    (TeamId)data.activeTeamId,
+                    Mathf.Max(1, playerNumber),
+                    data.currentTurn);
+                loadingPresentationReleased = true;
+                matchMusicAudioManager?.PrepareForMatchStart(forceRestartPlayback: true);
+            }
             LogLoadPerf(normalizedSlot, "load_async.end", asyncStartMs, PerfNowMs() - asyncStartMs);
         }
         finally
         {
+            if (!loadingPresentationReleased && panelRodada != null && panelRodada.IsPresenting)
+                panelRodada.CancelLoadingPresentation();
+            if (!loadingPresentationReleased)
+                matchMusicAudioManager?.EndTurnTransition();
             // Em casos de erro antes de entrar no LoadRoutine, garante desbloqueio.
             loadInProgress = false;
             IsAnyLoadInProgress = false;
+            mainMenuLoadTransitionActive = false;
         }
     }
 
@@ -1423,6 +1459,7 @@ public class SaveGameManager : MonoBehaviour
         IsAnyLoadInProgress = true;
         string stage = "init";
         bool coreLoadSucceeded = false;
+        lastLoadRoutineSucceeded = false;
         bool suppressedFogRefresh = false;
         double routineStartMs = PerfNowMs();
         LogLoadPerf(loadedSlot, "load_routine.start", routineStartMs, 0d);
@@ -1695,9 +1732,6 @@ public class SaveGameManager : MonoBehaviour
             matchController.SuppressFogOfWarRefresh = false;
 
         LogLoadPerf(loadedSlot, "load_routine.end", routineStartMs, PerfNowMs() - routineStartMs);
-        loadInProgress = false;
-        IsAnyLoadInProgress = false;
-
         if (coreLoadSucceeded)
         {
             matchController?.ForceReapplyActiveTeamWithTurnStart();
@@ -1716,6 +1750,7 @@ public class SaveGameManager : MonoBehaviour
             }
 
             OnAfterLoadSuccess?.Invoke();
+            lastLoadRoutineSucceeded = true;
         }
     }
 

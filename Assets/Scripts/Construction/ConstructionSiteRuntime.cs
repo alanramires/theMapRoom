@@ -62,6 +62,9 @@ public class ConstructionSiteRuntime
             if (offer == null)
                 continue;
             offer.quantity = Mathf.Max(0, offer.quantity);
+            // Marca d'agua nunca fica abaixo do estoque atual; saves antigos
+            // (sem o campo) inicializam o teto no valor corrente.
+            offer.peakQuantity = Mathf.Max(Mathf.Max(0, offer.peakQuantity), offer.quantity);
         }
     }
 
@@ -99,7 +102,8 @@ public class ConstructionSiteRuntime
             result.Add(new ConstructionSupplyOffer
             {
                 supply = offer.supply,
-                quantity = Mathf.Max(0, offer.quantity)
+                quantity = Mathf.Max(0, offer.quantity),
+                peakQuantity = Mathf.Max(Mathf.Max(0, offer.peakQuantity), Mathf.Max(0, offer.quantity))
             });
         }
 

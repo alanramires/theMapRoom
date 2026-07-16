@@ -875,6 +875,12 @@ public class MatchController : MonoBehaviour
 
     private IEnumerator InitializeMatchAfterHotSeatGate()
     {
+        // Ao entrar numa cena para carregar um save do menu, o SaveGameManager
+        // assume o PanelRodada e restaura o snapshot. Nao inicializa uma partida
+        // nova em paralelo, pois isso aplicaria turno/FOW/camera antes do load.
+        if (SaveGameManager.HasPendingMainMenuLoadRequest)
+            yield break;
+
         // Esta e a barreira real de inicializacao: nenhum efeito de inicio de turno,
         // camera, FoW ou musica da partida e liberado antes da confirmacao hot seat.
         if (panelRodada == null)

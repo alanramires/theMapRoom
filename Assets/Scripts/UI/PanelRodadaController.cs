@@ -14,12 +14,16 @@ public sealed class PanelRodadaController : MonoBehaviour
     [SerializeField] private AudioClip aguardandoRodada;
     [SerializeField, Min(0f)] private float atrasoAntesMenuOpen = 0.5f;
     [SerializeField, Min(0.05f)] private float duracaoAnimacao = 0.3f;
+    [SerializeField, Min(0f)] private float loadingPlayerTextVerticalOffset = 55f;
 
     private CanvasGroup canvasGroup;
     private CanvasGroup buttonCanvasGroup;
     private RectTransform panelRect;
     private bool aguardandoConfirmacao;
     private bool confirmado;
+    private int presentationVersion;
+    private Vector2 textoJogadorDefaultAnchoredPosition;
+    private bool textoJogadorPositionCached;
 
     public bool IsPresenting { get; private set; }
 
@@ -43,6 +47,7 @@ public sealed class PanelRodadaController : MonoBehaviour
             if (textos[i].name == "text_rodada") textoJogador = textos[i];
             else if (textos[i].name == "text_turn") textoTurno = textos[i];
         }
+        CachePlayerTextPosition();
         if (audioSource == null)
         {
             audioSource = GetComponent<AudioSource>();
@@ -64,6 +69,7 @@ public sealed class PanelRodadaController : MonoBehaviour
 
     public IEnumerator Apresentar(TeamId team, int numeroJogador, int turno)
     {
+        int version = ++presentationVersion;
         IsPresenting = true;
         confirmado = false;
         aguardandoConfirmacao = false;
@@ -73,6 +79,7 @@ public sealed class PanelRodadaController : MonoBehaviour
         canvasGroup.blocksRaycasts = true;
         canvasGroup.interactable = true;
         panelRect.localScale = Vector3.one;
+        RestorePlayerTextPosition();
 
         if (textoJogador != null)
         {
@@ -91,8 +98,11 @@ public sealed class PanelRodadaController : MonoBehaviour
         SetContentAlpha(0f);
         if (atrasoAntesMenuOpen > 0f)
             yield return new WaitForSecondsRealtime(atrasoAntesMenuOpen);
+        if (version != presentationVersion) yield break;
         yield return PlayClip(menuOpen, false);
+        if (version != presentationVersion) yield break;
         yield return AnimateContent(0f, 1f);
+        if (version != presentationVersion) yield break;
 
         aguardandoConfirmacao = true;
         if (botaoRodada != null)
@@ -112,6 +122,7 @@ public sealed class PanelRodadaController : MonoBehaviour
             audioSource.Play();
         }
         yield return new WaitUntil(() => confirmado);
+        if (version != presentationVersion) yield break;
 
         aguardandoConfirmacao = false;
         audioSource.Stop();
@@ -133,6 +144,162 @@ public sealed class PanelRodadaController : MonoBehaviour
         canvasGroup.interactable = false;
         IsPresenting = false;
         gameObject.SetActive(false);
+    }
+
+    public void BeginLoadingPresentation()
+    {
+        presentationVersion++;
+        IsPresenting = true;
+        confirmado = false;
+        aguardandoConfirmacao = false;
+        gameObject.SetActive(true);
+        transform.SetAsLastSibling();
+        canvasGroup.alpha = 1f;
+        canvasGroup.blocksRaycasts = true;
+        canvasGroup.interactable = true;
+        panelRect.localScale = Vector3.one;
+        RestorePlayerTextPosition();
+
+        if (textoJogador != null)
+        {
+            textoJogador.color = Color.white;
+            textoJogador.text = "Carregando jogo...";
+        }
+        if (textoTurno != null)
+        {
+            textoTurno.color = Color.white;
+            textoTurno.text = string.Empty;
+        }
+        SetButtonEnabled(false);
+        SetContentAlpha(1f);
+        StartWaitingAudio();
+    }
+
+    public void SetLoadingTeam(TeamId team, int turno)
+    {
+        if (!IsPresenting)
+            BeginLoadingPresentation();
+
+        if (textoJogador != null)
+        {
+            ApplyLoadingPlayerTextPosition();
+            string htmlColor = ColorUtility.ToHtmlStringRGB(TeamUtils.GetColor(team));
+            string teamName = TeamUtils.GetName(team).ToUpperInvariant();
+            textoJogador.color = Color.white;
+            textoJogador.text = $"Carregando turno do jogador\n<color=#{htmlColor}>{teamName}</color>";
+        }
+        if (textoTurno != null)
+        {
+            textoTurno.text = $"Turno {turno}";
+            textoTurno.color = TeamUtils.GetColor(team);
+        }
+        SetButtonEnabled(false);
+    }
+
+    public IEnumerator ReleaseLoadingPresentation(TeamId team, int numeroJogador, int turno)
+    {
+        int version = presentationVersion;
+        if (!IsPresenting)
+            BeginLoadingPresentation();
+        version = presentationVersion;
+        RestorePlayerTextPosition();
+
+        if (textoJogador != null)
+        {
+            string htmlColor = ColorUtility.ToHtmlStringRGB(TeamUtils.GetColor(team));
+            textoJogador.color = Color.white;
+            textoJogador.text = $"Vez do Time <color=#{htmlColor}>{TeamUtils.GetName(team)}</color>";
+        }
+        if (textoTurno != null)
+        {
+            textoTurno.text = $"Turno {turno}";
+            textoTurno.color = TeamUtils.GetColor(team);
+        }
+
+        aguardandoConfirmacao = true;
+        SetButtonEnabled(true);
+        if (botaoRodada != null)
+            botaoRodada.Select();
+        StartWaitingAudio();
+
+        yield return new WaitUntil(() => confirmado || version != presentationVersion);
+        if (version != presentationVersion)
+            yield break;
+
+        aguardandoConfirmacao = false;
+        audioSource.Stop();
+        audioSource.loop = false;
+        SetButtonEnabled(false);
+        if (menuClose != null)
+        {
+            audioSource.clip = menuClose;
+            audioSource.Play();
+        }
+        yield return AnimateClose();
+        canvasGroup.blocksRaycasts = false;
+        canvasGroup.interactable = false;
+        IsPresenting = false;
+        gameObject.SetActive(false);
+    }
+
+    public void CancelLoadingPresentation()
+    {
+        presentationVersion++;
+        aguardandoConfirmacao = false;
+        confirmado = false;
+        audioSource.Stop();
+        audioSource.loop = false;
+        SetButtonEnabled(false);
+        canvasGroup.alpha = 0f;
+        canvasGroup.blocksRaycasts = false;
+        canvasGroup.interactable = false;
+        IsPresenting = false;
+        gameObject.SetActive(false);
+    }
+
+    private void SetButtonEnabled(bool enabled)
+    {
+        if (botaoRodada != null)
+            botaoRodada.interactable = enabled;
+        if (buttonCanvasGroup != null)
+        {
+            buttonCanvasGroup.interactable = enabled;
+            buttonCanvasGroup.blocksRaycasts = enabled;
+            buttonCanvasGroup.alpha = 1f;
+        }
+    }
+
+    private void StartWaitingAudio()
+    {
+        if (aguardandoRodada == null || audioSource == null)
+            return;
+        if (audioSource.isPlaying && audioSource.clip == aguardandoRodada && audioSource.loop)
+            return;
+        audioSource.clip = aguardandoRodada;
+        audioSource.loop = true;
+        audioSource.Play();
+    }
+
+    private void CachePlayerTextPosition()
+    {
+        if (textoJogadorPositionCached || textoJogador == null)
+            return;
+        textoJogadorDefaultAnchoredPosition = textoJogador.rectTransform.anchoredPosition;
+        textoJogadorPositionCached = true;
+    }
+
+    private void ApplyLoadingPlayerTextPosition()
+    {
+        CachePlayerTextPosition();
+        if (textoJogador != null && textoJogadorPositionCached)
+            textoJogador.rectTransform.anchoredPosition = textoJogadorDefaultAnchoredPosition + Vector2.up * loadingPlayerTextVerticalOffset;
+    }
+
+    private void RestorePlayerTextPosition()
+    {
+        CachePlayerTextPosition();
+        if (textoJogador != null && textoJogadorPositionCached)
+            textoJogador.rectTransform.anchoredPosition = textoJogadorDefaultAnchoredPosition;
     }
 
     private void Confirmar()

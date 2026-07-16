@@ -654,13 +654,16 @@ public class MainMenuLoadPanelController : MonoBehaviour
         SetMenuHidden(true);
 
         if (matchMusicAudioManager != null)
-            matchMusicAudioManager.SetRuntimeVolumeOverride(matchMusicAudioManager.MenuLoadTransitionMusicVolume);
+        {
+            matchMusicAudioManager.BeginTurnTransition();
+            matchMusicAudioManager.StopForTurnTransition();
+        }
 
         bool started = saveGameManager != null && saveGameManager.BeginLoadFromMainMenuSlot(slot);
         if (!started)
         {
             if (matchMusicAudioManager != null)
-                matchMusicAudioManager.ClearRuntimeVolumeOverride();
+                matchMusicAudioManager.RestartCurrentModePlayback();
             cursorController?.PlayErrorSfx();
             SetMenuHidden(false);
             SelectCurrentButton(playSfx: false);

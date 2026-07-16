@@ -68,6 +68,7 @@ public partial class TurnStateManager
         public Sprite UnitStatsStructureSprite;
         public Color UnitStatsStructureColor = Color.white;
         public int UnitStatsDefensePoints;
+        public string UnitStatsConstructionStockLine;
         public string TerrainStatsName;
         public string TerrainStatsDescription;
         public string ConstructionStatsName;
@@ -796,6 +797,7 @@ public partial class TurnStateManager
             out data.UnitStatsStructureSprite,
             out data.UnitStatsStructureColor);
         data.UnitStatsDefensePoints = Mathf.Max(0, ResolveDpqAtUnitPosition(unit, null).points);
+        data.UnitStatsConstructionStockLine = BuildConstructionStockLineAtCell(unitCell);
 
         int hpCurrent = Mathf.Max(0, unit.CurrentHP);
         int hpMax = Mathf.Max(1, unit.GetMaxHP());
@@ -851,6 +853,45 @@ public partial class TurnStateManager
             AppendUnitVisionDetailedLines(data.UnitStatsLines, unit);
 
         return data.UnitStatsLines.Count > 0;
+    }
+
+    private string BuildConstructionStockLineAtCell(Vector3Int cell)
+    {
+        Tilemap board = terrainTilemap;
+        if (board == null)
+            return string.Empty;
+
+        cell.z = 0;
+        ConstructionManager construction = ConstructionOccupancyRules.GetConstructionAtCell(board, cell);
+        if (construction == null)
+            return string.Empty;
+        if (matchController != null && matchController.IsFogOfWarDebugEnabled &&
+            construction.TeamId != TeamId.Neutral && construction.TeamId != matchController.ActiveTeam)
+            return string.Empty;
+
+        string gallons = "0";
+        string ammoBoxes = "0";
+        string parts = "0";
+        IReadOnlyList<ConstructionSupplyOffer> offers = construction.OfferedSupplies;
+        for (int i = 0; i < offers.Count; i++)
+        {
+            ConstructionSupplyOffer offer = offers[i];
+            if (offer == null || offer.supply == null)
+                continue;
+
+            string amount = construction.HasInfiniteSuppliesFor(offer.supply)
+                ? "INF"
+                : Mathf.Max(0, offer.quantity).ToString();
+            string supplyId = offer.supply.id ?? string.Empty;
+            if (supplyId.Equals("gasolina", StringComparison.OrdinalIgnoreCase))
+                gallons = amount;
+            else if (supplyId.Equals("caixaMunicao", StringComparison.OrdinalIgnoreCase))
+                ammoBoxes = amount;
+            else if (supplyId.Equals("pecas", StringComparison.OrdinalIgnoreCase))
+                parts = amount;
+        }
+
+        return $"ESTOQUE:\n{gallons} galões | {ammoBoxes} caixas | {parts} peças";
     }
 
     private void ResolveUnitActiveLocalVisual(
@@ -1776,12 +1817,17 @@ public partial class TurnStateManager
 
         float safeAlphaMultiplier = Mathf.Clamp01(alphaMultiplier);
         Color movementColor = new Color(teamColor.r, teamColor.g, teamColor.b, Mathf.Clamp01(movementRangeAlpha * safeAlphaMultiplier));
+        // RangeMap fica acima de LineOfFireMap. Nas celulas compartilhadas, pintar
+        // os dois sprites lava o outline do alvo; deixa apenas a mira inferior ali.
+        HashSet<Vector3Int> lineCellLookup = cachedLineCells.Count > 0
+            ? new HashSet<Vector3Int>(cachedLineCells)
+            : null;
         if (rangeMapTilemap != null && rangeOverlayTile != null)
         {
             for (int i = 0; i < cachedRangeCells.Count; i++)
             {
                 Vector3Int cell = cachedRangeCells[i];
-                if (targetRangeLookup.Contains(cell))
+                if (targetRangeLookup.Contains(cell) || (lineCellLookup != null && lineCellLookup.Contains(cell)))
                     continue;
 
                 rangeMapTilemap.SetTile(cell, rangeOverlayTile);
@@ -1794,12 +1840,25 @@ public partial class TurnStateManager
 
         if (cachedLineCells.Count <= 0)
             return;
-        Color threatColor = new Color(teamColor.r, teamColor.g, teamColor.b, Mathf.Clamp01(lineOfFireAlpha * safeAlphaMultiplier));
+        // O primeiro inspect representa movimento futuro e atenua somente essa
+        // camada. A mira usa o mesmo alpha do alcance estacionario (segundo
+        // inspect), preservando o outline do sprite nas duas visualizacoes.
+        Color threatColor = new Color(teamColor.r, teamColor.g, teamColor.b, Mathf.Clamp01(lineOfFireAlpha));
         for (int i = 0; i < cachedLineCells.Count; i++)
         {
             Vector3Int cell = cachedLineCells[i];
             if (targetLineLookup.Contains(cell))
                 continue;
+
+            // Hex preto de FoW nao recebe mira: o contrato de combate proibe
+            // pre-mirar o escuro (alvo precisa estar no snapshot confirmado),
+            // entao a mira ali prometeria um tiro impossivel. O filtro fica na
+            // PINTURA (nao no envelope cacheado) porque o cache e fog-agnostico
+            // e o fog muda por turno/time. A mancha verdadeira e "mira em volta,
+            // buraco no escuro".
+            if (matchController != null && !matchController.IsCellVisibleForActiveTeam(cell))
+                continue;
+
             lineOfFireMapTilemap.SetTile(cell, lineOfFireOverlayTile);
             lineOfFireMapTilemap.SetTileFlags(cell, TileFlags.None);
             lineOfFireMapTilemap.SetColor(cell, threatColor);

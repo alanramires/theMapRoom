@@ -198,6 +198,7 @@ public class PanelHelperController : MonoBehaviour
     private Image unitStatsStructureIcon;
     private TMP_Text unitStatsLocalText;
     private TMP_Text unitStatsDefenseText;
+    private TMP_Text unitStatsConstructionStockText;
     private bool unitStatsLocalAtBottom;
     private readonly List<Image> unitStatsTransportedIcons = new List<Image>();
     private GameObject disembarkActionsRoot;
@@ -1681,7 +1682,7 @@ public class PanelHelperController : MonoBehaviour
             helperTxt.ForceMeshUpdate();
             bodyHeight = Mathf.Max(0f, helperTxt.preferredHeight);
             if (unitStatsLocalAtBottom && unitStatsLocalRoot != null && unitStatsLocalRoot.activeSelf)
-                bodyHeight += 66f;
+                bodyHeight += unitStatsLocalRoot.GetComponent<RectTransform>().rect.height + 6f;
         }
 
         float baseMin = cachedBasePanelHeight > 0f ? cachedBasePanelHeight : 0f;
@@ -2017,6 +2018,10 @@ public class PanelHelperController : MonoBehaviour
             ? "LOCAL: —"
             : $"LOCAL: {data.UnitStatsLocalLabel}";
         unitStatsDefenseText.text = $"DEFESA: {data.UnitStatsDefensePoints}";
+        bool showConstructionStock = data.Kind == TurnStateManager.HelperPanelKind.UnitStats &&
+                                     !string.IsNullOrWhiteSpace(data.UnitStatsConstructionStockLine);
+        unitStatsConstructionStockText.text = data.UnitStatsConstructionStockLine ?? string.Empty;
+        unitStatsConstructionStockText.gameObject.SetActive(showConstructionStock);
         unitStatsLocalIcon.sprite = data.UnitStatsLocalSprite;
         unitStatsLocalIcon.enabled = data.UnitStatsLocalSprite != null;
         unitStatsLocalIcon.color = data.UnitStatsLocalColor;
@@ -2025,7 +2030,9 @@ public class PanelHelperController : MonoBehaviour
         unitStatsStructureIcon.color = data.UnitStatsStructureColor;
         unitStatsLocalText.color = currentTeamColor;
         unitStatsDefenseText.color = currentTeamColor;
+        unitStatsConstructionStockText.color = currentTeamColor;
         RectTransform localRect = unitStatsLocalRoot.GetComponent<RectTransform>();
+        localRect.sizeDelta = new Vector2(0f, showConstructionStock ? 108f : 60f);
         if (data.Kind == TurnStateManager.HelperPanelKind.TerrainStats)
         {
             localRect.anchoredPosition = new Vector2(0f, -48f);
@@ -2174,6 +2181,15 @@ public class PanelHelperController : MonoBehaviour
 
         unitStatsLocalText = CreateUnitStatsLocalText("local_name", textObject.transform);
         unitStatsDefenseText = CreateUnitStatsLocalText("local_defense", textObject.transform);
+        unitStatsConstructionStockText = CreateUnitStatsLocalText("local_construction_stock", textObject.transform);
+        unitStatsConstructionStockText.fontSize = 15f;
+        unitStatsConstructionStockText.fontSizeMax = 15f;
+        unitStatsConstructionStockText.fontSizeMin = 12f;
+        unitStatsConstructionStockText.textWrappingMode = TextWrappingModes.NoWrap;
+        LayoutElement stockLayout = unitStatsConstructionStockText.GetComponent<LayoutElement>();
+        stockLayout.minHeight = 48f;
+        stockLayout.preferredHeight = 48f;
+        unitStatsConstructionStockText.gameObject.SetActive(false);
         unitStatsLocalRoot.SetActive(false);
     }
 

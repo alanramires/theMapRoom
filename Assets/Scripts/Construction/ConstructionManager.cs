@@ -30,12 +30,15 @@ public class ConstructionManager : MonoBehaviour
     [SerializeField] private Vector3Int currentCellPosition = Vector3Int.zero;
     [SerializeField] private TeamId teamId = TeamId.Green;
     // Pilha de alerta de estoque (supply_top/middle/bottom no prefab), igual ao
-    // supridor-unidade — mas construcao nao tem teto de recursos (a logistica
-    // pode lotar a cidade a vontade), entao so existe o alerta de "acabou".
+    // supridor-unidade. Construcao nao tem capacidade fixa (a logistica pode
+    // lotar a cidade a vontade); o teto do alerta e DINAMICO: a marca d'agua
+    // (peakQuantity) — maior estoque ja visto — vira o denominador da razao,
+    // habilitando o spriteHalf no threshold e o spriteEmpty no zero.
     [Header("Supplier Stock Alerts")]
     [SerializeField] private Image supplyTop;
     [SerializeField] private Image supplyMiddle;
     [SerializeField] private Image supplyBottom;
+    [SerializeField] [Range(0.01f, 0.99f)] private float supplierStockAlertThreshold = 0.5f;
     private int supplierStockAlertSignature = int.MinValue;
     private bool supplyAlertSlotsResolved;
     // Unidade em cima da construcao suprime a pilha: os mesmos icones aparecem
@@ -740,10 +743,10 @@ public class ConstructionManager : MonoBehaviour
     }
 
     // Espelho do alerta do supridor-unidade (UnitManager.RefreshSupplierStockAlerts),
-    // com a regra propria da construcao: sem teto de recursos nao existe razao/half —
-    // alerta somente o supply nao-infinito que ZEROU (spriteEmpty). Cobre tanto o
-    // catalogo do asset (o que a construcao deveria oferecer) quanto ofertas que a
-    // logistica trouxe em runtime e foram consumidas ate o fim.
+    // com a regra propria da construcao: o teto e a marca d'agua (peakQuantity,
+    // maior estoque ja visto — doacao que eleva o estoque eleva o teto), entao
+    // ha spriteHalf no threshold e spriteEmpty no zero. Supply de catalogo sem
+    // oferta runtime (pico desconhecido) so alerta o zerado. Infinito nunca alerta.
     private void RefreshSupplierStockAlerts(bool force)
     {
         if (!supplyAlertSlotsResolved)
@@ -785,7 +788,7 @@ public class ConstructionManager : MonoBehaviour
             {
                 ConstructionSupplierResourceCapacity entry = constructionData.supplierResources[i];
                 if (entry != null)
-                    TryAddConstructionEmptyAlert(entry.supply, seenSupplies, alerts);
+                    TryAddConstructionStockAlert(entry.supply, seenSupplies, alerts);
             }
         }
 
@@ -793,7 +796,7 @@ public class ConstructionManager : MonoBehaviour
         {
             ConstructionSupplyOffer offer = offers[i];
             if (offer != null)
-                TryAddConstructionEmptyAlert(offer.supply, seenSupplies, alerts);
+                TryAddConstructionStockAlert(offer.supply, seenSupplies, alerts);
         }
 
         SupplierStockAlertView.SortMostCriticalFirst(alerts);
@@ -816,7 +819,7 @@ public class ConstructionManager : MonoBehaviour
         }
     }
 
-    private void TryAddConstructionEmptyAlert(SupplyData supply, List<SupplyData> seenSupplies, List<SupplierStockAlert> alerts)
+    private void TryAddConstructionStockAlert(SupplyData supply, List<SupplyData> seenSupplies, List<SupplierStockAlert> alerts)
     {
         if (supply == null || seenSupplies.Contains(supply))
             return;
@@ -826,15 +829,42 @@ public class ConstructionManager : MonoBehaviour
             return;
 
         int current = 0;
+        int peak = 0;
+        bool hasRuntimeOffer = false;
         IReadOnlyList<ConstructionSupplyOffer> offers = OfferedSupplies;
         for (int i = 0; i < offers.Count; i++)
         {
             ConstructionSupplyOffer offer = offers[i];
-            if (offer != null && offer.supply == supply)
-                current += Mathf.Max(0, offer.quantity);
+            if (offer == null || offer.supply != supply)
+                continue;
+
+            hasRuntimeOffer = true;
+            current += Mathf.Max(0, offer.quantity);
+            // Marca d'agua lazy: qualquer aumento (doacao/transferencia) eleva o
+            // teto aqui mesmo, sem hook no fluxo de transferencia.
+            if (offer.quantity > offer.peakQuantity)
+                offer.peakQuantity = offer.quantity;
+            peak += Mathf.Max(0, offer.peakQuantity);
         }
 
-        if (current > 0)
+        bool empty = current <= 0;
+
+        if (hasRuntimeOffer && peak > 0)
+        {
+            float ratio = Mathf.Clamp01((float)current / peak);
+            if (ratio > supplierStockAlertThreshold)
+                return;
+
+            Sprite ratioSprite = SupplierStockAlertView.ResolveAlertSprite(supply, empty);
+            if (ratioSprite == null)
+                return;
+
+            alerts.Add(new SupplierStockAlert { ratio = ratio, empty = empty, sprite = ratioSprite });
+            return;
+        }
+
+        // Catalogo sem oferta runtime (ou pico desconhecido): so alerta o zerado.
+        if (!empty)
             return;
 
         Sprite alertSprite = SupplierStockAlertView.ResolveAlertSprite(supply, empty: true);

@@ -80,7 +80,7 @@ public class MatchMusicAudioManager : MonoBehaviour
 
     private void Start()
     {
-        if (matchController != null && matchController.IsHotSeatGateActive)
+        if (ShouldSuppressPlaybackForPrivacyGate())
         {
             if (audioSource != null) audioSource.Stop();
             return;
@@ -104,7 +104,7 @@ public class MatchMusicAudioManager : MonoBehaviour
     private void Update()
     {
         HandleToggleShortcut();
-        if (matchController != null && matchController.IsHotSeatGateActive)
+        if (ShouldSuppressPlaybackForPrivacyGate())
         {
             if (audioSource != null && audioSource.isPlaying) audioSource.Stop();
             return;
@@ -113,6 +113,13 @@ public class MatchMusicAudioManager : MonoBehaviour
             return;
 
         EnsurePlayback();
+    }
+
+    private bool ShouldSuppressPlaybackForPrivacyGate()
+    {
+        return (matchController != null && matchController.IsHotSeatGateActive) ||
+               SaveGameManager.HasPendingMainMenuLoadRequest ||
+               SaveGameManager.IsAnyLoadInProgress;
     }
 
 #if UNITY_EDITOR

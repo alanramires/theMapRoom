@@ -540,7 +540,8 @@ public static class SaveDataMapper
                 result.offeredSupplies.Add(new RuntimeSupplySaveData
                 {
                     supplyId = offer.supply.id,
-                    quantity = Mathf.Max(0, offer.quantity)
+                    quantity = Mathf.Max(0, offer.quantity),
+                    peakQuantity = Mathf.Max(0, offer.peakQuantity)
                 });
             }
         }
@@ -616,7 +617,9 @@ public static class SaveDataMapper
                 runtime.offeredSupplies.Add(new ConstructionSupplyOffer
                 {
                     supply = supply,
-                    quantity = Mathf.Max(0, entry.quantity)
+                    quantity = Mathf.Max(0, entry.quantity),
+                    // Save antigo sem o campo: Sanitize eleva o teto ate o atual.
+                    peakQuantity = Mathf.Max(0, entry.peakQuantity)
                 });
             }
         }

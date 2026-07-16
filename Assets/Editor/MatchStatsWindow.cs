@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 
@@ -180,25 +181,43 @@ public sealed class MatchStatsWindow : EditorWindow
 
     private void DrawSummaryRow(SlotMatchStats stats)
     {
+        bool hiddenByFog = ShouldHideTeamByFog(stats.team);
         Color prev = GUI.color;
         GUI.color = TeamUtils.GetColor(stats.team);
-        EditorGUILayout.BeginHorizontal();
-        GUILayout.Label($"{TeamUtils.GetName(stats.team)} ({(int)stats.team})", EditorStyles.label, GUILayout.Width(90f));
+        using (new EditorGUI.DisabledScope(hiddenByFog))
+        {
+            EditorGUILayout.BeginHorizontal();
+            GUILayout.Label($"{TeamUtils.GetName(stats.team)} ({(int)stats.team})", EditorStyles.label, GUILayout.Width(90f));
+            GUI.color = prev;
+            if (hiddenByFog)
+            {
+                GUILayout.Label("dados ocultos pelo FOW", subtleStyle);
+            }
+            else
+            {
+                GUILayout.Label(stats.currentUnits.ToString(), rightMiniStyle, GUILayout.Width(45f));
+                GUILayout.Label(stats.totalPurchases.ToString(), rightMiniStyle, GUILayout.Width(60f));
+                GUILayout.Label(stats.totalLosses.ToString(), rightMiniStyle, GUILayout.Width(55f));
+                GUILayout.Label(stats.totalKills.ToString(), rightMiniStyle, GUILayout.Width(55f));
+                GUILayout.Label(stats.damageCaused.ToString(), rightMiniStyle, GUILayout.Width(55f));
+                GUILayout.Label($"{stats.territoryControlPercent:0.0}%", rightMiniStyle, GUILayout.Width(75f));
+                GUILayout.Label(stats.controlledConstructions.ToString(), rightMiniStyle, GUILayout.Width(60f));
+                GUILayout.Label(stats.controlledSectors.ToString(), rightMiniStyle, GUILayout.Width(60f));
+            }
+            GUILayout.FlexibleSpace();
+            EditorGUILayout.EndHorizontal();
+        }
         GUI.color = prev;
-        GUILayout.Label(stats.currentUnits.ToString(), rightMiniStyle, GUILayout.Width(45f));
-        GUILayout.Label(stats.totalPurchases.ToString(), rightMiniStyle, GUILayout.Width(60f));
-        GUILayout.Label(stats.totalLosses.ToString(), rightMiniStyle, GUILayout.Width(55f));
-        GUILayout.Label(stats.totalKills.ToString(), rightMiniStyle, GUILayout.Width(55f));
-        GUILayout.Label(stats.damageCaused.ToString(), rightMiniStyle, GUILayout.Width(55f));
-        GUILayout.Label($"{stats.territoryControlPercent:0.0}%", rightMiniStyle, GUILayout.Width(75f));
-        GUILayout.Label(stats.controlledConstructions.ToString(), rightMiniStyle, GUILayout.Width(60f));
-        GUILayout.Label(stats.controlledSectors.ToString(), rightMiniStyle, GUILayout.Width(60f));
-        GUILayout.FlexibleSpace();
-        EditorGUILayout.EndHorizontal();
     }
 
     private void DrawSelectedSlot(MatchStatsManager manager)
     {
+        if (ShouldHideTeamByFog(selectedTeam))
+        {
+            EditorGUILayout.HelpBox("Estatísticas inimigas desativadas enquanto o Fog of War estiver ligado.", MessageType.Info);
+            return;
+        }
+
         if (!manager.TryGetStats(selectedTeam, out SlotMatchStats stats) || stats == null)
         {
             EditorGUILayout.HelpBox($"Sem estatísticas para {TeamUtils.GetName(selectedTeam)} ainda.", MessageType.Info);
@@ -213,6 +232,7 @@ public sealed class MatchStatsWindow : EditorWindow
 
         DrawEconomyAndCombat(stats);
         DrawTerritory(stats);
+        DrawConstructions(stats.team);
         DrawOperation(stats);
         DrawLogistics(stats);
 
@@ -220,6 +240,98 @@ public sealed class MatchStatsWindow : EditorWindow
             DrawUnitBreakdown(stats);
 
         EditorGUILayout.EndVertical();
+    }
+
+    private void DrawConstructions(TeamId observerTeam)
+    {
+        ConstructionCounts controlled = default;
+        ConstructionCounts neutral = default;
+        ConstructionCounts enemy = default;
+
+        IReadOnlyList<ConstructionManager> constructions = ConstructionManager.AllActive;
+        for (int i = 0; i < constructions.Count; i++)
+        {
+            ConstructionManager construction = constructions[i];
+            if (construction == null || construction.IsFakeBuilding)
+                continue;
+
+            ConstructionCounts counts = ClassifyConstruction(construction);
+            if (construction.TeamId == observerTeam)
+                controlled.Add(counts);
+            else if (construction.TeamId == TeamId.Neutral)
+                neutral.Add(counts);
+            else
+                enemy.Add(counts);
+        }
+
+        EditorGUILayout.Space(4f);
+        EditorGUILayout.LabelField("Construções", sectionStyle);
+        DrawConstructionRow("controladas", controlled, hidden: false);
+        DrawConstructionRow("neutras", neutral, hidden: false);
+        DrawConstructionRow("inimigas", enemy, ShouldHideEnemyConstructionsByFog());
+    }
+
+    private void DrawConstructionRow(string label, ConstructionCounts counts, bool hidden)
+    {
+        using (new EditorGUI.DisabledScope(hidden))
+        {
+            EditorGUILayout.BeginHorizontal();
+            GUILayout.Label(label, EditorStyles.miniBoldLabel, GUILayout.Width(90f));
+            if (hidden)
+                GUILayout.Label("dados ocultos pelo FOW", subtleStyle);
+            else
+                GUILayout.Label($"{counts.hq} HQ, {counts.factories} fábricas, {counts.airports} aeroportos, {counts.ports} portos", EditorStyles.label);
+            GUILayout.FlexibleSpace();
+            EditorGUILayout.EndHorizontal();
+        }
+    }
+
+    private static ConstructionCounts ClassifyConstruction(ConstructionManager construction)
+    {
+        ConstructionCounts result = default;
+        if (construction.IsPlayerHeadQuarter)
+            result.hq = 1;
+
+        if (!construction.TryResolveConstructionData(out ConstructionData data) || data == null)
+            return result;
+
+        if (data.isAirport)
+            result.airports = 1;
+        else if (data.isHarbor)
+            result.ports = 1;
+        else if (string.Equals(data.sufixo, "Factory", System.StringComparison.OrdinalIgnoreCase))
+            result.factories = 1;
+
+        return result;
+    }
+
+    private bool ShouldHideTeamByFog(TeamId team)
+    {
+        return team != TeamId.Neutral
+            && matchController != null
+            && matchController.IsFogOfWarDebugEnabled
+            && team != matchController.ActiveTeam;
+    }
+
+    private bool ShouldHideEnemyConstructionsByFog()
+    {
+        return matchController != null && matchController.IsFogOfWarDebugEnabled;
+    }
+
+    private struct ConstructionCounts
+    {
+        public int hq;
+        public int factories;
+        public int airports;
+        public int ports;
+
+        public void Add(ConstructionCounts other)
+        {
+            hq += other.hq;
+            factories += other.factories;
+            airports += other.airports;
+            ports += other.ports;
+        }
     }
 
     private void DrawEconomyAndCombat(SlotMatchStats stats)

@@ -239,13 +239,16 @@ public class ConstructionData : ScriptableObject
             {
                 ConstructionSupplyOffer existing = result[existingIndex];
                 existing.quantity = Mathf.Max(existing.quantity, quantity);
+                existing.peakQuantity = Mathf.Max(existing.peakQuantity, existing.quantity);
                 continue;
             }
 
             result.Add(new ConstructionSupplyOffer
             {
                 supply = entry.supply,
-                quantity = quantity
+                quantity = quantity,
+                // Teto dinamico nasce no estoque inicial da partida.
+                peakQuantity = quantity
             });
         }
 
