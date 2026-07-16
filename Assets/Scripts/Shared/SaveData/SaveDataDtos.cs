@@ -178,6 +178,12 @@ public class UnitSaveData
     public int heightLevel;
     public bool isAircraftGrounded;
     public int aircraftOperationLockTurns;
+    // Lock de camada forcada completo (emersao por ataque/dano). Substitui o
+    // legado aircraftOperationLockTurns, mantido para saves antigos.
+    public bool hasForcedLayerLock;
+    public int forcedLayerLockDomain;
+    public int forcedLayerLockHeight;
+    public int forcedLayerLockTurns;
     public bool aiHasAssignedPlan;
     public string aiAssignedPlanKey;
     public string aiAssignedPlanName;

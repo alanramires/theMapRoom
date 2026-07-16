@@ -2491,6 +2491,36 @@ public class MatchController : MonoBehaviour
         return result;
     }
 
+    // Emersao/camada forcada pendente (ver TurnStateManager.ApplyPendingForcedLayerLock):
+    // no inicio do turno do dono tenta aplicar a camada travada, caso o hex tenha
+    // liberado (ex.: navio saiu de cima do submarino). Retorna true quando aplicou
+    // agora — nesse turno o tempo do lock ainda nao conta.
+    private bool TryApplyPendingForcedLayerAtTurnStart(UnitManager unit)
+    {
+        if (unit == null || unit.IsEmbarked || !unit.HasPendingForcedLayerLock)
+            return false;
+        if (!unit.TryGetForcedLayerLock(out Domain lockDomain, out HeightLevel lockHeight, out _))
+            return false;
+
+        Tilemap boardMap = unit.BoardTilemap != null ? unit.BoardTilemap : ResolveFogBoardTilemap();
+        if (boardMap == null)
+            return false;
+
+        Vector3Int cell = unit.CurrentCellPosition;
+        cell.z = 0;
+        if (!PodeEmergirSensor.CanApplyLayerTransitionAtCell(
+                unit, boardMap, ResolveFogTerrainDatabase(), cell, lockDomain, lockHeight, out _))
+        {
+            return false;
+        }
+
+        if (!unit.TrySetCurrentLayerMode(lockDomain, lockHeight))
+            return false;
+
+        Debug.Log($"[LayerForce] Upkeep aplicou camada pendente: {unit.name} -> {lockDomain}/{lockHeight} em ({cell.x},{cell.y})");
+        return true;
+    }
+
     private void ReleaseUnitsForActiveTeam(List<ConstructionManager> activeConstructions = null)
     {
         if (!Application.isPlaying)
@@ -2532,7 +2562,13 @@ public class MatchController : MonoBehaviour
             if ((int)unit.TeamId != activeTeamId)
                 continue;
 
-            unit.ConsumeForcedLayerLockTurn();
+            // Lock pendente (ex.: emersao forcada adiada por hex ocupado) tenta
+            // aplicar agora que o hex pode ter liberado. No turno em que aplica,
+            // o tempo do lock ainda nao conta — a janela de exposicao comeca
+            // com a unidade de fato na camada forcada.
+            bool pendingForcedLayerAppliedNow = TryApplyPendingForcedLayerAtTurnStart(unit);
+            if (!pendingForcedLayerAppliedNow)
+                unit.ConsumeForcedLayerLockTurn();
 
             if (pendingTurnStartUpkeep)
             {
@@ -2566,12 +2602,15 @@ public class MatchController : MonoBehaviour
                         turnStartAutonomyEntries ??= new List<TurnStateManager.TurnStartAutonomyUpkeepEntry>();
                         Vector3Int cell = unit.CurrentCellPosition;
                         cell.z = 0;
+                        SpriteRenderer upkeepRenderer = unit.GetMainSpriteRenderer();
                         turnStartAutonomyEntries.Add(new TurnStateManager.TurnStartAutonomyUpkeepEntry(
                             ResolveRuntimeUnitName(unit),
                             cell,
                             consumed,
                             beforeFuel,
-                            afterFuel));
+                            afterFuel,
+                            upkeepRenderer != null ? upkeepRenderer.sprite : null,
+                            upkeepRenderer != null ? upkeepRenderer.color : Color.white));
                     }
                 }
             }
@@ -3714,7 +3753,8 @@ public class MatchController : MonoBehaviour
             if (observerTeamId < -1 || observerTeamId > 3)
                 continue;
 
-            bool enforceStealthValidation = enableStealthValidation && !target.HasFiredThisTurn;
+            // Lock de camada pendente equivale a "revelada": anula stealth como atirar anula.
+            bool enforceStealthValidation = enableStealthValidation && !target.HasFiredThisTurn && !target.HasPendingForcedLayerLock;
             bool canObserveTarget = PodeDetectarSensor.IsTargetObservedByTeam(
                 target,
                 observerTeamId,
@@ -3865,7 +3905,7 @@ public class MatchController : MonoBehaviour
         if (IsUnitOnFriendlyConstruction(unit, observerTeam, boardMap))
             return true;
 
-        bool enforceStealthValidation = enableStealthValidation && !unit.HasFiredThisTurn;
+        bool enforceStealthValidation = enableStealthValidation && !unit.HasFiredThisTurn && !unit.HasPendingForcedLayerLock;
         return PodeDetectarSensor.IsTargetObservedByTeamWithoutForwardObserver(
             unit,
             (int)observerTeam,
@@ -3898,7 +3938,7 @@ public class MatchController : MonoBehaviour
             return true;
         }
 
-        bool enforceStealthValidation = enableStealthValidation && !unit.HasFiredThisTurn;
+        bool enforceStealthValidation = enableStealthValidation && !unit.HasFiredThisTurn && !unit.HasPendingForcedLayerLock;
         return PodeDetectarSensor.IsTargetObservedByTeamWithoutForwardObserver(
             unit,
             activeTeamId,
@@ -4377,32 +4417,15 @@ public class MatchController : MonoBehaviour
         return fogOfWarTilemap != null;
     }
 
-    // Resolve o estado final do renderer sob Total FoW.
-    //
-    // - Se o PodeDetectar disser que a unidade e visivel para o observador
-    //   (logicallyVisible), renderiza: o sensor e a fonte de verdade da deteccao.
-    // - Caso contrario, so mantem o renderer ligado quando o overlay opaco de fato
-    //   COBRE a celula da unidade. Ai a nevoa preta em world-space faz a oclusao e o
-    //   renderer pode ficar ligado para a animacao de travessia da fronteira funcionar
-    //   sem o "religa renderer na posicao final" (teleporte).
-    //
-    // Em celula revelada (sem tile de nevoa) o overlay nao cobre nada, entao a unidade
-    // invisivel volta a ser ocultada pelo hide individual do sensor -- evitando que ela
-    // apareca flutuando em terreno revelado mas nao spottado (raio de visao vs spot).
-    //
-    // A cobertura da celula usa a API oficial do proprio FoW (mesma que decide quais
-    // tiles pretos sao limpos), sem logica paralela.
+    // A revelacao do hex e a deteccao da unidade sao informacoes independentes.
+    // O renderer deve seguir exclusivamente o snapshot logico produzido pelo
+    // PodeDetectar. Deixar uma unidade nao detectada renderizada sob a hipotese de
+    // que o overlay preto a ocultara vaza alvos quando outra camada libera o mesmo
+    // hex (por exemplo: EWACS revela o hex a alcance 9 para Air, mas so detecta
+    // Land/Naval Surface pelo alcance geral 3).
     private bool ResolveFogRenderVisibility(UnitManager unit, bool logicallyVisible, bool fogOverlayOwnsWorldOcclusion)
     {
-        if (logicallyVisible)
-            return true;
-        if (!fogOverlayOwnsWorldOcclusion || unit == null)
-            return false;
-
-        Vector3Int cell = unit.CurrentCellPosition;
-        cell.z = 0;
-        // Coberta pela nevoa = nao visivel na apresentacao atual.
-        return !IsCellVisibleInFogPresentation(cell);
+        return logicallyVisible;
     }
 
     private Tilemap ResolveFogBoardTilemap()

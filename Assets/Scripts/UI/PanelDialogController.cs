@@ -605,6 +605,10 @@ public class PanelDialogController : MonoBehaviour
         contentRect.anchorMax = new Vector2(1f, 1f);
         contentRect.pivot = new Vector2(0f, 1f);
         contentRect.anchoredPosition = Vector2.zero;
+        // sizeDelta padrao de RectTransform novo e 100x100; com ancoras esticadas
+        // na horizontal isso deixaria o conteudo 100px mais largo que a viewport
+        // e a mascara cortaria o fim de cada linha.
+        contentRect.sizeDelta = Vector2.zero;
 
         GameObject bodyTextObject = new GameObject("text_unit_body", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
         RectTransform bodyTextRect = bodyTextObject.GetComponent<RectTransform>();
@@ -641,7 +645,9 @@ public class PanelDialogController : MonoBehaviour
         handleImage.color = new Color(0.65f, 1f, 0.65f, 0.85f);
 
         shoppingBodyScrollbar = scrollbarObject.GetComponent<Scrollbar>();
-        shoppingBodyScrollbar.direction = Scrollbar.Direction.TopToBottom;
+        // ScrollRect vertical assume valor 1 = topo, que numa Scrollbar corresponde
+        // a BottomToTop; TopToBottom inverte o sentido do arrasto do handle.
+        shoppingBodyScrollbar.direction = Scrollbar.Direction.BottomToTop;
         shoppingBodyScrollbar.handleRect = handleRect;
         shoppingBodyScrollbar.targetGraphic = handleImage;
 
@@ -953,20 +959,25 @@ public class PanelDialogController : MonoBehaviour
 
                 float headerWidth = Mathf.Max(24f, panelRect.rect.width - headerLeftInset - rightInset);
                 float headerPreferredHeight = textUnit.GetPreferredValues(textUnit.text, headerWidth, 0f).y;
-                // Ponto de "retorno" do float: o corpo so volta a largura total depois
-                // que passa da imagem OU do cabecalho, o que for mais alto.
-                float floatHeight = Mathf.Max(previewHeight, headerPreferredHeight);
 
                 textRect.anchorMin = new Vector2(0f, 1f);
                 textRect.anchorMax = new Vector2(0f, 1f);
                 textRect.pivot = new Vector2(0f, 1f);
                 textRect.anchoredPosition = new Vector2(headerLeftInset, -topInset);
                 textRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, headerWidth);
-                textRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, floatHeight);
+                textRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, headerPreferredHeight);
 
                 if (shoppingBodyScrollRect != null && shoppingBodyContentRect != null)
                 {
-                    float bodyTop = topInset + floatHeight + 10f;
+                    // O corpo comeca logo abaixo do que terminar mais embaixo: a imagem
+                    // (colada no topo do painel, pivot superior) ou o cabecalho (que
+                    // comeca deslocado por topInset). Medir cada um da sua posicao real
+                    // evita somar topInset em cima da altura da imagem e abrir um vao.
+                    float previewBottom = previewVisible
+                        ? previewHeight - unitPreviewImage.rectTransform.anchoredPosition.y
+                        : 0f;
+                    float headerBottom = topInset + headerPreferredHeight;
+                    float bodyTop = Mathf.Max(previewBottom, headerBottom) + 10f;
                     float bodyTotalWidth = Mathf.Max(24f, panelRect.rect.width - bodyLeftInset - rightInset);
                     float bodyHeight = Mathf.Max(24f, panelRect.rect.height - bodyTop - bottomInset);
                     const float scrollbarWidth = 10f;

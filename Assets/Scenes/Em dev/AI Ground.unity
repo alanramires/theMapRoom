@@ -2290,6 +2290,11 @@ MonoBehaviour:
     id: 519888321
   combatProjectileSortingLayerInitialized: 1
   combatProjectileSortingOrder: 210
+  combatProjectileShadowSprite: {fileID: 21300000, guid: c0d79acfc6b3a6a45a2d8c468d481479, type: 3}
+  combatProjectileShadowScale: 1.05
+  combatProjectileShadowGroundAlpha: 0.85
+  combatProjectileShadowApexAlpha: 0.38
+  combatProjectileShadowSortingOrder: 209
   supplyCursorFocusDelay: 0.25
   supplySpawnInterval: 0.12
   supplyFlightPadding: 0.066

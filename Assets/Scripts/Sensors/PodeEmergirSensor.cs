@@ -82,6 +82,47 @@ public static class PodeEmergirSensor
         return report;
     }
 
+    // Fonte unica para "posso trocar para esta camada neste hex?": terreno,
+    // estrutura, construcao e skills (via CanSurfaceAtCell, quando o alvo e
+    // Naval/Surface) + ocupancia da banda alvo (CanEndLayerTransitionAtCell).
+    // Usada pelo gate de ataque do submarino, pela degradacao de emersao
+    // forcada em combate, pelo upkeep de inicio de turno e pelo movimento.
+    public static bool CanApplyLayerTransitionAtCell(
+        UnitManager unit,
+        Tilemap map,
+        TerrainDatabase terrainDatabase,
+        Vector3Int cell,
+        Domain targetDomain,
+        HeightLevel targetHeight,
+        out string reason)
+    {
+        reason = string.Empty;
+
+        if (unit == null || map == null)
+        {
+            reason = "Contexto de mapa/unidade invalido.";
+            return false;
+        }
+
+        cell.z = 0;
+
+        if (targetDomain == Domain.Naval && targetHeight == HeightLevel.Surface &&
+            !CanSurfaceAtCell(unit, map, terrainDatabase, cell, out reason))
+        {
+            return false;
+        }
+
+        if (!UnitOccupancyRules.CanEndLayerTransitionAtCell(map, cell, unit, targetDomain, targetHeight, out UnitManager blocker))
+        {
+            reason = blocker != null
+                ? $"Hex ocupado por {blocker.name} na camada {targetDomain}/{targetHeight}."
+                : $"Hex nao permite transicao para {targetDomain}/{targetHeight}.";
+            return false;
+        }
+
+        return true;
+    }
+
     public static bool CanSurfaceAtCell(
         UnitManager unit,
         Tilemap map,

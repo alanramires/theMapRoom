@@ -624,9 +624,9 @@ public partial class TurnStateManager
             LogConstructionShoppingPanel();
     }
 
-    // Cabecalho: fica ao lado da imagem da unidade (mesma "faixa" de altura dela).
-    // Armas/carga sao linhas curtas e cabem na coluna estreita; so a descricao
-    // (texto corrido) precisa da largura total, entao vai pro corpo.
+    // Cabecalho: so identidade e stats, ao lado da imagem da unidade (mesma
+    // "faixa" de altura dela). Armas/carga/descricao vao pro corpo, que ocupa a
+    // largura total abaixo da imagem e rola quando nao cabe.
     private string BuildShoppingDialogHeader(UnitData unit)
     {
         if (unit == null)
@@ -642,19 +642,28 @@ public partial class TurnStateManager
         if (TryBuildVisionSpecializationsSummary(unit, out string visionSpecializationsSummary))
             sb.AppendLine($"    {visionSpecializationsSummary}");
 
-        AppendShoppingPreviewWeaponLines(sb, unit);
-        AppendShoppingPreviewSupplyLines(sb, unit);
-
         return sb.ToString().TrimEnd();
     }
 
-    // Corpo: so a descricao, abaixo da imagem, em largura total.
+    // Corpo: armas, carga e descricao, em largura total. Unidades sem armas nem
+    // carga (civis desarmadas) mostram so a descricao — as secoes nao aparecem.
     private string BuildShoppingDialogBody(UnitData unit)
     {
-        if (unit == null || string.IsNullOrWhiteSpace(unit.description))
+        if (unit == null)
             return string.Empty;
 
-        return unit.description.Trim();
+        StringBuilder sb = new StringBuilder();
+        AppendShoppingPreviewWeaponLines(sb, unit);
+        AppendShoppingPreviewSupplyLines(sb, unit);
+
+        if (!string.IsNullOrWhiteSpace(unit.description))
+        {
+            if (sb.Length > 0)
+                sb.AppendLine();
+            sb.Append(unit.description.Trim());
+        }
+
+        return sb.ToString().TrimEnd();
     }
 
 

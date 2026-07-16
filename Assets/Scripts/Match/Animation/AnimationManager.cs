@@ -200,6 +200,13 @@ public class AnimationManager : MonoBehaviour
     [SerializeField] private SortingLayerReference combatProjectileSortingLayer;
     [SerializeField, HideInInspector] private bool combatProjectileSortingLayerInitialized;
     [SerializeField] private int combatProjectileSortingOrder = 210;
+    [Header("Parabolic Projectile Shadow FX")]
+    [Tooltip("Sombra projetada no tabuleiro somente durante voos parabolicos.")]
+    [SerializeField] private Sprite combatProjectileShadowSprite;
+    [SerializeField] [Range(0.05f, 2f)] private float combatProjectileShadowScale = 1.05f;
+    [SerializeField] [Range(0f, 1f)] private float combatProjectileShadowGroundAlpha = 0.85f;
+    [SerializeField] [Range(0f, 1f)] private float combatProjectileShadowApexAlpha = 0.38f;
+    [SerializeField] private int combatProjectileShadowSortingOrder = 209;
     [Header("Supply Sequence Timing")]
     [Tooltip("Pausa curta apos mover o cursor para permitir foco visual antes da animacao de suprimento.")]
     [SerializeField] [Range(0f, 0.5f)] private float supplyCursorFocusDelay = 0.10f;
@@ -898,6 +905,24 @@ public class AnimationManager : MonoBehaviour
         if (trajectory == WeaponTrajectoryType.Parabolic)
             control = BuildParabolicControlPoint(from, to);
 
+        GameObject shadowGo = null;
+        Transform shadowTransform = null;
+        SpriteRenderer shadowRenderer = null;
+        if (trajectory == WeaponTrajectoryType.Parabolic && combatProjectileShadowSprite != null)
+        {
+            shadowGo = new GameObject("Combat Projectile Shadow FX");
+            shadowTransform = shadowGo.transform;
+            shadowTransform.position = from;
+            // O sprite da sombra nasce horizontal; gira para acompanhar a projecao
+            // da linha de mira no chao (origem -> alvo), sem seguir a tangente do arco.
+            shadowTransform.rotation = Quaternion.Euler(0f, 0f, angle);
+            shadowTransform.localScale = Vector3.one * Mathf.Max(0.05f, combatProjectileShadowScale);
+            shadowRenderer = shadowGo.AddComponent<SpriteRenderer>();
+            shadowRenderer.sprite = combatProjectileShadowSprite;
+            shadowRenderer.sortingLayerID = combatProjectileSortingLayer.Id;
+            shadowRenderer.sortingOrder = combatProjectileShadowSortingOrder;
+        }
+
         float elapsed = 0f;
         while (elapsed < duration)
         {
@@ -908,6 +933,19 @@ public class AnimationManager : MonoBehaviour
                 : Vector3.Lerp(from, to, p);
             t.position = pos;
             sr.enabled = true;
+
+            if (shadowTransform != null && shadowRenderer != null)
+            {
+                // A sombra percorre o chao em linha reta; apenas o projetil abandona
+                // essa projecao para desenhar o arco parabolico.
+                shadowTransform.position = Vector3.Lerp(from, to, p);
+                float height01 = Mathf.Sin(p * Mathf.PI);
+                float scaleMultiplier = Mathf.Lerp(1f, 1.25f, height01);
+                shadowTransform.localScale = Vector3.one *
+                    (Mathf.Max(0.05f, combatProjectileShadowScale) * scaleMultiplier);
+                float alpha = Mathf.Lerp(combatProjectileShadowGroundAlpha, combatProjectileShadowApexAlpha, height01);
+                shadowRenderer.color = new Color(1f, 1f, 1f, Mathf.Clamp01(alpha));
+            }
 
             float nextP = Mathf.Clamp01(p + 0.02f);
             Vector3 nextPos = trajectory == WeaponTrajectoryType.Parabolic
@@ -925,6 +963,8 @@ public class AnimationManager : MonoBehaviour
 
         if (go != null)
             Destroy(go);
+        if (shadowGo != null)
+            Destroy(shadowGo);
     }
 
     private Vector3 BuildParabolicControlPoint(Vector3 from, Vector3 to)

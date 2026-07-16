@@ -204,6 +204,14 @@ public class UnitManager : MonoBehaviour
     public bool IsAircraftEmbarkedInCarrier => isEmbarked;
     public int AircraftOperationLockTurns => Mathf.Max(0, forcedLayerLockTurnsRemaining);
     public bool HasForcedLayerLock => hasForcedLayerLock && forcedLayerLockTurnsRemaining > 0;
+    // Lock forcado ainda nao aplicado: a camada atual difere da travada porque o
+    // hex nao permitia a transicao no momento do efeito (ex.: navio na superficie
+    // sobre o submarino forcado a emergir). Enquanto pendente a unidade fica
+    // revelada (anula stealth no FoW) e o tempo do lock nao corre; o upkeep do
+    // dono ou o fim do proximo movimento aplica a camada quando o hex permitir.
+    public bool HasPendingForcedLayerLock =>
+        HasForcedLayerLock &&
+        (currentDomain != forcedLayerLockDomain || currentHeightLevel != forcedLayerLockHeight);
     public Domain ForcedLayerLockDomain => forcedLayerLockDomain;
     public HeightLevel ForcedLayerLockHeight => forcedLayerLockHeight;
     public int ForcedLayerLockTurnsRemaining => Mathf.Max(0, forcedLayerLockTurnsRemaining);
@@ -1217,9 +1225,9 @@ public class UnitManager : MonoBehaviour
         return true;
     }
 
-    public bool TrySetCurrentLayerMode(Domain domain, HeightLevel heightLevel)
+    public bool TrySetCurrentLayerMode(Domain domain, HeightLevel heightLevel, bool ignoreForcedLock = false)
     {
-        if (IsLayerChangeBlockedByForcedLock(domain, heightLevel, out _))
+        if (!ignoreForcedLock && IsLayerChangeBlockedByForcedLock(domain, heightLevel, out _))
             return false;
 
         Domain previousDomain = currentDomain;
@@ -1311,6 +1319,12 @@ public class UnitManager : MonoBehaviour
     public void ConsumeForcedLayerLockTurn()
     {
         if (!HasForcedLayerLock)
+            return;
+
+        // Lock pendente nao conta tempo: a janela de exposicao so corre depois
+        // que a camada forcada e de fato aplicada. Senao, campear sob um navio
+        // ate o lock expirar anularia a emersao forcada.
+        if (HasPendingForcedLayerLock)
             return;
 
         forcedLayerLockTurnsRemaining = Mathf.Max(0, forcedLayerLockTurnsRemaining - 1);

@@ -350,7 +350,7 @@ public partial class TurnStateManager
         return result;
     }
 
-    private static bool CanPaintMovementStopAtCell(UnitManager mover, Vector3Int cell, IEnumerable<UnitManager> occupants)
+    private bool CanPaintMovementStopAtCell(UnitManager mover, Vector3Int cell, IEnumerable<UnitManager> occupants)
     {
         if (mover == null)
             return false;
@@ -360,7 +360,26 @@ public partial class TurnStateManager
 
         HeightBand moverBand = OccupancyResolver.GetHeightBand(mover);
         if (moverBand != HeightBand.Blocking)
+        {
+            // Lock de camada pendente: o movimento termina na camada travada,
+            // entao o destino precisa aceita-la (ex.: submarino revelado nao
+            // para sob um navio). Ficar parado no proprio hex continua valido.
+            if (mover.HasPendingForcedLayerLock &&
+                mover.TryGetForcedLayerLock(out Domain pendingLockDomain, out HeightLevel pendingLockHeight, out _))
+            {
+                Vector3Int moverCell = mover.CurrentCellPosition;
+                moverCell.z = 0;
+                cell.z = 0;
+                if (cell == moverCell)
+                    return true;
+
+                Tilemap pendingBoardMap = terrainTilemap != null ? terrainTilemap : mover.BoardTilemap;
+                return PodeEmergirSensor.CanApplyLayerTransitionAtCell(
+                    mover, pendingBoardMap, terrainDatabase, cell, pendingLockDomain, pendingLockHeight, out _);
+            }
+
             return true;
+        }
 
         if (occupants == null)
             return true;

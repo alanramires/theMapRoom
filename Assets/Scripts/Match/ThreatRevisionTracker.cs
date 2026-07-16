@@ -97,6 +97,25 @@ public static class ThreatRevisionTracker
         IncrementTeamObserver(unit.TeamId);
     }
 
+    public static void NotifyUnitSpawned(UnitManager unit)
+    {
+        if (!Application.isPlaying || unit == null)
+            return;
+
+        IncrementGlobalBoard();
+        IncrementTeamObserver(unit.TeamId);
+    }
+
+    public static void ForceInvalidateAll()
+    {
+        if (!Application.isPlaying)
+            return;
+
+        IncrementGlobalBoard();
+        for (int teamId = TeamIdMin; teamId <= TeamIdMax; teamId++)
+            IncrementTeamObserver(teamId);
+    }
+
     public static void NotifyConstructionCellChanged(ConstructionManager construction, Vector3Int previousCell, Vector3Int nextCell)
     {
         if (!Application.isPlaying || construction == null)

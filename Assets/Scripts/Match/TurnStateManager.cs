@@ -1033,6 +1033,8 @@ public partial class TurnStateManager : MonoBehaviour
         }
 
         EnsureDebugSpawnRegisteredInAllActive(spawned);
+        UnitManager spawnedUnit = spawned.GetComponent<UnitManager>();
+        ThreatRevisionTracker.NotifyUnitSpawned(spawnedUnit);
         message = $"Spawnado: {ResolveDebugUnitDataName(unitData)} em {FormatMapCellWithZ(cursorCell)} para team {TeamUtils.GetName(teamId)}.";
         Debug.Log($"[Debug Command] {message}");
         return true;
@@ -1067,6 +1069,7 @@ public partial class TurnStateManager : MonoBehaviour
         }
 
         EnsureDebugSpawnRegisteredInAllActive(spawned);
+        ThreatRevisionTracker.NotifyUnitSpawned(spawned.GetComponent<UnitManager>());
 
         // Mesmo pos-passo do Unit Painter: re-assenta slot e flip do MatchController
         // depois de todo o setup do spawn (no editor, o OnValidate faz isso pela cena).

@@ -96,7 +96,7 @@ public class PanelVisibilityHotkeysController : MonoBehaviour
 
         // Com o painel aberto, o proprio campo de comando captura foco. O atalho
         // precisa furar esse bloqueio para funcionar como toggle e fechar de novo.
-        bool canToggleDebugPanel = debugPanelOpen || DebugManager.AreAIDebugShortcutsEnabled();
+        bool canToggleDebugPanel = debugPanelOpen || DebugManager.AreDebugShortcutsEnabled();
         if (canToggleDebugPanel && WasDebugTogglePressedThisFrame() && (debugPanelOpen || !textInputFocused || debugInputFocused))
             TogglePanelDebug();
 

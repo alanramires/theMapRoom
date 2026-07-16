@@ -209,14 +209,18 @@ public partial class TurnStateManager
         public readonly int autonomyConsumed;
         public readonly int fuelBefore;
         public readonly int fuelAfter;
+        public readonly Sprite unitSprite;
+        public readonly Color unitColor;
 
-        public TurnStartAutonomyUpkeepEntry(string unitName, Vector3Int cell, int autonomyConsumed, int fuelBefore, int fuelAfter)
+        public TurnStartAutonomyUpkeepEntry(string unitName, Vector3Int cell, int autonomyConsumed, int fuelBefore, int fuelAfter, Sprite unitSprite, Color unitColor)
         {
             this.unitName = unitName ?? string.Empty;
             this.cell = cell;
             this.autonomyConsumed = Mathf.Max(0, autonomyConsumed);
             this.fuelBefore = Mathf.Max(0, fuelBefore);
             this.fuelAfter = Mathf.Max(0, fuelAfter);
+            this.unitSprite = unitSprite;
+            this.unitColor = unitColor;
         }
     }
 
@@ -415,6 +419,8 @@ public partial class TurnStateManager
         public int fuelBefore;
         public int fuelAfter;
         public Vector3Int cell;
+        public Sprite unitSprite;
+        public Color unitColor = Color.white;
     }
 
     public bool TryBuildHelperPanelData(out HelperPanelData data)
@@ -480,6 +486,8 @@ public partial class TurnStateManager
         public bool isCancel;
         public int hp;
         public string terrainLabel;
+        public string weaponName;
+        public string weaponCategoryLabel;
         public Sprite unitSprite;
         public Color unitColor = Color.white;
     }
@@ -519,6 +527,9 @@ public partial class TurnStateManager
         {
             MirandoSelectionEntry entry = cachedMirandoSelectionEntries[i];
             UnitManager target = entry.TargetUnit;
+            WeaponData weapon = entry.isValid
+                ? entry.validOption != null ? entry.validOption.weapon : null
+                : entry.invalidOption != null ? entry.invalidOption.weapon : null;
             SpriteRenderer renderer = target != null ? target.GetMainSpriteRenderer() : null;
             data.AimTargetLines.Add(new HelperAimTargetLine
             {
@@ -528,6 +539,10 @@ public partial class TurnStateManager
                 isFocused = !mirandoCancelFocused && scannerSelectedTargetIndex == i,
                 hp = target != null ? Mathf.Max(0, target.CurrentHP) : 0,
                 terrainLabel = target != null ? ResolveUnitLocalLabel(target) : string.Empty,
+                weaponName = weapon != null ? ResolveWeaponName(weapon, "Arma") : string.Empty,
+                weaponCategoryLabel = weapon != null
+                    ? WeaponCategoryLabels.GetAlias(weapon.WeaponCategory).ToUpperInvariant()
+                    : string.Empty,
                 unitSprite = renderer != null ? renderer.sprite : null,
                 unitColor = renderer != null ? renderer.color : Color.white
             });
@@ -698,7 +713,9 @@ public partial class TurnStateManager
                 autonomyConsumed = Mathf.Max(0, entry.autonomyConsumed),
                 fuelBefore = Mathf.Max(0, entry.fuelBefore),
                 fuelAfter = Mathf.Max(0, entry.fuelAfter),
-                cell = entry.cell
+                cell = entry.cell,
+                unitSprite = entry.unitSprite,
+                unitColor = entry.unitColor
             });
         }
 

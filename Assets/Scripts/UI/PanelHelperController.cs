@@ -95,6 +95,22 @@ public class PanelHelperController : MonoBehaviour
     private Image keepPositionImage;
     private TMP_Text keepPositionLabel;
     private const float KeepPositionControlHeight = 80f;
+    // Faixa invisivel sobre o titulo: arrastar o painel segurando qualquer
+    // ponto do titulo, nao apenas a alca do canto.
+    private GameObject titleDragSurfaceRoot;
+    private RectTransform titleDragSurfaceRect;
+    // Viewport com mascara propria da lista de alvos da mira: a lista rola por
+    // baixo do titulo fixo em vez de deslizar por cima dele.
+    private GameObject aimTargetsViewportRoot;
+    private RectTransform aimTargetsViewportRect;
+    // Botao TROCAR UNIDADE: alias tocavel do PageUp/PageDown para hex com
+    // empilhamento (ex.: aereo + terrestre). So aparece quando ha 2+ entradas
+    // ciclaveis na ancora da selecao.
+    private GameObject cycleSelectionControlRoot;
+    private Button cycleSelectionButton;
+    private Image cycleSelectionImage;
+    private TMP_Text cycleSelectionLabel;
+    private const float CycleSelectionControlHeight = 80f;
     // Cor de fallback dos botoes gerados via script (usada so na criacao; o tint por time
     // sobrescreve todo frame). Os botoes seguem a cor do time ativo (virou tudo slot de jogador).
     private static readonly Color FooterButtonIdleColor = new Color(0.04f, 0.12f, 0.06f, 0.92f);
@@ -159,6 +175,9 @@ public class PanelHelperController : MonoBehaviour
     private GameObject aimTargetsRoot;
     private readonly List<Button> aimTargetButtons = new List<Button>();
     private string aimTargetsSignature = string.Empty;
+    private int aimFocusedButtonIndex = -1;
+    private float aimTargetsViewportHeight;
+    private const float AimTargetsMaxPanelHeight = 800f;
     // Alvo mostra 2 linhas (nome+HP / terreno), entao precisa de mais altura que os demais botoes.
     private const float AimTargetButtonHeight = 50f;
     // Seccao de detalhes do passo CONFIRMAR ATAQUE: HP + LOCAL (icone do hex + nome do terreno).
@@ -169,6 +188,11 @@ public class PanelHelperController : MonoBehaviour
     private Image aimConfirmLocalIcon;
     private TMP_Text aimConfirmLocalText;
     private const float AimConfirmDetailsHeight = 172f;
+    private GameObject autonomyUpkeepRoot;
+    private readonly List<GameObject> autonomyUpkeepRows = new List<GameObject>();
+    private string autonomyUpkeepSignature = string.Empty;
+    private const float AutonomyUpkeepHeaderHeight = 34f;
+    private const float AutonomyUpkeepRowHeight = 72f;
     private GameObject unitStatsLocalRoot;
     private Image unitStatsLocalIcon;
     private Image unitStatsStructureIcon;
@@ -346,6 +370,7 @@ public class PanelHelperController : MonoBehaviour
         EnsureCancelControl();
         EnsureExecuteCommandServiceControl();
         EnsureKeepPositionControl();
+        EnsureCycleSelectionControl();
         EnsureShoppingActionsRoot();
         EnsurePersistenceActionsRoot();
         EnsureTimeoutProgressBar();
@@ -704,36 +729,7 @@ public class PanelHelperController : MonoBehaviour
 
     private string BuildTurnStartAutonomyBody(TurnStateManager.HelperPanelData data)
     {
-        if (data == null || data.TurnStartAutonomyLines == null || data.TurnStartAutonomyLines.Count <= 0)
-            return string.Empty;
-
-        StringBuilder sb = new StringBuilder();
-        sb.AppendLine(ResolveMessage("helper.turn_start_autonomy.header", "Consumo de autonomia (operando):"));
-
-        for (int i = 0; i < data.TurnStartAutonomyLines.Count; i++)
-        {
-            TurnStateManager.HelperTurnStartAutonomyLine line = data.TurnStartAutonomyLines[i];
-            if (line == null)
-                continue;
-
-            string unitName = string.IsNullOrWhiteSpace(line.unitName) ? "Unidade" : line.unitName;
-            int consumed = Mathf.Max(0, line.autonomyConsumed);
-            int fuelBefore = Mathf.Max(0, line.fuelBefore);
-            int fuelAfter = Mathf.Max(0, line.fuelAfter);
-            sb.AppendLine(ResolveMessage(
-                "helper.turn_start_autonomy.line",
-                "<unit> <cell> Fuel <before> - <consumed> = <after>",
-                new Dictionary<string, string>
-                {
-                    { "unit", unitName },
-                    { "cell", FormatMapCell(line.cell) },
-                    { "before", fuelBefore.ToString() },
-                    { "consumed", consumed.ToString() },
-                    { "after", fuelAfter.ToString() }
-                }));
-        }
-
-        return sb.ToString().TrimEnd();
+        return string.Empty;
     }
 
     private string BuildShoppingBody(TurnStateManager.HelperPanelData data)
@@ -1520,12 +1516,14 @@ public class PanelHelperController : MonoBehaviour
         RefreshTimeoutProgressBar(panelVisible, data);
         RefreshCancelControl(panelVisible);
         RefreshKeepPositionControl(panelVisible, data);
+        RefreshCycleSelectionControl(panelVisible, data);
         RefreshExecuteCommandServiceControl(panelVisible);
         RefreshCommandServicePreviewFocusHighlight(panelVisible);
         RefreshSensorActionControls(panelVisible, data);
         RefreshAimTargetControls(panelVisible, data);
         RefreshAimFooterFocus(panelVisible, data);
         RefreshAimConfirmDetails(panelVisible, data);
+        RefreshTurnStartAutonomyControls(panelVisible, data);
         RefreshUnitStatsLocal(panelVisible, data);
         RefreshUnitStatsTransportedIcons(panelVisible, data);
         RefreshDisembarkActionControls(panelVisible, data);
@@ -1627,6 +1625,7 @@ public class PanelHelperController : MonoBehaviour
         bool sensorButtonsActive = sensorActionsRoot != null && sensorActionsRoot.activeSelf;
         bool aimButtonsActive = aimTargetsRoot != null && aimTargetsRoot.activeSelf;
         bool aimConfirmActive = aimConfirmDetailsRoot != null && aimConfirmDetailsRoot.activeSelf;
+        bool autonomyUpkeepActive = autonomyUpkeepRoot != null && autonomyUpkeepRoot.activeSelf;
         bool disembarkButtonsActive = disembarkActionsRoot != null && disembarkActionsRoot.activeSelf;
         bool shoppingButtonsActive = shoppingActionsRoot != null && shoppingActionsRoot.activeSelf;
         bool persistenceButtonsActive = persistenceActionsRoot != null && persistenceActionsRoot.activeSelf;
@@ -1642,9 +1641,13 @@ public class PanelHelperController : MonoBehaviour
         {
             bodyHeight = AimConfirmDetailsHeight;
         }
+        else if (autonomyUpkeepActive)
+        {
+            bodyHeight = AutonomyUpkeepHeaderHeight + 4f + autonomyUpkeepRows.Count * (AutonomyUpkeepRowHeight + 4f);
+        }
         else if (disembarkButtonsActive)
         {
-            bodyHeight = disembarkActionButtons.Count * (DisembarkActionButtonHeight + 4f);
+            bodyHeight = GetDisembarkActionsPreferredHeight();
         }
         else if (shoppingButtonsActive)
         {
@@ -1669,12 +1672,132 @@ public class PanelHelperController : MonoBehaviour
 
         float baseMin = cachedBasePanelHeight > 0f ? cachedBasePanelHeight : 0f;
         float minHeight = Mathf.Max(minPanelHeight, baseMin);
-        float maxHeight = Mathf.Max(minHeight, maxPanelHeight);
+        float configuredMaxHeight = aimButtonsActive
+            ? Mathf.Min(maxPanelHeight, AimTargetsMaxPanelHeight)
+            : maxPanelHeight;
+        float maxHeight = Mathf.Max(minHeight, configuredMaxHeight);
         float footerHeight = GetActiveFooterHeight();
         float targetHeight = Mathf.Clamp(titleHeight + bodyHeight + Mathf.Max(0f, contentVerticalPadding) + footerHeight, minHeight, maxHeight);
         helperRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, targetHeight);
         RefreshHelperScrollLayout(titleHeight, bodyHeight, targetHeight);
         disembarkLayoutDirty = false;
+    }
+
+    private void RefreshTurnStartAutonomyControls(bool panelVisible, TurnStateManager.HelperPanelData data)
+    {
+        bool active = panelVisible && data != null &&
+                      data.Kind == TurnStateManager.HelperPanelKind.TurnStartAutonomy &&
+                      data.TurnStartAutonomyLines != null && data.TurnStartAutonomyLines.Count > 0;
+        if (!active)
+        {
+            if (autonomyUpkeepRoot != null)
+                autonomyUpkeepRoot.SetActive(false);
+            autonomyUpkeepSignature = string.Empty;
+            return;
+        }
+
+        EnsureAutonomyUpkeepRoot();
+        StringBuilder signatureBuilder = new StringBuilder();
+        for (int i = 0; i < data.TurnStartAutonomyLines.Count; i++)
+        {
+            TurnStateManager.HelperTurnStartAutonomyLine line = data.TurnStartAutonomyLines[i];
+            if (line == null) continue;
+            signatureBuilder.Append('|').Append(line.unitName).Append('|').Append(line.cell)
+                .Append('|').Append(line.fuelBefore).Append('|').Append(line.autonomyConsumed)
+                .Append('|').Append(line.fuelAfter).Append('|').Append(line.unitSprite != null ? line.unitSprite.name : string.Empty);
+        }
+        string signature = signatureBuilder.ToString();
+        if (signature != autonomyUpkeepSignature)
+        {
+            RebuildAutonomyUpkeepRows(data.TurnStartAutonomyLines);
+            autonomyUpkeepSignature = signature;
+        }
+
+        autonomyUpkeepRoot.SetActive(true);
+        if (helperTxt != null)
+            helperTxt.enabled = false;
+    }
+
+    private void EnsureAutonomyUpkeepRoot()
+    {
+        if (!Application.isPlaying || autonomyUpkeepRoot != null || helperRect == null)
+            return;
+        autonomyUpkeepRoot = new GameObject("helper_autonomy_upkeep", typeof(RectTransform), typeof(VerticalLayoutGroup));
+        RectTransform rect = autonomyUpkeepRoot.GetComponent<RectTransform>();
+        rect.SetParent(helperRect, false);
+        rect.anchorMin = new Vector2(0.04f, 1f);
+        rect.anchorMax = new Vector2(0.96f, 1f);
+        rect.pivot = new Vector2(0.5f, 1f);
+        rect.anchoredPosition = new Vector2(0f, -48f);
+        VerticalLayoutGroup layout = autonomyUpkeepRoot.GetComponent<VerticalLayoutGroup>();
+        layout.spacing = 4f;
+        layout.childControlWidth = true;
+        layout.childControlHeight = true;
+        layout.childForceExpandWidth = true;
+        layout.childForceExpandHeight = false;
+        autonomyUpkeepRoot.SetActive(false);
+    }
+
+    private void RebuildAutonomyUpkeepRows(List<TurnStateManager.HelperTurnStartAutonomyLine> lines)
+    {
+        for (int i = autonomyUpkeepRoot.transform.childCount - 1; i >= 0; i--)
+            Destroy(autonomyUpkeepRoot.transform.GetChild(i).gameObject);
+        autonomyUpkeepRows.Clear();
+
+        CreateAutonomyUpkeepTextRow("Consumo em voo", AutonomyUpkeepHeaderHeight, 20f, TextAlignmentOptions.Center);
+        for (int i = 0; i < lines.Count; i++)
+        {
+            TurnStateManager.HelperTurnStartAutonomyLine line = lines[i];
+            if (line == null) continue;
+            GameObject row = new GameObject("autonomy_upkeep_unit", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(LayoutElement));
+            row.transform.SetParent(autonomyUpkeepRoot.transform, false);
+            row.GetComponent<Image>().color = new Color(0.02f, 0.06f, 0.04f, 0.72f);
+            LayoutElement element = row.GetComponent<LayoutElement>();
+            element.minHeight = AutonomyUpkeepRowHeight;
+            element.preferredHeight = AutonomyUpkeepRowHeight;
+
+            if (line.unitSprite != null)
+                CreateDisembarkRowIcon(row.transform, "unit_icon", line.unitSprite, line.unitColor, true);
+
+            GameObject labelObject = new GameObject("label", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
+            RectTransform labelRect = labelObject.GetComponent<RectTransform>();
+            labelRect.SetParent(row.transform, false);
+            labelRect.anchorMin = Vector2.zero;
+            labelRect.anchorMax = Vector2.one;
+            labelRect.offsetMin = new Vector2(line.unitSprite != null ? 52f : 8f, 3f);
+            labelRect.offsetMax = new Vector2(-6f, -3f);
+            TMP_Text label = labelObject.GetComponent<TMP_Text>();
+            string unitName = string.IsNullOrWhiteSpace(line.unitName) ? "Unidade" : line.unitName;
+            label.text = $"{unitName}\nCombustível {Mathf.Max(0, line.fuelBefore)} − {Mathf.Max(0, line.autonomyConsumed)} = {Mathf.Max(0, line.fuelAfter)}\n{FormatMapCell(line.cell)}";
+            label.fontStyle = FontStyles.Bold;
+            label.fontSize = 18f;
+            label.enableAutoSizing = true;
+            label.fontSizeMin = 12f;
+            label.fontSizeMax = 18f;
+            label.alignment = TextAlignmentOptions.MidlineLeft;
+            label.color = currentTeamColor;
+            label.raycastTarget = false;
+            autonomyUpkeepRows.Add(row);
+        }
+
+        autonomyUpkeepRoot.GetComponent<RectTransform>().sizeDelta = new Vector2(
+            0f, AutonomyUpkeepHeaderHeight + 4f + autonomyUpkeepRows.Count * (AutonomyUpkeepRowHeight + 4f));
+    }
+
+    private void CreateAutonomyUpkeepTextRow(string text, float height, float fontSize, TextAlignmentOptions alignment)
+    {
+        GameObject obj = new GameObject("autonomy_upkeep_header", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI), typeof(LayoutElement));
+        obj.transform.SetParent(autonomyUpkeepRoot.transform, false);
+        LayoutElement element = obj.GetComponent<LayoutElement>();
+        element.minHeight = height;
+        element.preferredHeight = height;
+        TMP_Text label = obj.GetComponent<TMP_Text>();
+        label.text = text;
+        label.fontSize = fontSize;
+        label.fontStyle = FontStyles.Bold;
+        label.alignment = alignment;
+        label.color = currentTeamColor;
+        label.raycastTarget = false;
     }
 
     private void RefreshSensorActionControls(bool panelVisible, TurnStateManager.HelperPanelData data)
@@ -1766,6 +1889,8 @@ public class PanelHelperController : MonoBehaviour
                 .Append(data.AimTargetLines[i].unitName)
                 .Append('|').Append(data.AimTargetLines[i].hp)
                 .Append('|').Append(data.AimTargetLines[i].terrainLabel)
+                .Append('|').Append(data.AimTargetLines[i].weaponName)
+                .Append('|').Append(data.AimTargetLines[i].weaponCategoryLabel)
                 .Append('|').Append(data.AimTargetLines[i].isValid);
         string signature = data.Kind + signatureBuilder.ToString();
         if (signature != aimTargetsSignature)
@@ -1782,10 +1907,23 @@ public class PanelHelperController : MonoBehaviour
             {
                 button.GetComponent<Image>().color = new Color(0.12f, 0.12f, 0.12f, 0.92f);
                 button.GetComponentInChildren<TMP_Text>(true).color = Color.gray;
+                Outline focusBorder = button.GetComponent<Outline>();
+                if (focusBorder != null)
+                {
+                    focusBorder.effectColor = currentTeamColor;
+                    focusBorder.enabled = data.AimTargetLines[i].isFocused;
+                }
             }
             else
+            {
+                Outline focusBorder = button.GetComponent<Outline>();
+                if (focusBorder != null)
+                    focusBorder.enabled = false;
                 TintScriptButtonToTeam(button, data.AimTargetLines[i].isFocused);
+            }
         }
+        aimFocusedButtonIndex = data.AimTargetLines.FindIndex(line => line != null && line.isFocused);
+        EnsureFocusedAimTargetVisible();
         if (helperTxt != null) helperTxt.enabled = false;
         // O CANCELAR agora e o ultimo item da lista (destacado no loop acima), nao mais o botao de rodape.
         if (panelHelper == gameObject && selfPanelCanvasGroup != null)
@@ -2129,11 +2267,23 @@ public class PanelHelperController : MonoBehaviour
     private void EnsureAimTargetsRoot()
     {
         if (!Application.isPlaying || aimTargetsRoot != null || helperRect == null) return;
+
+        // Viewport com RectMask2D propria: o scroll da lista corta por baixo do
+        // titulo (fixo no modo mira) em vez de deslizar os botoes por cima dele.
+        aimTargetsViewportRoot = new GameObject("helper_aim_targets_viewport", typeof(RectTransform), typeof(RectMask2D));
+        aimTargetsViewportRect = aimTargetsViewportRoot.GetComponent<RectTransform>();
+        aimTargetsViewportRect.SetParent(helperRect, false);
+        aimTargetsViewportRect.anchorMin = new Vector2(0.06f, 1f);
+        aimTargetsViewportRect.anchorMax = new Vector2(0.94f, 1f);
+        aimTargetsViewportRect.pivot = new Vector2(0.5f, 1f);
+        aimTargetsViewportRect.anchoredPosition = new Vector2(0f, -48f);
+        aimTargetsViewportRect.sizeDelta = new Vector2(0f, 200f);
+
         aimTargetsRoot = new GameObject("helper_aim_targets", typeof(RectTransform), typeof(VerticalLayoutGroup));
         RectTransform rect = aimTargetsRoot.GetComponent<RectTransform>();
-        rect.SetParent(helperRect, false);
-        rect.anchorMin = new Vector2(0.06f, 1f); rect.anchorMax = new Vector2(0.94f, 1f);
-        rect.pivot = new Vector2(0.5f, 1f); rect.anchoredPosition = new Vector2(0f, -48f);
+        rect.SetParent(aimTargetsViewportRect, false);
+        rect.anchorMin = new Vector2(0f, 1f); rect.anchorMax = new Vector2(1f, 1f);
+        rect.pivot = new Vector2(0.5f, 1f); rect.anchoredPosition = Vector2.zero;
         VerticalLayoutGroup layout = aimTargetsRoot.GetComponent<VerticalLayoutGroup>();
         layout.spacing = 4f; layout.childControlWidth = true; layout.childControlHeight = true;
         layout.childForceExpandWidth = true; layout.childForceExpandHeight = false;
@@ -2418,13 +2568,55 @@ public class PanelHelperController : MonoBehaviour
             CreateDisembarkButton(summary, null, false, -1,
                 selected != null ? selected.unitSprite : null,
                 selected != null ? selected.unitColor : Color.white);
+            ConfigureLastDisembarkRowLayout(82f, 18f);
             if (!string.IsNullOrWhiteSpace(data.MergeConfirmPreview))
+            {
                 CreateDisembarkButton($"RESULTADO: {data.MergeConfirmPreview}", null, false, -1);
+                ConfigureLastDisembarkRowLayout(76f, 17f);
+            }
             CreateDisembarkButton("CONFIRMAR FUSÃO", () => turnStateManager?.TryAdvanceMergeFromPointer(), true, -1);
+            ConfigureLastDisembarkRowLayout(58f, 20f);
         }
 
         disembarkActionsRoot.GetComponent<RectTransform>().sizeDelta =
-            new Vector2(0f, disembarkActionButtons.Count * (DisembarkActionButtonHeight + 4f));
+            new Vector2(0f, GetDisembarkActionsPreferredHeight());
+    }
+
+    private void ConfigureLastDisembarkRowLayout(float height, float fontSizeMax)
+    {
+        if (disembarkActionButtons.Count <= 0)
+            return;
+        Button button = disembarkActionButtons[disembarkActionButtons.Count - 1];
+        if (button == null)
+            return;
+        LayoutElement element = button.GetComponent<LayoutElement>();
+        if (element != null)
+        {
+            element.minHeight = height;
+            element.preferredHeight = height;
+        }
+        TMP_Text label = button.GetComponentInChildren<TMP_Text>(true);
+        if (label != null)
+        {
+            label.enableAutoSizing = true;
+            label.fontSizeMin = 12f;
+            label.fontSizeMax = fontSizeMax;
+            label.lineSpacing = 4f;
+        }
+    }
+
+    private float GetDisembarkActionsPreferredHeight()
+    {
+        float height = 0f;
+        for (int i = 0; i < disembarkActionButtons.Count; i++)
+        {
+            Button button = disembarkActionButtons[i];
+            LayoutElement element = button != null ? button.GetComponent<LayoutElement>() : null;
+            height += element != null ? Mathf.Max(DisembarkActionButtonHeight, element.preferredHeight) : DisembarkActionButtonHeight;
+            if (i < disembarkActionButtons.Count - 1)
+                height += 4f;
+        }
+        return height;
     }
 
     private void RebuildTransferActionButtons(TurnStateManager.HelperPanelData data)
@@ -2570,11 +2762,16 @@ public class PanelHelperController : MonoBehaviour
             bool isCancel = line.isCancel;
             int targetIndex = line.index;
             string objSuffix = isCancel ? "cancel" : i.ToString();
-            GameObject obj = new GameObject($"button_aim_target_{objSuffix}", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button), typeof(LayoutElement));
+            GameObject obj = new GameObject($"button_aim_target_{objSuffix}", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Outline), typeof(Button), typeof(LayoutElement));
             obj.transform.SetParent(aimTargetsRoot.transform, false);
             obj.GetComponent<Image>().color = FooterButtonIdleColor;
+            Outline focusBorder = obj.GetComponent<Outline>();
+            focusBorder.effectDistance = new Vector2(2f, -2f);
+            focusBorder.useGraphicAlpha = false;
+            focusBorder.enabled = false;
             LayoutElement element = obj.GetComponent<LayoutElement>(); element.minHeight = AimTargetButtonHeight; element.preferredHeight = AimTargetButtonHeight;
             Button button = obj.GetComponent<Button>();
+            obj.AddComponent<PanelHelperAimScrollDragHandle>().Configure(this);
             if (isCancel)
                 button.onClick.AddListener(() => cursorController?.TryCancelCurrentActionFromPointer());
             else if (embark)
@@ -2591,9 +2788,21 @@ public class PanelHelperController : MonoBehaviour
                 label.text = line.unitName;
             else
             {
-                // Linha 1: "N - Nome (Hp: X)". Linha 2: terreno (Cidade / Estrada na Floresta / Floresta).
+                // Linha 1: alvo/HP. Linha 2: camada/local. Linha 3: arma concreta e
+                // categoria. O motivo detalhado da opcao invalida permanece no
+                // PanelDialog quando o jogador tenta confirma-la.
                 string head = $"{i + 1} - {line.unitName} (Hp: {line.hp})";
-                label.text = string.IsNullOrWhiteSpace(line.terrainLabel) ? head : $"{head}\n{line.terrainLabel}";
+                string targetContext = string.IsNullOrWhiteSpace(line.terrainLabel)
+                    ? head
+                    : $"{head}\n{line.terrainLabel}";
+                string weaponLine = string.IsNullOrWhiteSpace(line.weaponName)
+                    ? string.Empty
+                    : string.IsNullOrWhiteSpace(line.weaponCategoryLabel)
+                        ? line.weaponName
+                        : $"{line.weaponName}  [{line.weaponCategoryLabel}]";
+                label.text = string.IsNullOrWhiteSpace(weaponLine)
+                    ? targetContext
+                    : $"{targetContext}\n{weaponLine}";
             }
             label.fontStyle = FontStyles.Bold; label.color = FooterLabelIdleColor; label.alignment = TextAlignmentOptions.Center; label.raycastTarget = false;
             // Auto-encolhe se o nome for grande, pra nao estourar a largura do botao.
@@ -3387,6 +3596,8 @@ public class PanelHelperController : MonoBehaviour
             height += ExecuteCommandServiceControlHeight;
         if (keepPositionControlRoot != null && keepPositionControlRoot.activeSelf)
             height += KeepPositionControlHeight;
+        if (cycleSelectionControlRoot != null && cycleSelectionControlRoot.activeSelf)
+            height += CycleSelectionControlHeight;
         return height;
     }
 
@@ -3438,6 +3649,90 @@ public class PanelHelperController : MonoBehaviour
 
         keepPositionButton.onClick.AddListener(() => turnStateManager?.TryKeepSelectedUnitPositionFromHelper());
         keepPositionControlRoot.SetActive(false);
+    }
+
+    // Botao TROCAR UNIDADE: mesmo padrao do MANTER POSICAO, empilhado logo acima
+    // dele. Alias tocavel do PageUp para alternar a ancora num hex empilhado
+    // (mobile nao tem segunda tecla; o segundo toque no hex confirma mover).
+    private void EnsureCycleSelectionControl()
+    {
+        if (!Application.isPlaying || cycleSelectionControlRoot != null || helperRect == null)
+            return;
+
+        cycleSelectionControlRoot = new GameObject("helper_cycle_selection_control", typeof(RectTransform));
+        RectTransform rootRect = cycleSelectionControlRoot.GetComponent<RectTransform>();
+        rootRect.SetParent(helperRect, false);
+        rootRect.anchorMin = new Vector2(0f, 0f);
+        rootRect.anchorMax = new Vector2(1f, 0f);
+        rootRect.pivot = new Vector2(0.5f, 0f);
+        rootRect.anchoredPosition = new Vector2(0f, CancelControlHeight + KeepPositionControlHeight);
+        rootRect.sizeDelta = new Vector2(0f, CycleSelectionControlHeight);
+        rootRect.SetAsLastSibling();
+
+        GameObject buttonObject = new GameObject("button_cycle_selection", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
+        RectTransform buttonRect = buttonObject.GetComponent<RectTransform>();
+        buttonRect.SetParent(rootRect, false);
+        buttonRect.anchorMin = new Vector2(0.08f, 0f);
+        buttonRect.anchorMax = new Vector2(0.92f, 1f);
+        buttonRect.offsetMin = new Vector2(4f, 5f);
+        buttonRect.offsetMax = new Vector2(-4f, -5f);
+
+        cycleSelectionImage = buttonObject.GetComponent<Image>();
+        cycleSelectionImage.color = FooterButtonIdleColor;
+        cycleSelectionButton = buttonObject.GetComponent<Button>();
+        Navigation navigation = cycleSelectionButton.navigation;
+        navigation.mode = Navigation.Mode.None;
+        cycleSelectionButton.navigation = navigation;
+
+        GameObject labelObject = new GameObject("label", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
+        RectTransform labelRect = labelObject.GetComponent<RectTransform>();
+        labelRect.SetParent(buttonRect, false);
+        labelRect.anchorMin = Vector2.zero;
+        labelRect.anchorMax = Vector2.one;
+        labelRect.offsetMin = Vector2.zero;
+        labelRect.offsetMax = Vector2.zero;
+        cycleSelectionLabel = labelObject.GetComponent<TMP_Text>();
+        cycleSelectionLabel.text = "TROCAR UNIDADE";
+        cycleSelectionLabel.fontSize = 20f;
+        cycleSelectionLabel.fontStyle = FontStyles.Bold;
+        cycleSelectionLabel.color = FooterLabelIdleColor;
+        cycleSelectionLabel.alignment = TextAlignmentOptions.Center;
+        cycleSelectionLabel.raycastTarget = false;
+        ConfigureMobileActionLabel(cycleSelectionLabel);
+
+        cycleSelectionButton.onClick.AddListener(() => turnStateManager?.TryCycleSelectionWithinHexFromHelper());
+        cycleSelectionControlRoot.SetActive(false);
+    }
+
+    private void RefreshCycleSelectionControl(bool panelVisible, TurnStateManager.HelperPanelData data)
+    {
+        if (cycleSelectionControlRoot == null)
+            return;
+
+        int cyclePosition = 0;
+        int cycleTotal = 0;
+        bool active = panelVisible && data != null &&
+                      data.Kind == TurnStateManager.HelperPanelKind.UnitStats &&
+                      turnStateManager != null &&
+                      turnStateManager.CurrentCursorState == TurnStateManager.CursorState.UnitSelected &&
+                      turnStateManager.TryGetSelectionCycleInfo(out cyclePosition, out cycleTotal);
+
+        if (cycleSelectionControlRoot.activeSelf != active)
+            cycleSelectionControlRoot.SetActive(active);
+        if (cycleSelectionButton != null)
+            cycleSelectionButton.interactable = active;
+
+        if (active)
+        {
+            if (cycleSelectionLabel != null)
+                cycleSelectionLabel.text = $"TROCAR UNIDADE {cyclePosition}/{cycleTotal}";
+            TintScriptButtonToTeamIdle(cycleSelectionButton);
+            if (panelHelper == gameObject && selfPanelCanvasGroup != null)
+            {
+                selfPanelCanvasGroup.interactable = true;
+                selfPanelCanvasGroup.blocksRaycasts = true;
+            }
+        }
     }
 
     private void RefreshKeepPositionControl(bool panelVisible, TurnStateManager.HelperPanelData data)
@@ -3853,6 +4148,46 @@ public class PanelHelperController : MonoBehaviour
         if (handle == null)
             handle = dragHandleRoot.AddComponent<PanelHelperDragHandle>();
         handle.Configure(helperRect, this);
+
+        EnsureTitleDragSurface();
+    }
+
+    // Faixa transparente cobrindo a regiao do titulo, com o mesmo handle de
+    // drag do painel: mover o helper segurando o titulo inteiro (mobile), sem
+    // depender da alca pequena do canto. Altura sincronizada com o titulo real
+    // em RefreshHelperScrollLayout.
+    private void EnsureTitleDragSurface()
+    {
+        if (!Application.isPlaying || titleDragSurfaceRoot != null || helperRect == null)
+            return;
+
+        Transform existing = helperRect.Find("helper_title_drag_surface");
+        titleDragSurfaceRoot = existing != null ? existing.gameObject : new GameObject(
+            "helper_title_drag_surface",
+            typeof(RectTransform),
+            typeof(CanvasRenderer),
+            typeof(Image),
+            typeof(PanelHelperDragHandle));
+
+        titleDragSurfaceRect = titleDragSurfaceRoot.GetComponent<RectTransform>();
+        titleDragSurfaceRect.SetParent(helperRect, false);
+        titleDragSurfaceRect.anchorMin = new Vector2(0f, 1f);
+        titleDragSurfaceRect.anchorMax = new Vector2(1f, 1f);
+        titleDragSurfaceRect.pivot = new Vector2(0.5f, 1f);
+        titleDragSurfaceRect.anchoredPosition = Vector2.zero;
+        titleDragSurfaceRect.sizeDelta = new Vector2(0f, 52f);
+        titleDragSurfaceRect.SetAsLastSibling();
+
+        Image surfaceImage = titleDragSurfaceRoot.GetComponent<Image>();
+        if (surfaceImage == null)
+            surfaceImage = titleDragSurfaceRoot.AddComponent<Image>();
+        surfaceImage.color = new Color(0f, 0f, 0f, 0f);
+        surfaceImage.raycastTarget = true;
+
+        PanelHelperDragHandle surfaceHandle = titleDragSurfaceRoot.GetComponent<PanelHelperDragHandle>();
+        if (surfaceHandle == null)
+            surfaceHandle = titleDragSurfaceRoot.AddComponent<PanelHelperDragHandle>();
+        surfaceHandle.Configure(helperRect, this);
     }
 
     private static Rect GetScreenRect(RectTransform rectTransform)
@@ -3920,21 +4255,40 @@ public class PanelHelperController : MonoBehaviour
         helperTxtRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, targetBodyHeight);
 
         float titleTopInset = Mathf.Max(0f, -originalHelperTitleAnchoredPosition.y);
-        float combinedContentHeight = targetTitleHeight + originalBodySpacingFromTitle + targetBodyHeight;
+        // Faixa de drag do titulo acompanha a altura real do titulo do frame.
+        if (titleDragSurfaceRect != null)
+            titleDragSurfaceRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, titleTopInset + targetTitleHeight);
         float footerHeight = GetActiveFooterHeight();
-        float viewportHeight = Mathf.Max(1f, panelHeight - titleTopInset - footerHeight);
+        bool aimButtonsActive = aimTargetsRoot != null && aimTargetsRoot.activeSelf;
+        float viewportHeight = aimButtonsActive
+            ? Mathf.Max(1f, panelHeight - titleTopInset - targetTitleHeight - originalBodySpacingFromTitle - footerHeight)
+            : Mathf.Max(1f, panelHeight - titleTopInset - footerHeight);
+        float combinedContentHeight = aimButtonsActive
+            ? targetBodyHeight
+            : targetTitleHeight + originalBodySpacingFromTitle + targetBodyHeight;
+        aimTargetsViewportHeight = aimButtonsActive ? viewportHeight : 0f;
         helperScrollMaxOffset = Mathf.Max(0f, combinedContentHeight - viewportHeight);
         helperScrollActive = helperScrollMaxOffset > 0.5f;
         helperScrollOffset = Mathf.Clamp(helperScrollOffset, 0f, helperScrollMaxOffset);
         if (!helperScrollActive)
             helperScrollOffset = 0f;
 
-        Vector2 scrollOffset = new Vector2(0f, helperScrollOffset);
         Vector2 bodyBasePosition = new Vector2(
             originalHelperTxtAnchoredPosition.x,
             originalHelperTitleAnchoredPosition.y - targetTitleHeight - originalBodySpacingFromTitle);
-        helperTitleRect.anchoredPosition = originalHelperTitleAnchoredPosition + scrollOffset;
-        helperTxtRect.anchoredPosition = bodyBasePosition + scrollOffset;
+        if (aimButtonsActive)
+        {
+            helperTitleRect.anchoredPosition = originalHelperTitleAnchoredPosition;
+            helperTxtRect.anchoredPosition = bodyBasePosition;
+            ApplyAimTargetsScrollPosition(bodyBasePosition.y);
+            EnsureFocusedAimTargetVisible();
+        }
+        else
+        {
+            Vector2 scrollOffset = new Vector2(0f, helperScrollOffset);
+            helperTitleRect.anchoredPosition = originalHelperTitleAnchoredPosition + scrollOffset;
+            helperTxtRect.anchoredPosition = bodyBasePosition + scrollOffset;
+        }
     }
 
     private void ResetHelperScrollLayout()
@@ -3996,6 +4350,12 @@ public class PanelHelperController : MonoBehaviour
             0f,
             helperScrollMaxOffset);
 
+        if (aimTargetsRoot != null && aimTargetsRoot.activeSelf)
+        {
+            ApplyAimTargetsScrollPosition();
+            return;
+        }
+
         if (helperTitle != null)
         {
             helperTitleRect = helperTitle.rectTransform;
@@ -4014,6 +4374,63 @@ public class PanelHelperController : MonoBehaviour
                 helperTxtRect.anchoredPosition = bodyBasePosition + new Vector2(0f, helperScrollOffset);
             }
         }
+    }
+
+    public void ScrollAimTargetsByPointerDelta(float screenDeltaY)
+    {
+        if (!helperScrollActive || aimTargetsRoot == null || !aimTargetsRoot.activeSelf)
+            return;
+        helperScrollOffset = Mathf.Clamp(helperScrollOffset + screenDeltaY, 0f, helperScrollMaxOffset);
+        ApplyAimTargetsScrollPosition();
+    }
+
+    private void ApplyAimTargetsScrollPosition(float? bodyBaseY = null)
+    {
+        if (aimTargetsRoot == null)
+            return;
+        RectTransform rect = aimTargetsRoot.GetComponent<RectTransform>();
+        if (rect == null)
+            return;
+        float baseY = bodyBaseY ?? (originalHelperTitleAnchoredPosition.y -
+            Mathf.Max(0f, helperTitleRect != null ? helperTitleRect.rect.height : originalHelperTitleHeight) -
+            originalBodySpacingFromTitle);
+
+        if (aimTargetsViewportRect != null)
+        {
+            // Viewport ancorado logo abaixo do titulo; so o conteudo desloca
+            // dentro da mascara — o titulo nunca e coberto pela lista.
+            aimTargetsViewportRect.anchoredPosition = new Vector2(aimTargetsViewportRect.anchoredPosition.x, baseY);
+            if (aimTargetsViewportHeight > 0f)
+                aimTargetsViewportRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, aimTargetsViewportHeight);
+            rect.anchoredPosition = new Vector2(rect.anchoredPosition.x, helperScrollOffset);
+            return;
+        }
+
+        rect.anchoredPosition = new Vector2(rect.anchoredPosition.x, baseY + helperScrollOffset);
+    }
+
+    private void EnsureFocusedAimTargetVisible()
+    {
+        if (!helperScrollActive || aimFocusedButtonIndex < 0 ||
+            aimFocusedButtonIndex >= aimTargetButtons.Count || aimTargetsViewportHeight <= 0f)
+            return;
+
+        float top = 0f;
+        for (int i = 0; i < aimFocusedButtonIndex; i++)
+        {
+            LayoutElement prior = aimTargetButtons[i] != null ? aimTargetButtons[i].GetComponent<LayoutElement>() : null;
+            top += (prior != null ? Mathf.Max(AimTargetButtonHeight, prior.preferredHeight) : AimTargetButtonHeight) + 4f;
+        }
+        LayoutElement focused = aimTargetButtons[aimFocusedButtonIndex] != null
+            ? aimTargetButtons[aimFocusedButtonIndex].GetComponent<LayoutElement>()
+            : null;
+        float bottom = top + (focused != null ? Mathf.Max(AimTargetButtonHeight, focused.preferredHeight) : AimTargetButtonHeight);
+        if (top < helperScrollOffset)
+            helperScrollOffset = top;
+        else if (bottom > helperScrollOffset + aimTargetsViewportHeight)
+            helperScrollOffset = bottom - aimTargetsViewportHeight;
+        helperScrollOffset = Mathf.Clamp(helperScrollOffset, 0f, helperScrollMaxOffset);
+        ApplyAimTargetsScrollPosition();
     }
 
     private static Vector2 ReadMouseScrollDelta()
@@ -4281,6 +4698,16 @@ public class PanelHelperController : MonoBehaviour
         return null;
     }
 #endif
+}
+
+public sealed class PanelHelperAimScrollDragHandle : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler
+{
+    private PanelHelperController owner;
+
+    public void Configure(PanelHelperController controller) => owner = controller;
+    public void OnBeginDrag(PointerEventData eventData) { }
+    public void OnDrag(PointerEventData eventData) => owner?.ScrollAimTargetsByPointerDelta(eventData.delta.y);
+    public void OnEndDrag(PointerEventData eventData) { }
 }
 
 public sealed class PanelHelperDragHandle : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler

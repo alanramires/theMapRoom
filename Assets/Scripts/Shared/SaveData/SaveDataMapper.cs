@@ -177,6 +177,10 @@ public static class SaveDataMapper
             heightLevel = (int)unit.GetHeightLevel(),
             isAircraftGrounded = unit.IsAircraftGrounded,
             aircraftOperationLockTurns = unit.AircraftOperationLockTurns,
+            hasForcedLayerLock = unit.HasForcedLayerLock,
+            forcedLayerLockDomain = (int)unit.ForcedLayerLockDomain,
+            forcedLayerLockHeight = (int)unit.ForcedLayerLockHeight,
+            forcedLayerLockTurns = unit.ForcedLayerLockTurnsRemaining,
             aiHasAssignedPlan = unit.AIHasAssignedPlan,
             aiAssignedPlanKey = unit.AIAssignedPlanKey,
             aiAssignedPlanName = unit.AIAssignedPlanName,
@@ -259,7 +263,22 @@ public static class SaveDataMapper
         {
             bool shouldRestoreGrounded = saved.isAircraftGrounded || domain != Domain.Air;
             unit.SetAircraftGrounded(shouldRestoreGrounded);
-            unit.SetAircraftOperationLockTurns(saved.aircraftOperationLockTurns);
+            // Formato legado (saves sem o lock completo): restaura o contador
+            // assumindo a camada atual, como antes.
+            if (!saved.hasForcedLayerLock)
+                unit.SetAircraftOperationLockTurns(saved.aircraftOperationLockTurns);
+        }
+
+        // Lock de camada forcada completo (emersao por ataque/dano): dominio e
+        // altura salvos, nao os atuais — um lock pendente (camada atual != lock)
+        // sobrevive ao load. A camada da unidade ja foi restaurada acima, entao
+        // a ordem evita o proprio lock bloquear TrySetCurrentLayerMode.
+        if (saved.hasForcedLayerLock && saved.forcedLayerLockTurns > 0)
+        {
+            unit.SetForcedLayerLock(
+                (Domain)saved.forcedLayerLockDomain,
+                (HeightLevel)saved.forcedLayerLockHeight,
+                saved.forcedLayerLockTurns);
         }
 
         IReadOnlyList<UnitEmbarkedWeapon> embarked = unit.GetEmbarkedWeapons();

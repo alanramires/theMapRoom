@@ -20,8 +20,10 @@ public class DebugManager : MonoBehaviour
     [SerializeField] private GameObject commandInputObject;
 
     [Header("AI Debug Shortcuts")]
-    [Tooltip("F12 = AI Resume | F10 = AI Pause | F11 = AI Step. Tambem controla o atalho de abertura do Panel_Debug.")]
+    [Tooltip("F12 = AI Resume | F10 = AI Pause | F11 = AI Step.")]
     [SerializeField] private bool aiDebugShortcutsEnabled;
+    [Tooltip("Permite abrir o Panel_Debug pelos atalhos de desenvolvedor: ', ;, crase ou Ctrl+D.")]
+    [SerializeField] private bool debugShortcutsEnabled;
     [Tooltip("Quando ativo, 'AI Stage 1' limpa o plano antes de rodar (força nova atribuição A+B).")]
     [SerializeField] private bool resetPlanOnDebugStage;
 
@@ -85,6 +87,11 @@ public class DebugManager : MonoBehaviour
     public static bool AreAIDebugShortcutsEnabled()
     {
         return instance != null && instance.aiDebugShortcutsEnabled;
+    }
+
+    public static bool AreDebugShortcutsEnabled()
+    {
+        return instance != null && instance.debugShortcutsEnabled;
     }
 
     public static bool IsPanelRodadaDisabledForHotSeat()
@@ -183,7 +190,7 @@ public class DebugManager : MonoBehaviour
         string command = NormalizeCommand(rawCommand);
         bool executed = false;
 
-        if (command == "DESTROY UNIT")
+        if (command == "DESTROY UNIT" || command == "REMOVE UNIT")
         {
             executed = turnStateManager.TryDestroyUnitUnderCursorFromDebug(out string message);
             if (!executed && !string.IsNullOrWhiteSpace(message))
@@ -210,6 +217,17 @@ public class DebugManager : MonoBehaviour
             executed = turnStateManager.TrySyncDebugSelectedUnitPositionFromTransform(out string message);
             if (executed)
                 cursorController?.PlayDoneSfx();
+            if (!string.IsNullOrWhiteSpace(message))
+                Debug.Log($"[Debug Command] {message}");
+        }
+        else if (command == "REFRESH CACHE" || command == "REFRESH CACHES" || command == "RESET CACHE")
+        {
+            executed = turnStateManager.TryRefreshRuntimeCachesFromDebug(out string message);
+            if (executed)
+            {
+                cursorController?.PlayDoneSfx();
+                PanelDialogController.TrySetTransientText("DEBUG: caches atualizados", 2.2f);
+            }
             if (!string.IsNullOrWhiteSpace(message))
                 Debug.Log($"[Debug Command] {message}");
         }
@@ -995,8 +1013,9 @@ public class DebugManager : MonoBehaviour
         return
             "wake unit - acorda unidade no cursor\n" +
             "wake all units - acorda todas unidades do time ativo\n" +
-            "destroy unit - destroi unidade no cursor\n" +
+            "destroy unit | remove unit - destroi unidade no cursor\n" +
             "set position - sincroniza a unidade selecionada no Scene/Hierarchy com o hex do Transform\n" +
+            "refresh cache | refresh caches | reset cache - invalida caches, republica o FoW (unidades novas entram em alvos/visao; exige estado Neutral) e recalcula os sensores\n" +
             "set hp <v>\n" +
             "set autonomy <v>\n" +
             "set fuel <v> (alias de set autonomy)\n" +

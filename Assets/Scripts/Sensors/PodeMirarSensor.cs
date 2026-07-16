@@ -4,6 +4,7 @@ using UnityEngine.Tilemaps;
 
 public static class PodeMirarSensor
 {
+    private const float ObservationLosGrazeEpsilon = 0.05f;
     private const string InvalidReasonNoAmmo = "Falta de municao.";
     private const string InvalidReasonLayer = "Layer do alvo incompativel com a arma.";
     private const string InvalidReasonAttackerLayerWeaponBlocked = "nao atira quando em";
@@ -113,6 +114,32 @@ public static class PodeMirarSensor
             attackerData != null &&
             attackerData.IsWeaponUseBlockedAt(attacker.GetDomain(), attacker.GetHeightLevel());
 
+        // Quem emerge ao atacar (ex.: submarino) so pode mirar se a emersao for
+        // legal na origem do disparo (terreno + ocupancia). Sem este gate, o
+        // pos-combate empilharia a unidade na camada bloqueante ja ocupada
+        // (ex.: navio na superficie do mesmo hex).
+        string attackerEmergeBlockedReason = null;
+        if (attackerData != null &&
+            attackerData.emergesToAttack &&
+            attacker.SupportsLayerMode(attackerData.emergeAfterAttackDomain, attackerData.emergeAfterAttackHeight) &&
+            (attacker.GetDomain() != attackerData.emergeAfterAttackDomain ||
+             attacker.GetHeightLevel() != attackerData.emergeAfterAttackHeight) &&
+            !PodeEmergirSensor.CanApplyLayerTransitionAtCell(
+                attacker,
+                map,
+                terrainDatabase,
+                origin,
+                attackerData.emergeAfterAttackDomain,
+                attackerData.emergeAfterAttackHeight,
+                out string emergeBlockReason))
+        {
+            string attackerEmergeName = !string.IsNullOrWhiteSpace(attacker.UnitDisplayName)
+                ? attacker.UnitDisplayName
+                : (!string.IsNullOrWhiteSpace(attacker.UnitId) ? attacker.UnitId : attacker.name);
+            attackerEmergeBlockedReason =
+                $"{attackerEmergeName} precisa emergir para atirar e nao pode neste hex ({emergeBlockReason})";
+        }
+
         Dictionary<Vector3Int, int> distances = BuildDistanceMap(map, origin, globalMaxRange);
         string attackerPositionLabel = ResolveUnitPositionLabel(map, terrainDatabase, attacker, origin);
 
@@ -147,6 +174,24 @@ public static class PodeMirarSensor
                     attackerPositionLabel,
                     defenderPositionLabel,
                     attackerLayerReason,
+                    Vector3Int.zero,
+                    null,
+                    null);
+                continue;
+            }
+
+            if (attackerEmergeBlockedReason != null)
+            {
+                AppendInvalid(
+                    invalidOutput,
+                    attacker,
+                    target,
+                    null,
+                    -1,
+                    distance,
+                    attackerPositionLabel,
+                    defenderPositionLabel,
+                    attackerEmergeBlockedReason,
                     Vector3Int.zero,
                     null,
                     null);
@@ -1512,10 +1557,22 @@ public static class PodeMirarSensor
         evPath.Add(originEv);
         List<Vector3Int> crossedCells = GetIntermediateCellsByCellLerp(tilemap, originCell, targetCell);
         intermediateCells.AddRange(crossedCells);
+
+        // Mesma geometria usada pelo PodeDetectar/AlguemMeVe: a altura da LOS
+        // deve ser interpolada pela posicao real do centro do hex projetada na
+        // reta observador->alvo. Assim o PodeMirar aceita exatamente os aliados
+        // cuja observacao direta ja foi confirmada pelo sensor de deteccao.
+        Vector2 losOriginWorld2 = ToWorld2(tilemap.GetCellCenterWorld(originCell));
+        Vector2 losTargetWorld2 = ToWorld2(tilemap.GetCellCenterWorld(targetCell));
+        Vector2 losDir = losTargetWorld2 - losOriginWorld2;
+        float losLenSq = Vector2.Dot(losDir, losDir);
+
         for (int i = 0; i < crossedCells.Count; i++)
         {
             Vector3Int cell = crossedCells[i];
-            float t = (i + 1f) / (crossedCells.Count + 1f);
+            float t = losLenSq > 0.0001f
+                ? Mathf.Clamp01(Vector2.Dot(ToWorld2(tilemap.GetCellCenterWorld(cell)) - losOriginWorld2, losDir) / losLenSq)
+                : (i + 1f) / (crossedCells.Count + 1f);
             float losHeightAtCell = Mathf.Lerp(originEv, targetEv, t);
             evPath.Add(losHeightAtCell);
 
@@ -1537,7 +1594,7 @@ public static class PodeMirarSensor
             if (!cellBlocksLoS || cellEv <= 0)
                 continue;
 
-            if (cellEv > losHeightAtCell)
+            if (cellEv > losHeightAtCell + ObservationLosGrazeEpsilon)
             {
                 blockedCell = cell;
                 return false;

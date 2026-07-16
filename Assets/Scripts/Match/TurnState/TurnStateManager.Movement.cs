@@ -217,6 +217,15 @@ public partial class TurnStateManager
         cell.z = 0;
         Domain currentDomain = selectedUnit.GetDomain();
         HeightLevel currentHeight = selectedUnit.GetHeightLevel();
+
+        // Lock de camada pendente (emersao forcada que nao coube no hex de
+        // origem): o movimento termina na camada travada assim que o destino
+        // permitir. Aplicado provisoriamente com snapshot de rollback —
+        // cancelar o movimento devolve a camada e, com ela, o estado pendente
+        // (que e derivado de camada atual != camada do lock).
+        if (TryApplyPendingForcedLayerAfterMovement(boardMap, cell, currentDomain, currentHeight))
+            return;
+
         if (!TryResolveForcedEndMovementTargetForCell(
                 boardMap,
                 terrainDatabase,
@@ -240,6 +249,15 @@ public partial class TurnStateManager
             return;
         }
 
+        // A camada forcada e bloqueante: se a banda alvo ja tem ocupante
+        // (ex.: navio na superficie), nao empilha — a unidade permanece na
+        // camada atual (o filtro de destino ja evita parar aqui no fluxo da UI).
+        if (!UnitOccupancyRules.CanEndLayerTransitionAtCell(boardMap, cell, selectedUnit, forcedDomain, forcedHeight, out UnitManager forcedLayerBlocker))
+        {
+            Debug.Log($"[LayerForce] Adiado: {forcedDomain}/{forcedHeight} bloqueado no hex por {(forcedLayerBlocker != null ? forcedLayerBlocker.name : "ocupante")}.");
+            return;
+        }
+
         if (!hasForcedLayerRollbackSnapshot)
         {
             hasForcedLayerRollbackSnapshot = true;
@@ -249,6 +267,38 @@ public partial class TurnStateManager
 
         if (selectedUnit.TrySetCurrentLayerMode(forcedDomain, forcedHeight))
             Debug.Log($"[LayerForce] {forcedReason} | {currentDomain}/{currentHeight} -> {forcedDomain}/{forcedHeight}");
+    }
+
+    private bool TryApplyPendingForcedLayerAfterMovement(
+        Tilemap boardMap,
+        Vector3Int cell,
+        Domain currentDomain,
+        HeightLevel currentHeight)
+    {
+        if (selectedUnit == null || !selectedUnit.HasPendingForcedLayerLock)
+            return false;
+        if (!selectedUnit.TryGetForcedLayerLock(out Domain lockDomain, out HeightLevel lockHeight, out _))
+            return false;
+        if (!PodeEmergirSensor.CanApplyLayerTransitionAtCell(
+                selectedUnit, boardMap, terrainDatabase, cell, lockDomain, lockHeight, out _))
+        {
+            return false;
+        }
+
+        if (!hasForcedLayerRollbackSnapshot)
+        {
+            hasForcedLayerRollbackSnapshot = true;
+            forcedLayerRollbackDomain = currentDomain;
+            forcedLayerRollbackHeight = currentHeight;
+        }
+
+        if (selectedUnit.TrySetCurrentLayerMode(lockDomain, lockHeight))
+        {
+            Debug.Log($"[LayerForce] PendingLock aplicado no destino | {currentDomain}/{currentHeight} -> {lockDomain}/{lockHeight}");
+            return true;
+        }
+
+        return false;
     }
 
     private void TryApplyPreferredNavalLayerAfterMovement(
@@ -286,7 +336,10 @@ public partial class TurnStateManager
         if (!hasForcedLayerRollbackSnapshot || selectedUnit == null)
             return;
 
-        if (selectedUnit.TrySetCurrentLayerMode(forcedLayerRollbackDomain, forcedLayerRollbackHeight))
+        // ignoreForcedLock: o rollback transacional precisa devolver a camada
+        // original mesmo quando um lock pendente aponta para outra camada
+        // (ex.: emersao aplicada provisoriamente no destino e movimento cancelado).
+        if (selectedUnit.TrySetCurrentLayerMode(forcedLayerRollbackDomain, forcedLayerRollbackHeight, ignoreForcedLock: true))
             Debug.Log($"[LayerForce] [roll back] restaurado para {forcedLayerRollbackDomain}/{forcedLayerRollbackHeight}");
         hasForcedLayerRollbackSnapshot = false;
     }

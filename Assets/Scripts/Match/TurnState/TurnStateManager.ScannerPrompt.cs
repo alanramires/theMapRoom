@@ -158,6 +158,7 @@ public partial class TurnStateManager
     private bool suppressInitialMirandoAutoFocus;
     private CursorState cursorStateBeforeEmbarcando = CursorState.MoveuParado;
     private CursorState cursorStateBeforePousando = CursorState.MoveuParado;
+    private CursorState cursorStateBeforeMirando = CursorState.MoveuParado;
     private CursorState lastLoggedCursorState = (CursorState)(-1);
     private ScannerPromptStep lastLoggedScannerPromptStep = (ScannerPromptStep)(-1);
     private UnitManager lastLoggedSelectedUnit;
@@ -2982,11 +2983,14 @@ public partial class TurnStateManager
             yield break;
 
         PodeDecolarReport report = PodeDecolarSensor.Evaluate(transporter, boardMap, terrainDatabase);
-        bool canTakeoffInPlace = report != null
-            && report.status
-            && report.takeoffMoveOptions != null
-            && (report.takeoffMoveOptions.Contains(0) || report.takeoffMoveOptions.Contains(9));
-        if (!canTakeoffInPlace)
+        // O embarque em um transportador aereo possui uma decolagem operacional
+        // propria: depois que o passageiro confirma o embarque, o transportador
+        // volta ao ar no mesmo hex e na mesma rodada. As opcoes 0/1/full do
+        // PodeDecolar descrevem a decolagem iniciada pelo movimento normal da
+        // aeronave; usa-las aqui fazia o Hidroaviao permanecer no solo em estrada,
+        // onde sua decolagem normal anuncia corrida obrigatoria de 1 hex.
+        bool canTakeoffAfterEmbark = report != null && report.status;
+        if (!canTakeoffAfterEmbark)
         {
             RuntimeLog(report != null && !string.IsNullOrWhiteSpace(report.explicacao)
                 ? $"[Embarque] Transportador permanece no solo apos embarque: {report.explicacao}"
@@ -3857,6 +3861,20 @@ public partial class TurnStateManager
             return;
         if (!firingUnit.SupportsLayerMode(revealDomain, revealHeight))
             return;
+
+        Tilemap selfEmergeBoardMap = terrainTilemap != null ? terrainTilemap : firingUnit.BoardTilemap;
+        Vector3Int selfEmergeCell = firingUnit.CurrentCellPosition;
+        selfEmergeCell.z = 0;
+        if (!PodeEmergirSensor.CanApplyLayerTransitionAtCell(
+                firingUnit, selfEmergeBoardMap, terrainDatabase, selfEmergeCell,
+                revealDomain, revealHeight, out string selfEmergeBlockReason))
+        {
+            // Cobre o revide: o ataque proprio ja e barrado pelo gate do
+            // PodeMirarSensor, mas o contra-ataque nao passa por mira.
+            ApplyPendingForcedLayerLock(firingUnit, revealDomain, revealHeight, firingData.emergeAfterAttackTurns, selfEmergeBlockReason);
+            return;
+        }
+
         if (!firingUnit.TrySetCurrentLayerMode(revealDomain, revealHeight))
             return;
 
@@ -3907,6 +3925,18 @@ public partial class TurnStateManager
             if (!target.SupportsLayerMode(forcedDomain, forcedHeight))
                 continue;
 
+            Tilemap forcedLayerBoardMap = terrainTilemap != null ? terrainTilemap : target.BoardTilemap;
+            Vector3Int forcedLayerCell = target.CurrentCellPosition;
+            forcedLayerCell.z = 0;
+            if ((target.GetDomain() != forcedDomain || target.GetHeightLevel() != forcedHeight) &&
+                !PodeEmergirSensor.CanApplyLayerTransitionAtCell(
+                    target, forcedLayerBoardMap, terrainDatabase, forcedLayerCell,
+                    forcedDomain, forcedHeight, out string forcedLayerBlockReason))
+            {
+                ApplyPendingForcedLayerLock(target, forcedDomain, forcedHeight, turns, forcedLayerBlockReason);
+                return;
+            }
+
             bool hadPreviousLock = target.TryGetForcedLayerLock(out Domain previousDomain, out HeightLevel previousHeight, out int previousTurns);
             target.ClearForcedLayerLock();
 
@@ -3954,6 +3984,20 @@ public partial class TurnStateManager
             return false;
 
         const int forcedTurns = 2;
+
+        Tilemap emergeBoardMap = terrainTilemap != null ? terrainTilemap : target.BoardTilemap;
+        Vector3Int emergeCell = target.CurrentCellPosition;
+        emergeCell.z = 0;
+        if (!PodeEmergirSensor.CanApplyLayerTransitionAtCell(
+                target, emergeBoardMap, terrainDatabase, emergeCell,
+                forcedDomain, forcedHeight, out string emergeBlockReason))
+        {
+            // Emersao forcada ilegal no hex (ex.: navio na superficie): a
+            // unidade permanece submersa, porem revelada e com o lock pendente.
+            ApplyPendingForcedLayerLock(target, forcedDomain, forcedHeight, forcedTurns, emergeBlockReason);
+            return true;
+        }
+
         bool hadPreviousLock = target.TryGetForcedLayerLock(out Domain previousDomain, out HeightLevel previousHeight, out int previousTurns);
         target.ClearForcedLayerLock();
 
@@ -3981,6 +4025,33 @@ public partial class TurnStateManager
             });
         PushPanelUnitMessage(forcedMessage, 2.6f);
         return true;
+    }
+
+    // Camada forcada que nao cabe no hex atual vira lock pendente: a unidade
+    // permanece na camada de origem, porem revelada (HasPendingForcedLayerLock
+    // anula stealth no FoW) e sem contar o tempo do lock. O upkeep do dono
+    // (MatchController.TryApplyPendingForcedLayerAtTurnStart) ou o fim do
+    // proximo movimento aplica a camada quando o hex permitir.
+    private void ApplyPendingForcedLayerLock(UnitManager unit, Domain domain, HeightLevel height, int turns, string blockReason)
+    {
+        if (unit == null)
+            return;
+
+        unit.ClearForcedLayerLock();
+        unit.SetForcedLayerLock(domain, height, Mathf.Max(1, turns));
+
+        string pendingMessage = PanelDialogController.ResolveDialogMessage(
+            "layer.forced.pending",
+            "<unit> revelada: transicao para <domain>/<height> pendente (hex ocupado).",
+            new Dictionary<string, string>
+            {
+                { "unit", ResolveDebugUnitName(unit) },
+                { "domain", domain.ToString() },
+                { "height", height.ToString() },
+                { "turns", turns.ToString() }
+            });
+        PushPanelUnitMessage(pendingMessage, 2.6f);
+        RuntimeLog($"[LayerForce] Pendente: {ResolveDebugUnitName(unit)} -> {domain}/{height} ({blockReason})");
     }
 
     private void ApplyEmbarkedCascadeFromDirectHit(UnitManager directlyHitUnit, int hpBefore, int hpAfter)
@@ -4242,6 +4313,9 @@ public partial class TurnStateManager
         // Ao sair do fluxo de movimento para mirar, oculta o rastro legado do caminho comprometido.
         ClearCommittedPathVisual();
 
+        cursorStateBeforeMirando = CurrentCursorState == CursorState.MoveuAndando
+            ? CursorState.MoveuAndando
+            : CursorState.MoveuParado;
         Advance(CursorState.Mirando, "EnterMirandoState");
         if (cursorController != null)
             RecordCinematicAimAction(cursorController.CurrentCell);
@@ -4403,6 +4477,17 @@ public partial class TurnStateManager
         SortClockwiseAroundUnit(cachedMirandoSelectionEntries,
             e => e.TargetUnit != null ? e.TargetUnit.CurrentCellPosition : Vector3Int.zero,
             selectedUnit);
+        // A ordem circular continua valendo dentro de cada grupo, mas opcoes que podem
+        // ser confirmadas sempre aparecem antes das entradas apenas informativas.
+        List<MirandoSelectionEntry> groupedEntries = new List<MirandoSelectionEntry>(cachedMirandoSelectionEntries.Count);
+        for (int i = 0; i < cachedMirandoSelectionEntries.Count; i++)
+            if (cachedMirandoSelectionEntries[i].isValid)
+                groupedEntries.Add(cachedMirandoSelectionEntries[i]);
+        for (int i = 0; i < cachedMirandoSelectionEntries.Count; i++)
+            if (!cachedMirandoSelectionEntries[i].isValid)
+                groupedEntries.Add(cachedMirandoSelectionEntries[i]);
+        cachedMirandoSelectionEntries.Clear();
+        cachedMirandoSelectionEntries.AddRange(groupedEntries);
         ApplyMirandoInvalidUnitTint();
     }
 

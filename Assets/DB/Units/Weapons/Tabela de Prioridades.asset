@@ -16,7 +16,7 @@ MonoBehaviour:
   - weaponCategory: 0
     preferredTargetClasses: 00000000
   - weaponCategory: 1
-    preferredTargetClasses: 010000000300000002000000
+    preferredTargetClasses: 0100000003000000020000000800000007000000
   - weaponCategory: 2
     preferredTargetClasses: 040000000600000005000000
   - weaponCategory: 3

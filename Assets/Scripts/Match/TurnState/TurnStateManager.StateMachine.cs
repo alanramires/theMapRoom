@@ -94,47 +94,19 @@ public partial class TurnStateManager
         if (direction == 0)
             return false;
 
-        Vector3Int cell;
-        bool currentIsConstruction;
-        if (CurrentCursorState == CursorState.UnitSelected && selectedUnit != null)
-        {
-            cell = selectedUnit.CurrentCellPosition;
-            currentIsConstruction = false;
-        }
-        else if (CurrentCursorState == CursorState.ShoppingAndServices && shoppingConstruction != null)
-        {
-            cell = shoppingConstruction.CurrentCellPosition;
-            currentIsConstruction = true;
-        }
-        else
+        if (!TryResolveSelectionCycleContext(
+                out Vector3Int cell,
+                out bool currentIsConstruction,
+                out List<UnitManager> units,
+                out ConstructionManager construction,
+                out int currentIndex,
+                out int total))
         {
             return false;
         }
-        cell.z = 0;
 
         int activeTeam = matchController != null ? matchController.ActiveTeamId : -1;
-        List<UnitManager> units = CollectSelectableAlliesAtCell(cell);
-        // When already in the shop, the construction is definitionally part of the cycle (we got
-        // here); otherwise it joins only when reachable (ally, shoppable, cell not blocked).
-        ConstructionManager construction = currentIsConstruction
-            ? shoppingConstruction
-            : ResolveCyclableConstructionAtCell(cell, activeTeam);
         bool hasConstruction = construction != null;
-
-        // Construction occupies the slot right after the units.
-        int total = units.Count + (hasConstruction ? 1 : 0);
-        if (total <= 1)
-            return false;
-
-        int currentIndex;
-        if (currentIsConstruction)
-            currentIndex = units.Count;
-        else
-        {
-            currentIndex = units.IndexOf(selectedUnit);
-            if (currentIndex < 0)
-                return false;
-        }
 
         int step = direction >= 0 ? 1 : -1;
         int nextIndex = (currentIndex + step + total) % total;
@@ -166,6 +138,97 @@ public partial class TurnStateManager
             return false;
         ExitConstructionShoppingStateToNeutral(rollback: false);
         return SelectUnitFromNeutral(nextUnit, cell);
+    }
+
+    // Contexto compartilhado do ciclo de selecao no hex (PageUp/PageDown e o
+    // botao TROCAR do painel helper): resolve celula ancora, entradas ciclaveis
+    // (unidades + loja, loja no slot apos as unidades) e o indice atual.
+    // Retorna false quando nao ha ciclo (total <= 1 ou estado sem ancora).
+    private bool TryResolveSelectionCycleContext(
+        out Vector3Int cell,
+        out bool currentIsConstruction,
+        out List<UnitManager> units,
+        out ConstructionManager construction,
+        out int currentIndex,
+        out int total)
+    {
+        cell = default;
+        currentIsConstruction = false;
+        units = null;
+        construction = null;
+        currentIndex = -1;
+        total = 0;
+
+        if (CurrentCursorState == CursorState.UnitSelected && selectedUnit != null)
+        {
+            cell = selectedUnit.CurrentCellPosition;
+            currentIsConstruction = false;
+        }
+        else if (CurrentCursorState == CursorState.ShoppingAndServices && shoppingConstruction != null)
+        {
+            cell = shoppingConstruction.CurrentCellPosition;
+            currentIsConstruction = true;
+        }
+        else
+        {
+            return false;
+        }
+        cell.z = 0;
+
+        int activeTeam = matchController != null ? matchController.ActiveTeamId : -1;
+        units = CollectSelectableAlliesAtCell(cell);
+        // When already in the shop, the construction is definitionally part of the cycle (we got
+        // here); otherwise it joins only when reachable (ally, shoppable, cell not blocked).
+        construction = currentIsConstruction
+            ? shoppingConstruction
+            : ResolveCyclableConstructionAtCell(cell, activeTeam);
+        bool hasConstruction = construction != null;
+
+        // Construction occupies the slot right after the units.
+        total = units.Count + (hasConstruction ? 1 : 0);
+        if (total <= 1)
+            return false;
+
+        if (currentIsConstruction)
+            currentIndex = units.Count;
+        else
+        {
+            currentIndex = units.IndexOf(selectedUnit);
+            if (currentIndex < 0)
+                return false;
+        }
+
+        return true;
+    }
+
+    // Consulta sem efeito colateral para a UI (visibilidade/rotulo do botao
+    // TROCAR do helper): posicao 1-based da ancora atual e total de entradas.
+    public bool TryGetSelectionCycleInfo(out int currentPosition, out int total)
+    {
+        currentPosition = 0;
+        if (!TryResolveSelectionCycleContext(out _, out _, out _, out _, out int currentIndex, out total))
+        {
+            total = 0;
+            return false;
+        }
+
+        currentPosition = currentIndex + 1;
+        return true;
+    }
+
+    // Entrada tocavel do ciclo (botao TROCAR do painel helper): mesmo caminho
+    // do PageUp, com feedback sonoro resolvido aqui porque o helper nao trata SFX.
+    public bool TryCycleSelectionWithinHexFromHelper()
+    {
+        ActionSfx feedback = HandleCycleSelectionWithinHex(1);
+        if (feedback == ActionSfx.None)
+        {
+            cursorController?.PlayErrorSfx();
+            return false;
+        }
+
+        cursorController?.PlayBeepSfx();
+        return true;
     }
 
     // The hex's ally construction is part of the cycle only when it can actually be shopped
@@ -844,6 +907,21 @@ public partial class TurnStateManager
         Vector3Int unitCell = selectedUnit.CurrentCellPosition;
         unitCell.z = 0;
         cell.z = 0;
+
+        // Lock de camada pendente: mover exige que o destino aceite a camada
+        // travada (a emersao adiada e aplicada ao fim do movimento). Ficar no
+        // proprio hex nao forca a transicao, portanto segue permitido.
+        if (cell != unitCell &&
+            selectedUnit.HasPendingForcedLayerLock &&
+            selectedUnit.TryGetForcedLayerLock(out Domain pendingLockDomain, out HeightLevel pendingLockHeight, out _))
+        {
+            Tilemap pendingBoardMap = terrainTilemap != null ? terrainTilemap : selectedUnit.BoardTilemap;
+            if (!PodeEmergirSensor.CanApplyLayerTransitionAtCell(
+                    selectedUnit, pendingBoardMap, terrainDatabase, cell, pendingLockDomain, pendingLockHeight, out _))
+            {
+                return false;
+            }
+        }
 
         bool projectsToAir =
             selectedUnit.GetDomain() == Domain.Air && !selectedUnit.IsAircraftGrounded;

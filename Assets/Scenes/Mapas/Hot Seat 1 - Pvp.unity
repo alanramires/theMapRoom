@@ -2088,6 +2088,11 @@ MonoBehaviour:
     id: 519888321
   combatProjectileSortingLayerInitialized: 1
   combatProjectileSortingOrder: 210
+  combatProjectileShadowSprite: {fileID: 21300000, guid: c0d79acfc6b3a6a45a2d8c468d481479, type: 3}
+  combatProjectileShadowScale: 1.05
+  combatProjectileShadowGroundAlpha: 0.85
+  combatProjectileShadowApexAlpha: 0.38
+  combatProjectileShadowSortingOrder: 209
   supplyCursorFocusDelay: 0.25
   supplySpawnInterval: 0.12
   supplyFlightPadding: 0.066
@@ -11742,7 +11747,7 @@ MonoBehaviour:
     defeated: 0
     startMoney: 85000
     actualMoney: 0
-    incomePerTurn: 15000
+    incomePerTurn: 7500
     startMoneyApplied: 1
   - teamId: 1
     flipX: 1
@@ -11752,7 +11757,7 @@ MonoBehaviour:
     defeated: 0
     startMoney: 85000
     actualMoney: 0
-    incomePerTurn: 15000
+    incomePerTurn: 12000
     startMoneyApplied: 1
   includeNeutralTeam: 0
   economyEnabled: 1
@@ -11803,7 +11808,7 @@ MonoBehaviour:
   appliedActiveTeamId: 0
   pendingTurnStartUpkeep: 1
   pendingTurnStartEconomy: 1
-  cachedConstructionIncomeSignature: 2053073946
+  cachedConstructionIncomeSignature: 1859669022
   cachedConstructionIncomeCount: 57
   constructionIncomeRefreshIntervalSeconds: 0.35
   continuousEditorRefresh: 0
@@ -17877,37 +17882,197 @@ Tilemap:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 548823234}
   m_Enabled: 1
-  m_Tiles: {}
+  m_Tiles:
+  - first: {x: -4, y: -7, z: 0}
+    second:
+      serializedVersion: 2
+      m_TileIndex: 2
+      m_TileSpriteIndex: 2
+      m_TileMatrixIndex: 0
+      m_TileColorIndex: 0
+      m_TileObjectToInstantiateIndex: 65535
+      dummyAlignment: 0
+      m_AllTileFlags: 1073741825
+  - first: {x: 1, y: -7, z: 0}
+    second:
+      serializedVersion: 2
+      m_TileIndex: 2
+      m_TileSpriteIndex: 2
+      m_TileMatrixIndex: 9
+      m_TileColorIndex: 0
+      m_TileObjectToInstantiateIndex: 65535
+      dummyAlignment: 0
+      m_AllTileFlags: 1073741825
+  - first: {x: -10, y: -6, z: 0}
+    second:
+      serializedVersion: 2
+      m_TileIndex: 2
+      m_TileSpriteIndex: 2
+      m_TileMatrixIndex: 6
+      m_TileColorIndex: 0
+      m_TileObjectToInstantiateIndex: 65535
+      dummyAlignment: 0
+      m_AllTileFlags: 1073741825
+  - first: {x: -8, y: -6, z: 0}
+    second:
+      serializedVersion: 2
+      m_TileIndex: 2
+      m_TileSpriteIndex: 2
+      m_TileMatrixIndex: 8
+      m_TileColorIndex: 0
+      m_TileObjectToInstantiateIndex: 65535
+      dummyAlignment: 0
+      m_AllTileFlags: 1073741825
+  - first: {x: -10, y: -4, z: 0}
+    second:
+      serializedVersion: 2
+      m_TileIndex: 2
+      m_TileSpriteIndex: 2
+      m_TileMatrixIndex: 0
+      m_TileColorIndex: 0
+      m_TileObjectToInstantiateIndex: 65535
+      dummyAlignment: 0
+      m_AllTileFlags: 1073741825
+  - first: {x: -10, y: -3, z: 0}
+    second:
+      serializedVersion: 2
+      m_TileIndex: 3
+      m_TileSpriteIndex: 3
+      m_TileMatrixIndex: 0
+      m_TileColorIndex: 0
+      m_TileObjectToInstantiateIndex: 65535
+      dummyAlignment: 0
+      m_AllTileFlags: 1073741825
+  - first: {x: 2, y: -1, z: 0}
+    second:
+      serializedVersion: 2
+      m_TileIndex: 1
+      m_TileSpriteIndex: 1
+      m_TileMatrixIndex: 8
+      m_TileColorIndex: 0
+      m_TileObjectToInstantiateIndex: 65535
+      dummyAlignment: 0
+      m_AllTileFlags: 1073741825
+  - first: {x: -3, y: 0, z: 0}
+    second:
+      serializedVersion: 2
+      m_TileIndex: 1
+      m_TileSpriteIndex: 1
+      m_TileMatrixIndex: 1
+      m_TileColorIndex: 0
+      m_TileObjectToInstantiateIndex: 65535
+      dummyAlignment: 0
+      m_AllTileFlags: 1073741825
+  - first: {x: 3, y: 0, z: 0}
+    second:
+      serializedVersion: 2
+      m_TileIndex: 1
+      m_TileSpriteIndex: 1
+      m_TileMatrixIndex: 7
+      m_TileColorIndex: 0
+      m_TileObjectToInstantiateIndex: 65535
+      dummyAlignment: 0
+      m_AllTileFlags: 1073741825
+  - first: {x: -3, y: 1, z: 0}
+    second:
+      serializedVersion: 2
+      m_TileIndex: 1
+      m_TileSpriteIndex: 1
+      m_TileMatrixIndex: 0
+      m_TileColorIndex: 0
+      m_TileObjectToInstantiateIndex: 65535
+      dummyAlignment: 0
+      m_AllTileFlags: 1073741825
+  - first: {x: 9, y: 3, z: 0}
+    second:
+      serializedVersion: 2
+      m_TileIndex: 3
+      m_TileSpriteIndex: 3
+      m_TileMatrixIndex: 8
+      m_TileColorIndex: 0
+      m_TileObjectToInstantiateIndex: 65535
+      dummyAlignment: 0
+      m_AllTileFlags: 1073741825
+  - first: {x: 10, y: 4, z: 0}
+    second:
+      serializedVersion: 2
+      m_TileIndex: 2
+      m_TileSpriteIndex: 2
+      m_TileMatrixIndex: 8
+      m_TileColorIndex: 0
+      m_TileObjectToInstantiateIndex: 65535
+      dummyAlignment: 0
+      m_AllTileFlags: 1073741825
+  - first: {x: 8, y: 6, z: 0}
+    second:
+      serializedVersion: 2
+      m_TileIndex: 2
+      m_TileSpriteIndex: 2
+      m_TileMatrixIndex: 0
+      m_TileColorIndex: 0
+      m_TileObjectToInstantiateIndex: 65535
+      dummyAlignment: 0
+      m_AllTileFlags: 1073741825
+  - first: {x: 10, y: 6, z: 0}
+    second:
+      serializedVersion: 2
+      m_TileIndex: 2
+      m_TileSpriteIndex: 2
+      m_TileMatrixIndex: 9
+      m_TileColorIndex: 0
+      m_TileObjectToInstantiateIndex: 65535
+      dummyAlignment: 0
+      m_AllTileFlags: 1073741825
+  - first: {x: -2, y: 7, z: 0}
+    second:
+      serializedVersion: 2
+      m_TileIndex: 2
+      m_TileSpriteIndex: 2
+      m_TileMatrixIndex: 6
+      m_TileColorIndex: 0
+      m_TileObjectToInstantiateIndex: 65535
+      dummyAlignment: 0
+      m_AllTileFlags: 1073741825
+  - first: {x: 3, y: 7, z: 0}
+    second:
+      serializedVersion: 2
+      m_TileIndex: 2
+      m_TileSpriteIndex: 2
+      m_TileMatrixIndex: 8
+      m_TileColorIndex: 0
+      m_TileObjectToInstantiateIndex: 65535
+      dummyAlignment: 0
+      m_AllTileFlags: 1073741825
   m_AnimatedTiles: {}
   m_TileAssetArray:
   - serializedVersion: 2
     m_RefCount: 0
     m_Data: {fileID: 11400000, guid: 9dc76304884487740ab3ec8c096b0034, type: 2}
   - serializedVersion: 2
-    m_RefCount: 0
+    m_RefCount: 4
     m_Data: {fileID: 11400000, guid: 5ce90b8ffcede3e4d8ae80ea2cc80d86, type: 2}
   - serializedVersion: 2
-    m_RefCount: 0
+    m_RefCount: 10
     m_Data: {fileID: 11400000, guid: 0e9488cb434eec343bb011247068a620, type: 2}
   - serializedVersion: 2
-    m_RefCount: 0
+    m_RefCount: 2
     m_Data: {fileID: 11400000, guid: 555dbf6160238b349830893c14cda1e3, type: 2}
   m_TileSpriteArray:
   - serializedVersion: 2
     m_RefCount: 0
     m_Data: {fileID: 21300000, guid: 908142c41c7c6594b8c99ed58815a5f7, type: 3}
   - serializedVersion: 2
-    m_RefCount: 0
+    m_RefCount: 4
     m_Data: {fileID: 21300000, guid: 86606810d10263b4f843b0e916cb3a10, type: 3}
   - serializedVersion: 2
-    m_RefCount: 0
+    m_RefCount: 10
     m_Data: {fileID: 21300000, guid: 512d241c3ffefc340a1f5d2b15875c37, type: 3}
   - serializedVersion: 2
-    m_RefCount: 0
+    m_RefCount: 2
     m_Data: {fileID: 21300000, guid: cffa89daff7f85c4cb3446a4fc7d2fbb, type: 3}
   m_TileMatrixArray:
   - serializedVersion: 2
-    m_RefCount: 0
+    m_RefCount: 5
     m_Data:
       e00: -0.5000001
       e01: 0.8660254
@@ -17926,7 +18091,7 @@ Tilemap:
       e32: 0
       e33: 1
   - serializedVersion: 2
-    m_RefCount: 0
+    m_RefCount: 1
     m_Data:
       e00: -1.0000001
       e01: -0.00000015885017
@@ -18021,7 +18186,7 @@ Tilemap:
       e32: 0
       e33: 1
   - serializedVersion: 2
-    m_RefCount: 0
+    m_RefCount: 2
     m_Data:
       e00: 0.49999997
       e01: 0.86602545
@@ -18040,7 +18205,7 @@ Tilemap:
       e32: 0
       e33: 1
   - serializedVersion: 2
-    m_RefCount: 0
+    m_RefCount: 1
     m_Data:
       e00: 1
       e01: 0
@@ -18059,7 +18224,7 @@ Tilemap:
       e32: 0
       e33: 1
   - serializedVersion: 2
-    m_RefCount: 0
+    m_RefCount: 5
     m_Data:
       e00: 0.49999997
       e01: -0.86602545
@@ -18078,7 +18243,7 @@ Tilemap:
       e32: 0
       e33: 1
   - serializedVersion: 2
-    m_RefCount: 0
+    m_RefCount: 2
     m_Data:
       e00: -0.49999988
       e01: -0.8660256
@@ -18098,7 +18263,7 @@ Tilemap:
       e33: 1
   m_TileColorArray:
   - serializedVersion: 2
-    m_RefCount: 0
+    m_RefCount: 16
     m_Data: {r: 1, g: 1, b: 1, a: 1}
   m_TileObjectToInstantiateArray: []
   m_AnimationFrameRate: 1
@@ -34736,8 +34901,10 @@ MonoBehaviour:
   cursorController: {fileID: 2105919121}
   sendButton: {fileID: 0}
   commandInputObject: {fileID: 0}
-  aiDebugShortcutsEnabled: 1
-  resetPlanOnDebugStage: 1
+  aiDebugShortcutsEnabled: 0
+  debugShortcutsEnabled: 1
+  resetPlanOnDebugStage: 0
+  panelRodadaDesativadoPvpDebug: 1
 --- !u!1 &1083665238
 GameObject:
   m_ObjectHideFlags: 0
@@ -67612,14 +67779,14 @@ MonoBehaviour:
       capturePointsMax: 20
       source: {fileID: 1704695949}
     riskEntries:
-    - Team: 0
-      RiskRatio: 0.5
-      RiskLevel: 2
     - Team: 1
       RiskRatio: 0.5
       RiskLevel: 2
-    sectorDistances:
     - Team: 0
+      RiskRatio: 0.5
+      RiskLevel: 2
+    sectorDistances:
+    - Team: 1
       Entries:
       - ConstructionName: HQ
         InstanceId: 0
@@ -67628,61 +67795,35 @@ MonoBehaviour:
         AirDistance: 14
         IsHQ: 1
       - ConstructionName: "F\xE1brica"
-        InstanceId: 77
-        Distance: 13
-        VehicleDistance: 13
-        AirDistance: 12
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 4
+        InstanceId: 14
         Distance: 14
         VehicleDistance: 14
-        AirDistance: 13
+        AirDistance: 14
         IsHQ: 0
       - ConstructionName: Aeroporto
-        InstanceId: 8
-        Distance: 13
-        VehicleDistance: 13
-        AirDistance: 13
+        InstanceId: 9
+        Distance: 14
+        VehicleDistance: 14
+        AirDistance: 12
         IsHQ: 0
       - ConstructionName: Porto Naval
-        InstanceId: 71
+        InstanceId: 74
         Distance: 15
         VehicleDistance: 15
         AirDistance: 9
         IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 6
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 13
         Distance: 14
         VehicleDistance: 14
-        AirDistance: 12
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 5
-        Distance: 14
-        VehicleDistance: 14
-        AirDistance: 14
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 3
-        Distance: 15
-        VehicleDistance: 15
         AirDistance: 13
         IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 72
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 80
         Distance: 13
         VehicleDistance: 13
         AirDistance: 12
         IsHQ: 0
-    - Team: 1
-      Entries:
-      - ConstructionName: HQ
-        InstanceId: 0
-        Distance: 15
-        VehicleDistance: 15
-        AirDistance: 14
-        IsHQ: 1
       - ConstructionName: Aeroporto
         InstanceId: 11
         Distance: 13
@@ -67695,41 +67836,67 @@ MonoBehaviour:
         VehicleDistance: 15
         AirDistance: 13
         IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 9
-        Distance: 14
-        VehicleDistance: 14
-        AirDistance: 12
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 80
-        Distance: 13
-        VehicleDistance: 13
-        AirDistance: 12
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 14
-        Distance: 14
-        VehicleDistance: 14
-        AirDistance: 14
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 13
-        Distance: 14
-        VehicleDistance: 14
-        AirDistance: 13
-        IsHQ: 0
       - ConstructionName: Porto Naval
         InstanceId: 73
         Distance: 13
         VehicleDistance: 13
         AirDistance: 12
         IsHQ: 0
+    - Team: 0
+      Entries:
+      - ConstructionName: HQ
+        InstanceId: 0
+        Distance: 15
+        VehicleDistance: 15
+        AirDistance: 14
+        IsHQ: 1
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 3
+        Distance: 15
+        VehicleDistance: 15
+        AirDistance: 13
+        IsHQ: 0
+      - ConstructionName: Aeroporto
+        InstanceId: 8
+        Distance: 13
+        VehicleDistance: 13
+        AirDistance: 13
+        IsHQ: 0
       - ConstructionName: Porto Naval
-        InstanceId: 74
+        InstanceId: 72
+        Distance: 13
+        VehicleDistance: 13
+        AirDistance: 12
+        IsHQ: 0
+      - ConstructionName: Aeroporto
+        InstanceId: 6
+        Distance: 14
+        VehicleDistance: 14
+        AirDistance: 12
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 4
+        Distance: 14
+        VehicleDistance: 14
+        AirDistance: 13
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 77
+        Distance: 13
+        VehicleDistance: 13
+        AirDistance: 12
+        IsHQ: 0
+      - ConstructionName: Porto Naval
+        InstanceId: 71
         Distance: 15
         VehicleDistance: 15
         AirDistance: 9
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 5
+        Distance: 14
+        VehicleDistance: 14
+        AirDistance: 14
         IsHQ: 0
     closestNeighbor1: 0
     closestNeighbor1Distance: 3.4028235e+38
@@ -75634,7 +75801,7 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 1348457725607290348, guid: f7e44d7c210a32d4ba630ba660da88a1, type: 3}
       propertyPath: m_text
-      value: 15000 / turn
+      value: 7500 / turn
       objectReference: {fileID: 0}
     - target: {fileID: 4985144350662451516, guid: f7e44d7c210a32d4ba630ba660da88a1, type: 3}
       propertyPath: m_Enabled

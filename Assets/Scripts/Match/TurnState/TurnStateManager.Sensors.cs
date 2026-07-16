@@ -38,6 +38,51 @@ public partial class TurnStateManager
     public ConstructionManager CachedPodeCapturarConstruction => cachedPodeCapturarConstruction;
     public string CachedPodeCapturarReason => cachedPodeCapturarReason;
 
+    public bool TryRefreshRuntimeCachesFromDebug(out string message)
+    {
+        bool wasMirando = CurrentCursorState == CursorState.Mirando;
+        ScannerPromptStep previousMirandoStep = scannerPromptStep;
+        int previousTargetIndex = scannerSelectedTargetIndex;
+
+        ThreatRevisionTracker.ForceInvalidateAll();
+        PodeDetectarSensor.ClearRefreshScopedTerrainCache();
+        ClearThreatLayerHotzoneCache();
+
+        // Unidades instanciadas via debug nao existem no snapshot de FoW
+        // publicado (ausencia no cache = oculto) nem contribuem visao ate a
+        // proxima publicacao — por isso nao entram na lista de alvos nem no
+        // conhecimento do time. Republica o FoW completo como o inicio de
+        // turno faz. Somente em Neutral: com acao em andamento, publicar
+        // recalcularia o tabuleiro confirmado a partir de posicao provisoria.
+        bool fogRepublished = false;
+        if (CurrentCursorState == CursorState.Neutral && matchController != null)
+        {
+            matchController.RefreshFogOfWarForActiveTeam(FogOfWarRefreshMode.FullVisual);
+            fogRepublished = true;
+        }
+
+        RefreshSensorsForCurrentState();
+        if (wasMirando)
+        {
+            scannerPromptStep = previousMirandoStep;
+            BuildMirandoSelectionEntries();
+            int total = GetMirandoEntryCount();
+            scannerSelectedTargetIndex = total > 0
+                ? Mathf.Clamp(previousTargetIndex, 0, total - 1)
+                : 0;
+            mirandoCancelFocused = false;
+            if (total > 0)
+                FocusCurrentMirandoTarget(logDetails: false);
+        }
+
+        message = $"Caches atualizados | boardRev={ThreatRevisionTracker.GlobalBoardRevision} " +
+                  $"| fow={(fogRepublished ? "republicado" : "PULADO (fora de Neutral — cancele a acao e rode de novo)")} " +
+                  $"| miraValidos={cachedPodeMirarTargets.Count} " +
+                  $"| miraInvalidos={cachedPodeMirarInvalidTargets.Count}.";
+        Debug.Log($"[Debug Command] {message}");
+        return true;
+    }
+
     private void RefreshSensorsForCurrentState()
     {
         double perfStart = Time.realtimeSinceStartupAsDouble;
@@ -74,7 +119,14 @@ public partial class TurnStateManager
             if (ShouldSuppressContextSensorsAtUnconfirmedDestination())
             {
                 ClearSensorResults();
-                RuntimeLog("[Sensors] Destino provisório fora da visão confirmada: sensores contextuais suprimidos.");
+                // Exceção estreita ao contrato: do escuro pode ATACAR ('A'),
+                // restrito a alvos ja visiveis no snapshot confirmado e com o
+                // corredor de tiro inteiro em hexes revelados. Cancelar segue
+                // sem ensinar nada — alvos e corredor ja eram conhecimento do time.
+                RunMirarSensorAtUnconfirmedDestination(boardMap, movementMode);
+                RuntimeLog(
+                    "[Sensors] Destino provisório fora da visão confirmada: sensores contextuais suprimidos " +
+                    $"(exceção de ataque: validos={cachedPodeMirarTargets.Count}, invalidos={cachedPodeMirarInvalidTargets.Count}).");
                 NotifySensorsReady();
                 return;
             }
@@ -206,6 +258,126 @@ public partial class TurnStateManager
         {
             RegisterPerfSensorsDuration((Time.realtimeSinceStartupAsDouble - perfStart) * 1000d);
         }
+    }
+
+    // Exceção estreita ao contrato anti-oráculo (ver chamada em
+    // RefreshSensorsForCurrentState): com destino provisório em hex preto,
+    // roda SOMENTE o PodeMirar. O proprio sensor ja filtra alvos pela
+    // visibilidade confirmada (respectTotalWarVisibility); aqui adicionamos a
+    // regra do corredor — linha de tiro so vale se todos os hexes
+    // intermediarios estiverem revelados no snapshot confirmado (adjacencia
+    // passa trivialmente; tiro indireto nao tem corredor). Alvos/invalidos com
+    // corredor no escuro viram invalido de motivo neutro, sem expor celula
+    // bloqueadora nem perfil EV (estado de FoW e conhecimento do jogador;
+    // terreno oculto nao vaza).
+    private void RunMirarSensorAtUnconfirmedDestination(Tilemap boardMap, SensorMovementMode movementMode)
+    {
+        if (selectedUnit == null || matchController == null)
+            return;
+
+        PodeMirarSensor.CollectTargets(
+            selectedUnit,
+            boardMap,
+            terrainDatabase,
+            movementMode,
+            cachedPodeMirarTargets,
+            cachedPodeMirarInvalidTargets,
+            weaponPriorityData,
+            dpqAirHeightConfig,
+            matchController.EnableLdtValidation,
+            matchController.EnableLosValidation,
+            matchController.EnableSpotter,
+            matchController.EnableStealthValidation,
+            respectTotalWarVisibility: true);
+
+        for (int i = cachedPodeMirarTargets.Count - 1; i >= 0; i--)
+        {
+            PodeMirarTargetOption option = cachedPodeMirarTargets[i];
+            if (option == null)
+            {
+                cachedPodeMirarTargets.RemoveAt(i);
+                continue;
+            }
+
+            if (IsLineOfFireCorridorConfirmedVisible(option.lineOfFireIntermediateCells))
+                continue;
+
+            cachedPodeMirarInvalidTargets.Add(BuildCorridorUnscoutedInvalidOption(
+                option.attackerUnit, option.targetUnit, option.weapon, option.embarkedWeaponIndex,
+                option.distance, option.attackerPositionLabel, option.defenderPositionLabel));
+            cachedPodeMirarTargets.RemoveAt(i);
+        }
+
+        for (int i = cachedPodeMirarInvalidTargets.Count - 1; i >= 0; i--)
+        {
+            PodeMirarInvalidOption invalid = cachedPodeMirarInvalidTargets[i];
+            if (invalid == null)
+            {
+                cachedPodeMirarInvalidTargets.RemoveAt(i);
+                continue;
+            }
+
+            if (invalid.reasonId == PodeMirarInvalidOption.ReasonIdCorridorUnscouted)
+                continue;
+            if (IsLineOfFireCorridorConfirmedVisible(invalid.lineOfFireIntermediateCells))
+                continue;
+
+            // Neutraliza in-place: o motivo original (ex.: LOS bloqueada em
+            // celula X) foi computado com terreno oculto e vazaria intel.
+            invalid.reason = "Linha de tiro atravessa área não reconhecida.";
+            invalid.reasonId = PodeMirarInvalidOption.ReasonIdCorridorUnscouted;
+            invalid.blockedCell = Vector3Int.zero;
+            invalid.lineOfFireIntermediateCells?.Clear();
+            invalid.lineOfFireEvPath?.Clear();
+        }
+
+        CollapseMirarTargetsByTargetUnit(cachedPodeMirarTargets);
+
+        availableSensorActionCodes.Remove('A');
+        if (cachedPodeMirarTargets.Count > 0 || cachedPodeMirarInvalidTargets.Count > 0)
+            availableSensorActionCodes.Add('A');
+    }
+
+    private PodeMirarInvalidOption BuildCorridorUnscoutedInvalidOption(
+        UnitManager attacker,
+        UnitManager target,
+        WeaponData weapon,
+        int embarkedWeaponIndex,
+        int distance,
+        string attackerPositionLabel,
+        string defenderPositionLabel)
+    {
+        return new PodeMirarInvalidOption
+        {
+            attackerUnit = attacker,
+            targetUnit = target,
+            weapon = weapon,
+            embarkedWeaponIndex = embarkedWeaponIndex,
+            distance = distance,
+            attackerPositionLabel = attackerPositionLabel,
+            defenderPositionLabel = defenderPositionLabel,
+            reason = "Linha de tiro atravessa área não reconhecida.",
+            reasonId = PodeMirarInvalidOption.ReasonIdCorridorUnscouted,
+            blockedCell = Vector3Int.zero
+        };
+    }
+
+    private bool IsLineOfFireCorridorConfirmedVisible(List<Vector3Int> intermediateCells)
+    {
+        if (matchController == null)
+            return false;
+        if (intermediateCells == null || intermediateCells.Count == 0)
+            return true;
+
+        for (int i = 0; i < intermediateCells.Count; i++)
+        {
+            Vector3Int cell = intermediateCells[i];
+            cell.z = 0;
+            if (!matchController.IsCellVisibleForActiveTeam(cell))
+                return false;
+        }
+
+        return true;
     }
 
     private bool ShouldSuppressContextSensorsAtUnconfirmedDestination()
@@ -363,6 +535,14 @@ public partial class TurnStateManager
         if (CurrentCursorState == CursorState.Desembarcando)
         {
             mode = SensorMovementMode.MoveuParado;
+            return true;
+        }
+
+        if (CurrentCursorState == CursorState.Mirando)
+        {
+            mode = cursorStateBeforeMirando == CursorState.MoveuAndando
+                ? SensorMovementMode.MoveuAndando
+                : SensorMovementMode.MoveuParado;
             return true;
         }
 
