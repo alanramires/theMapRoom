@@ -293,6 +293,9 @@ public class BattleMapMenuRootController : MonoBehaviour
 
     public bool TryToggleMenuFromShortcut()
     {
+        if (PanelRodadaController.IsGameplayInputBlocked)
+            return false;
+
         TryAutoAssignReferences();
         EnsureButtonsCache();
 
@@ -397,6 +400,9 @@ public class BattleMapMenuRootController : MonoBehaviour
 
     public bool TryHandleMenuInput(CursorController cursor, TurnStateManager stateManager)
     {
+        if (PanelRodadaController.IsGameplayInputBlocked)
+            return false;
+
         cursorController = cursorController != null ? cursorController : cursor;
         turnStateManager = turnStateManager != null ? turnStateManager : stateManager;
         TryAutoAssignReferences();

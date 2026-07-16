@@ -207,6 +207,9 @@ public class CursorController : MonoBehaviour
 
     private bool IsCursorBlocked()
     {
+        if (PanelRodadaController.IsGameplayInputBlocked)
+            return true;
+
         if (UiInputBlocker.IsTextInputFocused())
             return true;
 
@@ -230,6 +233,14 @@ public class CursorController : MonoBehaviour
         UpdateRightClickCancelTap();
         TryAutoAssignReplayManager();
         if (replayManager != null && replayManager.IsReplaying)
+        {
+            heldDirection = Vector3Int.zero;
+            return;
+        }
+
+        // O panel_rodada e uma barreira total: enquanto carrega ou aguarda o
+        // jogador, nem o menu pode receber atalhos por tras da tela de privacidade.
+        if (PanelRodadaController.IsGameplayInputBlocked)
         {
             heldDirection = Vector3Int.zero;
             return;

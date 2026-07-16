@@ -299,6 +299,28 @@ public partial class TurnStateManager
                 continue;
             }
 
+            // Regra dura do escuro: alem do alvo confirmado, a CELULA do alvo
+            // precisa ser conhecida pelo time. Alvo em hex que o time nao ve
+            // sai SILENCIOSAMENTE (entrada invalida nomeada tambem vazaria a
+            // existencia dele). O log abaixo e o diagnostico de fonte: se um
+            // alvo passou o filtro confirmado mas caiu aqui, o cache de
+            // visibilidade de unidades foi populado por um caminho errado.
+            UnitManager targetUnit = option.targetUnit;
+            if (targetUnit != null)
+            {
+                Vector3Int targetCell = targetUnit.CurrentCellPosition;
+                targetCell.z = 0;
+                if (!matchController.IsCellKnownForActiveTeam(targetCell, selectedUnit))
+                {
+                    Debug.Log(
+                        $"[MiraNoEscuro][LEAK] alvo={targetUnit.name} cell=({targetCell.x},{targetCell.y}) " +
+                        $"passou confirmado={matchController.IsUnitVisibleForActiveTeamConfirmed(targetUnit)} " +
+                        $"mas celula NAO conhecida pelo time ativo={matchController.ActiveTeamId} — removido da mira.");
+                    cachedPodeMirarTargets.RemoveAt(i);
+                    continue;
+                }
+            }
+
             if (IsLineOfFireCorridorConfirmedVisible(option.lineOfFireIntermediateCells))
                 continue;
 
@@ -315,6 +337,25 @@ public partial class TurnStateManager
             {
                 cachedPodeMirarInvalidTargets.RemoveAt(i);
                 continue;
+            }
+
+            // Mesma regra dura, POR ENTRADA (cada arma gera a sua): alvo em
+            // celula desconhecida sai silenciosamente tambem dos invalidos —
+            // a entrada nomeada ("Apache, HP...") vazaria a existencia da
+            // unidade exatamente como a valida.
+            UnitManager invalidTarget = invalid.targetUnit;
+            if (invalidTarget != null)
+            {
+                Vector3Int invalidCell = invalidTarget.CurrentCellPosition;
+                invalidCell.z = 0;
+                if (!matchController.IsCellKnownForActiveTeam(invalidCell, selectedUnit))
+                {
+                    Debug.Log(
+                        $"[MiraNoEscuro][LEAK] entrada INVALIDA alvo={invalidTarget.name} cell=({invalidCell.x},{invalidCell.y}) " +
+                        $"em celula nao conhecida pelo time ativo={matchController.ActiveTeamId} — removida da lista.");
+                    cachedPodeMirarInvalidTargets.RemoveAt(i);
+                    continue;
+                }
             }
 
             if (invalid.reasonId == PodeMirarInvalidOption.ReasonIdCorridorUnscouted)
@@ -373,7 +414,10 @@ public partial class TurnStateManager
         {
             Vector3Int cell = intermediateCells[i];
             cell.z = 0;
-            if (!matchController.IsCellVisibleForActiveTeam(cell))
+            // Conhecimento do time (visao geral + especializacoes + construcoes),
+            // consistente com o gate de supressao de sensores — e igualmente
+            // excluindo a visao da propria unidade em posicao provisoria.
+            if (!matchController.IsCellKnownForActiveTeam(cell, selectedUnit))
                 return false;
         }
 
@@ -393,7 +437,13 @@ public partial class TurnStateManager
 
         Vector3Int destination = selectedUnit.CurrentCellPosition;
         destination.z = 0;
-        return !matchController.IsCellVisibleForActiveTeam(destination);
+        // Conhecimento do TIME, nao da unidade selecionada: inclui visao geral,
+        // especializacoes (ex.: EWACS revelando o hex a distancia) e construcoes
+        // aliadas. Sem isso, a infantaria nao podia capturar um hex que o radar
+        // do proprio time ja enxergava. A PROPRIA unidade em movimento provisorio
+        // e excluida da uniao — senao ela "iluminaria" o destino cancelavel com a
+        // propria visao e desligaria esta supressao (oraculo).
+        return !matchController.IsCellKnownForActiveTeam(destination, selectedUnit);
     }
 
     private bool IsSelectedUnitInContestedHexTotalWar()

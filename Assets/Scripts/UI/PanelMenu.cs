@@ -253,6 +253,9 @@ public class PanelMenu : MonoBehaviour
 
     protected virtual void Update()
     {
+        if (PanelRodadaController.IsGameplayInputBlocked)
+            return;
+
         if (stateController != null)
             return;
 

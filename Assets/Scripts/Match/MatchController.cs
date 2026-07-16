@@ -469,6 +469,7 @@ public class MatchController : MonoBehaviour
     public TeamId VictoryWinnerTeam => victoryWinnerTeam;
     private Coroutine advanceTurnTransitionRoutine;
     private bool hotSeatGateActive;
+    private bool deferTurnStartEffectsForHotSeatGate;
 
     public int GetVictoryStars(TeamId team)
     {
@@ -1547,11 +1548,22 @@ public class MatchController : MonoBehaviour
         }
 
         double advanceTurnStartMs = TurnPerfNowMs();
-        AdvanceTurn();
+        deferTurnStartEffectsForHotSeatGate = useHotSeatPanel;
+        try
+        {
+            AdvanceTurn();
+        }
+        finally
+        {
+            deferTurnStartEffectsForHotSeatGate = false;
+        }
         TurnPerfLog("AdvanceTurn", advanceTurnStartMs);
 
         if (useHotSeatPanel && !hasVictoryWinner)
+        {
             yield return panelRodada.Apresentar(ActiveTeam, activePlayerListIndex + 1, currentTurn);
+            ApplyPendingTurnStartEffectsAfterHotSeatGate();
+        }
 
         float postDelay = turnStateManager != null ? turnStateManager.AdvanceTurnPostDelay : advanceTurnPostDelay;
         if (postDelay > 0f)
@@ -2317,13 +2329,13 @@ public class MatchController : MonoBehaviour
 
         List<ConstructionManager> activeConstructions = GetActiveConstructionsOnScene();
 
-        if (applyTurnStartEffects)
+        if (applyTurnStartEffects && !deferTurnStartEffectsForHotSeatGate)
         {
             stageStartMs = TurnPerfNowMs();
             ReleaseUnitsForActiveTeam(activeConstructions);
             TurnPerfLog("ApplyActiveTeam.ReleaseUnitsForActiveTeam", stageStartMs);
         }
-        else
+        else if (!deferTurnStartEffectsForHotSeatGate)
             pendingTurnStartAutonomyHelperEntries = null;
 
         stageStartMs = TurnPerfNowMs();
@@ -2361,6 +2373,36 @@ public class MatchController : MonoBehaviour
         FlushTurnStartAutonomyHelper();
         TurnPerfLog("ApplyActiveTeam.FlushTurnStartAutonomyHelper", stageStartMs);
         TurnPerfLog("ApplyActiveTeam.Total", totalStartMs);
+    }
+
+    private void ApplyPendingTurnStartEffectsAfterHotSeatGate()
+    {
+        if (!pendingTurnStartUpkeep && !pendingTurnStartEconomy)
+            return;
+
+        double totalStartMs = TurnPerfNowMs();
+        List<ConstructionManager> activeConstructions = GetActiveConstructionsOnScene();
+        ReleaseUnitsForActiveTeam(activeConstructions);
+
+        if (!debugFogOfWarEnabled)
+        {
+            ResetFogOfWarRuntime(clearTilemap: true);
+            ShowAllUnitsIgnoringFog();
+        }
+        else if (enableTotalWar)
+        {
+            RefreshFogOfWarForActiveTeam();
+            RefreshRuntimeUnitFogVisibility();
+            RunTurnStartStillObservedForActiveTeamStealthUnits();
+        }
+        else
+        {
+            ResetFogOfWarRuntime(clearTilemap: true);
+            RefreshRuntimeUnitFogVisibility();
+        }
+
+        FlushTurnStartAutonomyHelper();
+        TurnPerfLog("ApplyPendingTurnStartEffectsAfterHotSeatGate.Total", totalStartMs);
     }
 
     private void ApplyTeamFlipSettingsToSceneObjects()
@@ -3992,6 +4034,14 @@ public class MatchController : MonoBehaviour
     {
         if (unit == null || boardMap == null || observerTeam == TeamId.Neutral)
             return false;
+        // A regra e sobre OCUPACAO da construcao (quem esta DE PE nela, na banda
+        // bloqueante — o inimigo que ameaca capturar seu predio e sempre visto).
+        // Aeronave sobrevoando ou submarino passando por baixo do hex da
+        // construcao amiga NAO esta "na construcao" e nao pode ser auto-revelado
+        // por esta regra — senao um Apache em Baixas Altitudes sobre o seu
+        // aeroporto vira alvo mesmo com o hex coberto pelo FoW.
+        if (OccupancyResolver.GetHeightBand(unit) != HeightBand.Blocking)
+            return false;
         if (!IsUnitOnBoard(unit, boardMap))
             return false;
 
@@ -4051,6 +4101,53 @@ public class MatchController : MonoBehaviour
 
         cell.z = 0;
         return fogVisibleContributorsByCell.TryGetValue(cell, out int contributors) && contributors > 0;
+    }
+
+    // Cache por frame do conhecimento de celulas do time ativo (uniao All-modes:
+    // visao geral + especializacoes + construcoes aliadas). Rebuild no maximo
+    // uma vez por frame; as views especializadas por unidade ja sao cacheadas.
+    private readonly HashSet<Vector3Int> teamKnownCellsCache = new HashSet<Vector3Int>();
+    private int teamKnownCellsCacheFrame = -1;
+    private int teamKnownCellsCacheTeamId = int.MinValue;
+    private int teamKnownCellsCacheExcludedIndex = int.MinValue;
+
+    // Conhecimento confirmado do TIME sobre a celula, independente do modo de
+    // visao selecionado no HUD: visao geral (fogVisibleContributorsByCell) +
+    // especializacoes de camada (ex.: EWACS revela Air a alcance 9) + celulas
+    // reveladas por construcoes aliadas. E o predicado correto para gates de
+    // GAMEPLAY (supressao de sensores, captura, corredor de tiro): visao e
+    // conhecimento do time, nao da unidade selecionada.
+    //
+    // excludeProvisionalUnit: a unidade em MOVIMENTO PROVISORIO nao pode
+    // contribuir a propria visao para a uniao — a especializacao dela radiaria
+    // do destino cancelavel e marcaria o escuro como "conhecido", desligando a
+    // supressao anti-oraculo que protege exatamente esse fluxo. O restante do
+    // time (posicoes confirmadas) continua contando.
+    public bool IsCellKnownForActiveTeam(Vector3Int cell, UnitManager excludeProvisionalUnit = null)
+    {
+        if (!debugFogOfWarEnabled || !enableTotalWar)
+            return true;
+
+        cell.z = 0;
+        if (IsCellVisibleForActiveTeam(cell))
+            return true;
+
+        Tilemap boardMap = ResolveFogBoardTilemap();
+        if (boardMap == null)
+            return false;
+
+        int excludedIndex = excludeProvisionalUnit != null ? ResolveFogCacheIndex(excludeProvisionalUnit) : int.MinValue;
+        if (teamKnownCellsCacheFrame != Time.frameCount ||
+            teamKnownCellsCacheTeamId != activeTeamId ||
+            teamKnownCellsCacheExcludedIndex != excludedIndex)
+        {
+            BuildFogDisplayVisibleCellsForAllModes(boardMap, teamKnownCellsCache, excludeProvisionalUnit);
+            teamKnownCellsCacheFrame = Time.frameCount;
+            teamKnownCellsCacheTeamId = activeTeamId;
+            teamKnownCellsCacheExcludedIndex = excludedIndex;
+        }
+
+        return teamKnownCellsCache.Contains(cell);
     }
 
     public bool IsCellVisibleInFogPresentation(Vector3Int cell)
@@ -4590,7 +4687,7 @@ public class MatchController : MonoBehaviour
         }
     }
 
-    private void BuildFogDisplayVisibleCellsForAllModes(Tilemap boardMap, HashSet<Vector3Int> output)
+    private void BuildFogDisplayVisibleCellsForAllModes(Tilemap boardMap, HashSet<Vector3Int> output, UnitManager excludeUnit = null)
     {
         if (output == null)
             return;
@@ -4610,6 +4707,11 @@ public class MatchController : MonoBehaviour
         for (int i = 0; i < units.Length; i++)
         {
             UnitManager unit = units[i];
+            // excludeUnit: unidade em posicao provisoria nao radia a propria
+            // visao (a view especializada usa a posicao ATUAL, que ainda e
+            // cancelavel durante MoveuAndando).
+            if (unit == excludeUnit)
+                continue;
             if (unit == null || !unit.gameObject.activeInHierarchy || unit.IsEmbarked ||
                 (int)unit.TeamId != activeTeamId || !IsUnitOnBoard(unit, boardMap) ||
                 !unit.TryGetUnitData(out UnitData unitData) || unitData == null ||
@@ -5198,6 +5300,60 @@ public class MatchController : MonoBehaviour
                 || ComputeIsUnitVisibleForTeamWithoutCache(unit, observerTeam);
             fogUnitVisibilityByCacheIndex[ResolveFogCacheIndex(unit)] = visible;
             unit.SetFogOfWarVisibility(ResolveFogRenderVisibility(unit, visible, fogOverlayOwnsWorldOcclusion));
+        }
+
+        RefreshStackedHexFrontRendering(units, boardMap, observerTeam);
+    }
+
+    // Scratch do passo de empilhamento multicamada (ver metodo abaixo).
+    private readonly HashSet<Vector3Int> stackedHexOtherTeamCellsScratch = new HashSet<Vector3Int>();
+
+    // Hex multicamada compartilhado (ex.: navio inimigo Naval/Surface parado
+    // sobre o submarino Submerged do observador): a unidade do PROPRIO
+    // observador renderiza na frente, para o dono ver onde ela esta. E so
+    // apresentacao, relativa ao time que olha — o oponente que nao detecta a
+    // unidade continua sem ve-la (o hide individual do FoW cuida disso).
+    private void RefreshStackedHexFrontRendering(List<UnitManager> units, Tilemap boardMap, TeamId observerTeam)
+    {
+        if (units == null)
+            return;
+
+        stackedHexOtherTeamCellsScratch.Clear();
+
+        for (int i = 0; i < units.Count; i++)
+        {
+            UnitManager unit = units[i];
+            if (unit == null || !unit.gameObject.activeInHierarchy || unit.IsEmbarked || unit.IsDead)
+                continue;
+            if (boardMap != null && !IsUnitOnBoard(unit, boardMap))
+                continue;
+            if (unit.TeamId == observerTeam)
+                continue;
+
+            Vector3Int cell = unit.CurrentCellPosition;
+            cell.z = 0;
+            stackedHexOtherTeamCellsScratch.Add(cell);
+        }
+
+        for (int i = 0; i < units.Count; i++)
+        {
+            UnitManager unit = units[i];
+            if (unit == null)
+                continue;
+
+            bool front = unit.gameObject.activeInHierarchy
+                && !unit.IsEmbarked
+                && !unit.IsDead
+                && unit.TeamId == observerTeam
+                && (boardMap == null || IsUnitOnBoard(unit, boardMap));
+            if (front)
+            {
+                Vector3Int cell = unit.CurrentCellPosition;
+                cell.z = 0;
+                front = stackedHexOtherTeamCellsScratch.Contains(cell);
+            }
+
+            unit.SetStackedHexFrontRendering(front);
         }
     }
 

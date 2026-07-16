@@ -786,6 +786,57 @@ public class UnitManager : MonoBehaviour
         hasTemporarySortingOverride = false;
     }
 
+    // Hex multicamada (ex.: navio Naval/Surface + submarino Submerged no mesmo
+    // hex): a unidade do time OBSERVADOR salta pra frente do sprite inimigo,
+    // para o dono ver onde a sua unidade esta. Bump persistente e bem abaixo do
+    // 999 da selecao. Convive com o override temporario de selecao ajustando a
+    // base cacheada quando ele estiver ativo (senao a deselecao restauraria a
+    // ordem errada).
+    private const int StackedHexFrontSortingBump = 40;
+    private int stackedHexFrontBaseOrder;
+    private bool stackedHexFrontApplied;
+
+    public void SetStackedHexFrontRendering(bool front)
+    {
+        if (front == stackedHexFrontApplied)
+            return;
+
+        if (spriteRenderer == null)
+            spriteRenderer = GetComponentInChildren<SpriteRenderer>();
+        if (spriteRenderer == null)
+            return;
+
+        if (hasTemporarySortingOverride)
+        {
+            // Selecao ativa: o renderer esta em 999; ajusta apenas a base que
+            // sera restaurada no ClearTemporarySortingOrder.
+            if (front)
+            {
+                stackedHexFrontBaseOrder = cachedSpriteSortingOrder;
+                cachedSpriteSortingOrder = stackedHexFrontBaseOrder + StackedHexFrontSortingBump;
+            }
+            else
+            {
+                cachedSpriteSortingOrder = stackedHexFrontBaseOrder;
+            }
+
+            stackedHexFrontApplied = front;
+            return;
+        }
+
+        if (front)
+        {
+            stackedHexFrontBaseOrder = spriteRenderer.sortingOrder;
+            spriteRenderer.sortingOrder = stackedHexFrontBaseOrder + StackedHexFrontSortingBump;
+        }
+        else
+        {
+            spriteRenderer.sortingOrder = stackedHexFrontBaseOrder;
+        }
+
+        stackedHexFrontApplied = front;
+    }
+
     public void BeginTemporaryFogTraversalVisual()
     {
         if (temporaryFogTraversalVisual) return;

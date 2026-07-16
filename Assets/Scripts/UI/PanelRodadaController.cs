@@ -5,6 +5,8 @@ using UnityEngine.UI;
 
 public sealed class PanelRodadaController : MonoBehaviour
 {
+    private static int gameplayInputBlockCount;
+
     [SerializeField] private Button botaoRodada;
     [SerializeField] private TMP_Text textoJogador;
     [SerializeField] private TMP_Text textoTurno;
@@ -22,10 +24,19 @@ public sealed class PanelRodadaController : MonoBehaviour
     private bool aguardandoConfirmacao;
     private bool confirmado;
     private int presentationVersion;
+    private Coroutine loadingOpeningAudioRoutine;
+    private bool gameplayInputBlockRegistered;
     private Vector2 textoJogadorDefaultAnchoredPosition;
     private bool textoJogadorPositionCached;
 
     public bool IsPresenting { get; private set; }
+    public static bool IsGameplayInputBlocked => gameplayInputBlockCount > 0 || SaveGameManager.IsAnyLoadInProgress;
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetGameplayInputGate()
+    {
+        gameplayInputBlockCount = 0;
+    }
 
     private void Awake()
     {
@@ -67,10 +78,16 @@ public sealed class PanelRodadaController : MonoBehaviour
             Confirmar();
     }
 
+    private void OnDisable()
+    {
+        ReleaseGameplayInputBlock();
+    }
+
     public IEnumerator Apresentar(TeamId team, int numeroJogador, int turno)
     {
         int version = ++presentationVersion;
         IsPresenting = true;
+        AcquireGameplayInputBlock();
         confirmado = false;
         aguardandoConfirmacao = false;
         gameObject.SetActive(true);
@@ -143,6 +160,7 @@ public sealed class PanelRodadaController : MonoBehaviour
         canvasGroup.blocksRaycasts = false;
         canvasGroup.interactable = false;
         IsPresenting = false;
+        ReleaseGameplayInputBlock();
         gameObject.SetActive(false);
     }
 
@@ -150,6 +168,7 @@ public sealed class PanelRodadaController : MonoBehaviour
     {
         presentationVersion++;
         IsPresenting = true;
+        AcquireGameplayInputBlock();
         confirmado = false;
         aguardandoConfirmacao = false;
         gameObject.SetActive(true);
@@ -172,7 +191,9 @@ public sealed class PanelRodadaController : MonoBehaviour
         }
         SetButtonEnabled(false);
         SetContentAlpha(1f);
-        StartWaitingAudio();
+        if (loadingOpeningAudioRoutine != null)
+            StopCoroutine(loadingOpeningAudioRoutine);
+        loadingOpeningAudioRoutine = StartCoroutine(PlayLoadingOpeningAudio());
     }
 
     public void SetLoadingTeam(TeamId team, int turno)
@@ -202,6 +223,15 @@ public sealed class PanelRodadaController : MonoBehaviour
         if (!IsPresenting)
             BeginLoadingPresentation();
         version = presentationVersion;
+
+        // Mesmo quando o restore termina muito rapido, preserva a abertura sonora
+        // completa ainda na fase "Carregando": menu_open -> aguardandoRodada.
+        // So depois que o loop de espera entrou liberamos "Vez do Time" e o botao.
+        if (loadingOpeningAudioRoutine != null)
+            yield return new WaitUntil(() => loadingOpeningAudioRoutine == null || version != presentationVersion);
+        if (version != presentationVersion)
+            yield break;
+
         RestorePlayerTextPosition();
 
         if (textoJogador != null)
@@ -220,13 +250,21 @@ public sealed class PanelRodadaController : MonoBehaviour
         SetButtonEnabled(true);
         if (botaoRodada != null)
             botaoRodada.Select();
-        StartWaitingAudio();
+        // Se menu_open ainda estiver tocando, a propria sequencia inicia o loop
+        // logo depois. Se ja terminou, preserva/garante aguardandoRodada agora.
+        if (loadingOpeningAudioRoutine == null)
+            StartWaitingAudio();
 
         yield return new WaitUntil(() => confirmado || version != presentationVersion);
         if (version != presentationVersion)
             yield break;
 
         aguardandoConfirmacao = false;
+        if (loadingOpeningAudioRoutine != null)
+        {
+            StopCoroutine(loadingOpeningAudioRoutine);
+            loadingOpeningAudioRoutine = null;
+        }
         audioSource.Stop();
         audioSource.loop = false;
         SetButtonEnabled(false);
@@ -239,6 +277,7 @@ public sealed class PanelRodadaController : MonoBehaviour
         canvasGroup.blocksRaycasts = false;
         canvasGroup.interactable = false;
         IsPresenting = false;
+        ReleaseGameplayInputBlock();
         gameObject.SetActive(false);
     }
 
@@ -247,6 +286,11 @@ public sealed class PanelRodadaController : MonoBehaviour
         presentationVersion++;
         aguardandoConfirmacao = false;
         confirmado = false;
+        if (loadingOpeningAudioRoutine != null)
+        {
+            StopCoroutine(loadingOpeningAudioRoutine);
+            loadingOpeningAudioRoutine = null;
+        }
         audioSource.Stop();
         audioSource.loop = false;
         SetButtonEnabled(false);
@@ -254,6 +298,7 @@ public sealed class PanelRodadaController : MonoBehaviour
         canvasGroup.blocksRaycasts = false;
         canvasGroup.interactable = false;
         IsPresenting = false;
+        ReleaseGameplayInputBlock();
         gameObject.SetActive(false);
     }
 
@@ -278,6 +323,34 @@ public sealed class PanelRodadaController : MonoBehaviour
         audioSource.clip = aguardandoRodada;
         audioSource.loop = true;
         audioSource.Play();
+    }
+
+    private void AcquireGameplayInputBlock()
+    {
+        if (gameplayInputBlockRegistered)
+            return;
+        gameplayInputBlockRegistered = true;
+        gameplayInputBlockCount++;
+    }
+
+    private void ReleaseGameplayInputBlock()
+    {
+        if (!gameplayInputBlockRegistered)
+            return;
+        gameplayInputBlockRegistered = false;
+        gameplayInputBlockCount = Mathf.Max(0, gameplayInputBlockCount - 1);
+    }
+
+    private IEnumerator PlayLoadingOpeningAudio()
+    {
+        if (menuOpen != null)
+            yield return PlayClip(menuOpen, false);
+
+        // Sequencia unica do painel: menu_open uma vez e, em seguida,
+        // aguardandoRodada em loop. O loop atravessa a troca de
+        // "Carregando" para "Vez do Time" e so para na confirmacao.
+        StartWaitingAudio();
+        loadingOpeningAudioRoutine = null;
     }
 
     private void CachePlayerTextPosition()

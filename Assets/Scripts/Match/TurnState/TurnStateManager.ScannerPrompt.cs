@@ -218,6 +218,8 @@ public partial class TurnStateManager
     {
         UpdateAiActionOverlayPresentation();
         RecordFramePerfSample();
+        if (PanelRodadaController.IsGameplayInputBlocked)
+            return;
         ProcessPerformanceSnapshotHotkeyInput();
         UpdateInspectedHelperAutoDismiss();
         TrackRuntimeDebugLogs();

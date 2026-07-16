@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Tanque A
   m_EditorClassIdentifier: Assembly-CSharp::UnitData
   id: tanqueA
-  displayName: Tanque Pesado
+  displayName: Tanque de Batalha
   apelido: TA
   description: "Blindado r\xE1pido e vers\xE1til, ideal para flanquear e explorar
     falhas na linha inimiga. Eficiente contra blindados e infantaria, mas vulner\xE1vel

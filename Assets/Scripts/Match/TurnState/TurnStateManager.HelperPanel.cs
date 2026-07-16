@@ -1849,16 +1849,6 @@ public partial class TurnStateManager
             Vector3Int cell = cachedLineCells[i];
             if (targetLineLookup.Contains(cell))
                 continue;
-
-            // Hex preto de FoW nao recebe mira: o contrato de combate proibe
-            // pre-mirar o escuro (alvo precisa estar no snapshot confirmado),
-            // entao a mira ali prometeria um tiro impossivel. O filtro fica na
-            // PINTURA (nao no envelope cacheado) porque o cache e fog-agnostico
-            // e o fog muda por turno/time. A mancha verdadeira e "mira em volta,
-            // buraco no escuro".
-            if (matchController != null && !matchController.IsCellVisibleForActiveTeam(cell))
-                continue;
-
             lineOfFireMapTilemap.SetTile(cell, lineOfFireOverlayTile);
             lineOfFireMapTilemap.SetTileFlags(cell, TileFlags.None);
             lineOfFireMapTilemap.SetColor(cell, threatColor);
