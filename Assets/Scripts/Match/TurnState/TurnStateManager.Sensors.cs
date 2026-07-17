@@ -236,13 +236,6 @@ public partial class TurnStateManager
             cachedPodeMirarInvalidTargets.Clear();
         }
 
-        if (selectedUnit.LayerLockTurnsRemaining > 0)
-        {
-            availableSensorActionCodes.Remove('A');
-            cachedPodeMirarTargets.Clear();
-            cachedPodeMirarInvalidTargets.Clear();
-        }
-
         if (selectedUnit.IsEmbarked)
         {
             availableSensorActionCodes.Remove('A');

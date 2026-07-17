@@ -1306,14 +1306,12 @@ public partial class TurnStateManager
             });
         }
 
-        if (commandServicePreviewEntries.Count <= 0)
-            return;
-
-        commandServicePreviewSelectedIndex = 0;
-        commandServicePreviewNavigationIndex = 0;
-        commandServicePreviewFocusIndex = -1;
-        RefreshCommandServiceHelperFocus();
-        PanCommandServicePreviewCamera(commandServicePreviewEntries[0].cell);
+        // Executar e a acao principal. As linhas de unidade continuam na mesma
+        // navegacao para inspecao opcional, mas nao capturam o foco ao abrir.
+        commandServicePreviewSelectedIndex = -1;
+        commandServicePreviewNavigationIndex = commandServicePreviewEntries.Count;
+        commandServicePreviewFocusIndex = CommandServicePreviewExecuteIndex;
+        RefreshCommandServiceHelperFocus(clearSelection: true);
     }
 
     public bool NavigateCommandServicePreviewUnits(int delta)

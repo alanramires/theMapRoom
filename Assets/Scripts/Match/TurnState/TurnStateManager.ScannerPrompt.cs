@@ -4179,8 +4179,11 @@ public partial class TurnStateManager
                 KillEntireEmbarkedChain(children[i], detachSelf: true, deathReason: deathReason, killer: killer);
         }
 
-        root.SetCurrentHP(0);
+        // MarkDead precisa observar a transicao vivo -> morto para publicar o
+        // evento no Jornal do Comandante. SetCurrentHP(0) primeiro sincronizava
+        // isDead e fazia MarkDead interpretar a morte como ja registrada.
         root.MarkDead(deathReason, killer);
+        root.SetCurrentHP(0);
         
         OnUnitDestroyed?.Invoke(root);
 
