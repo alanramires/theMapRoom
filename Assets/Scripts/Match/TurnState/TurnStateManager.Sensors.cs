@@ -236,7 +236,7 @@ public partial class TurnStateManager
             cachedPodeMirarInvalidTargets.Clear();
         }
 
-        if (selectedUnit.AircraftOperationLockTurns > 0)
+        if (selectedUnit.LayerLockTurnsRemaining > 0)
         {
             availableSensorActionCodes.Remove('A');
             cachedPodeMirarTargets.Clear();

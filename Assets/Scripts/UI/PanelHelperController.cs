@@ -1943,6 +1943,7 @@ public class PanelHelperController : MonoBehaviour
                 .Append('|').Append(line.fuelBefore).Append('|').Append(line.autonomyConsumed)
                 .Append('|').Append(line.fuelAfter).Append('/').Append(line.fuelMax)
                 .Append('|').Append(line.isFocused)
+                .Append('|').Append(line.customText ?? string.Empty)
                 .Append('|').Append(line.unitSprite != null ? line.unitSprite.name : string.Empty);
         }
         string signature = signatureBuilder.ToString();
@@ -1992,11 +1993,12 @@ public class PanelHelperController : MonoBehaviour
             Destroy(autonomyUpkeepRoot.transform.GetChild(i).gameObject);
         autonomyUpkeepRows.Clear();
 
-        CreateAutonomyUpkeepTextRow("Consumo em voo", AutonomyUpkeepHeaderHeight, 20f, TextAlignmentOptions.Center);
+        CreateAutonomyUpkeepTextRow("Jornal do Comandante", AutonomyUpkeepHeaderHeight, 20f, TextAlignmentOptions.Center);
         for (int i = 0; i < lines.Count; i++)
         {
             TurnStateManager.HelperTurnStartAutonomyLine line = lines[i];
             if (line == null) continue;
+            bool isBriefingLine = !string.IsNullOrWhiteSpace(line.customText);
             GameObject row = new GameObject("autonomy_upkeep_unit", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button), typeof(LayoutElement));
             row.transform.SetParent(autonomyUpkeepRoot.transform, false);
             row.GetComponent<Image>().color = line.isFocused
@@ -2018,11 +2020,20 @@ public class PanelHelperController : MonoBehaviour
             labelRect.SetParent(row.transform, false);
             labelRect.anchorMin = Vector2.zero;
             labelRect.anchorMax = Vector2.one;
-            labelRect.offsetMin = new Vector2(line.unitSprite != null ? 52f : 8f, 12f);
+            // Linhas de briefing nao tem barra de combustivel: usam a altura toda.
+            labelRect.offsetMin = new Vector2(line.unitSprite != null ? 52f : 8f, isBriefingLine ? 3f : 12f);
             labelRect.offsetMax = new Vector2(-6f, -3f);
             TMP_Text label = labelObject.GetComponent<TMP_Text>();
-            string unitName = string.IsNullOrWhiteSpace(line.unitName) ? "Unidade" : line.unitName;
-            label.text = $"{unitName}\nCombustível {Mathf.Max(0, line.fuelBefore)} − {Mathf.Max(0, line.autonomyConsumed)} = {Mathf.Max(0, line.fuelAfter)}\n{FormatMapCell(line.cell)}";
+            if (isBriefingLine)
+            {
+                // Linha do Jornal (evento de briefing): texto pronto, sem barra.
+                label.text = line.customText;
+            }
+            else
+            {
+                string unitName = string.IsNullOrWhiteSpace(line.unitName) ? "Unidade" : line.unitName;
+                label.text = $"{unitName}\nCombustível {Mathf.Max(0, line.fuelBefore)} − {Mathf.Max(0, line.autonomyConsumed)} = {Mathf.Max(0, line.fuelAfter)}\n{FormatMapCell(line.cell)}";
+            }
             label.fontStyle = FontStyles.Bold;
             label.fontSize = 18f;
             label.enableAutoSizing = true;
@@ -2031,7 +2042,8 @@ public class PanelHelperController : MonoBehaviour
             label.alignment = TextAlignmentOptions.MidlineLeft;
             label.color = currentTeamColor;
             label.raycastTarget = false;
-            CreateAutonomyFuelBar(row.transform, line.fuelAfter, line.fuelMax);
+            if (!isBriefingLine)
+                CreateAutonomyFuelBar(row.transform, line.fuelAfter, line.fuelMax);
             autonomyUpkeepRows.Add(row);
         }
 
@@ -2808,7 +2820,8 @@ public class PanelHelperController : MonoBehaviour
                 TurnStateManager.HelperDisembarkPassengerLine passenger = data.DisembarkPassengerLines[i];
                 int selectionNumber = passenger.index;
                 CreateDisembarkButton($"{passenger.index} - {passenger.unitName} ({passenger.stats})",
-                    () => turnStateManager?.TrySelectDisembarkPassengerFromPointer(selectionNumber), true, i);
+                    () => turnStateManager?.TrySelectDisembarkPassengerFromPointer(selectionNumber), true, i,
+                    flexibleTextHeight: true);
             }
             if (data.HasQueuedDisembarkOrders)
                 CreateDisembarkButton("EXECUTAR FILA", () => turnStateManager?.TryExecuteDisembarkQueueFromPointer(), true,
@@ -2826,7 +2839,7 @@ public class PanelHelperController : MonoBehaviour
         }
 
         disembarkActionsRoot.GetComponent<RectTransform>().sizeDelta =
-            new Vector2(0f, disembarkActionButtons.Count * (DisembarkActionButtonHeight + 4f));
+            new Vector2(0f, GetDisembarkActionsPreferredHeight());
     }
 
     private void RebuildSupplyActionButtons(TurnStateManager.HelperPanelData data)
@@ -3079,7 +3092,8 @@ public class PanelHelperController : MonoBehaviour
         Sprite leftSprite = null,
         Color? leftColor = null,
         Sprite rightSprite = null,
-        Color? rightColor = null)
+        Color? rightColor = null,
+        bool flexibleTextHeight = false)
     {
         GameObject obj = new GameObject("button_disembark", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button), typeof(LayoutElement));
         obj.transform.SetParent(disembarkActionsRoot.transform, false);
@@ -3097,6 +3111,22 @@ public class PanelHelperController : MonoBehaviour
         label.text = text; label.fontStyle = FontStyles.Bold; label.alignment = TextAlignmentOptions.Center;
         label.enableAutoSizing = true; label.fontSizeMin = 11f; label.fontSizeMax = 18f; label.raycastTarget = false;
         ConfigureMobileActionLabel(label);
+        if (flexibleTextHeight)
+        {
+            // No passo ESCOLHER UNIDADE, nomes e estatisticas podem quebrar em mais
+            // de uma linha. O botao acompanha o texto e preserva um respiro vertical.
+            label.enableWordWrapping = true;
+            label.lineSpacing = 4f;
+            float panelWidth = helperRect != null ? helperRect.rect.width : 320f;
+            float buttonWidth = panelWidth * 0.88f;
+            float availableTextWidth = Mathf.Max(80f, buttonWidth - iconReserve * 2f);
+            float preferredTextHeight = label.GetPreferredValues(text, availableTextWidth, 0f).y;
+            float flexibleHeight = Mathf.Max(DisembarkActionButtonHeight, preferredTextHeight + 20f);
+            element.minHeight = flexibleHeight;
+            element.preferredHeight = flexibleHeight;
+            labelRect.offsetMin = new Vector2(iconReserve, 10f);
+            labelRect.offsetMax = new Vector2(-iconReserve, -10f);
+        }
         if (interactable)
             TintScriptButtonToTeam(button, false);
         else

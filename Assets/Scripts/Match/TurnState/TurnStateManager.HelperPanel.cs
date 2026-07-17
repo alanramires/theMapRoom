@@ -487,6 +487,10 @@ public partial class TurnStateManager
         public Sprite unitSprite;
         public Color unitColor = Color.white;
         public bool isFocused;
+        // Jornal do Comandante: quando preenchido, a linha e um evento de
+        // briefing generico — o renderer usa este texto no lugar do formato de
+        // combustivel e nao desenha a barra de autonomia.
+        public string customText;
     }
 
     public bool TryBuildHelperPanelData(out HelperPanelData data)
@@ -760,40 +764,55 @@ public partial class TurnStateManager
 
     public void ShowTurnStartAutonomyUpkeepHelper(IReadOnlyList<TurnStartAutonomyUpkeepEntry> entries)
     {
+        ShowTurnStartBriefing(entries, null);
+    }
+
+    // Jornal do Comandante: briefing generico (eventos entre turnos + varreduras
+    // de estado) na frente, consumo em voo atras — um relatorio unico com
+    // navegacao/pan/reabertura herdados do relatorio de autonomia.
+    public void ShowTurnStartBriefing(
+        IReadOnlyList<TurnStartAutonomyUpkeepEntry> entries,
+        List<HelperTurnStartAutonomyLine> briefingLines)
+    {
         turnStartAutonomyHelperLines.Clear();
         lastTurnStartAutonomyHelperLines.Clear();
-        if (entries == null || entries.Count <= 0)
-        {
-            ClearTurnStartAutonomyHelper();
-            return;
-        }
 
-        for (int i = 0; i < entries.Count; i++)
+        if (briefingLines != null)
         {
-            TurnStartAutonomyUpkeepEntry entry = entries[i];
-            if (entry.autonomyConsumed <= 0)
-                continue;
-
-            turnStartAutonomyHelperLines.Add(new HelperTurnStartAutonomyLine
+            for (int i = 0; i < briefingLines.Count; i++)
             {
-                unitName = entry.unitName ?? string.Empty,
-                autonomyConsumed = Mathf.Max(0, entry.autonomyConsumed),
-                fuelBefore = Mathf.Max(0, entry.fuelBefore),
-                fuelAfter = Mathf.Max(0, entry.fuelAfter),
-                fuelMax = Mathf.Max(1, entry.fuelMax),
-                cell = entry.cell,
-                unitSprite = entry.unitSprite,
-                unitColor = entry.unitColor
-            });
+                HelperTurnStartAutonomyLine line = briefingLines[i];
+                if (line != null && !string.IsNullOrWhiteSpace(line.customText))
+                    turnStartAutonomyHelperLines.Add(line);
+            }
         }
 
-        if (turnStartAutonomyHelperLines.Count <= 0)
+        int briefingCount = turnStartAutonomyHelperLines.Count;
+
+        List<HelperTurnStartAutonomyLine> autonomyLines = new List<HelperTurnStartAutonomyLine>();
+        if (entries != null)
         {
-            ClearTurnStartAutonomyHelper();
-            return;
+            for (int i = 0; i < entries.Count; i++)
+            {
+                TurnStartAutonomyUpkeepEntry entry = entries[i];
+                if (entry.autonomyConsumed <= 0)
+                    continue;
+
+                autonomyLines.Add(new HelperTurnStartAutonomyLine
+                {
+                    unitName = entry.unitName ?? string.Empty,
+                    autonomyConsumed = Mathf.Max(0, entry.autonomyConsumed),
+                    fuelBefore = Mathf.Max(0, entry.fuelBefore),
+                    fuelAfter = Mathf.Max(0, entry.fuelAfter),
+                    fuelMax = Mathf.Max(1, entry.fuelMax),
+                    cell = entry.cell,
+                    unitSprite = entry.unitSprite,
+                    unitColor = entry.unitColor
+                });
+            }
         }
 
-        turnStartAutonomyHelperLines.Sort((a, b) =>
+        autonomyLines.Sort((a, b) =>
         {
             float aRatio = a != null ? (float)a.fuelAfter / Mathf.Max(1, a.fuelMax) : 1f;
             float bRatio = b != null ? (float)b.fuelAfter / Mathf.Max(1, b.fuelMax) : 1f;
@@ -803,6 +822,17 @@ public partial class TurnStateManager
             if (fuelOrder != 0) return fuelOrder;
             return string.Compare(a?.unitName, b?.unitName, System.StringComparison.OrdinalIgnoreCase);
         });
+        turnStartAutonomyHelperLines.AddRange(autonomyLines);
+
+        if (turnStartAutonomyHelperLines.Count <= 0)
+        {
+            ClearTurnStartAutonomyHelper();
+            return;
+        }
+
+        // Alarga o painel enquanto o jornal estiver na tela (mesma mecanica do
+        // shopping/about); o Clear devolve a largura original.
+        PanelHelperController.SetExternalWideMode(true);
         lastTurnStartAutonomyHelperLines.AddRange(turnStartAutonomyHelperLines);
 
         float helperDuration = animationManager != null
@@ -832,6 +862,7 @@ public partial class TurnStateManager
         turnStartAutonomyHelperCursorCell = cursorController != null ? cursorController.CurrentCell : default;
         turnStartAutonomyHelperOpenedFromMenu = true;
         turnStartAutonomyHelperFocusIndex = 0;
+        PanelHelperController.SetExternalWideMode(true);
         return true;
     }
 
@@ -872,6 +903,8 @@ public partial class TurnStateManager
         turnStartAutonomyHelperCursorCell = default;
         turnStartAutonomyHelperOpenedFromMenu = false;
         turnStartAutonomyHelperFocusIndex = 0;
+        // Jornal fechado: devolve a largura original do painel.
+        PanelHelperController.SetExternalWideMode(false);
     }
 
     private bool TryBuildUnitStatsHelperPanelData(HelperPanelData data)

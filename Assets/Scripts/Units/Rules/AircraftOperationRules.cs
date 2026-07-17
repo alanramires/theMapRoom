@@ -64,8 +64,8 @@ public static class AircraftOperationRules
             return Unavailable(lockReason);
         }
 
-        if (unit.AircraftOperationLockTurns > 0)
-            return Unavailable("Aeronave em recuperacao operacional.");
+        if (unit.LayerLockTurnsRemaining > 0)
+            return Unavailable("Unidade sob trava de camada.");
 
         Vector3Int cell = unit.CurrentCellPosition;
         cell.z = 0;

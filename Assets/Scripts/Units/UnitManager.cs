@@ -112,11 +112,12 @@ public class UnitManager : MonoBehaviour
     [SerializeField] private HeightLevel preferredAirHeightRuntime = HeightLevel.AirLow;
     [SerializeField] private bool useExplicitPreferredNavalHeightRuntime;
     [SerializeField] private HeightLevel preferredNavalHeightRuntime = HeightLevel.Submerged;
-    [Header("Forced Layer Lock")]
+    [Header("Layer Lock")]
     [SerializeField] private bool hasForcedLayerLock;
     [SerializeField] private Domain forcedLayerLockDomain = Domain.Land;
     [SerializeField] private HeightLevel forcedLayerLockHeight = HeightLevel.Surface;
     [SerializeField, Min(0)] private int forcedLayerLockTurnsRemaining;
+    [SerializeField] private bool layerLockCountdownStarted;
     [Header("Transport Runtime")]
     [SerializeField] private List<UnitTransportSeatRuntime> transportedUnitSlots = new List<UnitTransportSeatRuntime>();
     [SerializeField, HideInInspector] private UnitManager embarkedTransporter;
@@ -202,7 +203,8 @@ public class UnitManager : MonoBehaviour
     public UnitDatabase UnitDatabase => unitDatabase;
     public bool IsAircraftGrounded => GetAircraftType() != AircraftType.None && currentDomain != Domain.Air;
     public bool IsAircraftEmbarkedInCarrier => isEmbarked;
-    public int AircraftOperationLockTurns => Mathf.Max(0, forcedLayerLockTurnsRemaining);
+    [System.Obsolete("Use LayerLockTurnsRemaining. This alias is kept only for legacy save compatibility.")]
+    public int AircraftOperationLockTurns => LayerLockTurnsRemaining;
     public bool HasForcedLayerLock => hasForcedLayerLock && forcedLayerLockTurnsRemaining > 0;
     // Lock forcado ainda nao aplicado: a camada atual difere da travada porque o
     // hex nao permitia a transicao no momento do efeito (ex.: navio na superficie
@@ -215,6 +217,8 @@ public class UnitManager : MonoBehaviour
     public Domain ForcedLayerLockDomain => forcedLayerLockDomain;
     public HeightLevel ForcedLayerLockHeight => forcedLayerLockHeight;
     public int ForcedLayerLockTurnsRemaining => Mathf.Max(0, forcedLayerLockTurnsRemaining);
+    public int LayerLockTurnsRemaining => Mathf.Max(0, forcedLayerLockTurnsRemaining);
+    public bool LayerLockCountdownStarted => layerLockCountdownStarted;
     public IReadOnlyList<UnitTransportSeatRuntime> TransportedUnitSlots => transportedUnitSlots;
     public UnitManager EmbarkedTransporter => embarkedTransporter;
     public int EmbarkedTransporterSlotIndex => embarkedTransporterSlotIndex;
@@ -645,6 +649,7 @@ public class UnitManager : MonoBehaviour
         if (turnNumber < 0)
             turnNumber = ResolveCurrentTurnNumber();
 
+        bool wasAlreadyDead = isDead;
         isDead = true;
         deadWhenTurn = turnNumber;
         deadByReason = string.IsNullOrWhiteSpace(reason) ? "(unknown)" : reason.Trim();
@@ -655,7 +660,35 @@ public class UnitManager : MonoBehaviour
             Vector3Int cell = currentCellPosition;
             cell.z = 0;
             UnitOccupancyRules.NotifyUnitOccupancyChanged(this, cell, cell);
+            if (!wasAlreadyDead)
+                ReportDeathToTurnBriefing(killer);
         }
+    }
+
+    // Jornal do Comandante: morte durante turno ALHEIO vira "contato perdido"
+    // no briefing do dono. Fog-honesto: o assassino so e nomeado se estava
+    // visivel para o time do dono no momento — senao a unica informacao e a
+    // ultima posicao reportada.
+    private void ReportDeathToTurnBriefing(UnitManager killer)
+    {
+        TryAutoAssignMatchController();
+        if (matchController == null || TeamId == TeamId.Neutral)
+            return;
+        // Morte no proprio turno do dono foi vista ao vivo; o Jornal cobre a ausencia.
+        if ((int)TeamId == matchController.ActiveTeamId)
+            return;
+
+        Vector3Int cell = currentCellPosition;
+        cell.z = 0;
+        string detail = killer != null && matchController.IsUnitVisibleForTeam(killer, TeamId)
+            ? $"abatida por {(!string.IsNullOrWhiteSpace(killer.UnitDisplayName) ? killer.UnitDisplayName : killer.name)}"
+            : "sem contato visual com o atacante";
+        matchController.ReportTurnBriefingEvent(
+            TeamId,
+            MatchController.TurnBriefingCategory.ContactLost,
+            ResolveRuntimeUnitName(),
+            detail,
+            cell);
     }
 
     public void ClearDeathAudit()
@@ -1223,7 +1256,11 @@ public class UnitManager : MonoBehaviour
         if (index < 0 || index >= modes.Length)
             return false;
 
-        SetCurrentLayerState(index, modes[index]);
+        UnitLayerMode targetMode = modes[index];
+        if (IsLayerChangeBlockedByForcedLock(targetMode.domain, targetMode.heightLevel, out _))
+            return false;
+
+        SetCurrentLayerState(index, targetMode);
         return true;
     }
 
@@ -1310,12 +1347,20 @@ public class UnitManager : MonoBehaviour
         forcedLayerLockDomain = domain;
         forcedLayerLockHeight = heightLevel;
         forcedLayerLockTurnsRemaining = Mathf.Max(1, turns);
+        layerLockCountdownStarted = false;
+    }
+
+    public void RestoreLayerLock(Domain domain, HeightLevel heightLevel, int turns, bool countdownStarted)
+    {
+        SetForcedLayerLock(domain, heightLevel, turns);
+        layerLockCountdownStarted = countdownStarted;
     }
 
     public void ClearForcedLayerLock()
     {
         hasForcedLayerLock = false;
         forcedLayerLockTurnsRemaining = 0;
+        layerLockCountdownStarted = false;
     }
 
     public void ConsumeForcedLayerLockTurn()
@@ -1328,6 +1373,15 @@ public class UnitManager : MonoBehaviour
         // ate o lock expirar anularia a emersao forcada.
         if (HasPendingForcedLayerLock)
             return;
+
+        // O valor configurado representa turnos jogaveis completos do dono.
+        // No primeiro upkeep depois de receber a trava, apenas inicia a janela;
+        // decrementar aqui faria "2 turnos" bloquear somente uma acao.
+        if (!layerLockCountdownStarted)
+        {
+            layerLockCountdownStarted = true;
+            return;
+        }
 
         forcedLayerLockTurnsRemaining = Mathf.Max(0, forcedLayerLockTurnsRemaining - 1);
         if (forcedLayerLockTurnsRemaining <= 0)
@@ -1549,7 +1603,9 @@ public class UnitManager : MonoBehaviour
             return;
         }
 
-        SetForcedLayerLock(currentDomain, currentHeightLevel, turns);
+        // Compatibilidade com saves antigos: o contador legado ja estava em
+        // andamento, portanto nao deve ganhar um turno extra ao ser restaurado.
+        RestoreLayerLock(currentDomain, currentHeightLevel, turns, countdownStarted: true);
     }
 
     private string ResolveRuntimeUnitName()

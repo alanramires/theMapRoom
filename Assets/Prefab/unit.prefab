@@ -601,6 +601,7 @@ MonoBehaviour:
   forcedLayerLockDomain: 0
   forcedLayerLockHeight: 3
   forcedLayerLockTurnsRemaining: 0
+  layerLockCountdownStarted: 0
   transportedUnitSlots: []
   embarkedTransporter: {fileID: 0}
   embarkedTransporterSlotIndex: -1

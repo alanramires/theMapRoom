@@ -1630,7 +1630,9 @@ public partial class TurnStateManager : MonoBehaviour
     }
     // Legalidade do pouso de emergencia no hex atual, direto da fonte de verdade
     // do sensor PodePousar (terreno/estrutura/construcao + ocupancia + locks).
-    private bool CanEmergencyLandAtTurnStart(UnitManager unit)
+    // Publico: o MatchController pre-avalia o desfecho no upkeep para o Jornal
+    // do Comandante (mesma regra deterministica que a fila aplica em seguida).
+    public bool CanEmergencyLandAtTurnStart(UnitManager unit)
     {
         if (unit == null || unit.IsEmbarked)
             return false;

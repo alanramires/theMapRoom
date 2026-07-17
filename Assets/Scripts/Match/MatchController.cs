@@ -2573,6 +2573,13 @@ public class MatchController : MonoBehaviour
             return false;
 
         Debug.Log($"[LayerForce] Upkeep aplicou camada pendente: {unit.name} -> {lockDomain}/{lockHeight} em ({cell.x},{cell.y})");
+        // Jornal do Comandante: o dono precisa saber que a camada mudou sozinha.
+        ReportTurnBriefingEvent(
+            unit.TeamId,
+            TurnBriefingCategory.ForcedSurfaceApplied,
+            ResolveRuntimeUnitName(unit),
+            $"camada aplicada automaticamente: {lockDomain}/{lockHeight}",
+            cell);
         return true;
     }
 
@@ -2650,6 +2657,21 @@ public class MatchController : MonoBehaviour
                             // do sensor PodePousar) ou queda como antes.
                             turnStartUnitsMarkedForFuelDepletionDeath.Add(unit);
                             markedForFuelDepletionDeath = true;
+
+                            // Jornal do Comandante: pre-avalia o desfecho (mesma
+                            // regra deterministica que a fila usara neste mesmo
+                            // frame de estado) para o briefing do turno JA conter
+                            // a linha — a fila roda depois do flush do relatorio.
+                            Vector3Int fuelCell = unit.CurrentCellPosition;
+                            fuelCell.z = 0;
+                            TryAutoAssignTurnStateManager();
+                            bool willLand = turnStateManager != null && turnStateManager.CanEmergencyLandAtTurnStart(unit);
+                            ReportTurnBriefingEvent(
+                                unit.TeamId,
+                                willLand ? TurnBriefingCategory.EmergencyLanding : TurnBriefingCategory.FuelCrash,
+                                ResolveRuntimeUnitName(unit),
+                                willLand ? "pousou sem combustível — reabasteça ou remova" : "perdida por exaustão de combustível",
+                                fuelCell);
                         }
                     }
 
@@ -2706,10 +2728,182 @@ public class MatchController : MonoBehaviour
         pendingTurnStartUpkeep = false;
     }
 
+    // ------------------------------------------------------------------
+    // Jornal do Comandante — ledger de eventos entre turnos.
+    // Eventos registrados DURANTE os turnos alheios (contato perdido, tiro da
+    // nevoa, conquista perdida...) acumulam aqui por time destinatario e sao
+    // drenados no inicio do turno dele, virando linhas do relatorio do
+    // panel_helper (junto do consumo em voo). Regra de ouro: quem registra
+    // decide fog-honesto o que o destinatario tem direito de saber.
+    // ------------------------------------------------------------------
+    public enum TurnBriefingCategory
+    {
+        ContactLost = 0,
+        FogFire = 1,
+        ConstructionLost = 2,
+        CaptureInProgress = 3,
+        EmergencyLanding = 4,
+        FuelCrash = 5,
+        ForcedSurfaceApplied = 6,
+        NewContact = 7,
+        SupplyDepleted = 8
+    }
+
+    [System.NonSerialized] private readonly List<TurnBriefingEventSaveData> turnBriefingLedger = new List<TurnBriefingEventSaveData>();
+
+    public IReadOnlyList<TurnBriefingEventSaveData> TurnBriefingLedger => turnBriefingLedger;
+
+    public void RestoreTurnBriefingLedger(List<TurnBriefingEventSaveData> events)
+    {
+        turnBriefingLedger.Clear();
+        if (events != null)
+            turnBriefingLedger.AddRange(events);
+    }
+
+    public void ReportTurnBriefingEvent(
+        TeamId targetTeam,
+        TurnBriefingCategory category,
+        string subjectName,
+        string detail,
+        Vector3Int cell)
+    {
+        if (!Application.isPlaying)
+            return;
+        if (targetTeam == TeamId.Neutral || (int)targetTeam < 0)
+            return;
+
+        cell.z = 0;
+        turnBriefingLedger.Add(new TurnBriefingEventSaveData
+        {
+            teamId = (int)targetTeam,
+            category = (int)category,
+            subjectName = subjectName ?? string.Empty,
+            detail = detail ?? string.Empty,
+            cellX = cell.x,
+            cellY = cell.y,
+            turnNumber = currentTurn
+        });
+    }
+
+    private static string ResolveBriefingCategoryLabel(TurnBriefingCategory category)
+    {
+        switch (category)
+        {
+            case TurnBriefingCategory.ContactLost: return "CONTATO PERDIDO";
+            case TurnBriefingCategory.FogFire: return "TIRO DA NÉVOA";
+            case TurnBriefingCategory.ConstructionLost: return "CONQUISTA PERDIDA";
+            case TurnBriefingCategory.CaptureInProgress: return "SOB CAPTURA";
+            case TurnBriefingCategory.EmergencyLanding: return "POUSO DE EMERGÊNCIA";
+            case TurnBriefingCategory.FuelCrash: return "QUEDA (COMBUSTÍVEL)";
+            case TurnBriefingCategory.ForcedSurfaceApplied: return "EMERSÃO AUTOMÁTICA";
+            case TurnBriefingCategory.NewContact: return "NOVO CONTATO";
+            case TurnBriefingCategory.SupplyDepleted: return "ESTOQUE ZERADO";
+            default: return "EVENTO";
+        }
+    }
+
+    // Drena o ledger do time ativo + varreduras de ESTADO (estoques zerados,
+    // capturas parciais) em linhas prontas para o relatorio.
+    private List<TurnStateManager.HelperTurnStartAutonomyLine> BuildTurnBriefingLinesForActiveTeam()
+    {
+        var lines = new List<TurnStateManager.HelperTurnStartAutonomyLine>();
+        if (activeTeamId < 0)
+            return lines;
+
+        // 1) Eventos do ledger destinados ao time ativo (drena removendo).
+        var drained = new List<TurnBriefingEventSaveData>();
+        for (int i = turnBriefingLedger.Count - 1; i >= 0; i--)
+        {
+            TurnBriefingEventSaveData evt = turnBriefingLedger[i];
+            if (evt == null)
+            {
+                turnBriefingLedger.RemoveAt(i);
+                continue;
+            }
+            if (evt.teamId != activeTeamId)
+                continue;
+            drained.Add(evt);
+            turnBriefingLedger.RemoveAt(i);
+        }
+        // Removidos de tras pra frente: restaura ordem cronologica.
+        drained.Reverse();
+        // Categoria mais critica primeiro, cronologia dentro da categoria.
+        drained.Sort((a, b) => a.category != b.category
+            ? a.category.CompareTo(b.category)
+            : a.turnNumber.CompareTo(b.turnNumber));
+
+        for (int i = 0; i < drained.Count; i++)
+        {
+            TurnBriefingEventSaveData evt = drained[i];
+            var cell = new Vector3Int(evt.cellX, evt.cellY, 0);
+            string label = ResolveBriefingCategoryLabel((TurnBriefingCategory)evt.category);
+            string body = string.IsNullOrWhiteSpace(evt.detail)
+                ? evt.subjectName
+                : $"{evt.subjectName}\n{evt.detail}";
+            lines.Add(new TurnStateManager.HelperTurnStartAutonomyLine
+            {
+                unitName = evt.subjectName,
+                cell = cell,
+                customText = $"{label}\n{body}\n({cell.x},{cell.y}) — T{evt.turnNumber}"
+            });
+        }
+
+        // 2) Varreduras de estado do proprio time (lembretes persistentes).
+        List<ConstructionManager> constructions = ConstructionManager.AllActive;
+        for (int i = 0; i < constructions.Count; i++)
+        {
+            ConstructionManager construction = constructions[i];
+            if (construction == null || !construction.gameObject.activeInHierarchy)
+                continue;
+            if ((int)construction.TeamId != activeTeamId)
+                continue;
+
+            Vector3Int cell = construction.CurrentCellPosition;
+            cell.z = 0;
+            string name = construction.ConstructionDisplayName;
+
+            // Captura parcial em andamento contra voce (e seu predio: voce sabe).
+            if (construction.IsCapturable &&
+                construction.CurrentCapturePoints < construction.CapturePointsMax)
+            {
+                lines.Add(new TurnStateManager.HelperTurnStartAutonomyLine
+                {
+                    unitName = name,
+                    cell = cell,
+                    customText = $"{ResolveBriefingCategoryLabel(TurnBriefingCategory.CaptureInProgress)}\n{name} ({construction.CurrentCapturePoints}/{construction.CapturePointsMax})\n({cell.x},{cell.y})"
+                });
+            }
+
+            // Estoques zerados (supply nao-infinito com oferta runtime em 0).
+            if (construction.CanProvideSupplies && !construction.HasInfiniteSuppliesOverride)
+            {
+                IReadOnlyList<ConstructionSupplyOffer> offers = construction.OfferedSupplies;
+                for (int o = 0; o < offers.Count; o++)
+                {
+                    ConstructionSupplyOffer offer = offers[o];
+                    if (offer == null || offer.supply == null)
+                        continue;
+                    if (offer.quantity > 0 || construction.HasInfiniteSuppliesFor(offer.supply))
+                        continue;
+
+                    lines.Add(new TurnStateManager.HelperTurnStartAutonomyLine
+                    {
+                        unitName = name,
+                        cell = cell,
+                        customText = $"{ResolveBriefingCategoryLabel(TurnBriefingCategory.SupplyDepleted)}\n{name}: sem {offer.supply.displayName}\n({cell.x},{cell.y})"
+                    });
+                }
+            }
+        }
+
+        return lines;
+    }
+
     private void FlushTurnStartAutonomyHelper()
     {
         TryAutoAssignTurnStateManager();
-        turnStateManager?.ShowTurnStartAutonomyUpkeepHelper(pendingTurnStartAutonomyHelperEntries);
+        List<TurnStateManager.HelperTurnStartAutonomyLine> briefingLines = BuildTurnBriefingLinesForActiveTeam();
+        turnStateManager?.ShowTurnStartBriefing(pendingTurnStartAutonomyHelperEntries, briefingLines);
         pendingTurnStartAutonomyHelperEntries = null;
     }
 
@@ -3571,6 +3765,50 @@ public class MatchController : MonoBehaviour
         target.RegisterStealthReveal(detectorTeamId);
         target.AddCurrentlyObservedByTeam(detectorTeamId);
         target.RefreshRuntimeVisualState();
+
+        // Jornal do Comandante — novo contato: deteccao PASSIVA durante o turno
+        // alheio (meus sensores flagraram algo enquanto o inimigo se movia).
+        // Deteccao no proprio turno foi vista ao vivo e nao entra.
+        if (detectorTeamId != activeTeamId &&
+            observer.TeamId != target.TeamId &&
+            observer.TeamId != TeamId.Neutral)
+        {
+            Vector3Int contactCell = target.CurrentCellPosition;
+            contactCell.z = 0;
+            if (!HasTurnBriefingEntry(observer.TeamId, TurnBriefingCategory.NewContact, contactCell, currentTurn))
+            {
+                ReportTurnBriefingEvent(
+                    observer.TeamId,
+                    TurnBriefingCategory.NewContact,
+                    ResolveRuntimeUnitName(target),
+                    $"detectado por {ResolveRuntimeUnitName(observer)}",
+                    contactCell);
+            }
+        }
+    }
+
+    // Dedupe barato do briefing: mesma categoria, mesmo destinatario, mesma
+    // celula e mesmo turno = um evento so (a deteccao pode disparar varias
+    // vezes por movimento).
+    private bool HasTurnBriefingEntry(TeamId team, TurnBriefingCategory category, Vector3Int cell, int turnNumber)
+    {
+        cell.z = 0;
+        for (int i = 0; i < turnBriefingLedger.Count; i++)
+        {
+            TurnBriefingEventSaveData evt = turnBriefingLedger[i];
+            if (evt == null)
+                continue;
+            if (evt.teamId == (int)team &&
+                evt.category == (int)category &&
+                evt.cellX == cell.x &&
+                evt.cellY == cell.y &&
+                evt.turnNumber == turnNumber)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static bool IsSubmarineLikeDetectionTarget(PodeDetectarOption option)

@@ -1764,6 +1764,9 @@ public class SaveGameManager : MonoBehaviour
             stage = "restore-unit-active-states";
             RestoreSavedUnitActiveStates(data, unitsById);
 
+            stage = "restore-turn-briefing-ledger";
+            matchController?.RestoreTurnBriefingLedger(data.turnBriefingEvents);
+
             stage = "restore-ai-objective-plans";
             AIIntelLedger.Restore(data.aiIntelLedgers);
             if (data.aiObjectivePlans != null && data.aiObjectivePlans.Count > 0)
@@ -1962,6 +1965,10 @@ public class SaveGameManager : MonoBehaviour
             aiRuntimeStage = aiController != null ? aiController.CurrentAIStage : 0,
             aiIntelLedgers = AIIntelLedger.BuildSaveData()
         };
+
+        // Jornal do Comandante: eventos pendentes entre turnos sao estado.
+        if (matchController != null && matchController.TurnBriefingLedger != null)
+            data.turnBriefingEvents.AddRange(matchController.TurnBriefingLedger);
 
         UnitManager[] units = FindObjectsByType<UnitManager>(FindObjectsInactive.Include, FindObjectsSortMode.None);
         for (int i = 0; i < units.Length; i++)

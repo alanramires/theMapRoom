@@ -176,11 +176,15 @@ public static class SaveDataMapper
             domain = (int)unit.GetDomain(),
             heightLevel = (int)unit.GetHeightLevel(),
             isAircraftGrounded = unit.IsAircraftGrounded,
-            aircraftOperationLockTurns = unit.AircraftOperationLockTurns,
+            // Campo legado mantido no DTO para saves antigos. O nome atual da
+            // regra e Layer Lock; o estado completo esta nos campos forcedLayerLock*.
+            aircraftOperationLockTurns = unit.LayerLockTurnsRemaining,
             hasForcedLayerLock = unit.HasForcedLayerLock,
             forcedLayerLockDomain = (int)unit.ForcedLayerLockDomain,
             forcedLayerLockHeight = (int)unit.ForcedLayerLockHeight,
             forcedLayerLockTurns = unit.ForcedLayerLockTurnsRemaining,
+            hasLayerLockCountdownState = true,
+            layerLockCountdownStarted = unit.LayerLockCountdownStarted,
             aiHasAssignedPlan = unit.AIHasAssignedPlan,
             aiAssignedPlanKey = unit.AIAssignedPlanKey,
             aiAssignedPlanName = unit.AIAssignedPlanName,
@@ -275,10 +279,11 @@ public static class SaveDataMapper
         // a ordem evita o proprio lock bloquear TrySetCurrentLayerMode.
         if (saved.hasForcedLayerLock && saved.forcedLayerLockTurns > 0)
         {
-            unit.SetForcedLayerLock(
+            unit.RestoreLayerLock(
                 (Domain)saved.forcedLayerLockDomain,
                 (HeightLevel)saved.forcedLayerLockHeight,
-                saved.forcedLayerLockTurns);
+                saved.forcedLayerLockTurns,
+                saved.hasLayerLockCountdownState ? saved.layerLockCountdownStarted : true);
         }
 
         IReadOnlyList<UnitEmbarkedWeapon> embarked = unit.GetEmbarkedWeapons();

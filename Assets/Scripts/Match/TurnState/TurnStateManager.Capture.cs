@@ -126,6 +126,21 @@ public partial class TurnStateManager
                     targetConstruction.SetCurrentCapturePoints(targetConstruction.CapturePointsMax);
                     captureCompletedForReplay = true;
                     newOwnerForReplay = capturer.TeamId;
+
+                    // Jornal do Comandante: o dono anterior perdeu a conquista.
+                    // Fog-honesto: e prédio dele — a guarnicao viu quem entrou,
+                    // entao o novo dono e nomeado.
+                    if (previousOwnerTeam != TeamId.Neutral && previousOwnerTeam != capturer.TeamId && matchController != null)
+                    {
+                        Vector3Int capturedCell = targetConstruction.CurrentCellPosition;
+                        capturedCell.z = 0;
+                        matchController.ReportTurnBriefingEvent(
+                            previousOwnerTeam,
+                            MatchController.TurnBriefingCategory.ConstructionLost,
+                            targetConstruction.ConstructionDisplayName,
+                            $"capturada por {TeamUtils.GetName(capturer.TeamId)}",
+                            capturedCell);
+                    }
                     RuntimeLog(
                         $"[Captura] Construcao capturada por {TeamUtils.GetName(capturer.TeamId)}. " +
                         $"Capture resetado para {targetConstruction.CurrentCapturePoints}/{targetConstruction.CapturePointsMax}.");

@@ -226,6 +226,17 @@ public partial class TurnStateManager
         if (TryApplyPendingForcedLayerAfterMovement(boardMap, cell, currentDomain, currentHeight))
             return;
 
+        // Uma trava ja aplicada e uma verdade confirmada da unidade: mover nao
+        // pode acionar preferencia naval, auto-promocao ou qualquer outra troca
+        // para fora da camada imposta. A trava pendente tambem permanece como
+        // esta se o destino ainda nao comportar a camada exigida.
+        if (selectedUnit.HasForcedLayerLock)
+        {
+            if (selectedUnit.HasPendingForcedLayerLock)
+                Debug.Log($"[LayerLock] Pendente apos movimento: destino nao permite a camada imposta.");
+            return;
+        }
+
         if (!TryResolveForcedEndMovementTargetForCell(
                 boardMap,
                 terrainDatabase,

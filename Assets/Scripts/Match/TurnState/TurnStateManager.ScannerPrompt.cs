@@ -3643,6 +3643,29 @@ public partial class TurnStateManager
         ApplyPostHitForcedLayerEffects(option, combat, attackerHpBeforeResolution, defenderHpBeforeResolution);
         ApplyPostAttackSelfEmergeEffect(combat);
         ApplyPendingCombatHp(combat);
+
+        // Jornal do Comandante — tiro da nevoa: o defensor foi atingido por um
+        // atacante que o time dele NAO via. Fog-honesto: registra a vitima, o
+        // dano e a celula DELA; a posicao do atacante nunca viaja no evento.
+        if (defender != null && attacker != null &&
+            defender.TeamId != attacker.TeamId &&
+            defender.TeamId != TeamId.Neutral &&
+            !attackerVisibleToDefender &&
+            matchController != null)
+        {
+            int fogFireDamage = Mathf.Max(0, defenderHpBeforeResolution - Mathf.Max(0, combat.defenderHpAfter));
+            if (fogFireDamage > 0)
+            {
+                Vector3Int fogFireCell = defender.CurrentCellPosition;
+                fogFireCell.z = 0;
+                matchController.ReportTurnBriefingEvent(
+                    defender.TeamId,
+                    MatchController.TurnBriefingCategory.FogFire,
+                    ResolveDebugUnitName(defender),
+                    $"atingida (−{fogFireDamage} PV) por atacante não identificado",
+                    fogFireCell);
+            }
+        }
         JogadasManager.SetUltimoAtaqueResultado(
             attacker,
             defender,
@@ -3948,6 +3971,7 @@ public partial class TurnStateManager
             }
 
             bool hadPreviousLock = target.TryGetForcedLayerLock(out Domain previousDomain, out HeightLevel previousHeight, out int previousTurns);
+            bool previousCountdownStarted = target.LayerLockCountdownStarted;
             target.ClearForcedLayerLock();
 
             bool moved = target.GetDomain() == forcedDomain && target.GetHeightLevel() == forcedHeight;
@@ -3957,7 +3981,7 @@ public partial class TurnStateManager
             if (!moved)
             {
                 if (hadPreviousLock)
-                    target.SetForcedLayerLock(previousDomain, previousHeight, previousTurns);
+                    target.RestoreLayerLock(previousDomain, previousHeight, previousTurns, previousCountdownStarted);
                 continue;
             }
 
@@ -4009,6 +4033,7 @@ public partial class TurnStateManager
         }
 
         bool hadPreviousLock = target.TryGetForcedLayerLock(out Domain previousDomain, out HeightLevel previousHeight, out int previousTurns);
+        bool previousCountdownStarted = target.LayerLockCountdownStarted;
         target.ClearForcedLayerLock();
 
         bool moved = targetDomain == forcedDomain && targetHeight == forcedHeight;
@@ -4018,7 +4043,7 @@ public partial class TurnStateManager
         if (!moved)
         {
             if (hadPreviousLock)
-                target.SetForcedLayerLock(previousDomain, previousHeight, previousTurns);
+                target.RestoreLayerLock(previousDomain, previousHeight, previousTurns, previousCountdownStarted);
             return false;
         }
 

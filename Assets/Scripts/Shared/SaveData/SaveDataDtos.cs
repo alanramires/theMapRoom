@@ -33,6 +33,22 @@ public class SaveGameData
     public int aiRuntimeTurnNumber;
     public int aiRuntimeStage;
     public List<AIIntelLedgerSaveData> aiIntelLedgers = new List<AIIntelLedgerSaveData>();
+    // Jornal do Comandante: eventos acumulados entre os turnos de cada time
+    // (contato perdido, tiro da nevoa, conquista perdida...), drenados no
+    // inicio do turno do time destinatario. Ordem cronologica (deterministica).
+    public List<TurnBriefingEventSaveData> turnBriefingEvents = new List<TurnBriefingEventSaveData>();
+}
+
+[Serializable]
+public class TurnBriefingEventSaveData
+{
+    public int teamId;       // destinatario do evento
+    public int category;     // TurnBriefingCategory
+    public string subjectName;
+    public string detail;    // texto extra JA resolvido fog-honesto no registro
+    public int cellX;
+    public int cellY;
+    public int turnNumber;
 }
 
 [Serializable]
@@ -184,6 +200,8 @@ public class UnitSaveData
     public int forcedLayerLockDomain;
     public int forcedLayerLockHeight;
     public int forcedLayerLockTurns;
+    public bool hasLayerLockCountdownState;
+    public bool layerLockCountdownStarted;
     public bool aiHasAssignedPlan;
     public string aiAssignedPlanKey;
     public string aiAssignedPlanName;

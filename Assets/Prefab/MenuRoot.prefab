@@ -3925,6 +3925,7 @@ MonoBehaviour:
   btnLoad: {fileID: 3475117946203619319}
   btnGerenciar: {fileID: 7750567305879412250}
   btnVoltarOptions: {fileID: 2480590471021247990}
+  btnConsumo: {fileID: 0}
   btnDestruir: {fileID: 5431445003419938976}
   btnRender: {fileID: 7381734012061680620}
   btnSair: {fileID: 1413808416407575135}
@@ -4930,7 +4931,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: "Consumo em V\xF4o"
+  m_text: Resumo do Turno
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 3cb5543ccd204d54c9c34b6008539c4d, type: 2}
   m_sharedMaterial: {fileID: -7834541552760396438, guid: 3cb5543ccd204d54c9c34b6008539c4d, type: 2}
