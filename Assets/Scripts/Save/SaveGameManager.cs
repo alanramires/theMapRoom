@@ -67,6 +67,9 @@ public class SaveGameManager : MonoBehaviour
     [SerializeField] private string customSaveDirectory = string.Empty;
     [SerializeField] private bool blockCrossSceneLoad = true;
     [SerializeField] private bool verboseLogs = true;
+    [Tooltip("Exibe no Console traces detalhados de entrada nos fluxos de Save/Load.")]
+    [InspectorName("Show SaveLoad Logs")]
+    [SerializeField] private bool showSaveLoadLogs;
     [SerializeField] private bool forceLoadWhenBusy = true;
 
     [Header("Replay")]
@@ -1006,7 +1009,8 @@ public class SaveGameManager : MonoBehaviour
         if (IsPersistenceBlockedByTurnState(showFeedback: true, allowPersistencePromptState: promptState != SlotPromptState.None))
             return;
 
-        Debug.Log($"[TRACE][SaveGameManager.LoadSlot] slotIndex={slotIndex}\n{Environment.StackTrace}");
+        if (showSaveLoadLogs)
+            Debug.Log($"[TRACE][SaveGameManager.LoadSlot] slotIndex={slotIndex}\n{Environment.StackTrace}");
 
         if (!Application.isPlaying)
         {
@@ -1321,15 +1325,31 @@ public class SaveGameManager : MonoBehaviour
 
             // LoadRoutine controla loadInProgress e encerra o indicador no fim.
             yield return StartCoroutine(LoadRoutine(data, normalizedSlot));
+
+            double replayRestoreStartMs = PerfNowMs();
+            LogLoadPerf(normalizedSlot, "restore_replay.begin", replayRestoreStartMs, replayRestoreStartMs - asyncStartMs);
             RestoreReplayFromContainer(preprocess.replayJson);
+            LogLoadPerf(normalizedSlot, "restore_replay.end", replayRestoreStartMs, PerfNowMs() - asyncStartMs);
+
+            double jogadasRestoreStartMs = PerfNowMs();
+            LogLoadPerf(normalizedSlot, "restore_jogadas.begin", jogadasRestoreStartMs, jogadasRestoreStartMs - asyncStartMs);
             RestoreJogadasFromContainer(preprocess.jogadasJson);
+            LogLoadPerf(normalizedSlot, "restore_jogadas.end", jogadasRestoreStartMs, PerfNowMs() - asyncStartMs);
             if (lastLoadRoutineSucceeded && panelRodada != null)
             {
                 int playerNumber = matchController != null ? matchController.ActivePlayerListIndex + 1 : 1;
+                double presentationStartMs = PerfNowMs();
+                LogLoadPerf(normalizedSlot, "turn_presentation.begin", presentationStartMs, presentationStartMs - asyncStartMs);
                 yield return panelRodada.ReleaseLoadingPresentation(
                     (TeamId)data.activeTeamId,
                     Mathf.Max(1, playerNumber),
-                    data.currentTurn);
+                    data.currentTurn,
+                    () => LogLoadPerf(
+                        normalizedSlot,
+                        "turn_button.ready",
+                        presentationStartMs,
+                        PerfNowMs() - asyncStartMs));
+                LogLoadPerf(normalizedSlot, "turn_button.confirmed", presentationStartMs, PerfNowMs() - asyncStartMs);
                 loadingPresentationReleased = true;
                 matchMusicAudioManager?.PrepareForMatchStart(forceRestartPlayback: true);
             }
@@ -1683,7 +1703,7 @@ public class SaveGameManager : MonoBehaviour
         if (matchController != null)
             RestoreMatchPlayers(data);
 
-        // Hoisted para ficar acessivel apos o try-catch (necessario para reaplicar flags depois de ForceReapplyActiveTeamWithTurnStart).
+        // Mantem lookup estavel durante todas as etapas de restauracao do snapshot.
         Dictionary<int, UnitManager> unitsById = new Dictionary<int, UnitManager>();
 
         int maxUnitId = 0;
@@ -1863,27 +1883,19 @@ public class SaveGameManager : MonoBehaviour
         if (suppressedFogRefresh && matchController != null)
             matchController.SuppressFogOfWarRefresh = false;
 
-        LogLoadPerf(loadedSlot, "load_routine.end", routineStartMs, PerfNowMs() - routineStartMs);
         if (coreLoadSucceeded)
         {
-            matchController?.ForceReapplyActiveTeamWithTurnStart();
-
-            // ForceReapplyActiveTeamWithTurnStart chama ReleaseUnitsForActiveTeam, que zera hasActed/movementPoints
-            // de todas as unidades do time ativo. Reaplica os flags salvos para restaurar o estado correto.
-            if (data?.units != null)
-            {
-                for (int i = 0; i < data.units.Count; i++)
-                {
-                    UnitSaveData saved = data.units[i];
-                    if (saved == null || !unitsById.TryGetValue(saved.instanceId, out UnitManager unit) || unit == null)
-                        continue;
-                    SaveDataMapper.ApplyUnitTurnFlagsFromSaveData(unit, saved);
-                }
-            }
-
+            // O time ativo e seus efeitos visuais ja foram aplicados por
+            // SetActiveTeamIdWithoutTurnStart, e as flags vieram do snapshot.
+            // Nao simule um novo inicio de turno aqui: isso zera o estado salvo,
+            // redispara FOW/eventos globais e exige uma segunda restauracao inteira.
+            double afterLoadEventsStartMs = PerfNowMs();
+            LogLoadPerf(loadedSlot, "after_load_events.begin", afterLoadEventsStartMs, afterLoadEventsStartMs - routineStartMs);
             OnAfterLoadSuccess?.Invoke();
+            LogLoadPerf(loadedSlot, "after_load_events.end", afterLoadEventsStartMs, PerfNowMs() - routineStartMs);
             lastLoadRoutineSucceeded = true;
         }
+        LogLoadPerf(loadedSlot, "load_routine.end", routineStartMs, PerfNowMs() - routineStartMs);
     }
 
     private void SchedulePostLoadThreatWarmup()
@@ -2691,9 +2703,9 @@ public class SaveGameManager : MonoBehaviour
 
         string message = $"[SaveGame][PromptPerf] stage={stage} ms={Math.Max(0d, elapsedMs):F2}";
         if (forceWarning || elapsedMs >= promptPerfWarnThresholdMs)
-            LogManager.Warning(GameLogCategory.SaveLoad, message, this);
+            Debug.LogWarning(message, this);
         else
-            LogManager.Info(GameLogCategory.SaveLoad, message, this);
+            Debug.Log(message, this);
     }
 
     private static T FindInActiveScene<T>() where T : Component

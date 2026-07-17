@@ -13965,7 +13965,7 @@ MonoBehaviour:
     defeated: 0
     startMoney: 85000
     actualMoney: 0
-    incomePerTurn: 0
+    incomePerTurn: 15000
     startMoneyApplied: 1
   - teamId: 1
     flipX: 1
@@ -13975,7 +13975,7 @@ MonoBehaviour:
     defeated: 0
     startMoney: 85000
     actualMoney: 0
-    incomePerTurn: 0
+    incomePerTurn: 15000
     startMoneyApplied: 1
   includeNeutralTeam: 0
   economyEnabled: 1
@@ -14026,7 +14026,7 @@ MonoBehaviour:
   appliedActiveTeamId: 0
   pendingTurnStartUpkeep: 1
   pendingTurnStartEconomy: 1
-  cachedConstructionIncomeSignature: 348879018
+  cachedConstructionIncomeSignature: 381628142
   cachedConstructionIncomeCount: 57
   constructionIncomeRefreshIntervalSeconds: 0.35
   continuousEditorRefresh: 0
@@ -14636,6 +14636,7 @@ MonoBehaviour:
   customSaveDirectory: C:/Users/Alan/AppData/LocalLow/Sistemas Info/The Map Room
   blockCrossSceneLoad: 1
   verboseLogs: 0
+  showSaveLoadLogs: 0
   forceLoadWhenBusy: 1
   saveReplayData: 1
   enableThreatCacheWarmupOnLoad: 0
@@ -19730,6 +19731,7 @@ MonoBehaviour:
   turnStateManager: {fileID: 1900915756}
   boardTilemap: {fileID: 1566606925}
   terrainDatabase: {fileID: 11400000, guid: af24f1a2f28971f498767ede9f9cfba1, type: 2}
+  showAILogs: 0
   showAIUnitHUD: 0
   startOnPause: 0
   iaRapida: 0
@@ -36779,7 +36781,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 376536317023229975, guid: bbd1302fcb61c7d49ac7944eafbfdede, type: 3}
       propertyPath: m_fontColor32.rgba
-      value: 4288388095
+      value: 4287688336
       objectReference: {fileID: 0}
     - target: {fileID: 3803312006916396853, guid: bbd1302fcb61c7d49ac7944eafbfdede, type: 3}
       propertyPath: m_Pivot.x
@@ -36867,7 +36869,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7653284495940490440, guid: bbd1302fcb61c7d49ac7944eafbfdede, type: 3}
       propertyPath: m_fontColor32.rgba
-      value: 4288388095
+      value: 4287688336
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -45017,37 +45019,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1142559120}
   m_CullTransparentMesh: 1
---- !u!1 &1145037264
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1145037265}
-  m_Layer: 0
-  m_Name: AI Capturer
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &1145037265
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1145037264}
-  serializedVersion: 2
-  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 1986179052}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1145591517
 GameObject:
   m_ObjectHideFlags: 0
@@ -52318,7 +52289,6 @@ Transform:
   - {fileID: 350734194}
   - {fileID: 1477498055}
   - {fileID: 1679592217}
-  - {fileID: 1647220977}
   - {fileID: 677354449}
   - {fileID: 1986179052}
   m_Father: {fileID: 0}
@@ -52368,6 +52338,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fb232daae2c5e4a4793768632e445f0b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::JogadasManager
+  showJogadasLogs: 0
   log:
     jogadas: []
     proximoId: 1
@@ -69742,83 +69713,6 @@ SpriteRenderer:
   m_WasSpriteAssigned: 1
   m_SpriteSortPoint: 0
   m_BlendShapeWeights: []
---- !u!1 &1647220976
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1647220977}
-  - component: {fileID: 1647220978}
-  m_Layer: 0
-  m_Name: Log Manager
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &1647220977
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1647220976}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 1307941790}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1647220978
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1647220976}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 604cfebb591abd34f84d3e32bcf47a3f, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::LogManager
-  enableLogs: 1
-  dontDestroyOnLoad: 1
-  categories:
-  - category: 0
-    enabled: 0
-    maxLevel: 2
-  - category: 1
-    enabled: 1
-    maxLevel: 2
-  - category: 2
-    enabled: 0
-    maxLevel: 2
-  - category: 3
-    enabled: 0
-    maxLevel: 2
-  - category: 4
-    enabled: 0
-    maxLevel: 2
-  - category: 5
-    enabled: 0
-    maxLevel: 2
-  - category: 6
-    enabled: 0
-    maxLevel: 2
-  - category: 7
-    enabled: 0
-    maxLevel: 2
-  - category: 8
-    enabled: 0
-    maxLevel: 2
-  - category: 9
-    enabled: 0
-    maxLevel: 2
 --- !u!1 &1647281764
 GameObject:
   m_ObjectHideFlags: 0
@@ -70705,11 +70599,11 @@ MonoBehaviour:
   shoppingMenuOpenDelay: 0.25
   playerMenuStepDelay: 0.2
   fastReplayMode: 0
-  snapshotTelemetryEnabled: 1
+  snapshotTelemetryEnabled: 0
   snapshotTelemetryLogEvery: 20
   snapshotTelemetryVerboseContext: 0
-  enableReplayRuntimeLogs: 1
-  enableReplayRuntimeWarnings: 1
+  enableReplayRuntimeLogs: 0
+  enableReplayRuntimeWarnings: 0
 --- !u!1 &1680477017
 GameObject:
   m_ObjectHideFlags: 0
@@ -79471,7 +79365,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 60acc276072194c4bb7c52df5024829d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SectorManager
-  sectorLog: 1
+  sectorLog: 0
   useTerrainCostForNeighborDistances: 1
   neighborDistanceTilemap: {fileID: 1566606925}
   neighborDistanceTerrainDatabase: {fileID: 11400000, guid: af24f1a2f28971f498767ede9f9cfba1, type: 2}
@@ -79906,23 +79800,17 @@ MonoBehaviour:
         VehicleDistance: 16
         AirDistance: 14
         IsHQ: 1
-      - ConstructionName: Porto Naval
-        InstanceId: 74
-        Distance: 16
-        VehicleDistance: 16
-        AirDistance: 9
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 13
-        Distance: 15
-        VehicleDistance: 15
+      - ConstructionName: Aeroporto
+        InstanceId: 11
+        Distance: 14
+        VehicleDistance: 14
         AirDistance: 13
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 14
-        Distance: 15
-        VehicleDistance: 15
-        AirDistance: 14
+        InstanceId: 12
+        Distance: 16
+        VehicleDistance: 16
+        AirDistance: 13
         IsHQ: 0
       - ConstructionName: Aeroporto
         InstanceId: 9
@@ -79931,25 +79819,31 @@ MonoBehaviour:
         AirDistance: 12
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 12
-        Distance: 16
-        VehicleDistance: 16
-        AirDistance: 13
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 73
-        Distance: 14
-        VehicleDistance: 14
-        AirDistance: 12
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 11
-        Distance: 14
-        VehicleDistance: 14
+        InstanceId: 13
+        Distance: 15
+        VehicleDistance: 15
         AirDistance: 13
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
         InstanceId: 80
+        Distance: 14
+        VehicleDistance: 14
+        AirDistance: 12
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 14
+        Distance: 15
+        VehicleDistance: 15
+        AirDistance: 14
+        IsHQ: 0
+      - ConstructionName: Porto Naval
+        InstanceId: 74
+        Distance: 16
+        VehicleDistance: 16
+        AirDistance: 9
+        IsHQ: 0
+      - ConstructionName: Porto Naval
+        InstanceId: 73
         Distance: 14
         VehicleDistance: 14
         AirDistance: 12
@@ -79962,10 +79856,10 @@ MonoBehaviour:
         VehicleDistance: 16
         AirDistance: 14
         IsHQ: 1
-      - ConstructionName: Aeroporto
-        InstanceId: 8
-        Distance: 14
-        VehicleDistance: 14
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 3
+        Distance: 16
+        VehicleDistance: 16
         AirDistance: 13
         IsHQ: 0
       - ConstructionName: Porto Naval
@@ -79974,18 +79868,6 @@ MonoBehaviour:
         VehicleDistance: 16
         AirDistance: 9
         IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 5
-        Distance: 15
-        VehicleDistance: 15
-        AirDistance: 14
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 3
-        Distance: 16
-        VehicleDistance: 16
-        AirDistance: 13
-        IsHQ: 0
       - ConstructionName: Aeroporto
         InstanceId: 6
         Distance: 15
@@ -79993,10 +79875,10 @@ MonoBehaviour:
         AirDistance: 12
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 77
-        Distance: 14
-        VehicleDistance: 14
-        AirDistance: 12
+        InstanceId: 5
+        Distance: 15
+        VehicleDistance: 15
+        AirDistance: 14
         IsHQ: 0
       - ConstructionName: Porto Naval
         InstanceId: 72
@@ -80005,9 +79887,21 @@ MonoBehaviour:
         AirDistance: 12
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
+        InstanceId: 77
+        Distance: 14
+        VehicleDistance: 14
+        AirDistance: 12
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
         InstanceId: 4
         Distance: 15
         VehicleDistance: 15
+        AirDistance: 13
+        IsHQ: 0
+      - ConstructionName: Aeroporto
+        InstanceId: 8
+        Distance: 14
+        VehicleDistance: 14
         AirDistance: 13
         IsHQ: 0
     closestNeighbor1: 0
@@ -80289,6 +80183,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::TurnStateManager
   turnStartAutonomyHelperDurationFallbackSeconds: 6
   enableTurnStateRuntimeLogs: 0
+  showMovementLogs: 0
   enableRangeCacheDebugLogs: 0
   showPerfRangeLine: 0
   showPerfSensorsLine: 0
@@ -80790,6 +80685,7 @@ MonoBehaviour:
   unitDatabase: {fileID: 11400000, guid: e8814965e8c2b764c881f833b39e19f1, type: 2}
   matchController: {fileID: 327617512}
   currentId: 1
+  showUnitSpawnerLogs: 0
   unitPrefab: {fileID: 1817672200303259516, guid: 530b4fee239c9904cbceb477236210f2, type: 3}
   boardTilemap: {fileID: 1566606925}
   spawnWithHasActedFalse: 0
@@ -83103,7 +82999,6 @@ Transform:
   - {fileID: 1213214727}
   - {fileID: 569387743}
   - {fileID: 1310407251}
-  - {fileID: 1145037265}
   m_Father: {fileID: 1307941790}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1986345165

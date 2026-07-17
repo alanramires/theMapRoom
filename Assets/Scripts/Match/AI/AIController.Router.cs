@@ -142,7 +142,8 @@ public partial class AIController
 
         {
 
-            Debug.LogWarning($"[AI] {unit.InstanceId}: HexEvaluator sem vencedor — aguardando no lugar.");
+            if (showAILogs)
+                Debug.LogWarning($"[AI] {unit.InstanceId}: HexEvaluator sem vencedor — aguardando no lugar.");
 
             return BuildMoveBatch(unit, snapshot.AITeam, fromCell, fromCell);
 
@@ -152,7 +153,8 @@ public partial class AIController
 
         if (IsReservedCaptureCellForAnotherUnit(unit, snapshot.AITeam, destCell, paths, out UnitManager reservedFor))
         {
-            Debug.Log($"[AI] {unit.InstanceId} evita mover para captura reservada @ {destCell} por {reservedFor.InstanceId}");
+            if (showAILogs)
+                Debug.Log($"[AI] {unit.InstanceId} evita mover para captura reservada @ {destCell} por {reservedFor.InstanceId}");
             if (TrySelectFallbackHexEvaluation(unit, snapshot.AITeam, evaluations, paths, out HexEvaluation fallbackChosen))
             {
                 chosen = fallbackChosen;
@@ -193,7 +195,8 @@ public partial class AIController
             if (canCapture && SimulateCaptureSensor(unit, destCell, out _))
             {
 
-            Debug.Log($"[AI] {unit.InstanceId} → captura @ {destCell}");
+            if (showAILogs)
+                Debug.Log($"[AI] {unit.InstanceId} → captura @ {destCell}");
 
             return BuildCaptureBatch(unit, snapshot.AITeam, fromCell, destCell, paths);
 
@@ -223,13 +226,15 @@ public partial class AIController
 
                     if (!PassesAttackDecision(unit, target.targetUnit, destCell, false, out string atkReason))
                     {
-                        Debug.Log($"[AI] {unit.InstanceId} → ataque bloqueado por AttackDecision ({target.targetUnit.InstanceId}): {atkReason}");
+                        if (showAILogs)
+                            Debug.Log($"[AI] {unit.InstanceId} → ataque bloqueado por AttackDecision ({target.targetUnit.InstanceId}): {atkReason}");
                         continue;
                     }
 
                     Vector3Int targetCell = target.targetUnit.CurrentCellPosition; targetCell.z = 0;
 
-                    Debug.Log($"[AI] {unit.InstanceId} → ataca {target.targetUnit.InstanceId} de {destCell}");
+                    if (showAILogs)
+                        Debug.Log($"[AI] {unit.InstanceId} → ataca {target.targetUnit.InstanceId} de {destCell}");
 
                     return BuildAttackBatch(
 
@@ -249,7 +254,8 @@ public partial class AIController
 
         // 3. Movimento simples
 
-        Debug.Log($"[AI] {unit.InstanceId} → move para {destCell}");
+        if (showAILogs)
+            Debug.Log($"[AI] {unit.InstanceId} → move para {destCell}");
 
         return BuildMoveBatch(unit, snapshot.AITeam, fromCell, destCell, paths);
 
@@ -367,13 +373,15 @@ public partial class AIController
                 if (target?.targetUnit == null) continue;
                 if (!PassesAttackDecision(unit, target.targetUnit, attackCell, false, out string atkReason))
                 {
-                    Debug.Log($"[AI] {unit.InstanceId} -> fallback ataque bloqueado por AttackDecision ({target.targetUnit.InstanceId}): {atkReason}");
+                    if (showAILogs)
+                        Debug.Log($"[AI] {unit.InstanceId} -> fallback ataque bloqueado por AttackDecision ({target.targetUnit.InstanceId}): {atkReason}");
                     continue;
                 }
 
                 Vector3Int targetCell = target.targetUnit.CurrentCellPosition;
                 targetCell.z = 0;
-                Debug.Log($"[AI] {unit.InstanceId} -> fallback ataca {target.targetUnit.InstanceId} de {attackCell}");
+                if (showAILogs)
+                    Debug.Log($"[AI] {unit.InstanceId} -> fallback ataca {target.targetUnit.InstanceId} de {attackCell}");
                 action = BuildAttackBatch(
                     unit, snapshot.AITeam, fromCell, attackCell,
                     target.targetUnit.InstanceId.ToString(), targetCell, paths);

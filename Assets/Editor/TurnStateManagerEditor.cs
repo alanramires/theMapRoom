@@ -11,6 +11,7 @@ public class TurnStateManagerEditor : Editor
     private SerializedProperty showPerfSelectionLineProp;
     private SerializedProperty showPerfTakeoffPrepLineProp;
     private SerializedProperty enableTurnStateRuntimeLogsProp;
+    private SerializedProperty showMovementLogsProp;
 
     private void OnEnable()
     {
@@ -21,6 +22,7 @@ public class TurnStateManagerEditor : Editor
         showPerfSelectionLineProp = serializedObject.FindProperty("showPerfSelectionLine");
         showPerfTakeoffPrepLineProp = serializedObject.FindProperty("showPerfTakeoffPrepLine");
         enableTurnStateRuntimeLogsProp = serializedObject.FindProperty("enableTurnStateRuntimeLogs");
+        showMovementLogsProp = serializedObject.FindProperty("showMovementLogs");
     }
 
     public override void OnInspectorGUI()
@@ -30,6 +32,7 @@ public class TurnStateManagerEditor : Editor
         DrawPropertiesExcluding(
             serializedObject,
             "enableTurnStateRuntimeLogs",
+            "showMovementLogs",
             "enableRangeCacheDebugLogs",
             "showPerfRangeLine",
             "showPerfSensorsLine",
@@ -40,6 +43,8 @@ public class TurnStateManagerEditor : Editor
         EditorGUILayout.LabelField("Logs & Perf (Quick Access)", EditorStyles.boldLabel);
         if (enableTurnStateRuntimeLogsProp != null)
             EditorGUILayout.PropertyField(enableTurnStateRuntimeLogsProp, new GUIContent("Enable TurnState Runtime Logs"));
+        if (showMovementLogsProp != null)
+            EditorGUILayout.PropertyField(showMovementLogsProp, new GUIContent("Show Movement Logs"));
         if (enableRangeCacheDebugLogsProp != null)
             EditorGUILayout.PropertyField(enableRangeCacheDebugLogsProp, new GUIContent("Enable Range Cache Debug Logs"));
         if (showPerfRangeLineProp != null)

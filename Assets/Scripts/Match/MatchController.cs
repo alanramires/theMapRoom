@@ -234,6 +234,8 @@ public class MatchController : MonoBehaviour
     [System.NonSerialized] private readonly List<Vector3Int> fogBoardCellsBuffer = new List<Vector3Int>(1024);
     [System.NonSerialized] private readonly HashSet<Vector3Int> fogVisibleCellsBuffer = new HashSet<Vector3Int>();
     [System.NonSerialized] private readonly HashSet<Vector3Int> fogDisplayVisibleCellsBuffer = new HashSet<Vector3Int>();
+    [System.NonSerialized] private readonly HashSet<Vector3Int> fogRenderedVisibleCellsBuffer = new HashSet<Vector3Int>();
+    [System.NonSerialized] private bool fogRenderedVisibleCellsValid;
     [System.NonSerialized] private readonly Dictionary<int, FogOfWarUnitCacheEntry> fogVisibleCellsByUnit = new Dictionary<int, FogOfWarUnitCacheEntry>();
     [System.NonSerialized] private readonly Dictionary<FogSpecializedViewCacheKey, HashSet<Vector3Int>> fogSpecializedViewCellsByUnit = new Dictionary<FogSpecializedViewCacheKey, HashSet<Vector3Int>>();
     [System.NonSerialized] private readonly Dictionary<Vector3Int, int> fogVisibleContributorsByCell = new Dictionary<Vector3Int, int>();
@@ -2785,6 +2787,29 @@ public class MatchController : MonoBehaviour
         });
     }
 
+    // Tiers do Jornal do Comandante (0=Critico, 1=Atencao, 2=Informativo):
+    // Critico   = perda consumada ou golpe recebido (unidade, cidade, queda, tiro da nevoa);
+    // Atencao   = ameaca em curso ou escassez (captura parcial, estoque zerado, autonomia critica);
+    // Informativo = ganho de intel / auto-ajuste (novo contato, emersao, pouso).
+    public enum TurnBriefingSeverity { Critical = 0, Warning = 1, Info = 2 }
+
+    public static TurnBriefingSeverity ResolveBriefingSeverity(TurnBriefingCategory category)
+    {
+        switch (category)
+        {
+            case TurnBriefingCategory.ContactLost:
+            case TurnBriefingCategory.ConstructionLost:
+            case TurnBriefingCategory.FuelCrash:
+            case TurnBriefingCategory.FogFire:
+                return TurnBriefingSeverity.Critical;
+            case TurnBriefingCategory.CaptureInProgress:
+            case TurnBriefingCategory.SupplyDepleted:
+                return TurnBriefingSeverity.Warning;
+            default:
+                return TurnBriefingSeverity.Info;
+        }
+    }
+
     private static string ResolveBriefingCategoryLabel(TurnBriefingCategory category)
     {
         switch (category)
@@ -2836,7 +2861,8 @@ public class MatchController : MonoBehaviour
         {
             TurnBriefingEventSaveData evt = drained[i];
             var cell = new Vector3Int(evt.cellX, evt.cellY, 0);
-            string label = ResolveBriefingCategoryLabel((TurnBriefingCategory)evt.category);
+            TurnBriefingCategory category = (TurnBriefingCategory)evt.category;
+            string label = ResolveBriefingCategoryLabel(category);
             string body = string.IsNullOrWhiteSpace(evt.detail)
                 ? evt.subjectName
                 : $"{evt.subjectName}\n{evt.detail}";
@@ -2844,7 +2870,8 @@ public class MatchController : MonoBehaviour
             {
                 unitName = evt.subjectName,
                 cell = cell,
-                customText = $"{label}\n{body}\n({cell.x},{cell.y}) — T{evt.turnNumber}"
+                customText = $"{label}\n{body}\n({cell.x},{cell.y}) — T{evt.turnNumber}",
+                severityTier = (int)ResolveBriefingSeverity(category)
             });
         }
 
@@ -2870,7 +2897,8 @@ public class MatchController : MonoBehaviour
                 {
                     unitName = name,
                     cell = cell,
-                    customText = $"{ResolveBriefingCategoryLabel(TurnBriefingCategory.CaptureInProgress)}\n{name} ({construction.CurrentCapturePoints}/{construction.CapturePointsMax})\n({cell.x},{cell.y})"
+                    customText = $"{ResolveBriefingCategoryLabel(TurnBriefingCategory.CaptureInProgress)}\n{name} ({construction.CurrentCapturePoints}/{construction.CapturePointsMax})\n({cell.x},{cell.y})",
+                    severityTier = (int)ResolveBriefingSeverity(TurnBriefingCategory.CaptureInProgress)
                 });
             }
 
@@ -2890,7 +2918,8 @@ public class MatchController : MonoBehaviour
                     {
                         unitName = name,
                         cell = cell,
-                        customText = $"{ResolveBriefingCategoryLabel(TurnBriefingCategory.SupplyDepleted)}\n{name}: sem {offer.supply.displayName}\n({cell.x},{cell.y})"
+                        customText = $"{ResolveBriefingCategoryLabel(TurnBriefingCategory.SupplyDepleted)}\n{name}: sem {offer.supply.displayName}\n({cell.x},{cell.y})",
+                        severityTier = (int)ResolveBriefingSeverity(TurnBriefingCategory.SupplyDepleted)
                     });
                 }
             }
@@ -3534,27 +3563,43 @@ public class MatchController : MonoBehaviour
         }
 
         double incrementalStartMs = enableFogStepPerfLogs ? Time.realtimeSinceStartupAsDouble : 0d;
+        double stageStartMs = incrementalStartMs;
         UpdateFogVisibilityForUnit(
             unit,
             boardMap,
             out double collectMs,
             out int visibleCellsCollected,
             out bool collectExecuted);
+        double updateCacheMs = enableFogStepPerfLogs ? (Time.realtimeSinceStartupAsDouble - stageStartMs) * 1000d : 0d;
         // MarkAsActed e o ponto de compromisso da acao. A uniao especializada do modo ALL
         // so pode revelar o novo ponto de observacao agora, nunca ao fim do movimento provisório.
+        stageStartMs = enableFogStepPerfLogs ? Time.realtimeSinceStartupAsDouble : 0d;
         if (fogOfWarVisionMode == FogOfWarVisionMode.All)
             RenderFogOverlayFromRuntimeCache(boardMap);
+        double renderOverlayMs = enableFogStepPerfLogs ? (Time.realtimeSinceStartupAsDouble - stageStartMs) * 1000d : 0d;
+        stageStartMs = enableFogStepPerfLogs ? Time.realtimeSinceStartupAsDouble : 0d;
         RefreshRuntimeUnitFogVisibility();
+        double runtimeVisibilityMs = enableFogStepPerfLogs ? (Time.realtimeSinceStartupAsDouble - stageStartMs) * 1000d : 0d;
+        stageStartMs = enableFogStepPerfLogs ? Time.realtimeSinceStartupAsDouble : 0d;
         AIIntelLedger.RecordVisibleContactsForTeam(ActiveTeam, currentTurn, this);
+        double intelMs = enableFogStepPerfLogs ? (Time.realtimeSinceStartupAsDouble - stageStartMs) * 1000d : 0d;
+        stageStartMs = enableFogStepPerfLogs ? Time.realtimeSinceStartupAsDouble : 0d;
         TryPlaySkillDetectionSfxForActedUnit(unit, boardMap);
+        double detectionSfxMs = enableFogStepPerfLogs ? (Time.realtimeSinceStartupAsDouble - stageStartMs) * 1000d : 0d;
+        stageStartMs = enableFogStepPerfLogs ? Time.realtimeSinceStartupAsDouble : 0d;
         TryRefreshDetectedPersistenceForActedUnit(unit, boardMap);
+        double detectedPersistenceMs = enableFogStepPerfLogs ? (Time.realtimeSinceStartupAsDouble - stageStartMs) * 1000d : 0d;
+        stageStartMs = enableFogStepPerfLogs ? Time.realtimeSinceStartupAsDouble : 0d;
         OnFogOfWarUpdated?.Invoke();
+        double callbacksMs = enableFogStepPerfLogs ? (Time.realtimeSinceStartupAsDouble - stageStartMs) * 1000d : 0d;
         if (enableFogStepPerfLogs)
         {
             double totalMs = (Time.realtimeSinceStartupAsDouble - incrementalStartMs) * 1000d;
             Debug.Log(
                 $"[FoW][Perf][Incremental] unit={unit.name} total={totalMs:F3}ms " +
-                $"collect={collectMs:F3}ms collected={collectExecuted} cells={visibleCellsCollected}");
+                $"updateCache={updateCacheMs:F3}ms collect={collectMs:F3}ms collected={collectExecuted} cells={visibleCellsCollected} " +
+                $"render={renderOverlayMs:F3}ms visibility={runtimeVisibilityMs:F3}ms intel={intelMs:F3}ms " +
+                $"detectionSfx={detectionSfxMs:F3}ms persistence={detectedPersistenceMs:F3}ms callbacks={callbacksMs:F3}ms");
         }
     }
 
@@ -4865,6 +4910,8 @@ public class MatchController : MonoBehaviour
         fogBoardCellsBuffer.Clear();
         fogVisibleCellsBuffer.Clear();
         fogDisplayVisibleCellsBuffer.Clear();
+        fogRenderedVisibleCellsBuffer.Clear();
+        fogRenderedVisibleCellsValid = false;
         fogVisibleCellsByUnit.Clear();
         fogVisibleContributorsByCell.Clear();
         fogUnitVisibilityByCacheIndex.Clear();
@@ -4902,6 +4949,9 @@ public class MatchController : MonoBehaviour
 
         fogCachedTeamId = activeTeamId;
         fogOverlayInitialized = true;
+        // InitializeFogOverlay acabou de desenhar nevoa em todas as celulas.
+        fogRenderedVisibleCellsBuffer.Clear();
+        fogRenderedVisibleCellsValid = true;
     }
 
     // Coleta células do board e marca overlay como inicializado, sem escrever no tilemap.
@@ -4923,27 +4973,59 @@ public class MatchController : MonoBehaviour
     // Deve ser chamado apenas após todos os UpdateFogVisibilityForUnit do turno terem rodado.
     private void RenderFogOverlayFromRuntimeCache(Tilemap boardMap)
     {
-        bool useDisplayFilter = true;
         if (fogOfWarVisionMode == FogOfWarVisionMode.All)
             BuildFogDisplayVisibleCellsForAllModes(boardMap, fogDisplayVisibleCellsBuffer);
         else
             BuildFogDisplayVisibleCellsForMode(boardMap, fogOfWarVisionMode, fogDisplayVisibleCellsBuffer);
 
-        fogOfWarTilemap.ClearAllTiles();
         Color fogColor = new Color(0f, 0f, 0f, ResolveFogOfWarAlpha());
+
+        if (!fogRenderedVisibleCellsValid)
+        {
+            fogOfWarTilemap.ClearAllTiles();
+            for (int i = 0; i < fogBoardCellsBuffer.Count; i++)
+            {
+                Vector3Int cell = fogBoardCellsBuffer[i];
+                if (fogDisplayVisibleCellsBuffer.Contains(cell))
+                    continue;
+                TileBase tile = ResolveFogTileForCell(boardMap, cell);
+                if (tile == null)
+                    continue;
+                fogOfWarTilemap.SetTile(cell, tile);
+                fogOfWarTilemap.SetTileFlags(cell, TileFlags.None);
+                fogOfWarTilemap.SetColor(cell, fogColor);
+            }
+
+            fogRenderedVisibleCellsBuffer.Clear();
+            fogRenderedVisibleCellsBuffer.UnionWith(fogDisplayVisibleCellsBuffer);
+            fogRenderedVisibleCellsValid = true;
+            return;
+        }
+
+        // O cache confirmado anterior representa exatamente o que esta desenhado.
+        // Atualize apenas celulas cujo estado visivel/nevoa realmente mudou.
         for (int i = 0; i < fogBoardCellsBuffer.Count; i++)
         {
             Vector3Int cell = fogBoardCellsBuffer[i];
-            bool visible = useDisplayFilter
-                ? fogDisplayVisibleCellsBuffer.Contains(cell)
-                : fogVisibleContributorsByCell.ContainsKey(cell);
-            if (visible) continue;
+            bool wasVisible = fogRenderedVisibleCellsBuffer.Contains(cell);
+            bool visible = fogDisplayVisibleCellsBuffer.Contains(cell);
+            if (visible == wasVisible)
+                continue;
+            if (visible)
+            {
+                fogOfWarTilemap.SetTile(cell, null);
+                continue;
+            }
             TileBase tile = ResolveFogTileForCell(boardMap, cell);
-            if (tile == null) continue;
+            if (tile == null)
+                continue;
             fogOfWarTilemap.SetTile(cell, tile);
             fogOfWarTilemap.SetTileFlags(cell, TileFlags.None);
             fogOfWarTilemap.SetColor(cell, fogColor);
         }
+
+        fogRenderedVisibleCellsBuffer.Clear();
+        fogRenderedVisibleCellsBuffer.UnionWith(fogDisplayVisibleCellsBuffer);
     }
 
     private void BuildFogDisplayVisibleCellsForAllModes(Tilemap boardMap, HashSet<Vector3Int> output, UnitManager excludeUnit = null)
@@ -4977,11 +5059,13 @@ public class MatchController : MonoBehaviour
                 unitData.visionSpecializations == null || unitData.visionSpecializations.Count == 0)
                 continue;
 
+            // A coleta agregada (fogVisibleContributorsByCell) ja avalia a camada
+            // nativa do terreno e todas as especializacoes compativeis com ela.
+            // Repetir Land/Naval/Sub aqui reconstruia os mesmos distance maps.
+            // Air e a unica familia independente do terreno sob o hex e, por isso,
+            // ainda precisa da passagem virtual para cobrir tanto terra quanto mar.
             bool airLowAdded = false;
             bool airHighAdded = false;
-            bool surfaceLandAdded = false;
-            bool surfaceNavalAdded = false;
-            bool submergedAdded = false;
             for (int j = 0; j < unitData.visionSpecializations.Count; j++)
             {
                 UnitVisionException specialization = unitData.visionSpecializations[j];
@@ -4990,21 +5074,18 @@ public class MatchController : MonoBehaviour
 
                 Domain domain = specialization.domain;
                 HeightLevel height = specialization.heightLevel;
+                if (domain != Domain.Air)
+                    continue;
+
                 bool alreadyAdded =
                     (domain == Domain.Air && height == HeightLevel.AirLow && airLowAdded) ||
-                    (domain == Domain.Air && height == HeightLevel.AirHigh && airHighAdded) ||
-                    (domain == Domain.Land && height == HeightLevel.Surface && surfaceLandAdded) ||
-                    (domain == Domain.Naval && height == HeightLevel.Surface && surfaceNavalAdded) ||
-                    (domain == Domain.Submarine && height == HeightLevel.Submerged && submergedAdded);
+                    (domain == Domain.Air && height == HeightLevel.AirHigh && airHighAdded);
                 if (alreadyAdded)
                     continue;
 
                 AddCachedFogLayerVisibleCellsForUnit(unit, boardMap, terrainDatabase, dpqConfig, domain, height, output);
                 if (domain == Domain.Air && height == HeightLevel.AirLow) airLowAdded = true;
                 else if (domain == Domain.Air && height == HeightLevel.AirHigh) airHighAdded = true;
-                else if (domain == Domain.Land && height == HeightLevel.Surface) surfaceLandAdded = true;
-                else if (domain == Domain.Naval && height == HeightLevel.Surface) surfaceNavalAdded = true;
-                else if (domain == Domain.Submarine && height == HeightLevel.Submerged) submergedAdded = true;
             }
         }
 

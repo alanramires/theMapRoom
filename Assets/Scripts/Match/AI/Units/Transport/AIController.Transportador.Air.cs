@@ -60,7 +60,8 @@ public partial class AIController
         List<UnitManager> passengers = CollectPassengers(unit);
         if (passengers.Count == 0)
         {
-            Debug.LogWarning($"[AI] {TL("Transporte")} heli {unit.InstanceId} courier: cargo inconsistente, reverte para shuttle");
+            if (showAILogs)
+                Debug.LogWarning($"[AI] {TL("Transporte")} heli {unit.InstanceId} courier: cargo inconsistente, reverte para shuttle");
             return DecideAirShuttleAction(unit, snapshot, plan);
         }
 

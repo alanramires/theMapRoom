@@ -243,21 +243,19 @@ public sealed class PanelRodadaController : MonoBehaviour
         SetButtonEnabled(false);
     }
 
-    public IEnumerator ReleaseLoadingPresentation(TeamId team, int numeroJogador, int turno)
+    public IEnumerator ReleaseLoadingPresentation(
+        TeamId team,
+        int numeroJogador,
+        int turno,
+        System.Action onButtonReady = null)
     {
         int version = presentationVersion;
         if (!IsPresenting)
             BeginLoadingPresentation();
         version = presentationVersion;
 
-        // Mesmo quando o restore termina muito rapido, preserva a abertura sonora
-        // completa ainda na fase "Carregando": menu_open -> aguardandoRodada.
-        // So depois que o loop de espera entrou liberamos "Vez do Time" e o botao.
-        if (loadingOpeningAudioRoutine != null)
-            yield return new WaitUntil(() => loadingOpeningAudioRoutine == null || version != presentationVersion);
-        if (version != presentationVersion)
-            yield break;
-
+        // O audio de abertura e apenas apresentacao: ele pode continuar tocando,
+        // mas nunca deve segurar a liberacao do turno depois que o save foi restaurado.
         RestorePlayerTextPosition();
         StartTeamVideo(team);
 
@@ -275,6 +273,7 @@ public sealed class PanelRodadaController : MonoBehaviour
 
         aguardandoConfirmacao = true;
         SetButtonEnabled(true);
+        onButtonReady?.Invoke();
         if (botaoRodada != null)
             botaoRodada.Select();
         // Se menu_open ainda estiver tocando, a propria sequencia inicia o loop

@@ -14,7 +14,8 @@ public partial class AIController
     private IEnumerator RunAITurn(TeamId aiTeam)
     {
         float turnStart = Time.realtimeSinceStartup;
-        Debug.Log($"[AI] RunAITurn iniciado para {aiTeam}.");
+        if (showAILogs)
+            Debug.Log($"[AI] RunAITurn iniciado para {aiTeam}.");
         if (ShouldStopAIForMatchEnd("turn_start"))
             yield break;
 

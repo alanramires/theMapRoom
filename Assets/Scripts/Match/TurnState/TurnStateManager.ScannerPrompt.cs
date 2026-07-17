@@ -190,6 +190,9 @@ public partial class TurnStateManager
     private string landingOptionUnavailableReason = string.Empty;
     [Header("Debug Logs & Perf Snapshot (F8)")]
     [SerializeField] private bool enableTurnStateRuntimeLogs = false;
+    [Tooltip("Exibe no Console os logs informativos do fluxo de movimento.")]
+    [InspectorName("Show Movement Logs")]
+    [SerializeField] private bool showMovementLogs = false;
     [SerializeField] private bool enableRangeCacheDebugLogs = true;
     [SerializeField] private bool showPerfRangeLine = true;
     [SerializeField] private bool showPerfSensorsLine = true;

@@ -27,6 +27,11 @@ public partial class AIController : MonoBehaviour
     [SerializeField] private TerrainDatabase terrainDatabase;
 
     [Header("AI Settings")]
+    [Tooltip("Exibe no Console os logs gerais com prefixo [AI].")]
+    [InspectorName("Show AI Logs")]
+    [SerializeField] private bool showAILogs;
+    public bool ShowAILogs => showAILogs;
+
     [Tooltip("Exibe os elementos de AI sobre as unidades, tais como plano, badge, eixo.")]
     [SerializeField] private bool showAIUnitHUD;
 

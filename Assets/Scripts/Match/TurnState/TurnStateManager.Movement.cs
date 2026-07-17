@@ -320,11 +320,20 @@ public partial class TurnStateManager
     {
         if (selectedUnit == null)
             return;
+
+        // Invariante local: preferencia automatica nunca pode vencer uma trava
+        // de camada, mesmo se este metodo passar a ser chamado por outro fluxo
+        // ou a ordem do fechamento do movimento mudar no futuro.
+        if (selectedUnit.HasForcedLayerLock)
+            return;
+
         if (!selectedUnit.TryGetPreferredNavalLayerMode(out Domain preferredDomain, out HeightLevel preferredHeight))
             return;
         if (preferredDomain == currentDomain && preferredHeight == currentHeight)
             return;
         if (!selectedUnit.SupportsLayerMode(preferredDomain, preferredHeight))
+            return;
+        if (selectedUnit.IsLayerChangeBlockedByForcedLock(preferredDomain, preferredHeight, out _))
             return;
         if (!CanUseLayerModeAtCellForLayerForce(selectedUnit, boardMap, terrainDatabase, cell, preferredDomain, preferredHeight))
             return;

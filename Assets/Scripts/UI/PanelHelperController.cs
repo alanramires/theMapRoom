@@ -194,6 +194,10 @@ public class PanelHelperController : MonoBehaviour
     private string autonomyUpkeepSignature = string.Empty;
     private const float AutonomyUpkeepHeaderHeight = 34f;
     private const float AutonomyUpkeepRowHeight = 82f;
+    private const float AutonomyUpkeepTierHeaderHeight = 28f;
+    // Altura total do conteudo do Jornal (titulo + cabecalhos de tier + linhas),
+    // computada no rebuild e reusada pelo scroll layout.
+    private float autonomyUpkeepContentHeight;
     private GameObject commandServiceRowsRoot;
     private GameObject commandServiceViewportRoot;
     private RectTransform commandServiceViewportRect;
@@ -1674,7 +1678,9 @@ public class PanelHelperController : MonoBehaviour
         }
         else if (autonomyUpkeepActive)
         {
-            bodyHeight = AutonomyUpkeepHeaderHeight + 4f + autonomyUpkeepRows.Count * (AutonomyUpkeepRowHeight + 4f);
+            bodyHeight = autonomyUpkeepContentHeight > 0f
+                ? autonomyUpkeepContentHeight
+                : AutonomyUpkeepHeaderHeight + 4f + autonomyUpkeepRows.Count * (AutonomyUpkeepRowHeight + 4f);
         }
         else if (commandServiceRowsActive)
         {
@@ -1944,6 +1950,7 @@ public class PanelHelperController : MonoBehaviour
                 .Append('|').Append(line.fuelAfter).Append('/').Append(line.fuelMax)
                 .Append('|').Append(line.isFocused)
                 .Append('|').Append(line.customText ?? string.Empty)
+                .Append('|').Append(line.severityTier)
                 .Append('|').Append(line.unitSprite != null ? line.unitSprite.name : string.Empty);
         }
         string signature = signatureBuilder.ToString();
@@ -1993,11 +2000,24 @@ public class PanelHelperController : MonoBehaviour
             Destroy(autonomyUpkeepRoot.transform.GetChild(i).gameObject);
         autonomyUpkeepRows.Clear();
 
-        CreateAutonomyUpkeepTextRow("Jornal do Comandante", AutonomyUpkeepHeaderHeight, 20f, TextAlignmentOptions.Center);
+        CreateAutonomyUpkeepTextRow("Jornal do Comandante", AutonomyUpkeepHeaderHeight, 20f, TextAlignmentOptions.Center, null);
+        int tierHeaderCount = 0;
+        int lastTier = int.MinValue;
         for (int i = 0; i < lines.Count; i++)
         {
             TurnStateManager.HelperTurnStartAutonomyLine line = lines[i];
             if (line == null) continue;
+
+            // Cabecalho do tier de severidade, na troca de tier. Cor fixa (nao
+            // por time): severidade e universal e precisa saltar aos olhos.
+            if (line.severityTier != lastTier)
+            {
+                lastTier = line.severityTier;
+                GetSeverityTierHeader(line.severityTier, out string tierLabel, out Color tierColor);
+                CreateAutonomyUpkeepTextRow(tierLabel, AutonomyUpkeepTierHeaderHeight, 16f, TextAlignmentOptions.Left, tierColor);
+                tierHeaderCount++;
+            }
+
             bool isBriefingLine = !string.IsNullOrWhiteSpace(line.customText);
             GameObject row = new GameObject("autonomy_upkeep_unit", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button), typeof(LayoutElement));
             row.transform.SetParent(autonomyUpkeepRoot.transform, false);
@@ -2047,8 +2067,30 @@ public class PanelHelperController : MonoBehaviour
             autonomyUpkeepRows.Add(row);
         }
 
-        autonomyUpkeepRoot.GetComponent<RectTransform>().sizeDelta = new Vector2(
-            0f, AutonomyUpkeepHeaderHeight + 4f + autonomyUpkeepRows.Count * (AutonomyUpkeepRowHeight + 4f));
+        autonomyUpkeepContentHeight = AutonomyUpkeepHeaderHeight + 4f
+            + tierHeaderCount * (AutonomyUpkeepTierHeaderHeight + 4f)
+            + autonomyUpkeepRows.Count * (AutonomyUpkeepRowHeight + 4f);
+        autonomyUpkeepRoot.GetComponent<RectTransform>().sizeDelta = new Vector2(0f, autonomyUpkeepContentHeight);
+    }
+
+    private static void GetSeverityTierHeader(int tier, out string label, out Color color)
+    {
+        // Marcadores ASCII (qualquer fonte tem); a cor faz o peso da severidade.
+        switch (tier)
+        {
+            case 0:
+                label = "!! CRÍTICO";
+                color = new Color(1f, 0.42f, 0.38f); // vermelho
+                break;
+            case 1:
+                label = "! ATENÇÃO";
+                color = new Color(1f, 0.80f, 0.32f); // ambar
+                break;
+            default:
+                label = "- INFORMATIVO";
+                color = new Color(0.62f, 0.85f, 1f); // azul claro
+                break;
+        }
     }
 
     private static void CreateAutonomyFuelBar(Transform parent, int fuelAfter, int fuelMax)
@@ -2098,7 +2140,7 @@ public class PanelHelperController : MonoBehaviour
         return true;
     }
 
-    private void CreateAutonomyUpkeepTextRow(string text, float height, float fontSize, TextAlignmentOptions alignment)
+    private void CreateAutonomyUpkeepTextRow(string text, float height, float fontSize, TextAlignmentOptions alignment, Color? fixedColor = null)
     {
         GameObject obj = new GameObject("autonomy_upkeep_header", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI), typeof(LayoutElement));
         obj.transform.SetParent(autonomyUpkeepRoot.transform, false);
@@ -2110,7 +2152,8 @@ public class PanelHelperController : MonoBehaviour
         label.fontSize = fontSize;
         label.fontStyle = FontStyles.Bold;
         label.alignment = alignment;
-        label.color = currentTeamColor;
+        // Cabecalhos de tier usam cor fixa de severidade; o titulo segue o time.
+        label.color = fixedColor ?? currentTeamColor;
         label.raycastTarget = false;
     }
 

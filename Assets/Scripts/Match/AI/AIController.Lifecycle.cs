@@ -39,7 +39,8 @@ public partial class AIController
         if (IsDebugPaused) IsDebugPaused = false;
         if (IsDebugShoppingPaused) IsDebugShoppingPaused = false;
         PanelDialogController.ClearExternalText();
-        Debug.Log($"[AI] Partida encerrada ({context}); IA interrompida.");
+        if (showAILogs)
+            Debug.Log($"[AI] Partida encerrada ({context}); IA interrompida.");
     }
 
     private void OnGUI()
@@ -158,12 +159,14 @@ public partial class AIController
 
             terrainDatabase = Resources.Load<TerrainDatabase>("TerrainDatabase");
 
-        Debug.Log($"[AI] Start — matchController={matchController != null} replayManager={replayManager != null} turnStateManager={turnStateManager != null}");
+        if (showAILogs)
+            Debug.Log($"[AI] Start — matchController={matchController != null} replayManager={replayManager != null} turnStateManager={turnStateManager != null}");
 
         if (startOnPause)
         {
             SetDebugPaused(true);
-            Debug.Log("[AI] Start on Pause ativo - estado inicial equivalente ao F10.");
+            if (showAILogs)
+                Debug.Log("[AI] Start on Pause ativo - estado inicial equivalente ao F10.");
         }
 
         RefreshConstructionHudAfterAIHudReady();
@@ -176,7 +179,8 @@ public partial class AIController
 
         {
 
-            Debug.Log($"[AI] Start — time ativo ({matchController.ActiveTeam}) já é IA, iniciando turno.");
+            if (showAILogs)
+                Debug.Log($"[AI] Start — time ativo ({matchController.ActiveTeam}) já é IA, iniciando turno.");
 
             HandleTeamChanged((int)matchController.ActiveTeam);
 
@@ -227,7 +231,8 @@ public partial class AIController
 
         bool aiCheck = matchController != null && matchController.IsPlayerAI(newTeam);
 
-        Debug.Log($"[AI] HandleTeamChanged — teamIndex={teamIndex} newTeam={newTeam} matchController={matchController != null} isAI={aiCheck}");
+        if (showAILogs)
+            Debug.Log($"[AI] HandleTeamChanged — teamIndex={teamIndex} newTeam={newTeam} matchController={matchController != null} isAI={aiCheck}");
 
         if (matchController == null) return;
         if (matchController.HasVictoryWinner)
@@ -249,7 +254,8 @@ public partial class AIController
             if (SaveGameManager.IsAnyLoadInProgress)
             {
                 if (aiCoroutine != null) { StopCoroutine(aiCoroutine); aiCoroutine = null; }
-                Debug.Log("[AI] HandleTeamChanged adiado: load em andamento; turno (re)inicia pos-restauracao.");
+                if (showAILogs)
+                    Debug.Log("[AI] HandleTeamChanged adiado: load em andamento; turno (re)inicia pos-restauracao.");
                 return;
             }
 

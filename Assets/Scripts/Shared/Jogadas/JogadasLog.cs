@@ -46,7 +46,8 @@ public class JogadasLog
         j.jogadaId = proximoId++;
         jogadas.Add(j);
         OnJogadaRegistrada?.Invoke(j);
-        Debug.Log($"[Jogadas] #{j.jogadaId} T{j.turno} team={j.team} {j.acao} uid={j.uid} ({j.unidadeSigla}) de ({j.cx},{j.cy}) para ({j.dx},{j.dy})");
+        if (JogadasManager.ShouldLog)
+            Debug.Log($"[Jogadas] #{j.jogadaId} T{j.turno} team={j.team} {j.acao} uid={j.uid} ({j.unidadeSigla}) de ({j.cx},{j.cy}) para ({j.dx},{j.dy})");
     }
 }
 

@@ -97,17 +97,18 @@ public class ReplayManager : MonoBehaviour
     public ActionStack ActionStack => actionStack;
     public PlayerAction CurrentBuffer => currentBuffer;
     public int CurrentReplayBatchCount => ResolveCurrentReplayBatchCount();
+    public bool RuntimeLogsEnabled => enableReplayRuntimeLogs;
 
     private void ReplayLog(string message)
     {
         if (enableReplayRuntimeLogs)
-            LogManager.Info(GameLogCategory.Replay, message, this);
+            Debug.Log($"[Replay] {message}", this);
     }
 
     private void ReplayLogWarning(string message)
     {
         if (enableReplayRuntimeWarnings)
-            LogManager.Warning(GameLogCategory.Replay, message, this);
+            Debug.LogWarning($"[Replay] {message}", this);
     }
 
     public float GetEffectiveTimeBetweenBatchesForAutoplay()

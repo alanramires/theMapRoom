@@ -11,6 +11,11 @@ public class UnitSpawner : MonoBehaviour
     [SerializeField] private MatchController matchController;
     [SerializeField] private int currentId = 1;
 
+    [Header("Debug")]
+    [Tooltip("Exibe no Console os logs informativos do UnitSpawner.")]
+    [InspectorName("Show Unit Spawner Logs")]
+    [SerializeField] private bool showUnitSpawnerLogs;
+
     [Header("Spawn Template")]
     [Tooltip("Prefab unico de molde (Assets/Prefab/unit.prefab). No spawn, sprite/nome sao aplicados via UnitData e a autonomia atual inicia cheia com base em UnitData.autonomia.")]
     [SerializeField] private GameObject unitPrefab;
@@ -368,7 +373,8 @@ public class UnitSpawner : MonoBehaviour
         }
 
         SetNextIdAfterMax(maxUnitId);
-        Debug.Log($"[UnitSpawner] NextId ajustado por unidades em cena: maxUnitId={maxUnitId} nextId={currentId}.");
+        if (showUnitSpawnerLogs)
+            Debug.Log($"[UnitSpawner] NextId ajustado por unidades em cena: maxUnitId={maxUnitId} nextId={currentId}.");
         return maxUnitId;
     }
 

@@ -97,7 +97,7 @@ public static class AIIntelLedger
         {
             if (enemy == null || enemy.IsDead || enemy.IsEmbarked
                 || enemy.TeamId == observer
-                || !match.IsUnitVisibleForTeamNoCache(enemy, observer)
+                || !match.IsUnitVisibleForTeam(enemy, observer)
                 || !enemy.TryGetUnitData(out UnitData data) || data == null)
                 continue;
 

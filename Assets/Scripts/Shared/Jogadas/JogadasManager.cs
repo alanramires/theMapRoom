@@ -10,7 +10,11 @@ public class JogadasManager : MonoBehaviour
 {
     public static JogadasManager Instance { get; private set; }
 
+    [Header("Debug Logs")]
+    [SerializeField] private bool showJogadasLogs;
     [HideInInspector] public JogadasLog log = new JogadasLog();
+    public bool ShowJogadasLogs => showJogadasLogs;
+    public static bool ShouldLog => Instance != null && Instance.showJogadasLogs;
 
     void Awake()
     {
@@ -290,7 +294,8 @@ public class JogadasManager : MonoBehaviour
             : BuildTexto(log?.jogadas);
 
         File.WriteAllText(path, content, new UTF8Encoding(true));
-        Debug.Log($"[Jogadas] exportado ({format}) {log?.jogadas?.Count ?? 0} jogada(s) em: {path}");
+        if (showJogadasLogs)
+            Debug.Log($"[Jogadas] exportado ({format}) {log?.jogadas?.Count ?? 0} jogada(s) em: {path}");
         return path;
     }
 
@@ -693,7 +698,12 @@ public class JogadasManager : MonoBehaviour
     public static void RegistrarPlayerAction(PlayerAction action)
     {
         JogadasManager manager = EnsureInstance();
-        if (manager == null) { Debug.LogWarning("[Jogadas] RegistrarPlayerAction: falha ao criar JogadasManager."); return; }
+        if (manager == null)
+        {
+            if (ShouldLog)
+                Debug.LogWarning("[Jogadas] RegistrarPlayerAction: falha ao criar JogadasManager.");
+            return;
+        }
         if (action == null) return;
         if (action.ActionType != PlayerActionType.UnitAction) return;
 
@@ -714,7 +724,8 @@ public class JogadasManager : MonoBehaviour
                        && string.IsNullOrEmpty(action.TargetInstanceId);
         if (!isCaptura && !isEmbarque && !isAtaque && !isDesembarque && !isFusao && !isSuprir && !isTransferir && !isEstacionario && !isMover)
         {
-            Debug.Log($"[Jogadas] RegistrarPlayerAction ignorada: ActionType={action.ActionType} SensorAction={action.SensorAction} HasMoveTo={action.HasMoveTo} HasMoveFrom={action.HasMoveFrom} MoveFrom={action.MoveFrom} MoveTo={action.MoveTo}");
+            if (ShouldLog)
+                Debug.Log($"[Jogadas] RegistrarPlayerAction ignorada: ActionType={action.ActionType} SensorAction={action.SensorAction} HasMoveTo={action.HasMoveTo} HasMoveFrom={action.HasMoveFrom} MoveFrom={action.MoveFrom} MoveTo={action.MoveTo}");
             return;
         }
 

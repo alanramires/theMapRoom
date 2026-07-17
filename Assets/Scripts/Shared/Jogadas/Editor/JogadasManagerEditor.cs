@@ -13,6 +13,11 @@ public class JogadasManagerEditor : Editor
 
     public override void OnInspectorGUI()
     {
+        serializedObject.Update();
+        EditorGUILayout.PropertyField(serializedObject.FindProperty("showJogadasLogs"), new GUIContent("Show Jogadas Logs"));
+        serializedObject.ApplyModifiedProperties();
+        EditorGUILayout.Space(4);
+
         JogadasManager mgr = (JogadasManager)target;
         JogadasLog     log  = mgr.log;
         List<Jogada>   all  = log?.jogadas ?? new List<Jogada>();

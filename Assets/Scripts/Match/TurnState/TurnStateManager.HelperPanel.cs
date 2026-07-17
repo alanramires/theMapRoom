@@ -491,6 +491,11 @@ public partial class TurnStateManager
         // briefing generico — o renderer usa este texto no lugar do formato de
         // combustivel e nao desenha a barra de autonomia.
         public string customText;
+        // Tier de severidade do Jornal: 0=Critico, 1=Atencao, 2=Informativo.
+        // Agrupa as linhas sob cabecalhos coloridos (fixos, nao por time).
+        public int severityTier = 2;
+        // Auxiliar do sort estavel por tier (preserva a ordem interna).
+        public int stableOrder;
     }
 
     public bool TryBuildHelperPanelData(out HelperPanelData data)
@@ -777,52 +782,73 @@ public partial class TurnStateManager
         turnStartAutonomyHelperLines.Clear();
         lastTurnStartAutonomyHelperLines.Clear();
 
+        // Autonomia critica (<=25% do tanque) sobe para o tier Atencao junto de
+        // estoque/captura; o resto do consumo em voo fica no tier Informativo.
+        const float AutonomyWarningRatio = 0.25f;
+
+        List<HelperTurnStartAutonomyLine> combined = new List<HelperTurnStartAutonomyLine>();
+
         if (briefingLines != null)
         {
             for (int i = 0; i < briefingLines.Count; i++)
             {
                 HelperTurnStartAutonomyLine line = briefingLines[i];
                 if (line != null && !string.IsNullOrWhiteSpace(line.customText))
-                    turnStartAutonomyHelperLines.Add(line);
+                    combined.Add(line);
             }
         }
 
-        int briefingCount = turnStartAutonomyHelperLines.Count;
-
-        List<HelperTurnStartAutonomyLine> autonomyLines = new List<HelperTurnStartAutonomyLine>();
         if (entries != null)
         {
+            List<HelperTurnStartAutonomyLine> autonomyLines = new List<HelperTurnStartAutonomyLine>();
             for (int i = 0; i < entries.Count; i++)
             {
                 TurnStartAutonomyUpkeepEntry entry = entries[i];
                 if (entry.autonomyConsumed <= 0)
                     continue;
 
+                int fuelAfter = Mathf.Max(0, entry.fuelAfter);
+                int fuelMax = Mathf.Max(1, entry.fuelMax);
+                float ratio = (float)fuelAfter / fuelMax;
                 autonomyLines.Add(new HelperTurnStartAutonomyLine
                 {
                     unitName = entry.unitName ?? string.Empty,
                     autonomyConsumed = Mathf.Max(0, entry.autonomyConsumed),
                     fuelBefore = Mathf.Max(0, entry.fuelBefore),
-                    fuelAfter = Mathf.Max(0, entry.fuelAfter),
-                    fuelMax = Mathf.Max(1, entry.fuelMax),
+                    fuelAfter = fuelAfter,
+                    fuelMax = fuelMax,
                     cell = entry.cell,
                     unitSprite = entry.unitSprite,
-                    unitColor = entry.unitColor
+                    unitColor = entry.unitColor,
+                    severityTier = ratio <= AutonomyWarningRatio ? 1 : 2
                 });
             }
+
+            // Dentro do consumo em voo, o mais seco primeiro (mantido apos o sort por tier).
+            autonomyLines.Sort((a, b) =>
+            {
+                float aRatio = a != null ? (float)a.fuelAfter / Mathf.Max(1, a.fuelMax) : 1f;
+                float bRatio = b != null ? (float)b.fuelAfter / Mathf.Max(1, b.fuelMax) : 1f;
+                int ratioOrder = aRatio.CompareTo(bRatio);
+                if (ratioOrder != 0) return ratioOrder;
+                int fuelOrder = (a?.fuelAfter ?? int.MaxValue).CompareTo(b?.fuelAfter ?? int.MaxValue);
+                if (fuelOrder != 0) return fuelOrder;
+                return string.Compare(a?.unitName, b?.unitName, System.StringComparison.OrdinalIgnoreCase);
+            });
+            combined.AddRange(autonomyLines);
         }
 
-        autonomyLines.Sort((a, b) =>
+        // Sort estavel por tier (Critico->Atencao->Informativo), preservando a
+        // ordem interna ja definida: eventos (por categoria) antes do consumo em
+        // voo (por combustivel) dentro do mesmo tier.
+        for (int i = 0; i < combined.Count; i++)
+            combined[i].stableOrder = i;
+        combined.Sort((a, b) =>
         {
-            float aRatio = a != null ? (float)a.fuelAfter / Mathf.Max(1, a.fuelMax) : 1f;
-            float bRatio = b != null ? (float)b.fuelAfter / Mathf.Max(1, b.fuelMax) : 1f;
-            int ratioOrder = aRatio.CompareTo(bRatio);
-            if (ratioOrder != 0) return ratioOrder;
-            int fuelOrder = (a?.fuelAfter ?? int.MaxValue).CompareTo(b?.fuelAfter ?? int.MaxValue);
-            if (fuelOrder != 0) return fuelOrder;
-            return string.Compare(a?.unitName, b?.unitName, System.StringComparison.OrdinalIgnoreCase);
+            int tierOrder = a.severityTier.CompareTo(b.severityTier);
+            return tierOrder != 0 ? tierOrder : a.stableOrder.CompareTo(b.stableOrder);
         });
-        turnStartAutonomyHelperLines.AddRange(autonomyLines);
+        turnStartAutonomyHelperLines.AddRange(combined);
 
         if (turnStartAutonomyHelperLines.Count <= 0)
         {

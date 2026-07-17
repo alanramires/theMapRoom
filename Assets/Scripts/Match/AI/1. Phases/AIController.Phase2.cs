@@ -170,7 +170,8 @@ public partial class AIController
 
             if (action == null)
             {
-                Debug.LogWarning($"[AI] Sem decisão para {unit.InstanceId} — marcando como agida.");
+                if (showAILogs)
+                    Debug.LogWarning($"[AI] Sem decisão para {unit.InstanceId} — marcando como agida.");
                 unit.MarkAsActed();
                 cursor++;
                 continue;

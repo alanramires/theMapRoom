@@ -850,7 +850,8 @@ public partial class TurnStateManager
 
             EnterSensorsState(CursorState.MoveuParado);
             pendingHeldPositionCompletion = true;
-            Debug.Log("moveu no mesmo lugar");
+            if (showMovementLogs)
+                Debug.Log("[Movement] moveu no mesmo lugar");
             return ActionSfx.Confirm;
         }
 

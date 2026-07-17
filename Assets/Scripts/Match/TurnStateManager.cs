@@ -251,7 +251,7 @@ public partial class TurnStateManager : MonoBehaviour
 
         if (nextState == CursorState.Neutral && previous != CursorState.Neutral)
         {
-            if (enableTurnStateRuntimeLogs)
+            if (replayManager != null && replayManager.RuntimeLogsEnabled)
                 Debug.Log($"[Replay][Dispatch] OnCursorReturnedToNeutral fired previous={previous} current={nextState}");
             CursorController.NotifyCursorReturnedToNeutral();
         }
@@ -465,7 +465,8 @@ public partial class TurnStateManager : MonoBehaviour
     private void NotifySensorsReady()
     {
         string selectedId = selectedUnit != null ? selectedUnit.InstanceId.ToString() : "none";
-        Debug.Log($"[Replay][Dispatch] OnSensorsReady fired state={CurrentCursorState} selected={selectedId}");
+        if (replayManager != null && replayManager.RuntimeLogsEnabled)
+            Debug.Log($"[Replay][Dispatch] OnSensorsReady fired state={CurrentCursorState} selected={selectedId}");
         OnSensorsReady?.Invoke();
     }
 

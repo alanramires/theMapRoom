@@ -21,9 +21,10 @@ public partial class AIController
             PanelDialogController.TrySetTransientText("AI RESUME", 1.8f);
         }
 
-        Debug.Log(paused
-            ? "[AI] Pausa de debug solicitada. Aguardando ponto seguro."
-            : "[AI] Pausa de debug encerrada. Retomando IA.");
+        if (showAILogs)
+            Debug.Log(paused
+                ? "[AI] Pausa de debug solicitada. Aguardando ponto seguro."
+                : "[AI] Pausa de debug encerrada. Retomando IA.");
 
         if (paused)
             PanelDialogController.TrySetExternalText("AI PAUSE\nAguardando AI RESUME ou AI STEP");
@@ -39,9 +40,10 @@ public partial class AIController
         if (isPlayerPaused == paused)
             return;
         isPlayerPaused = paused;
-        Debug.Log(paused
-            ? "[AI] Pause de jogador (menu in-game aberto). Aguardando fechar o menu."
-            : "[AI] Pause de jogador encerrado (menu fechado). Retomando IA.");
+        if (showAILogs)
+            Debug.Log(paused
+                ? "[AI] Pause de jogador (menu in-game aberto). Aguardando fechar o menu."
+                : "[AI] Pause de jogador encerrado (menu fechado). Retomando IA.");
     }
 
     public void RequestDebugStep()
@@ -137,16 +139,17 @@ public partial class AIController
             yield break;
         if (!isDebugPaused && !isPlayerPaused) yield break;
 
-        Debug.Log(isPlayerPaused
-            ? "[AI] Pausada (menu do jogador aberto) - aguardando fechar o menu."
-            : "[AI] Pausa de debug ativa - aguardando 'AI RESUME' ou 'AI STEP'.");
+        if (showAILogs)
+            Debug.Log(isPlayerPaused
+                ? "[AI] Pausada (menu do jogador aberto) - aguardando fechar o menu."
+                : "[AI] Pausa de debug ativa - aguardando 'AI RESUME' ou 'AI STEP'.");
         // Pause de jogador é hold ABSOLUTO (sem AI STEP): só retoma quando o menu fecha. Pause de
         // debug mantém a semântica de STEP. Resume = NÃO player-paused E (NÃO debug-paused OU step).
         yield return new WaitUntil(() =>
             !isPlayerPaused && (!isDebugPaused || debugStepRequest != DebugStepRequest.None));
         if (ShouldStopAIForMatchEnd("debug_pause_end"))
             yield break;
-        if (!isDebugPaused && !isPlayerPaused)
+        if (showAILogs && !isDebugPaused && !isPlayerPaused)
             Debug.Log("[AI] Retomando execucao da IA.");
     }
 
