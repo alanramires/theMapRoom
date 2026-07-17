@@ -104,6 +104,10 @@ public class SaveGameManager : MonoBehaviour
         public long savedAtUtcTicks;
         public bool hasReplay;
         public bool hasJogadas;
+        // Hash canonico do estado no momento do save (MatchStateHasher).
+        // Saves antigos: vazio. Futuro pacote de turno do multiplayer viaja
+        // com este campo como detector de desync.
+        public string stateHash;
     }
 
     private sealed class LoadPreprocessResult
@@ -817,12 +821,20 @@ public class SaveGameManager : MonoBehaviour
             cursorController?.PlayConfirmSfx();
 
             SaveGameData data = BuildSaveData();
+            // ComputeHash tambem canonicaliza as listas (SortCanonical), entao o
+            // JSON persistido abaixo sai em ordem canonica — dois saves do mesmo
+            // estado geram bytes identicos. O hash logado e a ferramenta de
+            // validacao round-trip: salvar -> carregar -> salvar deve repetir o
+            // hash; divergencia = campo se perdendo no load. E a fundacao do
+            // anti-desync do multiplayer (docs/ideias_futuras_multiplayer.md).
+            string stateHash = MatchStateHasher.ComputeHash(data);
+            Debug.Log($"[SaveGame] state_hash={stateHash}");
             string json = JsonUtility.ToJson(data, false);
             string replayJson = BuildReplayJsonForSave();
             string jogadasJson = BuildJogadasJsonForSave();
             string path = ResolveWritableSlotPath(normalizedSlot);
             Directory.CreateDirectory(Path.GetDirectoryName(path) ?? ResolveSaveDirectory());
-            WriteSaveContainerAtomic(path, data, json, replayJson, jogadasJson);
+            WriteSaveContainerAtomic(path, data, json, replayJson, jogadasJson, stateHash);
             LogSaveDiagnostics(normalizedSlot, json, new FileInfo(path).Length);
 #if UNITY_WEBGL && !UNITY_EDITOR
             string syncingText = ResolveDialog(
@@ -843,6 +855,40 @@ public class SaveGameManager : MonoBehaviour
         catch (Exception ex)
         {
             Debug.LogError($"[SaveGame] Falha ao salvar: {ex.Message}\n{ex.StackTrace}");
+        }
+    }
+
+    // Hash canonico do estado ATUAL da cena (sem gravar nada). Fluxo de
+    // validacao round-trip manual: salvar (hash sai no log) -> carregar ->
+    // rodar "state hash" no debug -> comparar. Divergiu = campo se perdendo
+    // no load.
+    public string ComputeCurrentStateHash()
+    {
+        SaveGameData data = BuildSaveData();
+        return MatchStateHasher.ComputeHash(data);
+    }
+
+    // Diagnostico do round-trip: grava o JSON canonico do estado atual num
+    // arquivo. Rodar apos o save e apos o load e diffar os dois arquivos
+    // aponta exatamente o campo que diverge quando os hashes nao batem.
+    public bool TryDumpCanonicalStateToFile(out string path)
+    {
+        path = string.Empty;
+        try
+        {
+            SaveGameData data = BuildSaveData();
+            string json = MatchStateHasher.BuildCanonicalJson(data);
+            if (string.IsNullOrEmpty(json))
+                return false;
+
+            path = Path.Combine(Application.persistentDataPath, $"state_dump_{DateTime.UtcNow:yyyyMMdd_HHmmss}.json");
+            File.WriteAllText(path, json);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError($"[SaveGame] Falha no state dump: {ex.Message}");
+            return false;
         }
     }
 
@@ -2363,7 +2409,8 @@ public class SaveGameManager : MonoBehaviour
         SaveGameData data,
         string gameJson,
         string replayJson,
-        string jogadasJson)
+        string jogadasJson,
+        string stateHash = null)
     {
         string tempPath = savePath + ".tmp";
         string backupPath = savePath + ".bak";
@@ -2377,7 +2424,8 @@ public class SaveGameManager : MonoBehaviour
                 sceneName = data?.sceneName ?? string.Empty,
                 savedAtUtcTicks = data?.savedAtUtcTicks ?? 0L,
                 hasReplay = !string.IsNullOrWhiteSpace(replayJson),
-                hasJogadas = !string.IsNullOrWhiteSpace(jogadasJson)
+                hasJogadas = !string.IsNullOrWhiteSpace(jogadasJson),
+                stateHash = stateHash ?? string.Empty
             };
 
             using (FileStream stream = new FileStream(tempPath, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None))

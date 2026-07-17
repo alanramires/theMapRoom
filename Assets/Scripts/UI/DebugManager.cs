@@ -231,6 +231,37 @@ public class DebugManager : MonoBehaviour
             if (!string.IsNullOrWhiteSpace(message))
                 Debug.Log($"[Debug Command] {message}");
         }
+        else if (command == "STATE HASH")
+        {
+            SaveGameManager saveManager = FindAnyObjectByType<SaveGameManager>();
+            if (saveManager != null)
+            {
+                string stateHash = saveManager.ComputeCurrentStateHash();
+                Debug.Log($"[Debug Command] state_hash={stateHash}");
+                PanelDialogController.TrySetTransientText($"HASH: {stateHash.Substring(0, Mathf.Min(16, stateHash.Length))}…", 4f);
+                cursorController?.PlayDoneSfx();
+                executed = true;
+            }
+            else
+            {
+                Debug.Log("[Debug Command] STATE HASH: SaveGameManager nao encontrado na cena.");
+            }
+        }
+        else if (command == "STATE DUMP")
+        {
+            SaveGameManager saveManager = FindAnyObjectByType<SaveGameManager>();
+            if (saveManager != null && saveManager.TryDumpCanonicalStateToFile(out string dumpPath))
+            {
+                Debug.Log($"[Debug Command] state dump: {dumpPath}");
+                PanelDialogController.TrySetTransientText("DEBUG: state dump gravado (ver console)", 2.6f);
+                cursorController?.PlayDoneSfx();
+                executed = true;
+            }
+            else
+            {
+                Debug.Log("[Debug Command] STATE DUMP: falha ao gravar (SaveGameManager ausente ou erro de IO).");
+            }
+        }
         else if (command == "LAND UNIT")
         {
             executed = turnStateManager.TryChangeAltitudeFromDebug(Domain.Land, HeightLevel.Surface, out string message);
@@ -1016,6 +1047,8 @@ public class DebugManager : MonoBehaviour
             "destroy unit | remove unit - destroi unidade no cursor\n" +
             "set position - sincroniza a unidade selecionada no Scene/Hierarchy com o hex do Transform\n" +
             "refresh cache | refresh caches | reset cache - invalida caches, republica o FoW (unidades novas entram em alvos/visao; exige estado Neutral) e recalcula os sensores\n" +
+            "state hash - hash canonico do estado atual (salvar loga o hash; comparar apos load valida o round-trip do save)\n" +
+            "state dump - grava o JSON canonico do estado num arquivo (diffar dump pre-save vs pos-load acha o campo divergente)\n" +
             "set hp <v>\n" +
             "set autonomy <v>\n" +
             "set fuel <v> (alias de set autonomy)\n" +

@@ -18,11 +18,13 @@ MonoBehaviour:
   description: Bandeira
   isAirport: 0
   isHarbor: 0
+  isCity: 0
   spriteDefault: {fileID: 21300000, guid: 78ce03294baece64981d4fe73df1856f, type: 3}
   spriteGreen: {fileID: 0}
   spriteRed: {fileID: 0}
   spriteBlue: {fileID: 0}
   spriteYellow: {fileID: 0}
+  visao: 0
   baseMovementCost: 1
   isFakeBuilding: 1
   dpqData: {fileID: 11400000, guid: 151bdc82ef06071449424d30a1d567a5, type: 2}
@@ -66,10 +68,13 @@ MonoBehaviour:
     offeredSupplies:
     - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
       quantity: 20
+      peakQuantity: 20
     - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
       quantity: 50
+      peakQuantity: 50
     - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
       quantity: 12
+      peakQuantity: 12
     offeredServices:
     - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
     - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}

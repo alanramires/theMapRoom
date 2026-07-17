@@ -297,10 +297,10 @@ public partial class TurnStateManager
         if (enableTurnStateRuntimeLogs)
             Debug.Log($"[Shopping] Compra concluida: {ResolveUnitName(unit)} por ${unitCost} em {ResolveConstructionName(shoppingConstruction)}.");
         OnUnitPurchased?.Invoke(spawnedUnitManager);
-        // O prefab de aeronave nasce na camada padrao do UnitData (normalmente AirHigh)
-        // e logo acima e convertido para grounded. Recalcule agora para nao deixar no
-        // cache do modo All a cobertura aerea registrada durante o OnEnable do spawn.
-        matchController?.RefreshFogOfWarForActiveTeam(FogOfWarRefreshMode.FullVisual);
+        // A compra ja foi comprometida, mas a publicacao do FOW confirmado deve esperar
+        // o retorno a Neutral. Atualize somente a contribuicao da unidade nova; FullVisual
+        // apagaria todos os caches e recalcularia a visao de cada unidade em campo.
+        matchController?.NotifyCommittedUnitSpawnedForFog(spawnedUnitManager);
         ExitConstructionShoppingStateToNeutral(rollback: false);
         return true;
     }
@@ -466,6 +466,7 @@ public partial class TurnStateManager
             Debug.Log($"[AI][Shopping] Comprado: {ResolveUnitName(unit)} para {team} em {spawnCell}. Saldo restante: {economyAfter}.");
 
         OnUnitPurchased?.Invoke(spawnedManager);
+        matchController?.NotifyCommittedUnitSpawnedForFog(spawnedManager);
         return true;
     }
 

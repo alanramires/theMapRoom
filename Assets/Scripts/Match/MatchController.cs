@@ -246,6 +246,7 @@ public class MatchController : MonoBehaviour
     [System.NonSerialized] private bool initialStealthDetectionBootstrapped;
     [System.NonSerialized] private bool pendingCommittedBoardRefresh;
     [System.NonSerialized] private UnitManager pendingCommittedActedUnit;
+    [System.NonSerialized] private bool pendingCommittedUnitRequiresHasActed;
     [System.NonSerialized] private bool debugFogOfWarEnabled = true;
     [System.NonSerialized] private bool debugFogOfWarPartial;
     [System.NonSerialized] private int fogPresentationGameplayTeamId = int.MinValue;
@@ -3281,10 +3282,15 @@ public class MatchController : MonoBehaviour
     }
     public void NotifyUnitReachedHasAct(UnitManager unit)
     {
-        ProcessCommittedActedUnitFog(unit, raiseActedEvent: true);
+        ProcessCommittedUnitFog(unit, raiseActedEvent: true, requireHasActed: true);
     }
 
-    private void ProcessCommittedActedUnitFog(UnitManager unit, bool raiseActedEvent)
+    public void NotifyCommittedUnitSpawnedForFog(UnitManager unit)
+    {
+        ProcessCommittedUnitFog(unit, raiseActedEvent: false, requireHasActed: false);
+    }
+
+    private void ProcessCommittedUnitFog(UnitManager unit, bool raiseActedEvent, bool requireHasActed)
     {
         if (!Application.isPlaying)
             return;
@@ -3298,7 +3304,7 @@ public class MatchController : MonoBehaviour
             return;
         if (unit == null || !unit.gameObject.activeInHierarchy)
             return;
-        if (!unit.HasActed)
+        if (requireHasActed && !unit.HasActed)
             return;
         if (activeTeamId < 0)
             return;
@@ -3311,6 +3317,7 @@ public class MatchController : MonoBehaviour
         {
             pendingCommittedBoardRefresh = true;
             pendingCommittedActedUnit = unit;
+            pendingCommittedUnitRequiresHasActed = requireHasActed;
             return;
         }
 
@@ -3332,7 +3339,13 @@ public class MatchController : MonoBehaviour
             return;
         }
 
-        UpdateFogVisibilityForUnit(unit, boardMap, out _, out _, out _);
+        double incrementalStartMs = enableFogStepPerfLogs ? Time.realtimeSinceStartupAsDouble : 0d;
+        UpdateFogVisibilityForUnit(
+            unit,
+            boardMap,
+            out double collectMs,
+            out int visibleCellsCollected,
+            out bool collectExecuted);
         // MarkAsActed e o ponto de compromisso da acao. A uniao especializada do modo ALL
         // so pode revelar o novo ponto de observacao agora, nunca ao fim do movimento provisório.
         if (fogOfWarVisionMode == FogOfWarVisionMode.All)
@@ -3342,6 +3355,13 @@ public class MatchController : MonoBehaviour
         TryPlaySkillDetectionSfxForActedUnit(unit, boardMap);
         TryRefreshDetectedPersistenceForActedUnit(unit, boardMap);
         OnFogOfWarUpdated?.Invoke();
+        if (enableFogStepPerfLogs)
+        {
+            double totalMs = (Time.realtimeSinceStartupAsDouble - incrementalStartMs) * 1000d;
+            Debug.Log(
+                $"[FoW][Perf][Incremental] unit={unit.name} total={totalMs:F3}ms " +
+                $"collect={collectMs:F3}ms collected={collectExecuted} cells={visibleCellsCollected}");
+        }
     }
 
     private void RunTurnStartStillObservedForActiveTeamStealthUnits()
@@ -5052,12 +5072,14 @@ public class MatchController : MonoBehaviour
             return;
 
         UnitManager actedUnit = pendingCommittedActedUnit;
+        bool requireHasActed = pendingCommittedUnitRequiresHasActed;
         pendingCommittedBoardRefresh = false;
         pendingCommittedActedUnit = null;
+        pendingCommittedUnitRequiresHasActed = false;
 
         // Ja estamos em Neutral: publique somente o delta da unidade comprometida.
         // FullVisual apagaria os caches e escalaria com todas as unidades a cada acao.
-        ProcessCommittedActedUnitFog(actedUnit, raiseActedEvent: false);
+        ProcessCommittedUnitFog(actedUnit, raiseActedEvent: false, requireHasActed: requireHasActed);
     }
 
     private void RemoveFogSpecializedViewCacheForUnit(int unitIndex)
