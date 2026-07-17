@@ -1786,6 +1786,7 @@ public class SaveGameManager : MonoBehaviour
 
             stage = "restore-turn-briefing-ledger";
             matchController?.RestoreTurnBriefingLedger(data.turnBriefingEvents);
+            turnStateManager?.RestoreTurnBriefingReportSaveData(data.turnBriefingReportLines, data.activeTeamId);
 
             stage = "restore-ai-objective-plans";
             AIIntelLedger.Restore(data.aiIntelLedgers);
@@ -1801,6 +1802,9 @@ public class SaveGameManager : MonoBehaviour
 
             if (aiController != null)
             {
+                if (data.aiDifficultySaved)
+                    aiController.RestoreDifficultyFromSave(
+                        data.aiEasyMode, data.aiHardMode, data.aiConscriptionDoctrine);
                 TeamId restoredAiTeam = (TeamId)data.aiRuntimeTeamId;
                 if (matchController != null && !matchController.IsPlayerAI(restoredAiTeam) &&
                     matchController.TryGetFirstAITeam(out TeamId configuredAiTeam))
@@ -1978,9 +1982,21 @@ public class SaveGameManager : MonoBehaviour
             aiIntelLedgers = AIIntelLedger.BuildSaveData()
         };
 
+        if (aiController != null)
+        {
+            aiController.CaptureDifficultyForSave(
+                out bool aiEasy, out bool aiHard, out bool aiConscription);
+            data.aiDifficultySaved = true;
+            data.aiEasyMode = aiEasy;
+            data.aiHardMode = aiHard;
+            data.aiConscriptionDoctrine = aiConscription;
+        }
+
         // Jornal do Comandante: eventos pendentes entre turnos sao estado.
         if (matchController != null && matchController.TurnBriefingLedger != null)
             data.turnBriefingEvents.AddRange(matchController.TurnBriefingLedger);
+        if (turnStateManager != null)
+            data.turnBriefingReportLines.AddRange(turnStateManager.BuildTurnBriefingReportSaveData());
 
         UnitManager[] units = FindObjectsByType<UnitManager>(FindObjectsInactive.Include, FindObjectsSortMode.None);
         for (int i = 0; i < units.Length; i++)

@@ -168,6 +168,8 @@ public partial class TurnStateManager
     private Vector3Int inspectedHelperCursorCell;
     private readonly List<HelperTurnStartAutonomyLine> turnStartAutonomyHelperLines = new List<HelperTurnStartAutonomyLine>();
     private readonly List<HelperTurnStartAutonomyLine> lastTurnStartAutonomyHelperLines = new List<HelperTurnStartAutonomyLine>();
+    private readonly Dictionary<int, List<HelperTurnStartAutonomyLine>> lastTurnStartBriefingLinesByTeam =
+        new Dictionary<int, List<HelperTurnStartAutonomyLine>>();
     private float turnStartAutonomyHelperVisibleUntil = -1f;
     private float turnStartAutonomyHelperDuration = -1f;
     private int turnStartAutonomyHelperActivatedFrame = -1;
@@ -860,6 +862,7 @@ public partial class TurnStateManager
         // shopping/about); o Clear devolve a largura original.
         PanelHelperController.SetExternalWideMode(true);
         lastTurnStartAutonomyHelperLines.AddRange(turnStartAutonomyHelperLines);
+        StoreLastTurnStartBriefingForActiveTeam(turnStartAutonomyHelperLines);
 
         float helperDuration = animationManager != null
             ? animationManager.TurnStartAutonomyHelperTextDuration
@@ -870,6 +873,149 @@ public partial class TurnStateManager
         turnStartAutonomyHelperCursorCell = cursorController != null ? cursorController.CurrentCell : default;
         turnStartAutonomyHelperOpenedFromMenu = false;
         turnStartAutonomyHelperFocusIndex = 0;
+    }
+
+    private void StoreLastTurnStartBriefingForActiveTeam(IReadOnlyList<HelperTurnStartAutonomyLine> lines)
+    {
+        int teamId = matchController != null ? matchController.ActiveTeamId : -1;
+        if (teamId < 0)
+            return;
+
+        var stored = new List<HelperTurnStartAutonomyLine>();
+        if (lines != null)
+        {
+            for (int i = 0; i < lines.Count; i++)
+            {
+                HelperTurnStartAutonomyLine clone = CloneTurnStartBriefingLine(lines[i]);
+                if (clone != null)
+                    stored.Add(clone);
+            }
+        }
+        lastTurnStartBriefingLinesByTeam[teamId] = stored;
+    }
+
+    private static HelperTurnStartAutonomyLine CloneTurnStartBriefingLine(HelperTurnStartAutonomyLine source)
+    {
+        if (source == null)
+            return null;
+        return new HelperTurnStartAutonomyLine
+        {
+            unitName = source.unitName,
+            autonomyConsumed = source.autonomyConsumed,
+            fuelBefore = source.fuelBefore,
+            fuelAfter = source.fuelAfter,
+            fuelMax = source.fuelMax,
+            cell = source.cell,
+            unitSprite = source.unitSprite,
+            unitColor = source.unitColor,
+            customText = source.customText,
+            severityTier = source.severityTier,
+            stableOrder = source.stableOrder
+        };
+    }
+
+    public List<TurnBriefingReportLineSaveData> BuildTurnBriefingReportSaveData()
+    {
+        var saved = new List<TurnBriefingReportLineSaveData>();
+        foreach (KeyValuePair<int, List<HelperTurnStartAutonomyLine>> report in lastTurnStartBriefingLinesByTeam)
+        {
+            List<HelperTurnStartAutonomyLine> lines = report.Value;
+            if (lines == null)
+                continue;
+            for (int i = 0; i < lines.Count; i++)
+            {
+                HelperTurnStartAutonomyLine line = lines[i];
+                if (line == null)
+                    continue;
+                saved.Add(new TurnBriefingReportLineSaveData
+                {
+                    teamId = report.Key,
+                    unitName = line.unitName ?? string.Empty,
+                    autonomyConsumed = line.autonomyConsumed,
+                    fuelBefore = line.fuelBefore,
+                    fuelAfter = line.fuelAfter,
+                    fuelMax = line.fuelMax,
+                    cellX = line.cell.x,
+                    cellY = line.cell.y,
+                    colorR = line.unitColor.r,
+                    colorG = line.unitColor.g,
+                    colorB = line.unitColor.b,
+                    colorA = line.unitColor.a,
+                    customText = line.customText ?? string.Empty,
+                    severityTier = line.severityTier,
+                    stableOrder = line.stableOrder
+                });
+            }
+        }
+        return saved;
+    }
+
+    public void RestoreTurnBriefingReportSaveData(
+        IReadOnlyList<TurnBriefingReportLineSaveData> saved,
+        int activeTeamId)
+    {
+        lastTurnStartBriefingLinesByTeam.Clear();
+        lastTurnStartAutonomyHelperLines.Clear();
+        ClearTurnStartAutonomyHelper();
+
+        if (saved != null)
+        {
+            for (int i = 0; i < saved.Count; i++)
+            {
+                TurnBriefingReportLineSaveData item = saved[i];
+                if (item == null || item.teamId < 0)
+                    continue;
+                if (!lastTurnStartBriefingLinesByTeam.TryGetValue(item.teamId, out List<HelperTurnStartAutonomyLine> lines))
+                {
+                    lines = new List<HelperTurnStartAutonomyLine>();
+                    lastTurnStartBriefingLinesByTeam[item.teamId] = lines;
+                }
+                Vector3Int cell = new Vector3Int(item.cellX, item.cellY, 0);
+                lines.Add(new HelperTurnStartAutonomyLine
+                {
+                    unitName = item.unitName ?? string.Empty,
+                    autonomyConsumed = item.autonomyConsumed,
+                    fuelBefore = item.fuelBefore,
+                    fuelAfter = item.fuelAfter,
+                    fuelMax = item.fuelMax,
+                    cell = cell,
+                    unitSprite = ResolveTurnBriefingUnitSprite(item.unitName, cell),
+                    unitColor = new Color(item.colorR, item.colorG, item.colorB, item.colorA),
+                    customText = item.customText ?? string.Empty,
+                    severityTier = item.severityTier,
+                    stableOrder = item.stableOrder
+                });
+            }
+        }
+
+        if (lastTurnStartBriefingLinesByTeam.TryGetValue(activeTeamId, out List<HelperTurnStartAutonomyLine> activeLines))
+        {
+            for (int i = 0; i < activeLines.Count; i++)
+            {
+                HelperTurnStartAutonomyLine clone = CloneTurnStartBriefingLine(activeLines[i]);
+                if (clone != null)
+                    lastTurnStartAutonomyHelperLines.Add(clone);
+            }
+        }
+    }
+
+    private static Sprite ResolveTurnBriefingUnitSprite(string unitName, Vector3Int cell)
+    {
+        UnitManager[] units = FindObjectsByType<UnitManager>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        for (int i = 0; i < units.Length; i++)
+        {
+            UnitManager unit = units[i];
+            if (unit == null || unit.CurrentCellPosition != cell)
+                continue;
+            if (!string.IsNullOrWhiteSpace(unitName) &&
+                !string.Equals(unit.UnitDisplayName, unitName, System.StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(unit.name, unitName, System.StringComparison.OrdinalIgnoreCase))
+                continue;
+            SpriteRenderer renderer = unit.GetMainSpriteRenderer();
+            if (renderer != null)
+                return renderer.sprite;
+        }
+        return null;
     }
 
     public bool OpenTurnStartAutonomyReportFromMenu()

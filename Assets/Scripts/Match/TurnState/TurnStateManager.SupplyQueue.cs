@@ -1214,9 +1214,12 @@ public partial class TurnStateManager
                 || report.takeoffMoveOptions.Contains(9));
         if (!canTakeoffInPlace)
         {
-            Debug.Log(report != null && !string.IsNullOrWhiteSpace(report.explicacao)
-                ? $"{logPrefix} {target.name} permanece no solo apos servico: {report.explicacao}"
-                : $"{logPrefix} {target.name} permanece no solo apos servico: decolagem indisponivel.");
+            if (SensorLogGate.IsPodeSuprirEnabled())
+            {
+                Debug.Log(report != null && !string.IsNullOrWhiteSpace(report.explicacao)
+                    ? $"{logPrefix} {target.name} permanece no solo apos servico: {report.explicacao}"
+                    : $"{logPrefix} {target.name} permanece no solo apos servico: decolagem indisponivel.");
+            }
             yield break;
         }
 
@@ -1227,15 +1230,19 @@ public partial class TurnStateManager
                 SensorMovementMode.MoveuParado,
                 out AircraftOperationDecision takeoffDecision))
         {
-            Debug.Log(string.IsNullOrWhiteSpace(takeoffDecision.reason)
-                ? $"{logPrefix} Falha ao decolar {target.name} apos servico."
-                : $"{logPrefix} {target.name} permanece no solo apos servico: {takeoffDecision.reason}");
+            if (SensorLogGate.IsPodeSuprirEnabled())
+            {
+                Debug.Log(string.IsNullOrWhiteSpace(takeoffDecision.reason)
+                    ? $"{logPrefix} Falha ao decolar {target.name} apos servico."
+                    : $"{logPrefix} {target.name} permanece no solo apos servico: {takeoffDecision.reason}");
+            }
             yield break;
         }
 
         target.MarkTookOffRecently();
         PlayMovementStartSfx(target);
-        Debug.Log($"{logPrefix} {target.name} decolou apos receber servico.");
+        if (SensorLogGate.IsPodeSuprirEnabled())
+            Debug.Log($"{logPrefix} {target.name} decolou apos receber servico.");
 
         float takeoffFxDuration = animationManager != null ? animationManager.PlayVtolLandingEffect(target) : 0f;
         if (takeoffFxDuration > 0f)

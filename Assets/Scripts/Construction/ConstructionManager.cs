@@ -811,7 +811,7 @@ public class ConstructionManager : MonoBehaviour
         // Diagnostico de ponto unico: so loga quando o estoque muda em play
         // (signature nova), nunca por frame. Diz onde a pilha morre se o icone
         // nao aparecer: slots nao achados, gate, ou alerts=0.
-        if (Application.isPlaying && !force)
+        if (Application.isPlaying && !force && SensorLogGate.IsPodeSuprirEnabled())
         {
             Debug.Log($"[SupplyAlert] {name}: offers={offers.Count} alerts={alerts.Count} " +
                       $"slots(top={(supplyTop != null)}, mid={(supplyMiddle != null)}, bot={(supplyBottom != null)}) " +

@@ -70,7 +70,7 @@ public class PanelMenu : MonoBehaviour
     private static readonly TeamId[] NewGameTeams = { TeamId.Green, TeamId.Red, TeamId.Blue, TeamId.Yellow };
     private static readonly AIDifficulty[] NewGameDifficulties =
     {
-        AIDifficulty.Facil, AIDifficulty.Normal, AIDifficulty.Dificil
+        AIDifficulty.Facil, AIDifficulty.Normal, AIDifficulty.Competitivo, AIDifficulty.Agressivo
     };
     private static readonly MatchController.GameSetupPreset[] NewGamePresets =
     {
@@ -930,7 +930,8 @@ public class PanelMenu : MonoBehaviour
     };
     private static string ResolveDifficultyLabel(AIDifficulty difficulty) => difficulty switch
     {
-        AIDifficulty.Facil => "FÁCIL", AIDifficulty.Dificil => "DIFÍCIL", _ => "NORMAL"
+        AIDifficulty.Facil => "FÁCIL", AIDifficulty.Competitivo => "COMPETITIVO",
+        AIDifficulty.Agressivo => "AGRESSIVO", _ => "NORMAL"
     };
     private static string ResolvePresetLabel(MatchController.GameSetupPreset preset) => preset switch
     {

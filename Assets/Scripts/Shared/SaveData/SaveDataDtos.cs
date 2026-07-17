@@ -33,10 +33,20 @@ public class SaveGameData
     public int aiRuntimeTurnNumber;
     public int aiRuntimeStage;
     public List<AIIntelLedgerSaveData> aiIntelLedgers = new List<AIIntelLedgerSaveData>();
+    // Dificuldade da IA (flags do AIController). aiDifficultySaved distingue save novo de
+    // save antigo sem estes campos (JsonUtility zera bools ausentes) — save antigo mantem
+    // os defaults serializados na cena, comportamento de antes.
+    public bool aiDifficultySaved;
+    public bool aiEasyMode;
+    public bool aiHardMode;
+    public bool aiConscriptionDoctrine;
     // Jornal do Comandante: eventos acumulados entre os turnos de cada time
     // (contato perdido, tiro da nevoa, conquista perdida...), drenados no
     // inicio do turno do time destinatario. Ordem cronologica (deterministica).
     public List<TurnBriefingEventSaveData> turnBriefingEvents = new List<TurnBriefingEventSaveData>();
+    // Ultimo Jornal ja apresentado por equipe. Diferente do ledger pendente:
+    // serve apenas para reabrir o mesmo resumo depois de salvar/carregar.
+    public List<TurnBriefingReportLineSaveData> turnBriefingReportLines = new List<TurnBriefingReportLineSaveData>();
 }
 
 [Serializable]
@@ -49,6 +59,26 @@ public class TurnBriefingEventSaveData
     public int cellX;
     public int cellY;
     public int turnNumber;
+}
+
+[Serializable]
+public class TurnBriefingReportLineSaveData
+{
+    public int teamId;
+    public string unitName;
+    public int autonomyConsumed;
+    public int fuelBefore;
+    public int fuelAfter;
+    public int fuelMax;
+    public int cellX;
+    public int cellY;
+    public float colorR = 1f;
+    public float colorG = 1f;
+    public float colorB = 1f;
+    public float colorA = 1f;
+    public string customText;
+    public int severityTier = 2;
+    public int stableOrder;
 }
 
 [Serializable]

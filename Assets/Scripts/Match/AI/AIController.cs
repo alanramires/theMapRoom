@@ -5,12 +5,18 @@ using UnityEngine;
 using UnityEngine.Tilemaps;
 
 // Nivel de dificuldade escolhido na Tela de Entrada. Mapeia direto para os flags
-// easyMode/hardMode do AIController (a mecanica ja esta pronta em cima desses flags).
+// easyMode/hardMode/conscriptionDoctrine do AIController (a mecanica ja esta pronta
+// em cima desses flags):
+//   Facil       = 1/3 da renda, shopping normal
+//   Normal      = renda cheia, shopping normal
+//   Competitivo = hard (lista banida, projecao, blitz reserve); conscricao SO perdendo
+//   Agressivo   = hard + doutrina do enxame (conscricao SEMPRE)
 public enum AIDifficulty
 {
     Facil,
     Normal,
-    Dificil
+    Competitivo,
+    Agressivo
 }
 
 /// <summary>
@@ -51,25 +57,35 @@ public partial class AIController : MonoBehaviour
     [SerializeField] private bool easyMode = false;
     public bool EasyMode => easyMode && !hardMode;
 
-    // Aplica a dificuldade escolhida na Tela de Entrada. Facil e Dificil sao mutuamente
-    // exclusivos; Normal desliga ambos os flags.
+    [Tooltip("Doutrina da Conscricao (tatica do enxame): todo produtor do exercito compra o corpo mais barato TODO turno; demandas/elite so gastam por cima da massa garantida (imposto de conscricao no shopping). Desenhada pro Hard (Agressivo), mas pode ser ligada avulsa pra experimentar um Normal mais dificil.")]
+    [SerializeField] private bool conscriptionDoctrine = false;
+    public bool ConscriptionDoctrine => conscriptionDoctrine;
+
+    // Aplica a dificuldade escolhida na Tela de Entrada. Os flags sao mutuamente
+    // exclusivos por combinacao: Facil liga easy; Competitivo liga hard; Agressivo
+    // liga hard + conscricao; Normal desliga tudo.
     public void ApplyDifficulty(AIDifficulty difficulty)
     {
-        switch (difficulty)
-        {
-            case AIDifficulty.Facil:
-                easyMode = true;
-                hardMode = false;
-                break;
-            case AIDifficulty.Dificil:
-                easyMode = false;
-                hardMode = true;
-                break;
-            default:
-                easyMode = false;
-                hardMode = false;
-                break;
-        }
+        easyMode = difficulty == AIDifficulty.Facil;
+        hardMode = difficulty == AIDifficulty.Competitivo || difficulty == AIDifficulty.Agressivo;
+        conscriptionDoctrine = difficulty == AIDifficulty.Agressivo;
+    }
+
+    // Save/Load: a dificuldade escolhida na Tela de Entrada só existe nestes flags depois
+    // do ApplyDifficulty (PartidaConfig é consumido uma vez) — sem persistir, o load
+    // voltava aos defaults serializados na cena.
+    public void CaptureDifficultyForSave(out bool easy, out bool hard, out bool conscription)
+    {
+        easy = easyMode;
+        hard = hardMode;
+        conscription = conscriptionDoctrine;
+    }
+
+    public void RestoreDifficultyFromSave(bool easy, bool hard, bool conscription)
+    {
+        easyMode = easy;
+        hardMode = hard;
+        conscriptionDoctrine = conscription;
     }
 
     [Header("AI Stage Emulation")]

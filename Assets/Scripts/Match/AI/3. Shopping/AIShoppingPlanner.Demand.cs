@@ -1307,6 +1307,25 @@ public partial class AIShoppingPlanner
                 + (concentrateEmergency ? " (EMERGÊNCIA: cadeia de elite ignorada)" : ""));
         }
 
+        // DOUTRINA DO ENXAME (Agressivo/conscriptionDoctrine): imposto de conscrição. Antes das compras por demanda,
+        // reserva o custo do corpo Army mais barato de CADA produtor do exército livre — o
+        // carrinho (incluindo o elite) só gasta o que couber POR CIMA da massa garantida.
+        // Ex.: 20k, 4 produtores, MBT 18k → imposto 4k, gastoLivre 16k < 18k: MBT não fecha,
+        // 4 soldados saem. Com 26k → gastoLivre 22k: MBT fecha E os outros 3 compram soldado.
+        // Levemente conservador: o produtor que o próprio carrinho usar também foi taxado
+        // (devolve só no turno seguinte) — erro máximo de alguns corpos baratos, lado seguro.
+        // O fill do fim do turno consome o imposto comprando a massa (só a reserva elite é
+        // intocável lá). Hard+Perdendo nunca chega aqui (RecruitmentSurgeFill retorna antes).
+        int conscriptionTax = 0;
+        if (AIController.Instance != null && AIController.Instance.ConscriptionDoctrine)
+        {
+            conscriptionTax = ComputeConscriptionTax(snapshot, occupied);
+            if (conscriptionTax > 0)
+                Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] doutrina do "
+                    + $"enxame: imposto de conscrição={conscriptionTax} — demandas só gastam acima da "
+                    + $"massa garantida (todo produtor do exército compra SEMPRE)");
+        }
+
         LogRoleShoppingQueue(snapshot, demands, remaining);
         if (expansionCapturerTarget > 0)
         {
@@ -1315,7 +1334,7 @@ public partial class AIShoppingPlanner
                 + $"no carrinho antes de diversificar");
         }
         RoleShoppingCart cart = BuildBestRoleShoppingCart(
-            snapshot, demands, counterPressure, occupied, remaining - reserve,
+            snapshot, demands, counterPressure, occupied, remaining - reserve - conscriptionTax,
             macroLosing, concentrateSpend, concentrateEmergency, expansionCapturerTarget,
             breakStrategicReserve ? null : eliteCommitment?.unitId);
         if (cart != null)
@@ -1360,7 +1379,7 @@ public partial class AIShoppingPlanner
         {
             Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] "
                 + $"carrinho vazio: nenhuma oferta elegível atende demanda com gastoLivre="
-                + $"{Mathf.Max(0, remaining - reserve)} — caixa preservado");
+                + $"{Mathf.Max(0, remaining - reserve - conscriptionTax)} — caixa preservado");
         }
 
         // DEFESA: não deixar prédio de produção VAZIO — cada casa aberta é captura fácil pro oponente
@@ -1370,12 +1389,23 @@ public partial class AIShoppingPlanner
         // Perder o mapa nao torna toda fabrica uma torre defensiva. O preenchimento barato
         // so existe quando ha ameaca local visivel a uma base; longe dela a stance e as
         // demandas operacionais continuam decidindo a composicao.
+        //
+        // DOUTRINA DO ENXAME (Agressivo, SEMPRE): produtor nunca dorme. Depois das compras por
+        // demanda, todo produtor livre compra o corpo Army mais barato gastando APENAS o
+        // excedente acima da reserva estratégica — a poupança pro elite (Caça B, MBT...)
+        // continua intocável, e Aeronáutica/Marinha só produzem quando a demanda real fecha
+        // a conta. Tática do enxame: a AI poupa POR CIMA da produção de massa, nunca em vez
+        // dela — o humano nunca ganha um turno de folga. Sob ameaça visível à base, o
+        // preenchimento defensivo clássico prevalece (sem restrição de força).
         bool defendFillBuildings = HasAnyVisibleEnemyNearOwnedBase(
             snapshot, DefensiveBaseThreatRange);
-        if (defendFillBuildings)
+        bool hardSwarmDoctrine = AIController.Instance != null
+            && AIController.Instance.ConscriptionDoctrine;
+        if (defendFillBuildings || hardSwarmDoctrine)
             FillIdleProductionBuildings(
                 snapshot, orders, usedBuildings, occupied, ref remaining,
-                hasStrategicReserve ? reserve : 0);
+                hasStrategicReserve ? reserve : 0,
+                armyMassOnly: hardSwarmDoctrine && !defendFillBuildings);
 
         foreach (AIShoppingDemand demand in demands)
             if (demand.Count > 0)
@@ -2815,8 +2845,11 @@ public partial class AIShoppingPlanner
         UnitData pick = null;
         foreach (UnitData u in building.OfferedUnits)
         {
+            // Massa do recrutamento forçado e SEMPRE do Exercito ("onde tiver
+            // soldado"): aeroporto/porto nao viram fabrica de massa cara — o
+            // elite comprometido (que pode ser aereo) continua no fluxo proprio.
             if (u == null || u.cost <= 0 || u.cost > remaining
-                || u.militaryForce == MilitaryForce.Navy
+                || u.militaryForce != MilitaryForce.Army
                 || !IsRolePurchaseAllowed(u, snapshot.Stance, emergency: true))
                 continue;
             if (pick == null || IsBetterEmptyBuildingFiller(u, pick))
@@ -2846,10 +2879,49 @@ public partial class AIShoppingPlanner
         return false;
     }
 
+    // Imposto de conscrição (doutrina do enxame, Hard): soma do corpo Army mais barato de
+    // cada produtor do exército livre com célula de spawn desocupada. Descontado do
+    // orçamento do carrinho de demandas ANTES das compras, garante que o elite só fecha a
+    // conta quando cabe por cima da massa — todo produtor do exército compra todo turno.
+    // Aeroporto/porto (sem oferta Army) não pagam imposto: ficam quietos poupando.
+    private static int ComputeConscriptionTax(
+        AIWorldSnapshot snapshot, HashSet<Vector3Int> occupied)
+    {
+        if (snapshot.MyBuildings == null)
+            return 0;
+        int tax = 0;
+        foreach (ConstructionManager building in snapshot.MyBuildings)
+        {
+            if (building == null || !building.CanProduceUnitsForTeam(snapshot.AITeam)
+                || building.OfferedUnits == null)
+                continue;
+            Vector3Int cell = building.CurrentCellPosition; cell.z = 0;
+            if (occupied.Contains(cell))
+                continue;
+            int cheapest = 0;
+            foreach (UnitData u in building.OfferedUnits)
+            {
+                if (u == null || u.cost <= 0 || u.militaryForce != MilitaryForce.Army
+                    || !IsRolePurchaseAllowed(u, snapshot.Stance, emergency: true))
+                    continue;
+                if (cheapest == 0 || u.cost < cheapest)
+                    cheapest = u.cost;
+            }
+            tax += cheapest;
+        }
+        return tax;
+    }
+
+    // armyMassOnly (doutrina do enxame): a massa e SEMPRE do Exercito — produtor
+    // que so oferece Aeronautica/Marinha (aeroporto, porto) fica quieto guardando
+    // caixa pro elite ("fecha a conta? manda"); base mista compra o soldado. No
+    // preenchimento DEFENSIVO (ameaca visivel), a restricao nao vale: ocupar a
+    // casa contra captura importa mais que a composicao.
     private static void FillIdleProductionBuildings(
         AIWorldSnapshot snapshot, List<ShoppingOrder> orders,
         HashSet<ConstructionManager> usedBuildings, HashSet<Vector3Int> occupied, ref int remaining,
-        int protectedReserve = 0)
+        int protectedReserve = 0,
+        bool armyMassOnly = false)
     {
         if (snapshot.MyBuildings == null) return;
         foreach (ConstructionManager building in snapshot.MyBuildings)
@@ -2866,7 +2938,7 @@ public partial class AIShoppingPlanner
             foreach (UnitData u in building.OfferedUnits)
             {
                 if (u == null || u.cost <= 0 || u.cost > spendable
-                    || u.militaryForce == MilitaryForce.Navy
+                    || (armyMassOnly ? u.militaryForce != MilitaryForce.Army : u.militaryForce == MilitaryForce.Navy)
                     || !IsRolePurchaseAllowed(u, snapshot.Stance, emergency: true))
                     continue;
                 if (pick == null || IsBetterEmptyBuildingFiller(u, pick))
@@ -2880,9 +2952,10 @@ public partial class AIShoppingPlanner
             remaining -= pick.cost;
             usedBuildings.Add(building);
             occupied.Add(cell);
-            Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] defesa: preenche "
+            Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] "
+                + $"{(armyMassOnly ? "conscrição (enxame)" : "defesa")}: preenche "
                 + $"prédio vazio {building.ConstructionDisplayName} com {pick.displayName} ${pick.cost} "
-                + $"(nega captura) restante={remaining}");
+                + $"restante={remaining}");
         }
     }
 
