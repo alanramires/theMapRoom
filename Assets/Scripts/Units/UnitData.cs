@@ -262,8 +262,8 @@ public class UnitData : ScriptableObject
     public bool isSupplier = false;
     public SupplierTier supplierTier = SupplierTier.Hub;
     [Min(0)] public int maxUnitsServedPerTurn = 0;
-    public SupplierRangeMode serviceRange = SupplierRangeMode.EmbarkedOnly;
-    public SupplierRangeMode collectionRange = SupplierRangeMode.EmbarkedOnly;
+    public SupplierRangeMode serviceRange = SupplierRangeMode.SameHexOrEmbarked;
+    public SupplierRangeMode collectionRange = SupplierRangeMode.SameHexOrEmbarked;
     [Tooltip("Dominios/alturas onde esta unidade consegue operar logistica.")]
     public List<SupplierOperationDomain> supplierOperationDomains = new List<SupplierOperationDomain>();
     [Tooltip("Servicos oferecidos por esta unidade de logistica.")]

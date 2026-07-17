@@ -106,7 +106,8 @@ MonoBehaviour:
     heightLevel: 3
   - domain: 1
     heightLevel: 3
-  supplierServicesProvided: []
+  supplierServicesProvided:
+  - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   supplierResources:
   - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
     amount: 4

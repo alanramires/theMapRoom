@@ -28,6 +28,7 @@ public class PanelHelperController : MonoBehaviour
     [SerializeField] private MatchController matchController;
     [SerializeField] private TurnStateManager turnStateManager;
     [SerializeField] private AnimationManager animationManager;
+    [SerializeField] private CameraController cameraController;
     [SerializeField] private SaveGameManager saveGameManager;
     [SerializeField] private MainMenuLoadPanelController mainMenuLoadPanelController;
     [SerializeField] private MainMenuTutorialPanelController mainMenuTutorialPanelController;
@@ -192,8 +193,19 @@ public class PanelHelperController : MonoBehaviour
     private readonly List<GameObject> autonomyUpkeepRows = new List<GameObject>();
     private string autonomyUpkeepSignature = string.Empty;
     private const float AutonomyUpkeepHeaderHeight = 34f;
-    private const float AutonomyUpkeepRowHeight = 72f;
+    private const float AutonomyUpkeepRowHeight = 82f;
+    private GameObject commandServiceRowsRoot;
+    private GameObject commandServiceViewportRoot;
+    private RectTransform commandServiceViewportRect;
+    private TMP_Text commandServiceSummaryLabel;
+    private readonly List<GameObject> commandServiceRows = new List<GameObject>();
+    private string commandServiceRowsSignature = string.Empty;
+    private const float CommandServiceSummaryHeight = 96f;
+    private const float CommandServiceRowHeight = 72f;
+    private const float CommandServiceMaxListHeight = 500f;
     private GameObject unitStatsLocalRoot;
+    private GameObject unitStatsIconsRoot;
+    private LayoutElement unitStatsIconsLayout;
     private Image unitStatsLocalIcon;
     private Image unitStatsStructureIcon;
     private TMP_Text unitStatsLocalText;
@@ -340,6 +352,8 @@ public class PanelHelperController : MonoBehaviour
             turnStateManager = FindAnyObjectByType<TurnStateManager>();
         if (animationManager == null)
             animationManager = FindAnyObjectByType<AnimationManager>();
+        if (cameraController == null)
+            cameraController = FindAnyObjectByType<CameraController>();
         if (saveGameManager == null)
             saveGameManager = FindAnyObjectByType<SaveGameManager>();
 
@@ -1539,6 +1553,7 @@ public class PanelHelperController : MonoBehaviour
         RefreshAimFooterFocus(panelVisible, data);
         RefreshAimConfirmDetails(panelVisible, data);
         RefreshTurnStartAutonomyControls(panelVisible, data);
+        RefreshCommandServiceRows(panelVisible, data);
         RefreshUnitStatsLocal(panelVisible, data);
         RefreshUnitStatsTransportedIcons(panelVisible, data);
         RefreshDisembarkActionControls(panelVisible, data);
@@ -1641,6 +1656,7 @@ public class PanelHelperController : MonoBehaviour
         bool aimButtonsActive = aimTargetsRoot != null && aimTargetsRoot.activeSelf;
         bool aimConfirmActive = aimConfirmDetailsRoot != null && aimConfirmDetailsRoot.activeSelf;
         bool autonomyUpkeepActive = autonomyUpkeepRoot != null && autonomyUpkeepRoot.activeSelf;
+        bool commandServiceRowsActive = commandServiceRowsRoot != null && commandServiceRowsRoot.activeSelf;
         bool disembarkButtonsActive = disembarkActionsRoot != null && disembarkActionsRoot.activeSelf;
         bool shoppingButtonsActive = shoppingActionsRoot != null && shoppingActionsRoot.activeSelf;
         bool persistenceButtonsActive = persistenceActionsRoot != null && persistenceActionsRoot.activeSelf;
@@ -1659,6 +1675,10 @@ public class PanelHelperController : MonoBehaviour
         else if (autonomyUpkeepActive)
         {
             bodyHeight = AutonomyUpkeepHeaderHeight + 4f + autonomyUpkeepRows.Count * (AutonomyUpkeepRowHeight + 4f);
+        }
+        else if (commandServiceRowsActive)
+        {
+            bodyHeight = GetCommandServicePreferredHeight();
         }
         else if (disembarkButtonsActive)
         {
@@ -1698,6 +1718,208 @@ public class PanelHelperController : MonoBehaviour
         disembarkLayoutDirty = false;
     }
 
+    private void RefreshCommandServiceRows(bool panelVisible, TurnStateManager.HelperPanelData data)
+    {
+        bool active = panelVisible && data != null && data.Kind == TurnStateManager.HelperPanelKind.CommandService &&
+                      data.CommandServiceIsEstimate && data.CommandServiceTargetLines != null;
+        if (!active)
+        {
+            if (commandServiceRowsRoot != null) commandServiceRowsRoot.SetActive(false);
+            if (commandServiceViewportRoot != null) commandServiceViewportRoot.SetActive(false);
+            if (commandServiceSummaryLabel != null) commandServiceSummaryLabel.gameObject.SetActive(false);
+            commandServiceRowsSignature = string.Empty;
+            return;
+        }
+
+        EnsureCommandServiceRowsRoot();
+        StringBuilder signature = new StringBuilder();
+        signature.Append(data.CommandServiceServedTargets).Append('|').Append(data.CommandServiceTotalCost)
+            .Append('|').Append(data.CommandServiceMoneyAfter);
+        for (int i = 0; i < data.CommandServiceTargetLines.Count; i++)
+        {
+            var line = data.CommandServiceTargetLines[i];
+            if (line != null) signature.Append('|').Append(line.unitName).Append('|').Append(line.gainsLabel)
+                .Append('|').Append(line.isFocused).Append('|').Append(line.isFullyAffordable);
+        }
+        for (int i = 0; i < data.CommandServiceSkippedUnitLines.Count; i++)
+        {
+            var line = data.CommandServiceSkippedUnitLines[i];
+            if (line != null) signature.Append("|skip|").Append(line.unitName).Append('|').Append(line.isFocused);
+        }
+
+        if (signature.ToString() != commandServiceRowsSignature)
+        {
+            RebuildCommandServiceRows(data);
+            commandServiceRowsSignature = signature.ToString();
+            disembarkLayoutDirty = true;
+        }
+        commandServiceRowsRoot.SetActive(true);
+        commandServiceViewportRoot.SetActive(true);
+        commandServiceSummaryLabel.gameObject.SetActive(true);
+        if (helperTxt != null) helperTxt.enabled = false;
+        if (selfPanelCanvasGroup != null)
+        {
+            selfPanelCanvasGroup.interactable = true;
+            selfPanelCanvasGroup.blocksRaycasts = true;
+        }
+    }
+
+    private void EnsureCommandServiceRowsRoot()
+    {
+        if (!Application.isPlaying || commandServiceRowsRoot != null || helperRect == null) return;
+        GameObject summary = new GameObject("helper_command_service_summary", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
+        RectTransform summaryRect = summary.GetComponent<RectTransform>();
+        summaryRect.SetParent(helperRect, false);
+        summaryRect.anchorMin = new Vector2(0.04f, 1f);
+        summaryRect.anchorMax = new Vector2(0.96f, 1f);
+        summaryRect.pivot = new Vector2(0.5f, 1f);
+        summaryRect.anchoredPosition = new Vector2(0f, -48f);
+        summaryRect.sizeDelta = new Vector2(0f, CommandServiceSummaryHeight);
+        commandServiceSummaryLabel = summary.GetComponent<TMP_Text>();
+        commandServiceSummaryLabel.fontSize = 18f;
+        commandServiceSummaryLabel.fontStyle = FontStyles.Bold;
+        commandServiceSummaryLabel.alignment = TextAlignmentOptions.Center;
+        commandServiceSummaryLabel.raycastTarget = false;
+        commandServiceSummaryLabel.margin = new Vector4(8f, 3f, 8f, 3f);
+
+        commandServiceViewportRoot = new GameObject("helper_command_service_viewport", typeof(RectTransform), typeof(RectMask2D));
+        commandServiceViewportRect = commandServiceViewportRoot.GetComponent<RectTransform>();
+        commandServiceViewportRect.SetParent(helperRect, false);
+        commandServiceViewportRect.anchorMin = new Vector2(0.04f, 1f);
+        commandServiceViewportRect.anchorMax = new Vector2(0.96f, 1f);
+        commandServiceViewportRect.pivot = new Vector2(0.5f, 1f);
+        commandServiceViewportRect.anchoredPosition = new Vector2(0f, -48f - CommandServiceSummaryHeight - 4f);
+
+        commandServiceRowsRoot = new GameObject("helper_command_service_rows", typeof(RectTransform), typeof(VerticalLayoutGroup));
+        RectTransform rect = commandServiceRowsRoot.GetComponent<RectTransform>();
+        rect.SetParent(commandServiceViewportRect, false);
+        rect.anchorMin = new Vector2(0f, 1f);
+        rect.anchorMax = new Vector2(1f, 1f);
+        rect.pivot = new Vector2(0.5f, 1f);
+        rect.anchoredPosition = Vector2.zero;
+        VerticalLayoutGroup layout = commandServiceRowsRoot.GetComponent<VerticalLayoutGroup>();
+        layout.spacing = 4f;
+        layout.childControlWidth = layout.childControlHeight = true;
+        layout.childForceExpandWidth = true;
+        layout.childForceExpandHeight = false;
+        commandServiceRowsRoot.SetActive(false);
+        commandServiceViewportRoot.SetActive(false);
+    }
+
+    private void RebuildCommandServiceRows(TurnStateManager.HelperPanelData data)
+    {
+        for (int i = commandServiceRowsRoot.transform.childCount - 1; i >= 0; i--)
+            Destroy(commandServiceRowsRoot.transform.GetChild(i).gameObject);
+        commandServiceRows.Clear();
+
+        commandServiceSummaryLabel.text = $"Previstos: {data.CommandServiceServedTargets}\nCusto previsto: ${data.CommandServiceTotalCost}\nRestante: ${data.CommandServiceMoneyAfter}";
+        commandServiceSummaryLabel.color = currentTeamColor;
+
+        for (int i = 0; i < data.CommandServiceTargetLines.Count; i++)
+        {
+            var line = data.CommandServiceTargetLines[i];
+            if (line == null) continue;
+            CreateCommandServiceUnitRow(line.unitName, line.gainsLabel, line.unitSprite, line.unitColor,
+                line.cell, true, i, line.isFocused, line.isFullyAffordable ? currentTeamColor : new Color(1f, 0.7f, 0.28f));
+        }
+        for (int i = 0; i < data.CommandServiceSkippedUnitLines.Count; i++)
+        {
+            var line = data.CommandServiceSkippedUnitLines[i];
+            if (line == null) continue;
+            CreateCommandServiceUnitRow(line.unitName, $"Não atendida — {line.sourceLabel}", line.unitSprite,
+                line.unitColor, line.cell, false, i, line.isFocused, new Color(0.58f, 0.58f, 0.58f));
+        }
+        float contentHeight = commandServiceRows.Count * (CommandServiceRowHeight + 4f);
+        commandServiceRowsRoot.GetComponent<RectTransform>().sizeDelta = new Vector2(0f, contentHeight);
+        float viewportHeight = GetCommandServiceListViewportHeight();
+        commandServiceViewportRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, viewportHeight);
+        EnsureFocusedCommandServiceRowVisible();
+    }
+
+    private float GetCommandServiceListViewportHeight()
+    {
+        float content = commandServiceRows.Count * (CommandServiceRowHeight + 4f);
+        float screenLimit = Mathf.Clamp(Screen.height * 0.52f, CommandServiceRowHeight * 2f, CommandServiceMaxListHeight);
+        return Mathf.Min(content, screenLimit);
+    }
+
+    private float GetCommandServicePreferredHeight()
+    {
+        return CommandServiceSummaryHeight + 4f + GetCommandServiceListViewportHeight();
+    }
+
+    private void EnsureFocusedCommandServiceRowVisible()
+    {
+        if (commandServiceRowsRoot == null || commandServiceViewportRect == null || commandServiceRows.Count == 0) return;
+        int focused = -1;
+        for (int i = 0; i < commandServiceRows.Count; i++)
+        {
+            Image image = commandServiceRows[i] != null ? commandServiceRows[i].GetComponent<Image>() : null;
+            if (image != null && image.color.a > 0.9f) { focused = i; break; }
+        }
+        RectTransform contentRect = commandServiceRowsRoot.GetComponent<RectTransform>();
+        float viewport = commandServiceViewportRect.rect.height;
+        float content = commandServiceRows.Count * (CommandServiceRowHeight + 4f);
+        float current = contentRect.anchoredPosition.y;
+        if (focused >= 0)
+        {
+            float top = focused * (CommandServiceRowHeight + 4f);
+            float bottom = top + CommandServiceRowHeight;
+            if (top < current) current = top;
+            else if (bottom > current + viewport) current = bottom - viewport;
+        }
+        contentRect.anchoredPosition = new Vector2(0f, Mathf.Clamp(current, 0f, Mathf.Max(0f, content - viewport)));
+    }
+
+    private void CreateCommandServiceUnitRow(string unitName, string details, Sprite sprite, Color spriteColor,
+        Vector3Int cell, bool served, int lineIndex, bool focused, Color textColor)
+    {
+        GameObject row = new GameObject("command_service_unit", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button), typeof(LayoutElement));
+        row.transform.SetParent(commandServiceRowsRoot.transform, false);
+        row.GetComponent<Image>().color = focused ? TeamButtonBackground(currentTeamColor, true) : new Color(0.02f, 0.06f, 0.04f, 0.72f);
+        LayoutElement element = row.GetComponent<LayoutElement>();
+        element.minHeight = element.preferredHeight = CommandServiceRowHeight;
+        Button button = row.GetComponent<Button>();
+        button.transition = Selectable.Transition.None;
+        button.onClick.AddListener(() => turnStateManager?.FocusCommandServicePreviewLine(served, lineIndex));
+        if (sprite != null) CreateDisembarkRowIcon(row.transform, "unit_icon", sprite, spriteColor, true);
+
+        GameObject labelObject = new GameObject("label", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
+        RectTransform labelRect = labelObject.GetComponent<RectTransform>();
+        labelRect.SetParent(row.transform, false);
+        labelRect.anchorMin = Vector2.zero;
+        labelRect.anchorMax = Vector2.one;
+        labelRect.offsetMin = new Vector2(sprite != null ? 52f : 8f, 3f);
+        labelRect.offsetMax = new Vector2(-6f, -3f);
+        TMP_Text label = labelObject.GetComponent<TMP_Text>();
+        label.text = $"{unitName}\n{details}";
+        label.fontStyle = FontStyles.Bold;
+        label.fontSize = 18f;
+        label.enableAutoSizing = true;
+        label.fontSizeMin = 12f;
+        label.fontSizeMax = 18f;
+        label.alignment = TextAlignmentOptions.MidlineLeft;
+        label.color = textColor;
+        label.raycastTarget = false;
+        commandServiceRows.Add(row);
+    }
+
+    private void CreateCommandServiceTextRow(string text, float height, Color color, TextAlignmentOptions alignment)
+    {
+        GameObject obj = new GameObject("command_service_summary", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI), typeof(LayoutElement));
+        obj.transform.SetParent(commandServiceRowsRoot.transform, false);
+        LayoutElement element = obj.GetComponent<LayoutElement>();
+        element.minHeight = element.preferredHeight = height;
+        TMP_Text label = obj.GetComponent<TMP_Text>();
+        label.text = text;
+        label.fontSize = 18f;
+        label.fontStyle = FontStyles.Bold;
+        label.alignment = alignment;
+        label.color = color;
+        label.margin = new Vector4(8f, 3f, 8f, 3f);
+        label.raycastTarget = false;
+    }
+
     private void RefreshTurnStartAutonomyControls(bool panelVisible, TurnStateManager.HelperPanelData data)
     {
         bool active = panelVisible && data != null &&
@@ -1719,7 +1941,9 @@ public class PanelHelperController : MonoBehaviour
             if (line == null) continue;
             signatureBuilder.Append('|').Append(line.unitName).Append('|').Append(line.cell)
                 .Append('|').Append(line.fuelBefore).Append('|').Append(line.autonomyConsumed)
-                .Append('|').Append(line.fuelAfter).Append('|').Append(line.unitSprite != null ? line.unitSprite.name : string.Empty);
+                .Append('|').Append(line.fuelAfter).Append('/').Append(line.fuelMax)
+                .Append('|').Append(line.isFocused)
+                .Append('|').Append(line.unitSprite != null ? line.unitSprite.name : string.Empty);
         }
         string signature = signatureBuilder.ToString();
         if (signature != autonomyUpkeepSignature)
@@ -1731,6 +1955,15 @@ public class PanelHelperController : MonoBehaviour
         autonomyUpkeepRoot.SetActive(true);
         if (helperTxt != null)
             helperTxt.enabled = false;
+        ApplyFooterButtonFocus(
+            cancelActionImage,
+            cancelActionLabel,
+            turnStateManager != null && turnStateManager.IsTurnStartAutonomyReportCancelFocused);
+        if (panelHelper == gameObject && selfPanelCanvasGroup != null)
+        {
+            selfPanelCanvasGroup.interactable = true;
+            selfPanelCanvasGroup.blocksRaycasts = true;
+        }
     }
 
     private void EnsureAutonomyUpkeepRoot()
@@ -1764,9 +1997,15 @@ public class PanelHelperController : MonoBehaviour
         {
             TurnStateManager.HelperTurnStartAutonomyLine line = lines[i];
             if (line == null) continue;
-            GameObject row = new GameObject("autonomy_upkeep_unit", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(LayoutElement));
+            GameObject row = new GameObject("autonomy_upkeep_unit", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button), typeof(LayoutElement));
             row.transform.SetParent(autonomyUpkeepRoot.transform, false);
-            row.GetComponent<Image>().color = new Color(0.02f, 0.06f, 0.04f, 0.72f);
+            row.GetComponent<Image>().color = line.isFocused
+                ? TeamButtonBackground(currentTeamColor, true)
+                : new Color(0.02f, 0.06f, 0.04f, 0.72f);
+            Button rowButton = row.GetComponent<Button>();
+            rowButton.transition = Selectable.Transition.None;
+            int targetIndex = i;
+            rowButton.onClick.AddListener(() => turnStateManager?.TryPanToTurnStartAutonomyUnitFromPointer(targetIndex));
             LayoutElement element = row.GetComponent<LayoutElement>();
             element.minHeight = AutonomyUpkeepRowHeight;
             element.preferredHeight = AutonomyUpkeepRowHeight;
@@ -1779,7 +2018,7 @@ public class PanelHelperController : MonoBehaviour
             labelRect.SetParent(row.transform, false);
             labelRect.anchorMin = Vector2.zero;
             labelRect.anchorMax = Vector2.one;
-            labelRect.offsetMin = new Vector2(line.unitSprite != null ? 52f : 8f, 3f);
+            labelRect.offsetMin = new Vector2(line.unitSprite != null ? 52f : 8f, 12f);
             labelRect.offsetMax = new Vector2(-6f, -3f);
             TMP_Text label = labelObject.GetComponent<TMP_Text>();
             string unitName = string.IsNullOrWhiteSpace(line.unitName) ? "Unidade" : line.unitName;
@@ -1792,11 +2031,59 @@ public class PanelHelperController : MonoBehaviour
             label.alignment = TextAlignmentOptions.MidlineLeft;
             label.color = currentTeamColor;
             label.raycastTarget = false;
+            CreateAutonomyFuelBar(row.transform, line.fuelAfter, line.fuelMax);
             autonomyUpkeepRows.Add(row);
         }
 
         autonomyUpkeepRoot.GetComponent<RectTransform>().sizeDelta = new Vector2(
             0f, AutonomyUpkeepHeaderHeight + 4f + autonomyUpkeepRows.Count * (AutonomyUpkeepRowHeight + 4f));
+    }
+
+    private static void CreateAutonomyFuelBar(Transform parent, int fuelAfter, int fuelMax)
+    {
+        GameObject backgroundObject = new GameObject("autonomy_bar", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+        RectTransform backgroundRect = backgroundObject.GetComponent<RectTransform>();
+        backgroundRect.SetParent(parent, false);
+        backgroundRect.anchorMin = new Vector2(0.02f, 0f);
+        backgroundRect.anchorMax = new Vector2(0.98f, 0f);
+        backgroundRect.pivot = new Vector2(0.5f, 0f);
+        backgroundRect.anchoredPosition = new Vector2(0f, 4f);
+        backgroundRect.sizeDelta = new Vector2(0f, 7f);
+        Image background = backgroundObject.GetComponent<Image>();
+        background.color = new Color(0f, 0f, 0f, 0.78f);
+        background.raycastTarget = false;
+
+        float ratio = Mathf.Clamp01((float)Mathf.Max(0, fuelAfter) / Mathf.Max(1, fuelMax));
+        GameObject fillObject = new GameObject("fill", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+        RectTransform fillRect = fillObject.GetComponent<RectTransform>();
+        fillRect.SetParent(backgroundRect, false);
+        fillRect.anchorMin = Vector2.zero;
+        fillRect.anchorMax = new Vector2(ratio, 1f);
+        fillRect.offsetMin = Vector2.zero;
+        fillRect.offsetMax = Vector2.zero;
+        Image fill = fillObject.GetComponent<Image>();
+        // Mesmos thresholds e cores do indicador de autonomia do Unit.prefab.
+        fill.color = ratio <= 0.25f
+            ? new Color(1f, 0.3f, 0.3f, 1f)
+            : ratio <= 0.50f
+                ? new Color(1f, 0.85f, 0.35f, 1f)
+                : new Color(0.8235295f, 0.4117647f, 0.1176471f, 1f);
+        fill.raycastTarget = false;
+    }
+
+    public static bool TryPanToAutonomyCell(Vector3Int cell)
+    {
+        if (instance == null)
+            return false;
+        if (instance.cameraController == null)
+            instance.cameraController = FindAnyObjectByType<CameraController>();
+        Tilemap board = instance.cursorController != null ? instance.cursorController.BoardTilemap : null;
+        if (instance.cameraController == null || board == null)
+            return false;
+
+        cell.z = 0;
+        instance.cameraController.FocusOn(board.GetCellCenterWorld(cell));
+        return true;
     }
 
     private void CreateAutonomyUpkeepTextRow(string text, float height, float fontSize, TextAlignmentOptions alignment)
@@ -2028,6 +2315,7 @@ public class PanelHelperController : MonoBehaviour
         unitStatsStructureIcon.sprite = data.UnitStatsStructureSprite;
         unitStatsStructureIcon.enabled = data.UnitStatsStructureSprite != null;
         unitStatsStructureIcon.color = data.UnitStatsStructureColor;
+        ConfigureUnitStatsLocalIcons(data.UnitStatsStructureIsSeparate && data.UnitStatsStructureSprite != null);
         unitStatsLocalText.color = currentTeamColor;
         unitStatsDefenseText.color = currentTeamColor;
         unitStatsConstructionStockText.color = currentTeamColor;
@@ -2086,7 +2374,7 @@ public class PanelHelperController : MonoBehaviour
             float iconHalfWidth = rect.rect.width * 0.5f;
             float minimumCenterX = helperTxt.rectTransform.rect.xMin + iconHalfWidth + 2f;
             rect.localPosition = new Vector3(
-                Mathf.Max(character.bottomLeft.x - 27f, minimumCenterX),
+                Mathf.Max(character.bottomLeft.x - iconHalfWidth - 8f, minimumCenterX),
                 (character.bottomLeft.y + character.topRight.y) * 0.5f,
                 0f);
             icon.sprite = visual.sprite;
@@ -2141,13 +2429,21 @@ public class PanelHelperController : MonoBehaviour
         layout.childForceExpandWidth = false;
         layout.childForceExpandHeight = false;
 
-        GameObject iconObject = new GameObject("local_icon", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(LayoutElement));
-        iconObject.transform.SetParent(rootRect, false);
-        LayoutElement iconLayout = iconObject.GetComponent<LayoutElement>();
-        iconLayout.minWidth = 52f;
-        iconLayout.preferredWidth = 52f;
-        iconLayout.minHeight = 52f;
-        iconLayout.preferredHeight = 52f;
+        unitStatsIconsRoot = new GameObject("local_icons", typeof(RectTransform), typeof(LayoutElement));
+        unitStatsIconsRoot.transform.SetParent(rootRect, false);
+        unitStatsIconsLayout = unitStatsIconsRoot.GetComponent<LayoutElement>();
+        unitStatsIconsLayout.minWidth = 52f;
+        unitStatsIconsLayout.preferredWidth = 52f;
+        unitStatsIconsLayout.minHeight = 52f;
+        unitStatsIconsLayout.preferredHeight = 52f;
+
+        GameObject iconObject = new GameObject("local_icon", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+        RectTransform iconRect = iconObject.GetComponent<RectTransform>();
+        iconRect.SetParent(unitStatsIconsRoot.transform, false);
+        iconRect.anchorMin = Vector2.zero;
+        iconRect.anchorMax = Vector2.one;
+        iconRect.offsetMin = Vector2.zero;
+        iconRect.offsetMax = Vector2.zero;
         unitStatsLocalIcon = iconObject.GetComponent<Image>();
         unitStatsLocalIcon.preserveAspect = true;
         unitStatsLocalIcon.raycastTarget = false;
@@ -2191,6 +2487,34 @@ public class PanelHelperController : MonoBehaviour
         stockLayout.preferredHeight = 48f;
         unitStatsConstructionStockText.gameObject.SetActive(false);
         unitStatsLocalRoot.SetActive(false);
+    }
+
+    private void ConfigureUnitStatsLocalIcons(bool separate)
+    {
+        if (unitStatsIconsRoot == null || unitStatsIconsLayout == null ||
+            unitStatsLocalIcon == null || unitStatsStructureIcon == null)
+            return;
+
+        unitStatsIconsLayout.minWidth = 52f;
+        unitStatsIconsLayout.preferredWidth = 52f;
+        unitStatsIconsLayout.minHeight = separate ? 108f : 52f;
+        unitStatsIconsLayout.preferredHeight = separate ? 108f : 52f;
+
+        RectTransform localRect = unitStatsLocalIcon.rectTransform;
+        RectTransform structureRect = unitStatsStructureIcon.rectTransform;
+        structureRect.SetParent(separate ? unitStatsIconsRoot.transform : unitStatsLocalIcon.transform, false);
+
+        localRect.anchorMin = separate ? new Vector2(0f, 0.52f) : Vector2.zero;
+        localRect.anchorMax = Vector2.one;
+        localRect.offsetMin = Vector2.zero;
+        localRect.offsetMax = Vector2.zero;
+        unitStatsLocalIcon.preserveAspect = true;
+
+        structureRect.anchorMin = separate ? Vector2.zero : new Vector2(0.30f, 0f);
+        structureRect.anchorMax = separate ? new Vector2(1f, 0.48f) : new Vector2(0.70f, 1f);
+        structureRect.offsetMin = Vector2.zero;
+        structureRect.offsetMax = Vector2.zero;
+        unitStatsStructureIcon.preserveAspect = separate;
     }
 
     private TMP_Text CreateUnitStatsLocalText(string objectName, Transform parent)
@@ -2375,7 +2699,10 @@ public class PanelHelperController : MonoBehaviour
         }
         else
         {
-            sb.Append('|').Append(data.TransferIsConfirmStep).Append('|').Append(data.TransferSelectedLabel);
+            sb.Append('|').Append(data.TransferIsConfirmStep)
+                .Append('|').Append(data.TransferIsDonationPercentageStep)
+                .Append('|').Append(data.TransferDonationPercent)
+                .Append('|').Append(data.TransferSelectedLabel);
             for (int i = 0; i < data.TransferCandidateLines.Count; i++)
                 sb.Append('|').Append(data.TransferCandidateLines[i].index)
                     .Append(data.TransferCandidateLines[i].unitName)
@@ -2656,7 +2983,32 @@ public class PanelHelperController : MonoBehaviour
         disembarkActionButtons.Clear();
         disembarkActionFocusIndices.Clear();
 
-        if (!data.TransferIsConfirmStep)
+        if (data.TransferIsDonationPercentageStep)
+        {
+            TurnStateManager.HelperTransferCandidateLine selected = null;
+            for (int i = 0; i < data.TransferCandidateLines.Count; i++)
+                if (data.TransferCandidateLines[i] != null && data.TransferCandidateLines[i].isFocused)
+                {
+                    selected = data.TransferCandidateLines[i];
+                    break;
+                }
+
+            string target = selected != null ? selected.unitName : data.TransferSelectedLabel;
+            CreateDisembarkButton($"DOAR → {target}", null, false, -1,
+                selected != null ? selected.targetSprite : null,
+                selected != null ? selected.targetColor : Color.white);
+            TintLastSupplyInformationRow(currentTeamColor);
+
+            int[] percentages = { 25, 50, 75, 100 };
+            for (int i = 0; i < percentages.Length; i++)
+            {
+                int percentageIndex = i;
+                CreateDisembarkButton($"{percentages[i]}%",
+                    () => turnStateManager?.TrySelectTransferDonationPercentageFromPointer(percentageIndex),
+                    true, i);
+            }
+        }
+        else if (!data.TransferIsConfirmStep)
         {
             for (int i = 0; i < data.TransferCandidateLines.Count; i++)
             {
@@ -2678,10 +3030,13 @@ public class PanelHelperController : MonoBehaviour
                     break;
                 }
             string mode = selected != null && selected.isDonate ? "DOAR" : "RECEBER";
+            if (selected != null && selected.isDonate)
+                mode += $" {data.TransferDonationPercent}%";
             string target = selected != null ? selected.unitName : data.TransferSelectedLabel;
             CreateDisembarkButton($"{mode} → {target}", null, false, -1,
                 selected != null ? selected.targetSprite : null,
                 selected != null ? selected.targetColor : Color.white);
+            TintLastSupplyInformationRow(currentTeamColor);
 
             for (int i = 0; i < data.TransferResourceLines.Count; i++)
             {
@@ -2694,8 +3049,7 @@ public class PanelHelperController : MonoBehaviour
                 CreateDisembarkButton(
                     $"{line.supplyName}: {sourceBefore} - {line.movedAmount} → {sourceAfter} | {destinationBefore} + {line.movedAmount} → {destinationAfter}",
                     null, false, -1);
-                TintLastSupplyInformationRow(line.movedAmount > 0
-                    ? new Color(0.45f, 1f, 0.45f, 1f) : Color.gray);
+                TintLastSupplyInformationRow(currentTeamColor);
             }
             CreateDisembarkButton("CONFIRMAR TRANSFERÊNCIA",
                 () => turnStateManager?.TryConfirmTransferFromPointer(), true, 0);
@@ -2776,6 +3130,8 @@ public class PanelHelperController : MonoBehaviour
         rect.sizeDelta = new Vector2(40f, 40f);
         Image image = iconObj.GetComponent<Image>();
         image.sprite = sprite;
+        // Sprites usados como miniaturas no helper devem permanecer legiveis mesmo quando
+        // o renderer original estiver escurecido por FOW, seleção ou estado provisório.
         image.color = color;
         image.preserveAspect = true;
         image.raycastTarget = false;
@@ -3810,6 +4166,8 @@ public class PanelHelperController : MonoBehaviour
     {
         if (turnStateManager == null)
             return false;
+        if (turnStateManager.IsManualTurnStartAutonomyReportActive)
+            return true;
 
         switch (turnStateManager.CurrentCursorState)
         {
@@ -4247,6 +4605,39 @@ public class PanelHelperController : MonoBehaviour
     {
         SyncDragSurfaceGroup(dragHandleRoot, panelVisible);
         SyncDragSurfaceGroup(titleDragSurfaceRoot, panelVisible);
+    }
+
+    public static bool IsPointerOverDragSurface()
+    {
+        if (instance == null || !instance.IsPanelVisibleForDrag)
+            return false;
+
+        Vector2 screenPosition;
+#if ENABLE_INPUT_SYSTEM
+        if (Mouse.current != null)
+            screenPosition = Mouse.current.position.ReadValue();
+        else
+#endif
+            screenPosition = Input.mousePosition;
+
+        return IsScreenPointInsideRect(instance.titleDragSurfaceRect, screenPosition) ||
+               IsScreenPointInsideRect(
+                   instance.dragHandleRoot != null
+                       ? instance.dragHandleRoot.GetComponent<RectTransform>()
+                       : null,
+                   screenPosition);
+    }
+
+    private static bool IsScreenPointInsideRect(RectTransform rect, Vector2 screenPosition)
+    {
+        if (rect == null || !rect.gameObject.activeInHierarchy)
+            return false;
+
+        Canvas canvas = rect.GetComponentInParent<Canvas>();
+        Camera eventCamera = canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay
+            ? canvas.worldCamera
+            : null;
+        return RectTransformUtility.RectangleContainsScreenPoint(rect, screenPosition, eventCamera);
     }
 
     private static void SyncDragSurfaceGroup(GameObject target, bool panelVisible)

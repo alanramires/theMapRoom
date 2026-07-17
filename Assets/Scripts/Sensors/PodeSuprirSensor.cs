@@ -48,7 +48,7 @@ public static class PodeSuprirSensor
             return false;
         }
 
-        bool embarkedOnlyRange = supplierData.serviceRange == SupplierRangeMode.EmbarkedOnly;
+        bool embarkedOnlyRange = supplierData.serviceRange == SupplierRangeMode.SameHexOrEmbarked;
         if (!embarkedOnlyRange && !SupportsOperationDomain(supplierData, supplier.GetDomain(), supplier.GetHeightLevel()))
         {
             reason =

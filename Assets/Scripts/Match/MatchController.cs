@@ -2668,8 +2668,9 @@ public class MatchController : MonoBehaviour
                             consumed,
                             beforeFuel,
                             afterFuel,
+                            unit.GetMaxFuel(),
                             upkeepRenderer != null ? upkeepRenderer.sprite : null,
-                            upkeepRenderer != null ? upkeepRenderer.color : Color.white));
+                            TeamUtils.GetColor(unit.TeamId)));
                     }
                 }
             }

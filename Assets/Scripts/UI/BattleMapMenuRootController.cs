@@ -37,7 +37,8 @@ public class BattleMapMenuRootController : MonoBehaviour
         Render = 12,
         Sair = 13,
         VoltarGerenciar = 14,
-        Camada = 15
+        Camada = 15,
+        Consumo = 16
     }
 
     [Header("Scene")]
@@ -67,6 +68,7 @@ public class BattleMapMenuRootController : MonoBehaviour
     [SerializeField] private Button btnLoad;
     [SerializeField] private Button btnGerenciar;
     [SerializeField] private Button btnVoltarOptions;
+    [SerializeField] private Button btnConsumo;
 
     [SerializeField] private Button btnDestruir;
     [SerializeField] private Button btnRender;
@@ -971,6 +973,7 @@ public class BattleMapMenuRootController : MonoBehaviour
         BindButton(btnLoad, MenuAction.Load);
         BindButton(btnGerenciar, MenuAction.Gerenciar);
         BindButton(btnVoltarOptions, MenuAction.VoltarOptions);
+        BindButton(btnConsumo, MenuAction.Consumo);
 
         BindButton(btnDestruir, MenuAction.Destruir);
         BindButton(btnRender, MenuAction.Render);
@@ -980,7 +983,7 @@ public class BattleMapMenuRootController : MonoBehaviour
         panelButtons.Clear();
         RefreshLayerButtonAvailability();
         panelButtons[MenuPanel.Menu] = BuildPanelButtonsFromLayout(panelMenu, btnStatus, btnComando, btnRodada, btnCamada, btnOpcoes, btnVoltarMenu);
-        panelButtons[MenuPanel.Options] = BuildPanelButtonsFromLayout(panelOptions, btnMinimapa, btnConfig, btnSave, btnLoad, btnGerenciar, btnVoltarOptions);
+        panelButtons[MenuPanel.Options] = BuildPanelButtonsFromLayout(panelOptions, btnMinimapa, btnConfig, btnSave, btnLoad, btnGerenciar, btnConsumo, btnVoltarOptions);
         panelButtons[MenuPanel.Gerenciar] = BuildPanelButtonsFromLayout(panelGerenciar, btnDestruir, btnRender, btnSair, btnVoltarGerenciar);
 
     }
@@ -1170,6 +1173,7 @@ public class BattleMapMenuRootController : MonoBehaviour
                 if (name.Contains("save")) { action = MenuAction.Save; return true; }
                 if (name.Contains("load")) { action = MenuAction.Load; return true; }
                 if (name.Contains("gerenciar")) { action = MenuAction.Gerenciar; return true; }
+                if (name.Contains("consumo")) { action = MenuAction.Consumo; return true; }
                 if (name.Contains("voltar")) { action = MenuAction.VoltarOptions; return true; }
                 break;
             case MenuPanel.Gerenciar:
@@ -1269,6 +1273,20 @@ public class BattleMapMenuRootController : MonoBehaviour
             case MenuAction.Gerenciar:
                 SetPanel(MenuPanel.Gerenciar, resetIndex: true);
                 ScheduleRestoreSelectionNextFrame();
+                break;
+            case MenuAction.Consumo:
+                if (turnStateManager == null || !turnStateManager.HasTurnStartAutonomyReport)
+                {
+                    cursorController?.PlayErrorSfx();
+                    break;
+                }
+                if (!TryCloseMenuForSaveLoadDispatch())
+                    break;
+                if (!turnStateManager.OpenTurnStartAutonomyReportFromMenu())
+                {
+                    cursorController?.PlayErrorSfx();
+                    RestoreMenuFromStateStack(TurnStateManager.CursorState.Neutral);
+                }
                 break;
             case MenuAction.VoltarOptions:
                 SetPanel(MenuPanel.Menu, resetIndex: false);
@@ -1580,6 +1598,7 @@ public class BattleMapMenuRootController : MonoBehaviour
         if (btnLoad == null) btnLoad = FindButtonByNames(panelOptions, "button_load", "btn_load");
         if (btnGerenciar == null) btnGerenciar = FindButtonByNames(panelOptions, "btn_gerenciar", "button_gerenciar");
         if (btnVoltarOptions == null) btnVoltarOptions = FindButtonByNames(panelOptions, "btn_voltar", "button_voltar");
+        if (btnConsumo == null) btnConsumo = FindButtonByNames(panelOptions, "button_consumo", "btn_consumo");
 
         if (btnDestruir == null) btnDestruir = FindButtonByNames(panelGerenciar, "btn_destruir", "button_destruir");
         if (btnRender == null) btnRender = FindButtonByNames(panelGerenciar, "btn_render", "button_render");

@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Tilemaps;
 
 public partial class TurnStateManager
 {
@@ -19,7 +20,10 @@ public partial class TurnStateManager
     private readonly List<TransferEstimateLine> transferPreviewLines = new List<TransferEstimateLine>();
     private int transferPromptSelectedIndex = -1;
     private bool transferPromptSelectionPending;
+    private bool transferPromptDonationPercentagePending;
     private bool transferPromptConfirmationPending;
+    private static readonly int[] TransferDonationPercentOptions = { 25, 50, 75, 100 };
+    private int transferDonationPercentIndex = 3;
     private bool transferExecutionInProgress;
     private readonly List<LineRenderer> transferPreviewRenderers = new List<LineRenderer>();
     private readonly List<Vector3> transferPreviewPathPoints = new List<Vector3>(2);
@@ -30,17 +34,24 @@ public partial class TurnStateManager
     private int transferHelperFocusIndex;
 
     public bool IsTransferSelectionStep => IsTransferSelectionStepActive();
+    public bool IsTransferDonationPercentageStep => IsTransferDonationPercentageStepActive();
     public bool IsTransferHelperActive => IsTransferPromptActive();
     public int TransferHelperFocusIndex => transferHelperFocusIndex;
     public bool TransferHelperCancelFocused => IsTransferPromptActive() &&
-        (IsTransferConfirmStepActive() ? transferHelperFocusIndex == 1 : transferHelperFocusIndex == transferPromptOptions.Count);
+        (IsTransferConfirmStepActive() ? transferHelperFocusIndex == 1 :
+         IsTransferDonationPercentageStepActive() ? transferHelperFocusIndex == TransferDonationPercentOptions.Length :
+         transferHelperFocusIndex == transferPromptOptions.Count);
 
     public bool NavigateTransferHelperFocus(int delta)
     {
         if (!IsTransferPromptActive() || delta == 0)
             return false;
-        int total = IsTransferConfirmStepActive() ? 2 : transferPromptOptions.Count + 1;
+        int total = IsTransferConfirmStepActive() ? 2 :
+            IsTransferDonationPercentageStepActive() ? TransferDonationPercentOptions.Length + 1 :
+            transferPromptOptions.Count + 1;
         transferHelperFocusIndex = (transferHelperFocusIndex + (delta > 0 ? 1 : -1) + total) % total;
+        if (IsTransferDonationPercentageStepActive() && transferHelperFocusIndex < TransferDonationPercentOptions.Length)
+            transferDonationPercentIndex = transferHelperFocusIndex;
         if (IsTransferSelectionStepActive() && transferHelperFocusIndex < transferPromptOptions.Count)
         {
             transferPromptSelectedIndex = transferHelperFocusIndex;
@@ -56,6 +67,8 @@ public partial class TurnStateManager
             return false;
         if (IsTransferConfirmStepActive())
             return TryConfirmPendingTransferPrompt();
+        if (IsTransferDonationPercentageStepActive())
+            return TrySelectTransferDonationPercentageFromPointer(transferHelperFocusIndex);
         return TrySelectTransferOptionFromPointer(transferHelperFocusIndex);
     }
 
@@ -66,6 +79,17 @@ public partial class TurnStateManager
         transferPromptSelectedIndex = index;
         transferHelperFocusIndex = index;
         FocusTransferOptionByIndex(index, playSfx: false);
+        EnterTransferStepAfterTargetSelection();
+        cursorController?.PlayConfirmSfx();
+        return true;
+    }
+
+    public bool TrySelectTransferDonationPercentageFromPointer(int index)
+    {
+        if (!IsTransferDonationPercentageStepActive() || index < 0 || index >= TransferDonationPercentOptions.Length)
+            return false;
+        transferDonationPercentIndex = index;
+        transferHelperFocusIndex = index;
         EnterTransferConfirmStep();
         cursorController?.PlayConfirmSfx();
         return true;
@@ -136,7 +160,7 @@ public partial class TurnStateManager
         {
             transferPromptSelectedIndex = number - 1;
             FocusTransferOptionByIndex(transferPromptSelectedIndex, playSfx: true);
-            EnterTransferConfirmStep();
+            EnterTransferStepAfterTargetSelection();
             return;
         }
 
@@ -152,7 +176,7 @@ public partial class TurnStateManager
                           selectedUnit != null &&
                           transferPromptSelectedIndex >= 0 &&
                           transferPromptSelectedIndex < transferPromptOptions.Count &&
-                          !IsTransferEmbarkedOnlyCollection(selectedUnit);
+                          !IsTransferSameHexOrEmbarkedCollection(selectedUnit);
         if (!shouldShow)
         {
             SetTransferPreviewVisible(false);
@@ -251,14 +275,21 @@ public partial class TurnStateManager
 
     private bool IsTransferPromptActive()
     {
-        return (transferPromptSelectionPending || transferPromptConfirmationPending) &&
+        return (transferPromptSelectionPending || transferPromptDonationPercentagePending || transferPromptConfirmationPending) &&
                transferPromptOptions.Count > 0 &&
                (CurrentCursorState == CursorState.MoveuAndando || CurrentCursorState == CursorState.MoveuParado);
     }
 
     private bool IsTransferSelectionStepActive()
     {
-        return IsTransferPromptActive() && transferPromptSelectionPending && !transferPromptConfirmationPending;
+        return IsTransferPromptActive() && transferPromptSelectionPending &&
+               !transferPromptDonationPercentagePending && !transferPromptConfirmationPending;
+    }
+
+    private bool IsTransferDonationPercentageStepActive()
+    {
+        return IsTransferPromptActive() && transferPromptDonationPercentagePending &&
+               !transferPromptSelectionPending && !transferPromptConfirmationPending;
     }
 
     private bool IsTransferConfirmStepActive()
@@ -290,6 +321,14 @@ public partial class TurnStateManager
                 }
             }
 
+            EnterTransferStepAfterTargetSelection();
+            cursorController?.PlayConfirmSfx();
+            return true;
+        }
+
+        if (IsTransferDonationPercentageStepActive())
+        {
+            transferDonationPercentIndex = Mathf.Clamp(transferHelperFocusIndex, 0, TransferDonationPercentOptions.Length - 1);
             EnterTransferConfirmStep();
             cursorController?.PlayConfirmSfx();
             return true;
@@ -323,7 +362,65 @@ public partial class TurnStateManager
         transferExecutionInProgress = true;
         try
         {
-            bool executed = TryExecuteTransferOptionRuntime(option, selectedUnit, out int movedTotal, out string message, out Dictionary<SupplyData, int> movedBySupply);
+            if (!TryEstimateTransferOption(option, selectedUnit, GetSelectedTransferDonationPercent(), out _, out _, out _))
+            {
+                cursorController?.PlayErrorSfx();
+                Debug.Log("[Transfer] Contexto mudou: nao ha mais estoque/capacidade para concluir.");
+                yield break;
+            }
+
+            if (option != null && option.requiresSupplierLanding)
+            {
+                UnitManager landingSupplier = selectedUnit;
+                Tilemap landingMap = terrainTilemap != null ? terrainTilemap : landingSupplier?.BoardTilemap;
+                AircraftOperationDecision landingDecision = AircraftOperationRules.Evaluate(
+                    landingSupplier,
+                    landingMap,
+                    terrainDatabase,
+                    option.landingMovementMode);
+                if (!landingDecision.available || landingDecision.action != AircraftOperationAction.Land)
+                {
+                    cursorController?.PlayErrorSfx();
+                    Debug.Log(string.IsNullOrWhiteSpace(landingDecision.reason)
+                        ? "[Transfer] Pouso obrigatorio deixou de ser valido."
+                        : $"[Transfer] {landingDecision.reason}");
+                    yield break;
+                }
+
+                PlayMovementStartSfx(landingSupplier);
+                bool startedHigh = landingSupplier.GetDomain() == Domain.Air && landingSupplier.GetHeightLevel() == HeightLevel.AirHigh;
+                if (startedHigh)
+                {
+                    float highToLowDuration = GetEmbarkAirHighToGroundDuration() * Mathf.Clamp01(GetEmbarkHighToLowNormalizedTime());
+                    if (highToLowDuration > 0f)
+                        yield return new WaitForSeconds(highToLowDuration);
+                    landingSupplier.TrySetCurrentLayerMode(Domain.Air, HeightLevel.AirLow);
+                }
+
+                float landingDuration = GetLayerOperationTransitionDuration();
+                if (landingDuration > 0f)
+                    yield return new WaitForSeconds(landingDuration);
+
+                if (!AircraftOperationRules.TryApplyOperation(
+                        landingSupplier,
+                        landingMap,
+                        terrainDatabase,
+                        option.landingMovementMode,
+                        out AircraftOperationDecision appliedLanding)
+                    || appliedLanding.action != AircraftOperationAction.Land)
+                {
+                    cursorController?.PlayErrorSfx();
+                    Debug.Log("[Transfer] Falha ao aplicar pouso obrigatorio; transferencia cancelada.");
+                    yield break;
+                }
+
+                float vtolFxDuration = animationManager != null ? animationManager.PlayVtolLandingEffect(landingSupplier) : 0f;
+                if (vtolFxDuration > 0f)
+                    yield return new WaitForSeconds(vtolFxDuration);
+                Debug.Log($"[Transfer] {landingSupplier.name} pousou em {option.landingDomain}/{option.landingHeight} para transferir e permanecera pousado.");
+            }
+
+            bool executed = TryExecuteTransferOptionRuntime(option, selectedUnit, GetSelectedTransferDonationPercent(), out int movedTotal, out string message, out Dictionary<SupplyData, int> movedBySupply);
             if (executed)
             {
                 yield return PlayTransferSupplyProjectiles(option, selectedUnit, movedBySupply);
@@ -351,6 +448,20 @@ public partial class TurnStateManager
 
         if (IsTransferConfirmStepActive())
         {
+            PodeTransferirOption selectedOption = transferPromptSelectedIndex >= 0 &&
+                transferPromptSelectedIndex < transferPromptOptions.Count
+                ? transferPromptOptions[transferPromptSelectedIndex]
+                : null;
+            if (selectedOption != null && selectedOption.flowMode == TransferFlowMode.Fornecimento)
+            {
+                transferPromptConfirmationPending = false;
+                transferPromptDonationPercentagePending = true;
+                transferHelperFocusIndex = transferDonationPercentIndex;
+                transferPreviewLines.Clear();
+                PanelDialogController.TrySetExternalText("Transferir :: escolha quanto doar");
+                return true;
+            }
+
             if (transferPromptOptions.Count <= 1)
             {
                 ClearPendingTransferPrompt();
@@ -363,6 +474,22 @@ public partial class TurnStateManager
             transferPreviewLines.Clear();
             LogTransferPromptOptions();
             Debug.Log("[Transfer] Confirmacao cancelada. Retornando para selecao.");
+            return true;
+        }
+
+        if (IsTransferDonationPercentageStepActive())
+        {
+            if (transferPromptOptions.Count <= 1)
+            {
+                ClearPendingTransferPrompt();
+                Debug.Log("[Transfer] Cancelado.");
+                return true;
+            }
+
+            transferPromptDonationPercentagePending = false;
+            transferPromptSelectionPending = true;
+            transferHelperFocusIndex = Mathf.Clamp(transferPromptSelectedIndex, 0, transferPromptOptions.Count - 1);
+            LogTransferPromptOptions();
             return true;
         }
 
@@ -412,6 +539,13 @@ public partial class TurnStateManager
                 return false;
         }
 
+        if (IsTransferDonationPercentageStepActive())
+        {
+            transferDonationPercentIndex = TransferDonationPercentOptions.Length - 1;
+            transferHelperFocusIndex = transferDonationPercentIndex;
+            EnterTransferConfirmStep();
+        }
+
         if (IsTransferConfirmStepActive())
             return TryConfirmPendingTransferPrompt();
 
@@ -422,8 +556,10 @@ public partial class TurnStateManager
     {
         TryRestoreCommittedPathAfterTransferPrompt();
         transferPromptSelectionPending = false;
+        transferPromptDonationPercentagePending = false;
         transferPromptConfirmationPending = false;
         transferPromptSelectedIndex = -1;
+        transferDonationPercentIndex = TransferDonationPercentOptions.Length - 1;
         transferHelperFocusIndex = 0;
         transferPromptOptions.Clear();
         transferPromptIndexByCell.Clear();
@@ -440,6 +576,7 @@ public partial class TurnStateManager
     {
         TryHideCommittedPathForTransferPrompt();
         transferPromptSelectionPending = true;
+        transferPromptDonationPercentagePending = false;
         transferPromptConfirmationPending = false;
         transferPromptSelectedIndex = transferPromptOptions.Count > 0 ? 0 : -1;
         transferHelperFocusIndex = 0;
@@ -448,7 +585,7 @@ public partial class TurnStateManager
         TrySelectTransferOptionFromCursor();
         if (transferPromptOptions.Count == 1)
         {
-            EnterTransferConfirmStep();
+            EnterTransferStepAfterTargetSelection();
             return;
         }
 
@@ -486,6 +623,7 @@ public partial class TurnStateManager
             return;
 
         transferPromptSelectionPending = false;
+        transferPromptDonationPercentagePending = false;
         transferPromptConfirmationPending = true;
         transferHelperFocusIndex = 0;
         RebuildTransferPreviewLines();
@@ -496,6 +634,33 @@ public partial class TurnStateManager
             "Transferir :: Confirmar <label>",
             tokens);
         PanelDialogController.TrySetExternalText(confirmText);
+    }
+
+    private void EnterTransferStepAfterTargetSelection()
+    {
+        if (transferPromptSelectedIndex < 0 || transferPromptSelectedIndex >= transferPromptOptions.Count)
+            return;
+
+        PodeTransferirOption option = transferPromptOptions[transferPromptSelectedIndex];
+        if (option != null && option.flowMode == TransferFlowMode.Fornecimento)
+        {
+            transferPromptSelectionPending = false;
+            transferPromptDonationPercentagePending = true;
+            transferPromptConfirmationPending = false;
+            transferDonationPercentIndex = TransferDonationPercentOptions.Length - 1;
+            transferHelperFocusIndex = transferDonationPercentIndex;
+            transferPreviewLines.Clear();
+            PanelDialogController.TrySetExternalText("Transferir :: escolha quanto doar");
+            return;
+        }
+
+        EnterTransferConfirmStep();
+    }
+
+    private int GetSelectedTransferDonationPercent()
+    {
+        int index = Mathf.Clamp(transferDonationPercentIndex, 0, TransferDonationPercentOptions.Length - 1);
+        return TransferDonationPercentOptions[index];
     }
 
     private void LogTransferPromptOptions()
@@ -704,13 +869,13 @@ public partial class TurnStateManager
         }
     }
 
-    private static bool IsTransferEmbarkedOnlyCollection(UnitManager supplier)
+    private static bool IsTransferSameHexOrEmbarkedCollection(UnitManager supplier)
     {
         if (supplier == null)
             return false;
         if (!supplier.TryGetUnitData(out UnitData data) || data == null)
             return false;
-        return data.collectionRange == SupplierRangeMode.EmbarkedOnly;
+        return data.collectionRange == SupplierRangeMode.SameHexOrEmbarked;
     }
 
     private bool HasMultipleTransferTargetCells()
@@ -754,7 +919,7 @@ public partial class TurnStateManager
         if (option == null)
             return;
 
-        if (!TryEstimateTransferOption(option, selectedUnit, out Dictionary<SupplyData, int> sourceStock, out Dictionary<SupplyData, int> destinationStock, out Dictionary<SupplyData, int> movedBySupply))
+        if (!TryEstimateTransferOption(option, selectedUnit, GetSelectedTransferDonationPercent(), out Dictionary<SupplyData, int> sourceStock, out Dictionary<SupplyData, int> destinationStock, out Dictionary<SupplyData, int> movedBySupply))
             return;
 
         foreach (KeyValuePair<SupplyData, int> pair in movedBySupply)
@@ -783,6 +948,7 @@ public partial class TurnStateManager
     private static bool TryEstimateTransferOption(
         PodeTransferirOption option,
         UnitManager supplier,
+        int donationPercent,
         out Dictionary<SupplyData, int> sourceStock,
         out Dictionary<SupplyData, int> destinationStock,
         out Dictionary<SupplyData, int> movedBySupply)
@@ -812,6 +978,8 @@ public partial class TurnStateManager
                 continue;
 
             int transferable = available;
+            if (option.flowMode == TransferFlowMode.Fornecimento)
+                transferable = ResolveDonationAmount(available, donationPercent);
             if (destinationUnit != null)
             {
                 int capacity = destinationCapacity != null && destinationCapacity.TryGetValue(supply, out int maxCap) ? Mathf.Max(0, maxCap) : 0;
@@ -861,7 +1029,7 @@ public partial class TurnStateManager
         }
     }
 
-    private bool TryExecuteTransferOptionRuntime(PodeTransferirOption option, UnitManager supplier, out int movedTotal, out string message, out Dictionary<SupplyData, int> movedBySupply)
+    private bool TryExecuteTransferOptionRuntime(PodeTransferirOption option, UnitManager supplier, int donationPercent, out int movedTotal, out string message, out Dictionary<SupplyData, int> movedBySupply)
     {
         movedTotal = 0;
         movedBySupply = new Dictionary<SupplyData, int>();
@@ -903,6 +1071,8 @@ public partial class TurnStateManager
                 continue;
 
             int transferable = available;
+            if (option.flowMode == TransferFlowMode.Fornecimento)
+                transferable = ResolveDonationAmount(available, donationPercent);
             if (destinationUnit != null)
             {
                 int capacity = destinationCapacity != null && destinationCapacity.TryGetValue(supply, out int maxCap) ? Mathf.Max(0, maxCap) : 0;
@@ -939,6 +1109,16 @@ public partial class TurnStateManager
         string flowLabel = option.flowMode == TransferFlowMode.Fornecimento ? "Doar" : "Receber";
         message = $"{flowLabel} concluido. Movido={movedTotal}.";
         return true;
+    }
+
+    private static int ResolveDonationAmount(int available, int donationPercent)
+    {
+        available = Mathf.Max(0, available);
+        if (available <= 0)
+            return 0;
+        int percent = Mathf.Clamp(donationPercent, 1, 100);
+        long proportional = ((long)available * percent) / 100L;
+        return Mathf.Clamp((int)proportional, 1, available);
     }
 
     private static void ResolveTransferEndpoints(

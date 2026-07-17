@@ -14,4 +14,8 @@ public class PodeTransferirOption
     public Vector3Int targetCell;
     public TransferFlowMode flowMode;
     public string displayLabel;
+    public bool requiresSupplierLanding;
+    public Domain landingDomain;
+    public HeightLevel landingHeight;
+    public SensorMovementMode landingMovementMode;
 }

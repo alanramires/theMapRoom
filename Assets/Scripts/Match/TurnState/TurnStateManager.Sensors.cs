@@ -216,6 +216,8 @@ public partial class TurnStateManager
         bool canTransfer = PodeTransferirSensor.CollectOptions(
             selectedUnit,
             boardMap,
+            terrainDatabase,
+            movementMode,
             cachedPodeTransferirTargets,
             out cachedPodeTransferirReason,
             cachedPodeTransferirInvalidTargets);

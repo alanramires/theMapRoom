@@ -9,6 +9,8 @@ public static class PodeTransferirSensor
     public static bool CollectOptions(
         UnitManager supplier,
         Tilemap map,
+        TerrainDatabase terrainDatabase,
+        SensorMovementMode movementMode,
         List<PodeTransferirOption> output,
         out string reason,
         List<PodeTransferirInvalidOption> invalidOutput = null)
@@ -54,11 +56,33 @@ public static class PodeTransferirSensor
             return false;
         }
 
-        bool collectionEmbarkedOnly = supplierData.collectionRange == SupplierRangeMode.EmbarkedOnly;
-        if (!collectionEmbarkedOnly && !SupportsOperationDomain(supplierData, supplier.GetDomain(), supplier.GetHeightLevel()))
+        bool sameHexOrEmbarked = supplierData.collectionRange == SupplierRangeMode.SameHexOrEmbarked;
+        bool requiresLanding = sameHexOrEmbarked && supplier.GetDomain() == Domain.Air && !supplier.IsAircraftGrounded;
+        Domain operationDomain = supplier.GetDomain();
+        HeightLevel operationHeight = supplier.GetHeightLevel();
+        if (requiresLanding)
+        {
+            AircraftOperationDecision landingDecision = AircraftOperationRules.Evaluate(
+                supplier, map, terrainDatabase, movementMode);
+            if (!landingDecision.available || landingDecision.action != AircraftOperationAction.Land)
+            {
+                reason = string.IsNullOrWhiteSpace(landingDecision.reason)
+                    ? "Aeronave precisa de pouso valido para transferir."
+                    : landingDecision.reason;
+                return false;
+            }
+
+            Vector3Int landingCell = supplier.CurrentCellPosition;
+            landingCell.z = 0;
+            AircraftOperationRules.ResolveGroundedLayerForCell(
+                supplier, map, terrainDatabase, landingCell,
+                out operationDomain, out operationHeight);
+        }
+
+        if ((!sameHexOrEmbarked || requiresLanding) && !SupportsOperationDomain(supplierData, operationDomain, operationHeight))
         {
             reason =
-                $"Supplier fora do Supplier Operation Domain atual ({supplier.GetDomain()}/{supplier.GetHeightLevel()}). " +
+                $"Supplier fora do Supplier Operation Domain de transferencia ({operationDomain}/{operationHeight}). " +
                 "Reposicione para um dominio/altura permitido para transferir.";
             return false;
         }
@@ -77,15 +101,15 @@ public static class PodeTransferirSensor
             boardMap,
             origin,
             supplier.TeamId,
-            supplier.GetDomain(),
-            supplier.GetHeightLevel());
+            operationDomain,
+            operationHeight);
         List<ConstructionManager> constructionsInCollectionRange = CollectConstructionsInCollectionRange(
             supplierData,
             boardMap,
             origin,
             supplier.TeamId,
-            supplier.GetDomain(),
-            supplier.GetHeightLevel());
+            operationDomain,
+            operationHeight);
         List<UnitManager> unitsInCollectionRange = CollectUnitsInCollectionRange(supplier, supplierData, boardMap, origin);
         List<UnitManager> nearbyHubUnits = CollectNearbyHubUnits(unitsInCollectionRange, supplier.TeamId);
         bool hasEmbarkedPassengerInCollection = HasEmbarkedPassengerInCollectionRange(unitsInCollectionRange, supplier);
@@ -125,6 +149,21 @@ public static class PodeTransferirSensor
         }
 
         SortTransferOptions(output);
+
+        if (requiresLanding)
+        {
+            for (int i = 0; i < output.Count; i++)
+            {
+                PodeTransferirOption option = output[i];
+                if (option == null)
+                    continue;
+                option.requiresSupplierLanding = true;
+                option.landingDomain = operationDomain;
+                option.landingHeight = operationHeight;
+                option.landingMovementMode = movementMode;
+                option.displayLabel = $"Pousar + {option.displayLabel}";
+            }
+        }
 
         if (output.Count <= 0)
         {

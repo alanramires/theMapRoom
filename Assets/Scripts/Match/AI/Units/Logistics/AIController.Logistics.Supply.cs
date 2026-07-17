@@ -79,7 +79,9 @@ public partial class AIController
         action = null;
         reason = "";
         var options = new List<PodeTransferirOption>();
-        if (!PodeTransferirSensor.CollectOptions(unit, boardTilemap, options, out string sensorReason) || options.Count <= 0)
+        if (!PodeTransferirSensor.CollectOptions(
+                unit, boardTilemap, terrainDatabase, SensorMovementMode.MoveuParado,
+                options, out string sensorReason) || options.Count <= 0)
         {
             reason = sensorReason;
             return false;
@@ -136,7 +138,9 @@ public partial class AIController
         try
         {
             var options = new List<PodeTransferirOption>();
-            if (!PodeTransferirSensor.CollectOptions(unit, boardTilemap, options, out string sensorReason) || options.Count <= 0)
+            if (!PodeTransferirSensor.CollectOptions(
+                    unit, boardTilemap, terrainDatabase, SensorMovementMode.MoveuAndando,
+                    options, out string sensorReason) || options.Count <= 0)
             {
                 reason = sensorReason;
                 return false;
@@ -197,7 +201,9 @@ public partial class AIController
         try
         {
             var options = new List<PodeTransferirOption>();
-            if (!PodeTransferirSensor.CollectOptions(unit, boardTilemap, options, out _) || options.Count <= 0)
+            if (!PodeTransferirSensor.CollectOptions(
+                    unit, boardTilemap, terrainDatabase, SensorMovementMode.MoveuAndando,
+                    options, out _) || options.Count <= 0)
                 return false;
 
             for (int i = 0; i < options.Count; i++)
@@ -1138,7 +1144,7 @@ public partial class AIController
                 return dist <= 1f;
             case SupplierRangeMode.Adjacent1Hex:
                 return Mathf.Approximately(dist, 1f);
-            case SupplierRangeMode.EmbarkedOnly:
+            case SupplierRangeMode.SameHexOrEmbarked:
                 return target.IsEmbarked && target.EmbarkedTransporter == logistics;
             default:
                 return false;

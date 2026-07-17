@@ -2,6 +2,7 @@ using System.Collections;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.Video;
 
 public sealed class PanelRodadaController : MonoBehaviour
 {
@@ -14,6 +15,13 @@ public sealed class PanelRodadaController : MonoBehaviour
     [SerializeField] private AudioClip menuOpen;
     [SerializeField] private AudioClip menuClose;
     [SerializeField] private AudioClip aguardandoRodada;
+    [Header("Team Loading Video")]
+    [SerializeField] private VideoClip videoVerde;
+    [SerializeField] private VideoClip videoVermelho;
+    [SerializeField] private VideoClip videoAzul;
+    [SerializeField] private VideoClip videoAmarelo;
+    [SerializeField] private Vector2 videoSize = new Vector2(720f, 360f);
+    [SerializeField] private Vector2 videoAnchoredPosition = new Vector2(0f, -320f);
     [SerializeField, Min(0f)] private float atrasoAntesMenuOpen = 0.5f;
     [SerializeField, Min(0.05f)] private float duracaoAnimacao = 0.3f;
     [SerializeField, Min(0f)] private float loadingPlayerTextVerticalOffset = 55f;
@@ -26,6 +34,10 @@ public sealed class PanelRodadaController : MonoBehaviour
     private int presentationVersion;
     private Coroutine loadingOpeningAudioRoutine;
     private bool gameplayInputBlockRegistered;
+    private RawImage teamVideoImage;
+    private VideoPlayer teamVideoPlayer;
+    private RenderTexture teamVideoTexture;
+    private TeamId playingVideoTeam = TeamId.Neutral;
     private Vector2 textoJogadorDefaultAnchoredPosition;
     private bool textoJogadorPositionCached;
 
@@ -67,6 +79,7 @@ public sealed class PanelRodadaController : MonoBehaviour
         audioSource.playOnAwake = false;
         audioSource.loop = false;
         audioSource.spatialBlend = 0f;
+        EnsureTeamVideoPlayer();
         if (botaoRodada != null)
             botaoRodada.onClick.AddListener(Confirmar);
     }
@@ -80,7 +93,19 @@ public sealed class PanelRodadaController : MonoBehaviour
 
     private void OnDisable()
     {
+        StopTeamVideo();
         ReleaseGameplayInputBlock();
+    }
+
+    private void OnDestroy()
+    {
+        if (teamVideoPlayer != null)
+            teamVideoPlayer.frameReady -= HandleTeamVideoFrameReady;
+        if (teamVideoTexture == null)
+            return;
+        teamVideoTexture.Release();
+        Destroy(teamVideoTexture);
+        teamVideoTexture = null;
     }
 
     public IEnumerator Apresentar(TeamId team, int numeroJogador, int turno)
@@ -97,7 +122,7 @@ public sealed class PanelRodadaController : MonoBehaviour
         canvasGroup.interactable = true;
         panelRect.localScale = Vector3.one;
         RestorePlayerTextPosition();
-
+        StartTeamVideo(team);
         if (textoJogador != null)
         {
             textoJogador.color = Color.white;
@@ -178,6 +203,7 @@ public sealed class PanelRodadaController : MonoBehaviour
         canvasGroup.interactable = true;
         panelRect.localScale = Vector3.one;
         RestorePlayerTextPosition();
+        StopTeamVideo();
 
         if (textoJogador != null)
         {
@@ -233,6 +259,7 @@ public sealed class PanelRodadaController : MonoBehaviour
             yield break;
 
         RestorePlayerTextPosition();
+        StartTeamVideo(team);
 
         if (textoJogador != null)
         {
@@ -267,6 +294,7 @@ public sealed class PanelRodadaController : MonoBehaviour
         }
         audioSource.Stop();
         audioSource.loop = false;
+        StopTeamVideo();
         SetButtonEnabled(false);
         if (menuClose != null)
         {
@@ -293,6 +321,7 @@ public sealed class PanelRodadaController : MonoBehaviour
         }
         audioSource.Stop();
         audioSource.loop = false;
+        StopTeamVideo();
         SetButtonEnabled(false);
         canvasGroup.alpha = 0f;
         canvasGroup.blocksRaycasts = false;
@@ -323,6 +352,123 @@ public sealed class PanelRodadaController : MonoBehaviour
         audioSource.clip = aguardandoRodada;
         audioSource.loop = true;
         audioSource.Play();
+    }
+
+    private void EnsureTeamVideoPlayer()
+    {
+        if (teamVideoPlayer != null && teamVideoImage != null && teamVideoTexture != null)
+            return;
+
+        GameObject videoObject = new GameObject(
+            "team_loading_video",
+            typeof(RectTransform),
+            typeof(CanvasRenderer),
+            typeof(RawImage),
+            typeof(VideoPlayer));
+        videoObject.layer = gameObject.layer;
+        RectTransform rect = videoObject.GetComponent<RectTransform>();
+        rect.SetParent(transform, false);
+        rect.anchorMin = new Vector2(0.5f, 0.5f);
+        rect.anchorMax = new Vector2(0.5f, 0.5f);
+        rect.pivot = new Vector2(0.5f, 0.5f);
+        rect.sizeDelta = videoSize;
+        rect.anchoredPosition = videoAnchoredPosition;
+        rect.SetAsFirstSibling();
+
+        teamVideoImage = videoObject.GetComponent<RawImage>();
+        teamVideoImage.raycastTarget = false;
+        teamVideoImage.color = Color.white;
+
+        teamVideoTexture = new RenderTexture(1024, 512, 0, RenderTextureFormat.ARGB32)
+        {
+            name = "PanelRodadaTeamVideoRT",
+            filterMode = FilterMode.Bilinear,
+            wrapMode = TextureWrapMode.Clamp
+        };
+        teamVideoTexture.Create();
+        teamVideoImage.texture = teamVideoTexture;
+
+        teamVideoPlayer = videoObject.GetComponent<VideoPlayer>();
+        teamVideoPlayer.playOnAwake = false;
+        teamVideoPlayer.isLooping = true;
+        teamVideoPlayer.waitForFirstFrame = true;
+        teamVideoPlayer.skipOnDrop = true;
+        teamVideoPlayer.renderMode = VideoRenderMode.RenderTexture;
+        teamVideoPlayer.targetTexture = teamVideoTexture;
+        teamVideoPlayer.audioOutputMode = VideoAudioOutputMode.None;
+        teamVideoPlayer.sendFrameReadyEvents = true;
+        teamVideoPlayer.frameReady += HandleTeamVideoFrameReady;
+        videoObject.SetActive(false);
+    }
+
+    private void StartTeamVideo(TeamId team)
+    {
+        VideoClip clip = ResolveTeamVideo(team);
+        if (clip == null)
+        {
+            StopTeamVideo();
+            return;
+        }
+
+        EnsureTeamVideoPlayer();
+        if (teamVideoPlayer == null || teamVideoImage == null)
+            return;
+        if (playingVideoTeam == team && teamVideoPlayer.clip == clip && teamVideoPlayer.isPlaying)
+            return;
+
+        teamVideoPlayer.Stop();
+        teamVideoPlayer.clip = clip;
+        teamVideoPlayer.isLooping = true;
+        teamVideoImage.gameObject.SetActive(true);
+        teamVideoImage.enabled = false;
+        ClearTeamVideoTexture();
+        teamVideoPlayer.Play();
+        playingVideoTeam = team;
+    }
+
+    private void StopTeamVideo()
+    {
+        if (teamVideoPlayer != null)
+        {
+            teamVideoPlayer.Stop();
+            teamVideoPlayer.clip = null;
+        }
+        if (teamVideoImage != null)
+        {
+            teamVideoImage.enabled = false;
+            teamVideoImage.gameObject.SetActive(false);
+        }
+        ClearTeamVideoTexture();
+        playingVideoTeam = TeamId.Neutral;
+    }
+
+    private void HandleTeamVideoFrameReady(VideoPlayer source, long frameIndex)
+    {
+        if (source != teamVideoPlayer || teamVideoImage == null || source.clip == null)
+            return;
+        teamVideoImage.enabled = true;
+    }
+
+    private void ClearTeamVideoTexture()
+    {
+        if (teamVideoTexture == null || !teamVideoTexture.IsCreated())
+            return;
+        RenderTexture previous = RenderTexture.active;
+        RenderTexture.active = teamVideoTexture;
+        GL.Clear(true, true, Color.black);
+        RenderTexture.active = previous;
+    }
+
+    private VideoClip ResolveTeamVideo(TeamId team)
+    {
+        switch (team)
+        {
+            case TeamId.Green: return videoVerde;
+            case TeamId.Red: return videoVermelho;
+            case TeamId.Blue: return videoAzul;
+            case TeamId.Yellow: return videoAmarelo;
+            default: return null;
+        }
     }
 
     private void AcquireGameplayInputBlock()

@@ -2,6 +2,8 @@
 
 Backlog de design — sugestões discutidas mas **não implementadas**. Cada item registra a motivação e as regras esboçadas, pra retomar sem reconstruir o raciocínio. (Origem: conversas de design de logística, jul/2026.)
 
+> **Multiplayer online** tem documento próprio: [ideias_futuras_multiplayer.md](ideias_futuras_multiplayer.md) — assíncrono PBEM como alvo primeiro, pacote de turno + hash, replay sob o fog do observador, "contato perdido".
+
 ---
 
 ## Logística

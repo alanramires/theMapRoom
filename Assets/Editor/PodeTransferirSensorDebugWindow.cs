@@ -56,6 +56,7 @@ public class PodeTransferirSensorDebugWindow : EditorWindow
 
     [SerializeField] private UnitManager selectedSupplier;
     [SerializeField] private Tilemap overrideTilemap;
+    [SerializeField] private TerrainDatabase overrideTerrainDatabase;
 
     private readonly List<TransferCandidateEntry> eligibleCandidates = new List<TransferCandidateEntry>();
     private readonly List<IneligibleTransferEntry> ineligibleCandidates = new List<IneligibleTransferEntry>();
@@ -356,7 +357,14 @@ public class PodeTransferirSensorDebugWindow : EditorWindow
 
         List<PodeTransferirOption> options = new List<PodeTransferirOption>();
         List<PodeTransferirInvalidOption> invalids = new List<PodeTransferirInvalidOption>();
-        canTransfer = PodeTransferirSensor.CollectOptions(selectedSupplier, map, options, out sensorReason, invalids);
+        canTransfer = PodeTransferirSensor.CollectOptions(
+            selectedSupplier,
+            map,
+            ResolveTerrainDatabase(),
+            SensorMovementMode.MoveuParado,
+            options,
+            out sensorReason,
+            invalids);
 
         for (int i = 0; i < options.Count; i++)
         {
@@ -399,6 +407,21 @@ public class PodeTransferirSensorDebugWindow : EditorWindow
         Debug.Log(
             $"[PodeTransferirSensorDebug] supplier={(selectedSupplier != null ? selectedSupplier.name : "(null)")} | " +
             $"canTransfer={canTransfer} | valid={eligibleCandidates.Count} | invalid={ineligibleCandidates.Count} | reason={sensorReason}");
+    }
+
+    private TerrainDatabase ResolveTerrainDatabase()
+    {
+        if (overrideTerrainDatabase != null)
+            return overrideTerrainDatabase;
+
+        MatchController match = FindAnyObjectByType<MatchController>();
+        if (match != null && match.TerrainDatabaseRef != null)
+            return match.TerrainDatabaseRef;
+
+        string[] guids = AssetDatabase.FindAssets("t:TerrainDatabase");
+        if (guids == null || guids.Length == 0)
+            return null;
+        return AssetDatabase.LoadAssetAtPath<TerrainDatabase>(AssetDatabase.GUIDToAssetPath(guids[0]));
     }
 
     private void TryUseCurrentSelection()

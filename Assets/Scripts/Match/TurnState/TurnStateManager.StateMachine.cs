@@ -10,6 +10,12 @@ public partial class TurnStateManager
         LogStateStep("HandleConfirm");
         if (IsMovementAnimationRunning())
             return ActionSfx.None;
+        if (IsManualTurnStartAutonomyReportActive)
+        {
+            if (IsTurnStartAutonomyReportCancelFocused)
+                return CloseManualTurnStartAutonomyReport() ? ActionSfx.Cancel : ActionSfx.None;
+            return TryPanToFocusedTurnStartAutonomyUnit() ? ActionSfx.Confirm : ActionSfx.None;
+        }
         if (IsTransferPromptActive())
         {
             if (TransferHelperCancelFocused)
@@ -372,6 +378,8 @@ public partial class TurnStateManager
         LogStateStep("HandleCancel", rollback: true);
         if (IsMovementAnimationRunning())
             return ActionSfx.None;
+        if (CloseManualTurnStartAutonomyReport())
+            return ActionSfx.Cancel;
         if (TryCancelPendingTransferPrompt())
             return ActionSfx.Cancel;
 
@@ -1227,6 +1235,12 @@ public partial class TurnStateManager
         LogStateStep("HandleConfirmWhileCommandService");
         if (IsCommandServiceExecutionRunning)
             return ActionSfx.None;
+        // Enter sobre um cartao apenas recentraliza a camera; nao compromete a ordem.
+        if (commandServicePreviewFocusIndex < 0)
+        {
+            FocusCommandServicePreviewUnit(commandServicePreviewSelectedIndex);
+            return ActionSfx.None;
+        }
         // Enter respeita o botao em foco: com CANCELAR destacado, cancela em vez de executar.
         if (commandServicePreviewFocusIndex == CommandServicePreviewCancelIndex)
             return HandleCancelWhileCommandService();

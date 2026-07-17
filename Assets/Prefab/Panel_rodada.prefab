@@ -235,10 +235,15 @@ MonoBehaviour:
   menuOpen: {fileID: 8300000, guid: e8ac9d09803a87c4aa714c55515b6de9, type: 3}
   menuClose: {fileID: 8300000, guid: 89137a44a29961f488fb6f4d8ebc5ae3, type: 3}
   aguardandoRodada: {fileID: 8300000, guid: 6a422193493bc4d4cacff34fd9f745b5, type: 3}
-  falasJogadores:
-  - {fileID: 8300000, guid: 75c5d56af9f893a4c9df582393e33a76, type: 3}
-  - {fileID: 8300000, guid: 40c598c2ef7b80d42b68bc443575f840, type: 3}
+  videoVerde: {fileID: 32900000, guid: dec09f1ad3117744b9bd5e4b661fdc61, type: 3}
+  videoVermelho: {fileID: 32900000, guid: 0f6e2d6eeb4818f46b9e89c0b4ff1386, type: 3}
+  videoAzul: {fileID: 32900000, guid: 1520558bea8b41549a0d52c30f41e5e8, type: 3}
+  videoAmarelo: {fileID: 32900000, guid: b11b6d87e69f3414db1a8fecfadcd911, type: 3}
+  videoSize: {x: 720, y: 360}
+  videoAnchoredPosition: {x: 0, y: -320}
+  atrasoAntesMenuOpen: 0.5
   duracaoAnimacao: 0.3
+  loadingPlayerTextVerticalOffset: 55
 --- !u!1 &6373864257852629158
 GameObject:
   m_ObjectHideFlags: 0

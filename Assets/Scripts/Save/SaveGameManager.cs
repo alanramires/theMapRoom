@@ -242,6 +242,12 @@ public class SaveGameManager : MonoBehaviour
 
     private void Update()
     {
+        // O panel_rodada e uma barreira total. SaveGameManager le I/O/Esc
+        // diretamente, fora do CursorController, portanto precisa respeitar o
+        // gate antes ate de processar/cancelar um prompt ja aberto.
+        if (PanelRodadaController.IsGameplayInputBlocked)
+            return;
+
         if (!Application.isPlaying || !enableHotkeys || loadInProgress)
             return;
 
@@ -277,6 +283,8 @@ public class SaveGameManager : MonoBehaviour
     [ContextMenu("Save Quick Slot")]
     public void Save()
     {
+        if (PanelRodadaController.IsGameplayInputBlocked)
+            return;
         if (IsPersistenceBlockedByActiveAI(showFeedback: true))
             return;
         if (IsPersistenceBlockedByTurnState(showFeedback: true))
@@ -295,6 +303,9 @@ public class SaveGameManager : MonoBehaviour
 
     public void OpenSaveSlotPromptFromMenu()
     {
+        if (PanelRodadaController.IsGameplayInputBlocked)
+            return;
+
         if (!EnterSavingStateForPersistencePrompt())
             return;
 
@@ -308,6 +319,9 @@ public class SaveGameManager : MonoBehaviour
 
     public void OpenLoadSlotPromptFromMenu()
     {
+        if (PanelRodadaController.IsGameplayInputBlocked)
+            return;
+
         if (!EnterLoadingStateForPersistencePrompt())
             return;
 
@@ -1453,6 +1467,144 @@ public class SaveGameManager : MonoBehaviour
         LoadSlot(slotIndex);
     }
 
+    private IEnumerator RestoreConstructionsBatched(
+        SaveGameData data,
+        Action<int> setMaxId,
+        Action<string> setError)
+    {
+        const int batchSize = int.MaxValue;
+        int maxId = 0;
+        int count = data?.constructions?.Count ?? 0;
+        for (int i = 0; i < count; i++)
+        {
+            bool failed = false;
+            try
+            {
+                ConstructionSaveData saved = data.constructions[i];
+                if (saved != null && !string.IsNullOrWhiteSpace(saved.constructionId))
+                {
+                    if (!constructionSpawner.TryGetConstructionData(saved.constructionId, out ConstructionData constructionData) || constructionData == null)
+                    {
+                        Debug.LogWarning($"[SaveGame] Construcao nao encontrada no DB: {saved.constructionId}");
+                    }
+                    else
+                    {
+                        Vector3 world = new Vector3(saved.worldX, saved.worldY, 0f);
+                        GameObject go = constructionSpawner.Spawn(constructionData, (TeamId)saved.teamId, world, Quaternion.identity);
+                        ConstructionManager manager = go != null ? go.GetComponent<ConstructionManager>() : null;
+                        if (manager != null)
+                        {
+                            SaveDataMapper.ApplyConstructionSaveData(manager, saved, BuildSiteRuntimeFromSaveData);
+                            maxId = Mathf.Max(maxId, saved.instanceId);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                setError?.Invoke(ex.Message);
+                failed = true;
+            }
+            if (failed)
+                yield break;
+
+            if ((i + 1) % batchSize == 0)
+                yield return null;
+        }
+        setMaxId?.Invoke(maxId);
+        yield break;
+    }
+
+    private IEnumerator RestoreUnitsBatched(
+        SaveGameData data,
+        Dictionary<int, UnitManager> unitsById,
+        Action<int> setMaxId,
+        Action<string> setError)
+    {
+        const int batchSize = int.MaxValue;
+        int maxId = 0;
+        int count = data?.units?.Count ?? 0;
+        for (int i = 0; i < count; i++)
+        {
+            bool failed = false;
+            try
+            {
+                UnitSaveData saved = data.units[i];
+                if (saved != null && !string.IsNullOrWhiteSpace(saved.unitId))
+                {
+                    if (!unitSpawner.TryGetUnitData(saved.unitId, out UnitData unitData) || unitData == null)
+                    {
+                        Debug.LogWarning($"[SaveGame] Unidade nao encontrada no DB: {saved.unitId}");
+                    }
+                    else
+                    {
+                        Vector3 world = new Vector3(saved.worldX, saved.worldY, 0f);
+                        GameObject go = unitSpawner.Spawn(
+                            unitData,
+                            (TeamId)saved.teamId,
+                            world,
+                            Quaternion.identity,
+                            enforceSpawnOccupancyRule: false);
+                        UnitManager manager = go != null ? go.GetComponent<UnitManager>() : null;
+                        if (manager != null)
+                        {
+                            SaveDataMapper.ApplyUnitSaveData(manager, saved);
+                            unitsById[saved.instanceId] = manager;
+                            maxId = Mathf.Max(maxId, saved.instanceId);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                setError?.Invoke(ex.Message);
+                failed = true;
+            }
+            if (failed)
+                yield break;
+
+            if ((i + 1) % batchSize == 0)
+                yield return null;
+        }
+        setMaxId?.Invoke(maxId);
+        yield break;
+    }
+
+    private IEnumerator RestoreEmbarkedUnitsBatched(
+        SaveGameData data,
+        Dictionary<int, UnitManager> unitsById,
+        Action<string> setError)
+    {
+        const int batchSize = int.MaxValue;
+        int count = data?.units?.Count ?? 0;
+        for (int i = 0; i < count; i++)
+        {
+            bool failed = false;
+            try
+            {
+                UnitSaveData saved = data.units[i];
+                if (saved != null && saved.isEmbarked && saved.transporterInstanceId > 0 &&
+                    unitsById.TryGetValue(saved.instanceId, out UnitManager passenger) && passenger != null &&
+                    unitsById.TryGetValue(saved.transporterInstanceId, out UnitManager transporter) && transporter != null &&
+                    !transporter.TryEmbarkPassengerInSlot(passenger, saved.transporterSlotIndex, out string reason) && verboseLogs)
+                {
+                    Debug.LogWarning($"[SaveGame] Falha embarque {saved.instanceId}->{saved.transporterInstanceId}: {reason}");
+                }
+            }
+            catch (Exception ex)
+            {
+                setError?.Invoke(ex.Message);
+                failed = true;
+            }
+            if (failed)
+                yield break;
+
+            if ((i + 1) % batchSize == 0)
+                yield return null;
+        }
+        yield break;
+    }
+
     private IEnumerator LoadRoutine(SaveGameData data, int loadedSlot)
     {
         loadInProgress = true;
@@ -1488,110 +1640,41 @@ public class SaveGameManager : MonoBehaviour
         // Hoisted para ficar acessivel apos o try-catch (necessario para reaplicar flags depois de ForceReapplyActiveTeamWithTurnStart).
         Dictionary<int, UnitManager> unitsById = new Dictionary<int, UnitManager>();
 
-        try
+        int maxUnitId = 0;
+        int maxConstructionId = 0;
+        string batchedRestoreError = string.Empty;
+
+        stage = "spawn-constructions";
+        double spawnConstructionsStartMs = PerfNowMs();
+        LogLoadPerf(loadedSlot, "restore_constructions.begin", spawnConstructionsStartMs, spawnConstructionsStartMs - routineStartMs);
+        yield return RestoreConstructionsBatched(data, value => maxConstructionId = value, error => batchedRestoreError = error);
+        LogLoadPerf(loadedSlot, "restore_constructions.end", spawnConstructionsStartMs, PerfNowMs() - routineStartMs);
+        SectorManager.RequestRebuildFromActiveConstructions("post-restore-constructions");
+
+        if (string.IsNullOrEmpty(batchedRestoreError))
         {
-            int maxUnitId = 0;
-            int maxConstructionId = 0;
-
-            stage = "spawn-constructions";
-            double spawnConstructionsStartMs = PerfNowMs();
-            LogLoadPerf(loadedSlot, "restore_constructions.begin", spawnConstructionsStartMs, spawnConstructionsStartMs - routineStartMs);
-            if (data.constructions != null)
-            {
-                for (int i = 0; i < data.constructions.Count; i++)
-                {
-                    ConstructionSaveData saved = data.constructions[i];
-                    if (saved == null || string.IsNullOrWhiteSpace(saved.constructionId))
-                        continue;
-
-                    if (!constructionSpawner.TryGetConstructionData(saved.constructionId, out ConstructionData constructionData) || constructionData == null)
-                    {
-                        Debug.LogWarning($"[SaveGame] Construcao nao encontrada no DB: {saved.constructionId}");
-                        continue;
-                    }
-
-                    Vector3 world = new Vector3(saved.worldX, saved.worldY, 0f);
-                    GameObject go = constructionSpawner.Spawn(constructionData, (TeamId)saved.teamId, world, Quaternion.identity);
-                    if (go == null)
-                        continue;
-
-                    ConstructionManager manager = go.GetComponent<ConstructionManager>();
-                    if (manager == null)
-                        continue;
-
-                    SaveDataMapper.ApplyConstructionSaveData(manager, saved, BuildSiteRuntimeFromSaveData);
-
-                    if (saved.instanceId > maxConstructionId)
-                        maxConstructionId = saved.instanceId;
-                }
-            }
-            LogLoadPerf(loadedSlot, "restore_constructions.end", spawnConstructionsStartMs, PerfNowMs() - routineStartMs);
-            SectorManager.RequestRebuildFromActiveConstructions("post-restore-constructions");
-
             stage = "spawn-units";
             double spawnUnitsStartMs = PerfNowMs();
             LogLoadPerf(loadedSlot, "restore_units.begin", spawnUnitsStartMs, spawnUnitsStartMs - routineStartMs);
-            if (data.units != null)
-            {
-                for (int i = 0; i < data.units.Count; i++)
-                {
-                    UnitSaveData saved = data.units[i];
-                    if (saved == null || string.IsNullOrWhiteSpace(saved.unitId))
-                        continue;
-
-                    if (!unitSpawner.TryGetUnitData(saved.unitId, out UnitData unitData) || unitData == null)
-                    {
-                        Debug.LogWarning($"[SaveGame] Unidade nao encontrada no DB: {saved.unitId}");
-                        continue;
-                    }
-
-                    Vector3 world = new Vector3(saved.worldX, saved.worldY, 0f);
-                    // Load restores exact runtime placement/embark state right after spawn.
-                    // Skip occupancy blocking here to avoid false warnings when transporter and passenger share a cell.
-                    GameObject go = unitSpawner.Spawn(
-                        unitData,
-                        (TeamId)saved.teamId,
-                        world,
-                        Quaternion.identity,
-                        enforceSpawnOccupancyRule: false);
-                    if (go == null)
-                        continue;
-
-                    UnitManager manager = go.GetComponent<UnitManager>();
-                    if (manager == null)
-                        continue;
-
-                    SaveDataMapper.ApplyUnitSaveData(manager, saved);
-
-                    unitsById[saved.instanceId] = manager;
-                    if (saved.instanceId > maxUnitId)
-                        maxUnitId = saved.instanceId;
-                }
-            }
+            yield return RestoreUnitsBatched(data, unitsById, value => maxUnitId = value, error => batchedRestoreError = error);
             LogLoadPerf(loadedSlot, "restore_units.end", spawnUnitsStartMs, PerfNowMs() - routineStartMs);
+        }
 
-            // Religa passageiros embarcados apos todos os spawns.
+        if (string.IsNullOrEmpty(batchedRestoreError))
+        {
             stage = "restore-embarked";
             double restoreEmbarkedStartMs = PerfNowMs();
             LogLoadPerf(loadedSlot, "restore_embarked.begin", restoreEmbarkedStartMs, restoreEmbarkedStartMs - routineStartMs);
-            if (data.units != null)
-            {
-                for (int i = 0; i < data.units.Count; i++)
-                {
-                    UnitSaveData saved = data.units[i];
-                    if (saved == null || !saved.isEmbarked || saved.transporterInstanceId <= 0)
-                        continue;
-
-                    if (!unitsById.TryGetValue(saved.instanceId, out UnitManager passenger) || passenger == null)
-                        continue;
-                    if (!unitsById.TryGetValue(saved.transporterInstanceId, out UnitManager transporter) || transporter == null)
-                        continue;
-
-                    if (!transporter.TryEmbarkPassengerInSlot(passenger, saved.transporterSlotIndex, out string reason) && verboseLogs)
-                        Debug.LogWarning($"[SaveGame] Falha embarque {saved.instanceId}->{saved.transporterInstanceId}: {reason}");
-                }
-            }
+            yield return RestoreEmbarkedUnitsBatched(data, unitsById, error => batchedRestoreError = error);
             LogLoadPerf(loadedSlot, "restore_embarked.end", restoreEmbarkedStartMs, PerfNowMs() - routineStartMs);
+        }
+
+        if (!string.IsNullOrEmpty(batchedRestoreError))
+        {
+            Debug.LogError($"[SaveGame] Falha no load (etapa: {stage}): {batchedRestoreError}");
+        }
+        else try
+        {
 
             stage = "sync-ids";
             double syncIdsStartMs = PerfNowMs();

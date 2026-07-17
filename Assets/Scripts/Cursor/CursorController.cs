@@ -318,6 +318,16 @@ public class CursorController : MonoBehaviour
             return;
         }
 
+        if (turnStateManager != null && turnStateManager.IsManualTurnStartAutonomyReportActive)
+        {
+            if (WasMenuUpPressedThisFrame() || WasMenuLeftPressedThisFrame())
+                turnStateManager.NavigateTurnStartAutonomyReport(-1);
+            else if (WasMenuDownPressedThisFrame() || WasMenuRightPressedThisFrame())
+                turnStateManager.NavigateTurnStartAutonomyReport(+1);
+            heldDirection = Vector3Int.zero;
+            return;
+        }
+
         if (turnStateManager != null && turnStateManager.IsTransferHelperActive)
         {
             if (WasMenuUpPressedThisFrame() || WasMenuLeftPressedThisFrame())

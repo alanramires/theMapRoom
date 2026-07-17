@@ -67,6 +67,7 @@ public partial class TurnStateManager
         public Color UnitStatsLocalColor = Color.white;
         public Sprite UnitStatsStructureSprite;
         public Color UnitStatsStructureColor = Color.white;
+        public bool UnitStatsStructureIsSeparate;
         public int UnitStatsDefensePoints;
         public string UnitStatsConstructionStockLine;
         public string TerrainStatsName;
@@ -90,6 +91,8 @@ public partial class TurnStateManager
         public bool SupplyIsConfirmStep;
         public bool SupplyHasQueuedOrders;
         public bool TransferIsConfirmStep;
+        public bool TransferIsDonationPercentageStep;
+        public int TransferDonationPercent = 100;
         public bool TransferHasCursorOption;
         public bool TransferCursorOptionFocused;
         public string TransferSelectedLabel;
@@ -164,9 +167,60 @@ public partial class TurnStateManager
     private int inspectedHelperActivatedFrame = -1;
     private Vector3Int inspectedHelperCursorCell;
     private readonly List<HelperTurnStartAutonomyLine> turnStartAutonomyHelperLines = new List<HelperTurnStartAutonomyLine>();
+    private readonly List<HelperTurnStartAutonomyLine> lastTurnStartAutonomyHelperLines = new List<HelperTurnStartAutonomyLine>();
     private float turnStartAutonomyHelperVisibleUntil = -1f;
+    private float turnStartAutonomyHelperDuration = -1f;
     private int turnStartAutonomyHelperActivatedFrame = -1;
     private Vector3Int turnStartAutonomyHelperCursorCell;
+    private bool turnStartAutonomyHelperOpenedFromMenu;
+    private int turnStartAutonomyHelperFocusIndex;
+
+    public bool IsManualTurnStartAutonomyReportActive =>
+        turnStartAutonomyHelperOpenedFromMenu && IsTurnStartAutonomyHelperActive();
+    public bool HasTurnStartAutonomyReport => lastTurnStartAutonomyHelperLines.Count > 0;
+    public bool IsTurnStartAutonomyReportCancelFocused => IsManualTurnStartAutonomyReportActive &&
+        turnStartAutonomyHelperFocusIndex == turnStartAutonomyHelperLines.Count;
+
+    public bool NavigateTurnStartAutonomyReport(int delta)
+    {
+        if (!IsManualTurnStartAutonomyReportActive || delta == 0 || turnStartAutonomyHelperLines.Count <= 0)
+            return false;
+        int count = turnStartAutonomyHelperLines.Count + 1;
+        turnStartAutonomyHelperFocusIndex =
+            (turnStartAutonomyHelperFocusIndex + (delta > 0 ? 1 : -1) + count) % count;
+        cursorController?.PlayCursorMoveSfx();
+        return true;
+    }
+
+    public bool TryPanToFocusedTurnStartAutonomyUnit()
+    {
+        if (!IsManualTurnStartAutonomyReportActive || turnStartAutonomyHelperLines.Count <= 0)
+            return false;
+        if (IsTurnStartAutonomyReportCancelFocused)
+            return false;
+        int index = Mathf.Clamp(turnStartAutonomyHelperFocusIndex, 0, turnStartAutonomyHelperLines.Count - 1);
+        return PanelHelperController.TryPanToAutonomyCell(turnStartAutonomyHelperLines[index].cell);
+    }
+
+    public bool TryPanToTurnStartAutonomyUnitFromPointer(int index)
+    {
+        if (!IsTurnStartAutonomyHelperActive() || index < 0 || index >= turnStartAutonomyHelperLines.Count)
+            return false;
+        if (turnStartAutonomyHelperOpenedFromMenu)
+            turnStartAutonomyHelperFocusIndex = index;
+        return PanelHelperController.TryPanToAutonomyCell(turnStartAutonomyHelperLines[index].cell);
+    }
+
+    public bool CloseManualTurnStartAutonomyReport()
+    {
+        if (!IsManualTurnStartAutonomyReportActive)
+            return false;
+        ClearTurnStartAutonomyHelper();
+        UiInputBlocker.SuppressGameplayInputForFrames(2);
+        BattleMapMenuRootController.SuppressMenuOpenForCurrentFrame();
+        BattleMapMenuRootController.TryRestoreMenuFromStateStack(TurnStateManager.CursorState.Neutral);
+        return true;
+    }
     private Vector3Int lastHoveredCell = new Vector3Int(int.MinValue, int.MinValue, int.MinValue);
     private float hoveredCellStartTime = -1f;
     private bool hasTriggeredHoverAtCurrentCell = false;
@@ -210,16 +264,18 @@ public partial class TurnStateManager
         public readonly int autonomyConsumed;
         public readonly int fuelBefore;
         public readonly int fuelAfter;
+        public readonly int fuelMax;
         public readonly Sprite unitSprite;
         public readonly Color unitColor;
 
-        public TurnStartAutonomyUpkeepEntry(string unitName, Vector3Int cell, int autonomyConsumed, int fuelBefore, int fuelAfter, Sprite unitSprite, Color unitColor)
+        public TurnStartAutonomyUpkeepEntry(string unitName, Vector3Int cell, int autonomyConsumed, int fuelBefore, int fuelAfter, int fuelMax, Sprite unitSprite, Color unitColor)
         {
             this.unitName = unitName ?? string.Empty;
             this.cell = cell;
             this.autonomyConsumed = Mathf.Max(0, autonomyConsumed);
             this.fuelBefore = Mathf.Max(0, fuelBefore);
             this.fuelAfter = Mathf.Max(0, fuelAfter);
+            this.fuelMax = Mathf.Max(1, fuelMax);
             this.unitSprite = unitSprite;
             this.unitColor = unitColor;
         }
@@ -257,6 +313,7 @@ public partial class TurnStateManager
         public string terrainName;
         public Sprite unitSprite;
         public Color unitColor = Color.white;
+        public bool isFocused;
         public Sprite localSprite;
         public Color localColor = Color.white;
     }
@@ -365,6 +422,9 @@ public partial class TurnStateManager
         public string unitName;
         public string sourceLabel;
         public string gainsLabel;
+        public Sprite unitSprite;
+        public Color unitColor = Color.white;
+        public Vector3Int cell;
         public bool isFocused;
         public bool isFullyAffordable = true;
     }
@@ -373,6 +433,9 @@ public partial class TurnStateManager
     {
         public string unitName;
         public string sourceLabel;
+        public Sprite unitSprite;
+        public Color unitColor = Color.white;
+        public Vector3Int cell;
         public bool isFocused;
     }
 
@@ -419,9 +482,11 @@ public partial class TurnStateManager
         public int autonomyConsumed;
         public int fuelBefore;
         public int fuelAfter;
+        public int fuelMax;
         public Vector3Int cell;
         public Sprite unitSprite;
         public Color unitColor = Color.white;
+        public bool isFocused;
     }
 
     public bool TryBuildHelperPanelData(out HelperPanelData data)
@@ -509,7 +574,7 @@ public partial class TurnStateManager
                     Vector3Int targetCell = target.CurrentCellPosition;
                     SpriteRenderer targetRenderer = target.GetMainSpriteRenderer();
                     data.AimConfirmTargetSprite = targetRenderer != null ? targetRenderer.sprite : null;
-                    data.AimConfirmTargetColor = targetRenderer != null ? targetRenderer.color : Color.white;
+                    data.AimConfirmTargetColor = TeamUtils.GetColor(target.TeamId);
                     data.AimConfirmHp = Mathf.Max(0, target.CurrentHP);
                     ResolveUnitActiveLocalVisual(
                         target,
@@ -545,7 +610,7 @@ public partial class TurnStateManager
                     ? WeaponCategoryLabels.GetAlias(weapon.WeaponCategory).ToUpperInvariant()
                     : string.Empty,
                 unitSprite = renderer != null ? renderer.sprite : null,
-                unitColor = renderer != null ? renderer.color : Color.white
+                unitColor = TeamUtils.GetColor(target.TeamId)
             });
         }
 
@@ -637,7 +702,7 @@ public partial class TurnStateManager
         if (constructionRenderer != null && constructionRenderer.sprite != null)
         {
             sprite = constructionRenderer.sprite;
-            color = constructionRenderer.color;
+            color = TeamUtils.GetColor(construction.TeamId);
             return;
         }
 
@@ -696,6 +761,7 @@ public partial class TurnStateManager
     public void ShowTurnStartAutonomyUpkeepHelper(IReadOnlyList<TurnStartAutonomyUpkeepEntry> entries)
     {
         turnStartAutonomyHelperLines.Clear();
+        lastTurnStartAutonomyHelperLines.Clear();
         if (entries == null || entries.Count <= 0)
         {
             ClearTurnStartAutonomyHelper();
@@ -714,6 +780,7 @@ public partial class TurnStateManager
                 autonomyConsumed = Mathf.Max(0, entry.autonomyConsumed),
                 fuelBefore = Mathf.Max(0, entry.fuelBefore),
                 fuelAfter = Mathf.Max(0, entry.fuelAfter),
+                fuelMax = Mathf.Max(1, entry.fuelMax),
                 cell = entry.cell,
                 unitSprite = entry.unitSprite,
                 unitColor = entry.unitColor
@@ -726,12 +793,46 @@ public partial class TurnStateManager
             return;
         }
 
+        turnStartAutonomyHelperLines.Sort((a, b) =>
+        {
+            float aRatio = a != null ? (float)a.fuelAfter / Mathf.Max(1, a.fuelMax) : 1f;
+            float bRatio = b != null ? (float)b.fuelAfter / Mathf.Max(1, b.fuelMax) : 1f;
+            int ratioOrder = aRatio.CompareTo(bRatio);
+            if (ratioOrder != 0) return ratioOrder;
+            int fuelOrder = (a?.fuelAfter ?? int.MaxValue).CompareTo(b?.fuelAfter ?? int.MaxValue);
+            if (fuelOrder != 0) return fuelOrder;
+            return string.Compare(a?.unitName, b?.unitName, System.StringComparison.OrdinalIgnoreCase);
+        });
+        lastTurnStartAutonomyHelperLines.AddRange(turnStartAutonomyHelperLines);
+
         float helperDuration = animationManager != null
             ? animationManager.TurnStartAutonomyHelperTextDuration
             : Mathf.Max(0.5f, turnStartAutonomyHelperDurationFallbackSeconds);
-        turnStartAutonomyHelperVisibleUntil = Time.time + Mathf.Max(0.1f, helperDuration);
+        turnStartAutonomyHelperDuration = Mathf.Max(0.1f, helperDuration);
+        turnStartAutonomyHelperVisibleUntil = Time.time + turnStartAutonomyHelperDuration;
         turnStartAutonomyHelperActivatedFrame = Time.frameCount;
         turnStartAutonomyHelperCursorCell = cursorController != null ? cursorController.CurrentCell : default;
+        turnStartAutonomyHelperOpenedFromMenu = false;
+        turnStartAutonomyHelperFocusIndex = 0;
+    }
+
+    public bool OpenTurnStartAutonomyReportFromMenu()
+    {
+        if (IsTurnStartAutonomyHelperActive())
+            ClearTurnStartAutonomyHelper();
+
+        if (lastTurnStartAutonomyHelperLines.Count <= 0)
+            return false;
+
+        turnStartAutonomyHelperLines.Clear();
+        turnStartAutonomyHelperLines.AddRange(lastTurnStartAutonomyHelperLines);
+        turnStartAutonomyHelperDuration = -1f;
+        turnStartAutonomyHelperVisibleUntil = float.PositiveInfinity;
+        turnStartAutonomyHelperActivatedFrame = Time.frameCount;
+        turnStartAutonomyHelperCursorCell = cursorController != null ? cursorController.CurrentCell : default;
+        turnStartAutonomyHelperOpenedFromMenu = true;
+        turnStartAutonomyHelperFocusIndex = 0;
+        return true;
     }
 
     private bool TryBuildTurnStartAutonomyHelperPanelData(HelperPanelData data)
@@ -740,8 +841,17 @@ public partial class TurnStateManager
             return false;
 
         data.Kind = HelperPanelKind.TurnStartAutonomy;
+        data.ShowTimeoutProgress = !turnStartAutonomyHelperOpenedFromMenu;
+        data.TimeoutProgress01 = turnStartAutonomyHelperOpenedFromMenu
+            ? 0f
+            : Mathf.Clamp01((turnStartAutonomyHelperVisibleUntil - Time.time) /
+                            Mathf.Max(0.1f, turnStartAutonomyHelperDuration));
         for (int i = 0; i < turnStartAutonomyHelperLines.Count; i++)
+        {
+            turnStartAutonomyHelperLines[i].isFocused = turnStartAutonomyHelperOpenedFromMenu &&
+                                                        i == turnStartAutonomyHelperFocusIndex;
             data.TurnStartAutonomyLines.Add(turnStartAutonomyHelperLines[i]);
+        }
 
         return data.TurnStartAutonomyLines.Count > 0;
     }
@@ -757,8 +867,11 @@ public partial class TurnStateManager
     {
         turnStartAutonomyHelperLines.Clear();
         turnStartAutonomyHelperVisibleUntil = -1f;
+        turnStartAutonomyHelperDuration = -1f;
         turnStartAutonomyHelperActivatedFrame = -1;
         turnStartAutonomyHelperCursorCell = default;
+        turnStartAutonomyHelperOpenedFromMenu = false;
+        turnStartAutonomyHelperFocusIndex = 0;
     }
 
     private bool TryBuildUnitStatsHelperPanelData(HelperPanelData data)
@@ -798,6 +911,30 @@ public partial class TurnStateManager
             out data.UnitStatsStructureColor);
         data.UnitStatsDefensePoints = Mathf.Max(0, ResolveDpqAtUnitPosition(unit, null).points);
         data.UnitStatsConstructionStockLine = BuildConstructionStockLineAtCell(unitCell);
+        bool isAircraftInOperationalAltitude = unit.GetDomain() == Domain.Air &&
+            (unit.GetHeightLevel() == HeightLevel.AirLow || unit.GetHeightLevel() == HeightLevel.AirHigh);
+        if (isAircraftInOperationalAltitude &&
+            !string.IsNullOrWhiteSpace(data.UnitStatsConstructionStockLine) &&
+            data.UnitStatsStructureSprite == null && terrainTilemap != null)
+        {
+            ConstructionManager overflownConstruction =
+                ConstructionOccupancyRules.GetConstructionAtCell(terrainTilemap, unitCell);
+            SpriteRenderer constructionRenderer = overflownConstruction != null
+                ? overflownConstruction.GetMainSpriteRenderer()
+                : null;
+            if (constructionRenderer != null && constructionRenderer.sprite != null)
+            {
+                data.UnitStatsStructureSprite = constructionRenderer.sprite;
+                data.UnitStatsStructureColor = TeamUtils.GetColor(overflownConstruction.TeamId);
+                data.UnitStatsStructureIsSeparate = true;
+                string constructionName = !string.IsNullOrWhiteSpace(overflownConstruction.ConstructionDisplayName)
+                    ? overflownConstruction.ConstructionDisplayName
+                    : overflownConstruction.name;
+                if (!string.IsNullOrWhiteSpace(constructionName))
+                    data.UnitStatsConstructionStockLine = data.UnitStatsConstructionStockLine.Replace(
+                        "ESTOQUE:", $"{constructionName}:");
+            }
+        }
 
         int hpCurrent = Mathf.Max(0, unit.CurrentHP);
         int hpMax = Mathf.Max(1, unit.GetMaxHP());
@@ -1189,7 +1326,11 @@ public partial class TurnStateManager
                     continue;
 
                 string name = ResolveSupplyDisplayName(offer.supply);
-                string amount = construction.HasInfiniteSuppliesFor(offer.supply) ? "INF" : Mathf.Max(0, offer.quantity).ToString();
+                int current = Mathf.Max(0, offer.quantity);
+                int maximum = Mathf.Max(current, offer.peakQuantity);
+                string amount = construction.HasInfiniteSuppliesFor(offer.supply)
+                    ? "INF"
+                    : $"{current}/{maximum}";
                 data.ConstructionStatsLines.Add($"- {name}: {amount}");
                 addedAny = true;
             }
@@ -2378,7 +2519,8 @@ public partial class TurnStateManager
 
         bool anyInput = WasAnyInputPressedThisFrame();
         bool inspectionCycleInput = inspectedHelperUnit != null && WasInspectionCycleInputPressedThisFrame();
-        if (anyInput && !inspectionCycleInput)
+        bool helperDragInput = PanelHelperController.IsPointerOverDragSurface();
+        if (anyInput && !inspectionCycleInput && !helperDragInput)
             ExitInspectStateToNeutral();
     }
 
@@ -2484,13 +2626,14 @@ public partial class TurnStateManager
         if (Time.frameCount <= turnStartAutonomyHelperActivatedFrame)
             return;
 
-        if (cursorController != null && cursorController.CurrentCell != turnStartAutonomyHelperCursorCell)
+        if (!turnStartAutonomyHelperOpenedFromMenu &&
+            cursorController != null && cursorController.CurrentCell != turnStartAutonomyHelperCursorCell)
         {
             ClearTurnStartAutonomyHelper();
             return;
         }
 
-        if (WasAnyInputPressedThisFrame())
+        if (!turnStartAutonomyHelperOpenedFromMenu && WasAnyInputPressedThisFrame())
             ClearTurnStartAutonomyHelper();
     }
 
@@ -2526,9 +2669,9 @@ public partial class TurnStateManager
         if (seats == null || seats.Count <= 0)
             return;
 
-        // Reserva uma coluna completa para o icone 52x52 antes do nome.
-        // Cinco espacos na fonte monoespacada mantem o sprite dentro da mascara.
-        string indent = new string(' ', (Mathf.Max(0, depth) + 1) * 5);
+        // Reserva uma coluna completa para o icone 52x52 e mais um caractere de
+        // respiro antes do nome. Niveis aninhados preservam o recuo anterior.
+        string indent = new string(' ', 8 + Mathf.Max(0, depth) * 5);
         for (int i = 0; i < seats.Count; i++)
         {
             UnitManager passenger = seats[i] != null ? seats[i].embarkedUnit : null;
@@ -2551,9 +2694,7 @@ public partial class TurnStateManager
             {
                 unitName = passengerName,
                 sprite = passengerSprite,
-                color = passenger.GetMainSpriteRenderer() != null
-                    ? passenger.GetMainSpriteRenderer().color
-                    : Color.white,
+                color = TeamUtils.GetColor(passenger.TeamId),
                 depth = depth
             });
             AppendTransportedUnitStatsLines(data, passenger, depth + 1);
@@ -2653,6 +2794,9 @@ public partial class TurnStateManager
                 unitName = line.unitName,
                 sourceLabel = line.sourceLabel,
                 gainsLabel = line.gainsLabel,
+                unitSprite = line.unitSprite,
+                unitColor = line.unitColor,
+                cell = line.cell,
                 isFocused = line.isFocused,
                 isFullyAffordable = line.isFullyAffordable
             });
@@ -2668,6 +2812,9 @@ public partial class TurnStateManager
             {
                 unitName = line.unitName,
                 sourceLabel = line.sourceLabel,
+                unitSprite = line.unitSprite,
+                unitColor = line.unitColor,
+                cell = line.cell,
                 isFocused = line.isFocused
             });
         }
@@ -2732,6 +2879,9 @@ public partial class TurnStateManager
                     unitName = line.unitName,
                     sourceLabel = line.sourceLabel,
                     gainsLabel = line.gainsLabel,
+                    unitSprite = line.unitSprite,
+                    unitColor = line.unitColor,
+                    cell = line.cell,
                     isFocused = line.isFocused,
                     isFullyAffordable = line.isFullyAffordable
                 });
@@ -2750,6 +2900,9 @@ public partial class TurnStateManager
                 {
                     unitName = line.unitName,
                     sourceLabel = line.sourceLabel,
+                    unitSprite = line.unitSprite,
+                    unitColor = line.unitColor,
+                    cell = line.cell,
                     isFocused = line.isFocused
                 });
             }
@@ -2929,7 +3082,7 @@ public partial class TurnStateManager
                     unitSprite = order.passenger.GetMainSpriteRenderer() != null
                         ? order.passenger.GetMainSpriteRenderer().sprite : null,
                     unitColor = order.passenger.GetMainSpriteRenderer() != null
-                        ? order.passenger.GetMainSpriteRenderer().color : Color.white
+                        ? TeamUtils.GetColor(order.passenger.TeamId) : Color.white
                 });
                 HelperDisembarkOrderLine added = data.DisembarkOrderLines[data.DisembarkOrderLines.Count - 1];
                 ResolveCellLocalVisual(order.targetCell, out added.localSprite, out added.localColor);
@@ -2977,7 +3130,7 @@ public partial class TurnStateManager
                     unitName = ResolveUnitRuntimeName(unit),
                     stats = BuildUnitStatInline(unit),
                     unitSprite = unit.GetMainSpriteRenderer() != null ? unit.GetMainSpriteRenderer().sprite : null,
-                    unitColor = unit.GetMainSpriteRenderer() != null ? unit.GetMainSpriteRenderer().color : Color.white
+                    unitColor = TeamUtils.GetColor(unit.TeamId)
                 });
             }
         }
@@ -2998,7 +3151,7 @@ public partial class TurnStateManager
                     isValid = entry.isValid,
                     invalidReason = ResolveMergeInvalidReason(entry),
                     unitSprite = entry.unit.GetMainSpriteRenderer() != null ? entry.unit.GetMainSpriteRenderer().sprite : null,
-                    unitColor = entry.unit.GetMainSpriteRenderer() != null ? entry.unit.GetMainSpriteRenderer().color : Color.white
+                    unitColor = TeamUtils.GetColor(entry.unit.TeamId)
                 });
             }
         }
@@ -3041,7 +3194,7 @@ public partial class TurnStateManager
                 {
                     SpriteRenderer renderer = transporter.GetMainSpriteRenderer();
                     data.AimConfirmTargetSprite = renderer != null ? renderer.sprite : null;
-                    data.AimConfirmTargetColor = renderer != null ? renderer.color : Color.white;
+                    data.AimConfirmTargetColor = TeamUtils.GetColor(transporter.TeamId);
                     data.AimConfirmHp = Mathf.Max(0, transporter.CurrentHP);
                     Vector3Int cell = transporter.CurrentCellPosition;
                     data.AimConfirmTerrainLabel = ResolveCellTerrainLabel(cell);
@@ -3085,7 +3238,7 @@ public partial class TurnStateManager
                     unitSprite = transporter.GetMainSpriteRenderer() != null
                         ? transporter.GetMainSpriteRenderer().sprite : null,
                     unitColor = transporter.GetMainSpriteRenderer() != null
-                        ? transporter.GetMainSpriteRenderer().color : Color.white
+                        ? TeamUtils.GetColor(transporter.TeamId) : Color.white
                 });
             }
 
@@ -3126,7 +3279,7 @@ public partial class TurnStateManager
                 unitName = ResolveUnitRuntimeName(candidate.targetUnit),
                 stats = BuildUnitStatInline(candidate.targetUnit),
                 unitSprite = renderer != null ? renderer.sprite : null,
-                unitColor = renderer != null ? renderer.color : Color.white,
+                unitColor = TeamUtils.GetColor(candidate.targetUnit.TeamId),
                 isValid = true
             });
         }
@@ -3142,7 +3295,7 @@ public partial class TurnStateManager
                 unitName = ResolveUnitRuntimeName(candidate.targetUnit),
                 stats = BuildUnitStatInline(candidate.targetUnit),
                 unitSprite = renderer != null ? renderer.sprite : null,
-                unitColor = renderer != null ? renderer.color : Color.white,
+                unitColor = TeamUtils.GetColor(candidate.targetUnit.TeamId),
                 isValid = false,
                 invalidReason = candidate.reason
             });
@@ -3200,7 +3353,7 @@ public partial class TurnStateManager
                 unitSprite = line.target.GetMainSpriteRenderer() != null
                     ? line.target.GetMainSpriteRenderer().sprite : null,
                 unitColor = line.target.GetMainSpriteRenderer() != null
-                    ? line.target.GetMainSpriteRenderer().color : Color.white
+                    ? TeamUtils.GetColor(line.target.TeamId) : Color.white
             });
         }
 
@@ -3220,6 +3373,8 @@ public partial class TurnStateManager
 
         data.Kind = HelperPanelKind.Transfer;
         data.TransferIsConfirmStep = IsTransferConfirmStepActive();
+        data.TransferIsDonationPercentageStep = IsTransferDonationPercentageStepActive();
+        data.TransferDonationPercent = GetSelectedTransferDonationPercent();
         data.TransferHasCursorOption = false;
         data.TransferCursorOptionFocused = false;
 
@@ -3240,9 +3395,9 @@ public partial class TurnStateManager
                     : (option.targetConstruction != null && option.targetConstruction.GetMainSpriteRenderer() != null
                         ? option.targetConstruction.GetMainSpriteRenderer().sprite : null),
                 targetColor = option.targetUnit != null
-                    ? (option.targetUnit.GetMainSpriteRenderer() != null ? option.targetUnit.GetMainSpriteRenderer().color : Color.white)
-                    : (option.targetConstruction != null && option.targetConstruction.GetMainSpriteRenderer() != null
-                        ? option.targetConstruction.GetMainSpriteRenderer().color : Color.white)
+                    ? TeamUtils.GetColor(option.targetUnit.TeamId)
+                    : (option.targetConstruction != null
+                        ? TeamUtils.GetColor(option.targetConstruction.TeamId) : Color.white)
             });
         }
 

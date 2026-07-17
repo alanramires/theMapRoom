@@ -215,6 +215,8 @@ public partial class TurnStateManager
     private const int CommandServicePreviewExecuteIndex = 0;
     private const int CommandServicePreviewCancelIndex = 1;
     private int commandServicePreviewFocusIndex = CommandServicePreviewExecuteIndex;
+    // 0..N-1 = unidades; N = EXECUTAR; N+1 = CANCELAR.
+    private int commandServicePreviewNavigationIndex;
 
     public int CommandServicePreviewFocusIndex => commandServicePreviewFocusIndex;
 
@@ -225,12 +227,24 @@ public partial class TurnStateManager
         if (CurrentCursorState != CursorState.CommandService || delta == 0)
             return false;
 
-        int total = CommandServicePreviewCancelIndex - CommandServicePreviewExecuteIndex + 1;
-        int next = (commandServicePreviewFocusIndex + (delta > 0 ? 1 : -1) + total) % total;
-        if (next == commandServicePreviewFocusIndex)
-            return false;
-
-        commandServicePreviewFocusIndex = next;
+        int unitCount = commandServicePreviewEntries.Count;
+        int total = unitCount + 2;
+        commandServicePreviewNavigationIndex =
+            (commandServicePreviewNavigationIndex + (delta > 0 ? 1 : -1) + total) % total;
+        if (commandServicePreviewNavigationIndex < unitCount)
+        {
+            commandServicePreviewSelectedIndex = commandServicePreviewNavigationIndex;
+            commandServicePreviewFocusIndex = -1;
+            RefreshCommandServiceHelperFocus();
+            PanCommandServicePreviewCamera(commandServicePreviewEntries[commandServicePreviewSelectedIndex].cell);
+        }
+        else
+        {
+            commandServicePreviewFocusIndex = commandServicePreviewNavigationIndex == unitCount
+                ? CommandServicePreviewExecuteIndex
+                : CommandServicePreviewCancelIndex;
+            RefreshCommandServiceHelperFocus(clearSelection: true);
+        }
         cursorController?.PlayCursorMoveSfx();
         return true;
     }
@@ -243,6 +257,8 @@ public partial class TurnStateManager
             return;
         commandServicePreviewFocusIndex = Mathf.Clamp(
             index, CommandServicePreviewExecuteIndex, CommandServicePreviewCancelIndex);
+        commandServicePreviewNavigationIndex = commandServicePreviewEntries.Count + commandServicePreviewFocusIndex;
+        RefreshCommandServiceHelperFocus(clearSelection: true);
     }
 
     // logica para cancelar a ordem do Servico do Comando durante a fase de preview/confirmacao, com mensagens de feedback mais especificas para o contexto de uso via menu.
@@ -266,6 +282,7 @@ public partial class TurnStateManager
             estimate.moneyAfter,
             estimate.targetLines,
             estimate.skippedUnitLines);
+        ApplyCommandServicePreviewNavigation(estimate.previewEntries);
         ApplyCommandServicePreviewDimmedUnits(estimate.skippedUnits);
         PanelDialogController.TrySetExternalText(
             PanelDialogController.ResolveDialogMessage(
@@ -1069,6 +1086,9 @@ public partial class TurnStateManager
                     unitName = ResolveUnitRuntimeName(target),
                     sourceLabel = ResolveCommandServiceSourceLabel(order),
                     gainsLabel = BuildCommandServiceGainsInline(targetHp, targetFuel, targetAmmoByWeapon),
+                    unitSprite = target.GetMainSpriteRenderer() != null ? target.GetMainSpriteRenderer().sprite : null,
+                    unitColor = TeamUtils.GetColor(target.TeamId),
+                    cell = ResolveCommandServicePreviewCell(order),
                     isFullyAffordable = !targetSkippedByMoney
                 });
                 summary.targetLineUnits.Add(target);
@@ -1087,7 +1107,10 @@ public partial class TurnStateManager
                 summary.skippedUnitLines.Add(new HelperCommandServiceSkippedUnitLine
                 {
                     unitName = ResolveUnitRuntimeName(target),
-                    sourceLabel = ResolveCommandServiceSourceLabel(order)
+                    sourceLabel = ResolveCommandServiceSourceLabel(order),
+                    unitSprite = target.GetMainSpriteRenderer() != null ? target.GetMainSpriteRenderer().sprite : null,
+                    unitColor = TeamUtils.GetColor(target.TeamId),
+                    cell = ResolveCommandServicePreviewCell(order)
                 });
                 summary.skippedLineUnits.Add(target);
                 int skippedLineIndex = summary.skippedUnitLines.Count - 1;
@@ -1287,9 +1310,51 @@ public partial class TurnStateManager
             return;
 
         commandServicePreviewSelectedIndex = 0;
+        commandServicePreviewNavigationIndex = 0;
+        commandServicePreviewFocusIndex = -1;
         RefreshCommandServiceHelperFocus();
-        if (cursorController != null)
-            cursorController.SetCell(commandServicePreviewEntries[0].cell, playMoveSfx: false);
+        PanCommandServicePreviewCamera(commandServicePreviewEntries[0].cell);
+    }
+
+    public bool NavigateCommandServicePreviewUnits(int delta)
+    {
+        if (!IsCommandServiceAwaitingConfirmation || delta == 0 || commandServicePreviewEntries.Count <= 0)
+            return false;
+        int current = Mathf.Clamp(commandServicePreviewSelectedIndex, 0, commandServicePreviewEntries.Count - 1);
+        commandServicePreviewSelectedIndex = (current + (delta > 0 ? 1 : -1) + commandServicePreviewEntries.Count) % commandServicePreviewEntries.Count;
+        RefreshCommandServiceHelperFocus();
+        PanCommandServicePreviewCamera(commandServicePreviewEntries[commandServicePreviewSelectedIndex].cell);
+        cursorController?.PlayCursorMoveSfx();
+        return true;
+    }
+
+    public void FocusCommandServicePreviewUnit(int index)
+    {
+        if (!IsCommandServiceAwaitingConfirmation || index < 0 || index >= commandServicePreviewEntries.Count)
+            return;
+        commandServicePreviewSelectedIndex = index;
+        commandServicePreviewNavigationIndex = index;
+        commandServicePreviewFocusIndex = -1;
+        RefreshCommandServiceHelperFocus();
+        PanCommandServicePreviewCamera(commandServicePreviewEntries[index].cell);
+    }
+
+    public void FocusCommandServicePreviewLine(bool served, int lineIndex)
+    {
+        for (int i = 0; i < commandServicePreviewEntries.Count; i++)
+        {
+            CommandServicePreviewEntry entry = commandServicePreviewEntries[i];
+            if (entry != null && (served ? entry.targetLineIndex : entry.skippedLineIndex) == lineIndex)
+            {
+                FocusCommandServicePreviewUnit(i);
+                return;
+            }
+        }
+    }
+
+    private void PanCommandServicePreviewCamera(Vector3Int cell)
+    {
+        PanelHelperController.TryPanToAutonomyCell(cell);
     }
 
     private void ClearCommandServicePreviewNavigation()
@@ -1348,7 +1413,7 @@ public partial class TurnStateManager
         }
     }
 
-    private void RefreshCommandServiceHelperFocus()
+    private void RefreshCommandServiceHelperFocus(bool clearSelection = false)
     {
         for (int i = 0; i < commandServiceHelperTargetLines.Count; i++)
         {
@@ -1364,7 +1429,7 @@ public partial class TurnStateManager
                 line.isFocused = false;
         }
 
-        if (commandServicePreviewSelectedIndex < 0 || commandServicePreviewSelectedIndex >= commandServicePreviewEntries.Count)
+        if (clearSelection || commandServicePreviewSelectedIndex < 0 || commandServicePreviewSelectedIndex >= commandServicePreviewEntries.Count)
             return;
 
         CommandServicePreviewEntry focused = commandServicePreviewEntries[commandServicePreviewSelectedIndex];
