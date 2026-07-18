@@ -189,6 +189,13 @@ public partial class AITacticalAnalyzer
         // Fora de qualquer eixo (rogue/base/fora de alcance): sem pressão antecipatória.
         if (eixo <= 0 || axisMap == null)
             return 0;
+        // DIVISÃO DE PAPÉIS COM O AR TRANSPORTADOR: o APC só entra DEPOIS que o nó
+        // INICIAL do eixo (Corridor[0]) foi conquistado — antes disso a infantaria
+        // trabalha os nós próximos a pé e o salto profundo é do Chinook (que nasce no
+        // início do jogo mirando os nós intermediários). FrontIndex >= 1 = 1º nó nosso.
+        if (!axisMap.TryGetAxis(eixo, out InvasionAxisMap.Axis axisInfo)
+            || axisInfo.FrontIndex < 1)
+            return 0;
         // Teto 1/eixo: só o ALVO DE TRANSPORTE do eixo gera demanda — a frente, ou o próximo
         // nó se a frente já está sob captura (pipelining). Eixo completo não tem alvo.
         ConstructionSector target = axisMap.GetTransportTargetSector(eixo);
@@ -311,6 +318,59 @@ public partial class AITacticalAnalyzer
         ops.Add(op);
         built.Add(info.Sector);
         Debug.Log($"[AI Ops][T{snapshot.TurnNumber}][{team}] SectorDefense {info.Sector}: partial={info.HasPartialCapture} ground={visibleGroundThreat} air={visibleAirThreat} intelHot={(sectorIntel != null ? sectorIntel.hotScore.ToString("F1") : "-")} slots={DescribeSlots(op)}");
+    }
+
+    // PAPEL AR TRANSPORTADOR (política própria de shopping pressure): o Chinook é compra
+    // de INÍCIO de jogo — o foco são os nós INTERMEDIÁRIOS do eixo (Corridor[1..]) o
+    // quanto antes, saltando a caminhada enquanto a infantaria trabalha os nós iniciais
+    // a pé. Por isso NÃO espera slot de Transportador do plano nem massa mínima de
+    // capturadores (gates do APC, que só entra depois do nó inicial conquistado): a
+    // geometria do eixo cria a demanda desde o T1. 1 slot por eixo qualificado, teto
+    // MaxAirTransporters; chinooks existentes preenchem os slots na atribuição e zeram
+    // o déficit de compra. Mapa sem oferta aérea só deixa a demanda pendente no log.
+    private const int EarlyAxisAirliftPriority = 4;
+
+    private void TryBuildEarlyAxisAirliftOps(TeamId team, AIWorldSnapshot snapshot, List<AITacticalNeed> ops)
+    {
+        InvasionAxisMap axisMap = GetShoppingAxisMap(team);
+        if (axisMap == null || snapshot == null)
+            return;
+        int maxFleet = AIShoppingPlanner.Instance != null
+            ? AIShoppingPlanner.Instance.MaxAirTransporters : 3;
+        int threshold = AIController.Instance != null
+            ? AIController.Instance.GetEffectiveTransportThreshold(team) : 7;
+        int built = 0;
+        foreach (InvasionAxisMap.Axis axis in axisMap.Axes)
+        {
+            if (built >= maxFleet)
+                break;
+            if (axis == null || axis.IsInvasionAxis || axis.Complete)
+                continue;
+            if (axis.Corridor == null || axis.Corridor.Count < 2)
+                continue; // eixo sem nó intermediário
+            int front = Mathf.Max(0, axis.FrontIndex);
+            if (front >= axis.Corridor.Count)
+                continue; // corredor todo conquistado — restou só o rally
+            ConstructionSector targetSector =
+                axis.Corridor[Mathf.Clamp(front + 1, 1, axis.Corridor.Count - 1)];
+            if (!SectorManager.TryGetSectorInfo(targetSector, out SectorManager.SectorInfo info))
+                continue;
+            // Nó intermediário raso não justifica frota aérea (a pé resolve; APC depois).
+            if (info.GetDistanceToHQ(team) < threshold)
+                continue;
+
+            AITacticalNeed op = CreateOperation(
+                team, AITacticalNeedType.AirliftCapture, EarlyAxisAirliftPriority, snapshot, targetSector);
+            op.AnchorCell = snapshot.MyHQ != null
+                ? Normalize(snapshot.MyHQ.CurrentCellPosition) : Vector3Int.zero;
+            op.TargetCell = Normalize(info.RepresentativeCell);
+            op.AddSlots(AINeedKind.AirTransport, 1);
+            ops.Add(op);
+            built++;
+            Debug.Log($"[AI Ops][T{snapshot.TurnNumber}][{team}] EarlyAxisAirlift eixo={axis.EixoIndex} "
+                + $"alvo={targetSector} front={axis.FrontIndex} dist={info.GetDistanceToHQ(team):F0} "
+                + $"(Chinook cedo nos nós intermediários)");
+        }
     }
 
     private void TryBuildAirliftCaptureOps(TeamId team, AIWorldSnapshot snapshot, TeamObjectivePlan plan, List<AITacticalNeed> ops, AIIntelReport intel)

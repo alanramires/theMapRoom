@@ -5,7 +5,7 @@ using UnityEngine;
 [Serializable]
 public class SaveGameData
 {
-    public int version = 9;
+    public int version = 10;
     public string sceneName;
     public long savedAtUtcTicks;
     public int currentTurn;
@@ -39,7 +39,12 @@ public class SaveGameData
     public bool aiDifficultySaved;
     public bool aiEasyMode;
     public bool aiHardMode;
+    public bool aiConscriptionWhenLosing;
     public bool aiConscriptionDoctrine;
+    // Histerese da Fase de Massacre (valvula da conscricao). Default false em save
+    // antigo e inofensivo: a fase reentra na proxima avaliacao de shopping se o
+    // ratio ainda estiver acima do limiar de entrada.
+    public bool aiMassacrePhase;
     // Jornal do Comandante: eventos acumulados entre os turnos de cada time
     // (contato perdido, tiro da nevoa, conquista perdida...), drenados no
     // inicio do turno do time destinatario. Ordem cronologica (deterministica).

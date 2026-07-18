@@ -16,7 +16,12 @@ public enum UnitRole
     RaidAntiSub = 11,
     CapturadorAgressivo = 12,
     ArtilheiroCombatente = 13,
-    AntiaereoCombatente = 14
+    AntiaereoCombatente = 14,
+    // Transporte AÉREO operacional (Chinook): mesma mecânica do Transportador, mas com
+    // política de shopping própria — compra de início de jogo focada nos nós
+    // INTERMEDIÁRIOS do eixo, enquanto o APC só gera demanda depois que os nós
+    // iniciais do eixo foram conquistados.
+    TransportadorAereo = 15
 }
 
 public static class UnitRoleCompatibility
@@ -40,6 +45,8 @@ public static class UnitRoleCompatibility
                 return requestedRole == UnitRole.Antiaereo
                     || requestedRole == UnitRole.Assalto
                     || requestedRole == UnitRole.FogoIndireto;
+            case UnitRole.TransportadorAereo:
+                return requestedRole == UnitRole.Transportador;
             default:
                 return false;
         }
@@ -88,6 +95,8 @@ public static class UnitRoleCompatibility
             return data.unitClass == GameUnitClass.Armored
                 ? UnitRole.Assalto
                 : UnitRole.FogoIndireto;
+        if (primary == UnitRole.TransportadorAereo)
+            return UnitRole.Transportador;
         return primary;
     }
 

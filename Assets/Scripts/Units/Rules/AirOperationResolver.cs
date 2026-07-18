@@ -268,6 +268,14 @@ public static class AirOperationResolver
         return HasAnySkill(unit, SkillVtol, SkillStovl, SkillAircraftLanding, SkillCarrierLanding);
     }
 
+    // VTOL/STOVL pousa fora de aeroporto (cidade aliada etc. — as regras de pouso da
+    // construção decidem). A AI usa isto pra tratar a aeronave como unidade regular
+    // na escolha de reparo, em vez de restringi-la a aeroportos.
+    public static bool UnitHasVtolStyleLanding(UnitManager unit)
+    {
+        return HasAnySkill(unit, SkillVtol, SkillStovl);
+    }
+
     public static bool CanLand(UnitManager unit, Tilemap referenceTilemap, TerrainDatabase terrainDatabase, Vector3Int cell)
     {
         AirOperationTileContext tile = ResolveContext(referenceTilemap, terrainDatabase, cell);

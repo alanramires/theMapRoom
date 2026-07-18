@@ -75,6 +75,8 @@ public partial class AIShoppingPlanner : MonoBehaviour
 
     [Header("Logistica")]
     [Range(1, 8)] public int RepairsPerGroundSupplier = 2;
+    [Tooltip("Doutrina da ConscriÃ§Ã£o: prioridade da demanda de logÃ­stica quando hÃ¡ um ELITE ferido. Menor = mais cedo. Default 7 supera o counter-pressure-elite (8/9), garantindo o supridor mÃ³vel pra consertar o elite no campo enquanto as bases produzem massa.")]
+    [Range(1, 20)] public int EliteRepairLogisticsPriority = 7;
 
     [Header("Economia AeronÃ¡utica")]
     [Range(1, 8)]    public int   MaxAirTransporters               = 3;
@@ -167,8 +169,8 @@ public partial class AIShoppingPlanner : MonoBehaviour
             Debug.Log($"[AI Shopping] proactive_anti_air: SAM proativo activeAAAs={activeAAAs} activeSAMs={activeSAMs}/{maxSAMCap} â†’ slot fire_support defensivo aberto");
         }
 
-        // Hard: o primeiro elite terrestre é a peça de ruptura (MBT), não o Obus Médio.
-        // Defesa antiaérea emergencial continua podendo furar esta regra mais abaixo.
+        // Hard: o primeiro elite terrestre ï¿½ a peï¿½a de ruptura (MBT), nï¿½o o Obus Mï¿½dio.
+        // Defesa antiaï¿½rea emergencial continua podendo furar esta regra mais abaixo.
         ComputeGuaranteedBaseDefense(snapshot, out int baseArtSlots, out bool forceBaseAAA);
         if (baseArtSlots > 0)
         {
@@ -537,8 +539,8 @@ public partial class AIShoppingPlanner : MonoBehaviour
                 Debug.Log($"[AI Shopping] proactive_anti_air: SAM target={samTarget.displayName} custo={samTarget.cost}");
             }
         }
-        // Hard: o primeiro elite terrestre é a peça de ruptura (MBT), não o Obus Médio.
-        // Defesa antiaérea emergencial continua podendo furar esta regra mais abaixo.
+        // Hard: o primeiro elite terrestre ï¿½ a peï¿½a de ruptura (MBT), nï¿½o o Obus Mï¿½dio.
+        // Defesa antiaï¿½rea emergencial continua podendo furar esta regra mais abaixo.
         if (AIController.Instance != null
             && AIController.Instance.HardMode
             && activeEliteAssaultCount == 0
@@ -1112,7 +1114,8 @@ public partial class AIShoppingPlanner : MonoBehaviour
             }
             else if ((IsPrimaryRole(unit, UnitRole.Assalto) || boughtAggressiveCapturer) && openAssaultSlots > 0)
                 openAssaultSlots--;
-            else if (IsPrimaryRole(unit, UnitRole.Transportador) && openTransportSlots > 0)
+            else if (UnitRoleCompatibility.ResolveCompositionRole(unit) == UnitRole.Transportador
+                && openTransportSlots > 0)
             {
                 openTransportSlots--;
                 if (ShouldSeedCapturerForNewAPC(snapshot, openCapturerSlots, pendingGroundCapturerBuys, apcPassengerFollowupDemand))
@@ -1188,7 +1191,7 @@ public partial class AIShoppingPlanner : MonoBehaviour
                     bool isIntercept = IsPrimaryRole(airUnit, UnitRole.Interceptador);
                     bool isAtaque    = IsPrimaryRole(airUnit, UnitRole.AtaqueAereo);
                     bool isElite     = airUnit.eliteLevel >= 1;
-                    if (IsPrimaryRole(airUnit, UnitRole.Transportador)) { if (openAirTransportSlots > 0) openAirTransportSlots--; wantsAirTransport = openAirTransportSlots > 0; }
+                    if (UnitRoleCompatibility.ResolveCompositionRole(airUnit) == UnitRole.Transportador) { if (openAirTransportSlots > 0) openAirTransportSlots--; wantsAirTransport = openAirTransportSlots > 0; }
                     else if (isIntercept && !isElite)                   { if (openCacaBSlots  > 0) openCacaBSlots--;  wantsCacaB  = openCacaBSlots  > 0; }
                     else if (isIntercept &&  isElite)                   { if (openCacaASlots  > 0) openCacaASlots--;  wantsCacaA  = openCacaASlots  > 0; }
                     else if (isAtaque    && !isElite)                   { if (openApacheSlots > 0) openApacheSlots--; wantsApache = openApacheSlots > 0; }

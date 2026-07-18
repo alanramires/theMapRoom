@@ -360,9 +360,8 @@ public partial class AIController
         bool isInterceptor = targetData.roles != null
             && targetData.roles.Count > 0
             && targetData.roles[0] == UnitRole.Interceptador;
-        bool isTransport = targetData.roles != null
-            && targetData.roles.Count > 0
-            && targetData.roles[0] == UnitRole.Transportador;
+        bool isTransport =
+            UnitRoleCompatibility.ResolveCompositionRole(targetData) == UnitRole.Transportador;
 
         if (targetData.domain == Domain.Air)
             score += 26000f;

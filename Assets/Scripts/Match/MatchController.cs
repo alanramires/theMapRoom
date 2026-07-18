@@ -5736,6 +5736,7 @@ public class MatchController : MonoBehaviour
         {
             ResetFogOfWarRuntime(clearTilemap: true);
             ShowAllUnitsIgnoringFog();
+            ConstructionManager.RefreshAllOccupancyVisuals();
             Debug.Log("[Debug Command] FoW OFF (debug).");
             return;
         }

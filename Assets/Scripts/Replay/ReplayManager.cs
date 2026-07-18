@@ -2911,6 +2911,10 @@ public class ReplayManager : MonoBehaviour
                 if (saved == null || string.IsNullOrWhiteSpace(saved.constructionId))
                     continue;
 
+                if (!constructionSpawner.TryGetConstructionData(saved.constructionId, out ConstructionData constructionData)
+                    || constructionData == null)
+                    continue;
+
                 ConstructionManager manager = null;
                 bool reused = saved.instanceId > 0
                     && replayConstructionPool.TryGetValue(saved.instanceId, out manager)
@@ -2919,9 +2923,6 @@ public class ReplayManager : MonoBehaviour
 
                 if (!reused)
                 {
-                    if (!constructionSpawner.TryGetConstructionData(saved.constructionId, out ConstructionData constructionData) || constructionData == null)
-                        continue;
-
                     Vector3 world = new Vector3(saved.worldX, saved.worldY, 0f);
                     GameObject go = constructionSpawner.Spawn(constructionData, (TeamId)saved.teamId, world, Quaternion.identity);
                     if (go == null)
@@ -2935,7 +2936,11 @@ public class ReplayManager : MonoBehaviour
                 if (!manager.gameObject.activeSelf)
                     manager.gameObject.SetActive(true);
 
-                SaveDataMapper.ApplyConstructionSaveData(manager, saved, BuildSiteRuntimeFromSaveData);
+                SaveDataMapper.ApplyConstructionSaveData(
+                    manager,
+                    saved,
+                    BuildSiteRuntimeFromSaveData,
+                    constructionData);
                 RegisterConstructionInPool(manager);
                 restoredConstructions.Add((manager, saved.isActiveInHierarchy));
                 if (saved.instanceId > maxConstructionId)

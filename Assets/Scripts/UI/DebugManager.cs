@@ -39,19 +39,31 @@ public class DebugManager : MonoBehaviour
 
     private void Awake()
     {
-        instance = this;
         TryAutoAssignReferences();
-        if (sendButton != null)
-            sendButton.onClick.AddListener(HandleSendClicked);
-        RegisterInputSubmitListeners();
+        if (IsPanelCommandControllerRole())
+        {
+            if (sendButton != null)
+                sendButton.onClick.AddListener(HandleSendClicked);
+            RegisterInputSubmitListeners();
+        }
+        else
+        {
+            // Somente o manager permanente, fora do Panel_Debug, e autoridade
+            // das flags e dos atalhos globais. O componente interno do painel
+            // existe apenas para o campo de comando.
+            instance = this;
+        }
     }
 
     private void OnDestroy()
     {
-        if (sendButton != null)
-            sendButton.onClick.RemoveListener(HandleSendClicked);
-        UnregisterInputSubmitListeners();
-        UiInputBlocker.SetExplicitTextInputFocused(false);
+        if (IsPanelCommandControllerRole())
+        {
+            if (sendButton != null)
+                sendButton.onClick.RemoveListener(HandleSendClicked);
+            UnregisterInputSubmitListeners();
+            UiInputBlocker.SetExplicitTextInputFocused(false);
+        }
         if (instance == this)
             instance = null;
     }
@@ -63,48 +75,55 @@ public class DebugManager : MonoBehaviour
 
     public static bool TryFocusCommandInput()
     {
-        if (instance == null)
+        DebugManager manager = ResolveCommandManagerIncludingInactive();
+        if (manager == null)
             return false;
 
-        instance.StartCoroutine(instance.FocusCommandInputNextFrame());
+        manager.StartCoroutine(manager.FocusCommandInputNextFrame());
         return true;
     }
 
     public static bool TryReleaseCommandInput()
     {
-        if (instance == null)
+        DebugManager manager = ResolveCommandManagerIncludingInactive();
+        if (manager == null)
             return false;
 
-        instance.ReleaseCommandInputFocus();
+        manager.ReleaseCommandInputFocus();
         return true;
     }
 
     public static bool IsDebugCommandInputFocused()
     {
-        return instance != null && instance.IsCommandInputFocused();
+        DebugManager manager = ResolveCommandManagerIncludingInactive();
+        return manager != null && manager.IsCommandInputFocused();
     }
 
     public static bool AreAIDebugShortcutsEnabled()
     {
-        return instance != null && instance.aiDebugShortcutsEnabled;
+        DebugManager manager = ResolveShortcutAuthorityIncludingInactive();
+        return manager != null && manager.aiDebugShortcutsEnabled;
     }
 
     public static bool AreDebugShortcutsEnabled()
     {
-        return instance != null && instance.debugShortcutsEnabled;
+        DebugManager manager = ResolveShortcutAuthorityIncludingInactive();
+        return manager != null && manager.debugShortcutsEnabled;
     }
 
     public static bool IsPanelRodadaDisabledForHotSeat()
     {
-        return instance != null && instance.panelRodadaDesativadoPvpDebug;
+        DebugManager manager = ResolveShortcutAuthorityIncludingInactive();
+        return manager != null && manager.panelRodadaDesativadoPvpDebug;
     }
 
     public static bool TryConsumeDebugToggleCharacterFromInput()
     {
-        if (instance == null)
+        DebugManager manager = ResolveCommandManagerIncludingInactive();
+        if (manager == null)
             return false;
 
-        string value = instance.GetInputText();
+        string value = manager.GetInputText();
         if (string.IsNullOrEmpty(value))
             return false;
 
@@ -112,8 +131,68 @@ public class DebugManager : MonoBehaviour
         if (last != '\'' && last != ';' && last != '`')
             return false;
 
-        instance.SetInputText(value.Substring(0, value.Length - 1));
+        manager.SetInputText(value.Substring(0, value.Length - 1));
         return true;
+    }
+
+    // PanelVisibilityHotkeysController tem execução antecipada e fecha o
+    // Panel_Debug durante o Awake. Se este componente estiver dentro do painel,
+    // seu próprio Awake ainda não rodou e a referência estática fica nula. Os
+    // atalhos precisam localizar também componentes inativos para ler os flags
+    // serializados e conseguir abrir o painel pela primeira vez.
+    private static DebugManager ResolveCommandManagerIncludingInactive()
+    {
+        if (instance != null && instance.HasCommandInputBinding())
+            return instance;
+
+        DebugManager[] managers = Resources.FindObjectsOfTypeAll<DebugManager>();
+        DebugManager fallback = null;
+        for (int i = 0; i < managers.Length; i++)
+        {
+            DebugManager candidate = managers[i];
+            if (!IsLoadedSceneManager(candidate))
+                continue;
+
+            fallback ??= candidate;
+            if (!candidate.HasCommandInputBinding())
+                continue;
+
+            instance = candidate;
+            return candidate;
+        }
+
+        return fallback;
+    }
+
+    private bool HasCommandInputBinding()
+    {
+        return commandInputObject != null || resolvedCommandInputField != null
+            || resolvedLegacyInputField != null || resolvedTmpInputField != null;
+    }
+
+    private static DebugManager ResolveShortcutAuthorityIncludingInactive()
+    {
+        if (instance != null && !instance.IsPanelCommandControllerRole())
+            return instance;
+
+        DebugManager[] managers = Resources.FindObjectsOfTypeAll<DebugManager>();
+        for (int i = 0; i < managers.Length; i++)
+        {
+            DebugManager candidate = managers[i];
+            if (!IsLoadedSceneManager(candidate) || candidate.IsPanelCommandControllerRole())
+                continue;
+
+            instance = candidate;
+            return candidate;
+        }
+        return null;
+    }
+
+    private static bool IsLoadedSceneManager(DebugManager candidate)
+    {
+        return candidate != null && candidate.gameObject != null
+            && candidate.gameObject.scene.IsValid()
+            && candidate.gameObject.scene.isLoaded;
     }
 
 #if UNITY_EDITOR
@@ -125,8 +204,12 @@ public class DebugManager : MonoBehaviour
 
     private void Update()
     {
-        if (aiDebugShortcutsEnabled)
-            HandleAIDebugShortcuts();
+        if (!IsPanelCommandControllerRole())
+        {
+            if (aiDebugShortcutsEnabled)
+                HandleAIDebugShortcuts();
+            return;
+        }
 
         bool commandInputFocused = IsCommandInputFocused();
         if (!commandInputFocused)
@@ -145,6 +228,11 @@ public class DebugManager : MonoBehaviour
 
         if (IsEnterPressedThisFrame())
             TrySubmitCommandInputOncePerFrame();
+    }
+
+    private bool IsPanelCommandControllerRole()
+    {
+        return commandInputObject != null || sendButton != null;
     }
 
     private void TryAutoAssignReferences()

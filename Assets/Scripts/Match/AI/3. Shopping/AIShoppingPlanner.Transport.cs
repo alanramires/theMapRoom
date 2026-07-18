@@ -372,7 +372,8 @@ public partial class AIShoppingPlanner
         {
             if (unit == null || unit.TeamId != snapshot.AITeam || unit.IsDead || unit.IsEmbarked)
                 continue;
-            if (!unit.TryGetUnitData(out UnitData data) || data == null || data.domain != Domain.Air || !IsPrimaryRole(data, UnitRole.Transportador))
+            if (!unit.TryGetUnitData(out UnitData data) || data == null || data.domain != Domain.Air
+                || UnitRoleCompatibility.ResolveCompositionRole(data) != UnitRole.Transportador)
                 continue;
             if (requireEmpty && HasTransportCargo(unit))
                 continue;
@@ -447,7 +448,7 @@ public partial class AIShoppingPlanner
         {
             if (unit == null || unit.domain != Domain.Air)
                 continue;
-            if (IsPrimaryRole(unit, UnitRole.Transportador))
+            if (UnitRoleCompatibility.ResolveCompositionRole(unit) == UnitRole.Transportador)
                 return true;
         }
         return false;
@@ -538,7 +539,7 @@ public partial class AIShoppingPlanner
                 continue;
             if (data.roles == null || !data.roles.Contains(UnitRole.Capturador))
                 continue;
-            if (IsPrimaryRole(data, UnitRole.Transportador))
+            if (UnitRoleCompatibility.ResolveCompositionRole(data) == UnitRole.Transportador)
                 continue;
 
             Vector3Int unitCell = unit.CurrentCellPosition;
@@ -570,7 +571,8 @@ public partial class AIShoppingPlanner
             if (b == null || !b.CanProduceUnitsForTeam(snapshot.AITeam) || b.OfferedUnits == null) continue;
             foreach (UnitData u in b.OfferedUnits)
             {
-                if (u == null || u.domain != Domain.Land || !IsPrimaryRole(u, UnitRole.Transportador)) continue;
+                if (u == null || u.domain != Domain.Land
+                    || UnitRoleCompatibility.ResolveCompositionRole(u) != UnitRole.Transportador) continue;
                 if (cheapest == 0 || u.cost < cheapest) cheapest = u.cost;
             }
         }
@@ -586,7 +588,8 @@ public partial class AIShoppingPlanner
             if (b == null || !b.CanProduceUnitsForTeam(snapshot.AITeam) || b.OfferedUnits == null) continue;
             foreach (UnitData u in b.OfferedUnits)
             {
-                if (u == null || u.domain != Domain.Air || !IsPrimaryRole(u, UnitRole.Transportador)) continue;
+                if (u == null || u.domain != Domain.Air
+                    || UnitRoleCompatibility.ResolveCompositionRole(u) != UnitRole.Transportador) continue;
                 if (cheapest == 0 || u.cost < cheapest) cheapest = u.cost;
             }
         }

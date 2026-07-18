@@ -64,13 +64,14 @@ public class PanelMenu : MonoBehaviour
     private int newGameWizardFocusIndex;
     private TeamId newGameHumanTeam = TeamId.Green;
     private TeamId newGameAiTeam = TeamId.Red;
-    private AIDifficulty newGameDifficulty = AIDifficulty.Normal;
+    private AIDifficulty newGameDifficulty = AIDifficulty.Facil;
     private MatchController.GameSetupPreset newGamePreset = MatchController.GameSetupPreset.FogOfWarTotal;
 
     private static readonly TeamId[] NewGameTeams = { TeamId.Green, TeamId.Red, TeamId.Blue, TeamId.Yellow };
     private static readonly AIDifficulty[] NewGameDifficulties =
     {
-        AIDifficulty.Facil, AIDifficulty.Normal, AIDifficulty.Competitivo, AIDifficulty.Agressivo
+        AIDifficulty.Iniciante, AIDifficulty.Facil, AIDifficulty.Medio,
+        AIDifficulty.Formigueiro, AIDifficulty.Competitiva, AIDifficulty.Agressiva
     };
     private static readonly MatchController.GameSetupPreset[] NewGamePresets =
     {
@@ -161,6 +162,8 @@ public class PanelMenu : MonoBehaviour
         if (!newGameWizardOpen || direction == 0) return false;
         int count = GetNewGameWizardOptionCount();
         newGameWizardFocusIndex = (newGameWizardFocusIndex + (direction > 0 ? 1 : -1) + count) % count;
+        if (newGameWizardStep == 2)
+            RefreshNewGameWizardHelper();
         cursorController?.PlayCursorMoveSfx();
         return true;
     }
@@ -841,7 +844,7 @@ public class PanelMenu : MonoBehaviour
         newGameWizardFocusIndex = 0;
         newGameHumanTeam = TeamId.Green;
         newGameAiTeam = TeamId.Red;
-        newGameDifficulty = AIDifficulty.Normal;
+        newGameDifficulty = AIDifficulty.Facil;
         newGamePreset = MatchController.GameSetupPreset.FogOfWarTotal;
         RefreshNewGameWizardHelper();
     }
@@ -874,7 +877,9 @@ public class PanelMenu : MonoBehaviour
                 : $"Você: {ResolveTeamLabel(newGameHumanTeam)}\nIA adversária: {ResolveTeamLabel(newGameAiTeam)}\nDificuldade: {ResolveDifficultyLabel(newGameDifficulty)}\nRegras: {ResolvePresetLabel(newGamePreset)}")
             : (newGameWizardStep == 1
                 ? (newGameHotSeat ? "Escolha a cor do segundo jogador." : "Slot 1 será controlado pela IA.")
-                : string.Empty);
+                : newGameWizardStep == 2 && newGameWizardFocusIndex < NewGameDifficulties.Length
+                    ? ResolveDifficultyDescription(NewGameDifficulties[newGameWizardFocusIndex])
+                    : string.Empty);
         PanelHelperController.TrySetExternalText(title, body);
     }
 
@@ -930,8 +935,24 @@ public class PanelMenu : MonoBehaviour
     };
     private static string ResolveDifficultyLabel(AIDifficulty difficulty) => difficulty switch
     {
-        AIDifficulty.Facil => "FÁCIL", AIDifficulty.Competitivo => "COMPETITIVO",
-        AIDifficulty.Agressivo => "AGRESSIVO", _ => "NORMAL"
+        AIDifficulty.Iniciante => "INICIANTE",
+        AIDifficulty.Facil => "FÁCIL",
+        AIDifficulty.Medio => "MÉDIO",
+        AIDifficulty.Formigueiro => "FORMIGUEIRO",
+        AIDifficulty.Competitiva => "COMPETITIVA",
+        AIDifficulty.Agressiva => "AGRESSIVA",
+        _ => "FÁCIL"
+    };
+
+    private static string ResolveDifficultyDescription(AIDifficulty difficulty) => difficulty switch
+    {
+        AIDifficulty.Iniciante => "Renda reduzida fora das cidades. Sem pacote Hard, banimentos ou recrutamento forçado.",
+        AIDifficulty.Facil => "Renda e regras normais. Sem pacote Hard, banimentos ou recrutamento forçado.",
+        AIDifficulty.Medio => "Regras normais e todas as unidades. Recrutamento forçado somente quando estiver perdendo.",
+        AIDifficulty.Formigueiro => "Regras normais e todas as unidades. Recrutamento forçado em todos os turnos.",
+        AIDifficulty.Competitiva => "Pacote Hard e unidades banidas. Recrutamento forçado somente quando estiver perdendo.",
+        AIDifficulty.Agressiva => "Pacote Hard e unidades banidas. Recrutamento forçado em todos os turnos.",
+        _ => string.Empty
     };
     private static string ResolvePresetLabel(MatchController.GameSetupPreset preset) => preset switch
     {

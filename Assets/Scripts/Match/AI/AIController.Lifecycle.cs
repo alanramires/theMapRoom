@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 //-------------------------------------------------------------------------
@@ -12,6 +13,7 @@ public partial class AIController
     private GUIStyle aiTurnIndicatorStageStyle;
     private GUIStyle aiTurnIndicatorBoxStyle;
     private bool aiTurnBatchExecuting;
+    private Coroutine postLoadResumeRoutine;
 
     private bool IsMatchEnded()
     {
@@ -126,6 +128,7 @@ public partial class AIController
 
         _instance = this;
         MatchController.OnActiveTeamChanged += HandleTeamChanged;
+        SaveGameManager.OnAfterLoadSuccess += HandleAfterLoadSuccess;
         _availableUnitsComparison = CompareAvailableUnits;
         _initiativeComparison = CompareUnitsByInitiative;
 
@@ -208,8 +211,10 @@ public partial class AIController
     {
 
         MatchController.OnActiveTeamChanged -= HandleTeamChanged;
+        SaveGameManager.OnAfterLoadSuccess -= HandleAfterLoadSuccess;
 
         if (aiCoroutine != null) StopCoroutine(aiCoroutine);
+        if (postLoadResumeRoutine != null) StopCoroutine(postLoadResumeRoutine);
 
         if (IsDebugPaused) IsDebugPaused = false;
 
@@ -222,6 +227,47 @@ public partial class AIController
     // Entrada do turno
 
     // -------------------------------------------------------------------------
+
+    private void HandleAfterLoadSuccess()
+    {
+        if (postLoadResumeRoutine != null)
+            StopCoroutine(postLoadResumeRoutine);
+        postLoadResumeRoutine = StartCoroutine(ResumeActiveAITurnAfterLoad());
+    }
+
+    private IEnumerator ResumeActiveAITurnAfterLoad()
+    {
+        // OnAfterLoadSuccess dispara ainda dentro de LoadSlotAsync. Aguarda tambem a
+        // restauracao dos logs/replay e a liberacao da apresentacao de turno.
+        while (SaveGameManager.IsAnyLoadInProgress)
+            yield return null;
+
+        postLoadResumeRoutine = null;
+        if (matchController == null)
+            matchController = FindAnyObjectByType<MatchController>();
+        if (replayManager == null)
+            replayManager = FindAnyObjectByType<ReplayManager>();
+        if (turnStateManager == null)
+            turnStateManager = FindAnyObjectByType<TurnStateManager>();
+
+        if (matchController == null || matchController.HasVictoryWinner)
+            yield break;
+
+        TeamId activeTeam = matchController.ActiveTeam;
+        if (!matchController.IsPlayerAI(activeTeam))
+            yield break;
+
+        // O load ja restaurou time, turno, stage, plano e snapshot confirmado. Reiniciamos
+        // somente a coroutine operacional; nao reaplicamos inicio de turno nem seus efeitos.
+        isActive = true;
+        aiTurnBatchExecuting = false;
+        if (aiCoroutine != null)
+            StopCoroutine(aiCoroutine);
+        aiCoroutine = StartCoroutine(RunAITurn(activeTeam));
+
+        Debug.Log($"[AI Stage] Pos-load: coroutine retomada para {activeTeam} "
+            + $"no turno {aiTurnNumber}, stage {currentAIStage}, paused={isDebugPaused}.");
+    }
 
     private void HandleTeamChanged(int teamIndex)
 

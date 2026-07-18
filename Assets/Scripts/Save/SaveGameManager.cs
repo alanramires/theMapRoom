@@ -1538,6 +1538,8 @@ public class SaveGameManager : MonoBehaviour
 
     private IEnumerator RestoreConstructionsBatched(
         SaveGameData data,
+        Dictionary<int, ConstructionManager> existingConstructionsById,
+        HashSet<ConstructionManager> restoredConstructions,
         Action<int> setMaxId,
         Action<string> setError)
     {
@@ -1558,12 +1560,33 @@ public class SaveGameManager : MonoBehaviour
                     }
                     else
                     {
-                        Vector3 world = new Vector3(saved.worldX, saved.worldY, 0f);
-                        GameObject go = constructionSpawner.Spawn(constructionData, (TeamId)saved.teamId, world, Quaternion.identity);
-                        ConstructionManager manager = go != null ? go.GetComponent<ConstructionManager>() : null;
+                        ConstructionManager manager = null;
+                        if (existingConstructionsById != null
+                            && saved.instanceId > 0
+                            && existingConstructionsById.TryGetValue(saved.instanceId, out ConstructionManager existing)
+                            && existing != null
+                            && string.Equals(existing.ConstructionId, saved.constructionId, StringComparison.OrdinalIgnoreCase))
+                        {
+                            manager = existing;
+                        }
+
+                        if (manager == null)
+                        {
+                            Vector3 world = new Vector3(saved.worldX, saved.worldY, 0f);
+                            GameObject go = constructionSpawner.Spawn(constructionData, (TeamId)saved.teamId, world, Quaternion.identity);
+                            manager = go != null ? go.GetComponent<ConstructionManager>() : null;
+                        }
+
                         if (manager != null)
                         {
-                            SaveDataMapper.ApplyConstructionSaveData(manager, saved, BuildSiteRuntimeFromSaveData);
+                            if (!manager.gameObject.activeSelf)
+                                manager.gameObject.SetActive(true);
+                            SaveDataMapper.ApplyConstructionSaveData(
+                                manager,
+                                saved,
+                                BuildSiteRuntimeFromSaveData,
+                                constructionData);
+                            restoredConstructions?.Add(manager);
                             maxId = Mathf.Max(maxId, saved.instanceId);
                         }
                     }
@@ -1691,11 +1714,14 @@ public class SaveGameManager : MonoBehaviour
             suppressedFogRefresh = true;
         }
 
-        // Espera um frame apos destruir para evitar residuos de lookup no mesmo frame.
+        Dictionary<int, ConstructionManager> existingConstructionsById = CollectSceneConstructionsById();
+        HashSet<ConstructionManager> restoredConstructions = new HashSet<ConstructionManager>();
+
+        // Unidades sao reconstruidas; construcoes do mapa preservam sua identidade e referencias.
         stage = "clear-runtime";
         double clearRuntimeStartMs = PerfNowMs();
         LogLoadPerf(loadedSlot, "clear_runtime.begin", clearRuntimeStartMs, clearRuntimeStartMs - routineStartMs);
-        ClearCurrentRuntime();
+        ClearCurrentRuntime(preserveConstructions: true);
         yield return null;
         LogLoadPerf(loadedSlot, "clear_runtime.end", clearRuntimeStartMs, PerfNowMs() - routineStartMs);
 
@@ -1716,7 +1742,13 @@ public class SaveGameManager : MonoBehaviour
         stage = "spawn-constructions";
         double spawnConstructionsStartMs = PerfNowMs();
         LogLoadPerf(loadedSlot, "restore_constructions.begin", spawnConstructionsStartMs, spawnConstructionsStartMs - routineStartMs);
-        yield return RestoreConstructionsBatched(data, value => maxConstructionId = value, error => batchedRestoreError = error);
+        yield return RestoreConstructionsBatched(
+            data,
+            existingConstructionsById,
+            restoredConstructions,
+            value => maxConstructionId = value,
+            error => batchedRestoreError = error);
+        DestroyConstructionsNotInSnapshot(existingConstructionsById, restoredConstructions);
         LogLoadPerf(loadedSlot, "restore_constructions.end", spawnConstructionsStartMs, PerfNowMs() - routineStartMs);
         SectorManager.RequestRebuildFromActiveConstructions("post-restore-constructions");
 
@@ -1807,7 +1839,11 @@ public class SaveGameManager : MonoBehaviour
             {
                 if (data.aiDifficultySaved)
                     aiController.RestoreDifficultyFromSave(
-                        data.aiEasyMode, data.aiHardMode, data.aiConscriptionDoctrine);
+                        data.aiEasyMode, data.aiHardMode,
+                        data.aiConscriptionWhenLosing
+                            || (data.version < 10 && data.aiHardMode && !data.aiConscriptionDoctrine),
+                        data.aiConscriptionDoctrine);
+                aiController.MassacrePhaseActive = data.aiMassacrePhase;
                 TeamId restoredAiTeam = (TeamId)data.aiRuntimeTeamId;
                 if (matchController != null && !matchController.IsPlayerAI(restoredAiTeam) &&
                     matchController.TryGetFirstAITeam(out TeamId configuredAiTeam))
@@ -1875,6 +1911,11 @@ public class SaveGameManager : MonoBehaviour
                     matchController.RefreshFogOfWarForActiveTeam();
                 LogLoadPerf(loadedSlot, "refresh_fog_after_load.end", refreshFogStartMs, PerfNowMs() - routineStartMs);
             }
+
+            // A ocupacao visual depende da visibilidade final da unidade. Recalcular somente
+            // depois do FOW e do planejamento evita manter a barra da construcao sob a unidade.
+            stage = "refresh-construction-occupancy";
+            RefreshConstructionOccupancyAfterLoad(unitsById);
 
             cursorController?.PlayBeepSfx();
             if (verboseLogs)
@@ -1988,11 +2029,14 @@ public class SaveGameManager : MonoBehaviour
         if (aiController != null)
         {
             aiController.CaptureDifficultyForSave(
-                out bool aiEasy, out bool aiHard, out bool aiConscription);
+                out bool aiEasy, out bool aiHard,
+                out bool aiConscriptionWhenLosing, out bool aiConscriptionAlways);
             data.aiDifficultySaved = true;
             data.aiEasyMode = aiEasy;
             data.aiHardMode = aiHard;
-            data.aiConscriptionDoctrine = aiConscription;
+            data.aiConscriptionWhenLosing = aiConscriptionWhenLosing;
+            data.aiConscriptionDoctrine = aiConscriptionAlways;
+            data.aiMassacrePhase = aiController.MassacrePhaseActive;
         }
 
         // Jornal do Comandante: eventos pendentes entre turnos sao estado.
@@ -2098,7 +2142,64 @@ public class SaveGameManager : MonoBehaviour
         }
     }
 
-    private void ClearCurrentRuntime()
+    private static void RefreshConstructionOccupancyAfterLoad(Dictionary<int, UnitManager> unitsById)
+    {
+        if (unitsById != null)
+        {
+            foreach (UnitManager unit in unitsById.Values)
+            {
+                if (unit == null || !unit.gameObject.activeInHierarchy || unit.IsDead || unit.IsEmbarked)
+                    continue;
+
+                Vector3Int cell = unit.CurrentCellPosition;
+                cell.z = 0;
+                UnitOccupancyRules.NotifyUnitOccupancyChanged(unit, cell, cell);
+            }
+        }
+
+        Scene activeScene = SceneManager.GetActiveScene();
+        ConstructionManager[] constructions = FindObjectsByType<ConstructionManager>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        for (int i = 0; i < constructions.Length; i++)
+        {
+            ConstructionManager construction = constructions[i];
+            if (construction != null && construction.gameObject.scene == activeScene)
+                construction.RefreshRuntimeVisualState(force: true);
+        }
+    }
+
+    private static Dictionary<int, ConstructionManager> CollectSceneConstructionsById()
+    {
+        Dictionary<int, ConstructionManager> result = new Dictionary<int, ConstructionManager>();
+        Scene activeScene = SceneManager.GetActiveScene();
+        ConstructionManager[] constructions = FindObjectsByType<ConstructionManager>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        for (int i = 0; i < constructions.Length; i++)
+        {
+            ConstructionManager construction = constructions[i];
+            if (construction == null || construction.gameObject.scene != activeScene || construction.InstanceId <= 0)
+                continue;
+
+            if (!result.ContainsKey(construction.InstanceId))
+                result.Add(construction.InstanceId, construction);
+        }
+
+        return result;
+    }
+
+    private static void DestroyConstructionsNotInSnapshot(
+        Dictionary<int, ConstructionManager> existingConstructionsById,
+        HashSet<ConstructionManager> restoredConstructions)
+    {
+        if (existingConstructionsById == null)
+            return;
+
+        foreach (ConstructionManager construction in existingConstructionsById.Values)
+        {
+            if (construction != null && (restoredConstructions == null || !restoredConstructions.Contains(construction)))
+                Destroy(construction.gameObject);
+        }
+    }
+
+    private void ClearCurrentRuntime(bool preserveConstructions = false)
     {
         Scene activeScene = SceneManager.GetActiveScene();
         UnitManager[] units = FindObjectsByType<UnitManager>(FindObjectsInactive.Include, FindObjectsSortMode.None);
@@ -2108,11 +2209,14 @@ public class SaveGameManager : MonoBehaviour
                 Destroy(units[i].gameObject);
         }
 
-        ConstructionManager[] constructions = FindObjectsByType<ConstructionManager>(FindObjectsInactive.Include, FindObjectsSortMode.None);
-        for (int i = 0; i < constructions.Length; i++)
+        if (!preserveConstructions)
         {
-            if (constructions[i] != null && constructions[i].gameObject.scene == activeScene)
-                Destroy(constructions[i].gameObject);
+            ConstructionManager[] constructions = FindObjectsByType<ConstructionManager>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            for (int i = 0; i < constructions.Length; i++)
+            {
+                if (constructions[i] != null && constructions[i].gameObject.scene == activeScene)
+                    Destroy(constructions[i].gameObject);
+            }
         }
     }
 

@@ -454,7 +454,8 @@ public static class SaveDataMapper
     public static void ApplyConstructionSaveData(
         ConstructionManager manager,
         ConstructionSaveData saved,
-        Func<ConstructionSiteRuntimeSaveData, ConstructionSiteRuntime> siteRuntimeResolver)
+        Func<ConstructionSiteRuntimeSaveData, ConstructionSiteRuntime> siteRuntimeResolver,
+        ConstructionData authoritativeConstructionData = null)
     {
         if (manager == null || saved == null)
             return;
@@ -489,10 +490,39 @@ public static class SaveDataMapper
         ConstructionSiteRuntime runtime = siteRuntimeResolver != null
             ? siteRuntimeResolver(saved.siteRuntime)
             : null;
+
+        int savedCapturePointsMax = saved.siteRuntime != null
+            ? Mathf.Max(0, saved.siteRuntime.capturePointsMax)
+            : 0;
+        int capturePointsMax = runtime != null
+            ? Mathf.Max(0, runtime.capturePointsMax)
+            : 0;
+
+        // O ConstructionData atual e a fonte de verdade da configuracao da construcao.
+        // O save restaura o estado mutavel, mas nao deve perpetuar configuracoes antigas.
+        ConstructionData constructionData = authoritativeConstructionData;
+        if (constructionData == null)
+            manager.TryResolveConstructionData(out constructionData);
+
+        if (constructionData != null
+            && constructionData.constructionConfiguration != null)
+        {
+            capturePointsMax = Mathf.Max(0, constructionData.constructionConfiguration.capturePointsMax);
+            if (runtime != null)
+                runtime.capturePointsMax = capturePointsMax;
+        }
+
         if (runtime != null)
             manager.ApplySiteRuntime(runtime);
 
-        manager.SetCurrentCapturePoints(saved.currentCapturePoints);
+        int currentCapturePoints = saved.currentCapturePoints;
+        if (savedCapturePointsMax > 0 && savedCapturePointsMax != capturePointsMax)
+        {
+            float savedProgress = Mathf.Clamp01(currentCapturePoints / (float)savedCapturePointsMax);
+            currentCapturePoints = Mathf.RoundToInt(savedProgress * capturePointsMax);
+        }
+
+        manager.SetCurrentCapturePoints(currentCapturePoints);
         manager.SetInfiniteSuppliesOverride(saved.hasInfiniteSuppliesOverride);
     }
 

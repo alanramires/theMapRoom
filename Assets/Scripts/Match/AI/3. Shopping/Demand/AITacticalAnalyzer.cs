@@ -61,6 +61,7 @@ public partial class AITacticalAnalyzer : MonoBehaviour
         TryBuildBaseDefenseOp(team, snapshot, plan, ops, intel);
         TryBuildSectorDefenseOps(team, snapshot, plan, ops, intel);
         TryBuildGroundCaptureOps(team, snapshot, plan, ops, intel);
+        TryBuildEarlyAxisAirliftOps(team, snapshot, ops);
         TryBuildAirliftCaptureOps(team, snapshot, plan, ops, intel);
         TryBuildAirRefuelSupportOp(team, snapshot, ops);
         TryBuildPreventiveDefenseOp(team, snapshot, ops);

@@ -5,18 +5,21 @@ using UnityEngine;
 using UnityEngine.Tilemaps;
 
 // Nivel de dificuldade escolhido na Tela de Entrada. Mapeia direto para os flags
-// easyMode/hardMode/conscriptionDoctrine do AIController (a mecanica ja esta pronta
-// em cima desses flags):
-//   Facil       = 1/3 da renda, shopping normal
-//   Normal      = renda cheia, shopping normal
-//   Competitivo = hard (lista banida, projecao, blitz reserve); conscricao SO perdendo
-//   Agressivo   = hard + doutrina do enxame (conscricao SEMPRE)
+// easyMode/hardMode/conscriptionWhenLosing/conscriptionDoctrine do AIController:
+//   Iniciante   = 1/3 da renda fora das cidades; sem hard, sem conscricao
+//   Facil       = renda e regras normais; sem hard, sem conscricao
+//   Medio       = regras normais; conscricao SO perdendo
+//   Formigueiro = regras normais; doutrina do enxame (conscricao SEMPRE), sem pacote hard
+//   Competitiva = pacote hard (lista banida, projecao, blitz reserve); conscricao SO perdendo
+//   Agressiva   = pacote hard + doutrina do enxame (conscricao SEMPRE)
 public enum AIDifficulty
 {
+    Iniciante,
     Facil,
-    Normal,
-    Competitivo,
-    Agressivo
+    Medio,
+    Formigueiro,
+    Competitiva,
+    Agressiva
 }
 
 /// <summary>
@@ -61,31 +64,64 @@ public partial class AIController : MonoBehaviour
     [SerializeField] private bool conscriptionDoctrine = false;
     public bool ConscriptionDoctrine => conscriptionDoctrine;
 
+    [Tooltip("Fase de Massacre (valvula da conscricao): com clara vantagem numerica a doutrina cessa a massa e o caixa volta pro elite. Entra quando o ForceRatio macro atinge este valor (0.66 = ~2:1).")]
+    [SerializeField, Range(0.5f, 1f)] private float massacreEnterForceRatio = 0.66f;
+    public float MassacreEnterForceRatio => massacreEnterForceRatio;
+
+    [Tooltip("Histerese da Fase de Massacre: uma vez ativa, so volta a conscricao se o ForceRatio cair abaixo deste valor (evita alternar soldado/elite com o ratio oscilando na fronteira).")]
+    [SerializeField, Range(0.5f, 1f)] private float massacreExitForceRatio = 0.58f;
+    public float MassacreExitForceRatio => massacreExitForceRatio;
+
+    [Tooltip("Valvula de teto da Fase de Massacre: cessa a massa quando as unidades em campo atingem esta fracao do limite por time — perto do teto, corpo barato rouba o slot do elite.")]
+    [SerializeField, Range(0.5f, 1f)] private float massacreUnitCapFillRatio = 0.85f;
+    public float MassacreUnitCapFillRatio => massacreUnitCapFillRatio;
+
+    // Estado de histerese da Fase de Massacre (persiste no save via SaveGameManager).
+    [System.NonSerialized] private bool massacrePhaseActive;
+    public bool MassacrePhaseActive
+    {
+        get => massacrePhaseActive;
+        set => massacrePhaseActive = value;
+    }
+
+    public MatchController Match => matchController;
+
+    [Tooltip("Recrutamento forcado emergencial quando a IA esta perdendo. Independente do pacote Hard.")]
+    [SerializeField] private bool conscriptionWhenLosing = false;
+    public bool ConscriptionWhenLosing => conscriptionWhenLosing;
+
     // Aplica a dificuldade escolhida na Tela de Entrada. Os flags sao mutuamente
     // exclusivos por combinacao: Facil liga easy; Competitivo liga hard; Agressivo
     // liga hard + conscricao; Normal desliga tudo.
     public void ApplyDifficulty(AIDifficulty difficulty)
     {
-        easyMode = difficulty == AIDifficulty.Facil;
-        hardMode = difficulty == AIDifficulty.Competitivo || difficulty == AIDifficulty.Agressivo;
-        conscriptionDoctrine = difficulty == AIDifficulty.Agressivo;
+        easyMode = difficulty == AIDifficulty.Iniciante;
+        hardMode = difficulty == AIDifficulty.Competitiva || difficulty == AIDifficulty.Agressiva;
+        conscriptionWhenLosing = difficulty == AIDifficulty.Medio
+            || difficulty == AIDifficulty.Competitiva;
+        conscriptionDoctrine = difficulty == AIDifficulty.Formigueiro
+            || difficulty == AIDifficulty.Agressiva;
     }
 
     // Save/Load: a dificuldade escolhida na Tela de Entrada só existe nestes flags depois
     // do ApplyDifficulty (PartidaConfig é consumido uma vez) — sem persistir, o load
     // voltava aos defaults serializados na cena.
-    public void CaptureDifficultyForSave(out bool easy, out bool hard, out bool conscription)
+    public void CaptureDifficultyForSave(out bool easy, out bool hard,
+        out bool conscriptionWhenBehind, out bool conscriptionAlways)
     {
         easy = easyMode;
         hard = hardMode;
-        conscription = conscriptionDoctrine;
+        conscriptionWhenBehind = conscriptionWhenLosing;
+        conscriptionAlways = conscriptionDoctrine;
     }
 
-    public void RestoreDifficultyFromSave(bool easy, bool hard, bool conscription)
+    public void RestoreDifficultyFromSave(bool easy, bool hard,
+        bool conscriptionWhenBehind, bool conscriptionAlways)
     {
         easyMode = easy;
         hardMode = hard;
-        conscriptionDoctrine = conscription;
+        conscriptionWhenLosing = conscriptionWhenBehind;
+        conscriptionDoctrine = conscriptionAlways;
     }
 
     [Header("AI Stage Emulation")]

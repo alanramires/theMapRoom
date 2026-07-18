@@ -265,7 +265,7 @@ public partial class AIShoppingPlanner
             if (enemy == null || enemy.IsDead || enemy.IsEmbarked) continue;
             if (!enemy.TryGetUnitData(out UnitData enemyData) || enemyData == null) continue;
             if (enemyData.unitClass != GameUnitClass.Armored) continue;
-            if (enemyData.roles != null && enemyData.roles.Count > 0 && enemyData.roles[0] == UnitRole.Transportador) continue;
+            if (UnitRoleCompatibility.ResolveCompositionRole(enemyData) == UnitRole.Transportador) continue;
             if (enemyData.eliteLevel < 1) continue;
 
             Vector3Int enemyCell = enemy.CurrentCellPosition;

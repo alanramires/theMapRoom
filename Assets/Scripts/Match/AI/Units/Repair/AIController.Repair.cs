@@ -90,8 +90,53 @@ public partial class AIController
 
     private const int BaseRepairPressureRange = 3;
 
+    // Elite terrestre: bônus por SEGURAR uma construção aliada AVANÇADA (não-home) em reparo em
+    // vez de recuar pro HQ. A blindagem/poder elite justifica reparar sob ameaça; o bônus supera
+    // o viés de segurança (+500) + home (+25) pra a base avançada próxima ganhar do HQ seguro
+    // distante — a distância (-100/hex) segue mandando entre as avançadas (pega a mais perto).
+    private const float EliteForwardHoldRepairBonus = 600f;
+
+    // Elite: penalidade por reparar numa base/âncora fechada pela conscrição — só como ÚLTIMO
+    // recurso (nenhum outro destino elegível). Grande o bastante pra qualquer alternativa (cidade
+    // avançada, mesmo perigosa) ganhar, mas FINITA: continua elegível, então o elite ferido não
+    // fica preso "sem destino → HQ fechado" e morre. Preservar o elite > 1 turno de produção ali.
+    private const float EliteConscriptionBaseRepairPenalty = 100000f;
+
+    // Célula representativa de um setor em Defending com DONO VIVO: penalidade, NÃO exclusão.
+    // Grande o bastante pra qualquer prédio livre ganhar, mas MUITO menor que a penalidade da
+    // conscrição — a ordem certa é: prédio livre > prédio reservado à defesa > base fechada.
+    // Excluir de vez fazia o ferido marchar de volta pra base fechada (onde nem repara) por causa
+    // de uma reserva que ninguém tinha assumido.
+    private const float DefenseReserveRepairPenalty = 5000f;
+
+    // Uma reserva de defesa só vale se tiver DONO: slot preenchido, unidade viva, que não seja a
+    // própria unidade em reparo e que AINDA POSSA AGIR neste turno. O reparo age no fim da
+    // iniciativa (grupos 4/5), então HasActed já é definitivo aqui — quem ainda não agiu é quem de
+    // fato pode ocupar a célula. Sem esse teste a reserva é anônima e tranca a célula pra ninguém.
+    private static bool TryGetLiveDefenderClaim(SectorObjective obj, TeamId aiTeam, UnitManager self, out int ownerId)
+    {
+        ownerId = -1;
+        if (obj?.Slots == null)
+            return false;
+        foreach (SlotNeed slot in obj.Slots)
+        {
+            if (slot == null || !slot.Filled || slot.AssignedUnitId < 0) continue;
+            if (self != null && slot.AssignedUnitId == self.InstanceId) continue;
+            UnitManager owner = FindActiveUnit(slot.AssignedUnitId, aiTeam);
+            if (owner == null || owner.IsDead || owner.HasActed || owner.IsUnderRepair) continue;
+            ownerId = owner.InstanceId;
+            return true;
+        }
+        return false;
+    }
+
     private static bool IsEliteRepairUnit(UnitManager unit)
         => unit != null && unit.TryGetUnitData(out UnitData d) && d != null && d.eliteLevel >= 1;
+
+    // Elite TERRESTRE pode reparar numa construção aliada conquistada mesmo sob ameaça (aeronave
+    // segue a lógica de segurança/aeroporto). Relaxa os filtros de segurança do FindRepairConstruction.
+    private static bool EliteHoldsDangerousRepair(UnitManager unit)
+        => unit != null && unit.GetAircraftType() == AircraftType.None && IsEliteRepairUnit(unit);
 
     // Base "cluster": QG, setor de base, ou âncora — as construções que devem estar livres pra
     // produzir em massa quando a base está sob pressão.
@@ -105,6 +150,64 @@ public partial class AIController
     {
         ConstructionManager at = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, cell);
         return at != null && at.TeamId == aiTeam && IsBaseClusterConstruction(at);
+    }
+
+    // -------------------------------------------------------------------------
+    // Política da conscrição: enquanto o recrutamento forçado está comprando
+    // (doutrina fora da Fase de Massacre, ou surge Perdendo), NINGUÉM — ferido,
+    // elite, qualquer papel — termina o turno em cima de um produtor do exército
+    // próprio: célula de produção é linha de montagem, não estacionamento.
+    // Feridos reparam em prédio aliado sem oferta Army (cidade etc.) ou fundem
+    // na retaguarda. Produtor SEM oferta Army (aeroporto/porto poupando) fica
+    // ABERTO — mesmo recorte do imposto de conscrição; fechá-lo mataria o único
+    // ponto de reparo de aeronaves.
+    // -------------------------------------------------------------------------
+
+    private bool IsConscriptionParkingBanActive()
+    {
+        if (ConscriptionDoctrine && !MassacrePhaseActive)
+            return true;
+        return ConscriptionWhenLosing
+            && GetMacroTerritoryForInspection(CurrentAITeam).Losing;
+    }
+
+    // Só o CLUSTER DE CASA do próprio time (HQ + setor BASEX + âncora) que EFETIVAMENTE produz
+    // massa Army fecha pra estacionar/reparar durante a conscrição — é onde a doutrina fabrica os
+    // números. Cidade conquistada AVANÇADA que produz pra você NÃO fecha (dá pra reparar nela). E
+    // âncora inimiga capturada com selling rule que não vende pra você (FirstOwner/OriginalOwner)
+    // já cai fora por CanProduceUnitsForTeam=false. Vender desligado / oferta vazia idem.
+    private bool IsConscriptionClosedProducerConstruction(ConstructionManager c, TeamId aiTeam)
+    {
+        if (c == null || c.TeamId != aiTeam
+            || !IsBaseClusterConstruction(c)
+            || !c.CanProduceUnitsForTeam(aiTeam) || c.OfferedUnits == null)
+            return false;
+        foreach (UnitData u in c.OfferedUnits)
+            if (u != null && u.militaryForce == MilitaryForce.Army)
+                return true;
+        return false;
+    }
+
+    private bool IsConscriptionClosedProducerCell(Vector3Int cell, TeamId aiTeam)
+        => IsConscriptionClosedProducerConstruction(
+            ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, cell), aiTeam);
+
+    // Injeta as células fechadas pela conscrição no set de "ocupadas" usado como filtro de
+    // DESTINO por todos os ramos de decisão (capturer/assault/transport/fire support/repair/
+    // fallback). Ficar parado (from==to) não consulta esse set — a saída de quem já está em
+    // cima é responsabilidade do fluxo de reparo/vacate.
+    private void AddConscriptionClosedProducerCells(HashSet<Vector3Int> set)
+    {
+        if (set == null || !IsConscriptionParkingBanActive())
+            return;
+        TeamId aiTeam = CurrentAITeam;
+        foreach (ConstructionManager c in ConstructionManager.AllActive)
+        {
+            if (!IsConscriptionClosedProducerConstruction(c, aiTeam))
+                continue;
+            Vector3Int cc = c.CurrentCellPosition; cc.z = 0;
+            set.Add(cc);
+        }
     }
 
     // Pressão à base: macro Perdendo OU inimigo VISÍVEL perto de uma base/HQ/âncora própria.
@@ -221,14 +324,23 @@ public partial class AIController
             UnitMovementPathRules.CalcularCaminhosValidos(
                 boardTilemap, unit, Mathf.Max(0, unit.RemainingMovementPoints), terrainDatabase);
         bool aircraftRepair = unit.GetAircraftType() != AircraftType.None;
-        HashSet<Vector3Int> occupied = aircraftRepair ? BuildAirOccupied(unit) : BuildOccupied(unit);
-        HashSet<Vector3Int> repairDestinationOccupied = aircraftRepair ? BuildOccupied(unit) : occupied;
+        // Reparo NÃO conta produtor fechado pela conscrição como "ocupado" — o ban é aplicado pelo
+        // check explícito (que o elite fura como último recurso). Sem isto, a célula fechada saía
+        // como "ocupado" na busca e o elite ficava sem destino mesmo com base/cidade aliada livre.
+        HashSet<Vector3Int> occupied = aircraftRepair
+            ? BuildAirOccupied(unit)
+            : BuildOccupied(unit, includeConscriptionClosedProducers: false);
+        HashSet<Vector3Int> repairDestinationOccupied = aircraftRepair
+            ? BuildOccupied(unit, includeConscriptionClosedProducers: false)
+            : occupied;
         ConstructionManager currentBldg = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, fromCell);
 
         // Sob pressão à base (macro Perdendo OU inimigo visível perto de base/HQ/âncora própria), a
         // infantaria NÃO-elite fica PROIBIDA de usar base/âncora/HQ para manutenção. Pode reparar em
         // qualquer OUTRO prédio aliado normalmente; só esses três tipos ficam fechados. Elite mantém.
         bool rejectBaseCluster = !IsEliteRepairUnit(unit) && IsBaseUnderPressureForRepair(snapshot);
+        // Conscrição comprando: produtor do exército fechado pra TODOS (elite incluso).
+        bool conscriptionBan = IsConscriptionParkingBanActive();
 
         if (TryReleaseAirTransportRepairPassengers(
                 unit,
@@ -269,11 +381,15 @@ public partial class AIController
         // 1. Prédio conquistado: verifica segurança e presença de substituto
         if (currentBldg != null && currentBldg.IsCapturable
             && currentBldg.TeamId == aiTeam && currentBldg.CurrentCapturePoints >= currentBldg.CapturePointsMax
-            && !(rejectBaseCluster && IsBaseClusterConstruction(currentBldg)))
+            && !(rejectBaseCluster && IsBaseClusterConstruction(currentBldg))
+            && !(conscriptionBan && IsConscriptionClosedProducerConstruction(currentBldg, aiTeam)))
         {
             bool safe = IsRepairConstructionSectorSafe(currentBldg, aiTeam)
                 && !HasNearbyVisibleEnemy(fromCell, aiTeam, DefenseEnemyRange);
+            // VTOL não é empurrado pro aeroporto: se já está num prédio onde pousa
+            // (cidade aliada), fica reparando ali como unidade regular.
             bool aircraftShouldSeekPreferredRepair = aircraftRepair
+                && !IsVtolStyleAircraft(unit)
                 && !IsPreferredAircraftRepairConstruction(currentBldg, aiTeam);
             if (safe && !isBlockingCapTarget && !aircraftShouldSeekPreferredRepair)
             {
@@ -534,6 +650,9 @@ public partial class AIController
             return lastStandAction;
 
         var occupiedForRepair = new HashSet<Vector3Int>(repairDestinationOccupied) { fromCell };
+        // Reserva de defesa NÃO entra em "ocupado" (exclusão dura) — vira penalidade de score, e só
+        // existe se o objetivo tiver um defensor vivo que ainda pode chegar lá neste turno.
+        var defenseReservedCells = new Dictionary<Vector3Int, int>();
         TeamObjectivePlan repPlan = ObjectiveManager.GetPlanForTeam(aiTeam);
         if (repPlan != null)
             foreach (SectorObjective obj in repPlan.Objectives)
@@ -547,7 +666,12 @@ public partial class AIController
                 Vector3Int rc = defInfo.RepresentativeCell; rc.z = 0;
                 ConstructionManager reservedConstruction = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, rc);
                 if (IsRepairHomeConstruction(reservedConstruction, aiTeam)) continue;
-                occupiedForRepair.Add(rc);
+                if (!TryGetLiveDefenderClaim(obj, aiTeam, unit, out int defenderId))
+                {
+                    Debug.Log($"{TL("Repair")} reserva de defesa {obj.Sector} {rc} IGNORADA — sem dono vivo que ainda possa agir");
+                    continue;
+                }
+                defenseReservedCells[rc] = defenderId;
             }
 
         if (aircraftRepair
@@ -557,7 +681,8 @@ public partial class AIController
             return roadRecovery;
         }
 
-        ConstructionManager repairDest = FindRepairConstruction(unit, fromCell, aiTeam, occupiedForRepair, rejectBaseCluster);
+        ConstructionManager repairDest = FindRepairConstruction(
+            unit, fromCell, aiTeam, occupiedForRepair, rejectBaseCluster, defenseReservedCells);
         if (repairDest == null)
         {
             // Não-elite sob pressão: recolhe pros ARREDORES do HQ sem ocupar célula de construção

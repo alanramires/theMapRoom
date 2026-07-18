@@ -240,7 +240,7 @@ public partial class AITacticalAnalyzer
             if (enemy == null || enemy.IsDead || enemy.IsEmbarked) continue;
             if (!enemy.TryGetUnitData(out UnitData data) || data == null) continue;
             if (data.unitClass != GameUnitClass.Armored) continue;
-            if (IsPrimaryRole(data, UnitRole.Transportador)) continue;
+            if (UnitRoleCompatibility.ResolveCompositionRole(data) == UnitRole.Transportador) continue;
             if (data.eliteLevel < 1) continue;
 
             Vector3Int enemyCell = Normalize(enemy.CurrentCellPosition);

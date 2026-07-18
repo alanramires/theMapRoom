@@ -112,7 +112,8 @@ public partial class AIShoppingPlanner
             {
                 if (u == null || u.IsDead || u.IsUnderRepair) continue;
                 if (!u.TryGetUnitData(out UnitData d) || d?.roles == null || d.roles.Count == 0) continue;
-                if (d.domain == Domain.Air && d.roles[0] == UnitRole.Transportador) activeChinooks++;
+                if (d.domain == Domain.Air
+                    && UnitRoleCompatibility.ResolveCompositionRole(d) == UnitRole.Transportador) activeChinooks++;
             }
 
         // Apache as an alternative anti-helicopter: count visible enemy helicopters (same definition
@@ -312,6 +313,41 @@ public partial class AIShoppingPlanner
         int demand = Mathf.Max(0, desiredFireSupport - activeFireSupport);
         Debug.Log($"[AI Shopping] fire_support_demand: demand={demand} desired={desiredFireSupport} activeFire={activeFireSupport} activeAss={activeAssault} ratio=1:{ratio} stance={snapshot.Stance} defensive={defensiveNeed} offensive={offensiveNeed} preferDef={preferDefensiveFireSupport}");
         return demand;
+    }
+
+    // CHOKE POINT do teto de logística do Hard Mode.
+    //
+    // Há MAIS DE UM emissor de demanda de Logistica (ComputeLogisticsDemand/"service",
+    // BuildLogisticsOperationalPressure/"operational-pressure", ...) e MergeRoleDemand funde por
+    // Max(Count). Aplicar o teto dentro de um emissor não segura nada: o emissor que respeitava o
+    // limite (x1) perdia na fusão pro que não o conhecia (x3, teto próprio hardcoded), e o Hard
+    // comprava 3 supridores com o limite configurado em 1.
+    //
+    // Aqui, com a lista já fechada, o teto vale pra qualquer emissor — presente ou futuro.
+    // Tanque aéreo (Domain.Air) tem trilho próprio e não entra nesta conta.
+    private static void ApplyHardModeLogisticsCap(AIWorldSnapshot snapshot, List<AIShoppingDemand> demands)
+    {
+        if (snapshot == null || demands == null
+            || AIController.Instance == null || !AIController.Instance.HardMode)
+            return;
+
+        int cap = AIController.Instance.MaxLogisticUnitsOnHardMode;
+        int active = CountActiveGroundLogistics(snapshot);
+        int allowed = Mathf.Max(0, cap - active);
+
+        foreach (AIShoppingDemand demand in demands)
+        {
+            if (demand == null || demand.Role != UnitRole.Logistica) continue;
+            if (demand.Domain == Domain.Air) continue;
+            if (demand.Count <= allowed) continue;
+            Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] "
+                + $"teto Hard de logística: Logistica x{demand.Count} -> x{allowed} "
+                + $"(max={cap} ativos={active} origem={demand.Origin})");
+            demand.Count = allowed;
+        }
+
+        demands.RemoveAll(d => d != null && d.Role == UnitRole.Logistica
+            && d.Domain != Domain.Air && d.Count <= 0);
     }
 
     private static int ComputeLogisticsDemand(AIWorldSnapshot snapshot, out int repairDemandCount, out int activeLogisticsCount)
@@ -1230,6 +1266,29 @@ public partial class AIShoppingPlanner
         var usedBuildings = new HashSet<ConstructionManager>();
         int remaining = snapshot.Budget;
 
+        // DOUTRINA DO ENXAME (Agressivo/conscriptionDoctrine): imposto de conscrição. Reserva o
+        // custo do corpo Army mais barato de CADA produtor do exército livre — o carrinho
+        // (incluindo o elite) só gasta o que couber POR CIMA da massa garantida. Ex.: 20k, 4
+        // produtores, MBT 18k → imposto 4k, gastoLivre 16k < 18k: MBT não fecha, 4 soldados saem.
+        // Com 26k → gastoLivre 22k: MBT fecha E os outros 3 compram soldado. Levemente conservador:
+        // o produtor que o próprio carrinho usar também foi taxado (devolve só no turno seguinte).
+        // Computado ANTES da reserva blitz/elite porque o gate "já dá pra comprar o MBT" precisa
+        // somar o imposto — senão o blitz solta a reserva, o imposto come a diferença e o Obus mais
+        // barato fura a fila de armor-first. Válvula: em Fase de Massacre a doutrina pausa (o caixa
+        // inteiro volta pras demandas e a máquina de elite existente assume).
+        int conscriptionTax = 0;
+        bool conscriptionActive = false;
+        if (AIController.Instance != null && AIController.Instance.ConscriptionDoctrine)
+            conscriptionActive = !ResolveMassacrePhase(snapshot, AIController.Instance);
+        if (conscriptionActive)
+        {
+            conscriptionTax = ComputeConscriptionTax(snapshot, occupied);
+            if (conscriptionTax > 0)
+                Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] doutrina do "
+                    + $"enxame: imposto de conscrição={conscriptionTax} — demandas só gastam acima da "
+                    + $"massa garantida (todo produtor do exército compra SEMPRE)");
+        }
+
         // Reserva estratégica existe apenas para alvo ELITE com o core já formado.
         // Compras regulares permanecem gulosas para montar o exército rapidamente.
         int reserve = ComputeStrategicSavingReserve(
@@ -1238,8 +1297,10 @@ public partial class AIShoppingPlanner
         // Bootstrap Blitz: no Hard o primeiro Assalto É o MBT elite caro (básico banido). A reserva
         // elite normal exige um core que já inclui Assalto — impossível antes de comprar o primeiro.
         // Este bootstrap fura esse catch-22 e segura o grosso do caixa até o MBT ficar pagável.
+        // Passa o imposto: o MBT só "fecha a conta" quando cabe DEPOIS da massa garantida.
         int blitzArmorReserve = ComputeBlitzFirstArmorReserve(
-            snapshot, demands, remaining, out AIShoppingDemand blitzArmorTarget);
+            snapshot, demands, remaining, conscriptionTax,
+            out AIShoppingDemand blitzArmorTarget, out bool buyFirstMbtNow);
         if (blitzArmorReserve > reserve)
         {
             reserve = blitzArmorReserve;
@@ -1255,7 +1316,9 @@ public partial class AIShoppingPlanner
         // força), corpo vem antes do elite. Enche cada produtor livre com o corpo mais BARATO (massa),
         // e o elite comprometido só entra no ÚLTIMO produtor se ainda couber no caixa depois da massa —
         // o resto vira reserva. Normal/Easy seguem o fluxo validado (retrato de hoje), intocados.
-        if (AIController.Instance != null && AIController.Instance.HardMode && macroLosing)
+        if (AIController.Instance != null
+            && AIController.Instance.ConscriptionWhenLosing
+            && macroLosing)
         {
             RecruitmentSurgeFill(snapshot, orders, usedBuildings, occupied, ref remaining, demands, eliteCommitment);
             Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] RECRUTAMENTO FORÇADO: "
@@ -1307,25 +1370,24 @@ public partial class AIShoppingPlanner
                 + (concentrateEmergency ? " (EMERGÊNCIA: cadeia de elite ignorada)" : ""));
         }
 
-        // DOUTRINA DO ENXAME (Agressivo/conscriptionDoctrine): imposto de conscrição. Antes das compras por demanda,
-        // reserva o custo do corpo Army mais barato de CADA produtor do exército livre — o
-        // carrinho (incluindo o elite) só gasta o que couber POR CIMA da massa garantida.
-        // Ex.: 20k, 4 produtores, MBT 18k → imposto 4k, gastoLivre 16k < 18k: MBT não fecha,
-        // 4 soldados saem. Com 26k → gastoLivre 22k: MBT fecha E os outros 3 compram soldado.
-        // Levemente conservador: o produtor que o próprio carrinho usar também foi taxado
-        // (devolve só no turno seguinte) — erro máximo de alguns corpos baratos, lado seguro.
-        // O fill do fim do turno consome o imposto comprando a massa (só a reserva elite é
-        // intocável lá). Hard+Perdendo nunca chega aqui (RecruitmentSurgeFill retorna antes).
-        int conscriptionTax = 0;
-        if (AIController.Instance != null && AIController.Instance.ConscriptionDoctrine)
-        {
-            conscriptionTax = ComputeConscriptionTax(snapshot, occupied);
-            if (conscriptionTax > 0)
-                Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] doutrina do "
-                    + $"enxame: imposto de conscrição={conscriptionTax} — demandas só gastam acima da "
-                    + $"massa garantida (todo produtor do exército compra SEMPRE)");
-        }
+        // PRÉ-COMPRA do 1º MBT: quando o blitz decide que já dá pra comprar o MBT, a compra é
+        // GARANTIDA fora do carrinho — senão a soma-de-cobertura do beam prefere largura (2-3 peças
+        // baratas cobrindo mais demandas) à profundidade (1 MBT caro), e o "primeiro elite = MBT"
+        // nunca acontece enquanto houver artilharia de rally / contra-pressão competindo. Ocupa o
+        // produtor antes do carrinho; o troco (respeitando gordura + imposto) segue pro carrinho/fill.
+        if (buyFirstMbtNow && blitzArmorTarget != null)
+            TryPreCommitBlitzFirstMbt(
+                snapshot, blitzArmorTarget, eliteCommitment,
+                orders, usedBuildings, occupied, ref remaining);
 
+        // Nota — fill do fim do turno: consome o imposto comprando a massa (só a reserva elite é
+        // intocável lá). Com ConscriptionWhenLosing (Médio/Competitiva), Perdendo nunca chega aqui
+        // (RecruitmentSurgeFill retorna antes); na doutrina (Formigueiro/Agressiva), Perdendo passa
+        // por aqui mesmo — conscrição é sempre, e massacre nunca ativa perdendo.
+        // Teto de logística do Hard Mode aplicado DEPOIS da fusão de demandas — ver
+        // ApplyHardModeLogisticsCap. Precisa vir antes do log da fila pra ela anunciar o número
+        // que vai ser realmente comprado.
+        ApplyHardModeLogisticsCap(snapshot, demands);
         LogRoleShoppingQueue(snapshot, demands, remaining);
         if (expansionCapturerTarget > 0)
         {
@@ -1397,14 +1459,18 @@ public partial class AIShoppingPlanner
         // a conta. Tática do enxame: a AI poupa POR CIMA da produção de massa, nunca em vez
         // dela — o humano nunca ganha um turno de folga. Sob ameaça visível à base, o
         // preenchimento defensivo clássico prevalece (sem restrição de força).
+        //
+        // A reserva estratégica CEDE o imposto de conscrição pro fill: a poupança
+        // (blitz/elite) pode reivindicar quase o caixa todo (ex.: 12k com reserva 11k),
+        // mas a massa vem primeiro — sem essa cessão, o fill respeitava a reserva cheia
+        // e só 1 produtor comprava (o horizonte da poupança estica; a doutrina aceita).
         bool defendFillBuildings = HasAnyVisibleEnemyNearOwnedBase(
             snapshot, DefensiveBaseThreatRange);
-        bool hardSwarmDoctrine = AIController.Instance != null
-            && AIController.Instance.ConscriptionDoctrine;
+        bool hardSwarmDoctrine = conscriptionActive;
         if (defendFillBuildings || hardSwarmDoctrine)
             FillIdleProductionBuildings(
                 snapshot, orders, usedBuildings, occupied, ref remaining,
-                hasStrategicReserve ? reserve : 0,
+                hasStrategicReserve ? Mathf.Max(0, reserve - conscriptionTax) : 0,
                 armyMassOnly: hardSwarmDoctrine && !defendFillBuildings);
 
         foreach (AIShoppingDemand demand in demands)
@@ -2019,9 +2085,10 @@ public partial class AIShoppingPlanner
     // grosso do caixa até o MBT ficar pagável, liberando apenas um corpo barato (renda/screen).
     private static int ComputeBlitzFirstArmorReserve(
         AIWorldSnapshot snapshot, List<AIShoppingDemand> demands, int remaining,
-        out AIShoppingDemand target)
+        int conscriptionTax, out AIShoppingDemand target, out bool buyNow)
     {
         target = null;
+        buyNow = false;
         if (snapshot == null || demands == null || remaining <= 0)
             return 0;
         if (AIController.Instance == null || !AIController.Instance.HardMode)
@@ -2062,14 +2129,18 @@ public partial class AIShoppingPlanner
         // não fecha. Por isso só compra quando dá pra pagar MBT + gordura, e mesmo aí segura os 20%.
         int upkeepFat = Mathf.CeilToInt(remaining * upkeepBufferPct);
 
-        // Já dá pra comprar o MBT mantendo a gordura? Libera a compra segurando só os 20%.
-        if (mbtCost + upkeepFat <= remaining && availableNow)
+        // Já dá pra comprar o MBT mantendo a gordura E a massa de conscrição? O imposto entra na
+        // conta: o carrinho gasta remaining - reserva - imposto, então o MBT só cabe quando o caixa
+        // cobre MBT + gordura + imposto. Sem isso o blitz soltava a reserva na janela em que o
+        // imposto ainda comia a diferença, e o Obus (mais barato) furava a fila de armor-first.
+        if (mbtCost + upkeepFat + conscriptionTax <= remaining && availableNow)
         {
             target = assaultDemand;
+            buyNow = true;
             UnitData mbtNow = FindBestOfferedUnitForDemand(snapshot, assaultDemand);
             Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] blitz_armor: "
                 + $"compra 1º MBT {(mbtNow != null ? mbtNow.displayName : "Assalto")} custo={mbtCost} "
-                + $"caixa={remaining} segura gordura={upkeepFat} ({upkeepBufferPct:P0} p/ Serviço do Comando)");
+                + $"caixa={remaining} segura gordura={upkeepFat} imposto={conscriptionTax} ({upkeepBufferPct:P0} p/ Serviço do Comando)");
             return upkeepFat;
         }
 
@@ -2079,7 +2150,9 @@ public partial class AIShoppingPlanner
         // esperar até 3 rodadas comprando soldado enquanto junta (peça de maior ticket).
         int netIncome = Mathf.FloorToInt(income * (1f - upkeepBufferPct));
         int maxTurns = Mathf.Max(3, AIController.Instance.EliteSaveTurns);
-        if (remaining + netIncome * maxTurns < mbtCost + upkeepFat)
+        // Alcance conta com o imposto: se nem em maxTurns o caixa cobre MBT + gordura + massa,
+        // não entesoura o grosso (segue expandindo/spammando). Mesma conta do gate de compra.
+        if (remaining + netIncome * maxTurns < mbtCost + upkeepFat + conscriptionTax)
             return 0;
 
         // Segura o grosso; libera um corpo barato (soldado) por turno — vai comprando soldados
@@ -2098,6 +2171,67 @@ public partial class AIShoppingPlanner
             + $"({upkeepBufferPct:P0} p/ Serviço do Comando) horizonte={maxTurns}T reserva={reserve} "
             + $"gastoLivre={remaining - reserve} (vai comprando soldado até o MBT)");
         return reserve;
+    }
+
+    // Pré-compra GARANTIDA do 1º MBT quando o blitz sinaliza buyNow. Emite a ordem fora do carrinho
+    // (o beam prefere largura à profundidade e o MBT caro nunca ganharia a soma-de-cobertura sozinho).
+    // Escolhe o produtor LIVRE mais barato que satisfaz a demanda-alvo; ocupa-o pro carrinho/fill
+    // pularem. Idempotente por chamada: decrementa a demanda e retorna false se não achar produtor.
+    private static bool TryPreCommitBlitzFirstMbt(
+        AIWorldSnapshot snapshot, AIShoppingDemand target,
+        AIElitePurchaseCommitment eliteCommitment,
+        List<ShoppingOrder> orders, HashSet<ConstructionManager> usedBuildings,
+        HashSet<Vector3Int> occupied, ref int remaining)
+    {
+        if (snapshot?.MyBuildings == null || target == null || target.Count <= 0)
+            return false;
+
+        ConstructionManager bestBuilding = null;
+        UnitData bestUnit = null;
+        foreach (ConstructionManager building in snapshot.MyBuildings)
+        {
+            if (building == null || usedBuildings.Contains(building)
+                || !building.CanProduceUnitsForTeam(snapshot.AITeam) || building.OfferedUnits == null)
+                continue;
+            Vector3Int cell = building.CurrentCellPosition; cell.z = 0;
+            if (occupied.Contains(cell))
+                continue;
+            foreach (UnitData unit in building.OfferedUnits)
+            {
+                if (unit == null || unit.cost <= 0 || unit.cost > remaining
+                    || unit.militaryForce == MilitaryForce.Navy
+                    || !IsEliteChainAvailable(unit, snapshot)
+                    || !IsRolePurchaseAllowed(unit, snapshot.Stance, IsEmergencyShoppingDemand(target))
+                    || !DoesUnitMeetShoppingDemand(unit, target))
+                    continue;
+                if (bestUnit == null || unit.cost < bestUnit.cost)
+                {
+                    bestUnit = unit;
+                    bestBuilding = building;
+                }
+            }
+        }
+        if (bestUnit == null || bestBuilding == null)
+            return false;
+
+        int idx = IndexOf(bestBuilding.OfferedUnits, bestUnit);
+        orders.Add(new ShoppingOrder { Building = bestBuilding, UnitToBuy = bestUnit, SelectedIndex = idx });
+        remaining -= bestUnit.cost;
+        usedBuildings.Add(bestBuilding);
+        Vector3Int pc = bestBuilding.CurrentCellPosition; pc.z = 0;
+        occupied.Add(pc);
+        target.Count = Mathf.Max(0, target.Count - 1);
+        Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] blitz_armor: "
+            + $"PRÉ-COMPRA garantida do 1º MBT {bestUnit.displayName} ${bestUnit.cost} em "
+            + $"{bestBuilding.ConstructionDisplayName} (fura a soma-de-cobertura do carrinho) restante={remaining}");
+        if (eliteCommitment != null
+            && string.Equals(bestUnit.id, eliteCommitment.unitId, System.StringComparison.Ordinal))
+        {
+            AIIntelLedger.ClearElitePurchaseCommitment(snapshot.AITeam);
+            Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] "
+                + $"compromisso elite concluído (pré-compra): {bestUnit.displayName}");
+        }
+        return true;
     }
 
     private static bool IsCriticalCapabilityDemand(AIShoppingDemand demand)
@@ -2877,6 +3011,35 @@ public partial class AIShoppingPlanner
             if (d != null && d.Count > 0 && DoesUnitMeetShoppingDemand(unit, d))
                 return true;
         return false;
+    }
+
+    // FASE DE MASSACRE (válvula da doutrina): jogadores cessam o recrutamento forçado quando
+    // têm clara vantagem numérica (~2:1) ou estão perto do teto de unidades, e convertem o
+    // caixa em elite pra fechar o jogo de uma vez. Histerese entre entrar (>= enter) e sair
+    // (< exit) evita alternar soldado/elite com o ratio oscilando na fronteira. Fog-honesto
+    // por construção: o ForceRatio macro usa inimigos CONHECIDOS (+ projeção de produtores no
+    // Hard) — a AI pode "achar" que domina enquanto o inimigo esconde exército, o mesmo erro
+    // que um humano cometeria com a mesma informação. O gate exige EnemyForce > 0: sem nenhum
+    // contato/projeção o ratio degenera pra 100% e desligaria a doutrina no turno 1.
+    private static bool ResolveMassacrePhase(AIWorldSnapshot snapshot, AIController ai)
+    {
+        AIController.MacroTerritoryInspection macro =
+            AIController.GetMacroTerritoryForInspection(snapshot.AITeam);
+        bool wasActive = ai.MassacrePhaseActive;
+        bool byRatio = macro.EnemyForce > 0 && macro.ForceRatio
+            >= (wasActive ? ai.MassacreExitForceRatio : ai.MassacreEnterForceRatio);
+        int unitCap = ai.Match != null ? ai.Match.MaxUnitsPerTeam : 0;
+        bool byCap = unitCap > 0 && snapshot.MyUnits.Count
+            >= Mathf.CeilToInt(unitCap * ai.MassacreUnitCapFillRatio);
+        bool active = byRatio || byCap;
+        ai.MassacrePhaseActive = active;
+        if (active != wasActive)
+            Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] "
+                + (active
+                    ? $"FASE DE MASSACRE: conscrição cessa (fr={macro.ForceRatio:P0} "
+                        + $"unidades={snapshot.MyUnits.Count}/{unitCap}) — caixa vira elite"
+                    : $"fim do massacre (fr={macro.ForceRatio:P0}) — conscrição reativada"));
+        return active;
     }
 
     // Imposto de conscrição (doutrina do enxame, Hard): soma do corpo Army mais barato de

@@ -24,7 +24,7 @@ public static class PartidaConfig
             pendingDifficulty = null;
             return true;
         }
-        difficulty = AIDifficulty.Normal;
+        difficulty = AIDifficulty.Facil;
         return false;
     }
 

@@ -188,7 +188,10 @@ public partial class AIController
 
         // Não-elite sob pressão não pode SEGURAR em cima de uma construção do cluster da base:
         // se está numa, tem que sair pros arredores (loop abaixo já exclui essas células).
-        bool fromOnBaseCluster = avoidBaseClusterCells && IsOwnBaseClusterCell(fromCell, aiTeam);
+        // Conscrição comprando: mesmo tratamento pra produtor do exército, pra TODOS.
+        bool conscriptionProducerBan = IsConscriptionParkingBanActive();
+        bool fromOnBaseCluster = (avoidBaseClusterCells && IsOwnBaseClusterCell(fromCell, aiTeam))
+            || (conscriptionProducerBan && IsConscriptionClosedProducerCell(fromCell, aiTeam));
 
         bool safeNearHQ = !fromOnBaseCluster
             && SectorManager.HexDistance(fromCell, hqCell) <= DefenseEnemyRange
@@ -208,6 +211,7 @@ public partial class AIController
             if (cell != fromCell && occupied.Contains(cell)) continue;
             // Recolhe pros ARREDORES do HQ sem parar em base/âncora/HQ (deixa a produção livre).
             if (avoidBaseClusterCells && cell != fromCell && IsOwnBaseClusterCell(cell, aiTeam)) continue;
+            if (conscriptionProducerBan && cell != fromCell && IsConscriptionClosedProducerCell(cell, aiTeam)) continue;
 
             float dist = SectorManager.HexDistance(cell, hqCell);
             float threat = CalculateThreatLevel(cell, aiTeam);
@@ -226,14 +230,23 @@ public partial class AIController
     }
 
 
-    private ConstructionManager FindRepairConstruction(UnitManager unit, Vector3Int fromCell, TeamId aiTeam, HashSet<Vector3Int> occupied, bool rejectBaseCluster = false)
+    private ConstructionManager FindRepairConstruction(
+        UnitManager unit,
+        Vector3Int fromCell,
+        TeamId aiTeam,
+        HashSet<Vector3Int> occupied,
+        bool rejectBaseCluster = false,
+        Dictionary<Vector3Int, int> defenseReservedCells = null)
     {
         ConstructionManager best = null;
         float bestScore = float.MinValue;
+        bool conscriptionProducerBan = IsConscriptionParkingBanActive();
+        bool eliteRelaxSafety = EliteHoldsDangerousRepair(unit);
         bool preferAircraftFacility = unit != null && unit.GetAircraftType() != AircraftType.None;
         bool needsPassengerRelease = IsAirTransporter(unit) && HasTransportCargo(unit);
         int passengerCount = needsPassengerRelease ? CollectPassengers(unit).Count : 0;
-        bool restrictToPreferredAircraftFacility = preferAircraftFacility
+        bool vtolStyle = IsVtolStyleAircraft(unit);
+        bool restrictToPreferredAircraftFacility = preferAircraftFacility && !vtolStyle
             && HasUsablePreferredAircraftRepairConstruction(unit, fromCell, aiTeam, occupied);
         foreach (ConstructionManager c in ConstructionManager.AllActive)
         {
@@ -245,6 +258,18 @@ public partial class AIController
                 Debug.Log($"[Repair] skip {cc} base/âncora/HQ fechado p/ não-elite sob pressão dist={dist:F1}");
                 continue;
             }
+            bool conscriptionClosed = conscriptionProducerBan
+                && IsConscriptionClosedProducerConstruction(c, aiTeam);
+            if (conscriptionClosed && !eliteRelaxSafety)
+            {
+                Debug.Log($"[Repair] skip {cc} base/âncora de produção fechada pela conscrição dist={dist:F1}");
+                continue;
+            }
+            // Elite: base fechada NÃO é descartada — fica como ÚLTIMO recurso (penalidade pesada
+            // no score abaixo). Sem isso o elite ferido não achava NENHUM destino (só sobravam base
+            // fechada + ocupados + neutros) e recuava pro HQ fechado sem reparar.
+            if (conscriptionClosed && eliteRelaxSafety)
+                Debug.Log($"[Repair] {cc} base fechada pela conscrição, mas ELEGÍVEL p/ elite (último recurso) dist={dist:F1}");
             bool isAircraftFacility = IsAircraftRepairConstruction(c);
             bool isPreferredAircraftFacility = IsPreferredAircraftRepairConstruction(c, aiTeam);
             if (restrictToPreferredAircraftFacility && !isPreferredAircraftFacility)
@@ -260,7 +285,7 @@ public partial class AIController
                 Debug.Log($"[Repair] skip {cc} cap={c.CurrentCapturePoints}/{c.CapturePointsMax} (incompleto) dist={dist:F1}");
                 continue;
             }
-            if (!isHomeRepair && !IsRepairConstructionSectorSafe(c, aiTeam))
+            if (!isHomeRepair && !eliteRelaxSafety && !IsRepairConstructionSectorSafe(c, aiTeam))
             {
                 Debug.Log($"[Repair] skip {cc} setor inseguro sector={c.Sector} dist={dist:F1}");
                 continue;
@@ -275,9 +300,18 @@ public partial class AIController
                 Debug.Log($"[Repair] home {cc} ocupado, mantendo como fallback de reparo dist={dist:F1}");
 
             bool safe = !HasNearbyVisibleEnemy(cc, aiTeam, DefenseEnemyRange);
-            if (!safe && !isHomeRepair)
+            if (!safe && !isHomeRepair && !eliteRelaxSafety)
             {
                 Debug.Log($"[Repair] skip {cc} unsafe (não-home) dist={dist:F1}");
+                continue;
+            }
+            if (!safe && !isHomeRepair && eliteRelaxSafety)
+                Debug.Log($"[Repair] {cc} sob ameaça mas ELEGÍVEL (elite segura base avançada) dist={dist:F1}");
+            // VTOL: elegibilidade é PODER POUSAR ali (o resolver decide — regras da
+            // construção + skills). Cidade que permite pouso entra; sem pouso, fora.
+            if (vtolStyle && !AirOperationResolver.CanLand(unit, boardTilemap, terrainDatabase, cc))
+            {
+                Debug.Log($"[Repair] skip {cc} VTOL sem pouso permitido dist={dist:F1}");
                 continue;
             }
             float aircraftTakeoffScore = 0f;
@@ -304,8 +338,27 @@ public partial class AIController
             float score = -dist * 100f;
             if (safe) score += 500f;
             if (isHomeRepair) score += 25f;
+            // Elite: prefere SEGURAR uma base avançada (não-home) a recuar pro HQ — o bônus supera
+            // o viés de segurança do HQ, então uma base aliada livre próxima ganha do HQ distante.
+            if (eliteRelaxSafety && !isHomeRepair)
+                score += EliteForwardHoldRepairBonus;
+            // Elite: base fechada pela conscrição só como ÚLTIMO recurso — penalidade pesada faz
+            // QUALQUER alternativa elegível (cidade avançada, mesmo perigosa) ganhar; mas o score
+            // segue finito, então continua elegível quando não há mais nada (não morre sem reparo).
+            if (eliteRelaxSafety && conscriptionClosed)
+                score -= EliteConscriptionBaseRepairPenalty;
+            // Reservado a um objetivo defensivo COM dono vivo: penaliza, não exclui. Continua
+            // ganhando de uma base fechada pela conscrição (-100000) — reparar num prédio
+            // reservado é melhor que marchar de volta pra base onde a unidade nem repara.
+            if (defenseReservedCells != null && defenseReservedCells.TryGetValue(cc, out int reserveOwnerId))
+            {
+                score -= DefenseReserveRepairPenalty;
+                Debug.Log($"[Repair] {cc} reservado (defesa {c.Sector}, dono=Unit#{reserveOwnerId}) — penalizado, não excluído dist={dist:F1}");
+            }
             float aircraftCohesion = 0f;
-            if (preferAircraftFacility)
+            // VTOL não recebe o viés de aeroporto (+70k/+20k): repara no prédio pousável
+            // mais próximo como uma unidade regular — cidade vizinha ganha de aeroporto longe.
+            if (preferAircraftFacility && !vtolStyle)
             {
                 aircraftCohesion = CalculateAircraftRepairCohesionScore(unit, cc, aiTeam);
                 if (isPreferredAircraftFacility) score += 70000f + aircraftCohesion + aircraftTakeoffScore;
@@ -568,6 +621,12 @@ public partial class AIController
         return weighted + closeBonus + nearbyBonus + isolationPenalty;
     }
 
+
+    // VTOL/STOVL repara como unidade regular do exército: procura o prédio aliado mais
+    // PRÓXIMO onde consegue pousar (cidade conta), sem restrição nem viés de aeroporto.
+    private static bool IsVtolStyleAircraft(UnitManager unit)
+        => unit != null && unit.GetAircraftType() != AircraftType.None
+            && AirOperationResolver.UnitHasVtolStyleLanding(unit);
 
     private static bool IsAircraftRepairConstruction(ConstructionManager construction)
     {

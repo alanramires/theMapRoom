@@ -5318,12 +5318,12 @@ MonoBehaviour:
   - teamId: 0
     flipX: 0
     flipXOverride: 0
-    isAI: 0
-    commandServiceAutomatic: 0
+    isAI: 1
+    commandServiceAutomatic: 1
     defeated: 0
     startMoney: 0
     actualMoney: 0
-    incomePerTurn: 0
+    incomePerTurn: 4500
     startMoneyApplied: 1
   - teamId: 1
     flipX: 1
@@ -5333,7 +5333,7 @@ MonoBehaviour:
     defeated: 0
     startMoney: 0
     actualMoney: 0
-    incomePerTurn: 0
+    incomePerTurn: 4500
     startMoneyApplied: 1
   includeNeutralTeam: 0
   economyEnabled: 1
@@ -5384,7 +5384,7 @@ MonoBehaviour:
   appliedActiveTeamId: 0
   pendingTurnStartUpkeep: 1
   pendingTurnStartEconomy: 1
-  cachedConstructionIncomeSignature: 869148845
+  cachedConstructionIncomeSignature: -1336226801
   cachedConstructionIncomeCount: 21
   constructionIncomeRefreshIntervalSeconds: 0.35
   continuousEditorRefresh: 0
@@ -5900,6 +5900,7 @@ MonoBehaviour:
   customSaveDirectory: C:/Users/Alan/AppData/LocalLow/Sistemas Info/The Map Room
   blockCrossSceneLoad: 1
   verboseLogs: 0
+  showSaveLoadLogs: 0
   forceLoadWhenBusy: 1
   saveReplayData: 1
   enableThreatCacheWarmupOnLoad: 0
@@ -7767,11 +7768,14 @@ MonoBehaviour:
   turnStateManager: {fileID: 1900915756}
   boardTilemap: {fileID: 1566606925}
   terrainDatabase: {fileID: 11400000, guid: af24f1a2f28971f498767ede9f9cfba1, type: 2}
-  showAIUnitHUD: 0
+  showAILogs: 1
+  showAIUnitHUD: 1
   startOnPause: 0
-  iaRapida: 0
-  hardMode: 0
+  iaRapida: 1
+  hardMode: 1
   easyMode: 0
+  conscriptionDoctrine: 1
+  conscriptionWhenLosing: 0
   emulateStage0: 1
   emulateStage1: 1
   emulateStage2: 1
@@ -16639,8 +16643,8 @@ MonoBehaviour:
   cursorController: {fileID: 2105919121}
   sendButton: {fileID: 0}
   commandInputObject: {fileID: 0}
-  aiDebugShortcutsEnabled: 0
-  debugShortcutsEnabled: 0
+  aiDebugShortcutsEnabled: 1
+  debugShortcutsEnabled: 1
   resetPlanOnDebugStage: 1
   panelRodadaDesativadoPvpDebug: 0
 --- !u!1 &1078171621
@@ -19373,6 +19377,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fb232daae2c5e4a4793768632e445f0b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::JogadasManager
+  showJogadasLogs: 0
   log:
     jogadas: []
     proximoId: 1
@@ -19507,7 +19512,7 @@ MonoBehaviour:
   eixoOverrides: []
   constructionId: flag
   instanceId: 129
-  currentPosition: {x: -1.7319531, y: 0, z: 0}
+  currentPosition: {x: -1.7319533, y: 0, z: 0}
   constructionDisplayName: Flag
   lastAutoConstructionDisplayName: Flag
   isVisible: 0
@@ -21397,7 +21402,7 @@ MonoBehaviour:
   eixoOverrides: []
   constructionId: cidade
   instanceId: 144
-  currentPosition: {x: -2.5979297, y: 0, z: 0}
+  currentPosition: {x: -2.5979295, y: 0, z: 0}
   constructionDisplayName: Cidade
   lastAutoConstructionDisplayName: Cidade
   isVisible: 1
@@ -32108,7 +32113,7 @@ MonoBehaviour:
   eixoOverrides: []
   constructionId: flag
   instanceId: 153
-  currentPosition: {x: -1.7319531, y: -1.5, z: 0}
+  currentPosition: {x: -1.7319533, y: -1.5, z: 0}
   constructionDisplayName: Flag
   lastAutoConstructionDisplayName: Flag
   isVisible: 0
@@ -32380,16 +32385,16 @@ MonoBehaviour:
         AirDistance: 11
         IsHQ: 1
       - ConstructionName: "F\xE1brica"
-        InstanceId: 157
-        Distance: 12
-        VehicleDistance: 12
-        AirDistance: 12
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
         InstanceId: 98
         Distance: 11
         VehicleDistance: 11
         AirDistance: 11
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 157
+        Distance: 12
+        VehicleDistance: 12
+        AirDistance: 12
         IsHQ: 0
     closestNeighbor1: 1
     closestNeighbor1Distance: 4
@@ -32452,16 +32457,16 @@ MonoBehaviour:
         AirDistance: 10
         IsHQ: 1
       - ConstructionName: "F\xE1brica"
-        InstanceId: 157
-        Distance: 11
-        VehicleDistance: 11
-        AirDistance: 11
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
         InstanceId: 98
         Distance: 10
         VehicleDistance: 10
         AirDistance: 10
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 157
+        Distance: 11
+        VehicleDistance: 11
+        AirDistance: 11
         IsHQ: 0
     closestNeighbor1: 7
     closestNeighbor1Distance: 3
@@ -32524,16 +32529,16 @@ MonoBehaviour:
         AirDistance: 8
         IsHQ: 1
       - ConstructionName: "F\xE1brica"
-        InstanceId: 157
-        Distance: 8
-        VehicleDistance: 8
-        AirDistance: 8
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
         InstanceId: 98
         Distance: 9
         VehicleDistance: 9
         AirDistance: 9
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 157
+        Distance: 8
+        VehicleDistance: 8
+        AirDistance: 8
         IsHQ: 0
     closestNeighbor1: 3
     closestNeighbor1Distance: 3
@@ -32596,16 +32601,16 @@ MonoBehaviour:
         AirDistance: 5
         IsHQ: 1
       - ConstructionName: "F\xE1brica"
-        InstanceId: 157
-        Distance: 5
-        VehicleDistance: 5
-        AirDistance: 5
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
         InstanceId: 98
         Distance: 6
         VehicleDistance: 6
         AirDistance: 6
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 157
+        Distance: 5
+        VehicleDistance: 5
+        AirDistance: 5
         IsHQ: 0
     closestNeighbor1: 2
     closestNeighbor1Distance: 3
@@ -32668,16 +32673,16 @@ MonoBehaviour:
         AirDistance: 5
         IsHQ: 1
       - ConstructionName: "F\xE1brica"
-        InstanceId: 157
-        Distance: 6
-        VehicleDistance: 6
-        AirDistance: 6
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
         InstanceId: 98
         Distance: 5
         VehicleDistance: 5
         AirDistance: 5
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 157
+        Distance: 6
+        VehicleDistance: 6
+        AirDistance: 6
         IsHQ: 0
     closestNeighbor1: 7
     closestNeighbor1Distance: 2
@@ -32740,16 +32745,16 @@ MonoBehaviour:
         AirDistance: 6
         IsHQ: 1
       - ConstructionName: "F\xE1brica"
-        InstanceId: 157
-        Distance: 7
-        VehicleDistance: 7
-        AirDistance: 7
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
         InstanceId: 98
         Distance: 6
         VehicleDistance: 6
         AirDistance: 6
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 157
+        Distance: 7
+        VehicleDistance: 7
+        AirDistance: 7
         IsHQ: 0
     closestNeighbor1: 7
     closestNeighbor1Distance: 4
@@ -32812,16 +32817,16 @@ MonoBehaviour:
         AirDistance: 2
         IsHQ: 1
       - ConstructionName: "F\xE1brica"
-        InstanceId: 157
-        Distance: 3
-        VehicleDistance: 3
-        AirDistance: 3
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
         InstanceId: 98
         Distance: 2
         VehicleDistance: 2
         AirDistance: 2
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 157
+        Distance: 3
+        VehicleDistance: 3
+        AirDistance: 3
         IsHQ: 0
     closestNeighbor1: 4
     closestNeighbor1Distance: 3
@@ -32884,16 +32889,16 @@ MonoBehaviour:
         AirDistance: 7
         IsHQ: 1
       - ConstructionName: "F\xE1brica"
-        InstanceId: 157
-        Distance: 8
-        VehicleDistance: 8
-        AirDistance: 8
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
         InstanceId: 98
         Distance: 7
         VehicleDistance: 7
         AirDistance: 7
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 157
+        Distance: 8
+        VehicleDistance: 8
+        AirDistance: 8
         IsHQ: 0
     closestNeighbor1: 4
     closestNeighbor1Distance: 2
@@ -32971,16 +32976,16 @@ MonoBehaviour:
         AirDistance: 13
         IsHQ: 1
       - ConstructionName: "F\xE1brica"
-        InstanceId: 157
-        Distance: 14
-        VehicleDistance: 14
-        AirDistance: 14
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
         InstanceId: 98
         Distance: 13
         VehicleDistance: 13
         AirDistance: 13
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 157
+        Distance: 14
+        VehicleDistance: 14
+        AirDistance: 14
         IsHQ: 0
     closestNeighbor1: 0
     closestNeighbor1Distance: 3.4028235e+38
@@ -33057,13 +33062,13 @@ MonoBehaviour:
         AirDistance: 0
         IsHQ: 1
       - ConstructionName: "F\xE1brica"
-        InstanceId: 157
+        InstanceId: 98
         Distance: 1
         VehicleDistance: 1
         AirDistance: 1
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
-        InstanceId: 98
+        InstanceId: 157
         Distance: 1
         VehicleDistance: 1
         AirDistance: 1
@@ -33118,11 +33123,14 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::TurnStateManager
   turnStartAutonomyHelperDurationFallbackSeconds: 6
   enableTurnStateRuntimeLogs: 0
+  showMovementLogs: 0
   enableRangeCacheDebugLogs: 0
   showPerfRangeLine: 0
   showPerfSensorsLine: 0
   showPerfSelectionLine: 0
   showPerfTakeoffPrepLine: 0
+  showFrameSpikeLogs: 0
+  frameSpikeThresholdMs: 250
   matchController: {fileID: 327617512}
   cursorController: {fileID: 2105919121}
   animationManager: {fileID: 58026847}
@@ -33279,6 +33287,7 @@ MonoBehaviour:
   unitDatabase: {fileID: 11400000, guid: ad64939888cd7b3439a2e94cb06a0fa6, type: 2}
   matchController: {fileID: 327617512}
   currentId: 5
+  showUnitSpawnerLogs: 0
   unitPrefab: {fileID: 1817672200303259516, guid: 530b4fee239c9904cbceb477236210f2, type: 3}
   boardTilemap: {fileID: 1566606925}
   spawnWithHasActedFalse: 0
@@ -37206,7 +37215,7 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 1348457725607290348, guid: f7e44d7c210a32d4ba630ba660da88a1, type: 3}
       propertyPath: m_text
-      value: 0 / turn
+      value: 4500 / turn
       objectReference: {fileID: 0}
     - target: {fileID: 4985144350662451516, guid: f7e44d7c210a32d4ba630ba660da88a1, type: 3}
       propertyPath: m_Enabled

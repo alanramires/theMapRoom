@@ -198,6 +198,16 @@ public class ConstructionManager : MonoBehaviour
         totalMs = activeTeamChangedHandlerTotalMs;
     }
 
+    public static void RefreshAllOccupancyVisuals()
+    {
+        for (int i = AllActive.Count - 1; i >= 0; i--)
+        {
+            ConstructionManager construction = AllActive[i];
+            if (construction != null && construction.gameObject.activeInHierarchy)
+                construction.RefreshRuntimeVisualState(force: true);
+        }
+    }
+
     public Domain GetDomain()
     {
         if (TryGetConstructionData(out ConstructionData data))

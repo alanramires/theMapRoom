@@ -180,7 +180,7 @@ public partial class AIShoppingPlanner
             bool isPrimaryCapturer   = u.roles != null && u.roles.Count > 0 && u.roles[0] == UnitRole.Capturador;
             bool isPrimaryAssault    = u.roles != null && u.roles.Count > 0 && u.roles[0] == UnitRole.Assalto;
             bool isAggressiveCapturer = u.roles != null && u.roles.Count > 0 && u.roles[0] == UnitRole.CapturadorAgressivo;
-            bool isPrimaryTransporter = u.roles != null && u.roles.Count > 0 && u.roles[0] == UnitRole.Transportador;
+            bool isPrimaryTransporter = UnitRoleCompatibility.ResolveCompositionRole(u) == UnitRole.Transportador;
             bool isPrimaryLogistics = u.roles != null && u.roles.Count > 0 && u.roles[0] == UnitRole.Logistica;
             bool isPrimaryFireSupport = u.roles != null && u.roles.Count > 0 && u.roles[0] == UnitRole.FogoIndireto;
             bool isPrimaryIntel = IsDedicatedIntelPurchase(u);

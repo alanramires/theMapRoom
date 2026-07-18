@@ -33,6 +33,7 @@ public partial class AIShoppingPlanner
         public float Preventive;
         public int CurrentRepairUnits;
         public int RememberedRepairUnits;
+        public int EliteUnitsUnderRepair;
         public int ActiveLogistics;
         public int DesiredLogistics;
         public int LogisticsGap;
@@ -105,9 +106,14 @@ public partial class AIShoppingPlanner
                 // aparece quando a frente realmente avancou pelo corredor; caso contrario,
                 // tres eixos potenciais geravam artificialmente Transportador x3 no inicio.
                 bool hasRealAdvance = advance > 0.001f;
-                desired = activeFront && hasRealAdvance && depth >= 7f ? 1 : 0;
+                // Divisão com o Ar Transportador (mesma regra do builder real,
+                // ComputeGroundTransportNeed): APC só depois do nó INICIAL conquistado
+                // (FrontIndex >= 1) — captura parcial do 1º nó ainda não libera.
+                bool initialNodeConquered = axis.FrontIndex >= 1;
+                desired = activeFront && hasRealAdvance && initialNodeConquered
+                    && depth >= 7f ? 1 : 0;
                 float depthPressure = Mathf.Clamp01((depth - 4f) / 8f);
-                score = activeFront && hasRealAdvance
+                score = activeFront && hasRealAdvance && initialNodeConquered
                     ? progress * 1.5f + depthPressure * 1.5f
                     : 0f;
             }
@@ -195,6 +201,8 @@ public partial class AIShoppingPlanner
                 || data == null || data.domain == Domain.Air)
                 continue;
             currentRepairIds.Add(unit.InstanceId);
+            if (data.eliteLevel >= 1)
+                result.EliteUnitsUnderRepair++;
             float hpMissing = data.maxHP > 0
                 ? 1f - Mathf.Clamp01(unit.CurrentHP / (float)data.maxHP)
                 : 0f;
@@ -228,6 +236,12 @@ public partial class AIShoppingPlanner
         result.Logistics = result.CurrentRepair + result.RememberedRepair + result.Preventive;
         result.ActiveLogistics = CountActiveOperationalRole(snapshot, UnitRole.Logistica);
         result.DesiredLogistics = Mathf.Clamp(Mathf.CeilToInt(result.Logistics / 2.5f), 0, 3);
+        // Elite ferido: garante ao menos 1 supridor desejado (mesmo com peso baixo), pra existir
+        // uma demanda a ser priorizada — o supridor móvel conserta o elite no campo quando as bases
+        // estão ocupadas produzindo (doutrina do enxame). O boost de PRIORIDADE é aplicado no
+        // emissor da demanda; aqui só garantimos que o gap não seja zerado por arredondamento.
+        if (result.EliteUnitsUnderRepair > 0)
+            result.DesiredLogistics = Mathf.Max(result.DesiredLogistics, 1);
         result.LogisticsGap = Mathf.Max(0, result.DesiredLogistics - result.ActiveLogistics);
     }
 
@@ -260,10 +274,24 @@ public partial class AIShoppingPlanner
                 $"eixos={pressure.Axes.Count} pressão={pressure.Transport:F1} cobertura={pressure.ActiveTransports}/{pressure.DesiredTransports}");
 
         if (pressure.LogisticsGap > 0)
+        {
+            // BOOST DE ELITE FERIDO (doutrina do enxame): o elite é investimento caro e, com as
+            // bases ocupadas produzindo (conscrição), não sobra prédio pra ele reparar — o supridor
+            // móvel é a única forma de consertá-lo no campo pra voltar a lutar. Sobe a demanda de
+            // logística acima do counter-pressure-elite (8/9) pra o supridor não perder a fila.
+            // Fora da doutrina, mantém o comportamento validado (10 com repair alto, senão 18).
+            bool eliteRepairBoost = pressure.EliteUnitsUnderRepair > 0
+                && AIController.Instance != null && AIController.Instance.ConscriptionDoctrine;
+            int logisticsPriority = eliteRepairBoost && AIShoppingPlanner.Instance != null
+                ? AIShoppingPlanner.Instance.EliteRepairLogisticsPriority
+                : pressure.CurrentRepairUnits >= 3 ? 10 : 18;
             EnsureRoleDemand(
                 demands, UnitRole.Logistica, pressure.LogisticsGap,
-                pressure.CurrentRepairUnits >= 3 ? 10 : 18,
+                logisticsPriority,
                 "operational-pressure",
-                $"logística={pressure.Logistics:F1} repair={pressure.CurrentRepairUnits} memória={pressure.RememberedRepairUnits} cobertura={pressure.ActiveLogistics}/{pressure.DesiredLogistics}");
+                $"logística={pressure.Logistics:F1} repair={pressure.CurrentRepairUnits} "
+                + $"elite_ferido={pressure.EliteUnitsUnderRepair}{(eliteRepairBoost ? " (BOOST)" : "")} "
+                + $"memória={pressure.RememberedRepairUnits} cobertura={pressure.ActiveLogistics}/{pressure.DesiredLogistics}");
+        }
     }
 }

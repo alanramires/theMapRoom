@@ -91,6 +91,20 @@ public partial class AIController
                 return transA.CompareTo(transB);
         }
 
+        // Entre FERIDOS (grupo 5 sempre; grupo 1 quando ambos reparam durante a invasão): o
+        // ELITE assegura o spot de reparo primeiro — maior eliteLevel age antes. A preferência
+        // de reparar elites do handler não adianta se um normal age antes e ocupa a vaga boa
+        // (prédio seguro, célula de reparo, transporte de evac). Empatando o nível, o mais
+        // MACHUCADO (menor HP) na frente: é quem mais precisa da vaga. Só afeta reparo-vs-reparo,
+        // então Intel/helicóptero no grupo 1 seguem pela iniciativa do tipo, intocados.
+        if (a.IsUnderRepair && b.IsUnderRepair)
+        {
+            int eliteCmp = GetUnitEliteLevel(b).CompareTo(GetUnitEliteLevel(a));
+            if (eliteCmp != 0) return eliteCmp;
+            int repairHpCmp = a.CurrentHP.CompareTo(b.CurrentHP);
+            if (repairHpCmp != 0) return repairHpCmp;
+        }
+
         int initiativeCmp = CompareUnitInitiative(a, b);
         return initiativeCmp != 0 ? initiativeCmp : b.CurrentHP.CompareTo(a.CurrentHP);
     }
@@ -921,6 +935,13 @@ public partial class AIController
             : (int)AiInitiative.Medium;
     }
 
+    private static int GetUnitEliteLevel(UnitManager unit)
+    {
+        return unit != null && unit.TryGetUnitData(out UnitData data) && data != null
+            ? data.eliteLevel
+            : 0;
+    }
+
     // Distância ao transporter mais próximo que tem slot compatível livre para esta unidade.
     // Retorna float.MaxValue se não houver nenhum disponível.
     private float GetDistanceToNearestAvailableTransporter(UnitManager unit, TeamId aiTeam)
@@ -946,7 +967,12 @@ public partial class AIController
         return best;
     }
 
-    private HashSet<Vector3Int> BuildOccupied(UnitManager excludeUnit)
+    // includeConscriptionClosedProducers: durante a conscrição, produtores do cluster de casa
+    // contam como ocupados no roteamento da Fase 2 (nenhuma unidade TERMINA movimento neles). Mas
+    // a busca de REPARO passa false — lá o ban é tratado pelo check explícito (que o elite fura
+    // como último recurso); injetar as células aqui as marcava "ocupado" e anulava o last-resort.
+    private HashSet<Vector3Int> BuildOccupied(UnitManager excludeUnit,
+        bool includeConscriptionClosedProducers = true)
 
     {
 
@@ -963,6 +989,9 @@ public partial class AIController
             set.Add(p);
 
         }
+
+        if (includeConscriptionClosedProducers)
+            AddConscriptionClosedProducerCells(set);
 
         return set;
 
