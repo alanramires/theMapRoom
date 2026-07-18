@@ -193,16 +193,28 @@ public partial class TurnStateManager
     [Tooltip("Exibe no Console os logs informativos do fluxo de movimento.")]
     [InspectorName("Show Movement Logs")]
     [SerializeField] private bool showMovementLogs = false;
+    public bool ShowMovementLogs => showMovementLogs;
     [SerializeField] private bool enableRangeCacheDebugLogs = true;
     [SerializeField] private bool showPerfRangeLine = true;
     [SerializeField] private bool showPerfSensorsLine = true;
     [SerializeField] private bool showPerfSelectionLine = true;
     [SerializeField] private bool showPerfTakeoffPrepLine = true;
+    [InspectorName("Show Frame Spike Logs")]
+    [SerializeField] private bool showFrameSpikeLogs = false;
+    public bool ShowFrameSpikeLogs => showFrameSpikeLogs;
+    [Tooltip("Registra automaticamente frames acima deste tempo enquanto Show Frame Spike Logs estiver ligado.")]
+    [SerializeField, Min(16f)] private float frameSpikeThresholdMs = 250f;
     private const int PerfFrameWindowSampleCount = 120;
+    private readonly float[] perfFrameWindowMs = new float[PerfFrameWindowSampleCount];
+    private int perfFrameWindowWriteIndex;
     private int perfFrameSamplesCollected;
     private double perfFrameWindowSumMs;
     private float perfFrameWindowMinMs = float.MaxValue;
     private float perfFrameWindowMaxMs;
+    private long perfPreviousManagedBytes = -1L;
+    private int perfPreviousGc0Count;
+    private int perfPreviousGc1Count;
+    private int perfPreviousGc2Count;
     private double perfLastRangeMs;
     private double perfRangeTotalMs;
     private int perfRangeCallCount;
@@ -270,16 +282,73 @@ public partial class TurnStateManager
         if (!float.IsFinite(frameMs) || frameMs <= 0f)
             return;
 
-        perfFrameWindowSumMs += frameMs;
-        perfFrameWindowMinMs = Mathf.Min(perfFrameWindowMinMs, frameMs);
-        perfFrameWindowMaxMs = Mathf.Max(perfFrameWindowMaxMs, frameMs);
-        perfFrameSamplesCollected++;
+        if (perfFrameSamplesCollected == PerfFrameWindowSampleCount)
+            perfFrameWindowSumMs -= perfFrameWindowMs[perfFrameWindowWriteIndex];
+        else
+            perfFrameSamplesCollected++;
 
-        if (perfFrameSamplesCollected <= PerfFrameWindowSampleCount)
+        perfFrameWindowMs[perfFrameWindowWriteIndex] = frameMs;
+        perfFrameWindowSumMs += frameMs;
+        perfFrameWindowWriteIndex = (perfFrameWindowWriteIndex + 1) % PerfFrameWindowSampleCount;
+
+        // Janela curta (120): recalcular min/max evita que um spike antigo fique
+        // eternamente preso no F8 e torna o snapshot representativo dos frames atuais.
+        perfFrameWindowMinMs = float.MaxValue;
+        perfFrameWindowMaxMs = 0f;
+        for (int i = 0; i < perfFrameSamplesCollected; i++)
+        {
+            float sampleMs = perfFrameWindowMs[i];
+            perfFrameWindowMinMs = Mathf.Min(perfFrameWindowMinMs, sampleMs);
+            perfFrameWindowMaxMs = Mathf.Max(perfFrameWindowMaxMs, sampleMs);
+        }
+
+        TrackFrameSpike(frameMs);
+    }
+
+    private void TrackFrameSpike(float frameMs)
+    {
+        if (!showFrameSpikeLogs)
             return;
 
-        perfFrameSamplesCollected = PerfFrameWindowSampleCount;
-        perfFrameWindowSumMs -= perfFrameWindowSumMs / PerfFrameWindowSampleCount;
+        long managedBytes = System.GC.GetTotalMemory(false);
+        int gc0 = System.GC.CollectionCount(0);
+        int gc1 = System.GC.CollectionCount(1);
+        int gc2 = System.GC.CollectionCount(2);
+        long managedDeltaBytes = perfPreviousManagedBytes >= 0L ? managedBytes - perfPreviousManagedBytes : 0L;
+        int gc0Delta = gc0 - perfPreviousGc0Count;
+        int gc1Delta = gc1 - perfPreviousGc1Count;
+        int gc2Delta = gc2 - perfPreviousGc2Count;
+        perfPreviousManagedBytes = managedBytes;
+        perfPreviousGc0Count = gc0;
+        perfPreviousGc1Count = gc1;
+        perfPreviousGc2Count = gc2;
+
+        if (frameMs < Mathf.Max(16f, frameSpikeThresholdMs))
+            return;
+
+        string selectedName = selectedUnit != null ? selectedUnit.name : "(none)";
+        bool replayActive = replayManager != null && replayManager.IsReplaying;
+        bool movementAnimating = animationManager != null && animationManager.IsAnimatingMovement;
+        bool aiTurn = matchController != null && matchController.IsActiveTeamAI();
+        bool aiInputLock = matchController != null && matchController.IsPlayerInputLockedByActiveAI();
+        bool turnTransition = matchController != null && matchController.IsTurnTransitionInProgress;
+        double managedMb = managedBytes / (1024d * 1024d);
+        double managedDeltaMb = managedDeltaBytes / (1024d * 1024d);
+#if UNITY_2020_1_OR_NEWER
+        double unityAllocatedMb = UnityEngine.Profiling.Profiler.GetTotalAllocatedMemoryLong() / (1024d * 1024d);
+#else
+        double unityAllocatedMb = 0d;
+#endif
+
+        Debug.Log(
+            $"[FrameSpike] frame={Time.frameCount} duration={frameMs:0.00}ms " +
+            $"state={CurrentCursorState} substep={scannerPromptStep} selected={selectedName} " +
+            $"boardRev={ThreatRevisionTracker.GlobalBoardRevision} " +
+            $"replay={replayActive} aiTurn={aiTurn} aiInputLock={aiInputLock} " +
+            $"turnTransition={turnTransition} movementAnimating={movementAnimating} " +
+            $"gameplayInputBlocked={PanelRodadaController.IsGameplayInputBlocked} " +
+            $"managed={managedMb:0.0}MB managedDelta={managedDeltaMb:+0.0;-0.0;0.0}MB " +
+            $"gcDelta=[{gc0Delta},{gc1Delta},{gc2Delta}] unityAlloc={unityAllocatedMb:0.0}MB");
     }
 
     private void RegisterPerfRangeDuration(double ms)
@@ -376,7 +445,10 @@ public partial class TurnStateManager
             sb.AppendLine($"SetSelectedUnit pipeline: last={perfLastSelectionMs:0.00}ms | avg={avgSelectionMs:0.00}ms | calls={perfSelectionCallCount}");
         if (showPerfTakeoffPrepLine)
             sb.AppendLine($"TryPrepareTemporaryTakeoffStateForSelection: last={perfLastTakeoffPrepMs:0.00}ms | avg={avgTakeoffPrepMs:0.00}ms | calls={perfTakeoffPrepCallCount}");
-        RuntimeLog(sb.ToString());
+        // O snapshot F8 possui seus próprios toggles Show Perf*. Ele não pode
+        // depender de Enable TurnState Runtime Logs, senão as linhas escolhidas
+        // no Inspector são silenciosamente descartadas pelo RuntimeLog().
+        Debug.Log(sb.ToString());
         PanelDialogController.TrySetTransientText("Perf snapshot logged (F8)", 1.8f);
     }
 
@@ -4089,7 +4161,8 @@ public partial class TurnStateManager
                 { "turns", turns.ToString() }
             });
         PushPanelUnitMessage(pendingMessage, 2.6f);
-        RuntimeLog($"[LayerForce] Pendente: {ResolveDebugUnitName(unit)} -> {domain}/{height} ({blockReason})");
+        if (showMovementLogs)
+            Debug.Log($"[LayerForce] Pendente: {ResolveDebugUnitName(unit)} -> {domain}/{height} ({blockReason})");
     }
 
     private void ApplyEmbarkedCascadeFromDirectHit(UnitManager directlyHitUnit, int hpBefore, int hpAfter)

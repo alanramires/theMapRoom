@@ -831,14 +831,16 @@ public class SaveGameManager : MonoBehaviour
             // hash; divergencia = campo se perdendo no load. E a fundacao do
             // anti-desync do multiplayer (docs/ideias_futuras_multiplayer.md).
             string stateHash = MatchStateHasher.ComputeHash(data);
-            Debug.Log($"[SaveGame] state_hash={stateHash}");
+            if (showSaveLoadLogs)
+                Debug.Log($"[SaveGame] state_hash={stateHash}");
             string json = JsonUtility.ToJson(data, false);
             string replayJson = BuildReplayJsonForSave();
             string jogadasJson = BuildJogadasJsonForSave();
             string path = ResolveWritableSlotPath(normalizedSlot);
             Directory.CreateDirectory(Path.GetDirectoryName(path) ?? ResolveSaveDirectory());
             WriteSaveContainerAtomic(path, data, json, replayJson, jogadasJson, stateHash);
-            LogSaveDiagnostics(normalizedSlot, json, new FileInfo(path).Length);
+            if (showSaveLoadLogs)
+                LogSaveDiagnostics(normalizedSlot, json, new FileInfo(path).Length);
 #if UNITY_WEBGL && !UNITY_EDITOR
             string syncingText = ResolveDialog(
                 "dialog.save_status.webgl_syncing",
@@ -852,7 +854,8 @@ public class SaveGameManager : MonoBehaviour
                 ResolveHelper("helper.save_status.success", "Jogo salvo no slot <slot>"),
                 new Dictionary<string, string> { { "slot", normalizedSlot.ToString() } });
             PanelDialogController.TrySetTransientText(savedText, 2.2f);
-            Debug.Log($"[SaveGame] Slot {normalizedSlot} salvo em: {path}");
+            if (showSaveLoadLogs)
+                Debug.Log($"[SaveGame] Slot {normalizedSlot} salvo em: {path}");
 #endif
         }
         catch (Exception ex)

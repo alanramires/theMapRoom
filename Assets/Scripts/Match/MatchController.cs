@@ -2574,7 +2574,8 @@ public class MatchController : MonoBehaviour
         if (!unit.TrySetCurrentLayerMode(lockDomain, lockHeight))
             return false;
 
-        Debug.Log($"[LayerForce] Upkeep aplicou camada pendente: {unit.name} -> {lockDomain}/{lockHeight} em ({cell.x},{cell.y})");
+        if (turnStateManager != null && turnStateManager.ShowMovementLogs)
+            Debug.Log($"[LayerForce] Upkeep aplicou camada pendente: {unit.name} -> {lockDomain}/{lockHeight} em ({cell.x},{cell.y})");
         // Jornal do Comandante: o dono precisa saber que a camada mudou sozinha.
         ReportTurnBriefingEvent(
             unit.TeamId,

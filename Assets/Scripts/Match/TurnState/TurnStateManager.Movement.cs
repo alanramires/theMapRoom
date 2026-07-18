@@ -256,7 +256,8 @@ public partial class TurnStateManager
 
         if (!selectedUnit.SupportsLayerMode(forcedDomain, forcedHeight))
         {
-            Debug.Log($"[LayerForce] Ignorado: unidade nao suporta camada forcada {forcedDomain}/{forcedHeight}.");
+            if (showMovementLogs)
+                Debug.Log($"[LayerForce] Ignorado: unidade nao suporta camada forcada {forcedDomain}/{forcedHeight}.");
             return;
         }
 
@@ -265,7 +266,8 @@ public partial class TurnStateManager
         // camada atual (o filtro de destino ja evita parar aqui no fluxo da UI).
         if (!UnitOccupancyRules.CanEndLayerTransitionAtCell(boardMap, cell, selectedUnit, forcedDomain, forcedHeight, out UnitManager forcedLayerBlocker))
         {
-            Debug.Log($"[LayerForce] Adiado: {forcedDomain}/{forcedHeight} bloqueado no hex por {(forcedLayerBlocker != null ? forcedLayerBlocker.name : "ocupante")}.");
+            if (showMovementLogs)
+                Debug.Log($"[LayerForce] Adiado: {forcedDomain}/{forcedHeight} bloqueado no hex por {(forcedLayerBlocker != null ? forcedLayerBlocker.name : "ocupante")}.");
             return;
         }
 
@@ -276,7 +278,7 @@ public partial class TurnStateManager
             forcedLayerRollbackHeight = currentHeight;
         }
 
-        if (selectedUnit.TrySetCurrentLayerMode(forcedDomain, forcedHeight))
+        if (selectedUnit.TrySetCurrentLayerMode(forcedDomain, forcedHeight) && showMovementLogs)
             Debug.Log($"[LayerForce] {forcedReason} | {currentDomain}/{currentHeight} -> {forcedDomain}/{forcedHeight}");
     }
 
@@ -305,7 +307,8 @@ public partial class TurnStateManager
 
         if (selectedUnit.TrySetCurrentLayerMode(lockDomain, lockHeight))
         {
-            Debug.Log($"[LayerForce] PendingLock aplicado no destino | {currentDomain}/{currentHeight} -> {lockDomain}/{lockHeight}");
+            if (showMovementLogs)
+                Debug.Log($"[LayerForce] PendingLock aplicado no destino | {currentDomain}/{currentHeight} -> {lockDomain}/{lockHeight}");
             return true;
         }
 
@@ -347,7 +350,8 @@ public partial class TurnStateManager
 
         if (selectedUnit.TrySetCurrentLayerMode(preferredDomain, preferredHeight))
         {
-            Debug.Log($"[LayerForce] AutoNavalPreference | {currentDomain}/{currentHeight} -> {preferredDomain}/{preferredHeight}");
+            if (showMovementLogs)
+                Debug.Log($"[LayerForce] AutoNavalPreference | {currentDomain}/{currentHeight} -> {preferredDomain}/{preferredHeight}");
         }
     }
 
@@ -359,7 +363,7 @@ public partial class TurnStateManager
         // ignoreForcedLock: o rollback transacional precisa devolver a camada
         // original mesmo quando um lock pendente aponta para outra camada
         // (ex.: emersao aplicada provisoriamente no destino e movimento cancelado).
-        if (selectedUnit.TrySetCurrentLayerMode(forcedLayerRollbackDomain, forcedLayerRollbackHeight, ignoreForcedLock: true))
+        if (selectedUnit.TrySetCurrentLayerMode(forcedLayerRollbackDomain, forcedLayerRollbackHeight, ignoreForcedLock: true) && showMovementLogs)
             Debug.Log($"[LayerForce] [roll back] restaurado para {forcedLayerRollbackDomain}/{forcedLayerRollbackHeight}");
         hasForcedLayerRollbackSnapshot = false;
     }

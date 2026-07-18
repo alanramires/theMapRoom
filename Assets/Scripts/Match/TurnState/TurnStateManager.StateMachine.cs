@@ -596,9 +596,9 @@ public partial class TurnStateManager
         return false;
     }
 
-    private static void LogEnemyUnitInspection(UnitManager unit, int activeTeam)
+    private void LogEnemyUnitInspection(UnitManager unit, int activeTeam)
     {
-        if (unit == null)
+        if (!enableTurnStateRuntimeLogs || unit == null)
             return;
 
         StringBuilder sb = new StringBuilder();
@@ -651,9 +651,9 @@ public partial class TurnStateManager
         Debug.Log(sb.ToString());
     }
 
-    private static void LogEnemyConstructionInspection(ConstructionManager construction, int activeTeam)
+    private void LogEnemyConstructionInspection(ConstructionManager construction, int activeTeam)
     {
-        if (construction == null)
+        if (!enableTurnStateRuntimeLogs || construction == null)
             return;
 
         string constructionName = !string.IsNullOrWhiteSpace(construction.ConstructionDisplayName)
@@ -667,9 +667,9 @@ public partial class TurnStateManager
         Debug.Log(sb.ToString());
     }
 
-    private static void LogAllyConstructionInspection(ConstructionManager construction, int activeTeam)
+    private void LogAllyConstructionInspection(ConstructionManager construction, int activeTeam)
     {
-        if (construction == null)
+        if (!enableTurnStateRuntimeLogs || construction == null)
             return;
 
         string constructionName = !string.IsNullOrWhiteSpace(construction.ConstructionDisplayName)

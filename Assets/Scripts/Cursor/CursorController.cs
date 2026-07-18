@@ -232,6 +232,7 @@ public class CursorController : MonoBehaviour
         UpdateCursorBlink();
         UpdateRightClickCancelTap();
         TryAutoAssignReplayManager();
+        TraceRawPrimaryPointerInput();
         if (replayManager != null && replayManager.IsReplaying)
         {
             heldDirection = Vector3Int.zero;
@@ -584,6 +585,10 @@ public class CursorController : MonoBehaviour
 
         Vector2 pointerScreenPosition = GetMousePosition();
         TurnStateManager.CursorState state = turnStateManager.CurrentCursorState;
+        bool traceNeutralPointer = state == TurnStateManager.CursorState.Neutral && turnStateManager.ShowFrameSpikeLogs;
+        double pointerPerfStart = traceNeutralPointer ? Time.realtimeSinceStartupAsDouble : 0d;
+        if (traceNeutralPointer)
+            Debug.Log($"[PointerSelect] received frame={Time.frameCount} state={state} cursor={currentCell} screen=({pointerScreenPosition.x:0},{pointerScreenPosition.y:0})");
         bool isInspecting = state == TurnStateManager.CursorState.InspectingUnit ||
                             state == TurnStateManager.CursorState.InspectingBuilding ||
                             state == TurnStateManager.CursorState.InspectingHotZone;
@@ -617,8 +622,21 @@ public class CursorController : MonoBehaviour
             return;
         }
 
-        if (IsScreenPointOverUI(pointerScreenPosition))
+        double uiCheckStart = traceNeutralPointer ? Time.realtimeSinceStartupAsDouble : 0d;
+        // RaycastAll tambem devolve Images/paineis transparentes usados apenas
+        // para layout. Em Neutral eles nao podem criar "buracos mortos" sobre o
+        // mapa: bloqueie a selecao somente quando o hit (ou um pai) realmente
+        // implementa clique. Menus abertos continuam tendo prioridade no Update,
+        // e botoes/controles interativos permanecem protegidos.
+        if (IsScreenPointOverClickableUI(pointerScreenPosition))
+        {
+            if (traceNeutralPointer)
+                Debug.Log($"[PointerSelect] ignored reason=pointer-over-clickable-ui uiCheck={(Time.realtimeSinceStartupAsDouble - uiCheckStart) * 1000d:0.00}ms");
             return;
+        }
+        double uiCheckMs = traceNeutralPointer
+            ? (Time.realtimeSinceStartupAsDouble - uiCheckStart) * 1000d
+            : 0d;
 
         bool isMovementActionChoice = state == TurnStateManager.CursorState.MoveuAndando ||
                                       state == TurnStateManager.CursorState.MoveuParado;
@@ -641,7 +659,11 @@ public class CursorController : MonoBehaviour
 
         Camera cam = cameraController != null ? cameraController.GetComponent<Camera>() : Camera.main;
         if (cam == null || boardTilemap == null)
+        {
+            if (traceNeutralPointer)
+                Debug.Log($"[PointerSelect] ignored reason=missing-camera-or-board cam={cam != null} board={boardTilemap != null}");
             return;
+        }
 
         Vector3 mouseScreen = GetMousePosition();
         mouseScreen.z = -cam.transform.position.z;
@@ -689,15 +711,34 @@ public class CursorController : MonoBehaviour
             !turnStateManager.IsPointerMovementTargetSelectable(targetCell))
             return;
 
+        double setCellStart = traceNeutralPointer ? Time.realtimeSinceStartupAsDouble : 0d;
         if (!SetCell(targetCell, playMoveSfx: false))
+        {
+            if (traceNeutralPointer)
+                Debug.Log($"[PointerSelect] ignored reason=invalid-cell target={targetCell} setCell={(Time.realtimeSinceStartupAsDouble - setCellStart) * 1000d:0.00}ms");
             return;
+        }
+        double setCellMs = traceNeutralPointer
+            ? (Time.realtimeSinceStartupAsDouble - setCellStart) * 1000d
+            : 0d;
 
         // O clique direto equivale a posicionar o cursor no hex e apertar Enter.
+        double confirmStart = traceNeutralPointer ? Time.realtimeSinceStartupAsDouble : 0d;
         TurnStateManager.ActionSfx feedback = turnStateManager.HandleConfirm();
+        double confirmMs = traceNeutralPointer
+            ? (Time.realtimeSinceStartupAsDouble - confirmStart) * 1000d
+            : 0d;
         if (feedback == TurnStateManager.ActionSfx.None)
             PlayMoveSfx();
         else
             PlayActionFeedback(feedback);
+        if (traceNeutralPointer)
+        {
+            double totalMs = (Time.realtimeSinceStartupAsDouble - pointerPerfStart) * 1000d;
+            Debug.Log($"[PointerSelect] processed frame={Time.frameCount} target={targetCell} feedback={feedback} " +
+                $"uiCheck={uiCheckMs:0.00}ms setCell={setCellMs:0.00}ms confirm={confirmMs:0.00}ms total={totalMs:0.00}ms " +
+                $"resultState={turnStateManager.CurrentCursorState}");
+        }
     }
 
     public bool TryMove(Vector3Int delta)
@@ -811,6 +852,33 @@ public class CursorController : MonoBehaviour
 
         // No FOW Total a tilemap da nevoa fica acima do Cursor e faz a oclusao.
         cursorRenderer.enabled = true;
+    }
+
+    private void TraceRawPrimaryPointerInput()
+    {
+        if (turnStateManager == null || !turnStateManager.ShowFrameSpikeLogs)
+            return;
+
+#if ENABLE_INPUT_SYSTEM
+        bool mousePressed = Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame;
+#else
+        bool mousePressed = Input.GetMouseButtonDown(0);
+#endif
+        // Nao consulte WasPrimaryTouchTapReleasedThisFrame aqui: ela consome o
+        // estado interno do tap. O touch continua rastreado no fluxo canonico.
+        if (!mousePressed)
+            return;
+
+        bool replayActive = replayManager != null && replayManager.IsReplaying;
+        bool panelBlocked = PanelRodadaController.IsGameplayInputBlocked;
+        bool textFocused = UiInputBlocker.IsTextInputFocused();
+        bool victory = matchController != null && matchController.HasVictoryWinner;
+        bool aiLocked = matchController != null && matchController.IsPlayerInputLockedByActiveAI();
+        bool turnTransition = matchController != null && matchController.IsTurnTransitionInProgress;
+        Debug.Log(
+            $"[PointerRaw] frame={Time.frameCount} source=mouse-down " +
+            $"state={turnStateManager.CurrentCursorState} replay={replayActive} panelBlocked={panelBlocked} " +
+            $"textFocused={textFocused} victory={victory} aiLocked={aiLocked} turnTransition={turnTransition}");
     }
 
     public void ApplyFogOfWarSorting(bool playerTurn)

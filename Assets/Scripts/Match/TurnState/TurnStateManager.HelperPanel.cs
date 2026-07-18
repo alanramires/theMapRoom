@@ -2390,7 +2390,8 @@ public partial class TurnStateManager
         if (matchController != null && matchController.EnableTotalWar)
         {
             onProgress?.Invoke(0, 0);
-            Debug.Log("[HotzoneCache] Skip warm-up: Total War ativo.");
+            if (enableRangeCacheDebugLogs)
+                Debug.Log("[HotzoneCache] Skip warm-up: Total War ativo.");
             yield break;
         }
 
@@ -2573,10 +2574,13 @@ public partial class TurnStateManager
 
         string unitName = unit != null ? ResolveUnitRuntimeName(unit) : $"unit#{cacheIndex}";
         string result = wasHit ? "HIT" : "MISS";
-        Debug.Log(
-            $"[HotzoneCache] {result} | unit={unitName} ({cacheIndex}) | " +
-            $"unit[h={unitHits},m={unitMisses},rate={unitHitRate:0.0}%] | " +
-            $"session[h={totalHits},m={totalMisses},rate={totalHitRate:0.0}%]");
+        if (enableRangeCacheDebugLogs)
+        {
+            Debug.Log(
+                $"[HotzoneCache] {result} | unit={unitName} ({cacheIndex}) | " +
+                $"unit[h={unitHits},m={unitMisses},rate={unitHitRate:0.0}%] | " +
+                $"session[h={totalHits},m={totalMisses},rate={totalHitRate:0.0}%]");
+        }
     }
 
     private static int ResolveInspectionMovementSteps(UnitManager unit)
