@@ -7,17 +7,29 @@ public class CombatLargePairCalculatorWindow : EditorWindow
     private UnitData defender;
     private int range;
     private bool includeCounterAttack;
+    private string attackerDpq;
+    private string defenderDpq;
     private string summary;
     private string details;
     private Vector2 scroll;
 
-    public static void Open(UnitData attacker, UnitData defender, int range, bool includeCounterAttack, string summary, string details)
+    public static void Open(
+        UnitData attacker,
+        UnitData defender,
+        int range,
+        bool includeCounterAttack,
+        string attackerDpq,
+        string defenderDpq,
+        string summary,
+        string details)
     {
         CombatLargePairCalculatorWindow window = GetWindow<CombatLargePairCalculatorWindow>("Calc Simples");
         window.attacker = attacker;
         window.defender = defender;
         window.range = Mathf.Max(1, range);
         window.includeCounterAttack = includeCounterAttack;
+        window.attackerDpq = attackerDpq ?? "DPQ_Padrao";
+        window.defenderDpq = defenderDpq ?? "DPQ_Padrao";
         window.summary = summary ?? "-";
         window.details = details ?? string.Empty;
         window.minSize = new Vector2(540f, 320f);
@@ -35,6 +47,8 @@ public class CombatLargePairCalculatorWindow : EditorWindow
         EditorGUILayout.ObjectField("Defensor", defender, typeof(UnitData), false);
         EditorGUILayout.IntField("Range", range);
         EditorGUILayout.Toggle("Revide", includeCounterAttack);
+        EditorGUILayout.TextField("DPQ do Atacante", attackerDpq);
+        EditorGUILayout.TextField("DPQ do Defensor", defenderDpq);
         EditorGUI.EndDisabledGroup();
 
         EditorGUILayout.Space(6f);

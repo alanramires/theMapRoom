@@ -125,6 +125,15 @@ public static class HexCohabitationVisualManager
         if (airUnits.Count == 0 || airUnits.Count + surfaceUnits.Count < 2)
             return;
 
+        // Ar sem superficie: usa as duas posicoes verticais do visual classico
+        // ar+chao. Se uma unidade terrestre/naval chegar ao hex, as aeronaves
+        // voltam ao leque horizontal superior e a superficie ocupa a linha baixa.
+        if (surfaceUnits.Count == 0)
+        {
+            ApplyAirOnlyRows(airUnits);
+            return;
+        }
+
         ApplyLayerFan(airUnits, AirOffset);
         ApplyLayerFan(surfaceUnits, SurfaceOffset);
     }
@@ -186,6 +195,41 @@ public static class HexCohabitationVisualManager
             float dx = (i - center) * IntraLayerSpread;
             Vector3 offset = baseOffset + new Vector3(dx, 0f, 0f);
             u.ApplyCohabitationVisual(offset, SharedScale);
+        }
+    }
+
+    // Sem ocupante de superficie, aeronaves coabitando usam duas linhas, como
+    // no visual ar+terrestre. Para 3+ aeronaves, cada linha abre seu proprio leque.
+    private static void ApplyAirOnlyRows(List<UnitManager> airUnits)
+    {
+        int count = airUnits.Count;
+        if (count == 0)
+            return;
+
+        int upperCount = (count + 1) / 2;
+        ApplyLayerFanRange(airUnits, 0, upperCount, AirOffset);
+        ApplyLayerFanRange(airUnits, upperCount, count - upperCount, SurfaceOffset);
+    }
+
+    private static void ApplyLayerFanRange(
+        List<UnitManager> units,
+        int startIndex,
+        int count,
+        Vector3 baseOffset)
+    {
+        if (units == null || count <= 0)
+            return;
+
+        float center = (count - 1) * 0.5f;
+        for (int i = 0; i < count; i++)
+        {
+            UnitManager unit = units[startIndex + i];
+            if (unit == null)
+                continue;
+
+            float dx = (i - center) * IntraLayerSpread;
+            Vector3 offset = baseOffset + new Vector3(dx, 0f, 0f);
+            unit.ApplyCohabitationVisual(offset, SharedScale);
         }
     }
 

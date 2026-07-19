@@ -16,3 +16,6 @@ MonoBehaviour:
   nome: Unfavorable
   descricao: Bad terrain or construction
   qualidadeDePosicao: 0
+  usarValoresPadraoDaQualidade: 1
+  pontos: 0
+  defesaBonus: -1

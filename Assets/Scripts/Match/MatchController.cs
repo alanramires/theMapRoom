@@ -475,6 +475,14 @@ public class MatchController : MonoBehaviour
     public int ActivePlayerListIndex => activePlayerListIndex;
     public bool IsTurnTransitionInProgress => hotSeatGateActive || advanceTurnTransitionRoutine != null;
     public bool IsHotSeatGateActive => hotSeatGateActive;
+
+    // O load iniciado pela Tela de Entrada substitui a inicializacao normal da
+    // cena. Depois que o snapshot foi restaurado e o Panel_Rodada confirmado,
+    // libera o gate provisorio criado no Awake da cena-base.
+    public void ReleaseHotSeatGateAfterLoad()
+    {
+        hotSeatGateActive = false;
+    }
     public bool EnableVictoryStars => enableVictoryStars;
     public int VictoryStarsToWin => ClampVictoryStarsGoal(victoryStarsToWin);
     public bool HasVictoryWinner => hasVictoryWinner;
@@ -4894,7 +4902,14 @@ public class MatchController : MonoBehaviour
             {
                 Vector3Int cell = unit.CurrentCellPosition;
                 cell.z = 0;
-                if (snapshot.globalLandmarkOnlyCells.Contains(cell))
+
+                // Com tile de FoW, o renderer pode continuar ligado por baixo da
+                // tampa para atravessar seus recortes sem aparecer magicamente no
+                // fim do movimento. Sem tile (hex aberto), a tampa ja nao protege:
+                // obedece a deteccao logica individual. Isso separa terreno revelado
+                // por alcance especializado (ex.: EWACS 9) de ocupante realmente
+                // observado pela visao aplicavel ao alvo (ex.: Surface apenas 3).
+                if (snapshot.visibleCells.Contains(cell))
                     return logicallyVisible;
             }
 
@@ -5812,18 +5827,21 @@ public class MatchController : MonoBehaviour
 
     // Scratch do passo de empilhamento multicamada (ver metodo abaixo).
     private readonly HashSet<Vector3Int> stackedHexOtherTeamCellsScratch = new HashSet<Vector3Int>();
+    private readonly HashSet<Vector3Int> stackedHexSubmergedCellsScratch = new HashSet<Vector3Int>();
+    private readonly HashSet<Vector3Int> stackedHexSurfaceCellsScratch = new HashSet<Vector3Int>();
 
-    // Hex multicamada compartilhado (ex.: navio inimigo Naval/Surface parado
-    // sobre o submarino Submerged do observador): a unidade do PROPRIO
-    // observador renderiza na frente, para o dono ver onde ela esta. E so
-    // apresentacao, relativa ao time que olha — o oponente que nao detecta a
-    // unidade continua sem ve-la (o hide individual do FoW cuida disso).
+    // Hex multicamada compartilhado: Submarine/Submerged fica na frente de uma
+    // unidade Surface no mesmo hex, tanto sob navio quanto sob Exercito em ponte.
+    // Nos demais empilhamentos entre times, preserva a prioridade da unidade do
+    // observador. E apenas apresentacao; o FoW ainda decide se o sprite aparece.
     private void RefreshStackedHexFrontRendering(List<UnitManager> units, Tilemap boardMap, TeamId observerTeam)
     {
         if (units == null)
             return;
 
         stackedHexOtherTeamCellsScratch.Clear();
+        stackedHexSubmergedCellsScratch.Clear();
+        stackedHexSurfaceCellsScratch.Clear();
 
         for (int i = 0; i < units.Count; i++)
         {
@@ -5832,12 +5850,16 @@ public class MatchController : MonoBehaviour
                 continue;
             if (boardMap != null && !IsUnitOnBoard(unit, boardMap))
                 continue;
-            if (unit.TeamId == observerTeam)
-                continue;
-
             Vector3Int cell = unit.CurrentCellPosition;
             cell.z = 0;
-            stackedHexOtherTeamCellsScratch.Add(cell);
+            bool submerged = unit.GetDomain() == Domain.Submarine || unit.GetHeightLevel() == HeightLevel.Submerged;
+            if (submerged)
+                stackedHexSubmergedCellsScratch.Add(cell);
+            else if (unit.GetHeightLevel() == HeightLevel.Surface)
+                stackedHexSurfaceCellsScratch.Add(cell);
+
+            if (unit.TeamId != observerTeam)
+                stackedHexOtherTeamCellsScratch.Add(cell);
         }
 
         for (int i = 0; i < units.Count; i++)
@@ -5846,16 +5868,21 @@ public class MatchController : MonoBehaviour
             if (unit == null)
                 continue;
 
-            bool front = unit.gameObject.activeInHierarchy
+            bool eligible = unit.gameObject.activeInHierarchy
                 && !unit.IsEmbarked
                 && !unit.IsDead
-                && unit.TeamId == observerTeam
                 && (boardMap == null || IsUnitOnBoard(unit, boardMap));
-            if (front)
+            bool front = false;
+            if (eligible)
             {
                 Vector3Int cell = unit.CurrentCellPosition;
                 cell.z = 0;
-                front = stackedHexOtherTeamCellsScratch.Contains(cell);
+                bool layeredSubmarineStack = stackedHexSubmergedCellsScratch.Contains(cell)
+                    && stackedHexSurfaceCellsScratch.Contains(cell);
+                if (layeredSubmarineStack)
+                    front = unit.GetDomain() == Domain.Submarine || unit.GetHeightLevel() == HeightLevel.Submerged;
+                else
+                    front = unit.TeamId == observerTeam && stackedHexOtherTeamCellsScratch.Contains(cell);
             }
 
             unit.SetStackedHexFrontRendering(front);

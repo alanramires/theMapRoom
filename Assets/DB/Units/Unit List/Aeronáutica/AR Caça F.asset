@@ -10,28 +10,28 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 67e557a91c4c9e647867393f7063f6f8, type: 3}
-  m_Name: "AR Ca\xE7a Stealth"
+  m_Name: "AR Ca\xE7a F"
   m_EditorClassIdentifier: Assembly-CSharp::UnitData
-  id: cacaS
-  displayName: "Ca\xE7a Stealth"
-  apelido: CS
+  id: cacaF
+  displayName: "Ca\xE7a F"
+  apelido: CF
   description: "Ca\xE7a de superioridade a\xE9rea com grande alcance, capaz de projetar
     for\xE7a rapidamente em qualquer ponto do mapa. Eficaz contra aeronaves e \xFAtil
     contra alvos leves. Consome autonomia enquanto permanece no ar, exigindo opera\xE7\xF5es
     curtas e planejamento de retorno. Ideal para garantir dom\xEDnio a\xE9reo em
     momentos decisivos."
-  spriteDefault: {fileID: 21300000, guid: ab4dd6fb73168824ca05fc40a270a71a, type: 3}
+  spriteDefault: {fileID: 21300000, guid: d6df093a3c91e5c47ad250ed8b400a30, type: 3}
   teamVariantSprites: []
   maxHP: 10
   defense: 15
   armorClass: 2
-  movement: 9
+  movement: 7
   visao: 4
   visionSpecializations: []
   movementCategory: 3
   militaryForce: 1
   unitClass: 4
-  combatClassification: 0
+  combatClassification: 2
   roles: 08000000
   aiInitiative: 1
   aiPurchaseMode: 2
@@ -71,21 +71,22 @@ MonoBehaviour:
   aiPreventiveSupplyHpBelowPct: 70
   aiPreventiveSupplyAutonomyBelowPct: 60
   aiPreventiveSupplyWeaponAmmoAtOrBelow: 1
-  eliteLevel: 1
-  eliteFrom: {fileID: 11400000, guid: 4712157db5587b64c99690ba148b4b80, type: 2}
+  eliteLevel: 2
+  eliteFrom: {fileID: 11400000, guid: 68658bfb5d8329a46ae3d991cc94ccd7, type: 2}
   combatModifiers:
-  - {fileID: 11400000, guid: 25b8791e695efc94a8c2d5a329cd5602, type: 2}
+  - {fileID: 11400000, guid: 84e79caf71c32194296b7fcdc7398288, type: 2}
+  - {fileID: 11400000, guid: fd87feedf31f0894ba8f7e5acc1e388a, type: 2}
   - {fileID: 11400000, guid: e3e752c450b5d8243b04ca1abf1eac6a, type: 2}
   domain: 3
   heightLevel: 5
   aditionalDomainsAllowed:
   - domain: 3
     heightLevel: 4
-    spriteDefault: {fileID: 21300000, guid: 72ec5f2c5995ee746972615303dddb01, type: 3}
+    spriteDefault: {fileID: 21300000, guid: 3022842bbb4b938469bd2b04beae0bb5, type: 3}
     teamVariantSprites: []
   - domain: 0
     heightLevel: 3
-    spriteDefault: {fileID: 21300000, guid: 6d668a2538038af449f596df1c66b18b, type: 3}
+    spriteDefault: {fileID: 21300000, guid: 233b329df58164546b6e0eca5a47d99d, type: 3}
     teamVariantSprites: []
   useExplicitPreferredAirHeight: 0
   preferredAirHeight: 4
@@ -106,9 +107,9 @@ MonoBehaviour:
   autonomyData: {fileID: 11400000, guid: d52348f636f1466d95a6489891e176bf, type: 2}
   embarkedWeapons:
   - weapon: {fileID: 11400000, guid: 90f330ac8c9e6624fafb495e58bdba25, type: 2}
-    squadAmmunition: 5
+    squadAmmunition: 6
     operationRangeMin: 1
-    operationRangeMax: 1
+    operationRangeMax: 2
     selectedTrajectory: 0
     canBeFireOnlyAtDomainHeigh: []
     lastSyncedWeapon: {fileID: 11400000, guid: 90f330ac8c9e6624fafb495e58bdba25, type: 2}

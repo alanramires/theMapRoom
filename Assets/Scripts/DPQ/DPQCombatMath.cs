@@ -19,7 +19,11 @@ public static class DPQCombatMath
                 return isInteger ? rounded - 1 : rounded;
             }
             default:
-                return Mathf.RoundToInt(value);
+                // Neutro: 0,5 SEMPRE sobe. Nao usar Mathf.RoundToInt aqui — ele
+                // delega para Math.Round, cujo padrao e MidpointRounding.ToEven
+                // (arredondamento bancario): 2,5 viraria 2 e 4,5 viraria 4.
+                // Valor exato permanece igual, pois Floor(n + 0,5) == n.
+                return Mathf.FloorToInt(value + 0.5f);
         }
     }
 

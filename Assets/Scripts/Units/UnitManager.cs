@@ -3088,6 +3088,12 @@ public class UnitManager : MonoBehaviour
 
     private bool ShouldShowDetectedIndicator(UnitData unitData)
     {
+        // INTENCIONAL: sobrecarga SEM camada. O Olho significa "unidade com skill
+        // de ocultacao foi detectada", nao "foi detectada apesar do stealth ativo".
+        // A camada e onde a skill foi feita para funcionar, nao condicao do aviso.
+        // Caca F em Air/Low no alcance do SAM, ou pousado e visto por um soldado,
+        // PRECISA do Olho: esconder ali faz o jogador se achar seguro sem estar.
+        // Nao trocar por IsStealthUnit(GetDomain(), GetHeightLevel()).
         if (unitData == null || !unitData.IsStealthUnit())
             return false;
 

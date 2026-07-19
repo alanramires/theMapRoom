@@ -36,8 +36,14 @@ public class DPQData : ScriptableObject
     [Tooltip("Bonus de defesa deste DPQ (pode ser negativo).")]
     public int defesaBonus = 0;
 
-    public int Pontos => pontos;
-    public int DefesaBonus => defesaBonus;
+    // Com a flag ligada, os valores sao DERIVADOS da qualidade, nao lidos do
+    // campo serializado. O OnValidate ja fazia isso, mas ele e editor-only: um
+    // asset antigo que nunca foi regravado (ex.: DPQ_Desfavoravel, que so tem
+    // qualidadeDePosicao no disco) cairia nos inicializadores da classe fora do
+    // editor. Derivando aqui, o valor correto independe do que esta serializado.
+    // Flag desligada continua respeitando os campos manuais — e para isso que ela existe.
+    public int Pontos => usarValoresPadraoDaQualidade ? GetPontosPadrao(qualidadeDePosicao) : pontos;
+    public int DefesaBonus => usarValoresPadraoDaQualidade ? GetDefesaPadrao(qualidadeDePosicao) : defesaBonus;
 
     [ContextMenu("Aplicar Valores Padrao da Qualidade")]
     public void AplicarValoresPadraoDaQualidade()

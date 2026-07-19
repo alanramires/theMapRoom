@@ -41,8 +41,6 @@ MonoBehaviour:
   aditionalDomainsAllowed:
   - domain: 1
     heightLevel: 3
-  - domain: 1
-    heightLevel: 2
   alwaysAllowAirDomain: 1
   allowAircraftTakeoffAndLanding: 1
   aircraftUnitsPaysUpkeep: 1

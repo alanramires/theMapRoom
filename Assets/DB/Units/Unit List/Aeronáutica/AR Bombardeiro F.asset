@@ -10,57 +10,58 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 67e557a91c4c9e647867393f7063f6f8, type: 3}
-  m_Name: AR EWACS
+  m_Name: AR Bombardeiro F
   m_EditorClassIdentifier: Assembly-CSharp::UnitData
-  id: ewacs
-  displayName: EWACS
-  apelido: EW
-  description: "Aeronave de reconhecimento que amplia drasticamente a vis\xE3o a\xE9rea,
-    revelando movimentos em grandes dist\xE2ncias. Essencial para antecipar amea\xE7as
-    e coordenar opera\xE7\xF5es. N\xE3o possui capacidade de combate e n\xE3o detecta
-    unidades terrestres ou submarinos. Deve operar protegida, pois sua perda reduz
-    severamente a consci\xEAncia do campo de batalha."
-  spriteDefault: {fileID: 21300000, guid: c0b17bc8f689a46478caca98f7d5183b, type: 3}
+  id: bf
+  displayName: Bombardeiro F
+  apelido: BF
+  description: "Bombardeiro de alto impacto capaz de causar dano severo a unidades
+    terrestres expostas. Ideal para abrir brechas e punir concentra\xE7\xF5es inimigas.
+    Consome autonomia rapidamente no ar e depende de planejamento log\xEDstico para
+    operar. Vulner\xE1vel a defesas anti-a\xE9reas e exige timing preciso para evitar
+    perdas."
+  spriteDefault: {fileID: 21300000, guid: 35328fdd87c991449885c49a0c7ff593, type: 3}
   teamVariantSprites: []
   maxHP: 10
-  defense: 12
+  defense: 13
   armorClass: 1
-  movement: 7
+  movement: 6
   visao: 3
-  visionSpecializations:
-  - domain: 3
-    allHeights: 1
-    heightLevel: 5
-    vision: 7
-    detectUnitsWithFollowingSkills:
-    - {fileID: 11400000, guid: 3ae2d2213e72ea144a307a743470d032, type: 2}
-    losPolicy: 0
+  visionSpecializations: []
   movementCategory: 3
   militaryForce: 1
   unitClass: 6
-  combatClassification: 3
-  roles: 06000000
-  aiInitiative: 0
+  combatClassification: 2
+  roles: 09000000
+  aiInitiative: 2
   aiPurchaseMode: 0
   bannedOnHardMode: 0
-  aiTargetPreferenceByClass: []
+  aiTargetPreferenceByClass:
+  - targetClass: 2
+    priority: 2
+  - targetClass: 3
+    priority: 2
+  - targetClass: 1
+    priority: 1
+  - targetClass: 8
+    priority: 1
   aiSensorPriority: 0000000002000000
   prioritizeDpqAtBattle: 0
-  playConservative: 1
+  playConservative: 0
   preferMoveOnBestDPQ: 0
-  preferMaxDisplacement: 0
+  preferMaxDisplacement: 1
   longRangeStationary: 0
   preferRepositionAtWeaponMaxRange: 0
   preferArtilleryModeBeforeCombatant: 0
-  useAttackDecision: 0
-  attackAcceptHpLossPercent: 50
+  useAttackDecision: 1
+  attackAcceptHpLossPercent: 90
   attackEliminationMinPercent: 10
   attackMustSurvive: 1
   ignoreAttackDecisionWhenDefending: 0
   defensiveAttackExtraHpLossPercent: 20
   repairTriggerHpBelow: 3
   repairTriggerAutonomyPct: 40
-  repairTriggerAmmoEnabled: 0
+  repairTriggerAmmoEnabled: 1
   repairTriggerAmmoPct: 0
   repairRecoverHpAbove: 8
   fuseWhileInRepair: 1
@@ -74,19 +75,20 @@ MonoBehaviour:
   aiPreventiveSupplyHpBelowPct: 70
   aiPreventiveSupplyAutonomyBelowPct: 60
   aiPreventiveSupplyWeaponAmmoAtOrBelow: 1
-  eliteLevel: 0
-  eliteFrom: {fileID: 0}
-  combatModifiers: []
+  eliteLevel: 1
+  eliteFrom: {fileID: 11400000, guid: 55cd1f4769313c14a99e623384d368e2, type: 2}
+  combatModifiers:
+  - {fileID: 11400000, guid: 23ed629c09c8bb74d882635509ae0f57, type: 2}
   domain: 3
   heightLevel: 5
   aditionalDomainsAllowed:
   - domain: 0
     heightLevel: 3
-    spriteDefault: {fileID: 21300000, guid: 06cbc9a30dd101f4395d6b36b942a822, type: 3}
+    spriteDefault: {fileID: 21300000, guid: 920ede89edee42f4fb77cfee2e93a972, type: 3}
     teamVariantSprites: []
   - domain: 3
     heightLevel: 4
-    spriteDefault: {fileID: 21300000, guid: 2c55b7950037b9e43a76edfdeb8b2780, type: 3}
+    spriteDefault: {fileID: 21300000, guid: 9a6abd1f3b943a34a94be1fd5abc106a, type: 3}
     teamVariantSprites: []
   useExplicitPreferredAirHeight: 0
   preferredAirHeight: 4
@@ -100,10 +102,22 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e73850be27dc4e2e8c8f210db151b0b4, type: 2}
   - {fileID: 11400000, guid: 3f52a3b7c5d14c5ea1f0f9aa34d2be11, type: 2}
   stealthSkills: []
-  stealthSkillRules: []
+  stealthSkillRules:
+  - domain: 3
+    heightLevel: 5
+    skill: {fileID: 11400000, guid: 3ae2d2213e72ea144a307a743470d032, type: 2}
   autonomyData: {fileID: 11400000, guid: d52348f636f1466d95a6489891e176bf, type: 2}
-  embarkedWeapons: []
-  cantUseWeaponsOnTheFollowDomain: []
+  embarkedWeapons:
+  - weapon: {fileID: 11400000, guid: 86a03ca38b95e2a4db570315170881be, type: 2}
+    squadAmmunition: 3
+    operationRangeMin: 1
+    operationRangeMax: 2
+    selectedTrajectory: 0
+    canBeFireOnlyAtDomainHeigh: []
+    lastSyncedWeapon: {fileID: 11400000, guid: 86a03ca38b95e2a4db570315170881be, type: 2}
+  cantUseWeaponsOnTheFollowDomain:
+  - domain: 0
+    heightLevel: 3
   isSupplier: 0
   supplierTier: 0
   maxUnitsServedPerTurn: 0
@@ -125,4 +139,4 @@ MonoBehaviour:
   passengersCanDisembarkAndGoesToConstructions: []
   transportSlots: []
   autonomia: 90
-  cost: 9000
+  cost: 32000

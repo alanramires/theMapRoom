@@ -12,7 +12,7 @@ public class HexCohabitationVisualSettings : MonoBehaviour
     [Range(0.3f, 1f)]
     public float scale = 0.6f;
 
-    [Header("Espalhamento na mesma banda (ar+ar / chao+chao contestado)")]
+    [Header("Espalhamento por linha (usado quando ha superficie ou 3+ aereos)")]
     [Range(0f, 0.5f)]
     public float intraLayerSpread = 0.18f;
 

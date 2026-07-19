@@ -7,6 +7,16 @@ using UnityEngine;
 
 public class CombatLargeMatrixWindow : EditorWindow
 {
+    private const int BaselineDpqIndex = 1;
+    private static readonly DpqPreset[] DpqPresets =
+    {
+        new DpqPreset("DPQ_Desfavoravel", DPQQualidadeDePosicao.Unfavorable),
+        new DpqPreset("DPQ_Padrao", DPQQualidadeDePosicao.Default),
+        new DpqPreset("DPQ_Melhorado", DPQQualidadeDePosicao.Improved),
+        new DpqPreset("DPQ_Favoravel", DPQQualidadeDePosicao.Favorable),
+        new DpqPreset("DPQ_Unico", DPQQualidadeDePosicao.Unique)
+    };
+
     private const float RowHeaderWidth = 72f;
     private const float CellWidth = 96f;
     private const float CellHeight = 30f;
@@ -16,6 +26,8 @@ public class CombatLargeMatrixWindow : EditorWindow
     [SerializeField] private DPQMatchupDatabase dpqMatchupDatabase;
     [SerializeField] private WeaponPriorityData weaponPriorityData;
     [SerializeField] private int range = 1;
+    [SerializeField] private int attackerDpqIndex = BaselineDpqIndex;
+    [SerializeField] private int defenderDpqIndex = BaselineDpqIndex;
     [SerializeField] private bool includeCounterAttack = true;
     [SerializeField] private bool includeUnavailableWeapons = true;
     [SerializeField] private int attackerClassMask = -1;
@@ -62,6 +74,7 @@ public class CombatLargeMatrixWindow : EditorWindow
         weaponPriorityData = (WeaponPriorityData)EditorGUILayout.ObjectField("Weapon Priority", weaponPriorityData, typeof(WeaponPriorityData), false);
 
         range = Mathf.Max(1, EditorGUILayout.IntField("Alcance (hex)", range));
+        DrawDpqSelectors();
         includeCounterAttack = EditorGUILayout.ToggleLeft("Incluir revide (inv)", includeCounterAttack);
         includeUnavailableWeapons = EditorGUILayout.ToggleLeft("Listar armas indisponiveis (sem muni/layer/range)", includeUnavailableWeapons);
 
@@ -75,7 +88,7 @@ public class CombatLargeMatrixWindow : EditorWindow
         autoUpdateIntervalSeconds = Mathf.Clamp(EditorGUILayout.FloatField("Auto Update Interval (s)", autoUpdateIntervalSeconds), 0.1f, 5f);
         outputRelativePath = EditorGUILayout.TextField("Saida CSV", outputRelativePath);
 
-        EditorGUILayout.HelpBox("DPQ da matriz: sempre padrao (atacante=1, defensor=1).", MessageType.Info);
+        EditorGUILayout.HelpBox("DPQ especializado: pontos controlam o matchup/arredondamento; defesa DPQ entra na FD de cada lado.", MessageType.Info);
         EditorGUILayout.Space(6f);
 
         using (new EditorGUI.DisabledScope(unitDatabase == null))
@@ -122,6 +135,8 @@ public class CombatLargeMatrixWindow : EditorWindow
                         cachedDefenders[col],
                         range,
                         includeCounterAttack,
+                        DpqPresets[Mathf.Clamp(attackerDpqIndex, 0, DpqPresets.Length - 1)].label,
+                        DpqPresets[Mathf.Clamp(defenderDpqIndex, 0, DpqPresets.Length - 1)].label,
                         cell.summary,
                         cell.details);
                 }
@@ -129,6 +144,26 @@ public class CombatLargeMatrixWindow : EditorWindow
 
             EditorGUILayout.EndHorizontal();
         }
+    }
+
+    private void DrawDpqSelectors()
+    {
+        string[] labels = new string[DpqPresets.Length];
+        for (int i = 0; i < DpqPresets.Length; i++)
+        {
+            DpqPreset preset = DpqPresets[i];
+            labels[i] = $"{preset.label} (pontos={preset.points}, defesa={preset.defenseBonus:+0;-0;0})";
+        }
+
+        attackerDpqIndex = Mathf.Clamp(attackerDpqIndex, 0, DpqPresets.Length - 1);
+        defenderDpqIndex = Mathf.Clamp(defenderDpqIndex, 0, DpqPresets.Length - 1);
+        attackerDpqIndex = EditorGUILayout.Popup("DPQ do Atacante", attackerDpqIndex, labels);
+        defenderDpqIndex = EditorGUILayout.Popup("DPQ do Defensor", defenderDpqIndex, labels);
+    }
+
+    private static DpqPreset ResolveSelectedDpq(int index)
+    {
+        return DpqPresets[Mathf.Clamp(index, 0, DpqPresets.Length - 1)];
     }
 
     private void RebuildMatrix(bool writeCsv)
@@ -158,10 +193,12 @@ public class CombatLargeMatrixWindow : EditorWindow
             return;
         }
 
+        DpqPreset attackerDpq = ResolveSelectedDpq(attackerDpqIndex);
+        DpqPreset defenderDpq = ResolveSelectedDpq(defenderDpqIndex);
         DPQCombatOutcome atkOutcome = DPQCombatOutcome.Neutro;
         DPQCombatOutcome defOutcome = DPQCombatOutcome.Neutro;
         if (dpqMatchupDatabase != null)
-            dpqMatchupDatabase.Resolve(1, 1, out atkOutcome, out defOutcome);
+            dpqMatchupDatabase.Resolve(attackerDpq.points, defenderDpq.points, out atkOutcome, out defOutcome);
 
         matrixCells = new CellView[cachedAttackers.Count, cachedDefenders.Count];
 
@@ -187,7 +224,8 @@ public class CombatLargeMatrixWindow : EditorWindow
             for (int col = 0; col < cachedDefenders.Count; col++)
             {
                 UnitData defender = cachedDefenders[col];
-                CellView cell = BuildCell(attacker, defender, range, includeCounterAttack, includeUnavailableWeapons, atkOutcome, defOutcome);
+                CellView cell = BuildCell(attacker, defender, range, includeCounterAttack, includeUnavailableWeapons,
+                    attackerDpq, defenderDpq, atkOutcome, defOutcome);
                 matrixCells[row, col] = cell;
 
                 if (writeCsv)
@@ -210,7 +248,7 @@ public class CombatLargeMatrixWindow : EditorWindow
             File.WriteAllText(absolutePath, csv.ToString(), Encoding.UTF8);
             AssetDatabase.Refresh();
 
-            Debug.Log($"[MatrizCombate] Gerado: {absolutePath}\nAtacantes={cachedAttackers.Count} | Defensores={cachedDefenders.Count} | Range={range} | Revide={(includeCounterAttack ? "on" : "off")} | DPQ=padrao(1x1)");
+            Debug.Log($"[MatrizCombate] Gerado: {absolutePath}\nAtacantes={cachedAttackers.Count} | Defensores={cachedDefenders.Count} | Range={range} | Revide={(includeCounterAttack ? "on" : "off")} | DPQ={attackerDpq.label} x {defenderDpq.label}");
         }
 
         matrixReady = true;
@@ -249,6 +287,8 @@ public class CombatLargeMatrixWindow : EditorWindow
         int attackRange,
         bool allowCounter,
         bool keepUnavailable,
+        DpqPreset attackerDpq,
+        DpqPreset defenderDpq,
         DPQCombatOutcome attackerOutcome,
         DPQCombatOutcome defenderOutcome)
     {
@@ -265,8 +305,8 @@ public class CombatLargeMatrixWindow : EditorWindow
         details.AppendLine($"Atacante: {GetUnitLabel(attacker)}");
         details.AppendLine($"Defensor: {GetUnitLabel(defender)}");
         details.AppendLine($"Range: {attackRange}");
-        details.AppendLine($"DPQ outcome atacante: {attackerOutcome}");
-        details.AppendLine($"DPQ outcome defensor: {defenderOutcome}");
+        details.AppendLine($"DPQ atacante: {attackerDpq.label} (pontos={attackerDpq.points}, defesa={attackerDpq.defenseBonus}, outcome={attackerOutcome})");
+        details.AppendLine($"DPQ defensor: {defenderDpq.label} (pontos={defenderDpq.points}, defesa={defenderDpq.defenseBonus}, outcome={defenderOutcome})");
         details.AppendLine("Regra de elite: modifiers dos dois lados sempre entram no calculo (mesmo sem revide).");
         details.AppendLine("Regra de revide: so aplica dano de retorno quando houver arma valida de revide.");
         details.AppendLine();
@@ -292,6 +332,7 @@ public class CombatLargeMatrixWindow : EditorWindow
             defenderHp,
             defender.maxHP,
             defender.defense,
+            defenderDpq.defenseBonus,
             attackerOutcome,
             bestCounter.isValid ? bestCounter.weapon : embarked.weapon,
             out DamageBreakdown attackBreakdown);
@@ -310,6 +351,7 @@ public class CombatLargeMatrixWindow : EditorWindow
                 attackerHp,
                 attacker.maxHP,
                 attacker.defense,
+                attackerDpq.defenseBonus,
                 defenderOutcome,
                 embarked.weapon,
                 out DamageBreakdown counterBreakdown);
@@ -445,6 +487,7 @@ public class CombatLargeMatrixWindow : EditorWindow
         int defenderCurrentHp,
         int defenderMaxHp,
         int defenderBaseDefense,
+        int defenderDpqDefenseBonus,
         DPQCombatOutcome outcome,
         WeaponData defenderWeaponContextForSkill)
     {
@@ -456,6 +499,7 @@ public class CombatLargeMatrixWindow : EditorWindow
             defenderCurrentHp,
             defenderMaxHp,
             defenderBaseDefense,
+            defenderDpqDefenseBonus,
             outcome,
             defenderWeaponContextForSkill,
             out _);
@@ -469,6 +513,7 @@ public class CombatLargeMatrixWindow : EditorWindow
         int defenderCurrentHp,
         int defenderMaxHp,
         int defenderBaseDefense,
+        int defenderDpqDefenseBonus,
         DPQCombatOutcome outcome,
         WeaponData defenderWeaponContextForSkill,
         out DamageBreakdown breakdown)
@@ -511,7 +556,7 @@ public class CombatLargeMatrixWindow : EditorWindow
         int attackTermApplied = Mathf.Max(1, attackTermRaw);
         int attackEffective = attackerHp * attackTermApplied;
         int woundedPenalty = ResolveWoundedDefensePenalty(defenderCurrentHp, defenderMaxHp);
-        int defenderEffectiveDefense = Mathf.Max(1, defenderBaseDefense + defenseRps + defenseSkillTotal + woundedPenalty); // DPQ padrao = defesa 0
+        int defenderEffectiveDefense = Mathf.Max(1, defenderBaseDefense + defenderDpqDefenseBonus + defenseRps + defenseSkillTotal + woundedPenalty);
         int rounded = DPQCombatMath.DivideAndRound(attackEffective, defenderEffectiveDefense, outcome);
         int damage = Mathf.Max(0, rounded);
 
@@ -525,7 +570,7 @@ public class CombatLargeMatrixWindow : EditorWindow
             defenderSkill.opponentAttack,
             attackEffective,
             defenderBaseDefense,
-            0,
+            defenderDpqDefenseBonus,
             defenseRps,
             defenderSkill.ownerDefense,
             attackerSkill.opponentDefense,
@@ -751,6 +796,20 @@ public class CombatLargeMatrixWindow : EditorWindow
             this.ownerDefense = ownerDefense;
             this.opponentAttack = opponentAttack;
             this.opponentDefense = opponentDefense;
+        }
+    }
+
+    private readonly struct DpqPreset
+    {
+        public readonly string label;
+        public readonly int points;
+        public readonly int defenseBonus;
+
+        public DpqPreset(string label, DPQQualidadeDePosicao quality)
+        {
+            this.label = label;
+            points = DPQData.GetPontosPadrao(quality);
+            defenseBonus = DPQData.GetDefesaPadrao(quality);
         }
     }
 

@@ -13965,7 +13965,7 @@ MonoBehaviour:
     defeated: 0
     startMoney: 85000
     actualMoney: 0
-    incomePerTurn: 15000
+    incomePerTurn: 7500
     startMoneyApplied: 1
   - teamId: 1
     flipX: 1
@@ -13975,7 +13975,7 @@ MonoBehaviour:
     defeated: 0
     startMoney: 85000
     actualMoney: 0
-    incomePerTurn: 15000
+    incomePerTurn: 3000
     startMoneyApplied: 1
   includeNeutralTeam: 0
   economyEnabled: 1
@@ -14026,7 +14026,7 @@ MonoBehaviour:
   appliedActiveTeamId: 0
   pendingTurnStartUpkeep: 1
   pendingTurnStartEconomy: 1
-  cachedConstructionIncomeSignature: 21809086
+  cachedConstructionIncomeSignature: -1085235056
   cachedConstructionIncomeCount: 57
   constructionIncomeRefreshIntervalSeconds: 0.35
   continuousEditorRefresh: 0
@@ -18233,11 +18233,13 @@ MonoBehaviour:
     - {fileID: 11400000, guid: eb2fdf3f9331b4648af28377f6083658, type: 2}
     - {fileID: 11400000, guid: 68658bfb5d8329a46ae3d991cc94ccd7, type: 2}
     - {fileID: 11400000, guid: 4712157db5587b64c99690ba148b4b80, type: 2}
-    - {fileID: 11400000, guid: 212e0e436c7e0834780a712787e61eba, type: 2}
+    - {fileID: 11400000, guid: ae5d15fc76fb4eb4cbb2f91d5133003d, type: 2}
     - {fileID: 11400000, guid: f818fb00e3afbc64baa48f18f9d88465, type: 2}
     - {fileID: 11400000, guid: 5d423c80fa8a66241a1c616051de6ca2, type: 2}
-    - {fileID: 11400000, guid: 9d52bdec098eb9047906b57709b8d578, type: 2}
+    - {fileID: 11400000, guid: 212e0e436c7e0834780a712787e61eba, type: 2}
+    - {fileID: 11400000, guid: 3d3d08341c39190459cf42c73cd6c1b8, type: 2}
     - {fileID: 11400000, guid: b7f859c456bfb334fafe58f296fddc6b, type: 2}
+    - {fileID: 11400000, guid: 9d52bdec098eb9047906b57709b8d578, type: 2}
     canProvideSupplies: 1
     offeredSupplies:
     - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
@@ -18253,7 +18255,7 @@ MonoBehaviour:
     - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
     - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
     - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
-  hasSiteRuntimeOverride: 0
+  hasSiteRuntimeOverride: 1
   currentCapturePoints: 30
   hasInfiniteSuppliesOverride: 1
   originalOwnerSlotIndex: 1
@@ -22999,11 +23001,13 @@ MonoBehaviour:
     - {fileID: 11400000, guid: eb2fdf3f9331b4648af28377f6083658, type: 2}
     - {fileID: 11400000, guid: 68658bfb5d8329a46ae3d991cc94ccd7, type: 2}
     - {fileID: 11400000, guid: 4712157db5587b64c99690ba148b4b80, type: 2}
-    - {fileID: 11400000, guid: 212e0e436c7e0834780a712787e61eba, type: 2}
+    - {fileID: 11400000, guid: ae5d15fc76fb4eb4cbb2f91d5133003d, type: 2}
     - {fileID: 11400000, guid: f818fb00e3afbc64baa48f18f9d88465, type: 2}
     - {fileID: 11400000, guid: 5d423c80fa8a66241a1c616051de6ca2, type: 2}
-    - {fileID: 11400000, guid: 9d52bdec098eb9047906b57709b8d578, type: 2}
+    - {fileID: 11400000, guid: 212e0e436c7e0834780a712787e61eba, type: 2}
+    - {fileID: 11400000, guid: 3d3d08341c39190459cf42c73cd6c1b8, type: 2}
     - {fileID: 11400000, guid: b7f859c456bfb334fafe58f296fddc6b, type: 2}
+    - {fileID: 11400000, guid: 9d52bdec098eb9047906b57709b8d578, type: 2}
     canProvideSupplies: 1
     offeredSupplies:
     - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
@@ -23019,7 +23023,7 @@ MonoBehaviour:
     - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
     - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
     - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
-  hasSiteRuntimeOverride: 0
+  hasSiteRuntimeOverride: 1
   currentCapturePoints: 30
   hasInfiniteSuppliesOverride: 1
   originalOwnerSlotIndex: 1
@@ -28996,11 +29000,13 @@ MonoBehaviour:
     - {fileID: 11400000, guid: eb2fdf3f9331b4648af28377f6083658, type: 2}
     - {fileID: 11400000, guid: 68658bfb5d8329a46ae3d991cc94ccd7, type: 2}
     - {fileID: 11400000, guid: 4712157db5587b64c99690ba148b4b80, type: 2}
-    - {fileID: 11400000, guid: 212e0e436c7e0834780a712787e61eba, type: 2}
+    - {fileID: 11400000, guid: ae5d15fc76fb4eb4cbb2f91d5133003d, type: 2}
     - {fileID: 11400000, guid: f818fb00e3afbc64baa48f18f9d88465, type: 2}
     - {fileID: 11400000, guid: 5d423c80fa8a66241a1c616051de6ca2, type: 2}
-    - {fileID: 11400000, guid: 9d52bdec098eb9047906b57709b8d578, type: 2}
+    - {fileID: 11400000, guid: 212e0e436c7e0834780a712787e61eba, type: 2}
+    - {fileID: 11400000, guid: 3d3d08341c39190459cf42c73cd6c1b8, type: 2}
     - {fileID: 11400000, guid: b7f859c456bfb334fafe58f296fddc6b, type: 2}
+    - {fileID: 11400000, guid: 9d52bdec098eb9047906b57709b8d578, type: 2}
     canProvideSupplies: 1
     offeredSupplies:
     - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
@@ -29016,7 +29022,7 @@ MonoBehaviour:
     - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
     - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
     - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
-  hasSiteRuntimeOverride: 0
+  hasSiteRuntimeOverride: 1
   currentCapturePoints: 30
   hasInfiniteSuppliesOverride: 1
   originalOwnerSlotIndex: 0
@@ -42585,10 +42591,10 @@ MonoBehaviour:
   cursorController: {fileID: 2105919121}
   sendButton: {fileID: 0}
   commandInputObject: {fileID: 0}
-  aiDebugShortcutsEnabled: 0
-  debugShortcutsEnabled: 0
-  resetPlanOnDebugStage: 0
-  panelRodadaDesativadoPvpDebug: 0
+  aiDebugShortcutsEnabled: 1
+  debugShortcutsEnabled: 1
+  resetPlanOnDebugStage: 1
+  panelRodadaDesativadoPvpDebug: 1
 --- !u!1 &1083665238
 GameObject:
   m_ObjectHideFlags: 0
@@ -49282,11 +49288,13 @@ MonoBehaviour:
     - {fileID: 11400000, guid: eb2fdf3f9331b4648af28377f6083658, type: 2}
     - {fileID: 11400000, guid: 68658bfb5d8329a46ae3d991cc94ccd7, type: 2}
     - {fileID: 11400000, guid: 4712157db5587b64c99690ba148b4b80, type: 2}
-    - {fileID: 11400000, guid: 212e0e436c7e0834780a712787e61eba, type: 2}
+    - {fileID: 11400000, guid: ae5d15fc76fb4eb4cbb2f91d5133003d, type: 2}
     - {fileID: 11400000, guid: f818fb00e3afbc64baa48f18f9d88465, type: 2}
     - {fileID: 11400000, guid: 5d423c80fa8a66241a1c616051de6ca2, type: 2}
-    - {fileID: 11400000, guid: 9d52bdec098eb9047906b57709b8d578, type: 2}
+    - {fileID: 11400000, guid: 212e0e436c7e0834780a712787e61eba, type: 2}
+    - {fileID: 11400000, guid: 3d3d08341c39190459cf42c73cd6c1b8, type: 2}
     - {fileID: 11400000, guid: b7f859c456bfb334fafe58f296fddc6b, type: 2}
+    - {fileID: 11400000, guid: 9d52bdec098eb9047906b57709b8d578, type: 2}
     canProvideSupplies: 1
     offeredSupplies:
     - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
@@ -49302,7 +49310,7 @@ MonoBehaviour:
     - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
     - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
     - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
-  hasSiteRuntimeOverride: 0
+  hasSiteRuntimeOverride: 1
   currentCapturePoints: 30
   hasInfiniteSuppliesOverride: 1
   originalOwnerSlotIndex: 0
@@ -79785,69 +79793,13 @@ MonoBehaviour:
       capturePointsMax: 20
       source: {fileID: 1704695949}
     riskEntries:
-    - Team: 1
+    - Team: 0
       RiskRatio: 0.5
       RiskLevel: 2
-    - Team: 0
+    - Team: 1
       RiskRatio: 0.5
       RiskLevel: 2
     sectorDistances:
-    - Team: 1
-      Entries:
-      - ConstructionName: HQ
-        InstanceId: 0
-        Distance: 16
-        VehicleDistance: 16
-        AirDistance: 14
-        IsHQ: 1
-      - ConstructionName: Porto Naval
-        InstanceId: 73
-        Distance: 14
-        VehicleDistance: 14
-        AirDistance: 12
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 74
-        Distance: 16
-        VehicleDistance: 16
-        AirDistance: 9
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 14
-        Distance: 15
-        VehicleDistance: 15
-        AirDistance: 14
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 9
-        Distance: 15
-        VehicleDistance: 15
-        AirDistance: 12
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 80
-        Distance: 14
-        VehicleDistance: 14
-        AirDistance: 12
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 13
-        Distance: 15
-        VehicleDistance: 15
-        AirDistance: 13
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 11
-        Distance: 14
-        VehicleDistance: 14
-        AirDistance: 13
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 12
-        Distance: 16
-        VehicleDistance: 16
-        AirDistance: 13
-        IsHQ: 0
     - Team: 0
       Entries:
       - ConstructionName: HQ
@@ -79856,11 +79808,41 @@ MonoBehaviour:
         VehicleDistance: 16
         AirDistance: 14
         IsHQ: 1
+      - ConstructionName: Aeroporto
+        InstanceId: 8
+        Distance: 14
+        VehicleDistance: 14
+        AirDistance: 13
+        IsHQ: 0
+      - ConstructionName: Aeroporto
+        InstanceId: 6
+        Distance: 15
+        VehicleDistance: 15
+        AirDistance: 12
+        IsHQ: 0
       - ConstructionName: Porto Naval
         InstanceId: 71
         Distance: 16
         VehicleDistance: 16
         AirDistance: 9
+        IsHQ: 0
+      - ConstructionName: Porto Naval
+        InstanceId: 72
+        Distance: 14
+        VehicleDistance: 14
+        AirDistance: 12
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 77
+        Distance: 14
+        VehicleDistance: 14
+        AirDistance: 12
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 4
+        Distance: 15
+        VehicleDistance: 15
+        AirDistance: 13
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
         InstanceId: 3
@@ -79874,32 +79856,58 @@ MonoBehaviour:
         VehicleDistance: 15
         AirDistance: 14
         IsHQ: 0
+    - Team: 1
+      Entries:
+      - ConstructionName: HQ
+        InstanceId: 0
+        Distance: 16
+        VehicleDistance: 16
+        AirDistance: 14
+        IsHQ: 1
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 80
+        Distance: 14
+        VehicleDistance: 14
+        AirDistance: 12
+        IsHQ: 0
       - ConstructionName: Aeroporto
-        InstanceId: 6
+        InstanceId: 9
         Distance: 15
         VehicleDistance: 15
         AirDistance: 12
         IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 12
+        Distance: 16
+        VehicleDistance: 16
+        AirDistance: 13
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 14
+        Distance: 15
+        VehicleDistance: 15
+        AirDistance: 14
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 13
+        Distance: 15
+        VehicleDistance: 15
+        AirDistance: 13
+        IsHQ: 0
+      - ConstructionName: Porto Naval
+        InstanceId: 74
+        Distance: 16
+        VehicleDistance: 16
+        AirDistance: 9
+        IsHQ: 0
       - ConstructionName: Aeroporto
-        InstanceId: 8
+        InstanceId: 11
         Distance: 14
         VehicleDistance: 14
         AirDistance: 13
         IsHQ: 0
       - ConstructionName: Porto Naval
-        InstanceId: 72
-        Distance: 14
-        VehicleDistance: 14
-        AirDistance: 12
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 4
-        Distance: 15
-        VehicleDistance: 15
-        AirDistance: 13
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 77
+        InstanceId: 73
         Distance: 14
         VehicleDistance: 14
         AirDistance: 12
@@ -89153,7 +89161,7 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 1348457725607290348, guid: f7e44d7c210a32d4ba630ba660da88a1, type: 3}
       propertyPath: m_text
-      value: 0 / turn
+      value: 7500 / turn
       objectReference: {fileID: 0}
     - target: {fileID: 4985144350662451516, guid: f7e44d7c210a32d4ba630ba660da88a1, type: 3}
       propertyPath: m_Enabled

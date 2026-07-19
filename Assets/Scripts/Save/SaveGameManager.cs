@@ -1007,7 +1007,12 @@ public class SaveGameManager : MonoBehaviour
         if (!IsWebGLStorageAvailable(showFeedback: true))
             return;
 
-        if (IsPersistenceBlockedByActiveAI(showFeedback: true))
+        // Ao carregar pela Tela de Entrada, a cena-base existe apenas como suporte
+        // temporario ate o snapshot ser restaurado. Em Hot Seat, o gate de troca de
+        // jogador tambem bloqueia input e compartilha a mesma consulta usada pelo
+        // turno da IA; nao deixe esse estado transitorio impedir o load solicitado.
+        bool isPendingMainMenuLoad = HasPendingMainMenuLoadRequest;
+        if (!isPendingMainMenuLoad && IsPersistenceBlockedByActiveAI(showFeedback: true))
             return;
         if (IsPersistenceBlockedByTurnState(showFeedback: true, allowPersistencePromptState: promptState != SlotPromptState.None))
             return;
@@ -1353,6 +1358,7 @@ public class SaveGameManager : MonoBehaviour
                         presentationStartMs,
                         PerfNowMs() - asyncStartMs));
                 LogLoadPerf(normalizedSlot, "turn_button.confirmed", presentationStartMs, PerfNowMs() - asyncStartMs);
+                matchController?.ReleaseHotSeatGateAfterLoad();
                 loadingPresentationReleased = true;
                 matchMusicAudioManager?.PrepareForMatchStart(forceRestartPlayback: true);
             }
