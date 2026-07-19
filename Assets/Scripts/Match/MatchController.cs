@@ -241,6 +241,15 @@ public class MatchController : MonoBehaviour
     [System.NonSerialized] private readonly Dictionary<Vector3Int, int> fogVisibleContributorsByCell = new Dictionary<Vector3Int, int>();
     [System.NonSerialized] private readonly Dictionary<int, bool> fogUnitVisibilityByCacheIndex = new Dictionary<int, bool>();
     [System.NonSerialized] private readonly HashSet<Vector3Int> fogUnitVisibleScratchBuffer = new HashSet<Vector3Int>();
+    private sealed class FogTeamGameplaySnapshot
+    {
+        public readonly HashSet<Vector3Int> visibleCells = new HashSet<Vector3Int>();
+        public readonly HashSet<Vector3Int> knownCells = new HashSet<Vector3Int>();
+        public readonly HashSet<Vector3Int> globalLandmarkOnlyCells = new HashSet<Vector3Int>();
+        public readonly Dictionary<int, bool> unitVisibility = new Dictionary<int, bool>();
+    }
+    [System.NonSerialized] private readonly Dictionary<int, FogTeamGameplaySnapshot> fogGameplaySnapshotsByTeam =
+        new Dictionary<int, FogTeamGameplaySnapshot>();
     [System.NonSerialized] private PanelRemainingController fogVisionPanelRemaining;
     [System.NonSerialized] private bool fogSortingLayerValidated;
     [System.NonSerialized] private int fogCachedTeamId = int.MinValue;
@@ -3441,6 +3450,7 @@ public class MatchController : MonoBehaviour
         double constructionVisionMs = enableFogStepPerfLogs
             ? (Time.realtimeSinceStartupAsDouble - constructionVisionStartMs) * 1000d
             : 0d;
+        PublishFogGameplaySnapshot(activeTeamId, boardMap, units);
         if (mode == FogOfWarRefreshMode.FullVisual)
             RefreshRuntimeUnitFogVisibility();
         if (Application.isPlaying && activeTeamId >= 0
@@ -3580,6 +3590,8 @@ public class MatchController : MonoBehaviour
         double renderOverlayMs = enableFogStepPerfLogs ? (Time.realtimeSinceStartupAsDouble - stageStartMs) * 1000d : 0d;
         stageStartMs = enableFogStepPerfLogs ? Time.realtimeSinceStartupAsDouble : 0d;
         RefreshRuntimeUnitFogVisibility();
+        UnitManager[] snapshotUnits = FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude);
+        PublishFogGameplaySnapshot(activeTeamId, boardMap, snapshotUnits);
         double runtimeVisibilityMs = enableFogStepPerfLogs ? (Time.realtimeSinceStartupAsDouble - stageStartMs) * 1000d : 0d;
         stageStartMs = enableFogStepPerfLogs ? Time.realtimeSinceStartupAsDouble : 0d;
         AIIntelLedger.RecordVisibleContactsForTeam(ActiveTeam, currentTurn, this);
@@ -4191,6 +4203,12 @@ public class MatchController : MonoBehaviour
             return cachedVisible;
         }
 
+        if (TryGetFogGameplaySnapshot(activeTeamId, out FogTeamGameplaySnapshot snapshot) &&
+            snapshot.unitVisibility.TryGetValue(cacheIndex, out bool snapshotVisible))
+        {
+            return snapshotVisible;
+        }
+
         return ComputeIsUnitVisibleForActiveTeam(unit);
     }
 
@@ -4211,6 +4229,9 @@ public class MatchController : MonoBehaviour
             return true;
 
         int cacheIndex = ResolveFogCacheIndex(unit);
+        if (TryGetFogGameplaySnapshot(activeTeamId, out FogTeamGameplaySnapshot snapshot))
+            return snapshot.unitVisibility.TryGetValue(cacheIndex, out bool visible) && visible;
+
         return fogCachedTeamId == activeTeamId &&
                fogUnitVisibilityByCacheIndex.TryGetValue(cacheIndex, out bool cachedVisible) &&
                cachedVisible;
@@ -4233,6 +4254,11 @@ public class MatchController : MonoBehaviour
         if ((int)observerTeam == activeTeamId)
         {
             int cacheIndex = ResolveFogCacheIndex(unit);
+            if (TryGetFogGameplaySnapshot((int)observerTeam, out FogTeamGameplaySnapshot snapshot) &&
+                snapshot.unitVisibility.TryGetValue(cacheIndex, out bool snapshotVisible))
+            {
+                return snapshotVisible;
+            }
             if (fogCachedTeamId == activeTeamId &&
                 fogUnitVisibilityByCacheIndex.TryGetValue(cacheIndex, out bool cachedVisible))
             {
@@ -4401,10 +4427,12 @@ public class MatchController : MonoBehaviour
             return true;
         if (!enableTotalWar)
             return true;
+        cell.z = 0;
+        if (TryGetFogGameplaySnapshot(activeTeamId, out FogTeamGameplaySnapshot snapshot))
+            return snapshot.visibleCells.Contains(cell);
         if (fogCachedTeamId != activeTeamId)
             return false;
 
-        cell.z = 0;
         return fogVisibleContributorsByCell.TryGetValue(cell, out int contributors) && contributors > 0;
     }
 
@@ -4436,6 +4464,12 @@ public class MatchController : MonoBehaviour
         cell.z = 0;
         if (IsCellVisibleForActiveTeam(cell))
             return true;
+
+        if (excludeProvisionalUnit == null &&
+            TryGetFogGameplaySnapshot(activeTeamId, out FogTeamGameplaySnapshot snapshot))
+        {
+            return snapshot.knownCells.Contains(cell);
+        }
 
         Tilemap boardMap = ResolveFogBoardTilemap();
         if (boardMap == null)
@@ -4586,6 +4620,8 @@ public class MatchController : MonoBehaviour
             }
         }
 
+        UnitManager[] snapshotUnits = FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude);
+        PublishFogGameplaySnapshot(activeTeamId, boardMap, snapshotUnits);
         ApplyRuntimeUnitFogVisibilityFromCache(boardMap);
         if (Application.isPlaying)
             OnFogOfWarUpdated?.Invoke();
@@ -4612,7 +4648,7 @@ public class MatchController : MonoBehaviour
                     visible = false;
             }
 
-            unit.SetFogOfWarVisibility(ResolveFogRenderVisibility(unit, visible, fogOverlayOwnsWorldOcclusion));
+            unit.SetFogOfWarVisibility(ResolveFogRenderVisibility(unit, visible, fogOverlayOwnsWorldOcclusion, ActiveTeam));
         }
     }
 
@@ -4836,15 +4872,72 @@ public class MatchController : MonoBehaviour
         return fogOfWarTilemap != null;
     }
 
-    // A revelacao do hex e a deteccao da unidade sao informacoes independentes.
-    // O renderer deve seguir exclusivamente o snapshot logico produzido pelo
-    // PodeDetectar. Deixar uma unidade nao detectada renderizada sob a hipotese de
-    // que o overlay preto a ocultara vaza alvos quando outra camada libera o mesmo
-    // hex (por exemplo: EWACS revela o hex a alcance 9 para Air, mas so detecta
-    // Land/Naval Surface pelo alcance geral 3).
-    private bool ResolveFogRenderVisibility(UnitManager unit, bool logicallyVisible, bool fogOverlayOwnsWorldOcclusion)
+    // No FoW Total, o overlay opaco e a mascara espacial do mundo. Unidades comuns
+    // permanecem renderizadas abaixo dele para surgirem e sumirem naturalmente ao
+    // atravessar os recortes visiveis, inclusive durante a animacao de movimento.
+    // Apenas unidades com stealth ativo precisam do hide individual, pois podem
+    // continuar ocultas mesmo quando o hex estiver visualmente aberto.
+    //
+    // Nos setups sem overlay opaco (ex.: Neblina Leve), a visibilidade logica segue
+    // controlando diretamente os renderers, ja que nao existe uma tampa para
+    // realizar essa oclusao.
+    private bool ResolveFogRenderVisibility(
+        UnitManager unit,
+        bool logicallyVisible,
+        bool fogOverlayOwnsWorldOcclusion,
+        TeamId observerTeam)
     {
+        if (fogOverlayOwnsWorldOcclusion && !HasActiveIndividualFogConcealment(unit))
+        {
+            if (unit != null && unit.TeamId != observerTeam &&
+                TryGetFogGameplaySnapshot((int)observerTeam, out FogTeamGameplaySnapshot snapshot))
+            {
+                Vector3Int cell = unit.CurrentCellPosition;
+                cell.z = 0;
+                if (snapshot.globalLandmarkOnlyCells.Contains(cell))
+                    return logicallyVisible;
+            }
+
+            return true;
+        }
+
         return logicallyVisible;
+    }
+
+    private bool HasActiveIndividualFogConcealment(UnitManager unit)
+    {
+        if (unit == null || !enableStealthValidation)
+            return false;
+        if (unit.HasFiredThisTurn || unit.HasPendingForcedLayerLock)
+            return false;
+        if (!unit.TryGetUnitData(out UnitData unitData) || unitData == null)
+            return false;
+
+        return unitData.IsStealthUnit(unit.GetDomain(), unit.GetHeightLevel());
+    }
+
+    public void RefreshMovingUnitFogPresentation(UnitManager unit)
+    {
+        if (unit == null || !debugFogOfWarEnabled || !enableTotalWar)
+            return;
+
+        TeamId observerTeam = ActiveTeam;
+        if (ShouldUseHumanFogPresentation(out TeamId presentationTeam))
+            observerTeam = presentationTeam;
+
+        bool logicallyVisible = unit.TeamId == observerTeam;
+        if (!logicallyVisible &&
+            TryGetFogGameplaySnapshot((int)observerTeam, out FogTeamGameplaySnapshot snapshot))
+        {
+            int cacheIndex = ResolveFogCacheIndex(unit);
+            logicallyVisible = snapshot.unitVisibility.TryGetValue(cacheIndex, out bool visible) && visible;
+        }
+
+        unit.SetFogOfWarVisibility(ResolveFogRenderVisibility(
+            unit,
+            logicallyVisible,
+            UsesFogOverlayForWorldOcclusion(),
+            observerTeam));
     }
 
     private Tilemap ResolveFogBoardTilemap()
@@ -4904,6 +4997,75 @@ public class MatchController : MonoBehaviour
                     output.Add(cell);
             }
         }
+    }
+
+    private void PublishFogGameplaySnapshot(int teamId, Tilemap boardMap, UnitManager[] units)
+    {
+        if (teamId < 0 || boardMap == null || !Enum.IsDefined(typeof(TeamId), teamId))
+            return;
+
+        if (!fogGameplaySnapshotsByTeam.TryGetValue(teamId, out FogTeamGameplaySnapshot snapshot))
+        {
+            snapshot = new FogTeamGameplaySnapshot();
+            fogGameplaySnapshotsByTeam[teamId] = snapshot;
+        }
+
+        snapshot.visibleCells.Clear();
+        foreach (var entry in fogVisibleContributorsByCell)
+        {
+            if (entry.Value > 0)
+                snapshot.visibleCells.Add(entry.Key);
+        }
+
+        snapshot.knownCells.Clear();
+        BuildFogDisplayVisibleCellsForAllModes(boardMap, snapshot.knownCells);
+
+        snapshot.globalLandmarkOnlyCells.Clear();
+        TeamId observerTeam = (TeamId)teamId;
+        List<ConstructionManager> constructions = ConstructionManager.AllActive;
+        for (int i = 0; i < constructions.Count; i++)
+        {
+            ConstructionManager construction = constructions[i];
+            if (construction == null || !construction.gameObject.activeInHierarchy)
+                continue;
+            if (!construction.IsPlayerHeadQuarter || construction.TeamId == observerTeam)
+                continue;
+            if (construction.BoardTilemap != boardMap || construction.gameObject.scene != boardMap.gameObject.scene)
+                continue;
+
+            Vector3Int landmarkCell = construction.CurrentCellPosition;
+            landmarkCell.z = 0;
+            if (fogVisibleContributorsByCell.TryGetValue(landmarkCell, out int contributors) && contributors == 1)
+                snapshot.globalLandmarkOnlyCells.Add(landmarkCell);
+        }
+
+        snapshot.unitVisibility.Clear();
+        if (units == null)
+            return;
+
+        for (int i = 0; i < units.Length; i++)
+        {
+            UnitManager unit = units[i];
+            if (unit == null || !unit.gameObject.activeInHierarchy || unit.IsEmbarked)
+                continue;
+            if (!IsUnitOnBoard(unit, boardMap))
+                continue;
+
+            bool visible = unit.TeamId == observerTeam ||
+                           ComputeIsUnitVisibleForTeamWithoutCache(unit, observerTeam);
+            snapshot.unitVisibility[ResolveFogCacheIndex(unit)] = visible;
+        }
+    }
+
+    private bool TryGetFogGameplaySnapshot(int teamId, out FogTeamGameplaySnapshot snapshot)
+    {
+        if (teamId < 0)
+        {
+            snapshot = null;
+            return false;
+        }
+
+        return fogGameplaySnapshotsByTeam.TryGetValue(teamId, out snapshot) && snapshot != null;
     }
 
     private void ResetFogOfWarRuntime(bool clearTilemap)
@@ -5642,7 +5804,7 @@ public class MatchController : MonoBehaviour
             bool visible = unit.TeamId == observerTeam
                 || ComputeIsUnitVisibleForTeamWithoutCache(unit, observerTeam);
             fogUnitVisibilityByCacheIndex[ResolveFogCacheIndex(unit)] = visible;
-            unit.SetFogOfWarVisibility(ResolveFogRenderVisibility(unit, visible, fogOverlayOwnsWorldOcclusion));
+            unit.SetFogOfWarVisibility(ResolveFogRenderVisibility(unit, visible, fogOverlayOwnsWorldOcclusion, observerTeam));
         }
 
         RefreshStackedHexFrontRendering(units, boardMap, observerTeam);
@@ -5718,7 +5880,7 @@ public class MatchController : MonoBehaviour
 
             bool visible = !useConservativeFog || (int)unit.TeamId == activeTeamId;
             fogUnitVisibilityByCacheIndex[ResolveFogCacheIndex(unit)] = visible;
-            unit.SetFogOfWarVisibility(ResolveFogRenderVisibility(unit, visible, fogOverlayOwnsWorldOcclusion));
+            unit.SetFogOfWarVisibility(ResolveFogRenderVisibility(unit, visible, fogOverlayOwnsWorldOcclusion, ActiveTeam));
         }
     }
 
@@ -5735,6 +5897,7 @@ public class MatchController : MonoBehaviour
         if (!enabled)
         {
             ResetFogOfWarRuntime(clearTilemap: true);
+            fogGameplaySnapshotsByTeam.Clear();
             ShowAllUnitsIgnoringFog();
             ConstructionManager.RefreshAllOccupancyVisuals();
             Debug.Log("[Debug Command] FoW OFF (debug).");

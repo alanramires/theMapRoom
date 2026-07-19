@@ -124,7 +124,10 @@ public class PanelTurnController : MonoBehaviour
         bool fogOfWarTotal = matchController != null &&
                              matchController.GameSetup == MatchController.GameSetupPreset.FogOfWarTotal &&
                              matchController.IsFogOfWarDebugEnabled;
-        bool shouldShow = hasTwoSlots && (!fogOfWarTotal || aiVersusAi);
+        // Mapa de tutorial: o painel de turno fica só com o contador. Placar de unidades/território
+        // não tem sentido num mapa roteirizado e ainda compete com o passo a passo pela atenção.
+        bool tutorial = matchController != null && matchController.IsTutorialMode;
+        bool shouldShow = !tutorial && hasTwoSlots && (!fogOfWarTotal || aiVersusAi);
 
         if (panelEstatisticas.activeSelf != shouldShow)
         {

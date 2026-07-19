@@ -60,6 +60,7 @@ public partial class TurnStateManager
             {
                 walkedTrail.Add(cell);
                 DrawCommittedPathVisual(walkedTrail);
+                matchController?.RefreshMovingUnitFogPresentation(selectedUnit);
             });
     }
 
@@ -109,7 +110,7 @@ public partial class TurnStateManager
                 RuntimeLog("[Rollback] Animacao de retorno concluida. Aplicando UnitSelected.");
                 HandleMovementAnimationCompleted(CursorState.UnitSelected);
             },
-            onCellReached: null);
+            onCellReached: _ => matchController?.RefreshMovingUnitFogPresentation(selectedUnit));
         return true;
     }
 

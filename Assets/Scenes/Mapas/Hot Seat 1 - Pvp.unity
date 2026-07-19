@@ -13965,7 +13965,7 @@ MonoBehaviour:
     defeated: 0
     startMoney: 85000
     actualMoney: 0
-    incomePerTurn: 0
+    incomePerTurn: 15000
     startMoneyApplied: 1
   - teamId: 1
     flipX: 1
@@ -13975,7 +13975,7 @@ MonoBehaviour:
     defeated: 0
     startMoney: 85000
     actualMoney: 0
-    incomePerTurn: 0
+    incomePerTurn: 15000
     startMoneyApplied: 1
   includeNeutralTeam: 0
   economyEnabled: 1
@@ -14026,7 +14026,7 @@ MonoBehaviour:
   appliedActiveTeamId: 0
   pendingTurnStartUpkeep: 1
   pendingTurnStartEconomy: 1
-  cachedConstructionIncomeSignature: 1025387294
+  cachedConstructionIncomeSignature: 21809086
   cachedConstructionIncomeCount: 57
   constructionIncomeRefreshIntervalSeconds: 0.35
   continuousEditorRefresh: 0
@@ -19738,6 +19738,10 @@ MonoBehaviour:
   hardMode: 0
   easyMode: 0
   conscriptionDoctrine: 0
+  massacreEnterForceRatio: 0.66
+  massacreExitForceRatio: 0.58
+  massacreUnitCapFillRatio: 0.85
+  conscriptionWhenLosing: 0
   emulateStage0: 1
   emulateStage1: 1
   emulateStage2: 1
@@ -19980,7 +19984,7 @@ MonoBehaviour:
   eixoOverrides: []
   constructionId: porto
   instanceId: 75
-  currentPosition: {x: -7.3608007, y: -5.25, z: 0}
+  currentPosition: {x: -7.3608003, y: -5.25, z: 0}
   constructionDisplayName: Porto Naval
   lastAutoConstructionDisplayName: Porto Naval
   isVisible: 1
@@ -23588,6 +23592,7 @@ MonoBehaviour:
   StalemateEliteCapturerFillRatio: 0.3
   StalemateEliteCapturerRange: 8
   RepairsPerGroundSupplier: 4
+  EliteRepairLogisticsPriority: 7
   MaxAirTransporters: 3
   MinTurnForInterceptador: 4
   HelicopterosPorCacaB: 3
@@ -43626,7 +43631,7 @@ MonoBehaviour:
   eixoOverrides: []
   constructionId: cidade
   instanceId: 23
-  currentPosition: {x: -1.7319531, y: -6, z: 0}
+  currentPosition: {x: -1.7319533, y: -6, z: 0}
   constructionDisplayName: Cidade
   lastAutoConstructionDisplayName: Cidade
   isVisible: 1
@@ -49259,7 +49264,7 @@ MonoBehaviour:
   eixoOverrides: []
   constructionId: aeroporto
   instanceId: 6
-  currentPosition: {x: -7.793789, y: 4.5, z: 0}
+  currentPosition: {x: -7.7937884, y: 4.5, z: 0}
   constructionDisplayName: Aeroporto
   lastAutoConstructionDisplayName: Aeroporto
   isVisible: 1
@@ -53370,7 +53375,7 @@ MonoBehaviour:
   eixoOverrides: []
   constructionId: aeroporto
   instanceId: 59
-  currentPosition: {x: -7.3608007, y: -3.75, z: 0}
+  currentPosition: {x: -7.3608003, y: -3.75, z: 0}
   constructionDisplayName: Aeroporto
   lastAutoConstructionDisplayName: Aeroporto
   isVisible: 1
@@ -66459,7 +66464,7 @@ MonoBehaviour:
   eixoOverrides: []
   constructionId: cidade
   instanceId: 19
-  currentPosition: {x: -2.5979297, y: -6, z: 0}
+  currentPosition: {x: -2.5979295, y: -6, z: 0}
   constructionDisplayName: Cidade
   lastAutoConstructionDisplayName: Cidade
   isVisible: 1
@@ -67958,7 +67963,7 @@ MonoBehaviour:
   eixoOverrides: []
   constructionId: cidade
   instanceId: 63
-  currentPosition: {x: -7.793789, y: -4.5, z: 0}
+  currentPosition: {x: -7.7937884, y: -4.5, z: 0}
   constructionDisplayName: Cidade
   lastAutoConstructionDisplayName: Cidade
   isVisible: 1
@@ -79795,29 +79800,17 @@ MonoBehaviour:
         VehicleDistance: 16
         AirDistance: 14
         IsHQ: 1
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 13
-        Distance: 15
-        VehicleDistance: 15
-        AirDistance: 13
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 12
-        Distance: 16
-        VehicleDistance: 16
-        AirDistance: 13
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 80
-        Distance: 14
-        VehicleDistance: 14
-        AirDistance: 12
-        IsHQ: 0
       - ConstructionName: Porto Naval
         InstanceId: 73
         Distance: 14
         VehicleDistance: 14
         AirDistance: 12
+        IsHQ: 0
+      - ConstructionName: Porto Naval
+        InstanceId: 74
+        Distance: 16
+        VehicleDistance: 16
+        AirDistance: 9
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
         InstanceId: 14
@@ -79831,17 +79824,29 @@ MonoBehaviour:
         VehicleDistance: 15
         AirDistance: 12
         IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 80
+        Distance: 14
+        VehicleDistance: 14
+        AirDistance: 12
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 13
+        Distance: 15
+        VehicleDistance: 15
+        AirDistance: 13
+        IsHQ: 0
       - ConstructionName: Aeroporto
         InstanceId: 11
         Distance: 14
         VehicleDistance: 14
         AirDistance: 13
         IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 74
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 12
         Distance: 16
         VehicleDistance: 16
-        AirDistance: 9
+        AirDistance: 13
         IsHQ: 0
     - Team: 0
       Entries:
@@ -79851,23 +79856,11 @@ MonoBehaviour:
         VehicleDistance: 16
         AirDistance: 14
         IsHQ: 1
-      - ConstructionName: Aeroporto
-        InstanceId: 8
-        Distance: 14
-        VehicleDistance: 14
-        AirDistance: 13
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 77
-        Distance: 14
-        VehicleDistance: 14
-        AirDistance: 12
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica"
-        InstanceId: 5
-        Distance: 15
-        VehicleDistance: 15
-        AirDistance: 14
+      - ConstructionName: Porto Naval
+        InstanceId: 71
+        Distance: 16
+        VehicleDistance: 16
+        AirDistance: 9
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
         InstanceId: 3
@@ -79875,16 +79868,28 @@ MonoBehaviour:
         VehicleDistance: 16
         AirDistance: 13
         IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 71
-        Distance: 16
-        VehicleDistance: 16
-        AirDistance: 9
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 5
+        Distance: 15
+        VehicleDistance: 15
+        AirDistance: 14
         IsHQ: 0
       - ConstructionName: Aeroporto
         InstanceId: 6
         Distance: 15
         VehicleDistance: 15
+        AirDistance: 12
+        IsHQ: 0
+      - ConstructionName: Aeroporto
+        InstanceId: 8
+        Distance: 14
+        VehicleDistance: 14
+        AirDistance: 13
+        IsHQ: 0
+      - ConstructionName: Porto Naval
+        InstanceId: 72
+        Distance: 14
+        VehicleDistance: 14
         AirDistance: 12
         IsHQ: 0
       - ConstructionName: "F\xE1brica"
@@ -79893,8 +79898,8 @@ MonoBehaviour:
         VehicleDistance: 15
         AirDistance: 13
         IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 72
+      - ConstructionName: "F\xE1brica"
+        InstanceId: 77
         Distance: 14
         VehicleDistance: 14
         AirDistance: 12
@@ -80179,12 +80184,12 @@ MonoBehaviour:
   turnStartAutonomyHelperDurationFallbackSeconds: 6
   enableTurnStateRuntimeLogs: 0
   showMovementLogs: 0
-  enableRangeCacheDebugLogs: 1
-  showPerfRangeLine: 1
+  enableRangeCacheDebugLogs: 0
+  showPerfRangeLine: 0
   showPerfSensorsLine: 0
-  showPerfSelectionLine: 1
+  showPerfSelectionLine: 0
   showPerfTakeoffPrepLine: 0
-  showFrameSpikeLogs: 1
+  showFrameSpikeLogs: 0
   frameSpikeThresholdMs: 250
   matchController: {fileID: 327617512}
   cursorController: {fileID: 2105919121}
@@ -89148,7 +89153,7 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 1348457725607290348, guid: f7e44d7c210a32d4ba630ba660da88a1, type: 3}
       propertyPath: m_text
-      value: 7500 / turn
+      value: 0 / turn
       objectReference: {fileID: 0}
     - target: {fileID: 4985144350662451516, guid: f7e44d7c210a32d4ba630ba660da88a1, type: 3}
       propertyPath: m_Enabled

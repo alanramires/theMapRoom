@@ -1160,6 +1160,15 @@ public class UnitManager : MonoBehaviour
 
     public void SetSelected(bool selected)
     {
+        if (selected && hiddenByFogOfWar)
+        {
+            isSelected = false;
+            StopSelectionBlinkRoutine();
+            ClearTemporarySortingOrder();
+            ApplyFogOfWarVisibility();
+            return;
+        }
+
         if (isSelected == selected)
             return;
 

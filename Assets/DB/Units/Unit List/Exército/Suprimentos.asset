@@ -35,7 +35,7 @@ MonoBehaviour:
   roles: 04000000
   aiInitiative: 2
   aiPurchaseMode: 0
-  bannedOnHardMode: 1
+  bannedOnHardMode: 0
   aiTargetPreferenceByClass: []
   aiSensorPriority: 0000000002000000
   prioritizeDpqAtBattle: 0
@@ -77,6 +77,10 @@ MonoBehaviour:
   preferredAirHeight: 4
   useExplicitPreferredNavalHeight: 0
   preferredNavalHeight: 2
+  emergesToAttack: 0
+  emergeAfterAttackDomain: 1
+  emergeAfterAttackHeight: 3
+  emergeAfterAttackTurns: 2
   skills:
   - {fileID: 11400000, guid: 759d9c0f4a06434f8f54d781709f8c7e, type: 2}
   - {fileID: 11400000, guid: ef10c9e820afc074b99ea8e0b709c2f4, type: 2}

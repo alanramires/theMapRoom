@@ -3599,12 +3599,20 @@ public class PanelHelperController : MonoBehaviour
         TMP_Text label = persistenceConfirmationDetails.GetComponent<TMP_Text>();
         label.text = text ?? string.Empty;
         label.richText = true;
-        label.fontSize = 16f;
+        label.fontSize = 18f;
         label.fontStyle = FontStyles.Bold;
         label.color = FooterLabelIdleColor;
         label.alignment = TextAlignmentOptions.TopLeft;
         label.textWrappingMode = TextWrappingModes.Normal;
         label.raycastTarget = false;
+
+        float availableWidth = helperRect != null
+            ? Mathf.Max(1f, helperRect.rect.width * 0.88f)
+            : 300f;
+        float requiredHeight = label.GetPreferredValues(label.text, availableWidth, Mathf.Infinity).y + 6f;
+        float detailsHeight = Mathf.Max(PersistenceConfirmationDetailsHeight, requiredHeight);
+        element.minHeight = detailsHeight;
+        element.preferredHeight = detailsHeight;
     }
 
     private void CreateAboutDetails(string text)
