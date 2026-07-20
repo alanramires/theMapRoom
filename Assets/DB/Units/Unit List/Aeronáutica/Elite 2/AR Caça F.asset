@@ -10,56 +10,54 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 67e557a91c4c9e647867393f7063f6f8, type: 3}
-  m_Name: Tanque A
+  m_Name: "AR Ca\xE7a F"
   m_EditorClassIdentifier: Assembly-CSharp::UnitData
-  id: tanqueA
-  displayName: Tanque de Batalha
-  apelido: TA
-  description: "Blindado r\xE1pido e vers\xE1til, ideal para flanquear e explorar
-    falhas na linha inimiga. Eficiente contra blindados e infantaria, mas vulner\xE1vel
-    se exposto sem apoio. Posicione fora do alcance inimigo e use sua mobilidade
-    para atacar no momento certo."
-  spriteDefault: {fileID: 21300000, guid: 3e0f3f5da4bfffd4b9e5959af789a09d, type: 3}
+  id: cacaF
+  displayName: "Ca\xE7a F"
+  apelido: CF
+  description: "Ca\xE7a de superioridade a\xE9rea com grande alcance, capaz de projetar
+    for\xE7a rapidamente em qualquer ponto do mapa. Eficaz contra aeronaves e \xFAtil
+    contra alvos leves. Consome autonomia enquanto permanece no ar, exigindo opera\xE7\xF5es
+    curtas e planejamento de retorno. Ideal para garantir dom\xEDnio a\xE9reo em
+    momentos decisivos."
+  requiredBuilding: {fileID: 11400000, guid: c217ce9a62b1d5e4ca4ceb0c65946b56, type: 2}
+  spriteDefault: {fileID: 21300000, guid: d6df093a3c91e5c47ad250ed8b400a30, type: 3}
   teamVariantSprites: []
   maxHP: 10
-  defense: 16
+  defense: 15
   armorClass: 2
-  movement: 6
-  visao: 3
+  movement: 7
+  visao: 4
   visionSpecializations: []
-  movementCategory: 6
-  militaryForce: 0
-  unitClass: 3
-  combatClassification: 0
-  roles: 02000000
+  movementCategory: 3
+  militaryForce: 1
+  unitClass: 4
+  combatClassification: 2
+  roles: 08000000
   aiInitiative: 1
-  aiPurchaseMode: 1
+  aiPurchaseMode: 2
   bannedOnHardMode: 0
   aiTargetPreferenceByClass:
-  - targetClass: 2
+  - targetClass: 6
     priority: 2
-  - targetClass: 1
-    priority: 1
-  - targetClass: 3
-    priority: 1
-  - targetClass: 0
+  - targetClass: 4
     priority: 1
   aiSensorPriority: 0000000002000000
-  prioritizeDpqAtBattle: 1
+  prioritizeDpqAtBattle: 0
   playConservative: 0
   preferMoveOnBestDPQ: 0
-  preferMaxDisplacement: 0
+  preferMaxDisplacement: 1
   longRangeStationary: 0
   preferRepositionAtWeaponMaxRange: 0
   preferArtilleryModeBeforeCombatant: 0
   useAttackDecision: 1
-  attackAcceptHpLossPercent: 60
+  attackAcceptHpLossPercent: 90
   attackEliminationMinPercent: 10
   attackMustSurvive: 1
-  ignoreAttackDecisionWhenDefending: 1
+  ignoreAttackDecisionWhenDefending: 0
   defensiveAttackExtraHpLossPercent: 20
-  repairTriggerHpBelow: 3
-  repairTriggerAutonomyPct: 25
+  repairTriggerHpBelow: 5
+  repairTriggerAutonomyPct: 30
   repairTriggerAmmoEnabled: 1
   repairTriggerAmmoPct: 0
   repairRecoverHpAbove: 8
@@ -74,16 +72,23 @@ MonoBehaviour:
   aiPreventiveSupplyHpBelowPct: 70
   aiPreventiveSupplyAutonomyBelowPct: 60
   aiPreventiveSupplyWeaponAmmoAtOrBelow: 1
-  eliteLevel: 1
-  eliteFrom: {fileID: 11400000, guid: a5d9d72a15e061a4cbaf125b2b6b9d48, type: 2}
+  eliteLevel: 2
+  eliteFrom: {fileID: 11400000, guid: 68658bfb5d8329a46ae3d991cc94ccd7, type: 2}
   combatModifiers:
-  - {fileID: 11400000, guid: 42fcc72060965254e91dc5cb0e43f35c, type: 2}
-  - {fileID: 11400000, guid: d58111958c2c10f479263d9a51cda8c7, type: 2}
-  - {fileID: 11400000, guid: d53245461a76eea488b698d9a1d5897a, type: 2}
-  - {fileID: 11400000, guid: 7225c1a33e708754e9ee8c5114565859, type: 2}
-  domain: 0
-  heightLevel: 3
-  aditionalDomainsAllowed: []
+  - {fileID: 11400000, guid: 84e79caf71c32194296b7fcdc7398288, type: 2}
+  - {fileID: 11400000, guid: fd87feedf31f0894ba8f7e5acc1e388a, type: 2}
+  - {fileID: 11400000, guid: e3e752c450b5d8243b04ca1abf1eac6a, type: 2}
+  domain: 3
+  heightLevel: 5
+  aditionalDomainsAllowed:
+  - domain: 3
+    heightLevel: 4
+    spriteDefault: {fileID: 21300000, guid: 3022842bbb4b938469bd2b04beae0bb5, type: 3}
+    teamVariantSprites: []
+  - domain: 0
+    heightLevel: 3
+    spriteDefault: {fileID: 21300000, guid: 233b329df58164546b6e0eca5a47d99d, type: 3}
+    teamVariantSprites: []
   useExplicitPreferredAirHeight: 0
   preferredAirHeight: 4
   useExplicitPreferredNavalHeight: 0
@@ -93,26 +98,32 @@ MonoBehaviour:
   emergeAfterAttackHeight: 3
   emergeAfterAttackTurns: 2
   skills:
-  - {fileID: 11400000, guid: ef10c9e820afc074b99ea8e0b709c2f4, type: 2}
+  - {fileID: 11400000, guid: 3f52a3b7c5d14c5ea1f0f9aa34d2be11, type: 2}
+  - {fileID: 11400000, guid: e73850be27dc4e2e8c8f210db151b0b4, type: 2}
   stealthSkills: []
-  stealthSkillRules: []
-  autonomyData: {fileID: 0}
+  stealthSkillRules:
+  - domain: 3
+    heightLevel: 5
+    skill: {fileID: 11400000, guid: 3ae2d2213e72ea144a307a743470d032, type: 2}
+  autonomyData: {fileID: 11400000, guid: d52348f636f1466d95a6489891e176bf, type: 2}
   embarkedWeapons:
-  - weapon: {fileID: 11400000, guid: c2c0a4bea373d0149a3157223b14f3dd, type: 2}
+  - weapon: {fileID: 11400000, guid: 90f330ac8c9e6624fafb495e58bdba25, type: 2}
     squadAmmunition: 6
+    operationRangeMin: 1
+    operationRangeMax: 2
+    selectedTrajectory: 0
+    canBeFireOnlyAtDomainHeigh: []
+    lastSyncedWeapon: {fileID: 11400000, guid: 90f330ac8c9e6624fafb495e58bdba25, type: 2}
+  - weapon: {fileID: 11400000, guid: 5430f79fb5141ce41a424bd96250ed1b, type: 2}
+    squadAmmunition: 8
     operationRangeMin: 1
     operationRangeMax: 1
     selectedTrajectory: 0
     canBeFireOnlyAtDomainHeigh: []
-    lastSyncedWeapon: {fileID: 11400000, guid: c2c0a4bea373d0149a3157223b14f3dd, type: 2}
-  - weapon: {fileID: 11400000, guid: f7bfd5005ca7dbd4aad1017263cfecb0, type: 2}
-    squadAmmunition: 6
-    operationRangeMin: 1
-    operationRangeMax: 1
-    selectedTrajectory: 0
-    canBeFireOnlyAtDomainHeigh: []
-    lastSyncedWeapon: {fileID: 11400000, guid: f7bfd5005ca7dbd4aad1017263cfecb0, type: 2}
-  cantUseWeaponsOnTheFollowDomain: []
+    lastSyncedWeapon: {fileID: 11400000, guid: 5430f79fb5141ce41a424bd96250ed1b, type: 2}
+  cantUseWeaponsOnTheFollowDomain:
+  - domain: 0
+    heightLevel: 3
   isSupplier: 0
   supplierTier: 0
   maxUnitsServedPerTurn: 0
@@ -133,5 +144,5 @@ MonoBehaviour:
   passengersCanDisembarkAndGoesToTerrainStructures: []
   passengersCanDisembarkAndGoesToConstructions: []
   transportSlots: []
-  autonomia: 70
-  cost: 18000
+  autonomia: 80
+  cost: 36000

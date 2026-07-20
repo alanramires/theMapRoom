@@ -151,6 +151,24 @@ public partial class TurnStateManager
         }
     }
 
+    public bool ShoppingSelectedOptionCanPurchase
+    {
+        get
+        {
+            int index = ClampShoppingSelectedIndex();
+            if (index < 0 || index >= shoppingUnitsForSale.Count || shoppingUnitsForSale[index] == null)
+                return false;
+
+            UnitData unit = shoppingUnitsForSale[index];
+            TeamId team = matchController != null && matchController.ActiveTeamId >= 0
+                ? (TeamId)matchController.ActiveTeamId
+                : (shoppingConstruction != null ? shoppingConstruction.TeamId : TeamId.Neutral);
+            if (matchController != null && !matchController.CanProduceUnit(team, unit, out _))
+                return false;
+            return matchController == null || matchController.GetActualMoney(team) >= ShoppingSelectedOptionCost;
+        }
+    }
+
     public bool TrySelectShoppingOptionFromPointer(int direction)
     {
         if (CurrentCursorState != CursorState.ShoppingAndServices || shoppingUnitsForSale.Count <= 1 || direction == 0)
@@ -232,6 +250,13 @@ public partial class TurnStateManager
 
         int activeTeam = matchController != null ? matchController.ActiveTeamId : -1;
         TeamId spawnTeam = activeTeam >= 0 ? (TeamId)activeTeam : shoppingConstruction.TeamId;
+        if (matchController != null && !matchController.CanProduceUnit(spawnTeam, unit, out string requirementReason))
+        {
+            PushPanelUnitMessage(requirementReason, 3.2f);
+            cursorController?.PlayErrorSfx();
+            Debug.LogWarning($"[Shopping] Requisito nao cumprido para {ResolveUnitName(unit)}: {requirementReason}");
+            return false;
+        }
         if (matchController != null && matchController.HasReachedMaxUnitsPerTeam(spawnTeam))
         {
             cursorController?.PlayErrorSfx();
@@ -412,6 +437,12 @@ public partial class TurnStateManager
             return false;
         if (!construction.CanProduceUnitsForTeam(team))
             return false;
+        if (matchController != null && !matchController.CanProduceUnit(team, unit, out string requirementReason))
+        {
+            if (enableTurnStateRuntimeLogs)
+                Debug.Log($"[AI][Shopping] Requisito nao cumprido para {ResolveUnitName(unit)}: {requirementReason}");
+            return false;
+        }
         if (unitSpawner == null)
             return false;
         if (matchController != null && matchController.HasReachedMaxUnitsPerTeam(team))
@@ -654,6 +685,14 @@ public partial class TurnStateManager
             return string.Empty;
 
         StringBuilder sb = new StringBuilder();
+        TeamId team = matchController != null && matchController.ActiveTeamId >= 0
+            ? (TeamId)matchController.ActiveTeamId
+            : (shoppingConstruction != null ? shoppingConstruction.TeamId : TeamId.Neutral);
+        if (matchController != null && !matchController.CanProduceUnit(team, unit, out string blockedReason))
+        {
+            sb.AppendLine($"BLOQUEADO - {blockedReason}");
+            sb.AppendLine();
+        }
         AppendShoppingPreviewWeaponLines(sb, unit);
         AppendShoppingPreviewSupplyLines(sb, unit);
 

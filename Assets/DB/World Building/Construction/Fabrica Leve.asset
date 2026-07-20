@@ -1,0 +1,108 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0746e2e5fa3ba154eb1c64585653d260, type: 3}
+  m_Name: Fabrica Leve
+  m_EditorClassIdentifier: Assembly-CSharp::ConstructionData
+  id: fabricaL
+  displayName: "F\xE1brica Leve"
+  sufixo: Factory Light
+  description: "Produz infantaria, ve\xEDculos e apoio terrestre.\n\xC9 a base da
+    produ\xE7\xE3o do Ex\xE9rcito."
+  grammaticalGender: 1
+  requiredBuilding: {fileID: 0}
+  isAirport: 0
+  isHarbor: 0
+  isCity: 0
+  spriteDefault: {fileID: 21300000, guid: 825c27d68263e094a8bf48c563036a80, type: 3}
+  spriteGreen: {fileID: 0}
+  spriteRed: {fileID: 0}
+  spriteBlue: {fileID: 0}
+  spriteYellow: {fileID: 0}
+  visao: 1
+  baseMovementCost: 1
+  isFakeBuilding: 0
+  dpqData: {fileID: 11400000, guid: 1ff1954ba402c104b837d28d29e3d69d, type: 2}
+  requiredSkillsToEnter: []
+  blockedSkills: []
+  skillCostOverrides: []
+  domain: 0
+  heightLevel: 3
+  aditionalDomainsAllowed: []
+  alwaysAllowAirDomain: 1
+  allowAircraftTakeoffAndLanding: 1
+  aircraftUnitsPaysUpkeep: 1
+  legacyRequiredLandingSkills: []
+  requiredLandingSkillRules:
+  - skill: {fileID: 11400000, guid: 1b0f1eb9d5454df3a0e1b42f0c8d6aa1, type: 2}
+    takeoffMode: 0
+  - skill: {fileID: 11400000, guid: 8d5ec3fba2fd43139e8619b6f2b23eb9, type: 2}
+    takeoffMode: 2
+  requireAtLeastOneLandingSkill: 1
+  forceEndMovementOnTerrainDomainForDomains: []
+  forceDetectOnForcedEndMovementDomains: 0
+  forceDetectUnitsWithFollowingStealthSkills: []
+  isSupplier: 1
+  supplierTier: 0
+  maxUnitsServedPerTurn: 1
+  serviceRange: 0
+  collectionRange: 0
+  supplierOperationDomains:
+  - domain: 0
+    heightLevel: 3
+  supplierServicesProvided:
+  - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+  - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+  - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+  supplierResources:
+  - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+    hasInfiniteSupply: 0
+    maxCapacity: 20
+  - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+    hasInfiniteSupply: 0
+    maxCapacity: 10
+  - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+    hasInfiniteSupply: 0
+    maxCapacity: 40
+  constructionConfiguration:
+    isPlayerHeadQuarter: 0
+    isVictoryBuilding: 0
+    isCapturable: 1
+    capturePointsMax: 30
+    capturedIncoming: 1500
+    sellingRule: 1
+    legacyCanProduceAndSellUnits: 
+    offeredUnits:
+    - {fileID: 11400000, guid: 4a3afdea0950dfc46a48dd7a659563ee, type: 2}
+    - {fileID: 11400000, guid: b28c15593869dae419f9b58292ef4845, type: 2}
+    - {fileID: 11400000, guid: c0e59b3e4bf2e4c49a67906805e43801, type: 2}
+    - {fileID: 11400000, guid: a5d9d72a15e061a4cbaf125b2b6b9d48, type: 2}
+    - {fileID: 11400000, guid: 70b7ea3ddea78fc4e9d744cee13b053a, type: 2}
+    - {fileID: 11400000, guid: 3dc9b119819519440820c81f5db4fdce, type: 2}
+    - {fileID: 11400000, guid: 70b98199c49882e44892f7ca76df6b33, type: 2}
+    - {fileID: 11400000, guid: 99b30df53878c69499853a4ef3cb5f81, type: 2}
+    - {fileID: 11400000, guid: 8c89f5278e312ad46af401333934721b, type: 2}
+    - {fileID: 11400000, guid: 5e69516e1944ffc43bae1a7cd3c7c69c, type: 2}
+    canProvideSupplies: 1
+    offeredSupplies:
+    - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+      quantity: 20
+      peakQuantity: 20
+    - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+      quantity: 10
+      peakQuantity: 10
+    - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+      quantity: 40
+      peakQuantity: 40
+    offeredServices:
+    - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+    - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+    - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}

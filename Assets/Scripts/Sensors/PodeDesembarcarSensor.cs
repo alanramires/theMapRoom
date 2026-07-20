@@ -290,7 +290,9 @@ public static class PodeDesembarcarSensor
             return false;
         }
 
-        UnitManager blocker = UnitOccupancyRules.GetUnitAtCell(map, targetCell, transporter);
+        // Unidades em voo nao consomem o espaco fisico de desembarque.
+        // Aeronaves pousadas ficam fora da banda Air e continuam bloqueando.
+        UnitManager blocker = FindDisembarkBlockerAtCell(transporter, map, targetCell);
         if (blocker != null)
         {
             reason = $"Hex ocupado por {blocker.name}.";
@@ -803,14 +805,34 @@ public static class PodeDesembarcarSensor
         if (transporter == null || map == null)
             return null;
 
-        Vector3Int cell = transporter.CurrentCellPosition;
+        return FindBlockingUnitAtCell(transporter, map, transporter.CurrentCellPosition);
+    }
+
+    private static UnitManager FindDisembarkBlockerAtCell(UnitManager exceptUnit, Tilemap map, Vector3Int cell)
+    {
+        List<UnitManager> occupants = UnitOccupancyRules.GetUnitsAtCell(map, cell, exceptUnit);
+        for (int i = 0; i < occupants.Count; i++)
+        {
+            UnitManager occupant = occupants[i];
+            if (occupant != null && OccupancyResolver.GetHeightBand(occupant) != HeightBand.Air)
+                return occupant;
+        }
+
+        return null;
+    }
+
+    private static UnitManager FindBlockingUnitAtCell(UnitManager exceptUnit, Tilemap map, Vector3Int cell)
+    {
+        if (map == null)
+            return null;
+
         cell.z = 0;
 
         var all = UnitManager.AllActive;
         for (int i = 0; i < all.Count; i++)
         {
             UnitManager other = all[i];
-            if (other == null || other == transporter || other.IsEmbarked || other.IsDead)
+            if (other == null || other == exceptUnit || other.IsEmbarked || other.IsDead)
                 continue;
             if (!other.gameObject.activeInHierarchy)
                 continue;

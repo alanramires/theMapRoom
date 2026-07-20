@@ -10,45 +10,54 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 67e557a91c4c9e647867393f7063f6f8, type: 3}
-  m_Name: Machine Gunner
+  m_Name: Tanque A
   m_EditorClassIdentifier: Assembly-CSharp::UnitData
-  id: machinegun
-  displayName: Metranca
-  apelido: MG
-  description: "Unidade defesiva de infantaria. Capaz de disparar sua metralhadora
-    a distancia e segurar posi\xE7\xF5es em montanha."
-  spriteDefault: {fileID: 21300000, guid: 7a907eaea1ab79841900f85802c76f8b, type: 3}
+  id: tanqueA
+  displayName: Tanque de Batalha
+  apelido: TA
+  description: "Blindado r\xE1pido e vers\xE1til, ideal para flanquear e explorar
+    falhas na linha inimiga. Eficiente contra blindados e infantaria, mas vulner\xE1vel
+    se exposto sem apoio. Posicione fora do alcance inimigo e use sua mobilidade
+    para atacar no momento certo."
+  requiredBuilding: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
+  spriteDefault: {fileID: 21300000, guid: 3e0f3f5da4bfffd4b9e5959af789a09d, type: 3}
   teamVariantSprites: []
   maxHP: 10
-  defense: 12
-  armorClass: 1
-  movement: 2
+  defense: 16
+  armorClass: 2
+  movement: 6
   visao: 3
   visionSpecializations: []
-  movementCategory: 4
+  movementCategory: 6
   militaryForce: 0
-  unitClass: 0
+  unitClass: 3
   combatClassification: 0
-  roles: 0c000000
-  aiInitiative: 3
-  aiPurchaseMode: 0
+  roles: 02000000
+  aiInitiative: 1
+  aiPurchaseMode: 1
   bannedOnHardMode: 0
   aiTargetPreferenceByClass:
-  - targetClass: 0
+  - targetClass: 2
     priority: 2
-  aiSensorPriority: 010000000000000002000000
+  - targetClass: 1
+    priority: 1
+  - targetClass: 3
+    priority: 1
+  - targetClass: 0
+    priority: 1
+  aiSensorPriority: 0000000002000000
   prioritizeDpqAtBattle: 1
   playConservative: 0
   preferMoveOnBestDPQ: 0
-  preferMaxDisplacement: 1
+  preferMaxDisplacement: 0
   longRangeStationary: 0
-  preferRepositionAtWeaponMaxRange: 1
-  preferArtilleryModeBeforeCombatant: 1
+  preferRepositionAtWeaponMaxRange: 0
+  preferArtilleryModeBeforeCombatant: 0
   useAttackDecision: 1
-  attackAcceptHpLossPercent: 50
+  attackAcceptHpLossPercent: 60
   attackEliminationMinPercent: 10
   attackMustSurvive: 1
-  ignoreAttackDecisionWhenDefending: 0
+  ignoreAttackDecisionWhenDefending: 1
   defensiveAttackExtraHpLossPercent: 20
   repairTriggerHpBelow: 3
   repairTriggerAutonomyPct: 25
@@ -66,9 +75,13 @@ MonoBehaviour:
   aiPreventiveSupplyHpBelowPct: 70
   aiPreventiveSupplyAutonomyBelowPct: 60
   aiPreventiveSupplyWeaponAmmoAtOrBelow: 1
-  eliteLevel: 0
-  eliteFrom: {fileID: 0}
-  combatModifiers: []
+  eliteLevel: 1
+  eliteFrom: {fileID: 11400000, guid: a5d9d72a15e061a4cbaf125b2b6b9d48, type: 2}
+  combatModifiers:
+  - {fileID: 11400000, guid: 42fcc72060965254e91dc5cb0e43f35c, type: 2}
+  - {fileID: 11400000, guid: d58111958c2c10f479263d9a51cda8c7, type: 2}
+  - {fileID: 11400000, guid: d53245461a76eea488b698d9a1d5897a, type: 2}
+  - {fileID: 11400000, guid: 7225c1a33e708754e9ee8c5114565859, type: 2}
   domain: 0
   heightLevel: 3
   aditionalDomainsAllowed: []
@@ -76,21 +89,30 @@ MonoBehaviour:
   preferredAirHeight: 4
   useExplicitPreferredNavalHeight: 0
   preferredNavalHeight: 2
+  emergesToAttack: 0
+  emergeAfterAttackDomain: 1
+  emergeAfterAttackHeight: 3
+  emergeAfterAttackTurns: 2
   skills:
-  - {fileID: 11400000, guid: 9c22b855a2e730f4faced0e069dc2a8d, type: 2}
-  - {fileID: 11400000, guid: b5c241bd4e3f15448b70c001b4a66dae, type: 2}
-  - {fileID: 11400000, guid: fc7763e126a22974d87a6869f87beea4, type: 2}
+  - {fileID: 11400000, guid: ef10c9e820afc074b99ea8e0b709c2f4, type: 2}
   stealthSkills: []
   stealthSkillRules: []
   autonomyData: {fileID: 0}
   embarkedWeapons:
-  - weapon: {fileID: 11400000, guid: 4d8e9d2a3dbc4a64f82d3c67c8ff0bb7, type: 2}
+  - weapon: {fileID: 11400000, guid: c2c0a4bea373d0149a3157223b14f3dd, type: 2}
     squadAmmunition: 6
     operationRangeMin: 1
     operationRangeMax: 1
     selectedTrajectory: 0
     canBeFireOnlyAtDomainHeigh: []
-    lastSyncedWeapon: {fileID: 11400000, guid: 4d8e9d2a3dbc4a64f82d3c67c8ff0bb7, type: 2}
+    lastSyncedWeapon: {fileID: 11400000, guid: c2c0a4bea373d0149a3157223b14f3dd, type: 2}
+  - weapon: {fileID: 11400000, guid: f7bfd5005ca7dbd4aad1017263cfecb0, type: 2}
+    squadAmmunition: 6
+    operationRangeMin: 1
+    operationRangeMax: 1
+    selectedTrajectory: 0
+    canBeFireOnlyAtDomainHeigh: []
+    lastSyncedWeapon: {fileID: 11400000, guid: f7bfd5005ca7dbd4aad1017263cfecb0, type: 2}
   cantUseWeaponsOnTheFollowDomain: []
   isSupplier: 0
   supplierTier: 0
@@ -112,5 +134,5 @@ MonoBehaviour:
   passengersCanDisembarkAndGoesToTerrainStructures: []
   passengersCanDisembarkAndGoesToConstructions: []
   transportSlots: []
-  autonomia: 30
-  cost: 2500
+  autonomia: 70
+  cost: 18000

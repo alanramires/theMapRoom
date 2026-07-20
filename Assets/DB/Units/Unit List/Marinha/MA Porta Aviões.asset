@@ -19,6 +19,7 @@ MonoBehaviour:
     de aeronaves no mar. Permite projetar poder a\xE9reo longe da base e manter miss\xF5es
     ativas por mais tempo. Possui defesa anti-a\xE9rea limitada e depende de escolta.
     Vulner\xE1vel a submarinos e ataques coordenados."
+  requiredBuilding: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
   spriteDefault: {fileID: 21300000, guid: afb5ef766ad0a334fb60994606a18363, type: 3}
   teamVariantSprites: []
   maxHP: 10
@@ -34,6 +35,7 @@ MonoBehaviour:
   roles: 0f000000
   aiInitiative: 2
   aiPurchaseMode: 0
+  bannedOnHardMode: 0
   aiTargetPreferenceByClass:
   - targetClass: 6
     priority: 2
@@ -79,6 +81,10 @@ MonoBehaviour:
   preferredAirHeight: 4
   useExplicitPreferredNavalHeight: 0
   preferredNavalHeight: 2
+  emergesToAttack: 0
+  emergeAfterAttackDomain: 1
+  emergeAfterAttackHeight: 3
+  emergeAfterAttackTurns: 2
   skills: []
   stealthSkills: []
   stealthSkillRules: []

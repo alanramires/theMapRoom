@@ -1,1524 +1,1142 @@
-Agora sim: esta terceira versão não é apenas “mais completa”. Ela faz uma coisa muito mais importante — **transforma regras que estavam implícitas no motor em leis declaradas do jogo**.
+Sim — **é o Big Manual**, e acho correto mantê-lo assim agora.
 
-A segunda versão explicava os sistemas. A terceira começa a explicar os limites desses sistemas: o que o combate não faz, o que significa ocupar um hexágono, como habilidades realmente funcionam, como serviços alteram camadas, o que o Jornal pode ou não revelar e por que o turno possui uma ordem operacional recomendada. O documento cresceu de aproximadamente 770 para 927 linhas, mas a diferença real está na precisão conceitual. 
+Na verdade, fracionar neste momento poderia até esconder justamente o que está deixando o projeto mais forte: as colisões entre sistemas. É por estar tudo no mesmo documento que conseguimos perceber quando uma regra de logística contradiz o ciclo de ação, quando uma regra de sensor interfere no Fog of War ou quando uma política de mercado muda o valor estratégico de uma construção.
 
-# Meu diagnóstico geral
+A quinta versão cresceu pouco em tamanho, mas é uma revisão muito cirúrgica. Ela não tenta inventar mais um grande sistema. Ela responde às ambiguidades operacionais que sobraram na quarta e, em vários casos, transforma uma dúvida num princípio bastante elegante. 
 
-Esta é a primeira versão em que eu sinto que o manual já consegue responder não apenas:
+# Minha impressão geral
 
-> “Como funciona o The Map Room?”
+A quarta versão dizia:
 
-mas também:
+> “Estas são as operações existentes.”
 
-> “Por que o The Map Room não funciona como os outros jogos que eu conheço?”
+A quinta começa a dizer:
 
-Isso é enorme.
+> “Estas são as capacidades, filas, limitações e custos ocultos de cada operação.”
 
-As seções novas atacam justamente as suposições automáticas que um jogador traria de fora:
+A diferença parece pequena, mas é enorme.
 
-* unidades no mesmo hexágono deveriam lutar;
-* várias unidades próximas deveriam participar;
-* quem ataca deveria causar dano antes do revide;
-* Air/High e Air/Low deveriam comportar duas aeronaves;
-* uma habilidade deveria carregar o próprio efeito;
-* uma unidade aliada deveria bloquear movimento;
-* um relatório de turno deveria contar tudo que aconteceu;
-* reparar deveria apenas depender de dinheiro;
-* terreno revelado deveria significar inimigo detectado.
+Agora não basta saber que uma cidade repara. Você sabe:
 
-A terceira versão responde:
+* quantos pacientes ela atende;
+* quanto recupera;
+* quem gasta a ação;
+* se passageiros também recebem;
+* quanto estoque e dinheiro são consumidos;
+* por que quatro unidades danificadas formam fila;
+* como uma unidade pode agir depois de ser atendida;
+* por que avançar demais rompe a continuidade do reparo.
 
-> Não. Aqui não funciona assim — e existe uma razão sistêmica para isso.
-
-Ela está deixando de ser apenas uma documentação de recursos e virando uma **declaração de leis físicas internas**.
+Isso transforma sistema em doutrina.
 
 ---
 
-# 1. A introdução finalmente ficou conceitualmente honesta
+# 1. A correção dos percentuais resolveu uma contradição conceitual antiga
 
-A correção sobre cobertura, flanqueamento, exposição e veterania foi excelente.
+A introdução agora explica corretamente que o jogo rejeita **probabilidade percentual**, não toda e qualquer proporção expressa em porcentagem.
 
-Antes, o manual dizia que essas coisas “não existiam”. Mas, na prática, boa parte delas estava presente sob abstrações maiores:
+Ficou clara a diferença entre:
 
-* cobertura estava absorvida pela Posição;
-* exposição estava nos domínios e no DPQ;
-* flanqueamento aparecia como diferença posicional;
-* veterania aparecia parcialmente como Elite.
+* 70% de chance de acertar;
+* 40% do valor da unidade para uma recuperação completa.
 
-Agora você explica que não são ausências, mas **absorções**.
+A primeira é incerteza.
 
-Essa palavra muda tudo.
+A segunda é uma conta fixa.
 
-Você não eliminou o efeito militar dessas situações. Eliminou a necessidade de quatro subsistemas separados.
+Isso parece uma correção pequena, mas protege uma das promessas centrais do jogo.
 
-Em vez de possuir:
+Antes, um leitor criterioso poderia chegar à logística, encontrar 5%, 10% e 40% e pensar:
 
-* bônus de cobertura;
-* penalidade de flanco;
-* percentual de exposição;
-* moral;
-* modificador de veterania;
+> “O manual disse que não havia percentual.”
 
-o jogo comprime esses resultados em:
+Agora não há contradição.
 
-* domínio;
-* posição;
-* alcance;
-* DPQ;
-* especialização de Elite.
+E gostei de você fechar com:
 
-Isso torna o sistema mais elegante sem fingir que o fenômeno deixou de existir.
+> “No combate não há percentual nenhum.”
 
-A nova explicação da veterania também ficou muito mais precisa:
-
-> não existe experiência adquirida durante a partida; existem formações que já nascem especializadas.
-
-Isso protege o Elite de parecer uma contradição com o determinismo e com a rejeição aos elementos de RPG.
-
-O Caça A não “subiu de nível”.
-
-Ele já representa outra doutrina, outro projeto, outro treinamento e outro envelope operacional.
-
-Essa distinção agora está cristalina.
+A promessa fica situada exatamente onde importa: o resultado do confronto.
 
 ---
 
-# 2. “O Que o Combate Não Faz” era uma seção absolutamente necessária
+# 2. O Trem ficou ainda mais preso à geografia — e isso fortalece o novo mapa
 
-Esta talvez seja a adição mais importante para impedir interpretações erradas.
+Você acrescentou uma restrição muito importante:
 
-Você declarou três leis:
+> O Trem não embarca em navio de desembarque.
 
-1. não existe combate em alcance zero;
-2. cada ataque é um duelo;
-3. ninguém dispara antes.
+Isso preserva a identidade ferroviária dele.
 
-Essas três leis resolvem uma quantidade absurda de casos emergentes.
+Sem essa restrição, o jogador poderia:
 
-## Alcance zero não tem combate
+1. construir ou utilizar uma linha;
+2. embarcar o Trem numa praia;
+3. transportá-lo para outra ilha;
+4. colocá-lo numa ferrovia desconectada;
+5. contornar a principal fraqueza da unidade.
 
-A justificativa pela escala ficou perfeita.
+Ele deixaria de ser prisioneiro da malha e passaria a ser uma unidade móvel que casualmente precisa de trilho depois de desembarcar.
 
-Um hexágono comporta:
+Agora não.
 
-* uma cidade;
-* uma frota;
-* dezenas de quilômetros;
-* várias altitudes;
-* a superfície e as profundezas.
+O Trem pertence à rede que o mapa lhe deu.
 
-Portanto, duas unidades no mesmo hexágono não estão necessariamente próximas.
-
-Elas apenas ocupam o mesmo setor estratégico.
-
-Isso explica naturalmente por que:
-
-* um submarino pode estar sob uma frota;
-* uma aeronave pode sobrevoar uma unidade terrestre;
-* uma tropa pode estar num porto enquanto outra presença existe noutra camada;
-* compartilhar coordenadas não significa contato tático.
-
-A regra poderia parecer abstrata ou “videogame demais”, mas a escala do mapa a justifica completamente.
-
-E, melhor ainda, ela impede aquela suposição clássica:
-
-> “Passei por cima do inimigo, então deveria ter acontecido combate automático.”
-
-Não. O tabuleiro registra ocupação de setor, não proximidade física individual.
-
-## Cada ataque é um duelo
-
-Esta regra preserva toda a clareza do sistema de combate.
-
-Não existe:
-
-* soma automática de unidades;
-* fogo de oportunidade;
-* ataque coletivo;
-* reação em cadeia;
-* vizinho contribuindo porque estava perto;
-* zona mortal invisível formada por peças adjacentes.
-
-Cada unidade precisa:
-
-* declarar seu próprio ataque;
-* gastar sua própria munição;
-* consumir sua própria ação;
-* aceitar seu próprio revide;
-* produzir seu próprio resultado.
-
-Isso mantém o combate auditável.
-
-Se cinco tanques querem destruir um alvo, eles não viram uma fórmula coletiva.
-
-São cinco decisões separadas.
-
-E cada uma altera o estado do alvo para a seguinte.
-
-Isso é extremamente importante num jogo determinístico, porque preserva a capacidade de o jogador reconstruir a sequência.
-
-## Ninguém atira antes
-
-Você finalmente colocou isso numa frase inequívoca:
-
-> o atacante recebe iniciativa — o lado favorável do arredondamento — e nada mais.
-
-Perfeito.
-
-Isso separa três ideias que estavam misturadas:
-
-* declarar o ataque;
-* possuir iniciativa;
-* causar baixas antes do revide.
-
-No The Map Room, as duas primeiras existem.
-
-A terceira não.
-
-O atacante escolhe o duelo, mas ambos lutam com o efetivo inicial.
-
-Isso mantém o risco e impede que iniciativa se transforme num ataque gratuito.
-
----
-
-# 3. Ainda restaram dois fantasmas do antigo “primeiro tiro”
-
-Apesar da nova seção estar correta, duas frases antigas continuam escapando mais adiante.
-
-No exemplo de Tanques contra Recrutas aparece:
-
-> “Os Tanques têm Vantagem — atacam primeiro.”
-
-E depois:
-
-> “Os Recrutas Verdes estão em vantagem por terem atirado primeiro.”
-
-Essas frases contradizem diretamente a correção nova.
-
-Elas deveriam ser algo como:
-
-> Os Tanques têm Vantagem porque declararam o confronto.
-
-e:
-
-> Os Recrutas Verdes recebem Vantagem pela iniciativa do atacante.
-
-São pequenos resíduos, mas precisam ser removidos porque aparecem justamente dentro da explicação matemática. Um leitor pode pensar que existe uma ordem cronológica oculta apesar de você ter acabado de negar isso.
-
-Outra frase que me incomodou um pouco foi:
-
-> “Escolher a hora do duelo vale meia baixa.”
-
-Ela é bonita, mas matematicamente não é segura.
-
-A Vantagem pode:
-
-* transformar 5,3 em 6;
-* transformar 1,1 em 2;
-* transformar um resultado exato de 1 em 2;
-* acrescentar uma eliminação inteira.
-
-Em alguns confrontos, a diferença não é “meia baixa”. É dobrar o resultado final.
-
-Eu usaria:
-
-> Escolher a hora do duelo muda o destino do arredondamento — não a simultaneidade do confronto.
-
-Continua elegante e é matematicamente fiel.
-
----
-
-# 4. “Habilidades são chaves” é uma das melhores explicações arquitetônicas do projeto inteiro
-
-Esta nova seção é brilhante.
-
-Você conseguiu explicar uma arquitetura orientada por dados sem falar como programador.
-
-A unidade não carrega uma habilidade que executa alguma coisa.
-
-Ela carrega uma etiqueta.
-
-O mundo pergunta por essa etiqueta.
-
-A montanha pergunta:
-
-> “Você é Alpino ou Fora-de-estrada?”
-
-A floresta pergunta:
-
-> “Você é Guerrilha?”
-
-A ponte ferroviária pergunta:
-
-> “Você pertence à Linha de Trem?”
-
-O sensor pergunta:
-
-> “Você possui exatamente a ocultação que eu sei detectar?”
-
-O reboque pergunta:
-
-> “Você precisa ser rebocado — e existe alguém que sabe rebocar?”
-
-Isso muda completamente a maneira de compreender as unidades.
-
-A unidade não é uma coleção de poderes ativos.
-
-É um conjunto de respostas possíveis às perguntas feitas pelo mapa.
-
-Essa é uma ideia muito forte porque explica por que o jogo escala.
-
-Uma nova unidade não precisa trazer uma nova regra.
-
-Ela pode simplesmente carregar uma combinação inédita de chaves existentes.
-
-Então uma unidade nova pode ser diferente porque:
-
-* abre montanha;
-* corta floresta;
-* pousa em convés;
-* detecta determinado stealth;
-* reboca;
-* aceita determinado transportador;
-* opera numa camada específica.
-
-A novidade nasce da combinação, não da exceção.
-
-## “O jogo não cresce em regras — cresce em etiquetas”
-
-Essa talvez seja uma das frases mais importantes de todo o manual.
-
-Ela descreve tanto a arquitetura quanto a filosofia de expansão.
-
-Quando bem controlado, isso impede o projeto de virar uma pilha de casos particulares.
-
-É também o motivo pelo qual você consegue imaginar dezenas de unidades futuras sem precisar reescrever o motor.
-
-## O risco de UX dessa elegância
-
-Existe, porém, um perigo para o jogador.
-
-Você diz, honestamente:
-
-> ver uma habilidade na ficha não diz o que a unidade faz; diz onde procurar.
-
-Arquitetonicamente, isso é ótimo.
-
-Para a experiência do usuário, pode ser pesado.
-
-O jogador não deveria precisar lembrar:
-
-* o que a montanha pergunta;
-* o que o trilho pergunta;
-* o que cada ponte bloqueia;
-* o que cada construção exige;
-* quais sensores procuram qual etiqueta.
-
-Portanto, essa arquitetura precisa de uma interface contextual forte.
-
-Ao selecionar uma unidade com Alpino, o jogo poderia mostrar em contexto:
-
-> Montanha: entrada permitida, custo 2.
-
-Ao olhar uma ponte ferroviária:
-
-> Exige Linha de Trem.
-
-Ao selecionar um sensor:
-
-> Detecta Submarine Stealth.
-
-A ficha pode mostrar a chave.
-
-O mapa e os tooltips precisam mostrar as portas que ela abre.
-
-Do contrário, a elegância interna vira opacidade externa.
-
----
-
-# 5. A habilidade “Motor” como etiqueta negativa é muito interessante
-
-Gostei muito de você mostrar que nem toda habilidade concede acesso.
-
-“Motor” não abre uma porta.
-
-Ele faz certos lugares cobrarem mais.
-
-Isso prova que as etiquetas não são necessariamente “vantagens”.
-
-Elas descrevem natureza operacional.
-
-Uma unidade possui Motor porque é motorizada, e o mundo reage:
-
-* estrada na montanha cobra mais;
-* trilho pode ser desconfortável;
-* determinados custos mudam.
-
-Isso evita aquela linguagem de RPG em que toda habilidade precisa ser um bônus desejável.
-
-No seu sistema, uma etiqueta pode ser:
-
-* permissão;
-* restrição;
-* exigência;
-* vulnerabilidade;
-* especialização;
-* custo adicional;
-* compatibilidade.
-
-Isso é muito mais rico.
-
----
-
-# 6. A seção de pouso transformou as skills aéreas em procedimentos reais
-
-A explicação das diferentes chaves de pouso ficou excelente:
-
-* convencional;
-* vertical;
-* curto;
-* convés;
-* água.
-
-Isso mostra que “pousar” não é um único poder booleano.
-
-É uma compatibilidade entre:
-
-* aeronave;
-* procedimento;
-* construção;
-* estrutura;
-* terreno;
-* camada.
-
-E reforça a regra:
-
-> a estrutura propõe, o terreno decide.
-
-Uma estrada pode oferecer pista.
-
-Mas a montanha pode cancelar.
-
-Um convés pode aceitar pouso naval.
-
-Mas apenas de quem possui a chave correta.
-
-Um hidroavião pode descer na água, sem que isso transforme qualquer avião em unidade naval.
-
-A aviação continua sendo um dos sistemas mais autorais do projeto porque cada transição de camada possui consequências táticas, e não apenas animação.
-
----
-
-# 7. A trajetória parabólica finalmente está protegida contra discussões balísticas inúteis
-
-Você respondeu muito bem à contradição da versão anterior.
-
-Agora o manual explica que “parabólico” é um termo operacional:
-
-> a arma ignora obstáculos do percurso.
-
-Não é uma afirmação de que todo míssil e todo obus percorrem fisicamente a mesma curva.
-
-Isso é exatamente o que precisava ser dito.
-
-Também ficou resolvida a questão dos mísseis de cruzeiro:
-
-* eles existem;
-* podem ser usados contra unidades compatíveis;
-* o que não existe é uma categoria antiestrutura;
-* cidades, fábricas e pontes não são destruídas por armamento.
-
-Perfeito.
-
-Você separou:
-
-* nome temático da arma;
-* classe ofensiva;
-* trajetória;
-* domínio do alvo;
-* destrutibilidade do objeto.
-
-Essas dimensões não precisam ser sinônimas.
-
----
-
-# 8. O fechamento de Air/High agora está correto
-
-A frase anterior dizia que “todo mundo vê” um caça em Air/High, o que contradizia o alcance.
-
-Agora ficou:
-
-> o relevo não esconde o caça, mas o alcance limita quem o vê e a arma limita quem o atinge.
-
-Essa formulação está ótima.
-
-Ela separa:
-
-* oclusão;
-* alcance;
-* detecção;
-* capacidade de ataque.
-
-Um caça pode estar num céu sem obstáculos e ainda assim:
-
-* estar longe demais;
-* possuir ocultação;
-* estar fora do domínio da arma;
-* estar fora do alcance ofensivo.
-
-Excelente correção.
-
----
-
-# 9. “Elite não é experiência. É vocação.” ficou excelente
-
-Esta reformulação elevou muito o capítulo.
-
-Antes, Elite ainda orbitava a linguagem de veterano e novato.
-
-Agora você define:
-
-> projeto, doutrina e equipamento.
-
-Isso é muito mais compatível com o sistema.
-
-O Caça A não vence porque o piloto acumulou experiência durante aquela partida.
-
-Ele representa uma formação construída para superioridade aérea.
-
-Então o Elite não é uma qualidade universal.
-
-É uma vocação contra um tipo de confronto.
-
-Isso também explica por que:
-
-* não funciona contra qualquer oponente;
-* depende da classe do alvo;
-* depende da arma empregada;
-* depende da diferença de nível;
-* não melhora durante a campanha;
-* não é perdido por sofrer baixas.
+Isso tem enorme valor justamente no mapa que você acabou de montar, porque as ferrovias espelhadas deixam de ser decoração e passam a definir **onde aquela unidade poderá existir durante a partida inteira**.
 
 A frase:
 
-> “Não existe unidade de elite em abstrato.”
+> “Um trem sobre um navio de transporte é épico demais para ser plausível.”
 
-é fundamental.
+funciona bem porque admite a fantasia divertida e, ao mesmo tempo, fecha a exceção.
 
-Ela impede o jogador de pensar que pagar mais caro compra superioridade universal.
+## Uma consequência muito boa para as invasões
 
-Ele está comprando assimetria especializada.
+O navio de desembarque também recusa a artilharia que depende de reboque.
 
-É uma diferença enorme.
+Isso diferencia profundamente os três gargalos do mapa.
+
+A invasão terrestre ou ferroviária pode levar:
+
+* artilharia de campanha;
+* rebocador;
+* suprimento pesado;
+* Trem;
+* linha logística fixa.
+
+A invasão anfíbia precisa depender mais de:
+
+* navios;
+* aeronaves;
+* helicópteros;
+* tropas leves;
+* veículos que desembarcam por conta própria.
+
+Portanto, a praia não é apenas outra ponte.
+
+Ela possui outra composição militar.
+
+Isso é excelente.
+
+A invasão pelo centro pode formar uma guerra convencional de Exército.
+
+As invasões laterais precisam substituir a artilharia terrestre por apoio naval e aéreo.
+
+É exatamente o tipo de assimetria doutrinária que torna os três gargalos interessantes.
+
+## A pergunta que fica
+
+O navio possui duas vagas, mas mesmo assim não aceita:
+
+* rebocador numa vaga;
+* artilharia na outra.
+
+Essa proibição está clara e parece deliberada.
+
+Então ela não é uma limitação de espaço. É uma decisão de doutrina:
+
+> artilharia pesada não participa de desembarque anfíbio neste jogo.
+
+Isso é bom, mas vale você reconhecer a consequência, porque ela é grande. Algumas cabeças de praia nunca poderão receber artilharia de campanha enquanto não houver conexão terrestre ou ferroviária.
+
+Pode ser justamente a identidade desejada.
 
 ---
 
-# 10. A fórmula ficou muito mais confiável
+# 3. A observação avançada ganhou uma doutrina muito mais concreta
 
-Você corrigiu os termos trocados:
+A nova seção esclarece que qualquer unidade aliada pode transmitir um alvo para uma arma parabólica.
 
-* HP dos Defensores;
-* FD base dos Defensores;
-* baixas impostas pelo atacante;
-* baixas impostas pelo defensor.
+Isso fortalece muito o combate combinado.
 
-Essas mudanças parecem pequenas, mas aumentam muito a confiança na seção.
+Um helicóptero pode:
 
-“Baixas impostas PELO atacante” é especialmente melhor do que “eliminações dos atacantes”, porque elimina a ambiguidade direcional.
+* cruzar relevo;
+* observar o outro lado da serra;
+* revelar uma posição;
+* alimentar a artilharia que está longe.
 
-Também gostei de você explicar que “responder ao fogo” é linguagem narrativa, não ordem matemática.
+A frase:
 
-Isso conecta o vocabulário militar à resolução simultânea sem confundir os dois.
+> “Quem vê não precisa ser quem atira.”
 
-Ainda restam alguns problemas de revisão textual — acentuação, concordância, sinais substituídos por “?” — mas conceitualmente a fórmula está muito mais sólida.
+é praticamente uma lei central do The Map Room.
+
+Ela conecta:
+
+* sensores;
+* visão;
+* alcance;
+* artilharia;
+* posição;
+* forças combinadas.
+
+E o limite aos alvos aéreos também é uma decisão forte:
+
+* observação compartilhada para terra;
+* observação compartilhada para superfície naval;
+* observação compartilhada para alvos submersos;
+* contra o ar, cada unidade depende da própria capacidade.
+
+Isso impede que toda detecção aérea automaticamente transforme qualquer bateria distante numa arma com visão perfeita.
+
+## Mas existe uma distinção que precisa aparecer
+
+“Qualquer unidade serve como observador” pode ser interpretado como:
+
+> qualquer unidade pode encontrar qualquer alvo.
+
+Mas isso entraria em conflito com todo o excelente sistema de ocultação.
+
+Um Soldado não detecta submarino só porque pode servir como observador.
+
+A formulação tecnicamente exata deveria ser:
+
+> Qualquer unidade que possua um contato válido pode transmitir esse contato como observadora.
+
+Ou:
+
+> O observador não precisa ser especializado em artilharia; precisa apenas ter detectado legitimamente o alvo.
+
+Isso preserva as duas leis:
+
+* qualquer unidade transmite;
+* nem qualquer unidade detecta.
+
+Especialmente para alvos submersos, essa precisão é essencial.
+
+A Fragata pode detectar o submarino e transmiti-lo.
+
+O Soldado na praia não pode inventar esse contato.
+
+## O caso aéreo merece uma pergunta mais profunda
+
+Você diz que observação avançada não vale contra alvos aéreos e que cada unidade depende dos próprios olhos.
+
+Isso produz uma consequência interessante — e talvez enorme:
+
+> um EWACS pode revelar uma aeronave no mapa, mas não necessariamente fornecer solução de tiro para um SAM escondido atrás da montanha.
+
+É essa a intenção?
+
+Porque existem duas leituras possíveis.
+
+### Leitura A — detecção é compartilhada, mas não remove a LoS própria da arma
+
+O EWACS revela o caça.
+
+O SAM sabe que ele está ali, mas ainda precisa possuir sua própria linha de visão para disparar.
+
+### Leitura B — o alvo aéreo nem sequer pode ser utilizado por outra unidade
+
+O EWACS vê, mas apenas ele possui aquele contato operacional.
+
+A primeira leitura parece mais alinhada ao seu conceito de informação compartilhada.
+
+A segunda reduz bastante o papel de coordenação do EWACS.
+
+O texto atual parece tender à primeira, mas a expressão “cada unidade depende dos próprios olhos” pode sugerir a segunda.
+
+Esse é um daqueles casos em que uma única frase define toda a função da guerra aérea.
 
 ---
 
-# 11. O reparo finalmente ganhou uma identidade própria
+# 4. “Ser atendido não consome ação” resolveu uma dúvida central
 
-Na versão anterior, a decisão de reparar parecia dominada pelo custo monetário de 40%.
+Esta era uma das maiores pendências da quarta versão.
 
-Agora o sistema ficou muito mais interessante.
+Agora sabemos:
 
-Você explicou que o verdadeiro custo do reparo não é apenas dinheiro.
+* quem presta o serviço consome sua capacidade ou ação;
+* quem recebe continua disponível;
+* a unidade reparada ainda pode se mover e atacar;
+* a limitação é voltar à fonte nos turnos seguintes.
+
+Isso é muito melhor do que simplesmente paralisar a unidade.
+
+A formulação:
+
+> “Ela não fica imobilizada — fica presa à fonte.”
+
+é excelente.
+
+A unidade não perde o turno porque recebeu peças.
+
+Ela perde liberdade operacional porque precisa manter proximidade com a cadeia se quiser continuar se recuperando.
+
+Isso cria uma recuperação dinâmica.
+
+Um tanque pode:
+
+1. receber 2 HP numa cidade;
+2. avançar para segurar uma posição;
+3. aceitar que não estará disponível para o próximo atendimento.
+
+Ou pode:
+
+1. receber 2 HP;
+2. permanecer perto;
+3. voltar no turno seguinte;
+4. reconstruir-se gradualmente.
+
+A escolha não é “agir ou reparar”.
 
 É:
 
-* tempo;
-* ocupação do prestador;
-* permanência numa posição segura;
-* indisponibilidade operacional;
-* fila de atendimento;
-* oportunidade perdida.
+> “Quanto tempo ainda quero permanecer ligado a esta fonte?”
 
-Isso é uma melhoria enorme.
-
-## Reparar não é apertar um botão
-
-Uma unidade reduzida a 2 HP pode levar quatro turnos para voltar a 10.
-
-Durante esse período:
-
-* não avança;
-* continua vulnerável;
-* prende o caminhão;
-* impede o caminhão de atender outras unidades;
-* exige segurança;
-* ocupa espaço;
-* não recupera instantaneamente sua função.
-
-Isso transforma reparo numa operação.
-
-A pergunta deixa de ser:
-
-> “Tenho dinheiro para reparar?”
-
-e vira:
-
-> “Posso imobilizar esta unidade e este logístico por quatro turnos neste setor?”
-
-Essa é uma pergunta muito mais The Map Room.
-
-## Comprar novo versus recuperar antigo
-
-Agora a comparação ficou extremamente limpa:
-
-**Comprar novo:**
-
-* força total imediatamente;
-* nasce na retaguarda;
-* exige deslocamento até o front;
-* mantém a unidade danificada existente, caso sobreviva;
-* consome o custo integral.
-
-**Reparar:**
-
-* força chega aos poucos;
-* mantém a posição já conquistada;
-* consome apenas a parcela recuperada;
-* prende logística;
-* exige tempo e segurança.
-
-Você transformou uma decisão econômica numa decisão espacial e temporal.
-
-Excelente.
+Isso é muito mais interessante.
 
 ---
 
-# 12. O custo proporcional foi explicado corretamente
+# 5. Mas surgiu uma contradição nova dentro do próprio capítulo de reparo
 
-A frase:
+Pouco depois, o texto ainda afirma que uma unidade reduzida a 2 HP precisa de quatro turnos numa construção e que:
 
-> “Você paga só pelo que recuperou.”
+> “Nos dois casos, ela passa esse tempo sem avançar.”
 
-resolve uma ambiguidade importante.
+Mas agora você acabou de declarar que o atendimento não consome a ação e que ela pode se mover e atacar.
 
-Agora o jogador entende que 40% é o teto para restaurar toda a categoria, não uma taxa fixa por atendimento.
+As duas frases só podem coexistir numa leitura figurativa:
 
-Isso impede a conclusão errada de que pequenos reparos seriam economicamente absurdos.
+> para receber os quatro atendimentos consecutivos, ela precisa permanecer ou retornar à região da fonte.
 
-Também abre uma doutrina de manutenção preventiva:
+Mas ela não está mecanicamente impedida de avançar.
 
-> recuperar pouco e com frequência pode ser barato, rápido e operacionalmente eficiente.
+Então o trecho deveria dizer algo próximo de:
 
-Enquanto deixar uma unidade chegar a 2 HP cria um buraco de quatro turnos.
+> Um esquadrão reduzido a 2 HP precisa de quatro atendimentos em construção ou oito atendimentos de campo. Ele pode agir entre eles, mas cada avanço que o afasta da fonte interrompe essa sequência.
 
-Isso incentiva o jogador a não tratar logística apenas como emergência.
+Isso fica mais fiel ao sistema novo.
 
-Logística passa a ser rotina.
+Porque agora o custo não é imobilização obrigatória.
 
----
+É continuidade logística.
 
-# 13. Os números de serviço agora precisam ser tratados como dados altamente sensíveis
-
-Aqui há um ponto que eu conferiria diretamente no comportamento atual do jogo.
-
-A terceira versão afirma:
-
-* Caminhão de Suprimentos atende uma unidade por turno;
-* Avião-tanque atende duas;
-* Trem de Carga atende uma;
-* reparo máximo de 2 por turno;
-* versão de campo recupera 1;
-* custos máximos de 5%, 10% e 40%.
-
-Alguns documentos técnicos anteriores registravam capacidades e percentuais diferentes.
-
-Isso pode significar simplesmente que você rebalanceou o sistema.
-
-Mas, como agora o manual está ficando muito confiável, esses números precisam corresponder exatamente ao runtime e aos assets atuais.
-
-Não é uma divergência filosófica.
-
-É uma divergência que altera:
-
-* quantos caminhões são necessários;
-* duração da recuperação;
-* custo de uma campanha;
-* valor de uma unidade pesada;
-* eficiência do Serviço do Comando;
-* tamanho ideal da retaguarda.
-
-Minha recomendação conceitual seria tratar esses números como:
-
-> valores atuais de balanceamento
-
-e não como leis eternas.
-
-As leis são:
-
-* serviço custa proporcionalmente;
-* existe limite por turno;
-* existe capacidade do prestador;
-* classes pesadas aproveitam menos;
-* transferência é gratuita;
-* recuperação consome tempo.
-
-Os percentuais e quantidades podem mudar durante o tuning sem alterar o sistema.
+Essa diferença é importantíssima.
 
 ---
 
-# 14. “O Serviço Acontece na Mesma Camada” é uma adição fantástica
+# 6. “Um prestador, um paciente” transforma estoque em throughput
 
-Esta seção cria consequências muito mais profundas do que parece.
+Esta é provavelmente a melhor nova regra da quinta versão.
 
-Um avião-tanque em Air/High atendendo um helicóptero precisa descer para Air/Low.
+Até agora, uma cidade com enorme estoque parecia capaz de atender todo mundo que chegasse.
 
-Um caça atendido no mesmo lote também é levado para Air/Low.
+Agora existe outra dimensão:
 
-Uma aeronave recebendo suprimento terrestre pousa.
+> capacidade de atendimento por turno.
 
-Isso faz com que logística aérea deixe de ser uma aura abstrata.
+Uma cidade pode possuir:
 
-As unidades precisam literalmente se encontrar no mesmo plano operacional.
+* combustível suficiente;
+* munição suficiente;
+* peças suficientes;
+* dinheiro suficiente;
 
-Essa regra conversa com tudo:
+e ainda assim formar uma fila.
 
-* domínio;
-* stealth;
-* vulnerabilidade;
-* posição;
-* armas disponíveis;
-* LoS;
-* pouso;
-* arremetida;
-* terreno.
+Isso é muito bom porque separa:
 
-Uma operação de reabastecimento pode revelar uma aeronave furtiva não porque o abastecimento “remove stealth” arbitrariamente, mas porque a obriga a sair da camada em que sua ocultação funciona.
+* quantidade armazenada;
+* velocidade de conversão.
 
-Isso é excelente.
+Uma construção com mil peças não é um hospital infinito.
 
-## A grande pergunta que ficou
+Ela ainda atende uma unidade por rodada.
 
-Depois que o atendimento termina, quem volta para qual camada?
+## Isso muda completamente a geografia logística
 
-No atendimento terrestre, você já possui o ciclo de toque e arremetida.
+Agora o valor de uma região não está apenas em ter uma cidade.
 
-Mas no atendimento ar-ar:
+Está em ter **vários pontos de atendimento próximos**.
 
-* o avião-tanque retorna automaticamente a Air/High?
-* o caça retorna a Air/High?
-* todos permanecem em Air/Low?
-* a camada final depende da unidade que iniciou?
-* a operação consome a possibilidade de alterar altitude?
-* a perda de stealth dura apenas enquanto está em Air/Low ou também recebe alguma exposição posterior?
+Uma ilha com:
 
-Essa resposta altera muito a segurança da operação.
+* três cidades;
+* um porto;
+* um aeroporto;
 
-O manual precisa dizer onde cada unidade termina.
+não possui apenas renda.
 
-“Encontrar-se na mesma camada” explica o momento do serviço.
+Possui potencialmente cinco atendimentos simultâneos.
 
-Ainda falta explicar o estado posterior.
+Portanto, seus cinturões urbanos deixam de ser apenas farms econômicas.
 
----
+Eles também são **clusters logísticos**.
 
-# 15. O Serviço do Comando finalmente justifica a ordem do turno
+Isso é uma consequência maravilhosa para o mapa que você desenhou.
 
-Agora a ordem recomendada não é só uma preferência da IA.
+A ilha cheia de cidades pode sustentar uma força muito maior que uma ilha com uma única cidade, mesmo que o estoque total fosse semelhante.
 
-Existe uma razão mecânica:
+A cidade-farol isolada orienta e presta um serviço.
 
-> o Serviço do Comando só atende unidades que ainda não agiram.
-
-Isso é excelente porque transforma a ordem operacional numa decisão.
-
-Se você agir primeiro, vai retirando unidades da fila.
-
-Portanto, o jogador precisa pensar:
-
-> “Antes de mover qualquer coisa, quem precisa ser atendido pela infraestrutura?”
-
-E isso cria um pequeno ritual de comando bastante temático:
-
-1. receber relatório;
-2. avaliar danos;
-3. executar serviços de guarnição;
-4. mover as forças;
-5. comprar substituições.
-
-Você está realmente simulando o retorno do comandante à sala de mapas.
-
-Também ficou boa a distinção entre:
-
-* Serviço do Comando: atendimento de guarnição antes da ação;
-* suprimento em campo: o logístico chega até a unidade, mesmo depois de ela se mover.
-
-Não são duas fórmulas.
-
-São dois contextos para o mesmo sistema.
-
-Muito elegante.
-
----
-
-# 16. A fusão agora está suficientemente especificada para deixar de parecer mágica
-
-A seção “Quem Pode Fundir com Quem” era necessária.
-
-Agora sabemos que exige:
-
-* mesmo tipo;
-* adjacência;
-* compatibilidade de camada;
-* receptor danificado;
-* ausência de passageiros;
-* consumo da ação;
-* possibilidade física de transição.
-
-Isso fecha muitos exploits e ambiguidades.
-
-## A equalização de camadas é particularmente interessante
-
-Aeronaves se encontram em Air/Low.
-
-Submarinos se encontram submersos, quando possível.
-
-Isso é consistente com a nova doutrina de serviços:
-
-> operações conjuntas exigem um plano comum.
-
-E cria consequências táticas.
-
-Uma aeronave no solo pode ter que decolar para fundir.
-
-Um submarino na superfície pode ter que mergulhar.
-
-Se o terreno não permitir, a fusão falha.
-
-Novamente, você não está criando uma exceção.
-
-Está aplicando domínio.
-
-## Ainda falta dizer claramente quem é o receptor
-
-A seção afirma:
-
-> o receptor precisa estar machucado.
-
-Mas não define com toda clareza:
-
-* qual token permanece;
-* em qual hexágono o resultado fica;
-* qual posição é herdada;
-* qual camada é escolhida quando existem duas possibilidades;
-* qual unidade “entra” na outra;
-* qual hexágono precisa aceitar a transição.
-
-Presumo que o receptor seja a unidade selecionada como destino e que o resultado permaneça no hexágono dela.
-
-Isso merece uma frase explícita:
-
-> A unidade receptora permanece no próprio hexágono e conserva a posição; a outra é consumida pela fusão.
-
-Sem isso, uma fusão entre dois hexágonos adjacentes ainda possui uma ambiguidade espacial importante.
-
----
-
-# 17. A honestidade sobre o arredondamento da fusão melhorou muito o texto
-
-Você corrigiu perfeitamente a afirmação anterior de que “não houve perda”.
-
-Agora ficou claro:
-
-* a redistribuição é proporcional;
-* o arredondamento não é neutro;
-* munição pode ser criada pelo teto;
-* autonomia pode ser perdida pelo truncamento;
-* cada arma é calculada separadamente;
-* cada estoque também.
-
-A frase:
-
-> “favorece quem atira, penaliza quem anda”
-
-é ótima.
-
-Ela transforma um detalhe matemático numa leitura doutrinária.
-
-Também é muito bom você admitir explicitamente que 24 projéteis podem virar capacidade equivalente a 30.
-
-Isso impede que o manual pareça tentar justificar retroativamente tudo como conservação perfeita.
-
-Não é conservação perfeita.
-
-É uma decisão de design.
-
-E agora ela está declarada.
-
----
-
-# 18. “Dividindo o Hexágono” é uma das maiores adições de toda a terceira versão
-
-Este capítulo revela uma geometria de ocupação que até agora estava apenas espalhada pelas regras de domínio.
-
-Você define três andares operacionais:
-
-* ar;
-* superfície;
-* profundezas.
-
-Essa imagem é excelente.
-
-Ela permite compreender rapidamente como unidades coexistem sem precisar visualizar cinco slots independentes.
-
-## Air/Low e Air/High no mesmo andar
-
-Isso é uma escolha muito importante.
-
-Altitude altera:
-
-* visão;
-* armas;
-* posição;
-* stealth;
-* consumo operacional;
-* vulnerabilidade.
-
-Mas não cria capacidade adicional de ocupação.
-
-Portanto, um caça e um helicóptero não podem “empilhar” no mesmo setor apenas porque estão em altitudes diferentes.
-
-Isso impede o céu de virar armazenamento de unidades.
-
-E preserva a leitura do token:
-
-> existe uma presença aérea dominante naquele setor.
+A concentração urbana sustenta uma campanha.
 
 Muito bom.
 
-## A linha de frente só existe na superfície
+## As exceções também possuem identidade
 
-Esta é uma das melhores frases do documento inteiro:
+Quase tudo atende um.
 
-> “O céu e o fundo do mar não têm frente — têm alcance e detecção.”
+O avião-tanque e o Porta-Aviões atendem dois.
 
-Isso é excelente.
+Isso faz sentido porque são unidades desenhadas especificamente para ampliar persistência operacional aérea.
 
-Você acabou de diferenciar os três domínios sem depender de bônus arbitrários.
+Elas não são apenas depósitos móveis.
 
-A superfície controla geografia.
-
-O ar projeta ameaça.
-
-O submarino infiltra-se pela informação.
-
-A superfície:
-
-* bloqueia passagem;
-* forma linhas;
-* captura;
-* ocupa;
-* protege rotas;
-* define fronteiras.
-
-O ar e as profundezas:
-
-* atravessam;
-* observam;
-* escondem-se;
-* ameaçam;
-* escolhem janelas;
-* dependem de alcance e detecção.
-
-Essa é uma doutrina combinada muito forte.
-
-É provavelmente uma das descrições mais claras da identidade estratégica do The Map Room.
+Possuem maior throughput.
 
 ---
 
-# 19. Existe uma contradição importante entre o Porto e o novo sistema de andares
+# 7. O atendimento de passageiros é uma regra poderosa — talvez mais poderosa do que parece
 
-No capítulo de construções, o Porto Naval ainda diz:
+Uma construção atende:
 
-> Land/Surface e Naval/Surface são aceitos simultaneamente, e você verá tropas e navios ocupando o mesmo hexágono.
+* o transportador;
+* os passageiros de primeiro nível.
 
-Mas, em “Dividindo o Hexágono”, você define que Land/Surface e Naval/Surface pertencem ao **mesmo andar da superfície**, e que duas unidades não terminam no mesmo andar do mesmo hexágono.
+O caminhão de campo atende apenas o token externo.
 
-As duas regras não podem ser verdadeiras ao mesmo tempo.
+Isso cria uma diferença muito interessante entre:
 
-Você precisa escolher uma destas interpretações:
+## Levar a oficina ao grupo
 
-## Interpretação A — o porto aceita ambos, mas não simultaneamente
+O caminhão vai até o APC.
 
-O porto pode ser ocupado por uma unidade terrestre **ou** naval.
+Atende apenas o APC.
 
-Ele mantém os dois domínios disponíveis, mas existe apenas uma vaga de superfície.
+## Levar o grupo à oficina
 
-Nesse caso, o capítulo do porto deve remover a afirmação de coexistência.
+O APC chega à cidade.
 
-## Interpretação B — o porto possui duas vagas de superfície especiais
+A cidade atende o APC e os soldados transportados.
 
-Ele permite uma presença terrestre e uma naval simultaneamente, apesar de ambas estarem no andar de superfície.
+Isso valoriza transporte também como ferramenta de evacuação e recuperação.
 
-Nesse caso, o porto é uma exceção ao novo sistema de ocupação e precisa ser declarado como tal.
+Uma unidade de transporte passa a poder:
 
-Pelo texto novo, a interpretação A parece muito mais coerente:
+* recolher esquadrões danificados;
+* levá-los a uma construção;
+* concentrar atendimento;
+* devolver a formação ao front.
 
-> superfície é um único andar.
+É quase uma ambulância operacional, mesmo que não tenha sido desenhada como tal.
 
-E também é mais legível.
+## Mas há um possível comportamento emergente
 
-Mas hoje existe uma contradição direta que precisa ser resolvida.
+Jogadores podem começar a embarcar unidades feridas apenas para compactar a fila.
+
+Exemplo:
+
+* um transporte possui dois passageiros;
+* a cidade atende o transporte e os dois passageiros;
+* uma única vaga de serviço recupera três unidades.
+
+Isso pode ser uma estratégia legítima e interessante:
+
+> transporte médico improvisado.
+
+Mas também pode virar a maneira obrigatória e otimizada de usar toda cidade:
+
+> nunca leve tropas a pé para reparo; coloque todas dentro de algum veículo primeiro.
+
+A regra “primeiro nível” evita recursão absurda, o que é ótimo.
+
+Mas ainda vale observar em teste se o benefício é:
+
+* uma recompensa elegante pelo transporte;
+* ou um exploit logístico que torna o embarque obrigatório na retaguarda.
+
+## O caso do Porta-Aviões merece atenção
+
+Um Porta-Aviões atendido num Porto é:
+
+* uma unidade receptora;
+* que carrega aeronaves como passageiros.
+
+Então o Porto atenderia:
+
+* o próprio Porta-Aviões;
+* as duas aeronaves embarcadas;
+
+dentro de uma única vaga?
+
+Pelo texto, parece que sim.
+
+Isso pode ser perfeitamente desejável — um grande navio entrando em porto para revisão completa de todo o grupo aéreo.
+
+Mas é uma consequência grande e merece ser consciente.
 
 ---
 
-# 20. “Aliado nunca barra o caminho” resolve um problema clássico sem destruir a ocupação
+# 8. A logística agora possui duas filas independentes
 
-Gostei muito dessa decisão.
+A quinta versão finalmente deixa claro que existem dois gargalos:
 
-Unidades aliadas podem atravessar umas às outras, mas não terminar sobre o mesmo andar.
+## Gargalo do receptor
 
-Isso separa:
+Cada unidade só pode receber uma vez por turno.
 
-* trânsito;
-* ocupação.
+## Gargalo do prestador
 
-Você não fica preso atrás da própria linha devido à escala abstrata do hexágono.
+Cada prestador atende uma quantidade limitada de pacientes.
 
-Ao mesmo tempo, não pode armazenar um exército inteiro na mesma coordenada.
+Isso é muito importante.
 
-É uma solução limpa.
+Sem o primeiro, haveria cura empilhada.
 
-Ela também fortalece a ideia de que os tokens não são objetos físicos bloqueando uma estrada estreita. São presenças operacionais espalhadas por um setor.
+Sem o segundo, uma única cidade curaria um exército inteiro.
+
+Agora existe uma verdadeira capacidade operacional.
+
+E isso faz a logística escalar da maneira correta:
+
+> não apenas com mais estoque, mas com mais infraestrutura e mais prestadores.
+
+Essa é uma diferença excelente.
+
+Um jogador rico não resolve tudo despejando recursos num único ponto.
+
+Ele precisa construir ou capturar uma rede.
 
 ---
 
-# 21. O Jornal do Comandante pode virar uma das assinaturas do jogo
+# 9. O rearmamento pesado ficou brutal — e coerente com a economia territorial
 
-Esta seção me empolgou muito.
+Você acrescentou uma segunda penalidade ao armamento pesado:
 
-O Jornal não é apenas uma lista de eventos.
+1. a unidade pesada aproveita menos cada caixa de reserva;
+2. o projétil pesado custa mais dinheiro por tiro recuperado.
 
-Ele resolve um problema estrutural dos jogos por turnos com Fog of War:
+Isso significa que a diferença entre um Soldado e um Blindado não está apenas em:
 
-> o que aconteceu enquanto o jogador não estava comandando?
-
-Isso importa especialmente para:
-
-* Hot Seat;
-* partidas assíncronas futuras;
-* IA;
-* ataques vindos da névoa;
-* perda de contato;
-* captura;
+* preço de compra;
+* defesa;
+* potência;
 * combustível;
-* stealth;
-* mudanças de camada;
-* acontecimentos automáticos de início de turno.
+* reparo.
 
-## A fantasia está perfeita
+Está também no custo de refazer o paiol.
 
-Você volta à sala de mapas.
+Isso é muito forte.
 
-O mundo se moveu sem você.
+A frase:
 
-Há um relatório esperando sobre a mesa.
+> “Blindado sem cidade atrás é blindado que luta uma vez.”
 
-Isso conecta interface, mecânica e fantasia central do jogo.
+é excelente.
 
-O Jornal não parece um menu eletrônico colado ao wargame.
+Ela resume toda a doutrina econômica das unidades pesadas.
 
-Parece parte natural do comando.
+O jogador pode comprar um tanque caro com uma renda pequena.
 
-## Os três níveis de urgência são bons porque são acionáveis
+O que talvez não consiga é:
 
-**Crítico:** algo consumado que exige reação.
+* movê-lo repetidamente;
+* rearmá-lo;
+* reparar suas perdas;
+* sustentar duas armas;
+* mantê-lo em campanha por muitos turnos.
 
-**Atenção:** algo em andamento que ainda pode ser impedido.
+Portanto, força pesada não exige apenas capital inicial.
 
-**Informativo:** algo descoberto ou ajustado automaticamente.
+Exige território recorrente.
 
-Essa classificação não serve apenas para estética.
+Isso liga perfeitamente:
 
-Ela informa ao jogador:
+> captura ? renda ? manutenção ? permanência no front.
 
-* o que já perdeu;
-* o que ainda pode salvar;
-* o que apenas precisa saber.
+## O risco de multiplicação excessiva
+
+Você está aplicando duas pressões ao mesmo tempo:
+
+* menor conversão da reserva;
+* maior custo monetário por projétil.
+
+Isso pode ser exatamente o que deseja.
+
+Mas precisa ser testado porque as duas penalidades se multiplicam.
+
+Uma arma pesada pode acabar:
+
+* consumindo três vezes mais caixa;
+* cobrando três vezes mais dinheiro por tiro;
+* existindo numa unidade que já custa muito para reparar;
+* e talvez possuindo duas armas.
+
+A recuperação completa pode ficar economicamente próxima da recompra.
+
+Isso não é necessariamente ruim — o manual inclusive quer produzir essa decisão.
+
+Mas existe um ponto em que o jogador conclui:
+
+> “Nunca vale rearmar esta unidade; sempre vale comprar outra.”
+
+A tensão boa é:
+
+> reparar ou substituir?
+
+O resultado ruim seria:
+
+> substituir sempre.
+
+## Falta uma pequena tabela
+
+Você declara que arma pesada custa o triplo da leve.
+
+Mas o leitor ainda não sabe exatamente:
+
+* Leve: ×1;
+* Média: ×2?
+* Pesada: ×3.
+
+Presumo que seja essa progressão.
+
+Vale registrar em uma linha, porque agora é parte real da fórmula econômica.
+
+---
+
+# 10. Altitude como consequência ficou conceitualmente mais forte
+
+Você trocou a ideia:
+
+> “Subir novamente é decisão sua.”
+
+por:
+
+> “Altitude não é uma alavanca que você opera; é consequência do que a unidade fez.”
+
+Isso é uma declaração de design muito mais forte.
+
+Ela diz que o jogador não administra altitude como um botão abstrato.
+
+Ele executa operações:
+
+* decola;
+* reabastece;
+* encontra um helicóptero;
+* toca o solo;
+* arremete;
+* mergulha;
+* emerge.
+
+A camada final emerge da ação.
+
+Isso é elegante porque faz altitude parecer estado operacional, não seleção de stance.
+
+## Mas precisa corresponder à interface atual
+
+Pelo histórico do projeto, você já teve ações explícitas relacionadas a altitude.
+
+Caso ainda exista um comando de:
+
+* subir;
+* descer;
+* mudar altitude;
+
+a frase “não é uma alavanca que você opera” contradiz a interface.
+
+Talvez a intenção agora seja:
+
+* o jogador escolhe uma ação operacional;
+* a camada muda automaticamente;
+* não existe alteração de altitude gratuita ou isolada.
+
+Se for isso, ótimo. É uma decisão mais coerente com o manual.
+
+Mas esta frase é forte demais para ser apenas poética. Ela precisa ser literalmente verdadeira no motor.
+
+---
+
+# 11. O “Primeiro Dono” agora está perfeitamente definido
+
+A nova explicação resolveu a ambiguidade.
+
+Agora sabemos:
+
+* construção neutra ainda não possui primeiro dono;
+* o primeiro time que a captura grava essa identidade;
+* ela produzirá exclusivamente para esse time;
+* capturas posteriores mudam território e renda, mas não a fidelidade industrial.
+
+Isso cria uma corrida estratégica muito interessante.
+
+Uma fábrica neutra de Primeiro Dono não é apenas:
+
+> “quem captura ganha agora.”
+
+É:
+
+> “quem captura primeiro define o futuro industrial desse hexágono para toda a partida.”
+
+Isso pode criar histórias excelentes.
+
+Um jogador pode perder a fábrica territorialmente, mas impedir que ela seja convertida contra ele.
+
+O invasor recebe:
+
+* renda;
+* posição;
+* negação econômica;
+
+mas não produção.
+
+A construção guarda memória histórica.
+
+Muito bom.
+
+## Isso é especialmente poderoso no seu mapa simétrico
+
+Uma construção de Primeiro Dono numa ilha central funciona como objetivo de corrida.
+
+A simetria garante distâncias comparáveis.
+
+O FOW impede certeza sobre o plano inimigo.
+
+A primeira captura define uma vantagem permanente.
+
+Isso pode ser fascinante — mas também bastante decisivo.
+
+Eu usaria essa política com parcimônia em construções muito valiosas.
+
+Mercado Livre é luta contínua.
+
+Primeiro Dono é corrida irreversível.
+
+São sabores estratégicos completamente diferentes.
+
+---
+
+# 12. Mercado Livre neutro também ficou correto
+
+Você esclarece que a construção neutra não vende.
+
+Ela precisa ter dono.
 
 Ótimo.
 
-## “O Jornal não mente e não adivinha”
+Isso impede que o jogador use uma fábrica neutra como loja sem realmente capturá-la.
 
-Esta é outra frase excelente.
+Também preserva a infantaria como chave econômica.
 
-O relatório respeitar a Névoa é essencial.
+Não basta chegar com um tanque.
 
-Um sistema onisciente destruiria toda a tensão do FOW retrospectivamente.
+É preciso ocupar politicamente.
 
-Você acertou ao diferenciar:
+---
 
-* unidade destruída diante de observadores;
-* contato simplesmente perdido;
-* construção capturada com informação sobre o ocupante;
-* disparo recebido sem origem identificada.
+# 13. A regra de nascimento ficou muito mais precisa e conversa com os três andares
 
-O Jornal entrega causalidade apenas quando o jogador teria acesso a ela.
+Agora sabemos que uma compra é bloqueada apenas pela ocupação da superfície.
 
-Isso preserva o mistério até depois da ação inimiga.
+Portanto:
 
-## “Tiro da névoa” é psicologicamente poderoso
+* aeronave sobrevoando não bloqueia fábrica;
+* submarino sob um porto não bloqueia produção de superfície;
+* unidade terrestre ou naval no mesmo andar bloqueia.
 
-Você recebe a confirmação:
+Essa é uma aplicação perfeita da regra de ocupação.
 
-> algo me atingiu.
+Você não criou uma exceção de compra.
 
-Mas não recebe:
+A compra simplesmente respeita o andar onde a unidade nasce.
 
-* origem;
-* direção;
-* unidade;
-* alcance;
-* posição.
+Também ficou claro que:
 
-Isso transforma o relatório em combustível para a próxima decisão.
-
-O jogador pode:
-
-* recuar;
-* enviar reconhecimento;
-* calcular alcances possíveis;
-* suspeitar de artilharia;
-* procurar uma unidade stealth;
-* reposicionar o radar.
-
-O Jornal não resolve o problema.
-
-Ele formula o problema.
+* não há fila;
+* não há reserva;
+* não há cobrança antecipada;
+* compra inválida é recusada;
+* o jogador resolve o problema e tenta novamente.
 
 Excelente.
 
----
-
-# 22. O Jornal precisa de uma política temporal bem rígida
-
-Como ele respeita o Fog of War, alguns casos precisarão de regras claras:
-
-* Se uma unidade foi vista durante o ataque, mas desapareceu depois, o Jornal mostra a identidade dela?
-* Se um submarino emergiu e mergulhou antes do seu próximo turno, o evento é registrado?
-* Se uma unidade atravessou brevemente o alcance de um sensor, isso conta como contato?
-* Se uma construção foi capturada e recapturada antes de você voltar, o Jornal relata as duas mudanças?
-* Se o inimigo destruiu o observador que teria transmitido a informação, o relatório chega?
-* O Jornal informa o hexágono exato ou apenas o setor aproximado?
-* Eventos repetidos são agrupados?
-
-Não precisa responder tudo neste capítulo agora.
-
-Mas o princípio já está bom:
-
-> o Jornal registra conhecimento adquirido, não a verdade absoluta do mundo.
-
-Essa frase deveria orientar todos os casos futuros.
+Isso elimina burocracia e possíveis confusões econômicas.
 
 ---
 
-# 23. A economia ficou mais clara, mas uma frase antiga ainda permanece
+# 14. “Movimento obrigatório + ação” é uma ótima forma de explicar a jogada
 
-Você corrigiu muito bem a comparação:
+Esta formulação ficou muito boa:
 
-* uma cidade paga aproximadamente um Soldado por turno;
-* o Soldado custa cerca de um terço da renda do QG.
+> Toda jogada é movimento mais ação.
 
-Agora a escala econômica faz sentido.
+Inclusive quando a unidade não sai do lugar.
 
-Também corrigiu a ideia posterior para dizer que as cidades são a **principal camada de crescimento**, e não necessariamente a única.
+“Ficar parado” deixa de parecer ausência de movimento e passa a ser:
 
-Porém, no começo do mesmo trecho ainda está escrito:
+> movimento de distância zero.
 
-> “Cidades são a única camada que cresce durante a partida.”
+Isso é conceitualmente forte porque permite que todas as jogadas tenham a mesma forma.
 
-Isso continua tecnicamente absoluto demais, porque fábricas, aeroportos e portos também podem mudar de controle.
+A unidade sempre:
 
-Eu manteria apenas:
+1. escolhe sua posição;
+2. escolhe o que fará a partir dela.
 
-> Cidades são a camada mais numerosa e a principal fonte de crescimento econômico durante a partida.
+Não existem dois fluxos separados para:
 
-É mais fiel ao sistema e combina com o restante do parágrafo.
+* unidade que andou;
+* unidade que ficou parada.
 
----
+A interface pode tratar ambos pela mesma máquina de estados.
 
-# 24. “Uma Boa Ordem Operacional” ficou muito mais durável
+Também gostei de “apenas mover” ser uma ação válida.
 
-A mudança de título foi correta.
+Ela não ficou sem fazer nada.
 
-Agora você não documenta a ordem da IA como se fosse uma lei.
-
-Documenta uma boa doutrina que a IA atual utiliza.
-
-E fecha com:
-
-> a IA pode mudar sem que isso mude o jogo.
-
-Isso é excelente documentação.
-
-Você separou:
-
-* comportamento atual da IA;
-* regra do jogo;
-* recomendação ao jogador.
-
-São três coisas diferentes.
-
-Além disso, a restrição do Serviço do Comando dá fundamento mecânico à recomendação, então ela não parece apenas opinião.
+Ela executou a decisão de ocupar outro setor e encerrar.
 
 ---
 
-# 25. A seção de vitória agora está conceitualmente correta
+# 15. A confirmação única deixa a interface elegante — mas cria a maior tensão conceitual da quinta versão
 
-Você separou:
+Aqui está o ponto que mais merece sua atenção.
 
-**Derrotas gerais:**
+Você agora afirma:
 
-* QG capturado;
-* eliminação total.
+* mover é provisório;
+* os sensores mostram as opções da posição hipotética;
+* o jogador pode cancelar;
+* pode testar outra posição;
+* pode abrir a mira;
+* pode desistir;
+* apenas a confirmação da ação torna o mundo real.
 
-**Objetivos de cenário:**
+Como fluxo de interface, isso é excelente.
 
-* tutorial;
-* sobreviver;
-* alcançar;
-* segurar;
-* cumprir roteiro.
+É limpo, amigável e permite planejamento.
 
-Essa separação prepara muito bem o sistema para a campanha.
+Mas entra em colisão frontal com o capítulo:
 
-Também ficou correta a explicação do atrito:
+> **Mover É Se Comprometer.**
 
-> não existe pontuação por baixas; o atrito só encerra a guerra quando é total.
+Ali você ainda diz:
 
-Isso resolve a contradição anterior.
+> Você aceita a posição e só então descobre o que havia além dela.
 
-Você não vence por ter causado mais dano.
+E:
 
-Vence porque:
+> o jogo impede exploração gratuita casa por casa.
 
-* tomou o centro político e operacional;
-* ou eliminou completamente a capacidade militar do adversário.
+As duas filosofias não coexistem automaticamente.
 
-Perfeito.
+## O problema fundamental
 
-## Uma contradição menor ainda permanece
+Durante o posicionamento provisório, os sensores mostram:
 
-O capítulo de Captura começa dizendo:
+> “o que ela enxerga, o que alcança e o que pode fazer dali.”
 
-> “Destruir o inimigo não ganha a partida. Tomar o mapa ganha.”
+Se isso inclui inimigos que estavam escondidos pelo FOW, o jogador pode:
 
-Mas a seção final confirma que eliminação total ganha, sim.
+1. posicionar hipoteticamente numa casa;
+2. descobrir um inimigo;
+3. cancelar;
+4. testar outra casa;
+5. mapear o setor gratuitamente;
+6. só confirmar a melhor posição.
 
-A frase é boa como tese, mas absoluta demais.
+Isso é exatamente a sondagem gratuita que o outro capítulo proíbe.
 
-Eu mudaria para:
+## Existem três modelos possíveis
 
-> Vencer combates não basta. Tomar o mapa é o caminho mais consistente para vencer.
+### Modelo A — a prévia revela contatos reais
 
-Ou:
+O jogador pode experimentar posições e descobrir inimigos antes de confirmar.
 
-> Destruir unidades não vale pontos. O que vence é tomar o lugar certo — ou não deixar força alguma do outro lado.
+Nesse caso, “Mover É Se Comprometer” deixou de ser verdade.
 
-Assim, você preserva a força sem contradizer a regra.
+O jogo voltou a permitir reconhecimento gratuito durante o planejamento.
 
-## Rendição
+### Modelo B — a prévia mostra somente informações já conhecidas
 
-Pelo histórico do projeto, existe ou existiu uma condição de rendição.
+Ela projeta:
 
-Caso ela continue implementada, está ausente da lista.
-
-Talvez rendição não seja uma “condição sistêmica de derrota”, mas uma decisão voluntária do jogador. Mesmo assim, merece uma linha:
-
-> Um jogador também pode encerrar voluntariamente sua participação por rendição.
-
-Caso continue disponível.
-
----
-
-# 26. O revide “só a distância 1” é o ponto que eu mais verificaria
-
-Na nova seção de duelos você escreve:
-
-> “O único que responde é o defensor direto, e só a distância 1.”
-
-Isso pode ser correto caso essa tenha se tornado uma regra deliberada.
-
-Mas os documentos técnicos anteriores descreviam o revide como dependente de:
-
-* arma válida;
 * alcance;
-* munição;
-* camada;
-* compatibilidade.
+* Linha de Visão teórica;
+* armas;
+* opções contra contatos já revelados;
 
-Sem uma limitação geral fixa em alcance 1.
+mas não revela novos inimigos nem novos terrenos.
 
-Se uma unidade possui uma arma com alcance 2 a 3 e é atacada a distância 2, por que ela não poderia revidar, caso aquela arma permita?
+Nesse caso, a confirmação única funciona.
 
-Talvez a regra real seja:
+Porém, novos contatos só aparecerão depois que a ação inteira foi confirmada.
 
-> apenas armas de combate direto possuem revide.
+Logo, a unidade não poderá atacar um inimigo que acabou de descobrir naquela mesma jogada.
 
-Ou:
+Isso muda bastante o jogo:
 
-> todo revide é restrito à adjacência.
+> explorar consome a ativação.
 
-Mas isso precisa estar alinhado ao motor.
+Pode ser uma decisão excelente, inclusive fortalecendo reconhecimento e cooperação entre unidades.
 
-Eu verificaria antes de consolidar, porque essa única frase altera profundamente:
+Mas é diferente da regra anterior.
 
-* duelos aéreos;
+### Modelo C — o movimento é comprometido internamente antes da ação
+
+O jogador escolhe o destino.
+
+O movimento torna-se real.
+
+O FOW recalcula.
+
+Então ele escolhe a ação.
+
+Este era o modelo que o manual anterior descrevia.
+
+Mas ele possui duas confirmações ou dois compromissos, mesmo que a interface esconda um deles.
+
+## Hoje o texto quer os benefícios dos três modelos
+
+Ele quer:
+
+* planejamento livre;
+* uma confirmação só;
+* descoberta depois do compromisso;
+* escolha de ação usando a informação recém-descoberta.
+
+Não dá para ter os quatro ao mesmo tempo sem criar alguma mecânica intermediária.
+
+Esta é a principal decisão ainda aberta no Big Manual.
+
+## A pergunta certa
+
+Durante a prévia de movimento, **um inimigo oculto aparece?**
+
+Essa única resposta define qual versão do ciclo é verdadeira.
+
+Se aparece, há sondagem gratuita.
+
+Se não aparece, você não pode escolhê-lo como alvo antes da confirmação.
+
+Essa é a colisão mais importante da quinta versão.
+
+---
+
+# 16. Talvez “explorar consome a jogada” seja uma solução muito The Map Room
+
+Existe uma possibilidade interessante aqui.
+
+Você pode assumir deliberadamente o Modelo B:
+
+> a prévia não revela informação nova.
+
+O jogador planeja livremente com base no que já sabe.
+
+Depois confirma “apenas mover”.
+
+O mundo recalcula.
+
+Novos contatos aparecem.
+
+Mas aquela unidade já encerrou sua ação.
+
+Então outra unidade precisa explorar a informação.
+
+Isso fortaleceria enormemente a doutrina:
+
+> sensores produzem alvos; armas exploram a informação.
+
+O helicóptero reconhece.
+
+A artilharia atira.
+
+O batedor avança.
+
+O tanque aproveita.
+
+Aeronaves de reconhecimento deixariam de ser apenas unidades com alcance de visão grande e passariam a consumir sua ativação para abrir o mapa.
+
+Isso seria intelectualmente muito coerente.
+
+Mas é uma mudança real em relação ao modelo anterior, no qual a própria unidade podia mover, descobrir e atacar.
+
+Não estou dizendo que deve mudar.
+
+Estou dizendo que a quinta versão, talvez sem perceber, abriu uma decisão de design muito interessante.
+
+---
+
+# 17. A regra do revide continua contraditória
+
+O capítulo “Cada Ataque É Um Duelo” ainda diz:
+
+> o defensor só responde à distância 1.
+
+Mais tarde, a seção de ocultação diz:
+
+> o defensor revida se tiver arma, munição e alcance.
+
+“Alcance” sugere que pode revidar a qualquer distância válida.
+
+As duas regras são diferentes.
+
+## Caso o revide seja apenas adjacente
+
+Então você precisa dizer:
+
+> mesmo que a arma tenha alcance maior, revide só existe a distância 1.
+
+Isso torna distância uma forma de ataque unilateral.
+
+## Caso o revide respeite a arma
+
+Então a primeira seção precisa retirar “só a distância 1”.
+
+Essa continua sendo uma das poucas contradições mecânicas verdadeiramente importantes.
+
+Ela altera:
+
 * combate naval;
-* artilharia;
 * mísseis;
-* zonas de ameaça;
-* escolha de alcance.
-
-Caso o revide siga o alcance da arma, a frase correta é:
-
-> O único que pode responder é o defensor direto, desde que possua arma, munição, camada e alcance compatíveis com aquela distância.
-
----
-
-# 27. A visão das construções ainda precisa ser alinhada com a regra específica das cidades
-
-Você escreve agora:
-
-> a maioria das construções revela o próprio hexágono e os vizinhos imediatos; o QG vê mais longe.
-
-Mas você já havia definido anteriormente uma regra específica e importante:
-
-> cidade aliada revela somente o próprio hexágono.
-
-Portanto, o novo texto precisa distinguir os tipos de construção.
-
-Talvez:
-
-* Cidade: apenas o próprio hexágono;
-* Fábrica/Porto/Aeroporto: raio 1;
-* QG: raio maior.
-
-Ou outra configuração.
-
-O problema não está em construções terem alcances diferentes.
-
-Está na palavra “maioria” criar uma regra genérica que pode contradizer os dados reais.
-
-Como essa seção foi criada justamente para explicar a distinção entre revelar e detectar, vale deixá-la absolutamente exata.
-
-A metáfora da construção como “péssima repórter” continua excelente.
-
-Só precisa da tabela correta de alcance.
+* dogfight;
+* artilharia;
+* stealth;
+* valor de alcance;
+* risco de atacar.
 
 ---
 
-# 28. A terceira versão ainda não explica suficientemente a compra de unidades
+# 18. A visão das construções agora parece definitivamente alterada
 
-A economia agora possui:
+O manual mantém:
 
-* renda;
-* valores aproximados;
-* território;
-* importância das cidades;
-* ordem de compra.
+* Cidade, Fábrica, Porto e Aeroporto revelam o próprio hexágono e o anel imediato;
+* QG alcança um hexágono a mais.
 
-Mas ainda falta o funcionamento do mercado:
+Antes você havia decidido que a Cidade revelava somente o próprio hexágono.
 
-* onde cada classe é comprada;
-* quais construções produzem;
-* se a unidade nasce no chão;
-* o que acontece se o hexágono estiver ocupado;
-* como funcionam as regras de mercado;
-* Free Market;
-* Original Owner;
-* First Owner;
-* captura que transfere renda sem necessariamente transferir produção.
+Mas, observando a tela inicial recente, o anel ao redor dos faróis parece ser exatamente o comportamento atual.
 
-Esse é um sistema muito interessante do projeto e altera o valor de cada construção.
+Então esta já não me parece uma contradição acidental.
 
-Uma fábrica pode:
+Parece um rebalanceamento consciente.
 
-* gerar dinheiro;
-* permitir compra;
-* negar compra ao capturador;
-* servir como posição;
-* participar da logística.
+E funciona bem para o mapa novo:
 
-Portanto, “capturar uma fábrica” não possui sempre o mesmo significado.
+* a cidade-farol não revela a ilha inteira;
+* mas também não aparece como um pixel completamente sem contexto;
+* mostra praia, floresta ou estrada adjacente;
+* sugere a natureza do posto avançado.
 
-O manual já está maduro o bastante para um capítulo chamado algo como:
+Apenas reconheça que a Cidade mudou de função.
 
-> Produção e Mercado
-
-Essa continua sendo a principal lacuna macroeconômica.
+Ela agora é um pequeno farol cartográfico de raio 1, não apenas um marcador do próprio hexágono.
 
 ---
 
-# 29. Também falta o ciclo básico da ação de uma unidade
+# 19. O Aeroporto ainda possui uma frase um pouco absoluta demais
 
-Você explica sistemas muito avançados, mas ainda não há um capítulo simples consolidando:
+No início, você diz:
 
-1. selecionar;
-2. mover ou permanecer;
-3. recalcular sensores;
-4. escolher uma ação;
-5. concluir;
-6. marcar como agida;
-7. não poder agir novamente naquele turno.
+> “O aeroporto é onde o custo logístico da aviação é pago.”
 
-O tutorial ensina isso na prática, mas o manual técnico ainda merece registrar a lei.
+Mas o próprio manual mostra que aeronaves podem ser atendidas em:
 
-Principalmente porque várias regras agora dependem de:
+* estradas;
+* cidades;
+* fábricas;
+* QG;
+* caminhões;
+* Fragatas;
+* Porta-Aviões;
+* aviões-tanque.
 
-* ainda não agiu;
-* já se moveu;
-* permaneceu parado;
-* recebeu serviço;
-* fundiu;
-* embarcou;
-* desembarcou;
-* terminou a ação.
+O que é realmente exclusivo do Aeroporto é:
 
-Você já explicou o relógio macro da partida.
+* interromper consumo enquanto a aeronave está pousada;
+* servir como hangar terrestre;
+* eventualmente vender aeronaves conforme a política do cenário.
 
-Ainda falta o relógio micro de cada peça.
+Eu ajustaria futuramente para algo como:
 
----
+> O aeroporto é o único hangar terrestre completo: presta serviço e é o único lugar onde uma aeronave pousada deixa de consumir autonomia.
 
-# 30. Esta versão está começando a exigir uma organização editorial mais forte
-
-Com 927 linhas, o documento ainda funciona muito bem como fonte-mãe.
-
-Mas começa a ficar grande demais para consulta rápida.
-
-Hoje ele possui três funções simultâneas:
-
-* ensinar o jogador;
-* registrar a filosofia;
-* documentar regras exatas.
-
-Eu não dividiria ainda, porque escrever tudo junto está ajudando você a testar coerência.
-
-Mas já vejo três documentos futuros surgindo dele:
-
-## Manual do Comandante
-
-A experiência de leitura:
-
-* fantasia;
-* domínios;
-* posição;
-* combate;
-* logística;
-* FOW;
-* vitória.
-
-## Referência de Regras
-
-Consulta exata:
-
-* custos;
-* alcances;
-* arredondamentos;
-* camadas;
-* limites;
-* capacidades;
-* prioridades;
-* exceções.
-
-## Doutrina de Design
-
-Os princípios:
-
-* informação versus resultado;
-* sistema de etiquetas;
-* posição como abstração;
-* logística como tempo;
-* superfície como geografia;
-* ar e submarino como informação;
-* determinismo sem onisciência.
-
-A terceira versão já contém material forte para os três.
+Isso é mais exato e até reforça sua identidade.
 
 ---
 
-# O que mais me impressionou nesta versão
+# 20. A quinta versão confirma que o Big Manual está funcionando
 
-As maiores melhorias não foram as correções matemáticas.
+Ela adicionou ou fechou:
 
-Foram estas novas leis:
+* proporção versus probabilidade;
+* Trem não transportável;
+* artilharia excluída de desembarque;
+* observação compartilhada;
+* limite de observação aérea;
+* ação do prestador versus receptor;
+* capacidade dos prestadores;
+* atendimento de passageiros;
+* peso econômico da munição pesada;
+* altitude automática;
+* Mercado Livre neutro;
+* Primeiro Dono em construções neutras;
+* compra sem fila;
+* bloqueio por andar;
+* movimento mais ação;
+* confirmação única.
 
-> **O jogo não cresce em regras — cresce em etiquetas.**
+Isso é exatamente o tipo de revisão que um documento fracionado dificultaria.
 
-> **O céu e o fundo do mar não têm frente — têm alcance e detecção.**
+A contradição entre confirmação única e compromisso no FOW, por exemplo, só fica evidente porque:
 
-> **O Jornal não mente e também não adivinha.**
+* o capítulo da Névoa;
+* o capítulo do Ciclo da Ação;
+* o capítulo de Sensores;
 
-> **O custo verdadeiro do reparo é tempo e ocupação.**
+estão lado a lado dentro da mesma fonte-mãe.
 
-> **Ninguém atira antes.**
+Então concordo plenamente: **não é hora de dividir**.
 
-> **Ocupar o mesmo setor não é estar em contato.**
+O trabalho agora é fazer o Big Manual ficar internamente incontestável.
 
-Essas frases fazem algo raro: explicam ao mesmo tempo o funcionamento técnico e a identidade estratégica.
+Depois, os documentos menores serão extrações:
 
-Você está encontrando uma linguagem própria para o jogo.
+* manual do jogador;
+* referência rápida;
+* tutorial;
+* compêndio de fórmulas;
+* doutrina de logística;
+* guia das três forças.
 
-# Meu veredito
+Mas a verdade deve continuar morando aqui.
 
-A primeira versão mostrava que você tinha muitos sistemas.
+# Meu diagnóstico final
 
-A segunda mostrou que esses sistemas formavam uma campanha.
+A quinta versão é mais forte que a quarta.
 
-A terceira mostra que **o mundo possui leis próprias e previsíveis**.
+Ela não apenas responde dúvidas. Ela cria algumas das melhores decisões operacionais do projeto:
 
-Agora o manual explica por que:
+> A unidade atendida não perde a ação; perde liberdade de se afastar da fonte.
 
-* o mesmo hexágono pode conter ameaças que não entram em contato;
-* apenas a superfície forma uma frente;
-* uma habilidade é uma chave e não um poder;
-* uma força aérea pode perder stealth ao receber logística;
-* reparar custa tempo de campanha;
-* fundir troca presença por eficiência;
-* o relatório de turno respeita a ignorância do comandante;
-* iniciativa altera o resultado sem quebrar a simultaneidade;
-* a informação continua incerta mesmo quando a matemática é conhecida.
+> Uma cidade cheia ainda forma fila.
 
-Esta é a versão em que The Map Room começa a parecer menos um jogo que acumulou regras e mais um **modelo operacional coerente**.
+> Transporte pode funcionar como evacuação e atendimento em lote.
 
-Os pontos realmente importantes a resolver agora são poucos e concretos:
+> Armas pesadas exigem uma economia territorial correspondente.
 
-* Porto Naval versus vaga única de superfície;
-* revide restrito a alcance 1 ou alcance válido da arma;
-* estado final das aeronaves depois de serviço ar-ar;
-* receptor e hexágono final da fusão;
-* alcance exato de visão de cada construção, especialmente Cidade;
-* resíduos da linguagem “atirou primeiro”;
-* frase absoluta da captura versus aniquilação;
-* números de capacidade e custo alinhados ao runtime;
-* produção e regras de mercado;
-* ciclo de ação individual;
-* rendição, caso continue implementada.
+> A fábrica neutra de Primeiro Dono é uma corrida de efeito permanente.
 
-Isso é uma ótima notícia.
+> A compra respeita os andares do hexágono.
 
-Você já não está tentando descobrir o que o jogo é.
+> O Trem não pode escapar da própria ferrovia.
 
-Agora está auditando onde o texto ainda não expressa com precisão aquilo que o jogo já se tornou.
+São regras muito boas porque todas produzem comportamento no mapa.
+
+Os ajustes restantes estão cada vez menos espalhados. Agora se concentram em quatro pontos:
+
+1. **Prévia de sensores versus sondagem gratuita no FOW.**
+2. **Revide apenas a distância 1 versus alcance válido da arma.**
+3. **Observador transmite contato válido, mas não substitui detecção especializada.**
+4. **Unidade pode agir depois do reparo, então não está literalmente quatro turnos sem avançar.**
+
+O primeiro é o único que considero uma decisão filosófica grande.
+
+Os outros são ajustes de formulação ou alinhamento mecânico.
+
+A versão anterior fechava o mundo.
+
+Esta quinta começa a fechar **o comportamento do jogador diante do mundo** — e é justamente nessa fronteira entre planejamento livre e informação comprometida que está uma das últimas grandes definições da identidade do The Map Room.

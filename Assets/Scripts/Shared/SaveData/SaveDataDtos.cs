@@ -17,6 +17,7 @@ public class SaveGameData
     public bool hasVictoryWinner;
     public int victoryWinnerTeamId = (int)TeamId.Neutral;
     public List<MatchPlayerSaveData> players = new List<MatchPlayerSaveData>();
+    public List<TeamCapturedBuildingSaveData> capturedBuildingHistory = new List<TeamCapturedBuildingSaveData>();
     public List<MatchVictoryStarSaveData> victoryStars = new List<MatchVictoryStarSaveData>();
     public List<UnitSaveData> units = new List<UnitSaveData>();
     public List<ConstructionSaveData> constructions = new List<ConstructionSaveData>();
@@ -26,6 +27,8 @@ public class SaveGameData
     public int fogCacheTeamId = int.MinValue;
     public List<FogCellContributorSaveData> fogVisibleContributorsByCell = new List<FogCellContributorSaveData>();
     public List<FogUnitVisibilitySaveData> fogUnitVisibilityByCacheIndex = new List<FogUnitVisibilitySaveData>();
+    public List<TeamExploredCellsSaveData> fogExploredCellsByTeam = new List<TeamExploredCellsSaveData>();
+    public List<FogConstructionMemorySaveData> fogConstructionMemory = new List<FogConstructionMemorySaveData>();
     public AIPlannerMultiTeamSaveData aiPlannerState;
     public List<AIObjectivePlanSaveData> aiObjectivePlans = new List<AIObjectivePlanSaveData>();
     public bool aiRuntimeActive;
@@ -136,6 +139,13 @@ public class MatchPlayerSaveData
     public int actualMoney;
     public int incomePerTurn;
     public bool startMoneyApplied;
+}
+
+[Serializable]
+public class TeamCapturedBuildingSaveData
+{
+    public int teamId;
+    public List<string> buildingKeys = new List<string>();
 }
 
 [Serializable]
@@ -346,6 +356,24 @@ public class FogUnitVisibilitySaveData
 {
     public int cacheIndex;
     public bool isVisible;
+}
+
+[Serializable]
+public class TeamExploredCellsSaveData
+{
+    public int teamId;
+    public List<Vector3Int> cells = new List<Vector3Int>();
+}
+
+[Serializable]
+public class FogConstructionMemorySaveData
+{
+    public int observerTeamId;
+    public int x;
+    public int y;
+    public string constructionDataId;
+    public int knownOwnerTeamId;
+    public bool flipX;
 }
 
 

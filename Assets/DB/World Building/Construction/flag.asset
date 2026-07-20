@@ -16,6 +16,8 @@ MonoBehaviour:
   displayName: Flag
   sufixo: Flag
   description: Bandeira
+  grammaticalGender: 0
+  requiredBuilding: {fileID: 0}
   isAirport: 0
   isHarbor: 0
   isCity: 0

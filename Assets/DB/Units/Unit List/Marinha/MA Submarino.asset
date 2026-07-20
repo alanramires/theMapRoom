@@ -20,6 +20,7 @@ MonoBehaviour:
     Ideal para emboscadas e controle de \xE1reas mar\xEDtimas. Vulner\xE1vel quando
     exposta e dependente de posicionamento. Pode ser neutralizado por detec\xE7\xE3o
     naval especializada."
+  requiredBuilding: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
   spriteDefault: {fileID: 21300000, guid: 2345ab0360bab724090a920cb6b3bdb9, type: 3}
   teamVariantSprites: []
   maxHP: 10

@@ -15,6 +15,9 @@ public sealed class PanelRodadaController : MonoBehaviour
     [SerializeField] private AudioClip menuOpen;
     [SerializeField] private AudioClip menuClose;
     [SerializeField] private AudioClip aguardandoRodada;
+    [Header("Audio Volume Routing")]
+    [SerializeField] private CursorController cursorController;
+    [SerializeField] private MatchMusicAudioManager musicAudioManager;
     [Header("Team Loading Video")]
     [SerializeField] private VideoClip videoVerde;
     [SerializeField] private VideoClip videoVermelho;
@@ -79,6 +82,8 @@ public sealed class PanelRodadaController : MonoBehaviour
         audioSource.playOnAwake = false;
         audioSource.loop = false;
         audioSource.spatialBlend = 0f;
+        EnsureAudioVolumeManagers();
+        ApplyCurrentClipVolume();
         EnsureTeamVideoPlayer();
         if (botaoRodada != null)
             botaoRodada.onClick.AddListener(Confirmar);
@@ -86,6 +91,7 @@ public sealed class PanelRodadaController : MonoBehaviour
 
     private void Update()
     {
+        ApplyCurrentClipVolume();
         if (aguardandoConfirmacao && (Input.GetKeyDown(KeyCode.Return)
             || Input.GetKeyDown(KeyCode.KeypadEnter)))
             Confirmar();
@@ -161,6 +167,7 @@ public sealed class PanelRodadaController : MonoBehaviour
         {
             audioSource.clip = aguardandoRodada;
             audioSource.loop = true;
+            ApplyCurrentClipVolume();
             audioSource.Play();
         }
         yield return new WaitUntil(() => confirmado);
@@ -179,6 +186,7 @@ public sealed class PanelRodadaController : MonoBehaviour
         {
             audioSource.clip = menuClose;
             audioSource.loop = false;
+            ApplyCurrentClipVolume();
             audioSource.Play();
         }
         yield return AnimateClose();
@@ -298,6 +306,7 @@ public sealed class PanelRodadaController : MonoBehaviour
         if (menuClose != null)
         {
             audioSource.clip = menuClose;
+            ApplyCurrentClipVolume();
             audioSource.Play();
         }
         yield return AnimateClose();
@@ -350,6 +359,7 @@ public sealed class PanelRodadaController : MonoBehaviour
             return;
         audioSource.clip = aguardandoRodada;
         audioSource.loop = true;
+        ApplyCurrentClipVolume();
         audioSource.Play();
     }
 
@@ -531,8 +541,44 @@ public sealed class PanelRodadaController : MonoBehaviour
         if (clip == null) yield break;
         audioSource.clip = clip;
         audioSource.loop = loop;
+        ApplyCurrentClipVolume();
         audioSource.Play();
         if (!loop) yield return new WaitForSecondsRealtime(clip.length);
+    }
+
+    private void ApplyCurrentClipVolume()
+    {
+        if (audioSource == null)
+            return;
+
+        EnsureAudioVolumeManagers();
+        bool isRoundMusic = audioSource.clip != null && audioSource.clip == aguardandoRodada;
+        float categoryVolume = ResolveCurrentClipCategoryVolume(isRoundMusic);
+        float masterVolume = isRoundMusic
+            ? (musicAudioManager != null ? musicAudioManager.GetMasterMusicVolume() : 1f)
+            : (cursorController != null ? cursorController.GetMasterSfxVolume() : 1f);
+        audioSource.volume = Mathf.Clamp01(categoryVolume * masterVolume);
+    }
+
+    private float ResolveCurrentClipCategoryVolume(bool isRoundMusic)
+    {
+        if (isRoundMusic)
+            return musicAudioManager != null ? musicAudioManager.GetRoundMusicVolume() : 1f;
+        if (cursorController == null)
+            return 1f;
+        if (audioSource.clip == menuOpen)
+            return cursorController.GetMenuOpenSfxVolume();
+        if (audioSource.clip == menuClose)
+            return cursorController.GetMenuCloseSfxVolume();
+        return 1f;
+    }
+
+    private void EnsureAudioVolumeManagers()
+    {
+        if (cursorController == null)
+            cursorController = FindAnyObjectByType<CursorController>();
+        if (musicAudioManager == null)
+            musicAudioManager = FindAnyObjectByType<MatchMusicAudioManager>();
     }
 
     private IEnumerator AnimateContent(float from, float to)

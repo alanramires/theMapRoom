@@ -139,6 +139,13 @@ public class MatchController : MonoBehaviour
         [Min(0)] public int stars;
     }
 
+    [System.Serializable]
+    private sealed class TeamCapturedBuildingHistory
+    {
+        public TeamId teamId;
+        public List<string> buildingKeys = new List<string>();
+    }
+
     public enum GameSetupPreset
     {
         GameBoyClassic = 0,
@@ -160,6 +167,7 @@ public class MatchController : MonoBehaviour
         new PlayerEntry { teamId = TeamId.Yellow, flipX = true, defeated = false, startMoney = 0, actualMoney = 0, incomePerTurn = 0, startMoneyApplied = false }
     };
     [SerializeField] private bool includeNeutralTeam = false;
+    [SerializeField, HideInInspector] private List<TeamCapturedBuildingHistory> capturedBuildingHistory = new List<TeamCapturedBuildingHistory>();
     [SerializeField] private bool economyEnabled = true;
     // Placeholder para futura pintura de visibilidade no mapa (nao governa regras de combate no momento).
     [SerializeField, HideInInspector] private bool fogOfWar = true;
@@ -207,6 +215,7 @@ public class MatchController : MonoBehaviour
     [Header("Fog Of War")]
     [SerializeField] private FogOfWarController fogOfWarController;
     [SerializeField] private Tilemap fogOfWarTilemap;
+    [SerializeField] private Tilemap fogOfWarMemoryTilemap;
     [SerializeField] private TileBase fogOfWarOverlayTile;
     [SerializeField] private TerrainDatabase fogOfWarTerrainDatabase;
     [SerializeField] private DPQAirHeightConfig fogOfWarDpqAirHeightConfig;
@@ -248,8 +257,20 @@ public class MatchController : MonoBehaviour
         public readonly HashSet<Vector3Int> globalLandmarkOnlyCells = new HashSet<Vector3Int>();
         public readonly Dictionary<int, bool> unitVisibility = new Dictionary<int, bool>();
     }
+    private sealed class FogConstructionMemoryEntry
+    {
+        public ConstructionData data;
+        public TeamId knownOwner;
+        public bool flipX;
+    }
     [System.NonSerialized] private readonly Dictionary<int, FogTeamGameplaySnapshot> fogGameplaySnapshotsByTeam =
         new Dictionary<int, FogTeamGameplaySnapshot>();
+    [System.NonSerialized] private readonly Dictionary<int, HashSet<Vector3Int>> fogExploredCellsByTeam =
+        new Dictionary<int, HashSet<Vector3Int>>();
+    [System.NonSerialized] private readonly Dictionary<int, Dictionary<Vector3Int, FogConstructionMemoryEntry>> fogConstructionMemoryByTeam =
+        new Dictionary<int, Dictionary<Vector3Int, FogConstructionMemoryEntry>>();
+    [System.NonSerialized] private readonly List<SpriteRenderer> fogConstructionMemoryRenderers =
+        new List<SpriteRenderer>();
     [System.NonSerialized] private PanelRemainingController fogVisionPanelRemaining;
     [System.NonSerialized] private bool fogSortingLayerValidated;
     [System.NonSerialized] private int fogCachedTeamId = int.MinValue;
@@ -901,6 +922,12 @@ public class MatchController : MonoBehaviour
         // nova em paralelo, pois isso aplicaria turno/FOW/camera antes do load.
         if (SaveGameManager.HasPendingMainMenuLoadRequest)
             yield break;
+
+        if (capturedBuildingHistory == null)
+            capturedBuildingHistory = new List<TeamCapturedBuildingHistory>();
+        else
+            capturedBuildingHistory.Clear();
+        RegisterCurrentlyOwnedBuildings();
 
         // Esta e a barreira real de inicializacao: nenhum efeito de inicio de turno,
         // camera, FoW ou musica da partida e liberado antes da confirmacao hot seat.
@@ -1810,6 +1837,12 @@ public class MatchController : MonoBehaviour
     // capturador vence imediatamente (mesmo com outros jogadores/IA ainda em jogo).
     public void NotifyConstructionCaptured(ConstructionManager construction, TeamId previousOwner, TeamId newOwner)
     {
+        if (Application.isPlaying && construction != null && newOwner != TeamId.Neutral && previousOwner != newOwner &&
+            construction.TryResolveConstructionData(out ConstructionData capturedData))
+        {
+            RegisterCapturedBuilding(newOwner, capturedData);
+        }
+
         if (!Application.isPlaying || hasVictoryWinner)
             return;
         if (!allowDefeatForHeadQuarterCapture)
@@ -1825,6 +1858,167 @@ public class MatchController : MonoBehaviour
         Debug.Log($"[Match] QG de {TeamUtils.GetName(previousOwner)} capturado por {TeamUtils.GetName(newOwner)}. Time eliminado.");
         // O primeiro a capturar um QG vence na hora, mesmo com outros jogadores em jogo.
         DeclareEliminationVictory(newOwner, previousOwner, VictoryReason.HeadQuarterCaptured);
+    }
+
+    public bool CanProduceUnit(TeamId team, UnitData unit, out string blockedReason)
+    {
+        blockedReason = string.Empty;
+        if (unit == null || unit.requiredBuilding == null)
+            return true;
+        if (HasCapturedBuilding(team, unit.requiredBuilding))
+            return true;
+
+        blockedReason = $"Requer capturar {ResolveProgressionBuildingName(unit.requiredBuilding)} ao menos uma vez.";
+        return false;
+    }
+
+    public bool CanCaptureConstruction(TeamId team, ConstructionData construction, out string blockedReason)
+    {
+        blockedReason = string.Empty;
+        if (construction == null || construction.requiredBuilding == null)
+            return true;
+        if (HasCapturedBuilding(team, construction.requiredBuilding))
+            return true;
+
+        string article = construction.requiredBuilding.grammaticalGender == ConstructionGrammaticalGender.Feminine
+            ? "uma"
+            : "um";
+        blockedReason = $"Capture {article} {ResolveProgressionBuildingName(construction.requiredBuilding)} primeiro.";
+        return false;
+    }
+
+    public bool HasCapturedBuilding(TeamId team, ConstructionData building)
+    {
+        string key = ResolveProgressionBuildingKey(building);
+        if (team == TeamId.Neutral || string.IsNullOrWhiteSpace(key) || capturedBuildingHistory == null)
+            return false;
+
+        for (int i = 0; i < capturedBuildingHistory.Count; i++)
+        {
+            TeamCapturedBuildingHistory entry = capturedBuildingHistory[i];
+            if (entry == null || entry.teamId != team || entry.buildingKeys == null)
+                continue;
+            for (int k = 0; k < entry.buildingKeys.Count; k++)
+                if (string.Equals(entry.buildingKeys[k], key, StringComparison.OrdinalIgnoreCase))
+                    return true;
+        }
+
+        // Construcoes que ja pertencem ao time no inicio da partida tambem contam como requisito
+        // cumprido. Registra no historico para que uma perda posterior nao remova o desbloqueio.
+        ConstructionManager[] activeConstructions = FindObjectsByType<ConstructionManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        for (int i = 0; i < activeConstructions.Length; i++)
+        {
+            ConstructionManager owned = activeConstructions[i];
+            if (owned == null || owned.TeamId != team || !owned.TryResolveConstructionData(out ConstructionData ownedData))
+                continue;
+            if (!string.Equals(ResolveProgressionBuildingKey(ownedData), key, StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            RegisterCapturedBuilding(team, ownedData);
+            return true;
+        }
+
+        return false;
+    }
+
+    public void RegisterCurrentlyOwnedBuildings()
+    {
+        ConstructionManager[] constructions = FindObjectsByType<ConstructionManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        for (int i = 0; i < constructions.Length; i++)
+        {
+            ConstructionManager construction = constructions[i];
+            if (construction == null || construction.TeamId == TeamId.Neutral ||
+                !construction.TryResolveConstructionData(out ConstructionData data))
+            {
+                continue;
+            }
+
+            RegisterCapturedBuilding(construction.TeamId, data);
+        }
+    }
+
+    private void RegisterCapturedBuilding(TeamId team, ConstructionData building)
+    {
+        string key = ResolveProgressionBuildingKey(building);
+        if (team == TeamId.Neutral || string.IsNullOrWhiteSpace(key))
+            return;
+        if (capturedBuildingHistory == null)
+            capturedBuildingHistory = new List<TeamCapturedBuildingHistory>();
+
+        TeamCapturedBuildingHistory teamHistory = null;
+        for (int i = 0; i < capturedBuildingHistory.Count; i++)
+        {
+            if (capturedBuildingHistory[i] != null && capturedBuildingHistory[i].teamId == team)
+            {
+                teamHistory = capturedBuildingHistory[i];
+                break;
+            }
+        }
+
+        if (teamHistory == null)
+        {
+            teamHistory = new TeamCapturedBuildingHistory { teamId = team };
+            capturedBuildingHistory.Add(teamHistory);
+        }
+        if (teamHistory.buildingKeys == null)
+            teamHistory.buildingKeys = new List<string>();
+        for (int i = 0; i < teamHistory.buildingKeys.Count; i++)
+            if (string.Equals(teamHistory.buildingKeys[i], key, StringComparison.OrdinalIgnoreCase))
+                return;
+        teamHistory.buildingKeys.Add(key);
+    }
+
+    public void ExportCapturedBuildingHistory(List<TeamCapturedBuildingSaveData> destination)
+    {
+        if (destination == null)
+            return;
+        destination.Clear();
+        if (capturedBuildingHistory == null)
+            return;
+        for (int i = 0; i < capturedBuildingHistory.Count; i++)
+        {
+            TeamCapturedBuildingHistory source = capturedBuildingHistory[i];
+            if (source == null)
+                continue;
+            destination.Add(new TeamCapturedBuildingSaveData
+            {
+                teamId = (int)source.teamId,
+                buildingKeys = source.buildingKeys != null ? new List<string>(source.buildingKeys) : new List<string>()
+            });
+        }
+    }
+
+    public void ImportCapturedBuildingHistory(IList<TeamCapturedBuildingSaveData> source)
+    {
+        if (capturedBuildingHistory == null)
+            capturedBuildingHistory = new List<TeamCapturedBuildingHistory>();
+        else
+            capturedBuildingHistory.Clear();
+        if (source == null)
+            return;
+        for (int i = 0; i < source.Count; i++)
+        {
+            TeamCapturedBuildingSaveData saved = source[i];
+            if (saved == null || !Enum.IsDefined(typeof(TeamId), saved.teamId) || (TeamId)saved.teamId == TeamId.Neutral)
+                continue;
+            capturedBuildingHistory.Add(new TeamCapturedBuildingHistory
+            {
+                teamId = (TeamId)saved.teamId,
+                buildingKeys = saved.buildingKeys != null ? new List<string>(saved.buildingKeys) : new List<string>()
+            });
+        }
+    }
+
+    private static string ResolveProgressionBuildingKey(ConstructionData building)
+    {
+        return building != null ? building.name.Trim() : string.Empty;
+    }
+
+    private static string ResolveProgressionBuildingName(ConstructionData building)
+    {
+        if (building == null)
+            return "a construcao necessaria";
+        return !string.IsNullOrWhiteSpace(building.displayName) ? building.displayName.Trim() : building.name;
     }
 
     // Marca um time como derrotado por qualquer condicao (QG capturado, rendicao, etc.): neutraliza
@@ -3157,11 +3351,47 @@ public class MatchController : MonoBehaviour
 
         if (fogOfWarTilemap == null)
             fogOfWarTilemap = FindTilemapByName("FogOfWar");
+        if (Application.isPlaying)
+            EnsureFogOfWarMemoryTilemap();
 
         if (fogOfWarTerrainDatabase == null)
             fogOfWarTerrainDatabase = ResolveFogTerrainDatabase();
         if (fogOfWarDpqAirHeightConfig == null)
             fogOfWarDpqAirHeightConfig = ResolveFogDpqAirHeightConfig();
+    }
+
+    private void EnsureFogOfWarMemoryTilemap()
+    {
+        if (fogOfWarMemoryTilemap != null || fogOfWarTilemap == null)
+            return;
+
+        fogOfWarMemoryTilemap = FindTilemapByName("FogOfWarTile");
+        if (fogOfWarMemoryTilemap != null || !Application.isPlaying)
+            return;
+
+        GameObject memoryObject = new GameObject("FogOfWarTile", typeof(Tilemap), typeof(TilemapRenderer));
+        Transform sourceTransform = fogOfWarTilemap.transform;
+        Transform memoryTransform = memoryObject.transform;
+        memoryTransform.SetParent(sourceTransform.parent, false);
+        memoryTransform.localPosition = sourceTransform.localPosition;
+        memoryTransform.localRotation = sourceTransform.localRotation;
+        memoryTransform.localScale = sourceTransform.localScale;
+
+        fogOfWarMemoryTilemap = memoryObject.GetComponent<Tilemap>();
+        fogOfWarMemoryTilemap.tileAnchor = fogOfWarTilemap.tileAnchor;
+        fogOfWarMemoryTilemap.orientation = fogOfWarTilemap.orientation;
+        fogOfWarMemoryTilemap.orientationMatrix = fogOfWarTilemap.orientationMatrix;
+        fogOfWarMemoryTilemap.color = Color.white;
+
+        TilemapRenderer sourceRenderer = fogOfWarTilemap.GetComponent<TilemapRenderer>();
+        TilemapRenderer memoryRenderer = memoryObject.GetComponent<TilemapRenderer>();
+        if (sourceRenderer != null)
+        {
+            memoryRenderer.sharedMaterial = sourceRenderer.sharedMaterial;
+            memoryRenderer.mode = sourceRenderer.mode;
+        }
+        memoryRenderer.sortingLayerName = "FogOfWarTile";
+        memoryRenderer.sortingOrder = 0;
     }
 
     private void TryAutoAssignVictoryOverlayReferences()
@@ -4835,6 +5065,16 @@ public class MatchController : MonoBehaviour
             currentLayer = SortingLayer.IDToName(renderer.sortingLayerID);
         }
 
+        EnsureFogOfWarMemoryTilemap();
+        TilemapRenderer memoryRenderer = fogOfWarMemoryTilemap != null
+            ? fogOfWarMemoryTilemap.GetComponent<TilemapRenderer>()
+            : null;
+        if (memoryRenderer != null)
+        {
+            memoryRenderer.sortingLayerName = coverWorldPresentation ? "FogOfWarTile" : "SFX";
+            memoryRenderer.sortingOrder = 0;
+        }
+
         bool playerTurn = activeTeamId >= 0
             && Enum.IsDefined(typeof(TeamId), activeTeamId)
             && !IsPlayerAI((TeamId)activeTeamId);
@@ -5034,6 +5274,8 @@ public class MatchController : MonoBehaviour
 
         snapshot.knownCells.Clear();
         BuildFogDisplayVisibleCellsForAllModes(boardMap, snapshot.knownCells);
+        RecordConfirmedExploredCells(teamId, snapshot.knownCells);
+        RecordConfirmedConstructionMemory(teamId, boardMap, snapshot.knownCells);
 
         snapshot.globalLandmarkOnlyCells.Clear();
         TeamId observerTeam = (TeamId)teamId;
@@ -5083,6 +5325,240 @@ public class MatchController : MonoBehaviour
         return fogGameplaySnapshotsByTeam.TryGetValue(teamId, out snapshot) && snapshot != null;
     }
 
+    private void RecordConfirmedExploredCells(int teamId, IEnumerable<Vector3Int> visibleCells)
+    {
+        if (!Application.isPlaying || visibleCells == null)
+            return;
+        if (turnStateManager != null && turnStateManager.CurrentCursorState != TurnStateManager.CursorState.Neutral)
+            return;
+        if (teamId < 0 || !Enum.IsDefined(typeof(TeamId), teamId))
+            return;
+
+        if (!fogExploredCellsByTeam.TryGetValue(teamId, out HashSet<Vector3Int> explored))
+        {
+            explored = new HashSet<Vector3Int>();
+            fogExploredCellsByTeam[teamId] = explored;
+        }
+
+        foreach (Vector3Int sourceCell in visibleCells)
+        {
+            Vector3Int cell = sourceCell;
+            cell.z = 0;
+            explored.Add(cell);
+        }
+    }
+
+    public bool IsCellExploredByTeam(TeamId team, Vector3Int cell)
+    {
+        cell.z = 0;
+        return team != TeamId.Neutral &&
+               fogExploredCellsByTeam.TryGetValue((int)team, out HashSet<Vector3Int> explored) &&
+               explored.Contains(cell);
+    }
+
+    public int GetExploredCellCount(TeamId team)
+    {
+        return team != TeamId.Neutral &&
+               fogExploredCellsByTeam.TryGetValue((int)team, out HashSet<Vector3Int> explored)
+            ? explored.Count
+            : 0;
+    }
+
+    private void RecordConfirmedConstructionMemory(
+        int teamId,
+        Tilemap boardMap,
+        HashSet<Vector3Int> visibleCells)
+    {
+        if (!Application.isPlaying || boardMap == null || visibleCells == null)
+            return;
+        if (turnStateManager != null && turnStateManager.CurrentCursorState != TurnStateManager.CursorState.Neutral)
+            return;
+        if (teamId < 0 || !Enum.IsDefined(typeof(TeamId), teamId))
+            return;
+
+        if (!fogConstructionMemoryByTeam.TryGetValue(teamId, out Dictionary<Vector3Int, FogConstructionMemoryEntry> memory))
+        {
+            memory = new Dictionary<Vector3Int, FogConstructionMemoryEntry>();
+            fogConstructionMemoryByTeam[teamId] = memory;
+        }
+
+        List<ConstructionManager> constructions = ConstructionManager.AllActive;
+        for (int i = 0; i < constructions.Count; i++)
+        {
+            ConstructionManager construction = constructions[i];
+            if (construction == null || !construction.gameObject.activeInHierarchy ||
+                construction.BoardTilemap != boardMap ||
+                construction.gameObject.scene != boardMap.gameObject.scene)
+            {
+                continue;
+            }
+
+            Vector3Int cell = construction.CurrentCellPosition;
+            cell.z = 0;
+            if (!visibleCells.Contains(cell) ||
+                !construction.TryResolveConstructionData(out ConstructionData data) || data == null)
+            {
+                continue;
+            }
+
+            SpriteRenderer sourceRenderer = construction.GetMainSpriteRenderer();
+            memory[cell] = new FogConstructionMemoryEntry
+            {
+                data = data,
+                knownOwner = construction.TeamId,
+                flipX = sourceRenderer != null && sourceRenderer.flipX
+            };
+        }
+    }
+
+    public bool TryGetKnownConstructionAtCell(
+        TeamId observerTeam,
+        Vector3Int cell,
+        out ConstructionData constructionData,
+        out TeamId knownOwner)
+    {
+        constructionData = null;
+        knownOwner = TeamId.Neutral;
+        cell.z = 0;
+        if (observerTeam == TeamId.Neutral ||
+            !fogConstructionMemoryByTeam.TryGetValue((int)observerTeam, out Dictionary<Vector3Int, FogConstructionMemoryEntry> memory) ||
+            !memory.TryGetValue(cell, out FogConstructionMemoryEntry entry) || entry == null || entry.data == null)
+        {
+            return false;
+        }
+
+        constructionData = entry.data;
+        knownOwner = entry.knownOwner;
+        return true;
+    }
+
+    public void ExportFogConstructionMemory(List<FogConstructionMemorySaveData> destination)
+    {
+        if (destination == null)
+            return;
+        destination.Clear();
+
+        foreach (KeyValuePair<int, Dictionary<Vector3Int, FogConstructionMemoryEntry>> teamPair in fogConstructionMemoryByTeam)
+        {
+            foreach (KeyValuePair<Vector3Int, FogConstructionMemoryEntry> cellPair in teamPair.Value)
+            {
+                FogConstructionMemoryEntry entry = cellPair.Value;
+                if (entry == null || entry.data == null)
+                    continue;
+                destination.Add(new FogConstructionMemorySaveData
+                {
+                    observerTeamId = teamPair.Key,
+                    x = cellPair.Key.x,
+                    y = cellPair.Key.y,
+                    constructionDataId = !string.IsNullOrWhiteSpace(entry.data.id) ? entry.data.id : entry.data.name,
+                    knownOwnerTeamId = (int)entry.knownOwner,
+                    flipX = entry.flipX
+                });
+            }
+        }
+
+        destination.Sort((a, b) =>
+        {
+            int teamCompare = a.observerTeamId.CompareTo(b.observerTeamId);
+            if (teamCompare != 0) return teamCompare;
+            int xCompare = a.x.CompareTo(b.x);
+            return xCompare != 0 ? xCompare : a.y.CompareTo(b.y);
+        });
+    }
+
+    public void ImportFogConstructionMemory(IList<FogConstructionMemorySaveData> source)
+    {
+        fogConstructionMemoryByTeam.Clear();
+        if (source == null)
+            return;
+
+        Tilemap boardMap = ResolveFogBoardTilemap();
+        for (int i = 0; i < source.Count; i++)
+        {
+            FogConstructionMemorySaveData saved = source[i];
+            if (saved == null || !Enum.IsDefined(typeof(TeamId), saved.observerTeamId) ||
+                (TeamId)saved.observerTeamId == TeamId.Neutral ||
+                !Enum.IsDefined(typeof(TeamId), saved.knownOwnerTeamId))
+            {
+                continue;
+            }
+
+            Vector3Int cell = new Vector3Int(saved.x, saved.y, 0);
+            ConstructionManager construction = ConstructionOccupancyRules.GetConstructionAtCell(boardMap, cell);
+            if (construction == null ||
+                !construction.TryResolveConstructionData(out ConstructionData data) || data == null)
+            {
+                continue;
+            }
+
+            string dataId = !string.IsNullOrWhiteSpace(data.id) ? data.id : data.name;
+            if (!string.Equals(dataId, saved.constructionDataId, StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            if (!fogConstructionMemoryByTeam.TryGetValue(saved.observerTeamId, out Dictionary<Vector3Int, FogConstructionMemoryEntry> memory))
+            {
+                memory = new Dictionary<Vector3Int, FogConstructionMemoryEntry>();
+                fogConstructionMemoryByTeam[saved.observerTeamId] = memory;
+            }
+            memory[cell] = new FogConstructionMemoryEntry
+            {
+                data = data,
+                knownOwner = (TeamId)saved.knownOwnerTeamId,
+                flipX = saved.flipX
+            };
+        }
+    }
+
+    public void ExportFogExplorationMemory(List<TeamExploredCellsSaveData> destination)
+    {
+        if (destination == null)
+            return;
+        destination.Clear();
+
+        foreach (KeyValuePair<int, HashSet<Vector3Int>> pair in fogExploredCellsByTeam)
+        {
+            if (!Enum.IsDefined(typeof(TeamId), pair.Key) || (TeamId)pair.Key == TeamId.Neutral)
+                continue;
+
+            var saved = new TeamExploredCellsSaveData { teamId = pair.Key };
+            if (pair.Value != null)
+                saved.cells.AddRange(pair.Value);
+            saved.cells.Sort((a, b) => a.x != b.x ? a.x.CompareTo(b.x) : a.y.CompareTo(b.y));
+            destination.Add(saved);
+        }
+
+        destination.Sort((a, b) => a.teamId.CompareTo(b.teamId));
+    }
+
+    public void ImportFogExplorationMemory(IList<TeamExploredCellsSaveData> source)
+    {
+        fogExploredCellsByTeam.Clear();
+        if (source == null)
+            return;
+
+        for (int i = 0; i < source.Count; i++)
+        {
+            TeamExploredCellsSaveData saved = source[i];
+            if (saved == null || !Enum.IsDefined(typeof(TeamId), saved.teamId) ||
+                (TeamId)saved.teamId == TeamId.Neutral)
+            {
+                continue;
+            }
+
+            var explored = new HashSet<Vector3Int>();
+            if (saved.cells != null)
+            {
+                for (int c = 0; c < saved.cells.Count; c++)
+                {
+                    Vector3Int cell = saved.cells[c];
+                    cell.z = 0;
+                    explored.Add(cell);
+                }
+            }
+            fogExploredCellsByTeam[saved.teamId] = explored;
+        }
+    }
+
     private void ResetFogOfWarRuntime(bool clearTilemap)
     {
         fogBoardCellsBuffer.Clear();
@@ -5098,6 +5574,10 @@ public class MatchController : MonoBehaviour
         fogOverlayInitialized = false;
         if (clearTilemap && fogOfWarTilemap != null)
             fogOfWarTilemap.ClearAllTiles();
+        if (clearTilemap && fogOfWarMemoryTilemap != null)
+            fogOfWarMemoryTilemap.ClearAllTiles();
+        if (clearTilemap)
+            SetFogConstructionMemoryRenderersActive(0);
     }
 
     private void InitializeFogOverlay(Tilemap boardMap)
@@ -5112,7 +5592,6 @@ public class MatchController : MonoBehaviour
         }
 
         fogOfWarTilemap.ClearAllTiles();
-        Color fogColor = new Color(0f, 0f, 0f, ResolveFogOfWarAlpha());
         for (int i = 0; i < fogBoardCellsBuffer.Count; i++)
         {
             Vector3Int cell = fogBoardCellsBuffer[i];
@@ -5122,7 +5601,7 @@ public class MatchController : MonoBehaviour
 
             fogOfWarTilemap.SetTile(cell, tile);
             fogOfWarTilemap.SetTileFlags(cell, TileFlags.None);
-            fogOfWarTilemap.SetColor(cell, fogColor);
+            fogOfWarTilemap.SetColor(cell, ResolveFogColorForCell(cell));
         }
 
         fogCachedTeamId = activeTeamId;
@@ -5156,7 +5635,7 @@ public class MatchController : MonoBehaviour
         else
             BuildFogDisplayVisibleCellsForMode(boardMap, fogOfWarVisionMode, fogDisplayVisibleCellsBuffer);
 
-        Color fogColor = new Color(0f, 0f, 0f, ResolveFogOfWarAlpha());
+        RenderFogExplorationMemory(boardMap, fogDisplayVisibleCellsBuffer);
 
         if (!fogRenderedVisibleCellsValid)
         {
@@ -5171,7 +5650,7 @@ public class MatchController : MonoBehaviour
                     continue;
                 fogOfWarTilemap.SetTile(cell, tile);
                 fogOfWarTilemap.SetTileFlags(cell, TileFlags.None);
-                fogOfWarTilemap.SetColor(cell, fogColor);
+                fogOfWarTilemap.SetColor(cell, ResolveFogColorForCell(cell));
             }
 
             fogRenderedVisibleCellsBuffer.Clear();
@@ -5199,11 +5678,121 @@ public class MatchController : MonoBehaviour
                 continue;
             fogOfWarTilemap.SetTile(cell, tile);
             fogOfWarTilemap.SetTileFlags(cell, TileFlags.None);
-            fogOfWarTilemap.SetColor(cell, fogColor);
+            fogOfWarTilemap.SetColor(cell, ResolveFogColorForCell(cell));
         }
 
         fogRenderedVisibleCellsBuffer.Clear();
         fogRenderedVisibleCellsBuffer.UnionWith(fogDisplayVisibleCellsBuffer);
+    }
+
+    private void RenderFogExplorationMemory(Tilemap boardMap, HashSet<Vector3Int> visibleCells)
+    {
+        EnsureFogOfWarMemoryTilemap();
+        if (fogOfWarMemoryTilemap == null || boardMap == null)
+            return;
+
+        fogOfWarMemoryTilemap.ClearAllTiles();
+        SetFogConstructionMemoryRenderersActive(0);
+        int renderedTeamId = fogCachedTeamId >= 0 ? fogCachedTeamId : activeTeamId;
+        if (renderedTeamId < 0 || !Enum.IsDefined(typeof(TeamId), renderedTeamId) ||
+            !fogExploredCellsByTeam.TryGetValue(renderedTeamId, out HashSet<Vector3Int> explored))
+        {
+            return;
+        }
+
+        foreach (Vector3Int sourceCell in explored)
+        {
+            Vector3Int cell = sourceCell;
+            cell.z = 0;
+            if (visibleCells != null && visibleCells.Contains(cell))
+                continue;
+
+            TileBase terrainTile = boardMap.GetTile(cell);
+            if (terrainTile == null)
+                continue;
+
+            fogOfWarMemoryTilemap.SetTile(cell, terrainTile);
+            fogOfWarMemoryTilemap.SetTileFlags(cell, TileFlags.None);
+            fogOfWarMemoryTilemap.SetColor(cell, Color.white);
+        }
+
+        RenderFogConstructionMemory(boardMap, visibleCells, renderedTeamId);
+    }
+
+    private void RenderFogConstructionMemory(Tilemap boardMap, HashSet<Vector3Int> visibleCells, int renderedTeamId)
+    {
+        if (!fogConstructionMemoryByTeam.TryGetValue(renderedTeamId, out Dictionary<Vector3Int, FogConstructionMemoryEntry> memory))
+            return;
+
+        int rendererIndex = 0;
+        foreach (KeyValuePair<Vector3Int, FogConstructionMemoryEntry> pair in memory)
+        {
+            if (visibleCells != null && visibleCells.Contains(pair.Key))
+                continue;
+            FogConstructionMemoryEntry entry = pair.Value;
+            if (entry == null || entry.data == null)
+                continue;
+
+            ConstructionManager liveConstruction = ConstructionOccupancyRules.GetConstructionAtCell(boardMap, pair.Key);
+            SpriteRenderer liveRenderer = liveConstruction != null ? liveConstruction.GetMainSpriteRenderer() : null;
+            if (liveRenderer == null)
+                continue;
+
+            Sprite sprite = TeamUtils.GetTeamSprite(entry.data, entry.knownOwner);
+            if (sprite == null)
+                sprite = liveRenderer.sprite;
+            if (sprite == null)
+                continue;
+
+            SpriteRenderer memoryRenderer = GetOrCreateFogConstructionMemoryRenderer(rendererIndex++);
+            memoryRenderer.sprite = sprite;
+            memoryRenderer.color = TeamUtils.GetColor(entry.knownOwner);
+            memoryRenderer.flipX = entry.flipX;
+            memoryRenderer.flipY = liveRenderer.flipY;
+            memoryRenderer.drawMode = liveRenderer.drawMode;
+            memoryRenderer.size = liveRenderer.size;
+            memoryRenderer.maskInteraction = SpriteMaskInteraction.None;
+            memoryRenderer.sortingLayerName = "FogOfWarTile";
+            memoryRenderer.sortingOrder = 1;
+            memoryRenderer.transform.position = liveRenderer.transform.position;
+            memoryRenderer.transform.rotation = liveRenderer.transform.rotation;
+            memoryRenderer.transform.localScale = ResolveLocalScaleForFogMemory(liveRenderer.transform.lossyScale);
+            memoryRenderer.gameObject.SetActive(true);
+        }
+
+        SetFogConstructionMemoryRenderersActive(rendererIndex);
+    }
+
+    private SpriteRenderer GetOrCreateFogConstructionMemoryRenderer(int index)
+    {
+        while (fogConstructionMemoryRenderers.Count <= index)
+        {
+            GameObject memoryObject = new GameObject($"FogConstructionMemory_{fogConstructionMemoryRenderers.Count}");
+            memoryObject.transform.SetParent(fogOfWarMemoryTilemap.transform, false);
+            fogConstructionMemoryRenderers.Add(memoryObject.AddComponent<SpriteRenderer>());
+        }
+        return fogConstructionMemoryRenderers[index];
+    }
+
+    private void SetFogConstructionMemoryRenderersActive(int activeCount)
+    {
+        for (int i = 0; i < fogConstructionMemoryRenderers.Count; i++)
+        {
+            SpriteRenderer renderer = fogConstructionMemoryRenderers[i];
+            if (renderer != null)
+                renderer.gameObject.SetActive(i < activeCount);
+        }
+    }
+
+    private Vector3 ResolveLocalScaleForFogMemory(Vector3 desiredWorldScale)
+    {
+        Vector3 parentScale = fogOfWarMemoryTilemap != null
+            ? fogOfWarMemoryTilemap.transform.lossyScale
+            : Vector3.one;
+        return new Vector3(
+            Mathf.Approximately(parentScale.x, 0f) ? desiredWorldScale.x : desiredWorldScale.x / parentScale.x,
+            Mathf.Approximately(parentScale.y, 0f) ? desiredWorldScale.y : desiredWorldScale.y / parentScale.y,
+            Mathf.Approximately(parentScale.z, 0f) ? desiredWorldScale.z : desiredWorldScale.z / parentScale.z);
     }
 
     private void BuildFogDisplayVisibleCellsForAllModes(Tilemap boardMap, HashSet<Vector3Int> output, UnitManager excludeUnit = null)
@@ -5635,7 +6224,7 @@ public class MatchController : MonoBehaviour
 
             fogOfWarTilemap.SetTile(cell, tile);
             fogOfWarTilemap.SetTileFlags(cell, TileFlags.None);
-            fogOfWarTilemap.SetColor(cell, new Color(0f, 0f, 0f, ResolveFogOfWarAlpha()));
+            fogOfWarTilemap.SetColor(cell, ResolveFogColorForCell(cell));
         }
     }
 
@@ -5951,13 +6540,28 @@ public class MatchController : MonoBehaviour
         if (fogOfWarTilemap == null)
             return;
 
-        Color fogColor = new Color(0f, 0f, 0f, ResolveFogOfWarAlpha());
         BoundsInt bounds = fogOfWarTilemap.cellBounds;
         foreach (Vector3Int cell in bounds.allPositionsWithin)
         {
             if (fogOfWarTilemap.HasTile(cell))
-                fogOfWarTilemap.SetColor(cell, fogColor);
+                fogOfWarTilemap.SetColor(cell, ResolveFogColorForCell(cell));
         }
+    }
+
+    private Color ResolveFogColorForCell(Vector3Int cell)
+    {
+        float alpha = ResolveFogOfWarAlpha();
+        int renderedTeamId = fogCachedTeamId >= 0 ? fogCachedTeamId : activeTeamId;
+        if (renderedTeamId >= 0 && Enum.IsDefined(typeof(TeamId), renderedTeamId) &&
+            IsCellExploredByTeam((TeamId)renderedTeamId, cell))
+        {
+            float exploredMultiplier = fogOfWarController != null
+                ? fogOfWarController.ExploredFogAlphaMultiplier
+                : 0.8f;
+            alpha *= exploredMultiplier;
+        }
+
+        return new Color(0f, 0f, 0f, Mathf.Clamp01(alpha));
     }
 
     private float ResolveFogOfWarAlpha()

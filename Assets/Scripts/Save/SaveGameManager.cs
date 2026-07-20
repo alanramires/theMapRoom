@@ -1802,6 +1802,7 @@ public class SaveGameManager : MonoBehaviour
                 // Reaplica economia/flip apos SetActiveTeamIdWithoutTurnStart para evitar side effects
                 // de credito no inicio do turno sobrescrever o snapshot salvo.
                 RestoreMatchPlayers(data);
+                matchController.RegisterCurrentlyOwnedBuildings();
             }
             LogLoadPerf(loadedSlot, "restore_match_state.end", restoreMatchStartMs, PerfNowMs() - routineStartMs);
 
@@ -2020,10 +2021,13 @@ public class SaveGameManager : MonoBehaviour
             hasVictoryWinner = matchState.hasVictoryWinner,
             victoryWinnerTeamId = matchState.victoryWinnerTeamId,
             players = matchState.players != null ? matchState.players : new List<MatchPlayerSaveData>(),
+            capturedBuildingHistory = new List<TeamCapturedBuildingSaveData>(),
             victoryStars = matchState.victoryStars != null ? matchState.victoryStars : new List<MatchVictoryStarSaveData>(),
             fogCacheTeamId = int.MinValue,
             fogVisibleContributorsByCell = new List<FogCellContributorSaveData>(),
             fogUnitVisibilityByCacheIndex = new List<FogUnitVisibilitySaveData>(),
+            fogExploredCellsByTeam = new List<TeamExploredCellsSaveData>(),
+            fogConstructionMemory = new List<FogConstructionMemorySaveData>(),
             aiObjectivePlans = ObjectiveManager.BuildSaveData(),
             aiRuntimeActive = aiController != null && aiController.IsAIRuntimeActive,
             aiRuntimeTeamId = aiController != null ? (int)aiController.CurrentAITeam : (int)TeamId.Neutral,
@@ -2089,6 +2093,9 @@ public class SaveGameManager : MonoBehaviour
 
         if (matchController != null)
         {
+            matchController.ExportCapturedBuildingHistory(data.capturedBuildingHistory);
+            matchController.ExportFogExplorationMemory(data.fogExploredCellsByTeam);
+            matchController.ExportFogConstructionMemory(data.fogConstructionMemory);
             matchController.ExportFogRuntimeCacheForSave(
                 out data.fogCacheTeamId,
                 data.fogVisibleContributorsByCell,
@@ -2117,6 +2124,9 @@ public class SaveGameManager : MonoBehaviour
             victoryWinnerTeamId = data.victoryWinnerTeamId
         };
         SaveDataMapper.ApplyMatchStateSaveData(matchController, matchState);
+        matchController?.ImportCapturedBuildingHistory(data.capturedBuildingHistory);
+        matchController?.ImportFogExplorationMemory(data.fogExploredCellsByTeam);
+        matchController?.ImportFogConstructionMemory(data.fogConstructionMemory);
     }
 
     private static void ClearLoadedAIAssignmentBadges(Dictionary<int, UnitManager> unitsById)

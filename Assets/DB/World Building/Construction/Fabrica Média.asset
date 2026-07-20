@@ -10,17 +10,15 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 0746e2e5fa3ba154eb1c64585653d260, type: 3}
-  m_Name: fabrica
+  m_Name: "Fabrica M\xE9dia"
   m_EditorClassIdentifier: Assembly-CSharp::ConstructionData
   id: fabrica
   displayName: "F\xE1brica"
   sufixo: Factory
-  description: 'Produz tropas terrestres.
-
-    Gera renda por turno.
-
-    Revela
-    os arredores.'
+  description: "Produz unidades terrestres avan\xE7adas.\nRequer uma F\xE1brica Leve.\nDestranca
+    tecnologia militar avan\xE7ada."
+  grammaticalGender: 1
+  requiredBuilding: {fileID: 11400000, guid: e6171f1508dc1494aae624dbbb6d2f43, type: 2}
   isAirport: 0
   isHarbor: 0
   isCity: 0
@@ -80,23 +78,11 @@ MonoBehaviour:
     isCapturable: 1
     capturePointsMax: 30
     capturedIncoming: 1500
-    sellingRule: 1
+    sellingRule: 2
     legacyCanProduceAndSellUnits: 
     offeredUnits:
-    - {fileID: 11400000, guid: 4a3afdea0950dfc46a48dd7a659563ee, type: 2}
-    - {fileID: 11400000, guid: b28c15593869dae419f9b58292ef4845, type: 2}
     - {fileID: 11400000, guid: 784e1b5ab74d4d34fa6c3ef79ba6219e, type: 2}
-    - {fileID: 11400000, guid: a5d9d72a15e061a4cbaf125b2b6b9d48, type: 2}
-    - {fileID: 11400000, guid: 5c1c693f4969237429fa904ea6955abe, type: 2}
-    - {fileID: 11400000, guid: cf26f5e5f9f009748bc56b1a7681b06d, type: 2}
     - {fileID: 11400000, guid: f5327adf7bafffb408255d31a96ba049, type: 2}
-    - {fileID: 11400000, guid: 70b7ea3ddea78fc4e9d744cee13b053a, type: 2}
-    - {fileID: 11400000, guid: 3dc9b119819519440820c81f5db4fdce, type: 2}
-    - {fileID: 11400000, guid: 70b98199c49882e44892f7ca76df6b33, type: 2}
-    - {fileID: 11400000, guid: 99b30df53878c69499853a4ef3cb5f81, type: 2}
-    - {fileID: 11400000, guid: 8c89f5278e312ad46af401333934721b, type: 2}
-    - {fileID: 11400000, guid: 816da5452d95e1144a868a0cf7868baa, type: 2}
-    - {fileID: 11400000, guid: 5e69516e1944ffc43bae1a7cd3c7c69c, type: 2}
     - {fileID: 11400000, guid: 87b4ab0e959c2324aa2628feb5356585, type: 2}
     canProvideSupplies: 1
     offeredSupplies:

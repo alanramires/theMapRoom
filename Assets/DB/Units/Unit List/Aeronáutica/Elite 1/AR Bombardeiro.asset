@@ -10,28 +10,29 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 67e557a91c4c9e647867393f7063f6f8, type: 3}
-  m_Name: AR Bombardeiro F
+  m_Name: AR Bombardeiro
   m_EditorClassIdentifier: Assembly-CSharp::UnitData
-  id: bf
-  displayName: Bombardeiro F
-  apelido: BF
+  id: bombardeiro
+  displayName: Bombardeiro
+  apelido: BB
   description: "Bombardeiro de alto impacto capaz de causar dano severo a unidades
     terrestres expostas. Ideal para abrir brechas e punir concentra\xE7\xF5es inimigas.
     Consome autonomia rapidamente no ar e depende de planejamento log\xEDstico para
     operar. Vulner\xE1vel a defesas anti-a\xE9reas e exige timing preciso para evitar
     perdas."
-  spriteDefault: {fileID: 21300000, guid: 35328fdd87c991449885c49a0c7ff593, type: 3}
+  requiredBuilding: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
+  spriteDefault: {fileID: 21300000, guid: 7a1965bdd345f0848a06ce310b8df52c, type: 3}
   teamVariantSprites: []
   maxHP: 10
   defense: 13
   armorClass: 1
-  movement: 6
+  movement: 7
   visao: 3
   visionSpecializations: []
   movementCategory: 3
   militaryForce: 1
   unitClass: 6
-  combatClassification: 2
+  combatClassification: 0
   roles: 09000000
   aiInitiative: 2
   aiPurchaseMode: 0
@@ -84,11 +85,11 @@ MonoBehaviour:
   aditionalDomainsAllowed:
   - domain: 0
     heightLevel: 3
-    spriteDefault: {fileID: 21300000, guid: 920ede89edee42f4fb77cfee2e93a972, type: 3}
+    spriteDefault: {fileID: 21300000, guid: b912eff212a67fc4b8ff48aa7012fc0a, type: 3}
     teamVariantSprites: []
   - domain: 3
     heightLevel: 4
-    spriteDefault: {fileID: 21300000, guid: 9a6abd1f3b943a34a94be1fd5abc106a, type: 3}
+    spriteDefault: {fileID: 21300000, guid: 98e69eb17447393488dafcfd695800e0, type: 3}
     teamVariantSprites: []
   useExplicitPreferredAirHeight: 0
   preferredAirHeight: 4
@@ -102,16 +103,13 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e73850be27dc4e2e8c8f210db151b0b4, type: 2}
   - {fileID: 11400000, guid: 3f52a3b7c5d14c5ea1f0f9aa34d2be11, type: 2}
   stealthSkills: []
-  stealthSkillRules:
-  - domain: 3
-    heightLevel: 5
-    skill: {fileID: 11400000, guid: 3ae2d2213e72ea144a307a743470d032, type: 2}
+  stealthSkillRules: []
   autonomyData: {fileID: 11400000, guid: d52348f636f1466d95a6489891e176bf, type: 2}
   embarkedWeapons:
   - weapon: {fileID: 11400000, guid: 86a03ca38b95e2a4db570315170881be, type: 2}
-    squadAmmunition: 3
+    squadAmmunition: 6
     operationRangeMin: 1
-    operationRangeMax: 2
+    operationRangeMax: 1
     selectedTrajectory: 0
     canBeFireOnlyAtDomainHeigh: []
     lastSyncedWeapon: {fileID: 11400000, guid: 86a03ca38b95e2a4db570315170881be, type: 2}
@@ -139,4 +137,4 @@ MonoBehaviour:
   passengersCanDisembarkAndGoesToConstructions: []
   transportSlots: []
   autonomia: 90
-  cost: 32000
+  cost: 22000

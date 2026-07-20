@@ -5,7 +5,8 @@ Imagine que estamos em uma sala de guerra e no meio da sala, uma grande mesa com
 Por estar em uma sala de mapas, o que você vê é estratégia pura."
 É ali que você está, dando ordens, atualizando a posição da frota a medida que ela avança e registrando por onde a esquadrilha está sobrevoando, registrando o consumo logístico e dando ordens indiretas para suas tropas. Você não está no front de batalha, você está na sala de mapas, no estado maior comandando todas as 3 forças militares. Esse é o "The Map Room"
 Um jogo determinístico
-Por estar em uma sala de mapas, não existe aleatoriedade, percentual, grind, rng nem dailies. Nada aqui é sorteado: as mesmas condições produzem sempre o mesmo resultado.
+Por estar em uma sala de mapas, não existe aleatoriedade, grind, rng nem dailies. Nada aqui é sorteado: as mesmas condições produzem sempre o mesmo resultado.
+Quando este manual diz que não há percentual, ele fala de **probabilidade** — não existe "70% de chance de acertar", não existe rolagem escondida. Porcentagens de proporção existem e são usadas à vontade nos custos — quanto um reparo cobra sobre o valor da unidade, por exemplo. Essas são contas fixas, não apostas. No combate não há percentual nenhum.
 Também não existem clima, tempo, ataque de oportunidade nem os elementos de RPG.
 Duas ausências, porém, merecem ser ditas com mais cuidado, porque não são ausências de verdade — são absorções.
 Cobertura, flanqueamento e exposição não têm modificadores próprios. Seus efeitos foram consolidados em Posição, domínio, alcance e DPQ. Estar na floresta protege; estar melhor colocado que o inimigo dá vantagem; estar no domínio errado te expõe. O que não existe é um sistema separado para cada uma dessas ideias.
@@ -156,10 +157,16 @@ Essa é a regra de prioridade aparecendo em campo: a estrutura propõe, o terreno 
 A Linha de Trem e Suas Exceções
 O trilho é mais lento que a estrada. Custa o dobro para atravessar, e não dá bônus de velocidade a ninguém. Ele não existe para acelerar tropas — existe para a logística ferroviária.
 Mas cada terreno tem sua lista de exceções por habilidade, e são elas que dão sentido ao traçado:
-O Trem de Carga atravessa trilho pelo custo mínimo, em qualquer terreno. É a via dele.
-Tropas alpinas atravessam trilho na montanha pelo custo mínimo. Quem sabe escalar aproveita o leito da ferrovia.
-Tropas de guerrilha atravessam trilho na planície e na floresta pelo custo mínimo. Quem se move fora de estrada usa o trilho como trilha.
-Todos os outros pagam o preço cheio. O trilho é uma boa estrada para quem foi treinado nele, e um caminho ruim para o resto.
+O Trem de Carga atravessa trilho pelo custo mínimo na planície e na floresta. É a via dele.
+Tropas de guerrilha também atravessam por 1 nesses dois terrenos. Quem se move fora de estrada usa o leito da ferrovia como trilha.
+Todos os outros pagam o preço cheio. Na floresta, quem tem motor paga o dobro do mínimo — passa, mas devagar.
+--------------------------------------------------------------------------------
+A Montanha Não Perdoa Nem o Trilho
+Na serra, as regras mudam de tom, e vale entender por quê.
+Motorizados são **proibidos**. Não é caro: é impossível. Trilho em montanha não é uma rampa para veículo.
+O Trem de Carga passa, mas paga **2** em vez de 1. Nem a própria ferrovia torna a montanha barata para ele.
+Tropas alpinas passam pagando **2** — exatamente o que pagariam na montanha nua. E é aqui que está o ponto: o trilho não oferece nada à infantaria na serra. Ela não confunde uma ferrovia com uma estrada; continua escalando do mesmo jeito, com trilho ou sem.
+A leitura é boa: a estrada domestica a montanha, o trilho não. Uma estrada na serra abre passagem para quem jamais subiria. Uma ferrovia na serra é só uma ferrovia que por acaso está numa montanha — serve ao trem, e mesmo assim a contragosto.
 --------------------------------------------------------------------------------
 O Trem Não Segue a Hierarquia
 Aqui está a exceção mais peculiar do jogo, e ela merece atenção porque parece um bug quando você a encontra sem saber.
@@ -206,6 +213,8 @@ E mesmo quando você enxerga, ver não significa alcançar. Essa é a próxima questã
 Linha de Tiro
 Você viu o alvo. Agora precisa saber se consegue atingi-lo.
 Para disparos parabólicos, a linha de tiro direta não é avaliada. A trajetória vai por cima dos obstáculos. Mas se o alvo estiver além da sua visão, você precisa de um observador avançado que veja onde ele está e transmita a posição. Sem olhos no alvo, a artilharia atira às cegas.
+Qualquer unidade sua serve de observador — e as aeronaves são especialmente boas nisso. Um helicóptero pairando sobre a linha inimiga enxerga o que a artilharia não alcança e entrega o alvo para ela. É uma das parcerias mais fortes do jogo: quem vê não precisa ser quem atira.
+Há um limite, e ele é preciso: observação avançada vale para alvos em terra, na superfície do mar e submersos. Não vale para alvos aéreos. Ninguém aponta um caça para a artilharia de outra pessoa — contra o céu, cada unidade depende dos próprios olhos.
 Não pense em parabólico como sinônimo de artilharia. Mísseis antiaéreos de longo alcance e mísseis de cruzeiro também são parabólicos aqui.
 E vale dizer o que a palavra significa neste manual: parabólico é o termo operacional do sistema para toda arma que **ignora os obstáculos do percurso**. Não é uma descrição balística rigorosa, e não vale discutir o perfil real de voo de cada munição. O que ela declara é uma coisa só: se essa arma alcança, o relevo entre você e o alvo não importa.
 E há uma sutileza que muda a leitura de várias unidades: a trajetória pertence à arma como ela foi montada naquela unidade, não ao tipo de arma. O mesmo foguete pode ser parabólico de longo alcance numa plataforma de artilharia e reto de alcance curto num helicóptero de ataque. Duas unidades que carregam "o mesmo foguete" podem jogar de formas opostas.
@@ -567,7 +576,10 @@ O consumo da aeronave não para quando ela pousa.
 Uma aeronave pousada continua pagando o mesmo consumo de turno que pagava no ar. Estacionar no Quartel General não ajuda. Na fábrica, na cidade, no porto — não ajuda. Ela continua queimando.
 Existe uma única exceção no jogo inteiro: o Aeroporto.
 Aeronave pousada em aeroporto não paga nada. É a diferença entre desligar os motores num hangar com equipe de solo e deixar a aeronave de prontidão num campo qualquer. Só o aeroporto é hangar.
-Isso dá ao Aeroporto um peso estratégico que o mapa não anuncia. Ele não é apenas onde você repara e reabastece — é o único lugar do mapa onde sua força aérea para de consumir. Perder o aeroporto não corta só a manutenção: liga um cronômetro em cada aeronave que você tem no ar.
+Isso dá ao Aeroporto um peso estratégico que o mapa não anuncia. Serviço para aeronave você consegue em vários lugares — cidades, fábricas, o Quartel General, caminhões, fragatas, porta-aviões, aviões-tanque. O que é exclusivo do aeroporto são duas outras coisas.
+A primeira você já viu: é o único lugar onde uma aeronave pousada **deixa de consumir autonomia**.
+A segunda é a decolagem. Do aeroporto, a subida é completa: a aeronave sai direto para a altitude que prefere. De qualquer outro lugar, quem precisa de corrida termina em Air/Low — e passa pela camada onde a furtividade não funciona e a antiaérea alcança.
+Então o aeroporto não é onde a aviação é atendida. É o único hangar terrestre completo: o único que interrompe o relógio e o único que devolve a aeronave direto ao seu céu. Perder o aeroporto não corta a manutenção — corta o descanso e a subida segura.
 Uma última isenção, essa mais intuitiva: unidade embarcada não paga consumo. Dentro de um transportador, ela é carga. Quem paga a viagem é quem dirige.
 --------------------------------------------------------------------------------
 Quando o Combustível Acaba
@@ -601,19 +613,32 @@ Um Atendimento por Turno
 Antes do resto, a regra que organiza tudo: **cada unidade recebe atendimento uma vez por turno.**
 Um atendimento pode incluir vários serviços de uma vez — o mesmo caminhão pode reabastecer, rearmar e reparar na mesma visita. Mas depois que você recebeu, acabou por esta rodada.
 Isso significa que atendimentos **não somam**. Se a sua unidade já tomou o Serviço do Comando no início do turno, procurar um caminhão em campo depois não acrescenta nada. Ela já tomou o banho de cura desta rodada.
+Mas repare no que o atendimento **não** custa: ser atendido não consome a ação da unidade. Um esquadrão reparado ainda pode se mover e atacar no mesmo turno. Quem gasta a ação é quem presta o serviço, não quem recebe.
+Isso muda a leitura do reparo. A unidade machucada não fica imobilizada — ela fica **presa à fonte**. Pode avançar depois de ser tratada, mas se avançar demais, não estará lá para o próximo atendimento.
+--------------------------------------------------------------------------------
+Um Prestador, Um Paciente
+E existe um segundo limite, do outro lado do balcão, que costuma pegar o jogador desprevenido: **cada prestador atende uma unidade por turno.**
+Isso vale para as construções inteiras. Uma cidade não é um hospital de campanha com dez macas — ela atende um esquadrão por rodada. Fábrica, porto, aeroporto e o próprio Quartel General, todos iguais: um.
+Do lado das unidades, quase todos os prestadores também atendem um. As duas exceções são o avião-tanque e o porta-aviões, que atendem dois.
+Há um detalhe generoso: uma construção atende a unidade **e os passageiros que ela carrega no primeiro nível**. Um transporte blindado cheio de tropa que encosta numa cidade sai dali com o veículo e os soldados atendidos, tudo dentro da mesma vaga.
+O caminhão na rua não faz isso. Ele atende a unidade e só ela — quem está dentro continua como estava. Se a tropa precisa de serviço, precisa desembarcar ou chegar num prédio.
+Junte tudo e o quadro operacional aparece: quatro unidades machucadas recuando para a mesma cidade formam uma fila de quatro turnos. Logística não escala empilhando gente no mesmo lugar — escala com mais pontos de atendimento. E transportar tropa até um prédio atende mais gente de uma vez do que levar o caminhão até ela.
 --------------------------------------------------------------------------------
 Onde Você Se Cura Importa
 E aqui entra o limite que muda a natureza do reparo: **não se recupera um esquadrão de uma vez.** O quanto você recupera depende de onde é atendido.
 Em uma construção — cidade, fábrica, aeroporto, porto, quartel general — o reparo devolve **2 pontos de vida** por turno. Não é a construção que faz diferença: é o serviço. Construções oferecem o reparo completo; o caminhão oferece a versão leve.
 Dois navios prestam esse mesmo reparo completo, mas apenas para o ar. A **Fragata** tem um heliponto e atende exclusivamente helicópteros, um de cada vez. O **Porta-Aviões** tem hangar para duas aeronaves e atende quem souber pousar em convés. Nenhum dos dois conserta navios ou tropa terrestre — são bases aéreas que flutuam, não oficinas gerais.
 Com o caminhão de suprimentos em campo, é reparo leve: **1 ponto de vida** por turno.
-Um esquadrão reduzido a 2 pontos precisa de quatro turnos recuando para uma construção, ou oito turnos sendo remendado na frente. Nos dois casos, ele passa esse tempo sem avançar.
+Um esquadrão reduzido a 2 pontos precisa de quatro atendimentos numa construção, ou oito atendimentos de campo.
+E aqui está o detalhe que muda a leitura: ele **pode agir entre um atendimento e outro**. Pode lutar, pode defender o prédio onde está sendo consertado, pode recuar mais. O que ele não pode é se afastar da fonte — porque cada avanço que o tira do alcance do prestador interrompe a sequência.
+O custo do reparo não é imobilização obrigatória. É **continuidade logística**. Você não está preso; você está amarrado a um ponto do mapa.
 --------------------------------------------------------------------------------
 O Custo Real do Reparo
 Isso reposiciona a decisão inteira. O preço em dinheiro nunca chega de uma vez, porque a recuperação nunca chega de uma vez.
 O custo verdadeiro de recuperar uma unidade muito desgastada é **tempo e posição**. E a escolha é sempre entre dois males:
-Recuar para uma construção cura o dobro por turno — e tira a unidade do front enquanto ela vai, fica e volta.
-Ficar na frente e receber do caminhão mantém a posição — e cura metade da velocidade, num lugar onde ela ainda pode ser atacada.
+Recuar para uma construção cura o dobro por turno — e gasta os turnos de ida e volta, além de manter a unidade colada naquele prédio enquanto dura o tratamento.
+Ficar na frente e receber do caminhão mantém a posição — e cura na metade da velocidade, num lugar onde ela ainda pode ser atacada.
+Em nenhum dos dois casos a unidade fica de braços cruzados. Uma tropa em reparo dentro de uma cidade continua defendendo aquela cidade.
 Comprar uma unidade nova entrega força total imediatamente, num lugar que você escolhe. Reparar entrega força aos poucos, no lugar onde a unidade já está.
 Por isso reparo é excelente para quem está pouco machucado e ruim para quem está quase morto. Não porque a conta fique cara — mas porque o relógio fica longo demais.
 --------------------------------------------------------------------------------
@@ -623,6 +648,8 @@ Reabastecimento e rearmamento: unidades leves aproveitam 3 por unidade de reserv
 Reparo: leves aproveitam 2, médias e pesadas 1.
 E o rearmamento cobra duas vezes pelo mesmo peso. Além de aproveitar menos cada caixa, armamento pesado custa mais caro por tiro reposto: um projétil de arma pesada pesa o triplo de um de arma leve na conta final. Reabastecer o paiol de um blindado não é a mesma despesa que reabastecer o de um soldado, nem por unidade de reserva, nem por moeda.
 Um tanque pesado não é só caro de comprar. É caro de manter, de abastecer e de consertar. O custo de uma força pesada não termina na loja.
+Vale ver o tamanho disso com números redondos. Recuperar um blindado caro que saiu de um combate sério — remendando o esquadrão, enchendo o tanque e refazendo os dois paióis — consome uma fatia grande da sua renda daquele turno. Não é uma despesa de manutenção: é uma decisão orçamentária que compete com comprar uma unidade nova.
+É esse o efeito pretendido. Combate pesado gera pressão econômica, e uma doutrina de força pesada só se sustenta se a sua renda territorial acompanhar. Blindado sem cidade atrás é blindado que luta uma vez.
 A transferência de reservas entre agentes é a única operação gratuita da cadeia. Mover estoque não custa nada; convertê-lo em benefício custa sempre.
 --------------------------------------------------------------------------------
 O Serviço Acontece na Mesma Camada
@@ -630,7 +657,9 @@ Atender alguém exige estar no mesmo plano operacional que essa pessoa — e o jogo
 Um avião-tanque em alta altitude que vai reabastecer um helicóptero desce para Air/Low, porque é ali que o helicóptero vive. Se ele atende também um caça na mesma leva, o caça é trazido para Air/Low junto. Todo mundo se encontra no mesmo andar para a operação acontecer.
 O mesmo vale para baixo: um caça em voo que vai receber suprimento de um caminhão terrestre pousa para ser atendido — e, se puder, arremete depois, pelo ciclo que você já conhece.
 E existe o caso em que não dá. Se o hexágono não aceita a camada necessária — a aeronave não tem onde pousar, o transporte não pode subir —, aquele alvo simplesmente é pulado. A fila segue para o próximo.
-Terminado o atendimento, todos permanecem na camada em que ele aconteceu. O caça que desceu para Air/Low não volta sozinho para a alta altitude: ele fica onde foi servido, e subir de novo é decisão sua, num turno seu. A única exceção é quem precisou tocar o solo — essa arremete, pelo ciclo que você já conhece.
+Terminado o atendimento, todos permanecem na camada em que ele aconteceu — o caça que desceu para Air/Low fica em Air/Low. E o que vier depois é automático: quem precisou tocar o solo arremete sozinha, pelo ciclo que você já conhece.
+Vale dizer isso de forma geral, porque vale para o jogo inteiro: **não existem comandos de altitude.** Você não manda subir, descer, emergir nem submergir. A unidade vai para a camada preferida do domínio dela assim que é selecionada, e todas as outras mudanças são consequência de alguma coisa que ela fez — decolar, pousar, atacar, ser atingida, receber serviço.
+Altitude não é uma alavanca que você opera. É o resultado do que a unidade está fazendo.
 Vale guardar isso quando montar uma operação de reabastecimento: você não está só verificando alcance e estoque. Está verificando se todos conseguem se encontrar no mesmo plano, naquele terreno.
 --------------------------------------------------------------------------------
 O Serviço do Comando
@@ -658,6 +687,7 @@ Um navio-tanque coleta estoque nas cidades da costa.
 Ele leva esse estoque para um porta-aviões no mar aberto.
 O porta-aviões converte em serviço para as aeronaves que pousam nele — ou repassa para um avião-tanque.
 O avião-tanque decola e atende caças **no ar**, sem que ninguém precise voltar para casa.
+E a corrente funciona em cascata dentro do mesmo hexágono. Um porta-aviões atracado num porto, com aeronaves a bordo: as aeronaves aparecem e são supridas **pelo porta-aviões**; depois o porta-aviões é suprido **pelo porto**. Cada elo atende o elo seguinte, na ordem, e o estoque desce a fila.
 Cada elo é uma unidade sua, que se move, gasta o turno e pode ser atacada. Uma frota longe da costa só se sustenta enquanto essa corrente estiver inteira — e cortar um elo no meio dela vale mais do que afundar um caça.
 --------------------------------------------------------------------------------
 Quem Dá o Primeiro Passo
@@ -930,7 +960,7 @@ De Onde Vem o Dinheiro
 Sua renda chega no início de cada turno, e vem de três camadas de território:
 O Quartel General rende cerca de 3.000 por turno. É a sua fonte primária, e ela existe enquanto você existir.
 Fábricas, aeroportos e portos rendem cerca de 1.500 cada. São a camada secundária — a infraestrutura pesada que você defende ou toma.
-Cidades rendem cerca de 1.000 cada. É a camada terciária, e a única que cresce durante a partida, conforme sua infantaria conquista o tabuleiro.
+Cidades rendem cerca de 1.000 cada. É a camada terciária, e a principal fonte de crescimento durante a partida, conforme sua infantaria conquista o tabuleiro.
 Isso dá uma escala para os preços que você viu: um turno de renda de uma cidade paga aproximadamente um esquadrão de Soldados. Um esquadrão de Soldados custa cerca de um terço do que o seu Quartel General rende por turno. E um caça de ponta custa vários turnos de renda inteira.
 É uma boa forma de olhar para o mapa: cada cidade que você mantém equivale a mais um esquadrão de infantaria por turno, indefinidamente.
 E dá o sentido estratégico da captura. O QG é fixo, e as construções pesadas são poucas e muito disputadas. As cidades são numerosas — são elas que formam a principal camada de crescimento durante a partida. A diferença entre dois exércitos, numa partida longa, costuma ser o número de cidades que cada um tomou — o que faz do capturador, a unidade mais barata e mais frágil do jogo, o motor da sua economia.
@@ -941,11 +971,14 @@ Renda é metade da economia. A outra metade é onde você consegue gastá-la.
 Comprar unidades não é uma ação abstrata do jogador: é uma transação com uma construção específica, que oferece um catálogo específico. Cada fábrica, porto ou aeroporto tem a sua lista do que sabe produzir, e ela é definida pelo cenário. Um porto vende navios. Uma fábrica vende tropa e blindado. O que você pode comprar depende inteiramente do que você controla.
 --------------------------------------------------------------------------------
 Nem Toda Conquista Vem com a Chave
-E aqui está a regra que muda o valor de cada construção do mapa. Cada uma carrega uma política de venda, e ela decide **para quem** aquele prédio produz:
-**Mercado livre.** Vende para quem for o dono atual. Capturou, produz. É o caso mais simples e o mais generoso.
-**Dono original.** Só produz para o time a quem o prédio pertencia no início do cenário. Se ele foi tomado de você, o inimigo ganha a renda e o território — mas as linhas de montagem não trabalham para ele.
-**Primeiro dono.** Só produz para quem o controlou primeiro. Se você chegou depois e capturou, ele não vende para você. Nunca vai vender.
-**Desativada.** Não produz para ninguém. É prédio de renda e posição, não de produção.
+Antes das políticas, o denominador comum: **capturar sempre entrega a renda e o território.** Isso vale para os quatro casos abaixo, sem exceção. O que muda de um para outro é uma coisa só — se o prédio passa a **produzir** para o novo dono.
+Em outras palavras: o cofre sempre troca de mãos. A oficina, nem sempre.
+--------------------------------------------------------------------------------
+**Mercado livre.** Produz para quem for o dono atual, seja ele quem for. Capturou, produz; perdeu, produz para o outro; recapturou, produz de novo para você. A única condição é ter dono: enquanto o prédio estiver neutro, não vende para ninguém.
+**Dono original.** Produz apenas para o time a quem o prédio pertencia no começo do cenário, e para mais ninguém, nunca. Tomado de você, o inimigo fica com a renda — mas as linhas de montagem não trabalham para ele.
+**Primeiro dono.** É a mesma regra do dono original, com o beneficiário ainda indefinido. O prédio está esperando pátria: o primeiro time a controlá-lo se torna o dono para sempre, e a partir daí ele se comporta exatamente como um dono original.
+A diferença entre os dois, portanto, não é o comportamento — é **quem decide**. No dono original, quem decide é o desenho do cenário. No primeiro dono, quem decide é a corrida: numa fábrica neutra no meio do mapa, chegar primeiro não vale só o território daquele turno. Vale a fábrica para o resto da partida.
+**Desativada.** Não produz para ninguém, em hipótese alguma. É prédio de renda e posição.
 --------------------------------------------------------------------------------
 Capturar Não É Sempre a Mesma Coisa
 Some isso ao que você já sabe da renda e o mapa deixa de ser uniforme.
@@ -954,28 +987,75 @@ Tomar uma fábrica de primeiro dono, quando o primeiro dono não foi você, é um ga
 E a leitura defensiva é ainda mais interessante: uma fábrica sua marcada como primeiro dono é **impossível de virar contra você**. Perdê-la dói no bolso e no mapa, mas não arma o inimigo. Já uma fábrica de mercado livre na linha de frente é uma arma carregada apontada para os dois lados.
 Por isso a pergunta antes de um avanço não é apenas "consigo tomar aquilo?". É "aquilo vai trabalhar para mim depois de tomado?".
 --------------------------------------------------------------------------------
+Progressão por Conquista
+Há um segundo portão antes do dinheiro, e ele não se abre com dinheiro nenhum.
+Boa parte do arsenal exige que o seu time **já tenha capturado** determinada construção. Não construído — capturado. Aqui você nunca ergue um prédio: você toma o que existe no mapa, e é a tomada que destrava.
+--------------------------------------------------------------------------------
+A Conquista Não Se Perde
+Esta é a regra que dá caráter ao sistema: **basta capturar uma vez.**
+Assim que uma construção muda para as suas cores, aquilo fica registrado como conquista sua para o resto da partida. Perder o prédio no turno seguinte não desfaz nada. A fábrica volta a ser do inimigo, a renda vai junto — mas o que ela destravou continua destravado.
+É uma memória de campanha, não um inventário. O jogo não pergunta "você tem?", pergunta "você já teve?".
+--------------------------------------------------------------------------------
+A Cadeia das Fábricas
+Os pré-requisitos formam uma escada, e cada degrau exige o anterior:
+A **Fábrica Leve** é a base, e não pede nada.
+A **Fábrica** exige que você já tenha tomado uma Fábrica Leve.
+A **Fábrica Pesada** exige a Fábrica.
+O **Aeroporto Avançado** também parte da Fábrica, num ramo próprio.
+E a escada é obrigatória de verdade: **você nem consegue capturar o degrau seguinte sem ter o anterior.** Um capturador seu parado em cima de uma Fábrica Pesada, sem que o time jamais tenha tomado uma Fábrica, vê a opção de capturar aparecer — porém acinzentada, acompanhada do motivo: capture uma Fábrica primeiro.
+Repare na escolha de desenho. O jogo poderia simplesmente esconder a opção e deixar você adivinhando. Em vez disso, ele mostra a porta trancada **e diz qual é a chave**. É assim que a árvore de tecnologia se ensina sozinha: você descobre o próximo degrau tentando o degrau errado.
+Isso muda o que o mapa significa. A ordem em que você avança deixa de ser só geografia: não adianta correr para o prédio mais valioso do tabuleiro se você pulou os degraus. Ele fica lá, visível, explicado e intocável.
+--------------------------------------------------------------------------------
+O Que Cada Degrau Abre
+**Fábrica** libera o grosso do arsenal moderno: tanque médio, obus médio, o sistema antiaéreo, o caça interceptador, o bombardeiro convencional — e, no mar, o destroyer, o submarino e o porta-aviões.
+**Fábrica Pesada** libera o que há de mais pesado em terra e o bombardeiro furtivo: o tanque de topo de linha, a artilharia de campanha.
+**Aeroporto Avançado** libera a aviação especializada: o caça furtivo e o EWACS. E ele carrega a propriedade que você já conhece do aeroporto comum — aeronave pousada ali não consome autonomia.
+Isso desenha uma pergunta estratégica nova, que não é sobre território nem sobre dinheiro: **qual capacidade eu quero destravar primeiro?** Correr para a Fábrica Pesada te dá o chão mais forte do jogo. Correr para o Aeroporto Avançado te dá olhos e furtividade. Os dois saem da mesma Fábrica, e o mapa raramente deixa você ter os dois cedo.
+--------------------------------------------------------------------------------
+Duas Portas em Série
+Vale juntar com a seção anterior, porque as duas regras operam ao mesmo tempo e são independentes:
+A **progressão** pergunta se o seu time já conquistou o pré-requisito, alguma vez. Ela age em dois momentos: barra a **captura** da construção seguinte, e barra a **produção** da unidade que depende dela.
+A **política de venda** pergunta se este prédio, agora, produz para você.
+As duas são independentes. Uma Fábrica Pesada que você destravou e conquistou, mas que já perdeu para o inimigo, não produz para você — falta a posse. Uma Fábrica Pesada que é sua e cujo degrau anterior você tomou, mas marcada como dono original de outro time, também não produz — falta a permissão.
+Você precisa das duas portas abertas, e elas se fecham por motivos diferentes.
+--------------------------------------------------------------------------------
 Onde a Unidade Nasce
 A unidade comprada aparece na construção que a vendeu, e isso amarra produção a geografia.
-Fábrica longe do front significa reforço que chega tarde. Fábrica perto do front significa reforço imediato e uma construção exposta. E o hexágono de saída precisa estar livre segundo as regras de ocupação que você já conhece — a superfície comporta uma presença por vez, então uma construção com a saída bloqueada não entrega nada naquele turno.
+Fábrica longe do front significa reforço que chega tarde. Fábrica perto do front significa reforço imediato e uma construção exposta.
+E o hexágono de saída precisa estar livre — mas só na superfície. É lá que a unidade nova vai aparecer, e é lá que o andar comporta uma presença por vez. Uma aeronave pairando sobre a fábrica não atrapalha nada: ela está em outro andar.
+Se faltar dinheiro ou se a superfície estiver ocupada, a compra é simplesmente recusada. Não existe fila, não existe encomenda pendente. Você resolve o problema e compra depois.
 Comprar, portanto, não é só uma decisão de orçamento. É uma decisão de logística: **você está escolhendo onde a força vai aparecer, não apenas qual força.**
 --------------------------------------------------------------------------------
 O Ciclo da Ação
 Você já viu o relógio da partida. Falta o relógio de cada peça — e ele importa, porque quase toda regra deste manual depende de em que ponto do ciclo a unidade está.
 --------------------------------------------------------------------------------
-Os Passos
-Toda ação segue a mesma sequência:
-Você **seleciona** a unidade.
-Ela **se move**, ou permanece onde está. As duas coisas são escolhas válidas, e algumas ações só existem para quem ficou parado.
-O jogo **recalcula os sensores** a partir da posição final. É só aqui que você descobre o que aquela posição enxerga, alcança e ameaça.
-Você **escolhe a ação** com base nessa informação nova: atacar, capturar, embarcar, desembarcar, suprir, fundir, pousar, decolar — ou nenhuma.
-A ação é **executada**, e a unidade é **marcada como agida**.
-A partir daí ela não age de novo neste turno.
+Movimento Mais Ação
+Toda jogada tem a mesma forma, e ela é um par:
+**movimento (obrigatório) + ação**
+O movimento sempre acontece — mesmo quando a unidade fica exatamente onde está. Ficar parado é um movimento de distância zero, e é uma escolha, não uma omissão.
+A ação é o que vem depois, e "apenas mover" é uma das opções válidas dela. Você pode andar e encerrar; pode andar e capturar; pode ficar parado e atirar; pode ficar parado e fundir. O par sempre existe, e as duas metades são suas.
 --------------------------------------------------------------------------------
-Nada É Definitivo Até Você Confirmar
-O passo mais importante é o que acontece **entre** os passos.
-Todo o percurso até a confirmação é provisório. O movimento que você está desenhando, o menu que abriu, a pré-visualização do ataque — nada disso mexeu no tabuleiro ainda. Você pode desistir a qualquer momento e nada terá acontecido.
-Só a confirmação torna qualquer coisa real. É nesse instante que a névoa é recalculada de verdade, que os contatos são atualizados, que o recurso é gasto e que a unidade passa a constar como agida.
-Isso é o que permite mover dentro da névoa sem transformar o movimento numa sonda gratuita: você não vai descobrindo o mapa enquanto arrasta o cursor. Você escolhe o destino, aceita, e **então** descobre o que havia lá.
+Os Passos
+Toda jogada segue a mesma sequência:
+Você **seleciona** a unidade.
+Ela **se posiciona** — andando, ou ficando exatamente onde está. As duas coisas contam como posicionamento, e algumas ações só existem para quem não andou.
+Os **sensores apresentam as opções** daquela posição: o que ela enxerga, o que alcança, o que pode fazer dali.
+Você **escolhe uma opção**: atacar, capturar, embarcar, desembarcar, suprir, fundir, pousar, decolar — ou simplesmente ficar onde parou.
+A **animação toca** e o **mundo recalcula**.
+Fim. A unidade não age de novo neste turno.
+--------------------------------------------------------------------------------
+Existe Uma Confirmação Só
+Este é o ponto que mais confunde, então vale ser direto: **mover não confirma nada.**
+No xadrez, peça tocada é peça mexida. Aqui não. Pense em levantar o cavalo, percorrer o L com ele no ar, olhar como o tabuleiro ficaria — e devolver a peça à casa de origem. Enquanto você não larga, nada aconteceu.
+É exatamente assim. Você posiciona a unidade, os sensores mostram o que dali é possível, e você continua livre. Pode cancelar e mover para outro lugar. Pode abrir a mira, ver o resultado previsto do ataque, desistir na última tecla e voltar ao movimento. Nada disso tocou o tabuleiro.
+A única confirmação que existe é a da ação escolhida. É ela que dispara a animação, recalcula o mundo, atualiza a névoa e encerra a jogada daquela unidade.
+E "apenas mover" é uma ação como qualquer outra. Escolher andar e não fazer mais nada é uma decisão válida, que fecha o ciclo do mesmo jeito.
+--------------------------------------------------------------------------------
+Por Que Isso Importa
+Porque a prévia mostra o que você **já sabe**, não o que existe.
+Isso é o que impede a exploração hexágono a hexágono. Se você levar o cursor até uma cidade escondida na névoa, a opção de capturar não aparece. Se levar um helicóptero até um hexágono onde há artilharia inimiga, a sua unidade não aparece empilhada denunciando que tem alguém ali. A prévia não vaza o mapa — ela mostra a sua leitura atual dele.
+O jogo te deixa experimentar posições e olhar as opções de cada uma antes de se comprometer. O que ele não te deixa fazer é **desfazer o mundo** depois que a ação foi confirmada — a partir dali, a névoa foi recalculada, os contatos foram atualizados e a unidade já agiu.
+Planejar é livre. Executar é definitivo.
 --------------------------------------------------------------------------------
 Por Que o Estado da Peça Importa Tanto
 Volte às regras que você já leu e repare quantas dependem deste ciclo:

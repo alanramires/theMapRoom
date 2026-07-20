@@ -20,6 +20,7 @@ MonoBehaviour:
     alcance. Eficaz contra embarca\xE7\xF5es expostas, mas incapaz de detectar submarinos
     submersos. Use para controlar \xE1reas mar\xEDtimas e apoiar opera\xE7\xF5es
     navais com poder de fogo consistente."
+  requiredBuilding: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
   spriteDefault: {fileID: 21300000, guid: d5f1abaec22e4704a9340d82833397c7, type: 3}
   teamVariantSprites: []
   maxHP: 10
@@ -35,6 +36,7 @@ MonoBehaviour:
   roles: 05000000
   aiInitiative: 2
   aiPurchaseMode: 0
+  bannedOnHardMode: 0
   aiTargetPreferenceByClass:
   - targetClass: 8
     priority: 2
@@ -84,6 +86,10 @@ MonoBehaviour:
   preferredAirHeight: 4
   useExplicitPreferredNavalHeight: 0
   preferredNavalHeight: 2
+  emergesToAttack: 0
+  emergeAfterAttackDomain: 1
+  emergeAfterAttackHeight: 3
+  emergeAfterAttackTurns: 2
   skills: []
   stealthSkills: []
   stealthSkillRules: []

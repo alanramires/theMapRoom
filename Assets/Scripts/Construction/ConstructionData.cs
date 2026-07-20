@@ -12,6 +12,12 @@ public class ConstructionLandingSkillRule
     public TakeoffProcedure takeoffMode = TakeoffProcedure.InstantToPreferredHeight;
 }
 
+public enum ConstructionGrammaticalGender
+{
+    Masculine = 0,
+    Feminine = 1
+}
+
 [CreateAssetMenu(menuName = "Game/Construction/Construction Data", fileName = "ConstructionData_")]
 public class ConstructionData : ScriptableObject
 {
@@ -29,6 +35,13 @@ public class ConstructionData : ScriptableObject
 
     [TextArea]
     public string description;
+
+    [Tooltip("Genero gramatical usado nas mensagens: 'um' para masculino e 'uma' para feminino.")]
+    public ConstructionGrammaticalGender grammaticalGender = ConstructionGrammaticalGender.Masculine;
+
+    [Header("Construction Requirements")]
+    [Tooltip("Construcao que a equipe precisa ter capturado ao menos uma vez antes de poder construir esta.")]
+    public ConstructionData requiredBuilding;
 
     [Header("Facility Type")]
     [Tooltip("Marca esta construcao como aeroporto real para prioridades de IA e regras aereas.")]

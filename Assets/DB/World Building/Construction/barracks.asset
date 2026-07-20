@@ -10,12 +10,14 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 0746e2e5fa3ba154eb1c64585653d260, type: 3}
-  m_Name: barracks
+  m_Name: Barracks
   m_EditorClassIdentifier: Assembly-CSharp::ConstructionData
   id: barracks
   displayName: Barracks
   sufixo: Barrack
-  description: Barracks
+  description: "Produz infantaria.\nGera pouca renda.\nServe como ponto de refor\xE7o
+    local."
+  requiredBuilding: {fileID: 0}
   isAirport: 0
   isHarbor: 0
   isCity: 0
@@ -73,7 +75,7 @@ MonoBehaviour:
     isPlayerHeadQuarter: 0
     isVictoryBuilding: 0
     isCapturable: 1
-    capturePointsMax: 20
+    capturePointsMax: 10
     capturedIncoming: 500
     sellingRule: 0
     legacyCanProduceAndSellUnits: 

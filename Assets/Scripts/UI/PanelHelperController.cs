@@ -3339,8 +3339,9 @@ public class PanelHelperController : MonoBehaviour
             bool unavailable = i < data.ShoppingLines.Count &&
                                data.ShoppingLines[i] != null &&
                                !data.ShoppingLines[i].isCancel &&
-                               !data.ShoppingLines[i].canAfford;
-            shoppingButton.interactable = !unavailable;
+                               (!data.ShoppingLines[i].canAfford || !data.ShoppingLines[i].requirementMet);
+            // Mantem itens bloqueados clicaveis para que a tentativa mostre o motivo no PanelDialog.
+            shoppingButton.interactable = true;
             ApplyFooterButtonFocus(
                 shoppingButton.GetComponent<Image>(),
                 shoppingButton.GetComponentInChildren<TMP_Text>(true),
@@ -3737,7 +3738,8 @@ public class PanelHelperController : MonoBehaviour
             TurnStateManager.HelperShoppingLine line = lines[i];
             if (line != null)
                 sb.Append(line.index).Append('|').Append(line.unitName).Append('|').Append(line.cost)
-                    .Append('|').Append(line.canAfford).Append(';');
+                    .Append('|').Append(line.canAfford).Append('|').Append(line.requirementMet)
+                    .Append('|').Append(line.requiredBuildingName).Append(';');
         }
         return sb.ToString();
     }
@@ -3766,7 +3768,7 @@ public class PanelHelperController : MonoBehaviour
             element.preferredHeight = ShoppingActionButtonHeight;
 
             Button button = buttonObject.GetComponent<Button>();
-            button.interactable = isCancel || line.canAfford;
+            button.interactable = true;
             Navigation navigation = button.navigation;
             navigation.mode = Navigation.Mode.None;
             button.navigation = navigation;
@@ -3790,7 +3792,10 @@ public class PanelHelperController : MonoBehaviour
             else
             {
                 string cost = line.cost.HasValue ? $" (${line.cost.Value})" : string.Empty;
-                label.text = $"{line.index} - {line.unitName}{cost}";
+                string locked = line.requirementMet
+                    ? string.Empty
+                    : $"\n<size=70%>[REQUER: {line.requiredBuildingName}]</size>";
+                label.text = $"{line.index} - {line.unitName}{cost}{locked}";
             }
             label.fontSize = 20f;
             label.fontStyle = FontStyles.Bold;

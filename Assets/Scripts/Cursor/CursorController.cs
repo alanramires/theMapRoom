@@ -77,6 +77,12 @@ public class CursorController : MonoBehaviour
 
     [Header("Feedback")]
     [SerializeField] private AudioSource audioSource;
+    [Header("Master Volume")]
+    [InspectorName("Master SFX Volume")]
+    [Tooltip("Volume mestre aplicado a todos os sons reproduzidos pelo CursorController.")]
+    [Range(0f, 1f)]
+    [SerializeField] private float masterSfxVolume = 1f;
+    [Header("SFX Clips")]
     [SerializeField] private AudioClip moveSfx;
     [SerializeField] private AudioClip confirmSfx;
     [SerializeField] private AudioClip cancelSfx;
@@ -106,6 +112,7 @@ public class CursorController : MonoBehaviour
     [SerializeField] private AudioClip sonarSkillSfx;
     [Tooltip("Vinculo entre uma ou mais skills e um AudioClip customizado.")]
     [SerializeField] private List<SkillSfxBinding> skillSfxBindings = new List<SkillSfxBinding>();
+    [Header("Per-SFX Volume")]
     [Range(0f, 1f)]
     [SerializeField] private float moveSfxVolume = 1f;
     [Range(0f, 1f)]
@@ -122,6 +129,10 @@ public class CursorController : MonoBehaviour
     [SerializeField] private float endingTurnSfxVolume = 1f;
     [Range(0f, 1f)]
     [SerializeField] private float skillSfxVolume = 1f;
+    [Range(0f, 1f)]
+    [SerializeField] private float menuOpenSfxVolume = 1f;
+    [Range(0f, 1f)]
+    [SerializeField] private float menuCloseSfxVolume = 1f;
 
     [Header("Cursor Blink")]
     [Tooltip("SpriteRenderer do cursor (branco com borda preta). Deixe vazio para desativar o blink.")]
@@ -174,6 +185,26 @@ public class CursorController : MonoBehaviour
     public TurnStateManager.CursorState CursorState => CurrentCursorState;
     public bool IsBlocked => IsCursorBlocked();
     public bool IsEndTurnConfirmationPending => pendingEndTurnConfirmation;
+
+    public void SetMasterSfxVolume(float volume)
+    {
+        masterSfxVolume = Mathf.Clamp01(volume);
+    }
+
+    public float GetMasterSfxVolume()
+    {
+        return masterSfxVolume;
+    }
+
+    public float GetMenuOpenSfxVolume()
+    {
+        return menuOpenSfxVolume;
+    }
+
+    public float GetMenuCloseSfxVolume()
+    {
+        return menuCloseSfxVolume;
+    }
 
     private void Awake()
     {
@@ -1826,11 +1857,11 @@ public class CursorController : MonoBehaviour
 
         if (audioSource == null)
         {
-            AudioSource.PlayClipAtPoint(moveSfx, transform.position, moveSfxVolume);
+            AudioSource.PlayClipAtPoint(moveSfx, transform.position, ApplyMasterSfxVolume(moveSfxVolume));
             return;
         }
 
-        audioSource.PlayOneShot(moveSfx, moveSfxVolume);
+        audioSource.PlayOneShot(moveSfx, ApplyMasterSfxVolume(moveSfxVolume));
     }
 
     private void PlayActionFeedback(TurnStateManager.ActionSfx feedback)
@@ -1879,7 +1910,7 @@ public class CursorController : MonoBehaviour
         if (clip == null)
             return 0f;
 
-        PlayClipWithPitch(clip, Mathf.Clamp01(combatSfxVolume * Mathf.Clamp01(volumeScale)), 1f);
+        PlayClipWithPitch(clip, ApplyMasterSfxVolume(combatSfxVolume, volumeScale), 1f);
         return clip.length;
     }
 
@@ -1888,7 +1919,7 @@ public class CursorController : MonoBehaviour
         if (weapon == null || weapon.fireSfx == null)
             return;
 
-        float volume = Mathf.Clamp01(combatSfxVolume * Mathf.Clamp01(volumeScale) * Mathf.Clamp01(weapon.fireSfxVolume));
+        float volume = ApplyMasterSfxVolume(combatSfxVolume, volumeScale, weapon.fireSfxVolume);
         PlayClipWithPitch(weapon.fireSfx, volume, 1f);
     }
 
@@ -1897,7 +1928,7 @@ public class CursorController : MonoBehaviour
         if (capturingSfx == null)
             return 0f;
 
-        PlayClipWithPitch(capturingSfx, Mathf.Clamp01(stateSfxVolume * Mathf.Clamp01(volumeScale)), pitch);
+        PlayClipWithPitch(capturingSfx, ApplyMasterSfxVolume(stateSfxVolume, volumeScale), pitch);
         return capturingSfx.length;
     }
 
@@ -1906,7 +1937,7 @@ public class CursorController : MonoBehaviour
         if (capturedSfx == null)
             return 0f;
 
-        PlayClipWithPitch(capturedSfx, Mathf.Clamp01(stateSfxVolume * Mathf.Clamp01(volumeScale)), pitch);
+        PlayClipWithPitch(capturedSfx, ApplyMasterSfxVolume(stateSfxVolume, volumeScale), pitch);
         return capturedSfx.length;
     }
 
@@ -1915,7 +1946,7 @@ public class CursorController : MonoBehaviour
         if (explosionSfx == null)
             return 0f;
 
-        PlayClipWithPitch(explosionSfx, Mathf.Clamp01(explosionSfxVolume * Mathf.Clamp01(volumeScale)), 1f);
+        PlayClipWithPitch(explosionSfx, ApplyMasterSfxVolume(explosionSfxVolume, volumeScale), 1f);
         return explosionSfx.length;
     }
 
@@ -1924,7 +1955,7 @@ public class CursorController : MonoBehaviour
         if (endingTurnSfx == null)
             return 0f;
 
-        PlayClipWithPitch(endingTurnSfx, Mathf.Clamp01(endingTurnSfxVolume * Mathf.Clamp01(volumeScale)), 1f);
+        PlayClipWithPitch(endingTurnSfx, ApplyMasterSfxVolume(endingTurnSfxVolume, volumeScale), 1f);
         return endingTurnSfx.length;
     }
 
@@ -1936,11 +1967,11 @@ public class CursorController : MonoBehaviour
 
         if (audioSource == null)
         {
-            AudioSource.PlayClipAtPoint(clip, transform.position, unitMoveSfxVolume);
+            AudioSource.PlayClipAtPoint(clip, transform.position, ApplyMasterSfxVolume(unitMoveSfxVolume));
             return;
         }
 
-        audioSource.PlayOneShot(clip, unitMoveSfxVolume);
+        audioSource.PlayOneShot(clip, ApplyMasterSfxVolume(unitMoveSfxVolume));
     }
 
     public bool TryPlaySkillSfx(SkillData skill, float volumeScale = 1f)
@@ -1949,7 +1980,7 @@ public class CursorController : MonoBehaviour
         if (clip == null)
             return false;
 
-        float volume = Mathf.Clamp01(skillSfxVolume * Mathf.Clamp01(volumeScale));
+        float volume = ApplyMasterSfxVolume(skillSfxVolume, volumeScale);
         if (audioSource == null)
         {
             AudioSource.PlayClipAtPoint(clip, transform.position, volume);
@@ -2122,7 +2153,7 @@ public class CursorController : MonoBehaviour
             PanelDialogController.TrySetTransientText("Invalid action", 2f);
 
         if (audioSource != null)
-            audioSource.PlayOneShot(clip, uiSfxVolume);
+            audioSource.PlayOneShot(clip, ApplyMasterSfxVolume(uiSfxVolume));
     }
 
     public void PlayBeepSfx() => PlayUiSfx(beepSfx);
@@ -2132,6 +2163,21 @@ public class CursorController : MonoBehaviour
     public void PlayDoneSfx() => PlayUiSfx(doneSfx);
     public void PlayLoadSfx() => PlayUiSfx(loadSfx);
     public void PlayCursorMoveSfx() => PlayMoveSfx();
+
+    private float ApplyMasterSfxVolume(float categoryVolume)
+    {
+        return Mathf.Clamp01(masterSfxVolume) * Mathf.Clamp01(categoryVolume);
+    }
+
+    private float ApplyMasterSfxVolume(float categoryVolume, float volumeScale)
+    {
+        return Mathf.Clamp01(ApplyMasterSfxVolume(categoryVolume) * Mathf.Clamp01(volumeScale));
+    }
+
+    private float ApplyMasterSfxVolume(float categoryVolume, float volumeScale, float clipVolume)
+    {
+        return Mathf.Clamp01(ApplyMasterSfxVolume(categoryVolume, volumeScale) * Mathf.Clamp01(clipVolume));
+    }
 
     private void PlayClipWithPitch(AudioClip clip, float volume, float pitch)
     {

@@ -26,6 +26,7 @@ public class MatchMusicAudioManager : MonoBehaviour
     [SerializeField] private MusicPlaybackMode playbackMode = MusicPlaybackMode.Free;
     [SerializeField] private bool playOnStart = true;
     [SerializeField] [Range(0f, 1f)] private float musicVolume = 0.7f;
+    [SerializeField] [Range(0f, 1f)] private float roundMusicVolume = 1f;
     [SerializeField] private bool shuffleFreeMode = false;
     [Header("Per-Team Volume")]
     [SerializeField] [Range(0f, 2f)] private float neutralMusicVolume = 1f;
@@ -128,6 +129,7 @@ public class MatchMusicAudioManager : MonoBehaviour
         EnsureReferences();
         EnsurePerTeamVolumeLegacyFallback();
         musicVolume = Mathf.Clamp01(musicVolume);
+        roundMusicVolume = Mathf.Clamp01(roundMusicVolume);
         ClampPerTeamVolumes();
         TryAutoAssignMusicClipsInEditor();
         EnsureFreePlaylistFallback();
@@ -144,6 +146,11 @@ public class MatchMusicAudioManager : MonoBehaviour
     public float GetMasterMusicVolume()
     {
         return musicVolume;
+    }
+
+    public float GetRoundMusicVolume()
+    {
+        return roundMusicVolume;
     }
 
     public void SetTeamMusicVolume(int teamId, float volume)

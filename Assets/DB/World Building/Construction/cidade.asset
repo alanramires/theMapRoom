@@ -10,13 +10,15 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 0746e2e5fa3ba154eb1c64585653d260, type: 3}
-  m_Name: cidade
+  m_Name: Cidade
   m_EditorClassIdentifier: Assembly-CSharp::ConstructionData
   id: cidade
   displayName: Cidade
   sufixo: City
-  description: "Gera dinheiro por turno.\nMarca alvos no pr\xF3prio hex.\nRevela
-    os arredores."
+  description: "Gera renda e armazena suprimentos.\nN\xE3o produz unidades.\nOferece
+    posi\xE7\xE3o defensiva melhorada."
+  grammaticalGender: 0
+  requiredBuilding: {fileID: 0}
   isAirport: 0
   isHarbor: 0
   isCity: 1

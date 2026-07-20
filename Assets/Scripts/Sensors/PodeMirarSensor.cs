@@ -2321,8 +2321,13 @@ public static class UnitThreatEnvelopeService
             var localThreat = new HashSet<Vector3Int>();
             foreach (Vector3Int moveCell in movementCells)
             {
-                if (profile == ThreatProfile.Hybrid && staticThreat.Contains(moveCell))
-                    continue;
+                // Nao pular celulas de movimento que caiam dentro do staticThreat: uma
+                // coisa e a celula estar no alcance parado, outra e tudo que se atinge
+                // DE LA ja estar coberto. Numa hibrida (min 1 / max 2) o tiro pos-movimento
+                // colapsa para alcance 1, entao a partir de uma celula na borda do alcance
+                // parado ela alcanca alvos que o tiro parado nao alcanca. Pular aqui abria
+                // um buraco no envelope e o CanThreaten barrava o ataque antes do sensor:
+                // a artilheira combatente parava ao lado do alvo sem atirar.
                 localThreat.Clear();
                 PodeMirarSensor.CollectValidFireCellsFromOrigin(
                     unit, map, terrainDatabase, SensorMovementMode.MoveuAndando,

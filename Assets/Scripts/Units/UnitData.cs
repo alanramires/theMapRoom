@@ -99,6 +99,10 @@ public class UnitData : ScriptableObject
     [TextArea]
     public string description;
 
+    [Header("Construction Requirements")]
+    [Tooltip("Construcao que a equipe precisa ter capturado ao menos uma vez antes de poder produzir esta unidade.")]
+    public ConstructionData requiredBuilding;
+
     [FormerlySerializedAs("sprite")]
     public Sprite spriteDefault;
     public List<TeamVariantSprite> teamVariantSprites = new List<TeamVariantSprite>();

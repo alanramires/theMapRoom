@@ -10,36 +10,41 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 67e557a91c4c9e647867393f7063f6f8, type: 3}
-  m_Name: "AR Ca\xE7a A"
+  m_Name: AR Bombardeiro F
   m_EditorClassIdentifier: Assembly-CSharp::UnitData
-  id: cacaA
-  displayName: "Ca\xE7a A"
-  apelido: CA
-  description: "Ca\xE7a de superioridade a\xE9rea com grande alcance, capaz de projetar
-    for\xE7a rapidamente em qualquer ponto do mapa. Eficaz contra aeronaves e \xFAtil
-    contra alvos leves. Consome autonomia enquanto permanece no ar, exigindo opera\xE7\xF5es
-    curtas e planejamento de retorno. Ideal para garantir dom\xEDnio a\xE9reo em
-    momentos decisivos."
-  spriteDefault: {fileID: 21300000, guid: ab4dd6fb73168824ca05fc40a270a71a, type: 3}
+  id: bf
+  displayName: Bombardeiro F
+  apelido: BF
+  description: "Bombardeiro de alto impacto capaz de causar dano severo a unidades
+    terrestres expostas. Ideal para abrir brechas e punir concentra\xE7\xF5es inimigas.
+    Consome autonomia rapidamente no ar e depende de planejamento log\xEDstico para
+    operar. Vulner\xE1vel a defesas anti-a\xE9reas e exige timing preciso para evitar
+    perdas."
+  requiredBuilding: {fileID: 11400000, guid: a0196e8786679d54082c6308926bdb18, type: 2}
+  spriteDefault: {fileID: 21300000, guid: 35328fdd87c991449885c49a0c7ff593, type: 3}
   teamVariantSprites: []
   maxHP: 10
-  defense: 15
-  armorClass: 2
-  movement: 9
-  visao: 4
+  defense: 13
+  armorClass: 1
+  movement: 6
+  visao: 3
   visionSpecializations: []
   movementCategory: 3
   militaryForce: 1
-  unitClass: 4
-  combatClassification: 0
-  roles: 08000000
-  aiInitiative: 1
-  aiPurchaseMode: 2
+  unitClass: 6
+  combatClassification: 2
+  roles: 09000000
+  aiInitiative: 2
+  aiPurchaseMode: 0
   bannedOnHardMode: 0
   aiTargetPreferenceByClass:
-  - targetClass: 6
+  - targetClass: 2
     priority: 2
-  - targetClass: 4
+  - targetClass: 3
+    priority: 2
+  - targetClass: 1
+    priority: 1
+  - targetClass: 8
     priority: 1
   aiSensorPriority: 0000000002000000
   prioritizeDpqAtBattle: 0
@@ -55,8 +60,8 @@ MonoBehaviour:
   attackMustSurvive: 1
   ignoreAttackDecisionWhenDefending: 0
   defensiveAttackExtraHpLossPercent: 20
-  repairTriggerHpBelow: 5
-  repairTriggerAutonomyPct: 30
+  repairTriggerHpBelow: 3
+  repairTriggerAutonomyPct: 40
   repairTriggerAmmoEnabled: 1
   repairTriggerAmmoPct: 0
   repairRecoverHpAbove: 8
@@ -72,20 +77,19 @@ MonoBehaviour:
   aiPreventiveSupplyAutonomyBelowPct: 60
   aiPreventiveSupplyWeaponAmmoAtOrBelow: 1
   eliteLevel: 1
-  eliteFrom: {fileID: 11400000, guid: 4712157db5587b64c99690ba148b4b80, type: 2}
+  eliteFrom: {fileID: 11400000, guid: 55cd1f4769313c14a99e623384d368e2, type: 2}
   combatModifiers:
-  - {fileID: 11400000, guid: 25b8791e695efc94a8c2d5a329cd5602, type: 2}
-  - {fileID: 11400000, guid: e3e752c450b5d8243b04ca1abf1eac6a, type: 2}
+  - {fileID: 11400000, guid: 23ed629c09c8bb74d882635509ae0f57, type: 2}
   domain: 3
   heightLevel: 5
   aditionalDomainsAllowed:
-  - domain: 3
-    heightLevel: 4
-    spriteDefault: {fileID: 21300000, guid: 72ec5f2c5995ee746972615303dddb01, type: 3}
-    teamVariantSprites: []
   - domain: 0
     heightLevel: 3
-    spriteDefault: {fileID: 21300000, guid: 6d668a2538038af449f596df1c66b18b, type: 3}
+    spriteDefault: {fileID: 21300000, guid: 920ede89edee42f4fb77cfee2e93a972, type: 3}
+    teamVariantSprites: []
+  - domain: 3
+    heightLevel: 4
+    spriteDefault: {fileID: 21300000, guid: 9a6abd1f3b943a34a94be1fd5abc106a, type: 3}
     teamVariantSprites: []
   useExplicitPreferredAirHeight: 0
   preferredAirHeight: 4
@@ -96,26 +100,22 @@ MonoBehaviour:
   emergeAfterAttackHeight: 3
   emergeAfterAttackTurns: 2
   skills:
-  - {fileID: 11400000, guid: 3f52a3b7c5d14c5ea1f0f9aa34d2be11, type: 2}
   - {fileID: 11400000, guid: e73850be27dc4e2e8c8f210db151b0b4, type: 2}
+  - {fileID: 11400000, guid: 3f52a3b7c5d14c5ea1f0f9aa34d2be11, type: 2}
   stealthSkills: []
-  stealthSkillRules: []
+  stealthSkillRules:
+  - domain: 3
+    heightLevel: 5
+    skill: {fileID: 11400000, guid: 3ae2d2213e72ea144a307a743470d032, type: 2}
   autonomyData: {fileID: 11400000, guid: d52348f636f1466d95a6489891e176bf, type: 2}
   embarkedWeapons:
-  - weapon: {fileID: 11400000, guid: 90f330ac8c9e6624fafb495e58bdba25, type: 2}
-    squadAmmunition: 5
+  - weapon: {fileID: 11400000, guid: 86a03ca38b95e2a4db570315170881be, type: 2}
+    squadAmmunition: 3
     operationRangeMin: 1
-    operationRangeMax: 1
+    operationRangeMax: 2
     selectedTrajectory: 0
     canBeFireOnlyAtDomainHeigh: []
-    lastSyncedWeapon: {fileID: 11400000, guid: 90f330ac8c9e6624fafb495e58bdba25, type: 2}
-  - weapon: {fileID: 11400000, guid: 5430f79fb5141ce41a424bd96250ed1b, type: 2}
-    squadAmmunition: 8
-    operationRangeMin: 1
-    operationRangeMax: 1
-    selectedTrajectory: 0
-    canBeFireOnlyAtDomainHeigh: []
-    lastSyncedWeapon: {fileID: 11400000, guid: 5430f79fb5141ce41a424bd96250ed1b, type: 2}
+    lastSyncedWeapon: {fileID: 11400000, guid: 86a03ca38b95e2a4db570315170881be, type: 2}
   cantUseWeaponsOnTheFollowDomain:
   - domain: 0
     heightLevel: 3
@@ -139,5 +139,5 @@ MonoBehaviour:
   passengersCanDisembarkAndGoesToTerrainStructures: []
   passengersCanDisembarkAndGoesToConstructions: []
   transportSlots: []
-  autonomia: 80
-  cost: 26000
+  autonomia: 90
+  cost: 32000

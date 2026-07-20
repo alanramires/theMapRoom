@@ -24,8 +24,14 @@ public partial class TurnStateManager
                 movementMode,
                 out ConstructionManager target,
                 out _,
-                out reason))
+                out reason,
+                matchController))
         {
+            if (!string.IsNullOrWhiteSpace(reason))
+            {
+                PushPanelUnitMessage(reason, 3.2f);
+                cursorController?.PlayErrorSfx();
+            }
             RuntimeLog(string.IsNullOrWhiteSpace(reason)
                 ? "Pode Capturar (\"C\"): sem alvo de captura valido."
                 : $"Pode Capturar (\"C\"): {reason}");
@@ -71,8 +77,11 @@ public partial class TurnStateManager
                     movementMode,
                     out _,
                     out PodeCapturarSensor.CaptureOperationType operationType,
-                    out string operationReason))
+                    out string operationReason,
+                    matchController))
             {
+                if (!string.IsNullOrWhiteSpace(operationReason))
+                    PushPanelUnitMessage(operationReason, 3.2f);
                 RuntimeLog(string.IsNullOrWhiteSpace(operationReason)
                     ? "[Captura] Operacao invalida no momento da execucao."
                     : $"[Captura] Operacao invalida: {operationReason}");

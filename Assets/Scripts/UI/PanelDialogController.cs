@@ -837,6 +837,7 @@ public class PanelDialogController : MonoBehaviour
         int cost = turnStateManager.ShoppingSelectedOptionCost;
         shoppingCounterText.text = count > 0 ? $"{index + 1} / {count}" : string.Empty;
         shoppingBuyText.text = $"COMPRAR  $ {cost.ToString("N0", CultureInfo.GetCultureInfo("pt-BR"))}";
+        shoppingBuyButton.interactable = turnStateManager.ShoppingSelectedOptionCanPurchase;
 
         // Botoes seguem a cor do time ativo (virou tudo slot de jogador).
         Color teamColor = ResolveActiveTeamColor();

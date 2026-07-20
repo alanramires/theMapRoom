@@ -11,7 +11,7 @@ GameObject:
   - component: {fileID: 8608215982428590264}
   - component: {fileID: 5998134151792928748}
   - component: {fileID: 847503807857744681}
-  - component: {fileID: 3142565628165459601}
+  - component: {fileID: 6204454998205797334}
   m_Layer: 5
   m_Name: Panel_Debug
   m_TagString: Untagged
@@ -78,7 +78,7 @@ MonoBehaviour:
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 1
---- !u!114 &3142565628165459601
+--- !u!114 &6204454998205797334
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -87,16 +87,14 @@ MonoBehaviour:
   m_GameObject: {fileID: 799349422101955933}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 57204a2b092e5ec468746a6a29c85a52, type: 3}
+  m_Script: {fileID: 11500000, guid: 5b11be9ee63fe2340ae9fd8814bebd05, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::DebugPanelCommandController
+  m_EditorClassIdentifier: Assembly-CSharp::PanelDebugController
   turnStateManager: {fileID: 0}
   matchController: {fileID: 0}
   cursorController: {fileID: 0}
   sendButton: {fileID: 675876448835424477}
   commandInputObject: {fileID: 8248598168521185953}
-  aiDebugShortcutsEnabled: 0
-  resetPlanOnDebugStage: 0
 --- !u!1 &1825758723578554666
 GameObject:
   m_ObjectHideFlags: 0

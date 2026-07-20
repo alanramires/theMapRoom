@@ -289,6 +289,9 @@ public partial class TurnStateManager
         public string unitName;
         public int? cost;
         public bool canAfford = true;
+        public bool requirementMet = true;
+        public string blockedReason;
+        public string requiredBuildingName;
         public bool isFocused;
         public bool isCancel;
     }
@@ -3154,6 +3157,9 @@ public partial class TurnStateManager
                 resolvedCost = matchController.ResolveEconomyCost(unit.cost);
             bool canAfford = !resolvedCost.HasValue || matchController == null ||
                 matchController.GetActualMoney((TeamId)matchController.ActiveTeamId) >= resolvedCost.Value;
+            string blockedReason = string.Empty;
+            bool requirementMet = matchController == null ||
+                matchController.CanProduceUnit((TeamId)matchController.ActiveTeamId, unit, out blockedReason);
 
             data.ShoppingLines.Add(new HelperShoppingLine
             {
@@ -3161,6 +3167,13 @@ public partial class TurnStateManager
                 unitName = ResolveUnitName(unit),
                 cost = resolvedCost,
                 canAfford = canAfford,
+                requirementMet = requirementMet,
+                blockedReason = blockedReason,
+                requiredBuildingName = unit.requiredBuilding != null
+                    ? (!string.IsNullOrWhiteSpace(unit.requiredBuilding.displayName)
+                        ? unit.requiredBuilding.displayName.Trim()
+                        : unit.requiredBuilding.name)
+                    : string.Empty,
                 isFocused = !shoppingCancelFocused && shoppingSelectedIndex == i
             });
         }

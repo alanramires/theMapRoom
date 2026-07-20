@@ -10,54 +10,58 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 67e557a91c4c9e647867393f7063f6f8, type: 3}
-  m_Name: "AR Ca\xE7a F"
+  m_Name: AR EWACS
   m_EditorClassIdentifier: Assembly-CSharp::UnitData
-  id: cacaF
-  displayName: "Ca\xE7a F"
-  apelido: CF
-  description: "Ca\xE7a de superioridade a\xE9rea com grande alcance, capaz de projetar
-    for\xE7a rapidamente em qualquer ponto do mapa. Eficaz contra aeronaves e \xFAtil
-    contra alvos leves. Consome autonomia enquanto permanece no ar, exigindo opera\xE7\xF5es
-    curtas e planejamento de retorno. Ideal para garantir dom\xEDnio a\xE9reo em
-    momentos decisivos."
-  spriteDefault: {fileID: 21300000, guid: d6df093a3c91e5c47ad250ed8b400a30, type: 3}
+  id: ewacs
+  displayName: EWACS
+  apelido: EW
+  description: "Aeronave de reconhecimento que amplia drasticamente a vis\xE3o a\xE9rea,
+    revelando movimentos em grandes dist\xE2ncias. Essencial para antecipar amea\xE7as
+    e coordenar opera\xE7\xF5es. N\xE3o possui capacidade de combate e n\xE3o detecta
+    unidades terrestres ou submarinos. Deve operar protegida, pois sua perda reduz
+    severamente a consci\xEAncia do campo de batalha."
+  requiredBuilding: {fileID: 11400000, guid: c217ce9a62b1d5e4ca4ceb0c65946b56, type: 2}
+  spriteDefault: {fileID: 21300000, guid: c0b17bc8f689a46478caca98f7d5183b, type: 3}
   teamVariantSprites: []
   maxHP: 10
-  defense: 15
-  armorClass: 2
+  defense: 12
+  armorClass: 1
   movement: 7
-  visao: 4
-  visionSpecializations: []
+  visao: 3
+  visionSpecializations:
+  - domain: 3
+    allHeights: 1
+    heightLevel: 5
+    vision: 7
+    detectUnitsWithFollowingSkills:
+    - {fileID: 11400000, guid: 3ae2d2213e72ea144a307a743470d032, type: 2}
+    losPolicy: 0
   movementCategory: 3
   militaryForce: 1
-  unitClass: 4
-  combatClassification: 2
-  roles: 08000000
-  aiInitiative: 1
-  aiPurchaseMode: 2
+  unitClass: 6
+  combatClassification: 3
+  roles: 06000000
+  aiInitiative: 0
+  aiPurchaseMode: 0
   bannedOnHardMode: 0
-  aiTargetPreferenceByClass:
-  - targetClass: 6
-    priority: 2
-  - targetClass: 4
-    priority: 1
+  aiTargetPreferenceByClass: []
   aiSensorPriority: 0000000002000000
   prioritizeDpqAtBattle: 0
-  playConservative: 0
+  playConservative: 1
   preferMoveOnBestDPQ: 0
-  preferMaxDisplacement: 1
+  preferMaxDisplacement: 0
   longRangeStationary: 0
   preferRepositionAtWeaponMaxRange: 0
   preferArtilleryModeBeforeCombatant: 0
-  useAttackDecision: 1
-  attackAcceptHpLossPercent: 90
+  useAttackDecision: 0
+  attackAcceptHpLossPercent: 50
   attackEliminationMinPercent: 10
   attackMustSurvive: 1
   ignoreAttackDecisionWhenDefending: 0
   defensiveAttackExtraHpLossPercent: 20
-  repairTriggerHpBelow: 5
-  repairTriggerAutonomyPct: 30
-  repairTriggerAmmoEnabled: 1
+  repairTriggerHpBelow: 3
+  repairTriggerAutonomyPct: 40
+  repairTriggerAmmoEnabled: 0
   repairTriggerAmmoPct: 0
   repairRecoverHpAbove: 8
   fuseWhileInRepair: 1
@@ -71,22 +75,19 @@ MonoBehaviour:
   aiPreventiveSupplyHpBelowPct: 70
   aiPreventiveSupplyAutonomyBelowPct: 60
   aiPreventiveSupplyWeaponAmmoAtOrBelow: 1
-  eliteLevel: 2
-  eliteFrom: {fileID: 11400000, guid: 68658bfb5d8329a46ae3d991cc94ccd7, type: 2}
-  combatModifiers:
-  - {fileID: 11400000, guid: 84e79caf71c32194296b7fcdc7398288, type: 2}
-  - {fileID: 11400000, guid: fd87feedf31f0894ba8f7e5acc1e388a, type: 2}
-  - {fileID: 11400000, guid: e3e752c450b5d8243b04ca1abf1eac6a, type: 2}
+  eliteLevel: 0
+  eliteFrom: {fileID: 0}
+  combatModifiers: []
   domain: 3
   heightLevel: 5
   aditionalDomainsAllowed:
-  - domain: 3
-    heightLevel: 4
-    spriteDefault: {fileID: 21300000, guid: 3022842bbb4b938469bd2b04beae0bb5, type: 3}
-    teamVariantSprites: []
   - domain: 0
     heightLevel: 3
-    spriteDefault: {fileID: 21300000, guid: 233b329df58164546b6e0eca5a47d99d, type: 3}
+    spriteDefault: {fileID: 21300000, guid: 06cbc9a30dd101f4395d6b36b942a822, type: 3}
+    teamVariantSprites: []
+  - domain: 3
+    heightLevel: 4
+    spriteDefault: {fileID: 21300000, guid: 2c55b7950037b9e43a76edfdeb8b2780, type: 3}
     teamVariantSprites: []
   useExplicitPreferredAirHeight: 0
   preferredAirHeight: 4
@@ -97,32 +98,13 @@ MonoBehaviour:
   emergeAfterAttackHeight: 3
   emergeAfterAttackTurns: 2
   skills:
-  - {fileID: 11400000, guid: 3f52a3b7c5d14c5ea1f0f9aa34d2be11, type: 2}
   - {fileID: 11400000, guid: e73850be27dc4e2e8c8f210db151b0b4, type: 2}
+  - {fileID: 11400000, guid: 3f52a3b7c5d14c5ea1f0f9aa34d2be11, type: 2}
   stealthSkills: []
-  stealthSkillRules:
-  - domain: 3
-    heightLevel: 5
-    skill: {fileID: 11400000, guid: 3ae2d2213e72ea144a307a743470d032, type: 2}
+  stealthSkillRules: []
   autonomyData: {fileID: 11400000, guid: d52348f636f1466d95a6489891e176bf, type: 2}
-  embarkedWeapons:
-  - weapon: {fileID: 11400000, guid: 90f330ac8c9e6624fafb495e58bdba25, type: 2}
-    squadAmmunition: 6
-    operationRangeMin: 1
-    operationRangeMax: 2
-    selectedTrajectory: 0
-    canBeFireOnlyAtDomainHeigh: []
-    lastSyncedWeapon: {fileID: 11400000, guid: 90f330ac8c9e6624fafb495e58bdba25, type: 2}
-  - weapon: {fileID: 11400000, guid: 5430f79fb5141ce41a424bd96250ed1b, type: 2}
-    squadAmmunition: 8
-    operationRangeMin: 1
-    operationRangeMax: 1
-    selectedTrajectory: 0
-    canBeFireOnlyAtDomainHeigh: []
-    lastSyncedWeapon: {fileID: 11400000, guid: 5430f79fb5141ce41a424bd96250ed1b, type: 2}
-  cantUseWeaponsOnTheFollowDomain:
-  - domain: 0
-    heightLevel: 3
+  embarkedWeapons: []
+  cantUseWeaponsOnTheFollowDomain: []
   isSupplier: 0
   supplierTier: 0
   maxUnitsServedPerTurn: 0
@@ -143,5 +125,5 @@ MonoBehaviour:
   passengersCanDisembarkAndGoesToTerrainStructures: []
   passengersCanDisembarkAndGoesToConstructions: []
   transportSlots: []
-  autonomia: 80
-  cost: 36000
+  autonomia: 90
+  cost: 9000

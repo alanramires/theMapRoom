@@ -663,7 +663,8 @@ public partial class TurnStateManager
             SensorMovementMode.MoveuParado,
             out targetConstruction,
             out operationType,
-            out reason);
+            out reason,
+            matchController);
     }
 
     // Retorna os alvos de suprimento validos para 'supplier' na posicao atual.
@@ -1438,5 +1439,4 @@ public partial class TurnStateManager
         return true;
     }
 }
-
 

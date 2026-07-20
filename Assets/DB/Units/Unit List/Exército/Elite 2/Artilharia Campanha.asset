@@ -10,44 +10,46 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 67e557a91c4c9e647867393f7063f6f8, type: 3}
-  m_Name: SAM
+  m_Name: Artilharia Campanha
   m_EditorClassIdentifier: Assembly-CSharp::UnitData
-  id: sam
-  displayName: Surface Air Missile
-  apelido: SAM
-  description: "Sistema anti-a\xE9reo de m\xE9dio alcance que controla o espa\xE7o
-    a\xE9reo. Quando combinado com radar ou detec\xE7\xE3o, cria zonas de nega\xE7\xE3o
-    eficazes. Posicione m\xFAltiplas unidades cobrindo pontos cegos. Vulner\xE1vel
-    a ataques terrestres e dependente de posicionamento estrat\xE9gico."
-  spriteDefault: {fileID: 21300000, guid: 0b38e614f48c0a74aacb439821d77c9c, type: 3}
+  id: artCampanha
+  displayName: Artilharia de Campanha
+  apelido: AC
+  description: "Arma de longo alcance que controla \xE1reas inteiras do campo. Quando
+    protegida, for\xE7a avan\xE7os m\xFAltiplos ou causa perdas constantes. Depende
+    de spotters para alcance m\xE1ximo e log\xEDstica para operar. Vulner\xE1vel
+    a aproxima\xE7\xF5es curtas e \xE0 perda de observadores."
+  requiredBuilding: {fileID: 11400000, guid: a0196e8786679d54082c6308926bdb18, type: 2}
+  spriteDefault: {fileID: 21300000, guid: 15f6d8eabcc24eb41a8ca606fd780207, type: 3}
   teamVariantSprites: []
   maxHP: 10
-  defense: 13
-  armorClass: 1
-  movement: 4
+  defense: 16
+  armorClass: 2
+  movement: 1
   visao: 3
   visionSpecializations: []
   movementCategory: 6
   militaryForce: 0
   unitClass: 2
   combatClassification: 1
-  roles: 0a000000
+  roles: 05000000
   aiInitiative: 0
   aiPurchaseMode: 2
+  bannedOnHardMode: 0
   aiTargetPreferenceByClass:
-  - targetClass: 6
+  - targetClass: 3
     priority: 2
-  - targetClass: 5
-    priority: 2
-  - targetClass: 5
-    priority: 2
+  - targetClass: 1
+    priority: 1
+  - targetClass: 2
+    priority: 1
   aiSensorPriority: 0000000002000000
-  prioritizeDpqAtBattle: 0
-  playConservative: 1
+  prioritizeDpqAtBattle: 1
+  playConservative: 0
   preferMoveOnBestDPQ: 0
   preferMaxDisplacement: 0
-  longRangeStationary: 0
-  preferRepositionAtWeaponMaxRange: 1
+  longRangeStationary: 1
+  preferRepositionAtWeaponMaxRange: 0
   preferArtilleryModeBeforeCombatant: 0
   useAttackDecision: 1
   attackAcceptHpLossPercent: 50
@@ -55,23 +57,29 @@ MonoBehaviour:
   attackMustSurvive: 1
   ignoreAttackDecisionWhenDefending: 0
   defensiveAttackExtraHpLossPercent: 20
-  repairTriggerHpBelow: 5
-  repairTriggerAutonomyPct: 50
+  repairTriggerHpBelow: 2
+  repairTriggerAutonomyPct: 10
   repairTriggerAmmoEnabled: 1
   repairTriggerAmmoPct: 0
   repairRecoverHpAbove: 8
   fuseWhileInRepair: 1
+  restockTriggerGallonPct: 0
+  restockTriggerAmmoBoxPct: 0
+  restockTriggerToolsPct: 0
+  restockWhenAnyRuntimeSupplyEmpty: 1
   aiPreventiveMaintenanceEnabled: 1
   aiPreventiveSupplyCanRunWithUnderRepair: 0
   aiConservativeSupplyAvoidEnemyRange: 2
   aiPreventiveSupplyHpBelowPct: 70
   aiPreventiveSupplyAutonomyBelowPct: 60
   aiPreventiveSupplyWeaponAmmoAtOrBelow: 1
-  eliteLevel: 1
-  eliteFrom: {fileID: 11400000, guid: 5e69516e1944ffc43bae1a7cd3c7c69c, type: 2}
+  eliteLevel: 2
+  eliteFrom: {fileID: 11400000, guid: f5327adf7bafffb408255d31a96ba049, type: 2}
   combatModifiers:
-  - {fileID: 11400000, guid: cae64e256d2ce3b459cbc9e546b4402c, type: 2}
-  - {fileID: 11400000, guid: 156fa08900203414093f59ab53a77cc5, type: 2}
+  - {fileID: 11400000, guid: 8f009e4781fd97c4384dbdc6c19ce234, type: 2}
+  - {fileID: 11400000, guid: a85d4249a06a33349ab391872875ed9a, type: 2}
+  - {fileID: 11400000, guid: f960fb6e28f9b074ab0e201a641471d9, type: 2}
+  - {fileID: 11400000, guid: 43b464b15f9886a44aed4c53ad9d7091, type: 2}
   domain: 0
   heightLevel: 3
   aditionalDomainsAllowed: []
@@ -79,19 +87,23 @@ MonoBehaviour:
   preferredAirHeight: 4
   useExplicitPreferredNavalHeight: 0
   preferredNavalHeight: 2
+  emergesToAttack: 0
+  emergeAfterAttackDomain: 1
+  emergeAfterAttackHeight: 3
+  emergeAfterAttackTurns: 2
   skills:
-  - {fileID: 11400000, guid: ef10c9e820afc074b99ea8e0b709c2f4, type: 2}
+  - {fileID: 11400000, guid: 5ef7a75e35294b68ac315145f98dcd17, type: 2}
   stealthSkills: []
   stealthSkillRules: []
-  autonomyData: {fileID: 0}
+  autonomyData: {fileID: 11400000, guid: 0bcfd3f1dc5e42f3ba4f7be31a5de231, type: 2}
   embarkedWeapons:
-  - weapon: {fileID: 11400000, guid: e58612c9a6796da4eb35f981486fa0e4, type: 2}
-    squadAmmunition: 4
-    operationRangeMin: 2
+  - weapon: {fileID: 11400000, guid: 196d938a8ddb1e245ac7ab070d89f387, type: 2}
+    squadAmmunition: 3
+    operationRangeMin: 3
     operationRangeMax: 4
-    selectedTrajectory: 0
+    selectedTrajectory: 1
     canBeFireOnlyAtDomainHeigh: []
-    lastSyncedWeapon: {fileID: 11400000, guid: e58612c9a6796da4eb35f981486fa0e4, type: 2}
+    lastSyncedWeapon: {fileID: 11400000, guid: 196d938a8ddb1e245ac7ab070d89f387, type: 2}
   cantUseWeaponsOnTheFollowDomain: []
   isSupplier: 0
   supplierTier: 0
@@ -113,5 +125,5 @@ MonoBehaviour:
   passengersCanDisembarkAndGoesToTerrainStructures: []
   passengersCanDisembarkAndGoesToConstructions: []
   transportSlots: []
-  autonomia: 40
-  cost: 12000
+  autonomia: 10
+  cost: 20000

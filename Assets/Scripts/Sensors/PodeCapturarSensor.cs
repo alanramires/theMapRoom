@@ -41,7 +41,8 @@ public static class PodeCapturarSensor
         Tilemap boardTilemap,
         SensorMovementMode movementMode,
         out ConstructionManager targetConstruction,
-        out string reason)
+        out string reason,
+        MatchController matchController = null)
     {
         return TryGetCaptureTarget(
             selectedUnit,
@@ -49,7 +50,8 @@ public static class PodeCapturarSensor
             movementMode,
             out targetConstruction,
             out _,
-            out reason);
+            out reason,
+            matchController);
     }
 
     public static bool TryGetCaptureTarget(
@@ -58,7 +60,8 @@ public static class PodeCapturarSensor
         SensorMovementMode movementMode,
         out ConstructionManager targetConstruction,
         out CaptureOperationType operationType,
-        out string reason)
+        out string reason,
+        MatchController matchController = null)
     {
         targetConstruction = null;
         operationType = CaptureOperationType.None;
@@ -110,6 +113,17 @@ public static class PodeCapturarSensor
 
         Vector3Int cell = selectedUnit.CurrentCellPosition;
         cell.z = 0;
+        if (matchController == null)
+            matchController = Object.FindAnyObjectByType<MatchController>();
+        if (matchController != null && matchController.IsFogOfWarDebugEnabled &&
+            !matchController.IsCellVisibleForActiveTeam(cell) &&
+            !matchController.TryGetKnownConstructionAtCell(
+                selectedUnit.TeamId, cell, out _, out _))
+        {
+            reason = "Nao ha construcao conhecida neste hex.";
+            return false;
+        }
+
         ConstructionManager construction = ConstructionOccupancyRules.GetConstructionAtCell(map, cell);
         if (construction == null)
         {
@@ -147,6 +161,15 @@ public static class PodeCapturarSensor
 
         targetConstruction = construction;
         operationType = CaptureOperationType.CaptureEnemy;
+        if (construction.TryResolveConstructionData(out ConstructionData constructionData))
+        {
+            if (matchController != null && !matchController.CanCaptureConstruction(unitTeam, constructionData, out reason))
+            {
+                if (sensorLogs)
+                    SensorLogGate.Log("PodeCapturarSensor", $"result blocked construction={construction.name} reason={reason}");
+                return false;
+            }
+        }
         if (sensorLogs)
             SensorLogGate.Log("PodeCapturarSensor", $"result hasAny=true op={operationType} construction={construction.name}");
         return true;

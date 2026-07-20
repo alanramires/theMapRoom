@@ -17,6 +17,8 @@ public class FogOfWarController : MonoBehaviour
     [SerializeField] private MatchController matchController;
     [Header("Presentation")]
     [SerializeField] [Range(0f, 1f)] private float fogOfWarAlpha = 0.65f;
+    [Tooltip("Multiplicador da nevoa em hexes ja explorados, mas fora da visao atual.")]
+    [SerializeField] [Range(0f, 1f)] private float exploredFogAlphaMultiplier = 0.8f;
     [SerializeField, HideInInspector] private bool fogOfWarAlphaInitialized;
     [SerializeField] private bool autoRefreshOnFogUpdate = false;
     [SerializeField] private bool includeInvisibleTargets = true;
@@ -28,6 +30,7 @@ public class FogOfWarController : MonoBehaviour
     public IReadOnlyList<FogUnitContributorsView> Snapshot => snapshot;
     public string LastDump => lastDump;
     public float FogOfWarAlpha => Mathf.Clamp01(fogOfWarAlpha);
+    public float ExploredFogAlphaMultiplier => Mathf.Clamp01(exploredFogAlphaMultiplier);
 
     private void OnEnable()
     {

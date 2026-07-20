@@ -181,9 +181,11 @@ public partial class TurnStateManager
             boardMap,
             movementMode,
             out cachedPodeCapturarConstruction,
-            out cachedPodeCapturarReason);
+            out cachedPodeCapturarReason,
+            matchController);
         availableSensorActionCodes.Remove('C');
-        if (canCapture)
+        // Mantem Capturar visivel quando existe alvo, mesmo se um requisito de progressao o bloquear.
+        if (canCapture || cachedPodeCapturarConstruction != null)
             availableSensorActionCodes.Add('C');
 
         bool canMerge = PodeFundirSensor.CollectOptions(
