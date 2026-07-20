@@ -2470,8 +2470,9 @@ public partial class TurnStateManager : MonoBehaviour
         if (temporaryFogTraversalUnit != null && temporaryFogTraversalUnit != unit)
             temporaryFogTraversalUnit.EndTemporaryFogTraversalVisual();
         temporaryFogTraversalUnit = unit;
-        bool isHumanTurn = matchController == null || !matchController.IsActiveTeamAI();
-        if (isHumanTurn)
+        bool showActionToObserver = matchController == null
+            || !matchController.ShouldHideActiveAiActionPresentation();
+        if (showActionToObserver)
         {
             temporaryFogTraversalUnit?.BeginTemporaryFogTraversalVisual();
             pathManager?.BeginTemporaryFogTraversalVisual();

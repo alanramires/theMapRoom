@@ -852,6 +852,17 @@ Névoa de Guerra
 Você comanda de uma sala de mapas. Só existe no seu tabuleiro aquilo que alguém seu está vendo agora.
 Essa é a última camada do jogo, e a que transforma tudo que você aprendeu numa disputa de verdade. Posição, alcance e RPS decidem combates. Informação decide se o combate acontece nos seus termos.
 --------------------------------------------------------------------------------
+O Que Você Já Viu, Você Lembra
+Antes de tudo, uma distinção que muda como o mapa se comporta: existe diferença entre o que você **vê agora** e o que você **já viu**.
+Terreno que suas unidades revelaram uma vez não volta ao breu quando elas se afastam. Ele fica como uma fotografia: o relevo continua desenhado no mapa, porque terreno não anda e não muda. Uma montanha que você viu no turno 3 ainda estará ali no turno 30, tenha você tropas por perto ou não.
+O mesmo vale para as construções que você já avistou. Elas permanecem no mapa com o dono que tinham **no momento em que você as viu por último**. É memória, não vigilância.
+--------------------------------------------------------------------------------
+A Fotografia Pode Estar Velha
+E aqui está a parte que engana: a lembrança não se atualiza sozinha.
+Se você viu uma cidade inimiga no turno 3 e saiu de perto, ela continua marcada como inimiga — mesmo que o dono dela tenha mudado três vezes desde então. A fotografia mostra o que você sabia, não o que é verdade agora. Para atualizar, é preciso voltar a ter olhos sobre o hexágono.
+Isso é honesto com a névoa, não uma brecha nela. O jogo não te dá de graça a informação que você não colheu; ele apenas não apaga a que você já colheu. Terreno é seguro lembrar, porque não muda. Dono de prédio é perigoso lembrar, porque muda — e a sua memória pode estar mentindo sem saber.
+E vale o mesmo que sempre valeu: lembrar o terreno não é lembrar quem está nele. A fotografia mostra o cenário parado. Quem se move por cima dele continua invisível até ser detectado de novo.
+--------------------------------------------------------------------------------
 Ver Não É Uma Coisa Só
 Duas perguntas diferentes se escondem sob a palavra "ver":
 O hexágono está revelado? — é o terreno, o que existe no mapa.
@@ -1085,3 +1096,19 @@ Concluir as tarefas de um tutorial encerra aquele cenário. É condição do roteiro
 Repare no que essas condições têm em comum: nenhuma delas transforma baixas em placar. Não existe meta de destruição, não existe pontuação por dano, não existe vitória por "causar mais estrago".
 O atrito só encerra a partida quando é total — quando o adversário não tem mais nenhuma força com que continuar. Você não vence porque destruiu vinte unidades. Vence porque tomou o lugar certo, ou porque não sobrou nada do outro lado.
 É por isso que o The Map Room premia quem administra território, informação e logística acima de quem administra combates. Ganhar todas as trocas de tiro e não tomar nada é perder devagar.
+--------------------------------------------------------------------------------
+Epílogo — A Sala de Mapas
+Se você guardar uma única ideia deste manual, guarde esta: **o The Map Room não é um jogo de tempo real. É um jogo de intel.**
+Num jogo de tempo real, o mapa é a verdade. Você vê as coisas acontecerem enquanto acontecem, e a informação chega junto com o evento. Aqui não. Aqui você comanda de uma sala de mapas, e sobre a mesa há apenas a última inteligência que chegou até você. O que está além do alcance dos seus sensores não é escuro porque o jogo o esconde — é escuro porque ninguém seu esteve lá para contar.
+--------------------------------------------------------------------------------
+Avançar Não É Descobrir
+É por isso que mover não revela.
+Você levanta a peça, desenha o trajeto, olha as opções que aquela posição ofereceria — e nada no mundo mudou ainda. Pode devolver a peça à origem e tentar outra coisa. Pode mudar de ideia quantas vezes quiser. O tabuleiro é seu para pensar, e pensar não custa nada nem entrega nada.
+O mundo só se atualiza depois que você **compromete** a ação e o jogo volta ao repouso. É nesse retorno — e só nele — que a névoa é recalculada, que a fotografia do terreno é refeita, que os contatos aparecem ou somem. Antes disso, tudo é ensaio.
+Repouso, ação comprometida, repouso, recálculo. Essa é a respiração do jogo, e ela é o que separa o The Map Room de um mapa que você tateia às cegas. Você não descobre o mundo empurrando o cursor contra a escuridão. Você toma uma decisão sob incerteza, aceita as consequências, e **então** o mundo te conta o que você encontrou.
+--------------------------------------------------------------------------------
+A Aposta
+No fim, é isso que o jogo pede de você: decidir com informação incompleta e viver com o resultado.
+Cada avanço para dentro da névoa é uma aposta sobre o que há do outro lado. Cada disparo é uma aposta sobre se o alvo que apareceu no seu tabuleiro está mesmo vulnerável — ou se foi você quem entrou na mira de alguém. A última intel conhecida é tudo o que você tem, e ela pode estar velha, incompleta, ou ser exatamente a isca que o inimigo quis que você visse.
+Vencer aqui não é ter a melhor arma. É administrar melhor a observação, a ocultação, o alcance, o momento e a posição dos seus olhos no mapa.
+A guerra não é sobre atirar. É sobre saber.

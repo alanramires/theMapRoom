@@ -36,9 +36,14 @@ public class ShoppingPressureWindow : EditorWindow
     private GUIStyle _objTitle;
     private GUIStyle _demandTitle;
     private GUIStyle _subtle;
+    private GUIStyle _boldFoldout;
     private bool _stylesReady;
     private bool _showCounterPressure = true;
     private bool _showOperationalPressure = true;
+    private bool _showBestCounters = true;
+    private bool _showEligibleQueue = true;
+    private bool _showAxisOverview = true;
+    private readonly Dictionary<string, bool> _counterCategoryFoldouts = new Dictionary<string, bool>();
 
     [MenuItem("Tools/Utils/Shopping Pressure")]
     public static void OpenWindow()
@@ -78,6 +83,7 @@ public class ShoppingPressureWindow : EditorWindow
         _demandTitle = new GUIStyle(EditorStyles.boldLabel) { fontSize = 11 };
         _subtle = new GUIStyle(EditorStyles.miniLabel) { wordWrap = true };
         _subtle.normal.textColor = new Color(0.6f, 0.6f, 0.6f);
+        _boldFoldout = new GUIStyle(EditorStyles.foldout) { fontStyle = FontStyle.Bold };
         _stylesReady = true;
     }
 
@@ -121,6 +127,7 @@ public class ShoppingPressureWindow : EditorWindow
         // Coluna direita: objetivos do plano + fila de pressão no shopping.
         EditorGUILayout.BeginVertical(GUILayout.Width(position.width * 0.5f - 8f));
         _rightScroll = EditorGUILayout.BeginScrollView(_rightScroll);
+        DrawAxisOverview(_snapshot);
         DrawObjectivesColumn(plan);
         DrawPressureColumn(_snapshot, _demands);
         EditorGUILayout.EndScrollView();
@@ -444,18 +451,22 @@ public class ShoppingPressureWindow : EditorWindow
         if (offered.Count > 0)
         {
             EditorGUILayout.Space(2f);
-            EditorGUILayout.LabelField("melhores counters disponíveis:", _subtle);
-            int count = Mathf.Min(8, offered.Count);
-            for (int i = 0; i < count; i++)
+            _showBestCounters = EditorGUILayout.Foldout(
+                _showBestCounters, "melhores counters disponíveis", true, _boldFoldout);
+            if (_showBestCounters)
             {
-                UnitData unit = offered[i];
-                float fit = AIShoppingPlanner.InspectCounterFit(unit, pressure);
-                bool eligible = AIShoppingPlanner.InspectPurchaseEligibility(
-                    snapshot, unit, demands, out string reason);
-                EditorGUILayout.LabelField(
-                    $"  {i + 1}. {unit.displayName}  fit={fit:F1}  elite={unit.eliteLevel}  ${unit.cost}" +
-                    (eligible ? "  [elegível]" : $"  — {reason}"),
-                    _subtle);
+                int count = Mathf.Min(8, offered.Count);
+                for (int i = 0; i < count; i++)
+                {
+                    UnitData unit = offered[i];
+                    float fit = AIShoppingPlanner.InspectCounterFit(unit, pressure);
+                    bool eligible = AIShoppingPlanner.InspectPurchaseEligibility(
+                        snapshot, unit, demands, out string reason);
+                    EditorGUILayout.LabelField(
+                        $"  {i + 1}. {unit.displayName}  fit={fit:F1}  elite={unit.eliteLevel}  ${unit.cost}" +
+                        (eligible ? "  [elegível]" : $"  — {reason}"),
+                        _subtle);
+                }
             }
 
             var eligibleOffers = new List<UnitData>();
@@ -465,18 +476,22 @@ public class ShoppingPressureWindow : EditorWindow
                     eligibleOffers.Add(unit);
 
             EditorGUILayout.Space(2f);
-            EditorGUILayout.LabelField("elegíveis para a fila agora:", _subtle);
-            if (eligibleOffers.Count == 0)
-                EditorGUILayout.LabelField("  — nenhum counter elegível —", _subtle);
-            else
-                for (int i = 0; i < Mathf.Min(5, eligibleOffers.Count); i++)
-                {
-                    UnitData unit = eligibleOffers[i];
-                    float fit = AIShoppingPlanner.InspectCounterFit(unit, pressure);
-                    EditorGUILayout.LabelField(
-                        $"  {i + 1}. {unit.displayName}  fit={fit:F1}  elite={unit.eliteLevel}  ${unit.cost}",
-                        _subtle);
-                }
+            _showEligibleQueue = EditorGUILayout.Foldout(
+                _showEligibleQueue, "elegíveis para a fila agora", true, _boldFoldout);
+            if (_showEligibleQueue)
+            {
+                if (eligibleOffers.Count == 0)
+                    EditorGUILayout.LabelField("  — nenhum counter elegível —", _subtle);
+                else
+                    for (int i = 0; i < Mathf.Min(5, eligibleOffers.Count); i++)
+                    {
+                        UnitData unit = eligibleOffers[i];
+                        float fit = AIShoppingPlanner.InspectCounterFit(unit, pressure);
+                        EditorGUILayout.LabelField(
+                            $"  {i + 1}. {unit.displayName}  fit={fit:F1}  elite={unit.eliteLevel}  ${unit.cost}",
+                            _subtle);
+                    }
+            }
         }
         EditorGUILayout.EndVertical();
     }
@@ -573,9 +588,16 @@ public class ShoppingPressureWindow : EditorWindow
             return false;
 
         EditorGUILayout.Space(3f);
-        EditorGUILayout.LabelField(
-            $"▸ {label}: bruto={raw:F1}  cobertura={coverage:F1}  saldo={Mathf.Max(0f, raw - coverage):F1}",
-            EditorStyles.boldLabel);
+        if (!_counterCategoryFoldouts.TryGetValue(label, out bool expanded))
+            expanded = true;
+        expanded = EditorGUILayout.Foldout(
+            expanded,
+            $"{label}: bruto={raw:F1}  cobertura={coverage:F1}  saldo={Mathf.Max(0f, raw - coverage):F1}",
+            true,
+            _boldFoldout);
+        _counterCategoryFoldouts[label] = expanded;
+        if (!expanded)
+            return true;
 
         foreach (AIShoppingPlanner.EnemyClassPressureInspection entry in pressure.Classes)
         {
@@ -799,6 +821,112 @@ public class ShoppingPressureWindow : EditorWindow
 
     private static readonly PlanKind[] KindOrder =
         { PlanKind.Invasion, PlanKind.Rally, PlanKind.Defend, PlanKind.Capture };
+
+    // ----------------------------------------------------------------------------
+    // Visão por eixo: progresso e classificação relativa (estética por enquanto).
+    // ----------------------------------------------------------------------------
+    private enum SideClass { Strong, Balanced, Weak }
+
+    // Peso composto de um eixo: mistura o SCORE (critério próprio da AI para
+    // importância do eixo), o PROGRESSO (o quanto a guerra avançou nele) e a
+    // PROFUNDIDADE (investimento acumulado). Só serve para ranquear os eixos
+    // entre si — a escala absoluta não importa, só a comparação com a média.
+    private static float AxisCompositeWeight(AIShoppingPlanner.AxisTransportPressureInspection axis)
+    {
+        return axis.Score + (axis.Progress * 50f) + (axis.Depth * 5f);
+    }
+
+    private static string SideLabel(SideClass side)
+    {
+        switch (side)
+        {
+            case SideClass.Strong: return "strong side";
+            case SideClass.Weak: return "weak side";
+            default: return "balanced side";
+        }
+    }
+
+    private static Color SideColor(SideClass side)
+    {
+        switch (side)
+        {
+            case SideClass.Strong: return new Color(0.45f, 0.85f, 0.45f);
+            case SideClass.Weak: return new Color(0.85f, 0.5f, 0.45f);
+            default: return new Color(0.80f, 0.78f, 0.45f);
+        }
+    }
+
+    private void DrawAxisOverview(AIWorldSnapshot snapshot)
+    {
+        if (snapshot == null)
+            return;
+
+        _showAxisOverview = EditorGUILayout.Foldout(
+            _showAxisOverview, "Eixos  (progresso e classificação)", true);
+        if (!_showAxisOverview)
+            return;
+
+        AIShoppingPlanner.OperationalPressureInspection pressure =
+            AIShoppingPlanner.InspectOperationalPressure(snapshot);
+
+        EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+
+        if (pressure.Axes.Count == 0)
+        {
+            EditorGUILayout.LabelField("— sem eixos ativos —", _subtle);
+            EditorGUILayout.EndVertical();
+            return;
+        }
+
+        // Turno 0 e 1: a AI ainda não decidiu onde focar, tudo começa equilibrado.
+        bool earlyGame = snapshot.TurnNumber <= 1;
+
+        float sum = 0f;
+        for (int i = 0; i < pressure.Axes.Count; i++)
+            sum += AxisCompositeWeight(pressure.Axes[i]);
+        float mean = pressure.Axes.Count > 0 ? sum / pressure.Axes.Count : 0f;
+        // Sem sinal ainda (tudo zerado no começo) → não há lado forte/fraco.
+        bool undecided = earlyGame || mean < 0.01f;
+
+        EditorGUILayout.LabelField(
+            undecided
+                ? "guerra ainda indefinida — todos os eixos equilibrados"
+                : $"média composta={mean:F1}  ·  forte ≥ {mean * 1.15f:F1}  ·  fraco ≤ {mean * 0.85f:F1}",
+            _subtle);
+
+        var lineStyle = new GUIStyle(_subtle) { richText = false };
+
+        foreach (AIShoppingPlanner.AxisTransportPressureInspection axis in pressure.Axes)
+        {
+            float weight = AxisCompositeWeight(axis);
+            SideClass side;
+            if (undecided)
+                side = SideClass.Balanced;
+            else if (weight >= mean * 1.15f)
+                side = SideClass.Strong;
+            else if (weight <= mean * 0.85f)
+                side = SideClass.Weak;
+            else
+                side = SideClass.Balanced;
+
+            EditorGUILayout.BeginHorizontal();
+
+            Rect bar = GUILayoutUtility.GetRect(
+                60f, 16f, GUILayout.Width(120f));
+            EditorGUI.ProgressBar(bar, Mathf.Clamp01(axis.Progress), $"eixo {axis.Eixo}  {axis.Progress:P0}");
+
+            Color prev = lineStyle.normal.textColor;
+            lineStyle.normal.textColor = SideColor(side);
+            EditorGUILayout.LabelField(
+                $"[{SideLabel(side)}]  score={axis.Score:F1}  prof={axis.Depth:F1}  peso={weight:F1}",
+                lineStyle);
+            lineStyle.normal.textColor = prev;
+
+            EditorGUILayout.EndHorizontal();
+        }
+
+        EditorGUILayout.EndVertical();
+    }
 
     private void DrawObjectivesColumn(TeamObjectivePlan plan)
     {

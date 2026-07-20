@@ -2804,7 +2804,8 @@ public partial class AIShoppingPlanner
         if (demand.Urgent) score += 250000;
         if (demand.TargetClass.HasValue)
             score += (int)unit.ResolveAiTargetPriorityForTargetClass(demand.TargetClass.Value) * 18000;
-        float counterFit = ScoreCounterFit(unit, counterPressure);
+        float counterFit = ScoreCounterFitForDemand(
+            unit, counterPressure, demand.RequiredWeaponCategory, demand.TargetClass);
         score += Mathf.RoundToInt(counterFit * 18000f);
         if (demand.MinRallyArtilleryWeight > 0f)
             score += Mathf.RoundToInt(GetShoppingRallyArtilleryWeight(unit) * 35000f);

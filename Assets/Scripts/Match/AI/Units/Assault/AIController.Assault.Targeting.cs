@@ -46,5 +46,23 @@ public partial class AIController
         }
     }
 
+    private static bool IsBetterAssaultTargetCandidate(
+        BazookaTargetPriority preference,
+        int eliteLevel,
+        float tacticalScore,
+        UnitManager currentBest,
+        BazookaTargetPriority bestPreference,
+        int bestEliteLevel,
+        float bestTacticalScore)
+    {
+        if (currentBest == null)
+            return true;
+        if (preference != bestPreference)
+            return preference > bestPreference;
+        if (eliteLevel != bestEliteLevel)
+            return eliteLevel > bestEliteLevel;
+        return tacticalScore > bestTacticalScore;
+    }
+
 
 }

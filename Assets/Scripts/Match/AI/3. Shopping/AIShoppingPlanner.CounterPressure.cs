@@ -695,4 +695,41 @@ public partial class AIShoppingPlanner
         }
         return score;
     }
+
+    private static float ScoreCounterFitForDemand(
+        UnitData unit,
+        CounterPressureInspection pressure,
+        WeaponCategory? requiredCategory,
+        GameUnitClass? targetClass)
+    {
+        // Demandas genericas de composicao nao podem absorver a pressao global de
+        // counters. Esse bonus pertence somente ao matchup explicitamente pedido.
+        if (unit == null || pressure == null || !requiredCategory.HasValue
+            || unit.embarkedWeapons == null)
+            return 0f;
+
+        bool hasRequiredWeapon = false;
+        foreach (UnitEmbarkedWeapon weapon in unit.embarkedWeapons)
+        {
+            if (weapon?.weapon != null
+                && weapon.weapon.WeaponCategory == requiredCategory.Value)
+            {
+                hasRequiredWeapon = true;
+                break;
+            }
+        }
+        if (!hasRequiredWeapon)
+            return 0f;
+
+        float score = 0f;
+        foreach (EnemyClassPressureInspection enemyClass in pressure.Classes)
+        {
+            if (enemyClass.CounterCategory != requiredCategory.Value)
+                continue;
+            if (targetClass.HasValue && enemyClass.UnitClass != targetClass.Value)
+                continue;
+            score += enemyClass.Unmet * ComputeCounterCoverageFit(unit, enemyClass);
+        }
+        return score;
+    }
 }

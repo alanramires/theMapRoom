@@ -35,6 +35,8 @@ public class RoadNetworkManager : MonoBehaviour
 
     private readonly List<GameObject> generatedRoadObjects = new List<GameObject>();
     private readonly Dictionary<Vector3Int, StructureData> structureByCell = new Dictionary<Vector3Int, StructureData>();
+    private readonly Dictionary<SpriteRenderer, Vector3Int[]> generatedVisualCells =
+        new Dictionary<SpriteRenderer, Vector3Int[]>();
     private float nextLivePreviewTime;
     private int lastPreviewSignature = int.MinValue;
 #if UNITY_EDITOR
@@ -49,6 +51,18 @@ public class RoadNetworkManager : MonoBehaviour
         cell.z = 0;
         EnsureStructureCellLookup();
         return structureByCell.TryGetValue(cell, out structure);
+    }
+
+    public bool TryGetGeneratedVisualCells(SpriteRenderer renderer, out Vector3Int fromCell, out Vector3Int toCell)
+    {
+        fromCell = Vector3Int.zero;
+        toCell = Vector3Int.zero;
+        if (renderer == null || !generatedVisualCells.TryGetValue(renderer, out Vector3Int[] cells)
+            || cells == null || cells.Length < 2)
+            return false;
+        fromCell = cells[0];
+        toCell = cells[1];
+        return true;
     }
 
     private void Awake()
@@ -182,6 +196,7 @@ public class RoadNetworkManager : MonoBehaviour
         }
 
         generatedRoadObjects.Clear();
+        generatedVisualCells.Clear();
     }
 
     private void CollectOrphanedGeneratedRoadObjects()
@@ -262,6 +277,7 @@ public class RoadNetworkManager : MonoBehaviour
             if (sortingLayer.Id != 0)
                 renderer.sortingLayerID = sortingLayer.Id;
             renderer.sortingOrder = sortingOrder;
+            generatedVisualCells[renderer] = new[] { fromCell, toCell };
 
             float spriteWidth = 1f;
             float spriteHeight = 1f;

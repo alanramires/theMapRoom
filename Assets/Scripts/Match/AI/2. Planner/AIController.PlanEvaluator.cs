@@ -84,6 +84,9 @@ public partial class AIController
         TeamObjectivePlan plan = ObjectiveManager.GetOrCreatePlanForTeam(aiTeam);
         MarkEnemyBaseObjectivesAsInvasion(plan, aiTeam);
         currentAxisMap = InvasionAxisMap.Build(aiTeam);
+        // Strong/Weak Side Politic (prototipo, flag off por padrao): classifica os eixos e
+        // deixa o vies de elite pronto ANTES da atribuicao de fire support mais abaixo.
+        UpdateAxisSidePolitics(snapshot);
         // Presenca por eixo (quantas unidades em cada eixo AGORA, incluindo as que vao dar
         // handoff). Construido antes dos releases para a contagem refletir o campo atual.
         BuildEixoPresence(aiTeam);
@@ -1406,7 +1409,8 @@ public partial class AIController
                     float score = -obj.Priority * 900f
                         - dist * 45f
                         + risk * 220f
-                        + (obj.Status == ObjectiveStatus.Defending ? 180f : 0f);
+                        + (obj.Status == ObjectiveStatus.Defending ? 180f : 0f)
+                        + ComputeFireSupportSideBias(obj.Sector);
 
                     if (score > bestScore)
                     {

@@ -107,6 +107,8 @@ public partial class AIController
         float dpqWeight = preferDpq ? 2000f : 50f;
 
         float bestScore = float.MinValue;
+        BazookaTargetPriority bestPreference = BazookaTargetPriority.Tertiary;
+        int bestElite = -1;
         int candidateCells = 0;
         int reservedBlocked = 0;
         int occupiedBlocked = 0;
@@ -161,9 +163,13 @@ public partial class AIController
                 if (enemyCell == escortCell)
                     score += 100000f;
 
-                if (score > bestScore)
+                if (IsBetterAssaultTargetCandidate(
+                        targetPreference, targetElite, score,
+                        bestTarget, bestPreference, bestElite, bestScore))
                 {
                     bestScore = score;
+                    bestPreference = targetPreference;
+                    bestElite = targetElite;
                     bestCell = cell;
                     bestTarget = enemy;
                     reason = $"score={score:F0} pref={targetPreference} elite={targetElite} hp={enemy.CurrentHP} threatDist={targetDist:F1} coverDist={coverDist:F1} dpq={dpq:F1} dpqW={dpqWeight:F0} preferDpq={preferDpq} {attackDecisionReason}";
@@ -210,6 +216,8 @@ public partial class AIController
         float fromHexDist = SectorManager.HexDistance(fromCell, escortCell);
 
         float bestScore = float.MinValue;
+        BazookaTargetPriority bestPreference = BazookaTargetPriority.Tertiary;
+        int bestElite = -1;
         foreach (Vector3Int cell in paths.Keys)
         {
             if (IsReservedAssaultEscortCaptureCell(cell, snapshot.AITeam)) continue;
@@ -250,9 +258,13 @@ public partial class AIController
                     - GetPathStepCount(paths, cell) * 8f
                     - enemy.InstanceId * 0.001f;
 
-                if (score > bestScore)
+                if (IsBetterAssaultTargetCandidate(
+                        targetPreference, targetElite, score,
+                        bestTarget, bestPreference, bestElite, bestScore))
                 {
                     bestScore = score;
+                    bestPreference = targetPreference;
+                    bestElite = targetElite;
                     bestCell = cell;
                     bestTarget = enemy;
                     reason = $"advanceRoute score={score:F0} pref={targetPreference} elite={targetElite} hp={enemy.CurrentHP} progRota={routeProgress:+0.0;-0.0;0.0} rota={routeDist:F1} alvoZona={targetDist:F1} tiroDist={enemyDist:F1} dpq={dpq:F1} {attackDecisionReason}";

@@ -145,6 +145,8 @@ public partial class AIController
         enemyHqCell.z = 0;
 
         float bestScore = float.MinValue;
+        BazookaTargetPriority bestPreference = BazookaTargetPriority.Tertiary;
+        int bestElite = -1;
         foreach (Vector3Int cell in paths.Keys)
         {
             if (cell != fromCell && occupied.Contains(cell)) continue;
@@ -166,6 +168,9 @@ public partial class AIController
                 float dpq = GetTerrainDpqPontos(cell);
                 BazookaTargetPriority targetPreference = ResolveAssaultTargetPreference(unit, enemy);
                 float targetPreferenceScore = GetAssaultTargetPreferenceScore(targetPreference);
+                int targetElite = enemy.TryGetUnitData(out UnitData enemyUd) && enemyUd != null
+                    ? Mathf.Max(0, enemyUd.eliteLevel)
+                    : 0;
                 bool hasSim = TrySimulateAttackForAI(unit, enemy, cell, out AIAttackSimulationSummary simSummary);
                 if (hasSim && simSummary.targetDamage <= 0)
                     continue;
@@ -202,12 +207,16 @@ public partial class AIController
                     - GetPathStepCount(paths, cell) * 5f
                     - enemy.InstanceId * 0.001f;
 
-                if (score > bestScore)
+                if (IsBetterAssaultTargetCandidate(
+                        targetPreference, targetElite, score,
+                        bestTarget, bestPreference, bestElite, bestScore))
                 {
                     bestScore = score;
+                    bestPreference = targetPreference;
+                    bestElite = targetElite;
                     bestCell = cell;
                     bestTarget = enemy;
-                    reason = $"score={score:F0} pref={targetPreference} hp={enemy.CurrentHP} bldg={inConstruction} ownBldg={inOwnConstruction} enemyHqDist={enemyHqDist:F1} dpqCell={dpq:F1} preferDpq={preferDpq} {simDetails} {attackDecisionReason}";
+                    reason = $"score={score:F0} pref={targetPreference} elite={targetElite} hp={enemy.CurrentHP} bldg={inConstruction} ownBldg={inOwnConstruction} enemyHqDist={enemyHqDist:F1} dpqCell={dpq:F1} preferDpq={preferDpq} {simDetails} {attackDecisionReason}";
                 }
             }
         }

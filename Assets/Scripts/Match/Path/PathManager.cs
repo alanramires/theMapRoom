@@ -18,6 +18,7 @@ public class PathManager : MonoBehaviour
     [SerializeField] private int committedPathSortingOrder = 50;
 
     private LineRenderer committedPathRenderer;
+    private bool committedPathPresentationSuppressed;
     private bool committedPathTemporaryFogSorting;
     private int committedPathSortingLayerBeforeFog;
     private int committedPathSortingOrderBeforeFog;
@@ -55,6 +56,11 @@ public class PathManager : MonoBehaviour
         EnsureCommittedPathRenderer();
         if (committedPathRenderer == null)
             return;
+        if (committedPathPresentationSuppressed)
+        {
+            committedPathRenderer.enabled = false;
+            return;
+        }
         ApplyRendererSorting(tilemap);
         ApplyTemporaryFogSortingIfNeeded();
 
@@ -85,6 +91,13 @@ public class PathManager : MonoBehaviour
 
         committedPathRenderer.positionCount = 0;
         committedPathRenderer.enabled = false;
+    }
+
+    public void SetCommittedPathPresentationSuppressed(bool suppressed)
+    {
+        committedPathPresentationSuppressed = suppressed;
+        if (suppressed && committedPathRenderer != null)
+            committedPathRenderer.enabled = false;
     }
 
     public void BeginTemporaryFogTraversalVisual()

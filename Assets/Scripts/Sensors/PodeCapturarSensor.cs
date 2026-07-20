@@ -117,10 +117,9 @@ public static class PodeCapturarSensor
             matchController = Object.FindAnyObjectByType<MatchController>();
         if (matchController != null && matchController.IsFogOfWarDebugEnabled &&
             !matchController.IsCellVisibleForActiveTeam(cell) &&
-            !matchController.TryGetKnownConstructionAtCell(
-                selectedUnit.TeamId, cell, out _, out _))
+            !matchController.IsCellExploredByTeam(selectedUnit.TeamId, cell))
         {
-            reason = "Nao ha construcao conhecida neste hex.";
+            reason = "Terreno ainda desconhecido.";
             return false;
         }
 

@@ -124,9 +124,13 @@ public partial class TurnStateManager
                 // corredor de tiro inteiro em hexes revelados. Cancelar segue
                 // sem ensinar nada — alvos e corredor ja eram conhecimento do time.
                 RunMirarSensorAtUnconfirmedDestination(boardMap, movementMode);
+                bool destinationWasExplored = IsUnconfirmedDestinationExplored();
+                if (destinationWasExplored)
+                    RunExploredTerrainContextSensors(boardMap, movementMode);
                 RuntimeLog(
                     "[Sensors] Destino provisório fora da visão confirmada: sensores contextuais suprimidos " +
-                    $"(exceção de ataque: validos={cachedPodeMirarTargets.Count}, invalidos={cachedPodeMirarInvalidTargets.Count}).");
+                    $"(ataque confirmado: validos={cachedPodeMirarTargets.Count}, invalidos={cachedPodeMirarInvalidTargets.Count}; " +
+                    $"terrenoExplorado={destinationWasExplored}, excecoes=C/D/T).");
                 NotifySensorsReady();
                 return;
             }
@@ -441,6 +445,57 @@ public partial class TurnStateManager
         // e excluida da uniao — senao ela "iluminaria" o destino cancelavel com a
         // propria visao e desligaria esta supressao (oraculo).
         return !matchController.IsCellKnownForActiveTeam(destination, selectedUnit);
+    }
+
+    private bool IsUnconfirmedDestinationExplored()
+    {
+        if (CurrentCursorState != CursorState.MoveuAndando || selectedUnit == null || matchController == null)
+            return false;
+
+        Vector3Int destination = selectedUnit.CurrentCellPosition;
+        destination.z = 0;
+        return matchController.IsCellExploredByTeam(selectedUnit.TeamId, destination);
+    }
+
+    private void RunExploredTerrainContextSensors(Tilemap boardMap, SensorMovementMode movementMode)
+    {
+        bool canDisembark = PodeDesembarcarSensor.CollectOptions(
+            selectedUnit,
+            boardMap,
+            terrainDatabase,
+            cachedPodeDesembarcarTargets,
+            cachedPodeDesembarcarInvalidTargets);
+        availableSensorActionCodes.Remove('D');
+        if (canDisembark)
+            availableSensorActionCodes.Add('D');
+
+        bool canCapture = PodeCapturarSensor.TryGetCaptureTarget(
+            selectedUnit,
+            boardMap,
+            movementMode,
+            out cachedPodeCapturarConstruction,
+            out cachedPodeCapturarReason,
+            matchController);
+        availableSensorActionCodes.Remove('C');
+        if (canCapture || cachedPodeCapturarConstruction != null)
+            availableSensorActionCodes.Add('C');
+
+        bool canTransfer = PodeTransferirSensor.CollectOptions(
+            selectedUnit,
+            boardMap,
+            terrainDatabase,
+            movementMode,
+            cachedPodeTransferirTargets,
+            out cachedPodeTransferirReason,
+            cachedPodeTransferirInvalidTargets);
+        availableSensorActionCodes.Remove('T');
+        if (canTransfer)
+            availableSensorActionCodes.Add('T');
+
+        // Em terreno apenas memorizado, E/F/S continuam sob a barreira anti-oraculo.
+        availableSensorActionCodes.Remove('E');
+        availableSensorActionCodes.Remove('F');
+        availableSensorActionCodes.Remove('S');
     }
 
     private bool IsSelectedUnitInContestedHexTotalWar()

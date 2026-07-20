@@ -1674,7 +1674,10 @@ public class ConstructionManager : MonoBehaviour
 
     private void HandleFogOfWarUpdated()
     {
-        RefreshRuntimeVisualState(force: false);
+        // A transicao foto/nevoa -> mundo visivel pode reativar um HUD que foi
+        // cacheado antes da unidade ocupante aparecer. Reaplica a ocupacao para
+        // impedir que os HUDs da construcao e da unidade disputem o mesmo hex.
+        RefreshRuntimeVisualState(force: true);
     }
 
     // Resolve o teamId a partir do slotIndex no MatchController.

@@ -216,6 +216,7 @@ public class MatchController : MonoBehaviour
     [SerializeField] private FogOfWarController fogOfWarController;
     [SerializeField] private Tilemap fogOfWarTilemap;
     [SerializeField] private Tilemap fogOfWarMemoryTilemap;
+    [SerializeField] private Tilemap fogOfWarBreakwaterMemoryTilemap;
     [SerializeField] private TileBase fogOfWarOverlayTile;
     [SerializeField] private TerrainDatabase fogOfWarTerrainDatabase;
     [SerializeField] private DPQAirHeightConfig fogOfWarDpqAirHeightConfig;
@@ -270,6 +271,8 @@ public class MatchController : MonoBehaviour
     [System.NonSerialized] private readonly Dictionary<int, Dictionary<Vector3Int, FogConstructionMemoryEntry>> fogConstructionMemoryByTeam =
         new Dictionary<int, Dictionary<Vector3Int, FogConstructionMemoryEntry>>();
     [System.NonSerialized] private readonly List<SpriteRenderer> fogConstructionMemoryRenderers =
+        new List<SpriteRenderer>();
+    [System.NonSerialized] private readonly List<SpriteRenderer> fogStructureMemoryRenderers =
         new List<SpriteRenderer>();
     [System.NonSerialized] private PanelRemainingController fogVisionPanelRemaining;
     [System.NonSerialized] private bool fogSortingLayerValidated;
@@ -3362,11 +3365,21 @@ public class MatchController : MonoBehaviour
 
     private void EnsureFogOfWarMemoryTilemap()
     {
-        if (fogOfWarMemoryTilemap != null || fogOfWarTilemap == null)
+        if (fogOfWarTilemap == null)
             return;
+        if (fogOfWarMemoryTilemap != null)
+        {
+            EnsureFogBreakwaterMemoryTilemap();
+            return;
+        }
 
         fogOfWarMemoryTilemap = FindTilemapByName("FogOfWarTile");
-        if (fogOfWarMemoryTilemap != null || !Application.isPlaying)
+        if (fogOfWarMemoryTilemap != null)
+        {
+            EnsureFogBreakwaterMemoryTilemap();
+            return;
+        }
+        if (!Application.isPlaying)
             return;
 
         GameObject memoryObject = new GameObject("FogOfWarTile", typeof(Tilemap), typeof(TilemapRenderer));
@@ -3392,6 +3405,48 @@ public class MatchController : MonoBehaviour
         }
         memoryRenderer.sortingLayerName = "FogOfWarTile";
         memoryRenderer.sortingOrder = 0;
+
+        EnsureFogBreakwaterMemoryTilemap();
+    }
+
+    private void EnsureFogBreakwaterMemoryTilemap()
+    {
+        if (fogOfWarTilemap == null)
+            return;
+
+        Tilemap boardMap = ResolveFogBoardTilemap();
+        Tilemap source = FindTilemapByNameOnBoard("quebraMar", boardMap);
+        if (fogOfWarBreakwaterMemoryTilemap == null)
+            fogOfWarBreakwaterMemoryTilemap = FindTilemapByNameOnBoard("FogOfWarBreakwaterTile", boardMap);
+        if (fogOfWarBreakwaterMemoryTilemap == null)
+        {
+            GameObject memoryObject = new GameObject("FogOfWarBreakwaterTile", typeof(Tilemap), typeof(TilemapRenderer));
+            fogOfWarBreakwaterMemoryTilemap = memoryObject.GetComponent<Tilemap>();
+        }
+
+        Tilemap layoutSource = source != null ? source : fogOfWarTilemap;
+        Transform sourceTransform = layoutSource.transform;
+        Transform memoryTransform = fogOfWarBreakwaterMemoryTilemap.transform;
+        memoryTransform.SetParent(sourceTransform.parent, false);
+        memoryTransform.localPosition = sourceTransform.localPosition;
+        memoryTransform.localRotation = sourceTransform.localRotation;
+        memoryTransform.localScale = sourceTransform.localScale;
+
+        fogOfWarBreakwaterMemoryTilemap.tileAnchor = layoutSource.tileAnchor;
+        fogOfWarBreakwaterMemoryTilemap.orientation = layoutSource.orientation;
+        fogOfWarBreakwaterMemoryTilemap.orientationMatrix = layoutSource.orientationMatrix;
+        fogOfWarBreakwaterMemoryTilemap.color = layoutSource.color;
+
+        TilemapRenderer renderer = fogOfWarBreakwaterMemoryTilemap.GetComponent<TilemapRenderer>();
+        TilemapRenderer sourceRenderer = layoutSource.GetComponent<TilemapRenderer>();
+        if (sourceRenderer != null)
+        {
+            renderer.sharedMaterial = sourceRenderer.sharedMaterial;
+            renderer.mode = sourceRenderer.mode;
+            renderer.sortOrder = sourceRenderer.sortOrder;
+        }
+        renderer.sortingLayerName = "FogOfWarTile";
+        renderer.sortingOrder = 1;
     }
 
     private void TryAutoAssignVictoryOverlayReferences()
@@ -3544,6 +3599,25 @@ public class MatchController : MonoBehaviour
                 return tilemap;
         }
 
+        return null;
+    }
+
+    private static Tilemap FindTilemapByNameOnBoard(string targetName, Tilemap boardMap)
+    {
+        if (string.IsNullOrWhiteSpace(targetName) || boardMap == null)
+            return null;
+
+        Tilemap[] tilemaps = FindObjectsByType<Tilemap>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        for (int i = 0; i < tilemaps.Length; i++)
+        {
+            Tilemap tilemap = tilemaps[i];
+            if (tilemap == null
+                || tilemap.gameObject.scene != boardMap.gameObject.scene
+                || tilemap.layoutGrid != boardMap.layoutGrid)
+                continue;
+            if (string.Equals(tilemap.name, targetName, StringComparison.OrdinalIgnoreCase))
+                return tilemap;
+        }
         return null;
     }
 
@@ -5074,6 +5148,14 @@ public class MatchController : MonoBehaviour
             memoryRenderer.sortingLayerName = coverWorldPresentation ? "FogOfWarTile" : "SFX";
             memoryRenderer.sortingOrder = 0;
         }
+        TilemapRenderer breakwaterMemoryRenderer = fogOfWarBreakwaterMemoryTilemap != null
+            ? fogOfWarBreakwaterMemoryTilemap.GetComponent<TilemapRenderer>()
+            : null;
+        if (breakwaterMemoryRenderer != null)
+        {
+            breakwaterMemoryRenderer.sortingLayerName = coverWorldPresentation ? "FogOfWarTile" : "SFX";
+            breakwaterMemoryRenderer.sortingOrder = 1;
+        }
 
         bool playerTurn = activeTeamId >= 0
             && Enum.IsDefined(typeof(TeamId), activeTeamId)
@@ -5576,8 +5658,13 @@ public class MatchController : MonoBehaviour
             fogOfWarTilemap.ClearAllTiles();
         if (clearTilemap && fogOfWarMemoryTilemap != null)
             fogOfWarMemoryTilemap.ClearAllTiles();
+        if (clearTilemap && fogOfWarBreakwaterMemoryTilemap != null)
+            fogOfWarBreakwaterMemoryTilemap.ClearAllTiles();
         if (clearTilemap)
+        {
             SetFogConstructionMemoryRenderersActive(0);
+            SetFogStructureMemoryRenderersActive(0);
+        }
     }
 
     private void InitializeFogOverlay(Tilemap boardMap)
@@ -5692,7 +5779,11 @@ public class MatchController : MonoBehaviour
             return;
 
         fogOfWarMemoryTilemap.ClearAllTiles();
+        EnsureFogBreakwaterMemoryTilemap();
+        if (fogOfWarBreakwaterMemoryTilemap != null)
+            fogOfWarBreakwaterMemoryTilemap.ClearAllTiles();
         SetFogConstructionMemoryRenderersActive(0);
+        SetFogStructureMemoryRenderersActive(0);
         int renderedTeamId = fogCachedTeamId >= 0 ? fogCachedTeamId : activeTeamId;
         if (renderedTeamId < 0 || !Enum.IsDefined(typeof(TeamId), renderedTeamId) ||
             !fogExploredCellsByTeam.TryGetValue(renderedTeamId, out HashSet<Vector3Int> explored))
@@ -5716,7 +5807,121 @@ public class MatchController : MonoBehaviour
             fogOfWarMemoryTilemap.SetColor(cell, Color.white);
         }
 
+        RenderFogBreakwaterMemory(visibleCells, explored);
+        RenderFogStructureMemory(boardMap, visibleCells, explored);
         RenderFogConstructionMemory(boardMap, visibleCells, renderedTeamId);
+    }
+
+    private void RenderFogBreakwaterMemory(HashSet<Vector3Int> visibleCells, HashSet<Vector3Int> explored)
+    {
+        if (fogOfWarBreakwaterMemoryTilemap == null || explored == null)
+            return;
+        Tilemap source = FindTilemapByNameOnBoard("quebraMar", boardMap: ResolveFogBoardTilemap());
+        if (source == null || source == fogOfWarBreakwaterMemoryTilemap)
+            return;
+
+        foreach (Vector3Int sourceCell in explored)
+        {
+            Vector3Int cell = sourceCell;
+            cell.z = 0;
+            if (visibleCells != null && visibleCells.Contains(cell))
+                continue;
+            TileBase tile = source.GetTile(cell);
+            if (tile == null)
+                continue;
+            fogOfWarBreakwaterMemoryTilemap.SetTile(cell, tile);
+            fogOfWarBreakwaterMemoryTilemap.SetTileFlags(cell, TileFlags.None);
+            fogOfWarBreakwaterMemoryTilemap.SetTransformMatrix(cell, source.GetTransformMatrix(cell));
+            fogOfWarBreakwaterMemoryTilemap.SetColor(cell, source.GetColor(cell));
+        }
+    }
+
+    private void RenderFogStructureMemory(
+        Tilemap boardMap,
+        HashSet<Vector3Int> visibleCells,
+        HashSet<Vector3Int> explored)
+    {
+        if (boardMap == null || explored == null)
+            return;
+
+        int rendererIndex = 0;
+        RoadNetworkManager[] networks = FindObjectsByType<RoadNetworkManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        for (int n = 0; n < networks.Length; n++)
+        {
+            RoadNetworkManager network = networks[n];
+            if (network == null || network.BoardTilemap == null
+                || network.BoardTilemap.layoutGrid != boardMap.layoutGrid)
+                continue;
+
+            SpriteRenderer[] renderers = network.GetComponentsInChildren<SpriteRenderer>(true);
+            for (int r = 0; r < renderers.Length; r++)
+            {
+                SpriteRenderer source = renderers[r];
+                if (!network.TryGetGeneratedVisualCells(source, out Vector3Int fromCell, out Vector3Int toCell))
+                    continue;
+                fromCell.z = 0;
+                toCell.z = 0;
+                bool fromExplored = explored.Contains(fromCell);
+                bool toExplored = explored.Contains(toCell);
+                if (!fromExplored && !toExplored)
+                    continue;
+                bool fromVisible = visibleCells != null && visibleCells.Contains(fromCell);
+                bool toVisible = visibleCells != null && visibleCells.Contains(toCell);
+                bool fromKnownHidden = fromExplored && !fromVisible;
+                bool toKnownHidden = toExplored && !toVisible;
+                if (!fromKnownHidden && !toKnownHidden)
+                    continue;
+
+                SpriteRenderer memory = GetOrCreateFogStructureMemoryRenderer(rendererIndex++);
+                memory.sprite = source.sprite;
+                memory.color = source.color;
+                memory.flipX = source.flipX;
+                memory.flipY = source.flipY;
+                memory.drawMode = source.drawMode;
+                memory.size = source.size;
+                memory.maskInteraction = SpriteMaskInteraction.None;
+                memory.sortingLayerName = "FogOfWarTile";
+                memory.sortingOrder = 2;
+                Vector3 memoryPosition = source.transform.position;
+                Vector3 memoryWorldScale = source.transform.lossyScale;
+                if (fromExplored != toExplored)
+                {
+                    Vector3Int knownCell = fromExplored ? fromCell : toCell;
+                    Vector3Int unknownCell = fromExplored ? toCell : fromCell;
+                    Vector3 knownCenter = boardMap.GetCellCenterWorld(knownCell);
+                    Vector3 unknownCenter = boardMap.GetCellCenterWorld(unknownCell);
+                    memoryPosition = Vector3.Lerp(knownCenter, unknownCenter, 0.25f);
+                    memoryPosition.z = source.transform.position.z;
+                    memoryWorldScale.y *= 0.5f;
+                }
+                memory.transform.position = memoryPosition;
+                memory.transform.rotation = source.transform.rotation;
+                memory.transform.localScale = ResolveLocalScaleForFogMemory(memoryWorldScale);
+                memory.gameObject.SetActive(true);
+            }
+        }
+        SetFogStructureMemoryRenderersActive(rendererIndex);
+    }
+
+    private SpriteRenderer GetOrCreateFogStructureMemoryRenderer(int index)
+    {
+        while (fogStructureMemoryRenderers.Count <= index)
+        {
+            GameObject memoryObject = new GameObject($"FogStructureMemory_{fogStructureMemoryRenderers.Count}");
+            memoryObject.transform.SetParent(fogOfWarMemoryTilemap.transform, false);
+            fogStructureMemoryRenderers.Add(memoryObject.AddComponent<SpriteRenderer>());
+        }
+        return fogStructureMemoryRenderers[index];
+    }
+
+    private void SetFogStructureMemoryRenderersActive(int activeCount)
+    {
+        for (int i = 0; i < fogStructureMemoryRenderers.Count; i++)
+        {
+            SpriteRenderer renderer = fogStructureMemoryRenderers[i];
+            if (renderer != null)
+                renderer.gameObject.SetActive(i < activeCount);
+        }
     }
 
     private void RenderFogConstructionMemory(Tilemap boardMap, HashSet<Vector3Int> visibleCells, int renderedTeamId)
@@ -5753,7 +5958,7 @@ public class MatchController : MonoBehaviour
             memoryRenderer.size = liveRenderer.size;
             memoryRenderer.maskInteraction = SpriteMaskInteraction.None;
             memoryRenderer.sortingLayerName = "FogOfWarTile";
-            memoryRenderer.sortingOrder = 1;
+            memoryRenderer.sortingOrder = 3;
             memoryRenderer.transform.position = liveRenderer.transform.position;
             memoryRenderer.transform.rotation = liveRenderer.transform.rotation;
             memoryRenderer.transform.localScale = ResolveLocalScaleForFogMemory(liveRenderer.transform.lossyScale);
@@ -6502,12 +6707,10 @@ public class MatchController : MonoBehaviour
 
     public void SetFogOfWarDebugEnabled(bool enabled)
     {
-        bool modeChanged = debugFogOfWarPartial;
         debugFogOfWarPartial = false;
-        if (debugFogOfWarEnabled == enabled && !modeChanged)
-            return;
-
         debugFogOfWarEnabled = enabled;
+        TryAutoAssignFogOfWarReferences();
+        EnsureFogOfWarMemoryTilemap();
         fogSortingLayerValidated = false;
         ValidateFogOfWarSortingLayer();
         if (!enabled)
@@ -6573,13 +6776,12 @@ public class MatchController : MonoBehaviour
 
     public void SetFogOfWarDebugPartial()
     {
-        bool modeChanged = !debugFogOfWarEnabled || !debugFogOfWarPartial;
         debugFogOfWarEnabled = true;
         debugFogOfWarPartial = true;
+        TryAutoAssignFogOfWarReferences();
+        EnsureFogOfWarMemoryTilemap();
         fogSortingLayerValidated = false;
         ValidateFogOfWarSortingLayer();
-        if (!modeChanged)
-            return;
 
         if (enableTotalWar)
             RefreshFogOfWarForActiveTeam();

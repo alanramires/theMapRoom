@@ -60,6 +60,10 @@ public partial class AIController : MonoBehaviour
     [SerializeField] private bool easyMode = false;
     public bool EasyMode => easyMode && !hardMode;
 
+    [Tooltip("Strong/Weak Side Politic (PROTOTIPO, off por padrao): classifica os eixos em forte/equilibrado/fraco (com histerese) e enviesa a distribuicao de elite (fire support) para o lado forte, aliviando o fraco. Doutrina de concentracao de forca ao estilo AWBW. So mexe na priorizacao do elite existente — nao infla demanda de slots.")]
+    [SerializeField] private bool strongWeakSidePolitic = false;
+    public bool StrongWeakSidePolitic => strongWeakSidePolitic;
+
     [Tooltip("Doutrina da Conscricao (tatica do enxame): todo produtor do exercito compra o corpo mais barato TODO turno; demandas/elite so gastam por cima da massa garantida (imposto de conscricao no shopping). Desenhada pro Hard (Agressivo), mas pode ser ligada avulsa pra experimentar um Normal mais dificil.")]
     [SerializeField] private bool conscriptionDoctrine = false;
     public bool ConscriptionDoctrine => conscriptionDoctrine;

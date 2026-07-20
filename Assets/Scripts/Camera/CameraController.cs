@@ -785,11 +785,11 @@ public class CameraController : MonoBehaviour
         if (_matchController == null)
             _matchController = FindAnyObjectByType<MatchController>();
 
+        // So interrompe a camera quando uma IA esta sendo apresentada sob a
+        // perspectiva protegida de um jogador humano. Em AI vs AI nao existe
+        // observador humano a ocultar, portanto o cursor continua acompanhado.
         return _matchController != null &&
-               _matchController.IsFogOfWarDebugEnabled &&
-               _matchController.GameSetup == MatchController.GameSetupPreset.FogOfWarTotal &&
-               !_matchController.IsFogOfWarDebugPartial &&
-               _matchController.IsActiveTeamAI();
+               _matchController.ShouldHideActiveAiActionPresentation();
     }
 
     IEnumerator SmoothFocus(Vector3 target)

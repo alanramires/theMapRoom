@@ -646,6 +646,9 @@ public partial class TurnStateManager
 
         bool transporterSortingRaised = false;
         bool airTransporterForcedLandedForDisembark = false;
+        bool showDisembarkAboveFog = matchController == null
+            || !matchController.ShouldHideActiveAiActionPresentation();
+        List<UnitManager> fogRaisedPassengers = new List<UnitManager>();
         if (transporter != null)
         {
             transporter.SetTemporarySortingOrder();
@@ -751,6 +754,11 @@ public partial class TurnStateManager
             // Evita mostrar lock de "ja agiu" durante o spawn/movimento.
             passenger.ResetActed();
             ReapplyForcedUnitVisualForFog(passenger);
+            if (showDisembarkAboveFog)
+            {
+                passenger.BeginTemporaryFogTraversalVisual();
+                fogRaisedPassengers.Add(passenger);
+            }
             runtimeOrders.Add(new DisembarkRuntimeOrder
             {
                 passenger = passenger,
@@ -782,6 +790,8 @@ public partial class TurnStateManager
             if (!CanDisembarkAircraftPassengerAtRuntime(passenger, transporter, transporter.CurrentCellPosition, out string aircraftReason))
             {
                 Debug.LogWarning($"[Desembarque] {ResolveUnitRuntimeName(passenger)} bloqueado por regra de decolagem: {aircraftReason}");
+                passenger.EndTemporaryFogTraversalVisual();
+                fogRaisedPassengers.Remove(passenger);
                 passenger.ClearTemporarySortingOrder();
                 continue;
             }
@@ -852,7 +862,6 @@ public partial class TurnStateManager
             if (afterPassengerMoveDelay > 0f)
                 yield return new WaitForSeconds(afterPassengerMoveDelay);
 
-            passenger.ClearTemporarySortingOrder();
             cursorController?.PlayLoadSfx();
             passenger.MarkAsActed();
             RecordDisembarkReplayCommand(passenger, transporter, targetCell);
@@ -897,6 +906,14 @@ public partial class TurnStateManager
         } // try
         finally
         {
+            for (int i = 0; i < fogRaisedPassengers.Count; i++)
+            {
+                UnitManager passenger = fogRaisedPassengers[i];
+                if (passenger == null)
+                    continue;
+                passenger.EndTemporaryFogTraversalVisual();
+                passenger.ClearTemporarySortingOrder();
+            }
             disembarkExecutionInProgress = false;
         }
     }

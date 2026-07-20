@@ -253,27 +253,31 @@ public partial class TurnStateManager
 
     private void UpdateAiActionOverlayPresentation()
     {
+        bool suppress = ShouldSuppressAiActionPreviewLines();
         TilemapRenderer rangeRenderer = rangeMapTilemap != null ? rangeMapTilemap.GetComponent<TilemapRenderer>() : null;
         TilemapRenderer lineRenderer = lineOfFireMapTilemap != null ? lineOfFireMapTilemap.GetComponent<TilemapRenderer>() : null;
 
-        if (aiActionOverlaysSuppressed)
+        if (suppress && !aiActionOverlaysSuppressed)
         {
-            ClearMovementRangeVisualOnly(keepCommittedMovement: false);
-            ClearLineOfFireArea();
-            ClearCommittedPathVisual();
-            aiActionOverlaysSuppressed = false;
+            SetMirandoPreviewVisible(false);
+            SetMirandoSpotterPreviewsVisible(false);
+            SetEmbarkPreviewVisible(false);
         }
 
         if (rangeRenderer != null)
-            rangeRenderer.enabled = true;
+            rangeRenderer.enabled = !suppress;
         if (lineRenderer != null)
-            lineRenderer.enabled = true;
+            lineRenderer.enabled = !suppress;
+
+        pathManager?.SetCommittedPathPresentationSuppressed(suppress);
+        aiActionOverlaysSuppressed = suppress;
     }
 
     private bool ShouldSuppressAiActionPreviewLines()
     {
-        // A layer FogOfWar cobre as linhas e previews nas celulas ocultas.
-        return false;
+        // Somente o FOW Total com um observador humano oculta a apresentacao
+        // provisoria das acoes da IA. Nos demais presets, os overlays continuam.
+        return matchController != null && matchController.ShouldHideActiveAiActionPresentation();
     }
 
     private void RecordFramePerfSample()
@@ -5641,6 +5645,7 @@ public partial class TurnStateManager
 
     private void SetMirandoPreviewVisible(bool visible)
     {
+        visible = visible && !ShouldSuppressAiActionPreviewLines();
         for (int i = 0; i < mirandoPreviewRenderers.Count; i++)
         {
             LineRenderer renderer = mirandoPreviewRenderers[i];
@@ -5660,6 +5665,7 @@ public partial class TurnStateManager
 
     private void SetMirandoSpotterPreviewsVisible(bool visible)
     {
+        visible = visible && !ShouldSuppressAiActionPreviewLines();
         for (int i = 0; i < mirandoSpotterPreviewTracks.Count; i++)
         {
             MirandoSpotterPreviewTrack track = mirandoSpotterPreviewTracks[i];

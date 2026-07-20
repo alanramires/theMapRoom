@@ -1897,6 +1897,8 @@ public class SaveGameManager : MonoBehaviour
             double resetInputStartMs = PerfNowMs();
             LogLoadPerf(loadedSlot, "reset_runtime_input.begin", resetInputStartMs, resetInputStartMs - routineStartMs);
             turnStateManager?.ForceNeutral();
+            foreach (UnitManager restoredUnit in unitsById.Values)
+                restoredUnit?.EndTemporaryFogTraversalVisual();
             cursorController?.ClearRuntimeInputLocksAfterLoad();
             cursorController?.SnapToCurrentCell();
             PanelDialogController.ClearExternalText();
@@ -1910,12 +1912,11 @@ public class SaveGameManager : MonoBehaviour
                 yield return null;
                 matchController.SuppressFogOfWarRefresh = false;
                 suppressedFogRefresh = false;
-                bool restoredFromCache = matchController.TryRestoreFogRuntimeCacheFromSave(
-                    data.fogCacheTeamId,
-                    data.fogVisibleContributorsByCell,
-                    data.fogUnitVisibilityByCacheIndex);
-                if (!restoredFromCache)
-                    matchController.RefreshFogOfWarForActiveTeam();
+                // O cache salvo e apenas uma fotografia de runtime e pode ficar
+                // incompatível com unidades/construcoes reidratadas. Recalcula o
+                // snapshot confirmado para nunca combinar unidade visivel com hex
+                // apenas conhecido depois do load.
+                matchController.RefreshFogOfWarForActiveTeam();
                 LogLoadPerf(loadedSlot, "refresh_fog_after_load.end", refreshFogStartMs, PerfNowMs() - routineStartMs);
             }
 
