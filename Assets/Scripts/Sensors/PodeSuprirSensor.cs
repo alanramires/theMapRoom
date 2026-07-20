@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Tilemaps;
 
@@ -125,12 +125,6 @@ public static class PodeSuprirSensor
             if (target.ReceivedSuppliesThisTurn)
             {
                 AppendInvalid(invalidOutput, supplier, target, cell, "Unidade ja recebeu suprimentos nesta rodada.");
-                continue;
-            }
-
-            if (target.TookOffRecently)
-            {
-                AppendInvalid(invalidOutput, supplier, target, cell, "Unidade decolou recentemente.");
                 continue;
             }
 
@@ -313,12 +307,6 @@ public static class PodeSuprirSensor
         if (target.ReceivedSuppliesThisTurn)
         {
             reason = "Unidade ja recebeu suprimentos nesta rodada.";
-            return false;
-        }
-
-        if (target.TookOffRecently)
-        {
-            reason = "Unidade decolou recentemente.";
             return false;
         }
 
@@ -619,9 +607,6 @@ public static class PodeSuprirSensor
     {
         if (target == null || service == null)
             return false;
-        if (target.TookOffRecently)
-            return false;
-
         if (service.recuperaHp && target.CurrentHP < target.GetMaxHP())
             return true;
         if (service.recuperaAutonomia && target.CurrentFuel < target.MaxFuel)

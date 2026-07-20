@@ -18,7 +18,9 @@ MonoBehaviour:
   - {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
   - {fileID: 11400000, guid: 98dfc90eb1ac05849a3c30f308a5acbc, type: 2}
   - {fileID: 11400000, guid: 18336762152ab4246bb4cd0fb463da45, type: 2}
+  - {fileID: 11400000, guid: a385afd73b91aa64297b44d032cac9c4, type: 2}
   - {fileID: 11400000, guid: 225c257a62190524d829aa7aeb50a6da, type: 2}
+  - {fileID: 11400000, guid: 5572b2429e4e3fb43a7e49289c1fac2e, type: 2}
   fieldEntries:
   - id: HQ_S0_C1
     construction: {fileID: 11400000, guid: 872d2cdd8cf954541b315a21c0ba6296, type: 2}
@@ -56,10 +58,13 @@ MonoBehaviour:
       offeredSupplies:
       - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
         quantity: 2147483647
+        peakQuantity: 2147483647
       - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
         quantity: 2147483647
+        peakQuantity: 2147483647
       - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
         quantity: 2147483647
+        peakQuantity: 2147483647
       offeredServices:
       - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
       - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
@@ -100,10 +105,13 @@ MonoBehaviour:
       offeredSupplies:
       - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
         quantity: 2147483647
+        peakQuantity: 2147483647
       - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
         quantity: 2147483647
+        peakQuantity: 2147483647
       - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
         quantity: 2147483647
+        peakQuantity: 2147483647
       offeredServices:
       - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
       - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
@@ -143,10 +151,13 @@ MonoBehaviour:
       offeredSupplies:
       - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
         quantity: 2147483647
+        peakQuantity: 2147483647
       - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
         quantity: 2147483647
+        peakQuantity: 2147483647
       - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
         quantity: 2147483647
+        peakQuantity: 2147483647
       offeredServices:
       - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
       - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
@@ -186,10 +197,13 @@ MonoBehaviour:
       offeredSupplies:
       - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
         quantity: 2147483647
+        peakQuantity: 2147483647
       - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
         quantity: 2147483647
+        peakQuantity: 2147483647
       - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
         quantity: 2147483647
+        peakQuantity: 2147483647
       offeredServices:
       - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
       - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
@@ -229,10 +243,13 @@ MonoBehaviour:
       offeredSupplies:
       - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
         quantity: 2147483647
+        peakQuantity: 2147483647
       - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
         quantity: 2147483647
+        peakQuantity: 2147483647
       - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
         quantity: 2147483647
+        peakQuantity: 2147483647
       offeredServices:
       - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
       - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
@@ -266,10 +283,13 @@ MonoBehaviour:
       offeredSupplies:
       - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
         quantity: 2147483647
+        peakQuantity: 2147483647
       - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
         quantity: 2147483647
+        peakQuantity: 2147483647
       - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
         quantity: 2147483647
+        peakQuantity: 2147483647
       offeredServices:
       - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
       - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
@@ -303,10 +323,13 @@ MonoBehaviour:
       offeredSupplies:
       - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
         quantity: 2147483647
+        peakQuantity: 2147483647
       - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
         quantity: 2147483647
+        peakQuantity: 2147483647
       - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
         quantity: 2147483647
+        peakQuantity: 2147483647
       offeredServices:
       - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
       - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
@@ -340,10 +363,13 @@ MonoBehaviour:
       offeredSupplies:
       - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
         quantity: 2147483647
+        peakQuantity: 2147483647
       - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
         quantity: 2147483647
+        peakQuantity: 2147483647
       - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
         quantity: 2147483647
+        peakQuantity: 2147483647
       offeredServices:
       - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
       - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
@@ -377,10 +403,13 @@ MonoBehaviour:
       offeredSupplies:
       - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
         quantity: 2147483647
+        peakQuantity: 2147483647
       - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
         quantity: 2147483647
+        peakQuantity: 2147483647
       - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
         quantity: 2147483647
+        peakQuantity: 2147483647
       offeredServices:
       - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
       - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
@@ -420,10 +449,13 @@ MonoBehaviour:
       offeredSupplies:
       - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
         quantity: 2147483647
+        peakQuantity: 2147483647
       - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
         quantity: 2147483647
+        peakQuantity: 2147483647
       - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
         quantity: 2147483647
+        peakQuantity: 2147483647
       offeredServices:
       - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
       - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
@@ -463,10 +495,13 @@ MonoBehaviour:
       offeredSupplies:
       - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
         quantity: 2147483647
+        peakQuantity: 2147483647
       - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
         quantity: 2147483647
+        peakQuantity: 2147483647
       - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
         quantity: 2147483647
+        peakQuantity: 2147483647
       offeredServices:
       - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
       - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
@@ -506,38 +541,13 @@ MonoBehaviour:
       offeredSupplies:
       - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
         quantity: 2147483647
+        peakQuantity: 2147483647
       - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
         quantity: 2147483647
+        peakQuantity: 2147483647
       - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
         quantity: 2147483647
-      offeredServices:
-      - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
-      - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
-      - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
-  - id: Cidade_Neutral_C15
-    construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialSlotIndex: -1
-    sector: 0
-    cellPosition: {x: -4, y: -7, z: 0}
-    initialCapturePoints: -1
-    useConstructionConfigurationOverride: 0
-    constructionConfiguration:
-      isPlayerHeadQuarter: 0
-      isVictoryBuilding: 0
-      isCapturable: 1
-      capturePointsMax: 20
-      capturedIncoming: 1000
-      sellingRule: 3
-      legacyCanProduceAndSellUnits: 
-      offeredUnits: []
-      canProvideSupplies: 1
-      offeredSupplies:
-      - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
-        quantity: 40
-      - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
-        quantity: 20
-      - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
-        quantity: 30
+        peakQuantity: 2147483647
       offeredServices:
       - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
       - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
@@ -562,10 +572,13 @@ MonoBehaviour:
       offeredSupplies:
       - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
         quantity: 40
+        peakQuantity: 40
       - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
         quantity: 20
+        peakQuantity: 20
       - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
         quantity: 30
+        peakQuantity: 30
       offeredServices:
       - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
       - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
@@ -590,10 +603,13 @@ MonoBehaviour:
       offeredSupplies:
       - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
         quantity: 40
+        peakQuantity: 40
       - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
         quantity: 20
+        peakQuantity: 20
       - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
         quantity: 30
+        peakQuantity: 30
       offeredServices:
       - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
       - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
@@ -618,38 +634,13 @@ MonoBehaviour:
       offeredSupplies:
       - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
         quantity: 40
+        peakQuantity: 40
       - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
         quantity: 20
+        peakQuantity: 20
       - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
         quantity: 30
-      offeredServices:
-      - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
-      - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
-      - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
-  - id: Cidade_Neutral_C19
-    construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialSlotIndex: -1
-    sector: 0
-    cellPosition: {x: -3, y: -8, z: 0}
-    initialCapturePoints: -1
-    useConstructionConfigurationOverride: 0
-    constructionConfiguration:
-      isPlayerHeadQuarter: 0
-      isVictoryBuilding: 0
-      isCapturable: 1
-      capturePointsMax: 20
-      capturedIncoming: 1000
-      sellingRule: 3
-      legacyCanProduceAndSellUnits: 
-      offeredUnits: []
-      canProvideSupplies: 1
-      offeredSupplies:
-      - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
-        quantity: 40
-      - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
-        quantity: 20
-      - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
-        quantity: 30
+        peakQuantity: 30
       offeredServices:
       - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
       - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
@@ -674,66 +665,13 @@ MonoBehaviour:
       offeredSupplies:
       - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
         quantity: 40
+        peakQuantity: 40
       - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
         quantity: 20
+        peakQuantity: 20
       - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
         quantity: 30
-      offeredServices:
-      - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
-      - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
-      - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
-  - id: Cidade_Neutral_C21
-    construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialSlotIndex: -1
-    sector: 0
-    cellPosition: {x: -3, y: -1, z: 0}
-    initialCapturePoints: -1
-    useConstructionConfigurationOverride: 0
-    constructionConfiguration:
-      isPlayerHeadQuarter: 0
-      isVictoryBuilding: 0
-      isCapturable: 1
-      capturePointsMax: 20
-      capturedIncoming: 1000
-      sellingRule: 3
-      legacyCanProduceAndSellUnits: 
-      offeredUnits: []
-      canProvideSupplies: 1
-      offeredSupplies:
-      - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
-        quantity: 40
-      - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
-        quantity: 20
-      - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
-        quantity: 30
-      offeredServices:
-      - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
-      - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
-      - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
-  - id: Cidade_Neutral_C22
-    construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialSlotIndex: -1
-    sector: 0
-    cellPosition: {x: 2, y: 1, z: 0}
-    initialCapturePoints: -1
-    useConstructionConfigurationOverride: 0
-    constructionConfiguration:
-      isPlayerHeadQuarter: 0
-      isVictoryBuilding: 0
-      isCapturable: 1
-      capturePointsMax: 20
-      capturedIncoming: 1000
-      sellingRule: 3
-      legacyCanProduceAndSellUnits: 
-      offeredUnits: []
-      canProvideSupplies: 1
-      offeredSupplies:
-      - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
-        quantity: 40
-      - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
-        quantity: 20
-      - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
-        quantity: 30
+        peakQuantity: 30
       offeredServices:
       - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
       - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
@@ -758,10 +696,13 @@ MonoBehaviour:
       offeredSupplies:
       - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
         quantity: 40
+        peakQuantity: 40
       - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
         quantity: 20
+        peakQuantity: 20
       - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
         quantity: 30
+        peakQuantity: 30
       offeredServices:
       - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
       - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
@@ -786,10 +727,13 @@ MonoBehaviour:
       offeredSupplies:
       - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
         quantity: 40
+        peakQuantity: 40
       - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
         quantity: 20
+        peakQuantity: 20
       - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
         quantity: 30
+        peakQuantity: 30
       offeredServices:
       - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
       - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
@@ -814,10 +758,13 @@ MonoBehaviour:
       offeredSupplies:
       - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
         quantity: 40
+        peakQuantity: 40
       - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
         quantity: 20
+        peakQuantity: 20
       - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
         quantity: 30
+        peakQuantity: 30
       offeredServices:
       - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
       - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
@@ -842,10 +789,13 @@ MonoBehaviour:
       offeredSupplies:
       - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
         quantity: 40
+        peakQuantity: 40
       - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
         quantity: 20
+        peakQuantity: 20
       - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
         quantity: 30
+        peakQuantity: 30
       offeredServices:
       - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
       - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
@@ -870,10 +820,13 @@ MonoBehaviour:
       offeredSupplies:
       - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
         quantity: 40
+        peakQuantity: 40
       - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
         quantity: 20
+        peakQuantity: 20
       - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
         quantity: 30
+        peakQuantity: 30
       offeredServices:
       - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
       - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
@@ -898,10 +851,13 @@ MonoBehaviour:
       offeredSupplies:
       - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
         quantity: 40
+        peakQuantity: 40
       - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
         quantity: 20
+        peakQuantity: 20
       - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
         quantity: 30
+        peakQuantity: 30
       offeredServices:
       - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
       - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
@@ -926,10 +882,13 @@ MonoBehaviour:
       offeredSupplies:
       - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
         quantity: 40
+        peakQuantity: 40
       - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
         quantity: 20
+        peakQuantity: 20
       - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
         quantity: 30
+        peakQuantity: 30
       offeredServices:
       - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
       - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
@@ -954,66 +913,13 @@ MonoBehaviour:
       offeredSupplies:
       - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
         quantity: 40
+        peakQuantity: 40
       - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
         quantity: 20
+        peakQuantity: 20
       - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
         quantity: 30
-      offeredServices:
-      - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
-      - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
-      - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
-  - id: Cidade_Neutral_C33
-    construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialSlotIndex: -1
-    sector: 0
-    cellPosition: {x: 3, y: 8, z: 0}
-    initialCapturePoints: -1
-    useConstructionConfigurationOverride: 0
-    constructionConfiguration:
-      isPlayerHeadQuarter: 0
-      isVictoryBuilding: 0
-      isCapturable: 1
-      capturePointsMax: 20
-      capturedIncoming: 1000
-      sellingRule: 3
-      legacyCanProduceAndSellUnits: 
-      offeredUnits: []
-      canProvideSupplies: 1
-      offeredSupplies:
-      - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
-        quantity: 40
-      - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
-        quantity: 20
-      - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
-        quantity: 30
-      offeredServices:
-      - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
-      - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
-      - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
-  - id: Cidade_Neutral_C34
-    construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialSlotIndex: -1
-    sector: 0
-    cellPosition: {x: 3, y: 7, z: 0}
-    initialCapturePoints: -1
-    useConstructionConfigurationOverride: 0
-    constructionConfiguration:
-      isPlayerHeadQuarter: 0
-      isVictoryBuilding: 0
-      isCapturable: 1
-      capturePointsMax: 20
-      capturedIncoming: 1000
-      sellingRule: 3
-      legacyCanProduceAndSellUnits: 
-      offeredUnits: []
-      canProvideSupplies: 1
-      offeredSupplies:
-      - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
-        quantity: 40
-      - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
-        quantity: 20
-      - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
-        quantity: 30
+        peakQuantity: 30
       offeredServices:
       - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
       - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
@@ -1038,10 +944,13 @@ MonoBehaviour:
       offeredSupplies:
       - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
         quantity: 40
+        peakQuantity: 40
       - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
         quantity: 20
+        peakQuantity: 20
       - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
         quantity: 30
+        peakQuantity: 30
       offeredServices:
       - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
       - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
@@ -1066,10 +975,13 @@ MonoBehaviour:
       offeredSupplies:
       - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
         quantity: 40
+        peakQuantity: 40
       - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
         quantity: 20
+        peakQuantity: 20
       - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
         quantity: 30
+        peakQuantity: 30
       offeredServices:
       - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
       - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
@@ -1094,10 +1006,13 @@ MonoBehaviour:
       offeredSupplies:
       - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
         quantity: 40
+        peakQuantity: 40
       - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
         quantity: 20
+        peakQuantity: 20
       - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
         quantity: 30
+        peakQuantity: 30
       offeredServices:
       - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
       - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
@@ -1122,10 +1037,13 @@ MonoBehaviour:
       offeredSupplies:
       - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
         quantity: 40
+        peakQuantity: 40
       - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
         quantity: 20
+        peakQuantity: 20
       - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
         quantity: 30
+        peakQuantity: 30
       offeredServices:
       - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
       - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
@@ -1150,10 +1068,13 @@ MonoBehaviour:
       offeredSupplies:
       - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
         quantity: 40
+        peakQuantity: 40
       - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
         quantity: 20
+        peakQuantity: 20
       - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
         quantity: 30
+        peakQuantity: 30
       offeredServices:
       - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
       - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
@@ -1178,10 +1099,13 @@ MonoBehaviour:
       offeredSupplies:
       - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
         quantity: 40
+        peakQuantity: 40
       - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
         quantity: 20
+        peakQuantity: 20
       - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
         quantity: 30
+        peakQuantity: 30
       offeredServices:
       - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
       - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
@@ -1206,10 +1130,13 @@ MonoBehaviour:
       offeredSupplies:
       - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
         quantity: 40
+        peakQuantity: 40
       - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
         quantity: 20
+        peakQuantity: 20
       - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
         quantity: 30
+        peakQuantity: 30
       offeredServices:
       - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
       - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
@@ -1243,10 +1170,13 @@ MonoBehaviour:
       offeredSupplies:
       - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
         quantity: 2147483647
+        peakQuantity: 2147483647
       - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
         quantity: 2147483647
+        peakQuantity: 2147483647
       - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
         quantity: 2147483647
+        peakQuantity: 2147483647
       offeredServices:
       - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
       - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
@@ -1280,10 +1210,13 @@ MonoBehaviour:
       offeredSupplies:
       - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
         quantity: 2147483647
+        peakQuantity: 2147483647
       - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
         quantity: 2147483647
+        peakQuantity: 2147483647
       - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
         quantity: 2147483647
+        peakQuantity: 2147483647
       offeredServices:
       - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
       - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
@@ -1317,38 +1250,13 @@ MonoBehaviour:
       offeredSupplies:
       - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
         quantity: 2147483647
+        peakQuantity: 2147483647
       - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
         quantity: 2147483647
+        peakQuantity: 2147483647
       - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
         quantity: 2147483647
-      offeredServices:
-      - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
-      - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
-      - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
-  - id: Cidade_Neutral_C60
-    construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialSlotIndex: -1
-    sector: 0
-    cellPosition: {x: 9, y: 6, z: 0}
-    initialCapturePoints: -1
-    useConstructionConfigurationOverride: 0
-    constructionConfiguration:
-      isPlayerHeadQuarter: 0
-      isVictoryBuilding: 0
-      isCapturable: 1
-      capturePointsMax: 20
-      capturedIncoming: 1000
-      sellingRule: 3
-      legacyCanProduceAndSellUnits: 
-      offeredUnits: []
-      canProvideSupplies: 1
-      offeredSupplies:
-      - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
-        quantity: 40
-      - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
-        quantity: 20
-      - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
-        quantity: 30
+        peakQuantity: 2147483647
       offeredServices:
       - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
       - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
@@ -1373,10 +1281,13 @@ MonoBehaviour:
       offeredSupplies:
       - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
         quantity: 40
+        peakQuantity: 40
       - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
         quantity: 20
+        peakQuantity: 20
       - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
         quantity: 30
+        peakQuantity: 30
       offeredServices:
       - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
       - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
@@ -1401,38 +1312,13 @@ MonoBehaviour:
       offeredSupplies:
       - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
         quantity: 40
+        peakQuantity: 40
       - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
         quantity: 20
+        peakQuantity: 20
       - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
         quantity: 30
-      offeredServices:
-      - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
-      - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
-      - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
-  - id: Cidade_Neutral_C63
-    construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-    initialSlotIndex: -1
-    sector: 0
-    cellPosition: {x: -9, y: -6, z: 0}
-    initialCapturePoints: -1
-    useConstructionConfigurationOverride: 0
-    constructionConfiguration:
-      isPlayerHeadQuarter: 0
-      isVictoryBuilding: 0
-      isCapturable: 1
-      capturePointsMax: 20
-      capturedIncoming: 1000
-      sellingRule: 3
-      legacyCanProduceAndSellUnits: 
-      offeredUnits: []
-      canProvideSupplies: 1
-      offeredSupplies:
-      - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
-        quantity: 40
-      - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
-        quantity: 20
-      - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
-        quantity: 30
+        peakQuantity: 30
       offeredServices:
       - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
       - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
@@ -1457,10 +1343,13 @@ MonoBehaviour:
       offeredSupplies:
       - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
         quantity: 40
+        peakQuantity: 40
       - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
         quantity: 20
+        peakQuantity: 20
       - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
         quantity: 30
+        peakQuantity: 30
       offeredServices:
       - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
       - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
@@ -1485,10 +1374,13 @@ MonoBehaviour:
       offeredSupplies:
       - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
         quantity: 40
+        peakQuantity: 40
       - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
         quantity: 20
+        peakQuantity: 20
       - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
         quantity: 30
+        peakQuantity: 30
       offeredServices:
       - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
       - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
@@ -1513,10 +1405,13 @@ MonoBehaviour:
       offeredSupplies:
       - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
         quantity: 40
+        peakQuantity: 40
       - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
         quantity: 20
+        peakQuantity: 20
       - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
         quantity: 30
+        peakQuantity: 30
       offeredServices:
       - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
       - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
@@ -1541,10 +1436,13 @@ MonoBehaviour:
       offeredSupplies:
       - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
         quantity: 40
+        peakQuantity: 40
       - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
         quantity: 20
+        peakQuantity: 20
       - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
         quantity: 30
+        peakQuantity: 30
       offeredServices:
       - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
       - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
@@ -1569,10 +1467,13 @@ MonoBehaviour:
       offeredSupplies:
       - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
         quantity: 40
+        peakQuantity: 40
       - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
         quantity: 20
+        peakQuantity: 20
       - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
         quantity: 30
+        peakQuantity: 30
       offeredServices:
       - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
       - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
@@ -1597,10 +1498,13 @@ MonoBehaviour:
       offeredSupplies:
       - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
         quantity: 40
+        peakQuantity: 40
       - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
         quantity: 20
+        peakQuantity: 20
       - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
         quantity: 30
+        peakQuantity: 30
       offeredServices:
       - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
       - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
@@ -1625,10 +1529,13 @@ MonoBehaviour:
       offeredSupplies:
       - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
         quantity: 40
+        peakQuantity: 40
       - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
         quantity: 20
+        peakQuantity: 20
       - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
         quantity: 30
+        peakQuantity: 30
       offeredServices:
       - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
       - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
@@ -1659,10 +1566,13 @@ MonoBehaviour:
       offeredSupplies:
       - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
         quantity: 2147483647
+        peakQuantity: 2147483647
       - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
         quantity: 2147483647
+        peakQuantity: 2147483647
       - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
         quantity: 2147483647
+        peakQuantity: 2147483647
       offeredServices:
       - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
       - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
@@ -1693,10 +1603,13 @@ MonoBehaviour:
       offeredSupplies:
       - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
         quantity: 2147483647
+        peakQuantity: 2147483647
       - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
         quantity: 2147483647
+        peakQuantity: 2147483647
       - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
         quantity: 2147483647
+        peakQuantity: 2147483647
       offeredServices:
       - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
       - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
@@ -1727,10 +1640,13 @@ MonoBehaviour:
       offeredSupplies:
       - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
         quantity: 2147483647
+        peakQuantity: 2147483647
       - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
         quantity: 2147483647
+        peakQuantity: 2147483647
       - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
         quantity: 2147483647
+        peakQuantity: 2147483647
       offeredServices:
       - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
       - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
@@ -1761,10 +1677,13 @@ MonoBehaviour:
       offeredSupplies:
       - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
         quantity: 2147483647
+        peakQuantity: 2147483647
       - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
         quantity: 2147483647
+        peakQuantity: 2147483647
       - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
         quantity: 2147483647
+        peakQuantity: 2147483647
       offeredServices:
       - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
       - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
@@ -1795,10 +1714,13 @@ MonoBehaviour:
       offeredSupplies:
       - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
         quantity: 2147483647
+        peakQuantity: 2147483647
       - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
         quantity: 2147483647
+        peakQuantity: 2147483647
       - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
         quantity: 2147483647
+        peakQuantity: 2147483647
       offeredServices:
       - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
       - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
@@ -1829,10 +1751,13 @@ MonoBehaviour:
       offeredSupplies:
       - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
         quantity: 2147483647
+        peakQuantity: 2147483647
       - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
         quantity: 2147483647
+        peakQuantity: 2147483647
       - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
         quantity: 2147483647
+        peakQuantity: 2147483647
       offeredServices:
       - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
       - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
@@ -1872,10 +1797,13 @@ MonoBehaviour:
       offeredSupplies:
       - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
         quantity: 2147483647
+        peakQuantity: 2147483647
       - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
         quantity: 2147483647
+        peakQuantity: 2147483647
       - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
         quantity: 2147483647
+        peakQuantity: 2147483647
       offeredServices:
       - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
       - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
@@ -1915,10 +1843,827 @@ MonoBehaviour:
       offeredSupplies:
       - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
         quantity: 2147483647
+        peakQuantity: 2147483647
       - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
         quantity: 2147483647
+        peakQuantity: 2147483647
       - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
         quantity: 2147483647
+        peakQuantity: 2147483647
+      offeredServices:
+      - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+      - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+      - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+  - id: "F\xE1brica_Neutral_C82"
+    construction: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
+    initialSlotIndex: -1
+    sector: 0
+    cellPosition: {x: 8, y: -9, z: 0}
+    initialCapturePoints: -1
+    useConstructionConfigurationOverride: 0
+    constructionConfiguration:
+      isPlayerHeadQuarter: 0
+      isVictoryBuilding: 0
+      isCapturable: 1
+      capturePointsMax: 30
+      capturedIncoming: 1500
+      sellingRule: 1
+      legacyCanProduceAndSellUnits: 
+      offeredUnits:
+      - {fileID: 11400000, guid: 4a3afdea0950dfc46a48dd7a659563ee, type: 2}
+      - {fileID: 11400000, guid: b28c15593869dae419f9b58292ef4845, type: 2}
+      - {fileID: 11400000, guid: 784e1b5ab74d4d34fa6c3ef79ba6219e, type: 2}
+      - {fileID: 11400000, guid: a5d9d72a15e061a4cbaf125b2b6b9d48, type: 2}
+      - {fileID: 11400000, guid: 5c1c693f4969237429fa904ea6955abe, type: 2}
+      - {fileID: 11400000, guid: cf26f5e5f9f009748bc56b1a7681b06d, type: 2}
+      - {fileID: 11400000, guid: f5327adf7bafffb408255d31a96ba049, type: 2}
+      - {fileID: 11400000, guid: 70b7ea3ddea78fc4e9d744cee13b053a, type: 2}
+      - {fileID: 11400000, guid: 3dc9b119819519440820c81f5db4fdce, type: 2}
+      - {fileID: 11400000, guid: 70b98199c49882e44892f7ca76df6b33, type: 2}
+      - {fileID: 11400000, guid: 99b30df53878c69499853a4ef3cb5f81, type: 2}
+      - {fileID: 11400000, guid: 8c89f5278e312ad46af401333934721b, type: 2}
+      - {fileID: 11400000, guid: 816da5452d95e1144a868a0cf7868baa, type: 2}
+      - {fileID: 11400000, guid: 5e69516e1944ffc43bae1a7cd3c7c69c, type: 2}
+      - {fileID: 11400000, guid: 87b4ab0e959c2324aa2628feb5356585, type: 2}
+      canProvideSupplies: 1
+      offeredSupplies:
+      - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+        quantity: 20
+        peakQuantity: 2147483647
+      - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+        quantity: 10
+        peakQuantity: 2147483647
+      - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+        quantity: 40
+        peakQuantity: 2147483647
+      offeredServices:
+      - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+      - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+      - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+  - id: Cidade_Neutral_C90
+    construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
+    initialSlotIndex: -1
+    sector: 0
+    cellPosition: {x: 12, y: -9, z: 0}
+    initialCapturePoints: -1
+    useConstructionConfigurationOverride: 0
+    constructionConfiguration:
+      isPlayerHeadQuarter: 0
+      isVictoryBuilding: 0
+      isCapturable: 1
+      capturePointsMax: 20
+      capturedIncoming: 1000
+      sellingRule: 3
+      legacyCanProduceAndSellUnits: 
+      offeredUnits: []
+      canProvideSupplies: 1
+      offeredSupplies:
+      - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+        quantity: 40
+        peakQuantity: 2147483647
+      - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+        quantity: 10
+        peakQuantity: 2147483647
+      - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+        quantity: 20
+        peakQuantity: 2147483647
+      offeredServices:
+      - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+      - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+      - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+  - id: Cidade_Neutral_C91
+    construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
+    initialSlotIndex: -1
+    sector: 0
+    cellPosition: {x: 12, y: -10, z: 0}
+    initialCapturePoints: -1
+    useConstructionConfigurationOverride: 0
+    constructionConfiguration:
+      isPlayerHeadQuarter: 0
+      isVictoryBuilding: 0
+      isCapturable: 1
+      capturePointsMax: 20
+      capturedIncoming: 1000
+      sellingRule: 3
+      legacyCanProduceAndSellUnits: 
+      offeredUnits: []
+      canProvideSupplies: 1
+      offeredSupplies:
+      - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+        quantity: 40
+        peakQuantity: 2147483647
+      - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+        quantity: 10
+        peakQuantity: 2147483647
+      - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+        quantity: 20
+        peakQuantity: 2147483647
+      offeredServices:
+      - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+      - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+      - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+  - id: "Esta\xE7\xE3odeTrem_Neutral_C92"
+    construction: {fileID: 11400000, guid: a385afd73b91aa64297b44d032cac9c4, type: 2}
+    initialSlotIndex: -1
+    sector: 0
+    cellPosition: {x: 13, y: -2, z: 0}
+    initialCapturePoints: -1
+    useConstructionConfigurationOverride: 0
+    constructionConfiguration:
+      isPlayerHeadQuarter: 0
+      isVictoryBuilding: 0
+      isCapturable: 1
+      capturePointsMax: 30
+      capturedIncoming: 1500
+      sellingRule: 1
+      legacyCanProduceAndSellUnits: 
+      offeredUnits:
+      - {fileID: 11400000, guid: 4a3afdea0950dfc46a48dd7a659563ee, type: 2}
+      - {fileID: 11400000, guid: b28c15593869dae419f9b58292ef4845, type: 2}
+      - {fileID: 11400000, guid: 784e1b5ab74d4d34fa6c3ef79ba6219e, type: 2}
+      - {fileID: 11400000, guid: a5d9d72a15e061a4cbaf125b2b6b9d48, type: 2}
+      - {fileID: 11400000, guid: 5c1c693f4969237429fa904ea6955abe, type: 2}
+      - {fileID: 11400000, guid: cf26f5e5f9f009748bc56b1a7681b06d, type: 2}
+      - {fileID: 11400000, guid: f5327adf7bafffb408255d31a96ba049, type: 2}
+      - {fileID: 11400000, guid: 70b7ea3ddea78fc4e9d744cee13b053a, type: 2}
+      - {fileID: 11400000, guid: 3dc9b119819519440820c81f5db4fdce, type: 2}
+      - {fileID: 11400000, guid: 70b98199c49882e44892f7ca76df6b33, type: 2}
+      - {fileID: 11400000, guid: 99b30df53878c69499853a4ef3cb5f81, type: 2}
+      - {fileID: 11400000, guid: 8c89f5278e312ad46af401333934721b, type: 2}
+      - {fileID: 11400000, guid: 816da5452d95e1144a868a0cf7868baa, type: 2}
+      - {fileID: 11400000, guid: 5e69516e1944ffc43bae1a7cd3c7c69c, type: 2}
+      - {fileID: 11400000, guid: 87b4ab0e959c2324aa2628feb5356585, type: 2}
+      - {fileID: 11400000, guid: 01d3b4c11356e2b47bc6907e49211941, type: 2}
+      canProvideSupplies: 1
+      offeredSupplies:
+      - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+        quantity: 20
+        peakQuantity: 2147483647
+      - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+        quantity: 10
+        peakQuantity: 2147483647
+      - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+        quantity: 10
+        peakQuantity: 2147483647
+      offeredServices:
+      - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+      - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+      - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+  - id: "Esta\xE7\xE3odeTrem_Neutral_C93"
+    construction: {fileID: 11400000, guid: a385afd73b91aa64297b44d032cac9c4, type: 2}
+    initialSlotIndex: -1
+    sector: 0
+    cellPosition: {x: 9, y: -8, z: 0}
+    initialCapturePoints: -1
+    useConstructionConfigurationOverride: 0
+    constructionConfiguration:
+      isPlayerHeadQuarter: 0
+      isVictoryBuilding: 0
+      isCapturable: 1
+      capturePointsMax: 30
+      capturedIncoming: 1500
+      sellingRule: 1
+      legacyCanProduceAndSellUnits: 
+      offeredUnits:
+      - {fileID: 11400000, guid: 4a3afdea0950dfc46a48dd7a659563ee, type: 2}
+      - {fileID: 11400000, guid: b28c15593869dae419f9b58292ef4845, type: 2}
+      - {fileID: 11400000, guid: 784e1b5ab74d4d34fa6c3ef79ba6219e, type: 2}
+      - {fileID: 11400000, guid: a5d9d72a15e061a4cbaf125b2b6b9d48, type: 2}
+      - {fileID: 11400000, guid: 5c1c693f4969237429fa904ea6955abe, type: 2}
+      - {fileID: 11400000, guid: cf26f5e5f9f009748bc56b1a7681b06d, type: 2}
+      - {fileID: 11400000, guid: f5327adf7bafffb408255d31a96ba049, type: 2}
+      - {fileID: 11400000, guid: 70b7ea3ddea78fc4e9d744cee13b053a, type: 2}
+      - {fileID: 11400000, guid: 3dc9b119819519440820c81f5db4fdce, type: 2}
+      - {fileID: 11400000, guid: 70b98199c49882e44892f7ca76df6b33, type: 2}
+      - {fileID: 11400000, guid: 99b30df53878c69499853a4ef3cb5f81, type: 2}
+      - {fileID: 11400000, guid: 8c89f5278e312ad46af401333934721b, type: 2}
+      - {fileID: 11400000, guid: 816da5452d95e1144a868a0cf7868baa, type: 2}
+      - {fileID: 11400000, guid: 5e69516e1944ffc43bae1a7cd3c7c69c, type: 2}
+      - {fileID: 11400000, guid: 87b4ab0e959c2324aa2628feb5356585, type: 2}
+      - {fileID: 11400000, guid: 01d3b4c11356e2b47bc6907e49211941, type: 2}
+      canProvideSupplies: 1
+      offeredSupplies:
+      - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+        quantity: 20
+        peakQuantity: 2147483647
+      - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+        quantity: 10
+        peakQuantity: 2147483647
+      - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+        quantity: 10
+        peakQuantity: 2147483647
+      offeredServices:
+      - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+      - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+      - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+  - id: "Esta\xE7\xE3odeTrem_Neutral_C94"
+    construction: {fileID: 11400000, guid: a385afd73b91aa64297b44d032cac9c4, type: 2}
+    initialSlotIndex: -1
+    sector: 0
+    cellPosition: {x: -3, y: -8, z: 0}
+    initialCapturePoints: -1
+    useConstructionConfigurationOverride: 0
+    constructionConfiguration:
+      isPlayerHeadQuarter: 0
+      isVictoryBuilding: 0
+      isCapturable: 1
+      capturePointsMax: 30
+      capturedIncoming: 1500
+      sellingRule: 1
+      legacyCanProduceAndSellUnits: 
+      offeredUnits:
+      - {fileID: 11400000, guid: 4a3afdea0950dfc46a48dd7a659563ee, type: 2}
+      - {fileID: 11400000, guid: b28c15593869dae419f9b58292ef4845, type: 2}
+      - {fileID: 11400000, guid: 784e1b5ab74d4d34fa6c3ef79ba6219e, type: 2}
+      - {fileID: 11400000, guid: a5d9d72a15e061a4cbaf125b2b6b9d48, type: 2}
+      - {fileID: 11400000, guid: 5c1c693f4969237429fa904ea6955abe, type: 2}
+      - {fileID: 11400000, guid: cf26f5e5f9f009748bc56b1a7681b06d, type: 2}
+      - {fileID: 11400000, guid: f5327adf7bafffb408255d31a96ba049, type: 2}
+      - {fileID: 11400000, guid: 70b7ea3ddea78fc4e9d744cee13b053a, type: 2}
+      - {fileID: 11400000, guid: 3dc9b119819519440820c81f5db4fdce, type: 2}
+      - {fileID: 11400000, guid: 70b98199c49882e44892f7ca76df6b33, type: 2}
+      - {fileID: 11400000, guid: 99b30df53878c69499853a4ef3cb5f81, type: 2}
+      - {fileID: 11400000, guid: 8c89f5278e312ad46af401333934721b, type: 2}
+      - {fileID: 11400000, guid: 816da5452d95e1144a868a0cf7868baa, type: 2}
+      - {fileID: 11400000, guid: 5e69516e1944ffc43bae1a7cd3c7c69c, type: 2}
+      - {fileID: 11400000, guid: 87b4ab0e959c2324aa2628feb5356585, type: 2}
+      - {fileID: 11400000, guid: 01d3b4c11356e2b47bc6907e49211941, type: 2}
+      canProvideSupplies: 1
+      offeredSupplies:
+      - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+        quantity: 20
+        peakQuantity: 2147483647
+      - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+        quantity: 10
+        peakQuantity: 2147483647
+      - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+        quantity: 10
+        peakQuantity: 2147483647
+      offeredServices:
+      - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+      - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+      - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+  - id: "Esta\xE7\xE3odeTrem_Neutral_C95"
+    construction: {fileID: 11400000, guid: a385afd73b91aa64297b44d032cac9c4, type: 2}
+    initialSlotIndex: -1
+    sector: 0
+    cellPosition: {x: -13, y: 2, z: 0}
+    initialCapturePoints: -1
+    useConstructionConfigurationOverride: 0
+    constructionConfiguration:
+      isPlayerHeadQuarter: 0
+      isVictoryBuilding: 0
+      isCapturable: 1
+      capturePointsMax: 30
+      capturedIncoming: 1500
+      sellingRule: 1
+      legacyCanProduceAndSellUnits: 
+      offeredUnits:
+      - {fileID: 11400000, guid: 4a3afdea0950dfc46a48dd7a659563ee, type: 2}
+      - {fileID: 11400000, guid: b28c15593869dae419f9b58292ef4845, type: 2}
+      - {fileID: 11400000, guid: 784e1b5ab74d4d34fa6c3ef79ba6219e, type: 2}
+      - {fileID: 11400000, guid: a5d9d72a15e061a4cbaf125b2b6b9d48, type: 2}
+      - {fileID: 11400000, guid: 5c1c693f4969237429fa904ea6955abe, type: 2}
+      - {fileID: 11400000, guid: cf26f5e5f9f009748bc56b1a7681b06d, type: 2}
+      - {fileID: 11400000, guid: f5327adf7bafffb408255d31a96ba049, type: 2}
+      - {fileID: 11400000, guid: 70b7ea3ddea78fc4e9d744cee13b053a, type: 2}
+      - {fileID: 11400000, guid: 3dc9b119819519440820c81f5db4fdce, type: 2}
+      - {fileID: 11400000, guid: 70b98199c49882e44892f7ca76df6b33, type: 2}
+      - {fileID: 11400000, guid: 99b30df53878c69499853a4ef3cb5f81, type: 2}
+      - {fileID: 11400000, guid: 8c89f5278e312ad46af401333934721b, type: 2}
+      - {fileID: 11400000, guid: 816da5452d95e1144a868a0cf7868baa, type: 2}
+      - {fileID: 11400000, guid: 5e69516e1944ffc43bae1a7cd3c7c69c, type: 2}
+      - {fileID: 11400000, guid: 87b4ab0e959c2324aa2628feb5356585, type: 2}
+      - {fileID: 11400000, guid: 01d3b4c11356e2b47bc6907e49211941, type: 2}
+      canProvideSupplies: 1
+      offeredSupplies:
+      - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+        quantity: 20
+        peakQuantity: 2147483647
+      - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+        quantity: 10
+        peakQuantity: 2147483647
+      - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+        quantity: 10
+        peakQuantity: 2147483647
+      offeredServices:
+      - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+      - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+      - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+  - id: "Esta\xE7\xE3odeTrem_Neutral_C96"
+    construction: {fileID: 11400000, guid: a385afd73b91aa64297b44d032cac9c4, type: 2}
+    initialSlotIndex: -1
+    sector: 0
+    cellPosition: {x: -9, y: 9, z: 0}
+    initialCapturePoints: -1
+    useConstructionConfigurationOverride: 0
+    constructionConfiguration:
+      isPlayerHeadQuarter: 0
+      isVictoryBuilding: 0
+      isCapturable: 1
+      capturePointsMax: 30
+      capturedIncoming: 1500
+      sellingRule: 1
+      legacyCanProduceAndSellUnits: 
+      offeredUnits:
+      - {fileID: 11400000, guid: 4a3afdea0950dfc46a48dd7a659563ee, type: 2}
+      - {fileID: 11400000, guid: b28c15593869dae419f9b58292ef4845, type: 2}
+      - {fileID: 11400000, guid: 784e1b5ab74d4d34fa6c3ef79ba6219e, type: 2}
+      - {fileID: 11400000, guid: a5d9d72a15e061a4cbaf125b2b6b9d48, type: 2}
+      - {fileID: 11400000, guid: 5c1c693f4969237429fa904ea6955abe, type: 2}
+      - {fileID: 11400000, guid: cf26f5e5f9f009748bc56b1a7681b06d, type: 2}
+      - {fileID: 11400000, guid: f5327adf7bafffb408255d31a96ba049, type: 2}
+      - {fileID: 11400000, guid: 70b7ea3ddea78fc4e9d744cee13b053a, type: 2}
+      - {fileID: 11400000, guid: 3dc9b119819519440820c81f5db4fdce, type: 2}
+      - {fileID: 11400000, guid: 70b98199c49882e44892f7ca76df6b33, type: 2}
+      - {fileID: 11400000, guid: 99b30df53878c69499853a4ef3cb5f81, type: 2}
+      - {fileID: 11400000, guid: 8c89f5278e312ad46af401333934721b, type: 2}
+      - {fileID: 11400000, guid: 816da5452d95e1144a868a0cf7868baa, type: 2}
+      - {fileID: 11400000, guid: 5e69516e1944ffc43bae1a7cd3c7c69c, type: 2}
+      - {fileID: 11400000, guid: 87b4ab0e959c2324aa2628feb5356585, type: 2}
+      - {fileID: 11400000, guid: 01d3b4c11356e2b47bc6907e49211941, type: 2}
+      canProvideSupplies: 1
+      offeredSupplies:
+      - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+        quantity: 20
+        peakQuantity: 2147483647
+      - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+        quantity: 10
+        peakQuantity: 2147483647
+      - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+        quantity: 10
+        peakQuantity: 2147483647
+      offeredServices:
+      - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+      - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+      - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+  - id: "Esta\xE7\xE3odeTrem_Neutral_C98"
+    construction: {fileID: 11400000, guid: a385afd73b91aa64297b44d032cac9c4, type: 2}
+    initialSlotIndex: -1
+    sector: 0
+    cellPosition: {x: 3, y: 8, z: 0}
+    initialCapturePoints: -1
+    useConstructionConfigurationOverride: 0
+    constructionConfiguration:
+      isPlayerHeadQuarter: 0
+      isVictoryBuilding: 0
+      isCapturable: 1
+      capturePointsMax: 30
+      capturedIncoming: 1500
+      sellingRule: 1
+      legacyCanProduceAndSellUnits: 
+      offeredUnits:
+      - {fileID: 11400000, guid: 4a3afdea0950dfc46a48dd7a659563ee, type: 2}
+      - {fileID: 11400000, guid: b28c15593869dae419f9b58292ef4845, type: 2}
+      - {fileID: 11400000, guid: 784e1b5ab74d4d34fa6c3ef79ba6219e, type: 2}
+      - {fileID: 11400000, guid: a5d9d72a15e061a4cbaf125b2b6b9d48, type: 2}
+      - {fileID: 11400000, guid: 5c1c693f4969237429fa904ea6955abe, type: 2}
+      - {fileID: 11400000, guid: cf26f5e5f9f009748bc56b1a7681b06d, type: 2}
+      - {fileID: 11400000, guid: f5327adf7bafffb408255d31a96ba049, type: 2}
+      - {fileID: 11400000, guid: 70b7ea3ddea78fc4e9d744cee13b053a, type: 2}
+      - {fileID: 11400000, guid: 3dc9b119819519440820c81f5db4fdce, type: 2}
+      - {fileID: 11400000, guid: 70b98199c49882e44892f7ca76df6b33, type: 2}
+      - {fileID: 11400000, guid: 99b30df53878c69499853a4ef3cb5f81, type: 2}
+      - {fileID: 11400000, guid: 8c89f5278e312ad46af401333934721b, type: 2}
+      - {fileID: 11400000, guid: 816da5452d95e1144a868a0cf7868baa, type: 2}
+      - {fileID: 11400000, guid: 5e69516e1944ffc43bae1a7cd3c7c69c, type: 2}
+      - {fileID: 11400000, guid: 87b4ab0e959c2324aa2628feb5356585, type: 2}
+      - {fileID: 11400000, guid: 01d3b4c11356e2b47bc6907e49211941, type: 2}
+      canProvideSupplies: 1
+      offeredSupplies:
+      - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+        quantity: 20
+        peakQuantity: 2147483647
+      - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+        quantity: 10
+        peakQuantity: 2147483647
+      - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+        quantity: 10
+        peakQuantity: 2147483647
+      offeredServices:
+      - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+      - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+      - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+  - id: "F\xE1brica_Neutral_C99"
+    construction: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
+    initialSlotIndex: -1
+    sector: 0
+    cellPosition: {x: -9, y: 8, z: 0}
+    initialCapturePoints: -1
+    useConstructionConfigurationOverride: 0
+    constructionConfiguration:
+      isPlayerHeadQuarter: 0
+      isVictoryBuilding: 0
+      isCapturable: 1
+      capturePointsMax: 30
+      capturedIncoming: 1500
+      sellingRule: 1
+      legacyCanProduceAndSellUnits: 
+      offeredUnits:
+      - {fileID: 11400000, guid: 4a3afdea0950dfc46a48dd7a659563ee, type: 2}
+      - {fileID: 11400000, guid: b28c15593869dae419f9b58292ef4845, type: 2}
+      - {fileID: 11400000, guid: 784e1b5ab74d4d34fa6c3ef79ba6219e, type: 2}
+      - {fileID: 11400000, guid: a5d9d72a15e061a4cbaf125b2b6b9d48, type: 2}
+      - {fileID: 11400000, guid: 5c1c693f4969237429fa904ea6955abe, type: 2}
+      - {fileID: 11400000, guid: cf26f5e5f9f009748bc56b1a7681b06d, type: 2}
+      - {fileID: 11400000, guid: f5327adf7bafffb408255d31a96ba049, type: 2}
+      - {fileID: 11400000, guid: 70b7ea3ddea78fc4e9d744cee13b053a, type: 2}
+      - {fileID: 11400000, guid: 3dc9b119819519440820c81f5db4fdce, type: 2}
+      - {fileID: 11400000, guid: 70b98199c49882e44892f7ca76df6b33, type: 2}
+      - {fileID: 11400000, guid: 99b30df53878c69499853a4ef3cb5f81, type: 2}
+      - {fileID: 11400000, guid: 8c89f5278e312ad46af401333934721b, type: 2}
+      - {fileID: 11400000, guid: 816da5452d95e1144a868a0cf7868baa, type: 2}
+      - {fileID: 11400000, guid: 5e69516e1944ffc43bae1a7cd3c7c69c, type: 2}
+      - {fileID: 11400000, guid: 87b4ab0e959c2324aa2628feb5356585, type: 2}
+      canProvideSupplies: 1
+      offeredSupplies:
+      - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+        quantity: 20
+        peakQuantity: 2147483647
+      - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+        quantity: 10
+        peakQuantity: 2147483647
+      - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+        quantity: 40
+        peakQuantity: 2147483647
+      offeredServices:
+      - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+      - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+      - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+  - id: "Esta\xE7\xE3odeTrem_S1_C101"
+    construction: {fileID: 11400000, guid: a385afd73b91aa64297b44d032cac9c4, type: 2}
+    initialSlotIndex: 1
+    sector: 0
+    cellPosition: {x: 8, y: -10, z: 0}
+    initialCapturePoints: -1
+    useConstructionConfigurationOverride: 0
+    constructionConfiguration:
+      isPlayerHeadQuarter: 0
+      isVictoryBuilding: 0
+      isCapturable: 1
+      capturePointsMax: 30
+      capturedIncoming: 1500
+      sellingRule: 1
+      legacyCanProduceAndSellUnits: 
+      offeredUnits:
+      - {fileID: 11400000, guid: 4a3afdea0950dfc46a48dd7a659563ee, type: 2}
+      - {fileID: 11400000, guid: b28c15593869dae419f9b58292ef4845, type: 2}
+      - {fileID: 11400000, guid: 784e1b5ab74d4d34fa6c3ef79ba6219e, type: 2}
+      - {fileID: 11400000, guid: a5d9d72a15e061a4cbaf125b2b6b9d48, type: 2}
+      - {fileID: 11400000, guid: 5c1c693f4969237429fa904ea6955abe, type: 2}
+      - {fileID: 11400000, guid: cf26f5e5f9f009748bc56b1a7681b06d, type: 2}
+      - {fileID: 11400000, guid: f5327adf7bafffb408255d31a96ba049, type: 2}
+      - {fileID: 11400000, guid: 70b7ea3ddea78fc4e9d744cee13b053a, type: 2}
+      - {fileID: 11400000, guid: 3dc9b119819519440820c81f5db4fdce, type: 2}
+      - {fileID: 11400000, guid: 70b98199c49882e44892f7ca76df6b33, type: 2}
+      - {fileID: 11400000, guid: 99b30df53878c69499853a4ef3cb5f81, type: 2}
+      - {fileID: 11400000, guid: 8c89f5278e312ad46af401333934721b, type: 2}
+      - {fileID: 11400000, guid: 816da5452d95e1144a868a0cf7868baa, type: 2}
+      - {fileID: 11400000, guid: 5e69516e1944ffc43bae1a7cd3c7c69c, type: 2}
+      - {fileID: 11400000, guid: 87b4ab0e959c2324aa2628feb5356585, type: 2}
+      - {fileID: 11400000, guid: 01d3b4c11356e2b47bc6907e49211941, type: 2}
+      canProvideSupplies: 1
+      offeredSupplies:
+      - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+        quantity: 20
+        peakQuantity: 2147483647
+      - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+        quantity: 10
+        peakQuantity: 2147483647
+      - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+        quantity: 10
+        peakQuantity: 2147483647
+      offeredServices:
+      - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+      - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+      - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+  - id: "Esta\xE7\xE3odeTrem_S0_C102"
+    construction: {fileID: 11400000, guid: a385afd73b91aa64297b44d032cac9c4, type: 2}
+    initialSlotIndex: 0
+    sector: 0
+    cellPosition: {x: -8, y: 10, z: 0}
+    initialCapturePoints: -1
+    useConstructionConfigurationOverride: 0
+    constructionConfiguration:
+      isPlayerHeadQuarter: 0
+      isVictoryBuilding: 0
+      isCapturable: 1
+      capturePointsMax: 30
+      capturedIncoming: 1500
+      sellingRule: 1
+      legacyCanProduceAndSellUnits: 
+      offeredUnits:
+      - {fileID: 11400000, guid: 4a3afdea0950dfc46a48dd7a659563ee, type: 2}
+      - {fileID: 11400000, guid: b28c15593869dae419f9b58292ef4845, type: 2}
+      - {fileID: 11400000, guid: 784e1b5ab74d4d34fa6c3ef79ba6219e, type: 2}
+      - {fileID: 11400000, guid: a5d9d72a15e061a4cbaf125b2b6b9d48, type: 2}
+      - {fileID: 11400000, guid: 5c1c693f4969237429fa904ea6955abe, type: 2}
+      - {fileID: 11400000, guid: cf26f5e5f9f009748bc56b1a7681b06d, type: 2}
+      - {fileID: 11400000, guid: f5327adf7bafffb408255d31a96ba049, type: 2}
+      - {fileID: 11400000, guid: 70b7ea3ddea78fc4e9d744cee13b053a, type: 2}
+      - {fileID: 11400000, guid: 3dc9b119819519440820c81f5db4fdce, type: 2}
+      - {fileID: 11400000, guid: 70b98199c49882e44892f7ca76df6b33, type: 2}
+      - {fileID: 11400000, guid: 99b30df53878c69499853a4ef3cb5f81, type: 2}
+      - {fileID: 11400000, guid: 8c89f5278e312ad46af401333934721b, type: 2}
+      - {fileID: 11400000, guid: 816da5452d95e1144a868a0cf7868baa, type: 2}
+      - {fileID: 11400000, guid: 5e69516e1944ffc43bae1a7cd3c7c69c, type: 2}
+      - {fileID: 11400000, guid: 87b4ab0e959c2324aa2628feb5356585, type: 2}
+      - {fileID: 11400000, guid: 01d3b4c11356e2b47bc6907e49211941, type: 2}
+      canProvideSupplies: 1
+      offeredSupplies:
+      - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+        quantity: 20
+        peakQuantity: 2147483647
+      - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+        quantity: 10
+        peakQuantity: 2147483647
+      - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+        quantity: 10
+        peakQuantity: 2147483647
+      offeredServices:
+      - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+      - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+      - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+  - id: Cidade_S1_C103
+    construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
+    initialSlotIndex: 1
+    sector: 0
+    cellPosition: {x: 9, y: 6, z: 0}
+    initialCapturePoints: -1
+    useConstructionConfigurationOverride: 0
+    constructionConfiguration:
+      isPlayerHeadQuarter: 0
+      isVictoryBuilding: 0
+      isCapturable: 1
+      capturePointsMax: 20
+      capturedIncoming: 1000
+      sellingRule: 3
+      legacyCanProduceAndSellUnits: 
+      offeredUnits: []
+      canProvideSupplies: 1
+      offeredSupplies:
+      - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+        quantity: 40
+        peakQuantity: 2147483647
+      - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+        quantity: 10
+        peakQuantity: 2147483647
+      - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+        quantity: 20
+        peakQuantity: 2147483647
+      offeredServices:
+      - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+      - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+      - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+  - id: Cidade_S0_C104
+    construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
+    initialSlotIndex: 0
+    sector: 0
+    cellPosition: {x: -9, y: -6, z: 0}
+    initialCapturePoints: -1
+    useConstructionConfigurationOverride: 0
+    constructionConfiguration:
+      isPlayerHeadQuarter: 0
+      isVictoryBuilding: 0
+      isCapturable: 1
+      capturePointsMax: 20
+      capturedIncoming: 1000
+      sellingRule: 3
+      legacyCanProduceAndSellUnits: 
+      offeredUnits: []
+      canProvideSupplies: 1
+      offeredSupplies:
+      - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+        quantity: 40
+        peakQuantity: 2147483647
+      - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+        quantity: 10
+        peakQuantity: 2147483647
+      - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+        quantity: 20
+        peakQuantity: 2147483647
+      offeredServices:
+      - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+      - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+      - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+  - id: Cidade_S0_C105
+    construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
+    initialSlotIndex: 0
+    sector: 0
+    cellPosition: {x: -3, y: -1, z: 0}
+    initialCapturePoints: -1
+    useConstructionConfigurationOverride: 0
+    constructionConfiguration:
+      isPlayerHeadQuarter: 0
+      isVictoryBuilding: 0
+      isCapturable: 1
+      capturePointsMax: 20
+      capturedIncoming: 1000
+      sellingRule: 3
+      legacyCanProduceAndSellUnits: 
+      offeredUnits: []
+      canProvideSupplies: 1
+      offeredSupplies:
+      - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+        quantity: 40
+        peakQuantity: 2147483647
+      - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+        quantity: 10
+        peakQuantity: 2147483647
+      - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+        quantity: 20
+        peakQuantity: 2147483647
+      offeredServices:
+      - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+      - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+      - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+  - id: Cidade_S1_C106
+    construction: {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
+    initialSlotIndex: 1
+    sector: 0
+    cellPosition: {x: 2, y: 1, z: 0}
+    initialCapturePoints: -1
+    useConstructionConfigurationOverride: 0
+    constructionConfiguration:
+      isPlayerHeadQuarter: 0
+      isVictoryBuilding: 0
+      isCapturable: 1
+      capturePointsMax: 20
+      capturedIncoming: 1000
+      sellingRule: 3
+      legacyCanProduceAndSellUnits: 
+      offeredUnits: []
+      canProvideSupplies: 1
+      offeredSupplies:
+      - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+        quantity: 40
+        peakQuantity: 2147483647
+      - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+        quantity: 10
+        peakQuantity: 2147483647
+      - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+        quantity: 20
+        peakQuantity: 2147483647
+      offeredServices:
+      - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+      - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+      - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+  - id: "F\xE1brica_Neutral_C109"
+    construction: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
+    initialSlotIndex: -1
+    sector: 0
+    cellPosition: {x: 13, y: -10, z: 0}
+    initialCapturePoints: -1
+    useConstructionConfigurationOverride: 0
+    constructionConfiguration:
+      isPlayerHeadQuarter: 0
+      isVictoryBuilding: 0
+      isCapturable: 1
+      capturePointsMax: 30
+      capturedIncoming: 1500
+      sellingRule: 1
+      legacyCanProduceAndSellUnits: 
+      offeredUnits:
+      - {fileID: 11400000, guid: 4a3afdea0950dfc46a48dd7a659563ee, type: 2}
+      - {fileID: 11400000, guid: b28c15593869dae419f9b58292ef4845, type: 2}
+      - {fileID: 11400000, guid: 784e1b5ab74d4d34fa6c3ef79ba6219e, type: 2}
+      - {fileID: 11400000, guid: a5d9d72a15e061a4cbaf125b2b6b9d48, type: 2}
+      - {fileID: 11400000, guid: 5c1c693f4969237429fa904ea6955abe, type: 2}
+      - {fileID: 11400000, guid: cf26f5e5f9f009748bc56b1a7681b06d, type: 2}
+      - {fileID: 11400000, guid: f5327adf7bafffb408255d31a96ba049, type: 2}
+      - {fileID: 11400000, guid: 70b7ea3ddea78fc4e9d744cee13b053a, type: 2}
+      - {fileID: 11400000, guid: 3dc9b119819519440820c81f5db4fdce, type: 2}
+      - {fileID: 11400000, guid: 70b98199c49882e44892f7ca76df6b33, type: 2}
+      - {fileID: 11400000, guid: 99b30df53878c69499853a4ef3cb5f81, type: 2}
+      - {fileID: 11400000, guid: 8c89f5278e312ad46af401333934721b, type: 2}
+      - {fileID: 11400000, guid: 816da5452d95e1144a868a0cf7868baa, type: 2}
+      - {fileID: 11400000, guid: 5e69516e1944ffc43bae1a7cd3c7c69c, type: 2}
+      - {fileID: 11400000, guid: 87b4ab0e959c2324aa2628feb5356585, type: 2}
+      canProvideSupplies: 1
+      offeredSupplies:
+      - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+        quantity: 20
+        peakQuantity: 2147483647
+      - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+        quantity: 10
+        peakQuantity: 2147483647
+      - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+        quantity: 40
+        peakQuantity: 2147483647
+      offeredServices:
+      - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+      - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+      - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+  - id: "F\xE1brica_Neutral_C110"
+    construction: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
+    initialSlotIndex: -1
+    sector: 0
+    cellPosition: {x: -13, y: 10, z: 0}
+    initialCapturePoints: -1
+    useConstructionConfigurationOverride: 0
+    constructionConfiguration:
+      isPlayerHeadQuarter: 0
+      isVictoryBuilding: 0
+      isCapturable: 1
+      capturePointsMax: 30
+      capturedIncoming: 1500
+      sellingRule: 1
+      legacyCanProduceAndSellUnits: 
+      offeredUnits:
+      - {fileID: 11400000, guid: 4a3afdea0950dfc46a48dd7a659563ee, type: 2}
+      - {fileID: 11400000, guid: b28c15593869dae419f9b58292ef4845, type: 2}
+      - {fileID: 11400000, guid: 784e1b5ab74d4d34fa6c3ef79ba6219e, type: 2}
+      - {fileID: 11400000, guid: a5d9d72a15e061a4cbaf125b2b6b9d48, type: 2}
+      - {fileID: 11400000, guid: 5c1c693f4969237429fa904ea6955abe, type: 2}
+      - {fileID: 11400000, guid: cf26f5e5f9f009748bc56b1a7681b06d, type: 2}
+      - {fileID: 11400000, guid: f5327adf7bafffb408255d31a96ba049, type: 2}
+      - {fileID: 11400000, guid: 70b7ea3ddea78fc4e9d744cee13b053a, type: 2}
+      - {fileID: 11400000, guid: 3dc9b119819519440820c81f5db4fdce, type: 2}
+      - {fileID: 11400000, guid: 70b98199c49882e44892f7ca76df6b33, type: 2}
+      - {fileID: 11400000, guid: 99b30df53878c69499853a4ef3cb5f81, type: 2}
+      - {fileID: 11400000, guid: 8c89f5278e312ad46af401333934721b, type: 2}
+      - {fileID: 11400000, guid: 816da5452d95e1144a868a0cf7868baa, type: 2}
+      - {fileID: 11400000, guid: 5e69516e1944ffc43bae1a7cd3c7c69c, type: 2}
+      - {fileID: 11400000, guid: 87b4ab0e959c2324aa2628feb5356585, type: 2}
+      canProvideSupplies: 1
+      offeredSupplies:
+      - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+        quantity: 20
+        peakQuantity: 2147483647
+      - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+        quantity: 10
+        peakQuantity: 2147483647
+      - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+        quantity: 40
+        peakQuantity: 2147483647
+      offeredServices:
+      - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+      - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+      - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+  - id: Barracks_Neutral_C111
+    construction: {fileID: 11400000, guid: 5572b2429e4e3fb43a7e49289c1fac2e, type: 2}
+    initialSlotIndex: -1
+    sector: 0
+    cellPosition: {x: 3, y: 7, z: 0}
+    initialCapturePoints: -1
+    useConstructionConfigurationOverride: 0
+    constructionConfiguration:
+      isPlayerHeadQuarter: 0
+      isVictoryBuilding: 0
+      isCapturable: 1
+      capturePointsMax: 20
+      capturedIncoming: 500
+      sellingRule: 0
+      legacyCanProduceAndSellUnits: 
+      offeredUnits:
+      - {fileID: 11400000, guid: 4a3afdea0950dfc46a48dd7a659563ee, type: 2}
+      - {fileID: 11400000, guid: b28c15593869dae419f9b58292ef4845, type: 2}
+      - {fileID: 11400000, guid: c0e59b3e4bf2e4c49a67906805e43801, type: 2}
+      canProvideSupplies: 1
+      offeredSupplies:
+      - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+        quantity: 10
+        peakQuantity: 2147483647
+      - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+        quantity: 20
+        peakQuantity: 2147483647
+      - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+        quantity: 30
+        peakQuantity: 2147483647
+      offeredServices:
+      - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+      - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+      - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+  - id: Barracks_Neutral_C112
+    construction: {fileID: 11400000, guid: 5572b2429e4e3fb43a7e49289c1fac2e, type: 2}
+    initialSlotIndex: -1
+    sector: 0
+    cellPosition: {x: -4, y: -7, z: 0}
+    initialCapturePoints: -1
+    useConstructionConfigurationOverride: 0
+    constructionConfiguration:
+      isPlayerHeadQuarter: 0
+      isVictoryBuilding: 0
+      isCapturable: 1
+      capturePointsMax: 20
+      capturedIncoming: 500
+      sellingRule: 0
+      legacyCanProduceAndSellUnits: 
+      offeredUnits:
+      - {fileID: 11400000, guid: 4a3afdea0950dfc46a48dd7a659563ee, type: 2}
+      - {fileID: 11400000, guid: b28c15593869dae419f9b58292ef4845, type: 2}
+      - {fileID: 11400000, guid: c0e59b3e4bf2e4c49a67906805e43801, type: 2}
+      canProvideSupplies: 1
+      offeredSupplies:
+      - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+        quantity: 10
+        peakQuantity: 2147483647
+      - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+        quantity: 20
+        peakQuantity: 2147483647
+      - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+        quantity: 30
+        peakQuantity: 2147483647
       offeredServices:
       - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
       - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}

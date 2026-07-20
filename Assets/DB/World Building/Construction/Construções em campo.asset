@@ -51,7 +51,7 @@ MonoBehaviour:
       canProvideSupplies: 0
       offeredSupplies: []
       offeredServices: []
-  - id: "F\xE1brica_T-1_C41"
+  - id: Cidade_T1_C89
     construction: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
     initialSlotIndex: -1
     sector: 0
@@ -108,7 +108,7 @@ MonoBehaviour:
       canProvideSupplies: 0
       offeredSupplies: []
       offeredServices: []
-  - id: PortoNaval_T-1_C247
+  - id: "Esta\xE7\xE3odeTrem_T-1_C93"
     construction: {fileID: 11400000, guid: 18336762152ab4246bb4cd0fb463da45, type: 2}
     initialSlotIndex: -1
     sector: 0
@@ -687,7 +687,7 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
       - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
       - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
-  - id: Cidade_T-1_C62
+  - id: "F\xE1brica_T-1_C62"
     construction: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
     initialSlotIndex: -1
     sector: 0
@@ -869,7 +869,7 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
       - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
       - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
-  - id: Aeroporto_T-1_C58
+  - id: Barracks_T-1_C58
     construction: {fileID: 11400000, guid: 5572b2429e4e3fb43a7e49289c1fac2e, type: 2}
     initialSlotIndex: -1
     sector: 0

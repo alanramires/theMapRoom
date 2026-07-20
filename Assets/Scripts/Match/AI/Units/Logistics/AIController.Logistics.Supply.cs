@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -30,8 +30,7 @@ public partial class AIController
                 || ally.IsDead
                 || ally.IsEmbarked
                 || ally.TeamId != logistics.TeamId
-                || ally.ReceivedSuppliesThisTurn
-                || ally.TookOffRecently)
+                || ally.ReceivedSuppliesThisTurn)
                 continue;
 
             bool critical = ally.IsUnderRepair;
@@ -394,8 +393,7 @@ public partial class AIController
                     || target.IsDead
                     || target.IsEmbarked
                     || target.TeamId != unit.TeamId
-                    || target.ReceivedSuppliesThisTurn
-                    || target.TookOffRecently)
+                    || target.ReceivedSuppliesThisTurn)
                     continue;
                 if (!seen.Add(target.InstanceId))
                     continue;
@@ -844,8 +842,7 @@ public partial class AIController
             || target.IsDead
             || target.IsEmbarked
             || target.TeamId != logistics.TeamId
-            || target.ReceivedSuppliesThisTurn
-            || target.TookOffRecently)
+            || target.ReceivedSuppliesThisTurn)
             return false;
 
         if (target.IsUnderRepair)
@@ -890,7 +887,6 @@ public partial class AIController
                 || ally.IsEmbarked
                 || ally.TeamId != logistics.TeamId
                 || ally.ReceivedSuppliesThisTurn
-                || ally.TookOffRecently
                 || !ally.IsUnderRepair)
                 continue;
 

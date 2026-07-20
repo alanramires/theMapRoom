@@ -5,7 +5,11 @@ Imagine que estamos em uma sala de guerra e no meio da sala, uma grande mesa com
 Por estar em uma sala de mapas, o que você vê é estratégia pura."
 É ali que você está, dando ordens, atualizando a posição da frota a medida que ela avança e registrando por onde a esquadrilha está sobrevoando, registrando o consumo logístico e dando ordens indiretas para suas tropas. Você não está no front de batalha, você está na sala de mapas, no estado maior comandando todas as 3 forças militares. Esse é o "The Map Room"
 Um jogo determinístico
-Por estar em uma sala de mapas, elementos como cobertura, flanqueamento, ataque de oportunidade, clima, tempo, veterania, e todos os elementos de RPG não existem nesse sistema. Tambem não existe aleatoriedade, percentual, grind, rng, dailies.
+Por estar em uma sala de mapas, não existe aleatoriedade, percentual, grind, rng nem dailies. Nada aqui é sorteado: as mesmas condições produzem sempre o mesmo resultado.
+Também não existem clima, tempo, ataque de oportunidade nem os elementos de RPG.
+Duas ausências, porém, merecem ser ditas com mais cuidado, porque não são ausências de verdade — são absorções.
+Cobertura, flanqueamento e exposição não têm modificadores próprios. Seus efeitos foram consolidados em Posição, domínio, alcance e DPQ. Estar na floresta protege; estar melhor colocado que o inimigo dá vantagem; estar no domínio errado te expõe. O que não existe é um sistema separado para cada uma dessas ideias.
+Veterania adquirida também não existe. Nenhuma unidade ganha experiência, sobe de nível ou melhora ao longo da partida. O que existe são formações que já nascem de elite em confrontos específicos — o que é uma descrição da unidade, não uma progressão dela.
 O Tabuleiro
 Aqui o tabuleiro representa um mapa, o hexagono é grande o bastante para caber uma cidade inteira, ou uma frota de porta aviões. e você tem uma representação de qual força está ocupando aquele setor no momento. Então se você vê um caça parado em um hexágono entre turnos, ele não está parado no ar, ele está ocupando aquele setor ou território que pode se extender em vários kilometros. Uma vez que você conseguiu abstrair o que é o "The Map Room" é hora de mergulhar nos conceitos, e o primeiro deles, antes de falar de unidade, é os "Domínios"
 Domínios
@@ -14,7 +18,7 @@ O domínio do Ar se divide em duas camadas. As Altas Altitudes (Air/High) — ar ra
 O domínio da Terra (Land) contém apenas a Superfície (Land/Surface), onde operam todas as unidades do exército — planícies, florestas, e as construções humanas como fábricas, cidades e estradas.
 O domínio do Mar (Naval) agrupa dois subdomínios. O Nível do Mar (Naval/Surface), onde navegam as unidades da marinha e se localizam construções como portos navais. E as Águas Profundas (Submarine/Submerged), onde operam unidades abaixo d'água como o Submarino.
 Se classificássemos em altitude como um bolo em camadas, teríamos do topo à base:
-Air/High ? Air/Low ? Land/Surface · Naval/Surface ? Submarine/Submerged
+Air/High » Air/Low » Land/Surface · Naval/Surface » Submarine/Submerged
 Terrenos
 O mundo do jogo é organizado em terrenos — e cada terreno pertence a um domínio. Isso determina quem pode entrar, operar e sobreviver em cada parte do mapa.
 Planície — campos abertos. Sem obstáculos, sem cobertura. Favorece velocidade e visibilidade. Land/Surface.
@@ -33,7 +37,8 @@ Uma construção sobrescreve o domínio do terreno onde foi erguida — e pode aceita
 --------------------------------------------------------------------------------
 Cidade — Land/Surface. Se construída sobre uma praia, a cidade sobrescreve o domínio naval do terreno. O hexágono passa a ser Land/Surface: canhões estacionam, navios não entram. A engenharia humana fechou o porto natural.
 Fábrica — Land/Surface. Produção e reparo de unidades terrestres. Quem controla a fábrica controla a capacidade de reposição do front.
-Porto Naval — construído na praia, aceita Land/Surface e Naval/Surface simultaneamente. Você verá tropas e navios ocupando o mesmo hexágono. É a construção que mantém os dois domínios abertos onde o terreno sozinho só teria um.
+Porto Naval — construído na praia, aceita tanto Land/Surface quanto Naval/Surface. É a construção que mantém os dois domínios abertos onde o terreno sozinho só teria um: ali cabe uma tropa, ou cabe um navio.
+Cuidado com a palavra "ambos": o porto aceita os dois domínios, mas não os dois ao mesmo tempo. A superfície é um andar só — se há um navio atracado, não entra tropa; se há tropa no porto, não entra navio. O porto amplia suas opções, não a lotação do hexágono.
 Aeroporto — Land/Surface. A ponte entre o ar e o solo. Uma aeronave não recebe manutenção em Air/Low ou Air/High — ela precisa pousar, igualar o domínio ao da construção, para então receber reparos, combustível e munição. Voar tem custo logístico. O aeroporto é onde esse custo é pago.
 --------------------------------------------------------------------------------
 Uma observação sobre submarinos: a praia não aceita o domínio Submerged — nem sozinha, nem com porto construído sobre ela. Um submarino que se aproxima da costa é forçado a emergir para Naval/Surface. Não há profundidade suficiente para operar submerso. A geografia impõe a limitação antes de qualquer regra de jogo.
@@ -44,7 +49,10 @@ A regra fundamental das estruturas: elas são sempre avaliadas em par com o terre
 Estrada — Land/Surface. Oferece bônus de velocidade para unidades motorizadas que percorrem todo o seu movimento sobre ela. Abre passagem por florestas e montanhas, permitindo que unidades alcancem cidades construídas em terrenos elevados.
 Na combinação com planície, a estrada funciona como pista improvisada — aeronaves conseguem pousar para receber reabastecimento de unidades logísticas como o caminhão de suprimentos. Na montanha, essa mesma aeronave não pousa. O terreno cancela o acesso que a estrutura abriria.
 Pontes e Pontes Ferroviárias — Land/Surface e Naval/Surface. Construídas sobre praias e travessias marítimas, interligam territórios que estradas sozinhas não alcançam — estradas não podem ser construídas em praias por diferença de domínio.
-Pontes existem em duas variantes. A ponte alta permite passagem simultânea de Naval/Surface por baixo e Land/Surface por cima — navios passam enquanto tanques cruzam. A ponte baixa permite apenas passagem de Submarine/Submerged por baixo. A escolha de qual ponte construir no cenário define rotas inteiras de ataque e defesa.
+Pontes existem em duas variantes, e a diferença entre elas não é altura — é quem passa por cima.
+A ponte rodoviária carrega o tráfego comum e bloqueia o Trem de Carga. A ponte ferroviária faz o oposto: exige a habilidade de linha de trem, e só o trem atravessa. Uma não substitui a outra.
+Por baixo, as duas se comportam igual: ambas permitem passagem de Naval/Surface e de Submarine/Submerged. Navios cruzam por baixo, submarinos submersos também.
+A escolha de qual ponte construir define rotas inteiras de ataque e defesa — e decide se a sua artéria ferroviária alcança ou não o outro lado da água.
 Linha de Trem — Land/Surface. Similar à estrada em traçado, mas sem o bônus de velocidade. Existe exclusivamente para operação do Trem de Carga — a artéria logística que conecta a base ao front em mapas grandes.
 Ordem de Prioridade
 Quando um hexágono contém terreno, estrutura e construção ao mesmo tempo, uma regra simples determina o que vale:
@@ -55,6 +63,112 @@ Uma unidade numa cidade com estrada está na cidade — recebe a proteção da constr
 --------------------------------------------------------------------------------
 Estruturas por si só são desfavoráveis à defesa. Uma estrada na montanha dá acesso ao terreno elevado e mantém os atributos de visão da montanha — mas não oferece a proteção dela. Você chegou lá, mas ficou exposto.
 A exceção que confirma a regra: o Trem de Carga é a única unidade que exige a presença de Linha de Trem na construção para operar. As demais unidades seguem a hierarquia naturalmente — a prioridade determina o contexto, não bloqueia o acesso.
+--------------------------------------------------------------------------------
+O Que o Combate Não Faz
+Três leis que o sistema respeita em silêncio, e que vale declarar antes que alguém suponha o contrário.
+--------------------------------------------------------------------------------
+Alcance Zero Não Tem Combate
+Nenhuma arma do jogo atinge o próprio hexágono. Todas começam no alcance 1.
+Isso não é um descuido: é a escala. O hexágono comporta uma cidade inteira ou uma frota. Duas unidades no mesmo setor não estão lado a lado — podem estar a dezenas de quilômetros, em altitudes diferentes, ou uma sob a água e outra sobre ela.
+Por isso um navio e um submarino coexistem no mesmo hexágono sem se atacar. Por isso uma aeronave sobrevoa tropas inimigas sem trocar tiros com elas. Ocupar o mesmo setor não é estar em contato.
+--------------------------------------------------------------------------------
+Cada Ataque É Um Duelo
+Um ataque resolve um confronto entre exatamente duas unidades: quem declarou e quem recebeu.
+Não existe fogo de oportunidade. Não existe revide coletivo. Não existe unidade vizinha que se junta ao disparo porque estava por perto. Cinco tanques adjacentes ao alvo não somam forças — cada um precisa atacar por conta, no seu próprio momento, gastando a própria ação.
+O único que responde é o defensor direto, e só a distância 1, se tiver arma, munição e camada compatíveis.
+Isso é o que torna o posicionamento uma decisão e não uma armadilha automática. Você nunca perde uma unidade por ter passado perto de alguém.
+--------------------------------------------------------------------------------
+Ninguém Atira Antes
+Já foi dito, mas cabe repetir aqui junto das outras duas: a resolução é simultânea. Os dois lados calculam com o efetivo que tinham no início da troca. O atacante recebe iniciativa — o lado bom do arredondamento — e nada mais.
+--------------------------------------------------------------------------------
+Habilidades
+Uma habilidade não é um poder. É uma chave.
+O nome que aparece na ficha — alpino, guerrilha, fora-de-estrada — não faz nada sozinho. Não concede bônus, não altera atributo, não dispara efeito. É um rótulo, e só.
+Quem dá sentido a ele é o resto do mundo. A montanha diz "só entra quem for alpino ou fora-de-estrada, e o alpino atravessa por 2". A floresta diz "guerrilha passa por 1". A ponte ferroviária diz "só passa quem for da linha de trem". Cada lugar pendura a mesma etiqueta e define, ali, o que ela significa.
+A consequência prática é essa: ver uma habilidade na ficha não te diz o que a unidade faz. Te diz onde procurar. Alpino não significa "escala bem" em abstrato — significa que existem lugares no mapa que perguntam por alpino, e nesses lugares essa unidade tem resposta.
+--------------------------------------------------------------------------------
+Onde o Terreno Pergunta
+Alpino abre a montanha e a atravessa por 2. Toda a sua infantaria tem.
+Fora-de-estrada também abre a montanha, mas cobra 6 — quase o turno inteiro. No exército inteiro, uma única unidade tem: o transporte blindado.
+Guerrilha atravessa floresta por 1 em vez de 2. Também é da infantaria.
+Motor é a etiqueta invertida: não abre nada, só cobra. Quem tem motor paga a mais na estrada da montanha e no trilho.
+Some as três primeiras e você entende por que a infantaria é a rainha do terreno ruim. Ela sobe o que ninguém sobe, atravessa mato sem perder tempo, e é a única que toma território. O blindado ganha a batalha; a infantaria ganha o mapa.
+--------------------------------------------------------------------------------
+Onde a Estrutura Pergunta
+Linha de trem é a etiqueta mais restritiva do jogo, e vale ver o tamanho disso: ela é exigida pela ponte ferroviária, e bloqueada pela estrada, pela ponte rodoviária e pelos cinco terrenos — planície, floresta, montanha, praia e mar.
+E não adianta procurar atalho pelo mar: o navio de desembarque também recusa a etiqueta. Um trem não embarca.
+Ou seja, o portador dessa etiqueta não anda em absolutamente nenhum lugar que não seja trilho, e não pode ser carregado para fora dele. E uma única unidade a carrega: o Trem de Carga.
+A restrição é deliberada. Um trem sobre um navio de transporte é épico demais para ser plausível — e o Trem de Carga precisa continuar sendo o que ele é: uma unidade presa à malha que você construiu.
+É o exemplo mais puro do sistema. A unidade não tem uma regra especial escrita nela. Ela tem uma etiqueta, e o mundo inteiro foi configurado para responder a essa etiqueta com "não" — exceto o trilho.
+--------------------------------------------------------------------------------
+Onde o Céu Pergunta
+Pousar é o caso com mais chaves diferentes, porque cada tipo de aeronave desce de um jeito:
+Pouso convencional exige pista de verdade: aeroporto, ou estrada e trilho construídos na planície.
+Pouso vertical dispensa pista. Helicópteros descem em qualquer construção.
+Pouso curto é o meio-termo, e no seu exército uma única aeronave o tem.
+Pouso em convés é exigido pelo hangar do porta-aviões e da fragata. Sem essa etiqueta, a aeronave não embarca no navio.
+Pouso na água é só do hidroavião — mar e praia perguntam por ela, e ninguém mais responde.
+--------------------------------------------------------------------------------
+Onde o Combate Pergunta
+Ocultação funciona pelo mesmo princípio, e isso explica uma regra que confunde muita gente.
+A unidade furtiva carrega uma etiqueta de ocultação. O sensor não diz "eu detecto furtivos" — ele diz "eu detecto quem tiver esta etiqueta específica". São listas que precisam bater.
+Por isso não existe detecção genérica de furtivo. O radar que encontra um caça furtivo não encontra um submarino, e não é por falta de alcance: é porque ele pergunta por uma etiqueta que o submarino não tem. São dois mundos de ocultação que não se cruzam, e você precisa de equipamento próprio para cada um.
+--------------------------------------------------------------------------------
+Reboque
+Duas etiquetas que se procuram: uma diz "preciso de reboque", a outra diz "sei rebocar".
+A artilharia de campanha não se desloca sozinha. O caminhão de suprimentos e o trem de carga sabem puxá-la. Uma peça de artilharia sem rebocador por perto é uma peça que ficou onde estava.
+--------------------------------------------------------------------------------
+Por Que Isso Importa Para Você
+Porque o jogo não cresce em regras — cresce em etiquetas.
+Quando uma unidade nova entra, ela não traz mecânica nova. Ela traz um conjunto de chaves, e o mundo já sabe responder a elas. Um novo veículo com fora-de-estrada sobe montanha porque a montanha já pergunta por isso, não porque alguém escreveu uma exceção para ele.
+E para você, na hora de montar exército, a leitura vira uma pergunta só: **quais portas do mapa eu consigo abrir?** Um exército inteiro de blindados é poderoso e não sobe montanha, não corta floresta, não anda em trilho e não captura nada. Ele ganha todos os combates que conseguir alcançar — e o mapa decide quantos serão.
+--------------------------------------------------------------------------------
+Combinações que Importam
+Você já sabe que estrutura e terreno são avaliados em par. Agora as combinações específicas que mudam o jogo — vale conhecê-las de cabeça, porque nenhuma delas está escrita no tabuleiro.
+--------------------------------------------------------------------------------
+O Custo do Terreno
+Atravessar não custa igual em todo lugar — e em alguns lugares não é questão de custo, é questão de conseguir.
+Planície e praia custam 1. É o padrão contra o qual tudo se compara.
+Floresta custa 2. O dobro, para qualquer um — exceto para quem tem treinamento de guerrilha, que atravessa por 1. Tropa feita para o mato não é atrasada pelo mato.
+Montanha custa 99. Isso não é uma penalidade cara: é uma parede. Nenhuma unidade tem movimento para pagar esse valor, e o efeito prático é que a montanha simplesmente não é atravessável.
+Com exatamente duas exceções:
+Tropas alpinas sobem por 2. É a especialidade delas.
+Unidades fora-de-estrada sobem por 6. Conseguem, mas gastam quase todo o turno para isso.
+Todo o resto não sobe. Não é caro — é impossível. Infantaria comum, blindados, artilharia e caminhões param no sopé.
+O Trem de Carga é bloqueado por completo em floresta e montanha, sem exceção de habilidade. Ele não atravessa nenhum dos dois.
+--------------------------------------------------------------------------------
+A Estrada Abre a Montanha
+É aqui que a estrutura muda o mapa de verdade.
+Construída na montanha, a estrada remove a exigência de habilidade. A parede vira passagem: obuses, caminhões de suprimento e veículos comuns — que sozinhos jamais subiriam — passam a alcançar o topo. Rotas que não existiam passam a existir, e é por isso que uma estrada na serra costuma ser a decisão de cenário mais impactante de um mapa.
+Mas a montanha cobra o pedágio de duas formas:
+Unidades motorizadas pagam 2 em vez de 1. A subida é íngreme mesmo com asfalto.
+Ninguém recebe o bônus de estrada. O acréscimo de velocidade que a estrada dá na planície não vale aqui. Você anda por ela, não corre.
+Existe uma forma boa de guardar isso: para um veículo, estrada na montanha custa exatamente o que custa uma floresta. É uma floresta em cima de um morro — mesmo preço, mesma lentidão, sem a cobertura.
+E some ao que você já sabe da prioridade: a estrutura vence o terreno, então você fica com a posição Desfavorável da estrada em vez da posição Favorável da montanha. O quadro completo é esse — você chegou ao alto, devagar, e sem a proteção que o alto daria.
+O consolo é a visão. A elevação da montanha continua sua para efeito de observação. Você enxerga como quem está no topo, mas se defende como quem está na estrada.
+--------------------------------------------------------------------------------
+Onde Nasce uma Pista
+Estrada e linha de trem, construídas na planície, funcionam como pista improvisada. Aeronaves com a habilidade de pouso apropriada podem descer ali — e cada habilidade traz o seu procedimento: pouso convencional, decolagem curta ou vertical.
+Na floresta e na montanha, não. A mesma estrada, o mesmo trilho, e nenhum pouso. O terreno cancela o que a estrutura ofereceria.
+Pontes nunca aceitam pouso, de nenhum tipo.
+Essa é a regra de prioridade aparecendo em campo: a estrutura propõe, o terreno decide.
+--------------------------------------------------------------------------------
+A Linha de Trem e Suas Exceções
+O trilho é mais lento que a estrada. Custa o dobro para atravessar, e não dá bônus de velocidade a ninguém. Ele não existe para acelerar tropas — existe para a logística ferroviária.
+Mas cada terreno tem sua lista de exceções por habilidade, e são elas que dão sentido ao traçado:
+O Trem de Carga atravessa trilho pelo custo mínimo, em qualquer terreno. É a via dele.
+Tropas alpinas atravessam trilho na montanha pelo custo mínimo. Quem sabe escalar aproveita o leito da ferrovia.
+Tropas de guerrilha atravessam trilho na planície e na floresta pelo custo mínimo. Quem se move fora de estrada usa o trilho como trilha.
+Todos os outros pagam o preço cheio. O trilho é uma boa estrada para quem foi treinado nele, e um caminho ruim para o resto.
+--------------------------------------------------------------------------------
+O Trem Não Segue a Hierarquia
+Aqui está a exceção mais peculiar do jogo, e ela merece atenção porque parece um bug quando você a encontra sem saber.
+Toda unidade obedece à ordem de prioridade — construção, depois estrutura mais terreno, depois terreno. O Trem de Carga não.
+O trem ignora a hierarquia inteira. Ele faz uma pergunta só: existe rota de trilho neste hexágono que me aceite?
+Se existe, ele passa. Se não existe, ele não passa — e não importa o que mais esteja ali.
+A consequência que pega todo mundo é a cidade. Uma cidade é perfeitamente transitável para qualquer unidade terrestre. Para o trem, ela é irrelevante: se não houver trilho naquele hexágono, o trem não entra na cidade. A construção não abre caminho para ele, porque ele não está olhando para a construção.
+Isso vale nos dois sentidos. A estrada comum bloqueia o trem — ele não anda em asfalto. A ponte rodoviária também. O trem só existe onde existe trilho: linha de trem e ponte ferroviária, e mais nada.
+Planejar uma malha ferroviária, portanto, não é decorar o mapa com trilhos. É desenhar uma rota contínua, de ponta a ponta, incluindo dentro das construções que você quer servir. Um trecho faltando no meio de uma cidade corta a linha inteira.
 A Unidade e o Domínio
 Unidades militares são projetadas para operar em domínios específicos — e não cruzam para domínios para os quais não foram projetadas. Esse é o princípio que você já conhece.
 A exceção é o embarque. Uma unidade embarcada em um transportador adota temporariamente o domínio dele. Tropas dentro de um helicóptero atravessam Air/Low. Infantaria num navio cruza Naval/Surface. A unidade não mudou — ela está no mundo do seu transportador enquanto durar a viagem.
@@ -91,13 +205,16 @@ E mesmo quando você enxerga, ver não significa alcançar. Essa é a próxima questã
 --------------------------------------------------------------------------------
 Linha de Tiro
 Você viu o alvo. Agora precisa saber se consegue atingi-lo.
-Para disparos parabólicos — artilharia, obuseiros — a linha de tiro direta não é avaliada. A trajetória vai por cima dos obstáculos. Mas se o alvo estiver além da sua visão, você precisa de um observador avançado que veja onde ele está e transmita a posição. Sem olhos no alvo, a artilharia atira às cegas.
+Para disparos parabólicos, a linha de tiro direta não é avaliada. A trajetória vai por cima dos obstáculos. Mas se o alvo estiver além da sua visão, você precisa de um observador avançado que veja onde ele está e transmita a posição. Sem olhos no alvo, a artilharia atira às cegas.
+Não pense em parabólico como sinônimo de artilharia. Mísseis antiaéreos de longo alcance e mísseis de cruzeiro também são parabólicos aqui.
+E vale dizer o que a palavra significa neste manual: parabólico é o termo operacional do sistema para toda arma que **ignora os obstáculos do percurso**. Não é uma descrição balística rigorosa, e não vale discutir o perfil real de voo de cada munição. O que ela declara é uma coisa só: se essa arma alcança, o relevo entre você e o alvo não importa.
+E há uma sutileza que muda a leitura de várias unidades: a trajetória pertence à arma como ela foi montada naquela unidade, não ao tipo de arma. O mesmo foguete pode ser parabólico de longo alcance numa plataforma de artilharia e reto de alcance curto num helicóptero de ataque. Duas unidades que carregam "o mesmo foguete" podem jogar de formas opostas.
 Para disparos retos — canhões, torpedos, mísseis de trajetória direta — a arma precisa atravessar todos os domínios válidos no caminho até o alvo. Um torpedo opera em Naval/Surface e Submarine/Submerged. Se entre o atirador e o alvo existe uma faixa de terra, o torpedo não tem por onde passar. A península bloqueia não porque é um obstáculo físico no sentido do jogo — mas porque o domínio da arma não existe naquele trecho do trajeto.
 O domínio não define só onde você ataca. Define por onde o ataque pode viajar.
 Domínio — Fechamento
 Tudo que você viu até agora — terrenos, construções, estruturas, unidades, armas, visão e tiro — gira em torno de um único eixo: o domínio.
 Cinco camadas definem o mundo:
-Air/High ? Air/Low ? Land/Surface · Naval/Surface ? Submarine/Submerged
+Air/High » Air/Low » Land/Surface · Naval/Surface » Submarine/Submerged
 Cada elemento do jogo pertence a uma ou mais dessas camadas. E as regras emergem naturalmente dessa pertença — sem exceções arbitrárias, sem casos especiais inventados. Quando algo parece estranho, a resposta quase sempre está no domínio.
 --------------------------------------------------------------------------------
 Um tanque não entra na praia — diferença de domínio.
@@ -106,7 +223,7 @@ Um caça pousado pode ser destruído por artilharia — mesmo domínio.
 Um submarino na praia emerge — o terreno não suporta o domínio submerso.
 Uma cidade construída na praia fecha o acesso naval — a construção sobrescreveu o domínio.
 Um torpedo não atravessa uma península — a arma perdeu seu domínio no meio do caminho.
-Todo mundo vê o caça em Air/High — mas nem todo mundo consegue atingi-lo.
+O relevo não esconde o caça em Air/High — mas o alcance ainda limita quem o vê, e a arma certa limita quem o atinge.
 --------------------------------------------------------------------------------
 Você não precisa memorizar regras para cada situação. Você precisa entender em qual domínio cada coisa existe — e o resto se deduz.
 Esse é o alicerce do jogo. Tudo que vem a seguir é construído sobre ele.
@@ -124,9 +241,10 @@ Dois soldados lutando na praia têm o mesmo DPQ que dois soldados lutando na mont
 A diferença começa quando um está num degrau e o outro em outro.
 --------------------------------------------------------------------------------
 A Iniciativa
-Em condições idênticas, o jogo premia quem puxa o gatilho primeiro. O The Map Room incentiva a ofensiva — atacar é melhor que esperar.
+Em condições idênticas, o jogo premia quem inicia o confronto. O The Map Room incentiva a ofensiva — atacar é melhor que esperar.
+Cuidado com a imagem, porque ela engana: ninguém dispara antes de ninguém. A troca é simultânea, e você verá isso na fórmula. Quem ataca não recebe um tiro grátis — recebe a **iniciativa**, que é o lado favorável do arredondamento. Escolher a hora do duelo muda o destino do arredondamento — não a simultaneidade do confronto.
 Essa vantagem é medida pelo DPQ, sempre calculado do ponto de vista do atacante:
-DPQ = Posição do Atacante ? Posição do Defensor
+DPQ = Posição do Atacante - Posição do Defensor
 O resultado é aplicado aos dois lados do confronto. Nunca se calcula o DPQ da defesa em relação ao ataque — a direção é sempre do ataque para a defesa.
 --------------------------------------------------------------------------------
 Pontuação de Qualidade
@@ -183,7 +301,7 @@ Melhorado
 Favorável
 +6
 Único
-Lembra dos dois soldados na praia e dos dois soldados na montanha — DPQ idêntico, comportamento idêntico? O par de arredondamento é o mesmo. Mas na praia, o bônus de defesa é ?1 para os dois lados. Na montanha, é +4. O confronto se comporta da mesma forma — mas na montanha morrem menos soldados, e na praia morrem mais.
+Lembra dos dois soldados na praia e dos dois soldados na montanha — DPQ idêntico, comportamento idêntico? O par de arredondamento é o mesmo. Mas na praia, o bônus de defesa é -1 para os dois lados. Na montanha, é +4. O confronto se comporta da mesma forma — mas na montanha morrem menos soldados, e na praia morrem mais.
 DPQ e bônus de defesa são independentes. Um governa o como o combate se resolve. O outro governa o quanto ele custa.
 Essa separação é intencional. Combater num terreno ruim é duplamente perigoso — você não só perde a iniciativa se o inimigo estiver melhor posicionado, como também paga um preço maior em baixas independente de quem ataca quem.
 Nota de design: o bônus de defesa pertence à posição, não ao terreno, construção ou estrutura individualmente. Tudo que é classificado como Melhorado concede +2 — floresta, cidade, fábrica, Air/High. Quando um novo elemento é adicionado ao jogo, basta definir sua posição. O bônus vem junto, sem exceção.
@@ -206,7 +324,8 @@ A separação entre Veículos e Blindados é intencional — não é sobre rodas versus 
 Classes de Armas
 As armas se dividem em quatro classes:
 Antiaérea · Antitanque · Antiinfantaria · Antinavio
-Construções, terrenos e estruturas são indestrutíveis no The Map Room — então armas antiestrutura como bombas guiadas ou mísseis de cruzeiro simplesmente não existem no sistema. Não há alvo para elas.
+Construções, terrenos e estruturas são indestrutíveis no The Map Room — então a categoria de armas antiestrutura simplesmente não existe no sistema. Não há alvo para ela.
+Cuidado para não confundir: mísseis de cruzeiro existem, e navios os carregam contra alvos navais. O que não existe é uma arma cujo alvo seja o prédio. Nenhum armamento do jogo derruba uma cidade, uma fábrica ou uma ponte — construções só mudam de dono por captura.
 O comportamento é consistente com tudo que vimos até agora: o sistema não distingue entre um Sidewinder e um Patriot. Ambos são antiaérea. O nome da arma é temático — o que importa é a classe.
 --------------------------------------------------------------------------------
 Por que isso importa
@@ -225,11 +344,11 @@ Na Prática
 Faz sentido que Blindados com antitanque façam picadinho de Veículos com antiinfantaria — a arma certa contra o alvo certo. Faz sentido que um Bombardeiro não revide um Caça que ataca com antiaérea — suas bombas antitanque não alcançam o domínio do ar. O sistema só formaliza o que já faz sentido no mundo.
 Veja o exemplo completo de um confronto entre Blindados e Veículos:
 Do lado dos Blindados:
-Blindados com Antitanque atacam Veículos ? RPS Ataque +2
-Veículos se defendem de Blindados com Antitanque ? RPS Defesa ?2
+Blindados com Antitanque atacam Veículos » RPS Ataque +2
+Veículos se defendem de Blindados com Antitanque » RPS Defesa -2
 Do lado dos Veículos:
-Veículos com Antiinfantaria atacam Blindados ? RPS Ataque ?5
-Blindados se defendem de Veículos com Antiinfantaria ? RPS Defesa +5
+Veículos com Antiinfantaria atacam Blindados » RPS Ataque -5
+Blindados se defendem de Veículos com Antiinfantaria » RPS Defesa +5
 O resultado antes mesmo do cálculo de combate já conta a história: Blindados atacam com vantagem e são difíceis de atingir com a arma errada. Veículos atacam com desvantagem e não conseguem penetrar a blindagem com antiinfantaria.
 --------------------------------------------------------------------------------
 Por Que Isso Escala?
@@ -267,8 +386,8 @@ Ele calcula eliminações.
 Cada lado descobre quantas baixas impõe ao outro. Não há pontos de vida sendo corroídos gradualmente — há um confronto com um resultado. Essa distinção vai ficar clara quando chegar no capítulo de combate, mas vale registrar agora: o vocabulário que você está aprendendo não serve para calcular feridas. Serve para calcular desfechos.
 Esquadrão como HP
 "Não! Não é ponto de vida!"
-O ícone que aparece na tela é um ?. A leitura imediata é ponto de vida. Mas o que ele representa é outra coisa — o número de membros vivos dentro do token que você está vendo naquele momento.
-Ao ver um Soldado com ? 10, você não está vendo um soldado com 10 pontos de vida. Você está vendo 10 soldados reunidos, representados por aquele único token na tela. O mesmo vale para aviões, blindados, navios — qualquer esquadrão do jogo.
+O ícone que aparece na tela puxa a leitura imediata para ponto de vida. Mas o que ele representa é outra coisa — o número de membros vivos dentro do token que você está vendo naquele momento.
+Ao ver um Soldado marcando 10 nesse indicador, você não está vendo um soldado com 10 pontos de vida. Você está vendo 10 soldados reunidos, representados por aquele único token na tela. O mesmo vale para aviões, blindados, navios — qualquer esquadrão do jogo.
 --------------------------------------------------------------------------------
 O Esquadrão em Combate
 Uma unidade com HP completo opera na capacidade máxima. Uma unidade com HP baixo está com o esquadrão desgastado — menos membros, menos eficiência.
@@ -295,12 +414,16 @@ Se o sistema não enxerga nomes — só classes — o que diferencia um Soldado comum 
 Como justificar que um custa mais que o outro?
 --------------------------------------------------------------------------------
 Elite — Diferenciando Unidades Caras
-O sistema de Elite não é um número solto que indica veterano ou regular. Ele é uma condição — e só age quando existe diferença de nível entre os combatentes.
+Elite não é experiência. É vocação.
+Uma unidade com elite alto contra jatos não voou mais horas que as outras. Ela foi projetada, equipada e doutrinada para esse confronto. O Caça A é interceptador: a superioridade dele contra aeronaves está no projeto, não no histórico.
+Por isso o Elite é sempre **contra alguma coisa**. Não existe unidade "de elite" em abstrato. Existe unidade que é excepcional numa luta específica e perfeitamente comum em todas as outras — e é essa assimetria que você compra quando paga mais caro.
+O sistema de Elite, portanto, não é um número solto que indica tropa boa ou ruim. Ele é uma condição — e só age quando existe diferença de nível entre os combatentes.
+E ele não contradiz o que foi dito lá no início. Nenhuma unidade sobe de nível durante a partida: o Caça A não fica melhor porque venceu duelos, e não fica pior porque apanhou. O nível de elite descreve o que aquela formação já era quando você a comprou — projeto, doutrina e equipamento, não experiência acumulada em campo.
 Dois Caças A lutando entre si — ambos Elite 1 — não recebem bônus de elite. Os níveis se cancelam, e o confronto se resolve como qualquer combate simétrico. O mesmo vale para dois Caças B, ambos Elite 0: sem diferença de nível, o Elite não entra na conta.
-O Elite só existe na diferença. Quando o Caça A enfrenta o Caça B — Elite 1 contra Elite 0, mesma classe, mesma arma, mesmo domínio — o combate deixa de ser simétrico e passa a favorecer o veterano de forma acentuada.
+O Elite só existe na diferença. Quando o Caça A enfrenta o Caça B — Elite 1 contra Elite 0, mesma classe, mesma arma, mesmo domínio — o combate deixa de ser simétrico e passa a favorecer o especialista de forma acentuada.
 Uma ressalva honesta, porque ela evita uma leitura errada: o Elite não é a única diferença entre os dois. O Caça A também tem armadura superior à do Caça B — é mais difícil de eliminar antes mesmo do Elite entrar na conta. A diferença de 10.000 no custo paga as duas coisas juntas. O que o Elite acrescenta é a assimetria: mesmo que as armaduras fossem idênticas, a diferença de nível sozinha já inclinaria o confronto.
 Uma observação importante: Elite é específico de classe e arma. O modificador de Dog Fight do Caça A se aplica ao confronto entre jatos — não contra um SAM antiaéreo, não contra Infantaria em terra. Nesses casos, o Elite simplesmente não entra no cálculo, a menos que a unidade tenha uma especialização adicional para aquele confronto específico.
-Um veterano de guerra aérea não é automaticamente um veterano de tudo. Ele é excepcional no que foi treinado para fazer.
+Especialista em duelo aéreo não é especialista em tudo. Ele é excepcional exatamente naquilo para que foi projetado — e perfeitamente comum em todo o resto.
 --------------------------------------------------------------------------------
 O objetivo aqui é só estabelecer o conceito antes de entrar nas contas. O que importa entender agora: Elite não é progressão de personagem. É um multiplicador de assimetria que só existe quando há desequilíbrio de nível — e quando existe, é brutal.
 --------------------------------------------------------------------------------
@@ -309,16 +432,16 @@ Para entender a fórmula, vamos partir do inicio que os Recrutas (uma unidade usa
 Fórmula básica:
 Então vamos ao confronto. Os Recrutas Verdes encontram os Recrutas Vermelhos nas planicies distantes. Como ambos estão ha 1 hex de distancia um do outro e com armas adequadas (carabinas são armas land/surface e os alvos estão no domínio). O combate é considerado simultâneo com revide.
 Iniciativa
-Como os Recrutas Verdes atiram primeiro, eles são chamados de atacantes e como os vermelhos respondem ao fogo, são chamados de defensor. Isso é importante para o calculo da diferença de posição (após a eliminação bruta)
+Como os Recrutas Verdes declararam o ataque, eles são chamados de atacantes, e os vermelhos, que respondem ao fogo, são chamados de defensores. Note que "responder ao fogo" é linguagem narrativa: os dois lados disparam dentro da mesma resolução, com o efetivo que tinham no início dela. Isso é importante para o calculo da diferença de posição (após a eliminação bruta)
 Força de Ataque Efetiva (FA Efetiva)
 Primeiro, determinamos a Força de Ataque efetiva de cada lado, multiplicando o HP atual antes dos tiros de cada lado pela força da arma equipada usada no confronto (a carabina).
-Força de Ataque Efetiva dos Atacantes: (FA Efetiva) = HP dos Atacantes x Força de Ataque base da arma (FA base) = 10 x 4 = 40 Força de Ataque Efetiva dos Defensores: (FA Efetiva) = HP dos Atacantes x Força de Ataque base da arma (FA base) = 10 x 4 = 40
+Força de Ataque Efetiva dos Atacantes: (FA Efetiva) = HP dos Atacantes x Força de Ataque base da arma (FA base) = 10 x 4 = 40 Força de Ataque Efetiva dos Defensores: (FA Efetiva) = HP dos Defensores x Força de Ataque base da arma (FA base) = 10 x 4 = 40
 Força de Defesa Efetiva (FD Efetiva)
 A força de defesa Efetiva considera a força de defesa básica da unidade somada da força de defesa da posição da unidade. Como cada lado do confronto está em um terreno de planície, eles recebem +0 de defesa extra da posição. Logo
-Força de Defesa Efetiva dos Atacantes: (FD Efetiva) = FD base dos Atacantes + FD base da Posição = 8 + 0 = 8 Força de Defesa Efetiva dos Defensores: (FD Efetiva) = FD base dos Atacantes + FD base da Posição = 8 + 0 = 8
+Força de Defesa Efetiva dos Atacantes: (FD Efetiva) = FD base dos Atacantes + FD base da Posição = 8 + 0 = 8 Força de Defesa Efetiva dos Defensores: (FD Efetiva) = FD base dos Defensores + FD base da Posição = 8 + 0 = 8
 Eliminação Bruta
 Após determinar os valores efetivos de ataque e defesa, seguimos para a divisão para descobrir quantos membros morreram em cada conjunto, ou quanto de HP cada lado sofreu. O calculo é simultâneo em combate (não é como no d&d que você revida com o que sobrou). O valor encontrado não é arredondado nessa etapa.
-Eliminações Brutas dos Atacantes = Força de Ataque Efetiva dos Atacantes / Força de Defesa Efetiva dos Defensores = FA Efetiva / FD Efetiva = 40 / 8 = 5 Eliminações Brutas dos Defensores = Força de Ataque Efetiva dos Defensores / Força de Defesa Efetiva dos Atacantes = FA Efetiva / FD Efetiva = 40 / 8 = 5
+Baixas impostas PELO atacante (Eliminações Brutas) = Força de Ataque Efetiva dos Atacantes / Força de Defesa Efetiva dos Defensores = FA Efetiva / FD Efetiva = 40 / 8 = 5 Baixas impostas PELO defensor (Eliminações Brutas) = Força de Ataque Efetiva dos Defensores / Força de Defesa Efetiva dos Atacantes = FA Efetiva / FD Efetiva = 40 / 8 = 5
 Aparentemente 5 HP de baixas em cada esquadrão certo? porem não fizemos a avaliação do DPQ
 Observação Importante — Teto de Eliminações
 O número final de eliminações está sujeito a dois tetos:
@@ -331,21 +454,21 @@ Exemplo 1 — Recrutas enfraquecidos Dois esquadrões de Recrutas (ambos com 2 HP r
 FA Efetiva = 2 × 4 = 8
 FD Efetiva = 8 + 0 = 8
 Eliminações Brutas = 8 ÷ 8 = 1,0 (exato)
-Verdes (Vantagem — atiram primeiro): 1,0 exato ? +1 extra = 2 eliminações (respeita teto do alvo).
-Vermelhos (Neutro — revidam): 1,0 exato ? mantém 1 eliminação.
+Verdes (Vantagem — iniciativa do atacante): 1,0 exato » +1 extra = 2 eliminações (respeita teto do alvo).
+Vermelhos (Neutro — revidam): 1,0 exato » mantém 1 eliminação.
 Resultado: Verdes terminam com 1 HP | Vermelhos são eliminados.
-Exemplo 2 — Tanques vs Recrutas (números exatos) Tanques (4 HP, FD 13, canhão potência 10) atacam Recrutas (10 HP, FD 8, carabina potência 4) em planície. Assim como os Recrutas, estes Tanques são uma unidade de exemplo — os blindados reais do jogo têm valores próprios, e o que importa aqui é a mecânica, não a ficha. Os Tanques têm Vantagem (atacam primeiro), Recrutas estão Neutros.
+Exemplo 2 — Tanques vs Recrutas (números exatos) Tanques (4 HP, FD 13, canhão potência 10) atacam Recrutas (10 HP, FD 8, carabina potência 4) em planície. Assim como os Recrutas, estes Tanques são uma unidade de exemplo — os blindados reais do jogo têm valores próprios, e o que importa aqui é a mecânica, não a ficha. Os Tanques têm Vantagem por terem declarado o confronto; os Recrutas estão Neutros.
 Tanques atacando (Vantagem):
 FA Efetiva = 4 × 10 = 40
 FD do alvo = 8
 Eliminações Brutas = 40 ÷ 8 = 5,0 (exato)
-Vantagem + exato ? 6
-Teto do atacante (4 HP) ? eliminam 4 Recrutas
+Vantagem + exato » 6
+Teto do atacante (4 HP) » eliminam 4 Recrutas
 Recrutas revidando (Neutro):
 FA Efetiva = 10 × 4 = 40
 FD do alvo = 13
-Eliminações Brutas = 40 ÷ 13 ? 3,077
-Neutro ? arredonda para 3 Tanques
+Eliminações Brutas = 40 ÷ 13 ~ 3,077
+Neutro » arredonda para 3 Tanques
 Resultado final: Tanques sobram com 1 HP | Recrutas sobram com 6 HP
 Diferença de Posição e Qualidade (DPQ)
 Pela iniciativa, determinamos que o atacante são os recrutas verdes, então fazemos uma avaliação do ponto de vista do atacante em relação ao defensor. Pela seção DPQ - Pontuação de Qualidade temos que a Planície fornece 1 ponto de qualidade e defesa +0. Logo
@@ -360,22 +483,22 @@ Iniciativa do Atacante
 Vantagem
 Neutro
 Onde Vantagem significa arredondar o resultado bruto da divisão para cima OU em divisões exatas, somar +1 nas eliminações (sim! um grande desvio de 25% ou mais dependendo das eliminações) Desvantagem significa arredondar o resultado bruto da divisão para baixo OU em divisões exatas, subtrair -1 nas eliminações (sim! uma perda de 20 a 25% dependendo das eliminações) Neutro significa arredondar o resultado bruto da divisão para cima se a fração for 0,5 ou superior OU em divisões exatas, manter o resultado como está.
-Logo os Recrutas Verdes estão em vantagem por terem atirado primeiro e os recrutas Vermelhos estão normal
+Logo os Recrutas Verdes recebem Vantagem pela iniciativa do atacante, e os Recrutas Vermelhos ficam Neutros
 Como a divisão deu exata, os recrutas verdes eliminam 1 a mais = 6 eliminados, enquanto os vermelhos apenas 5
 Resultado Final do Confronto Verdes com 5 HP restante x Vermelhos com 4 HP restantes
 Regra de arredondamento
 Depois de calcular Eliminações Brutas, aplique a condição de DPQ nesta ordem exata:
 Vantagem (Iniciativa do Atacante): Arredonde para cima (ceil). Se o resultado bruto for exato (sem decimal), some +1 extra.
-Neutro: Arredonde normalmente (0,5 ou mais ? para cima; abaixo de 0,5 ? para baixo). Se exato, mantém o número.
+Neutro: Arredonde normalmente (0,5 ou mais » para cima; abaixo de 0,5 » para baixo). Se exato, mantém o número.
 Desvantagem: Arredonde para baixo (floor). Se o resultado bruto for exato, subtraia -1.
 Aplique o teto (nunca pode ultrapassar HP atual do alvo).
-Exemplo rápido: 5,3 em Vantagem ? arredonda para cima = 6 (não soma +1 porque não foi exato).
+Exemplo rápido: 5,3 em Vantagem » arredonda para cima = 6 (não soma +1 porque não foi exato).
 --------------------------------------------------------------------------------
 Formula Avançada
 Em RPS aprendemos sobre o vocabulario de operacores que usam armas contra alvos e alvos que se defendem de operadores com armas. Mas você precisa saber que
 em RPS, quase tudo viraria disputa de numero bruto (HP, ataque base, defesa). Com RPS, o jogo recompensa escolher a unidade/arma certa para o alvo certo.
 Para ilustrar melhor o cenario, vamos imaginar o seguinte. Um mestre e uma aluna. Se pudessemos transformar esses 2 em classe, teriamos o seguinte vocabulario
-RPS Mestre com Espada vs Aluna O Mestre manejando uma Espada ataca a Aluna com +2 (afinal ele é veterano em combate) A Aluna se defende do Mestre manejando uma espada com -2 (ela mal ve de onde vem o golpe)
+RPS Mestre com Espada vs Aluna O Mestre manejando uma Espada ataca a Aluna com +2 (afinal ele é o mestre) A Aluna se defende do Mestre manejando uma espada com -2 (ela mal ve de onde vem o golpe)
 RPS Aluna com Espada vs Mestre A Aluna manejando uma Espada ataca o Mestre com -1 (a espada pra ela é desajeitado) O Mestre se defende da Aluna manejando uma espada com +3 (pra ele, desviar dos golpes dela é tranquilo)
 Note que acabamos de criar duas entradas de RPS de Ataque e Defesa para 1 confronto entre 2 classes distintas.
 Supondo que esse mesmo mestre tenha 2 alunas. a situação seria mais ou menos assim
@@ -385,17 +508,17 @@ ou podemos pensar em RPS Mestre com Espada vs Mestre O Mestre manejando uma Espa
 O que isso quer dizer na pratica? que esses parametros de RPS aos pares, são acrescentados na formula para o calculo do ataque efetivo e da defesa efetiva, no total 4 novos parametros são adicionados nas 2 formulas (atacantes e defensores) dependendo de contra qual classe eles estão lutando (note que aluna, aluno, aprendiz, etc, todos eles são "alunas" pois o sistema nao trata nomes, e sim classes). Vamos supor que Recrutas enfrentando recrutas é +1 pra ataque e +3 pra defesa. afinal eles fazem o que foram treinados pra fazer e tambem sabem rolar no chão
 Força de Ataque Efetiva dos Atacantes: (FA Efetiva) = ((HP dos Atacantes x (Força de Ataque base da arma (FA base) + RPS Ataque do Atacante) = ((10 x (4+1)) = 50 Força de Ataque Efetiva dos Defensores: (FA Efetiva) = ((HP dos Defensores x (Força de Ataque base da arma (FA base) + RPS Ataque do Defensor) = ((10 x (4+1)) = 50
 e aformula de defesa tambem é atualizada
-Força de Defesa Efetiva dos Atacantes: (FD Efetiva) = FD base dos Atacantes + FD base da Posição + FD RPS do Atacante = 8 + 0 + 3 = 11 Força de Defesa Efetiva dos Defensores: (FD Efetiva) = FD base dos Atacantes + FD base da Posição + FD RPS do Defensor = 8 + 0 +3 = 11
+Força de Defesa Efetiva dos Atacantes: (FD Efetiva) = FD base dos Atacantes + FD base da Posição + FD RPS do Atacante = 8 + 0 + 3 = 11 Força de Defesa Efetiva dos Defensores: (FD Efetiva) = FD base dos Defensores + FD base da Posição + FD RPS do Defensor = 8 + 0 +3 = 11
 Logo em 50/11 = 4,54, ambos vão eliminar 5 cada (pois em vantagem, os verdes arredonda pra cima pra 5, e em neutro, os vermelhos tambem arredonda padrão pra cima pra 5 devido a fração acima de 0,5+)
 --------------------------------------------------------------------------------
 Onde o Elite Entra
 Você viu que o RPS acrescenta quatro parâmetros à conta — dois no ataque, dois na defesa. O Elite não inventa um quinto lugar na fórmula. Ele entra exatamente nos mesmos espaços.
-Isso é proposital. Um veterano não ganha uma regra especial: ele ganha um RPS melhor naquele confronto específico. A fórmula continua a mesma.
+Isso é proposital. Um especialista não ganha uma regra especial: ele ganha um RPS melhor naquele confronto específico. A fórmula continua a mesma.
 Cada especialização de Elite carrega três filtros, e os três precisam passar ao mesmo tempo:
 A classe do oponente — a especialização de combate aéreo de um caça olha para jatos. Contra infantaria em terra, ela simplesmente não existe.
 A categoria da arma — a especialização vale para a arma certa. O mesmo caça, metralhando tropas, não leva sua especialização de duelo aéreo junto.
 A relação de nível — a maioria das especializações exige que você esteja acima do oponente. Nível igual não dispara nada. É por isso que dois Caças A não recebem nada um contra o outro.
-Quando os três filtros passam, a especialização mexe em quatro valores de uma vez: seu ataque, sua defesa, o ataque do oponente e a defesa do oponente. Ela não só te fortalece — ela enfraquece quem está do outro lado. Um veterano faz o novato lutar pior.
+Quando os três filtros passam, a especialização mexe em quatro valores de uma vez: seu ataque, sua defesa, o ataque do oponente e a defesa do oponente. Ela não só te fortalece — ela enfraquece quem está do outro lado. O especialista não apenas luta melhor: ele faz o oponente lutar pior.
 E as especializações se somam. Uma unidade com três especializações válidas no mesmo confronto aplica as três.
 --------------------------------------------------------------------------------
 Unidade Ferida
@@ -465,12 +588,77 @@ Peças viram HP, pelo serviço de Reparo.
 Repare que reparar não é curar ferido: é repor membros do esquadrão. Peças entram, bolas de gude voltam para o copo.
 Unidades têm teto de reserva — o caminhão carrega até encher e não aceita mais. Construções não têm teto: acumulam indefinidamente enquanto alguém entrega, e esvaziam conforme as unidades consomem.
 --------------------------------------------------------------------------------
+Serviço Custa Dinheiro
+Reserva não é a única coisa que se gasta. Todo serviço cobra uma taxa em dinheiro, calculada sobre o valor de compra da unidade atendida.
+Os percentuais abaixo são o preço de encher aquela categoria **do zero até o máximo**:
+Reabastecer: até 5% do valor da unidade.
+Rearmar: até 10%.
+Reparar: até 40%.
+E aqui está o detalhe que muda tudo: **você paga só pelo que recuperou**. O custo é proporcional. Reparar um único ponto de HP num esquadrão de dez custa um décimo daquele teto, não os 40% inteiros.
+Isso significa que não existe penalidade por atendimento pequeno. Encostar um caminhão e devolver dois pontos de combustível é barato, e continua sendo barato se você fizer isso todo turno.
+--------------------------------------------------------------------------------
+Um Atendimento por Turno
+Antes do resto, a regra que organiza tudo: **cada unidade recebe atendimento uma vez por turno.**
+Um atendimento pode incluir vários serviços de uma vez — o mesmo caminhão pode reabastecer, rearmar e reparar na mesma visita. Mas depois que você recebeu, acabou por esta rodada.
+Isso significa que atendimentos **não somam**. Se a sua unidade já tomou o Serviço do Comando no início do turno, procurar um caminhão em campo depois não acrescenta nada. Ela já tomou o banho de cura desta rodada.
+--------------------------------------------------------------------------------
+Onde Você Se Cura Importa
+E aqui entra o limite que muda a natureza do reparo: **não se recupera um esquadrão de uma vez.** O quanto você recupera depende de onde é atendido.
+Em uma construção — cidade, fábrica, aeroporto, porto, quartel general — o reparo devolve **2 pontos de vida** por turno. Não é a construção que faz diferença: é o serviço. Construções oferecem o reparo completo; o caminhão oferece a versão leve.
+Dois navios prestam esse mesmo reparo completo, mas apenas para o ar. A **Fragata** tem um heliponto e atende exclusivamente helicópteros, um de cada vez. O **Porta-Aviões** tem hangar para duas aeronaves e atende quem souber pousar em convés. Nenhum dos dois conserta navios ou tropa terrestre — são bases aéreas que flutuam, não oficinas gerais.
+Com o caminhão de suprimentos em campo, é reparo leve: **1 ponto de vida** por turno.
+Um esquadrão reduzido a 2 pontos precisa de quatro turnos recuando para uma construção, ou oito turnos sendo remendado na frente. Nos dois casos, ele passa esse tempo sem avançar.
+--------------------------------------------------------------------------------
+O Custo Real do Reparo
+Isso reposiciona a decisão inteira. O preço em dinheiro nunca chega de uma vez, porque a recuperação nunca chega de uma vez.
+O custo verdadeiro de recuperar uma unidade muito desgastada é **tempo e posição**. E a escolha é sempre entre dois males:
+Recuar para uma construção cura o dobro por turno — e tira a unidade do front enquanto ela vai, fica e volta.
+Ficar na frente e receber do caminhão mantém a posição — e cura metade da velocidade, num lugar onde ela ainda pode ser atacada.
+Comprar uma unidade nova entrega força total imediatamente, num lugar que você escolhe. Reparar entrega força aos poucos, no lugar onde a unidade já está.
+Por isso reparo é excelente para quem está pouco machucado e ruim para quem está quase morto. Não porque a conta fique cara — mas porque o relógio fica longo demais.
+--------------------------------------------------------------------------------
+Nem Todos Recebem Igual
+A mesma quantidade de reserva rende diferente conforme a classe de armadura de quem recebe. Blindagem pesada consome mais para andar o mesmo tanto:
+Reabastecimento e rearmamento: unidades leves aproveitam 3 por unidade de reserva, médias 2, pesadas 1.
+Reparo: leves aproveitam 2, médias e pesadas 1.
+E o rearmamento cobra duas vezes pelo mesmo peso. Além de aproveitar menos cada caixa, armamento pesado custa mais caro por tiro reposto: um projétil de arma pesada pesa o triplo de um de arma leve na conta final. Reabastecer o paiol de um blindado não é a mesma despesa que reabastecer o de um soldado, nem por unidade de reserva, nem por moeda.
+Um tanque pesado não é só caro de comprar. É caro de manter, de abastecer e de consertar. O custo de uma força pesada não termina na loja.
+A transferência de reservas entre agentes é a única operação gratuita da cadeia. Mover estoque não custa nada; convertê-lo em benefício custa sempre.
+--------------------------------------------------------------------------------
+O Serviço Acontece na Mesma Camada
+Atender alguém exige estar no mesmo plano operacional que essa pessoa — e o jogo resolve isso mexendo em quem for preciso.
+Um avião-tanque em alta altitude que vai reabastecer um helicóptero desce para Air/Low, porque é ali que o helicóptero vive. Se ele atende também um caça na mesma leva, o caça é trazido para Air/Low junto. Todo mundo se encontra no mesmo andar para a operação acontecer.
+O mesmo vale para baixo: um caça em voo que vai receber suprimento de um caminhão terrestre pousa para ser atendido — e, se puder, arremete depois, pelo ciclo que você já conhece.
+E existe o caso em que não dá. Se o hexágono não aceita a camada necessária — a aeronave não tem onde pousar, o transporte não pode subir —, aquele alvo simplesmente é pulado. A fila segue para o próximo.
+Terminado o atendimento, todos permanecem na camada em que ele aconteceu. O caça que desceu para Air/Low não volta sozinho para a alta altitude: ele fica onde foi servido, e subir de novo é decisão sua, num turno seu. A única exceção é quem precisou tocar o solo — essa arremete, pelo ciclo que você já conhece.
+Vale guardar isso quando montar uma operação de reabastecimento: você não está só verificando alcance e estoque. Está verificando se todos conseguem se encontrar no mesmo plano, naquele terreno.
+--------------------------------------------------------------------------------
+O Serviço do Comando
+Existe um atalho para tudo isso, e ele é apenas suprimento em lote.
+O Serviço do Comando pega as unidades elegíveis, monta uma fila e executa os mesmos serviços que um supridor executaria em campo — pelas mesmas regras, com os mesmos custos e os mesmos limites. Não é um sistema separado: é o suprimento de sempre, aplicado de uma vez.
+Com duas restrições, e elas decidem a ordem do seu turno. O Serviço do Comando só atende unidades que **ainda não agiram** e que **ainda não receberam atendimento** nesta rodada.
+Suprimento em campo não tem essa trava. Um caminhão pode alcançar e atender uma unidade que já se moveu — o que importa ali é ela não ter recebido nada ainda naquele turno. Faz sentido: o caminhão chegou até ela.
+Já o lote do comando é serviço de guarnição, prestado antes do expediente começar. Quem já saiu para trabalhar, perdeu.
+--------------------------------------------------------------------------------
 A Cadeia
 Nem todo agente logístico faz tudo. Cada um pertence a um tier que define o que pode passar para quem:
 Hub — doa e recebe. É o elo que movimenta estoque pela cadeia.
 Receiver — apenas recebe. É a ponta da linha, o consumidor final.
 A direção importa e não é simétrica. Um Hub abastece outro Hub ou qualquer Receiver. Um Receiver não devolve para ninguém — nem para Hub, nem para outro Receiver. O estoque desce a cadeia e não sobe.
 No topo existe o Hub infinito: ele só doa, nunca recebe. É a fonte, e não faz sentido encher uma fonte.
+--------------------------------------------------------------------------------
+O Estoque Acaba
+Um detalhe que muda o planejamento de campanha inteiro: **construções gastam reserva ao prestar serviço.**
+Uma cidade que reabastece, rearma e repara vai esvaziando. Quando o estoque dela zera, os serviços param — e aquele ponto do mapa, que parecia uma base segura, vira apenas um prédio.
+Reabastecer as próprias bases é trabalho seu. O Trem de Carga e o caminhão de carga existem para isso: mover estoque de onde ele sobra para onde ele falta, entre cidades e em direção ao front. É uma malha de distribuição que você opera na mão — sem rotas automáticas, sem entrega programada. Nada se move sozinho.
+--------------------------------------------------------------------------------
+A Cadeia Chega ao Mar e ao Ar
+A cadeia mais longa do jogo é também a mais bonita de montar, e vale ver o desenho completo:
+Um navio-tanque coleta estoque nas cidades da costa.
+Ele leva esse estoque para um porta-aviões no mar aberto.
+O porta-aviões converte em serviço para as aeronaves que pousam nele — ou repassa para um avião-tanque.
+O avião-tanque decola e atende caças **no ar**, sem que ninguém precise voltar para casa.
+Cada elo é uma unidade sua, que se move, gasta o turno e pode ser atacada. Uma frota longe da costa só se sustenta enquanto essa corrente estiver inteira — e cortar um elo no meio dela vale mais do que afundar um caça.
 --------------------------------------------------------------------------------
 Quem Dá o Primeiro Passo
 Uma regra que economiza confusão: construções nunca iniciam uma transferência.
@@ -483,15 +671,63 @@ O front que avança sem cadeia logística avança rápido e para de repente. As unid
 O front que avança com cadeia avança mais devagar e não para. Cada hexágono conquistado vira base para o próximo.
 Por isso a logística não é um sistema acessório do The Map Room. É o que separa uma investida de uma campanha.
 --------------------------------------------------------------------------------
+Fusão de Esquadrões
+Reparar custa caro e depende de logística no lugar certo. Existe uma alternativa mais rápida para reconstituir força: juntar dois esquadrões desgastados num só.
+Dois esquadrões de 5 HP viram um esquadrão de 10. A unidade some do tabuleiro, o token continua — e você trocou duas peças fracas por uma inteira.
+--------------------------------------------------------------------------------
+Quem Pode Fundir com Quem
+A fusão é restrita, e as restrições importam tanto quanto a conta:
+Mesmo tipo de unidade. Soldado funde com Soldado. Não se junta infantaria com blindado para fabricar um híbrido.
+Adjacentes. Os dois precisam estar a um hexágono de distância — e é bom saber quem fica onde: a unidade que você seleciona é a **receptora**. Ela permanece no próprio hexágono e conserva a posição dela; a outra se desloca até lá e é consumida pela fusão. O hexágono do resultado é sempre o do receptor.
+Mesma camada — mas o jogo tenta resolver isso por você. Se as duas estiverem em alturas diferentes, a fusão iguala automaticamente: aeronaves se encontram em Air/Low, o que faz a que estava no solo decolar; submarinos se encontram submersos, quando o hexágono permite.
+Se a igualação não for possível — o hex não aceita a camada, a transição está bloqueada — a fusão simplesmente não acontece.
+O receptor precisa estar machucado. Unidade com esquadrão completo não recebe fusão — não há onde colocar mais gente.
+Nenhuma das duas pode estar transportando. Quem carrega passageiros não funde, de nenhum dos lados.
+E a fusão consome a ação. O esquadrão resultante termina o turno sem movimento e sem poder agir. Você trocou duas peças por uma, e essa uma já fez o que tinha para fazer.
+--------------------------------------------------------------------------------
+Contribuição, Não Herança
+Aqui o jogo poderia ter feito o simples: pegar o maior valor de cada atributo e seguir em frente. Não é o que acontece, e a diferença importa.
+Volte à ideia de esquadrão. Quando um esquadrão de 7 homens anda um hexágono, não é uma pessoa que anda — são sete. Quando ele dispara uma vez, não é um tiro — são sete.
+Então cada unidade contribui com o total real que ela carrega:
+Passos contribuídos = autonomia × HP
+Projéteis contribuídos = disparos × HP
+E o esquadrão resultante divide esse total pelo novo tamanho.
+--------------------------------------------------------------------------------
+Um Exemplo Completo
+Um esquadrão de Soldados com 7 HP, 30 de autonomia e 3 disparos contribui com 210 passos e 21 projéteis.
+Chega outro, com 3 HP, 50 de autonomia e 1 disparo: contribui com 150 passos e 3 projéteis.
+A fusão soma tudo e redistribui pelo novo efetivo de 10 homens:
+HP: 7 + 3 = 10.
+Autonomia: 360 passos ÷ 10 = 36.
+Disparos: 24 projéteis ÷ 10 = 3.
+Repare no segundo esquadrão. Ele tinha 50 de autonomia e o resultado ficou em 36 — os 50 dele nunca foram 50 para dez pessoas. Eram 50 para três. Espalhados por um esquadrão maior, viram 36.
+Não houve herança arbitrária: houve redistribuição pelo tamanho real da tropa. O combustível que levava três homens longe não leva dez igualmente longe.
+O que acontece depois da divisão, aí sim, não é neutro — e é o assunto da próxima seção.
+--------------------------------------------------------------------------------
+Dois Detalhes que Decidem
+O arredondamento não é simétrico, e é bom saber de que lado ele cai.
+Munição e reservas arredondam para cima. Foi por isso que 2,4 disparos viraram 3 no exemplo — e vale ser honesto sobre o que isso significa: o esquadrão novo passa a carregar o equivalente a 30 projéteis, embora só 24 tenham sido contribuídos. Houve ganho real, não apenas redistribuição. A fusão é generosa com o paiol.
+A generosidade é proposital, e existe para evitar um resultado absurdo: sem ela, juntar dois esquadrões que ainda tinham disparos poderia produzir um esquadrão com **zero** munição. Uma tropa não pode ficar desarmada por ter se reorganizado.
+Autonomia trunca para baixo. Sobra de combustível que não completa um passo inteiro simplesmente se perde. Aqui a fusão é mesquinha.
+Some os dois e a leitura correta é essa: a redistribuição é proporcional, e o arredondamento em cima dela é intencionalmente torto — favorece quem atira, penaliza quem anda.
+Cada arma é calculada separadamente. Uma unidade com canhão e metralhadora não mistura os dois paióis: cada armamento recebe a sua própria soma de projéteis e a sua própria divisão. O mesmo vale para cada tipo de suprimento transportado.
+O teto de 10 é absoluto. Fundir um esquadrão de 7 com um de 5 não produz 12 — produz 10, e os 2 HP excedentes desaparecem. Fusão com sobra é desperdício puro, e quase sempre vale mais fundir o de 7 com um de 3 e deixar o outro inteiro.
+--------------------------------------------------------------------------------
+Quando Vale a Pena
+A fusão brilha exatamente onde o reparo é ruim: longe da logística, com pressa, e com unidades baratas.
+Ela não custa dinheiro, não exige suprimento no hexágono, e devolve um esquadrão cheio imediatamente. O preço é que você fica com uma unidade a menos no tabuleiro — menos presença, menos frentes, menos hexágonos ocupados.
+Repor com fusão é concentrar. Repor com reparo é manter espalhado. As duas coisas são úteis, e raramente ao mesmo tempo.
+--------------------------------------------------------------------------------
 Transporte e Embarque
 Você já viu o princípio: uma unidade embarcada adota o domínio do transportador. Tropas dentro de um helicóptero atravessam Air/Low. Infantaria num navio cruza Naval/Surface.
 Agora as consequências, que são mais fundas do que parecem.
 --------------------------------------------------------------------------------
-Slots, Não Vagas
-Um transportador não tem "espaço para três unidades". Ele tem slots — e cada slot é uma vaga especializada, com regras próprias.
-Cada slot define quantas unidades aceita, quais classes pode receber, quais habilidades exige ou proíbe, e em que camadas ele opera.
-Isso é deliberado. Um slot de passageiro não vira slot de carga porque sobrou espaço. Um caminhão que reboca artilharia não leva infantaria naquela vaga só porque ela está livre. A vaga tem função, não volume.
-Na prática, a pergunta certa nunca é "cabe?". É "este transportador tem um slot que aceita esta unidade?".
+Não É Espaço, É Vaga
+Um transportador não tem "lugar para três unidades". Ele tem vagas — e cada vaga é especializada, com regras próprias.
+Cada vaga define quantas unidades aceita, quais classes pode receber, quais habilidades exige ou proíbe, e em que camadas ela opera.
+Isso é deliberado. Uma vaga de passageiro não vira vaga de carga porque sobrou lugar. Um caminhão que reboca artilharia não leva infantaria no engate só porque ele está livre. A vaga tem função, não volume.
+O navio de desembarque é o exemplo mais claro. O porão dele leva duas unidades — e recusa explicitamente duas coisas: o Trem de Carga, que pertence aos trilhos, e a artilharia que depende de reboque, que precisaria do seu rebocador junto. Ele desembarca tropa e veículo numa praia. Não é uma balsa para qualquer coisa que caiba.
+Na prática, a pergunta certa nunca é "cabe?". É "este transportador tem uma vaga que aceita esta unidade?".
 --------------------------------------------------------------------------------
 Quem Faz o Quê
 Uma assimetria que confunde no começo e depois faz todo o sentido:
@@ -531,11 +767,33 @@ O solo plano, para quem pode.
 E no mar, o convés e a doca, para as aeronaves navais.
 Vale relembrar a regra de prioridade que você já conhece, porque ela morde aqui: o terreno cancela o que a estrutura abriria. Uma estrada na planície vira pista. A mesma estrada na montanha, não. A estrutura oferece, o terreno decide.
 --------------------------------------------------------------------------------
+Toque e Arremetida
+Aeronave no The Map Room não estaciona. Ela toca o solo, faz o que precisa, e volta para o ar.
+Uma aeronave recém-comprada nasce no chão. Na primeira atividade — você a seleciona, ou manda alguém embarcar nela — ela decola. E a partir daí, toda operação que exige o solo segue o mesmo ciclo automático:
+Recebe um passageiro: pousa, embarca a unidade, decola.
+Desembarca tropas: pousa, desembarca, decola.
+Recebe suprimento: pousa, é atendida, decola.
+Recebe Serviço do Comando: pousa, é atendida, decola.
+Você não precisa mandar decolar. O ciclo é automático, e ele existe também como confirmação: ver a aeronave voltar ao ar é o sinal de que a operação deu certo.
+--------------------------------------------------------------------------------
+Quando Ela Fica no Chão
+Duas situações quebram o ciclo — e nas duas, ficar parado é o ponto.
+Combustível esgotado. Uma aeronave que fez pouso de emergência por falta de autonomia não arremete. Ela fica ali, imóvel, esperando alguém trazer combustível. Só depois de suprida ela volta a voar, e aí pelas regras normais de decolagem: subida direta, corrida curta ou corrida de um hexágono, conforme o que ela é e onde está.
+Transferência de recursos. Uma aeronave que transfere estoque para outro agente pousa e permanece pousada. Transferir carga não é reabastecer em trânsito — é uma operação demorada, e ela cobra o tempo em que a aeronave fica no solo.
+Existe ainda uma condição silenciosa sobre o ciclo: a arremetida só acontece se a decolagem for possível naquele hexágono. Se o terreno não permite subir dali, a aeronave permanece no solo depois da operação, queira você ou não. Vale relembrar a regra da estrada na montanha — a estrutura oferece, o terreno decide.
+--------------------------------------------------------------------------------
+Por Que o Ciclo Existe
+Lembre do capítulo de domínios: uma aeronave pousada está em Land/Surface. Ela saiu do céu — e com isso, saiu do alcance de tudo que foi construído para derrubar aeronaves. Armas antiaéreas miram Air/Low e Air/High. Contra um caça estacionado no chão, elas não têm alvo.
+Se cada operação deixasse a aeronave pousada, o resultado seria uma força aérea que toca o solo para ficar invulnerável à defesa antiaérea e sobe só para atacar. A antiaérea viraria uma unidade decorativa, pagando caro para nunca encontrar um alvo.
+A arremetida automática fecha essa porta. Por padrão, aeronave operacional está no ar — que é onde a antiaérea pode encontrá-la, e onde ela paga o consumo de autonomia que você já conhece.
+E as duas exceções passam a fazer sentido como o que realmente são: janelas deliberadas de vulnerabilidade. A aeronave sem combustível e a aeronave transferindo carga estão no chão porque ficaram sem escolha ou porque escolheram uma operação lenta. Nos dois casos, ela está fora do alcance da antiaérea e dentro do alcance de tudo que atira em solo.
+Não é impunidade. É troca de ameaça.
+--------------------------------------------------------------------------------
 Captura
-Destruir o inimigo não ganha a partida. Tomar o mapa ganha.
+Destruir unidades não vale pontos. O que vence é tomar o lugar certo — ou não deixar força alguma do outro lado.
 --------------------------------------------------------------------------------
 Quem Pode Capturar
-Nem toda unidade captura. Apenas as que têm o papel de Capturador — e isso não é um detalhe de ficha, é uma decisão de composição de exército. Um exército só de blindados domina qualquer combate e não conquista nada.
+Nem toda unidade captura. Só a infantaria toma território — e isso não é um detalhe de ficha, é uma decisão de composição de exército. Um exército só de blindados domina qualquer combate e não conquista nada.
 Unidade embarcada não captura. É preciso pisar no chão.
 --------------------------------------------------------------------------------
 O Esquadrão É a Velocidade
@@ -545,9 +803,11 @@ Um esquadrão completo de dez homens retira dez pontos de captura por ação. O mes
 Construções têm um total de pontos de captura a vencer. Cada ação de captura desconta o poder do capturador. Quando chega a zero, o prédio troca de dono — e reinicia cheio para o novo proprietário, que agora precisa ser expulso da mesma forma.
 A consequência tática é limpa: um capturador desgastado não é um capturador mais fraco, é um capturador mais lento. E lentidão perto do inimigo é como se perdem unidades.
 --------------------------------------------------------------------------------
-O Capturador Agressivo
-Existe uma variante que troca velocidade por capacidade de briga. O Capturador Agressivo captura pela metade do seu HP, arredondada para cima.
-É uma escolha honesta, não um upgrade. Ele sobrevive a coisas que o capturador comum não sobrevive, e chega mais tarde a tudo que precisa ser tomado. Você paga a conquista em turnos para receber segurança em combate.
+Nem Toda Infantaria Captura Igual
+Entre as tropas que capturam, existe uma divisão que vale conhecer antes de montar o exército.
+O Soldado captura com todo o seu HP. Dez homens retiram dez pontos por ação. É a tropa de ocupação pura — frágil em combate, imbatível em velocidade de conquista.
+Bazooka e metralhadora — a infantaria pesada do seu exército, uma antiblindado e a outra antitropa — capturam pela metade do HP, arredondada para cima. Elas trocam velocidade de conquista por capacidade de briga: sobrevivem a coisas que o soldado não sobrevive, e chegam mais tarde a tudo que precisa ser tomado.
+Não é upgrade nem downgrade. É a mesma escolha de sempre, em outra roupa: você paga a conquista em turnos para receber segurança em combate. Um avanço feito só de bazookas é mais resistente e lento. Um avanço feito só de soldados é rápido e quebradiço. Nenhum dos dois é seguro diante de blindados, artilharia ou aviação — a escolha é entre morrer devagar tomando pouco, ou tomar rápido e perder tropa.
 --------------------------------------------------------------------------------
 Recuperar o Que É Seu
 A mesma ação funciona ao contrário. Um prédio seu que foi parcialmente capturado pelo inimigo pode ser recuperado por um capturador aliado — que em vez de descontar, devolve pontos até o máximo.
@@ -566,7 +826,10 @@ Ver Não É Uma Coisa Só
 Duas perguntas diferentes se escondem sob a palavra "ver":
 O hexágono está revelado? — é o terreno, o que existe no mapa.
 A unidade está detectada? — é o inimigo, quem está ocupando aquele setor.
-Elas não andam sempre juntas. Você pode enxergar um hexágono perfeitamente e não fazer ideia de que há um submarino embaixo dele. Uma construção com visão revela o terreno ao redor, mas não é observadora: ela não aponta unidades a distância.
+Elas não andam sempre juntas. Você pode enxergar um hexágono perfeitamente e não fazer ideia de que há um submarino embaixo dele.
+As construções são o exemplo mais claro dessa separação. Uma construção revela o terreno dentro do alcance de visão que lhe foi atribuído — e esse alcance é curto. Cidade, fábrica, porto e aeroporto enxergam o próprio hexágono e o anel imediato ao redor. O Quartel General alcança um hexágono a mais.
+Mas ela é péssima repórter: não aponta unidades a distância. Ela ilumina o cenário sem denunciar quem está em cena.
+Na prática, isso significa que território revelado não é território vigiado. O anel de mapa aberto ao redor da sua fábrica não substitui uma unidade de olho na estrada.
 Guarde a distinção. Muita confusão sobre "por que eu não vi aquilo" se resolve percebendo que o mapa estava aberto e o inimigo não estava detectado.
 --------------------------------------------------------------------------------
 Alcance e Linha de Visão
@@ -605,8 +868,10 @@ Disparar Custa Ocultação
 Ocultação dá iniciativa, não impunidade.
 Uma unidade furtiva escolhe o momento do duelo e entra como atacante — com o benefício de posição que isso traz. O que ela não ganha é um tiro grátis: o defensor revida normalmente se tiver arma, munição e alcance.
 E o disparo cobra o seu preço. Ao atacar, a unidade furtiva perde a ocultação temporariamente e fica exposta.
-Para aeronaves furtivas, a exposição é curta — elas permanecem na sua camada e voltam a sumir logo depois. Representa velocidade: trocar de setor e reduzir assinatura antes que forças lentas cerquem a área.
-Para o submarino, é mais severo. Ele não perde uma marcação: ele muda de camada, emerge, e fica preso na superfície por um período maior. E não é só atacar que o traz para cima — ser atingido por armamento apropriado faz o mesmo, pelo mesmo tempo. Atacar nunca é mais seguro do que ser caçado.
+Para aeronaves furtivas, a exposição dura **uma rodada**. Elas permanecem na própria camada e voltam a sumir no seu turno seguinte. Representa velocidade: trocar de setor e reduzir assinatura antes que forças lentas cerquem a área.
+Para o submarino, é mais severo, e dura **duas rodadas**. Ele não perde uma marcação: ele muda de camada, emerge, e fica preso na superfície durante esse tempo.
+E não é só atacar que o traz para cima. Ser atingido por armamento apropriado faz o mesmo, pelas mesmas duas rodadas — de propósito. Se disparar custasse menos que ser pego, atacar seria mais seguro do que se esconder, e a arma antissubmarino puniria menos que o próprio torpedo do submarino.
+Essa duração não é sabor narrativo: é o seu relógio de caçada. Duas rodadas é o que você tem para aproximar a fragata, chamar a aeronave, fechar a rota de fuga ou atacar de novo antes que ele mergulhe.
 A assimetria entre os dois é o tema de sempre: aeronaves rápidas desaparecem antes. Navios lentos permanecem expostos por mais tempo.
 --------------------------------------------------------------------------------
 Mover É Se Comprometer
@@ -616,3 +881,127 @@ O deslocamento acontece dentro da névoa. Só depois de a unidade parar no hexágon
 Isso impede a exploração gratuita do mapa casa por casa, e transforma cada avanço numa aposta real. Mover-se sem saber quem observa o setor é a maior aposta da partida.
 No ar, a velocidade é anulada pela ignorância. No mar, o alcance é anulado pelo medo de emergir. Quem move primeiro no escuro entrega sua posição — e quem espera demais perde a janela.
 A guerra aqui não é sobre atirar. É sobre decidir se o alvo que apareceu no seu tabuleiro está realmente vulnerável — ou se foi você quem entrou numa emboscada.
+--------------------------------------------------------------------------------
+Dividindo o Hexágono
+Se o hexágono comporta uma cidade inteira, ele obviamente comporta mais de uma unidade. Mas não de qualquer jeito.
+Cada hexágono tem três andares operacionais:
+O ar. Qualquer aeronave, em qualquer altitude.
+A superfície. Terra e mar ao nível do solo, juntos no mesmo andar.
+As profundezas. Submarinos submersos.
+--------------------------------------------------------------------------------
+Altitude Não Cria Andar
+Aqui está a regra que mais surpreende: **Air/Low e Air/High são o mesmo andar para efeito de ocupação.**
+Um helicóptero em baixa altitude e um caça em alta altitude não dividem o hexágono. Para o tabuleiro, os dois estão "no ar sobre aquele setor", e o setor aéreo comporta uma presença.
+A altitude importa para visão, para posição, para quais armas te alcançam e para onde sua furtividade funciona. Para ocupação, não. Voar mais alto não abre uma vaga nova.
+--------------------------------------------------------------------------------
+A Superfície É o Andar que Trava
+Dos três, só a superfície bloqueia passagem — e é por isso que ela é o andar disputado.
+Uma unidade inimiga na superfície impede que outra unidade de superfície atravesse aquele hexágono. Não dá para passar por dentro de uma linha inimiga.
+Os outros dois andares não travam nada. Uma aeronave sobrevoa tropas inimigas livremente. Um submarino passa por baixo de uma frota inimiga sem pedir licença. E qualquer unidade cruza um hexágono ocupado por alguém de outro andar, sempre.
+Isso desenha a geografia real da guerra: **a linha de frente existe apenas na superfície.** O céu e o fundo do mar não têm frente — têm alcance e detecção.
+--------------------------------------------------------------------------------
+Aliado Nunca Barra o Caminho
+Uma unidade sua jamais impede a passagem de outra unidade sua. Você atravessa suas próprias tropas à vontade.
+O que continua valendo é onde você **termina** o movimento: dois aliados não param no mesmo andar do mesmo hexágono. Passar por cima do companheiro, sim. Acampar em cima dele, não.
+Isso evita o problema clássico de embaralhar a própria linha e ficar preso atrás das suas peças, sem transformar o hexágono num depósito infinito de tropa.
+--------------------------------------------------------------------------------
+O Jornal do Comandante
+Você comanda de uma sala de mapas, e entre um turno seu e o próximo o mundo não parou. O adversário se moveu, atirou, capturou e avançou — e você não estava lá para ver.
+O Jornal do Comandante é o que estava sobre a mesa quando você voltou. No início de cada turno, ele apresenta o registro do que aconteceu enquanto você não comandava.
+--------------------------------------------------------------------------------
+Três Níveis de Urgência
+As entradas chegam separadas por gravidade, para você ler o que importa primeiro:
+**Crítico** é perda consumada ou golpe recebido. Contato perdido, conquista perdida, aeronave caída por falta de combustível, tiro vindo da névoa.
+**Atenção** é ameaça em curso ou escassez. Uma construção sua sob captura parcial, um estoque logístico que zerou.
+**Informativo** é ganho de informação ou ajuste automático. Um novo contato detectado, um submarino que emergiu, uma aeronave que fez pouso de emergência.
+A leitura é direta: o crítico já aconteceu e você precisa reagir. O atenção ainda está acontecendo e você talvez consiga impedir. O informativo é o seu serviço de inteligência entregando o que descobriu.
+--------------------------------------------------------------------------------
+O Jornal Não Mente, e Também Não Adivinha
+O ponto mais importante: **o Jornal respeita a névoa.**
+Ele só registra o que você teria como saber. Uma unidade sua que desapareceu vira "contato perdido" — não "destruída pelo tanque inimigo em tal hexágono", porque você não viu isso acontecer. Uma construção sua que mudou de dono é reportada com o novo dono nomeado, porque a guarnição que estava lá viu quem entrou.
+Ele não é onisciente e não te dá de graça a informação que o Fog of War cobra. É o relatório honesto de quem esteve em campo, com os limites de quem esteve em campo.
+Se você precisar de um princípio para prever o que o Jornal vai ou não contar, é este: **ele registra conhecimento adquirido, não a verdade absoluta do mundo.** Se ninguém seu poderia ter sabido daquilo, não aparece. Se alguém seu viu e depois morreu, o que ele viu antes de morrer já era seu.
+Por isso "tiro da névoa" é uma categoria própria e crítica: você levou fogo de uma origem que não conseguiu identificar. O jogo te conta que aconteceu, e não te conta de onde veio. Descobrir isso é trabalho seu.
+--------------------------------------------------------------------------------
+A Partida
+Você conhece as peças. Falta o relógio.
+--------------------------------------------------------------------------------
+De Onde Vem o Dinheiro
+Sua renda chega no início de cada turno, e vem de três camadas de território:
+O Quartel General rende cerca de 3.000 por turno. É a sua fonte primária, e ela existe enquanto você existir.
+Fábricas, aeroportos e portos rendem cerca de 1.500 cada. São a camada secundária — a infraestrutura pesada que você defende ou toma.
+Cidades rendem cerca de 1.000 cada. É a camada terciária, e a única que cresce durante a partida, conforme sua infantaria conquista o tabuleiro.
+Isso dá uma escala para os preços que você viu: um turno de renda de uma cidade paga aproximadamente um esquadrão de Soldados. Um esquadrão de Soldados custa cerca de um terço do que o seu Quartel General rende por turno. E um caça de ponta custa vários turnos de renda inteira.
+É uma boa forma de olhar para o mapa: cada cidade que você mantém equivale a mais um esquadrão de infantaria por turno, indefinidamente.
+E dá o sentido estratégico da captura. O QG é fixo, e as construções pesadas são poucas e muito disputadas. As cidades são numerosas — são elas que formam a principal camada de crescimento durante a partida. A diferença entre dois exércitos, numa partida longa, costuma ser o número de cidades que cada um tomou — o que faz do capturador, a unidade mais barata e mais frágil do jogo, o motor da sua economia.
+Perder território não é perder espaço. É perder renda, todo turno, até o fim.
+--------------------------------------------------------------------------------
+Produção e Mercado
+Renda é metade da economia. A outra metade é onde você consegue gastá-la.
+Comprar unidades não é uma ação abstrata do jogador: é uma transação com uma construção específica, que oferece um catálogo específico. Cada fábrica, porto ou aeroporto tem a sua lista do que sabe produzir, e ela é definida pelo cenário. Um porto vende navios. Uma fábrica vende tropa e blindado. O que você pode comprar depende inteiramente do que você controla.
+--------------------------------------------------------------------------------
+Nem Toda Conquista Vem com a Chave
+E aqui está a regra que muda o valor de cada construção do mapa. Cada uma carrega uma política de venda, e ela decide **para quem** aquele prédio produz:
+**Mercado livre.** Vende para quem for o dono atual. Capturou, produz. É o caso mais simples e o mais generoso.
+**Dono original.** Só produz para o time a quem o prédio pertencia no início do cenário. Se ele foi tomado de você, o inimigo ganha a renda e o território — mas as linhas de montagem não trabalham para ele.
+**Primeiro dono.** Só produz para quem o controlou primeiro. Se você chegou depois e capturou, ele não vende para você. Nunca vai vender.
+**Desativada.** Não produz para ninguém. É prédio de renda e posição, não de produção.
+--------------------------------------------------------------------------------
+Capturar Não É Sempre a Mesma Coisa
+Some isso ao que você já sabe da renda e o mapa deixa de ser uniforme.
+Tomar uma fábrica de mercado livre é um ganho triplo: você recebe a renda, nega a renda ao inimigo e ainda passa a produzir ali.
+Tomar uma fábrica de primeiro dono, quando o primeiro dono não foi você, é um ganho parcial: a renda vem, o território vem, a produção não. Você tomou um cofre, não uma oficina.
+E a leitura defensiva é ainda mais interessante: uma fábrica sua marcada como primeiro dono é **impossível de virar contra você**. Perdê-la dói no bolso e no mapa, mas não arma o inimigo. Já uma fábrica de mercado livre na linha de frente é uma arma carregada apontada para os dois lados.
+Por isso a pergunta antes de um avanço não é apenas "consigo tomar aquilo?". É "aquilo vai trabalhar para mim depois de tomado?".
+--------------------------------------------------------------------------------
+Onde a Unidade Nasce
+A unidade comprada aparece na construção que a vendeu, e isso amarra produção a geografia.
+Fábrica longe do front significa reforço que chega tarde. Fábrica perto do front significa reforço imediato e uma construção exposta. E o hexágono de saída precisa estar livre segundo as regras de ocupação que você já conhece — a superfície comporta uma presença por vez, então uma construção com a saída bloqueada não entrega nada naquele turno.
+Comprar, portanto, não é só uma decisão de orçamento. É uma decisão de logística: **você está escolhendo onde a força vai aparecer, não apenas qual força.**
+--------------------------------------------------------------------------------
+O Ciclo da Ação
+Você já viu o relógio da partida. Falta o relógio de cada peça — e ele importa, porque quase toda regra deste manual depende de em que ponto do ciclo a unidade está.
+--------------------------------------------------------------------------------
+Os Passos
+Toda ação segue a mesma sequência:
+Você **seleciona** a unidade.
+Ela **se move**, ou permanece onde está. As duas coisas são escolhas válidas, e algumas ações só existem para quem ficou parado.
+O jogo **recalcula os sensores** a partir da posição final. É só aqui que você descobre o que aquela posição enxerga, alcança e ameaça.
+Você **escolhe a ação** com base nessa informação nova: atacar, capturar, embarcar, desembarcar, suprir, fundir, pousar, decolar — ou nenhuma.
+A ação é **executada**, e a unidade é **marcada como agida**.
+A partir daí ela não age de novo neste turno.
+--------------------------------------------------------------------------------
+Nada É Definitivo Até Você Confirmar
+O passo mais importante é o que acontece **entre** os passos.
+Todo o percurso até a confirmação é provisório. O movimento que você está desenhando, o menu que abriu, a pré-visualização do ataque — nada disso mexeu no tabuleiro ainda. Você pode desistir a qualquer momento e nada terá acontecido.
+Só a confirmação torna qualquer coisa real. É nesse instante que a névoa é recalculada de verdade, que os contatos são atualizados, que o recurso é gasto e que a unidade passa a constar como agida.
+Isso é o que permite mover dentro da névoa sem transformar o movimento numa sonda gratuita: você não vai descobrindo o mapa enquanto arrasta o cursor. Você escolhe o destino, aceita, e **então** descobre o que havia lá.
+--------------------------------------------------------------------------------
+Por Que o Estado da Peça Importa Tanto
+Volte às regras que você já leu e repare quantas dependem deste ciclo:
+O Serviço do Comando só atende quem ainda não agiu.
+O suprimento só atende quem ainda não recebeu nesta rodada.
+A fusão exige uma receptora machucada e consome a ação das duas.
+Captura, embarque e desembarque exigem terminar o movimento no lugar certo.
+Algumas ações só existem para quem permaneceu parado.
+"Agiu" e "não agiu" não são detalhes de interface. São o estado que decide o que ainda é possível — e é por isso que a ordem em que você mexe nas suas peças muda o que você consegue fazer com elas.
+--------------------------------------------------------------------------------
+Uma Boa Ordem Operacional
+Existe uma sequência que funciona bem, e é a que a inteligência artificial usa hoje:
+Primeiro o Serviço do Comando. Depois as ações das unidades. Por último, as compras.
+Você não tem essa obrigação. Pode comprar antes de agir, agir antes de comprar, alternar entre as duas coisas, ou simplesmente passar a vez sem fazer nada. A liberdade é sua.
+Ainda assim, vale entender por que essa ordem funciona. Resolver o comando primeiro significa entrar no turno com as unidades já atendidas. Agir antes de comprar significa saber o que sobrou de dinheiro e o que faltou no front antes de decidir o que reforçar.
+E há um motivo mecânico, não só de bom senso: **o Serviço do Comando só atende unidades que ainda não agiram**. Cada peça que você move antes de acionar o comando é uma peça que sai da lista. Deixar o lote para o fim do turno significa encontrá-lo quase vazio.
+É uma boa ordem padrão. Não é uma regra — e a IA pode mudar a dela sem que isso mude o jogo.
+--------------------------------------------------------------------------------
+Como se Ganha
+Existem duas categorias diferentes, e vale separá-las.
+**Derrotas gerais** — valem em qualquer partida:
+Captura do Quartel General. O adversário perde no instante em que o QG dele muda de dono.
+Eliminação total. Um lado sem nenhuma unidade restante está fora — e unidades embarcadas contam. Enquanto houver tropa dentro de um transporte, você ainda está na partida.
+E há uma terceira via, que não é derrota imposta: **a rendição**. Um jogador pode encerrar voluntariamente a própria participação. O efeito no tabuleiro é o mesmo de uma derrota, mas a decisão foi dele.
+**Objetivos de cenário** — valem só onde foram definidos:
+Concluir as tarefas de um tutorial encerra aquele cenário. É condição do roteiro, não regra do jogo — e é por essa porta que entram, no futuro, objetivos como segurar um ponto, sobreviver a um número de turnos ou alcançar uma posição.
+Repare no que essas condições têm em comum: nenhuma delas transforma baixas em placar. Não existe meta de destruição, não existe pontuação por dano, não existe vitória por "causar mais estrago".
+O atrito só encerra a partida quando é total — quando o adversário não tem mais nenhuma força com que continuar. Você não vence porque destruiu vinte unidades. Vence porque tomou o lugar certo, ou porque não sobrou nada do outro lado.
+É por isso que o The Map Room premia quem administra território, informação e logística acima de quem administra combates. Ganhar todas as trocas de tiro e não tomar nada é perder devagar.

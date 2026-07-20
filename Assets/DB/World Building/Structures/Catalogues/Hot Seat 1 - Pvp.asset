@@ -15,6 +15,8 @@ MonoBehaviour:
   structures:
   - {fileID: 11400000, guid: 2c50b52605f4f1c4ca013ba4bd7acee3, type: 2}
   - {fileID: 11400000, guid: 7933d65148f7b884c895240966ea81b1, type: 2}
+  - {fileID: 11400000, guid: e0adc11a0eac5bc42811605fe2a45f9f, type: 2}
+  - {fileID: 11400000, guid: 32bd7b500bf78b64a95d16600a68909d, type: 2}
   roadRoutesByStructure:
   - structure: {fileID: 11400000, guid: 2c50b52605f4f1c4ca013ba4bd7acee3, type: 2}
     routes:
@@ -114,3 +116,90 @@ MonoBehaviour:
       - {x: 4, y: -2, z: 0}
       - {x: 3, y: -2, z: 0}
       - {x: 2, y: -2, z: 0}
+  - structure: {fileID: 11400000, guid: e0adc11a0eac5bc42811605fe2a45f9f, type: 2}
+    routes:
+    - routeName: Trilho Norte
+      ownerDatabase: {fileID: 11400000}
+      cells:
+      - {x: -13, y: 2, z: 0}
+      - {x: -14, y: 3, z: 0}
+      - {x: -13, y: 4, z: 0}
+      - {x: -14, y: 5, z: 0}
+      - {x: -14, y: 6, z: 0}
+      - {x: -14, y: 7, z: 0}
+      - {x: -13, y: 8, z: 0}
+      - {x: -13, y: 9, z: 0}
+      - {x: -12, y: 10, z: 0}
+      - {x: -11, y: 10, z: 0}
+      - {x: -10, y: 10, z: 0}
+      - {x: -9, y: 10, z: 0}
+      - {x: -8, y: 10, z: 0}
+      - {x: -7, y: 10, z: 0}
+      - {x: -6, y: 10, z: 0}
+      - {x: -5, y: 10, z: 0}
+    - routeName: Trilho Sul
+      ownerDatabase: {fileID: 11400000}
+      cells:
+      - {x: 13, y: -2, z: 0}
+      - {x: 13, y: -3, z: 0}
+      - {x: 13, y: -4, z: 0}
+      - {x: 13, y: -5, z: 0}
+      - {x: 14, y: -6, z: 0}
+      - {x: 13, y: -7, z: 0}
+      - {x: 13, y: -8, z: 0}
+      - {x: 12, y: -9, z: 0}
+      - {x: 12, y: -10, z: 0}
+      - {x: 11, y: -10, z: 0}
+      - {x: 10, y: -10, z: 0}
+      - {x: 9, y: -10, z: 0}
+      - {x: 8, y: -10, z: 0}
+      - {x: 7, y: -10, z: 0}
+      - {x: 6, y: -10, z: 0}
+      - {x: 5, y: -10, z: 0}
+    - routeName: Ilha Sul
+      ownerDatabase: {fileID: 11400000}
+      cells:
+      - {x: 1, y: -9, z: 0}
+      - {x: 0, y: -9, z: 0}
+      - {x: -1, y: -9, z: 0}
+      - {x: -2, y: -9, z: 0}
+    - routeName: Ilha Norte
+      ownerDatabase: {fileID: 11400000}
+      cells:
+      - {x: -2, y: 9, z: 0}
+      - {x: -1, y: 9, z: 0}
+      - {x: 0, y: 9, z: 0}
+      - {x: 1, y: 9, z: 0}
+  - structure: {fileID: 11400000, guid: 32bd7b500bf78b64a95d16600a68909d, type: 2}
+    routes:
+    - routeName: Ponte Norte
+      ownerDatabase: {fileID: 11400000}
+      cells:
+      - {x: -5, y: 10, z: 0}
+      - {x: -4, y: 10, z: 0}
+      - {x: -4, y: 9, z: 0}
+      - {x: -3, y: 9, z: 0}
+      - {x: -2, y: 9, z: 0}
+    - routeName: Ponte Sul
+      ownerDatabase: {fileID: 11400000}
+      cells:
+      - {x: 5, y: -10, z: 0}
+      - {x: 4, y: -10, z: 0}
+      - {x: 3, y: -9, z: 0}
+      - {x: 2, y: -9, z: 0}
+      - {x: 1, y: -9, z: 0}
+    - routeName: Pontilhao Sul
+      ownerDatabase: {fileID: 11400000}
+      cells:
+      - {x: -2, y: -9, z: 0}
+      - {x: -3, y: -9, z: 0}
+      - {x: -3, y: -8, z: 0}
+    - routeName: Pontilhao Norte
+      ownerDatabase: {fileID: 11400000}
+      cells: []
+    - routeName: Route 5
+      ownerDatabase: {fileID: 11400000}
+      cells:
+      - {x: 1, y: 9, z: 0}
+      - {x: 2, y: 9, z: 0}
+      - {x: 3, y: 8, z: 0}

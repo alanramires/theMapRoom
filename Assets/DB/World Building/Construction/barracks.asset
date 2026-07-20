@@ -80,6 +80,7 @@ MonoBehaviour:
     offeredUnits:
     - {fileID: 11400000, guid: 4a3afdea0950dfc46a48dd7a659563ee, type: 2}
     - {fileID: 11400000, guid: b28c15593869dae419f9b58292ef4845, type: 2}
+    - {fileID: 11400000, guid: c0e59b3e4bf2e4c49a67906805e43801, type: 2}
     canProvideSupplies: 1
     offeredSupplies:
     - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}

@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using System.Text;
 using UnityEngine;
@@ -874,8 +874,6 @@ public partial class TurnStateManager
     private static bool UnitNeedsServiceForSupplyExecution(UnitManager target, ServiceData service)
     {
         if (target == null || service == null)
-            return false;
-        if (target.TookOffRecently)
             return false;
         if (service.recuperaHp && target.CurrentHP < target.GetMaxHP())
             return true;
