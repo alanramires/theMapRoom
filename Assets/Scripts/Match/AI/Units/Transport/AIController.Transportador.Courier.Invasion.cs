@@ -50,6 +50,13 @@ public partial class AIController
         if (cell == transporter.CurrentCellPosition)
             return true;
 
+        // GO GREEN é uma ordem operacional global: todos avançam para o plano final ">>".
+        // Não exigir screen/bridgehead local aqui, pois isso cria um deadlock em que o APC não
+        // avança sem screen e o passageiro que formaria a screen permanece preso no APC.
+        // Quando a invasão falha, IsInvading volta a false e os gates conservadores retornam.
+        if (snapshot != null && snapshot.IsInvading)
+            return true;
+
         if (!HasTransportInvasionGoGreen(transporter, snapshot, target, out _))
             return false;
 
@@ -69,6 +76,11 @@ public partial class AIController
         Vector3Int dropCell,
         Vector3Int target)
     {
+        // Durante GO GREEN o desembarque também integra a invasão total; não condicionar a
+        // liberação da carga a uma screen que pode estar justamente dentro do transporte.
+        if (snapshot != null && snapshot.IsInvading)
+            return true;
+
         if (!IsTransportInvasionCourierCellAllowed(transporter, snapshot, transporterCell, target))
             return false;
 

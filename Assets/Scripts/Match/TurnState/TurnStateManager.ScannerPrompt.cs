@@ -2731,12 +2731,21 @@ public partial class TurnStateManager
         Tilemap movementTilemap = terrainTilemap != null ? terrainTilemap : (passenger != null ? passenger.BoardTilemap : null);
         bool passengerSortingRaised = false;
         bool transporterSortingRaised = false;
+        bool passengerFogRaised = false;
+        bool transporterFogRaised = false;
+        bool showEmbarkAboveFog = matchController == null
+            || !matchController.ShouldHideActiveAiActionPresentation();
 
         if (passenger != null)
         {
             // Keep the passenger visually above the transporter during embark.
             passenger.SetTemporarySortingOrder(1000);
             passengerSortingRaised = true;
+            if (showEmbarkAboveFog)
+            {
+                passenger.BeginTemporaryFogTraversalVisual();
+                passengerFogRaised = true;
+            }
         }
 
         Advance(CursorState.EmbarcandoExecuting, "ExecuteEmbarkSequence: begin");
@@ -2747,6 +2756,11 @@ public partial class TurnStateManager
             {
                 transporter.SetTemporarySortingOrder(999);
                 transporterSortingRaised = true;
+                if (showEmbarkAboveFog)
+                {
+                    transporter.BeginTemporaryFogTraversalVisual();
+                    transporterFogRaised = true;
+                }
             }
 
             if (transporter != null && transporter.GetDomain() == Domain.Air)
@@ -2936,6 +2950,10 @@ public partial class TurnStateManager
         finally
         {
             embarkExecutionInProgress = false;
+            if (passengerFogRaised && passenger != null)
+                passenger.EndTemporaryFogTraversalVisual();
+            if (transporterFogRaised && transporter != null)
+                transporter.EndTemporaryFogTraversalVisual();
             if (passengerSortingRaised && passenger != null)
                 passenger.ClearTemporarySortingOrder();
             if (transporterSortingRaised && transporter != null)

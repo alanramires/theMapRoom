@@ -50,6 +50,130 @@ public partial class AIController
         unit.SetAIEixo(currentAxisMap != null ? currentAxisMap.GetEixo(obj.Sector) : 0);
     }
 
+    private int AssignUnslottedUnitsToGoGreenInvasion(TeamObjectivePlan plan, TeamId aiTeam)
+    {
+        if (plan?.Objectives == null)
+            return 0;
+
+        SectorObjective invasion = null;
+        foreach (SectorObjective obj in plan.Objectives)
+        {
+            if (obj == null || obj.ObjectiveType != AIObjectiveType.InvasionAttack)
+                continue;
+            if (obj.Status == ObjectiveStatus.Complete || obj.Status == ObjectiveStatus.Abandoned)
+                continue;
+            invasion = obj;
+            break;
+        }
+        if (invasion == null)
+            return 0;
+
+        var alreadySlotted = new HashSet<int>();
+        foreach (SectorObjective obj in plan.Objectives)
+            if (obj?.Slots != null)
+                foreach (SlotNeed slot in obj.Slots)
+                    if (slot != null && slot.Filled && slot.AssignedUnitId >= 0)
+                        alreadySlotted.Add(slot.AssignedUnitId);
+
+        int assigned = 0;
+
+        // IDs rogue persistidos podem representar uma unidade temporariamente fora de AllActive
+        // (por exemplo, embarcada durante um load). Eles também entram no plano final.
+        var persistedRogueIds = plan.RogueUnitIds != null
+            ? new List<int>(plan.RogueUnitIds)
+            : new List<int>();
+        foreach (int unitId in persistedRogueIds)
+        {
+            if (!alreadySlotted.Contains(unitId))
+            {
+                UnitManager unit = FindActiveUnit(unitId, aiTeam);
+                UnitRole role = ResolveGoGreenInvasionRole(unit);
+                invasion.Slots.Add(new SlotNeed
+                {
+                    Role = role,
+                    Filled = true,
+                    AssignedUnitId = unitId,
+                    GoGreenFallbackAssignment = true
+                });
+                alreadySlotted.Add(unitId);
+                if (unit != null)
+                    ApplyPlanHUD(unit, invasion, role);
+                assigned++;
+            }
+        }
+
+        // A lista cobre só capturadores; a ausência de plano é o rogue real para as demais
+        // composições (assalto, fogo indireto, logística, suprimentos, transportes, aviação...).
+        foreach (UnitManager unit in UnitManager.AllActive)
+        {
+            if (unit == null || unit.TeamId != aiTeam || unit.IsDead
+                || alreadySlotted.Contains(unit.InstanceId))
+                continue;
+
+            UnitRole role = ResolveGoGreenInvasionRole(unit);
+            invasion.Slots.Add(new SlotNeed
+            {
+                Role = role,
+                Filled = true,
+                AssignedUnitId = unit.InstanceId,
+                GoGreenFallbackAssignment = true
+            });
+            alreadySlotted.Add(unit.InstanceId);
+            ApplyPlanHUD(unit, invasion, role);
+            assigned++;
+        }
+
+        plan.RogueUnitIds?.Clear();
+        if (assigned > 0)
+            Debug.Log($"{TL("Plan")} Go Green: {assigned} unidade(s) sem plano absorvida(s) pelo eixo de invasão >>");
+        return assigned;
+    }
+
+    private int ReleaseGoGreenFallbackAssignments(TeamObjectivePlan plan, TeamId aiTeam)
+    {
+        if (plan?.Objectives == null)
+            return 0;
+
+        int released = 0;
+        foreach (SectorObjective obj in plan.Objectives)
+        {
+            if (obj?.Slots == null)
+                continue;
+            for (int i = obj.Slots.Count - 1; i >= 0; i--)
+            {
+                SlotNeed slot = obj.Slots[i];
+                if (slot == null || !slot.GoGreenFallbackAssignment)
+                    continue;
+
+                UnitManager unit = FindActiveUnit(slot.AssignedUnitId, aiTeam);
+                if (unit != null)
+                {
+                    unit.ClearAIAssignedPlan();
+                    unit.SetAIEixo(0);
+                }
+                obj.Slots.RemoveAt(i);
+                released++;
+            }
+        }
+
+        if (released > 0)
+            Debug.Log($"{TL("Plan")} reassembly: {released} alocação(ões) fallback de Go Green liberada(s)");
+        return released;
+    }
+
+    private static UnitRole ResolveGoGreenInvasionRole(UnitManager unit)
+    {
+        if (unit != null && unit.TryGetUnitData(out UnitData data) && data != null)
+        {
+            UnitRole role = UnitRoleCompatibility.ResolveCompositionRole(data);
+            if (role != UnitRole.None)
+                return role;
+            if (data.roles != null && data.roles.Count > 0)
+                return data.roles[0];
+        }
+        return UnitRole.Assalto;
+    }
+
     private static TeamId FindHQTeamInSector(ConstructionSector sector)
     {
         foreach (ConstructionManager c in ConstructionManager.AllActive)

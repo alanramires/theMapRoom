@@ -190,8 +190,10 @@ public partial class AIController
         // se está numa, tem que sair pros arredores (loop abaixo já exclui essas células).
         // Conscrição comprando: mesmo tratamento pra produtor do exército, pra TODOS.
         bool conscriptionProducerBan = IsConscriptionParkingBanActive();
+        bool logisticsProducerBan = IsPrimaryLogisticsUnit(unit);
         bool fromOnBaseCluster = (avoidBaseClusterCells && IsOwnBaseClusterCell(fromCell, aiTeam))
-            || (conscriptionProducerBan && IsConscriptionClosedProducerCell(fromCell, aiTeam));
+            || (conscriptionProducerBan && IsConscriptionClosedProducerCell(fromCell, aiTeam))
+            || (logisticsProducerBan && IsLogisticsProductionCell(aiTeam, fromCell));
 
         bool safeNearHQ = !fromOnBaseCluster
             && SectorManager.HexDistance(fromCell, hqCell) <= DefenseEnemyRange
@@ -212,6 +214,7 @@ public partial class AIController
             // Recolhe pros ARREDORES do HQ sem parar em base/âncora/HQ (deixa a produção livre).
             if (avoidBaseClusterCells && cell != fromCell && IsOwnBaseClusterCell(cell, aiTeam)) continue;
             if (conscriptionProducerBan && cell != fromCell && IsConscriptionClosedProducerCell(cell, aiTeam)) continue;
+            if (logisticsProducerBan && cell != fromCell && IsLogisticsProductionCell(aiTeam, cell)) continue;
 
             float dist = SectorManager.HexDistance(cell, hqCell);
             float threat = CalculateThreatLevel(cell, aiTeam);
@@ -241,6 +244,7 @@ public partial class AIController
         ConstructionManager best = null;
         float bestScore = float.MinValue;
         bool conscriptionProducerBan = IsConscriptionParkingBanActive();
+        bool logisticsProducerBan = IsPrimaryLogisticsUnit(unit);
         bool eliteRelaxSafety = EliteHoldsDangerousRepair(unit);
         bool preferAircraftFacility = unit != null && unit.GetAircraftType() != AircraftType.None;
         bool needsPassengerRelease = IsAirTransporter(unit) && HasTransportCargo(unit);
@@ -260,6 +264,7 @@ public partial class AIController
             }
             bool conscriptionClosed = conscriptionProducerBan
                 && IsConscriptionClosedProducerConstruction(c, aiTeam);
+            bool logisticsProducer = logisticsProducerBan && c.CanProduceUnitsForTeam(aiTeam);
             if (conscriptionClosed && !eliteRelaxSafety)
             {
                 Debug.Log($"[Repair] skip {cc} base/âncora de produção fechada pela conscrição dist={dist:F1}");
@@ -347,6 +352,11 @@ public partial class AIController
             // segue finito, então continua elegível quando não há mais nada (não morre sem reparo).
             if (eliteRelaxSafety && conscriptionClosed)
                 score -= EliteConscriptionBaseRepairPenalty;
+            // Produtor e linha de montagem, nao estacionamento de supridor.
+            // Penalidade finita: ainda serve como ultimo recurso se nao houver
+            // qualquer outro ponto de reparo elegivel.
+            if (logisticsProducer)
+                score -= EliteConscriptionBaseRepairPenalty * 2f;
             // Reservado a um objetivo defensivo COM dono vivo: penaliza, não exclui. Continua
             // ganhando de uma base fechada pela conscrição (-100000) — reparar num prédio
             // reservado é melhor que marchar de volta pra base onde a unidade nem repara.

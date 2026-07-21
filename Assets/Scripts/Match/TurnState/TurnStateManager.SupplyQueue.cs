@@ -925,7 +925,11 @@ public partial class TurnStateManager
             return 0f;
 
         if (animationManager != null)
-            return animationManager.PlayServiceProjectileStraight(supplier.transform.position, target.transform.position, service != null ? service.spriteDefault : null);
+            return animationManager.PlayServiceProjectileStraight(
+                supplier.transform.position,
+                target.transform.position,
+                service != null ? service.spriteDefault : null,
+                matchController != null && matchController.ShouldPromoteActiveAiActionFxAboveFog());
 
         return 0f;
     }

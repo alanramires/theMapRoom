@@ -273,9 +273,6 @@ public partial class AIController
 
         currentAITeam = aiTeam;
         currentAIStage = Mathf.Clamp(stage, 1, 3);
-        yield return WaitIfDebugPaused();
-        if (ShouldStopAIForMatchEnd("debug_apos_pause_inicial"))
-            yield break;
         yield return new WaitUntil(() => replayManager == null || !replayManager.IsStepExecutionBusy);
         if (ShouldStopAIForMatchEnd("debug_apos_replay_busy"))
             yield break;
@@ -307,6 +304,25 @@ public partial class AIController
             BuildObjectivePlan(snapshot);
             AITacticalAnalyzer.Instance.Rebuild(aiTeam, snapshot, ObjectiveManager.GetPlanForTeam(aiTeam));
         }
+
+        // O snapshot nasceu antes do planejamento e o próprio build pode ter disparado Go Green.
+        // Reconcilia a invariável sem-rogues antes de pausar para inspeção do plano recalculado.
+        AIController.GoGreenInvasionInspection debugInvasion =
+            GetGoGreenInvasionForInspection(aiTeam, snapshot.TurnNumber);
+        snapshot.IsInvading = debugInvasion.Active;
+        if (snapshot.IsInvading)
+        {
+            TeamObjectivePlan debugPlan = ObjectiveManager.GetPlanForTeam(aiTeam);
+            currentAxisMap = InvasionAxisMap.Build(aiTeam);
+            AssignUnslottedUnitsToGoGreenInvasion(debugPlan, aiTeam);
+        }
+
+        // O comando Stage deve reconstruir o plano imediatamente, mesmo sob AI PAUSE, para que
+        // HUD/Shopping Pressure mostrem o recálculo antes do primeiro step. A pausa continua
+        // bloqueando toda ação de tabuleiro e é respeitada a partir desta fronteira.
+        yield return WaitIfDebugPaused();
+        if (ShouldStopAIForMatchEnd("debug_apos_recalculo_pausado"))
+            yield break;
 
         if (stage <= 1 && emulateStage1)
         {

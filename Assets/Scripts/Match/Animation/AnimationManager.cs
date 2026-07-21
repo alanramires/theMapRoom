@@ -774,7 +774,7 @@ public class AnimationManager : MonoBehaviour
         return duration;
     }
 
-    public float PlayServiceProjectileStraight(Vector3 from, Vector3 to, Sprite sprite)
+    public float PlayServiceProjectileStraight(Vector3 from, Vector3 to, Sprite sprite, bool renderAboveFog = false)
     {
         float distance = Vector2.Distance(new Vector2(from.x, from.y), new Vector2(to.x, to.y));
         float speed = SupplyProjectileSpeed;
@@ -783,7 +783,15 @@ public class AnimationManager : MonoBehaviour
         float projectileScale = SupplyProjectileScale;
         // Galões, caixas e peças representam objetos transportados, não munição:
         // percorrem a linha reta mantendo a orientação original do sprite.
-        StartCoroutine(AnimateWeaponProjectileRoutine(from, to, resolved, WeaponTrajectoryType.Straight, duration, projectileScale, rotateAlongTrajectory: false));
+        StartCoroutine(AnimateWeaponProjectileRoutine(
+            from,
+            to,
+            resolved,
+            WeaponTrajectoryType.Straight,
+            duration,
+            projectileScale,
+            rotateAlongTrajectory: false,
+            renderAboveFog: renderAboveFog));
         return duration;
     }
 
@@ -887,7 +895,8 @@ public class AnimationManager : MonoBehaviour
         WeaponTrajectoryType trajectory,
         float duration,
         float projectileScale,
-        bool rotateAlongTrajectory)
+        bool rotateAlongTrajectory,
+        bool renderAboveFog = false)
     {
         GameObject go = new GameObject("Combat Projectile FX");
         Transform t = go.transform;
@@ -896,7 +905,9 @@ public class AnimationManager : MonoBehaviour
 
         SpriteRenderer sr = go.AddComponent<SpriteRenderer>();
         sr.sprite = sprite;
-        sr.sortingLayerID = combatProjectileSortingLayer.Id;
+        sr.sortingLayerID = renderAboveFog
+            ? SortingLayer.NameToID("FogOfWar")
+            : combatProjectileSortingLayer.Id;
         sr.sortingOrder = combatProjectileSortingOrder;
 
         Vector2 flat = new Vector2(to.x - from.x, to.y - from.y);

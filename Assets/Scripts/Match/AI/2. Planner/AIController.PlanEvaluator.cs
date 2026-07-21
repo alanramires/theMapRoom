@@ -1585,6 +1585,13 @@ public partial class AIController
         // Passo 6: reaplica HUD + libera suporte sem capturador
         ReleaseOffensiveSupportWithoutCapturer(plan, aiTeam);
 
+        // Go Green suspende o papel rogue para TODA composição. Só depois de todas as alocações
+        // normais absorvemos cada unidade que ainda ficou sem slot no plano final ">>". Se o
+        // monitor declarar fracasso, rallyGoGreen volta a false e essas novas absorções cessam,
+        // restaurando naturalmente o comportamento rogue durante o reassembly.
+        if (rallyGoGreen)
+            AssignUnslottedUnitsToGoGreenInvasion(plan, aiTeam);
+
         foreach (SectorObjective obj in plan.Objectives)
             foreach (SlotNeed slot in obj.Slots)
                 if (slot.Filled && !freeCapturers.Exists(u => u.InstanceId == slot.AssignedUnitId))

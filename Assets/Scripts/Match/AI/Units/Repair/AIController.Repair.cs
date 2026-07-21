@@ -341,6 +341,7 @@ public partial class AIController
         bool rejectBaseCluster = !IsEliteRepairUnit(unit) && IsBaseUnderPressureForRepair(snapshot);
         // Conscrição comprando: produtor do exército fechado pra TODOS (elite incluso).
         bool conscriptionBan = IsConscriptionParkingBanActive();
+        bool logisticsProducerBan = IsPrimaryLogisticsUnit(unit);
 
         if (TryReleaseAirTransportRepairPassengers(
                 unit,
@@ -382,7 +383,8 @@ public partial class AIController
         if (currentBldg != null && currentBldg.IsCapturable
             && currentBldg.TeamId == aiTeam && currentBldg.CurrentCapturePoints >= currentBldg.CapturePointsMax
             && !(rejectBaseCluster && IsBaseClusterConstruction(currentBldg))
-            && !(conscriptionBan && IsConscriptionClosedProducerConstruction(currentBldg, aiTeam)))
+            && !(conscriptionBan && IsConscriptionClosedProducerConstruction(currentBldg, aiTeam))
+            && !(logisticsProducerBan && currentBldg.CanProduceUnitsForTeam(aiTeam)))
         {
             bool safe = IsRepairConstructionSectorSafe(currentBldg, aiTeam)
                 && !HasNearbyVisibleEnemy(fromCell, aiTeam, DefenseEnemyRange);

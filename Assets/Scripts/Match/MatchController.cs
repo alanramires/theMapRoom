@@ -4822,6 +4822,16 @@ public class MatchController : MonoBehaviour
         return ShouldUseHumanFogPresentation(out _);
     }
 
+    public bool ShouldPromoteActiveAiActionFxAboveFog()
+    {
+        return Application.isPlaying
+            && debugFogOfWarEnabled
+            && enableTotalWar
+            && gameSetup == GameSetupPreset.FogOfWarTotal
+            && IsActiveTeamAI()
+            && !AnyHumanPlayerExists();
+    }
+
     private bool ShouldUseHumanFogPresentation(out TeamId presentationTeam)
     {
         presentationTeam = TeamId.Neutral;
@@ -5884,13 +5894,18 @@ public class MatchController : MonoBehaviour
                 memory.sortingOrder = 2;
                 Vector3 memoryPosition = source.transform.position;
                 Vector3 memoryWorldScale = source.transform.lossyScale;
-                if (fromExplored != toExplored)
+                // A fotografia pode ocupar somente a metade pertencente ao hex
+                // conhecido e atualmente oculto. Isso tambem vale quando o outro
+                // extremo ja foi explorado, mas esta visivel agora: copiar o
+                // segmento inteiro faria a camada FogOfWarTile atravessar o recorte
+                // aberto e cobrir unidades reais naquele hex.
+                if (fromKnownHidden != toKnownHidden)
                 {
-                    Vector3Int knownCell = fromExplored ? fromCell : toCell;
-                    Vector3Int unknownCell = fromExplored ? toCell : fromCell;
-                    Vector3 knownCenter = boardMap.GetCellCenterWorld(knownCell);
-                    Vector3 unknownCenter = boardMap.GetCellCenterWorld(unknownCell);
-                    memoryPosition = Vector3.Lerp(knownCenter, unknownCenter, 0.25f);
+                    Vector3Int hiddenCell = fromKnownHidden ? fromCell : toCell;
+                    Vector3Int otherCell = fromKnownHidden ? toCell : fromCell;
+                    Vector3 hiddenCenter = boardMap.GetCellCenterWorld(hiddenCell);
+                    Vector3 otherCenter = boardMap.GetCellCenterWorld(otherCell);
+                    memoryPosition = Vector3.Lerp(hiddenCenter, otherCenter, 0.25f);
                     memoryPosition.z = source.transform.position.z;
                     memoryWorldScale.y *= 0.5f;
                 }

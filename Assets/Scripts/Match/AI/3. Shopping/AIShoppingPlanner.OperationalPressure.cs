@@ -6,6 +6,7 @@ public partial class AIShoppingPlanner
     public sealed class AxisTransportPressureInspection
     {
         public int Eixo;
+        public bool IsInvasionAxis;
         public ConstructionSector Front;
         public ConstructionSector Rally;
         public int Conquered;
@@ -16,6 +17,7 @@ public partial class AIShoppingPlanner
         public float Depth;
         public int AssignedTransports;
         public int DesiredTransports;
+        public int AssignedUnits;
         public float Score;
     }
 
@@ -66,6 +68,27 @@ public partial class AIShoppingPlanner
         if (map == null)
             return;
 
+        // O eixo de invasão é o eixo agregado da campanha: todos os nós regulares já
+        // conquistados/convertidos formam o caminho até o HQ rival, que é o último nó.
+        int campaignRegularTotal = 0;
+        int campaignRegularConquered = 0;
+        float campaignRegularAdvance = 0f;
+        foreach (InvasionAxisMap.Axis regularAxis in map.Axes)
+        {
+            if (regularAxis == null || regularAxis.IsInvasionAxis)
+                continue;
+            int regularTotal = regularAxis.Corridor.Count + 1;
+            int regularConquered = regularAxis.Complete
+                ? regularTotal
+                : Mathf.Clamp(regularAxis.FrontIndex, 0, regularTotal);
+            float regularPartial = regularAxis.Complete
+                ? 0f
+                : GetAxisFrontCaptureProgress(regularAxis.FrontSector, snapshot.AITeam);
+            campaignRegularTotal += regularTotal;
+            campaignRegularConquered += regularConquered;
+            campaignRegularAdvance += Mathf.Clamp(regularConquered + regularPartial, 0f, regularTotal);
+        }
+
         foreach (InvasionAxisMap.Axis axis in map.Axes)
         {
             int total = axis.Corridor.Count + 1;
@@ -75,6 +98,17 @@ public partial class AIShoppingPlanner
                 : GetAxisFrontCaptureProgress(axis.FrontSector, snapshot.AITeam);
             float advance = Mathf.Clamp(conquered + partialFrontProgress, 0f, total);
             float progress = total > 0 ? advance / total : 0f;
+            if (axis.IsInvasionAxis)
+            {
+                // O HQ rival vale o último nó. Antes de tocá-lo, o eixo 4 já reflete toda a
+                // campanha conquistada nos eixos 1..3; 100% continua reservado à queda do HQ.
+                float hqProgress = GetAxisFrontCaptureProgress(axis.FrontSector, snapshot.AITeam);
+                total = campaignRegularTotal + 1;
+                conquered = campaignRegularConquered;
+                partialFrontProgress = hqProgress;
+                advance = Mathf.Clamp(campaignRegularAdvance + hqProgress, 0f, total);
+                progress = total > 0 ? advance / total : 0f;
+            }
             ConstructionSector target = map.GetTransportTargetSector(axis.EixoIndex);
             float depth = 0f;
             if (axis.IsInvasionAxis)
@@ -121,6 +155,7 @@ public partial class AIShoppingPlanner
             result.Axes.Add(new AxisTransportPressureInspection
             {
                 Eixo = axis.EixoIndex,
+                IsInvasionAxis = axis.IsInvasionAxis,
                 Front = axis.FrontSector,
                 Rally = axis.RallySector,
                 Conquered = conquered,
@@ -131,6 +166,7 @@ public partial class AIShoppingPlanner
                 Depth = depth,
                 AssignedTransports = assigned,
                 DesiredTransports = desired,
+                AssignedUnits = CountAxisUnits(snapshot, axis.EixoIndex),
                 Score = score,
             });
             result.Transport += score;
@@ -184,6 +220,17 @@ public partial class AIShoppingPlanner
                 && unit.TryGetUnitData(out UnitData data)
                 && data != null && data.domain == Domain.Land
                 && UnitRoleCompatibility.IsOperationalTransporter(data))
+                count++;
+        return count;
+    }
+
+    private static int CountAxisUnits(AIWorldSnapshot snapshot, int eixo)
+    {
+        int count = 0;
+        if (snapshot?.MyUnits == null)
+            return 0;
+        foreach (UnitManager unit in snapshot.MyUnits)
+            if (unit != null && !unit.IsDead && unit.AIEixo == eixo)
                 count++;
         return count;
     }

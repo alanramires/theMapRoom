@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Tilemaps;
@@ -349,9 +350,24 @@ public class ShoppingPressureWindow : EditorWindow
             if (!string.IsNullOrEmpty(force))
                 detail += $"  ·  força {force}";
 
+            // Composição atual da massa — quem/quantos ja estao no rally.
+            string cap = ExtractRallyReadinessValue(rally.RallyReadinessReason, "cap=");
+            string rupt = ExtractRallyReadinessValue(rally.RallyReadinessReason, "ass=");
+            string air = ExtractRallyReadinessValue(rally.RallyReadinessReason, "airAtk=");
+            string art = ExtractRallyReadinessValue(rally.RallyReadinessReason, "artGlobal=");
+            string composition = string.Join("  ", new[]
+                {
+                    !string.IsNullOrEmpty(cap) ? $"{cap} cap" : null,
+                    !string.IsNullOrEmpty(rupt) ? $"ruptura {rupt}" : null,
+                    !string.IsNullOrEmpty(air) && air != "0" ? $"{air} ar" : null,
+                    !string.IsNullOrEmpty(art) ? $"art {art}" : null,
+                }.Where(s => !string.IsNullOrEmpty(s)));
+
             EditorGUILayout.LabelField(
                 $"  {rally.Sector}: {rally.RallyState}  ·  {detail}",
                 _subtle);
+            if (!string.IsNullOrEmpty(composition))
+                EditorGUILayout.LabelField($"      massa: {composition}", _subtle);
         }
     }
 
@@ -765,12 +781,18 @@ public class ShoppingPressureWindow : EditorWindow
             _subtle);
 
         foreach (AIShoppingPlanner.AxisTransportPressureInspection axis in pressure.Axes)
+        {
+            string axisLabel = axis.IsInvasionAxis ? $"eixo {axis.Eixo} >>" : $"eixo {axis.Eixo}";
+            string axisProgress = axis.IsInvasionAxis
+                ? $"campanha={axis.Advance:F1}/{axis.Total} ({axis.Progress:P0}) alvo={axis.Front} "
+                : $"frente={axis.Front} rally={axis.Rally} avanço={axis.Advance:F1}/{axis.Total} ({axis.Progress:P0}) ";
             EditorGUILayout.LabelField(
-                $"  eixo {axis.Eixo}: frente={axis.Front} rally={axis.Rally} " +
-                $"avanço={axis.Advance:F1}/{axis.Total} ({axis.Progress:P0}) " +
-                $"prof={axis.Depth:F1} trans={axis.AssignedTransports}/{axis.DesiredTransports} " +
+                $"  {axisLabel}: {axisProgress}" +
+                $"prof={axis.Depth:F1} força={axis.AssignedUnits} " +
+                $"trans={axis.AssignedTransports}/{axis.DesiredTransports} " +
                 $"score={axis.Score:F1}",
                 _subtle);
+        }
 
         EditorGUILayout.LabelField(
             $"logística: repair atual={pressure.CurrentRepairUnits} score={pressure.CurrentRepair:F1}  " +
@@ -913,7 +935,8 @@ public class ShoppingPressureWindow : EditorWindow
 
             Rect bar = GUILayoutUtility.GetRect(
                 60f, 16f, GUILayout.Width(120f));
-            EditorGUI.ProgressBar(bar, Mathf.Clamp01(axis.Progress), $"eixo {axis.Eixo}  {axis.Progress:P0}");
+            string axisLabel = axis.IsInvasionAxis ? $"eixo {axis.Eixo} >>" : $"eixo {axis.Eixo}";
+            EditorGUI.ProgressBar(bar, Mathf.Clamp01(axis.Progress), $"{axisLabel}  {axis.Progress:P0}");
 
             Color prev = lineStyle.normal.textColor;
             lineStyle.normal.textColor = SideColor(side);

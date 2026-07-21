@@ -247,6 +247,8 @@ public partial class AIController
             return false;
         bool allowPreventiveMaintenance = IsPreventiveLogisticsAllowed(unit, snapshot, fromCell, paths, occupied);
         bool hasReachableCritical = HasReachableCriticalLogisticsTarget(unit, snapshot, fromCell, paths, occupied);
+        bool mustVacateProducer = IsLogisticsProductionCell(snapshot.AITeam, fromCell)
+            && HasReachableNonProductionLogisticsCell(unit, snapshot, fromCell, paths, occupied);
 
         Vector3Int bestCell = fromCell;
         List<UnitManager> bestTargets = null;
@@ -262,7 +264,7 @@ public partial class AIController
                 Debug.Log($"{TL("Logistics")} {unit.InstanceId} supplySensor agora valid={currentOptions.Count} selected={currentTargets.Count}/{limit} invalid={currentInvalidOptions.Count} " +
                           $"{BuildLogisticsSupplyDebug(unit, currentOptions, currentTargets, currentInvalidOptions, allowPreventiveMaintenance)}");
             }
-            if (currentTargets.Count > 0)
+            if (currentTargets.Count > 0 && !mustVacateProducer)
             {
                 bestTargets = currentTargets;
                 bestScore = ScoreLogisticsSupplyCell(unit, snapshot, fromCell, fromCell, currentTargets, paths, anchor, baseDefense, preferCurrentCell: true);
@@ -279,6 +281,10 @@ public partial class AIController
 
                 Debug.Log($"{TL("Logistics")} {unit.InstanceId} encontrou {currentTargets.Count}/{limit} agora; verifica se andar atende mais alvos" +
                           (preventiveWouldPreemptCritical ? " (critico alcancavel tem prioridade)" : ""));
+            }
+            else if (currentTargets.Count > 0)
+            {
+                Debug.Log($"{TL("Logistics")} {unit.InstanceId} nao atende parado em {fromCell}: desocupa produtora primeiro");
             }
         }
         else if (currentInvalidOptions.Count > 0)
@@ -297,6 +303,9 @@ public partial class AIController
             if (cell == fromCell && bestTargets != null)
                 continue;
             if (cell != fromCell && occupied != null && occupied.Contains(cell))
+                continue;
+            if (IsLogisticsProductionCell(snapshot.AITeam, cell)
+                && (cell != fromCell || mustVacateProducer))
                 continue;
             if (!IsLogisticsServiceCellAllowed(unit, snapshot, cell))
                 continue;
@@ -637,6 +646,8 @@ public partial class AIController
         bool allowPreventiveMaintenance = IsPreventiveLogisticsAllowed(unit, snapshot, fromCell, paths, occupied);
         if (paths == null || paths.Count == 0)
             return false;
+        bool mustVacateProducer = IsLogisticsProductionCell(snapshot.AITeam, fromCell)
+            && HasReachableNonProductionLogisticsCell(unit, snapshot, fromCell, paths, occupied);
 
         Vector3Int anchor = ResolveLogisticsAnchor(snapshot, fromCell);
         Vector3Int bestCell = fromCell;
@@ -659,6 +670,9 @@ public partial class AIController
                 Vector3Int cell = rawCell;
                 cell.z = 0;
                 if (cell != fromCell && occupied != null && occupied.Contains(cell))
+                    continue;
+                if (IsLogisticsProductionCell(snapshot.AITeam, cell)
+                    && (cell != fromCell || mustVacateProducer))
                     continue;
                 if (!IsLogisticsServiceCellAllowed(unit, snapshot, cell))
                     continue;

@@ -12,6 +12,11 @@ public partial class AIController
     private const int RallyArtilleryRadius = 4;
     private const int RallyMinimumArtillery = 3;
     private const int RallyMinimumLocalLaunchArtillery = 3;
+    // Valvula de ruptura esmagadora: quando o pacote de assalto e tao maior que o
+    // necessario que o amaciamento de artilharia vira redundante, o rally GREENA sem
+    // esperar a cota de artilharia (que num mapa sem peca pesada pode nunca fechar).
+    // A artilharia continua sendo demandada/comprada e se junta ao ataque depois.
+    private const int RallyOverwhelmingBreakthroughFloor = 5;
     private const int RallyArtilleryRecruitRange = 8;
     private const int RallyMaximumArtilleryUnits = 12;
     private const int RallyInfantryTransportDistance = 7;
@@ -54,7 +59,7 @@ public partial class AIController
     {
         public bool Held;
         public int Capturers;
-        public int Assault;
+        public float Assault;
         public int AirAttack;
         public float Artillery;
         public float LocalArtillery;
@@ -80,7 +85,7 @@ public partial class AIController
     {
         public int HeldRallies;
         public int Capturers;
-        public int Assault;
+        public float Assault;
         public int AirAttack;
         public float Artillery;
         public int Intel;
@@ -247,7 +252,7 @@ public partial class AIController
             $"held={readiness.Held} rallies={readiness.HeldRallies} focus={readiness.FocusSector} " +
             $"artGlobal={readiness.Artillery:0.#}/{readiness.RequiredArtillery} " +
             $"artLocal={readiness.LocalArtillery:0.#} cap={readiness.Capturers} " +
-            $"ass={readiness.Assault} airAtk={readiness.AirAttack} intel={readiness.Intel} log={readiness.Logistics} " +
+            $"ass={readiness.Assault:0.#} airAtk={readiness.AirAttack} intel={readiness.Intel} log={readiness.Logistics} " +
             $"threat={readiness.VisibleThreats} knownEnemy={readiness.KnownEnemyForce} " +
             $"packages={readiness.RequiredPackages} force={readiness.ForceScore}/{readiness.RequiredForce} " +
             $"rallyState={readiness.State} goGreen={readiness.GoGreen} timeout={readiness.Timeout} " +
@@ -289,8 +294,10 @@ public partial class AIController
             unitCell.z = 0;
             float dist = SectorManager.HexDistance(anchor, unitCell);
 
-            bool capturer = HasRole(data, UnitRole.Capturador);
-            bool assault = IsRallyPrimaryAssaultUnit(data);
+            // Cota de capturador do GoGreen conta pela SKILL "Captura Construcoes", nao por
+            // papel/classe: qualquer unidade portadora (hoje Soldado/Bazooka/Metranca; amanha
+            // um zepelim capturador) conta. Nao mexe no gate real de captura (PodeCapturarSensor).
+            bool capturer = HasRallyCaptureSkill(data);
             bool airAttack = IsOperationalRallyAirAttackUnit(unit, data);
             float artillery = GetRallyArtilleryWeight(data);
             bool intelUnit = HasRole(data, UnitRole.Intel);
@@ -300,8 +307,7 @@ public partial class AIController
             {
                 if (capturer)
                     readiness.Capturers++;
-                if (assault)
-                    readiness.Assault++;
+                readiness.Assault += GetRallyAssaultWeight(data);
             }
 
             // Ataque aéreo conta num raio maior (5h — aviões reposicionam rápido), mas ainda por
@@ -351,9 +357,9 @@ public partial class AIController
             + (readiness.RequiredPackages * 3)
             + (readiness.RequiredArtillery * 2);
 
-        int breakthrough = readiness.Assault + readiness.AirAttack;
+        float breakthrough = readiness.Assault + readiness.AirAttack;
         float usefulArtillery = Mathf.Min(readiness.Artillery, readiness.RequiredArtillery);
-        readiness.ForceScore = readiness.Capturers + (breakthrough * 3)
+        readiness.ForceScore = readiness.Capturers + Mathf.RoundToInt(breakthrough * 3f)
             + Mathf.RoundToInt(usefulArtillery * 2f);
         readiness.Timeout = startedTurn >= 0 && turnNumber >= 0
             && turnNumber - startedTurn >= RallyAssemblyTimeoutTurns;
@@ -378,8 +384,16 @@ public partial class AIController
         // massa combinada satisfaz os mínimos, OU domínio macro, OU vantagem numérica >= 2:1.
         int friendlyForce = CountLiveUnitsOfTeam(aiTeam);
         bool numericalDominance = friendlyForce >= 2 * Mathf.Max(1, readiness.KnownEnemyForce);
+        // Ruptura esmagadora: hold package completo (inclui >=1 capturador) e pacote de
+        // assalto no minimo DOBRO do necessario pro inimigo conhecido. Massa dessa dimensao
+        // nao deve congelar esperando artilharia — invade e a artilharia chega depois.
+        bool overwhelmingBreakthrough = hasHoldPackage
+            && breakthrough >= Mathf.Max(RallyOverwhelmingBreakthroughFloor, readiness.RequiredPackages * 2);
         readiness.GoGreen = readiness.Held
-            && ((hasHoldPackage && hasRequiredForce && hasArtillery) || macroDominating || numericalDominance);
+            && ((hasHoldPackage && hasRequiredForce && hasArtillery)
+                || macroDominating
+                || numericalDominance
+                || overwhelmingBreakthrough);
 
         if (!readiness.Held)
         {
@@ -390,9 +404,15 @@ public partial class AIController
         else if (readiness.GoGreen)
         {
             readiness.State = AIRallyAssemblyState.GoGreen;
-            readiness.Status = numericalDominance && !(hasHoldPackage && hasRequiredForce && hasArtillery)
-                ? $"GO_GREEN(2:1 {friendlyForce}v{readiness.KnownEnemyForce})"
-                : "GO_GREEN";
+            bool fullComposition = hasHoldPackage && hasRequiredForce && hasArtillery;
+            if (fullComposition)
+                readiness.Status = "GO_GREEN";
+            else if (numericalDominance)
+                readiness.Status = $"GO_GREEN(2:1 {friendlyForce}v{readiness.KnownEnemyForce})";
+            else if (overwhelmingBreakthrough)
+                readiness.Status = $"GO_GREEN(ruptura {breakthrough}x sem art)";
+            else
+                readiness.Status = "GO_GREEN(macro)";
             readiness.Missing = "-";
         }
         else if (hasHoldPackage && hasArtillery)
@@ -495,10 +515,10 @@ public partial class AIController
                 nearLogistics |= distance <= RallyLogisticsRadius;
             }
 
-            if (nearForce && HasRole(data, UnitRole.Capturador))
+            if (nearForce && HasRallyCaptureSkill(data))
                 aggregate.Capturers++;
-            if (nearForce && IsRallyPrimaryAssaultUnit(data))
-                aggregate.Assault++;
+            if (nearForce)
+                aggregate.Assault += GetRallyAssaultWeight(data);
             if (nearAir && IsOperationalRallyAirAttackUnit(unit, data))
                 aggregate.AirAttack++;
             if (nearArtillery)
@@ -530,7 +550,7 @@ public partial class AIController
             float distance = SectorManager.HexDistance(anchor, cell);
             if (distance <= RallyAssemblyForceRadius)
             {
-                if (HasRole(data, UnitRole.Capturador)) score += 100f;
+                if (HasRallyCaptureSkill(data)) score += 100f;
                 if (IsRallyPrimaryAssaultUnit(data)) score += 300f;
             }
             if (distance <= RallyArtilleryRadius)
@@ -620,11 +640,11 @@ public partial class AIController
         {
             if (readiness.Capturers < 1)
                 missing += $"cap({readiness.Capturers}/1)";
-            int breakthrough = readiness.Assault + readiness.AirAttack;
+            float breakthrough = readiness.Assault + readiness.AirAttack;
             if (breakthrough < readiness.RequiredPackages)
                 missing += string.IsNullOrEmpty(missing)
-                    ? $"ruptura({breakthrough}/{readiness.RequiredPackages})"
-                    : $"+ruptura({breakthrough}/{readiness.RequiredPackages})";
+                    ? $"ruptura({breakthrough:0.#}/{readiness.RequiredPackages})"
+                    : $"+ruptura({breakthrough:0.#}/{readiness.RequiredPackages})";
         }
         if (!hasArtillery)
             missing += string.IsNullOrEmpty(missing)
@@ -674,7 +694,7 @@ public partial class AIController
         obj.RallyState = readiness.State;
         obj.RallyReadinessReason =
             $"{readiness.Status} ready={readiness.ForceScore} cap={readiness.Capturers} " +
-            $"ass={readiness.Assault} airAtk={readiness.AirAttack} " +
+            $"ass={readiness.Assault:0.#} airAtk={readiness.AirAttack} " +
             $"artGlobal={readiness.Artillery:0.#}/{readiness.RequiredArtillery} " +
             $"artLocal={readiness.LocalArtillery:0.#} rallies={readiness.HeldRallies} " +
             $"focus={readiness.FocusSector} intel={readiness.Intel} log={readiness.Logistics} " +
@@ -760,6 +780,8 @@ public partial class AIController
         // eixo (invasão) não apareceria após o load para um objetivo restaurado como CaptureSector.
         MarkEnemyBaseObjectivesAsInvasion(plan, aiTeam);
         currentAxisMap = InvasionAxisMap.Build(aiTeam);
+        if (GetGoGreenInvasionForInspection(aiTeam, turnNumber).Active)
+            AssignUnslottedUnitsToGoGreenInvasion(plan, aiTeam);
         var slottedIds = new HashSet<int>();
         int restored = 0;
         int unavailable = 0;
@@ -1303,6 +1325,7 @@ public partial class AIController
             Debug.Log($"{TL("Plan")} invasão FRACASSOU (" +
                 (collapse ? "colapso: 0 assalto vivo na força" : $"estagnação: {mon.StallCounter}T sem progresso, best={mon.BestDistance}h") +
                 ") -> libera re-montagem (2ª onda); frente mantém posição");
+            ReleaseGoGreenFallbackAssignments(plan, aiTeam);
             ClearGoGreenTurnsForTeam(aiTeam);   // solta supressão -> rallies reabrem montagem
             invasionMonitors.Remove(aiTeam);
             // Zera o marcador de GoGreen dos objetivos pra que a 2ª onda registre um GoGreen LIMPO
@@ -1722,6 +1745,36 @@ public partial class AIController
     private static bool HasRole(UnitData data, UnitRole role)
     {
         return data != null && data.roles != null && data.roles.Contains(role);
+    }
+
+    // Portadora da skill "Captura Construcoes" (id capturaConstrucoes). Marcador exclusivo
+    // da CONTAGEM de capturador do rally/GoGreen — desacopla essa cota de papel/classe e
+    // deixa qualquer futura unidade portadora contar. Nao afeta o gate real de captura.
+    private const string RallyCaptureSkillId = "capturaConstrucoes";
+    private static bool HasRallyCaptureSkill(UnitData data)
+    {
+        if (data == null || data.skills == null)
+            return false;
+        for (int i = 0; i < data.skills.Count; i++)
+        {
+            SkillData skill = data.skills[i];
+            if (skill != null && string.Equals(skill.id, RallyCaptureSkillId, System.StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+        return false;
+    }
+
+    // Peso de RUPTURA de uma unidade de assalto (0 se nao for assalto primario). Como a
+    // artilharia, ruptura conta por PESO, nao por cabeca: um MBT (blindado pesado) rompe por
+    // mais de um tankinho. Base pela armadura + refino por elite.
+    //   Tanque Leve (Medium, elite 0) = 1.0   |  MBT (Heavy, elite 1) = 2.5  |  Pesado (Heavy, elite 2) = 3.0
+    private static float GetRallyAssaultWeight(UnitData data)
+    {
+        if (!IsRallyPrimaryAssaultUnit(data))
+            return 0f;
+        float weight = data.ArmorClass >= ArmorClass.Heavy ? 2f : 1f;
+        weight += 0.5f * Mathf.Clamp(data.eliteLevel, 0, 2);
+        return weight;
     }
 
     private static string NormalizeRallyUnitKey(string value)

@@ -42,6 +42,9 @@ public class SlotNeed
     public UnitRole Role;
     public bool     Filled;
     public int      AssignedUnitId = -1;
+    // Slot temporário criado para suspender o papel rogue durante uma operação Go Green.
+    // É liberado se a invasão fracassar e voltar ao reassembly; slots formais são preservados.
+    public bool     GoGreenFallbackAssignment;
     // PM reais (terreno) da unidade até o objetivo; -1 = desconhecido.
     // Unidades embarcadas propagam a posição do transportador.
     public int      DistanceToObjective = -1;
@@ -263,7 +266,8 @@ public class ObjectiveManager : MonoBehaviour
                             {
                                 role = (int)slot.Role,
                                 filled = slot.Filled,
-                                assignedUnitId = slot.AssignedUnitId
+                                assignedUnitId = slot.AssignedUnitId,
+                                goGreenFallbackAssignment = slot.GoGreenFallbackAssignment
                             });
                         }
                     }
@@ -357,7 +361,8 @@ public class ObjectiveManager : MonoBehaviour
                             {
                                 Role = (UnitRole)savedSlot.role,
                                 Filled = savedSlot.filled,
-                                AssignedUnitId = savedSlot.assignedUnitId
+                                AssignedUnitId = savedSlot.assignedUnitId,
+                                GoGreenFallbackAssignment = savedSlot.goGreenFallbackAssignment
                             });
                         }
                     }

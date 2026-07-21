@@ -1013,6 +1013,8 @@ public partial class TurnStateManager
 
         float spawnInterval = GetSupplySpawnInterval();
         float flightPadding = GetSupplyFlightPadding();
+        bool renderAboveFog = matchController != null
+            && matchController.ShouldPromoteActiveAiActionFxAboveFog();
 
         foreach (KeyValuePair<SupplyData, int> pair in movedBySupply)
         {
@@ -1021,7 +1023,11 @@ public partial class TurnStateManager
             if (supply == null || moved <= 0)
                 continue;
 
-            float duration = animationManager.PlayServiceProjectileStraight(sourcePos, destinationPos, supply.spriteDefault);
+            float duration = animationManager.PlayServiceProjectileStraight(
+                sourcePos,
+                destinationPos,
+                supply.spriteDefault,
+                renderAboveFog);
             if (spawnInterval > 0f)
                 yield return new WaitForSeconds(spawnInterval);
             if (duration > 0f)

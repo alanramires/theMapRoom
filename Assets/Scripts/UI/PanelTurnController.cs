@@ -154,6 +154,25 @@ public class PanelTurnController : MonoBehaviour
         float percent0 = stats0 != null ? Mathf.Clamp(stats0.territoryControlPercent, 0f, 100f) : 0f;
         float percent1 = stats1 != null ? Mathf.Clamp(stats1.territoryControlPercent, 0f, 100f) : 0f;
 
+        // Em partida de dois lados sem nenhuma construção neutra, toda a barra pertence a um dos
+        // dois times. Pontos já retirados do dono por captura parcial migram para o adversário,
+        // mesmo se o cache de ocupação não conseguiu identificar o capturador naquele frame.
+        // Isso evita uma faixa cinza falsa entre os lados durante a captura de prédio inimigo.
+        if (!HasNeutralCapturableConstruction()
+            && stats0 != null && stats1 != null
+            && stats0.totalCapturePointsMax > 0)
+        {
+            int unclaimedFromTeam0 = Mathf.Max(0,
+                stats0.contestedOwnedCapturePoints - stats1.contestingCapturePoints);
+            int unclaimedFromTeam1 = Mathf.Max(0,
+                stats1.contestedOwnedCapturePoints - stats0.contestingCapturePoints);
+            float totalPoints = stats0.totalCapturePointsMax;
+            percent0 = Mathf.Clamp((stats0.controlledCapturePoints + unclaimedFromTeam1)
+                * 100f / totalPoints, 0f, 100f);
+            percent1 = Mathf.Clamp((stats1.controlledCapturePoints + unclaimedFromTeam0)
+                * 100f / totalPoints, 0f, 100f);
+        }
+
         // Arredondamentos e territórios contestados podem fazer a soma passar de 100.
         // Normalizamos apenas a apresentação; a fonte estatística permanece intacta.
         float ownedTotal = percent0 + percent1;
@@ -185,6 +204,17 @@ public class PanelTurnController : MonoBehaviour
         SetHorizontalSegment(neutralBar, 0f, 1f);
         SetHorizontalSegment(slot0Bar, 0f, percent0 / 100f);
         SetHorizontalSegment(slot1Bar, 1f - percent1 / 100f, 1f);
+    }
+
+    private static bool HasNeutralCapturableConstruction()
+    {
+        foreach (ConstructionManager construction in ConstructionManager.AllActive)
+            if (construction != null
+                && construction.IsCapturable
+                && construction.CapturePointsMax > 0
+                && construction.TeamId == TeamId.Neutral)
+                return true;
+        return false;
     }
 
     private static void SetHorizontalSegment(Image image, float min, float max)

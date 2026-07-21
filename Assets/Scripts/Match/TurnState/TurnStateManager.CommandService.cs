@@ -587,7 +587,11 @@ public partial class TurnStateManager
                         ? sourceConstruction.transform.position
                         : sourceSupplierUnit.transform.position;
                     float flightDuration = animationManager != null
-                        ? animationManager.PlayServiceProjectileStraight(sourceWorld, target.transform.position, service.spriteDefault)
+                        ? animationManager.PlayServiceProjectileStraight(
+                            sourceWorld,
+                            target.transform.position,
+                            service.spriteDefault,
+                            matchController != null && matchController.ShouldPromoteActiveAiActionFxAboveFog())
                         : 0f;
                     float spawnInterval = GetSupplySpawnInterval();
                     if (spawnInterval > 0f)

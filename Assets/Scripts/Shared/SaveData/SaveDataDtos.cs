@@ -203,6 +203,7 @@ public class AISlotNeedSaveData
     public int role;
     public bool filled;
     public int assignedUnitId = -1;
+    public bool goGreenFallbackAssignment;
 }
 
 [Serializable]

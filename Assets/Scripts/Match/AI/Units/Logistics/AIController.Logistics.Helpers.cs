@@ -328,9 +328,43 @@ public partial class AIController
         if (snapshot == null)
             return false;
 
+        return IsLogisticsProductionCell(snapshot.AITeam, cell);
+    }
+
+    private bool IsLogisticsProductionCell(TeamId aiTeam, Vector3Int cell)
+    {
+
         cell.z = 0;
         ConstructionManager construction = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, cell);
-        return construction != null && construction.CanProduceUnitsForTeam(snapshot.AITeam);
+        return construction != null && construction.CanProduceUnitsForTeam(aiTeam);
+    }
+
+    private bool HasReachableNonProductionLogisticsCell(
+        UnitManager logistics,
+        AIWorldSnapshot snapshot,
+        Vector3Int fromCell,
+        Dictionary<Vector3Int, List<Vector3Int>> paths,
+        HashSet<Vector3Int> occupied)
+    {
+        if (logistics == null || snapshot == null || paths == null)
+            return false;
+
+        foreach (Vector3Int rawCell in paths.Keys)
+        {
+            Vector3Int cell = rawCell;
+            cell.z = 0;
+            if (cell == fromCell)
+                continue;
+            if (occupied != null && occupied.Contains(cell))
+                continue;
+            if (IsLogisticsProductionCell(snapshot.AITeam, cell))
+                continue;
+            if (!IsLogisticsServiceCellAllowed(logistics, snapshot, cell))
+                continue;
+            return true;
+        }
+
+        return false;
     }
 
     private float CalculateLogisticsRearAreaScore(UnitManager unit, AIWorldSnapshot snapshot, Vector3Int cell, Vector3Int anchor)

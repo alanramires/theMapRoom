@@ -137,8 +137,8 @@ public class UnitManager : MonoBehaviour
     [SerializeField] private int aiAssignedPlanRole = 0;
     [SerializeField] private bool aiAssignedPlanBadgeVisible;
     [Header("AI Eixo Runtime")]
-    [Tooltip("Eixo de invasão ao qual a unidade pertence: 1, 2 ou 3. 0 = nenhum (rogue / fora de eixo).")]
-    [Range(0, 3)]
+    [Tooltip("Eixo ao qual a unidade pertence: 1, 2 ou 3 = eixos regulares; 4 = invasão final. 0 = nenhum (rogue / fora de eixo).")]
+    [Range(0, 4)]
     [SerializeField] private int aiEixo = 0;
     [Header("AI Stance Runtime")]
     [SerializeField] private bool aiHasStance;
@@ -233,7 +233,7 @@ public class UnitManager : MonoBehaviour
     public int AIEixo => aiEixo;
     public void SetAIEixo(int eixo)
     {
-        aiEixo = Mathf.Clamp(eixo, 0, 3);
+        aiEixo = Mathf.Clamp(eixo, 0, 4);
         RefreshAIAssignedPlanBadge();
     }
     public UnitCombatClassification CombatClassification
