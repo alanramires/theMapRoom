@@ -1333,7 +1333,7 @@ public partial class TurnStateManager : MonoBehaviour
         selectedUnit = null;
         ExecuteAndReset("ClearSelectionAndReturnToNeutral");
         ClearMovementRange();
-        ClearCommittedMovement();
+        ClearCommittedMovement(preserveConfirmedFogVisibility: keepPreparedFuelCost);
     }
     private void CommitTemporaryTakeoffSelectionState(bool markTookOff = false)
     {
@@ -2453,9 +2453,9 @@ public partial class TurnStateManager : MonoBehaviour
         return null;
     }
 
-    private void ClearCommittedMovement()
+    private void ClearCommittedMovement(bool preserveConfirmedFogVisibility = false)
     {
-        ClearTemporaryFogTraversalVisual();
+        ClearTemporaryFogTraversalVisual(restorePreviousDetectionVisibility: !preserveConfirmedFogVisibility);
         committedMovementPath.Clear();
         committedOriginCell = Vector3Int.zero;
         committedDestinationCell = Vector3Int.zero;
@@ -2468,7 +2468,10 @@ public partial class TurnStateManager : MonoBehaviour
     private void SetTemporaryFogTraversalUnit(UnitManager unit)
     {
         if (temporaryFogTraversalUnit != null && temporaryFogTraversalUnit != unit)
+        {
             temporaryFogTraversalUnit.EndTemporaryFogTraversalVisual();
+            temporaryFogTraversalUnit.EndTemporaryFogDetectionPresentation(restorePreviousVisibility: true);
+        }
         temporaryFogTraversalUnit = unit;
         bool showActionToObserver = matchController == null
             || !matchController.ShouldHideActiveAiActionPresentation();
@@ -2479,10 +2482,13 @@ public partial class TurnStateManager : MonoBehaviour
         }
     }
 
-    private void ClearTemporaryFogTraversalVisual()
+    private void ClearTemporaryFogTraversalVisual(bool restorePreviousDetectionVisibility = true)
     {
         if (temporaryFogTraversalUnit != null)
-            temporaryFogTraversalUnit.EndTemporaryFogTraversalVisual();
+        {
+            temporaryFogTraversalUnit.EndTemporaryFogTraversalVisual(restorePreviousDetectionVisibility);
+            temporaryFogTraversalUnit.EndTemporaryFogDetectionPresentation(restorePreviousDetectionVisibility);
+        }
         pathManager?.EndTemporaryFogTraversalVisual();
         temporaryFogTraversalUnit = null;
     }

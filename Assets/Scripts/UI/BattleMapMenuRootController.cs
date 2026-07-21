@@ -447,12 +447,14 @@ public class BattleMapMenuRootController : MonoBehaviour
                 return false;
 
             bool aiTurn = matchController != null && matchController.IsPlayerInputLockedByActiveAI();
+            bool developerPausedAiTurn = aiTurn && AIController.IsDebugPaused;
 
             // Durante o turno da IA, o clique direito NUNCA abre nem agenda o menu — mesmo sendo o
-            // equivalente do ESC. So o ESC/Backspace pode pausar a simulacao e abrir. Sem esta guarda,
+            // equivalente do ESC. So o ESC/Backspace pode pausar a simulacao e abrir. A excecao e a
+            // pausa de desenvolvedor (F10), que libera ESC e Rclick para inspecionar o menu. Sem esta guarda,
             // um Rclick numa janela Neutral entre batches da IA (CanOpenMenuNow() == true) cairia
             // direto no OpenMenu() logo abaixo.
-            if (aiTurn && !cancelShortcut)
+            if (aiTurn && !developerPausedAiTurn && !cancelShortcut)
                 return false;
 
             if (!CanOpenMenuNow())

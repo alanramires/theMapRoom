@@ -21,6 +21,11 @@ public class UnitHudController : MonoBehaviour
     [Header("HP")]
     [SerializeField] private Image hpStateImage;
     [SerializeField] private TMP_Text hpText;
+    // Posicao de repouso do coracao e do numero, capturada na primeira vez que a
+    // coabitacao desloca o HUD. Sem isso, deslocamentos sucessivos acumulariam.
+    private Vector3 hpBaseLocalPosition;
+    private Vector3 hpTextBaseLocalPosition;
+    private bool hasHudCohabitationBase;
     [SerializeField] private Sprite heartSprite;
     [SerializeField] private Sprite halfHeartSprite;
     [SerializeField] private Sprite emptyHeartSprite;
@@ -831,6 +836,48 @@ public class UnitHudController : MonoBehaviour
 
         renderer.sortingLayerID = sortingLayerId;
         renderer.sortingOrder = sortingOrder;
+    }
+
+    // Desce (ou sobe) coracao e numero de HP enquanto a unidade divide o hex, para
+    // achatar a ficha: com varios andares ocupados o espaco vertical de cada unidade
+    // encolhe e o HUD precisa encostar no sprite. Os dois andam juntos e so no eixo
+    // Y — sao irmaos na hierarquia, entao um deslocamento so descreve o par.
+    internal void ApplyCohabitationHudOffset(float offsetY)
+    {
+        CaptureHudCohabitationBase();
+        if (!hasHudCohabitationBase)
+            return;
+
+        Vector3 delta = new Vector3(0f, offsetY, 0f);
+        if (hpStateImage != null)
+            hpStateImage.transform.localPosition = hpBaseLocalPosition + delta;
+        if (hpText != null)
+            hpText.transform.localPosition = hpTextBaseLocalPosition + delta;
+    }
+
+    internal void ClearCohabitationHudOffset()
+    {
+        if (!hasHudCohabitationBase)
+            return;
+
+        if (hpStateImage != null)
+            hpStateImage.transform.localPosition = hpBaseLocalPosition;
+        if (hpText != null)
+            hpText.transform.localPosition = hpTextBaseLocalPosition;
+    }
+
+    private void CaptureHudCohabitationBase()
+    {
+        if (hasHudCohabitationBase)
+            return;
+        if (hpStateImage == null && hpText == null)
+            return;
+
+        if (hpStateImage != null)
+            hpBaseLocalPosition = hpStateImage.transform.localPosition;
+        if (hpText != null)
+            hpTextBaseLocalPosition = hpText.transform.localPosition;
+        hasHudCohabitationBase = true;
     }
 
     private static Transform FindChildRecursive(Transform parent, string childName)

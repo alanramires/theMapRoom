@@ -83,6 +83,8 @@ public class UnitManager : MonoBehaviour
     [SerializeField, HideInInspector] private bool isPreviewDimmed;
     [SerializeField, HideInInspector] private bool hasTemporarySortingOverride;
     [System.NonSerialized] private bool temporaryFogTraversalVisual;
+    [System.NonSerialized] private bool temporaryFogDetectionPresentation;
+    [System.NonSerialized] private bool temporaryFogDetectionWasHidden;
     [System.NonSerialized] private int temporaryFogSpriteLayerId;
     [System.NonSerialized] private int temporaryFogSpriteOrder;
     [System.NonSerialized] private bool temporaryFogWasHidden;
@@ -200,6 +202,7 @@ public class UnitManager : MonoBehaviour
     public bool IsEmbarkedVisualPreviewActive => embarkedVisualPreviewDepth > 0;
     public bool IsSelected => isSelected;
     public bool IsHiddenByFogOfWar => hiddenByFogOfWar;
+    public bool IsTemporaryFogDetectionPresentationActive => temporaryFogDetectionPresentation;
     public UnitDatabase UnitDatabase => unitDatabase;
     public bool IsAircraftGrounded => GetAircraftType() != AircraftType.None && currentDomain != Domain.Air;
     public bool IsAircraftEmbarkedInCarrier => isEmbarked;
@@ -901,7 +904,7 @@ public class UnitManager : MonoBehaviour
         ApplyFogOfWarVisibility();
     }
 
-    public void EndTemporaryFogTraversalVisual()
+    public void EndTemporaryFogTraversalVisual(bool restorePreviousVisibility = true)
     {
         if (!temporaryFogTraversalVisual) return;
         if (spriteRenderer != null)
@@ -920,11 +923,41 @@ public class UnitManager : MonoBehaviour
             }
         }
         temporaryFogTraversalVisual = false;
-        hiddenByFogOfWar = temporaryFogWasHidden;
+        if (restorePreviousVisibility)
+            hiddenByFogOfWar = temporaryFogWasHidden;
         ApplyFogOfWarVisibility();
         temporaryFogHudCanvases = null;
         temporaryFogHudLayerIds = null;
         temporaryFogHudOrders = null;
+    }
+
+    /// <summary>
+    /// Mantem sprite e HUD coerentes depois que uma unidade em movimento cruza uma
+    /// area onde a apresentacao provisoria confirmou sua deteccao. Nao altera cache,
+    /// memoria ou verdade confirmada do FOW.
+    /// </summary>
+    public void BeginTemporaryFogDetectionPresentation()
+    {
+        if (temporaryFogDetectionPresentation)
+            return;
+
+        temporaryFogDetectionPresentation = true;
+        temporaryFogDetectionWasHidden = hiddenByFogOfWar;
+        hiddenByFogOfWar = false;
+        ApplyFogOfWarVisibility();
+    }
+
+    public void EndTemporaryFogDetectionPresentation(bool restorePreviousVisibility)
+    {
+        if (!temporaryFogDetectionPresentation)
+            return;
+
+        temporaryFogDetectionPresentation = false;
+        if (restorePreviousVisibility)
+        {
+            hiddenByFogOfWar = temporaryFogDetectionWasHidden;
+            ApplyFogOfWarVisibility();
+        }
     }
 
     public void MarkAsActed()
@@ -2498,7 +2531,10 @@ public class UnitManager : MonoBehaviour
         currentPosition = snapped;
     }
 
-    internal void ApplyCohabitationVisual(Vector3 positionOffset, Vector3 scale)
+    internal void ApplyCohabitationVisual(
+        Vector3 positionOffset,
+        Vector3 scale,
+        float hudOffsetY)
     {
         if (!_hasCohabitationVisual)
             _cohabitationPreScale = transform.localScale;
@@ -2506,6 +2542,8 @@ public class UnitManager : MonoBehaviour
         _cohabitationOffset = positionOffset;
         transform.localScale = scale;
         SnapToCellCenter();
+        if (unitHud != null)
+            unitHud.ApplyCohabitationHudOffset(hudOffsetY);
     }
 
     internal void ClearCohabitationVisual()
@@ -2516,6 +2554,8 @@ public class UnitManager : MonoBehaviour
         transform.localScale = _cohabitationPreScale;
         _cohabitationOffset = Vector3.zero;
         SnapToCellCenter();
+        if (unitHud != null)
+            unitHud.ClearCohabitationHudOffset();
     }
 
     public void PullCellFromTransform()

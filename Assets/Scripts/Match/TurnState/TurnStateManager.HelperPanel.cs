@@ -80,6 +80,7 @@ public partial class TurnStateManager
         public Sprite AimConfirmTargetSprite;
         public Color AimConfirmTargetColor = Color.white;
         public int AimConfirmHp;
+        public string AimConfirmWeaponName;
         public string AimConfirmTerrainLabel;
         public Sprite AimConfirmLocalSprite;
         public Color AimConfirmLocalColor = Color.white;
@@ -581,8 +582,15 @@ public partial class TurnStateManager
             data.Kind = HelperPanelKind.AimConfirm;
             if (scannerSelectedTargetIndex >= 0 && scannerSelectedTargetIndex < cachedMirandoSelectionEntries.Count)
             {
-                UnitManager target = cachedMirandoSelectionEntries[scannerSelectedTargetIndex].TargetUnit;
+                MirandoSelectionEntry selectedEntry = cachedMirandoSelectionEntries[scannerSelectedTargetIndex];
+                UnitManager target = selectedEntry.TargetUnit;
+                WeaponData selectedWeapon = selectedEntry.isValid
+                    ? selectedEntry.validOption != null ? selectedEntry.validOption.weapon : null
+                    : selectedEntry.invalidOption != null ? selectedEntry.invalidOption.weapon : null;
                 data.AimConfirmTargetName = target != null ? ResolveDebugUnitName(target) : "Alvo";
+                data.AimConfirmWeaponName = selectedWeapon != null
+                    ? ResolveWeaponName(selectedWeapon, "Arma")
+                    : string.Empty;
                 if (target != null)
                 {
                     Vector3Int targetCell = target.CurrentCellPosition;

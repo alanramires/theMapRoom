@@ -946,8 +946,11 @@ public class MatchController : MonoBehaviour
         RecomputeTeamFlips();
         ResetUnfundedStartMoneyFlagsForFreshMatch();
         ApplyActiveTeamIfChanged(force: true);
+        // AI vs AI possui um observador, nao uma perspectiva de debug parcial.
+        // Mantem o mesmo FOW Total usado pelo jogador humano; apenas a apresentacao
+        // temporaria da acao ativa e promovida acima da nevoa.
         if (AreAllPlayerSlotsAI())
-            SetFogOfWarDebugPartial();
+            SetFogOfWarDebugEnabled(true);
         TryAutoAssignTurnTransitionReferences();
         hotSeatGateActive = false;
         matchMusicAudioManager?.PrepareForMatchStart(forceRestartPlayback: true);
@@ -4822,14 +4825,32 @@ public class MatchController : MonoBehaviour
         return ShouldUseHumanFogPresentation(out _);
     }
 
+    /// <summary>
+    /// Indica que a acao do participante ativo pode ser apresentada ao observador
+    /// desta maquina acima do FOW. A origem dos comandos (humano, AI ou futuramente
+    /// jogador remoto/replay) e deliberadamente separada desta politica visual.
+    /// </summary>
+    public bool ShouldPresentActiveActionToLocalObserver()
+    {
+        if (!Application.isPlaying || !debugFogOfWarEnabled || !enableTotalWar)
+            return false;
+        if (gameSetup != GameSetupPreset.FogOfWarTotal || activeTeamId < 0
+            || !Enum.IsDefined(typeof(TeamId), activeTeamId))
+            return false;
+
+        TeamId activeTeam = (TeamId)activeTeamId;
+        if (!IsPlayerAI(activeTeam))
+            return true;
+
+        // Sem jogador humano local, a partida AI vs AI possui um observador neutro
+        // autorizado a acompanhar a acao do time ativo. Um futuro RemotePlayer pode
+        // entrar aqui por sua propria politica, sem ser rotulado como AI.
+        return !AnyHumanPlayerExists();
+    }
+
     public bool ShouldPromoteActiveAiActionFxAboveFog()
     {
-        return Application.isPlaying
-            && debugFogOfWarEnabled
-            && enableTotalWar
-            && gameSetup == GameSetupPreset.FogOfWarTotal
-            && IsActiveTeamAI()
-            && !AnyHumanPlayerExists();
+        return IsActiveTeamAI() && ShouldPresentActiveActionToLocalObserver();
     }
 
     private bool ShouldUseHumanFogPresentation(out TeamId presentationTeam)
@@ -5170,7 +5191,10 @@ public class MatchController : MonoBehaviour
         bool playerTurn = activeTeamId >= 0
             && Enum.IsDefined(typeof(TeamId), activeTeamId)
             && !IsPlayerAI((TeamId)activeTeamId);
-        cursorController?.ApplyFogOfWarSorting(playerTurn);
+        bool showCursorAboveFog = ShouldPresentActiveActionToLocalObserver();
+        cursorController?.ApplyFogOfWarSorting(showCursorAboveFog);
+        // Range map continua sendo uma ferramenta do turno humano. O observador de
+        // AI vs AI acompanha cursor e acao executada, nao o planejamento interno.
         turnStateManager?.ApplyMovementRangeFogOfWarSorting(playerTurn);
 
         if (fogSortingLayerValidated)
@@ -5278,6 +5302,24 @@ public class MatchController : MonoBehaviour
         {
             int cacheIndex = ResolveFogCacheIndex(unit);
             logicallyVisible = snapshot.unitVisibility.TryGetValue(cacheIndex, out bool visible) && visible;
+
+            Vector3Int currentCell = unit.CurrentCellPosition;
+            currentCell.z = 0;
+            if (!logicallyVisible
+                && snapshot.visibleCells.Contains(currentCell)
+                && ComputeIsUnitVisibleForTeamWithoutCache(unit, observerTeam))
+            {
+                // A consulta usa a posicao apenas para a apresentacao corrente e nao
+                // publica cache/intel. Uma vez detectada ao sair do tampao, a unidade
+                // e seu HUD permanecem continuos ate commit ou rollback.
+                unit.BeginTemporaryFogDetectionPresentation();
+            }
+        }
+
+        if (unit.IsTemporaryFogDetectionPresentationActive)
+        {
+            unit.SetFogOfWarVisibility(true);
+            return;
         }
 
         unit.SetFogOfWarVisibility(ResolveFogRenderVisibility(

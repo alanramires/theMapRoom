@@ -15293,6 +15293,8 @@ MonoBehaviour:
   victoryWinnerTeam: -1
   fogOfWarController: {fileID: 677354450}
   fogOfWarTilemap: {fileID: 2015085660}
+  fogOfWarMemoryTilemap: {fileID: 0}
+  fogOfWarBreakwaterMemoryTilemap: {fileID: 0}
   fogOfWarOverlayTile: {fileID: 11400000, guid: a9d34637cfec5f34f85ff83701fe1885, type: 2}
   fogOfWarTerrainDatabase: {fileID: 11400000, guid: af24f1a2f28971f498767ede9f9cfba1, type: 2}
   fogOfWarDpqAirHeightConfig: {fileID: 11400000, guid: 74c8a09efff211941b27a37f6bb948f1, type: 2}
@@ -15306,7 +15308,7 @@ MonoBehaviour:
   appliedActiveTeamId: 0
   pendingTurnStartUpkeep: 1
   pendingTurnStartEconomy: 1
-  cachedConstructionIncomeSignature: 235898541
+  cachedConstructionIncomeSignature: 1043072293
   cachedConstructionIncomeCount: 69
   constructionIncomeRefreshIntervalSeconds: 0.35
   continuousEditorRefresh: 0
@@ -23195,6 +23197,7 @@ MonoBehaviour:
   iaRapida: 0
   hardMode: 0
   easyMode: 0
+  strongWeakSidePolitic: 0
   conscriptionDoctrine: 0
   massacreEnterForceRatio: 0.66
   massacreExitForceRatio: 0.58
@@ -31697,6 +31700,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::FogOfWarController
   matchController: {fileID: 327617512}
   fogOfWarAlpha: 1
+  exploredFogAlphaMultiplier: 0.8
   fogOfWarAlphaInitialized: 1
   autoRefreshOnFogUpdate: 0
   includeInvisibleTargets: 1
@@ -94459,16 +94463,22 @@ MonoBehaviour:
         VehicleDistance: 16
         AirDistance: 14
         IsHQ: 1
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 132
+      - ConstructionName: Aeroporto
+        InstanceId: 9
         Distance: 15
         VehicleDistance: 15
-        AirDistance: 14
+        AirDistance: 12
         IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 11
-        Distance: 14
-        VehicleDistance: 14
+      - ConstructionName: Porto Naval
+        InstanceId: 74
+        Distance: 16
+        VehicleDistance: 16
+        AirDistance: 9
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 133
+        Distance: 15
+        VehicleDistance: 15
         AirDistance: 13
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
@@ -94477,29 +94487,17 @@ MonoBehaviour:
         VehicleDistance: 14
         AirDistance: 12
         IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 9
-        Distance: 15
-        VehicleDistance: 15
-        AirDistance: 12
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 73
-        Distance: 15
-        VehicleDistance: 15
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 134
+        Distance: 16
+        VehicleDistance: 16
         AirDistance: 13
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 133
+        InstanceId: 132
         Distance: 15
         VehicleDistance: 15
-        AirDistance: 13
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 74
-        Distance: 16
-        VehicleDistance: 16
-        AirDistance: 9
+        AirDistance: 14
         IsHQ: 0
       - ConstructionName: "Esta\xE7\xE3o de Trem"
         InstanceId: 101
@@ -94507,10 +94505,16 @@ MonoBehaviour:
         VehicleDistance: 18
         AirDistance: 13
         IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 134
-        Distance: 16
-        VehicleDistance: 16
+      - ConstructionName: Porto Naval
+        InstanceId: 73
+        Distance: 15
+        VehicleDistance: 15
+        AirDistance: 13
+        IsHQ: 0
+      - ConstructionName: Aeroporto
+        InstanceId: 11
+        Distance: 14
+        VehicleDistance: 14
         AirDistance: 13
         IsHQ: 0
     - Team: 0
@@ -94521,6 +94525,30 @@ MonoBehaviour:
         VehicleDistance: 16
         AirDistance: 14
         IsHQ: 1
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 117
+        Distance: 15
+        VehicleDistance: 15
+        AirDistance: 14
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 120
+        Distance: 14
+        VehicleDistance: 14
+        AirDistance: 12
+        IsHQ: 0
+      - ConstructionName: Aeroporto
+        InstanceId: 6
+        Distance: 15
+        VehicleDistance: 15
+        AirDistance: 12
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 118
+        Distance: 15
+        VehicleDistance: 15
+        AirDistance: 13
+        IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 119
         Distance: 16
@@ -94533,41 +94561,17 @@ MonoBehaviour:
         VehicleDistance: 16
         AirDistance: 9
         IsHQ: 0
-      - ConstructionName: "Esta\xE7\xE3o de Trem"
-        InstanceId: 102
-        Distance: 18
-        VehicleDistance: 18
-        AirDistance: 13
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 118
-        Distance: 15
-        VehicleDistance: 15
-        AirDistance: 13
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 6
-        Distance: 15
-        VehicleDistance: 15
-        AirDistance: 12
-        IsHQ: 0
       - ConstructionName: Aeroporto
         InstanceId: 8
         Distance: 14
         VehicleDistance: 14
         AirDistance: 13
         IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 117
-        Distance: 15
-        VehicleDistance: 15
-        AirDistance: 14
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 120
-        Distance: 14
-        VehicleDistance: 14
-        AirDistance: 12
+      - ConstructionName: "Esta\xE7\xE3o de Trem"
+        InstanceId: 102
+        Distance: 18
+        VehicleDistance: 18
+        AirDistance: 13
         IsHQ: 0
       - ConstructionName: Porto Naval
         InstanceId: 72
@@ -95809,8 +95813,28 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 27e2444ae5ec3a548a46ce68f6a80b48, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::HexCohabitationVisualSettings
-  airOffset: {x: 0, y: 0.275}
-  surfaceOffset: {x: 0, y: -0.2}
+  airSurface:
+    air: {x: -0.1, y: 0.22}
+    airHudY: -1
+    surface: {x: 0, y: -0.2}
+    surfaceHudY: -1
+  airSubmerged:
+    air: {x: -0.1, y: 0.22}
+    airHudY: -1
+    submerged: {x: 0, y: -0.2}
+    submergedHudY: -3
+  surfaceSubmerged:
+    surface: {x: 0, y: 0.22}
+    surfaceHudY: -1
+    submerged: {x: 0, y: -0.2}
+    submergedHudY: -3
+  fullStack:
+    air: {x: -0.1, y: 0.3}
+    airHudY: -1
+    surface: {x: 0, y: 0}
+    surfaceHudY: -3
+    submerged: {x: 0, y: -0.32}
+    submergedHudY: -3
   scale: 0.6
   intraLayerSpread: 0.18
 --- !u!1 &1924419468
@@ -108370,7 +108394,7 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 1348457725607290348, guid: f7e44d7c210a32d4ba630ba660da88a1, type: 3}
       propertyPath: m_text
-      value: 12500 / turn
+      value: 5500 / turn
       objectReference: {fileID: 0}
     - target: {fileID: 4985144350662451516, guid: f7e44d7c210a32d4ba630ba660da88a1, type: 3}
       propertyPath: m_Enabled

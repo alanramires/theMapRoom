@@ -253,11 +253,13 @@ public partial class TurnStateManager
 
     private void UpdateAiActionOverlayPresentation()
     {
-        bool suppress = ShouldSuppressAiActionPreviewLines();
+        bool suppressPreviews = ShouldSuppressAiActionPreviewLines();
+        bool suppressCommittedPath = matchController != null
+            && matchController.ShouldHideActiveAiActionPresentation();
         TilemapRenderer rangeRenderer = rangeMapTilemap != null ? rangeMapTilemap.GetComponent<TilemapRenderer>() : null;
         TilemapRenderer lineRenderer = lineOfFireMapTilemap != null ? lineOfFireMapTilemap.GetComponent<TilemapRenderer>() : null;
 
-        if (suppress && !aiActionOverlaysSuppressed)
+        if (suppressPreviews && !aiActionOverlaysSuppressed)
         {
             SetMirandoPreviewVisible(false);
             SetMirandoSpotterPreviewsVisible(false);
@@ -265,19 +267,21 @@ public partial class TurnStateManager
         }
 
         if (rangeRenderer != null)
-            rangeRenderer.enabled = !suppress;
+            rangeRenderer.enabled = !suppressPreviews;
         if (lineRenderer != null)
-            lineRenderer.enabled = !suppress;
+            lineRenderer.enabled = !suppressPreviews;
 
-        pathManager?.SetCommittedPathPresentationSuppressed(suppress);
-        aiActionOverlaysSuppressed = suppress;
+        // Sob observacao AI vs AI, o caminho realmente executado e apresentado;
+        // somente previsoes, ranges e linhas auxiliares da AI ficam ocultos.
+        pathManager?.SetCommittedPathPresentationSuppressed(suppressCommittedPath);
+        aiActionOverlaysSuppressed = suppressPreviews;
     }
 
     private bool ShouldSuppressAiActionPreviewLines()
     {
-        // Somente o FOW Total com um observador humano oculta a apresentacao
-        // provisoria das acoes da IA. Nos demais presets, os overlays continuam.
-        return matchController != null && matchController.ShouldHideActiveAiActionPresentation();
+        // Range e linhas auxiliares pertencem ao planejamento, nao a apresentacao
+        // observavel da acao. Isso vale tanto em Humano vs AI quanto em AI vs AI.
+        return matchController != null && matchController.IsActiveTeamAI();
     }
 
     private void RecordFramePerfSample()

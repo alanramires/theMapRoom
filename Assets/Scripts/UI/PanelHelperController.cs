@@ -186,9 +186,10 @@ public class PanelHelperController : MonoBehaviour
     private Image aimConfirmTargetIcon;
     private TMP_Text aimConfirmTargetText;
     private TMP_Text aimConfirmHpText;
+    private TMP_Text aimConfirmWeaponText;
     private Image aimConfirmLocalIcon;
     private TMP_Text aimConfirmLocalText;
-    private const float AimConfirmDetailsHeight = 172f;
+    private const float AimConfirmDetailsHeight = 206f;
     private GameObject autonomyUpkeepRoot;
     private readonly List<GameObject> autonomyUpkeepRows = new List<GameObject>();
     private string autonomyUpkeepSignature = string.Empty;
@@ -2324,6 +2325,11 @@ public class PanelHelperController : MonoBehaviour
         aimConfirmTargetIcon.enabled = data.AimConfirmTargetSprite != null;
         aimConfirmTargetIcon.color = data.AimConfirmTargetColor;
         aimConfirmHpText.text = $"HP: {data.AimConfirmHp}";
+        bool showWeapon = data.Kind == TurnStateManager.HelperPanelKind.AimConfirm;
+        aimConfirmWeaponText.text = string.IsNullOrWhiteSpace(data.AimConfirmWeaponName)
+            ? "ARMA: —"
+            : $"ARMA: {data.AimConfirmWeaponName}";
+        aimConfirmWeaponText.gameObject.SetActive(showWeapon);
         aimConfirmLocalText.text = string.IsNullOrWhiteSpace(data.AimConfirmTerrainLabel)
             ? "LOCAL:" : $"LOCAL: {data.AimConfirmTerrainLabel}";
         aimConfirmLocalIcon.sprite = data.AimConfirmLocalSprite;
@@ -2332,6 +2338,7 @@ public class PanelHelperController : MonoBehaviour
 
         aimConfirmTargetText.color = currentTeamColor;
         aimConfirmHpText.color = currentTeamColor;
+        aimConfirmWeaponText.color = currentTeamColor;
         aimConfirmLocalText.color = currentTeamColor;
 
         aimConfirmDetailsRoot.SetActive(true);
@@ -2633,6 +2640,7 @@ public class PanelHelperController : MonoBehaviour
         aimConfirmTargetText.enableAutoSizing = true; aimConfirmTargetText.fontSizeMin = 13f; aimConfirmTargetText.fontSizeMax = 22f;
 
         aimConfirmHpText = CreateAimConfirmText("aim_confirm_hp", 22f, 28f);
+        aimConfirmWeaponText = CreateAimConfirmText("aim_confirm_weapon", 18f, 28f);
 
         // Linha LOCAL: nome (label + terreno) a esquerda e o icone do hex a direita.
         GameObject row = new GameObject("aim_confirm_local", typeof(RectTransform), typeof(HorizontalLayoutGroup), typeof(LayoutElement));

@@ -97,7 +97,8 @@ public static class PodeMirarSensor
                 globalMaxRange = candidate.maxRange;
         }
 
-        if (candidates.Count == 0 || globalMaxRange <= 0)
+        // Alcance 0 e valido para combate no mesmo hex (ex.: mina naval).
+        if (candidates.Count == 0 || globalMaxRange < 0)
             return false;
 
         Tilemap map = boardTilemap != null ? boardTilemap : attacker.BoardTilemap;
@@ -957,17 +958,20 @@ public static class PodeMirarSensor
 
         if (movementMode == SensorMovementMode.MoveuAndando)
         {
-            if (min != 1)
+            // Quem se deslocou engaja apenas no contato: alcance 0 (mesmo hex) ou 1.
+            // Alcance minimo 2+ (artilharia) segue impedido de mover e atirar.
+            if (min > 1)
                 return false;
 
-            min = 1;
-            max = 1;
+            // Teto de contato, nunca promocao: arma declarada [0,0] continua [0,0].
+            max = Mathf.Min(max, 1);
         }
 
         if (max < min)
             max = min;
 
-        if (max <= 0)
+        // Zero representa combate deliberado contra alvo no mesmo hex.
+        if (max < 0)
             return false;
 
         candidate = new WeaponRangeCandidate
@@ -1359,8 +1363,13 @@ public static class PodeMirarSensor
             if (embarked == null || embarked.weapon == null)
                 continue;
 
-            int min = embarked.GetRangeMin();
-            if (min != 1)
+            if (!TryResolveWeaponRangeCandidate(
+                    embarked,
+                    SensorMovementMode.MoveuParado,
+                    requireAmmo: false,
+                    out int min,
+                    out _)
+                || min != 1)
                 continue;
             hasMinRangeOne = true;
 
@@ -2375,8 +2384,13 @@ public static class UnitThreatEnvelopeService
             UnitEmbarkedWeapon embarked = weapons[i];
             if (embarked == null || embarked.weapon == null || embarked.squadAmmunition <= 0)
                 continue;
-            int min = embarked.GetRangeMin();
-            int max = Mathf.Max(min, embarked.GetRangeMax());
+            if (!PodeMirarSensor.TryResolveWeaponRangeCandidate(
+                    embarked,
+                    SensorMovementMode.MoveuParado,
+                    requireAmmo: false,
+                    out int min,
+                    out int max))
+                continue;
             hasOne |= min == 1 && max == 1;
             hasLong |= max > 1;
             hasHybrid |= min == 1 && max > 1;

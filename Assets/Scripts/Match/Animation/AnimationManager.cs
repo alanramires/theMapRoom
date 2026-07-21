@@ -642,13 +642,9 @@ public class AnimationManager : MonoBehaviour
             return false;
 
         Domain domain = unit.GetDomain();
-        if (domain == Domain.Naval || domain == Domain.Submarine)
-            return true;
-
-        if (!unit.TryGetUnitData(out UnitData data) || data == null)
-            return false;
-
-        return data.unitClass == GameUnitClass.Ship || data.unitClass == GameUnitClass.Submarine;
+        HeightLevel height = unit.GetHeightLevel();
+        return (domain == Domain.Naval && height == HeightLevel.Surface)
+            || (domain == Domain.Submarine && height == HeightLevel.Submerged);
     }
 
     public float PlayExplosionEffectAt(Vector3 worldPosition)

@@ -5557,8 +5557,8 @@ MonoBehaviour:
   - teamId: 1
     flipX: 1
     flipXOverride: 0
-    isAI: 0
-    commandServiceAutomatic: 0
+    isAI: 1
+    commandServiceAutomatic: 1
     defeated: 0
     startMoney: 0
     actualMoney: 0
@@ -5616,7 +5616,7 @@ MonoBehaviour:
   appliedActiveTeamId: 0
   pendingTurnStartUpkeep: 1
   pendingTurnStartEconomy: 1
-  cachedConstructionIncomeSignature: -711668399
+  cachedConstructionIncomeSignature: -1481752697
   cachedConstructionIncomeCount: 21
   constructionIncomeRefreshIntervalSeconds: 0.35
   continuousEditorRefresh: 0
@@ -7878,7 +7878,7 @@ MonoBehaviour:
   showAILogs: 1
   showAIUnitHUD: 1
   startOnPause: 1
-  iaRapida: 1
+  iaRapida: 0
   hardMode: 0
   easyMode: 0
   strongWeakSidePolitic: 0
@@ -15410,7 +15410,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 376536317023229975, guid: bbd1302fcb61c7d49ac7944eafbfdede, type: 3}
       propertyPath: m_fontColor32.rgba
-      value: 4287688336
+      value: 4288388095
       objectReference: {fileID: 0}
     - target: {fileID: 3803312006916396853, guid: bbd1302fcb61c7d49ac7944eafbfdede, type: 3}
       propertyPath: m_Pivot.x
@@ -15498,7 +15498,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7653284495940490440, guid: bbd1302fcb61c7d49ac7944eafbfdede, type: 3}
       propertyPath: m_fontColor32.rgba
-      value: 4287688336
+      value: 4288388095
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []

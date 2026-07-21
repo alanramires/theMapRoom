@@ -141,13 +141,21 @@ public class DebugManager : MonoBehaviour
         if (!f12 && !f10 && !f11) return;
 
         AIController ai = FindAnyObjectByType<AIController>();
+        MatchController match = FindAnyObjectByType<MatchController>();
 
         if (f12)
         {
-            ForceNeutralBeforeAIControlRelease("F12 AI Resume");
-            if (ai != null) ai.SetDebugPaused(false);
-            else Debug.Log("[AI Shortcuts] AIController não encontrado.");
-            Debug.Log("[AI Shortcuts] F12 — AI Resume");
+            if (match == null || !match.IsActiveTeamAI())
+            {
+                Debug.Log("[AI Shortcuts] F12 ignorado: o time ativo nao esta configurado como AI.");
+            }
+            else
+            {
+                ForceNeutralBeforeAIControlRelease("F12 AI Resume");
+                if (ai != null) ai.SetDebugPaused(false);
+                else Debug.Log("[AI Shortcuts] AIController não encontrado.");
+                Debug.Log("[AI Shortcuts] F12 — AI Resume");
+            }
         }
         if (f10)
         {
@@ -157,10 +165,17 @@ public class DebugManager : MonoBehaviour
         }
         if (f11)
         {
-            ForceNeutralBeforeAIControlRelease("F11 AI Step");
-            if (ai != null) ai.RequestDebugStep();
-            else Debug.Log("[AI Shortcuts] AIController nao encontrado.");
-            Debug.Log("[AI Shortcuts] F11 — AI Step");
+            if (match == null || !match.IsActiveTeamAI())
+            {
+                Debug.Log("[AI Shortcuts] F11 ignorado: o time ativo nao esta configurado como AI.");
+            }
+            else
+            {
+                ForceNeutralBeforeAIControlRelease("F11 AI Step");
+                if (ai != null) ai.RequestDebugStep();
+                else Debug.Log("[AI Shortcuts] AIController nao encontrado.");
+                Debug.Log("[AI Shortcuts] F11 — AI Step");
+            }
         }
     }
 
