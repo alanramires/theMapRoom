@@ -34,10 +34,9 @@ public partial class AIShoppingPlanner : MonoBehaviour
     [HideInInspector] public int  MinArmySizeForElitePivot  = 12; // legado de serialização; não usado
     // Poupança de elite (turnos) e margem de manutenção (%) migraram para o AI Manager (AIController):
     // EliteSaveTurns / EliteMaintenanceReservePercent, com par por modo (normal/hard). Ver ComputeStrategicSavingReserve.
-    [Tooltip("Pressao liquida anti-tank/anti-infantaria a partir da qual a IA deixa de repetir counters baratos e passa a poupar para um counter elite.")]
-    [Range(1f, 30f)] public float CounterEliteEscalationPressure = 8f;
-    [Tooltip("Quanto de pressao inimiga um counter comum especializado consegue cobrir. Elite, custo e preferencia de alvo multiplicam esta base.")]
-    [Range(1f, 10f)] public float BasicCounterPressureCoverage = 4f;
+    [Tooltip("Pressao liquida na escala 0..1 do Unit Analysis a partir da qual a IA deixa de repetir counters baratos e passa a poupar para um counter elite.")]
+    [Range(0.2f, 10f)] public float CounterEliteEscalationPressure = 3.2f;
+    [HideInInspector] public float BasicCounterPressureCoverage = 4f; // legado; agora vem da matriz oficial
     // Razões de elite (normal/hard, pressão/cobertas) migraram para o AI Manager (AIController):
     // EliteRatioPressure / EliteRatioSafe, resolvidas por modo. Ver AddEliteQualityDemand.
     [Range(1, 12)]   public int   MinTurnForFireSupport     = 3;

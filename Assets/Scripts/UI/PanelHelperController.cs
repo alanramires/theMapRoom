@@ -296,7 +296,7 @@ public class PanelHelperController : MonoBehaviour
     {
         if (!showCoordinateOverlay)
             return;
-        if (matchController != null && matchController.ShouldHideActiveAiActionPresentation())
+        if (ShouldHideForActiveAI())
             return;
 
         if (!Application.isPlaying || cursorController == null || cursorController.BoardTilemap == null)
@@ -414,7 +414,7 @@ public class PanelHelperController : MonoBehaviour
             externalOverrideUntilUnscaledTime = -1f;
         }
 
-        if (matchController != null && matchController.ShouldHideActiveAiActionPresentation())
+        if (ShouldHideForActiveAI())
         {
             HideAll(force);
             return;
@@ -437,6 +437,16 @@ public class PanelHelperController : MonoBehaviour
 
         SetVisible(panelVisible: true, title: title, body: body, data: data, force: force);
         RefreshDockByCursorProximity();
+    }
+
+    // No turno normal da IA o helper acompanha a politica de apresentacao oculta.
+    // F10, porem, entrega a tela ao desenvolvedor para inspecao: assim como o
+    // menuRoot volta a responder, o panel_helper deve voltar a renderizar o estado.
+    private bool ShouldHideForActiveAI()
+    {
+        return matchController != null
+            && matchController.ShouldHideActiveAiActionPresentation()
+            && !AIController.IsDebugPaused;
     }
 
 

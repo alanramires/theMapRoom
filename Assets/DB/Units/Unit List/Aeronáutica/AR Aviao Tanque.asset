@@ -19,6 +19,7 @@ MonoBehaviour:
     de ca\xE7as e bombardeiros. Permite miss\xF5es mais profundas e sustentadas longe
     da base. Tamb\xE9m pode apoiar helic\xF3pteros com combust\xEDvel. Vulner\xE1vel
     e sem capacidade ofensiva, deve operar protegido e fora do alcance inimigo."
+  requiredBuilding: {fileID: 0}
   spriteDefault: {fileID: 21300000, guid: 38a846ce0549df1408b70c042c03b5dc, type: 3}
   teamVariantSprites: []
   maxHP: 10
@@ -34,6 +35,7 @@ MonoBehaviour:
   roles: 04000000
   aiInitiative: 2
   aiPurchaseMode: 0
+  bannedOnHardMode: 0
   aiTargetPreferenceByClass: []
   aiSensorPriority: 0000000002000000
   prioritizeDpqAtBattle: 0
@@ -55,6 +57,10 @@ MonoBehaviour:
   repairTriggerAmmoPct: 0
   repairRecoverHpAbove: 8
   fuseWhileInRepair: 1
+  restockTriggerGallonPct: 0
+  restockTriggerAmmoBoxPct: 0
+  restockTriggerToolsPct: 0
+  restockWhenAnyRuntimeSupplyEmpty: 1
   aiPreventiveMaintenanceEnabled: 1
   aiPreventiveSupplyCanRunWithUnderRepair: 0
   aiConservativeSupplyAvoidEnemyRange: 2
@@ -79,6 +85,10 @@ MonoBehaviour:
   preferredAirHeight: 4
   useExplicitPreferredNavalHeight: 0
   preferredNavalHeight: 2
+  emergesToAttack: 0
+  emergeAfterAttackDomain: 1
+  emergeAfterAttackHeight: 3
+  emergeAfterAttackTurns: 2
   skills:
   - {fileID: 11400000, guid: e73850be27dc4e2e8c8f210db151b0b4, type: 2}
   - {fileID: 11400000, guid: 3f52a3b7c5d14c5ea1f0f9aa34d2be11, type: 2}
@@ -107,13 +117,13 @@ MonoBehaviour:
   spriteTransport: {fileID: 0}
   allowedEmbarkWhenTransporterAtTerrains: []
   allowedEmbarkWhenTransporterAtTerrainStructures: []
-  allowedEmbarkWhenTransporterAtConstructions: []
+  allowedEmbarkWhenTransporterAtFacilities: 0
   allowedDisembarkWhenTransporterAtTerrains: []
   allowedDisembarkWhenTransporterAtTerrainStructures: []
-  allowedDisembarkWhenTransporterAtConstructions: []
+  allowedDisembarkWhenTransporterAtFacilities: 0
   passengersCanDisembarkAndGoesToTerrains: []
   passengersCanDisembarkAndGoesToTerrainStructures: []
-  passengersCanDisembarkAndGoesToConstructions: []
+  passengersCanDisembarkAndGoesToFacilities: 0
   transportSlots: []
   autonomia: 120
   cost: 14000

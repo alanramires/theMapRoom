@@ -20,6 +20,7 @@ MonoBehaviour:
     no ar, permitindo vigil\xE2ncia cont\xEDnua. Possui armamento leve para apoio,
     mas seu valor est\xE1 na detec\xE7\xE3o e controle de informa\xE7\xE3o. Use para
     revelar amea\xE7as ocultas e orientar opera\xE7\xF5es."
+  requiredBuilding: {fileID: 0}
   spriteDefault: {fileID: 21300000, guid: 66c29b8fc0b48bd4d9395477688a860f, type: 3}
   teamVariantSprites: []
   maxHP: 10
@@ -134,13 +135,13 @@ MonoBehaviour:
   spriteTransport: {fileID: 0}
   allowedEmbarkWhenTransporterAtTerrains: []
   allowedEmbarkWhenTransporterAtTerrainStructures: []
-  allowedEmbarkWhenTransporterAtConstructions: []
+  allowedEmbarkWhenTransporterAtFacilities: 0
   allowedDisembarkWhenTransporterAtTerrains: []
   allowedDisembarkWhenTransporterAtTerrainStructures: []
-  allowedDisembarkWhenTransporterAtConstructions: []
+  allowedDisembarkWhenTransporterAtFacilities: 0
   passengersCanDisembarkAndGoesToTerrains: []
   passengersCanDisembarkAndGoesToTerrainStructures: []
-  passengersCanDisembarkAndGoesToConstructions: []
+  passengersCanDisembarkAndGoesToFacilities: 0
   transportSlots: []
   autonomia: 80
   cost: 9000

@@ -19,6 +19,7 @@ MonoBehaviour:
     e costeiras. Capaz de carregar m\xFAltiplas unidades, incluindo transportes,
     viabilizando opera\xE7\xF5es de desembarque e reposicionamento em larga escala.
     Vulner\xE1vel em combate, deve operar protegido durante travessias."
+  requiredBuilding: {fileID: 0}
   spriteDefault: {fileID: 21300000, guid: 4f4299fa73e331346ba0dc6df6d2dfb4, type: 3}
   teamVariantSprites: []
   maxHP: 10
@@ -99,16 +100,14 @@ MonoBehaviour:
   allowedEmbarkWhenTransporterAtTerrains:
   - {fileID: 11400000, guid: adc0bfc8c2e8f9a41be0abda3e29e582, type: 2}
   allowedEmbarkWhenTransporterAtTerrainStructures: []
-  allowedEmbarkWhenTransporterAtConstructions:
-  - {fileID: 11400000, guid: 18336762152ab4246bb4cd0fb463da45, type: 2}
+  allowedEmbarkWhenTransporterAtFacilities: 1
   allowedDisembarkWhenTransporterAtTerrains:
   - {fileID: 11400000, guid: adc0bfc8c2e8f9a41be0abda3e29e582, type: 2}
   allowedDisembarkWhenTransporterAtTerrainStructures: []
-  allowedDisembarkWhenTransporterAtConstructions:
-  - {fileID: 11400000, guid: 18336762152ab4246bb4cd0fb463da45, type: 2}
+  allowedDisembarkWhenTransporterAtFacilities: 1
   passengersCanDisembarkAndGoesToTerrains: []
   passengersCanDisembarkAndGoesToTerrainStructures: []
-  passengersCanDisembarkAndGoesToConstructions: []
+  passengersCanDisembarkAndGoesToFacilities: -1
   transportSlots:
   - slotId: Cargo
     capacity: 2

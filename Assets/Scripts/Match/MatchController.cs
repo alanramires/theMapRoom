@@ -891,6 +891,7 @@ public class MatchController : MonoBehaviour
         TryAutoAssignCursorController();
         TryAutoAssignTurnStateManager();
         TryAutoAssignTurnTransitionReferences();
+        ValidateFogOfWarSortingLayer();
         TryAutoAssignVictoryOverlayReferences();
         TryRefreshVictoryOverlayFromConstructions(markDirtyInEditor: false);
         if (enableTotalWar)
@@ -946,6 +947,10 @@ public class MatchController : MonoBehaviour
         RecomputeTeamFlips();
         ResetUnfundedStartMoneyFlagsForFreshMatch();
         ApplyActiveTeamIfChanged(force: true);
+        // Neste ponto todos os objetos da cena ja passaram por OnEnable.
+        // Reaplica SFX nos presets sem FOW Total caso o cursor ainda nao
+        // estivesse disponivel durante o Awake/ApplyGameSetupPreset.
+        ValidateFogOfWarSortingLayer();
         // AI vs AI possui um observador, nao uma perspectiva de debug parcial.
         // Mantem o mesmo FOW Total usado pelo jogador humano; apenas a apresentacao
         // temporaria da acao ativa e promovida acima da nevoa.
@@ -1154,7 +1159,7 @@ public class MatchController : MonoBehaviour
         if (activeTeamId < 0 && !includeNeutralTeam)
             return;
         int expectedVisualTeamId = activeTeamId;
-        if (ShouldUseHumanFogPresentation(out TeamId presentationTeam))
+        if (TryResolveFogPresentationTeam(out TeamId presentationTeam))
             expectedVisualTeamId = (int)presentationTeam;
         if (fogCachedTeamId == expectedVisualTeamId && fogOverlayInitialized)
             return;
@@ -3626,7 +3631,8 @@ public class MatchController : MonoBehaviour
 
     public void RefreshFogOfWarForActiveTeam(FogOfWarRefreshMode mode = FogOfWarRefreshMode.FullVisual)
     {
-        if (!ShouldUseHumanFogPresentation(out TeamId presentationTeam))
+        if (!TryResolveFogPresentationTeam(out TeamId presentationTeam)
+            || (int)presentationTeam == activeTeamId)
         {
             RefreshFogOfWarForCurrentTeamInternal(mode);
             return;
@@ -4810,7 +4816,7 @@ public class MatchController : MonoBehaviour
             return true;
 
         int expectedTeamId = activeTeamId;
-        if (ShouldUseHumanFogPresentation(out TeamId presentationTeam))
+        if (TryResolveFogPresentationTeam(out TeamId presentationTeam))
             expectedTeamId = (int)presentationTeam;
         if (fogCachedTeamId != expectedTeamId)
             return false;
@@ -4839,6 +4845,8 @@ public class MatchController : MonoBehaviour
             return false;
 
         TeamId activeTeam = (TeamId)activeTeamId;
+        if (debugFogOfWarPartial && TryGetFirstAITeam(out TeamId aiPresentationTeam))
+            return activeTeam == aiPresentationTeam;
         if (!IsPlayerAI(activeTeam))
             return true;
 
@@ -4864,6 +4872,22 @@ public class MatchController : MonoBehaviour
             return false;
 
         return TryGetFirstHumanTeam(out presentationTeam);
+    }
+
+    private bool TryResolveFogPresentationTeam(out TeamId presentationTeam)
+    {
+        presentationTeam = TeamId.Neutral;
+        if (!Application.isPlaying || !debugFogOfWarEnabled || !enableTotalWar
+            || gameSetup != GameSetupPreset.FogOfWarTotal)
+            return false;
+
+        // PARTIAL e o espelho do modo humano: apenas a apresentacao fica presa
+        // ao primeiro participante AI. Turno, sensores e commits continuam usando
+        // o participante ativo real.
+        if (debugFogOfWarPartial)
+            return TryGetFirstAITeam(out presentationTeam);
+
+        return ShouldUseHumanFogPresentation(out presentationTeam);
     }
 
     public void ExportFogRuntimeCacheForSave(
@@ -5153,6 +5177,20 @@ public class MatchController : MonoBehaviour
 
     private void ValidateFogOfWarSortingLayer()
     {
+        bool coverWorldPresentation = UsesFogOverlayForWorldOcclusion();
+        bool playerTurn = activeTeamId >= 0
+            && Enum.IsDefined(typeof(TeamId), activeTeamId)
+            && !IsPlayerAI((TeamId)activeTeamId);
+        bool showCursorAboveFog = ShouldPresentActiveActionToLocalObserver();
+        bool showHumanTurnTools = playerTurn
+            || (debugFogOfWarPartial && showCursorAboveFog);
+
+        // FogOfWar/FogOfWarTile pertencem exclusivamente ao preset Total.
+        // Nos demais presets restaura cursor e ferramentas ao pipeline legado SFX,
+        // mesmo que a cena ainda possua referencias/objetos de FOW serializados.
+        cursorController?.ApplyFogOfWarSorting(coverWorldPresentation && showCursorAboveFog);
+        turnStateManager?.ApplyMovementRangeFogOfWarSorting(coverWorldPresentation && showHumanTurnTools);
+
         if (fogOfWarTilemap == null)
             return;
 
@@ -5160,7 +5198,6 @@ public class MatchController : MonoBehaviour
         if (renderer == null)
             return;
 
-        bool coverWorldPresentation = UsesFogOverlayForWorldOcclusion();
         string expectedLayer = coverWorldPresentation ? "FogOfWar" : "SFX";
         string currentLayer = SortingLayer.IDToName(renderer.sortingLayerID);
         if (!string.Equals(currentLayer, expectedLayer, StringComparison.OrdinalIgnoreCase))
@@ -5188,14 +5225,9 @@ public class MatchController : MonoBehaviour
             breakwaterMemoryRenderer.sortingOrder = 1;
         }
 
-        bool playerTurn = activeTeamId >= 0
-            && Enum.IsDefined(typeof(TeamId), activeTeamId)
-            && !IsPlayerAI((TeamId)activeTeamId);
-        bool showCursorAboveFog = ShouldPresentActiveActionToLocalObserver();
-        cursorController?.ApplyFogOfWarSorting(showCursorAboveFog);
-        // Range map continua sendo uma ferramenta do turno humano. O observador de
-        // AI vs AI acompanha cursor e acao executada, nao o planejamento interno.
-        turnStateManager?.ApplyMovementRangeFogOfWarSorting(playerTurn);
+        // PARTIAL e o humano sentado na cadeira da AI: alem do cursor, enxerga as
+        // mesmas ferramentas visuais do seu turno (range map, linhas e overlays).
+        // Fora dele, o observador neutro de AI vs AI continua sem planejamento interno.
 
         if (fogSortingLayerValidated)
             return;
@@ -5229,7 +5261,7 @@ public class MatchController : MonoBehaviour
         //
         // NOTE: independente de qual time esta ativo. A perspectiva apresentada e
         // decidida por ShouldUseHumanFogPresentation; a posse da oclusao nao.
-        if (!Application.isPlaying || !debugFogOfWarEnabled || debugFogOfWarPartial)
+        if (!Application.isPlaying || !debugFogOfWarEnabled)
             return false;
         if (!enableTotalWar || gameSetup != GameSetupPreset.FogOfWarTotal)
             return false;
@@ -5293,7 +5325,7 @@ public class MatchController : MonoBehaviour
             return;
 
         TeamId observerTeam = ActiveTeam;
-        if (ShouldUseHumanFogPresentation(out TeamId presentationTeam))
+        if (TryResolveFogPresentationTeam(out TeamId presentationTeam))
             observerTeam = presentationTeam;
 
         bool logicallyVisible = unit.TeamId == observerTeam;
@@ -6651,7 +6683,7 @@ public class MatchController : MonoBehaviour
         }
 
         TeamId observerTeam = ActiveTeam;
-        bool useHumanPresentation = ShouldUseHumanFogPresentation(out TeamId presentationTeam);
+        bool useHumanPresentation = TryResolveFogPresentationTeam(out TeamId presentationTeam);
         bool fogOverlayOwnsWorldOcclusion = UsesFogOverlayForWorldOcclusion();
         if (useHumanPresentation)
             observerTeam = presentationTeam;
@@ -6846,7 +6878,10 @@ public class MatchController : MonoBehaviour
             ResetFogOfWarRuntime(clearTilemap: true);
 
         RefreshRuntimeUnitFogVisibility();
-        Debug.Log("[Debug Command] FoW PARTIAL (debug): exibindo a perspectiva do time ativo.");
+        string perspective = TryGetFirstAITeam(out TeamId aiTeam)
+            ? $"time AI {aiTeam}"
+            : "time ativo (nenhuma AI configurada)";
+        Debug.Log($"[Debug Command] FoW PARTIAL (debug): perspectiva travada no {perspective}.");
     }
 
     private void ShowAllUnitsIgnoringFog()

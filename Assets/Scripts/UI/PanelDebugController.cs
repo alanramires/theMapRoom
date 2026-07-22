@@ -271,10 +271,8 @@ public class PanelDebugController : MonoBehaviour
         }
         else if (command == "LAND UNIT")
         {
-            executed = turnStateManager.TryChangeAltitudeFromDebug(Domain.Land, HeightLevel.Surface, out string message);
-            if (executed)
-                cursorController?.PlayDoneSfx();
-            else if (!string.IsNullOrWhiteSpace(message))
+            executed = turnStateManager.TryExecuteLayerCommandFromDebug(DebugLayerCommand.Landing, out string message);
+            if (!executed && !string.IsNullOrWhiteSpace(message))
                 Debug.Log($"[Debug Command] {message}");
         }
         else if (TryParseSetActiveTeamCommand(command, out int activeTeamValue))
@@ -495,12 +493,10 @@ public class PanelDebugController : MonoBehaviour
                 Debug.Log($"[Debug Command] Economy {(economyEnabled ? "ON" : "OFF")}.");
             }
         }
-        else if (TryParseChangeAltitudeCommand(rawCommand, out Domain targetDomain, out HeightLevel targetHeight))
+        else if (TryParseDebugLayerCommand(rawCommand, out DebugLayerCommand layerCommand))
         {
-            executed = turnStateManager.TryChangeAltitudeFromDebug(targetDomain, targetHeight, out string message);
-            if (executed)
-                cursorController?.PlayDoneSfx();
-            else if (!string.IsNullOrWhiteSpace(message))
+            executed = turnStateManager.TryExecuteLayerCommandFromDebug(layerCommand, out string message);
+            if (!executed && !string.IsNullOrWhiteSpace(message))
                 Debug.Log($"[Debug Command] {message}");
         }
         else if (TryParseSetFogAlphaCommand(rawCommand, out int fogAlphaPercent))
@@ -1016,7 +1012,8 @@ public class PanelDebugController : MonoBehaviour
             "spawn:<team> <unit>\n" +
             "set money <v> | set money +<v> | set money:<team> <v>\n" +
             "set economy on|off\n" +
-            "change altitude <dominio>/<altura>\n" +
+            "altitude high|low (aeronave no ar)\n" +
+            "change altitude high|low (legado)\n" +
             "land unit\n" +
             "landing | emerge | submerge | take off | fast take off\n" +
             "fow on|off|partial | set fow <0-100>\n" +
@@ -1271,6 +1268,58 @@ public class PanelDebugController : MonoBehaviour
             return TryParseDomainHeightPair("submarine/submerged", out targetDomain, out targetHeight);
 
         return TryParseAltitudeAliasCommand(token, out targetDomain, out targetHeight);
+    }
+
+    private static bool TryParseDebugLayerCommand(string rawCommand, out DebugLayerCommand command)
+    {
+        command = DebugLayerCommand.Landing;
+        if (string.IsNullOrWhiteSpace(rawCommand))
+            return false;
+
+        string normalized = rawCommand.Trim();
+        if (string.Equals(normalized, "landing", System.StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(normalized, "land unit", System.StringComparison.OrdinalIgnoreCase))
+        {
+            command = DebugLayerCommand.Landing;
+            return true;
+        }
+        if (string.Equals(normalized, "take off", System.StringComparison.OrdinalIgnoreCase))
+        {
+            command = DebugLayerCommand.Takeoff;
+            return true;
+        }
+        if (string.Equals(normalized, "altitude low", System.StringComparison.OrdinalIgnoreCase))
+        {
+            command = DebugLayerCommand.AltitudeLow;
+            return true;
+        }
+        if (string.Equals(normalized, "altitude high", System.StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(normalized, "fast take off", System.StringComparison.OrdinalIgnoreCase))
+        {
+            command = DebugLayerCommand.AltitudeHigh;
+            return true;
+        }
+        if (string.Equals(normalized, "emerge", System.StringComparison.OrdinalIgnoreCase))
+        {
+            command = DebugLayerCommand.Emerge;
+            return true;
+        }
+        if (string.Equals(normalized, "submerge", System.StringComparison.OrdinalIgnoreCase))
+        {
+            command = DebugLayerCommand.Submerge;
+            return true;
+        }
+
+        if (!TryParseChangeAltitudeCommand(rawCommand, out Domain domain, out HeightLevel height))
+            return false;
+
+        if (domain != Domain.Air || (height != HeightLevel.AirLow && height != HeightLevel.AirHigh))
+            return false;
+
+        command = height == HeightLevel.AirHigh
+            ? DebugLayerCommand.AltitudeHigh
+            : DebugLayerCommand.AltitudeLow;
+        return true;
     }
 
     private static bool TryParseAltitudeAliasCommand(string token, out Domain targetDomain, out HeightLevel targetHeight)

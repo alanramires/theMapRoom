@@ -17,9 +17,10 @@ MonoBehaviour:
   sufixo: Air Field Water
   description: "Produz Hidroavi\xF5es.\nAceita pouso e manuten\xE7\xE3o de aeronaves.\nUnidades
     navais leves podem operar aqui."
+  grammaticalGender: 0
   requiredBuilding: {fileID: 0}
   isAirport: 1
-  isHarbor: 0
+  isHarbor: 1
   isCity: 0
   spriteDefault: {fileID: 21300000, guid: dfc4d77e822296947b883b4d0f1eac90, type: 3}
   spriteGreen: {fileID: 0}

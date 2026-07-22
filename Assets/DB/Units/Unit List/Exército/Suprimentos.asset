@@ -20,6 +20,7 @@ MonoBehaviour:
     evitando recuos frequentes. Sua capacidade \xE9 limitada e exige reposi\xE7\xE3o
     constante. Vulner\xE1vel no front, deve ser protegido, pois sua perda pode colapsar
     rapidamente a linha de combate."
+  requiredBuilding: {fileID: 0}
   spriteDefault: {fileID: 21300000, guid: 7bb9e34a5859e51449deab8a27150dd5, type: 3}
   teamVariantSprites: []
   maxHP: 10
@@ -113,13 +114,13 @@ MonoBehaviour:
   spriteTransport: {fileID: 21300000, guid: e25e62f91373702469b06ac486d35060, type: 3}
   allowedEmbarkWhenTransporterAtTerrains: []
   allowedEmbarkWhenTransporterAtTerrainStructures: []
-  allowedEmbarkWhenTransporterAtConstructions: []
+  allowedEmbarkWhenTransporterAtFacilities: -1
   allowedDisembarkWhenTransporterAtTerrains: []
   allowedDisembarkWhenTransporterAtTerrainStructures: []
-  allowedDisembarkWhenTransporterAtConstructions: []
+  allowedDisembarkWhenTransporterAtFacilities: -1
   passengersCanDisembarkAndGoesToTerrains: []
   passengersCanDisembarkAndGoesToTerrainStructures: []
-  passengersCanDisembarkAndGoesToConstructions: []
+  passengersCanDisembarkAndGoesToFacilities: -1
   transportSlots:
   - slotId: reboque
     capacity: 1

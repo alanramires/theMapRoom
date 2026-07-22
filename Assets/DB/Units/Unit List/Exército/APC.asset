@@ -20,6 +20,7 @@ MonoBehaviour:
     rotas onde blindados pesados perdem ritmo. Sua metralhadora \xE9 eficaz contra
     infantaria exposta, mas seu valor real est\xE1 em reposicionar tropas e antecipar
     capturas, emboscadas e respostas t\xE1ticas."
+  requiredBuilding: {fileID: 0}
   spriteDefault: {fileID: 21300000, guid: eb47016b4b81a574eb99e655c0ae0803, type: 3}
   teamVariantSprites: []
   maxHP: 10
@@ -83,6 +84,10 @@ MonoBehaviour:
   preferredAirHeight: 4
   useExplicitPreferredNavalHeight: 0
   preferredNavalHeight: 2
+  emergesToAttack: 0
+  emergeAfterAttackDomain: 1
+  emergeAfterAttackHeight: 3
+  emergeAfterAttackTurns: 2
   skills:
   - {fileID: 11400000, guid: 8bfcf50a7b4285c4cad503493431fb4b, type: 2}
   - {fileID: 11400000, guid: ef10c9e820afc074b99ea8e0b709c2f4, type: 2}
@@ -110,13 +115,13 @@ MonoBehaviour:
   spriteTransport: {fileID: 0}
   allowedEmbarkWhenTransporterAtTerrains: []
   allowedEmbarkWhenTransporterAtTerrainStructures: []
-  allowedEmbarkWhenTransporterAtConstructions: []
+  allowedEmbarkWhenTransporterAtFacilities: 0
   allowedDisembarkWhenTransporterAtTerrains: []
   allowedDisembarkWhenTransporterAtTerrainStructures: []
-  allowedDisembarkWhenTransporterAtConstructions: []
+  allowedDisembarkWhenTransporterAtFacilities: 0
   passengersCanDisembarkAndGoesToTerrains: []
   passengersCanDisembarkAndGoesToTerrainStructures: []
-  passengersCanDisembarkAndGoesToConstructions: []
+  passengersCanDisembarkAndGoesToFacilities: 0
   transportSlots:
   - slotId: passageiro
     capacity: 1

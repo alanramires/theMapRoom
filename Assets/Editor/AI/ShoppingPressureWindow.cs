@@ -30,6 +30,7 @@ public class ShoppingPressureWindow : EditorWindow
     private const double RefreshInterval = 1.0;
     private List<AIShoppingDemand> _demands = new List<AIShoppingDemand>();
     private AIWorldSnapshot _snapshot;
+    private AIShoppingPlanner.AIRosterKnowledge _roster;
     private TeamId _snapshotTeam = TeamId.Neutral;
     private double _lastBuild = -999;
 
@@ -40,11 +41,13 @@ public class ShoppingPressureWindow : EditorWindow
     private GUIStyle _boldFoldout;
     private bool _stylesReady;
     private bool _showCounterPressure = true;
+    private bool _showRoster = true;
     private bool _showOperationalPressure = true;
     private bool _showBestCounters = true;
     private bool _showEligibleQueue = true;
     private bool _showAxisOverview = true;
     private readonly Dictionary<string, bool> _counterCategoryFoldouts = new Dictionary<string, bool>();
+    private readonly Dictionary<string, bool> _rosterUnitFoldouts = new Dictionary<string, bool>();
 
     [MenuItem("Tools/Utils/Shopping Pressure")]
     public static void OpenWindow()
@@ -121,6 +124,7 @@ public class ShoppingPressureWindow : EditorWindow
         _leftScroll = EditorGUILayout.BeginScrollView(_leftScroll);
         DrawHeader(_snapshot, plan, _demands);
         DrawCounterPressure(_snapshot, _demands);
+        DrawRosterKnowledge(_roster);
         DrawOperationalPressure(_snapshot);
         EditorGUILayout.EndScrollView();
         EditorGUILayout.EndVertical();
@@ -146,6 +150,7 @@ public class ShoppingPressureWindow : EditorWindow
 
         _snapshot = AIWorldSnapshot.Build(team, _matchController);
         _demands = AIShoppingPlanner.InspectRoleDemands(_snapshot);
+        _roster = AIShoppingPlanner.InspectRosterKnowledge(_snapshot);
         _snapshotTeam = team;
         _lastBuild = EditorApplication.timeSinceStartup;
     }
@@ -510,6 +515,130 @@ public class ShoppingPressureWindow : EditorWindow
             }
         }
         EditorGUILayout.EndVertical();
+    }
+
+    private void DrawRosterKnowledge(AIShoppingPlanner.AIRosterKnowledge roster)
+    {
+        EditorGUILayout.Space(5f);
+        int count = roster != null ? roster.Profiles.Count : 0;
+        _showRoster = EditorGUILayout.Foldout(
+            _showRoster, $"Roster da AI  ({count} unidades conhecidas)", true, _boldFoldout);
+        if (!_showRoster)
+            return;
+
+        EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+        EditorGUILayout.LabelField(
+            "Catálogo derivado das unidades oferecidas pelos produtores do time. "
+            + "É a mesma fonte usada para escolher counters básicos e elite.",
+            _subtle);
+
+        if (roster == null || roster.Profiles.Count == 0)
+        {
+            EditorGUILayout.LabelField("— roster vazio —", _subtle);
+            EditorGUILayout.EndVertical();
+            return;
+        }
+
+        foreach (AIShoppingPlanner.AIRosterProfile profile in roster.Profiles)
+        {
+            UnitData unit = profile.Unit;
+            if (unit == null)
+                continue;
+
+            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+            Color previous = GUI.color;
+            GUI.color = profile.AvailableNow
+                ? new Color(0.55f, 0.9f, 0.55f)
+                : profile.Unlockable
+                    ? new Color(1f, 0.78f, 0.35f)
+                    : new Color(0.7f, 0.7f, 0.7f);
+            EditorGUILayout.LabelField(
+                $"{unit.displayName}  ·  ${unit.cost}  ·  "
+                + (profile.AvailableNow ? "DISPONÍVEL AGORA"
+                    : profile.Unlockable ? "DESBLOQUEÁVEL" : "BLOQUEADA"),
+                EditorStyles.boldLabel);
+            GUI.color = previous;
+
+            EditorGUILayout.LabelField(
+                $"id={unit.id}  ·  classe={unit.unitClass}  ·  combate={unit.CombatClassification}  "
+                + $"·  role={profile.CompositionRole}  ·  elite={unit.eliteLevel}",
+                _subtle);
+
+            string capabilities = profile.IsTransporter ? "transporte" : "";
+            if (profile.IsSupplier)
+                capabilities += string.IsNullOrEmpty(capabilities) ? "logística" : ", logística";
+            if (!string.IsNullOrEmpty(capabilities))
+                EditorGUILayout.LabelField($"capacidades: {capabilities}", _subtle);
+
+            if (unit.embarkedWeapons == null || unit.embarkedWeapons.Count == 0)
+            {
+                EditorGUILayout.LabelField("armas: nenhuma", _subtle);
+            }
+            else
+            {
+                foreach (UnitEmbarkedWeapon slot in unit.embarkedWeapons)
+                {
+                    if (slot?.weapon == null)
+                        continue;
+                    EditorGUILayout.LabelField(
+                        $"arma: {slot.weapon.displayName}  ·  {slot.weapon.WeaponCategory}  "
+                        + $"·  alcance={slot.operationRangeMin}-{slot.operationRangeMax}",
+                        _subtle);
+                }
+            }
+
+            string producers = string.Join(", ", profile.Producers
+                .Where(p => p != null)
+                .Select(p => p.ConstructionDisplayName));
+            if (!string.IsNullOrEmpty(producers))
+                EditorGUILayout.LabelField($"produtores: {producers}", _subtle);
+
+            string foldoutKey = !string.IsNullOrEmpty(unit.id) ? unit.id : unit.name;
+            if (!_rosterUnitFoldouts.TryGetValue(foldoutKey, out bool showCoverage))
+                showCoverage = false;
+            showCoverage = EditorGUILayout.Foldout(
+                showCoverage,
+                $"matriz de cobertura ({profile.CoverageMatrix.Count})",
+                true,
+                _boldFoldout);
+            _rosterUnitFoldouts[foldoutKey] = showCoverage;
+            if (showCoverage)
+            {
+                EditorGUILayout.BeginHorizontal(EditorStyles.toolbar);
+                GUILayout.Label("Arma", EditorStyles.miniBoldLabel, GUILayout.Width(105f));
+                GUILayout.Label("Classe", EditorStyles.miniBoldLabel, GUILayout.Width(90f));
+                GUILayout.Label("Cob.", EditorStyles.miniBoldLabel, GUILayout.Width(42f));
+                GUILayout.Label("Alc.", EditorStyles.miniBoldLabel, GUILayout.Width(42f));
+                GUILayout.Label("Mortes", EditorStyles.miniBoldLabel, GUILayout.Width(45f));
+                GUILayout.Label("Nota", EditorStyles.miniBoldLabel);
+                EditorGUILayout.EndHorizontal();
+
+                foreach (AIShoppingPlanner.AIRosterCoverage row in profile.CoverageMatrix)
+                {
+                    EditorGUILayout.BeginHorizontal();
+                    GUILayout.Label(row.HasWeapon ? row.WeaponCategory.ToString() : "—", _subtle, GUILayout.Width(105f));
+                    GUILayout.Label(row.TargetClass.ToString(), _subtle, GUILayout.Width(90f));
+                    GUILayout.Label(row.Coverage.ToString("0.00"), _subtle, GUILayout.Width(42f));
+                    GUILayout.Label($"{row.Reach}/{row.ClassSize}", _subtle, GUILayout.Width(42f));
+                    GUILayout.Label(row.Deaths > 0 ? row.Deaths.ToString() : "—", _subtle, GUILayout.Width(45f));
+                    GUILayout.Label(RosterCoverageLabel(row.Coverage), _subtle);
+                    EditorGUILayout.EndHorizontal();
+                }
+            }
+
+            EditorGUILayout.EndVertical();
+        }
+        EditorGUILayout.EndVertical();
+    }
+
+    private static string RosterCoverageLabel(float coverage)
+    {
+        if (coverage >= 0.90f) return "counter natural";
+        if (coverage >= 0.70f) return "counter econômico";
+        if (coverage >= 0.55f) return "forte";
+        if (coverage >= 0.35f) return "parcial/troca";
+        if (coverage >= 0.15f) return "neutro";
+        return "desvantagem/gap";
     }
 
     private void DrawEliteQualityStatus(

@@ -50,6 +50,8 @@ public class ConstructionData : ScriptableObject
     public bool isHarbor = false;
     [Tooltip("Cidade mantem renda integral para a IA mesmo no modo Easy.")]
     public bool isCity = false;
+    [Tooltip("Marca esta construcao como terminal de transporte, sem aplicar regras economicas de cidade.")]
+    public bool isTransportTerminal = false;
 
     [Header("Visuals")]
     [FormerlySerializedAs("sprite")]

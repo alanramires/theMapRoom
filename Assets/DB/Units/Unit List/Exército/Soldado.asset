@@ -20,6 +20,7 @@ MonoBehaviour:
     e na persist\xEAncia ao longo do tempo. Use em conjunto com outras unidades para
     pressionar o inimigo e manter presen\xE7a no mapa. Depende de log\xEDstica em
     avan\xE7os longos."
+  requiredBuilding: {fileID: 0}
   spriteDefault: {fileID: 21300000, guid: 7a4e98efb59da8447b1de4d056a57e79, type: 3}
   teamVariantSprites: []
   maxHP: 10
@@ -79,6 +80,10 @@ MonoBehaviour:
   preferredAirHeight: 4
   useExplicitPreferredNavalHeight: 0
   preferredNavalHeight: 2
+  emergesToAttack: 0
+  emergeAfterAttackDomain: 1
+  emergeAfterAttackHeight: 3
+  emergeAfterAttackTurns: 2
   skills:
   - {fileID: 11400000, guid: 9c22b855a2e730f4faced0e069dc2a8d, type: 2}
   - {fileID: 11400000, guid: b5c241bd4e3f15448b70c001b4a66dae, type: 2}
@@ -107,13 +112,13 @@ MonoBehaviour:
   spriteTransport: {fileID: 0}
   allowedEmbarkWhenTransporterAtTerrains: []
   allowedEmbarkWhenTransporterAtTerrainStructures: []
-  allowedEmbarkWhenTransporterAtConstructions: []
+  allowedEmbarkWhenTransporterAtFacilities: 0
   allowedDisembarkWhenTransporterAtTerrains: []
   allowedDisembarkWhenTransporterAtTerrainStructures: []
-  allowedDisembarkWhenTransporterAtConstructions: []
+  allowedDisembarkWhenTransporterAtFacilities: 0
   passengersCanDisembarkAndGoesToTerrains: []
   passengersCanDisembarkAndGoesToTerrainStructures: []
-  passengersCanDisembarkAndGoesToConstructions: []
+  passengersCanDisembarkAndGoesToFacilities: 0
   transportSlots: []
   autonomia: 70
   cost: 1000

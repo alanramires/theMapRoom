@@ -17,10 +17,12 @@ MonoBehaviour:
   sufixo: Station
   description: "Produz Trens de Carga.\nCaptur\xE1-la transfere sua produ\xE7\xE3o.\nO
     trem exige trilhos cont\xEDnuos."
+  grammaticalGender: 0
   requiredBuilding: {fileID: 0}
   isAirport: 0
   isHarbor: 0
   isCity: 0
+  isTransportTerminal: 1
   spriteDefault: {fileID: 21300000, guid: a7b162bc180581b428ddac3618f1dd33, type: 3}
   spriteGreen: {fileID: 0}
   spriteRed: {fileID: 0}

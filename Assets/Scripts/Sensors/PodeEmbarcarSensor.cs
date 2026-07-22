@@ -136,7 +136,7 @@ public static class PodeEmbarcarSensor
             }
         }
 
-        bool hasConstructionFilter = transporterData.allowedEmbarkWhenTransporterAtConstructions != null && transporterData.allowedEmbarkWhenTransporterAtConstructions.Count > 0;
+        bool hasConstructionFilter = transporterData.allowedEmbarkWhenTransporterAtFacilities != ConstructionFacilityType.None;
         bool hasStructureFilter = transporterData.allowedEmbarkWhenTransporterAtTerrainStructures != null && transporterData.allowedEmbarkWhenTransporterAtTerrainStructures.Count > 0;
         bool hasTerrainFilter = transporterData.allowedEmbarkWhenTransporterAtTerrains != null && transporterData.allowedEmbarkWhenTransporterAtTerrains.Count > 0;
         Vector3Int cell = transporter.CurrentCellPosition;
@@ -162,7 +162,7 @@ public static class PodeEmbarcarSensor
         {
             if (hasConstructionFilter)
             {
-                if (transporterData.allowedEmbarkWhenTransporterAtConstructions.Contains(constructionData))
+                if (ConstructionFacilityTypeRules.MatchesAny(constructionData, transporterData.allowedEmbarkWhenTransporterAtFacilities))
                     return true;
 
                 reason = "Construcao do hex nao permitida para embarque deste transportador.";
@@ -230,8 +230,7 @@ public static class PodeEmbarcarSensor
     {
         if (transporterData == null) return true;
 
-        bool hasConstructionFilter = transporterData.allowedEmbarkWhenTransporterAtConstructions != null
-            && transporterData.allowedEmbarkWhenTransporterAtConstructions.Count > 0;
+        bool hasConstructionFilter = transporterData.allowedEmbarkWhenTransporterAtFacilities != ConstructionFacilityType.None;
         bool hasStructureFilter = transporterData.allowedEmbarkWhenTransporterAtTerrainStructures != null
             && transporterData.allowedEmbarkWhenTransporterAtTerrainStructures.Count > 0;
         bool hasTerrainFilter = transporterData.allowedEmbarkWhenTransporterAtTerrains != null
@@ -245,7 +244,7 @@ public static class PodeEmbarcarSensor
         if (construction != null && construction.TryResolveConstructionData(out ConstructionData constructionData) && constructionData != null)
         {
             if (hasConstructionFilter)
-                return transporterData.allowedEmbarkWhenTransporterAtConstructions.Contains(constructionData);
+                return ConstructionFacilityTypeRules.MatchesAny(constructionData, transporterData.allowedEmbarkWhenTransporterAtFacilities);
             return true; // construction present, no filter = allowed
         }
 

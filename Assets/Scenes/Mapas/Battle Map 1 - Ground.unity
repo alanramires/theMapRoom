@@ -2306,7 +2306,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: 30
+  m_text: 40
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 3cb5543ccd204d54c9c34b6008539c4d, type: 2}
   m_sharedMaterial: {fileID: -7834541552760396438, guid: 3cb5543ccd204d54c9c34b6008539c4d, type: 2}
@@ -5542,9 +5542,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MatchController
   currentTurn: 1
-  activeTeamId: 0
+  activeTeamId: 2
   players:
-  - teamId: 0
+  - teamId: 2
     flipX: 0
     flipXOverride: 0
     isAI: 0
@@ -5554,7 +5554,7 @@ MonoBehaviour:
     actualMoney: 0
     incomePerTurn: 6000
     startMoneyApplied: 1
-  - teamId: 1
+  - teamId: 3
     flipX: 1
     flipXOverride: 0
     isAI: 1
@@ -5593,9 +5593,9 @@ MonoBehaviour:
   victoryStarsToWin: 5
   freezeTurnAdvanceAfterVictory: 1
   victoryStarsByTeam:
-  - teamId: 0
+  - teamId: 2
     stars: 0
-  - teamId: 1
+  - teamId: 3
     stars: 0
   hasVictoryWinner: 0
   victoryWinnerTeam: -1
@@ -5613,10 +5613,10 @@ MonoBehaviour:
   victoryOverlayTile: {fileID: 0}
   victoryOverlayAlpha: 1
   activePlayerListIndex: 0
-  appliedActiveTeamId: 0
+  appliedActiveTeamId: 2
   pendingTurnStartUpkeep: 1
   pendingTurnStartEconomy: 1
-  cachedConstructionIncomeSignature: -1481752697
+  cachedConstructionIncomeSignature: -940178431
   cachedConstructionIncomeCount: 21
   constructionIncomeRefreshIntervalSeconds: 0.35
   continuousEditorRefresh: 0
@@ -7875,8 +7875,8 @@ MonoBehaviour:
   turnStateManager: {fileID: 1900915756}
   boardTilemap: {fileID: 1566606925}
   terrainDatabase: {fileID: 11400000, guid: af24f1a2f28971f498767ede9f9cfba1, type: 2}
-  showAILogs: 1
-  showAIUnitHUD: 1
+  showAILogs: 0
+  showAIUnitHUD: 0
   startOnPause: 1
   iaRapida: 0
   hardMode: 0
@@ -9894,7 +9894,7 @@ GameObject:
   - component: {fileID: 587944565}
   - component: {fileID: 587944564}
   m_Layer: 0
-  m_Name: "F\xE1bricaLeve_T0_C162"
+  m_Name: "F\xE1bricaLeve_T2_C162"
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -9934,7 +9934,7 @@ MonoBehaviour:
   snapToCellCenter: 1
   autoSnapWhenMovedInEditor: 1
   currentCellPosition: {x: -3, y: 6, z: 0}
-  teamId: 0
+  teamId: 2
   supplyTop: {fileID: 761593225}
   supplyMiddle: {fileID: 1750193528}
   supplyBottom: {fileID: 885189557}
@@ -9965,9 +9965,7 @@ MonoBehaviour:
     - {fileID: 11400000, guid: 70b7ea3ddea78fc4e9d744cee13b053a, type: 2}
     - {fileID: 11400000, guid: 3dc9b119819519440820c81f5db4fdce, type: 2}
     - {fileID: 11400000, guid: 70b98199c49882e44892f7ca76df6b33, type: 2}
-    - {fileID: 11400000, guid: 99b30df53878c69499853a4ef3cb5f81, type: 2}
     - {fileID: 11400000, guid: 8c89f5278e312ad46af401333934721b, type: 2}
-    - {fileID: 11400000, guid: 5e69516e1944ffc43bae1a7cd3c7c69c, type: 2}
     canProvideSupplies: 1
     offeredSupplies:
     - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
@@ -10056,7 +10054,7 @@ SpriteRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_Sprite: {fileID: 21300000, guid: 825c27d68263e094a8bf48c563036a80, type: 3}
-  m_Color: {r: 0.5647059, g: 0.93333334, b: 0.5647059, a: 1}
+  m_Color: {r: 0.65882355, g: 0.65882355, b: 1, a: 1}
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 0
@@ -10289,14 +10287,13 @@ MonoBehaviour:
     isPlayerHeadQuarter: 0
     isVictoryBuilding: 0
     isCapturable: 1
-    capturePointsMax: 30
-    capturedIncoming: 1500
+    capturePointsMax: 40
+    capturedIncoming: 2000
     sellingRule: 2
     legacyCanProduceAndSellUnits: 
     offeredUnits:
     - {fileID: 11400000, guid: 784e1b5ab74d4d34fa6c3ef79ba6219e, type: 2}
     - {fileID: 11400000, guid: f5327adf7bafffb408255d31a96ba049, type: 2}
-    - {fileID: 11400000, guid: 87b4ab0e959c2324aa2628feb5356585, type: 2}
     canProvideSupplies: 1
     offeredSupplies:
     - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
@@ -10312,8 +10309,8 @@ MonoBehaviour:
     - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
     - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
     - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
-  hasSiteRuntimeOverride: 0
-  currentCapturePoints: 30
+  hasSiteRuntimeOverride: 1
+  currentCapturePoints: 40
   hasInfiniteSuppliesOverride: 1
   originalOwnerSlotIndex: -1
   originalOwnerInitialized: 1
@@ -11516,7 +11513,7 @@ GameObject:
   - component: {fileID: 659395222}
   - component: {fileID: 659395221}
   m_Layer: 0
-  m_Name: HQ_T0_C1
+  m_Name: HQ_T2_C1
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -11556,7 +11553,7 @@ MonoBehaviour:
   snapToCellCenter: 1
   autoSnapWhenMovedInEditor: 1
   currentCellPosition: {x: -4, y: 5, z: 0}
-  teamId: 0
+  teamId: 2
   supplyTop: {fileID: 1034020528}
   supplyMiddle: {fileID: 1463556004}
   supplyBottom: {fileID: 480720113}
@@ -11575,7 +11572,7 @@ MonoBehaviour:
     isPlayerHeadQuarter: 1
     isVictoryBuilding: 0
     isCapturable: 1
-    capturePointsMax: 40
+    capturePointsMax: 60
     capturedIncoming: 3000
     sellingRule: 1
     legacyCanProduceAndSellUnits: 
@@ -11599,7 +11596,7 @@ MonoBehaviour:
     - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
     - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
   hasSiteRuntimeOverride: 0
-  currentCapturePoints: 40
+  currentCapturePoints: 60
   hasInfiniteSuppliesOverride: 1
   originalOwnerSlotIndex: 0
   originalOwnerInitialized: 1
@@ -11671,7 +11668,7 @@ SpriteRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_Sprite: {fileID: 21300000, guid: c090fb273a5237f4b9aef7fb2304a715, type: 3}
-  m_Color: {r: 0.5647059, g: 0.93333334, b: 0.5647059, a: 1}
+  m_Color: {r: 0.65882355, g: 0.65882355, b: 1, a: 1}
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 0
@@ -12246,7 +12243,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: 30/30
+  m_text: 40/40
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 3cb5543ccd204d54c9c34b6008539c4d, type: 2}
   m_sharedMaterial: {fileID: -7834541552760396438, guid: 3cb5543ccd204d54c9c34b6008539c4d, type: 2}
@@ -15148,7 +15145,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: 40/40
+  m_text: 60/60
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 3cb5543ccd204d54c9c34b6008539c4d, type: 2}
   m_sharedMaterial: {fileID: -7834541552760396438, guid: 3cb5543ccd204d54c9c34b6008539c4d, type: 2}
@@ -15410,7 +15407,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 376536317023229975, guid: bbd1302fcb61c7d49ac7944eafbfdede, type: 3}
       propertyPath: m_fontColor32.rgba
-      value: 4288388095
+      value: 4287493887
       objectReference: {fileID: 0}
     - target: {fileID: 3803312006916396853, guid: bbd1302fcb61c7d49ac7944eafbfdede, type: 3}
       propertyPath: m_Pivot.x
@@ -15498,7 +15495,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7653284495940490440, guid: bbd1302fcb61c7d49ac7944eafbfdede, type: 3}
       propertyPath: m_fontColor32.rgba
-      value: 4288388095
+      value: 4287493887
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -19910,7 +19907,7 @@ GameObject:
   - component: {fileID: 1317805173}
   - component: {fileID: 1317805172}
   m_Layer: 0
-  m_Name: "F\xE1bricaLeve_T1_C163"
+  m_Name: "F\xE1bricaLeve_T3_C163"
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -19950,7 +19947,7 @@ MonoBehaviour:
   snapToCellCenter: 1
   autoSnapWhenMovedInEditor: 1
   currentCellPosition: {x: 5, y: -5, z: 0}
-  teamId: 1
+  teamId: 3
   supplyTop: {fileID: 1864743550}
   supplyMiddle: {fileID: 1254636261}
   supplyBottom: {fileID: 1759697564}
@@ -19981,9 +19978,7 @@ MonoBehaviour:
     - {fileID: 11400000, guid: 70b7ea3ddea78fc4e9d744cee13b053a, type: 2}
     - {fileID: 11400000, guid: 3dc9b119819519440820c81f5db4fdce, type: 2}
     - {fileID: 11400000, guid: 70b98199c49882e44892f7ca76df6b33, type: 2}
-    - {fileID: 11400000, guid: 99b30df53878c69499853a4ef3cb5f81, type: 2}
     - {fileID: 11400000, guid: 8c89f5278e312ad46af401333934721b, type: 2}
-    - {fileID: 11400000, guid: 5e69516e1944ffc43bae1a7cd3c7c69c, type: 2}
     canProvideSupplies: 1
     offeredSupplies:
     - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
@@ -20072,7 +20067,7 @@ SpriteRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_Sprite: {fileID: 21300000, guid: 825c27d68263e094a8bf48c563036a80, type: 3}
-  m_Color: {r: 1, g: 0.60784316, b: 0.60784316, a: 1}
+  m_Color: {r: 1, g: 0.9647059, b: 0.5529412, a: 1}
   m_FlipX: 1
   m_FlipY: 0
   m_DrawMode: 0
@@ -20758,7 +20753,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: 40
+  m_text: 60
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 3cb5543ccd204d54c9c34b6008539c4d, type: 2}
   m_sharedMaterial: {fileID: -7834541552760396438, guid: 3cb5543ccd204d54c9c34b6008539c4d, type: 2}
@@ -21078,7 +21073,7 @@ GameObject:
   - component: {fileID: 1358103575}
   - component: {fileID: 1358103574}
   m_Layer: 0
-  m_Name: "F\xE1bricaLeve_T0_C161"
+  m_Name: "F\xE1bricaLeve_T2_C161"
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -21118,7 +21113,7 @@ MonoBehaviour:
   snapToCellCenter: 1
   autoSnapWhenMovedInEditor: 1
   currentCellPosition: {x: -5, y: 5, z: 0}
-  teamId: 0
+  teamId: 2
   supplyTop: {fileID: 1304848808}
   supplyMiddle: {fileID: 603939730}
   supplyBottom: {fileID: 996146656}
@@ -21149,9 +21144,7 @@ MonoBehaviour:
     - {fileID: 11400000, guid: 70b7ea3ddea78fc4e9d744cee13b053a, type: 2}
     - {fileID: 11400000, guid: 3dc9b119819519440820c81f5db4fdce, type: 2}
     - {fileID: 11400000, guid: 70b98199c49882e44892f7ca76df6b33, type: 2}
-    - {fileID: 11400000, guid: 99b30df53878c69499853a4ef3cb5f81, type: 2}
     - {fileID: 11400000, guid: 8c89f5278e312ad46af401333934721b, type: 2}
-    - {fileID: 11400000, guid: 5e69516e1944ffc43bae1a7cd3c7c69c, type: 2}
     canProvideSupplies: 1
     offeredSupplies:
     - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
@@ -21240,7 +21233,7 @@ SpriteRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_Sprite: {fileID: 21300000, guid: 825c27d68263e094a8bf48c563036a80, type: 3}
-  m_Color: {r: 0.5647059, g: 0.93333334, b: 0.5647059, a: 1}
+  m_Color: {r: 0.65882355, g: 0.65882355, b: 1, a: 1}
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 0
@@ -21372,7 +21365,7 @@ GameObject:
   - component: {fileID: 1369132135}
   - component: {fileID: 1369132134}
   m_Layer: 0
-  m_Name: "F\xE1bricaLeve_T1_C164"
+  m_Name: "F\xE1bricaLeve_T3_C164"
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -21412,7 +21405,7 @@ MonoBehaviour:
   snapToCellCenter: 1
   autoSnapWhenMovedInEditor: 1
   currentCellPosition: {x: 4, y: -6, z: 0}
-  teamId: 1
+  teamId: 3
   supplyTop: {fileID: 1342878484}
   supplyMiddle: {fileID: 1604190270}
   supplyBottom: {fileID: 969272552}
@@ -21443,9 +21436,7 @@ MonoBehaviour:
     - {fileID: 11400000, guid: 70b7ea3ddea78fc4e9d744cee13b053a, type: 2}
     - {fileID: 11400000, guid: 3dc9b119819519440820c81f5db4fdce, type: 2}
     - {fileID: 11400000, guid: 70b98199c49882e44892f7ca76df6b33, type: 2}
-    - {fileID: 11400000, guid: 99b30df53878c69499853a4ef3cb5f81, type: 2}
     - {fileID: 11400000, guid: 8c89f5278e312ad46af401333934721b, type: 2}
-    - {fileID: 11400000, guid: 5e69516e1944ffc43bae1a7cd3c7c69c, type: 2}
     canProvideSupplies: 1
     offeredSupplies:
     - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
@@ -21534,7 +21525,7 @@ SpriteRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_Sprite: {fileID: 21300000, guid: 825c27d68263e094a8bf48c563036a80, type: 3}
-  m_Color: {r: 1, g: 0.60784316, b: 0.60784316, a: 1}
+  m_Color: {r: 1, g: 0.9647059, b: 0.5529412, a: 1}
   m_FlipX: 1
   m_FlipY: 0
   m_DrawMode: 0
@@ -23852,7 +23843,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: 40
+  m_text: 60
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 3cb5543ccd204d54c9c34b6008539c4d, type: 2}
   m_sharedMaterial: {fileID: -7834541552760396438, guid: 3cb5543ccd204d54c9c34b6008539c4d, type: 2}
@@ -28216,7 +28207,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: 30/30
+  m_text: 40/40
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 3cb5543ccd204d54c9c34b6008539c4d, type: 2}
   m_sharedMaterial: {fileID: -7834541552760396438, guid: 3cb5543ccd204d54c9c34b6008539c4d, type: 2}
@@ -28521,14 +28512,13 @@ MonoBehaviour:
     isPlayerHeadQuarter: 0
     isVictoryBuilding: 0
     isCapturable: 1
-    capturePointsMax: 30
-    capturedIncoming: 1500
+    capturePointsMax: 40
+    capturedIncoming: 2000
     sellingRule: 2
     legacyCanProduceAndSellUnits: 
     offeredUnits:
     - {fileID: 11400000, guid: 784e1b5ab74d4d34fa6c3ef79ba6219e, type: 2}
     - {fileID: 11400000, guid: f5327adf7bafffb408255d31a96ba049, type: 2}
-    - {fileID: 11400000, guid: 87b4ab0e959c2324aa2628feb5356585, type: 2}
     canProvideSupplies: 1
     offeredSupplies:
     - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
@@ -28544,8 +28534,8 @@ MonoBehaviour:
     - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
     - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
     - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
-  hasSiteRuntimeOverride: 0
-  currentCapturePoints: 30
+  hasSiteRuntimeOverride: 1
+  currentCapturePoints: 40
   hasInfiniteSuppliesOverride: 1
   originalOwnerSlotIndex: -1
   originalOwnerInitialized: 1
@@ -29029,7 +29019,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: 30
+  m_text: 40
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 3cb5543ccd204d54c9c34b6008539c4d, type: 2}
   m_sharedMaterial: {fileID: -7834541552760396438, guid: 3cb5543ccd204d54c9c34b6008539c4d, type: 2}
@@ -31437,7 +31427,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: 40/40
+  m_text: 60/60
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 3cb5543ccd204d54c9c34b6008539c4d, type: 2}
   m_sharedMaterial: {fileID: -7834541552760396438, guid: 3cb5543ccd204d54c9c34b6008539c4d, type: 2}
@@ -32527,8 +32517,8 @@ MonoBehaviour:
     representativeConstruction: {fileID: 1652883917}
     representativeCell: {x: -2, y: 4, z: 0}
     representativeLabel: "F\xE1brica"
-    totalCapturePointsMax: 30
-    totalCurrentCapturePoints: 30
+    totalCapturePointsMax: 40
+    totalCurrentCapturePoints: 40
     constructionCount: 1
     isFullyControlled: 1
     isDisputed: 0
@@ -32540,38 +32530,18 @@ MonoBehaviour:
       displayName: "F\xE1brica"
       cell: {x: -2, y: 4, z: 0}
       ownerTeam: -1
-      currentCapturePoints: 30
-      capturePointsMax: 30
+      currentCapturePoints: 40
+      capturePointsMax: 40
       source: {fileID: 1652883917}
     riskEntries:
-    - Team: 0
-      RiskRatio: 0.15
-      RiskLevel: 0
-    - Team: 1
+    - Team: 3
       RiskRatio: 0.85
       RiskLevel: 4
+    - Team: 2
+      RiskRatio: 0.15
+      RiskLevel: 0
     sectorDistances:
-    - Team: 0
-      Entries:
-      - ConstructionName: HQ
-        InstanceId: 0
-        Distance: 2
-        VehicleDistance: 2
-        AirDistance: 2
-        IsHQ: 1
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 161
-        Distance: 3
-        VehicleDistance: 3
-        AirDistance: 3
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 162
-        Distance: 2
-        VehicleDistance: 2
-        AirDistance: 2
-        IsHQ: 0
-    - Team: 1
+    - Team: 3
       Entries:
       - ConstructionName: HQ
         InstanceId: 0
@@ -32579,17 +32549,37 @@ MonoBehaviour:
         VehicleDistance: 11
         AirDistance: 11
         IsHQ: 1
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 164
+        Distance: 11
+        VehicleDistance: 11
+        AirDistance: 11
+        IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 163
         Distance: 12
         VehicleDistance: 12
         AirDistance: 12
         IsHQ: 0
+    - Team: 2
+      Entries:
+      - ConstructionName: HQ
+        InstanceId: 0
+        Distance: 2
+        VehicleDistance: 2
+        AirDistance: 2
+        IsHQ: 1
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 164
-        Distance: 11
-        VehicleDistance: 11
-        AirDistance: 11
+        InstanceId: 162
+        Distance: 2
+        VehicleDistance: 2
+        AirDistance: 2
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 161
+        Distance: 3
+        VehicleDistance: 3
+        AirDistance: 3
         IsHQ: 0
     closestNeighbor1: 1
     closestNeighbor1Distance: 4
@@ -32616,34 +32606,14 @@ MonoBehaviour:
       capturePointsMax: 20
       source: {fileID: 1437863600}
     riskEntries:
-    - Team: 0
-      RiskRatio: 0.33
-      RiskLevel: 1
-    - Team: 1
+    - Team: 3
       RiskRatio: 0.67
       RiskLevel: 3
+    - Team: 2
+      RiskRatio: 0.33
+      RiskLevel: 1
     sectorDistances:
-    - Team: 0
-      Entries:
-      - ConstructionName: HQ
-        InstanceId: 0
-        Distance: 5
-        VehicleDistance: 5
-        AirDistance: 5
-        IsHQ: 1
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 161
-        Distance: 5
-        VehicleDistance: 5
-        AirDistance: 5
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 162
-        Distance: 6
-        VehicleDistance: 6
-        AirDistance: 6
-        IsHQ: 0
-    - Team: 1
+    - Team: 3
       Entries:
       - ConstructionName: HQ
         InstanceId: 0
@@ -32651,17 +32621,37 @@ MonoBehaviour:
         VehicleDistance: 10
         AirDistance: 10
         IsHQ: 1
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 164
+        Distance: 10
+        VehicleDistance: 10
+        AirDistance: 10
+        IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 163
         Distance: 11
         VehicleDistance: 11
         AirDistance: 11
         IsHQ: 0
+    - Team: 2
+      Entries:
+      - ConstructionName: HQ
+        InstanceId: 0
+        Distance: 5
+        VehicleDistance: 5
+        AirDistance: 5
+        IsHQ: 1
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 164
-        Distance: 10
-        VehicleDistance: 10
-        AirDistance: 10
+        InstanceId: 162
+        Distance: 6
+        VehicleDistance: 6
+        AirDistance: 6
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 161
+        Distance: 5
+        VehicleDistance: 5
+        AirDistance: 5
         IsHQ: 0
     closestNeighbor1: 7
     closestNeighbor1Distance: 3
@@ -32688,34 +32678,14 @@ MonoBehaviour:
       capturePointsMax: 20
       source: {fileID: 1457171919}
     riskEntries:
-    - Team: 0
-      RiskRatio: 0.47
-      RiskLevel: 2
-    - Team: 1
+    - Team: 3
       RiskRatio: 0.53
       RiskLevel: 2
+    - Team: 2
+      RiskRatio: 0.47
+      RiskLevel: 2
     sectorDistances:
-    - Team: 0
-      Entries:
-      - ConstructionName: HQ
-        InstanceId: 0
-        Distance: 7
-        VehicleDistance: 7
-        AirDistance: 7
-        IsHQ: 1
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 161
-        Distance: 8
-        VehicleDistance: 8
-        AirDistance: 8
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 162
-        Distance: 7
-        VehicleDistance: 7
-        AirDistance: 7
-        IsHQ: 0
-    - Team: 1
+    - Team: 3
       Entries:
       - ConstructionName: HQ
         InstanceId: 0
@@ -32723,17 +32693,37 @@ MonoBehaviour:
         VehicleDistance: 8
         AirDistance: 8
         IsHQ: 1
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 164
+        Distance: 9
+        VehicleDistance: 9
+        AirDistance: 9
+        IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 163
         Distance: 8
         VehicleDistance: 8
         AirDistance: 8
         IsHQ: 0
+    - Team: 2
+      Entries:
+      - ConstructionName: HQ
+        InstanceId: 0
+        Distance: 7
+        VehicleDistance: 7
+        AirDistance: 7
+        IsHQ: 1
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 164
-        Distance: 9
-        VehicleDistance: 9
-        AirDistance: 9
+        InstanceId: 162
+        Distance: 7
+        VehicleDistance: 7
+        AirDistance: 7
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 161
+        Distance: 8
+        VehicleDistance: 8
+        AirDistance: 8
         IsHQ: 0
     closestNeighbor1: 3
     closestNeighbor1Distance: 3
@@ -32760,34 +32750,14 @@ MonoBehaviour:
       capturePointsMax: 20
       source: {fileID: 1682746264}
     riskEntries:
-    - Team: 0
-      RiskRatio: 0.67
-      RiskLevel: 3
-    - Team: 1
+    - Team: 3
       RiskRatio: 0.33
       RiskLevel: 1
+    - Team: 2
+      RiskRatio: 0.67
+      RiskLevel: 3
     sectorDistances:
-    - Team: 0
-      Entries:
-      - ConstructionName: HQ
-        InstanceId: 0
-        Distance: 10
-        VehicleDistance: 10
-        AirDistance: 10
-        IsHQ: 1
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 161
-        Distance: 11
-        VehicleDistance: 11
-        AirDistance: 11
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 162
-        Distance: 10
-        VehicleDistance: 10
-        AirDistance: 10
-        IsHQ: 0
-    - Team: 1
+    - Team: 3
       Entries:
       - ConstructionName: HQ
         InstanceId: 0
@@ -32795,17 +32765,37 @@ MonoBehaviour:
         VehicleDistance: 5
         AirDistance: 5
         IsHQ: 1
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 164
+        Distance: 6
+        VehicleDistance: 6
+        AirDistance: 6
+        IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 163
         Distance: 5
         VehicleDistance: 5
         AirDistance: 5
         IsHQ: 0
+    - Team: 2
+      Entries:
+      - ConstructionName: HQ
+        InstanceId: 0
+        Distance: 10
+        VehicleDistance: 10
+        AirDistance: 10
+        IsHQ: 1
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 164
-        Distance: 6
-        VehicleDistance: 6
-        AirDistance: 6
+        InstanceId: 162
+        Distance: 10
+        VehicleDistance: 10
+        AirDistance: 10
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 161
+        Distance: 11
+        VehicleDistance: 11
+        AirDistance: 11
         IsHQ: 0
     closestNeighbor1: 2
     closestNeighbor1Distance: 3
@@ -32832,34 +32822,14 @@ MonoBehaviour:
       capturePointsMax: 20
       source: {fileID: 22519269}
     riskEntries:
-    - Team: 0
-      RiskRatio: 0.62
-      RiskLevel: 3
-    - Team: 1
+    - Team: 3
       RiskRatio: 0.38
       RiskLevel: 1
+    - Team: 2
+      RiskRatio: 0.62
+      RiskLevel: 3
     sectorDistances:
-    - Team: 0
-      Entries:
-      - ConstructionName: HQ
-        InstanceId: 0
-        Distance: 8
-        VehicleDistance: 8
-        AirDistance: 8
-        IsHQ: 1
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 161
-        Distance: 9
-        VehicleDistance: 9
-        AirDistance: 9
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 162
-        Distance: 8
-        VehicleDistance: 8
-        AirDistance: 8
-        IsHQ: 0
-    - Team: 1
+    - Team: 3
       Entries:
       - ConstructionName: HQ
         InstanceId: 0
@@ -32867,17 +32837,37 @@ MonoBehaviour:
         VehicleDistance: 5
         AirDistance: 5
         IsHQ: 1
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 164
+        Distance: 5
+        VehicleDistance: 5
+        AirDistance: 5
+        IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 163
         Distance: 6
         VehicleDistance: 6
         AirDistance: 6
         IsHQ: 0
+    - Team: 2
+      Entries:
+      - ConstructionName: HQ
+        InstanceId: 0
+        Distance: 8
+        VehicleDistance: 8
+        AirDistance: 8
+        IsHQ: 1
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 164
-        Distance: 5
-        VehicleDistance: 5
-        AirDistance: 5
+        InstanceId: 162
+        Distance: 8
+        VehicleDistance: 8
+        AirDistance: 8
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 161
+        Distance: 9
+        VehicleDistance: 9
+        AirDistance: 9
         IsHQ: 0
     closestNeighbor1: 7
     closestNeighbor1Distance: 2
@@ -32904,34 +32894,14 @@ MonoBehaviour:
       capturePointsMax: 20
       source: {fileID: 44789890}
     riskEntries:
-    - Team: 0
-      RiskRatio: 0.62
-      RiskLevel: 3
-    - Team: 1
+    - Team: 3
       RiskRatio: 0.38
       RiskLevel: 1
+    - Team: 2
+      RiskRatio: 0.62
+      RiskLevel: 3
     sectorDistances:
-    - Team: 0
-      Entries:
-      - ConstructionName: HQ
-        InstanceId: 0
-        Distance: 10
-        VehicleDistance: 10
-        AirDistance: 10
-        IsHQ: 1
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 161
-        Distance: 10
-        VehicleDistance: 10
-        AirDistance: 10
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 162
-        Distance: 11
-        VehicleDistance: 11
-        AirDistance: 11
-        IsHQ: 0
-    - Team: 1
+    - Team: 3
       Entries:
       - ConstructionName: HQ
         InstanceId: 0
@@ -32939,17 +32909,37 @@ MonoBehaviour:
         VehicleDistance: 6
         AirDistance: 6
         IsHQ: 1
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 164
+        Distance: 6
+        VehicleDistance: 6
+        AirDistance: 6
+        IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 163
         Distance: 7
         VehicleDistance: 7
         AirDistance: 7
         IsHQ: 0
+    - Team: 2
+      Entries:
+      - ConstructionName: HQ
+        InstanceId: 0
+        Distance: 10
+        VehicleDistance: 10
+        AirDistance: 10
+        IsHQ: 1
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 164
-        Distance: 6
-        VehicleDistance: 6
-        AirDistance: 6
+        InstanceId: 162
+        Distance: 11
+        VehicleDistance: 11
+        AirDistance: 11
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 161
+        Distance: 10
+        VehicleDistance: 10
+        AirDistance: 10
         IsHQ: 0
     closestNeighbor1: 7
     closestNeighbor1Distance: 4
@@ -32959,8 +32949,8 @@ MonoBehaviour:
     representativeConstruction: {fileID: 605713677}
     representativeCell: {x: 3, y: -4, z: 0}
     representativeLabel: "F\xE1brica"
-    totalCapturePointsMax: 30
-    totalCurrentCapturePoints: 30
+    totalCapturePointsMax: 40
+    totalCurrentCapturePoints: 40
     constructionCount: 1
     isFullyControlled: 1
     isDisputed: 0
@@ -32972,38 +32962,18 @@ MonoBehaviour:
       displayName: "F\xE1brica"
       cell: {x: 3, y: -4, z: 0}
       ownerTeam: -1
-      currentCapturePoints: 30
-      capturePointsMax: 30
+      currentCapturePoints: 40
+      capturePointsMax: 40
       source: {fileID: 605713677}
     riskEntries:
-    - Team: 0
-      RiskRatio: 0.85
-      RiskLevel: 4
-    - Team: 1
+    - Team: 3
       RiskRatio: 0.15
       RiskLevel: 0
+    - Team: 2
+      RiskRatio: 0.85
+      RiskLevel: 4
     sectorDistances:
-    - Team: 0
-      Entries:
-      - ConstructionName: HQ
-        InstanceId: 0
-        Distance: 11
-        VehicleDistance: 11
-        AirDistance: 11
-        IsHQ: 1
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 161
-        Distance: 12
-        VehicleDistance: 12
-        AirDistance: 12
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 162
-        Distance: 11
-        VehicleDistance: 11
-        AirDistance: 11
-        IsHQ: 0
-    - Team: 1
+    - Team: 3
       Entries:
       - ConstructionName: HQ
         InstanceId: 0
@@ -33011,17 +32981,37 @@ MonoBehaviour:
         VehicleDistance: 2
         AirDistance: 2
         IsHQ: 1
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 164
+        Distance: 2
+        VehicleDistance: 2
+        AirDistance: 2
+        IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 163
         Distance: 3
         VehicleDistance: 3
         AirDistance: 3
         IsHQ: 0
+    - Team: 2
+      Entries:
+      - ConstructionName: HQ
+        InstanceId: 0
+        Distance: 11
+        VehicleDistance: 11
+        AirDistance: 11
+        IsHQ: 1
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 164
-        Distance: 2
-        VehicleDistance: 2
-        AirDistance: 2
+        InstanceId: 162
+        Distance: 11
+        VehicleDistance: 11
+        AirDistance: 11
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 161
+        Distance: 12
+        VehicleDistance: 12
+        AirDistance: 12
         IsHQ: 0
     closestNeighbor1: 4
     closestNeighbor1Distance: 3
@@ -33048,14 +33038,34 @@ MonoBehaviour:
       capturePointsMax: 20
       source: {fileID: 1113079838}
     riskEntries:
-    - Team: 0
-      RiskRatio: 0.46
-      RiskLevel: 2
-    - Team: 1
+    - Team: 3
       RiskRatio: 0.54
       RiskLevel: 2
+    - Team: 2
+      RiskRatio: 0.46
+      RiskLevel: 2
     sectorDistances:
-    - Team: 0
+    - Team: 3
+      Entries:
+      - ConstructionName: HQ
+        InstanceId: 0
+        Distance: 7
+        VehicleDistance: 7
+        AirDistance: 7
+        IsHQ: 1
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 164
+        Distance: 7
+        VehicleDistance: 7
+        AirDistance: 7
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 163
+        Distance: 8
+        VehicleDistance: 8
+        AirDistance: 8
+        IsHQ: 0
+    - Team: 2
       Entries:
       - ConstructionName: HQ
         InstanceId: 0
@@ -33064,33 +33074,13 @@ MonoBehaviour:
         AirDistance: 6
         IsHQ: 1
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 161
-        Distance: 7
-        VehicleDistance: 7
-        AirDistance: 7
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
         InstanceId: 162
         Distance: 7
         VehicleDistance: 7
         AirDistance: 7
         IsHQ: 0
-    - Team: 1
-      Entries:
-      - ConstructionName: HQ
-        InstanceId: 0
-        Distance: 7
-        VehicleDistance: 7
-        AirDistance: 7
-        IsHQ: 1
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 163
-        Distance: 8
-        VehicleDistance: 8
-        AirDistance: 8
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 164
+        InstanceId: 161
         Distance: 7
         VehicleDistance: 7
         AirDistance: 7
@@ -33104,45 +33094,65 @@ MonoBehaviour:
     representativeConstruction: {fileID: 659395221}
     representativeCell: {x: -4, y: 5, z: 0}
     representativeLabel: HQ
-    totalCapturePointsMax: 100
-    totalCurrentCapturePoints: 100
+    totalCapturePointsMax: 120
+    totalCurrentCapturePoints: 120
     constructionCount: 3
     isFullyControlled: 1
     isDisputed: 0
     hasPartialCapture: 0
-    controllingTeam: 0
-    statusText: Controlado por verde
+    controllingTeam: 2
+    statusText: Controlado por azul
     constructions:
     - instanceId: 161
       displayName: "F\xE1brica Leve"
       cell: {x: -5, y: 5, z: 0}
-      ownerTeam: 0
+      ownerTeam: 2
       currentCapturePoints: 30
       capturePointsMax: 30
       source: {fileID: 1358103574}
     - instanceId: 1
       displayName: HQ
       cell: {x: -4, y: 5, z: 0}
-      ownerTeam: 0
-      currentCapturePoints: 40
-      capturePointsMax: 40
+      ownerTeam: 2
+      currentCapturePoints: 60
+      capturePointsMax: 60
       source: {fileID: 659395221}
     - instanceId: 162
       displayName: "F\xE1brica Leve"
       cell: {x: -3, y: 6, z: 0}
-      ownerTeam: 0
+      ownerTeam: 2
       currentCapturePoints: 30
       capturePointsMax: 30
       source: {fileID: 587944564}
     riskEntries:
-    - Team: 0
-      RiskRatio: 0
-      RiskLevel: 0
-    - Team: 1
+    - Team: 3
       RiskRatio: 1
       RiskLevel: 4
+    - Team: 2
+      RiskRatio: 0
+      RiskLevel: 0
     sectorDistances:
-    - Team: 0
+    - Team: 3
+      Entries:
+      - ConstructionName: HQ
+        InstanceId: 0
+        Distance: 13
+        VehicleDistance: 13
+        AirDistance: 13
+        IsHQ: 1
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 164
+        Distance: 13
+        VehicleDistance: 13
+        AirDistance: 13
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 163
+        Distance: 14
+        VehicleDistance: 14
+        AirDistance: 14
+        IsHQ: 0
+    - Team: 2
       Entries:
       - ConstructionName: HQ
         InstanceId: 0
@@ -33151,36 +33161,16 @@ MonoBehaviour:
         AirDistance: 0
         IsHQ: 1
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 161
-        Distance: 1
-        VehicleDistance: 1
-        AirDistance: 1
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
         InstanceId: 162
         Distance: 1
         VehicleDistance: 1
         AirDistance: 1
         IsHQ: 0
-    - Team: 1
-      Entries:
-      - ConstructionName: HQ
-        InstanceId: 0
-        Distance: 13
-        VehicleDistance: 13
-        AirDistance: 13
-        IsHQ: 1
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 163
-        Distance: 14
-        VehicleDistance: 14
-        AirDistance: 14
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 164
-        Distance: 13
-        VehicleDistance: 13
-        AirDistance: 13
+        InstanceId: 161
+        Distance: 1
+        VehicleDistance: 1
+        AirDistance: 1
         IsHQ: 0
     closestNeighbor1: 0
     closestNeighbor1Distance: 3.4028235e+38
@@ -33190,65 +33180,45 @@ MonoBehaviour:
     representativeConstruction: {fileID: 2139282031}
     representativeCell: {x: 4, y: -5, z: 0}
     representativeLabel: HQ
-    totalCapturePointsMax: 100
-    totalCurrentCapturePoints: 100
+    totalCapturePointsMax: 120
+    totalCurrentCapturePoints: 120
     constructionCount: 3
     isFullyControlled: 1
     isDisputed: 0
     hasPartialCapture: 0
-    controllingTeam: 1
-    statusText: Controlado por vermelho
+    controllingTeam: 3
+    statusText: Controlado por amarelo
     constructions:
     - instanceId: 164
       displayName: "F\xE1brica Leve"
       cell: {x: 4, y: -6, z: 0}
-      ownerTeam: 1
+      ownerTeam: 3
       currentCapturePoints: 30
       capturePointsMax: 30
       source: {fileID: 1369132134}
     - instanceId: 139
       displayName: HQ
       cell: {x: 4, y: -5, z: 0}
-      ownerTeam: 1
-      currentCapturePoints: 40
-      capturePointsMax: 40
+      ownerTeam: 3
+      currentCapturePoints: 60
+      capturePointsMax: 60
       source: {fileID: 2139282031}
     - instanceId: 163
       displayName: "F\xE1brica Leve"
       cell: {x: 5, y: -5, z: 0}
-      ownerTeam: 1
+      ownerTeam: 3
       currentCapturePoints: 30
       capturePointsMax: 30
       source: {fileID: 1317805172}
     riskEntries:
-    - Team: 0
-      RiskRatio: 1
-      RiskLevel: 4
-    - Team: 1
+    - Team: 3
       RiskRatio: 0
       RiskLevel: 0
+    - Team: 2
+      RiskRatio: 1
+      RiskLevel: 4
     sectorDistances:
-    - Team: 0
-      Entries:
-      - ConstructionName: HQ
-        InstanceId: 0
-        Distance: 13
-        VehicleDistance: 13
-        AirDistance: 13
-        IsHQ: 1
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 161
-        Distance: 14
-        VehicleDistance: 14
-        AirDistance: 14
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 162
-        Distance: 13
-        VehicleDistance: 13
-        AirDistance: 13
-        IsHQ: 0
-    - Team: 1
+    - Team: 3
       Entries:
       - ConstructionName: HQ
         InstanceId: 0
@@ -33257,16 +33227,36 @@ MonoBehaviour:
         AirDistance: 0
         IsHQ: 1
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 163
+        InstanceId: 164
         Distance: 1
         VehicleDistance: 1
         AirDistance: 1
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 164
+        InstanceId: 163
         Distance: 1
         VehicleDistance: 1
         AirDistance: 1
+        IsHQ: 0
+    - Team: 2
+      Entries:
+      - ConstructionName: HQ
+        InstanceId: 0
+        Distance: 13
+        VehicleDistance: 13
+        AirDistance: 13
+        IsHQ: 1
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 162
+        Distance: 13
+        VehicleDistance: 13
+        AirDistance: 13
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 161
+        Distance: 14
+        VehicleDistance: 14
+        AirDistance: 14
         IsHQ: 0
     closestNeighbor1: 0
     closestNeighbor1Distance: 3.4028235e+38
@@ -33636,8 +33626,28 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 27e2444ae5ec3a548a46ce68f6a80b48, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::HexCohabitationVisualSettings
-  airOffset: {x: 0, y: 0.2}
-  surfaceOffset: {x: 0, y: -0.2}
+  airSurface:
+    air: {x: -0.1, y: 0.2}
+    airHudY: 0
+    surface: {x: 0, y: -0.2}
+    surfaceHudY: 0
+  airSubmerged:
+    air: {x: -0.1, y: 0.2}
+    airHudY: 0
+    submerged: {x: 0, y: -0.2}
+    submergedHudY: 0
+  surfaceSubmerged:
+    surface: {x: 0, y: 0.15}
+    surfaceHudY: 0
+    submerged: {x: 0, y: -0.25}
+    submergedHudY: 0
+  fullStack:
+    air: {x: -0.1, y: 0.3}
+    airHudY: 0
+    surface: {x: 0, y: 0}
+    surfaceHudY: 0
+    submerged: {x: 0, y: -0.32}
+    submergedHudY: 0
   scale: 0.6
   intraLayerSpread: 0.18
 --- !u!1 &1926388766
@@ -36880,7 +36890,7 @@ GameObject:
   - component: {fileID: 2139282032}
   - component: {fileID: 2139282031}
   m_Layer: 0
-  m_Name: HQ_T1_C139
+  m_Name: HQ_T3_C139
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -36920,7 +36930,7 @@ MonoBehaviour:
   snapToCellCenter: 1
   autoSnapWhenMovedInEditor: 1
   currentCellPosition: {x: 4, y: -5, z: 0}
-  teamId: 1
+  teamId: 3
   supplyTop: {fileID: 159821850}
   supplyMiddle: {fileID: 1107645398}
   supplyBottom: {fileID: 418286241}
@@ -36939,7 +36949,7 @@ MonoBehaviour:
     isPlayerHeadQuarter: 1
     isVictoryBuilding: 0
     isCapturable: 1
-    capturePointsMax: 40
+    capturePointsMax: 60
     capturedIncoming: 3000
     sellingRule: 1
     legacyCanProduceAndSellUnits: 
@@ -36963,7 +36973,7 @@ MonoBehaviour:
     - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
     - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
   hasSiteRuntimeOverride: 0
-  currentCapturePoints: 40
+  currentCapturePoints: 60
   hasInfiniteSuppliesOverride: 1
   originalOwnerSlotIndex: 1
   originalOwnerInitialized: 1
@@ -37035,7 +37045,7 @@ SpriteRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_Sprite: {fileID: 21300000, guid: c090fb273a5237f4b9aef7fb2304a715, type: 3}
-  m_Color: {r: 1, g: 0.60784316, b: 0.60784316, a: 1}
+  m_Color: {r: 1, g: 0.9647059, b: 0.5529412, a: 1}
   m_FlipX: 1
   m_FlipY: 0
   m_DrawMode: 0
@@ -37204,15 +37214,15 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 5377797194001161901, guid: f7e44d7c210a32d4ba630ba660da88a1, type: 3}
       propertyPath: m_Color.b
-      value: 0.5647059
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 5377797194001161901, guid: f7e44d7c210a32d4ba630ba660da88a1, type: 3}
       propertyPath: m_Color.g
-      value: 0.93333334
+      value: 0.65882355
       objectReference: {fileID: 0}
     - target: {fileID: 5377797194001161901, guid: f7e44d7c210a32d4ba630ba660da88a1, type: 3}
       propertyPath: m_Color.r
-      value: 0.5647059
+      value: 0.65882355
       objectReference: {fileID: 0}
     - target: {fileID: 6479182521967626403, guid: f7e44d7c210a32d4ba630ba660da88a1, type: 3}
       propertyPath: m_text
@@ -38014,15 +38024,19 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 4702684852002017877, guid: 41718aa68dd0b8d44bbba1b60b8a9c2b, type: 3}
       propertyPath: m_fontColor.b
-      value: 0.5647059
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 4702684852002017877, guid: 41718aa68dd0b8d44bbba1b60b8a9c2b, type: 3}
       propertyPath: m_fontColor.g
-      value: 0.93333334
+      value: 0.65882355
       objectReference: {fileID: 0}
     - target: {fileID: 4702684852002017877, guid: 41718aa68dd0b8d44bbba1b60b8a9c2b, type: 3}
       propertyPath: m_fontColor.r
-      value: 0.5647059
+      value: 0.65882355
+      objectReference: {fileID: 0}
+    - target: {fileID: 4702684852002017877, guid: 41718aa68dd0b8d44bbba1b60b8a9c2b, type: 3}
+      propertyPath: m_fontColor32.rgba
+      value: 4294944936
       objectReference: {fileID: 0}
     - target: {fileID: 4784404864065719851, guid: 41718aa68dd0b8d44bbba1b60b8a9c2b, type: 3}
       propertyPath: m_Name

@@ -19,6 +19,7 @@ MonoBehaviour:
     infantaria e ve\xEDculos leves, mas n\xE3o resiste a unidades superiores. Use
     em grupo para for\xE7ar o inimigo a gastar muni\xE7\xE3o e criar oportunidades.
     Depende de n\xFAmero e coordena\xE7\xE3o para ser relevante."
+  requiredBuilding: {fileID: 0}
   spriteDefault: {fileID: 21300000, guid: eb765444f338388409c52aaed0921eef, type: 3}
   teamVariantSprites: []
   maxHP: 10
@@ -82,6 +83,10 @@ MonoBehaviour:
   preferredAirHeight: 4
   useExplicitPreferredNavalHeight: 0
   preferredNavalHeight: 2
+  emergesToAttack: 0
+  emergeAfterAttackDomain: 1
+  emergeAfterAttackHeight: 3
+  emergeAfterAttackTurns: 2
   skills:
   - {fileID: 11400000, guid: ef10c9e820afc074b99ea8e0b709c2f4, type: 2}
   stealthSkills: []
@@ -115,13 +120,13 @@ MonoBehaviour:
   spriteTransport: {fileID: 0}
   allowedEmbarkWhenTransporterAtTerrains: []
   allowedEmbarkWhenTransporterAtTerrainStructures: []
-  allowedEmbarkWhenTransporterAtConstructions: []
+  allowedEmbarkWhenTransporterAtFacilities: 0
   allowedDisembarkWhenTransporterAtTerrains: []
   allowedDisembarkWhenTransporterAtTerrainStructures: []
-  allowedDisembarkWhenTransporterAtConstructions: []
+  allowedDisembarkWhenTransporterAtFacilities: 0
   passengersCanDisembarkAndGoesToTerrains: []
   passengersCanDisembarkAndGoesToTerrainStructures: []
-  passengersCanDisembarkAndGoesToConstructions: []
+  passengersCanDisembarkAndGoesToFacilities: 0
   transportSlots: []
   autonomia: 32
   cost: 6000

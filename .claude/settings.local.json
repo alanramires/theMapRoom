@@ -58,7 +58,9 @@
       "Bash(python -)",
       "Bash(python \"C:/Users/Alan/AppData/Local/Temp/claude/d--Unity-Projects-The-Map-Room/66969f76-1e2c-456f-9129-1f0cfc210fb1/scratchpad/patch_manual_9.py\")",
       "Bash(python -c ' *)",
-      "Bash(timeout 110 python \"C:/Users/Alan/AppData/Local/Temp/claude/d--Unity-Projects-The-Map-Room/66969f76-1e2c-456f-9129-1f0cfc210fb1/scratchpad/patch_logistica.py\")"
+      "Bash(timeout 110 python \"C:/Users/Alan/AppData/Local/Temp/claude/d--Unity-Projects-The-Map-Room/66969f76-1e2c-456f-9129-1f0cfc210fb1/scratchpad/patch_logistica.py\")",
+      "PowerShell(& \"C:\\\\Users\\\\Alan\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\d--Unity-Projects-The-Map-Room\\\\bb378bc3-41d4-4980-ade9-5a76859b5839\\\\scratchpad\\\\split.ps1\")",
+      "PowerShell(& \"C:\\\\Users\\\\Alan\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\d--Unity-Projects-The-Map-Room\\\\bb378bc3-41d4-4980-ade9-5a76859b5839\\\\scratchpad\\\\verify.ps1\")"
     ],
     "additionalDirectories": [
       "d:\\Unity Projects\\The Map Room\\Assets\\Scripts\\Match\\AI\\Units\\Assault"

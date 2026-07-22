@@ -20,6 +20,7 @@ MonoBehaviour:
     atr\xE1s da linha de frente, revelando aeronaves antes que elas entrem em posi\xE7\xE3o
     de ataque. Combine com SAMs e AAA para criar setores de nega\xE7\xE3o a\xE9rea.
     Vulner\xE1vel se avan\xE7ar sem escolta."
+  requiredBuilding: {fileID: 0}
   spriteDefault: {fileID: 21300000, guid: e86a7f2475fd74b4c9f898e444cf0c69, type: 3}
   teamVariantSprites: []
   maxHP: 10
@@ -114,13 +115,13 @@ MonoBehaviour:
   spriteTransport: {fileID: 0}
   allowedEmbarkWhenTransporterAtTerrains: []
   allowedEmbarkWhenTransporterAtTerrainStructures: []
-  allowedEmbarkWhenTransporterAtConstructions: []
+  allowedEmbarkWhenTransporterAtFacilities: 0
   allowedDisembarkWhenTransporterAtTerrains: []
   allowedDisembarkWhenTransporterAtTerrainStructures: []
-  allowedDisembarkWhenTransporterAtConstructions: []
+  allowedDisembarkWhenTransporterAtFacilities: 0
   passengersCanDisembarkAndGoesToTerrains: []
   passengersCanDisembarkAndGoesToTerrainStructures: []
-  passengersCanDisembarkAndGoesToConstructions: []
+  passengersCanDisembarkAndGoesToFacilities: 0
   transportSlots: []
   autonomia: 50
   cost: 5000

@@ -1261,7 +1261,8 @@ public partial class AIShoppingPlanner
         List<AIShoppingDemand> demands = BuildRoleShoppingDemands(snapshot);
         AIElitePurchaseCommitment eliteCommitment =
             ResolveElitePurchaseCommitment(snapshot, demands);
-        CounterPressureInspection counterPressure = BuildCounterPressure(snapshot);
+        AIRosterKnowledge shoppingRoster = BuildRosterKnowledge(snapshot, log: false);
+        CounterPressureInspection counterPressure = BuildCounterPressure(snapshot, shoppingRoster);
         var occupied = BuildProductionOccupiedCells();
         var usedBuildings = new HashSet<ConstructionManager>();
         int remaining = snapshot.Budget;
@@ -1471,7 +1472,8 @@ public partial class AIShoppingPlanner
             FillIdleProductionBuildings(
                 snapshot, orders, usedBuildings, occupied, ref remaining,
                 hasStrategicReserve ? Mathf.Max(0, reserve - conscriptionTax) : 0,
-                armyMassOnly: hardSwarmDoctrine && !defendFillBuildings);
+                armyMassOnly: hardSwarmDoctrine && !defendFillBuildings,
+                counterPressure: counterPressure);
 
         foreach (AIShoppingDemand demand in demands)
             if (demand.Count > 0)
@@ -1572,7 +1574,9 @@ public partial class AIShoppingPlanner
                         if (state.RemainingDemand[demandIndex] <= 0
                             || !IsRolePurchaseAllowed(unit, snapshot.Stance,
                                 IsEmergencyShoppingDemand(demand))
-                            || !DoesUnitMeetShoppingDemand(unit, demand))
+                            || !DoesUnitMeetShoppingDemand(unit, demand)
+                            || ShouldYieldGenericFireSupportToAntiInfantry(
+                                unit, demand, counterPressure))
                             continue;
 
                         var candidate = new RoleShoppingCandidate
@@ -2409,6 +2413,8 @@ public partial class AIShoppingPlanner
     private static List<AIShoppingDemand> BuildRoleShoppingDemands(AIWorldSnapshot snapshot, bool log = true)
     {
         var demands = new List<AIShoppingDemand>();
+        AIRosterKnowledge roster = BuildRosterKnowledge(snapshot, log);
+        CounterPressureInspection counterPressure = BuildCounterPressure(snapshot, roster);
         List<TacticalDeficit> deficits = AITacticalAnalyzer.Instance.GetDeficits(snapshot.AITeam, log);
         SectorObjective rallyFireSupportFocus = FindRallyShoppingFocus(deficits);
         foreach (TacticalDeficit deficit in deficits)
@@ -2455,11 +2461,25 @@ public partial class AIShoppingPlanner
         // transporte). Assalto continua liberado. A artilharia defensiva (PreventiveDefense) não
         // passa por aqui e não é gateada.
         int massGate = Instance != null ? Instance.MinCapturerMassForSupport : 4;
-        int compositionFire = capturers >= massGate
+        // Composicao define o espaco doutrinario, mas nao pode gastar o produtor/caixa com
+        // qualquer artilharia enquanto existe um counter terrestre material em aberto.
+        // A demanda de counter abaixo escolhe a peca pelo matchup: foguetes se couberem;
+        // metralhadora ou outro counter validado pela matriz como resposta acessivel. Quando a pressao baixar, o pacote
+        // 2/2/1 volta a completar seu fire support normalmente.
+        const float materialCounterGap = 0.4f;
+        bool counterResponseOwnsFireSlot = Mathf.Max(
+            counterPressure.AntiInfantry, counterPressure.AntiTank) >= materialCounterGap;
+        int compositionFire = capturers >= massGate && !counterResponseOwnsFireSlot
             ? Mathf.Max(0, packages - fireSupport)
             : 0;
         EnsureRoleDemand(demands, UnitRole.FogoIndireto, compositionFire, 32,
             "composition", $"pacote 2/2/1 cap={capturers} ass={assaults} art={fireSupport}");
+        if (log && counterResponseOwnsFireSlot && capturers >= massGate
+            && packages > fireSupport)
+            Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] "
+                + $"composition fire_support cedido ao counter: "
+                + $"antiInf={counterPressure.AntiInfantry:F2} "
+                + $"antiTank={counterPressure.AntiTank:F2}");
 
         int visibleAir = CountEnemyDomain(snapshot, Domain.Air);
         if (visibleAir > 0)
@@ -2516,8 +2536,7 @@ public partial class AIShoppingPlanner
 
         AddEliteProgressionDemand(snapshot, demands, UnitRole.Assalto, assaults, 24);
         AddEliteProgressionDemand(snapshot, demands, UnitRole.FogoIndireto, fireSupport, 25);
-        CounterPressureInspection counterPressure = BuildCounterPressure(snapshot);
-        AddCounterPressureDemands(snapshot, demands, counterPressure);
+        AddCounterPressureDemands(snapshot, demands, counterPressure, roster);
         bool groundCounterPressureCovered = counterPressure.AntiTank <= 0.05f
             && counterPressure.AntiInfantry <= 0.05f;
         bool rallyAssemblyActive = HasActiveRallyAssembly(snapshot.AITeam);
@@ -3085,7 +3104,8 @@ public partial class AIShoppingPlanner
         AIWorldSnapshot snapshot, List<ShoppingOrder> orders,
         HashSet<ConstructionManager> usedBuildings, HashSet<Vector3Int> occupied, ref int remaining,
         int protectedReserve = 0,
-        bool armyMassOnly = false)
+        bool armyMassOnly = false,
+        CounterPressureInspection counterPressure = null)
     {
         if (snapshot.MyBuildings == null) return;
         foreach (ConstructionManager building in snapshot.MyBuildings)
@@ -3103,7 +3123,9 @@ public partial class AIShoppingPlanner
             {
                 if (u == null || u.cost <= 0 || u.cost > spendable
                     || (armyMassOnly ? u.militaryForce != MilitaryForce.Army : u.militaryForce == MilitaryForce.Navy)
-                    || !IsRolePurchaseAllowed(u, snapshot.Stance, emergency: true))
+                    || !IsRolePurchaseAllowed(u, snapshot.Stance, emergency: true)
+                    || ShouldYieldGenericFireSupportToAntiInfantry(
+                        u, demand: null, counterPressure: counterPressure))
                     continue;
                 if (pick == null || IsBetterEmptyBuildingFiller(u, pick))
                     pick = u;
@@ -3121,6 +3143,32 @@ public partial class AIShoppingPlanner
                 + $"prédio vazio {building.ConstructionDisplayName} com {pick.displayName} ${pick.cost} "
                 + $"restante={remaining}");
         }
+    }
+
+    private static bool ShouldYieldGenericFireSupportToAntiInfantry(
+        UnitData unit,
+        AIShoppingDemand demand,
+        CounterPressureInspection counterPressure)
+    {
+        if (unit == null || counterPressure == null
+            || counterPressure.AntiInfantry < 0.4f
+            || counterPressure.AntiInfantry <= counterPressure.AntiTank)
+            return false;
+
+        // Demandas de matchup explicitas ja possuem seu proprio filtro. A regra
+        // existe para impedir composicao/progressao/fill de comprarem artilharia
+        // antitanque enquanto a lacuna dominante e infantaria.
+        if (demand != null && (demand.RequiredWeaponCategory.HasValue
+            || demand.Urgent || demand.RequireRallyBreakthrough
+            || demand.MinRallyArtilleryWeight > 0f))
+            return false;
+        if (!UnitRoleCompatibility.CanSatisfy(unit, UnitRole.FogoIndireto))
+            return false;
+
+        float antiInfantryFit = ScoreCounterFitForDemand(
+            unit, counterPressure, WeaponCategory.AntiInfantaria,
+            GameUnitClass.Infantry);
+        return antiInfantryFit <= 0.0001f;
     }
 
     // Melhor defensor pra encher prédio vazio: prefere Assalto/Capturador (corpo de defesa), depois

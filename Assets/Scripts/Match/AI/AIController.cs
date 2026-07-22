@@ -105,6 +105,10 @@ public partial class AIController : MonoBehaviour
             || difficulty == AIDifficulty.Competitiva;
         conscriptionDoctrine = difficulty == AIDifficulty.Formigueiro
             || difficulty == AIDifficulty.Agressiva;
+
+        // FASE 1 da migração para AIPresetData: resolve e guarda o preset correspondente.
+        // Nenhuma decisão lê dele ainda — os flags acima continuam sendo a fonte de verdade.
+        ResolveActivePreset(difficulty);
     }
 
     // Save/Load: a dificuldade escolhida na Tela de Entrada só existe nestes flags depois
@@ -126,6 +130,10 @@ public partial class AIController : MonoBehaviour
         hardMode = hard;
         conscriptionWhenLosing = conscriptionWhenBehind;
         conscriptionDoctrine = conscriptionAlways;
+
+        // Save antigo não guarda o preset, só os flags — reconstrói a dificuldade a partir
+        // deles para que a inspeção mostre o perfil certo depois de um load.
+        ResolveActivePreset(InferDifficultyFromFlags());
     }
 
     [Header("AI Stage Emulation")]

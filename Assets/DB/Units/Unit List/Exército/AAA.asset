@@ -19,6 +19,7 @@ MonoBehaviour:
     unidades terrestres contra ataques a\xE9reos e reduz a liberdade do inimigo no
     uso de aeronaves. N\xE3o elimina amea\xE7as sozinha, mas imp\xF5e risco constante.
     Ideal para acompanhar avan\xE7os e proteger forma\xE7\xF5es."
+  requiredBuilding: {fileID: 0}
   spriteDefault: {fileID: 21300000, guid: 7cffcbae4b6cd034693321f798081f60, type: 3}
   teamVariantSprites: []
   maxHP: 10
@@ -34,6 +35,7 @@ MonoBehaviour:
   roles: 0e000000
   aiInitiative: 0
   aiPurchaseMode: 0
+  bannedOnHardMode: 0
   aiTargetPreferenceByClass:
   - targetClass: 6
     priority: 2
@@ -61,6 +63,10 @@ MonoBehaviour:
   repairTriggerAmmoPct: 0
   repairRecoverHpAbove: 8
   fuseWhileInRepair: 1
+  restockTriggerGallonPct: 0
+  restockTriggerAmmoBoxPct: 0
+  restockTriggerToolsPct: 0
+  restockWhenAnyRuntimeSupplyEmpty: 1
   aiPreventiveMaintenanceEnabled: 1
   aiPreventiveSupplyCanRunWithUnderRepair: 0
   aiConservativeSupplyAvoidEnemyRange: 2
@@ -80,6 +86,10 @@ MonoBehaviour:
   preferredAirHeight: 4
   useExplicitPreferredNavalHeight: 0
   preferredNavalHeight: 2
+  emergesToAttack: 0
+  emergeAfterAttackDomain: 1
+  emergeAfterAttackHeight: 3
+  emergeAfterAttackTurns: 2
   skills:
   - {fileID: 11400000, guid: ef10c9e820afc074b99ea8e0b709c2f4, type: 2}
   stealthSkills: []
@@ -106,13 +116,13 @@ MonoBehaviour:
   spriteTransport: {fileID: 0}
   allowedEmbarkWhenTransporterAtTerrains: []
   allowedEmbarkWhenTransporterAtTerrainStructures: []
-  allowedEmbarkWhenTransporterAtConstructions: []
+  allowedEmbarkWhenTransporterAtFacilities: 0
   allowedDisembarkWhenTransporterAtTerrains: []
   allowedDisembarkWhenTransporterAtTerrainStructures: []
-  allowedDisembarkWhenTransporterAtConstructions: []
+  allowedDisembarkWhenTransporterAtFacilities: 0
   passengersCanDisembarkAndGoesToTerrains: []
   passengersCanDisembarkAndGoesToTerrainStructures: []
-  passengersCanDisembarkAndGoesToConstructions: []
+  passengersCanDisembarkAndGoesToFacilities: 0
   transportSlots: []
   autonomia: 50
   cost: 5500

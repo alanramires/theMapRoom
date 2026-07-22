@@ -10,7 +10,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: f69f8ff2970547247ab0bb6a5a5f3dc1, type: 3}
-  m_Name: Ponte Alta
+  m_Name: Ponte Rodoviaria
   m_EditorClassIdentifier: Assembly-CSharp::StructureData
   id: bridges
   displayName: Ponte
@@ -42,10 +42,12 @@ MonoBehaviour:
   segmentOverlap: 0.088
   roadBoost: 0
   aircraftOpsByTerrain:
-  - terrainData: {fileID: 11400000, guid: f00a773f2a7664042bbabe8e117528f7, type: 2}
+  - terrainData: {fileID: 0}
     allowTakeoffAndLanding: 0
     legacyRequiredLandingSkills: []
-    requiredLandingSkillRules: []
+    requiredLandingSkillRules:
+    - skill: {fileID: 11400000, guid: 3f52a3b7c5d14c5ea1f0f9aa34d2be11, type: 2}
+      takeoffMode: 0
     requireAtLeastOneLandingSkill: 0
   navalOpsByTerrain:
   - terrainData: {fileID: 11400000, guid: adc0bfc8c2e8f9a41be0abda3e29e582, type: 2}

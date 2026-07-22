@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System;
+using System.Text;
 using UnityEngine;
 
 public partial class AIShoppingPlanner
@@ -83,6 +84,234 @@ public partial class AIShoppingPlanner
         public float Coverage;
     }
 
+    public sealed class AIRosterProfile
+    {
+        public UnitData Unit;
+        public readonly HashSet<WeaponCategory> WeaponCategories = new HashSet<WeaponCategory>();
+        public readonly HashSet<ConstructionManager> Producers = new HashSet<ConstructionManager>();
+        public UnitRole CompositionRole;
+        public bool AvailableNow;
+        public bool Unlockable;
+        public bool IsTransporter;
+        public bool IsSupplier;
+        public readonly List<AIRosterCoverage> CoverageMatrix = new List<AIRosterCoverage>();
+
+        public bool HasWeaponCategory(WeaponCategory category)
+            => WeaponCategories.Contains(category);
+    }
+
+    public sealed class AIRosterCoverage
+    {
+        public bool HasWeapon;
+        public WeaponCategory WeaponCategory;
+        public GameUnitClass TargetClass;
+        public float Coverage;
+        public int Reach;
+        public int ClassSize;
+        public int Deaths;
+    }
+
+    public sealed class AIRosterKnowledge
+    {
+        public readonly List<AIRosterProfile> Profiles = new List<AIRosterProfile>();
+        private readonly Dictionary<UnitData, AIRosterProfile> byUnit =
+            new Dictionary<UnitData, AIRosterProfile>();
+
+        internal AIRosterProfile GetOrCreate(UnitData unit)
+        {
+            if (!byUnit.TryGetValue(unit, out AIRosterProfile profile))
+            {
+                profile = new AIRosterProfile
+                {
+                    Unit = unit,
+                    CompositionRole = UnitRoleCompatibility.ResolveCompositionRole(unit),
+                    IsTransporter = UnitRoleCompatibility.IsOperationalTransporter(unit),
+                    IsSupplier = unit != null && unit.isSupplier,
+                };
+                if (unit?.embarkedWeapons != null)
+                    foreach (UnitEmbarkedWeapon slot in unit.embarkedWeapons)
+                        if (slot?.weapon != null)
+                            profile.WeaponCategories.Add(slot.weapon.WeaponCategory);
+                byUnit.Add(unit, profile);
+                Profiles.Add(profile);
+            }
+            return profile;
+        }
+
+        internal bool TryGetProfile(UnitData unit, out AIRosterProfile profile)
+        {
+            profile = null;
+            return unit != null && byUnit.TryGetValue(unit, out profile);
+        }
+    }
+
+    public static AIRosterKnowledge InspectRosterKnowledge(AIWorldSnapshot snapshot)
+        => BuildRosterKnowledge(snapshot, log: false);
+
+    private static AIRosterKnowledge BuildRosterKnowledge(AIWorldSnapshot snapshot, bool log)
+    {
+        var roster = new AIRosterKnowledge();
+        if (snapshot?.MyBuildings == null)
+            return roster;
+
+        foreach (ConstructionManager building in snapshot.MyBuildings)
+        {
+            if (building == null || building.OfferedUnits == null)
+                continue;
+            bool producerAvailable = building.CanProduceUnitsForTeam(snapshot.AITeam);
+            foreach (UnitData unit in building.OfferedUnits)
+            {
+                if (unit == null)
+                    continue;
+                AIRosterProfile profile = roster.GetOrCreate(unit);
+                profile.Producers.Add(building);
+                bool chainAvailable = IsEliteChainAvailable(unit, snapshot);
+                profile.AvailableNow |= producerAvailable && chainAvailable
+                    && IsRolePurchaseAllowed(unit, snapshot.Stance, emergency: true);
+                profile.Unlockable |= !chainAvailable || !producerAvailable;
+            }
+        }
+
+        roster.Profiles.Sort((a, b) =>
+        {
+            int available = b.AvailableNow.CompareTo(a.AvailableNow);
+            if (available != 0) return available;
+            int elite = a.Unit.eliteLevel.CompareTo(b.Unit.eliteLevel);
+            if (elite != 0) return elite;
+            return a.Unit.cost.CompareTo(b.Unit.cost);
+        });
+
+        BuildRosterCoverageMatrix(roster);
+
+        if (log)
+            LogRosterKnowledge(snapshot, roster);
+        return roster;
+    }
+
+    private static void BuildRosterCoverageMatrix(AIRosterKnowledge roster)
+    {
+        if (roster == null)
+            return;
+
+        ResolveCounterCombatDatabases(out RPSDatabase rps, out DPQMatchupDatabase dpq,
+            out WeaponPriorityData priorities);
+        foreach (AIRosterProfile attackerProfile in roster.Profiles)
+        {
+            UnitData attacker = attackerProfile.Unit;
+            if (attacker == null)
+                continue;
+
+            var classSizes = new Dictionary<GameUnitClass, int>();
+            var byMatchup = new Dictionary<(WeaponCategory, GameUnitClass), AIRosterCoverage>();
+            var classesWithReach = new HashSet<GameUnitClass>();
+            foreach (AIRosterProfile defenderProfile in roster.Profiles)
+            {
+                UnitData defender = defenderProfile.Unit;
+                if (defender == null || defender == attacker)
+                    continue;
+                classSizes.TryGetValue(defender.unitClass, out int classSize);
+                classSizes[defender.unitClass] = classSize + 1;
+
+                UnitCounterEvaluator.Evaluation evaluation =
+                    UnitCounterEvaluator.EvaluateBestAuto(attacker, defender, rps, dpq, priorities);
+                if (!evaluation.IsValid)
+                    continue;
+
+                classesWithReach.Add(defender.unitClass);
+                var key = (evaluation.WeaponCategory, defender.unitClass);
+                if (!byMatchup.TryGetValue(key, out AIRosterCoverage row))
+                {
+                    row = new AIRosterCoverage
+                    {
+                        HasWeapon = true,
+                        WeaponCategory = evaluation.WeaponCategory,
+                        TargetClass = defender.unitClass,
+                    };
+                    byMatchup.Add(key, row);
+                }
+                row.Coverage += evaluation.Coverage;
+                row.Reach++;
+                if (!evaluation.Survives)
+                    row.Deaths++;
+            }
+
+            foreach (AIRosterCoverage row in byMatchup.Values)
+            {
+                row.ClassSize = classSizes.TryGetValue(row.TargetClass, out int size)
+                    ? Mathf.Max(1, size)
+                    : 1;
+                row.Coverage /= row.ClassSize;
+                attackerProfile.CoverageMatrix.Add(row);
+            }
+            foreach (KeyValuePair<GameUnitClass, int> entry in classSizes)
+                if (!classesWithReach.Contains(entry.Key))
+                    attackerProfile.CoverageMatrix.Add(new AIRosterCoverage
+                    {
+                        HasWeapon = false,
+                        TargetClass = entry.Key,
+                        Coverage = 0f,
+                        Reach = 0,
+                        ClassSize = entry.Value,
+                    });
+
+            attackerProfile.CoverageMatrix.Sort((a, b) => b.Coverage.CompareTo(a.Coverage));
+        }
+    }
+
+    private static UnitData FindBestRosterCounter(
+        AIRosterKnowledge roster,
+        CounterPressureInspection pressure,
+        WeaponCategory category,
+        GameUnitClass? targetClass,
+        bool availableNow,
+        int minElite,
+        int maxElite)
+    {
+        if (roster == null)
+            return null;
+
+        UnitData best = null;
+        float bestScore = float.MinValue;
+        foreach (AIRosterProfile profile in roster.Profiles)
+        {
+            UnitData unit = profile.Unit;
+            if (unit == null || !profile.HasWeaponCategory(category)
+                || unit.eliteLevel < minElite || unit.eliteLevel > maxElite
+                || (availableNow && !profile.AvailableNow))
+                continue;
+            if (targetClass.HasValue
+                && unit.ResolveAiTargetPriorityForTargetClass(targetClass.Value)
+                    < BazookaTargetPriority.Primary)
+                continue;
+
+            float fit = ScoreCounterFitForDemand(unit, pressure, category, targetClass);
+            float economicFit = unit.cost > 0 ? fit * 10000f / unit.cost : fit;
+            float score = fit * 100f + economicFit * 8f;
+            if (score > bestScore)
+            {
+                bestScore = score;
+                best = unit;
+            }
+        }
+        return best;
+    }
+
+    private static void LogRosterKnowledge(AIWorldSnapshot snapshot, AIRosterKnowledge roster)
+    {
+        var log = new StringBuilder();
+        log.Append($"[AI Roster][T{snapshot.TurnNumber}][{snapshot.AITeam}] "
+            + $"catalogo={roster.Profiles.Count}");
+        foreach (AIRosterProfile profile in roster.Profiles)
+        {
+            UnitData unit = profile.Unit;
+            log.Append($"\n  {unit.displayName} id={unit.id} role={profile.CompositionRole} "
+                + $"elite={unit.eliteLevel} cost={unit.cost} "
+                + $"status={(profile.AvailableNow ? "available" : profile.Unlockable ? "unlockable" : "blocked")} "
+                + $"weapons=[{string.Join(",", profile.WeaponCategories)}]");
+        }
+        Debug.Log(log.ToString());
+    }
+
     private sealed class OwnCounterCandidate
     {
         public UnitManager Manager;
@@ -90,16 +319,20 @@ public partial class AIShoppingPlanner
     }
 
     public static CounterPressureInspection InspectCounterPressure(AIWorldSnapshot snapshot)
-        => BuildCounterPressure(snapshot);
+        => BuildCounterPressure(snapshot, BuildRosterKnowledge(snapshot, log: false));
 
     public static float InspectCounterFit(UnitData unit, CounterPressureInspection pressure)
         => ScoreCounterFit(unit, pressure);
 
-    private static CounterPressureInspection BuildCounterPressure(AIWorldSnapshot snapshot)
+    private static CounterPressureInspection BuildCounterPressure(
+        AIWorldSnapshot snapshot,
+        AIRosterKnowledge roster = null)
     {
         var result = new CounterPressureInspection();
         if (snapshot == null)
             return result;
+        if (roster == null)
+            roster = BuildRosterKnowledge(snapshot, log: false);
         counterEvaluationCache.Clear();
 
         var byClass = new Dictionary<GameUnitClass, EnemyClassPressureInspection>();
@@ -137,11 +370,13 @@ public partial class AIShoppingPlanner
                     continue;
 
                 float recency = Mathf.Lerp(0.35f, 1f, 1f - age / (float)lookback);
-                float score = (0.7f
-                    + signal.damage * 0.16f
-                    + signal.kills * 1.4f
-                    + Mathf.Clamp(signal.destroyedValue / 12000f, 0f, 2.5f))
-                    * recency;
+                // Sem a identidade do atacante nao ha linha exata na matriz. Trata o
+                // evento como uma estimativa de 0..1 unidade de cobertura equivalente,
+                // preservando a escala oficial em vez de reintroduzir pontos arbitrarios.
+                float score = Mathf.Clamp(
+                    0.2f + signal.damage * 0.04f + signal.kills * 0.4f
+                    + signal.destroyedValue / 20000f,
+                    0.1f, 1f) * recency;
                 AddAnonymousWeaponPressure(result, signal.weaponCategory, score);
                 result.AnonymousThreatSignals++;
             }
@@ -154,9 +389,7 @@ public partial class AIShoppingPlanner
                 continue;
 
             visibleIds.Add(enemy.InstanceId);
-            float score = ComputeEnemyCounterWeight(enemy, data);
-            if (contactsByUid.TryGetValue(enemy.InstanceId, out AIIntelContact visibleMemory))
-                score += ComputeCombatImpactScore(visibleMemory);
+            float score = ComputeEnemyCounterWeight(enemy, data, roster);
             AddPressure(result, byClass, data, score, visible: true);
         }
 
@@ -179,8 +412,7 @@ public partial class AIShoppingPlanner
 
                 float recency = Mathf.Lerp(0.35f, 0.85f, 1f - age / (float)lookback);
                 float confidence = Mathf.Clamp01(memory.confidence);
-                float score = ComputeEnemyCounterWeight(null, data) * recency * confidence
-                    + ComputeCombatImpactScore(memory) * recency;
+                float score = ComputeEnemyCounterWeight(null, data, roster) * recency * confidence;
                 AddPressure(result, byClass, data, score, visible: false);
             }
         }
@@ -209,8 +441,8 @@ public partial class AIShoppingPlanner
 
         // As pecas mais decisivas alocam cobertura primeiro. Cada unidade cobre uma classe
         // favorita por snapshot; Tanque A contra artilharia nao e contado de novo contra veiculo.
-        ownCounters.Sort((a, b) => ComputeCounterPowerBase(b.Data)
-            .CompareTo(ComputeCounterPowerBase(a.Data)));
+        ownCounters.Sort((a, b) => ComputeBestCounterCoverageFit(b.Data, pressure)
+            .CompareTo(ComputeBestCounterCoverageFit(a.Data, pressure)));
         foreach (OwnCounterCandidate candidate in ownCounters)
         {
             UnitData data = candidate.Data;
@@ -233,7 +465,7 @@ public partial class AIShoppingPlanner
                 continue;
             float available = Mathf.Max(0f, best.Score - best.Coverage);
             float contribution = Mathf.Min(available,
-                ComputeCounterPowerBase(data) * ComputeCounterCoverageFit(data, best));
+                ComputeCounterCoverageFit(data, best));
             best.Coverage += contribution;
             if (contribution > 0f)
                 pressure.OwnContributions.Add(new OwnCounterContributionInspection
@@ -275,15 +507,16 @@ public partial class AIShoppingPlanner
             pressure.RawAntiShip - pressure.AntiShipCoverage);
     }
 
-    private static float ComputeCounterPowerBase(UnitData unit)
+    private static float ComputeBestCounterCoverageFit(
+        UnitData unit,
+        CounterPressureInspection pressure)
     {
-        float basicCoverage = Instance != null
-            ? Mathf.Max(1f, Instance.BasicCounterPressureCoverage)
-            : 4f;
-        float eliteMultiplier = 1f + Mathf.Max(0, unit.eliteLevel) * 0.9f;
-        float valueMultiplier = Mathf.Lerp(0.85f, 1.35f,
-            Mathf.Clamp01(unit.cost / 15000f));
-        return basicCoverage * eliteMultiplier * valueMultiplier;
+        float best = 0f;
+        if (unit == null || pressure == null)
+            return best;
+        foreach (EnemyClassPressureInspection enemyClass in pressure.Classes)
+            best = Mathf.Max(best, ComputeCounterCoverageFit(unit, enemyClass));
+        return best;
     }
 
     private static float ComputeCounterCoverageFit(UnitData unit, EnemyClassPressureInspection enemyClass)
@@ -408,15 +641,52 @@ public partial class AIShoppingPlanner
         }
     }
 
-    private static float ComputeEnemyCounterWeight(UnitManager enemy, UnitData data)
+    private static float ComputeEnemyCounterWeight(
+        UnitManager enemy,
+        UnitData data,
+        AIRosterKnowledge roster)
     {
-        float eliteWeight = 1f + Mathf.Max(0, data.eliteLevel) * 0.75f;
-        float valueWeight = 1f + Mathf.Clamp(data.cost / 20000f, 0f, 1.5f);
+        if (data == null)
+            return 0f;
+        WeaponCategory category = CounterCategoryFor(data.unitClass);
+        float matrixCoverage = ResolveRosterMatrixCoverage(
+            data, category, data.unitClass, roster);
         float hpRatio = enemy != null && data.maxHP > 0
             ? Mathf.Clamp01(enemy.CurrentHP / (float)data.maxHP)
             : 1f;
-        float combatReadiness = Mathf.Lerp(0.55f, 1f, hpRatio);
-        return eliteWeight * valueWeight * combatReadiness;
+        return matrixCoverage * hpRatio;
+    }
+
+    private static float ResolveRosterMatrixCoverage(
+        UnitData attacker,
+        WeaponCategory category,
+        GameUnitClass targetClass,
+        AIRosterKnowledge roster)
+    {
+        if (attacker == null || roster == null)
+            return 0f;
+        if (roster.TryGetProfile(attacker, out AIRosterProfile profile))
+            foreach (AIRosterCoverage row in profile.CoverageMatrix)
+                if (row.HasWeapon && row.WeaponCategory == category
+                    && row.TargetClass == targetClass)
+                    return row.Coverage;
+
+        ResolveCounterCombatDatabases(out RPSDatabase rps, out DPQMatchupDatabase dpq,
+            out WeaponPriorityData priorities);
+        float sum = 0f;
+        int classSize = 0;
+        foreach (AIRosterProfile defenderProfile in roster.Profiles)
+        {
+            UnitData defender = defenderProfile.Unit;
+            if (defender == null || defender == attacker || defender.unitClass != targetClass)
+                continue;
+            classSize++;
+            UnitCounterEvaluator.Evaluation evaluation = UnitCounterEvaluator.EvaluateBestAuto(
+                attacker, defender, rps, dpq, priorities);
+            if (evaluation.IsValid && evaluation.WeaponCategory == category)
+                sum += evaluation.Coverage;
+        }
+        return classSize > 0 ? Mathf.Clamp01(sum / classSize) : 0f;
     }
 
     private static float ComputeCombatImpactScore(AIUnitIntel memory)
@@ -469,17 +739,18 @@ public partial class AIShoppingPlanner
     private static void AddCounterPressureDemands(
         AIWorldSnapshot snapshot,
         List<AIShoppingDemand> demands,
-        CounterPressureInspection pressure)
+        CounterPressureInspection pressure,
+        AIRosterKnowledge roster)
     {
         if (snapshot == null || demands == null || pressure == null)
             return;
 
         AddCounterCategoryDemands(snapshot, demands, pressure,
             WeaponCategory.AntiTanque, pressure.RawAntiTank,
-            pressure.AntiTankCoverage, pressure.AntiTank, 11, 13);
+            pressure.AntiTankCoverage, pressure.AntiTank, 11, 13, roster);
         AddCounterCategoryDemands(snapshot, demands, pressure,
             WeaponCategory.AntiInfantaria, pressure.RawAntiInfantry,
-            pressure.AntiInfantryCoverage, pressure.AntiInfantry, 12, 14);
+            pressure.AntiInfantryCoverage, pressure.AntiInfantry, 12, 14, roster);
     }
 
     private static void AddCounterCategoryDemands(
@@ -491,7 +762,8 @@ public partial class AIShoppingPlanner
         float coverage,
         float aggregateUnmet,
         int classPriority,
-        int anonymousPriority)
+        int anonymousPriority,
+        AIRosterKnowledge roster)
     {
         float escalationThreshold = Instance != null
             ? Mathf.Max(1f, Instance.CounterEliteEscalationPressure)
@@ -503,10 +775,20 @@ public partial class AIShoppingPlanner
         if (aggregateUnmet >= escalationThreshold)
         {
             GameUnitClass? targetClass = FindAggregateEliteCounterTarget(
-                snapshot, pressure, category);
+                snapshot, pressure, category, roster);
+            UnitData immediate = FindBestRosterCounter(
+                roster, pressure, category, targetClass,
+                availableNow: true, minElite: 0, maxElite: 0);
+            if (immediate != null)
+            {
+                AddCounterPressureDemand(snapshot, demands, pressure,
+                    category, targetClass, rawPressure, coverage, aggregateUnmet,
+                    Mathf.Max(1, classPriority - 7), roster,
+                    forceBasicResponse: true);
+            }
             AddCounterPressureDemand(snapshot, demands, pressure,
                 category, targetClass, rawPressure, coverage, aggregateUnmet,
-                classPriority, forceEliteEscalation: true);
+                classPriority, roster, forceEliteEscalation: true);
             return;
         }
 
@@ -518,20 +800,21 @@ public partial class AIShoppingPlanner
             classifiedUnmet += enemyClass.Unmet;
             AddCounterPressureDemand(snapshot, demands, pressure,
                 category, enemyClass.UnitClass, enemyClass.Score,
-                enemyClass.Coverage, enemyClass.Unmet, classPriority);
+                enemyClass.Coverage, enemyClass.Unmet, classPriority, roster);
         }
 
         // Sinais anonimos pequenos ainda podem pedir resposta comum, mas nunca criam
         // uma compra barata paralela quando a categoria agregada já escalou para elite.
         AddCounterPressureDemand(snapshot, demands, pressure,
             category, null, rawPressure, coverage,
-            Mathf.Max(0f, aggregateUnmet - classifiedUnmet), anonymousPriority);
+            Mathf.Max(0f, aggregateUnmet - classifiedUnmet), anonymousPriority, roster);
     }
 
     private static GameUnitClass? FindAggregateEliteCounterTarget(
         AIWorldSnapshot snapshot,
         CounterPressureInspection pressure,
-        WeaponCategory category)
+        WeaponCategory category,
+        AIRosterKnowledge roster)
     {
         EnemyClassPressureInspection bestWithElite = null;
         EnemyClassPressureInspection bestKnown = null;
@@ -541,7 +824,7 @@ public partial class AIShoppingPlanner
                 continue;
             if (bestKnown == null || enemyClass.Unmet > bestKnown.Unmet)
                 bestKnown = enemyClass;
-            if (FindBestEliteCounter(snapshot, category, enemyClass.UnitClass,
+            if (FindBestEliteCounter(snapshot, pressure, roster, category, enemyClass.UnitClass,
                     requireAvailableChain: false) != null
                 && (bestWithElite == null || enemyClass.Unmet > bestWithElite.Unmet))
                 bestWithElite = enemyClass;
@@ -553,7 +836,7 @@ public partial class AIShoppingPlanner
         if (bestWithElite != null)
             return bestWithElite.UnitClass;
         return bestKnown != null
-            && FindBestEliteCounter(snapshot, category, bestKnown.UnitClass,
+            && FindBestEliteCounter(snapshot, pressure, roster, category, bestKnown.UnitClass,
                 requireAvailableChain: false) != null
             ? bestKnown.UnitClass
             : (GameUnitClass?)null;
@@ -569,7 +852,9 @@ public partial class AIShoppingPlanner
         float coverage,
         float unmetPressure,
         int rememberedPriority,
-        bool forceEliteEscalation = false)
+        AIRosterKnowledge roster,
+        bool forceEliteEscalation = false,
+        bool forceBasicResponse = false)
     {
         // Evita transformar residuo de ponto flutuante (exibido como 0,0) em compra real.
         if (unmetPressure <= 0.05f)
@@ -578,36 +863,43 @@ public partial class AIShoppingPlanner
         float escalationThreshold = Instance != null
             ? Mathf.Max(1f, Instance.CounterEliteEscalationPressure)
             : 8f;
-        bool highPressure = forceEliteEscalation
-            || unmetPressure >= escalationThreshold;
+        bool highPressure = !forceBasicResponse && (forceEliteEscalation
+            || unmetPressure >= escalationThreshold);
         UnitData potentialElite = highPressure
-            ? FindBestEliteCounter(snapshot, category, targetClass,
+            ? FindBestEliteCounter(snapshot, pressure, roster, category, targetClass,
                 requireAvailableChain: false)
             : null;
         UnitData availableElite = highPressure
-            ? FindBestEliteCounter(snapshot, category, targetClass,
+            ? FindBestEliteCounter(snapshot, pressure, roster, category, targetClass,
                 requireAvailableChain: true)
             : null;
         bool eliteCounterExists = potentialElite != null;
         bool escalate = availableElite != null;
+        float basicCoverage = ResolveBasicCounterCoverage(
+            roster, pressure, category, targetClass);
+        int basicCount = Mathf.Min(2,
+            Mathf.Max(1, Mathf.CeilToInt(unmetPressure / basicCoverage)));
         int priority = pressure.RememberedUnits > 0
             ? rememberedPriority
             : rememberedPriority + 4;
 
         AIShoppingDemand counterDemand = NewRoleDemand(
             UnitRole.None,
-            escalate || eliteCounterExists
+            forceBasicResponse
+                ? basicCount
+                : escalate || eliteCounterExists
                 ? 1
-                : Mathf.Min(2, Mathf.CeilToInt(unmetPressure /
-                    (Instance != null ? Mathf.Max(1f, Instance.BasicCounterPressureCoverage) : 4f))),
+                : basicCount,
             escalate ? Mathf.Max(1, priority - 3) : priority,
             escalate ? "counter-pressure-elite"
                 : eliteCounterExists ? "counter-pressure-prerequisite" : "counter-pressure",
             $"{category}/{(targetClass.HasValue ? targetClass.Value.ToString() : "desconhecido")}"
                 + $" bruto={rawPressure:F1} cobertura={coverage:F1} saldo={unmetPressure:F1}"
                 + $" vis={pressure.VisibleUnits} memoria={pressure.RememberedUnits}",
-            false);
+            forceBasicResponse);
         counterDemand.RequiredWeaponCategory = category;
+        if (forceBasicResponse)
+            counterDemand.MaxEliteLevel = 0;
         counterDemand.TargetClass = targetClass;
         if (targetClass.HasValue)
             counterDemand.MinTargetPriority = BazookaTargetPriority.Primary;
@@ -628,48 +920,44 @@ public partial class AIShoppingPlanner
         MergeRoleDemand(demands, counterDemand, false);
     }
 
+    private static float ResolveBasicCounterCoverage(
+        AIRosterKnowledge roster,
+        CounterPressureInspection pressure,
+        WeaponCategory category,
+        GameUnitClass? targetClass)
+    {
+        UnitData basic = FindBestRosterCounter(
+            roster, pressure, category, targetClass,
+            availableNow: true, minElite: 0, maxElite: 0);
+        if (basic == null)
+            return 0.2f;
+
+        // Mesma nota 0..1 usada pela matriz do Unit Analysis. Assim a quantidade
+        // pedida e a cobertura exibida falam exatamente a mesma unidade de medida.
+        float coverage = 0f;
+        foreach (EnemyClassPressureInspection enemyClass in pressure.Classes)
+        {
+            if (enemyClass.CounterCategory != category
+                || (targetClass.HasValue && enemyClass.UnitClass != targetClass.Value))
+                continue;
+            coverage = Mathf.Max(coverage,
+                ComputeCounterCoverageFit(basic, enemyClass));
+        }
+        return Mathf.Max(0.05f, coverage);
+    }
+
     private static UnitData FindBestEliteCounter(
         AIWorldSnapshot snapshot,
+        CounterPressureInspection pressure,
+        AIRosterKnowledge roster,
         WeaponCategory category,
         GameUnitClass? targetClass,
         bool requireAvailableChain)
     {
-        if (snapshot?.MyBuildings == null)
-            return null;
-        UnitData best = null;
-        foreach (ConstructionManager building in snapshot.MyBuildings)
-        {
-            if (building == null || !building.CanProduceUnitsForTeam(snapshot.AITeam)
-                || building.OfferedUnits == null)
-                continue;
-            foreach (UnitData unit in building.OfferedUnits)
-                if (unit != null && unit.eliteLevel > 0
-                    && HasWeaponCategory(unit, category)
-                    && (!targetClass.HasValue
-                        || unit.ResolveAiTargetPriorityForTargetClass(targetClass.Value)
-                            == BazookaTargetPriority.Primary)
-                    && (!requireAvailableChain || IsEliteChainAvailable(unit, snapshot))
-                    && IsRolePurchaseAllowed(unit, snapshot.Stance, emergency: true))
-                {
-                    bool better = best == null;
-                    if (!better && requireAvailableChain)
-                    {
-                        // Com a cadeia aberta, sobe para a resposta mais poderosa: Medio ->
-                        // Campanha, em vez de repetir o primeiro tier elite para sempre.
-                        better = ComputeCounterPowerBase(unit) > ComputeCounterPowerBase(best);
-                    }
-                    else if (!better)
-                    {
-                        // Sem cadeia aberta, persegue primeiro o degrau mais proximo.
-                        better = unit.eliteLevel < best.eliteLevel
-                            || (unit.eliteLevel == best.eliteLevel
-                                && ComputeCounterPowerBase(unit) > ComputeCounterPowerBase(best));
-                    }
-                    if (better)
-                        best = unit;
-                }
-        }
-        return best;
+        return FindBestRosterCounter(
+            roster, pressure, category, targetClass,
+            availableNow: requireAvailableChain,
+            minElite: 1, maxElite: int.MaxValue);
     }
 
     private static float ScoreCounterFit(UnitData unit, CounterPressureInspection pressure)

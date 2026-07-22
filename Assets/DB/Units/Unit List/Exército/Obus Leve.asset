@@ -19,6 +19,7 @@ MonoBehaviour:
     em confrontos diretos, mas pune unidades expostas e finaliza alvos danificados.
     Use com infantaria para pressionar e for\xE7ar trocas desfavor\xE1veis. Baixa
     resist\xEAncia exige posicionamento cuidadoso."
+  requiredBuilding: {fileID: 0}
   spriteDefault: {fileID: 21300000, guid: 6a4e130757b853c4daa6663e05a831b6, type: 3}
   teamVariantSprites: []
   maxHP: 10
@@ -81,6 +82,10 @@ MonoBehaviour:
   preferredAirHeight: 4
   useExplicitPreferredNavalHeight: 0
   preferredNavalHeight: 2
+  emergesToAttack: 0
+  emergeAfterAttackDomain: 1
+  emergeAfterAttackHeight: 3
+  emergeAfterAttackTurns: 2
   skills:
   - {fileID: 11400000, guid: ef10c9e820afc074b99ea8e0b709c2f4, type: 2}
   stealthSkills: []
@@ -107,13 +112,13 @@ MonoBehaviour:
   spriteTransport: {fileID: 0}
   allowedEmbarkWhenTransporterAtTerrains: []
   allowedEmbarkWhenTransporterAtTerrainStructures: []
-  allowedEmbarkWhenTransporterAtConstructions: []
+  allowedEmbarkWhenTransporterAtFacilities: 0
   allowedDisembarkWhenTransporterAtTerrains: []
   allowedDisembarkWhenTransporterAtTerrainStructures: []
-  allowedDisembarkWhenTransporterAtConstructions: []
+  allowedDisembarkWhenTransporterAtFacilities: 0
   passengersCanDisembarkAndGoesToTerrains: []
   passengersCanDisembarkAndGoesToTerrainStructures: []
-  passengersCanDisembarkAndGoesToConstructions: []
+  passengersCanDisembarkAndGoesToFacilities: 0
   transportSlots: []
   autonomia: 30
   cost: 4000

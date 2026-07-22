@@ -19,6 +19,7 @@ MonoBehaviour:
     e com muni\xE7\xE3o limitada, depende de transporte para alcan\xE7ar o front.
     Ideal para trocas eficientes contra unidades caras. Use para punir avan\xE7os
     de blindados e proteger posi\xE7\xF5es cr\xEDticas com baixo custo."
+  requiredBuilding: {fileID: 0}
   spriteDefault: {fileID: 21300000, guid: 5fe376938140a9a4180ef4bad9915343, type: 3}
   teamVariantSprites: []
   maxHP: 10
@@ -85,6 +86,10 @@ MonoBehaviour:
   preferredAirHeight: 4
   useExplicitPreferredNavalHeight: 0
   preferredNavalHeight: 2
+  emergesToAttack: 0
+  emergeAfterAttackDomain: 1
+  emergeAfterAttackHeight: 3
+  emergeAfterAttackTurns: 2
   skills:
   - {fileID: 11400000, guid: 9c22b855a2e730f4faced0e069dc2a8d, type: 2}
   - {fileID: 11400000, guid: b5c241bd4e3f15448b70c001b4a66dae, type: 2}
@@ -120,13 +125,13 @@ MonoBehaviour:
   spriteTransport: {fileID: 0}
   allowedEmbarkWhenTransporterAtTerrains: []
   allowedEmbarkWhenTransporterAtTerrainStructures: []
-  allowedEmbarkWhenTransporterAtConstructions: []
+  allowedEmbarkWhenTransporterAtFacilities: 0
   allowedDisembarkWhenTransporterAtTerrains: []
   allowedDisembarkWhenTransporterAtTerrainStructures: []
-  allowedDisembarkWhenTransporterAtConstructions: []
+  allowedDisembarkWhenTransporterAtFacilities: 0
   passengersCanDisembarkAndGoesToTerrains: []
   passengersCanDisembarkAndGoesToTerrainStructures: []
-  passengersCanDisembarkAndGoesToConstructions: []
+  passengersCanDisembarkAndGoesToFacilities: 0
   transportSlots: []
   autonomia: 70
   cost: 2000

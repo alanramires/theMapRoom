@@ -319,12 +319,6 @@ public static class PodeDesembarcarSensor
             return false;
         }
 
-        if (!IsContextAllowedByPassengerDisembarkDestinationRules(map, terrainDatabase, targetCell, transporterData, out string contextReason))
-        {
-            reason = contextReason;
-            return false;
-        }
-
         ConstructionManager targetConstruction = ConstructionOccupancyRules.GetConstructionAtCell(map, targetCell);
         if (targetConstruction == null &&
             terrainDatabase != null &&
@@ -476,90 +470,6 @@ public static class PodeDesembarcarSensor
         return false;
     }
 
-    private static bool IsContextAllowedByPassengerDisembarkDestinationRules(
-        Tilemap map,
-        TerrainDatabase terrainDatabase,
-        Vector3Int cell,
-        UnitData transporterData,
-        out string reason)
-    {
-        reason = string.Empty;
-        if (map == null || transporterData == null)
-        {
-            reason = "Contexto invalido para filtro de desembarque.";
-            return false;
-        }
-
-        bool hasConstructionFilter = transporterData.passengersCanDisembarkAndGoesToConstructions != null && transporterData.passengersCanDisembarkAndGoesToConstructions.Count > 0;
-        bool hasStructureFilter = transporterData.passengersCanDisembarkAndGoesToTerrainStructures != null && transporterData.passengersCanDisembarkAndGoesToTerrainStructures.Count > 0;
-        bool hasTerrainFilter = transporterData.passengersCanDisembarkAndGoesToTerrains != null && transporterData.passengersCanDisembarkAndGoesToTerrains.Count > 0;
-        if (!hasConstructionFilter && !hasStructureFilter && !hasTerrainFilter)
-            return true;
-
-        cell.z = 0;
-
-        ConstructionManager construction = ConstructionOccupancyRules.GetConstructionAtCell(map, cell);
-        if (construction != null && construction.TryResolveConstructionData(out ConstructionData constructionData) && constructionData != null)
-        {
-            if (hasConstructionFilter)
-            {
-                if (transporterData.passengersCanDisembarkAndGoesToConstructions.Contains(constructionData))
-                    return true;
-
-                reason = "Construcao do hex nao permitida para desembarque deste transportador.";
-                return false;
-            }
-
-            // Lista vazia = sem restricao por construcao.
-            return true;
-        }
-
-        StructureData structure = StructureOccupancyRules.GetStructureAtCell(map, cell);
-        if (structure != null)
-        {
-            if (!hasStructureFilter)
-            {
-                reason = "Estrutura do hex nao permitida para desembarque deste transportador.";
-                return false;
-            }
-
-            if (!TryResolveTerrainAtCell(map, terrainDatabase, cell, out TerrainTypeData terrainAtStructure) || terrainAtStructure == null)
-            {
-                reason = "Estrutura encontrada, mas sem terreno base valido no hex.";
-                return false;
-            }
-
-            PairRuleMatchResult destinationPairResult = EvaluateDisembarkStructureTerrainPair(
-                transporterData.passengersCanDisembarkAndGoesToTerrainStructures,
-                structure,
-                terrainAtStructure);
-            if (destinationPairResult == PairRuleMatchResult.Blocked)
-            {
-                reason = "Par estrutura+terreno base bloqueado para destino de desembarque.";
-                return false;
-            }
-
-            if (destinationPairResult != PairRuleMatchResult.Allowed)
-            {
-                reason = "Par estrutura+terreno base nao permitido para desembarque deste transportador.";
-                return false;
-            }
-
-            return true;
-        }
-
-        if (hasTerrainFilter &&
-            TryResolveTerrainAtCell(map, terrainDatabase, cell, out TerrainTypeData terrain) &&
-            terrain != null &&
-            transporterData.passengersCanDisembarkAndGoesToTerrains.Contains(terrain))
-        {
-            return true;
-        }
-
-        reason = "Contexto nao permitido (fora de terreno/estrutura/construcao permitidos para desembarque).";
-        return false;
-    }
-
     private static PairRuleMatchResult EvaluateDisembarkStructureTerrainPair(
         List<TransportStructureTerrainRule> rules,
         StructureData structure,
@@ -648,7 +558,7 @@ public static class PodeDesembarcarSensor
             return false;
         }
 
-        bool hasConstructionFilter = transporterData.allowedDisembarkWhenTransporterAtConstructions != null && transporterData.allowedDisembarkWhenTransporterAtConstructions.Count > 0;
+        bool hasConstructionFilter = transporterData.allowedDisembarkWhenTransporterAtFacilities != ConstructionFacilityType.None;
         bool hasStructureFilter = transporterData.allowedDisembarkWhenTransporterAtTerrainStructures != null && transporterData.allowedDisembarkWhenTransporterAtTerrainStructures.Count > 0;
         bool hasTerrainFilter = transporterData.allowedDisembarkWhenTransporterAtTerrains != null && transporterData.allowedDisembarkWhenTransporterAtTerrains.Count > 0;
         if (!hasConstructionFilter && !hasStructureFilter && !hasTerrainFilter)
@@ -661,7 +571,7 @@ public static class PodeDesembarcarSensor
         {
             if (hasConstructionFilter)
             {
-                if (transporterData.allowedDisembarkWhenTransporterAtConstructions.Contains(constructionData))
+                if (ConstructionFacilityTypeRules.MatchesAny(constructionData, transporterData.allowedDisembarkWhenTransporterAtFacilities))
                     return true;
 
                 reason = "Hex atual do transportador (construcao) nao permitido para desembarque.";

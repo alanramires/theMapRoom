@@ -347,14 +347,11 @@ public class PodeDesembarcarSensorDebugWindow : EditorWindow
             return;
 
         int blockedAtCurrentHex = CountBlockedPairs(data.allowedDisembarkWhenTransporterAtTerrainStructures);
-        int blockedAtDestination = CountBlockedPairs(data.passengersCanDisembarkAndGoesToTerrainStructures);
         string snapshot =
             $"Transporter At: terrain={SafeCount(data.allowedDisembarkWhenTransporterAtTerrains)}, " +
             $"terrain+structure={SafeCount(data.allowedDisembarkWhenTransporterAtTerrainStructures)} (blocked={blockedAtCurrentHex}), " +
-            $"constructions={SafeCount(data.allowedDisembarkWhenTransporterAtConstructions)}\n" +
-            $"Passenger Goes To: terrain={SafeCount(data.passengersCanDisembarkAndGoesToTerrains)}, " +
-            $"terrain+structure={SafeCount(data.passengersCanDisembarkAndGoesToTerrainStructures)} (blocked={blockedAtDestination}), " +
-            $"constructions={SafeCount(data.passengersCanDisembarkAndGoesToConstructions)}";
+            $"facilities={data.allowedDisembarkWhenTransporterAtFacilities}\n" +
+            "Passenger Goes To: regras naturais de entrada/movimento do passageiro";
 
         EditorGUILayout.HelpBox(snapshot, MessageType.None);
     }

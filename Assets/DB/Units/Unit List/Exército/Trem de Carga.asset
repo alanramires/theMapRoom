@@ -21,6 +21,7 @@ MonoBehaviour:
     com efici\xEAncia.\n\nDepende totalmente da integridade da malha ferrovi\xE1ria:
     interrup\xE7\xF5es na linha podem atrasar refor\xE7os e comprometer toda a cadeia
     de suprimentos. Possui prote\xE7\xE3o limitada e requer escolta em \xE1reas contestadas."
+  requiredBuilding: {fileID: 0}
   spriteDefault: {fileID: 21300000, guid: 867592e92dfef1948a0e46f4c664642e, type: 3}
   teamVariantSprites: []
   maxHP: 10
@@ -36,6 +37,7 @@ MonoBehaviour:
   roles: 04000000
   aiInitiative: 2
   aiPurchaseMode: 0
+  bannedOnHardMode: 0
   aiTargetPreferenceByClass: []
   aiSensorPriority: 0000000002000000
   prioritizeDpqAtBattle: 0
@@ -77,6 +79,10 @@ MonoBehaviour:
   preferredAirHeight: 4
   useExplicitPreferredNavalHeight: 0
   preferredNavalHeight: 2
+  emergesToAttack: 0
+  emergeAfterAttackDomain: 1
+  emergeAfterAttackHeight: 3
+  emergeAfterAttackTurns: 2
   skills:
   - {fileID: 11400000, guid: 44c13554a7f731f418bad4395bf10e52, type: 2}
   - {fileID: 11400000, guid: 759d9c0f4a06434f8f54d781709f8c7e, type: 2}
@@ -106,27 +112,13 @@ MonoBehaviour:
   spriteTransport: {fileID: 0}
   allowedEmbarkWhenTransporterAtTerrains: []
   allowedEmbarkWhenTransporterAtTerrainStructures: []
-  allowedEmbarkWhenTransporterAtConstructions:
-  - {fileID: 11400000, guid: 98dfc90eb1ac05849a3c30f308a5acbc, type: 2}
-  - {fileID: 11400000, guid: 5572b2429e4e3fb43a7e49289c1fac2e, type: 2}
-  - {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-  - {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
-  - {fileID: 11400000, guid: 872d2cdd8cf954541b315a21c0ba6296, type: 2}
-  - {fileID: 11400000, guid: 18336762152ab4246bb4cd0fb463da45, type: 2}
-  - {fileID: 11400000, guid: a385afd73b91aa64297b44d032cac9c4, type: 2}
+  allowedEmbarkWhenTransporterAtFacilities: 8
   allowedDisembarkWhenTransporterAtTerrains: []
   allowedDisembarkWhenTransporterAtTerrainStructures: []
-  allowedDisembarkWhenTransporterAtConstructions:
-  - {fileID: 11400000, guid: 98dfc90eb1ac05849a3c30f308a5acbc, type: 2}
-  - {fileID: 11400000, guid: 5572b2429e4e3fb43a7e49289c1fac2e, type: 2}
-  - {fileID: 11400000, guid: a7f57c7606933044db5137afa72b7218, type: 2}
-  - {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
-  - {fileID: 11400000, guid: 872d2cdd8cf954541b315a21c0ba6296, type: 2}
-  - {fileID: 11400000, guid: 18336762152ab4246bb4cd0fb463da45, type: 2}
-  - {fileID: 11400000, guid: a385afd73b91aa64297b44d032cac9c4, type: 2}
+  allowedDisembarkWhenTransporterAtFacilities: 8
   passengersCanDisembarkAndGoesToTerrains: []
   passengersCanDisembarkAndGoesToTerrainStructures: []
-  passengersCanDisembarkAndGoesToConstructions: []
+  passengersCanDisembarkAndGoesToFacilities: -1
   transportSlots:
   - slotId: "Vag\xE3o"
     capacity: 2

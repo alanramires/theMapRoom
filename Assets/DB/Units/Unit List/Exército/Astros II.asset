@@ -19,6 +19,7 @@ MonoBehaviour:
     leves. Causa alto dano direto no alvo, sendo eficaz contra unidades agrupadas
     ou expostas. Ineficaz contra blindados pesados e extremamente fr\xE1gil. Use
     para quebrar forma\xE7\xF5es e abrir espa\xE7o para avan\xE7o."
+  requiredBuilding: {fileID: 0}
   spriteDefault: {fileID: 21300000, guid: 6802ac413b53adb4f85dfda3b65b80d2, type: 3}
   teamVariantSprites: []
   maxHP: 10
@@ -80,6 +81,10 @@ MonoBehaviour:
   preferredAirHeight: 4
   useExplicitPreferredNavalHeight: 0
   preferredNavalHeight: 2
+  emergesToAttack: 0
+  emergeAfterAttackDomain: 1
+  emergeAfterAttackHeight: 3
+  emergeAfterAttackTurns: 2
   skills:
   - {fileID: 11400000, guid: ef10c9e820afc074b99ea8e0b709c2f4, type: 2}
   stealthSkills: []
@@ -106,13 +111,13 @@ MonoBehaviour:
   spriteTransport: {fileID: 0}
   allowedEmbarkWhenTransporterAtTerrains: []
   allowedEmbarkWhenTransporterAtTerrainStructures: []
-  allowedEmbarkWhenTransporterAtConstructions: []
+  allowedEmbarkWhenTransporterAtFacilities: 0
   allowedDisembarkWhenTransporterAtTerrains: []
   allowedDisembarkWhenTransporterAtTerrainStructures: []
-  allowedDisembarkWhenTransporterAtConstructions: []
+  allowedDisembarkWhenTransporterAtFacilities: 0
   passengersCanDisembarkAndGoesToTerrains: []
   passengersCanDisembarkAndGoesToTerrainStructures: []
-  passengersCanDisembarkAndGoesToConstructions: []
+  passengersCanDisembarkAndGoesToFacilities: 0
   transportSlots: []
   autonomia: 50
   cost: 6200

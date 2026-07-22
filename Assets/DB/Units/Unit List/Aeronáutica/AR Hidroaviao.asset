@@ -19,6 +19,7 @@ MonoBehaviour:
     r\xE1pidos em curtas dist\xE2ncias entre terra e \xE1gua. Carrega uma unidade
     de infantaria e pousa em praias ou estradas. Ideal para movimentos improvisados
     e situa\xE7\xF5es espec\xEDficas, mas n\xE3o substitui transportes dedicados."
+  requiredBuilding: {fileID: 0}
   spriteDefault: {fileID: 21300000, guid: 45ca2a03cea85fe4f895f32d1843c233, type: 3}
   teamVariantSprites: []
   maxHP: 10
@@ -124,9 +125,7 @@ MonoBehaviour:
   - structure: {fileID: 11400000, guid: 2c50b52605f4f1c4ca013ba4bd7acee3, type: 2}
     baseTerrain: {fileID: 11400000, guid: f00a773f2a7664042bbabe8e117528f7, type: 2}
     isBlocked: 0
-  allowedEmbarkWhenTransporterAtConstructions:
-  - {fileID: 11400000, guid: 98dfc90eb1ac05849a3c30f308a5acbc, type: 2}
-  - {fileID: 11400000, guid: 18336762152ab4246bb4cd0fb463da45, type: 2}
+  allowedEmbarkWhenTransporterAtFacilities: 3
   allowedDisembarkWhenTransporterAtTerrains:
   - {fileID: 11400000, guid: adc0bfc8c2e8f9a41be0abda3e29e582, type: 2}
   - {fileID: 11400000, guid: f00a773f2a7664042bbabe8e117528f7, type: 2}
@@ -134,16 +133,14 @@ MonoBehaviour:
   - structure: {fileID: 11400000, guid: 2c50b52605f4f1c4ca013ba4bd7acee3, type: 2}
     baseTerrain: {fileID: 11400000, guid: f00a773f2a7664042bbabe8e117528f7, type: 2}
     isBlocked: 0
-  allowedDisembarkWhenTransporterAtConstructions:
-  - {fileID: 11400000, guid: 18336762152ab4246bb4cd0fb463da45, type: 2}
-  - {fileID: 11400000, guid: 98dfc90eb1ac05849a3c30f308a5acbc, type: 2}
+  allowedDisembarkWhenTransporterAtFacilities: 3
   passengersCanDisembarkAndGoesToTerrains:
   - {fileID: 11400000, guid: f00a773f2a7664042bbabe8e117528f7, type: 2}
   passengersCanDisembarkAndGoesToTerrainStructures:
   - structure: {fileID: 11400000, guid: 2c50b52605f4f1c4ca013ba4bd7acee3, type: 2}
     baseTerrain: {fileID: 11400000, guid: f00a773f2a7664042bbabe8e117528f7, type: 2}
     isBlocked: 0
-  passengersCanDisembarkAndGoesToConstructions: []
+  passengersCanDisembarkAndGoesToFacilities: -1
   transportSlots:
   - slotId: passageiro
     capacity: 1

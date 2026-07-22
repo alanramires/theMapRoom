@@ -20,6 +20,7 @@ MonoBehaviour:
     partir de posi\xE7\xF5es avan\xE7adas com suporte log\xEDstico. Consome autonomia
     enquanto permanece no ar, sendo ideal para defesa local. N\xE3o substitui ca\xE7as
     de superioridade a\xE9rea."
+  requiredBuilding: {fileID: 0}
   spriteDefault: {fileID: 21300000, guid: 768b0fc7023579940830ef3c4125ecd2, type: 3}
   teamVariantSprites: []
   maxHP: 10
@@ -35,6 +36,7 @@ MonoBehaviour:
   roles: 08000000
   aiInitiative: 1
   aiPurchaseMode: 0
+  bannedOnHardMode: 0
   aiTargetPreferenceByClass:
   - targetClass: 5
     priority: 2
@@ -60,6 +62,10 @@ MonoBehaviour:
   repairTriggerAmmoPct: 0
   repairRecoverHpAbove: 8
   fuseWhileInRepair: 1
+  restockTriggerGallonPct: 0
+  restockTriggerAmmoBoxPct: 0
+  restockTriggerToolsPct: 0
+  restockWhenAnyRuntimeSupplyEmpty: 1
   aiPreventiveMaintenanceEnabled: 1
   aiPreventiveSupplyCanRunWithUnderRepair: 0
   aiConservativeSupplyAvoidEnemyRange: 2
@@ -80,6 +86,10 @@ MonoBehaviour:
   preferredAirHeight: 4
   useExplicitPreferredNavalHeight: 0
   preferredNavalHeight: 2
+  emergesToAttack: 0
+  emergeAfterAttackDomain: 1
+  emergeAfterAttackHeight: 3
+  emergeAfterAttackTurns: 2
   skills:
   - {fileID: 11400000, guid: 8d5ec3fba2fd43139e8619b6f2b23eb9, type: 2}
   - {fileID: 11400000, guid: e73850be27dc4e2e8c8f210db151b0b4, type: 2}
@@ -116,13 +126,13 @@ MonoBehaviour:
   spriteTransport: {fileID: 0}
   allowedEmbarkWhenTransporterAtTerrains: []
   allowedEmbarkWhenTransporterAtTerrainStructures: []
-  allowedEmbarkWhenTransporterAtConstructions: []
+  allowedEmbarkWhenTransporterAtFacilities: 0
   allowedDisembarkWhenTransporterAtTerrains: []
   allowedDisembarkWhenTransporterAtTerrainStructures: []
-  allowedDisembarkWhenTransporterAtConstructions: []
+  allowedDisembarkWhenTransporterAtFacilities: 0
   passengersCanDisembarkAndGoesToTerrains: []
   passengersCanDisembarkAndGoesToTerrainStructures: []
-  passengersCanDisembarkAndGoesToConstructions: []
+  passengersCanDisembarkAndGoesToFacilities: 7
   transportSlots: []
   autonomia: 70
   cost: 16000

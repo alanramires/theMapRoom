@@ -1,0 +1,274 @@
+using System;
+using UnityEngine;
+
+// =====================================================================================
+// AIPresetData — perfil de doutrina da IA, no mesmo espírito do UnitData.
+//
+// FASE 1 (este arquivo): o asset EXISTE e é gerado a partir dos valores vivos da cena,
+// mas NADA no runtime lê dele ainda. Comportamento inalterado, de propósito. O objetivo
+// da fase 1 é tirar os números da cena e colocá-los num asset versionável e comparável.
+//
+// Os pares "normal/hard" do AIController (ex.: eliteRatioNormalPressure x
+// eliteRatioHardPressure) colapsam num ÚNICO campo aqui — o preset já É o modo. Quem
+// escolhe o valor é a escolha do preset, não um ternário no código.
+//
+// Ordem de migração planejada:
+//   Fase 1  criar asset + gerar os 6 presets a partir da cena (aqui)
+//   Fase 2  trocar as CONSULTAS DE VALOR para ler do preset
+//   Fase 3  trocar as PORTAS DE COMPORTAMENTO (if HardMode) por capacidades nomeadas
+//   Fase 4  remover os 4 booleanos e migrar save/load
+// =====================================================================================
+
+// -------------------------------------------------------------------------------------
+// Capacidades: as portas que hoje perguntam "eu sou o difícil?" quando queriam perguntar
+// "eu faço tal coisa?". Enquanto forem derivadas de hardMode, nenhum perfil pode ter uma
+// sem ter todas — é isso que impede um general que abre com blindado mas não projeta
+// produção inimiga.
+// -------------------------------------------------------------------------------------
+[Serializable]
+public class AICapabilityPreset
+{
+    [Tooltip("Ignora unidades marcadas com bannedOnHardMode na lista de compras. Hoje: AIShoppingPlanner.UnitPicker.IsHardModeBannedForAI.")]
+    public bool respeitarListaBanida = false;
+
+    [Tooltip("Soma a produção projetada dos produtores inimigos conhecidos na força macro. Hoje: BuildMacroTerritoryContext (enemyProducersProjected).")]
+    public bool projetarProducaoInimiga = false;
+
+    [Tooltip("Abertura com blindado antes do primeiro elite, incluindo a poupança bootstrap. Hoje: ApplyHardModeArmorFirst + ComputeBlitzFirstArmorReserve.")]
+    public bool aberturaBlindadoPrimeiro = false;
+
+    [Tooltip("Aplica teto ao total de logística terrestre em campo. Hoje: ApplyHardModeLogisticsCap. O valor do teto está em Composição.")]
+    public bool limitarLogistica = false;
+
+    [Tooltip("Dobra os slots de capturador por setor no plano (com teto próprio). Hoje: AIController.PlanEvaluator, linha do slots*2.")]
+    public bool dobrarSlotsCapturadorPorSetor = false;
+
+    [Tooltip("Handoff em profundidade: a ponta de lança vaga a captura para um seguidor e segue o eixo, em vez de terminar a captura. Hoje: PlanEvaluator.Handoff via hardMode.")]
+    public bool handoffEmProfundidade = false;
+
+    [Tooltip("Doutrina do Enxame: todo produtor compra o corpo mais barato TODO turno (imposto de conscrição). Hoje: conscriptionDoctrine.")]
+    public bool conscricaoSempre = false;
+
+    [Tooltip("Recrutamento emergencial apenas quando o macro está Perdendo. Hoje: conscriptionWhenLosing.")]
+    public bool conscricaoQuandoPerdendo = false;
+
+    [Tooltip("PROTÓTIPO. Classifica eixos em forte/equilibrado/fraco e enviesa a distribuição de elite para o lado forte. Hoje: strongWeakSidePolitic.")]
+    public bool politicaLadoForteFraco = false;
+}
+
+// -------------------------------------------------------------------------------------
+[Serializable]
+public class AIEconomyPreset
+{
+    [Tooltip("Fração da renda recebida por construções que NÃO são cidades. 1 = renda cheia. O Iniciante usa 1/3. Hoje isso é o easyMode com a fração fixa no MatchController.")]
+    [Range(0f, 1f)] public float fracaoRendaForaDeCidades = 1f;
+
+    [Tooltip("Quantos turnos de renda a IA topa POUPAR mirando um elite/capacidade. 0 = nunca poupa (guloso). Origem: eliteSaveTurnsNormal/Hard.")]
+    [Range(0, 4)] public int eliteSaveTurns = 1;
+
+    [Tooltip("Margem de caixa (%) mantida como troco enquanto poupa para elite, para ainda comprar coisas baratas. Origem: eliteMaintenanceReserveNormal/Hard.")]
+    [Range(0f, 50f)] public float eliteMaintenanceReservePercent = 20f;
+
+    [Tooltip("Percentual da renda reservado para elite no shopping. Origem: AIShoppingPlanner.SavingPercentualForElite.")]
+    [Range(0f, 20f)] public float savingPercentualForElite = 15f;
+
+    [Tooltip("Pressão líquida (escala 0..1 do Unit Analysis) a partir da qual a IA para de repetir counters baratos e poupa para um counter elite. Origem: CounterEliteEscalationPressure.")]
+    [Range(0.2f, 10f)] public float counterEliteEscalationPressure = 3.2f;
+}
+
+// -------------------------------------------------------------------------------------
+[Serializable]
+public class AICompositionPreset
+{
+    [Header("Núcleo operacional (Elite Gate)")]
+    [Tooltip("Capturadores (infantaria) exigidos antes de liberar compra de elite. Origem: minInfantryNormal/Hard.")]
+    [Range(0, 12)] public int coreMinInfantry = 2;
+    [Tooltip("Unidades de Assalto exigidas. Origem: minAssaultNormal/Hard. 0 = não exige (no Hard o tank básico costuma estar banido).")]
+    [Range(0, 12)] public int coreMinAssault = 2;
+    [Tooltip("Unidades de Artilharia/Fogo Indireto exigidas. Origem: minArtilleryNormal/Hard.")]
+    [Range(0, 12)] public int coreMinArtillery = 1;
+
+    [Header("Razões de elite")]
+    [Tooltip("Fatia de elite entre Assalto e Fogo Indireto enquanto há pressão terrestre aberta. Origem: eliteRatioNormalPressure/HardPressure.")]
+    [Range(0f, 1f)] public float eliteRatioPressure = 0.33f;
+    [Tooltip("Fatia de elite quando anti-tank E anti-infantaria já estão cobertas (folga vira superioridade qualitativa). Origem: eliteRatioNormalSafe/HardSafe.")]
+    [Range(0f, 1f)] public float eliteRatioSafe = 0.50f;
+    [Tooltip("Fração de preenchimento de capturadores que libera compra de elite. Origem: EliteCapturerFillRatio.")]
+    [Range(0f, 1f)] public float eliteCapturerFillRatio = 0.6f;
+    [Tooltip("Slots de assalto preenchidos exigidos. Origem: MinFilledAssaultSlots.")]
+    [Range(0, 5)] public int minFilledAssaultSlots = 1;
+
+    [Header("Massa antes do suporte")]
+    [Tooltip("Turno mínimo para liberar demanda de fire support. Origem: MinTurnForFireSupport.")]
+    [Range(1, 12)] public int minTurnForFireSupport = 3;
+    [Tooltip("Origem: MinActiveCapturersForFireSupport.")]
+    [Range(0, 8)] public int minActiveCapturersForFireSupport = 2;
+    [Tooltip("Origem: MinActiveAssaultForFireSupport.")]
+    [Range(0, 5)] public int minActiveAssaultForFireSupport = 1;
+    [Tooltip("Massa mínima de capturadores ativos antes de liberar demanda de suporte. Forma a base primeiro. Origem: MinCapturerMassForSupport.")]
+    [Range(0, 8)] public int minCapturerMassForSupport = 4;
+    [Tooltip("Origem: AssaultPerFireSupportRatio.")]
+    [Range(1, 4)] public int assaultPerFireSupportRatio = 2;
+    [Tooltip("Origem: CapturersPerPreventiveTransport.")]
+    [Range(2, 8)] public int capturersPerPreventiveTransport = 4;
+    [Tooltip("Origem: ProgressiveCapturerBatchSize.")]
+    [Range(1, 4)] public int progressiveCapturerBatchSize = 2;
+
+    [Header("Tetos")]
+    [Tooltip("Teto de logística terrestre em campo. Só aplicado quando a capacidade 'limitarLogistica' está ligada. Origem: maxLogisticUnitsOnHardMode.")]
+    [Range(0, 10)] public int maxLogisticUnits = 1;
+    [Tooltip("Origem: RepairsPerGroundSupplier.")]
+    [Range(1, 8)] public int repairsPerGroundSupplier = 2;
+    [Tooltip("Prioridade da demanda de logística quando há um ELITE ferido (menor = mais cedo). Origem: EliteRepairLogisticsPriority.")]
+    [Range(1, 20)] public int eliteRepairLogisticsPriority = 7;
+    [Tooltip("Origem: MaxProactiveDefensiveFireSupport.")]
+    [Range(0, 2)] public int maxProactiveDefensiveFireSupport = 1;
+    [Tooltip("Origem: MaxProactiveAntiAirSAM.")]
+    [Range(0, 5)] public int maxProactiveAntiAirSAM = 3;
+    [Tooltip("Origem: AntiAirCoverageRange.")]
+    [Range(2, 10)] public int antiAirCoverageRange = 5;
+}
+
+// -------------------------------------------------------------------------------------
+[Serializable]
+public class AIConscriptionPreset
+{
+    [Tooltip("Fase de Massacre: com vantagem numérica clara a doutrina cessa a massa e o caixa volta pro elite. Entra quando o ForceRatio macro atinge este valor (0.66 = ~2:1). Origem: massacreEnterForceRatio.")]
+    [Range(0.5f, 1f)] public float massacreEnterForceRatio = 0.66f;
+
+    [Tooltip("Histerese: uma vez ativa, a Fase de Massacre só volta à conscrição se o ForceRatio cair abaixo deste valor. Origem: massacreExitForceRatio.")]
+    [Range(0.5f, 1f)] public float massacreExitForceRatio = 0.58f;
+
+    [Tooltip("Válvula de teto: cessa a massa quando as unidades em campo atingem esta fração do limite por time. Origem: massacreUnitCapFillRatio.")]
+    [Range(0.5f, 1f)] public float massacreUnitCapFillRatio = 0.85f;
+}
+
+// -------------------------------------------------------------------------------------
+[Serializable]
+public class AIPlannerPreset
+{
+    [Tooltip("Máximo de objetivos ofensivos simultâneos (Pending/Pursuing/Capturing). Origem: maxActiveObjectives.")]
+    [Range(1, 12)] public int maxActiveObjectives = 4;
+
+    [Tooltip("Multiplicador dos slots de capturador por setor. 1 = normal, 2 = a antiga regra do Hard Mode. Origem: PlanEvaluator (slots * 2).")]
+    [Range(1, 3)] public int capturerSlotsPerSectorMultiplier = 1;
+
+    [Tooltip("Teto absoluto de slots de capturador por setor, depois do multiplicador. Hoje é const no código: 4 normal, HardModeCapturerSlotCap = 6.")]
+    [Range(1, 12)] public int capturerSlotCap = 4;
+
+    [Tooltip("Distância mínima em hexes do QG para um setor gerar slot de transportador no plano e no shopping. Origem: minDistanceForTransportSlot.")]
+    [Range(1, 30)] public int minDistanceForTransportSlot = 7;
+}
+
+// -------------------------------------------------------------------------------------
+[Serializable]
+public class AITacticsPreset
+{
+    [Header("Risco")]
+    [Tooltip("Impacto do risco na tomada de decisão (0 = ignora risco, 2 = risco pesa muito). Origem: riskDecisionImpact.")]
+    [Range(0f, 2f)] public float riskDecisionImpact = 0.5f;
+
+    [Header("Objetivo defensivo")]
+    [Tooltip("Raio em hexes para criar objetivo defensivo num setor conquistado quando há inimigo próximo. Origem: defenseEnemyRange.")]
+    [Range(1, 8)] public int defenseEnemyRange = 3;
+    [Tooltip("Rogues dentro deste raio são convocados para defesa. Origem: defenseCallRange.")]
+    [Range(1, 8)] public int defenseCallRange = 4;
+
+    [Header("Reforço SOS")]
+    [Tooltip("Raio para detectar inimigos perto do alvo de captura e acionar reforço. Origem: alliesEnemyRange.")]
+    [Range(1, 8)] public int alliesEnemyRange = 2;
+    [Tooltip("Raio para recrutar rogues como reforço SOS. Origem: alliesCallRange.")]
+    [Range(1, 16)] public int alliesCallRange = 8;
+    [Tooltip("Ratio HP inimigo / HP aliado que aciona o reforço SOS (2 = inimigo tem o dobro). Origem: alliesAgainstEnemiesHpRatio.")]
+    [Range(1f, 5f)] public float alliesAgainstEnemiesHpRatio = 2f;
+
+    [Header("Defesa de base")]
+    [Tooltip("Origem: MinBaseArtilharia.")]
+    [Range(0, 3)] public int minBaseArtilharia = 1;
+    [Tooltip("Origem: MinBaseAAA.")]
+    [Range(0, 3)] public int minBaseAAA = 1;
+    [Tooltip("Origem: MinTurnBaseDefense.")]
+    [Range(1, 12)] public int minTurnBaseDefense = 3;
+}
+
+// -------------------------------------------------------------------------------------
+[Serializable]
+public class AIIntelPreset
+{
+    [Tooltip("Origem: usarIntelJogadasNoShopping.")]
+    public bool usarIntelJogadasNoShopping = true;
+    [Range(1, 8)] public int lookbackTurns = 4;
+    [Range(0f, 10f)] public float infantryPressureAssaultThreshold = 1.5f;
+    [Range(0f, 10f)] public float airThreatAntiAirThreshold = 2f;
+    [Range(0f, 10f)] public float armorThreatDefenseThreshold = 2f;
+    [Range(0f, 10f)] public float capturePressureDefenseThreshold = 2f;
+    [Range(0f, 10f)] public float numericalPressureThreshold = 1.5f;
+    [Range(0f, 30f)] public float fireSupportGapHotThreshold = 8f;
+    [Range(0f, 20f)] public float fireSupportGapDamageThreshold = 3f;
+    [Range(0f, 10f)] public float offensiveAntiInfantryFireThreshold = 2.5f;
+    [Range(0f, 10f)] public float stalemateElitePressureThreshold = 3.5f;
+    [Range(0f, 10f)] public float stalemateFireSupportThreshold = 6f;
+    [Range(0f, 1f)] public float stalemateEliteCapturerFillRatio = 0.3f;
+    [Range(1, 12)] public int stalemateEliteCapturerRange = 8;
+}
+
+// -------------------------------------------------------------------------------------
+[Serializable]
+public class AIAirPreset
+{
+    [Range(1, 8)] public int maxAirTransporters = 3;
+    [Range(1, 12)] public int minTurnForInterceptador = 4;
+    [Range(1, 6)] public int helicopterosPorCacaB = 3;
+    [Range(0, 6)] public int maxCacaB = 4;
+    [Range(0, 4)] public int maxCacaA = 2;
+    [Range(1, 12)] public int minTurnForAtaqueAereo = 5;
+    [Range(1, 4)] public int chinooksPorApache = 2;
+    [Range(1, 6)] public int helicopterosInimigosPorApache = 3;
+    [Range(1, 4)] public int apachesParaBombardeiro = 2;
+    public bool comprarApacheEmModoDefesa = true;
+    [Range(0, 4)] public int minCacaBPresence = 1;
+    [Range(0, 4)] public int minApachePresence = 1;
+    [Range(0, 2)] public int minBombaPresence = 0;
+    [Range(1, 12)] public int minTurnForIntel = 4;
+    [Range(0, 3)] public int maxAirIntel = 1;
+    [Range(0, 3)] public int maxMobileAirIntel = 1;
+}
+
+// =====================================================================================
+[CreateAssetMenu(fileName = "AIPreset_", menuName = "Game/AI/AI Preset", order = 0)]
+public class AIPresetData : ScriptableObject
+{
+    [Header("Identidade")]
+    [Tooltip("Nome exibido do perfil. Pode ser uma dificuldade (\"Competitiva\") ou um general (\"Azul — a Fortaleza\").")]
+    public string nomeExibido = "";
+
+    [Tooltip("A doutrina em uma frase. É aqui que os documentos de perfil encostam no código.")]
+    [TextArea(2, 6)] public string doutrina = "";
+
+    [Tooltip("Dificuldade que este preset representa. Usado pela AIPresetLibrary para resolver a escolha da Tela de Entrada. Presets de general podem repetir a dificuldade base.")]
+    public AIDifficulty dificuldadeBase = AIDifficulty.Facil;
+
+    [Header("Seções")]
+    public AICapabilityPreset capacidades = new AICapabilityPreset();
+    public AIEconomyPreset economia = new AIEconomyPreset();
+    public AICompositionPreset composicao = new AICompositionPreset();
+    public AIConscriptionPreset conscricao = new AIConscriptionPreset();
+    public AIPlannerPreset plano = new AIPlannerPreset();
+    public AITacticsPreset tatica = new AITacticsPreset();
+    public AIIntelPreset intel = new AIIntelPreset();
+    public AIAirPreset aeronautica = new AIAirPreset();
+
+    // Compatibilidade com os 4 booleanos legados enquanto a migração não termina.
+    // O AIController continua sendo a fonte de verdade do runtime na fase 1; estes
+    // getters existem para o gerador e para as janelas de inspeção compararem preset
+    // contra estado vivo sem duplicar a regra de derivação.
+    public bool EquivaleAHardMode =>
+        capacidades.respeitarListaBanida
+        && capacidades.projetarProducaoInimiga
+        && capacidades.aberturaBlindadoPrimeiro
+        && capacidades.limitarLogistica
+        && capacidades.dobrarSlotsCapturadorPorSetor
+        && capacidades.handoffEmProfundidade;
+
+    public bool EquivaleAEasyMode => economia.fracaoRendaForaDeCidades < 0.999f;
+}

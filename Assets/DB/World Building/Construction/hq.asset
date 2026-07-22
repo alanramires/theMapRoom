@@ -22,6 +22,7 @@ MonoBehaviour:
   isAirport: 0
   isHarbor: 0
   isCity: 0
+  isTransportTerminal: 0
   spriteDefault: {fileID: 21300000, guid: c090fb273a5237f4b9aef7fb2304a715, type: 3}
   spriteGreen: {fileID: 0}
   spriteRed: {fileID: 0}
@@ -76,7 +77,7 @@ MonoBehaviour:
     isPlayerHeadQuarter: 1
     isVictoryBuilding: 0
     isCapturable: 1
-    capturePointsMax: 40
+    capturePointsMax: 60
     capturedIncoming: 3000
     sellingRule: 1
     legacyCanProduceAndSellUnits: 

@@ -58,16 +58,27 @@ public partial class TurnStateManager
     {
         if (rangeMapTilemap == null)
             rangeMapTilemap = FindRangeMapTilemap();
+        if (lineOfFireMapTilemap == null)
+            lineOfFireMapTilemap = FindLineOfFireMapTilemap();
 
-        TilemapRenderer renderer = rangeMapTilemap != null
+        TilemapRenderer rangeRenderer = rangeMapTilemap != null
             ? rangeMapTilemap.GetComponent<TilemapRenderer>()
             : null;
-        if (renderer == null)
-            return;
+        TilemapRenderer lineRenderer = lineOfFireMapTilemap != null
+            ? lineOfFireMapTilemap.GetComponent<TilemapRenderer>()
+            : null;
 
-        renderer.sortingLayerName = playerTurn ? "FogOfWar" : "SFX";
-        // Acima da nevoa no turno humano, mas abaixo do cursor (ordem 100).
-        renderer.sortingOrder = playerTurn ? 50 : 0;
+        if (rangeRenderer != null)
+        {
+            rangeRenderer.sortingLayerName = playerTurn ? "FogOfWar" : "SFX";
+            // Acima da nevoa e da linha, mas abaixo do cursor (ordem 100).
+            rangeRenderer.sortingOrder = playerTurn ? 50 : 0;
+        }
+        if (lineRenderer != null)
+        {
+            lineRenderer.sortingLayerName = playerTurn ? "FogOfWar" : "SFX";
+            lineRenderer.sortingOrder = playerTurn ? 40 : 0;
+        }
     }
 
     private void PaintSelectedUnitMovementRange()

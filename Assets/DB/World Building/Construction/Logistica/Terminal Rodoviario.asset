@@ -17,10 +17,12 @@ MonoBehaviour:
   sufixo: depo
   description: "Produz Caminh\xF5es de Carga.\nMove suprimentos entre constru\xE7\xF5es
     terrestres.\nCaptur\xE1-lo transfere sua produ\xE7\xE3o."
+  grammaticalGender: 0
   requiredBuilding: {fileID: 0}
   isAirport: 0
   isHarbor: 0
   isCity: 0
+  isTransportTerminal: 0
   spriteDefault: {fileID: 21300000, guid: 5ad6e7848a1957e4f83a0376a06e89fc, type: 3}
   spriteGreen: {fileID: 0}
   spriteRed: {fileID: 0}

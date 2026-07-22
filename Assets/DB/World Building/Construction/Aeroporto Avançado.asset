@@ -17,10 +17,12 @@ MonoBehaviour:
   sufixo: Air Field Advanced
   description: "Produz aeronaves furtivas e de intelig\xEAncia.\nRequer uma F\xE1brica
     M\xE9dia.\nAtaques estrat\xE9gicos exigem F\xE1brica Pesada."
+  grammaticalGender: 0
   requiredBuilding: {fileID: 11400000, guid: 966e76b3c3edcb847baece70d5196d11, type: 2}
   isAirport: 1
   isHarbor: 0
   isCity: 0
+  isTransportTerminal: 0
   spriteDefault: {fileID: 21300000, guid: 74380e8574e0d3b47a377e9e5e013b70, type: 3}
   spriteGreen: {fileID: 0}
   spriteRed: {fileID: 0}
@@ -77,8 +79,8 @@ MonoBehaviour:
     isPlayerHeadQuarter: 0
     isVictoryBuilding: 0
     isCapturable: 1
-    capturePointsMax: 40
-    capturedIncoming: 2000
+    capturePointsMax: 50
+    capturedIncoming: 2500
     sellingRule: 2
     legacyCanProduceAndSellUnits: 
     offeredUnits:

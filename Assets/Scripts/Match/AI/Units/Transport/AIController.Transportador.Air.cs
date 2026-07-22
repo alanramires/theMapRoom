@@ -775,7 +775,7 @@ public partial class AIController
             return paths;
         bool hasAnyFilter = (transporterData.allowedEmbarkWhenTransporterAtTerrains != null && transporterData.allowedEmbarkWhenTransporterAtTerrains.Count > 0)
             || (transporterData.allowedEmbarkWhenTransporterAtTerrainStructures != null && transporterData.allowedEmbarkWhenTransporterAtTerrainStructures.Count > 0)
-            || (transporterData.allowedEmbarkWhenTransporterAtConstructions != null && transporterData.allowedEmbarkWhenTransporterAtConstructions.Count > 0);
+            || transporterData.allowedEmbarkWhenTransporterAtFacilities != ConstructionFacilityType.None;
 
         var filtered = new System.Collections.Generic.Dictionary<Vector3Int, List<Vector3Int>>();
         foreach (var kv in paths)

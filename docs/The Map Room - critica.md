@@ -2,629 +2,395 @@
 
 
 
-Li o **Manual Técnico (6)** integralmente. Ele tem cerca de 21 mil palavras e já cobre praticamente todo o organismo do jogo: domínios, posição, combate, logística, transporte, aviação, captura, névoa, economia, progressão, turno e vitória. ?filecite?turn2file0?
-
 ## Veredito
 
-**Não precisa reescrever do zero.**
-
-Esta é, de longe, a versão mais madura do manual. Ela já pode ser considerada o **documento-mãe do The Map Room**.
-
-Como manual de doutrina e identidade do jogo, eu daria **9/10**.
-
-Como fonte única de verdade técnica, no estado atual, daria **7/10** — não por falta de conteúdo, mas porque algumas regras importantes ainda aparecem:
-
-- contraditórias em pontos diferentes;
-- misturadas entre implementação atual e intenção futura;
-- explicadas de maneira narrativa, mas sem uma definição normativa final;
-- incompletas em relação ao catálogo atual de construções e unidades.
-
-**Eu não dividiria o documento ainda.** Primeiro fecharia as dúvidas abaixo dentro dele. Só depois faria o desmembramento. Dividir agora pode transformar ambiguidades locais em contradições espalhadas por dez arquivos.
-
----
-
-# O que ficou excepcional
-
-## 1. O domínio virou realmente o alicerce do jogo
-
-A melhor conquista do manual é que domínio deixou de ser uma classificação técnica e virou uma ferramenta mental.
-
-Tanques, aviões, submarinos, armas, terrenos, pouso, trajetória e ocupação podem ser deduzidos a partir da pergunta:
-
-> Em qual domínio isso existe agora?
-
-Isso reduz muito a aparência de “exceções arbitrárias”. O jogador não precisa decorar que um caça pousado pode ser atingido por artilharia; ele deduz isso porque ambos estão em Land/Surface naquele momento. ?filecite?turn2file0?
-
-## 2. O conceito de habilidades como chaves é excelente
-
-A explicação de que Alpino, Guerrilha, Linha de Trem, Pouso em Convés e Ocultação não são poderes independentes, mas **etiquetas consultadas pelo mundo**, é talvez a melhor explicação sistêmica do projeto.
-
-A frase conceitual por trás disso é muito forte:
-
-> O jogo não cresce em regras; cresce em etiquetas.
-
-Isso descreve não apenas o jogo, mas a arquitetura do projeto.
-
-## 3. A separação entre DPQ e bônus de defesa está muito clara
-
-O manual finalmente deixa inequívoco que:
-
-- DPQ determina **como o resultado será arredondado**;
-- bônus de defesa determina **quanto o combate custa**;
-- posição não é altitude;
-- iniciativa não é disparar antes.
-
-Essa seção está didaticamente muito boa e preserva a identidade determinística do combate. ?filecite?turn3file7?
-
-## 4. O combate simultâneo está bem defendido
-
-A repetição de que ninguém atira antes é útil, porque “iniciativa” facilmente seria interpretada como ataque preventivo.
-
-A ideia de que o atacante escolhe o momento e recebe o lado favorável do arredondamento, mas ambos usam o efetivo inicial, está sólida.
-
-## 5. A logística ganhou uma identidade própria
-
-A logística não aparece como um conjunto de botões de cura. Ela aparece como:
-
-- estoque físico;
-- capacidade de atendimento;
-- dinheiro;
-- tempo;
-- geografia;
-- camadas;
-- cadeia de distribuição;
-- vulnerabilidade operacional.
-
-A frase “uma unidade sem munição ocupa território, mas não disputa nada” resume perfeitamente o papel da logística.
-
-Também ficou excelente a diferenciação entre:
-
-- receber serviço;
-- prestar serviço;
-- transferir reserva;
-- Serviço do Comando;
-- Hub;
-- Receiver.
-
-## 6. A progressão por conquista é uma mecânica de identidade
-
-O desbloqueio permanente por “já capturou uma vez” é muito mais interessante do que uma árvore tecnológica abstrata.
-
-A progressão transforma o mapa na árvore tecnológica. Isso combina perfeitamente com o manifesto: o tabuleiro é o protagonista.
-
-A ideia de impedir a captura do prédio avançado e mostrar a opção bloqueada com a explicação do pré-requisito é especialmente boa. Ensina o sistema sem esconder a porta.
-
-## 7. A névoa finalmente está explicada como inteligência
-
-O manual separa corretamente:
-
-- terreno revelado;
-- memória do terreno;
-- última informação sobre uma construção;
-- unidade detectada;
-- ocultação;
-- aviso de detecção;
-- informação do Jornal do Comandante.
-
-O epílogo é excelente. Ele fecha o documento voltando à Sala de Mapas, não ao combate. O jogo termina conceitualmente onde começou: informação incompleta e decisão consciente. ?filecite?turn1file7?
-
----
-
-# Problemas críticos antes do desmembramento
-
-## 1. Há duas versões incompatíveis do comprometimento da jogada
-
-Na seção sobre movimento dentro da névoa, o texto dá a entender esta sequência:
-
-1. a unidade se desloca;
-2. a visão é recalculada;
-3. novos contatos aparecem;
-4. o jogador escolhe o que fará com a informação recém-descoberta.
-
-Mas, em “Existe Uma Confirmação Só” e no epílogo, a regra apresentada é outra:
-
-1. o jogador experimenta posições;
-2. os sensores mostram apenas o que já era conhecido;
-3. o jogador escolhe a ação;
-4. confirma;
-5. somente então o mundo e a névoa são recalculados;
-6. a unidade encerra a atividade.
-
-Essas duas regras produzem jogos muito diferentes.
-
-Pelo que você vinha definindo, a segunda é a correta: **o jogador não anda, revela o inimigo e então decide atacar na mesma jogada**. Ele precisa comprometer a atividade inteira e só depois recebe a nova fotografia do mundo.
-
-A seção “Mover É Se Comprometer” precisa ser alinhada com “Existe Uma Confirmação Só”. Esta é a contradição mais importante do documento.
-
----
-
-## 2. O aeroporto interrompe consumo, mas não está claro como estacionar uma aeronave nele
-
-O manual afirma simultaneamente que:
-
-- aeronave pousada em aeroporto não consome autonomia;
-- operações no solo terminam normalmente em arremetida automática;
-- aeronaves não “estacionam”;
-- não existem comandos livres de altitude;
-- pousar e decolar aparecem entre as ações possíveis.
-
-Falta definir o procedimento canônico:
-
-- Como o jogador manda uma aeronave permanecer pousada no aeroporto?
-- Pousar no aeroporto é uma ação específica que encerra a atividade?
-- Uma aeronave atendida no aeroporto arremete automaticamente ou permanece no hangar?
-- Ao ser selecionada no turno seguinte, ela decola automaticamente?
-- É possível deixá-la pousada por vários turnos sem selecioná-la?
-- Aeroporto comum e avançado se comportam igualmente?
-
-Sem essa resposta, a principal vantagem estratégica do aeroporto — interromper o consumo — fica sem um ciclo operacional completamente explicado.
-
----
-
-## 3. A visão concedida pelas construções precisa ser confirmada
-
-O manual diz que cidade, fábrica, porto e aeroporto revelam:
-
-- o próprio hexágono;
-- o anel imediato ao redor;
-
-e que o QG alcança um hexágono adicional.
-
-Isso diverge da regra que havíamos fechado anteriormente para cidades: **a cidade revelava apenas o próprio hexágono**, permitindo detectar uma unidade inimiga que estivesse ocupando exatamente aquele espaço.
-
-É preciso escolher uma regra definitiva e separar claramente:
-
-- alcance de revelação de terreno;
-- alcance de detecção de unidades;
-- detecção no próprio hexágono;
-- detecção de ocultos;
-- memória após perder visão.
-
-Minha dúvida concreta: **as construções abrem somente terreno a distância, mas detectam unidades apenas no próprio hexágono?** O texto parece sugerir algo próximo disso, porém ainda não declara a matriz exata.
-
----
-
-## 4. O revide é sempre limitado à distância 1?
-
-O manual afirma que o defensor só responde a distância 1.
-
-Isso precisa ser marcado como uma lei absoluta ou corrigido para “quando sua arma de revide alcança o atacante”.
-
-As duas possibilidades têm consequências enormes:
-
-- Um obuseiro atacado de longe nunca revida, mesmo possuindo arma com alcance compatível?
-- Dois navios com armas de alcance 2 não trocam fogo quando um ataca a dois hexágonos?
-- Um míssil de longo alcance é sempre unilateral?
-- Apenas combate adjacente é simultâneo?
-
-Os documentos técnicos anteriores descreviam o revide como dependente de arma, munição, domínio e validade do confronto, sem destacar a distância 1 como lei universal. O Manual 6 precisa encerrar essa questão.
-
----
-
-## 5. O teto de eliminações mudou e precisa ser validado
-
-O Manual 6 estabelece dois tetos:
-
-- não eliminar mais do que o alvo possui;
-- não eliminar mais do que o esquadrão atacante possuía no começo da troca.
-
-Isso produz a regra de que uma unidade com 1 de efetivo nunca elimina mais de 1 inimigo, mesmo com uma arma extremamente poderosa.
-
-A regra é coerente com a metáfora do esquadrão, mas o relatório técnico anterior descrevia principalmente o limite pelo efetivo do alvo. ?filecite?turn0file12?
-
-Como ela altera fortemente o resultado dos confrontos, precisa haver confirmação explícita:
-
-**o limite pelo efetivo de quem atira já é a regra implementada ou é a nova regra de design que ainda será aplicada?**
-
----
-
-## 6. A montanha possui dois valores de elevação?
-
-O manual diz:
-
-- montanha tem elevação 2;
-- quem está nela herda essa elevação;
-- uma montanha intermediária bloqueia a visão entre dois outros picos porque, como obstáculo, ela é ligeiramente mais alta do que a posição que concede.
-
-Isso implica que há dois números diferentes:
-
-- elevação recebida pela unidade;
-- altura usada pela montanha como obstáculo.
-
-Essa é uma boa regra, mas o documento não informa os valores.
-
-Se ambos fossem 2, pela descrição matemática anterior, a montanha intermediária poderia não bloquear uma linha exatamente nivelada. Portanto, é preciso declarar algo como:
-
-- posição no topo: elevação 2;
-- obstáculo montanha: altura de bloqueio 3;
-
-ou explicar a regra específica que produz o bloqueio.
-
-Sem isso, a frase está conceitualmente boa, mas não é reproduzível como fonte técnica.
-
----
-
-## 7. Há uma contradição interna sobre infantaria e montanha
-
-Primeiro o manual afirma que toda a infantaria do exército possui Alpino.
-
-Depois afirma que “infantaria comum” para no sopé da montanha junto com blindados, artilharia e caminhões.
-
-Se toda a infantaria disponível é Alpina, “infantaria comum” não existe nesse roster. A frase deve virar algo como:
-
-- infantaria sem Alpino não entra;
-- no exército atual, todas as infantarias possuem Alpino.
-
----
-
-## 8. Há uma contradição aparente sobre trem, floresta e montanha
-
-Em “O Custo do Terreno”, o Trem de Carga é descrito como bloqueado completamente em floresta e montanha, sem exceção.
-
-Depois, o manual explica que:
-
-- o trem cruza floresta quando há trilho;
-- o trem cruza montanha quando há trilho, pagando 2.
-
-A regra real parece ser:
-
-> O Trem de Carga é bloqueado pelo terreno puro; ele só atravessa esses terrenos quando existe uma rota ferroviária válida.
-
-A expressão “bloqueado por completo, sem exceção” precisa incluir “na ausência de trilho”, porque hoje ela contradiz as seções seguintes.
-
----
-
-## 9. Classe de armadura é teto de arma ou apenas classificação?
-
-O manual declara que uma unidade leve não carrega armas médias ou pesadas.
-
-Isso soa como uma restrição absoluta do sistema.
-
-Porém, versões anteriores do catálogo continham combinações como plataformas leves ou médias utilizando armas classificadas acima de sua armadura. Se essas combinações continuam existindo, então a classe de armadura não é um teto obrigatório: é apenas uma faixa descritiva ou uma convenção de balanceamento.
-
-É necessário decidir entre:
-
-- **regra obrigatória:** nenhuma unidade opera arma de potência superior à própria classe;
-- **diretriz de balanceamento:** normalmente não ocorre, mas unidades especializadas podem violar;
-- **conceitos independentes:** armadura e potência não restringem uma à outra.
-
----
-
-## 10. Os percentuais logísticos precisam de uma única versão
-
-O Manual 6 informa:
-
-- reabastecimento: até 5%;
-- rearmamento: até 10%;
-- reparo: até 40%.
-
-O relatório técnico anterior registrava valores diferentes:
-
-- reabastecimento: 10%;
-- rearmamento: 25%;
-- reparo: 65%. ?filecite?turn0file11?
-
-Como este será o documento-mãe, precisa ficar explícito:
-
-- quais são os valores atuais;
-- se são valores padrão ou definidos por cenário;
-- se o Manual 6 já representa um rebalanceamento ainda não aplicado.
-
-Hoje não dá para saber se o manual está descrevendo o jogo ou prescrevendo a próxima alteração.
-
----
-
-## 11. Quantos pacientes o caminhão atende?
-
-O Manual 6 diz que cada prestador atende uma unidade, com duas exceções:
-
-- avião-tanque;
-- porta-aviões.
-
-?filecite?turn3file10?
-
-Entretanto, o catálogo anterior do Caminhão de Suprimentos dizia que ele atendia até duas unidades por turno. ?filecite?turn0file15?
-
-É preciso confirmar se:
-
-- o caminhão foi reduzido para um atendimento;
-- continua atendendo dois;
-- a quantidade depende do serviço ou da configuração individual do prestador.
-
----
-
-## 12. “Uma rodada” e “duas rodadas” precisam de definição formal
-
-Para o caça furtivo, o texto diz que a exposição dura uma rodada e termina no próximo turno dele.
-
-Para o submarino, diz que permanece exposto por duas rodadas.
-
-Em uma partida com mais de dois times, “rodada” pode significar:
-
-- dois turnos do proprietário;
-- dois turnos globais;
-- duas passagens completas por todos os times;
-- dois inícios de turno da unidade;
-- dois turnos adversários.
-
-A definição deve ser feita em termos inequívocos, preferencialmente a partir do turno do proprietário da unidade.
-
----
-
-## 13. O Jornal sabe que uma construção foi tomada, mas a fotografia continua velha?
-
-A seção da névoa afirma que uma construção fora de visão permanece no mapa com o último dono observado.
-
-Depois, o Jornal afirma que, quando uma construção sua é tomada, ele informa inclusive o novo dono, pois a guarnição soube quem entrou.
-
-Minha dúvida:
-
-- o Jornal atualiza também a cor da construção no mapa?
-- ou o mapa continua mostrando a fotografia velha, apesar de o jogador ter recebido o relatório?
-- uma construção que era sua continua sendo considerada “observada” durante o processo de captura?
-- a propriedade sempre comunica sua própria perda, mesmo sem unidade aliada por perto?
-
-A regra de conhecimento está ótima, mas falta definir como essa informação se propaga para a representação visual.
-
----
-
-## 14. A compra de submarinos precisa de uma camada inicial
-
-O manual diz que a unidade nasce na construção produtora e que a superfície precisa estar livre.
-
-Isso explica bem:
-
-- unidades terrestres;
-- navios;
-- aeronaves, que nascem pousadas.
-
-Mas o submarino nasce:
-
-- em Naval/Surface;
-- já em Submarine/Submerged;
-- na camada preferida;
-- dependendo do porto e da profundidade local?
-
-Como a camada inicial afeta ocupação, detecção e ocultação, ela precisa ser declarada.
-
----
-
-## 15. O destino dos passageiros deve ser dito sem metáfora
-
-O texto afirma que passageiros compartilham o destino do transportador.
-
-A interpretação natural é que todos são eliminados quando o transportador é destruído. Porém, por ser uma fonte técnica, precisa declarar diretamente:
-
-- todos os passageiros são eliminados;
-- não existe teste de sobrevivência;
-- não existe desembarque de emergência;
-- reservas e cargas embarcadas também são perdidas;
-- unidades transportadas contam para evitar eliminação total do time.
-
-A última parte já aparece na condição de derrota, mas a resolução da destruição do transportador ainda está implícita.
-
----
-
-# Lacunas de cobertura como fonte única de verdade
-
-## Catálogo de construções
-
-O manual descreve muito bem cidade, fábrica, porto, aeroporto, QG e prédios da progressão, mas o jogo atual possui ou está definindo também:
-
-- Fábrica Leve;
-- Fábrica Média;
-- Fábrica Pesada;
-- Estação de Trem;
-- Barracks;
-- Aeroporto Avançado;
-- Terminal Rodoviário;
-- Docas;
-- Hidrobase.
-
-Como fonte única, o manual precisa registrar para cada uma:
-
-- domínios aceitos;
-- posição e defesa;
-- renda;
-- mercado;
-- unidades produzidas;
-- serviços oferecidos;
-- capacidade de atendimento;
-- estoque;
-- regras de captura;
-- pré-requisitos;
-- regras de pouso;
-- comportamento do trem;
-- visão e detecção.
-
-A Hidrobase, por exemplo, tem uma identidade importante: aceita o pouso de qualquer aeronave para manutenção, mas comercializa somente hidroaviões. Isso ainda não aparece no documento.
-
-## Catálogo exato de unidades e armas
-
-O manual ensina o sistema muito bem, mas ainda não é suficiente para reconstruir as fichas atuais.
-
-Como fonte única, precisará conter ou anexar:
-
-- atributos de cada unidade;
-- classe;
-- domínio preferido;
-- custos;
+**Sim: os 19 arquivos satisfazem a separação planejada.** A biblioteca cobre todos os grandes sistemas do Manual 9, tem ordem de precedência, distingue doutrina, dados, dívida técnica, decisões e auditoria, e não precisa ganhar novos documentos neste momento.
+
+Mas eu classificaria o estado atual como:
+
+- **Arquitetura da separação:** 9/10  
+- **Distribuição temática:** 8/10  
+- **Ausência de duplicação:** 7/10  
+- **Completude da fonte única:** 6,5/10  
+- **Pronta para substituir o monólito:** sim, como biblioteca em construção  
+- **Pronta para dispensar consulta aos assets:** ainda não  
+
+Uma pequena precisão: atualmente são **19 arquivos no total**, não 19 capítulos mais apêndices:
+
+- 1 índice;
+- 10 documentos canônicos;
+- 5 catálogos e matrizes;
+- 3 documentos de engenharia.
+
+O próprio índice formaliza corretamente essa estrutura e declara que os documentos `01` a `10` são a doutrina, enquanto os catálogos ainda incompletos recorrem aos assets. ?filecite?turn6file0?
+
+# Avaliação dos 19 arquivos
+
+| Arquivo | Veredito | Observação |
+|---|---|---|
+| `00_fonte_unica_e_indice.md` | **Excelente** | Resolve autoridade, precedência, vocabulário e ordem de leitura. |
+| `01_principios_e_vocabulario.md` | **Ajustar** | Cumpre a função, mas o epílogo sobre névoa e comprometimento está fora de seu escopo. |
+| `02_dominios_terrenos_e_ocupacao.md` | **Bom** | Estruturalmente correto, mas ainda carrega detalhes de movimento que pertencem ao `03`. |
+| `03_movimento_terreno_e_infraestrutura.md` | **Excelente** | Tem fronteira clara e reúne corretamente terreno, estrada, trilho, habilidades e reboque. |
+| `04_ciclo_de_acao_e_comprometimento.md` | **Excelente com ajuste** | Deve possuir o uso da informação pela interface, mas não redefinir toda a doutrina da névoa. |
+| `05_visao_deteccao_e_nevoa.md` | **Excelente com correção** | É a autoridade natural sobre informação, mas ainda tem uma frase problemática sobre Air/High. |
+| `06_combate.md` | **Excelente** | Tem escopo suficiente e funciona como autoridade sobre a resolução de baixas. |
+| `07_logistica_e_servicos.md` | **Excelente com ajuste** | Deve perder parte das explicações operacionais de pouso e decolagem para o `08`. |
+| `08_transporte_fusao_e_operacoes_aereas.md` | **Bom** | Os três assuntos cabem juntos porque tratam de mudança de estado, embora seja o documento mais pesado. |
+| `09_captura_economia_e_progressao.md` | **Excelente** | As três mecânicas alimentam uma à outra e pertencem ao mesmo endereço. |
+| `10_turnos_jornal_e_vitoria.md` | **Incompleto no escopo** | Jornal e vitória estão bons, mas ainda falta o fluxo macro do turno prometido pelo título. |
+| `11_catalogo_de_construcoes.md` | **Estrutura correta** | Tem resumo útil, mas ainda não é um catálogo completo. |
+| `12_catalogo_de_unidades.md` | **Esqueleto** | Ainda está praticamente vazio e conserva um título interno que menciona armas. |
+| `13_catalogo_de_armas.md` | **Estrutura correta** | O esquema está bom, mas precisa distinguir atributos declarados de comportamentos derivados. |
+| `14_matriz_rps_e_elite.md` | **Esqueleto** | A divisão é correta, mas sem os valores ainda não cumpre sua função de consulta. |
+| `15_matriz_de_sensores.md` | **Esqueleto** | É exatamente o apêndice necessário, mas ainda precisa receber a matriz real. |
+| `90_pendencias_tecnicas.md` | **Muito bom** | Separa corretamente bug e doutrina; precisa apenas de formato mais operacional. |
+| `91_decisoes_de_design.md` | **Excelente** | Registra o “porquê” sem declarar-se autoridade sobre a regra. |
+| `92_auditoria.md` | **Excelente** | É a camada que transforma documentação confiante em documentação comprovada. |
+
+# O que já está muito bem resolvido
+
+## 1. Não falta nenhum grande sistema
+
+Os dez canônicos cobrem:
+
+- princípios e vocabulário;
+- domínio e ocupação;
 - movimento;
-- autonomia;
-- consumo;
-- defesa;
-- elite;
+- ciclo de ação;
+- informação;
+- combate;
+- logística;
+- transporte, fusão e aviação;
+- captura, economia e progressão;
+- turno, relatório e vitória.
+
+Portanto, **não vejo necessidade de um capítulo 11 canônico**. O universo de regras está completamente coberto.
+
+## 2. Os apêndices escolhidos são exatamente os necessários
+
+Os cinco catálogos respondem às entidades que mudam com dados:
+
+- construções;
+- unidades;
 - armas;
-- alcance;
-- munição;
-- trajetória;
-- alvos;
-- transportes;
+- RPS e Elite;
+- sensores.
+
+Isso preserva a diferença correta entre:
+
+> “Como o sistema funciona?”
+
+e:
+
+> “Quais valores esta peça possui?”
+
+O catálogo de armas, por exemplo, já separa adequadamente plataforma e armamento, e registra alcance, trajetória, domínio e munição como propriedades próprias. ?filecite?turn10file1?
+
+## 3. A camada de engenharia ficou melhor do que eu havia imaginado
+
+A combinação é excelente:
+
+- `90`: o que está divergente;
+- `91`: por que decidimos assim;
+- `92`: o que foi realmente verificado.
+
+A auditoria já registra evidência, commit e veredicto, e reconhece honestamente que cerca de um terço das afirmações normativas foi conferido. Ela também lista quais documentos ainda não foram auditados e quais partes permanecem sem validação, como Elite e alcance de sensores. ?filecite?turn12file0?
+
+Isso é muito mais robusto do que simplesmente escrever um manual e presumir que o jogo o obedece.
+
+# Ajustes necessários para a separação ficar limpa
+
+## 1. Retirar o epílogo do documento `01`
+
+O arquivo de princípios termina entrando novamente em:
+
+- informação incompleta;
+- movimento provisório;
+- recálculo da névoa;
+- comprometimento da ação.
+
+Essas regras pertencem ao `04` e ao `05`. O epílogo literário pode ir para o final do `10`, fechando toda a biblioteca após a vitória.
+
+Assim:
+
+- `01` abre a doutrina;
+- `10` fecha a experiência.
+
+O `01` deve terminar depois de estabelecer vocabulário, esquadrão e Elite. ?filecite?turn6file1?
+
+## 2. Limpar a fronteira entre `02` e `03`
+
+O `02` deve responder:
+
+> Onde isso existe e quem cabe aqui?
+
+O `03` deve responder:
+
+> Quanto custa entrar, por onde passa e que habilidade é exigida?
+
+Hoje o `02` ainda explica:
+
+- bônus de velocidade da estrada;
+- pista improvisada;
+- comportamento ferroviário;
+- quem atravessa cada ponte.
+
+Esses detalhes reaparecem de maneira mais completa no `03`. ?filecite?turn6file2?turn7file0?
+
+No `02`, bastaria:
+
+> Estradas, trilhos e pontes preservam os domínios declarados. Custos, permissões e combinações estão em `03_movimento_terreno_e_infraestrutura.md`.
+
+A descrição física pode continuar. A regra operacional fica apenas no `03`.
+
+## 3. Definir a fronteira entre `04` e `05`
+
+A divisão ideal é:
+
+### `04` possui
+
+- prévia;
+- confirmação;
+- cancelamento;
+- estados da peça;
+- quais ações aparecem;
+- como o menu usa a informação;
+- quando o mundo é recalculado.
+
+### `05` possui
+
+- visível agora;
+- explorado;
+- nunca explorado;
+- memória do terreno;
+- última observação;
+- detecção;
+- ocultação;
+- conhecimento do time.
+
+Hoje o `04` explica detalhadamente os três estados de conhecimento, enquanto o `05` também constrói toda a epistemologia da névoa. ?filecite?turn7file1?turn7file2?
+
+A correção é simples:
+
+> O `05` define o que o time sabe.  
+> O `04` define o que a interface permite fazer com esse conhecimento.
+
+Não precisa remover os nomes dos três estados do `04`, mas deve trocar a explicação completa por uma referência.
+
+## 4. Corrigir uma frase no `05`
+
+Ainda está escrito que Air/High:
+
+> “não projeta sombra e também não recebe nenhuma.”
+
+Isso é amplo demais. O próprio capítulo depois afirma que sensores terrestres continuam sujeitos ao relevo ao procurar alvos em Air/High.
+
+A formulação segura seria:
+
+> Air/High nunca funciona como obstáculo intermediário. Um alvo em Air/High, porém, ainda pode ficar fora da linha de visão de um sensor terrestre; somente aeronaves detectando Air/High dispensam essa geometria.
+
+A tabela também deveria mostrar `—` na altura como obstáculo de Air/High, porque a altura 4 é elevação da camada, não obstáculo que bloqueia visão.
+
+## 5. Separar melhor `07` e `08`
+
+O `07` deve possuir:
+
+- consumo;
+- isenção;
+- combustível;
+- reservas;
+- custos;
+- capacidade;
+- atendimento;
+- transferência logística.
+
+O `08` deve possuir:
+
+- como pousa;
+- como decola;
+- arremetida;
+- permanência no solo;
+- transição de camada;
+- emergência;
+- operação em convés e água.
+
+Hoje o `07` explica em profundidade que o aeroporto dá subida completa, que outros locais levam a Air/Low e como isso expõe furtivos. Isso já é operação aérea, não logística. ?filecite?turn8file1?turn8file2?
+
+No `07`, basta declarar:
+
+> Aeronaves pousadas em instalações aeronáuticas válidas não pagam consumo. O ciclo de pouso e decolagem é definido em `08_transporte_fusao_e_operacoes_aereas.md`.
+
+## 6. Completar o prometido pelo `10`
+
+O arquivo se chama **Turno, Jornal e Vitória**, mas atualmente contém essencialmente Jornal e Vitória. ?filecite?turn9file1?
+
+Ele precisa de uma seção curta:
+
+## Início do turno
+
+1. define-se o time ativo;
+2. processam-se consumo e efeitos temporários;
+3. resolvem-se pousos de emergência e perdas;
+4. credita-se a renda;
+5. reiniciam-se capacidades de atendimento e estados de ação;
+6. monta-se o Jornal;
+7. o jogador recebe o comando.
+
+Não precisa duplicar as fórmulas de logística ou economia. Deve apenas indicar a ordem e apontar para `07` e `09`.
+
+Alternativamente, renomeá-lo para `10_jornal_e_vitoria.md`, mas prefiro completar o fluxo. A biblioteca precisa de um endereço para o relógio macro da partida.
+
+# Ajustes nos apêndices
+
+## `11_catalogo_de_construcoes.md`
+
+A tabela inicial é boa, mas cada construção ainda precisa da ficha completa prometida:
+
+- domínios;
+- posição;
+- renda;
+- visão;
+- detecção;
+- captura;
+- mercado;
+- catálogo;
 - serviços;
-- sensores;
-- ocultações.
+- estoque;
+- pouso;
+- progressão;
+- trem.
 
-Não precisa interromper a narrativa com dezenas de tabelas. Isso pode ficar em apêndices canônicos.
+O próprio documento reconhece essa pendência. ?filecite?turn9file2?
 
-## Matriz de detecção
+## `12_catalogo_de_unidades.md`
 
-Falta uma matriz clara dizendo quem detecta:
+O título interno ainda diz:
 
-- caça furtivo;
-- submarino;
-- unidades comuns em cada camada;
-- quais sensores ignoram relevo;
-- quais detectam apenas terreno;
-- quais detectam unidades;
-- por quanto tempo a revelação persiste;
-- se a revelação pertence ao time detector ou a todos.
+> Apêndice — Unidades e Armas
 
-A explicação conceitual está ótima; falta o catálogo operacional.
+Mas as armas já possuem o `13`. Deve virar apenas:
 
-## Valores globais versus valores de cenário
+> Apêndice — Unidades
 
-A renda aparece como “cerca de” 3.000, 1.500 e 1.000. Isso é bom para ensinar, mas não para uma fonte técnica.
+Também falta declarar o molde exato de cada ficha antes de começar a preenchê-las. ?filecite?turn10file0?
 
-O documento precisa identificar cada número como:
+## `13_catalogo_de_armas.md`
 
-- valor global fixo;
-- valor padrão configurável;
-- exemplo do cenário atual;
-- estimativa narrativa.
+O campo “se pode revidar” não deve parecer uma escolha livre se o revide for derivado de:
 
-O mesmo vale para renda, estoques, capacidade, pontos de captura, alcance de visão e catálogo de produção.
+- alcance mínimo 1;
+- munição;
+- domínio atual do operador;
+- domínio do alvo;
+- validade da arma.
 
----
+Eu usaria:
 
-# Problemas editoriais que afetam a regra
+> **Revide:** derivado / bloqueado por exceção explícita.
 
-## 1. O arquivo está com problemas de codificação
+Caso não exista override de arma no sistema, nem precisa ser um campo da ficha.
 
-Em alguns trechos, os valores negativos aparecem como:
+## `14` e `15`
 
-- `?1`;
-- `?2`.
+A separação está correta, mas estes dois arquivos só satisfazem plenamente a função depois de preenchidos. Hoje eles são contratos de estrutura, não fontes de consulta. ?filecite?turn10file2?turn11file0?
 
-Isso ocorre justamente nas tabelas de DPQ e defesa, onde o sinal muda completamente a regra. Em outras versões, os mesmos valores aparecem corretamente como ?1 e ?2. ?filecite?turn3file12?turn3file18?
+A matriz de sensores deveria conter pelo menos:
 
-O arquivo também está em uma codificação antiga, não em UTF-8. Antes de desmembrar, isso precisa ser corrigido, porque o erro será replicado para todos os documentos filhos.
+| Sensor | Camada alvo | Alcance | Ocultação detectada | Exige LoS | Escopo da revelação | Duração |
+|---|---|---:|---|---|---|---|
 
-## 2. O arquivo não está realmente estruturado como Markdown
+# Ajustes nos documentos de engenharia
 
-Apesar da extensão, os títulos não possuem uma hierarquia consistente de cabeçalhos. As tabelas também foram achatadas em várias partes.
+## `90_pendencias_tecnicas.md`
 
-Isso prejudica:
+O conteúdo está correto, mas cada pendência deveria receber:
 
-- índice automático;
-- navegação;
-- links internos;
-- divisão futura;
-- comparação de versões;
-- busca por capítulo.
+- ID;
+- regra canônica relacionada;
+- comportamento atual;
+- evidência;
+- impacto;
+- prioridade;
+- status;
+- commit em que foi observada.
 
-## 3. “Fábrica” está ambígua
+Hoje ele é uma excelente lista narrativa. Com esses campos, vira uma fila real de manutenção. ?filecite?turn11file1?
 
-Na progressão aparecem:
+## `91_decisoes_de_design.md`
 
-- Fábrica Leve;
-- Fábrica;
-- Fábrica Pesada.
+Está muito bom, mas algumas decisões apontam para **dois endereços canônicos**, por exemplo altitude em `05` e `08`, ou Jornal em `05` e `10`. Isso enfraquece ligeiramente a regra de “um endereço por regra”. ?filecite?turn11file2?
 
-Mas o vocabulário que você vinha adotando é:
+A solução é escolher um proprietário:
 
-- Fábrica Leve;
-- Fábrica Média;
-- Fábrica Pesada.
+- mudança de camada: `08`;
+- consequência para detecção: `05`;
+- conhecimento produzido pelo Jornal: `10`;
+- efeito da informação na memória do mapa: `05`.
 
-“Fábrica” também é usada genericamente ao longo do manual para qualquer instalação industrial. O degrau intermediário precisa ser sempre chamado de **Fábrica Média**, caso esse seja o nome oficial.
+Cada decisão deve apontar para a regra primária, e a secundária apenas referencia a primária.
 
-## 4. Regras e justificativas estão misturadas
+## `92_auditoria.md`
 
-Isso dá personalidade ao texto, mas dificulta a consulta técnica.
+Está excelente e não precisa mudar de conceito.
 
-O formato ideal de cada assunto seria:
+Eu apenas adicionaria um identificador para cada afirmação:
 
-**Regra**  
-O que sempre acontece.
+- `LOG-001`;
+- `COM-014`;
+- `FOW-008`.
 
-**Procedimento**  
-Em qual ordem acontece.
+Assim, uma entrada da auditoria, uma pendência e um parágrafo canônico conseguem apontar para a mesma regra sem depender do texto permanecer idêntico.
 
-**Exceções**  
-Quando não acontece.
+# Duas pendências pequenas de regra que sobreviveram ao split
 
-**Exemplo**  
-Uma situação concreta.
+## Arredondamento do dano aos passageiros
 
-**Razão de design**  
-Por que a regra existe.
+O `08` diz que a fração de dano é “arredondada”, mas ainda não declara claramente:
 
-Hoje essas cinco coisas frequentemente aparecem dentro do mesmo fluxo narrativo.
+- arredondamento comum;
+- para cima;
+- para baixo.
 
----
+O exemplo com 30% não resolve um resultado de 1,5. Essa direção precisa entrar no texto, mesmo que a auditoria já tenha confirmado o restante da implementação. ?filecite?turn8file2?turn12file0?
 
-# Minha avaliação da estrutura futura
+## “Classe de arma” no alcance zero
 
-Quando chegar a hora de dividir, eu usaria aproximadamente esta arquitetura:
+O `06` diz que existe “uma classe de arma” operando no alcance zero. Mas “classe de arma” já significa:
 
-1. **Princípios e glossário**  
-   Determinismo, escala do hexágono, esquadrão, domínio, posição, ação e informação.
+- antiaérea;
+- antitanque;
+- antiinfantaria;
+- antinavio.
 
-2. **Domínios, camadas e ocupação**  
-   Terrenos, construções, estruturas, três andares, prioridade e coexistência.
+Melhor escrever:
 
-3. **Movimento e terreno**  
-   Custos, habilidades, estradas, trilhos, pontes, reboque e bloqueio.
+> Existe um tipo de operação de arma no alcance zero.
 
-4. **Visão, detecção e Fog of War**  
-   Elevação, LoS, memória, ocultação, sensores, Olho e Jornal.
+Assim, carga de profundidade não parece criar uma quinta classe.
 
-5. **Combate**  
-   Armas, alcance, trajetória, revide, RPS, elite, DPQ, feridos e eliminações.
+# O snapshot precisa ser verificado
 
-6. **Logística**  
-   Reservas, serviços, dinheiro, capacidade, tiers, transferências e Serviço do Comando.
+O índice referencia exatamente:
 
-7. **Transportes e operações aéreas**  
-   Vagas, embarque, passageiros, pouso, decolagem, autonomia e emergência.
+`The Map Room Manual tecnico (9) — snapshot.md`
 
-8. **Captura, economia e progressão**  
-   Pontos de captura, renda, mercado, pré-requisitos e produção.
+Mas não encontrei esse arquivo com esse nome exato entre os anexos; aparecem diversas versões genericamente chamadas `The Map Room Manual tecnico.md`. O snapshot precisa ser criado ou renomeado exatamente como o índice declara, para que a primeira referência da biblioteca não nasça quebrada. ?filecite?turn13file13?
 
-9. **Turno, ações e vitória**  
-   Confirmação, sensores, estados da unidade, ordem operacional e derrotas.
+# Conclusão
 
-10. **Catálogos canônicos**  
-    Unidades, armas, construções, estruturas, sensores, serviços e matrizes.
+**A separação foi bem-sucedida.**
 
-Mas o documento-mãe deve continuar existindo. Os arquivos menores não devem virar autoridades independentes. Eles devem declarar algo como:
+Não há capítulo sobrando, não há sistema importante sem endereço e não vejo motivo para criar mais arquivos. Até o `08`, que reúne transporte, fusão e aviação, ainda é coerente porque os três assuntos tratam de unidades mudando de estado.
 
-> Derivado do Manual Técnico, versão X. Em caso de divergência, prevalece o documento-mãe.
+O que falta agora não é redesenhar a biblioteca. É uma rodada de **normalização**:
 
----
+1. retirar duplicações;
+2. escolher proprietário único para regras de fronteira;
+3. completar o fluxo macro do `10`;
+4. preencher os catálogos;
+5. estruturar pendências e auditorias com IDs;
+6. corrigir os dois pequenos pontos normativos;
+7. garantir a existência do snapshot.
 
-# Ordem que eu seguiria agora
-
-Antes de qualquer revisão de português ou divisão:
-
-1. resolver a sequência de movimento, confirmação e recálculo da névoa;
-2. resolver estacionamento e arremetida de aeronaves;
-3. fechar visão e detecção das construções;
-4. confirmar revide a distância;
-5. confirmar os dois tetos de eliminações;
-6. confirmar percentuais e capacidades logísticas;
-7. definir duração exata da exposição stealth;
-8. revisar trem, montanha e elevação;
-9. completar o catálogo de construções;
-10. converter o arquivo para UTF-8 e Markdown estruturado.
-
-## Conclusão
-
-O Manual Técnico (6) já encontrou a **linguagem definitiva do The Map Room**.
-
-Ele consegue explicar sistemas complexos sem parecer uma documentação de engenharia e, ao mesmo tempo, apresenta razões táticas suficientes para que as regras não pareçam caprichos. Domínio, posição, etiquetas, logística e inteligência formam agora uma doutrina única.
-
-O que falta não é criatividade nem uma grande reescrita. Falta **congelar algumas decisões e remover ambiguidades normativas**.
-
-Depois disso, ele estará pronto para ser desmembrado sem perder a alma — e, mais importante, sem criar várias verdades concorrentes.
-
+Depois desses ajustes, a versão 9 pode realmente ser congelada, e os 19 arquivos passam a ser a autoridade operacional do projeto — não apenas uma cópia bem organizada do monólito.

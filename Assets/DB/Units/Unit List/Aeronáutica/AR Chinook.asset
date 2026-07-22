@@ -20,6 +20,7 @@ MonoBehaviour:
     refor\xE7os e capturas estrat\xE9gicas. Consome autonomia enquanto permanece
     no ar, sendo ideal para inser\xE7\xF5es r\xE1pidas. Vulner\xE1vel durante o desembarque
     e sem capacidade de combate relevante."
+  requiredBuilding: {fileID: 0}
   spriteDefault: {fileID: 21300000, guid: 135b068a83090ab4ca943296490afda1, type: 3}
   teamVariantSprites: []
   maxHP: 10
@@ -119,21 +120,21 @@ MonoBehaviour:
   - structure: {fileID: 11400000, guid: 2c50b52605f4f1c4ca013ba4bd7acee3, type: 2}
     baseTerrain: {fileID: 11400000, guid: f00a773f2a7664042bbabe8e117528f7, type: 2}
     isBlocked: 0
-  allowedEmbarkWhenTransporterAtConstructions: []
+  allowedEmbarkWhenTransporterAtFacilities: -1
   allowedDisembarkWhenTransporterAtTerrains:
   - {fileID: 11400000, guid: f00a773f2a7664042bbabe8e117528f7, type: 2}
   allowedDisembarkWhenTransporterAtTerrainStructures:
   - structure: {fileID: 11400000, guid: 2c50b52605f4f1c4ca013ba4bd7acee3, type: 2}
     baseTerrain: {fileID: 11400000, guid: f00a773f2a7664042bbabe8e117528f7, type: 2}
     isBlocked: 0
-  allowedDisembarkWhenTransporterAtConstructions: []
+  allowedDisembarkWhenTransporterAtFacilities: -1
   passengersCanDisembarkAndGoesToTerrains:
   - {fileID: 11400000, guid: f00a773f2a7664042bbabe8e117528f7, type: 2}
   passengersCanDisembarkAndGoesToTerrainStructures:
   - structure: {fileID: 11400000, guid: 2c50b52605f4f1c4ca013ba4bd7acee3, type: 2}
     baseTerrain: {fileID: 11400000, guid: f00a773f2a7664042bbabe8e117528f7, type: 2}
     isBlocked: 0
-  passengersCanDisembarkAndGoesToConstructions: []
+  passengersCanDisembarkAndGoesToFacilities: -1
   transportSlots:
   - slotId: passageiros
     capacity: 2

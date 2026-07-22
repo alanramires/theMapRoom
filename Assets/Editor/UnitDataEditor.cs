@@ -16,7 +16,21 @@ public class UnitDataEditor : Editor
     private SerializedProperty supplierResourcesProperty;
     private SerializedProperty stealthSkillRulesProperty;
     private SerializedProperty aiUnitProfileProperty;
-    private SerializedProperty aiTargetPreferenceByClassProperty;
+    private bool showTransportSection = false;
+    private bool showLogisticsSection = false;
+    private bool showWeaponsSection = false;
+    private bool showEmbarkedWeaponsSection = false;
+    private bool showAIBehaviorSection = false;
+    private bool showUnitInformationSection = false;
+    private bool showAircraftInformationSection = false;
+    private bool showNavalInformationSection = false;
+    private bool showNativeDomainSection = false;
+    private bool showVisualsSection = false;
+    private bool showRolesSection = false;
+    private bool showViewAndDetectSection = false;
+    private bool showTrainingAndAbilitiesSection = false;
+    private bool showEliteInfoSection = false;
+    private bool showSkillsAndTagsSection = false;
 
     private void OnEnable()
     {
@@ -31,7 +45,6 @@ public class UnitDataEditor : Editor
         supplierResourcesProperty = serializedObject.FindProperty("supplierResources");
         stealthSkillRulesProperty = serializedObject.FindProperty("stealthSkillRules");
         aiUnitProfileProperty = serializedObject.FindProperty("aiUnitProfile");
-        aiTargetPreferenceByClassProperty = serializedObject.FindProperty("aiTargetPreferenceByClass");
     }
 
     public override void OnInspectorGUI()
@@ -39,10 +52,10 @@ public class UnitDataEditor : Editor
         serializedObject.Update();
 
         DrawPrimaryIdentitySection();
-        DrawNativeDomainSection();
         DrawTopAttributesSection();
-        DrawAircraftInformationSection();
-        DrawNavalInformationSection();
+        DrawVisualsSection();
+        DrawNativeDomainSection();
+        DrawUnitInformationSection();
         DrawVisionAndDetectionSection();
         DrawTrainingAndAbilitiesSection();
         DrawPropertiesExcluding(
@@ -73,6 +86,7 @@ public class UnitDataEditor : Editor
             "autonomia",
             "autonomyData",
             "cost",
+            "requiredBuilding",
             "spriteDefault",
             "spriteGreen",
             "spriteRed",
@@ -83,6 +97,7 @@ public class UnitDataEditor : Editor
             "aiUnitProfile",
             "aiInitiative",
             "aiPurchaseMode",
+            "bannedOnHardMode",
             "aiTargetPreferenceByClass",
             "aiSensorPriority",
             "prioritizeDpqAtBattle",
@@ -108,12 +123,22 @@ public class UnitDataEditor : Editor
             "restockTriggerAmmoBoxPct",
             "restockTriggerToolsPct",
             "restockWhenAnyRuntimeSupplyEmpty",
+            "aiPreventiveMaintenanceEnabled",
+            "aiPreventiveSupplyCanRunWithUnderRepair",
+            "aiConservativeSupplyAvoidEnemyRange",
+            "aiPreventiveSupplyHpBelowPct",
+            "aiPreventiveSupplyAutonomyBelowPct",
+            "aiPreventiveSupplyWeaponAmmoAtOrBelow",
             "stealthSkills",
             "stealthSkillRules",
             "useExplicitPreferredAirHeight",
             "preferredAirHeight",
             "useExplicitPreferredNavalHeight",
             "preferredNavalHeight",
+            "emergesToAttack",
+            "emergeAfterAttackDomain",
+            "emergeAfterAttackHeight",
+            "emergeAfterAttackTurns",
             "cantUseWeaponsOnTheFollowDomain",
             "embarkedWeapons",
             "isSupplier",
@@ -128,38 +153,61 @@ public class UnitDataEditor : Editor
             "spriteTransport",
             "allowedEmbarkWhenTransporterAtTerrains",
             "allowedEmbarkWhenTransporterAtTerrainStructures",
-            "allowedEmbarkWhenTransporterAtConstructions",
+            "allowedEmbarkWhenTransporterAtFacilities",
             "allowedDisembarkWhenTransporterAtTerrains",
             "allowedDisembarkWhenTransporterAtTerrainStructures",
-            "allowedDisembarkWhenTransporterAtConstructions",
-            "passengersCanDisembarkAndGoesToTerrains",
-            "passengersCanDisembarkAndGoesToTerrainStructures",
-            "passengersCanDisembarkAndGoesToConstructions",
+            "allowedDisembarkWhenTransporterAtFacilities",
             "transportSlots");
-        EditorGUILayout.Space();
-        DrawAISection();
         EditorGUILayout.Space();
         DrawWeaponsSection();
         EditorGUILayout.Space();
         DrawTransportSection();
         EditorGUILayout.Space();
         DrawLogisticsSection();
+        EditorGUILayout.Space();
+        DrawAISection();
 
         serializedObject.ApplyModifiedProperties();
     }
 
     private void DrawAISection()
     {
-        EditorGUILayout.LabelField("AI", EditorStyles.boldLabel);
+        showAIBehaviorSection = EditorGUILayout.Foldout(
+            showAIBehaviorSection,
+            "AI Behavior",
+            toggleOnLabelClick: true,
+            EditorStyles.foldoutHeader);
+        if (!showAIBehaviorSection)
+            return;
+
+        EditorGUI.indentLevel++;
 
         SerializedProperty aiInitiativeProp      = serializedObject.FindProperty("aiInitiative");
         SerializedProperty aiPurchaseModeProp    = serializedObject.FindProperty("aiPurchaseMode");
+        SerializedProperty bannedOnHardModeProp  = serializedObject.FindProperty("bannedOnHardMode");
         SerializedProperty aiTargetPrefProp      = serializedObject.FindProperty("aiTargetPreferenceByClass");
         SerializedProperty sensorPriorityProp    = serializedObject.FindProperty("aiSensorPriority");
+        SerializedProperty rolesProp             = serializedObject.FindProperty("roles");
+        SerializedProperty combatClassificationProp = serializedObject.FindProperty("combatClassification");
         if (aiInitiativeProp != null)
             EditorGUILayout.PropertyField(aiInitiativeProp, new GUIContent("Ai Initiative"));
         if (aiPurchaseModeProp != null)
             EditorGUILayout.PropertyField(aiPurchaseModeProp, new GUIContent("Purchase Mode"));
+        if (bannedOnHardModeProp != null)
+            EditorGUILayout.PropertyField(bannedOnHardModeProp, new GUIContent("Unit Banned On Hard Mode"));
+        showRolesSection = EditorGUILayout.Foldout(
+            showRolesSection,
+            "Roles",
+            toggleOnLabelClick: true);
+        if (showRolesSection)
+        {
+            EditorGUI.indentLevel++;
+            if (combatClassificationProp != null)
+                EditorGUILayout.PropertyField(combatClassificationProp, new GUIContent("Combat Classification"));
+            if (rolesProp != null)
+                EditorGUILayout.PropertyField(rolesProp, new GUIContent("Unit Roles"), includeChildren: true);
+            EditorGUI.indentLevel--;
+        }
         if (aiTargetPrefProp != null)
             DrawAiTargetPreferenceByClassSection(aiTargetPrefProp);
 
@@ -281,12 +329,30 @@ public class UnitDataEditor : Editor
             EditorGUILayout.PropertyField(restockToolsProp, new GUIContent("Tools Stock <= %", "Return to restock when tools/parts stock reaches this % of default embarked supply. 0 disables."));
         if (restockEmptyProp != null)
             EditorGUILayout.PropertyField(restockEmptyProp, new GUIContent("Any Runtime Supply Empty", "Return to restock when any supplier runtime embarked supply reaches 0."));
+
+        EditorGUILayout.Space(4f);
+        EditorGUILayout.LabelField("Logistics AI", EditorStyles.boldLabel);
+        DrawIfExists(serializedObject.FindProperty("aiPreventiveMaintenanceEnabled"), "AI Preventive Maintenance Enabled");
+        DrawIfExists(serializedObject.FindProperty("aiPreventiveSupplyCanRunWithUnderRepair"), "AI Preventive Supply Can Run With Under Repair");
+        DrawIfExists(serializedObject.FindProperty("aiConservativeSupplyAvoidEnemyRange"), "AI Conservative Supply Avoid Enemy Range");
+        DrawIfExists(serializedObject.FindProperty("aiPreventiveSupplyHpBelowPct"), "AI Preventive Supply HP Below Pct");
+        DrawIfExists(serializedObject.FindProperty("aiPreventiveSupplyAutonomyBelowPct"), "AI Preventive Supply Autonomy Below Pct");
+        DrawIfExists(serializedObject.FindProperty("aiPreventiveSupplyWeaponAmmoAtOrBelow"), "AI Preventive Supply Weapon Ammo At Or Below");
+        EditorGUI.indentLevel--;
     }
 
     private void DrawNativeDomainSection()
     {
         EditorGUILayout.Space();
-        EditorGUILayout.LabelField("Native Domain", EditorStyles.boldLabel);
+        showNativeDomainSection = EditorGUILayout.Foldout(
+            showNativeDomainSection,
+            "Native Domain",
+            toggleOnLabelClick: true,
+            EditorStyles.foldoutHeader);
+        if (!showNativeDomainSection)
+            return;
+
+        EditorGUI.indentLevel++;
         SerializedProperty domainProperty = serializedObject.FindProperty("domain");
         SerializedProperty heightLevelProperty = serializedObject.FindProperty("heightLevel");
         SerializedProperty aditionalDomainsAllowedProperty = serializedObject.FindProperty("aditionalDomainsAllowed");
@@ -295,6 +361,7 @@ public class UnitDataEditor : Editor
         if (heightLevelProperty != null) EditorGUILayout.PropertyField(heightLevelProperty);
         if (aditionalDomainsAllowedProperty != null) 
             EditorGUILayout.PropertyField(aditionalDomainsAllowedProperty, new GUIContent("Adicional Domains of Operations"), includeChildren: true);
+        EditorGUI.indentLevel--;
     }
 
     private static void DrawAiTargetPreferenceByClassSection(SerializedProperty listProperty)
@@ -358,13 +425,37 @@ public class UnitDataEditor : Editor
         }
     }
 
+    private void DrawUnitInformationSection()
+    {
+        EditorGUILayout.Space(4f);
+        showUnitInformationSection = EditorGUILayout.Foldout(
+            showUnitInformationSection,
+            "Unit Information",
+            toggleOnLabelClick: true,
+            EditorStyles.foldoutHeader);
+        if (!showUnitInformationSection)
+            return;
+
+        EditorGUI.indentLevel++;
+        DrawAircraftInformationSection();
+        DrawNavalInformationSection();
+        EditorGUI.indentLevel--;
+    }
+
     private void DrawAircraftInformationSection()
     {
         UnitData unitData = (UnitData)target;
         bool isAircraft = unitData.IsAircraft();
 
-        EditorGUILayout.Space(4f);
-        EditorGUILayout.LabelField("Aircraft Information", EditorStyles.boldLabel);
+        showAircraftInformationSection = EditorGUILayout.Foldout(
+            showAircraftInformationSection,
+            "Aircraft Information",
+            toggleOnLabelClick: true,
+            EditorStyles.foldoutHeader);
+        if (!showAircraftInformationSection)
+            return;
+
+        EditorGUI.indentLevel++;
 
         using (new EditorGUI.DisabledScope(true))
             EditorGUILayout.Toggle("Is Aircraft (Derived)", isAircraft);
@@ -397,6 +488,8 @@ public class UnitDataEditor : Editor
                     : fallback, MessageType.None);
             }
         }
+
+        EditorGUI.indentLevel--;
     }
 
     private void DrawNavalInformationSection()
@@ -404,8 +497,15 @@ public class UnitDataEditor : Editor
         UnitData unitData = (UnitData)target;
         bool isMaritime = unitData.IsMaritime();
 
-        EditorGUILayout.Space(4f);
-        EditorGUILayout.LabelField("Naval Information", EditorStyles.boldLabel);
+        showNavalInformationSection = EditorGUILayout.Foldout(
+            showNavalInformationSection,
+            "Naval Information",
+            toggleOnLabelClick: true,
+            EditorStyles.foldoutHeader);
+        if (!showNavalInformationSection)
+            return;
+
+        EditorGUI.indentLevel++;
         
         using (new EditorGUI.DisabledScope(true))
             EditorGUILayout.Toggle("Is Maritime (Derived)", isMaritime);
@@ -429,7 +529,29 @@ public class UnitDataEditor : Editor
                     ? "Quando valido no hex final e sem force de emerge, o sistema tenta auto-ajustar para a altura naval preferencial antes dos sensores."
                     : "Override naval desativado.",
                 MessageType.None);
+
+            EditorGUILayout.Space(4f);
+            EditorGUILayout.LabelField("Layer Reveal After Attacking", EditorStyles.boldLabel);
+            SerializedProperty emergesToAttackProp = serializedObject.FindProperty("emergesToAttack");
+            SerializedProperty emergeDomainProp = serializedObject.FindProperty("emergeAfterAttackDomain");
+            SerializedProperty emergeHeightProp = serializedObject.FindProperty("emergeAfterAttackHeight");
+            SerializedProperty emergeTurnsProp = serializedObject.FindProperty("emergeAfterAttackTurns");
+
+            if (emergesToAttackProp != null)
+                EditorGUILayout.PropertyField(emergesToAttackProp, new GUIContent("Emerges To Attack"));
+
+            using (new EditorGUI.DisabledScope(emergesToAttackProp == null || !emergesToAttackProp.boolValue))
+            {
+                if (emergeDomainProp != null)
+                    EditorGUILayout.PropertyField(emergeDomainProp, new GUIContent("Emerge After Attack Domain"));
+                if (emergeHeightProp != null)
+                    EditorGUILayout.PropertyField(emergeHeightProp, new GUIContent("Emerge After Attack Height"));
+                if (emergeTurnsProp != null)
+                    EditorGUILayout.PropertyField(emergeTurnsProp, new GUIContent("Emerge After Attack Turns"));
+            }
         }
+
+        EditorGUI.indentLevel--;
     }
 
     private static void DrawIfExists(SerializedProperty property, string label)
@@ -440,7 +562,15 @@ public class UnitDataEditor : Editor
 
     private void DrawLogisticsSection()
     {
-        EditorGUILayout.LabelField("Logistics", EditorStyles.boldLabel);
+        showLogisticsSection = EditorGUILayout.Foldout(
+            showLogisticsSection,
+            "Logistics",
+            toggleOnLabelClick: true,
+            EditorStyles.foldoutHeader);
+        if (!showLogisticsSection)
+            return;
+
+        EditorGUI.indentLevel++;
         if (isSupplierProperty != null)
             EditorGUILayout.PropertyField(isSupplierProperty, new GUIContent("Is Supplier"));
         if (supplierTierProperty != null)
@@ -466,23 +596,30 @@ public class UnitDataEditor : Editor
         {
             EditorGUILayout.HelpBox("Ative Is Supplier para configurar Supplier Services e Supplier Resources.", MessageType.Info);
         }
+        EditorGUI.indentLevel--;
     }
 
     private void DrawTransportSection()
     {
-        EditorGUILayout.LabelField("Transport", EditorStyles.boldLabel);
+        showTransportSection = EditorGUILayout.Foldout(
+            showTransportSection,
+            "Transport",
+            toggleOnLabelClick: true,
+            EditorStyles.foldoutHeader);
+        if (!showTransportSection)
+            return;
+
+        EditorGUI.indentLevel++;
         DrawIfExists(serializedObject.FindProperty("isTransporter"), "Is Transporter");
         DrawIfExists(serializedObject.FindProperty("spriteTransport"), "Sprite Transport");
         DrawIfExists(serializedObject.FindProperty("allowedEmbarkWhenTransporterAtTerrains"), "Allowed Embark Terrain When Transporter At: Terrain");
         DrawIfExists(serializedObject.FindProperty("allowedEmbarkWhenTransporterAtTerrainStructures"), "Allowed Embark Terrain When Transporter At: Terrain + Structure");
-        DrawIfExists(serializedObject.FindProperty("allowedEmbarkWhenTransporterAtConstructions"), "Allowed Embark Terrain When Transporter At: Constructions");
+        DrawIfExists(serializedObject.FindProperty("allowedEmbarkWhenTransporterAtFacilities"), "Allowed Embark When Transporter At: Facilities");
         DrawIfExists(serializedObject.FindProperty("allowedDisembarkWhenTransporterAtTerrains"), "Allowed Disembark Terrain When Transporter At: Terrain");
         DrawIfExists(serializedObject.FindProperty("allowedDisembarkWhenTransporterAtTerrainStructures"), "Allowed Disembark Terrain When Transporter At: Terrain + Structure");
-        DrawIfExists(serializedObject.FindProperty("allowedDisembarkWhenTransporterAtConstructions"), "Allowed Disembark Terrain When Transporter At: Constructions");
-        DrawIfExists(serializedObject.FindProperty("passengersCanDisembarkAndGoesToTerrains"), "Passengers Can Disembark And Goes To: Terrain");
-        DrawIfExists(serializedObject.FindProperty("passengersCanDisembarkAndGoesToTerrainStructures"), "Passengers Can Disembark And Goes To: Terrain + Structure");
-        DrawIfExists(serializedObject.FindProperty("passengersCanDisembarkAndGoesToConstructions"), "Passengers Can Disembark And Goes To: Constructions");
+        DrawIfExists(serializedObject.FindProperty("allowedDisembarkWhenTransporterAtFacilities"), "Allowed Disembark When Transporter At: Facilities");
         DrawIfExists(serializedObject.FindProperty("transportSlots"), "Transport Slots");
+        EditorGUI.indentLevel--;
     }
 
     private void DrawPrimaryIdentitySection()
@@ -493,10 +630,7 @@ public class UnitDataEditor : Editor
         SerializedProperty descriptionProperty = serializedObject.FindProperty("description");
         SerializedProperty militaryForceProperty = serializedObject.FindProperty("militaryForce");
         SerializedProperty unitClassProperty = serializedObject.FindProperty("unitClass");
-        SerializedProperty combatClassificationProperty = serializedObject.FindProperty("combatClassification");
-        SerializedProperty rolesProperty = serializedObject.FindProperty("roles");
-        SerializedProperty spriteDefaultProperty = serializedObject.FindProperty("spriteDefault");
-        SerializedProperty teamVariantSpritesProperty = serializedObject.FindProperty("teamVariantSprites");
+        SerializedProperty requiredBuildingProperty = serializedObject.FindProperty("requiredBuilding");
         if (idProperty != null)
             EditorGUILayout.PropertyField(idProperty);
         if (displayNameProperty != null)
@@ -509,17 +643,41 @@ public class UnitDataEditor : Editor
             EditorGUILayout.PropertyField(militaryForceProperty);
         if (unitClassProperty != null)
             EditorGUILayout.PropertyField(unitClassProperty);
-        if (combatClassificationProperty != null)
-            EditorGUILayout.PropertyField(combatClassificationProperty);
-        if (rolesProperty != null)
-            EditorGUILayout.PropertyField(rolesProperty, new GUIContent("Roles"), includeChildren: true);
+        if (requiredBuildingProperty != null)
+        {
+            EditorGUI.showMixedValue = requiredBuildingProperty.hasMultipleDifferentValues;
+            EditorGUI.BeginChangeCheck();
+            ConstructionData requiredBuilding = (ConstructionData)EditorGUILayout.ObjectField(
+                "Required Building To Be Purchased",
+                requiredBuildingProperty.objectReferenceValue,
+                typeof(ConstructionData),
+                allowSceneObjects: false);
+            if (EditorGUI.EndChangeCheck())
+                requiredBuildingProperty.objectReferenceValue = requiredBuilding;
+            EditorGUI.showMixedValue = false;
+        }
+    }
+
+    private void DrawVisualsSection()
+    {
+        SerializedProperty spriteDefaultProperty = serializedObject.FindProperty("spriteDefault");
+        SerializedProperty teamVariantSpritesProperty = serializedObject.FindProperty("teamVariantSprites");
 
         EditorGUILayout.Space(2f);
-        EditorGUILayout.LabelField("Visuals", EditorStyles.boldLabel);
-        if (spriteDefaultProperty != null)
-            EditorGUILayout.PropertyField(spriteDefaultProperty, new GUIContent("Sprite (Default)"));
-        if (teamVariantSpritesProperty != null)
-            EditorGUILayout.PropertyField(teamVariantSpritesProperty, new GUIContent("Team Sprites Variants"), includeChildren: true);
+        showVisualsSection = EditorGUILayout.Foldout(
+            showVisualsSection,
+            "Visuals",
+            toggleOnLabelClick: true,
+            EditorStyles.foldoutHeader);
+        if (showVisualsSection)
+        {
+            EditorGUI.indentLevel++;
+            if (spriteDefaultProperty != null)
+                EditorGUILayout.PropertyField(spriteDefaultProperty, new GUIContent("Sprite (Default)"));
+            if (teamVariantSpritesProperty != null)
+                EditorGUILayout.PropertyField(teamVariantSpritesProperty, new GUIContent("Team Sprites Variants"), includeChildren: true);
+            EditorGUI.indentLevel--;
+        }
     }
 
     private void DrawTopAttributesSection()
@@ -556,7 +714,15 @@ public class UnitDataEditor : Editor
 
     private void DrawWeaponsSection()
     {
-        EditorGUILayout.LabelField("Weapons", EditorStyles.boldLabel);
+        showWeaponsSection = EditorGUILayout.Foldout(
+            showWeaponsSection,
+            "Weapons",
+            toggleOnLabelClick: true,
+            EditorStyles.foldoutHeader);
+        if (!showWeaponsSection)
+            return;
+
+        EditorGUI.indentLevel++;
         
         SerializedProperty cantUseWeaponsOnTheFollowDomainProperty = serializedObject.FindProperty("cantUseWeaponsOnTheFollowDomain");
         if (cantUseWeaponsOnTheFollowDomainProperty != null)
@@ -565,20 +731,29 @@ public class UnitDataEditor : Editor
             EditorGUILayout.Space(2f);
         }
 
-        if (aiTargetPreferenceByClassProperty != null)
+        showEmbarkedWeaponsSection = EditorGUILayout.Foldout(
+            showEmbarkedWeaponsSection,
+            "Embarked Weapons",
+            toggleOnLabelClick: true,
+            EditorStyles.foldoutHeader);
+        if (!showEmbarkedWeaponsSection)
         {
-            DrawAiTargetPreferenceByClassSection(aiTargetPreferenceByClassProperty);
-            EditorGUILayout.Space(2f);
+            EditorGUI.indentLevel--;
+            return;
         }
 
-        EditorGUILayout.LabelField("Embarked Weapons", EditorStyles.boldLabel);
+        EditorGUI.indentLevel++;
         WeaponDatabase database = ResolveWeaponDatabaseFromProject();
         List<WeaponData> catalog = BuildCatalog(database);
         if (database == null)
             EditorGUILayout.HelpBox("No WeaponDatabase found in project. Create one to drive weapon slots.", MessageType.Warning);
 
         if (embarkedWeaponsProperty == null)
+        {
+            EditorGUI.indentLevel--;
+            EditorGUI.indentLevel--;
             return;
+        }
 
         for (int i = 0; i < embarkedWeaponsProperty.arraySize; i++)
         {
@@ -638,12 +813,22 @@ public class UnitDataEditor : Editor
 
         if (GUILayout.Button("Add Weapon Slot"))
             embarkedWeaponsProperty.InsertArrayElementAtIndex(embarkedWeaponsProperty.arraySize);
+        EditorGUI.indentLevel--;
+        EditorGUI.indentLevel--;
     }
 
     private void DrawVisionAndDetectionSection()
     {
         EditorGUILayout.Space(4f);
-        EditorGUILayout.LabelField("View and Detect", EditorStyles.boldLabel);
+        showViewAndDetectSection = EditorGUILayout.Foldout(
+            showViewAndDetectSection,
+            "View and Detect",
+            toggleOnLabelClick: true,
+            EditorStyles.foldoutHeader);
+        if (!showViewAndDetectSection)
+            return;
+
+        EditorGUI.indentLevel++;
 
         SerializedProperty visaoProperty = serializedObject.FindProperty("visao");
         SerializedProperty visionSpecializationsProperty = serializedObject.FindProperty("visionSpecializations");
@@ -651,67 +836,101 @@ public class UnitDataEditor : Editor
         if (visaoProperty != null) EditorGUILayout.PropertyField(visaoProperty);
         if (visionSpecializationsProperty != null) EditorGUILayout.PropertyField(visionSpecializationsProperty, new GUIContent("Vision Specializations"), includeChildren: true);
 
-        EditorGUILayout.Space(2f);
-        EditorGUILayout.LabelField("Stealth Skills", EditorStyles.boldLabel);
-
-        if (stealthSkillRulesProperty != null)
-        {
-            EditorGUILayout.HelpBox(
-                "Config principal por camada. Cada elemento define: Skill + Domain + Height.",
-                MessageType.None);
-
-            for (int i = 0; i < stealthSkillRulesProperty.arraySize; i++)
-            {
-                SerializedProperty element = stealthSkillRulesProperty.GetArrayElementAtIndex(i);
-                if (element == null)
-                    continue;
-
-                SerializedProperty skillProperty = element.FindPropertyRelative("skill");
-                SerializedProperty domainProperty = element.FindPropertyRelative("domain");
-                SerializedProperty heightProperty = element.FindPropertyRelative("heightLevel");
-
-                EditorGUILayout.BeginVertical("box");
-                EditorGUILayout.BeginHorizontal();
-                EditorGUILayout.LabelField($"Element {i}", EditorStyles.boldLabel);
-                if (GUILayout.Button("-", GUILayout.Width(28f)))
-                {
-                    stealthSkillRulesProperty.DeleteArrayElementAtIndex(i);
-                    EditorGUILayout.EndHorizontal();
-                    EditorGUILayout.EndVertical();
-                    break;
-                }
-                EditorGUILayout.EndHorizontal();
-
-                if (skillProperty != null)
-                    EditorGUILayout.PropertyField(skillProperty, new GUIContent("Skill"));
-                if (domainProperty != null)
-                    EditorGUILayout.PropertyField(domainProperty, new GUIContent("Domain"));
-                if (heightProperty != null)
-                    EditorGUILayout.PropertyField(heightProperty, new GUIContent("Height"));
-                EditorGUILayout.EndVertical();
-            }
-
-            if (GUILayout.Button("+ Add Stealth Skill Rule"))
-                stealthSkillRulesProperty.InsertArrayElementAtIndex(stealthSkillRulesProperty.arraySize);
-        }
+        EditorGUI.indentLevel--;
     }
 
     private void DrawTrainingAndAbilitiesSection()
     {
         EditorGUILayout.Space(4f);
-        EditorGUILayout.LabelField("Training & Abilities", EditorStyles.boldLabel);
+        showTrainingAndAbilitiesSection = EditorGUILayout.Foldout(
+            showTrainingAndAbilitiesSection,
+            "Training & Abilities",
+            toggleOnLabelClick: true,
+            EditorStyles.foldoutHeader);
+        if (!showTrainingAndAbilitiesSection)
+            return;
+
+        EditorGUI.indentLevel++;
 
         SerializedProperty eliteLevelProperty    = serializedObject.FindProperty("eliteLevel");
         SerializedProperty eliteFromProperty     = serializedObject.FindProperty("eliteFrom");
         SerializedProperty skillsProperty        = serializedObject.FindProperty("skills");
         SerializedProperty combatModifiersProperty = serializedObject.FindProperty("combatModifiers");
 
-        EditorGUILayout.LabelField("Elite", EditorStyles.boldLabel);
-        if (eliteLevelProperty != null) EditorGUILayout.PropertyField(eliteLevelProperty, new GUIContent("Elite Level"));
-        if (eliteFromProperty  != null) EditorGUILayout.PropertyField(eliteFromProperty,  new GUIContent("Elite From"));
-        EditorGUILayout.Space(2f);
-        if (skillsProperty != null) EditorGUILayout.PropertyField(skillsProperty, includeChildren: true);
-        if (combatModifiersProperty != null) EditorGUILayout.PropertyField(combatModifiersProperty, includeChildren: true);
+        if (combatModifiersProperty != null)
+            EditorGUILayout.PropertyField(combatModifiersProperty, new GUIContent("Combat Modifiers"), includeChildren: true);
+
+        showEliteInfoSection = EditorGUILayout.Foldout(
+            showEliteInfoSection,
+            "Elite Info",
+            toggleOnLabelClick: true);
+        if (showEliteInfoSection)
+        {
+            EditorGUI.indentLevel++;
+            if (eliteLevelProperty != null) EditorGUILayout.PropertyField(eliteLevelProperty, new GUIContent("Elite Level"));
+            if (eliteFromProperty  != null) EditorGUILayout.PropertyField(eliteFromProperty,  new GUIContent("Elite From"));
+            EditorGUI.indentLevel--;
+        }
+
+        showSkillsAndTagsSection = EditorGUILayout.Foldout(
+            showSkillsAndTagsSection,
+            "Skills & Tags",
+            toggleOnLabelClick: true);
+        if (showSkillsAndTagsSection)
+        {
+            EditorGUI.indentLevel++;
+            if (skillsProperty != null)
+                EditorGUILayout.PropertyField(skillsProperty, new GUIContent("Skills"), includeChildren: true);
+            DrawStealthSkillsSection();
+            EditorGUI.indentLevel--;
+        }
+
+        EditorGUI.indentLevel--;
+    }
+
+    private void DrawStealthSkillsSection()
+    {
+        if (stealthSkillRulesProperty == null)
+            return;
+
+        EditorGUILayout.LabelField("Stealth Skills", EditorStyles.boldLabel);
+        EditorGUILayout.HelpBox(
+            "Config principal por camada. Cada elemento define: Skill + Domain + Height.",
+            MessageType.None);
+
+        for (int i = 0; i < stealthSkillRulesProperty.arraySize; i++)
+        {
+            SerializedProperty element = stealthSkillRulesProperty.GetArrayElementAtIndex(i);
+            if (element == null)
+                continue;
+
+            SerializedProperty skillProperty = element.FindPropertyRelative("skill");
+            SerializedProperty domainProperty = element.FindPropertyRelative("domain");
+            SerializedProperty heightProperty = element.FindPropertyRelative("heightLevel");
+
+            EditorGUILayout.BeginVertical("box");
+            EditorGUILayout.BeginHorizontal();
+            EditorGUILayout.LabelField($"Element {i}", EditorStyles.boldLabel);
+            if (GUILayout.Button("-", GUILayout.Width(28f)))
+            {
+                stealthSkillRulesProperty.DeleteArrayElementAtIndex(i);
+                EditorGUILayout.EndHorizontal();
+                EditorGUILayout.EndVertical();
+                break;
+            }
+            EditorGUILayout.EndHorizontal();
+
+            if (skillProperty != null)
+                EditorGUILayout.PropertyField(skillProperty, new GUIContent("Skill"));
+            if (domainProperty != null)
+                EditorGUILayout.PropertyField(domainProperty, new GUIContent("Domain"));
+            if (heightProperty != null)
+                EditorGUILayout.PropertyField(heightProperty, new GUIContent("Height"));
+            EditorGUILayout.EndVertical();
+        }
+
+        if (GUILayout.Button("+ Add Stealth Skill Rule"))
+            stealthSkillRulesProperty.InsertArrayElementAtIndex(stealthSkillRulesProperty.arraySize);
     }
 
     private static List<WeaponData> BuildCatalog(WeaponDatabase database)
