@@ -56,7 +56,7 @@ public class JogadasManager : MonoBehaviour
         manager.log.Registrar(new Jogada
         {
             turno = match != null ? match.CurrentTurn : 0,
-            team = (int)unit.TeamId,
+            team = unit.SlotIndex,
             acao = "Reparo",
             cx = cell.x,
             cy = cell.y,
@@ -499,7 +499,7 @@ public class JogadasManager : MonoBehaviour
                     parentUid = parentUid > 0 ? parentUid : transporter.InstanceId,
                     depth = depth,
                     uid = child.InstanceId,
-                    team = (int)child.TeamId,
+                    team = child.SlotIndex,
                     sigla = ResolveUnitSigla(child),
                     hpAntes = Mathf.Max(0, child.CurrentHP),
                     cost = data != null ? data.cost : 0,
@@ -527,11 +527,11 @@ public class JogadasManager : MonoBehaviour
         _combatResultPorAtacante[attacker.InstanceId] = new CombatLogResult
         {
             AttackerSigla = ResolveUnitSigla(attacker),
-            AttackerTeam = (int)attacker.TeamId,
+            AttackerTeam = attacker.SlotIndex,
             AttackerHpBefore = Mathf.Max(0, attackerHpBefore),
             AttackerHpAfter = Mathf.Max(0, attacker.CurrentHP),
             DefenderSigla = ResolveUnitSigla(defender),
-            DefenderTeam = (int)defender.TeamId,
+            DefenderTeam = defender.SlotIndex,
             DefenderHpBefore = Mathf.Max(0, defenderHpBefore),
             DefenderHpAfter = Mathf.Max(0, defender.CurrentHP),
             HasAttackIntel = true,
@@ -730,10 +730,11 @@ public class JogadasManager : MonoBehaviour
         }
 
         int turno = action.TurnNumber;
-        int team  = (int)action.ActingTeam;
-
         int.TryParse(action.UnitInstanceId, out int uid);
         UnitManager unit = uid > 0 ? UnitManager.AllActive.Find(u => u != null && u.InstanceId == uid) : null;
+        int team = action.ActingSlotIndex;
+        if (team < 0 && unit != null)
+            team = unit.SlotIndex;
         string sigla = unit != null && unit.TryGetUnitData(out UnitData ud) && ud != null ? ud.apelido : "-";
 
         Vector3Int from = action.MoveFrom; from.z = 0;

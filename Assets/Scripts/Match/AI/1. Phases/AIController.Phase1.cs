@@ -19,7 +19,8 @@ public partial class AIController
             yield break;
         }
 
-        if (matchController == null || !matchController.IsPlayerCommandServiceAutomatic(snapshot.AITeam))
+        PlayerSlotId aiSlot = PlayerSlotId.FromIndex(snapshot.AISlotIndex);
+        if (matchController == null || !matchController.IsPlayerCommandServiceAutomatic(aiSlot))
         {
             Debug.Log($"{TL()} Fase1 — commandServiceAutomatic=false, pulando.");
             yield break;
@@ -36,7 +37,7 @@ public partial class AIController
         if (ShouldStopAIForMatchEnd("phase1_apos_command_service"))
             yield break;
 
-        JogadasManager.EnsureInstance()?.RegistrarServicoComando(snapshot.TurnNumber, (int)snapshot.AITeam);
+        JogadasManager.EnsureInstance()?.RegistrarServicoComando(snapshot.TurnNumber, snapshot.AISlotIndex);
 
         float delay = GetBatchDelay();
         if (delay > 0f) yield return new WaitForSecondsRealtime(delay);

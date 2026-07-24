@@ -19,8 +19,9 @@ public partial class AIController
         if (units.Count == 0)
         {
             Debug.Log($"{TL()} Fase 2 — sem unidades em campo, pulando.");
-            if (matchController == null || !matchController.IsPlayerCommandServiceAutomatic(snapshot.AITeam))
-                JogadasManager.EnsureInstance()?.RegistrarServicoComando(snapshot.TurnNumber, (int)aiTeam);
+            if (matchController == null ||
+                !matchController.IsPlayerCommandServiceAutomatic(PlayerSlotId.FromIndex(snapshot.AISlotIndex)))
+                JogadasManager.EnsureInstance()?.RegistrarServicoComando(snapshot.TurnNumber, snapshot.AISlotIndex);
             yield break;
         }
 

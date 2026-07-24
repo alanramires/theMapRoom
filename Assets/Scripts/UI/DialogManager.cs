@@ -22,7 +22,7 @@ public class DialogManager : MonoBehaviour
     [Header("References")]
     [SerializeField] private MatchController matchController;
 
-    private readonly Dictionary<TeamId, HashSet<HelpHintId>> learnedHints = new Dictionary<TeamId, HashSet<HelpHintId>>();
+    private readonly Dictionary<int, HashSet<HelpHintId>> learnedHintsBySlot = new Dictionary<int, HashSet<HelpHintId>>();
 
     private void Awake()
     {
@@ -62,10 +62,13 @@ public class DialogManager : MonoBehaviour
         if (team == TeamId.Neutral || (int)team < 1)
             return;
 
-        if (!learnedHints.TryGetValue(team, out HashSet<HelpHintId> hints))
+        int slotIndex = ResolveSlotIndex(team);
+        if (slotIndex < 0)
+            return;
+        if (!learnedHintsBySlot.TryGetValue(slotIndex, out HashSet<HelpHintId> hints))
         {
             hints = new HashSet<HelpHintId>();
-            learnedHints[team] = hints;
+            learnedHintsBySlot[slotIndex] = hints;
         }
 
         hints.Add(hintId);
@@ -73,7 +76,7 @@ public class DialogManager : MonoBehaviour
 
     public void ClearLearnedHints()
     {
-        learnedHints.Clear();
+        learnedHintsBySlot.Clear();
     }
 
     public bool HasLearnedHint(TeamId team, HelpHintId hintId)
@@ -81,10 +84,23 @@ public class DialogManager : MonoBehaviour
         if (team == TeamId.Neutral)
             return true;
 
-        if (learnedHints.TryGetValue(team, out HashSet<HelpHintId> hints))
+        if (learnedHintsBySlot.TryGetValue(ResolveSlotIndex(team), out HashSet<HelpHintId> hints))
             return hints.Contains(hintId);
 
         return false;
+    }
+
+    private int ResolveSlotIndex(TeamId team)
+    {
+        if (matchController == null)
+            return -1;
+        PlayerSlotId activeSlot = matchController.ActiveSlotId;
+        if (matchController.IsValidPlayerSlot(activeSlot) &&
+            matchController.GetVisualTeamForSlot(activeSlot) == team)
+            return activeSlot.Value;
+        return matchController.TryGetUniqueSlotForTeam(team, out PlayerSlotId uniqueSlot)
+            ? uniqueSlot.Value
+            : -1;
     }
 
     public void TryShowHint(TeamId team, HelpHintId hintId, string buildingOrUnitName)

@@ -888,8 +888,8 @@ public partial class TurnStateManager
 
     private void StoreLastTurnStartBriefingForActiveTeam(IReadOnlyList<HelperTurnStartAutonomyLine> lines)
     {
-        int teamId = matchController != null ? matchController.ActiveTeamId : -1;
-        if (teamId < 0)
+        int slotIndex = matchController != null ? matchController.ActiveSlotId.Value : -1;
+        if (slotIndex < 0)
             return;
 
         var stored = new List<HelperTurnStartAutonomyLine>();
@@ -902,7 +902,7 @@ public partial class TurnStateManager
                     stored.Add(clone);
             }
         }
-        lastTurnStartBriefingLinesByTeam[teamId] = stored;
+        lastTurnStartBriefingLinesByTeam[slotIndex] = stored;
     }
 
     private static HelperTurnStartAutonomyLine CloneTurnStartBriefingLine(HelperTurnStartAutonomyLine source)
@@ -940,7 +940,10 @@ public partial class TurnStateManager
                     continue;
                 saved.Add(new TurnBriefingReportLineSaveData
                 {
-                    teamId = report.Key,
+                    slotIndex = report.Key,
+                    teamId = matchController != null
+                        ? (int)matchController.GetTeamIdForSlot(report.Key)
+                        : (int)TeamId.Neutral,
                     unitName = line.unitName ?? string.Empty,
                     autonomyConsumed = line.autonomyConsumed,
                     fuelBefore = line.fuelBefore,
@@ -963,7 +966,7 @@ public partial class TurnStateManager
 
     public void RestoreTurnBriefingReportSaveData(
         IReadOnlyList<TurnBriefingReportLineSaveData> saved,
-        int activeTeamId)
+        int activeSlotIndex)
     {
         lastTurnStartBriefingLinesByTeam.Clear();
         lastTurnStartAutonomyHelperLines.Clear();
@@ -974,12 +977,18 @@ public partial class TurnStateManager
             for (int i = 0; i < saved.Count; i++)
             {
                 TurnBriefingReportLineSaveData item = saved[i];
-                if (item == null || item.teamId < 0)
+                if (item == null)
                     continue;
-                if (!lastTurnStartBriefingLinesByTeam.TryGetValue(item.teamId, out List<HelperTurnStartAutonomyLine> lines))
+                int slotIndex = item.slotIndex;
+                if (slotIndex < 0 && matchController != null &&
+                    matchController.TryGetUniqueSlotForTeam((TeamId)item.teamId, out PlayerSlotId migratedSlot))
+                    slotIndex = migratedSlot.Value;
+                if (slotIndex < 0)
+                    continue;
+                if (!lastTurnStartBriefingLinesByTeam.TryGetValue(slotIndex, out List<HelperTurnStartAutonomyLine> lines))
                 {
                     lines = new List<HelperTurnStartAutonomyLine>();
-                    lastTurnStartBriefingLinesByTeam[item.teamId] = lines;
+                    lastTurnStartBriefingLinesByTeam[slotIndex] = lines;
                 }
                 Vector3Int cell = new Vector3Int(item.cellX, item.cellY, 0);
                 lines.Add(new HelperTurnStartAutonomyLine
@@ -999,7 +1008,7 @@ public partial class TurnStateManager
             }
         }
 
-        if (lastTurnStartBriefingLinesByTeam.TryGetValue(activeTeamId, out List<HelperTurnStartAutonomyLine> activeLines))
+        if (lastTurnStartBriefingLinesByTeam.TryGetValue(activeSlotIndex, out List<HelperTurnStartAutonomyLine> activeLines))
         {
             for (int i = 0; i < activeLines.Count; i++)
             {

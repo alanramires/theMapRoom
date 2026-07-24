@@ -98,7 +98,8 @@ public class TutorialEnemyTurnIndicator : MonoBehaviour
         for (int i = 0; i < units.Count; i++)
         {
             UnitManager unit = units[i];
-            if (unit != null && !unit.IsDead && !unit.IsEmbarked && unit.TeamId == team)
+            if (unit != null && !unit.IsDead && !unit.IsEmbarked &&
+                unit.SlotIndex == matchController.ActiveSlotId.Value)
                 return true;
         }
 

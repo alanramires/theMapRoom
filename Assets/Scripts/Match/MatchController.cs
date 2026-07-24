@@ -609,24 +609,28 @@ public class MatchController : MonoBehaviour
 
     public bool IsPlayerCommandServiceAutomatic(TeamId teamId)
     {
-        if (players == null) return false;
-        for (int i = 0; i < players.Count; i++)
-            if (players[i].teamId == teamId)
-                return players[i].commandServiceAutomatic;
-        return false;
+        return TryGetUniqueSlotForTeam(teamId, out PlayerSlotId slotId)
+            && IsPlayerCommandServiceAutomatic(slotId);
+    }
+
+    public bool IsPlayerCommandServiceAutomatic(PlayerSlotId slotId)
+    {
+        return IsValidPlayerSlot(slotId) && players[slotId.Value].commandServiceAutomatic;
     }
 
     public void SetPlayerCommandServiceAutomatic(TeamId teamId, bool value)
     {
-        if (players == null) return;
-        for (int i = 0; i < players.Count; i++)
-        {
-            if (players[i].teamId != teamId) continue;
-            PlayerEntry e = players[i];
-            e.commandServiceAutomatic = value;
-            players[i] = e;
+        if (TryGetUniqueSlotForTeam(teamId, out PlayerSlotId slotId))
+            SetPlayerCommandServiceAutomatic(slotId, value);
+    }
+
+    public void SetPlayerCommandServiceAutomatic(PlayerSlotId slotId, bool value)
+    {
+        if (!IsValidPlayerSlot(slotId))
             return;
-        }
+        PlayerEntry entry = players[slotId.Value];
+        entry.commandServiceAutomatic = value;
+        players[slotId.Value] = entry;
     }
     public bool EnableLdtValidation => enableLdtValidation;
     public bool EnableLosValidation => enableLosValidation;

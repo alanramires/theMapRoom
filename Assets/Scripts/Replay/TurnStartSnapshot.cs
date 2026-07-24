@@ -7,6 +7,7 @@ public class TurnStartSnapshot
 {
     public int TurnNumber;
     public TeamId ActiveTeam;
+    public int ActiveSlotIndex = -1;
     public string SnapshotTag;
     public bool HasCursorCell;
     public Vector3Int CursorCell;

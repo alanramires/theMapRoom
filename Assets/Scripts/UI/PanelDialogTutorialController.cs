@@ -272,7 +272,6 @@ public class PanelDialogTutorialController : MonoBehaviour
         if (matchController == null)
             return 0;
 
-        TeamId playerTeam = matchController.GetTeamIdForSlot(0);
         int count = 0;
         List<UnitManager> units = UnitManager.AllActive;
         for (int i = 0; i < units.Count; i++)
@@ -280,7 +279,7 @@ public class PanelDialogTutorialController : MonoBehaviour
             UnitManager unit = units[i];
             if (unit == null || unit.IsDead || unit.IsEmbarked)
                 continue;
-            if (unit.TeamId != playerTeam || unit.HasActed)
+            if (unit.SlotIndex != 0 || unit.HasActed)
                 continue;
             count++;
         }

@@ -719,6 +719,7 @@ public partial class TurnStateManager
                 ActionType = PlayerActionType.RemoveUnit,
                 TurnNumber = actionTurn,
                 ActingTeam = actionTeam,
+                ActingSlotIndex = matchController != null ? matchController.ActiveSlotId.Value : -1,
                 CursorHex = actionCell,
                 HasCursorHex = true,
                 TargetHex = actionCell,
@@ -729,7 +730,7 @@ public partial class TurnStateManager
             });
             JogadasManager.EnsureInstance()?.RegistrarDestruir(
                 actionTurn,
-                (int)actionTeam,
+                matchController != null ? matchController.ActiveSlotId.Value : -1,
                 actionCell.x,
                 actionCell.y,
                 targetSigla,

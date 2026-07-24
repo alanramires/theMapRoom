@@ -10,6 +10,7 @@ public static class SaveDataMapper
         {
             currentTurn = matchController != null ? matchController.CurrentTurn : 0,
             activeTeamId = matchController != null ? matchController.ActiveTeamId : (int)TeamId.Green,
+            activeSlotIndex = matchController != null ? matchController.ActiveSlotId.Value : -1,
             includeNeutralTeam = matchController != null && matchController.IncludeNeutralTeam,
             economyEnabled = matchController == null || matchController.EconomyEnabled
         };
@@ -31,10 +32,11 @@ public static class SaveDataMapper
         {
             result.players.Add(new MatchPlayerSaveData
             {
+                slotIndex = i,
                 teamId = teamIds[i],
                 flipX = i < flipXs.Count && flipXs[i],
                 isAI = i < isAIs.Count && isAIs[i],
-                commandServiceAutomatic = matchController.IsPlayerCommandServiceAutomatic((TeamId)teamIds[i]),
+                commandServiceAutomatic = matchController.IsPlayerCommandServiceAutomatic(PlayerSlotId.FromIndex(i)),
                 startMoney = i < startMoneys.Count ? Mathf.Max(0, startMoneys[i]) : 0,
                 actualMoney = i < actualMoneys.Count ? Mathf.Max(0, actualMoneys[i]) : 0,
                 incomePerTurn = i < incomePerTurns.Count ? Mathf.Max(0, incomePerTurns[i]) : 0,
@@ -117,7 +119,9 @@ public static class SaveDataMapper
         {
             MatchPlayerSaveData p = data.players[i];
             if (p != null)
-                matchController.SetPlayerCommandServiceAutomatic((TeamId)p.teamId, p.commandServiceAutomatic);
+                matchController.SetPlayerCommandServiceAutomatic(
+                    PlayerSlotId.FromIndex(p.slotIndex >= 0 ? p.slotIndex : i),
+                    p.commandServiceAutomatic);
         }
 
         List<int> victorySlotIndices = new List<int>();
@@ -247,9 +251,9 @@ public static class SaveDataMapper
         else if (unit.SlotIndex < 0)
         {
             MatchController match = UnityEngine.Object.FindAnyObjectByType<MatchController>();
-            int resolvedSlot = match != null ? match.GetSlotIndexForTeam((TeamId)saved.teamId) : -1;
-            if (resolvedSlot >= 0)
-                unit.SetSlotIndex(resolvedSlot);
+            if (match != null &&
+                match.TryGetUniqueSlotForTeam((TeamId)saved.teamId, out PlayerSlotId resolvedSlot))
+                unit.SetSlotIndex(resolvedSlot.Value);
         }
         unit.SetCurrentCellPosition(new Vector3Int(saved.cellX, saved.cellY, 0), enforceFinalOccupancyRule: false);
         unit.SetCurrentHP(saved.currentHP);

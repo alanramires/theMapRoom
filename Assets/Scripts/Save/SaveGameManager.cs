@@ -1798,7 +1798,11 @@ public class SaveGameManager : MonoBehaviour
                 RestoreMatchPlayers(data);
                 matchController.SetEconomyEnabled(data.economyEnabled);
                 matchController.SetCurrentTurn(data.currentTurn);
-                matchController.SetActiveTeamIdWithoutTurnStart(data.activeTeamId);
+                PlayerSlotId restoredActiveSlot = PlayerSlotId.FromIndex(data.activeSlotIndex);
+                if (matchController.IsValidPlayerSlot(restoredActiveSlot))
+                    matchController.SetActiveSlotWithoutTurnStart(restoredActiveSlot);
+                else
+                    matchController.SetActiveTeamIdWithoutTurnStart(data.activeTeamId);
                 // Reaplica economia/flip apos SetActiveTeamIdWithoutTurnStart para evitar side effects
                 // de credito no inicio do turno sobrescrever o snapshot salvo.
                 RestoreMatchPlayers(data);
@@ -1828,7 +1832,9 @@ public class SaveGameManager : MonoBehaviour
 
             stage = "restore-turn-briefing-ledger";
             matchController?.RestoreTurnBriefingLedger(data.turnBriefingEvents);
-            turnStateManager?.RestoreTurnBriefingReportSaveData(data.turnBriefingReportLines, data.activeTeamId);
+            turnStateManager?.RestoreTurnBriefingReportSaveData(
+                data.turnBriefingReportLines,
+                data.activeSlotIndex >= 0 ? data.activeSlotIndex : matchController.ActiveSlotId.Value);
 
             stage = "restore-ai-objective-plans";
             AIIntelLedger.Restore(data.aiIntelLedgers);
@@ -2023,6 +2029,7 @@ public class SaveGameManager : MonoBehaviour
             savedAtUtcTicks = DateTime.UtcNow.Ticks,
             currentTurn = matchState.currentTurn,
             activeTeamId = matchState.activeTeamId,
+            activeSlotIndex = matchState.activeSlotIndex,
             includeNeutralTeam = matchState.includeNeutralTeam,
             economyEnabled = matchState.economyEnabled,
             victoryStarsEnabled = matchState.victoryStarsEnabled,
@@ -2127,6 +2134,7 @@ public class SaveGameManager : MonoBehaviour
         MatchStateSaveData matchState = new MatchStateSaveData
         {
             includeNeutralTeam = data.includeNeutralTeam,
+            activeSlotIndex = data.activeSlotIndex,
             players = data.players != null ? data.players : new List<MatchPlayerSaveData>(),
             victoryStars = data.victoryStars != null ? data.victoryStars : new List<MatchVictoryStarSaveData>(),
             victoryStarsEnabled = data.victoryStarsEnabled,

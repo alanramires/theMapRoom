@@ -793,7 +793,7 @@ public partial class TurnStateManager
 
                 JogadasManager.EnsureInstance()?.RegistrarServicoLogistico(
                     matchController != null ? matchController.CurrentTurn : 0,
-                    (int)supplier.TeamId,
+                    supplier.SlotIndex,
                     target.CurrentCellPosition.x,
                     target.CurrentCellPosition.y,
                     target.TryGetUnitData(out UnitData targetData) && targetData != null ? targetData.apelido : "-",

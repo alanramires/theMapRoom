@@ -1400,7 +1400,7 @@ public class TutorialManager : MonoBehaviour
     {
         if (matchController != null && unit != null)
         {
-            if ((int)unit.TeamId != matchController.ActiveTeamId)
+            if (unit.SlotIndex != matchController.ActiveSlotId.Value)
                 MarkObjectiveCompleteById("INSPECT_ENEMY_UNIT");
             else
                 MarkObjectiveCompleteById("INSPECT_ALLY_UNIT");
@@ -1446,7 +1446,7 @@ public class TutorialManager : MonoBehaviour
         if (matchController != null && unit != null)
         {
             // Apenas se a unidade destruída for inimiga (time diferente do ativo)
-            if ((int)unit.TeamId != matchController.ActiveTeamId)
+            if (unit.SlotIndex != matchController.ActiveSlotId.Value)
             {
                 MarkObjectiveCompleteById("DESTROY_ENEMY_UNIT");
             }

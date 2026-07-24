@@ -222,7 +222,10 @@ public class ReplayPanelUI : MonoBehaviour
     public void CycleSpecificTeam()
     {
         specificTeam++;
-        if (specificTeam > 3)
+        int maxSlot = replayManager != null && replayManager.MatchControllerForInspection != null
+            ? replayManager.MatchControllerForInspection.SlotCount - 1
+            : 3;
+        if (specificTeam > maxSlot)
             specificTeam = -1;
         RefreshLabels();
     }
@@ -249,7 +252,10 @@ public class ReplayPanelUI : MonoBehaviour
     public void CycleViewUnderSpecificTeam()
     {
         viewUnderSpecificTeam++;
-        if (viewUnderSpecificTeam > 3)
+        int maxSlot = replayManager != null && replayManager.MatchControllerForInspection != null
+            ? replayManager.MatchControllerForInspection.SlotCount - 1
+            : 3;
+        if (viewUnderSpecificTeam > maxSlot)
             viewUnderSpecificTeam = -1;
 
         ApplyReplayViewSelection();
@@ -274,8 +280,9 @@ public class ReplayPanelUI : MonoBehaviour
             return;
         }
 
-        TeamId team = (TeamId)Mathf.Clamp(viewUnderSpecificTeam, 0, 3);
-        replayManager.SetReplayVision(ReplayVisionMode.TeamFiltered, team);
+        replayManager.SetReplayVision(
+            ReplayVisionMode.TeamFiltered,
+            PlayerSlotId.FromIndex(viewUnderSpecificTeam));
     }
 
     private void TryAutoAssignUiBindings()
@@ -406,7 +413,7 @@ public class ReplayPanelUI : MonoBehaviour
 
         bool started = false;
         ApplyReplayViewSelection();
-        TeamId specificTeamId = (TeamId)Mathf.Clamp(specificTeam, (int)TeamId.Neutral, (int)TeamId.Yellow);
+        PlayerSlotId specificSlot = PlayerSlotId.FromIndex(specificTeam);
 
         switch (replayStartMode)
         {
@@ -415,10 +422,10 @@ public class ReplayPanelUI : MonoBehaviour
                           || replayManager.StartReplayFromBeginning(replayManager.VisionMode, replayManager.ObserverTeam);
                 break;
             case ReplayStartMode.FromSpecificTurnTeam:
-                if (specificTeamId == TeamId.Neutral)
+                if (!specificSlot.IsValid)
                     started = replayManager.StartReplayFromTurn(specificTurn, replayManager.VisionMode, replayManager.ObserverTeam);
                 else
-                    started = replayManager.StartReplayFromTurnAndTeam(specificTurn, specificTeamId, replayManager.VisionMode, replayManager.ObserverTeam);
+                    started = replayManager.StartReplayFromTurnAndSlot(specificTurn, specificSlot, replayManager.VisionMode, replayManager.ObserverTeam);
                 break;
             case ReplayStartMode.FromCurrentTop:
             default:
@@ -603,7 +610,7 @@ public class ReplayPanelUI : MonoBehaviour
 
         SetText(textReplay, replayStateLabel);
         SetText(turnText, turnLabel >= 0 ? $"Turno: {turnLabel}" : "Turno: -");
-        SetText(observerText, $"Observador: {FormatObserverTeamLabel(replayManager.ObserverTeam)}");
+        SetText(observerText, $"Observador: {FormatObserverSlotLabel(replayManager)}");
         SetText(visionModeText, $"Visao: {FormatVisionModeLabel(replayManager.VisionMode, replayManager.ObserverTeam)}");
         SetText(stepText, $"Step: {currentSnapshotIndex}/{totalSnapshots}");
         SetText(startConfigText, BuildReplayStartConfigLabel());
@@ -655,10 +662,12 @@ public class ReplayPanelUI : MonoBehaviour
             case ReplayStartMode.FromBeginning:
                 return "Inicio: snapshot 0 (inicio do jogo/load)";
             case ReplayStartMode.FromSpecificTurnTeam:
-                TeamId team = (TeamId)Mathf.Clamp(specificTeam, (int)TeamId.Neutral, (int)TeamId.Yellow);
-                string teamLabel = team == TeamId.Neutral
-                    ? "qualquer time"
-                    : $"Time {(int)team} ({TeamUtils.GetName(team)})";
+                MatchController match = replayManager != null ? replayManager.MatchControllerForInspection : null;
+                PlayerSlotId slot = PlayerSlotId.FromIndex(specificTeam);
+                TeamId team = match != null ? match.GetVisualTeamForSlot(slot) : TeamId.Neutral;
+                string teamLabel = !slot.IsValid
+                    ? "qualquer slot"
+                    : $"Slot {slot.Value} ({TeamUtils.GetName(team)})";
                 return $"Inicio: especifico | {teamLabel} | Turno {Mathf.Max(0, specificTurn)}";
             default:
                 return "Inicio: atual (ultimo snapshot da pilha)";
@@ -676,6 +685,14 @@ public class ReplayPanelUI : MonoBehaviour
             return "Qualquer time";
 
         return $"Time {TeamUtils.GetName(teamId)}";
+    }
+
+    private static string FormatObserverSlotLabel(ReplayManager manager)
+    {
+        if (manager == null || !manager.ObserverSlotId.IsValid)
+            return FormatObserverTeamLabel(manager != null ? manager.ObserverTeam : TeamId.Neutral);
+
+        return $"Slot {manager.ObserverSlotId.Value} ({TeamUtils.GetName(manager.ObserverTeam)})";
     }
 
     private static string FormatVisionModeLabel(ReplayVisionMode mode, TeamId observerTeam)

@@ -5,11 +5,12 @@ using UnityEngine;
 [Serializable]
 public class SaveGameData
 {
-    public int version = 13;
+    public int version = 14;
     public string sceneName;
     public long savedAtUtcTicks;
     public int currentTurn;
     public int activeTeamId;
+    public int activeSlotIndex = -1;
     public bool includeNeutralTeam;
     public bool economyEnabled = true;
     public bool victoryStarsEnabled = true;
@@ -75,6 +76,7 @@ public class TurnBriefingEventSaveData
 [Serializable]
 public class TurnBriefingReportLineSaveData
 {
+    public int slotIndex = -1;
     public int teamId;
     public string unitName;
     public int autonomyConsumed;
@@ -121,6 +123,7 @@ public class MatchStateSaveData
 {
     public int currentTurn;
     public int activeTeamId;
+    public int activeSlotIndex = -1;
     public bool includeNeutralTeam;
     public bool economyEnabled = true;
     public bool victoryStarsEnabled = true;
@@ -135,6 +138,7 @@ public class MatchStateSaveData
 [Serializable]
 public class MatchPlayerSaveData
 {
+    public int slotIndex = -1;
     public int teamId;
     public bool flipX;
     public bool isAI;
@@ -327,6 +331,7 @@ public class ReplaySaveData
     public ReplayTurnRecordSaveData currentRecord;
     public int selectedTurnIndex = -1;
     public int observerTeamId = (int)TeamId.Neutral;
+    public int observerSlotIndex = -1;
     public int visionMode = (int)ReplayVisionMode.Omniscient;
     public ActionStack actionStack = new ActionStack();
 }
@@ -335,6 +340,7 @@ public class ReplaySaveData
 public class ReplayTurnRecordSaveData
 {
     public int turnNumber;
+    public int actingSlotIndex = -1;
     public int actingTeamId = (int)TeamId.Neutral;
     public TurnStartSnapshot startSnapshot;
     public List<ReplayStepSaveData> steps = new List<ReplayStepSaveData>();

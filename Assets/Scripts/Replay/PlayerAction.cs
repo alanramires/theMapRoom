@@ -18,6 +18,7 @@ public class PlayerAction
     public PlayerActionType ActionType;
     public int TurnNumber;
     public TeamId ActingTeam;
+    public int ActingSlotIndex = -1;
 
     public Vector3Int CursorHex;
     public bool HasCursorHex;

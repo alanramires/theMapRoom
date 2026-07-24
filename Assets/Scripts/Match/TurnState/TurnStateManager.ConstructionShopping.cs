@@ -995,6 +995,7 @@ public partial class TurnStateManager
             ActionType = PlayerActionType.Shopping,
             TurnNumber = matchController != null ? matchController.CurrentTurn : 0,
             ActingTeam = buyingTeam,
+            ActingSlotIndex = spawnedManager.SlotIndex,
             CursorHex = normalizedSpawnCell,
             UnitInstanceId = spawnedManager.InstanceId.ToString(),
             TargetHex = normalizedSpawnCell,
@@ -1007,7 +1008,7 @@ public partial class TurnStateManager
 
         JogadasManager.EnsureInstance()?.RegistrarCompra(
             matchController != null ? matchController.CurrentTurn : 0,
-            (int)buyingTeam,
+            spawnedManager.SlotIndex,
             normalizedSpawnCell.x, normalizedSpawnCell.y,
             unit.apelido,
             spawnedManager.InstanceId);

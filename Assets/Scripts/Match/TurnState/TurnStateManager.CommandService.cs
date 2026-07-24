@@ -204,7 +204,7 @@ public partial class TurnStateManager
             2.2f);
         JogadasManager.EnsureInstance()?.RegistrarServicoComando(
             matchController != null ? matchController.CurrentTurn : 0,
-            matchController != null ? (int)matchController.ActiveTeam : (int)TeamId.Neutral);
+            matchController != null ? matchController.ActiveSlotId.Value : -1);
         EnterCommandServiceState("TryStartCommandServiceOrder");
         EnterCommandServiceExecutingState("TryStartCommandServiceOrder: executing");
         commandServiceExecutionRoutine = StartCoroutine(ExecuteCommandServiceOrderSequence());
@@ -673,7 +673,7 @@ public partial class TurnStateManager
                         : (sourceConstruction != null ? sourceConstruction.InstanceId : 0);
                     JogadasManager.EnsureInstance()?.RegistrarServicoLogistico(
                         matchController != null ? matchController.CurrentTurn : 0,
-                        (int)target.TeamId,
+                        target.SlotIndex,
                         target.CurrentCellPosition.x,
                         target.CurrentCellPosition.y,
                         target.TryGetUnitData(out UnitData targetData) && targetData != null ? targetData.apelido : "-",
@@ -877,7 +877,7 @@ public partial class TurnStateManager
         });
         JogadasManager.EnsureInstance()?.RegistrarServicoComando(
             matchController != null ? matchController.CurrentTurn : 0,
-            matchController != null ? (int)matchController.ActiveTeam : (int)TeamId.Neutral);
+            matchController != null ? matchController.ActiveSlotId.Value : -1);
         EnterCommandServiceExecutingState("TryConfirmPendingCommandServiceOrder");
         commandServiceExecutionRoutine = StartCoroutine(ExecuteCommandServiceOrderSequence());
         return true;
@@ -2441,7 +2441,7 @@ public partial class TurnStateManager
         {
             JogadasManager.EnsureInstance()?.RegistrarServicoComando(
                 matchController != null ? matchController.CurrentTurn : 0,
-                matchController != null ? matchController.ActiveTeamId : 0);
+                matchController != null ? matchController.ActiveSlotId.Value : -1);
             autoCommandServiceRoutine = null;
             yield break;
         }

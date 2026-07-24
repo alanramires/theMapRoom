@@ -30,6 +30,7 @@ public class ReplayManager : MonoBehaviour
     [SerializeField] private List<ReplayTurnRecord> matchHistory = new List<ReplayTurnRecord>();
     [SerializeField] private int selectedTurnIndex = -1;
     [SerializeField] private TeamId observerTeam = TeamId.Neutral;
+    [SerializeField] private int observerSlotIndex = -1;
     [SerializeField] private ReplayVisionMode visionMode = ReplayVisionMode.Omniscient;
     [SerializeField] private int currentStepIndex;
     [Header("Playback")]
@@ -88,6 +89,8 @@ public class ReplayManager : MonoBehaviour
     public IReadOnlyList<ReplayTurnRecord> MatchHistory => matchHistory;
     public int SelectedTurnIndex => selectedTurnIndex;
     public TeamId ObserverTeam => observerTeam;
+    public PlayerSlotId ObserverSlotId => PlayerSlotId.FromIndex(observerSlotIndex);
+    public MatchController MatchControllerForInspection => matchController;
     public ReplayVisionMode VisionMode => visionMode;
     public int CurrentStepIndex => currentStepIndex;
     public bool IsPlaying => isPlaying;
@@ -1710,6 +1713,7 @@ public class ReplayManager : MonoBehaviour
         {
             TurnNumber = snapshot != null ? snapshot.TurnNumber : 0,
             ActingTeam = snapshot != null ? snapshot.ActiveTeam : TeamId.Neutral,
+            ActingSlotIndex = snapshot != null ? snapshot.ActiveSlotIndex : -1,
             StartSnapshot = snapshot,
             Steps = new List<ReplayStep>()
         };
@@ -1804,6 +1808,7 @@ public class ReplayManager : MonoBehaviour
         selectedTurnIndex = turnIndex;
         visionMode = replayVisionMode;
         observerTeam = replayObserverTeam;
+        observerSlotIndex = ResolveReplayObserverSlot(replayObserverTeam);
         isReplaying = true;
         isRecording = false;
         isPlaying = false;
@@ -1872,6 +1877,7 @@ public class ReplayManager : MonoBehaviour
         {
             selectedTurnIndex = selectedTurnIndex,
             observerTeamId = (int)observerTeam,
+            observerSlotIndex = observerSlotIndex,
             visionMode = (int)visionMode,
             actionStack = actionStack ?? new ActionStack()
         };
@@ -1933,6 +1939,7 @@ public class ReplayManager : MonoBehaviour
         int maxIndex = matchHistory.Count - 1;
         selectedTurnIndex = Mathf.Clamp(data.selectedTurnIndex, -1, maxIndex);
         observerTeam = (TeamId)data.observerTeamId;
+        observerSlotIndex = data.observerSlotIndex;
         visionMode = (ReplayVisionMode)data.visionMode;
     }
 
@@ -1945,6 +1952,20 @@ public class ReplayManager : MonoBehaviour
     {
         visionMode = replayVisionMode;
         observerTeam = replayObserverTeam;
+        observerSlotIndex = ResolveReplayObserverSlot(replayObserverTeam);
+        if (isReplaying)
+            ApplyReplayVision();
+    }
+
+    public void SetReplayVision(ReplayVisionMode replayVisionMode, PlayerSlotId replayObserverSlot)
+    {
+        visionMode = replayVisionMode;
+        observerSlotIndex = matchController != null && matchController.IsValidPlayerSlot(replayObserverSlot)
+            ? replayObserverSlot.Value
+            : -1;
+        observerTeam = observerSlotIndex >= 0
+            ? matchController.GetVisualTeamForSlot(replayObserverSlot)
+            : TeamId.Neutral;
         if (isReplaying)
             ApplyReplayVision();
     }
@@ -1963,6 +1984,7 @@ public class ReplayManager : MonoBehaviour
 
         visionMode = replayVisionMode;
         observerTeam = replayObserverTeam;
+        observerSlotIndex = ResolveReplayObserverSlot(replayObserverTeam);
         BeginReplayTransitionFeedback("dialog.replay.loading", "Replay iniciando (aguarde)");
         isReplaying = true;
         isRecording = false;
@@ -2043,6 +2065,26 @@ public class ReplayManager : MonoBehaviour
 
         return false;
     }
+
+    public bool StartReplayFromTurnAndSlot(
+        int turnNumber,
+        PlayerSlotId actingSlot,
+        ReplayVisionMode replayVisionMode,
+        TeamId replayObserverTeam)
+    {
+        if (!actingSlot.IsValid || matchHistory == null)
+            return false;
+        for (int i = 0; i < matchHistory.Count; i++)
+        {
+            ReplayTurnRecord record = matchHistory[i];
+            if (record == null || record.TurnNumber != turnNumber ||
+                record.ActingSlotIndex != actingSlot.Value)
+                continue;
+            StartReplay(i, replayVisionMode, replayObserverTeam);
+            return isReplaying;
+        }
+        return false;
+    }
     public bool StartReplayFromLatestSnapshot(ReplayVisionMode replayVisionMode, TeamId replayObserverTeam)
     {
         if (currentRecord == null || currentRecord.StartSnapshot == null)
@@ -2050,6 +2092,7 @@ public class ReplayManager : MonoBehaviour
 
         visionMode = replayVisionMode;
         observerTeam = replayObserverTeam;
+        observerSlotIndex = ResolveReplayObserverSlot(replayObserverTeam);
         StartReplay();
         return isReplaying;
     }
@@ -2115,10 +2158,12 @@ public class ReplayManager : MonoBehaviour
         {
             currentBuffer.UnitInstanceId = unit.InstanceId.ToString();
             currentBuffer.ActingTeam = unit.TeamId;
+            currentBuffer.ActingSlotIndex = unit.SlotIndex;
         }
         else if (matchController != null)
         {
             currentBuffer.ActingTeam = matchController.ActiveTeam;
+            currentBuffer.ActingSlotIndex = matchController.ActiveSlotId.Value;
         }
 
         if (matchController != null)
@@ -2225,6 +2270,18 @@ public class ReplayManager : MonoBehaviour
         if (actionStack == null)
             actionStack = new ActionStack();
 
+        if (action.ActingSlotIndex < 0)
+        {
+            if (int.TryParse(action.UnitInstanceId, out int actingUnitId))
+            {
+                UnitManager actingUnit = FindReplayUnitByInstanceId(actingUnitId);
+                if (actingUnit != null)
+                    action.ActingSlotIndex = actingUnit.SlotIndex;
+            }
+            if (action.ActingSlotIndex < 0 && matchController != null)
+                action.ActingSlotIndex = matchController.ActiveSlotId.Value;
+        }
+
         if (!action.HasCursorHex && (action.CursorHex != Vector3Int.zero || !string.IsNullOrWhiteSpace(action.UnitInstanceId) || !string.IsNullOrWhiteSpace(action.TargetInstanceId) || !string.IsNullOrWhiteSpace(action.TargetConstructionId)))
             action.HasCursorHex = true;
 
@@ -2269,7 +2326,10 @@ public class ReplayManager : MonoBehaviour
         if (currentBuffer.TurnNumber == 0 && matchController != null)
             currentBuffer.TurnNumber = matchController.CurrentTurn;
         if (matchController != null)
+        {
             currentBuffer.ActingTeam = matchController.ActiveTeam;
+            currentBuffer.ActingSlotIndex = matchController.ActiveSlotId.Value;
+        }
 
         RecordStandaloneAction(currentBuffer);
 
@@ -2879,8 +2939,10 @@ public class ReplayManager : MonoBehaviour
         if (action == null || currentRecord == null)
             return false;
 
-        return action.TurnNumber == currentRecord.TurnNumber
-               && action.ActingTeam == currentRecord.ActingTeam;
+        bool sameParticipant = action.ActingSlotIndex >= 0 && currentRecord.ActingSlotIndex >= 0
+            ? action.ActingSlotIndex == currentRecord.ActingSlotIndex
+            : action.ActingTeam == currentRecord.ActingTeam;
+        return action.TurnNumber == currentRecord.TurnNumber && sameParticipant;
     }
     public void RestoreSnapshot(TurnStartSnapshot snapshot)
     {
@@ -3016,7 +3078,11 @@ public class ReplayManager : MonoBehaviour
         SaveDataMapper.ApplyMatchStateSaveData(matchController, matchState);
         matchController.SetEconomyEnabled(matchState.economyEnabled);
         matchController.SetCurrentTurn(Mathf.Max(0, matchState.currentTurn));
-        matchController.SetActiveTeamId(matchState.activeTeamId);
+        PlayerSlotId activeSlot = PlayerSlotId.FromIndex(matchState.activeSlotIndex);
+        if (matchController.IsValidPlayerSlot(activeSlot))
+            matchController.SetActiveSlot(activeSlot);
+        else
+            matchController.SetActiveTeamId(matchState.activeTeamId);
         SaveDataMapper.ApplyMatchStateSaveData(matchController, matchState);
         // Evita drift visual de renda ao navegar snapshots (captura/reversao/avance).
         matchController.RefreshIncomeFromConstructionsNow();
@@ -3084,7 +3150,13 @@ public class ReplayManager : MonoBehaviour
         if (recordedTeam == TeamId.Neutral && currentRecord.ActingTeam != TeamId.Neutral)
             recordedTeam = currentRecord.ActingTeam;
 
-        return recordedTurn == runtimeTurn && recordedTeam == runtimeTeam;
+        int recordedSlotIndex = currentRecord.StartSnapshot.ActiveSlotIndex >= 0
+            ? currentRecord.StartSnapshot.ActiveSlotIndex
+            : currentRecord.ActingSlotIndex;
+        bool sameParticipant = recordedSlotIndex >= 0
+            ? recordedSlotIndex == matchController.ActiveSlotId.Value
+            : recordedTeam == runtimeTeam;
+        return recordedTurn == runtimeTurn && sameParticipant;
     }
 
     private bool IsReadyForTurnStartSnapshot(bool requireInitializedTurn)
@@ -3172,6 +3244,7 @@ public class ReplayManager : MonoBehaviour
         {
             TurnNumber = matchController != null ? matchController.CurrentTurn : 0,
             ActiveTeam = matchController != null ? matchController.ActiveTeam : TeamId.Neutral,
+            ActiveSlotIndex = matchController != null ? matchController.ActiveSlotId.Value : -1,
             MatchState = matchState
         };
 
@@ -3375,7 +3448,27 @@ public class ReplayManager : MonoBehaviour
             return;
         }
 
-        fogOfWarController?.RefreshFogOfWarForTeam(observerTeam);
+        if (observerSlotIndex >= 0)
+            matchController?.RefreshFogOfWarForSlot(PlayerSlotId.FromIndex(observerSlotIndex));
+        else
+            fogOfWarController?.RefreshFogOfWarForTeam(observerTeam);
+    }
+
+    private int ResolveReplayObserverSlot(TeamId visualTeam)
+    {
+        if (matchController == null || visualTeam == TeamId.Neutral)
+            return -1;
+        PlayerSlotId selectedSlot = PlayerSlotId.FromIndex(observerSlotIndex);
+        if (matchController.IsValidPlayerSlot(selectedSlot) &&
+            matchController.GetVisualTeamForSlot(selectedSlot) == visualTeam)
+            return selectedSlot.Value;
+        PlayerSlotId activeSlot = matchController.ActiveSlotId;
+        if (matchController.IsValidPlayerSlot(activeSlot) &&
+            matchController.GetVisualTeamForSlot(activeSlot) == visualTeam)
+            return activeSlot.Value;
+        return matchController.TryGetUniqueSlotForTeam(visualTeam, out PlayerSlotId uniqueSlot)
+            ? uniqueSlot.Value
+            : -1;
     }
 
     private void EnsureReplayPoolsInitialized()
@@ -3730,6 +3823,7 @@ public class ReplayManager : MonoBehaviour
         ReplayTurnRecordSaveData saveData = new ReplayTurnRecordSaveData
         {
             turnNumber = record.TurnNumber,
+            actingSlotIndex = record.ActingSlotIndex,
             actingTeamId = (int)record.ActingTeam,
             startSnapshot = record.StartSnapshot
         };
@@ -3755,6 +3849,7 @@ public class ReplayManager : MonoBehaviour
         ReplayTurnRecord record = new ReplayTurnRecord
         {
             TurnNumber = saveData.turnNumber,
+            ActingSlotIndex = saveData.actingSlotIndex,
             ActingTeam = (TeamId)saveData.actingTeamId,
             StartSnapshot = saveData.startSnapshot,
             Steps = new List<ReplayStep>()
