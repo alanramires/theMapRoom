@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -697,7 +697,7 @@ public partial class AIController
         float progress = fromDist - dropDist;
 
         ConstructionManager building = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, dropCell);
-        bool alliedBuilding = building != null && building.TeamId == snapshot.AITeam;
+        bool alliedBuilding = building != null && building.SlotIndex == snapshot.AISlotIndex;
 
         float score = 1800f
             + dpq * 85f
@@ -761,7 +761,7 @@ public partial class AIController
             return false;
 
         ConstructionManager building = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, dropCell);
-        if (building != null && building.TeamId == snapshot.AITeam)
+        if (building != null && building.SlotIndex == snapshot.AISlotIndex)
             return true;
 
         return HasAlliedCombatScreenAheadOfDrop(transporter, primaryPassenger, snapshot, dropCell, mainLineAnchor);
@@ -845,7 +845,7 @@ public partial class AIController
             if (!IsFireSupportConservativeCellAllowed(primaryPassenger, snapshot, cell)) continue;
 
             ConstructionManager construction = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, cell);
-            if (construction != null && construction.TeamId != snapshot.AITeam)
+            if (construction != null && construction.SlotIndex != snapshot.AISlotIndex)
                 continue;
 
             int pathCost = GetPathStepCount(paths, cell);
@@ -956,7 +956,7 @@ public partial class AIController
         float score = 0f;
 
         ConstructionManager building = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, dc);
-        if (building != null && building.TeamId == snapshot.AITeam)
+        if (building != null && building.SlotIndex == snapshot.AISlotIndex)
             score += 3000f;
 
         int allyCount = 0;

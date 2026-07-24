@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -66,7 +66,7 @@ public partial class AIController
         foreach (UnitManager candidate in UnitManager.AllActive)
         {
             if (candidate == transporter) continue;
-            if (candidate.TeamId != snapshot.AITeam || candidate.IsDead || candidate.IsEmbarked || candidate.HasActed) continue;
+            if (candidate.SlotIndex != snapshot.AISlotIndex || candidate.IsDead || candidate.IsEmbarked || candidate.HasActed) continue;
             if (!candidate.TryGetUnitData(out UnitData candidateData)) continue;
 
             // Capturador units are handled by the regular infantry shuttle.

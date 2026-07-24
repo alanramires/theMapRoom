@@ -23,7 +23,7 @@ public partial class AITacticalAnalyzer : MonoBehaviour
     private static AITacticalAnalyzer instance;
     public static AITacticalAnalyzer Instance => EnsureInstance();
 
-    private readonly Dictionary<TeamId, List<AITacticalNeed>> operationsByTeam = new Dictionary<TeamId, List<AITacticalNeed>>();
+    private readonly Dictionary<int, List<AITacticalNeed>> operationsBySlot = new Dictionary<int, List<AITacticalNeed>>();
     private int nextId = 1;
 
     private static AITacticalAnalyzer EnsureInstance()
@@ -52,7 +52,7 @@ public partial class AITacticalAnalyzer : MonoBehaviour
     public void Rebuild(TeamId team, AIWorldSnapshot snapshot, TeamObjectivePlan plan)
     {
         var ops = new List<AITacticalNeed>();
-        operationsByTeam[team] = ops;
+        operationsBySlot[snapshot != null ? snapshot.AISlotIndex : AIController.ResolveAISlotKey(team)] = ops;
         if (snapshot == null)
             return;
 
@@ -74,7 +74,7 @@ public partial class AITacticalAnalyzer : MonoBehaviour
 
     public IReadOnlyList<AITacticalNeed> GetOperationsForTeam(TeamId team)
     {
-        if (operationsByTeam.TryGetValue(team, out List<AITacticalNeed> ops))
+        if (operationsBySlot.TryGetValue(AIController.ResolveAISlotKey(team), out List<AITacticalNeed> ops))
             return ops;
         return System.Array.Empty<AITacticalNeed>();
     }
@@ -82,7 +82,7 @@ public partial class AITacticalAnalyzer : MonoBehaviour
     public bool TryGetCaptureOperationForObjective(TeamId team, SectorObjective objective, out AITacticalNeed operation)
     {
         operation = null;
-        if (objective == null || !operationsByTeam.TryGetValue(team, out List<AITacticalNeed> ops))
+        if (objective == null || !operationsBySlot.TryGetValue(AIController.ResolveAISlotKey(team), out List<AITacticalNeed> ops))
             return false;
 
         foreach (AITacticalNeed op in ops)
@@ -128,7 +128,7 @@ public partial class AITacticalAnalyzer : MonoBehaviour
     public List<TacticalDeficit> GetDeficits(TeamId team, bool log = true)
     {
         var deficits = new List<TacticalDeficit>();
-        if (!operationsByTeam.TryGetValue(team, out List<AITacticalNeed> ops))
+        if (!operationsBySlot.TryGetValue(AIController.ResolveAISlotKey(team), out List<AITacticalNeed> ops))
             return deficits;
 
         ops.Sort((a, b) => a.Priority.CompareTo(b.Priority));

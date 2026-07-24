@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -51,7 +51,7 @@ public partial class AIController
             MatchController mcRelease = GetMatchController();
             foreach (UnitManager e in UnitManager.AllActive)
             {
-                if (e == null || e.TeamId == snapshot.AITeam || e.IsDead || e.IsEmbarked) continue;
+                if (e == null || e.SlotIndex == snapshot.AISlotIndex || e.IsDead || e.IsEmbarked) continue;
                 Vector3Int ec = e.CurrentCellPosition; ec.z = 0;
                 if (mcRelease != null && !mcRelease.IsUnitVisibleForTeamNoCache(e, snapshot.AITeam))
                     continue;
@@ -176,7 +176,7 @@ public partial class AIController
             MatchController mcZone = GetMatchController();
             foreach (UnitManager enemy in UnitManager.AllActive)
             {
-                if (enemy.TeamId == snapshot.AITeam || enemy.IsDead || enemy.IsEmbarked) continue;
+                if (enemy.SlotIndex == snapshot.AISlotIndex || enemy.IsDead || enemy.IsEmbarked) continue;
                 if (mcZone != null && !mcZone.IsUnitVisibleForTeamNoCache(enemy, snapshot.AITeam)) continue;
                 Vector3Int ec = enemy.CurrentCellPosition; ec.z = 0;
                 if (SectorManager.HexDistance(ec, repCell) <= DefenseEnemyRange) zoneEnemies.Add(enemy);
@@ -186,7 +186,7 @@ public partial class AIController
         MatchController mcLocal = GetMatchController();
         foreach (UnitManager enemy in UnitManager.AllActive)
         {
-            if (enemy.TeamId == snapshot.AITeam || enemy.IsDead || enemy.IsEmbarked) continue;
+            if (enemy.SlotIndex == snapshot.AISlotIndex || enemy.IsDead || enemy.IsEmbarked) continue;
             if (mcLocal != null && !mcLocal.IsUnitVisibleForTeamNoCache(enemy, snapshot.AITeam)) continue;
             if (zoneEnemies.Contains(enemy)) continue;
 
@@ -442,7 +442,7 @@ public partial class AIController
         MatchController mc = GetMatchController();
         foreach (UnitManager enemy in UnitManager.AllActive)
         {
-            if (enemy.TeamId == snapshot.AITeam || enemy.IsDead || enemy.IsEmbarked) continue;
+            if (enemy.SlotIndex == snapshot.AISlotIndex || enemy.IsDead || enemy.IsEmbarked) continue;
             if (mc != null && !mc.IsUnitVisibleForTeamNoCache(enemy, snapshot.AITeam)) continue;
 
             Vector3Int ec = enemy.CurrentCellPosition; ec.z = 0;

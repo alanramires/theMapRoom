@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
 using UnityEngine;
@@ -38,9 +38,9 @@ public partial class AIController
     private static readonly Dictionary<string, AIRallyHudSnapshot> rallyHudStates = new Dictionary<string, AIRallyHudSnapshot>();
     // Monitor da operação de invasão POR TIME (a força de invasão é team-global — união das
     // unidades nos objetivos de base inimiga, não atrelada a um rally específico).
-    private static readonly Dictionary<TeamId, InvasionMonitor> invasionMonitors = new Dictionary<TeamId, InvasionMonitor>();
+    private static readonly Dictionary<int, InvasionMonitor> invasionMonitors = new Dictionary<int, InvasionMonitor>();
     // Memória do FocusSector por time, para hysteresis (não drenar um rally que já monta massa).
-    private static readonly Dictionary<TeamId, ConstructionSector> rallyFocusMemory = new Dictionary<TeamId, ConstructionSector>();
+    private static readonly Dictionary<int, ConstructionSector> rallyFocusMemory = new Dictionary<int, ConstructionSector>();
 
     private struct InvasionMonitor
     {
@@ -159,7 +159,7 @@ public partial class AIController
             && IsRallyPointHeldByTeam(sector, aiTeam);
     }
 
-    // O ponto de rally do setor esta sob controle ATUAL da AI? (rally.TeamId == aiTeam — o "Slot ID"
+    // O ponto de rally do setor esta sob controle ATUAL da AI? (rally.SlotIndex == ResolveAISlotKey(aiTeam) — o "Slot ID"
     // atual do ponto, nao o "Rally Owner Slot" que e so a intencao de dono quando conquistado.)
     private static bool IsRallyPointHeldByTeam(ConstructionSector sector, TeamId aiTeam)
     {
@@ -167,7 +167,7 @@ public partial class AIController
             return false;
         foreach (ConstructionManager rally in ConstructionManager.AllActive)
             if (rally != null && rally.IsRallyPoint && rally.Sector == sector)
-                return rally.TeamId == aiTeam;
+                return rally.SlotIndex == ResolveAISlotKey(aiTeam);
         return false;
     }
 
@@ -231,7 +231,7 @@ public partial class AIController
         if (mc.ActiveTeam == aiTeam)
             return mc.ActivePlayerListIndex;
 
-        return mc.GetSlotIndexForTeam(aiTeam);
+        return ResolveAISlotKey(aiTeam);
     }
 
     private static void LogRallyReadiness(
@@ -285,7 +285,7 @@ public partial class AIController
 
         foreach (UnitManager unit in UnitManager.AllActive)
         {
-            if (unit == null || unit.TeamId != aiTeam || unit.IsDead || unit.IsEmbarked || !unit.gameObject.activeInHierarchy)
+            if (unit == null || unit.SlotIndex != ResolveAISlotKey(aiTeam) || unit.IsDead || unit.IsEmbarked || !unit.gameObject.activeInHierarchy)
                 continue;
             if (!unit.TryGetUnitData(out UnitData data) || data == null)
                 continue;
@@ -339,11 +339,11 @@ public partial class AIController
             readiness.Logistics = aggregate.Logistics;
         }
 
-        // HELD/conquistado = o DONO ATUAL do ponto de rally e a AI (rally.TeamId == aiTeam).
+        // HELD/conquistado = o DONO ATUAL do ponto de rally e a AI (rally.SlotIndex == ResolveAISlotKey(aiTeam)).
         // NAO basta ter unidade amiga perto nem maioria de predios laterais — o slot atual do
         // ponto tem que ser o da AI (== rally owner slot quando conquistado). Ex.: Hotel com
         // Slot ID=0(verde) e Rally Owner=1(vermelho) NAO esta held pelo vermelho.
-        readiness.Held = rally.TeamId == aiTeam;
+        readiness.Held = rally.SlotIndex == ResolveAISlotKey(aiTeam);
         readiness.VisibleThreats = CountVisibleEnemyThreatsNearRally(anchor, aiTeam, RallyAssemblyForceRadius + 1);
         readiness.KnownEnemyForce = CountLiveEnemyUnits(aiTeam);
         readiness.RequiredPackages = Mathf.Clamp(
@@ -443,7 +443,7 @@ public partial class AIController
         int slot = ResolveAISlotIndex(aiTeam, GetMatchController());
         foreach (ConstructionManager rally in ConstructionManager.AllActive)
         {
-            if (rally == null || !rally.IsRallyPoint || rally.TeamId != aiTeam)
+            if (rally == null || !rally.IsRallyPoint || rally.SlotIndex != ResolveAISlotKey(aiTeam))
                 continue;
             if (!IsRallyOwnedBySlot(rally, aiTeam, slot))
                 continue;
@@ -473,7 +473,8 @@ public partial class AIController
         // a não ser que outro rally o bata por margem folgada (>= RallyFocusSwitchMargin x). Sem isso,
         // a oscilação de massa local fazia o foco pular entre rallies e DRENAR o que já montava massa.
         ConstructionSector chosenFocus = bestFocusSector;
-        if (rallyFocusMemory.TryGetValue(aiTeam, out ConstructionSector prevFocus)
+        int aiSlotKey = ResolveAISlotKey(aiTeam);
+        if (rallyFocusMemory.TryGetValue(aiSlotKey, out ConstructionSector prevFocus)
             && prevFocus != ConstructionSector.None
             && prevFocus != bestFocusSector)
         {
@@ -487,11 +488,11 @@ public partial class AIController
         }
 
         aggregate.FocusSector = chosenFocus;
-        rallyFocusMemory[aiTeam] = chosenFocus;
+        rallyFocusMemory[aiSlotKey] = chosenFocus;
 
         foreach (UnitManager unit in UnitManager.AllActive)
         {
-            if (unit == null || unit.TeamId != aiTeam || unit.IsDead || unit.IsEmbarked
+            if (unit == null || unit.SlotIndex != ResolveAISlotKey(aiTeam) || unit.IsDead || unit.IsEmbarked
                 || !unit.gameObject.activeInHierarchy
                 || !unit.TryGetUnitData(out UnitData data) || data == null)
                 continue;
@@ -541,7 +542,7 @@ public partial class AIController
         float score = 0f;
         foreach (UnitManager unit in UnitManager.AllActive)
         {
-            if (unit == null || unit.TeamId != aiTeam || unit.IsDead || unit.IsEmbarked
+            if (unit == null || unit.SlotIndex != ResolveAISlotKey(aiTeam) || unit.IsDead || unit.IsEmbarked
                 || !unit.gameObject.activeInHierarchy
                 || !unit.TryGetUnitData(out UnitData data) || data == null)
                 continue;
@@ -577,7 +578,7 @@ public partial class AIController
         int count = 0;
         foreach (UnitManager enemy in UnitManager.AllActive)
         {
-            if (enemy == null || enemy.TeamId == aiTeam || enemy.IsDead || enemy.IsEmbarked)
+            if (enemy == null || enemy.SlotIndex == ResolveAISlotKey(aiTeam) || enemy.IsDead || enemy.IsEmbarked)
                 continue;
             if (mc != null && !mc.IsUnitVisibleForTeam(enemy, aiTeam))
                 continue;
@@ -606,7 +607,7 @@ public partial class AIController
         {
             UnitManager u = all[i];
             if (u == null || u.IsDead) continue;
-            if (u.TeamId == aiTeam || u.TeamId == TeamId.Neutral) continue;
+            if (u.SlotIndex == ResolveAISlotKey(aiTeam) || u.TeamId == TeamId.Neutral) continue;
             n++;
         }
         return n;
@@ -711,7 +712,7 @@ public partial class AIController
             // rallies assegurados para que feeders nao iniciem uma segunda montagem paralela.
             int slot = ResolveAISlotIndex(aiTeam, GetMatchController());
             foreach (ConstructionManager heldRally in ConstructionManager.AllActive)
-                if (heldRally != null && heldRally.IsRallyPoint && heldRally.TeamId == aiTeam
+                if (heldRally != null && heldRally.IsRallyPoint && heldRally.SlotIndex == ResolveAISlotKey(aiTeam)
                     && IsRallyOwnedBySlot(heldRally, aiTeam, slot))
                     RememberRallyGoGreen(aiTeam, heldRally.Sector, turnNumber);
         }
@@ -823,7 +824,7 @@ public partial class AIController
         int cleared = 0;
         foreach (UnitManager unit in UnitManager.AllActive)
         {
-            if (unit == null || unit.TeamId != aiTeam || unit.IsDead || slottedIds.Contains(unit.InstanceId))
+            if (unit == null || unit.SlotIndex != ResolveAISlotKey(aiTeam) || unit.IsDead || slottedIds.Contains(unit.InstanceId))
                 continue;
             if (!unit.AIHasAssignedPlan)
                 continue;
@@ -1096,14 +1097,14 @@ public partial class AIController
     {
         if (sector == ConstructionSector.None || turnNumber < 0)
             return;
-        rallyGoGreenTurns[$"{(int)aiTeam}:{sector}"] = turnNumber;
+        rallyGoGreenTurns[$"{ResolveAISlotKey(aiTeam)}:{sector}"] = turnNumber;
     }
 
     private static bool IsRallyGoGreenSuppressed(TeamId aiTeam, ConstructionSector sector, int turnNumber)
     {
         if (sector == ConstructionSector.None || turnNumber < 0)
             return false;
-        string key = $"{(int)aiTeam}:{sector}";
+        string key = $"{ResolveAISlotKey(aiTeam)}:{sector}";
         return rallyGoGreenTurns.TryGetValue(key, out int goTurn)
             && turnNumber - goTurn <= RallyGoGreenSuppressTurns;
     }
@@ -1120,6 +1121,9 @@ public partial class AIController
     }
 
     public static GoGreenInvasionInspection GetGoGreenInvasionForInspection(TeamId aiTeam, int turnNumber)
+        => GetGoGreenInvasionForInspection(PlayerSlotId.FromIndex(ResolveAISlotKey(aiTeam)), turnNumber);
+
+    public static GoGreenInvasionInspection GetGoGreenInvasionForInspection(PlayerSlotId aiSlot, int turnNumber)
     {
         var result = new GoGreenInvasionInspection
         {
@@ -1129,7 +1133,7 @@ public partial class AIController
         if (turnNumber < 0)
             return result;
 
-        string prefix = $"{(int)aiTeam}:";
+        string prefix = $"{aiSlot.Value}:";
         foreach (KeyValuePair<string, int> entry in rallyGoGreenTurns)
         {
             if (!entry.Key.StartsWith(prefix, System.StringComparison.Ordinal))
@@ -1160,11 +1164,18 @@ public partial class AIController
         TeamId aiTeam,
         List<ConstructionSector> sectorsOut,
         List<int> turnsOut)
+        => CollectGoGreenTurnsForSlot(
+            PlayerSlotId.FromIndex(ResolveAISlotKey(aiTeam)), sectorsOut, turnsOut);
+
+    public static void CollectGoGreenTurnsForSlot(
+        PlayerSlotId aiSlot,
+        List<ConstructionSector> sectorsOut,
+        List<int> turnsOut)
     {
         if (sectorsOut == null || turnsOut == null)
             return;
 
-        string prefix = $"{(int)aiTeam}:";
+        string prefix = $"{aiSlot.Value}:";
         foreach (KeyValuePair<string, int> entry in rallyGoGreenTurns)
         {
             if (!entry.Key.StartsWith(prefix, System.StringComparison.Ordinal))
@@ -1179,8 +1190,11 @@ public partial class AIController
     }
 
     public static void ClearGoGreenTurnsForTeam(TeamId aiTeam)
+        => ClearGoGreenTurnsForSlot(PlayerSlotId.FromIndex(ResolveAISlotKey(aiTeam)));
+
+    public static void ClearGoGreenTurnsForSlot(PlayerSlotId aiSlot)
     {
-        string prefix = $"{(int)aiTeam}:";
+        string prefix = $"{aiSlot.Value}:";
         var toRemove = new List<string>();
         foreach (string key in rallyGoGreenTurns.Keys)
             if (key.StartsWith(prefix, System.StringComparison.Ordinal))
@@ -1194,6 +1208,13 @@ public partial class AIController
         RememberRallyGoGreen(aiTeam, sector, turnNumber);
     }
 
+    public static void RestoreGoGreenTurn(PlayerSlotId aiSlot, ConstructionSector sector, int turnNumber)
+    {
+        if (!aiSlot.IsValid || sector == ConstructionSector.None || turnNumber < 0)
+            return;
+        rallyGoGreenTurns[$"{aiSlot.Value}:{sector}"] = turnNumber;
+    }
+
     // Acesso público pro semáforo (ConstructionManager): enquanto a operação está em voo (supressa),
     // o ponto de rally mostra verde — a luz segue a OPERAÇÃO, não a massa parada no ancoradouro.
     public static bool IsRallyGoGreenSuppressedForHud(TeamId aiTeam, ConstructionSector sector, int turnNumber)
@@ -1202,8 +1223,12 @@ public partial class AIController
     }
 
     public static void GetInvasionMonitorForSave(TeamId aiTeam, out int bestDistance, out int stallCounter)
+        => GetInvasionMonitorForSave(
+            PlayerSlotId.FromIndex(ResolveAISlotKey(aiTeam)), out bestDistance, out stallCounter);
+
+    public static void GetInvasionMonitorForSave(PlayerSlotId aiSlot, out int bestDistance, out int stallCounter)
     {
-        if (invasionMonitors.TryGetValue(aiTeam, out InvasionMonitor m))
+        if (invasionMonitors.TryGetValue(aiSlot.Value, out InvasionMonitor m))
         {
             bestDistance = m.BestDistance == int.MaxValue ? -1 : m.BestDistance;
             stallCounter = m.StallCounter;
@@ -1216,13 +1241,17 @@ public partial class AIController
     }
 
     public static void RestoreInvasionMonitor(TeamId aiTeam, int bestDistance, int stallCounter)
+        => RestoreInvasionMonitor(
+            PlayerSlotId.FromIndex(ResolveAISlotKey(aiTeam)), bestDistance, stallCounter);
+
+    public static void RestoreInvasionMonitor(PlayerSlotId aiSlot, int bestDistance, int stallCounter)
     {
         if (bestDistance < 0 && stallCounter <= 0)
         {
-            invasionMonitors.Remove(aiTeam);
+            invasionMonitors.Remove(aiSlot.Value);
             return;
         }
-        invasionMonitors[aiTeam] = new InvasionMonitor
+        invasionMonitors[aiSlot.Value] = new InvasionMonitor
         {
             BestDistance = bestDistance < 0 ? int.MaxValue : bestDistance,
             StallCounter = Mathf.Max(0, stallCounter)
@@ -1247,7 +1276,7 @@ public partial class AIController
         CollectGoGreenTurnsForTeam(aiTeam, ggSectors, ggTurns);
         if (ggTurns.Count == 0)
         {
-            invasionMonitors.Remove(aiTeam);
+            invasionMonitors.Remove(ResolveAISlotKey(aiTeam));
             return;
         }
         int earliestGoGreen = int.MaxValue;
@@ -1275,7 +1304,7 @@ public partial class AIController
         if (baseObj == null)
         {
             ClearGoGreenTurnsForTeam(aiTeam);
-            invasionMonitors.Remove(aiTeam);
+            invasionMonitors.Remove(ResolveAISlotKey(aiTeam));
             return;
         }
 
@@ -1297,7 +1326,8 @@ public partial class AIController
             if (!inContact) inContact = IsAdjacentToVisibleEnemy(c, snapshot);
         }
 
-        InvasionMonitor mon = invasionMonitors.TryGetValue(aiTeam, out InvasionMonitor prev)
+        int aiSlotKey = ResolveAISlotKey(aiTeam);
+        InvasionMonitor mon = invasionMonitors.TryGetValue(aiSlotKey, out InvasionMonitor prev)
             ? prev
             : new InvasionMonitor { BestDistance = int.MaxValue, StallCounter = 0 };
 
@@ -1327,7 +1357,7 @@ public partial class AIController
                 ") -> libera re-montagem (2ª onda); frente mantém posição");
             ReleaseGoGreenFallbackAssignments(plan, aiTeam);
             ClearGoGreenTurnsForTeam(aiTeam);   // solta supressão -> rallies reabrem montagem
-            invasionMonitors.Remove(aiTeam);
+            invasionMonitors.Remove(aiSlotKey);
             // Zera o marcador de GoGreen dos objetivos pra que a 2ª onda registre um GoGreen LIMPO
             // (re-estabelecendo a supressão) em vez de ser bloqueada pelo marcador da onda falha.
             foreach (SectorObjective obj in plan.Objectives)
@@ -1336,7 +1366,7 @@ public partial class AIController
             return;
         }
 
-        invasionMonitors[aiTeam] = mon;
+        invasionMonitors[aiSlotKey] = mon;
     }
 
     private Vector3Int ResolveInvasionTargetCell(SectorObjective baseObj, AIWorldSnapshot snapshot, TeamId aiTeam)
@@ -1524,7 +1554,7 @@ public partial class AIController
         int recruited = 0;
         foreach (UnitManager unit in UnitManager.AllActive)
         {
-            if (unit == null || unit.TeamId != aiTeam || unit.IsDead || unit.IsUnderRepair
+            if (unit == null || unit.SlotIndex != ResolveAISlotKey(aiTeam) || unit.IsDead || unit.IsUnderRepair
                 || assignedIds.Contains(unit.InstanceId)
                 || !unit.TryGetUnitData(out UnitData data) || data == null)
                 continue;

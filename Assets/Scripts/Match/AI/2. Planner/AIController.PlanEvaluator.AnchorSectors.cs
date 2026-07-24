@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -78,7 +78,7 @@ public partial class AIController
         {
             if (construction == null || !construction.IsPlayerHeadQuarter)
                 continue;
-            if (construction.TeamId != aiTeam)
+            if (construction.SlotIndex != ResolveAISlotKey(aiTeam))
                 continue;
             if (construction.SlotIndex < 0)
                 continue;

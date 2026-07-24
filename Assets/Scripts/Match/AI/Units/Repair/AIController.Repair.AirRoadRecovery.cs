@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -124,7 +124,7 @@ public partial class AIController
                     || logistics == aircraft
                     || logistics.IsDead
                     || logistics.IsEmbarked
-                    || logistics.TeamId != aircraft.TeamId)
+                    || logistics.SlotIndex != aircraft.SlotIndex)
                 {
                     continue;
                 }

@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -544,7 +544,7 @@ public partial class AIController
         {
             if (construction == null || construction.Sector != sector)
                 continue;
-            if (construction.TeamId == aiTeam && construction.IsPlayerHeadQuarter)
+            if (construction.SlotIndex == ResolveAISlotKey(aiTeam) && construction.IsPlayerHeadQuarter)
                 return true;
         }
 
@@ -586,7 +586,7 @@ public partial class AIController
             Vector3Int cc = construction.CurrentCellPosition; cc.z = 0;
             foreach (UnitManager enemy in UnitManager.AllActive)
             {
-                if (enemy.TeamId == aiTeam || enemy.IsDead || enemy.IsEmbarked)
+                if (enemy.SlotIndex == ResolveAISlotKey(aiTeam) || enemy.IsDead || enemy.IsEmbarked)
                     continue;
                 if (mc != null && !mc.IsUnitVisibleForTeam(enemy, aiTeam))
                     continue;
@@ -619,7 +619,7 @@ public partial class AIController
                 continue;
 
             Vector3Int cc = construction.CurrentCellPosition; cc.z = 0;
-            bool ownedHomeConstruction = construction.TeamId == aiTeam
+            bool ownedHomeConstruction = construction.SlotIndex == ResolveAISlotKey(aiTeam)
                 && (ownBaseSector || construction.IsPlayerHeadQuarter);
             bool underCapture = construction.IsCapturable
                 && construction.CapturePointsMax > 0
@@ -630,7 +630,7 @@ public partial class AIController
             {
                 foreach (UnitManager enemy in UnitManager.AllActive)
                 {
-                    if (enemy.TeamId == aiTeam || enemy.IsDead || enemy.IsEmbarked)
+                    if (enemy.SlotIndex == ResolveAISlotKey(aiTeam) || enemy.IsDead || enemy.IsEmbarked)
                         continue;
                     if (mc != null && !mc.IsUnitVisibleForTeam(enemy, aiTeam))
                         continue;
@@ -671,7 +671,7 @@ public partial class AIController
                 continue;
             if (!construction.IsCapturable || construction.CapturePointsMax <= 0)
                 continue;
-            if (construction.TeamId != aiTeam)
+            if (construction.SlotIndex != ResolveAISlotKey(aiTeam))
                 continue;
             if (construction.CurrentCapturePoints < construction.CapturePointsMax)
                 return true;

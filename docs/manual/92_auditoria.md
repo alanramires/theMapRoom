@@ -47,6 +47,8 @@ Os IDs seguem o mesmo esquema de `90_pendencias_tecnicas.md` e não são reaprov
 | COM-013 | Penalidade de ferido: −1 desfalcado, −2 com HP ≤ 5 | Confirmada | `TurnStateManager.Combat.cs:684` |
 | COM-014 | Escala de posição 0–4 e bônus −1/0/+2/+4/+6 | Confirmada | `DPQData.cs:55-79` + assets DPQ |
 | COM-015 | Alcance 0 é suportado pelo motor | Confirmada | `PodeMirarSensor.cs:100` e `:971`; mover-e-atirar corrigido em `:959-968` nesta sessão |
+| COM-016 | Posição/DPQ é resolvida pela célula, sem consultar dono — invasor no QG recebe Único (+6) | Confirmada | `Combat.cs:389-432` (`ResolveDpqAtUnitPosition`): camada → construção → estrutura → terreno, nenhuma checagem de propriedade |
+| COM-017 | Penalidade de ferido entra na defesa dos DOIS lados, simetricamente | Confirmada | `Combat.cs:309-312` |
 | FOW-010 | Montanha concede elevação 2 e bloqueia como 2,25 | Confirmada | `TerrainTypeData.cs:95-108` · `Montanha.asset` |
 | FOW-011 | Construção revela terreno no raio e detecta unidade só no próprio hex | Confirmada | `MatchController.cs:4674-4713` e `:6265` |
 | FOW-012 | Exposição de furtivo dura até o próximo turno do dono | Confirmada | `UnitManager.cs:977-994` |

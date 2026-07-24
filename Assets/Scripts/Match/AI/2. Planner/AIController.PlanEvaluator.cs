@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 // --------------------------------------------------------------------------------------------
@@ -1271,7 +1271,7 @@ public partial class AIController
                 MatchController mc = GetMatchController();
                 foreach (UnitManager enemy in UnitManager.AllActive)
                 {
-                    if (enemy.TeamId == aiTeam || enemy.IsDead || enemy.IsEmbarked) continue;
+                    if (enemy.SlotIndex == ResolveAISlotKey(aiTeam) || enemy.IsDead || enemy.IsEmbarked) continue;
                     if (mc != null && !mc.IsUnitVisibleForTeam(enemy, aiTeam)) continue;
                     Vector3Int ec = enemy.CurrentCellPosition; ec.z = 0;
                     if (SectorManager.HexDistance(ec, tc) <= alliesEnemyRange) enemyHp += enemy.CurrentHP;
@@ -1607,7 +1607,7 @@ public partial class AIController
                 if (slot.Filled) slottedIds.Add(slot.AssignedUnitId);
         foreach (UnitManager u in UnitManager.AllActive)
         {
-            if (u.TeamId != aiTeam || u.IsDead) continue;
+            if (u.SlotIndex != ResolveAISlotKey(aiTeam) || u.IsDead) continue;
             if (!slottedIds.Contains(u.InstanceId)) u.ClearAIAssignedPlan();
         }
 
@@ -1728,7 +1728,7 @@ public partial class AIController
         var presence = new Dictionary<int, int>();
         foreach (UnitManager u in UnitManager.AllActive)
         {
-            if (u == null || u.TeamId != aiTeam || u.IsDead)
+            if (u == null || u.SlotIndex != ResolveAISlotKey(aiTeam) || u.IsDead)
                 continue;
             int e = u.AIEixo;
             if (e <= 0)
@@ -1747,7 +1747,7 @@ public partial class AIController
         var map = new Dictionary<int, string>();
         foreach (UnitManager u in UnitManager.AllActive)
         {
-            if (u == null || u.TeamId != aiTeam || u.IsDead)
+            if (u == null || u.SlotIndex != ResolveAISlotKey(aiTeam) || u.IsDead)
                 continue;
             if (!u.AIHasAssignedPlan)
                 continue;

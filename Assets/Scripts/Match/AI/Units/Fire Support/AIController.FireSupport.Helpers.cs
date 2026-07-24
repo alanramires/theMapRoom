@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -294,7 +294,7 @@ public partial class AIController
         if (construction == null
             || !construction.IsCapturable
             || construction.CapturePointsMax <= 0
-            || (construction.TeamId == aiTeam && construction.CurrentCapturePoints >= construction.CapturePointsMax))
+            || (construction.SlotIndex == ResolveAISlotKey(aiTeam) && construction.CurrentCapturePoints >= construction.CapturePointsMax))
         {
             return false;
         }
@@ -312,7 +312,7 @@ public partial class AIController
 
         foreach (UnitManager candidate in UnitManager.AllActive)
         {
-            if (candidate == null || candidate.TeamId != aiTeam)
+            if (candidate == null || candidate.SlotIndex != ResolveAISlotKey(aiTeam))
                 continue;
             if (candidate.HasActed || candidate.IsDead || candidate.IsEmbarked || candidate.IsUnderRepair)
                 continue;
@@ -407,9 +407,9 @@ public partial class AIController
         if (target == null || construction == null || !construction.IsCapturable)
             return 0f;
 
-        bool ownedOrContested = construction.TeamId == aiTeam
-            || (construction.TeamId == aiTeam && construction.CurrentCapturePoints < construction.CapturePointsMax);
-        bool enemyHeld = construction.TeamId != aiTeam;
+        bool ownedOrContested = construction.SlotIndex == ResolveAISlotKey(aiTeam)
+            || (construction.SlotIndex == ResolveAISlotKey(aiTeam) && construction.CurrentCapturePoints < construction.CapturePointsMax);
+        bool enemyHeld = construction.SlotIndex != ResolveAISlotKey(aiTeam);
         float score = ownedOrContested ? 26000f : enemyHeld ? 12000f : 0f;
 
         if (target.TryGetUnitData(out UnitData targetData)

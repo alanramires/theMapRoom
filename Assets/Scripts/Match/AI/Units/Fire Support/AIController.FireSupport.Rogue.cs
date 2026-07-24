@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -260,7 +260,7 @@ public partial class AIController
                 foreach (PodeMirarTargetOption opt in sensorTargets)
                 {
                     UnitManager enemy = opt?.targetUnit;
-                    if (enemy == null || enemy.TeamId == snapshot.AITeam || enemy.IsDead || enemy.IsEmbarked)
+                    if (enemy == null || enemy.SlotIndex == snapshot.AISlotIndex || enemy.IsDead || enemy.IsEmbarked)
                         continue;
 
                     sensorTargetCount++;

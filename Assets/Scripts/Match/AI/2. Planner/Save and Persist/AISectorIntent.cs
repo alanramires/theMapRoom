@@ -1,17 +1,17 @@
-using System;
+ï»¿using System;
 using System.Collections.Generic;
 using UnityEngine;
 
 // --------------------------------------------------------------------------------------------
-// Analisa a situação tática de cada setor do mapa, classificando-os em termos de
-// intenção de controle (manter, atacar, defender, evitar, etc.) e relação estratégica
-// (base própria, base inimiga, natural, centro neutro, etc.). Essa análise
-// é baseada em múltiplas fontes de informação, incluindo o plano de objetivos da equipe,
-// o relatório de inteligência de campo e o estado atual do mapa. O resultado é um conjunto
-// de intenções de setor que guiam as decisões táticas do AI, como onde alocar unidades, 
-// onde esperar resistência, onde priorizar ataques, etc.
-// O processo é reavaliadodo a cada turno, garantindo que o AI se adapte às mudanças na situação 
-// do jogo e às novas informações de inteligência.
+// Analisa a situaÃ§Ã£o tÃ¡tica de cada setor do mapa, classificando-os em termos de
+// intenÃ§Ã£o de controle (manter, atacar, defender, evitar, etc.) e relaÃ§Ã£o estratÃ©gica
+// (base prÃ³pria, base inimiga, natural, centro neutro, etc.). Essa anÃ¡lise
+// Ã© baseada em mÃºltiplas fontes de informaÃ§Ã£o, incluindo o plano de objetivos da equipe,
+// o relatÃ³rio de inteligÃªncia de campo e o estado atual do mapa. O resultado Ã© um conjunto
+// de intenÃ§Ãµes de setor que guiam as decisÃµes tÃ¡ticas do AI, como onde alocar unidades,
+// onde esperar resistÃªncia, onde priorizar ataques, etc.
+// O processo Ã© reavaliadodo a cada turno, garantindo que o AI se adapte Ã s mudanÃ§as na situaÃ§Ã£o
+// do jogo e Ã s novas informaÃ§Ãµes de inteligÃªncia.
 // -------------------------------------------------------------------------------------------------
 
 public enum AISectorIntentKind
@@ -52,12 +52,12 @@ public class AISectorIntent
 
 public static class AISectorIntentAnalyzer
 {
-    private static readonly Dictionary<TeamId, Dictionary<ConstructionSector, AISectorIntent>> intentsByTeam =
-        new Dictionary<TeamId, Dictionary<ConstructionSector, AISectorIntent>>();
+    private static readonly Dictionary<int, Dictionary<ConstructionSector, AISectorIntent>> intentsBySlot =
+        new Dictionary<int, Dictionary<ConstructionSector, AISectorIntent>>();
 
     public static IReadOnlyDictionary<ConstructionSector, AISectorIntent> GetIntents(TeamId team)
     {
-        if (intentsByTeam.TryGetValue(team, out Dictionary<ConstructionSector, AISectorIntent> intents))
+        if (intentsBySlot.TryGetValue(AIController.ResolveAISlotKey(team), out Dictionary<ConstructionSector, AISectorIntent> intents))
             return intents;
         return null;
     }
@@ -65,14 +65,14 @@ public static class AISectorIntentAnalyzer
     public static bool TryGetIntent(TeamId team, ConstructionSector sector, out AISectorIntent intent)
     {
         intent = null;
-        return intentsByTeam.TryGetValue(team, out Dictionary<ConstructionSector, AISectorIntent> intents)
+        return intentsBySlot.TryGetValue(AIController.ResolveAISlotKey(team), out Dictionary<ConstructionSector, AISectorIntent> intents)
             && intents.TryGetValue(sector, out intent);
     }
 
     public static void RebuildAndLog(TeamId team, AIWorldSnapshot snapshot, TeamObjectivePlan plan, AIIntelReport intel, string source)
     {
         Dictionary<ConstructionSector, AISectorIntent> intents = Build(team, snapshot, plan, intel, source);
-        intentsByTeam[team] = intents;
+        intentsBySlot[snapshot != null ? snapshot.AISlotIndex : AIController.ResolveAISlotKey(team)] = intents;
         Log(team, snapshot != null ? snapshot.TurnNumber : 0, source, intents);
     }
 

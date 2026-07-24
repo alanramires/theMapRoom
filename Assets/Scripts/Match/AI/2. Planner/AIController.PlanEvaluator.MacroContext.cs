@@ -37,8 +37,8 @@ public partial class AIController
 
     // Último macro context calculado por time (com força). O painel de inspeção lê DAQUI pra mostrar
     // exatamente o que a AI decidiu (a inspeção não tem intel pra recomputar a força sozinha).
-    private static readonly Dictionary<TeamId, AIMacroTerritoryContext> s_lastMacroByTeam
-        = new Dictionary<TeamId, AIMacroTerritoryContext>();
+    private static readonly Dictionary<int, AIMacroTerritoryContext> s_lastMacroBySlot
+        = new Dictionary<int, AIMacroTerritoryContext>();
 
     private static AIMacroTerritoryContext BuildMacroTerritoryContext(
         TeamId aiTeam,
@@ -62,7 +62,7 @@ public partial class AIController
 
         if (sectors == null || sectors.Count == 0)
         {
-            s_lastMacroByTeam[aiTeam] = ctx;
+            s_lastMacroBySlot[ResolveAISlotKey(aiTeam)] = ctx;
             return ctx;
         }
 
@@ -100,7 +100,7 @@ public partial class AIController
         {
             ctx.Phase = AIMacroTerritoryPhase.EarlyExpansion;
             ctx.AppliesCap = false;
-            s_lastMacroByTeam[aiTeam] = ctx;
+            s_lastMacroBySlot[ResolveAISlotKey(aiTeam)] = ctx;
             return ctx;
         }
 
@@ -127,7 +127,7 @@ public partial class AIController
             ctx.AppliesCap = false;
         }
 
-        s_lastMacroByTeam[aiTeam] = ctx;
+        s_lastMacroBySlot[ResolveAISlotKey(aiTeam)] = ctx;
         return ctx;
     }
 
@@ -186,7 +186,7 @@ public partial class AIController
     {
         // Prefere o último valor REAL calculado no plano (com força). Só recomputa sector-only se a
         // AI ainda não rodou o plano pra esse time (cache vazio) — aí sem dados de força (0/0).
-        if (!s_lastMacroByTeam.TryGetValue(team, out AIMacroTerritoryContext ctx))
+        if (!s_lastMacroBySlot.TryGetValue(ResolveAISlotKey(team), out AIMacroTerritoryContext ctx))
             ctx = BuildMacroTerritoryContext(team, SectorManager.GetAllSectorInfos(), 6, 0, 0);
 
         string label;

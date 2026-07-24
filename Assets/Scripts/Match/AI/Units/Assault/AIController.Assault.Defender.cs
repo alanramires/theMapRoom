@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -39,7 +39,7 @@ public partial class AIController
         MatchController mc = GetMatchController();
         foreach (UnitManager enemy in UnitManager.AllActive)
         {
-            if (enemy.TeamId == aiTeam || enemy.IsDead || enemy.IsEmbarked) continue;
+            if (enemy.SlotIndex == ResolveAISlotKey(aiTeam) || enemy.IsDead || enemy.IsEmbarked) continue;
             if (mc != null && !mc.IsUnitVisibleForTeam(enemy, aiTeam)) continue;
 
             Vector3Int ec = enemy.CurrentCellPosition; ec.z = 0;
@@ -60,7 +60,7 @@ public partial class AIController
         MatchController mc = GetMatchController();
         foreach (UnitManager enemy in UnitManager.AllActive)
         {
-            if (enemy.TeamId == aiTeam || enemy.IsDead || enemy.IsEmbarked) continue;
+            if (enemy.SlotIndex == ResolveAISlotKey(aiTeam) || enemy.IsDead || enemy.IsEmbarked) continue;
             if (mc != null && !mc.IsUnitVisibleForTeam(enemy, aiTeam)) continue;
             if (threats.Contains(enemy)) continue;
 
@@ -531,7 +531,7 @@ public partial class AIController
         if (construction == null || !construction.IsCapturable || construction.CapturePointsMax <= 0)
             return false;
 
-        return construction.TeamId != aiTeam
+        return construction.SlotIndex != ResolveAISlotKey(aiTeam)
             || construction.CurrentCapturePoints < construction.CapturePointsMax;
     }
 

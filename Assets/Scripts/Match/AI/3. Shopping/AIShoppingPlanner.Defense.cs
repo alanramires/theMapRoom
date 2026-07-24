@@ -361,7 +361,7 @@ public partial class AIShoppingPlanner
 
     private static bool IsCriticalHomeConstruction(ConstructionManager building, TeamId aiTeam)
     {
-        if (building == null || building.TeamId != aiTeam)
+        if (building == null || building.SlotIndex != AIController.ResolveAISlotKey(aiTeam))
             return false;
         return building.IsPlayerHeadQuarter || ConstructionSectorHelper.IsBase(building.Sector);
     }

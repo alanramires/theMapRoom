@@ -370,7 +370,7 @@ public partial class AIShoppingPlanner
         int count = 0;
         foreach (UnitManager manager in UnitManager.AllActive)
         {
-            if (manager == null || manager.TeamId != aiTeam || manager.IsDead)
+            if (manager == null || manager.SlotIndex != AIController.ResolveAISlotKey(aiTeam) || manager.IsDead)
                 continue;
             if (!manager.TryGetUnitData(out UnitData data) || data == null
                 || data.roles == null || data.roles.Count == 0

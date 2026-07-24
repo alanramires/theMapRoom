@@ -5,7 +5,7 @@ using UnityEngine;
 [Serializable]
 public class SaveGameData
 {
-    public int version = 12;
+    public int version = 13;
     public string sceneName;
     public long savedAtUtcTicks;
     public int currentTurn;
@@ -33,6 +33,7 @@ public class SaveGameData
     public AIPlannerMultiTeamSaveData aiPlannerState;
     public List<AIObjectivePlanSaveData> aiObjectivePlans = new List<AIObjectivePlanSaveData>();
     public bool aiRuntimeActive;
+    public int aiRuntimeSlotIndex = -1;
     public int aiRuntimeTeamId = (int)TeamId.Neutral;
     public int aiRuntimeTurnNumber;
     public int aiRuntimeStage;
@@ -163,6 +164,7 @@ public class MatchVictoryStarSaveData
 [Serializable]
 public class AIObjectivePlanSaveData
 {
+    public int slotIndex = -1;
     public int teamId;
     public List<AIObjectiveSaveData> objectives = new List<AIObjectiveSaveData>();
     public List<int> rogueUnitIds = new List<int>();

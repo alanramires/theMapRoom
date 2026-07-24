@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -138,7 +138,7 @@ public partial class AIController
         for (int i = 0; i < ConstructionManager.AllActive.Count; i++)
         {
             ConstructionManager building = ConstructionManager.AllActive[i];
-            if (building == null || building.TeamId != snapshot.AITeam)
+            if (building == null || building.SlotIndex != snapshot.AISlotIndex)
                 continue;
             if (building.CurrentCapturePoints < building.CapturePointsMax)
                 continue;
@@ -185,7 +185,7 @@ public partial class AIController
     private static bool IsLogisticsHomeConstruction(ConstructionManager construction, TeamId aiTeam)
     {
         return construction != null
-            && construction.TeamId == aiTeam
+            && construction.SlotIndex == ResolveAISlotKey(aiTeam)
             && (construction.IsPlayerHeadQuarter || ConstructionSectorHelper.IsBase(construction.Sector));
     }
 

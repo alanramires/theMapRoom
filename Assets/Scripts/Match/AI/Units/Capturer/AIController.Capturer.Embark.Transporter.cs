@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -43,7 +43,7 @@ public partial class AIController
 
         tCell.z = 0;
         UnitManager transporter = ResolveEmbarkTransporterAtCell(unit, tCell, expectedTransporter);
-        if (transporter == null || transporter.TeamId != unit.TeamId) return false;
+        if (transporter == null || transporter.SlotIndex != unit.SlotIndex) return false;
         if (transporter.IsDead || transporter.IsEmbarked || transporter.IsUnderRepair) return false;
         if (!transporter.TryGetUnitData(out UnitData tData) || !tData.isTransporter) return false;
         if (!PodeEmbarcarSensor.CanEmbarkAtTransporterContext(

@@ -262,6 +262,7 @@ public partial class AIController : MonoBehaviour
     [Header("Em tempo de execu��o (Debug)")]
     [SerializeField, Range(0, 4)] private int currentAIStage;
     [SerializeField] private TeamId currentAITeam = TeamId.Neutral;
+    [SerializeField] private int currentAISlotIndex = -1;
 
     // Debugging
     private enum DebugStepRequest
@@ -279,6 +280,20 @@ public partial class AIController : MonoBehaviour
             ? $"[AI {aiTeamTag}][T{aiTurnNumber}]"
             : $"[AI {aiTeamTag}][T{aiTurnNumber}][{category}]";
 
+    internal static int ResolveAISlotKey(TeamId visualTeam)
+    {
+        MatchController match = UnityEngine.Object.FindAnyObjectByType<MatchController>();
+        if (match == null)
+            return -1;
+        PlayerSlotId activeSlot = match.ActiveSlotId;
+        if (match.IsValidPlayerSlot(activeSlot) &&
+            match.GetVisualTeamForSlot(activeSlot) == visualTeam)
+            return activeSlot.Value;
+        return match.TryGetUniqueSlotForTeam(visualTeam, out PlayerSlotId uniqueSlot)
+            ? uniqueSlot.Value
+            : -1;
+    }
+
     // Propriedades p�blicas
   
     public static bool IsDebugPaused { get; private set; }
@@ -286,11 +301,27 @@ public partial class AIController : MonoBehaviour
     public bool IsAIRuntimeActive => isActive;
     public int CurrentAIStage => currentAIStage;
     public TeamId CurrentAITeam => currentAITeam;
+    public PlayerSlotId CurrentAISlotId => PlayerSlotId.FromIndex(currentAISlotIndex);
     public int CurrentAITurnNumber => aiTurnNumber;
 
     public void RestoreAIRuntimeState(bool active, TeamId team, int turnNumber, int stage)
     {
+        int slotIndex = -1;
+        if (matchController != null &&
+            matchController.TryGetUniqueSlotForTeam(team, out PlayerSlotId migratedSlot))
+            slotIndex = migratedSlot.Value;
+        RestoreAIRuntimeState(active, PlayerSlotId.FromIndex(slotIndex), team, turnNumber, stage);
+    }
+
+    public void RestoreAIRuntimeState(
+        bool active,
+        PlayerSlotId slot,
+        TeamId team,
+        int turnNumber,
+        int stage)
+    {
         isActive = active;
+        currentAISlotIndex = slot.Value;
         currentAITeam = team;
         aiTurnNumber = turnNumber;
         currentAIStage = Mathf.Clamp(stage, 0, 4);

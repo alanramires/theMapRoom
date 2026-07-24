@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -111,7 +111,7 @@ public partial class AIController
         float nearest = float.MaxValue;
         foreach (UnitManager ally in UnitManager.AllActive)
         {
-            if (ally == null || ally == unit || ally.TeamId != snapshot.AITeam || ally.IsDead || ally.IsEmbarked)
+            if (ally == null || ally == unit || ally.SlotIndex != snapshot.AISlotIndex || ally.IsDead || ally.IsEmbarked)
                 continue;
             if (!ally.TryGetUnitData(out UnitData data) || data == null || data.roles == null || data.roles.Count == 0)
                 continue;
@@ -256,10 +256,10 @@ public partial class AIController
                     firstNoTarget = $"{rally.Sector}/{rally.name} owner={ownerSlot}";
                 continue;
             }
-            // Conquistado = o DONO ATUAL do ponto de rally e a AI (rally.TeamId == aiTeam). NAO
+            // Conquistado = o DONO ATUAL do ponto de rally e a AI (rally.SlotIndex == ResolveAISlotKey(aiTeam)). NAO
             // basta unidade amiga perto nem maioria de predios laterais. Ex.: Hotel com Slot ID=
             // verde e Rally Owner=vermelho NAO esta held pelo vermelho.
-            if (rally.TeamId != aiTeam)
+            if (rally.SlotIndex != ResolveAISlotKey(aiTeam))
             {
                 skippedNotHeld++;
                 continue;

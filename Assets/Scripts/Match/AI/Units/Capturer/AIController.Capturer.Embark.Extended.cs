@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -75,7 +75,7 @@ public partial class AIController
     {
         foreach (UnitManager transporter in UnitManager.AllActive)
         {
-            if (transporter == null || transporter == unit || transporter.TeamId != unit.TeamId)
+            if (transporter == null || transporter == unit || transporter.SlotIndex != unit.SlotIndex)
                 continue;
             if (transporter.IsDead || transporter.IsEmbarked || transporter.IsUnderRepair)
                 continue;

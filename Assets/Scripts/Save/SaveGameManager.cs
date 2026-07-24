@@ -1852,11 +1852,19 @@ public class SaveGameManager : MonoBehaviour
                         data.aiConscriptionDoctrine);
                 aiController.MassacrePhaseActive = data.aiMassacrePhase;
                 TeamId restoredAiTeam = (TeamId)data.aiRuntimeTeamId;
-                if (matchController != null && !matchController.IsPlayerAI(restoredAiTeam) &&
-                    matchController.TryGetFirstAITeam(out TeamId configuredAiTeam))
-                    restoredAiTeam = configuredAiTeam;
+                PlayerSlotId restoredAiSlot = PlayerSlotId.FromIndex(data.aiRuntimeSlotIndex);
+                if (matchController != null && !matchController.IsValidPlayerSlot(restoredAiSlot))
+                {
+                    if (matchController.TryGetUniqueSlotForTeam(restoredAiTeam, out PlayerSlotId migratedSlot))
+                        restoredAiSlot = migratedSlot;
+                    else if (matchController.IsActiveTeamAI())
+                        restoredAiSlot = matchController.ActiveSlotId;
+                }
+                if (matchController != null && matchController.IsValidPlayerSlot(restoredAiSlot))
+                    restoredAiTeam = matchController.GetVisualTeamForSlot(restoredAiSlot);
                 aiController.RestoreAIRuntimeState(
                     data.aiRuntimeActive,
+                    restoredAiSlot,
                     restoredAiTeam,
                     data.aiRuntimeTurnNumber,
                     data.aiRuntimeStage);
@@ -2032,6 +2040,7 @@ public class SaveGameManager : MonoBehaviour
             fogConstructionMemory = new List<FogConstructionMemorySaveData>(),
             aiObjectivePlans = ObjectiveManager.BuildSaveData(),
             aiRuntimeActive = aiController != null && aiController.IsAIRuntimeActive,
+            aiRuntimeSlotIndex = aiController != null ? aiController.CurrentAISlotId.Value : -1,
             aiRuntimeTeamId = aiController != null ? (int)aiController.CurrentAITeam : (int)TeamId.Neutral,
             aiRuntimeTurnNumber = aiController != null ? aiController.CurrentAITurnNumber : 0,
             aiRuntimeStage = aiController != null ? aiController.CurrentAIStage : 0,

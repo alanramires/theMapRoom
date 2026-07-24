@@ -541,7 +541,7 @@ public partial class AIShoppingPlanner
         int count = 0;
         foreach (UnitManager unit in UnitManager.AllActive)
         {
-            if (unit == null || unit.TeamId != aiTeam || unit.IsDead || unit.IsEmbarked)
+            if (unit == null || unit.SlotIndex != AIController.ResolveAISlotKey(aiTeam) || unit.IsDead || unit.IsEmbarked)
                 continue;
             if (!unit.TryGetUnitData(out UnitData data) || data == null || data.domain != domain)
                 continue;

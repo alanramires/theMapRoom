@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -9,7 +9,7 @@ public partial class AIController
         MatchController mc = GetMatchController();
         foreach (UnitManager enemy in UnitManager.AllActive)
         {
-            if (enemy.TeamId == aiTeam || enemy.IsDead || enemy.IsEmbarked) continue;
+            if (enemy.SlotIndex == ResolveAISlotKey(aiTeam) || enemy.IsDead || enemy.IsEmbarked) continue;
             if (mc != null && !mc.IsUnitVisibleForTeam(enemy, aiTeam)) continue;
             enemies.Add(enemy);
         }

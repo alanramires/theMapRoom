@@ -29,7 +29,7 @@ public partial class AIController
                 || ally == logistics
                 || ally.IsDead
                 || ally.IsEmbarked
-                || ally.TeamId != logistics.TeamId
+                || ally.SlotIndex != logistics.SlotIndex
                 || ally.ReceivedSuppliesThisTurn)
                 continue;
 
@@ -401,7 +401,7 @@ public partial class AIController
                     || target == unit
                     || target.IsDead
                     || target.IsEmbarked
-                    || target.TeamId != unit.TeamId
+                    || target.SlotIndex != unit.SlotIndex
                     || target.ReceivedSuppliesThisTurn)
                     continue;
                 if (!seen.Add(target.InstanceId))
@@ -855,7 +855,7 @@ public partial class AIController
             || target == logistics
             || target.IsDead
             || target.IsEmbarked
-            || target.TeamId != logistics.TeamId
+            || target.SlotIndex != logistics.SlotIndex
             || target.ReceivedSuppliesThisTurn)
             return false;
 
@@ -899,7 +899,7 @@ public partial class AIController
                 || ally == logistics
                 || ally.IsDead
                 || ally.IsEmbarked
-                || ally.TeamId != logistics.TeamId
+                || ally.SlotIndex != logistics.SlotIndex
                 || ally.ReceivedSuppliesThisTurn
                 || !ally.IsUnderRepair)
                 continue;
@@ -1126,7 +1126,7 @@ public partial class AIController
                 || ally.IsDead
                 || ally.IsEmbarked
                 || ally.IsUnderRepair
-                || ally.TeamId != target.TeamId
+                || ally.SlotIndex != target.SlotIndex
                 || !ally.TryGetUnitData(out UnitData allyData)
                 || allyData != targetData)
                 continue;

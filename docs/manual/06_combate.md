@@ -24,6 +24,12 @@ Duas consequências caem de graça, e as duas são corretas para o que a arma re
 
 **Não existe revide no alcance 0.** O contra-ataque é lei de alcance 1, universal, sem exceção. Então um ataque no próprio hexágono é sempre unilateral. A resposta do submarino nunca foi revidar — é não ter sido encontrado.
 
+E a recíproca vale igual: **uma arma de alcance mínimo 0 também não serve para revidar.** O revide exige alcance mínimo exatamente 1, então a arma que alcança o próprio hexágono está fora dos dois lados da conta — ela não provoca resposta e não pode ser a resposta.
+
+A fragata mostra isso na prática, e é por isso que ela carrega duas armas. A carga de profundidade opera de 0 a 2 e é o que ela usa para caçar; quando **ela** é atacada, quem responde é o canhão de convés, de alcance 1. Sem essa segunda arma, a fragata seria uma unidade que nunca revida. Vale a regra geral: qualquer unidade que queira responder ao fogo precisa de pelo menos uma arma de alcance mínimo 1, por mais completo que seja o resto do arsenal dela.
+
+Uma observação de vocabulário, porque a distância confunde: alcance 0 não é combate corpo a corpo. Mecanicamente é **um ataque à distância cuja distância é zero** — a separação entre atacante e alvo é vertical, não horizontal. Por isso ele se comporta como tiro, e não como agarrão.
+
 **A superfície ocupada prende quem está embaixo.** O submarino atingido precisa emergir, e não consegue: o hexágono já tem um navio na superfície. A emersão fica pendente, ele permanece submerso porém revelado, e o relógio da exposição não corre enquanto isso durar. Enquanto a fragata ficar em cima dele, ele fica marcado. É o contato mantido pela escolta, e ele emerge das regras que você já conhece, sem nenhuma regra nova.
 
 ### Cada Ataque É Um Duelo
@@ -57,6 +63,20 @@ Desfavorável · Padrão · Melhorado · Favorável · Único
 Na montanha, você está em posição Favorável. Na floresta ou numa cidade, posição Melhorada. Na estrada ou na praia, posição Desfavorável. Planície, mar, Air/Low e o domínio submerso contido no mar são posição Padrão — tudo funciona como se espera. O espaço aéreo Air/High é posição Melhorada. O Quartel General é Único — a construção suprema do jogo.
 
 Não pense em terreno. Pense em posição. E se você consegue pensar em posição, consegue avaliar qualquer combate pela diferença entre onde o atacante e o defensor estão.
+
+### De Onde Vem a Sua Posição
+
+Duas regras resolvem isso, e a ordem entre elas importa.
+
+**Primeiro: quem está no ar ou submerso tira a posição da camada, não do chão.** Uma aeronave sobre o Quartel General não está no Quartel General — ela está em Air/High ou Air/Low, e é a camada que define a posição dela. O caça sobrevoando o QG inimigo tem a posição de Air/High, **não** o Único da construção lá embaixo. O mesmo vale para o submarino submerso: ele tira a posição das profundezas, e não do porto que estiver na superfície acima dele.
+
+Isso decorre direto do modelo de andares: o que está no chão pertence a outro andar, e você não se abriga numa fortificação que não está ocupando.
+
+**Depois, para quem está na superfície: a posição pertence ao lugar, não ao dono.** Resolvida a camada, vale o que houver na célula — construção, depois estrutura, depois terreno —, e a bandeira hasteada ali não muda nada. A montanha dá Favorável a qualquer um que suba, a cidade dá Melhorado a qualquer um que entre, e o Quartel General dá Único a qualquer unidade **de superfície** que o ocupe, inclusive ao invasor.
+
+A consequência incomoda à primeira vista e é deliberada: a tropa inimiga que toma o hexágono do seu QG passa a defender de dentro da fortificação, com os mesmos +6 que protegiam você. Não é um bônus de propriedade que trocou de mãos por engano — é que o concreto não sabe de quem é a bandeira. Quem tomou a fortaleza defende dela; quem quer retomá-la ataca contra ela.
+
+Junte as duas regras e o quadro operacional aparece: bombardear o QG com aviação não enfrenta os +6, mas **tomar** o QG com infantaria significa enfrentá-los — e, depois de tomado, defendê-lo com eles a seu favor.
 
 ### A Diferença de Qualidade de Posição (DPQ)
 

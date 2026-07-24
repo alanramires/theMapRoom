@@ -105,6 +105,7 @@ public class SectorObjective
 [System.Serializable]
 public class TeamObjectivePlan
 {
+    public int                   SlotIndex = -1;
     public TeamId                Team;
     public List<SectorObjective> Objectives   = new List<SectorObjective>();
     public List<int>             RogueUnitIds = new List<int>();
@@ -167,28 +168,46 @@ public class ObjectiveManager : MonoBehaviour
 
     public static TeamObjectivePlan GetPlanForTeam(TeamId team)
     {
+        return TryResolveSlot(team, out PlayerSlotId slot) ? GetPlanForSlot(slot) : null;
+    }
+
+    public static TeamObjectivePlan GetPlanForSlot(PlayerSlotId slot)
+    {
         ObjectiveManager m = EnsureInstance();
         foreach (TeamObjectivePlan p in m.plans)
-            if (p.Team == team) return p;
+            if (p.SlotIndex == slot.Value) return p;
         return null;
     }
 
     public static TeamObjectivePlan GetOrCreatePlanForTeam(TeamId team)
     {
+        if (!TryResolveSlot(team, out PlayerSlotId slot))
+            return null;
+        return GetOrCreatePlanForSlot(slot, team);
+    }
+
+    public static TeamObjectivePlan GetOrCreatePlanForSlot(PlayerSlotId slot, TeamId visualTeam)
+    {
         ObjectiveManager m = EnsureInstance();
         foreach (TeamObjectivePlan p in m.plans)
-            if (p.Team == team) return p;
-        TeamObjectivePlan newPlan = new TeamObjectivePlan { Team = team };
+            if (p.SlotIndex == slot.Value) return p;
+        TeamObjectivePlan newPlan = new TeamObjectivePlan { SlotIndex = slot.Value, Team = visualTeam };
         m.plans.Add(newPlan);
         return newPlan;
     }
 
     public static void ClearPlanForTeam(TeamId team)
     {
+        if (TryResolveSlot(team, out PlayerSlotId slot))
+            ClearPlanForSlot(slot);
+    }
+
+    public static void ClearPlanForSlot(PlayerSlotId slot)
+    {
         ObjectiveManager m = EnsureInstance();
         foreach (TeamObjectivePlan p in m.plans)
         {
-            if (p.Team != team) continue;
+            if (p.SlotIndex != slot.Value) continue;
             p.Objectives.Clear();
             p.RogueUnitIds.Clear();
             return;
@@ -207,6 +226,7 @@ public class ObjectiveManager : MonoBehaviour
             var savedPlan = new AIObjectivePlanSaveData
             {
                 teamId = (int)plan.Team,
+                slotIndex = plan.SlotIndex,
                 rogueUnitIds = plan.RogueUnitIds != null ? new List<int>(plan.RogueUnitIds) : new List<int>(),
                 handoffVacaterIds = plan.HandoffVacaterIds != null ? new List<int>(plan.HandoffVacaterIds) : new List<int>()
             };
@@ -221,14 +241,15 @@ public class ObjectiveManager : MonoBehaviour
             // que o rally é removido no GoGreen): exporta para persistir a invasão em andamento.
             var goGreenSectors = new List<ConstructionSector>();
             var goGreenTurns = new List<int>();
-            AIController.CollectGoGreenTurnsForTeam(plan.Team, goGreenSectors, goGreenTurns);
+            PlayerSlotId planSlot = PlayerSlotId.FromIndex(plan.SlotIndex);
+            AIController.CollectGoGreenTurnsForSlot(planSlot, goGreenSectors, goGreenTurns);
             for (int i = 0; i < goGreenSectors.Count; i++)
                 savedPlan.goGreenTurns.Add(new AIGoGreenTurnSaveData
                 {
                     sector = (int)goGreenSectors[i],
                     turn = goGreenTurns[i]
                 });
-            AIController.GetInvasionMonitorForSave(plan.Team, out int invBest, out int invStall);
+            AIController.GetInvasionMonitorForSave(planSlot, out int invBest, out int invStall);
             savedPlan.invasionBestDistance = invBest;
             savedPlan.invasionStallCounter = invStall;
 
@@ -296,8 +317,11 @@ public class ObjectiveManager : MonoBehaviour
 
             var plan = new TeamObjectivePlan
             {
+                SlotIndex = ResolveSavedSlot(savedPlan),
                 Team = (TeamId)savedPlan.teamId
             };
+            if (plan.SlotIndex < 0)
+                continue;
 
             if (savedPlan.rogueUnitIds != null)
                 plan.RogueUnitIds.AddRange(savedPlan.rogueUnitIds);
@@ -311,17 +335,18 @@ public class ObjectiveManager : MonoBehaviour
 
             // Repõe o estado GoGreen/Invasão estático. Limpa as entradas do time antes para o load
             // não acumular sobre uma partida anterior em memória.
-            AIController.ClearGoGreenTurnsForTeam(plan.Team);
+            PlayerSlotId planSlot = PlayerSlotId.FromIndex(plan.SlotIndex);
+            AIController.ClearGoGreenTurnsForSlot(planSlot);
             if (savedPlan.goGreenTurns != null)
             {
                 foreach (AIGoGreenTurnSaveData gg in savedPlan.goGreenTurns)
                 {
                     if (gg == null)
                         continue;
-                    AIController.RestoreGoGreenTurn(plan.Team, (ConstructionSector)gg.sector, gg.turn);
+                    AIController.RestoreGoGreenTurn(planSlot, (ConstructionSector)gg.sector, gg.turn);
                 }
             }
-            AIController.RestoreInvasionMonitor(plan.Team, savedPlan.invasionBestDistance, savedPlan.invasionStallCounter);
+            AIController.RestoreInvasionMonitor(planSlot, savedPlan.invasionBestDistance, savedPlan.invasionStallCounter);
 
             if (savedPlan.objectives != null)
             {
@@ -373,5 +398,26 @@ public class ObjectiveManager : MonoBehaviour
 
             m.plans.Add(plan);
         }
+    }
+
+    private static bool TryResolveSlot(TeamId team, out PlayerSlotId slot)
+    {
+        slot = PlayerSlotId.Invalid;
+        MatchController match = FindAnyObjectByType<MatchController>();
+        if (match == null)
+            return false;
+        slot = match.ActiveSlotId;
+        if (match.IsValidPlayerSlot(slot) && match.GetVisualTeamForSlot(slot) == team)
+            return true;
+        return match.TryGetUniqueSlotForTeam(team, out slot);
+    }
+
+    private static int ResolveSavedSlot(AIObjectivePlanSaveData savedPlan)
+    {
+        if (savedPlan.slotIndex >= 0)
+            return savedPlan.slotIndex;
+        return TryResolveSlot((TeamId)savedPlan.teamId, out PlayerSlotId slot)
+            ? slot.Value
+            : -1;
     }
 }

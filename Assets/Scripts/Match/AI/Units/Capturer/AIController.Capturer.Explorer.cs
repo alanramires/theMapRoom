@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -32,7 +32,7 @@ public partial class AIController
         {
             bool hiddenObjectiveOccupant = false;
             UnitManager occupant = HexOccupancyQuery.FindUnitAtCell(targetCell);
-            if (occupant != null && occupant.TeamId != snapshot.AITeam)
+            if (occupant != null && occupant.SlotIndex != snapshot.AISlotIndex)
             {
                 MatchController mc = GetMatchController();
                 if (mc == null || !mc.IsUnitVisibleForTeam(occupant, snapshot.AITeam))
@@ -317,7 +317,7 @@ public partial class AIController
 
         foreach (UnitManager enemy in UnitManager.AllActive)
         {
-            if (enemy == null || enemy.TeamId == snapshot.AITeam || enemy.IsDead || enemy.IsEmbarked)
+            if (enemy == null || enemy.SlotIndex == snapshot.AISlotIndex || enemy.IsDead || enemy.IsEmbarked)
                 continue;
             if (mc != null && !mc.IsUnitVisibleForTeam(enemy, snapshot.AITeam))
                 continue;

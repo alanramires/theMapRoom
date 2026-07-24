@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -322,7 +322,7 @@ public partial class AIController
     {
         cell.z = 0;
         ConstructionManager construction = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, cell);
-        return construction != null && construction.TeamId == aiTeam;
+        return construction != null && construction.SlotIndex == ResolveAISlotKey(aiTeam);
     }
 
     private static int ResolveIntelAirVision(UnitManager unit)

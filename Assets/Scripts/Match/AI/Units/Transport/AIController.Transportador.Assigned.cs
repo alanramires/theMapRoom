@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -220,7 +220,7 @@ public partial class AIController
         float bestScore = float.MinValue;
         foreach (ConstructionManager building in ConstructionManager.AllActive)
         {
-            if (building == null || !building.IsCapturable || building.TeamId != aiTeam)
+            if (building == null || !building.IsCapturable || building.SlotIndex != ResolveAISlotKey(aiTeam))
                 continue;
 
             Vector3Int buildingCell = building.CurrentCellPosition;
@@ -237,7 +237,7 @@ public partial class AIController
 
             foreach (UnitManager enemy in enemies)
             {
-                if (enemy == null || enemy.IsDead || enemy.IsEmbarked || enemy.TeamId == aiTeam)
+                if (enemy == null || enemy.IsDead || enemy.IsEmbarked || enemy.SlotIndex == ResolveAISlotKey(aiTeam))
                     continue;
 
                 Vector3Int enemyCell = enemy.CurrentCellPosition;
@@ -350,7 +350,7 @@ public partial class AIController
                 continue;
             if (target == null || !target.IsCapturable || target.CapturePointsMax <= 0)
                 continue;
-            if (target.TeamId == snapshot.AITeam && target.CurrentCapturePoints >= target.CapturePointsMax)
+            if (target.SlotIndex == snapshot.AISlotIndex && target.CurrentCapturePoints >= target.CapturePointsMax)
                 continue;
             if (ShouldReserveOpportunisticCaptureForCloserUnit(passenger, snapshot.AITeam, cell, passengerPaths, out _))
                 continue;
@@ -397,7 +397,7 @@ public partial class AIController
             ConstructionManager building = ConstructionManager.AllActive[i];
             if (building == null || !building.IsCapturable || building.CapturePointsMax <= 0)
                 continue;
-            if (building.TeamId == aiTeam && building.CurrentCapturePoints >= building.CapturePointsMax)
+            if (building.SlotIndex == ResolveAISlotKey(aiTeam) && building.CurrentCapturePoints >= building.CapturePointsMax)
                 continue;
 
             bool rallyLike = building.IsRallyPoint || IsPlannedRallyAssemblySector(building.Sector, plan);
@@ -431,7 +431,7 @@ public partial class AIController
         for (int i = 0; i < ConstructionManager.AllActive.Count; i++)
         {
             ConstructionManager building = ConstructionManager.AllActive[i];
-            if (building == null || !building.IsRallyPoint || building.TeamId != aiTeam)
+            if (building == null || !building.IsRallyPoint || building.SlotIndex != ResolveAISlotKey(aiTeam))
                 continue;
             if (building.CurrentCapturePoints < building.CapturePointsMax)
                 continue;

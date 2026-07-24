@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -525,7 +525,7 @@ public partial class AIController
                 Vector3Int enemyCell = enemy.CurrentCellPosition;
                 enemyCell.z = 0;
                 ConstructionManager enemyBldg = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, enemyCell);
-                bool inOwnConstruction = enemyBldg != null && enemyBldg.TeamId == snapshot.AITeam;
+                bool inOwnConstruction = enemyBldg != null && enemyBldg.SlotIndex == snapshot.AISlotIndex;
                 bool inConstruction = enemyBldg != null;
                 float constructionBonus = inOwnConstruction ? 20000f : inConstruction ? 5000f : 0f;
                 float enemyHqDist = SectorManager.HexDistance(enemyCell, enemyHqCell);

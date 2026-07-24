@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 // -------------------------------------------------------------------------
@@ -203,7 +203,7 @@ public partial class AIController
             if (OccupancyResolver.GetHeightBand(occupant) != moverBand)
                 continue;
 
-            if (occupant.TeamId == mover.TeamId)
+            if (occupant.SlotIndex == mover.SlotIndex)
                 return false;
 
             if (!OccupancyResolver.IsLayerAwareRulesActive)

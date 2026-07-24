@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -276,7 +276,7 @@ public partial class AIController
             if (SimulateCaptureSensor(primaryPassenger, dropCell, out ConstructionManager capture)
                 && capture != null)
             {
-                score += capture.TeamId != snapshot.AITeam ? 2500f : 500f;
+                score += capture.SlotIndex != snapshot.AISlotIndex ? 2500f : 500f;
             }
 
             if (score > bestScore)
@@ -343,7 +343,7 @@ public partial class AIController
         {
             if (u == null || u.IsEmbarked || u.IsDead)
                 continue;
-            if (!u.gameObject.activeInHierarchy || u.TeamId == aiTeam)
+            if (!u.gameObject.activeInHierarchy || u.SlotIndex == ResolveAISlotKey(aiTeam))
                 continue;
             if (u.BoardTilemap != boardTilemap)
                 continue;
@@ -449,7 +449,7 @@ public partial class AIController
         foreach (UnitManager candidate in UnitManager.AllActive)
         {
             if (candidate == transporter) continue;
-            if (candidate.TeamId != snapshot.AITeam || candidate.IsDead || candidate.IsEmbarked || candidate.HasActed) continue;
+            if (candidate.SlotIndex != snapshot.AISlotIndex || candidate.IsDead || candidate.IsEmbarked || candidate.HasActed) continue;
             if (!candidate.TryGetUnitData(out UnitData candidateData)) continue;
             if (FindFittingSlotIndex(transporter, transporterData, candidate, candidateData) < 0) continue;
             if (IsAlreadyFormalPassenger(candidate, transporter, plan)) continue;
@@ -612,7 +612,7 @@ public partial class AIController
         foreach (UnitManager u in UnitManager.AllActive)
         {
             if (u == excludeUnit || u.IsEmbarked || u.IsDead) continue;
-            if (excludeUnit != null && u.TeamId != excludeUnit.TeamId) continue;
+            if (excludeUnit != null && u.SlotIndex != excludeUnit.SlotIndex) continue;
             if (u.GetDomain() != Domain.Air || u.IsAircraftGrounded) continue;
             Vector3Int p = u.CurrentCellPosition; p.z = 0;
             set.Add(p);

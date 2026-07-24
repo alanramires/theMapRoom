@@ -11,7 +11,7 @@ public partial class AIController
     // Implementações: AIController.Phase0-4.cs
     // -------------------------------------------------------------------------
 
-    private IEnumerator RunAITurn(TeamId aiTeam)
+    private IEnumerator RunAITurn(PlayerSlotId aiSlot, TeamId aiTeam)
     {
         float turnStart = Time.realtimeSinceStartup;
         if (showAILogs)
@@ -23,9 +23,10 @@ public partial class AIController
         yield return null;
 
         int activeTurn = matchController != null ? matchController.CurrentTurn : aiTurnNumber;
-        bool sameRuntimeTurn = currentAITeam == aiTeam && aiTurnNumber == activeTurn;
+        bool sameRuntimeTurn = currentAISlotIndex == aiSlot.Value && aiTurnNumber == activeTurn;
         int resumeStage = sameRuntimeTurn ? Mathf.Clamp(currentAIStage, 0, 4) : 0;
         currentAITeam = aiTeam;
+        currentAISlotIndex = aiSlot.Value;
         if (resumeStage > 0)
             Debug.Log($"[AI Stage] Retomando turno de {aiTeam} a partir do stage {resumeStage}.");
 
@@ -64,7 +65,7 @@ public partial class AIController
         yield return CommitAIWorldHeavy(aiTeam, "turn-start", rebuildPlan: false);
         Debug.Log($"[AI Perf] CommitAIWorldHeavy: {(Time.realtimeSinceStartup - tCommit) * 1000f:F0}ms");
 
-        AIWorldSnapshot snapshot = AIWorldSnapshot.Build(aiTeam, matchController);
+        AIWorldSnapshot snapshot = AIWorldSnapshot.Build(aiSlot, matchController);
         yield return null;
         aiTurnNumber = snapshot.TurnNumber;
         aiTeamTag    = TeamUtils.GetName(aiTeam).ToUpper();
@@ -272,6 +273,7 @@ public partial class AIController
             yield break;
 
         currentAITeam = aiTeam;
+        currentAISlotIndex = ResolveAISlotKey(aiTeam);
         currentAIStage = Mathf.Clamp(stage, 1, 3);
         yield return new WaitUntil(() => replayManager == null || !replayManager.IsStepExecutionBusy);
         if (ShouldStopAIForMatchEnd("debug_apos_replay_busy"))
@@ -282,7 +284,8 @@ public partial class AIController
         if (ShouldStopAIForMatchEnd("debug_apos_neutral"))
             yield break;
 
-        AIWorldSnapshot snapshot = AIWorldSnapshot.Build(aiTeam, matchController);
+        AIWorldSnapshot snapshot = AIWorldSnapshot.Build(
+            PlayerSlotId.FromIndex(currentAISlotIndex), matchController);
         aiTurnNumber = snapshot.TurnNumber;
         aiTeamTag    = TeamUtils.GetName(aiTeam).ToUpper();
         Debug.Log($"{TL("Stage")} Inicio debug stage {stage} | Stance: {snapshot.Stance} " +

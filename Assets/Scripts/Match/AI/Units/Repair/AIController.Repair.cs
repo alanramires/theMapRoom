@@ -1,9 +1,9 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
 {
-    private static readonly Dictionary<TeamId, int> repairActivationsThisSessionByTeam = new Dictionary<TeamId, int>();
+    private static readonly Dictionary<int, int> repairActivationsThisSessionBySlot = new Dictionary<int, int>();
 
     // -------------------------------------------------------------------------
     // Modo de reparo
@@ -71,15 +71,16 @@ public partial class AIController
 
     private static int IncrementRepairActivationCount(TeamId team)
     {
-        repairActivationsThisSessionByTeam.TryGetValue(team, out int count);
+        int slotIndex = ResolveAISlotKey(team);
+        repairActivationsThisSessionBySlot.TryGetValue(slotIndex, out int count);
         count++;
-        repairActivationsThisSessionByTeam[team] = count;
+        repairActivationsThisSessionBySlot[slotIndex] = count;
         return count;
     }
 
     public static int GetRepairActivationCountThisSession(TeamId team)
     {
-        repairActivationsThisSessionByTeam.TryGetValue(team, out int count);
+        repairActivationsThisSessionBySlot.TryGetValue(ResolveAISlotKey(team), out int count);
         return count;
     }
 
@@ -149,7 +150,7 @@ public partial class AIController
     private bool IsOwnBaseClusterCell(Vector3Int cell, TeamId aiTeam)
     {
         ConstructionManager at = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, cell);
-        return at != null && at.TeamId == aiTeam && IsBaseClusterConstruction(at);
+        return at != null && at.SlotIndex == ResolveAISlotKey(aiTeam) && IsBaseClusterConstruction(at);
     }
 
     // -------------------------------------------------------------------------
@@ -178,7 +179,7 @@ public partial class AIController
     // já cai fora por CanProduceUnitsForTeam=false. Vender desligado / oferta vazia idem.
     private bool IsConscriptionClosedProducerConstruction(ConstructionManager c, TeamId aiTeam)
     {
-        if (c == null || c.TeamId != aiTeam
+        if (c == null || c.SlotIndex != ResolveAISlotKey(aiTeam)
             || !IsBaseClusterConstruction(c)
             || !c.CanProduceUnitsForTeam(aiTeam) || c.OfferedUnits == null)
             return false;
@@ -226,7 +227,7 @@ public partial class AIController
             return false;
         foreach (ConstructionManager c in ConstructionManager.AllActive)
         {
-            if (c == null || c.TeamId != snapshot.AITeam || !IsBaseClusterConstruction(c))
+            if (c == null || c.SlotIndex != snapshot.AISlotIndex || !IsBaseClusterConstruction(c))
                 continue;
             Vector3Int cc = c.CurrentCellPosition; cc.z = 0;
             foreach (UnitManager e in snapshot.EnemyUnits)
@@ -381,7 +382,7 @@ public partial class AIController
 
         // 1. Prédio conquistado: verifica segurança e presença de substituto
         if (currentBldg != null && currentBldg.IsCapturable
-            && currentBldg.TeamId == aiTeam && currentBldg.CurrentCapturePoints >= currentBldg.CapturePointsMax
+            && currentBldg.SlotIndex == ResolveAISlotKey(aiTeam) && currentBldg.CurrentCapturePoints >= currentBldg.CapturePointsMax
             && !(rejectBaseCluster && IsBaseClusterConstruction(currentBldg))
             && !(conscriptionBan && IsConscriptionClosedProducerConstruction(currentBldg, aiTeam))
             && !(logisticsProducerBan && currentBldg.CanProduceUnitsForTeam(aiTeam)))
@@ -419,7 +420,7 @@ public partial class AIController
             bool hasReplacement = false;
             foreach (UnitManager ally in UnitManager.AllActive)
             {
-                if (ally == unit || ally.TeamId != aiTeam || ally.IsDead || ally.IsEmbarked || ally.IsUnderRepair) continue;
+                if (ally == unit || ally.SlotIndex != ResolveAISlotKey(aiTeam) || ally.IsDead || ally.IsEmbarked || ally.IsUnderRepair) continue;
                 Vector3Int ac = ally.CurrentCellPosition; ac.z = 0;
                 if (SectorManager.HexDistance(ac, fromCell) <= DefenseEnemyRange) { hasReplacement = true; break; }
             }
@@ -552,7 +553,7 @@ public partial class AIController
         // Fire support units skip this when in open field — they must reach a construction first.
         // Se prioritizeDpqAtBattle, tenta se mover para célula de maior DPQ antes de atacar.
         bool fireSupportInOpenField = IsFireSupportUnit(unit)
-            && (currentBldg == null || currentBldg.TeamId != aiTeam);
+            && (currentBldg == null || currentBldg.SlotIndex != ResolveAISlotKey(aiTeam));
         if (!fireSupportInOpenField && IsRepairUnitInOwnHomeArea(snapshot, fromCell, aiTeam))
         {
             bool repairPreferDpq = unit.TryGetUnitData(out UnitData repairUd)
@@ -777,7 +778,7 @@ public partial class AIController
         if (unit == null || snapshot == null || !IsAirTransporter(unit) || !HasTransportCargo(unit))
             return false;
         if (currentBuilding == null
-            || currentBuilding.TeamId != snapshot.AITeam
+            || currentBuilding.SlotIndex != snapshot.AISlotIndex
             || !IsAircraftRepairConstruction(currentBuilding))
             return false;
         if (!IsRepairConstructionSectorSafe(currentBuilding, snapshot.AITeam)

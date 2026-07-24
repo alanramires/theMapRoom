@@ -12,12 +12,12 @@ public partial class AIController
 
     // -------------------------------------------------------------------------
 
-    private List<UnitManager> GetAvailableUnits(TeamId aiTeam)
+    private List<UnitManager> GetAvailableUnits(PlayerSlotId aiSlot, TeamId aiTeam)
     {
         _availableUnitsBuffer.Clear();
         foreach (UnitManager u in UnitManager.AllActive)
         {
-            if (u.TeamId != aiTeam || u.HasActed || u.IsDead || u.IsEmbarked)
+            if (u.SlotIndex != aiSlot.Value || u.HasActed || u.IsDead || u.IsEmbarked)
                 continue;
             _availableUnitsBuffer.Add(u);
         }
@@ -272,7 +272,7 @@ public partial class AIController
         foreach (PodeMirarTargetOption opt in targets)
         {
             if (opt == null || opt.targetUnit == null) continue;
-            if (opt.targetUnit.TeamId == aiTeam || opt.targetUnit.IsDead) continue;
+            if (opt.targetUnit.SlotIndex == ResolveAISlotKey(aiTeam) || opt.targetUnit.IsDead) continue;
             if (PassesAttackDecision(unit, opt.targetUnit, fromCell, defensiveContext: false, out _))
                 return true;
         }
@@ -317,7 +317,7 @@ public partial class AIController
         foreach (PodeMirarTargetOption opt in targets)
         {
             UnitManager target = opt != null ? opt.targetUnit : null;
-            if (target == null || target.TeamId == aiTeam || target.IsDead || target.IsEmbarked)
+            if (target == null || target.SlotIndex == ResolveAISlotKey(aiTeam) || target.IsDead || target.IsEmbarked)
                 continue;
             if (!PassesAttackDecision(unit, target, fromCell, defensiveContext: false, out _))
                 continue;
@@ -385,7 +385,7 @@ public partial class AIController
             foreach (PodeMirarTargetOption opt in targets)
             {
                 UnitManager target = opt != null ? opt.targetUnit : null;
-                if (target == null || target.TeamId == aiTeam || target.IsDead || target.IsEmbarked)
+                if (target == null || target.SlotIndex == ResolveAISlotKey(aiTeam) || target.IsDead || target.IsEmbarked)
                     continue;
                 if (mc != null && !mc.IsUnitVisibleForTeam(target, aiTeam))
                     continue;
@@ -458,7 +458,7 @@ public partial class AIController
 
     private bool IsEnemyCapturerOnOwnedConstruction(UnitManager target, TeamId aiTeam)
     {
-        if (target == null || target.TeamId == aiTeam || target.IsDead || target.IsEmbarked)
+        if (target == null || target.SlotIndex == ResolveAISlotKey(aiTeam) || target.IsDead || target.IsEmbarked)
             return false;
         if (!target.TryGetUnitData(out UnitData targetData)
             || targetData == null
@@ -470,7 +470,7 @@ public partial class AIController
         ConstructionManager construction = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, targetCell);
         return construction != null
             && construction.IsCapturable
-            && construction.TeamId == aiTeam
+            && construction.SlotIndex == ResolveAISlotKey(aiTeam)
             && construction.CurrentCapturePoints < construction.CapturePointsMax;
     }
 
@@ -487,7 +487,7 @@ public partial class AIController
         foreach (UnitManager candidate in UnitManager.AllActive)
         {
             if (candidate == unit) continue;
-            if (candidate.TeamId != aiTeam || candidate.IsDead || candidate.IsEmbarked || candidate.HasActed) continue;
+            if (candidate.SlotIndex != ResolveAISlotKey(aiTeam) || candidate.IsDead || candidate.IsEmbarked || candidate.HasActed) continue;
             if (!candidate.TryGetUnitData(out UnitData candidateData)) continue;
             Vector3Int cc = candidate.CurrentCellPosition; cc.z = 0;
             if (SectorManager.HexDistance(transporterCell, cc) > reach) continue;
@@ -636,7 +636,7 @@ public partial class AIController
 
         foreach (UnitManager candidate in UnitManager.AllActive)
         {
-            if (candidate == null || candidate.TeamId != aiTeam) continue;
+            if (candidate == null || candidate.SlotIndex != ResolveAISlotKey(aiTeam)) continue;
             if (candidate == unit || candidate.HasActed || candidate.IsDead || candidate.IsEmbarked) continue;
             if (plan.RogueUnitIds == null || !plan.RogueUnitIds.Contains(candidate.InstanceId)) continue;
 
@@ -687,7 +687,7 @@ public partial class AIController
 
         foreach (UnitManager t in UnitManager.AllActive)
         {
-            if (t == null || t == unit || t.TeamId != aiTeam || t.IsDead || t.IsEmbarked || t.IsUnderRepair)
+            if (t == null || t == unit || t.SlotIndex != ResolveAISlotKey(aiTeam) || t.IsDead || t.IsEmbarked || t.IsUnderRepair)
                 continue;
             if (!t.TryGetUnitData(out UnitData tData) || tData == null || !tData.isTransporter)
                 continue;
@@ -741,7 +741,7 @@ public partial class AIController
         {
             if (candidate == null || candidate == passenger)
                 continue;
-            if (candidate.TeamId != aiTeam || candidate.HasActed || candidate.IsDead || candidate.IsEmbarked || candidate.IsUnderRepair)
+            if (candidate.SlotIndex != ResolveAISlotKey(aiTeam) || candidate.HasActed || candidate.IsDead || candidate.IsEmbarked || candidate.IsUnderRepair)
                 continue;
             if (plan.RogueUnitIds == null || !plan.RogueUnitIds.Contains(candidate.InstanceId))
                 continue;
@@ -956,7 +956,7 @@ public partial class AIController
 
         foreach (UnitManager t in UnitManager.AllActive)
         {
-            if (t == null || t.TeamId != aiTeam || t.IsDead || t.IsEmbarked) continue;
+            if (t == null || t.SlotIndex != ResolveAISlotKey(aiTeam) || t.IsDead || t.IsEmbarked) continue;
             if (!t.TryGetUnitData(out UnitData tData) || tData == null || !tData.isTransporter) continue;
             if (FindFittingSlotIndex(t, tData, unit, data) < 0) continue;
             Vector3Int tCell = t.CurrentCellPosition; tCell.z = 0;

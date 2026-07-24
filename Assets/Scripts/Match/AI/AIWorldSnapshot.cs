@@ -33,11 +33,15 @@ public class AIWorldSnapshot
 
     public static AIWorldSnapshot Build(TeamId aiTeam, MatchController match)
     {
+        return Build(PlayerSlotId.FromIndex(ResolveSlotIndex(aiTeam, match)), match);
+    }
+
+    public static AIWorldSnapshot Build(PlayerSlotId aiSlot, MatchController match)
+    {
         var snap = new AIWorldSnapshot();
-        snap.AITeam       = aiTeam;
-        snap.AISlotIndex  = ResolveSlotIndex(aiTeam, match);
+        snap.AITeam       = match != null ? match.GetVisualTeamForSlot(aiSlot) : TeamId.Neutral;
+        snap.AISlotIndex  = aiSlot.Value;
         snap.TurnNumber   = match != null ? match.CurrentTurn : 0;
-        PlayerSlotId aiSlot = PlayerSlotId.FromIndex(snap.AISlotIndex);
         snap.Budget       = match != null ? match.GetActualMoney(aiSlot) : 0;
         snap.IncomePerTurn = match != null ? match.GetIncomePerTurn(aiSlot) : 0;
 
@@ -71,7 +75,7 @@ public class AIWorldSnapshot
         }
 
         snap.Stance = CalculateStance(snap);
-        snap.IsInvading = AIController.GetGoGreenInvasionForInspection(aiTeam, snap.TurnNumber).Active;
+        snap.IsInvading = AIController.GetGoGreenInvasionForInspection(snap.AITeam, snap.TurnNumber).Active;
         return snap;
     }
 
@@ -82,9 +86,14 @@ public class AIWorldSnapshot
     /// </summary>
     public static AIWorldSnapshot BuildLight(TeamId aiTeam, MatchController match)
     {
+        return BuildLight(PlayerSlotId.FromIndex(ResolveSlotIndex(aiTeam, match)), match);
+    }
+
+    public static AIWorldSnapshot BuildLight(PlayerSlotId aiSlot, MatchController match)
+    {
         var snap = new AIWorldSnapshot();
-        snap.AITeam     = aiTeam;
-        snap.AISlotIndex = ResolveSlotIndex(aiTeam, match);
+        snap.AITeam = match != null ? match.GetVisualTeamForSlot(aiSlot) : TeamId.Neutral;
+        snap.AISlotIndex = aiSlot.Value;
         snap.TurnNumber = match != null ? match.CurrentTurn : 0;
         snap.Budget     = match != null ? match.GetActualMoney(PlayerSlotId.FromIndex(snap.AISlotIndex)) : 0;
 
@@ -113,7 +122,7 @@ public class AIWorldSnapshot
 
         // IsInvading é barato (lookup no rallyGoGreenTurns) e é consumido por handlers da Fase 2
         // (ex.: gate de embarque de artilharia). Diferente de Stance, vale popular no Light.
-        snap.IsInvading = AIController.GetGoGreenInvasionForInspection(aiTeam, snap.TurnNumber).Active;
+        snap.IsInvading = AIController.GetGoGreenInvasionForInspection(snap.AITeam, snap.TurnNumber).Active;
         return snap;
     }
 
@@ -125,7 +134,9 @@ public class AIWorldSnapshot
         if (match.ActiveTeam == aiTeam)
             return match.ActivePlayerListIndex;
 
-        return match.GetSlotIndexForTeam(aiTeam);
+        return match.TryGetUniqueSlotForTeam(aiTeam, out PlayerSlotId uniqueSlot)
+            ? uniqueSlot.Value
+            : -1;
     }
 
     private static AIStance CalculateStance(AIWorldSnapshot snap)

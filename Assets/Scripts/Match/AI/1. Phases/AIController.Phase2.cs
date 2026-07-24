@@ -15,7 +15,7 @@ public partial class AIController
 
         TeamId aiTeam = snapshot.AITeam;
 
-        List<UnitManager> units = GetAvailableUnits(aiTeam);
+        List<UnitManager> units = GetAvailableUnits(PlayerSlotId.FromIndex(snapshot.AISlotIndex), aiTeam);
         if (units.Count == 0)
         {
             Debug.Log($"{TL()} Fase 2 — sem unidades em campo, pulando.");
@@ -30,13 +30,13 @@ public partial class AIController
 
         // ---- Setup: executado uma única vez por fase ----
         SyncAIUnitCellsFromTransforms();
-        AIWorldSnapshot current = AIWorldSnapshot.BuildLight(aiTeam, matchController);
+        AIWorldSnapshot current = AIWorldSnapshot.BuildLight(PlayerSlotId.FromIndex(snapshot.AISlotIndex), matchController);
         TeamObjectivePlan activePlan = ObjectiveManager.GetPlanForTeam(aiTeam);
         InvalidateStaleThreatObjectives(activePlan, aiTeam);
 
         foreach (UnitManager u in UnitManager.AllActive)
         {
-            if (u.TeamId == aiTeam && !u.IsDead)
+            if (u.SlotIndex == snapshot.AISlotIndex && !u.IsDead)
                 UpdateRepairState(u, activePlan);
         }
 
@@ -205,7 +205,7 @@ public partial class AIController
 
             // Reconstrói o snapshot para a próxima decisão (hexes ocupados mudam após cada ação)
             float snapshotStartedAt = Time.realtimeSinceStartup;
-            current = AIWorldSnapshot.BuildLight(aiTeam, matchController);
+            current = AIWorldSnapshot.BuildLight(PlayerSlotId.FromIndex(snapshot.AISlotIndex), matchController);
             float snapshotMs = (Time.realtimeSinceStartup - snapshotStartedAt) * 1000f;
             perfSnapshotTotalMs += snapshotMs;
 
@@ -466,7 +466,7 @@ public partial class AIController
                 continue;
             if (!IsFireSupportUnit(candidate))
                 continue;
-            if (candidate.TeamId != aiTeam)
+            if (candidate.SlotIndex != currentAISlotIndex)
                 continue;
 
             // Diagnóstico: por que esta artilharia não cedeu o amaciamento do alvo do atacante.
@@ -540,7 +540,7 @@ public partial class AIController
         {
             if (candidate == null || candidate == attacker)
                 continue;
-            if (candidate.TeamId != aiTeam || candidate.HasActed || candidate.IsDead || candidate.IsEmbarked || candidate.IsUnderRepair)
+            if (candidate.SlotIndex != snapshot.AISlotIndex || candidate.HasActed || candidate.IsDead || candidate.IsEmbarked || candidate.IsUnderRepair)
                 continue;
             if (!IsAirCombatUnit(candidate))
                 continue;
@@ -584,7 +584,7 @@ public partial class AIController
         {
             if (unit == null || unit.InstanceId != targetId)
                 continue;
-            if (unit.TeamId == aiTeam || unit.IsDead || unit.IsEmbarked)
+            if (unit.SlotIndex == currentAISlotIndex || unit.IsDead || unit.IsEmbarked)
                 return null;
             if (mc != null && !mc.IsUnitVisibleForTeam(unit, aiTeam))
                 return null;
@@ -802,7 +802,7 @@ public partial class AIController
         {
             if (transporter == null || transporter == unit)
                 continue;
-            if (transporter.TeamId != aiTeam || transporter.HasActed || transporter.IsDead
+            if (transporter.SlotIndex != currentAISlotIndex || transporter.HasActed || transporter.IsDead
                 || transporter.IsEmbarked || transporter.IsUnderRepair)
                 continue;
             if (!IsAirTransporter(transporter) || HasTransportCargo(transporter))

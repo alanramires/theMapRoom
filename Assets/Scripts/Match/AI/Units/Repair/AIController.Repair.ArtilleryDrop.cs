@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -10,7 +10,7 @@ public partial class AIController
         float bestScore = float.MinValue;
         foreach (ConstructionManager c in ConstructionManager.AllActive)
         {
-            if (c.TeamId != aiTeam) continue;
+            if (c.SlotIndex != ResolveAISlotKey(aiTeam)) continue;
             if (c.CurrentCapturePoints < c.CapturePointsMax) continue;
             Vector3Int cc = c.CurrentCellPosition; cc.z = 0;
             if (HasNearbyVisibleEnemy(cc, aiTeam, DefenseEnemyRange)) continue; // no exemption for home
@@ -130,7 +130,7 @@ public partial class AIController
                 if (opt.passengerUnit != artPassenger) continue;
                 Vector3Int dc = opt.disembarkCell; dc.z = 0;
                 ConstructionManager bldg = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, dc);
-                if (bldg == null || bldg.TeamId != aiTeam) continue;
+                if (bldg == null || bldg.SlotIndex != ResolveAISlotKey(aiTeam)) continue;
                 if (!IsRepairHomeConstruction(bldg, aiTeam) && !IsRepairConstructionSectorSafe(bldg, aiTeam)) continue;
                 if (requireSafe && HasNearbyVisibleEnemy(dc, aiTeam, DefenseEnemyRange)) continue;
                 hasValidDrop = true; break;

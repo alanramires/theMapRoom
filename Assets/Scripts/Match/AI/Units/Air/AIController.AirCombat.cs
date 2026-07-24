@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Tilemaps;
 
@@ -188,7 +188,7 @@ public partial class AIController
 
             foreach (UnitManager enemy in UnitManager.AllActive)
             {
-                if (enemy == null || enemy.TeamId == snapshot.AITeam || enemy.IsDead || enemy.IsEmbarked)
+                if (enemy == null || enemy.SlotIndex == snapshot.AISlotIndex || enemy.IsDead || enemy.IsEmbarked)
                     continue;
                 if (matchController != null && !matchController.IsUnitVisibleForTeam(enemy, snapshot.AITeam))
                     continue;
@@ -308,7 +308,7 @@ public partial class AIController
 
             foreach (UnitManager enemy in UnitManager.AllActive)
             {
-                if (enemy == null || enemy.TeamId == snapshot.AITeam || enemy.IsDead || enemy.IsEmbarked)
+                if (enemy == null || enemy.SlotIndex == snapshot.AISlotIndex || enemy.IsDead || enemy.IsEmbarked)
                     continue;
                 if (matchController != null && !matchController.IsUnitVisibleForTeam(enemy, snapshot.AITeam))
                     continue;

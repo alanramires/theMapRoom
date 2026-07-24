@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -106,7 +106,7 @@ public partial class AIController
         // composições (assalto, fogo indireto, logística, suprimentos, transportes, aviação...).
         foreach (UnitManager unit in UnitManager.AllActive)
         {
-            if (unit == null || unit.TeamId != aiTeam || unit.IsDead
+            if (unit == null || unit.SlotIndex != ResolveAISlotKey(aiTeam) || unit.IsDead
                 || alreadySlotted.Contains(unit.InstanceId))
                 continue;
 
@@ -243,7 +243,7 @@ public partial class AIController
         MatchController mc = GetMatchController();
         foreach (UnitManager enemy in UnitManager.AllActive)
         {
-            if (enemy.TeamId == aiTeam || enemy.IsDead || enemy.IsEmbarked) continue;
+            if (enemy.SlotIndex == ResolveAISlotKey(aiTeam) || enemy.IsDead || enemy.IsEmbarked) continue;
             if (mc != null && !mc.IsUnitVisibleForTeam(enemy, aiTeam)) continue;
             Vector3Int ec = enemy.CurrentCellPosition; ec.z = 0;
             if (SectorManager.HexDistance(ec, targetCell) <= enemyRange)
@@ -268,7 +268,7 @@ public partial class AIController
         var list = new List<UnitManager>();
         foreach (UnitManager u in UnitManager.AllActive)
         {
-            if (u.TeamId != aiTeam || u.IsDead || u.IsEmbarked || u.IsUnderRepair) continue;
+            if (u.SlotIndex != ResolveAISlotKey(aiTeam) || u.IsDead || u.IsEmbarked || u.IsUnderRepair) continue;
             if (!u.TryGetUnitData(out UnitData data)) continue;
             if (UnitRoleCompatibility.ResolveCompositionRole(data) == UnitRole.Assalto)
                 list.Add(u);
@@ -281,7 +281,7 @@ public partial class AIController
         var list = new List<UnitManager>();
         foreach (UnitManager u in UnitManager.AllActive)
         {
-            if (u.TeamId != aiTeam || u.IsDead || u.IsEmbarked || u.IsUnderRepair) continue;
+            if (u.SlotIndex != ResolveAISlotKey(aiTeam) || u.IsDead || u.IsEmbarked || u.IsUnderRepair) continue;
             if (!u.TryGetUnitData(out UnitData data)) continue;
             if (UnitRoleCompatibility.ResolveCompositionRole(data) == UnitRole.FogoIndireto)
                 list.Add(u);
@@ -294,7 +294,7 @@ public partial class AIController
         MatchController mc = GetMatchController();
         foreach (UnitManager enemy in UnitManager.AllActive)
         {
-            if (enemy.TeamId == aiTeam || enemy.IsDead || enemy.IsEmbarked) continue;
+            if (enemy.SlotIndex == ResolveAISlotKey(aiTeam) || enemy.IsDead || enemy.IsEmbarked) continue;
             if (mc != null && !mc.IsUnitVisibleForTeam(enemy, aiTeam)) continue;
             Vector3Int ec = enemy.CurrentCellPosition; ec.z = 0;
             if (SectorManager.HexDistance(ec, cell) <= range) return true;
@@ -371,7 +371,7 @@ public partial class AIController
                 continue;
             if (!construction.IsCapturable || construction.CapturePointsMax <= 0)
                 continue;
-            if (construction.TeamId != aiTeam)
+            if (construction.SlotIndex != ResolveAISlotKey(aiTeam))
                 continue;
             if (construction.CurrentCapturePoints > 0 && construction.CurrentCapturePoints < construction.CapturePointsMax)
                 return true;

@@ -18,7 +18,7 @@ public partial class AIShoppingPlanner
         int freeAPCs = 0;
         foreach (UnitManager u in UnitManager.AllActive)
         {
-            if (u == null || u.TeamId != aiTeam || u.IsDead || u.IsEmbarked) continue;
+            if (u == null || u.SlotIndex != AIController.ResolveAISlotKey(aiTeam) || u.IsDead || u.IsEmbarked) continue;
             if (!u.TryGetUnitData(out UnitData d)) continue;
             if (d.roles == null || d.roles.Count == 0 || d.roles[0] != UnitRole.Transportador) continue;
             if (d.domain == Domain.Air) continue;
@@ -239,7 +239,7 @@ public partial class AIShoppingPlanner
         {
             if (construction == null || !construction.IsPlayerHeadQuarter)
                 continue;
-            if (construction.TeamId != aiTeam)
+            if (construction.SlotIndex != AIController.ResolveAISlotKey(aiTeam))
                 continue;
             if (construction.SlotIndex < 0)
                 continue;
@@ -309,7 +309,7 @@ public partial class AIShoppingPlanner
         int activeGroundCapturers = 0;
         foreach (UnitManager u in UnitManager.AllActive)
         {
-            if (u == null || u.TeamId != aiTeam || u.IsDead || u.IsEmbarked) continue;
+            if (u == null || u.SlotIndex != AIController.ResolveAISlotKey(aiTeam) || u.IsDead || u.IsEmbarked) continue;
             if (!u.TryGetUnitData(out UnitData d)) continue;
             if (d.roles == null || d.roles.Count == 0) continue;
             if (d.roles[0] == UnitRole.Capturador && d.domain == Domain.Land)
@@ -370,7 +370,7 @@ public partial class AIShoppingPlanner
         int count = 0;
         foreach (UnitManager unit in UnitManager.AllActive)
         {
-            if (unit == null || unit.TeamId != snapshot.AITeam || unit.IsDead || unit.IsEmbarked)
+            if (unit == null || unit.SlotIndex != snapshot.AISlotIndex || unit.IsDead || unit.IsEmbarked)
                 continue;
             if (!unit.TryGetUnitData(out UnitData data) || data == null || data.domain != Domain.Air
                 || UnitRoleCompatibility.ResolveCompositionRole(data) != UnitRole.Transportador)
@@ -420,7 +420,7 @@ public partial class AIShoppingPlanner
         int count = 0;
         foreach (UnitManager unit in UnitManager.AllActive)
         {
-            if (unit == null || unit.TeamId != snapshot.AITeam || unit.IsDead || unit.IsEmbarked || unit.IsUnderRepair)
+            if (unit == null || unit.SlotIndex != snapshot.AISlotIndex || unit.IsDead || unit.IsEmbarked || unit.IsUnderRepair)
                 continue;
             if (!unit.TryGetUnitData(out UnitData data) || data == null || !IsPrimaryRole(data, UnitRole.Capturador) || data.domain != Domain.Land)
                 continue;

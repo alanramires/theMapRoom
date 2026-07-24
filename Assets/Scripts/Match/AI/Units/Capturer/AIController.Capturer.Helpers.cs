@@ -1,10 +1,10 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
 {
-    private readonly Dictionary<TeamId, List<Vector3Int>> aiThreatEnemyCellsByTeam =
-        new Dictionary<TeamId, List<Vector3Int>>();
+    private readonly Dictionary<int, List<Vector3Int>> aiThreatEnemyCellsBySlot =
+        new Dictionary<int, List<Vector3Int>>();
 
     // -------------------------------------------------------------------------
     // Helpers de captura: sensor, atribuição e seleção de alvos
@@ -15,13 +15,14 @@ public partial class AIController
     {
         float threat = 0f;
         Vector3Int cellXY = cell; cellXY.z = 0;
-        if (!aiThreatEnemyCellsByTeam.TryGetValue(aiTeam, out List<Vector3Int> enemyCells))
+        int aiSlotIndex = ResolveAISlotKey(aiTeam);
+        if (!aiThreatEnemyCellsBySlot.TryGetValue(aiSlotIndex, out List<Vector3Int> enemyCells))
         {
             enemyCells = new List<Vector3Int>();
             MatchController mc = GetMatchController();
             foreach (UnitManager enemy in UnitManager.AllActive)
             {
-                if (enemy == null || enemy.TeamId == aiTeam || enemy.IsDead || enemy.IsEmbarked)
+                if (enemy == null || enemy.SlotIndex == ResolveAISlotKey(aiTeam) || enemy.IsDead || enemy.IsEmbarked)
                     continue;
                 if (mc != null && !mc.IsUnitVisibleForTeam(enemy, aiTeam))
                     continue;
@@ -29,7 +30,7 @@ public partial class AIController
                 enemyCell.z = 0;
                 enemyCells.Add(enemyCell);
             }
-            aiThreatEnemyCellsByTeam[aiTeam] = enemyCells;
+            aiThreatEnemyCellsBySlot[aiSlotIndex] = enemyCells;
         }
 
         for (int i = 0; i < enemyCells.Count; i++)
@@ -52,7 +53,7 @@ public partial class AIController
         MatchController mc = GetMatchController();
         foreach (UnitManager enemy in UnitManager.AllActive)
         {
-            if (enemy.TeamId == aiTeam || enemy.IsDead || enemy.IsEmbarked) continue;
+            if (enemy.SlotIndex == ResolveAISlotKey(aiTeam) || enemy.IsDead || enemy.IsEmbarked) continue;
             if (mc != null && !mc.IsUnitVisibleForTeam(enemy, aiTeam)) continue;
             Vector3Int ec = enemy.CurrentCellPosition; ec.z = 0;
             if (nearCells.Contains(ec)) return true;
@@ -146,7 +147,7 @@ public partial class AIController
 
         foreach (UnitManager candidate in UnitManager.AllActive)
         {
-            if (candidate == opportunist || candidate.TeamId != aiTeam) continue;
+            if (candidate == opportunist || candidate.SlotIndex != ResolveAISlotKey(aiTeam)) continue;
             if (candidate.HasActed || candidate.IsDead || candidate.IsEmbarked || candidate.IsUnderRepair) continue;
             if (!SimulateCaptureSensor(candidate, captureCell, out _)) continue;
 
@@ -253,7 +254,7 @@ public partial class AIController
 
         ConstructionManager c = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, simulatedCell);
         if (c == null || !c.IsCapturable || c.CapturePointsMax <= 0) return false;
-        if (c.TeamId == unit.TeamId && c.CurrentCapturePoints >= c.CapturePointsMax) return false;
+        if (c.SlotIndex == unit.SlotIndex && c.CurrentCapturePoints >= c.CapturePointsMax) return false;
 
         targetConstruction = c;
         return true;
@@ -267,7 +268,7 @@ public partial class AIController
         foreach (ConstructionManager c in ConstructionManager.AllActive)
         {
             if (c.Sector != sector || !c.IsCapturable) continue;
-            if (c.TeamId == aiTeam && c.CurrentCapturePoints >= c.CapturePointsMax) continue;
+            if (c.SlotIndex == ResolveAISlotKey(aiTeam) && c.CurrentCapturePoints >= c.CapturePointsMax) continue;
 
             if (unitPos == null) return c;
 
@@ -284,7 +285,7 @@ public partial class AIController
         var list = new List<UnitManager>();
         foreach (UnitManager u in UnitManager.AllActive)
         {
-            if (u.TeamId != aiTeam || u.IsDead || u.IsEmbarked || u.IsUnderRepair) continue;
+            if (u.SlotIndex != ResolveAISlotKey(aiTeam) || u.IsDead || u.IsEmbarked || u.IsUnderRepair) continue;
             if (!u.TryGetUnitData(out UnitData data)) continue;
             if (UnitRoleCompatibility.CanSatisfy(data, UnitRole.Capturador))
                 list.Add(u);

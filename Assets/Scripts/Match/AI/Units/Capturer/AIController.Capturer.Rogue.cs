@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -127,7 +127,7 @@ public partial class AIController
         // FoW passinho: HQ tem ocupante invisível → sobe no DPQ mais elevado adjacente
         {
             UnitManager hqOccupant = HexOccupancyQuery.FindUnitAtCell(target);
-            if (hqOccupant != null && hqOccupant.TeamId != snapshot.AITeam)
+            if (hqOccupant != null && hqOccupant.SlotIndex != snapshot.AISlotIndex)
             {
                 MatchController mc = GetMatchController();
                 if (mc == null || !mc.IsUnitVisibleForTeam(hqOccupant, snapshot.AITeam))
@@ -151,7 +151,7 @@ public partial class AIController
             float       advAttackPri    = float.MinValue;
             foreach (UnitManager enemy in UnitManager.AllActive)
             {
-                if (enemy.TeamId == snapshot.AITeam || enemy.IsDead || enemy.IsEmbarked) continue;
+                if (enemy.SlotIndex == snapshot.AISlotIndex || enemy.IsDead || enemy.IsEmbarked) continue;
                 if (mcAdv != null && !mcAdv.IsUnitVisibleForTeam(enemy, snapshot.AITeam)) continue;
                 foreach (Vector3Int cell in paths.Keys)
                 {

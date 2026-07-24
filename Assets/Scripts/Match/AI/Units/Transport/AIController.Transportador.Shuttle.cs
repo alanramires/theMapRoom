@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -81,7 +81,7 @@ public partial class AIController
         foreach (UnitManager candidate in UnitManager.AllActive)
         {
             if (candidate == transporter) continue;
-            if (candidate.TeamId != snapshot.AITeam || candidate.IsDead || candidate.IsEmbarked || candidate.HasActed) continue;
+            if (candidate.SlotIndex != snapshot.AISlotIndex || candidate.IsDead || candidate.IsEmbarked || candidate.HasActed) continue;
             if (!candidate.TryGetUnitData(out UnitData candidateData)) continue;
 
             if (FindFittingSlotIndex(transporter, transporterData, candidate, candidateData) < 0) continue;
@@ -522,7 +522,7 @@ public partial class AIController
 
         foreach (UnitManager candidate in UnitManager.AllActive)
         {
-            if (candidate == null || candidate.TeamId != aiTeam) continue;
+            if (candidate == null || candidate.SlotIndex != ResolveAISlotKey(aiTeam)) continue;
             if (candidate.IsDead || candidate.IsEmbarked || candidate.HasActed) continue;
             if (!candidate.TryGetUnitData(out UnitData data) || data?.roles == null) continue;
             if (!data.roles.Contains(UnitRole.Capturador)) continue;
@@ -566,7 +566,7 @@ public partial class AIController
     private bool IsTeamProductionBuilding(Vector3Int cell, TeamId aiTeam)
     {
         ConstructionManager bldg = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, cell);
-        return bldg != null && bldg.TeamId == aiTeam && bldg.CanProduceUnits;
+        return bldg != null && bldg.SlotIndex == ResolveAISlotKey(aiTeam) && bldg.CanProduceUnits;
     }
 
     // Returns the nearest friendly factory or HQ to wait at between deliveries.
@@ -583,7 +583,7 @@ public partial class AIController
         float bestScore = float.MinValue;
         foreach (PodeMirarTargetOption opt in targets)
         {
-            if (opt?.targetUnit == null || opt.targetUnit.TeamId == snapshot.AITeam || opt.targetUnit.IsDead) continue;
+            if (opt?.targetUnit == null || opt.targetUnit.SlotIndex == snapshot.AISlotIndex || opt.targetUnit.IsDead) continue;
             if (!PassesAttackDecision(unit, opt.targetUnit, attackCell, false, out _)) continue;
             float score = (20f - opt.targetUnit.CurrentHP) * 100f - opt.targetUnit.InstanceId * 0.001f;
             if (score > bestScore) { bestScore = score; best = opt.targetUnit; }
@@ -598,7 +598,7 @@ public partial class AIController
 
         foreach (ConstructionManager bldg in ConstructionManager.AllActive)
         {
-            if (bldg == null || bldg.TeamId != aiTeam) continue;
+            if (bldg == null || bldg.SlotIndex != ResolveAISlotKey(aiTeam)) continue;
             if (!bldg.CanProduceUnits && !bldg.IsPlayerHeadQuarter) continue;
             Vector3Int bc = bldg.CurrentCellPosition; bc.z = 0;
             float dist = SectorManager.HexDistance(fromCell, bc);

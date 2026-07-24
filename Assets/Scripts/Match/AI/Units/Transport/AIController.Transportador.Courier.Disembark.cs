@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -137,14 +137,14 @@ public partial class AIController
         dropCell.z = 0;
         if (SimulateCaptureSensor(passenger, dropCell, out ConstructionManager immediate)
             && immediate != null
-            && immediate.TeamId != snapshot.AITeam)
+            && immediate.SlotIndex != snapshot.AISlotIndex)
             return true;
 
         foreach (ConstructionManager b in ConstructionManager.AllActive)
         {
             if (b == null || !b.IsCapturable || b.CapturePointsMax <= 0)
                 continue;
-            if (b.TeamId == snapshot.AITeam && b.CurrentCapturePoints >= b.CapturePointsMax)
+            if (b.SlotIndex == snapshot.AISlotIndex && b.CurrentCapturePoints >= b.CapturePointsMax)
                 continue;
             if (b.Sector == ConstructionSector.None || ConstructionSectorHelper.IsBase(b.Sector) || b.IsPlayerHeadQuarter)
                 continue;
@@ -180,7 +180,7 @@ public partial class AIController
         {
             Vector3Int captureCell = captureTarget.CurrentCellPosition; captureCell.z = 0;
             bool isAssignedTarget = assignedTarget != Vector3Int.zero && captureCell == assignedTarget;
-            bool isNeutralOrEnemy = captureTarget.TeamId != aiTeam;
+            bool isNeutralOrEnemy = captureTarget.SlotIndex != ResolveAISlotKey(aiTeam);
             score += isAssignedTarget ? 3000f : isNeutralOrEnemy ? 1800f : 900f;
         }
 

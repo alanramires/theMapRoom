@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -29,7 +29,7 @@ public partial class AIController
         MatchController mc = GetMatchController();
         foreach (UnitManager enemy in UnitManager.AllActive)
         {
-            if (enemy.TeamId == snapshot.AITeam || enemy.IsDead || enemy.IsEmbarked) continue;
+            if (enemy.SlotIndex == snapshot.AISlotIndex || enemy.IsDead || enemy.IsEmbarked) continue;
             if (mc != null && !mc.IsUnitVisibleForTeam(enemy, snapshot.AITeam)) continue;
             Vector3Int ec = enemy.CurrentCellPosition; ec.z = 0;
             if (SectorManager.HexDistance(ec, targetCell) > fromDist) continue;
@@ -115,7 +115,7 @@ public partial class AIController
         ConstructionManager currentBuilding =
             ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, fromCell);
         if (currentBuilding == null
-            || currentBuilding.TeamId != snapshot.AITeam
+            || currentBuilding.SlotIndex != snapshot.AISlotIndex
             || !currentBuilding.IsCapturable)
             return false;
 

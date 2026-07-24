@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -280,7 +280,7 @@ public partial class AIController
             if (restrictToPreferredAircraftFacility && !isPreferredAircraftFacility)
                 continue;
 
-            if (c.TeamId != aiTeam)
+            if (c.SlotIndex != ResolveAISlotKey(aiTeam))
             {
                 Debug.Log($"[Repair] skip {cc} team={c.TeamId} (need {aiTeam}) dist={dist:F1}");
                 continue;
@@ -421,7 +421,7 @@ public partial class AIController
         {
             if (!IsPreferredAircraftRepairConstruction(c, aiTeam))
                 continue;
-            if (c.TeamId != aiTeam)
+            if (c.SlotIndex != ResolveAISlotKey(aiTeam))
                 continue;
             if (c.CurrentCapturePoints < c.CapturePointsMax)
                 continue;
@@ -491,7 +491,7 @@ public partial class AIController
         {
             if (!IsAircraftRepairConstruction(c))
                 continue;
-            if (c.TeamId != aiTeam)
+            if (c.SlotIndex != ResolveAISlotKey(aiTeam))
                 continue;
             if (c.CurrentCapturePoints < c.CapturePointsMax)
                 continue;
@@ -596,7 +596,7 @@ public partial class AIController
 
         foreach (UnitManager ally in UnitManager.AllActive)
         {
-            if (ally == null || ally == unit || ally.TeamId != aiTeam)
+            if (ally == null || ally == unit || ally.SlotIndex != ResolveAISlotKey(aiTeam))
                 continue;
             if (ally.IsDead || ally.IsEmbarked || ally.IsUnderRepair)
                 continue;
@@ -657,7 +657,7 @@ public partial class AIController
     private static bool IsPreferredAircraftRepairConstruction(ConstructionManager construction, TeamId aiTeam)
     {
         return construction != null
-            && construction.TeamId == aiTeam
+            && construction.SlotIndex == ResolveAISlotKey(aiTeam)
             && IsAirportConstruction(construction)
             && IsAircraftRepairConstruction(construction);
     }
@@ -665,7 +665,7 @@ public partial class AIController
 
     private static bool IsRepairConstructionSectorSafe(ConstructionManager construction, TeamId aiTeam)
     {
-        if (construction == null || construction.TeamId != aiTeam)
+        if (construction == null || construction.SlotIndex != ResolveAISlotKey(aiTeam))
             return false;
 
         if (IsRepairHomeConstruction(construction, aiTeam))
@@ -684,7 +684,7 @@ public partial class AIController
     private static bool IsRepairHomeConstruction(ConstructionManager construction, TeamId aiTeam)
     {
         return construction != null
-            && construction.TeamId == aiTeam
+            && construction.SlotIndex == ResolveAISlotKey(aiTeam)
             && (construction.IsPlayerHeadQuarter || ConstructionSectorHelper.IsBase(construction.Sector));
     }
 
@@ -697,7 +697,7 @@ public partial class AIController
         float bestDist = float.MaxValue;
         foreach (ConstructionManager c in ConstructionManager.AllActive)
         {
-            if (c.TeamId != aiTeam || !IsRepairHomeConstruction(c, aiTeam)) continue;
+            if (c.SlotIndex != ResolveAISlotKey(aiTeam) || !IsRepairHomeConstruction(c, aiTeam)) continue;
             Vector3Int cc = c.CurrentCellPosition; cc.z = 0;
             float dist = SectorManager.HexDistance(fromCell, cc);
             if (dist < bestDist) { bestDist = dist; best = c; }

@@ -35,6 +35,7 @@ public partial class AIController
         aiTurnBatchExecuting = false;
         currentAIStage = 0;
         currentAITeam = TeamId.Neutral;
+        currentAISlotIndex = -1;
         aiCoroutine = null;
         debugStepPendingAction = null;
         debugStepRequest = DebugStepRequest.None;
@@ -263,7 +264,7 @@ public partial class AIController
         aiTurnBatchExecuting = false;
         if (aiCoroutine != null)
             StopCoroutine(aiCoroutine);
-        aiCoroutine = StartCoroutine(RunAITurn(activeTeam));
+        aiCoroutine = StartCoroutine(RunAITurn(matchController.ActiveSlotId, activeTeam));
 
         Debug.Log($"[AI Stage] Pos-load: coroutine retomada para {activeTeam} "
             + $"no turno {aiTurnNumber}, stage {currentAIStage}, paused={isDebugPaused}.");
@@ -309,7 +310,7 @@ public partial class AIController
 
             if (aiCoroutine != null) StopCoroutine(aiCoroutine);
 
-            aiCoroutine = StartCoroutine(RunAITurn(newTeam));
+            aiCoroutine = StartCoroutine(RunAITurn(matchController.ActiveSlotId, newTeam));
 
         }
 
@@ -324,6 +325,7 @@ public partial class AIController
             {
                 currentAIStage = 0;
                 currentAITeam = TeamId.Neutral;
+                currentAISlotIndex = -1;
             }
 
         }

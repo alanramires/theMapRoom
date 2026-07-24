@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using UnityEngine;
 
 public partial class AIController
@@ -76,7 +76,7 @@ public partial class AIController
                 continue;
             if (!construction.IsCapturable || construction.CapturePointsMax <= 0)
                 continue;
-            if (construction.TeamId != aiTeam || construction.CurrentCapturePoints < construction.CapturePointsMax)
+            if (construction.SlotIndex != ResolveAISlotKey(aiTeam) || construction.CurrentCapturePoints < construction.CapturePointsMax)
                 continue;
 
             hasOwnedCapturable = true;

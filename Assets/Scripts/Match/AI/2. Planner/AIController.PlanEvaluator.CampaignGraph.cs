@@ -42,7 +42,7 @@ public partial class AIController
     private static CampaignSectorEdge[] GetCampaignEdges(TeamId aiTeam)
     {
         MatchController match = GetMatchController();
-        int slot = match != null ? match.GetSlotIndexForTeam(aiTeam) : -1;
+        int slot = match != null ? ResolveAISlotKey(aiTeam) : -1;
         // A geometria da campanha pertence ao lado/slot da cena, nao a cor.
         // Slot 1 nasce no lado antes chamado Red; slot 0 no lado Green.
         if (slot >= 0)

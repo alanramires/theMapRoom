@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -120,7 +120,7 @@ public partial class AIController
                 return false;
 
             if (isDestination
-                && occupant.TeamId == unit.TeamId
+                && occupant.SlotIndex == unit.SlotIndex
                 && OccupancyResolver.GetHeightBand(occupant) == OccupancyResolver.GetHeightBand(unit))
                 return false;
         }

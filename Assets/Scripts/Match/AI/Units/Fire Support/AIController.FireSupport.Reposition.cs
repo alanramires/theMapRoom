@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -492,7 +492,7 @@ public partial class AIController
         {
             PodeMirarTargetOption opt = targets[i];
             UnitManager target = opt != null ? opt.targetUnit : null;
-            if (target == null || target.TeamId == snapshot.AITeam || target.IsDead || target.IsEmbarked)
+            if (target == null || target.SlotIndex == snapshot.AISlotIndex || target.IsDead || target.IsEmbarked)
                 continue;
 
             float targetScore = GetFireSupportTargetPreferenceScore(ResolveFireSupportTargetPreference(unit, target));
@@ -518,7 +518,7 @@ public partial class AIController
         {
             PodeMirarInvalidOption invalid = invalids[i];
             UnitManager target = invalid != null ? invalid.targetUnit : null;
-            if (target == null || target.TeamId == snapshot.AITeam || target.IsDead || target.IsEmbarked)
+            if (target == null || target.SlotIndex == snapshot.AISlotIndex || target.IsDead || target.IsEmbarked)
                 continue;
 
             bool usefulInvalid =

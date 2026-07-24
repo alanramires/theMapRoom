@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -15,7 +15,7 @@ public partial class AIController
         foreach (ConstructionManager bldg in ConstructionManager.AllActive)
         {
             if (bldg == null || !bldg.IsCapturable || bldg.CapturePointsMax <= 0) continue;
-            if (bldg.TeamId == aiTeam && bldg.CurrentCapturePoints >= bldg.CapturePointsMax) continue;
+            if (bldg.SlotIndex == ResolveAISlotKey(aiTeam) && bldg.CurrentCapturePoints >= bldg.CapturePointsMax) continue;
 
             Vector3Int bc = bldg.CurrentCellPosition; bc.z = 0;
             if (SectorManager.HexDistance(bc, escortCell) > searchRadius) continue;

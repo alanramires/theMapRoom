@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -79,7 +79,7 @@ public partial class AIController
         foreach (UnitManager candidate in UnitManager.AllActive)
         {
             if (candidate == transporter) continue;
-            if (candidate.TeamId != snapshot.AITeam || candidate.IsDead || candidate.IsEmbarked) continue;
+            if (candidate.SlotIndex != snapshot.AISlotIndex || candidate.IsDead || candidate.IsEmbarked) continue;
             if (!candidate.IsUnderRepair) continue;
             if (!candidate.TryGetUnitData(out UnitData candidateData)) continue;
             if (candidateData.domain == Domain.Air) continue;
@@ -287,7 +287,7 @@ public partial class AIController
         MatchController mc = GetMatchController();
         foreach (UnitManager enemy in UnitManager.AllActive)
         {
-            if (enemy == null || enemy.TeamId == aiTeam || enemy.IsDead || enemy.IsEmbarked)
+            if (enemy == null || enemy.SlotIndex == ResolveAISlotKey(aiTeam) || enemy.IsDead || enemy.IsEmbarked)
                 continue;
             if (mc != null && !mc.IsUnitVisibleForTeamNoCache(enemy, aiTeam))
                 continue;
@@ -330,7 +330,7 @@ public partial class AIController
 
         foreach (PodeEmbarcarOption opt in embarkOpts)
         {
-            if (opt.transporterUnit == null || opt.transporterUnit.TeamId != aiTeam) continue;
+            if (opt.transporterUnit == null || opt.transporterUnit.SlotIndex != ResolveAISlotKey(aiTeam)) continue;
             if (opt.transporterUnit.IsDead || opt.transporterUnit.IsUnderRepair) continue;
             if (HasTransportCargo(opt.transporterUnit)) continue; // already carrying someone
 
@@ -540,7 +540,7 @@ public partial class AIController
         float bestScore = float.MinValue;
         foreach (UnitManager transporter in UnitManager.AllActive)
         {
-            if (transporter == null || transporter.TeamId != aiTeam) continue;
+            if (transporter == null || transporter.SlotIndex != ResolveAISlotKey(aiTeam)) continue;
             if (transporter == passenger || transporter.IsDead || transporter.IsEmbarked || transporter.IsUnderRepair) continue;
             if (HasTransportCargo(transporter)) continue;
             if (!transporter.TryGetUnitData(out UnitData transporterData) || transporterData == null || !transporterData.isTransporter) continue;

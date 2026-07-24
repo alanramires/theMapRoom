@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+ï»¿using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -23,8 +23,8 @@ public partial class AIController
         PlayerAction repairAction = TryDecideRepairAction(unit, snapshot, plan);
         if (repairAction != null) return repairAction;
 
-        // Hard: a ponta de lança que já iniciou uma captura não fica terminando o prédio.
-        // Ela continua pelo mesmo eixo; outra infantaria fecha a captura atrás dela.
+        // Hard: a ponta de lanï¿½a que jï¿½ iniciou uma captura nï¿½o fica terminando o prï¿½dio.
+        // Ela continua pelo mesmo eixo; outra infantaria fecha a captura atrï¿½s dela.
         if (TryDecideHardBlitzkriegHandoff(unit, snapshot, plan, out PlayerAction blitzAction))
             return blitzAction;
 
@@ -115,7 +115,7 @@ public partial class AIController
                 continue;
             if (captureTarget == null || !captureTarget.IsCapturable || captureTarget.CapturePointsMax <= 0)
                 continue;
-            if (captureTarget.TeamId == snapshot.AITeam && captureTarget.CurrentCapturePoints >= captureTarget.CapturePointsMax)
+            if (captureTarget.SlotIndex == snapshot.AISlotIndex && captureTarget.CurrentCapturePoints >= captureTarget.CapturePointsMax)
                 continue;
             if (ShouldReserveOpportunisticCaptureForCloserUnit(unit, snapshot.AITeam, captureCell, paths, out UnitManager reservedFor))
             {
@@ -272,7 +272,7 @@ public partial class AIController
         var nearbyEnemies = new List<UnitManager>();
         foreach (UnitManager enemy in UnitManager.AllActive)
         {
-            if (enemy.TeamId == snapshot.AITeam || enemy.IsDead || enemy.IsEmbarked) continue;
+            if (enemy.SlotIndex == snapshot.AISlotIndex || enemy.IsDead || enemy.IsEmbarked) continue;
             if (mcDef != null && !mcDef.IsUnitVisibleForTeam(enemy, snapshot.AITeam)) continue;
             Vector3Int ec = enemy.CurrentCellPosition; ec.z = 0;
             if (SectorManager.HexDistance(ec, targetCell) > fromDist) continue;
@@ -452,7 +452,7 @@ public partial class AIController
             }
 
             UnitManager occupant = HexOccupancyQuery.FindUnitAtCell(targetCell);
-            if (occupant != null && occupant.TeamId == snapshot.AITeam)
+            if (occupant != null && occupant.SlotIndex == snapshot.AISlotIndex)
             {
                 Debug.Log($"{TL("PontaLanca")} {unit.InstanceId} aguarda {assigned.Sector} â€” aliado {occupant.InstanceId} ocupa o alvo");
                 return BuildMoveBatch(unit, snapshot.AITeam, fromCell, fromCell);
@@ -496,7 +496,7 @@ public partial class AIController
         UnitManager advOccupant = HexOccupancyQuery.FindUnitAtCell(targetCell);
         MatchController mcAdv   = GetMatchController();
         bool hiddenOccupant = advOccupant != null
-            && advOccupant.TeamId != snapshot.AITeam
+            && advOccupant.SlotIndex != snapshot.AISlotIndex
             && (mcAdv == null || !mcAdv.IsUnitVisibleForTeam(advOccupant, snapshot.AITeam));
         bool sectorInContest = HasNearbyVisibleEnemy(targetCell, snapshot.AITeam, DefenseEnemyRange);
         string advTag = hiddenOccupant ? "Explorador" : sectorInContest ? "Perseguidor" : "PontaLanca";

@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -424,7 +424,7 @@ public partial class AIController
         for (int i = 0; i < snapshot.MyBuildings.Count; i++)
         {
             ConstructionManager building = snapshot.MyBuildings[i];
-            if (building == null || building.TeamId != snapshot.AITeam)
+            if (building == null || building.SlotIndex != snapshot.AISlotIndex)
                 continue;
             if (building.IsCapturable && building.CurrentCapturePoints < building.CapturePointsMax)
                 continue;

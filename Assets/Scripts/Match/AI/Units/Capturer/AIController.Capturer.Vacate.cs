@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -500,12 +500,12 @@ public partial class AIController
                     : 0f;
                 float alliedConstructionPenalty = unit.GetDomain() == Domain.Air
                     && bldg != null
-                    && bldg.TeamId == aiTeam
+                    && bldg.SlotIndex == ResolveAISlotKey(aiTeam)
                         ? 180f
                         : 0f;
                 float currentAlliedConstructionBonus = unit.GetDomain() == Domain.Air
                     && ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, fromCell) is ConstructionManager currentBldg
-                    && currentBldg.TeamId == aiTeam
+                    && currentBldg.SlotIndex == ResolveAISlotKey(aiTeam)
                         ? 240f
                         : 0f;
                 float homeBias = 0f;
@@ -556,7 +556,7 @@ public partial class AIController
         MatchController mc = GetMatchController();
         foreach (UnitManager enemy in UnitManager.AllActive)
         {
-            if (enemy.TeamId == aiTeam || enemy.IsDead || enemy.IsEmbarked) continue;
+            if (enemy.SlotIndex == ResolveAISlotKey(aiTeam) || enemy.IsDead || enemy.IsEmbarked) continue;
             if (mc != null && !mc.IsUnitVisibleForTeam(enemy, aiTeam)) continue;
 
             Vector3Int enemyCell = enemy.CurrentCellPosition;
@@ -576,7 +576,7 @@ public partial class AIController
 
         foreach (UnitManager enemy in UnitManager.AllActive)
         {
-            if (enemy == null || enemy.TeamId == aiTeam || enemy.IsDead || enemy.IsEmbarked) continue;
+            if (enemy == null || enemy.SlotIndex == ResolveAISlotKey(aiTeam) || enemy.IsDead || enemy.IsEmbarked) continue;
             if (mc != null && !mc.IsUnitVisibleForTeam(enemy, aiTeam)) continue;
 
             Vector3Int cell = enemy.CurrentCellPosition;

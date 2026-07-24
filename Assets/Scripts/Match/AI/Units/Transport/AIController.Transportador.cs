@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -217,7 +217,7 @@ public partial class AIController
     private bool IsNonTeamConstruction(Vector3Int cell, TeamId aiTeam)
     {
         ConstructionManager bldg = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, cell);
-        return bldg != null && bldg.TeamId != aiTeam;
+        return bldg != null && bldg.SlotIndex != ResolveAISlotKey(aiTeam);
     }
 
     private float ScoreTransportTrafficPenalty(UnitManager unit, Vector3Int cell, Vector3Int targetCell, TeamId aiTeam)
@@ -233,7 +233,7 @@ public partial class AIController
 
         foreach (UnitManager ally in UnitManager.AllActive)
         {
-            if (ally == null || ally == unit || ally.TeamId != aiTeam || ally.IsDead || ally.IsEmbarked)
+            if (ally == null || ally == unit || ally.SlotIndex != ResolveAISlotKey(aiTeam) || ally.IsDead || ally.IsEmbarked)
                 continue;
 
             ally.SyncLayerStateFromData(forceNativeDefault: false);
@@ -479,7 +479,7 @@ public partial class AIController
         var list = new List<UnitManager>();
         foreach (UnitManager u in UnitManager.AllActive)
         {
-            if (u.TeamId != aiTeam || u.IsDead || u.IsEmbarked || u.IsUnderRepair) continue;
+            if (u.SlotIndex != ResolveAISlotKey(aiTeam) || u.IsDead || u.IsEmbarked || u.IsUnderRepair) continue;
             if (!u.TryGetUnitData(out UnitData data)) continue;
             if (UnitRoleCompatibility.IsOperationalTransporter(data))
                 list.Add(u);

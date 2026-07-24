@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Tilemaps;
 
@@ -17,7 +17,7 @@ public partial class AIController
     {
         aiAttackTargetsByOrigin.Clear();
         aiDpqByCell.Clear();
-        aiThreatEnemyCellsByTeam.Clear();
+        aiThreatEnemyCellsBySlot.Clear();
         aiThreatEnvelopeUnit = unit;
         aiThreatEnvelope = null;
         aiThreatEnvelopeResolved = false;
@@ -126,7 +126,7 @@ public partial class AIController
         float bestPriority = float.MinValue;
         foreach (PodeMirarTargetOption opt in options)
         {
-            if (opt?.targetUnit == null || opt.targetUnit.TeamId == aiTeam) continue;
+            if (opt?.targetUnit == null || opt.targetUnit.SlotIndex == ResolveAISlotKey(aiTeam)) continue;
             string decisionReason = "";
             if (attacker != null
                 && !PassesAttackDecision(attacker, opt.targetUnit, attackCell, defensiveContext, out decisionReason))
@@ -138,7 +138,7 @@ public partial class AIController
             Vector3Int ec = opt.targetUnit.CurrentCellPosition; ec.z = 0;
             ConstructionManager bldg = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, ec);
             if (bldg != null && bldg.IsCapturable
-                && !(bldg.TeamId == aiTeam && bldg.CurrentCapturePoints >= bldg.CapturePointsMax))
+                && !(bldg.SlotIndex == ResolveAISlotKey(aiTeam) && bldg.CurrentCapturePoints >= bldg.CapturePointsMax))
                 priority += 1000f;
 
             if (priority > bestPriority)
@@ -157,7 +157,7 @@ public partial class AIController
         MatchController mc = GetMatchController();
         foreach (UnitManager enemy in UnitManager.AllActive)
         {
-            if (enemy.TeamId == aiTeam || enemy.IsDead || enemy.IsEmbarked) continue;
+            if (enemy.SlotIndex == ResolveAISlotKey(aiTeam) || enemy.IsDead || enemy.IsEmbarked) continue;
             if (mc != null && !mc.IsUnitVisibleForTeam(enemy, aiTeam)) continue;
             Vector3Int ec = enemy.CurrentCellPosition; ec.z = 0;
             if (Vector3Int.Distance(fromCell, ec) <= radius) return true;
@@ -172,7 +172,7 @@ public partial class AIController
         MatchController mc = GetMatchController();
         foreach (UnitManager enemy in UnitManager.AllActive)
         {
-            if (enemy.TeamId == aiTeam || enemy.IsDead || enemy.IsEmbarked) continue;
+            if (enemy.SlotIndex == ResolveAISlotKey(aiTeam) || enemy.IsDead || enemy.IsEmbarked) continue;
             if (mc != null && !mc.IsUnitVisibleForTeam(enemy, aiTeam)) continue;
             Vector3Int ec = enemy.CurrentCellPosition; ec.z = 0;
             if (Vector3Int.Distance(fromCell, ec) > engageRadius) continue;
@@ -331,7 +331,7 @@ public partial class AIController
 
         foreach (UnitManager enemy in UnitManager.AllActive)
         {
-            if (enemy == null || enemy.TeamId == snapshot.AITeam || enemy.IsDead || enemy.IsEmbarked)
+            if (enemy == null || enemy.SlotIndex == snapshot.AISlotIndex || enemy.IsDead || enemy.IsEmbarked)
                 continue;
             if (mc != null && !mc.IsUnitVisibleForTeam(enemy, snapshot.AITeam))
                 continue;
@@ -422,12 +422,12 @@ public partial class AIController
         // O capturador esta EM CIMA de um capturavel NOSSO? Entao ele defende o predio pela
         // presenca — e um inimigo ADJACENTE a ele tambem ameaca o predio (nao so inimigo em cima).
         ConstructionManager buildingUnderMe = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, fromCell);
-        bool defendingHere = buildingUnderMe != null && buildingUnderMe.IsCapturable && buildingUnderMe.TeamId == snapshot.AITeam;
+        bool defendingHere = buildingUnderMe != null && buildingUnderMe.IsCapturable && buildingUnderMe.SlotIndex == snapshot.AISlotIndex;
         bool adjacentThreat = false;
 
         foreach (UnitManager enemy in UnitManager.AllActive)
         {
-            if (enemy == null || enemy.TeamId == snapshot.AITeam || enemy.IsDead || enemy.IsEmbarked)
+            if (enemy == null || enemy.SlotIndex == snapshot.AISlotIndex || enemy.IsDead || enemy.IsEmbarked)
                 continue;
             if (mc != null && !mc.IsUnitVisibleForTeam(enemy, snapshot.AITeam))
                 continue;
@@ -437,7 +437,7 @@ public partial class AIController
             ConstructionManager enemyOnBuilding = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, enemyCell);
             bool enemyOnOurBuilding = enemyOnBuilding != null
                 && enemyOnBuilding.IsCapturable
-                && enemyOnBuilding.TeamId == snapshot.AITeam;
+                && enemyOnBuilding.SlotIndex == snapshot.AISlotIndex;
             // Inimigo adjacente ao predio que ESTOU defendendo tambem conta (defende-se atacando-o).
             bool enemyAdjacentToMyBuilding = defendingHere
                 && SectorManager.HexDistance(fromCell, enemyCell) <= 1.5f;

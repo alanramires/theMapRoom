@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -51,7 +51,7 @@ public partial class AIController
                 Vector3Int enemyCell = enemy.CurrentCellPosition;
                 enemyCell.z = 0;
                 ConstructionManager enemyBldg = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, enemyCell);
-                bool enemyOnOwnBuilding = enemyBldg != null && enemyBldg.TeamId == snapshot.AITeam;
+                bool enemyOnOwnBuilding = enemyBldg != null && enemyBldg.SlotIndex == snapshot.AISlotIndex;
                 float targetPriority = AttackTargetPriority(enemyCell, cell);
                 bool hasSim = TrySimulateAttackForAI(unit, enemy, cell, out AIAttackSimulationSummary simSummary);
                 if (hasSim && simSummary.targetDamage <= 0)
@@ -119,7 +119,7 @@ public partial class AIController
         if (unit == null)
             return false;
 
-        if (currentConstruction != null && currentConstruction.TeamId == aiTeam)
+        if (currentConstruction != null && currentConstruction.SlotIndex == ResolveAISlotKey(aiTeam))
             return false;
 
         if (HasAnyUnoccupiedRepairMove(fromCell, paths, occupied))
@@ -271,7 +271,7 @@ public partial class AIController
         fromCell.z = 0;
 
         ConstructionManager current = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, fromCell);
-        if (current != null && current.TeamId == aiTeam
+        if (current != null && current.SlotIndex == ResolveAISlotKey(aiTeam)
             && (current.IsPlayerHeadQuarter || ConstructionSectorHelper.IsBase(current.Sector)))
             return true;
 

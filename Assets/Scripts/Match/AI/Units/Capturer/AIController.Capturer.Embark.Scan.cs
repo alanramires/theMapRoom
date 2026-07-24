@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -24,7 +24,7 @@ public partial class AIController
         int listed = 0;
         foreach (UnitManager t in UnitManager.AllActive)
         {
-            if (t == null || t == unit || t.TeamId != unit.TeamId || t.IsDead || t.IsEmbarked) continue;
+            if (t == null || t == unit || t.SlotIndex != unit.SlotIndex || t.IsDead || t.IsEmbarked) continue;
             if (!t.TryGetUnitData(out UnitData tData) || tData == null || !tData.isTransporter) continue;
 
             Vector3Int tCell = t.CurrentCellPosition; tCell.z = 0;
@@ -204,7 +204,7 @@ public partial class AIController
         foreach (ConstructionManager c in ConstructionManager.AllActive)
         {
             if (!c.IsCapturable || c.CapturePointsMax <= 0) continue;
-            if (c.TeamId == unit.TeamId && c.CurrentCapturePoints >= c.CapturePointsMax) continue;
+            if (c.SlotIndex == unit.SlotIndex && c.CurrentCapturePoints >= c.CapturePointsMax) continue;
             Vector3Int tc = c.CurrentCellPosition; tc.z = 0;
             float dist = SectorManager.HexDistance(fromCell, tc);
             if (dist < bestDist) { bestDist = dist; best = c; }
@@ -226,7 +226,7 @@ public partial class AIController
         foreach (UnitManager t in UnitManager.AllActive)
         {
             if (t == capturer) continue;
-            if (t.TeamId != capturer.TeamId || t.IsDead || t.IsEmbarked || t.IsUnderRepair) continue;
+            if (t.SlotIndex != capturer.SlotIndex || t.IsDead || t.IsEmbarked || t.IsUnderRepair) continue;
             if (!t.TryGetUnitData(out UnitData tData) || !tData.isTransporter) continue;
             SectorObjective tObj = plan != null ? ResolveAssignedTransportObjective(t, plan) : null;
             if (tObj != null) continue;

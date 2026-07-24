@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -241,7 +241,7 @@ public partial class AIController
     {
         if (target == null || !target.IsCapturable || target.CapturePointsMax <= 0)
             return false;
-        if (target.TeamId == aiTeam && target.CurrentCapturePoints >= target.CapturePointsMax)
+        if (target.SlotIndex == ResolveAISlotKey(aiTeam) && target.CurrentCapturePoints >= target.CapturePointsMax)
             return false;
         if (target.Sector == ConstructionSector.None || ConstructionSectorHelper.IsBase(target.Sector))
             return false;
@@ -259,10 +259,10 @@ public partial class AIController
             return false;
         if (target.Sector == ConstructionSector.None || ConstructionSectorHelper.IsBase(target.Sector) || target.IsPlayerHeadQuarter)
             return false;
-        if (target.TeamId == aiTeam && target.CurrentCapturePoints >= target.CapturePointsMax)
+        if (target.SlotIndex == ResolveAISlotKey(aiTeam) && target.CurrentCapturePoints >= target.CapturePointsMax)
             return false;
 
-        return target.TeamId != aiTeam || target.CurrentCapturePoints < target.CapturePointsMax;
+        return target.SlotIndex != ResolveAISlotKey(aiTeam) || target.CurrentCapturePoints < target.CapturePointsMax;
     }
 
     private bool IsUnheldCourierRallyOwnerPoint(ConstructionManager target, TeamId aiTeam)
@@ -277,7 +277,7 @@ public partial class AIController
             && IsRallySectorHeldByTeam(info, aiTeam))
             return false;
 
-        return target.TeamId != aiTeam || target.CurrentCapturePoints < target.CapturePointsMax;
+        return target.SlotIndex != ResolveAISlotKey(aiTeam) || target.CurrentCapturePoints < target.CapturePointsMax;
     }
 
     private bool HasPlanAllocationForSector(
@@ -408,7 +408,7 @@ public partial class AIController
             + missingCapture * 85f
             + GetTerrainDpqPontos(dropCell) * 45f;
 
-        if (target.TeamId != aiTeam)
+        if (target.SlotIndex != ResolveAISlotKey(aiTeam))
             score += 1400f;
         if (SimulateCaptureSensor(passenger, dropCell, out ConstructionManager immediate) && immediate == target)
             score += 3200f;

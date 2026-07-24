@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -70,7 +70,7 @@ public partial class AIController
 
             foreach (PodeMirarTargetOption opt in targets)
             {
-                if (opt?.targetUnit == null || opt.targetUnit.TeamId == snapshot.AITeam || opt.targetUnit.IsDead) continue;
+                if (opt?.targetUnit == null || opt.targetUnit.SlotIndex == snapshot.AISlotIndex || opt.targetUnit.IsDead) continue;
                 enemyOptions++;
                 if (optionFilter != null && !optionFilter(opt))
                 {
@@ -300,7 +300,7 @@ public partial class AIController
         {
             PodeMirarInvalidOption invalid = invalidTargets[i];
             UnitManager candidate = invalid != null ? invalid.targetUnit : null;
-            if (candidate == null || candidate.TeamId == snapshot.AITeam || candidate.IsDead || candidate.IsEmbarked)
+            if (candidate == null || candidate.SlotIndex == snapshot.AISlotIndex || candidate.IsDead || candidate.IsEmbarked)
                 continue;
             if (!IsBlockedLineReason(invalid.reasonId))
                 continue;

@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -25,7 +25,7 @@ public partial class AIController
         target.z = 0;
         ConstructionManager building = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, target);
         if (building != null
-            && building.TeamId != snapshot.AITeam
+            && building.SlotIndex != snapshot.AISlotIndex
             && (building.IsPlayerHeadQuarter || ConstructionSectorHelper.IsBase(building.Sector)))
             return true;
 
