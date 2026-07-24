@@ -182,9 +182,9 @@ public class AIPlanEvaluatorWindow : EditorWindow
 
         if (row.HasSectorInfo)
         {
-            SectorManager.SectorRiskLevel risk = row.SectorInfo.GetRiskLevelFor(selectedTeam);
-            float hq  = row.SectorInfo.GetDistanceToHQ(selectedTeam);
-            float fct = row.SectorInfo.GetNearestFactoryDistance(selectedTeam);
+            SectorManager.SectorRiskLevel risk = row.SectorInfo.GetRiskLevelFor(ResolveSelectedSlot());
+            float hq  = row.SectorInfo.GetDistanceToHQ(ResolveSelectedSlot());
+            float fct = row.SectorInfo.GetNearestFactoryDistance(ResolveSelectedSlot());
             EditorGUILayout.LabelField(
                 $"Risco:{risk}  HQ:{(hq==float.MaxValue?"—":$"{hq:F1}h")}  Fábr:{(fct==float.MaxValue?"—":$"{fct:F1}h")}",
                 EditorStyles.miniLabel);
@@ -479,7 +479,7 @@ public class AIPlanEvaluatorWindow : EditorWindow
 
         if (Application.isPlaying)
         {
-            _plan = ObjectiveManager.GetPlanForTeam(selectedTeam);
+            _plan = ObjectiveManager.GetPlanForSlot(ResolveSelectedSlot());
             _isEditorSimulation = false;
             if (_plan == null) { _status = $"Nenhum plano encontrado para {selectedTeam}."; return; }
         }
@@ -539,7 +539,7 @@ public class AIPlanEvaluatorWindow : EditorWindow
                 Sector = info.Sector, AssignedTeam = selectedTeam,
                 Status = ObjectiveStatus.Pending, Priority = SimulateCalculatePriority(info),
             };
-            int slots = info.GetRiskLevelFor(selectedTeam) >= SectorManager.SectorRiskLevel.High ? 2 : 1;
+            int slots = info.GetRiskLevelFor(ResolveSelectedSlot()) >= SectorManager.SectorRiskLevel.High ? 2 : 1;
             for (int s = 0; s < slots; s++) obj.Slots.Add(new SlotNeed { Role = UnitRole.Capturador });
             plan.Objectives.Add(obj);
         }
@@ -632,7 +632,7 @@ public class AIPlanEvaluatorWindow : EditorWindow
 
             // 2º slot co-chegada
             if (SectorManager.TryGetSectorInfo(obj.Sector, out SectorManager.SectorInfo slotInfo)
-                && slotInfo.GetRiskLevelFor(selectedTeam) >= SectorManager.SectorRiskLevel.High)
+                && slotInfo.GetRiskLevelFor(ResolveSelectedSlot()) >= SectorManager.SectorRiskLevel.High)
             {
                 SlotNeed filled = obj.Slots.Find(s => s.Role == UnitRole.Capturador && s.Filled);
                 if (filled != null)
@@ -695,7 +695,7 @@ public class AIPlanEvaluatorWindow : EditorWindow
         {
             riskMults[oj] = 1f;
             if (SectorManager.TryGetSectorInfo(assignable[oj].obj.Sector, out SectorManager.SectorInfo si))
-                riskMults[oj] = 1f + si.GetRiskRatioFor(selectedTeam) * RiskCostWeight;
+                riskMults[oj] = 1f + si.GetRiskRatioFor(ResolveSelectedSlot()) * RiskCostWeight;
         }
 
         // distMatrix
@@ -772,15 +772,15 @@ public class AIPlanEvaluatorWindow : EditorWindow
     private void SimMarkCascadeNeighbor(ConstructionSector sector, HashSet<ConstructionSector> covered)
     {
         if (!SectorManager.TryGetSectorInfo(sector, out SectorManager.SectorInfo info)) return;
-        float myHQDist = info.GetDistanceToHQ(selectedTeam);
+        float myHQDist = info.GetDistanceToHQ(ResolveSelectedSlot());
         ConstructionSector candidate = default;
         if (info.ClosestNeighbor1 != default
             && SectorManager.TryGetSectorInfo(info.ClosestNeighbor1, out SectorManager.SectorInfo n1)
-            && n1.GetDistanceToHQ(selectedTeam) > myHQDist)
+            && n1.GetDistanceToHQ(ResolveSelectedSlot()) > myHQDist)
             candidate = info.ClosestNeighbor1;
         else if (info.ClosestNeighbor2 != default
             && SectorManager.TryGetSectorInfo(info.ClosestNeighbor2, out SectorManager.SectorInfo n2)
-            && n2.GetDistanceToHQ(selectedTeam) > myHQDist)
+            && n2.GetDistanceToHQ(ResolveSelectedSlot()) > myHQDist)
             candidate = info.ClosestNeighbor2;
         if (candidate != default) covered.Add(candidate);
     }
@@ -808,9 +808,9 @@ public class AIPlanEvaluatorWindow : EditorWindow
 
     private int SimulateCalculatePriority(SectorManager.SectorInfo info)
     {
-        float dist = info.GetDistanceToHQ(selectedTeam);
+        float dist = info.GetDistanceToHQ(ResolveSelectedSlot());
         if (dist == float.MaxValue) return 0;
-        SectorManager.SectorRiskLevel risk = info.GetRiskLevelFor(selectedTeam);
+        SectorManager.SectorRiskLevel risk = info.GetRiskLevelFor(ResolveSelectedSlot());
         int rb = risk == SectorManager.SectorRiskLevel.Safe ? 40
                : risk == SectorManager.SectorRiskLevel.Low  ? 30
                : risk == SectorManager.SectorRiskLevel.Medium ? 20
@@ -1007,5 +1007,17 @@ public class AIPlanEvaluatorWindow : EditorWindow
                 if (mc != null) selectedTeam = mc.ActiveTeam;
             }
         }
+    }
+
+    private PlayerSlotId ResolveSelectedSlot()
+    {
+        MatchController match = Object.FindAnyObjectByType<MatchController>();
+        if (match == null)
+            return PlayerSlotId.Invalid;
+        if (match.ActiveTeam == selectedTeam && match.ActiveSlotId.IsValid)
+            return match.ActiveSlotId;
+        return match.TryGetUniqueSlotForTeam(selectedTeam, out PlayerSlotId slot)
+            ? slot
+            : PlayerSlotId.Invalid;
     }
 }

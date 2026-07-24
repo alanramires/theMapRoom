@@ -543,7 +543,7 @@ public class SectorManagerEditor : Editor
         EditorGUI.indentLevel++;
         foreach (TeamId team in teams)
         {
-            InvasionAxisMap axisMap = InvasionAxisMap.Build(team, map);
+            InvasionAxisMap axisMap = InvasionAxisMap.Build(ResolveSlotForVisualTeam(team), map);
             EditorGUILayout.LabelField($"{team} ({axisMap.AxisCount} eixo(s))", EditorStyles.miniBoldLabel);
             EditorGUI.indentLevel++;
             foreach (InvasionAxisMap.Axis axis in axisMap.Axes)
@@ -606,7 +606,7 @@ public class SectorManagerEditor : Editor
         // Fonte única de verdade: o classificador runtime InvasionAxisMap.
         foreach (TeamId team in teams)
         {
-            InvasionAxisMap axisMap = InvasionAxisMap.Build(team, map);
+            InvasionAxisMap axisMap = InvasionAxisMap.Build(ResolveSlotForVisualTeam(team), map);
             foreach (InvasionAxisMap.Axis axis in axisMap.Axes)
             {
                 if (hideInvasionAxis && axis.IsInvasionAxis)
@@ -954,5 +954,17 @@ public class SectorManagerEditor : Editor
             if (maps[i] != null && string.Equals(maps[i].name, "TileMap", System.StringComparison.OrdinalIgnoreCase))
                 return maps[i];
         return maps != null && maps.Length > 0 ? maps[0] : null;
+    }
+
+    private static PlayerSlotId ResolveSlotForVisualTeam(TeamId team)
+    {
+        MatchController match = Object.FindAnyObjectByType<MatchController>();
+        if (match == null)
+            return PlayerSlotId.Invalid;
+        if (match.ActiveTeam == team && match.ActiveSlotId.IsValid)
+            return match.ActiveSlotId;
+        return match.TryGetUniqueSlotForTeam(team, out PlayerSlotId slot)
+            ? slot
+            : PlayerSlotId.Invalid;
     }
 }

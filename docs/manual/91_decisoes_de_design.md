@@ -34,6 +34,22 @@ Cada entrada registra a decisão, o problema que a motivou, as alternativas cons
 
 ---
 
+## A primeira eliminação encerra a partida
+
+**Problema.** Numa partida de três ou quatro lados, "jogar até sobrar um" produz dois defeitos conhecidos de jogo multiplayer. O eliminado cedo fica assistindo os outros por horas, sem agência. E surge o *kingmaker*: o jogador já sem chance de vencer decide quem ganha escolhendo em quem bater no fim.
+
+**Decisão.** A partida termina no **primeiro abate**. Quem capturar um Quartel General ou destruir um exército inteiro vence a partida toda, mesmo restando outros participantes em campo. A rendição de qualquer participante produz o mesmo efeito. Declarada a vitória, o avanço de turno congela — resta menu, Jornal e estatísticas.
+
+**Família de design.** É o mesmo mecanismo de jogos de tabuleiro que terminam num gatilho em vez de por último sobrevivente, como Civilization — lá o gatilho é o primeiro a **chegar** a uma condição, aqui é o primeiro a **derrubar**. Gatilho espelhado, mesmo efeito estrutural.
+
+**Consequência desejada.** A partida vira uma corrida, não uma guerra de atrito. Acumular vantagem sem fechar o abate é perder: deixar dois vizinhos se destruindo enquanto você cresce é a pior estratégia possível, porque o vencedor daquele duelo vence você junto.
+
+**Consequência que o desenho de mapa precisa considerar.** O participante mais fraco deixa de ser presa e vira **prêmio** — vale como gatilho barato, não pelo território. Quem tiver fronteira com ele está numa corrida estruturalmente mais curta que os demais, independentemente de estar jogando melhor. Quem posiciona os spawns de um cenário está distribuindo distâncias até o alvo mais fácil, e isso decide partidas.
+
+**Onde vive a regra.** `10_turnos_jornal_e_vitoria.md`.
+
+---
+
 ## Disparar custa ocultação — inclusive no revide
 
 **Problema.** A ocultação caía ao atacar, mas o revide não cobrava nada: a aeronave furtiva atacada respondia ao fogo e continuava invisível. O submarino já emergia ao revidar, então os dois furtivos do jogo seguiam regras diferentes sem que ninguém tivesse decidido isso.

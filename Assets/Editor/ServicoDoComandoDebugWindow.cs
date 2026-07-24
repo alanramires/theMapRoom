@@ -152,11 +152,19 @@ public class ServicoDoComandoDebugWindow : EditorWindow
     {
         EditorGUILayout.LabelField("Relatorio de Custos (estimado)", EditorStyles.boldLabel);
         EditorGUILayout.BeginVertical("box");
-        TeamId team = ResolveTargetTeam();
+        PlayerSlotId slot = ResolveTargetSlot();
         MatchController match = FindAnyObjectByType<MatchController>();
-        int availableMoney = match != null ? Mathf.Max(0, match.GetActualMoney(team)) : 0;
+        TeamId team = match != null && slot.IsValid
+            ? match.GetVisualTeamForSlot(slot)
+            : teamOverride;
+        int availableMoney = match != null && slot.IsValid
+            ? Mathf.Max(0, match.GetActualMoney(slot))
+            : 0;
 
-        EditorGUILayout.LabelField("Time", $"{TeamUtils.GetName(team)} ({(int)team})");
+        EditorGUILayout.LabelField("Participante",
+            slot.IsValid
+                ? $"Slot {slot.Value} - {TeamUtils.GetName(team)} ({(int)team})"
+                : $"{TeamUtils.GetName(team)} ({(int)team}) - slot ambiguo/indisponivel");
         EditorGUILayout.LabelField("Saldo atual", match != null ? $"${availableMoney}" : "(MatchController nao encontrado)");
         EditorGUILayout.Space(4f);
         int totalEligibleCost = 0;
@@ -809,9 +817,9 @@ public class ServicoDoComandoDebugWindow : EditorWindow
     private void RunSimulation()
     {
         Tilemap map = ResolveTilemap();
-        TeamId team = ResolveTargetTeam();
+        PlayerSlotId slot = ResolveTargetSlot();
         bool canRun = ServicoDoComandoSensor.CollectOptions(
-            team,
+            slot.Value,
             map,
             terrainDatabase,
             eligibleOptions,
@@ -899,19 +907,18 @@ public class ServicoDoComandoDebugWindow : EditorWindow
         return FindAnyObjectByType<Tilemap>();
     }
 
-    private TeamId ResolveTargetTeam()
+    private PlayerSlotId ResolveTargetSlot()
     {
-        if (!useActiveTeamFromMatch)
-            return teamOverride;
-
         MatchController match = FindAnyObjectByType<MatchController>();
         if (match == null)
-            return teamOverride;
+            return PlayerSlotId.Invalid;
 
-        int activeId = match.ActiveTeamId;
-        if (activeId < -1 || activeId > 3)
-            return teamOverride;
-        return (TeamId)activeId;
+        if (useActiveTeamFromMatch)
+            return match.ActiveSlotId;
+
+        return match.TryGetUniqueSlotForTeam(teamOverride, out PlayerSlotId slot)
+            ? slot
+            : PlayerSlotId.Invalid;
     }
 
     private static List<ServiceData> BuildDistinctServiceList(IReadOnlyList<ServiceData> services)

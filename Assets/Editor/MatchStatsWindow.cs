@@ -218,7 +218,8 @@ public sealed class MatchStatsWindow : EditorWindow
             return;
         }
 
-        if (!manager.TryGetStats(selectedTeam, out SlotMatchStats stats) || stats == null)
+        PlayerSlotId selectedSlot = ResolveSelectedSlot();
+        if (!manager.TryGetStats(selectedSlot, out SlotMatchStats stats) || stats == null)
         {
             EditorGUILayout.HelpBox($"Sem estatísticas para {TeamUtils.GetName(selectedTeam)} ainda.", MessageType.Info);
             return;
@@ -240,6 +241,17 @@ public sealed class MatchStatsWindow : EditorWindow
             DrawUnitBreakdown(stats);
 
         EditorGUILayout.EndVertical();
+    }
+
+    private PlayerSlotId ResolveSelectedSlot()
+    {
+        if (matchController == null)
+            return PlayerSlotId.Invalid;
+        if (followActiveTeam)
+            return matchController.ActiveSlotId;
+        return matchController.TryGetUniqueSlotForTeam(selectedTeam, out PlayerSlotId slot)
+            ? slot
+            : PlayerSlotId.Invalid;
     }
 
     private void DrawConstructions(TeamId observerTeam)

@@ -114,7 +114,7 @@ public class ShoppingPressureWindow : EditorWindow
         if (followActiveTeam)
             team = _matchController.ActiveTeam;
 
-        TeamObjectivePlan plan = ObjectiveManager.GetPlanForTeam(team);   // leitura viva, silenciosa
+        TeamObjectivePlan plan = ObjectiveManager.GetPlanForSlot(ResolveSelectedSlot());   // leitura viva, silenciosa
         RebuildPressureIfStale(force: false);
 
         EditorGUILayout.BeginHorizontal();
@@ -148,7 +148,7 @@ public class ShoppingPressureWindow : EditorWindow
         if (!force && !teamChanged && !stale)
             return;
 
-        _snapshot = AIWorldSnapshot.Build(team, _matchController);
+        _snapshot = AIWorldSnapshot.Build(ResolveSelectedSlot(), _matchController);
         _demands = AIShoppingPlanner.InspectRoleDemands(_snapshot);
         _roster = AIShoppingPlanner.InspectRosterKnowledge(_snapshot);
         _snapshotTeam = team;
@@ -182,7 +182,7 @@ public class ShoppingPressureWindow : EditorWindow
         // quebraria as dezenas de gates "== Offensive" que dirigem ar/fogo/compra). A flag vem do
         // snapshot (snapshot.IsInvading); os setores/turno vêm da inspeção para detalhar o bloco.
         AIController.GoGreenInvasionInspection invasion =
-            AIController.GetGoGreenInvasionForInspection(team, snapshot.TurnNumber);
+            AIController.GetGoGreenInvasionForInspection(ResolveSelectedSlot(), snapshot.TurnNumber);
         string stanceLabel = snapshot.IsInvading ? "Invasão" : snapshot.Stance.ToString();
 
         EditorGUILayout.BeginVertical(EditorStyles.helpBox);
@@ -258,7 +258,7 @@ public class ShoppingPressureWindow : EditorWindow
         bool macroLosing)
     {
         AIElitePurchaseCommitment commitment = snapshot != null
-            ? AIIntelLedger.GetElitePurchaseCommitment(snapshot.AITeam)
+            ? AIIntelLedger.GetElitePurchaseCommitment(PlayerSlotId.FromIndex(snapshot.AISlotIndex))
             : null;
         if (commitment == null || string.IsNullOrEmpty(commitment.unitId))
         {
@@ -656,7 +656,7 @@ public class ShoppingPressureWindow : EditorWindow
             ? Mathf.Clamp01(AIController.Instance.EliteRatioSafe)
             : 0.5f;
         bool rallyAssemblyActive = snapshot != null
-            && AIShoppingPlanner.HasActiveRallyAssembly(snapshot.AITeam);
+            && AIShoppingPlanner.HasActiveRallyAssembly(PlayerSlotId.FromIndex(snapshot.AISlotIndex));
         float ratio = covered || rallyAssemblyActive
             ? Mathf.Max(pressureRatio, safeRatio)
             : pressureRatio;
@@ -791,7 +791,7 @@ public class ShoppingPressureWindow : EditorWindow
     private void DrawActiveEliteCommitment(AIWorldSnapshot snapshot)
     {
         AIElitePurchaseCommitment commitment =
-            AIIntelLedger.GetElitePurchaseCommitment(snapshot.AITeam);
+            AIIntelLedger.GetElitePurchaseCommitment(PlayerSlotId.FromIndex(snapshot.AISlotIndex));
         if (commitment == null || string.IsNullOrEmpty(commitment.unitId))
         {
             EditorGUILayout.LabelField("compromisso persistente: nenhum", _subtle);
@@ -1341,5 +1341,16 @@ public class ShoppingPressureWindow : EditorWindow
             EditorGUILayout.LabelField($"motivo: {d.Reason}", _subtle);
 
         EditorGUILayout.EndVertical();
+    }
+
+    private PlayerSlotId ResolveSelectedSlot()
+    {
+        if (_matchController == null)
+            return PlayerSlotId.Invalid;
+        if (followActiveTeam)
+            return _matchController.ActiveSlotId;
+        return _matchController.TryGetUniqueSlotForTeam(team, out PlayerSlotId slot)
+            ? slot
+            : PlayerSlotId.Invalid;
     }
 }

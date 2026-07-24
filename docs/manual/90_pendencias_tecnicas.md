@@ -123,3 +123,19 @@ O critério que emerge da tabela: nasce cheio quem foi comprado **em uma instala
 **Proposta.** Duplicar o perfil como **"Monomotor"**, com os mesmos valores, e repontar o hidroavião para ele. Puramente estético — nenhuma mudança de comportamento.
 
 **Status.** Aberta, cosmética. Exige criação de asset no editor.
+
+---
+
+### IA-002 — A IA não distingue adversários e é cega para a corrida do primeiro abate
+
+**Regra canônica.** A primeira eliminação encerra a partida inteira, e o vencedor é quem executou o abate (`10_turnos_jornal_e_vitoria.md`). Em partidas de três ou mais, isso torna o adversário **mais fraco** o alvo estrategicamente correto — ele é o gatilho mais barato.
+
+**Comportamento atual.** O modelo de mundo da IA funde todos os inimigos numa massa única: `EnemyUnits`, `EnemyBuildings` e um `EnemyHQ` **singular**, que recebe o primeiro QG inimigo encontrado na varredura da cena. Não existe representação de "adversário A" contra "adversário B".
+
+**Evidência.** `AIWorldSnapshot.cs:68` — `if (c.IsPlayerHeadQuarter && snap.EnemyHQ == null) snap.EnemyHQ = c;`
+
+**Impacto.** Nulo em partidas de dois lados, onde o modelo agregado é adequado. Em três ou mais, a IA joga por atrito contra a massa inimiga e ignora que existe um adversário quase morto valendo a partida inteira. O QG que ela ataca é decidido pela ordem dos objetos na cena, não por proximidade de derrota.
+
+**Decisão necessária.** Se partidas de três ou mais forem cenário suportado, o snapshot precisa segmentar inimigos por slot e o planner precisa de um critério de "quem está mais perto de cair". Se forem apenas curiosidade, basta registrar a limitação.
+
+**Status.** Aberta. Mais consequente que vários itens desta lista se o multiplayer de 3+ virar prioridade.

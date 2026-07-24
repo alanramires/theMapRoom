@@ -1,4 +1,4 @@
-﻿using UnityEditor;
+using UnityEditor;
 using UnityEngine;
 
 [CustomEditor(typeof(ConstructionManager))]
@@ -394,7 +394,7 @@ public class ConstructionManagerEditor : Editor
 
     private static string DescribeAutoEixo(TeamId team, ConstructionSector sector)
     {
-        InvasionAxisMap map = InvasionAxisMap.Build(team, null, applyOverrides: false);
+        InvasionAxisMap map = InvasionAxisMap.Build(ResolveSlotForVisualTeam(team), null, applyOverrides: false);
         int e = map.GetEixo(sector);
         return e > 0 ? $"E{e}" : "fora de eixo";
     }
@@ -405,7 +405,7 @@ public class ConstructionManagerEditor : Editor
     private static void BuildEixoOptionsForSlot(TeamId team, ConstructionSector sector,
         out string[] labels, out int[] values)
     {
-        InvasionAxisMap map = InvasionAxisMap.Build(team, null, applyOverrides: false);
+        InvasionAxisMap map = InvasionAxisMap.Build(ResolveSlotForVisualTeam(team), null, applyOverrides: false);
         var lbls = new System.Collections.Generic.List<string> { "0 - fora de eixo" };
         var vals = new System.Collections.Generic.List<int> { 0 };
         foreach (InvasionAxisMap.Axis axis in map.Axes)
@@ -735,6 +735,18 @@ public class ConstructionManagerEditor : Editor
     {
         if (prop != null)
             EditorGUILayout.PropertyField(prop, new GUIContent(label), includeChildren: true);
+    }
+
+    private static PlayerSlotId ResolveSlotForVisualTeam(TeamId team)
+    {
+        MatchController match = Object.FindAnyObjectByType<MatchController>();
+        if (match == null)
+            return PlayerSlotId.Invalid;
+        if (match.ActiveTeam == team && match.ActiveSlotId.IsValid)
+            return match.ActiveSlotId;
+        return match.TryGetUniqueSlotForTeam(team, out PlayerSlotId slot)
+            ? slot
+            : PlayerSlotId.Invalid;
     }
 
 }
