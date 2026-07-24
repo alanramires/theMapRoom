@@ -198,6 +198,7 @@ public class MatchController : MonoBehaviour
     [System.Serializable]
     private struct TeamVictoryEntry
     {
+        [SerializeField, HideInInspector] public int slotIndex;
         public TeamId teamId;
         [Min(0)] public int stars;
     }
@@ -205,6 +206,7 @@ public class MatchController : MonoBehaviour
     [System.Serializable]
     private sealed class TeamCapturedBuildingHistory
     {
+        public int slotIndex = -1;
         public TeamId teamId;
         public List<string> buildingKeys = new List<string>();
     }
@@ -275,6 +277,7 @@ public class MatchController : MonoBehaviour
     [SerializeField] private List<TeamVictoryEntry> victoryStarsByTeam = new List<TeamVictoryEntry>();
     [SerializeField, HideInInspector] private bool hasVictoryWinner;
     [SerializeField, HideInInspector] private TeamId victoryWinnerTeam = TeamId.Neutral;
+    [SerializeField, HideInInspector] private int victoryWinnerSlotIndex = -1;
     [Header("Fog Of War")]
     [SerializeField] private FogOfWarController fogOfWarController;
     [SerializeField] private Tilemap fogOfWarTilemap;
@@ -669,13 +672,19 @@ public class MatchController : MonoBehaviour
     public int VictoryStarsToWin => ClampVictoryStarsGoal(victoryStarsToWin);
     public bool HasVictoryWinner => hasVictoryWinner;
     public TeamId VictoryWinnerTeam => victoryWinnerTeam;
+    public PlayerSlotId VictoryWinnerSlotId => PlayerSlotId.FromIndex(victoryWinnerSlotIndex);
     private Coroutine advanceTurnTransitionRoutine;
     private bool hotSeatGateActive;
     private bool deferTurnStartEffectsForHotSeatGate;
 
     public int GetVictoryStars(TeamId team)
     {
-        int index = FindVictoryEntryIndex(team);
+        return TryGetUniqueSlotForTeam(team, out PlayerSlotId slotId) ? GetVictoryStars(slotId) : 0;
+    }
+
+    public int GetVictoryStars(PlayerSlotId slotId)
+    {
+        int index = FindVictoryEntryIndex(slotId.Value);
         if (index < 0)
             return 0;
 
@@ -684,12 +693,21 @@ public class MatchController : MonoBehaviour
 
     public void GetVictoryControlForTeam(TeamId team, out int controlled, out int total)
     {
+        if (!TryGetUniqueSlotForTeam(team, out PlayerSlotId slotId))
+        {
+            controlled = 0;
+            total = 0;
+            return;
+        }
+        GetVictoryControlForSlot(slotId, out controlled, out total);
+    }
+
+    public void GetVictoryControlForSlot(PlayerSlotId slotId, out int controlled, out int total)
+    {
         controlled = 0;
         total = 0;
 
-        if (team == TeamId.Neutral)
-            return;
-        if (FindPlayerIndexByTeam(team) < 0)
+        if (!IsValidPlayerSlot(slotId))
             return;
 
         ConstructionManager[] constructions = FindObjectsByType<ConstructionManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
@@ -702,21 +720,24 @@ public class MatchController : MonoBehaviour
                 continue;
 
             total++;
-            if (construction.TeamId == team)
+            if (construction.SlotIndex == slotId.Value)
                 controlled++;
         }
     }
 
     public int GetProjectedVictoryStarsGain(TeamId team)
     {
+        return TryGetUniqueSlotForTeam(team, out PlayerSlotId slotId) ? GetProjectedVictoryStarsGain(slotId) : 0;
+    }
+
+    public int GetProjectedVictoryStarsGain(PlayerSlotId slotId)
+    {
         if (!enableVictoryStars)
             return 0;
-        if (team == TeamId.Neutral)
-            return 0;
-        if (FindPlayerIndexByTeam(team) < 0)
+        if (!IsValidPlayerSlot(slotId))
             return 0;
 
-        GetVictoryControlForTeam(team, out int controlled, out int total);
+        GetVictoryControlForSlot(slotId, out int controlled, out int total);
         if (total <= 0)
             return 0;
 
@@ -726,12 +747,11 @@ public class MatchController : MonoBehaviour
 
     public int GetActualMoney(TeamId team)
     {
-        int playerIndex = FindPlayerEconomyIndex(team);
-        if (playerIndex < 0)
-            return 0;
-
-        return Mathf.Max(0, players[playerIndex].actualMoney);
+        return TryGetUniqueSlotForTeam(team, out PlayerSlotId slotId) ? GetActualMoney(slotId) : 0;
     }
+
+    public int GetActualMoney(PlayerSlotId slotId) =>
+        IsValidPlayerSlot(slotId) ? Mathf.Max(0, players[slotId.Value].actualMoney) : 0;
 
     public int GetStartMoney(TeamId team)
     {
@@ -751,15 +771,27 @@ public class MatchController : MonoBehaviour
         return Mathf.Max(0, players[playerIndex].incomePerTurn);
     }
 
+    public int GetIncomePerTurn(PlayerSlotId slotId) =>
+        IsValidPlayerSlot(slotId) ? Mathf.Max(0, players[slotId.Value].incomePerTurn) : 0;
+
     public bool TrySpendActualMoney(TeamId team, int amount, out int remainingMoney)
+    {
+        if (!TryGetUniqueSlotForTeam(team, out PlayerSlotId slotId))
+        {
+            remainingMoney = 0;
+            return false;
+        }
+        return TrySpendActualMoney(slotId, amount, out remainingMoney);
+    }
+
+    public bool TrySpendActualMoney(PlayerSlotId slotId, int amount, out int remainingMoney)
     {
         remainingMoney = 0;
         int spend = Mathf.Max(0, amount);
-        int playerIndex = FindPlayerEconomyIndex(team);
-        if (playerIndex < 0)
+        if (!IsValidPlayerSlot(slotId))
             return false;
 
-        PlayerEntry entry = players[playerIndex];
+        PlayerEntry entry = players[slotId.Value];
         int current = Mathf.Max(0, entry.actualMoney);
         if (current < spend)
         {
@@ -768,7 +800,7 @@ public class MatchController : MonoBehaviour
         }
 
         entry.actualMoney = current - spend;
-        players[playerIndex] = entry;
+        players[slotId.Value] = entry;
         remainingMoney = entry.actualMoney;
         return true;
     }
@@ -785,13 +817,16 @@ public class MatchController : MonoBehaviour
 
     public bool TrySetActualMoney(TeamId team, int value)
     {
-        int playerIndex = FindPlayerEconomyIndex(team);
-        if (playerIndex < 0)
-            return false;
+        return TryGetUniqueSlotForTeam(team, out PlayerSlotId slotId) && TrySetActualMoney(slotId, value);
+    }
 
-        PlayerEntry entry = players[playerIndex];
+    public bool TrySetActualMoney(PlayerSlotId slotId, int value)
+    {
+        if (!IsValidPlayerSlot(slotId))
+            return false;
+        PlayerEntry entry = players[slotId.Value];
         entry.actualMoney = Mathf.Max(0, value);
-        players[playerIndex] = entry;
+        players[slotId.Value] = entry;
         return true;
     }
 
@@ -858,7 +893,14 @@ public class MatchController : MonoBehaviour
 
     public bool HasReachedMaxUnitsPerTeam(TeamId teamId)
     {
-        GetTeamUnitCounts(teamId, out int totalInField, out _);
+        if (!TryGetUniqueSlotForTeam(teamId, out PlayerSlotId slotId))
+            return false;
+        return HasReachedMaxUnitsForSlot(slotId);
+    }
+
+    public bool HasReachedMaxUnitsForSlot(PlayerSlotId slotId)
+    {
+        GetSlotUnitCounts(slotId.Value, out int totalInField, out _);
         return totalInField >= MaxUnitsPerTeam;
     }
 
@@ -951,22 +993,22 @@ public class MatchController : MonoBehaviour
     }
 
     public void ExportVictoryStarsState(
-        List<int> teamIds,
+        List<int> slotIndices,
         List<int> stars,
         out bool enabled,
         out int starsToWin,
         out bool winnerDefined,
-        out int winnerTeamId)
+        out int winnerSlotIndex)
     {
         enabled = enableVictoryStars;
         starsToWin = ClampVictoryStarsGoal(victoryStarsToWin);
         winnerDefined = hasVictoryWinner;
-        winnerTeamId = (int)victoryWinnerTeam;
+        winnerSlotIndex = victoryWinnerSlotIndex;
 
-        if (teamIds == null || stars == null)
+        if (slotIndices == null || stars == null)
             return;
 
-        teamIds.Clear();
+        slotIndices.Clear();
         stars.Clear();
         for (int i = 0; i < victoryStarsByTeam.Count; i++)
         {
@@ -974,34 +1016,38 @@ public class MatchController : MonoBehaviour
             if (entry.teamId == TeamId.Neutral)
                 continue;
 
-            teamIds.Add((int)entry.teamId);
+            slotIndices.Add(entry.slotIndex);
             stars.Add(Mathf.Max(0, entry.stars));
         }
     }
 
     public void ImportVictoryStarsState(
-        IList<int> teamIds,
+        IList<int> slotIndices,
         IList<int> stars,
         bool enabled,
         int starsToWin,
         bool winnerDefined,
-        int winnerTeamId)
+        int winnerSlotIndex)
     {
         enableVictoryStars = enabled;
         victoryStarsToWin = ClampVictoryStarsGoal(starsToWin);
         hasVictoryWinner = winnerDefined;
-        victoryWinnerTeam = ClampToTeamId(winnerTeamId);
+        victoryWinnerSlotIndex = winnerSlotIndex;
+        victoryWinnerTeam = winnerSlotIndex >= 0 && players != null && winnerSlotIndex < players.Count
+            ? players[winnerSlotIndex].teamId
+            : TeamId.Neutral;
 
         victoryStarsByTeam.Clear();
-        int count = teamIds != null ? teamIds.Count : 0;
+        int count = slotIndices != null ? slotIndices.Count : 0;
         for (int i = 0; i < count; i++)
         {
-            TeamId team = ClampToTeamId(teamIds[i]);
-            if (team == TeamId.Neutral)
+            int slotIndex = slotIndices[i];
+            if (players == null || slotIndex < 0 || slotIndex >= players.Count)
                 continue;
+            TeamId team = players[slotIndex].teamId;
 
             int value = stars != null && i < stars.Count ? Mathf.Max(0, stars[i]) : 0;
-            victoryStarsByTeam.Add(new TeamVictoryEntry { teamId = team, stars = value });
+            victoryStarsByTeam.Add(new TeamVictoryEntry { slotIndex = slotIndex, teamId = team, stars = value });
         }
 
         NormalizeVictoryStars();
@@ -1577,11 +1623,11 @@ public class MatchController : MonoBehaviour
 
     public bool IsTeamDefeated(TeamId team)
     {
-        int index = FindPlayerEconomyIndex(team);
-        if (index < 0 || players == null || index >= players.Count)
-            return false;
-        return players[index].defeated;
+        return TryGetUniqueSlotForTeam(team, out PlayerSlotId slotId) && IsSlotDefeated(slotId);
     }
+
+    public bool IsSlotDefeated(PlayerSlotId slotId) =>
+        IsValidPlayerSlot(slotId) && players[slotId.Value].defeated;
 
     public void SetActiveTeamId(int teamId)
     {
@@ -1871,11 +1917,10 @@ public class MatchController : MonoBehaviour
         if (victoryStarsByTeam == null || victoryStarsByTeam.Count <= 0)
             return;
 
-        TeamId activeTeam = ClampToTeamId(activeTeamId);
-        if (activeTeam == TeamId.Neutral)
+        PlayerSlotId activeSlot = ActiveSlotId;
+        if (!IsValidPlayerSlot(activeSlot))
             return;
-        if (FindPlayerIndexByTeam(activeTeam) < 0)
-            return;
+        TeamId activeTeam = GetVisualTeamForSlot(activeSlot);
 
         constructions ??= GetActiveConstructionsOnScene();
         int totalVictoryBuildings = 0;
@@ -1889,7 +1934,7 @@ public class MatchController : MonoBehaviour
                 continue;
 
             totalVictoryBuildings++;
-            if (construction.TeamId == activeTeam)
+            if (construction.SlotIndex == activeSlot.Value)
                 activeTeamControlledVictoryBuildings++;
         }
 
@@ -1900,7 +1945,7 @@ public class MatchController : MonoBehaviour
         if (activeTeamControlledVictoryBuildings < majorityThreshold)
             return;
 
-        int winnerEntryIndex = FindVictoryEntryIndex(activeTeam);
+        int winnerEntryIndex = FindVictoryEntryIndex(activeSlot.Value);
         if (winnerEntryIndex < 0)
             return;
 
@@ -1914,6 +1959,7 @@ public class MatchController : MonoBehaviour
             return;
 
         hasVictoryWinner = true;
+        victoryWinnerSlotIndex = activeSlot.Value;
         victoryWinnerTeam = activeTeam;
         HandleVictoryAestheticPresentation(activeTeam, TeamId.Neutral, VictoryReason.VictoryStars);
     }
@@ -1924,6 +1970,7 @@ public class MatchController : MonoBehaviour
 
         TeamId winnerTeam = GetTeamIdForSlot(0);
         hasVictoryWinner = true;
+        victoryWinnerSlotIndex = 0;
         victoryWinnerTeam = winnerTeam;
 
         Debug.Log($"[Victory] Tutorial concluido: vitoria do {TeamUtils.GetName(winnerTeam)}.");
@@ -2021,11 +2068,12 @@ public class MatchController : MonoBehaviour
         return -1;
     }
 
-    private bool TryDefeatTeamIfZeroUnits(TeamId team)
+    private bool TryDefeatSlotIfZeroUnits(PlayerSlotId slotId)
     {
-        int playerIndex = FindPlayerEconomyIndex(team);
-        if (playerIndex < 0 || players == null || playerIndex >= players.Count)
+        if (!IsValidPlayerSlot(slotId))
             return false;
+        int playerIndex = slotId.Value;
+        TeamId team = players[playerIndex].teamId;
         if (players[playerIndex].defeated)
             return false;
         // Derrota por 0 unidades so vale para slots com QG. Uma faccao rebelde (sem QG) some do
@@ -2037,7 +2085,7 @@ public class MatchController : MonoBehaviour
         for (int i = 0; i < allUnits.Count; i++)
         {
             UnitManager unit = allUnits[i];
-            if (unit != null && unit.TeamId == team)
+            if (unit != null && unit.SlotIndex == playerIndex)
                 return false;
         }
 
@@ -2045,22 +2093,25 @@ public class MatchController : MonoBehaviour
         entry.defeated = true;
         players[playerIndex] = entry;
 
-        NeutralizeConstructionsOwnedByTeam(team);
-        Debug.Log($"[Match] Team {TeamUtils.GetName(team)} derrotado (0 unidades). Construcoes neutralizadas.");
+        NeutralizeConstructionsOwnedBySlot(slotId);
+        Debug.Log($"[Match] Slot {playerIndex} ({TeamUtils.GetName(team)}) derrotado (0 unidades). Construcoes neutralizadas.");
         OnTeamDefeated?.Invoke(team);
         return true;
     }
+
+    private bool TryDefeatTeamIfZeroUnits(TeamId team) =>
+        TryGetUniqueSlotForTeam(team, out PlayerSlotId slotId) && TryDefeatSlotIfZeroUnits(slotId);
 
     // Chamado do ponto unico de conclusao de captura (ExecuteCaptureSequence), valido tanto para o
     // jogador humano quanto para a IA (que captura pelo mesmo caminho via Automation ->
     // HandleCaptureActionRequested). Se o alvo for um QG, o antigo dono e eliminado na hora e o
     // capturador vence imediatamente (mesmo com outros jogadores/IA ainda em jogo).
-    public void NotifyConstructionCaptured(ConstructionManager construction, TeamId previousOwner, TeamId newOwner)
+    public void NotifyConstructionCaptured(ConstructionManager construction, int previousOwnerSlot, int newOwnerSlot, TeamId previousOwner, TeamId newOwner)
     {
-        if (Application.isPlaying && construction != null && newOwner != TeamId.Neutral && previousOwner != newOwner &&
+        if (Application.isPlaying && construction != null && newOwnerSlot >= 0 && previousOwnerSlot != newOwnerSlot &&
             construction.TryResolveConstructionData(out ConstructionData capturedData))
         {
-            RegisterCapturedBuilding(newOwner, capturedData);
+            RegisterCapturedBuilding(PlayerSlotId.FromIndex(newOwnerSlot), capturedData);
         }
 
         if (!Application.isPlaying || hasVictoryWinner)
@@ -2069,15 +2120,18 @@ public class MatchController : MonoBehaviour
             return;
         if (construction == null || !IsHeadQuarterConstruction(construction))
             return;
-        if (previousOwner == TeamId.Neutral || previousOwner == newOwner)
+        if (previousOwnerSlot < 0 || previousOwnerSlot == newOwnerSlot)
             return;
 
-        if (!MarkTeamDefeated(previousOwner, "QG capturado"))
+        if (!MarkSlotDefeated(PlayerSlotId.FromIndex(previousOwnerSlot), "QG capturado"))
             return;
 
         Debug.Log($"[Match] QG de {TeamUtils.GetName(previousOwner)} capturado por {TeamUtils.GetName(newOwner)}. Time eliminado.");
         // O primeiro a capturar um QG vence na hora, mesmo com outros jogadores em jogo.
-        DeclareEliminationVictory(newOwner, previousOwner, VictoryReason.HeadQuarterCaptured);
+        DeclareEliminationVictory(
+            PlayerSlotId.FromIndex(newOwnerSlot),
+            PlayerSlotId.FromIndex(previousOwnerSlot),
+            VictoryReason.HeadQuarterCaptured);
     }
 
     public bool CanProduceUnit(TeamId team, UnitData unit, out string blockedReason)
@@ -2145,6 +2199,36 @@ public class MatchController : MonoBehaviour
         return false;
     }
 
+    public bool HasCapturedBuilding(PlayerSlotId slotId, ConstructionData building)
+    {
+        string key = ResolveProgressionBuildingKey(building);
+        if (!IsValidPlayerSlot(slotId) || string.IsNullOrWhiteSpace(key))
+            return false;
+
+        for (int i = 0; capturedBuildingHistory != null && i < capturedBuildingHistory.Count; i++)
+        {
+            TeamCapturedBuildingHistory entry = capturedBuildingHistory[i];
+            if (entry == null || entry.slotIndex != slotId.Value || entry.buildingKeys == null)
+                continue;
+            for (int k = 0; k < entry.buildingKeys.Count; k++)
+                if (string.Equals(entry.buildingKeys[k], key, StringComparison.OrdinalIgnoreCase))
+                    return true;
+        }
+
+        ConstructionManager[] constructions = FindObjectsByType<ConstructionManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        for (int i = 0; i < constructions.Length; i++)
+        {
+            ConstructionManager owned = constructions[i];
+            if (owned == null || owned.SlotIndex != slotId.Value || !owned.TryResolveConstructionData(out ConstructionData ownedData))
+                continue;
+            if (!string.Equals(ResolveProgressionBuildingKey(ownedData), key, StringComparison.OrdinalIgnoreCase))
+                continue;
+            RegisterCapturedBuilding(slotId, ownedData);
+            return true;
+        }
+        return false;
+    }
+
     public void RegisterCurrentlyOwnedBuildings()
     {
         ConstructionManager[] constructions = FindObjectsByType<ConstructionManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
@@ -2157,7 +2241,7 @@ public class MatchController : MonoBehaviour
                 continue;
             }
 
-            RegisterCapturedBuilding(construction.TeamId, data);
+            RegisterCapturedBuilding(PlayerSlotId.FromIndex(construction.SlotIndex), data);
         }
     }
 
@@ -2192,6 +2276,37 @@ public class MatchController : MonoBehaviour
         teamHistory.buildingKeys.Add(key);
     }
 
+    private void RegisterCapturedBuilding(PlayerSlotId slotId, ConstructionData building)
+    {
+        string key = ResolveProgressionBuildingKey(building);
+        if (!IsValidPlayerSlot(slotId) || string.IsNullOrWhiteSpace(key))
+            return;
+        capturedBuildingHistory ??= new List<TeamCapturedBuildingHistory>();
+
+        TeamCapturedBuildingHistory history = null;
+        for (int i = 0; i < capturedBuildingHistory.Count; i++)
+            if (capturedBuildingHistory[i] != null && capturedBuildingHistory[i].slotIndex == slotId.Value)
+            {
+                history = capturedBuildingHistory[i];
+                break;
+            }
+
+        if (history == null)
+        {
+            history = new TeamCapturedBuildingHistory
+            {
+                slotIndex = slotId.Value,
+                teamId = GetVisualTeamForSlot(slotId)
+            };
+            capturedBuildingHistory.Add(history);
+        }
+        history.buildingKeys ??= new List<string>();
+        for (int i = 0; i < history.buildingKeys.Count; i++)
+            if (string.Equals(history.buildingKeys[i], key, StringComparison.OrdinalIgnoreCase))
+                return;
+        history.buildingKeys.Add(key);
+    }
+
     public void ExportCapturedBuildingHistory(List<TeamCapturedBuildingSaveData> destination)
     {
         if (destination == null)
@@ -2206,6 +2321,7 @@ public class MatchController : MonoBehaviour
                 continue;
             destination.Add(new TeamCapturedBuildingSaveData
             {
+                slotIndex = source.slotIndex,
                 teamId = (int)source.teamId,
                 buildingKeys = source.buildingKeys != null ? new List<string>(source.buildingKeys) : new List<string>()
             });
@@ -2227,6 +2343,9 @@ public class MatchController : MonoBehaviour
                 continue;
             capturedBuildingHistory.Add(new TeamCapturedBuildingHistory
             {
+                slotIndex = saved.slotIndex >= 0
+                    ? saved.slotIndex
+                    : (TryGetUniqueSlotForTeam((TeamId)saved.teamId, out PlayerSlotId migratedSlot) ? migratedSlot.Value : -1),
                 teamId = (TeamId)saved.teamId,
                 buildingKeys = saved.buildingKeys != null ? new List<string>(saved.buildingKeys) : new List<string>()
             });
@@ -2248,11 +2367,12 @@ public class MatchController : MonoBehaviour
     // Marca um time como derrotado por qualquer condicao (QG capturado, rendicao, etc.): neutraliza
     // suas construcoes e dispara OnTeamDefeated. A checagem de 0 unidades tem seu proprio caminho
     // (TryDefeatTeamIfZeroUnits) por causa do pre-requisito de contagem de unidades.
-    private bool MarkTeamDefeated(TeamId team, string reasonLabel)
+    private bool MarkSlotDefeated(PlayerSlotId slotId, string reasonLabel)
     {
-        int playerIndex = FindPlayerEconomyIndex(team);
-        if (playerIndex < 0 || players == null || playerIndex >= players.Count)
+        if (!IsValidPlayerSlot(slotId))
             return false;
+        int playerIndex = slotId.Value;
+        TeamId team = players[playerIndex].teamId;
         if (players[playerIndex].defeated)
             return false;
 
@@ -2260,22 +2380,25 @@ public class MatchController : MonoBehaviour
         entry.defeated = true;
         players[playerIndex] = entry;
 
-        NeutralizeConstructionsOwnedByTeam(team);
-        Debug.Log($"[Match] Team {TeamUtils.GetName(team)} derrotado ({reasonLabel}). Construcoes neutralizadas.");
+        NeutralizeConstructionsOwnedBySlot(slotId);
+        Debug.Log($"[Match] Slot {playerIndex} ({TeamUtils.GetName(team)}) derrotado ({reasonLabel}). Construcoes neutralizadas.");
         OnTeamDefeated?.Invoke(team);
         return true;
     }
 
-    private void NeutralizeConstructionsOwnedByTeam(TeamId defeatedTeam)
+    private bool MarkTeamDefeated(TeamId team, string reasonLabel) =>
+        TryGetUniqueSlotForTeam(team, out PlayerSlotId slotId) && MarkSlotDefeated(slotId, reasonLabel);
+
+    private void NeutralizeConstructionsOwnedBySlot(PlayerSlotId defeatedSlot)
     {
         List<ConstructionManager> constructions = GetActiveConstructionsOnScene();
         for (int i = 0; i < constructions.Count; i++)
         {
             ConstructionManager construction = constructions[i];
-            if (construction == null || construction.TeamId != defeatedTeam)
+            if (construction == null || construction.SlotIndex != defeatedSlot.Value)
                 continue;
 
-            construction.SetTeamId(TeamId.Neutral);
+            construction.SetOwnerSlot(-1);
             construction.SetCurrentCapturePoints(construction.CapturePointsMax);
         }
     }
@@ -2289,19 +2412,21 @@ public class MatchController : MonoBehaviour
         if (aliveCount != 1)
             return false;
 
-        TeamId winner = TeamId.Neutral;
+        int winnerSlot = -1;
         for (int i = 0; i < players.Count; i++)
         {
             if (!players[i].defeated)
             {
-                winner = players[i].teamId;
+                winnerSlot = i;
                 break;
             }
         }
-        if (winner == TeamId.Neutral)
+        if (winnerSlot < 0)
             return false;
 
         hasVictoryWinner = true;
+        victoryWinnerSlotIndex = winnerSlot;
+        TeamId winner = players[winnerSlot].teamId;
         victoryWinnerTeam = winner;
         HandleVictoryAestheticPresentation(winner, TeamId.Neutral, VictoryReason.ArmyEliminated);
         return true;
@@ -2318,6 +2443,9 @@ public class MatchController : MonoBehaviour
             return false;
 
         hasVictoryWinner = true;
+        victoryWinnerSlotIndex = TryGetUniqueSlotForTeam(winnerTeam, out PlayerSlotId winnerSlot)
+            ? winnerSlot.Value
+            : -1;
         victoryWinnerTeam = winnerTeam;
         HandleVictoryAestheticPresentation(winnerTeam, defeatedTeam, reason);
         return true;
@@ -2372,11 +2500,12 @@ public class MatchController : MonoBehaviour
         if (unit.TeamId == TeamId.Neutral)
             return;
 
-        TeamId defeatedTeam = unit.TeamId;
-        if (TryDefeatTeamIfZeroUnits(defeatedTeam))
+        PlayerSlotId defeatedSlot = PlayerSlotId.FromIndex(unit.SlotIndex);
+        if (TryDefeatSlotIfZeroUnits(defeatedSlot))
         {
             // O primeiro a destruir por completo o exercito de um jogador vence na hora.
-            DeclareEliminationVictory(ResolveEliminatorTeamFor(defeatedTeam), defeatedTeam, VictoryReason.ArmyEliminated);
+            PlayerSlotId winnerSlot = ActiveSlotId != defeatedSlot ? ActiveSlotId : ResolveFirstAliveOpponentSlot(defeatedSlot);
+            DeclareEliminationVictory(winnerSlot, defeatedSlot, VictoryReason.ArmyEliminated);
         }
     }
 
@@ -2517,56 +2646,62 @@ public class MatchController : MonoBehaviour
             victoryStarsByTeam = new List<TeamVictoryEntry>();
 
         victoryStarsToWin = ClampVictoryStarsGoal(victoryStarsToWin);
-
-        for (int i = victoryStarsByTeam.Count - 1; i >= 0; i--)
-        {
-            TeamVictoryEntry entry = victoryStarsByTeam[i];
-            if (entry.teamId == TeamId.Neutral || FindPlayerIndexByTeam(entry.teamId) < 0)
-            {
-                victoryStarsByTeam.RemoveAt(i);
-                continue;
-            }
-
-            entry.stars = Mathf.Max(0, entry.stars);
-            victoryStarsByTeam[i] = entry;
-        }
-
+        List<TeamVictoryEntry> normalized = new List<TeamVictoryEntry>();
         if (players != null)
         {
-            for (int i = 0; i < players.Count; i++)
+            for (int slotIndex = 0; slotIndex < players.Count; slotIndex++)
             {
-                TeamId team = players[i].teamId;
-                if (team == TeamId.Neutral)
-                    continue;
-                if (FindVictoryEntryIndex(team) >= 0)
-                    continue;
-
-                victoryStarsByTeam.Add(new TeamVictoryEntry
+                int stars = 0;
+                int existingIndex = FindVictoryEntryIndex(slotIndex);
+                if (existingIndex >= 0)
+                    stars = Mathf.Max(0, victoryStarsByTeam[existingIndex].stars);
+                else
                 {
-                    teamId = team,
-                    stars = 0
+                    for (int legacyIndex = 0; legacyIndex < victoryStarsByTeam.Count; legacyIndex++)
+                    {
+                        TeamVictoryEntry legacy = victoryStarsByTeam[legacyIndex];
+                        if (legacy.slotIndex < 0 && legacy.teamId == players[slotIndex].teamId)
+                        {
+                            stars = Mathf.Max(0, legacy.stars);
+                            break;
+                        }
+                    }
+                }
+
+                normalized.Add(new TeamVictoryEntry
+                {
+                    slotIndex = slotIndex,
+                    teamId = players[slotIndex].teamId,
+                    stars = stars
                 });
             }
         }
+        victoryStarsByTeam = normalized;
 
         if (hasVictoryWinner)
         {
-            if (victoryWinnerTeam == TeamId.Neutral || FindPlayerIndexByTeam(victoryWinnerTeam) < 0)
+            if (victoryWinnerSlotIndex < 0 || players == null || victoryWinnerSlotIndex >= players.Count)
             {
-                hasVictoryWinner = false;
-                victoryWinnerTeam = TeamId.Neutral;
+                if (TryGetUniqueSlotForTeam(victoryWinnerTeam, out PlayerSlotId migratedWinner))
+                    victoryWinnerSlotIndex = migratedWinner.Value;
+                else
+                {
+                    hasVictoryWinner = false;
+                    victoryWinnerTeam = TeamId.Neutral;
+                    victoryWinnerSlotIndex = -1;
+                }
             }
         }
     }
 
-    private int FindVictoryEntryIndex(TeamId team)
+    private int FindVictoryEntryIndex(int slotIndex)
     {
         if (victoryStarsByTeam == null)
             return -1;
 
         for (int i = 0; i < victoryStarsByTeam.Count; i++)
         {
-            if (victoryStarsByTeam[i].teamId == team)
+            if (victoryStarsByTeam[i].slotIndex == slotIndex)
                 return i;
         }
 
@@ -3039,10 +3174,9 @@ public class MatchController : MonoBehaviour
         // Checagem de derrota por 0 unidades: marca o time como defeated.
         if (allowDefeatForZeroUnits && currentTurn >= 2 && activeTeamId >= 0)
         {
-            TeamId activeTeam = ClampToTeamId(activeTeamId);
-            if (TryDefeatTeamIfZeroUnits(activeTeam))
+            if (TryDefeatSlotIfZeroUnits(activeSlot))
             {
-                DeclareEliminationVictory(ResolveEliminatorTeamFor(activeTeam), activeTeam, VictoryReason.ArmyEliminated);
+                DeclareEliminationVictory(ResolveFirstAliveOpponentSlot(activeSlot), activeSlot, VictoryReason.ArmyEliminated);
                 return;
             }
         }
@@ -3326,7 +3460,7 @@ public class MatchController : MonoBehaviour
             ConstructionManager construction = constructions[i];
             if (construction == null || !construction.gameObject.activeInHierarchy)
                 continue;
-            if ((int)construction.TeamId != activeTeamId)
+            if (construction.SlotIndex != ActiveSlotId.Value)
                 continue;
 
             Vector3Int cell = construction.CurrentCellPosition;
@@ -3409,7 +3543,7 @@ public class MatchController : MonoBehaviour
                 ConstructionManager construction = constructions[c];
                 if (construction == null)
                     continue;
-                if (construction.TeamId != entry.teamId)
+                if (construction.SlotIndex != i)
                     continue;
 
                 income += ResolveConstructionIncomeForPlayer(entry, construction);
@@ -3449,9 +3583,8 @@ public class MatchController : MonoBehaviour
             return;
         }
 
-        TeamId team = ClampToTeamId(activeTeamId);
-        int playerIndex = FindPlayerEconomyIndex(team);
-        if (playerIndex < 0)
+        int playerIndex = ActiveSlotId.Value;
+        if (!IsValidPlayerSlotIndex(playerIndex))
         {
             pendingTurnStartEconomy = false;
             return;
@@ -3460,6 +3593,7 @@ public class MatchController : MonoBehaviour
         RecalculateIncomePerTurnForAllPlayers(constructions);
 
         PlayerEntry entry = players[playerIndex];
+        TeamId team = entry.teamId;
         int credit = Mathf.Max(0, entry.incomePerTurn);
         if (!entry.startMoneyApplied)
         {
@@ -4889,16 +5023,17 @@ public class MatchController : MonoBehaviour
         // Rendicao e mais uma condicao de derrota: entra no mesmo ciclo de eliminacao/vitoria.
         // Quem se rende e o jogador ativo (dono do menu). Ele e marcado como derrotado e o vencedor
         // vira o primeiro oponente vivo — a apresentacao unica mostra DERROTA! para o humano.
-        TeamId surrenderingTeam = ClampToTeamId(activeTeamId);
-        if (surrenderingTeam != TeamId.Neutral)
-            MarkTeamDefeated(surrenderingTeam, "rendicao");
+        PlayerSlotId surrenderingSlot = ActiveSlotId;
+        TeamId surrenderingTeam = GetVisualTeamForSlot(surrenderingSlot);
+        if (surrenderingSlot.IsValid)
+            MarkSlotDefeated(surrenderingSlot, "rendicao");
 
-        TeamId winner = ResolveEliminatorTeamFor(surrenderingTeam);
-        if (DeclareEliminationVictory(winner, surrenderingTeam, VictoryReason.Surrender))
+        if (DeclareEliminationVictory(ResolveFirstAliveOpponentSlot(surrenderingSlot), surrenderingSlot, VictoryReason.Surrender))
             return;
 
         // Sem oponente vivo para coroar (config atipica): encerra como derrota simples.
         hasVictoryWinner = true;
+        victoryWinnerSlotIndex = -1;
         victoryWinnerTeam = TeamId.Neutral;
         HandleVictoryAestheticPresentation(TeamId.Neutral, surrenderingTeam, VictoryReason.Surrender);
     }
@@ -7347,6 +7482,18 @@ public class MatchController : MonoBehaviour
         return false;
     }
 
+    public bool CanProduceUnit(PlayerSlotId slotId, UnitData unit, out string blockedReason)
+    {
+        blockedReason = string.Empty;
+        if (unit == null || unit.requiredBuilding == null)
+            return true;
+        if (HasCapturedBuilding(slotId, unit.requiredBuilding))
+            return true;
+
+        blockedReason = $"Requer capturar {ResolveProgressionBuildingName(unit.requiredBuilding)} ao menos uma vez.";
+        return false;
+    }
+
     private static bool TryResolveSlotHeadQuarterCell(PlayerSlotId slotId, out Vector3Int cell)
     {
         cell = Vector3Int.zero;
@@ -7377,6 +7524,34 @@ public class MatchController : MonoBehaviour
         cell = bestHq.CurrentCellPosition;
         cell.z = 0;
         return true;
+    }
+
+    private bool DeclareEliminationVictory(PlayerSlotId winnerSlot, PlayerSlotId defeatedSlot, VictoryReason reason)
+    {
+        if (hasVictoryWinner)
+            return true;
+        if (!IsValidPlayerSlot(winnerSlot) || winnerSlot == defeatedSlot)
+            return false;
+
+        hasVictoryWinner = true;
+        victoryWinnerSlotIndex = winnerSlot.Value;
+        TeamId winnerTeam = GetVisualTeamForSlot(winnerSlot);
+        victoryWinnerTeam = winnerTeam;
+        HandleVictoryAestheticPresentation(
+            winnerTeam,
+            IsValidPlayerSlot(defeatedSlot) ? GetVisualTeamForSlot(defeatedSlot) : TeamId.Neutral,
+            reason);
+        return true;
+    }
+
+    private PlayerSlotId ResolveFirstAliveOpponentSlot(PlayerSlotId defeatedSlot)
+    {
+        if (players == null)
+            return PlayerSlotId.Invalid;
+        for (int i = 0; i < players.Count; i++)
+            if (i != defeatedSlot.Value && !players[i].defeated)
+                return PlayerSlotId.FromIndex(i);
+        return PlayerSlotId.Invalid;
     }
 
     private static bool TryResolveTeamHeadQuarterCell(int teamId, out Vector3Int cell)

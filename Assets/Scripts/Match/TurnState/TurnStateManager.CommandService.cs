@@ -566,11 +566,12 @@ public partial class TurnStateManager
 
                     // Cobra o custo JA calculado pelo plano. O planner reservou o saldo em ordem, entao
                     // este pagamento e garantido; nao ha recalculo de custo/ganho nem aborto de fila aqui.
-                    int economyBefore = matchController != null ? matchController.GetActualMoney(target.TeamId) : 0;
+                    PlayerSlotId payingSlot = PlayerSlotId.FromIndex(target.SlotIndex);
+                    int economyBefore = matchController != null ? matchController.GetActualMoney(payingSlot) : 0;
                     int serviceMoneySpent = 0;
                     if (matchController != null && plannedLine.cost > 0)
                     {
-                        if (!matchController.TrySpendActualMoney(target.TeamId, plannedLine.cost, out int remainingAfterCharge))
+                        if (!matchController.TrySpendActualMoney(payingSlot, plannedLine.cost, out int remainingAfterCharge))
                         {
                             // Nao deveria ocorrer (o plano garante que cabe). Se ocorrer, pula a linha
                             // em vez de abortar a fila, preservando o resto do plano prometido.
@@ -581,7 +582,7 @@ public partial class TurnStateManager
                         PanelMoneyController.PushContextualUpdate(target.TeamId, remainingAfterCharge, ResolveServiceUpdateLabel(service), -plannedLine.cost);
                     }
                     totalMoneySpent += Mathf.Max(0, serviceMoneySpent);
-                    int economyAfter = matchController != null ? matchController.GetActualMoney(target.TeamId) : economyBefore;
+                    int economyAfter = matchController != null ? matchController.GetActualMoney(payingSlot) : economyBefore;
 
                     Vector3 sourceWorld = fromConstruction
                         ? sourceConstruction.transform.position
@@ -959,7 +960,7 @@ public partial class TurnStateManager
     {
         CommandServiceEstimateSummary summary = new CommandServiceEstimateSummary();
         int remainingMoney = matchController != null && matchController.ActiveTeamId >= 0
-            ? Mathf.Max(0, matchController.GetActualMoney((TeamId)matchController.ActiveTeamId))
+            ? Mathf.Max(0, matchController.GetActualMoney(matchController.ActiveSlotId))
             : 0;
         summary.moneyBefore = remainingMoney;
 

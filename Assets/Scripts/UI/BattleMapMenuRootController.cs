@@ -1406,7 +1406,7 @@ public class BattleMapMenuRootController : MonoBehaviour
     {
         TeamId activeTeam = matchController != null ? matchController.ActiveTeam : TeamId.Neutral;
         int turnNumber = matchController != null ? matchController.CurrentTurn : 0;
-        int money = matchController != null ? matchController.GetActualMoney(activeTeam) : 0;
+        int money = matchController != null ? matchController.GetActualMoney(matchController.ActiveSlotId) : 0;
         string treasury = matchController != null && matchController.ShouldHideActiveAiActionPresentation()
             ? "----"
             : Mathf.Max(0, money).ToString();

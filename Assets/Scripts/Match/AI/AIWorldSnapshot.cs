@@ -37,8 +37,9 @@ public class AIWorldSnapshot
         snap.AITeam       = aiTeam;
         snap.AISlotIndex  = ResolveSlotIndex(aiTeam, match);
         snap.TurnNumber   = match != null ? match.CurrentTurn : 0;
-        snap.Budget       = match != null ? match.GetActualMoney(aiTeam) : 0;
-        snap.IncomePerTurn = match != null ? match.GetIncomePerTurn(aiTeam) : 0;
+        PlayerSlotId aiSlot = PlayerSlotId.FromIndex(snap.AISlotIndex);
+        snap.Budget       = match != null ? match.GetActualMoney(aiSlot) : 0;
+        snap.IncomePerTurn = match != null ? match.GetIncomePerTurn(aiSlot) : 0;
 
         foreach (UnitManager u in UnitManager.AllActive)
         {
@@ -47,13 +48,13 @@ public class AIWorldSnapshot
             Vector3Int p = u.CurrentCellPosition; p.z = 0;
             snap.OccupiedCells.Add(p);
 
-            if (u.TeamId == aiTeam) snap.MyUnits.Add(u);
+            if (u.SlotIndex == snap.AISlotIndex) snap.MyUnits.Add(u);
             else if (match == null || match.IsUnitVisibleForTeamNoCache(u, aiTeam)) snap.EnemyUnits.Add(u);
         }
 
         foreach (ConstructionManager c in ConstructionManager.AllActive)
         {
-            if (c.TeamId == aiTeam)
+            if (c.SlotIndex == snap.AISlotIndex)
             {
                 snap.MyBuildings.Add(c);
                 if (c.IsPlayerHeadQuarter && snap.MyHQ == null) snap.MyHQ = c;
@@ -85,7 +86,7 @@ public class AIWorldSnapshot
         snap.AITeam     = aiTeam;
         snap.AISlotIndex = ResolveSlotIndex(aiTeam, match);
         snap.TurnNumber = match != null ? match.CurrentTurn : 0;
-        snap.Budget     = match != null ? match.GetActualMoney(aiTeam) : 0;
+        snap.Budget     = match != null ? match.GetActualMoney(PlayerSlotId.FromIndex(snap.AISlotIndex)) : 0;
 
         // MyUnits: necessário para o handler de Logistics (FindLogisticsServiceTarget,
         // TryBuildLogisticsSupplyAction, CalculateLogisticsRearAreaScore, etc.).
@@ -94,12 +95,12 @@ public class AIWorldSnapshot
         foreach (UnitManager u in UnitManager.AllActive)
         {
             if (u.IsDead || u.IsEmbarked) continue;
-            if (u.TeamId == aiTeam) snap.MyUnits.Add(u);
+            if (u.SlotIndex == snap.AISlotIndex) snap.MyUnits.Add(u);
         }
 
         foreach (ConstructionManager c in ConstructionManager.AllActive)
         {
-            if (c.TeamId == aiTeam)
+            if (c.SlotIndex == snap.AISlotIndex)
             {
                 if (c.IsPlayerHeadQuarter && snap.MyHQ == null) snap.MyHQ = c;
             }

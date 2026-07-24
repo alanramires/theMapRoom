@@ -409,7 +409,7 @@ public static class PodeSuprirSensor
         if (finalCost <= 0)
             return true;
 
-        int currentMoney = Mathf.Max(0, matchController.GetActualMoney(supplier.TeamId));
+        int currentMoney = Mathf.Max(0, matchController.GetActualMoney(PlayerSlotId.FromIndex(supplier.SlotIndex)));
         return currentMoney >= finalCost;
     }
 

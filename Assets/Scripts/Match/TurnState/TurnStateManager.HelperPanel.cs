@@ -3164,10 +3164,10 @@ public partial class TurnStateManager
             if (matchController != null)
                 resolvedCost = matchController.ResolveEconomyCost(unit.cost);
             bool canAfford = !resolvedCost.HasValue || matchController == null ||
-                matchController.GetActualMoney((TeamId)matchController.ActiveTeamId) >= resolvedCost.Value;
+                matchController.GetActualMoney(matchController.ActiveSlotId) >= resolvedCost.Value;
             string blockedReason = string.Empty;
             bool requirementMet = matchController == null ||
-                matchController.CanProduceUnit((TeamId)matchController.ActiveTeamId, unit, out blockedReason);
+                matchController.CanProduceUnit(matchController.ActiveSlotId, unit, out blockedReason);
 
             data.ShoppingLines.Add(new HelperShoppingLine
             {
@@ -3700,7 +3700,7 @@ public partial class TurnStateManager
         Dictionary<SupplyData, int> initialStock = BuildSupplierStockSnapshot(supplier);
         Dictionary<SupplyData, int> simulatedStock = CloneSupplySnapshot(initialStock);
         int remainingMoney = matchController != null
-            ? Mathf.Max(0, matchController.GetActualMoney(supplier.TeamId))
+            ? Mathf.Max(0, matchController.GetActualMoney(PlayerSlotId.FromIndex(supplier.SlotIndex)))
             : int.MaxValue;
 
         for (int i = 0; i < executionOrder.Count; i++)
@@ -3784,7 +3784,7 @@ public partial class TurnStateManager
 
         Dictionary<SupplyData, int> sourceStock = BuildSupplierStockSnapshot(supplier);
         int remainingMoney = matchController != null
-            ? Mathf.Max(0, matchController.GetActualMoney(supplier.TeamId))
+            ? Mathf.Max(0, matchController.GetActualMoney(PlayerSlotId.FromIndex(supplier.SlotIndex)))
             : int.MaxValue;
 
         for (int i = 0; i < executionOrder.Count; i++)

@@ -156,7 +156,12 @@ public partial class TurnStateManager
                         $"Capture resetado para {targetConstruction.CurrentCapturePoints}/{targetConstruction.CapturePointsMax}.");
 
                     // Captura de QG encerra o jogo para o antigo dono (humano ou IA passam por aqui).
-                    matchController?.NotifyConstructionCaptured(targetConstruction, previousOwnerTeam, capturer.TeamId);
+                    matchController?.NotifyConstructionCaptured(
+                        targetConstruction,
+                        previousOwnerSlot,
+                        capturer.SlotIndex,
+                        previousOwnerTeam,
+                        capturer.TeamId);
                 }
                 else
                 {

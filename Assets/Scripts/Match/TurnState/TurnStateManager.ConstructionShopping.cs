@@ -162,9 +162,9 @@ public partial class TurnStateManager
             TeamId team = matchController != null && matchController.ActiveTeamId >= 0
                 ? (TeamId)matchController.ActiveTeamId
                 : (shoppingConstruction != null ? shoppingConstruction.TeamId : TeamId.Neutral);
-            if (matchController != null && !matchController.CanProduceUnit(team, unit, out _))
+            if (matchController != null && !matchController.CanProduceUnit(matchController.ActiveSlotId, unit, out _))
                 return false;
-            return matchController == null || matchController.GetActualMoney(team) >= ShoppingSelectedOptionCost;
+            return matchController == null || matchController.GetActualMoney(matchController.ActiveSlotId) >= ShoppingSelectedOptionCost;
         }
     }
 
@@ -251,27 +251,28 @@ public partial class TurnStateManager
         TeamId spawnTeam = matchController != null && activeSlot >= 0
             ? matchController.GetTeamIdForSlot(activeSlot)
             : shoppingConstruction.TeamId;
-        if (matchController != null && !matchController.CanProduceUnit(spawnTeam, unit, out string requirementReason))
+        PlayerSlotId buyerSlot = PlayerSlotId.FromIndex(activeSlot);
+        if (matchController != null && !matchController.CanProduceUnit(buyerSlot, unit, out string requirementReason))
         {
             PushPanelUnitMessage(requirementReason, 3.2f);
             cursorController?.PlayErrorSfx();
             Debug.LogWarning($"[Shopping] Requisito nao cumprido para {ResolveUnitName(unit)}: {requirementReason}");
             return false;
         }
-        if (matchController != null && matchController.HasReachedMaxUnitsPerTeam(spawnTeam))
+        if (matchController != null && matchController.HasReachedMaxUnitsForSlot(buyerSlot))
         {
             cursorController?.PlayErrorSfx();
             Debug.LogError($"[Shopping] Limite de unidades atingido para {TeamUtils.GetName(spawnTeam)} ({matchController.MaxUnitsPerTeam}).");
             return false;
         }
 
-        int economyBefore = matchController != null ? matchController.GetActualMoney(spawnTeam) : 0;
+        int economyBefore = matchController != null ? matchController.GetActualMoney(buyerSlot) : 0;
         int unitCost = matchController != null
             ? matchController.ResolveEconomyCost(unit.cost)
             : Mathf.Max(0, unit.cost);
         if (matchController != null)
         {
-            int currentMoney = matchController.GetActualMoney(spawnTeam);
+            int currentMoney = matchController.GetActualMoney(buyerSlot);
             if (currentMoney < unitCost)
             {
                 PushPanelUnitMessage("Sem dinheiro suficiente", 2.6f);
@@ -304,8 +305,8 @@ public partial class TurnStateManager
             spawnedUnitManager.SetSlotIndex(activeSlot);
         TryApplyForcedSpawnLayerFromCell(spawnedUnitManager, spawnCell);
 
-        int remainingMoney = matchController != null ? matchController.GetActualMoney(spawnTeam) : 0;
-        if (matchController != null && !matchController.TrySpendActualMoney(spawnTeam, unitCost, out remainingMoney))
+        int remainingMoney = matchController != null ? matchController.GetActualMoney(buyerSlot) : 0;
+        if (matchController != null && !matchController.TrySpendActualMoney(buyerSlot, unitCost, out remainingMoney))
         {
             // Protecao contra corrida/estado inesperado: se falhou no debito, desfaz spawn.
             Destroy(spawned);
@@ -314,7 +315,7 @@ public partial class TurnStateManager
             return false;
         }
 
-        int economyAfter = matchController != null ? matchController.GetActualMoney(spawnTeam) : economyBefore;
+        int economyAfter = matchController != null ? matchController.GetActualMoney(buyerSlot) : economyBefore;
         RecordShoppingBuyReplayCommand(spawned, unit, spawnTeam, spawnCell, economyBefore, economyAfter, index);
 
         if (matchController != null)
@@ -441,7 +442,8 @@ public partial class TurnStateManager
         int ownerSlot = construction.SlotIndex;
         if (!construction.CanProduceUnitsForSlot(ownerSlot))
             return false;
-        if (matchController != null && !matchController.CanProduceUnit(team, unit, out string requirementReason))
+        PlayerSlotId ownerSlotId = PlayerSlotId.FromIndex(ownerSlot);
+        if (matchController != null && !matchController.CanProduceUnit(ownerSlotId, unit, out string requirementReason))
         {
             if (enableTurnStateRuntimeLogs)
                 Debug.Log($"[AI][Shopping] Requisito nao cumprido para {ResolveUnitName(unit)}: {requirementReason}");
@@ -449,7 +451,7 @@ public partial class TurnStateManager
         }
         if (unitSpawner == null)
             return false;
-        if (matchController != null && matchController.HasReachedMaxUnitsPerTeam(team))
+        if (matchController != null && matchController.HasReachedMaxUnitsForSlot(ownerSlotId))
         {
             if (enableTurnStateRuntimeLogs)
                 Debug.Log($"[AI][Shopping] Limite de unidades atingido para {team}.");
@@ -457,10 +459,10 @@ public partial class TurnStateManager
         }
 
         int cost = matchController != null ? matchController.ResolveEconomyCost(unit.cost) : Mathf.Max(0, unit.cost);
-        if (matchController != null && matchController.GetActualMoney(team) < cost)
+        if (matchController != null && matchController.GetActualMoney(ownerSlotId) < cost)
         {
             if (enableTurnStateRuntimeLogs)
-                Debug.Log($"[AI][Shopping] Sem dinheiro para {ResolveUnitName(unit)}. Custo=${cost}, saldo={matchController.GetActualMoney(team)}.");
+                Debug.Log($"[AI][Shopping] Sem dinheiro para {ResolveUnitName(unit)}. Custo=${cost}, saldo={matchController.GetActualMoney(ownerSlotId)}.");
             return false;
         }
 
@@ -473,7 +475,7 @@ public partial class TurnStateManager
             return false;
         }
 
-        int economyBefore = matchController != null ? matchController.GetActualMoney(team) : 0;
+        int economyBefore = matchController != null ? matchController.GetActualMoney(ownerSlotId) : 0;
 
         GameObject spawned = unitSpawner.SpawnAtCell(unit, team, spawnCell);
         if (spawned == null)
@@ -489,14 +491,14 @@ public partial class TurnStateManager
         TryApplyForcedSpawnLayerFromCell(spawnedManager, spawnCell);
 
         int remainingMoney;
-        if (matchController != null && !matchController.TrySpendActualMoney(team, cost, out remainingMoney))
+        if (matchController != null && !matchController.TrySpendActualMoney(ownerSlotId, cost, out remainingMoney))
         {
             Destroy(spawned);
             Debug.LogError($"[AI][Shopping] Falha ao debitar custo de {ResolveUnitName(unit)}.");
             return false;
         }
 
-        int economyAfter = matchController != null ? matchController.GetActualMoney(team) : economyBefore;
+        int economyAfter = matchController != null ? matchController.GetActualMoney(ownerSlotId) : economyBefore;
         RecordShoppingBuyReplayCommand(spawned, unit, team, spawnCell, economyBefore, economyAfter, 0);
 
         if (enableTurnStateRuntimeLogs)

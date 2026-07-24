@@ -72,6 +72,8 @@ Os catálogos sustentam todos eles, mas não são necessários para entender o s
 
 **DPQ** — a diferença de posição entre atacante e defensor, sempre calculada do ataque para a defesa.
 
+**RPS** — de *rock-paper-scissors*, pedra-papel-tesoura. O sistema de vantagens entre classe de arma e classe de unidade alvo. Não é aleatório nem circular por obrigação: é uma matriz de valores, catalogada em `14_matriz_rps_e_elite.md`.
+
 **Etiqueta (habilidade)** — rótulo consultado pelo mundo. Não faz nada sozinha; quem lhe dá sentido é o terreno, a estrutura ou o sensor que pergunta por ela.
 
 **Esquadrão** — o que o indicador de HP mostra: número de membros vivos no token, não pontos de vida.

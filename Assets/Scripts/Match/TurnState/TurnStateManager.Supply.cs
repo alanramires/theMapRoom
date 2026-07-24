@@ -449,7 +449,8 @@ public partial class TurnStateManager
     }
 
     private bool TryPayServiceCostForExecution(
-        TeamId team,
+        PlayerSlotId payingSlot,
+        TeamId visualTeam,
         UnitManager target,
         ServiceData service,
         int hpGain,
@@ -470,10 +471,10 @@ public partial class TurnStateManager
         if (finalCost <= 0)
             return true;
 
-        if (matchController.TrySpendActualMoney(team, finalCost, out int remaining))
+        if (matchController.TrySpendActualMoney(payingSlot, finalCost, out int remaining))
         {
             chargedCost = finalCost;
-            PanelMoneyController.PushContextualUpdate(team, remaining, ResolveServiceUpdateLabel(service), -finalCost);
+            PanelMoneyController.PushContextualUpdate(visualTeam, remaining, ResolveServiceUpdateLabel(service), -finalCost);
             return true;
         }
 

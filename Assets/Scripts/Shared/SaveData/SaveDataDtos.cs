@@ -5,7 +5,7 @@ using UnityEngine;
 [Serializable]
 public class SaveGameData
 {
-    public int version = 10;
+    public int version = 11;
     public string sceneName;
     public long savedAtUtcTicks;
     public int currentTurn;
@@ -16,6 +16,7 @@ public class SaveGameData
     public int victoryStarsToWin = 5;
     public bool hasVictoryWinner;
     public int victoryWinnerTeamId = (int)TeamId.Neutral;
+    public int victoryWinnerSlotIndex = -1;
     public List<MatchPlayerSaveData> players = new List<MatchPlayerSaveData>();
     public List<TeamCapturedBuildingSaveData> capturedBuildingHistory = new List<TeamCapturedBuildingSaveData>();
     public List<MatchVictoryStarSaveData> victoryStars = new List<MatchVictoryStarSaveData>();
@@ -124,6 +125,7 @@ public class MatchStateSaveData
     public int victoryStarsToWin = 5;
     public bool hasVictoryWinner;
     public int victoryWinnerTeamId = (int)TeamId.Neutral;
+    public int victoryWinnerSlotIndex = -1;
     public List<MatchPlayerSaveData> players = new List<MatchPlayerSaveData>();
     public List<MatchVictoryStarSaveData> victoryStars = new List<MatchVictoryStarSaveData>();
 }
@@ -144,6 +146,7 @@ public class MatchPlayerSaveData
 [Serializable]
 public class TeamCapturedBuildingSaveData
 {
+    public int slotIndex = -1;
     public int teamId;
     public List<string> buildingKeys = new List<string>();
 }
@@ -151,6 +154,7 @@ public class TeamCapturedBuildingSaveData
 [Serializable]
 public class MatchVictoryStarSaveData
 {
+    public int slotIndex = -1;
     public int teamId;
     public int stars;
 }

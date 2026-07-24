@@ -709,8 +709,9 @@ public partial class TurnStateManager
                     out List<int> ammoPlannedByWeapon);
                 if (hpPlannedGain <= 0 && fuelPlannedGain <= 0 && ammoPlannedGain <= 0)
                     continue;
-                int economyBefore = matchController != null ? matchController.GetActualMoney(supplier.TeamId) : 0;
+                int economyBefore = matchController != null ? matchController.GetActualMoney(PlayerSlotId.FromIndex(supplier.SlotIndex)) : 0;
                 if (!TryPayServiceCostForExecution(
+                        PlayerSlotId.FromIndex(supplier.SlotIndex),
                         supplier.TeamId,
                         target,
                         service,
@@ -723,7 +724,7 @@ public partial class TurnStateManager
                 {
                     continue;
                 }
-                int economyAfter = matchController != null ? matchController.GetActualMoney(supplier.TeamId) : economyBefore;
+                int economyAfter = matchController != null ? matchController.GetActualMoney(PlayerSlotId.FromIndex(supplier.SlotIndex)) : economyBefore;
 
                 float flightDuration = PlaySupplyServiceProjectile(supplier, target, service);
                 float spawnInterval = GetSupplySpawnInterval();

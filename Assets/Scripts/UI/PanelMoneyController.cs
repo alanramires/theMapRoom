@@ -48,7 +48,7 @@ public class PanelMoneyController : MonoBehaviour
     private Color lastRenderedColor = new Color(float.NaN, float.NaN, float.NaN, float.NaN);
     private string lastRenderedIncoming = string.Empty;
     private string lastRenderedProgress = string.Empty;
-    private readonly Dictionary<TeamId, int> knownMoneyByTeam = new Dictionary<TeamId, int>();
+    private readonly Dictionary<int, int> knownMoneyBySlot = new Dictionary<int, int>();
     private Coroutine moneyUpdateRoutine;
     private readonly List<StarIconEntry> starIcons = new List<StarIconEntry>();
     private int lastRenderedVictoryGoal = -1;
@@ -318,8 +318,8 @@ public class PanelMoneyController : MonoBehaviour
             activeTeam = matchController.ActiveTeam;
             if (activeTeam != TeamId.Neutral)
             {
-                money = Mathf.Max(0, matchController.GetActualMoney(activeTeam));
-                incoming = Mathf.Max(0, matchController.GetIncomePerTurn(activeTeam));
+                money = Mathf.Max(0, matchController.GetActualMoney(matchController.ActiveSlotId));
+                incoming = Mathf.Max(0, matchController.GetIncomePerTurn(matchController.ActiveSlotId));
             }
         }
 
@@ -375,9 +375,9 @@ public class PanelMoneyController : MonoBehaviour
         int projectedGain = 0;
         if (matchController != null && activeTeam != TeamId.Neutral)
         {
-            currentStars = Mathf.Max(0, matchController.GetVictoryStars(activeTeam));
+            currentStars = Mathf.Max(0, matchController.GetVictoryStars(matchController.ActiveSlotId));
             goal = Mathf.Max(1, matchController.VictoryStarsToWin);
-            projectedGain = Mathf.Max(0, matchController.GetProjectedVictoryStarsGain(activeTeam));
+            projectedGain = Mathf.Max(0, matchController.GetProjectedVictoryStarsGain(matchController.ActiveSlotId));
         }
 
         string next = $"Controle: {currentStars}/{goal}  (+{projectedGain}";
@@ -397,10 +397,11 @@ public class PanelMoneyController : MonoBehaviour
         if (activeTeam == TeamId.Neutral)
             return;
 
-        int currentMoney = Mathf.Max(0, matchController.GetActualMoney(activeTeam));
-        if (!knownMoneyByTeam.TryGetValue(activeTeam, out int previousMoney))
+        int activeSlot = matchController.ActiveSlotId.Value;
+        int currentMoney = Mathf.Max(0, matchController.GetActualMoney(matchController.ActiveSlotId));
+        if (!knownMoneyBySlot.TryGetValue(activeSlot, out int previousMoney))
         {
-            knownMoneyByTeam[activeTeam] = currentMoney;
+            knownMoneyBySlot[activeSlot] = currentMoney;
             return;
         }
 
@@ -408,20 +409,17 @@ public class PanelMoneyController : MonoBehaviour
         if (delta != 0 && !ShouldHideActiveAiEconomy())
             ShowMoneyUpdate(string.Empty, delta);
 
-        knownMoneyByTeam[activeTeam] = currentMoney;
+        knownMoneyBySlot[activeSlot] = currentMoney;
     }
 
     private void SeedKnownMoneySnapshot()
     {
-        knownMoneyByTeam.Clear();
+        knownMoneyBySlot.Clear();
         if (matchController == null)
             return;
 
-        for (int i = (int)TeamId.Green; i <= (int)TeamId.Yellow; i++)
-        {
-            TeamId team = (TeamId)i;
-            knownMoneyByTeam[team] = Mathf.Max(0, matchController.GetActualMoney(team));
-        }
+        for (int i = 0; matchController.IsValidPlayerSlotIndex(i); i++)
+            knownMoneyBySlot[i] = Mathf.Max(0, matchController.GetActualMoney(PlayerSlotId.FromIndex(i)));
     }
 
     private void PushContextualUpdateInternal(TeamId team, int resultingMoney, string label, int delta)
@@ -430,7 +428,9 @@ public class PanelMoneyController : MonoBehaviour
         if (clampedTeam < TeamId.Neutral || clampedTeam > TeamId.Yellow)
             clampedTeam = TeamId.Neutral;
 
-        knownMoneyByTeam[clampedTeam] = Mathf.Max(0, resultingMoney);
+        int activeSlot = matchController != null ? matchController.ActiveSlotId.Value : -1;
+        if (activeSlot >= 0)
+            knownMoneyBySlot[activeSlot] = Mathf.Max(0, resultingMoney);
 
         if (matchController == null || matchController.ActiveTeam != clampedTeam)
             return;
@@ -560,7 +560,7 @@ public class PanelMoneyController : MonoBehaviour
 
         TeamId activeTeam = matchController.ActiveTeam;
         int goal = Mathf.Max(1, matchController.VictoryStarsToWin);
-        int vp = activeTeam == TeamId.Neutral ? 0 : Mathf.Max(0, matchController.GetVictoryStars(activeTeam));
+        int vp = activeTeam == TeamId.Neutral ? 0 : Mathf.Max(0, matchController.GetVictoryStars(matchController.ActiveSlotId));
         Sprite silver = starSilverSprite;
         Sprite gold = starGoldSprite;
 

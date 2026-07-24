@@ -2021,6 +2021,7 @@ public class SaveGameManager : MonoBehaviour
             victoryStarsToWin = matchState.victoryStarsToWin,
             hasVictoryWinner = matchState.hasVictoryWinner,
             victoryWinnerTeamId = matchState.victoryWinnerTeamId,
+            victoryWinnerSlotIndex = matchState.victoryWinnerSlotIndex,
             players = matchState.players != null ? matchState.players : new List<MatchPlayerSaveData>(),
             capturedBuildingHistory = new List<TeamCapturedBuildingSaveData>(),
             victoryStars = matchState.victoryStars != null ? matchState.victoryStars : new List<MatchVictoryStarSaveData>(),
@@ -2122,7 +2123,8 @@ public class SaveGameManager : MonoBehaviour
             victoryStarsEnabled = data.victoryStarsEnabled,
             victoryStarsToWin = data.victoryStarsToWin,
             hasVictoryWinner = data.hasVictoryWinner,
-            victoryWinnerTeamId = data.victoryWinnerTeamId
+            victoryWinnerTeamId = data.victoryWinnerTeamId,
+            victoryWinnerSlotIndex = data.victoryWinnerSlotIndex
         };
         SaveDataMapper.ApplyMatchStateSaveData(matchController, matchState);
         matchController?.ImportCapturedBuildingHistory(data.capturedBuildingHistory);

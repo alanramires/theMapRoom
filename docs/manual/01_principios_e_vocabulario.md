@@ -30,7 +30,7 @@ Veterania adquirida também não existe. Nenhuma unidade ganha experiência, sob
 
 ## O Tabuleiro
 
-Aqui o tabuleiro representa um mapa, o hexagono é grande o bastante para caber uma cidade inteira, ou uma frota de porta aviões. e você tem uma representação de qual força está ocupando aquele setor no momento. Então se você vê um caça parado em um hexágono entre turnos, ele não está parado no ar, ele está ocupando aquele setor ou território que pode se extender em vários kilometros. Uma vez que você conseguiu abstrair o que é o "The Map Room" é hora de mergulhar nos conceitos, e o primeiro deles, antes de falar de unidade, é os "Domínios"
+Aqui o tabuleiro representa um mapa, o hexagono é grande o bastante para caber uma cidade inteira, ou uma frota de porta aviões. e você tem uma representação de qual força está ocupando aquele setor no momento. Então se você vê um caça parado em um hexágono entre turnos, ele não está parado no ar, ele está ocupando aquele setor ou território que pode se extender em vários kilometros. Uma vez que você conseguiu abstrair o que é o "The Map Room" é hora de mergulhar nos conceitos. O primeiro deles, antes de falar de unidade, são os **Domínios** — as camadas em que cada coisa existe no tabuleiro. Eles abrem o próximo documento, `02_dominios_terrenos_e_ocupacao.md`. Aqui ficam o vocabulário e os princípios que você vai levar para lá.
 
 ## Habilidades
 

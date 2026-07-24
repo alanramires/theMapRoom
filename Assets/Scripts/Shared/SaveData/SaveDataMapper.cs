@@ -42,25 +42,30 @@ public static class SaveDataMapper
             });
         }
 
-        List<int> victoryTeamIds = new List<int>();
+        List<int> victorySlotIndices = new List<int>();
         List<int> victoryStars = new List<int>();
         matchController.ExportVictoryStarsState(
-            victoryTeamIds,
+            victorySlotIndices,
             victoryStars,
             out bool victoryEnabled,
             out int victoryStarsToWin,
             out bool hasWinner,
-            out int winnerTeamId);
+            out int winnerSlotIndex);
         result.victoryStarsEnabled = victoryEnabled;
         result.victoryStarsToWin = Mathf.Max(1, victoryStarsToWin);
         result.hasVictoryWinner = hasWinner;
-        result.victoryWinnerTeamId = winnerTeamId;
+        result.victoryWinnerSlotIndex = winnerSlotIndex;
+        result.victoryWinnerTeamId = matchController.VictoryWinnerTeam == TeamId.Neutral
+            ? (int)TeamId.Neutral
+            : (int)matchController.VictoryWinnerTeam;
 
-        for (int i = 0; i < victoryTeamIds.Count; i++)
+        for (int i = 0; i < victorySlotIndices.Count; i++)
         {
+            int slotIndex = victorySlotIndices[i];
             result.victoryStars.Add(new MatchVictoryStarSaveData
             {
-                teamId = victoryTeamIds[i],
+                slotIndex = slotIndex,
+                teamId = (int)matchController.GetTeamIdForSlot(slotIndex),
                 stars = i < victoryStars.Count ? Mathf.Max(0, victoryStars[i]) : 0
             });
         }
@@ -115,7 +120,7 @@ public static class SaveDataMapper
                 matchController.SetPlayerCommandServiceAutomatic((TeamId)p.teamId, p.commandServiceAutomatic);
         }
 
-        List<int> victoryTeamIds = new List<int>();
+        List<int> victorySlotIndices = new List<int>();
         List<int> victoryStars = new List<int>();
         if (data.victoryStars != null)
         {
@@ -125,18 +130,25 @@ public static class SaveDataMapper
                 if (entry == null)
                     continue;
 
-                victoryTeamIds.Add(entry.teamId);
+                int slotIndex = entry.slotIndex;
+                if (slotIndex < 0 && matchController.TryGetUniqueSlotForTeam((TeamId)entry.teamId, out PlayerSlotId migratedSlot))
+                    slotIndex = migratedSlot.Value;
+                victorySlotIndices.Add(slotIndex);
                 victoryStars.Add(Mathf.Max(0, entry.stars));
             }
         }
 
         matchController.ImportVictoryStarsState(
-            victoryTeamIds,
+            victorySlotIndices,
             victoryStars,
             data.victoryStarsEnabled,
             Mathf.Max(1, data.victoryStarsToWin),
             data.hasVictoryWinner,
-            data.victoryWinnerTeamId);
+            data.victoryWinnerSlotIndex >= 0
+                ? data.victoryWinnerSlotIndex
+                : (matchController.TryGetUniqueSlotForTeam((TeamId)data.victoryWinnerTeamId, out PlayerSlotId migratedWinner)
+                    ? migratedWinner.Value
+                    : -1));
     }
 
     public static UnitSaveData BuildUnitSaveData(UnitManager unit)

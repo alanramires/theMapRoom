@@ -381,7 +381,7 @@ Força de Ataque Efetiva = HP atual × (Potência da arma + RPS de Ataque + Elit
 
 Força de Defesa Efetiva = Defesa da unidade + Bônus da Posição + RPS de Defesa + Elite de Defesa + Penalidade de Ferido
 
-Duas salvaguardas seguram os extremos da conta, e as duas valem a mesma coisa: **1**.
+Duas salvaguardas seguram os extremos da conta — os **pisos de 1** — e as duas valem a mesma coisa: **1**.
 
 O termo entre parênteses do ataque — potência mais RPS mais Elite — nunca fica abaixo de 1. Um RPS muito negativo piora muito o seu disparo, mas não o transforma em nada. Uma unidade com a arma errada contra o alvo errado ainda arranha.
 
