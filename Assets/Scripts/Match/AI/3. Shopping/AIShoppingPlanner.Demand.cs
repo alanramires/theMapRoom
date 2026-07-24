@@ -1432,7 +1432,7 @@ public partial class AIShoppingPlanner
                     && string.Equals(item.Unit.id, eliteCommitment.unitId,
                         System.StringComparison.Ordinal))
                 {
-                    AIIntelLedger.ClearElitePurchaseCommitment(snapshot.AITeam);
+                    AIIntelLedger.ClearElitePurchaseCommitment(PlayerSlotId.FromIndex(snapshot.AISlotIndex));
                     Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] "
                         + $"compromisso elite concluído: {item.Unit.displayName}");
                 }
@@ -1706,7 +1706,7 @@ public partial class AIShoppingPlanner
         AIWorldSnapshot snapshot, List<AIShoppingDemand> demands)
     {
         AIElitePurchaseCommitment existing =
-            AIIntelLedger.GetElitePurchaseCommitment(snapshot.AITeam);
+            AIIntelLedger.GetElitePurchaseCommitment(PlayerSlotId.FromIndex(snapshot.AISlotIndex));
         if (existing != null)
         {
             UnitData unit = FindOfferedUnitById(snapshot, existing.unitId, out _,
@@ -1724,7 +1724,7 @@ public partial class AIShoppingPlanner
             {
                 Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] "
                     + $"cancela compromisso elite {existing.unitId}: {invalidReason}");
-                AIIntelLedger.ClearElitePurchaseCommitment(snapshot.AITeam);
+                AIIntelLedger.ClearElitePurchaseCommitment(PlayerSlotId.FromIndex(snapshot.AISlotIndex));
                 existing = null;
             }
             else
@@ -1783,7 +1783,7 @@ public partial class AIShoppingPlanner
             counterHasTargetClass = bestDemand.TargetClass.HasValue,
             counterTargetClass = bestDemand.TargetClass ?? GameUnitClass.Armored,
         };
-        AIIntelLedger.SetElitePurchaseCommitment(snapshot.AITeam, commitment);
+        AIIntelLedger.SetElitePurchaseCommitment(PlayerSlotId.FromIndex(snapshot.AISlotIndex), commitment);
         Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] "
             + $"novo compromisso elite: {bestUnit.displayName} ${bestUnit.cost} "
             + $"papel={commitment.role} elite={commitment.eliteLevel}");
@@ -2231,7 +2231,7 @@ public partial class AIShoppingPlanner
         if (eliteCommitment != null
             && string.Equals(bestUnit.id, eliteCommitment.unitId, System.StringComparison.Ordinal))
         {
-            AIIntelLedger.ClearElitePurchaseCommitment(snapshot.AITeam);
+            AIIntelLedger.ClearElitePurchaseCommitment(PlayerSlotId.FromIndex(snapshot.AISlotIndex));
             Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] "
                 + $"compromisso elite concluído (pré-compra): {bestUnit.displayName}");
         }
@@ -2978,7 +2978,7 @@ public partial class AIShoppingPlanner
                 usedBuildings.Add(eliteProducer);
                 occupied.Add(ec);
                 if (eliteCommitted)
-                    AIIntelLedger.ClearElitePurchaseCommitment(snapshot.AITeam);
+                    AIIntelLedger.ClearElitePurchaseCommitment(PlayerSlotId.FromIndex(snapshot.AISlotIndex));
                 Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] recrutamento forçado: "
                     + $"último produtor {eliteProducer.ConstructionDisplayName} compra elite {eliteUnit.displayName} "
                     + $"${eliteUnit.cost} (sobrou) restante={remaining}");

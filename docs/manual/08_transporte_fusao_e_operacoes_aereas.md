@@ -32,6 +32,18 @@ Desembarcar é ação do transportador. Quem abre a porta é quem dirige — o v
 
 Por isso você seleciona a infantaria para embarcá-la, mas seleciona o helicóptero para desembarcá-la.
 
+### De Onde a Tropa Desce
+
+Vale entender o gesto do desembarque, porque ele explica sozinho várias perguntas que parecem difíceis.
+
+Enquanto está embarcada, a unidade **não ocupa lugar nenhum no tabuleiro**. Ela não está no hexágono do transportador nem em nenhum outro: ela está dentro. Quando a porta abre, ela materializa **sobre o transportador** e de lá dá um passo para um dos seis hexágonos vizinhos. Nunca fica onde o veículo está, e nunca aparece direto no destino — ela desce por cima.
+
+É a cena do filme: a rampa baixa, a tropa surge no convés e pisa em terra.
+
+E o passo final obedece às regras de movimento **do passageiro**, não às do veículo. O hexágono de destino precisa ser um lugar onde aquela unidade poderia estar por conta própria — domínio compatível, terreno transitável, andar livre.
+
+Isso resolve o desembarque anfíbio sem nenhuma regra nova, e vale seguir o raciocínio porque ele é elegante. A praia é Naval/Surface: um navio pousa ali, um soldado não. Como o soldado só materializa **sobre o navio** e depois pisa, ele nunca precisa existir na praia — ele desce do convés direto para o hexágono terrestre vizinho. A cabeça de praia acontece sem que a infantaria jamais ocupe a areia, e sem inventar nem exceção de classe nem domínio temporário.
+
 ### O Preço de Ser Carga
 
 Enquanto está embarcada, a unidade sai do tabuleiro em quase todos os sentidos que importam:

@@ -62,7 +62,7 @@ public static class PodeDetectarSensor
             observerInstanceId = ResolveUnitCacheInstanceId(observer);
             observerCellX = observerCell.x;
             observerCellY = observerCell.y;
-            observerTeamId = observer != null ? (int)observer.TeamId : -1;
+            observerTeamId = observer != null ? observer.SlotIndex : -1;
             boardMapInstanceId = boardMap != null ? boardMap.GetEntityId().GetHashCode() : 0;
             terrainDatabaseInstanceId = terrainDatabase != null ? terrainDatabase.GetEntityId().GetHashCode() : 0;
             dpqConfigInstanceId = dpqAirHeightConfig != null ? dpqAirHeightConfig.GetEntityId().GetHashCode() : 0;
@@ -337,7 +337,7 @@ public static class PodeDetectarSensor
 
     public static bool IsTargetObservedByTeam(
         UnitManager target,
-        int viewerTeamId,
+        int viewerSlotIndex,
         Tilemap map,
         TerrainDatabase terrainDatabase,
         DPQAirHeightConfig dpqAirHeightConfig = null,
@@ -348,7 +348,7 @@ public static class PodeDetectarSensor
         if (target == null || !target.gameObject.activeInHierarchy || target.IsEmbarked)
             return false;
 
-        if ((int)target.TeamId == viewerTeamId)
+        if (target.SlotIndex == viewerSlotIndex)
             return true;
 
         Tilemap boardMap = map != null ? map : target.BoardTilemap;
@@ -363,7 +363,7 @@ public static class PodeDetectarSensor
             UnitManager observer = units[i];
             if (observer == null || !observer.gameObject.activeInHierarchy || observer.IsEmbarked)
                 continue;
-            if ((int)observer.TeamId != viewerTeamId)
+            if (observer.SlotIndex != viewerSlotIndex)
                 continue;
             if (!IsUnitOnBoard(observer, boardMap))
                 continue;
@@ -388,7 +388,7 @@ public static class PodeDetectarSensor
     // Uso de visibilidade direta para FoW/UI local: sem observador avancado.
     public static bool IsTargetObservedByTeamWithoutForwardObserver(
         UnitManager target,
-        int viewerTeamId,
+        int viewerSlotIndex,
         Tilemap map,
         TerrainDatabase terrainDatabase,
         DPQAirHeightConfig dpqAirHeightConfig = null,
@@ -397,7 +397,7 @@ public static class PodeDetectarSensor
     {
         return IsTargetObservedByTeam(
             target,
-            viewerTeamId,
+            viewerSlotIndex,
             map,
             terrainDatabase,
             dpqAirHeightConfig,

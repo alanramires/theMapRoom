@@ -5,7 +5,7 @@ using UnityEngine;
 [Serializable]
 public class SaveGameData
 {
-    public int version = 11;
+    public int version = 12;
     public string sceneName;
     public long savedAtUtcTicks;
     public int currentTurn;
@@ -61,6 +61,7 @@ public class SaveGameData
 [Serializable]
 public class TurnBriefingEventSaveData
 {
+    public int slotIndex = -1; // identidade do destinatario
     public int teamId;       // destinatario do evento
     public int category;     // TurnBriefingCategory
     public string subjectName;
@@ -366,6 +367,7 @@ public class FogUnitVisibilitySaveData
 [Serializable]
 public class TeamExploredCellsSaveData
 {
+    public int slotIndex = -1;
     public int teamId;
     public List<Vector3Int> cells = new List<Vector3Int>();
 }
@@ -373,6 +375,7 @@ public class TeamExploredCellsSaveData
 [Serializable]
 public class FogConstructionMemorySaveData
 {
+    public int observerSlotIndex = -1;
     public int observerTeamId;
     public int x;
     public int y;

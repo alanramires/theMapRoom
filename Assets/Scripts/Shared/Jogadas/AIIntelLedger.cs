@@ -21,6 +21,7 @@ public class AIIntelContact
 [Serializable]
 public class AIIntelLedgerSaveData
 {
+    public int observerSlotIndex = -1;
     public int observerTeam;
     public int lastProcessedJogadaId;
     public List<AIIntelContact> contacts = new List<AIIntelContact>();
@@ -58,7 +59,8 @@ public static class AIIntelLedger
 {
     private sealed class TeamLedger
     {
-        public TeamId Observer;
+        public int ObserverSlotIndex;
+        public TeamId ObserverTeam;
         public int LastProcessedJogadaId;
         public readonly Dictionary<int, AIIntelContact> Contacts =
             new Dictionary<int, AIIntelContact>();
@@ -67,37 +69,55 @@ public static class AIIntelLedger
         public AIElitePurchaseCommitment ElitePurchaseCommitment;
     }
 
-    private static readonly Dictionary<TeamId, TeamLedger> ledgers =
-        new Dictionary<TeamId, TeamLedger>();
+    private static readonly Dictionary<int, TeamLedger> ledgers =
+        new Dictionary<int, TeamLedger>();
 
     public static IReadOnlyCollection<AIIntelContact> UpdateAndGetContacts(
         AIWorldSnapshot snapshot)
     {
         if (snapshot == null)
             return Array.Empty<AIIntelContact>();
-        TeamLedger ledger = GetOrCreate(snapshot.AITeam);
+        TeamLedger ledger = GetOrCreate(snapshot.AISlotIndex, snapshot.AITeam);
         ProcessObservableCombatEvents(ledger);
         UpdateVisibleContacts(ledger, snapshot);
         return ledger.Contacts.Values;
     }
 
     public static IReadOnlyList<AIIntelThreatSignal> GetThreatSignals(TeamId observer)
-        => GetOrCreate(observer).ThreatSignals;
+        => TryResolveUniqueSlot(observer, out int slotIndex)
+            ? GetOrCreate(slotIndex, observer).ThreatSignals
+            : Array.Empty<AIIntelThreatSignal>();
+
+    public static IReadOnlyList<AIIntelThreatSignal> GetThreatSignals(PlayerSlotId observerSlot)
+        => observerSlot.IsValid
+            ? GetOrCreate(observerSlot.Value, ResolveVisualTeam(observerSlot)).ThreatSignals
+            : Array.Empty<AIIntelThreatSignal>();
 
     public static void RecordVisibleContactsForTeam(
         TeamId observer,
         int turn,
         MatchController match)
     {
-        if (observer == TeamId.Neutral || match == null)
+        if (match == null || !match.TryGetUniqueSlotForTeam(observer, out PlayerSlotId observerSlot))
+            return;
+        RecordVisibleContactsForSlot(observerSlot, turn, match);
+    }
+
+    public static void RecordVisibleContactsForSlot(
+        PlayerSlotId observerSlot,
+        int turn,
+        MatchController match)
+    {
+        if (match == null || !match.IsValidPlayerSlot(observerSlot))
             return;
 
-        TeamLedger ledger = GetOrCreate(observer);
+        TeamId observerTeam = match.GetVisualTeamForSlot(observerSlot);
+        TeamLedger ledger = GetOrCreate(observerSlot.Value, observerTeam);
         foreach (UnitManager enemy in UnitManager.AllActive)
         {
             if (enemy == null || enemy.IsDead || enemy.IsEmbarked
-                || enemy.TeamId == observer
-                || !match.IsUnitVisibleForTeam(enemy, observer)
+                || enemy.SlotIndex == observerSlot.Value
+                || !match.IsUnitVisibleForSlot(enemy, observerSlot)
                 || !enemy.TryGetUnitData(out UnitData data) || data == null)
                 continue;
 
@@ -112,7 +132,8 @@ public static class AIIntelLedger
         {
             var saved = new AIIntelLedgerSaveData
             {
-                observerTeam = (int)ledger.Observer,
+                observerTeam = (int)ledger.ObserverTeam,
+                observerSlotIndex = ledger.ObserverSlotIndex,
                 lastProcessedJogadaId = ledger.LastProcessedJogadaId,
                 elitePurchaseCommitment = Clone(ledger.ElitePurchaseCommitment),
             };
@@ -134,7 +155,10 @@ public static class AIIntelLedger
         {
             if (saved == null || !Enum.IsDefined(typeof(TeamId), saved.observerTeam))
                 continue;
-            TeamLedger ledger = GetOrCreate((TeamId)saved.observerTeam);
+            int slotIndex = saved.observerSlotIndex;
+            if (slotIndex < 0 && !TryResolveUniqueSlot((TeamId)saved.observerTeam, out slotIndex))
+                continue;
+            TeamLedger ledger = GetOrCreate(slotIndex, (TeamId)saved.observerTeam);
             ledger.LastProcessedJogadaId = Mathf.Max(0, saved.lastProcessedJogadaId);
             ledger.ElitePurchaseCommitment = Clone(saved.elitePurchaseCommitment);
             if (saved.contacts != null)
@@ -151,27 +175,75 @@ public static class AIIntelLedger
     public static void Clear() => ledgers.Clear();
 
     public static AIElitePurchaseCommitment GetElitePurchaseCommitment(TeamId observer)
-        => Clone(GetOrCreate(observer).ElitePurchaseCommitment);
+        => TryResolveUniqueSlot(observer, out int slotIndex)
+            ? Clone(GetOrCreate(slotIndex, observer).ElitePurchaseCommitment)
+            : null;
+
+    public static AIElitePurchaseCommitment GetElitePurchaseCommitment(PlayerSlotId observerSlot)
+        => observerSlot.IsValid
+            ? Clone(GetOrCreate(observerSlot.Value, ResolveVisualTeam(observerSlot)).ElitePurchaseCommitment)
+            : null;
 
     public static void SetElitePurchaseCommitment(
         TeamId observer, AIElitePurchaseCommitment commitment)
     {
-        GetOrCreate(observer).ElitePurchaseCommitment = Clone(commitment);
+        if (TryResolveUniqueSlot(observer, out int slotIndex))
+            GetOrCreate(slotIndex, observer).ElitePurchaseCommitment = Clone(commitment);
+    }
+
+    public static void SetElitePurchaseCommitment(
+        PlayerSlotId observerSlot, AIElitePurchaseCommitment commitment)
+    {
+        if (observerSlot.IsValid)
+            GetOrCreate(observerSlot.Value, ResolveVisualTeam(observerSlot)).ElitePurchaseCommitment = Clone(commitment);
     }
 
     public static void ClearElitePurchaseCommitment(TeamId observer)
     {
-        GetOrCreate(observer).ElitePurchaseCommitment = null;
+        if (TryResolveUniqueSlot(observer, out int slotIndex))
+            GetOrCreate(slotIndex, observer).ElitePurchaseCommitment = null;
     }
 
-    private static TeamLedger GetOrCreate(TeamId observer)
+    public static void ClearElitePurchaseCommitment(PlayerSlotId observerSlot)
     {
-        if (!ledgers.TryGetValue(observer, out TeamLedger ledger))
+        if (observerSlot.IsValid)
+            GetOrCreate(observerSlot.Value, ResolveVisualTeam(observerSlot)).ElitePurchaseCommitment = null;
+    }
+
+    private static TeamLedger GetOrCreate(int observerSlotIndex, TeamId observerTeam)
+    {
+        if (!ledgers.TryGetValue(observerSlotIndex, out TeamLedger ledger))
         {
-            ledger = new TeamLedger { Observer = observer };
-            ledgers.Add(observer, ledger);
+            ledger = new TeamLedger
+            {
+                ObserverSlotIndex = observerSlotIndex,
+                ObserverTeam = observerTeam
+            };
+            ledgers.Add(observerSlotIndex, ledger);
         }
         return ledger;
+    }
+
+    private static bool TryResolveUniqueSlot(TeamId observerTeam, out int slotIndex)
+    {
+        slotIndex = -1;
+        MatchController match = UnityEngine.Object.FindAnyObjectByType<MatchController>();
+        if (match == null)
+            return false;
+        PlayerSlotId slot = match.ActiveSlotId;
+        if (!match.IsValidPlayerSlot(slot) || match.GetVisualTeamForSlot(slot) != observerTeam)
+        {
+            if (!match.TryGetUniqueSlotForTeam(observerTeam, out slot))
+                return false;
+        }
+        slotIndex = slot.Value;
+        return true;
+    }
+
+    private static TeamId ResolveVisualTeam(PlayerSlotId observerSlot)
+    {
+        MatchController match = UnityEngine.Object.FindAnyObjectByType<MatchController>();
+        return match != null ? match.GetVisualTeamForSlot(observerSlot) : TeamId.Neutral;
     }
 
     private static void UpdateVisibleContacts(TeamLedger ledger, AIWorldSnapshot snapshot)
@@ -217,8 +289,8 @@ public static class AIIntelLedger
                 || !string.Equals(play.acao, "Ataque", StringComparison.OrdinalIgnoreCase))
                 continue;
 
-            bool attackerFriendly = play.team == (int)ledger.Observer;
-            bool defenderFriendly = play.team2 == (int)ledger.Observer;
+            bool attackerFriendly = play.team == ledger.ObserverSlotIndex;
+            bool defenderFriendly = play.team2 == ledger.ObserverSlotIndex;
             if (defenderFriendly)
             {
                 if (play.attackerVisibleToDefender)
@@ -262,7 +334,7 @@ public static class AIIntelLedger
         }
         if (play.combatCargo != null)
             foreach (CombatCargoResult cargo in play.combatCargo)
-                if (cargo != null && cargo.team == (int)ledger.Observer
+                if (cargo != null && cargo.team == ledger.ObserverSlotIndex
                     && cargo.hpAntes > 0 && cargo.hpDepois <= 0)
                 {
                     killed++;

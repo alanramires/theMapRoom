@@ -49,7 +49,7 @@ public class AIWorldSnapshot
             snap.OccupiedCells.Add(p);
 
             if (u.SlotIndex == snap.AISlotIndex) snap.MyUnits.Add(u);
-            else if (match == null || match.IsUnitVisibleForTeamNoCache(u, aiTeam)) snap.EnemyUnits.Add(u);
+            else if (match == null || match.IsUnitVisibleForSlotNoCache(u, aiSlot)) snap.EnemyUnits.Add(u);
         }
 
         foreach (ConstructionManager c in ConstructionManager.AllActive)

@@ -1624,7 +1624,7 @@ public partial class TurnStateManager
             return false;
 
         MatchController controller = Object.FindAnyObjectByType<MatchController>();
-        int viewerTeamId = controller != null ? controller.ActiveTeamId : (int)unit.TeamId;
+        int viewerTeamId = controller != null ? controller.ActiveSlotId.Value : unit.SlotIndex;
         return PodeMirarSensor.IsStealthTargetRevealedForTeam(unit, viewerTeamId);
     }
 

@@ -355,7 +355,7 @@ public partial class AIShoppingPlanner
                 }
 
         IReadOnlyList<AIIntelThreatSignal> threatSignals =
-            AIIntelLedger.GetThreatSignals(snapshot.AITeam);
+            AIIntelLedger.GetThreatSignals(PlayerSlotId.FromIndex(snapshot.AISlotIndex));
         if (threatSignals != null)
         {
             int lookback = Instance != null

@@ -145,7 +145,7 @@ public partial class TurnStateManager
                         Vector3Int capturedCell = targetConstruction.CurrentCellPosition;
                         capturedCell.z = 0;
                         matchController.ReportTurnBriefingEvent(
-                            previousOwnerTeam,
+                            PlayerSlotId.FromIndex(previousOwnerSlot),
                             MatchController.TurnBriefingCategory.ConstructionLost,
                             targetConstruction.ConstructionDisplayName,
                             $"capturada por {TeamUtils.GetName(capturer.TeamId)}",

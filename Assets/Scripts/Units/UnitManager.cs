@@ -687,7 +687,7 @@ public class UnitManager : MonoBehaviour
             ? $"abatida por {(!string.IsNullOrWhiteSpace(killer.UnitDisplayName) ? killer.UnitDisplayName : killer.name)}"
             : "sem contato visual com o atacante";
         matchController.ReportTurnBriefingEvent(
-            TeamId,
+            PlayerSlotId.FromIndex(SlotIndex),
             MatchController.TurnBriefingCategory.ContactLost,
             ResolveRuntimeUnitName(),
             detail,

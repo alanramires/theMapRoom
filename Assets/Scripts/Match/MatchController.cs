@@ -1387,10 +1387,10 @@ public class MatchController : MonoBehaviour
             return;
         if (activeTeamId < 0 && !includeNeutralTeam)
             return;
-        int expectedVisualTeamId = activeTeamId;
-        if (TryResolveFogPresentationTeam(out TeamId presentationTeam))
-            expectedVisualTeamId = (int)presentationTeam;
-        if (fogCachedTeamId == expectedVisualTeamId && fogOverlayInitialized)
+        int expectedObserverSlot = ActiveSlotId.Value;
+        if (TryResolveFogPresentationSlot(out PlayerSlotId presentationSlot))
+            expectedObserverSlot = presentationSlot.Value;
+        if (fogCachedTeamId == expectedObserverSlot && fogOverlayInitialized)
             return;
 
         // Domain reloads durante o Play Mode limpam o cache nao serializado, mas o
@@ -3151,7 +3151,7 @@ public class MatchController : MonoBehaviour
             Debug.Log($"[LayerForce] Upkeep aplicou camada pendente: {unit.name} -> {lockDomain}/{lockHeight} em ({cell.x},{cell.y})");
         // Jornal do Comandante: o dono precisa saber que a camada mudou sozinha.
         ReportTurnBriefingEvent(
-            unit.TeamId,
+            PlayerSlotId.FromIndex(unit.SlotIndex),
             TurnBriefingCategory.ForcedSurfaceApplied,
             ResolveRuntimeUnitName(unit),
             $"camada aplicada automaticamente: {lockDomain}/{lockHeight}",
@@ -3245,7 +3245,7 @@ public class MatchController : MonoBehaviour
                             TryAutoAssignTurnStateManager();
                             bool willLand = turnStateManager != null && turnStateManager.CanEmergencyLandAtTurnStart(unit);
                             ReportTurnBriefingEvent(
-                                unit.TeamId,
+                                PlayerSlotId.FromIndex(unit.SlotIndex),
                                 willLand ? TurnBriefingCategory.EmergencyLanding : TurnBriefingCategory.FuelCrash,
                                 ResolveRuntimeUnitName(unit),
                                 willLand ? "pousou sem combustível — reabasteça ou remova" : "perdida por exaustão de combustível",
@@ -3347,15 +3347,28 @@ public class MatchController : MonoBehaviour
         string detail,
         Vector3Int cell)
     {
+        if (!TryGetUniqueSlotForTeam(targetTeam, out PlayerSlotId targetSlot))
+            return;
+        ReportTurnBriefingEvent(targetSlot, category, subjectName, detail, cell);
+    }
+
+    public void ReportTurnBriefingEvent(
+        PlayerSlotId targetSlot,
+        TurnBriefingCategory category,
+        string subjectName,
+        string detail,
+        Vector3Int cell)
+    {
         if (!Application.isPlaying)
             return;
-        if (targetTeam == TeamId.Neutral || (int)targetTeam < 0)
+        if (!IsValidPlayerSlot(targetSlot))
             return;
 
         cell.z = 0;
         turnBriefingLedger.Add(new TurnBriefingEventSaveData
         {
-            teamId = (int)targetTeam,
+            slotIndex = targetSlot.Value,
+            teamId = (int)GetVisualTeamForSlot(targetSlot),
             category = (int)category,
             subjectName = subjectName ?? string.Empty,
             detail = detail ?? string.Empty,
@@ -3423,7 +3436,11 @@ public class MatchController : MonoBehaviour
                 turnBriefingLedger.RemoveAt(i);
                 continue;
             }
-            if (evt.teamId != activeTeamId)
+            int eventSlotIndex = evt.slotIndex;
+            if (!IsValidPlayerSlotIndex(eventSlotIndex) &&
+                TryGetUniqueSlotForTeam((TeamId)evt.teamId, out PlayerSlotId migratedSlot))
+                eventSlotIndex = migratedSlot.Value;
+            if (eventSlotIndex != ActiveSlotId.Value)
                 continue;
             drained.Add(evt);
             turnBriefingLedger.RemoveAt(i);
@@ -3986,8 +4003,8 @@ public class MatchController : MonoBehaviour
 
     public void RefreshFogOfWarForActiveTeam(FogOfWarRefreshMode mode = FogOfWarRefreshMode.FullVisual)
     {
-        if (!TryResolveFogPresentationTeam(out TeamId presentationTeam)
-            || (int)presentationTeam == activeTeamId)
+        if (!TryResolveFogPresentationSlot(out PlayerSlotId presentationSlot)
+            || presentationSlot == ActiveSlotId)
         {
             RefreshFogOfWarForCurrentTeamInternal(mode);
             return;
@@ -4002,8 +4019,8 @@ public class MatchController : MonoBehaviour
             RefreshFogOfWarForCurrentTeamInternal(FogOfWarRefreshMode.DataOnly);
 
             // A apresentação permanece sempre sob os sensores do jogador humano.
-            activeTeamId = (int)presentationTeam;
-            activePlayerListIndex = GetSlotIndexForTeam(presentationTeam);
+            activePlayerListIndex = presentationSlot.Value;
+            activeTeamId = (int)GetVisualTeamForSlot(presentationSlot);
             RefreshFogOfWarForCurrentTeamInternal(FogOfWarRefreshMode.FullVisual);
         }
         finally
@@ -4029,7 +4046,8 @@ public class MatchController : MonoBehaviour
 
         if (fogOfWarTilemap == null)
             return;
-        if (activeTeamId < 0 && !includeNeutralTeam)
+        PlayerSlotId observerSlot = ActiveSlotId;
+        if (!IsValidPlayerSlot(observerSlot))
             return;
 
         ValidateFogOfWarSortingLayer();
@@ -4073,7 +4091,7 @@ public class MatchController : MonoBehaviour
                     Debug.Log($"[FoW][Unit][Skip] {unit.name} reason=inactive_or_embarked");
                 continue;
             }
-            if ((int)unit.TeamId != activeTeamId)
+            if (unit.SlotIndex != observerSlot.Value)
             {
                 if (ShouldLogPodeEnxergarRuntime)
                     Debug.Log($"[FoW][Unit][Skip] {unit.name} reason=other_team team={(int)unit.TeamId}");
@@ -4126,13 +4144,11 @@ public class MatchController : MonoBehaviour
         double constructionVisionMs = enableFogStepPerfLogs
             ? (Time.realtimeSinceStartupAsDouble - constructionVisionStartMs) * 1000d
             : 0d;
-        PublishFogGameplaySnapshot(activeTeamId, boardMap, units);
+        PublishFogGameplaySnapshot(observerSlot.Value, boardMap, units);
         if (mode == FogOfWarRefreshMode.FullVisual)
             RefreshRuntimeUnitFogVisibility();
-        if (Application.isPlaying && activeTeamId >= 0
-            && Enum.IsDefined(typeof(TeamId), activeTeamId))
-            AIIntelLedger.RecordVisibleContactsForTeam(
-                (TeamId)activeTeamId, currentTurn, this);
+        if (Application.isPlaying)
+            AIIntelLedger.RecordVisibleContactsForSlot(observerSlot, currentTurn, this);
         if (mode == FogOfWarRefreshMode.FullVisual)
         {
             RenderFogOverlayFromRuntimeCache(boardMap);
@@ -4179,15 +4195,27 @@ public class MatchController : MonoBehaviour
 
     public void RefreshFogOfWarForTeam(TeamId observerTeamId)
     {
+        if (!TryGetUniqueSlotForTeam(observerTeamId, out PlayerSlotId observerSlot))
+            return;
+        RefreshFogOfWarForSlot(observerSlot);
+    }
+
+    public void RefreshFogOfWarForSlot(PlayerSlotId observerSlot)
+    {
+        if (!IsValidPlayerSlot(observerSlot))
+            return;
         int previousActiveTeamId = activeTeamId;
+        int previousPlayerIndex = activePlayerListIndex;
         try
         {
-            activeTeamId = Mathf.Clamp((int)observerTeamId, -1, 3);
+            activePlayerListIndex = observerSlot.Value;
+            activeTeamId = (int)GetVisualTeamForSlot(observerSlot);
             RefreshFogOfWarForActiveTeam();
         }
         finally
         {
             activeTeamId = previousActiveTeamId;
+            activePlayerListIndex = previousPlayerIndex;
         }
     }
     public void NotifyUnitReachedHasAct(UnitManager unit)
@@ -4218,7 +4246,7 @@ public class MatchController : MonoBehaviour
             return;
         if (activeTeamId < 0)
             return;
-        if ((int)unit.TeamId != activeTeamId)
+        if (unit.SlotIndex != ActiveSlotId.Value)
             return;
 
         // HasActed confirma a acao, mas o snapshot definitivo so pode ser publicado
@@ -4241,7 +4269,7 @@ public class MatchController : MonoBehaviour
             return;
 
         ValidateFogOfWarSortingLayer();
-        if (fogCachedTeamId != activeTeamId || !fogOverlayInitialized)
+        if (fogCachedTeamId != ActiveSlotId.Value || !fogOverlayInitialized)
         {
             RefreshFogOfWarForActiveTeam();
             TryPlaySkillDetectionSfxForActedUnit(unit, boardMap);
@@ -4267,10 +4295,10 @@ public class MatchController : MonoBehaviour
         stageStartMs = enableFogStepPerfLogs ? Time.realtimeSinceStartupAsDouble : 0d;
         RefreshRuntimeUnitFogVisibility();
         UnitManager[] snapshotUnits = FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude);
-        PublishFogGameplaySnapshot(activeTeamId, boardMap, snapshotUnits);
+        PublishFogGameplaySnapshot(ActiveSlotId.Value, boardMap, snapshotUnits);
         double runtimeVisibilityMs = enableFogStepPerfLogs ? (Time.realtimeSinceStartupAsDouble - stageStartMs) * 1000d : 0d;
         stageStartMs = enableFogStepPerfLogs ? Time.realtimeSinceStartupAsDouble : 0d;
-        AIIntelLedger.RecordVisibleContactsForTeam(ActiveTeam, currentTurn, this);
+        AIIntelLedger.RecordVisibleContactsForSlot(ActiveSlotId, currentTurn, this);
         double intelMs = enableFogStepPerfLogs ? (Time.realtimeSinceStartupAsDouble - stageStartMs) * 1000d : 0d;
         stageStartMs = enableFogStepPerfLogs ? Time.realtimeSinceStartupAsDouble : 0d;
         TryPlaySkillDetectionSfxForActedUnit(unit, boardMap);
@@ -4495,24 +4523,25 @@ public class MatchController : MonoBehaviour
         if (observer == null || target == null)
             return;
 
-        int detectorTeamId = (int)observer.TeamId;
-        target.RegisterStealthReveal(detectorTeamId);
-        target.AddCurrentlyObservedByTeam(detectorTeamId);
+        int detectorSlotIndex = observer.SlotIndex;
+        target.RegisterStealthReveal(detectorSlotIndex);
+        target.AddCurrentlyObservedByTeam(detectorSlotIndex);
         target.RefreshRuntimeVisualState();
 
         // Jornal do Comandante — novo contato: deteccao PASSIVA durante o turno
         // alheio (meus sensores flagraram algo enquanto o inimigo se movia).
         // Deteccao no proprio turno foi vista ao vivo e nao entra.
-        if (detectorTeamId != activeTeamId &&
-            observer.TeamId != target.TeamId &&
-            observer.TeamId != TeamId.Neutral)
+        if (detectorSlotIndex != ActiveSlotId.Value &&
+            observer.SlotIndex != target.SlotIndex &&
+            detectorSlotIndex >= 0)
         {
             Vector3Int contactCell = target.CurrentCellPosition;
             contactCell.z = 0;
-            if (!HasTurnBriefingEntry(observer.TeamId, TurnBriefingCategory.NewContact, contactCell, currentTurn))
+            PlayerSlotId observerSlot = PlayerSlotId.FromIndex(observer.SlotIndex);
+            if (!HasTurnBriefingEntry(observerSlot, TurnBriefingCategory.NewContact, contactCell, currentTurn))
             {
                 ReportTurnBriefingEvent(
-                    observer.TeamId,
+                    observerSlot,
                     TurnBriefingCategory.NewContact,
                     ResolveRuntimeUnitName(target),
                     $"detectado por {ResolveRuntimeUnitName(observer)}",
@@ -4524,7 +4553,7 @@ public class MatchController : MonoBehaviour
     // Dedupe barato do briefing: mesma categoria, mesmo destinatario, mesma
     // celula e mesmo turno = um evento so (a deteccao pode disparar varias
     // vezes por movimento).
-    private bool HasTurnBriefingEntry(TeamId team, TurnBriefingCategory category, Vector3Int cell, int turnNumber)
+    private bool HasTurnBriefingEntry(PlayerSlotId slot, TurnBriefingCategory category, Vector3Int cell, int turnNumber)
     {
         cell.z = 0;
         for (int i = 0; i < turnBriefingLedger.Count; i++)
@@ -4532,7 +4561,11 @@ public class MatchController : MonoBehaviour
             TurnBriefingEventSaveData evt = turnBriefingLedger[i];
             if (evt == null)
                 continue;
-            if (evt.teamId == (int)team &&
+            int eventSlotIndex = evt.slotIndex;
+            if (!IsValidPlayerSlotIndex(eventSlotIndex) &&
+                TryGetUniqueSlotForTeam((TeamId)evt.teamId, out PlayerSlotId migratedSlot))
+                eventSlotIndex = migratedSlot.Value;
+            if (eventSlotIndex == slot.Value &&
                 evt.category == (int)category &&
                 evt.cellX == cell.x &&
                 evt.cellY == cell.y &&
@@ -4728,7 +4761,7 @@ public class MatchController : MonoBehaviour
 
         Domain targetDomain = target.GetDomain();
         HeightLevel targetHeight = target.GetHeightLevel();
-        int targetTeamId = (int)target.TeamId;
+        int targetSlotIndex = target.SlotIndex;
 
         int maxRange = 1;
         UnitManager[] units = FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
@@ -4737,7 +4770,7 @@ public class MatchController : MonoBehaviour
             UnitManager observer = units[i];
             if (observer == null || observer == target || !observer.gameObject.activeInHierarchy || observer.IsEmbarked)
                 continue;
-            if ((int)observer.TeamId == targetTeamId)
+            if (observer.SlotIndex == targetSlotIndex)
                 continue;
             if (!IsUnitOnBoard(observer, boardMap))
                 continue;
@@ -4759,12 +4792,12 @@ public class MatchController : MonoBehaviour
         if (target == null)
             return false;
 
-        int ownerTeamId = (int)target.TeamId;
-        for (int teamId = -1; teamId <= 3; teamId++)
+        int ownerSlotIndex = target.SlotIndex;
+        for (int slotIndex = 0; slotIndex < players.Count; slotIndex++)
         {
-            if (teamId == ownerTeamId)
+            if (slotIndex == ownerSlotIndex)
                 continue;
-            if (target.IsStealthRevealedForTeam(teamId, currentTurn))
+            if (target.IsStealthRevealedForTeam(slotIndex, currentTurn))
                 return true;
         }
 
@@ -4791,7 +4824,7 @@ public class MatchController : MonoBehaviour
             UnitManager observer = units[i];
             if (observer == null || observer == target || !observer.gameObject.activeInHierarchy || observer.IsEmbarked)
                 continue;
-            if (observer.TeamId == target.TeamId)
+            if (observer.SlotIndex == target.SlotIndex)
                 continue;
             if (!IsUnitOnBoard(observer, map))
                 continue;
@@ -4801,15 +4834,15 @@ public class MatchController : MonoBehaviour
             if (!cellsInRadius.Contains(observerCell))
                 continue;
 
-            int observerTeamId = (int)observer.TeamId;
-            if (observerTeamId < -1 || observerTeamId > 3)
+            int observerSlotIndex = observer.SlotIndex;
+            if (!IsValidPlayerSlotIndex(observerSlotIndex))
                 continue;
 
             // Lock de camada pendente equivale a "revelada": anula stealth como atirar anula.
             bool enforceStealthValidation = enableStealthValidation && !target.HasFiredThisTurn && !target.HasPendingForcedLayerLock;
             bool canObserveTarget = PodeDetectarSensor.IsTargetObservedByTeam(
                 target,
-                observerTeamId,
+                observerSlotIndex,
                 map,
                 ResolveFogTerrainDatabase(),
                 ResolveFogDpqAirHeightConfig(),
@@ -4819,7 +4852,7 @@ public class MatchController : MonoBehaviour
             if (!canObserveTarget)
                 continue;
 
-            observerTeamIds.Add(observerTeamId);
+            observerTeamIds.Add(observerSlotIndex);
         }
 
         return observerTeamIds.Count > 0;
@@ -4873,13 +4906,14 @@ public class MatchController : MonoBehaviour
             return false;
 
         int cacheIndex = ResolveFogCacheIndex(unit);
-        if (fogCachedTeamId == activeTeamId &&
+        int observerSlotIndex = ActiveSlotId.Value;
+        if (fogCachedTeamId == observerSlotIndex &&
             fogUnitVisibilityByCacheIndex.TryGetValue(cacheIndex, out bool cachedVisible))
         {
             return cachedVisible;
         }
 
-        if (TryGetFogGameplaySnapshot(activeTeamId, out FogTeamGameplaySnapshot snapshot) &&
+        if (TryGetFogGameplaySnapshot(observerSlotIndex, out FogTeamGameplaySnapshot snapshot) &&
             snapshot.unitVisibility.TryGetValue(cacheIndex, out bool snapshotVisible))
         {
             return snapshotVisible;
@@ -4901,51 +4935,67 @@ public class MatchController : MonoBehaviour
         if (unit == null || !unit.gameObject.activeInHierarchy || unit.IsEmbarked)
             return false;
 
-        if ((int)unit.TeamId == activeTeamId)
+        int observerSlotIndex = ActiveSlotId.Value;
+        if (unit.SlotIndex == observerSlotIndex)
             return true;
 
         int cacheIndex = ResolveFogCacheIndex(unit);
-        if (TryGetFogGameplaySnapshot(activeTeamId, out FogTeamGameplaySnapshot snapshot))
+        if (TryGetFogGameplaySnapshot(observerSlotIndex, out FogTeamGameplaySnapshot snapshot))
             return snapshot.unitVisibility.TryGetValue(cacheIndex, out bool visible) && visible;
 
-        return fogCachedTeamId == activeTeamId &&
+        return fogCachedTeamId == observerSlotIndex &&
                fogUnitVisibilityByCacheIndex.TryGetValue(cacheIndex, out bool cachedVisible) &&
                cachedVisible;
     }
 
     public bool IsUnitVisibleForTeam(UnitManager unit, TeamId observerTeam)
     {
+        return TryResolveObserverSlotForLegacyTeam(observerTeam, out PlayerSlotId observerSlot)
+            && IsUnitVisibleForSlot(unit, observerSlot);
+    }
+
+    public bool IsUnitVisibleForSlot(UnitManager unit, PlayerSlotId observerSlot)
+    {
         if (!debugFogOfWarEnabled)
             return true;
 
         if (unit == null || !unit.gameObject.activeInHierarchy || unit.IsEmbarked)
             return false;
 
-        if (unit.TeamId == observerTeam)
+        if (!IsValidPlayerSlot(observerSlot))
+            return false;
+
+        if (unit.SlotIndex == observerSlot.Value)
             return true;
 
         if (!enableTotalWar)
             return true;
 
-        if ((int)observerTeam == activeTeamId)
+        if (observerSlot == ActiveSlotId)
         {
             int cacheIndex = ResolveFogCacheIndex(unit);
-            if (TryGetFogGameplaySnapshot((int)observerTeam, out FogTeamGameplaySnapshot snapshot) &&
+            if (TryGetFogGameplaySnapshot(observerSlot.Value, out FogTeamGameplaySnapshot snapshot) &&
                 snapshot.unitVisibility.TryGetValue(cacheIndex, out bool snapshotVisible))
             {
                 return snapshotVisible;
             }
-            if (fogCachedTeamId == activeTeamId &&
+            if (fogCachedTeamId == observerSlot.Value &&
                 fogUnitVisibilityByCacheIndex.TryGetValue(cacheIndex, out bool cachedVisible))
             {
                 return cachedVisible;
             }
         }
 
-        return ComputeIsUnitVisibleForTeamWithoutCache(unit, observerTeam);
+        return ComputeIsUnitVisibleForSlotWithoutCache(unit, observerSlot);
     }
 
     public bool IsUnitVisibleForTeamNoCache(UnitManager unit, TeamId observerTeam)
+    {
+        return TryResolveObserverSlotForLegacyTeam(observerTeam, out PlayerSlotId observerSlot)
+            && IsUnitVisibleForSlotNoCache(unit, observerSlot);
+    }
+
+    public bool IsUnitVisibleForSlotNoCache(UnitManager unit, PlayerSlotId observerSlot)
     {
         if (!debugFogOfWarEnabled)
             return true;
@@ -4953,28 +5003,45 @@ public class MatchController : MonoBehaviour
         if (unit == null || !unit.gameObject.activeInHierarchy || unit.IsEmbarked)
             return false;
 
-        if (unit.TeamId == observerTeam)
+        if (!IsValidPlayerSlot(observerSlot))
+            return false;
+
+        if (unit.SlotIndex == observerSlot.Value)
             return true;
 
         if (!enableTotalWar)
             return true;
 
-        return ComputeIsUnitVisibleForTeamWithoutCache(unit, observerTeam);
+        return ComputeIsUnitVisibleForSlotWithoutCache(unit, observerSlot);
     }
 
     private bool ComputeIsUnitVisibleForTeamWithoutCache(UnitManager unit, TeamId observerTeam)
+    {
+        return TryResolveObserverSlotForLegacyTeam(observerTeam, out PlayerSlotId observerSlot)
+            && ComputeIsUnitVisibleForSlotWithoutCache(unit, observerSlot);
+    }
+
+    private bool TryResolveObserverSlotForLegacyTeam(TeamId observerTeam, out PlayerSlotId observerSlot)
+    {
+        observerSlot = ActiveSlotId;
+        if (IsValidPlayerSlot(observerSlot) && GetVisualTeamForSlot(observerSlot) == observerTeam)
+            return true;
+        return TryGetUniqueSlotForTeam(observerTeam, out observerSlot);
+    }
+
+    private bool ComputeIsUnitVisibleForSlotWithoutCache(UnitManager unit, PlayerSlotId observerSlot)
     {
         Tilemap boardMap = ResolveFogBoardTilemap();
         if (boardMap == null)
             return false;
 
-        if (IsUnitOnFriendlyConstruction(unit, observerTeam, boardMap))
+        if (IsUnitOnFriendlyConstruction(unit, observerSlot, boardMap))
             return true;
 
         bool enforceStealthValidation = enableStealthValidation && !unit.HasFiredThisTurn && !unit.HasPendingForcedLayerLock;
         return PodeDetectarSensor.IsTargetObservedByTeamWithoutForwardObserver(
             unit,
-            (int)observerTeam,
+            observerSlot.Value,
             boardMap,
             ResolveFogTerrainDatabase(),
             ResolveFogDpqAirHeightConfig(),
@@ -4987,8 +5054,8 @@ public class MatchController : MonoBehaviour
         if (unit == null || !unit.gameObject.activeInHierarchy || unit.IsEmbarked)
             return false;
 
-        TeamId unitTeam = unit.TeamId;
-        if ((int)unitTeam == activeTeamId)
+        PlayerSlotId observerSlot = ActiveSlotId;
+        if (unit.SlotIndex == observerSlot.Value)
             return true;
 
         if (!enableTotalWar)
@@ -4998,8 +5065,8 @@ public class MatchController : MonoBehaviour
         if (boardMap == null)
             return false;
 
-        if (Enum.IsDefined(typeof(TeamId), activeTeamId)
-            && IsUnitOnFriendlyConstruction(unit, (TeamId)activeTeamId, boardMap))
+        if (IsValidPlayerSlot(observerSlot)
+            && IsUnitOnFriendlyConstruction(unit, observerSlot, boardMap))
         {
             return true;
         }
@@ -5007,7 +5074,7 @@ public class MatchController : MonoBehaviour
         bool enforceStealthValidation = enableStealthValidation && !unit.HasFiredThisTurn && !unit.HasPendingForcedLayerLock;
         return PodeDetectarSensor.IsTargetObservedByTeamWithoutForwardObserver(
             unit,
-            activeTeamId,
+            observerSlot.Value,
             boardMap,
             ResolveFogTerrainDatabase(),
             ResolveFogDpqAirHeightConfig(),
@@ -5038,9 +5105,9 @@ public class MatchController : MonoBehaviour
         HandleVictoryAestheticPresentation(TeamId.Neutral, surrenderingTeam, VictoryReason.Surrender);
     }
 
-    private bool IsUnitOnFriendlyConstruction(UnitManager unit, TeamId observerTeam, Tilemap boardMap)
+    private bool IsUnitOnFriendlyConstruction(UnitManager unit, PlayerSlotId observerSlot, Tilemap boardMap)
     {
-        if (unit == null || boardMap == null || observerTeam == TeamId.Neutral)
+        if (unit == null || boardMap == null || !IsValidPlayerSlot(observerSlot))
             return false;
         // A regra e sobre OCUPACAO da construcao (quem esta DE PE nela, na banda
         // bloqueante — o inimigo que ameaca capturar seu predio e sempre visto).
@@ -5062,7 +5129,7 @@ public class MatchController : MonoBehaviour
             ConstructionManager construction = constructions[i];
             if (construction == null || !construction.gameObject.activeInHierarchy)
                 continue;
-            if (!IsConstructionOwnedByTeam(construction, observerTeam))
+            if (construction.SlotIndex != observerSlot.Value)
                 continue;
             if (construction.BoardTilemap != boardMap)
                 continue;
@@ -5105,9 +5172,10 @@ public class MatchController : MonoBehaviour
         if (!enableTotalWar)
             return true;
         cell.z = 0;
-        if (TryGetFogGameplaySnapshot(activeTeamId, out FogTeamGameplaySnapshot snapshot))
+        int observerSlotIndex = ActiveSlotId.Value;
+        if (TryGetFogGameplaySnapshot(observerSlotIndex, out FogTeamGameplaySnapshot snapshot))
             return snapshot.visibleCells.Contains(cell);
-        if (fogCachedTeamId != activeTeamId)
+        if (fogCachedTeamId != observerSlotIndex)
             return false;
 
         return fogVisibleContributorsByCell.TryGetValue(cell, out int contributors) && contributors > 0;
@@ -5143,7 +5211,7 @@ public class MatchController : MonoBehaviour
             return true;
 
         if (excludeProvisionalUnit == null &&
-            TryGetFogGameplaySnapshot(activeTeamId, out FogTeamGameplaySnapshot snapshot))
+            TryGetFogGameplaySnapshot(ActiveSlotId.Value, out FogTeamGameplaySnapshot snapshot))
         {
             return snapshot.knownCells.Contains(cell);
         }
@@ -5154,12 +5222,12 @@ public class MatchController : MonoBehaviour
 
         int excludedIndex = excludeProvisionalUnit != null ? ResolveFogCacheIndex(excludeProvisionalUnit) : int.MinValue;
         if (teamKnownCellsCacheFrame != Time.frameCount ||
-            teamKnownCellsCacheTeamId != activeTeamId ||
+            teamKnownCellsCacheTeamId != ActiveSlotId.Value ||
             teamKnownCellsCacheExcludedIndex != excludedIndex)
         {
             BuildFogDisplayVisibleCellsForAllModes(boardMap, teamKnownCellsCache, excludeProvisionalUnit);
             teamKnownCellsCacheFrame = Time.frameCount;
-            teamKnownCellsCacheTeamId = activeTeamId;
+            teamKnownCellsCacheTeamId = ActiveSlotId.Value;
             teamKnownCellsCacheExcludedIndex = excludedIndex;
         }
 
@@ -5171,10 +5239,10 @@ public class MatchController : MonoBehaviour
         if (!debugFogOfWarEnabled || !enableTotalWar)
             return true;
 
-        int expectedTeamId = activeTeamId;
-        if (TryResolveFogPresentationTeam(out TeamId presentationTeam))
-            expectedTeamId = (int)presentationTeam;
-        if (fogCachedTeamId != expectedTeamId)
+        int expectedSlotIndex = ActiveSlotId.Value;
+        if (TryResolveFogPresentationSlot(out PlayerSlotId presentationSlot))
+            expectedSlotIndex = presentationSlot.Value;
+        if (fogCachedTeamId != expectedSlotIndex)
             return false;
 
         cell.z = 0;
@@ -5244,6 +5312,24 @@ public class MatchController : MonoBehaviour
             return TryGetFirstAITeam(out presentationTeam);
 
         return ShouldUseHumanFogPresentation(out presentationTeam);
+    }
+
+    private bool TryResolveFogPresentationSlot(out PlayerSlotId presentationSlot)
+    {
+        presentationSlot = PlayerSlotId.Invalid;
+        if (!TryResolveFogPresentationTeam(out TeamId presentationTeam) || players == null)
+            return false;
+
+        bool requireAI = debugFogOfWarPartial;
+        for (int i = 0; i < players.Count; i++)
+        {
+            if (players[i].teamId != presentationTeam || players[i].isAI != requireAI)
+                continue;
+            presentationSlot = PlayerSlotId.FromIndex(i);
+            return true;
+        }
+
+        return false;
     }
 
     public void ExportFogRuntimeCacheForSave(
@@ -5344,7 +5430,7 @@ public class MatchController : MonoBehaviour
         }
 
         UnitManager[] snapshotUnits = FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude);
-        PublishFogGameplaySnapshot(activeTeamId, boardMap, snapshotUnits);
+        PublishFogGameplaySnapshot(ActiveSlotId.Value, boardMap, snapshotUnits);
         ApplyRuntimeUnitFogVisibilityFromCache(boardMap);
         if (Application.isPlaying)
             OnFogOfWarUpdated?.Invoke();
@@ -5776,15 +5862,16 @@ public class MatchController : MonoBehaviour
         }
     }
 
-    private void PublishFogGameplaySnapshot(int teamId, Tilemap boardMap, UnitManager[] units)
+    private void PublishFogGameplaySnapshot(int slotIndex, Tilemap boardMap, UnitManager[] units)
     {
-        if (teamId < 0 || boardMap == null || !Enum.IsDefined(typeof(TeamId), teamId))
+        PlayerSlotId observerSlot = PlayerSlotId.FromIndex(slotIndex);
+        if (!IsValidPlayerSlot(observerSlot) || boardMap == null)
             return;
 
-        if (!fogGameplaySnapshotsByTeam.TryGetValue(teamId, out FogTeamGameplaySnapshot snapshot))
+        if (!fogGameplaySnapshotsByTeam.TryGetValue(slotIndex, out FogTeamGameplaySnapshot snapshot))
         {
             snapshot = new FogTeamGameplaySnapshot();
-            fogGameplaySnapshotsByTeam[teamId] = snapshot;
+            fogGameplaySnapshotsByTeam[slotIndex] = snapshot;
         }
 
         snapshot.visibleCells.Clear();
@@ -5796,18 +5883,17 @@ public class MatchController : MonoBehaviour
 
         snapshot.knownCells.Clear();
         BuildFogDisplayVisibleCellsForAllModes(boardMap, snapshot.knownCells);
-        RecordConfirmedExploredCells(teamId, snapshot.knownCells);
-        RecordConfirmedConstructionMemory(teamId, boardMap, snapshot.knownCells);
+        RecordConfirmedExploredCells(slotIndex, snapshot.knownCells);
+        RecordConfirmedConstructionMemory(slotIndex, boardMap, snapshot.knownCells);
 
         snapshot.globalLandmarkOnlyCells.Clear();
-        TeamId observerTeam = (TeamId)teamId;
         List<ConstructionManager> constructions = ConstructionManager.AllActive;
         for (int i = 0; i < constructions.Count; i++)
         {
             ConstructionManager construction = constructions[i];
             if (construction == null || !construction.gameObject.activeInHierarchy)
                 continue;
-            if (!construction.IsPlayerHeadQuarter || construction.TeamId == observerTeam)
+            if (!construction.IsPlayerHeadQuarter || construction.SlotIndex == slotIndex)
                 continue;
             if (construction.BoardTilemap != boardMap || construction.gameObject.scene != boardMap.gameObject.scene)
                 continue;
@@ -5830,8 +5916,8 @@ public class MatchController : MonoBehaviour
             if (!IsUnitOnBoard(unit, boardMap))
                 continue;
 
-            bool visible = unit.TeamId == observerTeam ||
-                           ComputeIsUnitVisibleForTeamWithoutCache(unit, observerTeam);
+            bool visible = unit.SlotIndex == slotIndex ||
+                           ComputeIsUnitVisibleForSlotWithoutCache(unit, observerSlot);
             snapshot.unitVisibility[ResolveFogCacheIndex(unit)] = visible;
         }
     }
@@ -5853,7 +5939,7 @@ public class MatchController : MonoBehaviour
             return;
         if (turnStateManager != null && turnStateManager.CurrentCursorState != TurnStateManager.CursorState.Neutral)
             return;
-        if (teamId < 0 || !Enum.IsDefined(typeof(TeamId), teamId))
+        if (!IsValidPlayerSlotIndex(teamId))
             return;
 
         if (!fogExploredCellsByTeam.TryGetValue(teamId, out HashSet<Vector3Int> explored))
@@ -5872,16 +5958,21 @@ public class MatchController : MonoBehaviour
 
     public bool IsCellExploredByTeam(TeamId team, Vector3Int cell)
     {
+        return TryGetUniqueSlotForTeam(team, out PlayerSlotId slot) && IsCellExploredBySlot(slot, cell);
+    }
+
+    public bool IsCellExploredBySlot(PlayerSlotId slot, Vector3Int cell)
+    {
         cell.z = 0;
-        return team != TeamId.Neutral &&
-               fogExploredCellsByTeam.TryGetValue((int)team, out HashSet<Vector3Int> explored) &&
+        return IsValidPlayerSlot(slot) &&
+               fogExploredCellsByTeam.TryGetValue(slot.Value, out HashSet<Vector3Int> explored) &&
                explored.Contains(cell);
     }
 
     public int GetExploredCellCount(TeamId team)
     {
-        return team != TeamId.Neutral &&
-               fogExploredCellsByTeam.TryGetValue((int)team, out HashSet<Vector3Int> explored)
+        return TryGetUniqueSlotForTeam(team, out PlayerSlotId slot) &&
+               fogExploredCellsByTeam.TryGetValue(slot.Value, out HashSet<Vector3Int> explored)
             ? explored.Count
             : 0;
     }
@@ -5895,7 +5986,7 @@ public class MatchController : MonoBehaviour
             return;
         if (turnStateManager != null && turnStateManager.CurrentCursorState != TurnStateManager.CursorState.Neutral)
             return;
-        if (teamId < 0 || !Enum.IsDefined(typeof(TeamId), teamId))
+        if (!IsValidPlayerSlotIndex(teamId))
             return;
 
         if (!fogConstructionMemoryByTeam.TryGetValue(teamId, out Dictionary<Vector3Int, FogConstructionMemoryEntry> memory))
@@ -5939,11 +6030,26 @@ public class MatchController : MonoBehaviour
         out ConstructionData constructionData,
         out TeamId knownOwner)
     {
+        if (!TryGetUniqueSlotForTeam(observerTeam, out PlayerSlotId observerSlot))
+        {
+            constructionData = null;
+            knownOwner = TeamId.Neutral;
+            return false;
+        }
+        return TryGetKnownConstructionAtCell(observerSlot, cell, out constructionData, out knownOwner);
+    }
+
+    public bool TryGetKnownConstructionAtCell(
+        PlayerSlotId observerSlot,
+        Vector3Int cell,
+        out ConstructionData constructionData,
+        out TeamId knownOwner)
+    {
         constructionData = null;
         knownOwner = TeamId.Neutral;
         cell.z = 0;
-        if (observerTeam == TeamId.Neutral ||
-            !fogConstructionMemoryByTeam.TryGetValue((int)observerTeam, out Dictionary<Vector3Int, FogConstructionMemoryEntry> memory) ||
+        if (!IsValidPlayerSlot(observerSlot) ||
+            !fogConstructionMemoryByTeam.TryGetValue(observerSlot.Value, out Dictionary<Vector3Int, FogConstructionMemoryEntry> memory) ||
             !memory.TryGetValue(cell, out FogConstructionMemoryEntry entry) || entry == null || entry.data == null)
         {
             return false;
@@ -5969,7 +6075,8 @@ public class MatchController : MonoBehaviour
                     continue;
                 destination.Add(new FogConstructionMemorySaveData
                 {
-                    observerTeamId = teamPair.Key,
+                    observerSlotIndex = teamPair.Key,
+                    observerTeamId = (int)GetVisualTeamForSlot(PlayerSlotId.FromIndex(teamPair.Key)),
                     x = cellPair.Key.x,
                     y = cellPair.Key.y,
                     constructionDataId = !string.IsNullOrWhiteSpace(entry.data.id) ? entry.data.id : entry.data.name,
@@ -5999,7 +6106,6 @@ public class MatchController : MonoBehaviour
         {
             FogConstructionMemorySaveData saved = source[i];
             if (saved == null || !Enum.IsDefined(typeof(TeamId), saved.observerTeamId) ||
-                (TeamId)saved.observerTeamId == TeamId.Neutral ||
                 !Enum.IsDefined(typeof(TeamId), saved.knownOwnerTeamId))
             {
                 continue;
@@ -6017,10 +6123,18 @@ public class MatchController : MonoBehaviour
             if (!string.Equals(dataId, saved.constructionDataId, StringComparison.OrdinalIgnoreCase))
                 continue;
 
-            if (!fogConstructionMemoryByTeam.TryGetValue(saved.observerTeamId, out Dictionary<Vector3Int, FogConstructionMemoryEntry> memory))
+            int observerSlotIndex = saved.observerSlotIndex;
+            PlayerSlotId migratedSlot = PlayerSlotId.Invalid;
+            if (!IsValidPlayerSlotIndex(observerSlotIndex) &&
+                !TryGetUniqueSlotForTeam((TeamId)saved.observerTeamId, out migratedSlot))
+                continue;
+            if (!IsValidPlayerSlotIndex(observerSlotIndex))
+                observerSlotIndex = migratedSlot.Value;
+
+            if (!fogConstructionMemoryByTeam.TryGetValue(observerSlotIndex, out Dictionary<Vector3Int, FogConstructionMemoryEntry> memory))
             {
                 memory = new Dictionary<Vector3Int, FogConstructionMemoryEntry>();
-                fogConstructionMemoryByTeam[saved.observerTeamId] = memory;
+                fogConstructionMemoryByTeam[observerSlotIndex] = memory;
             }
             memory[cell] = new FogConstructionMemoryEntry
             {
@@ -6039,10 +6153,14 @@ public class MatchController : MonoBehaviour
 
         foreach (KeyValuePair<int, HashSet<Vector3Int>> pair in fogExploredCellsByTeam)
         {
-            if (!Enum.IsDefined(typeof(TeamId), pair.Key) || (TeamId)pair.Key == TeamId.Neutral)
+            if (!IsValidPlayerSlotIndex(pair.Key))
                 continue;
 
-            var saved = new TeamExploredCellsSaveData { teamId = pair.Key };
+            var saved = new TeamExploredCellsSaveData
+            {
+                slotIndex = pair.Key,
+                teamId = (int)GetVisualTeamForSlot(PlayerSlotId.FromIndex(pair.Key))
+            };
             if (pair.Value != null)
                 saved.cells.AddRange(pair.Value);
             saved.cells.Sort((a, b) => a.x != b.x ? a.x.CompareTo(b.x) : a.y.CompareTo(b.y));
@@ -6061,8 +6179,7 @@ public class MatchController : MonoBehaviour
         for (int i = 0; i < source.Count; i++)
         {
             TeamExploredCellsSaveData saved = source[i];
-            if (saved == null || !Enum.IsDefined(typeof(TeamId), saved.teamId) ||
-                (TeamId)saved.teamId == TeamId.Neutral)
+            if (saved == null || !Enum.IsDefined(typeof(TeamId), saved.teamId))
             {
                 continue;
             }
@@ -6077,7 +6194,14 @@ public class MatchController : MonoBehaviour
                     explored.Add(cell);
                 }
             }
-            fogExploredCellsByTeam[saved.teamId] = explored;
+            int slotIndex = saved.slotIndex;
+            PlayerSlotId migratedSlot = PlayerSlotId.Invalid;
+            if (!IsValidPlayerSlotIndex(slotIndex) &&
+                !TryGetUniqueSlotForTeam((TeamId)saved.teamId, out migratedSlot))
+                continue;
+            if (!IsValidPlayerSlotIndex(slotIndex))
+                slotIndex = migratedSlot.Value;
+            fogExploredCellsByTeam[slotIndex] = explored;
         }
     }
 
@@ -6131,7 +6255,7 @@ public class MatchController : MonoBehaviour
             fogOfWarTilemap.SetColor(cell, ResolveFogColorForCell(cell));
         }
 
-        fogCachedTeamId = activeTeamId;
+        fogCachedTeamId = ActiveSlotId.Value;
         fogOverlayInitialized = true;
         // InitializeFogOverlay acabou de desenhar nevoa em todas as celulas.
         fogRenderedVisibleCellsBuffer.Clear();
@@ -6149,7 +6273,7 @@ public class MatchController : MonoBehaviour
             fogOverlayInitialized = false;
             return;
         }
-        fogCachedTeamId = activeTeamId;
+        fogCachedTeamId = ActiveSlotId.Value;
         fogOverlayInitialized = true;
     }
 

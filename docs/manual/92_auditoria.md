@@ -53,6 +53,11 @@ Os IDs seguem o mesmo esquema de `90_pendencias_tecnicas.md` e não são reaprov
 | FOW-013 | Submarino exposto por 2 turnos jogáveis do dono; lock pendente não conta tempo | Confirmada | `UnitManager.cs:1376-1398` |
 | FOW-014 | Air/Low bloqueia linha de visão / unidade projeta sombra | **Manual errado** | `TerrainVisionResolver.cs:57` só compõe a camada aérea com ocupante; `PodeMirarSensor.cs:1595` passa `null` nas células intermediárias. **Unidade nunca é obstáculo** |
 | FOW-015 | Do destino provisório no escuro só o ataque é liberado | **Manual errado** | são três estados; terreno explorado libera também desembarque, captura e transferência — `Sensors.cs:119-136` e `:460-499` |
+| FOW-016 | Corredor de tiro exige células intermediárias conhecidas pelo time, excluindo a visão da própria unidade provisória | Confirmada | `TurnStateManager.Sensors.cs` (`IsLineOfFireCorridorConfirmedVisible` → `IsCellKnownForActiveTeam(cell, selectedUnit)`) |
+| FOW-017 | Revide expõe a aeronave furtiva | **Corrigido no código** | `MarkAsFired()` era chamado só no atacante (`Combat.cs:151`); revide agora marca o defensor quando `counterExecuted`. Submarino já emergia por revide (`ScannerPrompt.cs:3982`) |
+| FOW-018 | Revide é automático, sem opção de segurar fogo | Confirmada | `Combat.cs:197-201` — `counterExecuted` deriva só de condições |
+| FOW-019 | `hasFiredThisTurn` afeta apenas validação de ocultação, não gateia ação | Confirmada | 4 usos em `MatchController` (stealth); ação é gateada por `hasActed`; ambos limpos em `ResetActed()` |
+| FOW-020 | Transferência só alcança unidades do próprio time (não vaza presença inimiga em terreno explorado) | Confirmada | `PodeTransferirSensor.CollectNearbyHubUnits` filtra por `TeamId` |
 | AIR-010 | Aeroporto é a única construção que isenta consumo aéreo | **Manual errado** | isentam com `aircraftUnitsPaysUpkeep: 0`: Aeroporto e Hidrobase. Porto e Docas cobram (`: 1`). Conferir Aeroporto Avançado ao preencher o catálogo |
 | AIR-011 | Submarino nasce emerso no porto e mergulha após o primeiro movimento | Confirmada | `ConstructionShopping.cs:332-370` · `Movement.cs:319-355` |
 | AIR-012 | Isenção de consumo é por presença sobre a instalação, sem checar se pousou (design, não bug) | Confirmada | `OperationalAutonomyRules.cs:93-102` não consulta `IsAircraftGrounded`. Decisão em `91` |

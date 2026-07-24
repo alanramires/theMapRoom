@@ -199,6 +199,17 @@ public partial class TurnStateManager
             !defenderCounterBlockedByEmbarked &&
             !defenderCounterBlockedByLayer &&
             defenderConsumed;
+
+        // Quem revida tambem disparou: o revide custa ocultacao igual ao ataque.
+        // Simetrico ao submarino, que ja emerge ao revidar (ApplyPostAttackSelfEmergeEffect).
+        // Fisicamente: a aeronave furtiva abre o compartimento de armas para atirar, e a
+        // cavidade quebra o desenho anguloso que devolvia a onda de radar para longe.
+        if (counterExecuted)
+        {
+            defender.MarkAsFired();
+            trace.AppendLine("- Marcador de disparo runtime do revide: ativo (hasFiredThisTurn=true).");
+        }
+
         GameUnitClass attackerClass = ResolveUnitClass(attacker);
         GameUnitClass defenderClass = ResolveUnitClass(defender);
         int attackerEliteLevel = ResolveEliteLevel(attacker);

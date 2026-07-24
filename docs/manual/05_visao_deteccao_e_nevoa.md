@@ -60,6 +60,16 @@ Não pense em parabólico como sinônimo de artilharia. Mísseis antiaéreos de 
 
 E vale dizer o que a palavra significa neste manual: parabólico é o termo operacional do sistema para toda arma que **ignora os obstáculos do percurso**. Não é uma descrição balística rigorosa, e não vale discutir o perfil real de voo de cada munição. O que ela declara é uma coisa só: se essa arma alcança, o relevo entre você e o alvo não importa.
 
+### O Corredor de Tiro
+
+O corredor é o conjunto de hexágonos que a linha reta atravessa entre o atirador e o alvo — as células do meio, sem contar as duas pontas. Alvo adjacente não tem corredor; a distância 1 passa direto.
+
+O corredor importa numa situação específica, e é bom conhecê-la porque parece arbitrária quando você a encontra sem saber: **atacar a partir de um destino que o seu time nunca explorou.** Ali quase tudo está suprimido, e o ataque é a exceção — mas ele exige que cada hexágono do corredor já seja **conhecido pelo time**.
+
+Repare no critério, porque ele não é "visível agora": vale o conhecimento acumulado do time, memória inclusive. E há uma exclusão deliberada — a visão da própria unidade em posição provisória **não conta**. Se contasse, ela iluminaria o próprio corredor ao entrar nele e desligaria a regra sozinha, que é exatamente o oráculo que a supressão existe para impedir.
+
+A leitura tática é direta: **você não atira através daquilo que nunca viu.** Pode disparar sobre um alvo conhecido de dentro do escuro, mas o caminho da bala precisa ser terreno que o seu time já mapeou. Um corredor com um hexágono inédito no meio recusa o tiro — e recusa sem dizer por quê, para não transformar a negativa numa sonda.
+
 E há uma sutileza que muda a leitura de várias unidades: a trajetória pertence à arma como ela foi montada naquela unidade, não ao tipo de arma. O mesmo foguete pode ser parabólico de longo alcance numa plataforma de artilharia e reto de alcance curto num helicóptero de ataque. Duas unidades que carregam "o mesmo foguete" podem jogar de formas opostas.
 
 Para disparos retos — canhões, torpedos, mísseis de trajetória direta — a arma precisa atravessar todos os domínios válidos no caminho até o alvo. Um torpedo opera em Naval/Surface e Submarine/Submerged. Se entre o atirador e o alvo existe uma faixa de terra, o torpedo não tem por onde passar. A península bloqueia não porque é um obstáculo físico no sentido do jogo — mas porque o domínio da arma não existe naquele trecho do trajeto.
@@ -128,6 +138,8 @@ Mas ela é péssima repórter: **não aponta unidades a distância**. Ela ilumin
 E contra ocultação, a construção não serve para nada: não fura, não denuncia, e não empresta os olhos dela para ninguém que esteja tentando furar. Prédio não é sensor.
 
 Na prática, isso significa que território revelado não é território vigiado. O anel de mapa aberto ao redor da sua fábrica não substitui uma unidade de olho na estrada.
+
+O caso que mais estranha é o Quartel General, porque ele tem o maior alcance de visão do jogo — e mesmo assim não detecta ninguém a distância. Vale guardar a formulação: **o QG é um centro de comando, não um sensor.** A visão estendida dele revela o mapa, não os ocupantes. Um tanque inimigo a dois hexágonos do seu QG está sobre terreno que você enxerga e continua invisível.
 
 Guarde a distinção. Muita confusão sobre "por que eu não vi aquilo" se resolve percebendo que o mapa estava aberto e o inimigo não estava detectado.
 
@@ -214,6 +226,10 @@ Ocultação dá iniciativa, não impunidade.
 Uma unidade furtiva escolhe o momento do duelo e entra como atacante — com o benefício de posição que isso traz. O que ela não ganha é um tiro grátis: o defensor revida normalmente se tiver arma, munição e alcance.
 
 E o disparo cobra o seu preço. Ao atacar, a unidade furtiva perde a ocultação temporariamente e fica exposta.
+
+**Vale para o revide também, e a simetria é deliberada.** Quem responde ao fogo disparou — e disparar é disparar. Uma aeronave furtiva que revida sai da ocultação exatamente como se tivesse iniciado o ataque. A imagem física é literal: para atirar, ela abre o compartimento de armas, e a cavidade quebra o desenho anguloso que devolvia a onda de radar para longe. Naquele instante ela deixa de ser uma superfície lisa e vira um alvo.
+
+E como o revide é **automático** — não existe segurar fogo para permanecer oculto —, isso significa que ser atacado já custa a sua ocultação. É o contrapeso de entrar no duelo escolhendo a hora: você atira primeiro, mas ninguém atira de graça.
 
 Antes dos números, a unidade de medida, porque numa partida com mais de dois times ela precisa ser inequívoca. **Toda duração deste manual é contada em turnos do proprietário da unidade.** Não em turnos globais, não em passagens completas por todos os times. Quando o texto disser "um turno", leia sempre "um turno de quem é dono daquela peça".
 

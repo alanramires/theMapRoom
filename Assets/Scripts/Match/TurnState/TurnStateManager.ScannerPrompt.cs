@@ -3715,12 +3715,15 @@ public partial class TurnStateManager
         SetMirandoSpotterPreviewsVisible(false);
         UnitManager attacker = option != null ? option.attackerUnit : null;
         UnitManager defender = option != null ? option.targetUnit : null;
+        PlayerSlotId defenderSlot = defender != null
+            ? PlayerSlotId.FromIndex(defender.SlotIndex)
+            : PlayerSlotId.Invalid;
         bool attackerVisibleToDefender = attacker != null && defender != null
             && (matchController == null
-                || matchController.IsUnitVisibleForTeamNoCache(attacker, defender.TeamId));
+                || matchController.IsUnitVisibleForSlotNoCache(attacker, defenderSlot));
         if (defender != null && matchController != null)
-            AIIntelLedger.RecordVisibleContactsForTeam(
-                defender.TeamId, matchController.CurrentTurn, matchController);
+            AIIntelLedger.RecordVisibleContactsForSlot(
+                defenderSlot, matchController.CurrentTurn, matchController);
 
         float audioDuration = PlayCombatAttackSfx(attackerTrajectory, defender);
         float waitDuration = audioDuration;
@@ -3760,7 +3763,7 @@ public partial class TurnStateManager
                 Vector3Int fogFireCell = defender.CurrentCellPosition;
                 fogFireCell.z = 0;
                 matchController.ReportTurnBriefingEvent(
-                    defender.TeamId,
+                    PlayerSlotId.FromIndex(defender.SlotIndex),
                     MatchController.TurnBriefingCategory.FogFire,
                     ResolveDebugUnitName(defender),
                     $"atingida (−{fogFireDamage} PV) por atacante não identificado",

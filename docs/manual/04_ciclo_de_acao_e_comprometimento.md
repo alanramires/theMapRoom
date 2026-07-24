@@ -96,7 +96,9 @@ Você não tem essa obrigação. Pode comprar antes de agir, agir antes de compr
 
 Ainda assim, vale entender por que essa ordem funciona. Resolver o comando primeiro significa entrar no turno com as unidades já atendidas. Agir antes de comprar significa saber o que sobrou de dinheiro e o que faltou no front antes de decidir o que reforçar.
 
-E há um motivo mecânico, não só de bom senso: **o Serviço do Comando só atende unidades que ainda não agiram**. Cada peça que você move antes de acionar o comando é uma peça que sai da lista. Deixar o lote para o fim do turno significa encontrá-lo quase vazio.
+E há um motivo mecânico, não só de bom senso: **o Serviço do Comando só atende unidades que ainda não agiram**. Cada peça que você **comprometeu** antes de acionar o comando é uma peça que sai da lista. Deixar o lote para o fim do turno significa encontrá-lo quase vazio.
+
+E "comprometeu" é literal, sem pegadinha: selecionar uma unidade, arrastar o cursor e cancelar **não** a tira da lista. Enquanto você não confirma, ela não agiu — e o Comando ainda a atende normalmente. Vale o mesmo princípio de todo o capítulo: só o commit conta. Ensaiar com a peça é de graça, aqui como em tudo o mais.
 
 É uma boa ordem padrão. Não é uma regra — e a IA pode mudar a dela sem que isso mude o jogo.
 
@@ -116,7 +118,7 @@ O que você pode fazer a partir de um destino provisório depende do estado de c
 
 **Destino apenas explorado.** Ficam liberados o ataque, o desembarque, a captura e a transferência. Embarque, fusão e suprimento continuam calados, porque dependem de saber quem está lá agora, e isso a fotografia não conta.
 
-**Destino nunca explorado.** Sobra apenas o ataque, e ainda assim restrito aos alvos que você já conhecia e cujo corredor de tiro esteja inteiramente revelado. É o mínimo para que avançar não seja suicídio automático, sem transformar o cursor numa lanterna.
+**Destino nunca explorado.** Sobra apenas o ataque, e ainda assim restrito aos alvos que você já conhecia e cujo **corredor de tiro** esteja inteiramente conhecido pelo time — o corredor está definido em `05_visao_deteccao_e_nevoa.md`. É o mínimo para que avançar não seja suicídio automático, sem transformar o cursor numa lanterna.
 
 Existe um princípio por trás dessa escada, e ele vale para qualquer opção que o jogo te ofereça: **ou o menu filtra pelo que o seu time conhece e só mostra o conhecido, ou não filtra e mostra tudo. O que ele nunca faz é filtrar pela verdade oculta.**
 

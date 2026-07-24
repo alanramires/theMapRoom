@@ -51,3 +51,37 @@ Dois itens que já foram desta lista — a isenção de consumo por presença no
 **Impacto.** Uma fragata sob controle da IA não caça submarino com carga de profundidade.
 
 **Status.** Aberta, adiada por decisão — a IA naval ainda não foi construída.
+
+---
+
+### FOW-002 — A divisão C/D/T contra E/F/S em terreno explorado não tem princípio declarado
+
+**Regra canônica.** Com destino provisório em terreno apenas explorado, ficam liberados ataque, desembarque, captura e transferência; embarque, fusão e suprimento seguem suprimidos (`04_ciclo_de_acao_e_comprometimento.md`).
+
+**Comportamento atual.** É exatamente isso que o código faz. O problema não é divergência — é que **nenhum princípio conhecido explica a linha**.
+
+O argumento anti-oráculo justificaria bloquear o que revela presença inimiga. Mas os seis verbos miram **aliados ou construções**: transferência só alcança unidades do próprio time (verificado, FOW-020), embarque é sobre transportador aliado, fusão sobre unidade aliada, suprimento sobre unidade aliada, captura sobre construção estática e lembrada pela fotografia. Nenhum deles vaza inimigo. Logo, o critério que separa os liberados dos bloqueados não é o anti-oráculo — e não está escrito em lugar nenhum qual é.
+
+**Evidência.** `TurnStateManager.Sensors.cs:460-499` (`RunExploredTerrainContextSensors`). O único comentário diz "Em terreno apenas memorizado, E/F/S continuam sob a barreira anti-oraculo", sem justificar por que E/F/S e não C/D/T.
+
+**Impacto.** Baixo em jogo, alto em manutenção. Sem princípio declarado, a próxima pessoa que mexer nesses sensores não tem como decidir de que lado um verbo novo cai — e o manual declara em `00` que cada regra deve ter um endereço e um motivo.
+
+**Decisão necessária.** Uma das três: (a) existe um motivo que não foi registrado, e basta escrevê-lo; (b) a linha foi traçada por instinto e deve ser refeita sob um princípio único; (c) a linha está certa e o princípio é outro que ainda não nomeamos.
+
+**Status.** Aberta, sem prioridade.
+
+---
+
+### FOW-003 — Recusa de desembarque nomeia unidade não detectada
+
+**Regra canônica.** O menu nunca filtra pela verdade oculta, e nenhuma recusa deve ensinar o que o time não sabe (`04_ciclo_de_acao_e_comprometimento.md`).
+
+**Comportamento atual.** A checagem de ocupação do desembarque lê a ocupação crua, sem filtro de névoa, e devolve o **nome** do bloqueador: `"Hex ocupado por {blocker.name}"`. Isso entrega a identidade de uma unidade que o jogador nunca detectou.
+
+**Evidência.** `PodeDesembarcarSensor.cs:295-299`.
+
+**Impacto.** Vazamento real, e de categoria pior que os demais: presença já seria informação, mas identidade não tem equivalente em nenhum outro sensor. Acontece hoje em terreno visível e explorado, onde o desembarque roda normalmente.
+
+**Decisão necessária.** Recusar sem nomear, e sem distinguir "ocupado" de "inválido" quando a unidade não é conhecida pelo time — o padrão de motivo neutro que a exceção de ataque no escuro já usa.
+
+**Status.** Aberta. Consertar independe da decisão de FOW-002.

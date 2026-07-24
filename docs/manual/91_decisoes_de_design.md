@@ -34,6 +34,20 @@ Cada entrada registra a decisão, o problema que a motivou, as alternativas cons
 
 ---
 
+## Disparar custa ocultação — inclusive no revide
+
+**Problema.** A ocultação caía ao atacar, mas o revide não cobrava nada: a aeronave furtiva atacada respondia ao fogo e continuava invisível. O submarino já emergia ao revidar, então os dois furtivos do jogo seguiam regras diferentes sem que ninguém tivesse decidido isso.
+
+**Decisão.** Revidar expõe igual a atacar. Disparar é disparar, seja iniciando o duelo ou respondendo a ele.
+
+**Justificativa física.** A aeronave furtiva precisa abrir o compartimento de armas para atirar, e a cavidade quebra o desenho anguloso que devolvia a onda de radar para longe. No instante do disparo ela deixa de ser uma superfície lisa.
+
+**Consequência desejada.** Como o revide é automático — não existe segurar fogo para permanecer oculto —, ser atacado passa a custar a ocultação. É o contrapeso de entrar no duelo escolhendo a hora: o furtivo atira primeiro, mas ninguém atira de graça. E os dois furtivos do jogo voltam a obedecer ao mesmo princípio.
+
+**Onde vive a regra.** `05_visao_deteccao_e_nevoa.md`.
+
+---
+
 ## Revide existe apenas no alcance 1
 
 **Problema.** Não estava claro se o defensor responde quando possui arma de alcance compatível com a distância do ataque.

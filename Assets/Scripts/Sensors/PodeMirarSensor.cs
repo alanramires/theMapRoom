@@ -1991,7 +1991,7 @@ public static class PodeMirarSensor
         if (IsTargetFreelyDetectedByForcedEndMovementRules(target, boardMap, terrainDatabase))
             return true;
 
-        int attackerTeamId = (int)attacker.TeamId;
+        int attackerTeamId = attacker.SlotIndex;
         int currentTurn = GetCurrentTurnSafe();
         if (IsTargetAlreadyRevealedForTeam(target, attackerTeamId, currentTurn))
             return true;
