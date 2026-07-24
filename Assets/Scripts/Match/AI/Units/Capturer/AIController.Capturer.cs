@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -47,7 +47,7 @@ public partial class AIController
             if (SimulateCaptureSensor(unit, currentCell, out _))
             {
                 SectorObjective ownObjective = plan != null ? ResolveAssignedObjective(unit, plan) : null;
-                TeamObjectivePlan selfPlan = ObjectiveManager.GetPlanForTeam(snapshot.AITeam);
+                TeamObjectivePlan selfPlan = ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(snapshot.AISlotIndex));
                 bool isOtherTarget = selfPlan != null
                     && IsOtherAssignedCapturerTarget(currentCell, unit, ownObjective, selfPlan, snapshot.AITeam);
                 if (!isOtherTarget)
@@ -181,7 +181,7 @@ public partial class AIController
 
         // Se está sobre o objetivo de captura de outro setor com capturador ativo,
         // marca o próprio hex como ocupado para forçar saída no scoring.
-        TeamObjectivePlan selfPlan = ObjectiveManager.GetPlanForTeam(snapshot.AITeam);
+        TeamObjectivePlan selfPlan = ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(snapshot.AISlotIndex));
         bool onOtherTarget = selfPlan != null && IsOtherAssignedCapturerTarget(fromCell, unit, assigned, selfPlan, snapshot.AITeam);
         if (onOtherTarget)
         {
@@ -273,7 +273,7 @@ public partial class AIController
         foreach (UnitManager enemy in UnitManager.AllActive)
         {
             if (enemy.SlotIndex == snapshot.AISlotIndex || enemy.IsDead || enemy.IsEmbarked) continue;
-            if (mcDef != null && !mcDef.IsUnitVisibleForTeam(enemy, snapshot.AITeam)) continue;
+            if (mcDef != null && !mcDef.IsUnitVisibleForSlot(enemy, PlayerSlotId.FromIndex(snapshot.AISlotIndex))) continue;
             Vector3Int ec = enemy.CurrentCellPosition; ec.z = 0;
             if (SectorManager.HexDistance(ec, targetCell) > fromDist) continue;
             nearbyEnemies.Add(enemy);
@@ -354,7 +354,7 @@ public partial class AIController
             // bestMove: só células que avançam em direção ao objetivo
             if (advances && IsBetterScore(score, sectorTie, hqTie, bestScore, bestSectorTie, bestHqTie))
             {
-                TeamObjectivePlan capPlan = ObjectiveManager.GetPlanForTeam(snapshot.AITeam);
+                TeamObjectivePlan capPlan = ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(snapshot.AISlotIndex));
                 if (IsOtherAssignedCapturerTarget(cell, unit, assigned, capPlan, snapshot.AITeam))
                     scoringLog?.AppendLine($"    ↳ SKIP bestMove: hex de captura de outro setor");
                 else
@@ -497,7 +497,7 @@ public partial class AIController
         MatchController mcAdv   = GetMatchController();
         bool hiddenOccupant = advOccupant != null
             && advOccupant.SlotIndex != snapshot.AISlotIndex
-            && (mcAdv == null || !mcAdv.IsUnitVisibleForTeam(advOccupant, snapshot.AITeam));
+            && (mcAdv == null || !mcAdv.IsUnitVisibleForSlot(advOccupant, PlayerSlotId.FromIndex(snapshot.AISlotIndex)));
         bool sectorInContest = HasNearbyVisibleEnemy(targetCell, snapshot.AITeam, DefenseEnemyRange);
         string advTag = hiddenOccupant ? "Explorador" : sectorInContest ? "Perseguidor" : "PontaLanca";
         string bestNextText = bestNextDist < float.MaxValue ? bestNextDist.ToString("F1") : "?";
@@ -566,7 +566,7 @@ public partial class AIController
             if (!advancesByRoute && !advancesByHex)
                 continue;
 
-            TeamObjectivePlan capPlan = ObjectiveManager.GetPlanForTeam(snapshot.AITeam);
+            TeamObjectivePlan capPlan = ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(snapshot.AISlotIndex));
             if (IsOtherAssignedCapturerTarget(cell, unit, assigned, capPlan, snapshot.AITeam))
                 continue;
 

@@ -59,7 +59,7 @@ public class TutorialEnemyTurnIndicator : MonoBehaviour
             return;
 
         // Nao duplicar com o AIController, se a cena tiver um (ele ja desenha o dele).
-        if (matchController.IsPlayerAI(activeTeam))
+        if (matchController.IsPlayerAI(matchController.ActiveSlotId))
             return;
 
         EnsureStyles();

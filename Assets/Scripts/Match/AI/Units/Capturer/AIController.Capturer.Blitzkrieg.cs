@@ -188,14 +188,14 @@ public partial class AIController
         if (assigned != null && assigned.Sector != ConstructionSector.None && assigned.Sector != originSector)
             return assigned.Sector;
 
-        InvasionAxisMap axisMap = InvasionAxisMap.Build(team, boardTilemap);
+        InvasionAxisMap axisMap = InvasionAxisMap.Build(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(team)), boardTilemap);
         int axisIndex = axisMap.GetEixo(originSector);
         return axisIndex > 0 ? axisMap.GetTransportTargetSector(axisIndex) : ConstructionSector.None;
     }
 
     private ConstructionSector ComputeBlitzkriegForwardSector(ConstructionSector sector, TeamId team)
     {
-        InvasionAxisMap axisMap = InvasionAxisMap.Build(team, boardTilemap);
+        InvasionAxisMap axisMap = InvasionAxisMap.Build(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(team)), boardTilemap);
         int axisIndex = axisMap.GetEixo(sector);
         if (axisIndex > 0)
         {

@@ -64,7 +64,7 @@ public partial class TurnStateManager
         if (!TryEnterConstructionShoppingState(construction, activeSlot))
             return false;
 
-        DialogManager.Instance?.MarkHintLearned(matchController.ActiveTeam, HelpHintId.Produce);
+        DialogManager.Instance?.MarkHintLearned(matchController.ActiveSlotId, HelpHintId.Produce);
         cursorController?.PlayConfirmSfx();
         return true;
     }
@@ -305,6 +305,13 @@ public partial class TurnStateManager
             spawnedUnitManager.SetSlotIndex(activeSlot);
         TryApplyForcedSpawnLayerFromCell(spawnedUnitManager, spawnCell);
 
+        // Supridor recem-comprado nasce vazio por padrao: a cadeia logistica so tem
+        // razao de existir se o elo menor precisar ser carregado por outro. Nascer
+        // cheio e a excecao declarada na ficha, para quem foi comprado numa instalacao
+        // que teria o que dar (caminhao de suprimentos, aviao-tanque, porta-avioes, trem).
+        if (spawnedUnitManager != null && unit != null && unit.isSupplier && unit.startsWithEmptySupplies)
+            spawnedUnitManager.ClearSupplierReservesForFreshSpawn();
+
         int remainingMoney = matchController != null ? matchController.GetActualMoney(buyerSlot) : 0;
         if (matchController != null && !matchController.TrySpendActualMoney(buyerSlot, unitCost, out remainingMoney))
         {
@@ -489,6 +496,11 @@ public partial class TurnStateManager
         if (spawnedManager != null)
             spawnedManager.SetSlotIndex(ownerSlot);
         TryApplyForcedSpawnLayerFromCell(spawnedManager, spawnCell);
+
+        // Mesma regra do spawn do jogador: supridor nasce vazio salvo excecao na ficha.
+        // Precisa estar nos dois caminhos, senao a IA compraria supridores cheios.
+        if (spawnedManager != null && unit != null && unit.isSupplier && unit.startsWithEmptySupplies)
+            spawnedManager.ClearSupplierReservesForFreshSpawn();
 
         int remainingMoney;
         if (matchController != null && !matchController.TrySpendActualMoney(ownerSlotId, cost, out remainingMoney))
@@ -693,10 +705,10 @@ public partial class TurnStateManager
             return string.Empty;
 
         StringBuilder sb = new StringBuilder();
-        TeamId team = matchController != null && matchController.ActiveTeamId >= 0
-            ? (TeamId)matchController.ActiveTeamId
-            : (shoppingConstruction != null ? shoppingConstruction.TeamId : TeamId.Neutral);
-        if (matchController != null && !matchController.CanProduceUnit(team, unit, out string blockedReason))
+        PlayerSlotId buyerSlot = matchController != null
+            ? matchController.ActiveSlotId
+            : PlayerSlotId.FromIndex(shoppingConstruction != null ? shoppingConstruction.SlotIndex : -1);
+        if (matchController != null && !matchController.CanProduceUnit(buyerSlot, unit, out string blockedReason))
         {
             sb.AppendLine($"BLOQUEADO - {blockedReason}");
             sb.AppendLine();

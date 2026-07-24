@@ -68,13 +68,25 @@ Existem duas categorias diferentes, e vale separá-las.
 
 **Derrotas gerais** — valem em qualquer partida:
 
-Captura do Quartel General. O adversário perde no instante em que o QG dele muda de dono.
+Captura do Quartel General. O adversário perde no instante em que o QG dele muda de dono — e quem capturou vence a partida, não apenas aquele duelo.
 
 Eliminação total. Um lado sem nenhuma unidade restante no tabuleiro está fora. A verificação começa a valer a partir do segundo turno, para que ninguém seja eliminado antes de comprar a primeira força.
 
 Vale precisar o que "no tabuleiro" quer dizer, porque a dúvida é natural: a contagem olha para as unidades presentes no mapa, não para os passageiros dentro delas. Isso na prática nunca te prejudica — como perder o transportador mata toda a tropa embarcada, não existe situação em que você tenha gente viva dentro de um veículo e nada em campo. **O que te mantém na partida é o transportador; a tropa dentro dele não sobrevive à perda dele.** Um APC carregado é uma unidade em campo e vale como tal.
 
 E há uma terceira via, que não é derrota imposta: **a rendição**. Um jogador pode encerrar voluntariamente a própria participação. O efeito no tabuleiro é o mesmo de uma derrota, mas a decisão foi dele.
+
+### A Primeira Eliminação Encerra a Partida
+
+Esta é a regra que reorganiza todas as outras, e ela surpreende: **quem eliminar um jogador primeiro vence na hora — mesmo que ainda restem outros participantes em campo.**
+
+Não existe "sobreviver até sobrar um". Numa partida de três ou quatro lados, o primeiro a tomar um Quartel General ou a destruir um exército inteiro leva a partida inteira, e os demais param onde estavam. A rendição de qualquer participante produz o mesmo efeito: ela encerra o jogo, não abre uma vaga.
+
+A leitura estratégica muda por completo. Você não está numa guerra de atrito com vários rivais, esperando que se desgastem entre si — está numa corrida, e o prêmio vai para quem fechar o primeiro abate. Deixar dois vizinhos se destruindo enquanto você cresce é a pior estratégia possível: o vencedor daquele duelo vence **você** junto.
+
+**E a partida congela de verdade.** Declarada a vitória, o turno não avança mais. Nada se move, nem em jogador contra jogador — o que resta é abrir o menu para ler o Jornal, consultar as estatísticas da partida e sair. Não há epílogo jogável, não há limpeza de campo. O placar fechou.
+
+Quanto ao território de quem saiu: as construções dele **voltam a ser neutras, com os pontos de captura restaurados ao máximo** — não passam para o vencedor. Na prática do jogo base isso raramente se joga, já que a partida termina no mesmo instante; a regra existe e importa em cenários que decidirem manter a partida viva após uma eliminação.
 
 **Objetivos de cenário** — valem só onde foram definidos:
 

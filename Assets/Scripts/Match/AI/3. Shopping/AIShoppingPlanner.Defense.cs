@@ -302,7 +302,7 @@ public partial class AIShoppingPlanner
         UnitData best = null;
         foreach (ConstructionManager building in snapshot.MyBuildings)
         {
-            if (building == null || !building.CanProduceUnitsForTeam(snapshot.AITeam)) continue;
+            if (building == null || !building.CanProduceUnitsForSlot(snapshot.AISlotIndex)) continue;
             if (building.OfferedUnits == null) continue;
 
             foreach (UnitData unit in building.OfferedUnits)
@@ -380,7 +380,7 @@ public partial class AIShoppingPlanner
 
     private static bool HasAnyOffensiveObjective(TeamId aiTeam)
     {
-        TeamObjectivePlan plan = ObjectiveManager.GetPlanForTeam(aiTeam);
+        TeamObjectivePlan plan = ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam)));
         if (plan == null) return false;
 
         foreach (SectorObjective obj in plan.Objectives)
@@ -414,7 +414,7 @@ public partial class AIShoppingPlanner
         int bestScore = int.MinValue;
         foreach (ConstructionManager building in snapshot.MyBuildings)
         {
-            if (building == null || !building.CanProduceUnitsForTeam(snapshot.AITeam)) continue;
+            if (building == null || !building.CanProduceUnitsForSlot(snapshot.AISlotIndex)) continue;
             UnitData unit = FindBestAffordableEmergencyDefensePurchase(building, budget);
             if (unit == null) continue;
 
@@ -509,7 +509,7 @@ public partial class AIShoppingPlanner
         int cheapest = int.MaxValue;
         foreach (ConstructionManager building in snapshot.MyBuildings)
         {
-            if (building == null || !building.CanProduceUnitsForTeam(snapshot.AITeam)) continue;
+            if (building == null || !building.CanProduceUnitsForSlot(snapshot.AISlotIndex)) continue;
             if (building.OfferedUnits == null) continue;
 
             foreach (UnitData unit in building.OfferedUnits)
@@ -529,7 +529,7 @@ public partial class AIShoppingPlanner
         int cheapest = int.MaxValue;
         foreach (ConstructionManager building in snapshot.MyBuildings)
         {
-            if (building == null || !building.CanProduceUnitsForTeam(snapshot.AITeam)) continue;
+            if (building == null || !building.CanProduceUnitsForSlot(snapshot.AISlotIndex)) continue;
             if (building.OfferedUnits == null) continue;
 
             foreach (UnitData unit in building.OfferedUnits)
@@ -548,7 +548,7 @@ public partial class AIShoppingPlanner
 
         foreach (ConstructionManager building in snapshot.MyBuildings)
         {
-            if (building == null || !building.CanProduceUnitsForTeam(snapshot.AITeam)) continue;
+            if (building == null || !building.CanProduceUnitsForSlot(snapshot.AISlotIndex)) continue;
             if (building.OfferedUnits == null) continue;
 
             foreach (UnitData unit in building.OfferedUnits)

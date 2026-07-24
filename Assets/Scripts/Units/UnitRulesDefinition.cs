@@ -11,9 +11,9 @@ public static class UnitRulesDefinition
         return UnitOccupancyRules.IsUnitCellOccupied(referenceTilemap, cell, exceptUnit);
     }
 
-    public static bool IsUnitCellOccupiedForTeam(Tilemap referenceTilemap, Vector3Int cell, TeamId teamId, UnitManager exceptUnit = null)
+    public static bool IsUnitCellOccupiedForSlot(Tilemap referenceTilemap, Vector3Int cell, PlayerSlotId slot, UnitManager exceptUnit = null)
     {
-        return UnitOccupancyRules.IsUnitCellOccupiedForTeam(referenceTilemap, cell, teamId, exceptUnit);
+        return UnitOccupancyRules.IsUnitCellOccupiedForSlot(referenceTilemap, cell, slot, exceptUnit);
     }
 
     public static UnitManager GetUnitAtCell(Tilemap referenceTilemap, Vector3Int cell, UnitManager exceptUnit = null)

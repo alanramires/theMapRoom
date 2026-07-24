@@ -2403,10 +2403,10 @@ public partial class TurnStateManager
     public void HandleAutoCommandServiceTeamChanged(int teamId)
     {
         if (matchController == null) return;
-        if (!matchController.IsPlayerCommandServiceAutomatic((TeamId)teamId))
+        if (!matchController.IsPlayerCommandServiceAutomatic(matchController.ActiveSlotId))
             return;
         // IA faz o serviço visualmente via ReplayManager; não usa a rotina automática.
-        if (matchController.IsPlayerAI((TeamId)teamId))
+        if (matchController.IsPlayerAI(matchController.ActiveSlotId))
             return;
 
         // Turno 0 = frame de inicializacao: nao roda automaticamente.

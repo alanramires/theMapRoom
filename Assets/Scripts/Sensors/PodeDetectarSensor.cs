@@ -456,7 +456,9 @@ public static class PodeDetectarSensor
         Vector3Int observerCell = observer.CurrentCellPosition;
         observerCell.z = 0;
         int globalBoardRevision = ThreatRevisionTracker.GlobalBoardRevision;
-        int teamObserverRevision = observer != null ? ThreatRevisionTracker.GetTeamObserverRevision(observer.TeamId) : 0;
+        int teamObserverRevision = observer != null
+            ? ThreatRevisionTracker.GetSlotObserverRevision(PlayerSlotId.FromIndex(observer.SlotIndex))
+            : 0;
         InvalidateCollectVisibleCellsCacheIfNeeded(globalBoardRevision);
 
         CollectVisibleCellsCacheKey cacheKey = new CollectVisibleCellsCacheKey(

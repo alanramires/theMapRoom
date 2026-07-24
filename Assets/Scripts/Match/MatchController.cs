@@ -563,20 +563,6 @@ public class MatchController : MonoBehaviour
         return false;
     }
 
-    public int GetSlotIndexForTeam(TeamId teamId)
-    {
-        if (teamId == TeamId.Neutral || players == null)
-            return -1;
-
-        for (int i = 0; i < players.Count; i++)
-        {
-            if (players[i].teamId == teamId)
-                return i;
-        }
-
-        return -1;
-    }
-
     // Retorna quantos slots de jogador existem (excluindo Neutral).
     public int SlotCount => players != null ? players.Count : 0;
     public bool EconomyEnabled => economyEnabled;
@@ -607,21 +593,9 @@ public class MatchController : MonoBehaviour
         }
     }
 
-    public bool IsPlayerCommandServiceAutomatic(TeamId teamId)
-    {
-        return TryGetUniqueSlotForTeam(teamId, out PlayerSlotId slotId)
-            && IsPlayerCommandServiceAutomatic(slotId);
-    }
-
     public bool IsPlayerCommandServiceAutomatic(PlayerSlotId slotId)
     {
         return IsValidPlayerSlot(slotId) && players[slotId.Value].commandServiceAutomatic;
-    }
-
-    public void SetPlayerCommandServiceAutomatic(TeamId teamId, bool value)
-    {
-        if (TryGetUniqueSlotForTeam(teamId, out PlayerSlotId slotId))
-            SetPlayerCommandServiceAutomatic(slotId, value);
     }
 
     public void SetPlayerCommandServiceAutomatic(PlayerSlotId slotId, bool value)
@@ -681,11 +655,6 @@ public class MatchController : MonoBehaviour
     private bool hotSeatGateActive;
     private bool deferTurnStartEffectsForHotSeatGate;
 
-    public int GetVictoryStars(TeamId team)
-    {
-        return TryGetUniqueSlotForTeam(team, out PlayerSlotId slotId) ? GetVictoryStars(slotId) : 0;
-    }
-
     public int GetVictoryStars(PlayerSlotId slotId)
     {
         int index = FindVictoryEntryIndex(slotId.Value);
@@ -693,17 +662,6 @@ public class MatchController : MonoBehaviour
             return 0;
 
         return Mathf.Max(0, victoryStarsByTeam[index].stars);
-    }
-
-    public void GetVictoryControlForTeam(TeamId team, out int controlled, out int total)
-    {
-        if (!TryGetUniqueSlotForTeam(team, out PlayerSlotId slotId))
-        {
-            controlled = 0;
-            total = 0;
-            return;
-        }
-        GetVictoryControlForSlot(slotId, out controlled, out total);
     }
 
     public void GetVictoryControlForSlot(PlayerSlotId slotId, out int controlled, out int total)
@@ -729,11 +687,6 @@ public class MatchController : MonoBehaviour
         }
     }
 
-    public int GetProjectedVictoryStarsGain(TeamId team)
-    {
-        return TryGetUniqueSlotForTeam(team, out PlayerSlotId slotId) ? GetProjectedVictoryStarsGain(slotId) : 0;
-    }
-
     public int GetProjectedVictoryStarsGain(PlayerSlotId slotId)
     {
         if (!enableVictoryStars)
@@ -749,44 +702,14 @@ public class MatchController : MonoBehaviour
         return controlled >= majorityThreshold ? 1 : 0;
     }
 
-    public int GetActualMoney(TeamId team)
-    {
-        return TryGetUniqueSlotForTeam(team, out PlayerSlotId slotId) ? GetActualMoney(slotId) : 0;
-    }
-
     public int GetActualMoney(PlayerSlotId slotId) =>
         IsValidPlayerSlot(slotId) ? Mathf.Max(0, players[slotId.Value].actualMoney) : 0;
 
-    public int GetStartMoney(TeamId team)
-    {
-        int playerIndex = FindPlayerEconomyIndex(team);
-        if (playerIndex < 0)
-            return 0;
-
-        return Mathf.Max(0, players[playerIndex].startMoney);
-    }
-
-    public int GetIncomePerTurn(TeamId team)
-    {
-        int playerIndex = FindPlayerEconomyIndex(team);
-        if (playerIndex < 0)
-            return 0;
-
-        return Mathf.Max(0, players[playerIndex].incomePerTurn);
-    }
+    public int GetStartMoney(PlayerSlotId slotId) =>
+        IsValidPlayerSlot(slotId) ? Mathf.Max(0, players[slotId.Value].startMoney) : 0;
 
     public int GetIncomePerTurn(PlayerSlotId slotId) =>
         IsValidPlayerSlot(slotId) ? Mathf.Max(0, players[slotId.Value].incomePerTurn) : 0;
-
-    public bool TrySpendActualMoney(TeamId team, int amount, out int remainingMoney)
-    {
-        if (!TryGetUniqueSlotForTeam(team, out PlayerSlotId slotId))
-        {
-            remainingMoney = 0;
-            return false;
-        }
-        return TrySpendActualMoney(slotId, amount, out remainingMoney);
-    }
 
     public bool TrySpendActualMoney(PlayerSlotId slotId, int amount, out int remainingMoney)
     {
@@ -819,11 +742,6 @@ public class MatchController : MonoBehaviour
         return economyEnabled ? Mathf.Max(0, baseCost) : 0;
     }
 
-    public bool TrySetActualMoney(TeamId team, int value)
-    {
-        return TryGetUniqueSlotForTeam(team, out PlayerSlotId slotId) && TrySetActualMoney(slotId, value);
-    }
-
     public bool TrySetActualMoney(PlayerSlotId slotId, int value)
     {
         if (!IsValidPlayerSlot(slotId))
@@ -845,30 +763,6 @@ public class MatchController : MonoBehaviour
         players[0] = entry;
         team = entry.teamId;
         return true;
-    }
-
-    public void GetTeamUnitCounts(TeamId teamId, out int totalInField, out int readyToAct, bool includeEmbarked = true)
-    {
-        totalInField = 0;
-        readyToAct = 0;
-        if (teamId == TeamId.Neutral && !includeNeutralTeam)
-            return;
-
-        UnitManager[] units = FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-        for (int i = 0; i < units.Length; i++)
-        {
-            UnitManager unit = units[i];
-            if (unit == null || !unit.gameObject.activeInHierarchy)
-                continue;
-            if (unit.TeamId != teamId)
-                continue;
-            if (!includeEmbarked && unit.IsEmbarked)
-                continue;
-
-            totalInField++;
-            if (!unit.HasActed)
-                readyToAct++;
-        }
     }
 
     public void GetSlotUnitCounts(int slotIndex, out int totalInField, out int readyToAct, bool includeEmbarked = true)
@@ -893,13 +787,6 @@ public class MatchController : MonoBehaviour
             if (!unit.HasActed)
                 readyToAct++;
         }
-    }
-
-    public bool HasReachedMaxUnitsPerTeam(TeamId teamId)
-    {
-        if (!TryGetUniqueSlotForTeam(teamId, out PlayerSlotId slotId))
-            return false;
-        return HasReachedMaxUnitsForSlot(slotId);
     }
 
     public bool HasReachedMaxUnitsForSlot(PlayerSlotId slotId)
@@ -1555,36 +1442,20 @@ public class MatchController : MonoBehaviour
         SyncThreatRevisionFlags();
     }
 
-    public void SetPlayerIsAI(TeamId teamId, bool isAI)
+    public void SetPlayerIsAI(PlayerSlotId slotId, bool isAI)
     {
-        if (players == null)
+        if (!IsValidPlayerSlot(slotId))
             return;
-        for (int i = 0; i < players.Count; i++)
-        {
-            if (players[i].teamId == teamId)
-            {
-                PlayerEntry e = players[i];
-                e.isAI = isAI;
-                players[i] = e;
-                return;
-            }
-        }
+        PlayerEntry entry = players[slotId.Value];
+        entry.isAI = isAI;
+        players[slotId.Value] = entry;
     }
 
-    public bool IsPlayerAI(TeamId teamId)
-    {
-        if (players == null)
-            return false;
-        for (int i = 0; i < players.Count; i++)
-        {
-            if (players[i].teamId == teamId)
-                return players[i].isAI;
-        }
-        return false;
-    }
+    public bool IsPlayerAI(PlayerSlotId slotId) =>
+        IsValidPlayerSlot(slotId) && players[slotId.Value].isAI;
 
     // Verifica se o time ATUALMENTE ativo e IA, usando o slot index diretamente.
-    // Mais robusto que IsPlayerAI(TeamId) pois nao depende de lookup por TeamId.
+    // Usa a identidade real do participante, sem lookup por cor.
     public bool IsActiveTeamAI()
     {
         if (players == null || activePlayerListIndex < 0 || activePlayerListIndex >= players.Count)
@@ -1623,11 +1494,6 @@ public class MatchController : MonoBehaviour
         for (int i = 0; i < players.Count; i++)
             if (players[i].isAI) return false;
         return true;
-    }
-
-    public bool IsTeamDefeated(TeamId team)
-    {
-        return TryGetUniqueSlotForTeam(team, out PlayerSlotId slotId) && IsSlotDefeated(slotId);
     }
 
     public bool IsSlotDefeated(PlayerSlotId slotId) =>
@@ -2103,9 +1969,6 @@ public class MatchController : MonoBehaviour
         return true;
     }
 
-    private bool TryDefeatTeamIfZeroUnits(TeamId team) =>
-        TryGetUniqueSlotForTeam(team, out PlayerSlotId slotId) && TryDefeatSlotIfZeroUnits(slotId);
-
     // Chamado do ponto unico de conclusao de captura (ExecuteCaptureSequence), valido tanto para o
     // jogador humano quanto para a IA (que captura pelo mesmo caminho via Automation ->
     // HandleCaptureActionRequested). Se o alvo for um QG, o antigo dono e eliminado na hora e o
@@ -2136,71 +1999,6 @@ public class MatchController : MonoBehaviour
             PlayerSlotId.FromIndex(newOwnerSlot),
             PlayerSlotId.FromIndex(previousOwnerSlot),
             VictoryReason.HeadQuarterCaptured);
-    }
-
-    public bool CanProduceUnit(TeamId team, UnitData unit, out string blockedReason)
-    {
-        blockedReason = string.Empty;
-        if (unit == null || unit.requiredBuilding == null)
-            return true;
-        if (HasCapturedBuilding(team, unit.requiredBuilding))
-            return true;
-
-        blockedReason = $"Requer capturar {ResolveProgressionBuildingName(unit.requiredBuilding)} ao menos uma vez.";
-        return false;
-    }
-
-    public bool CanCaptureConstruction(TeamId team, ConstructionData construction, out string blockedReason)
-    {
-        blockedReason = string.Empty;
-        if (construction == null || construction.requiredBuilding == null)
-            return true;
-        // Rebeldes/dissidentes (time sem QG) capturam qualquer coisa: sem base propria, a
-        // progressao por pre-requisito nao se aplica a eles.
-        if (ConstructionManager.IsHeadQuarterlessTeam(team))
-            return true;
-        if (HasCapturedBuilding(team, construction.requiredBuilding))
-            return true;
-
-        string article = construction.requiredBuilding.grammaticalGender == ConstructionGrammaticalGender.Feminine
-            ? "uma"
-            : "um";
-        blockedReason = $"Capture {article} {ResolveProgressionBuildingName(construction.requiredBuilding)} primeiro.";
-        return false;
-    }
-
-    public bool HasCapturedBuilding(TeamId team, ConstructionData building)
-    {
-        string key = ResolveProgressionBuildingKey(building);
-        if (team == TeamId.Neutral || string.IsNullOrWhiteSpace(key) || capturedBuildingHistory == null)
-            return false;
-
-        for (int i = 0; i < capturedBuildingHistory.Count; i++)
-        {
-            TeamCapturedBuildingHistory entry = capturedBuildingHistory[i];
-            if (entry == null || entry.teamId != team || entry.buildingKeys == null)
-                continue;
-            for (int k = 0; k < entry.buildingKeys.Count; k++)
-                if (string.Equals(entry.buildingKeys[k], key, StringComparison.OrdinalIgnoreCase))
-                    return true;
-        }
-
-        // Construcoes que ja pertencem ao time no inicio da partida tambem contam como requisito
-        // cumprido. Registra no historico para que uma perda posterior nao remova o desbloqueio.
-        ConstructionManager[] activeConstructions = FindObjectsByType<ConstructionManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-        for (int i = 0; i < activeConstructions.Length; i++)
-        {
-            ConstructionManager owned = activeConstructions[i];
-            if (owned == null || owned.TeamId != team || !owned.TryResolveConstructionData(out ConstructionData ownedData))
-                continue;
-            if (!string.Equals(ResolveProgressionBuildingKey(ownedData), key, StringComparison.OrdinalIgnoreCase))
-                continue;
-
-            RegisterCapturedBuilding(team, ownedData);
-            return true;
-        }
-
-        return false;
     }
 
     public bool HasCapturedBuilding(PlayerSlotId slotId, ConstructionData building)
@@ -2390,9 +2188,6 @@ public class MatchController : MonoBehaviour
         return true;
     }
 
-    private bool MarkTeamDefeated(TeamId team, string reasonLabel) =>
-        TryGetUniqueSlotForTeam(team, out PlayerSlotId slotId) && MarkSlotDefeated(slotId, reasonLabel);
-
     private void NeutralizeConstructionsOwnedBySlot(PlayerSlotId defeatedSlot)
     {
         List<ConstructionManager> constructions = GetActiveConstructionsOnScene();
@@ -2455,29 +2250,10 @@ public class MatchController : MonoBehaviour
         return true;
     }
 
-    // Atribui a eliminacao por 0 unidades a quem estava agindo (time ativo). Se nao der para
-    // atribuir (ex.: o time comeca o turno ja sem unidades), cai no primeiro oponente vivo.
-    private TeamId ResolveEliminatorTeamFor(TeamId defeatedTeam)
-    {
-        TeamId active = ClampToTeamId(activeTeamId);
-        if (active != TeamId.Neutral && active != defeatedTeam && !IsTeamDefeated(active))
-            return active;
-
-        if (players != null)
-        {
-            for (int i = 0; i < players.Count; i++)
-            {
-                if (!players[i].defeated && players[i].teamId != defeatedTeam && players[i].teamId != TeamId.Neutral)
-                    return players[i].teamId;
-            }
-        }
-        return TeamId.Neutral;
-    }
-
     // Time controlado por humano (nao IA, nao neutro).
-    private bool IsHumanTeam(TeamId team)
+    private bool IsHumanSlot(PlayerSlotId slotId)
     {
-        return team != TeamId.Neutral && !IsPlayerAI(team);
+        return IsValidPlayerSlot(slotId) && !IsPlayerAI(slotId);
     }
 
     private bool AnyHumanPlayerExists()
@@ -2736,7 +2512,9 @@ public class MatchController : MonoBehaviour
 
         // Resultado do ponto de vista do humano local: se o vencedor for humano -> VITORIA;
         // se quem venceu foi IA e existe humano na partida -> aquele humano perdeu (DERROTA).
-        bool humanLost = !IsHumanTeam(winnerTeam) && AnyHumanPlayerExists();
+        bool humanLost = (winnerTeam == TeamId.Neutral ||
+                          !IsHumanSlot(PlayerSlotId.FromIndex(victoryWinnerSlotIndex))) &&
+                         AnyHumanPlayerExists();
 
         CursorController cursor = FindAnyObjectByType<CursorController>();
         if (humanLost)
@@ -3342,18 +3120,6 @@ public class MatchController : MonoBehaviour
         turnBriefingLedger.Clear();
         if (events != null)
             turnBriefingLedger.AddRange(events);
-    }
-
-    public void ReportTurnBriefingEvent(
-        TeamId targetTeam,
-        TurnBriefingCategory category,
-        string subjectName,
-        string detail,
-        Vector3Int cell)
-    {
-        if (!TryGetUniqueSlotForTeam(targetTeam, out PlayerSlotId targetSlot))
-            return;
-        ReportTurnBriefingEvent(targetSlot, category, subjectName, detail, cell);
     }
 
     public void ReportTurnBriefingEvent(
@@ -4197,13 +3963,6 @@ public class MatchController : MonoBehaviour
     }
 
 
-    public void RefreshFogOfWarForTeam(TeamId observerTeamId)
-    {
-        if (!TryGetUniqueSlotForTeam(observerTeamId, out PlayerSlotId observerSlot))
-            return;
-        RefreshFogOfWarForSlot(observerSlot);
-    }
-
     public void RefreshFogOfWarForSlot(PlayerSlotId observerSlot)
     {
         if (!IsValidPlayerSlot(observerSlot))
@@ -4952,12 +4711,6 @@ public class MatchController : MonoBehaviour
                cachedVisible;
     }
 
-    public bool IsUnitVisibleForTeam(UnitManager unit, TeamId observerTeam)
-    {
-        return TryResolveObserverSlotForLegacyTeam(observerTeam, out PlayerSlotId observerSlot)
-            && IsUnitVisibleForSlot(unit, observerSlot);
-    }
-
     public bool IsUnitVisibleForSlot(UnitManager unit, PlayerSlotId observerSlot)
     {
         if (!debugFogOfWarEnabled)
@@ -4993,12 +4746,6 @@ public class MatchController : MonoBehaviour
         return ComputeIsUnitVisibleForSlotWithoutCache(unit, observerSlot);
     }
 
-    public bool IsUnitVisibleForTeamNoCache(UnitManager unit, TeamId observerTeam)
-    {
-        return TryResolveObserverSlotForLegacyTeam(observerTeam, out PlayerSlotId observerSlot)
-            && IsUnitVisibleForSlotNoCache(unit, observerSlot);
-    }
-
     public bool IsUnitVisibleForSlotNoCache(UnitManager unit, PlayerSlotId observerSlot)
     {
         if (!debugFogOfWarEnabled)
@@ -5017,20 +4764,6 @@ public class MatchController : MonoBehaviour
             return true;
 
         return ComputeIsUnitVisibleForSlotWithoutCache(unit, observerSlot);
-    }
-
-    private bool ComputeIsUnitVisibleForTeamWithoutCache(UnitManager unit, TeamId observerTeam)
-    {
-        return TryResolveObserverSlotForLegacyTeam(observerTeam, out PlayerSlotId observerSlot)
-            && ComputeIsUnitVisibleForSlotWithoutCache(unit, observerSlot);
-    }
-
-    private bool TryResolveObserverSlotForLegacyTeam(TeamId observerTeam, out PlayerSlotId observerSlot)
-    {
-        observerSlot = ActiveSlotId;
-        if (IsValidPlayerSlot(observerSlot) && GetVisualTeamForSlot(observerSlot) == observerTeam)
-            return true;
-        return TryGetUniqueSlotForTeam(observerTeam, out observerSlot);
     }
 
     private bool ComputeIsUnitVisibleForSlotWithoutCache(UnitManager unit, PlayerSlotId observerSlot)
@@ -5158,17 +4891,6 @@ public class MatchController : MonoBehaviour
         return (int)construction.TeamId == activeTeamId;
     }
 
-    private bool IsConstructionOwnedByTeam(ConstructionManager construction, TeamId observerTeam)
-    {
-        if (construction == null || observerTeam == TeamId.Neutral)
-            return false;
-
-        int observerSlot = GetSlotIndexForTeam(observerTeam);
-        if (observerSlot >= 0 && construction.SlotIndex >= 0)
-            return construction.SlotIndex == observerSlot;
-        return construction.TeamId == observerTeam;
-    }
-
     public bool IsCellVisibleForActiveTeam(Vector3Int cell)
     {
         if (!debugFogOfWarEnabled)
@@ -5256,7 +4978,7 @@ public class MatchController : MonoBehaviour
 
     public bool ShouldHideActiveAiActionPresentation()
     {
-        return ShouldUseHumanFogPresentation(out _);
+        return !debugFogOfWarPartial && TryResolveFogPresentationSlot(out _);
     }
 
     /// <summary>
@@ -5275,7 +4997,7 @@ public class MatchController : MonoBehaviour
         TeamId activeTeam = (TeamId)activeTeamId;
         if (debugFogOfWarPartial && TryGetFirstAITeam(out TeamId aiPresentationTeam))
             return activeTeam == aiPresentationTeam;
-        if (!IsPlayerAI(activeTeam))
+        if (!IsPlayerAI(ActiveSlotId))
             return true;
 
         // Sem jogador humano local, a partida AI vs AI possui um observador neutro
@@ -5289,45 +5011,19 @@ public class MatchController : MonoBehaviour
         return IsActiveTeamAI() && ShouldPresentActiveActionToLocalObserver();
     }
 
-    private bool ShouldUseHumanFogPresentation(out TeamId presentationTeam)
-    {
-        presentationTeam = TeamId.Neutral;
-        if (!Application.isPlaying || !debugFogOfWarEnabled || debugFogOfWarPartial)
-            return false;
-        if (!enableTotalWar || gameSetup != GameSetupPreset.FogOfWarTotal || activeTeamId < 0)
-            return false;
-        if (!Enum.IsDefined(typeof(TeamId), activeTeamId) || !IsPlayerAI((TeamId)activeTeamId))
-            return false;
-
-        return TryGetFirstHumanTeam(out presentationTeam);
-    }
-
-    private bool TryResolveFogPresentationTeam(out TeamId presentationTeam)
-    {
-        presentationTeam = TeamId.Neutral;
-        if (!Application.isPlaying || !debugFogOfWarEnabled || !enableTotalWar
-            || gameSetup != GameSetupPreset.FogOfWarTotal)
-            return false;
-
-        // PARTIAL e o espelho do modo humano: apenas a apresentacao fica presa
-        // ao primeiro participante AI. Turno, sensores e commits continuam usando
-        // o participante ativo real.
-        if (debugFogOfWarPartial)
-            return TryGetFirstAITeam(out presentationTeam);
-
-        return ShouldUseHumanFogPresentation(out presentationTeam);
-    }
-
     private bool TryResolveFogPresentationSlot(out PlayerSlotId presentationSlot)
     {
         presentationSlot = PlayerSlotId.Invalid;
-        if (!TryResolveFogPresentationTeam(out TeamId presentationTeam) || players == null)
+        if (!Application.isPlaying || !debugFogOfWarEnabled || !enableTotalWar ||
+            gameSetup != GameSetupPreset.FogOfWarTotal || players == null)
             return false;
 
         bool requireAI = debugFogOfWarPartial;
+        if (!requireAI && !IsPlayerAI(ActiveSlotId))
+            return false;
         for (int i = 0; i < players.Count; i++)
         {
-            if (players[i].teamId != presentationTeam || players[i].isAI != requireAI)
+            if (players[i].isAI != requireAI || players[i].defeated)
                 continue;
             presentationSlot = PlayerSlotId.FromIndex(i);
             return true;
@@ -5626,7 +5322,7 @@ public class MatchController : MonoBehaviour
         bool coverWorldPresentation = UsesFogOverlayForWorldOcclusion();
         bool playerTurn = activeTeamId >= 0
             && Enum.IsDefined(typeof(TeamId), activeTeamId)
-            && !IsPlayerAI((TeamId)activeTeamId);
+            && !IsPlayerAI(ActiveSlotId);
         bool showCursorAboveFog = ShouldPresentActiveActionToLocalObserver();
         bool showHumanTurnTools = playerTurn
             || (debugFogOfWarPartial && showCursorAboveFog);
@@ -5770,13 +5466,14 @@ public class MatchController : MonoBehaviour
         if (unit == null || !debugFogOfWarEnabled || !enableTotalWar)
             return;
 
-        TeamId observerTeam = ActiveTeam;
-        if (TryResolveFogPresentationTeam(out TeamId presentationTeam))
-            observerTeam = presentationTeam;
+        PlayerSlotId observerSlot = ActiveSlotId;
+        if (TryResolveFogPresentationSlot(out PlayerSlotId presentationSlot))
+            observerSlot = presentationSlot;
+        TeamId observerTeam = GetVisualTeamForSlot(observerSlot);
 
-        bool logicallyVisible = unit.TeamId == observerTeam;
+        bool logicallyVisible = unit.SlotIndex == observerSlot.Value;
         if (!logicallyVisible &&
-            TryGetFogGameplaySnapshot((int)observerTeam, out FogTeamGameplaySnapshot snapshot))
+            TryGetFogGameplaySnapshot(observerSlot.Value, out FogTeamGameplaySnapshot snapshot))
         {
             int cacheIndex = ResolveFogCacheIndex(unit);
             logicallyVisible = snapshot.unitVisibility.TryGetValue(cacheIndex, out bool visible) && visible;
@@ -5785,7 +5482,7 @@ public class MatchController : MonoBehaviour
             currentCell.z = 0;
             if (!logicallyVisible
                 && snapshot.visibleCells.Contains(currentCell)
-                && ComputeIsUnitVisibleForTeamWithoutCache(unit, observerTeam))
+                && ComputeIsUnitVisibleForSlotWithoutCache(unit, observerSlot))
             {
                 // A consulta usa a posicao apenas para a apresentacao corrente e nao
                 // publica cache/intel. Uma vez detectada ao sair do tampao, a unidade
@@ -5960,25 +5657,12 @@ public class MatchController : MonoBehaviour
         }
     }
 
-    public bool IsCellExploredByTeam(TeamId team, Vector3Int cell)
-    {
-        return TryGetUniqueSlotForTeam(team, out PlayerSlotId slot) && IsCellExploredBySlot(slot, cell);
-    }
-
     public bool IsCellExploredBySlot(PlayerSlotId slot, Vector3Int cell)
     {
         cell.z = 0;
         return IsValidPlayerSlot(slot) &&
                fogExploredCellsByTeam.TryGetValue(slot.Value, out HashSet<Vector3Int> explored) &&
                explored.Contains(cell);
-    }
-
-    public int GetExploredCellCount(TeamId team)
-    {
-        return TryGetUniqueSlotForTeam(team, out PlayerSlotId slot) &&
-               fogExploredCellsByTeam.TryGetValue(slot.Value, out HashSet<Vector3Int> explored)
-            ? explored.Count
-            : 0;
     }
 
     private void RecordConfirmedConstructionMemory(
@@ -6026,21 +5710,6 @@ public class MatchController : MonoBehaviour
                 flipX = sourceRenderer != null && sourceRenderer.flipX
             };
         }
-    }
-
-    public bool TryGetKnownConstructionAtCell(
-        TeamId observerTeam,
-        Vector3Int cell,
-        out ConstructionData constructionData,
-        out TeamId knownOwner)
-    {
-        if (!TryGetUniqueSlotForTeam(observerTeam, out PlayerSlotId observerSlot))
-        {
-            constructionData = null;
-            knownOwner = TeamId.Neutral;
-            return false;
-        }
-        return TryGetKnownConstructionAtCell(observerSlot, cell, out constructionData, out knownOwner);
     }
 
     public bool TryGetKnownConstructionAtCell(
@@ -7166,11 +6835,12 @@ public class MatchController : MonoBehaviour
             return;
         }
 
-        TeamId observerTeam = ActiveTeam;
-        bool useHumanPresentation = TryResolveFogPresentationTeam(out TeamId presentationTeam);
+        PlayerSlotId observerSlot = ActiveSlotId;
+        bool useHumanPresentation = TryResolveFogPresentationSlot(out PlayerSlotId presentationSlot);
         bool fogOverlayOwnsWorldOcclusion = UsesFogOverlayForWorldOcclusion();
         if (useHumanPresentation)
-            observerTeam = presentationTeam;
+            observerSlot = presentationSlot;
+        TeamId observerTeam = GetVisualTeamForSlot(observerSlot);
 
         List<UnitManager> units = UnitManager.AllActive;
         fogUnitVisibilityByCacheIndex.Clear();
@@ -7183,8 +6853,8 @@ public class MatchController : MonoBehaviour
             if (boardMap != null && !IsUnitOnBoard(unit, boardMap))
                 continue;
 
-            bool visible = unit.TeamId == observerTeam
-                || ComputeIsUnitVisibleForTeamWithoutCache(unit, observerTeam);
+            bool visible = unit.SlotIndex == observerSlot.Value
+                || ComputeIsUnitVisibleForSlotWithoutCache(unit, observerSlot);
             fogUnitVisibilityByCacheIndex[ResolveFogCacheIndex(unit)] = visible;
             unit.SetFogOfWarVisibility(ResolveFogRenderVisibility(unit, visible, fogOverlayOwnsWorldOcclusion, observerTeam));
         }
@@ -7328,8 +6998,9 @@ public class MatchController : MonoBehaviour
     {
         float alpha = ResolveFogOfWarAlpha();
         int renderedTeamId = fogCachedTeamId >= 0 ? fogCachedTeamId : activeTeamId;
-        if (renderedTeamId >= 0 && Enum.IsDefined(typeof(TeamId), renderedTeamId) &&
-            IsCellExploredByTeam((TeamId)renderedTeamId, cell))
+        PlayerSlotId renderedSlot = PlayerSlotId.FromIndex(renderedTeamId);
+        if (IsValidPlayerSlot(renderedSlot) &&
+            IsCellExploredBySlot(renderedSlot, cell))
         {
             float exploredMultiplier = fogOfWarController != null
                 ? fogOfWarController.ExploredFogAlphaMultiplier
@@ -7412,7 +7083,7 @@ public class MatchController : MonoBehaviour
     {
         int snapshotHash = BuildFogUnitSnapshotHash(unit, boardMap);
         int globalBoardRevision = ThreatRevisionTracker.GlobalBoardRevision;
-        int teamObserverRevision = ThreatRevisionTracker.GetTeamObserverRevision(activeTeamId);
+        int teamObserverRevision = ThreatRevisionTracker.GetSlotObserverRevision(PlayerSlotId.FromIndex(activeTeamId));
         int sensorFlagsHash = BuildFogSensorFlagsHash(enableLosValidation);
         return new FogOfWarUnitCacheKey(snapshotHash, globalBoardRevision, teamObserverRevision, sensorFlagsHash);
     }
@@ -7619,6 +7290,33 @@ public class MatchController : MonoBehaviour
             return true;
 
         blockedReason = $"Requer capturar {ResolveProgressionBuildingName(unit.requiredBuilding)} ao menos uma vez.";
+        return false;
+    }
+
+    public bool CanCaptureConstruction(
+        PlayerSlotId slotId,
+        ConstructionData construction,
+        out string blockedReason)
+    {
+        blockedReason = string.Empty;
+        if (construction == null || construction.requiredBuilding == null)
+            return true;
+        if (!IsValidPlayerSlot(slotId))
+        {
+            blockedReason = "Slot de jogador invalido.";
+            return false;
+        }
+        if (ConstructionManager.IsHeadQuarterlessTeam(GetVisualTeamForSlot(slotId)))
+            return true;
+        if (HasCapturedBuilding(slotId, construction.requiredBuilding))
+            return true;
+
+        string article = construction.requiredBuilding.grammaticalGender ==
+                         ConstructionGrammaticalGender.Feminine
+            ? "uma"
+            : "um";
+        blockedReason =
+            $"Capture {article} {ResolveProgressionBuildingName(construction.requiredBuilding)} primeiro.";
         return false;
     }
 

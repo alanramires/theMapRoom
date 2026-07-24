@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -94,7 +94,7 @@ public partial class AIController
         Vector3Int hqCell = snapshot.EnemyHQ.CurrentCellPosition;
         hqCell.z = 0;
         float selfHqDist = SectorManager.HexDistance(fromCell, hqCell);
-        int finalPressureRadius = Mathf.Max(5, GetEffectiveTransportThreshold(snapshot.AITeam));
+        int finalPressureRadius = Mathf.Max(5, GetEffectiveTransportThresholdForSlot(PlayerSlotId.FromIndex(snapshot.AISlotIndex)));
         if (selfHqDist <= finalPressureRadius)
         {
             if (HasRallyReleaseIntel(snapshot, hqCell, finalPressureRadius, out string intelReason))

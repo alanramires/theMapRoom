@@ -307,7 +307,7 @@ public partial class TurnStateManager
         ClearInspectedHelper();
         Advance(CursorState.UnitSelected, "SelectUnitFromNeutral: cycle to unit within hex");
         if (activeTeam >= 0)
-            DialogManager.Instance?.MarkHintLearned(matchController.ActiveTeam, HelpHintId.Act);
+            DialogManager.Instance?.MarkHintLearned(matchController.ActiveSlotId, HelpHintId.Act);
         return true;
     }
 
@@ -500,7 +500,7 @@ public partial class TurnStateManager
                 LogEnemyUnitInspection(unit, activeTeam);
                 BeginInspectedHelper(unit);
                 Advance(CursorState.InspectingUnit, "HandleConfirmFromNeutralLikeState: enemy inspect");
-                DialogManager.Instance?.MarkHintLearned(matchController.ActiveTeam, HelpHintId.Inspect);
+                DialogManager.Instance?.MarkHintLearned(matchController.ActiveSlotId, HelpHintId.Inspect);
                 return ActionSfx.Confirm;
             }
 
@@ -509,7 +509,7 @@ public partial class TurnStateManager
                 Debug.Log($"debug: inspecionando aliado que ja agiu (unit={unit.name}, unitTeam={(int)unit.TeamId}, activeTeam={activeTeam}, hasActed={unit.HasActed})");
                 BeginInspectedHelper(unit, paintThreatOverlay: true, nextTurnHotZone: true);
                 Advance(CursorState.InspectingUnit, "HandleConfirmFromNeutralLikeState: acted ally inspect");
-                DialogManager.Instance?.MarkHintLearned(matchController.ActiveTeam, HelpHintId.Inspect);
+                DialogManager.Instance?.MarkHintLearned(matchController.ActiveSlotId, HelpHintId.Inspect);
                 return ActionSfx.Confirm;
             }
 
@@ -523,7 +523,7 @@ public partial class TurnStateManager
             SetSelectedUnit(unit);
             ClearInspectedHelper();
             Advance(CursorState.UnitSelected, "HandleConfirmWhileNeutral: ally selected");
-            DialogManager.Instance?.MarkHintLearned(matchController.ActiveTeam, HelpHintId.Act);
+            DialogManager.Instance?.MarkHintLearned(matchController.ActiveSlotId, HelpHintId.Act);
             return ActionSfx.Confirm;
         }
 
@@ -541,7 +541,7 @@ public partial class TurnStateManager
 
         if (TryEnterConstructionShoppingState(construction, activeTeam))
         {
-            DialogManager.Instance?.MarkHintLearned(matchController.ActiveTeam, HelpHintId.Produce);
+            DialogManager.Instance?.MarkHintLearned(matchController.ActiveSlotId, HelpHintId.Produce);
             return ActionSfx.Confirm;
         }
 
@@ -564,7 +564,7 @@ public partial class TurnStateManager
         if (!TryEnterConstructionShoppingState(construction, activeTeam))
             return false;
 
-        DialogManager.Instance?.MarkHintLearned(matchController.ActiveTeam, HelpHintId.Produce);
+        DialogManager.Instance?.MarkHintLearned(matchController.ActiveSlotId, HelpHintId.Produce);
         return true;
     }
 
@@ -813,10 +813,10 @@ public partial class TurnStateManager
         {
             if (UnitRulesDefinition.IsTotalWarEnabled() &&
                 occupancyMap != null &&
-                UnitRulesDefinition.IsUnitCellOccupiedForTeam(
+                UnitRulesDefinition.IsUnitCellOccupiedForSlot(
                     occupancyMap,
                     cursorCell,
-                    selectedUnit.TeamId,
+                    PlayerSlotId.FromIndex(selectedUnit.SlotIndex),
                     selectedUnit))
             {
                 string message = PanelDialogController.ResolveDialogMessage(

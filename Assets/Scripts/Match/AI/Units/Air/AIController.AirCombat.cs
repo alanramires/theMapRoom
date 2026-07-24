@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Tilemaps;
 
@@ -190,7 +190,7 @@ public partial class AIController
             {
                 if (enemy == null || enemy.SlotIndex == snapshot.AISlotIndex || enemy.IsDead || enemy.IsEmbarked)
                     continue;
-                if (matchController != null && !matchController.IsUnitVisibleForTeam(enemy, snapshot.AITeam))
+                if (matchController != null && !matchController.IsUnitVisibleForSlot(enemy, PlayerSlotId.FromIndex(snapshot.AISlotIndex)))
                     continue;
                 bool isAirEnemy = enemy.TryGetUnitData(out UnitData _ed) && _ed != null && _ed.domain == Domain.Air;
                 if (!CanAttackTargetFrom(fromCell, cell, unit, enemy))
@@ -310,7 +310,7 @@ public partial class AIController
             {
                 if (enemy == null || enemy.SlotIndex == snapshot.AISlotIndex || enemy.IsDead || enemy.IsEmbarked)
                     continue;
-                if (matchController != null && !matchController.IsUnitVisibleForTeam(enemy, snapshot.AITeam))
+                if (matchController != null && !matchController.IsUnitVisibleForSlot(enemy, PlayerSlotId.FromIndex(snapshot.AISlotIndex)))
                     continue;
                 if (!enemy.TryGetUnitData(out UnitData enemyData) || enemyData == null || enemyData.domain != Domain.Air)
                     continue;

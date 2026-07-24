@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
 using UnityEngine;
@@ -580,7 +580,8 @@ public partial class AIController
         {
             if (enemy == null || enemy.SlotIndex == ResolveAISlotKey(aiTeam) || enemy.IsDead || enemy.IsEmbarked)
                 continue;
-            if (mc != null && !mc.IsUnitVisibleForTeam(enemy, aiTeam))
+            if (mc != null &&
+                !mc.IsUnitVisibleForSlot(enemy, PlayerSlotId.FromIndex(ResolveAISlotKey(aiTeam))))
                 continue;
 
             Vector3Int enemyCell = enemy.CurrentCellPosition;
@@ -780,8 +781,8 @@ public partial class AIController
         // Resume pula o BuildObjectivePlan, então re-marca a base inimiga aqui também — senão o 4º
         // eixo (invasão) não apareceria após o load para um objetivo restaurado como CaptureSector.
         MarkEnemyBaseObjectivesAsInvasion(plan, aiTeam);
-        currentAxisMap = InvasionAxisMap.Build(aiTeam);
-        if (GetGoGreenInvasionForInspection(aiTeam, turnNumber).Active)
+        currentAxisMap = InvasionAxisMap.Build(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam)));
+        if (GetGoGreenInvasionForInspection(PlayerSlotId.FromIndex(ResolveAISlotKey(aiTeam)), turnNumber).Active)
             AssignUnslottedUnitsToGoGreenInvasion(plan, aiTeam);
         var slottedIds = new HashSet<int>();
         int restored = 0;
@@ -1100,11 +1101,11 @@ public partial class AIController
         rallyGoGreenTurns[$"{ResolveAISlotKey(aiTeam)}:{sector}"] = turnNumber;
     }
 
-    private static bool IsRallyGoGreenSuppressed(TeamId aiTeam, ConstructionSector sector, int turnNumber)
+    private static bool IsRallyGoGreenSuppressed(PlayerSlotId aiSlot, ConstructionSector sector, int turnNumber)
     {
         if (sector == ConstructionSector.None || turnNumber < 0)
             return false;
-        string key = $"{ResolveAISlotKey(aiTeam)}:{sector}";
+        string key = $"{aiSlot.Value}:{sector}";
         return rallyGoGreenTurns.TryGetValue(key, out int goTurn)
             && turnNumber - goTurn <= RallyGoGreenSuppressTurns;
     }
@@ -1119,9 +1120,6 @@ public partial class AIController
         public List<ConstructionSector> Sectors;  // setores que viraram GoGreen na operação
         public int SinceTurn;                      // turno do GoGreen mais antigo ainda ativo
     }
-
-    public static GoGreenInvasionInspection GetGoGreenInvasionForInspection(TeamId aiTeam, int turnNumber)
-        => GetGoGreenInvasionForInspection(PlayerSlotId.FromIndex(ResolveAISlotKey(aiTeam)), turnNumber);
 
     public static GoGreenInvasionInspection GetGoGreenInvasionForInspection(PlayerSlotId aiSlot, int turnNumber)
     {
@@ -1160,13 +1158,6 @@ public partial class AIController
     // rally é removido no GoGreen. Os helpers abaixo deixam o ObjectiveManager exportar/importar
     // essas entradas junto do plano para que a invasão "em andamento" sobreviva ao save/load.
 
-    public static void CollectGoGreenTurnsForTeam(
-        TeamId aiTeam,
-        List<ConstructionSector> sectorsOut,
-        List<int> turnsOut)
-        => CollectGoGreenTurnsForSlot(
-            PlayerSlotId.FromIndex(ResolveAISlotKey(aiTeam)), sectorsOut, turnsOut);
-
     public static void CollectGoGreenTurnsForSlot(
         PlayerSlotId aiSlot,
         List<ConstructionSector> sectorsOut,
@@ -1189,9 +1180,6 @@ public partial class AIController
         }
     }
 
-    public static void ClearGoGreenTurnsForTeam(TeamId aiTeam)
-        => ClearGoGreenTurnsForSlot(PlayerSlotId.FromIndex(ResolveAISlotKey(aiTeam)));
-
     public static void ClearGoGreenTurnsForSlot(PlayerSlotId aiSlot)
     {
         string prefix = $"{aiSlot.Value}:";
@@ -1203,11 +1191,6 @@ public partial class AIController
             rallyGoGreenTurns.Remove(key);
     }
 
-    public static void RestoreGoGreenTurn(TeamId aiTeam, ConstructionSector sector, int turnNumber)
-    {
-        RememberRallyGoGreen(aiTeam, sector, turnNumber);
-    }
-
     public static void RestoreGoGreenTurn(PlayerSlotId aiSlot, ConstructionSector sector, int turnNumber)
     {
         if (!aiSlot.IsValid || sector == ConstructionSector.None || turnNumber < 0)
@@ -1217,14 +1200,10 @@ public partial class AIController
 
     // Acesso público pro semáforo (ConstructionManager): enquanto a operação está em voo (supressa),
     // o ponto de rally mostra verde — a luz segue a OPERAÇÃO, não a massa parada no ancoradouro.
-    public static bool IsRallyGoGreenSuppressedForHud(TeamId aiTeam, ConstructionSector sector, int turnNumber)
+    public static bool IsRallyGoGreenSuppressedForHud(PlayerSlotId aiSlot, ConstructionSector sector, int turnNumber)
     {
-        return IsRallyGoGreenSuppressed(aiTeam, sector, turnNumber);
+        return IsRallyGoGreenSuppressed(aiSlot, sector, turnNumber);
     }
-
-    public static void GetInvasionMonitorForSave(TeamId aiTeam, out int bestDistance, out int stallCounter)
-        => GetInvasionMonitorForSave(
-            PlayerSlotId.FromIndex(ResolveAISlotKey(aiTeam)), out bestDistance, out stallCounter);
 
     public static void GetInvasionMonitorForSave(PlayerSlotId aiSlot, out int bestDistance, out int stallCounter)
     {
@@ -1239,10 +1218,6 @@ public partial class AIController
             stallCounter = 0;
         }
     }
-
-    public static void RestoreInvasionMonitor(TeamId aiTeam, int bestDistance, int stallCounter)
-        => RestoreInvasionMonitor(
-            PlayerSlotId.FromIndex(ResolveAISlotKey(aiTeam)), bestDistance, stallCounter);
 
     public static void RestoreInvasionMonitor(PlayerSlotId aiSlot, int bestDistance, int stallCounter)
     {
@@ -1273,7 +1248,7 @@ public partial class AIController
         // Operação em voo? (algum rally GoGreen registrado). Sem isso, não há o que monitorar.
         var ggSectors = new List<ConstructionSector>();
         var ggTurns = new List<int>();
-        CollectGoGreenTurnsForTeam(aiTeam, ggSectors, ggTurns);
+        CollectGoGreenTurnsForSlot(PlayerSlotId.FromIndex(snapshot.AISlotIndex), ggSectors, ggTurns);
         if (ggTurns.Count == 0)
         {
             invasionMonitors.Remove(ResolveAISlotKey(aiTeam));
@@ -1303,7 +1278,7 @@ public partial class AIController
         // Sem objetivo de base = operação encerrada (sucesso/dissolvida): limpa silenciosamente.
         if (baseObj == null)
         {
-            ClearGoGreenTurnsForTeam(aiTeam);
+            ClearGoGreenTurnsForSlot(PlayerSlotId.FromIndex(ResolveAISlotKey(aiTeam)));
             invasionMonitors.Remove(ResolveAISlotKey(aiTeam));
             return;
         }
@@ -1356,7 +1331,7 @@ public partial class AIController
                 (collapse ? "colapso: 0 assalto vivo na força" : $"estagnação: {mon.StallCounter}T sem progresso, best={mon.BestDistance}h") +
                 ") -> libera re-montagem (2ª onda); frente mantém posição");
             ReleaseGoGreenFallbackAssignments(plan, aiTeam);
-            ClearGoGreenTurnsForTeam(aiTeam);   // solta supressão -> rallies reabrem montagem
+            ClearGoGreenTurnsForSlot(PlayerSlotId.FromIndex(ResolveAISlotKey(aiTeam)));   // solta supressão -> rallies reabrem montagem
             invasionMonitors.Remove(aiSlotKey);
             // Zera o marcador de GoGreen dos objetivos pra que a 2ª onda registre um GoGreen LIMPO
             // (re-estabelecendo a supressão) em vez de ser bloqueada pelo marcador da onda falha.

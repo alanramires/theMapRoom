@@ -158,7 +158,7 @@ public partial class AIShoppingPlanner
         {
             if (building == null || building.OfferedUnits == null)
                 continue;
-            bool producerAvailable = building.CanProduceUnitsForTeam(snapshot.AITeam);
+            bool producerAvailable = building.CanProduceUnitsForSlot(snapshot.AISlotIndex);
             foreach (UnitData unit in building.OfferedUnits)
             {
                 if (unit == null)

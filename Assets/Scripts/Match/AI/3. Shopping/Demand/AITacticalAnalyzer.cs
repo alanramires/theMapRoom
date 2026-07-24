@@ -49,12 +49,13 @@ public partial class AITacticalAnalyzer : MonoBehaviour
         if (instance == this) instance = null;
     }
 
-    public void Rebuild(TeamId team, AIWorldSnapshot snapshot, TeamObjectivePlan plan)
+    public void Rebuild(AIWorldSnapshot snapshot, TeamObjectivePlan plan)
     {
-        var ops = new List<AITacticalNeed>();
-        operationsBySlot[snapshot != null ? snapshot.AISlotIndex : AIController.ResolveAISlotKey(team)] = ops;
         if (snapshot == null)
             return;
+        TeamId team = snapshot.AITeam;
+        var ops = new List<AITacticalNeed>();
+        operationsBySlot[snapshot.AISlotIndex] = ops;
 
         AIIntelReport intel = BuildOperationIntelReport(team, snapshot);
 
@@ -72,17 +73,17 @@ public partial class AITacticalAnalyzer : MonoBehaviour
         LogOperations(team, snapshot.TurnNumber, ops);
     }
 
-    public IReadOnlyList<AITacticalNeed> GetOperationsForTeam(TeamId team)
+    public IReadOnlyList<AITacticalNeed> GetOperationsForSlot(PlayerSlotId slotId)
     {
-        if (operationsBySlot.TryGetValue(AIController.ResolveAISlotKey(team), out List<AITacticalNeed> ops))
+        if (operationsBySlot.TryGetValue(slotId.Value, out List<AITacticalNeed> ops))
             return ops;
         return System.Array.Empty<AITacticalNeed>();
     }
 
-    public bool TryGetCaptureOperationForObjective(TeamId team, SectorObjective objective, out AITacticalNeed operation)
+    public bool TryGetCaptureOperationForObjective(PlayerSlotId slotId, SectorObjective objective, out AITacticalNeed operation)
     {
         operation = null;
-        if (objective == null || !operationsBySlot.TryGetValue(AIController.ResolveAISlotKey(team), out List<AITacticalNeed> ops))
+        if (objective == null || !operationsBySlot.TryGetValue(slotId.Value, out List<AITacticalNeed> ops))
             return false;
 
         foreach (AITacticalNeed op in ops)
@@ -99,13 +100,13 @@ public partial class AITacticalAnalyzer : MonoBehaviour
         return false;
     }
 
-    public bool IsFireSupportScreenedForObjective(UnitManager fireSupport, TeamId team, SectorObjective objective, out AITacticalNeed operation, out string reason)
+    public bool IsFireSupportScreenedForObjective(UnitManager fireSupport, PlayerSlotId slotId, SectorObjective objective, out AITacticalNeed operation, out string reason)
     {
         operation = null;
         reason = "";
         if (fireSupport == null || objective == null)
             return true;
-        if (!TryGetCaptureOperationForObjective(team, objective, out operation))
+        if (!TryGetCaptureOperationForObjective(slotId, objective, out operation))
             return true;
 
         Vector3Int fireCell = Normalize(fireSupport.CurrentCellPosition);
@@ -125,10 +126,10 @@ public partial class AITacticalAnalyzer : MonoBehaviour
         return screened;
     }
 
-    public List<TacticalDeficit> GetDeficits(TeamId team, bool log = true)
+    public List<TacticalDeficit> GetDeficits(PlayerSlotId slotId, bool log = true)
     {
         var deficits = new List<TacticalDeficit>();
-        if (!operationsBySlot.TryGetValue(AIController.ResolveAISlotKey(team), out List<AITacticalNeed> ops))
+        if (!operationsBySlot.TryGetValue(slotId.Value, out List<AITacticalNeed> ops))
             return deficits;
 
         ops.Sort((a, b) => a.Priority.CompareTo(b.Priority));
@@ -152,7 +153,7 @@ public partial class AITacticalAnalyzer : MonoBehaviour
                     Count = kv.Value,
                 });
                 if (log)
-                    Debug.Log($"[AI Ops][T{op.LastUpdatedTurn}][{team}] deficit {op.Type} {op.Sector}: {kv.Key}x{kv.Value}");
+                    Debug.Log($"[AI Ops][T{op.LastUpdatedTurn}][slot {slotId.Value}] deficit {op.Type} {op.Sector}: {kv.Key}x{kv.Value}");
             }
         }
 

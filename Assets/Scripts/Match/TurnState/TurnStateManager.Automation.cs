@@ -155,7 +155,7 @@ public partial class TurnStateManager
         SetSelectedUnit(unit);
         ClearInspectedHelper();
         Advance(CursorState.UnitSelected, "TryAutomatedSelectUnitByInstanceId");
-        DialogManager.Instance?.MarkHintLearned(unit.TeamId, HelpHintId.Act);
+        DialogManager.Instance?.MarkHintLearned(PlayerSlotId.FromIndex(unit.SlotIndex), HelpHintId.Act);
         return selectedUnit == unit && CurrentCursorState == CursorState.UnitSelected;
     }
 

@@ -2428,7 +2428,7 @@ public static class UnitThreatEnvelopeService
             hash = hash * 31 + (unit.IsAircraftGrounded ? 1 : 0);
             hash = hash * 31 + map.GetEntityId().GetHashCode();
             hash = hash * 31 + ThreatRevisionTracker.GlobalBoardRevision;
-            hash = hash * 31 + ThreatRevisionTracker.GetTeamObserverRevision(unit.TeamId);
+            hash = hash * 31 + ThreatRevisionTracker.GetSlotObserverRevision(PlayerSlotId.FromIndex(unit.SlotIndex));
             hash = hash * 31 + ThreatRevisionTracker.MatchFlagsHash;
             hash = hash * 31 + (enableLdt ? 1 : 0);
             hash = hash * 31 + (enableLos ? 1 : 0);

@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -152,7 +152,7 @@ public partial class AIController
                 float homeScore = -threat * 1000f
                     - SectorManager.HexDistance(fromCell, cell) * 65f
                     + (building.IsPlayerHeadQuarter ? 1000f : 500f)
-                    + (building.CanProduceUnitsForTeam(snapshot.AITeam) ? 200f : 0f);
+                    + (building.CanProduceUnitsForSlot(snapshot.AISlotIndex) ? 200f : 0f);
 
                 if (homeScore > fallbackHomeScore)
                 {
@@ -170,7 +170,7 @@ public partial class AIController
                 + (IsLogisticsReloadConstruction(building) ? 300f : 0f)
                 + (home ? 150f : 0f)
                 + (building.IsPlayerHeadQuarter ? 250f : 0f)
-                + (building.CanProduceUnitsForTeam(snapshot.AITeam) ? 100f : 0f);
+                + (building.CanProduceUnitsForSlot(snapshot.AISlotIndex) ? 100f : 0f);
 
             if (score > bestScore)
             {
@@ -404,7 +404,7 @@ public partial class AIController
             score -= 90f;
 
         ConstructionManager construction = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, cell);
-        bool blocksProduction = construction != null && construction.CanProduceUnitsForTeam(snapshot.AITeam);
+        bool blocksProduction = construction != null && construction.CanProduceUnitsForSlot(snapshot.AISlotIndex);
         if (blocksProduction)
             score -= hasServiceTarget || baseDefense ? (cell == fromCell ? 220f : 900f) : 6000f;
 

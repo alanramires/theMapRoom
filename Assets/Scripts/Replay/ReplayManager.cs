@@ -1785,7 +1785,7 @@ public class ReplayManager : MonoBehaviour
         ApplyReplayVision();
     }
 
-    public void StartReplay(int turnIndex, ReplayVisionMode replayVisionMode, TeamId replayObserverTeam)
+    public void StartReplay(int turnIndex, ReplayVisionMode replayVisionMode, PlayerSlotId replayObserverSlot)
     {
         if (!isReplaying)
         {
@@ -1806,9 +1806,7 @@ public class ReplayManager : MonoBehaviour
         stepSnapshots.Clear();
         RebuildStepSnapshotsForCurrentRecordFromActionSnapshots();
         selectedTurnIndex = turnIndex;
-        visionMode = replayVisionMode;
-        observerTeam = replayObserverTeam;
-        observerSlotIndex = ResolveReplayObserverSlot(replayObserverTeam);
+        SetReplayVision(replayVisionMode, replayObserverSlot);
         isReplaying = true;
         isRecording = false;
         isPlaying = false;
@@ -1948,15 +1946,6 @@ public class ReplayManager : MonoBehaviour
         ImportReplaySaveData(null);
     }
 
-    public void SetReplayVision(ReplayVisionMode replayVisionMode, TeamId replayObserverTeam)
-    {
-        visionMode = replayVisionMode;
-        observerTeam = replayObserverTeam;
-        observerSlotIndex = ResolveReplayObserverSlot(replayObserverTeam);
-        if (isReplaying)
-            ApplyReplayVision();
-    }
-
     public void SetReplayVision(ReplayVisionMode replayVisionMode, PlayerSlotId replayObserverSlot)
     {
         visionMode = replayVisionMode;
@@ -1970,7 +1959,7 @@ public class ReplayManager : MonoBehaviour
             ApplyReplayVision();
     }
 
-    public bool StartReplayFromCurrentRecordBeginning(ReplayVisionMode replayVisionMode, TeamId replayObserverTeam)
+    public bool StartReplayFromCurrentRecordBeginning(ReplayVisionMode replayVisionMode, PlayerSlotId replayObserverSlot)
     {
         if (currentRecord == null || currentRecord.StartSnapshot == null)
             return false;
@@ -1982,9 +1971,7 @@ public class ReplayManager : MonoBehaviour
             preReplayWasRecording = isRecording;
         }
 
-        visionMode = replayVisionMode;
-        observerTeam = replayObserverTeam;
-        observerSlotIndex = ResolveReplayObserverSlot(replayObserverTeam);
+        SetReplayVision(replayVisionMode, replayObserverSlot);
         BeginReplayTransitionFeedback("dialog.replay.loading", "Replay iniciando (aguarde)");
         isReplaying = true;
         isRecording = false;
@@ -1997,19 +1984,19 @@ public class ReplayManager : MonoBehaviour
         return isReplaying;
     }
 
-    public bool StartReplayFromBeginning(ReplayVisionMode replayVisionMode, TeamId replayObserverTeam)
+    public bool StartReplayFromBeginning(ReplayVisionMode replayVisionMode, PlayerSlotId replayObserverSlot)
     {
-        if (StartReplayFromCurrentRecordBeginning(replayVisionMode, replayObserverTeam))
+        if (StartReplayFromCurrentRecordBeginning(replayVisionMode, replayObserverSlot))
             return true;
 
         if (matchHistory == null || matchHistory.Count <= 0)
             return false;
 
-        StartReplay(0, replayVisionMode, replayObserverTeam);
+        StartReplay(0, replayVisionMode, replayObserverSlot);
         return isReplaying;
     }
 
-    public bool StartReplayFromTurn(int turnNumber, ReplayVisionMode replayVisionMode, TeamId replayObserverTeam)
+    public bool StartReplayFromTurn(int turnNumber, ReplayVisionMode replayVisionMode, PlayerSlotId replayObserverSlot)
     {
         if (matchHistory == null || matchHistory.Count <= 0)
             return false;
@@ -2022,55 +2009,24 @@ public class ReplayManager : MonoBehaviour
             if (record.TurnNumber != turnNumber)
                 continue;
 
-            StartReplay(i, replayVisionMode, replayObserverTeam);
+            StartReplay(i, replayVisionMode, replayObserverSlot);
             return isReplaying;
         }
 
         // Fallback: allow direct index selection from the panel.
         if (turnNumber >= 0 && turnNumber < matchHistory.Count)
         {
-            StartReplay(turnNumber, replayVisionMode, replayObserverTeam);
+            StartReplay(turnNumber, replayVisionMode, replayObserverSlot);
             return isReplaying;
         }
 
         return false;
     }
-    public bool StartReplayFromTurnAndTeam(int turnNumber, TeamId actingTeam, ReplayVisionMode replayVisionMode, TeamId replayObserverTeam)
-    {
-        if (matchHistory == null || matchHistory.Count <= 0)
-            return false;
-
-        for (int i = 0; i < matchHistory.Count; i++)
-        {
-            ReplayTurnRecord record = matchHistory[i];
-            if (record == null)
-                continue;
-            if (record.TurnNumber != turnNumber || record.ActingTeam != actingTeam)
-                continue;
-
-            StartReplay(i, replayVisionMode, replayObserverTeam);
-            return isReplaying;
-        }
-
-        // Fallback: allow selecting by index + team when panel uses index semantics.
-        if (turnNumber >= 0 && turnNumber < matchHistory.Count)
-        {
-            ReplayTurnRecord record = matchHistory[turnNumber];
-            if (record != null && record.ActingTeam == actingTeam)
-            {
-                StartReplay(turnNumber, replayVisionMode, replayObserverTeam);
-                return isReplaying;
-            }
-        }
-
-        return false;
-    }
-
     public bool StartReplayFromTurnAndSlot(
         int turnNumber,
         PlayerSlotId actingSlot,
         ReplayVisionMode replayVisionMode,
-        TeamId replayObserverTeam)
+        PlayerSlotId replayObserverSlot)
     {
         if (!actingSlot.IsValid || matchHistory == null)
             return false;
@@ -2080,45 +2036,19 @@ public class ReplayManager : MonoBehaviour
             if (record == null || record.TurnNumber != turnNumber ||
                 record.ActingSlotIndex != actingSlot.Value)
                 continue;
-            StartReplay(i, replayVisionMode, replayObserverTeam);
+            StartReplay(i, replayVisionMode, replayObserverSlot);
             return isReplaying;
         }
         return false;
     }
-    public bool StartReplayFromLatestSnapshot(ReplayVisionMode replayVisionMode, TeamId replayObserverTeam)
+    public bool StartReplayFromLatestSnapshot(ReplayVisionMode replayVisionMode, PlayerSlotId replayObserverSlot)
     {
         if (currentRecord == null || currentRecord.StartSnapshot == null)
             return false;
 
-        visionMode = replayVisionMode;
-        observerTeam = replayObserverTeam;
-        observerSlotIndex = ResolveReplayObserverSlot(replayObserverTeam);
+        SetReplayVision(replayVisionMode, replayObserverSlot);
         StartReplay();
         return isReplaying;
-    }
-
-    public int ResolveActionIndexForTurn(int turnNumber, TeamId actingTeam)
-    {
-        if (currentRecord != null && currentRecord.TurnNumber == turnNumber && currentRecord.ActingTeam == actingTeam)
-            return 0;
-
-        if (matchHistory == null)
-            return 0;
-
-        for (int i = 0; i < matchHistory.Count; i++)
-        {
-            ReplayTurnRecord record = matchHistory[i];
-            if (record == null)
-                continue;
-            if (record.TurnNumber != turnNumber || record.ActingTeam != actingTeam)
-                continue;
-
-            currentRecord = record;
-            selectedTurnIndex = i;
-            return 0;
-        }
-
-        return 0;
     }
 
     public IEnumerator ExecuteActionFromAutomatedPlayer(int actionIndex)
@@ -3451,24 +3381,7 @@ public class ReplayManager : MonoBehaviour
         if (observerSlotIndex >= 0)
             matchController?.RefreshFogOfWarForSlot(PlayerSlotId.FromIndex(observerSlotIndex));
         else
-            fogOfWarController?.RefreshFogOfWarForTeam(observerTeam);
-    }
-
-    private int ResolveReplayObserverSlot(TeamId visualTeam)
-    {
-        if (matchController == null || visualTeam == TeamId.Neutral)
-            return -1;
-        PlayerSlotId selectedSlot = PlayerSlotId.FromIndex(observerSlotIndex);
-        if (matchController.IsValidPlayerSlot(selectedSlot) &&
-            matchController.GetVisualTeamForSlot(selectedSlot) == visualTeam)
-            return selectedSlot.Value;
-        PlayerSlotId activeSlot = matchController.ActiveSlotId;
-        if (matchController.IsValidPlayerSlot(activeSlot) &&
-            matchController.GetVisualTeamForSlot(activeSlot) == visualTeam)
-            return activeSlot.Value;
-        return matchController.TryGetUniqueSlotForTeam(visualTeam, out PlayerSlotId uniqueSlot)
-            ? uniqueSlot.Value
-            : -1;
+            Debug.LogWarning("[Replay] Observador legado sem SlotId inequívoco; FOW filtrado não foi aplicado.");
     }
 
     private void EnsureReplayPoolsInitialized()

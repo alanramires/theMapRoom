@@ -387,7 +387,7 @@ public partial class AITacticalAnalyzer
 
     private static int GetEffectiveTransportThreshold(TeamId team)
     {
-        return AIController.Instance != null ? AIController.Instance.GetEffectiveTransportThreshold(team) : 7;
+        return AIController.Instance != null ? AIController.Instance.GetEffectiveTransportThresholdForSlot(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(team))) : 7;
     }
 
     // Mapa de eixos para a fase de shopping. Reusa o currentAxisMap do planner (construido
@@ -398,7 +398,7 @@ public partial class AITacticalAnalyzer
         InvasionAxisMap map = AIController.Instance != null ? AIController.Instance.CurrentAxisMap : null;
         if (map != null && map.Team == team)
             return map;
-        return InvasionAxisMap.Build(team);
+        return InvasionAxisMap.Build(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(team)));
     }
 
     private static bool HasPreventiveDefenseBudget(AIWorldSnapshot snapshot)

@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -244,7 +244,7 @@ public partial class AIController
         foreach (UnitManager enemy in UnitManager.AllActive)
         {
             if (enemy.SlotIndex == ResolveAISlotKey(aiTeam) || enemy.IsDead || enemy.IsEmbarked) continue;
-            if (mc != null && !mc.IsUnitVisibleForTeam(enemy, aiTeam)) continue;
+            if (mc != null && !mc.IsUnitVisibleForSlot(enemy, PlayerSlotId.FromIndex(currentAISlotIndex))) continue;
             Vector3Int ec = enemy.CurrentCellPosition; ec.z = 0;
             if (SectorManager.HexDistance(ec, targetCell) <= enemyRange)
                 enemyHp += Mathf.Max(1, enemy.CurrentHP);
@@ -295,7 +295,7 @@ public partial class AIController
         foreach (UnitManager enemy in UnitManager.AllActive)
         {
             if (enemy.SlotIndex == ResolveAISlotKey(aiTeam) || enemy.IsDead || enemy.IsEmbarked) continue;
-            if (mc != null && !mc.IsUnitVisibleForTeam(enemy, aiTeam)) continue;
+            if (mc != null && !mc.IsUnitVisibleForSlot(enemy, PlayerSlotId.FromIndex(currentAISlotIndex))) continue;
             Vector3Int ec = enemy.CurrentCellPosition; ec.z = 0;
             if (SectorManager.HexDistance(ec, cell) <= range) return true;
         }
@@ -482,7 +482,7 @@ public partial class AIController
         {
             if (building == null)
                 continue;
-            if (building.CanProduceUnitsForTeam(aiTeam))
+            if (building.CanProduceUnitsForSlot(AIController.ResolveAISlotKey(aiTeam)))
                 count++;
         }
 
@@ -500,10 +500,10 @@ public partial class AIController
         {
             if (b == null)
                 continue;
-            TeamId t = b.TeamId;
-            if (t == aiTeam || t == TeamId.Neutral)
+            if (b.SlotIndex < 0 ||
+                b.SlotIndex == AIController.ResolveAISlotKey(aiTeam))
                 continue;
-            if (b.CanProduceUnitsForTeam(t))
+            if (b.CanProduceUnitsForSlot(b.SlotIndex))
                 count++;
         }
         return count;

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -55,25 +55,28 @@ public static class AISectorIntentAnalyzer
     private static readonly Dictionary<int, Dictionary<ConstructionSector, AISectorIntent>> intentsBySlot =
         new Dictionary<int, Dictionary<ConstructionSector, AISectorIntent>>();
 
-    public static IReadOnlyDictionary<ConstructionSector, AISectorIntent> GetIntents(TeamId team)
+    public static IReadOnlyDictionary<ConstructionSector, AISectorIntent> GetIntents(PlayerSlotId slotId)
     {
-        if (intentsBySlot.TryGetValue(AIController.ResolveAISlotKey(team), out Dictionary<ConstructionSector, AISectorIntent> intents))
+        if (intentsBySlot.TryGetValue(slotId.Value, out Dictionary<ConstructionSector, AISectorIntent> intents))
             return intents;
         return null;
     }
 
-    public static bool TryGetIntent(TeamId team, ConstructionSector sector, out AISectorIntent intent)
+    public static bool TryGetIntent(PlayerSlotId slotId, ConstructionSector sector, out AISectorIntent intent)
     {
         intent = null;
-        return intentsBySlot.TryGetValue(AIController.ResolveAISlotKey(team), out Dictionary<ConstructionSector, AISectorIntent> intents)
+        return intentsBySlot.TryGetValue(slotId.Value, out Dictionary<ConstructionSector, AISectorIntent> intents)
             && intents.TryGetValue(sector, out intent);
     }
 
-    public static void RebuildAndLog(TeamId team, AIWorldSnapshot snapshot, TeamObjectivePlan plan, AIIntelReport intel, string source)
+    public static void RebuildAndLog(AIWorldSnapshot snapshot, TeamObjectivePlan plan, AIIntelReport intel, string source)
     {
+        if (snapshot == null)
+            return;
+        TeamId team = snapshot.AITeam;
         Dictionary<ConstructionSector, AISectorIntent> intents = Build(team, snapshot, plan, intel, source);
-        intentsBySlot[snapshot != null ? snapshot.AISlotIndex : AIController.ResolveAISlotKey(team)] = intents;
-        Log(team, snapshot != null ? snapshot.TurnNumber : 0, source, intents);
+        intentsBySlot[snapshot.AISlotIndex] = intents;
+        Log(team, snapshot.TurnNumber, source, intents);
     }
 
     private static Dictionary<ConstructionSector, AISectorIntent> Build(
@@ -127,8 +130,10 @@ public static class AISectorIntentAnalyzer
         AISectorIntel sectorIntel = FindIntelForSector(intel, sector);
         SectorManager.SectorInfo info = TryGetSectorInfo(sector);
 
-        bool owned = info != null && info.ControllingTeam == team;
-        AISectorRelation relation = ClassifyRelation(team, info);
+        PlayerSlotId observerSlot = PlayerSlotId.FromIndex(
+            snapshot != null ? snapshot.AISlotIndex : AIController.ResolveAISlotKey(team));
+        bool owned = info != null && info.ControllingSlotIndex == observerSlot.Value;
+        AISectorRelation relation = ClassifyRelation(observerSlot, info);
         bool ownNaturalNeutral = relation == AISectorRelation.OwnNatural
             && info != null
             && info.ControllingTeam == TeamId.Neutral;
@@ -306,49 +311,49 @@ public static class AISectorIntentAnalyzer
         if (!SectorManager.TryGetSectorInfo(sector, out SectorManager.SectorInfo info))
             return default;
 
-        float myHQDist = info.GetDistanceToHQ(team);
+        float myHQDist = info.GetDistanceToHQ(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(team)));
         if (info.ClosestNeighbor1 != default
             && SectorManager.TryGetSectorInfo(info.ClosestNeighbor1, out SectorManager.SectorInfo n1)
-            && n1.GetDistanceToHQ(team) > myHQDist)
+            && n1.GetDistanceToHQ(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(team))) > myHQDist)
             return info.ClosestNeighbor1;
         if (info.ClosestNeighbor2 != default
             && SectorManager.TryGetSectorInfo(info.ClosestNeighbor2, out SectorManager.SectorInfo n2)
-            && n2.GetDistanceToHQ(team) > myHQDist)
+            && n2.GetDistanceToHQ(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(team))) > myHQDist)
             return info.ClosestNeighbor2;
         return default;
     }
 
-    public static AISectorRelation ClassifyRelation(TeamId team, SectorManager.SectorInfo info)
+    public static AISectorRelation ClassifyRelation(PlayerSlotId slotId, SectorManager.SectorInfo info)
     {
         if (info == null)
             return AISectorRelation.Unknown;
 
         if (ConstructionSectorHelper.IsBase(info.Sector))
         {
-            TeamId hqTeam = FindHQTeamInSector(info.Sector);
-            if (hqTeam == team) return AISectorRelation.OwnBase;
-            if (hqTeam != TeamId.Neutral) return AISectorRelation.EnemyBase;
+            PlayerSlotId hqSlot = FindHQSlotInSector(info.Sector);
+            if (hqSlot == slotId) return AISectorRelation.OwnBase;
+            if (hqSlot.IsValid) return AISectorRelation.EnemyBase;
             return AISectorRelation.Unknown;
         }
 
-        if (info.ControllingTeam == team)
+        if (info.ControllingSlotIndex == slotId.Value)
             return AISectorRelation.Owned;
-        if (info.ControllingTeam != TeamId.Neutral)
+        if (info.ControllingSlotIndex >= 0)
             return AISectorRelation.EnemyOwned;
 
-        TeamId nearest = info.NearestTeam();
-        if (nearest == team)
+        PlayerSlotId nearest = info.NearestSlot();
+        if (nearest == slotId)
             return AISectorRelation.OwnNatural;
-        if (nearest != TeamId.Neutral)
+        if (nearest.IsValid)
             return AISectorRelation.EnemyNatural;
         return AISectorRelation.NeutralCenter;
     }
 
-    private static TeamId FindHQTeamInSector(ConstructionSector sector)
+    private static PlayerSlotId FindHQSlotInSector(ConstructionSector sector)
     {
         foreach (ConstructionManager c in ConstructionManager.AllActive)
             if (c != null && c.Sector == sector && c.IsPlayerHeadQuarter)
-                return c.TeamId;
-        return TeamId.Neutral;
+                return PlayerSlotId.FromIndex(c.SlotIndex);
+        return PlayerSlotId.Invalid;
     }
 }

@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -334,7 +334,7 @@ public partial class AIController
                 ? terrainCost
                 : SectorManager.HexDistance(assignedCell, targetCell);
 
-        int threshold = Mathf.Max(4, GetEffectiveTransportThreshold(aiTeam) / 2 + 1);
+        int threshold = Mathf.Max(4, GetEffectiveTransportThresholdForSlot(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam))) / 2 + 1);
         return distance <= threshold;
     }
 

@@ -42,6 +42,7 @@ public class InvasionAxisMap
     private readonly List<Axis> axes = new List<Axis>();
 
     public TeamId Team { get; private set; }
+    public int SlotIndex { get; private set; } = -1;
     public IReadOnlyList<Axis> Axes => axes;
     public int AxisCount => axes.Count;
 
@@ -101,9 +102,11 @@ public class InvasionAxisMap
     // Constroi o mapa de eixos do time. tilemap pode ser null (resolve automaticamente).
     // applyOverrides=false devolve a classificacao PURA (geometria), sem os overrides manuais —
     // usado pelo inspector pra mostrar o "eixo automatico" que o override esta sobrepondo.
-    public static InvasionAxisMap Build(TeamId team, Tilemap tilemap = null, bool applyOverrides = true)
+    public static InvasionAxisMap Build(PlayerSlotId slotId, Tilemap tilemap = null, bool applyOverrides = true)
     {
-        var map = new InvasionAxisMap { Team = team };
+        MatchController match = Object.FindAnyObjectByType<MatchController>();
+        TeamId team = match != null ? match.GetVisualTeamForSlot(slotId) : TeamId.Neutral;
+        var map = new InvasionAxisMap { Team = team, SlotIndex = slotId.Value };
 
         Tilemap board = tilemap != null ? tilemap : ResolveBoardTilemap();
         if (board == null)
@@ -130,7 +133,7 @@ public class InvasionAxisMap
         {
             ConstructionManager hq = FindAxisHQ(allHqs, rally, rally.RallyOwnerSlotIndex);
             if (hq == null) continue;
-            if (hq.TeamId != team) continue; // rally de outro time
+            if (hq.SlotIndex != slotId.Value) continue;
             if (!porHQ.TryGetValue(hq, out List<ConstructionManager> lista)) { lista = new List<ConstructionManager>(); porHQ[hq] = lista; }
             lista.Add(rally);
         }
@@ -153,7 +156,7 @@ public class InvasionAxisMap
             map.sectorToEixo[axis.RallySector] = axis.EixoIndex; // o proprio setor do rally pertence ao eixo
             foreach (ConstructionSector sec in axis.Corridor)
                 map.sectorToEixo[sec] = axis.EixoIndex;
-            ComputeFront(axis, team);
+            ComputeFront(axis, slotId);
         }
 
         // Override manual (designer, ConstructionManager.OverrideEixo): reclassifica setores forcados
@@ -161,14 +164,11 @@ public class InvasionAxisMap
         // e relativo ao leque de cada slot). Recomputa as frentes dos eixos afetados.
         if (applyOverrides)
         {
-            int teamSlot = -1;
-            foreach (ConstructionManager hq in allHqs)
-                if (hq != null && hq.TeamId == team) { teamSlot = hq.SlotIndex; break; }
-            map.ApplyEixoOverrides(board, team, teamSlot);
+            map.ApplyEixoOverrides(board, slotId);
         }
 
         // 4o eixo: INVASAO (HQ -> QG inimigo). Append depois da numeracao (rally = 1..N, invasao = N+1).
-        map.AppendInvasionAxis(board, team, allHqs);
+        map.AppendInvasionAxis(board, slotId, team, allHqs);
 
         return map;
     }
@@ -177,21 +177,22 @@ public class InvasionAxisMap
     // A base e excluida dos eixos rally e recebe este eixo descritivo dedicado.
     // fica "fora de eixo" (GetEixo==0) e o builder de transporte nao gera demanda — entao a leva do
     // A demanda de APC permanece separada e so abre durante GoGreen/IsInvading.
-    private void AppendInvasionAxis(Tilemap board, TeamId team, List<ConstructionManager> allHqs)
+    private void AppendInvasionAxis(Tilemap board, PlayerSlotId slotId, TeamId team, List<ConstructionManager> allHqs)
     {
         if (board == null || allHqs == null)
             return;
 
         ConstructionManager hq = null;
         foreach (ConstructionManager h in allHqs)
-            if (h != null && h.TeamId == team) { hq = h; break; }
+            if (h != null && h.SlotIndex == slotId.Value) { hq = h; break; }
         if (hq == null)
             return;
 
         Vector3Int hqCell = hq.CurrentCellPosition; hqCell.z = 0;
 
         ConstructionSector plannedBase = ConstructionSector.None;
-        TeamObjectivePlan plan = ObjectiveManager.GetPlanForTeam(team);
+        TeamObjectivePlan plan = ObjectiveManager.GetPlanForSlot(
+            slotId);
         if (plan != null && plan.Objectives != null)
             foreach (SectorObjective obj in plan.Objectives)
                 if (obj != null && obj.ObjectiveType == AIObjectiveType.InvasionAttack)
@@ -200,9 +201,9 @@ public class InvasionAxisMap
                     break;
                 }
 
-        ConstructionManager enemyHq = FindNearestEnemyHq(allHqs, team, hqCell, plannedBase);
+        ConstructionManager enemyHq = FindNearestEnemyHq(allHqs, slotId, hqCell, plannedBase);
         if (enemyHq == null && plannedBase != ConstructionSector.None)
-            enemyHq = FindNearestEnemyHq(allHqs, team, hqCell, ConstructionSector.None);
+            enemyHq = FindNearestEnemyHq(allHqs, slotId, hqCell, ConstructionSector.None);
         if (enemyHq == null || sectorToEixo.ContainsKey(enemyHq.Sector))
             return;
 
@@ -233,7 +234,7 @@ public class InvasionAxisMap
 
     private static ConstructionManager FindNearestEnemyHq(
         List<ConstructionManager> allHqs,
-        TeamId team,
+        PlayerSlotId slotId,
         Vector3Int hqCell,
         ConstructionSector requiredSector)
     {
@@ -241,7 +242,7 @@ public class InvasionAxisMap
         float bestDistance = float.MaxValue;
         foreach (ConstructionManager candidate in allHqs)
         {
-            if (candidate == null || candidate.TeamId == team)
+            if (candidate == null || candidate.SlotIndex == slotId.Value)
                 continue;
             if (requiredSector != ConstructionSector.None && candidate.Sector != requiredSector)
                 continue;
@@ -319,7 +320,7 @@ public class InvasionAxisMap
     // Caminha o corredor de HQ pra fora e acha a frente: o primeiro setor ainda nao
     // conquistado pelo time. Se todo o corredor ja e nosso, a frente e o setor do rally;
     // se ate o rally for nosso, o eixo esta completo.
-    private static void ComputeFront(Axis axis, TeamId team)
+    private static void ComputeFront(Axis axis, PlayerSlotId slotId)
     {
         axis.FrontIndex = -1;
         axis.FrontSector = ConstructionSector.None;
@@ -327,7 +328,7 @@ public class InvasionAxisMap
 
         for (int i = 0; i < axis.Corridor.Count; i++)
         {
-            if (!IsOwnedBy(axis.Corridor[i], team))
+            if (!IsOwnedBy(axis.Corridor[i], slotId))
             {
                 axis.FrontIndex = i;
                 axis.FrontSector = axis.Corridor[i];
@@ -335,7 +336,7 @@ public class InvasionAxisMap
             }
         }
 
-        if (!IsOwnedBy(axis.RallySector, team))
+        if (!IsOwnedBy(axis.RallySector, slotId))
         {
             axis.FrontIndex = axis.Corridor.Count;
             axis.FrontSector = axis.RallySector;
@@ -346,24 +347,24 @@ public class InvasionAxisMap
         axis.Complete = true;
     }
 
-    private static bool IsOwnedBy(ConstructionSector sector, TeamId team)
+    private static bool IsOwnedBy(ConstructionSector sector, PlayerSlotId slotId)
     {
         return SectorManager.TryGetSectorInfo(sector, out SectorManager.SectorInfo info)
-            && info != null && info.ControllingTeam == team;
+            && info != null && info.ControllingSlotIndex == slotId.Value;
     }
 
     // Aplica os overrides manuais de eixo (ConstructionManager.OverrideEixo), depois da numeracao.
     // Para cada setor forcado: remove do corredor atual e, se o eixo-alvo (1..N) existe, insere no
     // corredor dele em ordem de distancia ao HQ (mantem "sempre pra frente"). Override 0 ou eixo
     // inexistente => fora de eixo (rogue). Setores de rally nao podem ser reatribuidos (sao o eixo).
-    private void ApplyEixoOverrides(Tilemap board, TeamId team, int teamSlot)
+    private void ApplyEixoOverrides(Tilemap board, PlayerSlotId slotId)
     {
         Dictionary<ConstructionSector, int> overrides = null;
         foreach (ConstructionManager c in GetConstructions())
         {
             if (c == null || !c.HasEixoOverride) continue;
             // Resolve a entrada da LISTA aplicavel a este slot (exato > -1). Sem entrada: nao mexe.
-            if (!c.TryGetEixoOverride(teamSlot, out int eixoForSlot)) continue;
+            if (!c.TryGetEixoOverride(slotId.Value, out int eixoForSlot)) continue;
             ConstructionSector sec = c.Sector;
             if (sec == ConstructionSector.None || ConstructionSectorHelper.IsBase(sec)) continue;
             overrides ??= new Dictionary<ConstructionSector, int>();
@@ -398,7 +399,7 @@ public class InvasionAxisMap
 
         if (changed)
             foreach (Axis ax in axes)
-                ComputeFront(ax, team);
+                ComputeFront(ax, slotId);
     }
 
     // Insere o setor no corredor mantendo a ordem por distancia (world) do HQ ao setor, igual ao

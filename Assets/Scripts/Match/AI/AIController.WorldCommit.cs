@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using UnityEngine;
 
 public partial class AIController
@@ -12,7 +12,7 @@ public partial class AIController
         if (refreshFoW)
             matchController?.RefreshFogOfWarForActiveTeam(FogOfWarRefreshMode.DataOnly);
 
-        TeamObjectivePlan plan = ObjectiveManager.GetPlanForTeam(aiTeam);
+        TeamObjectivePlan plan = ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(ResolveAISlotKey(aiTeam)));
         int turnNumber = matchController != null ? matchController.CurrentTurn : 0;
         int removed = InvalidateStaleObjectivesLight(plan, aiTeam, turnNumber);
 
@@ -139,13 +139,15 @@ public partial class AIController
         Debug.Log($"[AI Commit Heavy] Sync2: {(Time.realtimeSinceStartup - tSync2) * 1000f:F0}ms");
 
         float tSnapshot = Time.realtimeSinceStartup;
-        AIWorldSnapshot snapshot = AIWorldSnapshot.Build(aiTeam, matchController);
+        AIWorldSnapshot snapshot = AIWorldSnapshot.Build(
+            PlayerSlotId.FromIndex(currentAISlotIndex),
+            matchController);
         Debug.Log($"[AI Commit Heavy] AIWorldSnapshot.Build: {(Time.realtimeSinceStartup - tSnapshot) * 1000f:F0}ms");
 
         if (rebuildPlan)
         {
             BuildObjectivePlan(snapshot);
-            AITacticalAnalyzer.Instance?.Rebuild(aiTeam, snapshot, ObjectiveManager.GetPlanForTeam(aiTeam));
+            AITacticalAnalyzer.Instance?.Rebuild(snapshot, ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(ResolveAISlotKey(aiTeam))));
         }
 
         Debug.Log($"[AI Commit Heavy][T{snapshot.TurnNumber}][{TeamUtils.GetName(aiTeam)}] reason={reason} units={snapshot.MyUnits.Count} enemies={snapshot.EnemyUnits.Count} total={( Time.realtimeSinceStartup - tHeavy) * 1000f:F0}ms");

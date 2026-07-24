@@ -2492,7 +2492,9 @@ public partial class TurnStateManager
     {
         int snapshotHash = BuildUnitSnapshotHash(unit, boardMap);
         int globalBoardRevision = ThreatRevisionTracker.GlobalBoardRevision;
-        int teamObserverRevision = ThreatRevisionTracker.GetTeamObserverRevision(unit != null ? unit.TeamId : TeamId.Neutral);
+        int teamObserverRevision = unit != null
+            ? ThreatRevisionTracker.GetSlotObserverRevision(PlayerSlotId.FromIndex(unit.SlotIndex))
+            : 0;
         int matchFlagsHash = ThreatRevisionTracker.MatchFlagsHash;
 
         // Mantem consistencia mesmo em contextos antigos sem sincronizacao externa.
@@ -2806,18 +2808,17 @@ public partial class TurnStateManager
             if (matchController != null && !matchController.IsCellVisibleInFogPresentation(currentCell))
                 return;
 
-            int activeTeamId = matchController != null ? matchController.ActiveTeamId : -1;
-            TeamId activeTeam = activeTeamId >= 0 ? (TeamId)activeTeamId : TeamId.Neutral;
+            int activeSlotIndex = matchController != null ? matchController.ActiveSlotId.Value : -1;
 
             UnitManager unit = FindUnitAtCell(currentCell);
             if (unit != null)
             {
                 string unitName = ResolveUnitRuntimeName(unit);
-                bool isAlly = (int)unit.TeamId == activeTeamId;
+                bool isAlly = unit.SlotIndex == activeSlotIndex;
                 bool canAct = isAlly && !unit.HasActed;
                 
                 HelpHintId hint = canAct ? HelpHintId.Act : HelpHintId.Inspect;
-                DialogManager.Instance?.TryShowHint(activeTeam, hint, unitName);
+                DialogManager.Instance?.TryShowHint(PlayerSlotId.FromIndex(activeSlotIndex), hint, unitName);
             }
             else
             {
@@ -2828,11 +2829,11 @@ public partial class TurnStateManager
                         ? construction.ConstructionDisplayName 
                         : construction.name;
                     
-                    HelpHintId hint = construction.CanProduceUnitsForTeam(activeTeam) 
+                    HelpHintId hint = construction.CanProduceUnitsForSlot(activeSlotIndex)
                         ? HelpHintId.Produce 
                         : HelpHintId.Construction;
 
-                    DialogManager.Instance?.TryShowHint(activeTeam, hint, constructionName);
+                    DialogManager.Instance?.TryShowHint(PlayerSlotId.FromIndex(activeSlotIndex), hint, constructionName);
                 }
 
                 bool hasLocation = terrainTilemap != null && terrainTilemap.HasTile(currentCell);

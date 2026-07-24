@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -454,21 +454,21 @@ public partial class AIController
     // Returns the effective transport slot threshold for the current map.
     // If the farthest capturable sector is closer than MinDistanceForTransportSlot,
     // the threshold adapts so transport slots are still created and shuttle candidates still qualify.
-    public int GetEffectiveTransportThreshold(TeamId aiTeam)
+    public int GetEffectiveTransportThresholdForSlot(PlayerSlotId aiSlot)
     {
         int maxDist = 0;
         foreach (SectorManager.SectorInfo info in SectorManager.GetAllSectorInfos())
         {
-            if (info.IsFullyControlled && info.ControllingTeam == aiTeam) continue;
-            int d = Mathf.RoundToInt(info.GetDistanceToHQ(aiTeam));
+            if (info.IsFullyControlled && info.ControllingSlotIndex == aiSlot.Value) continue;
+            int d = Mathf.RoundToInt(info.GetDistanceToHQ(aiSlot));
             if (d > maxDist) maxDist = d;
         }
         // Include enemy base sectors so threshold stays at MinDistanceForTransportSlot in late
         // game when all regular sectors are captured (maxDist would otherwise collapse to 0).
         foreach (SectorManager.SectorInfo baseInfo in SectorManager.GetAllBaseInfos())
         {
-            if (FindHQTeamInSector(baseInfo.Sector) == aiTeam) continue;
-            int d = Mathf.RoundToInt(baseInfo.GetDistanceToHQ(aiTeam));
+            if (baseInfo.ControllingSlotIndex == aiSlot.Value) continue;
+            int d = Mathf.RoundToInt(baseInfo.GetDistanceToHQ(aiSlot));
             if (d > maxDist) maxDist = d;
         }
         return Mathf.Min(MinDistanceForTransportSlot, Mathf.Max(3, maxDist));

@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -289,7 +289,7 @@ public partial class AIController
         {
             if (enemy == null || enemy.SlotIndex == ResolveAISlotKey(aiTeam) || enemy.IsDead || enemy.IsEmbarked)
                 continue;
-            if (mc != null && !mc.IsUnitVisibleForTeamNoCache(enemy, aiTeam))
+            if (mc != null && !mc.IsUnitVisibleForSlotNoCache(enemy, PlayerSlotId.FromIndex(currentAISlotIndex)))
                 continue;
 
             Vector3Int ec = enemy.CurrentCellPosition;

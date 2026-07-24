@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -77,7 +77,7 @@ public partial class AIController
         if (TryFindHomeProductionVacateCombatAction(unit, snapshot, fromCell, paths, occupied, out PlayerAction assignedVacateAction))
             return assignedVacateAction;
 
-        TeamObjectivePlan escortPlan = ObjectiveManager.GetPlanForTeam(snapshot.AITeam);
+        TeamObjectivePlan escortPlan = ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(snapshot.AISlotIndex));
         bool inCorridor = escortPlan != null && IsAssaultEscortInCapturerCorridor(unit, fromCell, escortPlan, snapshot.AITeam);
         if (inCorridor)
         {
@@ -145,7 +145,7 @@ public partial class AIController
         if (unit == null || snapshot == null || paths == null || paths.Count == 0)
             return false;
 
-        TeamObjectivePlan plan = ObjectiveManager.GetPlanForTeam(snapshot.AITeam);
+        TeamObjectivePlan plan = ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(snapshot.AISlotIndex));
         if (plan == null || !IsOtherAssignedCapturerTarget(fromCell, unit, null, plan, snapshot.AITeam))
             return false;
 
@@ -166,7 +166,7 @@ public partial class AIController
                 continue;
 
             ConstructionManager construction = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, cell);
-            if (construction != null && construction.CanProduceUnitsForTeam(snapshot.AITeam))
+            if (construction != null && construction.CanProduceUnitsForSlot(snapshot.AISlotIndex))
                 continue;
 
             int pathCost = GetPathStepCount(paths, cell);
@@ -453,7 +453,7 @@ public partial class AIController
     {
         cell.z = 0;
         ConstructionManager construction = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, cell);
-        return construction != null && construction.CanProduceUnitsForTeam(aiTeam);
+        return construction != null && construction.CanProduceUnitsForSlot(AIController.ResolveAISlotKey(aiTeam));
     }
 
     private static bool IsGroundAntiAirOnlyAssault(UnitData data)
@@ -512,7 +512,7 @@ public partial class AIController
                 continue;
 
             ConstructionManager construction = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, cell);
-            if (construction != null && construction.CanProduceUnitsForTeam(snapshot.AITeam))
+            if (construction != null && construction.CanProduceUnitsForSlot(snapshot.AISlotIndex))
                 continue;
 
             foreach (UnitManager enemy in enemies)

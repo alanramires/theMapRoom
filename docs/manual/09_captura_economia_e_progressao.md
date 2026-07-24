@@ -60,11 +60,28 @@ Sua renda chega no início de cada turno, e vem de três camadas de território:
 
 O **Quartel General** rende 3.000 por turno. É a sua fonte primária, e ela existe enquanto você existir.
 
-A **infraestrutura pesada** é a camada secundária — a que você defende ou toma. Fábrica Pesada e Aeroporto Avançado rendem 2.000; Fábrica Leve, Fábrica, Aeroporto e Porto Naval rendem 1.500.
+A **infraestrutura pesada** é a camada secundária — a que você defende ou toma. Fábrica Pesada e Aeroporto Avançado rendem 2.500; Fábrica Média rende 2.000; Fábrica Leve, Aeroporto e Porto Naval rendem 1.500.
 
 As **cidades** rendem 1.000 cada, ao lado de Estação de Trem, Hidrobase e Docas. É a camada terciária, e a principal fonte de crescimento durante a partida, conforme sua infantaria conquista o tabuleiro. Barracks e Terminal Rodoviário rendem 500 — são posição e serviço, não economia.
 
 Os valores acima são atributos de cada construção, não constantes do jogo: um cenário pode redefini-los prédio a prédio. A tabela completa está no apêndice de construções.
+
+#### A Proporção do Jogo Base
+
+Existe uma regularidade por trás desses números, e ela vale conhecer — sobretudo se você for criar cenários. No arsenal atual, **a renda de uma construção é sempre os pontos de captura dela multiplicados por 50**, sem uma única exceção:
+
+| Pontos de captura | Renda | Construções |
+|---:|---:|---|
+| 10 | 500 | Barracks · Terminal Rodoviário |
+| 20 | 1.000 | Cidade · Estação de Trem · Docas · Hidrobase |
+| 30 | 1.500 | Aeroporto · Porto Naval · Fábrica Leve |
+| 40 | 2.000 | Fábrica Média |
+| 50 | 2.500 | Fábrica Pesada · Aeroporto Avançado |
+| 60 | 3.000 | Quartel General |
+
+**Isso não é uma regra do motor.** Nada impede um cenário de dar renda alta a um prédio de captura rápida, e o sistema não vai reclamar. É a proporção que o jogo base escolheu, e ela existe para manter honesto o preço da conquista: o que rende mais custa mais tempo de infantaria parada e exposta para tomar. Renda e risco andam juntos.
+
+Se você for modificar valores, use isso como âncora. Quebrar a proporção é uma decisão legítima de design — mas é uma decisão, não um descuido.
 
 Isso dá uma escala para os preços que você viu: um turno de renda de uma cidade paga aproximadamente um esquadrão de Soldados. Um esquadrão de Soldados custa cerca de um terço do que o seu Quartel General rende por turno. E um caça de ponta custa vários turnos de renda inteira.
 

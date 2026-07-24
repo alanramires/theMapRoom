@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -38,7 +38,7 @@ public partial class AIController
         HashSet<Vector3Int> occupied)
     {
         TeamId aiTeam = snapshot.AITeam;
-        TeamObjectivePlan plan = ObjectiveManager.GetPlanForTeam(aiTeam);
+        TeamObjectivePlan plan = ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(ResolveAISlotKey(aiTeam)));
 
         // ---- Tier 1 & 2: safe construction (no nearby enemies) ----
         var occupiedForSearch = new HashSet<Vector3Int>(occupied) { fromCell };

@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -130,7 +130,7 @@ public partial class AIController
             if (hqOccupant != null && hqOccupant.SlotIndex != snapshot.AISlotIndex)
             {
                 MatchController mc = GetMatchController();
-                if (mc == null || !mc.IsUnitVisibleForTeam(hqOccupant, snapshot.AITeam))
+                if (mc == null || !mc.IsUnitVisibleForSlot(hqOccupant, PlayerSlotId.FromIndex(snapshot.AISlotIndex)))
                 {
                     if (TryFindBestLoSCell(unit, paths, occupied, target, out Vector3Int dpqCell))
                     {
@@ -152,7 +152,7 @@ public partial class AIController
             foreach (UnitManager enemy in UnitManager.AllActive)
             {
                 if (enemy.SlotIndex == snapshot.AISlotIndex || enemy.IsDead || enemy.IsEmbarked) continue;
-                if (mcAdv != null && !mcAdv.IsUnitVisibleForTeam(enemy, snapshot.AITeam)) continue;
+                if (mcAdv != null && !mcAdv.IsUnitVisibleForSlot(enemy, PlayerSlotId.FromIndex(snapshot.AISlotIndex))) continue;
                 foreach (Vector3Int cell in paths.Keys)
                 {
                     if (occupied.Contains(cell)) continue;

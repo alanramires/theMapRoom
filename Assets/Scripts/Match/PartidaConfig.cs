@@ -128,9 +128,8 @@ public static class PartidaConfig
         mc.SetGameSetupPreset(Preset);
         for (int i = 0; i < PlayerCount; i++)
         {
-            TeamId team = (Teams != null && i < Teams.Length) ? Teams[i] : TeamId.Green;
             bool cmdAuto = (CommandServiceAutomatic != null && i < CommandServiceAutomatic.Length) ? CommandServiceAutomatic[i] : false;
-            mc.SetPlayerCommandServiceAutomatic(team, cmdAuto);
+            mc.SetPlayerCommandServiceAutomatic(PlayerSlotId.FromIndex(i), cmdAuto);
         }
     }
 

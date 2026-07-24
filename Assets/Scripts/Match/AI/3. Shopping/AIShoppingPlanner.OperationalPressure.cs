@@ -64,7 +64,7 @@ public partial class AIShoppingPlanner
             ? AIController.Instance.CurrentAxisMap
             : null;
         if (map == null || map.Team != snapshot.AITeam)
-            map = InvasionAxisMap.Build(snapshot.AITeam);
+            map = InvasionAxisMap.Build(PlayerSlotId.FromIndex(snapshot.AISlotIndex));
         if (map == null)
             return;
 
@@ -117,7 +117,7 @@ public partial class AIShoppingPlanner
                 depth = SectorManager.HexDistance(axis.HqCell, axis.RallyCell);
             else if (target != ConstructionSector.None
                 && SectorManager.TryGetSectorInfo(target, out SectorManager.SectorInfo info))
-                depth = info.GetDistanceToHQ(snapshot.AITeam);
+                depth = info.GetDistanceToHQ(PlayerSlotId.FromIndex(snapshot.AISlotIndex));
 
             int assigned = CountAxisGroundTransports(snapshot, axis.EixoIndex);
             int desired;

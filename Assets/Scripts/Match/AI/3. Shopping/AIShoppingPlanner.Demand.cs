@@ -447,7 +447,8 @@ public partial class AIShoppingPlanner
         AITacticalAnalyzer mgr = AITacticalAnalyzer.Instance;
         if (mgr == null) return 0;
         int count = 0;
-        foreach (AITacticalNeed op in mgr.GetOperationsForTeam(aiTeam))
+        foreach (AITacticalNeed op in mgr.GetOperationsForSlot(
+                     PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam))))
         {
             if (op.Type != AITacticalNeedType.SectorDefense) continue;
             if (op.CountOpenSlots(AINeedKind.Assault) > 0 || op.CountOpenSlots(AINeedKind.Artillery) > 0)
@@ -458,7 +459,7 @@ public partial class AIShoppingPlanner
 
     private static int CountOpenSlots(TeamId aiTeam, UnitRole role)
     {
-        TeamObjectivePlan plan = ObjectiveManager.GetPlanForTeam(aiTeam);
+        TeamObjectivePlan plan = ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam)));
         if (plan == null) return 0;
 
         int open = 0;
@@ -471,7 +472,7 @@ public partial class AIShoppingPlanner
     private static void CountSlots(TeamId aiTeam, UnitRole role, out int total, out int filled)
     {
         total = 0; filled = 0;
-        TeamObjectivePlan plan = ObjectiveManager.GetPlanForTeam(aiTeam);
+        TeamObjectivePlan plan = ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam)));
         if (plan == null) return;
         foreach (SectorObjective obj in plan.Objectives)
             foreach (SlotNeed slot in obj.Slots)
@@ -480,7 +481,7 @@ public partial class AIShoppingPlanner
 
     private static bool HasOpenDefensiveSlot(TeamId aiTeam)
     {
-        TeamObjectivePlan plan = ObjectiveManager.GetPlanForTeam(aiTeam);
+        TeamObjectivePlan plan = ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam)));
         if (plan == null) return false;
 
         foreach (SectorObjective obj in plan.Objectives)
@@ -585,7 +586,7 @@ public partial class AIShoppingPlanner
                 continue;
             if (!building.TryResolveConstructionData(out ConstructionData data) || data == null || !data.isAirport)
                 continue;
-            if (!building.CanProduceUnitsForTeam(building.TeamId))
+            if (!building.CanProduceUnitsForSlot(building.SlotIndex))
                 continue;
             if (building.OfferedUnits == null)
                 continue;
@@ -608,7 +609,7 @@ public partial class AIShoppingPlanner
         int cheapest = int.MaxValue;
         foreach (ConstructionManager building in snapshot.MyBuildings)
         {
-            if (building == null || !building.CanProduceUnitsForTeam(snapshot.AITeam))
+            if (building == null || !building.CanProduceUnitsForSlot(snapshot.AISlotIndex))
                 continue;
             if (building.OfferedUnits == null)
                 continue;
@@ -841,7 +842,7 @@ public partial class AIShoppingPlanner
         if (snapshot == null || snapshot.MyBuildings == null) return false;
         foreach (ConstructionManager building in snapshot.MyBuildings)
         {
-            if (building == null || !building.CanProduceUnitsForTeam(snapshot.AITeam)) continue;
+            if (building == null || !building.CanProduceUnitsForSlot(snapshot.AISlotIndex)) continue;
             if (building.OfferedUnits == null) continue;
             foreach (UnitData unit in building.OfferedUnits)
             {
@@ -861,7 +862,7 @@ public partial class AIShoppingPlanner
         int cheapest = int.MaxValue;
         foreach (ConstructionManager building in snapshot.MyBuildings)
         {
-            if (building == null || !building.CanProduceUnitsForTeam(snapshot.AITeam)) continue;
+            if (building == null || !building.CanProduceUnitsForSlot(snapshot.AISlotIndex)) continue;
             if (building.OfferedUnits == null) continue;
 
             foreach (UnitData unit in building.OfferedUnits)
@@ -886,7 +887,7 @@ public partial class AIShoppingPlanner
         int slots = 0;
         foreach (ConstructionManager building in snapshot.MyBuildings)
         {
-            if (building == null || !building.CanProduceUnitsForTeam(snapshot.AITeam)) continue;
+            if (building == null || !building.CanProduceUnitsForSlot(snapshot.AISlotIndex)) continue;
             if (building.OfferedUnits == null) continue;
 
             Vector3Int cell = building.CurrentCellPosition;
@@ -1143,7 +1144,7 @@ public partial class AIShoppingPlanner
         UnitData best = null;
         foreach (ConstructionManager building in snapshot.MyBuildings)
         {
-            if (building == null || !building.CanProduceUnitsForTeam(snapshot.AITeam))
+            if (building == null || !building.CanProduceUnitsForSlot(snapshot.AISlotIndex))
                 continue;
             if (building.OfferedUnits == null)
                 continue;
@@ -1348,7 +1349,7 @@ public partial class AIShoppingPlanner
         int availableProductionSlots = 0;
         foreach (ConstructionManager b in snapshot.MyBuildings)
         {
-            if (b == null || !b.CanProduceUnitsForTeam(snapshot.AITeam) || b.OfferedUnits == null)
+            if (b == null || !b.CanProduceUnitsForSlot(snapshot.AISlotIndex) || b.OfferedUnits == null)
                 continue;
             Vector3Int bc = b.CurrentCellPosition; bc.z = 0;
             if (!occupied.Contains(bc))
@@ -1519,7 +1520,7 @@ public partial class AIShoppingPlanner
         var buildings = new List<ConstructionManager>();
         foreach (ConstructionManager building in snapshot.MyBuildings)
         {
-            if (building == null || !building.CanProduceUnitsForTeam(snapshot.AITeam)
+            if (building == null || !building.CanProduceUnitsForSlot(snapshot.AISlotIndex)
                 || building.OfferedUnits == null || building.OfferedUnits.Count == 0)
                 continue;
             Vector3Int cell = building.CurrentCellPosition;
@@ -1883,7 +1884,7 @@ public partial class AIShoppingPlanner
         UnitData found = null;
         foreach (ConstructionManager building in snapshot.MyBuildings)
         {
-            if (building == null || !building.CanProduceUnitsForTeam(snapshot.AITeam)
+            if (building == null || !building.CanProduceUnitsForSlot(snapshot.AISlotIndex)
                 || building.OfferedUnits == null)
                 continue;
             Vector3Int cell = building.CurrentCellPosition;
@@ -1909,7 +1910,7 @@ public partial class AIShoppingPlanner
             return null;
         foreach (ConstructionManager building in snapshot.MyBuildings)
         {
-            if (building == null || !building.CanProduceUnitsForTeam(snapshot.AITeam)
+            if (building == null || !building.CanProduceUnitsForSlot(snapshot.AISlotIndex)
                 || building.OfferedUnits == null)
                 continue;
             foreach (UnitData unit in building.OfferedUnits)
@@ -1932,7 +1933,8 @@ public partial class AIShoppingPlanner
     {
         if (snapshot == null || snapshot.IncomePerTurn <= 0)
             return false;
-        bool rallyAssemblyActive = HasActiveRallyAssembly(snapshot.AITeam);
+        bool rallyAssemblyActive = HasActiveRallyAssembly(
+            PlayerSlotId.FromIndex(snapshot.AISlotIndex));
         foreach (AIShoppingDemand demand in demands)
             if (demand != null && demand.Count > 0
                 && (demand.Urgent
@@ -1942,9 +1944,9 @@ public partial class AIShoppingPlanner
         return HasOperationalCore(snapshot);
     }
 
-    public static bool HasActiveRallyAssembly(TeamId team)
+    public static bool HasActiveRallyAssembly(PlayerSlotId slotId)
     {
-        TeamObjectivePlan plan = ObjectiveManager.GetPlanForTeam(team);
+        TeamObjectivePlan plan = ObjectiveManager.GetPlanForSlot(slotId);
         if (plan?.Objectives == null)
             return false;
         foreach (SectorObjective objective in plan.Objectives)
@@ -2195,7 +2197,7 @@ public partial class AIShoppingPlanner
         foreach (ConstructionManager building in snapshot.MyBuildings)
         {
             if (building == null || usedBuildings.Contains(building)
-                || !building.CanProduceUnitsForTeam(snapshot.AITeam) || building.OfferedUnits == null)
+                || !building.CanProduceUnitsForSlot(snapshot.AISlotIndex) || building.OfferedUnits == null)
                 continue;
             Vector3Int cell = building.CurrentCellPosition; cell.z = 0;
             if (occupied.Contains(cell))
@@ -2257,7 +2259,7 @@ public partial class AIShoppingPlanner
         bool bestAvailableNow = false;
         foreach (ConstructionManager building in snapshot.MyBuildings)
         {
-            if (building == null || !building.CanProduceUnitsForTeam(snapshot.AITeam)
+            if (building == null || !building.CanProduceUnitsForSlot(snapshot.AISlotIndex)
                 || building.OfferedUnits == null)
                 continue;
 
@@ -2321,7 +2323,7 @@ public partial class AIShoppingPlanner
         int cheapestAvailable = int.MaxValue;
         foreach (ConstructionManager building in snapshot.MyBuildings)
         {
-            if (building == null || !building.CanProduceUnitsForTeam(snapshot.AITeam)
+            if (building == null || !building.CanProduceUnitsForSlot(snapshot.AISlotIndex)
                 || building.OfferedUnits == null)
                 continue;
             Vector3Int productionCell = building.CurrentCellPosition;
@@ -2415,7 +2417,9 @@ public partial class AIShoppingPlanner
         var demands = new List<AIShoppingDemand>();
         AIRosterKnowledge roster = BuildRosterKnowledge(snapshot, log);
         CounterPressureInspection counterPressure = BuildCounterPressure(snapshot, roster);
-        List<TacticalDeficit> deficits = AITacticalAnalyzer.Instance.GetDeficits(snapshot.AITeam, log);
+        List<TacticalDeficit> deficits = AITacticalAnalyzer.Instance.GetDeficits(
+            PlayerSlotId.FromIndex(snapshot.AISlotIndex),
+            log);
         SectorObjective rallyFireSupportFocus = FindRallyShoppingFocus(deficits);
         foreach (TacticalDeficit deficit in deficits)
         {
@@ -2539,7 +2543,8 @@ public partial class AIShoppingPlanner
         AddCounterPressureDemands(snapshot, demands, counterPressure, roster);
         bool groundCounterPressureCovered = counterPressure.AntiTank <= 0.05f
             && counterPressure.AntiInfantry <= 0.05f;
-        bool rallyAssemblyActive = HasActiveRallyAssembly(snapshot.AITeam);
+        bool rallyAssemblyActive = HasActiveRallyAssembly(
+            PlayerSlotId.FromIndex(snapshot.AISlotIndex));
         AddEliteQualityDemand(snapshot, demands, UnitRole.Assalto, assaults, 26,
             groundCounterPressureCovered, rallyAssemblyActive);
         AddEliteQualityDemand(snapshot, demands, UnitRole.FogoIndireto, fireSupport, 27,
@@ -2920,7 +2925,7 @@ public partial class AIShoppingPlanner
         foreach (ConstructionManager b in snapshot.MyBuildings)
         {
             if (b == null || usedBuildings.Contains(b)
-                || !b.CanProduceUnitsForTeam(snapshot.AITeam) || b.OfferedUnits == null)
+                || !b.CanProduceUnitsForSlot(snapshot.AISlotIndex) || b.OfferedUnits == null)
                 continue;
             Vector3Int cell = b.CurrentCellPosition; cell.z = 0;
             if (occupied.Contains(cell))
@@ -3075,7 +3080,7 @@ public partial class AIShoppingPlanner
         int tax = 0;
         foreach (ConstructionManager building in snapshot.MyBuildings)
         {
-            if (building == null || !building.CanProduceUnitsForTeam(snapshot.AITeam)
+            if (building == null || !building.CanProduceUnitsForSlot(snapshot.AISlotIndex)
                 || building.OfferedUnits == null)
                 continue;
             Vector3Int cell = building.CurrentCellPosition; cell.z = 0;
@@ -3111,7 +3116,7 @@ public partial class AIShoppingPlanner
         foreach (ConstructionManager building in snapshot.MyBuildings)
         {
             if (building == null || usedBuildings.Contains(building)
-                || !building.CanProduceUnitsForTeam(snapshot.AITeam) || building.OfferedUnits == null)
+                || !building.CanProduceUnitsForSlot(snapshot.AISlotIndex) || building.OfferedUnits == null)
                 continue;
             Vector3Int cell = building.CurrentCellPosition; cell.z = 0;
             if (occupied.Contains(cell))

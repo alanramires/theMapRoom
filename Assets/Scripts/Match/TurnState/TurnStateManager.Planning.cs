@@ -56,8 +56,8 @@ public partial class TurnStateManager
         if (turnStartRallyExecutionInProgress || turnStartRallyExecutionRoutine != null)
             return false;
 
-        TeamId team = matchController != null ? matchController.ActiveTeam : TeamId.Neutral;
-        if (!planningManager.HasActiveAssignmentsForTeam(team))
+        PlayerSlotId slot = matchController != null ? matchController.ActiveSlotId : PlayerSlotId.Invalid;
+        if (!planningManager.HasActiveAssignmentsForSlot(slot))
             return false;
 
         replayManager?.BeginTurnRecording();
@@ -75,9 +75,9 @@ public partial class TurnStateManager
 
         try
         {
-            TeamId team = matchController != null ? matchController.ActiveTeam : TeamId.Neutral;
+            PlayerSlotId slot = matchController != null ? matchController.ActiveSlotId : PlayerSlotId.Invalid;
             if (planningManager != null)
-                yield return planningManager.ExecuteTurnStartRallyPhase(team);
+                yield return planningManager.ExecuteTurnStartRallyPhase(slot);
         }
         finally
         {
@@ -180,5 +180,4 @@ public partial class TurnStateManager
         }
     }
 }
-
 

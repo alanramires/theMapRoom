@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -221,7 +221,7 @@ public partial class AIController
         UnitManager best = null;
         float bestDist = float.MaxValue;
         Vector3Int fromCell = capturer.CurrentCellPosition; fromCell.z = 0;
-        int pickupThreshold = Mathf.Max(4, GetEffectiveTransportThreshold(capturer.TeamId) / 2 + 1);
+        int pickupThreshold = Mathf.Max(4, GetEffectiveTransportThresholdForSlot(PlayerSlotId.FromIndex(capturer.SlotIndex)) / 2 + 1);
 
         foreach (UnitManager t in UnitManager.AllActive)
         {

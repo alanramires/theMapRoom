@@ -292,6 +292,8 @@ public class UnitData : ScriptableObject
 
     [Header("Logistics")]
     public bool isSupplier = false;
+    [Tooltip("Nasce com as reservas VAZIAS. Padrao: true. Desmarque para a unidade sair da compra ja carregada, o que so faz sentido quando a instalacao onde ela foi comprada teria o que dar (caminhao de suprimentos, aviao-tanque, porta-avioes, trem). Manter marcado preserva a cadeia logistica: quem nasce vazio precisa ser abastecido por outro elo.")]
+    public bool startsWithEmptySupplies = true;
     public SupplierTier supplierTier = SupplierTier.Hub;
     [Min(0)] public int maxUnitsServedPerTurn = 0;
     public SupplierRangeMode serviceRange = SupplierRangeMode.SameHexOrEmbarked;

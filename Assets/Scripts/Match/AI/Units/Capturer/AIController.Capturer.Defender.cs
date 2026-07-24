@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -9,7 +9,7 @@ public partial class AIController
 
     private PlayerAction DecideCapturerDefenderAction(UnitManager unit, AIWorldSnapshot snapshot, SectorObjective assigned, Vector3Int fromCell)
     {
-        TeamObjectivePlan activePlan = ObjectiveManager.GetPlanForTeam(snapshot.AITeam);
+        TeamObjectivePlan activePlan = ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(snapshot.AISlotIndex));
         if (!IsCriticalHomeDefenseObjective(assigned, snapshot.AITeam)
             && TryFindCriticalHomeDefenseObjectiveForUnit(activePlan, snapshot.AITeam, unit, fromCell, "Defensor", out SectorObjective criticalHome))
         {
@@ -53,7 +53,7 @@ public partial class AIController
             {
                 if (e == null || e.SlotIndex == snapshot.AISlotIndex || e.IsDead || e.IsEmbarked) continue;
                 Vector3Int ec = e.CurrentCellPosition; ec.z = 0;
-                if (mcRelease != null && !mcRelease.IsUnitVisibleForTeamNoCache(e, snapshot.AITeam))
+                if (mcRelease != null && !mcRelease.IsUnitVisibleForSlotNoCache(e, PlayerSlotId.FromIndex(snapshot.AISlotIndex)))
                     continue;
 
                 float sectorDist = SectorManager.HexDistance(ec, repCell);
@@ -177,7 +177,7 @@ public partial class AIController
             foreach (UnitManager enemy in UnitManager.AllActive)
             {
                 if (enemy.SlotIndex == snapshot.AISlotIndex || enemy.IsDead || enemy.IsEmbarked) continue;
-                if (mcZone != null && !mcZone.IsUnitVisibleForTeamNoCache(enemy, snapshot.AITeam)) continue;
+                if (mcZone != null && !mcZone.IsUnitVisibleForSlotNoCache(enemy, PlayerSlotId.FromIndex(snapshot.AISlotIndex))) continue;
                 Vector3Int ec = enemy.CurrentCellPosition; ec.z = 0;
                 if (SectorManager.HexDistance(ec, repCell) <= DefenseEnemyRange) zoneEnemies.Add(enemy);
             }
@@ -187,7 +187,7 @@ public partial class AIController
         foreach (UnitManager enemy in UnitManager.AllActive)
         {
             if (enemy.SlotIndex == snapshot.AISlotIndex || enemy.IsDead || enemy.IsEmbarked) continue;
-            if (mcLocal != null && !mcLocal.IsUnitVisibleForTeamNoCache(enemy, snapshot.AITeam)) continue;
+            if (mcLocal != null && !mcLocal.IsUnitVisibleForSlotNoCache(enemy, PlayerSlotId.FromIndex(snapshot.AISlotIndex))) continue;
             if (zoneEnemies.Contains(enemy)) continue;
 
             Vector3Int ec = enemy.CurrentCellPosition; ec.z = 0;
@@ -443,7 +443,7 @@ public partial class AIController
         foreach (UnitManager enemy in UnitManager.AllActive)
         {
             if (enemy.SlotIndex == snapshot.AISlotIndex || enemy.IsDead || enemy.IsEmbarked) continue;
-            if (mc != null && !mc.IsUnitVisibleForTeamNoCache(enemy, snapshot.AITeam)) continue;
+            if (mc != null && !mc.IsUnitVisibleForSlotNoCache(enemy, PlayerSlotId.FromIndex(snapshot.AISlotIndex))) continue;
 
             Vector3Int ec = enemy.CurrentCellPosition; ec.z = 0;
             if (SectorManager.HexDistance(ec, repCell) <= interceptRange)

@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -91,7 +91,7 @@ public partial class AIController
         Vector3Int fromCell = unit.CurrentCellPosition;
         fromCell.z = 0;
         ConstructionManager current = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, fromCell);
-        if (current == null || !current.CanProduceUnitsForTeam(snapshot.AITeam))
+        if (current == null || !current.CanProduceUnitsForSlot(snapshot.AISlotIndex))
             return false;
         if (!AreAllAffordableHomeProducersOccupied(snapshot, out int occupiedProducers, out int totalProducers, out int cheapestOffer))
             return false;
@@ -125,7 +125,7 @@ public partial class AIController
 
         foreach (ConstructionManager building in snapshot.MyBuildings)
         {
-            if (building == null || !building.CanProduceUnitsForTeam(snapshot.AITeam))
+            if (building == null || !building.CanProduceUnitsForSlot(snapshot.AISlotIndex))
                 continue;
             if (building.OfferedUnits == null || building.OfferedUnits.Count == 0)
                 continue;
@@ -176,7 +176,7 @@ public partial class AIController
             if (occupied != null && occupied.Contains(cell)) continue;
 
             ConstructionManager construction = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, cell);
-            if (construction != null && construction.CanProduceUnitsForTeam(snapshot.AITeam))
+            if (construction != null && construction.CanProduceUnitsForSlot(snapshot.AISlotIndex))
                 continue;
 
             int pathCost = GetPathStepCount(paths, cell);
@@ -210,7 +210,7 @@ public partial class AIController
 
         fromCell.z = 0;
         ConstructionManager current = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, fromCell);
-        if (current == null || !current.CanProduceUnitsForTeam(aiTeam))
+        if (current == null || !current.CanProduceUnitsForSlot(AIController.ResolveAISlotKey(aiTeam)))
             return false;
 
         if (unit.TryGetUnitData(out UnitData unitData) && unitData != null)
@@ -231,7 +231,7 @@ public partial class AIController
         {
             foreach (ConstructionManager bldg in snapshot.MyBuildings)
             {
-                if (bldg == current || bldg == null || !bldg.CanProduceUnitsForTeam(aiTeam)) continue;
+                if (bldg == current || bldg == null || !bldg.CanProduceUnitsForSlot(AIController.ResolveAISlotKey(aiTeam))) continue;
                 Vector3Int cell = bldg.CurrentCellPosition; cell.z = 0;
                 if (UnitOccupancyRules.GetUnitAtCell(boardTilemap, cell, null) == null)
                 {
@@ -276,7 +276,7 @@ public partial class AIController
             if (UnitRoleCompatibility.CanSatisfy(otherData, UnitRole.FogoIndireto)) continue;
             Vector3Int otherCell = other.CurrentCellPosition; otherCell.z = 0;
             ConstructionManager bldg = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, otherCell);
-            if (bldg != null && bldg.CanProduceUnitsForTeam(aiTeam))
+            if (bldg != null && bldg.CanProduceUnitsForSlot(AIController.ResolveAISlotKey(aiTeam)))
                 return true;
         }
         return false;
@@ -296,7 +296,7 @@ public partial class AIController
             if (!UnitRoleCompatibility.CanSatisfy(otherData, UnitRole.FogoIndireto)) continue;
             Vector3Int otherCell = other.CurrentCellPosition; otherCell.z = 0;
             ConstructionManager bldg = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, otherCell);
-            if (bldg == null || !bldg.CanProduceUnitsForTeam(aiTeam)) continue;
+            if (bldg == null || !bldg.CanProduceUnitsForSlot(AIController.ResolveAISlotKey(aiTeam))) continue;
             if (otherData.eliteLevel < myElite) return false;
             if (otherData.eliteLevel > myElite) continue;
             if (otherData.preferArtilleryModeBeforeCombatant && !myArtilleryMode) return false;
@@ -478,7 +478,7 @@ public partial class AIController
             if (occupied != null && occupied.Contains(cell)) continue;
 
             ConstructionManager bldg = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, cell);
-            bool blocksProduction = bldg != null && bldg.CanProduceUnitsForTeam(aiTeam);
+            bool blocksProduction = bldg != null && bldg.CanProduceUnitsForSlot(AIController.ResolveAISlotKey(aiTeam));
             float enemyDist = DistanceToNearestVisibleEnemy(cell, aiTeam);
             float dpq = GetTerrainDpqPontos(cell);
             int pathCost = GetPathStepCount(paths, cell);
@@ -557,7 +557,7 @@ public partial class AIController
         foreach (UnitManager enemy in UnitManager.AllActive)
         {
             if (enemy.SlotIndex == ResolveAISlotKey(aiTeam) || enemy.IsDead || enemy.IsEmbarked) continue;
-            if (mc != null && !mc.IsUnitVisibleForTeam(enemy, aiTeam)) continue;
+            if (mc != null && !mc.IsUnitVisibleForSlot(enemy, PlayerSlotId.FromIndex(ResolveAISlotKey(aiTeam)))) continue;
 
             Vector3Int enemyCell = enemy.CurrentCellPosition;
             enemyCell.z = 0;
@@ -577,7 +577,7 @@ public partial class AIController
         foreach (UnitManager enemy in UnitManager.AllActive)
         {
             if (enemy == null || enemy.SlotIndex == ResolveAISlotKey(aiTeam) || enemy.IsDead || enemy.IsEmbarked) continue;
-            if (mc != null && !mc.IsUnitVisibleForTeam(enemy, aiTeam)) continue;
+            if (mc != null && !mc.IsUnitVisibleForSlot(enemy, PlayerSlotId.FromIndex(ResolveAISlotKey(aiTeam)))) continue;
 
             Vector3Int cell = enemy.CurrentCellPosition;
             cell.z = 0;

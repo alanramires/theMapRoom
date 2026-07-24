@@ -155,8 +155,8 @@ public class PlanningPanelUI : MonoBehaviour
         if (planningManager == null)
             return;
 
-        TeamId activeTeam = ResolveActiveTeam();
-        IReadOnlyList<RallyPoint> points = planningManager.GetRallyPointsForTeam(activeTeam);
+        PlayerSlotId activeSlot = ResolveActiveSlot();
+        IReadOnlyList<RallyPoint> points = planningManager.GetRallyPointsForSlot(activeSlot);
         if (points == null || points.Count <= 0)
             return;
 
@@ -184,10 +184,10 @@ public class PlanningPanelUI : MonoBehaviour
         Refresh();
     }
 
-    private TeamId ResolveActiveTeam()
+    private PlayerSlotId ResolveActiveSlot()
     {
         MatchController match = FindAnyObjectByType<MatchController>();
-        return match != null ? match.ActiveTeam : TeamId.Neutral;
+        return match != null ? match.ActiveSlotId : PlayerSlotId.Invalid;
     }
 
     private void Refresh()
@@ -235,8 +235,8 @@ public class PlanningPanelUI : MonoBehaviour
         if (rallyPointsText == null || planningManager == null)
             return;
 
-        TeamId activeTeam = ResolveActiveTeam();
-        IReadOnlyList<RallyPoint> points = planningManager.GetRallyPointsForTeam(activeTeam);
+        PlayerSlotId activeSlot = ResolveActiveSlot();
+        IReadOnlyList<RallyPoint> points = planningManager.GetRallyPointsForSlot(activeSlot);
         int maxPerTeam = planningManager.Config != null ? Mathf.Max(1, planningManager.Config.maxRallyPointsPerTeam) : 5;
 
         StringBuilder sb = new StringBuilder();

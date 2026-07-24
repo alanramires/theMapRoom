@@ -117,7 +117,7 @@ public static class PodeCapturarSensor
             matchController = Object.FindAnyObjectByType<MatchController>();
         if (matchController != null && matchController.IsFogOfWarDebugEnabled &&
             !matchController.IsCellVisibleForActiveTeam(cell) &&
-            !matchController.IsCellExploredByTeam(selectedUnit.TeamId, cell))
+            !matchController.IsCellExploredBySlot(PlayerSlotId.FromIndex(selectedUnit.SlotIndex), cell))
         {
             reason = "Terreno ainda desconhecido.";
             return false;
@@ -136,7 +136,6 @@ public static class PodeCapturarSensor
             return false;
         }
 
-        TeamId unitTeam = selectedUnit.TeamId;
         if (selectedUnit.SlotIndex < 0)
         {
             reason = "Unidade neutra nao captura.";
@@ -162,7 +161,11 @@ public static class PodeCapturarSensor
         operationType = CaptureOperationType.CaptureEnemy;
         if (construction.TryResolveConstructionData(out ConstructionData constructionData))
         {
-            if (matchController != null && !matchController.CanCaptureConstruction(unitTeam, constructionData, out reason))
+            if (matchController != null &&
+                !matchController.CanCaptureConstruction(
+                    PlayerSlotId.FromIndex(selectedUnit.SlotIndex),
+                    constructionData,
+                    out reason))
             {
                 if (sensorLogs)
                     SensorLogGate.Log("PodeCapturarSensor", $"result blocked construction={construction.name} reason={reason}");

@@ -22,7 +22,7 @@ public partial class AIController
             _availableUnitsBuffer.Add(u);
         }
         _sortAiTeam = aiTeam;
-        _sortActivePlan = ObjectiveManager.GetPlanForTeam(aiTeam);
+        _sortActivePlan = ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(ResolveAISlotKey(aiTeam)));
         _availableUnitsBuffer.Sort(_availableUnitsComparison);
         return _availableUnitsBuffer;
     }
@@ -387,7 +387,7 @@ public partial class AIController
                 UnitManager target = opt != null ? opt.targetUnit : null;
                 if (target == null || target.SlotIndex == ResolveAISlotKey(aiTeam) || target.IsDead || target.IsEmbarked)
                     continue;
-                if (mc != null && !mc.IsUnitVisibleForTeam(target, aiTeam))
+                if (mc != null && !mc.IsUnitVisibleForSlot(target, PlayerSlotId.FromIndex(currentAISlotIndex)))
                     continue;
                 if (PassesAttackDecision(unit, target, cell, defensiveContext: false, out _))
                     return true;

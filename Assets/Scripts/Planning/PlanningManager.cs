@@ -86,10 +86,10 @@ public class PlanningManager : MonoBehaviour
         RefreshFlagsForActiveTeam();
     }
 
-    public bool HasActiveAssignmentsForTeam(TeamId team)
+    public bool HasActiveAssignmentsForSlot(PlayerSlotId slotId)
     {
         CleanupInvisibleAssignments();
-        int owner = (int)team;
+        int owner = slotId.Value;
         for (int i = 0; i < rallyAssignments.Count; i++)
         {
             RallyAssignment a = rallyAssignments[i];
@@ -328,9 +328,9 @@ public class PlanningManager : MonoBehaviour
         return true;
     }
 
-    public IReadOnlyList<RallyPoint> GetRallyPointsForTeam(TeamId team)
+    public IReadOnlyList<RallyPoint> GetRallyPointsForSlot(PlayerSlotId slotId)
     {
-        int owner = (int)team;
+        int owner = slotId.Value;
         List<RallyPoint> result = new List<RallyPoint>();
         for (int i = 0; i < rallyPoints.Count; i++)
         {
@@ -473,7 +473,7 @@ public class PlanningManager : MonoBehaviour
         PlanningDataChanged?.Invoke();
     }
 
-    public IEnumerator ExecuteTurnStartRallyPhase(TeamId activeTeam)
+    public IEnumerator ExecuteTurnStartRallyPhase(PlayerSlotId activeSlot)
     {
         TryAutoAssignReferences();
         turnStartRallyExecutionInProgress = true;
@@ -483,8 +483,8 @@ public class PlanningManager : MonoBehaviour
         int removedCount = 0;
 
         CleanupInvisibleAssignments();
-        List<RallyAssignment> list = BuildExecutionList(activeTeam);
-        Debug.Log($"[Rally][TurnStart] team={(int)activeTeam} assignments={list.Count}");
+        List<RallyAssignment> list = BuildExecutionList(activeSlot);
+        Debug.Log($"[Rally][TurnStart] slot={activeSlot.Value} assignments={list.Count}");
 
         for (int i = 0; i < list.Count; i++)
         {
@@ -493,11 +493,11 @@ public class PlanningManager : MonoBehaviour
                 continue;
 
             RallyPoint point = FindRallyPointById(assignment.rallyPointId);
-            if (point == null || !point.ativo || point.teamOwner != (int)activeTeam)
+            if (point == null || !point.ativo || point.teamOwner != activeSlot.Value)
                 continue;
 
             UnitManager unit = ResolveUnitByInstanceId(assignment.unitId);
-            if (!IsUnitFieldVisible(unit) || (int)unit.TeamId != (int)activeTeam)
+            if (!IsUnitFieldVisible(unit) || unit.SlotIndex != activeSlot.Value)
             {
                 RemoveSpecificAssignment(assignment, "unidade fora de campo");
                 removedCount++;
@@ -578,7 +578,7 @@ public class PlanningManager : MonoBehaviour
         turnStartRallyExecutionInProgress = false;
     }
 
-    private List<RallyAssignment> BuildExecutionList(TeamId activeTeam)
+    private List<RallyAssignment> BuildExecutionList(PlayerSlotId activeSlot)
     {
         List<RallyAssignment> result = new List<RallyAssignment>();
         for (int i = 0; i < rallyAssignments.Count; i++)
@@ -587,7 +587,7 @@ public class PlanningManager : MonoBehaviour
             if (a == null)
                 continue;
             RallyPoint p = FindRallyPointById(a.rallyPointId);
-            if (p == null || !p.ativo || p.teamOwner != (int)activeTeam)
+            if (p == null || !p.ativo || p.teamOwner != activeSlot.Value)
                 continue;
             result.Add(new RallyAssignment { rallyPointId = a.rallyPointId, unitId = a.unitId });
         }

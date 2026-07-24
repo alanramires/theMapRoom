@@ -20,8 +20,8 @@ public partial class AIController
         foreach (UnitManager u in allCapturers)
             if (!assignedIds.Contains(u.InstanceId)) freeCapturers.Add(u);
 
-        // No Hard, a retaguarda pode já estar preenchendo o segundo slot do mesmo objetivo.
-        // Portanto, ausência de capturadores livres não significa ausência de sucessor.
+        // No Hard, a retaguarda pode jï¿½ estar preenchendo o segundo slot do mesmo objetivo.
+        // Portanto, ausï¿½ncia de capturadores livres nï¿½o significa ausï¿½ncia de sucessor.
         if (freeCapturers.Count == 0 && !hardMode) return;
 
         for (int i = 0; i < plan.Objectives.Count; i++)
@@ -222,21 +222,21 @@ public partial class AIController
     {
         if (!SectorManager.TryGetSectorInfo(sector, out SectorManager.SectorInfo info)) return;
 
-        float myHQDist = info.GetDistanceToHQ(aiTeam);
+        float myHQDist = info.GetDistanceToHQ(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam)));
 
         ConstructionSector candidate     = ConstructionSector.None;
         float              candidateDist = float.MaxValue;
 
         if (info.ClosestNeighbor1 != default
             && SectorManager.TryGetSectorInfo(info.ClosestNeighbor1, out SectorManager.SectorInfo n1)
-            && n1.GetDistanceToHQ(aiTeam) > myHQDist)
+            && n1.GetDistanceToHQ(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam))) > myHQDist)
         {
             candidate     = info.ClosestNeighbor1;
             candidateDist = info.ClosestNeighbor1Distance;
         }
         else if (info.ClosestNeighbor2 != default
             && SectorManager.TryGetSectorInfo(info.ClosestNeighbor2, out SectorManager.SectorInfo n2)
-            && n2.GetDistanceToHQ(aiTeam) > myHQDist)
+            && n2.GetDistanceToHQ(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam))) > myHQDist)
         {
             candidate     = info.ClosestNeighbor2;
             candidateDist = info.ClosestNeighbor2Distance;
@@ -295,14 +295,14 @@ public partial class AIController
             return campaignForward;
 
         if (!SectorManager.TryGetSectorInfo(sector, out SectorManager.SectorInfo info)) return ConstructionSector.None;
-        float myHQDist = info.GetDistanceToHQ(aiTeam);
+        float myHQDist = info.GetDistanceToHQ(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam)));
         if (info.ClosestNeighbor1 != default
             && SectorManager.TryGetSectorInfo(info.ClosestNeighbor1, out SectorManager.SectorInfo n1)
-            && n1.GetDistanceToHQ(aiTeam) > myHQDist)
+            && n1.GetDistanceToHQ(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam))) > myHQDist)
             return info.ClosestNeighbor1;
         if (info.ClosestNeighbor2 != default
             && SectorManager.TryGetSectorInfo(info.ClosestNeighbor2, out SectorManager.SectorInfo n2)
-            && n2.GetDistanceToHQ(aiTeam) > myHQDist)
+            && n2.GetDistanceToHQ(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam))) > myHQDist)
             return info.ClosestNeighbor2;
         return ConstructionSector.None;
     }

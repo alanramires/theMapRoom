@@ -9,10 +9,10 @@ public partial class AIController
 
     private static int CalculateSectorPriority(SectorManager.SectorInfo info, TeamId aiTeam, AIStance stance = AIStance.Tactical)
     {
-        float distToAI = info.GetDistanceToHQ(aiTeam);
+        float distToAI = info.GetDistanceToHQ(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam)));
         if (distToAI == float.MaxValue) return 0;
 
-        SectorManager.SectorRiskLevel risk = info.GetRiskLevelFor(aiTeam);
+        SectorManager.SectorRiskLevel risk = info.GetRiskLevelFor(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam)));
 
         int riskBonus;
         switch (risk)
@@ -124,7 +124,7 @@ public partial class AIController
             return false;
         if (macro.Phase != AIMacroTerritoryPhase.EarlyExpansion)
             return false;
-        if (AISectorIntentAnalyzer.ClassifyRelation(aiTeam, info) != AISectorRelation.EnemyNatural)
+        if (AISectorIntentAnalyzer.ClassifyRelation(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam)), info) != AISectorRelation.EnemyNatural)
             return false;
         if (info.IsDisputed || info.HasPartialCapture)
             return false;
@@ -150,7 +150,7 @@ public partial class AIController
         requiredRearSector = ConstructionSector.None;
         if (info == null)
             return false;
-        if (AISectorIntentAnalyzer.ClassifyRelation(aiTeam, info) != AISectorRelation.EnemyNatural)
+        if (AISectorIntentAnalyzer.ClassifyRelation(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam)), info) != AISectorRelation.EnemyNatural)
             return false;
 
         if (TryGetRequiredCampaignPredecessor(info.Sector, aiTeam, out ConstructionSector campaignRear))
@@ -182,7 +182,7 @@ public partial class AIController
             return true;
         }
 
-        float myHQDist = info.GetDistanceToHQ(aiTeam);
+        float myHQDist = info.GetDistanceToHQ(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam)));
         float bestDist = float.MinValue;
         if (TryRearNeighborAvailable(info.ClosestNeighbor1, myHQDist, plan, aiTeam, ref bestDist, out ConstructionSector rear1))
             rearSector = rear1;
@@ -204,7 +204,7 @@ public partial class AIController
         if (sector == ConstructionSector.None || !SectorManager.TryGetSectorInfo(sector, out SectorManager.SectorInfo rearInfo))
             return false;
 
-        float rearDist = rearInfo.GetDistanceToHQ(aiTeam);
+        float rearDist = rearInfo.GetDistanceToHQ(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam)));
         if (rearDist >= currentHQDistance || rearDist <= bestDist)
             return false;
 
@@ -235,13 +235,13 @@ public partial class AIController
         if (info == null)
             return false;
 
-        float myHQDist = info.GetDistanceToHQ(aiTeam);
+        float myHQDist = info.GetDistanceToHQ(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam)));
         float bestDist = float.MinValue;
 
         if (info.ClosestNeighbor1 != default
             && SectorManager.TryGetSectorInfo(info.ClosestNeighbor1, out SectorManager.SectorInfo n1))
         {
-            float d = n1.GetDistanceToHQ(aiTeam);
+            float d = n1.GetDistanceToHQ(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam)));
             if (d < myHQDist && d > bestDist)
             {
                 rearInfo = n1;
@@ -252,7 +252,7 @@ public partial class AIController
         if (info.ClosestNeighbor2 != default
             && SectorManager.TryGetSectorInfo(info.ClosestNeighbor2, out SectorManager.SectorInfo n2))
         {
-            float d = n2.GetDistanceToHQ(aiTeam);
+            float d = n2.GetDistanceToHQ(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam)));
             if (d < myHQDist && d > bestDist)
             {
                 rearInfo = n2;
@@ -393,7 +393,7 @@ public partial class AIController
             return false;
         if (info.HasPartialCapture || info.IsDisputed)
             return false;
-        if (AISectorIntentAnalyzer.ClassifyRelation(aiTeam, info) != AISectorRelation.OwnNatural)
+        if (AISectorIntentAnalyzer.ClassifyRelation(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam)), info) != AISectorRelation.OwnNatural)
             return false;
         if (IsHotPlanIntelSector(FindIntelForSector(intel, obj.Sector)))
             return false;
@@ -409,8 +409,8 @@ public partial class AIController
 
         if (TryGetAnySectorInfo(obj.Sector, out SectorManager.SectorInfo info))
         {
-            score += Mathf.Clamp(20f - info.GetDistanceToHQ(aiTeam), 0f, 20f);
-            score -= info.GetRiskRatioFor(aiTeam) * 50f;
+            score += Mathf.Clamp(20f - info.GetDistanceToHQ(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam))), 0f, 20f);
+            score -= info.GetRiskRatioFor(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam))) * 50f;
         }
 
         foreach (SlotNeed slot in obj.Slots)

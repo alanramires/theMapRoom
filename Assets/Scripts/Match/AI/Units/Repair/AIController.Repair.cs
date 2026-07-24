@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -181,7 +181,7 @@ public partial class AIController
     {
         if (c == null || c.SlotIndex != ResolveAISlotKey(aiTeam)
             || !IsBaseClusterConstruction(c)
-            || !c.CanProduceUnitsForTeam(aiTeam) || c.OfferedUnits == null)
+            || !c.CanProduceUnitsForSlot(AIController.ResolveAISlotKey(aiTeam)) || c.OfferedUnits == null)
             return false;
         foreach (UnitData u in c.OfferedUnits)
             if (u != null && u.militaryForce == MilitaryForce.Army)
@@ -257,7 +257,7 @@ public partial class AIController
             return false;
 
         Vector3Int anchor = fromCell;
-        TeamObjectivePlan plan = ObjectiveManager.GetPlanForTeam(snapshot.AITeam);
+        TeamObjectivePlan plan = ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(snapshot.AISlotIndex));
         SectorObjective assigned = ResolveAssignedFireSupportObjective(unit, plan);
         if (assigned != null)
             anchor = ResolveFireSupportObjectiveAnchor(assigned, snapshot.AITeam, fromCell);
@@ -354,7 +354,7 @@ public partial class AIController
             return repairPassengerRelease;
         }
 
-        TeamObjectivePlan capBlockPlan = ObjectiveManager.GetPlanForTeam(aiTeam);
+        TeamObjectivePlan capBlockPlan = ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(ResolveAISlotKey(aiTeam)));
         bool isBlockingCapTarget = capBlockPlan != null && IsBlockingCaptureTarget(unit, capBlockPlan, aiTeam);
         if (isBlockingCapTarget)
             Debug.Log($"{TL("Repair")} {unit.InstanceId} em {fromCell} bloqueia capturador designado — priorizando saida do predio");
@@ -385,7 +385,7 @@ public partial class AIController
             && currentBldg.SlotIndex == ResolveAISlotKey(aiTeam) && currentBldg.CurrentCapturePoints >= currentBldg.CapturePointsMax
             && !(rejectBaseCluster && IsBaseClusterConstruction(currentBldg))
             && !(conscriptionBan && IsConscriptionClosedProducerConstruction(currentBldg, aiTeam))
-            && !(logisticsProducerBan && currentBldg.CanProduceUnitsForTeam(aiTeam)))
+            && !(logisticsProducerBan && currentBldg.CanProduceUnitsForSlot(AIController.ResolveAISlotKey(aiTeam))))
         {
             bool safe = IsRepairConstructionSectorSafe(currentBldg, aiTeam)
                 && !HasNearbyVisibleEnemy(fromCell, aiTeam, DefenseEnemyRange);
@@ -464,7 +464,7 @@ public partial class AIController
         if (unit.TryGetUnitData(out UnitData fuseData) && fuseData.fuseWhileInRepair)
         {
             var defensiveRepCells = new HashSet<Vector3Int>();
-            TeamObjectivePlan fusePlan = ObjectiveManager.GetPlanForTeam(aiTeam);
+            TeamObjectivePlan fusePlan = ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(ResolveAISlotKey(aiTeam)));
             if (fusePlan != null)
                 foreach (SectorObjective obj in fusePlan.Objectives)
                 {
@@ -656,7 +656,7 @@ public partial class AIController
         // Reserva de defesa NÃO entra em "ocupado" (exclusão dura) — vira penalidade de score, e só
         // existe se o objetivo tiver um defensor vivo que ainda pode chegar lá neste turno.
         var defenseReservedCells = new Dictionary<Vector3Int, int>();
-        TeamObjectivePlan repPlan = ObjectiveManager.GetPlanForTeam(aiTeam);
+        TeamObjectivePlan repPlan = ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(ResolveAISlotKey(aiTeam)));
         if (repPlan != null)
             foreach (SectorObjective obj in repPlan.Objectives)
             {
@@ -719,7 +719,7 @@ public partial class AIController
 
         if (ShouldPreferRepairEvac(unit, fromCell, aiTeam))
         {
-            TeamObjectivePlan repairPlan = ObjectiveManager.GetPlanForTeam(aiTeam);
+            TeamObjectivePlan repairPlan = ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(ResolveAISlotKey(aiTeam)));
             PlayerAction evacAction = TryEvacEmbarkOrApproachAction(unit, snapshot, repairPlan, aiTeam, fromCell, paths);
             if (evacAction != null)
                 return evacAction;
@@ -800,7 +800,7 @@ public partial class AIController
             return false;
         }
 
-        TeamObjectivePlan plan = ObjectiveManager.GetPlanForTeam(snapshot.AITeam);
+        TeamObjectivePlan plan = ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(snapshot.AISlotIndex));
         List<PodeDesembarcarOption> selected = SelectBestDisembarkPerPassenger(options, passengers, plan, snapshot);
         if (selected.Count == 0)
             return false;
@@ -829,7 +829,7 @@ public partial class AIController
             return false;
 
         List<UnitManager> passengers = CollectPassengers(unit);
-        TeamObjectivePlan plan = ObjectiveManager.GetPlanForTeam(snapshot.AITeam);
+        TeamObjectivePlan plan = ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(snapshot.AISlotIndex));
         List<PodeDesembarcarOption> selected = SelectBestDisembarkPerPassenger(options, passengers, plan, snapshot);
         if (selected.Count == 0)
             return false;

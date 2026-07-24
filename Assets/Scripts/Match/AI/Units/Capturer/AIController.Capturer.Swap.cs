@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -82,7 +82,7 @@ public partial class AIController
         if (paths == null || paths.Count == 0) return null;
 
         HashSet<Vector3Int> occupied = BuildOccupied(occupant);
-        TeamObjectivePlan plan = ObjectiveManager.GetPlanForTeam(snapshot.AITeam);
+        TeamObjectivePlan plan = ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(snapshot.AISlotIndex));
         Vector3Int objectiveCell = ResolveUnitObjectiveCell(occupant, plan, snapshot);
         if (objectiveCell == Vector3Int.zero)
             objectiveCell = fromCell;
@@ -138,7 +138,7 @@ public partial class AIController
                 continue;
 
             ConstructionManager construction = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, cell);
-            if (construction != null && construction.CanProduceUnitsForTeam(snapshot.AITeam))
+            if (construction != null && construction.CanProduceUnitsForSlot(snapshot.AISlotIndex))
                 continue;
 
             foreach (UnitManager enemy in enemies)
@@ -223,7 +223,7 @@ public partial class AIController
                 continue;
 
             ConstructionManager construction = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, cell);
-            if (construction != null && construction.CanProduceUnitsForTeam(snapshot.AITeam))
+            if (construction != null && construction.CanProduceUnitsForSlot(snapshot.AISlotIndex))
                 continue;
 
             float cellDist = SectorManager.HexDistance(cell, objectiveCell);

@@ -348,8 +348,8 @@ public partial class AIController
 
         if (TryGetAnySectorInfo(obj.Sector, out SectorManager.SectorInfo info))
         {
-            score -= Mathf.Min(25f, info.GetDistanceToHQ(aiTeam));
-            if (info.GetRiskLevelFor(aiTeam) >= SectorManager.SectorRiskLevel.High)
+            score -= Mathf.Min(25f, info.GetDistanceToHQ(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam))));
+            if (info.GetRiskLevelFor(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam))) >= SectorManager.SectorRiskLevel.High)
                 score -= 10f;
             if (info.HasPartialCapture)
                 score += 40f;

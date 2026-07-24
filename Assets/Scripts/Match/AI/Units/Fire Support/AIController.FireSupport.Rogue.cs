@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -176,7 +176,7 @@ public partial class AIController
                 movementPoints,
                 terrainDatabase);
         int minRange = Mathf.Max(0, GetUnitIndirectWeaponMinRange(unit));
-        TeamObjectivePlan plan = ObjectiveManager.GetPlanForTeam(snapshot.AITeam);
+        TeamObjectivePlan plan = ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(snapshot.AISlotIndex));
         WeaponPriorityData weaponPriorityData = turnStateManager != null ? turnStateManager.WeaponPriorityDataRef : null;
         bool conservativeOffensiveObjective = rearLinePosture && assignedBacklineRequired;
         Vector3Int rearAnchor = snapshot.EnemyHQ != null
@@ -426,7 +426,7 @@ public partial class AIController
         if (!TryResolveRogueFireSupportFrontAnchor(unit, snapshot, fromCell, out Vector3Int anchor, out string anchorReason))
             return null;
 
-        TeamObjectivePlan plan = ObjectiveManager.GetPlanForTeam(snapshot.AITeam);
+        TeamObjectivePlan plan = ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(snapshot.AISlotIndex));
         int maxRange = GetFireSupportMaxWeaponRange(unit);
         if (maxRange <= 0)
             return null;
@@ -554,7 +554,7 @@ public partial class AIController
             return false;
 
         float bestScore = float.MinValue;
-        TeamObjectivePlan plan = ObjectiveManager.GetPlanForTeam(snapshot.AITeam);
+        TeamObjectivePlan plan = ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(snapshot.AISlotIndex));
         if (plan != null && plan.Objectives != null)
         {
             foreach (SectorObjective obj in plan.Objectives)

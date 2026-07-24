@@ -454,7 +454,9 @@ public partial class TurnStateManager
 
         Vector3Int destination = selectedUnit.CurrentCellPosition;
         destination.z = 0;
-        return matchController.IsCellExploredByTeam(selectedUnit.TeamId, destination);
+        return matchController.IsCellExploredBySlot(
+            PlayerSlotId.FromIndex(selectedUnit.SlotIndex),
+            destination);
     }
 
     private void RunExploredTerrainContextSensors(Tilemap boardMap, SensorMovementMode movementMode)

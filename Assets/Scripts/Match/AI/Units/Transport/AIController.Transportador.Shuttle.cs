@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -24,7 +24,7 @@ public partial class AIController
         // that would still benefit from a ride rather than leaving the APC idle.
         if (bestCandidate == null)
         {
-            int relaxed = Mathf.Max(2, GetEffectiveTransportThreshold(snapshot.AITeam) / 2);
+            int relaxed = Mathf.Max(2, GetEffectiveTransportThresholdForSlot(PlayerSlotId.FromIndex(snapshot.AISlotIndex)) / 2);
             bestCandidate = FindBestShuttleCandidate(unit, snapshot, plan, fromCell, out candidateCell,
                 thresholdReduction: relaxed);
             if (bestCandidate != null)
@@ -115,7 +115,7 @@ public partial class AIController
 
             Vector3Int candidateCell = candidate.CurrentCellPosition; candidateCell.z = 0;
             float objectiveDist = SectorManager.HexDistance(candidateCell, objectiveCell);
-            int candidateThreshold = GetEffectiveTransportThreshold(snapshot.AITeam);
+            int candidateThreshold = GetEffectiveTransportThresholdForSlot(PlayerSlotId.FromIndex(snapshot.AISlotIndex));
             int candidateMP = candidate.MaxMovementPoints;
             if (candidateMP < 3) candidateThreshold += (3 - candidateMP) * 2;
             candidateThreshold = Mathf.Max(2, candidateThreshold - thresholdReduction);

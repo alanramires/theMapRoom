@@ -2,25 +2,20 @@ using UnityEngine;
 
 public static class ThreatRevisionTracker
 {
-    private const int TeamIdMin = 0;
-    private const int TeamIdMax = 9;
-    private static readonly int[] teamObserverRevision = new int[TeamIdMax + 1];
+    private const int SlotMin = 0;
+    private const int SlotMax = 9;
+    private static readonly int[] slotObserverRevision = new int[SlotMax + 1];
     private static int globalBoardRevision;
     private static int matchFlagsHash = BuildFlagsHash(enableLdt: true, enableLos: true, enableSpotter: true);
 
     public static int GlobalBoardRevision => globalBoardRevision;
     public static int MatchFlagsHash => matchFlagsHash;
 
-    public static int GetTeamObserverRevision(int teamId)
+    public static int GetSlotObserverRevision(PlayerSlotId slot)
     {
-        if (teamId < TeamIdMin || teamId > TeamIdMax)
+        if (!slot.IsValid || slot.Value < SlotMin || slot.Value > SlotMax)
             return 0;
-        return teamObserverRevision[teamId];
-    }
-
-    public static int GetTeamObserverRevision(TeamId teamId)
-    {
-        return GetTeamObserverRevision((int)teamId);
+        return slotObserverRevision[slot.Value];
     }
 
     public static void SetMatchFlags(bool enableLdt, bool enableLos, bool enableSpotter)
@@ -43,7 +38,7 @@ public static class ThreatRevisionTracker
             return;
 
         IncrementGlobalBoard();
-        IncrementTeamObserver(unit.TeamId);
+        IncrementSlotObserver(unit.SlotIndex);
     }
 
     public static void NotifyUnitLayerChanged(UnitManager unit, Domain previousDomain, HeightLevel previousHeight, Domain nextDomain, HeightLevel nextHeight)
@@ -54,7 +49,7 @@ public static class ThreatRevisionTracker
             return;
 
         IncrementGlobalBoard();
-        IncrementTeamObserver(unit.TeamId);
+        IncrementSlotObserver(unit.SlotIndex);
     }
 
     public static void NotifyUnitEmbarkStateChanged(UnitManager unit, bool previousEmbarked, bool nextEmbarked)
@@ -65,28 +60,28 @@ public static class ThreatRevisionTracker
             return;
 
         IncrementGlobalBoard();
-        IncrementTeamObserver(unit.TeamId);
+        IncrementSlotObserver(unit.SlotIndex);
     }
 
-    public static void NotifyUnitTeamChanged(TeamId previousTeam, TeamId nextTeam)
+    public static void NotifyUnitSlotChanged(int previousSlot, int nextSlot)
     {
         if (!Application.isPlaying)
             return;
-        if (previousTeam == nextTeam)
+        if (previousSlot == nextSlot)
             return;
 
         IncrementGlobalBoard();
-        IncrementTeamObserver(previousTeam);
-        IncrementTeamObserver(nextTeam);
+        IncrementSlotObserver(previousSlot);
+        IncrementSlotObserver(nextSlot);
     }
 
-    public static void NotifyUnitDisabled(UnitManager unit, TeamId teamId, bool isEmbarked)
+    public static void NotifyUnitDisabled(UnitManager unit, bool isEmbarked)
     {
         if (!Application.isPlaying || unit == null)
             return;
 
         IncrementGlobalBoard();
-        IncrementTeamObserver(teamId);
+        IncrementSlotObserver(unit.SlotIndex);
     }
 
     public static void NotifyUnitDataApplied(UnitManager unit)
@@ -94,7 +89,7 @@ public static class ThreatRevisionTracker
         if (!Application.isPlaying || unit == null)
             return;
 
-        IncrementTeamObserver(unit.TeamId);
+        IncrementSlotObserver(unit.SlotIndex);
     }
 
     public static void NotifyUnitSpawned(UnitManager unit)
@@ -103,7 +98,7 @@ public static class ThreatRevisionTracker
             return;
 
         IncrementGlobalBoard();
-        IncrementTeamObserver(unit.TeamId);
+        IncrementSlotObserver(unit.SlotIndex);
     }
 
     public static void ForceInvalidateAll()
@@ -112,8 +107,8 @@ public static class ThreatRevisionTracker
             return;
 
         IncrementGlobalBoard();
-        for (int teamId = TeamIdMin; teamId <= TeamIdMax; teamId++)
-            IncrementTeamObserver(teamId);
+        for (int slot = SlotMin; slot <= SlotMax; slot++)
+            IncrementSlotObserver(slot);
     }
 
     public static void NotifyConstructionCellChanged(ConstructionManager construction, Vector3Int previousCell, Vector3Int nextCell)
@@ -147,20 +142,15 @@ public static class ThreatRevisionTracker
             globalBoardRevision++;
     }
 
-    private static void IncrementTeamObserver(TeamId teamId)
+    private static void IncrementSlotObserver(int slot)
     {
-        IncrementTeamObserver((int)teamId);
-    }
-
-    private static void IncrementTeamObserver(int teamId)
-    {
-        if (teamId < TeamIdMin || teamId > TeamIdMax)
+        if (slot < SlotMin || slot > SlotMax)
             return;
 
-        if (teamObserverRevision[teamId] == int.MaxValue)
-            teamObserverRevision[teamId] = 1;
+        if (slotObserverRevision[slot] == int.MaxValue)
+            slotObserverRevision[slot] = 1;
         else
-            teamObserverRevision[teamId]++;
+            slotObserverRevision[slot]++;
     }
 
     private static int BuildFlagsHash(bool enableLdt, bool enableLos, bool enableSpotter)

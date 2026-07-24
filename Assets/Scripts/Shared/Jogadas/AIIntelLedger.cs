@@ -83,25 +83,10 @@ public static class AIIntelLedger
         return ledger.Contacts.Values;
     }
 
-    public static IReadOnlyList<AIIntelThreatSignal> GetThreatSignals(TeamId observer)
-        => TryResolveUniqueSlot(observer, out int slotIndex)
-            ? GetOrCreate(slotIndex, observer).ThreatSignals
-            : Array.Empty<AIIntelThreatSignal>();
-
     public static IReadOnlyList<AIIntelThreatSignal> GetThreatSignals(PlayerSlotId observerSlot)
         => observerSlot.IsValid
             ? GetOrCreate(observerSlot.Value, ResolveVisualTeam(observerSlot)).ThreatSignals
             : Array.Empty<AIIntelThreatSignal>();
-
-    public static void RecordVisibleContactsForTeam(
-        TeamId observer,
-        int turn,
-        MatchController match)
-    {
-        if (match == null || !match.TryGetUniqueSlotForTeam(observer, out PlayerSlotId observerSlot))
-            return;
-        RecordVisibleContactsForSlot(observerSlot, turn, match);
-    }
 
     public static void RecordVisibleContactsForSlot(
         PlayerSlotId observerSlot,
@@ -174,34 +159,16 @@ public static class AIIntelLedger
 
     public static void Clear() => ledgers.Clear();
 
-    public static AIElitePurchaseCommitment GetElitePurchaseCommitment(TeamId observer)
-        => TryResolveUniqueSlot(observer, out int slotIndex)
-            ? Clone(GetOrCreate(slotIndex, observer).ElitePurchaseCommitment)
-            : null;
-
     public static AIElitePurchaseCommitment GetElitePurchaseCommitment(PlayerSlotId observerSlot)
         => observerSlot.IsValid
             ? Clone(GetOrCreate(observerSlot.Value, ResolveVisualTeam(observerSlot)).ElitePurchaseCommitment)
             : null;
 
     public static void SetElitePurchaseCommitment(
-        TeamId observer, AIElitePurchaseCommitment commitment)
-    {
-        if (TryResolveUniqueSlot(observer, out int slotIndex))
-            GetOrCreate(slotIndex, observer).ElitePurchaseCommitment = Clone(commitment);
-    }
-
-    public static void SetElitePurchaseCommitment(
         PlayerSlotId observerSlot, AIElitePurchaseCommitment commitment)
     {
         if (observerSlot.IsValid)
             GetOrCreate(observerSlot.Value, ResolveVisualTeam(observerSlot)).ElitePurchaseCommitment = Clone(commitment);
-    }
-
-    public static void ClearElitePurchaseCommitment(TeamId observer)
-    {
-        if (TryResolveUniqueSlot(observer, out int slotIndex))
-            GetOrCreate(slotIndex, observer).ElitePurchaseCommitment = null;
     }
 
     public static void ClearElitePurchaseCommitment(PlayerSlotId observerSlot)

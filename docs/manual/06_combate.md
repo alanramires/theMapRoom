@@ -189,6 +189,18 @@ O resultado antes mesmo do cálculo de combate já conta a história: Blindados 
 
 Uma nova unidade entra no jogo. Você define a classe dela e as armas que carrega. O sistema já sabe como ela se comporta contra tudo que existe — porque o RPS é definido entre classes, não entre nomes. O Leopard 2 e o T-90 são ambos Blindados. O sistema os trata igual. O que os diferencia são os atributos da unidade e as armas embarcadas — não uma entrada especial na tabela de RPS.
 
+### A Aeronave no Solo Não Tem RPS a Seu Favor
+
+Existe uma exceção ao RPS, e ela vale conhecer porque decide o valor de todo o ciclo de pouso: **contra uma aeronave pousada, nenhum atacante sofre penalidade de RPS.**
+
+A regra é um piso em zero, não uma zeragem — e a diferença importa. Um RPS negativo sobe para zero; um RPS positivo permanece intacto. Quem já era bom contra aquela classe continua bom. Quem seria péssimo deixa de ser penalizado.
+
+O caso que ensina a regra é a artilharia de campanha. Ela não tem nada que sirva contra aviação, e o RPS dela contra uma aeronave em voo é terrível. Contra a mesma aeronave **no chão**, essa penalidade desaparece — e a artilharia janta o caça. O mesmo vale para o caça cuja arma sofre penalidade no duelo aéreo: contra um caça estacionado, ela dispara sem o desconto.
+
+A simetria também existe. Se quem está pousado é o **atacante**, o revide do defensor ganha o mesmo piso. Estar no solo é ruim nos dois sentidos da troca.
+
+Junte isso ao que você já sabe e o quadro fecha: a aeronave no solo não perde uma proteção, perde **três**. Sai do alcance da antiaérea mas entra no de tudo que atira em superfície; troca a posição da camada aérea pela do terreno onde parou; e deixa de contar com a tabela de RPS que a defendia. É por isso que pousar não é uma ação que o jogador escolhe — ver `04_ciclo_de_acao_e_comprometimento.md`.
+
 ## A Premissa do Combate
 
 Todo o sistema do The Map Room nasceu sobre uma premissa simples:

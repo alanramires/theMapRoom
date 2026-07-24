@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 
 // --------------------------------------------------------------------------------------------
@@ -81,9 +81,9 @@ public partial class AIController
     private void BuildObjectivePlan(AIWorldSnapshot snapshot)
     {
         TeamId aiTeam = snapshot.AITeam;
-        TeamObjectivePlan plan = ObjectiveManager.GetOrCreatePlanForTeam(aiTeam);
+        TeamObjectivePlan plan = ObjectiveManager.GetOrCreatePlanForSlot(PlayerSlotId.FromIndex(ResolveAISlotKey(aiTeam)), aiTeam);
         MarkEnemyBaseObjectivesAsInvasion(plan, aiTeam);
-        currentAxisMap = InvasionAxisMap.Build(aiTeam);
+        currentAxisMap = InvasionAxisMap.Build(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam)));
         // Strong/Weak Side Politic (prototipo, flag off por padrao): classifica os eixos e
         // deixa o vies de elite pronto ANTES da atribuicao de fire support mais abaixo.
         UpdateAxisSidePolitics(snapshot);
@@ -131,7 +131,8 @@ public partial class AIController
             }
 
             bool ownedRallyHeld = IsEnemyHQRallySectorHeld(rallyContext, obj.Sector, aiTeam);
-            bool goGreenSuppressed = ownedRallyHeld && IsRallyGoGreenSuppressed(aiTeam, obj.Sector, snapshot.TurnNumber);
+            bool goGreenSuppressed = ownedRallyHeld && IsRallyGoGreenSuppressed(
+                PlayerSlotId.FromIndex(snapshot.AISlotIndex), obj.Sector, snapshot.TurnNumber);
             bool objectiveIsRallySector = ownedRallyHeld && !goGreenSuppressed;
             if (objectiveIsRallySector && obj.ObjectiveType == AIObjectiveType.CaptureSector)
                 obj.ObjectiveType = AIObjectiveType.RallyAssembly;
@@ -307,7 +308,8 @@ public partial class AIController
         foreach (SectorManager.SectorInfo info in allSectors)
         {
             bool isRallyAssemblySector = IsEnemyHQRallySectorHeld(rallyContext, info.Sector, aiTeam)
-                && !IsRallyGoGreenSuppressed(aiTeam, info.Sector, snapshot.TurnNumber);
+                && !IsRallyGoGreenSuppressed(
+                    PlayerSlotId.FromIndex(snapshot.AISlotIndex), info.Sector, snapshot.TurnNumber);
             if (IsOwnedDefensibleSector(info, aiTeam) && !isRallyAssemblySector) continue;
             bool hasCapturable = false;
             foreach (SectorManager.SectorConstructionInfo c in info.Constructions)
@@ -340,7 +342,7 @@ public partial class AIController
                 Debug.Log($"{TL("Plan")} skip {info.Sector}: {macro.Phase} EnemyNatural sem pressao local");
                 continue;
             }
-            if (rearBridgeAvailable && AISectorIntentAnalyzer.ClassifyRelation(aiTeam, info) == AISectorRelation.EnemyNatural)
+            if (rearBridgeAvailable && AISectorIntentAnalyzer.ClassifyRelation(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam)), info) == AISectorRelation.EnemyNatural)
                 Debug.Log($"{TL("Plan")} {info.Sector}: fronteira liberada por {rearBridgeSector}");
 
             bool hasPartialOwnCapture = false;
@@ -350,14 +352,14 @@ public partial class AIController
                 { hasPartialOwnCapture = true; break; }
 
             if (snapshot.Stance == AIStance.Defensive
-                && info.GetRiskLevelFor(aiTeam) >= SectorManager.SectorRiskLevel.Medium
+                && info.GetRiskLevelFor(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam))) >= SectorManager.SectorRiskLevel.Medium
                 && !hasPartialOwnCapture)
             {
-                Debug.Log($"{TL("Plan")} skip {info.Sector}: Defensive + risco={info.GetRiskLevelFor(aiTeam)} (>= Medium)");
+                Debug.Log($"{TL("Plan")} skip {info.Sector}: Defensive + risco={info.GetRiskLevelFor(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam)))} (>= Medium)");
                 continue;
             }
 
-            if (info.GetRiskLevelFor(aiTeam) >= SectorManager.SectorRiskLevel.High)
+            if (info.GetRiskLevelFor(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam))) >= SectorManager.SectorRiskLevel.High)
             {
                 ConstructionManager riskTgt = FindCapturableInSector(info.Sector, aiTeam);
                 if (riskTgt != null)
@@ -410,7 +412,7 @@ public partial class AIController
                 }
             }
             int slots = Mathf.Clamp(Mathf.CeilToInt(info.ConstructionCount / 2f), 1, 4);
-            bool highRisk = info.GetRiskLevelFor(aiTeam) >= SectorManager.SectorRiskLevel.High;
+            bool highRisk = info.GetRiskLevelFor(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam))) >= SectorManager.SectorRiskLevel.High;
             if (highRisk) slots = Mathf.Max(slots, 2);
             if (hardMode) slots = Mathf.Min(slots * 2, HardModeCapturerSlotCap); // Hard Mode: dobra a demanda de capturadores por setor (com teto)
             if (!isRallyAssemblySector)
@@ -420,8 +422,8 @@ public partial class AIController
                 if (highRisk)
                     obj.Slots.Add(new SlotNeed { Role = UnitRole.Assalto });
             }
-            float distHQ = info.GetDistanceToHQ(aiTeam);
-            int   transThreshold = GetEffectiveTransportThreshold(aiTeam);
+            float distHQ = info.GetDistanceToHQ(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam)));
+            int   transThreshold = GetEffectiveTransportThresholdForSlot(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam)));
             // Transporte e antecipatorio/posicional (R4): o slot so nasce quando o eixo de fato
             // vai precisar de carona — no ALVO DE TRANSPORTE PROFUNDO do eixo (a frente, ou o
             // proximo no se a frente ja esta sob captura: pipelining) ou num RALLY SEGURADO.
@@ -601,7 +603,7 @@ public partial class AIController
                 baseObj.Slots.Add(new SlotNeed { Role = UnitRole.FogoIndireto });
             // Transportador: leva a massa ao campo. Quando a base é longe, escala com a leva de
             // capturadores (capacidade por APC) para reposicionar rápido o que foi comprado no QG.
-            if (baseInfo.GetDistanceToHQ(aiTeam) >= GetEffectiveTransportThreshold(aiTeam))
+            if (baseInfo.GetDistanceToHQ(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam))) >= GetEffectiveTransportThresholdForSlot(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam))))
             {
                 int transportSlots = Mathf.Max(1,
                     Mathf.CeilToInt(baseInfo.ConstructionCount / (float)BaseInvasionTransportCapacity));
@@ -613,7 +615,7 @@ public partial class AIController
                 baseObj.Slots.Add(new SlotNeed { Role = UnitRole.Logistica });
             plan.Objectives.Add(baseObj);
             addedSectors++;
-            Debug.Log($"{TL("Plan")} base inimiga {baseInfo.Sector}: {massCapturerSlots}xCap(massa) + {BaseInvasionEliteAssaultSlots}xAssalto + {BaseInvasionEliteFireSupportSlots}xFogo + {BaseInvasionLogisticsSlots}xLog construcoes={baseInfo.ConstructionCount} dist={baseInfo.GetDistanceToHQ(aiTeam):F0}h");
+            Debug.Log($"{TL("Plan")} base inimiga {baseInfo.Sector}: {massCapturerSlots}xCap(massa) + {BaseInvasionEliteAssaultSlots}xAssalto + {BaseInvasionEliteFireSupportSlots}xFogo + {BaseInvasionLogisticsSlots}xLog construcoes={baseInfo.ConstructionCount} dist={baseInfo.GetDistanceToHQ(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam))):F0}h");
         }
 
         ClearResolvedCriticalHomeDefenseObjectives(plan, aiTeam);
@@ -635,7 +637,7 @@ public partial class AIController
                     if (c.CapturePointsMax > 0 && c.CurrentCapturePoints < c.CapturePointsMax) { hasCapturable = true; break; }
                 }
                 if (!hasCapturable) continue;
-                float d = info.GetDistanceToHQ(aiTeam);
+                float d = info.GetDistanceToHQ(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam)));
                 if (d < closestDist) { closestDist = d; closest = info; }
             }
             if (closest != null && plan.GetObjectiveForSector(closest.Sector) == null)
@@ -873,7 +875,7 @@ public partial class AIController
                 continue;
 
             if (TryGetAnySectorInfo(obj.Sector, out SectorManager.SectorInfo slotInfo)
-                && slotInfo.GetRiskLevelFor(aiTeam) >= SectorManager.SectorRiskLevel.High)
+                && slotInfo.GetRiskLevelFor(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam))) >= SectorManager.SectorRiskLevel.High)
             {
                 SlotNeed filledSlot = obj.Slots.Find(s => s.Role == UnitRole.Capturador && s.Filled);
                 if (filledSlot != null)
@@ -957,7 +959,7 @@ public partial class AIController
                 if (SectorManager.TryGetSectorInfo(assignableObjs[oj].obj.Sector,
                         out SectorManager.SectorInfo sInfo))
                 {
-                    riskMultipliers[oj] = 1f + sInfo.GetRiskRatioFor(aiTeam) * RiskCostWeight;
+                    riskMultipliers[oj] = 1f + sInfo.GetRiskRatioFor(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam))) * RiskCostWeight;
                     foreach (SectorManager.SectorConstructionInfo c in sInfo.Constructions)
                     {
                         if (c.OwnerTeam == aiTeam && c.CapturePointsMax > 0
@@ -1155,11 +1157,11 @@ public partial class AIController
                     if (!HasFilledSlot(obj, UnitRole.Capturador)) continue;
                     if (HasAnySlot(obj, UnitRole.Assalto)) continue;
                     if (!TryGetAnySectorInfo(obj.Sector, out SectorManager.SectorInfo escortInfo)) continue;
-                    var riskLevel = escortInfo.GetRiskLevelFor(aiTeam);
+                    var riskLevel = escortInfo.GetRiskLevelFor(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam)));
                     bool isHigh = riskLevel == SectorManager.SectorRiskLevel.High;
                     bool isMedium = riskLevel == SectorManager.SectorRiskLevel.Medium;
                     bool isLow = riskLevel == SectorManager.SectorRiskLevel.Low
-                        && escortInfo.GetRiskRatioFor(aiTeam) >= MinLowRiskForEscort;
+                        && escortInfo.GetRiskRatioFor(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam))) >= MinLowRiskForEscort;
                     if (!isHigh && !isMedium && !isLow) continue;
                     escortFallbacks.Add(obj);
                 }
@@ -1167,14 +1169,14 @@ public partial class AIController
                 escortFallbacks.Sort((a, b) =>
                 {
                     int aRank = TryGetAnySectorInfo(a.Sector, out SectorManager.SectorInfo ai)
-                        ? GetEscortFallbackRiskRank(ai.GetRiskLevelFor(aiTeam)) : 0;
+                        ? GetEscortFallbackRiskRank(ai.GetRiskLevelFor(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam)))) : 0;
                     int bRank = TryGetAnySectorInfo(b.Sector, out SectorManager.SectorInfo bi)
-                        ? GetEscortFallbackRiskRank(bi.GetRiskLevelFor(aiTeam)) : 0;
+                        ? GetEscortFallbackRiskRank(bi.GetRiskLevelFor(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam)))) : 0;
                     if (aRank != bRank) return bRank.CompareTo(aRank);
                     float ar = SectorManager.TryGetSectorInfo(a.Sector, out SectorManager.SectorInfo aInfo)
-                        ? aInfo.GetRiskRatioFor(aiTeam) : 0f;
+                        ? aInfo.GetRiskRatioFor(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam))) : 0f;
                     float br = SectorManager.TryGetSectorInfo(b.Sector, out SectorManager.SectorInfo bInfo)
-                        ? bInfo.GetRiskRatioFor(aiTeam) : 0f;
+                        ? bInfo.GetRiskRatioFor(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam))) : 0f;
                     int riskCompare = br.CompareTo(ar);
                     return riskCompare != 0 ? riskCompare : a.Priority.CompareTo(b.Priority);
                 });
@@ -1202,8 +1204,8 @@ public partial class AIController
                     if (obj.Status != ObjectiveStatus.Defending) obj.Status = ObjectiveStatus.Pursuing;
                     ApplyPlanHUD(best, obj, UnitRole.Assalto);
                     freeAssaults.Remove(best);
-                    Debug.Log($"{TL("Plan")} Assalto {best.InstanceId} ? batedor fallback {escortInfo.GetRiskLevelFor(aiTeam)} de {obj.Sector} " +
-                              $"(risco={escortInfo.GetRiskRatioFor(aiTeam):F2}, dist={bestDist:F0}h)");
+                    Debug.Log($"{TL("Plan")} Assalto {best.InstanceId} ? batedor fallback {escortInfo.GetRiskLevelFor(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam)))} de {obj.Sector} " +
+                              $"(risco={escortInfo.GetRiskRatioFor(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam))):F2}, dist={bestDist:F0}h)");
                 }
             }
         }
@@ -1272,7 +1274,7 @@ public partial class AIController
                 foreach (UnitManager enemy in UnitManager.AllActive)
                 {
                     if (enemy.SlotIndex == ResolveAISlotKey(aiTeam) || enemy.IsDead || enemy.IsEmbarked) continue;
-                    if (mc != null && !mc.IsUnitVisibleForTeam(enemy, aiTeam)) continue;
+                    if (mc != null && !mc.IsUnitVisibleForSlot(enemy, PlayerSlotId.FromIndex(currentAISlotIndex))) continue;
                     Vector3Int ec = enemy.CurrentCellPosition; ec.z = 0;
                     if (SectorManager.HexDistance(ec, tc) <= alliesEnemyRange) enemyHp += enemy.CurrentHP;
                 }
@@ -1405,7 +1407,7 @@ public partial class AIController
                     Vector3Int uc = u.CurrentCellPosition; uc.z = 0;
                     float dist = SectorManager.TryGetLandMovementDistance(uc, targetCell, out int td)
                         ? td : SectorManager.HexDistance(uc, targetCell);
-                    float risk = info.GetRiskRatioFor(aiTeam);
+                    float risk = info.GetRiskRatioFor(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam)));
                     float score = -obj.Priority * 900f
                         - dist * 45f
                         + risk * 220f
@@ -1453,7 +1455,7 @@ public partial class AIController
                 float bestApcDist = float.MaxValue;
                 float bestPickupDist = float.MaxValue;
                 bool bestCreatedSlot = false;
-                int planThreshold = GetEffectiveTransportThreshold(aiTeam);
+                int planThreshold = GetEffectiveTransportThresholdForSlot(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam)));
                 foreach (SectorObjective obj in plan.Objectives)
                 {
                     bool hasOpenTransportSlot = obj.HasOpenSlot(UnitRole.Transportador);
@@ -1478,7 +1480,7 @@ public partial class AIController
                     float pickupDist = float.MaxValue;
                     UnitManager pickupPassenger = null;
                     TryGetAnySectorInfo(obj.Sector, out SectorManager.SectorInfo sInfo);
-                    if (sInfo != null) sectorRisk = sInfo.GetRiskRatioFor(aiTeam);
+                    if (sInfo != null) sectorRisk = sInfo.GetRiskRatioFor(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam)));
                     foreach (SlotNeed slot in obj.Slots)
                     {
                         if (!IsGroundTransportPassengerSlot(obj, slot, aiTeam)) continue;
@@ -1542,7 +1544,7 @@ public partial class AIController
                     bool transportCapacityMet = totalTransportCapacity >= activeCapturers.Count;
                     bool canCreateOpportunisticSlot = !hasOpenTransportSlot
                         && !transportCapacityMet
-                        && capturerDistToObj >= GetEffectiveTransportThreshold(aiTeam)
+                        && capturerDistToObj >= GetEffectiveTransportThresholdForSlot(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam)))
                         && pickupDist <= pickupReach + 0.5f;
                     if (!hasOpenTransportSlot && !canCreateOpportunisticSlot) continue;
 
@@ -1636,7 +1638,7 @@ public partial class AIController
         planLog.Append($"  ? {totalAssigned} atribu�dos | {plan.RogueUnitIds.Count} rogues");
         Debug.Log(planLog.ToString());
 
-        AISectorIntentAnalyzer.RebuildAndLog(aiTeam, snapshot, plan, intel, "Plan");
+        AISectorIntentAnalyzer.RebuildAndLog(snapshot, plan, intel, "Plan");
     }
 
     private ConstructionSector ResolveUnitSectorForPlan(UnitManager unit)
@@ -1690,8 +1692,8 @@ public partial class AIController
         if (TryGetAnySectorInfo(originSector, out SectorManager.SectorInfo originInfo)
             && TryGetAnySectorInfo(targetSector, out SectorManager.SectorInfo targetInfo))
         {
-            float originHqDist = originInfo.GetDistanceToHQ(aiTeam);
-            float targetHqDist = targetInfo.GetDistanceToHQ(aiTeam);
+            float originHqDist = originInfo.GetDistanceToHQ(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam)));
+            float targetHqDist = targetInfo.GetDistanceToHQ(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam)));
             if (targetHqDist > originHqDist)
                 return 12f + axisCost;
         }

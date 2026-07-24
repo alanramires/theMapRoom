@@ -21,7 +21,7 @@ public partial class AIController
                 return vacateAction;
         }
 
-        TeamObjectivePlan capBlockPlan = ObjectiveManager.GetPlanForTeam(snapshot.AITeam);
+        TeamObjectivePlan capBlockPlan = ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(snapshot.AISlotIndex));
         if (capBlockPlan != null && IsCellACapturerTarget(fromCell, capBlockPlan, snapshot.AITeam))
         {
             Vector3Int vacateCell = FindFireSupportCapturerVacateCell(unit, snapshot, fromCell, capBlockPlan, vacatePaths ?? BuildFireSupportPaths(unit), vacateOccupied);
@@ -129,7 +129,12 @@ public partial class AIController
         // Missing screen is a planning signal now; rendezvous/repositioning decides the movement.
         if (assigned.Status != ObjectiveStatus.Defending
             && AITacticalAnalyzer.Instance != null
-            && !AITacticalAnalyzer.Instance.IsFireSupportScreenedForObjective(unit, snapshot.AITeam, assigned, out _, out string screenReason))
+            && !AITacticalAnalyzer.Instance.IsFireSupportScreenedForObjective(
+                unit,
+                PlayerSlotId.FromIndex(snapshot.AISlotIndex),
+                assigned,
+                out _,
+                out string screenReason))
         {
             Debug.Log($"{TL("FireSupport")} {unit.InstanceId} {assigned.Sector}: screen ausente, segue reposicionamento/rendezvous ({screenReason})");
         }
@@ -210,7 +215,7 @@ public partial class AIController
         if (rendezvousTarget == null || bestDist <= 1f) return null;
 
         Vector3Int targetCell = rendezvousTarget.CurrentCellPosition; targetCell.z = 0;
-        TeamObjectivePlan capPlan = ObjectiveManager.GetPlanForTeam(snapshot.AITeam);
+        TeamObjectivePlan capPlan = ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(snapshot.AISlotIndex));
         float fromThreat = CalculateThreatLevel(fromCell, snapshot.AITeam);
 
         // Try progression tool first — avoids backward movement toward rendezvous target.
@@ -269,7 +274,7 @@ public partial class AIController
         if (!IsFireSupportConservative(unit) && !PreferFireSupportWeaponMaxRange(unit))
             return null;
 
-        TeamObjectivePlan capPlan = ObjectiveManager.GetPlanForTeam(snapshot.AITeam);
+        TeamObjectivePlan capPlan = ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(snapshot.AISlotIndex));
         float fromThreat = CalculateThreatLevel(fromCell, snapshot.AITeam);
         float fromAnchorDist = SectorManager.HexDistance(fromCell, anchor);
         float fromCohesion = CalculateFireSupportCohesionScore(unit, snapshot, fromCell);

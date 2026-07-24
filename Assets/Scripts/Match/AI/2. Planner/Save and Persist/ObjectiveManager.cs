@@ -166,24 +166,12 @@ public class ObjectiveManager : MonoBehaviour
         if (instance == this) instance = null;
     }
 
-    public static TeamObjectivePlan GetPlanForTeam(TeamId team)
-    {
-        return TryResolveSlot(team, out PlayerSlotId slot) ? GetPlanForSlot(slot) : null;
-    }
-
     public static TeamObjectivePlan GetPlanForSlot(PlayerSlotId slot)
     {
         ObjectiveManager m = EnsureInstance();
         foreach (TeamObjectivePlan p in m.plans)
             if (p.SlotIndex == slot.Value) return p;
         return null;
-    }
-
-    public static TeamObjectivePlan GetOrCreatePlanForTeam(TeamId team)
-    {
-        if (!TryResolveSlot(team, out PlayerSlotId slot))
-            return null;
-        return GetOrCreatePlanForSlot(slot, team);
     }
 
     public static TeamObjectivePlan GetOrCreatePlanForSlot(PlayerSlotId slot, TeamId visualTeam)
@@ -194,12 +182,6 @@ public class ObjectiveManager : MonoBehaviour
         TeamObjectivePlan newPlan = new TeamObjectivePlan { SlotIndex = slot.Value, Team = visualTeam };
         m.plans.Add(newPlan);
         return newPlan;
-    }
-
-    public static void ClearPlanForTeam(TeamId team)
-    {
-        if (TryResolveSlot(team, out PlayerSlotId slot))
-            ClearPlanForSlot(slot);
     }
 
     public static void ClearPlanForSlot(PlayerSlotId slot)

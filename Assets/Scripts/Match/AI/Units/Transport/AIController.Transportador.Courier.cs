@@ -11,7 +11,7 @@ public partial class AIController
         Vector3Int assignedSectorTarget = default)
     {
         Vector3Int fromCell = unit.CurrentCellPosition; fromCell.z = 0;
-        TeamObjectivePlan plan = ObjectiveManager.GetPlanForTeam(snapshot.AITeam);
+        TeamObjectivePlan plan = ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(snapshot.AISlotIndex));
 
         List<UnitManager> passengers = CollectPassengers(unit);
         if (passengers.Count == 0)

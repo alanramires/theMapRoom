@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -50,7 +50,7 @@ public partial class AIController
             if (building == null)
                 continue;
 
-            bool strategic = building.IsPlayerHeadQuarter || building.CanProduceUnitsForTeam(snapshot.AITeam);
+            bool strategic = building.IsPlayerHeadQuarter || building.CanProduceUnitsForSlot(snapshot.AISlotIndex);
             if (!strategic)
                 continue;
 
@@ -76,7 +76,7 @@ public partial class AIController
                 if (building == null)
                     continue;
 
-                bool strategic = building.IsPlayerHeadQuarter || building.CanProduceUnitsForTeam(snapshot.AITeam);
+                bool strategic = building.IsPlayerHeadQuarter || building.CanProduceUnitsForSlot(snapshot.AISlotIndex);
                 if (!strategic)
                     continue;
 
@@ -85,7 +85,7 @@ public partial class AIController
                 float score = -SectorManager.HexDistance(fallback, cell);
                 if (building.IsPlayerHeadQuarter)
                     score += 8f;
-                if (building.CanProduceUnitsForTeam(snapshot.AITeam))
+                if (building.CanProduceUnitsForSlot(snapshot.AISlotIndex))
                     score += 3f;
 
                 if (score > bestScore)
@@ -336,7 +336,7 @@ public partial class AIController
 
         cell.z = 0;
         ConstructionManager construction = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, cell);
-        return construction != null && construction.CanProduceUnitsForTeam(aiTeam);
+        return construction != null && construction.CanProduceUnitsForSlot(AIController.ResolveAISlotKey(aiTeam));
     }
 
     private bool HasReachableNonProductionLogisticsCell(
@@ -435,7 +435,7 @@ public partial class AIController
             float value = Mathf.Max(0f, 3f - dist) * 180f;
             if (building.IsPlayerHeadQuarter)
                 value += Mathf.Max(0f, 5f - dist) * 80f;
-            if (building.CanProduceUnitsForTeam(snapshot.AITeam))
+            if (building.CanProduceUnitsForSlot(snapshot.AISlotIndex))
                 value += Mathf.Max(0f, 4f - dist) * 65f;
             best = Mathf.Max(best, value);
         }

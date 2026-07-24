@@ -31,11 +31,6 @@ public class AIWorldSnapshot
     public int Budget;
     public int IncomePerTurn;
 
-    public static AIWorldSnapshot Build(TeamId aiTeam, MatchController match)
-    {
-        return Build(PlayerSlotId.FromIndex(ResolveSlotIndex(aiTeam, match)), match);
-    }
-
     public static AIWorldSnapshot Build(PlayerSlotId aiSlot, MatchController match)
     {
         var snap = new AIWorldSnapshot();
@@ -75,7 +70,7 @@ public class AIWorldSnapshot
         }
 
         snap.Stance = CalculateStance(snap);
-        snap.IsInvading = AIController.GetGoGreenInvasionForInspection(snap.AITeam, snap.TurnNumber).Active;
+        snap.IsInvading = AIController.GetGoGreenInvasionForInspection(aiSlot, snap.TurnNumber).Active;
         return snap;
     }
 
@@ -84,11 +79,6 @@ public class AIWorldSnapshot
     /// Preenche apenas os campos consumidos pelos handlers de role;
     /// omite MyUnits, EnemyUnits, OccupiedCells, Stance e IncomePerTurn.
     /// </summary>
-    public static AIWorldSnapshot BuildLight(TeamId aiTeam, MatchController match)
-    {
-        return BuildLight(PlayerSlotId.FromIndex(ResolveSlotIndex(aiTeam, match)), match);
-    }
-
     public static AIWorldSnapshot BuildLight(PlayerSlotId aiSlot, MatchController match)
     {
         var snap = new AIWorldSnapshot();
@@ -122,21 +112,8 @@ public class AIWorldSnapshot
 
         // IsInvading é barato (lookup no rallyGoGreenTurns) e é consumido por handlers da Fase 2
         // (ex.: gate de embarque de artilharia). Diferente de Stance, vale popular no Light.
-        snap.IsInvading = AIController.GetGoGreenInvasionForInspection(snap.AITeam, snap.TurnNumber).Active;
+        snap.IsInvading = AIController.GetGoGreenInvasionForInspection(aiSlot, snap.TurnNumber).Active;
         return snap;
-    }
-
-    private static int ResolveSlotIndex(TeamId aiTeam, MatchController match)
-    {
-        if (match == null || aiTeam == TeamId.Neutral)
-            return -1;
-
-        if (match.ActiveTeam == aiTeam)
-            return match.ActivePlayerListIndex;
-
-        return match.TryGetUniqueSlotForTeam(aiTeam, out PlayerSlotId uniqueSlot)
-            ? uniqueSlot.Value
-            : -1;
     }
 
     private static AIStance CalculateStance(AIWorldSnapshot snap)

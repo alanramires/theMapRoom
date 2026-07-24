@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Tilemaps;
 
@@ -158,7 +158,7 @@ public partial class AIController
         foreach (UnitManager enemy in UnitManager.AllActive)
         {
             if (enemy.SlotIndex == ResolveAISlotKey(aiTeam) || enemy.IsDead || enemy.IsEmbarked) continue;
-            if (mc != null && !mc.IsUnitVisibleForTeam(enemy, aiTeam)) continue;
+            if (mc != null && !mc.IsUnitVisibleForSlot(enemy, PlayerSlotId.FromIndex(ResolveAISlotKey(aiTeam)))) continue;
             Vector3Int ec = enemy.CurrentCellPosition; ec.z = 0;
             if (Vector3Int.Distance(fromCell, ec) <= radius) return true;
         }
@@ -173,7 +173,7 @@ public partial class AIController
         foreach (UnitManager enemy in UnitManager.AllActive)
         {
             if (enemy.SlotIndex == ResolveAISlotKey(aiTeam) || enemy.IsDead || enemy.IsEmbarked) continue;
-            if (mc != null && !mc.IsUnitVisibleForTeam(enemy, aiTeam)) continue;
+            if (mc != null && !mc.IsUnitVisibleForSlot(enemy, PlayerSlotId.FromIndex(ResolveAISlotKey(aiTeam)))) continue;
             Vector3Int ec = enemy.CurrentCellPosition; ec.z = 0;
             if (Vector3Int.Distance(fromCell, ec) > engageRadius) continue;
             if (Vector3Int.Distance(ec, targetCell) < unitDist) return true;
@@ -333,7 +333,7 @@ public partial class AIController
         {
             if (enemy == null || enemy.SlotIndex == snapshot.AISlotIndex || enemy.IsDead || enemy.IsEmbarked)
                 continue;
-            if (mc != null && !mc.IsUnitVisibleForTeam(enemy, snapshot.AITeam))
+            if (mc != null && !mc.IsUnitVisibleForSlot(enemy, PlayerSlotId.FromIndex(snapshot.AISlotIndex)))
                 continue;
 
             Vector3Int enemyCell = enemy.CurrentCellPosition;
@@ -429,7 +429,7 @@ public partial class AIController
         {
             if (enemy == null || enemy.SlotIndex == snapshot.AISlotIndex || enemy.IsDead || enemy.IsEmbarked)
                 continue;
-            if (mc != null && !mc.IsUnitVisibleForTeam(enemy, snapshot.AITeam))
+            if (mc != null && !mc.IsUnitVisibleForSlot(enemy, PlayerSlotId.FromIndex(snapshot.AISlotIndex)))
                 continue;
 
             Vector3Int enemyCell = enemy.CurrentCellPosition;

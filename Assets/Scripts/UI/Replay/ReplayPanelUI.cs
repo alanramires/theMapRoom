@@ -276,7 +276,7 @@ public class ReplayPanelUI : MonoBehaviour
 
         if (viewUnderSpecificTeam < 0)
         {
-            replayManager.SetReplayVision(ReplayVisionMode.Omniscient, TeamId.Neutral);
+            replayManager.SetReplayVision(ReplayVisionMode.Omniscient, PlayerSlotId.Invalid);
             return;
         }
 
@@ -418,18 +418,18 @@ public class ReplayPanelUI : MonoBehaviour
         switch (replayStartMode)
         {
             case ReplayStartMode.FromBeginning:
-                started = replayManager.StartReplayFromCurrentRecordBeginning(replayManager.VisionMode, replayManager.ObserverTeam)
-                          || replayManager.StartReplayFromBeginning(replayManager.VisionMode, replayManager.ObserverTeam);
+                started = replayManager.StartReplayFromCurrentRecordBeginning(replayManager.VisionMode, replayManager.ObserverSlotId)
+                          || replayManager.StartReplayFromBeginning(replayManager.VisionMode, replayManager.ObserverSlotId);
                 break;
             case ReplayStartMode.FromSpecificTurnTeam:
                 if (!specificSlot.IsValid)
-                    started = replayManager.StartReplayFromTurn(specificTurn, replayManager.VisionMode, replayManager.ObserverTeam);
+                    started = replayManager.StartReplayFromTurn(specificTurn, replayManager.VisionMode, replayManager.ObserverSlotId);
                 else
-                    started = replayManager.StartReplayFromTurnAndSlot(specificTurn, specificSlot, replayManager.VisionMode, replayManager.ObserverTeam);
+                    started = replayManager.StartReplayFromTurnAndSlot(specificTurn, specificSlot, replayManager.VisionMode, replayManager.ObserverSlotId);
                 break;
             case ReplayStartMode.FromCurrentTop:
             default:
-                started = replayManager.StartReplayFromLatestSnapshot(replayManager.VisionMode, replayManager.ObserverTeam);
+                started = replayManager.StartReplayFromLatestSnapshot(replayManager.VisionMode, replayManager.ObserverSlotId);
                 break;
         }
 

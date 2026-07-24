@@ -157,7 +157,9 @@ public class UnitManager : MonoBehaviour
     public int SlotIndex => slotIndex;
     public void SetSlotIndex(int index)
     {
+        int previousSlot = slotIndex;
         slotIndex = index;
+        ThreatRevisionTracker.NotifyUnitSlotChanged(previousSlot, slotIndex);
         ResolveTeamIdFromSlot();
         UpdateDynamicName();
     }
@@ -425,7 +427,7 @@ public class UnitManager : MonoBehaviour
         MatchController.OnUnitActedStateChanged -= HandleUnitActedStateChanged;
         MatchController.OnFogOfWarUpdated -= HandleFogOfWarUpdated;
         MatchController.OnSlotConfigChanged -= HandleSlotConfigChanged;
-        ThreatRevisionTracker.NotifyUnitDisabled(this, teamId, isEmbarked);
+        ThreatRevisionTracker.NotifyUnitDisabled(this, isEmbarked);
         StopSelectionBlinkRoutine();
         ClearTemporarySortingOrder();
         SetSpriteVisible(true);
@@ -683,7 +685,8 @@ public class UnitManager : MonoBehaviour
 
         Vector3Int cell = currentCellPosition;
         cell.z = 0;
-        string detail = killer != null && matchController.IsUnitVisibleForTeam(killer, TeamId)
+        string detail = killer != null &&
+                        matchController.IsUnitVisibleForSlot(killer, PlayerSlotId.FromIndex(SlotIndex))
             ? $"abatida por {(!string.IsNullOrWhiteSpace(killer.UnitDisplayName) ? killer.UnitDisplayName : killer.name)}"
             : "sem contato visual com o atacante";
         matchController.ReportTurnBriefingEvent(
@@ -1929,6 +1932,26 @@ public class UnitManager : MonoBehaviour
         RefreshActedVisual();
     }
 
+    // Zera as reservas logisticas mantendo as entradas (tipo de suprimento e teto
+    // continuam vindo da ficha; so a quantidade vai a zero). Usado no spawn de compra
+    // quando a ficha marca startsWithEmptySupplies: a unidade sai da fabrica vazia e
+    // precisa ser carregada por outro elo da cadeia. NAO chamar em load/refresh —
+    // apagaria estoque conquistado em jogo.
+    public void ClearSupplierReservesForFreshSpawn()
+    {
+        if (embarkedResourcesRuntime == null)
+            return;
+
+        for (int i = 0; i < embarkedResourcesRuntime.Count; i++)
+        {
+            UnitEmbarkedSupply entry = embarkedResourcesRuntime[i];
+            if (entry != null)
+                entry.amount = 0;
+        }
+
+        RefreshSupplierStockAlerts(true);
+    }
+
     private void SyncEmbarkedWeaponsFromData(UnitData data)
     {
         if (embarkedWeaponsRuntime == null)
@@ -2393,7 +2416,6 @@ public class UnitManager : MonoBehaviour
         if (!ApplyFromDatabase())
             UpdateDynamicName();
         RefreshActedVisual();
-        ThreatRevisionTracker.NotifyUnitTeamChanged(previousTeam, teamId);
 #if UNITY_EDITOR
         if (!Application.isPlaying)
             UnityEditor.EditorUtility.SetDirty(this);
@@ -2410,7 +2432,6 @@ public class UnitManager : MonoBehaviour
             UpdateDynamicName();
         }
         RefreshActedVisual();
-        ThreatRevisionTracker.NotifyUnitTeamChanged(previousTeam, teamId);
         if (Application.isPlaying)
         {
             Vector3Int cell = currentCellPosition;
@@ -3231,7 +3252,8 @@ public class UnitManager : MonoBehaviour
 
         // Stance icon is independent of the plan badge.
         unitHud.SetStanceIcon(aiHasStance && aiStanceVisible ? aiStanceIcon : null);
-        bool isAIUnit = matchController != null && matchController.IsPlayerAI(TeamId);
+        bool isAIUnit = matchController != null &&
+            matchController.IsPlayerAI(PlayerSlotId.FromIndex(SlotIndex));
         // O icone de manutencao e informacao de depuracao da IA, assim como o
         // badge de eixo. Nao deve vazar para o HUD normal quando a flag global
         // "Show AI Unit HUD" estiver desligada.

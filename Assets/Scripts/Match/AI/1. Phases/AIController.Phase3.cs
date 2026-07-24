@@ -18,7 +18,9 @@ public partial class AIController
         yield return CommitAIWorldHeavy(snapshot.AITeam, "phase3:pre-shopping");
 
         // Reconstrói snapshot para refletir o saldo atual pós-ações
-        AIWorldSnapshot freshSnap = AIWorldSnapshot.Build(snapshot.AITeam, matchController);
+        AIWorldSnapshot freshSnap = AIWorldSnapshot.Build(
+            PlayerSlotId.FromIndex(snapshot.AISlotIndex),
+            matchController);
         if (ShouldStopAIForMatchEnd("phase3_apos_snapshot"))
             yield break;
 

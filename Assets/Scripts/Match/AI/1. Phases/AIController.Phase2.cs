@@ -32,7 +32,7 @@ public partial class AIController
         // ---- Setup: executado uma única vez por fase ----
         SyncAIUnitCellsFromTransforms();
         AIWorldSnapshot current = AIWorldSnapshot.BuildLight(PlayerSlotId.FromIndex(snapshot.AISlotIndex), matchController);
-        TeamObjectivePlan activePlan = ObjectiveManager.GetPlanForTeam(aiTeam);
+        TeamObjectivePlan activePlan = ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(ResolveAISlotKey(aiTeam)));
         InvalidateStaleThreatObjectives(activePlan, aiTeam);
 
         foreach (UnitManager u in UnitManager.AllActive)
@@ -587,7 +587,8 @@ public partial class AIController
                 continue;
             if (unit.SlotIndex == currentAISlotIndex || unit.IsDead || unit.IsEmbarked)
                 return null;
-            if (mc != null && !mc.IsUnitVisibleForTeam(unit, aiTeam))
+            if (mc != null &&
+                !mc.IsUnitVisibleForSlot(unit, PlayerSlotId.FromIndex(currentAISlotIndex)))
                 return null;
             return unit;
         }
@@ -612,7 +613,7 @@ public partial class AIController
         Dictionary<Vector3Int, List<Vector3Int>> paths = BuildFireSupportPaths(fireSupport);
         HashSet<Vector3Int> occupied = BuildOccupied(fireSupport);
         bool stationary = IsLongRangeStationary(fireSupport);
-        TeamObjectivePlan capPlan = ObjectiveManager.GetPlanForTeam(aiTeam);
+        TeamObjectivePlan capPlan = ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(ResolveAISlotKey(aiTeam)));
         WeaponPriorityData weaponPriorityData = turnStateManager != null ? turnStateManager.WeaponPriorityDataRef : null;
 
         bool sensorListedTarget = false;       // o sensor chegou a mirar o alvo de alguma célula?
@@ -705,7 +706,8 @@ public partial class AIController
                 return false;
             }
 
-            AIWorldSnapshot airSnapshot = snapshot ?? AIWorldSnapshot.BuildLight(aiTeam, matchController);
+            AIWorldSnapshot airSnapshot = snapshot ??
+                AIWorldSnapshot.BuildLight(PlayerSlotId.FromIndex(currentAISlotIndex), matchController);
             MatchController mc = GetMatchController();
             bool hasAttackableAircraft = applyAirCombatTargetGates && HasAttackableAirCombatTarget(
                 airCombat,

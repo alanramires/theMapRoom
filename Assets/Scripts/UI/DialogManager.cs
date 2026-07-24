@@ -57,14 +57,12 @@ public class DialogManager : MonoBehaviour
         ClearLearnedHints();
     }
 
-    public void MarkHintLearned(TeamId team, HelpHintId hintId)
+    public void MarkHintLearned(PlayerSlotId slotId, HelpHintId hintId)
     {
-        if (team == TeamId.Neutral || (int)team < 1)
+        if (!slotId.IsValid)
             return;
 
-        int slotIndex = ResolveSlotIndex(team);
-        if (slotIndex < 0)
-            return;
+        int slotIndex = slotId.Value;
         if (!learnedHintsBySlot.TryGetValue(slotIndex, out HashSet<HelpHintId> hints))
         {
             hints = new HashSet<HelpHintId>();
@@ -79,31 +77,18 @@ public class DialogManager : MonoBehaviour
         learnedHintsBySlot.Clear();
     }
 
-    public bool HasLearnedHint(TeamId team, HelpHintId hintId)
+    public bool HasLearnedHint(PlayerSlotId slotId, HelpHintId hintId)
     {
-        if (team == TeamId.Neutral)
+        if (!slotId.IsValid)
             return true;
 
-        if (learnedHintsBySlot.TryGetValue(ResolveSlotIndex(team), out HashSet<HelpHintId> hints))
+        if (learnedHintsBySlot.TryGetValue(slotId.Value, out HashSet<HelpHintId> hints))
             return hints.Contains(hintId);
 
         return false;
     }
 
-    private int ResolveSlotIndex(TeamId team)
-    {
-        if (matchController == null)
-            return -1;
-        PlayerSlotId activeSlot = matchController.ActiveSlotId;
-        if (matchController.IsValidPlayerSlot(activeSlot) &&
-            matchController.GetVisualTeamForSlot(activeSlot) == team)
-            return activeSlot.Value;
-        return matchController.TryGetUniqueSlotForTeam(team, out PlayerSlotId uniqueSlot)
-            ? uniqueSlot.Value
-            : -1;
-    }
-
-    public void TryShowHint(TeamId team, HelpHintId hintId, string buildingOrUnitName)
+    public void TryShowHint(PlayerSlotId slotId, HelpHintId hintId, string buildingOrUnitName)
     {
         if (!contextHelpEnabled)
             return;
@@ -114,7 +99,7 @@ public class DialogManager : MonoBehaviour
         if (PanelDialogController.HasActiveFixedExternalText())
             return;
 
-        if (HasLearnedHint(team, hintId))
+        if (HasLearnedHint(slotId, hintId))
             return;
 
         string dialogId = GetDialogIdForHint(hintId);

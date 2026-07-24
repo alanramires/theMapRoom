@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -12,7 +12,7 @@ public partial class AIController
         using var perf = new AIDecisionPerfScope(unit, "pursuerCurrent");
         action = null;
 
-        TeamObjectivePlan activePlanDef = ObjectiveManager.GetPlanForTeam(snapshot.AITeam);
+        TeamObjectivePlan activePlanDef = ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(snapshot.AISlotIndex));
         bool mustVacate = activePlanDef != null && IsBlockingCaptureTarget(unit, activePlanDef, snapshot.AITeam);
         // Hold any owned building under immediate pressure. Even if the capturer was reassigned
         // elsewhere, vacating a controlled construction can let the enemy start capturing it.
@@ -30,7 +30,7 @@ public partial class AIController
         foreach (UnitManager enemy in UnitManager.AllActive)
         {
             if (enemy.SlotIndex == snapshot.AISlotIndex || enemy.IsDead || enemy.IsEmbarked) continue;
-            if (mc != null && !mc.IsUnitVisibleForTeam(enemy, snapshot.AITeam)) continue;
+            if (mc != null && !mc.IsUnitVisibleForSlot(enemy, PlayerSlotId.FromIndex(snapshot.AISlotIndex))) continue;
             Vector3Int ec = enemy.CurrentCellPosition; ec.z = 0;
             if (SectorManager.HexDistance(ec, targetCell) > fromDist) continue;
             foreach (Vector3Int cell in paths.Keys)

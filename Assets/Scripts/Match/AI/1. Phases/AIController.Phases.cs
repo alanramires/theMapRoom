@@ -78,9 +78,9 @@ public partial class AIController
         {
             Debug.Log($"{TL("Stage")} Retomando stage {resumeStage} com plano salvo; BuildObjectivePlan ignorado.");
             float tAnalyzerResume = Time.realtimeSinceStartup;
-            TeamObjectivePlan savedPlan = ObjectiveManager.GetPlanForTeam(aiTeam);
+            TeamObjectivePlan savedPlan = ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(ResolveAISlotKey(aiTeam)));
             RefreshRestoredRallyObjectiveStates(savedPlan, snapshot);
-            AITacticalAnalyzer.Instance.Rebuild(aiTeam, snapshot, savedPlan);
+            AITacticalAnalyzer.Instance.Rebuild(snapshot, savedPlan);
             Debug.Log($"[AI Perf] TacticalAnalyzer.Rebuild (resume): {(Time.realtimeSinceStartup - tAnalyzerResume) * 1000f:F0}ms");
         }
         else if (resumeStage <= 3 && (emulateStage1 || emulateStage2 || emulateStage3))
@@ -91,7 +91,7 @@ public partial class AIController
             Debug.Log($"[AI Perf] BuildObjectivePlan: {(Time.realtimeSinceStartup - tPlan) * 1000f:F0}ms");
             yield return null;
             float tAnalyzer = Time.realtimeSinceStartup;
-            AITacticalAnalyzer.Instance.Rebuild(aiTeam, snapshot, ObjectiveManager.GetPlanForTeam(aiTeam));
+            AITacticalAnalyzer.Instance.Rebuild(snapshot, ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(ResolveAISlotKey(aiTeam))));
             Debug.Log($"[AI Perf] TacticalAnalyzer.Rebuild: {(Time.realtimeSinceStartup - tAnalyzer) * 1000f:F0}ms");
             yield return null;
         }
@@ -180,7 +180,7 @@ public partial class AIController
 
     private static bool HasUsableSavedObjectivePlan(TeamId aiTeam)
     {
-        TeamObjectivePlan plan = ObjectiveManager.GetPlanForTeam(aiTeam);
+        TeamObjectivePlan plan = ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(ResolveAISlotKey(aiTeam)));
         if (plan == null)
             return false;
         bool hasObjectives = plan.Objectives != null && plan.Objectives.Count > 0;
@@ -294,10 +294,10 @@ public partial class AIController
 
         if (resetPlan)
         {
-            TeamObjectivePlan existing = ObjectiveManager.GetOrCreatePlanForTeam(aiTeam);
+            TeamObjectivePlan existing = ObjectiveManager.GetOrCreatePlanForSlot(PlayerSlotId.FromIndex(ResolveAISlotKey(aiTeam)), aiTeam);
             foreach (SectorObjective obj in existing.Objectives)
                 ClearObjectiveHUD(obj);
-            ObjectiveManager.ClearPlanForTeam(aiTeam);
+            ObjectiveManager.ClearPlanForSlot(PlayerSlotId.FromIndex(ResolveAISlotKey(aiTeam)));
             Debug.Log($"{TL("Stage")} Plano resetado antes do BuildObjectivePlan.");
         }
 
@@ -305,18 +305,18 @@ public partial class AIController
         {
             currentAIStage = 1;
             BuildObjectivePlan(snapshot);
-            AITacticalAnalyzer.Instance.Rebuild(aiTeam, snapshot, ObjectiveManager.GetPlanForTeam(aiTeam));
+            AITacticalAnalyzer.Instance.Rebuild(snapshot, ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(ResolveAISlotKey(aiTeam))));
         }
 
         // O snapshot nasceu antes do planejamento e o próprio build pode ter disparado Go Green.
         // Reconcilia a invariável sem-rogues antes de pausar para inspeção do plano recalculado.
         AIController.GoGreenInvasionInspection debugInvasion =
-            GetGoGreenInvasionForInspection(aiTeam, snapshot.TurnNumber);
+            GetGoGreenInvasionForInspection(PlayerSlotId.FromIndex(snapshot.AISlotIndex), snapshot.TurnNumber);
         snapshot.IsInvading = debugInvasion.Active;
         if (snapshot.IsInvading)
         {
-            TeamObjectivePlan debugPlan = ObjectiveManager.GetPlanForTeam(aiTeam);
-            currentAxisMap = InvasionAxisMap.Build(aiTeam);
+            TeamObjectivePlan debugPlan = ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(ResolveAISlotKey(aiTeam)));
+            currentAxisMap = InvasionAxisMap.Build(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam)));
             AssignUnslottedUnitsToGoGreenInvasion(debugPlan, aiTeam);
         }
 

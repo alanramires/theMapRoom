@@ -231,6 +231,10 @@ A direção importa e não é simétrica. Um Hub abastece outro Hub ou qualquer 
 
 No topo existe o Hub infinito: ele só doa, nunca recebe. É a fonte, e não faz sentido encher uma fonte.
 
+Vale ver onde as unidades caem nessa divisão, porque contraria a intuição. O **Trem de Carga é Hub**: ele move estoque pela malha, e é a artéria que liga a retaguarda ao front nos mapas grandes — o que amarra a logística ao traçado ferroviário do `03_movimento_terreno_e_infraestrutura.md`, já que ele só existe onde há trilho contínuo. O **Caminhão de Suprimentos é Receiver**: ele é o capilar, a última perna. Recebe da cadeia e gasta atendendo unidades, mas nunca repassa estoque para outro supridor.
+
+A leitura tática cai sozinha: você não faz logística enfileirando caminhões, porque um caminhão não abastece outro. Você faz logística levando a artéria até perto do front e deixando os capilares curtos.
+
 ### O Estoque Acaba
 
 Um detalhe que muda o planejamento de campanha inteiro: **construções gastam reserva ao prestar serviço.**

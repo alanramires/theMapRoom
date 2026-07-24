@@ -85,3 +85,41 @@ O argumento anti-oráculo justificaria bloquear o que revela presença inimiga. 
 **Decisão necessária.** Recusar sem nomear, e sem distinguir "ocupado" de "inválido" quando a unidade não é conhecida pelo time — o padrão de motivo neutro que a exceção de ataque no escuro já usa.
 
 **Status.** Aberta. Consertar independe da decisão de FOW-002.
+
+---
+
+### LOG-003 — Supridor comprado já vem cheio, o que curto-circuita a cadeia
+
+**Problema de design.** Se todo supridor nasce com a reserva cheia, a cadeia logística perde a razão de existir: em vez de montar trem → caminhão → front, ou trem → navio-tanque → porta-aviões, basta comprar direto o nó menor e usá-lo cheio. O elo mais barato substitui a corrente inteira, e o `07` promete uma logística que precisa ser construída.
+
+**Proposta.** Um campo novo em `UnitData`, na seção de logística, logo abaixo de `isSupplier`: **"começa com 0 carga"**, com padrão **true**. Quem nasce cheio passa a ser a exceção declarada, não a regra silenciosa.
+
+**Valores pretendidos por unidade** (definidos pelo autor, ainda não aplicados):
+
+| Unidade | Começa com 0 carga | Razão |
+|---|---|---|
+| Trem de Carga | **false** — nasce cheio | é a fonte que alimenta a malha |
+| Caminhão de Suprimentos | **false** — nasce cheio | comprado na construção, sai carregado |
+| Avião-Tanque | **false** — nasce cheio | coletou no aeroporto onde foi comprado |
+| Porta-Aviões | **false** — nasce cheio | coletou no porto de onde veio |
+| Caminhão 18 rodas | **true** — nasce vazio | precisa ser carregado pela cadeia |
+| Navio-Tanque | **true** — nasce vazio | comprado nas Docas, não no Porto Naval |
+| Hidroavião | **true** — nasce vazio | a Hidrobase fornece o que tiver |
+
+O critério que emerge da tabela: nasce cheio quem foi comprado **em uma instalação que tinha o que dar**; nasce vazio quem foi comprado em instalação que não abastece aquele tipo de carga.
+
+**Impacto.** Restaura o valor da cadeia e dá sentido econômico às Docas e à Hidrobase como pontos de carregamento, não só de compra.
+
+**Status.** Aberta, especificada. Implementação sugerida em duas partes: o campo e a aplicação no spawn em C#, e a marcação por ficha feita no inspector da Unity — assets não devem ser editados no disco com o editor aberto.
+
+---
+
+### LOG-004 — Perfil de autonomia "Rotor" nomeia mal o hidroavião
+
+**Comportamento atual.** O `AR Hidroaviao` usa o perfil de autonomia **Rotor Autonomy** (consumo 2 por turno). O valor está correto e não se discute; o **nome** é que descreve asa rotativa, e o hidroavião não é helicóptero.
+
+**Evidência.** `AR Hidroaviao.asset` → `autonomyData` GUID `86f5ee65…` = `Rotor Autonomy` (`turnStartUpkeep: 2`).
+
+**Proposta.** Duplicar o perfil como **"Monomotor"**, com os mesmos valores, e repontar o hidroavião para ele. Puramente estético — nenhuma mudança de comportamento.
+
+**Status.** Aberta, cosmética. Exige criação de asset no editor.

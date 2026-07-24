@@ -101,7 +101,7 @@ public partial class AITacticalAnalyzer
             if (!TryGetOpsSectorInfo(obj.Sector, out SectorManager.SectorInfo info))
                 continue;
             bool isInvasion = obj.ObjectiveType == AIObjectiveType.InvasionAttack;
-            SectorManager.SectorInfo.TransportPreference transportPref = info.GetTransportPreference(team);
+            SectorManager.SectorInfo.TransportPreference transportPref = info.GetTransportPreference(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(team)));
             // Invasão cruza o mapa por terra até o QG inimigo: não cede o transporte ao airlift.
             if (!isInvasion
                 && HasAnySlot(obj, UnitRole.Transportador)
@@ -123,7 +123,7 @@ public partial class AITacticalAnalyzer
                         ? ComputeGroundTransportNeed(team, snapshot, obj)
                         : 0;
             AISectorIntel sectorIntel = FindIntelForSector(intel, obj.Sector);
-            bool risky = info.GetRiskLevelFor(team) >= SectorManager.SectorRiskLevel.Medium || IsHotIntelSector(sectorIntel);
+            bool risky = info.GetRiskLevelFor(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(team))) >= SectorManager.SectorRiskLevel.Medium || IsHotIntelSector(sectorIntel);
             bool hasBasicTaskForce = capturers > 0 && (assaults > 0 || fireSupport > 0);
             bool needsAssaultScreen = risky && !hasBasicTaskForce;
 
@@ -207,7 +207,7 @@ public partial class AITacticalAnalyzer
         // alvo garante que pipelinar uma frente perto (dentro dos ~7h) não gere demanda.
         if (!SectorManager.TryGetSectorInfo(target, out SectorManager.SectorInfo frontInfo))
             return 0;
-        float depth = frontInfo.GetDistanceToHQ(team);
+        float depth = frontInfo.GetDistanceToHQ(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(team)));
         if (depth < GroundTransportEmbarkDistance)
             return 0;
 
@@ -301,7 +301,7 @@ public partial class AITacticalAnalyzer
             op.AddSlots(AINeedKind.Assault, 1);
         if (visibleGroundThreat && sectorIntel != null && (sectorIntel.enemyPresence >= 2f || sectorIntel.landingPressure > 0f))
             op.AddSlots(AINeedKind.Assault, 1);
-        if (visibleGroundThreat && info.GetDistanceToHQ(team) <= GetEffectiveTransportThreshold(team))
+        if (visibleGroundThreat && info.GetDistanceToHQ(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(team))) <= GetEffectiveTransportThreshold(team))
             op.AddSlots(AINeedKind.Artillery, 1);
         else if (visibleGroundThreat && sectorIntel != null && sectorIntel.damageTaken > 0f)
             op.AddSlots(AINeedKind.Artillery, 1);
@@ -338,7 +338,7 @@ public partial class AITacticalAnalyzer
         int maxFleet = AIShoppingPlanner.Instance != null
             ? AIShoppingPlanner.Instance.MaxAirTransporters : 3;
         int threshold = AIController.Instance != null
-            ? AIController.Instance.GetEffectiveTransportThreshold(team) : 7;
+            ? AIController.Instance.GetEffectiveTransportThresholdForSlot(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(team))) : 7;
         int built = 0;
         foreach (InvasionAxisMap.Axis axis in axisMap.Axes)
         {
@@ -356,7 +356,7 @@ public partial class AITacticalAnalyzer
             if (!SectorManager.TryGetSectorInfo(targetSector, out SectorManager.SectorInfo info))
                 continue;
             // Nó intermediário raso não justifica frota aérea (a pé resolve; APC depois).
-            if (info.GetDistanceToHQ(team) < threshold)
+            if (info.GetDistanceToHQ(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(team))) < threshold)
                 continue;
 
             AITacticalNeed op = CreateOperation(
@@ -368,7 +368,7 @@ public partial class AITacticalAnalyzer
             ops.Add(op);
             built++;
             Debug.Log($"[AI Ops][T{snapshot.TurnNumber}][{team}] EarlyAxisAirlift eixo={axis.EixoIndex} "
-                + $"alvo={targetSector} front={axis.FrontIndex} dist={info.GetDistanceToHQ(team):F0} "
+                + $"alvo={targetSector} front={axis.FrontIndex} dist={info.GetDistanceToHQ(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(team))):F0} "
                 + $"(Chinook cedo nos nós intermediários)");
         }
     }
@@ -392,7 +392,7 @@ public partial class AITacticalAnalyzer
             if (!SectorManager.TryGetSectorInfo(obj.Sector, out SectorManager.SectorInfo info)) continue;
             // Setores que preferem veículo recebem APC pelo GroundCapture; evita demanda dupla
             // (APC terrestre + helicóptero) para o mesmo objetivo.
-            if (info.GetTransportPreference(team) == SectorManager.SectorInfo.TransportPreference.Vehicle)
+            if (info.GetTransportPreference(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(team))) == SectorManager.SectorInfo.TransportPreference.Vehicle)
                 continue;
 
             int desiredPassengers = CountSlots(obj, UnitRole.Capturador);
@@ -410,7 +410,7 @@ public partial class AITacticalAnalyzer
             AISectorIntel sectorIntel = FindIntelForSector(intel, obj.Sector);
             op.AddSlots(AINeedKind.Capturer, capturerDeficit);
             op.AddSlots(AINeedKind.AirTransport, airDeficit);
-            if (info.GetRiskLevelFor(team) >= SectorManager.SectorRiskLevel.High || IsHotIntelSector(sectorIntel))
+            if (info.GetRiskLevelFor(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(team))) >= SectorManager.SectorRiskLevel.High || IsHotIntelSector(sectorIntel))
                 op.AddSlots(AINeedKind.Assault, 1);
             if (sectorIntel != null && sectorIntel.damageTaken > 0f)
                 op.AddSlots(AINeedKind.Artillery, 1);

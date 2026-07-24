@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -454,7 +454,7 @@ public partial class AIController
 
                 Vector3Int transporterCell = transporter.CurrentCellPosition; transporterCell.z = 0;
                 float apcDist = SectorManager.HexDistance(transporterCell, targetCell);
-                int effectiveThreshold = GetEffectiveTransportThreshold(aiTeam);
+                int effectiveThreshold = GetEffectiveTransportThresholdForSlot(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam)));
                 if (apcDist >= effectiveThreshold)
                     continue;
 
@@ -588,7 +588,7 @@ public partial class AIController
             {
                 if (enemy.SlotIndex == ResolveAISlotKey(aiTeam) || enemy.IsDead || enemy.IsEmbarked)
                     continue;
-                if (mc != null && !mc.IsUnitVisibleForTeam(enemy, aiTeam))
+                if (mc != null && !mc.IsUnitVisibleForSlot(enemy, PlayerSlotId.FromIndex(currentAISlotIndex)))
                     continue;
                 Vector3Int ec = enemy.CurrentCellPosition; ec.z = 0;
                 if (SectorManager.HexDistance(ec, cc) <= range)
@@ -632,7 +632,7 @@ public partial class AIController
                 {
                     if (enemy.SlotIndex == ResolveAISlotKey(aiTeam) || enemy.IsDead || enemy.IsEmbarked)
                         continue;
-                    if (mc != null && !mc.IsUnitVisibleForTeam(enemy, aiTeam))
+                    if (mc != null && !mc.IsUnitVisibleForSlot(enemy, PlayerSlotId.FromIndex(currentAISlotIndex)))
                         continue;
                     Vector3Int ec = enemy.CurrentCellPosition; ec.z = 0;
                     if (SectorManager.HexDistance(ec, cc) <= HomeDefenseThreatRange)

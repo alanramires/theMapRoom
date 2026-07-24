@@ -15,7 +15,7 @@ public sealed class MatchStatsManager : MonoBehaviour
     [SerializeField] private int lastAttackJogadasCount;
     [SerializeField] private int lastCaptureJogadasCount;
 
-    private readonly Dictionary<TeamId, SlotMatchStats> statsByTeam = new Dictionary<TeamId, SlotMatchStats>();
+    private readonly Dictionary<int, SlotMatchStats> statsBySlot = new Dictionary<int, SlotMatchStats>();
     private readonly HashSet<int> purchasedUnitIds = new HashSet<int>();
     private readonly HashSet<int> destroyedUnitIds = new HashSet<int>();
     private bool subscribed;
@@ -51,19 +51,28 @@ public sealed class MatchStatsManager : MonoBehaviour
         return Instance;
     }
 
-    public bool TryGetStats(TeamId team, out SlotMatchStats stats)
+    public bool TryGetStats(PlayerSlotId slot, out SlotMatchStats stats)
     {
         RefreshTerritoryStats();
-        return statsByTeam.TryGetValue(team, out stats);
+        stats = null;
+        return slot.IsValid && statsBySlot.TryGetValue(slot.Value, out stats);
     }
 
-    public SlotMatchStats GetOrCreateStats(TeamId team)
+    public SlotMatchStats GetOrCreateStats(PlayerSlotId slot)
     {
-        if (statsByTeam.TryGetValue(team, out SlotMatchStats stats) && stats != null)
+        if (!slot.IsValid)
+            return null;
+        if (statsBySlot.TryGetValue(slot.Value, out SlotMatchStats stats) && stats != null)
             return stats;
 
-        stats = new SlotMatchStats { team = team, teamName = TeamUtils.GetName(team) };
-        statsByTeam[team] = stats;
+        TeamId team = ResolveVisualTeam(slot);
+        stats = new SlotMatchStats
+        {
+            slotIndex = slot.Value,
+            team = team,
+            teamName = TeamUtils.GetName(team)
+        };
+        statsBySlot[slot.Value] = stats;
         slotStats.Add(stats);
         SortSlotStats();
         return stats;
@@ -72,7 +81,7 @@ public sealed class MatchStatsManager : MonoBehaviour
     public void ResetStats()
     {
         slotStats.Clear();
-        statsByTeam.Clear();
+        statsBySlot.Clear();
         purchasedUnitIds.Clear();
         destroyedUnitIds.Clear();
         lastJogadasCount = 0;
@@ -182,7 +191,7 @@ public sealed class MatchStatsManager : MonoBehaviour
             return;
 
         destroyedUnitIds.Add(unit.InstanceId);
-        SlotMatchStats ownerStats = GetOrCreateStats(unit.TeamId);
+        SlotMatchStats ownerStats = GetOrCreateStats(PlayerSlotId.FromIndex(unit.SlotIndex));
         UnitTypeMatchStats typeStats = ownerStats.GetOrCreateUnitStats(ResolveUnitKey(unit, out UnitData data), data, unit);
         int cost = ResolveCost(data);
         typeStats.lost++;
@@ -243,19 +252,19 @@ public sealed class MatchStatsManager : MonoBehaviour
 
         if (string.Equals(action, "Embarque", StringComparison.OrdinalIgnoreCase))
         {
-            GetOrCreateStats(ToTeam(jogada.team)).embarkActions++;
+            GetOrCreateStats(PlayerSlotId.FromIndex(jogada.team)).embarkActions++;
             return;
         }
 
         if (string.Equals(action, "Desembarque", StringComparison.OrdinalIgnoreCase))
         {
-            GetOrCreateStats(ToTeam(jogada.team)).disembarkActions++;
+            GetOrCreateStats(PlayerSlotId.FromIndex(jogada.team)).disembarkActions++;
             return;
         }
 
         if (string.Equals(action, "Fusao", StringComparison.OrdinalIgnoreCase))
         {
-            SlotMatchStats mergeStats = GetOrCreateStats(ToTeam(jogada.team));
+            SlotMatchStats mergeStats = GetOrCreateStats(PlayerSlotId.FromIndex(jogada.team));
             mergeStats.mergeActions++;
             // Cada fusão confirmada consome exatamente um doador (unidades idênticas do
             // mesmo time). No jogo ao vivo essa morte já é contada pelo evento
@@ -301,12 +310,12 @@ public sealed class MatchStatsManager : MonoBehaviour
         if (jogada.uid > 0)
             purchasedUnitIds.Add(jogada.uid);
 
-        TeamId team = ToTeam(jogada.team);
+        PlayerSlotId slot = PlayerSlotId.FromIndex(jogada.team);
         UnitManager unit = FindUnit(jogada.uid);
         UnitData data = null;
         unit?.TryGetUnitData(out data);
 
-        SlotMatchStats stats = GetOrCreateStats(team);
+        SlotMatchStats stats = GetOrCreateStats(slot);
         UnitTypeMatchStats typeStats = stats.GetOrCreateUnitStats(ResolveUnitKey(jogada.unidadeSigla, unit, data), data, unit);
         typeStats.purchased++;
         typeStats.valuePurchased += ResolveCost(data);
@@ -317,10 +326,10 @@ public sealed class MatchStatsManager : MonoBehaviour
 
     private void ApplyAttack(Jogada jogada)
     {
-        TeamId attackerTeam = ToTeam(jogada.team);
-        TeamId defenderTeam = ToTeam(jogada.team2);
-        SlotMatchStats attackerStats = GetOrCreateStats(attackerTeam);
-        SlotMatchStats defenderStats = GetOrCreateStats(defenderTeam);
+        PlayerSlotId attackerSlot = PlayerSlotId.FromIndex(jogada.team);
+        PlayerSlotId defenderSlot = PlayerSlotId.FromIndex(jogada.team2);
+        SlotMatchStats attackerStats = GetOrCreateStats(attackerSlot);
+        SlotMatchStats defenderStats = GetOrCreateStats(defenderSlot);
 
         if (jogada.hasHpState)
         {
@@ -333,10 +342,10 @@ public sealed class MatchStatsManager : MonoBehaviour
         }
 
         if (jogada.hp2Antes > 0 && jogada.hp2Depois <= 0)
-            RecordKill(attackerTeam, defenderTeam, jogada.uid2, jogada.unidadeSigla2, jogada.defenderCost, jogada.defenderEliteLevel);
+            RecordKill(attackerSlot, defenderSlot, jogada.uid2, jogada.unidadeSigla2, jogada.defenderCost, jogada.defenderEliteLevel);
 
         if (jogada.hpAntes > 0 && jogada.hpDepois <= 0)
-            RecordKill(defenderTeam, attackerTeam, jogada.uid, jogada.unidadeSigla, 0, 0);
+            RecordKill(defenderSlot, attackerSlot, jogada.uid, jogada.unidadeSigla, 0, 0);
 
         if (jogada.combatCargo != null)
         {
@@ -346,14 +355,14 @@ public sealed class MatchStatsManager : MonoBehaviour
                 if (cargo == null || cargo.hpAntes <= 0 || cargo.hpDepois > 0)
                     continue;
 
-                RecordKill(attackerTeam, ToTeam(cargo.team), cargo.uid, cargo.sigla, cargo.cost, cargo.eliteLevel, cargo.unitClass);
+                RecordKill(attackerSlot, PlayerSlotId.FromIndex(cargo.team), cargo.uid, cargo.sigla, cargo.cost, cargo.eliteLevel, cargo.unitClass);
             }
         }
     }
 
     private void ApplyCapture(Jogada jogada)
     {
-        SlotMatchStats stats = GetOrCreateStats(ToTeam(jogada.team));
+        SlotMatchStats stats = GetOrCreateStats(PlayerSlotId.FromIndex(jogada.team));
         stats.captureActions++;
         if (!string.IsNullOrWhiteSpace(jogada.obs)
             && jogada.obs.IndexOf("capturado", StringComparison.OrdinalIgnoreCase) >= 0)
@@ -369,7 +378,7 @@ public sealed class MatchStatsManager : MonoBehaviour
 
     private void ApplyRepairState(Jogada jogada)
     {
-        SlotMatchStats stats = GetOrCreateStats(ToTeam(jogada.team));
+        SlotMatchStats stats = GetOrCreateStats(PlayerSlotId.FromIndex(jogada.team));
         if (!jogada.repairBefore && jogada.repairAfter)
             stats.unitsEnteredRepair++;
         else if (jogada.repairBefore && !jogada.repairAfter)
@@ -381,7 +390,7 @@ public sealed class MatchStatsManager : MonoBehaviour
         if (jogada == null || !jogada.hasServiceResult)
             return;
 
-        SlotMatchStats stats = GetOrCreateStats(ToTeam(jogada.team));
+        SlotMatchStats stats = GetOrCreateStats(PlayerSlotId.FromIndex(jogada.team));
         int cost = Mathf.Max(0, jogada.serviceCost);
         int hp = Mathf.Max(0, jogada.serviceHpGain);
         int fuel = Mathf.Max(0, jogada.serviceFuelGain);
@@ -420,8 +429,8 @@ public sealed class MatchStatsManager : MonoBehaviour
     }
 
     private void RecordKill(
-        TeamId killerTeam,
-        TeamId victimTeam,
+        PlayerSlotId killerSlot,
+        PlayerSlotId victimSlot,
         int victimUid,
         string victimSigla,
         int victimCost,
@@ -439,8 +448,8 @@ public sealed class MatchStatsManager : MonoBehaviour
         victim?.TryGetUnitData(out data);
         int resolvedCost = victimCost > 0 ? victimCost : ResolveCost(data);
 
-        SlotMatchStats killerStats = GetOrCreateStats(killerTeam);
-        SlotMatchStats victimStats = GetOrCreateStats(victimTeam);
+        SlotMatchStats killerStats = GetOrCreateStats(killerSlot);
+        SlotMatchStats victimStats = GetOrCreateStats(victimSlot);
 
         UnitTypeMatchStats killedType = killerStats.GetOrCreateUnitStats(
             ResolveUnitKey(victimSigla, victim, data),
@@ -493,7 +502,7 @@ public sealed class MatchStatsManager : MonoBehaviour
 
             UnitData data = null;
             unit.TryGetUnitData(out data);
-            SlotMatchStats stats = GetOrCreateStats(unit.TeamId);
+            SlotMatchStats stats = GetOrCreateStats(PlayerSlotId.FromIndex(unit.SlotIndex));
             UnitTypeMatchStats typeStats = stats.GetOrCreateUnitStats(ResolveUnitKey(unit, out data), data, unit);
             typeStats.current++;
             stats.currentUnits++;
@@ -548,7 +557,7 @@ public sealed class MatchStatsManager : MonoBehaviour
                     if (construction.OwnerTeam == TeamId.Neutral)
                         continue;
 
-                    SlotMatchStats owner = GetOrCreateStats(construction.OwnerTeam);
+                    SlotMatchStats owner = GetOrCreateStats(PlayerSlotId.FromIndex(construction.OwnerSlotIndex));
                     owner.controlledConstructions++;
                     owner.controlledCapturePoints += current;
                     owner.contestedOwnedCapturePoints += Mathf.Max(0, max - current);
@@ -560,7 +569,7 @@ public sealed class MatchStatsManager : MonoBehaviour
                         && construction.Source.CurrentOccupantOnTop.TeamId != TeamId.Neutral
                         && construction.Source.CurrentOccupantOnTop.TeamId != construction.OwnerTeam)
                     {
-                        SlotMatchStats attacker = GetOrCreateStats(construction.Source.CurrentOccupantOnTop.TeamId);
+                        SlotMatchStats attacker = GetOrCreateStats(PlayerSlotId.FromIndex(construction.Source.CurrentOccupantOnTop.SlotIndex));
                         attacker.contestingCapturePoints += contested;
                         attacker.controlledCapturePoints += contested;
                     }
@@ -570,7 +579,7 @@ public sealed class MatchStatsManager : MonoBehaviour
             if (info.ControllingTeam == TeamId.Neutral)
                 continue;
 
-            SlotMatchStats sectorOwner = GetOrCreateStats(info.ControllingTeam);
+            SlotMatchStats sectorOwner = GetOrCreateStats(PlayerSlotId.FromIndex(info.ControllingSlotIndex));
             if (countAsBase)
                 sectorOwner.controlledBases++;
             else
@@ -626,20 +635,24 @@ public sealed class MatchStatsManager : MonoBehaviour
         return data != null ? Mathf.Max(0, data.cost) : 0;
     }
 
-    private static TeamId ToTeam(int team)
+    private static TeamId ResolveVisualTeam(PlayerSlotId slot)
     {
-        return Enum.IsDefined(typeof(TeamId), team) ? (TeamId)team : TeamId.Neutral;
+        MatchController match = FindFirstObjectByType<MatchController>();
+        return slot.IsValid && match != null
+            ? match.GetVisualTeamForSlot(slot)
+            : TeamId.Neutral;
     }
 
     private void SortSlotStats()
     {
-        slotStats.Sort((a, b) => ((int)a.team).CompareTo((int)b.team));
+        slotStats.Sort((a, b) => a.slotIndex.CompareTo(b.slotIndex));
     }
 }
 
 [Serializable]
 public sealed class SlotMatchStats
 {
+    public int slotIndex = -1;
     public TeamId team;
     public string teamName;
     public int totalPurchases;

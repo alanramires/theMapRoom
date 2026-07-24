@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -264,7 +264,7 @@ public partial class AIController
             }
             bool conscriptionClosed = conscriptionProducerBan
                 && IsConscriptionClosedProducerConstruction(c, aiTeam);
-            bool logisticsProducer = logisticsProducerBan && c.CanProduceUnitsForTeam(aiTeam);
+            bool logisticsProducer = logisticsProducerBan && c.CanProduceUnitsForSlot(AIController.ResolveAISlotKey(aiTeam));
             if (conscriptionClosed && !eliteRelaxSafety)
             {
                 Debug.Log($"[Repair] skip {cc} base/âncora de produção fechada pela conscrição dist={dist:F1}");

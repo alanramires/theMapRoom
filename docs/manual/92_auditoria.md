@@ -41,6 +41,11 @@ Os IDs seguem o mesmo esquema de `90_pendencias_tecnicas.md` e não são reaprov
 | LOG-015 | Serviço do Comando alcança passageiros diretos (primeiro nível), não a cadeia inteira | Confirmada | `ServicoDoComandoSensor.cs:518` pula transportador embarcado como fonte |
 | LOG-016 | Fila do Comando ordenada por prioridade econômica (mais caro primeiro), família junta | Confirmada | `TurnStateManager.CommandService.cs:1667+` (`NormalizeCommandServiceQueueForEmbarkedFamilies`, sort por `ResolveCommandServiceUnitCost`) |
 | LOG-017 | Serviço em campo atende só o veículo, não passageiros | Confirmada | `PodeSuprirSensor` respeita `serviceRange`, não desce à carga |
+| LOG-018 | Trem de Carga é Hub; Caminhão de Suprimentos é Receiver | Confirmada | `SupplierSettings.cs` (`Hub=0, Receiver=1`); `Trem de Carga.asset` tier 0, `Suprimentos.asset` tier 1 |
+| LOG-019 | Hidroavião consome 2/turno (perfil Rotor), igual a helicóptero | Confirmada | `AR Hidroaviao.asset` → `Rotor Autonomy` (`turnStartUpkeep: 2`). Perfis: Rotor 2, Turbo Hélice 3, Jet 5, Heavy Motor 0 |
+| AIR-016 | Decolagem exige autonomia > 0 | Confirmada | `PodeDecolarSensor.cs:87` |
+| AIR-017 | Aeronave já pousada que recebe suprimento NÃO relança no mesmo turno | Confirmada | o relance vem de `forceLandBeforeSupply` (alvo voando que desce para ser servido); quem já estava no chão não passa por lá — `PodeSuprirSensor.cs:508-563` |
+| TRA-013 | Fusão NÃO iguala camada: exige camada já idêntica e rejeita o resto | **Manual errado** | `PodeFundirSensor.cs:174-191` (`sameOperationalLayer`); a execução só normaliza o resultado (`Merge.cs:546`). Texto corrigido em `08` |
 | COM-010 | Revide só a distância 1, e a arma precisa de alcance mínimo 1 | Confirmada | `PodeMirarSensor.cs:1317` e `:1362` |
 | COM-011 | Teto de eliminações é o HP do atacante no início da troca | Confirmada | `TurnStateManager.Combat.cs:337-347` |
 | COM-012 | "Teto do alvo" não existe como regra — é truncamento no piso 0 | Manual errado | mesma referência; texto corrigido em `06` |
@@ -49,6 +54,7 @@ Os IDs seguem o mesmo esquema de `90_pendencias_tecnicas.md` e não são reaprov
 | COM-015 | Alcance 0 é suportado pelo motor | Confirmada | `PodeMirarSensor.cs:100` e `:971`; mover-e-atirar corrigido em `:959-968` nesta sessão |
 | COM-016 | Posição/DPQ é resolvida pela célula, sem consultar dono — invasor no QG recebe Único (+6) | Confirmada | `Combat.cs:389-432` (`ResolveDpqAtUnitPosition`): camada → construção → estrutura → terreno, nenhuma checagem de propriedade |
 | COM-017 | Penalidade de ferido entra na defesa dos DOIS lados, simetricamente | Confirmada | `Combat.cs:309-312` |
+| COM-018 | Contra aeronave pousada o RPS de ataque tem piso 0 (negativo sobe a 0; positivo permanece) | Confirmada | `Combat.cs:232-240` (real) e `AICombatHpSimulator.cs:231-234` (IA) — mesma regra, sem divergência; trace registra em `Combat.cs:284` |
 | FOW-010 | Montanha concede elevação 2 e bloqueia como 2,25 | Confirmada | `TerrainTypeData.cs:95-108` · `Montanha.asset` |
 | FOW-011 | Construção revela terreno no raio e detecta unidade só no próprio hex | Confirmada | `MatchController.cs:4674-4713` e `:6265` |
 | FOW-012 | Exposição de furtivo dura até o próximo turno do dono | Confirmada | `UnitManager.cs:977-994` |
@@ -71,6 +77,11 @@ Os IDs seguem o mesmo esquema de `90_pendencias_tecnicas.md` e não são reaprov
 | TRA-012 | Unidades embarcadas contam contra a derrota por eliminação total | **Manual impreciso** | a contagem ignora embarcados (`MatchController.cs:2734`), mas o caso é inalcançável porque a morte do transportador mata a cadeia |
 | ECO-010 | Renda é atributo por construção, não constante global | Confirmada | `ConstructionSiteRuntime.capturedIncoming` |
 | ECO-011 | Nomes oficiais: "Fábrica" (não "Fábrica Média"), "Porto Naval", "Logistica Naval" | Confirmada | assets em `Assets/DB/World Building/Construction/` |
+| ECO-012 | Renda declarada no manual para infraestrutura pesada | **Manual errado** | Fábrica Pesada e Aeroporto Avançado são 2.500 (não 2.000); Fábrica Média é 2.000 (não 1.500). Corrigido em `09` |
+| ECO-013 | Renda = pontos de captura × 50 em todas as construções | Confirmada | 13 assets em `World Building/Construction`, zero exceções. Registrado em `09` como proporção do jogo base, não regra do motor |
+| ECO-014 | Derrota (rendição, QG, eliminação) neutraliza as construções e restaura captura ao máximo — não transfere ao vencedor | Confirmada | `MatchController.cs:2191-2203` (`NeutralizeConstructionsOwnedBySlot`: `SetOwnerSlot(-1)` + `SetCurrentCapturePoints(CapturePointsMax)`). Documentado em `10` |
+| ECO-015 | A PRIMEIRA eliminação encerra a partida inteira, mesmo restando outros participantes | Confirmada | `MatchController.cs:2236-2240` (`DeclareEliminationVictory`, comentário explícito); vencedor é quem executou a eliminação |
+| ECO-016 | Vitória congela o avanço de turno (`freezeTurnAdvanceAfterVictory`, padrão true) | Confirmada | `MatchController.cs:276` e `:1601` — `AdvanceTurn()` retorna de imediato. Resta só menu/Jornal/estatísticas |
 
 ## Reclassificações
 

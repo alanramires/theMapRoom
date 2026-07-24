@@ -119,8 +119,8 @@ public class PanelTurnController : MonoBehaviour
 
         bool hasTwoSlots = matchController != null && matchController.SlotCount == 2;
         bool aiVersusAi = hasTwoSlots &&
-                          matchController.IsPlayerAI(matchController.GetTeamIdForSlot(0)) &&
-                          matchController.IsPlayerAI(matchController.GetTeamIdForSlot(1));
+                          matchController.IsPlayerAI(PlayerSlotId.FromIndex(0)) &&
+                          matchController.IsPlayerAI(PlayerSlotId.FromIndex(1));
         bool fogOfWarTotal = matchController != null &&
                              matchController.GameSetup == MatchController.GameSetupPreset.FogOfWarTotal &&
                              matchController.IsFogOfWarDebugEnabled;
@@ -142,12 +142,10 @@ public class PanelTurnController : MonoBehaviour
         if (matchController == null)
             return;
 
-        TeamId team0 = matchController.GetTeamIdForSlot(0);
-        TeamId team1 = matchController.GetTeamIdForSlot(1);
         MatchStatsManager statsManager = MatchStatsManager.Instance ?? MatchStatsManager.EnsureInstance();
 
-        statsManager.TryGetStats(team0, out SlotMatchStats stats0);
-        statsManager.TryGetStats(team1, out SlotMatchStats stats1);
+        statsManager.TryGetStats(PlayerSlotId.FromIndex(0), out SlotMatchStats stats0);
+        statsManager.TryGetStats(PlayerSlotId.FromIndex(1), out SlotMatchStats stats1);
 
         int units0 = stats0 != null ? Mathf.Max(0, stats0.currentUnits) : 0;
         int units1 = stats1 != null ? Mathf.Max(0, stats1.currentUnits) : 0;
@@ -181,8 +179,8 @@ public class PanelTurnController : MonoBehaviour
             percent0 = percent0 * 100f / ownedTotal;
             percent1 = percent1 * 100f / ownedTotal;
         }
-        Color color0 = TeamUtils.GetColor(team0);
-        Color color1 = TeamUtils.GetColor(team1);
+        Color color0 = TeamUtils.GetColor(matchController.GetVisualTeamForSlot(PlayerSlotId.FromIndex(0)));
+        Color color1 = TeamUtils.GetColor(matchController.GetVisualTeamForSlot(PlayerSlotId.FromIndex(1)));
         if (slot0Count != null)
         {
             slot0Count.text = units0.ToString();

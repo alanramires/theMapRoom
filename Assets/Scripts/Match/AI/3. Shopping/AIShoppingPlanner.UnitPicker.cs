@@ -530,7 +530,8 @@ public partial class AIShoppingPlanner
         if (snapshot.Stance == AIStance.Defensive && fireBacklog)
             return true;
 
-        IReadOnlyDictionary<ConstructionSector, AISectorIntent> intents = AISectorIntentAnalyzer.GetIntents(snapshot.AITeam);
+        IReadOnlyDictionary<ConstructionSector, AISectorIntent> intents =
+            AISectorIntentAnalyzer.GetIntents(PlayerSlotId.FromIndex(snapshot.AISlotIndex));
         if (intents == null)
             return false;
 

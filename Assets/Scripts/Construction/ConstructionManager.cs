@@ -168,7 +168,7 @@ public class ConstructionManager : MonoBehaviour
     public bool IsCapturable => siteRuntime != null && siteRuntime.isCapturable;
     public int CapturePointsMax => siteRuntime != null ? siteRuntime.capturePointsMax : 0;
     public int CurrentCapturePoints => currentCapturePoints;
-    public bool CanProduceUnits => CanProduceUnitsForTeam(teamId);
+    public bool CanProduceUnits => CanProduceUnitsForSlot(slotIndex);
     public bool CanProvideSupplies => siteRuntime != null && siteRuntime.canProvideSupplies;
     public bool HasInfiniteSuppliesOverride => hasInfiniteSuppliesOverride;
     public bool IsPlayerHeadQuarter => siteRuntime != null && siteRuntime.isPlayerHeadQuarter;
@@ -533,7 +533,11 @@ public class ConstructionManager : MonoBehaviour
         TeamId previousTeam = teamId;
         teamId = team;
         TryAutoAssignMatchController();
-        slotIndex = matchController != null ? matchController.GetSlotIndexForTeam(team) : (team == TeamId.Neutral ? -1 : slotIndex);
+        if (team == TeamId.Neutral)
+            slotIndex = -1;
+        else if (matchController != null &&
+                 matchController.TryGetUniqueSlotForTeam(team, out PlayerSlotId uniqueSlot))
+            slotIndex = uniqueSlot.Value;
         if (!originalOwnerInitialized)
         {
             originalOwnerSlotIndex = slotIndex;
@@ -595,9 +599,12 @@ public class ConstructionManager : MonoBehaviour
         TeamId previousTeam = teamId;
         teamId = initialTeam;
         TryAutoAssignMatchController();
-        int initSlot = matchController != null
-            ? matchController.GetSlotIndexForTeam(initialTeam)
-            : (initialTeam == TeamId.Neutral ? -1 : slotIndex);
+        int initSlot = initialTeam == TeamId.Neutral
+            ? -1
+            : (matchController != null &&
+               matchController.TryGetUniqueSlotForTeam(initialTeam, out PlayerSlotId uniqueSlot)
+                ? uniqueSlot.Value
+                : slotIndex);
         slotIndex = initSlot;
         originalOwnerSlotIndex = initSlot;
         originalOwnerInitialized = true;
@@ -1140,7 +1147,7 @@ public class ConstructionManager : MonoBehaviour
         anchorSectorSlotIndex = Mathf.Max(-1, anchorSectorSlotIndex);
     }
 
-    public bool CanProduceUnitsForTeam(TeamId buyerTeam)
+    private bool CanProduceUnitsForVisualTeamAfterSlotValidation(TeamId buyerTeam)
     {
         if (siteRuntime == null)
             return false;
@@ -1176,7 +1183,7 @@ public class ConstructionManager : MonoBehaviour
             return false;
 
         TeamId buyerTeam = ResolveTeamForSlot(buyerSlotIndex);
-        return CanProduceUnitsForTeam(buyerTeam);
+        return CanProduceUnitsForVisualTeamAfterSlotValidation(buyerTeam);
     }
 
     private void EnsureCapturePointsInitialized()
@@ -1553,7 +1560,11 @@ public class ConstructionManager : MonoBehaviour
         // GoGreen, a supress�o solta e a luz volta ao estado real da re-montagem (amarelo).
         TryAutoAssignMatchController();
         int turn = matchController != null ? matchController.CurrentTurn : -1;
-        if (turn >= 0 && AIController.IsRallyGoGreenSuppressedForHud(teamId, sector, turn))
+        if (turn >= 0 &&
+            AIController.IsRallyGoGreenSuppressedForHud(
+                PlayerSlotId.FromIndex(slotIndex),
+                sector,
+                turn))
             return AIRallyAssemblyState.GoGreen;
 
         return hasState ? state : AIRallyAssemblyState.WaitHold;

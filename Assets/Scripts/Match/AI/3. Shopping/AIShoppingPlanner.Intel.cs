@@ -312,7 +312,7 @@ public partial class AIShoppingPlanner
             || sector == ConstructionSector.None)
             return false;
 
-        TeamObjectivePlan plan = ObjectiveManager.GetPlanForTeam(snapshot.AITeam);
+        TeamObjectivePlan plan = ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(snapshot.AISlotIndex));
         SectorObjective objective = plan != null ? plan.GetObjectiveForSector(sector) : null;
         if (objective != null && objective.Slots != null)
         {

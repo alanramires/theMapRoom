@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -24,7 +24,7 @@ public partial class AIController
             {
                 if (enemy == null || enemy.SlotIndex == ResolveAISlotKey(aiTeam) || enemy.IsDead || enemy.IsEmbarked)
                     continue;
-                if (mc != null && !mc.IsUnitVisibleForTeam(enemy, aiTeam))
+                if (mc != null && !mc.IsUnitVisibleForSlot(enemy, PlayerSlotId.FromIndex(currentAISlotIndex)))
                     continue;
                 Vector3Int enemyCell = enemy.CurrentCellPosition;
                 enemyCell.z = 0;
@@ -54,7 +54,7 @@ public partial class AIController
         foreach (UnitManager enemy in UnitManager.AllActive)
         {
             if (enemy.SlotIndex == ResolveAISlotKey(aiTeam) || enemy.IsDead || enemy.IsEmbarked) continue;
-            if (mc != null && !mc.IsUnitVisibleForTeam(enemy, aiTeam)) continue;
+            if (mc != null && !mc.IsUnitVisibleForSlot(enemy, PlayerSlotId.FromIndex(currentAISlotIndex))) continue;
             Vector3Int ec = enemy.CurrentCellPosition; ec.z = 0;
             if (nearCells.Contains(ec)) return true;
         }
@@ -136,7 +136,7 @@ public partial class AIController
             return false;
 
         int opportunistCost = GetPathStepCount(opportunistPaths, captureCell);
-        TeamObjectivePlan plan = ObjectiveManager.GetPlanForTeam(aiTeam);
+        TeamObjectivePlan plan = ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(ResolveAISlotKey(aiTeam)));
 
         if (TryFindAssignedCapturerForCaptureTarget(
                 opportunist, plan, captureTarget, aiTeam, captureCell, out UnitManager assignedCapturer))

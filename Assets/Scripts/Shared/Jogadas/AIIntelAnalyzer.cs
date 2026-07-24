@@ -91,7 +91,7 @@ public class AIIntelAnalyzer : MonoBehaviour
 
         if (match != null)
         {
-            AIWorldSnapshot snap = AIWorldSnapshot.Build(perspectiveTeam, match);
+            AIWorldSnapshot snap = AIWorldSnapshot.Build(match.ActiveSlotId, match);
             stanceLabel = snap != null ? snap.Stance.ToString() : "-";
         }
         else
@@ -869,7 +869,7 @@ public class AIIntelReport
             && !SectorManager.TryGetBaseInfo(sector, out info))
             return "-";
 
-        return AISectorIntentAnalyzer.ClassifyRelation(team, info).ToString();
+        return AISectorIntentAnalyzer.ClassifyRelation(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(team)), info).ToString();
     }
 }
 

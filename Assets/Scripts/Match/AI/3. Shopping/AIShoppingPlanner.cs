@@ -235,7 +235,8 @@ public partial class AIShoppingPlanner : MonoBehaviour
         }
 
         int urgentCapturerFloor = 0;
-        List<TacticalDeficit> opDeficits = AITacticalAnalyzer.Instance?.GetDeficits(snapshot.AITeam);
+        List<TacticalDeficit> opDeficits = AITacticalAnalyzer.Instance?.GetDeficits(
+            PlayerSlotId.FromIndex(snapshot.AISlotIndex));
         if (opDeficits != null)
         {
             foreach (TacticalDeficit deficit in opDeficits)
@@ -831,7 +832,7 @@ public partial class AIShoppingPlanner : MonoBehaviour
         }
 
         // Separa edifícios por domínio das unidades que oferecem
-        TeamObjectivePlan plan = ObjectiveManager.GetPlanForTeam(snapshot.AITeam);
+        TeamObjectivePlan plan = ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(snapshot.AISlotIndex));
         var landBuildings = new List<ConstructionManager>();
         var airBuildings  = new List<ConstructionManager>();
         foreach (ConstructionManager b in snapshot.MyBuildings)
@@ -934,7 +935,7 @@ public partial class AIShoppingPlanner : MonoBehaviour
         foreach (ConstructionManager building in sortedBuildings)
         {
             Vector3Int cell = building.CurrentCellPosition; cell.z = 0;
-            if (!building.CanProduceUnitsForTeam(snapshot.AITeam))
+            if (!building.CanProduceUnitsForSlot(snapshot.AISlotIndex))
             {
                 Debug.Log($"[AI Shopping] {building.ConstructionDisplayName} @ {cell} — não produz para o time, pulando");
                 continue;
@@ -1160,7 +1161,7 @@ public partial class AIShoppingPlanner : MonoBehaviour
                 foreach (ConstructionManager building in airBuildings)
                 {
                     Vector3Int cell = building.CurrentCellPosition; cell.z = 0;
-                    if (!building.CanProduceUnitsForTeam(snapshot.AITeam))
+                    if (!building.CanProduceUnitsForSlot(snapshot.AISlotIndex))
                     {
                         Debug.Log($"[AI Shopping Air] {building.ConstructionDisplayName} @ {cell} — não produz para o time, pulando");
                         continue;

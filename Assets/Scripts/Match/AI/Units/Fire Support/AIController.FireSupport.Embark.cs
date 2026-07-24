@@ -40,7 +40,7 @@ public partial class AIController
                 return null;
             }
 
-            float sectorDistance = info.GetDistanceToHQ(snapshot.AITeam);
+            float sectorDistance = info.GetDistanceToHQ(PlayerSlotId.FromIndex(snapshot.AISlotIndex));
             if (sectorDistance < FireSupportEmbarkSectorThreshold)
             {
                 Debug.Log($"{TL("FireSupport")} {unit.InstanceId} ignora embarque: {assigned.Sector} dist={sectorDistance:F0}h < {FireSupportEmbarkSectorThreshold}h");

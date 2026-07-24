@@ -45,7 +45,8 @@ public static class UnitOccupancyRules
     public static bool IsUnitCellOccupied(Tilemap referenceTilemap, Vector3Int cell, UnitManager exceptUnit = null)
     {
         if (UnitRulesDefinition.IsTotalWarEnabled() && exceptUnit != null)
-            return IsUnitCellOccupiedForTeam(referenceTilemap, cell, exceptUnit.TeamId, exceptUnit);
+            return IsUnitCellOccupiedForSlot(
+                referenceTilemap, cell, PlayerSlotId.FromIndex(exceptUnit.SlotIndex), exceptUnit);
 
         cell.z = 0;
         int count = 0;
@@ -72,7 +73,11 @@ public static class UnitOccupancyRules
         return false;
     }
 
-    public static bool IsUnitCellOccupiedForTeam(Tilemap referenceTilemap, Vector3Int cell, TeamId teamId, UnitManager exceptUnit = null)
+    public static bool IsUnitCellOccupiedForSlot(
+        Tilemap referenceTilemap,
+        Vector3Int cell,
+        PlayerSlotId slot,
+        UnitManager exceptUnit = null)
     {
         cell.z = 0;
 
@@ -82,7 +87,7 @@ public static class UnitOccupancyRules
             UnitManager unit = units[i];
             if (unit == null || !unit.gameObject.activeInHierarchy || unit == exceptUnit || unit.IsEmbarked || unit.IsDead)
                 continue;
-            if (unit.TeamId != teamId)
+            if (unit.SlotIndex != slot.Value)
                 continue;
             if (!IsUnitOnReferenceMap(unit, referenceTilemap))
                 continue;

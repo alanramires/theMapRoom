@@ -194,7 +194,7 @@ public partial class AIController
 
         Vector3Int hqCell = snapshot.EnemyHQ.CurrentCellPosition;
         hqCell.z = 0;
-        int threshold = Mathf.Max(3, GetEffectiveTransportThreshold(snapshot.AITeam));
+        int threshold = Mathf.Max(3, GetEffectiveTransportThresholdForSlot(PlayerSlotId.FromIndex(snapshot.AISlotIndex)));
         int terrainCost = TerrainCostToCell(unit, fromCell, hqCell, threshold);
         float hexDist = SectorManager.HexDistance(fromCell, hqCell);
         if (terrainCost > threshold && hexDist > Mathf.Max(3, threshold - 1))

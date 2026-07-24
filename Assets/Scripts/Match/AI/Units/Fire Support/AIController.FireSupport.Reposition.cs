@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -25,7 +25,7 @@ public partial class AIController
 
         Vector3Int best = fromCell;
         float bestScore = fromScore;
-        TeamObjectivePlan plan = ObjectiveManager.GetPlanForTeam(snapshot.AITeam);
+        TeamObjectivePlan plan = ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(snapshot.AISlotIndex));
 
         foreach (Vector3Int rawCell in paths.Keys)
         {
@@ -144,7 +144,7 @@ public partial class AIController
         float bestAdvanceThreat = CalculateThreatLevel(fromCell, snapshot.AITeam);
         int bestAdvancePathCost = int.MaxValue;
         bool foundAdvance = false;
-        TeamObjectivePlan repositionCapPlan = ObjectiveManager.GetPlanForTeam(snapshot.AITeam);
+        TeamObjectivePlan repositionCapPlan = ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(snapshot.AISlotIndex));
         bool shouldAdvanceToAssignedEarly = fromEffectiveDist > Mathf.Max(1, maxRange + 1);
         float moveMargin = moveMarginOverride >= 0f ? moveMarginOverride : 120f;
 
@@ -386,7 +386,7 @@ public partial class AIController
         WeaponPriorityData weaponPriorityData = turnStateManager != null ? turnStateManager.WeaponPriorityDataRef : null;
         bool conservative = IsFireSupportConservative(unit);
         float fromThreat = CalculateThreatLevel(fromCell, snapshot.AITeam);
-        TeamObjectivePlan plan = ObjectiveManager.GetPlanForTeam(snapshot.AITeam);
+        TeamObjectivePlan plan = ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(snapshot.AISlotIndex));
         float bestScore = float.MinValue;
         float bestThreat = 0f;
         float bestDpq = 0f;

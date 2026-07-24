@@ -384,8 +384,9 @@ public class UnitSpawner : MonoBehaviour
             return -1;
 
         TryAutoAssignMatchController();
-        if (matchController != null)
-            return matchController.GetSlotIndexForTeam(teamId);
+        if (matchController != null &&
+            matchController.TryGetUniqueSlotForTeam(teamId, out PlayerSlotId uniqueSlot))
+            return uniqueSlot.Value;
 
         return -1;
     }
@@ -410,7 +411,8 @@ public class UnitSpawner : MonoBehaviour
 
         if (UnitRulesDefinition.IsTotalWarEnabled())
         {
-            if (UnitRulesDefinition.IsUnitCellOccupiedForTeam(boardTilemap, cell, teamId))
+            if (UnitRulesDefinition.IsUnitCellOccupiedForSlot(
+                    boardTilemap, cell, PlayerSlotId.FromIndex(ResolveSlotIndexForTeam(teamId))))
                 return true;
         }
         else

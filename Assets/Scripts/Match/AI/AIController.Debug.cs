@@ -109,7 +109,7 @@ public partial class AIController
         }
 
         TeamId aiTeam = matchController.ActiveTeam;
-        if (!matchController.IsPlayerAI(aiTeam))
+        if (!matchController.IsPlayerAI(matchController.ActiveSlotId))
         {
             Debug.Log($"[AI Stage] Time ativo {aiTeam} nao e IA.");
             PanelDialogController.TrySetTransientText($"AI STAGE: time ativo {aiTeam} nao e IA", 2.2f);

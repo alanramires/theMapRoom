@@ -90,9 +90,13 @@ Mesmo tipo de unidade. Soldado funde com Soldado. Não se junta infantaria com b
 
 Adjacentes. Os dois precisam estar a um hexágono de distância — e é bom saber quem fica onde: a unidade que você seleciona é a **receptora**. Ela permanece no próprio hexágono e conserva a posição dela; a outra se desloca até lá e é consumida pela fusão. O hexágono do resultado é sempre o do receptor.
 
-Mesma camada — mas o jogo tenta resolver isso por você. Se as duas estiverem em alturas diferentes, a fusão iguala automaticamente: aeronaves se encontram em Air/Low, o que faz a que estava no solo decolar; submarinos se encontram submersos, quando o hexágono permite.
+**Mesma camada, e aqui a regra é estrita: a fusão não levanta nem baixa ninguém para acomodar.** As duas unidades precisam já estar na mesma camada operacional. Se uma está no ar e a outra no solo, a fusão nem é oferecida — sai como opção inválida, por diferença de camada.
 
-Se a igualação não for possível — o hex não aceita a camada, a transição está bloqueada — a fusão simplesmente não acontece.
+Isso confunde porque na prática costuma dar certo, e vale entender por quê. A unidade que você **seleciona** vai para a camada natural dela na seleção, como qualquer outra: se era uma aeronave pousada com combustível, ela decola nesse instante. Mas isso é a regra de seleção do `04`, não uma cortesia da fusão. A **candidata** nunca é levantada. Uma aeronave pousada no chão não é puxada para o ar para fundir com uma que está voando, e a que está voando também não desce para encontrá-la.
+
+A consequência prática aparece no pior momento: uma aeronave **sem combustível** não decola — a decolagem exige autonomia acima de zero. Então ela não pode fundir com nenhuma aeronave em voo, em nenhuma direção. Se você contava com a fusão para salvar um esquadrão que pousou seco, não conta: primeiro reabastece, depois funde.
+
+O que a fusão de fato normaliza é o **resultado**. Concluída a operação, o esquadrão fundido assume a camada canônica do tipo — Air/Low para aeronaves, submerso para submarinos quando o hexágono permite. Se essa camada final não for possível ali, a fusão não acontece.
 
 O receptor precisa estar machucado. Unidade com esquadrão completo não recebe fusão — não há onde colocar mais gente.
 

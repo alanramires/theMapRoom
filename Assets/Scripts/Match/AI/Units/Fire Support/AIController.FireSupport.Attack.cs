@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -41,7 +41,7 @@ public partial class AIController
         string lastAttackDecisionBlock = "";
 
         int artilleryMaxRange = indirectOnly ? GetFireSupportMaxWeaponRange(unit) : 0;
-        TeamObjectivePlan capPlan = ObjectiveManager.GetPlanForTeam(snapshot.AITeam);
+        TeamObjectivePlan capPlan = ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(snapshot.AISlotIndex));
 
         foreach (Vector3Int rawCell in EnumerateFireSupportCandidateCells(fromCell, paths, stationary || stationaryOnly))
         {
@@ -175,7 +175,7 @@ public partial class AIController
         float bestScore = float.MinValue;
         Vector3Int bestCell = fromCell;
         string bestDetails = "";
-        TeamObjectivePlan blockedCapPlan = ObjectiveManager.GetPlanForTeam(snapshot.AITeam);
+        TeamObjectivePlan blockedCapPlan = ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(snapshot.AISlotIndex));
 
         foreach (Vector3Int rawCell in paths.Keys)
         {

@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -473,7 +473,7 @@ public partial class AIController
             objCell.z = 0;
         }
         bool hasObjCell = objCell != Vector3Int.zero;
-        int transportThreshold = GetEffectiveTransportThreshold(aiTeam);
+        int transportThreshold = GetEffectiveTransportThresholdForSlot(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam)));
 
         // Passageiros needy: capturadores do objetivo vivos, fora, sem ter agido e LONGE A PE
         // (alem da distancia de embarque) — quem chega a pe nao precisa de carona. NAO usar o

@@ -8,11 +8,11 @@ public partial class AIShoppingPlanner
     {
         urgentTransportDemand = false;
         TeamId aiTeam = snapshot.AITeam;
-        TeamObjectivePlan plan = ObjectiveManager.GetPlanForTeam(aiTeam);
+        TeamObjectivePlan plan = ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam)));
         if (plan == null) return 0;
 
         int minDist = AIController.Instance != null
-            ? AIController.Instance.GetEffectiveTransportThreshold(aiTeam) : 7;
+            ? AIController.Instance.GetEffectiveTransportThresholdForSlot(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam))) : 7;
 
         int activeTransporters = 0;
         int freeAPCs = 0;
@@ -55,7 +55,7 @@ public partial class AIShoppingPlanner
             if (tgt == null) continue;
 
             bool sectorInfoFound = SectorManager.TryGetSectorInfo(obj.Sector, out SectorManager.SectorInfo info);
-            if (sectorInfoFound && info.GetTransportPreference(aiTeam) == SectorManager.SectorInfo.TransportPreference.Air)
+            if (sectorInfoFound && info.GetTransportPreference(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam))) == SectorManager.SectorInfo.TransportPreference.Air)
                 continue;
 
             if (hasOpenTransportSlot
@@ -63,7 +63,7 @@ public partial class AIShoppingPlanner
                 && activeAssault >= 1
                 && ObjectiveHasOpenOrFilledCapturer(obj)
                 && sectorInfoFound
-                && info.GetDistanceToHQ(aiTeam) >= minDist)
+                && info.GetDistanceToHQ(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam))) >= minDist)
             {
                 preventiveNeeded++;
             }
@@ -189,7 +189,7 @@ public partial class AIShoppingPlanner
                 continue;
 
             if (SectorManager.TryGetSectorInfo(obj.Sector, out SectorManager.SectorInfo info)
-                && info.GetTransportPreference(aiTeam) == SectorManager.SectorInfo.TransportPreference.Air)
+                && info.GetTransportPreference(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam))) == SectorManager.SectorInfo.TransportPreference.Air)
                 continue;
 
             sector = obj.Sector;
@@ -274,10 +274,10 @@ public partial class AIShoppingPlanner
                 continue;
             if (ConstructionSectorHelper.IsBase(info.Sector))
                 continue;
-            if (info.GetTransportPreference(aiTeam) == SectorManager.SectorInfo.TransportPreference.Air)
+            if (info.GetTransportPreference(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam))) == SectorManager.SectorInfo.TransportPreference.Air)
                 continue;
 
-            float foot = info.GetDistanceToHQ(aiTeam);
+            float foot = info.GetDistanceToHQ(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam)));
             if (foot < minDist)
                 continue;
 
@@ -287,8 +287,8 @@ public partial class AIShoppingPlanner
 
             sector = info.Sector;
             footDistance = foot;
-            vehicleDistance = info.GetVehicleDistanceToHQ(aiTeam);
-            airDistance = info.GetAirDistanceToHQ(aiTeam);
+            vehicleDistance = info.GetVehicleDistanceToHQ(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam)));
+            airDistance = info.GetAirDistanceToHQ(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam)));
             return true;
         }
 
@@ -346,17 +346,17 @@ public partial class AIShoppingPlanner
     {
         TeamId aiTeam = snapshot != null ? snapshot.AITeam : TeamId.Neutral;
         minDist = AIController.Instance != null
-            ? AIController.Instance.GetEffectiveTransportThreshold(aiTeam) : 7;
+            ? AIController.Instance.GetEffectiveTransportThresholdForSlot(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam))) : 7;
 
         foreach (SectorManager.SectorInfo info in SectorManager.GetAllSectorInfos())
         {
             if (info.IsFullyControlled && info.ControllingTeam == aiTeam) continue;
-            if (info.GetDistanceToHQ(aiTeam) >= minDist) return true;
+            if (info.GetDistanceToHQ(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam))) >= minDist) return true;
         }
 
         foreach (SectorManager.SectorInfo baseInfo in SectorManager.GetAllBaseInfos())
         {
-            if (baseInfo.GetDistanceToHQ(aiTeam) >= minDist) return true;
+            if (baseInfo.GetDistanceToHQ(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam))) >= minDist) return true;
         }
 
         return false;
@@ -403,7 +403,7 @@ public partial class AIShoppingPlanner
         var pickupCells = new List<Vector3Int>();
         foreach (ConstructionManager building in snapshot.MyBuildings)
         {
-            if (building == null || !building.CanProduceUnitsForTeam(snapshot.AITeam))
+            if (building == null || !building.CanProduceUnitsForSlot(snapshot.AISlotIndex))
                 continue;
             if (!CanOfferAirTransporter(building))
                 continue;
@@ -497,7 +497,7 @@ public partial class AIShoppingPlanner
 
     private static bool HasGroundTransportObjectiveNeedingCapturer(AIWorldSnapshot snapshot)
     {
-        TeamObjectivePlan plan = ObjectiveManager.GetPlanForTeam(snapshot.AITeam);
+        TeamObjectivePlan plan = ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(snapshot.AISlotIndex));
         if (plan == null)
             return false;
 
@@ -515,7 +515,7 @@ public partial class AIShoppingPlanner
                 continue;
 
             if (SectorManager.TryGetSectorInfo(obj.Sector, out SectorManager.SectorInfo info)
-                && info.GetTransportPreference(snapshot.AITeam) == SectorManager.SectorInfo.TransportPreference.Air)
+                && info.GetTransportPreference(PlayerSlotId.FromIndex(snapshot.AISlotIndex)) == SectorManager.SectorInfo.TransportPreference.Air)
                 continue;
 
             return true;
@@ -568,7 +568,7 @@ public partial class AIShoppingPlanner
         if (snapshot == null || snapshot.MyBuildings == null) return cheapest;
         foreach (ConstructionManager b in snapshot.MyBuildings)
         {
-            if (b == null || !b.CanProduceUnitsForTeam(snapshot.AITeam) || b.OfferedUnits == null) continue;
+            if (b == null || !b.CanProduceUnitsForSlot(snapshot.AISlotIndex) || b.OfferedUnits == null) continue;
             foreach (UnitData u in b.OfferedUnits)
             {
                 if (u == null || u.domain != Domain.Land
@@ -585,7 +585,7 @@ public partial class AIShoppingPlanner
         if (snapshot == null || snapshot.MyBuildings == null) return cheapest;
         foreach (ConstructionManager b in snapshot.MyBuildings)
         {
-            if (b == null || !b.CanProduceUnitsForTeam(snapshot.AITeam) || b.OfferedUnits == null) continue;
+            if (b == null || !b.CanProduceUnitsForSlot(snapshot.AISlotIndex) || b.OfferedUnits == null) continue;
             foreach (UnitData u in b.OfferedUnits)
             {
                 if (u == null || u.domain != Domain.Air
@@ -602,7 +602,7 @@ public partial class AIShoppingPlanner
         if (snapshot == null || snapshot.MyBuildings == null) return cheapest;
         foreach (ConstructionManager b in snapshot.MyBuildings)
         {
-            if (b == null || !b.CanProduceUnitsForTeam(snapshot.AITeam) || b.OfferedUnits == null) continue;
+            if (b == null || !b.CanProduceUnitsForSlot(snapshot.AISlotIndex) || b.OfferedUnits == null) continue;
             foreach (UnitData u in b.OfferedUnits)
             {
                 if (u == null || u.domain != Domain.Air) continue;
@@ -620,7 +620,7 @@ public partial class AIShoppingPlanner
         if (snapshot == null || snapshot.MyBuildings == null) return cheapest;
         foreach (ConstructionManager b in snapshot.MyBuildings)
         {
-            if (b == null || !b.CanProduceUnitsForTeam(snapshot.AITeam) || b.OfferedUnits == null) continue;
+            if (b == null || !b.CanProduceUnitsForSlot(snapshot.AISlotIndex) || b.OfferedUnits == null) continue;
             foreach (UnitData u in b.OfferedUnits)
             {
                 if (u == null || u.domain != Domain.Air) continue;

@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -55,7 +55,7 @@ public partial class AIController
         Vector3Int assignedSectorTarget = default)
     {
         Vector3Int fromCell = unit.CurrentCellPosition; fromCell.z = 0;
-        TeamObjectivePlan plan = ObjectiveManager.GetPlanForTeam(snapshot.AITeam);
+        TeamObjectivePlan plan = ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(snapshot.AISlotIndex));
 
         List<UnitManager> passengers = CollectPassengers(unit);
         if (passengers.Count == 0)
@@ -399,7 +399,7 @@ public partial class AIController
         // Pass 3: relax the distance threshold.
         if (bestCandidate == null)
         {
-            int relaxed = Mathf.Max(2, GetEffectiveTransportThreshold(snapshot.AITeam) / 2);
+            int relaxed = Mathf.Max(2, GetEffectiveTransportThresholdForSlot(PlayerSlotId.FromIndex(snapshot.AISlotIndex)) / 2);
             bestCandidate = FindBestAirShuttleCandidate(
                 unit, snapshot, plan, fromCell, out candidateCell,
                 preferAirSectors: false, thresholdReduction: relaxed);
@@ -475,7 +475,7 @@ public partial class AIController
             Vector3Int candidateCell = candidate.CurrentCellPosition; candidateCell.z = 0;
             float objectiveDist = SectorManager.HexDistance(candidateCell, objectiveCell);
 
-            int candidateThreshold = GetEffectiveTransportThreshold(snapshot.AITeam);
+            int candidateThreshold = GetEffectiveTransportThresholdForSlot(PlayerSlotId.FromIndex(snapshot.AISlotIndex));
             int candidateMP = candidate.MaxMovementPoints;
             if (candidateMP < 3) candidateThreshold += (3 - candidateMP) * 2;
             candidateThreshold = Mathf.Max(2, candidateThreshold - thresholdReduction);
@@ -491,7 +491,7 @@ public partial class AIController
                         if (slot.Filled && slot.AssignedUnitId == candidate.InstanceId) { candidateInSlot = true; break; }
                     if (!candidateInSlot) continue;
                     if (TryGetAnySectorInfo(obj.Sector, out SectorManager.SectorInfo si)
-                        && si.GetTransportPreference(snapshot.AITeam) == SectorManager.SectorInfo.TransportPreference.Air)
+                        && si.GetTransportPreference(PlayerSlotId.FromIndex(snapshot.AISlotIndex)) == SectorManager.SectorInfo.TransportPreference.Air)
                         isAirPreferred = true;
                     break;
                 }
@@ -553,7 +553,7 @@ public partial class AIController
         {
             Vector3Int objCheckCell = assignedCaptureTarget.CurrentCellPosition; objCheckCell.z = 0;
             Vector3Int passCell = targetPassenger.CurrentCellPosition; passCell.z = 0;
-            int airThreshold = GetEffectiveTransportThreshold(snapshot.AITeam);
+            int airThreshold = GetEffectiveTransportThresholdForSlot(PlayerSlotId.FromIndex(snapshot.AISlotIndex));
             int passTerrainCost = TerrainCostToCell(targetPassenger, passCell, objCheckCell, airThreshold);
             if (passTerrainCost < airThreshold)
                 targetPassenger = null;

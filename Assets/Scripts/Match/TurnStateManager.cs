@@ -1121,7 +1121,7 @@ public partial class TurnStateManager : MonoBehaviour
         UnitManager spawnedUnit = spawned.GetComponent<UnitManager>();
         if (spawnedUnit != null && matchController != null)
         {
-            spawnedUnit.SetSlotIndex(matchController.GetSlotIndexForTeam(resolvedTeam));
+            spawnedUnit.SetSlotIndex(matchController.ActiveSlotId.Value);
             spawnedUnit.ApplyTeamVisualFlipX(matchController.GetTeamFlipX(resolvedTeam));
         }
 
@@ -1819,8 +1819,8 @@ public partial class TurnStateManager : MonoBehaviour
             yield break;
         }
 
-        TeamId team = matchController != null ? matchController.ActiveTeam : TeamId.Neutral;
-        if (!planningManager.HasActiveAssignmentsForTeam(team))
+        PlayerSlotId slot = matchController != null ? matchController.ActiveSlotId : PlayerSlotId.Invalid;
+        if (!planningManager.HasActiveAssignmentsForSlot(slot))
         {
             ExitTurnStartFuelDepletionCursorState();
             yield break;

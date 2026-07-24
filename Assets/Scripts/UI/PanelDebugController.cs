@@ -407,37 +407,34 @@ public class PanelDebugController : MonoBehaviour
             }
             else if (moneyTeamOverride.HasValue)
             {
-                TeamId team = (TeamId)Mathf.Clamp(moneyTeamOverride.Value, 0, 3);
-                int currentMoney = matchController.GetActualMoney(team);
+                PlayerSlotId slot = PlayerSlotId.FromIndex(Mathf.Clamp(moneyTeamOverride.Value, 0, 3));
+                int currentMoney = matchController.GetActualMoney(slot);
                 int adjustedMoney = ClampMoneyDelta(currentMoney, moneyDelta);
-                executed = matchController.TrySetActualMoney(team, adjustedMoney);
+                executed = matchController.TrySetActualMoney(slot, adjustedMoney);
                 if (executed)
                 {
                     cursorController?.PlayDoneSfx();
-                    Debug.Log($"[Debug Command] Actual money do team {(int)team} ajustado em {moneyDelta:+#;-#;0}: ${currentMoney} -> ${adjustedMoney}.");
+                    Debug.Log($"[Debug Command] Actual money do slot {slot.Value} ajustado em {moneyDelta:+#;-#;0}: ${currentMoney} -> ${adjustedMoney}.");
                 }
                 else
                 {
-                    Debug.Log($"[Debug Command] Team {(int)team} nao encontrado na lista de players.");
+                    Debug.Log($"[Debug Command] Slot {slot.Value} nao encontrado na lista de players.");
                 }
             }
             else
             {
-                TeamId resolvedTeam = matchController.ActiveTeam;
-                if (resolvedTeam == TeamId.Neutral)
-                    resolvedTeam = TeamId.Green;
-
-                int currentMoney = matchController.GetActualMoney(resolvedTeam);
+                PlayerSlotId resolvedSlot = matchController.ActiveSlotId;
+                int currentMoney = matchController.GetActualMoney(resolvedSlot);
                 int adjustedMoney = ClampMoneyDelta(currentMoney, moneyDelta);
-                executed = matchController.TrySetActualMoney(resolvedTeam, adjustedMoney);
+                executed = matchController.TrySetActualMoney(resolvedSlot, adjustedMoney);
                 if (executed)
                 {
                     cursorController?.PlayDoneSfx();
-                    Debug.Log($"[Debug Command] Actual money do team ativo ({(int)resolvedTeam}) ajustado em {moneyDelta:+#;-#;0}: ${currentMoney} -> ${adjustedMoney}.");
+                    Debug.Log($"[Debug Command] Actual money do slot ativo ({resolvedSlot.Value}) ajustado em {moneyDelta:+#;-#;0}: ${currentMoney} -> ${adjustedMoney}.");
                 }
                 else
                 {
-                    Debug.Log($"[Debug Command] Team ativo ({(int)resolvedTeam}) nao encontrado na lista de players.");
+                    Debug.Log($"[Debug Command] Slot ativo ({resolvedSlot.Value}) nao encontrado na lista de players.");
                 }
             }
         }
@@ -449,33 +446,30 @@ public class PanelDebugController : MonoBehaviour
             }
             else if (moneyTeamOverride.HasValue)
             {
-                TeamId team = (TeamId)Mathf.Clamp(moneyTeamOverride.Value, 0, 3);
-                executed = matchController.TrySetActualMoney(team, moneyValue);
+                PlayerSlotId slot = PlayerSlotId.FromIndex(Mathf.Clamp(moneyTeamOverride.Value, 0, 3));
+                executed = matchController.TrySetActualMoney(slot, moneyValue);
                 if (executed)
                 {
                     cursorController?.PlayDoneSfx();
-                    Debug.Log($"[Debug Command] Actual money do team {(int)team} atualizado para ${Mathf.Max(0, moneyValue)}.");
+                    Debug.Log($"[Debug Command] Actual money do slot {slot.Value} atualizado para ${Mathf.Max(0, moneyValue)}.");
                 }
                 else
                 {
-                    Debug.Log($"[Debug Command] Team {(int)team} nao encontrado na lista de players.");
+                    Debug.Log($"[Debug Command] Slot {slot.Value} nao encontrado na lista de players.");
                 }
             }
             else
             {
-                TeamId resolvedTeam = matchController.ActiveTeam;
-                if (resolvedTeam == TeamId.Neutral)
-                    resolvedTeam = TeamId.Green;
-
-                executed = matchController.TrySetActualMoney(resolvedTeam, moneyValue);
+                PlayerSlotId resolvedSlot = matchController.ActiveSlotId;
+                executed = matchController.TrySetActualMoney(resolvedSlot, moneyValue);
                 if (executed)
                 {
                     cursorController?.PlayDoneSfx();
-                    Debug.Log($"[Debug Command] Actual money do team ativo ({(int)resolvedTeam}) atualizado para ${Mathf.Max(0, moneyValue)}.");
+                    Debug.Log($"[Debug Command] Actual money do slot ativo ({resolvedSlot.Value}) atualizado para ${Mathf.Max(0, moneyValue)}.");
                 }
                 else
                 {
-                    Debug.Log($"[Debug Command] Team ativo ({(int)resolvedTeam}) nao encontrado na lista de players.");
+                    Debug.Log($"[Debug Command] Slot ativo ({resolvedSlot.Value}) nao encontrado na lista de players.");
                 }
             }
         }

@@ -119,16 +119,6 @@ public class FogOfWarController : MonoBehaviour
     }
 
 
-    public void RefreshFogOfWarForTeam(TeamId observerTeamId)
-    {
-        if (matchController == null)
-            matchController = FindAnyObjectByType<MatchController>();
-        if (matchController == null)
-            return;
-
-        matchController.RefreshFogOfWarForTeam(observerTeamId);
-        RebuildSnapshot();
-    }
     public void DumpSnapshotToConsole()
     {
         if (string.IsNullOrWhiteSpace(lastDump))

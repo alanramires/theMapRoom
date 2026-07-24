@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -35,7 +35,7 @@ public partial class AIController
             if (occupant != null && occupant.SlotIndex != snapshot.AISlotIndex)
             {
                 MatchController mc = GetMatchController();
-                if (mc == null || !mc.IsUnitVisibleForTeam(occupant, snapshot.AITeam))
+                if (mc == null || !mc.IsUnitVisibleForSlot(occupant, PlayerSlotId.FromIndex(snapshot.AISlotIndex)))
                 {
                     hiddenObjectiveOccupant = true;
                     if (TryFindBestForwardObserverSpot(
@@ -319,7 +319,7 @@ public partial class AIController
         {
             if (enemy == null || enemy.SlotIndex == snapshot.AISlotIndex || enemy.IsDead || enemy.IsEmbarked)
                 continue;
-            if (mc != null && !mc.IsUnitVisibleForTeam(enemy, snapshot.AITeam))
+            if (mc != null && !mc.IsUnitVisibleForSlot(enemy, PlayerSlotId.FromIndex(snapshot.AISlotIndex)))
                 continue;
 
             Vector3Int enemyCell = enemy.CurrentCellPosition;

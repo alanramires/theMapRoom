@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -154,7 +154,7 @@ public partial class AIController
         if (unit == null || snapshot == null)
             return false;
 
-        TeamObjectivePlan capPlan = ObjectiveManager.GetPlanForTeam(snapshot.AITeam);
+        TeamObjectivePlan capPlan = ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(snapshot.AISlotIndex));
         float fromScore = ScoreIntelPostureCell(unit, snapshot, fromCell, fromCell, anchor, offensiveAnchor, 0, out string fromReason);
         float bestScore = fromScore;
         string bestReason = fromReason;
@@ -413,7 +413,7 @@ public partial class AIController
             if (building == null)
                 continue;
 
-            bool valuable = building.IsPlayerHeadQuarter || building.CanProduceUnitsForTeam(snapshot.AITeam);
+            bool valuable = building.IsPlayerHeadQuarter || building.CanProduceUnitsForSlot(snapshot.AISlotIndex);
             if (!valuable)
                 continue;
 
