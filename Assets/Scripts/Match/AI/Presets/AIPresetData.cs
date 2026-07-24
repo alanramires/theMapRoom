@@ -28,34 +28,99 @@ using UnityEngine;
 [Serializable]
 public class AICapabilityPreset
 {
-    [Tooltip("Ignora unidades marcadas com bannedOnHardMode na lista de compras. Hoje: AIShoppingPlanner.UnitPicker.IsHardModeBannedForAI.")]
+    [Header("Compras — o que a IA se permite comprar")]
+    [Tooltip("LIGADO: nunca compra unidades marcadas como 'banidas no difícil' (ex.: as mais baratas e fracas).\n" +
+             "DESLIGADO: pode comprar qualquer coisa que o produtor ofereça.\n" +
+             "Use ligado para forçar um exército de melhor qualidade.\n\n" +
+             "(código: IsHardModeBannedForAI)")]
     public bool respeitarListaBanida = false;
 
-    [Tooltip("Soma a produção projetada dos produtores inimigos conhecidos na força macro. Hoje: BuildMacroTerritoryContext (enemyProducersProjected).")]
+    [Tooltip("LIGADO: ao medir se está ganhando ou perdendo, soma a produção que os produtores inimigos VÃO fazer no próximo turno — não só o que já existe.\n" +
+             "DESLIGADO: conta apenas as forças que já estão no tabuleiro.\n" +
+             "Ligado deixa a IA mais precavida, reagindo antes de a ameaça nascer.\n\n" +
+             "(código: enemyProducersProjected)")]
     public bool projetarProducaoInimiga = false;
 
-    [Tooltip("Abertura com blindado antes do primeiro elite, incluindo a poupança bootstrap. Hoje: ApplyHardModeArmorFirst + ComputeBlitzFirstArmorReserve.")]
+    [Header("Abertura de jogo")]
+    [Tooltip("LIGADO: os primeiros turnos priorizam comprar um BLINDADO antes de qualquer elite, e o dinheiro é poupado até ele caber.\n" +
+             "DESLIGADO: segue a demanda normal do plano desde o início.\n" +
+             "Ligado dá uma abertura mais agressiva e sólida no chão.\n\n" +
+             "(código: ApplyHardModeArmorFirst + ComputeBlitzFirstArmorReserve)")]
     public bool aberturaBlindadoPrimeiro = false;
 
-    [Tooltip("Aplica teto ao total de logística terrestre em campo. Hoje: ApplyHardModeLogisticsCap. O valor do teto está em Composição.")]
+    [Header("Logística")]
+    [Tooltip("LIGADO: limita quantos caminhões/supridores terrestres a IA mantém em campo (o teto está na seção Composição).\n" +
+             "DESLIGADO: compra logística conforme a demanda, sem limite fixo.\n" +
+             "Ligado evita que a IA gaste demais em suprimento e de menos em combate.\n\n" +
+             "(código: ApplyHardModeLogisticsCap)")]
     public bool limitarLogistica = false;
 
-    [Tooltip("Dobra os slots de capturador por setor no plano (com teto próprio). Hoje: AIController.PlanEvaluator, linha do slots*2.")]
+    [Header("Plano de captura")]
+    [Tooltip("LIGADO: cada setor pede o DOBRO de capturadores no plano (com teto próprio). Mais tropa dedicada a tomar território.\n" +
+             "DESLIGADO: um conjunto normal de capturadores por setor.\n" +
+             "Ligado acelera a conquista do mapa, ao custo de gastar mais em infantaria.\n\n" +
+             "(código: slots*2 no PlanEvaluator)")]
     public bool dobrarSlotsCapturadorPorSetor = false;
 
-    [Tooltip("Handoff em profundidade: a ponta de lança vaga a captura para um seguidor e segue o eixo, em vez de terminar a captura. Hoje: PlanEvaluator.Handoff via hardMode.")]
+    [Tooltip("LIGADO: a unidade da ponta NÃO para para terminar a captura — ela passa o prédio para um seguidor e segue avançando no eixo.\n" +
+             "DESLIGADO: quem chega no prédio fica ali até capturar.\n" +
+             "Ligado mantém o avanço fluido; desligado consolida antes de seguir.\n\n" +
+             "(código: PlanEvaluator.Handoff)")]
     public bool handoffEmProfundidade = false;
 
-    [Tooltip("Doutrina do Enxame: todo produtor compra o corpo mais barato TODO turno (imposto de conscrição). Hoje: conscriptionDoctrine.")]
+    // -------------------------------------------------------------------------------
+    // POLÍTICA DE ORÇAMENTO — o 2×2 (PISO × TETO)
+    //
+    //   PISO  = gastaEmNumeros (conscricaoSempre): todo produtor de exército compra o
+    //           corpo mais barato todo turno. Garante massa na frente.
+    //   TETO  = poupaPraElite: guarda a sobra ACIMA do piso para comprar elite caro.
+    //
+    // As duas são INDEPENDENTES. Combinando:
+    //   poupa ON  + gasta OFF → atual: compra por demanda e junta caixa; pode até passar
+    //                           a vez sem comprar nada enquanto poupa.
+    //   poupa OFF + gasta OFF → guloso oportunista: compra o que o plano pede quando dá,
+    //                           não poupa e não preenche produtor ocioso.
+    //   poupa ON  + gasta ON  → SD todo turno + guarda a sobra p/ elite; sem alvo elite,
+    //                           a sobra compra unidades do plano.
+    //   poupa OFF + gasta ON  → guloso total: SD garantido + torra a sobra no plano,
+    //                           nunca deixa produtor parado.
+    //
+    // Aeroporto e porto NÃO entram no piso — só compram por demanda (inclusive elite).
+    // -------------------------------------------------------------------------------
+    [Header("Política de Orçamento — PISO × TETO (o 2×2)")]
+    [Tooltip("PISO — 'gasta em números' (Doutrina do Enxame).\n" +
+             "LIGADO: todo produtor DO EXÉRCITO compra o corpo mais barato TODO turno — nenhum produtor terrestre fica ocioso. Aeroporto e porto NÃO entram (só compram por demanda).\n" +
+             "DESLIGADO: compra só o que o plano pedir, podendo deixar produtor parado.\n" +
+             "Garante massa na frente. O que fazer com a SOBRA acima do piso é decidido pelo TETO (Poupa Pra Elite) logo abaixo.\n\n" +
+             "(código: conscriptionDoctrine / ComputeConscriptionTax)")]
     public bool conscricaoSempre = false;
 
-    [Tooltip("Recrutamento emergencial apenas quando o macro está Perdendo. Hoje: conscriptionWhenLosing.")]
+    [Tooltip("PISO condicional.\n" +
+             "LIGADO: o piso de massa barata só liga quando a IA está PERDENDO o macro (defesa emergencial).\n" +
+             "DESLIGADO: sem gatilho de emergência.\n" +
+             "É a versão 'só quando aperta' do piso acima.\n\n" +
+             "(código: conscriptionWhenLosing)")]
     public bool conscricaoQuandoPerdendo = false;
 
-    [Tooltip("PROTÓTIPO. Classifica eixos em forte/equilibrado/fraco e enviesa a distribuição de elite para o lado forte. Hoje: strongWeakSidePolitic.")]
+    [Tooltip("TETO — 'poupa pra elite'. Interruptor-mestre da poupança estratégica.\n" +
+             "LIGADO: guarda a sobra (acima do piso) para comprar um elite caro quando o núcleo estiver pronto. QUANTOS turnos ela topa poupar está no slider 'Elite Save Turns' (seção Economia).\n" +
+             "DESLIGADO: nunca poupa — a sobra é torrada nas unidades do plano (guloso). Equivale a Elite Save Turns = 0.\n" +
+             "Este é o outro eixo do 2×2 com o PISO acima. Veja o comentário do bloco para as 4 combinações.\n\n" +
+             "(código: ComputeStrategicSavingReserve / eliteSaveTurns > 0)")]
+    public bool poupaPraElite = true;
+
+    [Header("Elite — como decidir e priorizar unidades caras")]
+    [Tooltip("PROTÓTIPO — em desenvolvimento. LIGADO: classifica os eixos de ataque em forte/equilibrado/fraco e manda mais elite para o lado FORTE (dobra a aposta onde já está ganhando).\n" +
+             "DESLIGADO: distribui elite sem esse viés.\n" +
+             "Experimental; pode ter comportamento incompleto.\n\n" +
+             "(código: strongWeakSidePolitic)")]
     public bool politicaLadoForteFraco = false;
 
-    [Tooltip("Gate de núcleo SUAVE: a maturidade do núcleo (0..1) vira peso no score do elite em vez de muro tudo-ou-nada. Sem ele, o gate duro bane o elite E desliga a penalidade anti-barato ao mesmo tempo, forçando a IA a comprar a pior artilharia só para destravar. Hoje: AIController.softCoreGate.")]
+    [Tooltip("O 'núcleo' é o exército-base mínimo (alguns capturadores, assalto e artilharia) que a IA quer ter ANTES de gastar em elite caro. O 'gate' é a trava que segura o elite até o núcleo estar formado.\n\n" +
+             "LIGADO (gate SUAVE): a maturidade do núcleo (de 0 a 100%) vira um PESO — quanto mais formado, mais o elite é favorecido. Transição gradual.\n" +
+             "DESLIGADO (gate DURO): tudo-ou-nada. Enquanto o núcleo não fecha, o elite é proibido — e, pior, o freio anti-compra-ruim também desliga junto, o que empurra a IA a comprar a PIOR artilharia só para destravar o gate.\n" +
+             "Recomendado LIGADO: o modo duro tem esse efeito perverso conhecido.\n\n" +
+             "(código: AIController.softCoreGate)")]
     public bool gateNucleoSuave = false;
 }
 
@@ -66,7 +131,9 @@ public class AIEconomyPreset
     [Tooltip("Fração da renda recebida por construções que NÃO são cidades. 1 = renda cheia. O Iniciante usa 1/3. Hoje isso é o easyMode com a fração fixa no MatchController.")]
     [Range(0f, 1f)] public float fracaoRendaForaDeCidades = 1f;
 
-    [Tooltip("Quantos turnos de renda a IA topa POUPAR mirando um elite/capacidade. 0 = nunca poupa (guloso). Origem: eliteSaveTurnsNormal/Hard.")]
+    [Tooltip("Quantos turnos de renda a IA topa POUPAR mirando um elite/capacidade. 0 = nunca poupa (guloso).\n" +
+             "É a MAGNITUDE do TETO 'Poupa Pra Elite' (seção Política de Orçamento): esse check liga/desliga a poupança, este número diz por quantos turnos. Se o check estiver desligado, trate como 0.\n\n" +
+             "(código: eliteSaveTurnsNormal/Hard)")]
     [Range(0, 4)] public int eliteSaveTurns = 1;
 
     [Tooltip("Margem de caixa (%) mantida como troco enquanto poupa para elite, para ainda comprar coisas baratas. Origem: eliteMaintenanceReserveNormal/Hard.")]
@@ -303,6 +370,9 @@ public class AIPresetData : ScriptableObject
         target.capacidades.handoffEmProfundidade = hard;
         target.capacidades.conscricaoSempre = conscricaoSempre;
         target.capacidades.conscricaoQuandoPerdendo = conscricaoPerdendo;
+        // TETO do 2×2: derivado da magnitude de poupança que a overlay/baseline já definiu.
+        // Poupa turnos > 0 → o interruptor liga; 0 → guloso (nunca poupa).
+        target.capacidades.poupaPraElite = target.economia.eliteSaveTurns > 0;
 
         // --- economia ---
         target.economia.fracaoRendaForaDeCidades = easy ? 1f / 3f : 1f;

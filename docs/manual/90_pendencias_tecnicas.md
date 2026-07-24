@@ -139,3 +139,107 @@ O critério que emerge da tabela: nasce cheio quem foi comprado **em uma instala
 **Decisão necessária.** Se partidas de três ou mais forem cenário suportado, o snapshot precisa segmentar inimigos por slot e o planner precisa de um critério de "quem está mais perto de cair". Se forem apenas curiosidade, basta registrar a limitação.
 
 **Status.** Aberta. Mais consequente que vários itens desta lista se o multiplayer de 3+ virar prioridade.
+
+---
+
+### IA-003 — A fragata é comprada como caçadora e operada como unidade genérica
+
+**Regra canônica.** A fragata existe para caçar submarino: sensor antissubmarino mais carga de profundidade de alcance 0 (`06_combate.md`).
+
+**Comportamento atual.** O shopping funciona pelo motivo certo — há demanda explícita de `RaidAntiSub` quando a IA detecta capacidade submarina inimiga. A **operação** não existe: `RaidAntiSub` não tem tratador no roteador, e o único lugar que reconhece o papel é o combate aéreo, que exige `data.domain == Domain.Air`. Sendo Naval, a fragata passa por todos os tratadores e cai no `HexEvaluator` genérico.
+
+**Evidência.** `AIShoppingPlanner.Demand.cs:2582` (demanda); `AIController.AirCombat.cs:39-44` (`IsAirCombatUnit` exige domínio aéreo); `AIController.Router.cs` (sem ramo para `RaidAntiSub`).
+
+**Impacto.** A IA compra a unidade certa e a usa como barco armado qualquer. Não mantém contato, não fica sobre o alvo, não usa o sensor. Soma-se ao `IA-001`: mesmo que caçasse, o ataque de alcance 0 seria subavaliado.
+
+**Decisão necessária.** Não resolver empurrando a fragata para o tratador aéreo — ele lida com decolagem, altitude e duelo aéreo, e produziria comportamento pior que o genérico. O que falta é lógica de caça antissubmarino própria.
+
+**Status.** Aberta. Lacuna de escopo, não bug de uma linha.
+
+---
+
+### IA-004 — Navio de Desembarque opera com heurística de APC
+
+**Regra canônica.** O desembarque anfíbio funciona porque o passageiro materializa sobre o transportador e pisa num vizinho válido — o navio nunca precisa alcançar a terra (`08_transporte_fusao_e_operacoes_aereas.md`).
+
+**Comportamento atual.** `MA Desembarque` tem papel Transportador e **entra** no tratador de transporte, porque o gate é por papel e não por domínio. Como não é aéreo, cai no mesmo fluxo do APC (shuttle / courier / assigned).
+
+As peças de baixo nível são agnósticas e funcionam: o embarque é ação do passageiro via `PodeEmbarcarSensor`, e o `PodeDesembarcarSensor` valida o destino pelas regras do passageiro. O que é terrestre é o **raciocínio** em volta:
+
+- `FindTransportMove` roteia pelo custo do próprio transportador — correto para o navio (só água), mas o alvo é um objetivo em **terra** que ele nunca alcança;
+- `TransportDropOffRange = 3` foi calibrado para APC, que descarrega e a tropa segue andando. No desembarque anfíbio o navio precisa estar **encostado** na praia certa.
+
+**Evidência.** `AIController.Transportador.cs:20-47`; constantes em `AIController.Transportador.cs`.
+
+**Impacto.** Não trava. O risco é o navio oscilar na costa sem concluir entrega, e nunca escolher a praia certa por não haver nada que modele "levar tropa por mar e desembarcar no litoral".
+
+**Status.** Aberta, não observada em Play. Diferente do Chinook, que tem lógica dedicada (`AIController.Transportador.Air.cs`) e funciona.
+
+---
+
+### DAT-001 — Navio Tanque tem papel fora do enum
+
+**Comportamento atual.** `MA Tanque` (id `navioTanque`) declara `roles: 10000000` = **16**. O enum `UnitRole` termina em `TransportadorAereo = 15`. É valor inválido.
+
+**Evidência.** `Assets/DB/Units/Unit List/Marinha/MA Tanque.asset:35`; `Assets/Scripts/Units/UnitRole.cs`.
+
+**Impacto.** Desconhecido e silencioso: comparações de papel simplesmente não casam, então a unidade tende a desaparecer da lógica de decisão sem erro visível.
+
+**Decisão necessária.** Escolher o papel correto — pelos atributos (`isSupplier`, tier Hub) os candidatos são `Logistica (4)` ou `Suprimentos (7)`. É decisão de design, por isso não foi corrigido por conta.
+
+**Status.** Aberta. Marcação de ficha no inspector.
+
+---
+
+### MAP-001 — Rota com salto desenha linha contínua que o trem não percorre
+
+**Regra canônica.** O Trem de Carga passa entre dois hexágonos apenas quando eles aparecem **consecutivos** na lista de células de uma rota declarada (`03_movimento_terreno_e_infraestrutura.md`).
+
+**Comportamento atual.** A validação de rota confere cada célula **individualmente** — terreno e domínio — e **nunca verifica se células consecutivas são de fato hexágonos vizinhos**. Se o autor do mapa declarar um salto na lista:
+
+- o **visual desenha** a linha entre as duas células distantes, porque o desenho apenas liga os centros par a par, sem checar distância;
+- o **movimento ignora** aquele par, porque a busca só testa arestas fisicamente adjacentes.
+
+O resultado é uma ferrovia que **parece contínua no mapa e não é percorrível**, sem nenhum aviso — a rota passou na validação.
+
+**Evidência.** `RoadNetworkManager.cs` — `IsRouteValid` (valida célula a célula, sem adjacência) e `CreateRouteSegments` (liga `cells[i]` a `cells[i+1]` por posição de mundo). Consumo em `UnitMovementPathRules.HasConnectedRouteSegmentAllowingUnit`.
+
+**Impacto.** Não corrompe partida e não permite teleporte — o efeito é uma linha morta. Mas é silencioso e difícil de diagnosticar: quem desenhou vê o trilho na tela e conclui que o trem está bugado.
+
+**Decisão necessária.** Acrescentar checagem de adjacência em `IsRouteValid`, emitindo o mesmo `LogWarning` que as demais rotas inválidas já emitem. Alternativa mais branda: manter a rota válida e avisar apenas no salto.
+
+**Status.** Aberta. Ferramenta de autoria, não regra de jogo.
+
+---
+
+### MOV-001 — Emersão forçada pendente sob a ponte nunca foi testada
+
+**Regra canônica.** Um submarino atingido por armamento apropriado é forçado a emergir; se o hexágono não permitir a emersão, a ordem fica **pendente** e o relógio de exposição não corre até ela acontecer (`05_visao_deteccao_e_nevoa.md`).
+
+**Comportamento atual.** Desconhecido — é o ponto. A estrutura da ponte declara `forceEndMovementOnTerrainDomainForDomains`, criado para o submarino **parar** sob o vão. Essa regra nunca foi exercitada em conjunto com o lock de emersão forçada.
+
+O cenário não testado: submarino que encerra o movimento sob a ponte por força do `forceEndMovement` **e** carrega uma emersão pendente por ter sido atingido. As duas regras se encontram num hexágono onde a superfície pode estar ocupada pelo convés, pelo tanque em cima dele ou por um navio embaixo.
+
+**Evidência.** `StructureNavalOpsTerrainRule.forceEndMovementOnTerrainDomainForDomains`; interação com `HasPendingForcedLayerLock` e `PodeEmergirSensor.CanApplyLayerTransitionAtCell`.
+
+**Impacto.** Provavelmente não é erro visível — o risco é o submarino ficar num estado que nenhuma das duas regras previu, com a exposição congelada indefinidamente por um bloqueio que o próprio sistema criou.
+
+**Decisão necessária.** Testar o caso em Play antes de qualquer mudança. Só depois decidir se o `forceEndMovement` deve ceder ao lock, o lock ao `forceEndMovement`, ou se a combinação já resolve.
+
+**Status.** Aberta, não diagnosticada. Registrada por ser combinação conhecida e não exercitada, não por sintoma observado.
+
+---
+
+### OCP-001 — Multiocupação por camadas estava presa ao Total War *(corrigido)*
+
+**Regra canônica.** Os três andares do hexágono — ar, superfície, profundezas — são regra de tabuleiro e valem em qualquer partida (`02_dominios_terrenos_e_ocupacao.md`).
+
+**Comportamento anterior.** `IsLayerAwareRulesActive` exigia `EnableLayerOccupancyResolver && IsTotalWarEnabled()`. Sem Total War, **todo** o modelo de camadas desligava e o jogo revertia para uma unidade por hexágono: nenhuma aeronave sobre tanque, nenhum submarino sob navio, em nenhum modo sem névoa.
+
+O erro conceitual: FOW é cobertura de **informação** sobre o tabuleiro, não um modo de regras. Modos sem névoa (neblina leve, montanha, gameboy, física básica) apenas revelam o tabuleiro — a ocupação deveria ser idêntica. O próprio código descrevia a condição como "flag de rollout local", o que indica dívida de implantação, não desenho.
+
+**Correção aplicada.** `IsLayerAwareRulesActive` passou a depender apenas de `EnableLayerOccupancyResolver`. O que é de fato exclusivo do Total War — dois **inimigos** dividirem a **mesma** banda, o hex disputado — foi separado em `AllowsEnemyShareInSameBand`, aplicado só onde cabe.
+
+**Evidência.** `OccupancyResolver.cs` (`IsLayerAwareRulesActive`, `AllowsEnemyShareInSameBand`, `CanEndMoveInBand`).
+
+**Status.** Corrigido, aguardando teste. Verificar nos modos sem névoa: aeronave sobre unidade terrestre, submarino sob navio, e — como controle — dois aliados de superfície ainda bloqueando entre si.

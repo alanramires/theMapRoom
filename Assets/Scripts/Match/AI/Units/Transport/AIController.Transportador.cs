@@ -29,6 +29,11 @@ public partial class AIController
         if (data.domain == Domain.Air)
             return TryDecideAirTransportAction(unit, snapshot, plan);
 
+        // Naval tem caminho proprio pelo mesmo motivo do aereo: o fluxo terrestre rota ATE
+        // o objetivo, e um navio nunca alcanca um objetivo em terra. Ver Transportador.Naval.
+        if (data.domain == Domain.Naval)
+            return TryDecideNavalTransportAction(unit, snapshot, plan);
+
         // Courier does NOT scan for new pickups — it is delivering existing cargo.
         // The next rogue-shuttle turn (empty APC) handles new pickups.
         bool hasCargo = HasTransportCargo(unit);

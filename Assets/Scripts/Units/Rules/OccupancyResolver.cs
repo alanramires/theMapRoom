@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Tilemaps;
 
 public enum HeightBand
 {
@@ -17,9 +18,19 @@ public struct LayerOccupancyKey
 
 public static class OccupancyResolver
 {
-    // Flag de rollout local (default on). Regras layer-aware so ativam quando Total War estiver ativo.
+    // Flag de rollout local (default on).
     public static bool EnableLayerOccupancyResolver = true;
-    public static bool IsLayerAwareRulesActive => EnableLayerOccupancyResolver && UnitRulesDefinition.IsTotalWarEnabled();
+
+    // Os tres andares do hexagono sao regra de TABULEIRO e valem em toda partida: aviao
+    // sobrevoa tanque, submarino navega sob navio, tanque para no conves com navio embaixo.
+    // Nada disso depende de nevoa — FOW e cobertura de INFORMACAO sobre o tabuleiro, nao um
+    // modo de regras. Modos sem FOW (neblina leve, montanha, gameboy, fisica basica) apenas
+    // revelam o tabuleiro; a ocupacao por camadas continua identica.
+    public static bool IsLayerAwareRulesActive => EnableLayerOccupancyResolver;
+
+    // O que E exclusivo do Total War: dois INIMIGOS dividirem a MESMA banda (hex disputado).
+    // Fora dele, a mesma banda comporta uma presenca so, seja aliada ou inimiga.
+    private static bool AllowsEnemyShareInSameBand => UnitRulesDefinition.IsTotalWarEnabled();
 
     public static HeightBand GetHeightBand(UnitManager unit)
     {
@@ -62,6 +73,11 @@ public static class OccupancyResolver
         if (moverBand != HeightBand.Blocking)
             return true;
 
+        // Conves da ponte separa terra e agua: nao ha o que bloquear entre quem anda em
+        // cima e quem navega embaixo, nem sendo inimigos.
+        if (DeckSeparatesFromWater(mover, blocker, cell))
+            return true;
+
         // Mesma camada bloqueante + inimigo: sempre bloqueia passagem.
         // Total War impacta apenas regra de termino de movimento (CanEndMove).
         return false;
@@ -84,7 +100,7 @@ public static class OccupancyResolver
             return true;
 
         HeightBand moverBand = GetHeightBand(mover);
-        return CanEndMoveInBand(mover, moverBand, occupants);
+        return CanEndMoveInBand(mover, moverBand, occupants, cell);
     }
 
     public static bool CanEndMoveAsLayer(
@@ -103,7 +119,77 @@ public static class OccupancyResolver
         return CanEndMoveInBand(mover, targetBand, occupants);
     }
 
-    private static bool CanEndMoveInBand(UnitManager mover, HeightBand moverBand, IEnumerable<UnitManager> occupants)
+    // Conves da ponte: no hex marcado, Land/Surface e Naval/Surface deixam de ser o mesmo
+    // andar. E a unica excecao ao "superficie e superficie" — em todo o resto do mapa terra
+    // e mar ao nivel do mar disputam a mesma vaga, que e o que impede tanque e navio de
+    // dividirem uma praia. Sobre a ponte existe conves em cima e agua embaixo, entao os dois
+    // coexistem de fato.
+    private static bool DeckSeparatesFromWater(UnitManager a, UnitManager b, Vector3Int? cell)
+    {
+        if (!cell.HasValue || a == null || b == null)
+            return false;
+
+        Domain domainA = a.GetDomain();
+        Domain domainB = b.GetDomain();
+        bool oneIsLandOtherIsNaval =
+            (domainA == Domain.Land && domainB == Domain.Naval) ||
+            (domainA == Domain.Naval && domainB == Domain.Land);
+        if (!oneIsLandOtherIsNaval)
+            return false;
+
+        Tilemap map = a.BoardTilemap != null ? a.BoardTilemap : b.BoardTilemap;
+        if (map == null)
+            return false;
+
+        StructureData structure = StructureOccupancyRules.GetStructureAtCell(map, cell.Value);
+        if (structure == null)
+            return false;
+
+        // Regra do PAR estrutura+terreno: a mesma ponte tem vao sobre o mar e encosta no
+        // chao sobre a praia. So o par declara se ha conves separando terra de agua.
+        TerrainTypeData terrain = ResolveTerrainAtCell(map, cell.Value);
+        return structure.TryGetNavalOpsRuleForTerrain(terrain, out StructureNavalOpsTerrainRule rule)
+            && rule != null
+            && rule.separaConvesEAgua;
+    }
+
+    private static TerrainDatabase cachedTerrainDatabase;
+
+    private static TerrainTypeData ResolveTerrainAtCell(Tilemap map, Vector3Int cell)
+    {
+        if (map == null)
+            return null;
+
+        if (cachedTerrainDatabase == null)
+        {
+            TurnStateManager turnState = Object.FindAnyObjectByType<TurnStateManager>();
+            if (turnState != null)
+                cachedTerrainDatabase = turnState.TerrainDatabaseRef;
+
+            if (cachedTerrainDatabase == null)
+            {
+                MatchController match = Object.FindAnyObjectByType<MatchController>();
+                if (match != null)
+                    cachedTerrainDatabase = match.TerrainDatabaseRef;
+            }
+        }
+
+        if (cachedTerrainDatabase == null)
+            return null;
+
+        cell.z = 0;
+        TileBase tile = map.GetTile(cell);
+        if (tile != null && cachedTerrainDatabase.TryGetByPaletteTile(tile, out TerrainTypeData terrain))
+            return terrain;
+
+        return null;
+    }
+
+    private static bool CanEndMoveInBand(
+        UnitManager mover,
+        HeightBand moverBand,
+        IEnumerable<UnitManager> occupants,
+        Vector3Int? cell = null)
     {
         if (occupants == null)
             return true;
@@ -114,12 +200,17 @@ public static class OccupancyResolver
                 continue;
             if (GetHeightBand(occupant) != moverBand)
                 continue;
+            if (moverBand == HeightBand.Blocking && DeckSeparatesFromWater(mover, occupant, cell))
+                continue;
 
             // Vale para todas as bandas (Blocking, Air, Sub). Em Air,
             // AirLow e AirHigh compartilham o mesmo slot por dominio/time.
             // - aliado nunca compartilha o hex final na mesma banda;
-            // - inimigo coexiste (Blocking = Total War; Air/Sub = hex contestado/dogfight).
+            // - inimigo so compartilha sob Total War (hex disputado/dogfight).
             if (PlayerSlotRelations.AreAllies(occupant, mover))
+                return false;
+
+            if (!AllowsEnemyShareInSameBand)
                 return false;
         }
 

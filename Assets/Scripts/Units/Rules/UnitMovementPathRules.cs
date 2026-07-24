@@ -394,13 +394,35 @@ public static class UnitMovementPathRules
             return CanTraverseUsingTerrain(terrainData, unit, currentDomain, currentHeight);
         }
 
-        if (construction != null)
+        // Gate de conexao por rota declarada, resolvido pelo par Estrutura+Terreno.
+        // E um AND sobre a travessia normal, nao um atalho: a unidade continua pagando
+        // custo e obedecendo terreno/estrutura — ela apenas nao ENTRA por qualquer flanco.
+        // Modela a estrada de montanha como desfiladeiro: so se sobe pela boca da estrada.
+        bool routeGateFailed = structure != null
+            && previousCell.HasValue
+            && cache != null
+            && structure.ExigeRotaDeclaradaEm(terrainData)
+            && !cache.HasConnectedRouteSegmentAllowingUnit(previousCell.Value, cell, unit);
+
+        // Uma construcao no hex normalmente encerra a exigencia — a cidade na serra liberta.
+        // A estrutura pode dizer o contrario (exigeEstruturaNaConstrucao): e o
+        // caso do trilho, onde a cidade so e alcancavel se a linha chegar ate ela.
+        bool routeGateBlocks = routeGateFailed && (construction == null || structure.exigeEstruturaNaConstrucao);
+
+        if (construction != null && !routeGateBlocks)
             return CanTraverseUsingConstruction(construction, unit, currentDomain, currentHeight);
 
-        if (structure != null)
+        // Falhar no gate de rota NEGA A ESTRUTURA, nao o hex. Quem nao veio pela rota apenas
+        // perde o beneficio de usar a via — segue podendo entrar se o TERRENO por baixo o
+        // aceitar. Sem isso a estrutura viraria um muro para quem nem precisava dela: o
+        // soldado deixaria de cruzar um trilho na planicie, e o alpino nao subiria uma
+        // montanha so porque passa uma estrada por ela.
+        if (structure != null && !routeGateBlocks)
             return CanTraverseUsingStructure(structure, terrainData, unit, currentDomain, currentHeight);
 
-        if (cache != null && cache.HasAnyRouteStructureAtCellAllowingUnit(cell, unit))
+        // Atalho por estrutura de rota no hex — suprimido quando o gate barrou, senao ele
+        // devolveria pela janela o beneficio que a porta acabou de negar.
+        if (!routeGateBlocks && cache != null && cache.HasAnyRouteStructureAtCellAllowingUnit(cell, unit))
             return true;
 
         if (terrainData == null)
@@ -448,6 +470,11 @@ public static class UnitMovementPathRules
         if (structure == null || unit == null)
             return false;
 
+        // Veto do par Estrutura+Terreno vem primeiro: se o par proibiu a camada, nao ha
+        // concessao que valha — nem o dominio nativo, nem o adicional, nem o terreno base.
+        if (structure.IsLayerBlockedAt(terrainData, currentDomain, currentHeight))
+            return false;
+
         if (currentDomain == Domain.Air)
         {
             if (structure.alwaysAllowAirDomain)
@@ -457,8 +484,20 @@ public static class UnitMovementPathRules
             return UnitPassesSkillRules(unit, structure.GetRequiredSkillsToEnter(terrainData), structure.GetBlockedSkillsToEnter(terrainData));
         }
 
+        // Camada ADICIONAL da estrutura = atravessar por outro andar que nao o dela, tipicamente
+        // passar POR BAIXO (navio e submarino sob a ponte). Duas correcoes em relacao a tratar
+        // isso como travessia normal:
+        //
+        // 1) O terreno base precisa suportar a camada. Uma ponte concede naval/submerso porque
+        //    ha MAR embaixo; apoiada em planicie ou montanha ela nao cria agua, e sem esta
+        //    checagem um submarino navegaria por baixo de um campo.
+        //
+        // 2) As skills da estrutura governam quem anda POR CIMA, nao quem passa por baixo. A
+        //    ponte ferroviaria exige a skill de trilho para o traçado superior; aplicar isso ao
+        //    vao afundava a regra em quem so queria cruzar o rio — era por isso que o navio
+        //    passava sob a ponte rodoviaria e nao sob a ferroviaria.
         if (StructureSupportsAdditionalMode(structure, currentDomain, currentHeight))
-            return UnitPassesSkillRules(unit, structure.GetRequiredSkillsToEnter(terrainData), structure.GetBlockedSkillsToEnter(terrainData));
+            return TerrainSupportsMode(terrainData, currentDomain, currentHeight);
 
         IReadOnlyList<UnitLayerMode> unitModes = unit.GetAllLayerModes();
         bool supportsAnyMode = false;

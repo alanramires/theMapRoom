@@ -45,6 +45,20 @@ public class StructureSkillTerrainRule
     public List<SkillData> blockedSkills = new List<SkillData>();
     [Tooltip("Overrides opcionais de custo de autonomia por skill neste par Estrutura+Terreno.")]
     public List<TerrainSkillCostOverride> skillCostOverrides = new List<TerrainSkillCostOverride>();
+
+    [Tooltip("Exigencia de rota declarada NESTE par Estrutura+Terreno. Herdar = usa o valor global da estrutura. Ex.: Rodovia e livre na floresta (global false) mas canalizada na montanha (override Exigir).")]
+    public ExigenciaDeRotaDeclarada rotaDeclarada = ExigenciaDeRotaDeclarada.HerdarDaEstrutura;
+}
+
+// Exigencia de conexao por rota declarada. Quando ativa, uma unidade so entra na celula
+// vindo de um hex que seja o par consecutivo dela em alguma RoadRouteDefinition — nao basta
+// a estrutura estar pintada no destino. Modela trilho (trem segue a linha) e estrada de
+// montanha (so se sobe a serra pela boca do desfiladeiro, nao por qualquer flanco).
+public enum ExigenciaDeRotaDeclarada
+{
+    HerdarDaEstrutura = 0,
+    Exigir = 1,
+    NaoExigir = 2
 }
 
 [System.Serializable]
@@ -61,6 +75,12 @@ public class StructureNavalOpsTerrainRule
 
     [Tooltip("Se preenchido, somente unidades com estas Stealth Skills ficam livremente detectaveis neste par.")]
     public List<SkillData> forceDetectUnitsWithFollowingStealthSkills = new List<SkillData>();
+
+    [Tooltip("O conves fica ACIMA da agua NESTE par: Land/Surface e Naval/Surface deixam de ser o mesmo andar. Marque na ponte sobre MAR — tanque para em cima, navio passa embaixo. Deixe desmarcado na ponte sobre PRAIA: la a ponte encosta no chao e nao ha vao, entao navio e tanque continuam disputando a mesma vaga.")]
+    public bool separaConvesEAgua = false;
+
+    [Tooltip("Proibe unidades navais de superficie NESTE par, mesmo que a estrutura e o terreno as aceitem isoladamente. Marque em Ponte + Praia: ali fica a cabeceira da ponte (encontro, aterro, estacas), nao agua navegavel. Deixe desmarcado em Ponte + Mar, onde ha vao e o navio passa embaixo.")]
+    public bool bloqueiaNaval = false;
 }
 
 [System.Serializable]
@@ -123,6 +143,10 @@ public class StructureData : ScriptableObject
     public List<TerrainSkillCostOverride> skillCostOverrides = new List<TerrainSkillCostOverride>();
     [Tooltip("Regras por par Estrutura+Terreno. Quando o terreno do hex casar, estas regras complementam/substituem as globais.")]
     public List<StructureSkillTerrainRule> skillRulesByTerrain = new List<StructureSkillTerrainRule>();
+    [Tooltip("Valor GLOBAL da exigencia de rota declarada. Marque na Linha de Trem para cobrir todos os terrenos de uma vez. Cada par Estrutura+Terreno pode sobrescrever este valor.")]
+    public bool exigeRotaDeclarada = false;
+    [Tooltip("A exigencia de rota sobrevive a uma construcao no hex. Marque na Linha de Trem: o trem so entra numa cidade se houver trilho ligando ate ela. Desmarque na Rodovia: uma cidade na montanha liberta o movimento e encerra o desfiladeiro.")]
+    public bool exigeEstruturaNaConstrucao = false;
 
     [Header("Build Rules")]
     [FormerlySerializedAs("additionalBuildLayerModes")]
@@ -247,6 +271,19 @@ public class StructureData : ScriptableObject
         }
     }
 
+    // Veto do par Estrutura+Terreno sobre uma camada. Roda antes de qualquer concessao:
+    // nem o dominio nativo da estrutura, nem o adicional, nem o terreno base valem se o
+    // par proibiu. E como a ponte na praia recusa navio sem deixar de aceita-lo no mar.
+    public bool IsLayerBlockedAt(TerrainTypeData terrain, Domain domain, HeightLevel height)
+    {
+        if (domain != Domain.Naval || height != HeightLevel.Surface)
+            return false;
+
+        return TryGetNavalOpsRuleForTerrain(terrain, out StructureNavalOpsTerrainRule rule)
+            && rule != null
+            && rule.bloqueiaNaval;
+    }
+
     public bool TryGetNavalOpsRuleForTerrain(TerrainTypeData terrain, out StructureNavalOpsTerrainRule rule)
     {
         rule = null;
@@ -321,6 +358,25 @@ public class StructureData : ScriptableObject
             return rule.skillCostOverrides;
 
         return skillCostOverrides;
+    }
+
+    // Exigencia de rota declarada para este par Estrutura+Terreno. O par manda; se ele
+    // herdar, vale o valor global da estrutura. Ex.: Trilhos marca o global e cobre todos
+    // os terrenos; Rodovias fica global=false e sobrescreve so no par com Montanha.
+    public bool ExigeRotaDeclaradaEm(TerrainTypeData terrain)
+    {
+        if (TryGetSkillRuleForTerrain(terrain, out StructureSkillTerrainRule rule) && rule != null)
+        {
+            switch (rule.rotaDeclarada)
+            {
+                case ExigenciaDeRotaDeclarada.Exigir:
+                    return true;
+                case ExigenciaDeRotaDeclarada.NaoExigir:
+                    return false;
+            }
+        }
+
+        return exigeRotaDeclarada;
     }
 
     public bool TryGetSkillRuleForTerrain(TerrainTypeData terrain, out StructureSkillTerrainRule rule)

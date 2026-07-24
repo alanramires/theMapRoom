@@ -1344,9 +1344,13 @@ public class CursorController : MonoBehaviour
         }
 
         pendingEndTurnConfirmation = true;
+        // Sem TurnStateManager nao houve painel de confirmacao do helper — o beep dele mora
+        // em TryOpenEndingTurnConfirmation, para soar tambem quando a IA abre o mesmo painel.
         if (turnStateManager == null)
+        {
             PanelDialogController.TrySetExternalText("End Turn :: Confirm");
-        PlayBeepSfx();
+            PlayBeepSfx();
+        }
         return true;
     }
 

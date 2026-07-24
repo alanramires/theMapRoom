@@ -1965,42 +1965,42 @@ MonoBehaviour:
   - teamId: 2
     flipX: 0
     flipXOverride: 0
-    isAI: 0
-    commandServiceAutomatic: 0
+    isAI: 1
+    commandServiceAutomatic: 1
     defeated: 0
     startMoney: 0
     actualMoney: 0
-    incomePerTurn: 0
+    incomePerTurn: 3000
     startMoneyApplied: 1
   - teamId: 3
     flipX: 1
     flipXOverride: 0
-    isAI: 0
-    commandServiceAutomatic: 0
+    isAI: 1
+    commandServiceAutomatic: 1
     defeated: 0
     startMoney: 0
     actualMoney: 0
-    incomePerTurn: 0
+    incomePerTurn: 3000
     startMoneyApplied: 1
   - teamId: 0
     flipX: 0
     flipXOverride: 0
-    isAI: 0
-    commandServiceAutomatic: 0
+    isAI: 1
+    commandServiceAutomatic: 1
     defeated: 0
     startMoney: 0
     actualMoney: 0
-    incomePerTurn: 0
+    incomePerTurn: 3000
     startMoneyApplied: 0
   - teamId: 1
     flipX: 1
     flipXOverride: 0
-    isAI: 0
-    commandServiceAutomatic: 0
+    isAI: 1
+    commandServiceAutomatic: 1
     defeated: 0
     startMoney: 0
     actualMoney: 0
-    incomePerTurn: 0
+    incomePerTurn: 3000
     startMoneyApplied: 0
   includeNeutralTeam: 0
   capturedBuildingHistory: []
@@ -2064,7 +2064,7 @@ MonoBehaviour:
   appliedActiveTeamId: 2
   pendingTurnStartUpkeep: 1
   pendingTurnStartEconomy: 1
-  cachedConstructionIncomeSignature: 495780623
+  cachedConstructionIncomeSignature: 1061116371
   cachedConstructionIncomeCount: 4
   constructionIncomeRefreshIntervalSeconds: 0.35
   continuousEditorRefresh: 0
@@ -5976,9 +5976,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 57204a2b092e5ec468746a6a29c85a52, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DebugManager
-  aiDebugShortcutsEnabled: 0
-  debugShortcutsEnabled: 0
-  resetPlanOnDebugStage: 0
+  aiDebugShortcutsEnabled: 1
+  debugShortcutsEnabled: 1
+  resetPlanOnDebugStage: 1
   panelRodadaDesativadoPvpDebug: 0
 --- !u!1 &1092189553
 GameObject:
@@ -9976,10 +9976,6 @@ MonoBehaviour:
       capturePointsMax: 60
       source: {fileID: 417407532}
     riskEntries:
-    - SlotIndex: 1
-      Team: 3
-      RiskRatio: 1
-      RiskLevel: 4
     - SlotIndex: 0
       Team: 2
       RiskRatio: 0
@@ -9992,16 +9988,11 @@ MonoBehaviour:
       Team: 0
       RiskRatio: 1
       RiskLevel: 4
-    sectorDistances:
     - SlotIndex: 1
       Team: 3
-      Entries:
-      - ConstructionName: HQ
-        InstanceId: 0
-        Distance: 11
-        VehicleDistance: 11
-        AirDistance: 9
-        IsHQ: 1
+      RiskRatio: 1
+      RiskLevel: 4
+    sectorDistances:
     - SlotIndex: 0
       Team: 2
       Entries:
@@ -10028,6 +10019,15 @@ MonoBehaviour:
         Distance: 10
         VehicleDistance: 10
         AirDistance: 10
+        IsHQ: 1
+    - SlotIndex: 1
+      Team: 3
+      Entries:
+      - ConstructionName: HQ
+        InstanceId: 0
+        Distance: 11
+        VehicleDistance: 11
+        AirDistance: 9
         IsHQ: 1
     closestNeighbor1: 0
     closestNeighbor1Distance: 3.4028235e+38
@@ -10056,10 +10056,6 @@ MonoBehaviour:
       capturePointsMax: 60
       source: {fileID: 220164427}
     riskEntries:
-    - SlotIndex: 1
-      Team: 3
-      RiskRatio: 0
-      RiskLevel: 0
     - SlotIndex: 0
       Team: 2
       RiskRatio: 1
@@ -10072,16 +10068,11 @@ MonoBehaviour:
       Team: 0
       RiskRatio: 1
       RiskLevel: 4
-    sectorDistances:
     - SlotIndex: 1
       Team: 3
-      Entries:
-      - ConstructionName: HQ
-        InstanceId: 0
-        Distance: 0
-        VehicleDistance: 0
-        AirDistance: 0
-        IsHQ: 1
+      RiskRatio: 0
+      RiskLevel: 0
+    sectorDistances:
     - SlotIndex: 0
       Team: 2
       Entries:
@@ -10108,6 +10099,15 @@ MonoBehaviour:
         Distance: 14
         VehicleDistance: 14
         AirDistance: 14
+        IsHQ: 1
+    - SlotIndex: 1
+      Team: 3
+      Entries:
+      - ConstructionName: HQ
+        InstanceId: 0
+        Distance: 0
+        VehicleDistance: 0
+        AirDistance: 0
         IsHQ: 1
     closestNeighbor1: 0
     closestNeighbor1Distance: 3.4028235e+38
@@ -10136,10 +10136,6 @@ MonoBehaviour:
       capturePointsMax: 60
       source: {fileID: 1106072019}
     riskEntries:
-    - SlotIndex: 1
-      Team: 3
-      RiskRatio: 1
-      RiskLevel: 4
     - SlotIndex: 0
       Team: 2
       RiskRatio: 1
@@ -10152,16 +10148,11 @@ MonoBehaviour:
       Team: 0
       RiskRatio: 0
       RiskLevel: 0
-    sectorDistances:
     - SlotIndex: 1
       Team: 3
-      Entries:
-      - ConstructionName: HQ
-        InstanceId: 0
-        Distance: 14
-        VehicleDistance: 14
-        AirDistance: 14
-        IsHQ: 1
+      RiskRatio: 1
+      RiskLevel: 4
+    sectorDistances:
     - SlotIndex: 0
       Team: 2
       Entries:
@@ -10188,6 +10179,15 @@ MonoBehaviour:
         Distance: 0
         VehicleDistance: 0
         AirDistance: 0
+        IsHQ: 1
+    - SlotIndex: 1
+      Team: 3
+      Entries:
+      - ConstructionName: HQ
+        InstanceId: 0
+        Distance: 14
+        VehicleDistance: 14
+        AirDistance: 14
         IsHQ: 1
     closestNeighbor1: 0
     closestNeighbor1Distance: 3.4028235e+38
@@ -10216,10 +10216,6 @@ MonoBehaviour:
       capturePointsMax: 60
       source: {fileID: 646762210}
     riskEntries:
-    - SlotIndex: 1
-      Team: 3
-      RiskRatio: 1
-      RiskLevel: 4
     - SlotIndex: 0
       Team: 2
       RiskRatio: 1
@@ -10232,16 +10228,11 @@ MonoBehaviour:
       Team: 0
       RiskRatio: 1
       RiskLevel: 4
-    sectorDistances:
     - SlotIndex: 1
       Team: 3
-      Entries:
-      - ConstructionName: HQ
-        InstanceId: 0
-        Distance: 10
-        VehicleDistance: 10
-        AirDistance: 10
-        IsHQ: 1
+      RiskRatio: 1
+      RiskLevel: 4
+    sectorDistances:
     - SlotIndex: 0
       Team: 2
       Entries:
@@ -10268,6 +10259,15 @@ MonoBehaviour:
         Distance: 11
         VehicleDistance: 11
         AirDistance: 9
+        IsHQ: 1
+    - SlotIndex: 1
+      Team: 3
+      Entries:
+      - ConstructionName: HQ
+        InstanceId: 0
+        Distance: 10
+        VehicleDistance: 10
+        AirDistance: 10
         IsHQ: 1
     closestNeighbor1: 0
     closestNeighbor1Distance: 3.4028235e+38
@@ -11039,7 +11039,7 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 1348457725607290348, guid: f7e44d7c210a32d4ba630ba660da88a1, type: 3}
       propertyPath: m_text
-      value: 0 / turn
+      value: 3000 / turn
       objectReference: {fileID: 0}
     - target: {fileID: 4985144350662451516, guid: f7e44d7c210a32d4ba630ba660da88a1, type: 3}
       propertyPath: m_Enabled

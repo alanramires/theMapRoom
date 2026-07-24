@@ -134,6 +134,12 @@ O trem ignora a hierarquia inteira. Ele faz uma pergunta só: o passo que estou 
 
 Repare que a pergunta é sobre o **segmento**, não sobre o hexágono. Não basta haver trilho no destino: o destino precisa estar ligado à célula de onde o trem vem por um trecho declarado da mesma rota. Dois pedaços de ferrovia que se encostam no mapa mas não pertencem à mesma rota contínua não formam caminho — o trem não salta a emenda.
 
+E aqui está a parte que só importa a quem constrói mapas: **a continuidade é declarada, não desenhada.** Uma rota é uma lista ordenada de hexágonos, e o que abre passagem para o trem é dois hexágonos aparecerem **em sequência** nessa lista. Trilho pintado sem rota que o percorra é enfeite.
+
+Isso tem um efeito bom: rotas que se cruzam funcionam sem regra adicional. O hexágono compartilhado pertence às duas listas, então o trem troca de linha ali naturalmente.
+
+E tem um efeito que morde: dois hexágonos vizinhos, ambos com trilho, que nunca aparecem em sequência na mesma rota **não se conectam**. A vizinhança física não cria caminho — só a ordem da lista cria.
+
 Se o segmento existe, ele passa. Se não existe, ele não passa — e não importa o que mais esteja ali.
 
 A consequência que pega todo mundo é a cidade. Uma cidade é perfeitamente transitável para qualquer unidade terrestre. Para o trem, ela é irrelevante: se não houver trilho naquele hexágono, o trem não entra na cidade. A construção não abre caminho para ele, porque ele não está olhando para a construção.

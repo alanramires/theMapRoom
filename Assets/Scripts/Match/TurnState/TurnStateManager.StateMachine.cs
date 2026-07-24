@@ -1353,6 +1353,11 @@ public partial class TurnStateManager
         // Confirmacao clicavel/tocavel no helper panel, mesmo tratamento de Render-se/Sair.
         PanelDialogController.ClearExternalText();
         PanelHelperController.TrySetExternalText("PASSAR A VEZ", "Encerrar seu turno agora?");
+        // O beep pertence a ABERTURA do painel, nao a quem pediu: no modo visivel a IA abre
+        // esta mesma confirmacao (TryOpenRodadaConfirmationForAI) chamando este metodo direto,
+        // sem passar pelo wrapper do CursorController. Com o som aqui, painel aberto sempre
+        // soa — humano pelo menu, IA pelo replay — e o silencio da IA deixa de parecer bug.
+        cursorController?.PlayBeepSfx();
         return true;
     }
 

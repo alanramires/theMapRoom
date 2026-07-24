@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Tilemaps;
 
 public partial class AIController
 {
@@ -296,11 +297,20 @@ public partial class AIController
         if (paths == null || paths.Count == 0)
             return false;
 
+        // Zona de atendimento: os hexes de onde o supridor alcancaria ALGUEM. Sem isto o
+        // laco abaixo roda um PodeSuprir completo por celula alcancavel — num mapa grande,
+        // centenas de varreduras por caminhao, quase todas sobre hexes onde nao ha ninguem
+        // para atender. Aqui o conjunto de candidatos e montado UMA vez a partir das
+        // unidades aliadas, e so as celulas dentro do alcance de servico entram no laco.
+        HashSet<Vector3Int> serviceZone = BuildLogisticsServiceZone(unit, snapshot);
+
         foreach (Vector3Int rawCell in paths.Keys)
         {
             Vector3Int cell = rawCell;
             cell.z = 0;
             if (cell == fromCell && bestTargets != null)
+                continue;
+            if (serviceZone != null && !serviceZone.Contains(cell))
                 continue;
             if (cell != fromCell && occupied != null && occupied.Contains(cell))
                 continue;
@@ -1138,6 +1148,55 @@ public partial class AIController
         }
 
         return false;
+    }
+
+    // Hexes de onde este supridor alcancaria ALGUM aliado, montados uma vez por decisao.
+    // Serve de peneira barata antes do laco que roda PodeSuprir celula a celula: sem ela,
+    // um caminhao num mapa grande varre centenas de hexes vazios com sensor completo.
+    //
+    // A peneira e deliberadamente FROUXA — inclui quem ja recebeu, quem nao precisa e quem
+    // o sensor vai recusar por outro motivo. Ela responde "ha alguem ao alcance daqui?", e
+    // quem responde "da para atender?" continua sendo o PodeSuprir. Errar para o lado
+    // permissivo custa uma varredura extra; errar para o lado restritivo esconderia um
+    // atendimento legitimo, entao a assimetria e proposital.
+    //
+    // Devolve null quando nao ha candidato algum: o chamador entao nao filtra nada e o
+    // comportamento antigo permanece, em vez de a peneira zerar o laco por engano.
+    private HashSet<Vector3Int> BuildLogisticsServiceZone(UnitManager unit, AIWorldSnapshot snapshot)
+    {
+        if (unit == null || snapshot?.MyUnits == null || snapshot.MyUnits.Count == 0)
+            return null;
+
+        Tilemap map = boardTilemap != null ? boardTilemap : unit.BoardTilemap;
+        if (map == null)
+            return null;
+
+        HashSet<Vector3Int> zone = new HashSet<Vector3Int>();
+        List<Vector3Int> neighbors = new List<Vector3Int>(6);
+
+        for (int i = 0; i < snapshot.MyUnits.Count; i++)
+        {
+            UnitManager ally = snapshot.MyUnits[i];
+            if (ally == null || ally == unit || ally.IsDead)
+                continue;
+
+            Vector3Int allyCell = ally.CurrentCellPosition;
+            allyCell.z = 0;
+
+            // O proprio hex do aliado cobre SameHexOrEmbarked e Hybrid; os vizinhos cobrem
+            // Adjacent1Hex e Hybrid. Uniao dos dois atende qualquer serviceRange sem
+            // precisar ler o modo aqui.
+            zone.Add(allyCell);
+            UnitMovementPathRules.GetImmediateHexNeighbors(map, allyCell, neighbors);
+            for (int n = 0; n < neighbors.Count; n++)
+            {
+                Vector3Int neighbor = neighbors[n];
+                neighbor.z = 0;
+                zone.Add(neighbor);
+            }
+        }
+
+        return zone.Count > 0 ? zone : null;
     }
 
     private static bool IsInLogisticsServiceRange(UnitManager logistics, Vector3Int serviceCell, UnitManager target)

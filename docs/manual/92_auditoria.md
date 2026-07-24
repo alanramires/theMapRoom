@@ -82,6 +82,12 @@ Os IDs seguem o mesmo esquema de `90_pendencias_tecnicas.md` e não são reaprov
 | ECO-014 | Derrota (rendição, QG, eliminação) neutraliza as construções e restaura captura ao máximo — não transfere ao vencedor | Confirmada | `MatchController.cs:2191-2203` (`NeutralizeConstructionsOwnedBySlot`: `SetOwnerSlot(-1)` + `SetCurrentCapturePoints(CapturePointsMax)`). Documentado em `10` |
 | ECO-015 | A PRIMEIRA eliminação encerra a partida inteira, mesmo restando outros participantes | Confirmada | `MatchController.cs:2236-2240` (`DeclareEliminationVictory`, comentário explícito); vencedor é quem executou a eliminação |
 | ECO-016 | Vitória congela o avanço de turno (`freezeTurnAdvanceAfterVictory`, padrão true) | Confirmada | `MatchController.cs:276` e `:1601` — `AdvanceTurn()` retorna de imediato. Resta só menu/Jornal/estatísticas |
+| MOV-010 | Trem passa por aresta declarada (par consecutivo em `RoadRouteDefinition.cells`), não por tile pintado | Confirmada | `UnitMovementPathRules.HasConnectedRouteSegmentAllowingUnit`; rotas cruzadas conectam porque a busca varre todas as rotas |
+| MOV-011 | Validação de rota não checa adjacência entre células consecutivas | Confirmada | `RoadNetworkManager.IsRouteValid` valida célula a célula; `CreateRouteSegments` desenha o salto assim mesmo → ver MAP-001 |
+| OCP-010 | Três andares valem em toda partida, independente de névoa | **Corrigido no código** | dependia de `IsTotalWarEnabled()`; separado — ver OCP-001 em `90` |
+| OCP-011 | Camada adicional de estrutura exige que o terreno base a suporte | **Corrigido no código** | ponte sobre planície concedia Naval/Submerged sem água embaixo; `CanTraverseUsingStructure` agora consulta `TerrainSupportsMode` |
+| OCP-012 | Skills da estrutura governam quem anda por cima, não quem passa por baixo | **Corrigido no código** | `requiredSkillsToEnter` da Ponte Ferroviária barrava navio e submarino no vão — era a causa da assimetria entre as duas pontes |
+| OCP-013 | Convés da ponte separa Land/Surface de Naval/Surface, por par estrutura+terreno | **Implementado** | `StructureNavalOpsTerrainRule.separaConvesEAgua`; marcar sobre Mar, deixar desmarcado sobre Praia |
 
 ## Reclassificações
 

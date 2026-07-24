@@ -219,6 +219,30 @@ public partial class TurnStateManager
         Domain currentDomain = selectedUnit.GetDomain();
         HeightLevel currentHeight = selectedUnit.GetHeightLevel();
 
+        // Mover parado nao percorre caminho e por isso nao dispara o SFX de movimento.
+        // Mas quando a parada MUDA a camada — submarino que mergulha, aeronave que sobe —
+        // houve manobra de verdade, e ela precisa soar. Comparamos a camada no fim para
+        // tocar apenas quando algo mudou de fato; sem troca, o default segue mandando.
+        bool wasStationary = movementState == CursorState.MoveuParado;
+        Domain layerBeforeChange = currentDomain;
+        HeightLevel heightBeforeChange = currentHeight;
+
+        ApplyForcedEndMovementLayerCore(boardMap, cell, currentDomain, currentHeight);
+
+        if (wasStationary &&
+            selectedUnit != null &&
+            (selectedUnit.GetDomain() != layerBeforeChange || selectedUnit.GetHeightLevel() != heightBeforeChange))
+        {
+            PlayMovementStartSfx(selectedUnit);
+        }
+    }
+
+    private void ApplyForcedEndMovementLayerCore(
+        Tilemap boardMap,
+        Vector3Int cell,
+        Domain currentDomain,
+        HeightLevel currentHeight)
+    {
         // Lock de camada pendente (emersao forcada que nao coube no hex de
         // origem): o movimento termina na camada travada assim que o destino
         // permitir. Aplicado provisoriamente com snapshot de rollback —

@@ -30,7 +30,7 @@ MonoBehaviour:
     eliteSaveTurns: 1
     eliteMaintenanceReservePercent: 20
     savingPercentualForElite: 10
-    counterEliteEscalationPressure: 8
+    counterEliteEscalationPressure: 3.2
   composicao:
     coreMinInfantry: 2
     coreMinAssault: 2

@@ -47,6 +47,9 @@ MonoBehaviour:
       autonomyCost: 99
     - skill: {fileID: 11400000, guid: 24a55ae6170e7a642865a4a34c736233, type: 2}
       autonomyCost: 4
+    rotaDeclarada: 1
+  exigeRotaDeclarada: 0
+  exigeEstruturaNaConstrucao: 0
   canAlsoBeBuiltOnTheFollowDomains: []
   roadSegmentSprite: {fileID: 21300000, guid: 03650c0a2457e5046b8234d0bc968b5a, type: 3}
   roadColor: {r: 1, g: 1, b: 1, a: 1}

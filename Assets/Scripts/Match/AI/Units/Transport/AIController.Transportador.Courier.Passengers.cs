@@ -60,6 +60,26 @@ public partial class AIController
         if (assignedSectorTarget != Vector3Int.zero) assignedSectorTarget.z = 0;
         fallbackCell.z = 0;
 
+        // Facção sem QG: o passageiro nao tem slot de plano, entao o fluxo normal cairia no
+        // funil rogue-para-o-QG-inimigo. O rebelde a pe ja captura por PROXIMIDADE (ver
+        // AIController.Rebel); o mesmo criterio vale quando ele e carga, senao APC/Chinook/
+        // navio entregariam a tropa no lugar errado. Reusa o mesmo buscador — o transporte
+        // so precisa saber PARA ONDE levar.
+        if (ConstructionManager.IsHeadQuarterlessTeam(snapshot.AITeam))
+        {
+            ConstructionManager rebelTarget = FindNearestRebelCaptureTarget(passenger, snapshot, fallbackCell);
+            if (rebelTarget != null)
+            {
+                Vector3Int rc = rebelTarget.CurrentCellPosition; rc.z = 0;
+                Debug.Log($"{TL("Transporte")} PassengerTarget #{passenger.InstanceId} rebelde → capturavel proximo {rc}");
+                resolvedTarget = rc;
+                return true;
+            }
+            // Sem capturavel a vista: nao inventa alvo. Deixa o transporte decidir esperar
+            // em vez de marchar para o QG inimigo por falta de opcao.
+            return false;
+        }
+
         if (IsFireSupportUnit(passenger))
         {
             SectorObjective assignedFireSupport = ResolveAssignedFireSupportObjective(passenger, plan);

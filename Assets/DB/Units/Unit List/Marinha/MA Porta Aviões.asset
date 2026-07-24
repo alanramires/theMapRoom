@@ -106,6 +106,7 @@ MonoBehaviour:
     lastSyncedWeapon: {fileID: 11400000, guid: b1045e7e2a509504e9c1835590083ec2, type: 2}
   cantUseWeaponsOnTheFollowDomain: []
   isSupplier: 1
+  startsWithEmptySupplies: 0
   supplierTier: 0
   maxUnitsServedPerTurn: 2
   serviceRange: 0
@@ -135,12 +136,10 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 47664243e1e61d84aa1c496ae463bd9c, type: 2}
   allowedDisembarkWhenTransporterAtTerrainStructures: []
   allowedDisembarkWhenTransporterAtFacilities: 1
-  passengersCanDisembarkAndGoesToTerrains: []
-  passengersCanDisembarkAndGoesToTerrainStructures: []
-  passengersCanDisembarkAndGoesToFacilities: -1
   transportSlots:
   - slotId: hangar
     capacity: 2
+    exclusiveSlot: 0
     allowedLayerModes:
     - domain: 3
       heightLevel: 5
@@ -153,6 +152,5 @@ MonoBehaviour:
     requiredSkills:
     - {fileID: 11400000, guid: e73850be27dc4e2e8c8f210db151b0b4, type: 2}
     blockedSkills: []
-    canBeFireOnlyAtDomainHeigh: []
   autonomia: 90
   cost: 22500

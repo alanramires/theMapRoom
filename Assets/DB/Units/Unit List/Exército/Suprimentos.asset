@@ -91,6 +91,7 @@ MonoBehaviour:
   embarkedWeapons: []
   cantUseWeaponsOnTheFollowDomain: []
   isSupplier: 1
+  startsWithEmptySupplies: 0
   supplierTier: 1
   maxUnitsServedPerTurn: 1
   serviceRange: 1

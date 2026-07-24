@@ -29,6 +29,7 @@ MonoBehaviour:
   allowedLandingClasses: 
   requiredLandingSkills:
   - {fileID: 11400000, guid: e6032267446372a4b9de350d17b18418, type: 2}
+  - {fileID: 11400000, guid: 8d5ec3fba2fd43139e8619b6f2b23eb9, type: 2}
   requireAtLeastOneLandingSkill: 0
   allowedTakeoffModes: 
   forceEndMovementOnTerrainDomainForDomains:

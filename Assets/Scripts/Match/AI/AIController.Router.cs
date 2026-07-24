@@ -24,6 +24,12 @@ public partial class AIController
         if (TryFindProductionUnlockVacateAction(unit, snapshot, out PlayerAction productionUnlockAction))
             return productionUnlockAction;
 
+        // Facção sem QG: captura por proximidade, antes do planner. O plano normal assume
+        // um eixo a partir do proprio QG — a rebelde nao tem, e sem este curto-circuito
+        // todo capturador dela vira rogue e marcha para o QG inimigo. Ver AIController.Rebel.
+        PlayerAction rebelAction = TryDecideRebelAction(unit, snapshot);
+        if (rebelAction != null) return rebelAction;
+
         if (plan != null)
 
         {

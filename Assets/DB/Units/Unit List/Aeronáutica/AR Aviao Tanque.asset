@@ -98,6 +98,7 @@ MonoBehaviour:
   embarkedWeapons: []
   cantUseWeaponsOnTheFollowDomain: []
   isSupplier: 1
+  startsWithEmptySupplies: 0
   supplierTier: 1
   maxUnitsServedPerTurn: 2
   serviceRange: 1
@@ -121,9 +122,6 @@ MonoBehaviour:
   allowedDisembarkWhenTransporterAtTerrains: []
   allowedDisembarkWhenTransporterAtTerrainStructures: []
   allowedDisembarkWhenTransporterAtFacilities: 0
-  passengersCanDisembarkAndGoesToTerrains: []
-  passengersCanDisembarkAndGoesToTerrainStructures: []
-  passengersCanDisembarkAndGoesToFacilities: 0
   transportSlots: []
   autonomia: 120
   cost: 14000

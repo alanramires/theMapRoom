@@ -33,6 +33,8 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 44c13554a7f731f418bad4395bf10e52, type: 2}
   skillCostOverrides: []
   skillRulesByTerrain: []
+  exigeRotaDeclarada: 0
+  exigeEstruturaNaConstrucao: 0
   canAlsoBeBuiltOnTheFollowDomains:
   - domain: 1
     heightLevel: 3
@@ -58,6 +60,14 @@ MonoBehaviour:
       heightLevel: 2
     forceDetectOnForcedEndMovementDomains: 0
     forceDetectUnitsWithFollowingStealthSkills: []
+    separaConvesEAgua: 0
+    bloqueiaNaval: 1
+  - terrainData: {fileID: 11400000, guid: 47664243e1e61d84aa1c496ae463bd9c, type: 2}
+    forceEndMovementOnTerrainDomainForDomains: []
+    forceDetectOnForcedEndMovementDomains: 0
+    forceDetectUnitsWithFollowingStealthSkills: []
+    separaConvesEAgua: 1
+    bloqueiaNaval: 0
   forceEndMovementOnTerrainDomainForDomains: []
   forceDetectOnForcedEndMovementDomains: 0
   forceDetectUnitsWithFollowingStealthSkills: []

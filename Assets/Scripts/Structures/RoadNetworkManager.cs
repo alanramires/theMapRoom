@@ -232,12 +232,29 @@ public class RoadNetworkManager : MonoBehaviour
         return go.name.StartsWith("Road_");
     }
 
+    // Ordem total arbitraria entre celulas, so para normalizar a chave da aresta.
+    private static int Compare(Vector3Int a, Vector3Int b)
+    {
+        if (a.x != b.x)
+            return a.x < b.x ? -1 : 1;
+        if (a.y != b.y)
+            return a.y < b.y ? -1 : 1;
+        return 0;
+    }
+
     private void CreateRouteSegments(StructureData structure, RoadRouteDefinition route, int routeIndex)
     {
         Sprite segmentSprite = ResolveSegmentSprite(structure);
         Color segmentColor = ResolveRoadColor(structure);
         float width = ResolveRoadWidth(structure);
         float overlap = ResolveSegmentOverlap(structure);
+
+        // Arestas ja desenhadas nesta rota, normalizadas por sentido: A->B e B->A sao a
+        // mesma linha na tela. Traçar a volta de uma rodovia (A->B->C->B->D, para sair do
+        // entroncamento noutra direcao) e tecnica legitima e nao deve custar sprite dobrado
+        // nem escurecer o traçado por soma de alfa. Para o movimento a repeticao ja era
+        // inofensiva: a checagem de aresta testa os dois sentidos.
+        HashSet<(Vector3Int, Vector3Int)> drawnEdges = new HashSet<(Vector3Int, Vector3Int)>();
 
         GameObject routeRoot = new GameObject(GetRouteObjectName(structure, route, routeIndex));
         // Visual derivado: nunca deve ser serializado dentro da cena. Alem de evitar milhares
@@ -261,6 +278,12 @@ public class RoadNetworkManager : MonoBehaviour
             Vector3 delta = to - from;
             float length = delta.magnitude;
             if (length <= 0.0001f)
+                continue;
+
+            (Vector3Int, Vector3Int) edgeKey = Compare(fromCell, toCell) <= 0
+                ? (fromCell, toCell)
+                : (toCell, fromCell);
+            if (!drawnEdges.Add(edgeKey))
                 continue;
 
             float angle = Vector2.SignedAngle(Vector2.up, new Vector2(delta.x, delta.y));

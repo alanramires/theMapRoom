@@ -92,6 +92,7 @@ MonoBehaviour:
   embarkedWeapons: []
   cantUseWeaponsOnTheFollowDomain: []
   isSupplier: 1
+  startsWithEmptySupplies: 0
   supplierTier: 0
   maxUnitsServedPerTurn: 1
   serviceRange: 0
@@ -112,10 +113,10 @@ MonoBehaviour:
   spriteTransport: {fileID: 0}
   allowedEmbarkWhenTransporterAtTerrains: []
   allowedEmbarkWhenTransporterAtTerrainStructures: []
-  allowedEmbarkWhenTransporterAtFacilities: 8
+  allowedEmbarkWhenTransporterAtFacilities: -1
   allowedDisembarkWhenTransporterAtTerrains: []
   allowedDisembarkWhenTransporterAtTerrainStructures: []
-  allowedDisembarkWhenTransporterAtFacilities: 8
+  allowedDisembarkWhenTransporterAtFacilities: -1
   transportSlots:
   - slotId: "Vag\xE3o"
     capacity: 2
