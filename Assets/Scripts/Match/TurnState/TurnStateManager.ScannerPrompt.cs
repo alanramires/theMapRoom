@@ -279,9 +279,13 @@ public partial class TurnStateManager
 
     private bool ShouldSuppressAiActionPreviewLines()
     {
-        // Range e linhas auxiliares pertencem ao planejamento, nao a apresentacao
-        // observavel da acao. Isso vale tanto em Humano vs AI quanto em AI vs AI.
-        return matchController != null && matchController.IsActiveTeamAI();
+        if (matchController == null || !matchController.IsActiveTeamAI())
+            return false;
+
+        // No FOW Partial o jogador esta observando explicitamente o slot da AI:
+        // cursor, range e linhas auxiliares fazem parte dessa apresentacao.
+        // No FOW normal o planejamento interno da AI continua oculto.
+        return !matchController.IsFogOfWarDebugPartial;
     }
 
     private void RecordFramePerfSample()

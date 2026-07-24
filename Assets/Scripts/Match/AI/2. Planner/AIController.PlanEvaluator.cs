@@ -248,8 +248,12 @@ public partial class AIController
         }
 
         // Passo 2: adiciona objetivos para setores ainda n�o cobertos.
-        IReadOnlyList<SectorManager.SectorInfo> allSectors = SectorManager.GetAllSectorInfos();
-        IReadOnlyList<SectorManager.SectorInfo> allBases = SectorManager.GetAllBaseInfos();
+        // CÓPIA defensiva: GetAllSectorInfos/GetAllBaseInfos retornam as LISTAS INTERNAS VIVAS do
+        // SectorManager (não cópias). Criar objetivos dentro dos loops abaixo pode disparar um
+        // RebuildFromActiveConstructions (que dá Clear+refill nessas listas) e invalidar o
+        // enumerador → "Collection was modified". Materializar aqui desacopla a iteração da lista viva.
+        var allSectors = new List<SectorManager.SectorInfo>(SectorManager.GetAllSectorInfos());
+        var allBases = new List<SectorManager.SectorInfo>(SectorManager.GetAllBaseInfos());
 
         int existingOffensive = 0;
         foreach (SectorObjective existing in plan.Objectives)

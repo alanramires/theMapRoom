@@ -493,8 +493,6 @@ public sealed class SectorManager : MonoBehaviour
 
         GameObject go = new GameObject(nameof(SectorManager));
         instance = go.AddComponent<SectorManager>();
-        if (Application.isPlaying)
-            DontDestroyOnLoad(go);
         return instance;
     }
 
@@ -507,8 +505,6 @@ public sealed class SectorManager : MonoBehaviour
         }
 
         instance = this;
-        if (Application.isPlaying && transform.parent == null)
-            DontDestroyOnLoad(gameObject);
     }
 
     private void OnEnable()

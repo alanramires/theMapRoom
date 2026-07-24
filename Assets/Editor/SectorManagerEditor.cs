@@ -97,6 +97,11 @@ public class SectorManagerEditor : Editor
     private static int axisSlotFilterIdx = 0;
     // So no DESENHO: oculta o eixo sintetico de invasao (HQ->QG inimigo) pra ver so os principais.
     private static bool hideInvasionAxis = false;
+    // Foldout FECHADO por padrao: DrawEixoInfos reconstroi o InvasionAxisMap de cada time a CADA
+    // repaint do inspector (FindObjectsByType + possivel rebuild de setor). Com o inspector do
+    // SectorManager aberto e OnValidate chamando QueuePlayerLoopUpdate, isso vira tempestade de
+    // repaint e TRAVA o Editor. Colapsado = zero build. So constroi quando o usuario abre de proposito.
+    private static bool showEixoInfos = false;
 
     private struct SectorEdgeLine
     {
@@ -513,7 +518,10 @@ public class SectorManagerEditor : Editor
     // time"). Reflete os overrides de eixo (ConstructionManager.OverrideEixo) — util pra conferir.
     private static void DrawEixoInfos()
     {
-        EditorGUILayout.LabelField("Eixo Infos", EditorStyles.boldLabel);
+        // Foldout fechado por padrao evita reconstruir os eixos (caro) a cada repaint. Ver showEixoInfos.
+        showEixoInfos = EditorGUILayout.Foldout(showEixoInfos, "Eixo Infos", true);
+        if (!showEixoInfos)
+            return;
 
         Tilemap map = ResolveDrawTilemap();
         if (map == null)
