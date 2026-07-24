@@ -48,7 +48,7 @@ public partial class AIController
     private void OnGUI()
     {
         if (matchController == null || matchController.HasVictoryWinner ||
-            !matchController.IsPlayerAI(matchController.ActiveTeam))
+            !matchController.IsActiveTeamAI())
             return;
         if (currentAIStage == 2 && aiTurnBatchExecuting)
             return;
@@ -178,7 +178,7 @@ public partial class AIController
 
         // Verifica se o time já ativo é IA e inicia o turno se necessário.
 
-        if (matchController != null && matchController.IsPlayerAI(matchController.ActiveTeam))
+        if (matchController != null && matchController.IsActiveTeamAI())
 
         {
 
@@ -254,7 +254,7 @@ public partial class AIController
             yield break;
 
         TeamId activeTeam = matchController.ActiveTeam;
-        if (!matchController.IsPlayerAI(activeTeam))
+        if (!matchController.IsActiveTeamAI())
             yield break;
 
         // O load ja restaurou time, turno, stage, plano e snapshot confirmado. Reiniciamos
@@ -275,7 +275,7 @@ public partial class AIController
 
         TeamId newTeam = (TeamId)teamIndex;
 
-        bool aiCheck = matchController != null && matchController.IsPlayerAI(newTeam);
+        bool aiCheck = matchController != null && matchController.IsActiveTeamAI();
 
         if (showAILogs)
             Debug.Log($"[AI] HandleTeamChanged — teamIndex={teamIndex} newTeam={newTeam} matchController={matchController != null} isAI={aiCheck}");

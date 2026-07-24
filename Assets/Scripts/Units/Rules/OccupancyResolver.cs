@@ -119,7 +119,7 @@ public static class OccupancyResolver
             // AirLow e AirHigh compartilham o mesmo slot por dominio/time.
             // - aliado nunca compartilha o hex final na mesma banda;
             // - inimigo coexiste (Blocking = Total War; Air/Sub = hex contestado/dogfight).
-            if (occupant.TeamId == mover.TeamId)
+            if (PlayerSlotRelations.AreAllies(occupant, mover))
                 return false;
         }
 
@@ -165,7 +165,7 @@ public static class OccupancyResolver
 
             // Air/Sub: aliado bloqueia (sem empilhar mesmo time);
             // inimigo coexiste -> decola/transiciona para hex contestado.
-            if (occupant.TeamId == unit.TeamId)
+            if (PlayerSlotRelations.AreAllies(occupant, unit))
                 return false;
         }
 

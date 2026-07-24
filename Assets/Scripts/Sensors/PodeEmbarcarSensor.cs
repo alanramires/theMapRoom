@@ -308,7 +308,7 @@ public static class PodeEmbarcarSensor
             reason = "Nao ha transportador adjacente valido.";
             return false;
         }
-        if ((int)sourceUnit.TeamId != (int)transporter.TeamId)
+        if (!PlayerSlotRelations.AreAllies(sourceUnit, transporter))
         {
             reason = "Transportador adjacente eh de outro time.";
             return false;

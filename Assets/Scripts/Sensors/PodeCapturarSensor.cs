@@ -137,13 +137,13 @@ public static class PodeCapturarSensor
         }
 
         TeamId unitTeam = selectedUnit.TeamId;
-        if (unitTeam == TeamId.Neutral)
+        if (selectedUnit.SlotIndex < 0)
         {
             reason = "Unidade neutra nao captura.";
             return false;
         }
 
-        if (construction.TeamId == unitTeam)
+        if (PlayerSlotRelations.AreAllies(selectedUnit.SlotIndex, construction.SlotIndex))
         {
             if (construction.CurrentCapturePoints < construction.CapturePointsMax)
             {

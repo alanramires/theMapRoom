@@ -5,7 +5,7 @@ using UnityEngine.Tilemaps;
 public static class ServicoDoComandoSensor
 {
     public static bool CollectOptions(
-        TeamId activeTeam,
+        int activeSlot,
         Tilemap map,
         TerrainDatabase terrainDatabase,
         List<ServicoDoComandoOption> output,
@@ -21,9 +21,9 @@ public static class ServicoDoComandoSensor
         invalidOutput?.Clear();
 
         if (sensorLogs)
-            SensorLogGate.Log("ServicoDoComandoSensor", $"collect team={activeTeam}");
+            SensorLogGate.Log("ServicoDoComandoSensor", $"collect slot={activeSlot}");
 
-        if (activeTeam == TeamId.Neutral)
+        if (activeSlot < 0)
         {
             reason = "Time ativo invalido para servico do comando.";
             return false;
@@ -54,9 +54,9 @@ public static class ServicoDoComandoSensor
         }
 
         Dictionary<Vector3Int, List<UnitManager>> unitsByCell = BuildUnitsByCell(units);
-        CollectConstructionSupplierOptions(activeTeam, map, terrainDatabase, unitsByCell, output, invalidOutput);
-        CollectConstructionSupplierEmbarkedOptions(activeTeam, map, terrainDatabase, units, output, invalidOutput);
-        CollectTransportSupplierOptions(activeTeam, units, output, invalidOutput);
+        CollectConstructionSupplierOptions(activeSlot, map, terrainDatabase, unitsByCell, output, invalidOutput);
+        CollectConstructionSupplierEmbarkedOptions(activeSlot, map, terrainDatabase, units, output, invalidOutput);
+        CollectTransportSupplierOptions(activeSlot, units, output, invalidOutput);
 
         output.Sort((a, b) =>
         {
@@ -249,7 +249,7 @@ public static class ServicoDoComandoSensor
     }
 
     private static void CollectConstructionSupplierOptions(
-        TeamId activeTeam,
+        int activeSlot,
         Tilemap map,
         TerrainDatabase terrainDatabase,
         Dictionary<Vector3Int, List<UnitManager>> unitsByCell,
@@ -265,7 +265,7 @@ public static class ServicoDoComandoSensor
         for (int i = 0; i < constructions.Length; i++)
         {
             ConstructionManager construction = constructions[i];
-            if (construction == null || (int)construction.TeamId != (int)activeTeam)
+            if (construction == null || construction.SlotIndex != activeSlot)
                 continue;
             if (!construction.TryResolveConstructionData(out ConstructionData data) || data == null || !data.isSupplier)
             {
@@ -321,7 +321,7 @@ public static class ServicoDoComandoSensor
                 if (target == null || target.IsEmbarked || !target.gameObject.activeInHierarchy)
                     continue;
 
-                if ((int)target.TeamId != (int)activeTeam)
+                if (target.SlotIndex != activeSlot)
                 {
                     AppendInvalid(invalidOutput, construction, null, target, cell, "Unidade alvo de outro time.");
                     continue;
@@ -377,7 +377,7 @@ public static class ServicoDoComandoSensor
     }
 
     private static void CollectTransportSupplierOptions(
-        TeamId activeTeam,
+        int activeSlot,
         IReadOnlyList<UnitManager> units,
         List<ServicoDoComandoOption> output,
         List<ServicoDoComandoInvalidOption> invalidOutput)
@@ -390,7 +390,7 @@ public static class ServicoDoComandoSensor
             UnitManager supplier = units[i];
             if (supplier == null || !supplier.gameObject.activeInHierarchy || supplier.IsEmbarked)
                 continue;
-            if ((int)supplier.TeamId != (int)activeTeam)
+            if (supplier.SlotIndex != activeSlot)
                 continue;
             if (!supplier.TryGetUnitData(out UnitData supplierData) || supplierData == null || !supplierData.isSupplier)
                 continue;
@@ -423,7 +423,7 @@ public static class ServicoDoComandoSensor
                 Vector3Int cell = supplier.CurrentCellPosition;
                 cell.z = 0;
 
-                if ((int)target.TeamId != (int)activeTeam)
+                if (target.SlotIndex != activeSlot)
                 {
                     AppendInvalid(invalidOutput, null, supplier, target, cell, "Unidade embarcada de outro time.");
                     continue;
@@ -471,7 +471,7 @@ public static class ServicoDoComandoSensor
     }
 
     private static void CollectConstructionSupplierEmbarkedOptions(
-        TeamId activeTeam,
+        int activeSlot,
         Tilemap map,
         TerrainDatabase terrainDatabase,
         IReadOnlyList<UnitManager> units,
@@ -488,7 +488,7 @@ public static class ServicoDoComandoSensor
         for (int i = 0; i < constructions.Length; i++)
         {
             ConstructionManager construction = constructions[i];
-            if (construction == null || (int)construction.TeamId != (int)activeTeam)
+            if (construction == null || construction.SlotIndex != activeSlot)
                 continue;
             if (!construction.TryResolveConstructionData(out ConstructionData data) || data == null || !data.isSupplier)
                 continue;
@@ -517,7 +517,7 @@ public static class ServicoDoComandoSensor
                 UnitManager transporter = units[u];
                 if (transporter == null || !transporter.gameObject.activeInHierarchy || transporter.IsEmbarked)
                     continue;
-                if ((int)transporter.TeamId != (int)activeTeam)
+                if (transporter.SlotIndex != activeSlot)
                     continue;
 
                 Vector3Int transporterCell = transporter.CurrentCellPosition;
@@ -542,7 +542,7 @@ public static class ServicoDoComandoSensor
                     if (target == null || !target.IsEmbarked || target.EmbarkedTransporter != transporter)
                         continue;
 
-                    if ((int)target.TeamId != (int)activeTeam)
+                    if (target.SlotIndex != activeSlot)
                     {
                         AppendInvalid(invalidOutput, construction, transporter, target, constructionCell, "Unidade embarcada de outro time.");
                         continue;

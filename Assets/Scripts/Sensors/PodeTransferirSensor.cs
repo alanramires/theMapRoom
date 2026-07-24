@@ -278,7 +278,7 @@ public static class PodeTransferirSensor
             UnitManager unit = unitsInCollectionRange[i];
             if (unit == null)
                 continue;
-            if ((int)unit.TeamId != (int)supplier.TeamId)
+            if (!PlayerSlotRelations.AreAllies(unit, supplier))
                 continue;
             if (!TryGetSupplierData(unit, out UnitData targetData))
                 continue;

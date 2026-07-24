@@ -552,6 +552,34 @@ public class ConstructionManager : MonoBehaviour
         ThreatRevisionTracker.NotifyConstructionTeamChanged(previousTeam, teamId);
     }
 
+    public void SetOwnerSlot(int ownerSlotIndex)
+    {
+        TeamId previousTeam = teamId;
+        TryAutoAssignMatchController();
+
+        slotIndex = Mathf.Max(-1, ownerSlotIndex);
+        teamId = slotIndex >= 0 && matchController != null
+            ? matchController.GetTeamIdForSlot(slotIndex)
+            : TeamId.Neutral;
+
+        if (!originalOwnerInitialized)
+        {
+            originalOwnerSlotIndex = slotIndex;
+            originalOwnerInitialized = true;
+        }
+
+        if (!firstOwnerInitialized && slotIndex >= 0)
+        {
+            firstOwnerSlotIndex = slotIndex;
+            firstOwnerInitialized = true;
+        }
+
+        if (!ApplyFromDatabasePreservingSiteRuntime())
+            UpdateDynamicName();
+        RefreshRuntimeVisualState(force: true);
+        ThreatRevisionTracker.NotifyConstructionTeamChanged(previousTeam, teamId);
+    }
+
     public void ApplyTeamVisualFlipX(bool flipX)
     {
         if (spriteRenderer == null)
@@ -1140,6 +1168,15 @@ public class ConstructionManager : MonoBehaviour
             default:
                 return false;
         }
+    }
+
+    public bool CanProduceUnitsForSlot(int buyerSlotIndex)
+    {
+        if (!PlayerSlotRelations.AreAllies(slotIndex, buyerSlotIndex))
+            return false;
+
+        TeamId buyerTeam = ResolveTeamForSlot(buyerSlotIndex);
+        return CanProduceUnitsForTeam(buyerTeam);
     }
 
     private void EnsureCapturePointsInitialized()

@@ -1394,7 +1394,7 @@ public static class PodeDetectarSensor
                 UnitManager ally = units[i];
                 if (ally == null || !ally.gameObject.activeInHierarchy || ally.IsEmbarked)
                     continue;
-                if (ally.TeamId != observer.TeamId)
+                if (!PlayerSlotRelations.AreAllies(ally, observer))
                     continue;
                 if (ally == observer)
                     continue;
@@ -1475,7 +1475,7 @@ public static class PodeDetectarSensor
             ConstructionManager construction = constructions[i];
             if (construction == null || !construction.gameObject.activeInHierarchy)
                 continue;
-            if (construction.TeamId == TeamId.Neutral || construction.TeamId != observer.TeamId)
+            if (!PlayerSlotRelations.AreAllies(observer.SlotIndex, construction.SlotIndex))
                 continue;
             if (construction.BoardTilemap != map || !construction.TryResolveConstructionData(out ConstructionData data) || data == null)
                 continue;
@@ -1535,7 +1535,7 @@ public static class PodeDetectarSensor
             UnitManager ally = units[i];
             if (ally == null || !ally.gameObject.activeInHierarchy || ally.IsEmbarked)
                 continue;
-            if (ally.TeamId != referenceUnit.TeamId)
+            if (!PlayerSlotRelations.AreAllies(ally, referenceUnit))
                 continue;
             if (!IsUnitOnBoard(ally, boardMap))
                 continue;
@@ -1560,7 +1560,7 @@ public static class PodeDetectarSensor
             UnitManager ally = units[i];
             if (ally == null || !ally.gameObject.activeInHierarchy || ally.IsEmbarked)
                 continue;
-            if (ally.TeamId != referenceUnit.TeamId)
+            if (!PlayerSlotRelations.AreAllies(ally, referenceUnit))
                 continue;
             if (!IsUnitOnBoard(ally, boardMap))
                 continue;
@@ -1602,7 +1602,7 @@ public static class PodeDetectarSensor
                 UnitManager ally = units[i];
                 if (ally == null || !ally.gameObject.activeInHierarchy || ally.IsEmbarked)
                     continue;
-                if (ally.TeamId != observer.TeamId)
+                if (!PlayerSlotRelations.AreAllies(ally, observer))
                     continue;
                 if (!IsUnitOnBoard(ally, map))
                     continue;
@@ -1652,7 +1652,7 @@ public static class PodeDetectarSensor
         if (!IsUnitOnBoard(observer, boardMap) || !IsUnitOnBoard(target, boardMap))
             return false;
 
-        return observer.TeamId != target.TeamId;
+        return PlayerSlotRelations.AreEnemies(observer, target);
     }
 
     private static IReadOnlyList<UnitManager> GetUnitsForSensorQueries()

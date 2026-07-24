@@ -1223,7 +1223,7 @@ public static class UnitMovementPathRules
                     if (unit == null || !unit.gameObject.activeInHierarchy || unit == exceptUnit || unit.IsDead)
                         continue;
 
-                    if (unit.TeamId == exceptUnit.TeamId)
+                    if (PlayerSlotRelations.AreAllies(unit, exceptUnit))
                     {
                         sameTeam = unit;
                         break;

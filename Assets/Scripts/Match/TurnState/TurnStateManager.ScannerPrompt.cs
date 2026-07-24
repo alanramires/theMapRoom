@@ -677,15 +677,16 @@ public partial class TurnStateManager
             return false;
         }
 
-        if (activeTeam == TeamId.Neutral)
+        int activeSlot = matchController != null ? matchController.ActiveSlotId.Value : -1;
+        if (activeSlot < 0)
         {
             reason = "Destroy Unit exige um time ativo valido.";
             return false;
         }
 
-        if (target.TeamId != activeTeam)
+        if (target.SlotIndex != activeSlot)
         {
-            reason = $"Voce so pode destruir unidades do time ativo ({activeTeam}). Alvo pertence a {target.TeamId}.";
+            reason = $"Voce so pode destruir unidades do slot ativo ({activeSlot}). Alvo pertence ao slot {target.SlotIndex}.";
             return false;
         }
 
@@ -3749,8 +3750,7 @@ public partial class TurnStateManager
         // atacante que o time dele NAO via. Fog-honesto: registra a vitima, o
         // dano e a celula DELA; a posicao do atacante nunca viaja no evento.
         if (defender != null && attacker != null &&
-            defender.TeamId != attacker.TeamId &&
-            defender.TeamId != TeamId.Neutral &&
+            PlayerSlotRelations.AreEnemies(defender, attacker) &&
             !attackerVisibleToDefender &&
             matchController != null)
         {

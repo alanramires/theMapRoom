@@ -1031,7 +1031,7 @@ public static class PodeMirarSensor
             UnitManager ally = units[i];
             if (ally == null || !ally.gameObject.activeInHierarchy || ally.IsEmbarked)
                 continue;
-            if (ally.TeamId != attacker.TeamId)
+            if (!PlayerSlotRelations.AreAllies(ally, attacker))
                 continue;
 
             Vector3Int allyCell = ally.CurrentCellPosition;
@@ -1088,7 +1088,7 @@ public static class PodeMirarSensor
             UnitManager ally = units[i];
             if (ally == null || !ally.gameObject.activeInHierarchy || ally.IsEmbarked)
                 continue;
-            if (ally.TeamId != attacker.TeamId)
+            if (!PlayerSlotRelations.AreAllies(ally, attacker))
                 continue;
             if (ally == target)
                 continue;
@@ -1158,7 +1158,7 @@ public static class PodeMirarSensor
             ConstructionManager construction = constructions[i];
             if (construction == null || !construction.gameObject.activeInHierarchy)
                 continue;
-            if (construction.TeamId == TeamId.Neutral || construction.TeamId != attacker.TeamId)
+            if (!PlayerSlotRelations.AreAllies(attacker.SlotIndex, construction.SlotIndex))
                 continue;
             if (construction.BoardTilemap != map || !construction.TryResolveConstructionData(out ConstructionData data) || data == null)
                 continue;
@@ -1227,7 +1227,7 @@ public static class PodeMirarSensor
                 return false;
         }
 
-        return attacker.TeamId != target.TeamId;
+        return PlayerSlotRelations.AreEnemies(attacker, target);
     }
 
     private static int GetObservationRangeHexes(UnitManager unit)
@@ -1265,7 +1265,7 @@ public static class PodeMirarSensor
             UnitManager ally = units[i];
             if (ally == null || !ally.gameObject.activeInHierarchy || ally.IsEmbarked)
                 continue;
-            if (ally.TeamId != referenceUnit.TeamId)
+            if (!PlayerSlotRelations.AreAllies(ally, referenceUnit))
                 continue;
 
             int allyRange = GetObservationRangeHexes(ally);
@@ -1288,7 +1288,7 @@ public static class PodeMirarSensor
             UnitManager ally = units[i];
             if (ally == null || !ally.gameObject.activeInHierarchy || ally.IsEmbarked)
                 continue;
-            if (ally.TeamId != referenceUnit.TeamId)
+            if (!PlayerSlotRelations.AreAllies(ally, referenceUnit))
                 continue;
 
             int allyRange = GetObservationRangeHexes(ally, target);

@@ -642,7 +642,7 @@ public partial class TurnStateManager
                 if (!TryPrepareEmbarkedSupplyTarget(target, supplier, hiddenTransporterHudSet, out targetCell))
                     continue;
             }
-            else if (!TryPrepareIndividualSupplyTarget(target, supplier.TeamId, out targetCell))
+            else if (!TryPrepareIndividualSupplyTarget(target, supplier.SlotIndex, out targetCell))
             {
                 continue;
             }
@@ -1326,7 +1326,7 @@ public partial class TurnStateManager
             PodeSuprirInvalidOption invalid = cachedPodeSuprirInvalidTargets[i];
             if (invalid == null || invalid.targetUnit == null || validTargets.Contains(invalid.targetUnit))
                 continue;
-            if (selectedUnit != null && invalid.targetUnit.TeamId != selectedUnit.TeamId)
+            if (selectedUnit != null && !PlayerSlotRelations.AreAllies(invalid.targetUnit, selectedUnit))
                 continue;
             Vector3Int cell = invalid.targetCell;
             cell.z = 0;
@@ -2211,12 +2211,12 @@ public partial class TurnStateManager
             target.EmbarkedTransporter == supplier;
     }
 
-    private static bool TryPrepareIndividualSupplyTarget(UnitManager target, TeamId expectedTeam, out Vector3Int targetCell)
+    private static bool TryPrepareIndividualSupplyTarget(UnitManager target, int expectedSlot, out Vector3Int targetCell)
     {
         targetCell = default;
         if (target == null)
             return false;
-        if ((int)target.TeamId != (int)expectedTeam)
+        if (!PlayerSlotRelations.AreAllies(target.SlotIndex, expectedSlot))
             return false;
         if (!target.gameObject.activeInHierarchy)
             return false;

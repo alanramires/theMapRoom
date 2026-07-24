@@ -131,7 +131,8 @@ public partial class TurnStateManager
                 if (operationType == PodeCapturarSensor.CaptureOperationType.CaptureEnemy)
                 {
                     TeamId previousOwnerTeam = targetConstruction.TeamId;
-                    targetConstruction.SetTeamId(capturer.TeamId);
+                    int previousOwnerSlot = targetConstruction.SlotIndex;
+                    targetConstruction.SetOwnerSlot(capturer.SlotIndex);
                     targetConstruction.SetCurrentCapturePoints(targetConstruction.CapturePointsMax);
                     captureCompletedForReplay = true;
                     newOwnerForReplay = capturer.TeamId;
@@ -139,7 +140,7 @@ public partial class TurnStateManager
                     // Jornal do Comandante: o dono anterior perdeu a conquista.
                     // Fog-honesto: e prédio dele — a guarnicao viu quem entrou,
                     // entao o novo dono e nomeado.
-                    if (previousOwnerTeam != TeamId.Neutral && previousOwnerTeam != capturer.TeamId && matchController != null)
+                    if (previousOwnerSlot >= 0 && previousOwnerSlot != capturer.SlotIndex && matchController != null)
                     {
                         Vector3Int capturedCell = targetConstruction.CurrentCellPosition;
                         capturedCell.z = 0;

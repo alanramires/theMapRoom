@@ -9,9 +9,72 @@ using UnityEngine.SceneManagement;
 using UnityEditor;
 #endif
 
+/// <summary>
+/// Identidade lógica de um participante da partida.
+/// Não representa cor ou facção visual; isso continua sendo responsabilidade de TeamId.
+/// </summary>
+[Serializable]
+public readonly struct PlayerSlotId : IEquatable<PlayerSlotId>, IComparable<PlayerSlotId>
+{
+    public const int InvalidValue = -1;
+
+    public static PlayerSlotId Invalid => new PlayerSlotId(InvalidValue);
+
+    public int Value { get; }
+    public bool IsValid => Value >= 0;
+
+    private PlayerSlotId(int value)
+    {
+        Value = value;
+    }
+
+    public static PlayerSlotId FromIndex(int slotIndex)
+    {
+        return slotIndex >= 0 ? new PlayerSlotId(slotIndex) : Invalid;
+    }
+
+    public bool Equals(PlayerSlotId other) => Value == other.Value;
+    public override bool Equals(object obj) => obj is PlayerSlotId other && Equals(other);
+    public override int GetHashCode() => Value;
+    public int CompareTo(PlayerSlotId other) => Value.CompareTo(other.Value);
+    public override string ToString() => IsValid ? $"Slot {Value}" : "Slot inválido";
+
+    public static bool operator ==(PlayerSlotId left, PlayerSlotId right) => left.Equals(right);
+    public static bool operator !=(PlayerSlotId left, PlayerSlotId right) => !left.Equals(right);
+}
+
+/// <summary>
+/// Relações de propriedade entre participantes. Slot inválido representa mundo/neutro:
+/// não é aliado nem inimigo de um participante.
+/// </summary>
+public static class PlayerSlotRelations
+{
+    public static bool IsPlayerOwned(int slotIndex) => slotIndex >= 0;
+
+    public static bool AreAllies(int firstSlotIndex, int secondSlotIndex) =>
+        firstSlotIndex >= 0 && secondSlotIndex >= 0 && firstSlotIndex == secondSlotIndex;
+
+    public static bool AreEnemies(int firstSlotIndex, int secondSlotIndex) =>
+        firstSlotIndex >= 0 && secondSlotIndex >= 0 && firstSlotIndex != secondSlotIndex;
+
+    public static bool AreAllies(UnitManager first, UnitManager second) =>
+        first != null && second != null && AreAllies(first.SlotIndex, second.SlotIndex);
+
+    public static bool AreEnemies(UnitManager first, UnitManager second) =>
+        first != null && second != null && AreEnemies(first.SlotIndex, second.SlotIndex);
+
+    public static bool AreAllies(UnitManager unit, ConstructionManager construction) =>
+        unit != null && construction != null && AreAllies(unit.SlotIndex, construction.SlotIndex);
+
+    public static bool AreEnemies(UnitManager unit, ConstructionManager construction) =>
+        unit != null && construction != null && AreEnemies(unit.SlotIndex, construction.SlotIndex);
+}
+
 public class MatchController : MonoBehaviour
 {
     private const int MaxVictoryStarsGoal = 12;
+    public static event Action<PlayerSlotId, PlayerSlotId> OnActiveSlotChanged;
+    // Compatibilidade temporária: novos sistemas devem assinar OnActiveSlotChanged.
     public static event Action<int> OnActiveTeamChanged;
     public static event Action<UnitManager> OnUnitActedStateChanged;
     public static event Action OnFogOfWarUpdated;
@@ -229,6 +292,7 @@ public class MatchController : MonoBehaviour
     [SerializeField] private TileBase victoryOverlayTile;
     [SerializeField] [Range(0f, 1f)] private float victoryOverlayAlpha = 1f;
     [SerializeField] private int activePlayerListIndex = 0;
+    [SerializeField, HideInInspector] private int appliedActivePlayerListIndex = int.MinValue;
     [SerializeField, HideInInspector] private int appliedActiveTeamId = int.MinValue;
     [SerializeField, HideInInspector] private bool pendingTurnStartUpkeep;
     [SerializeField, HideInInspector] private bool pendingTurnStartEconomy = true;
@@ -338,6 +402,7 @@ public class MatchController : MonoBehaviour
 
     public int CurrentTurn => currentTurn;
     public int ActiveTeamId => activeTeamId;
+    public PlayerSlotId ActiveSlotId => GetPlayerSlotId(activePlayerListIndex);
     public bool AtalhoRPassarTurnoUsaConfirmacao => atalhoRPassarTurnoUsaConfirmacao;
     public float LegacyFogOfWarAlpha => Mathf.Clamp01(fogOfWarAlpha);
     public int VisualContrastActiveTeamId => fogPresentationGameplayTeamId != int.MinValue
@@ -359,6 +424,99 @@ public class MatchController : MonoBehaviour
         }
     }
     public bool IncludeNeutralTeam => includeNeutralTeam;
+
+    public PlayerSlotId GetPlayerSlotId(int slotIndex)
+    {
+        return IsValidPlayerSlotIndex(slotIndex)
+            ? PlayerSlotId.FromIndex(slotIndex)
+            : PlayerSlotId.Invalid;
+    }
+
+    public bool IsValidPlayerSlot(PlayerSlotId slotId)
+    {
+        return slotId.IsValid && IsValidPlayerSlotIndex(slotId.Value);
+    }
+
+    public bool IsValidPlayerSlotIndex(int slotIndex)
+    {
+        return players != null && slotIndex >= 0 && slotIndex < players.Count;
+    }
+
+    /// <summary>
+    /// Resolve apenas a aparência configurada para o participante.
+    /// TeamId não deve ser usado como identidade ou propriedade.
+    /// </summary>
+    public TeamId GetVisualTeamForSlot(PlayerSlotId slotId)
+    {
+        return IsValidPlayerSlot(slotId)
+            ? players[slotId.Value].teamId
+            : TeamId.Neutral;
+    }
+
+    public bool AreAllies(PlayerSlotId first, PlayerSlotId second)
+    {
+        return IsValidPlayerSlot(first)
+            && IsValidPlayerSlot(second)
+            && first == second;
+    }
+
+    public bool AreEnemies(PlayerSlotId first, PlayerSlotId second)
+    {
+        return IsValidPlayerSlot(first)
+            && IsValidPlayerSlot(second)
+            && first != second;
+    }
+
+    public bool IsOwnedBySlot(UnitManager unit, PlayerSlotId ownerSlot)
+    {
+        return unit != null
+            && IsValidPlayerSlot(ownerSlot)
+            && unit.SlotIndex == ownerSlot.Value;
+    }
+
+    public bool IsOwnedBySlot(ConstructionManager construction, PlayerSlotId ownerSlot)
+    {
+        return construction != null
+            && IsValidPlayerSlot(ownerSlot)
+            && construction.SlotIndex == ownerSlot.Value;
+    }
+
+    public PlayerSlotId GetOwnerSlot(UnitManager unit)
+    {
+        return unit != null ? GetPlayerSlotId(unit.SlotIndex) : PlayerSlotId.Invalid;
+    }
+
+    public PlayerSlotId GetOwnerSlot(ConstructionManager construction)
+    {
+        return construction != null ? GetPlayerSlotId(construction.SlotIndex) : PlayerSlotId.Invalid;
+    }
+
+    /// <summary>
+    /// Compatibilidade para dados legados. Falha se nenhuma ou mais de uma vaga
+    /// usar a mesma aparência, evitando escolher silenciosamente o primeiro slot.
+    /// </summary>
+    public bool TryGetUniqueSlotForTeam(TeamId visualTeam, out PlayerSlotId slotId)
+    {
+        slotId = PlayerSlotId.Invalid;
+        if (visualTeam == TeamId.Neutral || players == null)
+            return false;
+
+        for (int i = 0; i < players.Count; i++)
+        {
+            if (players[i].teamId != visualTeam)
+                continue;
+
+            if (slotId.IsValid)
+            {
+                slotId = PlayerSlotId.Invalid;
+                return false;
+            }
+
+            slotId = PlayerSlotId.FromIndex(i);
+        }
+
+        return slotId.IsValid;
+    }
 
     // Retorna o TeamId do slot indicado. slotIndex -1 = Neutral. Fora do range = Neutral.
     public TeamId GetTeamIdForSlot(int slotIndex)
@@ -923,6 +1081,7 @@ public class MatchController : MonoBehaviour
         if (Application.isPlaying)
         {
             // Delay first team apply/FoW refresh to Start so all scene objects had OnEnable.
+            appliedActivePlayerListIndex = activePlayerListIndex;
             appliedActiveTeamId = activeTeamId;
         }
         else
@@ -1431,10 +1590,31 @@ public class MatchController : MonoBehaviour
         ApplyActiveTeamIfChanged(force: false);
     }
 
+    public bool SetActiveSlot(PlayerSlotId slotId)
+    {
+        if (!IsValidPlayerSlot(slotId))
+            return false;
+
+        SetActivePlayerByIndex(slotId.Value);
+        return true;
+    }
+
+    public bool SetActiveSlotWithoutTurnStart(PlayerSlotId slotId)
+    {
+        if (!IsValidPlayerSlot(slotId))
+            return false;
+
+        activePlayerListIndex = slotId.Value;
+        activeTeamId = (int)players[slotId.Value].teamId;
+        ApplyActiveTeamIfChanged(force: false, applyTurnStartEffects: false);
+        return true;
+    }
+
     // Usado apos load: garante que OnActiveTeamChanged dispare mesmo que o time ativo seja o mesmo de antes.
     // Usa applyTurnStartEffects: false para nao reprocessar economia/upkeep que ja foram restaurados do save.
     public void ForceReapplyActiveTeam()
     {
+        appliedActivePlayerListIndex = int.MinValue;
         appliedActiveTeamId = int.MinValue;
         ApplyActiveTeamIfChanged(force: false, applyTurnStartEffects: false);
     }
@@ -1442,6 +1622,7 @@ public class MatchController : MonoBehaviour
     // Versao para load: aplica efeitos de inicio de turno.
     public void ForceReapplyActiveTeamWithTurnStart()
     {
+        appliedActivePlayerListIndex = int.MinValue;
         appliedActiveTeamId = int.MinValue;
         ApplyActiveTeamIfChanged(force: false, applyTurnStartEffects: true);
     }
@@ -2539,13 +2720,12 @@ public class MatchController : MonoBehaviour
 
     private void ApplyActiveTeamIfChanged(bool force, bool applyTurnStartEffects = true)
     {
-        if (!force && appliedActiveTeamId == activeTeamId)
+        if (!force && appliedActivePlayerListIndex == activePlayerListIndex)
             return;
 
-        if (activeTeamId >= 0)
+        if (activePlayerListIndex >= 0)
         {
-            TeamId requestedTeam = ClampToTeamId(activeTeamId);
-            if (IsTeamDefeated(requestedTeam))
+            if (!IsValidPlayerSlotIndex(activePlayerListIndex) || players[activePlayerListIndex].defeated)
             {
                 int aliveIndex = FindNextAlivePlayerIndex(-1);
                 if (aliveIndex >= 0)
@@ -2562,6 +2742,9 @@ public class MatchController : MonoBehaviour
         }
 
         double totalStartMs = TurnPerfNowMs();
+        PlayerSlotId previousSlot = GetPlayerSlotId(appliedActivePlayerListIndex);
+        PlayerSlotId nextSlot = GetPlayerSlotId(activePlayerListIndex);
+        appliedActivePlayerListIndex = activePlayerListIndex;
         appliedActiveTeamId = activeTeamId;
 
         double stageStartMs = TurnPerfNowMs();
@@ -2569,6 +2752,7 @@ public class MatchController : MonoBehaviour
         {
             UnitManager.ResetActiveTeamChangedPerfCounters();
             ConstructionManager.ResetActiveTeamChangedPerfCounters();
+            OnActiveSlotChanged?.Invoke(previousSlot, nextSlot);
             OnActiveTeamChanged?.Invoke(activeTeamId);
             if (enableTurnPerfLogs)
             {
@@ -2578,7 +2762,7 @@ public class MatchController : MonoBehaviour
                 Debug.Log($"[TurnPerf] handler=ConstructionManager.HandleActiveTeamChanged count={constructionHandlerCount} ms={constructionHandlerMs:F3}");
             }
         }
-        TurnPerfLog("ApplyActiveTeam.OnActiveTeamChanged", stageStartMs);
+        TurnPerfLog("ApplyActiveTeam.OnActiveSlotChanged", stageStartMs);
 
         stageStartMs = TurnPerfNowMs();
         TeleportCursorToActiveTeamHeadQuarterSilently();
@@ -2844,7 +3028,8 @@ public class MatchController : MonoBehaviour
     {
         if (!Application.isPlaying)
             return;
-        if (activeTeamId < 0 && !includeNeutralTeam)
+        PlayerSlotId activeSlot = ActiveSlotId;
+        if (!activeSlot.IsValid && !includeNeutralTeam)
             return;
 
         double stageStartMs = TurnPerfNowMs();
@@ -2878,7 +3063,9 @@ public class MatchController : MonoBehaviour
             UnitManager unit = units[i];
             if (unit == null)
                 continue;
-            if ((int)unit.TeamId != activeTeamId)
+            if (activeSlot.IsValid
+                ? !IsOwnedBySlot(unit, activeSlot)
+                : unit.TeamId != TeamId.Neutral)
                 continue;
 
             // Lock pendente (ex.: emersao forcada adiada por hex ocupado) tenta
@@ -2966,7 +3153,9 @@ public class MatchController : MonoBehaviour
                     UnitManager passenger = seat != null ? seat.embarkedUnit : null;
                     if (passenger == null || !passenger.IsEmbarked)
                         continue;
-                    if ((int)passenger.TeamId != activeTeamId)
+                    if (activeSlot.IsValid
+                        ? !IsOwnedBySlot(passenger, activeSlot)
+                        : passenger.TeamId != TeamId.Neutral)
                         continue;
                     passenger.ResetForTeamTurnStart();
                 }
@@ -7082,10 +7271,9 @@ public class MatchController : MonoBehaviour
                 return;
         }
 
-        if (!TeamAnchorResolver.TryResolveAnchorCell(activeTeamId, out Vector3Int anchorCell))
+        if (!TryResolveSlotHeadQuarterCell(ActiveSlotId, out Vector3Int anchorCell))
         {
-            if (activeTeamId == (int)TeamId.Neutral && includeNeutralTeam)
-                TryTeleportCursorToNearestUnitForActiveTeam(preferReadyUnits: true);
+            TryTeleportCursorToNearestUnitForActiveTeam(preferReadyUnits: true);
             return;
         }
 
@@ -7115,7 +7303,10 @@ public class MatchController : MonoBehaviour
             UnitManager unit = units[i];
             if (unit == null || !unit.gameObject.activeInHierarchy || unit.IsEmbarked)
                 continue;
-            if ((int)unit.TeamId != activeTeamId)
+            PlayerSlotId activeSlot = ActiveSlotId;
+            if (activeSlot.IsValid
+                ? !IsOwnedBySlot(unit, activeSlot)
+                : unit.TeamId != TeamId.Neutral)
                 continue;
 
             Vector3Int cell = unit.CurrentCellPosition;
@@ -7154,6 +7345,38 @@ public class MatchController : MonoBehaviour
         }
 
         return false;
+    }
+
+    private static bool TryResolveSlotHeadQuarterCell(PlayerSlotId slotId, out Vector3Int cell)
+    {
+        cell = Vector3Int.zero;
+        if (!slotId.IsValid)
+            return false;
+
+        ConstructionManager[] constructions = FindObjectsByType<ConstructionManager>(
+            FindObjectsInactive.Exclude,
+            FindObjectsSortMode.None);
+        ConstructionManager bestHq = null;
+        for (int i = 0; i < constructions.Length; i++)
+        {
+            ConstructionManager construction = constructions[i];
+            if (construction == null || !construction.gameObject.activeInHierarchy)
+                continue;
+            if (construction.SlotIndex != slotId.Value)
+                continue;
+            if (!IsHeadQuarterConstruction(construction))
+                continue;
+
+            if (bestHq == null || construction.InstanceId < bestHq.InstanceId)
+                bestHq = construction;
+        }
+
+        if (bestHq == null)
+            return false;
+
+        cell = bestHq.CurrentCellPosition;
+        cell.z = 0;
+        return true;
     }
 
     private static bool TryResolveTeamHeadQuarterCell(int teamId, out Vector3Int cell)

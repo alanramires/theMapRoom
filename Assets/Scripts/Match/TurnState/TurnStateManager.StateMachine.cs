@@ -111,7 +111,7 @@ public partial class TurnStateManager
             return false;
         }
 
-        int activeTeam = matchController != null ? matchController.ActiveTeamId : -1;
+        int activeTeam = matchController != null ? matchController.ActiveSlotId.Value : -1;
         bool hasConstruction = construction != null;
 
         int step = direction >= 0 ? 1 : -1;
@@ -181,7 +181,7 @@ public partial class TurnStateManager
         }
         cell.z = 0;
 
-        int activeTeam = matchController != null ? matchController.ActiveTeamId : -1;
+        int activeTeam = matchController != null ? matchController.ActiveSlotId.Value : -1;
         units = CollectSelectableAlliesAtCell(cell);
         // When already in the shop, the construction is definitionally part of the cycle (we got
         // here); otherwise it joins only when reachable (ally, shoppable, cell not blocked).
@@ -245,7 +245,7 @@ public partial class TurnStateManager
             return null;
 
         ConstructionManager construction = FindConstructionAtCell(cell);
-        if (construction == null || (int)construction.TeamId != activeTeam)
+        if (construction == null || construction.SlotIndex != activeTeam)
             return null;
 
         // The shop is unreachable while a ground/surface (blocking-band) unit sits on the
@@ -261,7 +261,7 @@ public partial class TurnStateManager
         if (IsTemporarySelectionTakeoffGroundedOnCell(cell))
             return null;
 
-        if (!construction.CanProduceUnitsForTeam((TeamId)activeTeam))
+        if (!construction.CanProduceUnitsForSlot(activeTeam))
             return null;
 
         IReadOnlyList<UnitData> offered = construction.OfferedUnits;
@@ -294,7 +294,7 @@ public partial class TurnStateManager
             return false;
 
         cell.z = 0;
-        int activeTeam = matchController != null ? matchController.ActiveTeamId : -1;
+        int activeTeam = matchController != null ? matchController.ActiveSlotId.Value : -1;
 
         double takeoffPerfStart = Time.realtimeSinceStartupAsDouble;
         TryPrepareTemporaryTakeoffStateForSelection(unit, out string takeoffInfo);
@@ -307,7 +307,7 @@ public partial class TurnStateManager
         ClearInspectedHelper();
         Advance(CursorState.UnitSelected, "SelectUnitFromNeutral: cycle to unit within hex");
         if (activeTeam >= 0)
-            DialogManager.Instance?.MarkHintLearned((TeamId)activeTeam, HelpHintId.Act);
+            DialogManager.Instance?.MarkHintLearned(matchController.ActiveTeam, HelpHintId.Act);
         return true;
     }
 
@@ -316,7 +316,7 @@ public partial class TurnStateManager
     private List<UnitManager> CollectSelectableAlliesAtCell(Vector3Int cell)
     {
         List<UnitManager> result = new List<UnitManager>();
-        int activeTeam = matchController != null ? matchController.ActiveTeamId : -1;
+        int activeTeam = matchController != null ? matchController.ActiveSlotId.Value : -1;
         if (activeTeam < 0)
             return result;
 
@@ -335,7 +335,7 @@ public partial class TurnStateManager
             UnitManager u = occupants[i];
             if (u == null || u.IsEmbarked || u.IsDead)
                 continue;
-            if ((int)u.TeamId != activeTeam)
+            if (u.SlotIndex != activeTeam)
                 continue;
             if (u.HasActed)
                 continue;
@@ -481,7 +481,7 @@ public partial class TurnStateManager
             return ActionSfx.None;
 
         Vector3Int cursorCell = cursorController.CurrentCell;
-        int activeTeam = matchController != null ? matchController.ActiveTeamId : -1;
+        int activeTeam = matchController != null ? matchController.ActiveSlotId.Value : -1;
 
         // O FOW visual tambem protege as consultas: nao permita selecionar loja,
         // unidade ou construcao que exista sob um hex ainda coberto.
@@ -494,13 +494,13 @@ public partial class TurnStateManager
         UnitManager unit = FindUnitAtCell(cursorCell);
         if (unit != null)
         {
-            bool isAlly = (int)unit.TeamId == activeTeam;
+            bool isAlly = unit.SlotIndex == activeTeam;
             if (!isAlly)
             {
                 LogEnemyUnitInspection(unit, activeTeam);
                 BeginInspectedHelper(unit);
                 Advance(CursorState.InspectingUnit, "HandleConfirmFromNeutralLikeState: enemy inspect");
-                DialogManager.Instance?.MarkHintLearned((TeamId)activeTeam, HelpHintId.Inspect);
+                DialogManager.Instance?.MarkHintLearned(matchController.ActiveTeam, HelpHintId.Inspect);
                 return ActionSfx.Confirm;
             }
 
@@ -509,7 +509,7 @@ public partial class TurnStateManager
                 Debug.Log($"debug: inspecionando aliado que ja agiu (unit={unit.name}, unitTeam={(int)unit.TeamId}, activeTeam={activeTeam}, hasActed={unit.HasActed})");
                 BeginInspectedHelper(unit, paintThreatOverlay: true, nextTurnHotZone: true);
                 Advance(CursorState.InspectingUnit, "HandleConfirmFromNeutralLikeState: acted ally inspect");
-                DialogManager.Instance?.MarkHintLearned((TeamId)activeTeam, HelpHintId.Inspect);
+                DialogManager.Instance?.MarkHintLearned(matchController.ActiveTeam, HelpHintId.Inspect);
                 return ActionSfx.Confirm;
             }
 
@@ -523,7 +523,7 @@ public partial class TurnStateManager
             SetSelectedUnit(unit);
             ClearInspectedHelper();
             Advance(CursorState.UnitSelected, "HandleConfirmWhileNeutral: ally selected");
-            DialogManager.Instance?.MarkHintLearned((TeamId)activeTeam, HelpHintId.Act);
+            DialogManager.Instance?.MarkHintLearned(matchController.ActiveTeam, HelpHintId.Act);
             return ActionSfx.Confirm;
         }
 
@@ -531,7 +531,7 @@ public partial class TurnStateManager
         if (construction == null)
             return ActionSfx.None;
 
-        bool isConstructionAlly = (int)construction.TeamId == activeTeam;
+        bool isConstructionAlly = construction.SlotIndex == activeTeam;
         if (!isConstructionAlly)
         {
             BeginInspectedConstructionHelper(construction);
@@ -541,7 +541,7 @@ public partial class TurnStateManager
 
         if (TryEnterConstructionShoppingState(construction, activeTeam))
         {
-            DialogManager.Instance?.MarkHintLearned((TeamId)activeTeam, HelpHintId.Produce);
+            DialogManager.Instance?.MarkHintLearned(matchController.ActiveTeam, HelpHintId.Produce);
             return ActionSfx.Confirm;
         }
 
@@ -553,7 +553,7 @@ public partial class TurnStateManager
     private bool TryEnterUnblockedConstructionShoppingBeforeUnit(Vector3Int cursorCell, int activeTeam)
     {
         ConstructionManager construction = FindConstructionAtCell(cursorCell);
-        if (construction == null || activeTeam < 0 || (int)construction.TeamId != activeTeam)
+        if (construction == null || activeTeam < 0 || construction.SlotIndex != activeTeam)
             return false;
 
         // A unidade visivel no hex e sempre o alvo primario da confirmacao. A loja
@@ -564,7 +564,7 @@ public partial class TurnStateManager
         if (!TryEnterConstructionShoppingState(construction, activeTeam))
             return false;
 
-        DialogManager.Instance?.MarkHintLearned((TeamId)activeTeam, HelpHintId.Produce);
+        DialogManager.Instance?.MarkHintLearned(matchController.ActiveTeam, HelpHintId.Produce);
         return true;
     }
 

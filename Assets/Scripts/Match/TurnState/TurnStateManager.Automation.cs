@@ -122,7 +122,7 @@ public partial class TurnStateManager
         if (!int.TryParse(unitInstanceId, out int expectedId))
             return false;
 
-        int activeTeam = matchController != null ? matchController.ActiveTeamId : -1;
+        int activeTeam = matchController != null ? matchController.ActiveSlotId.Value : -1;
         UnitManager unit = null;
         foreach (UnitManager candidate in UnitManager.AllActive)
         {
@@ -134,7 +134,7 @@ public partial class TurnStateManager
 
         if (unit == null || unit.IsDead || unit.IsEmbarked || unit.HasActed)
             return false;
-        if (activeTeam >= 0 && (int)unit.TeamId != activeTeam)
+        if (activeTeam >= 0 && unit.SlotIndex != activeTeam)
             return false;
 
         expectedCell.z = 0;
@@ -1439,4 +1439,3 @@ public partial class TurnStateManager
         return true;
     }
 }
-

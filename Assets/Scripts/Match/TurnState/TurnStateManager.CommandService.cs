@@ -334,8 +334,8 @@ public partial class TurnStateManager
         }
 
         Tilemap boardMap = terrainTilemap != null ? terrainTilemap : (cursorController != null ? cursorController.BoardTilemap : null);
-        int activeTeamId = matchController != null ? matchController.ActiveTeamId : -1;
-        if (activeTeamId < 0)
+        int activeSlot = matchController != null ? matchController.ActiveSlotId.Value : -1;
+        if (activeSlot < 0)
         {
             message = "Servico do Comando (\"X\"): sem time ativo valido.";
             if (emitLogs)
@@ -350,7 +350,7 @@ public partial class TurnStateManager
         RefreshCommandServiceServedCacheScope();
 
         bool canRun = ServicoDoComandoSensor.CollectOptions(
-            (TeamId)activeTeamId,
+            activeSlot,
             boardMap,
             terrainDatabase,
             commandServiceQueuedOrders,
@@ -490,9 +490,9 @@ public partial class TurnStateManager
                 : $"fornecedor={sourceSupplierUnit.name}";
             CommandServiceLog($"[ServicoComando][Fila] {i + 1}/{commandServiceQueuedOrders.Count} alvo={target.name} | {sourceLabel}");
 
-            if (fromConstruction && (int)target.TeamId != (int)sourceConstruction.TeamId)
+            if (fromConstruction && !PlayerSlotRelations.AreAllies(target.SlotIndex, sourceConstruction.SlotIndex))
                 continue;
-            if (fromSupplierUnit && (int)target.TeamId != (int)sourceSupplierUnit.TeamId)
+            if (fromSupplierUnit && !PlayerSlotRelations.AreAllies(target, sourceSupplierUnit))
                 continue;
             bool isEmbarkedPassenger = IsEmbarkedPassengerOfSupplier(target, sourceSupplierUnit);
             if (fromSupplierUnit && !isEmbarkedPassenger && target != sourceSupplierUnit)
@@ -513,7 +513,7 @@ public partial class TurnStateManager
                     continue;
                 CommandServiceLog($"ocultando HUD do {sourceSupplierUnit.name}");
             }
-            else if (!TryPrepareIndividualSupplyTarget(target, target.TeamId, out targetCell))
+            else if (!TryPrepareIndividualSupplyTarget(target, target.SlotIndex, out targetCell))
             {
                 continue;
             }

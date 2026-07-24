@@ -116,7 +116,7 @@ public static class PodeSuprirSensor
             Vector3Int cell = target.CurrentCellPosition;
             cell.z = 0;
 
-            if ((int)target.TeamId != (int)supplier.TeamId)
+            if (!PlayerSlotRelations.AreAllies(target, supplier))
             {
                 AppendInvalid(invalidOutput, supplier, target, cell, "Unidade alvo de outro time.");
                 continue;

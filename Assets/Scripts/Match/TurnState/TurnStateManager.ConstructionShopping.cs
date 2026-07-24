@@ -19,13 +19,12 @@ public partial class TurnStateManager
         return true;
     }
 
-    private bool TryEnterConstructionShoppingState(ConstructionManager construction, int activeTeam)
+    private bool TryEnterConstructionShoppingState(ConstructionManager construction, int activeSlot)
     {
-        if (construction == null || activeTeam < 0)
+        if (construction == null || activeSlot < 0)
             return false;
 
-        TeamId buyerTeam = (TeamId)activeTeam;
-        if (!construction.CanProduceUnitsForTeam(buyerTeam))
+        if (!construction.CanProduceUnitsForSlot(activeSlot))
             return false;
 
         IReadOnlyList<UnitData> offered = construction.OfferedUnits;
@@ -61,11 +60,11 @@ public partial class TurnStateManager
 
         cell.z = 0;
         ConstructionManager construction = FindConstructionAtCell(cell);
-        int activeTeam = matchController != null ? matchController.ActiveTeamId : -1;
-        if (!TryEnterConstructionShoppingState(construction, activeTeam))
+        int activeSlot = matchController != null ? matchController.ActiveSlotId.Value : -1;
+        if (!TryEnterConstructionShoppingState(construction, activeSlot))
             return false;
 
-        DialogManager.Instance?.MarkHintLearned((TeamId)activeTeam, HelpHintId.Produce);
+        DialogManager.Instance?.MarkHintLearned(matchController.ActiveTeam, HelpHintId.Produce);
         cursorController?.PlayConfirmSfx();
         return true;
     }
@@ -248,8 +247,10 @@ public partial class TurnStateManager
             return false;
         }
 
-        int activeTeam = matchController != null ? matchController.ActiveTeamId : -1;
-        TeamId spawnTeam = activeTeam >= 0 ? (TeamId)activeTeam : shoppingConstruction.TeamId;
+        int activeSlot = matchController != null ? matchController.ActiveSlotId.Value : shoppingConstruction.SlotIndex;
+        TeamId spawnTeam = matchController != null && activeSlot >= 0
+            ? matchController.GetTeamIdForSlot(activeSlot)
+            : shoppingConstruction.TeamId;
         if (matchController != null && !matchController.CanProduceUnit(spawnTeam, unit, out string requirementReason))
         {
             PushPanelUnitMessage(requirementReason, 3.2f);
@@ -282,7 +283,7 @@ public partial class TurnStateManager
 
         Vector3Int spawnCell = shoppingConstruction.CurrentCellPosition;
         spawnCell.z = 0;
-        if (IsShoppingSpawnCellBlocked(shoppingConstruction, unit, spawnCell, spawnTeam, out string blockedReason))
+        if (IsShoppingSpawnCellBlocked(shoppingConstruction, unit, spawnCell, activeSlot, out string blockedReason))
         {
             PushPanelUnitMessage(blockedReason, 2.8f);
             cursorController?.PlayErrorSfx();
@@ -299,6 +300,8 @@ public partial class TurnStateManager
         }
 
         UnitManager spawnedUnitManager = spawned.GetComponent<UnitManager>();
+        if (spawnedUnitManager != null)
+            spawnedUnitManager.SetSlotIndex(activeSlot);
         TryApplyForcedSpawnLayerFromCell(spawnedUnitManager, spawnCell);
 
         int remainingMoney = matchController != null ? matchController.GetActualMoney(spawnTeam) : 0;
@@ -435,7 +438,8 @@ public partial class TurnStateManager
     {
         if (construction == null || unit == null)
             return false;
-        if (!construction.CanProduceUnitsForTeam(team))
+        int ownerSlot = construction.SlotIndex;
+        if (!construction.CanProduceUnitsForSlot(ownerSlot))
             return false;
         if (matchController != null && !matchController.CanProduceUnit(team, unit, out string requirementReason))
         {
@@ -462,7 +466,7 @@ public partial class TurnStateManager
 
         Vector3Int spawnCell = construction.CurrentCellPosition;
         spawnCell.z = 0;
-        if (IsShoppingSpawnCellBlocked(construction, unit, spawnCell, team, out string blockedReason))
+        if (IsShoppingSpawnCellBlocked(construction, unit, spawnCell, ownerSlot, out string blockedReason))
         {
             if (enableTurnStateRuntimeLogs)
                 Debug.Log($"[AI][Shopping] Compra bloqueada em {spawnCell}: {blockedReason}");
@@ -480,6 +484,8 @@ public partial class TurnStateManager
         }
 
         UnitManager spawnedManager = spawned.GetComponent<UnitManager>();
+        if (spawnedManager != null)
+            spawnedManager.SetSlotIndex(ownerSlot);
         TryApplyForcedSpawnLayerFromCell(spawnedManager, spawnCell);
 
         int remainingMoney;
@@ -505,7 +511,7 @@ public partial class TurnStateManager
         ConstructionManager construction,
         UnitData unit,
         Vector3Int spawnCell,
-        TeamId spawnTeam,
+        int spawnSlot,
         out string reason)
     {
         reason = "";
@@ -529,7 +535,7 @@ public partial class TurnStateManager
             if (OccupancyResolver.GetHeightBand(occupant) != HeightBand.Blocking)
                 continue;
 
-            bool enemy = occupant.TeamId != spawnTeam;
+            bool enemy = PlayerSlotRelations.AreEnemies(occupant.SlotIndex, spawnSlot);
             reason = enemy
                 ? "Predio ocupado por oponente, compra bloqueada."
                 : "Predio ocupado por unidade aliada, compra bloqueada.";

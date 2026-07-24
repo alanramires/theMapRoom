@@ -121,7 +121,7 @@ public static class UnitOccupancyRules
                 if (occupiedCell != cell)
                     continue;
 
-                if (unit.TeamId == exceptUnit.TeamId)
+                if (PlayerSlotRelations.AreAllies(unit, exceptUnit))
                 {
                     sameTeam = unit;
                     break;
@@ -201,7 +201,7 @@ public static class UnitOccupancyRules
                 UnitManager occupant = occupants[i];
                 if (occupant == null)
                     continue;
-                if (occupant.TeamId == unit.TeamId && OccupancyResolver.GetHeightBand(occupant) == HeightBand.Air)
+                if (PlayerSlotRelations.AreAllies(occupant, unit) && OccupancyResolver.GetHeightBand(occupant) == HeightBand.Air)
                     occupants.RemoveAt(i);
             }
         }
@@ -218,7 +218,7 @@ public static class UnitOccupancyRules
             if (OccupancyResolver.GetHeightBand(occupant) != targetBand)
                 continue;
             // Em Air/Sub apenas o aliado bloqueia; em Blocking qualquer ocupante bloqueia.
-            if (targetBand != HeightBand.Blocking && occupant.TeamId != unit.TeamId)
+            if (targetBand != HeightBand.Blocking && !PlayerSlotRelations.AreAllies(occupant, unit))
                 continue;
             blocker = occupant;
             break;

@@ -113,7 +113,7 @@ public static class PodeFundirSensor
             if (other == null || other == selectedUnit || !other.gameObject.activeInHierarchy || other.IsEmbarked)
                 continue;
 
-            if ((int)selectedUnit.TeamId != (int)other.TeamId)
+            if (!PlayerSlotRelations.AreAllies(selectedUnit, other))
             {
                 if (invalidOutput != null)
                 {
