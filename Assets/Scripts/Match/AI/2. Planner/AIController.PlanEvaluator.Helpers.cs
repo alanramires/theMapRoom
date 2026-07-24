@@ -489,6 +489,31 @@ public partial class AIController
         return Mathf.Max(1, count);
     }
 
+    // Algum produtor do time oferta unidade que RESOLVE para este papel de composição?
+    // Espelha CanAnyOfferedUnitCloseCore do shopping: usa ResolveCompositionRole (mesmo predicado
+    // de CountCompositionRole), NÃO CanSatisfy — senão um CapturadorAgressivo "prometeria" fechar
+    // um slot de Assalto/Fogo que ele nunca conta.
+    //
+    // Sem informação de oferta (MyBuildings null): retorna TRUE — não remove slot por dúvida.
+    // A intenção é só evitar EXIGIR um papel que este mapa comprovadamente não vende (mesma lição
+    // do gate inaplicável); na incerteza, preserva o comportamento atual.
+    private static bool CanProduceCompositionRole(AIWorldSnapshot snapshot, TeamId aiTeam, UnitRole role)
+    {
+        if (snapshot == null || snapshot.MyBuildings == null)
+            return true;
+
+        int aiSlot = AIController.ResolveAISlotKey(aiTeam);
+        foreach (ConstructionManager building in snapshot.MyBuildings)
+        {
+            if (building == null || !building.CanProduceUnitsForSlot(aiSlot) || building.OfferedUnits == null)
+                continue;
+            foreach (UnitData offered in building.OfferedUnits)
+                if (offered != null && UnitRoleCompatibility.ResolveCompositionRole(offered) == role)
+                    return true;
+        }
+        return false;
+    }
+
     // Produtores INIMIGOS (ground-truth, igual à força macro que ignora névoa). Usado no Hard pra
     // projetar a onda de produção inimiga do próximo turno na análise de força.
     private static int CountEnemyProductionBuildings(TeamId aiTeam)

@@ -1961,12 +1961,28 @@ public partial class AIShoppingPlanner
     // Alvos do núcleo, JÁ descontando componentes que este mapa não vende. Ponto único: o gate
     // (HasOperationalCore) e o gradiente (ComputeOperationalCoreMaturity) precisam enxergar
     // exatamente os mesmos alvos, senão divergem e a maturidade nunca chega a 1 com o gate aberto.
+    // Cache dos alvos do núcleo por PASSADA de shopping. HasOperationalCore/Maturity são chamados
+    // dentro do scoring, que roda numa busca em feixe (largura 1024) — recomputar a varredura de
+    // ofertas por candidato custava dezenas de segundos. Os alvos são INVARIANTES durante o turno
+    // (mínimos do AI Manager + ofertas fixas), então memoizamos por REFERÊNCIA de snapshot: novo
+    // turno = novo snapshot = recomputa; mesma passada = leitura O(1).
+    [System.NonSerialized] private static AIWorldSnapshot s_coreTargetsSnapshot;
+    private static int s_coreCapTarget, s_coreAssTarget, s_coreArtTarget;
+
     private static void ResolveOperationalCoreTargets(
         AIWorldSnapshot snapshot,
         out int capturerTarget,
         out int assaultTarget,
         out int artilleryTarget)
     {
+        if (ReferenceEquals(snapshot, s_coreTargetsSnapshot))
+        {
+            capturerTarget = s_coreCapTarget;
+            assaultTarget = s_coreAssTarget;
+            artilleryTarget = s_coreArtTarget;
+            return;
+        }
+
         // Composição mínima do núcleo (gate de elite) vem do AI Manager, com par por modo (normal/hard).
         capturerTarget  = AIController.Instance != null ? AIController.Instance.CoreMinInfantry  : 2;
         assaultTarget   = AIController.Instance != null ? AIController.Instance.CoreMinAssault   : 2;
@@ -1982,6 +1998,11 @@ public partial class AIShoppingPlanner
             assaultTarget = 0;
         if (artilleryTarget > 0 && !CanAnyOfferedUnitCloseCore(snapshot, UnitRole.FogoIndireto))
             artilleryTarget = 0;
+
+        s_coreTargetsSnapshot = snapshot;
+        s_coreCapTarget = capturerTarget;
+        s_coreAssTarget = assaultTarget;
+        s_coreArtTarget = artilleryTarget;
     }
 
     // Algum produtor da IA oferta unidade que CONTA para este componente do núcleo?

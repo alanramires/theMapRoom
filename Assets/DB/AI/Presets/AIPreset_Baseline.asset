@@ -1,0 +1,105 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f8252d3c804d93142a44e5d5ab37e579, type: 3}
+  m_Name: AIPreset_Baseline
+  m_EditorClassIdentifier: Assembly-CSharp::AIPresetData
+  nomeExibido: "Padr\xE3o"
+  doutrina: Baseline gerado da cena. A dificuldade liga toggles por cima.
+  capacidades:
+    respeitarListaBanida: 0
+    projetarProducaoInimiga: 0
+    aberturaBlindadoPrimeiro: 0
+    limitarLogistica: 0
+    dobrarSlotsCapturadorPorSetor: 0
+    handoffEmProfundidade: 0
+    conscricaoSempre: 0
+    conscricaoQuandoPerdendo: 0
+    politicaLadoForteFraco: 0
+    gateNucleoSuave: 0
+  economia:
+    fracaoRendaForaDeCidades: 1
+    eliteSaveTurns: 1
+    eliteMaintenanceReservePercent: 20
+    savingPercentualForElite: 10
+    counterEliteEscalationPressure: 8
+  composicao:
+    coreMinInfantry: 2
+    coreMinAssault: 2
+    coreMinArtillery: 1
+    eliteRatioPressure: 0.33
+    eliteRatioSafe: 0.5
+    eliteCapturerFillRatio: 0.6
+    minFilledAssaultSlots: 1
+    minTurnForFireSupport: 3
+    minActiveCapturersForFireSupport: 2
+    minActiveAssaultForFireSupport: 1
+    minCapturerMassForSupport: 4
+    assaultPerFireSupportRatio: 2
+    capturersPerPreventiveTransport: 4
+    progressiveCapturerBatchSize: 2
+    maxLogisticUnits: 1
+    repairsPerGroundSupplier: 4
+    eliteRepairLogisticsPriority: 7
+    maxProactiveDefensiveFireSupport: 1
+    maxProactiveAntiAirSAM: 3
+    antiAirCoverageRange: 5
+  conscricao:
+    massacreEnterForceRatio: 0.66
+    massacreExitForceRatio: 0.58
+    massacreUnitCapFillRatio: 0.85
+  plano:
+    maxActiveObjectives: 4
+    capturerSlotsPerSectorMultiplier: 1
+    capturerSlotCap: 4
+    minDistanceForTransportSlot: 7
+  tatica:
+    riskDecisionImpact: 0.5
+    defenseEnemyRange: 2
+    defenseCallRange: 4
+    alliesEnemyRange: 2
+    alliesCallRange: 8
+    alliesAgainstEnemiesHpRatio: 1.5
+    minBaseArtilharia: 1
+    minBaseAAA: 1
+    minTurnBaseDefense: 3
+  intel:
+    usarIntelJogadasNoShopping: 1
+    lookbackTurns: 4
+    infantryPressureAssaultThreshold: 1.5
+    airThreatAntiAirThreshold: 2
+    armorThreatDefenseThreshold: 2
+    capturePressureDefenseThreshold: 2
+    numericalPressureThreshold: 1.5
+    fireSupportGapHotThreshold: 8
+    fireSupportGapDamageThreshold: 3
+    offensiveAntiInfantryFireThreshold: 2.5
+    stalemateElitePressureThreshold: 3.5
+    stalemateFireSupportThreshold: 6
+    stalemateEliteCapturerFillRatio: 0.3
+    stalemateEliteCapturerRange: 8
+  aeronautica:
+    maxAirTransporters: 3
+    minTurnForInterceptador: 4
+    helicopterosPorCacaB: 3
+    maxCacaB: 4
+    maxCacaA: 2
+    minTurnForAtaqueAereo: 5
+    chinooksPorApache: 2
+    helicopterosInimigosPorApache: 3
+    apachesParaBombardeiro: 2
+    comprarApacheEmModoDefesa: 1
+    minCacaBPresence: 1
+    minApachePresence: 1
+    minBombaPresence: 0
+    minTurnForIntel: 4
+    maxAirIntel: 1
+    maxMobileAirIntel: 1

@@ -891,6 +891,14 @@ public partial class TurnStateManager
 
         if (transporter != null)
             transporter.MarkAsActed();
+
+        // O desembarque compromete posicao/camada/estado de um ou mais
+        // passageiros e tambem o estado do transportador. O refresh incremental
+        // pendente guarda uma unica unidade e, portanto, podia publicar somente
+        // a visao do transportador. Solicita uma reconstrucao confirmada unica
+        // quando a maquina retornar a Neutral.
+        matchController?.NotifyCommittedMultiUnitBoardChangeForFog(transporter);
+
         cursorController?.PlayDoneSfx();
         float afterTransporterDoneDelay = GetDisembarkAfterTransporterDoneDelay();
         if (afterTransporterDoneDelay > 0f)

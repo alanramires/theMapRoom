@@ -989,7 +989,8 @@ public class UnitManager : MonoBehaviour
         hiddenByFogOfWar = shouldHide;
         ApplyFogOfWarVisibility();
         
-        if (visible && matchController != null && matchController.ActiveTeamId != (int)teamId)
+        if (visible && matchController != null &&
+            !matchController.IsUnitOwnedByFogPresentationObserver(this))
         {
             TurnStateManager.NotifyUnitRevealedFromFog(this);
         }

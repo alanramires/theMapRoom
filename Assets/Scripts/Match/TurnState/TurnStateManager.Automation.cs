@@ -609,8 +609,13 @@ public partial class TurnStateManager
         constructionCell.z = 0;
         cursorController.SetCell(constructionCell, playMoveSfx: false, adjustCamera: false);
 
-        int activeTeam = matchController != null ? matchController.ActiveTeamId : -1;
-        if (!TryEnterConstructionShoppingState(construction, activeTeam))
+        // Automacao executa pela verdade privada do participante ativo, nao pela
+        // perspectiva visual local. Em "fow on" o overlay/cache apresentado pode
+        // pertencer ao humano enquanto a IA joga; usar ActiveTeamId (cor) aqui
+        // fazia a abertura cair no gate de ownership do slot errado. Em
+        // "fow partial" funcionava apenas porque observador visual e IA coincidiam.
+        int activeSlot = matchController != null ? matchController.ActiveSlotId.Value : -1;
+        if (!TryEnterConstructionShoppingState(construction, activeSlot))
             return false;
 
         // Mantem a semantica audiovisual do "Confirm" usada no fluxo normal/replay.

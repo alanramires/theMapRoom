@@ -610,7 +610,14 @@ public partial class AIController
                 baseObj.Slots.Add(new SlotNeed { Role = UnitRole.Capturador });
             for (int s = 0; s < BaseInvasionEliteAssaultSlots; s++)
                 baseObj.Slots.Add(new SlotNeed { Role = UnitRole.Assalto });
-            for (int s = 0; s < BaseInvasionEliteFireSupportSlots; s++)
+            // Fogo indireto na invasão é AMACIAMENTO, não requisito: só demanda se este mapa
+            // vende artilharia. Sem produtor de fogo indireto, exigir o slot gera demanda-fantasma
+            // que nunca fecha — e num roster de infantaria isso empurrava a compra de obus fraco só
+            // para "pagar o imposto". Mesma lição do Fix A (núcleo) e do gate inaplicável.
+            int invasionFireSupportSlots = CanProduceCompositionRole(snapshot, aiTeam, UnitRole.FogoIndireto)
+                ? BaseInvasionEliteFireSupportSlots
+                : 0;
+            for (int s = 0; s < invasionFireSupportSlots; s++)
                 baseObj.Slots.Add(new SlotNeed { Role = UnitRole.FogoIndireto });
             // Transportador: leva a massa ao campo. Quando a base é longe, escala com a leva de
             // capturadores (capacidade por APC) para reposicionar rápido o que foi comprado no QG.
@@ -626,7 +633,7 @@ public partial class AIController
                 baseObj.Slots.Add(new SlotNeed { Role = UnitRole.Logistica });
             plan.Objectives.Add(baseObj);
             addedSectors++;
-            Debug.Log($"{TL("Plan")} base inimiga {baseInfo.Sector}: {massCapturerSlots}xCap(massa) + {BaseInvasionEliteAssaultSlots}xAssalto + {BaseInvasionEliteFireSupportSlots}xFogo + {BaseInvasionLogisticsSlots}xLog construcoes={baseInfo.ConstructionCount} dist={baseInfo.GetDistanceToHQ(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam))):F0}h");
+            Debug.Log($"{TL("Plan")} base inimiga {baseInfo.Sector}: {massCapturerSlots}xCap(massa) + {BaseInvasionEliteAssaultSlots}xAssalto + {invasionFireSupportSlots}xFogo{(invasionFireSupportSlots == 0 ? "(sem produtor)" : "")} + {BaseInvasionLogisticsSlots}xLog construcoes={baseInfo.ConstructionCount} dist={baseInfo.GetDistanceToHQ(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam))):F0}h");
         }
 
         ClearResolvedCriticalHomeDefenseObjectives(plan, aiTeam);

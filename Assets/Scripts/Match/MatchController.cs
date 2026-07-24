@@ -349,6 +349,7 @@ public class MatchController : MonoBehaviour
     [System.NonSerialized] private bool pendingCommittedBoardRefresh;
     [System.NonSerialized] private UnitManager pendingCommittedActedUnit;
     [System.NonSerialized] private bool pendingCommittedUnitRequiresHasActed;
+    [System.NonSerialized] private bool pendingCommittedUnitRequiresFullFogRefresh;
     [System.NonSerialized] private bool debugFogOfWarEnabled = true;
     [System.NonSerialized] private bool debugFogOfWarPartial;
     [System.NonSerialized] private int fogPresentationGameplayTeamId = int.MinValue;
@@ -3983,15 +3984,36 @@ public class MatchController : MonoBehaviour
     }
     public void NotifyUnitReachedHasAct(UnitManager unit)
     {
-        ProcessCommittedUnitFog(unit, raiseActedEvent: true, requireHasActed: true);
+        ProcessCommittedUnitFog(
+            unit,
+            raiseActedEvent: true,
+            requireHasActed: true,
+            requireFullRefresh: false);
     }
 
     public void NotifyCommittedUnitSpawnedForFog(UnitManager unit)
     {
-        ProcessCommittedUnitFog(unit, raiseActedEvent: false, requireHasActed: false);
+        ProcessCommittedUnitFog(
+            unit,
+            raiseActedEvent: false,
+            requireHasActed: false,
+            requireFullRefresh: true);
     }
 
-    private void ProcessCommittedUnitFog(UnitManager unit, bool raiseActedEvent, bool requireHasActed)
+    public void NotifyCommittedMultiUnitBoardChangeForFog(UnitManager contextUnit)
+    {
+        ProcessCommittedUnitFog(
+            contextUnit,
+            raiseActedEvent: false,
+            requireHasActed: false,
+            requireFullRefresh: true);
+    }
+
+    private void ProcessCommittedUnitFog(
+        UnitManager unit,
+        bool raiseActedEvent,
+        bool requireHasActed,
+        bool requireFullRefresh)
     {
         if (!Application.isPlaying)
             return;
@@ -4019,6 +4041,7 @@ public class MatchController : MonoBehaviour
             pendingCommittedBoardRefresh = true;
             pendingCommittedActedUnit = unit;
             pendingCommittedUnitRequiresHasActed = requireHasActed;
+            pendingCommittedUnitRequiresFullFogRefresh |= requireFullRefresh;
             return;
         }
 
@@ -4032,6 +4055,19 @@ public class MatchController : MonoBehaviour
             return;
 
         ValidateFogOfWarSortingLayer();
+        // Uma unidade recem-criada ainda nao fazia parte do snapshot confirmado
+        // anterior. Reconstruir o FOW ao concluir a compra evita que o overlay
+        // preserve o cache antigo enquanto consultas diretas de LOS ja enxergam
+        // a nova unidade. Compras/spawns sao eventos raros e justificam o refresh
+        // completo; movimentos continuam usando o delta otimizado.
+        if (requireFullRefresh)
+        {
+            RefreshFogOfWarForActiveTeam(FogOfWarRefreshMode.FullVisual);
+            TryPlaySkillDetectionSfxForActedUnit(unit, boardMap);
+            TryRefreshDetectedPersistenceForActedUnit(unit, boardMap);
+            return;
+        }
+
         if (fogCachedTeamId != ActiveSlotId.Value || !fogOverlayInitialized)
         {
             RefreshFogOfWarForActiveTeam();
@@ -4103,7 +4139,7 @@ public class MatchController : MonoBehaviour
             UnitManager unit = units[i];
             if (unit == null || !unit.gameObject.activeInHierarchy || unit.IsEmbarked)
                 continue;
-            if ((int)unit.TeamId != activeTeamId)
+            if (unit.SlotIndex != ActiveSlotId.Value)
                 continue;
             if (!IsUnitOnBoard(unit, boardMap))
                 continue;
@@ -4685,6 +4721,17 @@ public class MatchController : MonoBehaviour
         return ComputeIsUnitVisibleForActiveTeam(unit);
     }
 
+    public bool IsUnitOwnedByFogPresentationObserver(UnitManager unit)
+    {
+        if (unit == null)
+            return false;
+
+        PlayerSlotId observerSlot = ActiveSlotId;
+        if (TryResolveFogPresentationSlot(out PlayerSlotId presentationSlot))
+            observerSlot = presentationSlot;
+        return IsValidPlayerSlot(observerSlot) && unit.SlotIndex == observerSlot.Value;
+    }
+
     /// <summary>
     /// Consulta exclusivamente o snapshot de visibilidade ja publicado.
     /// Durante uma acao provisoria, ausencia no cache significa oculto: nunca
@@ -4994,9 +5041,9 @@ public class MatchController : MonoBehaviour
             || !Enum.IsDefined(typeof(TeamId), activeTeamId))
             return false;
 
-        TeamId activeTeam = (TeamId)activeTeamId;
-        if (debugFogOfWarPartial && TryGetFirstAITeam(out TeamId aiPresentationTeam))
-            return activeTeam == aiPresentationTeam;
+        if (debugFogOfWarPartial &&
+            TryResolveFogPresentationSlot(out PlayerSlotId aiPresentationSlot))
+            return ActiveSlotId == aiPresentationSlot;
         if (!IsPlayerAI(ActiveSlotId))
             return true;
 
@@ -5021,6 +5068,17 @@ public class MatchController : MonoBehaviour
         bool requireAI = debugFogOfWarPartial;
         if (!requireAI && !IsPlayerAI(ActiveSlotId))
             return false;
+
+        // No modo PARTIAL, a perspectiva acompanha a IA que realmente esta jogando.
+        // Escolher apenas "a primeira IA" fazia outros slots AI receberem a visao,
+        // memoria e apresentacao visual do participante errado.
+        if (requireAI && IsValidPlayerSlot(ActiveSlotId) &&
+            IsPlayerAI(ActiveSlotId) && !players[ActiveSlotId.Value].defeated)
+        {
+            presentationSlot = ActiveSlotId;
+            return true;
+        }
+
         for (int i = 0; i < players.Count; i++)
         {
             if (players[i].isAI != requireAI || players[i].defeated)
@@ -5078,7 +5136,7 @@ public class MatchController : MonoBehaviour
     {
         if (!debugFogOfWarEnabled || !enableTotalWar)
             return false;
-        if (cachedTeamId != activeTeamId)
+        if (cachedTeamId != ActiveSlotId.Value)
             return false;
         bool hasCellContributors = visibleContributorsByCell != null && visibleContributorsByCell.Count > 0;
         bool hasUnitVisibility = unitVisibilityByCacheIndex != null && unitVisibilityByCacheIndex.Count > 0;
@@ -5150,14 +5208,15 @@ public class MatchController : MonoBehaviour
                 continue;
 
             int cacheIndex = ResolveFogCacheIndex(unit);
-            bool visible = (int)unit.TeamId == activeTeamId;
+            bool visible = unit.SlotIndex == ActiveSlotId.Value;
             if (!visible)
             {
                 if (!fogUnitVisibilityByCacheIndex.TryGetValue(cacheIndex, out visible))
                     visible = false;
             }
 
-            unit.SetFogOfWarVisibility(ResolveFogRenderVisibility(unit, visible, fogOverlayOwnsWorldOcclusion, ActiveTeam));
+            unit.SetFogOfWarVisibility(ResolveFogRenderVisibility(
+                unit, visible, fogOverlayOwnsWorldOcclusion, ActiveSlotId));
         }
     }
 
@@ -5189,7 +5248,7 @@ public class MatchController : MonoBehaviour
 
             int cacheId = ResolveFogCacheIndex(unit);
             unitsById[cacheId] = unit;
-            if ((int)unit.TeamId == activeTeamId)
+            if (unit.SlotIndex == ActiveSlotId.Value)
                 observers.Add(unit);
             else
                 targets.Add(unit);
@@ -5423,12 +5482,12 @@ public class MatchController : MonoBehaviour
         UnitManager unit,
         bool logicallyVisible,
         bool fogOverlayOwnsWorldOcclusion,
-        TeamId observerTeam)
+        PlayerSlotId observerSlot)
     {
         if (fogOverlayOwnsWorldOcclusion && !HasActiveIndividualFogConcealment(unit))
         {
-            if (unit != null && unit.TeamId != observerTeam &&
-                TryGetFogGameplaySnapshot((int)observerTeam, out FogTeamGameplaySnapshot snapshot))
+            if (unit != null && unit.SlotIndex != observerSlot.Value &&
+                TryGetFogGameplaySnapshot(observerSlot.Value, out FogTeamGameplaySnapshot snapshot))
             {
                 Vector3Int cell = unit.CurrentCellPosition;
                 cell.z = 0;
@@ -5501,7 +5560,7 @@ public class MatchController : MonoBehaviour
             unit,
             logicallyVisible,
             UsesFogOverlayForWorldOcclusion(),
-            observerTeam));
+            observerSlot));
     }
 
     private Tilemap ResolveFogBoardTilemap()
@@ -6021,9 +6080,9 @@ public class MatchController : MonoBehaviour
             fogOfWarBreakwaterMemoryTilemap.ClearAllTiles();
         SetFogConstructionMemoryRenderersActive(0);
         SetFogStructureMemoryRenderersActive(0);
-        int renderedTeamId = fogCachedTeamId >= 0 ? fogCachedTeamId : activeTeamId;
-        if (renderedTeamId < 0 || !Enum.IsDefined(typeof(TeamId), renderedTeamId) ||
-            !fogExploredCellsByTeam.TryGetValue(renderedTeamId, out HashSet<Vector3Int> explored))
+        int renderedSlotIndex = fogCachedTeamId >= 0 ? fogCachedTeamId : ActiveSlotId.Value;
+        if (!IsValidPlayerSlotIndex(renderedSlotIndex) ||
+            !fogExploredCellsByTeam.TryGetValue(renderedSlotIndex, out HashSet<Vector3Int> explored))
         {
             return;
         }
@@ -6046,7 +6105,7 @@ public class MatchController : MonoBehaviour
 
         RenderFogBreakwaterMemory(visibleCells, explored);
         RenderFogStructureMemory(boardMap, visibleCells, explored);
-        RenderFogConstructionMemory(boardMap, visibleCells, renderedTeamId);
+        RenderFogConstructionMemory(boardMap, visibleCells, renderedSlotIndex);
     }
 
     private void RenderFogBreakwaterMemory(HashSet<Vector3Int> visibleCells, HashSet<Vector3Int> explored)
@@ -6268,7 +6327,7 @@ public class MatchController : MonoBehaviour
             if (unit == excludeUnit)
                 continue;
             if (unit == null || !unit.gameObject.activeInHierarchy || unit.IsEmbarked ||
-                (int)unit.TeamId != activeTeamId || !IsUnitOnBoard(unit, boardMap) ||
+                unit.SlotIndex != ActiveSlotId.Value || !IsUnitOnBoard(unit, boardMap) ||
                 !unit.TryGetUnitData(out UnitData unitData) || unitData == null ||
                 unitData.visionSpecializations == null || unitData.visionSpecializations.Count == 0)
                 continue;
@@ -6358,7 +6417,7 @@ public class MatchController : MonoBehaviour
             UnitManager unit = units[i];
             if (unit == null || !unit.gameObject.activeInHierarchy || unit.IsEmbarked)
                 continue;
-            if ((int)unit.TeamId != activeTeamId)
+            if (unit.SlotIndex != ActiveSlotId.Value)
                 continue;
             if (!IsUnitOnBoard(unit, boardMap))
                 continue;
@@ -6535,7 +6594,8 @@ public class MatchController : MonoBehaviour
             cacheEntry.visibleCells.Clear();
         }
 
-        if (!unit.gameObject.activeInHierarchy || unit.IsEmbarked || (int)unit.TeamId != activeTeamId)
+        if (!unit.gameObject.activeInHierarchy || unit.IsEmbarked ||
+            unit.SlotIndex != ActiveSlotId.Value)
         {
             RemoveFogSpecializedViewCacheForUnit(cacheIndex);
             cacheEntry.key = nextKey;
@@ -6606,13 +6666,19 @@ public class MatchController : MonoBehaviour
 
         UnitManager actedUnit = pendingCommittedActedUnit;
         bool requireHasActed = pendingCommittedUnitRequiresHasActed;
+        bool requireFullRefresh = pendingCommittedUnitRequiresFullFogRefresh;
         pendingCommittedBoardRefresh = false;
         pendingCommittedActedUnit = null;
         pendingCommittedUnitRequiresHasActed = false;
+        pendingCommittedUnitRequiresFullFogRefresh = false;
 
         // Ja estamos em Neutral: publique somente o delta da unidade comprometida.
         // FullVisual apagaria os caches e escalaria com todas as unidades a cada acao.
-        ProcessCommittedUnitFog(actedUnit, raiseActedEvent: false, requireHasActed: requireHasActed);
+        ProcessCommittedUnitFog(
+            actedUnit,
+            raiseActedEvent: false,
+            requireHasActed: requireHasActed,
+            requireFullRefresh: requireFullRefresh);
     }
 
     private void RemoveFogSpecializedViewCacheForUnit(int unitIndex)
@@ -6840,8 +6906,6 @@ public class MatchController : MonoBehaviour
         bool fogOverlayOwnsWorldOcclusion = UsesFogOverlayForWorldOcclusion();
         if (useHumanPresentation)
             observerSlot = presentationSlot;
-        TeamId observerTeam = GetVisualTeamForSlot(observerSlot);
-
         List<UnitManager> units = UnitManager.AllActive;
         fogUnitVisibilityByCacheIndex.Clear();
         Tilemap boardMap = ResolveFogBoardTilemap();
@@ -6856,10 +6920,11 @@ public class MatchController : MonoBehaviour
             bool visible = unit.SlotIndex == observerSlot.Value
                 || ComputeIsUnitVisibleForSlotWithoutCache(unit, observerSlot);
             fogUnitVisibilityByCacheIndex[ResolveFogCacheIndex(unit)] = visible;
-            unit.SetFogOfWarVisibility(ResolveFogRenderVisibility(unit, visible, fogOverlayOwnsWorldOcclusion, observerTeam));
+            unit.SetFogOfWarVisibility(ResolveFogRenderVisibility(
+                unit, visible, fogOverlayOwnsWorldOcclusion, observerSlot));
         }
 
-        RefreshStackedHexFrontRendering(units, boardMap, observerTeam);
+        RefreshStackedHexFrontRendering(units, boardMap, observerSlot);
     }
 
     // Scratch do passo de empilhamento multicamada (ver metodo abaixo).
@@ -6871,7 +6936,10 @@ public class MatchController : MonoBehaviour
     // unidade Surface no mesmo hex, tanto sob navio quanto sob Exercito em ponte.
     // Nos demais empilhamentos entre times, preserva a prioridade da unidade do
     // observador. E apenas apresentacao; o FoW ainda decide se o sprite aparece.
-    private void RefreshStackedHexFrontRendering(List<UnitManager> units, Tilemap boardMap, TeamId observerTeam)
+    private void RefreshStackedHexFrontRendering(
+        List<UnitManager> units,
+        Tilemap boardMap,
+        PlayerSlotId observerSlot)
     {
         if (units == null)
             return;
@@ -6895,7 +6963,7 @@ public class MatchController : MonoBehaviour
             else if (unit.GetHeightLevel() == HeightLevel.Surface)
                 stackedHexSurfaceCellsScratch.Add(cell);
 
-            if (unit.TeamId != observerTeam)
+            if (unit.SlotIndex != observerSlot.Value)
                 stackedHexOtherTeamCellsScratch.Add(cell);
         }
 
@@ -6919,7 +6987,8 @@ public class MatchController : MonoBehaviour
                 if (layeredSubmarineStack)
                     front = unit.GetDomain() == Domain.Submarine || unit.GetHeightLevel() == HeightLevel.Submerged;
                 else
-                    front = unit.TeamId == observerTeam && stackedHexOtherTeamCellsScratch.Contains(cell);
+                    front = unit.SlotIndex == observerSlot.Value &&
+                            stackedHexOtherTeamCellsScratch.Contains(cell);
             }
 
             unit.SetStackedHexFrontRendering(front);
@@ -6942,9 +7011,10 @@ public class MatchController : MonoBehaviour
             if (boardMap != null && !IsUnitOnBoard(unit, boardMap))
                 continue;
 
-            bool visible = !useConservativeFog || (int)unit.TeamId == activeTeamId;
+            bool visible = !useConservativeFog || unit.SlotIndex == ActiveSlotId.Value;
             fogUnitVisibilityByCacheIndex[ResolveFogCacheIndex(unit)] = visible;
-            unit.SetFogOfWarVisibility(ResolveFogRenderVisibility(unit, visible, fogOverlayOwnsWorldOcclusion, ActiveTeam));
+            unit.SetFogOfWarVisibility(ResolveFogRenderVisibility(
+                unit, visible, fogOverlayOwnsWorldOcclusion, ActiveSlotId));
         }
     }
 
@@ -6997,8 +7067,8 @@ public class MatchController : MonoBehaviour
     private Color ResolveFogColorForCell(Vector3Int cell)
     {
         float alpha = ResolveFogOfWarAlpha();
-        int renderedTeamId = fogCachedTeamId >= 0 ? fogCachedTeamId : activeTeamId;
-        PlayerSlotId renderedSlot = PlayerSlotId.FromIndex(renderedTeamId);
+        int renderedSlotIndex = fogCachedTeamId >= 0 ? fogCachedTeamId : ActiveSlotId.Value;
+        PlayerSlotId renderedSlot = PlayerSlotId.FromIndex(renderedSlotIndex);
         if (IsValidPlayerSlot(renderedSlot) &&
             IsCellExploredBySlot(renderedSlot, cell))
         {
@@ -7033,10 +7103,10 @@ public class MatchController : MonoBehaviour
             ResetFogOfWarRuntime(clearTilemap: true);
 
         RefreshRuntimeUnitFogVisibility();
-        string perspective = TryGetFirstAITeam(out TeamId aiTeam)
-            ? $"time AI {aiTeam}"
-            : "time ativo (nenhuma AI configurada)";
-        Debug.Log($"[Debug Command] FoW PARTIAL (debug): perspectiva travada no {perspective}.");
+        string perspective = TryResolveFogPresentationSlot(out PlayerSlotId aiSlot)
+            ? $"slot AI {aiSlot.Value}"
+            : "slot ativo (nenhuma AI configurada)";
+        Debug.Log($"[Debug Command] FoW PARTIAL (debug): perspectiva no {perspective}.");
     }
 
     private void ShowAllUnitsIgnoringFog()
@@ -7083,7 +7153,7 @@ public class MatchController : MonoBehaviour
     {
         int snapshotHash = BuildFogUnitSnapshotHash(unit, boardMap);
         int globalBoardRevision = ThreatRevisionTracker.GlobalBoardRevision;
-        int teamObserverRevision = ThreatRevisionTracker.GetSlotObserverRevision(PlayerSlotId.FromIndex(activeTeamId));
+        int teamObserverRevision = ThreatRevisionTracker.GetSlotObserverRevision(ActiveSlotId);
         int sensorFlagsHash = BuildFogSensorFlagsHash(enableLosValidation);
         return new FogOfWarUnitCacheKey(snapshotHash, globalBoardRevision, teamObserverRevision, sensorFlagsHash);
     }
@@ -7099,7 +7169,7 @@ public class MatchController : MonoBehaviour
             Vector3Int cell = unit.CurrentCellPosition;
             hash = (hash * 31) + cell.x;
             hash = (hash * 31) + cell.y;
-            hash = (hash * 31) + (int)unit.TeamId;
+            hash = (hash * 31) + unit.SlotIndex;
             hash = (hash * 31) + (int)unit.GetDomain();
             hash = (hash * 31) + (int)unit.GetHeightLevel();
             hash = (hash * 31) + (unit.IsEmbarked ? 1 : 0);

@@ -33,6 +33,13 @@ public class MainMenuStateController : MonoBehaviour
     [SerializeField] private MainMenuCinematicController cinematicController;
 
     private bool _referencesResolved;
+    // Blindagem contra cena de JOGO: ResolveReferences só marca resolvido quando ACHA o menu, e
+    // numa cena de batalha o menu nunca existe — sem isto, Update varria a cena inteira com
+    // FindObjectsByType TODO frame, pra sempre, fritando o FPS e travando o Editor. Se o menu não
+    // aparece em poucas tentativas, esta cena não é a Tela de Entrada: desliga de vez. (Numa cena
+    // de menu real o painel é encontrado no 1º frame, então o limite nunca é atingido lá.)
+    private int _resolveAttempts;
+    private const int MaxResolveAttemptsBeforeSelfDisable = 30;
     private MainMenuState currentState;
     private int enteredNeutralFrame = -1;
     private int previousRootMenuIndex = -1;
@@ -542,6 +549,18 @@ public class MainMenuStateController : MonoBehaviour
     private void ResolveReferences()
     {
         if (_referencesResolved) return;
+
+        // Cena sem menu (batalha): _referencesResolved só vira true quando o menu INTEIRO é achado
+        // (panelMenu + load + cinematic). Numa cena de batalha esses não existem, então isto rodava
+        // FindObjectsByType TODO frame pra sempre, travando o Editor. Depois de algumas tentativas
+        // sem resolver, esta cena não é a Tela de Entrada: desliga de vez. Conta SEM depender de qual
+        // referência falta (a cópia trouxe panelMenu não-null; quem faltava era load/cinematic).
+        // Numa cena de menu real tudo resolve no 1º frame e o limite nunca é atingido.
+        if (++_resolveAttempts > MaxResolveAttemptsBeforeSelfDisable)
+        {
+            enabled = false;
+            return;
+        }
 
         if (panelMenu == null)
             panelMenu = FindInActiveScene<PanelMenu>();
