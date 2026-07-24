@@ -64,13 +64,27 @@ public class ConstructionDatabase : ScriptableObject
         for (int i = 0; i < constructions.Count; i++)
         {
             ConstructionData def = constructions[i];
-            if (def == null || string.IsNullOrWhiteSpace(def.id))
+            if (def == null)
                 continue;
 
-            string key = def.id.Trim();
-            if (byId.ContainsKey(key))
+            // Id vazio nao resolve por id — mesmo risco de fantasma que a duplicata.
+            if (string.IsNullOrWhiteSpace(def.id))
             {
-                Debug.LogWarning($"[ConstructionDatabase] ID duplicado '{key}' em ConstructionData. Mantendo o primeiro.");
+                Debug.LogWarning(
+                    $"[ConstructionDatabase] ConstructionData '{def.name}' SEM id — nao resolve por id "
+                    + "(risco de sumir no jogo). Defina um id unico.", def);
+                continue;
+            }
+
+            string key = def.id.Trim();
+            // 'def' vai como contexto do log: clicar no aviso pinga o asset FANTASMA no Project.
+            // So o primeiro com este id fica indexado; o resto e descartado e some no jogo.
+            if (byId.TryGetValue(key, out ConstructionData existing))
+            {
+                Debug.LogWarning(
+                    $"[ConstructionDatabase] ID duplicado '{key}': mantendo '{(existing != null ? existing.name : "?")}', "
+                    + $"DESCARTANDO '{def.name}' (vira fantasma no jogo). De ids unicos — "
+                    + "Tools > Construction > Verificar IDs duplicados.", def);
                 continue;
             }
 

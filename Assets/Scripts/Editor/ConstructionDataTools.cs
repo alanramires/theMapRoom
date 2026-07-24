@@ -8,7 +8,70 @@ using System.Collections.Generic;
 public static class ConstructionDataTools
 {
     private const string ApplyDataMenuPath = "Tools/Construction/Propagate Construction Data (Force Override)";
+    private const string CheckDuplicateIdsMenuPath = "Tools/Construction/Verificar IDs duplicados";
     private const string ConstructionPrefabPath = "Assets/Prefab/construction.prefab";
+
+    // Rastreador de ID duplicado: o sintoma classico e um predio que "some" (ex.: ao ser
+    // capturado). A causa costuma ser copiar/colar um ConstructionData sem trocar o campo 'id' —
+    // o ConstructionDatabase indexa por id e, achando duplicata, MANTEM O PRIMEIRO e descarta o
+    // resto (ver RebuildLookup). Assim toda resolucao por id (spawn, captura, persistencia) aponta
+    // para o mesmo asset, e o gemeo vira fantasma. Este menu varre TODOS os assets do projeto
+    // (nao so os que estao na lista do database) e nomeia os culpados.
+    [MenuItem(CheckDuplicateIdsMenuPath)]
+    private static void CheckDuplicateConstructionIds()
+    {
+        string[] guids = AssetDatabase.FindAssets("t:ConstructionData");
+        var byId = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+        var missingId = new List<string>();
+
+        for (int i = 0; i < guids.Length; i++)
+        {
+            string path = AssetDatabase.GUIDToAssetPath(guids[i]);
+            ConstructionData data = AssetDatabase.LoadAssetAtPath<ConstructionData>(path);
+            if (data == null)
+                continue;
+
+            string id = data.id != null ? data.id.Trim() : string.Empty;
+            if (string.IsNullOrEmpty(id))
+            {
+                missingId.Add(path);
+                continue;
+            }
+
+            if (!byId.TryGetValue(id, out List<string> list))
+            {
+                list = new List<string>();
+                byId[id] = list;
+            }
+            list.Add(path);
+        }
+
+        int collisions = 0;
+        var sb = new System.Text.StringBuilder();
+        foreach (KeyValuePair<string, List<string>> kv in byId)
+        {
+            if (kv.Value.Count <= 1)
+                continue;
+            collisions++;
+            sb.AppendLine($"  ID '{kv.Key}' em {kv.Value.Count} assets (so o 1º e usado, os demais somem):");
+            for (int i = 0; i < kv.Value.Count; i++)
+                sb.AppendLine($"    - {kv.Value[i]}");
+        }
+        if (missingId.Count > 0)
+        {
+            sb.AppendLine($"  {missingId.Count} asset(s) com ID VAZIO (nao resolvem por id):");
+            for (int i = 0; i < missingId.Count; i++)
+                sb.AppendLine($"    - {missingId[i]}");
+        }
+
+        if (collisions == 0 && missingId.Count == 0)
+        {
+            Debug.Log($"[ConstructionDataTools] OK — {guids.Length} ConstructionData verificados, nenhum ID duplicado ou vazio.");
+            return;
+        }
+
+        Debug.LogWarning($"[ConstructionDataTools] {collisions} ID(s) duplicado(s) e {missingId.Count} ID(s) vazio(s) em {guids.Length} ConstructionData:\n{sb}");
+    }
 
     [MenuItem(ApplyDataMenuPath)]
     private static void PropagateConstructionData()
