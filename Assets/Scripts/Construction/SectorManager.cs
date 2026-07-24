@@ -618,6 +618,88 @@ public sealed class SectorManager : MonoBehaviour
         return TryComputeLandMovementDistance(from, to, ctx, out cost, null);
     }
 
+    // Distancia de movimento terrestre de TODAS as celulas ATE 'target', numa unica busca.
+    // Substitui N chamadas TryGetLandMovementDistance(cell, target) por 1 Dijkstra reverso (a
+    // partir de target) + lookups baratos — o custo do two-turn da IA em unidades navais.
+    //
+    // BIT-A-BIT identico a chamada ponto-a-ponto: o custo e por-no (enterCost) num grafo nao
+    // direcionado, entao o caminho minimo minimiza o mesmo somatorio de nos nos dois sentidos.
+    // Disso sai a correcao exata por celula:
+    //   D(cell->target) = D(target->cell) + enterCost(target) - enterCost(cell)
+    // Celula ausente do mapa = inalcancavel (mesmo criterio da ponto-a-ponto; o chamador cai no
+    // fallback de HexDistance, igual a CalculateRouteDistanceOrHex).
+    public static bool TryBuildLandMovementDistanceToTargetMap(
+        Vector3Int target, UnitData referenceUnitData, out Dictionary<Vector3Int, int> distanceToTarget)
+    {
+        distanceToTarget = null;
+        SectorManager manager = EnsureInstance();
+        if (manager == null) return false;
+        SectorNeighborDistanceContext ctx = manager.BuildNeighborDistanceContext(referenceUnitData);
+        if (!ctx.IsValid || ctx.Tilemap == null) return false;
+
+        target.z = 0;
+        if (!TryGetLandEnterCost(target, ctx, out int enterCostTarget))
+            return false;
+
+        // Dijkstra reverso a partir de target (mesma estrutura de TryComputeLandMovementDistance,
+        // mas sem parada antecipada: espalha por tudo dentro do teto de expansao).
+        var costFromTarget = new Dictionary<Vector3Int, int> { [target] = 0 };
+        var frontier = new List<Vector3Int> { target };
+        var neighbors = new List<Vector3Int>(6);
+        int expanded = 0;
+        int maxExpanded = Mathf.Max(512, ctx.Tilemap.cellBounds.size.x * ctx.Tilemap.cellBounds.size.y);
+
+        while (frontier.Count > 0 && expanded < maxExpanded)
+        {
+            int bestIndex = 0;
+            int bestCost = costFromTarget[frontier[0]];
+            for (int i = 1; i < frontier.Count; i++)
+            {
+                int candidateCost = costFromTarget[frontier[i]];
+                if (candidateCost >= bestCost)
+                    continue;
+                bestIndex = i;
+                bestCost = candidateCost;
+            }
+
+            Vector3Int current = frontier[bestIndex];
+            frontier.RemoveAt(bestIndex);
+            expanded++;
+
+            UnitMovementPathRules.GetImmediateHexNeighbors(ctx.Tilemap, current, neighbors);
+            for (int i = 0; i < neighbors.Count; i++)
+            {
+                Vector3Int next = neighbors[i];
+                next.z = 0;
+                if (!TryGetLandEnterCost(next, ctx, out int enterCost))
+                    continue;
+
+                int nextCost = bestCost + enterCost;
+                if (costFromTarget.TryGetValue(next, out int knownCost) && knownCost <= nextCost)
+                    continue;
+
+                costFromTarget[next] = nextCost;
+                if (!frontier.Contains(next))
+                    frontier.Add(next);
+            }
+        }
+
+        // Converte D(target->cell) em D(cell->target) com a correcao por-no.
+        distanceToTarget = new Dictionary<Vector3Int, int>(costFromTarget.Count);
+        foreach (KeyValuePair<Vector3Int, int> kv in costFromTarget)
+        {
+            if (kv.Key == target)
+            {
+                distanceToTarget[kv.Key] = 0;
+                continue;
+            }
+            if (!TryGetLandEnterCost(kv.Key, ctx, out int enterCostCell))
+                continue;
+            distanceToTarget[kv.Key] = Mathf.Max(0, kv.Value + enterCostTarget - enterCostCell);
+        }
+        return true;
+    }
+
     private void RebuildFromActiveConstructions(string reason)
     {
         sectorInfos.Clear();
@@ -948,6 +1030,15 @@ public sealed class SectorManager : MonoBehaviour
             path?.Add(from);
             return true;
         }
+
+        // Se o destino nao e sequer transponivel por esta unidade (ex.: alvo em TERRA para um
+        // navio), nenhuma rota o alcanca. Falha JA, em vez de varrer o tabuleiro inteiro ate
+        // estourar o teto de expansao para so entao devolver false. Resultado identico (false),
+        // instantaneo. Era o custo real do two-turn naval: centenas de buscas condenadas a
+        // ~10ms cada, todas terminando em HexDistance. 'from' nao precisa desta checagem — a
+        // busca comeca nele (custo 0) e so exige transito nos vizinhos.
+        if (!TryGetLandEnterCost(to, context, out _))
+            return false;
 
         var frontier = new List<Vector3Int> { from };
         var costByCell = new Dictionary<Vector3Int, int> { [from] = 0 };

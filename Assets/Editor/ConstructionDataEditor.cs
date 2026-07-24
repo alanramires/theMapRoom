@@ -21,6 +21,7 @@ public class ConstructionDataEditor : Editor
             serializedObject,
             "m_Script",
             "constructionConfiguration",
+            "allowRebelAIPurchase",
             "allowAircraftTakeoffAndLanding",
             "legacyRequiredLandingSkills",
             "requiredLandingSkillRules",
@@ -76,6 +77,20 @@ public class ConstructionDataEditor : Editor
         DrawIfExists(configProperty.FindPropertyRelative("capturePointsMax"), "Capture Points Max");
         DrawIfExists(configProperty.FindPropertyRelative("capturedIncoming"), "Captured Incoming");
         DrawIfExists(configProperty.FindPropertyRelative("sellingRule"), "Selling Rules");
+
+        SerializedProperty rebelBuyProp = serializedObject.FindProperty("allowRebelAIPurchase");
+        if (rebelBuyProp != null)
+        {
+            EditorGUILayout.Space(2f);
+            EditorGUILayout.HelpBox(
+                "Allow Rebel AI Purchase: a faccao sem QG (rebelde) NUNCA produz por padrao — nem no que captura. " +
+                "Marque para tornar ESTE predio uma excecao renegada: o rebelde que o capturar pode comprar aqui, " +
+                "ignorando OriginalOwner/FirstOwner (rebelde nunca e o dono original do que toma). So Selling Rule = " +
+                "Disabled ainda barra. Nao afeta times COM QG.",
+                MessageType.Info);
+            EditorGUILayout.PropertyField(rebelBuyProp, new GUIContent("Allow Rebel AI Purchase"));
+        }
+
         SerializedProperty offeredUnitsProp = configProperty.FindPropertyRelative("offeredUnits");
         DrawIfExists(offeredUnitsProp, "Offered Units");
         DrawOfferedUnitsQuickFill(offeredUnitsProp);

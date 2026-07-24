@@ -290,6 +290,21 @@ public class ReplayManager : MonoBehaviour
 
         ReplayLog($"[Replay][CursorTravel] from={FormatReplayCell(fromCell)} to={FormatReplayCell(toCell)} pathSteps={travelPath.Count}");
 
+        // Apresentacao rapida (IA fast / replay fast): o cursor SALTA direto para o alvo,
+        // como um LClick humano na unidade — um unico passo, um unico SFX, camera num snap.
+        // Sem isto, o fast mode zera o delay por passo e varre os hexes intermediarios a 1
+        // frame cada: antes, com frames lentissimos, dava para ver o cursor rastejar; a 60fps
+        // vira um borrao instantaneo, e cada celula ainda dispara o SFX de cursor — uma rajada
+        // de ~N blips no lugar do clique unico. O glide celula-a-celula so faz sentido no modo
+        // cinematico (nao-fast), onde o delay por passo o torna assistivel.
+        if (IsFastPresentation)
+        {
+            cursorController.SetCell(toCell, playMoveSfx: animateCursorTravelBetweenActions, adjustCamera: false);
+            cursorController.TryAdjustCameraToCursor();
+            ReplayLog($"[Replay][CursorTravel] fast teleport -> {FormatReplayCell(toCell)}");
+            yield break;
+        }
+
         for (int i = 0; i < travelPath.Count; i++)
         {
             Vector3Int stepCell = NormalizeCell(travelPath[i]);

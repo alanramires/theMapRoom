@@ -1156,11 +1156,18 @@ public class ConstructionManager : MonoBehaviour
         if (buyerTeam != teamId)
             return false;
         // Rebeldes/dissidentes nao produzem em lugar nenhum — nem no que capturaram, mesmo que a
-        // sellingRule do predio permitisse. Ver IsHeadQuarterlessTeam.
-        if (IsHeadQuarterlessTeam(buyerTeam))
+        // sellingRule do predio permitisse. Excecao por predio: allowRebelAIPurchase (ConstructionData)
+        // libera ESTE predio renegado para o rebelde que o tomou. Ver IsHeadQuarterlessTeam.
+        bool rebelPurchaseException = IsHeadQuarterlessTeam(buyerTeam) && DataAllowsRebelPurchase();
+        if (IsHeadQuarterlessTeam(buyerTeam) && !rebelPurchaseException)
             return false;
         if (siteRuntime.offeredUnits == null || siteRuntime.offeredUnits.Count <= 0)
             return false;
+
+        // O predio renegado ignora as regras de dono: um rebelde nunca e o OriginalOwner/FirstOwner
+        // de algo que capturou. So Disabled (predio sem mercado) ainda barra.
+        if (rebelPurchaseException)
+            return siteRuntime.sellingRule != ConstructionUnitMarketRule.Disabled;
 
         switch (siteRuntime.sellingRule)
         {
@@ -1175,6 +1182,13 @@ public class ConstructionManager : MonoBehaviour
             default:
                 return false;
         }
+    }
+
+    // Excecao rebelde por predio: a flag allowRebelAIPurchase do ConstructionData marca este predio
+    // como renegado — um time sem QG que o capture pode produzir aqui. Ver CanProduceUnitsForVisualTeamAfterSlotValidation.
+    private bool DataAllowsRebelPurchase()
+    {
+        return TryGetConstructionData(out ConstructionData data) && data != null && data.allowRebelAIPurchase;
     }
 
     public bool CanProduceUnitsForSlot(int buyerSlotIndex)

@@ -200,8 +200,21 @@ public partial class AIController
             if (!IsNoOpUnitAction(action) || unitMoved || unitAttacked)
             {
                 bool targetedConstruction = !string.IsNullOrEmpty(action.TargetConstructionId);
-                bool refreshFoW = unitMoved || unitAttacked || targetedConstruction;
-                CommitAIWorldLightAfterAction(aiTeam, $"phase2:{FormatInitiativeUnitName(unit)}", refreshFoW);
+
+                // Só CAPTURA/predio dispara o refresh completo de FoW aqui. Movimento e ataque
+                // ja tiveram o FoW CONFIRMADO atualizado pelo caminho incremental (delta) ao
+                // comprometer a acao e voltar a Neutral — o MESMO contrato que o jogador humano
+                // usa, que nunca passa por este commit e mesmo assim enxerga certo. Repetir um
+                // recolhimento das N unidades por movimento e redundante: a chave do cache de
+                // visao inclui o globalBoardRevision, que sobe a cada passo de qualquer unidade,
+                // entao o full refresh perdia o cache das 35 e recoletava tudo (~3,8s por unidade
+                // em mapa grande). A captura fica de fora do delta porque muda a visao de
+                // CONSTRUCAO (predio recem-tomado passa a enxergar), que o delta do movedor nao
+                // cobre — por isso ela, e so ela, mantem o refresh completo.
+                bool changesConstructionVision =
+                    targetedConstruction || action.SensorAction == SensorActionType.Capture;
+                CommitAIWorldLightAfterAction(
+                    aiTeam, $"phase2:{FormatInitiativeUnitName(unit)}", changesConstructionVision);
             }
 
             // Reconstrói o snapshot para a próxima decisão (hexes ocupados mudam após cada ação)

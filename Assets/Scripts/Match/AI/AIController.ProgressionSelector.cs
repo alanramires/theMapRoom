@@ -38,6 +38,11 @@ public partial class AIController
         public float FinalScore;
     }
 
+    // Quantos candidatos (rankeados por progresso de 1º turno) recebem a 2ª jogada cara do
+    // two-turn (CalcularCaminhosValidos por candidato). O resto e pontuado so pelo 1º turno.
+    // Limita o pathfind de mar (naval) que explodia para dezenas de chamadas por decisao.
+    private const int TwoTurnLookaheadCandidateCap = 12;
+
     private bool TryFindBestToolProgressionCell(
         UnitManager unit,
         AIWorldSnapshot snapshot,
@@ -66,6 +71,24 @@ public partial class AIController
         float originDistance = CalculateRouteDistanceOrHex(unit, fromCell, targetCell);
         bool originRouteFound = TryCalculateRouteDistance(unit, fromCell, targetCell, out float originRouteDistance);
         float threatScale = ResolveProgressionThreatScale(unit);
+
+        // Alcancabilidade/custo do 1º passo (a partir da posicao atual) e a mesma para todos os
+        // candidatos: calcula UMA vez e reusa. Antes o TryScoreToolRouteProgression a refazia por
+        // candidato (BFS caro em naval sobre mar aberto).
+        Dictionary<Vector3Int, int> costFromOrigin = UnitMovementPathRules.CalculateMovementCostMap(
+            boardTilemap, unit, fromCell, Mathf.Max(0, unit.RemainingMovementPoints), terrainDatabase);
+
+        // Mapa reverso de distancia ATE o target: 1 busca, depois lookups no loop interno do
+        // two-turn (antes: N buscas ponto-a-ponto por candidato — o custo do naval). Mesma metrica
+        // (SectorManager), bit-a-bit igual. Aereo usa distancia-hexa direta, entao nao precisa de mapa.
+        Dictionary<Vector3Int, int> distanceToTargetMap = null;
+        if (unit.GetDomain() != Domain.Air
+            && unit.TryGetUnitData(out UnitData progressionUnitData)
+            && progressionUnitData != null)
+        {
+            SectorManager.TryBuildLandMovementDistanceToTargetMap(
+                targetCell, progressionUnitData, out distanceToTargetMap);
+        }
         float bestScore = float.MinValue;
         bool found = false;
         bool debugTransportProgression = intent == ToolProgressionIntent.TransportDelivery
@@ -80,6 +103,10 @@ public partial class AIController
             ? new List<ToolProgressionCandidate>()
             : null;
 
+        // Pass 1 — filtra candidatos validos e o proxy barato de 1º turno (routeDistance
+        // memoizado). A 2ª jogada (CalcularCaminhosValidos por candidato) e cara em naval, entao
+        // so os top-K por esse proxy a recebem.
+        var progressionCandidates = new List<(Vector3Int cell, List<Vector3Int> path, float firstTurnProgress)>();
         foreach (Vector3Int rawCell in paths.Keys)
         {
             Vector3Int cell = rawCell;
@@ -108,6 +135,39 @@ public partial class AIController
             if (!paths.TryGetValue(rawCell, out List<Vector3Int> path))
                 path = null;
 
+            float firstTurnProgress = originDistance - CalculateRouteDistanceOrHex(unit, cell, targetCell);
+            progressionCandidates.Add((cell, path, firstTurnProgress));
+        }
+
+        // Top-K por progresso de 1º turno (desempate por celula = ordem determinista) recebem a
+        // 2ª jogada; os demais sao pontuados so pelo 1º turno.
+        var twoTurnCells = new HashSet<Vector3Int>();
+        if (progressionCandidates.Count > TwoTurnLookaheadCandidateCap)
+        {
+            var ranked = new List<(Vector3Int cell, List<Vector3Int> path, float firstTurnProgress)>(progressionCandidates);
+            ranked.Sort((a, b) =>
+            {
+                int cmp = b.firstTurnProgress.CompareTo(a.firstTurnProgress);
+                if (cmp != 0) return cmp;
+                cmp = a.cell.x.CompareTo(b.cell.x);
+                return cmp != 0 ? cmp : a.cell.y.CompareTo(b.cell.y);
+            });
+            for (int i = 0; i < TwoTurnLookaheadCandidateCap; i++)
+                twoTurnCells.Add(ranked[i].cell);
+        }
+        else
+        {
+            for (int i = 0; i < progressionCandidates.Count; i++)
+                twoTurnCells.Add(progressionCandidates[i].cell);
+        }
+
+        // Pass 2 — pontua em ordem original (determinismo da selecao).
+        for (int idx = 0; idx < progressionCandidates.Count; idx++)
+        {
+            Vector3Int cell = progressionCandidates[idx].cell;
+            List<Vector3Int> path = progressionCandidates[idx].path;
+            bool evaluateSecondMove = twoTurnCells.Contains(cell);
+
             if (!TryScoreToolRouteProgression(
                     unit,
                     fromCell,
@@ -117,7 +177,10 @@ public partial class AIController
                     occupied,
                     out int toolScore,
                     out float nextDistance,
-                    out int moveCost))
+                    out int moveCost,
+                    costFromOrigin,
+                    evaluateSecondMove,
+                    distanceToTargetMap))
             {
                 skipScore++;
                 continue;
@@ -126,7 +189,7 @@ public partial class AIController
             bool roadBonus = path != null
                 && UnitMovementPathRules.DidUseRoadFullMoveBonus(boardTilemap, unit, path, terrainDatabase);
 
-            float firstTurnProgress = originDistance - CalculateRouteDistanceOrHex(unit, cell, targetCell);
+            float firstTurnProgress = progressionCandidates[idx].firstTurnProgress;
             float twoTurnProgress = originDistance - nextDistance;
             bool cellRouteFound = TryCalculateRouteDistance(unit, cell, targetCell, out float cellRouteDistance);
             float routeProgress = originRouteFound && cellRouteFound ? originRouteDistance - cellRouteDistance : 0f;

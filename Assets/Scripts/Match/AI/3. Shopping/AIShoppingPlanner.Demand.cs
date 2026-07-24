@@ -2475,6 +2475,23 @@ public partial class AIShoppingPlanner
 
     private static List<AIShoppingDemand> BuildRoleShoppingDemands(AIWorldSnapshot snapshot, bool log = true)
     {
+        // Faccao sem QG (rebelde): doutrina de insurgencia. Sem pacote de composicao 2/2/1, sem
+        // elite, sem ar/intel/transporte/counter — o rebelde so sabe CAPTURAR, entao gasta o caixa
+        // em MAIS capturadores. Nao pode reusar a formula de composicao: ela e razao (packages*2 -
+        // capturers), que zera assim que ha capturador demais — exatamente o que trava o rebelde.
+        // A demanda aqui e generosa e fixa; a cadencia real vem do produtor renegado (~1 compra/turno).
+        // Ver AIController.Rebel / project_faccao_sem_qg.
+        if (ConstructionManager.IsHeadQuarterlessTeam(snapshot.AITeam))
+        {
+            var rebelDemands = new List<AIShoppingDemand>();
+            EnsureRoleDemand(rebelDemands, UnitRole.Capturador, 6, 30,
+                "rebel-insurgency", "doutrina rebelde: so capturador (sem composicao/elite/ar)");
+            if (log)
+                Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] "
+                    + "doutrina rebelde: demanda so Capturador — sem pacote 2/2/1 / elite / ar");
+            return rebelDemands;
+        }
+
         var demands = new List<AIShoppingDemand>();
         AIRosterKnowledge roster = BuildRosterKnowledge(snapshot, log);
         CounterPressureInspection counterPressure = BuildCounterPressure(snapshot, roster);

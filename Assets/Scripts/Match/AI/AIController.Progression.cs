@@ -96,7 +96,10 @@ public partial class AIController
         HashSet<Vector3Int> occupied,
         out int score,
         out float bestDistanceAfterNextMove,
-        out int firstMoveCost)
+        out int firstMoveCost,
+        Dictionary<Vector3Int, int> costFromOrigin = null,
+        bool evaluateSecondMove = true,
+        Dictionary<Vector3Int, int> distanceToTargetMap = null)
     {
         score = 0;
         bestDistanceAfterNextMove = float.MaxValue;
@@ -117,8 +120,12 @@ public partial class AIController
         bestDistanceAfterNextMove = CalculateRouteDistanceOrHex(unit, firstStop, target);
 
         int movementPoints = Mathf.Max(0, unit.RemainingMovementPoints);
-        Dictionary<Vector3Int, int> costMap =
-            UnitMovementPathRules.CalculateMovementCostMap(
+        // Custo a partir de origin e INVARIANTE entre os candidatos desta decisao (origin e
+        // mp fixos). O chamador calcula uma vez e passa aqui; sem isso cada candidato refazia
+        // o mesmo BFS — para naval, ~12ms x dezenas de candidatos = centenas de ms escondidos
+        // por decisao (nao aparecem em nenhum stage). Fallback recalcula se ninguem passou.
+        Dictionary<Vector3Int, int> costMap = costFromOrigin
+            ?? UnitMovementPathRules.CalculateMovementCostMap(
                 boardTilemap,
                 unit,
                 origin,
@@ -129,34 +136,49 @@ public partial class AIController
             ? cost
             : (firstPath != null ? Mathf.Max(0, firstPath.Count - 1) : 0);
 
-        try
+        // A 2ª jogada (simular um movimento a partir de firstStop) faz CalcularCaminhosValidos
+        // por candidato — caro em naval sobre mar aberto. So os top-K candidatos (por progresso
+        // de 1º turno) a recebem; para os demais bestDistanceAfterNextMove fica no valor do 1º
+        // turno, entao two-turn == first-turn (sem bonus de lookahead). Ver o cap no chamador.
+        if (evaluateSecondMove)
         {
-            unit.SetCurrentCellPosition(firstStop, enforceFinalOccupancyRule: false);
-            Dictionary<Vector3Int, List<Vector3Int>> nextPaths =
-                UnitMovementPathRules.CalcularCaminhosValidos(
-                    boardTilemap,
-                    unit,
-                    movementPoints,
-                    terrainDatabase);
-
-            if (nextPaths != null)
+            try
             {
-                foreach (Vector3Int rawNextStop in nextPaths.Keys)
-                {
-                    Vector3Int nextStop = rawNextStop;
-                    nextStop.z = 0;
-                    if (!CanUseAsToolProgressStopCell(unit, nextStop, firstStop))
-                        continue;
+                unit.SetCurrentCellPosition(firstStop, enforceFinalOccupancyRule: false);
+                Dictionary<Vector3Int, List<Vector3Int>> nextPaths =
+                    UnitMovementPathRules.CalcularCaminhosValidos(
+                        boardTilemap,
+                        unit,
+                        movementPoints,
+                        terrainDatabase);
 
-                    float nextDistance = CalculateRouteDistanceOrHex(unit, nextStop, target);
-                    if (nextDistance < bestDistanceAfterNextMove)
-                        bestDistanceAfterNextMove = nextDistance;
+                if (nextPaths != null)
+                {
+                    foreach (Vector3Int rawNextStop in nextPaths.Keys)
+                    {
+                        Vector3Int nextStop = rawNextStop;
+                        nextStop.z = 0;
+                        if (!CanUseAsToolProgressStopCell(unit, nextStop, firstStop))
+                            continue;
+
+                        // Lookup no mapa reverso (1 busca em vez de N buscas ponto-a-ponto). Mesma
+                        // metrica, bit-a-bit igual: ausente do mapa = inalcancavel -> HexDistance,
+                        // exatamente o fallback de CalculateRouteDistanceOrHex. Aereo (mapa null)
+                        // segue pelo caminho antigo (distancia-hexa direta, ja barata).
+                        float nextDistance = distanceToTargetMap != null
+                            ? (distanceToTargetMap.TryGetValue(nextStop, out int nsd)
+                                ? nsd
+                                : SectorManager.HexDistance(nextStop, target))
+                            : CalculateRouteDistanceOrHex(unit, nextStop, target);
+                        if (nextDistance < bestDistanceAfterNextMove)
+                            bestDistanceAfterNextMove = nextDistance;
+                    }
                 }
             }
-        }
-        finally
-        {
-            unit.SetCurrentCellPosition(originalCell, enforceFinalOccupancyRule: false);
+            finally
+            {
+                unit.SetCurrentCellPosition(originalCell, enforceFinalOccupancyRule: false);
+            }
         }
 
         float twoTurnProgress = originDistance - bestDistanceAfterNextMove;
