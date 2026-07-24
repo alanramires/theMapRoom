@@ -57,6 +57,12 @@ public partial class AIController
         if (snapshot != null && snapshot.IsInvading)
             return true;
 
+        // Facção sem QG (rebeldes) não monta massa: sem produção, ela nunca junta assalto+artilharia
+        // perto do APC, então a cadeia GoGreen/ponte/screen seria um bloqueio permanente — o mesmo
+        // deadlock descrito acima, só que sem saída. Rebelde infiltra, não faz invasão de conjunto.
+        if (snapshot != null && ConstructionManager.IsHeadQuarterlessTeam(snapshot.AITeam))
+            return true;
+
         if (!HasTransportInvasionGoGreen(transporter, snapshot, target, out _))
             return false;
 
@@ -79,6 +85,11 @@ public partial class AIController
         // Durante GO GREEN o desembarque também integra a invasão total; não condicionar a
         // liberação da carga a uma screen que pode estar justamente dentro do transporte.
         if (snapshot != null && snapshot.IsInvading)
+            return true;
+
+        // Ver IsTransportInvasionCourierCellAllowed: de nada adianta o APC rebelde avançar se a
+        // carga fica presa dentro dele por falta de screen.
+        if (snapshot != null && ConstructionManager.IsHeadQuarterlessTeam(snapshot.AITeam))
             return true;
 
         if (!IsTransportInvasionCourierCellAllowed(transporter, snapshot, transporterCell, target))

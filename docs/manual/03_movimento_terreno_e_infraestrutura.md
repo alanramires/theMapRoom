@@ -130,9 +130,11 @@ Aqui está a exceção mais peculiar do jogo, e ela merece atenção porque pare
 
 Toda unidade obedece à ordem de prioridade — construção, depois estrutura mais terreno, depois terreno. O Trem de Carga não.
 
-O trem ignora a hierarquia inteira. Ele faz uma pergunta só: existe rota de trilho neste hexágono que me aceite?
+O trem ignora a hierarquia inteira. Ele faz uma pergunta só: o passo que estou dando agora corre sobre um **trecho contínuo** de uma rota de trilho que me aceite?
 
-Se existe, ele passa. Se não existe, ele não passa — e não importa o que mais esteja ali.
+Repare que a pergunta é sobre o **segmento**, não sobre o hexágono. Não basta haver trilho no destino: o destino precisa estar ligado à célula de onde o trem vem por um trecho declarado da mesma rota. Dois pedaços de ferrovia que se encostam no mapa mas não pertencem à mesma rota contínua não formam caminho — o trem não salta a emenda.
+
+Se o segmento existe, ele passa. Se não existe, ele não passa — e não importa o que mais esteja ali.
 
 A consequência que pega todo mundo é a cidade. Uma cidade é perfeitamente transitável para qualquer unidade terrestre. Para o trem, ela é irrelevante: se não houver trilho naquele hexágono, o trem não entra na cidade. A construção não abre caminho para ele, porque ele não está olhando para a construção.
 

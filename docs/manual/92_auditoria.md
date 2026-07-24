@@ -38,6 +38,9 @@ Os IDs seguem o mesmo esquema de `90_pendencias_tecnicas.md` e não são reaprov
 | LOG-012 | Caminhão atende 1 unidade; só avião-tanque e porta-aviões atendem 2 | Confirmada | `Suprimentos.asset:94` · `UnitData.maxUnitsServedPerTurn` |
 | LOG-013 | Rendimento por classe 3/2/1 (combustível e munição) e 2/1/1 (reparo) | Confirmada | `ServiceData.serviceEfficiency` nos assets de serviço |
 | LOG-014 | Projétil pesado pesa 3× o leve | Confirmada | `Rearmamento.asset` (`costWeight`) |
+| LOG-015 | Serviço do Comando alcança passageiros diretos (primeiro nível), não a cadeia inteira | Confirmada | `ServicoDoComandoSensor.cs:518` pula transportador embarcado como fonte |
+| LOG-016 | Fila do Comando ordenada por prioridade econômica (mais caro primeiro), família junta | Confirmada | `TurnStateManager.CommandService.cs:1667+` (`NormalizeCommandServiceQueueForEmbarkedFamilies`, sort por `ResolveCommandServiceUnitCost`) |
+| LOG-017 | Serviço em campo atende só o veículo, não passageiros | Confirmada | `PodeSuprirSensor` respeita `serviceRange`, não desce à carga |
 | COM-010 | Revide só a distância 1, e a arma precisa de alcance mínimo 1 | Confirmada | `PodeMirarSensor.cs:1317` e `:1362` |
 | COM-011 | Teto de eliminações é o HP do atacante no início da troca | Confirmada | `TurnStateManager.Combat.cs:337-347` |
 | COM-012 | "Teto do alvo" não existe como regra — é truncamento no piso 0 | Manual errado | mesma referência; texto corrigido em `06` |
@@ -50,17 +53,27 @@ Os IDs seguem o mesmo esquema de `90_pendencias_tecnicas.md` e não são reaprov
 | FOW-013 | Submarino exposto por 2 turnos jogáveis do dono; lock pendente não conta tempo | Confirmada | `UnitManager.cs:1376-1398` |
 | FOW-014 | Air/Low bloqueia linha de visão / unidade projeta sombra | **Manual errado** | `TerrainVisionResolver.cs:57` só compõe a camada aérea com ocupante; `PodeMirarSensor.cs:1595` passa `null` nas células intermediárias. **Unidade nunca é obstáculo** |
 | FOW-015 | Do destino provisório no escuro só o ataque é liberado | **Manual errado** | são três estados; terreno explorado libera também desembarque, captura e transferência — `Sensors.cs:119-136` e `:460-499` |
-| AIR-010 | Aeroporto é a única construção que isenta consumo aéreo | **Manual errado** | são três: Aeroporto, Aeroporto Avançado e Hidrobase (`aircraftUnitsPaysUpkeep: 0`) |
+| AIR-010 | Aeroporto é a única construção que isenta consumo aéreo | **Manual errado** | isentam com `aircraftUnitsPaysUpkeep: 0`: Aeroporto e Hidrobase. Porto e Docas cobram (`: 1`). Conferir Aeroporto Avançado ao preencher o catálogo |
 | AIR-011 | Submarino nasce emerso no porto e mergulha após o primeiro movimento | Confirmada | `ConstructionShopping.cs:332-370` · `Movement.cs:319-355` |
+| AIR-012 | Isenção de consumo é por presença sobre a instalação, sem checar se pousou (design, não bug) | Confirmada | `OperationalAutonomyRules.cs:93-102` não consulta `IsAircraftGrounded`. Decisão em `91` |
+| AIR-013 | Pousar/decolar/mudar camada não são ações de jogador; são automáticos | Confirmada | sem action code `P`/`L`; `PodePousarSensor`/`PodeDecolarSensor` chamados só por suprimento, desembarque e IA |
+| AIR-014 | Aeronave nasce pousada ao ser comprada | Confirmada | `TurnStateManager.ConstructionShopping.cs:339` (`SetAircraftGrounded(true)`) |
+| AIR-015 | Suprir voador força pousar-antes e decolar-depois (mesmo turno); transferir estoque pousa e fica | Confirmada | `PodeSuprirSensor.cs:140-141` (`forceLandBeforeSupply`/`forceTakeoffBeforeSupply`); `PodeTransferirSensor.cs:60` só exige pouso, sem relançar |
 | TRA-010 | Passageiros morrem recursivamente com o transportador | Confirmada | `ScannerPrompt.cs:4250-4293` |
 | TRA-011 | Dano proporcional a passageiros: fração do transportador, mínimo 1, piso de 1 HP, mesma fração por toda a cadeia | Confirmada | `ScannerPrompt.cs:4216-4247` |
 | TRA-012 | Unidades embarcadas contam contra a derrota por eliminação total | **Manual impreciso** | a contagem ignora embarcados (`MatchController.cs:2734`), mas o caso é inalcançável porque a morte do transportador mata a cadeia |
 | ECO-010 | Renda é atributo por construção, não constante global | Confirmada | `ConstructionSiteRuntime.capturedIncoming` |
 | ECO-011 | Nomes oficiais: "Fábrica" (não "Fábrica Média"), "Porto Naval", "Logistica Naval" | Confirmada | assets em `Assets/DB/World Building/Construction/` |
 
+## Reclassificações
+
+Duas afirmações antes listadas como pendência técnica foram verificadas e são **design deliberado**, não divergência: a isenção de consumo por presença no aeroporto (AIR-012) e o alcance do Serviço do Comando aos passageiros (LOG-015). Saíram de `90_pendencias_tecnicas.md` e a justificativa está em `91_decisoes_de_design.md`. Lição de método: uma busca por um termo (procurei "elite" na fila do comando) vindo vazia não prova ausência — a regra existia sob outro nome ("custo"). Procurar o conceito por sinônimos antes de concluir "não existe".
+
 ## Não auditado
 
-Nada dos documentos `01`, `03`, `09` e `10` foi verificado. Em `06` foram verificados a fórmula, o arredondamento, o teto e o DPQ — mas **não o Elite** (os três filtros, os quatro valores movidos, a soma de especializações). Em `05` foram verificados construções, elevação e ocultação, mas não os alcances de sensor por camada.
+Nada dos documentos `01` e `03` foi verificado. Em `06` foram verificados a fórmula, o arredondamento, o teto e o DPQ — mas **não o Elite** (os três filtros, os quatro valores movidos, a soma de especializações). Em `05` foram verificados construções, elevação e ocultação, mas não os alcances de sensor por camada. Em `09` e `10` a economia e o fluxo de turno seguem sem verificação sistemática.
+
+**Transporte e embarque mudaram no código** (troca de listas de construção por classificação `ConstructionFacilityType`, remoção das listas de destino do passageiro, slot exclusivo, trem por segmento contíguo). As entradas TRA e o capítulo `08` descrevem em parte a regra antiga e precisam de reverificação contra o commit atual.
 
 Estimativa honesta: cerca de um terço das afirmações normativas da biblioteca passou por verificação.
 

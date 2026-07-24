@@ -207,13 +207,7 @@ public partial class AIController
             yield break;
 
         aiTurnBatchExecuting = true;
-        // FoW PARTIAL e o ponto de vista humano da AI. Mesmo que "IA Rapida"
-        // esteja ligada, sustenta selecao e substeps para que RangeMap, cursor,
-        // linhas e panel_helper tenham frames reais para aparecer — exatamente
-        // como no fluxo humano. A decisao/batch continua sendo da AI.
-        bool fastPresentation = iaRapida
-            && (matchController == null || !matchController.IsFogOfWarDebugPartial);
-        replayManager.ExecuteLiveAIBatch(action, fastPresentation);
+        replayManager.ExecuteLiveAIBatch(action, iaRapida);
         yield return new WaitUntil(() => !replayManager.IsStepExecutionBusy);
         aiTurnBatchExecuting = false;
         if (ShouldStopAIForMatchEnd("batch_end"))

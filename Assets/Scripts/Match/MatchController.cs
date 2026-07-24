@@ -674,6 +674,30 @@ public class MatchController : MonoBehaviour
         }
     }
 
+    public void GetSlotUnitCounts(int slotIndex, out int totalInField, out int readyToAct, bool includeEmbarked = true)
+    {
+        totalInField = 0;
+        readyToAct = 0;
+        if (players == null || slotIndex < 0 || slotIndex >= players.Count)
+            return;
+
+        UnitManager[] units = FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        for (int i = 0; i < units.Length; i++)
+        {
+            UnitManager unit = units[i];
+            if (unit == null || !unit.gameObject.activeInHierarchy)
+                continue;
+            if (unit.SlotIndex != slotIndex)
+                continue;
+            if (!includeEmbarked && unit.IsEmbarked)
+                continue;
+
+            totalInField++;
+            if (!unit.HasActed)
+                readyToAct++;
+        }
+    }
+
     public bool HasReachedMaxUnitsPerTeam(TeamId teamId)
     {
         GetTeamUnitCounts(teamId, out int totalInField, out _);
@@ -1823,6 +1847,10 @@ public class MatchController : MonoBehaviour
             return false;
         if (players[playerIndex].defeated)
             return false;
+        // Derrota por 0 unidades so vale para slots com QG. Uma faccao rebelde (sem QG) some do
+        // tabuleiro sem encerrar a partida e sem neutralizar o que ja tinha capturado.
+        if (ConstructionManager.IsHeadQuarterlessTeam(team))
+            return false;
 
         List<UnitManager> allUnits = GetActiveUnitsOnScene();
         for (int i = 0; i < allUnits.Count; i++)
@@ -1887,6 +1915,10 @@ public class MatchController : MonoBehaviour
     {
         blockedReason = string.Empty;
         if (construction == null || construction.requiredBuilding == null)
+            return true;
+        // Rebeldes/dissidentes (time sem QG) capturam qualquer coisa: sem base propria, a
+        // progressao por pre-requisito nao se aplica a eles.
+        if (ConstructionManager.IsHeadQuarterlessTeam(team))
             return true;
         if (HasCapturedBuilding(team, construction.requiredBuilding))
             return true;

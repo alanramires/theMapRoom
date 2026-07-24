@@ -3,55 +3,52 @@ using UnityEngine;
 // =====================================================================================
 // Ponte AIController <-> AIPresetData.
 //
-// FASE 1: o preset é RESOLVIDO e fica disponível para inspeção, mas nenhuma decisão lê
-// dele. Os 4 booleanos legados continuam sendo a fonte de verdade do runtime. Isso é
-// intencional: a fase 1 não pode mudar comportamento, senão fica impossível saber se uma
-// regressão veio do refactor ou de um valor que mudou junto.
+// Modelo: UM baseline (editável como um UnitData) + a dificuldade como atalho que liga
+// toggles por cima de uma CÓPIA do baseline. Não há asset por dificuldade.
 //
-// Quando a fase 2 começar, os getters de valor do AIController (EliteRatioPressure,
-// CoreMinInfantry, ...) passam a ler daqui em vez do ternário hardMode ? a : b.
+// FASE 1: o preset ativo é RESOLVIDO e fica disponível para inspeção, mas nenhuma decisão
+// lê dele. Os 4 booleanos legados continuam sendo a fonte de verdade do runtime — assim a
+// fase 1 não muda comportamento, e uma regressão futura é rastreável ao passo que a causou.
+//
+// Fase 2: os getters de valor do AIController passam a ler de ActivePreset, com fallback
+// para o campo da cena quando basePreset for null (cenas antigas continuam idênticas).
 // =====================================================================================
 public partial class AIController
 {
     [Header("Perfil de IA (Preset)")]
-    [Tooltip("Biblioteca que resolve qual AIPresetData vale para a dificuldade escolhida. FASE 1: apenas inspeção — nenhuma decisão lê deste asset ainda.")]
-    [SerializeField] private AIPresetLibrary presetLibrary;
+    [Tooltip("Baseline único da doutrina da IA (toggles + valores). A dificuldade liga toggles por cima. FASE 1: só inspeção — nenhuma decisão lê deste asset ainda.")]
+    [SerializeField] private AIPresetData basePreset;
 
     [System.NonSerialized] private AIPresetData activePreset;
     [System.NonSerialized] private AIDifficulty appliedDifficulty = AIDifficulty.Facil;
     [System.NonSerialized] private bool hasAppliedDifficulty;
 
-    public AIPresetLibrary PresetLibrary => presetLibrary;
+    public AIPresetData BasePreset => basePreset;
 
-    /// <summary>Preset resolvido para a dificuldade atual. Pode ser null se a biblioteca não estiver ligada na cena.</summary>
+    /// <summary>Preset já com a overlay da dificuldade aplicada. Cópia de runtime; nunca é o asset. Null se basePreset não estiver ligado na cena.</summary>
     public AIPresetData ActivePreset => activePreset;
 
-    /// <summary>Dificuldade efetivamente aplicada nesta partida. Antes de ApplyDifficulty, reflete os booleanos serializados na cena.</summary>
+    /// <summary>Dificuldade efetivamente aplicada. Antes de ApplyDifficulty, é reconstruída dos booleanos serializados na cena.</summary>
     public AIDifficulty AppliedDifficulty => hasAppliedDifficulty ? appliedDifficulty : InferDifficultyFromFlags();
-
-    /// <summary>
-    /// Preset de um time específico. Na fase 1 devolve o mesmo preset para todos os times —
-    /// o parâmetro existe para que os call sites já nasçam corretos e a migração para
-    /// doutrina por time (generais) não precise revisitar tudo de novo.
-    /// </summary>
-    public AIPresetData ResolvePresetForTeam(TeamId team)
-    {
-        if (presetLibrary == null)
-            return activePreset;
-        return presetLibrary.Resolve(AppliedDifficulty, team);
-    }
 
     private void ResolveActivePreset(AIDifficulty difficulty)
     {
         appliedDifficulty = difficulty;
         hasAppliedDifficulty = true;
-        activePreset = presetLibrary != null ? presetLibrary.Resolve(difficulty) : null;
+
+        if (basePreset == null)
+        {
+            activePreset = null;
+            return;
+        }
+
+        activePreset = basePreset.CloneRuntime();
+        AIPresetData.ApplyDifficultyOverlay(activePreset, difficulty);
 
         if (showAILogs)
         {
-            string presetName = activePreset != null ? activePreset.name : "<nenhum>";
-            Debug.Log($"[AI][Preset] dificuldade={difficulty} preset={presetName} " +
-                      $"(fase 1: preset resolvido para inspeção; runtime ainda usa os flags)");
+            Debug.Log($"[AI][Preset] baseline={basePreset.name} dificuldade={difficulty} " +
+                      $"→ preset ativo montado (fase 1: só inspeção; runtime ainda usa os flags)");
         }
     }
 

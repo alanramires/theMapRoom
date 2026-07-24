@@ -6,6 +6,7 @@ using System.Text;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.Tilemaps;
 
 public class BasicMapGeneratorWindow : EditorWindow
@@ -359,7 +360,8 @@ public class BasicMapGeneratorWindow : EditorWindow
             minIslandSize,
             globalOriginX,
             globalOriginY);
-        PaintMap(terrainTilemap, map, originCell, set);
+        PaintMap(terrainTilemap, map, originCell, set, replaceExistingMap: true);
+        TilemapAutoMirrorDuringEdit.NotifyTilemapRebuilt(terrainTilemap);
 
         status = mode == GeneratorMode.WaterOnly
             ? $"Mapa de agua gerado: {width}x{height} (seed {effectiveSeed})."
@@ -830,12 +832,19 @@ public class BasicMapGeneratorWindow : EditorWindow
         return false;
     }
 
-    private static void PaintMap(Tilemap tilemap, CellKind[,] map, Vector2Int origin, TerrainSet set)
+    private static void PaintMap(
+        Tilemap tilemap,
+        CellKind[,] map,
+        Vector2Int origin,
+        TerrainSet set,
+        bool replaceExistingMap = false)
     {
         int mapWidth = map.GetLength(0);
         int mapHeight = map.GetLength(1);
 
         Undo.RegisterCompleteObjectUndo(tilemap, "Generate Basic Map");
+        if (replaceExistingMap)
+            tilemap.ClearAllTiles();
 
         for (int y = 0; y < mapHeight; y++)
         {
@@ -847,6 +856,7 @@ public class BasicMapGeneratorWindow : EditorWindow
             }
         }
 
+        tilemap.CompressBounds();
         EditorUtility.SetDirty(tilemap);
         if (tilemap.gameObject.scene.IsValid())
             EditorSceneManager.MarkSceneDirty(tilemap.gameObject.scene);
@@ -970,8 +980,9 @@ public class BasicMapGeneratorWindow : EditorWindow
 
     private static Tilemap FindPreferredTilemap()
     {
+        Scene activeScene = SceneManager.GetActiveScene();
         TurnStateManager tsm = FindAnyObjectByType<TurnStateManager>();
-        if (tsm != null)
+        if (tsm != null && tsm.gameObject.scene == activeScene)
         {
             SerializedObject so = new SerializedObject(tsm);
             SerializedProperty prop = so.FindProperty("terrainTilemap");
@@ -986,7 +997,12 @@ public class BasicMapGeneratorWindow : EditorWindow
         if (byName != null)
             return byName;
 
-        return FindAnyObjectByType<Tilemap>();
+        Tilemap[] maps = FindObjectsByType<Tilemap>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        for (int i = 0; i < maps.Length; i++)
+            if (maps[i] != null && maps[i].gameObject.scene == activeScene)
+                return maps[i];
+
+        return null;
     }
 
     private static Tilemap FindTilemapByName(string expectedName)
@@ -995,10 +1011,11 @@ public class BasicMapGeneratorWindow : EditorWindow
             return null;
 
         Tilemap[] maps = FindObjectsByType<Tilemap>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        Scene activeScene = SceneManager.GetActiveScene();
         for (int i = 0; i < maps.Length; i++)
         {
             Tilemap map = maps[i];
-            if (map == null)
+            if (map == null || map.gameObject.scene != activeScene)
                 continue;
             if (string.Equals(map.name, expectedName, StringComparison.OrdinalIgnoreCase))
                 return map;
@@ -1861,7 +1878,6 @@ public static class TilemapAutoMirrorDuringEdit
                     continue;
                 if (dst == src)
                     continue;
-
                 TileBase dstCurrent = tilemap.GetTile(dst);
                 if (dstCurrent == srcTile)
                     continue;
@@ -1870,6 +1886,7 @@ public static class TilemapAutoMirrorDuringEdit
                 changedAnyTile = true;
             }
 
+            tilemap.CompressBounds();
             Snapshot.Clear();
             foreach (Vector3Int cell in tilemap.cellBounds.allPositionsWithin)
             {
@@ -1892,11 +1909,12 @@ public static class TilemapAutoMirrorDuringEdit
 
     private static Tilemap ResolveTilemap()
     {
-        if (explicitTarget != null)
+        Scene activeScene = SceneManager.GetActiveScene();
+        if (explicitTarget != null && explicitTarget.gameObject.scene == activeScene)
             return explicitTarget;
 
         TurnStateManager tsm = UnityEngine.Object.FindAnyObjectByType<TurnStateManager>();
-        if (tsm != null)
+        if (tsm != null && tsm.gameObject.scene == activeScene)
         {
             SerializedObject so = new SerializedObject(tsm);
             SerializedProperty tileProp = so.FindProperty("terrainTilemap");
@@ -1911,7 +1929,12 @@ public static class TilemapAutoMirrorDuringEdit
         if (named != null)
             return named;
 
-        return UnityEngine.Object.FindAnyObjectByType<Tilemap>();
+        Tilemap[] maps = UnityEngine.Object.FindObjectsByType<Tilemap>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        for (int i = 0; i < maps.Length; i++)
+            if (maps[i] != null && maps[i].gameObject.scene == activeScene)
+                return maps[i];
+
+        return null;
     }
 
     private static Tilemap FindTilemapByName(string expectedName)
@@ -1920,16 +1943,25 @@ public static class TilemapAutoMirrorDuringEdit
             return null;
 
         Tilemap[] maps = UnityEngine.Object.FindObjectsByType<Tilemap>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        Scene activeScene = SceneManager.GetActiveScene();
         for (int i = 0; i < maps.Length; i++)
         {
             Tilemap map = maps[i];
-            if (map == null)
+            if (map == null || map.gameObject.scene != activeScene)
                 continue;
             if (string.Equals(map.name, expectedName, StringComparison.OrdinalIgnoreCase))
                 return map;
         }
 
         return null;
+    }
+
+    public static void NotifyTilemapRebuilt(Tilemap tilemap)
+    {
+        if (tilemap == null)
+            return;
+
+        ResetSnapshot();
     }
 
     private static void ResetSnapshot()

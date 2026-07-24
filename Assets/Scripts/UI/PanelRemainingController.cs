@@ -195,13 +195,14 @@ public class PanelRemainingController : MonoBehaviour
         TeamId activeTeam = matchController != null ? matchController.ActiveTeam : TeamId.Neutral;
         int totalInField = 0;
         int readyToAct = 0;
-        bool shouldCountActiveTeam =
+        int activeSlot = matchController != null ? matchController.ActivePlayerListIndex : -1;
+        bool shouldCountActiveSlot =
             matchController != null &&
-            (activeTeam != TeamId.Neutral || matchController.IncludeNeutralTeam);
-        if (shouldCountActiveTeam)
+            activeSlot >= 0;
+        if (shouldCountActiveSlot)
         {
-            matchController.GetTeamUnitCounts(activeTeam, out totalInField, out _);
-            matchController.GetTeamUnitCounts(activeTeam, out _, out readyToAct, includeEmbarked: false);
+            matchController.GetSlotUnitCounts(activeSlot, out totalInField, out _);
+            matchController.GetSlotUnitCounts(activeSlot, out _, out readyToAct, includeEmbarked: false);
         }
 
         bool hideAiUnitCounts = matchController != null &&

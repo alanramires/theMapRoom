@@ -235,18 +235,22 @@ public class AIAirPreset
 }
 
 // =====================================================================================
+// AIPresetData — UM asset baseline, editado como um UnitData: um saco de toggles e valores.
+//
+// NÃO existe um asset por dificuldade. A dificuldade é um ATALHO que liga toggles e ajusta
+// alguns valores POR CIMA de uma cópia deste baseline (ver ApplyDifficultyOverlay). Assim
+// o designer edita um lugar só; o jogador continua escolhendo "Fácil/Médio/Difícil" na Tela
+// de Entrada, mas isso não gera 6 assets divergentes para manter.
+// =====================================================================================
 [CreateAssetMenu(fileName = "AIPreset_", menuName = "Game/AI/AI Preset", order = 0)]
 public class AIPresetData : ScriptableObject
 {
     [Header("Identidade")]
-    [Tooltip("Nome exibido do perfil. Pode ser uma dificuldade (\"Competitiva\") ou um general (\"Azul — a Fortaleza\").")]
-    public string nomeExibido = "";
+    [Tooltip("Nome deste baseline. Ex.: \"Padrão\" ou, no futuro, um general (\"Azul — a Fortaleza\").")]
+    public string nomeExibido = "Padrão";
 
     [Tooltip("A doutrina em uma frase. É aqui que os documentos de perfil encostam no código.")]
     [TextArea(2, 6)] public string doutrina = "";
-
-    [Tooltip("Dificuldade que este preset representa. Usado pela AIPresetLibrary para resolver a escolha da Tela de Entrada. Presets de general podem repetir a dificuldade base.")]
-    public AIDifficulty dificuldadeBase = AIDifficulty.Facil;
 
     [Header("Seções")]
     public AICapabilityPreset capacidades = new AICapabilityPreset();
@@ -258,17 +262,61 @@ public class AIPresetData : ScriptableObject
     public AIIntelPreset intel = new AIIntelPreset();
     public AIAirPreset aeronautica = new AIAirPreset();
 
-    // Compatibilidade com os 4 booleanos legados enquanto a migração não termina.
-    // O AIController continua sendo a fonte de verdade do runtime na fase 1; estes
-    // getters existem para o gerador e para as janelas de inspeção compararem preset
-    // contra estado vivo sem duplicar a regra de derivação.
-    public bool EquivaleAHardMode =>
-        capacidades.respeitarListaBanida
-        && capacidades.projetarProducaoInimiga
-        && capacidades.aberturaBlindadoPrimeiro
-        && capacidades.limitarLogistica
-        && capacidades.dobrarSlotsCapturadorPorSetor
-        && capacidades.handoffEmProfundidade;
+    /// <summary>Cópia de runtime (não salva em disco). A overlay de dificuldade sempre roda sobre uma cópia, nunca sobre o asset.</summary>
+    public AIPresetData CloneRuntime()
+    {
+        AIPresetData clone = Instantiate(this);
+        clone.name = name + " (runtime)";
+        clone.hideFlags = HideFlags.HideAndDontSave;
+        return clone;
+    }
 
-    public bool EquivaleAEasyMode => economia.fracaoRendaForaDeCidades < 0.999f;
+    // -------------------------------------------------------------------------------
+    // Overlay de dificuldade: a ÚNICA tabela que diz o que cada dificuldade muda em cima
+    // do baseline. É código de propósito — é uma tabela pequena, tocada raramente, num
+    // lugar só; virar 6 assets foi o erro que esta reestruturação desfez.
+    //
+    // Espelha exatamente o que ApplyDifficulty faz hoje com os 4 booleanos, MAIS os
+    // valores que o antigo par normal/hard trocava. Enquanto a fase 1 durar, os booleanos
+    // do AIController seguem sendo a fonte de verdade do runtime; esta overlay só prepara
+    // o preset ativo para inspeção e para a fase 2.
+    // -------------------------------------------------------------------------------
+    public static void ApplyDifficultyOverlay(AIPresetData target, AIDifficulty difficulty)
+    {
+        if (target == null)
+            return;
+
+        bool hard = difficulty == AIDifficulty.Competitiva || difficulty == AIDifficulty.Agressiva;
+        bool easy = difficulty == AIDifficulty.Iniciante;
+        bool conscricaoSempre = difficulty == AIDifficulty.Formigueiro || difficulty == AIDifficulty.Agressiva;
+        bool conscricaoPerdendo = difficulty == AIDifficulty.Medio || difficulty == AIDifficulty.Competitiva;
+
+        // --- capacidades (os toggles que o hardMode antes acendia em bloco) ---
+        target.capacidades.respeitarListaBanida = hard;
+        target.capacidades.projetarProducaoInimiga = hard;
+        target.capacidades.aberturaBlindadoPrimeiro = hard;
+        target.capacidades.limitarLogistica = hard;
+        target.capacidades.dobrarSlotsCapturadorPorSetor = hard;
+        target.capacidades.handoffEmProfundidade = hard;
+        target.capacidades.conscricaoSempre = conscricaoSempre;
+        target.capacidades.conscricaoQuandoPerdendo = conscricaoPerdendo;
+
+        // --- economia ---
+        target.economia.fracaoRendaForaDeCidades = easy ? 1f / 3f : 1f;
+
+        // --- valores que o antigo par normal/hard trocava (só sobem no hard) ---
+        // O baseline guarda os valores NORMAL; a overlay hard os substitui. Se você quiser
+        // um general que abre com blindado mas mantém composição leve, é aqui que a fase 3
+        // vai deixar granular — hoje espelhamos o comportamento atual.
+        if (hard)
+        {
+            target.composicao.eliteRatioPressure = 0.60f;
+            target.composicao.eliteRatioSafe = 0.80f;
+            target.composicao.coreMinInfantry = 4;
+            target.composicao.coreMinAssault = 0;
+            target.composicao.coreMinArtillery = 0;
+            target.plano.capturerSlotsPerSectorMultiplier = 2;
+            target.plano.capturerSlotCap = 6;
+        }
+    }
 }

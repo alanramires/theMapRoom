@@ -55,7 +55,7 @@ public static class UnitMovementPathRules
                 StructureData structure = cache.GetStructureAtCell(next);
                 TerrainTypeData terrainData = cache.ResolveTerrainAtCell(next);
                 bool hasAnyTile = cache.HasAnyPaintedTileAtCell(next);
-                if (!CanTraverseCell(next, cache, construction, structure, terrainData, hasAnyTile, terrainDatabase != null, unit))
+                if (!CanTraverseCell(next, cache, construction, structure, terrainData, hasAnyTile, terrainDatabase != null, unit, current))
                     continue;
                 int movementCostBase = GetAutonomyCostToEnterCell(construction, structure, terrainData, unit, applyOperationalAutonomyModifier: false);
                 int autonomyCostToEnter = GetAutonomyCostToEnterCell(construction, structure, terrainData, unit, applyOperationalAutonomyModifier: true);
@@ -319,7 +319,7 @@ public static class UnitMovementPathRules
                 StructureData structure = cache.GetStructureAtCell(next);
                 TerrainTypeData terrainData = cache.ResolveTerrainAtCell(next);
                 bool hasAnyTile = cache.HasAnyPaintedTileAtCell(next);
-                if (!CanTraverseCell(next, cache, construction, structure, terrainData, hasAnyTile, terrainDatabase != null, unit))
+                if (!CanTraverseCell(next, cache, construction, structure, terrainData, hasAnyTile, terrainDatabase != null, unit, current))
                     continue;
 
                 int moveCost = Mathf.Max(1, GetAutonomyCostToEnterCell(construction, structure, terrainData, unit, applyOperationalAutonomyModifier: false));
@@ -354,7 +354,8 @@ public static class UnitMovementPathRules
         TerrainTypeData terrainData,
         bool hasAnyTile,
         bool terrainRulesAvailable,
-        UnitManager unit)
+        UnitManager unit,
+        Vector3Int? previousCell = null)
     {
         if (unit == null)
             return false;
@@ -365,7 +366,11 @@ public static class UnitMovementPathRules
         if (UnitHasRailSkill(unit))
         {
             if (cache != null)
-                return cache.HasAnyRouteStructureAtCellAllowingUnit(cell, unit);
+            {
+                return previousCell.HasValue
+                    ? cache.HasConnectedRouteSegmentAllowingUnit(previousCell.Value, cell, unit)
+                    : cache.HasAnyRouteStructureAtCellAllowingUnit(cell, unit);
+            }
             return StructureQualifiesAsRailForUnit(structure, unit);
         }
 
@@ -900,6 +905,7 @@ public static class UnitMovementPathRules
         private readonly Dictionary<Vector3Int, TerrainTypeData> terrainByCell = new Dictionary<Vector3Int, TerrainTypeData>();
         private readonly HashSet<Vector3Int> terrainMisses = new HashSet<Vector3Int>();
         private readonly Dictionary<Vector3Int, bool> hasAnyTileByCell = new Dictionary<Vector3Int, bool>();
+        private readonly Dictionary<(Vector3Int from, Vector3Int to), bool> routeSegmentByEdge = new Dictionary<(Vector3Int from, Vector3Int to), bool>();
 
         public MovementQueryCache(Tilemap referenceTilemap, TerrainDatabase terrainDatabase)
         {
@@ -1063,6 +1069,73 @@ public static class UnitMovementPathRules
                     break;
             }
             return found;
+        }
+
+        public bool HasConnectedRouteSegmentAllowingUnit(Vector3Int fromCell, Vector3Int toCell, UnitManager unit)
+        {
+            fromCell.z = 0;
+            toCell.z = 0;
+            if (fromCell == toCell)
+                return false;
+
+            var edge = (from: fromCell, to: toCell);
+            if (routeSegmentByEdge.TryGetValue(edge, out bool cached))
+                return cached;
+
+            for (int i = 0; i < roadNetworks.Length; i++)
+            {
+                RoadNetworkManager network = roadNetworks[i];
+                if (network == null || !network.gameObject.activeInHierarchy)
+                    continue;
+
+                Tilemap networkTilemap = network.BoardTilemap;
+                if (!IsCompatibleReference(referenceTilemap, networkTilemap))
+                    continue;
+
+                StructureDatabase db = network.StructureDatabase;
+                IReadOnlyList<StructureData> structures = db != null ? db.Structures : null;
+                if (structures == null)
+                    continue;
+
+                for (int s = 0; s < structures.Count; s++)
+                {
+                    StructureData structure = structures[s];
+                    if (structure == null || !StructureQualifiesAsRailForUnit(structure, unit))
+                        continue;
+
+                    IReadOnlyList<RoadRouteDefinition> routes = db.GetRoadRoutes(structure);
+                    if (routes == null)
+                        routes = structure.roadRoutes;
+                    if (routes == null)
+                        continue;
+
+                    for (int r = 0; r < routes.Count; r++)
+                    {
+                        RoadRouteDefinition route = routes[r];
+                        if (route == null || route.cells == null || route.cells.Count < 2)
+                            continue;
+
+                        for (int c = 1; c < route.cells.Count; c++)
+                        {
+                            Vector3Int a = route.cells[c - 1];
+                            Vector3Int b = route.cells[c];
+                            a.z = 0;
+                            b.z = 0;
+
+                            if ((a == fromCell && b == toCell) || (a == toCell && b == fromCell))
+                            {
+                                routeSegmentByEdge[edge] = true;
+                                routeSegmentByEdge[(toCell, fromCell)] = true;
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+
+            routeSegmentByEdge[edge] = false;
+            routeSegmentByEdge[(toCell, fromCell)] = false;
+            return false;
         }
 
         public TerrainTypeData ResolveTerrainAtCell(Vector3Int cell)

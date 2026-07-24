@@ -8,6 +8,32 @@ Cada entrada registra a decisão, o problema que a motivou, as alternativas cons
 
 ---
 
+## Pouso e decolagem foram tirados das mãos do jogador
+
+**Problema.** Numa versão anterior, pousar era uma ação que o jogador escolhia. Como toda ação se resolve no comprometimento e o inimigo só responde no turno dele, um jogador pousava o caça em solo firme na frente da bateria antiaérea inimiga — e a antiaérea, que só mira o céu, não tinha alvo quando seu turno chegava. A aviação usava o pouso manual como escudo, e tanques e antiaérea ficavam decorativos. As unidades de logística pioravam: forçavam o pouso para atender, e o jogador deixava o caça no chão de turno em turno, transportando aviões "no modo pipa" com uma fila de caminhões.
+
+**Decisão.** Mudança de camada deixou de ser ação. Pousar, decolar, subir, descer, emergir e submergir são **automáticos**, chamados pelos sensores que precisam deles. Selecionar uma unidade a manda para a camada natural do domínio. Suprir uma aeronave a faz pousar, receber e **relançar no mesmo turno** (arremetida). Transferir estoque a faz pousar e ficar. A isenção de consumo em instalação aeronáutica é concedida pela **presença** sobre o hexágono, sem verificar se está pousada — a aeronave sobrevoa, "toca e recolhe", e continua operacional no ar.
+
+**Alternativas.** Combate por interrupção, como em Jagged Alliance, em que a antiaérea dispararia no meio do voo inimigo. Rejeitada: quebraria a invariante transacional do jogo, em que o movimento inteiro se resolve antes de o outro lado responder.
+
+**Consequência desejada.** A aviação fica no ar a maior parte do tempo — onde a antiaérea e os caças a alcançam. Restam duas janelas de solo deliberadas: a aeronave recém-comprada, que nasce no chão até algo interagir com ela, e a que transfere estoque, que aceita a lentidão. As duas são vulnerabilidade escolhida, não impunidade.
+
+**Onde vive a regra.** `04_ciclo_de_acao_e_comprometimento.md` (não é ação) e `08_transporte_fusao_e_operacoes_aereas.md` (o ciclo).
+
+---
+
+## O Serviço do Comando alcança quem está embarcado
+
+**Problema.** Um atendimento de campo trata só o veículo que encostou. Isso deixava a tropa embarcada sem forma prática de manutenção coletiva — cada passageiro teria que desembarcar e procurar prédio.
+
+**Decisão.** O Serviço do Comando — a habilidade de guarnição do comandante, acionada no início do turno — desce até o **primeiro nível** de carga e atende também os passageiros diretos. Um Chinook com um APC dentro tem os dois tratados; o soldado dentro do APC, não. A fila é ordenada por **prioridade econômica**: cada transportador e sua carga formam um bloco, e os blocos são servidos do mais caro para o mais barato, para que a reserva curta seja gasta primeiro no que vale mais.
+
+**Consequência desejada.** A cidade e o comando representam o tempo e as mãos de uma retaguarda, onde várias peças são cuidadas de uma vez — enquanto o caminhão na estrada continua sendo um atendimento pontual, de uma unidade só. Dá à tropa embarcada um caminho de manutenção sem desmontar a operação.
+
+**Onde vive a regra.** `07_logistica_e_servicos.md`.
+
+---
+
 ## Revide existe apenas no alcance 1
 
 **Problema.** Não estava claro se o defensor responde quando possui arma de alcance compatível com a distância do ataque.

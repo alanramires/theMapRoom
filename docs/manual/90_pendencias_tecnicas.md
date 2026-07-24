@@ -8,33 +8,7 @@ Esta seção não é regra. É a lista de pontos onde o comportamento implementa
 
 **Sobre os identificadores.** Cada pendência tem um ID estável no formato `ÁREA-NNN`. O ID nunca é reaproveitado, mesmo depois de resolvido, e é por ele que uma entrada de auditoria em `92_auditoria.md` e um parágrafo canônico se referem à mesma regra sem depender de o texto permanecer idêntico. Áreas em uso: `LOG` logística, `COM` combate, `FOW` visão e informação, `AIR` operações aéreas, `IA` inteligência artificial.
 
----
-
-### AIR-001 — Isenção de consumo não verifica se a aeronave pousou
-
-**Regra canônica.** Aeronave **pousada** em instalação aeronáutica não paga consumo de autonomia (`07_logistica_e_servicos.md`).
-
-**Comportamento atual.** A isenção é concedida pela presença sobre o hexágono da instalação, sem verificar a camada. Uma aeronave **sobrevoando** o próprio aeroporto também deixa de pagar.
-
-**Evidência.** `OperationalAutonomyRules.cs:75-102`.
-
-**Impacto.** Contraria a razão de design da arremetida automática, que existe para manter a aviação operacional dentro do alcance da antiaérea. Permite estacionar no ar de graça sobre a própria base.
-
-**Status.** Aberta. Decisão necessária: corrigir o código ou aceitar como regra.
-
----
-
-### LOG-001 — Caminhão atende passageiros pelo Serviço do Comando
-
-**Regra canônica.** Apenas construções atendem os passageiros de um transportador; o caminhão atende só a unidade que encostou (`07_logistica_e_servicos.md`).
-
-**Comportamento atual.** Vale para o suprimento prestado em campo, mas não para o lote do Serviço do Comando, onde o caminhão alcança quem está embarcado.
-
-**Evidência.** `ServicoDoComandoSensor.cs:412-421` ignora `serviceRange`; `PodeSuprirSensor.cs:183-276` respeita.
-
-**Impacto.** Dois caminhos do mesmo serviço com regras diferentes. Um dos dois está errado.
-
-**Status.** Aberta.
+Dois itens que já foram desta lista — a isenção de consumo por presença no aeroporto e o alcance do Serviço do Comando aos passageiros — saíram porque **não são divergências**: são design deliberado. Migraram para `91_decisoes_de_design.md`. Os IDs `AIR-001` e `LOG-001` ficam aposentados e não serão reaproveitados.
 
 ---
 

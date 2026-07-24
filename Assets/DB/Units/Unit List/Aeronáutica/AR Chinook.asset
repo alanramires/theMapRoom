@@ -120,6 +120,9 @@ MonoBehaviour:
   - structure: {fileID: 11400000, guid: 2c50b52605f4f1c4ca013ba4bd7acee3, type: 2}
     baseTerrain: {fileID: 11400000, guid: f00a773f2a7664042bbabe8e117528f7, type: 2}
     isBlocked: 0
+  - structure: {fileID: 11400000, guid: e0adc11a0eac5bc42811605fe2a45f9f, type: 2}
+    baseTerrain: {fileID: 11400000, guid: f00a773f2a7664042bbabe8e117528f7, type: 2}
+    isBlocked: 0
   allowedEmbarkWhenTransporterAtFacilities: -1
   allowedDisembarkWhenTransporterAtTerrains:
   - {fileID: 11400000, guid: f00a773f2a7664042bbabe8e117528f7, type: 2}
@@ -127,17 +130,14 @@ MonoBehaviour:
   - structure: {fileID: 11400000, guid: 2c50b52605f4f1c4ca013ba4bd7acee3, type: 2}
     baseTerrain: {fileID: 11400000, guid: f00a773f2a7664042bbabe8e117528f7, type: 2}
     isBlocked: 0
-  allowedDisembarkWhenTransporterAtFacilities: -1
-  passengersCanDisembarkAndGoesToTerrains:
-  - {fileID: 11400000, guid: f00a773f2a7664042bbabe8e117528f7, type: 2}
-  passengersCanDisembarkAndGoesToTerrainStructures:
-  - structure: {fileID: 11400000, guid: 2c50b52605f4f1c4ca013ba4bd7acee3, type: 2}
+  - structure: {fileID: 11400000, guid: e0adc11a0eac5bc42811605fe2a45f9f, type: 2}
     baseTerrain: {fileID: 11400000, guid: f00a773f2a7664042bbabe8e117528f7, type: 2}
     isBlocked: 0
-  passengersCanDisembarkAndGoesToFacilities: -1
+  allowedDisembarkWhenTransporterAtFacilities: -1
   transportSlots:
   - slotId: passageiros
     capacity: 2
+    exclusiveSlot: 0
     allowedLayerModes:
     - domain: 0
       heightLevel: 3
@@ -147,6 +147,18 @@ MonoBehaviour:
     allowedClasses: 00000000
     requiredSkills: []
     blockedSkills: []
-    canBeFireOnlyAtDomainHeigh: []
+  - slotId: APC
+    capacity: 1
+    exclusiveSlot: 1
+    allowedLayerModes:
+    - domain: 0
+      heightLevel: 3
+    legacyAllowedDomain: 0
+    legacyAllowedHeight: 3
+    legacyAllowedLayerModes: []
+    allowedClasses: 
+    requiredSkills:
+    - {fileID: 11400000, guid: 8bfcf50a7b4285c4cad503493431fb4b, type: 2}
+    blockedSkills: []
   autonomia: 60
   cost: 4500

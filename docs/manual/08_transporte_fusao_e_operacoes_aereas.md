@@ -250,6 +250,8 @@ Se cada operação deixasse a aeronave pousada, o resultado seria uma força aé
 
 A arremetida automática fecha essa porta. Por padrão, aeronave operacional está no ar — que é onde a antiaérea pode encontrá-la, e onde ela paga o consumo de autonomia que você já conhece.
 
+O suprimento respeita a mesma lógica, e é o caso que mais tentaria burlá-la. Quando um caminhão de serviço atende uma aeronave voando, ele a **puxa para o solo, presta o serviço e a devolve ao ar no mesmo turno** — pousa, reabastece, arremete. Ela não fica no chão esperando o próximo turno para decolar. Sem isso, bastaria alinhar alguns caminhões para transformar um caça numa pipa que dá pulinhos rasteiros, invulnerável à antiaérea entre um serviço e outro. O reabastecimento em trânsito não é desculpa para descer: é uma parada técnica que termina de volta no céu.
+
 E as duas exceções passam a fazer sentido como o que realmente são: janelas deliberadas de vulnerabilidade. A aeronave sem combustível e a aeronave transferindo carga estão no chão porque ficaram sem escolha ou porque escolheram uma operação lenta. Nos dois casos, ela está fora do alcance da antiaérea e dentro do alcance de tudo que atira em solo.
 
 Não é impunidade. É troca de ameaça.

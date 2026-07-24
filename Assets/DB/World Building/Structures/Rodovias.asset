@@ -43,6 +43,10 @@ MonoBehaviour:
     skillCostOverrides:
     - skill: {fileID: 11400000, guid: ef10c9e820afc074b99ea8e0b709c2f4, type: 2}
       autonomyCost: 2
+    - skill: {fileID: 11400000, guid: 5ef7a75e35294b68ac315145f98dcd17, type: 2}
+      autonomyCost: 99
+    - skill: {fileID: 11400000, guid: 24a55ae6170e7a642865a4a34c736233, type: 2}
+      autonomyCost: 4
   canAlsoBeBuiltOnTheFollowDomains: []
   roadSegmentSprite: {fileID: 21300000, guid: 03650c0a2457e5046b8234d0bc968b5a, type: 3}
   roadColor: {r: 1, g: 1, b: 1, a: 1}
@@ -61,6 +65,7 @@ MonoBehaviour:
     - skill: {fileID: 11400000, guid: 1b0f1eb9d5454df3a0e1b42f0c8d6aa1, type: 2}
       takeoffMode: 0
     requireAtLeastOneLandingSkill: 1
+  navalOpsByTerrain: []
   forceEndMovementOnTerrainDomainForDomains:
   - domain: 2
     heightLevel: 2

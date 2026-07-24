@@ -4,14 +4,15 @@ using UnityEditor;
 using UnityEngine;
 
 // =====================================================================================
-// Gerador de AIPresetData a partir dos valores VIVOS da cena aberta.
+// Gerador do baseline AIPresetData a partir dos valores VIVOS da cena aberta.
 //
-// Por que gerar em vez de escrever os assets à mão: os valores da cena divergem dos
-// defaults do código (e divergem ENTRE cenas — ver o botão "Auditar cenas"). Criar os
-// presets a partir dos defaults do C# mudaria silenciosamente a calibração da IA.
+// Gera UM asset baseline (valores NORMAIS, capacidades desligadas). A dificuldade é uma
+// overlay de código (AIPresetData.ApplyDifficultyOverlay) que liga toggles por cima — não
+// há asset por dificuldade para manter.
 //
-// O que este gerador NÃO faz: mexer no comportamento. Ele só fotografa o que o código
-// resolveria hoje para cada dificuldade e grava num asset.
+// Por que gerar em vez de escrever à mão: os valores da cena divergem dos defaults do
+// código (e divergem ENTRE cenas — ver "Auditar cenas"). Escrever à mão mudaria
+// silenciosamente a calibração da IA.
 // =====================================================================================
 public class AIPresetGeneratorWindow : EditorWindow
 {
@@ -58,8 +59,9 @@ public class AIPresetGeneratorWindow : EditorWindow
 
         EditorGUILayout.LabelField("Fase 1 da migração para AIPresetData", EditorStyles.boldLabel);
         EditorGUILayout.HelpBox(
-            "Fotografa os valores da CENA ABERTA e grava um preset por dificuldade.\n" +
-            "Nenhuma decisão da IA lê esses assets ainda — comportamento inalterado.\n\n" +
+            "Fotografa os valores NORMAIS da CENA ABERTA e grava UM baseline (capacidades desligadas).\n" +
+            "A dificuldade liga toggles por cima via código — não gera asset por dificuldade.\n" +
+            "Nenhuma decisão da IA lê deste asset ainda — comportamento inalterado.\n\n" +
             "Gere a partir da cena mais calibrada (normalmente Battle Map 1 - Ground). " +
             "Cenas antigas podem não ter todos os campos serializados e cairiam nos defaults do código.",
             MessageType.Info);
@@ -86,14 +88,14 @@ public class AIPresetGeneratorWindow : EditorWindow
         }
 
         EditorGUILayout.Space();
-        previewExpanded = EditorGUILayout.Foldout(previewExpanded, "Prévia — o que muda entre as dificuldades", true);
+        previewExpanded = EditorGUILayout.Foldout(previewExpanded, "Prévia — o que a overlay de cada dificuldade muda", true);
         if (previewExpanded)
             DrawPreview();
 
         EditorGUILayout.Space();
         using (new EditorGUI.DisabledScope(controller == null))
         {
-            if (GUILayout.Button("Gerar os 6 presets + biblioteca", GUILayout.Height(32f)))
+            if (GUILayout.Button("Gerar baseline a partir da cena", GUILayout.Height(32f)))
                 Generate();
         }
 
@@ -155,65 +157,56 @@ public class AIPresetGeneratorWindow : EditorWindow
     {
         EnsureFolder(targetFolder);
         var so = new SerializedObject(controller);
-        var library = LoadOrCreate<AIPresetLibrary>($"{targetFolder}/AIPresetLibrary.asset");
 
-        foreach (AIDifficulty difficulty in AllDifficulties)
-        {
-            string path = $"{targetFolder}/AIPreset_{difficulty}.asset";
-            AIPresetData preset = LoadOrCreate<AIPresetData>(path);
-            Populate(preset, difficulty, so);
-            EditorUtility.SetDirty(preset);
-            library.SetPreset(difficulty, preset);
-        }
+        string path = $"{targetFolder}/AIPreset_Baseline.asset";
+        AIPresetData preset = LoadOrCreate<AIPresetData>(path);
+        Populate(preset, so);
+        EditorUtility.SetDirty(preset);
 
-        library.presetPadrao = library.Resolve(AIDifficulty.Facil);
-        EditorUtility.SetDirty(library);
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
 
-        Debug.Log($"[AI][Preset] 6 presets + biblioteca gravados em {targetFolder}. " +
-                  "Ligue a biblioteca no campo 'Preset Library' do AIController da cena.");
-        Selection.activeObject = library;
+        Debug.Log($"[AI][Preset] baseline gravado em {path}. " +
+                  "Ligue-o no campo 'Base Preset' do AIController da cena. " +
+                  "A dificuldade liga toggles por cima via ApplyDifficultyOverlay.");
+        Selection.activeObject = preset;
     }
 
-    private void Populate(AIPresetData preset, AIDifficulty difficulty, SerializedObject so)
+    // Baseline = valores NORMAIS, capacidades desligadas. A overlay de dificuldade
+    // (AIPresetData.ApplyDifficultyOverlay) é quem liga os toggles e nudga os valores hard.
+    private void Populate(AIPresetData preset, SerializedObject so)
     {
-        bool hard = IsHard(difficulty);
-        bool easy = IsEasy(difficulty);
-
-        preset.nomeExibido = difficulty.ToString();
-        preset.dificuldadeBase = difficulty;
+        preset.nomeExibido = "Padrão";
         if (string.IsNullOrEmpty(preset.doutrina))
-            preset.doutrina = DescribeDoctrine(difficulty);
+            preset.doutrina = "Baseline gerado da cena. A dificuldade liga toggles por cima.";
 
-        // --- capacidades: hoje TODAS derivam do mesmo hardMode. É esse acoplamento que a
-        // fase 3 desfaz; aqui só registramos o estado atual fielmente.
-        preset.capacidades.respeitarListaBanida = hard;
-        preset.capacidades.projetarProducaoInimiga = hard;
-        preset.capacidades.aberturaBlindadoPrimeiro = hard;
-        preset.capacidades.limitarLogistica = hard;
-        preset.capacidades.dobrarSlotsCapturadorPorSetor = hard;
-        preset.capacidades.handoffEmProfundidade = hard;
-        preset.capacidades.conscricaoSempre = IsDoctrine(difficulty);
-        preset.capacidades.conscricaoQuandoPerdendo = IsWhenLosing(difficulty);
+        // --- capacidades: baseline neutro. A overlay de dificuldade é que acende cada uma.
+        preset.capacidades.respeitarListaBanida = false;
+        preset.capacidades.projetarProducaoInimiga = false;
+        preset.capacidades.aberturaBlindadoPrimeiro = false;
+        preset.capacidades.limitarLogistica = false;
+        preset.capacidades.dobrarSlotsCapturadorPorSetor = false;
+        preset.capacidades.handoffEmProfundidade = false;
+        preset.capacidades.conscricaoSempre = false;
+        preset.capacidades.conscricaoQuandoPerdendo = false;
         preset.capacidades.politicaLadoForteFraco = Bool(so, "strongWeakSidePolitic");
 
-        // --- economia
-        preset.economia.fracaoRendaForaDeCidades = easy ? 1f / 3f : 1f;
-        preset.economia.eliteSaveTurns = Int(so, hard ? "eliteSaveTurnsHard" : "eliteSaveTurnsNormal");
-        preset.economia.eliteMaintenanceReservePercent = Flt(so, hard ? "eliteMaintenanceReserveHard" : "eliteMaintenanceReserveNormal");
+        // --- economia (lado NORMAL dos pares)
+        preset.economia.fracaoRendaForaDeCidades = 1f;
+        preset.economia.eliteSaveTurns = Int(so, "eliteSaveTurnsNormal");
+        preset.economia.eliteMaintenanceReservePercent = Flt(so, "eliteMaintenanceReserveNormal");
         if (shopping != null)
         {
             preset.economia.savingPercentualForElite = shopping.SavingPercentualForElite;
             preset.economia.counterEliteEscalationPressure = shopping.CounterEliteEscalationPressure;
         }
 
-        // --- composição
-        preset.composicao.coreMinInfantry = Int(so, hard ? "minInfantryHard" : "minInfantryNormal");
-        preset.composicao.coreMinAssault = Int(so, hard ? "minAssaultHard" : "minAssaultNormal");
-        preset.composicao.coreMinArtillery = Int(so, hard ? "minArtilleryHard" : "minArtilleryNormal");
-        preset.composicao.eliteRatioPressure = Flt(so, hard ? "eliteRatioHardPressure" : "eliteRatioNormalPressure");
-        preset.composicao.eliteRatioSafe = Flt(so, hard ? "eliteRatioHardSafe" : "eliteRatioNormalSafe");
+        // --- composição (lado NORMAL dos pares; a overlay hard nudga estes)
+        preset.composicao.coreMinInfantry = Int(so, "minInfantryNormal");
+        preset.composicao.coreMinAssault = Int(so, "minAssaultNormal");
+        preset.composicao.coreMinArtillery = Int(so, "minArtilleryNormal");
+        preset.composicao.eliteRatioPressure = Flt(so, "eliteRatioNormalPressure");
+        preset.composicao.eliteRatioSafe = Flt(so, "eliteRatioNormalSafe");
         preset.composicao.maxLogisticUnits = Int(so, "maxLogisticUnitsOnHardMode");
         if (shopping != null)
         {
@@ -238,10 +231,10 @@ public class AIPresetGeneratorWindow : EditorWindow
         preset.conscricao.massacreExitForceRatio = Flt(so, "massacreExitForceRatio");
         preset.conscricao.massacreUnitCapFillRatio = Flt(so, "massacreUnitCapFillRatio");
 
-        // --- plano
+        // --- plano (lado NORMAL; a overlay hard sobe multiplier→2 e cap→6)
         preset.plano.maxActiveObjectives = Int(so, "maxActiveObjectives");
-        preset.plano.capturerSlotsPerSectorMultiplier = hard ? 2 : 1;
-        preset.plano.capturerSlotCap = hard ? 6 : 4; // hoje const HardModeCapturerSlotCap / clamp 4
+        preset.plano.capturerSlotsPerSectorMultiplier = 1;
+        preset.plano.capturerSlotCap = 4;
         preset.plano.minDistanceForTransportSlot = Int(so, "minDistanceForTransportSlot");
 
         // --- tática
@@ -293,20 +286,6 @@ public class AIPresetGeneratorWindow : EditorWindow
             preset.aeronautica.minTurnForIntel = shopping.MinTurnForIntel;
             preset.aeronautica.maxAirIntel = shopping.MaxAirIntel;
             preset.aeronautica.maxMobileAirIntel = shopping.MaxMobileAirIntel;
-        }
-    }
-
-    private static string DescribeDoctrine(AIDifficulty d)
-    {
-        switch (d)
-        {
-            case AIDifficulty.Iniciante: return "Renda reduzida fora das cidades. Sem pacote hard, sem conscrição.";
-            case AIDifficulty.Facil: return "Regras normais e economia cheia. A linha de base do projeto.";
-            case AIDifficulty.Medio: return "Regras normais, mas recruta massa emergencial quando o macro está Perdendo.";
-            case AIDifficulty.Formigueiro: return "Doutrina do Enxame: conscrição permanente, massa antes do elite, com Fase de Massacre como válvula.";
-            case AIDifficulty.Competitiva: return "Pacote hard: lista banida, projeção de produção inimiga, abertura blindado, teto de logística. Conscrição só perdendo.";
-            case AIDifficulty.Agressiva: return "Pacote hard somado à conscrição permanente. O perfil mais denso em unidades e mais seletivo em compras.";
-            default: return "";
         }
     }
 

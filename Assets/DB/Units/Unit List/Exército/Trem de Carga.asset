@@ -116,12 +116,10 @@ MonoBehaviour:
   allowedDisembarkWhenTransporterAtTerrains: []
   allowedDisembarkWhenTransporterAtTerrainStructures: []
   allowedDisembarkWhenTransporterAtFacilities: 8
-  passengersCanDisembarkAndGoesToTerrains: []
-  passengersCanDisembarkAndGoesToTerrainStructures: []
-  passengersCanDisembarkAndGoesToFacilities: -1
   transportSlots:
   - slotId: "Vag\xE3o"
     capacity: 2
+    exclusiveSlot: 0
     allowedLayerModes:
     - domain: 0
       heightLevel: 3
@@ -131,6 +129,5 @@ MonoBehaviour:
     allowedClasses: 
     requiredSkills: []
     blockedSkills: []
-    canBeFireOnlyAtDomainHeigh: []
   autonomia: 120
   cost: 7500

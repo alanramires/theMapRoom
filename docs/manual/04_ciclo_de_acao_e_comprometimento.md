@@ -28,11 +28,19 @@ Ela **se posiciona** — andando, ou ficando exatamente onde está. As duas cois
 
 Os **sensores apresentam as opções** daquela posição: o que ela enxerga, o que alcança, o que pode fazer dali.
 
-Você **escolhe uma opção**: atacar, capturar, embarcar, desembarcar, suprir, fundir, pousar, decolar — ou simplesmente ficar onde parou.
+Você **escolhe uma opção**: atacar, capturar, embarcar, desembarcar, suprir, transferir, fundir — ou simplesmente ficar onde parou.
 
 A **animação toca** e o **mundo recalcula**.
 
 Fim. A unidade não age de novo neste turno.
+
+### Pousar e Decolar Não São Ações
+
+Repare que a lista de opções acima **não** inclui pousar, decolar, subir, descer, emergir ou submergir. Isso é deliberado: mudar de camada nunca é uma jogada que você escolhe. É consequência automática de outra coisa.
+
+Quando você seleciona uma unidade, ela vai para a camada natural do domínio dela — o avião decola, o submarino mergulha, o helicóptero sobe. Você não deu a ordem; a seleção deu. E as transições que aparecem no meio de outras ações são chamadas pelos próprios sensores que precisam delas: suprir uma aeronave a faz pousar, receber o serviço e decolar de novo na mesma jogada; transferir estoque a faz pousar e permanecer; comprar uma aeronave a faz nascer no solo até algo interagir com ela.
+
+O motivo é de fundo, e vale entender porque explica várias regras de aviação: se pousar fosse uma ação de jogador, a aviação usaria o solo como esconderijo antiaéreo. Como toda ação se resolve no comprometimento e o inimigo só responde depois, uma aeronave que pousasse manualmente na frente da bateria antiaérea passaria o turno dela intocada. Tirando pouso e decolagem das mãos do jogador, a aviação fica no ar a maior parte do tempo — que é onde a antiaérea e os caças a alcançam. O detalhe completo está em `08_transporte_fusao_e_operacoes_aereas.md`.
 
 ### Existe Uma Confirmação Só
 

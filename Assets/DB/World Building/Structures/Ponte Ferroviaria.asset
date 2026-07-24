@@ -43,10 +43,14 @@ MonoBehaviour:
   roadBoost: 0
   aircraftOpsByTerrain:
   - terrainData: {fileID: 11400000, guid: f00a773f2a7664042bbabe8e117528f7, type: 2}
-    allowTakeoffAndLanding: 0
+    allowTakeoffAndLanding: 1
     legacyRequiredLandingSkills: []
-    requiredLandingSkillRules: []
-    requireAtLeastOneLandingSkill: 0
+    requiredLandingSkillRules:
+    - skill: {fileID: 11400000, guid: 1b0f1eb9d5454df3a0e1b42f0c8d6aa1, type: 2}
+      takeoffMode: 0
+    - skill: {fileID: 11400000, guid: 8d5ec3fba2fd43139e8619b6f2b23eb9, type: 2}
+      takeoffMode: 0
+    requireAtLeastOneLandingSkill: 1
   navalOpsByTerrain:
   - terrainData: {fileID: 11400000, guid: adc0bfc8c2e8f9a41be0abda3e29e582, type: 2}
     forceEndMovementOnTerrainDomainForDomains:

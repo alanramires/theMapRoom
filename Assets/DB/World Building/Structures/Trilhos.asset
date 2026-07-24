@@ -70,8 +70,6 @@ MonoBehaviour:
     allowTakeoffAndLanding: 1
     legacyRequiredLandingSkills: []
     requiredLandingSkillRules:
-    - skill: {fileID: 11400000, guid: 3f52a3b7c5d14c5ea1f0f9aa34d2be11, type: 2}
-      takeoffMode: 1
     - skill: {fileID: 11400000, guid: 8d5ec3fba2fd43139e8619b6f2b23eb9, type: 2}
       takeoffMode: 2
     - skill: {fileID: 11400000, guid: 1b0f1eb9d5454df3a0e1b42f0c8d6aa1, type: 2}

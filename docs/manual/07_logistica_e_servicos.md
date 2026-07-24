@@ -205,9 +205,13 @@ Vale guardar isso quando montar uma operação de reabastecimento: você não es
 
 ### O Serviço do Comando
 
-Existe um atalho para tudo isso, e ele é apenas suprimento em lote.
+Existe um atalho para tudo isso, e ele é mais do que suprimento em lote — é a mão do comandante sobre a guarnição inteira antes do expediente. O nome é literal: é o **serviço do comando**, não o de um caminhão qualquer.
 
-O Serviço do Comando pega as unidades elegíveis, monta uma fila e executa os mesmos serviços que um supridor executaria em campo — pelas mesmas regras, com os mesmos custos e os mesmos limites. Não é um sistema separado: é o suprimento de sempre, aplicado de uma vez.
+Ele pega as unidades elegíveis, monta uma fila e executa os serviços de sempre, pelos mesmos custos e limites de reserva. O que o torna mais poderoso que um atendimento de campo é o alcance: **ele chega a quem está embarcado.**
+
+Um atendimento em campo enxerga só o veículo; o Serviço do Comando desce até o **primeiro nível** de carga e atende também os passageiros diretos. Um caminhão rebocando artilharia recebe o serviço, e a artilharia rebocada também. Um porta-aviões com caças dentro tem os caças tratados. Um Chinook carregando um APC que carrega um soldado tem o Chinook e o APC atendidos — mas **não** o soldado: a fila para no primeiro nível, não desce a cadeia inteira. É a diferença entre um posto na estrada e a guarnição de uma praça, onde há tempo e mãos para cuidar de várias peças de uma vez.
+
+**E a fila é ordenada por prioridade econômica.** Cada transportador e sua carga formam um bloco que anda junto, e os blocos são atendidos do **mais caro para o mais barato**, pelo custo da unidade raiz. Quando a reserva não chega para todos, é o que vale mais que come primeiro — o serviço que não couber no orçamento é pulado, sem abortar o resto da fila. Preview e execução leem o mesmo plano comprometido, então o custo previsto no painel é exatamente o que será gasto.
 
 Com duas restrições, e elas decidem a ordem do seu turno. O Serviço do Comando só atende unidades que **ainda não agiram** e que **ainda não receberam atendimento** neste turno.
 

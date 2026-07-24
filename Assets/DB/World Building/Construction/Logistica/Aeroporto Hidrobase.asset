@@ -22,6 +22,7 @@ MonoBehaviour:
   isAirport: 1
   isHarbor: 1
   isCity: 0
+  isTransportTerminal: 0
   spriteDefault: {fileID: 21300000, guid: dfc4d77e822296947b883b4d0f1eac90, type: 3}
   spriteGreen: {fileID: 0}
   spriteRed: {fileID: 0}

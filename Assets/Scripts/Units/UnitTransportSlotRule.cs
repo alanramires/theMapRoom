@@ -11,6 +11,9 @@ public class UnitTransportSlotRule
     [Tooltip("Capacidade total deste slot.")]
     public int capacity = 1;
 
+    [Tooltip("Se ativo, este slot nao pode ser usado ao mesmo tempo que outros slots do transportador. O primeiro tipo de carga embarcado bloqueia os demais slots ate ficar vazio novamente.")]
+    public bool exclusiveSlot;
+
     [Tooltip("Modos de dominio/altura permitidos para embarque neste slot. Se vazio, usa Land/Surface.")]
     public List<TransportSlotLayerMode> allowedLayerModes = new List<TransportSlotLayerMode>();
     [SerializeField, HideInInspector] private Domain legacyAllowedDomain = Domain.Land;
@@ -26,9 +29,6 @@ public class UnitTransportSlotRule
     [Tooltip("Skills bloqueadas para este slot. Se a unidade tiver alguma delas, embarque e negado.")]
     public List<SkillData> blockedSkills = new List<SkillData>();
 
-    [Tooltip("Can be fire only at domain/heigh. Vazio = sem restricao (campo reservado para regras de combate por slot).")]
-    public List<UnitLayerMode> canBeFireOnlyAtDomainHeigh = new List<UnitLayerMode>();
-
     public void EnsureDefaults()
     {
         capacity = Mathf.Max(1, capacity);
@@ -40,9 +40,6 @@ public class UnitTransportSlotRule
             requiredSkills = new List<SkillData>();
         if (blockedSkills == null)
             blockedSkills = new List<SkillData>();
-        if (canBeFireOnlyAtDomainHeigh == null)
-            canBeFireOnlyAtDomainHeigh = new List<UnitLayerMode>();
-
         if (allowedLayerModes.Count == 0 && legacyAllowedLayerModes != null && legacyAllowedLayerModes.Count > 0)
         {
             for (int i = 0; i < legacyAllowedLayerModes.Count; i++)

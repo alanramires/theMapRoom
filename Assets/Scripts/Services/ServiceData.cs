@@ -49,8 +49,8 @@ public class ServiceData : ScriptableObject
     public List<ServiceEfficiencyByClass> serviceEfficiency = new List<ServiceEfficiencyByClass>();
 
     [FormerlySerializedAs("weight")]
-    [Header("Cost Weight")]
-    [Tooltip("Cost weight values by armor/weapon class for this service.")]
+    [Header("Multiplicador de Preço de Rearme (por Classe de Arma)")]
+    [Tooltip("SÓ afeta rearmamento. Multiplica o preço por ponto de munição conforme a classe da ARMA (pesada custa mais por tiro). Reparo e reabastecimento NÃO usam este campo — o custo deles já é proporcional ao preço da unidade. Vazio = default Heavy 3 / Medium 2 / Light 1.")]
     public List<ServiceEfficiencyByClass> costWeight = new List<ServiceEfficiencyByClass>();
 
     [Header("Service Limits")]

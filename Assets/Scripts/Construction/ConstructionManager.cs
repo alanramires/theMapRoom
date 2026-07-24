@@ -198,6 +198,34 @@ public class ConstructionManager : MonoBehaviour
         totalMs = activeTeamChangedHandlerTotalMs;
     }
 
+    // Faccao sem QG (rebeldes/dissidentes). Nao existe flag de mapa: e derivado e dinamico -
+    // o time nao possui NENHUMA construcao com isPlayerHeadQuarter. Se um dia tomar um QG,
+    // deixa de ser rebelde no mesmo instante. Regras associadas:
+    //   1) captura ignora pre-requisito de progressao (MatchController.CanCaptureConstruction);
+    //   2) nunca produz, nem em predio capturado cuja regra de venda permitiria (CanProduceUnitsForTeam);
+    //   3) nao e derrotado por 0 unidades (MatchController.TryDefeatTeamIfZeroUnits).
+    // Guarda: se NENHUM QG do tabuleiro tem dono, o conceito nao se aplica e ninguem e rebelde.
+    // Isso tambem cobre a janela de carga em que AllActive ainda nao foi populado.
+    public static bool IsHeadQuarterlessTeam(TeamId team)
+    {
+        if (team == TeamId.Neutral)
+            return false;
+
+        bool anyOwnedHeadQuarterOnBoard = false;
+        for (int i = 0; i < AllActive.Count; i++)
+        {
+            ConstructionManager construction = AllActive[i];
+            if (construction == null || !construction.IsPlayerHeadQuarter)
+                continue;
+            if (construction.teamId == team)
+                return false;
+            if (construction.teamId != TeamId.Neutral)
+                anyOwnedHeadQuarterOnBoard = true;
+        }
+
+        return anyOwnedHeadQuarterOnBoard;
+    }
+
     public static void RefreshAllOccupancyVisuals()
     {
         for (int i = AllActive.Count - 1; i >= 0; i--)
@@ -1091,6 +1119,10 @@ public class ConstructionManager : MonoBehaviour
         if (buyerTeam == TeamId.Neutral)
             return false;
         if (buyerTeam != teamId)
+            return false;
+        // Rebeldes/dissidentes nao produzem em lugar nenhum — nem no que capturaram, mesmo que a
+        // sellingRule do predio permitisse. Ver IsHeadQuarterlessTeam.
+        if (IsHeadQuarterlessTeam(buyerTeam))
             return false;
         if (siteRuntime.offeredUnits == null || siteRuntime.offeredUnits.Count <= 0)
             return false;

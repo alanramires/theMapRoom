@@ -1752,6 +1752,9 @@ public class UnitManager : MonoBehaviour
         }
 
         SyncTransportRuntimeSlotsWithData(data);
+        if (!CanUseTransportSlotExclusivity(slotIndex, out reason))
+            return false;
+
         UnitTransportSeatRuntime freeSeat = FindFirstFreeSeat(slotIndex);
         if (freeSeat == null)
         {
@@ -1813,6 +1816,9 @@ public class UnitManager : MonoBehaviour
         }
 
         SyncTransportRuntimeSlotsWithData(data);
+        if (!CanUseTransportSlotExclusivity(slotIndex, out reason))
+            return false;
+
         UnitTransportSeatRuntime targetSeat = FindSeat(slotIndex, seatIndex);
         if (targetSeat == null)
         {
@@ -2080,6 +2086,56 @@ public class UnitManager : MonoBehaviour
         }
 
         return null;
+    }
+
+    public bool CanUseTransportSlotExclusivity(int slotIndex, out string reason)
+    {
+        reason = string.Empty;
+        UnitData data = TryGetUnitData();
+        if (data == null || data.transportSlots == null || slotIndex < 0 || slotIndex >= data.transportSlots.Count)
+        {
+            reason = "Slot de transporte invalido.";
+            return false;
+        }
+
+        SyncTransportRuntimeSlotsWithData(data);
+        UnitTransportSlotRule requestedSlot = data.transportSlots[slotIndex];
+        if (requestedSlot == null)
+        {
+            reason = "Slot de transporte invalido.";
+            return false;
+        }
+
+        for (int i = 0; i < transportedUnitSlots.Count; i++)
+        {
+            UnitTransportSeatRuntime seat = transportedUnitSlots[i];
+            if (seat == null || seat.embarkedUnit == null)
+                continue;
+
+            if (!seat.embarkedUnit.IsEmbarked)
+            {
+                seat.embarkedUnit = null;
+                continue;
+            }
+
+            if (seat.slotIndex == slotIndex)
+                continue;
+
+            bool occupiedSlotIsExclusive = seat.slotIndex >= 0
+                && seat.slotIndex < data.transportSlots.Count
+                && data.transportSlots[seat.slotIndex] != null
+                && data.transportSlots[seat.slotIndex].exclusiveSlot;
+
+            if (requestedSlot.exclusiveSlot || occupiedSlotIsExclusive)
+            {
+                reason = requestedSlot.exclusiveSlot
+                    ? "Slot exclusivo indisponivel enquanto houver carga em outra vaga."
+                    : "Outra vaga exclusiva do transportador ja esta em uso.";
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private UnitTransportSeatRuntime FindSeat(int slotIndex, int seatIndex)

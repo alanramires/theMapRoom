@@ -30,7 +30,8 @@ public enum ConstructionFacilityType
     Harbor = 1 << 0,
     Airport = 1 << 1,
     City = 1 << 2,
-    TransportTerminal = 1 << 3
+    TransportTerminal = 1 << 3,
+    Everything = ~0
 }
 
 public static class ConstructionFacilityTypeRules
@@ -39,6 +40,9 @@ public static class ConstructionFacilityTypeRules
     {
         if (construction == null || allowedFacilities == ConstructionFacilityType.None)
             return false;
+
+        if (allowedFacilities == ConstructionFacilityType.Everything)
+            return true;
 
         return (construction.isHarbor && (allowedFacilities & ConstructionFacilityType.Harbor) != 0)
             || (construction.isAirport && (allowedFacilities & ConstructionFacilityType.Airport) != 0)

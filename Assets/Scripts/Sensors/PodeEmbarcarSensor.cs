@@ -57,6 +57,12 @@ public static class PodeEmbarcarSensor
                     continue;
                 }
 
+                if (!transporter.CanUseTransportSlotExclusivity(slotIndex, out string exclusivityReason))
+                {
+                    AppendInvalid(invalidOutput, selectedUnit, transporter, cell, slotIndex, exclusivityReason, -1, remainingMovementPoints);
+                    continue;
+                }
+
                 if (!TryResolveEmbarkCost(map, terrainDatabase, selectedUnit, cell, out int embarkCost, out string costReason))
                 {
                     AppendInvalid(invalidOutput, selectedUnit, transporter, cell, slotIndex, costReason, -1, remainingMovementPoints);

@@ -26,7 +26,7 @@ MonoBehaviour:
   maxHP: 10
   defense: 8
   armorClass: 0
-  movement: 6
+  movement: 4
   visao: 1
   visionSpecializations: []
   movementCategory: 6
@@ -83,7 +83,7 @@ MonoBehaviour:
   emergeAfterAttackHeight: 3
   emergeAfterAttackTurns: 2
   skills:
-  - {fileID: 11400000, guid: ef10c9e820afc074b99ea8e0b709c2f4, type: 2}
+  - {fileID: 11400000, guid: 24a55ae6170e7a642865a4a34c736233, type: 2}
   stealthSkills: []
   stealthSkillRules: []
   autonomyData: {fileID: 0}
@@ -101,11 +101,11 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   supplierResources:
   - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
-    amount: 150
+    amount: 120
   - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
-    amount: 40
+    amount: 30
   - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
-    amount: 40
+    amount: 20
   isTransporter: 0
   spriteTransport: {fileID: 0}
   allowedEmbarkWhenTransporterAtTerrains: []
@@ -114,9 +114,6 @@ MonoBehaviour:
   allowedDisembarkWhenTransporterAtTerrains: []
   allowedDisembarkWhenTransporterAtTerrainStructures: []
   allowedDisembarkWhenTransporterAtFacilities: 0
-  passengersCanDisembarkAndGoesToTerrains: []
-  passengersCanDisembarkAndGoesToTerrainStructures: []
-  passengersCanDisembarkAndGoesToFacilities: 0
   transportSlots: []
   autonomia: 60
   cost: 2000

@@ -17,10 +17,12 @@ MonoBehaviour:
   sufixo: docas
   description: "Produzem unidades log\xEDsticas navais.\nMovem suprimentos pelo mar.\nTerrestres
     podem andar aqui."
+  grammaticalGender: 0
   requiredBuilding: {fileID: 0}
   isAirport: 0
   isHarbor: 1
   isCity: 0
+  isTransportTerminal: 0
   spriteDefault: {fileID: 21300000, guid: 95aaa3f81b1d1604eb068c062d7fff4a, type: 3}
   spriteGreen: {fileID: 0}
   spriteRed: {fileID: 0}
