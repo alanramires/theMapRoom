@@ -224,6 +224,10 @@ public partial class AIController : MonoBehaviour
     public int CoreMinAssault   => hardMode ? minAssaultHard   : minAssaultNormal;
     public int CoreMinArtillery => hardMode ? minArtilleryHard : minArtilleryNormal;
 
+    [Tooltip("Gate de núcleo SUAVE: em vez de banir elite até a composição mínima fechar (muro), a maturidade do núcleo (0..1) vira PESO no score. Corrige o incentivo perverso do gate duro, que ao mesmo tempo bane o elite E desliga a penalidade anti-barato — fazendo a IA comprar a artilharia mais fraca só para 'pagar o imposto' e destravar a cancela. Off = comportamento atual.")]
+    [SerializeField] private bool softCoreGate = false;
+    public bool SoftCoreGate => softCoreGate;
+
     [Header("Plano de Objetivos")]
     [Tooltip("M�ximo de objetivos ofensivos simult�neos (Pending/Pursuing/Capturing). Limita demand de capturadores em mapas grandes.")]
     [SerializeField, Range(1, 12)] private int maxActiveObjectives = 4;

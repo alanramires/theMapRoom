@@ -94,10 +94,11 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e6032267446372a4b9de350d17b18418, type: 2}
   stealthSkills: []
   stealthSkillRules: []
-  autonomyData: {fileID: 11400000, guid: 86f5ee654cae4d8ca9adadca74d0d9b8, type: 2}
+  autonomyData: {fileID: 11400000, guid: 2c3cfb49e16e5d444b45a2dd9d6e08d5, type: 2}
   embarkedWeapons: []
   cantUseWeaponsOnTheFollowDomain: []
   isSupplier: 1
+  startsWithEmptySupplies: 1
   supplierTier: 0
   maxUnitsServedPerTurn: 0
   serviceRange: 0

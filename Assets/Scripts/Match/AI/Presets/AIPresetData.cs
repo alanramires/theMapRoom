@@ -54,6 +54,9 @@ public class AICapabilityPreset
 
     [Tooltip("PROTÓTIPO. Classifica eixos em forte/equilibrado/fraco e enviesa a distribuição de elite para o lado forte. Hoje: strongWeakSidePolitic.")]
     public bool politicaLadoForteFraco = false;
+
+    [Tooltip("Gate de núcleo SUAVE: a maturidade do núcleo (0..1) vira peso no score do elite em vez de muro tudo-ou-nada. Sem ele, o gate duro bane o elite E desliga a penalidade anti-barato ao mesmo tempo, forçando a IA a comprar a pior artilharia só para destravar. Hoje: AIController.softCoreGate.")]
+    public bool gateNucleoSuave = false;
 }
 
 // -------------------------------------------------------------------------------------

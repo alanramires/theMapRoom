@@ -329,6 +329,33 @@ public class UnitSpawner : MonoBehaviour
         return Spawn(data, teamId, HexCoordinates.GetCellCenterWorld(boardTilemap, fixedCell), Quaternion.identity, enforceSpawnOccupancyRule: false);
     }
 
+    public GameObject SpawnAtCellForSlot(UnitData data, PlayerSlotId slot, Vector3Int cell)
+    {
+        TryAutoAssignBoardTilemap();
+        TryAutoAssignMatchController();
+        if (boardTilemap == null || matchController == null || !matchController.IsValidPlayerSlot(slot))
+            return null;
+
+        Vector3Int fixedCell = new Vector3Int(cell.x, cell.y, 0);
+        int targetSortingLayerId = GetTargetSortingLayerId();
+        if (IsCellOccupiedOnSortingLayerForSlot(fixedCell, targetSortingLayerId, slot, data))
+        {
+            Debug.LogWarning($"[UnitSpawner] Celula ocupada na mesma camada em ({fixedCell.x},{fixedCell.y},0). Spawn cancelado.");
+            return null;
+        }
+
+        TeamId visualTeam = matchController.GetVisualTeamForSlot(slot);
+        GameObject spawned = Spawn(
+            data,
+            visualTeam,
+            HexCoordinates.GetCellCenterWorld(boardTilemap, fixedCell),
+            Quaternion.identity,
+            enforceSpawnOccupancyRule: false);
+        UnitManager manager = spawned != null ? spawned.GetComponent<UnitManager>() : null;
+        manager?.SetSlotIndex(slot.Value);
+        return spawned;
+    }
+
     private void TryAutoAssignMatchController()
     {
         if (matchController == null)
@@ -437,6 +464,63 @@ public class UnitSpawner : MonoBehaviour
                 ? construction.CurrentCellPosition
                 : HexCoordinates.WorldToCell(boardTilemap, construction.transform.position);
 
+            occupiedCell.z = 0;
+            if (occupiedCell == cell)
+                return true;
+        }
+
+        return false;
+    }
+
+    private bool IsCellOccupiedOnSortingLayerForSlot(
+        Vector3Int cell,
+        int sortingLayerId,
+        PlayerSlotId slot,
+        UnitData spawnData = null)
+    {
+        TryAutoAssignBoardTilemap();
+        if (boardTilemap == null)
+            return false;
+
+        if (spawnData != null && OccupancyResolver.IsLayerAwareRulesActive)
+        {
+            HeightBand spawnBand = OccupancyResolver.GetHeightBand(spawnData.domain, spawnData.heightLevel);
+            if (spawnBand == HeightBand.Blocking)
+            {
+                List<UnitManager> units = UnitOccupancyRules.GetUnitsAtCell(boardTilemap, cell);
+                for (int i = 0; i < units.Count; i++)
+                {
+                    UnitManager unit = units[i];
+                    if (unit != null
+                        && OccupancyResolver.GetHeightBand(unit) == spawnBand
+                        && (!UnitRulesDefinition.IsTotalWarEnabled() || unit.SlotIndex == slot.Value))
+                        return true;
+                }
+            }
+        }
+        else if (UnitRulesDefinition.IsTotalWarEnabled())
+        {
+            if (UnitRulesDefinition.IsUnitCellOccupiedForSlot(boardTilemap, cell, slot))
+                return true;
+        }
+        else if (UnitRulesDefinition.IsUnitCellOccupied(boardTilemap, cell))
+        {
+            return true;
+        }
+
+        ConstructionManager[] constructions = FindObjectsByType<ConstructionManager>(
+            FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        for (int i = 0; i < constructions.Length; i++)
+        {
+            ConstructionManager construction = constructions[i];
+            if (construction == null || !construction.gameObject.activeInHierarchy)
+                continue;
+            SpriteRenderer renderer = construction.GetComponentInChildren<SpriteRenderer>();
+            if (renderer == null || renderer.sortingLayerID != sortingLayerId)
+                continue;
+            Vector3Int occupiedCell = construction.BoardTilemap == boardTilemap
+                ? construction.CurrentCellPosition
+                : HexCoordinates.WorldToCell(boardTilemap, construction.transform.position);
             occupiedCell.z = 0;
             if (occupiedCell == cell)
                 return true;

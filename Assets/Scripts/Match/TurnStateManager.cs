@@ -578,7 +578,8 @@ public partial class TurnStateManager : MonoBehaviour
             return false;
         }
 
-        TeamId activeTeam = matchController.ActiveTeam;
+        PlayerSlotId activeSlot = matchController.ActiveSlotId;
+        TeamId activeTeam = matchController.GetVisualTeamForSlot(activeSlot);
         UnitManager[] units = FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
         int totalTeamUnits = 0;
         int wokeUnits = 0;
@@ -588,7 +589,7 @@ public partial class TurnStateManager : MonoBehaviour
         for (int i = 0; i < units.Length; i++)
         {
             UnitManager unit = units[i];
-            if (unit == null || unit.TeamId != activeTeam)
+            if (unit == null || unit.SlotIndex != activeSlot.Value)
                 continue;
 
             totalTeamUnits++;
@@ -608,7 +609,7 @@ public partial class TurnStateManager : MonoBehaviour
             wokeUnits++;
         }
 
-        message = $"Wake all units: time ativo {TeamUtils.GetName(activeTeam)} | reativadas {wokeUnits}/{totalTeamUnits}";
+        message = $"Wake all units: slot ativo {activeSlot.Value} ({TeamUtils.GetName(activeTeam)}) | reativadas {wokeUnits}/{totalTeamUnits}";
         if (clearedMergeUnits > 0)
             message += $" | fusao liberada {clearedMergeUnits}";
         if (restoredActiveUnits > 0)
@@ -667,7 +668,7 @@ public partial class TurnStateManager : MonoBehaviour
         return true;
     }
 
-    public bool TrySetActiveTeamFromDebug(int teamValue, out string message)
+    public bool TrySetActiveTeamFromDebug(int slotValue, out string message)
     {
         message = string.Empty;
         if (matchController == null)
@@ -676,24 +677,26 @@ public partial class TurnStateManager : MonoBehaviour
             return false;
         }
 
-        if (teamValue < (int)TeamId.Neutral || teamValue > (int)TeamId.Yellow)
+        PlayerSlotId nextSlot = PlayerSlotId.FromIndex(slotValue);
+        if (!matchController.IsValidPlayerSlot(nextSlot))
         {
-            message = $"Team invalido: {teamValue}. Use entre {(int)TeamId.Neutral} e {(int)TeamId.Yellow}.";
+            message = $"Slot invalido: {slotValue}. Use um slot configurado da partida.";
             return false;
         }
 
-        TeamId previous = matchController.ActiveTeam;
-        TeamId next = (TeamId)teamValue;
-        if (previous == next)
+        PlayerSlotId previousSlot = matchController.ActiveSlotId;
+        TeamId previousTeam = matchController.GetVisualTeamForSlot(previousSlot);
+        TeamId nextTeam = matchController.GetVisualTeamForSlot(nextSlot);
+        if (previousSlot == nextSlot)
         {
-            message = $"Time ativo ja e {TeamUtils.GetName(next)} ({(int)next}).";
+            message = $"Slot ativo ja e {nextSlot.Value} ({TeamUtils.GetName(nextTeam)}).";
             return true;
         }
 
         UnitManager previouslySelected = selectedUnit;
         bool keepSelection =
             previouslySelected != null &&
-            previouslySelected.TeamId == next &&
+            previouslySelected.SlotIndex == nextSlot.Value &&
             previouslySelected.gameObject.activeInHierarchy &&
             !previouslySelected.IsEmbarked;
 
@@ -703,7 +706,11 @@ public partial class TurnStateManager : MonoBehaviour
             ForceNeutral();
         }
 
-        matchController.SetActiveTeamIdWithoutTurnStart(teamValue);
+        if (!matchController.SetActiveSlotWithoutTurnStart(nextSlot))
+        {
+            message = $"Nao foi possivel ativar o slot {nextSlot.Value}.";
+            return false;
+        }
 
         if (keepSelection && cursorController != null)
         {
@@ -712,7 +719,7 @@ public partial class TurnStateManager : MonoBehaviour
             cursorController.SetCell(selectedCell, playMoveSfx: false, adjustCamera: true);
         }
 
-        message = $"Time ativo alterado: {TeamUtils.GetName(previous)} ({(int)previous}) -> {TeamUtils.GetName(next)} ({(int)next}) sem avancar turno.";
+        message = $"Participante ativo alterado: slot {previousSlot.Value} ({TeamUtils.GetName(previousTeam)}) -> slot {nextSlot.Value} ({TeamUtils.GetName(nextTeam)}) sem avancar turno.";
         Debug.Log($"[Debug Command] {message}");
         return true;
     }
@@ -1032,7 +1039,7 @@ public partial class TurnStateManager : MonoBehaviour
         return true;
     }
 
-    public bool TrySpawnUnitUnderCursorFromDebug(string unitToken, int? teamOverride, out string message)
+    public bool TrySpawnUnitUnderCursorFromDebug(string unitToken, int? slotOverride, out string message)
     {
         message = string.Empty;
 
@@ -1064,13 +1071,23 @@ public partial class TurnStateManager : MonoBehaviour
 
         Vector3Int cursorCell = cursorController.CurrentCell;
         cursorCell.z = 0;
-        int activeTeam = matchController != null ? matchController.ActiveTeamId : (int)TeamId.Green;
-        int resolvedTeam = teamOverride.HasValue ? teamOverride.Value : activeTeam;
-        TeamId teamId = (resolvedTeam >= (int)TeamId.Green && resolvedTeam <= (int)TeamId.Yellow)
-            ? (TeamId)resolvedTeam
-            : TeamId.Green;
+        if (matchController == null)
+        {
+            message = "MatchController nao encontrado.";
+            return false;
+        }
 
-        GameObject spawned = unitSpawner.SpawnAtCell(unitData, teamId, cursorCell);
+        PlayerSlotId slot = slotOverride.HasValue
+            ? PlayerSlotId.FromIndex(slotOverride.Value)
+            : matchController.ActiveSlotId;
+        if (!matchController.IsValidPlayerSlot(slot))
+        {
+            message = $"Slot invalido para spawn: {slot.Value}.";
+            return false;
+        }
+        TeamId teamId = matchController.GetVisualTeamForSlot(slot);
+
+        GameObject spawned = unitSpawner.SpawnAtCellForSlot(unitData, slot, cursorCell);
         if (spawned == null)
         {
             message = $"Falha ao spawnar {ResolveDebugUnitDataName(unitData)} em {FormatMapCellWithZ(cursorCell)}. Hex pode estar ocupado.";
@@ -1080,7 +1097,7 @@ public partial class TurnStateManager : MonoBehaviour
         EnsureDebugSpawnRegisteredInAllActive(spawned);
         UnitManager spawnedUnit = spawned.GetComponent<UnitManager>();
         ThreatRevisionTracker.NotifyUnitSpawned(spawnedUnit);
-        message = $"Spawnado: {ResolveDebugUnitDataName(unitData)} em {FormatMapCellWithZ(cursorCell)} para team {TeamUtils.GetName(teamId)}.";
+        message = $"Spawnado: {ResolveDebugUnitDataName(unitData)} em {FormatMapCellWithZ(cursorCell)} para slot {slot.Value} ({TeamUtils.GetName(teamId)}).";
         Debug.Log($"[Debug Command] {message}");
         return true;
     }
@@ -1159,22 +1176,33 @@ public partial class TurnStateManager : MonoBehaviour
         matchController.RefreshFogOfWarForActiveTeam();
     }
 
-    public bool TrySetConstructionTeamUnderCursorFromDebug(int teamValue, out string message)
+    public bool TrySetConstructionTeamUnderCursorFromDebug(int slotValue, out string message)
     {
         message = string.Empty;
         if (!TryGetConstructionUnderCursorForDebug(out ConstructionManager target, out Vector3Int cursorCell, out message))
             return false;
 
-        if (teamValue < (int)TeamId.Neutral || teamValue > (int)TeamId.Yellow)
+        if (slotValue == -1)
         {
-            message = $"Team invalido: {teamValue}. Use entre {(int)TeamId.Neutral} e {(int)TeamId.Yellow}.";
+            TeamId beforeNeutral = target.TeamId;
+            target.SetOwnerSlot(-1);
+            message = $"Construcao atualizada: {target.name} slot {target.SlotIndex} ({TeamUtils.GetName(beforeNeutral)}) -> neutro em {FormatMapCellWithZ(cursorCell)}.";
+            Debug.Log($"[Debug Command] {message}");
+            return true;
+        }
+
+        PlayerSlotId nextSlot = PlayerSlotId.FromIndex(slotValue);
+        if (matchController == null || !matchController.IsValidPlayerSlot(nextSlot))
+        {
+            message = $"Slot invalido: {slotValue}. Use -1 para neutro ou um slot configurado.";
             return false;
         }
 
-        TeamId before = target.TeamId;
-        TeamId next = (TeamId)teamValue;
-        target.SetTeamId(next);
-        message = $"Construcao atualizada: {target.name} team {TeamUtils.GetName(before)} -> {TeamUtils.GetName(next)} em {FormatMapCellWithZ(cursorCell)}.";
+        int beforeSlot = target.SlotIndex;
+        TeamId beforeTeam = target.TeamId;
+        target.SetOwnerSlot(nextSlot.Value);
+        TeamId nextTeam = matchController.GetVisualTeamForSlot(nextSlot);
+        message = $"Construcao atualizada: {target.name} slot {beforeSlot} ({TeamUtils.GetName(beforeTeam)}) -> slot {nextSlot.Value} ({TeamUtils.GetName(nextTeam)}) em {FormatMapCellWithZ(cursorCell)}.";
         Debug.Log($"[Debug Command] {message}");
         return true;
     }

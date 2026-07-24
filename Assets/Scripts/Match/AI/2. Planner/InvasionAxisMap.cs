@@ -147,6 +147,22 @@ public class InvasionAxisMap
         foreach (var kv in porHQ)
             map.BuildFan(board, kv.Key, kv.Value, setores);
 
+        // CASO BASE: este slot nao tem rally nenhum. Em vez de ficar sem leque (e portanto sem
+        // corredor, sem frente e com todo setor fora de eixo), os QGs INIMIGOS viram os apices.
+        //
+        // A base inimiga e o unico no que TODO mapa tem por definicao — e a condicao de vitoria.
+        // Com ela como apice, o leque degrada sozinho:
+        //   so QGs          -> N eixos (um por inimigo), corredor vazio, frente = base inimiga
+        //   cidades s/ rally -> N eixos e as cidades se distribuem por angulo: corredor nasce
+        //   cidades + rally  -> nao passa por aqui; o rally refina como sempre
+        // Assim o rally deixa de ser PRE-CONDICAO do leque e vira REFINAMENTO dele.
+        //
+        // Escopo conservador de proposito (so quando porHQ esta vazio): se as bases entrassem no
+        // leque JUNTO com os rallies, setores de campo poderiam ser reivindicados por um eixo-de-base
+        // em vez do eixo-de-rally deles, mudando corredor nos mapas ja calibrados.
+        if (porHQ.Count == 0)
+            map.BuildEnemyBaseFan(board, slotId, allHqs, setores);
+
         // Numeracao global por angulo (esq->dir): EixoIndex = 1..N. Preenche setor->eixo.
         map.axes.Sort((a, b) => a.RallyAngleDeg.CompareTo(b.RallyAngleDeg));
         for (int i = 0; i < map.axes.Count; i++)
@@ -250,16 +266,75 @@ public class InvasionAxisMap
             Vector3Int candidateCell = candidate.CurrentCellPosition;
             candidateCell.z = 0;
             float distance = SectorManager.HexDistance(hqCell, candidateCell);
-            if (distance >= bestDistance)
+
+            // Desempate DETERMINISTICO. Antes era "distance >= bestDistance -> continue" (menor
+            // ESTRITO), entao em empate vencia o primeiro encontrado — e a ordem vem de
+            // ConstructionManager.AllActive, isto e, ordem de CENA. Num mapa simetrico (4 QGs nos
+            // cantos) as distancias empatam exatamente e o alvo da invasao virava sorteio, nao
+            // reproduzivel entre execucoes: inviabiliza qualquer teste A/B ou mapa de controle.
+            // Empate agora resolve pelo menor SlotIndex, que e estavel e independe da cena.
+            const float tieEpsilon = 0.01f;
+            bool better = best == null
+                || distance < bestDistance - tieEpsilon
+                || (Mathf.Abs(distance - bestDistance) <= tieEpsilon
+                    && candidate.SlotIndex < best.SlotIndex);
+            if (!better)
                 continue;
+
             bestDistance = distance;
             best = candidate;
         }
         return best;
     }
 
+    // CASO BASE do leque: sem rally deste slot, usa os QGs INIMIGOS como apices.
+    // Um eixo por inimigo — a geometria passa a existir em qualquer mapa, inclusive num
+    // tabuleiro so de QGs, onde antes o planner ficava sem eixo e todo setor virava rogue.
+    private void BuildEnemyBaseFan(
+        Tilemap board,
+        PlayerSlotId slotId,
+        List<ConstructionManager> allHqs,
+        List<SectorManager.SectorInfo> setores)
+    {
+        ConstructionManager ownHq = null;
+        var enemyHqs = new List<ConstructionManager>();
+        foreach (ConstructionManager h in allHqs)
+        {
+            if (h == null) continue;
+            if (h.SlotIndex == slotId.Value)
+            {
+                if (ownHq == null) ownHq = h;
+            }
+            else
+            {
+                enemyHqs.Add(h);
+            }
+        }
+        if (ownHq == null || enemyHqs.Count == 0)
+            return;
+
+        // Ordem estavel: os apices vem de allHqs (ordem de cena). Ordenar por slot deixa a
+        // numeracao angular reproduzivel quando dois inimigos empatam em angulo — mesma razao
+        // do desempate em FindNearestEnemyHq.
+        enemyHqs.Sort((a, b) => a.SlotIndex.CompareTo(b.SlotIndex));
+
+        // markAsInvasion: estes eixos MIRAM base inimiga, entao carregam a mesma semantica do
+        // eixo sintetico de invasao — a demanda de transporte segue gateada por GoGreen/IsInvading
+        // em vez de abrir junto com o eixo (preserva o comportamento atual do APC).
+        BuildFan(board, ownHq, enemyHqs, setores,
+            ownerSlotOverride: slotId.Value, markAsInvasion: true);
+    }
+
     // Leque angular para um grupo de rallys que compartilham o mesmo HQ-apex.
-    private void BuildFan(Tilemap map, ConstructionManager hq, List<ConstructionManager> rallies, List<SectorManager.SectorInfo> setores)
+    // ownerSlotOverride: quando os apices NAO sao rallys proprios (caso base: QGs inimigos), o
+    // RallyOwnerSlotIndex do apice nao representa o dono do eixo — passa o slot correto por aqui.
+    private void BuildFan(
+        Tilemap map,
+        ConstructionManager hq,
+        List<ConstructionManager> rallies,
+        List<SectorManager.SectorInfo> setores,
+        int ownerSlotOverride = -1,
+        bool markAsInvasion = false)
     {
         if (rallies.Count == 0) return;
         Vector3Int hqCell = hq.CurrentCellPosition; hqCell.z = 0;
@@ -304,12 +379,15 @@ public class InvasionAxisMap
             byRally[i].Sort((a, b) => a.dist.CompareTo(b.dist));
             var axis = new Axis
             {
-                RallyOwnerSlotIndex = rallies[i].RallyOwnerSlotIndex,
+                RallyOwnerSlotIndex = ownerSlotOverride >= 0
+                    ? ownerSlotOverride
+                    : rallies[i].RallyOwnerSlotIndex,
                 Team = Team,
                 RallySector = rallies[i].Sector,
                 HqCell = hqCell,
                 RallyCell = rallyCell[i],
                 RallyAngleDeg = rallyAng[i],
+                IsInvasionAxis = markAsInvasion,
             };
             foreach (var (info, _) in byRally[i])
                 axis.Corridor.Add(info.Sector);

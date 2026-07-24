@@ -275,13 +275,13 @@ public class PanelDebugController : MonoBehaviour
             if (!executed && !string.IsNullOrWhiteSpace(message))
                 Debug.Log($"[Debug Command] {message}");
         }
-        else if (TryParseSetActiveTeamCommand(command, out int activeTeamValue))
+        else if (TryParseSetActiveTeamCommand(command, out int activeSlotValue))
         {
-            executed = turnStateManager.TrySetActiveTeamFromDebug(activeTeamValue, out string message);
+            executed = turnStateManager.TrySetActiveTeamFromDebug(activeSlotValue, out string message);
             if (executed)
             {
                 cursorController?.PlayDoneSfx();
-                PanelDialogController.TrySetTransientText($"DEBUG: Active Team forced to {activeTeamValue}", 2.6f);
+                PanelDialogController.TrySetTransientText($"DEBUG: Active Slot forced to {activeSlotValue}", 2.6f);
             }
             if (!string.IsNullOrWhiteSpace(message))
                 Debug.Log($"[Debug Command] {message}");
@@ -343,17 +343,17 @@ public class PanelDebugController : MonoBehaviour
             else if (!string.IsNullOrWhiteSpace(message))
                 Debug.Log($"[Debug Command] {message}");
         }
-        else if (TryParseSetConstructionTeamCommand(command, out int constructionTeam))
+        else if (TryParseSetConstructionTeamCommand(command, out int constructionSlot))
         {
-            executed = turnStateManager.TrySetConstructionTeamUnderCursorFromDebug(constructionTeam, out string message);
+            executed = turnStateManager.TrySetConstructionTeamUnderCursorFromDebug(constructionSlot, out string message);
             if (executed)
                 cursorController?.PlayDoneSfx();
             else if (!string.IsNullOrWhiteSpace(message))
                 Debug.Log($"[Debug Command] {message}");
         }
-        else if (TryParseSetOwnerCommand(command, out int ownerTeam))
+        else if (TryParseSetOwnerCommand(command, out int ownerSlot))
         {
-            executed = turnStateManager.TrySetConstructionTeamUnderCursorFromDebug(ownerTeam, out string message);
+            executed = turnStateManager.TrySetConstructionTeamUnderCursorFromDebug(ownerSlot, out string message);
             if (executed)
                 cursorController?.PlayDoneSfx();
             else if (!string.IsNullOrWhiteSpace(message))
@@ -391,23 +391,23 @@ public class PanelDebugController : MonoBehaviour
             else if (!string.IsNullOrWhiteSpace(message))
                 Debug.Log($"[Debug Command] {message}");
         }
-        else if (TryParseSpawnCommand(rawCommand, out int? teamOverride, out string unitToken))
+        else if (TryParseSpawnCommand(rawCommand, out int? slotOverride, out string unitToken))
         {
-            executed = turnStateManager.TrySpawnUnitUnderCursorFromDebug(unitToken, teamOverride, out string message);
+            executed = turnStateManager.TrySpawnUnitUnderCursorFromDebug(unitToken, slotOverride, out string message);
             if (executed)
                 cursorController?.PlayLoadSfx();
             else if (!string.IsNullOrWhiteSpace(message))
                 Debug.Log($"[Debug Command] {message}");
         }
-        else if (TryParseAdjustMoneyCommand(rawCommand, out int? moneyTeamOverride, out int moneyDelta))
+        else if (TryParseAdjustMoneyCommand(rawCommand, out int? moneySlotOverride, out int moneyDelta))
         {
             if (matchController == null)
             {
                 Debug.Log("[Debug Command] MatchController nao encontrado.");
             }
-            else if (moneyTeamOverride.HasValue)
+            else if (moneySlotOverride.HasValue)
             {
-                PlayerSlotId slot = PlayerSlotId.FromIndex(Mathf.Clamp(moneyTeamOverride.Value, 0, 3));
+                PlayerSlotId slot = PlayerSlotId.FromIndex(Mathf.Clamp(moneySlotOverride.Value, 0, 3));
                 int currentMoney = matchController.GetActualMoney(slot);
                 int adjustedMoney = ClampMoneyDelta(currentMoney, moneyDelta);
                 executed = matchController.TrySetActualMoney(slot, adjustedMoney);
@@ -438,15 +438,15 @@ public class PanelDebugController : MonoBehaviour
                 }
             }
         }
-        else if (TryParseSetMoneyCommand(rawCommand, out moneyTeamOverride, out int moneyValue))
+        else if (TryParseSetMoneyCommand(rawCommand, out moneySlotOverride, out int moneyValue))
         {
             if (matchController == null)
             {
                 Debug.Log("[Debug Command] MatchController nao encontrado.");
             }
-            else if (moneyTeamOverride.HasValue)
+            else if (moneySlotOverride.HasValue)
             {
-                PlayerSlotId slot = PlayerSlotId.FromIndex(Mathf.Clamp(moneyTeamOverride.Value, 0, 3));
+                PlayerSlotId slot = PlayerSlotId.FromIndex(Mathf.Clamp(moneySlotOverride.Value, 0, 3));
                 executed = matchController.TrySetActualMoney(slot, moneyValue);
                 if (executed)
                 {
@@ -928,9 +928,9 @@ public class PanelDebugController : MonoBehaviour
         return true;
     }
 
-    private static bool TryParseSetConstructionTeamCommand(string normalizedCommand, out int teamValue)
+    private static bool TryParseSetConstructionTeamCommand(string normalizedCommand, out int slotValue)
     {
-        teamValue = 0;
+        slotValue = 0;
         if (string.IsNullOrWhiteSpace(normalizedCommand))
             return false;
 
@@ -942,12 +942,12 @@ public class PanelDebugController : MonoBehaviour
         if (string.IsNullOrWhiteSpace(valueToken))
             return false;
 
-        return int.TryParse(valueToken, out teamValue);
+        return int.TryParse(valueToken, out slotValue);
     }
 
-    private static bool TryParseSetOwnerCommand(string normalizedCommand, out int teamValue)
+    private static bool TryParseSetOwnerCommand(string normalizedCommand, out int slotValue)
     {
-        teamValue = 0;
+        slotValue = 0;
         if (string.IsNullOrWhiteSpace(normalizedCommand))
             return false;
 
@@ -959,12 +959,12 @@ public class PanelDebugController : MonoBehaviour
         if (string.IsNullOrWhiteSpace(valueToken))
             return false;
 
-        return int.TryParse(valueToken, out teamValue);
+        return int.TryParse(valueToken, out slotValue);
     }
 
-    private static bool TryParseSetActiveTeamCommand(string normalizedCommand, out int teamValue)
+    private static bool TryParseSetActiveTeamCommand(string normalizedCommand, out int slotValue)
     {
-        teamValue = 0;
+        slotValue = 0;
         if (string.IsNullOrWhiteSpace(normalizedCommand))
             return false;
 
@@ -976,14 +976,14 @@ public class PanelDebugController : MonoBehaviour
         if (string.IsNullOrWhiteSpace(valueToken))
             return false;
 
-        return int.TryParse(valueToken, out teamValue);
+        return int.TryParse(valueToken, out slotValue);
     }
 
     private static string BuildDebugHelpSummary()
     {
         return
             "wake unit - acorda unidade no cursor\n" +
-            "wake all units - acorda todas unidades do time ativo\n" +
+            "wake all units - acorda todas unidades do slot ativo\n" +
             "destroy unit | remove unit - destroi unidade no cursor\n" +
             "set position - sincroniza a unidade selecionada no Scene/Hierarchy com o hex do Transform\n" +
             "refresh cache | refresh caches | reset cache - invalida caches, republica o FoW (unidades novas entram em alvos/visao; exige estado Neutral) e recalcula os sensores\n" +
@@ -997,14 +997,14 @@ public class PanelDebugController : MonoBehaviour
             "set ammo <v> | set ammo:<idx> <v>\n" +
             "set galao <v> | set galoes <v> | set caixas <v> | set pecas <v> (unidade ou construcao no cursor)\n" +
             "refuel unit | rearm unit | repair unit\n" +
-            "set construction team <x>\n" +
-            "set owner <x> (alias, -1 neutro, 0 verde, 1 azul, 2 vermelho, 3 amarelo)\n" +
-            "set active team <x> (troca time ativo sem avancar turno)\n" +
+            "set construction team <slot> (nome legado; -1 deixa neutro)\n" +
+            "set owner <slot> (alias; -1 deixa neutro)\n" +
+            "set active team <slot> (troca participante ativo sem avancar turno)\n" +
             "set capture points <v>\n" +
             "set selling rules <free|original [slot]|first [slot]|disabled> (prédio no cursor)\n" +
             "spawn <unit> | ai spawn <unit>\n" +
-            "spawn:<team> <unit>\n" +
-            "set money <v> | set money +<v> | set money:<team> <v>\n" +
+            "spawn:<slot> <unit>\n" +
+            "set money <v> | set money +<v> | set money:<slot> <v>\n" +
             "set economy on|off\n" +
             "altitude high|low (aeronave no ar)\n" +
             "change altitude high|low (legado)\n" +
@@ -1056,9 +1056,9 @@ public class PanelDebugController : MonoBehaviour
         return int.TryParse(valueToken, out capturePointsValue);
     }
 
-    private static bool TryParseSpawnCommand(string rawCommand, out int? teamOverride, out string unitToken)
+    private static bool TryParseSpawnCommand(string rawCommand, out int? slotOverride, out string unitToken)
     {
-        teamOverride = null;
+        slotOverride = null;
         unitToken = string.Empty;
         if (string.IsNullOrWhiteSpace(rawCommand))
             return false;
@@ -1074,13 +1074,13 @@ public class PanelDebugController : MonoBehaviour
             if (firstSpace <= 0)
                 return false;
 
-            string teamToken = remainder.Substring(0, firstSpace).Trim();
-            if (!int.TryParse(teamToken, out int parsedTeam))
+            string slotToken = remainder.Substring(0, firstSpace).Trim();
+            if (!int.TryParse(slotToken, out int parsedSlot))
                 return false;
-            if (parsedTeam < 0 || parsedTeam > 3)
+            if (parsedSlot < 0 || parsedSlot > 3)
                 return false;
 
-            teamOverride = parsedTeam;
+            slotOverride = parsedSlot;
             unitToken = remainder.Substring(firstSpace + 1).Trim();
             return !string.IsNullOrWhiteSpace(unitToken);
         }
@@ -1100,9 +1100,9 @@ public class PanelDebugController : MonoBehaviour
         return !string.IsNullOrWhiteSpace(unitToken);
     }
 
-    private static bool TryParseSetMoneyCommand(string rawCommand, out int? teamOverride, out int moneyValue)
+    private static bool TryParseSetMoneyCommand(string rawCommand, out int? slotOverride, out int moneyValue)
     {
-        teamOverride = null;
+        slotOverride = null;
         moneyValue = 0;
         if (string.IsNullOrWhiteSpace(rawCommand))
             return false;
@@ -1116,16 +1116,16 @@ public class PanelDebugController : MonoBehaviour
             if (firstSpace <= 0)
                 return false;
 
-            string teamToken = remainder.Substring(0, firstSpace).Trim();
+            string slotToken = remainder.Substring(0, firstSpace).Trim();
             string valueToken = remainder.Substring(firstSpace + 1).Trim();
-            if (!int.TryParse(teamToken, out int parsedTeam))
+            if (!int.TryParse(slotToken, out int parsedSlot))
                 return false;
-            if (parsedTeam < 0 || parsedTeam > 3)
+            if (parsedSlot < 0 || parsedSlot > 3)
                 return false;
             if (!int.TryParse(valueToken, out moneyValue))
                 return false;
 
-            teamOverride = parsedTeam;
+            slotOverride = parsedSlot;
             return true;
         }
 
@@ -1137,9 +1137,9 @@ public class PanelDebugController : MonoBehaviour
         return int.TryParse(valueOnly, out moneyValue);
     }
 
-    private static bool TryParseAdjustMoneyCommand(string rawCommand, out int? teamOverride, out int moneyDelta)
+    private static bool TryParseAdjustMoneyCommand(string rawCommand, out int? slotOverride, out int moneyDelta)
     {
-        teamOverride = null;
+        slotOverride = null;
         moneyDelta = 0;
         if (string.IsNullOrWhiteSpace(rawCommand))
             return false;
@@ -1153,18 +1153,18 @@ public class PanelDebugController : MonoBehaviour
             if (firstSpace <= 0)
                 return false;
 
-            string teamToken = remainder.Substring(0, firstSpace).Trim();
+            string slotToken = remainder.Substring(0, firstSpace).Trim();
             string valueToken = remainder.Substring(firstSpace + 1).Trim();
             if (!IsSignedDeltaToken(valueToken))
                 return false;
-            if (!int.TryParse(teamToken, out int parsedTeam))
+            if (!int.TryParse(slotToken, out int parsedSlot))
                 return false;
-            if (parsedTeam < 0 || parsedTeam > 3)
+            if (parsedSlot < 0 || parsedSlot > 3)
                 return false;
             if (!int.TryParse(valueToken, out moneyDelta))
                 return false;
 
-            teamOverride = parsedTeam;
+            slotOverride = parsedSlot;
             return true;
         }
 

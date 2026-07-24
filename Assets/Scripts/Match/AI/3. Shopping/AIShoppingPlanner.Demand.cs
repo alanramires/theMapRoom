@@ -1958,14 +1958,55 @@ public partial class AIShoppingPlanner
         return false;
     }
 
+    // Alvos do núcleo, JÁ descontando componentes que este mapa não vende. Ponto único: o gate
+    // (HasOperationalCore) e o gradiente (ComputeOperationalCoreMaturity) precisam enxergar
+    // exatamente os mesmos alvos, senão divergem e a maturidade nunca chega a 1 com o gate aberto.
+    private static void ResolveOperationalCoreTargets(
+        AIWorldSnapshot snapshot,
+        out int capturerTarget,
+        out int assaultTarget,
+        out int artilleryTarget)
+    {
+        // Composição mínima do núcleo (gate de elite) vem do AI Manager, com par por modo (normal/hard).
+        capturerTarget  = AIController.Instance != null ? AIController.Instance.CoreMinInfantry  : 2;
+        assaultTarget   = AIController.Instance != null ? AIController.Instance.CoreMinAssault   : 2;
+        artilleryTarget = AIController.Instance != null ? AIController.Instance.CoreMinArtillery : 1;
+
+        // Componente INSATISFAZÍVEL sai da conta: exigir artilharia num mapa cujos produtores não
+        // ofertam artilharia trava o elite para sempre (mesmo padrão do "gate inaplicável" do rally).
+        // Foi essa rigidez que obrigou o bootstrap do MBT no Hard a furar o próprio gate — o código
+        // chama de catch-22 em ComputeBlitzFirstArmorReserve.
+        if (capturerTarget > 0 && !CanAnyOfferedUnitCloseCore(snapshot, UnitRole.Capturador))
+            capturerTarget = 0;
+        if (assaultTarget > 0 && !CanAnyOfferedUnitCloseCore(snapshot, UnitRole.Assalto))
+            assaultTarget = 0;
+        if (artilleryTarget > 0 && !CanAnyOfferedUnitCloseCore(snapshot, UnitRole.FogoIndireto))
+            artilleryTarget = 0;
+    }
+
+    // Algum produtor da IA oferta unidade que CONTA para este componente do núcleo?
+    // Usa ResolveCompositionRole de propósito — é o mesmo predicado de CountCompositionRole. Usar
+    // CanSatisfy aqui faria um CapturadorAgressivo "prometer" fechar o slot de Assalto que ele nunca
+    // conta, e o alvo continuaria inalcançável.
+    private static bool CanAnyOfferedUnitCloseCore(AIWorldSnapshot snapshot, UnitRole role)
+    {
+        if (snapshot?.MyBuildings == null)
+            return true; // sem informação de oferta: não afrouxa o gate
+        foreach (ConstructionManager building in snapshot.MyBuildings)
+        {
+            if (building == null || building.OfferedUnits == null) continue;
+            foreach (UnitData offered in building.OfferedUnits)
+                if (offered != null && UnitRoleCompatibility.ResolveCompositionRole(offered) == role)
+                    return true;
+        }
+        return false;
+    }
+
     private static bool HasOperationalCore(AIWorldSnapshot snapshot)
     {
         if (snapshot == null)
             return false;
-        // Composição mínima do núcleo (gate de elite) vem do AI Manager, com par por modo (normal/hard).
-        int capturerTarget  = AIController.Instance != null ? AIController.Instance.CoreMinInfantry  : 2;
-        int assaultTarget   = AIController.Instance != null ? AIController.Instance.CoreMinAssault   : 2;
-        int artilleryTarget = AIController.Instance != null ? AIController.Instance.CoreMinArtillery : 1;
+        ResolveOperationalCoreTargets(snapshot, out int capturerTarget, out int assaultTarget, out int artilleryTarget);
         return CountCompositionRole(snapshot, UnitRole.Capturador) >= capturerTarget
             && CountCompositionRole(snapshot, UnitRole.Assalto) >= assaultTarget
             && CountCompositionRole(snapshot, UnitRole.FogoIndireto) >= artilleryTarget;
@@ -1975,10 +2016,9 @@ public partial class AIShoppingPlanner
     {
         if (snapshot == null)
             return 0f;
-        // Mesma composição-alvo do gate de elite (AI Manager, par por modo). Alvo 0 = componente já satisfeito.
-        int capturerTarget  = AIController.Instance != null ? AIController.Instance.CoreMinInfantry  : 2;
-        int assaultTarget   = AIController.Instance != null ? AIController.Instance.CoreMinAssault   : 2;
-        int artilleryTarget = AIController.Instance != null ? AIController.Instance.CoreMinArtillery : 1;
+        // Mesma composição-alvo do gate de elite, pelo MESMO resolvedor (inclui o desconto de
+        // componente insatisfazível). Alvo 0 = componente já satisfeito.
+        ResolveOperationalCoreTargets(snapshot, out int capturerTarget, out int assaultTarget, out int artilleryTarget);
         float capturer = capturerTarget <= 0 ? 1f : Mathf.Clamp01(
             CountCompositionRole(snapshot, UnitRole.Capturador) / (float)capturerTarget);
         float assault = assaultTarget <= 0 ? 1f : Mathf.Clamp01(
@@ -2837,10 +2877,34 @@ public partial class AIShoppingPlanner
             score += IsShoppingRallyBreakthroughUnit(unit) ? 90000 : -300000;
 
         bool eliteReady = IsEliteEconomyReady(snapshot, unit, remaining, concentrate);
-        if (unit.eliteLevel > 0)
+        bool eliteBudgetRole = demand.Role == UnitRole.Assalto
+            || demand.Role == UnitRole.FogoIndireto || demand.Role == UnitRole.AtaqueAereo;
+
+        // GATE DE NÚCLEO SUAVE (opcional). O gate duro faz DUAS coisas de uma vez quando a
+        // composição não fechou: bane o elite (-120000) E desliga o nudge anti-barato (-25000).
+        // Resultado perverso: numa demanda de fogo indireto o obus fraco vence por WO — não por
+        // mérito, mas porque os concorrentes foram removidos. E comprá-lo é justamente o que fecha
+        // o núcleo, ou seja, a IA paga o pedágio com lixo para abrir a própria cancela.
+        // No modo suave a maturidade (0..1) vira PESO contínuo: com o núcleo quase pronto o elite
+        // tem desvantagem modesta em vez de banimento, e a IA escolhe se compensa.
+        // O piso de CAIXA continua duro — isso é poder de compra, não doutrina.
+        bool softGate = AIController.Instance != null
+            && AIController.Instance.SoftCoreGate
+            && !concentrate
+            && HasEliteCashFloor(snapshot, unit, remaining);
+
+        if (softGate)
+        {
+            float maturity = ComputeOperationalCoreMaturity(snapshot);
+            if (unit.eliteLevel > 0)
+                score += Mathf.RoundToInt(
+                    Mathf.Lerp(-120000f, 65000f + unit.eliteLevel * 18000f, maturity));
+            else if (eliteBudgetRole)
+                score -= Mathf.RoundToInt(25000f * maturity);
+        }
+        else if (unit.eliteLevel > 0)
             score += eliteReady ? 65000 + unit.eliteLevel * 18000 : -120000;
-        else if (eliteReady && (demand.Role == UnitRole.Assalto
-            || demand.Role == UnitRole.FogoIndireto || demand.Role == UnitRole.AtaqueAereo))
+        else if (eliteReady && eliteBudgetRole)
             score -= 25000;
 
         // Demanda de CAPTURA pura: o capturador dedicado (roles[0]==Capturador, ex.: Soldado) tem que
@@ -3226,10 +3290,18 @@ public partial class AIShoppingPlanner
         return unit.aiPurchaseMode == AIPurchaseMode.Offensive;
     }
 
+    // Poder de compra puro, separado da composição: o gate suave precisa manter ESTE piso duro
+    // (não adianta "escolher" um elite que o caixa não banca) enquanto suaviza só a doutrina.
+    private static bool HasEliteCashFloor(AIWorldSnapshot snapshot, UnitData unit, int remaining)
+    {
+        if (snapshot == null || unit == null)
+            return false;
+        return remaining >= Mathf.Max(unit.cost, Mathf.Max(1, snapshot.IncomePerTurn));
+    }
+
     private static bool IsEliteEconomyReady(AIWorldSnapshot snapshot, UnitData unit, int remaining, bool concentrate = false)
     {
-        int cashFloor = Mathf.Max(unit.cost, Mathf.Max(1, snapshot.IncomePerTurn));
-        if (remaining < cashFloor)
+        if (!HasEliteCashFloor(snapshot, unit, remaining))
             return false;
         // Unidade ELITE: pode liberar abaixo do piso de massa se o caixa banca o elite E os corpos
         // que faltam pra fechar a massa (ver IsEliteArmyFloorOrBudgetReady). Unidade COMUM (usada no

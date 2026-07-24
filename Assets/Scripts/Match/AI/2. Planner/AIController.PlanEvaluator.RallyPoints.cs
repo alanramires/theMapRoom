@@ -1866,6 +1866,48 @@ public partial class AIController
         return false;
     }
 
+    // TRUE se o mapa TEM algum rally DESIGNADO para este SLOT (podendo ainda nao estar conquistado).
+    //
+    // O gate de invasao (so invade a base inimiga com um rally governado/GoGreen) colapsa duas
+    // situacoes diferentes num mesmo "false":
+    //   (a) "existe rally meu, mas ainda nao conquistei" -> gate LEGITIMO: bloqueia e espera
+    //   (b) "nao ha rally meu neste mapa"                -> gate INAPLICAVEL: bloquearia pra sempre
+    // Em (b) o planner ficava criando e dissolvendo a invasao todo turno e o plano nunca saia do
+    // zero — num mapa so de QGs (tabuleiro de teste) a AI nunca atacava pelo plano, so pelo
+    // fallback generico do HexEvaluator.
+    //
+    // Escopo por SLOT, nao global: rally e DESIGNADO por slot via RallyOwnerSlotIndex (a
+    // "intencao de dono quando conquistado", ver IsRallyOwnedBySlot). Um mapa pode ter rally do
+    // slot 0 e nenhum do slot 1 — um teste global devolveria "gate aplicavel" pro slot 1 e
+    // recriaria o bug exatamente para ele.
+    //
+    // Usa RallyOwnerSlotIndex (designacao), NAO SlotIndex (posse atual): rally meu ainda por
+    // conquistar mantem o gate valendo, e a AI vai captura-lo antes de invadir — filtrar por posse
+    // abriria a invasao no turno 1 de qualquer mapa, o gotejamento suicida que o gate impede.
+    //
+    // RallyOwnerSlotIndex < 0 = sem dono explicito (InvasionAxisMap.FindAxisHQ resolve pelo HQ mais
+    // proximo), logo PODE ser meu: conta como aplicavel. Na duvida preserva o comportamento atual.
+    //
+    // Mesmo padrao que IsOffAxisCaptureGatedByRally ja usa (RallyPointCount <= 0 => nao trava)
+    // e que GetEffectiveTransportThresholdForSlot usa no transporte (limiar adapta em mapa curto).
+    // Slot nao resolvido (aiSlotIndex < 0) cai no lado CONSERVADOR: qualquer rally do mapa conta,
+    // preservando o gate como esta hoje. Falhar "aberto" aqui liberaria invasao por acidente de
+    // resolucao de slot — o oposto do que o gate existe para impedir.
+    private static bool MapHasAnyRallyPointForSlot(int aiSlotIndex)
+    {
+        IReadOnlyList<ConstructionManager> all = ConstructionManager.AllActive;
+        if (all == null) return false;
+        bool slotUnknown = aiSlotIndex < 0;
+        for (int i = 0; i < all.Count; i++)
+        {
+            ConstructionManager c = all[i];
+            if (c == null || !c.IsRallyPoint) continue;
+            if (slotUnknown || c.RallyOwnerSlotIndex < 0 || c.RallyOwnerSlotIndex == aiSlotIndex)
+                return true;
+        }
+        return false;
+    }
+
     private static bool TryFindOwnedRallyForSector(
         ConstructionSector sector,
         TeamId aiTeam,

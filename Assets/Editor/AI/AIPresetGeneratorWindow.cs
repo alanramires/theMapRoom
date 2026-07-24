@@ -190,6 +190,7 @@ public class AIPresetGeneratorWindow : EditorWindow
         preset.capacidades.conscricaoSempre = false;
         preset.capacidades.conscricaoQuandoPerdendo = false;
         preset.capacidades.politicaLadoForteFraco = Bool(so, "strongWeakSidePolitic");
+        preset.capacidades.gateNucleoSuave = Bool(so, "softCoreGate");
 
         // --- economia (lado NORMAL dos pares)
         preset.economia.fracaoRendaForaDeCidades = 1f;

@@ -109,6 +109,11 @@ public partial class AIController
         // A invasao (base inimiga ">>") so persiste enquanto a AI GOVERNA algum rally. Sem rally
         // held, o objetivo de invasao e dissolvido no Passo 1 e suas unidades voltam ao pool.
         bool anyRallyHeld = AnyOwnedRallyHeld(aiTeam, rallyContext);
+        // ...MAS so quando o gate e satisfazivel. Sem nenhum rally designado para este SLOT,
+        // anyRallyHeld e false pra sempre e a invasao era criada e dissolvida todo turno, num ciclo
+        // que nunca convergia. Ver MapHasAnyRallyPointForSlot: distingue "ainda nao conquistei" de
+        // "nao existe rally meu neste mapa".
+        bool rallyGateApplicableForDissolve = MapHasAnyRallyPointForSlot(snapshot.AISlotIndex);
 
         // Passo 1: valida objetivos existentes
         for (int i = plan.Objectives.Count - 1; i >= 0; i--)
@@ -117,7 +122,8 @@ public partial class AIController
 
             // Invasao (base inimiga ">>") sem rally governado: dissolve e LIBERA as unidades para
             // outros planos que precisem delas (em vez de marcharem sozinhas ate o QG inimigo).
-            if (!anyRallyHeld
+            if (rallyGateApplicableForDissolve
+                && !anyRallyHeld
                 && ConstructionSectorHelper.IsBase(obj.Sector)
                 && FindHQTeamInSector(obj.Sector) != aiTeam)
             {
@@ -503,9 +509,14 @@ public partial class AIController
         // um rally local formal so trava o fechamento; com forca dominante o push nao e suicida.
         bool macroDominating = macro.Phase == AIMacroTerritoryPhase.Dominating;
         bool rallyGoGreen = AnyOwnedRallyAtGoGreen(aiTeam, rallyContext, snapshot.TurnNumber, intel);
-        bool invasionUnlocked = rallyGoGreen || macroDominating;
+        // Gate INAPLICAVEL: sem nenhum rally designado para este SLOT, a exigencia de GoGreen nunca
+        // pode ser satisfeita. Sem esta saida, a invasao jamais e criada e o plano fica vazio pra
+        // sempre — o caso base (tabuleiro so com QGs) tinha o planner inteiro desligado. Havendo
+        // rally do slot, nada muda: o gate segue exigindo massa montada.
+        bool rallyGateApplicable = MapHasAnyRallyPointForSlot(snapshot.AISlotIndex);
+        bool invasionUnlocked = rallyGoGreen || macroDominating || !rallyGateApplicable;
         if (invasionUnlocked && !rallyGoGreen)
-            Debug.Log($"{TL("Plan")} invasão liberada por DOMÍNIO (Ganhando), sem rally GoGreen");
+            Debug.Log($"{TL("Plan")} invasão liberada por {(macroDominating ? "DOMÍNIO (Ganhando)" : "SEM RALLY DO SLOT (gate inaplicável)")}, sem rally GoGreen");
         foreach (SectorManager.SectorInfo baseInfo in allBases)
         {
             if (FindHQTeamInSector(baseInfo.Sector) == aiTeam) continue;
