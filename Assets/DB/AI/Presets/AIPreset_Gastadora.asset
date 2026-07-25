@@ -21,8 +21,9 @@ MonoBehaviour:
     limitarLogistica: 0
     dobrarSlotsCapturadorPorSetor: 0
     handoffEmProfundidade: 0
-    conscricaoSempre: 0
+    conscricaoSempre: 1
     conscricaoQuandoPerdendo: 0
+    poupaPraElite: 0
     politicaLadoForteFraco: 0
     gateNucleoSuave: 0
   economia:

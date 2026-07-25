@@ -210,6 +210,20 @@ MonoBehaviour:
       - {x: 2, y: -2, z: 0}
       - {x: 3, y: -2, z: 0}
       - {x: 4, y: -2, z: 0}
+      - {x: 3, y: -2, z: 0}
+      - {x: 2, y: -2, z: 0}
+      - {x: 1, y: -1, z: 0}
+      - {x: 1, y: 0, z: 0}
+      - {x: 1, y: 1, z: 0}
+      - {x: 2, y: 2, z: 0}
+      - {x: 2, y: 3, z: 0}
+      - {x: 2, y: 4, z: 0}
+      - {x: 2, y: 5, z: 0}
+      - {x: 3, y: 6, z: 0}
+      - {x: 2, y: 7, z: 0}
+      - {x: 2, y: 8, z: 0}
+      - {x: 2, y: 9, z: 0}
+      - {x: 3, y: 9, z: 0}
     - routeName: Auridia 2
       ownerDatabase: {fileID: 11400000}
       cells:
@@ -286,6 +300,16 @@ MonoBehaviour:
       - {x: 8, y: -11, z: 0}
       - {x: 9, y: -10, z: 0}
       - {x: 9, y: -9, z: 0}
+    - routeName: Ponte Norte Auridia
+      ownerDatabase: {fileID: 11400000}
+      cells:
+      - {x: 3, y: 9, z: 0}
+      - {x: 4, y: 9, z: 0}
+      - {x: 5, y: 9, z: 0}
+      - {x: 6, y: 9, z: 0}
+      - {x: 7, y: 9, z: 0}
+      - {x: 8, y: 9, z: 0}
+      - {x: 9, y: 10, z: 0}
   - structure: {fileID: 11400000, guid: e0adc11a0eac5bc42811605fe2a45f9f, type: 2}
     routes:
     - routeName: Beira da Sujeira A

@@ -224,6 +224,18 @@ public partial class TurnStateManager
         BattleMapMenuRootController.TryRestoreMenuFromStateStack(TurnStateManager.CursorState.Neutral);
         return true;
     }
+
+    // Atalho J (Jornal do Comandante): alterna o relatório de início de turno. Aberto → fecha;
+    // em Neutral com relatório disponível → abre. Retorna true quando tratou (para o chamador
+    // consumir o input). Fora de Neutral ou sem relatório, no-op.
+    public bool ToggleTurnStartAutonomyReport()
+    {
+        if (IsManualTurnStartAutonomyReportActive)
+            return CloseManualTurnStartAutonomyReport();
+        if (CurrentCursorState != CursorState.Neutral || !HasTurnStartAutonomyReport)
+            return false;
+        return OpenTurnStartAutonomyReportFromMenu();
+    }
     private Vector3Int lastHoveredCell = new Vector3Int(int.MinValue, int.MinValue, int.MinValue);
     private float hoveredCellStartTime = -1f;
     private bool hasTriggeredHoverAtCurrentCell = false;

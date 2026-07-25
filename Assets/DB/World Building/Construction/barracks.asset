@@ -73,6 +73,7 @@ MonoBehaviour:
   - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
     hasInfiniteSupply: 0
     maxCapacity: 30
+  allowRebelAIPurchase: 1
   constructionConfiguration:
     isPlayerHeadQuarter: 0
     isVictoryBuilding: 0

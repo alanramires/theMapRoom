@@ -3991,13 +3991,20 @@ public class MatchController : MonoBehaviour
             requireFullRefresh: false);
     }
 
+    // Spawn de UMA unidade (compra): a unidade e do time ativo e so SOMA visao — nenhuma outra
+    // unidade muda. Usa o delta incremental (como o movimento), que adiciona a visao da nova
+    // unidade e republica o snapshot de deteccao, em vez de recolher TODAS. Sem isto, um spawn
+    // custava um refresh completo O(unidades) (~4s em mapa com muitos aereos de visao grande),
+    // porque a chave do cache de visao inclui o globalBoardRevision que o spawn incrementa. Rede
+    // de seguranca: se o cache nao estiver pronto p/ o time ativo, o proprio caminho incremental
+    // cai em full (ver ProcessCommittedUnitFog). Multi-unidade continua full (NotifyCommittedMultiUnit...).
     public void NotifyCommittedUnitSpawnedForFog(UnitManager unit)
     {
         ProcessCommittedUnitFog(
             unit,
             raiseActedEvent: false,
             requireHasActed: false,
-            requireFullRefresh: true);
+            requireFullRefresh: false);
     }
 
     public void NotifyCommittedMultiUnitBoardChangeForFog(UnitManager contextUnit)
@@ -4055,11 +4062,11 @@ public class MatchController : MonoBehaviour
             return;
 
         ValidateFogOfWarSortingLayer();
-        // Uma unidade recem-criada ainda nao fazia parte do snapshot confirmado
-        // anterior. Reconstruir o FOW ao concluir a compra evita que o overlay
-        // preserve o cache antigo enquanto consultas diretas de LOS ja enxergam
-        // a nova unidade. Compras/spawns sao eventos raros e justificam o refresh
-        // completo; movimentos continuam usando o delta otimizado.
+        // Refresh completo: reservado para mudancas MULTI-unidade no tabuleiro (varias unidades
+        // mudam de uma vez), onde recolher todas se justifica. Spawn de UMA unidade (compra) e
+        // movimento usam o delta incremental abaixo — a unidade nova/movida so soma/atualiza a
+        // propria visao, e o snapshot de deteccao e republicado, mantendo overlay e consultas de
+        // LOS consistentes sem varrer o time inteiro.
         if (requireFullRefresh)
         {
             RefreshFogOfWarForActiveTeam(FogOfWarRefreshMode.FullVisual);

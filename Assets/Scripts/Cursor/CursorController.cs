@@ -350,6 +350,19 @@ public class CursorController : MonoBehaviour
             return;
         }
 
+        // Atalho J: abre/fecha o Jornal do Comandante (relatorio de inicio de turno). Vem ANTES do
+        // bloco de navegacao do relatorio para que o J tambem FECHE quando aberto (aquele bloco
+        // consome as setas e retorna). O toggle decide: aberto -> fecha; Neutral com relatorio
+        // disponivel -> abre. Fora disso e no-op (cai no fluxo normal).
+        if (WasJournalTogglePressedThisFrame()
+            && turnStateManager != null
+            && (matchController == null || !matchController.IsPlayerInputLockedByActiveAI())
+            && turnStateManager.ToggleTurnStartAutonomyReport())
+        {
+            heldDirection = Vector3Int.zero;
+            return;
+        }
+
         if (turnStateManager != null && turnStateManager.IsManualTurnStartAutonomyReportActive)
         {
             if (WasMenuUpPressedThisFrame() || WasMenuLeftPressedThisFrame())
@@ -1609,6 +1622,16 @@ public class CursorController : MonoBehaviour
         return Keyboard.current != null && Keyboard.current.homeKey.wasPressedThisFrame;
 #else
         return Input.GetKeyDown(KeyCode.Home);
+#endif
+    }
+
+    // J: alterna o Jornal do Comandante (relatorio de inicio de turno).
+    private bool WasJournalTogglePressedThisFrame()
+    {
+#if ENABLE_INPUT_SYSTEM
+        return Keyboard.current != null && Keyboard.current.jKey.wasPressedThisFrame;
+#else
+        return Input.GetKeyDown(KeyCode.J);
 #endif
     }
 
