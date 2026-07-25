@@ -491,77 +491,56 @@ public class TutorialManager : MonoBehaviour
         return matchController.ActiveTutorial;
     }
 
-    // Export simples do tutorial ativo para CSV: uma linha por TAREFA (objective) e uma por
-    // PASSO (fala do roteiro). Serve para revisar/editar o roteiro numa planilha. Escreve na raiz
-    // do projeto e loga o caminho. Botao de contexto no componente (clique-direito no inspector).
-    // Em edit mode depende de MatchController.ActiveTutorial estar resolvido; senao, rode em Play.
-    // Monta o CSV do tutorial ATIVO (uma linha por tarefa e por passo). null se nao ha tutorial.
-    public string BuildActiveTutorialCsv()
+    // Export/Import do tutorial ATIVO em JSON. Usa JsonUtility: serializa TODOS os campos
+    // serializados sem mapeamento manual — o unico cuidado e o AudioClip 'voice', que vira caminho
+    // de asset (JsonUtility grava referencia de objeto como instanceID, que nao sobrevive). Os
+    // botoes de Save/Open estao no TutorialManagerEditor.
+
+    // Monta o JSON do tutorial ATIVO. null se nao ha tutorial.
+    public string BuildActiveTutorialJson()
     {
         TutorialData tutorial = GetActiveTutorial();
         if (tutorial == null)
             return null;
 
-        var sb = new System.Text.StringBuilder();
-
-        // OBJ = tarefa (objective). key = hist_Y_XX; id = TIPO do evento (UNIT_AT_HEX...).
-        // A linha "# ..." e comentario (o import ignora): serve so de cabecalho legivel. A ordem
-        // das colunas e FIXA e o import le por posicao, entao NAO reordene/remova colunas.
-        sb.Append("# OBJ,idx,id,key,parameters,description,startHidden,isVisible,isOptional,isDefeatCondition,isCompleted,hasFailed\n");
+        var dto = new TutorialExportDto { id = tutorial.id, description = tutorial.description };
         if (tutorial.objectives != null)
-        {
             for (int i = 0; i < tutorial.objectives.Count; i++)
-            {
-                TutorialObjective o = tutorial.objectives[i];
-                if (o == null) continue;
-                sb.Append("OBJ,").Append(i).Append(',')
-                  .Append(Csv(o.id)).Append(',')
-                  .Append(Csv(o.key)).Append(',')
-                  .Append(Csv(o.parameters)).Append(',')
-                  .Append(Csv(o.description)).Append(',')
-                  .Append(o.startHidden).Append(',')
-                  .Append(o.isVisible).Append(',')
-                  .Append(o.isOptional).Append(',')
-                  .Append(o.isDefeatCondition).Append(',')
-                  .Append(o.isCompleted).Append(',')
-                  .Append(o.hasFailed).Append('\n');
-            }
-        }
-
-        sb.Append('\n');
-
-        // STEP = passo do roteiro (fala). voice sai como CAMINHO do asset (resolvido no editor).
-        sb.Append("# STEP,idx,advance,objectiveKey,revealObjective,waitObjectiveKey,waitObjectiveIndex,waitAllUnitsActed,waitPlayerTurnStart,turn,movement,unlockMovement,revealObjectiveKeyLegacy,revealObjectiveIndex,text,voice,spawnCommand,statCommand\n");
+                if (tutorial.objectives[i] != null)
+                    dto.objectives.Add(tutorial.objectives[i]);
         if (tutorial.script != null)
-        {
             for (int i = 0; i < tutorial.script.Count; i++)
-            {
-                TutorialDialogEntry e = tutorial.script[i];
-                if (e == null) continue;
-                sb.Append("STEP,").Append(i).Append(',')
-                  .Append(Csv(e.advance.ToString())).Append(',')
-                  .Append(Csv(e.objectiveKey)).Append(',')
-                  .Append(e.revealObjective).Append(',')
-                  .Append(Csv(e.waitObjectiveKey)).Append(',')
-                  .Append(e.waitObjectiveIndex).Append(',')
-                  .Append(e.waitAllUnitsActed).Append(',')
-                  .Append(e.waitPlayerTurnStart).Append(',')
-                  .Append(Csv(e.turn.ToString())).Append(',')
-                  .Append(Csv(e.movement.ToString())).Append(',')
-                  .Append(e.unlockMovement).Append(',')
-                  .Append(Csv(e.revealObjectiveKey)).Append(',')
-                  .Append(e.revealObjectiveIndex).Append(',')
-                  .Append(Csv(e.text)).Append(',')
-                  .Append(Csv(VoicePath(e.voice))).Append(',')
-                  .Append(Csv(e.spawnCommand)).Append(',')
-                  .Append(Csv(e.statCommand)).Append('\n');
-            }
-        }
+                if (tutorial.script[i] != null)
+                    dto.script.Add(StepToDto(tutorial.script[i]));
 
-        return sb.ToString();
+        return JsonUtility.ToJson(dto, true);
     }
 
-    // Caminho do AudioClip para o CSV. No editor usa o path do asset (round-trip completo); em
+    // Copia uma fala para o DTO, trocando o AudioClip 'voice' pelo caminho do asset.
+    private static TutorialStepDto StepToDto(TutorialDialogEntry e)
+    {
+        return new TutorialStepDto
+        {
+            advance = e.advance,
+            objectiveKey = e.objectiveKey,
+            revealObjective = e.revealObjective,
+            waitObjectiveKey = e.waitObjectiveKey,
+            waitObjectiveIndex = e.waitObjectiveIndex,
+            waitAllUnitsActed = e.waitAllUnitsActed,
+            waitPlayerTurnStart = e.waitPlayerTurnStart,
+            text = e.text,
+            voicePath = VoicePath(e.voice),
+            spawnCommand = e.spawnCommand,
+            statCommand = e.statCommand,
+            turn = e.turn,
+            movement = e.movement,
+            unlockMovement = e.unlockMovement,
+            revealObjectiveKey = e.revealObjectiveKey,
+            revealObjectiveIndex = e.revealObjectiveIndex,
+        };
+    }
+
+    // Caminho do AudioClip para o JSON. No editor usa o path do asset (round-trip completo); em
     // runtime cai no nome (o fluxo real de import/export e editor).
     private static string VoicePath(AudioClip clip)
     {
@@ -591,35 +570,27 @@ public class TutorialManager : MonoBehaviour
 
     // Export via ContextMenu (runtime): salva em persistentDataPath com timestamp e loga o caminho.
     // O botao do inspector (TutorialManagerEditor) usa Save File Panel para escolher o local.
-    [ContextMenu("Exportar Tutorial para CSV")]
-    public void ExportActiveTutorialToCsv()
+    [ContextMenu("Exportar Tutorial (JSON)")]
+    public void ExportActiveTutorialToJson()
     {
-        string csv = BuildActiveTutorialCsv();
-        if (csv == null)
+        string json = BuildActiveTutorialJson();
+        if (json == null)
         {
-            Debug.LogWarning("[TutorialManager] Export CSV: nenhum tutorial ativo (rode em Play ou garanta MatchController.ActiveTutorial).");
+            Debug.LogWarning("[TutorialManager] Export JSON: nenhum tutorial ativo (rode em Play ou garanta MatchController.ActiveTutorial).");
             return;
         }
         string path = System.IO.Path.Combine(
             Application.persistentDataPath,
-            $"{GetActiveTutorialExportName()}_{System.DateTime.Now:yyyyMMdd_HHmmss}.csv");
+            $"{GetActiveTutorialExportName()}_{System.DateTime.Now:yyyyMMdd_HHmmss}.json");
         try
         {
-            System.IO.File.WriteAllText(path, csv, new System.Text.UTF8Encoding(true));
+            System.IO.File.WriteAllText(path, json, new System.Text.UTF8Encoding(true));
             Debug.Log($"[TutorialManager] Tutorial exportado: {path}");
         }
         catch (System.Exception ex)
         {
-            Debug.LogError($"[TutorialManager] Falha ao escrever CSV em {path}: {ex.Message}");
+            Debug.LogError($"[TutorialManager] Falha ao escrever JSON em {path}: {ex.Message}");
         }
-    }
-
-    // Escapa um campo p/ CSV: sempre entre aspas, aspas internas duplicadas, quebras de linha viram espaco.
-    private static string Csv(string field)
-    {
-        if (string.IsNullOrEmpty(field))
-            return "\"\"";
-        return "\"" + field.Replace("\r", " ").Replace("\n", " ").Replace("\"", "\"\"") + "\"";
     }
 
     private void MarkObjectiveComplete(TutorialObjective obj)

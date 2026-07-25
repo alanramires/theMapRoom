@@ -5541,8 +5541,68 @@ public class MatchController : MonoBehaviour
         if (observerSlotIndex < 0)
             return;
 
+        AppendFogSourceContributionsForSave(
+            observerSlotIndex,
+            fogContributionsBySource,
+            destination);
+    }
+
+    public void ExportFogSourceCachesByObserverSlotForSave(
+        List<FogObserverSourceCacheSaveData> destination)
+    {
+        if (destination == null)
+            return;
+        destination.Clear();
+
+        int cacheConfigHash = BuildFogSourceCacheConfigHash(ResolveFogBoardTilemap());
+        List<int> observerSlots = new List<int>(fogContributionRuntimeBySlot.Keys);
+        if (fogCachedObserverSlotIndex >= 0 && !observerSlots.Contains(fogCachedObserverSlotIndex))
+            observerSlots.Add(fogCachedObserverSlotIndex);
+        observerSlots.Sort();
+
+        for (int i = 0; i < observerSlots.Count; i++)
+        {
+            int observerSlotIndex = observerSlots[i];
+            IReadOnlyDictionary<FogContributionSourceId, FogSourceContributionCacheEntry> sources = null;
+            if (observerSlotIndex == fogCachedObserverSlotIndex)
+            {
+                sources = fogContributionsBySource;
+            }
+            else if (fogContributionRuntimeBySlot.TryGetValue(
+                         observerSlotIndex,
+                         out FogSlotContributionRuntime runtime))
+            {
+                sources = runtime.sources;
+            }
+
+            if (sources == null || sources.Count == 0)
+                continue;
+
+            FogObserverSourceCacheSaveData block = new FogObserverSourceCacheSaveData
+            {
+                observerSlotIndex = observerSlotIndex,
+                cacheFormat = FogSourceCacheFormatVersion,
+                cacheConfigHash = cacheConfigHash
+            };
+            AppendFogSourceContributionsForSave(
+                observerSlotIndex,
+                sources,
+                block.contributions);
+            if (block.contributions.Count > 0)
+                destination.Add(block);
+        }
+    }
+
+    private static void AppendFogSourceContributionsForSave(
+        int observerSlotIndex,
+        IReadOnlyDictionary<FogContributionSourceId, FogSourceContributionCacheEntry> sources,
+        List<FogSourceContributionSaveData> destination)
+    {
+        if (sources == null || destination == null)
+            return;
+
         foreach (KeyValuePair<FogContributionSourceId, FogSourceContributionCacheEntry> pair
-                 in fogContributionsBySource)
+                 in sources)
         {
             FogSourceContributionCacheEntry entry = pair.Value;
             if (entry == null ||
@@ -5729,6 +5789,75 @@ public class MatchController : MonoBehaviour
         IList<FogSourceContributionSaveData> savedSources,
         out string result)
     {
+        if (observerSlotIndex != ActiveSlotId.Value)
+        {
+            result = "observer_slot_mismatch";
+            return false;
+        }
+        if (TryResolveFogPresentationSlot(out PlayerSlotId presentationSlot) &&
+            presentationSlot != ActiveSlotId)
+        {
+            result = "split_gameplay_presentation";
+            return false;
+        }
+
+        return TryRestoreFogSourceContributionsFromSaveInternal(
+            observerSlotIndex,
+            cacheFormat,
+            cacheConfigHash,
+            savedSources,
+            publishVisuals: true,
+            out result);
+    }
+
+    public bool TryRestoreFogSourceRuntimeForSlotFromSave(
+        PlayerSlotId gameplaySlot,
+        int observerSlotIndex,
+        int cacheFormat,
+        int cacheConfigHash,
+        IList<FogSourceContributionSaveData> savedSources,
+        out string result)
+    {
+        PlayerSlotId observerSlot = PlayerSlotId.FromIndex(observerSlotIndex);
+        if (!IsValidPlayerSlot(gameplaySlot) || !IsValidPlayerSlot(observerSlot))
+        {
+            result = "invalid_slot";
+            return false;
+        }
+
+        PlayerSlotId presentationSlot = ResolveFogVisualObserverSlot();
+        if (!IsValidPlayerSlot(presentationSlot))
+            presentationSlot = gameplaySlot;
+        FogUpdateContext context = CreateFogUpdateContext(
+            gameplaySlot,
+            observerSlot,
+            presentationSlot,
+            FogOfWarRefreshMode.DataOnly);
+        FogObserverScopeState previous = EnterFogObserverScope(context);
+        try
+        {
+            return TryRestoreFogSourceContributionsFromSaveInternal(
+                observerSlotIndex,
+                cacheFormat,
+                cacheConfigHash,
+                savedSources,
+                publishVisuals: false,
+                out result);
+        }
+        finally
+        {
+            ExitFogObserverScope(previous);
+        }
+    }
+
+    private bool TryRestoreFogSourceContributionsFromSaveInternal(
+        int observerSlotIndex,
+        int cacheFormat,
+        int cacheConfigHash,
+        IList<FogSourceContributionSaveData> savedSources,
+        bool publishVisuals,
+        out string result)
+    {
         result = "unknown";
         if (!debugFogOfWarEnabled || !enableTotalWar || fogOfWarTilemap == null)
         {
@@ -5743,13 +5872,7 @@ public class MatchController : MonoBehaviour
         }
         if (observerSlotIndex != ActiveSlotId.Value)
         {
-            result = "observer_slot_mismatch";
-            return false;
-        }
-        if (TryResolveFogPresentationSlot(out PlayerSlotId presentationSlot) &&
-            presentationSlot != ActiveSlotId)
-        {
-            result = "split_gameplay_presentation";
+            result = "observer_scope_mismatch";
             return false;
         }
         if (cacheFormat != FogSourceCacheFormatVersion ||
@@ -5889,10 +6012,13 @@ public class MatchController : MonoBehaviour
         // Todas as validacoes terminaram antes da primeira mutacao.
         ValidateFogOfWarSortingLayer();
         ResetFogOfWarRuntime(clearTilemap: false);
-        InitializeFogOverlay(boardMap);
+        if (publishVisuals)
+            InitializeFogOverlay(boardMap);
+        else
+            InitializeFogRuntimeData(boardMap);
         if (!fogOverlayInitialized)
         {
-            result = "overlay_init_failed";
+            result = publishVisuals ? "overlay_init_failed" : "runtime_init_failed";
             return false;
         }
 
@@ -5925,6 +6051,16 @@ public class MatchController : MonoBehaviour
             ResetFogOfWarRuntime(clearTilemap: false);
             result = "rebuild_invariant_mismatch";
             return false;
+        }
+
+        StoreFogContributionRuntimeForSlot(PlayerSlotId.FromIndex(observerSlotIndex));
+        if (!publishVisuals)
+        {
+            result =
+                $"cached sources={validated.Count} units={eligibleUnits.Count} " +
+                $"constructions={eligibleConstructions.Count} geographic={fogGeographicContributorsByCell.Count} " +
+                $"sensor={fogSensorContributorsByCell.Count}";
+            return true;
         }
 
         UnitManager[] snapshotUnits = FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude);

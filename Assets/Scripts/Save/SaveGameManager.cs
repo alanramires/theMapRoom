@@ -1928,38 +1928,84 @@ public class SaveGameManager : MonoBehaviour
                 matchController.SuppressFogOfWarRefresh = false;
                 suppressedFogRefresh = false;
                 // Fast path somente para fotografia integralmente validada.
-                // Qualquer incompatibilidade preserva o cold refresh anterior.
+                // Cada slot e validado isoladamente; o ativo preserva cold fallback.
                 bool fogCacheRestored = false;
                 string fogCacheRestoreResult = "cache_unavailable";
-                if (data.fogSourceContributions != null && data.fogSourceContributions.Count > 0)
+                FogObserverSourceCacheSaveData activeFogCache = null;
+                if (data.fogSourceCachesByObserverSlot != null)
+                {
+                    PlayerSlotId gameplaySlot = matchController.ActiveSlotId;
+                    HashSet<int> processedObserverSlots = new HashSet<int>();
+                    for (int i = 0; i < data.fogSourceCachesByObserverSlot.Count; i++)
+                    {
+                        FogObserverSourceCacheSaveData block = data.fogSourceCachesByObserverSlot[i];
+                        if (block == null || !processedObserverSlots.Add(block.observerSlotIndex))
+                        {
+                            Debug.Log(
+                                $"[FoW][LoadCacheRestore] slot={(block != null ? block.observerSlotIndex : -1)} " +
+                                "success=false retained=false reason=invalid_or_duplicate_block");
+                            continue;
+                        }
+                        if (block.observerSlotIndex == gameplaySlot.Value)
+                        {
+                            activeFogCache = block;
+                            continue;
+                        }
+
+                        bool cached = matchController.TryRestoreFogSourceRuntimeForSlotFromSave(
+                            gameplaySlot,
+                            block.observerSlotIndex,
+                            block.cacheFormat,
+                            block.cacheConfigHash,
+                            block.contributions,
+                            out string cacheSlotResult);
+                        Debug.Log(
+                            $"[FoW][LoadCacheRestore] slot={block.observerSlotIndex} " +
+                            $"success={cached.ToString().ToLowerInvariant()} retained={cached.ToString().ToLowerInvariant()} " +
+                            $"reason={cacheSlotResult}");
+                    }
+                }
+
+                IList<FogSourceContributionSaveData> activeFogSources =
+                    activeFogCache != null
+                        ? activeFogCache.contributions
+                        : data.fogSourceContributions;
+                int activeFogCacheFormat =
+                    activeFogCache != null ? activeFogCache.cacheFormat : data.fogSourceCacheFormat;
+                int activeFogCacheConfigHash =
+                    activeFogCache != null ? activeFogCache.cacheConfigHash : data.fogSourceCacheConfigHash;
+                int activeFogObserverSlot =
+                    activeFogCache != null ? activeFogCache.observerSlotIndex : data.fogObserverSlotIndex;
+
+                if (activeFogSources != null && activeFogSources.Count > 0)
                 {
                     double restoreFogCacheStartMs = PerfNowMs();
                     LogLoadPerf(loadedSlot, "restore_fog_cache.begin", restoreFogCacheStartMs, restoreFogCacheStartMs - routineStartMs);
                     fogCacheRestored = matchController.TryRestoreFogSourceContributionsFromSave(
-                        data.fogObserverSlotIndex,
-                        data.fogSourceCacheFormat,
-                        data.fogSourceCacheConfigHash,
-                        data.fogSourceContributions,
+                        activeFogObserverSlot,
+                        activeFogCacheFormat,
+                        activeFogCacheConfigHash,
+                        activeFogSources,
                         out fogCacheRestoreResult);
                     LogLoadPerf(loadedSlot, "restore_fog_cache.end", restoreFogCacheStartMs, PerfNowMs() - routineStartMs);
                 }
 
                 if (fogCacheRestored)
-                    Debug.Log($"[FoW][LoadCacheRestore] success=true {fogCacheRestoreResult}");
+                    Debug.Log($"[FoW][LoadCacheRestore] slot={activeFogObserverSlot} success=true retained=true {fogCacheRestoreResult}");
                 else
                 {
-                    Debug.Log($"[FoW][LoadCacheRestore] success=false fallback=cold reason={fogCacheRestoreResult}");
+                    Debug.Log($"[FoW][LoadCacheRestore] slot={activeFogObserverSlot} success=false retained=false fallback=cold reason={fogCacheRestoreResult}");
                     matchController.RefreshFogOfWarForActiveTeam();
                 }
                 LogLoadPerf(loadedSlot, "refresh_fog_after_load.end", refreshFogStartMs, PerfNowMs() - routineStartMs);
 
                 // No fallback, compara com o cold refresh para diagnosticar a causa.
                 if (!fogCacheRestored &&
-                    data.fogSourceContributions != null && data.fogSourceContributions.Count > 0)
+                    activeFogSources != null && activeFogSources.Count > 0)
                 {
                     double verifyFogCacheStartMs = PerfNowMs();
                     LogLoadPerf(loadedSlot, "verify_fog_cache.begin", verifyFogCacheStartMs, verifyFogCacheStartMs - routineStartMs);
-                    matchController.VerifyFogSourceContributionsFromSave(data.fogSourceContributions);
+                    matchController.VerifyFogSourceContributionsFromSave(activeFogSources);
                     LogLoadPerf(loadedSlot, "verify_fog_cache.end", verifyFogCacheStartMs, PerfNowMs() - routineStartMs);
                 }
             }
@@ -2077,6 +2123,7 @@ public class SaveGameManager : MonoBehaviour
             fogSourceContributions = new List<FogSourceContributionSaveData>(),
             fogSourceCacheFormat = 0,
             fogSourceCacheConfigHash = 0,
+            fogSourceCachesByObserverSlot = new List<FogObserverSourceCacheSaveData>(),
             fogExploredCellsBySlot = new List<TeamExploredCellsSaveData>(),
             fogExploredCellsByTeam = new List<TeamExploredCellsSaveData>(),
             fogConstructionMemory = new List<FogConstructionMemorySaveData>(),
@@ -2157,6 +2204,8 @@ public class SaveGameManager : MonoBehaviour
                 out data.fogSourceCacheFormat,
                 out data.fogSourceCacheConfigHash,
                 data.fogSourceContributions);
+            matchController.ExportFogSourceCachesByObserverSlotForSave(
+                data.fogSourceCachesByObserverSlot);
         }
 
         // if (aiPlayerController != null)
@@ -2187,6 +2236,19 @@ public class SaveGameManager : MonoBehaviour
         // e de futuros hashes/saves.
         data.fogExploredCellsByTeam = new List<TeamExploredCellsSaveData>();
         data.fogSourceContributions ??= new List<FogSourceContributionSaveData>();
+        data.fogSourceCachesByObserverSlot ??= new List<FogObserverSourceCacheSaveData>();
+        if (data.fogSourceCachesByObserverSlot.Count == 0 &&
+            data.fogObserverSlotIndex >= 0 &&
+            data.fogSourceContributions.Count > 0)
+        {
+            data.fogSourceCachesByObserverSlot.Add(new FogObserverSourceCacheSaveData
+            {
+                observerSlotIndex = data.fogObserverSlotIndex,
+                cacheFormat = data.fogSourceCacheFormat,
+                cacheConfigHash = data.fogSourceCacheConfigHash,
+                contributions = data.fogSourceContributions
+            });
+        }
     }
 
     private void RestoreMatchPlayers(SaveGameData data)

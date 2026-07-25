@@ -5,7 +5,7 @@ using UnityEngine;
 [Serializable]
 public class SaveGameData
 {
-    public int version = 17;
+    public int version = 18;
     public string sceneName;
     public long savedAtUtcTicks;
     public int currentTurn;
@@ -38,6 +38,9 @@ public class SaveGameData
     public List<FogSourceContributionSaveData> fogSourceContributions = new List<FogSourceContributionSaveData>();
     public int fogSourceCacheFormat;
     public int fogSourceCacheConfigHash;
+    // v18+: fotografias independentes por PlayerSlotId observador.
+    public List<FogObserverSourceCacheSaveData> fogSourceCachesByObserverSlot =
+        new List<FogObserverSourceCacheSaveData>();
     // v15+: a coleção é indexada semanticamente por slot; teamId em cada entrada
     // existe apenas como pista de migração para saves antigos.
     public List<TeamExploredCellsSaveData> fogExploredCellsBySlot = new List<TeamExploredCellsSaveData>();
@@ -396,6 +399,16 @@ public class FogSourceContributionSaveData
     public long contributionChecksum;
     public List<Vector3Int> geographicCells = new List<Vector3Int>();
     public List<Vector3Int> sensorCells = new List<Vector3Int>();
+}
+
+[Serializable]
+public class FogObserverSourceCacheSaveData
+{
+    public int observerSlotIndex = -1;
+    public int cacheFormat;
+    public int cacheConfigHash;
+    public List<FogSourceContributionSaveData> contributions =
+        new List<FogSourceContributionSaveData>();
 }
 
 [Serializable]

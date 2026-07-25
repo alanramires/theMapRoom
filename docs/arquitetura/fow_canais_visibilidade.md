@@ -221,3 +221,36 @@ Alguns coletores legados ainda consultam `ActiveSlotId`. Até que recebam
 `EnterFogObserverScope`/`ExitFogObserverScope`, com restauração em `finally`.
 Essa ponte não decide política: ela apenas expõe ao código legado o observador já
 autorizado pelo contexto.
+
+## Save v18: caches por observador
+
+O save v18 introduz `fogSourceCachesByObserverSlot`. Cada bloco contém:
+
+- `observerSlotIndex`;
+- versão interna do formato;
+- hash da configuração do tabuleiro e sensores;
+- contribuições geográficas e sensoriais canonicalizadas por fonte.
+
+O export inclui o runtime ativo e todas as fotografias quentes presentes em
+`fogContributionRuntimeBySlot`. Os blocos são ordenados por `PlayerSlotId`; cada
+contribuição conserva seu checksum e identidade de observador.
+
+No load, blocos de slots não ativos são restaurados em contexto `DataOnly`.
+Cada bloco passa pelas mesmas validações de configuração, fontes, assinaturas,
+células, checksums e invariantes agregados usadas pelo fast path visual. Um bloco
+aprovado é armazenado em `fogContributionRuntimeBySlot` sem publicar memória,
+contatos, visibilidade runtime, eventos ou Tilemaps.
+
+A aceitação é independente por slot:
+
+- falha em um bloco descarta somente aquele observador;
+- blocos válidos já restaurados permanecem quentes;
+- o slot ativo ainda exige validação integral para publicação visual;
+- falha do slot ativo mantém `RefreshFogOfWarForActiveTeam()` como cold fallback.
+
+Os logs `[FoW][LoadCacheRestore]` incluem `slot`, `success` e `retained`, tornando
+explícito quais fotografias sobreviveram ao load.
+
+Saves v17 continuam compatíveis. Durante a migração em memória, a fotografia
+única legada é embrulhada em um bloco v18 usando o `fogObserverSlotIndex`
+original, sem converter a identidade por `TeamId`.
