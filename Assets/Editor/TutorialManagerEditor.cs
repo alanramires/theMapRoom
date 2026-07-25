@@ -106,7 +106,29 @@ public class TutorialManagerEditor : Editor
             return;
         }
 
-        List<TutorialObjective> objectives = dto.objectives ?? new List<TutorialObjective>();
+        var objectives = new List<TutorialObjective>();
+        if (dto.objectives != null)
+        {
+            foreach (TutorialObjectiveDto o in dto.objectives)
+            {
+                if (o == null) continue;
+                objectives.Add(new TutorialObjective
+                {
+                    id = o.id,
+                    key = o.key,
+                    parameters = o.parameters,
+                    description = o.description,
+                    startHidden = o.startHidden,
+                    isOptional = o.isOptional,
+                    isDefeatCondition = o.isDefeatCondition,
+                    // Estado de runtime reinicializado — o asset de design nao carrega progresso.
+                    isVisible = !o.startHidden,
+                    isCompleted = false,
+                    hasFailed = false,
+                });
+            }
+        }
+
         var script = new List<TutorialDialogEntry>();
         int voiceMissing = 0;
         if (dto.script != null)
@@ -128,19 +150,19 @@ public class TutorialManagerEditor : Editor
 
                 script.Add(new TutorialDialogEntry
                 {
-                    advance = s.advance,
+                    advance = ParseEnum(s.advance, TutorialAdvanceCondition.Immediate),
+                    turn = ParseEnum(s.turn, TutorialEndTurnEffect.NoEffect),
+                    movement = ParseEnum(s.movement, TutorialMovementEffect.NoEffect),
                     objectiveKey = s.objectiveKey,
                     revealObjective = s.revealObjective,
-                    waitObjectiveKey = s.waitObjectiveKey,
-                    waitObjectiveIndex = s.waitObjectiveIndex,
-                    waitAllUnitsActed = s.waitAllUnitsActed,
-                    waitPlayerTurnStart = s.waitPlayerTurnStart,
                     text = s.text,
                     voice = voice,
                     spawnCommand = s.spawnCommand,
                     statCommand = s.statCommand,
-                    turn = s.turn,
-                    movement = s.movement,
+                    waitObjectiveKey = s.waitObjectiveKey,
+                    waitObjectiveIndex = s.waitObjectiveIndex,
+                    waitAllUnitsActed = s.waitAllUnitsActed,
+                    waitPlayerTurnStart = s.waitPlayerTurnStart,
                     unlockMovement = s.unlockMovement,
                     revealObjectiveKey = s.revealObjectiveKey,
                     revealObjectiveIndex = s.revealObjectiveIndex,
@@ -166,4 +188,8 @@ public class TutorialManagerEditor : Editor
         Debug.Log($"[TutorialManager] Importado de {path}: {objectives.Count} tarefa(s), {script.Count} passo(s)."
                   + (voiceMissing > 0 ? $" {voiceMissing} voice(s) não encontrado(s)." : ""));
     }
+
+    // Converte o nome do enum (string do JSON) de volta ao valor; fallback se vazio/desconhecido.
+    private static T ParseEnum<T>(string s, T fallback) where T : struct
+        => Enum.TryParse(s, true, out T v) ? v : fallback;
 }

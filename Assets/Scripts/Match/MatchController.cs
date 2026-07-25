@@ -70,6 +70,104 @@ public static class PlayerSlotRelations
         unit != null && construction != null && AreEnemies(unit.SlotIndex, construction.SlotIndex);
 }
 
+[Flags]
+public enum CommittedBoardChangeKind
+{
+    None = 0,
+    UnitActed = 1 << 0,
+    UnitSpawned = 1 << 1,
+    UnitRemoved = 1 << 2,
+    MultiUnitChanged = 1 << 3
+}
+
+/// <summary>
+/// Descreve somente mutacoes ja comprometidas do tabuleiro. O delta pode ser
+/// acumulado enquanto a FSM conclui a apresentacao, mas so pode ser consumido
+/// depois do retorno a Neutral.
+/// </summary>
+public sealed class CommittedBoardDelta
+{
+    private readonly List<UnitManager> changedUnits = new List<UnitManager>();
+    private readonly HashSet<UnitManager> changedUnitSet = new HashSet<UnitManager>();
+    private readonly HashSet<UnitManager> unitsRequiringHasActed = new HashSet<UnitManager>();
+    private readonly HashSet<Vector3Int> changedCells = new HashSet<Vector3Int>();
+
+    public CommittedBoardChangeKind ChangeKind { get; private set; }
+    public IReadOnlyList<UnitManager> ChangedUnits => changedUnits;
+    public IReadOnlyCollection<Vector3Int> ChangedCells => changedCells;
+    public bool RequireFullFogRefresh { get; private set; }
+    public bool RequireSourceReconciliation { get; private set; }
+    public bool IsEmpty =>
+        ChangeKind == CommittedBoardChangeKind.None &&
+        changedUnits.Count == 0 &&
+        !RequireFullFogRefresh &&
+        !RequireSourceReconciliation;
+
+    public void AddUnit(
+        UnitManager unit,
+        CommittedBoardChangeKind changeKind,
+        bool requireHasActed = false)
+    {
+        ChangeKind |= changeKind;
+        if (unit == null)
+            return;
+
+        if (changedUnitSet.Add(unit))
+            changedUnits.Add(unit);
+        if (requireHasActed)
+            unitsRequiringHasActed.Add(unit);
+
+        Vector3Int cell = unit.CurrentCellPosition;
+        cell.z = 0;
+        changedCells.Add(cell);
+    }
+
+    public void RequireFullRefresh(CommittedBoardChangeKind changeKind)
+    {
+        ChangeKind |= changeKind;
+        RequireFullFogRefresh = true;
+    }
+
+    public void RequireReconciliation(CommittedBoardChangeKind changeKind)
+    {
+        ChangeKind |= changeKind;
+        RequireSourceReconciliation = true;
+    }
+
+    public void AddChangedCell(Vector3Int cell)
+    {
+        cell.z = 0;
+        changedCells.Add(cell);
+    }
+
+    public void MergeFrom(CommittedBoardDelta other)
+    {
+        if (other == null || other.IsEmpty)
+            return;
+
+        ChangeKind |= other.ChangeKind;
+        RequireFullFogRefresh |= other.RequireFullFogRefresh;
+        RequireSourceReconciliation |= other.RequireSourceReconciliation;
+
+        for (int i = 0; i < other.changedUnits.Count; i++)
+        {
+            UnitManager unit = other.changedUnits[i];
+            if (unit != null && changedUnitSet.Add(unit))
+                changedUnits.Add(unit);
+            if (unit != null && other.unitsRequiringHasActed.Contains(unit))
+                unitsRequiringHasActed.Add(unit);
+        }
+
+        foreach (Vector3Int cell in other.changedCells)
+            changedCells.Add(cell);
+    }
+
+    public bool RequiresHasActed(UnitManager unit)
+    {
+        return unit != null && unitsRequiringHasActed.Contains(unit);
+    }
+}
+
 public class MatchController : MonoBehaviour
 {
     private const int MaxVictoryStarsGoal = 12;
@@ -442,11 +540,7 @@ public class MatchController : MonoBehaviour
     [System.NonSerialized] private string lastFogWriteBarrierWarning;
     [System.NonSerialized] private bool fogOverlayInitialized;
     [System.NonSerialized] private bool initialStealthDetectionBootstrapped;
-    [System.NonSerialized] private bool pendingCommittedBoardRefresh;
-    [System.NonSerialized] private UnitManager pendingCommittedActedUnit;
-    [System.NonSerialized] private bool pendingCommittedUnitRequiresHasActed;
-    [System.NonSerialized] private bool pendingCommittedUnitRequiresFullFogRefresh;
-    [System.NonSerialized] private bool pendingCommittedFogSourceRemovalReconciliation;
+    [System.NonSerialized] private CommittedBoardDelta pendingCommittedBoardDelta;
     [System.NonSerialized] private bool debugFogOfWarEnabled = true;
     [System.NonSerialized] private bool debugFogOfWarPartial;
     [System.NonSerialized] private int fogPresentationGameplayTeamId = int.MinValue;
@@ -4377,7 +4471,8 @@ public class MatchController : MonoBehaviour
             unit,
             raiseActedEvent: true,
             requireHasActed: true,
-            requireFullRefresh: false);
+            requireFullRefresh: false,
+            CommittedBoardChangeKind.UnitActed);
     }
 
     // Spawn de UMA unidade (compra): a unidade e do time ativo e so SOMA visao — nenhuma outra
@@ -4393,7 +4488,8 @@ public class MatchController : MonoBehaviour
             unit,
             raiseActedEvent: false,
             requireHasActed: false,
-            requireFullRefresh: false);
+            requireFullRefresh: false,
+            CommittedBoardChangeKind.UnitSpawned);
     }
 
     public void NotifyCommittedMultiUnitBoardChangeForFog(UnitManager contextUnit)
@@ -4402,14 +4498,16 @@ public class MatchController : MonoBehaviour
             contextUnit,
             raiseActedEvent: false,
             requireHasActed: false,
-            requireFullRefresh: true);
+            requireFullRefresh: true,
+            CommittedBoardChangeKind.MultiUnitChanged);
     }
 
     private void ProcessCommittedUnitFog(
         UnitManager unit,
         bool raiseActedEvent,
         bool requireHasActed,
-        bool requireFullRefresh)
+        bool requireFullRefresh,
+        CommittedBoardChangeKind changeKind)
     {
         if (!Application.isPlaying)
             return;
@@ -4430,15 +4528,50 @@ public class MatchController : MonoBehaviour
         if (unit.SlotIndex != ActiveSlotId.Value)
             return;
 
-        // HasActed confirma a acao, mas o snapshot definitivo so pode ser publicado
-        // depois que a maquina de estados voltar a Neutral.
+        CommittedBoardDelta delta = new CommittedBoardDelta();
+        delta.AddUnit(unit, changeKind, requireHasActed);
+        if (turnStateManager != null &&
+            turnStateManager.TryGetCommittedMovementPath(
+                out _,
+                out Vector3Int originCell,
+                out Vector3Int destinationCell))
+        {
+            delta.AddChangedCell(originCell);
+            delta.AddChangedCell(destinationCell);
+        }
+        if (requireFullRefresh)
+            delta.RequireFullRefresh(changeKind);
+        SubmitCommittedBoardDelta(delta);
+    }
+
+    private void SubmitCommittedBoardDelta(CommittedBoardDelta delta)
+    {
+        if (delta == null || delta.IsEmpty)
+            return;
+
+        // O delta ja descreve uma mutacao comprometida, mas sua publicacao
+        // definitiva continua bloqueada ate a FSM retornar a Neutral.
         if (turnStateManager != null && turnStateManager.CurrentCursorState != TurnStateManager.CursorState.Neutral)
         {
-            pendingCommittedBoardRefresh = true;
-            pendingCommittedActedUnit = unit;
-            pendingCommittedUnitRequiresHasActed = requireHasActed;
-            pendingCommittedUnitRequiresFullFogRefresh |= requireFullRefresh;
+            pendingCommittedBoardDelta ??= new CommittedBoardDelta();
+            pendingCommittedBoardDelta.MergeFrom(delta);
             return;
+        }
+
+        ApplyCommittedBoardDelta(delta);
+    }
+
+    private void ApplyCommittedBoardDelta(CommittedBoardDelta delta)
+    {
+        if (delta == null || delta.IsEmpty)
+            return;
+
+        if (enableFogStepPerfLogs)
+        {
+            Debug.Log(
+                $"[FoW][CommittedDelta] kinds={delta.ChangeKind} " +
+                $"units={delta.ChangedUnits.Count} cells={delta.ChangedCells.Count} " +
+                $"full={delta.RequireFullFogRefresh} reconcile={delta.RequireSourceReconciliation}");
         }
 
         if (fogOfWarTilemap == null)
@@ -4456,14 +4589,45 @@ public class MatchController : MonoBehaviour
         // movimento usam o delta incremental abaixo — a unidade nova/movida so soma/atualiza a
         // propria visao, e o snapshot de deteccao e republicado, mantendo overlay e consultas de
         // LOS consistentes sem varrer o time inteiro.
-        if (requireFullRefresh)
+        UnitManager contextUnit = null;
+        for (int i = 0; i < delta.ChangedUnits.Count; i++)
+        {
+            UnitManager candidate = delta.ChangedUnits[i];
+            if (candidate != null)
+            {
+                contextUnit = candidate;
+                break;
+            }
+        }
+
+        if (delta.RequireFullFogRefresh)
         {
             RefreshFogOfWarForActiveTeam(FogOfWarRefreshMode.FullVisual);
-            TryPlaySkillDetectionSfxForActedUnit(unit, boardMap);
-            TryRefreshDetectedPersistenceForActedUnit(unit, boardMap);
+            TryPlaySkillDetectionSfxForActedUnit(contextUnit, boardMap);
+            TryRefreshDetectedPersistenceForActedUnit(contextUnit, boardMap);
             return;
         }
 
+        if (delta.RequireSourceReconciliation)
+        {
+            if (!TryRefreshFogOfWarForTurnStartIncremental())
+                RefreshFogOfWarForActiveTeam();
+            return;
+        }
+
+        for (int i = 0; i < delta.ChangedUnits.Count; i++)
+        {
+            UnitManager unit = delta.ChangedUnits[i];
+            if (unit == null || !unit.gameObject.activeInHierarchy)
+                continue;
+            if (delta.RequiresHasActed(unit) && !unit.HasActed)
+                continue;
+            ApplyCommittedUnitFog(unit, boardMap);
+        }
+    }
+
+    private void ApplyCommittedUnitFog(UnitManager unit, Tilemap boardMap)
+    {
         if ((fogCachedObserverSlotIndex != ActiveSlotId.Value || !fogOverlayInitialized) &&
             !TryActivateFogContributionRuntimeForSlot(ActiveSlotId, boardMap))
         {
@@ -8068,7 +8232,9 @@ public class MatchController : MonoBehaviour
         {
             // A fila de morte ainda esta em apresentacao provisoria. A fonte so
             // deixa o snapshot confirmado depois do retorno a Neutral.
-            pendingCommittedFogSourceRemovalReconciliation = true;
+            CommittedBoardDelta delta = new CommittedBoardDelta();
+            delta.RequireReconciliation(CommittedBoardChangeKind.UnitRemoved);
+            SubmitCommittedBoardDelta(delta);
             return;
         }
 
@@ -8095,35 +8261,12 @@ public class MatchController : MonoBehaviour
 
     public void NotifyTurnStateReturnedToNeutral()
     {
-        bool reconcileRemovedSources = pendingCommittedFogSourceRemovalReconciliation;
-        pendingCommittedFogSourceRemovalReconciliation = false;
-        if (!pendingCommittedBoardRefresh && !reconcileRemovedSources)
+        CommittedBoardDelta delta = pendingCommittedBoardDelta;
+        pendingCommittedBoardDelta = null;
+        if (delta == null || delta.IsEmpty)
             return;
 
-        if (pendingCommittedBoardRefresh)
-        {
-            UnitManager actedUnit = pendingCommittedActedUnit;
-            bool requireHasActed = pendingCommittedUnitRequiresHasActed;
-            bool requireFullRefresh = pendingCommittedUnitRequiresFullFogRefresh;
-            pendingCommittedBoardRefresh = false;
-            pendingCommittedActedUnit = null;
-            pendingCommittedUnitRequiresHasActed = false;
-            pendingCommittedUnitRequiresFullFogRefresh = false;
-
-            // Ja estamos em Neutral: publique somente o delta da unidade comprometida.
-            // FullVisual apagaria os caches e escalaria com todas as unidades a cada acao.
-            ProcessCommittedUnitFog(
-                actedUnit,
-                raiseActedEvent: false,
-                requireHasActed: requireHasActed,
-                requireFullRefresh: requireFullRefresh);
-        }
-
-        if (reconcileRemovedSources &&
-            !TryRefreshFogOfWarForTurnStartIncremental())
-        {
-            RefreshFogOfWarForActiveTeam();
-        }
+        ApplyCommittedBoardDelta(delta);
     }
 
     private void RemoveFogSpecializedViewCacheForUnit(int unitIndex)

@@ -288,3 +288,31 @@ Elas marcam uma reconciliação pendente, executada somente depois do retorno a
 O diagnóstico `[FoW][TurnStartCache]` informa ativação, unidades alteradas,
 inalteradas e removidas, células recolhidas, construções reconstruídas, tempo
 total e eventual `fallback=full`.
+
+## Delta confirmado do tabuleiro
+
+Notificações de movimento concluído, compra, remoção e ações compostas são
+normalizadas em um `CommittedBoardDelta`. Ele descreve explicitamente:
+
+- os tipos de mutação comprometida;
+- as unidades alteradas, sem duplicatas;
+- as células confirmadas de origem e destino disponíveis;
+- a necessidade de reconciliação de fontes removidas;
+- a necessidade excepcional de um full refresh.
+
+O delta pode acumular várias notificações da mesma ação. Isso evita o modelo
+anterior de “uma unidade pendente + booleanos”, no qual uma notificação
+posterior podia substituir o contexto de uma unidade anterior.
+
+`SubmitCommittedBoardDelta` nunca publica um delta enquanto a FSM estiver fora
+de `CursorState.Neutral`. Nesse caso, ele apenas mescla o conteúdo ao delta
+pendente. `NotifyTurnStateReturnedToNeutral` retira esse envelope da fila e o
+entrega uma única vez ao consumidor de FoW.
+
+Os pontos públicos legados de movimento, compra e desembarque permanecem como
+adaptadores. Dessa forma, humano, AI, jogador remoto e replay produzem o mesmo
+contrato confirmado, independentemente de quem originou o batch.
+
+O log `[FoW][CommittedDelta]` informa os tipos de mudança, a quantidade de
+unidades e células afetadas e se o consumidor solicitou reconciliação ou full
+refresh.

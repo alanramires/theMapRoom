@@ -507,7 +507,7 @@ public class TutorialManager : MonoBehaviour
         if (tutorial.objectives != null)
             for (int i = 0; i < tutorial.objectives.Count; i++)
                 if (tutorial.objectives[i] != null)
-                    dto.objectives.Add(tutorial.objectives[i]);
+                    dto.objectives.Add(ObjectiveToDto(tutorial.objectives[i]));
         if (tutorial.script != null)
             for (int i = 0; i < tutorial.script.Count; i++)
                 if (tutorial.script[i] != null)
@@ -516,24 +516,39 @@ public class TutorialManager : MonoBehaviour
         return JsonUtility.ToJson(dto, true);
     }
 
-    // Copia uma fala para o DTO, trocando o AudioClip 'voice' pelo caminho do asset.
+    // Objetivo -> DTO: so campos de design (o runtime isVisible/isCompleted/hasFailed fica de fora).
+    private static TutorialObjectiveDto ObjectiveToDto(TutorialObjective o)
+    {
+        return new TutorialObjectiveDto
+        {
+            id = o.id,
+            key = o.key,
+            parameters = o.parameters,
+            description = o.description,
+            startHidden = o.startHidden,
+            isOptional = o.isOptional,
+            isDefeatCondition = o.isDefeatCondition,
+        };
+    }
+
+    // Fala -> DTO: enums viram nome (string) e o AudioClip 'voice' vira caminho do asset.
     private static TutorialStepDto StepToDto(TutorialDialogEntry e)
     {
         return new TutorialStepDto
         {
-            advance = e.advance,
+            advance = e.advance.ToString(),
+            turn = e.turn.ToString(),
+            movement = e.movement.ToString(),
             objectiveKey = e.objectiveKey,
             revealObjective = e.revealObjective,
-            waitObjectiveKey = e.waitObjectiveKey,
-            waitObjectiveIndex = e.waitObjectiveIndex,
-            waitAllUnitsActed = e.waitAllUnitsActed,
-            waitPlayerTurnStart = e.waitPlayerTurnStart,
             text = e.text,
             voicePath = VoicePath(e.voice),
             spawnCommand = e.spawnCommand,
             statCommand = e.statCommand,
-            turn = e.turn,
-            movement = e.movement,
+            waitObjectiveKey = e.waitObjectiveKey,
+            waitObjectiveIndex = e.waitObjectiveIndex,
+            waitAllUnitsActed = e.waitAllUnitsActed,
+            waitPlayerTurnStart = e.waitPlayerTurnStart,
             unlockMovement = e.unlockMovement,
             revealObjectiveKey = e.revealObjectiveKey,
             revealObjectiveIndex = e.revealObjectiveIndex,

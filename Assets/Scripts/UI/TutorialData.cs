@@ -150,22 +150,42 @@ public class TutorialDialogEntry
 // mapeamento manual — o unico cuidado e o AudioClip 'voice', que vira CAMINHO de asset (JsonUtility
 // grava referencia de objeto como instanceID, que nao sobrevive entre sessoes). TutorialObjective
 // nao tem referencia de asset, entao entra direto. Ver TutorialManager / TutorialManagerEditor.
+// Objetivo no export: SO campos de DESIGN. isVisible/isCompleted/hasFailed sao estado de RUNTIME
+// (o TutorialManager reseta no inicio) — se entrassem no round-trip, um teste com isCompleted=true
+// seria assado no asset. No import eles sao reinicializados a partir de startHidden.
+[System.Serializable]
+public class TutorialObjectiveDto
+{
+    public string id;          // TIPO do evento (UNIT_AT_HEX, END_TURN...)
+    public string key;         // identidade da tarefa (hist_Y_XX)
+    public string parameters;
+    public string description; // label da lista de tarefas / mensagem de derrota
+    public bool startHidden;
+    public bool isOptional;
+    public bool isDefeatCondition;
+}
+
 [System.Serializable]
 public class TutorialStepDto
 {
-    public TutorialAdvanceCondition advance;
+    // Enums como STRING (nome legivel) — o JsonUtility gravaria o int cru. Convertido de volta no
+    // import. Os campos modernos vem primeiro; os LEGADOS ficam no fim (o runtime ainda os le, entao
+    // seguem no round-trip para nao perder tutoriais antigos — ver Fase 3 do plano de refactor).
+    public string advance;     // TutorialAdvanceCondition
+    public string turn;        // TutorialEndTurnEffect
+    public string movement;    // TutorialMovementEffect
     public string objectiveKey;
     public bool revealObjective;
-    public string waitObjectiveKey;
-    public int waitObjectiveIndex = -1;
-    public bool waitAllUnitsActed;
-    public bool waitPlayerTurnStart;
     public string text;
     public string voicePath;
     public string spawnCommand;
     public string statCommand;
-    public TutorialEndTurnEffect turn;
-    public TutorialMovementEffect movement;
+
+    // --- legados (ainda lidos pelo PanelDialogTutorialController / TutorialManager) ---
+    public string waitObjectiveKey;
+    public int waitObjectiveIndex = -1;
+    public bool waitAllUnitsActed;
+    public bool waitPlayerTurnStart;
     public bool unlockMovement;
     public string revealObjectiveKey;
     public int revealObjectiveIndex = -1;
@@ -176,7 +196,7 @@ public class TutorialExportDto
 {
     public string id;
     public string description;
-    public List<TutorialObjective> objectives = new List<TutorialObjective>();
+    public List<TutorialObjectiveDto> objectives = new List<TutorialObjectiveDto>();
     public List<TutorialStepDto> script = new List<TutorialStepDto>();
 }
 
