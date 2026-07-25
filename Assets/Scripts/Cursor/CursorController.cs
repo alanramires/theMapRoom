@@ -356,11 +356,20 @@ public class CursorController : MonoBehaviour
         // disponivel -> abre. Fora disso e no-op (cai no fluxo normal).
         if (WasJournalTogglePressedThisFrame()
             && turnStateManager != null
-            && (matchController == null || !matchController.IsPlayerInputLockedByActiveAI())
-            && turnStateManager.ToggleTurnStartAutonomyReport())
+            && (matchController == null || !matchController.IsPlayerInputLockedByActiveAI()))
         {
-            heldDirection = Vector3Int.zero;
-            return;
+            bool journalWasOpen = turnStateManager.IsManualTurnStartAutonomyReportActive;
+            if (turnStateManager.ToggleTurnStartAutonomyReport())
+            {
+                // Abrir com J = beep.mp3; fechar com J = cancel.mp3. (ESC/RClick ja tocam
+                // cancel.mp3 pelo HandleCancel -> ActionSfx.Cancel.)
+                if (journalWasOpen)
+                    PlayCancelSfx();
+                else
+                    PlayBeepSfx();
+                heldDirection = Vector3Int.zero;
+                return;
+            }
         }
 
         if (turnStateManager != null && turnStateManager.IsManualTurnStartAutonomyReportActive)

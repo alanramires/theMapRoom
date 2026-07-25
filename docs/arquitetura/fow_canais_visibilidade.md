@@ -149,3 +149,31 @@ O caminho de sucesso mantém apenas o log resumido
 `[FoW][LoadCacheRestore] success=true`, agora com totais separados de unidades e
 construções. O diagnóstico detalhado de Tilemaps permanece restrito ao caminho
 de erro de célula inválida.
+
+### Runtime quente por slot durante movimentos
+
+Durante um turno de IA com apresentação sob os sensores de um jogador humano,
+o controlador mantém uma fotografia transitória das contribuições confirmadas
+de cada slot já calculado. A fotografia contém:
+
+- contribuições geográficas e sensoriais por fonte;
+- contagem agregada dos dois canais;
+- chaves incrementais das unidades.
+
+Quando uma unidade compromete um movimento e o estado retorna a `Neutral`, o
+runtime do slot ativo é reativado e somente a fonte movida é atualizada. Em
+seguida, o runtime do slot de apresentação é reativado: como suas fontes não
+mudaram, somente a visibilidade dos alvos é republicada e o overlay é redesenhado.
+
+Isso evita o antigo full refresh duplo do slot da IA e do observador humano. A
+fotografia é exclusivamente runtime, nunca é alimentada por posição provisória e
+é descartada em resets completos do Fog of War. Se algum contexto necessário não
+estiver disponível, o fluxo mantém `RefreshFogOfWarForActiveTeam()` como fallback
+conservador.
+
+A camada visual de memória/overlay é compartilhada, portanto possui uma barreira
+adicional: quando gameplay e apresentação pertencem a slots diferentes, o
+contexto da IA é estritamente `DataOnly` e não pode chamar renderização. A rotina
+de render também rejeita defensivamente qualquer cache cujo observador não seja o
+`PlayerSlotId` de apresentação. Somente depois de reativar o contexto humano a
+memória explorada e o overlay podem ser escritos nos Tilemaps visuais.

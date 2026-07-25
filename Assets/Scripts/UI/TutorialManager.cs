@@ -491,6 +491,87 @@ public class TutorialManager : MonoBehaviour
         return matchController.ActiveTutorial;
     }
 
+    // Export simples do tutorial ativo para CSV: uma linha por TAREFA (objective) e uma por
+    // PASSO (fala do roteiro). Serve para revisar/editar o roteiro numa planilha. Escreve na raiz
+    // do projeto e loga o caminho. Botao de contexto no componente (clique-direito no inspector).
+    // Em edit mode depende de MatchController.ActiveTutorial estar resolvido; senao, rode em Play.
+    [ContextMenu("Exportar Tutorial para CSV")]
+    private void ExportActiveTutorialToCsv()
+    {
+        TutorialData tutorial = GetActiveTutorial();
+        if (tutorial == null)
+        {
+            Debug.LogWarning("[TutorialManager] Export CSV: nenhum tutorial ativo (rode em Play ou garanta MatchController.ActiveTutorial).");
+            return;
+        }
+
+        var sb = new System.Text.StringBuilder();
+
+        // Seção 1 — Tarefas (objectives). key = hist_Y_XX; id = TIPO do evento (UNIT_AT_HEX...).
+        sb.AppendLine("secao,idx,key,tipo,parameters,description,optional,defeat,startHidden");
+        if (tutorial.objectives != null)
+        {
+            for (int i = 0; i < tutorial.objectives.Count; i++)
+            {
+                TutorialObjective o = tutorial.objectives[i];
+                if (o == null) continue;
+                sb.Append("TAREFA,").Append(i).Append(',')
+                  .Append(Csv(o.key)).Append(',')
+                  .Append(Csv(o.id)).Append(',')
+                  .Append(Csv(o.parameters)).Append(',')
+                  .Append(Csv(o.description)).Append(',')
+                  .Append(o.isOptional).Append(',')
+                  .Append(o.isDefeatCondition).Append(',')
+                  .Append(o.startHidden).Append('\n');
+            }
+        }
+
+        sb.Append('\n');
+
+        // Seção 2 — Passos do roteiro (script/falas).
+        sb.AppendLine("secao,idx,advance,objectiveKey,revealObjective,turn,movement,text,spawnCommand,statCommand");
+        if (tutorial.script != null)
+        {
+            for (int i = 0; i < tutorial.script.Count; i++)
+            {
+                TutorialDialogEntry e = tutorial.script[i];
+                if (e == null) continue;
+                sb.Append("PASSO,").Append(i).Append(',')
+                  .Append(Csv(e.advance.ToString())).Append(',')
+                  .Append(Csv(e.objectiveKey)).Append(',')
+                  .Append(e.revealObjective).Append(',')
+                  .Append(Csv(e.turn.ToString())).Append(',')
+                  .Append(Csv(e.movement.ToString())).Append(',')
+                  .Append(Csv(e.text)).Append(',')
+                  .Append(Csv(e.spawnCommand)).Append(',')
+                  .Append(Csv(e.statCommand)).Append('\n');
+            }
+        }
+
+        string baseName = string.IsNullOrWhiteSpace(tutorial.id) ? tutorial.name : tutorial.id;
+        foreach (char c in System.IO.Path.GetInvalidFileNameChars())
+            baseName = baseName.Replace(c, '_');
+        string path = System.IO.Path.Combine(System.IO.Directory.GetCurrentDirectory(), $"tutorial_{baseName}.csv");
+        try
+        {
+            System.IO.File.WriteAllText(path, sb.ToString(), System.Text.Encoding.UTF8);
+            Debug.Log($"[TutorialManager] Tutorial exportado: {path} " +
+                      $"({tutorial.objectives?.Count ?? 0} tarefa(s), {tutorial.script?.Count ?? 0} passo(s)).");
+        }
+        catch (System.Exception ex)
+        {
+            Debug.LogError($"[TutorialManager] Falha ao escrever CSV em {path}: {ex.Message}");
+        }
+    }
+
+    // Escapa um campo p/ CSV: sempre entre aspas, aspas internas duplicadas, quebras de linha viram espaco.
+    private static string Csv(string field)
+    {
+        if (string.IsNullOrEmpty(field))
+            return "\"\"";
+        return "\"" + field.Replace("\r", " ").Replace("\n", " ").Replace("\"", "\"\"") + "\"";
+    }
+
     private void MarkObjectiveComplete(TutorialObjective obj)
     {
         if (obj == null) return;
