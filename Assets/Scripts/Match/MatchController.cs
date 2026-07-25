@@ -315,14 +315,19 @@ public class MatchController : MonoBehaviour
     [System.NonSerialized] private bool fogRenderedVisibleCellsValid;
     [System.NonSerialized] private readonly Dictionary<int, FogOfWarUnitCacheEntry> fogVisibleCellsByUnit = new Dictionary<int, FogOfWarUnitCacheEntry>();
     [System.NonSerialized] private readonly Dictionary<FogSpecializedViewCacheKey, HashSet<Vector3Int>> fogSpecializedViewCellsByUnit = new Dictionary<FogSpecializedViewCacheKey, HashSet<Vector3Int>>();
-    [System.NonSerialized] private readonly Dictionary<Vector3Int, int> fogVisibleContributorsByCell = new Dictionary<Vector3Int, int>();
+    // Canais distintos: revelar o mapa nao implica detectar um ocupante.
+    // Unidades contribuem nos dois; construcoes revelam o raio geograficamente,
+    // mas somente o proprio hex possui cobertura de deteccao da construcao.
+    [System.NonSerialized] private readonly Dictionary<Vector3Int, int> fogGeographicContributorsByCell = new Dictionary<Vector3Int, int>();
+    [System.NonSerialized] private readonly Dictionary<Vector3Int, int> fogSensorContributorsByCell = new Dictionary<Vector3Int, int>();
     [System.NonSerialized] private readonly Dictionary<int, bool> fogUnitVisibilityByCacheIndex = new Dictionary<int, bool>();
     [System.NonSerialized] private readonly HashSet<Vector3Int> fogUnitVisibleScratchBuffer = new HashSet<Vector3Int>();
     private sealed class FogSlotGameplaySnapshot
     {
-        public readonly HashSet<Vector3Int> visibleCells = new HashSet<Vector3Int>();
+        public readonly HashSet<Vector3Int> geographicallyVisibleCells = new HashSet<Vector3Int>();
+        public readonly HashSet<Vector3Int> sensorCoveredCells = new HashSet<Vector3Int>();
         public readonly HashSet<Vector3Int> knownCells = new HashSet<Vector3Int>();
-        public readonly HashSet<Vector3Int> globalLandmarkOnlyCells = new HashSet<Vector3Int>();
+        public readonly HashSet<Vector3Int> geographicOnlyCells = new HashSet<Vector3Int>();
         public readonly Dictionary<int, bool> unitVisibility = new Dictionary<int, bool>();
     }
     private sealed class FogConstructionMemoryEntry
@@ -3949,6 +3954,10 @@ public class MatchController : MonoBehaviour
                 out int fragataCollectWorkspaceReleases);
             Debug.Log($"[FoW][Cache] hits={cacheHits} misses={cacheMisses}");
             Debug.Log(
+                $"[FoW][Coverage] geographic={fogGeographicContributorsByCell.Count} " +
+                $"sensor={fogSensorContributorsByCell.Count} " +
+                $"geographicOnly={CountFogGeographicOnlyCells()}");
+            Debug.Log(
                 $"[FoW][Pool] rents={poolRents} releases={poolReleases} " +
                 $"fragataCollect.rents={fragataCollectWorkspaceRents} fragataCollect.releases={fragataCollectWorkspaceReleases}");
 
@@ -3961,6 +3970,20 @@ public class MatchController : MonoBehaviour
                 }
             }
         }
+    }
+
+    private int CountFogGeographicOnlyCells()
+    {
+        int count = 0;
+        foreach (KeyValuePair<Vector3Int, int> entry in fogGeographicContributorsByCell)
+        {
+            if (entry.Value > 0 &&
+                (!fogSensorContributorsByCell.TryGetValue(entry.Key, out int sensors) || sensors <= 0))
+            {
+                count++;
+            }
+        }
+        return count;
     }
 
 
@@ -4947,6 +4970,11 @@ public class MatchController : MonoBehaviour
 
     public bool IsCellVisibleForActiveTeam(Vector3Int cell)
     {
+        return IsCellGeographicallyVisibleForActiveSlot(cell);
+    }
+
+    public bool IsCellGeographicallyVisibleForActiveSlot(Vector3Int cell)
+    {
         if (!debugFogOfWarEnabled)
             return true;
         if (!enableTotalWar)
@@ -4954,23 +4982,38 @@ public class MatchController : MonoBehaviour
         cell.z = 0;
         int observerSlotIndex = ActiveSlotId.Value;
         if (TryGetFogGameplaySnapshot(observerSlotIndex, out FogSlotGameplaySnapshot snapshot))
-            return snapshot.visibleCells.Contains(cell);
+            return snapshot.geographicallyVisibleCells.Contains(cell);
         if (fogCachedObserverSlotIndex != observerSlotIndex)
             return false;
 
-        return fogVisibleContributorsByCell.TryGetValue(cell, out int contributors) && contributors > 0;
+        return fogGeographicContributorsByCell.TryGetValue(cell, out int contributors) && contributors > 0;
     }
 
-    // Cache por frame do conhecimento de celulas do time ativo (uniao All-modes:
+    public bool IsCellCoveredBySensorForActiveSlot(Vector3Int cell)
+    {
+        if (!debugFogOfWarEnabled || !enableTotalWar)
+            return true;
+
+        cell.z = 0;
+        int observerSlotIndex = ActiveSlotId.Value;
+        if (TryGetFogGameplaySnapshot(observerSlotIndex, out FogSlotGameplaySnapshot snapshot))
+            return snapshot.sensorCoveredCells.Contains(cell);
+        if (fogCachedObserverSlotIndex != observerSlotIndex)
+            return false;
+
+        return fogSensorContributorsByCell.TryGetValue(cell, out int contributors) && contributors > 0;
+    }
+
+    // Cache por frame do conhecimento de celulas do slot observador (uniao All-modes:
     // visao geral + especializacoes + construcoes aliadas). Rebuild no maximo
     // uma vez por frame; as views especializadas por unidade ja sao cacheadas.
-    private readonly HashSet<Vector3Int> teamKnownCellsCache = new HashSet<Vector3Int>();
-    private int teamKnownCellsCacheFrame = -1;
-    private int teamKnownCellsCacheTeamId = int.MinValue;
-    private int teamKnownCellsCacheExcludedIndex = int.MinValue;
+    private readonly HashSet<Vector3Int> observerKnownCellsCache = new HashSet<Vector3Int>();
+    private int observerKnownCellsCacheFrame = -1;
+    private int observerKnownCellsCacheSlotIndex = int.MinValue;
+    private int observerKnownCellsCacheExcludedIndex = int.MinValue;
 
-    // Conhecimento confirmado do TIME sobre a celula, independente do modo de
-    // visao selecionado no HUD: visao geral (fogVisibleContributorsByCell) +
+    // Conhecimento confirmado do SLOT sobre a celula, independente do modo de
+    // visao selecionado no HUD: visao geografica geral (fogGeographicContributorsByCell) +
     // especializacoes de camada (ex.: EWACS revela Air a alcance 9) + celulas
     // reveladas por construcoes aliadas. E o predicado correto para gates de
     // GAMEPLAY (supressao de sensores, captura, corredor de tiro): visao e
@@ -5001,17 +5044,17 @@ public class MatchController : MonoBehaviour
             return false;
 
         int excludedIndex = excludeProvisionalUnit != null ? ResolveFogCacheIndex(excludeProvisionalUnit) : int.MinValue;
-        if (teamKnownCellsCacheFrame != Time.frameCount ||
-            teamKnownCellsCacheTeamId != ActiveSlotId.Value ||
-            teamKnownCellsCacheExcludedIndex != excludedIndex)
+        if (observerKnownCellsCacheFrame != Time.frameCount ||
+            observerKnownCellsCacheSlotIndex != ActiveSlotId.Value ||
+            observerKnownCellsCacheExcludedIndex != excludedIndex)
         {
-            BuildFogDisplayVisibleCellsForAllModes(boardMap, teamKnownCellsCache, excludeProvisionalUnit);
-            teamKnownCellsCacheFrame = Time.frameCount;
-            teamKnownCellsCacheTeamId = ActiveSlotId.Value;
-            teamKnownCellsCacheExcludedIndex = excludedIndex;
+            BuildFogDisplayVisibleCellsForAllModes(boardMap, observerKnownCellsCache, excludeProvisionalUnit);
+            observerKnownCellsCacheFrame = Time.frameCount;
+            observerKnownCellsCacheSlotIndex = ActiveSlotId.Value;
+            observerKnownCellsCacheExcludedIndex = excludedIndex;
         }
 
-        return teamKnownCellsCache.Contains(cell);
+        return observerKnownCellsCache.Contains(cell);
     }
 
     public bool IsCellVisibleInFogPresentation(Vector3Int cell)
@@ -5026,7 +5069,7 @@ public class MatchController : MonoBehaviour
             return false;
 
         cell.z = 0;
-        return fogVisibleContributorsByCell.TryGetValue(cell, out int contributors) && contributors > 0;
+        return fogGeographicContributorsByCell.TryGetValue(cell, out int contributors) && contributors > 0;
     }
 
 
@@ -5107,7 +5150,7 @@ public class MatchController : MonoBehaviour
         if (visibleContributorsByCell != null)
         {
             visibleContributorsByCell.Clear();
-            foreach (var kv in fogVisibleContributorsByCell)
+            foreach (var kv in fogGeographicContributorsByCell)
             {
                 if (kv.Value <= 0)
                     continue;
@@ -5177,7 +5220,7 @@ public class MatchController : MonoBehaviour
                     continue;
 
                 Vector3Int cell = new Vector3Int(entry.x, entry.y, entry.z);
-                fogVisibleContributorsByCell[cell] = contributors;
+                fogGeographicContributorsByCell[cell] = contributors;
                 fogOfWarTilemap.SetTile(cell, null);
             }
         }
@@ -5517,7 +5560,7 @@ public class MatchController : MonoBehaviour
                 // obedece a deteccao logica individual. Isso separa terreno revelado
                 // por alcance especializado (ex.: EWACS 9) de ocupante realmente
                 // observado pela visao aplicavel ao alvo (ex.: Surface apenas 3).
-                if (snapshot.visibleCells.Contains(cell))
+                if (snapshot.geographicallyVisibleCells.Contains(cell))
                     return logicallyVisible;
             }
 
@@ -5559,7 +5602,7 @@ public class MatchController : MonoBehaviour
             Vector3Int currentCell = unit.CurrentCellPosition;
             currentCell.z = 0;
             if (!logicallyVisible
-                && snapshot.visibleCells.Contains(currentCell)
+                && snapshot.geographicallyVisibleCells.Contains(currentCell)
                 && ComputeIsUnitVisibleForSlotWithoutCache(unit, observerSlot))
             {
                 // A consulta usa a posicao apenas para a apresentacao corrente e nao
@@ -5653,11 +5696,18 @@ public class MatchController : MonoBehaviour
             fogGameplaySnapshotsBySlot[slotIndex] = snapshot;
         }
 
-        snapshot.visibleCells.Clear();
-        foreach (var entry in fogVisibleContributorsByCell)
+        snapshot.geographicallyVisibleCells.Clear();
+        foreach (var entry in fogGeographicContributorsByCell)
         {
             if (entry.Value > 0)
-                snapshot.visibleCells.Add(entry.Key);
+                snapshot.geographicallyVisibleCells.Add(entry.Key);
+        }
+
+        snapshot.sensorCoveredCells.Clear();
+        foreach (var entry in fogSensorContributorsByCell)
+        {
+            if (entry.Value > 0)
+                snapshot.sensorCoveredCells.Add(entry.Key);
         }
 
         snapshot.knownCells.Clear();
@@ -5665,22 +5715,11 @@ public class MatchController : MonoBehaviour
         RecordConfirmedExploredCells(slotIndex, snapshot.knownCells);
         RecordConfirmedConstructionMemory(slotIndex, boardMap, snapshot.knownCells);
 
-        snapshot.globalLandmarkOnlyCells.Clear();
-        List<ConstructionManager> constructions = ConstructionManager.AllActive;
-        for (int i = 0; i < constructions.Count; i++)
+        snapshot.geographicOnlyCells.Clear();
+        foreach (Vector3Int cell in snapshot.geographicallyVisibleCells)
         {
-            ConstructionManager construction = constructions[i];
-            if (construction == null || !construction.gameObject.activeInHierarchy)
-                continue;
-            if (!construction.IsPlayerHeadQuarter || construction.SlotIndex == slotIndex)
-                continue;
-            if (construction.BoardTilemap != boardMap || construction.gameObject.scene != boardMap.gameObject.scene)
-                continue;
-
-            Vector3Int landmarkCell = construction.CurrentCellPosition;
-            landmarkCell.z = 0;
-            if (fogVisibleContributorsByCell.TryGetValue(landmarkCell, out int contributors) && contributors == 1)
-                snapshot.globalLandmarkOnlyCells.Add(landmarkCell);
+            if (!snapshot.sensorCoveredCells.Contains(cell))
+                snapshot.geographicOnlyCells.Add(cell);
         }
 
         snapshot.unitVisibility.Clear();
@@ -5964,7 +6003,8 @@ public class MatchController : MonoBehaviour
         fogRenderedVisibleCellsBuffer.Clear();
         fogRenderedVisibleCellsValid = false;
         fogVisibleCellsByUnit.Clear();
-        fogVisibleContributorsByCell.Clear();
+        fogGeographicContributorsByCell.Clear();
+        fogSensorContributorsByCell.Clear();
         fogUnitVisibilityByCacheIndex.Clear();
         fogUnitVisibleScratchBuffer.Clear();
         fogCachedObserverSlotIndex = int.MinValue;
@@ -6028,7 +6068,7 @@ public class MatchController : MonoBehaviour
         fogOverlayInitialized = true;
     }
 
-    // Desenha o overlay de névoa a partir do cache já calculado (fogVisibleContributorsByCell).
+    // Desenha o overlay a partir do canal geografico ja calculado.
     // Deve ser chamado apenas após todos os UpdateFogVisibilityForUnit do turno terem rodado.
     private void RenderFogOverlayFromRuntimeCache(Tilemap boardMap)
     {
@@ -6328,7 +6368,7 @@ public class MatchController : MonoBehaviour
 
         // A visao comum ja foi calculada por UpdateFogVisibilityForUnit. Reaproveitar esse
         // cache evita recalcular Air + Surface + Sub para toda unidade a cada spawn/refresh.
-        foreach (KeyValuePair<Vector3Int, int> entry in fogVisibleContributorsByCell)
+        foreach (KeyValuePair<Vector3Int, int> entry in fogGeographicContributorsByCell)
         {
             if (entry.Value > 0)
                 output.Add(entry.Key);
@@ -6351,7 +6391,7 @@ public class MatchController : MonoBehaviour
                 unitData.visionSpecializations == null || unitData.visionSpecializations.Count == 0)
                 continue;
 
-            // A coleta agregada (fogVisibleContributorsByCell) ja avalia a camada
+            // A coleta geografica agregada ja avalia a camada
             // nativa do terreno e todas as especializacoes compativeis com ela.
             // Repetir Land/Naval/Sub aqui reconstruia os mesmos distance maps.
             // Air e a unica familia independente do terreno sob o hex e, por isso,
@@ -6609,7 +6649,10 @@ public class MatchController : MonoBehaviour
         if (cacheEntry.visibleCells.Count > 0)
         {
             foreach (Vector3Int cell in cacheEntry.visibleCells)
-                ApplyFogContribution(cell, -1, boardMap, updateVisual);
+            {
+                ApplyFogGeographicContribution(cell, -1, boardMap, updateVisual);
+                ApplyFogSensorContribution(cell, -1);
+            }
             cacheEntry.visibleCells.Clear();
         }
 
@@ -6638,7 +6681,8 @@ public class MatchController : MonoBehaviour
         foreach (Vector3Int cell in fogUnitVisibleScratchBuffer)
         {
             cacheEntry.visibleCells.Add(cell);
-            ApplyFogContribution(cell, +1, boardMap, updateVisual);
+            ApplyFogGeographicContribution(cell, +1, boardMap, updateVisual);
+            ApplyFogSensorContribution(cell, +1);
         }
 
         cacheEntry.key = nextKey;
@@ -6666,7 +6710,10 @@ public class MatchController : MonoBehaviour
             cacheEntry.visibleCells.Count > 0)
         {
             foreach (Vector3Int cell in cacheEntry.visibleCells)
-                ApplyFogContribution(cell, -1, boardMap);
+            {
+                ApplyFogGeographicContribution(cell, -1, boardMap);
+                ApplyFogSensorContribution(cell, -1);
+            }
             cacheEntry.visibleCells.Clear();
             fogVisibleCellsByUnit.Remove(cacheIndex);
         }
@@ -6722,12 +6769,12 @@ public class MatchController : MonoBehaviour
             fogSpecializedViewCellsByUnit.Remove(keysToRemove[i]);
     }
 
-    private void ApplyFogContribution(Vector3Int cell, int delta, Tilemap boardMap, bool updateVisual = true)
+    private void ApplyFogGeographicContribution(Vector3Int cell, int delta, Tilemap boardMap, bool updateVisual = true)
     {
         if (delta == 0)
             return;
 
-        if (!fogVisibleContributorsByCell.TryGetValue(cell, out int current))
+        if (!fogGeographicContributorsByCell.TryGetValue(cell, out int current))
             current = 0;
 
         int next = Mathf.Max(0, current + delta);
@@ -6735,9 +6782,9 @@ public class MatchController : MonoBehaviour
             return;
 
         if (next <= 0)
-            fogVisibleContributorsByCell.Remove(cell);
+            fogGeographicContributorsByCell.Remove(cell);
         else
-            fogVisibleContributorsByCell[cell] = next;
+            fogGeographicContributorsByCell[cell] = next;
 
         if (!updateVisual)
             return;
@@ -6758,6 +6805,21 @@ public class MatchController : MonoBehaviour
             fogOfWarTilemap.SetTileFlags(cell, TileFlags.None);
             fogOfWarTilemap.SetColor(cell, ResolveFogColorForCell(cell));
         }
+    }
+
+    private void ApplyFogSensorContribution(Vector3Int cell, int delta)
+    {
+        if (delta == 0)
+            return;
+
+        if (!fogSensorContributorsByCell.TryGetValue(cell, out int current))
+            current = 0;
+
+        int next = Mathf.Max(0, current + delta);
+        if (next <= 0)
+            fogSensorContributorsByCell.Remove(cell);
+        else
+            fogSensorContributorsByCell[cell] = next;
     }
 
     private TileBase ResolveFogTileForCell(Tilemap boardMap, Vector3Int cell)
@@ -6838,7 +6900,7 @@ public class MatchController : MonoBehaviour
             if (!ownedByActivePlayer)
             {
                 constructionsIncluded++;
-                ApplyFogContribution(cell, +1, boardMap, updateVisual);
+                ApplyFogGeographicContribution(cell, +1, boardMap, updateVisual);
                 if (ShouldLogPodeEnxergarRuntime)
                 {
                     Debug.Log($"[FoW][Construction][Use] {construction.name} cell={cell.x},{cell.y} reason=global_hq");
@@ -6859,7 +6921,11 @@ public class MatchController : MonoBehaviour
 
             HashSet<Vector3Int> visibleCells = BuildCellsInRadius(boardMap, cell, visionRange);
             foreach (Vector3Int visibleCell in visibleCells)
-                ApplyFogContribution(visibleCell, +1, boardMap, updateVisual);
+                ApplyFogGeographicContribution(visibleCell, +1, boardMap, updateVisual);
+
+            // A construcao detecta o ocupante que esta efetivamente sobre ela.
+            // O restante do raio apenas revela a geografia.
+            ApplyFogSensorContribution(cell, +1);
         }
 
         if (ShouldLogPodeEnxergarRuntime)
@@ -7566,12 +7632,4 @@ public class MatchController : MonoBehaviour
         return false;
     }
 }
-
-
-
-
-
-
-
-
 
