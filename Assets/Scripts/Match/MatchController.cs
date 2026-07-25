@@ -5258,6 +5258,161 @@ public class MatchController : MonoBehaviour
         }
     }
 
+    public bool VerifyFogSourceContributionsFromSave(
+        IList<FogSourceContributionSaveData> savedSources)
+    {
+        if (savedSources == null || savedSources.Count == 0)
+            return false;
+
+        const int maxDetails = 8;
+        int observerSlotIndex = fogCachedObserverSlotIndex;
+        int invalid = 0;
+        int duplicate = 0;
+        int missingRuntime = 0;
+        int missingSaved = 0;
+        int stateMismatch = 0;
+        int geographicMismatch = 0;
+        int sensorMismatch = 0;
+        int matched = 0;
+        List<string> details = new List<string>(maxDetails);
+        Dictionary<FogContributionSourceId, FogSourceContributionSaveData> savedBySource =
+            new Dictionary<FogContributionSourceId, FogSourceContributionSaveData>();
+
+        for (int i = 0; i < savedSources.Count; i++)
+        {
+            FogSourceContributionSaveData saved = savedSources[i];
+            if (saved == null ||
+                saved.observerSlotIndex != observerSlotIndex ||
+                (saved.sourceType != (int)FogContributionSourceType.Unit &&
+                 saved.sourceType != (int)FogContributionSourceType.Construction))
+            {
+                invalid++;
+                RegisterFogCacheVerificationDetail(details, maxDetails, $"invalid@index={i}");
+                continue;
+            }
+
+            FogContributionSourceId sourceId = new FogContributionSourceId(
+                (FogContributionSourceType)saved.sourceType,
+                saved.sourceInstanceId);
+            if (!savedBySource.TryAdd(sourceId, saved))
+            {
+                duplicate++;
+                RegisterFogCacheVerificationDetail(details, maxDetails, $"duplicate={FormatFogSourceId(sourceId)}");
+            }
+        }
+
+        foreach (KeyValuePair<FogContributionSourceId, FogSourceContributionSaveData> pair in savedBySource)
+        {
+            if (!fogContributionsBySource.TryGetValue(pair.Key, out FogSourceContributionCacheEntry runtime) ||
+                runtime == null ||
+                (runtime.geographicCells.Count == 0 && runtime.sensorCells.Count == 0))
+            {
+                missingRuntime++;
+                RegisterFogCacheVerificationDetail(details, maxDetails, $"missingRuntime={FormatFogSourceId(pair.Key)}");
+                continue;
+            }
+
+            FogSourceContributionSaveData saved = pair.Value;
+            bool sourceMatches = true;
+            if (runtime.sourceStateHash != saved.sourceStateHash)
+            {
+                stateMismatch++;
+                sourceMatches = false;
+            }
+            if (!FogSavedCellsMatch(runtime.geographicCells, saved.geographicCells))
+            {
+                geographicMismatch++;
+                sourceMatches = false;
+            }
+            if (!FogSavedCellsMatch(runtime.sensorCells, saved.sensorCells))
+            {
+                sensorMismatch++;
+                sourceMatches = false;
+            }
+
+            if (sourceMatches)
+            {
+                matched++;
+            }
+            else
+            {
+                RegisterFogCacheVerificationDetail(
+                    details,
+                    maxDetails,
+                    $"mismatch={FormatFogSourceId(pair.Key)} " +
+                    $"geo={saved.geographicCells?.Count ?? 0}/{runtime.geographicCells.Count} " +
+                    $"sensor={saved.sensorCells?.Count ?? 0}/{runtime.sensorCells.Count}");
+            }
+        }
+
+        int runtimeComparable = 0;
+        foreach (KeyValuePair<FogContributionSourceId, FogSourceContributionCacheEntry> pair in fogContributionsBySource)
+        {
+            FogSourceContributionCacheEntry runtime = pair.Value;
+            if (runtime == null ||
+                (runtime.geographicCells.Count == 0 && runtime.sensorCells.Count == 0))
+            {
+                continue;
+            }
+
+            runtimeComparable++;
+            if (savedBySource.ContainsKey(pair.Key))
+                continue;
+            missingSaved++;
+            RegisterFogCacheVerificationDetail(details, maxDetails, $"missingSaved={FormatFogSourceId(pair.Key)}");
+        }
+
+        bool exact = invalid == 0 && duplicate == 0 && missingRuntime == 0 && missingSaved == 0 &&
+                     stateMismatch == 0 && geographicMismatch == 0 && sensorMismatch == 0 &&
+                     matched == savedBySource.Count && runtimeComparable == savedBySource.Count;
+        string summary =
+            $"[FoW][LoadCacheVerify] exact={exact} slot={observerSlotIndex} " +
+            $"saved={savedSources.Count} runtime={runtimeComparable} matched={matched} " +
+            $"invalid={invalid} duplicate={duplicate} missingRuntime={missingRuntime} missingSaved={missingSaved} " +
+            $"stateMismatch={stateMismatch} geographicMismatch={geographicMismatch} sensorMismatch={sensorMismatch}";
+        if (exact)
+        {
+            Debug.Log(summary);
+        }
+        else
+        {
+            if (details.Count > 0)
+                summary += $" details=[{string.Join(" | ", details)}]";
+            Debug.LogWarning(summary);
+        }
+        return exact;
+    }
+
+    private static bool FogSavedCellsMatch(
+        HashSet<Vector3Int> runtimeCells,
+        IList<Vector3Int> savedCells)
+    {
+        int savedCount = savedCells?.Count ?? 0;
+        if (runtimeCells == null)
+            return savedCount == 0;
+        if (runtimeCells.Count != savedCount)
+            return false;
+        if (savedCount == 0)
+            return true;
+
+        HashSet<Vector3Int> savedSet = new HashSet<Vector3Int>();
+        for (int i = 0; i < savedCount; i++)
+            savedSet.Add(savedCells[i]);
+        return savedSet.Count == savedCount && runtimeCells.SetEquals(savedSet);
+    }
+
+    private static void RegisterFogCacheVerificationDetail(
+        List<string> details,
+        int maxDetails,
+        string detail)
+    {
+        if (details != null && details.Count < maxDetails)
+            details.Add(detail);
+    }
+
+    private static string FormatFogSourceId(FogContributionSourceId sourceId) =>
+        $"{sourceId.type}:{sourceId.instanceId}";
+
     public bool TryRestoreFogRuntimeCacheForObserverSlotFromSave(
         int observerSlotIndex,
         List<FogCellContributorSaveData> visibleContributorsByCell,

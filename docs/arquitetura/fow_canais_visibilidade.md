@@ -66,4 +66,16 @@ Na etapa 4 do refactor, o save v16 passa a gravar `fogSourceContributions`. Cada
 
 As listas são canonicalizadas antes da escrita, mas excluídas do hash autoritativo da partida por serem estado derivado.
 
-O load ainda não consome essas entradas e continua executando cold refresh. A etapa seguinte deve comparar a fotografia salva com as contribuições recalculadas antes que qualquer fast path seja autorizado.
+Na etapa 5, o load continua executando cold refresh e, somente depois dele, compara a fotografia salva com as contribuições recalculadas.
+
+A verificação é estritamente read-only e compara:
+
+- slot observador;
+- tipo e identidade da fonte;
+- assinatura do estado;
+- conjunto geográfico;
+- conjunto sensor.
+
+O resultado é emitido em `[FoW][LoadCacheVerify]`. Sucesso produz uma única linha; divergências produzem um único warning com no máximo oito detalhes. Saves sem a coleção nova seguem silenciosamente pelo cold refresh.
+
+Nenhuma entrada salva é aplicada ao runtime nesta etapa. A restauração existente continua desconectada.

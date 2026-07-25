@@ -1933,6 +1933,17 @@ public class SaveGameManager : MonoBehaviour
                 // apenas conhecido depois do load.
                 matchController.RefreshFogOfWarForActiveTeam();
                 LogLoadPerf(loadedSlot, "refresh_fog_after_load.end", refreshFogStartMs, PerfNowMs() - routineStartMs);
+
+                // Etapa 5/6: o cold refresh continua sendo a verdade. A fotografia
+                // salva e somente comparada com o resultado recalculado; nunca e
+                // aplicada ao runtime neste ponto.
+                if (data.fogSourceContributions != null && data.fogSourceContributions.Count > 0)
+                {
+                    double verifyFogCacheStartMs = PerfNowMs();
+                    LogLoadPerf(loadedSlot, "verify_fog_cache.begin", verifyFogCacheStartMs, verifyFogCacheStartMs - routineStartMs);
+                    matchController.VerifyFogSourceContributionsFromSave(data.fogSourceContributions);
+                    LogLoadPerf(loadedSlot, "verify_fog_cache.end", verifyFogCacheStartMs, PerfNowMs() - routineStartMs);
+                }
             }
 
             // A ocupacao visual depende da visibilidade final da unidade. Recalcular somente
