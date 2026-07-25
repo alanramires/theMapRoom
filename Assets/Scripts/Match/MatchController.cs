@@ -5527,10 +5527,19 @@ public class MatchController : MonoBehaviour
                 result = $"checksum_mismatch:{i}";
                 return false;
             }
-            if (!ValidateSavedFogCells(saved.geographicCells, boardMap) ||
-                !ValidateSavedFogCells(saved.sensorCells, boardMap))
+            string sourceLabel = $"{(FogContributionSourceType)saved.sourceType}:{saved.sourceInstanceId}";
+            if (!ValidateSavedFogCells(
+                    saved.geographicCells,
+                    boardMap,
+                    "geographic",
+                    out string invalidCellDetail) ||
+                !ValidateSavedFogCells(
+                    saved.sensorCells,
+                    boardMap,
+                    "sensor",
+                    out invalidCellDetail))
             {
-                result = $"invalid_cells:{i}";
+                result = $"invalid_cells sourceIndex={i} source={sourceLabel} {invalidCellDetail}";
                 return false;
             }
 
@@ -5598,7 +5607,7 @@ public class MatchController : MonoBehaviour
             for (int i = 0; i < saved.geographicCells.Count; i++)
                 AddFogSourceGeographicContribution(runtime, saved.geographicCells[i], boardMap, updateVisual: false);
             for (int i = 0; i < saved.sensorCells.Count; i++)
-                AddFogSourceSensorContribution(runtime, saved.sensorCells[i]);
+                AddFogSourceSensorContribution(runtime, saved.sensorCells[i], boardMap);
         }
 
         UnitManager[] snapshotUnits = FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude);
@@ -5620,19 +5629,82 @@ public class MatchController : MonoBehaviour
         return true;
     }
 
-    private static bool ValidateSavedFogCells(IList<Vector3Int> cells, Tilemap boardMap)
+    private static bool ValidateSavedFogCells(
+        IList<Vector3Int> cells,
+        Tilemap boardMap,
+        string channel,
+        out string invalidDetail)
     {
-        if (cells == null || boardMap == null)
+        invalidDetail = string.Empty;
+        if (cells == null)
+        {
+            invalidDetail = $"channel={channel} cause=null_list";
             return false;
+        }
+        if (boardMap == null)
+        {
+            invalidDetail = $"channel={channel} cause=null_board";
+            return false;
+        }
+
         HashSet<Vector3Int> unique = new HashSet<Vector3Int>();
         for (int i = 0; i < cells.Count; i++)
         {
             Vector3Int cell = cells[i];
-            if (cell.z != 0 || boardMap.GetTile(cell) == null || !unique.Add(cell))
+            string cause = null;
+            if (cell.z != 0)
+                cause = "nonzero_z";
+            else if (!IsFogBoardCell(cell, boardMap))
+                cause = "board_tile_missing";
+            else if (!unique.Add(cell))
+                cause = "duplicate";
+
+            if (cause != null)
+            {
+                invalidDetail =
+                    $"channel={channel} cellIndex={i} cell=({cell.x},{cell.y},{cell.z}) " +
+                    $"cause={cause} board={boardMap.name} insideBounds={boardMap.cellBounds.Contains(cell)} " +
+                    $"layers={DescribeFogCellTilemapOccupancy(cell, boardMap)}";
                 return false;
+            }
         }
         return true;
     }
+
+    private static string DescribeFogCellTilemapOccupancy(Vector3Int cell, Tilemap boardMap)
+    {
+        if (boardMap == null)
+            return "[]";
+
+        const int maxLayers = 8;
+        List<string> occupiedLayers = new List<string>(maxLayers);
+        Tilemap[] tilemaps = UnityEngine.Object.FindObjectsByType<Tilemap>(
+            FindObjectsInactive.Include);
+        for (int i = 0; i < tilemaps.Length; i++)
+        {
+            Tilemap tilemap = tilemaps[i];
+            if (tilemap == null ||
+                tilemap.gameObject.scene != boardMap.gameObject.scene ||
+                tilemap.layoutGrid != boardMap.layoutGrid)
+            {
+                continue;
+            }
+
+            TileBase tile = tilemap.GetTile(cell);
+            if (tile == null)
+                continue;
+
+            if (occupiedLayers.Count < maxLayers)
+                occupiedLayers.Add($"{tilemap.name}:{tile.name}");
+        }
+
+        return occupiedLayers.Count == 0
+            ? "[]"
+            : $"[{string.Join(",", occupiedLayers)}]";
+    }
+
+    private static bool IsFogBoardCell(Vector3Int cell, Tilemap boardMap) =>
+        boardMap != null && cell.z == 0 && boardMap.GetTile(cell) != null;
 
     private static bool FogSavedCellListsMatch(
         IList<Vector3Int> left,
@@ -7166,7 +7238,7 @@ public class MatchController : MonoBehaviour
         foreach (Vector3Int cell in fogUnitVisibleScratchBuffer)
         {
             AddFogSourceGeographicContribution(cacheEntry, cell, boardMap, updateVisual);
-            AddFogSourceSensorContribution(cacheEntry, cell);
+            AddFogSourceSensorContribution(cacheEntry, cell, boardMap);
         }
 
         cacheEntry.unitCacheKey = nextKey;
@@ -7272,16 +7344,17 @@ public class MatchController : MonoBehaviour
         Tilemap boardMap,
         bool updateVisual)
     {
-        if (entry == null || !entry.geographicCells.Add(cell))
+        if (entry == null || !IsFogBoardCell(cell, boardMap) || !entry.geographicCells.Add(cell))
             return;
         ApplyFogGeographicContribution(cell, +1, boardMap, updateVisual);
     }
 
     private void AddFogSourceSensorContribution(
         FogSourceContributionCacheEntry entry,
-        Vector3Int cell)
+        Vector3Int cell,
+        Tilemap boardMap)
     {
-        if (entry == null || !entry.sensorCells.Add(cell))
+        if (entry == null || !IsFogBoardCell(cell, boardMap) || !entry.sensorCells.Add(cell))
             return;
         ApplyFogSensorContribution(cell, +1);
     }
@@ -7455,7 +7528,7 @@ public class MatchController : MonoBehaviour
 
             // A construcao detecta o ocupante que esta efetivamente sobre ela.
             // O restante do raio apenas revela a geografia.
-            AddFogSourceSensorContribution(sourceEntry, cell);
+            AddFogSourceSensorContribution(sourceEntry, cell, boardMap);
         }
 
         if (ShouldLogPodeEnxergarRuntime)
