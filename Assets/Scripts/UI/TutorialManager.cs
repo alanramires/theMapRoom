@@ -495,15 +495,12 @@ public class TutorialManager : MonoBehaviour
     // PASSO (fala do roteiro). Serve para revisar/editar o roteiro numa planilha. Escreve na raiz
     // do projeto e loga o caminho. Botao de contexto no componente (clique-direito no inspector).
     // Em edit mode depende de MatchController.ActiveTutorial estar resolvido; senao, rode em Play.
-    [ContextMenu("Exportar Tutorial para CSV")]
-    private void ExportActiveTutorialToCsv()
+    // Monta o CSV do tutorial ATIVO (uma linha por tarefa e por passo). null se nao ha tutorial.
+    public string BuildActiveTutorialCsv()
     {
         TutorialData tutorial = GetActiveTutorial();
         if (tutorial == null)
-        {
-            Debug.LogWarning("[TutorialManager] Export CSV: nenhum tutorial ativo (rode em Play ou garanta MatchController.ActiveTutorial).");
-            return;
-        }
+            return null;
 
         var sb = new System.Text.StringBuilder();
 
@@ -548,15 +545,39 @@ public class TutorialManager : MonoBehaviour
             }
         }
 
-        string baseName = string.IsNullOrWhiteSpace(tutorial.id) ? tutorial.name : tutorial.id;
+        return sb.ToString();
+    }
+
+    // Nome-base sugerido para o arquivo exportado (id do tutorial saneado).
+    public string GetActiveTutorialExportName()
+    {
+        TutorialData tutorial = GetActiveTutorial();
+        string baseName = tutorial == null
+            ? "tutorial"
+            : (string.IsNullOrWhiteSpace(tutorial.id) ? tutorial.name : tutorial.id);
         foreach (char c in System.IO.Path.GetInvalidFileNameChars())
             baseName = baseName.Replace(c, '_');
-        string path = System.IO.Path.Combine(System.IO.Directory.GetCurrentDirectory(), $"tutorial_{baseName}.csv");
+        return "tutorial_" + baseName;
+    }
+
+    // Export via ContextMenu (runtime): salva em persistentDataPath com timestamp e loga o caminho.
+    // O botao do inspector (TutorialManagerEditor) usa Save File Panel para escolher o local.
+    [ContextMenu("Exportar Tutorial para CSV")]
+    public void ExportActiveTutorialToCsv()
+    {
+        string csv = BuildActiveTutorialCsv();
+        if (csv == null)
+        {
+            Debug.LogWarning("[TutorialManager] Export CSV: nenhum tutorial ativo (rode em Play ou garanta MatchController.ActiveTutorial).");
+            return;
+        }
+        string path = System.IO.Path.Combine(
+            Application.persistentDataPath,
+            $"{GetActiveTutorialExportName()}_{System.DateTime.Now:yyyyMMdd_HHmmss}.csv");
         try
         {
-            System.IO.File.WriteAllText(path, sb.ToString(), System.Text.Encoding.UTF8);
-            Debug.Log($"[TutorialManager] Tutorial exportado: {path} " +
-                      $"({tutorial.objectives?.Count ?? 0} tarefa(s), {tutorial.script?.Count ?? 0} passo(s)).");
+            System.IO.File.WriteAllText(path, csv, new System.Text.UTF8Encoding(true));
+            Debug.Log($"[TutorialManager] Tutorial exportado: {path}");
         }
         catch (System.Exception ex)
         {

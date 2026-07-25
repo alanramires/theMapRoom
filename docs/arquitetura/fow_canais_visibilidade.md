@@ -177,3 +177,22 @@ contexto da IA é estritamente `DataOnly` e não pode chamar renderização. A r
 de render também rejeita defensivamente qualquer cache cujo observador não seja o
 `PlayerSlotId` de apresentação. Somente depois de reativar o contexto humano a
 memória explorada e o overlay podem ser escritos nos Tilemaps visuais.
+
+## Barreiras de escrita por slot
+
+Existem duas autorizações distintas na fronteira de saída do FoW:
+
+- memória confirmada só pode ser registrada em `Neutral` e quando o cache ativo
+  pertence exatamente ao `PlayerSlotId` que receberá a informação;
+- Tilemaps de overlay e memória só podem ser alterados em `Neutral`, pelo cache do
+  `PlayerSlotId` escolhido como observador visual local.
+
+Isso permite calcular e memorizar o FoW próprio de uma IA, jogador remoto ou
+replay em modo `DataOnly`, sem conceder a esse participante autoridade sobre a
+apresentação local. A origem do batch não participa da decisão: somente o slot
+observador e o contexto de apresentação importam.
+
+As rotinas centrais de renderização e de contribuição geográfica verificam essa
+barreira defensivamente. Com `enableFogValidationLogs`, uma tentativa rejeitada
+gera `[FoW][WriteBarrier]` deduplicado para diagnosticar o chamador sem contaminar
+o estado confirmado.

@@ -392,6 +392,7 @@ public class MatchController : MonoBehaviour
     [System.NonSerialized] private PanelRemainingController fogVisionPanelRemaining;
     [System.NonSerialized] private bool fogSortingLayerValidated;
     [System.NonSerialized] private int fogCachedObserverSlotIndex = int.MinValue;
+    [System.NonSerialized] private string lastFogWriteBarrierWarning;
     [System.NonSerialized] private bool fogOverlayInitialized;
     [System.NonSerialized] private bool initialStealthDetectionBootstrapped;
     [System.NonSerialized] private bool pendingCommittedBoardRefresh;
@@ -5255,6 +5256,73 @@ public class MatchController : MonoBehaviour
         return false;
     }
 
+    private PlayerSlotId ResolveFogVisualObserverSlot()
+    {
+        return TryResolveFogPresentationSlot(out PlayerSlotId presentationSlot)
+            ? presentationSlot
+            : ActiveSlotId;
+    }
+
+    private bool IsFogConfirmedMemoryWriteAuthorized(int observerSlotIndex, string operation)
+    {
+        bool isNeutral = turnStateManager == null ||
+                         turnStateManager.CurrentCursorState == TurnStateManager.CursorState.Neutral;
+        bool authorized = Application.isPlaying &&
+                          isNeutral &&
+                          IsValidPlayerSlotIndex(observerSlotIndex) &&
+                          fogCachedObserverSlotIndex == observerSlotIndex;
+        if (!authorized)
+        {
+            LogFogWriteBarrierRejection(
+                operation,
+                observerSlotIndex,
+                int.MinValue,
+                isNeutral);
+        }
+
+        return authorized;
+    }
+
+    private bool IsFogVisualWriteAuthorized(string operation)
+    {
+        PlayerSlotId presentationSlot = ResolveFogVisualObserverSlot();
+        bool isNeutral = turnStateManager == null ||
+                         turnStateManager.CurrentCursorState == TurnStateManager.CursorState.Neutral;
+        bool authorized = isNeutral &&
+                          IsValidPlayerSlot(presentationSlot) &&
+                          fogCachedObserverSlotIndex == presentationSlot.Value;
+        if (!authorized)
+        {
+            LogFogWriteBarrierRejection(
+                operation,
+                fogCachedObserverSlotIndex,
+                presentationSlot.Value,
+                isNeutral);
+        }
+
+        return authorized;
+    }
+
+    private void LogFogWriteBarrierRejection(
+        string operation,
+        int requestedSlotIndex,
+        int presentationSlotIndex,
+        bool isNeutral)
+    {
+        if (!enableFogValidationLogs)
+            return;
+
+        string warning =
+            $"[FoW][WriteBarrier] rejected={operation} requestedSlot={requestedSlotIndex} " +
+            $"cacheSlot={fogCachedObserverSlotIndex} " +
+            $"presentationSlot={presentationSlotIndex} neutral={isNeutral}";
+        if (string.Equals(lastFogWriteBarrierWarning, warning, StringComparison.Ordinal))
+            return;
+
+        lastFogWriteBarrierWarning = warning;
+        Debug.LogWarning(warning);
+    }
+
     public void ExportFogRuntimeCacheForSave(
         out int observerSlotIndex,
         List<FogCellContributorSaveData> visibleContributorsByCell,
@@ -6466,9 +6534,7 @@ public class MatchController : MonoBehaviour
     {
         if (!Application.isPlaying || visibleCells == null)
             return;
-        if (turnStateManager != null && turnStateManager.CurrentCursorState != TurnStateManager.CursorState.Neutral)
-            return;
-        if (!IsValidPlayerSlotIndex(observerSlotIndex))
+        if (!IsFogConfirmedMemoryWriteAuthorized(observerSlotIndex, "record_explored"))
             return;
 
         if (!fogExploredCellsBySlot.TryGetValue(observerSlotIndex, out HashSet<Vector3Int> explored))
@@ -6500,9 +6566,7 @@ public class MatchController : MonoBehaviour
     {
         if (!Application.isPlaying || boardMap == null || visibleCells == null)
             return;
-        if (turnStateManager != null && turnStateManager.CurrentCursorState != TurnStateManager.CursorState.Neutral)
-            return;
-        if (!IsValidPlayerSlotIndex(observerSlotIndex))
+        if (!IsFogConfirmedMemoryWriteAuthorized(observerSlotIndex, "record_construction_memory"))
             return;
 
         if (!fogConstructionMemoryBySlot.TryGetValue(observerSlotIndex, out Dictionary<Vector3Int, FogConstructionMemoryEntry> memory))
@@ -6821,6 +6885,13 @@ public class MatchController : MonoBehaviour
 
     private void InitializeFogOverlay(Tilemap boardMap)
     {
+        fogCachedObserverSlotIndex = ActiveSlotId.Value;
+        if (!IsFogVisualWriteAuthorized("initialize_overlay"))
+        {
+            fogOverlayInitialized = false;
+            return;
+        }
+
         fogBoardCellsBuffer.Clear();
         CollectBoardCells(boardMap, fogBoardCellsBuffer);
         if (fogBoardCellsBuffer.Count <= 0)
@@ -6843,7 +6914,6 @@ public class MatchController : MonoBehaviour
             fogOfWarTilemap.SetColor(cell, ResolveFogColorForCell(cell));
         }
 
-        fogCachedObserverSlotIndex = ActiveSlotId.Value;
         fogOverlayInitialized = true;
         // InitializeFogOverlay acabou de desenhar nevoa em todas as celulas.
         fogRenderedVisibleCellsBuffer.Clear();
@@ -6869,14 +6939,8 @@ public class MatchController : MonoBehaviour
     // Deve ser chamado apenas após todos os UpdateFogVisibilityForUnit do turno terem rodado.
     private void RenderFogOverlayFromRuntimeCache(Tilemap boardMap)
     {
-        // A camada visual e compartilhada. Durante um turno adversario, nunca
-        // permita que o contexto DataOnly do slot de gameplay pinte memoria ou
-        // overlay na perspectiva reservada ao observador de apresentacao.
-        if (TryResolveFogPresentationSlot(out PlayerSlotId presentationSlot) &&
-            fogCachedObserverSlotIndex != presentationSlot.Value)
-        {
+        if (!IsFogVisualWriteAuthorized("render_overlay"))
             return;
-        }
 
         if (fogOfWarVisionMode == FogOfWarVisionMode.All)
             BuildFogDisplayVisibleCellsForAllModes(boardMap, fogDisplayVisibleCellsBuffer);
@@ -6945,7 +7009,7 @@ public class MatchController : MonoBehaviour
             fogOfWarBreakwaterMemoryTilemap.ClearAllTiles();
         SetFogConstructionMemoryRenderersActive(0);
         SetFogStructureMemoryRenderersActive(0);
-        int renderedSlotIndex = fogCachedObserverSlotIndex >= 0 ? fogCachedObserverSlotIndex : ActiveSlotId.Value;
+        int renderedSlotIndex = ResolveFogVisualObserverSlot().Value;
         if (!IsValidPlayerSlotIndex(renderedSlotIndex) ||
             !fogExploredCellsBySlot.TryGetValue(renderedSlotIndex, out HashSet<Vector3Int> explored))
         {
@@ -7621,6 +7685,8 @@ public class MatchController : MonoBehaviour
 
         if (!updateVisual)
             return;
+        if (!IsFogVisualWriteAuthorized("apply_geographic_contribution"))
+            return;
 
         if (current <= 0 && next > 0)
         {
@@ -7986,6 +8052,8 @@ public class MatchController : MonoBehaviour
             fogOfWarAlpha = clampedPercent / 100f;
         if (fogOfWarTilemap == null)
             return;
+        if (Application.isPlaying && !IsFogVisualWriteAuthorized("set_overlay_alpha"))
+            return;
 
         BoundsInt bounds = fogOfWarTilemap.cellBounds;
         foreach (Vector3Int cell in bounds.allPositionsWithin)
@@ -7998,7 +8066,9 @@ public class MatchController : MonoBehaviour
     private Color ResolveFogColorForCell(Vector3Int cell)
     {
         float alpha = ResolveFogOfWarAlpha();
-        int renderedSlotIndex = fogCachedObserverSlotIndex >= 0 ? fogCachedObserverSlotIndex : ActiveSlotId.Value;
+        int renderedSlotIndex = Application.isPlaying
+            ? ResolveFogVisualObserverSlot().Value
+            : (fogCachedObserverSlotIndex >= 0 ? fogCachedObserverSlotIndex : ActiveSlotId.Value);
         PlayerSlotId renderedSlot = PlayerSlotId.FromIndex(renderedSlotIndex);
         if (IsValidPlayerSlot(renderedSlot) &&
             IsCellExploredBySlot(renderedSlot, cell))
