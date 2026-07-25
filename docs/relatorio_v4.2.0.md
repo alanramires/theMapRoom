@@ -1,4 +1,4 @@
-# v4.2.0 - Antes do refactor do Save/Load para SlotID
+# v4.2.0 - Refactor do Save/Load para SlotID parte 1/6
 
 Esta versão registra o estado estável imediatamente anterior ao refactor do Save/Load e dos caches persistidos de Fog of War para identidade explícita por `PlayerSlotId`.
 
@@ -65,6 +65,22 @@ Refatorar o Save/Load de FOW em etapas independentes:
 4. persistir contribuições por fonte sem alterar inicialmente o comportamento do load;
 5. comparar cache restaurado com cold refresh;
 6. ativar o fast path com fallback integral e, posteriormente, restauração parcial.
+
+## Refactor Save/Load por SlotID — etapa 1/6
+
+A primeira etapa foi concluída sem ativar a restauração do cache runtime:
+
+- o formato de save passou para a versão `15`;
+- `fogObserverSlotIndex` substitui semanticamente `fogCacheTeamId`;
+- `fogExploredCellsBySlot` substitui a coleção legada `fogExploredCellsByTeam`;
+- saves até v14 migram o valor de `fogCacheTeamId` diretamente como índice de slot, pois esse campo já armazenava `ActiveSlotId.Value`;
+- a migração nunca tenta reinterpretar esse valor como `TeamId`, preservando participantes distintos que compartilham a mesma cor;
+- campos legados continuam presentes apenas para desserialização compatível e ficam vazios em saves novos;
+- snapshots, exploração, memória de construções e cache ativo foram renomeados internamente para explicitar indexação por slot;
+- a API legada de restauração permanece como ponte obsoleta para compatibilidade;
+- o load continua descartando a fotografia runtime e executando o cold refresh confirmado.
+
+Não houve mudança nas regras de visão, detecção ou compromisso transacional nesta etapa.
 
 ## Validação
 

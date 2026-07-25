@@ -5,7 +5,7 @@ using UnityEngine;
 [Serializable]
 public class SaveGameData
 {
-    public int version = 14;
+    public int version = 15;
     public string sceneName;
     public long savedAtUtcTicks;
     public int currentTurn;
@@ -26,9 +26,17 @@ public class SaveGameData
     public PlanningConfigSaveData planningConfig = new PlanningConfigSaveData();
     public List<RallyPointSaveData> rallyPoints = new List<RallyPointSaveData>();
     public List<RallyAssignmentSaveData> rallyAssignments = new List<RallyAssignmentSaveData>();
+    // v15+: identidade explicita do slot observador dono do snapshot runtime de FOW.
+    public int fogObserverSlotIndex = int.MinValue;
+    // v14 e anteriores: apesar do nome, este campo sempre armazenou ActiveSlotId.Value.
+    // Mantido somente para desserializar saves antigos; saves novos deixam-no vazio.
     public int fogCacheTeamId = int.MinValue;
     public List<FogCellContributorSaveData> fogVisibleContributorsByCell = new List<FogCellContributorSaveData>();
     public List<FogUnitVisibilitySaveData> fogUnitVisibilityByCacheIndex = new List<FogUnitVisibilitySaveData>();
+    // v15+: a coleção é indexada semanticamente por slot; teamId em cada entrada
+    // existe apenas como pista de migração para saves antigos.
+    public List<TeamExploredCellsSaveData> fogExploredCellsBySlot = new List<TeamExploredCellsSaveData>();
+    // v14 e anteriores.
     public List<TeamExploredCellsSaveData> fogExploredCellsByTeam = new List<TeamExploredCellsSaveData>();
     public List<FogConstructionMemorySaveData> fogConstructionMemory = new List<FogConstructionMemorySaveData>();
     public AIPlannerMultiTeamSaveData aiPlannerState;

@@ -318,7 +318,7 @@ public class MatchController : MonoBehaviour
     [System.NonSerialized] private readonly Dictionary<Vector3Int, int> fogVisibleContributorsByCell = new Dictionary<Vector3Int, int>();
     [System.NonSerialized] private readonly Dictionary<int, bool> fogUnitVisibilityByCacheIndex = new Dictionary<int, bool>();
     [System.NonSerialized] private readonly HashSet<Vector3Int> fogUnitVisibleScratchBuffer = new HashSet<Vector3Int>();
-    private sealed class FogTeamGameplaySnapshot
+    private sealed class FogSlotGameplaySnapshot
     {
         public readonly HashSet<Vector3Int> visibleCells = new HashSet<Vector3Int>();
         public readonly HashSet<Vector3Int> knownCells = new HashSet<Vector3Int>();
@@ -331,11 +331,11 @@ public class MatchController : MonoBehaviour
         public TeamId knownOwner;
         public bool flipX;
     }
-    [System.NonSerialized] private readonly Dictionary<int, FogTeamGameplaySnapshot> fogGameplaySnapshotsByTeam =
-        new Dictionary<int, FogTeamGameplaySnapshot>();
-    [System.NonSerialized] private readonly Dictionary<int, HashSet<Vector3Int>> fogExploredCellsByTeam =
+    [System.NonSerialized] private readonly Dictionary<int, FogSlotGameplaySnapshot> fogGameplaySnapshotsBySlot =
+        new Dictionary<int, FogSlotGameplaySnapshot>();
+    [System.NonSerialized] private readonly Dictionary<int, HashSet<Vector3Int>> fogExploredCellsBySlot =
         new Dictionary<int, HashSet<Vector3Int>>();
-    [System.NonSerialized] private readonly Dictionary<int, Dictionary<Vector3Int, FogConstructionMemoryEntry>> fogConstructionMemoryByTeam =
+    [System.NonSerialized] private readonly Dictionary<int, Dictionary<Vector3Int, FogConstructionMemoryEntry>> fogConstructionMemoryBySlot =
         new Dictionary<int, Dictionary<Vector3Int, FogConstructionMemoryEntry>>();
     [System.NonSerialized] private readonly List<SpriteRenderer> fogConstructionMemoryRenderers =
         new List<SpriteRenderer>();
@@ -343,7 +343,7 @@ public class MatchController : MonoBehaviour
         new List<SpriteRenderer>();
     [System.NonSerialized] private PanelRemainingController fogVisionPanelRemaining;
     [System.NonSerialized] private bool fogSortingLayerValidated;
-    [System.NonSerialized] private int fogCachedTeamId = int.MinValue;
+    [System.NonSerialized] private int fogCachedObserverSlotIndex = int.MinValue;
     [System.NonSerialized] private bool fogOverlayInitialized;
     [System.NonSerialized] private bool initialStealthDetectionBootstrapped;
     [System.NonSerialized] private bool pendingCommittedBoardRefresh;
@@ -1282,7 +1282,7 @@ public class MatchController : MonoBehaviour
         int expectedObserverSlot = ActiveSlotId.Value;
         if (TryResolveFogPresentationSlot(out PlayerSlotId presentationSlot))
             expectedObserverSlot = presentationSlot.Value;
-        if (fogCachedTeamId == expectedObserverSlot && fogOverlayInitialized)
+        if (fogCachedObserverSlotIndex == expectedObserverSlot && fogOverlayInitialized)
             return;
 
         // Domain reloads durante o Play Mode limpam o cache nao serializado, mas o
@@ -4075,7 +4075,7 @@ public class MatchController : MonoBehaviour
             return;
         }
 
-        if (fogCachedTeamId != ActiveSlotId.Value || !fogOverlayInitialized)
+        if (fogCachedObserverSlotIndex != ActiveSlotId.Value || !fogOverlayInitialized)
         {
             RefreshFogOfWarForActiveTeam();
             TryPlaySkillDetectionSfxForActedUnit(unit, boardMap);
@@ -4713,13 +4713,13 @@ public class MatchController : MonoBehaviour
 
         int cacheIndex = ResolveFogCacheIndex(unit);
         int observerSlotIndex = ActiveSlotId.Value;
-        if (fogCachedTeamId == observerSlotIndex &&
+        if (fogCachedObserverSlotIndex == observerSlotIndex &&
             fogUnitVisibilityByCacheIndex.TryGetValue(cacheIndex, out bool cachedVisible))
         {
             return cachedVisible;
         }
 
-        if (TryGetFogGameplaySnapshot(observerSlotIndex, out FogTeamGameplaySnapshot snapshot) &&
+        if (TryGetFogGameplaySnapshot(observerSlotIndex, out FogSlotGameplaySnapshot snapshot) &&
             snapshot.unitVisibility.TryGetValue(cacheIndex, out bool snapshotVisible))
         {
             return snapshotVisible;
@@ -4757,10 +4757,10 @@ public class MatchController : MonoBehaviour
             return true;
 
         int cacheIndex = ResolveFogCacheIndex(unit);
-        if (TryGetFogGameplaySnapshot(observerSlotIndex, out FogTeamGameplaySnapshot snapshot))
+        if (TryGetFogGameplaySnapshot(observerSlotIndex, out FogSlotGameplaySnapshot snapshot))
             return snapshot.unitVisibility.TryGetValue(cacheIndex, out bool visible) && visible;
 
-        return fogCachedTeamId == observerSlotIndex &&
+        return fogCachedObserverSlotIndex == observerSlotIndex &&
                fogUnitVisibilityByCacheIndex.TryGetValue(cacheIndex, out bool cachedVisible) &&
                cachedVisible;
     }
@@ -4785,12 +4785,12 @@ public class MatchController : MonoBehaviour
         if (observerSlot == ActiveSlotId)
         {
             int cacheIndex = ResolveFogCacheIndex(unit);
-            if (TryGetFogGameplaySnapshot(observerSlot.Value, out FogTeamGameplaySnapshot snapshot) &&
+            if (TryGetFogGameplaySnapshot(observerSlot.Value, out FogSlotGameplaySnapshot snapshot) &&
                 snapshot.unitVisibility.TryGetValue(cacheIndex, out bool snapshotVisible))
             {
                 return snapshotVisible;
             }
-            if (fogCachedTeamId == observerSlot.Value &&
+            if (fogCachedObserverSlotIndex == observerSlot.Value &&
                 fogUnitVisibilityByCacheIndex.TryGetValue(cacheIndex, out bool cachedVisible))
             {
                 return cachedVisible;
@@ -4953,9 +4953,9 @@ public class MatchController : MonoBehaviour
             return true;
         cell.z = 0;
         int observerSlotIndex = ActiveSlotId.Value;
-        if (TryGetFogGameplaySnapshot(observerSlotIndex, out FogTeamGameplaySnapshot snapshot))
+        if (TryGetFogGameplaySnapshot(observerSlotIndex, out FogSlotGameplaySnapshot snapshot))
             return snapshot.visibleCells.Contains(cell);
-        if (fogCachedTeamId != observerSlotIndex)
+        if (fogCachedObserverSlotIndex != observerSlotIndex)
             return false;
 
         return fogVisibleContributorsByCell.TryGetValue(cell, out int contributors) && contributors > 0;
@@ -4991,7 +4991,7 @@ public class MatchController : MonoBehaviour
             return true;
 
         if (excludeProvisionalUnit == null &&
-            TryGetFogGameplaySnapshot(ActiveSlotId.Value, out FogTeamGameplaySnapshot snapshot))
+            TryGetFogGameplaySnapshot(ActiveSlotId.Value, out FogSlotGameplaySnapshot snapshot))
         {
             return snapshot.knownCells.Contains(cell);
         }
@@ -5022,7 +5022,7 @@ public class MatchController : MonoBehaviour
         int expectedSlotIndex = ActiveSlotId.Value;
         if (TryResolveFogPresentationSlot(out PlayerSlotId presentationSlot))
             expectedSlotIndex = presentationSlot.Value;
-        if (fogCachedTeamId != expectedSlotIndex)
+        if (fogCachedObserverSlotIndex != expectedSlotIndex)
             return false;
 
         cell.z = 0;
@@ -5098,11 +5098,11 @@ public class MatchController : MonoBehaviour
     }
 
     public void ExportFogRuntimeCacheForSave(
-        out int cachedTeamId,
+        out int observerSlotIndex,
         List<FogCellContributorSaveData> visibleContributorsByCell,
         List<FogUnitVisibilitySaveData> unitVisibilityByCacheIndex)
     {
-        cachedTeamId = fogCachedTeamId;
+        observerSlotIndex = fogCachedObserverSlotIndex;
 
         if (visibleContributorsByCell != null)
         {
@@ -5136,14 +5136,14 @@ public class MatchController : MonoBehaviour
         }
     }
 
-    public bool TryRestoreFogRuntimeCacheFromSave(
-        int cachedTeamId,
+    public bool TryRestoreFogRuntimeCacheForObserverSlotFromSave(
+        int observerSlotIndex,
         List<FogCellContributorSaveData> visibleContributorsByCell,
         List<FogUnitVisibilitySaveData> unitVisibilityByCacheIndex)
     {
         if (!debugFogOfWarEnabled || !enableTotalWar)
             return false;
-        if (cachedTeamId != ActiveSlotId.Value)
+        if (observerSlotIndex != ActiveSlotId.Value)
             return false;
         bool hasCellContributors = visibleContributorsByCell != null && visibleContributorsByCell.Count > 0;
         bool hasUnitVisibility = unitVisibilityByCacheIndex != null && unitVisibilityByCacheIndex.Count > 0;
@@ -5162,7 +5162,7 @@ public class MatchController : MonoBehaviour
         if (!fogOverlayInitialized)
             return false;
 
-        fogCachedTeamId = cachedTeamId;
+        fogCachedObserverSlotIndex = observerSlotIndex;
 
         if (visibleContributorsByCell != null)
         {
@@ -5200,6 +5200,18 @@ public class MatchController : MonoBehaviour
         if (Application.isPlaying)
             OnFogOfWarUpdated?.Invoke();
         return true;
+    }
+
+    [Obsolete("Use TryRestoreFogRuntimeCacheForObserverSlotFromSave; cachedTeamId sempre representou um índice de slot.")]
+    public bool TryRestoreFogRuntimeCacheFromSave(
+        int cachedTeamId,
+        List<FogCellContributorSaveData> visibleContributorsByCell,
+        List<FogUnitVisibilitySaveData> unitVisibilityByCacheIndex)
+    {
+        return TryRestoreFogRuntimeCacheForObserverSlotFromSave(
+            cachedTeamId,
+            visibleContributorsByCell,
+            unitVisibilityByCacheIndex);
     }
 
     private void ApplyRuntimeUnitFogVisibilityFromCache(Tilemap boardMap)
@@ -5494,7 +5506,7 @@ public class MatchController : MonoBehaviour
         if (fogOverlayOwnsWorldOcclusion && !HasActiveIndividualFogConcealment(unit))
         {
             if (unit != null && unit.SlotIndex != observerSlot.Value &&
-                TryGetFogGameplaySnapshot(observerSlot.Value, out FogTeamGameplaySnapshot snapshot))
+                TryGetFogGameplaySnapshot(observerSlot.Value, out FogSlotGameplaySnapshot snapshot))
             {
                 Vector3Int cell = unit.CurrentCellPosition;
                 cell.z = 0;
@@ -5539,7 +5551,7 @@ public class MatchController : MonoBehaviour
 
         bool logicallyVisible = unit.SlotIndex == observerSlot.Value;
         if (!logicallyVisible &&
-            TryGetFogGameplaySnapshot(observerSlot.Value, out FogTeamGameplaySnapshot snapshot))
+            TryGetFogGameplaySnapshot(observerSlot.Value, out FogSlotGameplaySnapshot snapshot))
         {
             int cacheIndex = ResolveFogCacheIndex(unit);
             logicallyVisible = snapshot.unitVisibility.TryGetValue(cacheIndex, out bool visible) && visible;
@@ -5635,10 +5647,10 @@ public class MatchController : MonoBehaviour
         if (!IsValidPlayerSlot(observerSlot) || boardMap == null)
             return;
 
-        if (!fogGameplaySnapshotsByTeam.TryGetValue(slotIndex, out FogTeamGameplaySnapshot snapshot))
+        if (!fogGameplaySnapshotsBySlot.TryGetValue(slotIndex, out FogSlotGameplaySnapshot snapshot))
         {
-            snapshot = new FogTeamGameplaySnapshot();
-            fogGameplaySnapshotsByTeam[slotIndex] = snapshot;
+            snapshot = new FogSlotGameplaySnapshot();
+            fogGameplaySnapshotsBySlot[slotIndex] = snapshot;
         }
 
         snapshot.visibleCells.Clear();
@@ -5689,30 +5701,30 @@ public class MatchController : MonoBehaviour
         }
     }
 
-    private bool TryGetFogGameplaySnapshot(int teamId, out FogTeamGameplaySnapshot snapshot)
+    private bool TryGetFogGameplaySnapshot(int observerSlotIndex, out FogSlotGameplaySnapshot snapshot)
     {
-        if (teamId < 0)
+        if (observerSlotIndex < 0)
         {
             snapshot = null;
             return false;
         }
 
-        return fogGameplaySnapshotsByTeam.TryGetValue(teamId, out snapshot) && snapshot != null;
+        return fogGameplaySnapshotsBySlot.TryGetValue(observerSlotIndex, out snapshot) && snapshot != null;
     }
 
-    private void RecordConfirmedExploredCells(int teamId, IEnumerable<Vector3Int> visibleCells)
+    private void RecordConfirmedExploredCells(int observerSlotIndex, IEnumerable<Vector3Int> visibleCells)
     {
         if (!Application.isPlaying || visibleCells == null)
             return;
         if (turnStateManager != null && turnStateManager.CurrentCursorState != TurnStateManager.CursorState.Neutral)
             return;
-        if (!IsValidPlayerSlotIndex(teamId))
+        if (!IsValidPlayerSlotIndex(observerSlotIndex))
             return;
 
-        if (!fogExploredCellsByTeam.TryGetValue(teamId, out HashSet<Vector3Int> explored))
+        if (!fogExploredCellsBySlot.TryGetValue(observerSlotIndex, out HashSet<Vector3Int> explored))
         {
             explored = new HashSet<Vector3Int>();
-            fogExploredCellsByTeam[teamId] = explored;
+            fogExploredCellsBySlot[observerSlotIndex] = explored;
         }
 
         foreach (Vector3Int sourceCell in visibleCells)
@@ -5727,12 +5739,12 @@ public class MatchController : MonoBehaviour
     {
         cell.z = 0;
         return IsValidPlayerSlot(slot) &&
-               fogExploredCellsByTeam.TryGetValue(slot.Value, out HashSet<Vector3Int> explored) &&
+               fogExploredCellsBySlot.TryGetValue(slot.Value, out HashSet<Vector3Int> explored) &&
                explored.Contains(cell);
     }
 
     private void RecordConfirmedConstructionMemory(
-        int teamId,
+        int observerSlotIndex,
         Tilemap boardMap,
         HashSet<Vector3Int> visibleCells)
     {
@@ -5740,13 +5752,13 @@ public class MatchController : MonoBehaviour
             return;
         if (turnStateManager != null && turnStateManager.CurrentCursorState != TurnStateManager.CursorState.Neutral)
             return;
-        if (!IsValidPlayerSlotIndex(teamId))
+        if (!IsValidPlayerSlotIndex(observerSlotIndex))
             return;
 
-        if (!fogConstructionMemoryByTeam.TryGetValue(teamId, out Dictionary<Vector3Int, FogConstructionMemoryEntry> memory))
+        if (!fogConstructionMemoryBySlot.TryGetValue(observerSlotIndex, out Dictionary<Vector3Int, FogConstructionMemoryEntry> memory))
         {
             memory = new Dictionary<Vector3Int, FogConstructionMemoryEntry>();
-            fogConstructionMemoryByTeam[teamId] = memory;
+            fogConstructionMemoryBySlot[observerSlotIndex] = memory;
         }
 
         List<ConstructionManager> constructions = ConstructionManager.AllActive;
@@ -5788,7 +5800,7 @@ public class MatchController : MonoBehaviour
         knownOwner = TeamId.Neutral;
         cell.z = 0;
         if (!IsValidPlayerSlot(observerSlot) ||
-            !fogConstructionMemoryByTeam.TryGetValue(observerSlot.Value, out Dictionary<Vector3Int, FogConstructionMemoryEntry> memory) ||
+            !fogConstructionMemoryBySlot.TryGetValue(observerSlot.Value, out Dictionary<Vector3Int, FogConstructionMemoryEntry> memory) ||
             !memory.TryGetValue(cell, out FogConstructionMemoryEntry entry) || entry == null || entry.data == null)
         {
             return false;
@@ -5805,17 +5817,17 @@ public class MatchController : MonoBehaviour
             return;
         destination.Clear();
 
-        foreach (KeyValuePair<int, Dictionary<Vector3Int, FogConstructionMemoryEntry>> teamPair in fogConstructionMemoryByTeam)
+        foreach (KeyValuePair<int, Dictionary<Vector3Int, FogConstructionMemoryEntry>> slotPair in fogConstructionMemoryBySlot)
         {
-            foreach (KeyValuePair<Vector3Int, FogConstructionMemoryEntry> cellPair in teamPair.Value)
+            foreach (KeyValuePair<Vector3Int, FogConstructionMemoryEntry> cellPair in slotPair.Value)
             {
                 FogConstructionMemoryEntry entry = cellPair.Value;
                 if (entry == null || entry.data == null)
                     continue;
                 destination.Add(new FogConstructionMemorySaveData
                 {
-                    observerSlotIndex = teamPair.Key,
-                    observerTeamId = (int)GetVisualTeamForSlot(PlayerSlotId.FromIndex(teamPair.Key)),
+                    observerSlotIndex = slotPair.Key,
+                    observerTeamId = (int)GetVisualTeamForSlot(PlayerSlotId.FromIndex(slotPair.Key)),
                     x = cellPair.Key.x,
                     y = cellPair.Key.y,
                     constructionDataId = !string.IsNullOrWhiteSpace(entry.data.id) ? entry.data.id : entry.data.name,
@@ -5836,7 +5848,7 @@ public class MatchController : MonoBehaviour
 
     public void ImportFogConstructionMemory(IList<FogConstructionMemorySaveData> source)
     {
-        fogConstructionMemoryByTeam.Clear();
+        fogConstructionMemoryBySlot.Clear();
         if (source == null)
             return;
 
@@ -5870,10 +5882,10 @@ public class MatchController : MonoBehaviour
             if (!IsValidPlayerSlotIndex(observerSlotIndex))
                 observerSlotIndex = migratedSlot.Value;
 
-            if (!fogConstructionMemoryByTeam.TryGetValue(observerSlotIndex, out Dictionary<Vector3Int, FogConstructionMemoryEntry> memory))
+            if (!fogConstructionMemoryBySlot.TryGetValue(observerSlotIndex, out Dictionary<Vector3Int, FogConstructionMemoryEntry> memory))
             {
                 memory = new Dictionary<Vector3Int, FogConstructionMemoryEntry>();
-                fogConstructionMemoryByTeam[observerSlotIndex] = memory;
+                fogConstructionMemoryBySlot[observerSlotIndex] = memory;
             }
             memory[cell] = new FogConstructionMemoryEntry
             {
@@ -5890,7 +5902,7 @@ public class MatchController : MonoBehaviour
             return;
         destination.Clear();
 
-        foreach (KeyValuePair<int, HashSet<Vector3Int>> pair in fogExploredCellsByTeam)
+        foreach (KeyValuePair<int, HashSet<Vector3Int>> pair in fogExploredCellsBySlot)
         {
             if (!IsValidPlayerSlotIndex(pair.Key))
                 continue;
@@ -5911,7 +5923,7 @@ public class MatchController : MonoBehaviour
 
     public void ImportFogExplorationMemory(IList<TeamExploredCellsSaveData> source)
     {
-        fogExploredCellsByTeam.Clear();
+        fogExploredCellsBySlot.Clear();
         if (source == null)
             return;
 
@@ -5940,7 +5952,7 @@ public class MatchController : MonoBehaviour
                 continue;
             if (!IsValidPlayerSlotIndex(slotIndex))
                 slotIndex = migratedSlot.Value;
-            fogExploredCellsByTeam[slotIndex] = explored;
+            fogExploredCellsBySlot[slotIndex] = explored;
         }
     }
 
@@ -5955,7 +5967,7 @@ public class MatchController : MonoBehaviour
         fogVisibleContributorsByCell.Clear();
         fogUnitVisibilityByCacheIndex.Clear();
         fogUnitVisibleScratchBuffer.Clear();
-        fogCachedTeamId = int.MinValue;
+        fogCachedObserverSlotIndex = int.MinValue;
         fogOverlayInitialized = false;
         if (clearTilemap && fogOfWarTilemap != null)
             fogOfWarTilemap.ClearAllTiles();
@@ -5994,7 +6006,7 @@ public class MatchController : MonoBehaviour
             fogOfWarTilemap.SetColor(cell, ResolveFogColorForCell(cell));
         }
 
-        fogCachedTeamId = ActiveSlotId.Value;
+        fogCachedObserverSlotIndex = ActiveSlotId.Value;
         fogOverlayInitialized = true;
         // InitializeFogOverlay acabou de desenhar nevoa em todas as celulas.
         fogRenderedVisibleCellsBuffer.Clear();
@@ -6012,7 +6024,7 @@ public class MatchController : MonoBehaviour
             fogOverlayInitialized = false;
             return;
         }
-        fogCachedTeamId = ActiveSlotId.Value;
+        fogCachedObserverSlotIndex = ActiveSlotId.Value;
         fogOverlayInitialized = true;
     }
 
@@ -6087,9 +6099,9 @@ public class MatchController : MonoBehaviour
             fogOfWarBreakwaterMemoryTilemap.ClearAllTiles();
         SetFogConstructionMemoryRenderersActive(0);
         SetFogStructureMemoryRenderersActive(0);
-        int renderedSlotIndex = fogCachedTeamId >= 0 ? fogCachedTeamId : ActiveSlotId.Value;
+        int renderedSlotIndex = fogCachedObserverSlotIndex >= 0 ? fogCachedObserverSlotIndex : ActiveSlotId.Value;
         if (!IsValidPlayerSlotIndex(renderedSlotIndex) ||
-            !fogExploredCellsByTeam.TryGetValue(renderedSlotIndex, out HashSet<Vector3Int> explored))
+            !fogExploredCellsBySlot.TryGetValue(renderedSlotIndex, out HashSet<Vector3Int> explored))
         {
             return;
         }
@@ -6232,9 +6244,9 @@ public class MatchController : MonoBehaviour
         }
     }
 
-    private void RenderFogConstructionMemory(Tilemap boardMap, HashSet<Vector3Int> visibleCells, int renderedTeamId)
+    private void RenderFogConstructionMemory(Tilemap boardMap, HashSet<Vector3Int> visibleCells, int renderedSlotIndex)
     {
-        if (!fogConstructionMemoryByTeam.TryGetValue(renderedTeamId, out Dictionary<Vector3Int, FogConstructionMemoryEntry> memory))
+        if (!fogConstructionMemoryBySlot.TryGetValue(renderedSlotIndex, out Dictionary<Vector3Int, FogConstructionMemoryEntry> memory))
             return;
 
         int rendererIndex = 0;
@@ -7036,7 +7048,7 @@ public class MatchController : MonoBehaviour
         if (!enabled)
         {
             ResetFogOfWarRuntime(clearTilemap: true);
-            fogGameplaySnapshotsByTeam.Clear();
+            fogGameplaySnapshotsBySlot.Clear();
             ShowAllUnitsIgnoringFog();
             ConstructionManager.RefreshAllOccupancyVisuals();
             Debug.Log("[Debug Command] FoW OFF (debug).");
@@ -7074,7 +7086,7 @@ public class MatchController : MonoBehaviour
     private Color ResolveFogColorForCell(Vector3Int cell)
     {
         float alpha = ResolveFogOfWarAlpha();
-        int renderedSlotIndex = fogCachedTeamId >= 0 ? fogCachedTeamId : ActiveSlotId.Value;
+        int renderedSlotIndex = fogCachedObserverSlotIndex >= 0 ? fogCachedObserverSlotIndex : ActiveSlotId.Value;
         PlayerSlotId renderedSlot = PlayerSlotId.FromIndex(renderedSlotIndex);
         if (IsValidPlayerSlot(renderedSlot) &&
             IsCellExploredBySlot(renderedSlot, cell))
@@ -7554,10 +7566,6 @@ public class MatchController : MonoBehaviour
         return false;
     }
 }
-
-
-
-
 
 
 

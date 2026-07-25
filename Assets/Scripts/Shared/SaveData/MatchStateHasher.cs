@@ -50,11 +50,13 @@ public static class MatchStateHasher
         SortCanonical(data);
 
         long savedTicks = data.savedAtUtcTicks;
-        int savedFogTeam = data.fogCacheTeamId;
+        int savedFogObserverSlot = data.fogObserverSlotIndex;
+        int savedLegacyFogTeam = data.fogCacheTeamId;
         System.Collections.Generic.List<FogCellContributorSaveData> savedFogCells = data.fogVisibleContributorsByCell;
         System.Collections.Generic.List<FogUnitVisibilitySaveData> savedFogUnits = data.fogUnitVisibilityByCacheIndex;
 
         data.savedAtUtcTicks = 0;
+        data.fogObserverSlotIndex = int.MinValue;
         data.fogCacheTeamId = int.MinValue;
         data.fogVisibleContributorsByCell = EmptyFogCells;
         data.fogUnitVisibilityByCacheIndex = EmptyFogUnits;
@@ -65,7 +67,8 @@ public static class MatchStateHasher
         finally
         {
             data.savedAtUtcTicks = savedTicks;
-            data.fogCacheTeamId = savedFogTeam;
+            data.fogObserverSlotIndex = savedFogObserverSlot;
+            data.fogCacheTeamId = savedLegacyFogTeam;
             data.fogVisibleContributorsByCell = savedFogCells;
             data.fogUnitVisibilityByCacheIndex = savedFogUnits;
         }

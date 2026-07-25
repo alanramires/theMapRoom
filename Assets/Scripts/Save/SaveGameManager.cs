@@ -1292,6 +1292,7 @@ public class SaveGameManager : MonoBehaviour
                     throw new InvalidDataException("Versao de container ausente ou nao suportada.");
 
                 data = JsonUtility.FromJson<SaveGameData>(preprocess.json);
+                MigrateFogObserverSlotIdentity(data);
             }
             catch (Exception ex)
             {
@@ -2040,9 +2041,11 @@ public class SaveGameManager : MonoBehaviour
             players = matchState.players != null ? matchState.players : new List<MatchPlayerSaveData>(),
             capturedBuildingHistory = new List<TeamCapturedBuildingSaveData>(),
             victoryStars = matchState.victoryStars != null ? matchState.victoryStars : new List<MatchVictoryStarSaveData>(),
+            fogObserverSlotIndex = int.MinValue,
             fogCacheTeamId = int.MinValue,
             fogVisibleContributorsByCell = new List<FogCellContributorSaveData>(),
             fogUnitVisibilityByCacheIndex = new List<FogUnitVisibilitySaveData>(),
+            fogExploredCellsBySlot = new List<TeamExploredCellsSaveData>(),
             fogExploredCellsByTeam = new List<TeamExploredCellsSaveData>(),
             fogConstructionMemory = new List<FogConstructionMemorySaveData>(),
             aiObjectivePlans = ObjectiveManager.BuildSaveData(),
@@ -2112,10 +2115,10 @@ public class SaveGameManager : MonoBehaviour
         if (matchController != null)
         {
             matchController.ExportCapturedBuildingHistory(data.capturedBuildingHistory);
-            matchController.ExportFogExplorationMemory(data.fogExploredCellsByTeam);
+            matchController.ExportFogExplorationMemory(data.fogExploredCellsBySlot);
             matchController.ExportFogConstructionMemory(data.fogConstructionMemory);
             matchController.ExportFogRuntimeCacheForSave(
-                out data.fogCacheTeamId,
+                out data.fogObserverSlotIndex,
                 data.fogVisibleContributorsByCell,
                 data.fogUnitVisibilityByCacheIndex);
         }
@@ -2124,6 +2127,29 @@ public class SaveGameManager : MonoBehaviour
         //     data.aiPlannerState = aiPlayerController.BuildPlannerSaveData();
 
         return data;
+    }
+
+    private static void MigrateFogObserverSlotIdentity(SaveGameData data)
+    {
+        if (data == null)
+            return;
+
+        // O campo legado tinha nome de TeamId, mas ExportFogRuntimeCacheForSave
+        // sempre gravou ActiveSlotId.Value. Copiar diretamente preserva dois slots
+        // que compartilham a mesma cor; jamais migrar este valor via TeamId.
+        if (data.fogObserverSlotIndex < 0 && data.fogCacheTeamId >= 0)
+            data.fogObserverSlotIndex = data.fogCacheTeamId;
+        data.fogCacheTeamId = int.MinValue;
+
+        if ((data.fogExploredCellsBySlot == null || data.fogExploredCellsBySlot.Count == 0) &&
+            data.fogExploredCellsByTeam != null && data.fogExploredCellsByTeam.Count > 0)
+        {
+            data.fogExploredCellsBySlot = data.fogExploredCellsByTeam;
+        }
+
+        // Depois da migração, apenas o campo por slot participa do estado em memória
+        // e de futuros hashes/saves.
+        data.fogExploredCellsByTeam = new List<TeamExploredCellsSaveData>();
     }
 
     private void RestoreMatchPlayers(SaveGameData data)
@@ -2145,7 +2171,7 @@ public class SaveGameManager : MonoBehaviour
         };
         SaveDataMapper.ApplyMatchStateSaveData(matchController, matchState);
         matchController?.ImportCapturedBuildingHistory(data.capturedBuildingHistory);
-        matchController?.ImportFogExplorationMemory(data.fogExploredCellsByTeam);
+        matchController?.ImportFogExplorationMemory(data.fogExploredCellsBySlot);
         matchController?.ImportFogConstructionMemory(data.fogConstructionMemory);
     }
 
