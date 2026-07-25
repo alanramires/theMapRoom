@@ -73,12 +73,11 @@ public partial class AIController
             return supplyAction;
         }
 
+        // O envelope movimento + alcance de servico ja foi resolvido acima por
+        // TryBuildLogisticsSupplyAction. Fora dele, somente uma unidade realmente
+        // em manutencao pode orientar deslocamento futuro; preventivos distantes
+        // nao sao trabalho desta rodada.
         UnitManager serviceTarget = FindLogisticsServiceTarget(unit, snapshot, fromCell, paths, occupied, baseDefense);
-        if (TryBuildTargetedLogisticsSupplyAction(unit, snapshot, fromCell, serviceTarget, paths, occupied, baseDefense, out PlayerAction targetedSupplyAction, out string targetedSupplyReason))
-        {
-            Debug.Log($"{TL("Logistics")} {unit.InstanceId} atende alvo logistica {targetedSupplyReason}");
-            return targetedSupplyAction;
-        }
 
         if (paths == null || paths.Count == 0)
         {

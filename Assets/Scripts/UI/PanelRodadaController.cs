@@ -43,8 +43,11 @@ public sealed class PanelRodadaController : MonoBehaviour
     private TeamId playingVideoTeam = TeamId.Neutral;
     private Vector2 textoJogadorDefaultAnchoredPosition;
     private bool textoJogadorPositionCached;
+    private Vector2 textoTurnoDefaultAnchoredPosition;
+    private bool textoTurnoPositionCached;
 
     public bool IsPresenting { get; private set; }
+    public bool IsPrivacyCurtainActive { get; private set; }
     public static bool IsGameplayInputBlocked => gameplayInputBlockCount > 0 || SaveGameManager.IsAnyLoadInProgress;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
@@ -74,6 +77,7 @@ public sealed class PanelRodadaController : MonoBehaviour
             else if (textos[i].name == "text_turn") textoTurno = textos[i];
         }
         CachePlayerTextPosition();
+        CacheTurnTextPosition();
         if (audioSource == null)
         {
             audioSource = GetComponent<AudioSource>();
@@ -100,6 +104,7 @@ public sealed class PanelRodadaController : MonoBehaviour
     private void OnDisable()
     {
         StopTeamVideo();
+        IsPrivacyCurtainActive = false;
         ReleaseGameplayInputBlock();
     }
 
@@ -117,6 +122,7 @@ public sealed class PanelRodadaController : MonoBehaviour
     public IEnumerator Apresentar(TeamId team, int numeroJogador, int turno)
     {
         int version = ++presentationVersion;
+        IsPrivacyCurtainActive = false;
         IsPresenting = true;
         AcquireGameplayInputBlock();
         confirmado = false;
@@ -128,6 +134,7 @@ public sealed class PanelRodadaController : MonoBehaviour
         canvasGroup.interactable = true;
         panelRect.localScale = Vector3.one;
         RestorePlayerTextPosition();
+        RestoreTurnTextPosition();
         StartTeamVideo(team);
         if (textoJogador != null)
         {
@@ -197,10 +204,70 @@ public sealed class PanelRodadaController : MonoBehaviour
         gameObject.SetActive(false);
     }
 
+    public void CoverImmediatelyForPrivateTurnTransition()
+    {
+        presentationVersion++;
+        IsPresenting = true;
+        IsPrivacyCurtainActive = true;
+        AcquireGameplayInputBlock();
+        confirmado = false;
+        aguardandoConfirmacao = false;
+        gameObject.SetActive(true);
+        transform.SetAsLastSibling();
+        canvasGroup.alpha = 1f;
+        canvasGroup.blocksRaycasts = true;
+        canvasGroup.interactable = false;
+        panelRect.localScale = Vector3.one;
+        StopTeamVideo();
+        SetButtonEnabled(false);
+        SetContentAlpha(0f);
+    }
+
+    public void ShowPrivacyCurtain(TeamId activeTeam, int turno, bool isAI)
+    {
+        CoverImmediatelyForPrivateTurnTransition();
+        RestorePlayerTextPosition();
+        StartTeamVideo(activeTeam);
+        if (textoJogador != null)
+        {
+            textoJogador.color = Color.white;
+            string htmlColor = ColorUtility.ToHtmlStringRGB(
+                TeamUtils.GetColor(activeTeam));
+            string teamName = TeamUtils.GetName(activeTeam).ToUpperInvariant();
+            textoJogador.text =
+                $"Turno do Time <color=#{htmlColor}>{teamName}</color>";
+        }
+        if (textoTurno != null)
+        {
+            textoTurno.text = $"Turno {turno}";
+            textoTurno.color = TeamUtils.GetColor(activeTeam);
+        }
+        ApplyPrivacyTurnTextPosition();
+        SetContentAlpha(1f);
+    }
+
+    public void HidePrivacyCurtainForDebug()
+    {
+        if (!IsPrivacyCurtainActive)
+            return;
+
+        presentationVersion++;
+        IsPrivacyCurtainActive = false;
+        IsPresenting = false;
+        StopTeamVideo();
+        SetButtonEnabled(false);
+        canvasGroup.alpha = 0f;
+        canvasGroup.blocksRaycasts = false;
+        canvasGroup.interactable = false;
+        ReleaseGameplayInputBlock();
+        gameObject.SetActive(false);
+    }
+
     public void BeginLoadingPresentation()
     {
         presentationVersion++;
         IsPresenting = true;
+        IsPrivacyCurtainActive = false;
         AcquireGameplayInputBlock();
         confirmado = false;
         aguardandoConfirmacao = false;
@@ -211,6 +278,7 @@ public sealed class PanelRodadaController : MonoBehaviour
         canvasGroup.interactable = true;
         panelRect.localScale = Vector3.one;
         RestorePlayerTextPosition();
+        RestoreTurnTextPosition();
         StopTeamVideo();
 
         if (textoJogador != null)
@@ -265,6 +333,7 @@ public sealed class PanelRodadaController : MonoBehaviour
         // O audio de abertura e apenas apresentacao: ele pode continuar tocando,
         // mas nunca deve segurar a liberacao do turno depois que o save foi restaurado.
         RestorePlayerTextPosition();
+        RestoreTurnTextPosition();
         StartTeamVideo(team);
 
         if (textoJogador != null)
@@ -313,6 +382,7 @@ public sealed class PanelRodadaController : MonoBehaviour
         canvasGroup.blocksRaycasts = false;
         canvasGroup.interactable = false;
         IsPresenting = false;
+        IsPrivacyCurtainActive = false;
         ReleaseGameplayInputBlock();
         gameObject.SetActive(false);
     }
@@ -335,6 +405,7 @@ public sealed class PanelRodadaController : MonoBehaviour
         canvasGroup.blocksRaycasts = false;
         canvasGroup.interactable = false;
         IsPresenting = false;
+        IsPrivacyCurtainActive = false;
         ReleaseGameplayInputBlock();
         gameObject.SetActive(false);
     }
@@ -528,6 +599,75 @@ public sealed class PanelRodadaController : MonoBehaviour
         CachePlayerTextPosition();
         if (textoJogador != null && textoJogadorPositionCached)
             textoJogador.rectTransform.anchoredPosition = textoJogadorDefaultAnchoredPosition;
+    }
+
+    private void CacheTurnTextPosition()
+    {
+        if (textoTurnoPositionCached || textoTurno == null)
+            return;
+        textoTurnoDefaultAnchoredPosition = textoTurno.rectTransform.anchoredPosition;
+        textoTurnoPositionCached = true;
+    }
+
+    private void RestoreTurnTextPosition()
+    {
+        CacheTurnTextPosition();
+        if (textoTurno != null)
+            textoTurno.enabled = true;
+        if (textoTurno != null && textoTurnoPositionCached)
+            textoTurno.rectTransform.anchoredPosition = textoTurnoDefaultAnchoredPosition;
+    }
+
+    public bool TryGetPrivacyIndicatorGuiCenter(out Vector2 guiCenter)
+    {
+        guiCenter = default;
+        if (!IsPrivacyCurtainActive || botaoRodada == null)
+            return false;
+
+        RectTransform buttonRect = botaoRodada.transform as RectTransform;
+        if (buttonRect == null)
+            return false;
+
+        Canvas canvas = GetComponentInParent<Canvas>();
+        Camera canvasCamera =
+            canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay
+                ? canvas.worldCamera
+                : null;
+        Vector3 localPoint = new Vector3(
+            buttonRect.rect.center.x,
+            buttonRect.rect.yMax + 44f,
+            0f);
+        Vector2 screenPoint = RectTransformUtility.WorldToScreenPoint(
+            canvasCamera,
+            buttonRect.TransformPoint(localPoint));
+        guiCenter = new Vector2(screenPoint.x, Screen.height - screenPoint.y);
+        return true;
+    }
+
+    private void ApplyPrivacyTurnTextPosition()
+    {
+        CacheTurnTextPosition();
+        if (textoTurno == null)
+            return;
+
+        RectTransform turnRect = textoTurno.rectTransform;
+        RectTransform buttonRect = botaoRodada != null
+            ? botaoRodada.transform as RectTransform
+            : null;
+        if (buttonRect == null)
+        {
+            if (textoTurnoPositionCached)
+                turnRect.anchoredPosition =
+                    textoTurnoDefaultAnchoredPosition + Vector2.down * 90f;
+            return;
+        }
+
+        Canvas.ForceUpdateCanvases();
+        Vector3 belowButton = new Vector3(
+            buttonRect.rect.center.x,
+            buttonRect.rect.yMin - (turnRect.rect.height * 0.5f) - 12f,
+            0f);
+        turnRect.position = buttonRect.TransformPoint(belowButton);
     }
 
     private void Confirmar()

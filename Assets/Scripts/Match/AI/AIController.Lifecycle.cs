@@ -14,6 +14,7 @@ public partial class AIController
     private GUIStyle aiTurnIndicatorBoxStyle;
     private bool aiTurnBatchExecuting;
     private Coroutine postLoadResumeRoutine;
+    private PanelRodadaController privacyPanelRodada;
 
     private bool IsMatchEnded()
     {
@@ -55,11 +56,33 @@ public partial class AIController
             return;
 
         EnsureAITurnIndicatorStyles();
-        float width = Mathf.Clamp(Screen.width * 0.34f, 250f, 440f);
-        float height = Mathf.Clamp(Screen.height * 0.085f, 58f, 90f);
+        bool privacyCurtain = matchController.ShouldUseHotSeatPrivacyCurtain();
+        float width = privacyCurtain
+            ? Mathf.Clamp(Screen.width * 0.28f, 230f, 360f)
+            : Mathf.Clamp(Screen.width * 0.34f, 250f, 440f);
+        float height = privacyCurtain
+            ? Mathf.Clamp(Screen.height * 0.072f, 54f, 74f)
+            : Mathf.Clamp(Screen.height * 0.085f, 58f, 90f);
+        Vector2 panelCenter = new Vector2(
+            Screen.width * 0.5f,
+            Screen.height * 0.5f);
+        if (privacyCurtain)
+        {
+            if (privacyPanelRodada == null)
+            {
+                privacyPanelRodada = FindAnyObjectByType<PanelRodadaController>(
+                    FindObjectsInactive.Include);
+            }
+            if (privacyPanelRodada != null &&
+                privacyPanelRodada.TryGetPrivacyIndicatorGuiCenter(
+                    out Vector2 privacyCenter))
+            {
+                panelCenter = privacyCenter;
+            }
+        }
         Rect panel = new Rect(
-            (Screen.width - width) * 0.5f,
-            (Screen.height - height) * 0.5f,
+            panelCenter.x - (width * 0.5f),
+            panelCenter.y - (height * 0.5f),
             width,
             height);
         float pulse = 0.68f + 0.32f * (0.5f + 0.5f * Mathf.Sin(Time.realtimeSinceStartup * 5f));

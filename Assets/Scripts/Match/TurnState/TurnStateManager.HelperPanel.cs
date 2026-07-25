@@ -230,6 +230,12 @@ public partial class TurnStateManager
     // consumir o input). Fora de Neutral ou sem relatório, no-op.
     public bool ToggleTurnStartAutonomyReport()
     {
+        if (matchController != null && matchController.IsActiveTeamAI())
+        {
+            if (IsManualTurnStartAutonomyReportActive)
+                CloseManualTurnStartAutonomyReport();
+            return false;
+        }
         if (IsManualTurnStartAutonomyReportActive)
             return CloseManualTurnStartAutonomyReport();
         if (CurrentCursorState != CursorState.Neutral || !HasTurnStartAutonomyReport)

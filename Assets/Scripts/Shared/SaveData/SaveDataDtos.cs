@@ -158,6 +158,8 @@ public class MatchPlayerSaveData
     public int teamId;
     public bool flipX;
     public bool isAI;
+    public bool localitySaved;
+    public bool isLocal;
     public bool commandServiceAutomatic;
     public int startMoney;
     public int actualMoney;

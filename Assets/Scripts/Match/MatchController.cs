@@ -324,6 +324,9 @@ public class MatchController : MonoBehaviour
         [HideInInspector] public bool flipX;
         public FlipXOverrideMode flipXOverride;
         public bool isAI;
+        [Tooltip("Este slot humano pertence a esta maquina/tela. Ignorado para AI.")]
+        public bool isLocal;
+        [SerializeField, HideInInspector] public bool localityConfigured;
         public bool commandServiceAutomatic;
         public bool defeated;
         [Min(0)] public int startMoney;
@@ -363,10 +366,10 @@ public class MatchController : MonoBehaviour
     [FormerlySerializedAs("playerEconomy")]
     [SerializeField] private List<PlayerEntry> players = new List<PlayerEntry>
     {
-        new PlayerEntry { teamId = TeamId.Green, flipX = false, defeated = false, startMoney = 0, actualMoney = 0, incomePerTurn = 0, startMoneyApplied = false },
-        new PlayerEntry { teamId = TeamId.Red, flipX = true, defeated = false, startMoney = 0, actualMoney = 0, incomePerTurn = 0, startMoneyApplied = false },
-        new PlayerEntry { teamId = TeamId.Blue, flipX = false, defeated = false, startMoney = 0, actualMoney = 0, incomePerTurn = 0, startMoneyApplied = false },
-        new PlayerEntry { teamId = TeamId.Yellow, flipX = true, defeated = false, startMoney = 0, actualMoney = 0, incomePerTurn = 0, startMoneyApplied = false }
+        new PlayerEntry { teamId = TeamId.Green, flipX = false, isLocal = true, localityConfigured = true, defeated = false, startMoney = 0, actualMoney = 0, incomePerTurn = 0, startMoneyApplied = false },
+        new PlayerEntry { teamId = TeamId.Red, flipX = true, isLocal = true, localityConfigured = true, defeated = false, startMoney = 0, actualMoney = 0, incomePerTurn = 0, startMoneyApplied = false },
+        new PlayerEntry { teamId = TeamId.Blue, flipX = false, isLocal = true, localityConfigured = true, defeated = false, startMoney = 0, actualMoney = 0, incomePerTurn = 0, startMoneyApplied = false },
+        new PlayerEntry { teamId = TeamId.Yellow, flipX = true, isLocal = true, localityConfigured = true, defeated = false, startMoney = 0, actualMoney = 0, incomePerTurn = 0, startMoneyApplied = false }
     };
     [SerializeField] private bool includeNeutralTeam = false;
     [SerializeField, HideInInspector] private List<TeamCapturedBuildingHistory> capturedBuildingHistory = new List<TeamCapturedBuildingHistory>();
@@ -547,10 +550,12 @@ public class MatchController : MonoBehaviour
     [System.NonSerialized] private int fogCachedObserverSlotIndex = int.MinValue;
     [System.NonSerialized] private string lastFogWriteBarrierWarning;
     [System.NonSerialized] private bool fogOverlayInitialized;
+    [System.NonSerialized] private int fogRenderedObserverSlotIndex = int.MinValue;
     [System.NonSerialized] private bool initialStealthDetectionBootstrapped;
     [System.NonSerialized] private CommittedBoardDelta pendingCommittedBoardDelta;
     [System.NonSerialized] private bool debugFogOfWarEnabled = true;
     [System.NonSerialized] private bool debugFogOfWarPartial;
+    [System.NonSerialized] private bool debugPanelRodadaEnabled = true;
     [System.NonSerialized] private int fogPresentationGameplayTeamId = int.MinValue;
     [System.NonSerialized] private FogUpdateContext? activeFogUpdateContext;
     [System.NonSerialized] private float runtimeConstructionIncomeRefreshTimer;
@@ -1070,6 +1075,8 @@ public class MatchController : MonoBehaviour
                 flipX = GetValueOrDefault(flipXs, i, GetDefaultFlipX(team)),
                 flipXOverride = i < previousOverrides.Count ? previousOverrides[i] : FlipXOverrideMode.Auto,
                 isAI = GetValueOrDefault(isAIs, i, false),
+                isLocal = !GetValueOrDefault(isAIs, i, false),
+                localityConfigured = true,
                 startMoney = Mathf.Max(0, GetValueOrDefault(startMoneys, i, 0)),
                 actualMoney = Mathf.Max(0, GetValueOrDefault(actualMoneys, i, 0)),
                 incomePerTurn = Mathf.Max(0, GetValueOrDefault(incomePerTurns, i, 0)),
@@ -1206,7 +1213,7 @@ public class MatchController : MonoBehaviour
         ApplyGameSetupPreset();
         SyncThreatRevisionFlags();
         NormalizeState();
-        hotSeatGateActive = Application.isPlaying && AreAllPlayersHuman();
+        hotSeatGateActive = Application.isPlaying && IsHotSeatPrivacyRequired();
         TryRefreshIncomeFromConstructions(markDirtyInEditor: false);
         TryAutoAssignCursorController();
         TryAutoAssignTurnStateManager();
@@ -1258,11 +1265,29 @@ public class MatchController : MonoBehaviour
         // camera, FoW ou musica da partida e liberado antes da confirmacao hot seat.
         if (panelRodada == null)
             panelRodada = FindAnyObjectByType<PanelRodadaController>(FindObjectsInactive.Include);
-        bool skipHotSeatPanel = DebugManager.IsPanelRodadaDisabledForHotSeat();
+        bool skipHotSeatPanel =
+            DebugManager.IsPanelRodadaDisabledForHotSeat() &&
+            !IsHotSeatPrivacyRequired();
         if (skipHotSeatPanel && panelRodada != null)
             panelRodada.gameObject.SetActive(false);
-        if (AreAllPlayersHuman() && panelRodada != null && !skipHotSeatPanel)
-            yield return panelRodada.Apresentar(ActiveTeam, 1, currentTurn);
+        bool requiresLocalPrivacy = IsHotSeatPrivacyRequired();
+        if (requiresLocalPrivacy && panelRodada != null && !skipHotSeatPanel)
+        {
+            if (ShouldUseHotSeatPrivacyCurtain())
+            {
+                panelRodada.ShowPrivacyCurtain(
+                    ActiveTeam,
+                    currentTurn,
+                    IsActiveTeamAI());
+            }
+            else
+            {
+                yield return panelRodada.Apresentar(
+                    ActiveTeam,
+                    activePlayerListIndex + 1,
+                    currentTurn);
+            }
+        }
 
         FindAnyObjectByType<ReplayManager>()?.CleanupReplayArtifactsForMatchStart();
         RecomputeTeamFlips();
@@ -1648,12 +1673,78 @@ public class MatchController : MonoBehaviour
         if (!IsValidPlayerSlot(slotId))
             return;
         PlayerEntry entry = players[slotId.Value];
+        bool wasAI = entry.isAI;
         entry.isAI = isAI;
+        if (isAI)
+            entry.isLocal = false;
+        else if (wasAI)
+            entry.isLocal = true;
+        entry.localityConfigured = true;
         players[slotId.Value] = entry;
     }
 
     public bool IsPlayerAI(PlayerSlotId slotId) =>
         IsValidPlayerSlot(slotId) && players[slotId.Value].isAI;
+
+    public void SetPlayerIsLocal(PlayerSlotId slotId, bool isLocal)
+    {
+        if (!IsValidPlayerSlot(slotId))
+            return;
+
+        PlayerEntry entry = players[slotId.Value];
+        entry.isLocal = !entry.isAI && isLocal;
+        entry.localityConfigured = true;
+        players[slotId.Value] = entry;
+    }
+
+    public bool IsPlayerLocal(PlayerSlotId slotId) =>
+        IsValidPlayerSlot(slotId) &&
+        !players[slotId.Value].isAI &&
+        players[slotId.Value].isLocal;
+
+    public int CountActiveLocalHumanPlayers()
+    {
+        int count = 0;
+        if (players == null)
+            return count;
+
+        for (int i = 0; i < players.Count; i++)
+        {
+            PlayerEntry player = players[i];
+            if (!player.defeated && !player.isAI && player.isLocal)
+                count++;
+        }
+        return count;
+    }
+
+    public bool IsHotSeatPrivacyRequired() =>
+        CountActiveLocalHumanPlayers() >= 2;
+
+    public bool ShouldUseHotSeatPrivacyCurtain() =>
+        debugPanelRodadaEnabled &&
+        IsHotSeatPrivacyRequired() &&
+        (!IsValidPlayerSlot(ActiveSlotId) || !IsPlayerLocal(ActiveSlotId));
+
+    public bool TryGetSingleActiveLocalHumanSlot(out PlayerSlotId slot)
+    {
+        slot = PlayerSlotId.Invalid;
+        if (players == null)
+            return false;
+
+        for (int i = 0; i < players.Count; i++)
+        {
+            PlayerEntry player = players[i];
+            if (player.defeated || player.isAI || !player.isLocal)
+                continue;
+            if (slot.IsValid)
+            {
+                slot = PlayerSlotId.Invalid;
+                return false;
+            }
+            slot = PlayerSlotId.FromIndex(i);
+        }
+        return slot.IsValid;
+    }
 
     // Verifica se o time ATUALMENTE ativo e IA, usando o slot index diretamente.
     // Usa a identidade real do participante, sem lookup por cor.
@@ -1914,17 +2005,18 @@ public class MatchController : MonoBehaviour
             panelRodada = FindAnyObjectByType<PanelRodadaController>(FindObjectsInactive.Include);
 
         // O painel preto sobe antes de trocar time/FoW/camera, preservando o hot seat.
-        bool skipHotSeatPanel = DebugManager.IsPanelRodadaDisabledForHotSeat();
-        bool useHotSeatPanel = AreAllPlayersHuman() && panelRodada != null && !skipHotSeatPanel;
+        bool skipHotSeatPanel =
+            DebugManager.IsPanelRodadaDisabledForHotSeat() &&
+            !IsHotSeatPrivacyRequired();
+        bool useHotSeatPanel =
+            IsHotSeatPrivacyRequired() &&
+            panelRodada != null &&
+            !skipHotSeatPanel;
         if (skipHotSeatPanel && panelRodada != null)
             panelRodada.gameObject.SetActive(false);
         if (useHotSeatPanel)
         {
-            panelRodada.gameObject.SetActive(true);
-            CanvasGroup privacy = panelRodada.GetComponent<CanvasGroup>();
-            if (privacy == null) privacy = panelRodada.gameObject.AddComponent<CanvasGroup>();
-            privacy.alpha = 1f;
-            privacy.blocksRaycasts = true;
+            panelRodada.CoverImmediatelyForPrivateTurnTransition();
         }
 
         double advanceTurnStartMs = TurnPerfNowMs();
@@ -1941,8 +2033,27 @@ public class MatchController : MonoBehaviour
 
         if (useHotSeatPanel && !hasVictoryWinner)
         {
-            yield return panelRodada.Apresentar(ActiveTeam, activePlayerListIndex + 1, currentTurn);
-            ApplyPendingTurnStartEffectsAfterHotSeatGate();
+            if (ShouldUseHotSeatPrivacyCurtain())
+            {
+                panelRodada.ShowPrivacyCurtain(
+                    ActiveTeam,
+                    currentTurn,
+                    IsActiveTeamAI());
+                ApplyPendingTurnStartEffectsAfterHotSeatGate();
+                Debug.Log(
+                    $"[PrivacyCurtain] hold activeSlot={ActiveSlotId.Value} " +
+                    $"localHumans={CountActiveLocalHumanPlayers()}");
+            }
+            else
+            {
+                yield return panelRodada.Apresentar(
+                    ActiveTeam,
+                    activePlayerListIndex + 1,
+                    currentTurn);
+                ApplyPendingTurnStartEffectsAfterHotSeatGate();
+                Debug.Log(
+                    $"[PrivacyCurtain] exit confirmedSlot={ActiveSlotId.Value}");
+            }
         }
 
         float postDelay = turnStateManager != null ? turnStateManager.AdvanceTurnPostDelay : advanceTurnPostDelay;
@@ -2599,6 +2710,14 @@ public class MatchController : MonoBehaviour
             entry.actualMoney = Mathf.Max(0, entry.actualMoney);
             entry.incomePerTurn = Mathf.Max(0, entry.incomePerTurn);
             entry.defeated = entry.defeated && entry.teamId != TeamId.Neutral;
+            if (!entry.localityConfigured)
+            {
+                // Cenas anteriores a isLocal: todo humano era implicitamente local.
+                entry.isLocal = !entry.isAI;
+                entry.localityConfigured = true;
+            }
+            if (entry.isAI)
+                entry.isLocal = false;
             players[i] = entry;
         }
     }
@@ -2918,7 +3037,8 @@ public class MatchController : MonoBehaviour
                         Debug.Log($"[FoW][TurnStartCache] slot={ActiveSlotId.Value} fallback=full");
                     RefreshFogOfWarForActiveTeam();
                 }
-                RefreshRuntimeUnitFogVisibility();
+                if (!ShouldUseHotSeatPrivacyCurtain())
+                    RefreshRuntimeUnitFogVisibility();
                 RunTurnStartStillObservedForActiveTeamStealthUnits();
             }
             else
@@ -2929,7 +3049,8 @@ public class MatchController : MonoBehaviour
         else
         {
             ResetFogOfWarRuntime(clearTilemap: true);
-            RefreshRuntimeUnitFogVisibility();
+            if (!ShouldUseHotSeatPrivacyCurtain())
+                RefreshRuntimeUnitFogVisibility();
         }
         TurnPerfLog("ApplyActiveTeam.FogAndVisibility", stageStartMs);
 
@@ -2961,13 +3082,15 @@ public class MatchController : MonoBehaviour
                     Debug.Log($"[FoW][TurnStartCache] slot={ActiveSlotId.Value} fallback=full");
                 RefreshFogOfWarForActiveTeam();
             }
-            RefreshRuntimeUnitFogVisibility();
+            if (!ShouldUseHotSeatPrivacyCurtain())
+                RefreshRuntimeUnitFogVisibility();
             RunTurnStartStillObservedForActiveTeamStealthUnits();
         }
         else
         {
             ResetFogOfWarRuntime(clearTilemap: true);
-            RefreshRuntimeUnitFogVisibility();
+            if (!ShouldUseHotSeatPrivacyCurtain())
+                RefreshRuntimeUnitFogVisibility();
         }
 
         FlushTurnStartAutonomyHelper();
@@ -3344,6 +3467,8 @@ public class MatchController : MonoBehaviour
             return;
         if (!IsValidPlayerSlot(targetSlot))
             return;
+        if (IsPlayerAI(targetSlot))
+            return;
 
         cell.z = 0;
         turnBriefingLedger.Add(new TurnBriefingEventSaveData
@@ -3507,9 +3632,46 @@ public class MatchController : MonoBehaviour
     private void FlushTurnStartAutonomyHelper()
     {
         TryAutoAssignTurnStateManager();
+        if (IsValidPlayerSlot(ActiveSlotId) && IsPlayerAI(ActiveSlotId))
+        {
+            DiscardTurnBriefingEventsForSlot(ActiveSlotId);
+            pendingTurnStartAutonomyHelperEntries = null;
+            // Limpa também um relatório humano que ainda estivesse aberto ou
+            // reabrível. A AI recebe o upkeep, mas não a interface de intel.
+            turnStateManager?.ShowTurnStartBriefing(null, null);
+            return;
+        }
+
         List<TurnStateManager.HelperTurnStartAutonomyLine> briefingLines = BuildTurnBriefingLinesForActiveTeam();
         turnStateManager?.ShowTurnStartBriefing(pendingTurnStartAutonomyHelperEntries, briefingLines);
         pendingTurnStartAutonomyHelperEntries = null;
+    }
+
+    private void DiscardTurnBriefingEventsForSlot(PlayerSlotId slot)
+    {
+        if (!IsValidPlayerSlot(slot))
+            return;
+
+        for (int i = turnBriefingLedger.Count - 1; i >= 0; i--)
+        {
+            TurnBriefingEventSaveData evt = turnBriefingLedger[i];
+            if (evt == null)
+            {
+                turnBriefingLedger.RemoveAt(i);
+                continue;
+            }
+
+            int eventSlotIndex = evt.slotIndex;
+            if (!IsValidPlayerSlotIndex(eventSlotIndex) &&
+                Enum.IsDefined(typeof(TeamId), evt.teamId) &&
+                TryGetUniqueSlotForTeam((TeamId)evt.teamId, out PlayerSlotId migratedSlot))
+            {
+                eventSlotIndex = migratedSlot.Value;
+            }
+
+            if (eventSlotIndex == slot.Value)
+                turnBriefingLedger.RemoveAt(i);
+        }
     }
 
     private int FindPlayerEconomyIndex(TeamId teamId)
@@ -3985,6 +4147,16 @@ public class MatchController : MonoBehaviour
     public void RefreshFogOfWarForActiveTeam(FogOfWarRefreshMode mode = FogOfWarRefreshMode.FullVisual)
     {
         PlayerSlotId gameplaySlot = ActiveSlotId;
+        if (ShouldUseHotSeatPrivacyCurtain())
+        {
+            ExecuteFogRefreshContext(
+                CreateFogUpdateContext(
+                    gameplaySlot,
+                    gameplaySlot,
+                    gameplaySlot,
+                    mode));
+            return;
+        }
         PlayerSlotId presentationSlot = TryResolveFogPresentationSlot(out PlayerSlotId resolvedPresentationSlot)
             ? resolvedPresentationSlot
             : gameplaySlot;
@@ -4032,7 +4204,7 @@ public class MatchController : MonoBehaviour
     {
         if (!IsValidPlayerSlot(context.gameplaySlot) ||
             !IsValidPlayerSlot(context.observerSlot) ||
-            !IsValidPlayerSlot(context.presentationSlot))
+            (context.publishVisuals && !IsValidPlayerSlot(context.presentationSlot)))
         {
             return;
         }
@@ -4272,6 +4444,19 @@ public class MatchController : MonoBehaviour
         PlayerSlotId gameplaySlot = ActiveSlotId;
         if (boardMap == null || !IsValidPlayerSlot(gameplaySlot))
             return false;
+
+        if (ShouldUseHotSeatPrivacyCurtain())
+        {
+            FogUpdateContext privacyContext = CreateFogUpdateContext(
+                gameplaySlot,
+                gameplaySlot,
+                gameplaySlot,
+                FogOfWarRefreshMode.FullVisual);
+            if (!TrySynchronizeFogRuntimeAtTurnStart(privacyContext, boardMap))
+                return false;
+            OnFogOfWarUpdated?.Invoke();
+            return true;
+        }
 
         PlayerSlotId presentationSlot = TryResolveFogPresentationSlot(out PlayerSlotId resolvedPresentationSlot)
             ? resolvedPresentationSlot
@@ -5866,8 +6051,6 @@ public class MatchController : MonoBehaviour
             return false;
 
         bool requireAI = debugFogOfWarPartial;
-        if (!requireAI && !IsPlayerAI(ActiveSlotId))
-            return false;
 
         // No modo PARTIAL, a perspectiva acompanha a IA que realmente esta jogando.
         // Escolher apenas "a primeira IA" fazia outros slots AI receberem a visao,
@@ -5877,6 +6060,26 @@ public class MatchController : MonoBehaviour
         {
             presentationSlot = ActiveSlotId;
             return true;
+        }
+
+        if (!requireAI)
+        {
+            // Um unico humano local e o observador fixo desta maquina, inclusive
+            // durante turnos de AI ou de um futuro jogador remoto.
+            if (TryGetSingleActiveLocalHumanSlot(out PlayerSlotId pinnedLocal))
+            {
+                if (pinnedLocal == ActiveSlotId)
+                    return false;
+                presentationSlot = pinnedLocal;
+                return true;
+            }
+
+            // Hot-seat: cada humano local observa apenas o proprio turno.
+            // Turnos nao-locais sao cobertos pela PrivacyCurtain e nao recebem
+            // um observador visual artificial.
+            if (IsPlayerLocal(ActiveSlotId))
+                return false;
+            return false;
         }
 
         for (int i = 0; i < players.Count; i++)
@@ -5894,6 +6097,11 @@ public class MatchController : MonoBehaviour
     {
         if (activeFogUpdateContext.HasValue)
             return activeFogUpdateContext.Value.presentationSlot;
+        if (ShouldUseHotSeatPrivacyCurtain())
+            // A cortina e a barreira de privacidade do Game View. O mundo por
+            // tras dela continua renderizado pela perspectiva do participante
+            // ativo para permitir inspecao do desenvolvedor na Scene View.
+            return ActiveSlotId;
         return TryResolveFogPresentationSlot(out PlayerSlotId presentationSlot)
             ? presentationSlot
             : ActiveSlotId;
@@ -7602,6 +7810,7 @@ public class MatchController : MonoBehaviour
         fogUnitVisibilityByCacheIndex.Clear();
         fogUnitVisibleScratchBuffer.Clear();
         fogCachedObserverSlotIndex = int.MinValue;
+        fogRenderedObserverSlotIndex = int.MinValue;
         fogOverlayInitialized = false;
         if (clearTilemap && fogOfWarTilemap != null)
             fogOfWarTilemap.ClearAllTiles();
@@ -7667,6 +7876,7 @@ public class MatchController : MonoBehaviour
             return false;
         }
 
+        int previouslyRenderedObserverSlot = fogRenderedObserverSlotIndex;
         fogContributionsBySource.Clear();
         foreach (KeyValuePair<FogContributionSourceId, FogSourceContributionCacheEntry> pair
                  in stored.sources)
@@ -7687,6 +7897,25 @@ public class MatchController : MonoBehaviour
         CopyFogContributorCounts(stored.geographicContributors, fogGeographicContributorsByCell);
         CopyFogContributorCounts(stored.sensorContributors, fogSensorContributorsByCell);
         InitializeFogRuntimeData(boardMap);
+        bool visualObserverChanged =
+            previouslyRenderedObserverSlot != observerSlot.Value &&
+            activeFogUpdateContext.HasValue &&
+            activeFogUpdateContext.Value.publishVisuals &&
+            activeFogUpdateContext.Value.observerSlot == observerSlot;
+        if (visualObserverChanged)
+        {
+            // O buffer representa o estado desenhado pelo observador anterior.
+            // Mesmo uma celula escondida nos dois slots precisa ser recolorida:
+            // o alpha de explored e a memoria pertencem ao novo PlayerSlotId.
+            fogRenderedVisibleCellsBuffer.Clear();
+            fogRenderedVisibleCellsValid = false;
+            if (enableFogStepPerfLogs)
+            {
+                Debug.Log(
+                    $"[FoW][PresentationSwitch] from={previouslyRenderedObserverSlot} " +
+                    $"to={observerSlot.Value} overlayInvalidated=true");
+            }
+        }
         return fogOverlayInitialized && fogCachedObserverSlotIndex == observerSlot.Value;
     }
 
@@ -7734,6 +7963,7 @@ public class MatchController : MonoBehaviour
         }
 
         fogOverlayInitialized = true;
+        fogRenderedObserverSlotIndex = ActiveSlotId.Value;
         // InitializeFogOverlay acabou de desenhar nevoa em todas as celulas.
         fogRenderedVisibleCellsBuffer.Clear();
         fogRenderedVisibleCellsValid = true;
@@ -7787,6 +8017,7 @@ public class MatchController : MonoBehaviour
             fogRenderedVisibleCellsBuffer.Clear();
             fogRenderedVisibleCellsBuffer.UnionWith(fogDisplayVisibleCellsBuffer);
             fogRenderedVisibleCellsValid = true;
+            fogRenderedObserverSlotIndex = ResolveFogVisualObserverSlot().Value;
             return;
         }
 
@@ -7814,6 +8045,7 @@ public class MatchController : MonoBehaviour
 
         fogRenderedVisibleCellsBuffer.Clear();
         fogRenderedVisibleCellsBuffer.UnionWith(fogDisplayVisibleCellsBuffer);
+        fogRenderedObserverSlotIndex = ResolveFogVisualObserverSlot().Value;
     }
 
     private void RenderFogExplorationMemory(Tilemap boardMap, HashSet<Vector3Int> visibleCells)
@@ -8997,6 +9229,28 @@ public class MatchController : MonoBehaviour
             ? $"slot AI {aiSlot.Value}"
             : "slot ativo (nenhuma AI configurada)";
         Debug.Log($"[Debug Command] FoW PARTIAL (debug): perspectiva no {perspective}.");
+    }
+
+    public void SetPanelRodadaDebugEnabled(bool enabled)
+    {
+        debugPanelRodadaEnabled = enabled;
+        if (!Application.isPlaying)
+            return;
+        if (panelRodada == null)
+            panelRodada = FindAnyObjectByType<PanelRodadaController>(FindObjectsInactive.Include);
+        if (panelRodada == null)
+            return;
+
+        if (!enabled || !ShouldUseHotSeatPrivacyCurtain())
+        {
+            panelRodada.HidePrivacyCurtainForDebug();
+            return;
+        }
+
+        panelRodada.ShowPrivacyCurtain(
+            ClampToTeamId(activeTeamId),
+            currentTurn,
+            IsActiveTeamAI());
     }
 
     private void ShowAllUnitsIgnoringFog()

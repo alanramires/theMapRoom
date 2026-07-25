@@ -969,60 +969,101 @@ public class TutorialManager : MonoBehaviour
         }
     }
 
+    // Eventos de objetivo que sao GESTOS DE INTERFACE, nao comando da propria unidade. O linter NAO
+    // os conta como "interacao de poder": o jogador nao esta jogando quando so mexe a camera — ele
+    // faz um gesto que o jogo mandou. E a distincao que separa "conta cliques" de "detecta parede".
+    private static readonly string[] InterfaceObjectiveEvents = { "CAMERA_ZOOM", "CAMERA_PAN" };
+
     public static List<string> LintTutorial(List<TutorialObjective> objectives, List<TutorialDialogEntry> script)
     {
         var report = new List<string>();
         if (objectives == null) objectives = new List<TutorialObjective>();
         if (script == null) script = new List<TutorialDialogEntry>();
 
-        // 1) Ritmo: passos ate a primeira interacao (Active) + contagem por tipo.
-        int firstActive = -1, active = 0, narrative = 0, passive = 0, milestone = 0;
+        // key -> id (tipo de evento), para separar interacao de PODER de gesto de interface e checar
+        // referencias orfas.
+        var keyToEvent = new Dictionary<string, string>(System.StringComparer.OrdinalIgnoreCase);
+        for (int i = 0; i < objectives.Count; i++)
+        {
+            TutorialObjective o = objectives[i];
+            if (o != null && !string.IsNullOrWhiteSpace(o.key))
+                keyToEvent[o.key.Trim()] = o.id;
+        }
+
+        // 1) Ritmo: distingue Active (qualquer) de interacao de PODER (comandar a propria unidade).
+        int firstActive = -1, firstPower = -1;
+        int narrative = 0, passive = 0, active = 0, milestone = 0, power = 0;
         for (int i = 0; i < script.Count; i++)
         {
             switch (ResolveInteractionType(script[i]))
             {
-                case TutorialInteractionType.Active: active++; if (firstActive < 0) firstActive = i; break;
+                case TutorialInteractionType.Active:
+                    active++;
+                    if (firstActive < 0) firstActive = i;
+                    if (IsPowerInteraction(script[i], keyToEvent))
+                    {
+                        power++;
+                        if (firstPower < 0) firstPower = i;
+                    }
+                    break;
                 case TutorialInteractionType.Passive: passive++; break;
                 case TutorialInteractionType.Milestone: milestone++; break;
                 default: narrative++; break;
             }
         }
 
-        int antesDaAcao = firstActive < 0 ? script.Count : firstActive;
+        int antesDoPoder = firstPower < 0 ? script.Count : firstPower;
         const int LongIntro = 6;
-        if (script.Count > 0 && antesDaAcao >= LongIntro)
-            report.Add($"[AVISO] {antesDaAcao} passos antes da 1a interacao (Active). Introducao longa cansa — " +
-                       "considere adiantar uma acao do jogador ou quebrar o bloco.");
-        if (active == 0 && script.Count > 0)
-            report.Add("[AVISO] Nenhum passo Active — o jogador so assiste. Falta acao?");
+        if (script.Count > 0 && antesDoPoder >= LongIntro)
+            report.Add($"[AVISO] {antesDoPoder} passos antes da 1a interacao de PODER (comandar a propria " +
+                       "unidade; zoom/pan de camera NAO contam). Parede narrativa — adiante uma acao real ou quebre o bloco.");
+        if (power == 0 && script.Count > 0)
+            report.Add("[AVISO] Nenhuma interacao de PODER — o jogador so assiste, nunca comanda a propria unidade.");
 
-        float porAcao = active > 0 ? (float)script.Count / active : script.Count;
-        report.Add($"[INFO] {script.Count} passo(s): {narrative} narrative, {passive} passive, {active} active, " +
-                   $"{milestone} milestone. ~1 interacao a cada {porAcao:0.#} passos.");
+        float porPoder = power > 0 ? (float)script.Count / power : script.Count;
+        report.Add($"[INFO] {script.Count} passo(s): {narrative} narrative, {passive} passive, " +
+                   $"{active} active (dos quais {power} de poder), {milestone} milestone.");
+        report.Add($"[INFO] 1a Active no passo {(firstActive < 0 ? -1 : firstActive)}; " +
+                   $"1a de PODER no passo {(firstPower < 0 ? -1 : firstPower)}. ~1 interacao de poder a cada {porPoder:0.#} passos.");
 
-        // 2) Keys de objetivo orfas (referenciam objective que nao existe).
-        var keys = new HashSet<string>(System.StringComparer.OrdinalIgnoreCase);
-        for (int i = 0; i < objectives.Count; i++)
-            if (objectives[i] != null && !string.IsNullOrWhiteSpace(objectives[i].key))
-                keys.Add(objectives[i].key.Trim());
-
+        // 2) Keys de objetivo orfas + tags de rich-text.
         for (int i = 0; i < script.Count; i++)
         {
             TutorialDialogEntry e = script[i];
             if (e == null) continue;
-            LintCheckKey(report, keys, i, "objectiveKey", e.objectiveKey);
-            LintCheckKey(report, keys, i, "waitObjectiveKey", e.waitObjectiveKey);
-            LintCheckKey(report, keys, i, "revealObjectiveKey", e.revealObjectiveKey);
+            LintCheckKey(report, keyToEvent, i, "objectiveKey", e.objectiveKey);
+            LintCheckKey(report, keyToEvent, i, "waitObjectiveKey", e.waitObjectiveKey);
+            LintCheckKey(report, keyToEvent, i, "revealObjectiveKey", e.revealObjectiveKey);
             LintRichTextTags(report, i, e.text);
         }
 
         return report;
     }
 
-    private static void LintCheckKey(List<string> report, HashSet<string> keys, int step, string field, string value)
+    // Passo Active que COMANDA a propria unidade (poder) vs gesto de interface (camera). So o avanco
+    // por ObjectiveCompleted pode ser gesto de camera; AllUnitsActed (moveu) e AimOpened (combate)
+    // sao sempre poder. Key desconhecida = assume poder (o orfa ja vira [ERRO] em outra checagem).
+    private static bool IsPowerInteraction(TutorialDialogEntry e, Dictionary<string, string> keyToEvent)
+    {
+        if (e == null || ResolveInteractionType(e) != TutorialInteractionType.Active)
+            return false;
+
+        if (e.advance == TutorialAdvanceCondition.ObjectiveCompleted)
+        {
+            string gatingKey = !string.IsNullOrWhiteSpace(e.objectiveKey) ? e.objectiveKey : e.waitObjectiveKey;
+            if (!string.IsNullOrWhiteSpace(gatingKey)
+                && keyToEvent.TryGetValue(gatingKey.Trim(), out string evId)
+                && !string.IsNullOrWhiteSpace(evId)
+                && System.Array.IndexOf(InterfaceObjectiveEvents, evId.Trim().ToUpperInvariant()) >= 0)
+                return false;
+        }
+        return true;
+    }
+
+    private static void LintCheckKey(List<string> report, Dictionary<string, string> keyToEvent, int step, string field, string value)
     {
         if (string.IsNullOrWhiteSpace(value)) return;
-        if (!keys.Contains(value.Trim()))
+        if (!keyToEvent.ContainsKey(value.Trim()))
             report.Add($"[ERRO] Passo {step}: {field}='{value}' nao existe nos objectives.");
     }
 

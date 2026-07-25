@@ -36,6 +36,8 @@ public static class SaveDataMapper
                 teamId = teamIds[i],
                 flipX = i < flipXs.Count && flipXs[i],
                 isAI = i < isAIs.Count && isAIs[i],
+                localitySaved = true,
+                isLocal = matchController.IsPlayerLocal(PlayerSlotId.FromIndex(i)),
                 commandServiceAutomatic = matchController.IsPlayerCommandServiceAutomatic(PlayerSlotId.FromIndex(i)),
                 startMoney = i < startMoneys.Count ? Mathf.Max(0, startMoneys[i]) : 0,
                 actualMoney = i < actualMoneys.Count ? Mathf.Max(0, actualMoneys[i]) : 0,
@@ -119,9 +121,16 @@ public static class SaveDataMapper
         {
             MatchPlayerSaveData p = data.players[i];
             if (p != null)
+            {
+                PlayerSlotId slot = PlayerSlotId.FromIndex(
+                    p.slotIndex >= 0 ? p.slotIndex : i);
+                matchController.SetPlayerIsLocal(
+                    slot,
+                    p.localitySaved ? p.isLocal : !p.isAI);
                 matchController.SetPlayerCommandServiceAutomatic(
-                    PlayerSlotId.FromIndex(p.slotIndex >= 0 ? p.slotIndex : i),
+                    slot,
                     p.commandServiceAutomatic);
+            }
         }
 
         List<int> victorySlotIndices = new List<int>();

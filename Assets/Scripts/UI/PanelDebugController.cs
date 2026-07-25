@@ -545,6 +545,20 @@ public class PanelDebugController : MonoBehaviour
                 Debug.Log($"[Debug Command] FoW {(fogEnabled ? "ON" : "OFF")}.");
             }
         }
+        else if (TryParsePanelRodadaCommand(rawCommand, out bool panelRodadaEnabled))
+        {
+            if (matchController == null)
+            {
+                Debug.Log("[Debug Command] MatchController nao encontrado.");
+            }
+            else
+            {
+                matchController.SetPanelRodadaDebugEnabled(panelRodadaEnabled);
+                executed = true;
+                cursorController?.PlayDoneSfx();
+                Debug.Log($"[Debug Command] PanelRodada {(panelRodadaEnabled ? "ON" : "OFF")}.");
+            }
+        }
         else if (command == "AI PAUSE" || command == "PAUSE AI")
         {
             AIController aiController = FindAnyObjectByType<AIController>();
@@ -1020,6 +1034,7 @@ public class PanelDebugController : MonoBehaviour
             "land unit\n" +
             "landing | emerge | submerge | take off | fast take off\n" +
             "fow on|off|partial | set fow <0-100>\n" +
+            "panelrodada on|off - controla somente a cortina de privacidade\n" +
             "ai pause | pause ai\n" +
             "ai resume | resume ai\n" +
             "ai shopping pause | pause ai shopping\n" +
@@ -1489,6 +1504,31 @@ public class PanelDebugController : MonoBehaviour
 
         alphaPercent = parsed;
         return true;
+    }
+
+    private static bool TryParsePanelRodadaCommand(string rawCommand, out bool enabled)
+    {
+        enabled = true;
+        if (string.IsNullOrWhiteSpace(rawCommand))
+            return false;
+
+        string trimmed = rawCommand.Trim();
+        const string prefix = "panelrodada ";
+        if (!trimmed.StartsWith(prefix, System.StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        string token = trimmed.Substring(prefix.Length).Trim();
+        if (string.Equals(token, "on", System.StringComparison.OrdinalIgnoreCase))
+        {
+            enabled = true;
+            return true;
+        }
+        if (string.Equals(token, "off", System.StringComparison.OrdinalIgnoreCase))
+        {
+            enabled = false;
+            return true;
+        }
+        return false;
     }
 
     private string GetInputText()

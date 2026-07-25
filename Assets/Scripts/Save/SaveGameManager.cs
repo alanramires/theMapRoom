@@ -1349,16 +1349,33 @@ public class SaveGameManager : MonoBehaviour
                 int playerNumber = matchController != null ? matchController.ActivePlayerListIndex + 1 : 1;
                 double presentationStartMs = PerfNowMs();
                 LogLoadPerf(normalizedSlot, "turn_presentation.begin", presentationStartMs, presentationStartMs - asyncStartMs);
-                yield return panelRodada.ReleaseLoadingPresentation(
-                    (TeamId)data.activeTeamId,
-                    Mathf.Max(1, playerNumber),
-                    data.currentTurn,
-                    () => LogLoadPerf(
+                if (matchController != null &&
+                    matchController.ShouldUseHotSeatPrivacyCurtain())
+                {
+                    panelRodada.CancelLoadingPresentation();
+                    panelRodada.ShowPrivacyCurtain(
+                        matchController.ActiveTeam,
+                        data.currentTurn,
+                        matchController.IsActiveTeamAI());
+                    LogLoadPerf(
                         normalizedSlot,
-                        "turn_button.ready",
+                        "turn_privacy_curtain.ready",
                         presentationStartMs,
-                        PerfNowMs() - asyncStartMs));
-                LogLoadPerf(normalizedSlot, "turn_button.confirmed", presentationStartMs, PerfNowMs() - asyncStartMs);
+                        PerfNowMs() - asyncStartMs);
+                }
+                else
+                {
+                    yield return panelRodada.ReleaseLoadingPresentation(
+                        (TeamId)data.activeTeamId,
+                        Mathf.Max(1, playerNumber),
+                        data.currentTurn,
+                        () => LogLoadPerf(
+                            normalizedSlot,
+                            "turn_button.ready",
+                            presentationStartMs,
+                            PerfNowMs() - asyncStartMs));
+                    LogLoadPerf(normalizedSlot, "turn_button.confirmed", presentationStartMs, PerfNowMs() - asyncStartMs);
+                }
                 matchController?.ReleaseHotSeatGateAfterLoad();
                 loadingPresentationReleased = true;
                 matchMusicAudioManager?.PrepareForMatchStart(forceRestartPlayback: true);

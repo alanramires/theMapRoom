@@ -20,7 +20,6 @@ public partial class AIController
         if (logistics == null || snapshot == null || snapshot.MyUnits == null)
             return null;
 
-        bool allowPreventiveMaintenance = IsPreventiveLogisticsAllowed(logistics, snapshot, fromCell, paths, occupied);
         UnitManager best = null;
         float bestScore = float.MinValue;
         for (int i = 0; i < snapshot.MyUnits.Count; i++)
@@ -34,17 +33,11 @@ public partial class AIController
                 || ally.ReceivedSuppliesThisTurn)
                 continue;
 
-            bool critical = ally.IsUnderRepair;
-            bool reachableCritical = critical && IsReachableLogisticsServiceTarget(logistics, ally, fromCell, paths, occupied);
-            if (critical && allowPreventiveMaintenance && !reachableCritical)
+            // Alvos que podem ser atendidos nesta rodada pertencem ao hotzone e
+            // foram consumidos antes deste metodo. Aqui so existe a excecao de
+            // planejamento: deslocar-se na direcao de quem esta em manutencao.
+            if (!ally.IsUnderRepair)
                 continue;
-
-            bool preventive = allowPreventiveMaintenance && IsPreventiveLogisticsTarget(logistics, ally);
-            if (!critical && !preventive)
-                continue;
-
-            bool preventiveReachable = preventive && !critical
-                && IsReachableLogisticsServiceTarget(logistics, ally, fromCell, paths, occupied);
 
             Vector3Int cell = ally.CurrentCellPosition;
             cell.z = 0;
@@ -53,11 +46,6 @@ public partial class AIController
                 + threat * (baseDefense ? 120f : 35f)
                 - SectorManager.HexDistance(fromCell, cell) * 45f
                 - ally.InstanceId * 0.001f;
-            if (reachableCritical)
-                score += 5000f;
-            if (preventiveReachable)
-                score += 2500f;
-
             if (score > bestScore)
             {
                 bestScore = score;
@@ -247,7 +235,6 @@ public partial class AIController
         if (limit <= 0)
             return false;
         bool allowPreventiveMaintenance = IsPreventiveLogisticsAllowed(unit, snapshot, fromCell, paths, occupied);
-        bool hasReachableCritical = HasReachableCriticalLogisticsTarget(unit, snapshot, fromCell, paths, occupied);
         bool mustVacateProducer = IsLogisticsProductionCell(snapshot.AITeam, fromCell)
             && HasReachableNonProductionLogisticsCell(unit, snapshot, fromCell, paths, occupied);
 
@@ -270,8 +257,7 @@ public partial class AIController
                 bestTargets = currentTargets;
                 bestScore = ScoreLogisticsSupplyCell(unit, snapshot, fromCell, fromCell, currentTargets, paths, anchor, baseDefense, preferCurrentCell: true);
                 bool currentHasCritical = HasCriticalLogisticsTarget(currentTargets);
-                bool preventiveWouldPreemptCritical = hasReachableCritical && !currentHasCritical;
-                if ((currentTargets.Count >= limit || paths == null || paths.Count == 0) && !preventiveWouldPreemptCritical)
+                if (currentTargets.Count >= limit || paths == null || paths.Count == 0)
                 {
                     action = BuildSupplyBatch(unit, snapshot.AITeam, fromCell, fromCell, currentTargets, paths);
                     reason = currentHasCritical
@@ -280,8 +266,7 @@ public partial class AIController
                     return true;
                 }
 
-                Debug.Log($"{TL("Logistics")} {unit.InstanceId} encontrou {currentTargets.Count}/{limit} agora; verifica se andar atende mais alvos" +
-                          (preventiveWouldPreemptCritical ? " (critico alcancavel tem prioridade)" : ""));
+                Debug.Log($"{TL("Logistics")} {unit.InstanceId} encontrou {currentTargets.Count}/{limit} agora; verifica se andar atende mais alvos");
             }
             else if (currentTargets.Count > 0)
             {
@@ -302,7 +287,7 @@ public partial class AIController
         // centenas de varreduras por caminhao, quase todas sobre hexes onde nao ha ninguem
         // para atender. Aqui o conjunto de candidatos e montado UMA vez a partir das
         // unidades aliadas, e so as celulas dentro do alcance de servico entram no laco.
-        HashSet<Vector3Int> serviceZone = BuildLogisticsServiceZone(unit, snapshot);
+        HashSet<Vector3Int> serviceZone = BuildLogisticsServiceZone(unit, snapshot, paths);
 
         foreach (Vector3Int rawCell in paths.Keys)
         {
@@ -336,8 +321,6 @@ public partial class AIController
                 continue;
             }
             bool hasCriticalTarget = HasCriticalLogisticsTarget(targets);
-            if (hasReachableCritical && !hasCriticalTarget)
-                continue;
             if (!baseDefense && cell != fromCell && IsLogisticsForwardOfMainLine(unit, snapshot, cell, anchor) && !hasCriticalTarget)
                 continue;
 
@@ -928,11 +911,12 @@ public partial class AIController
         Dictionary<Vector3Int, List<Vector3Int>> paths,
         HashSet<Vector3Int> occupied)
     {
-        bool allowPreventive = IsPreventiveLogisticsTarget(logistics, target);
-        int limit = GetLogisticsServiceLimit(logistics);
+        // Alcancabilidade aqui significa pertencer ao envelope movimento +
+        // alcance de servico desta rodada. Nao execute PodeSuprir para cada
+        // origem: o sensor e a validacao final feita apenas pelo construtor da
+        // acao, depois que a hotzone reduziu os candidatos.
         if (IsInLogisticsServiceRange(logistics, fromCell, target)
-            && IsLogisticsServiceCellAllowed(logistics, null, fromCell)
-            && SupplySensorAtCellContainsTarget(logistics, target, fromCell, limit, allowPreventive))
+            && IsLogisticsServiceCellAllowed(logistics, null, fromCell))
         {
             return true;
         }
@@ -947,37 +931,9 @@ public partial class AIController
                 continue;
             if (!IsLogisticsServiceCellAllowed(logistics, null, cell))
                 continue;
-            if (IsInLogisticsServiceRange(logistics, cell, target)
-                && SupplySensorAtCellContainsTarget(logistics, target, cell, limit, allowPreventive))
+            if (IsInLogisticsServiceRange(logistics, cell, target))
                 return true;
         }
-
-        return false;
-    }
-
-    private bool SupplySensorAtCellContainsTarget(
-        UnitManager logistics,
-        UnitManager target,
-        Vector3Int serviceCell,
-        int limit,
-        bool allowPreventiveMaintenance)
-    {
-        if (logistics == null || target == null || limit <= 0)
-            return false;
-
-        List<UnitManager> targets = CollectLogisticsTargetsBySupplySensorAtCell(
-            logistics,
-            null,
-            serviceCell,
-            limit,
-            allowPreventiveMaintenance,
-            out _,
-            out _,
-            out _);
-
-        for (int i = 0; i < targets.Count; i++)
-            if (targets[i] != null && targets[i].InstanceId == target.InstanceId)
-                return true;
 
         return false;
     }
@@ -1150,53 +1106,60 @@ public partial class AIController
         return false;
     }
 
-    // Hexes de onde este supridor alcancaria ALGUM aliado, montados uma vez por decisao.
-    // Serve de peneira barata antes do laco que roda PodeSuprir celula a celula: sem ela,
-    // um caminhao num mapa grande varre centenas de hexes vazios com sensor completo.
+    // Origens de servico que formam a hotzone logistica desta rodada.
+    // A intersecao deste conjunto com paths.Keys equivale a uma arma ficticia:
+    // movimento do supridor + alcance de servico. Um caminhao com 5 MP e alcance
+    // adjacente atende corretamente um alvo na casa 6.
     //
-    // A peneira e deliberadamente FROUXA — inclui quem ja recebeu, quem nao precisa e quem
-    // o sensor vai recusar por outro motivo. Ela responde "ha alguem ao alcance daqui?", e
-    // quem responde "da para atender?" continua sendo o PodeSuprir. Errar para o lado
-    // permissivo custa uma varredura extra; errar para o lado restritivo esconderia um
-    // atendimento legitimo, entao a assimetria e proposital.
-    //
-    // Devolve null quando nao ha candidato algum: o chamador entao nao filtra nada e o
-    // comportamento antigo permanece, em vez de a peneira zerar o laco por engano.
-    private HashSet<Vector3Int> BuildLogisticsServiceZone(UnitManager unit, AIWorldSnapshot snapshot)
+    private HashSet<Vector3Int> BuildLogisticsServiceZone(
+        UnitManager unit,
+        AIWorldSnapshot snapshot,
+        Dictionary<Vector3Int, List<Vector3Int>> paths)
     {
-        if (unit == null || snapshot?.MyUnits == null || snapshot.MyUnits.Count == 0)
-            return null;
+        if (unit == null || snapshot?.MyUnits == null || snapshot.MyUnits.Count == 0 ||
+            paths == null || paths.Count == 0 ||
+            !unit.TryGetUnitData(out UnitData data) || data == null)
+            return new HashSet<Vector3Int>();
 
         Tilemap map = boardTilemap != null ? boardTilemap : unit.BoardTilemap;
         if (map == null)
-            return null;
+            return new HashSet<Vector3Int>();
 
+        // Fonte compartilhada da hotzone: exatamente os destinos legais de
+        // movimento, expandidos pelo alcance da ferramenta de servico.
+        UnitThreatEnvelope hotzone = UnitThreatEnvelopeService.BuildServiceEnvelope(
+            unit,
+            map,
+            paths,
+            data.serviceRange);
         HashSet<Vector3Int> zone = new HashSet<Vector3Int>();
-        List<Vector3Int> neighbors = new List<Vector3Int>(6);
+        bool allowPreventiveMaintenance =
+            IsPreventiveLogisticsAllowed(unit, snapshot, unit.CurrentCellPosition, null, null);
 
         for (int i = 0; i < snapshot.MyUnits.Count; i++)
         {
             UnitManager ally = snapshot.MyUnits[i];
-            if (ally == null || ally == unit || ally.IsDead)
+            if (!IsLogisticsServiceTarget(unit, ally, allowPreventiveMaintenance))
                 continue;
 
             Vector3Int allyCell = ally.CurrentCellPosition;
             allyCell.z = 0;
+            if (!hotzone.CanThreaten(allyCell))
+                continue;
 
-            // O proprio hex do aliado cobre SameHexOrEmbarked e Hybrid; os vizinhos cobrem
-            // Adjacent1Hex e Hybrid. Uniao dos dois atende qualquer serviceRange sem
-            // precisar ler o modo aqui.
-            zone.Add(allyCell);
-            UnitMovementPathRules.GetImmediateHexNeighbors(map, allyCell, neighbors);
-            for (int n = 0; n < neighbors.Count; n++)
+            // A hotzone determina se o alvo pertence a esta rodada. Depois,
+            // preservamos somente as origens legais que efetivamente o atendem;
+            // PodeSuprir valida a acao final nessas poucas origens.
+            foreach (Vector3Int rawOrigin in hotzone.MovementCells)
             {
-                Vector3Int neighbor = neighbors[n];
-                neighbor.z = 0;
-                zone.Add(neighbor);
+                Vector3Int origin = rawOrigin;
+                origin.z = 0;
+                if (IsInLogisticsServiceRange(unit, origin, ally))
+                    zone.Add(origin);
             }
         }
 
-        return zone.Count > 0 ? zone : null;
+        return zone;
     }
 
     private static bool IsInLogisticsServiceRange(UnitManager logistics, Vector3Int serviceCell, UnitManager target)

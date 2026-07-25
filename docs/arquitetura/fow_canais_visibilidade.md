@@ -402,3 +402,62 @@ reutilizou cache ou precisou de fallback. Os logs `[AI Commit Heavy]` e
 - rebuild de setores;
 - construção do snapshot;
 - planejamento e execução.
+
+## Troca da perspectiva visual
+
+O cache de células desenhadas registra também o `PlayerSlotId` que produziu o
+overlay. Ao trocar o observador com autoridade `FullVisual`, o cache visual é
+invalidado e o nevoeiro é redesenhado uma vez.
+
+Essa invalidação é necessária mesmo para células escondidas nos dois slots:
+elas podem possuir estados de exploração diferentes e, portanto, usar alpha e
+memória geográfica diferentes.
+
+Ativações `DataOnly` não alteram o proprietário do overlay desenhado e não
+invalidam a apresentação local. O diagnóstico `[FoW][PresentationSwitch]`
+informa origem, destino e a invalidação.
+
+## Localidade do participante
+
+Cada `PlayerEntry` declara `isLocal`, separado de `isAI`:
+
+- `isAI=true`: executor automático; `isLocal` é ignorado e normalizado para
+  falso;
+- `isAI=false, isLocal=true`: humano que compartilha esta máquina/tela;
+- `isAI=false, isLocal=false`: humano remoto.
+
+O `MatchController` expõe `IsPlayerLocal`,
+`CountActiveLocalHumanPlayers`, `IsHotSeatPrivacyRequired` e
+`ShouldUseHotSeatPrivacyCurtain`. Nesta etapa, os checks apenas expressam a
+política; a cortina visual será um consumidor separado e não apagará caches.
+
+Cenas e saves anteriores à propriedade são migrados considerando todo humano
+como local, que era o comportamento implícito existente. Saves novos persistem
+um marcador explícito para distinguir `false=remoto` de campo legado ausente.
+
+## Política local de apresentação
+
+A perspectiva desta máquina segue a quantidade de humanos locais ativos:
+
+- nenhum humano local: AI ativa pode ser observada como espectador;
+- exatamente um humano local: seu slot é o observador fixo durante turnos
+  locais, remotos e de AI;
+- dois ou mais humanos locais: o humano local ativo observa o próprio slot;
+  qualquer turno AI/remoto usa `PrivacyCurtain`.
+
+`PrivacyCurtain` não é um slot e não possui memória. Durante a cortina:
+
+- o `panel_rodada` permanece opaco, sem botão de confirmação;
+- input e raycasts humanos são bloqueados pela própria apresentação;
+- o executor AI continua operando normalmente;
+- FoW, snapshot e inteligência do executor são atualizados em `DataOnly`;
+- nenhum cache humano é escolhido como perspectiva;
+- Jornal e HUD do mapa permanecem cobertos.
+
+Na saída de um turno privado, a cortina permanece levantada durante a troca de
+slot. Se o próximo participante for humano local, `panel_rodada` solicita a
+confirmação e somente então revela seu `FullVisual`. Se o próximo participante
+também for AI/remoto, a cortina continua sem interrupção.
+
+Loads restaurados diretamente em um turno privado substituem a apresentação de
+carregamento pela mesma cortina, sem um frame intermediário de mapa.

@@ -543,11 +543,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 57204a2b092e5ec468746a6a29c85a52, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DebugManager
-  turnStateManager: {fileID: 1900915756}
-  matchController: {fileID: 327617512}
-  cursorController: {fileID: 1082359631}
-  sendButton: {fileID: 0}
-  commandInputObject: {fileID: 0}
   aiDebugShortcutsEnabled: 1
   debugShortcutsEnabled: 0
   resetPlanOnDebugStage: 1
@@ -1690,6 +1685,7 @@ MonoBehaviour:
     incomePerTurn: 0
     startMoneyApplied: 0
   includeNeutralTeam: 0
+  capturedBuildingHistory: []
   economyEnabled: 1
   fogOfWar: 1
   autoFlipXFromHqPositions: 1
@@ -1717,14 +1713,19 @@ MonoBehaviour:
   victoryStarsToWin: 5
   freezeTurnAdvanceAfterVictory: 1
   victoryStarsByTeam:
-  - teamId: 0
+  - slotIndex: 0
+    teamId: 0
     stars: 0
-  - teamId: 1
+  - slotIndex: 1
+    teamId: 1
     stars: 0
   hasVictoryWinner: 0
   victoryWinnerTeam: -1
+  victoryWinnerSlotIndex: -1
   fogOfWarController: {fileID: 984791707}
   fogOfWarTilemap: {fileID: 2015085660}
+  fogOfWarMemoryTilemap: {fileID: 0}
+  fogOfWarBreakwaterMemoryTilemap: {fileID: 0}
   fogOfWarOverlayTile: {fileID: 11400000, guid: a9d34637cfec5f34f85ff83701fe1885, type: 2}
   fogOfWarTerrainDatabase: {fileID: 11400000, guid: af24f1a2f28971f498767ede9f9cfba1, type: 2}
   fogOfWarDpqAirHeightConfig: {fileID: 11400000, guid: 74c8a09efff211941b27a37f6bb948f1, type: 2}
@@ -1735,10 +1736,11 @@ MonoBehaviour:
   victoryOverlayTile: {fileID: 11400000, guid: dd2174cfa0a10cc4a9cb658af194727c, type: 2}
   victoryOverlayAlpha: 0.8
   activePlayerListIndex: 0
+  appliedActivePlayerListIndex: 0
   appliedActiveTeamId: 0
   pendingTurnStartUpkeep: 1
   pendingTurnStartEconomy: 1
-  cachedConstructionIncomeSignature: -426538384
+  cachedConstructionIncomeSignature: -426508594
   cachedConstructionIncomeCount: 2
   constructionIncomeRefreshIntervalSeconds: 0.35
   continuousEditorRefresh: 0
@@ -1806,9 +1808,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a023539e93c252842a5e94d03a9f00ce, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TutorialManager
-  terrainDatabase: {fileID: 0}
-  matchController: {fileID: 0}
-  turnStateManager: {fileID: 0}
+  terrainDatabase: {fileID: 11400000, guid: af24f1a2f28971f498767ede9f9cfba1, type: 2}
+  matchController: {fileID: 327617512}
+  turnStateManager: {fileID: 1900915756}
   automataDatabase: {fileID: 11400000, guid: 27105e25bac8750428f4ead5e36b358e, type: 2}
   enableTutorialAutomata: 1
 --- !u!1 &337511629
@@ -1958,6 +1960,7 @@ MonoBehaviour:
   playbackMode: 1
   playOnStart: 1
   musicVolume: 0.1
+  roundMusicVolume: 1
   shuffleFreeMode: 0
   neutralMusicVolume: 0.4
   team0MusicVolume: 0.4
@@ -4257,6 +4260,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::FogOfWarController
   matchController: {fileID: 327617512}
   fogOfWarAlpha: 1
+  exploredFogAlphaMultiplier: 0.8
   fogOfWarAlphaInitialized: 1
   autoRefreshOnFogUpdate: 0
   includeInvisibleTargets: 1
@@ -7751,6 +7755,7 @@ MonoBehaviour:
     - ActionType: 0
       TurnNumber: 0
       ActingTeam: 0
+      ActingSlotIndex: -1
       CursorHex: {x: 0, y: 0, z: 0}
       HasCursorHex: 0
       UnitInstanceId: 
@@ -7783,6 +7788,7 @@ MonoBehaviour:
       Snapshot:
         TurnNumber: 0
         ActiveTeam: 0
+        ActiveSlotIndex: -1
         SnapshotTag: 
         HasCursorCell: 0
         CursorCell: {x: 0, y: 0, z: 0}
@@ -7874,12 +7880,14 @@ MonoBehaviour:
         MatchState:
           currentTurn: 0
           activeTeamId: 0
+          activeSlotIndex: -1
           includeNeutralTeam: 0
           economyEnabled: 0
           victoryStarsEnabled: 0
           victoryStarsToWin: 0
           hasVictoryWinner: 0
           victoryWinnerTeamId: 0
+          victoryWinnerSlotIndex: -1
           players: []
           victoryStars: []
       IsTurnMarker: 0
@@ -7888,6 +7896,7 @@ MonoBehaviour:
     ActionType: 0
     TurnNumber: 0
     ActingTeam: 0
+    ActingSlotIndex: -1
     CursorHex: {x: 0, y: 0, z: 0}
     HasCursorHex: 0
     UnitInstanceId: 
@@ -7920,6 +7929,7 @@ MonoBehaviour:
     Snapshot:
       TurnNumber: 0
       ActiveTeam: 0
+      ActiveSlotIndex: -1
       SnapshotTag: 
       HasCursorCell: 0
       CursorCell: {x: 0, y: 0, z: 0}
@@ -7928,12 +7938,14 @@ MonoBehaviour:
       MatchState:
         currentTurn: 0
         activeTeamId: 0
+        activeSlotIndex: -1
         includeNeutralTeam: 0
         economyEnabled: 1
         victoryStarsEnabled: 1
         victoryStarsToWin: 5
         hasVictoryWinner: 0
         victoryWinnerTeamId: -1
+        victoryWinnerSlotIndex: -1
         players: []
         victoryStars: []
     IsTurnMarker: 0
@@ -7941,9 +7953,11 @@ MonoBehaviour:
   currentRecord:
     TurnNumber: 0
     ActingTeam: 0
+    ActingSlotIndex: -1
     StartSnapshot:
       TurnNumber: 0
       ActiveTeam: 0
+      ActiveSlotIndex: -1
       SnapshotTag: 
       HasCursorCell: 0
       CursorCell: {x: 0, y: 0, z: 0}
@@ -7952,18 +7966,21 @@ MonoBehaviour:
       MatchState:
         currentTurn: 0
         activeTeamId: 0
+        activeSlotIndex: -1
         includeNeutralTeam: 0
         economyEnabled: 1
         victoryStarsEnabled: 1
         victoryStarsToWin: 5
         hasVictoryWinner: 0
         victoryWinnerTeamId: -1
+        victoryWinnerSlotIndex: -1
         players: []
         victoryStars: []
     Steps: []
   matchHistory: []
   selectedTurnIndex: -1
   observerTeam: -1
+  observerSlotIndex: -1
   visionMode: 0
   currentStepIndex: 0
   isPlaying: 0

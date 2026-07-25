@@ -213,8 +213,15 @@ public class TutorialManagerEditor : Editor
 
         List<string> report = TutorialManager.LintTutorial(asset.objectives, asset.script);
         LogLintReport(asset.name, report);
-        EditorUtility.DisplayDialog("Validar Tutorial",
-            $"'{asset.name}' — {report.Count} linha(s) no relatorio.\nDetalhes no Console.", "OK");
+
+        // Mostra o relatorio NO DIALOGO (nao depende do filtro do Console — INFO fica escondido se o
+        // toggle 'Info' estiver desligado). Trunca se for muito longo; o completo esta no Console.
+        string body = report.Count == 0 ? "Sem observacoes." : string.Join("\n", report);
+        const int maxLinhas = 20;
+        if (report.Count > maxLinhas)
+            body = string.Join("\n", report.GetRange(0, maxLinhas)) + $"\n… (+{report.Count - maxLinhas} linha(s) — ver Console)";
+
+        EditorUtility.DisplayDialog("Validar Tutorial", $"'{asset.name}'\n\n{body}", "OK");
     }
 
     private static void LogLintReport(string tutorialName, List<string> report)

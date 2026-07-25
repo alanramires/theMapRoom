@@ -331,6 +331,8 @@ public class MatchControllerEditor : Editor
             SerializedProperty flipXProp = player.FindPropertyRelative("flipX");
             SerializedProperty flipXOverrideProp = player.FindPropertyRelative("flipXOverride");
             SerializedProperty isAIProp = player.FindPropertyRelative("isAI");
+            SerializedProperty isLocalProp = player.FindPropertyRelative("isLocal");
+            SerializedProperty localityConfiguredProp = player.FindPropertyRelative("localityConfigured");
             SerializedProperty commandServiceAutomaticProp = player.FindPropertyRelative("commandServiceAutomatic");
             SerializedProperty startMoneyProp = player.FindPropertyRelative("startMoney");
             SerializedProperty actualMoneyProp = player.FindPropertyRelative("actualMoney");
@@ -367,6 +369,28 @@ public class MatchControllerEditor : Editor
             }
             if (isAIProp != null)
                 EditorGUILayout.PropertyField(isAIProp, new GUIContent("Is AI"));
+            if (isLocalProp != null)
+            {
+                if (localityConfiguredProp != null && !localityConfiguredProp.boolValue)
+                {
+                    isLocalProp.boolValue = isAIProp == null || !isAIProp.boolValue;
+                    localityConfiguredProp.boolValue = true;
+                }
+
+                bool isAI = isAIProp != null && isAIProp.boolValue;
+                if (isAI)
+                    isLocalProp.boolValue = false;
+                using (new EditorGUI.DisabledScope(isAI))
+                {
+                    EditorGUILayout.PropertyField(
+                        isLocalProp,
+                        new GUIContent(
+                            "Is Local",
+                            "Humano que compartilha esta maquina/tela. AI nunca e local."));
+                }
+                if (localityConfiguredProp != null)
+                    localityConfiguredProp.boolValue = true;
+            }
             if (commandServiceAutomaticProp != null)
                 EditorGUILayout.PropertyField(commandServiceAutomaticProp, new GUIContent("Automated Command Service"));
             if (startMoneyProp != null)
@@ -467,12 +491,18 @@ public class MatchControllerEditor : Editor
         SerializedProperty actualMoneyProp = p.FindPropertyRelative("actualMoney");
         SerializedProperty incomePerTurnProp = p.FindPropertyRelative("incomePerTurn");
         SerializedProperty startMoneyAppliedProp = p.FindPropertyRelative("startMoneyApplied");
+        SerializedProperty isAIProp = p.FindPropertyRelative("isAI");
+        SerializedProperty isLocalProp = p.FindPropertyRelative("isLocal");
+        SerializedProperty localityConfiguredProp = p.FindPropertyRelative("localityConfigured");
 
         // flipX e calculado automaticamente por AutoComputeFlipXFromHqPositions — nao resetar aqui
         if (startMoneyProp != null) startMoneyProp.intValue = 0;
         if (actualMoneyProp != null) actualMoneyProp.intValue = 0;
         if (incomePerTurnProp != null) incomePerTurnProp.intValue = 0;
         if (startMoneyAppliedProp != null) startMoneyAppliedProp.boolValue = false;
+        if (isAIProp != null) isAIProp.boolValue = false;
+        if (isLocalProp != null) isLocalProp.boolValue = true;
+        if (localityConfiguredProp != null) localityConfiguredProp.boolValue = true;
     }
 
     private static SerializedProperty GetPlayerTeamProperty(SerializedProperty playerElementProp)

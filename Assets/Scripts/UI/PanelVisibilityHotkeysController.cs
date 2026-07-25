@@ -109,6 +109,14 @@ public class PanelVisibilityHotkeysController : MonoBehaviour
         UpdateHotkeysRetractAnimation();
     }
 
+    private void LateUpdate()
+    {
+        // O console de desenvolvimento deve permanecer utilizavel mesmo quando a
+        // PrivacyCurtain do hot-seat ocupa a tela inteira.
+        if (panelDebug != null && panelDebug.activeSelf)
+            panelDebug.transform.SetAsLastSibling();
+    }
+
     private void HandleSceneLoaded(Scene scene, LoadSceneMode mode)
     {
         RefreshReferences(forceSceneInit: true);
@@ -189,7 +197,10 @@ public class PanelVisibilityHotkeysController : MonoBehaviour
             PanelDebugController.TryConsumeDebugToggleCharacterFromInput();
         panelDebug.SetActive(willOpen);
         if (willOpen)
+        {
+            panelDebug.transform.SetAsLastSibling();
             PanelDebugController.TryFocusCommandInput();
+        }
         else
             PanelDebugController.TryReleaseCommandInput();
     }

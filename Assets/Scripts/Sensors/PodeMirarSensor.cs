@@ -2249,6 +2249,60 @@ public static class UnitThreatEnvelopeService
 
     private static readonly Dictionary<long, CacheEntry> Cache = new Dictionary<long, CacheEntry>();
 
+    /// <summary>
+    /// Constroi a hotzone de uma ferramenta de servico a partir dos mesmos
+    /// destinos de movimento legais usados pela hotzone de combate. Nao usa
+    /// distancia-hexa a partir da origem: terreno, estradas, ocupacao e custos
+    /// ja estao materializados em paths.
+    /// </summary>
+    public static UnitThreatEnvelope BuildServiceEnvelope(
+        UnitManager unit,
+        Tilemap boardMap,
+        Dictionary<Vector3Int, List<Vector3Int>> paths,
+        SupplierRangeMode serviceRange)
+    {
+        var normalizedPaths = paths ??
+            new Dictionary<Vector3Int, List<Vector3Int>>();
+        var movementCells = new HashSet<Vector3Int>();
+        var serviceableCells = new HashSet<Vector3Int>();
+        var lineCells = new HashSet<Vector3Int>();
+        Tilemap map = boardMap != null ? boardMap : unit != null ? unit.BoardTilemap : null;
+        var neighbors = new List<Vector3Int>(6);
+
+        foreach (Vector3Int rawCell in normalizedPaths.Keys)
+        {
+            Vector3Int moveCell = rawCell;
+            moveCell.z = 0;
+            if (map != null && map.GetTile(moveCell) == null)
+                continue;
+
+            movementCells.Add(moveCell);
+            if (serviceRange == SupplierRangeMode.Hybrid0Or1Hex)
+                serviceableCells.Add(moveCell);
+
+            if (serviceRange != SupplierRangeMode.Adjacent1Hex &&
+                serviceRange != SupplierRangeMode.Hybrid0Or1Hex)
+                continue;
+
+            UnitMovementPathRules.GetImmediateHexNeighbors(map, moveCell, neighbors);
+            for (int i = 0; i < neighbors.Count; i++)
+            {
+                Vector3Int targetCell = neighbors[i];
+                targetCell.z = 0;
+                if (map == null || map.GetTile(targetCell) != null)
+                    serviceableCells.Add(targetCell);
+            }
+        }
+
+        lineCells.UnionWith(serviceableCells);
+        lineCells.ExceptWith(movementCells);
+        return new UnitThreatEnvelope(
+            normalizedPaths,
+            movementCells,
+            serviceableCells,
+            lineCells);
+    }
+
     public static void ClearCache()
     {
         Cache.Clear();
