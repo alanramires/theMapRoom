@@ -73,6 +73,7 @@ public static class PlayerSlotRelations
 public class MatchController : MonoBehaviour
 {
     private const int MaxVictoryStarsGoal = 12;
+    private const int FogSourceCacheFormatVersion = 1;
     public static event Action<PlayerSlotId, PlayerSlotId> OnActiveSlotChanged;
     // Compatibilidade temporária: novos sistemas devem assinar OnActiveSlotChanged.
     public static event Action<int> OnActiveTeamChanged;
@@ -5225,8 +5226,12 @@ public class MatchController : MonoBehaviour
     }
 
     public void ExportFogSourceContributionsForSave(
+        out int cacheFormat,
+        out int cacheConfigHash,
         List<FogSourceContributionSaveData> destination)
     {
+        cacheFormat = FogSourceCacheFormatVersion;
+        cacheConfigHash = BuildFogSourceCacheConfigHash(ResolveFogBoardTilemap());
         if (destination == null)
             return;
         destination.Clear();
@@ -5254,6 +5259,9 @@ public class MatchController : MonoBehaviour
             };
             saved.geographicCells.AddRange(entry.geographicCells);
             saved.sensorCells.AddRange(entry.sensorCells);
+            SortFogCellList(saved.geographicCells);
+            SortFogCellList(saved.sensorCells);
+            saved.contributionChecksum = ComputeFogSourceContributionChecksum(saved);
             destination.Add(saved);
         }
     }
@@ -5413,6 +5421,253 @@ public class MatchController : MonoBehaviour
     private static string FormatFogSourceId(FogContributionSourceId sourceId) =>
         $"{sourceId.type}:{sourceId.instanceId}";
 
+    public bool TryRestoreFogSourceContributionsFromSave(
+        int observerSlotIndex,
+        int cacheFormat,
+        int cacheConfigHash,
+        IList<FogSourceContributionSaveData> savedSources,
+        out string result)
+    {
+        result = "unknown";
+        if (!debugFogOfWarEnabled || !enableTotalWar || fogOfWarTilemap == null)
+        {
+            result = "fog_unavailable";
+            return false;
+        }
+        if (turnStateManager != null &&
+            turnStateManager.CurrentCursorState != TurnStateManager.CursorState.Neutral)
+        {
+            result = "not_neutral";
+            return false;
+        }
+        if (observerSlotIndex != ActiveSlotId.Value)
+        {
+            result = "observer_slot_mismatch";
+            return false;
+        }
+        if (TryResolveFogPresentationSlot(out PlayerSlotId presentationSlot) &&
+            presentationSlot != ActiveSlotId)
+        {
+            result = "split_gameplay_presentation";
+            return false;
+        }
+        if (cacheFormat != FogSourceCacheFormatVersion ||
+            savedSources == null || savedSources.Count == 0)
+        {
+            result = "cache_format_or_empty";
+            return false;
+        }
+
+        Tilemap boardMap = ResolveFogBoardTilemap();
+        if (boardMap == null || cacheConfigHash == 0 ||
+            cacheConfigHash != BuildFogSourceCacheConfigHash(boardMap))
+        {
+            result = "config_mismatch";
+            return false;
+        }
+
+        Dictionary<FogContributionSourceId, UnitManager> eligibleUnits =
+            new Dictionary<FogContributionSourceId, UnitManager>();
+        List<UnitManager> activeUnits = UnitManager.AllActive;
+        for (int i = 0; i < activeUnits.Count; i++)
+        {
+            UnitManager unit = activeUnits[i];
+            if (unit == null || !unit.gameObject.activeInHierarchy || unit.IsEmbarked ||
+                unit.SlotIndex != observerSlotIndex || !IsUnitOnBoard(unit, boardMap))
+            {
+                continue;
+            }
+            FogContributionSourceId sourceId = ResolveFogContributionSourceId(unit);
+            if (!eligibleUnits.TryAdd(sourceId, unit))
+            {
+                result = $"duplicate_runtime_source:{FormatFogSourceId(sourceId)}";
+                return false;
+            }
+        }
+
+        Dictionary<FogContributionSourceId, ConstructionManager> eligibleConstructions =
+            new Dictionary<FogContributionSourceId, ConstructionManager>();
+        List<ConstructionManager> activeConstructions = ConstructionManager.AllActive;
+        for (int i = 0; i < activeConstructions.Count; i++)
+        {
+            ConstructionManager construction = activeConstructions[i];
+            if (construction == null || !construction.gameObject.activeInHierarchy)
+                continue;
+            bool owned = IsConstructionOwnedByActivePlayer(construction);
+            if (!owned && !construction.IsPlayerHeadQuarter)
+                continue;
+            if (construction.BoardTilemap != boardMap ||
+                construction.gameObject.scene != boardMap.gameObject.scene)
+            {
+                continue;
+            }
+            FogContributionSourceId sourceId = ResolveFogContributionSourceId(construction);
+            if (!eligibleConstructions.TryAdd(sourceId, construction))
+            {
+                result = $"duplicate_runtime_source:{FormatFogSourceId(sourceId)}";
+                return false;
+            }
+        }
+
+        Dictionary<FogContributionSourceId, FogSourceContributionSaveData> validated =
+            new Dictionary<FogContributionSourceId, FogSourceContributionSaveData>();
+        for (int i = 0; i < savedSources.Count; i++)
+        {
+            FogSourceContributionSaveData saved = savedSources[i];
+            if (saved == null || saved.observerSlotIndex != observerSlotIndex ||
+                (saved.sourceType != (int)FogContributionSourceType.Unit &&
+                 saved.sourceType != (int)FogContributionSourceType.Construction))
+            {
+                result = $"invalid_source:{i}";
+                return false;
+            }
+            if (saved.contributionChecksum == 0 ||
+                saved.contributionChecksum != ComputeFogSourceContributionChecksum(saved))
+            {
+                result = $"checksum_mismatch:{i}";
+                return false;
+            }
+            if (!ValidateSavedFogCells(saved.geographicCells, boardMap) ||
+                !ValidateSavedFogCells(saved.sensorCells, boardMap))
+            {
+                result = $"invalid_cells:{i}";
+                return false;
+            }
+
+            FogContributionSourceId sourceId = new FogContributionSourceId(
+                (FogContributionSourceType)saved.sourceType,
+                saved.sourceInstanceId);
+            if (!validated.TryAdd(sourceId, saved))
+            {
+                result = $"duplicate_saved_source:{FormatFogSourceId(sourceId)}";
+                return false;
+            }
+
+            if (sourceId.type == FogContributionSourceType.Unit)
+            {
+                if (!eligibleUnits.TryGetValue(sourceId, out UnitManager unit) ||
+                    saved.sourceStateHash != BuildFogUnitSourceStateHash(unit) ||
+                    !FogSavedCellListsMatch(saved.geographicCells, saved.sensorCells))
+                {
+                    result = $"unit_validation:{FormatFogSourceId(sourceId)}";
+                    return false;
+                }
+            }
+            else
+            {
+                if (!eligibleConstructions.TryGetValue(sourceId, out ConstructionManager construction) ||
+                    saved.sourceStateHash != BuildFogConstructionSourceStateHash(construction) ||
+                    !ValidateSavedConstructionContribution(saved, construction, boardMap))
+                {
+                    result = $"construction_validation:{FormatFogSourceId(sourceId)}";
+                    return false;
+                }
+            }
+        }
+
+        if (validated.Count != eligibleUnits.Count + eligibleConstructions.Count)
+        {
+            result = $"source_count:{validated.Count}/{eligibleUnits.Count + eligibleConstructions.Count}";
+            return false;
+        }
+
+        // Todas as validacoes terminaram antes da primeira mutacao.
+        ValidateFogOfWarSortingLayer();
+        ResetFogOfWarRuntime(clearTilemap: false);
+        InitializeFogOverlay(boardMap);
+        if (!fogOverlayInitialized)
+        {
+            result = "overlay_init_failed";
+            return false;
+        }
+
+        foreach (KeyValuePair<FogContributionSourceId, FogSourceContributionSaveData> pair in validated)
+        {
+            FogSourceContributionSaveData saved = pair.Value;
+            FogSourceContributionCacheEntry runtime = new FogSourceContributionCacheEntry
+            {
+                sourceStateHash = saved.sourceStateHash
+            };
+            if (pair.Key.type == FogContributionSourceType.Unit &&
+                eligibleUnits.TryGetValue(pair.Key, out UnitManager unit))
+            {
+                runtime.unitCacheKey = BuildFogUnitCacheKey(unit, boardMap);
+            }
+
+            fogContributionsBySource[pair.Key] = runtime;
+            for (int i = 0; i < saved.geographicCells.Count; i++)
+                AddFogSourceGeographicContribution(runtime, saved.geographicCells[i], boardMap, updateVisual: false);
+            for (int i = 0; i < saved.sensorCells.Count; i++)
+                AddFogSourceSensorContribution(runtime, saved.sensorCells[i]);
+        }
+
+        UnitManager[] snapshotUnits = FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude);
+        PublishFogGameplaySnapshot(observerSlotIndex, boardMap, snapshotUnits);
+        fogUnitVisibilityByCacheIndex.Clear();
+        if (TryGetFogGameplaySnapshot(observerSlotIndex, out FogSlotGameplaySnapshot snapshot))
+        {
+            foreach (KeyValuePair<int, bool> pair in snapshot.unitVisibility)
+                fogUnitVisibilityByCacheIndex[pair.Key] = pair.Value;
+        }
+        ApplyRuntimeUnitFogVisibilityFromCache(boardMap);
+        if (Application.isPlaying)
+            AIIntelLedger.RecordVisibleContactsForSlot(ActiveSlotId, currentTurn, this);
+        RenderFogOverlayFromRuntimeCache(boardMap);
+        if (Application.isPlaying)
+            OnFogOfWarUpdated?.Invoke();
+
+        result = $"restored sources={validated.Count} geographic={fogGeographicContributorsByCell.Count} sensor={fogSensorContributorsByCell.Count}";
+        return true;
+    }
+
+    private static bool ValidateSavedFogCells(IList<Vector3Int> cells, Tilemap boardMap)
+    {
+        if (cells == null || boardMap == null)
+            return false;
+        HashSet<Vector3Int> unique = new HashSet<Vector3Int>();
+        for (int i = 0; i < cells.Count; i++)
+        {
+            Vector3Int cell = cells[i];
+            if (cell.z != 0 || boardMap.GetTile(cell) == null || !unique.Add(cell))
+                return false;
+        }
+        return true;
+    }
+
+    private static bool FogSavedCellListsMatch(
+        IList<Vector3Int> left,
+        IList<Vector3Int> right)
+    {
+        if (left == null || right == null || left.Count != right.Count)
+            return false;
+        return new HashSet<Vector3Int>(left).SetEquals(right);
+    }
+
+    private bool ValidateSavedConstructionContribution(
+        FogSourceContributionSaveData saved,
+        ConstructionManager construction,
+        Tilemap boardMap)
+    {
+        Vector3Int origin = construction.CurrentCellPosition;
+        origin.z = 0;
+        bool owned = IsConstructionOwnedByActivePlayer(construction);
+        if (!owned)
+        {
+            return construction.IsPlayerHeadQuarter &&
+                   saved.geographicCells.Count == 1 &&
+                   saved.geographicCells[0] == origin &&
+                   saved.sensorCells.Count == 0;
+        }
+
+        int visionRange = 0;
+        if (construction.TryResolveConstructionData(out ConstructionData data) && data != null)
+            visionRange = Mathf.Max(0, data.visao);
+        HashSet<Vector3Int> expectedGeographic = BuildCellsInRadius(boardMap, origin, visionRange);
+        return expectedGeographic.SetEquals(saved.geographicCells) &&
+               saved.sensorCells.Count == 1 &&
+               saved.sensorCells[0] == origin;
+    }
+
     public bool TryRestoreFogRuntimeCacheForObserverSlotFromSave(
         int observerSlotIndex,
         List<FogCellContributorSaveData> visibleContributorsByCell,
@@ -5514,6 +5769,8 @@ public class MatchController : MonoBehaviour
             unit.SetFogOfWarVisibility(ResolveFogRenderVisibility(
                 unit, visible, fogOverlayOwnsWorldOcclusion, ActiveSlotId));
         }
+
+        RefreshStackedHexFrontRendering(units, boardMap, ActiveSlotId);
     }
 
     public void BuildFogUnitContributorDebugSnapshot(List<FogUnitContributorDebugInfo> output)
@@ -7578,6 +7835,87 @@ public class MatchController : MonoBehaviour
                 return hash;
             for (int i = 0; i < value.Length; i++)
                 hash = (hash * 31) + value[i];
+            return hash;
+        }
+    }
+
+    private int BuildFogSourceCacheConfigHash(Tilemap boardMap)
+    {
+        unchecked
+        {
+            if (boardMap == null)
+                return 0;
+
+            int hash = 17;
+            hash = (hash * 31) + StableFogStringHash(boardMap.gameObject.scene.name);
+            hash = (hash * 31) + StableFogStringHash(boardMap.name);
+            hash = (hash * 31) + (enableLosValidation ? 1 : 0);
+            hash = (hash * 31) + (enableStealthValidation ? 1 : 0);
+            TerrainDatabase terrain = ResolveFogTerrainDatabase();
+            DPQAirHeightConfig airConfig = ResolveFogDpqAirHeightConfig();
+            hash = (hash * 31) + StableFogStringHash(terrain != null ? terrain.name : string.Empty);
+            hash = (hash * 31) + StableFogStringHash(airConfig != null ? airConfig.name : string.Empty);
+
+            BoundsInt bounds = boardMap.cellBounds;
+            for (int x = bounds.xMin; x < bounds.xMax; x++)
+            {
+                for (int y = bounds.yMin; y < bounds.yMax; y++)
+                {
+                    Vector3Int cell = new Vector3Int(x, y, 0);
+                    TileBase tile = boardMap.GetTile(cell);
+                    if (tile == null)
+                        continue;
+                    hash = (hash * 31) + x;
+                    hash = (hash * 31) + y;
+                    hash = (hash * 31) + StableFogStringHash(tile.name);
+                }
+            }
+            return hash;
+        }
+    }
+
+    private static void SortFogCellList(List<Vector3Int> cells)
+    {
+        cells?.Sort((a, b) =>
+        {
+            int byY = a.y.CompareTo(b.y);
+            if (byY != 0)
+                return byY;
+            int byX = a.x.CompareTo(b.x);
+            return byX != 0 ? byX : a.z.CompareTo(b.z);
+        });
+    }
+
+    private static long ComputeFogSourceContributionChecksum(FogSourceContributionSaveData source)
+    {
+        unchecked
+        {
+            if (source == null)
+                return 0L;
+
+            long hash = 1469598103934665603L;
+            hash = (hash ^ source.observerSlotIndex) * 1099511628211L;
+            hash = (hash ^ source.sourceType) * 1099511628211L;
+            hash = (hash ^ source.sourceInstanceId) * 1099511628211L;
+            hash = (hash ^ source.sourceStateHash) * 1099511628211L;
+            hash = AppendFogCellsToChecksum(hash, source.geographicCells);
+            return AppendFogCellsToChecksum(hash, source.sensorCells);
+        }
+    }
+
+    private static long AppendFogCellsToChecksum(long hash, IList<Vector3Int> cells)
+    {
+        unchecked
+        {
+            int count = cells?.Count ?? 0;
+            hash = (hash ^ count) * 1099511628211L;
+            for (int i = 0; i < count; i++)
+            {
+                Vector3Int cell = cells[i];
+                hash = (hash ^ cell.x) * 1099511628211L;
+                hash = (hash ^ cell.y) * 1099511628211L;
+                hash = (hash ^ cell.z) * 1099511628211L;
+            }
             return hash;
         }
     }

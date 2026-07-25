@@ -57,6 +57,8 @@ public static class MatchStateHasher
         System.Collections.Generic.List<FogCellContributorSaveData> savedFogCells = data.fogVisibleContributorsByCell;
         System.Collections.Generic.List<FogUnitVisibilitySaveData> savedFogUnits = data.fogUnitVisibilityByCacheIndex;
         System.Collections.Generic.List<FogSourceContributionSaveData> savedFogSources = data.fogSourceContributions;
+        int savedFogSourceCacheFormat = data.fogSourceCacheFormat;
+        int savedFogSourceCacheConfigHash = data.fogSourceCacheConfigHash;
 
         data.savedAtUtcTicks = 0;
         data.fogObserverSlotIndex = int.MinValue;
@@ -64,6 +66,8 @@ public static class MatchStateHasher
         data.fogVisibleContributorsByCell = EmptyFogCells;
         data.fogUnitVisibilityByCacheIndex = EmptyFogUnits;
         data.fogSourceContributions = EmptyFogSources;
+        data.fogSourceCacheFormat = 0;
+        data.fogSourceCacheConfigHash = 0;
         try
         {
             return JsonUtility.ToJson(data, false);
@@ -76,6 +80,8 @@ public static class MatchStateHasher
             data.fogVisibleContributorsByCell = savedFogCells;
             data.fogUnitVisibilityByCacheIndex = savedFogUnits;
             data.fogSourceContributions = savedFogSources;
+            data.fogSourceCacheFormat = savedFogSourceCacheFormat;
+            data.fogSourceCacheConfigHash = savedFogSourceCacheConfigHash;
         }
     }
 

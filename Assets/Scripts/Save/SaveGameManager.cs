@@ -1927,17 +1927,35 @@ public class SaveGameManager : MonoBehaviour
                 yield return null;
                 matchController.SuppressFogOfWarRefresh = false;
                 suppressedFogRefresh = false;
-                // O cache salvo e apenas uma fotografia de runtime e pode ficar
-                // incompatível com unidades/construcoes reidratadas. Recalcula o
-                // snapshot confirmado para nunca combinar unidade visivel com hex
-                // apenas conhecido depois do load.
-                matchController.RefreshFogOfWarForActiveTeam();
+                // Fast path somente para fotografia integralmente validada.
+                // Qualquer incompatibilidade preserva o cold refresh anterior.
+                bool fogCacheRestored = false;
+                string fogCacheRestoreResult = "cache_unavailable";
+                if (data.fogSourceContributions != null && data.fogSourceContributions.Count > 0)
+                {
+                    double restoreFogCacheStartMs = PerfNowMs();
+                    LogLoadPerf(loadedSlot, "restore_fog_cache.begin", restoreFogCacheStartMs, restoreFogCacheStartMs - routineStartMs);
+                    fogCacheRestored = matchController.TryRestoreFogSourceContributionsFromSave(
+                        data.fogObserverSlotIndex,
+                        data.fogSourceCacheFormat,
+                        data.fogSourceCacheConfigHash,
+                        data.fogSourceContributions,
+                        out fogCacheRestoreResult);
+                    LogLoadPerf(loadedSlot, "restore_fog_cache.end", restoreFogCacheStartMs, PerfNowMs() - routineStartMs);
+                }
+
+                if (fogCacheRestored)
+                    Debug.Log($"[FoW][LoadCacheRestore] success=true {fogCacheRestoreResult}");
+                else
+                {
+                    Debug.Log($"[FoW][LoadCacheRestore] success=false fallback=cold reason={fogCacheRestoreResult}");
+                    matchController.RefreshFogOfWarForActiveTeam();
+                }
                 LogLoadPerf(loadedSlot, "refresh_fog_after_load.end", refreshFogStartMs, PerfNowMs() - routineStartMs);
 
-                // Etapa 5/6: o cold refresh continua sendo a verdade. A fotografia
-                // salva e somente comparada com o resultado recalculado; nunca e
-                // aplicada ao runtime neste ponto.
-                if (data.fogSourceContributions != null && data.fogSourceContributions.Count > 0)
+                // No fallback, compara com o cold refresh para diagnosticar a causa.
+                if (!fogCacheRestored &&
+                    data.fogSourceContributions != null && data.fogSourceContributions.Count > 0)
                 {
                     double verifyFogCacheStartMs = PerfNowMs();
                     LogLoadPerf(loadedSlot, "verify_fog_cache.begin", verifyFogCacheStartMs, verifyFogCacheStartMs - routineStartMs);
@@ -2057,6 +2075,8 @@ public class SaveGameManager : MonoBehaviour
             fogVisibleContributorsByCell = new List<FogCellContributorSaveData>(),
             fogUnitVisibilityByCacheIndex = new List<FogUnitVisibilitySaveData>(),
             fogSourceContributions = new List<FogSourceContributionSaveData>(),
+            fogSourceCacheFormat = 0,
+            fogSourceCacheConfigHash = 0,
             fogExploredCellsBySlot = new List<TeamExploredCellsSaveData>(),
             fogExploredCellsByTeam = new List<TeamExploredCellsSaveData>(),
             fogConstructionMemory = new List<FogConstructionMemorySaveData>(),
@@ -2133,7 +2153,10 @@ public class SaveGameManager : MonoBehaviour
                 out data.fogObserverSlotIndex,
                 data.fogVisibleContributorsByCell,
                 data.fogUnitVisibilityByCacheIndex);
-            matchController.ExportFogSourceContributionsForSave(data.fogSourceContributions);
+            matchController.ExportFogSourceContributionsForSave(
+                out data.fogSourceCacheFormat,
+                out data.fogSourceCacheConfigHash,
+                data.fogSourceContributions);
         }
 
         // if (aiPlayerController != null)

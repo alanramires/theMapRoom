@@ -5,7 +5,7 @@ using UnityEngine;
 [Serializable]
 public class SaveGameData
 {
-    public int version = 16;
+    public int version = 17;
     public string sceneName;
     public long savedAtUtcTicks;
     public int currentTurn;
@@ -33,9 +33,11 @@ public class SaveGameData
     public int fogCacheTeamId = int.MinValue;
     public List<FogCellContributorSaveData> fogVisibleContributorsByCell = new List<FogCellContributorSaveData>();
     public List<FogUnitVisibilitySaveData> fogUnitVisibilityByCacheIndex = new List<FogUnitVisibilitySaveData>();
-    // v16+: fotografia derivada por fonte. Persistida para validacao, mas ainda
-    // nao consumida pelo load nesta etapa.
+    // v16+: fotografia derivada por fonte. v17 adiciona integridade/configuracao
+    // e permite restauração conservadora com fallback integral.
     public List<FogSourceContributionSaveData> fogSourceContributions = new List<FogSourceContributionSaveData>();
+    public int fogSourceCacheFormat;
+    public int fogSourceCacheConfigHash;
     // v15+: a coleção é indexada semanticamente por slot; teamId em cada entrada
     // existe apenas como pista de migração para saves antigos.
     public List<TeamExploredCellsSaveData> fogExploredCellsBySlot = new List<TeamExploredCellsSaveData>();
@@ -391,6 +393,7 @@ public class FogSourceContributionSaveData
     public int sourceType;
     public int sourceInstanceId;
     public int sourceStateHash;
+    public long contributionChecksum;
     public List<Vector3Int> geographicCells = new List<Vector3Int>();
     public List<Vector3Int> sensorCells = new List<Vector3Int>();
 }

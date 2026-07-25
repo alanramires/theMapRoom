@@ -78,4 +78,25 @@ A verificação é estritamente read-only e compara:
 
 O resultado é emitido em `[FoW][LoadCacheVerify]`. Sucesso produz uma única linha; divergências produzem um único warning com no máximo oito detalhes. Saves sem a coleção nova seguem silenciosamente pelo cold refresh.
 
-Nenhuma entrada salva é aplicada ao runtime nesta etapa. A restauração existente continua desconectada.
+## Fast path de load
+
+Na etapa 6, saves v17 podem restaurar as contribuições sem executar a coleta cara de visão. A restauração é integral: não existe aceitação parcial nesta versão.
+
+Antes da primeira mutação, o load valida:
+
+- versão do formato interno do cache;
+- slot observador e ausência de perspectiva visual dividida;
+- `CursorState.Neutral`;
+- assinatura da cena, tilemap, terreno e configurações de sensor;
+- conjunto completo de unidades e construções elegíveis;
+- identidade e assinatura de cada fonte;
+- checksum de cada contribuição;
+- células existentes no board, sem duplicatas;
+- equivalência entre os canais de unidade;
+- regra geográfica/sensor das construções.
+
+Somente depois de todas as verificações o runtime é reinicializado e os agregados são reconstruídos a partir das fontes salvas. A chave incremental das unidades é recriada usando o estado runtime confirmado.
+
+Visibilidade final de unidades, stealth, contatos, memória, overlay e HUD continuam sendo publicados a partir do snapshot restaurado pelas rotinas normais. Os resultados derivados de detecção não são confiados cegamente ao save.
+
+Qualquer falha produz `[FoW][LoadCacheRestore] success=false fallback=cold` e executa `RefreshFogOfWarForActiveTeam()`. Saves v16 ou anteriores sempre usam esse fallback. No fallback, a verificação da etapa 5 continua disponível para diagnóstico.
