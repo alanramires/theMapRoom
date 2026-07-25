@@ -130,3 +130,22 @@ O recorte acontece na fronteira comum de entrada das contribuições e vale para
 unidades, construções, full refresh, atualização incremental e restauração.
 Algoritmos de alcance podem calcular coordenadas além da borda, mas essas
 coordenadas não passam a integrar o estado confirmado do FoW nem o save.
+
+### Invariantes antes da publicação
+
+Depois de reconstruir o cache persistido, mas antes de publicar snapshot,
+detecção, contatos, overlay, HUD ou `OnFogOfWarUpdated`, o fast path confirma:
+
+- correspondência exata de todas as fontes e seus dois conjuntos de células;
+- contagem agregada de contribuidores geográficos por célula;
+- contagem agregada de contribuidores sensoriais por célula.
+
+As contagens esperadas são derivadas da fotografia já validada, sem executar
+novamente o algoritmo de visão. Qualquer divergência produz
+`rebuild_invariant_mismatch`, descarta integralmente o runtime reconstruído e
+devolve o controle ao cold refresh.
+
+O caminho de sucesso mantém apenas o log resumido
+`[FoW][LoadCacheRestore] success=true`, agora com totais separados de unidades e
+construções. O diagnóstico detalhado de Tilemaps permanece restrito ao caminho
+de erro de célula inválida.

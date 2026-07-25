@@ -5580,6 +5580,11 @@ public class MatchController : MonoBehaviour
             return false;
         }
 
+        Dictionary<Vector3Int, int> expectedGeographicContributors =
+            BuildExpectedFogContributorCounts(validated.Values, useGeographicChannel: true);
+        Dictionary<Vector3Int, int> expectedSensorContributors =
+            BuildExpectedFogContributorCounts(validated.Values, useGeographicChannel: false);
+
         // Todas as validacoes terminaram antes da primeira mutacao.
         ValidateFogOfWarSortingLayer();
         ResetFogOfWarRuntime(clearTilemap: false);
@@ -5610,6 +5615,17 @@ public class MatchController : MonoBehaviour
                 AddFogSourceSensorContribution(runtime, saved.sensorCells[i], boardMap);
         }
 
+        if (!RestoredFogSourcesMatch(validated) ||
+            !FogContributorCountsMatch(fogGeographicContributorsByCell, expectedGeographicContributors) ||
+            !FogContributorCountsMatch(fogSensorContributorsByCell, expectedSensorContributors))
+        {
+            // Ainda nao houve publicacao de snapshot, contatos, overlay ou eventos.
+            // Descarte integralmente a tentativa para o caller executar o cold refresh.
+            ResetFogOfWarRuntime(clearTilemap: false);
+            result = "rebuild_invariant_mismatch";
+            return false;
+        }
+
         UnitManager[] snapshotUnits = FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude);
         PublishFogGameplaySnapshot(observerSlotIndex, boardMap, snapshotUnits);
         fogUnitVisibilityByCacheIndex.Clear();
@@ -5625,7 +5641,70 @@ public class MatchController : MonoBehaviour
         if (Application.isPlaying)
             OnFogOfWarUpdated?.Invoke();
 
-        result = $"restored sources={validated.Count} geographic={fogGeographicContributorsByCell.Count} sensor={fogSensorContributorsByCell.Count}";
+        result =
+            $"restored sources={validated.Count} units={eligibleUnits.Count} " +
+            $"constructions={eligibleConstructions.Count} geographic={fogGeographicContributorsByCell.Count} " +
+            $"sensor={fogSensorContributorsByCell.Count}";
+        return true;
+    }
+
+    private static Dictionary<Vector3Int, int> BuildExpectedFogContributorCounts(
+        IEnumerable<FogSourceContributionSaveData> savedSources,
+        bool useGeographicChannel)
+    {
+        Dictionary<Vector3Int, int> expected = new Dictionary<Vector3Int, int>();
+        foreach (FogSourceContributionSaveData saved in savedSources)
+        {
+            IList<Vector3Int> cells = useGeographicChannel
+                ? saved.geographicCells
+                : saved.sensorCells;
+            for (int i = 0; i < cells.Count; i++)
+            {
+                Vector3Int cell = cells[i];
+                expected.TryGetValue(cell, out int contributors);
+                expected[cell] = contributors + 1;
+            }
+        }
+        return expected;
+    }
+
+    private bool RestoredFogSourcesMatch(
+        Dictionary<FogContributionSourceId, FogSourceContributionSaveData> validated)
+    {
+        if (fogContributionsBySource.Count != validated.Count)
+            return false;
+
+        foreach (KeyValuePair<FogContributionSourceId, FogSourceContributionSaveData> pair in validated)
+        {
+            if (!fogContributionsBySource.TryGetValue(
+                    pair.Key,
+                    out FogSourceContributionCacheEntry runtime) ||
+                runtime == null ||
+                runtime.sourceStateHash != pair.Value.sourceStateHash ||
+                !FogSavedCellsMatch(runtime.geographicCells, pair.Value.geographicCells) ||
+                !FogSavedCellsMatch(runtime.sensorCells, pair.Value.sensorCells))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static bool FogContributorCountsMatch(
+        Dictionary<Vector3Int, int> runtime,
+        Dictionary<Vector3Int, int> expected)
+    {
+        if (runtime == null || expected == null || runtime.Count != expected.Count)
+            return false;
+
+        foreach (KeyValuePair<Vector3Int, int> pair in expected)
+        {
+            if (!runtime.TryGetValue(pair.Key, out int contributors) ||
+                contributors != pair.Value)
+            {
+                return false;
+            }
+        }
         return true;
     }
 
