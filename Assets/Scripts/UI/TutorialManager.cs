@@ -504,42 +504,55 @@ public class TutorialManager : MonoBehaviour
 
         var sb = new System.Text.StringBuilder();
 
-        // Seção 1 — Tarefas (objectives). key = hist_Y_XX; id = TIPO do evento (UNIT_AT_HEX...).
-        sb.AppendLine("secao,idx,key,tipo,parameters,description,optional,defeat,startHidden");
+        // OBJ = tarefa (objective). key = hist_Y_XX; id = TIPO do evento (UNIT_AT_HEX...).
+        // A linha "# ..." e comentario (o import ignora): serve so de cabecalho legivel. A ordem
+        // das colunas e FIXA e o import le por posicao, entao NAO reordene/remova colunas.
+        sb.Append("# OBJ,idx,id,key,parameters,description,startHidden,isVisible,isOptional,isDefeatCondition,isCompleted,hasFailed\n");
         if (tutorial.objectives != null)
         {
             for (int i = 0; i < tutorial.objectives.Count; i++)
             {
                 TutorialObjective o = tutorial.objectives[i];
                 if (o == null) continue;
-                sb.Append("TAREFA,").Append(i).Append(',')
-                  .Append(Csv(o.key)).Append(',')
+                sb.Append("OBJ,").Append(i).Append(',')
                   .Append(Csv(o.id)).Append(',')
+                  .Append(Csv(o.key)).Append(',')
                   .Append(Csv(o.parameters)).Append(',')
                   .Append(Csv(o.description)).Append(',')
+                  .Append(o.startHidden).Append(',')
+                  .Append(o.isVisible).Append(',')
                   .Append(o.isOptional).Append(',')
                   .Append(o.isDefeatCondition).Append(',')
-                  .Append(o.startHidden).Append('\n');
+                  .Append(o.isCompleted).Append(',')
+                  .Append(o.hasFailed).Append('\n');
             }
         }
 
         sb.Append('\n');
 
-        // Seção 2 — Passos do roteiro (script/falas).
-        sb.AppendLine("secao,idx,advance,objectiveKey,revealObjective,turn,movement,text,spawnCommand,statCommand");
+        // STEP = passo do roteiro (fala). voice sai como CAMINHO do asset (resolvido no editor).
+        sb.Append("# STEP,idx,advance,objectiveKey,revealObjective,waitObjectiveKey,waitObjectiveIndex,waitAllUnitsActed,waitPlayerTurnStart,turn,movement,unlockMovement,revealObjectiveKeyLegacy,revealObjectiveIndex,text,voice,spawnCommand,statCommand\n");
         if (tutorial.script != null)
         {
             for (int i = 0; i < tutorial.script.Count; i++)
             {
                 TutorialDialogEntry e = tutorial.script[i];
                 if (e == null) continue;
-                sb.Append("PASSO,").Append(i).Append(',')
+                sb.Append("STEP,").Append(i).Append(',')
                   .Append(Csv(e.advance.ToString())).Append(',')
                   .Append(Csv(e.objectiveKey)).Append(',')
                   .Append(e.revealObjective).Append(',')
+                  .Append(Csv(e.waitObjectiveKey)).Append(',')
+                  .Append(e.waitObjectiveIndex).Append(',')
+                  .Append(e.waitAllUnitsActed).Append(',')
+                  .Append(e.waitPlayerTurnStart).Append(',')
                   .Append(Csv(e.turn.ToString())).Append(',')
                   .Append(Csv(e.movement.ToString())).Append(',')
+                  .Append(e.unlockMovement).Append(',')
+                  .Append(Csv(e.revealObjectiveKey)).Append(',')
+                  .Append(e.revealObjectiveIndex).Append(',')
                   .Append(Csv(e.text)).Append(',')
+                  .Append(Csv(VoicePath(e.voice))).Append(',')
                   .Append(Csv(e.spawnCommand)).Append(',')
                   .Append(Csv(e.statCommand)).Append('\n');
             }
@@ -547,6 +560,22 @@ public class TutorialManager : MonoBehaviour
 
         return sb.ToString();
     }
+
+    // Caminho do AudioClip para o CSV. No editor usa o path do asset (round-trip completo); em
+    // runtime cai no nome (o fluxo real de import/export e editor).
+    private static string VoicePath(AudioClip clip)
+    {
+        if (clip == null)
+            return "";
+#if UNITY_EDITOR
+        return UnityEditor.AssetDatabase.GetAssetPath(clip);
+#else
+        return clip.name;
+#endif
+    }
+
+    // Asset do tutorial ativo (para o editor de import escrever de volta). Ver TutorialManagerEditor.
+    public TutorialData ResolveActiveTutorialAsset() => GetActiveTutorial();
 
     // Nome-base sugerido para o arquivo exportado (id do tutorial saneado).
     public string GetActiveTutorialExportName()

@@ -196,3 +196,28 @@ As rotinas centrais de renderização e de contribuição geográfica verificam 
 barreira defensivamente. Com `enableFogValidationLogs`, uma tentativa rejeitada
 gera `[FoW][WriteBarrier]` deduplicado para diagnosticar o chamador sem contaminar
 o estado confirmado.
+
+## Contexto explícito de atualização
+
+Full refresh, atualização incremental e refresh solicitado pelo replay passam a
+declarar um `FogUpdateContext` antes de calcular ou publicar qualquer resultado.
+O contexto separa:
+
+- `gameplaySlot`: participante cuja ação confirmada originou a atualização;
+- `observerSlot`: participante para o qual o conhecimento está sendo calculado;
+- `presentationSlot`: perspectiva autorizada nos Tilemaps locais;
+- `publishGameplayData`: autorização para publicar o snapshot consultável;
+- `publishVisuals`: autorização para alterar apresentação e visibilidade runtime;
+- `recordExplorationMemory`: autorização para persistir memória confirmada;
+- `recordIntel`: autorização para alimentar o ledger de contatos.
+
+As barreiras de escrita consultam o contexto ativo. Portanto, mesmo quando
+`gameplaySlot == observerSlot`, um contexto `DataOnly` não ganha autoridade
+visual por coincidência.
+
+Alguns coletores legados ainda consultam `ActiveSlotId`. Até que recebam
+`observerSlot` diretamente, a adaptação temporária de
+`activePlayerListIndex/activeTeamId` fica confinada a
+`EnterFogObserverScope`/`ExitFogObserverScope`, com restauração em `finally`.
+Essa ponte não decide política: ela apenas expõe ao código legado o observador já
+autorizado pelo contexto.

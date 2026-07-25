@@ -146,6 +146,40 @@ public class TutorialDialogEntry
     public int revealObjectiveIndex = -1;
 }
 
+// DTOs de export/import (JSON). O JsonUtility serializa todos os campos serializados sem
+// mapeamento manual — o unico cuidado e o AudioClip 'voice', que vira CAMINHO de asset (JsonUtility
+// grava referencia de objeto como instanceID, que nao sobrevive entre sessoes). TutorialObjective
+// nao tem referencia de asset, entao entra direto. Ver TutorialManager / TutorialManagerEditor.
+[System.Serializable]
+public class TutorialStepDto
+{
+    public TutorialAdvanceCondition advance;
+    public string objectiveKey;
+    public bool revealObjective;
+    public string waitObjectiveKey;
+    public int waitObjectiveIndex = -1;
+    public bool waitAllUnitsActed;
+    public bool waitPlayerTurnStart;
+    public string text;
+    public string voicePath;
+    public string spawnCommand;
+    public string statCommand;
+    public TutorialEndTurnEffect turn;
+    public TutorialMovementEffect movement;
+    public bool unlockMovement;
+    public string revealObjectiveKey;
+    public int revealObjectiveIndex = -1;
+}
+
+[System.Serializable]
+public class TutorialExportDto
+{
+    public string id;
+    public string description;
+    public List<TutorialObjective> objectives = new List<TutorialObjective>();
+    public List<TutorialStepDto> script = new List<TutorialStepDto>();
+}
+
 [CreateAssetMenu(fileName = "Novo TutorialData", menuName = "Game/Tutorial/Tutorial Data")]
 public class TutorialData : ScriptableObject
 {
