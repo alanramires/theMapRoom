@@ -81,6 +81,18 @@ public partial class AIController
     private void BuildObjectivePlan(AIWorldSnapshot snapshot)
     {
         TeamId aiTeam = snapshot.AITeam;
+        PlayerSlotId aiSlot = PlayerSlotId.FromIndex(snapshot.AISlotIndex);
+        if (matchController != null && matchController.IsSlotRebel(aiSlot))
+        {
+            TeamObjectivePlan previousPlan = ObjectiveManager.GetOrCreatePlanForSlot(aiSlot, aiTeam);
+            foreach (SectorObjective objective in previousPlan.Objectives)
+                ClearObjectiveHUD(objective);
+            ObjectiveManager.ClearPlanForSlot(aiSlot);
+            currentAxisMap = null;
+            Debug.Log($"{TL("Plan")} slot={aiSlot.Value} rebelde runtime: BuildObjectivePlan ignorado; distribuicao sera unidade-a-unidade por distancia.");
+            return;
+        }
+
         TeamObjectivePlan plan = ObjectiveManager.GetOrCreatePlanForSlot(PlayerSlotId.FromIndex(ResolveAISlotKey(aiTeam)), aiTeam);
         MarkEnemyBaseObjectivesAsInvasion(plan, aiTeam);
         currentAxisMap = InvasionAxisMap.Build(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam)));

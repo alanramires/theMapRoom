@@ -27,7 +27,7 @@ public partial class AIController
         // Facção sem QG: captura por proximidade, antes do planner. O plano normal assume
         // um eixo a partir do proprio QG — a rebelde nao tem, e sem este curto-circuito
         // todo capturador dela vira rogue e marcha para o QG inimigo. Ver AIController.Rebel.
-        PlayerAction rebelAction = TryDecideRebelAction(unit, snapshot);
+        PlayerAction rebelAction = TryDecideRebelAction(unit, snapshot, plan);
         if (rebelAction != null) return rebelAction;
 
         if (plan != null)
@@ -67,6 +67,18 @@ public partial class AIController
         PlayerAction airCombatAction = TryDecideAirCombatAction(unit, snapshot);
 
         if (airCombatAction != null) return airCombatAction;
+
+        // Navios de combate que tambem transportam suprimentos nao podem perder
+        // um tiro legal adjacente porque satisfazem o papel de Logistica. Caminhoes
+        // terrestres continuam priorizando exclusivamente o servico.
+        if (IsNavalCombatSupplier(unit)
+            && TryBuildRolePreemptiveAttack(
+                unit, snapshot, null, null, defensiveContext: false,
+                out PlayerAction navalSupplierAttack, out string navalAttackReason))
+        {
+            Debug.Log($"{TL("NavalCombatSupplier")} {unit.InstanceId} combate antes da logistica - {navalAttackReason}");
+            return navalSupplierAttack;
+        }
 
         PlayerAction logisticsAction = TryDecideLogisticsAction(unit, snapshot, plan);
 
@@ -265,6 +277,110 @@ public partial class AIController
 
         return BuildMoveBatch(unit, snapshot.AITeam, fromCell, destCell, paths);
 
+    }
+
+    private static bool IsNavalCombatSupplier(UnitManager unit)
+    {
+        if (unit == null || !unit.TryGetUnitData(out UnitData data) || data == null)
+            return false;
+        if (data.domain != Domain.Naval || !UnitRoleCompatibility.CanSatisfy(data, UnitRole.Logistica))
+            return false;
+
+        IReadOnlyList<UnitEmbarkedWeapon> weapons = unit.GetEmbarkedWeapons();
+        for (int i = 0; weapons != null && i < weapons.Count; i++)
+        {
+            UnitEmbarkedWeapon weapon = weapons[i];
+            if (weapon != null && weapon.weapon != null && weapon.squadAmmunition > 0)
+                return true;
+        }
+        return false;
+    }
+
+    private bool TryBuildRolePreemptiveAttack(
+        UnitManager unit,
+        AIWorldSnapshot snapshot,
+        Dictionary<Vector3Int, List<Vector3Int>> paths,
+        HashSet<Vector3Int> occupied,
+        bool defensiveContext,
+        out PlayerAction action,
+        out string reason)
+    {
+        action = null;
+        reason = "";
+        if (unit == null || snapshot == null)
+            return false;
+
+        Vector3Int fromCell = unit.CurrentCellPosition;
+        fromCell.z = 0;
+        paths ??= UnitMovementPathRules.CalcularCaminhosValidos(
+            boardTilemap,
+            unit,
+            Mathf.Max(0, unit.RemainingMovementPoints),
+            terrainDatabase);
+        occupied ??= BuildOccupied(unit);
+        if (paths == null || paths.Count == 0)
+            return false;
+
+        List<UnitManager> enemies = CollectVisibleAssaultEnemies(snapshot.AITeam);
+        UnitManager bestTarget = null;
+        Vector3Int bestCell = fromCell;
+        float bestScore = float.MinValue;
+        string bestDecision = "";
+
+        foreach (Vector3Int rawCell in paths.Keys)
+        {
+            Vector3Int cell = rawCell;
+            cell.z = 0;
+            if (cell != fromCell && occupied.Contains(cell))
+                continue;
+
+            for (int i = 0; i < enemies.Count; i++)
+            {
+                UnitManager enemy = enemies[i];
+                if (enemy == null || enemy.IsDead || enemy.IsEmbarked)
+                    continue;
+                if (!CanAttackTargetFrom(fromCell, cell, unit, enemy))
+                    continue;
+                if (!PassesAttackDecision(
+                        unit, enemy, cell, defensiveContext,
+                        out string decisionReason))
+                    continue;
+
+                Vector3Int enemyCell = enemy.CurrentCellPosition;
+                enemyCell.z = 0;
+                BazookaTargetPriority preference =
+                    ResolveAssaultTargetPreference(unit, enemy);
+                float score =
+                    GetAssaultTargetPreferenceScore(preference)
+                    + Mathf.Max(0, 20 - enemy.CurrentHP) * 900f
+                    - SectorManager.HexDistance(cell, enemyCell) * 100f
+                    - GetPathStepCount(paths, cell) * 25f
+                    - enemy.InstanceId * 0.001f;
+                if (score <= bestScore)
+                    continue;
+
+                bestScore = score;
+                bestCell = cell;
+                bestTarget = enemy;
+                bestDecision = decisionReason;
+            }
+        }
+
+        if (bestTarget == null)
+            return false;
+
+        Vector3Int targetCell = bestTarget.CurrentCellPosition;
+        targetCell.z = 0;
+        action = BuildAttackBatch(
+            unit,
+            snapshot.AITeam,
+            fromCell,
+            bestCell,
+            bestTarget.InstanceId.ToString(),
+            targetCell,
+            paths);
+        reason = $"via={bestCell} -> {bestTarget.UnitDisplayName}#{bestTarget.InstanceId} score={bestScore:F0} {bestDecision}";
+        return true;
     }
 
     private bool IsReservedCaptureCellForAnotherUnit(

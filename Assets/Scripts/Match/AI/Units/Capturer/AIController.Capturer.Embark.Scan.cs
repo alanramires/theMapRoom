@@ -60,6 +60,7 @@ public partial class AIController
         SectorObjective assigned,
         PodeEmbarcarOption option,
         TeamObjectivePlan plan,
+        AIWorldSnapshot snapshot,
         TeamId aiTeam,
         out int priority,
         out float distance)
@@ -92,13 +93,17 @@ public partial class AIController
         bool sameSector = transporterObjective != null && transporterObjective.Sector == assigned.Sector;
         bool compatibleSector = transporterObjective != null
             && AreEmbarkSectorsCompatible(assigned.Sector, transporterObjective.Sector);
+        bool compatibleNavalRoute = transporterObjective != null
+            && AreNavalEmbarkRoutesCompatible(
+                transporter, assigned, transporterObjective, snapshot);
+        bool compatibleTransportObjective = compatibleSector || compatibleNavalRoute;
         UnitManager formalPassenger = transporterObjective != null
             ? ResolveAssignedPassengerUnit(transporterObjective, aiTeam)
             : null;
         bool formalMatch = sameSector && formalPassenger == unit;
         bool freeTransport = transporterObjective == null;
         bool compatibleFreeTransport = transporterObjective != null
-            && compatibleSector
+            && compatibleTransportObjective
             && formalPassenger == null;
 
         if (formalMatch)

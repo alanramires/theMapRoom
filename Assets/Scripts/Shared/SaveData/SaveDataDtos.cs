@@ -265,6 +265,8 @@ public class UnitSaveData
     public bool isEmbarked;
     public int transporterInstanceId;
     public int transporterSlotIndex;
+    public bool hasEmbarkedOnTurn;
+    public int embarkedOnTurn = -1;
     public int domain;
     public int heightLevel;
     public bool isAircraftGrounded;

@@ -179,7 +179,27 @@ public partial class AIController
         // a logica de "ceder ao mais distante" abaixo. (Antes: 49 cedia ao 48 em TODOS os APCs,
         // inclusive no 19 reservado pra ele, e nunca embarcava.)
         if (assignedTransportClaims.TryGetValue(transporter.InstanceId, out int reservedPassengerId))
-            return reservedPassengerId != unit.InstanceId;
+        {
+            if (reservedPassengerId == unit.InstanceId)
+                return false;
+
+            UnitManager reservedPassenger =
+                FindActiveUnit(reservedPassengerId, unit.TeamId);
+            bool reservationFulfilled = reservedPassenger == null
+                || reservedPassenger.IsDead
+                || reservedPassenger.HasActed
+                || IsPassengerAlreadyOnboard(transporter, reservedPassenger);
+            int openSeats = CountAvailableSeatsForPassenger(transporter, unit);
+            if (reservationFulfilled && openSeats > 0)
+            {
+                Debug.Log($"{TL("Capturador")} {unit.InstanceId} usa vaga adicional: " +
+                          $"transporter={transporter.InstanceId} reserva #{reservedPassengerId} " +
+                          $"ja atendida, openSeats={openSeats}.");
+                return false;
+            }
+
+            return true;
+        }
 
         ConstructionManager objBuilding = FindCapturableInSector(assigned.Sector, unit.TeamId);
         if (objBuilding == null) return false;

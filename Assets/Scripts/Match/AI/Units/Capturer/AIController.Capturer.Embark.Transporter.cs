@@ -64,20 +64,37 @@ public partial class AIController
         bool sameSector = assigned != null && tObj != null && tObj.Sector == assigned.Sector;
         bool compatibleSector = assigned != null && tObj != null
             && AreEmbarkSectorsCompatible(assigned.Sector, tObj.Sector);
+        bool compatibleNavalRoute = assigned != null && tObj != null
+            && AreNavalEmbarkRoutesCompatible(
+                transporter, assigned, tObj, snapshot);
+        bool compatibleTransportObjective = compatibleSector || compatibleNavalRoute;
         UnitManager formalPassenger = tObj != null ? ResolveAssignedPassengerUnit(tObj, unit.TeamId) : null;
         bool formalMatch = sameSector && formalPassenger == unit;
+        // Chinook e navio operam como courier com fila. O objetivo do passageiro
+        // extra nao precisa coincidir com a primeira entrega: ele ocupa o banco #2,
+        // aguarda o passageiro formal descer e entao vira a nova entrega principal.
+        bool supportsQueuedPassenger =
+            tData.domain == Domain.Air || tData.domain == Domain.Naval;
+        bool queuedPassengerSeat =
+            supportsQueuedPassenger &&
+            assigned != null &&
+            tObj != null &&
+            formalPassenger != unit &&
+            CountAvailableSeatsForPassenger(transporter, unit) > 0;
         // Any capturer may board an APC with no formal passenger — free shuttle reorients to this objective.
         bool assignedRogueExtra = assigned == null
             && tObj != null
             && CanRogueUseAssignedTransporter(unit, transporter, tObj, unit.TeamId);
         bool shuttleFree = assigned == null
             ? (tObj == null || assignedRogueExtra)
-            : (tObj == null || (compatibleSector && formalPassenger == null));
+            : (tObj == null || (compatibleTransportObjective && formalPassenger == null));
         bool rogueEmbark = assigned == null && shuttleFree;
         if (requireFormalPassenger && !formalMatch) return false;
         // requireSectorMatch: called from the first preference pass — only accept the plan-assigned transporter.
         if (requireSectorMatch && !sameSector) return false;
-        if (assigned != null && tObj != null && !compatibleSector)
+        if (assigned != null && tObj != null
+            && !compatibleTransportObjective
+            && !queuedPassengerSeat)
         {
             Debug.Log($"{TL("Capturador")} {unit.InstanceId} TryEmbarkFromHex BLOQUEADO setor distante: assigned={assigned.Sector} tObj={tObj.Sector} transporter={transporter.InstanceId}");
             return false;
@@ -87,11 +104,11 @@ public partial class AIController
             Debug.Log($"{TL("Capturador")} {unit.InstanceId} TryEmbarkFromHex BLOQUEADO reserva: rogue nao usa transporter={transporter.InstanceId} reservado para {tObj.Sector}");
             return false;
         }
-        if (!sameSector && !shuttleFree)
+        if (!sameSector && !shuttleFree && !queuedPassengerSeat)
         {
             if (!allowOverflow)
             {
-                Debug.Log($"{TL("Capturador")} {unit.InstanceId} TryEmbarkFromHex BLOQUEADO setor: assigned={assigned?.Sector} tObj={tObj?.Sector} sameSector={sameSector} compatible={compatibleSector} shuttleFree={shuttleFree} isPrimary={isPrimary} transporter={transporter.InstanceId}");
+                Debug.Log($"{TL("Capturador")} {unit.InstanceId} TryEmbarkFromHex BLOQUEADO setor: assigned={assigned?.Sector} tObj={tObj?.Sector} sameSector={sameSector} compatible={compatibleSector} navalRoute={compatibleNavalRoute} shuttleFree={shuttleFree} isPrimary={isPrimary} transporter={transporter.InstanceId}");
                 return false;
             }
             // overflow: slot físico check abaixo confirma capacidade disponível
@@ -135,6 +152,12 @@ public partial class AIController
 
         if (ShouldYieldEmbarkToNeedierCapturer(unit, transporter, assigned, plan))
             return false;
+
+        if (queuedPassengerSeat && !compatibleTransportObjective)
+        {
+            Debug.Log($"{TL("Capturador")} {unit.InstanceId} usa banco courier #2 de " +
+                      $"{transporter.InstanceId}: entrega atual={tObj.Sector}, fila seguinte={assigned.Sector}.");
+        }
 
         tCell.z = 0;
         var pathsForBatch = pathToHex != null

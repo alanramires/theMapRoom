@@ -27,6 +27,7 @@ public partial class AIController
 
         Debug.Log($"{TL()} Fase2 — iniciando ações.");
         plannedDestinations.Clear();
+        rebelCaptureTargetReservations.Clear();
         assignedTransportClaims.Clear();
 
         // ---- Setup: executado uma única vez por fase ----

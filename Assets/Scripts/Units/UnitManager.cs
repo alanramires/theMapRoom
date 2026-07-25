@@ -1710,6 +1710,7 @@ public class UnitManager : MonoBehaviour
             if (!seat.embarkedUnit.IsEmbarked)
             {
                 seat.embarkedUnit = null;
+                seat.embarkedOnTurn = -1;
                 continue;
             }
 
@@ -1717,6 +1718,21 @@ public class UnitManager : MonoBehaviour
         }
 
         return count;
+    }
+
+    public int GetPassengerEmbarkedOnTurn(UnitManager passenger)
+    {
+        if (passenger == null || transportedUnitSlots == null)
+            return -1;
+
+        for (int i = 0; i < transportedUnitSlots.Count; i++)
+        {
+            UnitTransportSeatRuntime seat = transportedUnitSlots[i];
+            if (seat != null && seat.embarkedUnit == passenger && passenger.IsEmbarked)
+                return seat.embarkedOnTurn;
+        }
+
+        return -1;
     }
 
     public int GetCapacityForTransportSlot(int slotIndex)
@@ -1728,7 +1744,11 @@ public class UnitManager : MonoBehaviour
         return Mathf.Max(1, data.transportSlots[slotIndex].capacity);
     }
 
-    public bool TryEmbarkPassengerInSlot(UnitManager passenger, int slotIndex, out string reason)
+    public bool TryEmbarkPassengerInSlot(
+        UnitManager passenger,
+        int slotIndex,
+        out string reason,
+        int embarkedOnTurnOverride = int.MinValue)
     {
         reason = string.Empty;
         if (passenger == null)
@@ -1787,12 +1807,20 @@ public class UnitManager : MonoBehaviour
         // guarantees embarked passenger visuals/HUD remain hidden.
         passenger.RefreshRuntimeVisualState();
         freeSeat.embarkedUnit = passenger;
+        freeSeat.embarkedOnTurn = embarkedOnTurnOverride != int.MinValue
+            ? embarkedOnTurnOverride
+            : ResolveCurrentTurnNumber();
         RefreshSpriteForCurrentLayer(data);
         RefreshActedVisual();
         return true;
     }
 
-    public bool TryEmbarkPassengerInSeat(UnitManager passenger, int slotIndex, int seatIndex, out string reason)
+    public bool TryEmbarkPassengerInSeat(
+        UnitManager passenger,
+        int slotIndex,
+        int seatIndex,
+        out string reason,
+        int embarkedOnTurnOverride = int.MinValue)
     {
         reason = string.Empty;
         if (!TryGetUnitData(out UnitData data) || data == null || !data.isTransporter)
@@ -1857,6 +1885,9 @@ public class UnitManager : MonoBehaviour
         // guarantees embarked passenger visuals/HUD remain hidden.
         passenger.RefreshRuntimeVisualState();
         targetSeat.embarkedUnit = passenger;
+        targetSeat.embarkedOnTurn = embarkedOnTurnOverride != int.MinValue
+            ? embarkedOnTurnOverride
+            : ResolveCurrentTurnNumber();
         RefreshSpriteForCurrentLayer(data);
         RefreshActedVisual();
         return true;
@@ -1884,6 +1915,7 @@ public class UnitManager : MonoBehaviour
         }
 
         seat.embarkedUnit = null;
+        seat.embarkedOnTurn = -1;
         passenger.SetEmbarked(false);
         RefreshSpriteForCurrentLayer();
         RefreshActedVisual();
@@ -1903,6 +1935,7 @@ public class UnitManager : MonoBehaviour
                 continue;
 
             seat.embarkedUnit = null;
+            seat.embarkedOnTurn = -1;
             removed = true;
         }
 
@@ -2050,7 +2083,8 @@ public class UnitManager : MonoBehaviour
             return;
         }
 
-        Dictionary<string, UnitManager> existing = new Dictionary<string, UnitManager>();
+        Dictionary<string, UnitTransportSeatRuntime> existing =
+            new Dictionary<string, UnitTransportSeatRuntime>();
         for (int i = 0; i < transportedUnitSlots.Count; i++)
         {
             UnitTransportSeatRuntime seat = transportedUnitSlots[i];
@@ -2060,7 +2094,7 @@ public class UnitManager : MonoBehaviour
                 continue;
 
             string key = BuildTransportSeatKey(seat.slotIndex, seat.seatIndex);
-            existing[key] = seat.embarkedUnit;
+            existing[key] = seat;
         }
 
         transportedUnitSlots.Clear();
@@ -2083,8 +2117,13 @@ public class UnitManager : MonoBehaviour
                 };
 
                 string key = BuildTransportSeatKey(slotIndex, seatIndex);
-                if (existing.TryGetValue(key, out UnitManager passenger) && passenger != null && passenger.IsEmbarked)
-                    runtimeSeat.embarkedUnit = passenger;
+                if (existing.TryGetValue(key, out UnitTransportSeatRuntime previous)
+                    && previous?.embarkedUnit != null
+                    && previous.embarkedUnit.IsEmbarked)
+                {
+                    runtimeSeat.embarkedUnit = previous.embarkedUnit;
+                    runtimeSeat.embarkedOnTurn = previous.embarkedOnTurn;
+                }
 
                 transportedUnitSlots.Add(runtimeSeat);
             }
@@ -2103,7 +2142,10 @@ public class UnitManager : MonoBehaviour
                 continue;
 
             if (seat.embarkedUnit != null && !seat.embarkedUnit.IsEmbarked)
+            {
                 seat.embarkedUnit = null;
+                seat.embarkedOnTurn = -1;
+            }
 
             if (seat.embarkedUnit == null)
                 return seat;
@@ -2139,6 +2181,7 @@ public class UnitManager : MonoBehaviour
             if (!seat.embarkedUnit.IsEmbarked)
             {
                 seat.embarkedUnit = null;
+                seat.embarkedOnTurn = -1;
                 continue;
             }
 
@@ -2373,7 +2416,10 @@ public class UnitManager : MonoBehaviour
             }
 
             if (Application.isPlaying)
+            {
                 seat.embarkedUnit = null;
+                seat.embarkedOnTurn = -1;
+            }
         }
 
         return count;

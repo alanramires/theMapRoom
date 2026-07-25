@@ -21,11 +21,15 @@ public partial class AIController
     // passa a ser geografica em vez de vir do plano.
     // -------------------------------------------------------------------------
 
-    private PlayerAction TryDecideRebelAction(UnitManager unit, AIWorldSnapshot snapshot)
+    private PlayerAction TryDecideRebelAction(
+        UnitManager unit,
+        AIWorldSnapshot snapshot,
+        TeamObjectivePlan plan)
     {
         if (unit == null || snapshot == null)
             return null;
-        if (!ConstructionManager.IsHeadQuarterlessTeam(snapshot.AITeam))
+        PlayerSlotId rebelSlot = PlayerSlotId.FromIndex(snapshot.AISlotIndex);
+        if (matchController == null || !matchController.IsSlotRebel(rebelSlot))
             return null;
 
         // Transporte e logistica rebeldes seguem seus proprios caminhos (o aereo/naval ja
@@ -43,20 +47,48 @@ public partial class AIController
             boardTilemap, unit, unit.RemainingMovementPoints, terrainDatabase);
         HashSet<Vector3Int> occupied = BuildOccupied(unit);
 
-        // 1) Capturar agora, se ja estamos em cima de um capturavel valido. O sensor decide
+        // 1) Combate oportunista vem antes da marcha de captura. A faccao sem QG
+        // continua orientada por proximidade, mas nao ignora um inimigo que o
+        // sensor confirma que pode atacar nesta rodada.
+        if (TryBuildRolePreemptiveAttack(
+                unit,
+                snapshot,
+                paths,
+                occupied,
+                defensiveContext: false,
+                out PlayerAction attackAction,
+                out string attackReason))
+        {
+            Debug.Log($"{TL("Rebelde")} {unit.InstanceId} ataque oportunista antes da captura - {attackReason}");
+            return attackAction;
+        }
+
+        // 2) Capturar agora, se ja estamos em cima de um capturavel valido. O sensor decide
         //    — nao inventamos elegibilidade aqui.
         if (SimulateCaptureSensor(unit, fromCell, out _))
         {
             // Reserva a propria celula: outro rebelde (a pe ou transportado) nesta mesma
             // passada nao deve escolher este predio como alvo.
             plannedDestinations.Add(fromCell);
+            rebelCaptureTargetReservations.Add(fromCell);
             Debug.Log($"{TL("Rebelde")} {unit.InstanceId} captura em {fromCell}.");
             return BuildCaptureBatch(unit, snapshot.AITeam, fromCell, fromCell, paths);
         }
 
-        // 2) Alvo por PROXIMIDADE, pulando o que ja tem rebelde a caminho. plannedDestinations
-        //    (destinos ja reservados nesta passada da Fase 2) e a bolha que evita o
-        //    empilhamento: dois rebeldes nao marcham para o mesmo predio.
+        // 3) Honra o mesmo pareamento passageiro/transporte usado pelo capturador normal.
+        // O planner pode reconhecer que o objetivo exige travessia mesmo quando a distancia
+        // hexagonal parece curta; tentar marchar primeiro deixava o passageiro parado na praia
+        // enquanto o transporte formalmente pareado aguardava ao lado.
+        PlayerAction embarkAction = TryDecideCapturerEmbarkAction(unit, snapshot, plan);
+        if (embarkAction != null)
+        {
+            Debug.Log($"{TL("Rebelde")} {unit.InstanceId} honra embarque planejado antes da marcha terrestre.");
+            return embarkAction;
+        }
+
+        // 4) Alvo por PROXIMIDADE, pulando o que ja tem rebelde a caminho.
+        //    rebelCaptureTargetReservations e a bolha que evita o empilhamento:
+        //    dois rebeldes nao marcham para o mesmo predio distante.
         ConstructionManager target = FindNearestRebelCaptureTarget(unit, snapshot, fromCell);
         if (target == null)
         {
@@ -66,8 +98,10 @@ public partial class AIController
 
         Vector3Int targetCell = target.CurrentCellPosition;
         targetCell.z = 0;
+        rebelCaptureTargetReservations.Add(targetCell);
+        Debug.Log($"{TL("Rebelde")} {unit.InstanceId} reserva objetivo {targetCell} por proximidade.");
 
-        // 3) Se um passo deste turno ja encosta no capturavel (destino = o proprio predio
+        // 5) Se um passo deste turno ja encosta no capturavel (destino = o proprio predio
         //    ou adjacente valido), tenta capturar/avancar; senao, marcha na direcao dele.
         Vector3Int approach = FindRebelApproachCell(unit, targetCell, fromCell, paths, occupied);
         if (approach == fromCell)
@@ -129,9 +163,9 @@ public partial class AIController
             Vector3Int cell = construction.CurrentCellPosition;
             cell.z = 0;
 
-            // Ja ha aliado capturando aqui (persiste entre turnos), ou rebelde reservou
-            // nesta passada? Pula para a bolha seguinte.
-            if (allyCells.Contains(cell) || plannedDestinations.Contains(cell))
+            // Ja ha aliado capturando aqui (persiste entre turnos), ou outro rebelde
+            // reservou este objetivo nesta passada? Pula para a bolha seguinte.
+            if (allyCells.Contains(cell) || rebelCaptureTargetReservations.Contains(cell))
                 continue;
 
             float dist = SectorManager.HexDistance(fromCell, cell);

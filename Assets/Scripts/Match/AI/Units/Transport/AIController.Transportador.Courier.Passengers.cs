@@ -14,21 +14,33 @@ public partial class AIController
     }
 
 
-    private static UnitManager ResolvePrimaryPassenger(List<UnitManager> passengers, TeamObjectivePlan plan = null)
+    private UnitManager ResolvePrimaryPassenger(
+        UnitManager transporter,
+        List<UnitManager> passengers,
+        TeamObjectivePlan plan = null)
     {
-        UnitManager best = passengers[0];
-        int bestPriority = int.MaxValue;
-        bool bestIsAssigned = false;
-        foreach (UnitManager p in passengers)
+        // Fila FIFO por turno confirmado. Em empate, a ordem fisica das vagas
+        // (slotIndex/seatIndex, ja materializada na lista runtime) decide.
+        UnitManager oldest = null;
+        int oldestTurn = int.MaxValue;
+        if (transporter?.TransportedUnitSlots != null)
         {
-            if (!p.TryGetUnitData(out UnitData d) || d?.roles == null || d.roles.Count == 0) continue;
-            int priority = (int)d.roles[0];
-            bool isAssigned = plan != null && IsPassengerInPlanSlot(p, plan);
-            bool isBetter = priority < bestPriority
-                || (priority == bestPriority && isAssigned && !bestIsAssigned);
-            if (isBetter) { bestPriority = priority; bestIsAssigned = isAssigned; best = p; }
+            foreach (UnitTransportSeatRuntime seat in transporter.TransportedUnitSlots)
+            {
+                UnitManager passenger = seat?.embarkedUnit;
+                if (passenger == null || !passenger.IsEmbarked || !passengers.Contains(passenger))
+                    continue;
+
+                int turn = seat.embarkedOnTurn >= 0 ? seat.embarkedOnTurn : int.MaxValue - 1;
+                if (oldest == null || turn < oldestTurn)
+                {
+                    oldest = passenger;
+                    oldestTurn = turn;
+                }
+            }
         }
-        return best;
+
+        return oldest != null ? oldest : passengers[0];
     }
 
 

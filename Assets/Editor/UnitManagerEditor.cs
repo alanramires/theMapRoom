@@ -431,6 +431,10 @@ public class UnitManagerEditor : Editor
 
             EditorGUILayout.BeginVertical("box");
             EditorGUILayout.LabelField($"{seatLabel} - {status}", EditorStyles.boldLabel);
+            using (new EditorGUI.DisabledScope(true))
+                EditorGUILayout.IntField(
+                    "Embarked On Turn",
+                    occupied != null ? seat.embarkedOnTurn : -1);
             EditorGUI.BeginChangeCheck();
             UnitManager desired = (UnitManager)EditorGUILayout.ObjectField("Passageiro", occupied, typeof(UnitManager), true);
             if (EditorGUI.EndChangeCheck())

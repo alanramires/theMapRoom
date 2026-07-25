@@ -14,4 +14,7 @@ public class UnitTransportSeatRuntime
 
     [Tooltip("Unidade embarcada nesta vaga. Null = vaga livre.")]
     public UnitManager embarkedUnit;
+
+    [Tooltip("Turno confirmado em que a unidade ocupou esta vaga. -1 = vaga livre/legado.")]
+    public int embarkedOnTurn = -1;
 }

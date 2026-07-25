@@ -121,7 +121,10 @@ public class MatchControllerEditor : Editor
     {
         MatchController match = (MatchController)target;
         if (match != null)
+        {
             match.RefreshIncomeFromConstructionsNow();
+            match.RefreshPlayerRuntimeFlagsNow();
+        }
 
         if (currentTurnProp == null || activeTeamIdProp == null || playersProp == null || includeNeutralTeamProp == null || activePlayerListIndexProp == null)
         {
@@ -331,6 +334,7 @@ public class MatchControllerEditor : Editor
             SerializedProperty flipXProp = player.FindPropertyRelative("flipX");
             SerializedProperty flipXOverrideProp = player.FindPropertyRelative("flipXOverride");
             SerializedProperty isAIProp = player.FindPropertyRelative("isAI");
+            SerializedProperty isRebelRuntimeProp = player.FindPropertyRelative("isRebelRuntime");
             SerializedProperty isLocalProp = player.FindPropertyRelative("isLocal");
             SerializedProperty localityConfiguredProp = player.FindPropertyRelative("localityConfigured");
             SerializedProperty commandServiceAutomaticProp = player.FindPropertyRelative("commandServiceAutomatic");
@@ -369,6 +373,13 @@ public class MatchControllerEditor : Editor
             }
             if (isAIProp != null)
                 EditorGUILayout.PropertyField(isAIProp, new GUIContent("Is AI"));
+            using (new EditorGUI.DisabledScope(true))
+            {
+                if (isRebelRuntimeProp != null)
+                    EditorGUILayout.Toggle(
+                        new GUIContent("Is Rebel (runtime)", "Derivado: o SlotID participa da partida, mas nao possui QG."),
+                        isRebelRuntimeProp.boolValue);
+            }
             if (isLocalProp != null)
             {
                 if (localityConfiguredProp != null && !localityConfiguredProp.boolValue)

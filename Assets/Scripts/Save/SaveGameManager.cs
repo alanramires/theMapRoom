@@ -1702,7 +1702,11 @@ public class SaveGameManager : MonoBehaviour
                 if (saved != null && saved.isEmbarked && saved.transporterInstanceId > 0 &&
                     unitsById.TryGetValue(saved.instanceId, out UnitManager passenger) && passenger != null &&
                     unitsById.TryGetValue(saved.transporterInstanceId, out UnitManager transporter) && transporter != null &&
-                    !transporter.TryEmbarkPassengerInSlot(passenger, saved.transporterSlotIndex, out string reason) && verboseLogs)
+                    !transporter.TryEmbarkPassengerInSlot(
+                        passenger,
+                        saved.transporterSlotIndex,
+                        out string reason,
+                        saved.hasEmbarkedOnTurn ? saved.embarkedOnTurn : int.MinValue) && verboseLogs)
                 {
                     Debug.LogWarning($"[SaveGame] Falha embarque {saved.instanceId}->{saved.transporterInstanceId}: {reason}");
                 }

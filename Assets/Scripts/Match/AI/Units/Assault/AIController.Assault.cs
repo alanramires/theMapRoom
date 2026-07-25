@@ -255,6 +255,11 @@ public partial class AIController
         List<UnitManager> enemies = CollectVisibleAssaultEnemies(snapshot.AITeam);
         if (enemies == null || enemies.Count == 0)
             return false;
+        int visibleAir = 0;
+        int hotzoneAir = 0;
+        int sensorAttackableAir = 0;
+        int decisionRejectedAir = 0;
+        string lastDecisionRejection = "";
 
         Vector3Int home = snapshot.MyHQ != null ? snapshot.MyHQ.CurrentCellPosition : fromCell;
         home.z = 0;
@@ -269,13 +274,22 @@ public partial class AIController
             {
                 if (enemy == null || enemy.GetDomain() != Domain.Air)
                     continue;
-                if (!CanAttackTargetFrom(fromCell, cell, unit, enemy))
-                    continue;
-                if (!PassesAttackDecision(unit, enemy, cell, false, out string attackDecisionReason))
-                    continue;
-
+                visibleAir++;
                 Vector3Int enemyCell = enemy.CurrentCellPosition;
                 enemyCell.z = 0;
+                UnitThreatEnvelope envelope = GetAIThreatEnvelope(unit);
+                if (envelope != null && envelope.CanThreaten(enemyCell))
+                    hotzoneAir++;
+                if (!CanAttackTargetFrom(fromCell, cell, unit, enemy))
+                    continue;
+                sensorAttackableAir++;
+                if (!PassesAttackDecision(unit, enemy, cell, false, out string attackDecisionReason))
+                {
+                    decisionRejectedAir++;
+                    lastDecisionRejection = attackDecisionReason;
+                    continue;
+                }
+
                 float score =
                     150000f
                     + Mathf.Max(0, 20 - enemy.CurrentHP) * 1000f
@@ -293,6 +307,15 @@ public partial class AIController
             }
         }
 
+        if (bestTarget == null)
+        {
+            Debug.Log(
+                $"{TL("AntiaereoCombatente")} {unit.InstanceId} diagnostico sem tiro " +
+                $"visibleAirChecks={visibleAir} hotzoneChecks={hotzoneAir} " +
+                $"sensorAttackableChecks={sensorAttackableAir} " +
+                $"decisionRejectedChecks={decisionRejectedAir} " +
+                $"lastDecision=[{lastDecisionRejection}] paths={paths.Count}");
+        }
         return bestTarget != null;
     }
 

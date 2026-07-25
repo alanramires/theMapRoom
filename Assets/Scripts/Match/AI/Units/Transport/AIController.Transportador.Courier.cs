@@ -21,7 +21,7 @@ public partial class AIController
             return DecideRogueShuttleAction(unit, snapshot, plan);
         }
 
-        UnitManager primaryPassenger = ResolvePrimaryPassenger(passengers, plan);
+        UnitManager primaryPassenger = ResolvePrimaryPassenger(unit, passengers, plan);
         bool primaryTargetFound = TryResolveCourierPassengerTarget(primaryPassenger, plan, snapshot, assignedSectorTarget, fromCell, out Vector3Int primaryTarget);
         if (!primaryTargetFound) primaryTarget = fromCell;
         int dropOffRange = IsFireSupportUnit(primaryPassenger) ? FireSupportDropOffRange : TransportDropOffRange;

@@ -96,7 +96,7 @@ public partial class AIController
         {
             foreach (PodeEmbarcarOption opt in options)
             {
-                if (!TryGetCapturerEmbarkPreference(unit, assigned, opt, plan, snapshot.AITeam,
+                if (!TryGetCapturerEmbarkPreference(unit, assigned, opt, plan, snapshot, snapshot.AITeam,
                         out int priority, out float distance))
                     continue;
 

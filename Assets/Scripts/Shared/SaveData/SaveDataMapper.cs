@@ -198,6 +198,10 @@ public static class SaveDataMapper
             isEmbarked = unit.IsEmbarked,
             transporterInstanceId = unit.EmbarkedTransporter != null ? unit.EmbarkedTransporter.InstanceId : 0,
             transporterSlotIndex = unit.IsEmbarked ? unit.EmbarkedTransporterSlotIndex : -1,
+            hasEmbarkedOnTurn = unit.IsEmbarked && unit.EmbarkedTransporter != null,
+            embarkedOnTurn = unit.IsEmbarked && unit.EmbarkedTransporter != null
+                ? unit.EmbarkedTransporter.GetPassengerEmbarkedOnTurn(unit)
+                : -1,
             domain = (int)unit.GetDomain(),
             heightLevel = (int)unit.GetHeightLevel(),
             isAircraftGrounded = unit.IsAircraftGrounded,

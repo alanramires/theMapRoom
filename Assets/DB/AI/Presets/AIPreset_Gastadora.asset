@@ -20,7 +20,7 @@ MonoBehaviour:
     aberturaBlindadoPrimeiro: 0
     limitarLogistica: 0
     dobrarSlotsCapturadorPorSetor: 1
-    handoffEmProfundidade: 0
+    handoffEmProfundidade: 1
     conscricaoSempre: 1
     conscricaoQuandoPerdendo: 0
     poupaPraElite: 0

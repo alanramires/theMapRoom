@@ -119,7 +119,7 @@ public partial class AIController
             int candidateMP = candidate.MaxMovementPoints;
             if (candidateMP < 3) candidateThreshold += (3 - candidateMP) * 2;
             candidateThreshold = Mathf.Max(2, candidateThreshold - thresholdReduction);
-            int walkThreshold = Mathf.Max(CapturerShortWalkEmbarkCost, candidateThreshold);
+            int walkThreshold = Mathf.Max(TransportPassengerWalkRange, candidateThreshold);
             int objectiveTerrainCost = TerrainCostToCell(
                 candidate, candidateCell, objectiveCell, walkThreshold);
             if (objectiveTerrainCost <= walkThreshold)

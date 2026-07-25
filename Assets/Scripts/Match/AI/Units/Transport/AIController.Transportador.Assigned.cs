@@ -473,7 +473,7 @@ public partial class AIController
             objCell.z = 0;
         }
         bool hasObjCell = objCell != Vector3Int.zero;
-        int transportThreshold = GetEffectiveTransportThresholdForSlot(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam)));
+        int transportThreshold = TransportPassengerWalkRange;
 
         // Passageiros needy: capturadores do objetivo vivos, fora, sem ter agido e LONGE A PE
         // (alem da distancia de embarque) — quem chega a pe nao precisa de carona. NAO usar o
@@ -491,9 +491,9 @@ public partial class AIController
             if (cap.HasActed) { diag.Append($" cap#{cap.InstanceId}[jaAgiu]"); continue; }
             Vector3Int capCell = cap.CurrentCellPosition; capCell.z = 0;
             int cost = hasObjCell ? TerrainCostToCell(cap, capCell, objCell, transportThreshold) : 999;
-            if (hasObjCell && cost < transportThreshold)
+            if (hasObjCell && cost <= transportThreshold)
             {
-                diag.Append($" cap#{cap.InstanceId}[perto cost={cost}<{transportThreshold}]");
+                diag.Append($" cap#{cap.InstanceId}[perto cost={cost}<={transportThreshold}]");
                 continue; // perto o bastante pra ir a pe
             }
             diag.Append($" cap#{cap.InstanceId}[NEEDY cost={cost}]");

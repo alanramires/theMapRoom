@@ -240,6 +240,11 @@ public partial class AIController : MonoBehaviour
     public static bool ShowAIHUD => _instance != null && _instance.showAIUnitHUD;
 
     private readonly HashSet<Vector3Int> plannedDestinations = new HashSet<Vector3Int>();
+    // Objetivos de captura escolhidos nesta passada pela faccao sem QG. Nao se
+    // confunde com plannedDestinations: aquele conjunto reserva a celula onde a
+    // unidade terminara o movimento; este reserva o predio distante para que a
+    // proxima unidade rebelde varra a bolha seguinte.
+    private readonly HashSet<Vector3Int> rebelCaptureTargetReservations = new HashSet<Vector3Int>();
 
     // Buffers e caches para otimiza��o de performance
     private readonly List<UnitManager> _availableUnitsBuffer = new List<UnitManager>();

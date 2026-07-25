@@ -78,7 +78,7 @@ public partial class AIController
             return DecideEvacCourierAction(unit, evacuee, passengers, snapshot, fromCell, evacPaths, evacOccupied);
         }
 
-        UnitManager primaryPassenger = ResolvePrimaryPassenger(passengers, plan);
+        UnitManager primaryPassenger = ResolvePrimaryPassenger(unit, passengers, plan);
         bool targetFound = TryResolveCourierPassengerTarget(primaryPassenger, plan, snapshot,
             assignedSectorTarget, fromCell, out Vector3Int primaryTarget);
         if (!targetFound) primaryTarget = fromCell;

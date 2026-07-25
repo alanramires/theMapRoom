@@ -4,6 +4,9 @@ using UnityEngine;
 public partial class AIController
 {
     private const int TransportDropOffRange = 4;
+    // Passageiro que cobre ate este custo terrestre rumo ao proprio objetivo
+    // nao precisa ocupar um transporte. Compartilhado por APC, shuttle e navio.
+    private const int TransportPassengerWalkRange = 6;
     // Delivery range, not weapon range: artillery should be carried to the sector front
     // before DPQ decides the exact landing hex.
     private const int FireSupportDropOffRange = 3;

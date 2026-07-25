@@ -10,7 +10,11 @@ public partial class AIController
         foreach (UnitManager enemy in UnitManager.AllActive)
         {
             if (enemy.SlotIndex == ResolveAISlotKey(aiTeam) || enemy.IsDead || enemy.IsEmbarked) continue;
-            if (mc != null && !mc.IsUnitVisibleForSlot(enemy, PlayerSlotId.FromIndex(currentAISlotIndex))) continue;
+            // Planejamento consulta a verdade confirmada do slot da AI, nunca o
+            // cache de apresentacao que pode pertencer ao humano local/cortina.
+            if (mc != null && !mc.IsUnitVisibleForSlotNoCache(
+                    enemy, PlayerSlotId.FromIndex(currentAISlotIndex)))
+                continue;
             enemies.Add(enemy);
         }
         return enemies;

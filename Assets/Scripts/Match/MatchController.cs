@@ -324,6 +324,7 @@ public class MatchController : MonoBehaviour
         [HideInInspector] public bool flipX;
         public FlipXOverrideMode flipXOverride;
         public bool isAI;
+        [SerializeField, HideInInspector] public bool isRebelRuntime;
         [Tooltip("Este slot humano pertence a esta maquina/tela. Ignorado para AI.")]
         public bool isLocal;
         [SerializeField, HideInInspector] public bool localityConfigured;
@@ -1164,6 +1165,11 @@ public class MatchController : MonoBehaviour
 #endif
     }
 
+    public void RefreshPlayerRuntimeFlagsNow()
+    {
+        RecalculatePlayerRuntimeFlags(GetActiveConstructionsOnScene());
+    }
+
     public bool GetTeamFlipX(TeamId teamId)
     {
         if (teamId == TeamId.Neutral)
@@ -1685,6 +1691,17 @@ public class MatchController : MonoBehaviour
 
     public bool IsPlayerAI(PlayerSlotId slotId) =>
         IsValidPlayerSlot(slotId) && players[slotId.Value].isAI;
+
+    public bool IsSlotRebel(PlayerSlotId slotId)
+    {
+        if (!IsValidPlayerSlot(slotId))
+            return false;
+
+        // Mantem a consulta correta mesmo quando chamada imediatamente apos load,
+        // captura ou edicao, antes do proximo refresh periodico da economia.
+        RecalculatePlayerRuntimeFlags(GetActiveConstructionsOnScene());
+        return players[slotId.Value].isRebelRuntime;
+    }
 
     public void SetPlayerIsLocal(PlayerSlotId slotId, bool isLocal)
     {
@@ -3694,6 +3711,7 @@ public class MatchController : MonoBehaviour
             return;
 
         constructions ??= GetActiveConstructionsOnScene();
+        RecalculatePlayerRuntimeFlags(constructions);
         for (int i = 0; i < players.Count; i++)
         {
             PlayerEntry entry = players[i];
@@ -3710,6 +3728,41 @@ public class MatchController : MonoBehaviour
             }
 
             entry.incomePerTurn = Mathf.Max(0, income);
+            players[i] = entry;
+        }
+    }
+
+    private void RecalculatePlayerRuntimeFlags(List<ConstructionManager> constructions)
+    {
+        if (players == null)
+            return;
+
+        bool anyOwnedHeadQuarter = false;
+        var slotsWithHeadQuarter = new HashSet<int>();
+        if (constructions != null)
+        {
+            for (int i = 0; i < constructions.Count; i++)
+            {
+                ConstructionManager construction = constructions[i];
+                if (construction == null || !construction.IsPlayerHeadQuarter)
+                    continue;
+                int ownerSlot = construction.SlotIndex;
+                if (!IsValidPlayerSlotIndex(ownerSlot))
+                    continue;
+
+                anyOwnedHeadQuarter = true;
+                slotsWithHeadQuarter.Add(ownerSlot);
+            }
+        }
+
+        for (int i = 0; i < players.Count; i++)
+        {
+            PlayerEntry entry = players[i];
+            entry.isRebelRuntime =
+                anyOwnedHeadQuarter &&
+                entry.teamId != TeamId.Neutral &&
+                !entry.defeated &&
+                !slotsWithHeadQuarter.Contains(i);
             players[i] = entry;
         }
     }

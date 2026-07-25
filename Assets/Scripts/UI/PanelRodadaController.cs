@@ -135,6 +135,7 @@ public sealed class PanelRodadaController : MonoBehaviour
         panelRect.localScale = Vector3.one;
         RestorePlayerTextPosition();
         RestoreTurnTextPosition();
+        SetButtonVisible(true);
         StartTeamVideo(team);
         if (textoJogador != null)
         {
@@ -226,6 +227,7 @@ public sealed class PanelRodadaController : MonoBehaviour
     public void ShowPrivacyCurtain(TeamId activeTeam, int turno, bool isAI)
     {
         CoverImmediatelyForPrivateTurnTransition();
+        SetButtonVisible(!isAI);
         RestorePlayerTextPosition();
         StartTeamVideo(activeTeam);
         if (textoJogador != null)
@@ -279,6 +281,7 @@ public sealed class PanelRodadaController : MonoBehaviour
         panelRect.localScale = Vector3.one;
         RestorePlayerTextPosition();
         RestoreTurnTextPosition();
+        SetButtonVisible(true);
         StopTeamVideo();
 
         if (textoJogador != null)
@@ -334,6 +337,7 @@ public sealed class PanelRodadaController : MonoBehaviour
         // mas nunca deve segurar a liberacao do turno depois que o save foi restaurado.
         RestorePlayerTextPosition();
         RestoreTurnTextPosition();
+        SetButtonVisible(true);
         StartTeamVideo(team);
 
         if (textoJogador != null)
@@ -420,6 +424,12 @@ public sealed class PanelRodadaController : MonoBehaviour
             buttonCanvasGroup.blocksRaycasts = enabled;
             buttonCanvasGroup.alpha = 1f;
         }
+    }
+
+    private void SetButtonVisible(bool visible)
+    {
+        if (botaoRodada != null)
+            botaoRodada.gameObject.SetActive(visible);
     }
 
     private void StartWaitingAudio()
