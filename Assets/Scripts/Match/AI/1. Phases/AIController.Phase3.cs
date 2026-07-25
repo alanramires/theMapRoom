@@ -15,7 +15,9 @@ public partial class AIController
 
         Debug.Log($"{TL()} Fase3 — compras.");
 
-        yield return CommitAIWorldHeavy(snapshot.AITeam, "phase3:pre-shopping");
+        yield return CommitAIWorldHeavy(
+            PlayerSlotId.FromIndex(snapshot.AISlotIndex),
+            "phase3:pre-shopping");
 
         // Reconstrói snapshot para refletir o saldo atual pós-ações
         AIWorldSnapshot freshSnap = AIWorldSnapshot.Build(

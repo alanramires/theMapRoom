@@ -11,8 +11,11 @@ public partial class AIController
     // Implementações: AIController.Phase0-4.cs
     // -------------------------------------------------------------------------
 
-    private IEnumerator RunAITurn(PlayerSlotId aiSlot, TeamId aiTeam)
+    private IEnumerator RunAITurn(PlayerSlotId aiSlot)
     {
+        TeamId aiTeam = matchController != null
+            ? matchController.GetVisualTeamForSlot(aiSlot)
+            : TeamId.Neutral;
         float turnStart = Time.realtimeSinceStartup;
         if (showAILogs)
             Debug.Log($"[AI] RunAITurn iniciado para {aiTeam}.");
@@ -62,7 +65,7 @@ public partial class AIController
         }
 
         float tCommit = Time.realtimeSinceStartup;
-        yield return CommitAIWorldHeavy(aiTeam, "turn-start", rebuildPlan: false);
+        yield return CommitAIWorldHeavy(aiSlot, "turn-start", rebuildPlan: false);
         Debug.Log($"[AI Perf] CommitAIWorldHeavy: {(Time.realtimeSinceStartup - tCommit) * 1000f:F0}ms");
 
         AIWorldSnapshot snapshot = AIWorldSnapshot.Build(aiSlot, matchController);

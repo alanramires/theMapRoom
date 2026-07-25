@@ -80,6 +80,14 @@ public enum CommittedBoardChangeKind
     MultiUnitChanged = 1 << 3
 }
 
+public enum FogPlanningSnapshotBarrierResult
+{
+    Unavailable = 0,
+    ReusedAndReconciled = 1,
+    FullFallback = 2,
+    RejectedOutsideNeutral = 3
+}
+
 /// <summary>
 /// Descreve somente mutacoes ja comprometidas do tabuleiro. O delta pode ser
 /// acumulado enquanto a FSM conclui a apresentacao, mas so pode ser consumido
@@ -4290,6 +4298,98 @@ public class MatchController : MonoBehaviour
 
         OnFogOfWarUpdated?.Invoke();
         return true;
+    }
+
+    public FogPlanningSnapshotBarrierResult EnsureConfirmedFogGameplaySnapshotForSlot(
+        PlayerSlotId observerSlot)
+    {
+        if (!Application.isPlaying || !debugFogOfWarEnabled || !enableTotalWar ||
+            !IsValidPlayerSlot(observerSlot))
+        {
+            return FogPlanningSnapshotBarrierResult.Unavailable;
+        }
+
+        if (turnStateManager != null &&
+            turnStateManager.CurrentCursorState != TurnStateManager.CursorState.Neutral)
+        {
+            Debug.LogWarning(
+                $"[FoW][PlanningBarrier] slot={observerSlot.Value} rejected=outside-neutral");
+            return FogPlanningSnapshotBarrierResult.RejectedOutsideNeutral;
+        }
+
+        Tilemap boardMap = ResolveFogBoardTilemap();
+        if (boardMap == null)
+            return FogPlanningSnapshotBarrierResult.Unavailable;
+
+        PlayerSlotId presentationSlot =
+            TryResolveFogPresentationSlot(out PlayerSlotId resolvedPresentationSlot)
+                ? resolvedPresentationSlot
+                : observerSlot;
+        FogUpdateContext context = CreateFogUpdateContext(
+            observerSlot,
+            observerSlot,
+            presentationSlot,
+            FogOfWarRefreshMode.DataOnly);
+        PlayerSlotId runtimeOwnerBefore =
+            PlayerSlotId.FromIndex(fogCachedObserverSlotIndex);
+
+        double startMs = Time.realtimeSinceStartupAsDouble;
+        if (TrySynchronizeFogRuntimeAtTurnStart(context, boardMap))
+        {
+            RestoreFogRuntimeOwnerAfterPlanningBarrier(
+                observerSlot,
+                presentationSlot,
+                runtimeOwnerBefore,
+                boardMap);
+            if (enableFogStepPerfLogs)
+            {
+                Debug.Log(
+                    $"[FoW][PlanningBarrier] slot={observerSlot.Value} " +
+                    $"result=reused total={(Time.realtimeSinceStartupAsDouble - startMs) * 1000d:F3}ms");
+            }
+            return FogPlanningSnapshotBarrierResult.ReusedAndReconciled;
+        }
+
+        ExecuteFogRefreshContext(context);
+        RestoreFogRuntimeOwnerAfterPlanningBarrier(
+            observerSlot,
+            presentationSlot,
+            runtimeOwnerBefore,
+            boardMap);
+        if (enableFogStepPerfLogs)
+        {
+            Debug.Log(
+                $"[FoW][PlanningBarrier] slot={observerSlot.Value} " +
+                $"result=full-fallback total={(Time.realtimeSinceStartupAsDouble - startMs) * 1000d:F3}ms");
+        }
+        return FogPlanningSnapshotBarrierResult.FullFallback;
+    }
+
+    private void RestoreFogRuntimeOwnerAfterPlanningBarrier(
+        PlayerSlotId observerSlot,
+        PlayerSlotId presentationSlot,
+        PlayerSlotId runtimeOwnerBefore,
+        Tilemap boardMap)
+    {
+        PlayerSlotId targetRuntimeSlot = IsValidPlayerSlot(runtimeOwnerBefore)
+            ? runtimeOwnerBefore
+            : presentationSlot;
+        if (observerSlot == targetRuntimeSlot ||
+            !IsValidPlayerSlot(targetRuntimeSlot) ||
+            boardMap == null)
+        {
+            return;
+        }
+
+        if (!TryActivateFogContributionRuntimeForSlot(
+                targetRuntimeSlot,
+                boardMap) &&
+            enableFogValidationLogs)
+        {
+            Debug.LogWarning(
+                $"[FoW][PlanningBarrier] presentation-runtime-missing " +
+                $"slot={targetRuntimeSlot.Value}; visual tilemaps preservados");
+        }
     }
 
     private bool TrySynchronizeFogRuntimeAtTurnStart(

@@ -5,21 +5,42 @@ public partial class AIController
 {
     private const int FreshCaptureGarrisonEnemyRange = 2;
 
-    private void CommitAIWorldLightAfterAction(TeamId aiTeam, string reason, bool refreshFoW)
+    private void CommitAIWorldLightAfterAction(
+        PlayerSlotId aiSlot,
+        string reason,
+        bool ensureFogAfterConstructionChange)
     {
+        TeamId aiTeam = matchController != null
+            ? matchController.GetVisualTeamForSlot(aiSlot)
+            : currentAITeam;
         SyncAIUnitCellsFromTransforms();
 
-        if (refreshFoW)
-            matchController?.RefreshFogOfWarForActiveTeam(FogOfWarRefreshMode.DataOnly);
+        FogPlanningSnapshotBarrierResult fogBarrier =
+            FogPlanningSnapshotBarrierResult.Unavailable;
+        if (ensureFogAfterConstructionChange && matchController != null)
+        {
+            fogBarrier =
+                matchController.EnsureConfirmedFogGameplaySnapshotForSlot(aiSlot);
+        }
 
-        TeamObjectivePlan plan = ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(ResolveAISlotKey(aiTeam)));
+        TeamObjectivePlan plan = ObjectiveManager.GetPlanForSlot(aiSlot);
         int turnNumber = matchController != null ? matchController.CurrentTurn : 0;
-        int removed = InvalidateStaleObjectivesLight(plan, aiTeam, turnNumber);
+        int removed = InvalidateStaleObjectivesLight(
+            plan,
+            aiSlot,
+            aiTeam,
+            turnNumber);
 
-        Debug.Log($"[AI Commit Light][T{turnNumber}][{TeamUtils.GetName(aiTeam)}] reason={reason} refreshFoW={refreshFoW} removed={removed}");
+        Debug.Log(
+            $"[AI Commit Light][T{turnNumber}][slot={aiSlot.Value}][{TeamUtils.GetName(aiTeam)}] " +
+            $"reason={reason} fogBarrier={fogBarrier} removed={removed}");
     }
 
-    private int InvalidateStaleObjectivesLight(TeamObjectivePlan plan, TeamId aiTeam, int turnNumber)
+    private int InvalidateStaleObjectivesLight(
+        TeamObjectivePlan plan,
+        PlayerSlotId aiSlot,
+        TeamId aiTeam,
+        int turnNumber)
     {
         if (plan == null || plan.Objectives == null)
             return 0;
@@ -44,7 +65,10 @@ public partial class AIController
             {
                 RememberRecentlyCapturedSector(aiTeam, obj.Sector, turnNumber);
 
-                if (ShouldKeepFreshCaptureGarrison(obj.Sector, aiTeam, out Vector3Int guardCell))
+                if (ShouldKeepFreshCaptureGarrison(
+                        obj.Sector,
+                        aiSlot,
+                        out Vector3Int guardCell))
                 {
                     obj.Status = ObjectiveStatus.Defending;
                     obj.HandoffEligible = false;
@@ -54,7 +78,7 @@ public partial class AIController
                 }
             }
 
-            ClearLightObjectiveSlots(obj, aiTeam);
+            ClearLightObjectiveSlots(obj, aiSlot);
             ClearObjectiveHUD(obj);
             plan.Objectives.RemoveAt(i);
             removed++;
@@ -65,7 +89,10 @@ public partial class AIController
         return removed;
     }
 
-    private bool ShouldKeepFreshCaptureGarrison(ConstructionSector sector, TeamId aiTeam, out Vector3Int guardCell)
+    private bool ShouldKeepFreshCaptureGarrison(
+        ConstructionSector sector,
+        PlayerSlotId aiSlot,
+        out Vector3Int guardCell)
     {
         guardCell = Vector3Int.zero;
         bool hasOwnedCapturable = false;
@@ -76,12 +103,16 @@ public partial class AIController
                 continue;
             if (!construction.IsCapturable || construction.CapturePointsMax <= 0)
                 continue;
-            if (construction.SlotIndex != ResolveAISlotKey(aiTeam) || construction.CurrentCapturePoints < construction.CapturePointsMax)
+            if (construction.SlotIndex != aiSlot.Value ||
+                construction.CurrentCapturePoints < construction.CapturePointsMax)
                 continue;
 
             hasOwnedCapturable = true;
             Vector3Int cell = construction.CurrentCellPosition; cell.z = 0;
-            if (HasNearbyVisibleEnemy(cell, aiTeam, FreshCaptureGarrisonEnemyRange))
+            if (HasNearbyVisibleEnemyForSlot(
+                    cell,
+                    aiSlot,
+                    FreshCaptureGarrisonEnemyRange))
             {
                 guardCell = cell;
                 return true;
@@ -91,10 +122,40 @@ public partial class AIController
         return hasOwnedCapturable
             && TryGetAnySectorInfo(sector, out SectorManager.SectorInfo info)
             && info != null
-            && HasNearbyVisibleEnemy(info.RepresentativeCell, aiTeam, FreshCaptureGarrisonEnemyRange);
+            && HasNearbyVisibleEnemyForSlot(
+                info.RepresentativeCell,
+                aiSlot,
+                FreshCaptureGarrisonEnemyRange);
     }
 
-    private void ClearLightObjectiveSlots(SectorObjective obj, TeamId aiTeam)
+    private bool HasNearbyVisibleEnemyForSlot(
+        Vector3Int cell,
+        PlayerSlotId aiSlot,
+        int range)
+    {
+        MatchController match = GetMatchController();
+        foreach (UnitManager enemy in UnitManager.AllActive)
+        {
+            if (enemy == null ||
+                enemy.SlotIndex == aiSlot.Value ||
+                enemy.IsDead ||
+                enemy.IsEmbarked)
+            {
+                continue;
+            }
+
+            if (match != null && !match.IsUnitVisibleForSlot(enemy, aiSlot))
+                continue;
+
+            Vector3Int enemyCell = enemy.CurrentCellPosition;
+            enemyCell.z = 0;
+            if (SectorManager.HexDistance(enemyCell, cell) <= range)
+                return true;
+        }
+        return false;
+    }
+
+    private void ClearLightObjectiveSlots(SectorObjective obj, PlayerSlotId aiSlot)
     {
         if (obj == null || obj.Slots == null)
             return;
@@ -104,15 +165,38 @@ public partial class AIController
             if (slot == null || !slot.Filled)
                 continue;
 
-            UnitManager unit = FindActiveUnit(slot.AssignedUnitId, aiTeam);
+            UnitManager unit = FindActiveUnitForSlot(slot.AssignedUnitId, aiSlot);
             unit?.ClearAIAssignedPlan();
             slot.Filled = false;
             slot.AssignedUnitId = -1;
         }
     }
 
-    private IEnumerator CommitAIWorldHeavy(TeamId aiTeam, string reason, bool rebuildPlan = true)
+    private static UnitManager FindActiveUnitForSlot(
+        int instanceId,
+        PlayerSlotId slot)
     {
+        foreach (UnitManager unit in UnitManager.AllActive)
+        {
+            if (unit != null &&
+                unit.InstanceId == instanceId &&
+                unit.SlotIndex == slot.Value &&
+                !unit.IsDead)
+            {
+                return unit;
+            }
+        }
+        return null;
+    }
+
+    private IEnumerator CommitAIWorldHeavy(
+        PlayerSlotId aiSlot,
+        string reason,
+        bool rebuildPlan = true)
+    {
+        TeamId aiTeam = matchController != null
+            ? matchController.GetVisualTeamForSlot(aiSlot)
+            : currentAITeam;
         if (ShouldStopAIForMatchEnd($"ai_commit_start:{reason}"))
             yield break;
 
@@ -123,8 +207,12 @@ public partial class AIController
         Debug.Log($"[AI Commit Heavy] Sync1: {(Time.realtimeSinceStartup - tSync1) * 1000f:F0}ms");
 
         float tFoW = Time.realtimeSinceStartup;
-        matchController?.RefreshFogOfWarForActiveTeam(FogOfWarRefreshMode.DataOnly);
-        Debug.Log($"[AI Commit Heavy] RefreshFoW: {(Time.realtimeSinceStartup - tFoW) * 1000f:F0}ms");
+        FogPlanningSnapshotBarrierResult fogBarrier = matchController != null
+            ? matchController.EnsureConfirmedFogGameplaySnapshotForSlot(aiSlot)
+            : FogPlanningSnapshotBarrierResult.Unavailable;
+        Debug.Log(
+            $"[AI Commit Heavy] FogBarrier: {(Time.realtimeSinceStartup - tFoW) * 1000f:F0}ms " +
+            $"slot={aiSlot.Value} result={fogBarrier}");
 
         SectorManager.RequestRebuildFromActiveConstructions($"ai-commit:{reason}");
 
@@ -140,16 +228,21 @@ public partial class AIController
 
         float tSnapshot = Time.realtimeSinceStartup;
         AIWorldSnapshot snapshot = AIWorldSnapshot.Build(
-            PlayerSlotId.FromIndex(currentAISlotIndex),
+            aiSlot,
             matchController);
         Debug.Log($"[AI Commit Heavy] AIWorldSnapshot.Build: {(Time.realtimeSinceStartup - tSnapshot) * 1000f:F0}ms");
 
         if (rebuildPlan)
         {
             BuildObjectivePlan(snapshot);
-            AITacticalAnalyzer.Instance?.Rebuild(snapshot, ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(ResolveAISlotKey(aiTeam))));
+            AITacticalAnalyzer.Instance?.Rebuild(
+                snapshot,
+                ObjectiveManager.GetPlanForSlot(aiSlot));
         }
 
-        Debug.Log($"[AI Commit Heavy][T{snapshot.TurnNumber}][{TeamUtils.GetName(aiTeam)}] reason={reason} units={snapshot.MyUnits.Count} enemies={snapshot.EnemyUnits.Count} total={( Time.realtimeSinceStartup - tHeavy) * 1000f:F0}ms");
+        Debug.Log(
+            $"[AI Commit Heavy][T{snapshot.TurnNumber}][slot={aiSlot.Value}]" +
+            $"[{TeamUtils.GetName(aiTeam)}] reason={reason} units={snapshot.MyUnits.Count} " +
+            $"enemies={snapshot.EnemyUnits.Count} total={(Time.realtimeSinceStartup - tHeavy) * 1000f:F0}ms");
     }
 }

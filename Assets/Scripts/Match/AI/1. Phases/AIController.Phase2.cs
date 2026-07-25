@@ -214,7 +214,9 @@ public partial class AIController
                 bool changesConstructionVision =
                     targetedConstruction || action.SensorAction == SensorActionType.Capture;
                 CommitAIWorldLightAfterAction(
-                    aiTeam, $"phase2:{FormatInitiativeUnitName(unit)}", changesConstructionVision);
+                    PlayerSlotId.FromIndex(snapshot.AISlotIndex),
+                    $"phase2:{FormatInitiativeUnitName(unit)}",
+                    changesConstructionVision);
             }
 
             // Reconstrói o snapshot para a próxima decisão (hexes ocupados mudam após cada ação)

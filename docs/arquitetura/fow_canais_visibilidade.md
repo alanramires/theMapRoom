@@ -353,3 +353,52 @@ também preservam os fallbacks definidos nas etapas anteriores.
 Os logs `[FoW][AffectedTargets]` e `[FoW][AffectedTargets][Visual]` informam
 quantas células foram consideradas e quantas unidades realmente precisaram ser
 reavaliadas.
+
+## Barreira de planejamento por slot
+
+Planejadores não solicitam mais um full refresh de FoW como efeito colateral de
+“sincronizar o mundo”. Antes de construir um `AIWorldSnapshot`, eles chamam:
+
+```text
+EnsureConfirmedFogGameplaySnapshotForSlot(PlayerSlotId)
+```
+
+A barreira:
+
+1. exige `CursorState.Neutral`;
+2. entra em um `FogUpdateContext` `DataOnly` para o slot informado;
+3. ativa e reconcilia sua fotografia quente;
+4. republica snapshot, memória e inteligência confirmados;
+5. usa full refresh `DataOnly` somente quando a fotografia não pode ser
+   restaurada;
+6. restaura o proprietário anterior do runtime de contribuições quando a
+   perspectiva visual pertence a outro slot, sem repintar Tilemaps.
+
+O resultado distingue:
+
+```text
+ReusedAndReconciled
+FullFallback
+Unavailable
+RejectedOutsideNeutral
+```
+
+Os commits leves e pesados da AI são identificados primariamente por
+`PlayerSlotId`. `TeamId` é derivado do slot apenas para nome, cor e
+compatibilidade com regras legadas; ele não seleciona cache, memória, plano ou
+snapshot.
+
+Isso também vale para a entrada de `RunAITurn`, que recebe somente o slot. Dois
+slots com a mesma cor continuam possuindo planejamento, visão e inteligência
+independentes.
+
+O log `[FoW][PlanningBarrier]` mede o tempo da barreira e informa se o caminho
+reutilizou cache ou precisou de fallback. Os logs `[AI Commit Heavy]` e
+`[AI Commit Light]` incluem slot e resultado, permitindo separar:
+
+- espera/animação;
+- sincronização do mundo;
+- barreira de FoW;
+- rebuild de setores;
+- construção do snapshot;
+- planejamento e execução.
