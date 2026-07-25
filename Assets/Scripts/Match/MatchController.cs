@@ -138,6 +138,7 @@ public class MatchController : MonoBehaviour
         // Apenas unidades usam a chave incremental nesta etapa. Construcoes entram
         // pelo full refresh, mas ja compartilham a mesma representacao por fonte.
         public FogOfWarUnitCacheKey unitCacheKey;
+        public int sourceStateHash;
         public readonly HashSet<Vector3Int> geographicCells = new HashSet<Vector3Int>();
         public readonly HashSet<Vector3Int> sensorCells = new HashSet<Vector3Int>();
     }
@@ -5223,6 +5224,40 @@ public class MatchController : MonoBehaviour
         }
     }
 
+    public void ExportFogSourceContributionsForSave(
+        List<FogSourceContributionSaveData> destination)
+    {
+        if (destination == null)
+            return;
+        destination.Clear();
+
+        int observerSlotIndex = fogCachedObserverSlotIndex;
+        if (observerSlotIndex < 0)
+            return;
+
+        foreach (KeyValuePair<FogContributionSourceId, FogSourceContributionCacheEntry> pair
+                 in fogContributionsBySource)
+        {
+            FogSourceContributionCacheEntry entry = pair.Value;
+            if (entry == null ||
+                (entry.geographicCells.Count == 0 && entry.sensorCells.Count == 0))
+            {
+                continue;
+            }
+
+            FogSourceContributionSaveData saved = new FogSourceContributionSaveData
+            {
+                observerSlotIndex = observerSlotIndex,
+                sourceType = (int)pair.Key.type,
+                sourceInstanceId = pair.Key.instanceId,
+                sourceStateHash = entry.sourceStateHash
+            };
+            saved.geographicCells.AddRange(entry.geographicCells);
+            saved.sensorCells.AddRange(entry.sensorCells);
+            destination.Add(saved);
+        }
+    }
+
     public bool TryRestoreFogRuntimeCacheForObserverSlotFromSave(
         int observerSlotIndex,
         List<FogCellContributorSaveData> visibleContributorsByCell,
@@ -6698,6 +6733,7 @@ public class MatchController : MonoBehaviour
         {
             RemoveFogSpecializedViewCacheForUnit(cacheIndex);
             cacheEntry.unitCacheKey = nextKey;
+            cacheEntry.sourceStateHash = BuildFogUnitSourceStateHash(unit);
             return;
         }
 
@@ -6722,6 +6758,7 @@ public class MatchController : MonoBehaviour
         }
 
         cacheEntry.unitCacheKey = nextKey;
+        cacheEntry.sourceStateHash = BuildFogUnitSourceStateHash(unit);
         if (updateVisual && fogOfWarVisionMode != FogOfWarVisionMode.All)
             RenderFogOverlayFromRuntimeCache(boardMap);
     }
@@ -6974,6 +7011,7 @@ public class MatchController : MonoBehaviour
             {
                 RemoveFogSourceContributions(sourceEntry, boardMap, updateVisual);
             }
+            sourceEntry.sourceStateHash = BuildFogConstructionSourceStateHash(construction);
 
             // O QG e um marco global do tabuleiro: todos conhecem seu hex.
             // Apenas o dono recebe o restante do raio de visao configurado.
@@ -7330,6 +7368,63 @@ public class MatchController : MonoBehaviour
         if (instanceId <= 0)
             instanceId = construction.GetEntityId().GetHashCode();
         return new FogContributionSourceId(FogContributionSourceType.Construction, instanceId);
+    }
+
+    private static int BuildFogUnitSourceStateHash(UnitManager unit)
+    {
+        unchecked
+        {
+            if (unit == null)
+                return 0;
+
+            Vector3Int cell = unit.CurrentCellPosition;
+            int hash = 17;
+            hash = (hash * 31) + cell.x;
+            hash = (hash * 31) + cell.y;
+            hash = (hash * 31) + unit.SlotIndex;
+            hash = (hash * 31) + (int)unit.GetDomain();
+            hash = (hash * 31) + (int)unit.GetHeightLevel();
+            hash = (hash * 31) + (unit.IsEmbarked ? 1 : 0);
+            hash = (hash * 31) + Mathf.Max(1, unit.Visao);
+            if (unit.TryGetUnitData(out UnitData data) && data != null)
+                hash = (hash * 31) + StableFogStringHash(!string.IsNullOrWhiteSpace(data.id) ? data.id : data.name);
+            return hash;
+        }
+    }
+
+    private static int BuildFogConstructionSourceStateHash(ConstructionManager construction)
+    {
+        unchecked
+        {
+            if (construction == null)
+                return 0;
+
+            Vector3Int cell = construction.CurrentCellPosition;
+            int hash = 17;
+            hash = (hash * 31) + cell.x;
+            hash = (hash * 31) + cell.y;
+            hash = (hash * 31) + construction.SlotIndex;
+            hash = (hash * 31) + (construction.IsPlayerHeadQuarter ? 1 : 0);
+            if (construction.TryResolveConstructionData(out ConstructionData data) && data != null)
+            {
+                hash = (hash * 31) + Mathf.Max(0, data.visao);
+                hash = (hash * 31) + StableFogStringHash(!string.IsNullOrWhiteSpace(data.id) ? data.id : data.name);
+            }
+            return hash;
+        }
+    }
+
+    private static int StableFogStringHash(string value)
+    {
+        unchecked
+        {
+            int hash = 23;
+            if (string.IsNullOrEmpty(value))
+                return hash;
+            for (int i = 0; i < value.Length; i++)
+                hash = (hash * 31) + value[i];
+            return hash;
+        }
     }
 
     private FogOfWarUnitCacheKey BuildFogUnitCacheKey(UnitManager unit, Tilemap boardMap)

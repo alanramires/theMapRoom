@@ -20,6 +20,8 @@ public static class MatchStateHasher
         new System.Collections.Generic.List<FogCellContributorSaveData>();
     private static readonly System.Collections.Generic.List<FogUnitVisibilitySaveData> EmptyFogUnits =
         new System.Collections.Generic.List<FogUnitVisibilitySaveData>();
+    private static readonly System.Collections.Generic.List<FogSourceContributionSaveData> EmptyFogSources =
+        new System.Collections.Generic.List<FogSourceContributionSaveData>();
 
     public static string ComputeHash(SaveGameData data)
     {
@@ -54,12 +56,14 @@ public static class MatchStateHasher
         int savedLegacyFogTeam = data.fogCacheTeamId;
         System.Collections.Generic.List<FogCellContributorSaveData> savedFogCells = data.fogVisibleContributorsByCell;
         System.Collections.Generic.List<FogUnitVisibilitySaveData> savedFogUnits = data.fogUnitVisibilityByCacheIndex;
+        System.Collections.Generic.List<FogSourceContributionSaveData> savedFogSources = data.fogSourceContributions;
 
         data.savedAtUtcTicks = 0;
         data.fogObserverSlotIndex = int.MinValue;
         data.fogCacheTeamId = int.MinValue;
         data.fogVisibleContributorsByCell = EmptyFogCells;
         data.fogUnitVisibilityByCacheIndex = EmptyFogUnits;
+        data.fogSourceContributions = EmptyFogSources;
         try
         {
             return JsonUtility.ToJson(data, false);
@@ -71,6 +75,7 @@ public static class MatchStateHasher
             data.fogCacheTeamId = savedLegacyFogTeam;
             data.fogVisibleContributorsByCell = savedFogCells;
             data.fogUnitVisibilityByCacheIndex = savedFogUnits;
+            data.fogSourceContributions = savedFogSources;
         }
     }
 
@@ -131,6 +136,29 @@ public static class MatchStateHasher
             return a.cacheIndex.CompareTo(b.cacheIndex);
         });
 
+        if (data.fogSourceContributions != null)
+        {
+            for (int i = 0; i < data.fogSourceContributions.Count; i++)
+            {
+                FogSourceContributionSaveData source = data.fogSourceContributions[i];
+                if (source == null)
+                    continue;
+                SortFogCells(source.geographicCells);
+                SortFogCells(source.sensorCells);
+            }
+
+            data.fogSourceContributions.Sort((a, b) =>
+            {
+                if (a == null || b == null)
+                    return (a == null ? 1 : 0) - (b == null ? 1 : 0);
+                int byObserver = a.observerSlotIndex.CompareTo(b.observerSlotIndex);
+                if (byObserver != 0)
+                    return byObserver;
+                int byType = a.sourceType.CompareTo(b.sourceType);
+                return byType != 0 ? byType : a.sourceInstanceId.CompareTo(b.sourceInstanceId);
+            });
+        }
+
         data.rallyPoints?.Sort((a, b) =>
         {
             if (a == null || b == null)
@@ -144,6 +172,18 @@ public static class MatchStateHasher
                 return (a == null ? 1 : 0) - (b == null ? 1 : 0);
             int byRally = a.rallyPointId.CompareTo(b.rallyPointId);
             return byRally != 0 ? byRally : a.unitId.CompareTo(b.unitId);
+        });
+    }
+
+    private static void SortFogCells(System.Collections.Generic.List<Vector3Int> cells)
+    {
+        cells?.Sort((a, b) =>
+        {
+            int byY = a.y.CompareTo(b.y);
+            if (byY != 0)
+                return byY;
+            int byX = a.x.CompareTo(b.x);
+            return byX != 0 ? byX : a.z.CompareTo(b.z);
         });
     }
 }

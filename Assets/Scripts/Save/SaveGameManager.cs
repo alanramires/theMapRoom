@@ -2045,6 +2045,7 @@ public class SaveGameManager : MonoBehaviour
             fogCacheTeamId = int.MinValue,
             fogVisibleContributorsByCell = new List<FogCellContributorSaveData>(),
             fogUnitVisibilityByCacheIndex = new List<FogUnitVisibilitySaveData>(),
+            fogSourceContributions = new List<FogSourceContributionSaveData>(),
             fogExploredCellsBySlot = new List<TeamExploredCellsSaveData>(),
             fogExploredCellsByTeam = new List<TeamExploredCellsSaveData>(),
             fogConstructionMemory = new List<FogConstructionMemorySaveData>(),
@@ -2121,6 +2122,7 @@ public class SaveGameManager : MonoBehaviour
                 out data.fogObserverSlotIndex,
                 data.fogVisibleContributorsByCell,
                 data.fogUnitVisibilityByCacheIndex);
+            matchController.ExportFogSourceContributionsForSave(data.fogSourceContributions);
         }
 
         // if (aiPlayerController != null)
@@ -2150,6 +2152,7 @@ public class SaveGameManager : MonoBehaviour
         // Depois da migração, apenas o campo por slot participa do estado em memória
         // e de futuros hashes/saves.
         data.fogExploredCellsByTeam = new List<TeamExploredCellsSaveData>();
+        data.fogSourceContributions ??= new List<FogSourceContributionSaveData>();
     }
 
     private void RestoreMatchPlayers(SaveGameData data)

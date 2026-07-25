@@ -56,6 +56,14 @@ Movimento provisório, previews, animações e submenus não podem adicionar con
 
 ## Persistência
 
-Na etapa 3 do refactor, os canais e as contribuições por fonte existem apenas no runtime. O save continua no formato da etapa anterior e o load continua executando cold refresh.
+Na etapa 4 do refactor, o save v16 passa a gravar `fogSourceContributions`. Cada entrada contém:
 
-A persistência por fonte será introduzida em uma etapa posterior. Até lá, o DTO continua gravando somente o agregado geográfico legado e não grava `fogContributionsBySource`.
+- `observerSlotIndex`;
+- tipo e `InstanceId` da fonte;
+- assinatura estável do estado relevante da fonte;
+- células geográficas;
+- células sensoriais.
+
+As listas são canonicalizadas antes da escrita, mas excluídas do hash autoritativo da partida por serem estado derivado.
+
+O load ainda não consome essas entradas e continua executando cold refresh. A etapa seguinte deve comparar a fotografia salva com as contribuições recalculadas antes que qualquer fast path seja autorizado.
