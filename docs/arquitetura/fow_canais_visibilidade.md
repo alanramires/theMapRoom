@@ -254,3 +254,37 @@ explícito quais fotografias sobreviveram ao load.
 Saves v17 continuam compatíveis. Durante a migração em memória, a fotografia
 única legada é embrulhada em um bloco v18 usando o `fogObserverSlotIndex`
 original, sem converter a identidade por `TeamId`.
+
+## Início de turno incremental
+
+Ao ativar um slot, o controlador tenta reativar sua fotografia quente antes de
+considerar um full refresh. A sincronização acontece somente em `Neutral` e
+reconcilia o runtime com o tabuleiro confirmado:
+
+- fontes de unidades inexistentes, mortas ou embarcadas são removidas;
+- unidades novas ou cujo estado de visão mudou são recolhidas;
+- unidades com o mesmo `sourceStateHash` preservam suas células e apenas
+  rebaseiam a chave de revisão;
+- contribuições de construções são reconstruídas como subconjunto barato para
+  absorver mudanças de propriedade;
+- visibilidade dos alvos, memória e inteligência são republicadas segundo o
+  `FogUpdateContext`;
+- somente o `presentationSlot` escreve nos Tilemaps.
+
+A revisão global pode avançar por movimento inimigo sem alterar a geometria de
+uma fonte aliada. Por isso, uma unidade cujo estado confirmado — posição, slot,
+domínio, altura, embarque, alcance e tipo — permaneceu igual não executa
+`CollectVisibleCells` novamente no início do turno.
+
+Em turnos com gameplay e apresentação separados, o mesmo processo ocorre
+primeiro para o executor em `DataOnly` e depois para o observador visual. Se
+qualquer fotografia necessária estiver ausente ou inconsistente, o fluxo
+abandona o fast path e usa `RefreshFogOfWarForActiveTeam()`.
+
+Mortes apresentadas por filas não removem fontes durante o estado provisório.
+Elas marcam uma reconciliação pendente, executada somente depois do retorno a
+`Neutral`, quando a unidade já deixou o tabuleiro confirmado.
+
+O diagnóstico `[FoW][TurnStartCache]` informa ativação, unidades alteradas,
+inalteradas e removidas, células recolhidas, construções reconstruídas, tempo
+total e eventual `fallback=full`.

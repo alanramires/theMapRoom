@@ -894,6 +894,37 @@ public class TutorialManager : MonoBehaviour
         return false;
     }
 
+    // Ajuda dos comandos de roteiro do tutorial. Exposta pelo comando de debug "TUTORIAL HELP" /
+    // "HELP TUTORIAL" (ver PanelDebugController). Vive AQUI, ao lado do parser, para nao divergir
+    // da sintaxe real (spawnCommand em ProcessSpawnCommand, statCommand em TryExecuteSingleStatCommand).
+    public static string BuildTutorialCommandHelp()
+    {
+        return
+            "COMANDOS DE ROTEIRO DO TUTORIAL (campos das falas em TutorialData)\n" +
+            "Multiplos comandos no mesmo campo: separe por ';'.\n" +
+            "\n" +
+            "spawnCommand — nasce unidade(s):\n" +
+            "  slotN SIGLA x,y      ex.: slot0 SD 1,3   (N tambem sem 'slot': 1 SD 5,6)\n" +
+            "  opcoes apos as coordenadas:\n" +
+            "    acted              nasce ja tendo agido\n" +
+            "    name=Ryan          renomeia (use _ para espaco: name=Recruta_Ryan)\n" +
+            "    cursor             move o cursor ate a unidade\n" +
+            "  ex.: slot0 SD 1,3 name=Ryan cursor\n" +
+            "\n" +
+            "statCommand — ajustes e direcao de cena:\n" +
+            "  NOME stat=valor      stat = hp | fuel | ammo   (NOME casa por nome/apelido/id)\n" +
+            "  wake <alvo>          reativa (limpa 'ja agiu'). alvo: 1,3 | SD 1,3 | Ryan\n" +
+            "  complete <key>       completa objetivo por key (ex.: complete hist_1_08)\n" +
+            "  show <alvo>          torna construcao visivel. alvo: nome | x,y\n" +
+            "  hide <alvo>          oculta construcao\n" +
+            "  pan <alvo>           desliza SO a camera. alvo: x,y | unidade | construcao\n" +
+            "  cursor <alvo>        move SO o cursor (cinematografico)\n" +
+            "  zoom <valor>         orthographicSize exato (ex.: zoom 1.5 ou 1,5)\n" +
+            "  slotN move ...       movimento scriptado\n" +
+            "\n" +
+            "Tarefas (objectives): o campo 'parameters' aceita 'spawn:...' (mesma sintaxe do spawnCommand).";
+    }
+
     // Executa ajustes de status vindos do roteiro: "NOME stat=valor" separados por ';'.
     // Stats: hp, fuel (autonomia), ammo (municao). NOME casa por nome/apelido/id.
     public bool ExecuteStatCommands(string commands)

@@ -446,6 +446,7 @@ public class MatchController : MonoBehaviour
     [System.NonSerialized] private UnitManager pendingCommittedActedUnit;
     [System.NonSerialized] private bool pendingCommittedUnitRequiresHasActed;
     [System.NonSerialized] private bool pendingCommittedUnitRequiresFullFogRefresh;
+    [System.NonSerialized] private bool pendingCommittedFogSourceRemovalReconciliation;
     [System.NonSerialized] private bool debugFogOfWarEnabled = true;
     [System.NonSerialized] private bool debugFogOfWarPartial;
     [System.NonSerialized] private int fogPresentationGameplayTeamId = int.MinValue;
@@ -2809,7 +2810,12 @@ public class MatchController : MonoBehaviour
         {
             if (Application.isPlaying)
             {
-                RefreshFogOfWarForActiveTeam();
+                if (!TryRefreshFogOfWarForTurnStartIncremental())
+                {
+                    if (enableFogStepPerfLogs)
+                        Debug.Log($"[FoW][TurnStartCache] slot={ActiveSlotId.Value} fallback=full");
+                    RefreshFogOfWarForActiveTeam();
+                }
                 RefreshRuntimeUnitFogVisibility();
                 RunTurnStartStillObservedForActiveTeamStealthUnits();
             }
@@ -2847,7 +2853,12 @@ public class MatchController : MonoBehaviour
         }
         else if (enableTotalWar)
         {
-            RefreshFogOfWarForActiveTeam();
+            if (!TryRefreshFogOfWarForTurnStartIncremental())
+            {
+                if (enableFogStepPerfLogs)
+                    Debug.Log($"[FoW][TurnStartCache] slot={ActiveSlotId.Value} fallback=full");
+                RefreshFogOfWarForActiveTeam();
+            }
             RefreshRuntimeUnitFogVisibility();
             RunTurnStartStillObservedForActiveTeamStealthUnits();
         }
@@ -4142,6 +4153,181 @@ public class MatchController : MonoBehaviour
                     Debug.Log($"[FoW][Perf][CollectTop{(i + 1)}] unit={entry.unitName} ms={entry.collectMs:F3} cells={entry.visibleCellCount}");
                 }
             }
+        }
+    }
+
+    private bool TryRefreshFogOfWarForTurnStartIncremental()
+    {
+        if (!Application.isPlaying || !debugFogOfWarEnabled || !enableTotalWar)
+            return false;
+        if (turnStateManager != null &&
+            turnStateManager.CurrentCursorState != TurnStateManager.CursorState.Neutral)
+        {
+            return false;
+        }
+
+        Tilemap boardMap = ResolveFogBoardTilemap();
+        PlayerSlotId gameplaySlot = ActiveSlotId;
+        if (boardMap == null || !IsValidPlayerSlot(gameplaySlot))
+            return false;
+
+        PlayerSlotId presentationSlot = TryResolveFogPresentationSlot(out PlayerSlotId resolvedPresentationSlot)
+            ? resolvedPresentationSlot
+            : gameplaySlot;
+        bool splitPresentation = presentationSlot != gameplaySlot;
+        FogUpdateContext gameplayContext = CreateFogUpdateContext(
+            gameplaySlot,
+            gameplaySlot,
+            presentationSlot,
+            splitPresentation ? FogOfWarRefreshMode.DataOnly : FogOfWarRefreshMode.FullVisual);
+        if (!TrySynchronizeFogRuntimeAtTurnStart(gameplayContext, boardMap))
+            return false;
+
+        if (splitPresentation)
+        {
+            FogUpdateContext presentationContext = CreateFogUpdateContext(
+                gameplaySlot,
+                presentationSlot,
+                presentationSlot,
+                FogOfWarRefreshMode.FullVisual);
+            if (!TrySynchronizeFogRuntimeAtTurnStart(presentationContext, boardMap))
+                return false;
+        }
+
+        OnFogOfWarUpdated?.Invoke();
+        return true;
+    }
+
+    private bool TrySynchronizeFogRuntimeAtTurnStart(
+        FogUpdateContext context,
+        Tilemap boardMap)
+    {
+        FogObserverScopeState previous = EnterFogObserverScope(context);
+        try
+        {
+            if (!TryActivateFogContributionRuntimeForSlot(context.observerSlot, boardMap))
+            {
+                if (enableFogStepPerfLogs)
+                    Debug.Log($"[FoW][TurnStartCache] slot={context.observerSlot.Value} activated=false");
+                return false;
+            }
+
+            double startMs = enableFogStepPerfLogs ? Time.realtimeSinceStartupAsDouble : 0d;
+            List<UnitManager> eligibleUnits = new List<UnitManager>();
+            HashSet<FogContributionSourceId> eligibleUnitSources = new HashSet<FogContributionSourceId>();
+            List<UnitManager> activeUnits = UnitManager.AllActive;
+            for (int i = 0; i < activeUnits.Count; i++)
+            {
+                UnitManager unit = activeUnits[i];
+                if (unit == null || !unit.gameObject.activeInHierarchy || unit.IsEmbarked ||
+                    unit.SlotIndex != context.observerSlot.Value || !IsUnitOnBoard(unit, boardMap))
+                {
+                    continue;
+                }
+
+                FogContributionSourceId sourceId = ResolveFogContributionSourceId(unit);
+                if (!eligibleUnitSources.Add(sourceId))
+                    return false;
+                eligibleUnits.Add(unit);
+            }
+
+            int removedUnits = 0;
+            int removedConstructions = 0;
+            List<FogContributionSourceId> staleSources = new List<FogContributionSourceId>();
+            foreach (KeyValuePair<FogContributionSourceId, FogSourceContributionCacheEntry> pair
+                     in fogContributionsBySource)
+            {
+                if (pair.Key.type == FogContributionSourceType.Unit &&
+                    !eligibleUnitSources.Contains(pair.Key))
+                {
+                    staleSources.Add(pair.Key);
+                    removedUnits++;
+                }
+                else if (pair.Key.type == FogContributionSourceType.Construction)
+                {
+                    // Construcoes sao baratas e propriedade pode ter mudado durante
+                    // outro turno. Reconstrua somente este subconjunto de fontes.
+                    staleSources.Add(pair.Key);
+                    removedConstructions++;
+                }
+            }
+            for (int i = 0; i < staleSources.Count; i++)
+            {
+                FogContributionSourceId sourceId = staleSources[i];
+                if (fogContributionsBySource.TryGetValue(
+                        sourceId,
+                        out FogSourceContributionCacheEntry staleEntry))
+                {
+                    RemoveFogSourceContributions(staleEntry, boardMap, updateVisual: false);
+                }
+                fogContributionsBySource.Remove(sourceId);
+            }
+
+            int changedUnits = 0;
+            int unchangedUnits = 0;
+            int collectedCells = 0;
+            for (int i = 0; i < eligibleUnits.Count; i++)
+            {
+                UnitManager unit = eligibleUnits[i];
+                FogContributionSourceId sourceId = ResolveFogContributionSourceId(unit);
+                int sourceStateHash = BuildFogUnitSourceStateHash(unit);
+                if (fogContributionsBySource.TryGetValue(
+                        sourceId,
+                        out FogSourceContributionCacheEntry existing) &&
+                    existing != null &&
+                    existing.sourceStateHash == sourceStateHash)
+                {
+                    // Revisoes globais podem ter avancado por acoes inimigas sem
+                    // alterar esta fonte. Rebaseie a chave sobre o estado confirmado.
+                    existing.unitCacheKey = BuildFogUnitCacheKey(unit, boardMap);
+                    unchangedUnits++;
+                    continue;
+                }
+
+                UpdateFogVisibilityForUnit(
+                    unit,
+                    boardMap,
+                    out _,
+                    out int visibleCellsCollected,
+                    out _,
+                    updateVisual: false);
+                collectedCells += visibleCellsCollected;
+                changedUnits++;
+            }
+
+            int constructions = ApplyFriendlyConstructionVision(boardMap, updateVisual: false);
+            UnitManager[] snapshotUnits = FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude);
+            if (context.publishGameplayData)
+            {
+                PublishFogGameplaySnapshot(
+                    context.observerSlot.Value,
+                    boardMap,
+                    snapshotUnits,
+                    context.recordExplorationMemory);
+            }
+            StoreFogContributionRuntimeForSlot(context.observerSlot);
+            if (context.recordIntel)
+                AIIntelLedger.RecordVisibleContactsForSlot(context.observerSlot, currentTurn, this);
+            if (context.publishVisuals)
+            {
+                RefreshRuntimeUnitFogVisibility();
+                RenderFogOverlayFromRuntimeCache(boardMap);
+            }
+
+            if (enableFogStepPerfLogs)
+            {
+                double totalMs = (Time.realtimeSinceStartupAsDouble - startMs) * 1000d;
+                Debug.Log(
+                    $"[FoW][TurnStartCache] slot={context.observerSlot.Value} activated=true " +
+                    $"units.changed={changedUnits} units.unchanged={unchangedUnits} units.removed={removedUnits} " +
+                    $"cells.collected={collectedCells} constructions={constructions} " +
+                    $"constructions.removed={removedConstructions} total={totalMs:F3}ms");
+            }
+            return true;
+        }
+        finally
+        {
+            ExitFogObserverScope(previous);
         }
     }
 
@@ -7877,6 +8063,14 @@ public class MatchController : MonoBehaviour
             return;
         if (fogOfWarTilemap == null)
             return;
+        if (turnStateManager != null &&
+            turnStateManager.CurrentCursorState != TurnStateManager.CursorState.Neutral)
+        {
+            // A fila de morte ainda esta em apresentacao provisoria. A fonte so
+            // deixa o snapshot confirmado depois do retorno a Neutral.
+            pendingCommittedFogSourceRemovalReconciliation = true;
+            return;
+        }
 
         Tilemap boardMap = ResolveFogBoardTilemap();
         if (boardMap == null)
@@ -7901,24 +8095,35 @@ public class MatchController : MonoBehaviour
 
     public void NotifyTurnStateReturnedToNeutral()
     {
-        if (!pendingCommittedBoardRefresh)
+        bool reconcileRemovedSources = pendingCommittedFogSourceRemovalReconciliation;
+        pendingCommittedFogSourceRemovalReconciliation = false;
+        if (!pendingCommittedBoardRefresh && !reconcileRemovedSources)
             return;
 
-        UnitManager actedUnit = pendingCommittedActedUnit;
-        bool requireHasActed = pendingCommittedUnitRequiresHasActed;
-        bool requireFullRefresh = pendingCommittedUnitRequiresFullFogRefresh;
-        pendingCommittedBoardRefresh = false;
-        pendingCommittedActedUnit = null;
-        pendingCommittedUnitRequiresHasActed = false;
-        pendingCommittedUnitRequiresFullFogRefresh = false;
+        if (pendingCommittedBoardRefresh)
+        {
+            UnitManager actedUnit = pendingCommittedActedUnit;
+            bool requireHasActed = pendingCommittedUnitRequiresHasActed;
+            bool requireFullRefresh = pendingCommittedUnitRequiresFullFogRefresh;
+            pendingCommittedBoardRefresh = false;
+            pendingCommittedActedUnit = null;
+            pendingCommittedUnitRequiresHasActed = false;
+            pendingCommittedUnitRequiresFullFogRefresh = false;
 
-        // Ja estamos em Neutral: publique somente o delta da unidade comprometida.
-        // FullVisual apagaria os caches e escalaria com todas as unidades a cada acao.
-        ProcessCommittedUnitFog(
-            actedUnit,
-            raiseActedEvent: false,
-            requireHasActed: requireHasActed,
-            requireFullRefresh: requireFullRefresh);
+            // Ja estamos em Neutral: publique somente o delta da unidade comprometida.
+            // FullVisual apagaria os caches e escalaria com todas as unidades a cada acao.
+            ProcessCommittedUnitFog(
+                actedUnit,
+                raiseActedEvent: false,
+                requireHasActed: requireHasActed,
+                requireFullRefresh: requireFullRefresh);
+        }
+
+        if (reconcileRemovedSources &&
+            !TryRefreshFogOfWarForTurnStartIncremental())
+        {
+            RefreshFogOfWarForActiveTeam();
+        }
     }
 
     private void RemoveFogSpecializedViewCacheForUnit(int unitIndex)

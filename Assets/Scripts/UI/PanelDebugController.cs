@@ -295,6 +295,15 @@ public class PanelDebugController : MonoBehaviour
             cursorController?.PlayBeepSfx();
             executed = true;
         }
+        else if (command == "TUTORIAL HELP" || command == "HELP TUTORIAL")
+        {
+            string tutorialHelp = TutorialManager.BuildTutorialCommandHelp();
+            ShowDynamicHelpPanel(tutorialHelp);
+
+            Debug.Log($"[Debug Command] TUTORIAL HELP\n{tutorialHelp}");
+            cursorController?.PlayBeepSfx();
+            executed = true;
+        }
         else if (TryParseSetHpCommand(command, out int hpValue))
         {
             executed = turnStateManager.TrySetUnitHpUnderCursorFromDebug(hpValue, out string message);
@@ -1016,6 +1025,7 @@ public class PanelDebugController : MonoBehaviour
             "ai shopping pause | pause ai shopping\n" +
             "ai shopping resume | resume ai shopping\n" +
             "ai stage <1-3> (reinicia a IA no bloco escolhido)\n" +
+            "tutorial help | help tutorial - lista os comandos de roteiro do tutorial (spawn/stat das falas)\n" +
             "help";
     }
 
