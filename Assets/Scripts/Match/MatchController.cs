@@ -4622,11 +4622,16 @@ public class MatchController : MonoBehaviour
                 continue;
             if (delta.RequiresHasActed(unit) && !unit.HasActed)
                 continue;
-            ApplyCommittedUnitFog(unit, boardMap);
+            HashSet<Vector3Int> affectedTargetCells =
+                new HashSet<Vector3Int>(delta.ChangedCells);
+            ApplyCommittedUnitFog(unit, boardMap, affectedTargetCells);
         }
     }
 
-    private void ApplyCommittedUnitFog(UnitManager unit, Tilemap boardMap)
+    private void ApplyCommittedUnitFog(
+        UnitManager unit,
+        Tilemap boardMap,
+        HashSet<Vector3Int> affectedTargetCells)
     {
         if ((fogCachedObserverSlotIndex != ActiveSlotId.Value || !fogOverlayInitialized) &&
             !TryActivateFogContributionRuntimeForSlot(ActiveSlotId, boardMap))
@@ -4649,6 +4654,8 @@ public class MatchController : MonoBehaviour
             gameplaySlot,
             presentationSlot,
             splitPresentation ? FogOfWarRefreshMode.DataOnly : FogOfWarRefreshMode.FullVisual);
+        HashSet<Vector3Int> presentationTargetCells =
+            new HashSet<Vector3Int>(affectedTargetCells);
         FogObserverScopeState incrementalPrevious = EnterFogObserverScope(gameplayContext);
         try
         {
@@ -4658,7 +4665,8 @@ public class MatchController : MonoBehaviour
             out double collectMs,
             out int visibleCellsCollected,
             out bool collectExecuted,
-            updateVisual: gameplayContext.publishVisuals);
+            updateVisual: gameplayContext.publishVisuals,
+            affectedTargetCells);
         double updateCacheMs = enableFogStepPerfLogs ? (Time.realtimeSinceStartupAsDouble - stageStartMs) * 1000d : 0d;
         UnitManager[] snapshotUnits = FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude);
         // MarkAsActed e o ponto de compromisso da acao. A uniao especializada do modo ALL
@@ -4674,15 +4682,20 @@ public class MatchController : MonoBehaviour
                 gameplayContext.observerSlot.Value,
                 boardMap,
                 snapshotUnits,
-                gameplayContext.recordExplorationMemory);
+                gameplayContext.recordExplorationMemory,
+                affectedTargetCells);
         }
         StoreFogContributionRuntimeForSlot(gameplaySlot);
         if (gameplayContext.publishVisuals)
-            RefreshRuntimeUnitFogVisibility();
+            RefreshRuntimeUnitFogVisibilityForCells(affectedTargetCells);
         double runtimeVisibilityMs = enableFogStepPerfLogs ? (Time.realtimeSinceStartupAsDouble - stageStartMs) * 1000d : 0d;
         stageStartMs = enableFogStepPerfLogs ? Time.realtimeSinceStartupAsDouble : 0d;
         if (gameplayContext.recordIntel)
-            AIIntelLedger.RecordVisibleContactsForSlot(gameplaySlot, currentTurn, this);
+            AIIntelLedger.RecordVisibleContactsForSlot(
+                gameplaySlot,
+                currentTurn,
+                this,
+                affectedTargetCells);
         double intelMs = enableFogStepPerfLogs ? (Time.realtimeSinceStartupAsDouble - stageStartMs) * 1000d : 0d;
         stageStartMs = enableFogStepPerfLogs ? Time.realtimeSinceStartupAsDouble : 0d;
         TryPlaySkillDetectionSfxForActedUnit(unit, boardMap);
@@ -4698,7 +4711,8 @@ public class MatchController : MonoBehaviour
                     presentationSlot,
                     FogOfWarRefreshMode.FullVisual),
                 boardMap,
-                snapshotUnits))
+                snapshotUnits,
+                deltaTargetCells: presentationTargetCells))
         {
             RefreshFogOfWarForActiveTeam(FogOfWarRefreshMode.FullVisual);
             return;
@@ -4726,7 +4740,8 @@ public class MatchController : MonoBehaviour
     private bool TryRefreshFogPresentationAfterForeignUnitCommit(
         FogUpdateContext context,
         Tilemap boardMap,
-        UnitManager[] snapshotUnits)
+        UnitManager[] snapshotUnits,
+        HashSet<Vector3Int> deltaTargetCells)
     {
         if (!context.gameplaySlot.IsValid || !context.observerSlot.IsValid ||
             context.gameplaySlot == context.observerSlot ||
@@ -4750,16 +4765,21 @@ public class MatchController : MonoBehaviour
                     context.observerSlot.Value,
                     boardMap,
                     snapshotUnits,
-                    context.recordExplorationMemory);
+                    context.recordExplorationMemory,
+                    deltaTargetCells);
             }
             StoreFogContributionRuntimeForSlot(context.observerSlot);
             if (context.publishVisuals)
             {
-                RefreshRuntimeUnitFogVisibility();
+                RefreshRuntimeUnitFogVisibilityForCells(deltaTargetCells);
                 RenderFogOverlayFromRuntimeCache(boardMap);
             }
             if (context.recordIntel)
-                AIIntelLedger.RecordVisibleContactsForSlot(context.observerSlot, currentTurn, this);
+                AIIntelLedger.RecordVisibleContactsForSlot(
+                    context.observerSlot,
+                    currentTurn,
+                    this,
+                    deltaTargetCells);
             return true;
         }
         finally
@@ -5173,7 +5193,7 @@ public class MatchController : MonoBehaviour
             if (observedTeamsChanged)
             {
                 actedUnit.RefreshRuntimeVisualState();
-                RefreshRuntimeUnitFogVisibility();
+                RefreshRuntimeUnitFogVisibilityForUnit(actedUnit);
             }
 
             return;
@@ -5184,7 +5204,7 @@ public class MatchController : MonoBehaviour
         {
             actedUnit.ClearStealthRevealState();
             actedUnit.RefreshRuntimeVisualState();
-            RefreshRuntimeUnitFogVisibility();
+            RefreshRuntimeUnitFogVisibilityForUnit(actedUnit);
             if (ShouldLogAindaMeVeRuntime)
                 Debug.Log($"[AindaMeVe][Runtime][Clear] target={actedUnit.name} -> nenhum inimigo detectando.");
             return;
@@ -5192,6 +5212,17 @@ public class MatchController : MonoBehaviour
 
         if (observedTeamsCleared)
             actedUnit.RefreshRuntimeVisualState();
+    }
+
+    private void RefreshRuntimeUnitFogVisibilityForUnit(UnitManager unit)
+    {
+        if (unit == null)
+            return;
+
+        Vector3Int cell = unit.CurrentCellPosition;
+        cell.z = 0;
+        RefreshRuntimeUnitFogVisibilityForCells(
+            new HashSet<Vector3Int> { cell });
     }
 
     private int ResolveMaxEnemyObservationRadiusForTarget(UnitManager target)
@@ -7125,13 +7156,17 @@ public class MatchController : MonoBehaviour
         int slotIndex,
         Tilemap boardMap,
         UnitManager[] units,
-        bool recordExplorationMemory)
+        bool recordExplorationMemory,
+        HashSet<Vector3Int> affectedTargetCells = null)
     {
         PlayerSlotId observerSlot = PlayerSlotId.FromIndex(slotIndex);
         if (!IsValidPlayerSlot(observerSlot) || boardMap == null)
             return;
 
-        if (!fogGameplaySnapshotsBySlot.TryGetValue(slotIndex, out FogSlotGameplaySnapshot snapshot))
+        bool hadSnapshot = fogGameplaySnapshotsBySlot.TryGetValue(
+            slotIndex,
+            out FogSlotGameplaySnapshot snapshot);
+        if (!hadSnapshot)
         {
             snapshot = new FogSlotGameplaySnapshot();
             fogGameplaySnapshotsBySlot[slotIndex] = snapshot;
@@ -7166,10 +7201,16 @@ public class MatchController : MonoBehaviour
                 snapshot.geographicOnlyCells.Add(cell);
         }
 
-        snapshot.unitVisibility.Clear();
+        bool targetOnly = hadSnapshot &&
+                          snapshot.unitVisibility.Count > 0 &&
+                          affectedTargetCells != null &&
+                          affectedTargetCells.Count > 0;
+        if (!targetOnly)
+            snapshot.unitVisibility.Clear();
         if (units == null)
             return;
 
+        int evaluatedTargets = 0;
         for (int i = 0; i < units.Length; i++)
         {
             UnitManager unit = units[i];
@@ -7178,9 +7219,22 @@ public class MatchController : MonoBehaviour
             if (!IsUnitOnBoard(unit, boardMap))
                 continue;
 
+            Vector3Int unitCell = unit.CurrentCellPosition;
+            unitCell.z = 0;
+            if (targetOnly && !affectedTargetCells.Contains(unitCell))
+                continue;
+
             bool visible = unit.SlotIndex == slotIndex ||
                            ComputeIsUnitVisibleForSlotWithoutCache(unit, observerSlot);
             snapshot.unitVisibility[ResolveFogCacheIndex(unit)] = visible;
+            evaluatedTargets++;
+        }
+
+        if (enableFogStepPerfLogs && targetOnly)
+        {
+            Debug.Log(
+                $"[FoW][AffectedTargets] slot={slotIndex} " +
+                $"cells={affectedTargetCells.Count} evaluated={evaluatedTargets} totalUnits={units.Length}");
         }
     }
 
@@ -8157,7 +8211,8 @@ public class MatchController : MonoBehaviour
         out double collectMs,
         out int visibleCellsCollected,
         out bool collectExecuted,
-        bool updateVisual = true)
+        bool updateVisual = true,
+        HashSet<Vector3Int> affectedTargetCells = null)
     {
         collectMs = 0d;
         visibleCellsCollected = 0;
@@ -8182,6 +8237,11 @@ public class MatchController : MonoBehaviour
             fogContributionsBySource[sourceId] = cacheEntry;
         }
 
+        if (affectedTargetCells != null)
+        {
+            affectedTargetCells.UnionWith(cacheEntry.geographicCells);
+            affectedTargetCells.UnionWith(cacheEntry.sensorCells);
+        }
         RemoveFogSourceContributions(cacheEntry, boardMap, updateVisual);
 
         if (!unit.gameObject.activeInHierarchy || unit.IsEmbarked ||
@@ -8215,6 +8275,11 @@ public class MatchController : MonoBehaviour
 
         cacheEntry.unitCacheKey = nextKey;
         cacheEntry.sourceStateHash = BuildFogUnitSourceStateHash(unit);
+        if (affectedTargetCells != null)
+        {
+            affectedTargetCells.UnionWith(cacheEntry.geographicCells);
+            affectedTargetCells.UnionWith(cacheEntry.sensorCells);
+        }
         if (updateVisual && fogOfWarVisionMode != FogOfWarVisionMode.All)
             RenderFogOverlayFromRuntimeCache(boardMap);
     }
@@ -8585,6 +8650,67 @@ public class MatchController : MonoBehaviour
         }
 
         RefreshStackedHexFrontRendering(units, boardMap, observerSlot);
+    }
+
+    private void RefreshRuntimeUnitFogVisibilityForCells(
+        HashSet<Vector3Int> affectedTargetCells)
+    {
+        if (affectedTargetCells == null ||
+            affectedTargetCells.Count == 0 ||
+            fogUnitVisibilityByCacheIndex.Count == 0)
+        {
+            RefreshRuntimeUnitFogVisibility();
+            return;
+        }
+
+        if (!debugFogOfWarEnabled || !enableTotalWar ||
+            gameSetup != GameSetupPreset.FogOfWarTotal)
+        {
+            ShowAllUnitsIgnoringFog();
+            return;
+        }
+
+        PlayerSlotId observerSlot = ActiveSlotId;
+        if (TryResolveFogPresentationSlot(out PlayerSlotId presentationSlot))
+            observerSlot = presentationSlot;
+
+        bool fogOverlayOwnsWorldOcclusion = UsesFogOverlayForWorldOcclusion();
+        Tilemap boardMap = ResolveFogBoardTilemap();
+        List<UnitManager> units = UnitManager.AllActive;
+        int evaluatedTargets = 0;
+        for (int i = 0; i < units.Count; i++)
+        {
+            UnitManager unit = units[i];
+            if (unit == null)
+                continue;
+            if (boardMap != null && !IsUnitOnBoard(unit, boardMap))
+                continue;
+
+            Vector3Int cell = unit.CurrentCellPosition;
+            cell.z = 0;
+            if (!affectedTargetCells.Contains(cell))
+                continue;
+
+            bool visible = unit.SlotIndex == observerSlot.Value ||
+                           ComputeIsUnitVisibleForSlotWithoutCache(unit, observerSlot);
+            fogUnitVisibilityByCacheIndex[ResolveFogCacheIndex(unit)] = visible;
+            unit.SetFogOfWarVisibility(ResolveFogRenderVisibility(
+                unit,
+                visible,
+                fogOverlayOwnsWorldOcclusion,
+                observerSlot));
+            evaluatedTargets++;
+        }
+
+        // A prioridade visual de pilhas pode mudar nas células de origem e
+        // destino; a rotina não recalcula sensores nem memória.
+        RefreshStackedHexFrontRendering(units, boardMap, observerSlot);
+        if (enableFogStepPerfLogs)
+        {
+            Debug.Log(
+                $"[FoW][AffectedTargets][Visual] slot={observerSlot.Value} " +
+                $"cells={affectedTargetCells.Count} evaluated={evaluatedTargets}");
+        }
     }
 
     // Scratch do passo de empilhamento multicamada (ver metodo abaixo).

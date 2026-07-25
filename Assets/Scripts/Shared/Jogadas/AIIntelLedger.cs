@@ -91,7 +91,8 @@ public static class AIIntelLedger
     public static void RecordVisibleContactsForSlot(
         PlayerSlotId observerSlot,
         int turn,
-        MatchController match)
+        MatchController match,
+        HashSet<Vector3Int> affectedTargetCells = null)
     {
         if (match == null || !match.IsValidPlayerSlot(observerSlot))
             return;
@@ -101,11 +102,20 @@ public static class AIIntelLedger
         foreach (UnitManager enemy in UnitManager.AllActive)
         {
             if (enemy == null || enemy.IsDead || enemy.IsEmbarked
-                || enemy.SlotIndex == observerSlot.Value
-                || !match.IsUnitVisibleForSlot(enemy, observerSlot)
-                || !enemy.TryGetUnitData(out UnitData data) || data == null)
+                || enemy.SlotIndex == observerSlot.Value)
                 continue;
 
+            if (affectedTargetCells != null && affectedTargetCells.Count > 0)
+            {
+                Vector3Int enemyCell = enemy.CurrentCellPosition;
+                enemyCell.z = 0;
+                if (!affectedTargetCells.Contains(enemyCell))
+                    continue;
+            }
+
+            if (!match.IsUnitVisibleForSlot(enemy, observerSlot)
+                || !enemy.TryGetUnitData(out UnitData data) || data == null)
+                continue;
             RecordVisibleContact(ledger, enemy, data, turn);
         }
     }

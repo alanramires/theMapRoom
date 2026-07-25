@@ -74,6 +74,17 @@ public enum TutorialMovementEffect
     AttackOnly = 4
 }
 
+// Ritmo do passo do roteiro (para o linter de tutorial). Auto = inferido do 'advance'/comandos.
+public enum TutorialInteractionType
+{
+    [InspectorName("Auto (inferido)")]
+    Auto = 0,
+    Narrative = 1,   // so texto; o jogador nao faz nada
+    Passive = 2,     // algo acontece na tela (spawn/camera); o jogador observa
+    Active = 3,      // o jogador deve executar uma acao
+    Milestone = 4    // marco (completou algo significativo)
+}
+
 [System.Serializable]
 public class TutorialScoldEntry
 {
@@ -133,6 +144,10 @@ public class TutorialDialogEntry
     [Tooltip("Estado do movimento a partir desta fala. No Effect mantem. Locked trava tudo. Hold Only libera manter posicao/atacar parado mas impede sair da celula. Unlocked libera. Se QUALQUER fala usar Unlocked (ou o legado unlockMovement), a cena comeca travada.")]
     public TutorialMovementEffect movement;
 
+    [Tooltip("Ritmo deste passo, para o linter de tutorial. Auto = inferido do 'advance'/comandos. " +
+             "Narrative=so texto; Passive=cena acontece; Active=jogador age; Milestone=marco.")]
+    public TutorialInteractionType interactionType = TutorialInteractionType.Auto;
+
     [HideInInspector]
     [Tooltip("LEGADO (prefira movement=Unlocked). Se true, mover/manter posicao e liberado a partir desta fala (ordem de marcha).")]
     public bool unlockMovement;
@@ -174,6 +189,7 @@ public class TutorialStepDto
     public string advance;     // TutorialAdvanceCondition
     public string turn;        // TutorialEndTurnEffect
     public string movement;    // TutorialMovementEffect
+    public string interactionType; // TutorialInteractionType (Auto se vazio)
     public string objectiveKey;
     public bool revealObjective;
     public string text;

@@ -539,6 +539,7 @@ public class TutorialManager : MonoBehaviour
             advance = e.advance.ToString(),
             turn = e.turn.ToString(),
             movement = e.movement.ToString(),
+            interactionType = e.interactionType.ToString(),
             objectiveKey = e.objectiveKey,
             revealObjective = e.revealObjective,
             text = e.text,
@@ -938,6 +939,132 @@ public class TutorialManager : MonoBehaviour
             "  slotN move ...       movimento scriptado\n" +
             "\n" +
             "Tarefas (objectives): o campo 'parameters' aceita 'spawn:...' (mesma sintaxe do spawnCommand).";
+    }
+
+    // -------------------------------------------------------------------------
+    // Linter de tutorial (Fase 2): feedback de ritmo e consistencia. Sem dependencia de editor —
+    // chamado no import e por um botao no inspector. Devolve linhas [INFO]/[AVISO]/[ERRO].
+    // -------------------------------------------------------------------------
+
+    // Ritmo EFETIVO do passo: usa o override se != Auto; senao infere do 'advance' + comandos de cena.
+    public static TutorialInteractionType ResolveInteractionType(TutorialDialogEntry e)
+    {
+        if (e == null)
+            return TutorialInteractionType.Narrative;
+        if (e.interactionType != TutorialInteractionType.Auto)
+            return e.interactionType;
+
+        switch (e.advance)
+        {
+            case TutorialAdvanceCondition.ObjectiveCompleted:
+            case TutorialAdvanceCondition.AllUnitsActed:
+            case TutorialAdvanceCondition.AimOpened:
+                return TutorialInteractionType.Active;   // avanca por ACAO do jogador
+            case TutorialAdvanceCondition.PlayerTurnStarted:
+            case TutorialAdvanceCondition.EnemyTurnStarted:
+                return TutorialInteractionType.Passive;  // avanca por fluxo de turno
+            default: // Immediate
+                bool cena = !string.IsNullOrWhiteSpace(e.spawnCommand) || !string.IsNullOrWhiteSpace(e.statCommand);
+                return cena ? TutorialInteractionType.Passive : TutorialInteractionType.Narrative;
+        }
+    }
+
+    public static List<string> LintTutorial(List<TutorialObjective> objectives, List<TutorialDialogEntry> script)
+    {
+        var report = new List<string>();
+        if (objectives == null) objectives = new List<TutorialObjective>();
+        if (script == null) script = new List<TutorialDialogEntry>();
+
+        // 1) Ritmo: passos ate a primeira interacao (Active) + contagem por tipo.
+        int firstActive = -1, active = 0, narrative = 0, passive = 0, milestone = 0;
+        for (int i = 0; i < script.Count; i++)
+        {
+            switch (ResolveInteractionType(script[i]))
+            {
+                case TutorialInteractionType.Active: active++; if (firstActive < 0) firstActive = i; break;
+                case TutorialInteractionType.Passive: passive++; break;
+                case TutorialInteractionType.Milestone: milestone++; break;
+                default: narrative++; break;
+            }
+        }
+
+        int antesDaAcao = firstActive < 0 ? script.Count : firstActive;
+        const int LongIntro = 6;
+        if (script.Count > 0 && antesDaAcao >= LongIntro)
+            report.Add($"[AVISO] {antesDaAcao} passos antes da 1a interacao (Active). Introducao longa cansa — " +
+                       "considere adiantar uma acao do jogador ou quebrar o bloco.");
+        if (active == 0 && script.Count > 0)
+            report.Add("[AVISO] Nenhum passo Active — o jogador so assiste. Falta acao?");
+
+        float porAcao = active > 0 ? (float)script.Count / active : script.Count;
+        report.Add($"[INFO] {script.Count} passo(s): {narrative} narrative, {passive} passive, {active} active, " +
+                   $"{milestone} milestone. ~1 interacao a cada {porAcao:0.#} passos.");
+
+        // 2) Keys de objetivo orfas (referenciam objective que nao existe).
+        var keys = new HashSet<string>(System.StringComparer.OrdinalIgnoreCase);
+        for (int i = 0; i < objectives.Count; i++)
+            if (objectives[i] != null && !string.IsNullOrWhiteSpace(objectives[i].key))
+                keys.Add(objectives[i].key.Trim());
+
+        for (int i = 0; i < script.Count; i++)
+        {
+            TutorialDialogEntry e = script[i];
+            if (e == null) continue;
+            LintCheckKey(report, keys, i, "objectiveKey", e.objectiveKey);
+            LintCheckKey(report, keys, i, "waitObjectiveKey", e.waitObjectiveKey);
+            LintCheckKey(report, keys, i, "revealObjectiveKey", e.revealObjectiveKey);
+            LintRichTextTags(report, i, e.text);
+        }
+
+        return report;
+    }
+
+    private static void LintCheckKey(List<string> report, HashSet<string> keys, int step, string field, string value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return;
+        if (!keys.Contains(value.Trim()))
+            report.Add($"[ERRO] Passo {step}: {field}='{value}' nao existe nos objectives.");
+    }
+
+    // Tags conhecidas (pareadas), espelhando PanelDialogTutorialController.FormatSpeechText.
+    private static readonly string[] TutorialRichTags = { "ordem", "enfase", "azul", "amarelo", "vermelho" };
+    private static void LintRichTextTags(List<string> report, int step, string text)
+    {
+        if (string.IsNullOrEmpty(text)) return;
+        var open = new Dictionary<string, int>();
+        int idx = 0;
+        while (true)
+        {
+            int lb = text.IndexOf('[', idx);
+            if (lb < 0) break;
+            int rb = text.IndexOf(']', lb + 1);
+            if (rb < 0) break;
+            string raw = text.Substring(lb + 1, rb - lb - 1).Trim();
+            idx = rb + 1;
+            if (raw.Length == 0) continue;
+
+            bool closing = raw.StartsWith("/");
+            string name = (closing ? raw.Substring(1) : raw).ToLowerInvariant();
+            if (System.Array.IndexOf(TutorialRichTags, name) < 0)
+            {
+                report.Add($"[AVISO] Passo {step}: tag desconhecida '[{raw}]' no texto.");
+                continue;
+            }
+            if (closing)
+            {
+                if (!open.TryGetValue(name, out int c) || c <= 0)
+                    report.Add($"[AVISO] Passo {step}: '[/{name}]' sem abertura correspondente.");
+                else
+                    open[name] = c - 1;
+            }
+            else
+            {
+                open[name] = open.TryGetValue(name, out int c) ? c + 1 : 1;
+            }
+        }
+        foreach (KeyValuePair<string, int> kv in open)
+            if (kv.Value > 0)
+                report.Add($"[AVISO] Passo {step}: '[{kv.Key}]' aberta {kv.Value}x sem fechar.");
     }
 
     // Executa ajustes de status vindos do roteiro: "NOME stat=valor" separados por ';'.

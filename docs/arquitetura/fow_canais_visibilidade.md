@@ -316,3 +316,40 @@ contrato confirmado, independentemente de quem originou o batch.
 O log `[FoW][CommittedDelta]` informa os tipos de mudança, a quantidade de
 unidades e células afetadas e se o consumidor solicitou reconciliação ou full
 refresh.
+
+## Visibilidade limitada aos alvos afetados
+
+No caminho incremental, a atualização de uma fonte produz um conjunto de
+impacto formado pela união de:
+
+- células geográficas e sensoriais contribuídas antes da mudança;
+- células geográficas e sensoriais contribuídas depois da mudança;
+- origem, destino e posição confirmada informados pelo
+  `CommittedBoardDelta`.
+
+Somente unidades posicionadas nesse conjunto têm sua visibilidade recalculada
+no snapshot do observador. Entradas fora dele permanecem válidas e são
+preservadas.
+
+O mesmo filtro é aplicado:
+
+- à visibilidade runtime da apresentação;
+- à gravação de contatos no `AIIntelLedger`;
+- à atualização visual específica de uma unidade stealth cuja persistência de
+  detecção mudou.
+
+Quando gameplay e apresentação pertencem a slots diferentes, há dois conjuntos
+distintos:
+
+- o executor usa a união completa da cobertura antiga e nova, pois suas fontes
+  de visão mudaram;
+- o observador visual usa somente as células confirmadas da unidade que se
+  moveu, pois suas próprias fontes permaneceram iguais.
+
+Snapshots ausentes, conjuntos vazios e caminhos de reconciliação continuam
+usando a varredura integral conservadora. Remoções e mudanças multiunidade
+também preservam os fallbacks definidos nas etapas anteriores.
+
+Os logs `[FoW][AffectedTargets]` e `[FoW][AffectedTargets][Visual]` informam
+quantas células foram consideradas e quantas unidades realmente precisaram ser
+reavaliadas.

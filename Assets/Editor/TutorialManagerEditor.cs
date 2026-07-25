@@ -16,24 +16,27 @@ public class TutorialManagerEditor : Editor
         // Captura o clique DENTRO do scope e age DEPOIS que ele fecha: as janelas modais
         // (SaveFilePanel/OpenFilePanel/DisplayDialog) interrompem o IMGUI e, se chamadas dentro do
         // HorizontalScope, quebram o balanceamento de layout ("EndLayoutGroup: BeginLayoutGroup...").
-        bool doExport, doImport;
+        bool doExport, doImport, doValidate;
         using (new EditorGUILayout.HorizontalScope())
         {
             doExport = GUILayout.Button("Exportar JSON...", GUILayout.Height(26));
             doImport = GUILayout.Button("Importar JSON...", GUILayout.Height(26));
+            doValidate = GUILayout.Button("Validar", GUILayout.Height(26));
         }
 
         EditorGUILayout.HelpBox(
             "Export/Import do tutorial ATIVO em JSON (objectives + script). O 'voice' das falas vai " +
             "como caminho do asset (round-trip completo). Importar SUBSTITUI objectives e script do " +
-            "tutorial ativo (com Undo). Precisa do MatchController.ActiveTutorial — se avisar 'nenhum " +
-            "tutorial ativo', rode em Play.",
+            "tutorial ativo (com Undo). 'Validar' roda o linter (ritmo/consistencia) no Console. " +
+            "Precisa do MatchController.ActiveTutorial — se avisar 'nenhum tutorial ativo', rode em Play.",
             MessageType.Info);
 
         if (doExport)
             ExportTutorialJson((TutorialManager)target);
         if (doImport)
             ImportTutorialJson((TutorialManager)target);
+        if (doValidate)
+            ValidateTutorial((TutorialManager)target);
     }
 
     // ---------------------------------------------------------------- Export
@@ -153,6 +156,7 @@ public class TutorialManagerEditor : Editor
                     advance = ParseEnum(s.advance, TutorialAdvanceCondition.Immediate),
                     turn = ParseEnum(s.turn, TutorialEndTurnEffect.NoEffect),
                     movement = ParseEnum(s.movement, TutorialMovementEffect.NoEffect),
+                    interactionType = ParseEnum(s.interactionType, TutorialInteractionType.Auto),
                     objectiveKey = s.objectiveKey,
                     revealObjective = s.revealObjective,
                     text = s.text,
@@ -187,6 +191,46 @@ public class TutorialManagerEditor : Editor
 
         Debug.Log($"[TutorialManager] Importado de {path}: {objectives.Count} tarefa(s), {script.Count} passo(s)."
                   + (voiceMissing > 0 ? $" {voiceMissing} voice(s) não encontrado(s)." : ""));
+
+        // Linter (Fase 2): feedback de ritmo/consistencia do que acabou de entrar.
+        LogLintReport(asset.name, TutorialManager.LintTutorial(objectives, script));
+    }
+
+    // ---------------------------------------------------------------- Validar
+
+    private static void ValidateTutorial(TutorialManager manager)
+    {
+        if (manager == null)
+            return;
+
+        TutorialData asset = manager.ResolveActiveTutorialAsset();
+        if (asset == null)
+        {
+            EditorUtility.DisplayDialog("Validar Tutorial",
+                "Nenhum tutorial ativo. Garanta MatchController.ActiveTutorial (ou rode em Play).", "OK");
+            return;
+        }
+
+        List<string> report = TutorialManager.LintTutorial(asset.objectives, asset.script);
+        LogLintReport(asset.name, report);
+        EditorUtility.DisplayDialog("Validar Tutorial",
+            $"'{asset.name}' — {report.Count} linha(s) no relatorio.\nDetalhes no Console.", "OK");
+    }
+
+    private static void LogLintReport(string tutorialName, List<string> report)
+    {
+        if (report == null || report.Count == 0)
+        {
+            Debug.Log($"[TutorialLint] {tutorialName}: sem observacoes.");
+            return;
+        }
+
+        bool hasError = report.Exists(l => l.StartsWith("[ERRO]"));
+        bool hasWarn = report.Exists(l => l.StartsWith("[AVISO]"));
+        string body = $"[TutorialLint] {tutorialName}:\n  " + string.Join("\n  ", report);
+        if (hasError) Debug.LogError(body);
+        else if (hasWarn) Debug.LogWarning(body);
+        else Debug.Log(body);
     }
 
     // Converte o nome do enum (string do JSON) de volta ao valor; fallback se vazio/desconhecido.
