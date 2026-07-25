@@ -107,10 +107,39 @@ public class MatchController : MonoBehaviour
         }
     }
 
-    private sealed class FogOfWarUnitCacheEntry
+    private enum FogContributionSourceType
     {
-        public FogOfWarUnitCacheKey key;
-        public readonly HashSet<Vector3Int> visibleCells = new HashSet<Vector3Int>();
+        Unit = 1,
+        Construction = 2
+    }
+
+    private readonly struct FogContributionSourceId : IEquatable<FogContributionSourceId>
+    {
+        public readonly FogContributionSourceType type;
+        public readonly int instanceId;
+
+        public FogContributionSourceId(FogContributionSourceType type, int instanceId)
+        {
+            this.type = type;
+            this.instanceId = instanceId;
+        }
+
+        public bool Equals(FogContributionSourceId other) =>
+            type == other.type && instanceId == other.instanceId;
+
+        public override bool Equals(object obj) =>
+            obj is FogContributionSourceId other && Equals(other);
+
+        public override int GetHashCode() => ((int)type * 397) ^ instanceId;
+    }
+
+    private sealed class FogSourceContributionCacheEntry
+    {
+        // Apenas unidades usam a chave incremental nesta etapa. Construcoes entram
+        // pelo full refresh, mas ja compartilham a mesma representacao por fonte.
+        public FogOfWarUnitCacheKey unitCacheKey;
+        public readonly HashSet<Vector3Int> geographicCells = new HashSet<Vector3Int>();
+        public readonly HashSet<Vector3Int> sensorCells = new HashSet<Vector3Int>();
     }
 
     private readonly struct FogSpecializedViewCacheKey : IEquatable<FogSpecializedViewCacheKey>
@@ -313,7 +342,8 @@ public class MatchController : MonoBehaviour
     [System.NonSerialized] private readonly HashSet<Vector3Int> fogDisplayVisibleCellsBuffer = new HashSet<Vector3Int>();
     [System.NonSerialized] private readonly HashSet<Vector3Int> fogRenderedVisibleCellsBuffer = new HashSet<Vector3Int>();
     [System.NonSerialized] private bool fogRenderedVisibleCellsValid;
-    [System.NonSerialized] private readonly Dictionary<int, FogOfWarUnitCacheEntry> fogVisibleCellsByUnit = new Dictionary<int, FogOfWarUnitCacheEntry>();
+    [System.NonSerialized] private readonly Dictionary<FogContributionSourceId, FogSourceContributionCacheEntry> fogContributionsBySource =
+        new Dictionary<FogContributionSourceId, FogSourceContributionCacheEntry>();
     [System.NonSerialized] private readonly Dictionary<FogSpecializedViewCacheKey, HashSet<Vector3Int>> fogSpecializedViewCellsByUnit = new Dictionary<FogSpecializedViewCacheKey, HashSet<Vector3Int>>();
     // Canais distintos: revelar o mapa nao implica detectar um ocupante.
     // Unidades contribuem nos dois; construcoes revelam o raio geograficamente,
@@ -3956,7 +3986,10 @@ public class MatchController : MonoBehaviour
             Debug.Log(
                 $"[FoW][Coverage] geographic={fogGeographicContributorsByCell.Count} " +
                 $"sensor={fogSensorContributorsByCell.Count} " +
-                $"geographicOnly={CountFogGeographicOnlyCells()}");
+                $"geographicOnly={CountFogGeographicOnlyCells()} " +
+                $"sources={fogContributionsBySource.Count} " +
+                $"unitSources={CountFogContributionSources(FogContributionSourceType.Unit)} " +
+                $"constructionSources={CountFogContributionSources(FogContributionSourceType.Construction)}");
             Debug.Log(
                 $"[FoW][Pool] rents={poolRents} releases={poolReleases} " +
                 $"fragataCollect.rents={fragataCollectWorkspaceRents} fragataCollect.releases={fragataCollectWorkspaceReleases}");
@@ -3982,6 +4015,17 @@ public class MatchController : MonoBehaviour
             {
                 count++;
             }
+        }
+        return count;
+    }
+
+    private int CountFogContributionSources(FogContributionSourceType type)
+    {
+        int count = 0;
+        foreach (FogContributionSourceId sourceId in fogContributionsBySource.Keys)
+        {
+            if (sourceId.type == type)
+                count++;
         }
         return count;
     }
@@ -6002,7 +6046,7 @@ public class MatchController : MonoBehaviour
         fogDisplayVisibleCellsBuffer.Clear();
         fogRenderedVisibleCellsBuffer.Clear();
         fogRenderedVisibleCellsValid = false;
-        fogVisibleCellsByUnit.Clear();
+        fogContributionsBySource.Clear();
         fogGeographicContributorsByCell.Clear();
         fogSensorContributorsByCell.Clear();
         fogUnitVisibilityByCacheIndex.Clear();
@@ -6632,35 +6676,28 @@ public class MatchController : MonoBehaviour
             return;
 
         int cacheIndex = ResolveFogCacheIndex(unit);
+        FogContributionSourceId sourceId = ResolveFogContributionSourceId(unit);
         FogOfWarUnitCacheKey nextKey = BuildFogUnitCacheKey(unit, boardMap);
-        if (fogVisibleCellsByUnit.TryGetValue(cacheIndex, out FogOfWarUnitCacheEntry cacheEntry) &&
+        if (fogContributionsBySource.TryGetValue(sourceId, out FogSourceContributionCacheEntry cacheEntry) &&
             cacheEntry != null &&
-            cacheEntry.key.Equals(nextKey))
+            cacheEntry.unitCacheKey.Equals(nextKey))
         {
             return;
         }
 
         if (cacheEntry == null)
         {
-            cacheEntry = new FogOfWarUnitCacheEntry();
-            fogVisibleCellsByUnit[cacheIndex] = cacheEntry;
+            cacheEntry = new FogSourceContributionCacheEntry();
+            fogContributionsBySource[sourceId] = cacheEntry;
         }
 
-        if (cacheEntry.visibleCells.Count > 0)
-        {
-            foreach (Vector3Int cell in cacheEntry.visibleCells)
-            {
-                ApplyFogGeographicContribution(cell, -1, boardMap, updateVisual);
-                ApplyFogSensorContribution(cell, -1);
-            }
-            cacheEntry.visibleCells.Clear();
-        }
+        RemoveFogSourceContributions(cacheEntry, boardMap, updateVisual);
 
         if (!unit.gameObject.activeInHierarchy || unit.IsEmbarked ||
             unit.SlotIndex != ActiveSlotId.Value)
         {
             RemoveFogSpecializedViewCacheForUnit(cacheIndex);
-            cacheEntry.key = nextKey;
+            cacheEntry.unitCacheKey = nextKey;
             return;
         }
 
@@ -6680,12 +6717,11 @@ public class MatchController : MonoBehaviour
 
         foreach (Vector3Int cell in fogUnitVisibleScratchBuffer)
         {
-            cacheEntry.visibleCells.Add(cell);
-            ApplyFogGeographicContribution(cell, +1, boardMap, updateVisual);
-            ApplyFogSensorContribution(cell, +1);
+            AddFogSourceGeographicContribution(cacheEntry, cell, boardMap, updateVisual);
+            AddFogSourceSensorContribution(cacheEntry, cell);
         }
 
-        cacheEntry.key = nextKey;
+        cacheEntry.unitCacheKey = nextKey;
         if (updateVisual && fogOfWarVisionMode != FogOfWarVisionMode.All)
             RenderFogOverlayFromRuntimeCache(boardMap);
     }
@@ -6704,18 +6740,13 @@ public class MatchController : MonoBehaviour
             return;
 
         int cacheIndex = ResolveFogCacheIndex(unit);
+        FogContributionSourceId sourceId = ResolveFogContributionSourceId(unit);
         RemoveFogSpecializedViewCacheForUnit(cacheIndex);
-        if (fogVisibleCellsByUnit.TryGetValue(cacheIndex, out FogOfWarUnitCacheEntry cacheEntry) &&
-            cacheEntry != null &&
-            cacheEntry.visibleCells.Count > 0)
+        if (fogContributionsBySource.TryGetValue(sourceId, out FogSourceContributionCacheEntry cacheEntry) &&
+            cacheEntry != null)
         {
-            foreach (Vector3Int cell in cacheEntry.visibleCells)
-            {
-                ApplyFogGeographicContribution(cell, -1, boardMap);
-                ApplyFogSensorContribution(cell, -1);
-            }
-            cacheEntry.visibleCells.Clear();
-            fogVisibleCellsByUnit.Remove(cacheIndex);
+            RemoveFogSourceContributions(cacheEntry, boardMap, updateVisual: true);
+            fogContributionsBySource.Remove(sourceId);
         }
 
         fogUnitVisibilityByCacheIndex[cacheIndex] = false;
@@ -6767,6 +6798,43 @@ public class MatchController : MonoBehaviour
 
         for (int i = 0; i < keysToRemove.Count; i++)
             fogSpecializedViewCellsByUnit.Remove(keysToRemove[i]);
+    }
+
+    private void RemoveFogSourceContributions(
+        FogSourceContributionCacheEntry entry,
+        Tilemap boardMap,
+        bool updateVisual)
+    {
+        if (entry == null)
+            return;
+
+        foreach (Vector3Int cell in entry.geographicCells)
+            ApplyFogGeographicContribution(cell, -1, boardMap, updateVisual);
+        foreach (Vector3Int cell in entry.sensorCells)
+            ApplyFogSensorContribution(cell, -1);
+
+        entry.geographicCells.Clear();
+        entry.sensorCells.Clear();
+    }
+
+    private void AddFogSourceGeographicContribution(
+        FogSourceContributionCacheEntry entry,
+        Vector3Int cell,
+        Tilemap boardMap,
+        bool updateVisual)
+    {
+        if (entry == null || !entry.geographicCells.Add(cell))
+            return;
+        ApplyFogGeographicContribution(cell, +1, boardMap, updateVisual);
+    }
+
+    private void AddFogSourceSensorContribution(
+        FogSourceContributionCacheEntry entry,
+        Vector3Int cell)
+    {
+        if (entry == null || !entry.sensorCells.Add(cell))
+            return;
+        ApplyFogSensorContribution(cell, +1);
     }
 
     private void ApplyFogGeographicContribution(Vector3Int cell, int delta, Tilemap boardMap, bool updateVisual = true)
@@ -6895,12 +6963,24 @@ public class MatchController : MonoBehaviour
             if (boardMap.GetTile(cell) == null)
                 continue;
 
+            FogContributionSourceId sourceId = ResolveFogContributionSourceId(construction);
+            if (!fogContributionsBySource.TryGetValue(sourceId, out FogSourceContributionCacheEntry sourceEntry) ||
+                sourceEntry == null)
+            {
+                sourceEntry = new FogSourceContributionCacheEntry();
+                fogContributionsBySource[sourceId] = sourceEntry;
+            }
+            else
+            {
+                RemoveFogSourceContributions(sourceEntry, boardMap, updateVisual);
+            }
+
             // O QG e um marco global do tabuleiro: todos conhecem seu hex.
             // Apenas o dono recebe o restante do raio de visao configurado.
             if (!ownedByActivePlayer)
             {
                 constructionsIncluded++;
-                ApplyFogGeographicContribution(cell, +1, boardMap, updateVisual);
+                AddFogSourceGeographicContribution(sourceEntry, cell, boardMap, updateVisual);
                 if (ShouldLogPodeEnxergarRuntime)
                 {
                     Debug.Log($"[FoW][Construction][Use] {construction.name} cell={cell.x},{cell.y} reason=global_hq");
@@ -6921,11 +7001,11 @@ public class MatchController : MonoBehaviour
 
             HashSet<Vector3Int> visibleCells = BuildCellsInRadius(boardMap, cell, visionRange);
             foreach (Vector3Int visibleCell in visibleCells)
-                ApplyFogGeographicContribution(visibleCell, +1, boardMap, updateVisual);
+                AddFogSourceGeographicContribution(sourceEntry, visibleCell, boardMap, updateVisual);
 
             // A construcao detecta o ocupante que esta efetivamente sobre ela.
             // O restante do raio apenas revela a geografia.
-            ApplyFogSensorContribution(cell, +1);
+            AddFogSourceSensorContribution(sourceEntry, cell);
         }
 
         if (ShouldLogPodeEnxergarRuntime)
@@ -7232,6 +7312,24 @@ public class MatchController : MonoBehaviour
         if (instanceId > 0)
             return instanceId;
         return unit.GetEntityId().GetHashCode();
+    }
+
+    private static FogContributionSourceId ResolveFogContributionSourceId(UnitManager unit)
+    {
+        return new FogContributionSourceId(
+            FogContributionSourceType.Unit,
+            ResolveFogCacheIndex(unit));
+    }
+
+    private static FogContributionSourceId ResolveFogContributionSourceId(ConstructionManager construction)
+    {
+        if (construction == null)
+            return new FogContributionSourceId(FogContributionSourceType.Construction, 0);
+
+        int instanceId = construction.InstanceId;
+        if (instanceId <= 0)
+            instanceId = construction.GetEntityId().GetHashCode();
+        return new FogContributionSourceId(FogContributionSourceType.Construction, instanceId);
     }
 
     private FogOfWarUnitCacheKey BuildFogUnitCacheKey(UnitManager unit, Tilemap boardMap)
@@ -7632,4 +7730,3 @@ public class MatchController : MonoBehaviour
         return false;
     }
 }
-

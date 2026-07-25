@@ -13,6 +13,13 @@ Uma célula presente em `geographic`, mas ausente em `sensor`, é `geographicOnl
 
 ## Fontes
 
+Cada fonte confirmada possui uma identidade composta por:
+
+- `FogContributionSourceType`: `Unit` ou `Construction`;
+- `InstanceId`: identidade estável da entidade dentro da partida.
+
+O cache `fogContributionsBySource` mantém, para cada fonte, seus próprios conjuntos `geographicCells` e `sensorCells`. Os contadores agregados por célula são derivados da soma dessas entradas.
+
 ### Unidades
 
 As células produzidas pelo cache normal de visão da unidade contribuem para os dois canais. A decisão final sobre a visibilidade de um alvo continua pertencendo ao algoritmo de sensores, que considera domínio, altura, alcance, LOS e stealth.
@@ -49,6 +56,6 @@ Movimento provisório, previews, animações e submenus não podem adicionar con
 
 ## Persistência
 
-Na etapa 2 do refactor, os dois canais existem apenas no runtime. O save continua no formato da etapa anterior e o load continua executando cold refresh.
+Na etapa 3 do refactor, os canais e as contribuições por fonte existem apenas no runtime. O save continua no formato da etapa anterior e o load continua executando cold refresh.
 
-A persistência por fonte será introduzida somente depois que unidades e construções compartilharem um modelo explícito de contribuição.
+A persistência por fonte será introduzida em uma etapa posterior. Até lá, o DTO continua gravando somente o agregado geográfico legado e não grava `fogContributionsBySource`.
