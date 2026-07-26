@@ -335,6 +335,33 @@ public partial class AIController
             ? BuildOccupied(unit, includeConscriptionClosedProducers: false)
             : occupied;
         ConstructionManager currentBldg = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, fromCell);
+        bool aircraftHasRecoveryInTacticalOrOperationalReach = !aircraftRepair
+            || HasAircraftRecoveryWithinReach(unit, snapshot, fromCell, paths);
+        int aircraftMovementAllowance = 0;
+        int aircraftNextUpkeep = 0;
+        int aircraftCriticalThreshold = 0;
+        bool aircraftFuelCritical = aircraftRepair
+            && IsAircraftFuelCriticalForNextUpkeep(
+                unit,
+                out aircraftMovementAllowance,
+                out aircraftNextUpkeep,
+                out aircraftCriticalThreshold);
+
+        if (aircraftRepair
+            && !aircraftHasRecoveryInTacticalOrOperationalReach
+            && aircraftFuelCritical)
+        {
+            Debug.Log(
+                $"{TL("Repair")} aeronave #{unit.InstanceId} sem recuperacao tatica/operacional " +
+                $"fuel={unit.CurrentFuel} <= movimento={aircraftMovementAllowance} + upkeep={aircraftNextUpkeep} " +
+                $"(limite={aircraftCriticalThreshold}); prioriza LZ sem pousar agora.");
+            if (TryBuildAircraftEmergencyHoverAction(
+                    unit, snapshot, fromCell, paths, occupied,
+                    critical: true, out PlayerAction criticalHover))
+            {
+                return criticalHover;
+            }
+        }
 
         // Sob pressão à base (macro Perdendo OU inimigo visível perto de base/HQ/âncora própria), a
         // infantaria NÃO-elite fica PROIBIDA de usar base/âncora/HQ para manutenção. Pode reparar em
@@ -711,10 +738,12 @@ public partial class AIController
             }
 
         if (aircraftRepair
-            && !HasUsableAircraftRepairConstruction(unit, fromCell, aiTeam, occupiedForRepair)
-            && TryDecideAircraftRoadRecoveryFallback(unit, snapshot, fromCell, paths, occupied, out PlayerAction roadRecovery))
+            && !aircraftHasRecoveryInTacticalOrOperationalReach
+            && TryBuildAircraftEmergencyHoverAction(
+                unit, snapshot, fromCell, paths, occupied,
+                critical: false, out PlayerAction emergencyHover))
         {
-            return roadRecovery;
+            return emergencyHover;
         }
 
         ConstructionManager repairDest = FindRepairConstruction(
