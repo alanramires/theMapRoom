@@ -107,19 +107,14 @@ public partial class TurnStateManager
             }
 
             case DebugLayerCommand.Submerge:
-                if (unit.GetDomain() != Domain.Naval || unit.GetHeightLevel() != HeightLevel.Surface)
-                {
-                    reason = "Submerge exige unidade em Naval/Surface.";
-                    return false;
-                }
-                if (!unit.SupportsLayerMode(Domain.Submarine, HeightLevel.Submerged))
-                {
-                    reason = "Unidade nao suporta Submarine/Submerged.";
-                    return false;
-                }
-                return CanUseLayerModeAtCurrentCell(
-                    unit, boardMap, terrainDatabase, unit.CurrentCellPosition,
-                    Domain.Submarine, HeightLevel.Submerged, out reason);
+            {
+                PodeSubmergirReport report = PodeSubmergirSensor.Evaluate(
+                    unit,
+                    boardMap,
+                    terrainDatabase);
+                reason = report != null ? report.explicacao : "Falha ao avaliar submersao.";
+                return report != null && report.status;
+            }
         }
 
         reason = "Comando de camada desconhecido.";

@@ -1094,6 +1094,21 @@ public class UnitManager : MonoBehaviour
         return currentlyObservedByTeamIds.Contains(viewerTeamId);
     }
 
+    public bool IsCurrentlyObservedByOpponent()
+    {
+        if (currentlyObservedByTeamIds == null || currentlyObservedByTeamIds.Count <= 0)
+            return false;
+
+        for (int i = 0; i < currentlyObservedByTeamIds.Count; i++)
+        {
+            int observerTeamId = currentlyObservedByTeamIds[i];
+            if (observerTeamId >= 0 && observerTeamId != SlotIndex)
+                return true;
+        }
+
+        return false;
+    }
+
     public void ClearStealthRevealState()
     {
         if (currentlyObservedByTeamIds != null)

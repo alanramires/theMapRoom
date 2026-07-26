@@ -3,11 +3,7 @@ using UnityEngine;
 using UnityEngine.Tilemaps;
 
 // Consulta pura de "pode submergir?" (Naval/Surface -> Submarine/Submerged).
-//
-// Nao existe um PodeSubmergirSensor: quem valida a descida no jogo e a mesma dupla
-// usada pelo fluxo de troca de camada do jogador (TurnStateManager.ScannerPrompt) e
-// pelo comando SUBMERGE de debug — lock de camada forcado + CanUseLayerModeAtCurrentCell.
-// Esta janela chama exatamente esses dois; nada e reimplementado aqui.
+// A janela apenas monta o contexto e apresenta o relatorio do sensor autoritativo.
 public sealed class PodeSubmergirWindow : EditorWindow
 {
     [SerializeField] private UnitManager ship;
@@ -110,60 +106,17 @@ public sealed class PodeSubmergirWindow : EditorWindow
         Vector3Int testCell = hasDestination ? destination : ship.CurrentCellPosition;
         testCell.z = 0;
 
-        // Consulta por hex: CanUseLayerModeAtCurrentCell ja recebe a celula por
-        // parametro, entao nao ha nada a deslocar aqui.
-        canSubmerge = EvaluateSubmerge(ship, map, terrainDatabase, testCell, out explanation);
+        PodeSubmergirReport report = PodeSubmergirSensor.Evaluate(
+            ship,
+            map,
+            terrainDatabase,
+            testCell);
+        canSubmerge = report != null && report.status;
+        explanation = report != null ? report.explicacao : "PodeSubmergir sem resultado.";
         hasResult = true;
 
         Repaint();
         SceneView.RepaintAll();
-    }
-
-    // Mesma sequencia do comando SUBMERGE (TurnStateManager.TryValidateDebugLayerCommand)
-    // acrescida do lock de camada forcado, que o fluxo do jogador tambem checa antes de
-    // oferecer a transicao. A validacao pesada do hex fica no TurnStateManager.
-    private static bool EvaluateSubmerge(
-        UnitManager unit,
-        Tilemap boardMap,
-        TerrainDatabase terrainDb,
-        Vector3Int cell,
-        out string reason)
-    {
-        if (unit.IsEmbarked)
-        {
-            reason = "Unidade embarcada nao pode mudar de camada.";
-            return false;
-        }
-
-        if (unit.GetDomain() != Domain.Naval
-            || unit.GetHeightLevel() != HeightLevel.Surface)
-        {
-            reason = "Submergir exige unidade em Naval/Surface.";
-            return false;
-        }
-
-        if (!unit.SupportsLayerMode(Domain.Submarine, HeightLevel.Submerged))
-        {
-            reason = "Unidade nao suporta Submarine/Submerged.";
-            return false;
-        }
-
-        if (unit.IsLayerChangeBlockedByForcedLock(
-                Domain.Submarine, HeightLevel.Submerged, out string lockReason))
-        {
-            reason = lockReason;
-            return false;
-        }
-
-        if (!TurnStateManager.CanUseLayerModeAtCurrentCell(
-                unit, boardMap, terrainDb, cell,
-                Domain.Submarine, HeightLevel.Submerged, out reason))
-        {
-            return false;
-        }
-
-        reason = "Submersao disponivel neste hex.";
-        return true;
     }
 
     private void TryUseCurrentSelection()

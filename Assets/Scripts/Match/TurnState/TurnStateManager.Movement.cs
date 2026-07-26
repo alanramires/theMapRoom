@@ -363,8 +363,33 @@ public partial class TurnStateManager
             return;
         if (selectedUnit.IsLayerChangeBlockedByForcedLock(preferredDomain, preferredHeight, out _))
             return;
-        if (!CanUseLayerModeAtCellForLayerForce(selectedUnit, boardMap, terrainDatabase, cell, preferredDomain, preferredHeight))
+
+        bool isSubmarineSubmerge = currentDomain == Domain.Naval &&
+            currentHeight == HeightLevel.Surface &&
+            preferredDomain == Domain.Submarine &&
+            preferredHeight == HeightLevel.Submerged;
+        if (isSubmarineSubmerge)
+        {
+            if (!PodeSubmergirSensor.CanSubmergeAtCell(
+                    selectedUnit,
+                    boardMap,
+                    terrainDatabase,
+                    cell,
+                    out _))
+            {
+                return;
+            }
+        }
+        else if (!CanUseLayerModeAtCellForLayerForce(
+                     selectedUnit,
+                     boardMap,
+                     terrainDatabase,
+                     cell,
+                     preferredDomain,
+                     preferredHeight))
+        {
             return;
+        }
 
         if (!hasForcedLayerRollbackSnapshot)
         {

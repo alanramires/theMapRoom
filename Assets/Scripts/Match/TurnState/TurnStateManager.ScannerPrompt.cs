@@ -2156,18 +2156,43 @@ public partial class TurnStateManager
             if (mode.domain == currentDomain && mode.heightLevel == currentHeight)
                 continue;
 
-            if (unit.IsLayerChangeBlockedByForcedLock(mode.domain, mode.heightLevel, out string forcedLockReason))
-            {
-                if (string.IsNullOrWhiteSpace(unavailableReason))
-                    unavailableReason = forcedLockReason;
-                continue;
-            }
+            bool isSubmarineSubmerge = currentDomain == Domain.Naval &&
+                currentHeight == HeightLevel.Surface &&
+                mode.domain == Domain.Submarine &&
+                mode.heightLevel == HeightLevel.Submerged;
 
-            if (!CanUseLayerModeAtCurrentCell(unit, boardMap, terrainDatabase, unitCell, mode.domain, mode.heightLevel, out string blockReason))
+            if (isSubmarineSubmerge)
             {
-                if (string.IsNullOrWhiteSpace(unavailableReason))
-                    unavailableReason = blockReason;
-                continue;
+                PodeSubmergirReport submergirReport = PodeSubmergirSensor.Evaluate(
+                    unit,
+                    boardMap,
+                    terrainDatabase,
+                    unitCell);
+                if (submergirReport == null || !submergirReport.status)
+                {
+                    if (string.IsNullOrWhiteSpace(unavailableReason))
+                        unavailableReason = submergirReport != null &&
+                            !string.IsNullOrWhiteSpace(submergirReport.explicacao)
+                                ? submergirReport.explicacao
+                                : "Submersao indisponivel neste hex.";
+                    continue;
+                }
+            }
+            else
+            {
+                if (unit.IsLayerChangeBlockedByForcedLock(mode.domain, mode.heightLevel, out string forcedLockReason))
+                {
+                    if (string.IsNullOrWhiteSpace(unavailableReason))
+                        unavailableReason = forcedLockReason;
+                    continue;
+                }
+
+                if (!CanUseLayerModeAtCurrentCell(unit, boardMap, terrainDatabase, unitCell, mode.domain, mode.heightLevel, out string blockReason))
+                {
+                    if (string.IsNullOrWhiteSpace(unavailableReason))
+                        unavailableReason = blockReason;
+                    continue;
+                }
             }
 
             bool isAirToGroundLanding = ShouldUseLandingActionForTransition(currentDomain, currentHeight, mode.domain, mode.heightLevel);
@@ -2287,6 +2312,20 @@ public partial class TurnStateManager
         HeightLevel targetHeight,
         out string reason)
     {
+        if (unit != null &&
+            unit.GetDomain() == Domain.Naval &&
+            unit.GetHeightLevel() == HeightLevel.Surface &&
+            targetDomain == Domain.Submarine &&
+            targetHeight == HeightLevel.Submerged)
+        {
+            return PodeSubmergirSensor.CanSubmergeAtCell(
+                unit,
+                boardMap,
+                terrainDb,
+                cell,
+                out reason);
+        }
+
         reason = string.Empty;
         if (unit == null || boardMap == null)
         {
@@ -2578,6 +2617,30 @@ public partial class TurnStateManager
             }
 
             return true;
+        }
+
+        bool isSubmarineSubmerge = beforeDomain == Domain.Naval &&
+            beforeHeight == HeightLevel.Surface &&
+            option.toDomain == Domain.Submarine &&
+            option.toHeightLevel == HeightLevel.Submerged;
+        if (isSubmarineSubmerge)
+        {
+            Vector3Int operationCell = ResolveLayerOperationCell(
+                selectedUnit,
+                ResolveLandingMovementMode());
+            PodeSubmergirReport report = PodeSubmergirSensor.Evaluate(
+                selectedUnit,
+                boardMap,
+                terrainDatabase,
+                operationCell);
+            if (report == null || !report.status)
+            {
+                RuntimeLog(
+                    report != null && !string.IsNullOrWhiteSpace(report.explicacao)
+                        ? $"[LayerOperation] {report.explicacao}"
+                        : "[LayerOperation] Falha ao revalidar submersao.");
+                return false;
+            }
         }
 
         if (!selectedUnit.TrySetCurrentLayerMode(option.toDomain, option.toHeightLevel))
