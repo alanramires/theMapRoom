@@ -1,198 +1,273 @@
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Tilemaps;
-using System.Collections.Generic;
 
-public class PodePousarWindow : EditorWindow
+public sealed class PodePousarWindow : EditorWindow
 {
-    [SerializeField] private UnitManager selectedUnit;
-    [SerializeField] private Tilemap overrideTilemap;
+    [SerializeField] private UnitManager aircraft;
+    [SerializeField] private Tilemap map;
     [SerializeField] private TerrainDatabase terrainDatabase;
-    [SerializeField] private SensorMovementMode movementMode = SensorMovementMode.MoveuParado;
-    [SerializeField] private bool useManualRemainingMovement = false;
-    [SerializeField] private int manualRemainingMovement = 0;
+    [SerializeField] private SensorMovementMode movementMode =
+        SensorMovementMode.MoveuParado;
+    [SerializeField] private bool hasDestination;
+    [SerializeField] private Vector3Int destination;
 
-    private PodePousarReport latestReport;
-    private string statusMessage = "Ready.";
-    private Vector2 windowScroll;
+    private bool pickingDestination;
+    private Vector3Int hoverCell;
+    private PodePousarReport report;
+    private Domain predictedDomain;
+    private HeightLevel predictedHeight;
+    private bool hasPredictedLayer;
 
-    [MenuItem("Tools/Operações Aéreas/Pode Mudar de Altitude")]
-    public static void OpenWindow()
+    [MenuItem("Tools/Operações Aéreas/Pode Pousar")]
+    public static void Open()
     {
-        GetWindow<PodePousarWindow>("Pode Mudar de Altitude");
+        GetWindow<PodePousarWindow>(
+            "Pode Pousar").Show();
     }
 
     private void OnEnable()
     {
-        AutoDetectContext();
+        SceneView.duringSceneGui += OnSceneGUI;
+        AutoDetect();
+    }
+
+    private void OnDisable()
+    {
+        SceneView.duringSceneGui -= OnSceneGUI;
+    }
+
+    private void OnSelectionChange()
+    {
+        TryUseCurrentSelection();
+        Repaint();
     }
 
     private void OnGUI()
     {
-        windowScroll = EditorGUILayout.BeginScrollView(windowScroll);
-        EditorGUILayout.LabelField("Sensor Pode Mudar de Altitude", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField(
+            "Pode Pousar", EditorStyles.boldLabel);
         EditorGUILayout.HelpBox(
-            "Sensor generico de mudanca de altitude/camada. Disponivel para qualquer unidade com mais de uma camada operacional.",
+            "Consulta pura: simula o pouso no hex escolhido e restaura " +
+            "imediatamente a posição da unidade. Nenhuma ação é confirmada.",
             MessageType.Info);
 
-        selectedUnit = (UnitManager)EditorGUILayout.ObjectField("Unidade", selectedUnit, typeof(UnitManager), true);
-        overrideTilemap = (Tilemap)EditorGUILayout.ObjectField("Tilemap (opcional)", overrideTilemap, typeof(Tilemap), true);
-        terrainDatabase = (TerrainDatabase)EditorGUILayout.ObjectField("Terrain Database", terrainDatabase, typeof(TerrainDatabase), false);
-        movementMode = (SensorMovementMode)EditorGUILayout.EnumPopup("Modo", movementMode);
-        useManualRemainingMovement = EditorGUILayout.ToggleLeft("Usar movimento restante manual", useManualRemainingMovement);
-        using (new EditorGUI.DisabledScope(!useManualRemainingMovement))
-            manualRemainingMovement = EditorGUILayout.IntField("Movimento Restante", Mathf.Max(0, manualRemainingMovement));
+        EditorGUI.BeginChangeCheck();
+        aircraft = (UnitManager)EditorGUILayout.ObjectField(
+            "Aeronave", aircraft, typeof(UnitManager), true);
+        map = (Tilemap)EditorGUILayout.ObjectField(
+            "Tilemap", map, typeof(Tilemap), true);
+        terrainDatabase = (TerrainDatabase)EditorGUILayout.ObjectField(
+            "Terrain Database",
+            terrainDatabase,
+            typeof(TerrainDatabase),
+            false);
+        movementMode = (SensorMovementMode)EditorGUILayout.EnumPopup(
+            "Estado de movimento", movementMode);
+        if (EditorGUI.EndChangeCheck())
+            ClearResult();
 
         EditorGUILayout.BeginHorizontal();
         if (GUILayout.Button("Usar Selecionado"))
             TryUseCurrentSelection();
-        if (GUILayout.Button("Auto Detect"))
-            AutoDetectContext();
-        if (GUILayout.Button("Simular"))
-            RunSimulation();
+
+        GUI.backgroundColor = pickingDestination
+            ? new Color(1f, 0.75f, 0.2f)
+            : Color.white;
+        if (GUILayout.Button(
+                pickingDestination
+                    ? "Clique no Scene View..."
+                    : "Escolher Hex de Destino"))
+        {
+            pickingDestination = !pickingDestination;
+            SceneView.RepaintAll();
+        }
+        GUI.backgroundColor = Color.white;
         EditorGUILayout.EndHorizontal();
 
-        EditorGUILayout.Space(8f);
-        EditorGUILayout.HelpBox(statusMessage, MessageType.None);
-
-        EditorGUILayout.Space(4f);
-        EditorGUILayout.LabelField("Mudanca de Altitude/Camada", EditorStyles.boldLabel);
-        if (latestReport == null)
-        {
-            EditorGUILayout.HelpBox("Sem simulacao.", MessageType.Info);
-        }
-        else
-        {
-            EditorGUILayout.LabelField("Status", latestReport.status ? "valido" : "invalido");
-            EditorGUILayout.LabelField("Explicacao", string.IsNullOrWhiteSpace(latestReport.explicacao) ? "-" : latestReport.explicacao);
-        }
-
-        EditorGUILayout.Space(8f);
+        Vector3Int effectiveCell =
+            hasDestination
+                ? destination
+                : aircraft != null
+                    ? aircraft.CurrentCellPosition
+                    : Vector3Int.zero;
         using (new EditorGUI.DisabledScope(true))
+            EditorGUILayout.Vector3IntField(
+                "Hex avaliado", effectiveCell);
+
+        using (new EditorGUI.DisabledScope(!hasDestination))
         {
-            GUILayout.Button("Confirmar (in-game: tecla L)");
+            if (GUILayout.Button(
+                    "Usar o Próprio Hex da Aeronave"))
+            {
+                hasDestination = false;
+                pickingDestination = false;
+                ClearResult();
+                SceneView.RepaintAll();
+            }
         }
-        EditorGUILayout.EndScrollView();
+
+        using (new EditorGUI.DisabledScope(
+                   aircraft == null
+                   || map == null
+                   || terrainDatabase == null))
+        {
+            if (GUILayout.Button(
+                    "Verificar Pouso", GUILayout.Height(28f)))
+                Evaluate();
+        }
+
+        EditorGUILayout.Space(6f);
+        if (report == null)
+            return;
+
+        EditorGUILayout.HelpBox(
+            report.status
+                ? $"PODE POUSAR\n{report.explicacao}"
+                : $"NÃO PODE POUSAR\n{report.explicacao}",
+            report.status
+                ? MessageType.Info
+                : MessageType.Warning);
+
+        if (hasPredictedLayer)
+        {
+            EditorGUILayout.LabelField(
+                "Camada após pousar",
+                $"{predictedDomain} / {predictedHeight}");
+        }
     }
 
-    private void RunSimulation()
+    private void Evaluate()
     {
-        latestReport = EvaluateLayerChange();
+        AutoDetect();
+        if (aircraft == null || map == null
+            || terrainDatabase == null)
+            return;
 
-        statusMessage = latestReport != null
-            ? $"Simulacao concluida. Mudanca de altitude: {(latestReport.status ? "valida" : "invalida")}."
-            : "Falha ao executar simulacao.";
-    }
+        Vector3Int testCell =
+            hasDestination ? destination : aircraft.CurrentCellPosition;
+        testCell.z = 0;
 
-    private Tilemap ResolveTilemap()
-    {
-        if (overrideTilemap != null)
-            return overrideTilemap;
-        if (selectedUnit != null && selectedUnit.BoardTilemap != null)
-            return selectedUnit.BoardTilemap;
-        return FindPreferredTilemap();
-    }
+        // Consulta por hex: o sensor recebe a celula, ninguem e deslocado.
+        report = PodePousarSensor.Evaluate(
+            aircraft,
+            map,
+            terrainDatabase,
+            movementMode,
+            useManualRemainingMovement: false,
+            manualRemainingMovement: 0,
+            atCell: testCell);
 
-    private void AutoDetectContext()
-    {
-        if (selectedUnit == null)
-            TryUseCurrentSelection();
-        if (overrideTilemap == null)
-            overrideTilemap = FindPreferredTilemap();
-        if (terrainDatabase == null)
-            terrainDatabase = FindFirstTerrainDatabaseAsset();
+        hasPredictedLayer = report != null && report.status;
+        if (hasPredictedLayer)
+        {
+            predictedDomain = report.landingDomain;
+            predictedHeight = report.landingHeight;
+        }
+
+        Repaint();
+        SceneView.RepaintAll();
     }
 
     private void TryUseCurrentSelection()
     {
-        if (Selection.activeGameObject == null)
+        GameObject selected = Selection.activeGameObject;
+        UnitManager unit = selected != null
+            ? selected.GetComponentInParent<UnitManager>()
+            : null;
+        if (unit == null)
             return;
 
-        UnitManager unit = Selection.activeGameObject.GetComponent<UnitManager>();
-        if (unit == null)
-            unit = Selection.activeGameObject.GetComponentInParent<UnitManager>();
-        if (unit != null)
-            selectedUnit = unit;
+        aircraft = unit;
+        AutoDetect();
+        ClearResult();
     }
 
-    private PodePousarReport EvaluateLayerChange()
+    private void AutoDetect()
     {
-        var report = new PodePousarReport
-        {
-            status = false,
-            explicacao = "Contexto nao avaliado."
-        };
+        if (aircraft != null
+            && aircraft.BoardTilemap != null)
+            map = aircraft.BoardTilemap;
 
-        if (selectedUnit == null)
-        {
-            report.explicacao = "Selecione uma unidade.";
-            return report;
-        }
-
-        Tilemap map = ResolveTilemap();
         if (map == null)
         {
-            report.explicacao = "Tilemap base nao encontrado.";
-            return report;
+            Tilemap[] maps =
+                Object.FindObjectsByType<Tilemap>(
+                    FindObjectsInactive.Include,
+                    FindObjectsSortMode.None);
+            for (int i = 0; i < maps.Length; i++)
+            {
+                if (maps[i] != null
+                    && maps[i].name == "Tilemap")
+                {
+                    map = maps[i];
+                    break;
+                }
+            }
         }
 
-        HeightLevel currentHeight = selectedUnit.GetHeightLevel();
-        if (selectedUnit.GetDomain() != Domain.Air ||
-            (currentHeight != HeightLevel.AirLow && currentHeight != HeightLevel.AirHigh))
+        if (terrainDatabase == null)
         {
-            report.explicacao = "Selecione uma aeronave em AirLow ou AirHigh.";
-            return report;
+            string[] guids =
+                AssetDatabase.FindAssets("t:TerrainDatabase");
+            if (guids.Length > 0)
+            {
+                terrainDatabase =
+                    AssetDatabase.LoadAssetAtPath<TerrainDatabase>(
+                        AssetDatabase.GUIDToAssetPath(guids[0]));
+            }
         }
-
-        HeightLevel targetHeight = currentHeight == HeightLevel.AirLow
-            ? HeightLevel.AirHigh
-            : HeightLevel.AirLow;
-        PodeMudarAltitudeReport altitude =
-            PodeMudarAltitudeSensor.Evaluate(selectedUnit, map, targetHeight);
-        report.status = altitude != null && altitude.status;
-        report.explicacao = altitude != null
-            ? altitude.explicacao
-            : "Falha ao consultar PodeMudarAltitudeSensor.";
-
-        if (useManualRemainingMovement)
-        {
-            int safeRemaining = Mathf.Max(0, manualRemainingMovement);
-            report.explicacao += $" Movimento restante manual={safeRemaining} (informativo neste sensor).";
-        }
-
-        return report;
     }
 
-    private static Tilemap FindPreferredTilemap()
+    private void ClearResult()
     {
-        Tilemap[] maps = Object.FindObjectsByType<Tilemap>(FindObjectsInactive.Include, FindObjectsSortMode.None);
-        if (maps == null || maps.Length == 0)
-            return null;
-
-        for (int i = 0; i < maps.Length; i++)
-        {
-            Tilemap map = maps[i];
-            if (map != null && string.Equals(map.name, "Tilemap", System.StringComparison.OrdinalIgnoreCase))
-                return map;
-        }
-
-        return maps[0];
+        report = null;
+        hasPredictedLayer = false;
     }
 
-    private static TerrainDatabase FindFirstTerrainDatabaseAsset()
+    private void OnSceneGUI(SceneView sceneView)
     {
-        string[] guids = AssetDatabase.FindAssets("t:TerrainDatabase");
-        if (guids == null || guids.Length == 0)
-            return null;
+        if (!pickingDestination || map == null)
+            return;
 
-        for (int i = 0; i < guids.Length; i++)
+        Event current = Event.current;
+        Ray ray =
+            HandleUtility.GUIPointToWorldRay(
+                current.mousePosition);
+        Plane plane = new Plane(
+            map.transform.forward,
+            map.transform.position);
+        if (!plane.Raycast(ray, out float distance))
+            return;
+
+        Vector3 world = ray.GetPoint(distance);
+        hoverCell = map.WorldToCell(world);
+        hoverCell.z = 0;
+        Vector3 center = map.GetCellCenterWorld(hoverCell);
+
+        Handles.color = new Color(1f, 0.8f, 0.1f);
+        Handles.DrawWireDisc(
+            center,
+            map.transform.forward,
+            Mathf.Max(
+                map.cellSize.x,
+                map.cellSize.y) * 0.45f);
+        Handles.Label(center, $"Pouso {hoverCell}");
+        HandleUtility.AddDefaultControl(
+            GUIUtility.GetControlID(
+                FocusType.Passive));
+
+        if (current.type == EventType.MouseDown
+            && current.button == 0
+            && !current.alt)
         {
-            string path = AssetDatabase.GUIDToAssetPath(guids[i]);
-            TerrainDatabase db = AssetDatabase.LoadAssetAtPath<TerrainDatabase>(path);
-            if (db != null)
-                return db;
+            destination = hoverCell;
+            hasDestination = true;
+            pickingDestination = false;
+            ClearResult();
+            current.Use();
+            Repaint();
+            SceneView.RepaintAll();
         }
-
-        return null;
     }
 }
