@@ -84,6 +84,12 @@ public static class PodeSubmergirSensor
             return report;
         }
 
+        if (unit.SurfacedForSupplyThisTurn)
+        {
+            report.explicacao = "Unidade emergiu para receber suprimento e permanece na superficie nesta rodada.";
+            return report;
+        }
+
         if (unit.IsLayerChangeBlockedByForcedLock(
                 Domain.Submarine,
                 HeightLevel.Submerged,

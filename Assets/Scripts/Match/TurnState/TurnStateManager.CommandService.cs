@@ -542,7 +542,7 @@ public partial class TurnStateManager
                         continue;
                     }
 
-                    if (!LayerTransitionRules.CanUseLayerModeAtCell(target, boardMap, terrainDatabase, targetCell, order.plannedServiceDomain, order.plannedServiceHeight, out string plannedLayerReason))
+                    if (!CanUseSupplyServiceLayer(target, boardMap, targetCell, order.plannedServiceDomain, order.plannedServiceHeight, out string plannedLayerReason))
                     {
                         CommandServiceLog($"[ServicoComando] {target.name} ignorado: camada planejada {order.plannedServiceDomain}/{order.plannedServiceHeight} invalida ({plannedLayerReason}).");
                         continue;
@@ -561,6 +561,11 @@ public partial class TurnStateManager
                     }
 
                     yield return ApplySupplyLayerTransitionIfNeeded(target, Domain.Naval, HeightLevel.Surface);
+                    if (target.GetDomain() == Domain.Naval &&
+                        target.GetHeightLevel() == HeightLevel.Surface)
+                    {
+                        target.SetSurfacedForSupplyThisTurn(true);
+                    }
                 }
 
                 int hpGain = 0;
@@ -723,6 +728,7 @@ public partial class TurnStateManager
                         target,
                         boardMap,
                         order.aircraftFuelBeforeSupply,
+                        AirGoAroundOperation.CommandService,
                         "[ServicoComando]");
                 }
 

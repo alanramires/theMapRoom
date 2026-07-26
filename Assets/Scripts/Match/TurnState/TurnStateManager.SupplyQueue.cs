@@ -614,7 +614,7 @@ public partial class TurnStateManager
         {
             Vector3Int supplierCell = supplier.CurrentCellPosition;
             supplierCell.z = 0;
-            if (!LayerTransitionRules.CanUseLayerModeAtCell(supplier, terrainTilemap != null ? terrainTilemap : supplier.BoardTilemap, terrainDatabase, supplierCell, serviceDomain, serviceHeight, out string supplierLayerReason))
+            if (!CanUseSupplyServiceLayer(supplier, terrainTilemap != null ? terrainTilemap : supplier.BoardTilemap, supplierCell, serviceDomain, serviceHeight, out string supplierLayerReason))
             {
                 Debug.Log($"[Suprimento] Supplier nao pode operar em {serviceDomain}/{serviceHeight} no hex atual ({supplierLayerReason}).");
                 Retreat("SuprindoExecuting: retry layer");
@@ -670,7 +670,7 @@ public partial class TurnStateManager
                     continue;
                 }
 
-                if (!LayerTransitionRules.CanUseLayerModeAtCell(target, boardMap, terrainDatabase, targetCell, order.plannedServiceDomain, order.plannedServiceHeight, out string plannedLayerReason))
+                if (!CanUseSupplyServiceLayer(target, boardMap, targetCell, order.plannedServiceDomain, order.plannedServiceHeight, out string plannedLayerReason))
                 {
                     Debug.Log($"[Suprimento] {target.name} ignorado: camada planejada {order.plannedServiceDomain}/{order.plannedServiceHeight} invalida no hex atual ({plannedLayerReason}).");
                     continue;
@@ -686,10 +686,15 @@ public partial class TurnStateManager
                     continue;
                 }
                 yield return ApplySupplyLayerTransitionIfNeeded(target, Domain.Naval, HeightLevel.Surface);
+                if (target.GetDomain() == Domain.Naval &&
+                    target.GetHeightLevel() == HeightLevel.Surface)
+                {
+                    target.SetSurfacedForSupplyThisTurn(true);
+                }
             }
             if (!isEmbarkedPassenger && TryGetSupplyLayerFromPlan(layerPlan, out Domain targetServiceDomain, out HeightLevel targetServiceHeight))
             {
-                if (!LayerTransitionRules.CanUseLayerModeAtCell(target, boardMap, terrainDatabase, targetCell, targetServiceDomain, targetServiceHeight, out string queueLayerReason))
+                if (!CanUseSupplyServiceLayer(target, boardMap, targetCell, targetServiceDomain, targetServiceHeight, out string queueLayerReason))
                 {
                     Debug.Log($"[Suprimento] {target.name} ignorado: camada de atendimento {targetServiceDomain}/{targetServiceHeight} invalida no hex atual ({queueLayerReason}).");
                     continue;
@@ -831,6 +836,7 @@ public partial class TurnStateManager
                     target,
                     boardMap,
                     order.aircraftFuelBeforeSupply,
+                    AirGoAroundOperation.Supply,
                     "[Suprimento]");
             }
 
@@ -1178,8 +1184,24 @@ public partial class TurnStateManager
             yield break;
         if (!unit.SupportsLayerMode(domain, height))
             yield break;
-        bool takingOff = unit.GetDomain() != Domain.Air && domain == Domain.Air;
         Tilemap boardMap = unit.BoardTilemap != null ? unit.BoardTilemap : terrainTilemap;
+        bool altitudeChange =
+            unit.GetDomain() == Domain.Air &&
+            domain == Domain.Air &&
+            unit.GetHeightLevel() != height;
+        if (altitudeChange)
+        {
+            PodeMudarAltitudeReport altitude =
+                PodeMudarAltitudeSensor.Evaluate(unit, boardMap, height);
+            if (altitude == null || !altitude.status)
+            {
+                Debug.Log(altitude != null
+                    ? $"[Supply] Mudanca de altitude cancelada para {unit.name}: {altitude.explicacao}"
+                    : $"[Supply] Mudanca de altitude cancelada para {unit.name}.");
+                yield break;
+            }
+        }
+        bool takingOff = unit.GetDomain() != Domain.Air && domain == Domain.Air;
         Vector3Int cell = unit.CurrentCellPosition;
         cell.z = 0;
         if (!UnitOccupancyRules.CanEndLayerTransitionAtCell(boardMap, cell, unit, domain, height, out UnitManager blocker))
@@ -1218,6 +1240,37 @@ public partial class TurnStateManager
         float postTransitionDelay = GetLayerOperationAfterTransitionDelay();
         if (postTransitionDelay > 0f)
             yield return new WaitForSeconds(postTransitionDelay);
+    }
+
+    private bool CanUseSupplyServiceLayer(
+        UnitManager unit,
+        Tilemap boardMap,
+        Vector3Int cell,
+        Domain targetDomain,
+        HeightLevel targetHeight,
+        out string reason)
+    {
+        bool altitudeChange =
+            unit != null &&
+            unit.GetDomain() == Domain.Air &&
+            targetDomain == Domain.Air &&
+            unit.GetHeightLevel() != targetHeight;
+        if (altitudeChange)
+        {
+            PodeMudarAltitudeReport altitude =
+                PodeMudarAltitudeSensor.Evaluate(unit, boardMap, targetHeight, cell);
+            reason = altitude != null ? altitude.explicacao : "PodeMudarAltitude sem resultado.";
+            return altitude != null && altitude.status;
+        }
+
+        return LayerTransitionRules.CanUseLayerModeAtCell(
+            unit,
+            boardMap,
+            terrainDatabase,
+            cell,
+            targetDomain,
+            targetHeight,
+            out reason);
     }
 
     private bool CanApplyPlannedAirTransitionBeforeSupply(
@@ -1292,31 +1345,28 @@ public partial class TurnStateManager
         UnitManager aircraft,
         Tilemap boardMap,
         int fuelBeforeSupply,
+        AirGoAroundOperation operation,
         string logPrefix)
     {
         if (aircraft == null || boardMap == null)
             yield break;
 
-        // A autorizacao nasce do combustivel anterior ao servico. Combustivel
-        // recebido durante o batch nunca cria uma decolagem retroativa.
-        if (fuelBeforeSupply <= 0)
-        {
-            if (SensorLogGate.IsPodeSuprirEnabled())
-                Debug.Log($"{logPrefix} {aircraft.name} permanece no solo: motores estavam desligados antes do servico.");
-            yield break;
-        }
-
-        PodeDecolarReport report = PodeDecolarSensor.Evaluate(
+        PodeArremeterReport goAround = PodeArremeterSensor.Evaluate(
             aircraft,
             boardMap,
-            terrainDatabase);
-        if (report == null || !report.status)
+            terrainDatabase,
+            operation,
+            wasAirborneBeforeOperation: true,
+            landedForOperation: true,
+            fuelBeforeOperation: fuelBeforeSupply,
+            operationExplicitlyAllowsGoAround: true);
+        if (goAround == null || !goAround.status)
         {
             if (SensorLogGate.IsPodeSuprirEnabled())
             {
-                Debug.Log(report != null && !string.IsNullOrWhiteSpace(report.explicacao)
-                    ? $"{logPrefix} {aircraft.name} permanece no solo: {report.explicacao}"
-                    : $"{logPrefix} {aircraft.name} permanece no solo: decolagem indisponivel.");
+                Debug.Log(goAround != null && !string.IsNullOrWhiteSpace(goAround.explicacao)
+                    ? $"{logPrefix} {aircraft.name} permanece no solo: {goAround.explicacao}"
+                    : $"{logPrefix} {aircraft.name} permanece no solo: arremetida indisponivel.");
             }
             yield break;
         }

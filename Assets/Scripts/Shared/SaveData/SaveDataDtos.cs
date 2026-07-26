@@ -261,6 +261,7 @@ public class UnitSaveData
     public bool hasActed;
     public bool receivedSuppliesThisTurn;
     public bool tookOffRecently;
+    public bool surfacedForSupplyThisTurn;
     public bool aircraftForcedLandingAwaitingRefuel;
     public bool isUnderRepair;
     public bool isEmbarked;

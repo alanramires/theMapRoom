@@ -26,6 +26,7 @@ public class UnitManager : MonoBehaviour
     [SerializeField, HideInInspector] private bool hasFiredThisTurn;
     [SerializeField] private bool receivedSuppliesThisTurn;
     [SerializeField] private bool tookOffRecently;
+    [SerializeField] private bool surfacedForSupplyThisTurn;
     [SerializeField] private bool aircraftForcedLandingAwaitingRefuel;
     [SerializeField] private bool isUnderRepair;
     [SerializeField] private bool hasMerged;
@@ -55,6 +56,7 @@ public class UnitManager : MonoBehaviour
     [SerializeField] private string flagEmbarkedAtUnit = string.Empty;
     [SerializeField] private bool flagReceivedSupplies;
     [SerializeField] private bool flagTookOffRecently;
+    [SerializeField] private bool flagSurfacedForSupplyThisTurn;
     [SerializeField] private bool flagAircraftForcedLandingAwaitingRefuel;
     [SerializeField] private bool flagHasMerged;
     [SerializeField] private int flagMergedWhenTurn = -1;
@@ -201,6 +203,7 @@ public class UnitManager : MonoBehaviour
     public bool HasFiredThisTurn => hasFiredThisTurn;
     public bool ReceivedSuppliesThisTurn => receivedSuppliesThisTurn;
     public bool TookOffRecently => tookOffRecently;
+    public bool SurfacedForSupplyThisTurn => surfacedForSupplyThisTurn;
     public bool AircraftForcedLandingAwaitingRefuel =>
         GetAircraftType() != AircraftType.None &&
         aircraftForcedLandingAwaitingRefuel;
@@ -1033,6 +1036,7 @@ public class UnitManager : MonoBehaviour
         ResetActed();
         ClearReceivedSuppliesThisTurn();
         ClearTookOffRecently();
+        SetSurfacedForSupplyThisTurn(false);
     }
 
     public void SetRemainingMovementPoints(int value)
@@ -1097,6 +1101,13 @@ public class UnitManager : MonoBehaviour
             return false;
 
         return currentlyObservedByTeamIds.Contains(viewerTeamId);
+    }
+
+    public void SetSurfacedForSupplyThisTurn(bool value)
+    {
+        surfacedForSupplyThisTurn = value &&
+            GetAircraftType() == AircraftType.None &&
+            SupportsLayerMode(Domain.Submarine, HeightLevel.Submerged);
     }
 
     public bool IsCurrentlyObservedByOpponent()
@@ -2986,6 +2997,7 @@ public class UnitManager : MonoBehaviour
         flagEmbarkedAtUnit = embarkedAtUnit;
         flagReceivedSupplies = receivedSuppliesThisTurn;
         flagTookOffRecently = tookOffRecently;
+        flagSurfacedForSupplyThisTurn = surfacedForSupplyThisTurn;
         flagAircraftForcedLandingAwaitingRefuel = AircraftForcedLandingAwaitingRefuel;
         flagHasMerged = hasMerged;
         flagMergedWhenTurn = mergedWhenTurn;

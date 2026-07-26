@@ -136,40 +136,23 @@ public class PodePousarWindow : EditorWindow
             return report;
         }
 
-        IReadOnlyList<UnitLayerMode> modes = selectedUnit.GetAllLayerModes();
-        if (modes == null || modes.Count <= 1)
+        HeightLevel currentHeight = selectedUnit.GetHeightLevel();
+        if (selectedUnit.GetDomain() != Domain.Air ||
+            (currentHeight != HeightLevel.AirLow && currentHeight != HeightLevel.AirHigh))
         {
-            report.explicacao = "Unidade com apenas 1 camada operacional.";
+            report.explicacao = "Selecione uma aeronave em AirLow ou AirHigh.";
             return report;
         }
 
-        Domain currentDomain = selectedUnit.GetDomain();
-        HeightLevel currentHeight = selectedUnit.GetHeightLevel();
-        Vector3Int cell = selectedUnit.CurrentCellPosition;
-        cell.z = 0;
-        int validTransitions = 0;
-        string firstReason = string.Empty;
-
-        for (int i = 0; i < modes.Count; i++)
-        {
-            UnitLayerMode mode = modes[i];
-            if (mode.domain == currentDomain && mode.heightLevel == currentHeight)
-                continue;
-
-            if (LayerTransitionRules.CanUseLayerModeAtCell(selectedUnit, map, terrainDatabase, cell, mode.domain, mode.heightLevel, out string reason))
-            {
-                validTransitions++;
-                continue;
-            }
-
-            if (string.IsNullOrWhiteSpace(firstReason))
-                firstReason = reason;
-        }
-
-        report.status = validTransitions > 0;
-        report.explicacao = report.status
-            ? $"Unidade apta a mudar de altitude/camada (transicoes validas: {validTransitions})."
-            : $"Unidade sem transicao valida no hex atual. {firstReason}";
+        HeightLevel targetHeight = currentHeight == HeightLevel.AirLow
+            ? HeightLevel.AirHigh
+            : HeightLevel.AirLow;
+        PodeMudarAltitudeReport altitude =
+            PodeMudarAltitudeSensor.Evaluate(selectedUnit, map, targetHeight);
+        report.status = altitude != null && altitude.status;
+        report.explicacao = altitude != null
+            ? altitude.explicacao
+            : "Falha ao consultar PodeMudarAltitudeSensor.";
 
         if (useManualRemainingMovement)
         {

@@ -194,6 +194,7 @@ public static class SaveDataMapper
             hasActed = unit.HasActed,
             receivedSuppliesThisTurn = unit.ReceivedSuppliesThisTurn,
             tookOffRecently = unit.TookOffRecently,
+            surfacedForSupplyThisTurn = unit.SurfacedForSupplyThisTurn,
             aircraftForcedLandingAwaitingRefuel = unit.AircraftForcedLandingAwaitingRefuel,
             isUnderRepair = unit.IsUnderRepair,
             isEmbarked = unit.IsEmbarked,
@@ -283,6 +284,7 @@ public static class SaveDataMapper
         unit.SetCurrentFuel(saved.currentFuel);
         unit.SetReceivedSuppliesThisTurn(saved.receivedSuppliesThisTurn);
         unit.SetTookOffRecently(saved.tookOffRecently);
+        unit.SetSurfacedForSupplyThisTurn(saved.surfacedForSupplyThisTurn);
         RestoreUnitRepairState(unit, saved);
         if (saved.hasActed)
             unit.MarkAsActed();
@@ -353,6 +355,7 @@ public static class SaveDataMapper
         unit.SetRemainingMovementPoints(saved.remainingMovementPoints);
         unit.SetReceivedSuppliesThisTurn(saved.receivedSuppliesThisTurn);
         unit.SetTookOffRecently(saved.tookOffRecently);
+        unit.SetSurfacedForSupplyThisTurn(saved.surfacedForSupplyThisTurn);
         unit.SetAircraftForcedLandingAwaitingRefuel(saved.aircraftForcedLandingAwaitingRefuel);
         RestoreUnitRepairState(unit, saved);
     }

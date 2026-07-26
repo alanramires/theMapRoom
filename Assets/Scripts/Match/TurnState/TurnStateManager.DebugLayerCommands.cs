@@ -127,34 +127,10 @@ public partial class TurnStateManager
         HeightLevel targetHeight,
         out string reason)
     {
-        reason = string.Empty;
-        if (unit.GetDomain() != Domain.Air || unit.IsAircraftGrounded)
-        {
-            reason = "ALTITUDE exige aeronave no ar.";
-            return false;
-        }
-        if (unit.GetHeightLevel() == targetHeight)
-        {
-            reason = $"Aeronave ja esta em Air/{targetHeight}.";
-            return false;
-        }
-        if (!unit.SupportsLayerMode(Domain.Air, targetHeight))
-        {
-            reason = $"Unidade nao suporta Air/{targetHeight}.";
-            return false;
-        }
-        if (unit.IsLayerChangeBlockedByForcedLock(Domain.Air, targetHeight, out reason))
-            return false;
-        if (!UnitOccupancyRules.CanEndLayerTransitionAtCell(
-                boardMap, unit.CurrentCellPosition, unit, Domain.Air, targetHeight, out UnitManager blocker))
-        {
-            reason = blocker != null
-                ? $"Camada Air/{targetHeight} ocupada por {blocker.name}."
-                : $"Transicao para Air/{targetHeight} bloqueada.";
-            return false;
-        }
-
-        return true;
+        PodeMudarAltitudeReport report =
+            PodeMudarAltitudeSensor.Evaluate(unit, boardMap, targetHeight);
+        reason = report != null ? report.explicacao : "Falha ao avaliar mudanca de altitude.";
+        return report != null && report.status;
     }
 
     private IEnumerator ExecuteDebugLayerCommand(

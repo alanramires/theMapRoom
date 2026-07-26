@@ -1894,6 +1894,18 @@ public partial class TurnStateManager
             {
                 case LandingOptionAction.DescendToAirLow:
                 {
+                    PodeMudarAltitudeReport report = PodeMudarAltitudeSensor.Evaluate(
+                        selectedUnit,
+                        boardMap,
+                        HeightLevel.AirLow);
+                    if (report == null || !report.status)
+                    {
+                        RuntimeLog(report != null ? report.explicacao : "Descida indisponivel.");
+                        scannerPromptStep = ScannerPromptStep.LandingCycleOption;
+                        LogLandingSelectionPanel();
+                        yield break;
+                    }
+
                     if (!selectedUnit.TrySetCurrentLayerMode(Domain.Air, HeightLevel.AirLow))
                     {
                         RuntimeLog("[Landing] Falha ao aplicar transicao para Air/Low.");
@@ -1909,6 +1921,18 @@ public partial class TurnStateManager
                 }
                 case LandingOptionAction.AscendToAirHigh:
                 {
+                    PodeMudarAltitudeReport report = PodeMudarAltitudeSensor.Evaluate(
+                        selectedUnit,
+                        boardMap,
+                        HeightLevel.AirHigh);
+                    if (report == null || !report.status)
+                    {
+                        RuntimeLog(report != null ? report.explicacao : "Subida indisponivel.");
+                        scannerPromptStep = ScannerPromptStep.LandingCycleOption;
+                        LogLandingSelectionPanel();
+                        yield break;
+                    }
+
                     PlayMovementStartSfx(selectedUnit);
                     float duration = GetEmbarkAirHighToGroundDuration() * Mathf.Clamp01(GetEmbarkHighToLowNormalizedTime());
                     if (duration > 0f)
@@ -2160,8 +2184,29 @@ public partial class TurnStateManager
                 currentHeight == HeightLevel.Surface &&
                 mode.domain == Domain.Submarine &&
                 mode.heightLevel == HeightLevel.Submerged;
+            bool isAirAltitudeChange =
+                currentDomain == Domain.Air &&
+                mode.domain == Domain.Air &&
+                (currentHeight == HeightLevel.AirLow || currentHeight == HeightLevel.AirHigh) &&
+                (mode.heightLevel == HeightLevel.AirLow || mode.heightLevel == HeightLevel.AirHigh);
 
-            if (isSubmarineSubmerge)
+            if (isAirAltitudeChange)
+            {
+                PodeMudarAltitudeReport altitudeReport = PodeMudarAltitudeSensor.Evaluate(
+                    unit,
+                    boardMap,
+                    mode.heightLevel,
+                    unitCell);
+                if (altitudeReport == null || !altitudeReport.status)
+                {
+                    if (string.IsNullOrWhiteSpace(unavailableReason))
+                        unavailableReason = altitudeReport != null
+                            ? altitudeReport.explicacao
+                            : "Mudanca de altitude indisponivel.";
+                    continue;
+                }
+            }
+            else if (isSubmarineSubmerge)
             {
                 PodeSubmergirReport submergirReport = PodeSubmergirSensor.Evaluate(
                     unit,
@@ -2199,9 +2244,13 @@ public partial class TurnStateManager
             bool isSubmarineEmerge = currentDomain == Domain.Submarine && currentHeight == HeightLevel.Submerged
                 && mode.domain == Domain.Naval && mode.heightLevel == HeightLevel.Surface;
 
-            LandingOptionAction action = isAirToGroundLanding
-                ? LandingOptionAction.Land
-                : LandingOptionAction.DomainTransition;
+            LandingOptionAction action = isAirAltitudeChange
+                ? (mode.heightLevel == HeightLevel.AirHigh
+                    ? LandingOptionAction.AscendToAirHigh
+                    : LandingOptionAction.DescendToAirLow)
+                : (isAirToGroundLanding
+                    ? LandingOptionAction.Land
+                    : LandingOptionAction.DomainTransition);
 
             if (isAirToGroundLanding)
             {
