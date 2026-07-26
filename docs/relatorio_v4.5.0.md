@@ -2,214 +2,97 @@
 
 ## Objetivo
 
-Registrar o plano completo para consolidar as mudanças de camada aéreas e
-navais. Esta versão representa o marco inicial `0/5`: define responsabilidades,
-regras e critérios de validação, sem implementar ainda as cinco etapas do
-refactor.
+Planejar a consolidação das mudanças de camada aéreas e navais, separando as
+regras físicas do hex das condições operacionais de cada ação.
 
-Toda implementação futura deve preservar o contrato de ações transacionais:
-nenhuma mudança de camada, ocupação, combustível, detecção, Fog of War, cache
-confirmado ou flag operacional se torna definitiva antes do compromisso
-explícito da ação e do retorno a `CursorState.Neutral`.
+Esta versão registra o ponto inicial do refactor. As cinco etapas estão
+definidas, mas ainda não foram implementadas.
 
-## Separação de responsabilidades
+## Escada naval
 
-- `LayerTransitionRules` responderá: “esta camada cabe neste hex?”.
-- Sensores específicos responderão: “esta operação pode acontecer agora?”.
-- Janelas de ferramentas apenas coletarão entradas, chamarão sensores e
-  apresentarão seus relatórios.
-- `TurnStateManager` consumirá as decisões e aplicará seus efeitos somente no
-  compromisso.
-- Cancelamento deverá restaurar integralmente posição, camada e contexto
-  provisório, sem revelar informação nem recalcular o tabuleiro confirmado a
-  partir da prévia.
+- A primeira etapa criará o `PodeSubmergirSensor` como fonte única para a
+  transição de `Naval/Surface` para `Submarine/Submerged`.
+- A consulta considerará unidade, camada atual, ocupação, disparo, dano,
+  emersão forçada, detecção e demais janelas de exposição.
+- Terreno, estrutura combinada com terreno e construções também serão
+  avaliados.
+- Regras que forçam emersão ou impedem eclipse não poderão ser ignoradas pelo
+  simples suporte do hex à camada submersa.
+- O `TurnStateManager` deixará de reimplementar a decisão e passará a consumir o
+  sensor.
 
-## Etapa 1 — Fechar a escada naval
+## Escada aérea
 
-Criar `PodeSubmergirSensor` como fonte única para a transição
-`Naval/Surface → Submarine/Submerged`.
+- `PodeDecolarSensor` e `PodePousarSensor` serão revisados para compartilhar
+  consultas equivalentes por hex.
+- Aeronave, combustível, perfil aéreo, pista, local de pouso, espaço aéreo e
+  locks de camada continuarão sendo validados.
+- Decolagem curta, VTOL e decolagem completa permanecerão procedimentos
+  distintos.
+- O contexto distinguirá aeronaves que começaram o turno no chão das que
+  pousaram durante uma operação composta.
+- Receber combustível não autorizará retroativamente uma decolagem no mesmo
+  batch nem disparará decolagem automática.
+- Uma aeronave abastecida no chão poderá tentar depois uma decolagem normal,
+  quando for selecionada e novamente avaliada pelo `PodeDecolarSensor`.
 
-O sensor deverá validar:
+## Fundação comum
 
-- compatibilidade da unidade e camada atual;
-- suporte à camada submersa;
-- hex consultado e ocupação da banda de destino;
-- terreno;
-- combinação de estrutura e terreno;
-- construções;
-- skills obrigatórias e bloqueadas;
-- regras que forçam emersão ou proíbem submersão/eclipsamento;
-- trava após disparo;
-- trava após dano ou emersão forçada;
-- detecção recente;
-- demais janelas de exposição e locks operacionais.
+- A terceira etapa criará `LayerTransitionRules` em
+  `Assets/Scripts/Units/Rules`.
+- A fundação responderá se a camada de destino cabe no hex.
+- Suporte da unidade, terreno, estrutura, construção, skills, modos adicionais
+  e ocupação da banda serão centralizados.
+- Combustível, dano, disparo, detecção, suprimento e ordem das operações
+  permanecerão nos sensores específicos.
+- As cópias existentes no `TurnStateManager`, em janelas de Editor e em outros
+  sensores serão removidas durante a migração.
 
-Regras de construção, estrutura e terreno que forçam emersão prevalecerão sobre
-o simples suporte físico à camada submersa. O `TurnStateManager` e os demais
-consumidores deixarão de reimplementar essas decisões.
+## Altitude e operações compostas
 
-## Etapa 2 — Consolidar a escada aérea básica
+- Um sensor próprio tratará `AirLow ↔ AirHigh` sem consultar terreno,
+  construção ou skills do hex inferior durante nivelamento em voo.
+- `TookOffRecently` não será um bloqueio universal de `AirHigh`.
+- Aeroportos poderão preservar decolagem direta para `AirHigh`.
+- Estradas, porta-aviões e procedimentos equivalentes poderão manter a aeronave
+  recém-decolada em `AirLow`.
+- Aviões-tanque deverão descer para atender aeronaves temporariamente restritas
+  a `AirLow`.
+- `PodeArremeterSensor` tratará sequências autorizadas de pouso, operação e
+  decolagem no mesmo hex, respeitando a ordem e o combustível anterior à
+  operação.
+- `PodeSubmergirRapidamenteSensor` tratará futuros retornos autorizados após
+  emersão, sem superar bloqueios de suprimento, disparo, dano ou detecção.
+- As transições finais continuarão passando por `PodeDecolarSensor` ou
+  `PodeSubmergirSensor`.
 
-Revisar `PodeDecolarSensor` e `PodePousarSensor` para garantir:
+## Ferramentas
 
-- guarda explícita de aeronave;
-- consultas equivalentes por hex atual ou hipotético;
-- combustível quando aplicável;
-- perfil aéreo;
-- pista ou local de pouso;
-- terreno, estrutura e construção;
-- espaço aéreo;
-- locks de camada;
-- decolagem curta, VTOL, completa e entrada na altitude preferencial quando
-  autorizada.
+As janelas serão organizadas nos menus de operações aéreas e navais:
 
-O estado de solo deverá distinguir explicitamente:
+- `Pode Decolar`;
+- `Pode Pousar`;
+- `Pode Mudar de Altitude`;
+- `Pode Arremeter`;
+- `Pode Emergir`;
+- `Pode Submergir`;
+- `Pode Submergir Rapidamente`.
 
-- aeronave que começou o turno pousada, com operação encerrada;
-- aeronave que pousou durante a ação ou batch atual;
-- aeronave que já estava pousada no início da operação;
-- combustível existente antes da operação;
-- combustível recebido durante a operação;
-- suprimento recebido antes de uma futura seleção normal.
+Cada janela apenas montará o contexto, chamará seu sensor e exibirá o relatório.
+Nomes de arquivos e menus serão alinhados, preservando os respectivos `.meta`.
 
-`ReceivedSuppliesThisTurn` não será usado isoladamente como substituto desse
-contexto. Receber combustível não disparará decolagem automaticamente nem
-criará permissão retroativa no mesmo batch. Uma aeronave no chão e abastecida
-poderá tentar posteriormente uma decolagem normal quando for selecionada; essa
-nova tentativa passará integralmente por `PodeDecolarSensor`.
+## Arquitetura transacional
 
-## Etapa 3 — Criar a fundação comum
+- Sensores e ferramentas permanecerão consultas sem efeitos definitivos.
+- Nenhuma prévia alterará camada, combustível, ocupação, FOW, detecção, caches
+  confirmados ou memória da IA.
+- Mudanças de camada serão aplicadas somente no compromisso explícito da ação.
+- Cancelamento restaurará o snapshot confirmado.
+- O recálculo definitivo continuará ocorrendo após o retorno a
+  `CursorState.Neutral`.
 
-Criar `LayerTransitionRules` em `Assets/Scripts/Units/Rules`, responsável
-exclusivamente por:
+## Verificação
 
-- suporte da unidade à camada;
-- terreno;
-- estrutura combinada com terreno;
-- construções;
-- skills obrigatórias e bloqueadas;
-- modos adicionais;
-- ocupação da banda de destino.
-
-A fundação não avaliará combustível, disparo, dano, detecção,
-`TookOffRecently`, suprimento, ordem de ações, arremetida ou retorno rápido.
-
-Remover gradualmente as duplicações de:
-
-- `TurnStateManager.CanUseLayerModeAtCurrentCell`;
-- `PodePousarWindow`;
-- especializações físicas dentro de outros sensores;
-- helpers próprios de suprimento, fusão e ferramentas de debug.
-
-A migração deverá preservar a precedência atual de construção, estrutura com
-terreno e terreno.
-
-## Etapa 4 — Altitude e operações compostas
-
-### Pode Mudar de Altitude
-
-Criar sensor específico para `AirLow ↔ AirHigh`, validando:
-
-- aeronave e suporte à altitude de destino;
-- ocupação da banda aérea;
-- locks de camada;
-- restrições operacionais;
-- perfil e resultado da decolagem recente.
-
-Nivelamento em voo não consultará terreno, construção, estrutura ou skills de
-entrada do hex inferior.
-
-`TookOffRecently` não será um veto universal a `AirHigh`. O resultado legítimo
-de `PodeDecolarSensor` deverá ser preservado:
-
-- aeroporto poderá colocar a aeronave diretamente em `AirHigh`;
-- estrada, porta-aviões ou procedimento equivalente poderá terminar em
-  `AirLow`;
-- uma aeronave recém-decolada em `AirLow` não poderá subir indevidamente ao
-  acompanhar um avião-tanque;
-- o avião-tanque deverá descer para atendê-la em `AirLow`;
-- helicóptero e caça recém-decolado serão atendidos em `AirLow`;
-- após o término normal da restrição específica, a subida volta a ser possível.
-
-O contexto poderá precisar preservar altitude de saída, procedimento utilizado
-e eventual lock temporário de subida, em vez de depender apenas do booleano
-`TookOffRecently`.
-
-### Pode Arremeter
-
-Criar `PodeArremeterSensor` para
-`pousar → operação autorizada → tentar decolar no mesmo hex`.
-
-Como a sequência ocorre no mesmo hex, ela não consumirá autonomia de
-deslocamento. A ordem dos eventos, porém, será obrigatória. O sensor consultará
-um snapshot com camada inicial, estado de voo, combustível anterior, combustível
-recebido, operação intermediária e autorização explícita.
-
-Regras:
-
-- aeronave já pousada no início não arremete;
-- pouso para transferência não autoriza arremetida por padrão;
-- aeronave que pousou sem combustível e depois foi abastecida permanece
-  pousada;
-- suprimento não cria autorização retroativa nem decolagem automática;
-- apenas operações explicitamente autorizadas poderão tentar arremetida;
-- a decolagem final ainda passará por `PodeDecolarSensor`.
-
-### Pode Submergir Rapidamente
-
-Criar `PodeSubmergirRapidamenteSensor` para
-`emergir → operação autorizada → tentar submergir`.
-
-Regras:
-
-- submarino que emerge para receber suprimento não submerge na mesma rodada;
-- disparo, dano, detecção e locks continuam prevalecendo;
-- terreno, estrutura com terreno, construções e emersão forçada continuam
-  prevalecendo;
-- apenas operações futuras explicitamente autorizadas poderão solicitar
-  retorno rápido;
-- a transição final sempre passará por `PodeSubmergirSensor`.
-
-## Etapa 5 — Organizar a caixa de ferramentas
-
-Estrutura planejada:
-
-```text
-Tools > Operações Aéreas > Pode Decolar
-Tools > Operações Aéreas > Pode Pousar
-Tools > Operações Aéreas > Pode Mudar de Altitude
-Tools > Operações Aéreas > Pode Arremeter
-
-Tools > Operações Navais > Pode Emergir
-Tools > Operações Navais > Pode Submergir
-Tools > Operações Navais > Pode Submergir Rapidamente
-
-Tools > Sensors > Pode Mudar de Camada
-```
-
-A ferramenta genérica permanecerá somente se continuar útil para consultar a
-fundação física. Nomes de arquivos corresponderão às janelas, regras não serão
-reimplementadas no Editor, arquivos `.meta` serão preservados ou movidos junto
-com seus assets e ajustes de menu/texto não alterarão gameplay.
-
-## Critérios de validação
-
-- Submersão bloqueada corretamente por terreno, estrutura, construção,
-  ocupação, disparo, dano, detecção e emersão forçada.
-- Aeroporto preservando decolagem direta para `AirHigh`.
-- Estrada e porta-aviões preservando saída em `AirLow`.
-- `TookOffRecently` sem bloquear indevidamente uma decolagem legítima em
-  `AirHigh`.
-- Avião-tanque descendo para atender aeronaves restritas a `AirLow`.
-- Combustível recebido durante pouso sem criar arremetida retroativa.
-- Aeronave abastecida no chão usando uma futura decolagem normal, mediante nova
-  avaliação completa.
-- Operações não autorizadas mantendo aeronave pousada ou submarino emergido.
-- Cancelamento restaurando o snapshot confirmado.
-- Fog of War, detecção, IA e caches sem observar estados provisórios.
-
-## Estado desta versão
-
-- Planejamento: concluído.
-- Implementação das etapas: `0/5`.
-- Alterações de gameplay: nenhuma.
+- Plano dividido em cinco etapas.
+- Implementação atual: `0/5`.
+- Alterações de gameplay nesta versão: nenhuma.
