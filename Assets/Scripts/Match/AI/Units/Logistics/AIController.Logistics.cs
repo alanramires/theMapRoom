@@ -13,6 +13,9 @@ public partial class AIController
         // (picked up by tow shuttle), so re-derive the target via FindTowDeliveryTarget.
         if (HasTransportCargo(unit))
         {
+            // Ferido a bordo ja passou pelo modo hospital no roteador; chegar aqui com
+            // paciente significa que nao havia servico nem recarga. Ver
+            // Transportador.Hospital.
             // Pass assignedSectorTarget=zero — TryResolveCourierPassengerTarget re-derives the
             // target from the passenger's plan slot, handling cell (0,0,0) correctly.
             return DecideTransportadorCourierAction(unit, snapshot);
@@ -97,7 +100,21 @@ public partial class AIController
                 out Vector3Int moveCell,
                 out string reason))
         {
-            Debug.Log($"{TL("Logistics")} {unit.InstanceId} move retaguarda via {moveCell} anchor={anchorReason} {reason}");
+            string serviceTargetDebug;
+            if (serviceTarget != null)
+            {
+                Vector3Int targetCell = serviceTarget.CurrentCellPosition;
+                targetCell.z = 0;
+                serviceTargetDebug =
+                    $"serviceTarget={serviceTarget.UnitDisplayName}#{serviceTarget.InstanceId}@{targetCell}";
+            }
+            else
+            {
+                serviceTargetDebug = "serviceTarget=none";
+            }
+
+            Debug.Log($"{TL("Logistics")} {unit.InstanceId} move retaguarda via {moveCell} " +
+                      $"anchor={anchorReason} {serviceTargetDebug} {reason}");
 
             // If repositioning already lands in a valid service cell, do the service in the same action.
             if (moveCell != fromCell)

@@ -410,6 +410,103 @@ public partial class AIController
         return best;
     }
 
+    private UnitManager FindBestNavalRepairPlatform(
+        UnitManager aircraft,
+        Vector3Int fromCell,
+        TeamId aiTeam,
+        out int bestSlot,
+        out float bestDistance)
+    {
+        bestSlot = -1;
+        bestDistance = float.MaxValue;
+        if (aircraft == null
+            || !IsVtolStyleAircraft(aircraft)
+            || !aircraft.TryGetUnitData(out UnitData aircraftData)
+            || aircraftData == null)
+        {
+            return null;
+        }
+
+        UnitManager best = null;
+        int aiSlot = ResolveAISlotKey(aiTeam);
+        foreach (UnitManager candidate in UnitManager.AllActive)
+        {
+            if (candidate == null
+                || candidate == aircraft
+                || candidate.SlotIndex != aiSlot
+                || candidate.IsDead
+                || candidate.IsEmbarked
+                || candidate.IsUnderRepair)
+            {
+                continue;
+            }
+
+            if (!candidate.TryGetUnitData(out UnitData candidateData)
+                || candidateData == null
+                || candidateData.militaryForce != MilitaryForce.Navy
+                || !candidateData.IsMaritime()
+                // Vale tanto para quem exerce o papel Transportador quanto
+                // para navios de outro papel (fragata/porta-avioes) com a
+                // capacidade mecanica auxiliar habilitada no UnitData.
+                || !candidateData.isTransporter
+                || candidateData.transportSlots == null
+                || candidateData.transportSlots.Count == 0)
+            {
+                continue;
+            }
+
+            // A capacidade efetiva e a fonte de verdade: skill/camada, vaga,
+            // exclusividade e capacidade configuradas no proprio UnitData.
+            int fittingSlot = -1;
+            for (int slotIndex = 0; slotIndex < candidateData.transportSlots.Count; slotIndex++)
+            {
+                UnitTransportSlotRule slot = candidateData.transportSlots[slotIndex];
+                if (slot == null
+                    || !PodeEmbarcarSensor.CanUseSlot(aircraft, aircraftData, slot, out _)
+                    || !candidate.CanUseTransportSlotExclusivity(slotIndex, out _)
+                    || candidate.GetOccupiedTransportSeatCountForSlot(slotIndex) >= Mathf.Max(1, slot.capacity))
+                {
+                    continue;
+                }
+
+                fittingSlot = slotIndex;
+                break;
+            }
+
+            if (fittingSlot < 0)
+                continue;
+
+            Vector3Int candidateCell = candidate.CurrentCellPosition;
+            candidateCell.z = 0;
+            if (HasNearbyVisibleEnemy(candidateCell, aiTeam, DefenseEnemyRange))
+            {
+                Debug.Log($"[Repair] skip plataforma naval #{candidate.InstanceId}@{candidateCell}: unsafe");
+                continue;
+            }
+
+            float distance = SectorManager.HexDistance(fromCell, candidateCell);
+            if (best == null
+                || distance < bestDistance - 0.1f
+                || (Mathf.Abs(distance - bestDistance) <= 0.1f
+                    && candidate.InstanceId < best.InstanceId))
+            {
+                best = candidate;
+                bestSlot = fittingSlot;
+                bestDistance = distance;
+            }
+        }
+
+        if (best != null)
+        {
+            Vector3Int bestCell = best.CurrentCellPosition;
+            bestCell.z = 0;
+            Debug.Log($"[Repair] plataforma naval elegivel #{best.InstanceId}@{bestCell} " +
+                      $"slot={bestSlot} dist={bestDistance:F1}");
+        }
+
+        return best;
+    }
+
 
     private bool HasUsablePreferredAircraftRepairConstruction(
         UnitManager unit,

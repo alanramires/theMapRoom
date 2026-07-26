@@ -12,6 +12,7 @@ public class ConstructionDataEditor : Editor
     }
 
     private ForceCopyFilter forceCopyFilter = ForceCopyFilter.Army;
+    private bool showLogisticsSection;
 
     public override void OnInspectorGUI()
     {
@@ -26,7 +27,18 @@ public class ConstructionDataEditor : Editor
             "legacyRequiredLandingSkills",
             "requiredLandingSkillRules",
             "requireAtLeastOneLandingSkill",
-            "forceEndMovementOnTerrainDomainForDomains");
+            "forceEndMovementOnTerrainDomainForDomains",
+            "isSupplier",
+            "supplierTier",
+            "maxUnitsServedPerTurn",
+            "serviceRange",
+            "collectionRange",
+            "supplierOperationDomains",
+            "supplierServicesProvided",
+            "supplierServiceProfile",
+            "supplierResources");
+        EditorGUILayout.Space();
+        DrawLogisticsSection();
         EditorGUILayout.Space();
         DrawAircraftOpsSection(serializedObject);
         EditorGUILayout.Space();
@@ -35,6 +47,50 @@ public class ConstructionDataEditor : Editor
         DrawConstructionConfigurationExpanded(serializedObject.FindProperty("constructionConfiguration"));
 
         serializedObject.ApplyModifiedProperties();
+    }
+
+    private void DrawLogisticsSection()
+    {
+        showLogisticsSection = EditorGUILayout.Foldout(
+            showLogisticsSection,
+            "Logistics",
+            toggleOnLabelClick: true,
+            EditorStyles.foldoutHeader);
+        if (!showLogisticsSection)
+            return;
+
+        EditorGUI.indentLevel++;
+        DrawIfExists(serializedObject.FindProperty("isSupplier"), "Is Supplier");
+        DrawIfExists(serializedObject.FindProperty("supplierTier"), "Supplier Tier");
+        DrawIfExists(serializedObject.FindProperty("maxUnitsServedPerTurn"), "Max Units Served Per Turn");
+        DrawIfExists(serializedObject.FindProperty("serviceRange"), "Service Range");
+        DrawIfExists(serializedObject.FindProperty("collectionRange"), "Collection Range");
+
+        SerializedProperty isSupplier = serializedObject.FindProperty("isSupplier");
+        if (isSupplier != null && isSupplier.boolValue)
+        {
+            DrawIfExists(serializedObject.FindProperty("supplierOperationDomains"), "Supplier Operation Domain");
+            DrawIfExists(serializedObject.FindProperty("supplierServicesProvided"), "Supplier Services Provided");
+
+            SerializedProperty profile = serializedObject.FindProperty("supplierServiceProfile");
+            if (profile != null)
+            {
+                using (new EditorGUI.DisabledScope(true))
+                    EditorGUILayout.PropertyField(
+                        profile,
+                        new GUIContent("Supplier Service Profile"));
+            }
+
+            DrawIfExists(serializedObject.FindProperty("supplierResources"), "Supplier Services Supplies (Default)");
+        }
+        else
+        {
+            EditorGUILayout.HelpBox(
+                "Ative Is Supplier para configurar Supplier Services e Supplier Resources.",
+                MessageType.Info);
+        }
+
+        EditorGUI.indentLevel--;
     }
 
     private static void DrawNavalOpsSection(SerializedObject so)

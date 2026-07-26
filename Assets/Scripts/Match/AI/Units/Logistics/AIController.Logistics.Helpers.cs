@@ -13,7 +13,9 @@ public partial class AIController
         return unit != null
             && unit.TryGetUnitData(out UnitData data)
             && data != null
-            && UnitRoleCompatibility.CanSatisfy(data, UnitRole.Logistica);
+            && UnitRoleCompatibility.CanSatisfy(data, UnitRole.Logistica)
+            && ServiceData.ResolveSupplierServiceProfile(
+                data.supplierServicesProvided) == SupplierServiceProfile.FieldService;
     }
 
     private static bool PreferLogisticsBestDpq(UnitManager unit)

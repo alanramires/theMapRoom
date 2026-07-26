@@ -31,7 +31,7 @@ public enum ConstructionFacilityType
     Airport = 1 << 1,
     City = 1 << 2,
     TransportTerminal = 1 << 3,
-    Everything = ~0
+    AnyConstruction = ~0
 }
 
 public static class ConstructionFacilityTypeRules
@@ -41,7 +41,7 @@ public static class ConstructionFacilityTypeRules
         if (construction == null || allowedFacilities == ConstructionFacilityType.None)
             return false;
 
-        if (allowedFacilities == ConstructionFacilityType.Everything)
+        if (allowedFacilities == ConstructionFacilityType.AnyConstruction)
             return true;
 
         return (construction.isHarbor && (allowedFacilities & ConstructionFacilityType.Harbor) != 0)
@@ -237,6 +237,8 @@ public class UnitData : ScriptableObject
     [Range(0, 100)] public int aiPreventiveSupplyAutonomyBelowPct = 60;
     [Tooltip("Manutencao preventiva: suprir aliados com alguma arma embarcada com munição nesse valor ou abaixo. 0 desativa este criterio.")]
     [Range(0, 10)] public int aiPreventiveSupplyWeaponAmmoAtOrBelow = 1;
+    [Tooltip("So vale para unidades que sao supridoras E transportadoras. Carregando um passageiro em reparo, a ordem e: suprir a bordo > voltar para transferir estoque mantendo o ferido > e SO entao desembarcar num ponto de reparo. Desligado, o passageiro em reparo e entregue pelo EVAC normal como qualquer outra carga.")]
+    public bool aiDisembarkWhenCannotSupply = true;
 
     [Header("Elite")]
     [Tooltip("Nivel de elite da unidade (padrao: 0).")]
@@ -302,6 +304,8 @@ public class UnitData : ScriptableObject
     public List<SupplierOperationDomain> supplierOperationDomains = new List<SupplierOperationDomain>();
     [Tooltip("Servicos oferecidos por esta unidade de logistica.")]
     public List<ServiceData> supplierServicesProvided = new List<ServiceData>();
+    [Tooltip("Classificacao automatica: None sem servicos; StockTransfer somente Transfer; FieldService quando oferece qualquer outro servico.")]
+    public SupplierServiceProfile supplierServiceProfile = SupplierServiceProfile.None;
     [FormerlySerializedAs("embarkedResources")]
     [FormerlySerializedAs("embarkedSupplies")]
     [Tooltip("Recursos/logistica padrao de fabrica desta unidade fornecedora (Supply + quantidade).")]
@@ -350,6 +354,8 @@ public class UnitData : ScriptableObject
             supplierOperationDomains = new List<SupplierOperationDomain>();
         if (supplierServicesProvided == null)
             supplierServicesProvided = new List<ServiceData>();
+        supplierServiceProfile =
+            ServiceData.ResolveSupplierServiceProfile(supplierServicesProvided);
         if (supplierResources == null)
             supplierResources = new List<UnitEmbarkedSupply>();
         if (combatModifiers == null)

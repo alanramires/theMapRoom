@@ -92,19 +92,12 @@ public partial class AIController
             //   2. a different transporter occupies a filled Transportador slot.
             if (IsAlreadyFormalPassenger(candidate, transporter, plan)) continue;
 
-            // Embark compatibility: only pick candidates that will actually accept the ride.
-            // Primary capturers with a plan assignment will refuse a rogue shuttle (no sector
-            // assignment) because the embark check requires sameSector. Skip them here to avoid
-            // the APC wasting movement toward a capturer that will refuse on their own turn.
+            // Transporte sem objetivo formal pode atender um capturador planejado:
+            // o embarque atual classifica esse caso como freeTransport. A reserva de
+            // passageiro de OUTRO transportador ja foi protegida acima por
+            // IsAlreadyFormalPassenger; portanto nao descarte toda unidade com plano.
             SectorObjective candidateAssigned = plan != null ? ResolveAssignedObjective(candidate, plan) : null;
-            bool candidateIsPrimary = candidateData.roles != null && candidateData.roles.Count > 0
-                && candidateData.roles[0] == UnitRole.Capturador;
-            if (assignedSector == null)
-            {
-                // Rogue shuttle: primary capturer with a plan assignment will refuse.
-                if (candidateIsPrimary && candidateAssigned != null) continue;
-            }
-            else if (plan != null)
+            if (assignedSector != null && plan != null)
             {
                 // Assigned shuttle: only candidates heading to the same sector will accept.
                 if (candidateAssigned == null || candidateAssigned.Sector != assignedSector.Sector) continue;
@@ -160,7 +153,7 @@ public partial class AIController
             // da lista de pickup.
             bool groundTransporter = transporter.GetDomain() != Domain.Air;
             int candidateThreshold = groundTransporter
-                ? TransportPassengerWalkRange
+                ? ResolvePassengerWalkWithoutTransportBudget(candidate)
                 : GetEffectiveTransportThresholdForSlot(
                     PlayerSlotId.FromIndex(snapshot.AISlotIndex));
             if (!groundTransporter)
@@ -535,12 +528,13 @@ public partial class AIController
         float bestCandidateDist = 0f;
         float bestThreat = CalculateThreatLevel(candidateCell, aiTeam);
         bool bestIsProduction = IsTeamProductionBuilding(candidateCell, aiTeam);
-        bool found = CanUseTransporterPickupCell(transporter, aiTeam, candidateCell)
+        bool candidateReachableByTransporter =
+            candidateCell == transporter.CurrentCellPosition
+            || (transportPaths != null && transportPaths.ContainsKey(candidateCell));
+        bool found = candidateReachableByTransporter
+            && CanUseTransporterPickupCell(transporter, aiTeam, candidateCell)
             && !IsNonTeamConstruction(candidateCell, aiTeam);
         const float eps = 0.01f;
-
-        if (passengerReachable == null || passengerReachable.Count == 0)
-            return found ? best : homeTarget;
 
         if (transportPaths != null && transportPaths.Count > 0)
         {
@@ -550,7 +544,12 @@ public partial class AIController
                 cell.z = 0;
                 if (IsNonTeamConstruction(cell, aiTeam)) continue;
                 if (!CanUseTransporterPickupCell(transporter, aiTeam, cell)) continue;
-                if (!CanPassengerReachEmbarkStopForTransporterCell(cell, passengerReachable)) continue;
+
+                bool passengerHasTerrainAwareReach =
+                    passengerReachable != null && passengerReachable.Count > 0;
+                if (passengerHasTerrainAwareReach
+                    && !CanPassengerReachEmbarkStopForTransporterCell(cell, passengerReachable))
+                    continue;
 
                 float homeDist = SectorManager.HexDistance(cell, homeTarget);
                 float candidateDist = SectorManager.HexDistance(cell, candidateCell);
@@ -575,37 +574,53 @@ public partial class AIController
             }
         }
 
-        foreach (Vector3Int rawCell in passengerReachable)
+        if (passengerReachable != null)
         {
-            Vector3Int cell = rawCell;
-            cell.z = 0;
-            if (IsNonTeamConstruction(cell, aiTeam)) continue;
-            if (!CanUseTransporterPickupCell(transporter, aiTeam, cell)) continue;
+            foreach (Vector3Int rawCell in passengerReachable)
+            {
+                Vector3Int cell = rawCell;
+                cell.z = 0;
+                if (IsNonTeamConstruction(cell, aiTeam)) continue;
+                if (!CanUseTransporterPickupCell(transporter, aiTeam, cell)) continue;
 
-            float homeDist = SectorManager.HexDistance(cell, homeTarget);
-            float candidateDist = SectorManager.HexDistance(cell, candidateCell);
-            float threat = CalculateThreatLevel(cell, aiTeam);
-            bool isProduction = IsTeamProductionBuilding(cell, aiTeam);
+                float homeDist = SectorManager.HexDistance(cell, homeTarget);
+                float candidateDist = SectorManager.HexDistance(cell, candidateCell);
+                float threat = CalculateThreatLevel(cell, aiTeam);
+                bool isProduction = IsTeamProductionBuilding(cell, aiTeam);
 
-            bool isBetter = !found
-                ||
-                homeDist < bestHomeDist - eps
-                || (homeDist < bestHomeDist + eps && isProduction && !bestIsProduction)
-                || (homeDist < bestHomeDist + eps && isProduction == bestIsProduction && candidateDist < bestCandidateDist - eps)
-                || (homeDist < bestHomeDist + eps && isProduction == bestIsProduction && candidateDist < bestCandidateDist + eps && threat < bestThreat - eps);
+                bool isBetter = !found
+                    ||
+                    homeDist < bestHomeDist - eps
+                    || (homeDist < bestHomeDist + eps && isProduction && !bestIsProduction)
+                    || (homeDist < bestHomeDist + eps && isProduction == bestIsProduction && candidateDist < bestCandidateDist - eps)
+                    || (homeDist < bestHomeDist + eps && isProduction == bestIsProduction && candidateDist < bestCandidateDist + eps && threat < bestThreat - eps);
 
-            if (!isBetter)
-                continue;
+                if (!isBetter)
+                    continue;
 
-            best = cell;
-            bestHomeDist = homeDist;
-            bestCandidateDist = candidateDist;
-            bestThreat = threat;
-            bestIsProduction = isProduction;
-            found = true;
+                best = cell;
+                bestHomeDist = homeDist;
+                bestCandidateDist = candidateDist;
+                bestThreat = threat;
+                bestIsProduction = isProduction;
+                found = true;
+            }
         }
 
-        return found ? best : homeTarget;
+        // Nunca transforme uma célula incompatível com UnitData.Transport.Allow
+        // Embark At em "waiting zone". Se não houver parada de pickup válida
+        // alcançável neste turno, mantenha a posição; o chamador poderá tentar
+        // novamente com um novo envelope no turno seguinte.
+        if (!found)
+        {
+            Debug.Log($"{TL("Transporte")} {transporter.InstanceId} sem waiting zone compativel " +
+                      $"com Allow Embark At para passageiro@{candidateCell}; mantem {transporter.CurrentCellPosition}.");
+            Vector3Int current = transporter.CurrentCellPosition;
+            current.z = 0;
+            return current;
+        }
+
+        return best;
     }
 
     private static bool CanPassengerReachEmbarkStopForTransporterCell(

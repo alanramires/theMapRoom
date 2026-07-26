@@ -514,8 +514,6 @@ public partial class AIController
             objCell.z = 0;
         }
         bool hasObjCell = objCell != Vector3Int.zero;
-        int transportThreshold = TransportPassengerWalkRange;
-
         // Passageiros needy: capturadores do objetivo vivos, fora, sem ter agido e LONGE A PE
         // (alem da distancia de embarque) — quem chega a pe nao precisa de carona. NAO usar o
         // ShouldLeaveAssignedPassengerOnLocalRallyPressure aqui: ele e liberal demais (acha rally
@@ -536,6 +534,8 @@ public partial class AIController
                 diag.Append($" cap#{cap.InstanceId}[jaNoObjetivo]");
                 continue;
             }
+            int transportThreshold =
+                ResolvePassengerWalkWithoutTransportBudget(cap);
             int cost = hasObjCell ? TerrainCostToCell(cap, capCell, objCell, transportThreshold) : 999;
             if (hasObjCell && cost <= transportThreshold)
             {
@@ -545,7 +545,7 @@ public partial class AIController
             diag.Append($" cap#{cap.InstanceId}[NEEDY cost={cost}]");
             passengers.Add(cap);
         }
-        Debug.Log($"{TL("Transporte")} matching {assigned.Sector} APC {transporter.InstanceId}: needy={passengers.Count} thr={transportThreshold} obj={(objBldg != null ? objCell.ToString() : "null")} caps:{diag}");
+        Debug.Log($"{TL("Transporte")} matching {assigned.Sector} APC {transporter.InstanceId}: needy={passengers.Count} thr=2turnosPorUnidade obj={(objBldg != null ? objCell.ToString() : "null")} caps:{diag}");
         if (passengers.Count == 0) return null;
 
         // Reserva PERSISTENTE entre os APCs nesta passada da Phase 2 (assignedTransportClaims):

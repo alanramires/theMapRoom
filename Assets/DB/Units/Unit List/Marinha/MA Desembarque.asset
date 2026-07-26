@@ -25,7 +25,7 @@ MonoBehaviour:
   maxHP: 10
   defense: 10
   armorClass: 0
-  movement: 4
+  movement: 5
   visao: 3
   visionSpecializations: []
   movementCategory: 5
@@ -88,6 +88,7 @@ MonoBehaviour:
   embarkedWeapons: []
   cantUseWeaponsOnTheFollowDomain: []
   isSupplier: 0
+  startsWithEmptySupplies: 1
   supplierTier: 0
   maxUnitsServedPerTurn: 0
   serviceRange: 0
@@ -105,12 +106,10 @@ MonoBehaviour:
   - {fileID: 11400000, guid: adc0bfc8c2e8f9a41be0abda3e29e582, type: 2}
   allowedDisembarkWhenTransporterAtTerrainStructures: []
   allowedDisembarkWhenTransporterAtFacilities: 1
-  passengersCanDisembarkAndGoesToTerrains: []
-  passengersCanDisembarkAndGoesToTerrainStructures: []
-  passengersCanDisembarkAndGoesToFacilities: -1
   transportSlots:
   - slotId: Cargo
     capacity: 2
+    exclusiveSlot: 0
     allowedLayerModes:
     - domain: 0
       heightLevel: 3
@@ -122,6 +121,5 @@ MonoBehaviour:
     blockedSkills:
     - {fileID: 11400000, guid: 5ef7a75e35294b68ac315145f98dcd17, type: 2}
     - {fileID: 11400000, guid: 44c13554a7f731f418bad4395bf10e52, type: 2}
-    canBeFireOnlyAtDomainHeigh: []
   autonomia: 90
   cost: 12000

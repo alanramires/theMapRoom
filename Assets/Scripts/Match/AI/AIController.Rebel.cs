@@ -75,18 +75,7 @@ public partial class AIController
             return BuildCaptureBatch(unit, snapshot.AITeam, fromCell, fromCell, paths);
         }
 
-        // 3) Honra o mesmo pareamento passageiro/transporte usado pelo capturador normal.
-        // O planner pode reconhecer que o objetivo exige travessia mesmo quando a distancia
-        // hexagonal parece curta; tentar marchar primeiro deixava o passageiro parado na praia
-        // enquanto o transporte formalmente pareado aguardava ao lado.
-        PlayerAction embarkAction = TryDecideCapturerEmbarkAction(unit, snapshot, plan);
-        if (embarkAction != null)
-        {
-            Debug.Log($"{TL("Rebelde")} {unit.InstanceId} honra embarque planejado antes da marcha terrestre.");
-            return embarkAction;
-        }
-
-        // 4) Alvo por PROXIMIDADE, pulando o que ja tem rebelde a caminho.
+        // 3) Alvo por PROXIMIDADE, pulando o que ja tem rebelde a caminho.
         //    rebelCaptureTargetReservations e a bolha que evita o empilhamento:
         //    dois rebeldes nao marcham para o mesmo predio distante.
         ConstructionManager target = FindNearestRebelCaptureTarget(unit, snapshot, fromCell);
@@ -98,6 +87,41 @@ public partial class AIController
 
         Vector3Int targetCell = target.CurrentCellPosition;
         targetCell.z = 0;
+
+        // Mesma fronteira usada pelo APC: se o capturador alcanca um predio
+        // livre em ate duas rodadas do proprio movimento, marcha em vez de
+        // reembarcar logo depois de desembarcar.
+        int walkBudget =
+            ResolvePassengerWalkWithoutTransportBudget(unit);
+        int walkCost = TerrainCostToCell(
+            unit,
+            fromCell,
+            targetCell,
+            walkBudget);
+        bool reachesOnFoot =
+            walkCost <= walkBudget;
+
+        if (!reachesOnFoot)
+        {
+            PlayerAction embarkAction =
+                TryDecideCapturerEmbarkAction(unit, snapshot, plan);
+            if (embarkAction != null)
+            {
+                Debug.Log($"{TL("Rebelde")} {unit.InstanceId} aceita embarque: " +
+                          $"objetivo livre {targetCell} nao alcancavel a pe " +
+                          $"em {TransportPassengerWalkTurns} turnos " +
+                          $"(move={unit.MaxMovementPoints}, budget={walkBudget}, custo={walkCost}).");
+                return embarkAction;
+            }
+        }
+        else
+        {
+            Debug.Log($"{TL("Rebelde")} {unit.InstanceId} ignora embarque: " +
+                      $"objetivo livre {targetCell} alcancavel a pe " +
+                      $"custo={walkCost}<={walkBudget} " +
+                      $"({TransportPassengerWalkTurns} turnos x move={unit.MaxMovementPoints}).");
+        }
+
         rebelCaptureTargetReservations.Add(targetCell);
         Debug.Log($"{TL("Rebelde")} {unit.InstanceId} reserva objetivo {targetCell} por proximidade.");
 

@@ -102,6 +102,8 @@ Split into four files:
 
 Capturers can intercept to embark via `TryDecideCapturerEmbarkAction` in `AIController.Capturer.Embark.cs` (called near the top of `TryDecideCapturerAction`).
 
+**Hospital mode** (`AIController.Transportador.Hospital.cs`): a unit that is both `isSupplier` and `isTransporter` carrying a passenger with `IsUnderRepair` does maintenance before delivery. `TryDecideSupplierHospitalAction` is called at the **top of `DecideUnitAction`** (before every role) because a transporter at capacity skips the universal courier gate. Priority: supply aboard → restock keeping the patient aboard → hold (stationary shot / rear reposition) → return `null` so the normal EVAC disembarks. The `UnitData.aiDisembarkWhenCannotSupply` flag (default `true`, Logistics AI section) gates the whole mode; `serviceRange = SameHexOrEmbarked` means the supplier can only serve its **own** embarked passengers, so an `Adjacent1Hex` truck structurally can't nurse its cargo and keeps disembarking as before. The patient leaves the mode on its own: Phase 2 runs `UpdateRepairState` on embarked units too, so `repairRecoverHpAbove` releases it.
+
 **Courier decision priority** (`DecideTransportadorCourierAction`):
 1. Move + disembark — if moving gains >1h toward target AND simulated drop-off lands within `TransportDropOffRange`
 2. Disembark in place — if moving gains ≤1h and current position already qualifies for drop-off

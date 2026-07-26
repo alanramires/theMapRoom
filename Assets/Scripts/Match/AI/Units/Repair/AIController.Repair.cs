@@ -480,11 +480,44 @@ public partial class AIController
             PodeFundirOption bestFuseOpt = null;
             float bestFuseScore = float.MinValue;
 
-            foreach (Vector3Int cell in paths.Keys)
+            // Fusao consome o custo de entrada no hex do aliado. Sua hotzone
+            // especializada reserva esse MP (1 em planicie, 2 em terreno caro
+            // sem skill etc.); PodeFundir fica como validacao final.
+            UnitThreatEnvelope fuseHotzone = UnitThreatEnvelopeService.BuildFusionEnvelope(
+                unit,
+                boardTilemap,
+                terrainDatabase,
+                paths);
+            var fuseOrigins = new HashSet<Vector3Int>();
+            if (snapshot.MyUnits != null)
             {
-                if (occupied.Contains(cell)) continue;
+                for (int allyIndex = 0; allyIndex < snapshot.MyUnits.Count; allyIndex++)
+                {
+                    UnitManager ally = snapshot.MyUnits[allyIndex];
+                    if (!IsPotentialRepairFusionTarget(unit, ally))
+                        continue;
 
-                List<Vector3Int> pathToCell = paths[cell];
+                    Vector3Int allyCell = ally.CurrentCellPosition;
+                    allyCell.z = 0;
+                    if (!fuseHotzone.CanThreaten(allyCell))
+                        continue;
+
+                    foreach (Vector3Int rawOrigin in fuseHotzone.MovementCells)
+                    {
+                        Vector3Int origin = rawOrigin;
+                        origin.z = 0;
+                        if (SectorManager.HexDistance(origin, allyCell) <= 1f)
+                            fuseOrigins.Add(origin);
+                    }
+                }
+            }
+
+            foreach (Vector3Int cell in fuseOrigins)
+            {
+                if (cell != fromCell && occupied.Contains(cell)) continue;
+
+                if (!paths.TryGetValue(cell, out List<Vector3Int> pathToCell))
+                    continue;
                 int costToCell = pathToCell != null && pathToCell.Count > 0
                     ? Mathf.Max(0, UnitMovementPathRules.CalculateAutonomyCostForPath(
                         boardTilemap, unit, pathToCell, terrainDatabase,
@@ -686,6 +719,57 @@ public partial class AIController
 
         ConstructionManager repairDest = FindRepairConstruction(
             unit, fromCell, aiTeam, occupiedForRepair, rejectBaseCluster, defenseReservedCells);
+
+        // VTOL tambem pode recolher para um convoo aliado. A plataforma naval
+        // participa do mesmo fallback dos predios pousaveis, mas a conclusao
+        // mecanica e um embarque normal (logo continua transacional).
+        UnitManager navalRepairPlatform = FindBestNavalRepairPlatform(
+            unit,
+            fromCell,
+            aiTeam,
+            out int navalRepairSlot,
+            out float navalRepairDistance);
+        float constructionRepairDistance = repairDest != null
+            ? SectorManager.HexDistance(fromCell, repairDest.CurrentCellPosition)
+            : float.MaxValue;
+        if (navalRepairPlatform != null
+            && navalRepairDistance < constructionRepairDistance - 0.1f)
+        {
+            TeamObjectivePlan repairTransportPlan =
+                ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(snapshot.AISlotIndex));
+            if (TryBuildRepairEvacExtendedEmbarkAction(
+                    unit,
+                    snapshot,
+                    repairTransportPlan,
+                    aiTeam,
+                    fromCell,
+                    navalRepairPlatform,
+                    paths,
+                    out PlayerAction navalEmbark))
+            {
+                Debug.Log($"{TL("Repair")} {unit.InstanceId} recolhe para plataforma naval " +
+                          $"#{navalRepairPlatform.InstanceId} slot={navalRepairSlot}");
+                return navalEmbark;
+            }
+
+            Vector3Int platformCell = navalRepairPlatform.CurrentCellPosition;
+            platformCell.z = 0;
+            Vector3Int platformStep = FindRepairApproachStep(
+                unit,
+                aiTeam,
+                fromCell,
+                platformCell,
+                null,
+                paths,
+                occupied,
+                null,
+                out _);
+            Debug.Log($"{TL("Repair")} {unit.InstanceId} marcha para plataforma naval de reparo " +
+                      $"#{navalRepairPlatform.InstanceId}@{platformCell} via {platformStep} " +
+                      $"slot={navalRepairSlot}");
+            return BuildMoveBatch(unit, aiTeam, fromCell, platformStep, paths);
+        }
+
         if (repairDest == null)
         {
             // Não-elite sob pressão: recolhe pros ARREDORES do HQ sem ocupar célula de construção
@@ -765,6 +849,35 @@ public partial class AIController
 
         Debug.Log($"{TL("Repair")} {unit.InstanceId} marcha para reparo em {destCell} via {bestStep}");
         return BuildMoveBatch(unit, aiTeam, fromCell, bestStep, paths);
+    }
+
+    private static bool IsPotentialRepairFusionTarget(UnitManager receiver, UnitManager candidate)
+    {
+        if (receiver == null
+            || candidate == null
+            || candidate == receiver
+            || candidate.IsDead
+            || candidate.IsEmbarked
+            || !candidate.gameObject.activeInHierarchy
+            || !PlayerSlotRelations.AreAllies(receiver, candidate))
+        {
+            return false;
+        }
+
+        string receiverId = receiver.UnitId;
+        string candidateId = candidate.UnitId;
+        if (!string.IsNullOrWhiteSpace(receiverId) && !string.IsNullOrWhiteSpace(candidateId))
+        {
+            return string.Equals(
+                receiverId.Trim(),
+                candidateId.Trim(),
+                System.StringComparison.OrdinalIgnoreCase);
+        }
+
+        return receiver.TryGetUnitData(out UnitData receiverData)
+            && candidate.TryGetUnitData(out UnitData candidateData)
+            && receiverData != null
+            && receiverData == candidateData;
     }
 
     private bool TryReleaseAirTransportRepairPassengers(

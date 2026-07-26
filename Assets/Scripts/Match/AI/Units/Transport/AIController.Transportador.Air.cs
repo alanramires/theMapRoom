@@ -388,6 +388,48 @@ public partial class AIController
     // First pass prefers candidates whose assigned sectors favour air transport.
     // -------------------------------------------------------------------------
 
+    private bool HasPotentialAirShuttlePassenger(
+        UnitManager unit,
+        AIWorldSnapshot snapshot,
+        TeamObjectivePlan plan)
+    {
+        if (unit == null || snapshot == null)
+            return false;
+
+        Vector3Int fromCell = unit.CurrentCellPosition;
+        fromCell.z = 0;
+
+        UnitManager candidate = FindBestAirShuttleCandidate(
+            unit, snapshot, plan, fromCell, out _, preferAirSectors: true);
+        if (candidate != null)
+            return true;
+
+        candidate = FindBestAirShuttleCandidate(
+            unit, snapshot, plan, fromCell, out _, preferAirSectors: false);
+        if (candidate != null)
+            return true;
+
+        int relaxed = Mathf.Max(
+            2,
+            GetEffectiveTransportThresholdForSlot(
+                PlayerSlotId.FromIndex(snapshot.AISlotIndex)) / 2);
+        candidate = FindBestAirShuttleCandidate(
+            unit, snapshot, plan, fromCell, out _,
+            preferAirSectors: false,
+            thresholdReduction: relaxed);
+        if (candidate != null)
+            return true;
+
+        candidate = FindBestShuttleCandidate(
+            unit, snapshot, plan, fromCell, out _);
+        if (candidate != null)
+            return true;
+
+        return FindBestShuttleCandidate(
+            unit, snapshot, plan, fromCell, out _,
+            thresholdReduction: relaxed) != null;
+    }
+
     private PlayerAction DecideAirShuttleAction(UnitManager unit, AIWorldSnapshot snapshot, TeamObjectivePlan plan)
     {
         Vector3Int fromCell = unit.CurrentCellPosition; fromCell.z = 0;
@@ -417,6 +459,23 @@ public partial class AIController
                 preferAirSectors: false, thresholdReduction: relaxed);
             if (bestCandidate != null)
                 Debug.Log($"{TL("Transporte")} heli {unit.InstanceId} shuttle — candidato relaxado {bestCandidate.InstanceId}@{candidateCell} (threshold -{relaxed})");
+        }
+
+        // Pass 4: universal selector shared with the other transporters. It
+        // handles pending rogue/rebel targets, occupied objectives and real
+        // walking cost; the older air selector only adds Air-sector preference.
+        if (bestCandidate == null)
+        {
+            int relaxed = Mathf.Max(2, GetEffectiveTransportThresholdForSlot(PlayerSlotId.FromIndex(snapshot.AISlotIndex)) / 2);
+            bestCandidate = FindBestShuttleCandidate(
+                unit, snapshot, plan, fromCell, out candidateCell);
+            if (bestCandidate == null)
+                bestCandidate = FindBestShuttleCandidate(
+                    unit, snapshot, plan, fromCell, out candidateCell,
+                    thresholdReduction: relaxed);
+            if (bestCandidate != null)
+                Debug.Log($"{TL("Transporte")} heli {unit.InstanceId} shuttle - " +
+                          $"candidato pelo seletor universal {bestCandidate.InstanceId}@{candidateCell}.");
         }
 
         if (bestCandidate != null)
@@ -467,13 +526,7 @@ public partial class AIController
             if (IsAlreadyFormalPassenger(candidate, transporter, plan)) continue;
 
             SectorObjective candidateAssigned = plan != null ? ResolveAssignedObjective(candidate, plan) : null;
-            bool candidateIsPrimary = candidateData.roles != null && candidateData.roles.Count > 0
-                && candidateData.roles[0] == UnitRole.Capturador;
-            if (assignedSector == null)
-            {
-                if (candidateIsPrimary && candidateAssigned != null) continue;
-            }
-            else
+            if (assignedSector != null)
             {
                 if (candidateAssigned == null) continue;
                 if (candidateAssigned.Sector != assignedSector.Sector

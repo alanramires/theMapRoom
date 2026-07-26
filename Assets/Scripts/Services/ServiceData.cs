@@ -8,6 +8,13 @@ public enum ServiceType
     Transfer = 1
 }
 
+public enum SupplierServiceProfile
+{
+    None = 0,
+    StockTransfer = 1,
+    FieldService = 2
+}
+
 [CreateAssetMenu(menuName = "Game/Services/Service Data", fileName = "ServiceData_")]
 public class ServiceData : ScriptableObject
 {
@@ -68,6 +75,34 @@ public class ServiceData : ScriptableObject
         if (costWeight == null)
             costWeight = new List<ServiceEfficiencyByClass>();
         serviceLimitPerUnitPerTurn = Mathf.Max(0, serviceLimitPerUnitPerTurn);
+    }
+
+    public static SupplierServiceProfile ResolveSupplierServiceProfile(
+        IReadOnlyList<ServiceData> services)
+    {
+        bool hasTransfer = false;
+        if (services == null)
+            return SupplierServiceProfile.None;
+
+        for (int i = 0; i < services.Count; i++)
+        {
+            ServiceData service = services[i];
+            if (service == null)
+                continue;
+            if (service.serviceType == ServiceType.Transfer)
+            {
+                hasTransfer = true;
+                continue;
+            }
+
+            // Qualquer servico alem de Transfer torna o fornecedor apto a
+            // prestar servico em campo, mesmo que Transfer tambem esteja listado.
+            return SupplierServiceProfile.FieldService;
+        }
+
+        return hasTransfer
+            ? SupplierServiceProfile.StockTransfer
+            : SupplierServiceProfile.None;
     }
 }
 

@@ -52,8 +52,25 @@ public partial class AIController
         AIWorldSnapshot snapshot)
     {
         if (IsRuntimeRebelSnapshot(snapshot))
-            return SelectRebelDisembarkOrdersByDistinctTargets(
+        {
+            List<PodeDesembarcarOption> rebelSelected =
+                SelectRebelDisembarkOrdersByDistinctTargets(
                 options, snapshot, TransportDropOffRange);
+            UnitManager rebelTransporter = options != null
+                ? options.Find(option => option?.transporterUnit != null)
+                    ?.transporterUnit
+                : null;
+            if (ShouldRejectPartialRebelOrRogueSelection(
+                    rebelTransporter,
+                    rebelSelected,
+                    passengers,
+                    plan,
+                    snapshot,
+                    Vector3Int.zero,
+                    "fallback rebelde"))
+                return new List<PodeDesembarcarOption>();
+            return rebelSelected;
+        }
 
         var selected = new List<PodeDesembarcarOption>();
         foreach (UnitManager passenger in passengers)
@@ -83,6 +100,20 @@ public partial class AIController
 
             if (best != null) selected.Add(best);
         }
+
+        UnitManager transporter = options != null
+            ? options.Find(option => option?.transporterUnit != null)
+                ?.transporterUnit
+            : null;
+        if (ShouldRejectPartialRebelOrRogueSelection(
+                transporter,
+                selected,
+                passengers,
+                plan,
+                snapshot,
+                Vector3Int.zero,
+                "fallback courier"))
+            selected.Clear();
         return selected;
     }
 
@@ -134,6 +165,7 @@ public partial class AIController
         });
 
         var claimedTargets = new HashSet<ConstructionManager>();
+        var claimedDropCells = new HashSet<Vector3Int>();
         int safeRange = Mathf.Max(1, range);
         foreach (UnitManager passenger in passengers)
         {
@@ -157,6 +189,8 @@ public partial class AIController
                         continue;
                     Vector3Int dropCell = option.disembarkCell;
                     dropCell.z = 0;
+                    if (claimedDropCells.Contains(dropCell))
+                        continue;
                     int cost = TerrainCostToCell(
                         passenger, dropCell, targetCell, safeRange);
                     if (cost > safeRange || cost >= bestCost)
@@ -188,6 +222,8 @@ public partial class AIController
                             continue;
                         Vector3Int dropCell = option.disembarkCell;
                         dropCell.z = 0;
+                        if (claimedDropCells.Contains(dropCell))
+                            continue;
                         int cost = TerrainCostToCell(
                             passenger, dropCell, targetCell, safeRange);
                         if (cost > safeRange || cost >= bestCost)
@@ -207,6 +243,10 @@ public partial class AIController
                 }
 
                 result.Add(bestOption);
+                Vector3Int supportDropCell =
+                    bestOption.disembarkCell;
+                supportDropCell.z = 0;
+                claimedDropCells.Add(supportDropCell);
                 Debug.Log($"{TL("Transporte")} rebelde #{passenger.InstanceId} desembarca como reforco: " +
                           $"spot={bestOption.disembarkCell} alvo={bestTarget.InstanceId}@{bestTarget.CurrentCellPosition} " +
                           $"cost={bestCost} objetivoQuente=True.");
@@ -215,6 +255,9 @@ public partial class AIController
 
             claimedTargets.Add(bestTarget);
             result.Add(bestOption);
+            Vector3Int selectedDropCell = bestOption.disembarkCell;
+            selectedDropCell.z = 0;
+            claimedDropCells.Add(selectedDropCell);
             Debug.Log($"{TL("Transporte")} rebelde #{passenger.InstanceId} desembarque dedicado: " +
                       $"spot={bestOption.disembarkCell} alvo={bestTarget.InstanceId}@{bestTarget.CurrentCellPosition} " +
                       $"cost={bestCost}.");
@@ -263,8 +306,11 @@ public partial class AIController
 
     private bool IsRogueCapturerPassenger(UnitManager passenger, TeamObjectivePlan plan)
     {
-        if (passenger == null || plan == null) return false;
-        if (IsPassengerInPlanSlot(passenger, plan)) return false;
+        if (passenger == null) return false;
+        // Plano inexistente significa que nao ha slot formal: um capturador
+        // nesta situacao e rogue por definicao. Antes, o null fazia justamente
+        // esse caso cair no courier generico rumo ao HQ.
+        if (plan != null && IsPassengerInPlanSlot(passenger, plan)) return false;
         if (!passenger.TryGetUnitData(out UnitData data) || data?.roles == null) return false;
         return data.roles.Contains(UnitRole.Capturador);
     }

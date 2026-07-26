@@ -43,12 +43,35 @@ public partial class AIController
         foreach (UnitManager passenger in passengers)
         {
             if (!IsRogueLocalOpportunityPassenger(passenger, plan, allowAssignedPassengers))
+            {
+                if (showAILogs && passenger != null)
+                {
+                    Debug.Log($"{TL("Transporte")} courier local-op rejeita passageiro " +
+                              $"#{passenger.InstanceId}: inPlan={IsPassengerInPlanSlot(passenger, plan)} " +
+                              $"assignedOk={allowAssignedPassengers} repair={passenger.IsUnderRepair}");
+                }
                 continue;
+            }
 
             foreach (ConstructionManager target in ConstructionManager.AllActive)
             {
-                if (!IsRogueLocalOpportunityTarget(target, snapshot.AITeam, plan, allowAssignedPassengers))
+                if (!IsRogueLocalOpportunityTarget(
+                        target,
+                        snapshot.AITeam,
+                        plan,
+                        allowAssignedPassengers,
+                        out string targetRejectReason))
+                {
+                    if (showAILogs && target != null)
+                    {
+                        Vector3Int rejectedCell = target.CurrentCellPosition;
+                        rejectedCell.z = 0;
+                        Debug.Log($"{TL("Transporte")} courier local-op rejeita " +
+                                  $"{target.Sector}@{rejectedCell}: {targetRejectReason} " +
+                                  $"assignedOk={allowAssignedPassengers} pax=#{passenger.InstanceId}");
+                    }
                     continue;
+                }
 
                 Vector3Int targetCell = target.CurrentCellPosition;
                 targetCell.z = 0;
@@ -237,18 +260,38 @@ public partial class AIController
         ConstructionManager target,
         TeamId aiTeam,
         TeamObjectivePlan plan,
-        bool allowAssignedPassengers = false)
+        bool allowAssignedPassengers,
+        out string reason)
     {
+        reason = string.Empty;
         if (target == null || !target.IsCapturable || target.CapturePointsMax <= 0)
+        {
+            reason = "nao_capturavel";
             return false;
+        }
         if (target.SlotIndex == ResolveAISlotKey(aiTeam) && target.CurrentCapturePoints >= target.CapturePointsMax)
+        {
+            reason = "ja_controlado";
             return false;
-        if (target.Sector == ConstructionSector.None || ConstructionSectorHelper.IsBase(target.Sector))
+        }
+        // Captura oportunista segue a mesma verdade do capturador a pe:
+        // construcao capturavel, livre e nao controlada. Sector=None e comum
+        // em predios neutros isolados e nao torna o alvo invalido.
+        if (ConstructionSectorHelper.IsBase(target.Sector))
+        {
+            reason = "setor_base";
             return false;
+        }
         if (HasBlockingSurfaceUnitAtCell(target.CurrentCellPosition))
+        {
+            reason = "ocupante_bloqueante";
             return false;
+        }
         if (HasPlanAllocationForSector(plan, target, aiTeam, blockAnyReadyUnit: !allowAssignedPassengers))
+        {
+            reason = "reservado_por_plano";
             return false;
+        }
 
         return true;
     }

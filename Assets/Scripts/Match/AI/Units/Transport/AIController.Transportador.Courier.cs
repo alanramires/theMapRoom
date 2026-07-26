@@ -41,6 +41,22 @@ public partial class AIController
         if (evacuee != null)
             return DecideEvacCourierAction(unit, evacuee, passengers, snapshot, fromCell, paths, occupied);
 
+        // Mesma precedencia do capturador rogue a pe: uma captura local util
+        // acontece antes da progressao macro ao HQ. Antes estes checks vinham
+        // depois do MelhorDesembarque; como quase sempre havia uma entrega
+        // valida ao alvo final, o retorno antecipado tornava a oportunidade
+        // local inalcançavel.
+        if (TryBuildRogueCourierLocalOpportunityDrop(
+                unit, passengers, snapshot, plan, fromCell, paths, occupied, out PlayerAction localOpportunity))
+            return localOpportunity;
+
+        if (!IsFireSupportUnit(primaryPassenger)
+            && TryBuildRogueCourierLocalOpportunityDrop(
+                unit, passengers, snapshot, plan, fromCell, paths, occupied,
+                out PlayerAction assignedLocalOpportunity,
+                allowAssignedPassengers: true))
+            return assignedLocalOpportunity;
+
         if (TryBuildBestCourierDisembarkAction(
                 unit,
                 passengers,
@@ -52,17 +68,6 @@ public partial class AIController
                 "Terrestre",
                 out PlayerAction bestDropAction))
             return bestDropAction;
-
-        if (TryBuildRogueCourierLocalOpportunityDrop(
-                unit, passengers, snapshot, plan, fromCell, paths, occupied, out PlayerAction localOpportunity))
-            return localOpportunity;
-
-        if (!IsFireSupportUnit(primaryPassenger)
-            && TryBuildRogueCourierLocalOpportunityDrop(
-                unit, passengers, snapshot, plan, fromCell, paths, occupied,
-                out PlayerAction assignedLocalOpportunity,
-                allowAssignedPassengers: true))
-            return assignedLocalOpportunity;
 
         Vector3Int moveTarget = FindTransportMove(unit, fromCell, primaryTarget, paths, occupied, snapshot.AITeam);
 

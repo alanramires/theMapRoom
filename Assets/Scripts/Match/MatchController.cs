@@ -6067,6 +6067,19 @@ public class MatchController : MonoBehaviour
     }
 
     /// <summary>
+    /// A partida esconde informacao de alguem? Somente o Total War cobre o tabuleiro.
+    /// Nos presets sem FOW (Game Boy Classico, Fisica Basica, A Montanha Avacalha,
+    /// Neblina Leve) todos os participantes enxergam o mesmo tabuleiro, entao nao ha
+    /// sigilo a proteger — nenhum overlay deve ser suprimido "por privacidade",
+    /// independente de quem controla o time ativo (AI normal, AI rebelde, humano
+    /// local ou, no futuro, humano remoto).
+    /// </summary>
+    public bool ConcealsInformationFromObservers()
+    {
+        return Application.isPlaying && debugFogOfWarEnabled && enableTotalWar;
+    }
+
+    /// <summary>
     /// Indica que a acao do participante ativo pode ser apresentada ao observador
     /// desta maquina acima do FOW. A origem dos comandos (humano, AI ou futuramente
     /// jogador remoto/replay) e deliberadamente separada desta politica visual.

@@ -13,6 +13,7 @@ public class UnitDataEditor : Editor
     private SerializedProperty collectionRangeProperty;
     private SerializedProperty supplierOperationDomainsProperty;
     private SerializedProperty supplierServicesProvidedProperty;
+    private SerializedProperty supplierServiceProfileProperty;
     private SerializedProperty supplierResourcesProperty;
     private SerializedProperty stealthSkillRulesProperty;
     private SerializedProperty aiUnitProfileProperty;
@@ -42,6 +43,7 @@ public class UnitDataEditor : Editor
         collectionRangeProperty = serializedObject.FindProperty("collectionRange");
         supplierOperationDomainsProperty = serializedObject.FindProperty("supplierOperationDomains");
         supplierServicesProvidedProperty = serializedObject.FindProperty("supplierServicesProvided");
+        supplierServiceProfileProperty = serializedObject.FindProperty("supplierServiceProfile");
         supplierResourcesProperty = serializedObject.FindProperty("supplierResources");
         stealthSkillRulesProperty = serializedObject.FindProperty("stealthSkillRules");
         aiUnitProfileProperty = serializedObject.FindProperty("aiUnitProfile");
@@ -129,6 +131,7 @@ public class UnitDataEditor : Editor
             "aiPreventiveSupplyHpBelowPct",
             "aiPreventiveSupplyAutonomyBelowPct",
             "aiPreventiveSupplyWeaponAmmoAtOrBelow",
+            "aiDisembarkWhenCannotSupply",
             "stealthSkills",
             "stealthSkillRules",
             "useExplicitPreferredAirHeight",
@@ -148,6 +151,7 @@ public class UnitDataEditor : Editor
             "collectionRange",
             "supplierOperationDomains",
             "supplierServicesProvided",
+            "supplierServiceProfile",
             "supplierResources",
             "isTransporter",
             "spriteTransport",
@@ -338,6 +342,23 @@ public class UnitDataEditor : Editor
         DrawIfExists(serializedObject.FindProperty("aiPreventiveSupplyHpBelowPct"), "AI Preventive Supply HP Below Pct");
         DrawIfExists(serializedObject.FindProperty("aiPreventiveSupplyAutonomyBelowPct"), "AI Preventive Supply Autonomy Below Pct");
         DrawIfExists(serializedObject.FindProperty("aiPreventiveSupplyWeaponAmmoAtOrBelow"), "AI Preventive Supply Weapon Ammo At Or Below");
+
+        SerializedProperty isTransporterProp = serializedObject.FindProperty("isTransporter");
+        SerializedProperty isSupplierProp = serializedObject.FindProperty("isSupplier");
+        bool supplyTransporter = isTransporterProp != null && isTransporterProp.boolValue
+            && isSupplierProp != null && isSupplierProp.boolValue;
+        using (new EditorGUI.DisabledScope(!supplyTransporter))
+        {
+            DrawIfExists(
+                serializedObject.FindProperty("aiDisembarkWhenCannotSupply"),
+                "Desembarca Se Nao Consegue Suprir");
+        }
+        if (!supplyTransporter)
+        {
+            EditorGUILayout.HelpBox(
+                "So tem efeito quando a unidade e supridora E transportadora (isSupplier + isTransporter).",
+                MessageType.None);
+        }
         EditorGUI.indentLevel--;
     }
 
@@ -589,6 +610,13 @@ public class UnitDataEditor : Editor
                 EditorGUILayout.PropertyField(supplierOperationDomainsProperty, new GUIContent("Supplier Operation Domain"), includeChildren: true);
             if (supplierServicesProvidedProperty != null)
                 EditorGUILayout.PropertyField(supplierServicesProvidedProperty, new GUIContent("Supplier Services Provided"), includeChildren: true);
+            if (supplierServiceProfileProperty != null)
+            {
+                using (new EditorGUI.DisabledScope(true))
+                    EditorGUILayout.PropertyField(
+                        supplierServiceProfileProperty,
+                        new GUIContent("Supplier Service Profile"));
+            }
             if (supplierResourcesProperty != null)
                 EditorGUILayout.PropertyField(supplierResourcesProperty, new GUIContent("Supplier Services Supplies (Default)"), includeChildren: true);
         }
@@ -614,10 +642,10 @@ public class UnitDataEditor : Editor
         DrawIfExists(serializedObject.FindProperty("spriteTransport"), "Sprite Transport");
         DrawIfExists(serializedObject.FindProperty("allowedEmbarkWhenTransporterAtTerrains"), "Allowed Embark Terrain When Transporter At: Terrain");
         DrawIfExists(serializedObject.FindProperty("allowedEmbarkWhenTransporterAtTerrainStructures"), "Allowed Embark Terrain When Transporter At: Terrain + Structure");
-        DrawIfExists(serializedObject.FindProperty("allowedEmbarkWhenTransporterAtFacilities"), "Allowed Embark When Transporter At: Facilities");
+        DrawIfExists(serializedObject.FindProperty("allowedEmbarkWhenTransporterAtFacilities"), "Allowed Embark when Transporter At: Construction");
         DrawIfExists(serializedObject.FindProperty("allowedDisembarkWhenTransporterAtTerrains"), "Allowed Disembark Terrain When Transporter At: Terrain");
         DrawIfExists(serializedObject.FindProperty("allowedDisembarkWhenTransporterAtTerrainStructures"), "Allowed Disembark Terrain When Transporter At: Terrain + Structure");
-        DrawIfExists(serializedObject.FindProperty("allowedDisembarkWhenTransporterAtFacilities"), "Allowed Disembark When Transporter At: Facilities");
+        DrawIfExists(serializedObject.FindProperty("allowedDisembarkWhenTransporterAtFacilities"), "Allowed Disembark when Transporter At: Construction");
         DrawIfExists(serializedObject.FindProperty("transportSlots"), "Transport Slots");
         EditorGUI.indentLevel--;
     }

@@ -24,6 +24,15 @@ public partial class AIController
         if (TryFindProductionUnlockVacateAction(unit, snapshot, out PlayerAction productionUnlockAction))
             return productionUnlockAction;
 
+        // Supridor que TAMBEM transporta, carregando um ferido: a manutencao a bordo (ou
+        // a recarga que a viabiliza) e a acao da rodada, antes de qualquer papel. Vem
+        // aqui em cima porque um navio LOTADO pula o gate de courier abaixo e cairia no
+        // ataque preemptivo naval — cacar sub com paciente a bordo. Devolve null quando
+        // nao consegue suprir nem recarregar: dai o EVAC normal desembarca o ferido.
+        // Ver Transportador.Hospital.
+        PlayerAction hospitalAction = TryDecideSupplierHospitalAction(unit, snapshot, plan);
+        if (hospitalAction != null) return hospitalAction;
+
         // Regra transversal por capacidade, antes dos papeis: toda unidade
         // isTransporter carregada vira courier. Assim APC, helicoptero,
         // hidroaviao, navio, porta-avioes, trem, supridor e a futura fragata
@@ -31,7 +40,8 @@ public partial class AIController
         if (HasTransportCargo(unit)
             && unit.TryGetUnitData(out UnitData loadedTransporterData)
             && loadedTransporterData != null
-            && loadedTransporterData.isTransporter)
+            && loadedTransporterData.isTransporter
+            && !IsTransporterAtCapacity(unit, loadedTransporterData))
         {
             PlayerAction loadedTransportAction =
                 TryDecideTransportadorAction(unit, snapshot, plan);
@@ -42,6 +52,16 @@ public partial class AIController
                           $"prioriza courier antes dos papeis.");
                 return loadedTransportAction;
             }
+        }
+        else if (HasTransportCargo(unit)
+                 && unit.TryGetUnitData(out UnitData fullTransporterData)
+                 && fullTransporterData != null
+                 && fullTransporterData.isTransporter
+                 && IsTransporterAtCapacity(unit, fullTransporterData))
+        {
+            Debug.Log($"{TL("Transporte")} roteador universal: " +
+                      $"{unit.UnitDisplayName}#{unit.InstanceId} lotado; " +
+                      $"papeis agem antes do courier.");
         }
 
         // Facção sem QG: captura por proximidade, antes do planner. O plano normal assume
@@ -100,7 +120,33 @@ public partial class AIController
             return navalSupplierAttack;
         }
 
-        PlayerAction logisticsAction = TryDecideLogisticsAction(unit, snapshot, plan);
+        // Hibridos aereos (ex.: Hidroaviao Logistica + Transporte) antes caiam
+        // direto na retaguarda e jamais consultavam os passageiros. Transporte
+        // vazio nao deve sequestrar o papel logistico sem demanda: so ganha a
+        // precedencia quando o mesmo seletor do shuttle confirma um passageiro
+        // compativel. A acao continua sendo escrita pelo fluxo transacional.
+        bool primaryTransporter = IsPrimaryTransportRole(unit);
+        if (!HasTransportCargo(unit)
+            && (primaryTransporter || IsAirTransporter(unit))
+            && unit.TryGetUnitData(out UnitData emptyTransporterData)
+            && !IsTransporterAtCapacity(unit, emptyTransporterData)
+            && HasPotentialTransportPassenger(unit, snapshot, plan))
+        {
+            PlayerAction pickupAction = TryDecideTransportadorAction(unit, snapshot, plan);
+            if (pickupAction != null)
+            {
+                Debug.Log($"{TL("Transporte")} roteador universal: " +
+                          $"{unit.UnitDisplayName}#{unit.InstanceId} vazio encontrou passageiro; " +
+                          $"pickup age antes da logistica.");
+                return pickupAction;
+            }
+        }
+
+        // Papel primario Transporte nao presta servico logistico diretamente.
+        // Estoque a bordo e carga a transferir, nao uma hotzone de supply.
+        PlayerAction logisticsAction = primaryTransporter
+            ? null
+            : TryDecideLogisticsAction(unit, snapshot, plan);
 
         if (logisticsAction != null) return logisticsAction;
 

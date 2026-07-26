@@ -112,6 +112,79 @@ public static class UnitThreatEnvelopeService
             lineCells);
     }
 
+    /// <summary>
+    /// Hotzone especializada de fusao. O alvo nao fica a "+1 gratis" do
+    /// movimento: a unidade precisa conservar MP suficiente para entrar no
+    /// hex ocupado pelo receptor. Assim, o envelope perde 1 em planicie, 2 em
+    /// floresta/montanha, ou o custo efetivo resolvido pelas skills da unidade.
+    /// </summary>
+    public static UnitThreatEnvelope BuildFusionEnvelope(
+        UnitManager unit,
+        Tilemap boardMap,
+        TerrainDatabase terrainDatabase,
+        Dictionary<Vector3Int, List<Vector3Int>> paths)
+    {
+        var normalizedPaths = paths ?? new Dictionary<Vector3Int, List<Vector3Int>>();
+        var movementCells = new HashSet<Vector3Int>();
+        var fusionCells = new HashSet<Vector3Int>();
+        var lineCells = new HashSet<Vector3Int>();
+        Tilemap map = boardMap != null ? boardMap : unit != null ? unit.BoardTilemap : null;
+        if (unit == null || map == null)
+            return new UnitThreatEnvelope(normalizedPaths, movementCells, fusionCells, lineCells);
+
+        int totalMovement = Mathf.Max(0, unit.RemainingMovementPoints);
+        var neighbors = new List<Vector3Int>(6);
+        foreach (KeyValuePair<Vector3Int, List<Vector3Int>> pair in normalizedPaths)
+        {
+            Vector3Int moveCell = pair.Key;
+            moveCell.z = 0;
+            if (map.GetTile(moveCell) == null)
+                continue;
+
+            int moveCost = pair.Value != null && pair.Value.Count > 0
+                ? Mathf.Max(0, UnitMovementPathRules.CalculateAutonomyCostForPath(
+                    map,
+                    unit,
+                    pair.Value,
+                    terrainDatabase,
+                    applyOperationalAutonomyModifier: false))
+                : 0;
+            int remaining = Mathf.Max(0, totalMovement - moveCost);
+            movementCells.Add(moveCell);
+            if (remaining <= 0)
+                continue;
+
+            UnitMovementPathRules.GetImmediateHexNeighbors(map, moveCell, neighbors);
+            for (int i = 0; i < neighbors.Count; i++)
+            {
+                Vector3Int targetCell = neighbors[i];
+                targetCell.z = 0;
+                if (map.GetTile(targetCell) == null)
+                    continue;
+                if (!PodeFundirSensor.TryResolveMergeEnterCost(
+                        map,
+                        terrainDatabase,
+                        unit,
+                        targetCell,
+                        out int enterCost,
+                        out _))
+                {
+                    continue;
+                }
+                if (remaining >= Mathf.Max(1, enterCost))
+                    fusionCells.Add(targetCell);
+            }
+        }
+
+        lineCells.UnionWith(fusionCells);
+        lineCells.ExceptWith(movementCells);
+        return new UnitThreatEnvelope(
+            normalizedPaths,
+            movementCells,
+            fusionCells,
+            lineCells);
+    }
+
     public static void ClearCache()
     {
         Cache.Clear();

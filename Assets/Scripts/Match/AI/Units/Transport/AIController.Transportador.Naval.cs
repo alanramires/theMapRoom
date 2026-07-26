@@ -61,6 +61,14 @@ public partial class AIController
         Dictionary<Vector3Int, List<Vector3Int>> paths,
         HashSet<Vector3Int> occupied)
     {
+        // EVAC: com ferido a bordo o destino nao e o objetivo de combate do passageiro
+        // (que, ao entrar em reparo, ate perdeu o slot do plano) e sim o ponto de reparo
+        // mais proximo — o mesmo criterio do courier terrestre/aereo. Sem este ramo o
+        // navio largava o ferido na praia mais perto de um alvo que nao existe mais.
+        UnitManager navalEvacuee = FindEmbarkedPatient(unit);
+        if (navalEvacuee != null)
+            return DecideNavalEvacDeliveryAction(unit, navalEvacuee, snapshot, fromCell, paths, occupied);
+
         Vector3Int objective = ResolveNavalDeliveryObjective(unit, snapshot, plan);
         List<UnitManager> carriedPassengers = CollectPassengers(unit);
         if (TryBuildBestCourierDisembarkAction(
@@ -168,6 +176,109 @@ public partial class AIController
 
         Debug.Log($"{TL("NavalTransport")} {unit.InstanceId} sem ponto de desembarque alcancavel — aguarda.");
         return null;
+    }
+
+    // -------------------------------------------------------------------------
+    // EVAC naval: entregar o ferido no ponto de reparo, nao no objetivo de combate
+    // -------------------------------------------------------------------------
+
+    private PlayerAction DecideNavalEvacDeliveryAction(
+        UnitManager unit,
+        UnitManager evacuee,
+        AIWorldSnapshot snapshot,
+        Vector3Int fromCell,
+        Dictionary<Vector3Int, List<Vector3Int>> paths,
+        HashSet<Vector3Int> occupied)
+    {
+        ConstructionManager repairDest = FindRepairConstruction(
+            evacuee, fromCell, snapshot.AITeam, new HashSet<Vector3Int>(occupied));
+        Vector3Int target = repairDest != null
+            ? repairDest.CurrentCellPosition
+            : FindTransportWaitTarget(snapshot.AITeam, fromCell);
+        target.z = 0;
+
+        // 1) Ja da para largar daqui, perto o bastante e em celula segura?
+        List<PodeDesembarcarOption> here = SimulateDisembarkFromCell(unit, fromCell);
+        if (here.Count > 0)
+        {
+            List<PodeDesembarcarOption> selected =
+                SelectEvacDisembarkForPassenger(here, evacuee, target, snapshot.AITeam);
+            if (selected.Count > 0)
+            {
+                Vector3Int dropCell = selected[0].disembarkCell;
+                dropCell.z = 0;
+                float dropDistance = SectorManager.HexDistance(dropCell, target);
+                if (dropDistance <= TransportDropOffRange)
+                {
+                    Debug.Log($"{TL("NavalTransport")} {unit.InstanceId} EVAC desembarca #{evacuee.InstanceId} " +
+                              $"em {dropCell} — reparo {target}, dist={dropDistance:F0}h.");
+                    return BuildDesembarcarBatch(unit, snapshot.AITeam, fromCell, selected);
+                }
+            }
+        }
+
+        // 2) Melhor ponto de desembarque alcancavel neste turno, medido pelo hex onde o
+        //    ferido pisa em relacao ao ponto de reparo.
+        Vector3Int bestCell = fromCell;
+        List<PodeDesembarcarOption> bestSelection = null;
+        float bestDistance = float.MaxValue;
+        if (paths != null)
+        {
+            foreach (Vector3Int rawCell in paths.Keys)
+            {
+                Vector3Int cell = rawCell;
+                cell.z = 0;
+                if (cell == fromCell)
+                    continue;
+                if (occupied != null && occupied.Contains(cell))
+                    continue;
+
+                List<PodeDesembarcarOption> options = SimulateDisembarkFromCell(unit, cell);
+                if (options.Count == 0)
+                    continue;
+
+                List<PodeDesembarcarOption> selected =
+                    SelectEvacDisembarkForPassenger(options, evacuee, target, snapshot.AITeam);
+                if (selected.Count == 0)
+                    continue;
+
+                Vector3Int dropCell = selected[0].disembarkCell;
+                dropCell.z = 0;
+                float distance = SectorManager.HexDistance(dropCell, target);
+                if (distance >= bestDistance)
+                    continue;
+
+                bestDistance = distance;
+                bestCell = cell;
+                bestSelection = selected;
+            }
+        }
+
+        if (bestSelection != null && bestDistance <= TransportDropOffRange)
+        {
+            Debug.Log($"{TL("NavalTransport")} {unit.InstanceId} EVAC move {fromCell}->{bestCell} e desembarca " +
+                      $"#{evacuee.InstanceId} — reparo {target}, dist={bestDistance:F0}h.");
+            return BuildDesembarcarBatch(
+                unit, snapshot.AITeam, fromCell, bestSelection, bestCell, paths[bestCell]);
+        }
+
+        // 3) Nada ao alcance: aproximar da praia conhecida mais perto do ponto de reparo.
+        Vector3Int approachTarget = ResolveNavalApproachTarget(unit, target, fromCell);
+        if (approachTarget != fromCell)
+        {
+            Vector3Int moveTo = FindTransportMove(
+                unit, fromCell, approachTarget, paths, occupied, snapshot.AITeam);
+            if (moveTo != fromCell)
+            {
+                Debug.Log($"{TL("NavalTransport")} {unit.InstanceId} EVAC aproxima {fromCell}->{moveTo} " +
+                          $"rumo a praia {approachTarget} (reparo {target}) com #{evacuee.InstanceId} a bordo.");
+                return BuildMoveBatch(unit, snapshot.AITeam, fromCell, moveTo, paths);
+            }
+        }
+
+        Debug.Log($"{TL("NavalTransport")} {unit.InstanceId} EVAC sem ponto de desembarque alcancavel " +
+                  $"para #{evacuee.InstanceId} — mantem {fromCell}.");
+        return BuildMoveBatch(unit, snapshot.AITeam, fromCell, fromCell, paths);
     }
 
     // Melhor celula de agua alcancavel de onde o desembarque e valido, pontuada pela
@@ -640,13 +751,16 @@ public partial class AIController
             if (allyObjective != Vector3Int.zero)
             {
                 allyObjective.z = 0;
+                int walkBudget =
+                    ResolvePassengerWalkWithoutTransportBudget(ally);
                 int walkCost = TerrainCostToCell(
-                    ally, allyCell, allyObjective, TransportPassengerWalkRange);
-                if (walkCost <= TransportPassengerWalkRange)
+                    ally, allyCell, allyObjective, walkBudget);
+                if (walkCost <= walkBudget)
                 {
                     Debug.Log($"{TL("NavalTransport")} {unit.InstanceId} descarta passageiro potencial " +
                               $"#{ally.InstanceId}: chega a pe no objetivo {allyObjective}, " +
-                              $"cost={walkCost}<={TransportPassengerWalkRange}.");
+                              $"cost={walkCost}<={walkBudget} " +
+                              $"({TransportPassengerWalkTurns} turnos x move={ally.MaxMovementPoints}).");
                     continue;
                 }
             }
@@ -684,8 +798,25 @@ public partial class AIController
         var orders = new List<PodeDesembarcarOption>();
         if (options == null) return orders;
         if (IsRuntimeRebelSnapshot(snapshot))
-            return SelectRebelDisembarkOrdersByDistinctTargets(
+        {
+            List<PodeDesembarcarOption> rebelOrders =
+                SelectRebelDisembarkOrdersByDistinctTargets(
                 options, snapshot, TransportDropOffRange);
+            UnitManager rebelTransporter = options.Find(
+                option => option?.transporterUnit != null)?.transporterUnit;
+            List<UnitManager> rebelPassengers =
+                CollectPassengers(rebelTransporter);
+            if (ShouldRejectPartialRebelOrRogueSelection(
+                    rebelTransporter,
+                    rebelOrders,
+                    rebelPassengers,
+                    plan,
+                    snapshot,
+                    Vector3Int.zero,
+                    "Naval fallback rebelde"))
+                return orders;
+            return rebelOrders;
+        }
 
         var passengers = new HashSet<UnitManager>();
         for (int i = 0; i < options.Count; i++)
@@ -730,6 +861,19 @@ public partial class AIController
             }
             orders.Add(best);
         }
+
+        UnitManager transporter = options.Find(
+            option => option?.transporterUnit != null)?.transporterUnit;
+        List<UnitManager> carriedPassengers = CollectPassengers(transporter);
+        if (ShouldRejectPartialRebelOrRogueSelection(
+                transporter,
+                orders,
+                carriedPassengers,
+                plan,
+                snapshot,
+                Vector3Int.zero,
+                "Naval fallback"))
+            orders.Clear();
 
         return orders;
     }

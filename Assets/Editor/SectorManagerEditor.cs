@@ -83,6 +83,8 @@ public class SectorManagerEditor : Editor
     private SerializedProperty neighborDistanceTerrainDatabaseProp;
     private SerializedProperty neighborDistanceReferenceUnitDataProp;
     private SerializedProperty neighborDistanceVehicleUnitDataProp;
+    private SerializedProperty neighborDistanceNavalUnitDataProp;
+    private SerializedProperty navalApproachSearchRadiusProp;
     private SerializedProperty sectorInfosProp;
     private SerializedProperty baseInfosProp;
     private static readonly System.Collections.Generic.List<SectorEdgeLine> drawnLines = new System.Collections.Generic.List<SectorEdgeLine>();
@@ -126,6 +128,8 @@ public class SectorManagerEditor : Editor
         neighborDistanceTerrainDatabaseProp = serializedObject.FindProperty("neighborDistanceTerrainDatabase");
         neighborDistanceReferenceUnitDataProp = serializedObject.FindProperty("neighborDistanceReferenceUnitData");
         neighborDistanceVehicleUnitDataProp = serializedObject.FindProperty("neighborDistanceVehicleUnitData");
+        neighborDistanceNavalUnitDataProp = serializedObject.FindProperty("neighborDistanceNavalUnitData");
+        navalApproachSearchRadiusProp = serializedObject.FindProperty("navalApproachSearchRadius");
         sectorInfosProp = serializedObject.FindProperty("sectorInfos");
         baseInfosProp   = serializedObject.FindProperty("baseInfos");
         if (useTerrainCostForNeighborDistancesProp != null && !useTerrainCostForNeighborDistancesProp.boolValue)
@@ -158,6 +162,12 @@ public class SectorManagerEditor : Editor
             EditorGUILayout.PropertyField(neighborDistanceReferenceUnitDataProp, new GUIContent("Foot Reference (Soldier)"));
         if (neighborDistanceVehicleUnitDataProp != null)
             EditorGUILayout.PropertyField(neighborDistanceVehicleUnitDataProp, new GUIContent("Vehicle Reference (APC)"));
+        if (neighborDistanceNavalUnitDataProp != null)
+            EditorGUILayout.PropertyField(neighborDistanceNavalUnitDataProp, new GUIContent("Naval Reference (Navio)"));
+        if (navalApproachSearchRadiusProp != null)
+            EditorGUILayout.PropertyField(navalApproachSearchRadiusProp, new GUIContent(
+                "Raio de Aproximação Naval",
+                "Até quantos hexes procurar água em volta do QG/fábrica e do setor. Sem água nesse raio, a distância naval sai como '--'."));
 
         EditorGUILayout.Space(4f);
 
@@ -254,34 +264,33 @@ public class SectorManagerEditor : Editor
                         SerializedProperty dist    = entry.FindPropertyRelative("Distance");
                         SerializedProperty vehDist = entry.FindPropertyRelative("VehicleDistance");
                         SerializedProperty airDist = entry.FindPropertyRelative("AirDistance");
+                        SerializedProperty navDist = entry.FindPropertyRelative("NavalDistance");
                         if (isHQ == null || !isHQ.boolValue || dist == null) continue;
                         if (dist.floatValue >= float.MaxValue * 0.5f)
                         {
-                            var reachableParts = new System.Collections.Generic.List<string>();
+                            int reachableCount = 0;
                             float reachableSortDist = float.MaxValue;
                             if (vehDist != null && vehDist.floatValue < float.MaxValue * 0.5f)
                             {
-                                reachableParts.Add($"ðŸš—{vehDist.floatValue:F0}h");
+                                reachableCount++;
                                 reachableSortDist = Mathf.Min(reachableSortDist, vehDist.floatValue);
                             }
                             if (airDist != null && airDist.floatValue < float.MaxValue * 0.5f)
                             {
-                                reachableParts.Add($"âœˆ{airDist.floatValue:F0}h");
+                                reachableCount++;
                                 reachableSortDist = Mathf.Min(reachableSortDist, airDist.floatValue);
                             }
-                            if (reachableParts.Count > 0)
-                                distParts.Add((reachableSortDist, BuildSectorDistanceSummary(teamName, dist.floatValue, vehDist, airDist)));
+                            if (navDist != null && navDist.floatValue < float.MaxValue * 0.5f)
+                            {
+                                reachableCount++;
+                                reachableSortDist = Mathf.Min(reachableSortDist, navDist.floatValue);
+                            }
+                            if (reachableCount > 0)
+                                distParts.Add((reachableSortDist, BuildSectorDistanceSummary(teamName, dist.floatValue, vehDist, airDist, navDist)));
                             break;
                         }
-                        if (dist.floatValue >= float.MaxValue * 0.5f) continue;
 
-                        var parts = new System.Collections.Generic.List<string>();
-                        parts.Add($"👣{dist.floatValue:F0}h");
-                        if (vehDist != null && vehDist.floatValue < float.MaxValue * 0.5f)
-                            parts.Add($"🚗{vehDist.floatValue:F0}h");
-                        if (airDist != null && airDist.floatValue < float.MaxValue * 0.5f)
-                            parts.Add($"✈{airDist.floatValue:F0}h");
-                        distParts.Add((dist.floatValue, BuildSectorDistanceSummary(teamName, dist.floatValue, vehDist, airDist)));
+                        distParts.Add((dist.floatValue, BuildSectorDistanceSummary(teamName, dist.floatValue, vehDist, airDist, navDist)));
                         break;
                     }
                 }
@@ -334,17 +343,21 @@ public class SectorManagerEditor : Editor
         string teamName,
         float footDistance,
         SerializedProperty vehicleDistance,
-        SerializedProperty airDistance)
+        SerializedProperty airDistance,
+        SerializedProperty navalDistance)
     {
         const float Unreachable = float.MaxValue * 0.5f;
         float vehicle = vehicleDistance != null ? vehicleDistance.floatValue : float.MaxValue;
         float air = airDistance != null ? airDistance.floatValue : float.MaxValue;
+        float naval = navalDistance != null ? navalDistance.floatValue : float.MaxValue;
 
         string footText = footDistance < Unreachable ? $"{footDistance:F0}h" : "--";
         string vehicleText = vehicle < Unreachable ? $"{vehicle:F0}h" : "--";
         string airText = air < Unreachable ? $"{air:F0}h" : "--";
+        // Naval é aproximado (QG não fica na água): "~" marca isso no rótulo.
+        string navalText = naval < Unreachable ? $"~{naval:F0}h" : "--";
 
-        return $"{teamName}: 👣 {footText} 🚗 {vehicleText} ✈ {airText}";
+        return $"{teamName}: 👣 {footText} 🚗 {vehicleText} ✈ {airText} ⚓ {navalText}";
     }
 
     private static ConstructionSector ReadSector(SerializedProperty sectorProp)

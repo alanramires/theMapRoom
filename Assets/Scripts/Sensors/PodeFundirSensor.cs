@@ -334,7 +334,7 @@ public static class PodeFundirSensor
         return true;
     }
 
-    private static bool TryResolveMergeEnterCost(
+    public static bool TryResolveMergeEnterCost(
         Tilemap map,
         TerrainDatabase terrainDatabase,
         UnitManager mover,

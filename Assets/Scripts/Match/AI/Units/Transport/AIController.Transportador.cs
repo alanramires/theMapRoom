@@ -4,9 +4,10 @@ using UnityEngine;
 public partial class AIController
 {
     private const int TransportDropOffRange = 4;
-    // Passageiro que cobre ate este custo terrestre rumo ao proprio objetivo
-    // nao precisa ocupar um transporte. Compartilhado por APC, shuttle e navio.
-    private const int TransportPassengerWalkRange = 6;
+    // Passageiro que alcança o objetivo em ate duas rodadas completas nao
+    // precisa ocupar transporte. O orçamento concreto depende do movimento
+    // da própria unidade: move 3 => 6 MP; move 2 => 4 MP.
+    private const int TransportPassengerWalkTurns = 2;
     // Delivery range, not weapon range: artillery should be carried to the sector front
     // before DPQ decides the exact landing hex.
     private const int FireSupportDropOffRange = 3;
@@ -15,6 +16,15 @@ public partial class AIController
     // Persiste entre as decisoes dos APCs para que, depois que um APC se move, o recalculo do
     // proximo NAO realoque o mesmo passageiro (evita 2 APCs no mesmo cara). Limpo a cada Phase 2.
     private readonly Dictionary<int, int> assignedTransportClaims = new Dictionary<int, int>();
+
+    private static int ResolvePassengerWalkWithoutTransportBudget(
+        UnitManager passenger)
+    {
+        return passenger != null
+            ? Mathf.Max(1, passenger.MaxMovementPoints)
+                * TransportPassengerWalkTurns
+            : 0;
+    }
 
     // -------------------------------------------------------------------------
     // Entry point
@@ -29,6 +39,9 @@ public partial class AIController
         PlayerAction repairAction = TryDecideRepairAction(unit, snapshot, plan);
         if (repairAction != null) return repairAction;
 
+        // Ferido a bordo de um supridor ja foi tratado no roteador (modo hospital). Se o
+        // fluxo chegou aqui carregando paciente, e porque nao havia servico nem recarga:
+        // o courier/EVAC abaixo desembarca normalmente. Ver Transportador.Hospital.
         if (data.domain == Domain.Air)
             return TryDecideAirTransportAction(unit, snapshot, plan);
 
@@ -67,11 +80,78 @@ public partial class AIController
         return false;
     }
 
+    private static bool IsTransporterAtCapacity(UnitManager unit, UnitData data = null)
+    {
+        if (unit == null)
+            return false;
+        if (data == null && !unit.TryGetUnitData(out data))
+            return false;
+        if (data == null || !data.isTransporter
+            || data.transportSlots == null || data.transportSlots.Count == 0)
+            return false;
+
+        for (int slotIndex = 0; slotIndex < data.transportSlots.Count; slotIndex++)
+        {
+            UnitTransportSlotRule slot = data.transportSlots[slotIndex];
+            if (slot == null)
+                continue;
+            int capacity = Mathf.Max(1, slot.capacity);
+            int occupied = unit.GetOccupiedTransportSeatCountForSlot(slotIndex);
+            if (occupied < capacity
+                && unit.CanUseTransportSlotExclusivity(slotIndex, out _))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     private static bool IsAirTransporter(UnitManager unit)
     {
         if (unit == null) return false;
         if (!unit.TryGetUnitData(out UnitData data) || data == null) return false;
         return data.isTransporter && data.domain == Domain.Air;
+    }
+
+    private static bool IsPrimaryTransportRole(UnitManager unit)
+    {
+        if (unit == null
+            || !unit.TryGetUnitData(out UnitData data)
+            || data == null
+            || !data.isTransporter
+            || data.roles == null
+            || data.roles.Count == 0)
+            return false;
+
+        return data.roles[0] == UnitRole.Transportador;
+    }
+
+    private bool HasPotentialTransportPassenger(
+        UnitManager transporter,
+        AIWorldSnapshot snapshot,
+        TeamObjectivePlan plan)
+    {
+        if (transporter == null || snapshot == null)
+            return false;
+
+        if (transporter.GetDomain() == Domain.Air)
+            return HasPotentialAirShuttlePassenger(transporter, snapshot, plan);
+
+        Vector3Int fromCell = transporter.CurrentCellPosition;
+        fromCell.z = 0;
+        UnitManager candidate = FindBestShuttleCandidate(
+            transporter, snapshot, plan, fromCell, out _);
+        if (candidate != null)
+            return true;
+
+        int relaxed = Mathf.Max(
+            2,
+            GetEffectiveTransportThresholdForSlot(
+                PlayerSlotId.FromIndex(snapshot.AISlotIndex)) / 2);
+        return FindBestShuttleCandidate(
+            transporter, snapshot, plan, fromCell, out _,
+            thresholdReduction: relaxed) != null;
     }
 
     private PlayerAction DecideIdleTransportReturnAction(UnitManager unit, AIWorldSnapshot snapshot)

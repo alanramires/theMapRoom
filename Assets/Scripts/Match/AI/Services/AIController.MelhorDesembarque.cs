@@ -85,7 +85,11 @@ public partial class AIController
                 passengerPriorityByInstanceId =
                     passengerPriorityByInstanceId,
                 allowTransporterCell = IsConfirmedVisibleCellForAI,
-                allowDisembarkCell = IsConfirmedVisibleCellForAI
+                allowDisembarkCell = IsConfirmedVisibleCellForAI,
+                diagnosticLog = showAILogs
+                    ? message => Debug.Log(
+                        $"{TL("Transporte")}[MelhorDesembarque] {message}")
+                    : null
             });
         return result.best != null;
     }
@@ -149,19 +153,53 @@ public partial class AIController
                 out Dictionary<int, Vector3Int> targets))
             return false;
 
+        ApplyOperationalDisembarkCapacity(
+            transporter,
+            passengers,
+            snapshot,
+            targets);
+        if (targets.Count == 0)
+            return false;
+
+        int requiredJointDeliveries = ResolveRequiredJointDeliveries(
+            transporter, passengers, plan, snapshot, targets);
+        // Um grupo rebelde/rogue de duas cargas usa a semantica integral da
+        // ferramenta Melhor Desembarque: primeiro maximiza passageiros
+        // entregues e depois minimiza a soma das rotas. O antigo
+        // TransportDropOffRange era uma regra de entrega pingada e eliminava
+        // justamente o segundo passageiro (por exemplo R5), embora a melhor
+        // LZ conjunta fosse alcancavel no mesmo turno.
+        int effectiveRemainingRouteCost =
+            requiredJointDeliveries >= 2
+                ? int.MaxValue
+                : maxRemainingRouteCost;
         if (!TryEvaluateBestDisembark(
                 transporter,
                 targets,
                 out MelhorDesembarqueResult evaluation,
                 routeHorizon: 120,
                 movementBudget: transporter.RemainingMovementPoints,
-                maxRemainingRouteCost: maxRemainingRouteCost,
+                maxRemainingRouteCost: effectiveRemainingRouteCost,
                 pathsByDestination: paths,
                 passengerPriorityByInstanceId:
                     BuildPassengerDeliveryPriority(
                         transporter, passengers))
             || evaluation.best == null)
         {
+            if (requiredJointDeliveries >= 2
+                && TryBuildJointDisembarkProgressionAction(
+                    transporter,
+                    passengers,
+                    snapshot,
+                    targets,
+                    paths,
+                    effectiveRemainingRouteCost,
+                    requiredJointDeliveries,
+                    consumer,
+                    out action,
+                    out _))
+                return true;
+
             Debug.Log($"{TL("Transporte")} {consumer} " +
                       $"{transporter.InstanceId} MelhorDesembarque sem LZ: " +
                       $"alvos={targets.Count} rangeRota={maxRemainingRouteCost} " +
@@ -170,6 +208,42 @@ public partial class AIController
         }
 
         MelhorDesembarqueLzScore best = evaluation.best;
+        if (best.delivered < requiredJointDeliveries)
+        {
+            bool jointLzKnown;
+            if (TryBuildJointDisembarkProgressionAction(
+                    transporter,
+                    passengers,
+                    snapshot,
+                    targets,
+                    paths,
+                    effectiveRemainingRouteCost,
+                    requiredJointDeliveries,
+                    consumer,
+                    out action,
+                    out jointLzKnown))
+                return true;
+
+            if (jointLzKnown)
+            {
+                Debug.Log($"{TL("Transporte")} {consumer} " +
+                          $"{transporter.InstanceId} rejeita desembarque parcial: " +
+                          $"pax={best.delivered}/{requiredJointDeliveries}; " +
+                          $"LZ conjunta conhecida ainda nao alcancada.");
+                return false;
+            }
+
+            // A busca longa percorreu todo o envelope conhecido do
+            // transportador e provou que esta geografia nao oferece spots
+            // exclusivos para o grupo inteiro. Nao transforme uma ilha de um
+            // unico hex em deadlock: entrega o passageiro prioritario e
+            // conserva os demais a bordo.
+            Debug.Log($"{TL("Transporte")} {consumer} " +
+                      $"{transporter.InstanceId} libera desembarque parcial por " +
+                      $"capacidade fisica: melhor global={best.delivered}p, " +
+                      $"grupo={requiredJointDeliveries}p; sem LZ conjunta.");
+        }
+
         var selected = new List<PodeDesembarcarOption>();
         for (int i = 0; i < best.spots.Count; i++)
             selected.Add(best.spots[i].option);
@@ -197,6 +271,205 @@ public partial class AIController
             : BuildDesembarcarBatch(
                 transporter, snapshot.AITeam, fromCell, selected,
                 best.cell, movePath);
+        return true;
+    }
+
+    private void ApplyOperationalDisembarkCapacity(
+        UnitManager transporter,
+        List<UnitManager> passengers,
+        AIWorldSnapshot snapshot,
+        Dictionary<int, Vector3Int> targets)
+    {
+        if (transporter == null
+            || passengers == null
+            || targets == null
+            || targets.Count <= 1)
+            return;
+
+        List<UnitManager> ordered =
+            OrderPassengersForDelivery(transporter, passengers);
+        var claimedSafeTargets = new HashSet<Vector3Int>();
+        var removePassengerIds = new List<int>();
+
+        for (int i = 0; i < ordered.Count; i++)
+        {
+            UnitManager passenger = ordered[i];
+            if (passenger == null
+                || !targets.TryGetValue(
+                    passenger.InstanceId, out Vector3Int target))
+                continue;
+
+            target.z = 0;
+            if (claimedSafeTargets.Add(target))
+                continue;
+
+            // Um unico objetivo seguro justifica somente o passageiro mais
+            // antigo. Sob pressao confirmada, a segunda unidade tem funcao
+            // operacional de reforco e conserva sua intencao.
+            if (IsCaptureTargetUnderConfirmedPressure(target, snapshot))
+            {
+                Debug.Log($"{TL("Transporte")} capacidade operacional: " +
+                          $"objetivo quente {target} aceita reforco " +
+                          $"#{passenger.InstanceId}.");
+                continue;
+            }
+
+            removePassengerIds.Add(passenger.InstanceId);
+            Debug.Log($"{TL("Transporte")} capacidade operacional: " +
+                      $"passageiro #{passenger.InstanceId} permanece a bordo; " +
+                      $"objetivo seguro {target} ja reservado pelo passageiro " +
+                      $"prioritario.");
+        }
+
+        for (int i = 0; i < removePassengerIds.Count; i++)
+            targets.Remove(removePassengerIds[i]);
+    }
+
+    private bool TryBuildJointDisembarkProgressionAction(
+        UnitManager transporter,
+        List<UnitManager> passengers,
+        AIWorldSnapshot snapshot,
+        IReadOnlyDictionary<int, Vector3Int> targets,
+        Dictionary<Vector3Int, List<Vector3Int>> currentPaths,
+        int maxRemainingRouteCost,
+        int requiredJointDeliveries,
+        string consumer,
+        out PlayerAction action,
+        out bool jointLzKnown)
+    {
+        action = null;
+        jointLzKnown = false;
+        if (transporter == null
+            || passengers == null
+            || snapshot == null
+            || targets == null
+            || currentPaths == null
+            || requiredJointDeliveries < 2)
+            return false;
+
+        const int jointSearchBudget = 120;
+        Dictionary<Vector3Int, List<Vector3Int>> longPaths =
+            UnitMovementPathRules.CalcularCaminhosValidos(
+                boardTilemap,
+                transporter,
+                jointSearchBudget,
+                terrainDatabase);
+        if (longPaths == null || longPaths.Count == 0
+            || !TryEvaluateBestDisembark(
+                transporter,
+                targets,
+                out MelhorDesembarqueResult longEvaluation,
+                routeHorizon: jointSearchBudget,
+                movementBudget: jointSearchBudget,
+                maxRemainingRouteCost: maxRemainingRouteCost,
+                pathsByDestination: longPaths,
+                passengerPriorityByInstanceId:
+                    BuildPassengerDeliveryPriority(
+                        transporter, passengers))
+            || longEvaluation.best == null
+            || longEvaluation.best.delivered < requiredJointDeliveries)
+            return false;
+
+        jointLzKnown = true;
+        Vector3Int fromCell = transporter.CurrentCellPosition;
+        fromCell.z = 0;
+        Vector3Int jointLz = longEvaluation.best.cell;
+        jointLz.z = 0;
+        if (jointLz == fromCell)
+            return false;
+
+        HashSet<Vector3Int> occupied = BuildOccupied(transporter);
+        if (!TryFindBestToolProgressionCell(
+                transporter,
+                snapshot,
+                fromCell,
+                jointLz,
+                currentPaths,
+                occupied,
+                ToolProgressionIntent.TransportDelivery,
+                out Vector3Int progressionCell,
+                out _,
+                out string progressionReason))
+            return false;
+
+        Debug.Log($"{TL("Transporte")} {consumer} " +
+                  $"{transporter.InstanceId} preserva grupo " +
+                  $"{requiredJointDeliveries}p e progride {fromCell}" +
+                  $"->{progressionCell} rumo a LZ conjunta {jointLz} " +
+                  $"score={longEvaluation.best.displayScore} " +
+                  $"({progressionReason}).");
+        action = BuildMoveBatch(
+            transporter,
+            snapshot.AITeam,
+            fromCell,
+            progressionCell,
+            currentPaths);
+        return true;
+    }
+
+    private int ResolveRequiredJointDeliveries(
+        UnitManager transporter,
+        List<UnitManager> passengers,
+        TeamObjectivePlan plan,
+        AIWorldSnapshot snapshot,
+        IReadOnlyDictionary<int, Vector3Int> targets)
+    {
+        if (transporter == null
+            || passengers == null
+            || targets == null
+            || targets.Count < 2)
+            return 1;
+
+        if (IsRuntimeRebelSnapshot(snapshot))
+            return Mathf.Min(passengers.Count, targets.Count);
+
+        int rogueTargets = 0;
+        for (int i = 0; i < passengers.Count; i++)
+        {
+            UnitManager passenger = passengers[i];
+            if (passenger != null
+                && targets.ContainsKey(passenger.InstanceId)
+                && IsRogueCapturerPassenger(passenger, plan))
+                rogueTargets++;
+        }
+
+        return rogueTargets >= 2 ? rogueTargets : 1;
+    }
+
+    private bool ShouldRejectPartialRebelOrRogueSelection(
+        UnitManager transporter,
+        List<PodeDesembarcarOption> selected,
+        List<UnitManager> passengers,
+        TeamObjectivePlan plan,
+        AIWorldSnapshot snapshot,
+        Vector3Int assignedSectorTarget,
+        string consumer)
+    {
+        if (transporter == null
+            || selected == null
+            || passengers == null
+            || !TryBuildCourierDisembarkTargets(
+                transporter,
+                passengers,
+                plan,
+                snapshot,
+                assignedSectorTarget,
+                out Dictionary<int, Vector3Int> targets))
+            return false;
+
+        ApplyOperationalDisembarkCapacity(
+            transporter,
+            passengers,
+            snapshot,
+            targets);
+        int required = ResolveRequiredJointDeliveries(
+            transporter, passengers, plan, snapshot, targets);
+        if (selected.Count >= required)
+            return false;
+
+        Debug.Log($"{TL("Transporte")} {consumer} " +
+                  $"{transporter.InstanceId} rejeita fallback parcial: " +
+                  $"pax={selected.Count}/{required}; aguarda LZ conjunta.");
         return true;
     }
 
@@ -503,16 +776,22 @@ public partial class AIController
                 ? transportDistance + targetHqDistance - currentHqDistance
                 : 0f;
 
-            if (hasHq && progress < -0.5f)
-                continue;
             if (hasHq
                 && corridorDetour > TransportDropOffRange + 0.5f)
                 continue;
 
+            // O rogue a pe captura qualquer predio util alcançavel antes de
+            // continuar ao HQ. Embarcado, a equivalencia e um alvo local que
+            // caiba no envelope de entrega do transportador. Ele pode exigir
+            // um pequeno passo lateral/para tras, desde que continue dentro
+            // do desvio maximo do corredor.
+            bool localOpportunity =
+                transportDistance <= TransportDropOffRange + 0.5f;
             float score =
                 -transportDistance * 120f
                 - corridorDetour * 300f
                 + progress * 35f
+                + (localOpportunity ? 2000f : 0f)
                 - building.InstanceId * 0.001f;
             if (score <= bestScore)
                 continue;

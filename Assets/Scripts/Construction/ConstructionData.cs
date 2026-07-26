@@ -130,6 +130,8 @@ public class ConstructionData : ScriptableObject
     [Header("Construction Services Provided")]
     [Tooltip("Servicos fornecidos por esta construcao.")]
     public List<ServiceData> supplierServicesProvided = new List<ServiceData>();
+    [Tooltip("Classificacao automatica: None sem servicos; StockTransfer somente Transfer; FieldService quando oferece qualquer outro servico.")]
+    public SupplierServiceProfile supplierServiceProfile = SupplierServiceProfile.None;
 
     [Header("Construction Resources")]
     [Tooltip("Supplies fornecidos por esta construcao com capacidade maxima.")]
@@ -154,6 +156,8 @@ public class ConstructionData : ScriptableObject
             supplierOperationDomains = new List<TerrainLayerMode>();
         if (supplierServicesProvided == null)
             supplierServicesProvided = new List<ServiceData>();
+        supplierServiceProfile =
+            ServiceData.ResolveSupplierServiceProfile(supplierServicesProvided);
         if (legacyRequiredLandingSkills == null)
             legacyRequiredLandingSkills = new List<SkillData>();
         if (requiredSkillsToEnter == null)

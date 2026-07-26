@@ -282,6 +282,14 @@ public partial class TurnStateManager
         if (matchController == null || !matchController.IsActiveTeamAI())
             return false;
 
+        // Supressao existe para proteger SIGILO. Nos presets sem FOW (Game Boy
+        // Classico, Fisica Basica, A Montanha Avacalha, Neblina Leve) o tabuleiro e
+        // publico: o range map da unidade que a AI selecionou nao revela nada que o
+        // observador local ja nao veja, entao aparece normalmente. Vale para AI
+        // normal e AI rebelde; humano remoto nem chega aqui (nao e IsActiveTeamAI).
+        if (!matchController.ConcealsInformationFromObservers())
+            return false;
+
         // No FOW Partial o jogador esta observando explicitamente o slot da AI:
         // cursor, range e linhas auxiliares fazem parte dessa apresentacao.
         // No FOW normal o planejamento interno da AI continua oculto.

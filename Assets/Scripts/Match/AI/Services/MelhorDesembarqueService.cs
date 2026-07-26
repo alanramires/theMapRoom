@@ -42,6 +42,7 @@ public sealed class MelhorDesembarqueRequest
     public IReadOnlyDictionary<int, int> passengerPriorityByInstanceId;
     public Func<Vector3Int, bool> allowTransporterCell;
     public Func<Vector3Int, bool> allowDisembarkCell;
+    public Action<string> diagnosticLog;
 }
 
 public sealed class MelhorDesembarqueResult
@@ -113,7 +114,10 @@ public static class MelhorDesembarqueService
                 cell = lzCell,
                 moveCost = ResolvePathCost(path.Value)
             };
-            SolveBestMatching(request, lz, options);
+            var diagnostics = request.diagnosticLog != null
+                ? new List<string>()
+                : null;
+            SolveBestMatching(request, lz, options, diagnostics);
             if (lz.delivered <= 0)
                 continue;
 
@@ -129,6 +133,19 @@ public static class MelhorDesembarqueService
                 $"rotaRestante={lz.totalRouteCost} (termo={-lz.totalRouteCost * 100}) | " +
                 $"move={lz.moveCost} | sensor={contextReason}";
             result.ranking.Add(lz);
+
+            if (request.diagnosticLog != null)
+            {
+                request.diagnosticLog(
+                    $"LZ={lz.cell} sensorOptions={options.Count} " +
+                    $"matching={lz.delivered} move={lz.moveCost} " +
+                    $"rotaTotal={lz.totalRouteCost}");
+                if (diagnostics != null)
+                {
+                    for (int i = 0; i < diagnostics.Count; i++)
+                        request.diagnosticLog(diagnostics[i]);
+                }
+            }
         }
 
         result.ranking.Sort(CompareLz);
@@ -167,7 +184,8 @@ public static class MelhorDesembarqueService
     private static void SolveBestMatching(
         MelhorDesembarqueRequest request,
         MelhorDesembarqueLzScore lz,
-        List<PodeDesembarcarOption> options)
+        List<PodeDesembarcarOption> options,
+        List<string> diagnostics)
     {
         var scored = new List<MelhorDesembarqueSpotScore>();
         for (int i = 0; i < options.Count; i++)
@@ -180,22 +198,41 @@ public static class MelhorDesembarqueService
             spotCell.z = 0;
             if (request.allowDisembarkCell != null
                 && !request.allowDisembarkCell(spotCell))
+            {
+                diagnostics?.Add(
+                    $"  REJECT pax=#{option.passengerUnit.InstanceId} " +
+                    $"spot={spotCell} reason=confirmed_visibility");
                 continue;
+            }
             List<UnitManager> spotOccupants =
                 UnitOccupancyRules.GetUnitsAtCell(
                     request.map, spotCell, option.passengerUnit);
             if (!OccupancyResolver.CanEndMove(
                     option.passengerUnit, spotCell, spotOccupants))
+            {
+                diagnostics?.Add(
+                    $"  REJECT pax=#{option.passengerUnit.InstanceId} " +
+                    $"spot={spotCell} reason=occupancy " +
+                    $"occupants={spotOccupants.Count}");
                 continue;
+            }
 
             if (!request.resolvePassengerTarget(
                     option.passengerUnit,
                     spotCell,
                     out Vector3Int target,
                     out int routeCost))
+            {
+                diagnostics?.Add(
+                    $"  REJECT pax=#{option.passengerUnit.InstanceId} " +
+                    $"spot={spotCell} reason=route_or_limit");
                 continue;
+            }
 
             target.z = 0;
+            diagnostics?.Add(
+                $"  ACCEPT pax=#{option.passengerUnit.InstanceId} " +
+                $"spot={spotCell} target={target} route={routeCost}");
             scored.Add(new MelhorDesembarqueSpotScore
             {
                 option = option,

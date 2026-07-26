@@ -63,6 +63,9 @@ public sealed class SectorManager : MonoBehaviour
         [SerializeField] public float  Distance;        // foot reference
         [SerializeField] public float  VehicleDistance; // vehicle reference (APC, includes road bonus)
         [SerializeField] public float  AirDistance;     // air reference (hex distance — air ignores terrain)
+        [SerializeField] public float  NavalDistance;   // naval reference — APROXIMADA: nenhum QG/fábrica fica na água,
+                                                        // então mede água-mais-próxima-da-âncora → água-mais-próxima-do-setor
+                                                        // e soma os dois trechos secos em hexes (ver ComputeApproxNavalDistance)
         [SerializeField] public bool   IsHQ;
     }
 
@@ -91,6 +94,13 @@ public sealed class SectorManager : MonoBehaviour
         {
             for (int i = 0; i < Entries.Count; i++)
                 if (Entries[i].IsHQ) return Entries[i].AirDistance;
+            return float.MaxValue;
+        }
+
+        public float GetHQNavalDistance()
+        {
+            for (int i = 0; i < Entries.Count; i++)
+                if (Entries[i].IsHQ) return Entries[i].NavalDistance;
             return float.MaxValue;
         }
 
@@ -198,6 +208,15 @@ public sealed class SectorManager : MonoBehaviour
         {
             for (int i = 0; i < sectorDistances.Count; i++)
                 if (sectorDistances[i].SlotIndex == slotId.Value) return sectorDistances[i].GetHQAirDistance();
+            return float.MaxValue;
+        }
+
+        // Aproximada: parte da água mais próxima do QG e chega na água mais próxima do setor.
+        // float.MaxValue quando não há água ao alcance de um dos lados (setor mediterrâneo).
+        public float GetNavalDistanceToHQ(PlayerSlotId slotId)
+        {
+            for (int i = 0; i < sectorDistances.Count; i++)
+                if (sectorDistances[i].SlotIndex == slotId.Value) return sectorDistances[i].GetHQNavalDistance();
             return float.MaxValue;
         }
 
@@ -346,6 +365,8 @@ public sealed class SectorManager : MonoBehaviour
     [SerializeField] private TerrainDatabase neighborDistanceTerrainDatabase;
     [SerializeField] private UnitData neighborDistanceReferenceUnitData;  // foot reference (soldier)
     [SerializeField] private UnitData neighborDistanceVehicleUnitData;    // vehicle reference (APC)
+    [SerializeField] private UnitData neighborDistanceNavalUnitData;      // naval reference (navio)
+    [SerializeField] private int      navalApproachSearchRadius = 6;      // até onde procurar água em volta do QG/setor
     [SerializeField] private List<SectorInfo> sectorInfos = new List<SectorInfo>();
     [SerializeField] private List<SectorInfo> baseInfos   = new List<SectorInfo>();
 
@@ -744,6 +765,8 @@ public sealed class SectorManager : MonoBehaviour
 
         SectorNeighborDistanceContext neighborDistanceContext = BuildNeighborDistanceContext();
         SectorNeighborDistanceContext vehicleDistanceContext = BuildNeighborDistanceContext(neighborDistanceVehicleUnitData);
+        SectorNeighborDistanceContext navalDistanceContext = BuildNavalDistanceContext();
+        var navalApproachCache = new Dictionary<Vector3Int, List<Vector3Int>>();
 
         for (int i = 0; i < sectors.Count; i++)
         {
@@ -815,6 +838,7 @@ public sealed class SectorManager : MonoBehaviour
                     Distance         = ComputeSectorNeighborDistance(representativeCell, kv.Value.cell, neighborDistanceContext),
                     VehicleDistance  = ComputeSectorNeighborDistance(representativeCell, kv.Value.cell, vehicleDistanceContext),
                     AirDistance      = ComputeHexDistance(representativeCell, kv.Value.cell),
+                    NavalDistance    = ComputeApproxNavalDistance(representativeCell, kv.Value.cell, navalDistanceContext, navalApproachCache, navalApproachSearchRadius),
                     IsHQ             = true,
                 });
             }
@@ -835,6 +859,7 @@ public sealed class SectorManager : MonoBehaviour
                     Distance         = ComputeSectorNeighborDistance(representativeCell, f.CurrentCellPosition, neighborDistanceContext),
                     VehicleDistance  = ComputeSectorNeighborDistance(representativeCell, f.CurrentCellPosition, vehicleDistanceContext),
                     AirDistance      = ComputeHexDistance(representativeCell, f.CurrentCellPosition),
+                    NavalDistance    = ComputeApproxNavalDistance(representativeCell, f.CurrentCellPosition, navalDistanceContext, navalApproachCache, navalApproachSearchRadius),
                     IsHQ             = false,
                 });
             }
@@ -932,6 +957,142 @@ public sealed class SectorManager : MonoBehaviour
             ReferenceUnitData = referenceUnitData,
             IsValid = true,
         };
+    }
+
+    // Contexto naval: sem uma referência naval de verdade o contexto sai inválido de propósito,
+    // porque o fallback do builder genérico é o soldado a pé — mediria terra e chamaria de mar.
+    private SectorNeighborDistanceContext BuildNavalDistanceContext()
+    {
+        UnitData navalUnitData = neighborDistanceNavalUnitData != null
+            ? neighborDistanceNavalUnitData
+            : ResolveNeighborDistanceNavalUnitData();
+
+        return navalUnitData != null ? BuildNeighborDistanceContext(navalUnitData) : default;
+    }
+
+    private static UnitData ResolveNeighborDistanceNavalUnitData()
+    {
+        UnitManager[] units = Object.FindObjectsByType<UnitManager>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        for (int i = 0; i < units.Length; i++)
+        {
+            UnitManager unit = units[i];
+            if (unit != null && unit.TryGetUnitData(out UnitData data) && data != null && data.domain == Domain.Naval)
+                return data;
+        }
+
+        return null;
+    }
+
+    // Distância naval APROXIMADA até uma âncora terrestre (QG/fábrica), que por definição não fica
+    // na água: mede da água mais próxima da âncora até a água mais próxima do setor e soma os dois
+    // trechos secos (em hexes) nas pontas. Sem água ao alcance de um dos lados → float.MaxValue.
+    private static float ComputeApproxNavalDistance(
+        Vector3Int sectorCell,
+        Vector3Int anchorCell,
+        SectorNeighborDistanceContext navalContext,
+        Dictionary<Vector3Int, List<Vector3Int>> approachCache,
+        int searchRadius)
+    {
+        if (!navalContext.IsValid || navalContext.ReferenceUnitData == null)
+            return float.MaxValue;
+
+        List<Vector3Int> embarkCells   = GetNavalApproachCells(anchorCell, navalContext, approachCache, searchRadius);
+        List<Vector3Int> approachCells = GetNavalApproachCells(sectorCell, navalContext, approachCache, searchRadius);
+        if (embarkCells.Count == 0 || approachCells.Count == 0)
+            return float.MaxValue;
+
+        float best = float.MaxValue;
+        for (int e = 0; e < embarkCells.Count; e++)
+        {
+            for (int a = 0; a < approachCells.Count; a++)
+            {
+                if (!TryComputeLandMovementDistance(embarkCells[e], approachCells[a], navalContext, out int navalCost, null))
+                    continue;
+
+                float total = ComputeHexDistance(anchorCell, embarkCells[e])
+                            + navalCost
+                            + ComputeHexDistance(approachCells[a], sectorCell);
+                if (total < best)
+                    best = total;
+            }
+
+            // O ponto de embarque mais próximo já resolve; os seguintes só existem como plano B
+            // quando aquela água é um lago isolado (nenhuma rota atinge o setor).
+            if (best < float.MaxValue)
+                break;
+        }
+
+        return best;
+    }
+
+    private static List<Vector3Int> GetNavalApproachCells(
+        Vector3Int origin,
+        SectorNeighborDistanceContext navalContext,
+        Dictionary<Vector3Int, List<Vector3Int>> cache,
+        int searchRadius)
+    {
+        origin.z = 0;
+        if (cache != null && cache.TryGetValue(origin, out List<Vector3Int> cached))
+            return cached;
+
+        var result = new List<Vector3Int>();
+        CollectNavalApproachCells(origin, navalContext, searchRadius, MaxNavalApproachCandidates, result);
+        if (cache != null)
+            cache[origin] = result;
+        return result;
+    }
+
+    private const int MaxNavalApproachCandidates = 2;
+
+    // Anéis crescentes sobre células pintadas (transitáveis ou não — o que interessa é a forma do
+    // mapa) até achar as primeiras células onde a referência naval consegue entrar.
+    private static void CollectNavalApproachCells(
+        Vector3Int origin,
+        SectorNeighborDistanceContext navalContext,
+        int searchRadius,
+        int maxCandidates,
+        List<Vector3Int> result)
+    {
+        result.Clear();
+        if (!navalContext.IsValid || navalContext.Tilemap == null)
+            return;
+
+        origin.z = 0;
+        var visited   = new HashSet<Vector3Int> { origin };
+        var current   = new List<Vector3Int> { origin };
+        var next      = new List<Vector3Int>();
+        var neighbors = new List<Vector3Int>(6);
+
+        for (int ring = 0; ring <= Mathf.Max(0, searchRadius) && current.Count > 0; ring++)
+        {
+            for (int i = 0; i < current.Count; i++)
+            {
+                Vector3Int cell = current[i];
+                if (TryGetLandEnterCost(cell, navalContext, out _))
+                {
+                    result.Add(cell);
+                    if (result.Count >= maxCandidates)
+                        return;
+                }
+
+                UnitMovementPathRules.GetImmediateHexNeighbors(navalContext.Tilemap, cell, neighbors);
+                for (int n = 0; n < neighbors.Count; n++)
+                {
+                    Vector3Int neighbor = neighbors[n];
+                    neighbor.z = 0;
+                    if (!visited.Add(neighbor))
+                        continue;
+                    if (!HasAnyPaintedTileAtCell(neighbor, navalContext))
+                        continue;
+
+                    next.Add(neighbor);
+                }
+            }
+
+            current.Clear();
+            current.AddRange(next);
+            next.Clear();
+        }
     }
 
     private static UnitData ResolveNeighborDistanceReferenceUnitData()

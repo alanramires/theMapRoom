@@ -15,6 +15,8 @@ MonoBehaviour:
   structures:
   - {fileID: 11400000, guid: 2c50b52605f4f1c4ca013ba4bd7acee3, type: 2}
   - {fileID: 11400000, guid: 7933d65148f7b884c895240966ea81b1, type: 2}
+  - {fileID: 11400000, guid: e0adc11a0eac5bc42811605fe2a45f9f, type: 2}
+  - {fileID: 11400000, guid: 32bd7b500bf78b64a95d16600a68909d, type: 2}
   roadRoutesByStructure:
   - structure: {fileID: 11400000, guid: 2c50b52605f4f1c4ca013ba4bd7acee3, type: 2}
     routes: []
@@ -23,8 +25,46 @@ MonoBehaviour:
     - routeName: Route 1
       ownerDatabase: {fileID: 11400000}
       cells:
+      - {x: -12, y: 13, z: 0}
+      - {x: -11, y: 13, z: 0}
+      - {x: -10, y: 12, z: 0}
+      - {x: -10, y: 11, z: 0}
+      - {x: -9, y: 10, z: 0}
+      - {x: -9, y: 9, z: 0}
       - {x: -8, y: 8, z: 0}
       - {x: -8, y: 7, z: 0}
       - {x: -7, y: 6, z: 0}
       - {x: -7, y: 5, z: 0}
       - {x: -6, y: 4, z: 0}
+  - structure: {fileID: 11400000, guid: 32bd7b500bf78b64a95d16600a68909d, type: 2}
+    routes:
+    - routeName: Route 1
+      ownerDatabase: {fileID: 11400000}
+      cells:
+      - {x: -13, y: -38, z: 0}
+      - {x: -12, y: -38, z: 0}
+      - {x: -11, y: -38, z: 0}
+      - {x: -10, y: -38, z: 0}
+      - {x: -9, y: -38, z: 0}
+      - {x: -8, y: -38, z: 0}
+      - {x: -7, y: -38, z: 0}
+      - {x: -6, y: -38, z: 0}
+      - {x: -5, y: -38, z: 0}
+      - {x: -4, y: -38, z: 0}
+      - {x: -3, y: -38, z: 0}
+      - {x: -2, y: -38, z: 0}
+      - {x: -1, y: -38, z: 0}
+      - {x: 0, y: -38, z: 0}
+      - {x: 1, y: -38, z: 0}
+      - {x: 2, y: -38, z: 0}
+      - {x: 3, y: -38, z: 0}
+      - {x: 4, y: -38, z: 0}
+      - {x: 5, y: -38, z: 0}
+      - {x: 6, y: -38, z: 0}
+      - {x: 7, y: -38, z: 0}
+      - {x: 8, y: -38, z: 0}
+      - {x: 9, y: -38, z: 0}
+      - {x: 10, y: -38, z: 0}
+      - {x: 11, y: -38, z: 0}
+      - {x: 11, y: -39, z: 0}
+      - {x: 12, y: -40, z: 0}
