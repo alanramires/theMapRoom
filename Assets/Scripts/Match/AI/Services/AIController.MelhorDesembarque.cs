@@ -163,6 +163,8 @@ public partial class AIController
 
         int requiredJointDeliveries = ResolveRequiredJointDeliveries(
             transporter, passengers, plan, snapshot, targets);
+        bool usesFreeCargoFlow = UsesFreeCargoDisembarkFlow(
+            passengers, plan, snapshot, targets);
         // Um grupo rebelde/rogue de duas cargas usa a semantica integral da
         // ferramenta Melhor Desembarque: primeiro maximiza passageiros
         // entregues e depois minimiza a soma das rotas. O antigo
@@ -186,7 +188,7 @@ public partial class AIController
                         transporter, passengers))
             || evaluation.best == null)
         {
-            if (requiredJointDeliveries >= 2
+            if ((usesFreeCargoFlow || requiredJointDeliveries >= 2)
                 && TryBuildJointDisembarkProgressionAction(
                     transporter,
                     passengers,
@@ -195,6 +197,7 @@ public partial class AIController
                     paths,
                     effectiveRemainingRouteCost,
                     requiredJointDeliveries,
+                    usesFreeCargoFlow,
                     consumer,
                     out action,
                     out _))
@@ -219,6 +222,7 @@ public partial class AIController
                     paths,
                     effectiveRemainingRouteCost,
                     requiredJointDeliveries,
+                    usesFreeCargoFlow,
                     consumer,
                     out action,
                     out jointLzKnown))
@@ -333,6 +337,7 @@ public partial class AIController
         Dictionary<Vector3Int, List<Vector3Int>> currentPaths,
         int maxRemainingRouteCost,
         int requiredJointDeliveries,
+        bool usesFreeCargoFlow,
         string consumer,
         out PlayerAction action,
         out bool jointLzKnown)
@@ -344,10 +349,20 @@ public partial class AIController
             || snapshot == null
             || targets == null
             || currentPaths == null
-            || requiredJointDeliveries < 2)
+            || requiredJointDeliveries < 1)
             return false;
 
-        const int jointSearchBudget = 120;
+        // Carga com plano ja possui um destino estrategico e continua usando o
+        // envelope longo diretamente. Rogue/rebelde nao deve varrer todas as
+        // praias do mapa: primeiro consulta somente a progressao de duas
+        // rodadas. Se nao houver LZ conjunta nesse envelope, devolve o controle
+        // ao courier do dominio, que progride para a praia/construcao ancora
+        // mais proxima do objetivo escolhido.
+        int oneTurnBudget = Mathf.Max(
+            1, transporter.RemainingMovementPoints);
+        int jointSearchBudget = usesFreeCargoFlow
+            ? Mathf.Max(oneTurnBudget, oneTurnBudget * 2)
+            : 120;
         Dictionary<Vector3Int, List<Vector3Int>> longPaths =
             UnitMovementPathRules.CalcularCaminhosValidos(
                 boardTilemap,
@@ -368,7 +383,16 @@ public partial class AIController
                         transporter, passengers))
             || longEvaluation.best == null
             || longEvaluation.best.delivered < requiredJointDeliveries)
+        {
+            if (usesFreeCargoFlow)
+            {
+                Debug.Log($"{TL("Transporte")} {consumer} " +
+                          $"{transporter.InstanceId} fluxo livre: " +
+                          $"sem LZ conjunta na progressao de 2 turnos " +
+                          $"(budget={jointSearchBudget}); usa ancora costeira.");
+            }
             return false;
+        }
 
         jointLzKnown = true;
         Vector3Int fromCell = transporter.CurrentCellPosition;
@@ -405,6 +429,36 @@ public partial class AIController
             progressionCell,
             currentPaths);
         return true;
+    }
+
+    private bool UsesFreeCargoDisembarkFlow(
+        List<UnitManager> passengers,
+        TeamObjectivePlan plan,
+        AIWorldSnapshot snapshot,
+        IReadOnlyDictionary<int, Vector3Int> targets)
+    {
+        if (passengers == null
+            || targets == null
+            || targets.Count == 0)
+            return false;
+
+        if (IsRuntimeRebelSnapshot(snapshot))
+            return true;
+
+        bool hasTargetedPassenger = false;
+        for (int i = 0; i < passengers.Count; i++)
+        {
+            UnitManager passenger = passengers[i];
+            if (passenger == null
+                || !targets.ContainsKey(passenger.InstanceId))
+                continue;
+
+            hasTargetedPassenger = true;
+            if (!IsRogueCapturerPassenger(passenger, plan))
+                return false;
+        }
+
+        return hasTargetedPassenger;
     }
 
     private int ResolveRequiredJointDeliveries(

@@ -673,8 +673,10 @@ public partial class AIController
     }
 
     // Praia conhecida mais perto do objetivo, usada como destino intermediario quando
-    // nenhum ponto de desembarque esta ao alcance neste turno. Varre o entorno do
-    // objetivo porque e ali que a cabeca de praia interessa.
+    // nenhum ponto de desembarque esta ao alcance neste turno. A busca nasce NO
+    // objetivo e expande em bolhas ate encontrar a primeira faixa de praias/LZs
+    // validas. Assim um mapa oceanico nao paga PodeDesembarcar em cada celula
+    // alcancavel entre a origem e o extremo oposto do tabuleiro.
     private Vector3Int ResolveNavalApproachTarget(UnitManager unit, Vector3Int objective, Vector3Int fromCell)
     {
         Dictionary<Vector3Int, int> reachable = UnitMovementPathRules.CalculateMovementCostMap(
@@ -682,25 +684,73 @@ public partial class AIController
         if (reachable == null || reachable.Count == 0)
             return fromCell;
 
+        objective.z = 0;
+        fromCell.z = 0;
         Vector3Int best = fromCell;
-        float bestDist = float.MaxValue;
+        int bestRouteCost = int.MaxValue;
+        int bestBubbleDepth = int.MaxValue;
+        var queue = new Queue<Vector3Int>();
+        var depthByCell = new Dictionary<Vector3Int, int>();
+        var neighbors = new List<Vector3Int>(6);
+        queue.Enqueue(objective);
+        depthByCell[objective] = 0;
 
-        foreach (KeyValuePair<Vector3Int, int> pair in reachable)
+        // Limite defensivo; na pratica a busca termina na primeira costa ao
+        // redor da construcao alvo.
+        const int maxObjectiveBubbleCells = 4096;
+        while (queue.Count > 0
+               && depthByCell.Count <= maxObjectiveBubbleCells)
         {
-            Vector3Int cell = pair.Key;
+            Vector3Int cell = queue.Dequeue();
             cell.z = 0;
-            float d = SectorManager.HexDistance(cell, objective);
-            if (d >= bestDist)
+            int depth = depthByCell[cell];
+            if (bestBubbleDepth < int.MaxValue && depth > bestBubbleDepth)
+                break;
+
+            if (reachable.TryGetValue(cell, out int routeCost)
+                && IsConfirmedVisibleCellForAI(cell))
+            {
+                List<UnitManager> occupants =
+                    UnitOccupancyRules.GetUnitsAtCell(
+                        boardTilemap, cell, unit);
+                bool canStop = OccupancyResolver.CanEndMove(
+                    unit, cell, occupants);
+                bool isMeetingCell = canStop
+                    && (SimulateDisembarkFromCell(unit, cell).Count > 0
+                        || IsNavalPickupCell(unit, cell));
+                if (isMeetingCell)
+                {
+                    bestBubbleDepth = depth;
+                    if (routeCost < bestRouteCost)
+                    {
+                        bestRouteCost = routeCost;
+                        best = cell;
+                    }
+                }
+            }
+
+            if (bestBubbleDepth < int.MaxValue)
                 continue;
 
-            // So interessa agua que sirva de ponto de encontro com a terra.
-            if (SimulateDisembarkFromCell(unit, cell).Count == 0 && !IsNavalPickupCell(unit, cell))
-                continue;
-
-            bestDist = d;
-            best = cell;
+            neighbors.Clear();
+            UnitMovementPathRules.GetImmediateHexNeighbors(
+                boardTilemap, cell, neighbors);
+            for (int i = 0; i < neighbors.Count; i++)
+            {
+                Vector3Int next = neighbors[i];
+                next.z = 0;
+                if (depthByCell.ContainsKey(next))
+                    continue;
+                depthByCell[next] = depth + 1;
+                queue.Enqueue(next);
+            }
         }
 
+        Debug.Log($"{TL("NavalTransport")} ancora costeira objetivo={objective} " +
+                  $"LZ={best} bolha=" +
+                  $"{(bestBubbleDepth < int.MaxValue ? bestBubbleDepth.ToString() : "none")} " +
+                  $"rota={(bestRouteCost < int.MaxValue ? bestRouteCost.ToString() : "?")} " +
+                  $"visitadas={depthByCell.Count}.");
         return best;
     }
 
