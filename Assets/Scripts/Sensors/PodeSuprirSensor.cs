@@ -156,6 +156,7 @@ public static class PodeSuprirSensor
                 forceSurfaceBeforeSupply = forceSurfaceBeforeSupply,
                 forceLandBeforeSupply = forceLandBeforeSupply,
                 forceTakeoffBeforeSupply = forceTakeoffBeforeSupply,
+                aircraftFuelBeforeSupply = Mathf.Max(0, target.CurrentFuel),
                 plannedServiceDomain = plannedServiceDomain,
                 plannedServiceHeight = plannedServiceHeight,
                 displayLabel = $"{target.name} @ {cell.x},{cell.y}"

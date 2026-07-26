@@ -1701,6 +1701,8 @@ public partial class TurnStateManager : MonoBehaviour
             yield break;
         }
 
+        unit.SetAircraftForcedLandingAwaitingRefuel(true);
+
         Vector3Int landedCell = unit.CurrentCellPosition;
         landedCell.z = 0;
         Debug.Log($"[FuelQueue] Pouso de emergencia: {unit.name} pousou sem combustivel em ({landedCell.x},{landedCell.y}).");

@@ -528,6 +528,20 @@ public partial class TurnStateManager
 
                 if (!isEmbarkedPassenger && (order.forceLandBeforeSupply || order.forceTakeoffBeforeSupply))
                 {
+                    if (!CanApplyPlannedAirTransitionBeforeSupply(
+                            target,
+                            boardMap,
+                            targetCell,
+                            order.forceLandBeforeSupply,
+                            order.forceTakeoffBeforeSupply,
+                            order.plannedServiceDomain,
+                            order.plannedServiceHeight,
+                            out string airOperationReason))
+                    {
+                        CommandServiceLog($"[ServicoComando] {target.name} ignorado: operacao aerea preparatoria invalida ({airOperationReason}).");
+                        continue;
+                    }
+
                     if (!CanUseLayerModeAtCurrentCell(target, boardMap, terrainDatabase, targetCell, order.plannedServiceDomain, order.plannedServiceHeight, out string plannedLayerReason))
                     {
                         CommandServiceLog($"[ServicoComando] {target.name} ignorado: camada planejada {order.plannedServiceDomain}/{order.plannedServiceHeight} invalida ({plannedLayerReason}).");
@@ -631,6 +645,7 @@ public partial class TurnStateManager
                         CommandServiceLog($"[ServicoComando][FuelAnim] {target.name}: {fuelBeforeApply} -> {desiredFuel} (+{actualFuelGain})");
                         target.SetCurrentFuel(fuelBeforeApply);
                         yield return AnimateFuelRecoverFill(target, fuelBeforeApply, desiredFuel, ShouldLogCommandServiceRuntime);
+                        target.SetAircraftForcedLandingAwaitingRefuel(false);
                     }
                     else if (fuelStep > 0)
                     {
@@ -703,7 +718,13 @@ public partial class TurnStateManager
                     CommandServiceLog($"[ServicoComando][Fila] {target.name}: sem ganho de AUT no alvo (HP +{hpGain} | AUT +{fuelGain} | MUN +{ammoGain}).");
 
                 if (!isEmbarkedPassenger && order.forceLandBeforeSupply)
-                    yield return ExecutePostSupplyAircraftTakeoff(target, boardMap, "[ServicoComando]");
+                {
+                    yield return ExecuteReturnToFlightAfterSupply(
+                        target,
+                        boardMap,
+                        order.aircraftFuelBeforeSupply,
+                        "[ServicoComando]");
+                }
 
                 NotifyUnitSupplied(sourceSupplierUnit, target);
                 MarkUnitServedByCommandThisTurn(target);

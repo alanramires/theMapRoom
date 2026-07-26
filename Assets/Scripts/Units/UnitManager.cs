@@ -26,6 +26,7 @@ public class UnitManager : MonoBehaviour
     [SerializeField, HideInInspector] private bool hasFiredThisTurn;
     [SerializeField] private bool receivedSuppliesThisTurn;
     [SerializeField] private bool tookOffRecently;
+    [SerializeField] private bool aircraftForcedLandingAwaitingRefuel;
     [SerializeField] private bool isUnderRepair;
     [SerializeField] private bool hasMerged;
     [SerializeField, HideInInspector] private bool aiForcedToRepair;
@@ -54,6 +55,7 @@ public class UnitManager : MonoBehaviour
     [SerializeField] private string flagEmbarkedAtUnit = string.Empty;
     [SerializeField] private bool flagReceivedSupplies;
     [SerializeField] private bool flagTookOffRecently;
+    [SerializeField] private bool flagAircraftForcedLandingAwaitingRefuel;
     [SerializeField] private bool flagHasMerged;
     [SerializeField] private int flagMergedWhenTurn = -1;
     [SerializeField] private string flagMergedWithUnit = string.Empty;
@@ -199,6 +201,9 @@ public class UnitManager : MonoBehaviour
     public bool HasFiredThisTurn => hasFiredThisTurn;
     public bool ReceivedSuppliesThisTurn => receivedSuppliesThisTurn;
     public bool TookOffRecently => tookOffRecently;
+    public bool AircraftForcedLandingAwaitingRefuel =>
+        GetAircraftType() != AircraftType.None &&
+        aircraftForcedLandingAwaitingRefuel;
     public bool IsUnderRepair => isUnderRepair;
     public bool IsEmbarked => isEmbarked;
     public bool IsEmbarkedVisualPreviewActive => embarkedVisualPreviewDepth > 0;
@@ -1210,6 +1215,12 @@ public class UnitManager : MonoBehaviour
         UpdateDynamicName();
     }
 
+    public void SetAircraftForcedLandingAwaitingRefuel(bool value)
+    {
+        aircraftForcedLandingAwaitingRefuel =
+            GetAircraftType() != AircraftType.None && value;
+    }
+
     public void SetSelected(bool selected)
     {
         if (selected && hiddenByFogOfWar)
@@ -1458,7 +1469,6 @@ public class UnitManager : MonoBehaviour
         layerStateInitialized = true;
 
         currentLayerModeIndex = ResolveLayerModeIndex(domain, heightLevel);
-        SyncAircraftRuntimeStateWithCurrentLayer();
         RefreshSpriteForCurrentLayer();
         RefreshActedVisual();
         return true;
@@ -1649,6 +1659,7 @@ public class UnitManager : MonoBehaviour
 
         if (currentDomain != Domain.Air)
             TrySetCurrentLayerMode(Domain.Air, GetPreferredAirHeight());
+        SetAircraftForcedLandingAwaitingRefuel(false);
     }
 
     public void SetAircraftEmbarkedInCarrier(bool embarkedInCarrier)
@@ -2331,7 +2342,6 @@ public class UnitManager : MonoBehaviour
         currentDomain = mode.domain;
         currentHeightLevel = mode.heightLevel;
         layerStateInitialized = true;
-        SyncAircraftRuntimeStateWithCurrentLayer();
         RefreshSpriteForCurrentLayer();
         RefreshActedVisual();
 
@@ -2738,7 +2748,6 @@ public class UnitManager : MonoBehaviour
         RestoreEditorEmbarkedStateFromSeats(data);
         SyncPreferredLayerPreferencesFromData(TryGetUnitData());
         SyncCurrentLayerStateWithData(forceNativeDefault: false);
-        SyncAircraftRuntimeStateWithCurrentLayer();
     }
 
     private void RestoreEditorEmbarkedStateFromSeats(UnitData data)
@@ -2860,11 +2869,6 @@ public class UnitManager : MonoBehaviour
         preferredNavalHeightRuntime = data.preferredNavalHeight == HeightLevel.Surface ? HeightLevel.Surface : HeightLevel.Submerged;
     }
 
-    private void SyncAircraftRuntimeStateWithCurrentLayer()
-    {
-        // Aircraft runtime now derives from layer state + IsEmbarked.
-    }
-
     private void SyncPositionState()
     {
         if (boardTilemap == null)
@@ -2982,6 +2986,7 @@ public class UnitManager : MonoBehaviour
         flagEmbarkedAtUnit = embarkedAtUnit;
         flagReceivedSupplies = receivedSuppliesThisTurn;
         flagTookOffRecently = tookOffRecently;
+        flagAircraftForcedLandingAwaitingRefuel = AircraftForcedLandingAwaitingRefuel;
         flagHasMerged = hasMerged;
         flagMergedWhenTurn = mergedWhenTurn;
         flagMergedWithUnit = mergedWithUnit;

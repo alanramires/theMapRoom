@@ -6,6 +6,9 @@ public class PodePousarReport
 {
     public bool status;
     public string explicacao;
+    public Vector3Int cell;
+    public Domain landingDomain;
+    public HeightLevel landingHeight;
 }
 
 public static class PodePousarSensor
@@ -51,8 +54,14 @@ public static class PodePousarSensor
         var report = new PodePousarReport
         {
             status = false,
-            explicacao = "Contexto nao avaliado."
+            explicacao = "Contexto nao avaliado.",
+            cell = atCell ?? (selectedAircraft != null
+                ? selectedAircraft.CurrentCellPosition
+                : Vector3Int.zero),
+            landingDomain = Domain.Land,
+            landingHeight = HeightLevel.Surface
         };
+        report.cell.z = 0;
 
         if (sensorLogs)
             SensorLogGate.Log("PodePousarSensor", $"collect unit={(selectedAircraft != null ? selectedAircraft.name : "(null)")} movement={movementMode}");
@@ -60,6 +69,12 @@ public static class PodePousarSensor
         if (selectedAircraft == null)
         {
             report.explicacao = "Selecione uma unidade.";
+            return report;
+        }
+
+        if (selectedAircraft.IsEmbarked)
+        {
+            report.explicacao = "Unidade embarcada nao entra no sensor de pouso.";
             return report;
         }
 
@@ -86,6 +101,20 @@ public static class PodePousarSensor
             report.explicacao = "Unidade selecionada nao e aeronave.";
             return report;
         }
+
+        if (selectedAircraft.GetDomain() != Domain.Air || selectedAircraft.IsAircraftGrounded)
+        {
+            report.explicacao = "A aeronave precisa estar em voo para avaliar pouso.";
+            return report;
+        }
+
+        AircraftOperationRules.ResolveGroundedLayerForCell(
+            selectedAircraft,
+            map,
+            terrainDatabase,
+            report.cell,
+            out report.landingDomain,
+            out report.landingHeight);
 
         AircraftOperationDecision decision = AircraftOperationRules.Evaluate(
             selectedAircraft,

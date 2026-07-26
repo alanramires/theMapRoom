@@ -8,6 +8,7 @@ public class PodeSuprirOption
     public bool forceLandBeforeSupply;
     public bool forceTakeoffBeforeSupply;
     public bool forceSurfaceBeforeSupply;
+    public int aircraftFuelBeforeSupply;
     public Domain plannedServiceDomain;
     public HeightLevel plannedServiceHeight;
     public string displayLabel;

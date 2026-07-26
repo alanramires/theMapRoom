@@ -194,6 +194,7 @@ public static class SaveDataMapper
             hasActed = unit.HasActed,
             receivedSuppliesThisTurn = unit.ReceivedSuppliesThisTurn,
             tookOffRecently = unit.TookOffRecently,
+            aircraftForcedLandingAwaitingRefuel = unit.AircraftForcedLandingAwaitingRefuel,
             isUnderRepair = unit.IsUnderRepair,
             isEmbarked = unit.IsEmbarked,
             transporterInstanceId = unit.EmbarkedTransporter != null ? unit.EmbarkedTransporter.InstanceId : 0,
@@ -296,6 +297,7 @@ public static class SaveDataMapper
         {
             bool shouldRestoreGrounded = saved.isAircraftGrounded || domain != Domain.Air;
             unit.SetAircraftGrounded(shouldRestoreGrounded);
+            unit.SetAircraftForcedLandingAwaitingRefuel(saved.aircraftForcedLandingAwaitingRefuel);
             // Formato legado (saves sem o lock completo): restaura o contador
             // assumindo a camada atual, como antes.
             if (!saved.hasForcedLayerLock)
@@ -351,6 +353,7 @@ public static class SaveDataMapper
         unit.SetRemainingMovementPoints(saved.remainingMovementPoints);
         unit.SetReceivedSuppliesThisTurn(saved.receivedSuppliesThisTurn);
         unit.SetTookOffRecently(saved.tookOffRecently);
+        unit.SetAircraftForcedLandingAwaitingRefuel(saved.aircraftForcedLandingAwaitingRefuel);
         RestoreUnitRepairState(unit, saved);
     }
 

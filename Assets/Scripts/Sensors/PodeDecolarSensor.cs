@@ -7,6 +7,9 @@ public class PodeDecolarReport
 {
     public bool status;
     public string explicacao;
+    public Vector3Int cell;
+    public TakeoffProcedure procedure;
+    public HeightLevel endHeight;
     public bool canDecolar0Hex;
     public bool canDecolar1Hex;
     public bool canDecolarFullMove;
@@ -15,16 +18,46 @@ public class PodeDecolarReport
 
 public static class PodeDecolarSensor
 {
+    public static bool CanTakeoffAtCell(
+        UnitManager aircraft,
+        Tilemap map,
+        TerrainDatabase terrainDatabase,
+        Vector3Int cell,
+        out string reason,
+        SensorMovementMode movementMode = SensorMovementMode.MoveuParado,
+        bool allowSameTeamAirBlockerForMovementTakeoff = false)
+    {
+        PodeDecolarReport report = Evaluate(
+            aircraft,
+            map,
+            terrainDatabase,
+            allowSameTeamAirBlockerForMovementTakeoff,
+            cell,
+            movementMode);
+        reason = report != null ? report.explicacao : "PodeDecolar sem resultado.";
+        return report != null && report.status;
+    }
+
     public static PodeDecolarReport Evaluate(
         UnitManager selectedUnit,
         Tilemap map,
         TerrainDatabase terrainDatabase,
-        bool allowSameTeamAirBlockerForMovementTakeoff = false)
+        bool allowSameTeamAirBlockerForMovementTakeoff = false,
+        Vector3Int? atCell = null,
+        SensorMovementMode movementMode = SensorMovementMode.MoveuParado)
     {
+        Vector3Int cell = atCell ?? (selectedUnit != null
+            ? selectedUnit.CurrentCellPosition
+            : Vector3Int.zero);
+        cell.z = 0;
+
         var report = new PodeDecolarReport
         {
             status = false,
             explicacao = "Contexto nao avaliado.",
+            cell = cell,
+            procedure = TakeoffProcedure.InstantToPreferredHeight,
+            endHeight = HeightLevel.AirLow,
             canDecolar0Hex = false,
             canDecolar1Hex = false,
             canDecolarFullMove = false,
@@ -76,6 +109,12 @@ public static class PodeDecolarSensor
             return report;
         }
 
+        if (selectedUnit.AircraftForcedLandingAwaitingRefuel)
+        {
+            report.explicacao = "Aeronave aguarda reabastecimento apos pouso forcado.";
+            return report;
+        }
+
         // Aeronaves anfibias podem estar pousadas em Naval/Surface (ex.: hidroaviao).
         // O AirOperationResolver abaixo decide se o terreno/estrutura autoriza a decolagem.
         if (selectedUnit.GetDomain() == Domain.Air || selectedUnit.GetHeightLevel() != HeightLevel.Surface || !selectedUnit.IsAircraftGrounded)
@@ -84,26 +123,33 @@ public static class PodeDecolarSensor
             return report;
         }
 
-        if (selectedUnit.CurrentFuel <= 0)
-        {
-            report.explicacao = "Autonomia insuficiente para decolagem.";
-            return report;
-        }
-
         AircraftOperationDecision decision = AircraftOperationRules.Evaluate(
             selectedUnit,
             map,
             terrainDatabase,
-            SensorMovementMode.MoveuParado,
-            allowSameTeamAirBlockerForMovementTakeoff);
+            movementMode,
+            allowSameTeamAirBlockerForMovementTakeoff,
+            cell);
 
         bool canTakeoff = decision.available && decision.action == AircraftOperationAction.Takeoff;
         report.status = canTakeoff;
         if (canTakeoff)
         {
-            AirOperationTileContext tileContext = AirOperationResolver.ResolveContext(map, terrainDatabase, selectedUnit.CurrentCellPosition);
-            if (AirOperationResolver.TryGetTakeoffPlan(selectedUnit, tileContext, SensorMovementMode.MoveuParado, out AirTakeoffPlan plan, out _))
+            AirOperationTileContext tileContext = AirOperationResolver.ResolveContext(
+                map,
+                terrainDatabase,
+                cell);
+            if (AirOperationResolver.TryGetTakeoffPlan(
+                    selectedUnit,
+                    tileContext,
+                    movementMode,
+                    out AirTakeoffPlan plan,
+                    out _))
+            {
+                report.procedure = plan.procedure;
+                report.endHeight = plan.endHeight;
                 ApplyButtonAvailability(ref report, plan);
+            }
 
             BuildTakeoffMoveOptions(ref report);
             report.explicacao = BuildAllowedExplanation(report);

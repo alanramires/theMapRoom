@@ -656,6 +656,20 @@ public partial class TurnStateManager
 
             if (!isEmbarkedPassenger && (order.forceLandBeforeSupply || order.forceTakeoffBeforeSupply))
             {
+                if (!CanApplyPlannedAirTransitionBeforeSupply(
+                        target,
+                        boardMap,
+                        targetCell,
+                        order.forceLandBeforeSupply,
+                        order.forceTakeoffBeforeSupply,
+                        order.plannedServiceDomain,
+                        order.plannedServiceHeight,
+                        out string airOperationReason))
+                {
+                    Debug.Log($"[Suprimento] {target.name} ignorado: operacao aerea preparatoria invalida ({airOperationReason}).");
+                    continue;
+                }
+
                 if (!CanUseLayerModeAtCurrentCell(target, boardMap, terrainDatabase, targetCell, order.plannedServiceDomain, order.plannedServiceHeight, out string plannedLayerReason))
                 {
                     Debug.Log($"[Suprimento] {target.name} ignorado: camada planejada {order.plannedServiceDomain}/{order.plannedServiceHeight} invalida no hex atual ({plannedLayerReason}).");
@@ -768,6 +782,7 @@ public partial class TurnStateManager
                     target.SetCurrentFuel(fuelBeforeApply);
                     yield return AnimateFuelRecoverFill(target, fuelBeforeApply, desiredFuel);
                     startFuel = desiredFuel;
+                    target.SetAircraftForcedLandingAwaitingRefuel(false);
                 }
 
                 if (ammoStep > 0)
@@ -811,7 +826,13 @@ public partial class TurnStateManager
                 continue;
 
             if (!isEmbarkedPassenger && order.forceLandBeforeSupply)
-                yield return ExecutePostSupplyAircraftTakeoff(target, boardMap);
+            {
+                yield return ExecuteReturnToFlightAfterSupply(
+                    target,
+                    boardMap,
+                    order.aircraftFuelBeforeSupply,
+                    "[Suprimento]");
+            }
 
             NotifyUnitSupplied(supplier, target);
             servedTargets++;
@@ -1199,35 +1220,109 @@ public partial class TurnStateManager
             yield return new WaitForSeconds(postTransitionDelay);
     }
 
-    private IEnumerator ExecutePostSupplyAircraftTakeoff(UnitManager target, Tilemap boardMap, string logPrefix = "[Suprimento]")
+    private bool CanApplyPlannedAirTransitionBeforeSupply(
+        UnitManager aircraft,
+        Tilemap boardMap,
+        Vector3Int cell,
+        bool landing,
+        bool takingOff,
+        Domain plannedDomain,
+        HeightLevel plannedHeight,
+        out string reason)
     {
-        if (target == null || boardMap == null)
-            yield break;
-        if (!target.TryGetUnitData(out UnitData data) || data == null || !data.IsAircraft())
-            yield break;
-        if (target.GetDomain() == Domain.Air && !target.IsAircraftGrounded)
+        reason = string.Empty;
+        if (landing)
+        {
+            PodePousarReport report = PodePousarSensor.Evaluate(
+                aircraft,
+                boardMap,
+                terrainDatabase,
+                SensorMovementMode.MoveuParado,
+                useManualRemainingMovement: false,
+                manualRemainingMovement: 0,
+                atCell: cell);
+            if (report == null || !report.status)
+            {
+                reason = report != null ? report.explicacao : "PodePousar sem resultado.";
+                return false;
+            }
+
+            if (report.landingDomain != plannedDomain || report.landingHeight != plannedHeight)
+            {
+                reason =
+                    $"Pouso resulta em {report.landingDomain}/{report.landingHeight}, " +
+                    $"mas o servico planejou {plannedDomain}/{plannedHeight}.";
+                return false;
+            }
+
+            return true;
+        }
+
+        if (takingOff)
+        {
+            PodeDecolarReport report = PodeDecolarSensor.Evaluate(
+                aircraft,
+                boardMap,
+                terrainDatabase,
+                allowSameTeamAirBlockerForMovementTakeoff: false,
+                atCell: cell,
+                movementMode: SensorMovementMode.MoveuParado);
+            if (report == null || !report.status)
+            {
+                reason = report != null ? report.explicacao : "PodeDecolar sem resultado.";
+                return false;
+            }
+
+            if (plannedDomain != Domain.Air || report.endHeight != plannedHeight)
+            {
+                reason =
+                    $"Decolagem resulta em Air/{report.endHeight}, " +
+                    $"mas o servico planejou {plannedDomain}/{plannedHeight}.";
+                return false;
+            }
+
+            return true;
+        }
+
+        reason = "Operacao aerea preparatoria nao informada.";
+        return false;
+    }
+
+    private IEnumerator ExecuteReturnToFlightAfterSupply(
+        UnitManager aircraft,
+        Tilemap boardMap,
+        int fuelBeforeSupply,
+        string logPrefix)
+    {
+        if (aircraft == null || boardMap == null)
             yield break;
 
-        PodeDecolarReport report = PodeDecolarSensor.Evaluate(target, boardMap, terrainDatabase);
-        bool canTakeoffInPlace = report != null
-            && report.status
-            && report.takeoffMoveOptions != null
-            && (report.takeoffMoveOptions.Contains(0)
-                || report.takeoffMoveOptions.Contains(1)
-                || report.takeoffMoveOptions.Contains(9));
-        if (!canTakeoffInPlace)
+        // A autorizacao nasce do combustivel anterior ao servico. Combustivel
+        // recebido durante o batch nunca cria uma decolagem retroativa.
+        if (fuelBeforeSupply <= 0)
+        {
+            if (SensorLogGate.IsPodeSuprirEnabled())
+                Debug.Log($"{logPrefix} {aircraft.name} permanece no solo: motores estavam desligados antes do servico.");
+            yield break;
+        }
+
+        PodeDecolarReport report = PodeDecolarSensor.Evaluate(
+            aircraft,
+            boardMap,
+            terrainDatabase);
+        if (report == null || !report.status)
         {
             if (SensorLogGate.IsPodeSuprirEnabled())
             {
                 Debug.Log(report != null && !string.IsNullOrWhiteSpace(report.explicacao)
-                    ? $"{logPrefix} {target.name} permanece no solo apos servico: {report.explicacao}"
-                    : $"{logPrefix} {target.name} permanece no solo apos servico: decolagem indisponivel.");
+                    ? $"{logPrefix} {aircraft.name} permanece no solo: {report.explicacao}"
+                    : $"{logPrefix} {aircraft.name} permanece no solo: decolagem indisponivel.");
             }
             yield break;
         }
 
         if (!AircraftOperationRules.TryApplyOperation(
-                target,
+                aircraft,
                 boardMap,
                 terrainDatabase,
                 SensorMovementMode.MoveuParado,
@@ -1236,18 +1331,20 @@ public partial class TurnStateManager
             if (SensorLogGate.IsPodeSuprirEnabled())
             {
                 Debug.Log(string.IsNullOrWhiteSpace(takeoffDecision.reason)
-                    ? $"{logPrefix} Falha ao decolar {target.name} apos servico."
-                    : $"{logPrefix} {target.name} permanece no solo apos servico: {takeoffDecision.reason}");
+                    ? $"{logPrefix} Falha ao devolver {aircraft.name} ao voo."
+                    : $"{logPrefix} {aircraft.name} permanece no solo: {takeoffDecision.reason}");
             }
             yield break;
         }
 
-        target.MarkTookOffRecently();
-        PlayMovementStartSfx(target);
+        aircraft.MarkTookOffRecently();
+        PlayMovementStartSfx(aircraft);
         if (SensorLogGate.IsPodeSuprirEnabled())
-            Debug.Log($"{logPrefix} {target.name} decolou apos receber servico.");
+            Debug.Log($"{logPrefix} {aircraft.name} retornou ao voo com autorizacao anterior ao servico.");
 
-        float takeoffFxDuration = animationManager != null ? animationManager.PlayVtolLandingEffect(target) : 0f;
+        float takeoffFxDuration = animationManager != null
+            ? animationManager.PlayVtolLandingEffect(aircraft)
+            : 0f;
         if (takeoffFxDuration > 0f)
             yield return new WaitForSeconds(takeoffFxDuration);
     }

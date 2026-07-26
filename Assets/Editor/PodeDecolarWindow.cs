@@ -58,6 +58,12 @@ public class PodeDecolarWindow : EditorWindow
         {
             EditorGUILayout.LabelField("Status", latestReport.status ? "valido" : "invalido");
             EditorGUILayout.LabelField("Explicacao", string.IsNullOrWhiteSpace(latestReport.explicacao) ? "-" : latestReport.explicacao);
+            EditorGUILayout.Vector3IntField("Hex avaliado", latestReport.cell);
+            if (latestReport.status)
+            {
+                EditorGUILayout.LabelField("Procedimento", latestReport.procedure.ToString());
+                EditorGUILayout.LabelField("Camada apos decolar", $"Air / {latestReport.endHeight}");
+            }
         }
 
         EditorGUILayout.Space(8f);

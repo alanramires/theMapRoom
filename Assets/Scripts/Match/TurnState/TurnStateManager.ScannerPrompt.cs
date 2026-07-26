@@ -2205,16 +2205,20 @@ public partial class TurnStateManager
 
             if (isAirToGroundLanding)
             {
-                AircraftOperationDecision decision = AircraftOperationRules.Evaluate(
+                PodePousarReport pousarReport = PodePousarSensor.Evaluate(
                     unit,
                     boardMap,
                     terrainDatabase,
-                    movementMode);
-                if (!decision.available || decision.action != AircraftOperationAction.Land)
+                    movementMode,
+                    useManualRemainingMovement: false,
+                    manualRemainingMovement: 0,
+                    atCell: unitCell);
+                if (pousarReport == null || !pousarReport.status)
                 {
                     if (string.IsNullOrWhiteSpace(unavailableReason))
-                        unavailableReason = !string.IsNullOrWhiteSpace(decision.reason)
-                            ? decision.reason
+                        unavailableReason = pousarReport != null &&
+                            !string.IsNullOrWhiteSpace(pousarReport.explicacao)
+                            ? pousarReport.explicacao
                             : "Pouso indisponivel neste hex.";
                     continue;
                 }

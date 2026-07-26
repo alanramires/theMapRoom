@@ -161,13 +161,8 @@ public sealed class PodePousarSensorDebugWindow : EditorWindow
         hasPredictedLayer = report != null && report.status;
         if (hasPredictedLayer)
         {
-            AircraftOperationRules.ResolveGroundedLayerForCell(
-                aircraft,
-                map,
-                terrainDatabase,
-                testCell,
-                out predictedDomain,
-                out predictedHeight);
+            predictedDomain = report.landingDomain;
+            predictedHeight = report.landingHeight;
         }
 
         Repaint();

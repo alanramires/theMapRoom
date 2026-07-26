@@ -52,6 +52,9 @@ public static class AircraftOperationRules
         if (!unit.TryGetUnitData(out UnitData data) || data == null)
             return Unavailable("UnitData nao encontrado.");
 
+        if (!data.IsAircraft())
+            return Unavailable("Unidade selecionada nao e aeronave.");
+
         if (!HasAirOperationProfile(unit, data))
             return Unavailable("Unidade sem perfil de operacao aerea.");
 
@@ -89,11 +92,35 @@ public static class AircraftOperationRules
             return EvaluateLanding(unit, movementMode, tileContext);
         }
 
+        if (unit.GetDomain() == Domain.Air ||
+            unit.GetHeightLevel() != HeightLevel.Surface ||
+            !unit.IsAircraftGrounded)
+        {
+            return Unavailable("A aeronave precisa estar pousada em uma camada Surface para decolar.");
+        }
+
+        if (unit.CurrentFuel <= 0)
+            return Unavailable("Autonomia insuficiente para decolagem.");
+
+        AircraftOperationDecision takeoffDecision = EvaluateTakeoff(unit, movementMode, tileContext);
+        if (!takeoffDecision.available)
+            return takeoffDecision;
+
         // Decolagem: aeronave do mesmo time nao empilha na banda aerea
         // (inimigo coexiste -> hex contestado/dogfight). Durante a preparacao
         // de movimento, um aliado no ar nao bloqueia a decolagem em si; o hex
         // final ainda sera validado por CanEndMoveAsLayer.
         HeightLevel takeoffHeight = ResolvePreferredAirHeight(data);
+        if (AirOperationResolver.TryGetTakeoffPlan(
+                unit,
+                tileContext,
+                movementMode,
+                out AirTakeoffPlan takeoffPlan,
+                out _))
+        {
+            takeoffHeight = takeoffPlan.endHeight;
+        }
+
         if (!UnitOccupancyRules.CanEndLayerTransitionAtCell(
                 referenceTilemap,
                 cell,
@@ -107,7 +134,7 @@ public static class AircraftOperationRules
             return Unavailable($"Decolagem nao autorizada: espaco aereo ocupado por {blockerName}.");
         }
 
-        return EvaluateTakeoff(unit, movementMode, tileContext);
+        return takeoffDecision;
     }
 
     public static bool TryApplyOperation(
