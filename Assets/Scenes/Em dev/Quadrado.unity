@@ -5429,7 +5429,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 76194553}
-  m_Enabled: 0
+  m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
   m_Name: 
@@ -5442,7 +5442,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 0}
+  m_Sprite: {fileID: 21300000, guid: d69067b8a78952c44805e3ce8887994d, type: 3}
   m_Type: 0
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -6220,7 +6220,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 3.65, y: -7.88}
+  m_AnchoredPosition: {x: 3, y: -7.88}
   m_SizeDelta: {x: 15, y: 15}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &96545062
@@ -12281,7 +12281,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 3.65, y: -7.88}
+  m_AnchoredPosition: {x: 3, y: -7.88}
   m_SizeDelta: {x: 15, y: 15}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &176253828
@@ -15006,7 +15006,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 3.65, y: -7.88}
+  m_AnchoredPosition: {x: 3, y: -7.88}
   m_SizeDelta: {x: 15, y: 15}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &197696909
@@ -15141,7 +15141,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &200379250
 RectTransform:
   m_ObjectHideFlags: 0
@@ -19176,7 +19176,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 3.65, y: -7.88}
+  m_AnchoredPosition: {x: 3, y: -7.88}
   m_SizeDelta: {x: 15, y: 15}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &248814068
@@ -22673,7 +22673,7 @@ MonoBehaviour:
   visao: 3
   embarkedWeaponsRuntime:
   - weapon: {fileID: 11400000, guid: afbb31a3d8a2c3645bf90df243540a74, type: 2}
-    squadAmmunition: 0
+    squadAmmunition: 6
     operationRangeMin: 1
     operationRangeMax: 3
     selectedTrajectory: 0
@@ -25552,7 +25552,7 @@ MonoBehaviour:
   eixoOverrides: []
   constructionId: cidade
   instanceId: 19
-  currentPosition: {x: -1.7319533, y: 0, z: 0}
+  currentPosition: {x: -1.7319531, y: 0, z: 0}
   constructionDisplayName: Cidade
   lastAutoConstructionDisplayName: Cidade
   isVisible: 1
@@ -25738,7 +25738,7 @@ MonoBehaviour:
     defeated: 0
     startMoney: 0
     actualMoney: 0
-    incomePerTurn: 4000
+    incomePerTurn: 0
     startMoneyApplied: 1
   - teamId: 1
     flipX: 1
@@ -25825,7 +25825,7 @@ MonoBehaviour:
   appliedActiveTeamId: 2
   pendingTurnStartUpkeep: 1
   pendingTurnStartEconomy: 1
-  cachedConstructionIncomeSignature: 1096887930
+  cachedConstructionIncomeSignature: -1029288450
   cachedConstructionIncomeCount: 19
   constructionIncomeRefreshIntervalSeconds: 0.35
   continuousEditorRefresh: 0
@@ -26232,7 +26232,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 3.65, y: -7.88}
+  m_AnchoredPosition: {x: 3, y: -7.88}
   m_SizeDelta: {x: 15, y: 15}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &332882779
@@ -28226,7 +28226,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 3.65, y: -7.88}
+  m_AnchoredPosition: {x: 3, y: -7.88}
   m_SizeDelta: {x: 15, y: 15}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &372637761
@@ -30401,7 +30401,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 3.65, y: -7.88}
+  m_AnchoredPosition: {x: 3, y: -7.88}
   m_SizeDelta: {x: 15, y: 15}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &406385719
@@ -31676,7 +31676,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 3.65, y: -7.88}
+  m_AnchoredPosition: {x: 3, y: -7.88}
   m_SizeDelta: {x: 15, y: 15}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &418193549
@@ -34953,7 +34953,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 3.65, y: -7.88}
+  m_AnchoredPosition: {x: 3, y: -7.88}
   m_SizeDelta: {x: 15, y: 15}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &454627630
@@ -36465,7 +36465,7 @@ MonoBehaviour:
   m_PreserveAspect: 0
   m_FillCenter: 1
   m_FillMethod: 0
-  m_FillAmount: 0
+  m_FillAmount: 1
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
@@ -36647,6 +36647,42 @@ MonoBehaviour:
   currentAITeam: -1
   currentAISlotIndex: -1
   basePreset: {fileID: 11400000, guid: b82e8ba60f1d7e94a8315bf2dfa93732, type: 2}
+--- !u!21 &495641945
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: Runtime_UnitActedGlow
+  m_Shader: {fileID: 4800000, guid: 1601771c0533c1946bb776c9688f0186, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _MainTex:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _GlowSize: 1.5
+    - _GlowStrength: 1.25
+    m_Colors:
+    - _Color: {r: 1, g: 1, b: 1, a: 1}
+    - _GlowColor: {r: 1, g: 1, b: 1, a: 1}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1
 --- !u!1 &495646550
 GameObject:
   m_ObjectHideFlags: 0
@@ -37347,7 +37383,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 3.65, y: -7.88}
+  m_AnchoredPosition: {x: 3, y: -7.88}
   m_SizeDelta: {x: 15, y: 15}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &500340499
@@ -42429,7 +42465,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &558121611
 RectTransform:
   m_ObjectHideFlags: 0
@@ -42446,7 +42482,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 3.65, y: -7.88}
+  m_AnchoredPosition: {x: 3, y: -7.88}
   m_SizeDelta: {x: 15, y: 15}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &558121612
@@ -47375,7 +47411,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 3.65, y: -7.88}
+  m_AnchoredPosition: {x: 3, y: -7.88}
   m_SizeDelta: {x: 15, y: 15}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &613243658
@@ -48854,7 +48890,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &631314168
 RectTransform:
   m_ObjectHideFlags: 0
@@ -48871,7 +48907,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 3.65, y: -7.88}
+  m_AnchoredPosition: {x: 3, y: -7.88}
   m_SizeDelta: {x: 15, y: 15}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &631314169
@@ -52660,7 +52696,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 3.65, y: -7.88}
+  m_AnchoredPosition: {x: 3, y: -7.88}
   m_SizeDelta: {x: 15, y: 15}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &700015066
@@ -53310,9 +53346,9 @@ MonoBehaviour:
   actedGlowColor: {r: 1, g: 1, b: 1, a: 1}
   actedGlowSize: 1.5
   actedGlowStrength: 1.25
-  currentDomain: 0
-  currentHeightLevel: 3
-  currentLayerModeIndex: 2
+  currentDomain: 3
+  currentHeightLevel: 5
+  currentLayerModeIndex: 0
   layerStateInitialized: 1
   useExplicitPreferredAirHeightRuntime: 0
   preferredAirHeightRuntime: 4
@@ -53387,7 +53423,7 @@ SpriteRenderer:
   m_SortingLayer: 4
   m_SortingOrder: 0
   m_MaskInteraction: 0
-  m_Sprite: {fileID: 21300000, guid: 6d668a2538038af449f596df1c66b18b, type: 3}
+  m_Sprite: {fileID: 21300000, guid: ab4dd6fb73168824ca05fc40a270a71a, type: 3}
   m_Color: {r: 1, g: 0.60784316, b: 0.60784316, a: 1}
   m_FlipX: 1
   m_FlipY: 0
@@ -55654,7 +55690,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &741456199
 RectTransform:
   m_ObjectHideFlags: 0
@@ -58920,7 +58956,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 3.65, y: -7.88}
+  m_AnchoredPosition: {x: 3, y: -7.88}
   m_SizeDelta: {x: 15, y: 15}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &786630396
@@ -60059,7 +60095,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &811378184
 RectTransform:
   m_ObjectHideFlags: 0
@@ -60076,7 +60112,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 3.65, y: -7.88}
+  m_AnchoredPosition: {x: 3, y: -7.88}
   m_SizeDelta: {x: 15, y: 15}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &811378185
@@ -60604,7 +60640,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &819342984
 RectTransform:
   m_ObjectHideFlags: 0
@@ -61118,7 +61154,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &822921924
 RectTransform:
   m_ObjectHideFlags: 0
@@ -61135,7 +61171,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 3.65, y: -7.88}
+  m_AnchoredPosition: {x: 3, y: -7.88}
   m_SizeDelta: {x: 15, y: 15}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &822921925
@@ -64161,7 +64197,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &878827681
 RectTransform:
   m_ObjectHideFlags: 0
@@ -64188,7 +64224,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 878827680}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
   m_Name: 
@@ -64201,7 +64237,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: 90fb0c1038005544ebb3d0197a495c79, type: 3}
+  m_Sprite: {fileID: 0}
   m_Type: 0
   m_PreserveAspect: 1
   m_FillCenter: 1
@@ -66878,7 +66914,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 3.65, y: -7.88}
+  m_AnchoredPosition: {x: 3, y: -7.88}
   m_SizeDelta: {x: 15, y: 15}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &908078524
@@ -67090,7 +67126,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 3.65, y: -7.88}
+  m_AnchoredPosition: {x: 3, y: -7.88}
   m_SizeDelta: {x: 15, y: 15}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &909299157
@@ -70155,7 +70191,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 3.65, y: -7.88}
+  m_AnchoredPosition: {x: 3, y: -7.88}
   m_SizeDelta: {x: 15, y: 15}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &943325456
@@ -72030,7 +72066,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 3.65, y: -7.88}
+  m_AnchoredPosition: {x: 3, y: -7.88}
   m_SizeDelta: {x: 15, y: 15}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &965193522
@@ -74794,7 +74830,7 @@ MonoBehaviour:
   m_PreserveAspect: 0
   m_FillCenter: 1
   m_FillMethod: 0
-  m_FillAmount: 0.25
+  m_FillAmount: 1
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
@@ -77468,7 +77504,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 3.65, y: -7.88}
+  m_AnchoredPosition: {x: 3, y: -7.88}
   m_SizeDelta: {x: 15, y: 15}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1035926571
@@ -78029,7 +78065,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 3.65, y: -7.88}
+  m_AnchoredPosition: {x: 3, y: -7.88}
   m_SizeDelta: {x: 15, y: 15}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1041199595
@@ -78820,7 +78856,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 3.65, y: -7.88}
+  m_AnchoredPosition: {x: 3, y: -7.88}
   m_SizeDelta: {x: 15, y: 15}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1051626616
@@ -78878,7 +78914,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &1055264392
 RectTransform:
   m_ObjectHideFlags: 0
@@ -80348,7 +80384,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 3.65, y: -7.88}
+  m_AnchoredPosition: {x: 3, y: -7.88}
   m_SizeDelta: {x: 15, y: 15}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1072107288
@@ -81222,7 +81258,7 @@ MonoBehaviour:
   visao: 3
   embarkedWeaponsRuntime:
   - weapon: {fileID: 11400000, guid: f7bfd5005ca7dbd4aad1017263cfecb0, type: 2}
-    squadAmmunition: 2
+    squadAmmunition: 8
     operationRangeMin: 1
     operationRangeMax: 1
     selectedTrajectory: 0
@@ -83467,7 +83503,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &1105237507
 RectTransform:
   m_ObjectHideFlags: 0
@@ -83983,7 +84019,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &1116905762
 RectTransform:
   m_ObjectHideFlags: 0
@@ -84650,7 +84686,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &1131637318
 RectTransform:
   m_ObjectHideFlags: 0
@@ -87130,7 +87166,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 3.65, y: -7.88}
+  m_AnchoredPosition: {x: 3, y: -7.88}
   m_SizeDelta: {x: 15, y: 15}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1155386345
@@ -88290,7 +88326,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &1174165676
 RectTransform:
   m_ObjectHideFlags: 0
@@ -89114,7 +89150,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &1185302337
 RectTransform:
   m_ObjectHideFlags: 0
@@ -89480,7 +89516,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &1190744732
 RectTransform:
   m_ObjectHideFlags: 0
@@ -89497,7 +89533,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 3.65, y: -7.88}
+  m_AnchoredPosition: {x: 3, y: -7.88}
   m_SizeDelta: {x: 15, y: 15}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1190744733
@@ -90390,7 +90426,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 3.65, y: -7.88}
+  m_AnchoredPosition: {x: 3, y: -7.88}
   m_SizeDelta: {x: 15, y: 15}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1205313290
@@ -90857,7 +90893,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &1216681573
 RectTransform:
   m_ObjectHideFlags: 0
@@ -93704,7 +93740,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 3.65, y: -7.88}
+  m_AnchoredPosition: {x: 3, y: -7.88}
   m_SizeDelta: {x: 15, y: 15}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1255861345
@@ -94280,7 +94316,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 3.65, y: -7.88}
+  m_AnchoredPosition: {x: 3, y: -7.88}
   m_SizeDelta: {x: 15, y: 15}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1266626844
@@ -96395,7 +96431,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &1284018521
 RectTransform:
   m_ObjectHideFlags: 0
@@ -97147,7 +97183,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 3.65, y: -7.88}
+  m_AnchoredPosition: {x: 3, y: -7.88}
   m_SizeDelta: {x: 15, y: 15}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1302506468
@@ -106238,7 +106274,7 @@ SpriteRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 1926454416}
+  - {fileID: 495641945}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -108249,7 +108285,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 3.65, y: -7.88}
+  m_AnchoredPosition: {x: 3, y: -7.88}
   m_SizeDelta: {x: 15, y: 15}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1437329915
@@ -112719,7 +112755,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &1502000055
 RectTransform:
   m_ObjectHideFlags: 0
@@ -112736,7 +112772,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 3.65, y: -7.88}
+  m_AnchoredPosition: {x: 3, y: -7.88}
   m_SizeDelta: {x: 15, y: 15}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1502000056
@@ -113475,7 +113511,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 3.65, y: -7.88}
+  m_AnchoredPosition: {x: 3, y: -7.88}
   m_SizeDelta: {x: 15, y: 15}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1506614505
@@ -115039,7 +115075,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 3.65, y: -7.88}
+  m_AnchoredPosition: {x: 3, y: -7.88}
   m_SizeDelta: {x: 15, y: 15}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1528809118
@@ -116610,7 +116646,7 @@ MonoBehaviour:
   eixoOverrides: []
   constructionId: cidade
   instanceId: 21
-  currentPosition: {x: -7.3608003, y: -6.75, z: 0}
+  currentPosition: {x: -7.3608007, y: -6.75, z: 0}
   constructionDisplayName: Cidade
   lastAutoConstructionDisplayName: Cidade
   isVisible: 1
@@ -117441,7 +117477,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &1561046404
 RectTransform:
   m_ObjectHideFlags: 0
@@ -153496,7 +153532,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 3.65, y: -7.88}
+  m_AnchoredPosition: {x: 3, y: -7.88}
   m_SizeDelta: {x: 15, y: 15}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1647979841
@@ -155736,7 +155772,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 3.65, y: -7.88}
+  m_AnchoredPosition: {x: 3, y: -7.88}
   m_SizeDelta: {x: 15, y: 15}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1687596861
@@ -158174,7 +158210,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 3.65, y: -7.88}
+  m_AnchoredPosition: {x: 3, y: -7.88}
   m_SizeDelta: {x: 15, y: 15}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1720879983
@@ -158494,7 +158530,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &1724788275
 RectTransform:
   m_ObjectHideFlags: 0
@@ -161482,7 +161518,7 @@ MonoBehaviour:
   eixoOverrides: []
   constructionId: cidade
   instanceId: 22
-  currentPosition: {x: -7.7937884, y: 6, z: 0}
+  currentPosition: {x: -7.793789, y: 6, z: 0}
   constructionDisplayName: Cidade
   lastAutoConstructionDisplayName: Cidade
   isVisible: 1
@@ -162352,7 +162388,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 3.65, y: -7.88}
+  m_AnchoredPosition: {x: 3, y: -7.88}
   m_SizeDelta: {x: 15, y: 15}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1776410526
@@ -163534,7 +163570,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &1797722286
 RectTransform:
   m_ObjectHideFlags: 0
@@ -163561,7 +163597,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1797722285}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
   m_Name: 
@@ -163574,7 +163610,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: d5416a58e79ab464a880f56da513422c, type: 3}
+  m_Sprite: {fileID: 0}
   m_Type: 0
   m_PreserveAspect: 1
   m_FillCenter: 1
@@ -163876,7 +163912,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: 0
+  m_text: 6
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 3cb5543ccd204d54c9c34b6008539c4d, type: 2}
   m_sharedMaterial: {fileID: -7834541552760396438, guid: 3cb5543ccd204d54c9c34b6008539c4d, type: 2}
@@ -167263,7 +167299,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 3.65, y: -7.88}
+  m_AnchoredPosition: {x: 3, y: -7.88}
   m_SizeDelta: {x: 15, y: 15}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1848816668
@@ -168227,7 +168263,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &1864115328
 RectTransform:
   m_ObjectHideFlags: 0
@@ -170850,13 +170886,6 @@ MonoBehaviour:
         AirDistance: 39
         NavalDistance: 46
         IsHQ: 1
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 25
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 39
-        NavalDistance: 44
-        IsHQ: 0
       - ConstructionName: "F\xE1brica"
         InstanceId: 26
         Distance: 3.4028235e+38
@@ -170864,22 +170893,29 @@ MonoBehaviour:
         AirDistance: 39
         NavalDistance: 45
         IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 25
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 39
+        NavalDistance: 44
+        IsHQ: 0
     - SlotIndex: 1
       Team: 1
       Entries:
-      - ConstructionName: Logistica Naval
-        InstanceId: 29
-        Distance: 0
-        VehicleDistance: 0
-        AirDistance: 0
-        NavalDistance: 0
-        IsHQ: 0
       - ConstructionName: "Esta\xE7\xE3o de Trem"
         InstanceId: 27
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
         AirDistance: 26
         NavalDistance: 34
+        IsHQ: 0
+      - ConstructionName: Logistica Naval
+        InstanceId: 29
+        Distance: 0
+        VehicleDistance: 0
+        AirDistance: 0
+        NavalDistance: 0
         IsHQ: 0
     closestNeighbor1: 0
     closestNeighbor1Distance: 3.4028235e+38
@@ -170941,13 +170977,6 @@ MonoBehaviour:
         AirDistance: 4
         NavalDistance: 23
         IsHQ: 1
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 25
-        Distance: 3
-        VehicleDistance: 4
-        AirDistance: 3
-        NavalDistance: 11
-        IsHQ: 0
       - ConstructionName: "F\xE1brica"
         InstanceId: 26
         Distance: 5
@@ -170955,22 +170984,29 @@ MonoBehaviour:
         AirDistance: 5
         NavalDistance: 22
         IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 25
+        Distance: 3
+        VehicleDistance: 4
+        AirDistance: 3
+        NavalDistance: 11
+        IsHQ: 0
     - SlotIndex: 1
       Team: 1
       Entries:
-      - ConstructionName: Logistica Naval
-        InstanceId: 29
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 42
-        NavalDistance: 45
-        IsHQ: 0
       - ConstructionName: "Esta\xE7\xE3o de Trem"
         InstanceId: 27
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
         AirDistance: 41
         NavalDistance: 50
+        IsHQ: 0
+      - ConstructionName: Logistica Naval
+        InstanceId: 29
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 42
+        NavalDistance: 45
         IsHQ: 0
     closestNeighbor1: 3
     closestNeighbor1Distance: 3
@@ -171032,13 +171068,6 @@ MonoBehaviour:
         AirDistance: 2
         NavalDistance: 10
         IsHQ: 1
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 25
-        Distance: 3
-        VehicleDistance: 3
-        AirDistance: 3
-        NavalDistance: 30
-        IsHQ: 0
       - ConstructionName: "F\xE1brica"
         InstanceId: 26
         Distance: 1
@@ -171046,22 +171075,29 @@ MonoBehaviour:
         AirDistance: 1
         NavalDistance: 9
         IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 25
+        Distance: 3
+        VehicleDistance: 3
+        AirDistance: 3
+        NavalDistance: 30
+        IsHQ: 0
     - SlotIndex: 1
       Team: 1
       Entries:
-      - ConstructionName: Logistica Naval
-        InstanceId: 29
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 39
-        NavalDistance: 43
-        IsHQ: 0
       - ConstructionName: "Esta\xE7\xE3o de Trem"
         InstanceId: 27
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
         AirDistance: 38
         NavalDistance: 42
+        IsHQ: 0
+      - ConstructionName: Logistica Naval
+        InstanceId: 29
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 39
+        NavalDistance: 43
         IsHQ: 0
     closestNeighbor1: 3
     closestNeighbor1Distance: 4
@@ -171123,13 +171159,6 @@ MonoBehaviour:
         AirDistance: 2
         NavalDistance: 31
         IsHQ: 1
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 25
-        Distance: 1
-        VehicleDistance: 1
-        AirDistance: 1
-        NavalDistance: 9
-        IsHQ: 0
       - ConstructionName: "F\xE1brica"
         InstanceId: 26
         Distance: 3
@@ -171137,22 +171166,29 @@ MonoBehaviour:
         AirDistance: 3
         NavalDistance: 30
         IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 25
+        Distance: 1
+        VehicleDistance: 1
+        AirDistance: 1
+        NavalDistance: 9
+        IsHQ: 0
     - SlotIndex: 1
       Team: 1
       Entries:
-      - ConstructionName: Logistica Naval
-        InstanceId: 29
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 39
-        NavalDistance: 42
-        IsHQ: 0
       - ConstructionName: "Esta\xE7\xE3o de Trem"
         InstanceId: 27
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
         AirDistance: 38
         NavalDistance: 47
+        IsHQ: 0
+      - ConstructionName: Logistica Naval
+        InstanceId: 29
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 39
+        NavalDistance: 42
         IsHQ: 0
     closestNeighbor1: 1
     closestNeighbor1Distance: 3
@@ -171230,13 +171266,6 @@ MonoBehaviour:
         AirDistance: 5
         NavalDistance: 15
         IsHQ: 1
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 25
-        Distance: 7
-        VehicleDistance: 8
-        AirDistance: 6
-        NavalDistance: 19
-        IsHQ: 0
       - ConstructionName: "F\xE1brica"
         InstanceId: 26
         Distance: 5
@@ -171244,21 +171273,28 @@ MonoBehaviour:
         AirDistance: 5
         NavalDistance: 14
         IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 25
+        Distance: 7
+        VehicleDistance: 8
+        AirDistance: 6
+        NavalDistance: 19
+        IsHQ: 0
     - SlotIndex: 1
       Team: 1
       Entries:
-      - ConstructionName: Logistica Naval
-        InstanceId: 29
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 34
-        NavalDistance: 34
-        IsHQ: 0
       - ConstructionName: "Esta\xE7\xE3o de Trem"
         InstanceId: 27
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
         AirDistance: 33
+        NavalDistance: 34
+        IsHQ: 0
+      - ConstructionName: Logistica Naval
+        InstanceId: 29
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 34
         NavalDistance: 34
         IsHQ: 0
     closestNeighbor1: 2
@@ -171321,13 +171357,6 @@ MonoBehaviour:
         AirDistance: 4
         NavalDistance: 22
         IsHQ: 1
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 25
-        Distance: 3
-        VehicleDistance: 4
-        AirDistance: 3
-        NavalDistance: 11
-        IsHQ: 0
       - ConstructionName: "F\xE1brica"
         InstanceId: 26
         Distance: 5
@@ -171335,22 +171364,29 @@ MonoBehaviour:
         AirDistance: 5
         NavalDistance: 21
         IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 25
+        Distance: 3
+        VehicleDistance: 4
+        AirDistance: 3
+        NavalDistance: 11
+        IsHQ: 0
     - SlotIndex: 1
       Team: 1
       Entries:
-      - ConstructionName: Logistica Naval
-        InstanceId: 29
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 36
-        NavalDistance: 36
-        IsHQ: 0
       - ConstructionName: "Esta\xE7\xE3o de Trem"
         InstanceId: 27
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
         AirDistance: 35
         NavalDistance: 38
+        IsHQ: 0
+      - ConstructionName: Logistica Naval
+        InstanceId: 29
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 36
+        NavalDistance: 36
         IsHQ: 0
     closestNeighbor1: 3
     closestNeighbor1Distance: 3
@@ -171412,13 +171448,6 @@ MonoBehaviour:
         AirDistance: 13
         NavalDistance: 15
         IsHQ: 1
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 25
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 14
-        NavalDistance: 26
-        IsHQ: 0
       - ConstructionName: "F\xE1brica"
         InstanceId: 26
         Distance: 3.4028235e+38
@@ -171426,22 +171455,29 @@ MonoBehaviour:
         AirDistance: 12
         NavalDistance: 14
         IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 25
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 14
+        NavalDistance: 26
+        IsHQ: 0
     - SlotIndex: 1
       Team: 1
       Entries:
-      - ConstructionName: Logistica Naval
-        InstanceId: 29
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 36
-        NavalDistance: 36
-        IsHQ: 0
       - ConstructionName: "Esta\xE7\xE3o de Trem"
         InstanceId: 27
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
         AirDistance: 29
         NavalDistance: 31
+        IsHQ: 0
+      - ConstructionName: Logistica Naval
+        InstanceId: 29
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 36
+        NavalDistance: 36
         IsHQ: 0
     closestNeighbor1: 0
     closestNeighbor1Distance: 3.4028235e+38
@@ -171503,13 +171539,6 @@ MonoBehaviour:
         AirDistance: 13
         NavalDistance: 15
         IsHQ: 1
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 25
-        Distance: 14
-        VehicleDistance: 15
-        AirDistance: 14
-        NavalDistance: 26
-        IsHQ: 0
       - ConstructionName: "F\xE1brica"
         InstanceId: 26
         Distance: 12
@@ -171517,22 +171546,29 @@ MonoBehaviour:
         AirDistance: 12
         NavalDistance: 14
         IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 25
+        Distance: 14
+        VehicleDistance: 15
+        AirDistance: 14
+        NavalDistance: 26
+        IsHQ: 0
     - SlotIndex: 1
       Team: 1
       Entries:
-      - ConstructionName: Logistica Naval
-        InstanceId: 29
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 47
-        NavalDistance: 49
-        IsHQ: 0
       - ConstructionName: "Esta\xE7\xE3o de Trem"
         InstanceId: 27
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
         AirDistance: 46
         NavalDistance: 48
+        IsHQ: 0
+      - ConstructionName: Logistica Naval
+        InstanceId: 29
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 47
+        NavalDistance: 49
         IsHQ: 0
     closestNeighbor1: 2
     closestNeighbor1Distance: 11
@@ -171594,13 +171630,6 @@ MonoBehaviour:
         AirDistance: 13
         NavalDistance: 30
         IsHQ: 1
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 25
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 12
-        NavalDistance: 15
-        IsHQ: 0
       - ConstructionName: "F\xE1brica"
         InstanceId: 26
         Distance: 3.4028235e+38
@@ -171608,22 +171637,29 @@ MonoBehaviour:
         AirDistance: 14
         NavalDistance: 29
         IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 25
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 12
+        NavalDistance: 15
+        IsHQ: 0
     - SlotIndex: 1
       Team: 1
       Entries:
-      - ConstructionName: Logistica Naval
-        InstanceId: 29
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 48
-        NavalDistance: 49
-        IsHQ: 0
       - ConstructionName: "Esta\xE7\xE3o de Trem"
         InstanceId: 27
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
         AirDistance: 47
         NavalDistance: 54
+        IsHQ: 0
+      - ConstructionName: Logistica Naval
+        InstanceId: 29
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 48
+        NavalDistance: 49
         IsHQ: 0
     closestNeighbor1: 0
     closestNeighbor1Distance: 3.4028235e+38
@@ -171686,13 +171722,6 @@ MonoBehaviour:
         AirDistance: 0
         NavalDistance: 12
         IsHQ: 1
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 25
-        Distance: 1
-        VehicleDistance: 1
-        AirDistance: 1
-        NavalDistance: 32
-        IsHQ: 0
       - ConstructionName: "F\xE1brica"
         InstanceId: 26
         Distance: 1
@@ -171700,22 +171729,29 @@ MonoBehaviour:
         AirDistance: 1
         NavalDistance: 11
         IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 25
+        Distance: 1
+        VehicleDistance: 1
+        AirDistance: 1
+        NavalDistance: 32
+        IsHQ: 0
     - SlotIndex: 1
       Team: 1
       Entries:
-      - ConstructionName: Logistica Naval
-        InstanceId: 29
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 39
-        NavalDistance: 45
-        IsHQ: 0
       - ConstructionName: "Esta\xE7\xE3o de Trem"
         InstanceId: 27
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
         AirDistance: 38
         NavalDistance: 44
+        IsHQ: 0
+      - ConstructionName: Logistica Naval
+        InstanceId: 29
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 39
+        NavalDistance: 45
         IsHQ: 0
     closestNeighbor1: 0
     closestNeighbor1Distance: 3.4028235e+38
@@ -171777,13 +171813,6 @@ MonoBehaviour:
         AirDistance: 21
         NavalDistance: 39
         IsHQ: 1
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 25
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 20
-        NavalDistance: 23
-        IsHQ: 0
       - ConstructionName: "F\xE1brica"
         InstanceId: 26
         Distance: 3.4028235e+38
@@ -171791,22 +171820,29 @@ MonoBehaviour:
         AirDistance: 22
         NavalDistance: 38
         IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 25
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 20
+        NavalDistance: 23
+        IsHQ: 0
     - SlotIndex: 1
       Team: 1
       Entries:
-      - ConstructionName: Logistica Naval
-        InstanceId: 29
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 53
-        NavalDistance: 54
-        IsHQ: 0
       - ConstructionName: "Esta\xE7\xE3o de Trem"
         InstanceId: 27
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
         AirDistance: 53
         NavalDistance: 60
+        IsHQ: 0
+      - ConstructionName: Logistica Naval
+        InstanceId: 29
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 53
+        NavalDistance: 54
         IsHQ: 0
     closestNeighbor1: 0
     closestNeighbor1Distance: 3.4028235e+38
@@ -172326,9 +172362,9 @@ MonoBehaviour:
   - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
     amount: 500
   - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
-    amount: 10
+    amount: 120
   - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
-    amount: 5
+    amount: 100
   embarkedServicesRuntime:
   - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
@@ -172847,7 +172883,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 3.65, y: -7.88}
+  m_AnchoredPosition: {x: 3, y: -7.88}
   m_SizeDelta: {x: 15, y: 15}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1909557388
@@ -173414,42 +173450,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1925736062}
   m_CullTransparentMesh: 1
---- !u!21 &1926454416
-Material:
-  serializedVersion: 8
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: Runtime_UnitActedGlow
-  m_Shader: {fileID: 4800000, guid: 1601771c0533c1946bb776c9688f0186, type: 3}
-  m_Parent: {fileID: 0}
-  m_ModifiedSerializedProperties: 0
-  m_ValidKeywords: []
-  m_InvalidKeywords: []
-  m_LightmapFlags: 4
-  m_EnableInstancingVariants: 0
-  m_DoubleSidedGI: 0
-  m_CustomRenderQueue: -1
-  stringTagMap: {}
-  disabledShaderPasses: []
-  m_LockedProperties: 
-  m_SavedProperties:
-    serializedVersion: 3
-    m_TexEnvs:
-    - _MainTex:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    m_Ints: []
-    m_Floats:
-    - _GlowSize: 1.5
-    - _GlowStrength: 1.25
-    m_Colors:
-    - _Color: {r: 1, g: 1, b: 1, a: 1}
-    - _GlowColor: {r: 1, g: 1, b: 1, a: 1}
-  m_BuildTextureStacks: []
-  m_AllowLocking: 1
 --- !u!1 &1927355973
 GameObject:
   m_ObjectHideFlags: 0
@@ -174366,7 +174366,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 3.65, y: -7.88}
+  m_AnchoredPosition: {x: 3, y: -7.88}
   m_SizeDelta: {x: 15, y: 15}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1936568446
@@ -175695,7 +175695,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 3.65, y: -7.88}
+  m_AnchoredPosition: {x: 3, y: -7.88}
   m_SizeDelta: {x: 15, y: 15}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1954193818
@@ -178186,7 +178186,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 3.65, y: -7.88}
+  m_AnchoredPosition: {x: 3, y: -7.88}
   m_SizeDelta: {x: 15, y: 15}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1986900910
@@ -182281,7 +182281,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: 2
+  m_text: 8
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 3cb5543ccd204d54c9c34b6008539c4d, type: 2}
   m_sharedMaterial: {fileID: -7834541552760396438, guid: 3cb5543ccd204d54c9c34b6008539c4d, type: 2}
@@ -184133,7 +184133,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &2062770742
 RectTransform:
   m_ObjectHideFlags: 0
@@ -184379,7 +184379,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 3.65, y: -7.88}
+  m_AnchoredPosition: {x: 3, y: -7.88}
   m_SizeDelta: {x: 15, y: 15}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &2066679226
@@ -184437,7 +184437,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &2068699716
 RectTransform:
   m_ObjectHideFlags: 0
@@ -184454,7 +184454,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 3.65, y: -7.88}
+  m_AnchoredPosition: {x: 3, y: -7.88}
   m_SizeDelta: {x: 15, y: 15}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &2068699717
@@ -186561,7 +186561,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 3.65, y: -7.88}
+  m_AnchoredPosition: {x: 3, y: -7.88}
   m_SizeDelta: {x: 15, y: 15}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &2107543758
@@ -186769,7 +186769,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &2113687328
 RectTransform:
   m_ObjectHideFlags: 0
@@ -186786,7 +186786,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 3.65, y: -7.88}
+  m_AnchoredPosition: {x: 3, y: -7.88}
   m_SizeDelta: {x: 15, y: 15}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &2113687329
@@ -187988,7 +187988,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 3.65, y: -7.88}
+  m_AnchoredPosition: {x: 3, y: -7.88}
   m_SizeDelta: {x: 15, y: 15}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &2126797452
@@ -189734,7 +189734,7 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 1348457725607290348, guid: f7e44d7c210a32d4ba630ba660da88a1, type: 3}
       propertyPath: m_text
-      value: 4000 / turn
+      value: 0 / turn
       objectReference: {fileID: 0}
     - target: {fileID: 4985144350662451516, guid: f7e44d7c210a32d4ba630ba660da88a1, type: 3}
       propertyPath: m_Enabled

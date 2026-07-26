@@ -32,7 +32,7 @@ MonoBehaviour:
   militaryForce: 2
   unitClass: 8
   combatClassification: 1
-  roles: 05000000
+  roles: 03000000
   aiInitiative: 2
   aiPurchaseMode: 0
   bannedOnHardMode: 0
@@ -43,7 +43,7 @@ MonoBehaviour:
     priority: 1
   aiSensorPriority: 0000000002000000
   prioritizeDpqAtBattle: 0
-  playConservative: 0
+  playConservative: 1
   preferMoveOnBestDPQ: 0
   preferMaxDisplacement: 0
   longRangeStationary: 0
@@ -71,6 +71,7 @@ MonoBehaviour:
   aiPreventiveSupplyHpBelowPct: 70
   aiPreventiveSupplyAutonomyBelowPct: 60
   aiPreventiveSupplyWeaponAmmoAtOrBelow: 1
+  aiDisembarkWhenCannotSupply: 1
   eliteLevel: 0
   eliteFrom: {fileID: 0}
   combatModifiers: []
@@ -117,6 +118,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
   - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
   - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
+  supplierServiceProfile: 2
   supplierResources:
   - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
     amount: 400

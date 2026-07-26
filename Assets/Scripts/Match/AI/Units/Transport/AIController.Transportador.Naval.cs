@@ -360,7 +360,14 @@ public partial class AIController
         Dictionary<Vector3Int, List<Vector3Int>> paths,
         HashSet<Vector3Int> occupied)
     {
-        UnitManager candidate = FindNavalPickupCandidate(unit, snapshot, plan);
+        // EVAC precede o ferry comum. A compatibilidade do paciente vem dos
+        // transportSlots do UnitData (FindFittingSlotIndex), permitindo que
+        // porta-avioes receba aeronaves em reparo sem hardcode de Domain.Air.
+        UnitManager candidate = FindBestEvacCandidate(
+            unit, snapshot, fromCell, paths);
+        bool evacPickup = candidate != null;
+        if (candidate == null)
+            candidate = FindNavalPickupCandidate(unit, snapshot, plan);
         if (candidate == null)
         {
             Debug.Log($"{TL("NavalTransport")} {unit.InstanceId} sem candidato de embarque — aguarda.");
@@ -382,7 +389,8 @@ public partial class AIController
             && CanPassengerReachEmbarkStopForTransporterCell(
                 fromCell, passengerReachable))
         {
-            Debug.Log($"{TL("NavalTransport")} {unit.InstanceId} aguarda embarque em {fromCell} " +
+            Debug.Log($"{TL("NavalTransport")} {unit.InstanceId} aguarda " +
+                      $"{(evacPickup ? "EVAC" : "embarque")} em {fromCell} " +
                       $"(candidato #{candidate.InstanceId}@{candidateCell}).");
             return BuildMoveBatch(unit, snapshot.AITeam, fromCell, fromCell, paths);
         }
@@ -418,6 +426,7 @@ public partial class AIController
         if (bestCell != fromCell)
         {
             Debug.Log($"{TL("NavalTransport")} {unit.InstanceId} move {fromCell}->{bestCell} para receber " +
+                      $"{(evacPickup ? "EVAC " : string.Empty)}" +
                       $"#{candidate.InstanceId}@{candidateCell}.");
             return BuildMoveBatch(unit, snapshot.AITeam, fromCell, bestCell, paths);
         }

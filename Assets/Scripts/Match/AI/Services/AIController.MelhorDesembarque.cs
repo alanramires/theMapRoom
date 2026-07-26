@@ -260,8 +260,26 @@ public partial class AIController
         MelhorDesembarqueLzScore best = evaluation.best;
         if (best.delivered < requiredJointDeliveries)
         {
-            bool jointLzKnown;
-            if (TryBuildJointDisembarkProgressionAction(
+            string partialReleaseReason = string.Empty;
+            bool releaseUsefulPartialNow =
+                usesFreeCargoFlow
+                && ShouldReleasePartialFreeCargoAtTacticalLz(
+                    transporter,
+                    passengers,
+                    best,
+                    operationalTurns: 2,
+                    out partialReleaseReason);
+            if (releaseUsefulPartialNow)
+            {
+                Debug.Log($"{TL("Transporte")} {consumer} " +
+                          $"{transporter.InstanceId} libera desembarque parcial util: " +
+                          $"pax={best.delivered}/{requiredJointDeliveries}; " +
+                          $"{partialReleaseReason}.");
+            }
+
+            bool jointLzKnown = false;
+            if (!releaseUsefulPartialNow
+                && TryBuildJointDisembarkProgressionAction(
                     transporter,
                     passengers,
                     snapshot,
@@ -275,7 +293,7 @@ public partial class AIController
                     out jointLzKnown))
                 return true;
 
-            if (jointLzKnown)
+            if (!releaseUsefulPartialNow && jointLzKnown)
             {
                 Debug.Log($"{TL("Transporte")} {consumer} " +
                           $"{transporter.InstanceId} rejeita desembarque parcial: " +
@@ -322,6 +340,113 @@ public partial class AIController
             : BuildDesembarcarBatch(
                 transporter, snapshot.AITeam, fromCell, selected,
                 best.cell, movePath);
+        return true;
+    }
+
+    private bool ShouldReleasePartialFreeCargoAtTacticalLz(
+        UnitManager transporter,
+        List<UnitManager> passengers,
+        MelhorDesembarqueLzScore tacticalBest,
+        int operationalTurns,
+        out string reason)
+    {
+        reason = string.Empty;
+        if (transporter == null
+            || passengers == null
+            || tacticalBest == null
+            || tacticalBest.spots == null
+            || tacticalBest.spots.Count == 0
+            || tacticalBest.delivered >= passengers.Count)
+            return false;
+
+        var deliveredPassengerIds = new HashSet<int>();
+        var deliveredTargetCells = new HashSet<Vector3Int>();
+        for (int i = 0; i < tacticalBest.spots.Count; i++)
+        {
+            MelhorDesembarqueSpotScore spot = tacticalBest.spots[i];
+            if (spot?.option?.passengerUnit == null)
+                continue;
+            deliveredPassengerIds.Add(spot.option.passengerUnit.InstanceId);
+            Vector3Int target = spot.target;
+            target.z = 0;
+            deliveredTargetCells.Add(target);
+        }
+
+        List<PodeDesembarcarOption> options =
+            SimulateDisembarkFromCell(transporter, tacticalBest.cell);
+        int remainingFreeCargo = 0;
+        for (int passengerIndex = 0; passengerIndex < passengers.Count; passengerIndex++)
+        {
+            UnitManager passenger = passengers[passengerIndex];
+            if (passenger == null
+                || deliveredPassengerIds.Contains(passenger.InstanceId))
+                continue;
+
+            remainingFreeCargo++;
+            int operationalBudget =
+                Mathf.Max(1, passenger.GetMovementRange())
+                * Mathf.Max(1, operationalTurns);
+            bool hasAlternativeBuilding = false;
+
+            if (options != null)
+            {
+                for (int optionIndex = 0;
+                     optionIndex < options.Count && !hasAlternativeBuilding;
+                     optionIndex++)
+                {
+                    PodeDesembarcarOption option = options[optionIndex];
+                    if (option?.passengerUnit != passenger)
+                        continue;
+
+                    Vector3Int disembarkCell = option.disembarkCell;
+                    disembarkCell.z = 0;
+                    Dictionary<Vector3Int, int> operationalReach =
+                        UnitMovementPathRules.CalculateMovementCostMap(
+                            boardTilemap,
+                            passenger,
+                            disembarkCell,
+                            operationalBudget,
+                            terrainDatabase);
+
+                    foreach (ConstructionManager building in
+                             ConstructionManager.AllActive)
+                    {
+                        if (building == null
+                            || !IsRebelCapturable(passenger, building)
+                            || HasBlockingSurfaceUnitAtCell(
+                                building.CurrentCellPosition))
+                            continue;
+
+                        Vector3Int buildingCell =
+                            building.CurrentCellPosition;
+                        buildingCell.z = 0;
+                        if (deliveredTargetCells.Contains(buildingCell)
+                            || operationalReach == null
+                            || !operationalReach.ContainsKey(buildingCell))
+                            continue;
+
+                        hasAlternativeBuilding = true;
+                        break;
+                    }
+                }
+            }
+
+            if (hasAlternativeBuilding)
+            {
+                reason =
+                    $"passageiro #{passenger.InstanceId} ainda possui outro " +
+                    $"predio na progressao operacional da LZ {tacticalBest.cell}";
+                return false;
+            }
+        }
+
+        if (remainingFreeCargo <= 0)
+            return false;
+
+        reason =
+            $"{remainingFreeCargo} passageiro(s) restante(s) sem outro predio " +
+            $"alcancavel em {Mathf.Max(1, operationalTurns)} turnos a partir " +
+            $"da LZ {tacticalBest.cell}";
         return true;
     }
 

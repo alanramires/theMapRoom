@@ -72,7 +72,6 @@ public partial class AIController
         if (!transporter.TryGetUnitData(out UnitData transporterData) || transporterData == null)
             return null;
 
-        bool airTransport = IsAirTransporter(transporter);
         UnitManager best = null;
         float bestScore = float.MinValue;
 
@@ -82,7 +81,10 @@ public partial class AIController
             if (candidate.SlotIndex != snapshot.AISlotIndex || candidate.IsDead || candidate.IsEmbarked) continue;
             if (!candidate.IsUnderRepair) continue;
             if (!candidate.TryGetUnitData(out UnitData candidateData)) continue;
-            if (candidateData.domain == Domain.Air) continue;
+            // A ficha do transportador e a autoridade sobre quem pode ser
+            // evacuado. Nao exclua aeronaves (ou qualquer outro dominio) por
+            // uma regra generica: classe, skill, camada, vaga e exclusividade
+            // ja sao validadas pelo slot configurado no UnitData.
             if (FindFittingSlotIndex(transporter, transporterData, candidate, candidateData) < 0) continue;
 
             Vector3Int candidateCell = candidate.CurrentCellPosition; candidateCell.z = 0;
@@ -90,15 +92,12 @@ public partial class AIController
                 continue;
 
             float transportDist = SectorManager.HexDistance(transporterCell, candidateCell);
-            if (airTransport)
-            {
-                if (transportDist > Mathf.Max(EvacPickupRange + transporter.MaxMovementPoints, 10)) continue;
-            }
-            else
-            {
-                // Only consider candidates reachable within a reasonable horizon.
-                if (transportDist > EvacPickupRange + transporter.MaxMovementPoints) continue;
-            }
+            // Primeiro envelope do EVAC: encontro tatico/operacional curto.
+            // A compatibilidade nao depende do dominio do transportador.
+            int pickupHorizon = Mathf.Max(
+                EvacPickupRange + transporter.MaxMovementPoints,
+                transporter.MaxMovementPoints * 2);
+            if (transportDist > pickupHorizon) continue;
 
             float pickupReachBonus = IsPassengerInPickupRange(transporterCell, candidateCell, EvacPickupRange, BuildPassengerReachableSet(candidate)) ? 500f : 0f;
             float pathReachBonus = transporterPaths != null && transporterPaths.ContainsKey(candidateCell) ? 150f : 0f;
