@@ -2929,6 +2929,13 @@ public partial class TurnStateManager
             string stats = BuildUnitStatInlineWithoutSupplies(passenger);
             string supplies = BuildUnitSuppliesInline(passenger);
             string passengerName = ResolveUnitRuntimeName(passenger);
+            if (AIController.ShowAIHUD)
+            {
+                string planLabel = BuildTransportPassengerAIPlanLabel(passenger);
+                passengerName += string.IsNullOrWhiteSpace(planLabel)
+                    ? " (SEM PLANO)"
+                    : $" ({planLabel})";
+            }
             data.UnitStatsLines.Add($"{indent}{passengerName} ({stats})||SUPPLIES||{supplies}");
             Sprite passengerSprite = null;
             if (passenger.TryGetUnitData(out UnitData passengerData) && passengerData != null)
@@ -2947,6 +2954,70 @@ public partial class TurnStateManager
             });
             AppendTransportedUnitStatsLines(data, passenger, depth + 1);
         }
+    }
+
+    private static string BuildTransportPassengerAIPlanLabel(UnitManager passenger)
+    {
+        if (passenger == null)
+            return string.Empty;
+
+        string badge = passenger.AIHasAssignedPlan
+            ? passenger.AIAssignedPlanBadge
+            : string.Empty;
+        if (string.IsNullOrWhiteSpace(badge))
+        {
+            TeamObjectivePlan plan = ObjectiveManager.GetPlanForSlot(
+                PlayerSlotId.FromIndex(passenger.SlotIndex));
+            if (plan?.RogueUnitIds != null
+                && plan.RogueUnitIds.Contains(passenger.InstanceId))
+                return "ROGUE";
+
+            if (plan?.Objectives != null)
+            {
+                foreach (SectorObjective objective in plan.Objectives)
+                {
+                    if (objective?.Slots == null)
+                        continue;
+
+                    bool assignedHere = false;
+                    foreach (SlotNeed slot in objective.Slots)
+                    {
+                        if (slot != null
+                            && slot.Filled
+                            && slot.AssignedUnitId == passenger.InstanceId)
+                        {
+                            assignedHere = true;
+                            break;
+                        }
+                    }
+
+                    if (!assignedHere)
+                        continue;
+
+                    string sectorName = objective.Sector.ToString();
+                    if (!string.IsNullOrWhiteSpace(sectorName))
+                        badge = sectorName.Substring(0, 1).ToUpperInvariant();
+                    break;
+                }
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(badge) && passenger.AIHasAssignedPlan)
+        {
+            string planName = passenger.AIAssignedPlanName;
+            if (string.IsNullOrWhiteSpace(planName))
+                planName = passenger.AIAssignedPlanKey;
+            if (!string.IsNullOrWhiteSpace(planName))
+                badge = planName.Substring(0, 1).ToUpperInvariant();
+        }
+
+        if (string.IsNullOrWhiteSpace(badge))
+            return string.Empty;
+
+        int axis = passenger.AIEixo;
+        return axis > 0
+            ? $"{badge.Trim()}{axis}"
+            : badge.Trim();
     }
 
     private void AppendSupplierStockLines(List<string> lines, UnitManager supplier)

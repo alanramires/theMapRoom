@@ -110,35 +110,168 @@ public partial class AIController
                 if (candidateAssigned == null || candidateAssigned.Sector != assignedSector.Sector) continue;
             }
 
-            Vector3Int objectiveCell = ResolveUnitObjectiveCell(candidate, plan, snapshot);
-            if (objectiveCell == Vector3Int.zero) continue;
+            if (IsPassengerAlreadyAtCaptureObjective(candidate, snapshot.AITeam)) continue;
 
             Vector3Int candidateCell = candidate.CurrentCellPosition; candidateCell.z = 0;
-            float objectiveDist = SectorManager.HexDistance(candidateCell, objectiveCell);
-            int candidateThreshold = GetEffectiveTransportThresholdForSlot(PlayerSlotId.FromIndex(snapshot.AISlotIndex));
-            int candidateMP = candidate.MaxMovementPoints;
-            if (candidateMP < 3) candidateThreshold += (3 - candidateMP) * 2;
-            candidateThreshold = Mathf.Max(2, candidateThreshold - thresholdReduction);
-            int walkThreshold = Mathf.Max(TransportPassengerWalkRange, candidateThreshold);
-            int objectiveTerrainCost = TerrainCostToCell(
-                candidate, candidateCell, objectiveCell, walkThreshold);
-            if (objectiveTerrainCost <= walkThreshold)
-                continue;
+            bool hasResolvedObjective = TryResolveCourierPassengerTarget(
+                candidate,
+                plan,
+                snapshot,
+                Vector3Int.zero,
+                candidateCell,
+                out Vector3Int objectiveCell);
+            if (!hasResolvedObjective)
+                objectiveCell = Vector3Int.zero;
+
+            // "Consegue ir a pe" só vale quando o prédio continua disponível
+            // para ESTE passageiro. Se outro aliado já ocupa/captura o alvo,
+            // procura o próximo capturável livre antes de medir os 6 MP.
+            if (hasResolvedObjective
+                && IsPickupObjectiveClaimedByAlly(
+                    candidate, objectiveCell, snapshot.AISlotIndex))
+            {
+                Vector3Int claimedObjective = objectiveCell;
+                if (TryFindAlternatePickupObjective(
+                        candidate, snapshot, candidateCell,
+                        out Vector3Int alternateObjective))
+                {
+                    objectiveCell = alternateObjective;
+                    Debug.Log($"{TL("Transporte")} pickup global #{candidate.InstanceId}: " +
+                              $"objetivo {claimedObjective} ja ocupado; " +
+                              $"reavalia contra livre {objectiveCell}.");
+                }
+                else
+                {
+                    hasResolvedObjective = false;
+                    objectiveCell = Vector3Int.zero;
+                    Debug.Log($"{TL("Transporte")} pickup global #{candidate.InstanceId}: " +
+                              $"objetivo {claimedObjective} ja ocupado e sem alternativa livre; " +
+                              $"nao conta como 'consegue ir a pe'.");
+                }
+            }
+
+            float objectiveDist = hasResolvedObjective
+                ? SectorManager.HexDistance(candidateCell, objectiveCell)
+                : 0f;
+            // APC segue a mesma fronteira usada pelo matching formal: se o
+            // passageiro não alcança o objetivo dentro de 6 MP, precisa da
+            // carona. Não use o threshold dinâmico do planner aqui, pois ele
+            // pode crescer acima de 6 e fazer um rogue distante desaparecer
+            // da lista de pickup.
+            bool groundTransporter = transporter.GetDomain() != Domain.Air;
+            int candidateThreshold = groundTransporter
+                ? TransportPassengerWalkRange
+                : GetEffectiveTransportThresholdForSlot(
+                    PlayerSlotId.FromIndex(snapshot.AISlotIndex));
+            if (!groundTransporter)
+            {
+                int candidateMP = candidate.MaxMovementPoints;
+                if (candidateMP < 3)
+                    candidateThreshold += (3 - candidateMP) * 2;
+                candidateThreshold =
+                    Mathf.Max(2, candidateThreshold - thresholdReduction);
+            }
+            int walkThreshold = candidateThreshold;
+            if (hasResolvedObjective)
+            {
+                int objectiveTerrainCost = TerrainCostToCell(
+                    candidate, candidateCell, objectiveCell, walkThreshold);
+                if (objectiveTerrainCost <= walkThreshold)
+                {
+                    if (assignedSector == null)
+                        Debug.Log($"{TL("Transporte")} pickup global descarta " +
+                                  $"#{candidate.InstanceId}: chega ao objetivo " +
+                                  $"{objectiveCell} a pe cost={objectiveTerrainCost}" +
+                                  $"<={walkThreshold}.");
+                    continue;
+                }
+            }
 
             float transportDist = SectorManager.HexDistance(transporterCell, candidateCell);
             int rolePriority = candidateData.roles != null && candidateData.roles.Count > 0
                 ? (int)candidateData.roles[0] : 99;
 
-            float score = objectiveDist * 100f - transportDist * 50f - rolePriority * 10f;
+            // Sem objetivo pronto continua sendo passageiro potencial: o transporte
+            // volta para perto dele e o destino pode ser definido após o embarque.
+            // Não o descarte só porque o planner o classificou como rogue/target=null.
+            float score = (hasResolvedObjective ? objectiveDist * 100f : 250f)
+                - transportDist * 50f
+                - rolePriority * 10f;
             if (score > bestScore)
             {
                 bestScore = score;
                 best = candidate;
                 bestCandidateCell = candidateCell;
+                if (assignedSector == null)
+                    Debug.Log($"{TL("Transporte")} pickup global aceita " +
+                              $"#{candidate.InstanceId}@{candidateCell}: " +
+                              $"target={(hasResolvedObjective ? objectiveCell.ToString() : "pendente")} " +
+                              $"walkThreshold={walkThreshold}.");
             }
         }
 
         return best;
+    }
+
+    private static bool IsPickupObjectiveClaimedByAlly(
+        UnitManager passenger,
+        Vector3Int objectiveCell,
+        int aiSlotIndex)
+    {
+        objectiveCell.z = 0;
+        foreach (UnitManager ally in UnitManager.AllActive)
+        {
+            if (ally == null || ally == passenger || ally.IsDead || ally.IsEmbarked)
+                continue;
+            if (ally.SlotIndex != aiSlotIndex)
+                continue;
+
+            Vector3Int allyCell = ally.CurrentCellPosition;
+            allyCell.z = 0;
+            if (allyCell == objectiveCell)
+                return true;
+        }
+
+        return false;
+    }
+
+    private bool TryFindAlternatePickupObjective(
+        UnitManager passenger,
+        AIWorldSnapshot snapshot,
+        Vector3Int passengerCell,
+        out Vector3Int bestCell)
+    {
+        bestCell = Vector3Int.zero;
+        if (passenger == null || snapshot == null || matchController == null)
+            return false;
+
+        float bestDistance = float.MaxValue;
+        foreach (ConstructionManager building in ConstructionManager.AllActive)
+        {
+            if (building == null || !building.IsCapturable)
+                continue;
+            if (!building.TryResolveConstructionData(out ConstructionData data)
+                || data == null)
+                continue;
+            if (!matchController.CanCaptureConstruction(
+                    PlayerSlotId.FromIndex(passenger.SlotIndex), data, out _))
+                continue;
+
+            Vector3Int cell = building.CurrentCellPosition;
+            cell.z = 0;
+            if (IsPickupObjectiveClaimedByAlly(
+                    passenger, cell, snapshot.AISlotIndex))
+                continue;
+
+            float distance = SectorManager.HexDistance(passengerCell, cell);
+            if (distance >= bestDistance)
+                continue;
+
+            bestDistance = distance;
+            bestCell = cell;
+        }
+
+        return bestDistance < float.MaxValue;
     }
 
     private static bool IsAlreadyFormalPassenger(UnitManager candidate, UnitManager thisTransporter, TeamObjectivePlan plan)
@@ -200,7 +333,27 @@ public partial class AIController
         bool fromCanReceivePassengers = CanUseTransporterPickupCell(unit, aiTeam, fromCell);
         bool hasObjective = objectiveCell != default && objectiveCell != Vector3Int.zero;
         bool preferGroupPickup = unit != null && unit.GetDomain() == Domain.Air;
+        int waitingRange = preferGroupPickup ? 1 : ShuttlePickupRange;
         const float eps = 0.1f;
+
+        // Pickup confirmado tem precedencia sobre "adiantar a viagem": se o
+        // transportador ja esta numa parada valida e o passageiro consegue
+        // chegar ao seu hex/adjacencia dentro do envelope de ate 2h, fica
+        // esperando. Mover mais perto do objetivo neste ponto quebra o encontro
+        // e pode deixar o passageiro para tras.
+        if (fromCanReceivePassengers
+            && !fromIsProductionBldg
+            && IsPassengerInPickupRange(
+                fromCell,
+                candidateCell,
+                waitingRange,
+                passengerReachable))
+        {
+            Debug.Log($"{TL("Transporte")} {unit.InstanceId} pickup confirmado: " +
+                      $"aguarda em {fromCell} passageiro@{candidateCell} " +
+                      $"envelope={waitingRange}h.");
+            return fromCell;
+        }
 
         // When we know the destination, park on the path: find the reachable cell
         // within pickup range of the passenger that is closest to the objective.
@@ -209,7 +362,7 @@ public partial class AIController
         // "Stay" counts as a candidate if already in range and not blocking production.
         if (hasObjective)
         {
-            for (int pickupRange = ShuttlePickupRange; pickupRange <= ShuttlePickupRange + 1; pickupRange++)
+            for (int pickupRange = waitingRange; pickupRange <= waitingRange; pickupRange++)
             {
                 Vector3Int best = fromCell;
                 float bestScore = float.MinValue;
@@ -559,8 +712,13 @@ public partial class AIController
         HashSet<Vector3Int> passengerReachable)
     {
         Vector3Int c = cell; c.z = 0;
-        if (passengerReachable != null) return passengerReachable.Contains(c);
-        return SectorManager.HexDistance(c, candidateCell) <= maxHexDist;
+        Vector3Int passengerCell = candidateCell; passengerCell.z = 0;
+        if (SectorManager.HexDistance(c, passengerCell) > maxHexDist + 0.01f)
+            return false;
+        if (passengerReachable != null)
+            return CanPassengerReachEmbarkStopForTransporterCell(
+                c, passengerReachable);
+        return true;
     }
 
     private bool IsTeamProductionBuilding(Vector3Int cell, TeamId aiTeam)

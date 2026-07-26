@@ -66,7 +66,8 @@ public partial class AIController
         // Usa o objetivo efetivo, inclusive quando a unidade satisfaz Capturador mas ocupa
         // outro papel no plano. Passar apenas capturerAssigned fazia esses híbridos parecerem
         // rogue aqui e, logo depois, embarcarem pelo fallback usando assigned.
-        if (ShouldSkipCapturerEmbarkForShortWalk(unit, assigned, fromCell, "origem"))
+        if (ShouldSkipCapturerEmbarkForShortWalk(
+                unit, assigned, snapshot, fromCell, "origem"))
             return null;
 
         // Capturador montando massa num rally assembly AINDA ativo (nao GoGreen/Expired) e ja
@@ -189,18 +190,41 @@ public partial class AIController
         AIWorldSnapshot snapshot,
         Vector3Int fromCell)
     {
-        if (unit == null || snapshot?.EnemyHQ == null)
+        if (unit == null || snapshot == null)
             return false;
 
-        Vector3Int hqCell = snapshot.EnemyHQ.CurrentCellPosition;
-        hqCell.z = 0;
+        if (!TryResolveCourierPassengerTarget(
+                unit, null, snapshot, Vector3Int.zero, fromCell,
+                out Vector3Int targetCell))
+            return false;
+
+        targetCell.z = 0;
+        if (IsPickupObjectiveClaimedByAlly(
+                unit, targetCell, snapshot.AISlotIndex))
+        {
+            Vector3Int claimedTarget = targetCell;
+            if (!TryFindAlternatePickupObjective(
+                    unit, snapshot, fromCell, out targetCell))
+            {
+                Debug.Log($"{TL("Capturador")} {unit.InstanceId} rogue aceita transporte: " +
+                          $"alvo {claimedTarget} ja ocupado e sem objetivo livre.");
+                return false;
+            }
+
+            Debug.Log($"{TL("Capturador")} {unit.InstanceId} rogue troca alvo ocupado " +
+                      $"{claimedTarget} por {targetCell} antes de avaliar caminhada.");
+        }
+
         int threshold = Mathf.Max(3, GetEffectiveTransportThresholdForSlot(PlayerSlotId.FromIndex(snapshot.AISlotIndex)));
-        int terrainCost = TerrainCostToCell(unit, fromCell, hqCell, threshold);
-        float hexDist = SectorManager.HexDistance(fromCell, hqCell);
+        int terrainCost = TerrainCostToCell(
+            unit, fromCell, targetCell, threshold);
+        float hexDist = SectorManager.HexDistance(fromCell, targetCell);
         if (terrainCost > threshold && hexDist > Mathf.Max(3, threshold - 1))
             return false;
 
-        Debug.Log($"{TL("Capturador")} {unit.InstanceId} rogue ignora transporte: pressao final HQ dist={hexDist:F0} terreno={terrainCost}<={threshold}");
+        Debug.Log($"{TL("Capturador")} {unit.InstanceId} rogue ignora transporte: " +
+                  $"objetivo livre {targetCell} dist={hexDist:F0} " +
+                  $"terreno={terrainCost}<={threshold}");
         return true;
     }
 

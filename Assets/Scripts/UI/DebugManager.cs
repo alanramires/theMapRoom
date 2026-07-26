@@ -171,9 +171,22 @@ public class DebugManager : MonoBehaviour
             }
             else
             {
+                if (ai == null)
+                {
+                    Debug.Log("[AI Shortcuts] AIController nao encontrado.");
+                    return;
+                }
+                if (!ai.CanAcceptDebugStep(out string blockedReason))
+                {
+                    Debug.Log($"[AI Shortcuts] F11 ignorado: batch anterior ainda ativo ({blockedReason}).");
+                    return;
+                }
+
+                // A guarda precisa acontecer antes da normalizacao. Forcar
+                // Neutral durante replay/animacao interrompe o fechamento
+                // visual do batch ainda em execucao.
                 ForceNeutralBeforeAIControlRelease("F11 AI Step");
-                if (ai != null) ai.RequestDebugStep();
-                else Debug.Log("[AI Shortcuts] AIController nao encontrado.");
+                ai.RequestDebugStep();
                 Debug.Log("[AI Shortcuts] F11 — AI Step");
             }
         }

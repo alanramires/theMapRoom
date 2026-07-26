@@ -62,6 +62,18 @@ public partial class AIController
         HashSet<Vector3Int> occupied)
     {
         Vector3Int objective = ResolveNavalDeliveryObjective(unit, snapshot, plan);
+        List<UnitManager> carriedPassengers = CollectPassengers(unit);
+        if (TryBuildBestCourierDisembarkAction(
+                unit,
+                carriedPassengers,
+                plan,
+                snapshot,
+                Vector3Int.zero,
+                paths,
+                TransportDropOffRange,
+                "Naval",
+                out PlayerAction bestDropAction))
+            return bestDropAction;
 
         // A praia de coleta tambem permite desembarque, mas nao conclui a entrega.
         // Como no courier terrestre/aereo, a carga so desce perto do objetivo dela.
@@ -671,6 +683,9 @@ public partial class AIController
     {
         var orders = new List<PodeDesembarcarOption>();
         if (options == null) return orders;
+        if (IsRuntimeRebelSnapshot(snapshot))
+            return SelectRebelDisembarkOrdersByDistinctTargets(
+                options, snapshot, TransportDropOffRange);
 
         var passengers = new HashSet<UnitManager>();
         for (int i = 0; i < options.Count; i++)

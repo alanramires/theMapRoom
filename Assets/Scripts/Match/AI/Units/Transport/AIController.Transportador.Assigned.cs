@@ -74,9 +74,40 @@ public partial class AIController
                 Vector3Int objCell2 = ResolveUnitObjectiveCell(nearbyCandidate, plan, snapshot);
                 if (objCell2 == Vector3Int.zero)
                     objCell2 = sectorCell;
-                Vector3Int shuttleMove = FindTransportShuttleMove(unit, fromCell, nearbyCell, paths, occupied, snapshot.AITeam, objCell2);
+                HashSet<Vector3Int> nearbyReachable =
+                    BuildPassengerReachableSet(nearbyCandidate);
+                Vector3Int shuttleMove = FindTransportShuttleMove(
+                    unit, fromCell, nearbyCell, paths, occupied,
+                    snapshot.AITeam, objCell2, nearbyReachable,
+                    plan, assigned, paths);
                 Debug.Log($"{TL("Transporte")} {unit.InstanceId} assigned {assigned.Sector} — sem passageiro formal, aguarda candidato {nearbyCandidate.InstanceId}@{nearbyCell} obj={objCell2} via {shuttleMove}");
                 return BuildMoveBatch(unit, snapshot.AITeam, fromCell, shuttleMove, paths);
+            }
+
+            // O passageiro formal pode já ter chegado ao objetivo enquanto ainda existem
+            // capturadores sem pareamento em outros setores (ou ainda sem objetivo formal).
+            // Nesse caso o APC deixa de pertencer exclusivamente ao setor concluído e volta
+            // a operar como pickup global. Pressionar o objetivo antigo faria o transportador
+            // fugir justamente de quem ainda precisa da carona.
+            UnitManager globalCandidate =
+                FindBestShuttleCandidate(unit, snapshot, plan, fromCell,
+                    out Vector3Int globalCandidateCell, assignedSector: null);
+            if (globalCandidate != null)
+            {
+                Vector3Int globalObjective =
+                    ResolveUnitObjectiveCell(globalCandidate, plan, snapshot);
+                HashSet<Vector3Int> globalReachable =
+                    BuildPassengerReachableSet(globalCandidate);
+                Vector3Int globalPickupMove = FindTransportShuttleMove(
+                    unit, fromCell, globalCandidateCell, paths, occupied,
+                    snapshot.AITeam, globalObjective, globalReachable,
+                    plan, null, paths);
+                Debug.Log($"{TL("Transporte")} {unit.InstanceId} assigned {assigned.Sector} — " +
+                          $"passageiro formal concluido; retorna para passageiro global " +
+                          $"{globalCandidate.InstanceId}@{globalCandidateCell} " +
+                          $"obj={globalObjective} via {globalPickupMove}");
+                return BuildMoveBatch(
+                    unit, snapshot.AITeam, fromCell, globalPickupMove, paths);
             }
 
             // APC vazio designado a um RALLY, sem candidato fresco por perto (2h): em vez de campar
@@ -99,7 +130,12 @@ public partial class AIController
             {
                 Vector3Int softCell = softPassenger.CurrentCellPosition; softCell.z = 0;
                 Vector3Int softObj = ResolveUnitObjectiveCell(softPassenger, plan, snapshot);
-                Vector3Int softMove = FindTransportShuttleMove(unit, fromCell, softCell, paths, occupied, snapshot.AITeam, softObj);
+                HashSet<Vector3Int> softReachable =
+                    BuildPassengerReachableSet(softPassenger);
+                Vector3Int softMove = FindTransportShuttleMove(
+                    unit, fromCell, softCell, paths, occupied,
+                    snapshot.AITeam, softObj, softReachable,
+                    plan, assigned, paths);
                 Debug.Log($"{TL("Transporte")} {unit.InstanceId} assigned {assigned.Sector} — vai buscar capturador {softPassenger.InstanceId}@{softCell} (sem needy; carona antecipada) via {softMove}");
                 return BuildMoveBatch(unit, snapshot.AITeam, fromCell, softMove, paths);
             }
@@ -136,7 +172,12 @@ public partial class AIController
         // sector capturable is gone (e.g. already taken by another AI unit this turn).
         Vector3Int passengerCell = targetPassenger.CurrentCellPosition; passengerCell.z = 0;
         Vector3Int objCell = ResolveUnitObjectiveCell(targetPassenger, plan, snapshot);
-        Vector3Int moveTarget = FindTransportShuttleMove(unit, fromCell, passengerCell, paths, occupied, snapshot.AITeam, objCell);
+        HashSet<Vector3Int> passengerReachable =
+            BuildPassengerReachableSet(targetPassenger);
+        Vector3Int moveTarget = FindTransportShuttleMove(
+            unit, fromCell, passengerCell, paths, occupied,
+            snapshot.AITeam, objCell, passengerReachable,
+            plan, assigned, paths);
 
         if (TryFindTransportBreakerAttack(unit, snapshot, fromCell, paths, occupied, passengerCell,
                 out Vector3Int pickupAttackCell, out UnitManager pickupAttackTarget, preferNoMove, plan))
@@ -490,6 +531,11 @@ public partial class AIController
             if (cap.IsEmbarked) { diag.Append($" cap#{cap.InstanceId}[embarcado]"); continue; }
             if (cap.HasActed) { diag.Append($" cap#{cap.InstanceId}[jaAgiu]"); continue; }
             Vector3Int capCell = cap.CurrentCellPosition; capCell.z = 0;
+            if (IsPassengerAlreadyAtCaptureObjective(cap, snapshot.AITeam))
+            {
+                diag.Append($" cap#{cap.InstanceId}[jaNoObjetivo]");
+                continue;
+            }
             int cost = hasObjCell ? TerrainCostToCell(cap, capCell, objCell, transportThreshold) : 999;
             if (hasObjCell && cost <= transportThreshold)
             {
@@ -541,7 +587,7 @@ public partial class AIController
     // Capturador VIVO mais proximo do APC dentre os slots do objetivo (sem filtro de distancia/needy).
     // Usado quando nao ha passageiro needy: o APC vazio vai buscar o mais perto em vez de pressionar
     // o objetivo sozinho. So conta quem ainda pode embarcar (vivo, fora, sem ter agido).
-    private static UnitManager FindNearestPlanCapturer(SectorObjective assigned, TeamId aiTeam, Vector3Int fromCell)
+    private UnitManager FindNearestPlanCapturer(SectorObjective assigned, TeamId aiTeam, Vector3Int fromCell)
     {
         if (assigned?.Slots == null) return null;
         fromCell.z = 0;
@@ -552,11 +598,29 @@ public partial class AIController
             if (!IsGroundTransportPassengerSlot(assigned, slot, aiTeam)) continue;
             UnitManager cap = FindActiveUnit(slot.AssignedUnitId, aiTeam);
             if (cap == null || cap.IsEmbarked || cap.HasActed) continue;
+            if (IsPassengerAlreadyAtCaptureObjective(cap, aiTeam)) continue;
             Vector3Int cc = cap.CurrentCellPosition; cc.z = 0;
             float d = SectorManager.HexDistance(fromCell, cc);
             if (d < bestD) { bestD = d; best = cap; }
         }
         return best;
+    }
+
+    private bool IsPassengerAlreadyAtCaptureObjective(UnitManager passenger, TeamId aiTeam)
+    {
+        if (passenger == null || passenger.IsDead || passenger.IsEmbarked)
+            return false;
+
+        Vector3Int cell = passenger.CurrentCellPosition;
+        cell.z = 0;
+        ConstructionManager building =
+            ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, cell);
+        if (building == null || !building.IsCapturable)
+            return false;
+
+        int aiSlot = ResolveAISlotKey(aiTeam);
+        return building.SlotIndex != aiSlot
+            || building.CurrentCapturePoints < building.CapturePointsMax;
     }
 
     // Returns the first live, unacted capturer assigned to this objective's slots.

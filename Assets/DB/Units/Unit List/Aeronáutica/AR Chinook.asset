@@ -33,7 +33,7 @@ MonoBehaviour:
   militaryForce: 1
   unitClass: 5
   combatClassification: 0
-  roles: 0f000000
+  roles: 03000000
   aiInitiative: 0
   aiPurchaseMode: 0
   bannedOnHardMode: 0
@@ -105,6 +105,7 @@ MonoBehaviour:
   - domain: 0
     heightLevel: 3
   isSupplier: 0
+  startsWithEmptySupplies: 1
   supplierTier: 0
   maxUnitsServedPerTurn: 0
   serviceRange: 0

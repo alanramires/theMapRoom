@@ -96,6 +96,18 @@ public partial class AIController
         if (paths == null || paths.Count == 0)
             return BuildMoveBatch(unit, snapshot.AITeam, fromCell, fromCell);
 
+        if (TryBuildBestCourierDisembarkAction(
+                unit,
+                passengers,
+                plan,
+                snapshot,
+                assignedSectorTarget,
+                paths,
+                AirDropOffRange,
+                "Aereo",
+                out PlayerAction bestDropAction))
+            return bestDropAction;
+
         if (TryBuildRogueCourierLocalOpportunityDrop(
                 unit, passengers, snapshot, plan, fromCell, paths, occupied,
                 out PlayerAction localOpportunityDropAction))

@@ -6,7 +6,8 @@ public partial class AIController
     private List<PodeDesembarcarOption> SimulateDisembarkFromCell(UnitManager unit, Vector3Int simCell)
     {
         Vector3Int originalCell = unit.CurrentCellPosition;
-        simCell.z = 0; originalCell.z = 0;
+        simCell.z = 0;
+        originalCell.z = 0;
         var options = new List<PodeDesembarcarOption>();
 
         // Nao experimente desembarque a partir de um destino ainda preto. O
@@ -16,15 +17,13 @@ public partial class AIController
             && (matchController == null || !matchController.IsCellVisibleForActiveTeam(simCell)))
             return options;
 
-        try
-        {
-            unit.SetCurrentCellPosition(simCell, enforceFinalOccupancyRule: false);
-            PodeDesembarcarSensor.CollectOptions(unit, boardTilemap, terrainDatabase, options);
-        }
-        finally
-        {
-            unit.SetCurrentCellPosition(originalCell, enforceFinalOccupancyRule: false);
-        }
+        PodeDesembarcarSensor.CollectOptionsFromCell(
+            unit,
+            simCell,
+            boardTilemap,
+            terrainDatabase,
+            options,
+            out _);
 
         // Tambem nao revele, pela lista de opcoes, o terreno/ocupacao de uma
         // celula de desembarque que o snapshot confirmado ainda nao enxerga.
@@ -52,6 +51,10 @@ public partial class AIController
         TeamObjectivePlan plan,
         AIWorldSnapshot snapshot)
     {
+        if (IsRuntimeRebelSnapshot(snapshot))
+            return SelectRebelDisembarkOrdersByDistinctTargets(
+                options, snapshot, TransportDropOffRange);
+
         var selected = new List<PodeDesembarcarOption>();
         foreach (UnitManager passenger in passengers)
         {
@@ -81,6 +84,143 @@ public partial class AIController
             if (best != null) selected.Add(best);
         }
         return selected;
+    }
+
+    private bool IsRuntimeRebelSnapshot(AIWorldSnapshot snapshot)
+    {
+        return snapshot != null
+            && matchController != null
+            && matchController.IsSlotRebel(PlayerSlotId.FromIndex(snapshot.AISlotIndex));
+    }
+
+    // Rebelde nao tem plano/eixo: cada passageiro desembarcado precisa justificar
+    // uma oportunidade de captura DISTINTA. Passageiro sem outro predio proximo
+    // continua a bordo, evitando descer e reembarcar no turno seguinte.
+    private List<PodeDesembarcarOption> SelectRebelDisembarkOrdersByDistinctTargets(
+        List<PodeDesembarcarOption> options,
+        AIWorldSnapshot snapshot,
+        int range)
+    {
+        var result = new List<PodeDesembarcarOption>();
+        if (options == null || snapshot == null)
+            return result;
+
+        var passengers = new List<UnitManager>();
+        var seatIndexByPassenger = new Dictionary<UnitManager, int>();
+        UnitManager transporter = null;
+        for (int i = 0; i < options.Count; i++)
+        {
+            PodeDesembarcarOption option = options[i];
+            UnitManager passenger = option?.passengerUnit;
+            if (passenger == null)
+                continue;
+            transporter ??= option.transporterUnit;
+            if (!passengers.Contains(passenger))
+                passengers.Add(passenger);
+            if (!seatIndexByPassenger.TryGetValue(passenger, out int currentSeat)
+                || option.transporterSeatIndex < currentSeat)
+                seatIndexByPassenger[passenger] = option.transporterSeatIndex;
+        }
+
+        passengers.Sort((a, b) =>
+        {
+            int turnA = transporter != null ? transporter.GetPassengerEmbarkedOnTurn(a) : -1;
+            int turnB = transporter != null ? transporter.GetPassengerEmbarkedOnTurn(b) : -1;
+            int safeA = turnA >= 0 ? turnA : int.MaxValue;
+            int safeB = turnB >= 0 ? turnB : int.MaxValue;
+            int byTurn = safeA.CompareTo(safeB);
+            if (byTurn != 0) return byTurn;
+            return seatIndexByPassenger[a].CompareTo(seatIndexByPassenger[b]);
+        });
+
+        var claimedTargets = new HashSet<ConstructionManager>();
+        int safeRange = Mathf.Max(1, range);
+        foreach (UnitManager passenger in passengers)
+        {
+            PodeDesembarcarOption bestOption = null;
+            ConstructionManager bestTarget = null;
+            int bestCost = int.MaxValue;
+
+            foreach (ConstructionManager building in ConstructionManager.AllActive)
+            {
+                if (building == null || claimedTargets.Contains(building)
+                    || !IsRebelCapturable(passenger, building)
+                    || HasBlockingSurfaceUnitAtCell(building.CurrentCellPosition))
+                    continue;
+
+                Vector3Int targetCell = building.CurrentCellPosition;
+                targetCell.z = 0;
+                for (int i = 0; i < options.Count; i++)
+                {
+                    PodeDesembarcarOption option = options[i];
+                    if (option?.passengerUnit != passenger)
+                        continue;
+                    Vector3Int dropCell = option.disembarkCell;
+                    dropCell.z = 0;
+                    int cost = TerrainCostToCell(
+                        passenger, dropCell, targetCell, safeRange);
+                    if (cost > safeRange || cost >= bestCost)
+                        continue;
+                    bestCost = cost;
+                    bestOption = option;
+                    bestTarget = building;
+                }
+            }
+
+            if (bestOption == null || bestTarget == null)
+            {
+                foreach (ConstructionManager claimedTarget in claimedTargets)
+                {
+                    if (claimedTarget == null)
+                        continue;
+                    Vector3Int targetCell =
+                        claimedTarget.CurrentCellPosition;
+                    targetCell.z = 0;
+                    if (!IsRebelCapturable(passenger, claimedTarget)
+                        || !IsCaptureTargetUnderConfirmedPressure(
+                            targetCell, snapshot))
+                        continue;
+
+                    for (int i = 0; i < options.Count; i++)
+                    {
+                        PodeDesembarcarOption option = options[i];
+                        if (option?.passengerUnit != passenger)
+                            continue;
+                        Vector3Int dropCell = option.disembarkCell;
+                        dropCell.z = 0;
+                        int cost = TerrainCostToCell(
+                            passenger, dropCell, targetCell, safeRange);
+                        if (cost > safeRange || cost >= bestCost)
+                            continue;
+                        bestCost = cost;
+                        bestOption = option;
+                        bestTarget = claimedTarget;
+                    }
+                }
+
+                if (bestOption == null || bestTarget == null)
+                {
+                    Debug.Log($"{TL("Transporte")} rebelde #{passenger.InstanceId} permanece a bordo: " +
+                              $"nenhum segundo capturavel distinto em range {safeRange} " +
+                              $"e objetivo primario sem pressao.");
+                    continue;
+                }
+
+                result.Add(bestOption);
+                Debug.Log($"{TL("Transporte")} rebelde #{passenger.InstanceId} desembarca como reforco: " +
+                          $"spot={bestOption.disembarkCell} alvo={bestTarget.InstanceId}@{bestTarget.CurrentCellPosition} " +
+                          $"cost={bestCost} objetivoQuente=True.");
+                continue;
+            }
+
+            claimedTargets.Add(bestTarget);
+            result.Add(bestOption);
+            Debug.Log($"{TL("Transporte")} rebelde #{passenger.InstanceId} desembarque dedicado: " +
+                      $"spot={bestOption.disembarkCell} alvo={bestTarget.InstanceId}@{bestTarget.CurrentCellPosition} " +
+                      $"cost={bestCost}.");
+        }
+
+        return result;
     }
 
     // Partial disembark: remove passengers whose best drop-off cell is outside dropOffRange

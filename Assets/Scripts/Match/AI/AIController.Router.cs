@@ -24,6 +24,26 @@ public partial class AIController
         if (TryFindProductionUnlockVacateAction(unit, snapshot, out PlayerAction productionUnlockAction))
             return productionUnlockAction;
 
+        // Regra transversal por capacidade, antes dos papeis: toda unidade
+        // isTransporter carregada vira courier. Assim APC, helicoptero,
+        // hidroaviao, navio, porta-avioes, trem, supridor e a futura fragata
+        // ASW usam a mesma selecao de LZ. Vazia, segue o papel normal.
+        if (HasTransportCargo(unit)
+            && unit.TryGetUnitData(out UnitData loadedTransporterData)
+            && loadedTransporterData != null
+            && loadedTransporterData.isTransporter)
+        {
+            PlayerAction loadedTransportAction =
+                TryDecideTransportadorAction(unit, snapshot, plan);
+            if (loadedTransportAction != null)
+            {
+                Debug.Log($"{TL("Transporte")} roteador universal: " +
+                          $"{unit.UnitDisplayName}#{unit.InstanceId} carregado " +
+                          $"prioriza courier antes dos papeis.");
+                return loadedTransportAction;
+            }
+        }
+
         // Facção sem QG: captura por proximidade, antes do planner. O plano normal assume
         // um eixo a partir do proprio QG — a rebelde nao tem, e sem este curto-circuito
         // todo capturador dela vira rogue e marcha para o QG inimigo. Ver AIController.Rebel.

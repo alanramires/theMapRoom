@@ -152,6 +152,24 @@ public partial class AIController
             }
         }
 
+        // Rogue de uma IA com HQ mantém o vetor macro rumo ao HQ e escolhe
+        // apenas capturas próximas desse corredor. Não usa a expansão radial
+        // do rebelde nem herda automaticamente o setor do transportador.
+        if (!passengerHasPlanSlot
+            && IsRogueCapturerPassenger(passenger, plan)
+            && TryResolveRogueCorridorCaptureTarget(
+                passenger,
+                snapshot,
+                fallbackCell,
+                null,
+                out Vector3Int corridorTarget))
+        {
+            Debug.Log($"{TL("Transporte")} PassengerTarget #{passenger.InstanceId} " +
+                      $"rogue corredor HQ -> {corridorTarget}");
+            resolvedTarget = corridorTarget;
+            return true;
+        }
+
         // Passenger without a plan slot is extra cargo. On an assigned transporter,
         // it follows the transporter's assigned sector instead of hijacking the route to HQ.
         if (!passengerHasPlanSlot && assignedSectorTarget != Vector3Int.zero)

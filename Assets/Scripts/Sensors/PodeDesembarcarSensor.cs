@@ -4,6 +4,82 @@ using UnityEngine.Tilemaps;
 
 public static class PodeDesembarcarSensor
 {
+    // Consulta pura para ferramentas/planejamento: avalia o transportador como se
+    // estivesse em transporterCell sem alterar UnitManager, ocupacao, FOW ou revisoes.
+    public static bool CollectOptionsFromCell(
+        UnitManager selectedTransporter,
+        Vector3Int transporterCell,
+        Tilemap map,
+        TerrainDatabase terrainDatabase,
+        List<PodeDesembarcarOption> output,
+        out string contextReason)
+    {
+        contextReason = string.Empty;
+        output?.Clear();
+        if (selectedTransporter == null || map == null || output == null
+            || selectedTransporter.IsEmbarked)
+        {
+            contextReason = "Transportador/mapa/output invalido.";
+            return false;
+        }
+        if (!selectedTransporter.TryGetUnitData(out UnitData transporterData)
+            || transporterData == null || !transporterData.isTransporter)
+        {
+            contextReason = "Unidade nao e transportadora.";
+            return false;
+        }
+
+        transporterCell.z = 0;
+        if (!CanTransporterDisembarkAtCellContext(
+                selectedTransporter, transporterData, transporterCell,
+                map, terrainDatabase, out contextReason))
+            return false;
+
+        IReadOnlyList<UnitTransportSeatRuntime> seats = selectedTransporter.TransportedUnitSlots;
+        if (seats == null)
+        {
+            contextReason = "Transportador sem vagas runtime.";
+            return false;
+        }
+
+        var neighbors = BuildDisembarkCandidateCells(
+            selectedTransporter, transporterData, map, transporterCell);
+        for (int i = 0; i < seats.Count; i++)
+        {
+            UnitTransportSeatRuntime seat = seats[i];
+            UnitManager passenger = seat?.embarkedUnit;
+            if (passenger == null || !passenger.IsEmbarked)
+                continue;
+
+            for (int n = 0; n < neighbors.Count; n++)
+            {
+                Vector3Int targetCell = neighbors[n];
+                targetCell.z = 0;
+                if (!CanDisembarkAtCell(
+                        selectedTransporter, transporterData, passenger,
+                        map, terrainDatabase, transporterCell, targetCell,
+                        out int enterCost, out _))
+                    continue;
+
+                output.Add(new PodeDesembarcarOption
+                {
+                    transporterUnit = selectedTransporter,
+                    passengerUnit = passenger,
+                    transporterSlotIndex = seat.slotIndex,
+                    transporterSeatIndex = seat.seatIndex,
+                    disembarkCell = targetCell,
+                    disembarkCost = 1,
+                    enterCost = enterCost,
+                    displayLabel = $"{passenger.name} | {seat.slotId} vaga {seat.seatIndex + 1} -> {targetCell}"
+                });
+            }
+        }
+
+        if (output.Count == 0 && string.IsNullOrWhiteSpace(contextReason))
+            contextReason = "Nenhum spot valido para os passageiros.";
+        return output.Count > 0;
+    }
+
     public static PodeDesembarcarReport CollectReport(
         UnitManager selectedTransporter,
         Tilemap map,
@@ -132,10 +208,10 @@ public static class PodeDesembarcarSensor
         if (seats == null || seats.Count == 0)
             return false;
 
-        List<Vector3Int> neighbors = new List<Vector3Int>(6);
         Vector3Int transporterCell = selectedTransporter.CurrentCellPosition;
         transporterCell.z = 0;
-        UnitMovementPathRules.GetImmediateHexNeighbors(map, transporterCell, neighbors);
+        List<Vector3Int> neighbors = BuildDisembarkCandidateCells(
+            selectedTransporter, transporterData, map, transporterCell);
 
         bool hasAnyPassenger = false;
         for (int i = 0; i < seats.Count; i++)
@@ -161,6 +237,7 @@ public static class PodeDesembarcarSensor
                         passenger,
                         map,
                         terrainDatabase,
+                        transporterCell,
                         targetCell,
                         out int enterCost,
                         out string reason))
@@ -210,6 +287,19 @@ public static class PodeDesembarcarSensor
         if (sensorLogs)
             SensorLogGate.Log("PodeDesembarcarSensor", $"result valid={output.Count} invalid={(invalidOutput != null ? invalidOutput.Count : 0)} hasAny={hasAny} landingOk={(landingStatus != null && landingStatus.isValid)}");
         return hasAny;
+    }
+
+    private static List<Vector3Int> BuildDisembarkCandidateCells(
+        UnitManager transporter,
+        UnitData transporterData,
+        Tilemap map,
+        Vector3Int transporterCell)
+    {
+        var cells = new List<Vector3Int>(7);
+        transporterCell.z = 0;
+        UnitMovementPathRules.GetImmediateHexNeighbors(map, transporterCell, cells);
+
+        return cells;
     }
 
     private static PodeDesembarcarLandingStatus EvaluateLandingStatus(
@@ -277,6 +367,7 @@ public static class PodeDesembarcarSensor
         UnitManager passenger,
         Tilemap map,
         TerrainDatabase terrainDatabase,
+        Vector3Int transporterCell,
         Vector3Int targetCell,
         out int enterCost,
         out string reason)
@@ -312,7 +403,7 @@ public static class PodeDesembarcarSensor
                 passenger,
                 map,
                 terrainDatabase,
-                transporter.CurrentCellPosition,
+                transporterCell,
                 out string takeoffReason))
         {
             reason = takeoffReason;
@@ -542,6 +633,36 @@ public static class PodeDesembarcarSensor
             transporter.CurrentCellPosition,
             transporterData,
             out reason);
+    }
+
+    private static bool CanTransporterDisembarkAtCellContext(
+        UnitManager transporter,
+        UnitData transporterData,
+        Vector3Int transporterCell,
+        Tilemap map,
+        TerrainDatabase terrainDatabase,
+        out string reason)
+    {
+        reason = string.Empty;
+        transporterCell.z = 0;
+        if (transporter.GetDomain() == Domain.Air)
+        {
+            AirOperationTileContext tileContext =
+                AirOperationResolver.ResolveContext(map, terrainDatabase, transporterCell);
+            if (!AirOperationResolver.CanLand(
+                    transporter, tileContext, SensorMovementMode.MoveuParado, out reason))
+                return false;
+
+            UnitManager blocker = FindBlockingUnitAtCell(transporter, map, transporterCell);
+            if (blocker != null)
+            {
+                reason = $"Hex bloqueado por {blocker.name}.";
+                return false;
+            }
+        }
+
+        return IsContextAllowedByTransporterCurrentHexDisembarkRules(
+            map, terrainDatabase, transporterCell, transporterData, out reason);
     }
 
     private static bool IsContextAllowedByTransporterCurrentHexDisembarkRules(

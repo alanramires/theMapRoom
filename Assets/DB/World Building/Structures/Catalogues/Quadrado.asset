@@ -19,4 +19,12 @@ MonoBehaviour:
   - structure: {fileID: 11400000, guid: 2c50b52605f4f1c4ca013ba4bd7acee3, type: 2}
     routes: []
   - structure: {fileID: 11400000, guid: 7933d65148f7b884c895240966ea81b1, type: 2}
-    routes: []
+    routes:
+    - routeName: Route 1
+      ownerDatabase: {fileID: 11400000}
+      cells:
+      - {x: -8, y: 8, z: 0}
+      - {x: -8, y: 7, z: 0}
+      - {x: -7, y: 6, z: 0}
+      - {x: -7, y: 5, z: 0}
+      - {x: -6, y: 4, z: 0}

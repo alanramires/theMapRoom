@@ -41,6 +41,18 @@ public partial class AIController
         if (evacuee != null)
             return DecideEvacCourierAction(unit, evacuee, passengers, snapshot, fromCell, paths, occupied);
 
+        if (TryBuildBestCourierDisembarkAction(
+                unit,
+                passengers,
+                plan,
+                snapshot,
+                assignedSectorTarget,
+                paths,
+                dropOffRange,
+                "Terrestre",
+                out PlayerAction bestDropAction))
+            return bestDropAction;
+
         if (TryBuildRogueCourierLocalOpportunityDrop(
                 unit, passengers, snapshot, plan, fromCell, paths, occupied, out PlayerAction localOpportunity))
             return localOpportunity;

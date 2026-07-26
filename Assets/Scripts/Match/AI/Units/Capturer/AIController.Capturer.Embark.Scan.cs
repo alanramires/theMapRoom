@@ -143,6 +143,7 @@ public partial class AIController
     private bool ShouldSkipCapturerEmbarkForShortWalk(
         UnitManager unit,
         SectorObjective assigned,
+        AIWorldSnapshot snapshot,
         Vector3Int candidateCell,
         string context)
     {
@@ -185,6 +186,22 @@ public partial class AIController
         }
 
         Vector3Int objCell = objBuilding.CurrentCellPosition; objCell.z = 0;
+        if (IsPickupObjectiveClaimedByAlly(
+                unit, objCell, unit.SlotIndex))
+        {
+            Vector3Int claimedCell = objCell;
+            if (snapshot == null
+                || !TryFindAlternatePickupObjective(
+                    unit, snapshot, candidateCell, out objCell))
+            {
+                Debug.Log($"{TL("Capturador")} {unit.InstanceId} nao considera caminhada curta: " +
+                          $"objetivo {claimedCell} ja ocupado e sem alternativa livre.");
+                return false;
+            }
+
+            Debug.Log($"{TL("Capturador")} {unit.InstanceId} caminhada curta troca alvo ocupado " +
+                      $"{claimedCell} por {objCell}.");
+        }
         float hexDistance = SectorManager.HexDistance(candidateCell, objCell);
         // Decisao local, separada do threshold estrategico que cria demanda de transporte.
         // Proximidade geometrica evita que uma barreira local superestime uma viagem que ja

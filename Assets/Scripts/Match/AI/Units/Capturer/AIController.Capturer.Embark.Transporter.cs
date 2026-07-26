@@ -116,7 +116,8 @@ public partial class AIController
         Vector3Int fromCell = unit.CurrentCellPosition; fromCell.z = 0;
         // Short-walk guard uses the unit's actual position, not the intermediate stop cell —
         // moving 1-2h toward the transporter should not make the destination appear "walkable."
-        if (ShouldSkipCapturerEmbarkForShortWalk(unit, assigned, fromCell, "hex embarque"))
+        if (ShouldSkipCapturerEmbarkForShortWalk(
+                unit, assigned, snapshot, fromCell, "hex embarque"))
             return false;
 
         // Pickup range: usa fromHex (posição após movimento) para não bloquear embarque estendido.

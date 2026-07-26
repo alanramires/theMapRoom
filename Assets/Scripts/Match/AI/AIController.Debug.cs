@@ -55,6 +55,14 @@ public partial class AIController
             return;
         }
 
+        if (!CanAcceptDebugStep(out string blockedReason))
+        {
+            Debug.Log($"[AI Step] Ignorado: batch anterior ainda ativo ({blockedReason}).");
+            PanelDialogController.TrySetTransientText(
+                "AI STEP: aguarde o batch atual terminar", 1.6f);
+            return;
+        }
+
         debugStepRequest = debugStepPendingAction != null
             ? DebugStepRequest.Execute
             : DebugStepRequest.Prepare;
@@ -68,6 +76,52 @@ public partial class AIController
                 ? "AI STEP: preparando batch"
                 : "AI STEP: executando batch",
             1.6f);
+    }
+
+    public bool CanAcceptDebugStep(out string reason)
+    {
+        if (aiTurnBatchExecuting)
+        {
+            reason = "aiTurnBatchExecuting";
+            return false;
+        }
+
+        if (replayManager != null && replayManager.IsStepExecutionBusy)
+        {
+            reason = $"replay={replayManager.GetReplayStepExecutionBusyReason()}";
+            return false;
+        }
+
+        if (turnStateManager != null
+            && turnStateManager.IsScannerActionExecutionInProgress)
+        {
+            reason = "scannerActionExecution";
+            return false;
+        }
+
+        if (matchController != null
+            && matchController.IsTurnTransitionInProgress)
+        {
+            reason = "turnTransition";
+            return false;
+        }
+
+        if (turnStateManager != null
+            && turnStateManager.CurrentCursorState
+                != TurnStateManager.CursorState.Neutral)
+        {
+            reason = $"cursor={turnStateManager.CurrentCursorState}";
+            return false;
+        }
+
+        if (debugStepRequest != DebugStepRequest.None)
+        {
+            reason = $"request={debugStepRequest}";
+            return false;
+        }
+
+        reason = string.Empty;
+        return true;
     }
 
     public void SetDebugShoppingPaused(bool paused)

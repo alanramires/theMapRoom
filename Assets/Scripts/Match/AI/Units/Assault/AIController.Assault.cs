@@ -49,6 +49,19 @@ public partial class AIController
             assigned = criticalHome;
         }
 
+        // Assalto com plano também pode depender de transporte. Antes, somente
+        // o rogue passava por esta avaliação; um tanque separado de Charlie
+        // pelo mar caía direto no batedor e "mantinha patrulha", mesmo com um
+        // navio compatível disponível para embarque.
+        PlayerAction assignedEmbarkAction =
+            TryDecideAssaultEmbarkAction(unit, snapshot, plan);
+        if (assignedEmbarkAction != null)
+        {
+            Debug.Log($"{TL("Assalto")} {unit.InstanceId} {assigned.Sector} " +
+                      $"prioriza embarque: rota terrestre insuficiente.");
+            return assignedEmbarkAction;
+        }
+
         if (IsActiveRallyAssemblyObjective(assigned))
             return DecideRallyAssemblyAssaultAction(unit, snapshot, assigned);
 
