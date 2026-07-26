@@ -2275,7 +2275,10 @@ public partial class TurnStateManager
         return cell;
     }
 
-    private static bool CanUseLayerModeAtCurrentCell(
+    // Publico porque as janelas de debug do Editor (Tools/Operacoes Navais) precisam
+    // responder "pode submergir?" pela MESMA regra que o jogo aplica — replicar a
+    // validacao numa copia paralela e como o PodePousarWindow ja diverge daqui.
+    public static bool CanUseLayerModeAtCurrentCell(
         UnitManager unit,
         Tilemap boardMap,
         TerrainDatabase terrainDb,

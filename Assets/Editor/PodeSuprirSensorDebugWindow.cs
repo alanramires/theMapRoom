@@ -225,6 +225,12 @@ public class PodeSuprirSensorDebugWindow : EditorWindow
             EditorGUILayout.LabelField("Camada", $"{candidate.unit.GetDomain()}/{candidate.unit.GetHeightLevel()}");
             EditorGUILayout.LabelField("Hex", $"{candidate.cell.x},{candidate.cell.y}");
             EditorGUILayout.LabelField("Flags", BuildRuntimeFlagsLabel(candidate.unit));
+            if (!Application.isPlaying)
+            {
+                EditorGUILayout.LabelField(
+                    "Custo esperado",
+                    $"${EstimateCandidateCost(candidate)}");
+            }
             EditorGUILayout.BeginHorizontal();
             if (GUILayout.Button("Desenhar Linha"))
             {
@@ -237,6 +243,30 @@ public class PodeSuprirSensorDebugWindow : EditorWindow
             EditorGUILayout.EndHorizontal();
             EditorGUILayout.EndVertical();
         }
+    }
+
+    private int EstimateCandidateCost(
+        SupplyCandidateEntry candidate)
+    {
+        if (selectedSupplier == null
+            || candidate == null
+            || candidate.unit == null
+            || !selectedSupplier.TryGetUnitData(
+                out UnitData supplierData)
+            || supplierData == null)
+            return 0;
+
+        var simulatedQueue =
+            new List<SupplyCandidateEntry>(1)
+            {
+                candidate
+            };
+        QueueUsageEstimate estimate =
+            BuildQueueUsageEstimate(
+                selectedSupplier,
+                supplierData,
+                simulatedQueue);
+        return Mathf.Max(0, estimate.totalEstimatedCost);
     }
 
     private void DrawIneligibleCandidatesSection()
@@ -1501,7 +1531,9 @@ public class PodeSuprirSensorDebugWindow : EditorWindow
             return;
         }
 
-        if (!selectedSupplier.TryGetUnitData(out UnitData supplierData) || supplierData == null)
+        if (!selectedSupplier.TryGetUnitData(
+                out UnitData supplierData)
+            || supplierData == null)
         {
             canSupply = false;
             sensorReason = "Supplier sem UnitData.";
@@ -1510,214 +1542,60 @@ public class PodeSuprirSensorDebugWindow : EditorWindow
             return;
         }
 
-        if (!supplierData.isSupplier)
-        {
-            canSupply = false;
-            sensorReason = "Unidade selecionada nao eh supplier.";
-            maxUnitsServedPerTurn = 0;
-            ClearSelectedLine();
-            return;
-        }
-
-        if (!HasAtLeastOneOperationalService(selectedSupplier, supplierData))
-        {
-            canSupply = false;
-            sensorReason = "Supplier sem servico operacional com estoque disponivel. Atua apenas como hub/carga.";
-            maxUnitsServedPerTurn = 0;
-            ClearSelectedLine();
-            return;
-        }
-
-        maxUnitsServedPerTurn = Mathf.Max(0, supplierData.maxUnitsServedPerTurn);
-        if (maxUnitsServedPerTurn <= 0)
-        {
-            canSupply = false;
-            sensorReason = "Supplier sem capacidade de atendimento (maxUnitsServedPerTurn=0).";
-            ClearSelectedLine();
-            return;
-        }
-
-        if (!IsSupplierCurrentlyInOperationDomain(selectedSupplier, supplierData))
-        {
-            canSupply = false;
-            sensorReason =
-                $"Supplier fora do Supplier Operation Domain atual ({selectedSupplier.GetDomain()}/{selectedSupplier.GetHeightLevel()}). " +
-                "Reposicione para um dominio/altura permitido para prestar servicos.";
-            ClearSelectedLine();
-            return;
-        }
-
-        Vector3Int origin = selectedSupplier.CurrentCellPosition;
-        origin.z = 0;
-        List<Vector3Int> neighbors = new List<Vector3Int>(6);
-        UnitMovementPathRules.GetImmediateHexNeighbors(map, origin, neighbors);
-
-        List<SupplyCandidateEntry> prelim = new List<SupplyCandidateEntry>();
-        for (int i = 0; i < neighbors.Count; i++)
-        {
-            Vector3Int cell = neighbors[i];
-            cell.z = 0;
-            UnitManager other = UnitOccupancyRules.GetUnitAtCell(map, cell, selectedSupplier);
-            if (other == null || other == selectedSupplier)
-                continue;
-
-            if (!other.gameObject.activeInHierarchy)
-            {
-                AddInvalid(other, cell, "Unidade inativa.");
-                continue;
-            }
-
-            if (other.IsEmbarked)
-            {
-                AddInvalid(other, cell, "Unidade embarcada.");
-                continue;
-            }
-
-            if ((int)other.TeamId != (int)selectedSupplier.TeamId)
-            {
-                AddInvalid(other, cell, "Unidade de outro time.");
-                continue;
-            }
-
-            if (other.ReceivedSuppliesThisTurn)
-            {
-                AddInvalid(other, cell, AlreadySuppliedReason);
-                continue;
-            }
-
-            if (other.TookOffRecently)
-            {
-                AddInvalid(other, cell, TookOffRecentlyReason);
-                continue;
-            }
-
-            if (!TryResolveServiceDemandMatch(selectedSupplier, supplierData, other, out string serviceDemandReason))
-            {
-                AddInvalid(other, cell, serviceDemandReason);
-                continue;
-            }
-
-            bool sameDomain = other.GetDomain() == selectedSupplier.GetDomain();
-            bool needsForcedSurfaceBeforeSupply = IsSubmergedNavalUnit(other);
-            if (needsForcedSurfaceBeforeSupply)
-            {
-                if (!CanEmergeToNavalSurface(other))
-                {
-                    AddInvalid(other, cell, "Alvo submerso nao possui modo Naval/Surface para emergir antes do suprimento.");
-                    continue;
-                }
-
-                bool supplierCanServeNavalSurface =
-                    (selectedSupplier.GetDomain() == Domain.Naval && selectedSupplier.GetHeightLevel() == HeightLevel.Surface) ||
-                    SupportsSupplierOperationLayer(supplierData, Domain.Naval, HeightLevel.Surface);
-
-                if (!supplierCanServeNavalSurface)
-                {
-                    AddInvalid(other, cell, "Alvo submerso exige emergencia para suprimento em Naval/Surface, mas o supplier nao atende essa camada.");
-                    continue;
-                }
-
-                if (!sameDomain)
-                {
-                    prelim.Add(new SupplyCandidateEntry
-                    {
-                        unit = other,
-                        cell = cell,
-                        mode = "Dominio diferente (emergencia valida -> Naval/Surface)",
-                        forceLandBeforeSupply = false,
-                        forceTakeoffBeforeSupply = false,
-                        forceSurfaceBeforeSupply = true,
-                        plannedServiceDomain = Domain.Naval,
-                        plannedServiceHeight = HeightLevel.Surface
-                    });
-                    continue;
-                }
-            }
-
-            if (sameDomain)
-            {
-                prelim.Add(new SupplyCandidateEntry
-                {
-                    unit = other,
-                    cell = cell,
-                    mode = needsForcedSurfaceBeforeSupply ? "Mesmo dominio (emerge para suprir)" : "Mesmo dominio",
-                    forceLandBeforeSupply = false,
-                    forceTakeoffBeforeSupply = false,
-                    forceSurfaceBeforeSupply = needsForcedSurfaceBeforeSupply,
-                    plannedServiceDomain = needsForcedSurfaceBeforeSupply ? Domain.Naval : other.GetDomain(),
-                    plannedServiceHeight = needsForcedSurfaceBeforeSupply ? HeightLevel.Surface : other.GetHeightLevel()
-                });
-                continue;
-            }
-
-            if (terrainDatabase == null)
-            {
-                AddInvalid(other, cell, "TerrainDatabase ausente para validar pouso AR.");
-                continue;
-            }
-
-            PodePousarReport landing = PodePousarSensor.Evaluate(
-                other,
+        maxUnitsServedPerTurn =
+            Mathf.Max(0, supplierData.maxUnitsServedPerTurn);
+        var sensorOptions = new List<PodeSuprirOption>();
+        var sensorInvalid =
+            new List<PodeSuprirInvalidOption>();
+        MatchController match =
+            FindAnyObjectByType<MatchController>();
+        bool sensorHasAny =
+            PodeSuprirSensor.CollectOptions(
+                selectedSupplier,
                 map,
                 terrainDatabase,
-                SensorMovementMode.MoveuParado,
-                useManualRemainingMovement: false,
-                manualRemainingMovement: 0);
+                match,
+                sensorOptions,
+                out sensorReason,
+                sensorInvalid);
 
-            if (landing != null && landing.status)
+        var prelim = new List<SupplyCandidateEntry>(
+            sensorOptions.Count);
+        for (int i = 0; i < sensorOptions.Count; i++)
+        {
+            PodeSuprirOption option = sensorOptions[i];
+            if (option == null || option.targetUnit == null)
+                continue;
+
+            prelim.Add(new SupplyCandidateEntry
             {
-                prelim.Add(new SupplyCandidateEntry
-                {
-                    unit = other,
-                    cell = cell,
-                    mode = "Dominio diferente (pouso valido)",
-                    forceLandBeforeSupply = true,
-                    forceTakeoffBeforeSupply = false,
-                    forceSurfaceBeforeSupply = false,
-                    plannedServiceDomain = selectedSupplier.GetDomain(),
-                    plannedServiceHeight = selectedSupplier.GetHeightLevel()
-                });
-            }
-            else
-            {
-                bool isAirFamily = IsAirFamilyUnit(other);
-                if (isAirFamily)
-                {
-                    PodeDecolarReport takeoff = PodeDecolarSensor.Evaluate(other, map, terrainDatabase);
-                    if (takeoff != null && takeoff.status)
-                    {
-                        HeightLevel takeoffHeight = ResolveTakeoffServiceHeight(other);
-                        bool supplierSupportsTakeoffLayer =
-                            SupportsSupplierOperationLayer(supplierData, Domain.Air, takeoffHeight) ||
-                            (selectedSupplier.GetDomain() == Domain.Air && selectedSupplier.GetHeightLevel() == takeoffHeight);
+                unit = option.targetUnit,
+                cell = option.targetCell,
+                mode = BuildAuthoritativeMode(option),
+                forceLandBeforeSupply =
+                    option.forceLandBeforeSupply,
+                forceTakeoffBeforeSupply =
+                    option.forceTakeoffBeforeSupply,
+                forceSurfaceBeforeSupply =
+                    option.forceSurfaceBeforeSupply,
+                plannedServiceDomain =
+                    option.plannedServiceDomain,
+                plannedServiceHeight =
+                    option.plannedServiceHeight
+            });
+        }
 
-                        if (supplierSupportsTakeoffLayer)
-                        {
-                            prelim.Add(new SupplyCandidateEntry
-                            {
-                                unit = other,
-                                cell = cell,
-                                mode = $"Dominio diferente (decolagem valida -> Air/{takeoffHeight})",
-                                forceLandBeforeSupply = false,
-                                forceTakeoffBeforeSupply = true,
-                                forceSurfaceBeforeSupply = false,
-                                plannedServiceDomain = Domain.Air,
-                                plannedServiceHeight = takeoffHeight
-                            });
-                            continue;
-                        }
-
-                        AddInvalid(other, cell, $"Decolagem valida, mas supplier nao atende Air/{takeoffHeight} no Supplier Operation Domain.");
-                        continue;
-                    }
-                }
-
-                string landingReason = landing != null && !string.IsNullOrWhiteSpace(landing.explicacao)
-                    ? landing.explicacao
-                    : "Pouso invalido no hex atual.";
-                string reason = $"Dominio incompativel ({other.GetDomain()} != {selectedSupplier.GetDomain()}) e sem pouso/decolagem validos. {landingReason}";
-                AddInvalid(other, cell, reason);
-            }
+        for (int i = 0; i < sensorInvalid.Count; i++)
+        {
+            PodeSuprirInvalidOption invalid =
+                sensorInvalid[i];
+            if (invalid == null
+                || invalid.targetUnit == null)
+                continue;
+            AddInvalid(
+                invalid.targetUnit,
+                invalid.targetCell,
+                invalid.reason);
         }
 
         SyncQueueWithCurrentCandidates(prelim);
@@ -1732,8 +1610,10 @@ public class PodeSuprirSensorDebugWindow : EditorWindow
             eligibleCandidates.Add(candidate);
         }
 
-        canSupply = eligibleCandidates.Count > 0 || supplyQueue.Count > 0;
-        sensorReason = canSupply ? string.Empty : "Sem candidatos adjacentes validos para suprir.";
+        canSupply =
+            sensorHasAny
+            || eligibleCandidates.Count > 0
+            || supplyQueue.Count > 0;
 
         if (eligibleCandidates.Count > 0)
         {
@@ -1744,6 +1624,22 @@ public class PodeSuprirSensorDebugWindow : EditorWindow
         {
             ClearSelectedLine();
         }
+    }
+
+    private static string BuildAuthoritativeMode(
+        PodeSuprirOption option)
+    {
+        if (option == null)
+            return "Sensor autoritativo";
+        if (option.forceLandBeforeSupply)
+            return "PodeSuprir: pousa antes do atendimento";
+        if (option.forceTakeoffBeforeSupply)
+            return "PodeSuprir: decola antes do atendimento";
+        if (option.forceSurfaceBeforeSupply)
+            return "PodeSuprir: emerge antes do atendimento";
+        return
+            $"PodeSuprir: {option.plannedServiceDomain}/" +
+            $"{option.plannedServiceHeight}";
     }
 
     private void SyncQueueWithCurrentCandidates(List<SupplyCandidateEntry> currentValid)

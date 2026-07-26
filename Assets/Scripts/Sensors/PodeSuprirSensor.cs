@@ -212,7 +212,8 @@ public static class PodeSuprirSensor
             return result;
         }
 
-        List<UnitManager> units = UnitManager.AllActive;
+        IReadOnlyList<UnitManager> units =
+            ResolveUnitsForSupplyQuery();
         if (units == null || units.Count <= 0)
             return result;
 
@@ -273,6 +274,23 @@ public static class PodeSuprirSensor
         }
 
         return result;
+    }
+
+    private static IReadOnlyList<UnitManager>
+        ResolveUnitsForSupplyQuery()
+    {
+        List<UnitManager> runtimeUnits =
+            UnitManager.AllActive;
+        if (runtimeUnits != null
+            && runtimeUnits.Count > 0)
+            return runtimeUnits;
+
+        // Ferramentas de editor também consultam o sensor fora do
+        // Play Mode, quando OnEnable não popula AllActive. O fallback
+        // só ocorre com o registro vazio; o fluxo runtime permanece O(1).
+        return Object.FindObjectsByType<UnitManager>(
+            FindObjectsInactive.Exclude,
+            FindObjectsSortMode.None);
     }
 
     private static bool TryEvaluateSupplyCandidate(
@@ -381,7 +399,9 @@ public static class PodeSuprirSensor
     {
         if (target == null || service == null)
             return false;
-        if (matchController == null || supplier == null)
+        if (!Application.isPlaying
+            || matchController == null
+            || supplier == null)
             return true;
 
         Dictionary<SupplyData, int> stockSnapshot = new Dictionary<SupplyData, int>(stock);

@@ -16,7 +16,7 @@ public class PodePousarWindow : EditorWindow
     private string statusMessage = "Ready.";
     private Vector2 windowScroll;
 
-    [MenuItem("Tools/Operações Aereas/Pode Mudar de Altitude")]
+    [MenuItem("Tools/Operações Aéreas/Pode Mudar de Altitude")]
     public static void OpenWindow()
     {
         GetWindow<PodePousarWindow>("Pode Mudar de Altitude");

@@ -10,10 +10,28 @@ public class PodeEmergirReport
 
 public static class PodeEmergirSensor
 {
+    /// <summary>
+    /// "Posso emergir ALI?" — mesma consulta por hex do PodePousarSensor.CanLandAtCell,
+    /// do outro lado da escada. Nao move a unidade: os gates de ESTADO (submersa,
+    /// suporta Naval/Surface) valem pela unidade real, so o hex e hipotetico.
+    /// </summary>
+    public static bool CanEmergeAtCell(
+        UnitManager unit,
+        Tilemap map,
+        TerrainDatabase terrainDatabase,
+        Vector3Int cell,
+        out string reason)
+    {
+        PodeEmergirReport report = Evaluate(unit, map, terrainDatabase, cell);
+        reason = report != null ? report.explicacao : "PodeEmergir sem resultado.";
+        return report != null && report.status;
+    }
+
     public static PodeEmergirReport Evaluate(
         UnitManager unit,
         Tilemap map,
-        TerrainDatabase terrainDatabase)
+        TerrainDatabase terrainDatabase,
+        Vector3Int? atCell = null)
     {
         var report = new PodeEmergirReport
         {
@@ -62,7 +80,7 @@ public static class PodeEmergirSensor
             return report;
         }
 
-        Vector3Int cell = unit.CurrentCellPosition;
+        Vector3Int cell = atCell ?? unit.CurrentCellPosition;
         cell.z = 0;
 
         if (!CanSurfaceAtCell(unit, map, terrainDatabase, cell, out string cellReason))

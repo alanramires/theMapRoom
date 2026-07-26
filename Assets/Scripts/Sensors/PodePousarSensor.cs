@@ -10,13 +10,42 @@ public class PodePousarReport
 
 public static class PodePousarSensor
 {
+    /// <summary>
+    /// "Posso pousar ALI?" — consulta pura por hex, sem mover a unidade nem tocar
+    /// em estado. Use este overload quando o hex avaliado nao e o hex atual da
+    /// aeronave (escolha de LZ pela IA, preview de destino, ferramentas de debug).
+    /// Os gates de ESTADO (trava de camada, perfil aereo, no ar x pousada) seguem
+    /// valendo pela unidade real; so o hex e hipotetico.
+    /// </summary>
+    public static bool CanLandAtCell(
+        UnitManager aircraft,
+        Tilemap map,
+        TerrainDatabase terrainDatabase,
+        Vector3Int cell,
+        out string reason,
+        SensorMovementMode movementMode = SensorMovementMode.MoveuParado)
+    {
+        PodePousarReport report = Evaluate(
+            aircraft,
+            map,
+            terrainDatabase,
+            movementMode,
+            useManualRemainingMovement: false,
+            manualRemainingMovement: 0,
+            atCell: cell);
+
+        reason = report != null ? report.explicacao : "PodePousar sem resultado.";
+        return report != null && report.status;
+    }
+
     public static PodePousarReport Evaluate(
         UnitManager selectedAircraft,
         Tilemap map,
         TerrainDatabase terrainDatabase,
         SensorMovementMode movementMode,
         bool useManualRemainingMovement,
-        int manualRemainingMovement)
+        int manualRemainingMovement,
+        Vector3Int? atCell = null)
     {
         bool sensorLogs = SensorLogGate.IsPodePousarEnabled();
         var report = new PodePousarReport
@@ -62,7 +91,9 @@ public static class PodePousarSensor
             selectedAircraft,
             map,
             terrainDatabase,
-            movementMode);
+            movementMode,
+            allowSameTeamAirBlockerForMovementTakeoff: false,
+            atCell: atCell);
 
         bool canLand = decision.available && decision.action == AircraftOperationAction.Land;
         report.status = canLand;

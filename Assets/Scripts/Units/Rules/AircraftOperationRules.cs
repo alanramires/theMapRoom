@@ -33,12 +33,18 @@ public readonly struct AircraftOperationDecision
 
 public static class AircraftOperationRules
 {
+    // atCell responde "e se a aeronave estivesse NAQUELE hex?" sem mover a unidade.
+    // Tudo abaixo desta funcao (ResolveContext, ResolveGroundedLayerForCell,
+    // CanEndLayerTransitionAtCell) ja recebia a celula por parametro; so a entrada
+    // amarrava a consulta a posicao atual, obrigando quem perguntava sobre outro hex
+    // a deslocar a unidade e restaurar depois. Omitido = hex atual, como sempre foi.
     public static AircraftOperationDecision Evaluate(
         UnitManager unit,
         Tilemap referenceTilemap,
         TerrainDatabase terrainDatabase,
         SensorMovementMode movementMode,
-        bool allowSameTeamAirBlockerForMovementTakeoff = false)
+        bool allowSameTeamAirBlockerForMovementTakeoff = false,
+        Vector3Int? atCell = null)
     {
         if (unit == null)
             return Unavailable("Unidade invalida.");
@@ -67,7 +73,7 @@ public static class AircraftOperationRules
         if (unit.LayerLockTurnsRemaining > 0)
             return Unavailable("Unidade sob trava de camada.");
 
-        Vector3Int cell = unit.CurrentCellPosition;
+        Vector3Int cell = atCell ?? unit.CurrentCellPosition;
         cell.z = 0;
         AirOperationTileContext tileContext = AirOperationResolver.ResolveContext(referenceTilemap, terrainDatabase, cell);
 

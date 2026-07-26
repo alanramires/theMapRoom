@@ -20,40 +20,288 @@ public partial class AIController
         if (logistics == null || snapshot == null || snapshot.MyUnits == null)
             return null;
 
-        UnitManager best = null;
-        float bestScore = float.MinValue;
-        for (int i = 0; i < snapshot.MyUnits.Count; i++)
+        var compatibilityByTargetId =
+            new Dictionary<int, bool>();
+        bool IsCandidate(UnitManager ally)
         {
-            UnitManager ally = snapshot.MyUnits[i];
-            if (ally == null
-                || ally == logistics
-                || ally.IsDead
-                || (ally.IsEmbarked && !IsOwnEmbarkedPassenger(logistics, ally))
-                || ally.SlotIndex != logistics.SlotIndex
-                || ally.ReceivedSuppliesThisTurn)
-                continue;
+            bool structurallyEligible = ally != null
+                   && ally != logistics
+                   && !ally.IsDead
+                   && (!ally.IsEmbarked
+                       || IsOwnEmbarkedPassenger(logistics, ally))
+                   && ally.SlotIndex == logistics.SlotIndex
+                   && !ally.ReceivedSuppliesThisTurn
+                   && (ally.IsUnderRepair
+                       || IsPreventiveLogisticsTarget(
+                           logistics, ally));
+            if (!structurallyEligible)
+                return false;
 
-            // Alvos que podem ser atendidos nesta rodada pertencem ao hotzone e
-            // foram consumidos antes deste metodo. Aqui so existe a excecao de
-            // planejamento: deslocar-se na direcao de quem esta em manutencao.
-            if (!ally.IsUnderRepair)
-                continue;
-
-            Vector3Int cell = ally.CurrentCellPosition;
-            cell.z = 0;
-            float threat = CalculateThreatLevel(cell, snapshot.AITeam);
-            float score = ScoreLogisticsTargetNeed(snapshot, fromCell, ally)
-                + threat * (baseDefense ? 120f : 35f)
-                - SectorManager.HexDistance(fromCell, cell) * 45f
-                - ally.InstanceId * 0.001f;
-            if (score > bestScore)
+            if (!compatibilityByTargetId.TryGetValue(
+                    ally.InstanceId, out bool compatible))
             {
+                compatible =
+                    CanSupplyLogisticsTargetFromAnyLegalOrigin(
+                        logistics, ally, snapshot,
+                        out string compatibilityReason);
+                compatibilityByTargetId[ally.InstanceId] =
+                    compatible;
+                if (!compatible && showAILogs)
+                {
+                    Debug.Log($"{TL("Logistics")} " +
+                              $"{logistics.InstanceId} descarta " +
+                              $"{ally.UnitDisplayName}#{ally.InstanceId}: " +
+                              $"PodeSuprir sem origem compativel " +
+                              $"({compatibilityReason}).");
+                }
+            }
+
+            return compatible;
+        }
+
+        float ScoreCandidate(UnitManager ally)
+        {
+            Vector3Int allyCell = ally.CurrentCellPosition;
+            allyCell.z = 0;
+            float need = ScoreLogisticsTargetNeed(
+                snapshot, fromCell, ally);
+            int maxFuel = Mathf.Max(1, ally.GetMaxFuel());
+            float fuelPct =
+                ally.CurrentFuel * 100f / maxFuel;
+            float fuelEmergency = fuelPct <= 20f
+                ? 20000f + (20f - fuelPct) * 1000f
+                : 0f;
+            int cubic =
+                AIActionReachCoordinator.CubicDistance(
+                    fromCell, allyCell);
+            return need
+                   + fuelEmergency
+                   - cubic * 45f
+                   - ally.InstanceId * 0.001f;
+        }
+
+        bool EvaluateOperational(
+            int budget,
+            out AIReachDecisionCandidate<UnitManager> candidate)
+        {
+            candidate = null;
+            Dictionary<Vector3Int, List<Vector3Int>> operationalPaths =
+                UnitMovementPathRules.CalcularCaminhosValidos(
+                    boardTilemap,
+                    logistics,
+                    Mathf.Max(0, budget),
+                    terrainDatabase);
+            if (operationalPaths == null
+                || operationalPaths.Count == 0
+                || !logistics.TryGetUnitData(
+                    out UnitData logisticsData)
+                || logisticsData == null)
+                return false;
+
+            UnitThreatEnvelope envelope =
+                UnitThreatEnvelopeService.BuildServiceEnvelope(
+                    logistics,
+                    boardTilemap,
+                    operationalPaths,
+                    logisticsData.serviceRange);
+            UnitManager best = null;
+            float bestScore = float.MinValue;
+            for (int i = 0; i < snapshot.MyUnits.Count; i++)
+            {
+                UnitManager ally = snapshot.MyUnits[i];
+                if (!IsCandidate(ally))
+                    continue;
+                Vector3Int allyCell =
+                    ally.CurrentCellPosition;
+                allyCell.z = 0;
+                if (!envelope.CanThreaten(allyCell))
+                    continue;
+                float score = ScoreCandidate(ally);
+                if (score <= bestScore)
+                    continue;
                 bestScore = score;
                 best = ally;
             }
+
+            if (best == null)
+                return false;
+            Vector3Int target = best.CurrentCellPosition;
+            target.z = 0;
+            candidate = new AIReachDecisionCandidate<UnitManager>
+            {
+                Value = best,
+                ActionCell = target,
+                TargetCell = target,
+                Score = bestScore,
+                Reason = "service_hotzone_2t"
+            };
+            return true;
         }
 
-        return best;
+        bool EvaluateStrategic(
+            int _,
+            out AIReachDecisionCandidate<UnitManager> candidate)
+        {
+            candidate = null;
+            // Anotacao operacional do servico de retaguarda: um supridor so
+            // abandona sua ancora por demanda distante se nao houver ameaca
+            // no reach tatico nem no reach operacional de duas rodadas.
+            if (!baseDefense
+                && HasEnemyInsideLogisticsReach(
+                    logistics, snapshot, fromCell, 2))
+                return false;
+
+            UnitManager best = null;
+            float bestScore = float.MinValue;
+            for (int i = 0; i < snapshot.MyUnits.Count; i++)
+            {
+                UnitManager ally = snapshot.MyUnits[i];
+                if (!IsCandidate(ally))
+                    continue;
+                float score = ScoreCandidate(ally);
+                if (score <= bestScore)
+                    continue;
+                bestScore = score;
+                best = ally;
+            }
+
+            if (best == null)
+                return false;
+            Vector3Int target = best.CurrentCellPosition;
+            target.z = 0;
+            candidate = new AIReachDecisionCandidate<UnitManager>
+            {
+                Value = best,
+                ActionCell = target,
+                TargetCell = target,
+                Score = bestScore,
+                Reason = "critical_need_cubic"
+            };
+            return true;
+        }
+
+        AIReachDecisionResult<UnitManager> reach =
+            AIActionReachCoordinator.Evaluate(
+                new AIReachDecisionRequest<UnitManager>
+                {
+                    Context =
+                        $"FieldSupply:{logistics.InstanceId}",
+                    Policy = new AIReachDecisionPolicy(
+                        AIReachDecisionStages.Operational
+                        | AIReachDecisionStages.Strategic,
+                        operationalTurns: 2),
+                    CurrentMovementBudget = Mathf.Max(
+                        0, logistics.RemainingMovementPoints),
+                    EvaluateOperational = EvaluateOperational,
+                    EvaluateStrategic = EvaluateStrategic,
+                    DiagnosticLog = showAILogs
+                        ? message => Debug.Log(message)
+                        : null
+                });
+        return reach.Found ? reach.Decision.Value : null;
+    }
+
+    private bool CanSupplyLogisticsTargetFromAnyLegalOrigin(
+        UnitManager logistics,
+        UnitManager target,
+        AIWorldSnapshot snapshot,
+        out string reason)
+    {
+        reason = "sem origem candidata";
+        if (logistics == null
+            || target == null
+            || snapshot == null)
+            return false;
+
+        Vector3Int targetCell =
+            target.CurrentCellPosition;
+        targetCell.z = 0;
+        var origins = new List<Vector3Int>(7);
+        var neighbors = new List<Vector3Int>(6);
+        UnitMovementPathRules.GetImmediateHexNeighbors(
+            boardTilemap, targetCell, neighbors);
+        origins.Add(targetCell);
+        origins.AddRange(neighbors);
+        var visited = new HashSet<Vector3Int>();
+        int limit = Mathf.Max(1, GetLogisticsServiceLimit(logistics));
+        string lastSensorReason = reason;
+
+        for (int i = 0; i < origins.Count; i++)
+        {
+            Vector3Int origin = origins[i];
+            origin.z = 0;
+            if (!visited.Add(origin)
+                || !IsConfirmedVisibleCellForAI(origin)
+                || !IsLogisticsServiceCellAllowed(
+                    logistics, snapshot, origin))
+                continue;
+
+            List<UnitManager> occupants =
+                UnitOccupancyRules.GetUnitsAtCell(
+                    boardTilemap, origin, logistics);
+            if (!OccupancyResolver.CanEndMove(
+                    logistics, origin, occupants))
+                continue;
+
+            List<UnitManager> validTargets =
+                CollectLogisticsTargetsBySupplySensorAtCell(
+                    logistics,
+                    snapshot,
+                    origin,
+                    limit,
+                    allowPreventiveMaintenance: true,
+                    out _,
+                    out _,
+                    out string sensorReason);
+            lastSensorReason = sensorReason;
+            for (int t = 0; t < validTargets.Count; t++)
+            {
+                UnitManager valid = validTargets[t];
+                if (valid != null
+                    && valid.InstanceId == target.InstanceId)
+                {
+                    reason = $"origem={origin}";
+                    return true;
+                }
+            }
+        }
+
+        reason = string.IsNullOrWhiteSpace(lastSensorReason)
+            ? "dominio/camada/terreno/servico incompativeis"
+            : lastSensorReason;
+        return false;
+    }
+
+    private static bool HasEnemyInsideLogisticsReach(
+        UnitManager logistics,
+        AIWorldSnapshot snapshot,
+        Vector3Int fromCell,
+        int turns)
+    {
+        if (logistics == null
+            || snapshot?.EnemyUnits == null)
+            return false;
+
+        fromCell.z = 0;
+        int reach = Mathf.Max(
+            0, logistics.RemainingMovementPoints)
+            * Mathf.Max(1, turns);
+        for (int i = 0; i < snapshot.EnemyUnits.Count; i++)
+        {
+            UnitManager enemy = snapshot.EnemyUnits[i];
+            if (enemy == null
+                || enemy.IsDead
+                || enemy.IsEmbarked)
+                continue;
+            Vector3Int enemyCell =
+                enemy.CurrentCellPosition;
+            enemyCell.z = 0;
+            if (AIActionReachCoordinator.CubicDistance(
+                    fromCell, enemyCell) <= reach)
+                return true;
+        }
+
+        return false;
     }
 
     private bool TryBuildLogisticsSupplyAction(

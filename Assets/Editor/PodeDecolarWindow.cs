@@ -12,7 +12,7 @@ public class PodeDecolarWindow : EditorWindow
     private string statusMessage = "Ready.";
     private Vector2 windowScroll;
 
-    [MenuItem("Tools/Operações Aereas/Pode Decolar")]
+    [MenuItem("Tools/Operações Aéreas/Pode Decolar")]
     public static void OpenWindow()
     {
         GetWindow<PodeDecolarWindow>("Pode Decolar");
