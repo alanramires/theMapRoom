@@ -614,7 +614,7 @@ public partial class TurnStateManager
         {
             Vector3Int supplierCell = supplier.CurrentCellPosition;
             supplierCell.z = 0;
-            if (!CanUseLayerModeAtCurrentCell(supplier, terrainTilemap != null ? terrainTilemap : supplier.BoardTilemap, terrainDatabase, supplierCell, serviceDomain, serviceHeight, out string supplierLayerReason))
+            if (!LayerTransitionRules.CanUseLayerModeAtCell(supplier, terrainTilemap != null ? terrainTilemap : supplier.BoardTilemap, terrainDatabase, supplierCell, serviceDomain, serviceHeight, out string supplierLayerReason))
             {
                 Debug.Log($"[Suprimento] Supplier nao pode operar em {serviceDomain}/{serviceHeight} no hex atual ({supplierLayerReason}).");
                 Retreat("SuprindoExecuting: retry layer");
@@ -670,7 +670,7 @@ public partial class TurnStateManager
                     continue;
                 }
 
-                if (!CanUseLayerModeAtCurrentCell(target, boardMap, terrainDatabase, targetCell, order.plannedServiceDomain, order.plannedServiceHeight, out string plannedLayerReason))
+                if (!LayerTransitionRules.CanUseLayerModeAtCell(target, boardMap, terrainDatabase, targetCell, order.plannedServiceDomain, order.plannedServiceHeight, out string plannedLayerReason))
                 {
                     Debug.Log($"[Suprimento] {target.name} ignorado: camada planejada {order.plannedServiceDomain}/{order.plannedServiceHeight} invalida no hex atual ({plannedLayerReason}).");
                     continue;
@@ -689,7 +689,7 @@ public partial class TurnStateManager
             }
             if (!isEmbarkedPassenger && TryGetSupplyLayerFromPlan(layerPlan, out Domain targetServiceDomain, out HeightLevel targetServiceHeight))
             {
-                if (!CanUseLayerModeAtCurrentCell(target, boardMap, terrainDatabase, targetCell, targetServiceDomain, targetServiceHeight, out string queueLayerReason))
+                if (!LayerTransitionRules.CanUseLayerModeAtCell(target, boardMap, terrainDatabase, targetCell, targetServiceDomain, targetServiceHeight, out string queueLayerReason))
                 {
                     Debug.Log($"[Suprimento] {target.name} ignorado: camada de atendimento {targetServiceDomain}/{targetServiceHeight} invalida no hex atual ({queueLayerReason}).");
                     continue;

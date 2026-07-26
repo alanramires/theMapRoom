@@ -542,7 +542,7 @@ public partial class TurnStateManager
                         continue;
                     }
 
-                    if (!CanUseLayerModeAtCurrentCell(target, boardMap, terrainDatabase, targetCell, order.plannedServiceDomain, order.plannedServiceHeight, out string plannedLayerReason))
+                    if (!LayerTransitionRules.CanUseLayerModeAtCell(target, boardMap, terrainDatabase, targetCell, order.plannedServiceDomain, order.plannedServiceHeight, out string plannedLayerReason))
                     {
                         CommandServiceLog($"[ServicoComando] {target.name} ignorado: camada planejada {order.plannedServiceDomain}/{order.plannedServiceHeight} invalida ({plannedLayerReason}).");
                         continue;

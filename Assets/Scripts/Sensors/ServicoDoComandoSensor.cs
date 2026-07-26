@@ -768,7 +768,7 @@ public static class ServicoDoComandoSensor
             {
                 Vector3Int targetCell = target.CurrentCellPosition;
                 targetCell.z = 0;
-                if (!PodeSuprirSensor.CanUseLayerModeAtCurrentCellForSupply(
+                if (!LayerTransitionRules.CanUseLayerModeAtCell(
                         target,
                         boardMap,
                         terrainDatabase,
@@ -821,7 +821,7 @@ public static class ServicoDoComandoSensor
                     reason = lockReason;
                     return false;
                 }
-                if (!PodeSuprirSensor.CanUseLayerModeAtCurrentCellForSupply(
+                if (!LayerTransitionRules.CanUseLayerModeAtCell(
                         target,
                         boardMap,
                         terrainDatabase,
@@ -855,7 +855,7 @@ public static class ServicoDoComandoSensor
                         reason = lockReason;
                         return false;
                     }
-                    if (!PodeSuprirSensor.CanUseLayerModeAtCurrentCellForSupply(
+                    if (!LayerTransitionRules.CanUseLayerModeAtCell(
                             target,
                             boardMap,
                             terrainDatabase,

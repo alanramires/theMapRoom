@@ -925,7 +925,7 @@ public partial class TurnStateManager
             selectedUnit.TryGetForcedLayerLock(out Domain pendingLockDomain, out HeightLevel pendingLockHeight, out _))
         {
             Tilemap pendingBoardMap = terrainTilemap != null ? terrainTilemap : selectedUnit.BoardTilemap;
-            if (!PodeEmergirSensor.CanApplyLayerTransitionAtCell(
+            if (!LayerTransitionRules.CanUseLayerModeAtCell(
                     selectedUnit, pendingBoardMap, terrainDatabase, cell, pendingLockDomain, pendingLockHeight, out _))
             {
                 return false;

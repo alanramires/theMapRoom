@@ -482,7 +482,7 @@ public static class PodeSuprirSensor
             {
                 Vector3Int targetCell = target.CurrentCellPosition;
                 targetCell.z = 0;
-                if (!CanUseLayerModeAtCurrentCellForSupply(target, boardMap, terrainDatabase, targetCell, Domain.Naval, HeightLevel.Surface, out string surfaceReason))
+                if (!LayerTransitionRules.CanUseLayerModeAtCell(target, boardMap, terrainDatabase, targetCell, Domain.Naval, HeightLevel.Surface, out string surfaceReason))
                 {
                     reason = $"Alvo submerso pode emergir, mas o hex atual nao aceita Naval/Surface ({surfaceReason}).";
                     return false;
@@ -526,7 +526,7 @@ public static class PodeSuprirSensor
                         reason = lockReason;
                         return false;
                     }
-                    if (!CanUseLayerModeAtCurrentCellForSupply(
+                    if (!LayerTransitionRules.CanUseLayerModeAtCell(
                             target,
                             boardMap,
                             terrainDatabase,
@@ -563,7 +563,7 @@ public static class PodeSuprirSensor
                         reason = lockReason;
                         return false;
                     }
-                    if (!CanUseLayerModeAtCurrentCellForSupply(
+                    if (!LayerTransitionRules.CanUseLayerModeAtCell(
                             target,
                             boardMap,
                             terrainDatabase,
@@ -753,264 +753,6 @@ public static class PodeSuprirSensor
                 continue;
             if (HasSupplyForService(service, stock))
                 return true;
-        }
-
-        return false;
-    }
-
-    public static bool CanUseLayerModeAtCurrentCellForSupply(
-        UnitManager unit,
-        Tilemap boardMap,
-        TerrainDatabase terrainDb,
-        Vector3Int cell,
-        Domain targetDomain,
-        HeightLevel targetHeight,
-        out string reason)
-    {
-        reason = string.Empty;
-        if (unit == null || boardMap == null)
-        {
-            reason = "contexto de mapa/unidade invalido";
-            return false;
-        }
-        if (!CanEndLayerTransitionAtCurrentCellForSupply(unit, boardMap, cell, targetDomain, targetHeight, out reason))
-            return false;
-
-        ConstructionManager construction = ConstructionOccupancyRules.GetConstructionAtCell(boardMap, cell);
-        if (construction != null)
-        {
-            if (!construction.SupportsLayerMode(targetDomain, targetHeight))
-            {
-                reason = $"construcao nao suporta {targetDomain}/{targetHeight}";
-                return false;
-            }
-
-            if (!UnitPassesAnyRequiredSkill(unit, construction.GetRequiredSkillsToEnter()))
-            {
-                reason = "skill exigida pela construcao ausente";
-                return false;
-            }
-            if (UnitHasAnyBlockedSkill(unit, construction.GetBlockedSkillsToEnter()))
-            {
-                reason = "skill bloqueada pela construcao";
-                return false;
-            }
-
-            return true;
-        }
-
-        StructureData structure = StructureOccupancyRules.GetStructureAtCell(boardMap, cell);
-        if (structure != null)
-        {
-            TryResolveTerrainAtCellForSupply(boardMap, terrainDb, cell, out TerrainTypeData terrainWithStructure);
-
-            if (!StructureSupportsLayerModeForSupply(structure, targetDomain, targetHeight))
-            {
-                reason = $"estrutura nao suporta {targetDomain}/{targetHeight}";
-                return false;
-            }
-
-            bool usesAdditionalStructureMode = StructureSupportsAdditionalLayerModeForSupply(structure, targetDomain, targetHeight);
-            if (!usesAdditionalStructureMode && !UnitPassesAnyRequiredSkill(unit, structure.GetRequiredSkillsToEnter(terrainWithStructure)))
-            {
-                reason = "skill exigida pela estrutura ausente";
-                return false;
-            }
-            if (UnitHasAnyBlockedSkill(unit, structure.GetBlockedSkillsToEnter(terrainWithStructure)))
-            {
-                reason = "skill bloqueada pela estrutura";
-                return false;
-            }
-
-            if (terrainWithStructure == null)
-            {
-                reason = "terreno nao encontrado";
-                return false;
-            }
-
-            if (!TerrainSupportsLayerModeForSupply(terrainWithStructure, targetDomain, targetHeight))
-            {
-                reason = $"terreno nao suporta {targetDomain}/{targetHeight}";
-                return false;
-            }
-
-            return true;
-        }
-
-        if (!TryResolveTerrainAtCellForSupply(boardMap, terrainDb, cell, out TerrainTypeData terrain) || terrain == null)
-        {
-            reason = "terreno nao encontrado";
-            return false;
-        }
-
-        if (!TerrainSupportsLayerModeForSupply(terrain, targetDomain, targetHeight))
-        {
-            reason = $"terreno nao suporta {targetDomain}/{targetHeight}";
-            return false;
-        }
-
-        if (!UnitPassesAnyRequiredSkill(unit, terrain.requiredSkillsToEnter))
-        {
-            reason = "skill exigida pelo terreno ausente";
-            return false;
-        }
-        if (UnitHasAnyBlockedSkill(unit, terrain.blockedSkills))
-        {
-            reason = "skill bloqueada pelo terreno";
-            return false;
-        }
-
-        return true;
-    }
-
-    private static bool CanEndLayerTransitionAtCurrentCellForSupply(
-        UnitManager unit,
-        Tilemap boardMap,
-        Vector3Int cell,
-        Domain targetDomain,
-        HeightLevel targetHeight,
-        out string reason)
-    {
-        reason = string.Empty;
-        if (UnitOccupancyRules.CanEndLayerTransitionAtCell(boardMap, cell, unit, targetDomain, targetHeight, out UnitManager blocker))
-            return true;
-
-        string blockerName = blocker != null && !string.IsNullOrWhiteSpace(blocker.UnitDisplayName) ? blocker.UnitDisplayName : "aliado";
-        reason = $"camada {targetDomain}/{targetHeight} ocupada por {blockerName}";
-        return false;
-    }
-
-    private static bool UnitPassesAnyRequiredSkill(UnitManager unit, IReadOnlyList<SkillData> requiredSkills)
-    {
-        if (requiredSkills == null || requiredSkills.Count == 0)
-            return true;
-        if (unit == null)
-            return false;
-
-        bool hasAnyValidRequiredSkill = false;
-        for (int i = 0; i < requiredSkills.Count; i++)
-        {
-            SkillData required = requiredSkills[i];
-            if (required == null)
-                continue;
-            hasAnyValidRequiredSkill = true;
-            if (unit.HasSkill(required))
-                return true;
-        }
-
-        if (!hasAnyValidRequiredSkill)
-            return true;
-
-        return false;
-    }
-
-    private static bool UnitHasAnyBlockedSkill(UnitManager unit, IReadOnlyList<SkillData> blockedSkills)
-    {
-        if (unit == null || blockedSkills == null || blockedSkills.Count == 0)
-            return false;
-
-        for (int i = 0; i < blockedSkills.Count; i++)
-        {
-            SkillData blockedSkill = blockedSkills[i];
-            if (blockedSkill == null)
-                continue;
-            if (unit.HasSkill(blockedSkill))
-                return true;
-        }
-
-        return false;
-    }
-
-    private static bool TerrainSupportsLayerModeForSupply(TerrainTypeData terrain, Domain domain, HeightLevel heightLevel)
-    {
-        if (terrain == null)
-            return false;
-        if (terrain.domain == domain && terrain.heightLevel == heightLevel)
-            return true;
-        if (domain == Domain.Air && terrain.alwaysAllowAirDomain)
-            return true;
-        if (terrain.aditionalDomainsAllowed == null)
-            return false;
-        for (int i = 0; i < terrain.aditionalDomainsAllowed.Count; i++)
-        {
-            TerrainLayerMode mode = terrain.aditionalDomainsAllowed[i];
-            if (mode.domain == domain && mode.heightLevel == heightLevel)
-                return true;
-        }
-        return false;
-    }
-
-    private static bool StructureSupportsLayerModeForSupply(StructureData structure, Domain domain, HeightLevel heightLevel)
-    {
-        if (structure == null)
-            return false;
-        if (structure.domain == domain && structure.heightLevel == heightLevel)
-            return true;
-        if (domain == Domain.Air && structure.alwaysAllowAirDomain)
-            return true;
-        if (structure.aditionalDomainsAllowed == null)
-            return false;
-        for (int i = 0; i < structure.aditionalDomainsAllowed.Count; i++)
-        {
-            TerrainLayerMode mode = structure.aditionalDomainsAllowed[i];
-            if (mode.domain == domain && mode.heightLevel == heightLevel)
-                return true;
-        }
-        return false;
-    }
-
-    private static bool StructureSupportsAdditionalLayerModeForSupply(StructureData structure, Domain domain, HeightLevel heightLevel)
-    {
-        if (structure == null || structure.aditionalDomainsAllowed == null)
-            return false;
-
-        for (int i = 0; i < structure.aditionalDomainsAllowed.Count; i++)
-        {
-            TerrainLayerMode mode = structure.aditionalDomainsAllowed[i];
-            if (mode.domain == domain && mode.heightLevel == heightLevel)
-                return true;
-        }
-
-        return false;
-    }
-
-    private static bool TryResolveTerrainAtCellForSupply(
-        Tilemap terrainTilemap,
-        TerrainDatabase terrainDb,
-        Vector3Int cell,
-        out TerrainTypeData terrain)
-    {
-        terrain = null;
-        if (terrainTilemap == null || terrainDb == null)
-            return false;
-
-        cell.z = 0;
-        TileBase tile = terrainTilemap.GetTile(cell);
-        if (tile != null && terrainDb.TryGetByPaletteTile(tile, out TerrainTypeData byMainTile) && byMainTile != null)
-        {
-            terrain = byMainTile;
-            return true;
-        }
-
-        GridLayout grid = terrainTilemap.layoutGrid;
-        if (grid == null)
-            return false;
-
-        Tilemap[] maps = grid.GetComponentsInChildren<Tilemap>(includeInactive: true);
-        for (int i = 0; i < maps.Length; i++)
-        {
-            Tilemap map = maps[i];
-            if (map == null)
-                continue;
-
-            TileBase altTile = map.GetTile(cell);
-            if (altTile == null)
-                continue;
-            if (terrainDb.TryGetByPaletteTile(altTile, out TerrainTypeData byAltTile) && byAltTile != null)
-            {
-                terrain = byAltTile;
-                return true;
-            }
         }
 
         return false;

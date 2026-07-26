@@ -2187,7 +2187,7 @@ public partial class TurnStateManager
                     continue;
                 }
 
-                if (!CanUseLayerModeAtCurrentCell(unit, boardMap, terrainDatabase, unitCell, mode.domain, mode.heightLevel, out string blockReason))
+                if (!LayerTransitionRules.CanUseLayerModeAtCell(unit, boardMap, terrainDatabase, unitCell, mode.domain, mode.heightLevel, out string blockReason))
                 {
                     if (string.IsNullOrWhiteSpace(unavailableReason))
                         unavailableReason = blockReason;
@@ -2302,294 +2302,6 @@ public partial class TurnStateManager
         Vector3Int cell = unit.CurrentCellPosition;
         cell.z = 0;
         return cell;
-    }
-
-    // Publico porque as janelas de debug do Editor (Tools/Operacoes Navais) precisam
-    // responder "pode submergir?" pela MESMA regra que o jogo aplica — replicar a
-    // validacao numa copia paralela e como o PodePousarWindow ja diverge daqui.
-    public static bool CanUseLayerModeAtCurrentCell(
-        UnitManager unit,
-        Tilemap boardMap,
-        TerrainDatabase terrainDb,
-        Vector3Int cell,
-        Domain targetDomain,
-        HeightLevel targetHeight,
-        out string reason)
-    {
-        if (unit != null &&
-            unit.GetDomain() == Domain.Naval &&
-            unit.GetHeightLevel() == HeightLevel.Surface &&
-            targetDomain == Domain.Submarine &&
-            targetHeight == HeightLevel.Submerged)
-        {
-            return PodeSubmergirSensor.CanSubmergeAtCell(
-                unit,
-                boardMap,
-                terrainDb,
-                cell,
-                out reason);
-        }
-
-        reason = string.Empty;
-        if (unit == null || boardMap == null)
-        {
-            reason = "Contexto de mapa/unidade invalido.";
-            return false;
-        }
-        if (!CanEndLayerTransitionAtCurrentCell(unit, boardMap, cell, targetDomain, targetHeight, out reason))
-            return false;
-
-        ConstructionManager construction = ConstructionOccupancyRules.GetConstructionAtCell(boardMap, cell);
-        if (construction != null)
-        {
-            if (!construction.SupportsLayerMode(targetDomain, targetHeight))
-            {
-                reason = $"Construcao no hex nao suporta {targetDomain}/{targetHeight}.";
-                return false;
-            }
-
-            if (!UnitPassesSkillRequirement(unit, construction.GetRequiredSkillsToEnter()))
-            {
-                reason = "Unidade nao possui skill exigida pela construcao para trocar de camada.";
-                return false;
-            }
-            if (UnitHasAnyBlockedSkill(unit, construction.GetBlockedSkillsToEnter()))
-            {
-                reason = "Unidade possui skill bloqueada pela construcao para trocar de camada.";
-                return false;
-            }
-
-            return true;
-        }
-
-        StructureData structure = StructureOccupancyRules.GetStructureAtCell(boardMap, cell);
-        if (structure != null)
-        {
-            TryResolveTerrainAtCell(boardMap, terrainDb, cell, out TerrainTypeData terrainWithStructure);
-
-            if (!StructureSupportsLayerMode(structure, targetDomain, targetHeight))
-            {
-                reason = $"Estrutura no hex nao suporta {targetDomain}/{targetHeight}.";
-                return false;
-            }
-
-            bool usesAdditionalStructureMode = StructureSupportsAdditionalLayerMode(structure, targetDomain, targetHeight);
-            if (!usesAdditionalStructureMode && !UnitPassesSkillRequirement(unit, structure.GetRequiredSkillsToEnter(terrainWithStructure)))
-            {
-                reason = "Unidade nao possui skill exigida pela estrutura para trocar de camada.";
-                return false;
-            }
-            if (UnitHasAnyBlockedSkill(unit, structure.GetBlockedSkillsToEnter(terrainWithStructure)))
-            {
-                reason = "Unidade possui skill bloqueada pela estrutura para trocar de camada.";
-                return false;
-            }
-
-            if (terrainWithStructure == null)
-            {
-                reason = "Terreno do hex nao encontrado para validar camada com estrutura.";
-                return false;
-            }
-
-            if (!TerrainSupportsLayerMode(terrainWithStructure, targetDomain, targetHeight))
-            {
-                reason = $"Terreno no hex (com estrutura) nao suporta {targetDomain}/{targetHeight}.";
-                return false;
-            }
-
-            return true;
-        }
-
-        if (!TryResolveTerrainAtCell(boardMap, terrainDb, cell, out TerrainTypeData terrain) || terrain == null)
-        {
-            reason = "Terreno do hex nao encontrado para validar camada.";
-            return false;
-        }
-
-        if (!TerrainSupportsLayerMode(terrain, targetDomain, targetHeight))
-        {
-            reason = $"Terreno no hex nao suporta {targetDomain}/{targetHeight}.";
-            return false;
-        }
-
-        if (!UnitPassesSkillRequirement(unit, terrain.requiredSkillsToEnter))
-        {
-            reason = "Unidade nao possui skill exigida pelo terreno para trocar de camada.";
-            return false;
-        }
-        if (UnitHasAnyBlockedSkill(unit, terrain.blockedSkills))
-        {
-            reason = "Unidade possui skill bloqueada pelo terreno para trocar de camada.";
-            return false;
-        }
-
-        return true;
-    }
-
-    private static bool CanEndLayerTransitionAtCurrentCell(
-        UnitManager unit,
-        Tilemap boardMap,
-        Vector3Int cell,
-        Domain targetDomain,
-        HeightLevel targetHeight,
-        out string reason)
-    {
-        reason = string.Empty;
-        if (UnitOccupancyRules.CanEndLayerTransitionAtCell(boardMap, cell, unit, targetDomain, targetHeight, out UnitManager blocker))
-            return true;
-
-        string blockerName = blocker != null && !string.IsNullOrWhiteSpace(blocker.UnitDisplayName) ? blocker.UnitDisplayName : "aliado";
-        reason = $"Camada {targetDomain}/{targetHeight} ocupada por {blockerName}.";
-        return false;
-    }
-
-    private static bool UnitPassesSkillRequirement(UnitManager unit, IReadOnlyList<SkillData> requiredSkills)
-    {
-        if (requiredSkills == null || requiredSkills.Count == 0)
-            return true;
-        if (unit == null)
-            return false;
-
-        bool hasAnyValidRequiredSkill = false;
-        for (int i = 0; i < requiredSkills.Count; i++)
-        {
-            SkillData requiredSkill = requiredSkills[i];
-            if (requiredSkill == null)
-                continue;
-
-            hasAnyValidRequiredSkill = true;
-            if (unit.HasSkill(requiredSkill))
-                return true;
-        }
-
-        if (!hasAnyValidRequiredSkill)
-            return true;
-
-        return false;
-    }
-
-    private static bool UnitHasAnyBlockedSkill(UnitManager unit, IReadOnlyList<SkillData> blockedSkills)
-    {
-        if (unit == null || blockedSkills == null || blockedSkills.Count <= 0)
-            return false;
-
-        for (int i = 0; i < blockedSkills.Count; i++)
-        {
-            SkillData blockedSkill = blockedSkills[i];
-            if (blockedSkill == null)
-                continue;
-
-            if (unit.HasSkill(blockedSkill))
-                return true;
-        }
-
-        return false;
-    }
-
-    private static bool TerrainSupportsLayerMode(TerrainTypeData terrain, Domain domain, HeightLevel heightLevel)
-    {
-        if (terrain == null)
-            return false;
-
-        if (terrain.domain == domain && terrain.heightLevel == heightLevel)
-            return true;
-
-        if (domain == Domain.Air && terrain.alwaysAllowAirDomain)
-            return true;
-
-        if (terrain.aditionalDomainsAllowed == null)
-            return false;
-
-        for (int i = 0; i < terrain.aditionalDomainsAllowed.Count; i++)
-        {
-            TerrainLayerMode mode = terrain.aditionalDomainsAllowed[i];
-            if (mode.domain == domain && mode.heightLevel == heightLevel)
-                return true;
-        }
-
-        return false;
-    }
-
-    private static bool StructureSupportsLayerMode(StructureData structure, Domain domain, HeightLevel heightLevel)
-    {
-        if (structure == null)
-            return false;
-
-        if (structure.domain == domain && structure.heightLevel == heightLevel)
-            return true;
-
-        if (domain == Domain.Air && structure.alwaysAllowAirDomain)
-            return true;
-
-        if (structure.aditionalDomainsAllowed == null)
-            return false;
-
-        for (int i = 0; i < structure.aditionalDomainsAllowed.Count; i++)
-        {
-            TerrainLayerMode mode = structure.aditionalDomainsAllowed[i];
-            if (mode.domain == domain && mode.heightLevel == heightLevel)
-                return true;
-        }
-
-        return false;
-    }
-
-    private static bool StructureSupportsAdditionalLayerMode(StructureData structure, Domain domain, HeightLevel heightLevel)
-    {
-        if (structure == null || structure.aditionalDomainsAllowed == null)
-            return false;
-
-        for (int i = 0; i < structure.aditionalDomainsAllowed.Count; i++)
-        {
-            TerrainLayerMode mode = structure.aditionalDomainsAllowed[i];
-            if (mode.domain == domain && mode.heightLevel == heightLevel)
-                return true;
-        }
-
-        return false;
-    }
-
-    private static bool TryResolveTerrainAtCell(
-        Tilemap terrainTilemap,
-        TerrainDatabase terrainDb,
-        Vector3Int cell,
-        out TerrainTypeData terrain)
-    {
-        terrain = null;
-        if (terrainTilemap == null || terrainDb == null)
-            return false;
-
-        cell.z = 0;
-        TileBase tile = terrainTilemap.GetTile(cell);
-        if (tile != null && terrainDb.TryGetByPaletteTile(tile, out TerrainTypeData byMainTile) && byMainTile != null)
-        {
-            terrain = byMainTile;
-            return true;
-        }
-
-        GridLayout grid = terrainTilemap.layoutGrid;
-        if (grid == null)
-            return false;
-
-        Tilemap[] maps = grid.GetComponentsInChildren<Tilemap>(includeInactive: true);
-        for (int i = 0; i < maps.Length; i++)
-        {
-            Tilemap map = maps[i];
-            if (map == null)
-                continue;
-
-            TileBase other = map.GetTile(cell);
-            if (other == null)
-                continue;
-
-            if (terrainDb.TryGetByPaletteTile(other, out TerrainTypeData byGridTile) && byGridTile != null)
-            {
-                terrain = byGridTile;
-                return true;
-            }
-        }
-
-        return false;
     }
 
     private bool TryApplyDomainTransitionOption(LandingOption option, Tilemap boardMap)
@@ -4085,7 +3797,7 @@ public partial class TurnStateManager
         Tilemap selfEmergeBoardMap = terrainTilemap != null ? terrainTilemap : firingUnit.BoardTilemap;
         Vector3Int selfEmergeCell = firingUnit.CurrentCellPosition;
         selfEmergeCell.z = 0;
-        if (!PodeEmergirSensor.CanApplyLayerTransitionAtCell(
+        if (!LayerTransitionRules.CanUseLayerModeAtCell(
                 firingUnit, selfEmergeBoardMap, terrainDatabase, selfEmergeCell,
                 revealDomain, revealHeight, out string selfEmergeBlockReason))
         {
@@ -4149,7 +3861,7 @@ public partial class TurnStateManager
             Vector3Int forcedLayerCell = target.CurrentCellPosition;
             forcedLayerCell.z = 0;
             if ((target.GetDomain() != forcedDomain || target.GetHeightLevel() != forcedHeight) &&
-                !PodeEmergirSensor.CanApplyLayerTransitionAtCell(
+                !LayerTransitionRules.CanUseLayerModeAtCell(
                     target, forcedLayerBoardMap, terrainDatabase, forcedLayerCell,
                     forcedDomain, forcedHeight, out string forcedLayerBlockReason))
             {
@@ -4209,7 +3921,7 @@ public partial class TurnStateManager
         Tilemap emergeBoardMap = terrainTilemap != null ? terrainTilemap : target.BoardTilemap;
         Vector3Int emergeCell = target.CurrentCellPosition;
         emergeCell.z = 0;
-        if (!PodeEmergirSensor.CanApplyLayerTransitionAtCell(
+        if (!LayerTransitionRules.CanUseLayerModeAtCell(
                 target, emergeBoardMap, terrainDatabase, emergeCell,
                 forcedDomain, forcedHeight, out string emergeBlockReason))
         {

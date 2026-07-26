@@ -125,7 +125,7 @@ public static class PodeMirarSensor
             attacker.SupportsLayerMode(attackerData.emergeAfterAttackDomain, attackerData.emergeAfterAttackHeight) &&
             (attacker.GetDomain() != attackerData.emergeAfterAttackDomain ||
              attacker.GetHeightLevel() != attackerData.emergeAfterAttackHeight) &&
-            !PodeEmergirSensor.CanApplyLayerTransitionAtCell(
+            !LayerTransitionRules.CanUseLayerModeAtCell(
                 attacker,
                 map,
                 terrainDatabase,

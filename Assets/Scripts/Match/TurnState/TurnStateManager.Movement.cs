@@ -317,7 +317,7 @@ public partial class TurnStateManager
             return false;
         if (!selectedUnit.TryGetForcedLayerLock(out Domain lockDomain, out HeightLevel lockHeight, out _))
             return false;
-        if (!PodeEmergirSensor.CanApplyLayerTransitionAtCell(
+        if (!LayerTransitionRules.CanUseLayerModeAtCell(
                 selectedUnit, boardMap, terrainDatabase, cell, lockDomain, lockHeight, out _))
         {
             return false;
@@ -380,13 +380,14 @@ public partial class TurnStateManager
                 return;
             }
         }
-        else if (!CanUseLayerModeAtCellForLayerForce(
+        else if (!LayerTransitionRules.CanUseLayerModeAtCell(
                      selectedUnit,
                      boardMap,
                      terrainDatabase,
                      cell,
                      preferredDomain,
-                     preferredHeight))
+                     preferredHeight,
+                     out _))
         {
             return;
         }
@@ -521,78 +522,6 @@ public partial class TurnStateManager
         for (int i = 0; i < modes.Count; i++)
         {
             TerrainLayerMode mode = modes[i];
-            if (mode.domain == domain && mode.heightLevel == heightLevel)
-                return true;
-        }
-
-        return false;
-    }
-
-    private static bool CanUseLayerModeAtCellForLayerForce(
-        UnitManager unit,
-        Tilemap boardMap,
-        TerrainDatabase terrainDb,
-        Vector3Int cell,
-        Domain targetDomain,
-        HeightLevel targetHeight)
-    {
-        if (unit == null || boardMap == null)
-            return false;
-
-        ConstructionManager construction = ConstructionOccupancyRules.GetConstructionAtCell(boardMap, cell);
-        if (construction != null)
-            return construction.SupportsLayerMode(targetDomain, targetHeight);
-
-        StructureData structure = StructureOccupancyRules.GetStructureAtCell(boardMap, cell);
-        bool hasTerrain = TryResolveTerrainAtCellForLayerForce(boardMap, terrainDb, cell, out TerrainTypeData terrain) && terrain != null;
-        if (structure != null)
-        {
-            if (!StructureSupportsLayerModeForLayerForce(structure, targetDomain, targetHeight))
-                return false;
-            if (!hasTerrain)
-                return false;
-            return TerrainSupportsLayerModeForLayerForce(terrain, targetDomain, targetHeight);
-        }
-
-        if (!hasTerrain)
-            return false;
-
-        return TerrainSupportsLayerModeForLayerForce(terrain, targetDomain, targetHeight);
-    }
-
-    private static bool TerrainSupportsLayerModeForLayerForce(TerrainTypeData terrain, Domain domain, HeightLevel heightLevel)
-    {
-        if (terrain == null)
-            return false;
-        if (terrain.domain == domain && terrain.heightLevel == heightLevel)
-            return true;
-        if (domain == Domain.Air && terrain.alwaysAllowAirDomain)
-            return true;
-        if (terrain.aditionalDomainsAllowed == null)
-            return false;
-        for (int i = 0; i < terrain.aditionalDomainsAllowed.Count; i++)
-        {
-            TerrainLayerMode mode = terrain.aditionalDomainsAllowed[i];
-            if (mode.domain == domain && mode.heightLevel == heightLevel)
-                return true;
-        }
-
-        return false;
-    }
-
-    private static bool StructureSupportsLayerModeForLayerForce(StructureData structure, Domain domain, HeightLevel heightLevel)
-    {
-        if (structure == null)
-            return false;
-        if (structure.domain == domain && structure.heightLevel == heightLevel)
-            return true;
-        if (domain == Domain.Air && structure.alwaysAllowAirDomain)
-            return true;
-        if (structure.aditionalDomainsAllowed == null)
-            return false;
-        for (int i = 0; i < structure.aditionalDomainsAllowed.Count; i++)
-        {
-            TerrainLayerMode mode = structure.aditionalDomainsAllowed[i];
             if (mode.domain == domain && mode.heightLevel == heightLevel)
                 return true;
         }

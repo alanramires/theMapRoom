@@ -184,8 +184,8 @@ public static class AircraftOperationRules
     // quando a unidade suporta o modo e o hex o aceita (hidroaviao pousa na agua
     // ou praia de trem recolhido — a troca de camada aplica o sprite do modo
     // Naval/Surface do UnitData); caso contrario, Land/Surface. A regra de hex e
-    // a mesma da emersao (CanSurfaceAtCell: construcao > estrutura > terreno +
-    // skills), mantendo uma unica fonte de verdade para "Naval/Surface cabe aqui".
+    // a mesma da fundacao comum de camadas, mantendo uma unica fonte de verdade
+    // para "Naval/Surface cabe aqui".
     public static void ResolveGroundedLayerForCell(
         UnitManager unit,
         Tilemap referenceTilemap,
@@ -202,7 +202,14 @@ public static class AircraftOperationRules
 
         cell.z = 0;
         if (unit.SupportsLayerMode(Domain.Naval, HeightLevel.Surface) &&
-            PodeEmergirSensor.CanSurfaceAtCell(unit, referenceTilemap, terrainDatabase, cell, out _))
+            LayerTransitionRules.CanUseLayerModeAtCell(
+                unit,
+                referenceTilemap,
+                terrainDatabase,
+                cell,
+                Domain.Naval,
+                HeightLevel.Surface,
+                out _))
         {
             domain = Domain.Naval;
         }

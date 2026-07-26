@@ -4244,7 +4244,7 @@ public partial class TurnStateManager
         if (map == null && selectedUnit != null)
             map = selectedUnit.BoardTilemap;
 
-        if (TryResolveTerrainAtCell(map, terrainDatabase, cell, out TerrainTypeData terrain) && terrain != null)
+        if (LayerTransitionRules.TryResolveTerrainAtCell(map, terrainDatabase, cell, out TerrainTypeData terrain) && terrain != null)
             return ResolveTerrainName(terrain);
 
         return FormatMapCellWithZ(cell);

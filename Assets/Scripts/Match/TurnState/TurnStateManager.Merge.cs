@@ -711,7 +711,7 @@ public partial class TurnStateManager
 
                 Vector3Int cell = unit.CurrentCellPosition;
                 cell.z = 0;
-                if (!CanUseLayerModeAtCurrentCell(
+                if (!LayerTransitionRules.CanUseLayerModeAtCell(
                         unit,
                         boardMap,
                         terrainDatabase,

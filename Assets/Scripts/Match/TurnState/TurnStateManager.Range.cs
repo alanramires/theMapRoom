@@ -385,7 +385,7 @@ public partial class TurnStateManager
                     return true;
 
                 Tilemap pendingBoardMap = terrainTilemap != null ? terrainTilemap : mover.BoardTilemap;
-                return PodeEmergirSensor.CanApplyLayerTransitionAtCell(
+                return LayerTransitionRules.CanUseLayerModeAtCell(
                     mover, pendingBoardMap, terrainDatabase, cell, pendingLockDomain, pendingLockHeight, out _);
             }
 

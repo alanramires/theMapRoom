@@ -3271,7 +3271,7 @@ public class MatchController : MonoBehaviour
 
         Vector3Int cell = unit.CurrentCellPosition;
         cell.z = 0;
-        if (!PodeEmergirSensor.CanApplyLayerTransitionAtCell(
+        if (!LayerTransitionRules.CanUseLayerModeAtCell(
                 unit, boardMap, ResolveFogTerrainDatabase(), cell, lockDomain, lockHeight, out _))
         {
             return false;

@@ -1413,7 +1413,16 @@ public class PodeFundirSensorDebugWindow : EditorWindow
                 if (unit == null)
                     continue;
 
-                if (!CanUseLayerModeAtCurrentCell(unit, map, terrainDb, Domain.Submarine, HeightLevel.Submerged))
+                Vector3Int layerCell = unit.CurrentCellPosition;
+                layerCell.z = 0;
+                if (!LayerTransitionRules.CanUseLayerModeAtCell(
+                        unit,
+                        map,
+                        terrainDb,
+                        layerCell,
+                        Domain.Submarine,
+                        HeightLevel.Submerged,
+                        out _))
                 {
                     allCanSubmerge = false;
                     break;
@@ -1558,138 +1567,6 @@ public class PodeFundirSensorDebugWindow : EditorWindow
             return false;
 
         return value.TrimStart().StartsWith(tokenPrefix, System.StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static bool CanUseLayerModeAtCurrentCell(UnitManager unit, Tilemap boardMap, TerrainDatabase terrainDb, Domain targetDomain, HeightLevel targetHeight)
-    {
-        if (unit == null || boardMap == null)
-            return false;
-
-        Vector3Int cell = unit.CurrentCellPosition;
-        cell.z = 0;
-
-        ConstructionManager construction = ConstructionOccupancyRules.GetConstructionAtCell(boardMap, cell);
-        if (construction != null)
-            return construction.SupportsLayerMode(targetDomain, targetHeight) &&
-                   UnitPassesSkillRequirement(unit, construction.GetRequiredSkillsToEnter());
-
-        StructureData structure = StructureOccupancyRules.GetStructureAtCell(boardMap, cell);
-        if (structure != null)
-        {
-            if (!StructureSupportsLayerMode(structure, targetDomain, targetHeight))
-                return false;
-            if (!UnitPassesSkillRequirement(unit, structure.requiredSkillsToEnter))
-                return false;
-            if (!TryResolveTerrainAtCell(boardMap, terrainDb, cell, out TerrainTypeData terrainWithStructure) || terrainWithStructure == null)
-                return false;
-            if (!TerrainSupportsLayerMode(terrainWithStructure, targetDomain, targetHeight))
-                return false;
-            return UnitPassesSkillRequirement(unit, terrainWithStructure.requiredSkillsToEnter);
-        }
-
-        if (!TryResolveTerrainAtCell(boardMap, terrainDb, cell, out TerrainTypeData terrain) || terrain == null)
-            return false;
-        if (!TerrainSupportsLayerMode(terrain, targetDomain, targetHeight))
-            return false;
-        return UnitPassesSkillRequirement(unit, terrain.requiredSkillsToEnter);
-    }
-
-    private static bool UnitPassesSkillRequirement(UnitManager unit, IReadOnlyList<SkillData> requiredSkills)
-    {
-        if (requiredSkills == null || requiredSkills.Count == 0)
-            return true;
-        if (unit == null)
-            return false;
-
-        for (int i = 0; i < requiredSkills.Count; i++)
-        {
-            SkillData skill = requiredSkills[i];
-            if (skill == null)
-                continue;
-            if (unit.HasSkill(skill))
-                return true;
-        }
-
-        return false;
-    }
-
-    private static bool TerrainSupportsLayerMode(TerrainTypeData terrain, Domain domain, HeightLevel heightLevel)
-    {
-        if (terrain == null)
-            return false;
-        if (terrain.domain == domain && terrain.heightLevel == heightLevel)
-            return true;
-        if (domain == Domain.Air && terrain.alwaysAllowAirDomain)
-            return true;
-        if (terrain.aditionalDomainsAllowed == null)
-            return false;
-
-        for (int i = 0; i < terrain.aditionalDomainsAllowed.Count; i++)
-        {
-            TerrainLayerMode mode = terrain.aditionalDomainsAllowed[i];
-            if (mode.domain == domain && mode.heightLevel == heightLevel)
-                return true;
-        }
-
-        return false;
-    }
-
-    private static bool StructureSupportsLayerMode(StructureData structure, Domain domain, HeightLevel heightLevel)
-    {
-        if (structure == null)
-            return false;
-        if (structure.domain == domain && structure.heightLevel == heightLevel)
-            return true;
-        if (domain == Domain.Air && structure.alwaysAllowAirDomain)
-            return true;
-        if (structure.aditionalDomainsAllowed == null)
-            return false;
-
-        for (int i = 0; i < structure.aditionalDomainsAllowed.Count; i++)
-        {
-            TerrainLayerMode mode = structure.aditionalDomainsAllowed[i];
-            if (mode.domain == domain && mode.heightLevel == heightLevel)
-                return true;
-        }
-
-        return false;
-    }
-
-    private static bool TryResolveTerrainAtCell(Tilemap terrainTilemap, TerrainDatabase terrainDb, Vector3Int cell, out TerrainTypeData terrain)
-    {
-        terrain = null;
-        if (terrainTilemap == null || terrainDb == null)
-            return false;
-
-        cell.z = 0;
-        TileBase tile = terrainTilemap.GetTile(cell);
-        if (tile != null && terrainDb.TryGetByPaletteTile(tile, out TerrainTypeData byMainTile) && byMainTile != null)
-        {
-            terrain = byMainTile;
-            return true;
-        }
-
-        GridLayout grid = terrainTilemap.layoutGrid;
-        if (grid == null)
-            return false;
-
-        Tilemap[] maps = grid.GetComponentsInChildren<Tilemap>(includeInactive: true);
-        for (int i = 0; i < maps.Length; i++)
-        {
-            Tilemap map = maps[i];
-            if (map == null)
-                continue;
-            TileBase other = map.GetTile(cell);
-            if (other == null)
-                continue;
-            if (terrainDb.TryGetByPaletteTile(other, out TerrainTypeData byGridTile) && byGridTile != null)
-            {
-                terrain = byGridTile;
-                return true;
-            }
-        }
-
-        return false;
     }
 
     private static Tilemap FindPreferredTilemap()
