@@ -175,18 +175,65 @@ public partial class AIController
             requiredJointDeliveries >= 2
                 ? int.MaxValue
                 : maxRemainingRouteCost;
-        if (!TryEvaluateBestDisembark(
-                transporter,
-                targets,
-                out MelhorDesembarqueResult evaluation,
-                routeHorizon: 120,
-                movementBudget: transporter.RemainingMovementPoints,
-                maxRemainingRouteCost: effectiveRemainingRouteCost,
-                pathsByDestination: paths,
-                passengerPriorityByInstanceId:
-                    BuildPassengerDeliveryPriority(
-                        transporter, passengers))
-            || evaluation.best == null)
+
+        bool EvaluateTacticalDisembark(
+            int budget,
+            out AIReachDecisionCandidate<MelhorDesembarqueResult> candidate)
+        {
+            candidate = null;
+            if (!TryEvaluateBestDisembark(
+                    transporter,
+                    targets,
+                    out MelhorDesembarqueResult immediateEvaluation,
+                    routeHorizon: 120,
+                    movementBudget: budget,
+                    maxRemainingRouteCost:
+                        effectiveRemainingRouteCost,
+                    pathsByDestination: paths,
+                    passengerPriorityByInstanceId:
+                        BuildPassengerDeliveryPriority(
+                            transporter, passengers))
+                || immediateEvaluation.best == null)
+                return false;
+
+            MelhorDesembarqueLzScore immediateBest =
+                immediateEvaluation.best;
+            candidate =
+                new AIReachDecisionCandidate<MelhorDesembarqueResult>
+                {
+                    Value = immediateEvaluation,
+                    ActionCell = immediateBest.cell,
+                    TargetCell =
+                        immediateBest.spots.Count > 0
+                            ? immediateBest.spots[0].target
+                            : immediateBest.cell,
+                    Score = immediateBest.score,
+                    Reason =
+                        $"{immediateBest.delivered}p/" +
+                        $"{requiredJointDeliveries}p"
+                };
+            return true;
+        }
+
+        AIReachDecisionResult<MelhorDesembarqueResult>
+            immediateReach = AIActionReachCoordinator.Evaluate(
+                new AIReachDecisionRequest<MelhorDesembarqueResult>
+                {
+                    Context =
+                        $"TransportDelivery:{transporter.InstanceId}",
+                    Policy = AIReachDecisionPolicy.TacticalOnly,
+                    CurrentMovementBudget = Mathf.Max(
+                        0, transporter.RemainingMovementPoints),
+                    EvaluateTactical = EvaluateTacticalDisembark,
+                    DiagnosticLog = showAILogs
+                        ? message => Debug.Log(message)
+                        : null
+                });
+        MelhorDesembarqueResult evaluation =
+            immediateReach.Found
+                ? immediateReach.Decision.Value
+                : null;
+        if (evaluation?.best == null)
         {
             if ((usesFreeCargoFlow || requiredJointDeliveries >= 2)
                 && TryBuildJointDisembarkProgressionAction(
@@ -352,48 +399,216 @@ public partial class AIController
             || requiredJointDeliveries < 1)
             return false;
 
-        // Carga com plano ja possui um destino estrategico e continua usando o
-        // envelope longo diretamente. Rogue/rebelde nao deve varrer todas as
-        // praias do mapa: primeiro consulta somente a progressao de duas
-        // rodadas. Se nao houver LZ conjunta nesse envelope, devolve o controle
-        // ao courier do dominio, que progride para a praia/construcao ancora
-        // mais proxima do objetivo escolhido.
-        int oneTurnBudget = Mathf.Max(
-            1, transporter.RemainingMovementPoints);
-        int jointSearchBudget = usesFreeCargoFlow
-            ? Mathf.Max(oneTurnBudget, oneTurnBudget * 2)
-            : 120;
-        Dictionary<Vector3Int, List<Vector3Int>> longPaths =
-            UnitMovementPathRules.CalcularCaminhosValidos(
-                boardTilemap,
-                transporter,
-                jointSearchBudget,
-                terrainDatabase);
-        if (longPaths == null || longPaths.Count == 0
-            || !TryEvaluateBestDisembark(
-                transporter,
-                targets,
-                out MelhorDesembarqueResult longEvaluation,
-                routeHorizon: jointSearchBudget,
-                movementBudget: jointSearchBudget,
-                maxRemainingRouteCost: maxRemainingRouteCost,
-                pathsByDestination: longPaths,
-                passengerPriorityByInstanceId:
-                    BuildPassengerDeliveryPriority(
-                        transporter, passengers))
-            || longEvaluation.best == null
-            || longEvaluation.best.delivered < requiredJointDeliveries)
+        bool EvaluateDisembarkTier(
+            int budget,
+            out AIReachDecisionCandidate<MelhorDesembarqueResult> candidate)
+        {
+            candidate = null;
+            Dictionary<Vector3Int, List<Vector3Int>> tierPaths =
+                UnitMovementPathRules.CalcularCaminhosValidos(
+                    boardTilemap,
+                    transporter,
+                    Mathf.Max(0, budget),
+                    terrainDatabase);
+            if (tierPaths == null
+                || tierPaths.Count == 0
+                || !TryEvaluateBestDisembark(
+                    transporter,
+                    targets,
+                    out MelhorDesembarqueResult tierEvaluation,
+                    routeHorizon: Mathf.Max(1, budget),
+                    movementBudget: budget,
+                    maxRemainingRouteCost: maxRemainingRouteCost,
+                    pathsByDestination: tierPaths,
+                    passengerPriorityByInstanceId:
+                        BuildPassengerDeliveryPriority(
+                            transporter, passengers))
+                || tierEvaluation.best == null
+                || tierEvaluation.best.delivered
+                    < requiredJointDeliveries)
+                return false;
+
+            MelhorDesembarqueLzScore tierBest =
+                tierEvaluation.best;
+            Vector3Int targetCell =
+                tierBest.spots.Count > 0
+                    ? tierBest.spots[0].target
+                    : tierBest.cell;
+            candidate =
+                new AIReachDecisionCandidate<MelhorDesembarqueResult>
+                {
+                    Value = tierEvaluation,
+                    ActionCell = tierBest.cell,
+                    TargetCell = targetCell,
+                    Score = tierBest.score,
+                    Reason =
+                        $"{tierBest.delivered}p/" +
+                        $"{requiredJointDeliveries}p"
+                };
+            return true;
+        }
+
+        bool EvaluateStrategicAnchor(
+            int _,
+            out AIReachDecisionCandidate<MelhorDesembarqueResult> candidate)
+        {
+            candidate = null;
+            Vector3Int strategicFromCell =
+                transporter.CurrentCellPosition;
+            strategicFromCell.z = 0;
+            Vector3Int bestTarget = Vector3Int.zero;
+            int bestDistance = int.MaxValue;
+
+            // Carga planejada navega em funcao do passageiro prioritario, nao
+            // do predio geometricamente mais perto entre todos os passageiros.
+            // Rogue/rebelde nao possui eixo formal e cai no ranking cubico
+            // abaixo.
+            UnitManager strategicPrimary =
+                ResolvePrimaryPassenger(
+                    transporter, passengers, plan: null);
+            if (!usesFreeCargoFlow
+                && strategicPrimary != null
+                && targets.TryGetValue(
+                    strategicPrimary.InstanceId,
+                    out Vector3Int plannedTarget))
+            {
+                plannedTarget.z = 0;
+                bestTarget = plannedTarget;
+                bestDistance =
+                    AIActionReachCoordinator.CubicDistance(
+                        strategicFromCell, plannedTarget);
+            }
+
+            foreach (KeyValuePair<int, Vector3Int> pair in targets)
+            {
+                if (bestDistance < int.MaxValue
+                    && !usesFreeCargoFlow)
+                    break;
+                Vector3Int target = pair.Value;
+                target.z = 0;
+                int distance = AIActionReachCoordinator.CubicDistance(
+                    strategicFromCell, target);
+                if (distance >= bestDistance)
+                    continue;
+                bestDistance = distance;
+                bestTarget = target;
+            }
+
+            if (bestDistance == int.MaxValue)
+                return false;
+
+            // Value nulo identifica uma ancora, nao uma LZ pronta. O
+            // controlador do dominio traduz o alvo em praia, heliponto ou
+            // celula terrestre valida e usa Caminhos Validos para progredir.
+            candidate =
+                new AIReachDecisionCandidate<MelhorDesembarqueResult>
+                {
+                    Value = null,
+                    ActionCell = bestTarget,
+                    TargetCell = bestTarget,
+                    Score = -bestDistance,
+                    Reason = $"cubic={bestDistance}"
+                };
+            return true;
+        }
+
+        AIReachDecisionPolicy reachPolicy =
+            new AIReachDecisionPolicy(
+                AIReachDecisionStages.Operational
+                | AIReachDecisionStages.Strategic,
+                operationalTurns: 2);
+        var reachRequest =
+            new AIReachDecisionRequest<MelhorDesembarqueResult>
+            {
+                Context =
+                    $"TransportDelivery:{transporter.InstanceId}",
+                Policy = reachPolicy,
+                CurrentMovementBudget = Mathf.Max(
+                    1, transporter.RemainingMovementPoints),
+                StrategicSearchBudget = 120,
+                // O reach tatico ja foi consultado pelo chamador com os
+                // caminhos reais da rodada. Este segundo passe recebe o
+                // controle somente depois do miss ou de uma entrega parcial.
+                EvaluateOperational = EvaluateDisembarkTier,
+                EvaluateStrategic = EvaluateStrategicAnchor,
+                DiagnosticLog = showAILogs
+                    ? message => Debug.Log(message)
+                    : null
+            };
+        AIReachDecisionResult<MelhorDesembarqueResult>
+            reachDecision =
+                AIActionReachCoordinator.Evaluate(reachRequest);
+        if (!reachDecision.Found)
         {
             if (usesFreeCargoFlow)
-            {
                 Debug.Log($"{TL("Transporte")} {consumer} " +
                           $"{transporter.InstanceId} fluxo livre: " +
-                          $"sem LZ conjunta na progressao de 2 turnos " +
-                          $"(budget={jointSearchBudget}); usa ancora costeira.");
-            }
+                          $"sem LZ na progressao de " +
+                          $"{reachPolicy.OperationalTurns} turnos; " +
+                          $"usa ancora costeira.");
             return false;
         }
 
+        if (reachDecision.Tier == AIReachDecisionTier.Strategic
+            && reachDecision.Decision.Value == null)
+        {
+            Vector3Int strategicBranchFromCell =
+                transporter.CurrentCellPosition;
+            strategicBranchFromCell.z = 0;
+            Vector3Int strategicTarget =
+                reachDecision.Decision.TargetCell;
+            strategicTarget.z = 0;
+            Vector3Int strategicAnchor =
+                transporter.GetDomain() == Domain.Naval
+                    ? ResolveNavalApproachTarget(
+                        transporter,
+                        strategicTarget,
+                        strategicBranchFromCell)
+                    : strategicTarget;
+            strategicAnchor.z = 0;
+            HashSet<Vector3Int> strategicOccupied =
+                BuildOccupied(transporter);
+
+            if (strategicAnchor != strategicBranchFromCell
+                && TryFindBestToolProgressionCell(
+                    transporter,
+                    snapshot,
+                    strategicBranchFromCell,
+                    strategicAnchor,
+                    currentPaths,
+                    strategicOccupied,
+                    ToolProgressionIntent.TransportDelivery,
+                    out Vector3Int strategicProgressionCell,
+                    out _,
+                    out string strategicProgressionReason))
+            {
+                Debug.Log($"{TL("Transporte")} {consumer} " +
+                          $"{transporter.InstanceId} reach estrategico: " +
+                          $"alvo cubico {strategicTarget} -> " +
+                          $"ancora {strategicAnchor}; progride " +
+                          $"{strategicBranchFromCell}->" +
+                          $"{strategicProgressionCell} " +
+                          $"({strategicProgressionReason}).");
+                action = BuildMoveBatch(
+                    transporter,
+                    snapshot.AITeam,
+                    strategicBranchFromCell,
+                    strategicProgressionCell,
+                    currentPaths);
+                return true;
+            }
+
+            Debug.Log($"{TL("Transporte")} {consumer} " +
+                      $"{transporter.InstanceId} reach estrategico: " +
+                      $"ancora cubica " +
+                      $"{strategicTarget} " +
+                      $"({reachDecision.Decision.Reason}); " +
+                      $"sem progressao valida.");
+            return false;
+        }
+
+        MelhorDesembarqueResult longEvaluation =
+            reachDecision.Decision.Value;
         jointLzKnown = true;
         Vector3Int fromCell = transporter.CurrentCellPosition;
         fromCell.z = 0;
@@ -421,6 +636,7 @@ public partial class AIController
                   $"{requiredJointDeliveries}p e progride {fromCell}" +
                   $"->{progressionCell} rumo a LZ conjunta {jointLz} " +
                   $"score={longEvaluation.best.displayScore} " +
+                  $"tier={reachDecision.Tier} " +
                   $"({progressionReason}).");
         action = BuildMoveBatch(
             transporter,
@@ -662,7 +878,8 @@ public partial class AIController
                 // ao courier. A viabilidade real e o custo terrestre sao
                 // comprovados depois, de cada spot, pelo servico de desembarque.
                 float distance =
-                    SectorManager.HexDistance(transporterCell, target);
+                    AIActionReachCoordinator.CubicDistance(
+                        transporterCell, target);
                 if (distance >= bestDistance)
                     continue;
                 bestDistance = distance;
@@ -748,7 +965,7 @@ public partial class AIController
                     claimedCell, snapshot))
                 continue;
 
-            float distance = SectorManager.HexDistance(
+            float distance = AIActionReachCoordinator.CubicDistance(
                 passenger.CurrentCellPosition, claimedCell);
             if (distance >= bestDistance)
                 continue;
@@ -774,7 +991,8 @@ public partial class AIController
                 continue;
             Vector3Int enemyCell = enemy.CurrentCellPosition;
             enemyCell.z = 0;
-            if (SectorManager.HexDistance(target, enemyCell) <= 2f)
+            if (AIActionReachCoordinator.CubicDistance(
+                    target, enemyCell) <= 2)
                 return true;
         }
 
@@ -799,7 +1017,8 @@ public partial class AIController
         hqCell.z = 0;
         bool hasHq = snapshot.EnemyHQ != null;
         float currentHqDistance = hasHq
-            ? SectorManager.HexDistance(transporterCell, hqCell)
+            ? AIActionReachCoordinator.CubicDistance(
+                transporterCell, hqCell)
             : 0f;
 
         ConstructionManager best = null;
@@ -819,9 +1038,10 @@ public partial class AIController
                 continue;
 
             float transportDistance =
-                SectorManager.HexDistance(transporterCell, cell);
+                AIActionReachCoordinator.CubicDistance(
+                    transporterCell, cell);
             float targetHqDistance = hasHq
-                ? SectorManager.HexDistance(cell, hqCell)
+                ? AIActionReachCoordinator.CubicDistance(cell, hqCell)
                 : 0f;
             float progress = hasHq
                 ? currentHqDistance - targetHqDistance
@@ -953,7 +1173,8 @@ public partial class AIController
             if (claimedTargetCells.Contains(cell))
                 continue;
             float distance =
-                SectorManager.HexDistance(transporterCell, cell);
+                AIActionReachCoordinator.CubicDistance(
+                    transporterCell, cell);
             if (distance >= bestDistance)
                 continue;
 
