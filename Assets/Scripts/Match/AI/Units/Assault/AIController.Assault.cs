@@ -3,6 +3,102 @@ using UnityEngine;
 
 public partial class AIController
 {
+    private enum CombatPassengerTransportPolicy
+    {
+        Assault,
+        FireSupport
+    }
+
+    private enum FireSupportTransportOutcome
+    {
+        Handled,
+        NoAction,
+        TransportRejected
+    }
+
+    // Fundação provisória do passageiro combatente. Nesta primeira parte ela
+    // preserva o alcance adjacente e o gate de distância antigos; Quero Carona
+    // e Melhor Embarque entram na parte 2/4.
+    private PlayerAction TryDecideCombatPassengerTransportAction(
+        UnitManager unit,
+        AIWorldSnapshot snapshot,
+        TeamObjectivePlan plan,
+        CombatPassengerTransportPolicy policy,
+        int minDeliveryDistance)
+    {
+        var options = new List<PodeEmbarcarOption>();
+        PodeEmbarcarSensor.CollectOptions(
+            unit, boardTilemap, terrainDatabase,
+            Mathf.Max(0, unit.RemainingMovementPoints), options);
+        if (options.Count == 0)
+            return null;
+
+        Vector3Int fromCell = unit.CurrentCellPosition;
+        fromCell.z = 0;
+        if (!TryFindTowDeliveryTarget(
+                unit, fromCell, snapshot, plan,
+                out Vector3Int deliveryTarget))
+            return null;
+
+        float distToTarget =
+            SectorManager.HexDistance(fromCell, deliveryTarget);
+        if (distToTarget < minDeliveryDistance)
+            return null;
+
+        Dictionary<Vector3Int, List<Vector3Int>> paths =
+            UnitMovementPathRules.CalcularCaminhosValidos(
+                boardTilemap, unit,
+                Mathf.Max(0, unit.RemainingMovementPoints),
+                terrainDatabase);
+
+        foreach (PodeEmbarcarOption option in options)
+        {
+            if (option?.transporterUnit == null)
+                continue;
+
+            if (IsPrimaryLogisticsUnit(option.transporterUnit))
+            {
+                Vector3Int transporterCell =
+                    option.transporterUnit.CurrentCellPosition;
+                transporterCell.z = 0;
+                if (SectorManager.HexDistance(
+                        transporterCell, deliveryTarget)
+                    > distToTarget)
+                    continue;
+            }
+
+            if (policy == CombatPassengerTransportPolicy.FireSupport
+                && !CanFireSupportTowEmbarkSafely(
+                    unit, option.transporterUnit, snapshot, plan,
+                    fromCell, deliveryTarget,
+                    out string safetyReason))
+            {
+                Debug.Log(
+                    $"{TL("FireSupport")} {unit.InstanceId} rejeita " +
+                    $"transporte #{option.transporterUnit.InstanceId}: " +
+                    safetyReason);
+                continue;
+            }
+
+            string roleLabel =
+                policy == CombatPassengerTransportPolicy.FireSupport
+                    ? TL("FireSupport")
+                    : TL("Assalto");
+            Debug.Log(
+                $"{roleLabel} {unit.InstanceId} embarca " +
+                $"policy={policy} → " +
+                $"{option.transporterUnit.InstanceId} slot " +
+                $"{option.transporterSlotIndex} destino " +
+                $"{deliveryTarget}");
+            return BuildEmbarcarBatch(
+                unit, snapshot.AITeam, fromCell,
+                option.transporterUnit,
+                option.transporterSlotIndex, paths);
+        }
+
+        return null;
+    }
+
     private const int AssaultScoutZoneRadius = 2;
     // Se qualquer slot de Capturador no objetivo tiver DistanceToObjective ≤ esse limiar,
     // o escort entra em "advance mode": prioriza avançar ao objetivo em vez de patrulhar.
@@ -37,7 +133,11 @@ public partial class AIController
                 return DecideAssignedAssaultEscortAction(unit, snapshot, rogueCriticalHome);
             }
 
-            PlayerAction embarkAction = TryDecideAssaultEmbarkAction(unit, snapshot, plan);
+            PlayerAction embarkAction =
+                TryDecideCombatPassengerTransportAction(
+                    unit, snapshot, plan,
+                    CombatPassengerTransportPolicy.Assault,
+                    TowDeliveryThreshold);
             if (embarkAction != null) return embarkAction;
             return DecideRogueAssaultBreakerAction(unit, snapshot, plan);
         }
@@ -54,7 +154,10 @@ public partial class AIController
         // pelo mar caía direto no batedor e "mantinha patrulha", mesmo com um
         // navio compatível disponível para embarque.
         PlayerAction assignedEmbarkAction =
-            TryDecideAssaultEmbarkAction(unit, snapshot, plan);
+            TryDecideCombatPassengerTransportAction(
+                unit, snapshot, plan,
+                CombatPassengerTransportPolicy.Assault,
+                TowDeliveryThreshold);
         if (assignedEmbarkAction != null)
         {
             Debug.Log($"{TL("Assalto")} {unit.InstanceId} {assigned.Sector} " +

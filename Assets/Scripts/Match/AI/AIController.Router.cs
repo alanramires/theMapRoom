@@ -56,10 +56,40 @@ public partial class AIController
 
             if (preferFireSupportFirst)
             {
-                PlayerAction earlyFireSupportAction = IsPrimaryAssaultFireSupportHybrid(unit)
-                    ? TryDecideFireSupportAttackOnlyAction(unit, snapshot, plan)
+                bool primaryHybrid =
+                    IsPrimaryAssaultFireSupportHybrid(unit);
+                PlayerAction earlyFireSupportAction = primaryHybrid
+                    ? TryDecideFireSupportAttackOnlyAction(
+                        unit, snapshot, plan)
                     : TryDecideFireSupportAction(unit, snapshot, plan);
                 if (earlyFireSupportAction != null) return earlyFireSupportAction;
+
+                // Artilheiro Combatente: após não encontrar tiro útil,
+                // tenta explicitamente o transporte especializado antes do
+                // fallback Assault. Nesta etapa, rejeição ainda libera o
+                // fallback; a criticidade será refinada nas partes seguintes.
+                if (primaryHybrid)
+                {
+                    SectorObjective fireSupportObjective =
+                        ResolveAssignedFireSupportObjective(unit, plan);
+                    FireSupportTransportOutcome transportOutcome =
+                        TryDecideFireSupportTransportAction(
+                            unit, snapshot, plan, fireSupportObjective,
+                            out PlayerAction fireSupportTransportAction);
+                    if (transportOutcome
+                            == FireSupportTransportOutcome.Handled
+                        && fireSupportTransportAction != null)
+                        return fireSupportTransportAction;
+
+                    if (transportOutcome
+                        == FireSupportTransportOutcome.TransportRejected)
+                    {
+                        Debug.Log(
+                            $"{TL("FireSupport")} {unit.InstanceId} " +
+                            "Artilheiro Combatente: transporte rejeitado; " +
+                            "fallback Assault provisoriamente liberado.");
+                    }
+                }
             }
 
             PlayerAction assaultAction = TryDecideAssaultAction(unit, snapshot, plan);

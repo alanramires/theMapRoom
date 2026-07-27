@@ -101,7 +101,7 @@ public partial class AIController
     }
 
     // -------------------------------------------------------------------------
-    // Delivery target — shared with TryDecideAssaultEmbarkAction
+    // Delivery target — shared with the provisional combat-passenger transport foundation.
     // -------------------------------------------------------------------------
 
     // Returns true if a delivery target was found (including cell (0,0,0) which is valid).
