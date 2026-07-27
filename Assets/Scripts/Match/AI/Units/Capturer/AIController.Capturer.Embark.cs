@@ -3,6 +3,8 @@ using UnityEngine;
 
 public partial class AIController
 {
+    private const int CapturerRideOperationalTurns = 2;
+
     // -------------------------------------------------------------------------
     // Intercepção de embarque — capturador embarca em transporte no alcance
     // -------------------------------------------------------------------------
@@ -46,11 +48,6 @@ public partial class AIController
         // passenger — it is acting as shuttle and will reorient to the passenger's objective.
         bool isPrimaryCapturador = UnitRoleCompatibility.ResolveCompositionRole(data) == UnitRole.Capturador;
 
-        // Pass 1: sensor padrão — encontra transporters adjacentes (1h)
-        var options = new List<PodeEmbarcarOption>();
-        PodeEmbarcarSensor.CollectOptions(unit, boardTilemap, terrainDatabase,
-            Mathf.Max(0, unit.RemainingMovementPoints), options);
-
         // capturerAssigned: slot de capturador exclusivo — usado para o skip de embarque.
         // Rogues (sem slot de capturador) recebem null e nunca pulam o embarque por
         // "estar perto do objetivo", pois seu destino real é o HQ inimigo, não o setor.
@@ -63,12 +60,6 @@ public partial class AIController
             assigned = ResolveAnyAssignedObjective(unit, plan);
 
         Vector3Int fromCell = unit.CurrentCellPosition; fromCell.z = 0;
-        // Usa o objetivo efetivo, inclusive quando a unidade satisfaz Capturador mas ocupa
-        // outro papel no plano. Passar apenas capturerAssigned fazia esses híbridos parecerem
-        // rogue aqui e, logo depois, embarcarem pelo fallback usando assigned.
-        if (ShouldSkipCapturerEmbarkForShortWalk(
-                unit, assigned, snapshot, fromCell, "origem"))
-            return null;
 
         // Capturador montando massa num rally assembly AINDA ativo (nao GoGreen/Expired) e ja
         // DENTRO do raio de montagem NAO deve embarcar — sair leva a massa embora e adia o GoGreen
@@ -80,6 +71,26 @@ public partial class AIController
                 + $"{assigned.Sector} (state={assigned.RallyState}) dentro do raio {RallyAssemblyForceRadius}h");
             return null;
         }
+
+        // Gate único de necessidade. Não escolhe transporte, vaga ou LZ e não
+        // materializa ação; apenas decide se vale iniciar os scans de embarque.
+        QueroCaronaResult rideNeed =
+            EvaluateCapturerRideNeed(unit, assigned);
+        if (!rideNeed.wantsRide)
+            return null;
+
+        // Usa o objetivo efetivo, inclusive quando a unidade satisfaz Capturador mas ocupa
+        // outro papel no plano. Passar apenas capturerAssigned fazia esses híbridos parecerem
+        // rogue aqui e, logo depois, embarcarem pelo fallback usando assigned.
+        if (ShouldSkipCapturerEmbarkForShortWalk(
+                unit, assigned, snapshot, fromCell, "origem"))
+            return null;
+
+        // Pass 1: sensor padrão — encontra transporters adjacentes (1h).
+        // Só varre depois de o passageiro confirmar que precisa de carona.
+        var options = new List<PodeEmbarcarOption>();
+        PodeEmbarcarSensor.CollectOptions(unit, boardTilemap, terrainDatabase,
+            Mathf.Max(0, unit.RemainingMovementPoints), options);
 
         // Não embarcar em transporters ainda no aeroporto/fábrica — espera sair primeiro.
         options.RemoveAll(opt =>
@@ -183,6 +194,44 @@ public partial class AIController
         Debug.Log(BuildCapturerEmbarkScanDebug(unit, data, assigned, plan, snapshot,
             fromCell, options.Count, best, bestPriority, "sem embarque valido"));
         return null;
+    }
+
+    private QueroCaronaResult EvaluateCapturerRideNeed(
+        UnitManager unit,
+        SectorObjective assigned)
+    {
+        QueroCaronaContext context = assigned != null
+            ? QueroCaronaContext.ComPlano
+            : QueroCaronaContext.RogueOuRebelde;
+        ConstructionSector sector = assigned != null
+            ? assigned.Sector
+            : ConstructionSector.None;
+        QueroCaronaResult result = QueroCaronaService.Evaluate(
+            new QueroCaronaRequest
+            {
+                unit = unit,
+                map = boardTilemap,
+                terrainDatabase = terrainDatabase,
+                context = context,
+                plannedSector = sector,
+                operationalTurns = CapturerRideOperationalTurns,
+                emulateUnderRepairFromUnitData = false
+            });
+
+        string target = result.evaluatedConstruction != null
+            ? $"{result.evaluatedConstruction.name}@{result.evaluatedTarget}"
+            : result.evaluatedTarget.ToString();
+        string routeCost = result.routeCost == int.MaxValue
+            ? "-"
+            : result.routeCost.ToString();
+        Debug.Log(
+            $"{TL("Capturador")} {unit.InstanceId} QueroCarona=" +
+            $"{(result.wantsRide ? "SIM" : "NAO")} " +
+            $"contexto={context} setor={sector} " +
+            $"emergencia={result.isEmergency} " +
+            $"envelope={result.reach} custo={routeCost} " +
+            $"alvo={target} motivo={result.reason}");
+        return result;
     }
 
     private bool ShouldSkipRogueTransportForFinalPressure(
