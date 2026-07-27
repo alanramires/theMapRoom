@@ -149,28 +149,39 @@ public partial class AIController
 
         if (best != null && bestPriority == 0)
         {
-            if (ShouldYieldEmbarkToNeedierCapturer(unit, best.transporterUnit, assigned, plan))
+            if (ShouldYieldEmbarkToNeedierCapturer(
+                    unit, best.transporterUnit, assigned, plan))
                 return null;
             Debug.Log($"{TL("Capturador")} {unit.InstanceId} embarca → {best.transporterUnit.InstanceId} slot {best.transporterSlotIndex}");
             return BuildEmbarcarBatch(unit, snapshot.AITeam, fromCell, best.transporterUnit, best.transporterSlotIndex, paths);
         }
 
         PlayerAction formalExtendedEmbark =
-            TryBuildExtendedEmbarkBatch(unit, data, snapshot, plan, assigned, fromCell, paths, requireFormalPassenger: true);
+            TryBuildExtendedEmbarkBatch(
+                unit, data, snapshot, plan, assigned, rideNeed,
+                fromCell, paths, requireFormalPassenger: true);
         if (formalExtendedEmbark != null) return formalExtendedEmbark;
 
         if (best != null)
         {
-            if (ShouldYieldEmbarkToNeedierCapturer(unit, best.transporterUnit, assigned, plan))
+            if (ShouldYieldEmbarkToNeedierCapturer(
+                    unit, best.transporterUnit, assigned, plan))
                 return null;
             Debug.Log($"{TL("Capturador")} {unit.InstanceId} embarca fallback p{bestPriority} â†’ {best.transporterUnit.InstanceId} slot {best.transporterSlotIndex}");
             return BuildEmbarcarBatch(unit, snapshot.AITeam, fromCell, best.transporterUnit, best.transporterSlotIndex, paths);
         }
 
         PlayerAction extendedEmbark =
-            TryBuildExtendedEmbarkBatch(unit, data, snapshot, plan, assigned, fromCell, paths, requireSectorMatch: true)
-            ?? TryBuildExtendedEmbarkBatch(unit, data, snapshot, plan, assigned, fromCell, paths, requireSectorMatch: false)
-            ?? TryBuildExtendedEmbarkBatch(unit, data, snapshot, plan, assigned, fromCell, paths, requireSectorMatch: false, allowOverflow: true);
+            TryBuildExtendedEmbarkBatch(
+                unit, data, snapshot, plan, assigned, rideNeed,
+                fromCell, paths, requireSectorMatch: true)
+            ?? TryBuildExtendedEmbarkBatch(
+                unit, data, snapshot, plan, assigned, rideNeed,
+                fromCell, paths, requireSectorMatch: false)
+            ?? TryBuildExtendedEmbarkBatch(
+                unit, data, snapshot, plan, assigned, rideNeed,
+                fromCell, paths, requireSectorMatch: false,
+                allowOverflow: true);
         if (extendedEmbark != null) return extendedEmbark;
 
         // Rogue capturer: extended embark failed — move toward nearest rogue transporter so
@@ -178,7 +189,8 @@ public partial class AIController
         // (rogues march to enemy HQ; boarding any rogue transport accelerates the push).
         if (assigned == null)
         {
-            UnitManager rogueTransport = FindNearestRogueTransporter(unit, data, plan, snapshot);
+            UnitManager rogueTransport = FindNearestRogueTransporter(
+                unit, data, plan, snapshot, rideNeed);
             if (rogueTransport != null)
             {
                 Vector3Int tCell = rogueTransport.CurrentCellPosition; tCell.z = 0;

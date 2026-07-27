@@ -5,10 +5,14 @@ public partial class AIController
 {
     private PlayerAction TryBuildExtendedEmbarkBatch(
         UnitManager unit, UnitData unitData, AIWorldSnapshot snapshot, TeamObjectivePlan plan,
-        SectorObjective assigned, Vector3Int fromCell,
+        SectorObjective assigned, QueroCaronaResult rideNeed,
+        Vector3Int fromCell,
         Dictionary<Vector3Int, List<Vector3Int>> paths,
         bool requireSectorMatch = false, bool allowOverflow = false, bool requireFormalPassenger = false)
     {
+        if (rideNeed == null || !rideNeed.wantsRide)
+            return null;
+
         // Usa os paths completos e calcula a sobra real por caminho. Reservar 1 PM
         // antecipadamente quebra casos em que o passageiro anda 2 casas e embarca na 3a.
         var movePaths = paths;
@@ -21,8 +25,10 @@ public partial class AIController
         CollectEmbarkTargetCells(fromCell, unit, neighborBuf, pickupBuf, seenPickupCells);
         foreach (Vector3Int tCell in pickupBuf)
         {
-            if (TryEmbarkFromHex(fromCell, null, unit.RemainingMovementPoints,
-                    tCell, unit, unitData, plan, assigned, snapshot, out PlayerAction a, requireSectorMatch, allowOverflow, requireFormalPassenger))
+            if (TryCapturerEmbarkFromHex(fromCell, null, unit.RemainingMovementPoints,
+                    tCell, unit, unitData, plan, assigned, rideNeed,
+                    snapshot, out PlayerAction a, requireSectorMatch,
+                    allowOverflow, requireFormalPassenger))
                 return a;
         }
 
@@ -32,8 +38,9 @@ public partial class AIController
         HashSet<Vector3Int> occupied = BuildOccupied(unit);
 
         PlayerAction directTransporterEmbark = TryBuildDirectTransporterExtendedEmbarkBatch(
-            unit, unitData, snapshot, plan, assigned, fromCell, movePaths, occupied,
-            neighborBuf, requireSectorMatch, allowOverflow, requireFormalPassenger);
+            unit, unitData, snapshot, plan, assigned, rideNeed,
+            fromCell, movePaths, occupied, neighborBuf,
+            requireSectorMatch, allowOverflow, requireFormalPassenger);
         if (directTransporterEmbark != null)
             return directTransporterEmbark;
 
@@ -49,8 +56,10 @@ public partial class AIController
                 int remainingMPAtHex = CalculateRemainingMovementAfterPath(unit, kvp.Value);
                 if (remainingMPAtHex <= 0) continue;
 
-                if (TryEmbarkFromHex(hex, kvp.Value, remainingMPAtHex,
-                        tCell, unit, unitData, plan, assigned, snapshot, out PlayerAction a, requireSectorMatch, allowOverflow, requireFormalPassenger))
+                if (TryCapturerEmbarkFromHex(hex, kvp.Value, remainingMPAtHex,
+                        tCell, unit, unitData, plan, assigned, rideNeed,
+                        snapshot, out PlayerAction a, requireSectorMatch,
+                        allowOverflow, requireFormalPassenger))
                     return a;
             }
         }
@@ -65,6 +74,7 @@ public partial class AIController
         AIWorldSnapshot snapshot,
         TeamObjectivePlan plan,
         SectorObjective assigned,
+        QueroCaronaResult rideNeed,
         Vector3Int fromCell,
         Dictionary<Vector3Int, List<Vector3Int>> movePaths,
         HashSet<Vector3Int> occupied,
@@ -73,6 +83,9 @@ public partial class AIController
         bool allowOverflow,
         bool requireFormalPassenger)
     {
+        if (rideNeed == null || !rideNeed.wantsRide)
+            return null;
+
         foreach (UnitManager transporter in UnitManager.AllActive)
         {
             if (transporter == null || transporter == unit || transporter.SlotIndex != unit.SlotIndex)
@@ -107,9 +120,11 @@ public partial class AIController
 
                 if (stopCell == fromCell)
                 {
-                    if (TryEmbarkFromHex(fromCell, null, unit.RemainingMovementPoints,
-                            tCell, unit, unitData, plan, assigned, snapshot, out PlayerAction action,
-                            requireSectorMatch, allowOverflow, requireFormalPassenger, transporter))
+                    if (TryCapturerEmbarkFromHex(fromCell, null, unit.RemainingMovementPoints,
+                            tCell, unit, unitData, plan, assigned, rideNeed,
+                            snapshot, out PlayerAction action,
+                            requireSectorMatch, allowOverflow,
+                            requireFormalPassenger, transporter))
                         return action;
                     continue;
                 }
@@ -121,9 +136,11 @@ public partial class AIController
                 if (remainingMPAtStop <= 0)
                     continue;
 
-                if (TryEmbarkFromHex(stopCell, pathToStop, remainingMPAtStop,
-                        tCell, unit, unitData, plan, assigned, snapshot, out PlayerAction movedAction,
-                        requireSectorMatch, allowOverflow, requireFormalPassenger, transporter))
+                if (TryCapturerEmbarkFromHex(stopCell, pathToStop, remainingMPAtStop,
+                        tCell, unit, unitData, plan, assigned, rideNeed,
+                        snapshot, out PlayerAction movedAction,
+                        requireSectorMatch, allowOverflow,
+                        requireFormalPassenger, transporter))
                     return movedAction;
             }
         }

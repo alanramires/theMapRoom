@@ -31,6 +31,30 @@ public partial class AIController
     // Verifica se há um transporter válido em tCell acessível a partir de fromHex,
     // com MP restante suficiente para embarcar. Retorna true e preenche action se válido.
 
+    private bool TryCapturerEmbarkFromHex(
+        Vector3Int fromHex, List<Vector3Int> pathToHex, int remainingMPAtHex,
+        Vector3Int tCell, UnitManager unit, UnitData unitData,
+        TeamObjectivePlan plan, SectorObjective assigned,
+        QueroCaronaResult rideNeed,
+        AIWorldSnapshot snapshot, out PlayerAction action,
+        bool requireSectorMatch = false, bool allowOverflow = false, bool requireFormalPassenger = false,
+        UnitManager expectedTransporter = null)
+    {
+        action = null;
+        if (rideNeed == null || !rideNeed.wantsRide)
+            return false;
+
+        return TryEmbarkFromHex(
+            fromHex, pathToHex, remainingMPAtHex,
+            tCell, unit, unitData, plan, assigned,
+            snapshot, out action,
+            requireSectorMatch, allowOverflow,
+            requireFormalPassenger, expectedTransporter);
+    }
+
+    // Executor físico compartilhado. O Capturer chega aqui pelo wrapper acima,
+    // já autorizado pelo Quero Carona; EVAC reutiliza a legalidade de embarque
+    // sem precisar fabricar uma decisão de agenda do Capturer.
     private bool TryEmbarkFromHex(
         Vector3Int fromHex, List<Vector3Int> pathToHex, int remainingMPAtHex,
         Vector3Int tCell, UnitManager unit, UnitData unitData,
@@ -151,7 +175,8 @@ public partial class AIController
             return false;
         }
 
-        if (ShouldYieldEmbarkToNeedierCapturer(unit, transporter, assigned, plan))
+        if (ShouldYieldEmbarkToNeedierCapturer(
+                unit, transporter, assigned, plan))
             return false;
 
         if (queuedPassengerSeat && !compatibleTransportObjective)

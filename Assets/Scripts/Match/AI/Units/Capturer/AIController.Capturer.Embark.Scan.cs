@@ -237,9 +237,16 @@ public partial class AIController
     // Finds the nearest rogue transporter (no formal plan assignment) that has a fitting
     // slot for this capturer. Used as a fallback move target when extended embark fails.
 
-    private UnitManager FindNearestRogueTransporter(UnitManager capturer, UnitData capturerData,
-        TeamObjectivePlan plan, AIWorldSnapshot snapshot)
+    private UnitManager FindNearestRogueTransporter(
+        UnitManager capturer,
+        UnitData capturerData,
+        TeamObjectivePlan plan,
+        AIWorldSnapshot snapshot,
+        QueroCaronaResult rideNeed)
     {
+        if (rideNeed == null || !rideNeed.wantsRide)
+            return null;
+
         UnitManager best = null;
         float bestDist = float.MaxValue;
         Vector3Int fromCell = capturer.CurrentCellPosition; fromCell.z = 0;

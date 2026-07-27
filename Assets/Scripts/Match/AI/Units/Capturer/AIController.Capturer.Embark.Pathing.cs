@@ -169,7 +169,10 @@ public partial class AIController
     // ainda dentro do pickup range do APC — este capturer deve ceder a vaga.
 
     private bool ShouldYieldEmbarkToNeedierCapturer(
-        UnitManager unit, UnitManager transporter, SectorObjective assigned, TeamObjectivePlan plan)
+        UnitManager unit,
+        UnitManager transporter,
+        SectorObjective assigned,
+        TeamObjectivePlan plan)
     {
         if (assigned == null || plan == null) return false;
 
