@@ -358,16 +358,22 @@ public partial class AIController
         TeamObjectivePlan plan,
         Vector3Int fromCell,
         Dictionary<Vector3Int, List<Vector3Int>> paths,
-        HashSet<Vector3Int> occupied)
+        HashSet<Vector3Int> occupied,
+        float evacMaxTransportDistance = -1f,
+        UnitManager preferredCandidate = null)
     {
         // EVAC precede o ferry comum. A compatibilidade do paciente vem dos
         // transportSlots do UnitData (FindFittingSlotIndex), permitindo que
         // porta-avioes receba aeronaves em reparo sem hardcode de Domain.Air.
-        UnitManager candidate = FindBestEvacCandidate(
-            unit, snapshot, fromCell, paths);
+        UnitManager candidate = preferredCandidate;
+        if (candidate == null)
+            candidate = FindBestEvacCandidate(
+                unit, snapshot, fromCell, paths, evacMaxTransportDistance);
         bool evacPickup = candidate != null;
         if (candidate == null)
             candidate = FindNavalPickupCandidate(unit, snapshot, plan);
+        if (preferredCandidate != null)
+            evacPickup = preferredCandidate.IsUnderRepair;
         if (candidate == null)
         {
             Debug.Log($"{TL("NavalTransport")} {unit.InstanceId} sem candidato de embarque — aguarda.");
@@ -459,10 +465,14 @@ public partial class AIController
                 out routeReason);
         if (moveTo != fromCell)
         {
-            string movementKind = moveTo == rendezvousCell ? "chega ao pickup valido" : "transita rumo ao pickup valido";
+            string operationLabel = evacPickup ? "EVAC" : "pickup";
+            string movementKind = moveTo == rendezvousCell
+                ? $"chega ao ponto de encontro de {operationLabel}"
+                : $"transita rumo ao ponto de encontro de {operationLabel}";
+            string targetLabel = evacPickup ? "paciente" : "passageiro";
             Debug.Log($"{TL("NavalTransport")} {unit.InstanceId} {movementKind} " +
-                      $"{fromCell}->{moveTo} praia={rendezvousCell} " +
-                      $"passageiro=#{candidate.InstanceId}@{candidateCell} " +
+                      $"{fromCell}->{moveTo} encontro={rendezvousCell} " +
+                      $"{targetLabel}=#{candidate.InstanceId}@{candidateCell} " +
                       $"({routeReason}).");
             return BuildMoveBatch(unit, snapshot.AITeam, fromCell, moveTo, paths);
         }
@@ -793,46 +803,11 @@ public partial class AIController
         if (shuttleCandidate != null && CanNavalTransporterCarry(unit, shuttleCandidate))
             return shuttleCandidate;
 
-        UnitManager best = null;
-        float bestDist = float.MaxValue;
-
-        for (int i = 0; i < snapshot.MyUnits.Count; i++)
-        {
-            UnitManager ally = snapshot.MyUnits[i];
-            if (ally == null || ally == unit || ally.IsDead || ally.IsEmbarked)
-                continue;
-            if (!CanNavalTransporterCarry(unit, ally))
-                continue;
-
-            Vector3Int allyCell = ally.CurrentCellPosition;
-            allyCell.z = 0;
-            Vector3Int allyObjective = ResolveUnitObjectiveCell(ally, plan, snapshot);
-            if (allyObjective != Vector3Int.zero)
-            {
-                allyObjective.z = 0;
-                int walkBudget =
-                    ResolvePassengerWalkWithoutTransportBudget(ally);
-                int walkCost = TerrainCostToCell(
-                    ally, allyCell, allyObjective, walkBudget);
-                if (walkCost <= walkBudget)
-                {
-                    Debug.Log($"{TL("NavalTransport")} {unit.InstanceId} descarta passageiro potencial " +
-                              $"#{ally.InstanceId}: chega a pe no objetivo {allyObjective}, " +
-                              $"cost={walkCost}<={walkBudget} " +
-                              $"({TransportPassengerWalkTurns} turnos x move={ally.MaxMovementPoints}).");
-                    continue;
-                }
-            }
-
-            float d = SectorManager.HexDistance(fromCell, allyCell);
-            if (d < bestDist)
-            {
-                bestDist = d;
-                best = ally;
-            }
-        }
-
-        return best;
+        // Nao transforme qualquer unidade compativel em passageiro. Esse
+        // fallback capturava, por exemplo, um aviao-tanque saudavel ao lado do
+        // porta-avioes apenas porque havia vaga. Pickup normal exige demanda
+        // orientada a objetivo; paciente IsUnderRepair ja foi tratado pelo EVAC.
+        return null;
     }
 
     // Ha vaga compativel com este passageiro? Reaproveita FindFittingSlotIndex (shuttle),
@@ -842,6 +817,7 @@ public partial class AIController
         if (transporter == null || passenger == null) return false;
         if (!transporter.TryGetUnitData(out UnitData transporterData) || transporterData == null) return false;
         if (!passenger.TryGetUnitData(out UnitData passengerData) || passengerData == null) return false;
+        if (!UnitRoleCompatibility.ParticipatesInBattle(passengerData)) return false;
 
         int slot = FindFittingSlotIndex(transporter, transporterData, passenger, passengerData);
         return slot >= 0 && transporter.CanUseTransportSlotExclusivity(slot, out _);

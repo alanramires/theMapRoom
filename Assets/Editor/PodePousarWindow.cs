@@ -1,6 +1,7 @@
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Tilemaps;
+using System.Collections.Generic;
 
 public sealed class PodePousarWindow : EditorWindow
 {
@@ -18,8 +19,13 @@ public sealed class PodePousarWindow : EditorWindow
     private Domain predictedDomain;
     private HeightLevel predictedHeight;
     private bool hasPredictedLayer;
+    private AirOperationTileContext evaluatedContext;
+    private AirLandingEvaluation landingEvaluation;
+    private string resolvedLayerSource;
+    private bool occupancyAllowed;
+    private UnitManager occupancyBlocker;
+    private Vector2 detailsScroll;
 
-    [MenuItem("Tools/Operações Aéreas/Pode Pousar")]
     public static void Open()
     {
         GetWindow<PodePousarWindow>(
@@ -135,6 +141,8 @@ public sealed class PodePousarWindow : EditorWindow
                 "Camada após pousar",
                 $"{predictedDomain} / {predictedHeight}");
         }
+
+        DrawEvaluatedContext();
     }
 
     private void Evaluate()
@@ -147,6 +155,25 @@ public sealed class PodePousarWindow : EditorWindow
         Vector3Int testCell =
             hasDestination ? destination : aircraft.CurrentCellPosition;
         testCell.z = 0;
+
+        evaluatedContext = AirOperationResolver.ResolveContext(
+            map, terrainDatabase, testCell);
+        landingEvaluation = AirOperationResolver.EvaluateLanding(
+            aircraft, evaluatedContext, movementMode);
+        LayerTransitionRules.TryResolvePrimaryLayerAtCell(
+            map,
+            terrainDatabase,
+            testCell,
+            out predictedDomain,
+            out predictedHeight,
+            out resolvedLayerSource);
+        occupancyAllowed = UnitOccupancyRules.CanEndLayerTransitionAtCell(
+            map,
+            testCell,
+            aircraft,
+            predictedDomain,
+            predictedHeight,
+            out occupancyBlocker);
 
         // Consulta por hex: o sensor recebe a celula, ninguem e deslocado.
         report = PodePousarSensor.Evaluate(
@@ -167,6 +194,147 @@ public sealed class PodePousarWindow : EditorWindow
 
         Repaint();
         SceneView.RepaintAll();
+    }
+
+    private void DrawEvaluatedContext()
+    {
+        EditorGUILayout.Space(8f);
+        EditorGUILayout.LabelField("Contexto avaliado", EditorStyles.boldLabel);
+        detailsScroll = EditorGUILayout.BeginScrollView(
+            detailsScroll, GUILayout.MinHeight(175f));
+        EditorGUILayout.BeginVertical("box");
+
+        EditorGUILayout.LabelField("Hierarquia vencedora", evaluatedContext.source.ToString());
+        EditorGUILayout.LabelField(
+            "Construção",
+            evaluatedContext.construction != null
+                ? evaluatedContext.construction.displayName
+                : "—");
+        EditorGUILayout.LabelField(
+            "Estrutura",
+            evaluatedContext.structure != null
+                ? evaluatedContext.structure.displayName
+                : "—");
+        EditorGUILayout.LabelField(
+            "Terreno",
+            evaluatedContext.terrain != null
+                ? evaluatedContext.terrain.displayName
+                : "—");
+        EditorGUILayout.LabelField(
+            "Camada física",
+            $"{predictedDomain} / {predictedHeight} ({resolvedLayerSource})");
+        EditorGUILayout.LabelField(
+            "Aircraft Ops",
+            $"allow={landingEvaluation.allowed} | superfície={evaluatedContext.landingSurface}");
+        EditorGUILayout.LabelField(
+            "Ocupação",
+            occupancyAllowed
+                ? "Livre"
+                : $"Bloqueada por {(occupancyBlocker != null ? occupancyBlocker.UnitDisplayName : "unidade")}");
+
+        DrawLandingSkillContext();
+        DrawAircraftSkills();
+
+        if (!string.IsNullOrWhiteSpace(landingEvaluation.reason))
+            EditorGUILayout.HelpBox(landingEvaluation.reason, MessageType.Warning);
+
+        EditorGUILayout.EndVertical();
+        EditorGUILayout.EndScrollView();
+    }
+
+    private void DrawLandingSkillContext()
+    {
+        IReadOnlyList<SkillData> required = null;
+        bool anySkill = false;
+
+        if (evaluatedContext.source == AirOperationRuleSource.Terrain
+            && evaluatedContext.terrain != null)
+        {
+            required = evaluatedContext.terrain.requiredLandingSkills;
+            anySkill = evaluatedContext.terrain.requireAtLeastOneLandingSkill;
+        }
+        else if (evaluatedContext.source == AirOperationRuleSource.Construction
+                 && evaluatedContext.construction != null)
+        {
+            var skills = new List<SkillData>();
+            List<ConstructionLandingSkillRule> rules =
+                evaluatedContext.construction.requiredLandingSkillRules;
+            if (rules != null)
+            {
+                for (int i = 0; i < rules.Count; i++)
+                    if (rules[i] != null && rules[i].skill != null)
+                        skills.Add(rules[i].skill);
+            }
+            required = skills;
+            anySkill = evaluatedContext.construction.requireAtLeastOneLandingSkill;
+        }
+        else if (evaluatedContext.source == AirOperationRuleSource.Structure
+                 && evaluatedContext.structure != null
+                 && evaluatedContext.structure.aircraftOpsByTerrain != null)
+        {
+            for (int i = 0; i < evaluatedContext.structure.aircraftOpsByTerrain.Count; i++)
+            {
+                StructureAirOpsTerrainRule rule =
+                    evaluatedContext.structure.aircraftOpsByTerrain[i];
+                if (rule == null || rule.terrainData != evaluatedContext.terrain)
+                    continue;
+
+                var skills = new List<SkillData>();
+                if (rule.requiredLandingSkillRules != null)
+                {
+                    for (int j = 0; j < rule.requiredLandingSkillRules.Count; j++)
+                    {
+                        StructureLandingSkillRule entry =
+                            rule.requiredLandingSkillRules[j];
+                        if (entry != null && entry.skill != null)
+                            skills.Add(entry.skill);
+                    }
+                }
+                required = skills;
+                anySkill = rule.requireAtLeastOneLandingSkill;
+                break;
+            }
+        }
+
+        EditorGUILayout.LabelField(
+            "Regra de skills",
+            required == null || required.Count == 0
+                ? "Nenhuma skill explícita"
+                : anySkill ? "OU — pelo menos 1" : "E — exige todas");
+
+        if (required == null)
+            return;
+        for (int i = 0; i < required.Count; i++)
+        {
+            SkillData skill = required[i];
+            if (skill == null)
+                continue;
+            bool has = aircraft != null && aircraft.HasSkill(skill);
+            EditorGUILayout.LabelField(
+                $"  {(has ? "✓" : "✗")} {skill.displayName}",
+                has ? EditorStyles.boldLabel : EditorStyles.miniLabel);
+        }
+    }
+
+    private void DrawAircraftSkills()
+    {
+        EditorGUILayout.LabelField("Skills da aeronave", EditorStyles.boldLabel);
+        if (aircraft == null
+            || !aircraft.TryGetUnitData(out UnitData data)
+            || data == null
+            || data.skills == null
+            || data.skills.Count == 0)
+        {
+            EditorGUILayout.LabelField("  Nenhuma", EditorStyles.miniLabel);
+            return;
+        }
+
+        for (int i = 0; i < data.skills.Count; i++)
+        {
+            SkillData skill = data.skills[i];
+            if (skill != null)
+                EditorGUILayout.LabelField($"  • {skill.displayName}", EditorStyles.miniLabel);
+        }
     }
 
     private void TryUseCurrentSelection()
@@ -223,6 +391,8 @@ public sealed class PodePousarWindow : EditorWindow
     {
         report = null;
         hasPredictedLayer = false;
+        resolvedLayerSource = string.Empty;
+        occupancyBlocker = null;
     }
 
     private void OnSceneGUI(SceneView sceneView)

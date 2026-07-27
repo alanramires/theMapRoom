@@ -83,10 +83,24 @@ public static class AircraftOperationRules
         if (unit.GetDomain() == Domain.Air && !unit.IsAircraftGrounded)
         {
             ResolveGroundedLayerForCell(unit, referenceTilemap, terrainDatabase, cell, out Domain landDomain, out HeightLevel landHeight);
-            if (!UnitOccupancyRules.CanEndLayerTransitionAtCell(referenceTilemap, cell, unit, landDomain, landHeight, out UnitManager blocker))
+            if (!unit.SupportsLayerMode(landDomain, landHeight))
+                return Unavailable(
+                    $"Pouso indisponivel: unidade nao suporta {landDomain}/{landHeight}.");
+
+            if (!UnitOccupancyRules.CanEndLayerTransitionAtCell(
+                    referenceTilemap,
+                    cell,
+                    unit,
+                    landDomain,
+                    landHeight,
+                    out UnitManager blocker))
             {
-                string blockerName = blocker != null && !string.IsNullOrWhiteSpace(blocker.UnitDisplayName) ? blocker.UnitDisplayName : "aliado";
-                return Unavailable($"Pouso indisponivel: camada Surface ocupada por {blockerName}.");
+                string blockerName = blocker != null
+                    && !string.IsNullOrWhiteSpace(blocker.UnitDisplayName)
+                        ? blocker.UnitDisplayName
+                        : "aliado";
+                return Unavailable(
+                    $"Pouso indisponivel: camada Surface ocupada por {blockerName}.");
             }
 
             return EvaluateLanding(unit, movementMode, tileContext);
@@ -158,7 +172,14 @@ public static class AircraftOperationRules
         if (decision.action == AircraftOperationAction.Land)
         {
             ResolveGroundedLayerForCell(unit, referenceTilemap, terrainDatabase, cell, out Domain landDomain, out HeightLevel landHeight);
-            if (!UnitOccupancyRules.CanEndLayerTransitionAtCell(referenceTilemap, cell, unit, landDomain, landHeight, out _))
+            if (!unit.SupportsLayerMode(landDomain, landHeight)
+                || !UnitOccupancyRules.CanEndLayerTransitionAtCell(
+                    referenceTilemap,
+                    cell,
+                    unit,
+                    landDomain,
+                    landHeight,
+                    out _))
                 return false;
 
             unit.TrySetCurrentLayerMode(landDomain, landHeight);
@@ -180,12 +201,9 @@ public static class AircraftOperationRules
         return true;
     }
 
-    // Camada de pouso derivada do hex, nao mais Land/Surface fixo: Naval/Surface
-    // quando a unidade suporta o modo e o hex o aceita (hidroaviao pousa na agua
-    // ou praia de trem recolhido — a troca de camada aplica o sprite do modo
-    // Naval/Surface do UnitData); caso contrario, Land/Surface. A regra de hex e
-    // a mesma da fundacao comum de camadas, mantendo uma unica fonte de verdade
-    // para "Naval/Surface cabe aqui".
+    // Camada de pouso derivada da fonte fisica do hex, na mesma precedencia da
+    // fundacao comum: construcao > estrutura+terreno > terreno. A compatibilidade
+    // da unidade com a camada resolvida e validada por LayerTransitionRules.
     public static void ResolveGroundedLayerForCell(
         UnitManager unit,
         Tilemap referenceTilemap,
@@ -194,24 +212,16 @@ public static class AircraftOperationRules
         out Domain domain,
         out HeightLevel height)
     {
-        domain = Domain.Land;
-        height = HeightLevel.Surface;
-
-        if (unit == null || referenceTilemap == null)
-            return;
-
-        cell.z = 0;
-        if (unit.SupportsLayerMode(Domain.Naval, HeightLevel.Surface) &&
-            LayerTransitionRules.CanUseLayerModeAtCell(
-                unit,
+        if (!LayerTransitionRules.TryResolvePrimaryLayerAtCell(
                 referenceTilemap,
                 terrainDatabase,
                 cell,
-                Domain.Naval,
-                HeightLevel.Surface,
+                out domain,
+                out height,
                 out _))
         {
-            domain = Domain.Naval;
+            domain = Domain.Land;
+            height = HeightLevel.Surface;
         }
     }
 

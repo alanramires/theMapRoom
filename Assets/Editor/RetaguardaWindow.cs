@@ -12,6 +12,12 @@ public class RetaguardaWindow : EditorWindow
     [SerializeField] private TeamId team = TeamId.Green;
     [SerializeField] private bool includeOtherRoles = false;
     [SerializeField] private bool dynamicEnemyMassAnchor = true;
+    [SerializeField] private bool includeDetectedAlliedPoints = true;
+    [SerializeField] private List<Vector3Int> manualAlliedPoints = new List<Vector3Int>();
+    [SerializeField] private Vector3Int evaluationHex;
+    [SerializeField] private UnitManager evaluationUnit;
+    [SerializeField] private bool hasEvaluationLocation;
+    [SerializeField] private bool showAdvanced;
     [SerializeField] private ConstructionManager selectedSpot;
 
     [Header("Camadas")]
@@ -40,6 +46,8 @@ public class RetaguardaWindow : EditorWindow
     [SerializeField] private float spottingConeSpread = 1f;
 
     private bool pickingAnchor;
+    private bool pickingAlliedPoint;
+    private bool pickingEvaluation;
     private bool pickingSpot;
     private Vector3Int hoverCell;
     private bool hasResult;
@@ -60,7 +68,9 @@ public class RetaguardaWindow : EditorWindow
     private float maxRearScore = 1f;
     private Vector3Int bestRearCell;
     private bool hasBestRear;
-    private string statusMessage = string.Empty;
+    private AIBacklineScore evaluationScore;
+    private bool hasEvaluation;
+    private string statusMessage = "Selecione uma unidade ou escolha um local.";
     private Vector2 scroll;
 
     [MenuItem("Tools/Utils/Retaguarda")]
@@ -81,6 +91,8 @@ public class RetaguardaWindow : EditorWindow
     {
         SceneView.duringSceneGui -= OnSceneGUI;
         pickingAnchor = false;
+        pickingAlliedPoint = false;
+        pickingEvaluation = false;
         pickingSpot = false;
     }
 
@@ -101,10 +113,134 @@ public class RetaguardaWindow : EditorWindow
 
     private void OnGUI()
     {
+        EditorGUILayout.LabelField("Retaguarda", EditorStyles.boldLabel);
+        EditorGUILayout.HelpBox(
+            "Selecione a unidade ou o local que deseja investigar. A ferramenta detecta automaticamente a massa inimiga e a frente aliada.",
+            MessageType.Info);
+
+        evaluationUnit = (UnitManager)EditorGUILayout.ObjectField(
+            "Unidade investigada", evaluationUnit, typeof(UnitManager), true);
+
+        EditorGUILayout.BeginHorizontal();
+        if (GUILayout.Button("Usar Selecionado"))
+            UseSelectedEvaluationUnit();
+        if (GUILayout.Button("Auto Detect"))
+            AutoDetectEvaluationContext();
+        GUI.backgroundColor = pickingEvaluation
+            ? new Color(1f, 0.75f, 0.2f)
+            : Color.white;
+        if (GUILayout.Button(
+                pickingEvaluation ? "Clique no Scene View..." : "Escolher Local"))
+        {
+            pickingEvaluation = !pickingEvaluation;
+            pickingAnchor = false;
+            pickingAlliedPoint = false;
+            pickingSpot = false;
+            SceneView.RepaintAll();
+        }
+        GUI.backgroundColor = Color.white;
+        EditorGUILayout.EndHorizontal();
+
+        using (new EditorGUI.DisabledScope(
+                   evaluationUnit == null && !hasEvaluationLocation))
+        {
+            if (GUILayout.Button("Analisar Retaguarda", GUILayout.Height(30f)))
+            {
+                SyncEvaluationHexFromUnit();
+                AutoDetectEvaluationContext();
+                Recalculate();
+            }
+        }
+
+        EditorGUILayout.Space(6f);
+        if (hasEvaluation)
+        {
+            string classification = evaluationScore.IsVanguard
+                ? "VANGUARDA"
+                : evaluationScore.InRearSlice
+                    ? "RETAGUARDA"
+                    : "FLANCO / FAIXA NEUTRA";
+            MessageType type = evaluationScore.InRearSlice
+                ? MessageType.Info
+                : evaluationScore.IsVanguard
+                    ? MessageType.Warning
+                    : MessageType.None;
+            EditorGUILayout.HelpBox(
+                $"{classification}\nHex {evaluationHex} | profundidade {evaluationScore.Depth:F1} | ameaça {evaluationScore.Threat:F1} | score {evaluationScore.Score:F0}",
+                type);
+        }
+        else
+        {
+            EditorGUILayout.HelpBox(statusMessage, MessageType.None);
+        }
+
+        showAdvanced = EditorGUILayout.Foldout(
+            showAdvanced, "Avançado / visualizar geometria", true);
+        if (showAdvanced)
+            DrawAdvancedPanel();
+    }
+
+    private void UseSelectedEvaluationUnit()
+    {
+        UnitManager selected = Selection.activeGameObject != null
+            ? Selection.activeGameObject.GetComponent<UnitManager>()
+            : null;
+        if (selected == null)
+        {
+            statusMessage = "Selecione uma unidade na Hierarchy ou Scene View.";
+            return;
+        }
+
+        evaluationUnit = selected;
+        SyncEvaluationHexFromUnit();
+        AutoDetectEvaluationContext();
+        statusMessage = $"Pronto para analisar {selected.name}.";
+        ClearResultPreservingStatus();
+    }
+
+    private void AutoDetectEvaluationContext()
+    {
+        if (evaluationUnit != null)
+        {
+            team = evaluationUnit.TeamId;
+            if (evaluationUnit.BoardTilemap != null)
+                tilemap = evaluationUnit.BoardTilemap;
+        }
+        if (tilemap == null)
+            tilemap = ResolveBoardTilemap();
+
+        TeamId activeTeam = evaluationUnit != null
+            ? evaluationUnit.TeamId
+            : useSelectionTeam
+                ? ResolveSelectionTeam(out _)
+                : team;
+        SetAnchorFromEnemies(activeTeam, repaint: false);
+    }
+
+    private void SyncEvaluationHexFromUnit()
+    {
+        if (evaluationUnit == null)
+            return;
+
+        evaluationHex = ResolveSceneCell(
+            evaluationUnit.transform, evaluationUnit.CurrentCellPosition);
+        evaluationHex.z = 0;
+        hasEvaluationLocation = true;
+    }
+
+    private void ClearResultPreservingStatus()
+    {
+        string preserved = statusMessage;
+        ClearResult();
+        statusMessage = preserved;
+    }
+
+    private void DrawAdvancedPanel()
+    {
         scroll = EditorGUILayout.BeginScrollView(scroll);
 
         EditorGUILayout.HelpBox(
-            "Retaguarda: posicione pelo menos 3 unidades em campo para simular uma boa triangulacao.",
+            "1) Massa inimiga: direcao da ameaca. 2) Pontos aliados: formam a frente/arco. 3) Unidade atual ou local desejado: ponto que sera classificado.",
             MessageType.Info);
 
         EditorGUILayout.LabelField("Contexto", EditorStyles.boldLabel);
@@ -148,7 +284,7 @@ public class RetaguardaWindow : EditorWindow
             SceneView.RepaintAll();
 
         EditorGUILayout.Space(8f);
-        EditorGUILayout.LabelField("Direcao da frente", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField("1. Massa inimiga", EditorStyles.boldLabel);
         dynamicEnemyMassAnchor = EditorGUILayout.Toggle(
             "Usar massa inimiga dinamica", dynamicEnemyMassAnchor);
         EditorGUILayout.BeginHorizontal();
@@ -159,6 +295,8 @@ public class RetaguardaWindow : EditorWindow
         if (GUILayout.Button(pickingAnchor ? "X" : "<", GUILayout.Width(28)))
         {
             pickingAnchor = !pickingAnchor;
+            pickingAlliedPoint = false;
+            pickingEvaluation = false;
             pickingSpot = false;
             SceneView.RepaintAll();
         }
@@ -167,6 +305,59 @@ public class RetaguardaWindow : EditorWindow
 
         if (GUILayout.Button("Atualizar pela massa inimiga"))
             SetAnchorFromEnemies();
+
+        EditorGUILayout.Space(8f);
+        EditorGUILayout.LabelField("2. Pontos aliados", EditorStyles.boldLabel);
+        includeDetectedAlliedPoints = EditorGUILayout.Toggle(
+            "Usar massa aliada detectada", includeDetectedAlliedPoints);
+        for (int i = 0; i < manualAlliedPoints.Count; i++)
+        {
+            EditorGUILayout.BeginHorizontal();
+            manualAlliedPoints[i] = EditorGUILayout.Vector3IntField(
+                $"Ponto aliado {i + 1}", manualAlliedPoints[i]);
+            if (GUILayout.Button("-", GUILayout.Width(28)))
+            {
+                manualAlliedPoints.RemoveAt(i);
+                i--;
+            }
+            EditorGUILayout.EndHorizontal();
+        }
+        EditorGUILayout.BeginHorizontal();
+        if (GUILayout.Button("Adicionar ponto aliado"))
+            manualAlliedPoints.Add(Vector3Int.zero);
+        GUI.backgroundColor = pickingAlliedPoint ? Color.red : Color.white;
+        if (GUILayout.Button(
+                pickingAlliedPoint ? "Cancelar selecao" : "Selecionar no mapa",
+                GUILayout.Width(120)))
+        {
+            pickingAlliedPoint = !pickingAlliedPoint;
+            pickingAnchor = false;
+            pickingEvaluation = false;
+            pickingSpot = false;
+            SceneView.RepaintAll();
+        }
+        GUI.backgroundColor = Color.white;
+        EditorGUILayout.EndHorizontal();
+
+        EditorGUILayout.Space(8f);
+        EditorGUILayout.LabelField(
+            "3. Unidade atual / local desejado", EditorStyles.boldLabel);
+        EditorGUILayout.BeginHorizontal();
+        evaluationHex = EditorGUILayout.Vector3IntField(
+            "Hex investigado", evaluationHex);
+        GUI.backgroundColor = pickingEvaluation ? Color.yellow : Color.white;
+        if (GUILayout.Button(pickingEvaluation ? "X" : "<", GUILayout.Width(28)))
+        {
+            pickingEvaluation = !pickingEvaluation;
+            pickingAnchor = false;
+            pickingAlliedPoint = false;
+            pickingSpot = false;
+            SceneView.RepaintAll();
+        }
+        GUI.backgroundColor = Color.white;
+        EditorGUILayout.EndHorizontal();
+        if (GUILayout.Button("Usar unidade selecionada"))
+            UseSelectedEvaluationUnit();
 
         EditorGUILayout.Space(8f);
         EditorGUILayout.LabelField("Parametros", EditorStyles.boldLabel);
@@ -196,6 +387,8 @@ public class RetaguardaWindow : EditorWindow
         {
             pickingSpot = !pickingSpot;
             pickingAnchor = false;
+            pickingAlliedPoint = false;
+            pickingEvaluation = false;
             SceneView.RepaintAll();
         }
         GUI.backgroundColor = Color.white;
@@ -216,7 +409,7 @@ public class RetaguardaWindow : EditorWindow
         if (GUILayout.Button(
                 new GUIContent(
                     "Calcular mapa tatico",
-                    "Posicione pelo menos 3 unidades em campo para simular uma boa triangulacao."),
+                    "Um ponto aliado basta; varios pontos formam um arco."),
                 GUILayout.Height(28)))
             Recalculate();
         EditorGUI.EndDisabledGroup();
@@ -242,6 +435,17 @@ public class RetaguardaWindow : EditorWindow
             EditorGUILayout.LabelField($"Distancia media da faixa ao objetivo: {frontBandDist:F1}", EditorStyles.miniLabel);
             if (hasBestRear)
                 EditorGUILayout.LabelField($"Melhor retaguarda: {bestRearCell} (score {maxRearScore:F0})", EditorStyles.boldLabel);
+            if (hasEvaluation)
+            {
+                string classification = evaluationScore.IsVanguard
+                    ? "VANGUARDA"
+                    : evaluationScore.InRearSlice
+                        ? "RETAGUARDA"
+                        : "FLANCO/FAIXA NEUTRA";
+                EditorGUILayout.LabelField(
+                    $"Hex investigado: {classification} | profundidade={evaluationScore.Depth:F1} | ameaca={evaluationScore.Threat:F1} | score={evaluationScore.Score:F0}",
+                    EditorStyles.boldLabel);
+            }
         }
 
         EditorGUILayout.Space(6f);
@@ -257,6 +461,7 @@ public class RetaguardaWindow : EditorWindow
 
     private void Recalculate()
     {
+        SyncEvaluationHexFromUnit();
         ClearResult();
 
         if (tilemap == null)
@@ -265,10 +470,23 @@ public class RetaguardaWindow : EditorWindow
             return;
         }
 
-        TeamId activeTeam = useSelectionTeam ? ResolveSelectionTeam(out _) : team;
+        TeamId activeTeam = evaluationUnit != null
+            ? evaluationUnit.TeamId
+            : useSelectionTeam
+                ? ResolveSelectionTeam(out _)
+                : team;
         if (dynamicEnemyMassAnchor)
             SetAnchorFromEnemies(activeTeam, repaint: false);
         CollectSceneCells(activeTeam);
+        if (!includeDetectedAlliedPoints)
+            combatantCells.Clear();
+        foreach (Vector3Int rawPoint in manualAlliedPoints)
+        {
+            Vector3Int point = rawPoint;
+            point.z = 0;
+            if (!combatantCells.Contains(point))
+                combatantCells.Add(point);
+        }
         Vector3Int anchor = anchorHex;
         anchor.z = 0;
         BuildSpottingGeometry(anchor);
@@ -302,6 +520,10 @@ public class RetaguardaWindow : EditorWindow
         maxRearScore = result.MaxRearScore;
         bestRearCell = result.BestRearCell;
         hasBestRear = result.HasBestRear;
+        evaluationHex.z = 0;
+        evaluationScore = AIBacklineAnalyzer.ScoreCell(
+            geometryCombatants, enemyCells, evaluationHex, anchor, settings, result);
+        hasEvaluation = true;
         BuildIsolatedAdvanceCells(result, settings, anchor, geometryCombatants);
         BuildNeutralBand(result, settings, anchor, geometryCombatants);
 
@@ -442,6 +664,7 @@ public class RetaguardaWindow : EditorWindow
         rearScoreMap = null;
         vanguardCells = null;
         hasBestRear = false;
+        hasEvaluation = false;
         statusMessage = string.Empty;
         SceneView.RepaintAll();
         Repaint();
@@ -774,7 +997,7 @@ public class RetaguardaWindow : EditorWindow
         if (hasResult)
             DrawResult(labelStyle);
 
-        if (pickingAnchor || pickingSpot)
+        if (pickingAnchor || pickingAlliedPoint || pickingEvaluation || pickingSpot)
             DrawPicker();
     }
 
@@ -892,15 +1115,39 @@ public class RetaguardaWindow : EditorWindow
             Handles.Label(anchorWorld + Vector3.up * 0.42f,
                 dynamicEnemyMassAnchor ? "MASSA" : "REF", labelStyle);
         }
+
+        if (hasEvaluation)
+        {
+            Handles.color = evaluationScore.IsVanguard
+                ? Color.red
+                : evaluationScore.InRearSlice
+                    ? Color.green
+                    : Color.yellow;
+            Vector3 evaluationWorld = tilemap.GetCellCenterWorld(evaluationHex);
+            Handles.DrawWireDisc(evaluationWorld, Vector3.back, 0.42f);
+            Handles.DrawWireDisc(evaluationWorld, Vector3.back, 0.34f);
+            Handles.Label(evaluationWorld + Vector3.up * 0.5f,
+                "INVESTIGADO", labelStyle);
+        }
     }
 
     private void DrawPicker()
     {
-        Handles.color = pickingSpot ? Color.cyan : Color.red;
+        Handles.color = pickingSpot
+            ? Color.cyan
+            : pickingEvaluation
+                ? Color.yellow
+                : Color.red;
         Vector3 hoverWorld = tilemap.GetCellCenterWorld(hoverCell);
         Handles.DrawWireDisc(hoverWorld, Vector3.back, 0.35f);
         Handles.Label(hoverWorld + Vector3.up * 0.42f,
-            (pickingSpot ? "Spot " : "Referencia ") + hoverCell,
+            (pickingSpot
+                ? "Spot "
+                : pickingAlliedPoint
+                    ? "Aliado "
+                    : pickingEvaluation
+                        ? "Investigar "
+                    : "Referencia ") + hoverCell,
             new GUIStyle(EditorStyles.boldLabel)
             {
                 normal = { textColor = pickingSpot ? Color.cyan : Color.red }
@@ -909,7 +1156,7 @@ public class RetaguardaWindow : EditorWindow
 
     private void HandlePickingInput()
     {
-        if (!pickingAnchor && !pickingSpot)
+        if (!pickingAnchor && !pickingAlliedPoint && !pickingEvaluation && !pickingSpot)
             return;
 
         Event e = Event.current;
@@ -925,9 +1172,19 @@ public class RetaguardaWindow : EditorWindow
             picked.z = 0;
             if (pickingSpot)
                 selectedSpot = FindSpotAtCell(picked);
+            else if (pickingAlliedPoint)
+                manualAlliedPoints.Add(picked);
+            else if (pickingEvaluation)
+            {
+                evaluationUnit = null;
+                evaluationHex = picked;
+                hasEvaluationLocation = true;
+            }
             else
                 anchorHex = picked;
             pickingAnchor = false;
+            pickingAlliedPoint = false;
+            pickingEvaluation = false;
             pickingSpot = false;
             e.Use();
             Repaint();
@@ -937,6 +1194,8 @@ public class RetaguardaWindow : EditorWindow
             || (e.type == EventType.KeyDown && e.keyCode == KeyCode.Escape))
         {
             pickingAnchor = false;
+            pickingAlliedPoint = false;
+            pickingEvaluation = false;
             pickingSpot = false;
             e.Use();
             Repaint();

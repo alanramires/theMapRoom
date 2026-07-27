@@ -517,32 +517,14 @@ public static class PodeSuprirSensor
                 useManualRemainingMovement: false,
                 manualRemainingMovement: 0);
 
-                if (landing != null && landing.status)
-                {
-                    Vector3Int targetCell = target.CurrentCellPosition;
-                    targetCell.z = 0;
-                    if (target.IsLayerChangeBlockedByForcedLock(supplier.GetDomain(), supplier.GetHeightLevel(), out string lockReason))
-                    {
-                        reason = lockReason;
-                        return false;
-                    }
-                    if (!LayerTransitionRules.CanUseLayerModeAtCell(
-                            target,
-                            boardMap,
-                            terrainDatabase,
-                            targetCell,
-                        supplier.GetDomain(),
-                        supplier.GetHeightLevel(),
-                        out string landingLayerReason))
-                {
-                    reason =
-                        $"Pouso valido, mas o hex atual nao permite atendimento em {supplier.GetDomain()}/{supplier.GetHeightLevel()} ({landingLayerReason}).";
-                    return false;
-                }
-
+            if (landing != null && landing.status)
+            {
+                // PodePousarSensor ja resolveu a hierarquia fisica do hex,
+                // ocupacao e regras de Aircraft Ops (incluindo skills em
+                // AND/OU). O supply apenas consome a operacao autorizada.
                 forceLandBeforeSupply = true;
-                plannedServiceDomain = supplier.GetDomain();
-                plannedServiceHeight = supplier.GetHeightLevel();
+                plannedServiceDomain = landing.landingDomain;
+                plannedServiceHeight = landing.landingHeight;
                 return true;
             }
 

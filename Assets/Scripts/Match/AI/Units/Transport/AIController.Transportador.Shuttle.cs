@@ -83,6 +83,7 @@ public partial class AIController
             if (candidate == transporter) continue;
             if (candidate.SlotIndex != snapshot.AISlotIndex || candidate.IsDead || candidate.IsEmbarked || candidate.HasActed) continue;
             if (!candidate.TryGetUnitData(out UnitData candidateData)) continue;
+            if (!UnitRoleCompatibility.ParticipatesInBattle(candidateData)) continue;
 
             if (FindFittingSlotIndex(transporter, transporterData, candidate, candidateData) < 0) continue;
 

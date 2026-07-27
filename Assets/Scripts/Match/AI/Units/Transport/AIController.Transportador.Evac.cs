@@ -16,11 +16,13 @@ public partial class AIController
 
     private PlayerAction TryDecideEvacShuttleAction(
         UnitManager unit, AIWorldSnapshot snapshot, TeamObjectivePlan plan,
-        Dictionary<Vector3Int, List<Vector3Int>> paths, HashSet<Vector3Int> occupied)
+        Dictionary<Vector3Int, List<Vector3Int>> paths, HashSet<Vector3Int> occupied,
+        float maxTransportDistance = -1f)
     {
         Vector3Int fromCell = unit.CurrentCellPosition; fromCell.z = 0;
 
-        UnitManager evacuee = FindBestEvacCandidate(unit, snapshot, fromCell, paths);
+        UnitManager evacuee = FindBestEvacCandidate(
+            unit, snapshot, fromCell, paths, maxTransportDistance);
         if (evacuee == null) return null;
 
         Vector3Int evacueeCell = evacuee.CurrentCellPosition; evacueeCell.z = 0;
@@ -67,7 +69,8 @@ public partial class AIController
         UnitManager transporter,
         AIWorldSnapshot snapshot,
         Vector3Int transporterCell,
-        Dictionary<Vector3Int, List<Vector3Int>> transporterPaths)
+        Dictionary<Vector3Int, List<Vector3Int>> transporterPaths,
+        float maxTransportDistance = -1f)
     {
         if (!transporter.TryGetUnitData(out UnitData transporterData) || transporterData == null)
             return null;
@@ -94,9 +97,11 @@ public partial class AIController
             float transportDist = SectorManager.HexDistance(transporterCell, candidateCell);
             // Primeiro envelope do EVAC: encontro tatico/operacional curto.
             // A compatibilidade nao depende do dominio do transportador.
-            int pickupHorizon = Mathf.Max(
-                EvacPickupRange + transporter.MaxMovementPoints,
-                transporter.MaxMovementPoints * 2);
+            float pickupHorizon = maxTransportDistance >= 0f
+                ? maxTransportDistance
+                : Mathf.Max(
+                    EvacPickupRange + transporter.MaxMovementPoints,
+                    transporter.MaxMovementPoints * 2);
             if (transportDist > pickupHorizon) continue;
 
             float pickupReachBonus = IsPassengerInPickupRange(transporterCell, candidateCell, EvacPickupRange, BuildPassengerReachableSet(candidate)) ? 500f : 0f;
@@ -578,8 +583,33 @@ public partial class AIController
         routeDist = 0f;
         turnEstimate = 0f;
         danger = false;
-        if (unit == null || unit.GetDomain() == Domain.Air)
+        if (unit == null)
             return false;
+
+        // Aeronave em reparo nao precisa de uma construcao terrestre para
+        // justificar EVAC. A vaga compativel do transportador ja foi validada
+        // antes; aqui medimos apenas a urgencia operacional. Isso permite que
+        // porta-avioes e outros transportadores aereos recuperem aeronaves em
+        // voo sem reintroduzir uma exclusao generica por Domain.Air.
+        if (unit.GetDomain() == Domain.Air)
+        {
+            bool fuelCritical = IsAircraftFuelCriticalForNextUpkeep(
+                unit,
+                out _,
+                out _,
+                out int criticalThreshold);
+            routeDist = Mathf.Max(
+                0f, criticalThreshold - unit.CurrentFuel);
+            float fuelUrgency = 1f
+                - unit.CurrentFuel
+                  / (float)Mathf.Max(1, unit.GetMaxFuel());
+            turnEstimate = fuelUrgency * 2f
+                + (fuelCritical ? 3f : 0f);
+            danger = fuelCritical
+                || HasNearbyVisibleEnemy(
+                    fromCell, aiTeam, AirEvacPatientEnemyRange);
+            return unit.IsUnderRepair;
+        }
 
         ConstructionManager repairDest = FindRepairConstruction(unit, fromCell, aiTeam, BuildOccupied(unit));
         if (repairDest == null)

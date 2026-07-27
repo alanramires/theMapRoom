@@ -1,0 +1,316 @@
+using System.Collections.Generic;
+using UnityEditor;
+using UnityEngine;
+using UnityEngine.Tilemaps;
+
+public sealed class MelhorEmbarqueWindow : EditorWindow
+{
+    [SerializeField] private UnitManager transporter;
+    [SerializeField] private TerrainDatabase terrainDatabase;
+    [SerializeField] private int operationalTurns = 2;
+    [SerializeField] private bool includeStrategic;
+    [SerializeField] private bool showProbableDirection;
+
+    private Tilemap map;
+    private MelhorEmbarqueResult result;
+    private MelhorEmbarqueLzScore selected;
+    private MelhorEmbarqueLzScore probableDirection;
+    private Vector2 scroll;
+    private string status = "Selecione um transportador vazio.";
+
+    [MenuItem("Tools/Transporte/Melhor Embarque")]
+    public static void Open() =>
+        GetWindow<MelhorEmbarqueWindow>("Melhor Embarque").Show();
+
+    private void OnEnable()
+    {
+        SceneView.duringSceneGui += OnSceneGUI;
+        AutoDetect();
+    }
+
+    private void OnDisable() =>
+        SceneView.duringSceneGui -= OnSceneGUI;
+
+    private void OnSelectionChange()
+    {
+        TryUseSelection(silent: true);
+        Repaint();
+    }
+
+    private void AutoDetect()
+    {
+        if (transporter != null)
+            map = transporter.BoardTilemap;
+        if (terrainDatabase != null)
+            return;
+        string[] guids =
+            AssetDatabase.FindAssets("t:TerrainDatabase");
+        if (guids.Length > 0)
+        {
+            terrainDatabase =
+                AssetDatabase.LoadAssetAtPath<TerrainDatabase>(
+                    AssetDatabase.GUIDToAssetPath(guids[0]));
+        }
+    }
+
+    private void OnGUI()
+    {
+        EditorGUILayout.LabelField(
+            "Melhor Embarque", EditorStyles.boldLabel);
+        EditorGUILayout.HelpBox(
+            "Consulta pura. A varredura nasce no transportador: " +
+            "Tactical → Operational → Strategic. Os LZs vêm de " +
+            "UnitData > Transport > Allow Embark When Transporter At.",
+            MessageType.Info);
+
+        EditorGUI.BeginChangeCheck();
+        transporter = (UnitManager)EditorGUILayout.ObjectField(
+            "Transportador", transporter,
+            typeof(UnitManager), true);
+        terrainDatabase =
+            (TerrainDatabase)EditorGUILayout.ObjectField(
+                "Terrain Database", terrainDatabase,
+                typeof(TerrainDatabase), false);
+        operationalTurns = Mathf.Max(
+            1, EditorGUILayout.IntField(
+                "Turnos operacionais", operationalTurns));
+        includeStrategic = EditorGUILayout.Toggle(
+            "Incluir Strategic", includeStrategic);
+        showProbableDirection = EditorGUILayout.Toggle(
+            new GUIContent(
+                "Ver direção provável",
+                "Diagnóstico opcional e mais caro. Não participa da decisão; " +
+                "a orientação de gameplay pertence aos sensores PodeX."),
+            showProbableDirection);
+        if (EditorGUI.EndChangeCheck())
+        {
+            AutoDetect();
+            result = null;
+            selected = null;
+            probableDirection = null;
+        }
+
+        EditorGUILayout.BeginHorizontal();
+        if (GUILayout.Button("Usar Selecionado"))
+            TryUseSelection(silent: false);
+        if (GUILayout.Button("Auto Detect"))
+        {
+            AutoDetect();
+            status = map != null
+                ? "Contexto detectado."
+                : "Tilemap não encontrado.";
+        }
+        EditorGUILayout.EndHorizontal();
+
+        using (new EditorGUI.DisabledScope(
+                   transporter == null
+                   || map == null
+                   || terrainDatabase == null))
+        {
+            if (GUILayout.Button(
+                    "Calcular Melhor Embarque",
+                    GUILayout.Height(30f)))
+                Calculate();
+        }
+
+        EditorGUILayout.HelpBox(status, MessageType.None);
+        if (result == null)
+            return;
+
+        if (showProbableDirection
+            && probableDirection != null)
+        {
+            MelhorEmbarqueLzScore guidance =
+                probableDirection;
+            EditorGUILayout.HelpBox(
+                $"Diagnóstico visual — não participa da decisão\n" +
+                $"Direção provável: LZ {guidance.cell} | " +
+                $"pax={guidance.passengers.Count} | " +
+                $"dist={guidance.transporterDistance}",
+                MessageType.Info);
+        }
+
+        EditorGUILayout.LabelField(
+            $"LZs válidos ({result.ranking.Count})",
+            EditorStyles.boldLabel);
+        scroll = EditorGUILayout.BeginScrollView(scroll);
+        for (int i = 0; i < result.ranking.Count; i++)
+        {
+            MelhorEmbarqueLzScore lz = result.ranking[i];
+            bool active = selected == lz;
+            GUI.backgroundColor = active
+                ? new Color(1f, 0.8f, 0.2f)
+                : Color.white;
+            if (GUILayout.Button(
+                    $"#{i + 1} {lz.tier} LZ={lz.cell} " +
+                    $"pax={lz.passengers.Count} " +
+                    $"dist={lz.transporterDistance}",
+                    EditorStyles.miniButton))
+            {
+                selected = lz;
+                SceneView.RepaintAll();
+            }
+            GUI.backgroundColor = Color.white;
+            if (!active)
+                continue;
+            EditorGUILayout.LabelField(
+                lz.reason, EditorStyles.wordWrappedMiniLabel);
+            for (int p = 0; p < lz.passengers.Count; p++)
+            {
+                MelhorEmbarquePassengerScore passenger =
+                    lz.passengers[p];
+                EditorGUILayout.LabelField(
+                    $"  {passenger.passenger.name} " +
+                    $"@{passenger.passengerCell} " +
+                    $"slot={passenger.slotIndex} " +
+                    $"move={passenger.passengerMoveCost}",
+                    EditorStyles.miniLabel);
+            }
+        }
+
+        EditorGUILayout.Space(6f);
+        EditorGUILayout.LabelField(
+            $"Passageiros descartados " +
+            $"({result.rejectedPassengers.Count})",
+            EditorStyles.boldLabel);
+        for (int i = 0;
+             i < result.rejectedPassengers.Count;
+             i++)
+        {
+            MelhorEmbarqueReject reject =
+                result.rejectedPassengers[i];
+            EditorGUILayout.LabelField(
+                $"{(reject.passenger != null ? reject.passenger.name : "?")}: " +
+                reject.reason,
+                EditorStyles.wordWrappedMiniLabel);
+        }
+        EditorGUILayout.EndScrollView();
+    }
+
+    private void TryUseSelection(bool silent)
+    {
+        UnitManager picked =
+            Selection.activeGameObject != null
+                ? Selection.activeGameObject
+                    .GetComponent<UnitManager>()
+                : null;
+        if (picked == null)
+        {
+            if (!silent)
+                status =
+                    "O objeto selecionado não possui UnitManager.";
+            return;
+        }
+        transporter = picked;
+        AutoDetect();
+        result = null;
+        selected = null;
+        status = $"Transportador: {picked.name}.";
+        SceneView.RepaintAll();
+    }
+
+    private void Calculate()
+    {
+        SyncRegistry();
+        AutoDetect();
+        result = MelhorEmbarqueService.Evaluate(
+            new MelhorEmbarqueRequest
+            {
+                transporter = transporter,
+                map = map,
+                terrainDatabase = terrainDatabase,
+                tacticalBudget = Mathf.Max(
+                    0, transporter.RemainingMovementPoints),
+                operationalTurns = operationalTurns,
+                includeStrategic = includeStrategic
+            });
+        selected = result.best;
+        probableDirection = null;
+        if (showProbableDirection && !includeStrategic)
+        {
+            MelhorEmbarqueResult directionProbe =
+                MelhorEmbarqueService.Evaluate(
+                    new MelhorEmbarqueRequest
+                    {
+                        transporter = transporter,
+                        map = map,
+                        terrainDatabase = terrainDatabase,
+                        tacticalBudget = Mathf.Max(
+                            0, transporter.RemainingMovementPoints),
+                        operationalTurns = operationalTurns,
+                        includeStrategic = true
+                    });
+            probableDirection = directionProbe.ranking.Find(
+                lz => lz.tier == MelhorEmbarqueTier.Strategic);
+        }
+        status = selected != null
+            ? $"Melhor: {selected.tier} {selected.cell}, " +
+              $"{selected.passengers.Count} passageiro(s)."
+            : "Nenhum encontro válido encontrado.";
+        SceneView.RepaintAll();
+    }
+
+    private static void SyncRegistry()
+    {
+        if (Application.isPlaying)
+            return;
+        UnitManager.AllActive.Clear();
+        UnitManager[] units =
+            FindObjectsByType<UnitManager>(
+                FindObjectsInactive.Include,
+                FindObjectsSortMode.None);
+        for (int i = 0; i < units.Length; i++)
+        {
+            if (units[i] != null
+                && units[i].gameObject.activeInHierarchy)
+                UnitManager.AllActive.Add(units[i]);
+        }
+    }
+
+    private void OnSceneGUI(SceneView sceneView)
+    {
+        if (result == null)
+            return;
+        for (int i = 0; i < result.ranking.Count; i++)
+        {
+            MelhorEmbarqueLzScore lz = result.ranking[i];
+            Vector3 world = map.GetCellCenterWorld(lz.cell);
+            Color color = lz == selected
+                ? Color.yellow
+                : lz.tier == MelhorEmbarqueTier.Tactical
+                    ? Color.green
+                    : lz.tier == MelhorEmbarqueTier.Operational
+                        ? new Color(0.2f, 0.7f, 1f)
+                        : new Color(1f, 0.3f, 0.8f);
+            Handles.color = color;
+            Handles.DrawWireDisc(
+                world, Vector3.forward,
+                lz == selected ? 0.42f : 0.28f);
+            Handles.Label(
+                world + Vector3.up * 0.32f,
+                $"{lz.tier} P{lz.passengers.Count}");
+        }
+
+        if (showProbableDirection
+            && probableDirection != null
+            && transporter != null)
+        {
+            Vector3 from = map.GetCellCenterWorld(
+                transporter.CurrentCellPosition);
+            Vector3 to = map.GetCellCenterWorld(
+                probableDirection.cell);
+            Handles.color = new Color(1f, 0.3f, 0.8f);
+            Handles.DrawDottedLine(from, to, 6f);
+            Handles.ArrowHandleCap(
+                0,
+                to,
+                Quaternion.LookRotation(
+                    Vector3.forward, to - from),
+                0.6f,
+                EventType.Repaint);
+            Handles.Label(
+                Vector3.Lerp(from, to, 0.5f),
+                "Direção provável (debug)");
+        }
+    }
+}

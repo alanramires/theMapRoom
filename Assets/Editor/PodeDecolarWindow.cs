@@ -18,6 +18,23 @@ public class PodeDecolarWindow : EditorWindow
         GetWindow<PodeDecolarWindow>("Pode Decolar");
     }
 
+    [MenuItem("Tools/Operações Aéreas/Pode Pousar")]
+    private static void OpenPodePousarWindow()
+    {
+        System.Type windowType =
+            typeof(PodeDecolarWindow).Assembly.GetType("PodePousarWindow");
+        if (windowType == null)
+        {
+            EditorUtility.DisplayDialog(
+                "Pode Pousar",
+                "A janela PodePousarWindow não foi carregada pela assembly do Editor.",
+                "OK");
+            return;
+        }
+
+        GetWindow(windowType, false, "Pode Pousar", true).Show();
+    }
+
     private void OnEnable()
     {
         AutoDetectContext();

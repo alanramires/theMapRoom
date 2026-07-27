@@ -8,6 +8,56 @@ using UnityEngine.Tilemaps;
 /// </summary>
 public static class LayerTransitionRules
 {
+    public static bool TryResolvePrimaryLayerAtCell(
+        Tilemap boardMap,
+        TerrainDatabase terrainDatabase,
+        Vector3Int cell,
+        out Domain domain,
+        out HeightLevel height,
+        out string source)
+    {
+        domain = Domain.Land;
+        height = HeightLevel.Surface;
+        source = string.Empty;
+        if (boardMap == null)
+            return false;
+
+        cell.z = 0;
+        ConstructionManager construction =
+            ConstructionOccupancyRules.GetConstructionAtCell(boardMap, cell);
+        if (construction != null)
+        {
+            domain = construction.GetDomain();
+            height = construction.GetHeightLevel();
+            source = "construcao";
+            return true;
+        }
+
+        StructureData structure =
+            StructureOccupancyRules.GetStructureAtCell(boardMap, cell);
+        if (structure != null)
+        {
+            // A estrutura define o andar principal; o terreno sob ela continua
+            // participando da validacao do par em CanUseLayerModeAtCell.
+            domain = structure.domain;
+            height = structure.heightLevel;
+            source = "estrutura+terreno";
+            return true;
+        }
+
+        if (!TryResolveTerrainAtCell(
+                boardMap, terrainDatabase, cell, out TerrainTypeData terrain)
+            || terrain == null)
+        {
+            return false;
+        }
+
+        domain = terrain.domain;
+        height = terrain.heightLevel;
+        source = "terreno";
+        return true;
+    }
+
     public static bool CanUseLayerModeAtCell(
         UnitManager unit,
         Tilemap boardMap,

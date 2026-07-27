@@ -15,7 +15,10 @@ public partial class AIController
         Vector3Int fromCell,
         Dictionary<Vector3Int, List<Vector3Int>> paths,
         HashSet<Vector3Int> occupied,
-        bool baseDefense)
+        bool baseDefense,
+        AIReachDecisionStages stages =
+            AIReachDecisionStages.Operational
+            | AIReachDecisionStages.Strategic)
     {
         if (logistics == null || snapshot == null || snapshot.MyUnits == null)
             return null;
@@ -187,9 +190,7 @@ public partial class AIController
                     Context =
                         $"FieldSupply:{logistics.InstanceId}",
                     Policy = new AIReachDecisionPolicy(
-                        AIReachDecisionStages.Operational
-                        | AIReachDecisionStages.Strategic,
-                        operationalTurns: 2),
+                        stages, operationalTurns: 2),
                     CurrentMovementBudget = Mathf.Max(
                         0, logistics.RemainingMovementPoints),
                     EvaluateOperational = EvaluateOperational,

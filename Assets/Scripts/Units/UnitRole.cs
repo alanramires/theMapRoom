@@ -3,13 +3,10 @@ using System.Collections.Generic;
 public enum UnitRole
 {
     None = 0,
+    // Participacao direta ou especializada em batalha.
     Capturador = 1,
     Assalto = 2,
-    Transportador = 3,
-    Logistica = 4,
     FogoIndireto = 5,
-    Intel = 6,
-    Suprimentos = 7,
     Interceptador = 8,
     AtaqueAereo = 9,
     Antiaereo = 10,
@@ -17,6 +14,12 @@ public enum UnitRole
     CapturadorAgressivo = 12,
     ArtilheiroCombatente = 13,
     AntiaereoCombatente = 14,
+    // Apoio operacional. Os valores numericos permanecem estaveis porque
+    // UnitRole e serializado nos UnitData.
+    Transportador = 3,
+    Logistica = 4,
+    Intel = 6,
+    Suprimentos = 7,
     // Transporte AÉREO operacional (Chinook): mesma mecânica do Transportador, mas com
     // política de shopping própria — compra de início de jogo focada nos nós
     // INTERMEDIÁRIOS do eixo, enquanto o APC só gera demanda depois que os nós
@@ -24,8 +27,60 @@ public enum UnitRole
     TransportadorAereo = 15
 }
 
+public enum UnitBattleParticipation
+{
+    None = 0,
+    Indirect = 1,
+    Direct = 2
+}
+
 public static class UnitRoleCompatibility
 {
+    public static UnitBattleParticipation ResolveBattleParticipation(
+        UnitRole role)
+    {
+        switch (role)
+        {
+            case UnitRole.FogoIndireto:
+                return UnitBattleParticipation.Indirect;
+
+            case UnitRole.Capturador:
+            case UnitRole.Assalto:
+            case UnitRole.Interceptador:
+            case UnitRole.AtaqueAereo:
+            case UnitRole.Antiaereo:
+            case UnitRole.RaidAntiSub:
+            case UnitRole.CapturadorAgressivo:
+            case UnitRole.ArtilheiroCombatente:
+            case UnitRole.AntiaereoCombatente:
+                return UnitBattleParticipation.Direct;
+
+            default:
+                return UnitBattleParticipation.None;
+        }
+    }
+
+    public static UnitBattleParticipation ResolveBattleParticipation(
+        UnitData data)
+    {
+        if (data == null || data.roles == null)
+            return UnitBattleParticipation.None;
+
+        UnitBattleParticipation best = UnitBattleParticipation.None;
+        for (int i = 0; i < data.roles.Count; i++)
+        {
+            UnitBattleParticipation current =
+                ResolveBattleParticipation(data.roles[i]);
+            if (current > best)
+                best = current;
+        }
+
+        return best;
+    }
+
+    public static bool ParticipatesInBattle(UnitData data) =>
+        ResolveBattleParticipation(data) != UnitBattleParticipation.None;
+
     public static bool CanSatisfy(UnitRole actualRole, UnitRole requestedRole)
     {
         if (actualRole == requestedRole)
