@@ -43,11 +43,6 @@ public partial class AIController
         if (!unit.TryGetUnitData(out UnitData data)
             || !UnitRoleCompatibility.CanSatisfy(data, UnitRole.Capturador)) return null;
 
-        // Primary capturer: strict sector alignment (don't board a wrong-direction APC).
-        // Secondary capturer (e.g. Assalto+Capturador): can board any APC that has no formal
-        // passenger — it is acting as shuttle and will reorient to the passenger's objective.
-        bool isPrimaryCapturador = UnitRoleCompatibility.ResolveCompositionRole(data) == UnitRole.Capturador;
-
         // capturerAssigned: slot de capturador exclusivo — usado para o skip de embarque.
         // Rogues (sem slot de capturador) recebem null e nunca pulam o embarque por
         // "estar perto do objetivo", pois seu destino real é o HQ inimigo, não o setor.
@@ -77,13 +72,6 @@ public partial class AIController
         QueroCaronaResult rideNeed =
             EvaluateCapturerRideNeed(unit, assigned);
         if (!rideNeed.wantsRide)
-            return null;
-
-        // Usa o objetivo efetivo, inclusive quando a unidade satisfaz Capturador mas ocupa
-        // outro papel no plano. Passar apenas capturerAssigned fazia esses híbridos parecerem
-        // rogue aqui e, logo depois, embarcarem pelo fallback usando assigned.
-        if (ShouldSkipCapturerEmbarkForShortWalk(
-                unit, assigned, snapshot, fromCell, "origem"))
             return null;
 
         // Pass 1: sensor padrão — encontra transporters adjacentes (1h).
@@ -138,12 +126,8 @@ public partial class AIController
             return null;
         }
 
-        // Guards de rogue aplicados antes do embarque direto (priority 0) e do scan estendido.
-        // Evita que rogue próximo ao HQ inimigo ou com alvo/captura disponível engula slot
-        // de passageiro designado em transporter adjacente.
-        if (assigned == null && ShouldSkipRogueTransportForFinalPressure(unit, snapshot, fromCell))
-            return null;
-
+        // Combate/captura imediatos continuam sendo política do controller,
+        // mesmo quando a estimativa confirmou necessidade de transporte.
         if (assigned == null && ShouldRogueCapturerFightBeforeTransport(unit, snapshot, fromCell, paths))
             return null;
 
@@ -244,49 +228,6 @@ public partial class AIController
             $"envelope={result.reach} custo={routeCost} " +
             $"alvo={target} motivo={result.reason}");
         return result;
-    }
-
-    private bool ShouldSkipRogueTransportForFinalPressure(
-        UnitManager unit,
-        AIWorldSnapshot snapshot,
-        Vector3Int fromCell)
-    {
-        if (unit == null || snapshot == null)
-            return false;
-
-        if (!TryResolveCourierPassengerTarget(
-                unit, null, snapshot, Vector3Int.zero, fromCell,
-                out Vector3Int targetCell))
-            return false;
-
-        targetCell.z = 0;
-        if (IsPickupObjectiveClaimedByAlly(
-                unit, targetCell, snapshot.AISlotIndex))
-        {
-            Vector3Int claimedTarget = targetCell;
-            if (!TryFindAlternatePickupObjective(
-                    unit, snapshot, fromCell, out targetCell))
-            {
-                Debug.Log($"{TL("Capturador")} {unit.InstanceId} rogue aceita transporte: " +
-                          $"alvo {claimedTarget} ja ocupado e sem objetivo livre.");
-                return false;
-            }
-
-            Debug.Log($"{TL("Capturador")} {unit.InstanceId} rogue troca alvo ocupado " +
-                      $"{claimedTarget} por {targetCell} antes de avaliar caminhada.");
-        }
-
-        int threshold = Mathf.Max(3, GetEffectiveTransportThresholdForSlot(PlayerSlotId.FromIndex(snapshot.AISlotIndex)));
-        int terrainCost = TerrainCostToCell(
-            unit, fromCell, targetCell, threshold);
-        float hexDist = SectorManager.HexDistance(fromCell, targetCell);
-        if (terrainCost > threshold && hexDist > Mathf.Max(3, threshold - 1))
-            return false;
-
-        Debug.Log($"{TL("Capturador")} {unit.InstanceId} rogue ignora transporte: " +
-                  $"objetivo livre {targetCell} dist={hexDist:F0} " +
-                  $"terreno={terrainCost}<={threshold}");
-        return true;
     }
 
     private bool ShouldRogueCapturerFightBeforeTransport(

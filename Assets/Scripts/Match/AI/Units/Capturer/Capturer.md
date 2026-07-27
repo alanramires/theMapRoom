@@ -139,12 +139,17 @@ revelado.
 O embarque e um meio para cumprir a agenda, nao um objetivo proprio.
 
 - Apenas unidades compativeis com `Capturador` entram neste fluxo.
+- `QueroCaronaService` decide uma unica vez se o passageiro precisa de
+  transporte antes de qualquer scan.
+- Unidade com plano avalia o representante e alternativas livres do setor em
+  Tactical e Operational.
+- Rogue ou rebelde avalia predios capturaveis livres nos mesmos envelopes.
+- `IsUnderRepair` produz pedido emergencial de carona.
 - A preferencia e: passageiro formal do mesmo objetivo, mesmo setor, setor
   vizinho compativel e, por ultimo, transporte livre.
 - Rogue usa transporte livre ou compativel somente quando o contexto permite.
-- A unidade anda em vez de embarcar quando o custo de terreno ate o objetivo e
-  menor que o limite efetivo de transporte.
-- Unidades lentas recebem tolerancia maior antes de rejeitar o transporte.
+- Quando a rota propria cumpre a agenda em Tactical ou Operational, o Capturer
+  recusa carona e continua sua acao normal.
 - Transporte parado sobre construcao produtora deve primeiro liberar a base.
 - Transporte morto, em reparo, embarcado, sem assento compativel ou com contexto
   invalido e descartado.
@@ -154,6 +159,10 @@ O embarque e um meio para cumprir a agenda, nao um objetivo proprio.
 
 `PodeEmbarcarSensor` e as regras de slot/carga do transporte sao a fonte de
 verdade para autorizar o embarque.
+
+`QueroCaronaService` nao escolhe transportador, vaga nem caminho. O mesmo
+resultado positivo e propagado pelo embarque adjacente, formal, estendido,
+overflow e aproximacao. O controller escolhe o transporte e materializa a acao.
 
 ## Rogue
 

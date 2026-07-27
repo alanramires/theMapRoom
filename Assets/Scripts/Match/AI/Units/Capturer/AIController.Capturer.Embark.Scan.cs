@@ -3,8 +3,6 @@ using UnityEngine;
 
 public partial class AIController
 {
-    private const int CapturerShortWalkEmbarkCost = 4;
-
     private string BuildCapturerEmbarkScanDebug(
         UnitManager unit,
         UnitData unitData,
@@ -139,100 +137,6 @@ public partial class AIController
         return false;
     }
 
-
-    private bool ShouldSkipCapturerEmbarkForShortWalk(
-        UnitManager unit,
-        SectorObjective assigned,
-        AIWorldSnapshot snapshot,
-        Vector3Int candidateCell,
-        string context)
-    {
-        if (unit == null)
-            return false;
-
-        // Rogues marcham ao HQ inimigo, não ao capturável mais próximo.
-        // A referência de distância seria inválida — sempre permite embarque.
-        if (assigned == null)
-            return false;
-
-        candidateCell.z = 0;
-
-        ConstructionManager objBuilding = FindCapturableInSector(
-            assigned.Sector, unit.TeamId, candidateCell);
-
-        if (objBuilding == null)
-        {
-            float nearestSectorDistance = float.MaxValue;
-            foreach (ConstructionManager construction in ConstructionManager.AllActive)
-            {
-                if (construction == null || construction.Sector != assigned.Sector)
-                    continue;
-
-                Vector3Int constructionCell = construction.CurrentCellPosition;
-                constructionCell.z = 0;
-                float distance = SectorManager.HexDistance(candidateCell, constructionCell);
-                if (distance >= nearestSectorDistance)
-                    continue;
-
-                nearestSectorDistance = distance;
-                objBuilding = construction;
-            }
-        }
-
-        if (objBuilding == null)
-        {
-            Debug.Log($"{TL("Capturador")} {unit.InstanceId} embarque sem referencia de setor: assigned={assigned.Sector}");
-            return false;
-        }
-
-        Vector3Int objCell = objBuilding.CurrentCellPosition; objCell.z = 0;
-        if (IsPickupObjectiveClaimedByAlly(
-                unit, objCell, unit.SlotIndex))
-        {
-            Vector3Int claimedCell = objCell;
-            if (snapshot == null
-                || !TryFindAlternatePickupObjective(
-                    unit, snapshot, candidateCell, out objCell))
-            {
-                Debug.Log($"{TL("Capturador")} {unit.InstanceId} nao considera caminhada curta: " +
-                          $"objetivo {claimedCell} ja ocupado e sem alternativa livre.");
-                return false;
-            }
-
-            Debug.Log($"{TL("Capturador")} {unit.InstanceId} caminhada curta troca alvo ocupado " +
-                      $"{claimedCell} por {objCell}.");
-        }
-        float hexDistance = SectorManager.HexDistance(candidateCell, objCell);
-        // Decisao local, separada do threshold estrategico que cria demanda de transporte.
-        // Proximidade geometrica evita que uma barreira local superestime uma viagem que ja
-        // esta praticamente concluida; custo de terreno cobre rotas curtas menos obvias.
-        int terrainCost = TerrainCostToCell(
-            unit, candidateCell, objCell, CapturerShortWalkEmbarkCost);
-        bool physicallyNear = hexDistance <= CapturerShortWalkEmbarkCost;
-        bool shortTerrainWalk = terrainCost <= CapturerShortWalkEmbarkCost;
-        if (!physicallyNear && !shortTerrainWalk)
-            return false;
-
-        string sectorLabel = assigned != null ? assigned.Sector.ToString() : objBuilding.Sector.ToString();
-        Debug.Log($"{TL("Capturador")} {unit.InstanceId} ignora embarque ({context} hex={hexDistance:F0} terreno={terrainCost} limite={CapturerShortWalkEmbarkCost} de {sectorLabel})");
-        return true;
-    }
-
-
-    private ConstructionManager FindNearestCapturableForUnit(UnitManager unit, Vector3Int fromCell)
-    {
-        ConstructionManager best = null;
-        float bestDist = float.MaxValue;
-        foreach (ConstructionManager c in ConstructionManager.AllActive)
-        {
-            if (!c.IsCapturable || c.CapturePointsMax <= 0) continue;
-            if (c.SlotIndex == unit.SlotIndex && c.CurrentCapturePoints >= c.CapturePointsMax) continue;
-            Vector3Int tc = c.CurrentCellPosition; tc.z = 0;
-            float dist = SectorManager.HexDistance(fromCell, tc);
-            if (dist < bestDist) { bestDist = dist; best = c; }
-        }
-        return best;
-    }
 
     // Finds the nearest rogue transporter (no formal plan assignment) that has a fitting
     // slot for this capturer. Used as a fallback move target when extended embark fails.
