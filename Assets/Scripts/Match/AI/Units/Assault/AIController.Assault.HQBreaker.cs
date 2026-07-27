@@ -153,6 +153,8 @@ public partial class AIController
 
             foreach (UnitManager enemy in enemies)
             {
+                if (!PassesFireSupportRoleTargetFilter(unit, enemy))
+                    continue;
                 if (!CanAttackTargetFrom(fromCell, cell, unit, enemy)) continue;
                 if (!PassesAttackDecision(unit, enemy, cell, false, out string attackDecisionReason))
                     continue;

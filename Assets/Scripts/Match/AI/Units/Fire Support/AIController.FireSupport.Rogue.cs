@@ -262,6 +262,8 @@ public partial class AIController
                     UnitManager enemy = opt?.targetUnit;
                     if (enemy == null || enemy.SlotIndex == snapshot.AISlotIndex || enemy.IsDead || enemy.IsEmbarked)
                         continue;
+                    if (!PassesFireSupportRoleTargetFilter(unit, enemy))
+                        continue;
 
                     sensorTargetCount++;
                     ScoreRogueFireSupportRangeStepCandidate(
@@ -290,6 +292,8 @@ public partial class AIController
             foreach (UnitManager enemy in visibleEnemies)
             {
                 if (enemy == null || enemy.IsDead || enemy.IsEmbarked)
+                    continue;
+                if (!PassesFireSupportRoleTargetFilter(unit, enemy))
                     continue;
 
                 Vector3Int enemyCell = enemy.CurrentCellPosition;

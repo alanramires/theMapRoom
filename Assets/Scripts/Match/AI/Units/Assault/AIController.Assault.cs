@@ -44,32 +44,11 @@ public partial class AIController
             || decision.option == null)
             return null;
 
-        // A parte 2 preserva a decisão completa, mas ainda materializa somente
-        // o caso adjacente. Movimento até a LZ entra na parte 3/4.
         Vector3Int transporterCell =
             decision.transporter.CurrentCellPosition;
         transporterCell.z = 0;
         Vector3Int selectedLz = decision.option.lzCell;
         selectedLz.z = 0;
-        if (selectedLz != transporterCell)
-        {
-            Debug.Log(
-                $"{TL("Transporte")} {unit.InstanceId} policy={policy} " +
-                $"seleciona #{decision.transporter.InstanceId} " +
-                $"LZ={selectedLz} tier={decision.option.transporterTier}; " +
-                "materialização até LZ fica para 3/4.");
-            return null;
-        }
-
-        var adjacent = new List<PodeEmbarcarOption>();
-        PodeEmbarcarSensor.CollectOptions(
-            unit, boardTilemap, terrainDatabase,
-            Mathf.Max(0, unit.RemainingMovementPoints), adjacent);
-        PodeEmbarcarOption legal = adjacent.Find(option =>
-            option?.transporterUnit == decision.transporter
-            && option.transporterSlotIndex == decision.option.slotIndex);
-        if (legal == null)
-            return null;
 
         Vector3Int fromCell = unit.CurrentCellPosition;
         fromCell.z = 0;
@@ -78,20 +57,121 @@ public partial class AIController
                 boardTilemap, unit,
                 Mathf.Max(0, unit.RemainingMovementPoints),
                 terrainDatabase);
-        string roleLabel =
-            policy == CombatPassengerTransportPolicy.FireSupport
-                ? TL("FireSupport")
-                : TL("Assalto");
+
+        if (selectedLz == transporterCell)
+        {
+            var adjacent = new List<PodeEmbarcarOption>();
+            PodeEmbarcarSensor.CollectOptions(
+                unit, boardTilemap, terrainDatabase,
+                Mathf.Max(0, unit.RemainingMovementPoints), adjacent);
+            PodeEmbarcarOption legal = adjacent.Find(option =>
+                option?.transporterUnit == decision.transporter
+                && option.transporterSlotIndex == decision.option.slotIndex);
+            if (legal != null)
+            {
+                ClaimCombatPassengerTransportDecision(decision);
+                string roleLabel =
+                    policy == CombatPassengerTransportPolicy.FireSupport
+                        ? TL("FireSupport")
+                        : TL("Assalto");
+                Debug.Log(
+                    $"{roleLabel} {unit.InstanceId} embarca policy={policy} → " +
+                    $"{decision.transporter.InstanceId} slot " +
+                    $"{decision.option.slotIndex} LZ={selectedLz} " +
+                    $"tier={decision.option.transporterTier} " +
+                    $"paxCost={decision.option.passengerRouteCost} " +
+                    $"transportCost={decision.option.transporterRouteCost}");
+                return BuildEmbarcarBatch(
+                    unit, snapshot.AITeam, fromCell,
+                    decision.transporter, decision.option.slotIndex, paths);
+            }
+        }
+
+        return TryBuildCombatPassengerRendezvousAction(
+            unit, snapshot, decision, fromCell, selectedLz, paths);
+    }
+
+    private PlayerAction TryBuildCombatPassengerRendezvousAction(
+        UnitManager passenger,
+        AIWorldSnapshot snapshot,
+        CombatPassengerTransportDecision decision,
+        Vector3Int fromCell,
+        Vector3Int selectedLz,
+        Dictionary<Vector3Int, List<Vector3Int>> paths)
+    {
+        if (passenger == null || snapshot == null || decision?.transporter == null)
+            return null;
+
+        if (paths != null
+            && selectedLz != fromCell
+            && paths.ContainsKey(selectedLz))
+        {
+            ClaimCombatPassengerTransportDecision(decision);
+            Debug.Log(
+                $"{TL("Transporte")} passageiro #{passenger.InstanceId} " +
+                $"policy={decision.policy} segue para LZ={selectedLz} " +
+                $"do transportador #{decision.transporter.InstanceId} " +
+                $"tier={decision.option.transporterTier}.");
+            return BuildMoveBatch(
+                passenger, snapshot.AITeam, fromCell, selectedLz, paths);
+        }
+
+        if (selectedLz == fromCell)
+        {
+            ClaimCombatPassengerTransportDecision(decision);
+            Debug.Log(
+                $"{TL("Transporte")} passageiro #{passenger.InstanceId} " +
+                $"policy={decision.policy} aguarda na LZ={selectedLz} " +
+                $"transportador=#{decision.transporter.InstanceId}.");
+            return BuildMoveBatch(
+                passenger, snapshot.AITeam, fromCell, fromCell, paths);
+        }
+
+        HashSet<Vector3Int> occupied = passenger.GetDomain() == Domain.Air
+            ? BuildAirOccupied(passenger)
+            : BuildOccupied(passenger);
+        if (TryFindBestToolProgressionCell(
+                passenger,
+                snapshot,
+                fromCell,
+                selectedLz,
+                paths,
+                occupied,
+                ToolProgressionIntent.TransportRendezvous,
+                out Vector3Int progressionCell,
+                out _,
+                out string progressionReason)
+            && progressionCell != fromCell)
+        {
+            ClaimCombatPassengerTransportDecision(decision);
+            Debug.Log(
+                $"{TL("Transporte")} passageiro #{passenger.InstanceId} " +
+                $"policy={decision.policy} progride para LZ={selectedLz} " +
+                $"via={progressionCell} transportador=" +
+                $"#{decision.transporter.InstanceId} " +
+                $"({progressionReason}).");
+            return BuildMoveBatch(
+                passenger, snapshot.AITeam, fromCell,
+                progressionCell, paths);
+        }
+
         Debug.Log(
-            $"{roleLabel} {unit.InstanceId} embarca policy={policy} → " +
-            $"{decision.transporter.InstanceId} slot " +
-            $"{decision.option.slotIndex} LZ={selectedLz} " +
-            $"tier={decision.option.transporterTier} " +
-            $"paxCost={decision.option.passengerRouteCost} " +
-            $"transportCost={decision.option.transporterRouteCost}");
-        return BuildEmbarcarBatch(
-            unit, snapshot.AITeam, fromCell,
-            decision.transporter, decision.option.slotIndex, paths);
+            $"{TL("Transporte")} passageiro #{passenger.InstanceId} " +
+            $"policy={decision.policy} LZ={selectedLz} sem progressão " +
+            "materializável; libera o papel para outra ação.");
+        return null;
+    }
+
+    private void ClaimCombatPassengerTransportDecision(
+        CombatPassengerTransportDecision decision)
+    {
+        if (decision?.transporter == null || decision.option?.passenger == null)
+            return;
+
+        // Reserva apenas a decisão desta passada da Phase 2. Não altera unidade,
+        // ocupação ou qualquer verdade confirmada do tabuleiro.
+        assignedTransportClaims[decision.transporter.InstanceId] =
+            decision.option.passenger.InstanceId;
     }
 
     private QueroCaronaResult EvaluateCombatPassengerRideNeed(
@@ -149,6 +229,10 @@ public partial class AIController
                 || transporterData == null
                 || !transporterData.isTransporter)
                 continue;
+            if (assignedTransportClaims.TryGetValue(
+                    transporter.InstanceId, out int claimedPassengerId)
+                && claimedPassengerId != unit.InstanceId)
+                continue;
 
             MelhorEmbarqueResult evaluated =
                 MelhorEmbarqueService.Evaluate(
@@ -169,8 +253,6 @@ public partial class AIController
             MelhorEmbarqueOption option =
                 evaluated.options.Find(candidate =>
                     candidate?.passenger == unit
-                    && candidate.passengerRouteState !=
-                        MelhorEmbarquePassengerRouteState.NoCurrentRoute
                     && (candidate.rideDisposition ==
                             MelhorEmbarqueRideDisposition.Requested
                         || candidate.rideDisposition ==
@@ -294,9 +376,6 @@ public partial class AIController
             return null;
         if (!unit.TryGetUnitData(out UnitData data) || data == null
             || !UnitRoleCompatibility.CanSatisfy(data, UnitRole.Assalto))
-            return null;
-        if (data.roles != null && data.roles.Count > 0
-            && data.roles[0] == UnitRole.AntiaereoCombatente)
             return null;
         SectorObjective assigned = ResolveAssignedAssaultObjective(unit, plan);
         if (IsGroundAntiAirOnlyAssault(data))
@@ -833,6 +912,8 @@ public partial class AIController
 
             foreach (UnitManager enemy in enemies)
             {
+                if (!PassesFireSupportRoleTargetFilter(unit, enemy))
+                    continue;
                 if (!CanAttackTargetFrom(fromCell, cell, unit, enemy))
                     continue;
                 if (!PassesAttackDecision(unit, enemy, cell, false, out string attackDecisionReason))

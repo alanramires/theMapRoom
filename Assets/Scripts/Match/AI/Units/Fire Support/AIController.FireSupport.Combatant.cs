@@ -5,12 +5,8 @@ public partial class AIController
 {
     private static bool IsCombatantFireSupport(UnitManager unit)
     {
-        return unit != null
-            && unit.TryGetUnitData(out UnitData data)
-            && data != null
-            && data.roles != null
-            && data.roles.Count > 0
-            && data.roles[0] == UnitRole.ArtilheiroCombatente;
+        return HasPrimaryRole(unit, UnitRole.ArtilheiroCombatente)
+            || HasPrimaryRole(unit, UnitRole.AntiaereoCombatente);
     }
 
     private bool TryDecideCombatantFireSupportTacticalAction(

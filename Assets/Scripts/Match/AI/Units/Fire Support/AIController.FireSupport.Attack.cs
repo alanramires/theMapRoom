@@ -72,7 +72,8 @@ public partial class AIController
             {
                 if (opt?.targetUnit == null || opt.targetUnit.SlotIndex == snapshot.AISlotIndex || opt.targetUnit.IsDead) continue;
                 enemyOptions++;
-                if (optionFilter != null && !optionFilter(opt))
+                if (!PassesFireSupportRoleTargetFilter(unit, opt.targetUnit)
+                    || (optionFilter != null && !optionFilter(opt)))
                 {
                     optionFiltered++;
                     continue;
@@ -301,6 +302,8 @@ public partial class AIController
             PodeMirarInvalidOption invalid = invalidTargets[i];
             UnitManager candidate = invalid != null ? invalid.targetUnit : null;
             if (candidate == null || candidate.SlotIndex == snapshot.AISlotIndex || candidate.IsDead || candidate.IsEmbarked)
+                continue;
+            if (!PassesFireSupportRoleTargetFilter(unit, candidate))
                 continue;
             if (!IsBlockedLineReason(invalid.reasonId))
                 continue;

@@ -525,8 +525,8 @@ public partial class AIController
     {
         if (unit == null || !unit.TryGetUnitData(out UnitData data) || data == null)
             return false;
-        return UnitRoleCompatibility.ResolveCompositionRole(data) == UnitRole.Assalto
-            && UnitRoleCompatibility.CanSatisfy(data, UnitRole.FogoIndireto);
+        return IsCombatantFireSupport(unit)
+            && UnitRoleCompatibility.CanSatisfy(data, UnitRole.Assalto);
     }
 
     private bool TryBuildFallbackAttackFromEvaluations(

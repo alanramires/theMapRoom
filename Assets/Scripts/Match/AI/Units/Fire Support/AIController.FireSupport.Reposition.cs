@@ -494,6 +494,8 @@ public partial class AIController
             UnitManager target = opt != null ? opt.targetUnit : null;
             if (target == null || target.SlotIndex == snapshot.AISlotIndex || target.IsDead || target.IsEmbarked)
                 continue;
+            if (!PassesFireSupportRoleTargetFilter(unit, target))
+                continue;
 
             float targetScore = GetFireSupportTargetPreferenceScore(ResolveFireSupportTargetPreference(unit, target));
             float rangeFit = GetFireSupportRangeFitScore(unit, target, opt.distance, opt.weapon, weaponPriorityData);
@@ -519,6 +521,8 @@ public partial class AIController
             PodeMirarInvalidOption invalid = invalids[i];
             UnitManager target = invalid != null ? invalid.targetUnit : null;
             if (target == null || target.SlotIndex == snapshot.AISlotIndex || target.IsDead || target.IsEmbarked)
+                continue;
+            if (!PassesFireSupportRoleTargetFilter(unit, target))
                 continue;
 
             bool usefulInvalid =

@@ -13,6 +13,23 @@ public class ConstructionDataEditor : Editor
 
     private ForceCopyFilter forceCopyFilter = ForceCopyFilter.Army;
     private bool showLogisticsSection;
+    private bool showProductionSection;
+    private bool showAIBehaviorSection;
+    private bool showUnitInformationSection;
+    private bool showAircraftOpsSection;
+    private bool showNavalOpsSection;
+
+    // Toda secao nasce fechada a cada vez que o inspector se liga ao asset, sem depender
+    // do valor default sobreviver a reuso de instancia do Editor entre recompilacoes.
+    private void OnEnable()
+    {
+        showLogisticsSection = false;
+        showProductionSection = false;
+        showAIBehaviorSection = false;
+        showUnitInformationSection = false;
+        showAircraftOpsSection = false;
+        showNavalOpsSection = false;
+    }
 
     public override void OnInspectorGUI()
     {
@@ -24,10 +41,13 @@ public class ConstructionDataEditor : Editor
             "constructionConfiguration",
             "allowRebelAIPurchase",
             "allowAircraftTakeoffAndLanding",
+            "aircraftUnitsPaysUpkeep",
             "legacyRequiredLandingSkills",
             "requiredLandingSkillRules",
             "requireAtLeastOneLandingSkill",
             "forceEndMovementOnTerrainDomainForDomains",
+            "forceDetectOnForcedEndMovementDomains",
+            "forceDetectUnitsWithFollowingStealthSkills",
             "isSupplier",
             "supplierTier",
             "maxUnitsServedPerTurn",
@@ -38,13 +58,15 @@ public class ConstructionDataEditor : Editor
             "supplierServiceProfile",
             "supplierResources");
         EditorGUILayout.Space();
-        DrawLogisticsSection();
-        EditorGUILayout.Space();
-        DrawAircraftOpsSection(serializedObject);
-        EditorGUILayout.Space();
-        DrawNavalOpsSection(serializedObject);
+        DrawUnitInformationSection();
         EditorGUILayout.Space();
         DrawConstructionConfigurationExpanded(serializedObject.FindProperty("constructionConfiguration"));
+        EditorGUILayout.Space();
+        DrawProductionSection(serializedObject.FindProperty("constructionConfiguration"));
+        EditorGUILayout.Space();
+        DrawLogisticsSection();
+        EditorGUILayout.Space();
+        DrawAIBehaviorSection();
 
         serializedObject.ApplyModifiedProperties();
     }
@@ -93,18 +115,59 @@ public class ConstructionDataEditor : Editor
         EditorGUI.indentLevel--;
     }
 
+    // Unit Information agrupa o que a construcao permite/impoe as UNIDADES que a usam.
+    private void DrawUnitInformationSection()
+    {
+        showUnitInformationSection = EditorGUILayout.Foldout(
+            showUnitInformationSection,
+            "Unit Information",
+            toggleOnLabelClick: true,
+            EditorStyles.foldoutHeader);
+        if (!showUnitInformationSection)
+            return;
+
+        EditorGUI.indentLevel++;
+
+        showAircraftOpsSection = EditorGUILayout.Foldout(
+            showAircraftOpsSection,
+            "Aircraft Ops",
+            toggleOnLabelClick: true);
+        if (showAircraftOpsSection)
+        {
+            EditorGUI.indentLevel++;
+            DrawAircraftOpsSection(serializedObject);
+            EditorGUI.indentLevel--;
+        }
+
+        showNavalOpsSection = EditorGUILayout.Foldout(
+            showNavalOpsSection,
+            "Naval Ops",
+            toggleOnLabelClick: true);
+        if (showNavalOpsSection)
+        {
+            EditorGUI.indentLevel++;
+            DrawNavalOpsSection(serializedObject);
+            EditorGUI.indentLevel--;
+        }
+
+        EditorGUI.indentLevel--;
+    }
+
     private static void DrawNavalOpsSection(SerializedObject so)
     {
-        EditorGUILayout.LabelField("Naval Ops", EditorStyles.boldLabel);
         EditorGUILayout.HelpBox(
             "Unidades nesses dominios/alturas encerram movimento no dominio nativo da construcao.",
             MessageType.Info);
         DrawIfExists(so.FindProperty("forceEndMovementOnTerrainDomainForDomains"), "The Units On The Follow Domain Are Forced To Emerge");
+
+        // Quem emerge aqui fica exposto: a deteccao acompanha a regra de emersao.
+        EditorGUILayout.Space(2f);
+        DrawIfExists(so.FindProperty("forceDetectOnForcedEndMovementDomains"), "Forced To Emerge Units Are Freely Detectable");
+        DrawIfExists(so.FindProperty("forceDetectUnitsWithFollowingStealthSkills"), "Only These Stealth Skills Are Detectable");
     }
 
     private static void DrawAircraftOpsSection(SerializedObject so)
     {
-        EditorGUILayout.LabelField("Aircraft Ops", EditorStyles.boldLabel);
         EditorGUILayout.HelpBox(
             "Regras de Air Ops (Construction):\n" +
             "- Allow Aicrafft Take Off and Landing: habilita pouso e decolagem neste contexto.\n" +
@@ -114,6 +177,10 @@ public class ConstructionDataEditor : Editor
         DrawIfExists(allowProp, "Allow Aicrafft Take Off and Landing");
         DrawIfExists(so.FindProperty("requiredLandingSkillRules"), "Required Landing Skills");
         DrawIfExists(so.FindProperty("requireAtLeastOneLandingSkill"), "Pelo menos 1 skill");
+
+        // Custo de estacionar aqui: concerne a aeronave pousada, nao a permissao de pousar.
+        EditorGUILayout.Space(2f);
+        DrawIfExists(so.FindProperty("aircraftUnitsPaysUpkeep"), "Landed Aircraft Pays Upkeep");
     }
 
     private void DrawConstructionConfigurationExpanded(SerializedProperty configProperty)
@@ -132,12 +199,25 @@ public class ConstructionDataEditor : Editor
         DrawIfExists(configProperty.FindPropertyRelative("isCapturable"), "Is Capturable");
         DrawIfExists(configProperty.FindPropertyRelative("capturePointsMax"), "Capture Points Max");
         DrawIfExists(configProperty.FindPropertyRelative("capturedIncoming"), "Captured Incoming");
-        DrawIfExists(configProperty.FindPropertyRelative("sellingRule"), "Selling Rules");
+
+        EditorGUI.indentLevel--;
+    }
+
+    private void DrawAIBehaviorSection()
+    {
+        showAIBehaviorSection = EditorGUILayout.Foldout(
+            showAIBehaviorSection,
+            "AI Behavior",
+            toggleOnLabelClick: true,
+            EditorStyles.foldoutHeader);
+        if (!showAIBehaviorSection)
+            return;
+
+        EditorGUI.indentLevel++;
 
         SerializedProperty rebelBuyProp = serializedObject.FindProperty("allowRebelAIPurchase");
         if (rebelBuyProp != null)
         {
-            EditorGUILayout.Space(2f);
             EditorGUILayout.HelpBox(
                 "Allow Rebel AI Purchase: a faccao sem QG (rebelde) NUNCA produz por padrao — nem no que captura. " +
                 "Marque para tornar ESTE predio uma excecao renegada: o rebelde que o capturar pode comprar aqui, " +
@@ -147,6 +227,26 @@ public class ConstructionDataEditor : Editor
             EditorGUILayout.PropertyField(rebelBuyProp, new GUIContent("Allow Rebel AI Purchase"));
         }
 
+        EditorGUI.indentLevel--;
+    }
+
+    private void DrawProductionSection(SerializedProperty configProperty)
+    {
+        showProductionSection = EditorGUILayout.Foldout(
+            showProductionSection,
+            "Production",
+            toggleOnLabelClick: true,
+            EditorStyles.foldoutHeader);
+        if (!showProductionSection)
+            return;
+
+        EditorGUI.indentLevel++;
+
+        // Quem pode comprar aqui.
+        DrawIfExists(configProperty.FindPropertyRelative("sellingRule"), "Selling Rules");
+
+        // O que pode ser comprado aqui.
+        EditorGUILayout.Space(4f);
         SerializedProperty offeredUnitsProp = configProperty.FindPropertyRelative("offeredUnits");
         DrawIfExists(offeredUnitsProp, "Offered Units");
         DrawOfferedUnitsQuickFill(offeredUnitsProp);

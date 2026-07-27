@@ -35,9 +35,6 @@ public partial class AIController
         PlayerAction repairAction = TryDecideRepairAction(unit, snapshot, plan);
         if (repairAction != null) return repairAction;
 
-        PlayerAction antiAirAction = TryDecideAntiAirFireSupportAction(unit, snapshot, plan);
-        if (antiAirAction != null) return antiAirAction;
-
         SectorObjective assigned = ResolveAssignedFireSupportObjective(unit, plan);
         if (assigned == null)
         {

@@ -131,6 +131,8 @@ public partial class AIController
 
             foreach (UnitManager enemy in threats)
             {
+                if (!PassesFireSupportRoleTargetFilter(unit, enemy))
+                    continue;
                 if (!CanAttackTargetFrom(fromCell, cell, unit, enemy))
                 {
                     geometryBlocked++;
@@ -232,6 +234,8 @@ public partial class AIController
 
             foreach (UnitManager enemy in enemies)
             {
+                if (!PassesFireSupportRoleTargetFilter(unit, enemy))
+                    continue;
                 if (!CanAttackTargetFrom(fromCell, cell, unit, enemy)) continue;
                 if (!PassesAttackDecision(unit, enemy, cell, defensiveContext, out string attackDecisionReason))
                     continue;

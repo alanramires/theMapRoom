@@ -92,7 +92,7 @@ public class ConstructionData : ScriptableObject
     public List<TerrainLayerMode> aditionalDomainsAllowed = new List<TerrainLayerMode>();
     [Tooltip("Se true, dominio do ar e sempre permitido para esta construcao.")]
     public bool alwaysAllowAirDomain = true;
-    [Header("Aircraft Ops")]
+    // Sem [Header("Aircraft Ops")]: o agrupamento e o foldout homonimo em ConstructionDataEditor.
     [FormerlySerializedAs("allowAircraftLanding")]
     [FormerlySerializedAs("allowAircraftTakeoff")]
     [Tooltip("Permite pouso e decolagem de aeronaves neste tipo de construcao.")]
@@ -106,7 +106,7 @@ public class ConstructionData : ScriptableObject
     public List<ConstructionLandingSkillRule> requiredLandingSkillRules = new List<ConstructionLandingSkillRule>();
     [Tooltip("Se true, basta ter pelo menos 1 skill da lista para pousar/decolar nesta construcao. Se false, exige todas.")]
     public bool requireAtLeastOneLandingSkill = false;
-    [Header("Naval Ops")]
+    // Sem [Header("Naval Ops")]: o agrupamento e o foldout homonimo em ConstructionDataEditor.
     [Tooltip("Unidades nesses dominios/alturas encerram movimento no dominio nativo desta construcao.")]
     public List<TerrainLayerMode> forceEndMovementOnTerrainDomainForDomains = new List<TerrainLayerMode>();
     [Tooltip("Quando ligado, unidades nos dominios/alturas acima ficam livremente detectaveis nesta construcao.")]

@@ -25,7 +25,8 @@ public class ConstructionSiteRuntime
     [Min(0)] public int capturePointsMax = 20;
     [Min(0)] public int capturedIncoming = 1000;
 
-    [Header("Production")]
+    // Sem [Header("Production")]: o agrupamento agora e o foldout "Production" desenhado
+    // por ConstructionDataEditor — o decorator duplicaria o titulo dentro do foldout.
     [Tooltip("Regra de venda de unidades desta construcao.")]
     public ConstructionUnitMarketRule sellingRule = ConstructionUnitMarketRule.FreeMarket;
     [FormerlySerializedAs("canProduceAndSellUnits")]
