@@ -36,14 +36,15 @@ public partial class AIController
             return selfRecoveryAction;
 
         // Um transportador que tambem e Hub (como o Trem de Carga) precisa
-        // conferir a rede antes de sair procurando passageiro. Se houver uma
-        // construcao sem estoque no alcance, MelhorEstoque/PodeTransferir
-        // decide a transferencia; sem operacao de estoque, o fluxo normal de
-        // Transporte continua intacto.
+        // conferir a rede antes de sair procurando passageiro. Essa preempcao
+        // e reservada para falta critica: uma demanda preventiva continua
+        // disponivel no branch normal de Estoque, mas nao faz o Trem abandonar
+        // um pickup Tactical/Operational que ja esta pronto.
         if (!HasTransportCargo(unit)
             && IsPrimaryTransportRole(unit)
             && HasStockTransferCapability(unit)
-            && TryDecideStockAction(unit, snapshot, plan)
+            && TryDecideStockAction(
+                unit, snapshot, plan, criticalOnly: true)
                 is PlayerAction stockNetworkAction)
         {
             return stockNetworkAction;

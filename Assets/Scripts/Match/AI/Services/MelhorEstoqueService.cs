@@ -26,6 +26,10 @@ public sealed class MelhorEstoqueRequest
     public bool emulateStockFromUnitData;
     public float maxThreat = float.PositiveInfinity;
     public Func<Vector3Int, float> evaluateThreat;
+    // Filtro de politica do controller. A consulta continua calculando e
+    // validando a opcao pelo PodeTransferir; quem a consome pode, por exemplo,
+    // pedir apenas destinos criticos antes de preemptar transporte.
+    public Func<MelhorEstoqueOption, bool> includeOption;
     public Action<string> diagnosticLog;
 }
 
@@ -192,6 +196,16 @@ public static class MelhorEstoqueService
                         reason =
                             $"Ameaca {candidate.threat:0.0} excede " +
                             $"o limite {request.maxThreat:0.0}."
+                    });
+                    continue;
+                }
+                if (request.includeOption != null
+                    && !request.includeOption(candidate))
+                {
+                    result.rejected.Add(new MelhorEstoqueReject
+                    {
+                        actionCell = actionCell,
+                        reason = "Opcao fora da politica de prioridade atual."
                     });
                     continue;
                 }

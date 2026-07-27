@@ -64,7 +64,8 @@ public partial class AIController
     private PlayerAction TryDecideStockAction(
         UnitManager unit,
         AIWorldSnapshot snapshot,
-        TeamObjectivePlan plan)
+        TeamObjectivePlan plan,
+        bool criticalOnly = false)
     {
         if (unit == null || snapshot == null)
             return null;
@@ -101,7 +102,8 @@ public partial class AIController
                 paths,
                 occupied,
                 out PlayerAction action,
-                out string reason))
+                out string reason,
+                criticalOnly: criticalOnly))
         {
             Debug.Log(
                 $"{TL("Stock")} {unit.InstanceId} " +
@@ -131,7 +133,8 @@ public partial class AIController
         HashSet<Vector3Int> occupied,
         out PlayerAction action,
         out string reason,
-        bool allowStrategicDirection = false)
+        bool allowStrategicDirection = false,
+        bool criticalOnly = false)
     {
         action = null;
         reason = string.Empty;
@@ -175,6 +178,9 @@ public partial class AIController
                     evaluateThreat = cell =>
                         CalculateThreatLevel(
                             cell, snapshot.AITeam),
+                    includeOption = criticalOnly
+                        ? IsCriticalStockOperation
+                        : null,
                     diagnosticLog = line => Debug.Log(line)
                 });
 
@@ -265,6 +271,25 @@ public partial class AIController
             $"{stock.intent} {reachTier} encontro={rendezvous} " +
             $"{progressReason} {stock.reason}";
         return true;
+    }
+
+    private static bool IsCriticalStockOperation(
+        MelhorEstoqueOption option)
+    {
+        if (option == null)
+            return false;
+
+        if (option.destinationConstruction != null)
+        {
+            return option.constructionStockNeed != null
+                && option.constructionStockNeed.level
+                    >= StockNeedLevel.Critical;
+        }
+
+        // Para receber, o destinatario efetivo e a propria unidade. Para
+        // fornecer a outro Hub/Receiver, stockNeed representa o destino.
+        return option.stockNeed != null
+            && option.stockNeed.level >= StockNeedLevel.Critical;
     }
 
     private PlayerAction BuildStockTransferBatch(
