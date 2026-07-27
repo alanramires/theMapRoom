@@ -14,6 +14,7 @@ public sealed class MelhorEmbarqueWindow : EditorWindow
     private Tilemap map;
     private MelhorEmbarqueResult result;
     private MelhorEmbarqueLzScore selected;
+    private MelhorEmbarqueOption selectedOption;
     private MelhorEmbarqueLzScore probableDirection;
     private Vector2 scroll;
     private string status = "Selecione um transportador vazio.";
@@ -87,6 +88,7 @@ public sealed class MelhorEmbarqueWindow : EditorWindow
             AutoDetect();
             result = null;
             selected = null;
+            selectedOption = null;
             probableDirection = null;
         }
 
@@ -130,10 +132,54 @@ public sealed class MelhorEmbarqueWindow : EditorWindow
                 MessageType.Info);
         }
 
-        EditorGUILayout.LabelField(
-            $"LZs válidos ({result.ranking.Count})",
-            EditorStyles.boldLabel);
         scroll = EditorGUILayout.BeginScrollView(scroll);
+        EditorGUILayout.LabelField(
+            $"Opções passageiro–LZ ({result.options.Count})",
+            EditorStyles.boldLabel);
+        for (int i = 0; i < result.options.Count; i++)
+        {
+            MelhorEmbarqueOption option = result.options[i];
+            bool active = selectedOption == option;
+            GUI.backgroundColor = active
+                ? new Color(1f, 0.8f, 0.2f)
+                : Color.white;
+            string passengerName = option.passenger != null
+                ? option.passenger.name
+                : "?";
+            if (GUILayout.Button(
+                    $"#{i + 1} {option.transporterTier} " +
+                    $"{passengerName} → {option.lzCell} | " +
+                    $"{option.passengerRouteState}",
+                    EditorStyles.miniButton))
+            {
+                selectedOption = option;
+                selected = result.ranking.Find(
+                    lz => lz.cell == option.lzCell);
+                SceneView.RepaintAll();
+            }
+            GUI.backgroundColor = Color.white;
+            if (!active)
+                continue;
+
+            EditorGUILayout.LabelField(
+                option.reason, EditorStyles.wordWrappedMiniLabel);
+            EditorGUILayout.LabelField(
+                $"Slot: {option.slotIndex} | " +
+                $"Disposition: {option.rideDisposition} | " +
+                $"Nota técnica: {option.score:0}",
+                EditorStyles.wordWrappedMiniLabel);
+            EditorGUILayout.LabelField(
+                $"Rota transportador: " +
+                $"{FormatCost(option.transporterRouteCost)} | " +
+                $"Rota passageiro: " +
+                $"{FormatCost(option.passengerRouteCost)}",
+                EditorStyles.wordWrappedMiniLabel);
+        }
+
+        EditorGUILayout.Space(8f);
+        EditorGUILayout.LabelField(
+            $"LZs válidos legados ({result.ranking.Count})",
+            EditorStyles.boldLabel);
         for (int i = 0; i < result.ranking.Count; i++)
         {
             MelhorEmbarqueLzScore lz = result.ranking[i];
@@ -205,6 +251,7 @@ public sealed class MelhorEmbarqueWindow : EditorWindow
         AutoDetect();
         result = null;
         selected = null;
+        selectedOption = null;
         status = $"Transportador: {picked.name}.";
         SceneView.RepaintAll();
     }
@@ -225,6 +272,7 @@ public sealed class MelhorEmbarqueWindow : EditorWindow
                 includeStrategic = includeStrategic
             });
         selected = result.best;
+        selectedOption = result.bestOption;
         probableDirection = null;
         if (showProbableDirection && !includeStrategic)
         {
@@ -243,12 +291,17 @@ public sealed class MelhorEmbarqueWindow : EditorWindow
             probableDirection = directionProbe.ranking.Find(
                 lz => lz.tier == MelhorEmbarqueTier.Strategic);
         }
-        status = selected != null
-            ? $"Melhor: {selected.tier} {selected.cell}, " +
-              $"{selected.passengers.Count} passageiro(s)."
+        status = selectedOption != null
+            ? $"Melhor opção: {selectedOption.transporterTier} " +
+              $"{selectedOption.passenger?.name} → " +
+              $"{selectedOption.lzCell} " +
+              $"({selectedOption.passengerRouteState})."
             : "Nenhum encontro válido encontrado.";
         SceneView.RepaintAll();
     }
+
+    private static string FormatCost(int value) =>
+        value >= 0 ? value.ToString() : "sem rota atual";
 
     private static void SyncRegistry()
     {
@@ -289,6 +342,21 @@ public sealed class MelhorEmbarqueWindow : EditorWindow
             Handles.Label(
                 world + Vector3.up * 0.32f,
                 $"{lz.tier} P{lz.passengers.Count}");
+        }
+
+        if (selectedOption != null)
+        {
+            Vector3 optionWorld =
+                map.GetCellCenterWorld(selectedOption.lzCell);
+            Handles.color = Color.yellow;
+            Handles.DrawWireDisc(
+                optionWorld, Vector3.forward, 0.52f);
+            Handles.Label(
+                optionWorld + Vector3.up * 0.55f,
+                selectedOption.passenger != null
+                    ? $"{selectedOption.passenger.name} " +
+                      $"{selectedOption.passengerRouteState}"
+                    : selectedOption.passengerRouteState.ToString());
         }
 
         if (showProbableDirection

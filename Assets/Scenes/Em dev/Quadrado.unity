@@ -18356,6 +18356,42 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 234180621}
   m_CullTransparentMesh: 1
+--- !u!21 &234582389
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: Runtime_UnitActedGlow
+  m_Shader: {fileID: 4800000, guid: 1601771c0533c1946bb776c9688f0186, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties:
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _MainTex:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _GlowSize: 1.5
+    - _GlowStrength: 1.25
+    m_Colors:
+    - _Color: {r: 1, g: 1, b: 1, a: 1}
+    - _GlowColor: {r: 1, g: 1, b: 1, a: 1}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1
 --- !u!1 &239934713
 GameObject:
   m_ObjectHideFlags: 0
@@ -25738,13 +25774,13 @@ MonoBehaviour:
     defeated: 0
     startMoney: 0
     actualMoney: 0
-    incomePerTurn: 4000
+    incomePerTurn: 4500
     startMoneyApplied: 1
   - teamId: 1
     flipX: 1
     flipXOverride: 0
     isAI: 1
-    isRebelRuntime: 0
+    isRebelRuntime: 1
     isLocal: 0
     localityConfigured: 1
     commandServiceAutomatic: 1
@@ -25757,7 +25793,7 @@ MonoBehaviour:
     flipX: 1
     flipXOverride: 0
     isAI: 1
-    isRebelRuntime: 0
+    isRebelRuntime: 1
     isLocal: 0
     localityConfigured: 1
     commandServiceAutomatic: 1
@@ -25825,7 +25861,7 @@ MonoBehaviour:
   appliedActiveTeamId: 2
   pendingTurnStartUpkeep: 1
   pendingTurnStartEconomy: 1
-  cachedConstructionIncomeSignature: -33904672
+  cachedConstructionIncomeSignature: -415191416
   cachedConstructionIncomeCount: 19
   constructionIncomeRefreshIntervalSeconds: 0.35
   continuousEditorRefresh: 0
@@ -39966,7 +40002,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &531524249
 RectTransform:
   m_ObjectHideFlags: 0
@@ -39995,7 +40031,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 531524248}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
   m_Name: 
@@ -47717,7 +47753,7 @@ SpriteRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_Sprite: {fileID: 21300000, guid: 5ca4a449521141e49a72d100a0c798b4, type: 3}
-  m_Color: {r: 0.65882355, g: 0.65882355, b: 1, a: 1}
+  m_Color: {r: 0.26352942, g: 0.26352942, b: 0.4, a: 1}
   m_FlipX: 1
   m_FlipY: 0
   m_DrawMode: 0
@@ -57099,7 +57135,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &760282798
 RectTransform:
   m_ObjectHideFlags: 0
@@ -57126,7 +57162,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 760282797}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: f4688fdb7df04437aeb418b961361dc5, type: 3}
   m_Name: 
@@ -58538,7 +58574,7 @@ Transform:
   m_GameObject: {fileID: 782581411}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 12.209381, y: -10.1837, z: 0}
+  m_LocalPosition: {x: 7.446509, y: -4.9337, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -58565,7 +58601,7 @@ MonoBehaviour:
   boardTilemap: {fileID: 1566606925}
   snapToCellCenter: 1
   autoSnapWhenMovedInEditor: 1
-  currentCellPosition: {x: 14, y: -15, z: 0}
+  currentCellPosition: {x: 9, y: -8, z: 0}
   hasActed: 1
   hasFiredThisTurn: 0
   receivedSuppliesThisTurn: 0
@@ -58581,7 +58617,7 @@ MonoBehaviour:
   slotIndex: 1
   unitId: Soldado
   instanceId: 2
-  currentPosition: {x: 12.556661, y: -11.25, z: 0}
+  currentPosition: {x: 7.793789, y: -6, z: 0}
   unitDisplayName: Soldado
   currentHP: 10
   isDead: 0
@@ -69331,42 +69367,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 937008734}
   m_CullTransparentMesh: 1
---- !u!21 &938280961
-Material:
-  serializedVersion: 8
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: Runtime_UnitActedGlow
-  m_Shader: {fileID: 4800000, guid: 1601771c0533c1946bb776c9688f0186, type: 3}
-  m_Parent: {fileID: 0}
-  m_ModifiedSerializedProperties: 0
-  m_ValidKeywords: []
-  m_InvalidKeywords: []
-  m_LightmapFlags: 4
-  m_EnableInstancingVariants: 0
-  m_DoubleSidedGI: 0
-  m_CustomRenderQueue: -1
-  stringTagMap: {}
-  disabledShaderPasses: []
-  m_LockedProperties:
-  m_SavedProperties:
-    serializedVersion: 3
-    m_TexEnvs:
-    - _MainTex:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    m_Ints: []
-    m_Floats:
-    - _GlowSize: 1.5
-    - _GlowStrength: 1.25
-    m_Colors:
-    - _Color: {r: 1, g: 1, b: 1, a: 1}
-    - _GlowColor: {r: 1, g: 1, b: 1, a: 1}
-  m_BuildTextureStacks: []
-  m_AllowLocking: 1
 --- !u!1 &938686715
 GameObject:
   m_ObjectHideFlags: 0
@@ -93648,7 +93648,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &1255631444
 RectTransform:
   m_ObjectHideFlags: 0
@@ -93675,7 +93675,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1255631443}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
   m_Name: 
@@ -94459,7 +94459,7 @@ Transform:
   m_GameObject: {fileID: 1268645782}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 6.5805326, y: -4.9337, z: 0}
+  m_LocalPosition: {x: 7.0135207, y: -5.6837, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -94486,7 +94486,7 @@ MonoBehaviour:
   boardTilemap: {fileID: 1566606925}
   snapToCellCenter: 1
   autoSnapWhenMovedInEditor: 1
-  currentCellPosition: {x: 8, y: -8, z: 0}
+  currentCellPosition: {x: 8, y: -9, z: 0}
   hasActed: 1
   hasFiredThisTurn: 0
   receivedSuppliesThisTurn: 0
@@ -94502,7 +94502,7 @@ MonoBehaviour:
   slotIndex: 1
   unitId: Soldado
   instanceId: 10
-  currentPosition: {x: 6.9278126, y: -6, z: 0}
+  currentPosition: {x: 7.3608007, y: -6.75, z: 0}
   unitDisplayName: Soldado
   currentHP: 10
   isDead: 0
@@ -106274,7 +106274,7 @@ SpriteRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 938280961}
+  - {fileID: 234582389}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -130324,8 +130324,8 @@ Tilemap:
   - first: {x: -13, y: -17, z: 0}
     second:
       serializedVersion: 2
-      m_TileIndex: 4
-      m_TileSpriteIndex: 4
+      m_TileIndex: 1
+      m_TileSpriteIndex: 1
       m_TileMatrixIndex: 0
       m_TileColorIndex: 0
       m_TileObjectToInstantiateIndex: 65535
@@ -130854,8 +130854,8 @@ Tilemap:
   - first: {x: -13, y: -16, z: 0}
     second:
       serializedVersion: 2
-      m_TileIndex: 4
-      m_TileSpriteIndex: 4
+      m_TileIndex: 1
+      m_TileSpriteIndex: 1
       m_TileMatrixIndex: 0
       m_TileColorIndex: 0
       m_TileObjectToInstantiateIndex: 65535
@@ -130864,8 +130864,8 @@ Tilemap:
   - first: {x: -12, y: -16, z: 0}
     second:
       serializedVersion: 2
-      m_TileIndex: 4
-      m_TileSpriteIndex: 4
+      m_TileIndex: 1
+      m_TileSpriteIndex: 1
       m_TileMatrixIndex: 0
       m_TileColorIndex: 0
       m_TileObjectToInstantiateIndex: 65535
@@ -147267,7 +147267,7 @@ Tilemap:
     m_RefCount: 121
     m_Data: {fileID: 11400000, guid: 8e8a1b5164a85a542aa94afb63767c2d, type: 2}
   - serializedVersion: 2
-    m_RefCount: 23
+    m_RefCount: 26
     m_Data: {fileID: 11400000, guid: 989688aecc1c71149bf0412799bbfe7a, type: 2}
   - serializedVersion: 2
     m_RefCount: 32
@@ -147276,14 +147276,14 @@ Tilemap:
     m_RefCount: 75
     m_Data: {fileID: 11400000, guid: 384d099216329d140a7af40e2d9be860, type: 2}
   - serializedVersion: 2
-    m_RefCount: 2664
+    m_RefCount: 2661
     m_Data: {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
   m_TileSpriteArray:
   - serializedVersion: 2
     m_RefCount: 121
     m_Data: {fileID: 21300000, guid: 012c16dcc3f28014fb342a4ab5175e20, type: 3}
   - serializedVersion: 2
-    m_RefCount: 23
+    m_RefCount: 26
     m_Data: {fileID: 21300000, guid: a2e4edc57c7cb044b936dcf5bd68af31, type: 3}
   - serializedVersion: 2
     m_RefCount: 32
@@ -147292,7 +147292,7 @@ Tilemap:
     m_RefCount: 75
     m_Data: {fileID: 21300000, guid: 3d40b38523f815f40a2da17357fe373c, type: 3}
   - serializedVersion: 2
-    m_RefCount: 2664
+    m_RefCount: 2661
     m_Data: {fileID: 21300000, guid: ea08babb4b97b6b4b8f13b2944bb35eb, type: 3}
   m_TileMatrixArray:
   - serializedVersion: 2
@@ -170903,19 +170903,19 @@ MonoBehaviour:
     - SlotIndex: 1
       Team: 1
       Entries:
-      - ConstructionName: Logistica Naval
-        InstanceId: 29
-        Distance: 0
-        VehicleDistance: 0
-        AirDistance: 0
-        NavalDistance: 0
-        IsHQ: 0
       - ConstructionName: "Esta\xE7\xE3o de Trem"
         InstanceId: 27
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
         AirDistance: 26
         NavalDistance: 34
+        IsHQ: 0
+      - ConstructionName: Logistica Naval
+        InstanceId: 29
+        Distance: 0
+        VehicleDistance: 0
+        AirDistance: 0
+        NavalDistance: 0
         IsHQ: 0
     closestNeighbor1: 0
     closestNeighbor1Distance: 3.4028235e+38
@@ -170994,19 +170994,19 @@ MonoBehaviour:
     - SlotIndex: 1
       Team: 1
       Entries:
-      - ConstructionName: Logistica Naval
-        InstanceId: 29
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 42
-        NavalDistance: 45
-        IsHQ: 0
       - ConstructionName: "Esta\xE7\xE3o de Trem"
         InstanceId: 27
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
         AirDistance: 41
         NavalDistance: 50
+        IsHQ: 0
+      - ConstructionName: Logistica Naval
+        InstanceId: 29
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 42
+        NavalDistance: 45
         IsHQ: 0
     closestNeighbor1: 3
     closestNeighbor1Distance: 3
@@ -171085,19 +171085,19 @@ MonoBehaviour:
     - SlotIndex: 1
       Team: 1
       Entries:
-      - ConstructionName: Logistica Naval
-        InstanceId: 29
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 39
-        NavalDistance: 43
-        IsHQ: 0
       - ConstructionName: "Esta\xE7\xE3o de Trem"
         InstanceId: 27
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
         AirDistance: 38
         NavalDistance: 42
+        IsHQ: 0
+      - ConstructionName: Logistica Naval
+        InstanceId: 29
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 39
+        NavalDistance: 43
         IsHQ: 0
     closestNeighbor1: 3
     closestNeighbor1Distance: 4
@@ -171176,19 +171176,19 @@ MonoBehaviour:
     - SlotIndex: 1
       Team: 1
       Entries:
-      - ConstructionName: Logistica Naval
-        InstanceId: 29
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 39
-        NavalDistance: 42
-        IsHQ: 0
       - ConstructionName: "Esta\xE7\xE3o de Trem"
         InstanceId: 27
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
         AirDistance: 38
         NavalDistance: 47
+        IsHQ: 0
+      - ConstructionName: Logistica Naval
+        InstanceId: 29
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 39
+        NavalDistance: 42
         IsHQ: 0
     closestNeighbor1: 1
     closestNeighbor1Distance: 3
@@ -171283,18 +171283,18 @@ MonoBehaviour:
     - SlotIndex: 1
       Team: 1
       Entries:
-      - ConstructionName: Logistica Naval
-        InstanceId: 29
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 34
-        NavalDistance: 34
-        IsHQ: 0
       - ConstructionName: "Esta\xE7\xE3o de Trem"
         InstanceId: 27
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
         AirDistance: 33
+        NavalDistance: 34
+        IsHQ: 0
+      - ConstructionName: Logistica Naval
+        InstanceId: 29
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 34
         NavalDistance: 34
         IsHQ: 0
     closestNeighbor1: 2
@@ -171374,19 +171374,19 @@ MonoBehaviour:
     - SlotIndex: 1
       Team: 1
       Entries:
-      - ConstructionName: Logistica Naval
-        InstanceId: 29
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 36
-        NavalDistance: 36
-        IsHQ: 0
       - ConstructionName: "Esta\xE7\xE3o de Trem"
         InstanceId: 27
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
         AirDistance: 35
         NavalDistance: 38
+        IsHQ: 0
+      - ConstructionName: Logistica Naval
+        InstanceId: 29
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 36
+        NavalDistance: 36
         IsHQ: 0
     closestNeighbor1: 3
     closestNeighbor1Distance: 3
@@ -171465,19 +171465,19 @@ MonoBehaviour:
     - SlotIndex: 1
       Team: 1
       Entries:
-      - ConstructionName: Logistica Naval
-        InstanceId: 29
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 36
-        NavalDistance: 36
-        IsHQ: 0
       - ConstructionName: "Esta\xE7\xE3o de Trem"
         InstanceId: 27
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
         AirDistance: 29
         NavalDistance: 31
+        IsHQ: 0
+      - ConstructionName: Logistica Naval
+        InstanceId: 29
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 36
+        NavalDistance: 36
         IsHQ: 0
     closestNeighbor1: 0
     closestNeighbor1Distance: 3.4028235e+38
@@ -171556,19 +171556,19 @@ MonoBehaviour:
     - SlotIndex: 1
       Team: 1
       Entries:
-      - ConstructionName: Logistica Naval
-        InstanceId: 29
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 47
-        NavalDistance: 49
-        IsHQ: 0
       - ConstructionName: "Esta\xE7\xE3o de Trem"
         InstanceId: 27
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
         AirDistance: 46
         NavalDistance: 48
+        IsHQ: 0
+      - ConstructionName: Logistica Naval
+        InstanceId: 29
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 47
+        NavalDistance: 49
         IsHQ: 0
     closestNeighbor1: 2
     closestNeighbor1Distance: 11
@@ -171647,19 +171647,19 @@ MonoBehaviour:
     - SlotIndex: 1
       Team: 1
       Entries:
-      - ConstructionName: Logistica Naval
-        InstanceId: 29
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 48
-        NavalDistance: 49
-        IsHQ: 0
       - ConstructionName: "Esta\xE7\xE3o de Trem"
         InstanceId: 27
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
         AirDistance: 47
         NavalDistance: 54
+        IsHQ: 0
+      - ConstructionName: Logistica Naval
+        InstanceId: 29
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 48
+        NavalDistance: 49
         IsHQ: 0
     closestNeighbor1: 0
     closestNeighbor1Distance: 3.4028235e+38
@@ -171739,19 +171739,19 @@ MonoBehaviour:
     - SlotIndex: 1
       Team: 1
       Entries:
-      - ConstructionName: Logistica Naval
-        InstanceId: 29
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 39
-        NavalDistance: 45
-        IsHQ: 0
       - ConstructionName: "Esta\xE7\xE3o de Trem"
         InstanceId: 27
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
         AirDistance: 38
         NavalDistance: 44
+        IsHQ: 0
+      - ConstructionName: Logistica Naval
+        InstanceId: 29
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 39
+        NavalDistance: 45
         IsHQ: 0
     closestNeighbor1: 0
     closestNeighbor1Distance: 3.4028235e+38
@@ -171830,19 +171830,19 @@ MonoBehaviour:
     - SlotIndex: 1
       Team: 1
       Entries:
-      - ConstructionName: Logistica Naval
-        InstanceId: 29
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 53
-        NavalDistance: 54
-        IsHQ: 0
       - ConstructionName: "Esta\xE7\xE3o de Trem"
         InstanceId: 27
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
         AirDistance: 53
         NavalDistance: 60
+        IsHQ: 0
+      - ConstructionName: Logistica Naval
+        InstanceId: 29
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 53
+        NavalDistance: 54
         IsHQ: 0
     closestNeighbor1: 0
     closestNeighbor1Distance: 3.4028235e+38
@@ -181158,7 +181158,7 @@ Transform:
   m_GameObject: {fileID: 2023701972}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -11.171987, y: -10.1837, z: 0}
+  m_LocalPosition: {x: -11.171987, y: -11.6837, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -181185,7 +181185,7 @@ MonoBehaviour:
   boardTilemap: {fileID: 1566606925}
   snapToCellCenter: 1
   autoSnapWhenMovedInEditor: 1
-  currentCellPosition: {x: -13, y: -15, z: 0}
+  currentCellPosition: {x: -13, y: -17, z: 0}
   hasActed: 1
   hasFiredThisTurn: 0
   receivedSuppliesThisTurn: 0
@@ -181201,7 +181201,7 @@ MonoBehaviour:
   slotIndex: 1
   unitId: Bazooka
   instanceId: 21
-  currentPosition: {x: -10.824707, y: -11.25, z: 0}
+  currentPosition: {x: -10.824707, y: -12.75, z: 0}
   unitDisplayName: Bazooka
   currentHP: 10
   isDead: 0
@@ -189734,7 +189734,7 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 1348457725607290348, guid: f7e44d7c210a32d4ba630ba660da88a1, type: 3}
       propertyPath: m_text
-      value: 4000 / turn
+      value: 4500 / turn
       objectReference: {fileID: 0}
     - target: {fileID: 4985144350662451516, guid: f7e44d7c210a32d4ba630ba660da88a1, type: 3}
       propertyPath: m_Enabled
@@ -189951,27 +189951,27 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1238357028457191820, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchorMax.y
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 1238357028457191820, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchorMin.y
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 1238357028457191820, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_SizeDelta.x
-      value: 0
+      value: 350
       objectReference: {fileID: 0}
     - target: {fileID: 1238357028457191820, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_SizeDelta.y
-      value: 0
+      value: 46.852123
       objectReference: {fileID: 0}
     - target: {fileID: 1238357028457191820, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchoredPosition.x
-      value: 0
+      value: 175
       objectReference: {fileID: 0}
     - target: {fileID: 1238357028457191820, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchoredPosition.y
-      value: 0
+      value: -319.72183
       objectReference: {fileID: 0}
     - target: {fileID: 1559111691313144262, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchorMax.y
@@ -189999,51 +189999,51 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2282961218643192718, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchorMax.y
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 2282961218643192718, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchorMin.y
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 2282961218643192718, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_SizeDelta.x
-      value: 0
+      value: 350
       objectReference: {fileID: 0}
     - target: {fileID: 2282961218643192718, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_SizeDelta.y
-      value: 0
+      value: 46.852123
       objectReference: {fileID: 0}
     - target: {fileID: 2282961218643192718, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchoredPosition.x
-      value: 0
+      value: 175
       objectReference: {fileID: 0}
     - target: {fileID: 2282961218643192718, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchoredPosition.y
-      value: 0
+      value: -376.57394
       objectReference: {fileID: 0}
     - target: {fileID: 2296463182487355338, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchorMax.y
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 2296463182487355338, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchorMin.y
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 2296463182487355338, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_SizeDelta.x
-      value: 0
+      value: 350
       objectReference: {fileID: 0}
     - target: {fileID: 2296463182487355338, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_SizeDelta.y
-      value: 0
+      value: 46.852123
       objectReference: {fileID: 0}
     - target: {fileID: 2296463182487355338, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchoredPosition.x
-      value: 0
+      value: 175
       objectReference: {fileID: 0}
     - target: {fileID: 2296463182487355338, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchoredPosition.y
-      value: 0
+      value: -92.31333
       objectReference: {fileID: 0}
     - target: {fileID: 3265272143402930044, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchorMax.y
@@ -190119,27 +190119,27 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 5109494745487103150, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchorMax.y
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 5109494745487103150, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchorMin.y
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 5109494745487103150, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_SizeDelta.x
-      value: 0
+      value: 350
       objectReference: {fileID: 0}
     - target: {fileID: 5109494745487103150, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_SizeDelta.y
-      value: 0
+      value: 46.852123
       objectReference: {fileID: 0}
     - target: {fileID: 5109494745487103150, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchoredPosition.x
-      value: 0
+      value: 175
       objectReference: {fileID: 0}
     - target: {fileID: 5109494745487103150, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchoredPosition.y
-      value: 0
+      value: -206.01758
       objectReference: {fileID: 0}
     - target: {fileID: 5417498225948991444, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchorMax.y
@@ -190191,23 +190191,23 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6507900280305876854, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchorMax.y
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 6507900280305876854, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchorMin.y
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 6507900280305876854, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_SizeDelta.x
-      value: 0
+      value: 350
       objectReference: {fileID: 0}
     - target: {fileID: 6507900280305876854, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_SizeDelta.y
-      value: 0
+      value: 58.887264
       objectReference: {fileID: 0}
     - target: {fileID: 6507900280305876854, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchoredPosition.x
-      value: 0
+      value: 350
       objectReference: {fileID: 0}
     - target: {fileID: 6802222887232621682, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchorMax.y
@@ -190287,27 +190287,27 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8207324134304621415, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchorMax.y
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 8207324134304621415, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchorMin.y
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 8207324134304621415, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_SizeDelta.x
-      value: 0
+      value: 350
       objectReference: {fileID: 0}
     - target: {fileID: 8207324134304621415, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_SizeDelta.y
-      value: 0
+      value: 46.852123
       objectReference: {fileID: 0}
     - target: {fileID: 8207324134304621415, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchoredPosition.x
-      value: 0
+      value: 175
       objectReference: {fileID: 0}
     - target: {fileID: 8207324134304621415, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchoredPosition.y
-      value: 0
+      value: -262.86972
       objectReference: {fileID: 0}
     - target: {fileID: 8714050393753108646, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_Pivot.x
@@ -190411,27 +190411,27 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8843473493804996091, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchorMax.y
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 8843473493804996091, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchorMin.y
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 8843473493804996091, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_SizeDelta.x
-      value: 0
+      value: 350
       objectReference: {fileID: 0}
     - target: {fileID: 8843473493804996091, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_SizeDelta.y
-      value: 0
+      value: 46.852123
       objectReference: {fileID: 0}
     - target: {fileID: 8843473493804996091, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchoredPosition.x
-      value: 0
+      value: 175
       objectReference: {fileID: 0}
     - target: {fileID: 8843473493804996091, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchoredPosition.y
-      value: 0
+      value: -149.16545
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []

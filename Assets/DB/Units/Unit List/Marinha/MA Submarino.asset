@@ -75,12 +75,12 @@ MonoBehaviour:
   attackMustSurvive: 1
   ignoreAttackDecisionWhenDefending: 0
   defensiveAttackExtraHpLossPercent: 20
-  repairTriggerHpBelow: 0
-  repairTriggerAutonomyPct: 0
-  repairTriggerAmmoEnabled: 0
+  repairTriggerHpBelow: 3
+  repairTriggerAutonomyPct: 25
+  repairTriggerAmmoEnabled: 1
   repairTriggerAmmoPct: 0
   repairRecoverHpAbove: 8
-  fuseWhileInRepair: 0
+  fuseWhileInRepair: 1
   restockTriggerGallonPct: 0
   restockTriggerAmmoBoxPct: 0
   restockTriggerToolsPct: 0
@@ -91,6 +91,7 @@ MonoBehaviour:
   aiPreventiveSupplyHpBelowPct: 70
   aiPreventiveSupplyAutonomyBelowPct: 60
   aiPreventiveSupplyWeaponAmmoAtOrBelow: 1
+  aiDisembarkWhenCannotSupply: 1
   eliteLevel: 0
   eliteFrom: {fileID: 0}
   combatModifiers: []
@@ -127,12 +128,14 @@ MonoBehaviour:
     lastSyncedWeapon: {fileID: 11400000, guid: afbb31a3d8a2c3645bf90df243540a74, type: 2}
   cantUseWeaponsOnTheFollowDomain: []
   isSupplier: 0
+  startsWithEmptySupplies: 1
   supplierTier: 0
   maxUnitsServedPerTurn: 0
   serviceRange: 0
   collectionRange: 0
   supplierOperationDomains: []
   supplierServicesProvided: []
+  supplierServiceProfile: 0
   supplierResources: []
   isTransporter: 0
   spriteTransport: {fileID: 0}
@@ -142,9 +145,6 @@ MonoBehaviour:
   allowedDisembarkWhenTransporterAtTerrains: []
   allowedDisembarkWhenTransporterAtTerrainStructures: []
   allowedDisembarkWhenTransporterAtFacilities: 0
-  passengersCanDisembarkAndGoesToTerrains: []
-  passengersCanDisembarkAndGoesToTerrainStructures: []
-  passengersCanDisembarkAndGoesToFacilities: 0
   transportSlots: []
   autonomia: 90
   cost: 24000

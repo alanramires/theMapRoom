@@ -29,6 +29,12 @@ MonoBehaviour:
       - {x: 14, y: -40, z: 0}
       - {x: 15, y: -40, z: 0}
       - {x: 16, y: -40, z: 0}
+    - routeName: Route 2
+      ownerDatabase: {fileID: 11400000}
+      cells:
+      - {x: -14, y: -15, z: 0}
+      - {x: -13, y: -15, z: 0}
+      - {x: -12, y: -15, z: 0}
   - structure: {fileID: 11400000, guid: 7933d65148f7b884c895240966ea81b1, type: 2}
     routes:
     - routeName: Route 1
