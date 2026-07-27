@@ -888,46 +888,37 @@ public partial class AIController
         if (unit == null || limit <= 0)
             return empty;
 
-        Vector3Int originalCell = unit.CurrentCellPosition;
-        originalCell.z = 0;
         serviceCell.z = 0;
 
-        unit.SetCurrentCellPosition(serviceCell, enforceFinalOccupancyRule: false);
-        try
-        {
-            var options = new List<PodeSuprirOption>();
-            var invalidOptions = new List<PodeSuprirInvalidOption>();
-            bool hasAny = PodeSuprirSensor.CollectOptions(
-                unit,
-                boardTilemap,
-                terrainDatabase,
-                matchController,
-                options,
-                out string sensorReason,
-                invalidOptions);
+        var options = new List<PodeSuprirOption>();
+        var invalidOptions = new List<PodeSuprirInvalidOption>();
+        bool hasAny = PodeSuprirSensor.CollectOptionsFromCell(
+            unit,
+            boardTilemap,
+            terrainDatabase,
+            matchController,
+            serviceCell,
+            options,
+            out string sensorReason,
+            invalidOptions);
 
-            validCount = options.Count;
-            invalidCount = invalidOptions.Count;
-            List<UnitManager> targets = PickBestLogisticsSupplyTargets(
-                unit,
-                snapshot,
-                serviceCell,
-                options,
-                limit,
-                allowPreventiveMaintenance);
+        validCount = options.Count;
+        invalidCount = invalidOptions.Count;
+        List<UnitManager> targets = PickBestLogisticsSupplyTargets(
+            unit,
+            snapshot,
+            serviceCell,
+            options,
+            limit,
+            allowPreventiveMaintenance);
 
-            if (!hasAny || targets.Count <= 0)
-                debug = BuildLogisticsSupplyDebug(unit, options, targets, invalidOptions, allowPreventiveMaintenance);
+        if (!hasAny || targets.Count <= 0)
+            debug = BuildLogisticsSupplyDebug(unit, options, targets, invalidOptions, allowPreventiveMaintenance);
 
-            if (!hasAny && string.IsNullOrWhiteSpace(debug))
-                debug = sensorReason;
+        if (!hasAny && string.IsNullOrWhiteSpace(debug))
+            debug = sensorReason;
 
-            return targets;
-        }
-        finally
-        {
-            unit.SetCurrentCellPosition(originalCell, enforceFinalOccupancyRule: false);
-        }
+        return targets;
     }
 
     // Passageiro embarcado NESTE supridor. O PodeSuprir ja o aceita como alvo legal

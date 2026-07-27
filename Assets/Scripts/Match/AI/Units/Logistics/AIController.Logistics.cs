@@ -46,27 +46,26 @@ public partial class AIController
 
         if (needsReload)
         {
-            if (TryBuildLogisticsTransferReceiveAction(unit, snapshot, fromCell, paths, out PlayerAction transferAction, out string transferReason))
+            if (TryBuildLogisticsStockRestockAction(
+                    unit,
+                    snapshot,
+                    fromCell,
+                    paths,
+                    occupied,
+                    out PlayerAction stockAction,
+                    out string stockReason))
             {
-                Debug.Log($"{TL("Logistics")} {unit.InstanceId} recarrega por transferencia {restockReason} {transferReason}");
-                return transferAction;
+                Debug.Log(
+                    $"{TL("Logistics")} {unit.InstanceId} " +
+                    $"recarrega pela rede de estoque " +
+                    $"{restockReason} {stockReason}");
+                return stockAction;
             }
 
-            Debug.Log($"{TL("Logistics")} {unit.InstanceId} restock sem transferencia imediata {restockReason} motivo={transferReason}");
-
-            if (TryFindLogisticsReloadCell(unit, snapshot, fromCell, paths, occupied, out Vector3Int reloadCell, out string reloadReason))
-            {
-                if (TryBuildLogisticsTransferReceiveActionAtCell(unit, snapshot, fromCell, reloadCell, paths, out PlayerAction moveTransferAction, out string moveTransferReason))
-                {
-                    Debug.Log($"{TL("Logistics")} {unit.InstanceId} move + recarrega por transferencia {restockReason} {moveTransferReason} {reloadReason}");
-                    return moveTransferAction;
-                }
-
-                Debug.Log($"{TL("Logistics")} {unit.InstanceId} volta para recarga via {reloadCell} {restockReason} {reloadReason}");
-                return BuildMoveBatch(unit, snapshot.AITeam, fromCell, reloadCell, paths);
-            }
-
-            Debug.Log($"{TL("Logistics")} {unit.InstanceId} restock bloqueado: sem transferencia/rota segura {restockReason} reload={reloadReason}");
+            Debug.Log(
+                $"{TL("Logistics")} {unit.InstanceId} " +
+                $"restock bloqueado: {restockReason} " +
+                $"MelhorEstoque={stockReason}");
             return BuildMoveBatch(unit, snapshot.AITeam, fromCell, fromCell, paths);
         }
 

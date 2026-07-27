@@ -97,30 +97,27 @@ public partial class AIController
         bool needsReload = ShouldRestockLogisticsUnit(unit, out string restockReason);
         if (needsReload)
         {
-            if (TryBuildLogisticsTransferReceiveAction(
-                    unit, snapshot, fromCell, paths, out PlayerAction transferAction, out string transferReason))
+            if (TryBuildLogisticsStockRestockAction(
+                    unit,
+                    snapshot,
+                    fromCell,
+                    paths,
+                    occupied,
+                    out PlayerAction stockAction,
+                    out string stockReason))
             {
-                Debug.Log($"{TL("Hospital")} {unit.InstanceId} recarrega por transferencia com {patientTag} a bordo — {restockReason} {transferReason}");
-                return transferAction;
+                Debug.Log(
+                    $"{TL("Hospital")} {unit.InstanceId} " +
+                    $"recarrega pela rede com {patientTag} a bordo — " +
+                    $"{restockReason} {stockReason}");
+                return stockAction;
             }
 
-            if (TryFindLogisticsReloadCell(
-                    unit, snapshot, fromCell, paths, occupied,
-                    out Vector3Int reloadCell, out string reloadReason))
-            {
-                if (TryBuildLogisticsTransferReceiveActionAtCell(
-                        unit, snapshot, fromCell, reloadCell, paths,
-                        out PlayerAction moveTransferAction, out string moveTransferReason))
-                {
-                    Debug.Log($"{TL("Hospital")} {unit.InstanceId} move + recarrega com {patientTag} a bordo — {restockReason} {moveTransferReason}");
-                    return moveTransferAction;
-                }
-
-                Debug.Log($"{TL("Hospital")} {unit.InstanceId} volta para recarga via {reloadCell} com {patientTag} a bordo — {restockReason} {reloadReason}");
-                return BuildMoveBatch(unit, snapshot.AITeam, fromCell, reloadCell, paths);
-            }
-
-            Debug.Log($"{TL("Hospital")} {unit.InstanceId} sem recarga alcancavel — {restockReason}; libera EVAC normal para {patientTag}");
+            Debug.Log(
+                $"{TL("Hospital")} {unit.InstanceId} " +
+                $"sem recarga Tactical/Operational — " +
+                $"{restockReason} MelhorEstoque={stockReason}; " +
+                $"libera EVAC normal para {patientTag}");
             return null;
         }
 
@@ -289,26 +286,21 @@ public partial class AIController
         return true;
     }
 
-    // Simula o sensor a partir de outra celula pelo mesmo padrao ja usado no
-    // transporte (SimulateDisembarkFromCell): desloca, consulta, restaura. E
-    // sincrono e termina antes de qualquer outra decisao rodar.
+    // Consulta prospectiva: o sensor recebe o hex de servico sem deslocar a
+    // unidade confirmada no tabuleiro.
     private bool CollectHospitalSupplyOptionsAtCell(
         UnitManager unit, Vector3Int serviceCell, List<PodeSuprirOption> options)
     {
-        Vector3Int originalCell = unit.CurrentCellPosition;
-        originalCell.z = 0;
         serviceCell.z = 0;
-
-        unit.SetCurrentCellPosition(serviceCell, enforceFinalOccupancyRule: false);
-        try
-        {
-            return PodeSuprirSensor.CollectOptions(
-                unit, boardTilemap, terrainDatabase, matchController, options, out _, null);
-        }
-        finally
-        {
-            unit.SetCurrentCellPosition(originalCell, enforceFinalOccupancyRule: false);
-        }
+        return PodeSuprirSensor.CollectOptionsFromCell(
+            unit,
+            boardTilemap,
+            terrainDatabase,
+            matchController,
+            serviceCell,
+            options,
+            out _,
+            null);
     }
 
     private static string BuildHospitalSensorReason(

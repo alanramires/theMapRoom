@@ -3,322 +3,261 @@ using UnityEngine;
 
 public partial class AIController
 {
-    private sealed class RestockSource
-    {
-        public UnitManager Unit;
-        public ConstructionManager Construction;
-        public Vector3Int SourceCell;
-        public Vector3Int RendezvousCell;
-
-        public string DebugLabel =>
-            Unit != null
-                ? $"{Unit.UnitDisplayName}#{Unit.InstanceId}@{SourceCell}"
-                : Construction != null
-                    ? $"{Construction.ConstructionDisplayName}#{Construction.InstanceId}@{SourceCell}"
-                    : $"none@{SourceCell}";
-
-        public bool Matches(PodeTransferirOption option)
-        {
-            return option != null
-                && option.flowMode == TransferFlowMode.Recebedor
-                && ((Unit != null && option.targetUnit == Unit)
-                    || (Construction != null && option.targetConstruction == Construction));
-        }
-    }
-
-    private bool TryFindLogisticsReloadCell(
+    /// <summary>
+    /// Materializa a recomendacao pura do Melhor Estoque para a propria
+    /// unidade. Tactical executa movimento + transferencia nesta rodada;
+    /// Operational apenas progride para o rendezvous e reavalia no proximo
+    /// turno. A consulta nao move a unidade para simular posicoes.
+    /// </summary>
+    private bool TryBuildLogisticsStockRestockAction(
         UnitManager unit,
         AIWorldSnapshot snapshot,
         Vector3Int fromCell,
+        Dictionary<Vector3Int, List<Vector3Int>> paths,
+        HashSet<Vector3Int> occupied,
+        out PlayerAction action,
+        out string reason)
+    {
+        action = null;
+        reason = string.Empty;
+        if (unit == null
+            || snapshot == null
+            || boardTilemap == null
+            || terrainDatabase == null)
+        {
+            reason = "contexto de estoque indisponivel";
+            return false;
+        }
+
+        fromCell.z = 0;
+        StockNeedAssessment need =
+            StockNeedAssessmentService.Evaluate(unit);
+        if (need == null || !need.NeedsStock)
+        {
+            reason = need != null
+                ? need.reason
+                : "avaliacao de estoque indisponivel";
+            return false;
+        }
+
+        MelhorEstoqueResult result =
+            MelhorEstoqueService.Evaluate(
+                new MelhorEstoqueRequest
+                {
+                    unit = unit,
+                    map = boardTilemap,
+                    terrainDatabase = terrainDatabase,
+                    intent = MelhorEstoqueIntent.ReplenishSelf,
+                    tacticalBudget = Mathf.Max(
+                        0, unit.RemainingMovementPoints),
+                    operationalTurns = 2,
+                    includeStrategic = false,
+                    emulateStockFromUnitData = false,
+                    maxThreat = 0f,
+                    evaluateThreat = cell =>
+                        CalculateThreatLevel(
+                            cell, snapshot.AITeam),
+                    diagnosticLog = line => Debug.Log(line)
+                });
+
+        if (result?.reachDecision == null
+            || !result.reachDecision.Found
+            || result.reachDecision.Decision?.Value == null)
+        {
+            int rejected = result != null
+                ? result.rejected.Count
+                : 0;
+            reason =
+                $"{need.reason} MelhorEstoque sem encontro " +
+                $"Tactical/Operational (rejeitados={rejected})";
+            return false;
+        }
+
+        MelhorEstoqueOption stock =
+            result.reachDecision.Decision.Value;
+        PodeTransferirOption transfer =
+            stock.prospectiveTransfer;
+        if (transfer == null
+            || transfer.flowMode !=
+                TransferFlowMode.Recebedor)
+        {
+            reason =
+                "MelhorEstoque retornou fluxo diferente de Receber";
+            return false;
+        }
+
+        Vector3Int rendezvous = stock.actionCell;
+        rendezvous.z = 0;
+        if (result.reachDecision.Tier ==
+            AIReachDecisionTier.Tactical)
+        {
+            if (rendezvous != fromCell
+                && (paths == null
+                    || !paths.ContainsKey(rendezvous)))
+            {
+                reason =
+                    $"encontro Tactical {rendezvous} fora dos " +
+                    "caminhos atuais";
+                return false;
+            }
+
+            action = BuildTransferReceiveBatch(
+                unit,
+                snapshot.AITeam,
+                fromCell,
+                rendezvous,
+                transfer,
+                paths);
+            reason =
+                $"{need.level} via MelhorEstoque Tactical " +
+                $"{stock.reason}";
+            return true;
+        }
+
+        if (result.reachDecision.Tier !=
+            AIReachDecisionTier.Operational)
+        {
+            reason =
+                $"tier {result.reachDecision.Tier} nao materializado";
+            return false;
+        }
+
+        if (!TryChooseLogisticsStockProgressCell(
+                unit,
+                snapshot,
+                fromCell,
+                rendezvous,
+                paths,
+                occupied,
+                out Vector3Int progressCell,
+                out string progressReason))
+        {
+            reason =
+                $"{need.reason} encontro Operational={rendezvous}, " +
+                $"mas sem progressao segura";
+            return false;
+        }
+
+        action = BuildMoveBatch(
+            unit,
+            snapshot.AITeam,
+            fromCell,
+            progressCell,
+            paths);
+        reason =
+            $"{need.level} via MelhorEstoque Operational " +
+            $"encontro={rendezvous} {progressReason} " +
+            $"{stock.reason}";
+        return true;
+    }
+
+    private bool TryChooseLogisticsStockProgressCell(
+        UnitManager unit,
+        AIWorldSnapshot snapshot,
+        Vector3Int fromCell,
+        Vector3Int rendezvous,
         Dictionary<Vector3Int, List<Vector3Int>> paths,
         HashSet<Vector3Int> occupied,
         out Vector3Int bestCell,
         out string reason)
     {
         bestCell = fromCell;
-        reason = "";
-        if (paths == null || paths.Count == 0 || snapshot == null)
+        reason = string.Empty;
+        if (unit == null
+            || snapshot == null
+            || paths == null
+            || paths.Count == 0)
             return false;
 
-        RestockSource target = FindBestRestockSource(unit, snapshot, fromCell);
-        if (target == null)
-        {
-            reason = "sem RestockSource validado pelo PodeTransferir";
-            return false;
-        }
-
-        Vector3Int targetCell = target.RendezvousCell;
-        targetCell.z = 0;
-        float fromDist = SectorManager.HexDistance(fromCell, targetCell);
-
+        float fromDistance =
+            SectorManager.HexDistance(
+                fromCell, rendezvous);
         if (TryFindBestToolProgressionCell(
                 unit,
                 snapshot,
                 fromCell,
-                targetCell,
+                rendezvous,
                 paths,
                 occupied,
                 ToolProgressionIntent.LogisticsReload,
-                out Vector3Int toolReloadCell,
-                out ToolProgressionCandidate toolReloadCandidate,
-                out string toolReloadReason,
-                tacticalScore: (cell, candidate) =>
+                out Vector3Int toolCell,
+                out ToolProgressionCandidate candidate,
+                out string toolReason,
+                tacticalScore: (cell, value) =>
                 {
-                    float dist = SectorManager.HexDistance(cell, targetCell);
-                    float progress = fromDist - dist;
-                    float threat = CalculateThreatLevel(cell, snapshot.AITeam);
-                    float dpq = GetTerrainDpqPontos(cell);
-                    float score = progress * 650f
-                        - dist * 80f
-                        + dpq * 40f
-                        - threat * 120f
-                        - candidate.MoveCost * 8f;
+                    float threat =
+                        CalculateThreatLevel(
+                            cell, snapshot.AITeam);
+                    if (threat > 0f)
+                        return float.MinValue;
 
-                    if (CanLogisticsReceiveTransferAtCell(unit, snapshot, fromCell, cell))
-                        score += 6500f;
-                    if (cell == targetCell)
-                        score += 4000f;
-                    return score;
+                    float distance =
+                        SectorManager.HexDistance(
+                            cell, rendezvous);
+                    float progress =
+                        fromDistance - distance;
+                    return progress * 650f
+                        - distance * 80f
+                        + GetTerrainDpqPontos(cell) * 40f
+                        - value.MoveCost * 8f;
                 }))
         {
-            bool hasReloadProgress = toolReloadCandidate.ToolScore > 0
-                || toolReloadCandidate.FirstTurnProgress > 0f
-                || toolReloadCandidate.TwoTurnProgress > 0f;
-            if (hasReloadProgress || toolReloadCell == targetCell)
+            float progress =
+                fromDistance
+                - SectorManager.HexDistance(
+                    toolCell, rendezvous);
+            if (toolCell != fromCell && progress > 0f)
             {
-                bestCell = toolReloadCell;
-                reason = $"source={target.DebugLabel} rendezvous={targetCell} {toolReloadReason}";
+                bestCell = toolCell;
+                reason =
+                    $"{toolReason} progresso={progress:0.0} " +
+                    $"tool={candidate.ToolScore:0.0}";
                 return true;
             }
         }
 
         float bestScore = float.MinValue;
-        Vector3Int bestFallbackMove = fromCell;
-        float bestFallbackScore = float.MinValue;
         foreach (Vector3Int rawCell in paths.Keys)
         {
             Vector3Int cell = rawCell;
             cell.z = 0;
-            if (cell != fromCell && occupied != null && occupied.Contains(cell))
+            if (cell == fromCell)
+                continue;
+            if (occupied != null && occupied.Contains(cell))
                 continue;
 
-            float dist = SectorManager.HexDistance(cell, targetCell);
-            float progress = fromDist - dist;
-            float threat = CalculateThreatLevel(cell, snapshot.AITeam);
-            float dpq = GetTerrainDpqPontos(cell);
-            float score = progress * 650f
-                - dist * 80f
-                + dpq * 40f
-                - threat * 120f
-                - GetPathStepCount(paths, cell) * 8f;
-
-            if (CanLogisticsReceiveTransferAtCell(unit, snapshot, fromCell, cell))
-                score += 6500f;
-            if (cell == targetCell)
-                score += 4000f;
-
-            if (cell != fromCell && score > bestFallbackScore)
-            {
-                bestFallbackScore = score;
-                bestFallbackMove = cell;
-            }
-            if (score > bestScore)
-            {
-                bestScore = score;
-                bestCell = cell;
-            }
-        }
-
-        if (bestCell == fromCell && fromDist > 0f)
-        {
-            if (bestFallbackMove != fromCell)
-            {
-                bestCell = bestFallbackMove;
-                reason = $"source={target.DebugLabel} rendezvous={targetCell} fallbackMove dist={SectorManager.HexDistance(bestCell, targetCell):F1} score={bestFallbackScore:F0}";
-                return true;
-            }
-            return false;
-        }
-
-        reason = $"source={target.DebugLabel} rendezvous={targetCell} dist={SectorManager.HexDistance(bestCell, targetCell):F1} score={bestScore:F0}";
-        return true;
-    }
-
-    private RestockSource FindBestRestockSource(
-        UnitManager receiver,
-        AIWorldSnapshot snapshot,
-        Vector3Int fromCell)
-    {
-        RestockSource best = null;
-        float bestScore = float.MinValue;
-
-        for (int i = 0; i < ConstructionManager.AllActive.Count; i++)
-        {
-            ConstructionManager building = ConstructionManager.AllActive[i];
-            if (building == null || (int)building.TeamId != (int)receiver.TeamId)
-                continue;
-            if (building.CurrentCapturePoints < building.CapturePointsMax)
-                continue;
-            if (!building.TryResolveConstructionData(out ConstructionData buildingData)
-                || buildingData == null
-                || !buildingData.isSupplier
-                || buildingData.supplierTier != SupplierTier.Hub)
-                continue;
-
-            var candidate = new RestockSource
-            {
-                Construction = building,
-                SourceCell = NormalizeRestockCell(building.CurrentCellPosition)
-            };
-            ScoreRestockSourceCandidate(
-                receiver, snapshot, fromCell, candidate, ref best, ref bestScore);
-        }
-
-        foreach (UnitManager hub in UnitManager.AllActive)
-        {
-            if (hub == null || hub == receiver || hub.IsDead || hub.IsEmbarked)
-                continue;
-            if ((int)hub.TeamId != (int)receiver.TeamId)
-                continue;
-            if (!hub.TryGetUnitData(out UnitData hubData)
-                || hubData == null
-                || !hubData.isSupplier
-                || hubData.supplierTier != SupplierTier.Hub
-                || !HasRuntimeTransferService(hub))
-                continue;
-
-            var candidate = new RestockSource
-            {
-                Unit = hub,
-                SourceCell = NormalizeRestockCell(hub.CurrentCellPosition)
-            };
-            ScoreRestockSourceCandidate(
-                receiver, snapshot, fromCell, candidate, ref best, ref bestScore);
-        }
-
-        return best;
-    }
-
-    private static bool HasRuntimeTransferService(UnitManager supplier)
-    {
-        if (supplier == null)
-            return false;
-        IReadOnlyList<ServiceData> services = supplier.GetEmbarkedServices();
-        if (services == null)
-            return false;
-        for (int i = 0; i < services.Count; i++)
-        {
-            ServiceData service = services[i];
-            if (service != null && service.serviceType == ServiceType.Transfer)
-                return true;
-        }
-        return false;
-    }
-
-    private void ScoreRestockSourceCandidate(
-        UnitManager receiver,
-        AIWorldSnapshot snapshot,
-        Vector3Int fromCell,
-        RestockSource candidate,
-        ref RestockSource best,
-        ref float bestScore)
-    {
-        if (candidate == null)
-            return;
-
-        var meetingCells = new List<Vector3Int>(7) { candidate.SourceCell };
-        var neighbors = new List<Vector3Int>(6);
-        UnitMovementPathRules.GetImmediateHexNeighbors(
-            boardTilemap, candidate.SourceCell, neighbors);
-        for (int i = 0; i < neighbors.Count; i++)
-        {
-            Vector3Int neighbor = NormalizeRestockCell(neighbors[i]);
-            if (!meetingCells.Contains(neighbor))
-                meetingCells.Add(neighbor);
-        }
-
-        for (int i = 0; i < meetingCells.Count; i++)
-        {
-            Vector3Int rendezvous = meetingCells[i];
-            if (!TryValidateRestockSourceWithSensor(
-                    receiver, rendezvous, candidate, out _))
-                continue;
-
-            float threat = CalculateThreatLevel(rendezvous, snapshot.AITeam);
+            float threat =
+                CalculateThreatLevel(
+                    cell, snapshot.AITeam);
             if (threat > 0f)
                 continue;
 
-            float distance = CalculateRouteDistanceOrHex(
-                receiver, fromCell, rendezvous);
-            bool home = candidate.Construction != null
-                && IsLogisticsHomeConstruction(
-                    candidate.Construction, snapshot.AITeam);
-            float score =
-                -distance * 100f
-                - threat * 1000f
-                + (candidate.Unit != null ? 175f : 0f)
-                + (home ? 150f : 0f);
+            float distance =
+                SectorManager.HexDistance(
+                    cell, rendezvous);
+            float progress =
+                fromDistance - distance;
+            if (progress <= 0f)
+                continue;
 
+            float score =
+                progress * 650f
+                - distance * 80f
+                + GetTerrainDpqPontos(cell) * 40f
+                - GetPathStepCount(paths, cell) * 8f;
             if (score <= bestScore)
                 continue;
-
-            candidate.RendezvousCell = rendezvous;
             bestScore = score;
-            best = candidate;
-        }
-    }
-
-    private bool TryValidateRestockSourceWithSensor(
-        UnitManager receiver,
-        Vector3Int prospectiveCell,
-        RestockSource expectedSource,
-        out PodeTransferirOption matchingOption)
-    {
-        matchingOption = null;
-        if (receiver == null || expectedSource == null)
-            return false;
-
-        Vector3Int originalCell = NormalizeRestockCell(
-            receiver.CurrentCellPosition);
-        prospectiveCell = NormalizeRestockCell(prospectiveCell);
-        var options = new List<PodeTransferirOption>();
-        if (!PodeTransferirSensor.CollectOptionsFromCell(
-                receiver,
-                boardTilemap,
-                terrainDatabase,
-                prospectiveCell == originalCell
-                    ? SensorMovementMode.MoveuParado
-                    : SensorMovementMode.MoveuAndando,
-                prospectiveCell,
-                options,
-                out _))
-            return false;
-
-        for (int i = 0; i < options.Count; i++)
-        {
-            PodeTransferirOption option = options[i];
-            if (!expectedSource.Matches(option))
-                continue;
-            matchingOption = option;
-            return true;
+            bestCell = cell;
         }
 
-        return false;
-    }
+        if (bestCell == fromCell)
+            return false;
 
-    private static Vector3Int NormalizeRestockCell(Vector3Int cell)
-    {
-        cell.z = 0;
-        return cell;
-    }
-
-    private static bool IsLogisticsHomeConstruction(
-        ConstructionManager construction,
-        TeamId aiTeam)
-    {
-        return construction != null
-            && construction.SlotIndex == ResolveAISlotKey(aiTeam)
-            && (construction.IsPlayerHeadQuarter
-                || ConstructionSectorHelper.IsBase(construction.Sector));
+        reason =
+            $"fallback progresso=" +
+            $"{fromDistance - SectorManager.HexDistance(bestCell, rendezvous):0.0} " +
+            $"score={bestScore:0}";
+        return true;
     }
 }

@@ -46,6 +46,12 @@ Cedo você vai querer jogar infantaria num ponto distante — atravessar um mar,
 
 Guarde assim: **seleciona a tropa pra embarcar, seleciona o veículo pra desembarcar.** Parece invertido no começo; depois faz todo sentido (quem corre pra dentro é a tropa; quem escolhe onde parar e abrir a rampa é o motorista).
 
+### Quem embarca ou desembarca já gastou o turno
+
+Cuidado com uma pegadinha de ritmo: **tanto embarcar quanto desembarcar consomem a ação do transportador** — não só a da tropa. Pegar alguém ou largar alguém **é** o que o veículo faz naquele turno; ele não recolhe a tropa e sai dirigindo de brinde depois. E a tropa que **desce** também termina o turno ali (o passo pra fora do veículo foi o movimento dela).
+
+A boa notícia que salva a jogada: **dá pra mover e desembarcar na mesma ordem.** O transporte **anda** até perto do destino e **depois** abre a rampa, tudo contando como a única ação dele — você não perde o deslocamento. Então planeje a entrega como *o* movimento do transporte naquele turno, não como um extra depois de já ter andado.
+
 E não pense em "cabe?". Um transporte tem **vagas** especializadas, não espaço solto. A pergunta certa é *"este transporte tem uma vaga que aceita esta unidade?"* — um caminhão que reboca artilharia não leva infantaria no engate só porque está livre.
 
 ### A regra dura: se o transporte morre, todo mundo dentro morre

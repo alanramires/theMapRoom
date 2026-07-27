@@ -24,6 +24,7 @@ public sealed class MelhorEstoqueRequest
     public int operationalTurns = 2;
     public bool includeStrategic;
     public bool emulateStockFromUnitData;
+    public float maxThreat = float.PositiveInfinity;
     public Func<Vector3Int, float> evaluateThreat;
     public Action<string> diagnosticLog;
 }
@@ -164,7 +165,10 @@ public static class MelhorEstoqueService
                 if (transfer == null)
                     continue;
                 MelhorEstoqueIntent resolvedIntent =
-                    ResolveIntent(data, transfer);
+                    ResolveIntent(
+                        result.actorNeed,
+                        data,
+                        transfer);
                 if (!IntentMatches(request.intent, resolvedIntent))
                     continue;
 
@@ -176,8 +180,20 @@ public static class MelhorEstoqueService
                     origin,
                     actionCell,
                     routeCosts);
-                if (candidate != null)
-                    result.ranking.Add(candidate);
+                if (candidate == null)
+                    continue;
+                if (candidate.threat > request.maxThreat)
+                {
+                    result.rejected.Add(new MelhorEstoqueReject
+                    {
+                        actionCell = actionCell,
+                        reason =
+                            $"Ameaca {candidate.threat:0.0} excede " +
+                            $"o limite {request.maxThreat:0.0}."
+                    });
+                    continue;
+                }
+                result.ranking.Add(candidate);
             }
         }
 
@@ -359,6 +375,7 @@ public static class MelhorEstoqueService
     }
 
     private static MelhorEstoqueIntent ResolveIntent(
+        StockNeedAssessment actorNeed,
         UnitData actorData,
         PodeTransferirOption transfer)
     {
@@ -369,6 +386,8 @@ public static class MelhorEstoqueService
             return MelhorEstoqueIntent.EmbarkedDistribution;
         if (transfer.flowMode == TransferFlowMode.Recebedor)
         {
+            if (actorNeed != null && actorNeed.NeedsStock)
+                return MelhorEstoqueIntent.ReplenishSelf;
             if (transfer.targetConstruction != null)
                 return MelhorEstoqueIntent.CollectFromConstruction;
             return actorData.supplierTier == SupplierTier.Receiver

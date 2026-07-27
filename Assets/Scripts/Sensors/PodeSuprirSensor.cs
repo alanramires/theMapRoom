@@ -13,6 +13,35 @@ public static class PodeSuprirSensor
         out string reason,
         List<PodeSuprirInvalidOption> invalidOutput = null)
     {
+        Vector3Int origin = supplier != null
+            ? supplier.CurrentCellPosition
+            : Vector3Int.zero;
+        return CollectOptionsFromCell(
+            supplier,
+            map,
+            terrainDatabase,
+            matchController,
+            origin,
+            output,
+            out reason,
+            invalidOutput);
+    }
+
+    /// <summary>
+    /// Consulta prospectiva pura: avalia o atendimento como se o supridor
+    /// estivesse em <paramref name="originCell"/>, sem mover a unidade nem
+    /// alterar ocupacao, recursos ou qualquer estado confirmado.
+    /// </summary>
+    public static bool CollectOptionsFromCell(
+        UnitManager supplier,
+        Tilemap map,
+        TerrainDatabase terrainDatabase,
+        MatchController matchController,
+        Vector3Int originCell,
+        List<PodeSuprirOption> output,
+        out string reason,
+        List<PodeSuprirInvalidOption> invalidOutput = null)
+    {
         reason = string.Empty;
         bool sensorLogs = SensorLogGate.IsPodeSuprirEnabled();
         if (output == null)
@@ -90,7 +119,7 @@ public static class PodeSuprirSensor
             return false;
         }
 
-        Vector3Int origin = supplier.CurrentCellPosition;
+        Vector3Int origin = originCell;
         origin.z = 0;
 
         bool adjacentRange = supplierData.serviceRange == SupplierRangeMode.Adjacent1Hex
