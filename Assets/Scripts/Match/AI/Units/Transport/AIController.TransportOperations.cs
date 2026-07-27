@@ -6,7 +6,8 @@ public partial class AIController
     private PlayerAction TryDecideTransportOperationsAction(
         UnitManager unit,
         AIWorldSnapshot snapshot,
-        TeamObjectivePlan plan)
+        TeamObjectivePlan plan,
+        bool allowOpportunisticPickup = false)
     {
         if (unit == null
             || snapshot == null
@@ -33,13 +34,53 @@ public partial class AIController
                 out TransportOperationDecision decision) =>
                 TryEvaluateTransportOperation(
                     unit, data, snapshot, plan, operation, tier,
-                    movementBudget, out decision)
+                    movementBudget, allowOpportunisticPickup,
+                    out decision)
         };
 
         TransportOperationDecision selected =
             TransportOperationsService.Evaluate(context);
         return MaterializeTransportOperation(
             unit, snapshot, plan, selected);
+    }
+
+    private PlayerAction TryDecideOpportunisticTransportPickupAction(
+        UnitManager unit,
+        AIWorldSnapshot snapshot,
+        TeamObjectivePlan plan)
+    {
+        int tacticalBudget = Mathf.Max(
+            0, unit.RemainingMovementPoints);
+        int operationalBudget = Mathf.Max(
+            tacticalBudget,
+            unit.MaxMovementPoints * 2);
+        TransportOperationDecision decision;
+        if (!TryQueryTransportPickupOperation(
+                unit, snapshot, plan,
+                AIReachDecisionTier.Tactical,
+                tacticalBudget,
+                allowOpportunisticPickup: true,
+                onlyOpportunisticPickup: true,
+                out decision)
+            && !TryQueryTransportPickupOperation(
+                unit, snapshot, plan,
+                AIReachDecisionTier.Operational,
+                operationalBudget,
+                allowOpportunisticPickup: true,
+                onlyOpportunisticPickup: true,
+                out decision))
+        {
+            return null;
+        }
+
+        decision.Operation = TransportOperationType.Pickup;
+        decision.ReachTier =
+            decision.PickupOption?.transporterTier ==
+            MelhorEmbarqueTier.Tactical
+                ? AIReachDecisionTier.Tactical
+                : AIReachDecisionTier.Operational;
+        return MaterializeTransportOperation(
+            unit, snapshot, plan, decision);
     }
 
     private bool TryEvaluateTransportOperation(
@@ -50,6 +91,7 @@ public partial class AIController
         TransportOperationType operation,
         AIReachDecisionTier tier,
         int movementBudget,
+        bool allowOpportunisticPickup,
         out TransportOperationDecision decision)
     {
         decision = null;
@@ -108,7 +150,10 @@ public partial class AIController
 
             case TransportOperationType.Pickup:
                 return TryQueryTransportPickupOperation(
-                    unit, snapshot, plan, tier, movementBudget, out decision);
+                    unit, snapshot, plan, tier, movementBudget,
+                    allowOpportunisticPickup,
+                    onlyOpportunisticPickup: false,
+                    out decision);
         }
 
         return false;
@@ -237,6 +282,8 @@ public partial class AIController
         TeamObjectivePlan plan,
         AIReachDecisionTier requestedTier,
         int movementBudget,
+        bool allowOpportunisticPickup,
+        bool onlyOpportunisticPickup,
         out TransportOperationDecision decision)
     {
         decision = null;
@@ -271,10 +318,7 @@ public partial class AIController
                     allowPassenger = candidate =>
                         IsStructurallyEligiblePickupCandidate(
                             unit, candidate, snapshot, plan),
-                    includeInLegacyRanking = candidate =>
-                        IsPickupCandidateForTransportWave(
-                            unit, data, candidate, snapshot, plan,
-                            out _, out _),
+                    includeInLegacyRanking = _ => false,
                     evaluateRideNeed = candidate =>
                         EvaluatePickupRideNeed(
                             candidate, plan,
@@ -288,40 +332,44 @@ public partial class AIController
             requestedTier == AIReachDecisionTier.Tactical
                 ? MelhorEmbarqueTier.Tactical
                 : MelhorEmbarqueTier.Operational;
-        MelhorEmbarqueLzScore serviceLz =
-            pickup.ranking.Find(lz => lz.tier == serviceTier);
-        if (serviceLz == null || serviceLz.passengers.Count == 0)
-            return false;
-
-        MelhorEmbarquePassengerScore servicePassenger = null;
-        float serviceObjectiveDistance = float.MinValue;
-        for (int i = 0; i < serviceLz.passengers.Count; i++)
-        {
-            MelhorEmbarquePassengerScore option =
-                serviceLz.passengers[i];
-            if (!IsPickupCandidateForTransportWave(
-                    unit, data, option.passenger, snapshot, plan,
-                    out _, out float objectiveDistance)
-                || objectiveDistance <= serviceObjectiveDistance)
-                continue;
-            serviceObjectiveDistance = objectiveDistance;
-            servicePassenger = option;
-        }
-        if (servicePassenger == null)
+        MelhorEmbarqueOption selectedOption =
+            pickup.options.Find(option =>
+                option != null
+                && option.transporterTier == serviceTier
+                && (onlyOpportunisticPickup
+                    ? option.rideDisposition ==
+                        MelhorEmbarqueRideDisposition
+                            .OpportunisticFallback
+                    : allowOpportunisticPickup
+                        || option.rideDisposition !=
+                            MelhorEmbarqueRideDisposition
+                                .OpportunisticFallback));
+        if (selectedOption?.passenger == null)
             return false;
 
         Vector3Int servicePassengerCell =
-            servicePassenger.passenger.CurrentCellPosition;
+            selectedOption.passenger.CurrentCellPosition;
         servicePassengerCell.z = 0;
         decision = CreateTransportDecision(
-            servicePassenger.passenger,
+            selectedOption.passenger,
             servicePassengerCell,
             movementBudget,
-            serviceLz.score + serviceObjectiveDistance * 100f,
-            $"passageiro=#{servicePassenger.passenger.InstanceId} " +
-            $"encontro={serviceLz.cell} tier={serviceLz.tier} " +
-            $"dist={serviceLz.transporterDistance}",
-            serviceLz.cell);
+            selectedOption.score,
+            $"passageiro=#{selectedOption.passenger.InstanceId} " +
+            $"encontro={selectedOption.lzCell} " +
+            $"tier={selectedOption.transporterTier} " +
+            $"carona={selectedOption.rideDisposition} " +
+            $"rotaPax={selectedOption.passengerRouteState} " +
+            $"dist={selectedOption.transporterDistance}",
+            selectedOption.lzCell);
+        decision.PickupOption = selectedOption;
+        decision.RideDisposition = selectedOption.rideDisposition;
+        decision.PassengerRouteState =
+            selectedOption.passengerRouteState;
+        decision.PassengerRouteCost =
+            selectedOption.passengerRouteCost;
+        decision.TransporterRouteCost =
+            selectedOption.transporterRouteCost;
         return true;
 
 #if false // Implementacao duplicada anterior ao MelhorEmbarqueService.
@@ -672,32 +720,22 @@ public partial class AIController
                 progressionCell, paths);
         }
 
-        if (unit.GetDomain() == Domain.Naval)
+        if (serviceRendezvous == fromCell)
         {
-            return DecideNavalPickupAction(
-                unit, snapshot, plan, fromCell, paths, occupied,
-                preferredCandidate: decision.TargetUnit);
+            Debug.Log($"{TL("Transporte")} {unit.InstanceId} pickup " +
+                      $"{decision.ReachTier}: aguarda na LZ " +
+                      $"{serviceRendezvous} passageiro=" +
+                      $"#{decision.TargetUnit.InstanceId} " +
+                      $"carona={decision.RideDisposition} " +
+                      $"rotaPax={decision.PassengerRouteState}.");
+            return BuildMoveBatch(
+                unit, snapshot.AITeam, fromCell, fromCell, paths);
         }
 
-        Vector3Int passengerCell = decision.TargetUnit.CurrentCellPosition;
-        passengerCell.z = 0;
-        Vector3Int objective =
-            ResolveUnitObjectiveCell(decision.TargetUnit, plan, snapshot);
-        HashSet<Vector3Int> passengerReachable =
-            BuildPassengerReachableSet(decision.TargetUnit);
-        Dictionary<Vector3Int, List<Vector3Int>> embarkablePaths =
-            FilterPathsToEmbarkableCells(
-                paths, unit, snapshot.AITeam);
-        Vector3Int moveTarget = FindTransportShuttleMove(
-            unit, fromCell, passengerCell, embarkablePaths, occupied,
-            snapshot.AITeam, objective, passengerReachable, plan,
-            ResolveAssignedObjective(decision.TargetUnit, plan), paths);
         Debug.Log($"{TL("Transporte")} {unit.InstanceId} pickup " +
-                  $"{decision.ReachTier} passageiro " +
-                  $"#{decision.TargetUnit.InstanceId}@{passengerCell} " +
-                  $"encontro={decision.RendezvousCell} via {moveTarget}.");
-        return BuildMoveBatch(
-            unit, snapshot.AITeam, fromCell, moveTarget, paths);
+                  $"{decision.ReachTier}: LZ={serviceRendezvous} sem " +
+                  "progressao materializavel; libera outras atividades.");
+        return null;
     }
 
     private PlayerAction TryBuildTransportEvacOperation(

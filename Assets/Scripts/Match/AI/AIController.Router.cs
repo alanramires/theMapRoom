@@ -101,6 +101,16 @@ public partial class AIController
 
         if (logisticsAction != null) return logisticsAction;
 
+        // Passageiro que respondeu NAO ao Quero Carona continua como
+        // oportunidade de baixa prioridade. So agora, depois de objetivos,
+        // combate, intel e logistica, o transportador pode usar esse ranking
+        // para se posicionar sem transformar a estimativa em ordem obrigatoria.
+        PlayerAction opportunisticPickup =
+            TryDecideOpportunisticTransportPickupAction(
+                unit, snapshot, plan);
+        if (opportunisticPickup != null)
+            return opportunisticPickup;
+
         // Carga ja embarcada ainda pode materializar o courier residual. Um
         // transportador vazio, porem, nao pode reabrir o seletor global antigo:
         // Tactical -> Operational -> Strategic ja foram varridos pelo servico,

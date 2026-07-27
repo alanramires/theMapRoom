@@ -63,6 +63,12 @@ public sealed class TransportOperationDecision
     public int MovementBudget;
     public float Score;
     public string Reason;
+    public MelhorEmbarqueOption PickupOption;
+    public MelhorEmbarqueRideDisposition RideDisposition =
+        MelhorEmbarqueRideDisposition.NotEvaluated;
+    public MelhorEmbarquePassengerRouteState PassengerRouteState;
+    public int PassengerRouteCost = -1;
+    public int TransporterRouteCost = -1;
 }
 
 public delegate bool TransportOperationEvaluator(
