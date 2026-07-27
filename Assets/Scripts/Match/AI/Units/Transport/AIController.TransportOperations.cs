@@ -269,9 +269,16 @@ public partial class AIController
                     operationalTurns = serviceOperationalTurns,
                     includeStrategic = false,
                     allowPassenger = candidate =>
+                        IsStructurallyEligiblePickupCandidate(
+                            unit, candidate, snapshot, plan),
+                    includeInLegacyRanking = candidate =>
                         IsPickupCandidateForTransportWave(
                             unit, data, candidate, snapshot, plan,
                             out _, out _),
+                    evaluateRideNeed = candidate =>
+                        EvaluatePickupRideNeed(
+                            candidate, plan,
+                            serviceOperationalTurns),
                     diagnosticLog = showAILogs
                         ? message => Debug.Log(
                             $"{TL("Transporte")}[MelhorEmbarque] {message}")
@@ -389,6 +396,52 @@ public partial class AIController
             bestRendezvous);
         return true;
 #endif
+    }
+
+    private QueroCaronaResult EvaluatePickupRideNeed(
+        UnitManager passenger,
+        TeamObjectivePlan plan,
+        int operationalTurns)
+    {
+        SectorObjective assigned = plan != null
+            ? ResolveAssignedObjective(passenger, plan)
+            : null;
+        return QueroCaronaService.Evaluate(
+            new QueroCaronaRequest
+            {
+                unit = passenger,
+                map = boardTilemap,
+                terrainDatabase = terrainDatabase,
+                context = assigned != null
+                    ? QueroCaronaContext.ComPlano
+                    : QueroCaronaContext.RogueOuRebelde,
+                plannedSector = assigned != null
+                    ? assigned.Sector
+                    : ConstructionSector.None,
+                operationalTurns = Mathf.Max(
+                    1, operationalTurns),
+                emulateUnderRepairFromUnitData = false,
+                diagnosticLog = showAILogs
+                    ? message => Debug.Log(
+                        $"{TL("Transporte")}[QueroCarona] " +
+                        $"pax=#{passenger.InstanceId} {message}")
+                    : null
+            });
+    }
+
+    private bool IsStructurallyEligiblePickupCandidate(
+        UnitManager transporter,
+        UnitManager candidate,
+        AIWorldSnapshot snapshot,
+        TeamObjectivePlan plan)
+    {
+        return candidate != null
+            && candidate != transporter
+            && candidate.SlotIndex == snapshot.AISlotIndex
+            && !candidate.IsDead
+            && !candidate.IsEmbarked
+            && !IsAlreadyFormalPassenger(
+                candidate, transporter, plan);
     }
 
     private bool IsPickupCandidateForTransportWave(

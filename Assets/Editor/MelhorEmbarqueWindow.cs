@@ -166,8 +166,15 @@ public sealed class MelhorEmbarqueWindow : EditorWindow
             EditorGUILayout.LabelField(
                 $"Slot: {option.slotIndex} | " +
                 $"Disposition: {option.rideDisposition} | " +
-                $"Nota técnica: {option.score:0}",
+                $"Ajuste carona: {option.rideNeedAdjustment:0} | " +
+                $"Nota: {option.score:0}",
                 EditorStyles.wordWrappedMiniLabel);
+            if (option.rideNeed != null)
+            {
+                EditorGUILayout.LabelField(
+                    $"Quero Carona: {option.rideNeed.reason}",
+                    EditorStyles.wordWrappedMiniLabel);
+            }
             EditorGUILayout.LabelField(
                 $"Rota transportador: " +
                 $"{FormatCost(option.transporterRouteCost)} | " +
@@ -269,7 +276,8 @@ public sealed class MelhorEmbarqueWindow : EditorWindow
                 tacticalBudget = Mathf.Max(
                     0, transporter.RemainingMovementPoints),
                 operationalTurns = operationalTurns,
-                includeStrategic = includeStrategic
+                includeStrategic = includeStrategic,
+                evaluateRideNeed = EvaluateRideNeed
             });
         selected = result.best;
         selectedOption = result.bestOption;
@@ -286,7 +294,8 @@ public sealed class MelhorEmbarqueWindow : EditorWindow
                         tacticalBudget = Mathf.Max(
                             0, transporter.RemainingMovementPoints),
                         operationalTurns = operationalTurns,
-                        includeStrategic = true
+                        includeStrategic = true,
+                        evaluateRideNeed = EvaluateRideNeed
                     });
             probableDirection = directionProbe.ranking.Find(
                 lz => lz.tier == MelhorEmbarqueTier.Strategic);
@@ -303,6 +312,32 @@ public sealed class MelhorEmbarqueWindow : EditorWindow
     private static string FormatCost(int value) =>
         value >= 0 ? value.ToString() : "sem rota atual";
 
+    private QueroCaronaResult EvaluateRideNeed(
+        UnitManager passenger)
+    {
+        ConstructionSector sector = ConstructionSector.None;
+        bool hasPlan = passenger != null
+            && System.Enum.TryParse(
+                passenger.AIAssignedPlanName,
+                true,
+                out sector)
+            && sector != ConstructionSector.None;
+        return QueroCaronaService.Evaluate(
+            new QueroCaronaRequest
+            {
+                unit = passenger,
+                map = map,
+                terrainDatabase = terrainDatabase,
+                context = hasPlan
+                    ? QueroCaronaContext.ComPlano
+                    : QueroCaronaContext.RogueOuRebelde,
+                plannedSector = sector,
+                operationalTurns = operationalTurns,
+                emulateUnderRepairFromUnitData =
+                    !Application.isPlaying
+            });
+    }
+
     private static void SyncRegistry()
     {
         if (Application.isPlaying)
@@ -317,6 +352,18 @@ public sealed class MelhorEmbarqueWindow : EditorWindow
             if (units[i] != null
                 && units[i].gameObject.activeInHierarchy)
                 UnitManager.AllActive.Add(units[i]);
+        }
+
+        ConstructionManager.AllActive.Clear();
+        ConstructionManager[] constructions =
+            FindObjectsByType<ConstructionManager>(
+                FindObjectsInactive.Include,
+                FindObjectsSortMode.None);
+        for (int i = 0; i < constructions.Length; i++)
+        {
+            if (constructions[i] != null
+                && constructions[i].gameObject.activeInHierarchy)
+                ConstructionManager.AllActive.Add(constructions[i]);
         }
     }
 

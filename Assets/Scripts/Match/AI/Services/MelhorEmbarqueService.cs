@@ -42,6 +42,8 @@ public sealed class MelhorEmbarqueOption
     public int passengerRouteCost = -1;
     public MelhorEmbarqueRideDisposition rideDisposition =
         MelhorEmbarqueRideDisposition.NotEvaluated;
+    public QueroCaronaResult rideNeed;
+    public float rideNeedAdjustment;
     public float score;
     public string reason;
 }
@@ -82,6 +84,8 @@ public sealed class MelhorEmbarqueRequest
     public int operationalTurns = 2;
     public bool includeStrategic;
     public Func<UnitManager, bool> allowPassenger;
+    public Func<UnitManager, bool> includeInLegacyRanking;
+    public Func<UnitManager, QueroCaronaResult> evaluateRideNeed;
     public Action<string> diagnosticLog;
 }
 
@@ -141,6 +145,8 @@ public static class MelhorEmbarqueService
         var passengerSlots = new Dictionary<UnitManager, int>();
         var passengerReach =
             new Dictionary<UnitManager, PassengerReachProfile>();
+        var passengerRideNeed =
+            new Dictionary<UnitManager, QueroCaronaResult>();
         foreach (UnitManager unit in UnitManager.AllActive)
         {
             if (!TryResolvePassengerSlot(
@@ -166,8 +172,11 @@ public static class MelhorEmbarqueService
             passengerSlots[unit] = slotIndex;
             passengerReach[unit] = BuildPassengerReachProfile(
                 request, unit);
+            passengerRideNeed[unit] =
+                request.evaluateRideNeed?.Invoke(unit);
             request.diagnosticLog?.Invoke(
-                $"ACCEPT pax=#{unit.InstanceId} slot={slotIndex}");
+                $"ACCEPT pax=#{unit.InstanceId} slot={slotIndex} " +
+                FormatRideNeedDiagnostic(passengerRideNeed[unit]));
         }
 
         BoundsInt bounds = request.map.cellBounds;
@@ -224,10 +233,18 @@ public static class MelhorEmbarqueService
                     out MelhorEmbarquePassengerRouteState routeState,
                     out int moveCost);
                 int slotIndex = passengerSlots[passenger];
+                QueroCaronaResult rideNeed =
+                    passengerRideNeed[passenger];
+                MelhorEmbarqueRideDisposition disposition =
+                    ResolveRideDisposition(rideNeed);
+                float rideNeedAdjustment =
+                    ResolveRideNeedAdjustment(
+                        disposition, rideNeed);
                 float optionScore = 100000f
                     - distance * 100f
                     - ResolvePassengerRoutePenalty(
-                        routeState, moveCost);
+                        routeState, moveCost)
+                    + rideNeedAdjustment;
                 var option = new MelhorEmbarqueOption
                 {
                     passenger = passenger,
@@ -241,13 +258,18 @@ public static class MelhorEmbarqueService
                     passengerRouteState = routeState,
                     passengerRouteCost =
                         moveCost < int.MaxValue ? moveCost : -1,
+                    rideDisposition = disposition,
+                    rideNeed = rideNeed,
+                    rideNeedAdjustment = rideNeedAdjustment,
                     score = optionScore,
                     reason =
                         $"slot={slotIndex} encontro={cell} " +
                         $"rotaPax={routeState} " +
                         $"custoPax=" +
                         $"{(moveCost < int.MaxValue ? moveCost.ToString() : "n/a")} " +
-                        $"distTransport={distance}"
+                        $"distTransport={distance} " +
+                        $"carona={disposition} " +
+                        $"ajusteCarona={rideNeedAdjustment:0}"
                 };
                 result.options.Add(option);
 
@@ -256,7 +278,9 @@ public static class MelhorEmbarqueService
                 // ReachableLater/NoCurrentRoute já aparecem no ranking plano,
                 // mas só passam a influenciar decisões nas próximas partes.
                 if (routeState ==
-                    MelhorEmbarquePassengerRouteState.ReachableNow)
+                        MelhorEmbarquePassengerRouteState.ReachableNow
+                    && (request.includeInLegacyRanking == null
+                        || request.includeInLegacyRanking(passenger)))
                 {
                     lz.passengers.Add(
                         new MelhorEmbarquePassengerScore
@@ -452,6 +476,49 @@ public static class MelhorEmbarqueService
             default:
                 return 5000f;
         }
+    }
+
+    private static MelhorEmbarqueRideDisposition
+        ResolveRideDisposition(QueroCaronaResult rideNeed)
+    {
+        if (rideNeed == null)
+            return MelhorEmbarqueRideDisposition.NotEvaluated;
+        if (rideNeed.isEmergency)
+            return MelhorEmbarqueRideDisposition.Emergency;
+        return rideNeed.wantsRide
+            ? MelhorEmbarqueRideDisposition.Requested
+            : MelhorEmbarqueRideDisposition.OpportunisticFallback;
+    }
+
+    private static float ResolveRideNeedAdjustment(
+        MelhorEmbarqueRideDisposition disposition,
+        QueroCaronaResult rideNeed)
+    {
+        switch (disposition)
+        {
+            case MelhorEmbarqueRideDisposition.Emergency:
+                return Mathf.Max(
+                    2000f, rideNeed?.rideNeedScore ?? 0);
+            case MelhorEmbarqueRideDisposition.Requested:
+                return Mathf.Max(
+                    1000f, rideNeed?.rideNeedScore ?? 0);
+            case MelhorEmbarqueRideDisposition.OpportunisticFallback:
+                return -5000f;
+            default:
+                return 0f;
+        }
+    }
+
+    private static string FormatRideNeedDiagnostic(
+        QueroCaronaResult rideNeed)
+    {
+        if (rideNeed == null)
+            return "carona=NotEvaluated";
+        MelhorEmbarqueRideDisposition disposition =
+            ResolveRideDisposition(rideNeed);
+        return $"carona={disposition} " +
+               $"ajuste={ResolveRideNeedAdjustment(disposition, rideNeed):0} " +
+               $"motivo={rideNeed.reason}";
     }
 
     private static int Compare(
