@@ -72,7 +72,7 @@ public partial class AIController
         action = TryDecideCombatPassengerTransportAction(
             unit, snapshot, plan,
             CombatPassengerTransportPolicy.FireSupport,
-            FireSupportEmbarkSectorThreshold);
+            assigned);
         return action != null
             ? FireSupportTransportOutcome.Handled
             : FireSupportTransportOutcome.TransportRejected;

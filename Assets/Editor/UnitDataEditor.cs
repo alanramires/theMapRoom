@@ -27,7 +27,6 @@ public class UnitDataEditor : Editor
     private bool showNavalInformationSection = false;
     private bool showNativeDomainSection = false;
     private bool showVisualsSection = false;
-    private bool showRolesSection = false;
     private bool showViewAndDetectSection = false;
     private bool showTrainingAndAbilitiesSection = false;
     private bool showEliteInfoSection = false;
@@ -145,6 +144,7 @@ public class UnitDataEditor : Editor
             "cantUseWeaponsOnTheFollowDomain",
             "embarkedWeapons",
             "isSupplier",
+            "startsWithEmptySupplies",
             "supplierTier",
             "maxUnitsServedPerTurn",
             "serviceRange",
@@ -197,21 +197,12 @@ public class UnitDataEditor : Editor
             EditorGUILayout.PropertyField(aiInitiativeProp, new GUIContent("Ai Initiative"));
         if (aiPurchaseModeProp != null)
             EditorGUILayout.PropertyField(aiPurchaseModeProp, new GUIContent("Purchase Mode"));
+        if (combatClassificationProp != null)
+            EditorGUILayout.PropertyField(combatClassificationProp, new GUIContent("Combat Classification"));
+        if (rolesProp != null)
+            DrawSingleUnitRoleField(rolesProp);
         if (bannedOnHardModeProp != null)
             EditorGUILayout.PropertyField(bannedOnHardModeProp, new GUIContent("Unit Banned On Hard Mode"));
-        showRolesSection = EditorGUILayout.Foldout(
-            showRolesSection,
-            "Roles",
-            toggleOnLabelClick: true);
-        if (showRolesSection)
-        {
-            EditorGUI.indentLevel++;
-            if (combatClassificationProp != null)
-                EditorGUILayout.PropertyField(combatClassificationProp, new GUIContent("Combat Classification"));
-            if (rolesProp != null)
-                EditorGUILayout.PropertyField(rolesProp, new GUIContent("Unit Roles"), includeChildren: true);
-            EditorGUI.indentLevel--;
-        }
         if (aiTargetPrefProp != null)
             DrawAiTargetPreferenceByClassSection(aiTargetPrefProp);
 
@@ -383,6 +374,20 @@ public class UnitDataEditor : Editor
         if (aditionalDomainsAllowedProperty != null) 
             EditorGUILayout.PropertyField(aditionalDomainsAllowedProperty, new GUIContent("Adicional Domains of Operations"), includeChildren: true);
         EditorGUI.indentLevel--;
+    }
+
+    // `roles` continua sendo List<UnitRole> na serializacao (o codigo da IA le roles[0] e
+    // roles.Count), mas o inspector expoe um campo unico: cada unidade tem um papel so.
+    private static void DrawSingleUnitRoleField(SerializedProperty rolesProperty)
+    {
+        if (rolesProperty.arraySize == 0)
+            rolesProperty.InsertArrayElementAtIndex(0);
+        else if (rolesProperty.arraySize > 1)
+            rolesProperty.arraySize = 1;
+
+        EditorGUILayout.PropertyField(
+            rolesProperty.GetArrayElementAtIndex(0),
+            new GUIContent("Unit Role"));
     }
 
     private static void DrawAiTargetPreferenceByClassSection(SerializedProperty listProperty)
@@ -594,6 +599,7 @@ public class UnitDataEditor : Editor
         EditorGUI.indentLevel++;
         if (isSupplierProperty != null)
             EditorGUILayout.PropertyField(isSupplierProperty, new GUIContent("Is Supplier"));
+        DrawIfExists(serializedObject.FindProperty("startsWithEmptySupplies"), "Starts With Empty Supplies");
         if (supplierTierProperty != null)
             EditorGUILayout.PropertyField(supplierTierProperty, new GUIContent("Supplier Tier"));
         if (maxUnitsServedPerTurnProperty != null)

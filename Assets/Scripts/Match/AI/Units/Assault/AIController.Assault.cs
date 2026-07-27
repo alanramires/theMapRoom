@@ -16,87 +16,264 @@ public partial class AIController
         TransportRejected
     }
 
-    // Fundação provisória do passageiro combatente. Nesta primeira parte ela
-    // preserva o alcance adjacente e o gate de distância antigos; Quero Carona
-    // e Melhor Embarque entram na parte 2/4.
+    private sealed class CombatPassengerTransportDecision
+    {
+        public CombatPassengerTransportPolicy policy;
+        public QueroCaronaResult rideNeed;
+        public UnitManager transporter;
+        public MelhorEmbarqueOption option;
+        public float policyScore;
+    }
+
     private PlayerAction TryDecideCombatPassengerTransportAction(
         UnitManager unit,
         AIWorldSnapshot snapshot,
         TeamObjectivePlan plan,
         CombatPassengerTransportPolicy policy,
-        int minDeliveryDistance)
+        SectorObjective assigned)
     {
-        var options = new List<PodeEmbarcarOption>();
+        QueroCaronaResult rideNeed =
+            EvaluateCombatPassengerRideNeed(unit, policy, assigned);
+        if (rideNeed == null || !rideNeed.wantsRide)
+            return null;
+
+        CombatPassengerTransportDecision decision =
+            FindBestCombatPassengerTransportDecision(
+                unit, snapshot, plan, policy, assigned, rideNeed);
+        if (decision?.transporter == null
+            || decision.option == null)
+            return null;
+
+        // A parte 2 preserva a decisão completa, mas ainda materializa somente
+        // o caso adjacente. Movimento até a LZ entra na parte 3/4.
+        Vector3Int transporterCell =
+            decision.transporter.CurrentCellPosition;
+        transporterCell.z = 0;
+        Vector3Int selectedLz = decision.option.lzCell;
+        selectedLz.z = 0;
+        if (selectedLz != transporterCell)
+        {
+            Debug.Log(
+                $"{TL("Transporte")} {unit.InstanceId} policy={policy} " +
+                $"seleciona #{decision.transporter.InstanceId} " +
+                $"LZ={selectedLz} tier={decision.option.transporterTier}; " +
+                "materialização até LZ fica para 3/4.");
+            return null;
+        }
+
+        var adjacent = new List<PodeEmbarcarOption>();
         PodeEmbarcarSensor.CollectOptions(
             unit, boardTilemap, terrainDatabase,
-            Mathf.Max(0, unit.RemainingMovementPoints), options);
-        if (options.Count == 0)
+            Mathf.Max(0, unit.RemainingMovementPoints), adjacent);
+        PodeEmbarcarOption legal = adjacent.Find(option =>
+            option?.transporterUnit == decision.transporter
+            && option.transporterSlotIndex == decision.option.slotIndex);
+        if (legal == null)
             return null;
 
         Vector3Int fromCell = unit.CurrentCellPosition;
         fromCell.z = 0;
-        if (!TryFindTowDeliveryTarget(
-                unit, fromCell, snapshot, plan,
-                out Vector3Int deliveryTarget))
-            return null;
-
-        float distToTarget =
-            SectorManager.HexDistance(fromCell, deliveryTarget);
-        if (distToTarget < minDeliveryDistance)
-            return null;
-
         Dictionary<Vector3Int, List<Vector3Int>> paths =
             UnitMovementPathRules.CalcularCaminhosValidos(
                 boardTilemap, unit,
                 Mathf.Max(0, unit.RemainingMovementPoints),
                 terrainDatabase);
+        string roleLabel =
+            policy == CombatPassengerTransportPolicy.FireSupport
+                ? TL("FireSupport")
+                : TL("Assalto");
+        Debug.Log(
+            $"{roleLabel} {unit.InstanceId} embarca policy={policy} → " +
+            $"{decision.transporter.InstanceId} slot " +
+            $"{decision.option.slotIndex} LZ={selectedLz} " +
+            $"tier={decision.option.transporterTier} " +
+            $"paxCost={decision.option.passengerRouteCost} " +
+            $"transportCost={decision.option.transporterRouteCost}");
+        return BuildEmbarcarBatch(
+            unit, snapshot.AITeam, fromCell,
+            decision.transporter, decision.option.slotIndex, paths);
+    }
 
-        foreach (PodeEmbarcarOption option in options)
+    private QueroCaronaResult EvaluateCombatPassengerRideNeed(
+        UnitManager unit,
+        CombatPassengerTransportPolicy policy,
+        SectorObjective assigned)
+    {
+        QueroCaronaContext context = assigned != null
+            ? QueroCaronaContext.ComPlano
+            : QueroCaronaContext.RogueOuRebelde;
+        QueroCaronaResult result = QueroCaronaService.Evaluate(
+            new QueroCaronaRequest
+            {
+                unit = unit,
+                map = boardTilemap,
+                terrainDatabase = terrainDatabase,
+                context = context,
+                plannedSector = assigned != null
+                    ? assigned.Sector
+                    : ConstructionSector.None,
+                operationalTurns = 2,
+                emulateUnderRepairFromUnitData = false
+            });
+        Debug.Log(
+            $"{TL("Transporte")} {unit.InstanceId} policy={policy} " +
+            $"QueroCarona={(result.wantsRide ? "SIM" : "NAO")} " +
+            $"contexto={context} setor=" +
+            $"{(assigned != null ? assigned.Sector.ToString() : "rogue")} " +
+            $"emergencia={result.isEmergency} reach={result.reach} " +
+            $"custo={(result.routeCost == int.MaxValue ? "-" : result.routeCost.ToString())} " +
+            $"motivo={result.reason}");
+        return result;
+    }
+
+    private CombatPassengerTransportDecision
+        FindBestCombatPassengerTransportDecision(
+            UnitManager unit,
+            AIWorldSnapshot snapshot,
+            TeamObjectivePlan plan,
+            CombatPassengerTransportPolicy policy,
+            SectorObjective assigned,
+            QueroCaronaResult rideNeed)
+    {
+        CombatPassengerTransportDecision best = null;
+        foreach (UnitManager transporter in UnitManager.AllActive)
         {
-            if (option?.transporterUnit == null)
+            if (transporter == null
+                || transporter == unit
+                || transporter.IsDead
+                || transporter.IsEmbarked
+                || transporter.IsUnderRepair
+                || !PlayerSlotRelations.AreAllies(unit, transporter)
+                || !transporter.TryGetUnitData(
+                    out UnitData transporterData)
+                || transporterData == null
+                || !transporterData.isTransporter)
                 continue;
 
-            if (IsPrimaryLogisticsUnit(option.transporterUnit))
-            {
-                Vector3Int transporterCell =
-                    option.transporterUnit.CurrentCellPosition;
-                transporterCell.z = 0;
-                if (SectorManager.HexDistance(
-                        transporterCell, deliveryTarget)
-                    > distToTarget)
-                    continue;
-            }
+            MelhorEmbarqueResult evaluated =
+                MelhorEmbarqueService.Evaluate(
+                    new MelhorEmbarqueRequest
+                    {
+                        transporter = transporter,
+                        map = boardTilemap,
+                        terrainDatabase = terrainDatabase,
+                        tacticalBudget = Mathf.Max(
+                            0, transporter.RemainingMovementPoints),
+                        operationalTurns = 2,
+                        includeStrategic = false,
+                        allowPassenger = candidate => candidate == unit,
+                        includeInLegacyRanking = _ => false,
+                        evaluateRideNeed = candidate =>
+                            candidate == unit ? rideNeed : null
+                    });
+            MelhorEmbarqueOption option =
+                evaluated.options.Find(candidate =>
+                    candidate?.passenger == unit
+                    && candidate.passengerRouteState !=
+                        MelhorEmbarquePassengerRouteState.NoCurrentRoute
+                    && (candidate.rideDisposition ==
+                            MelhorEmbarqueRideDisposition.Requested
+                        || candidate.rideDisposition ==
+                            MelhorEmbarqueRideDisposition.Emergency));
+            if (option == null)
+                continue;
 
+            Vector3Int safetyTarget = rideNeed.evaluatedTarget;
+            safetyTarget.z = 0;
+            if (policy == CombatPassengerTransportPolicy.FireSupport
+                && assigned == null
+                && rideNeed.evaluatedConstruction == null
+                && TryFindTowDeliveryTarget(
+                    unit, unit.CurrentCellPosition, snapshot, plan,
+                    out Vector3Int fireSupportTarget))
+            {
+                safetyTarget = fireSupportTarget;
+                safetyTarget.z = 0;
+            }
             if (policy == CombatPassengerTransportPolicy.FireSupport
                 && !CanFireSupportTowEmbarkSafely(
-                    unit, option.transporterUnit, snapshot, plan,
-                    fromCell, deliveryTarget,
+                    unit, transporter, snapshot, plan,
+                    unit.CurrentCellPosition, safetyTarget,
                     out string safetyReason))
             {
                 Debug.Log(
                     $"{TL("FireSupport")} {unit.InstanceId} rejeita " +
-                    $"transporte #{option.transporterUnit.InstanceId}: " +
+                    $"#{transporter.InstanceId} LZ={option.lzCell}: " +
                     safetyReason);
                 continue;
             }
 
-            string roleLabel =
-                policy == CombatPassengerTransportPolicy.FireSupport
-                    ? TL("FireSupport")
-                    : TL("Assalto");
-            Debug.Log(
-                $"{roleLabel} {unit.InstanceId} embarca " +
-                $"policy={policy} → " +
-                $"{option.transporterUnit.InstanceId} slot " +
-                $"{option.transporterSlotIndex} destino " +
-                $"{deliveryTarget}");
-            return BuildEmbarcarBatch(
-                unit, snapshot.AITeam, fromCell,
-                option.transporterUnit,
-                option.transporterSlotIndex, paths);
+            float policyScore = option.score
+                + ResolveCombatPassengerTransportPolicyAdjustment(
+                    transporter, assigned, plan);
+            if (best == null
+                || IsBetterCombatPassengerTransportOption(
+                    option, policyScore,
+                    best.option, best.policyScore))
+            {
+                best = new CombatPassengerTransportDecision
+                {
+                    policy = policy,
+                    rideNeed = rideNeed,
+                    transporter = transporter,
+                    option = option,
+                    policyScore = policyScore
+                };
+            }
         }
 
-        return null;
+        if (best != null)
+        {
+            Debug.Log(
+                $"{TL("Transporte")} {unit.InstanceId} policy={policy} " +
+                $"MelhorEmbarque transporter=#{best.transporter.InstanceId} " +
+                $"LZ={best.option.lzCell} slot={best.option.slotIndex} " +
+                $"tier={best.option.transporterTier} " +
+                $"score={best.policyScore:F0}");
+        }
+        return best;
+    }
+
+    private static bool IsBetterCombatPassengerTransportOption(
+        MelhorEmbarqueOption candidate,
+        float candidatePolicyScore,
+        MelhorEmbarqueOption current,
+        float currentPolicyScore)
+    {
+        if (current == null)
+            return true;
+        int byTier = candidate.transporterTier.CompareTo(
+            current.transporterTier);
+        if (byTier != 0)
+            return byTier < 0;
+        if (!Mathf.Approximately(
+                candidatePolicyScore, currentPolicyScore))
+            return candidatePolicyScore > currentPolicyScore;
+        if (candidate.passengerRouteCost != current.passengerRouteCost)
+            return candidate.passengerRouteCost
+                < current.passengerRouteCost;
+        return candidate.transporterDistance
+            < current.transporterDistance;
+    }
+
+    private float ResolveCombatPassengerTransportPolicyAdjustment(
+        UnitManager transporter,
+        SectorObjective passengerObjective,
+        TeamObjectivePlan plan)
+    {
+        SectorObjective transportObjective = plan != null
+            ? ResolveAssignedTransportObjective(transporter, plan)
+            : null;
+        if (passengerObjective == null)
+            return transportObjective == null ? 500f : 0f;
+        if (transportObjective == null)
+            return 250f;
+        if (transportObjective.Sector == passengerObjective.Sector)
+            return 3000f;
+        return AreEmbarkSectorsCompatible(
+            passengerObjective.Sector, transportObjective.Sector)
+                ? 1000f
+                : -1000f;
     }
 
     private const int AssaultScoutZoneRadius = 2;
@@ -137,7 +314,7 @@ public partial class AIController
                 TryDecideCombatPassengerTransportAction(
                     unit, snapshot, plan,
                     CombatPassengerTransportPolicy.Assault,
-                    TowDeliveryThreshold);
+                    assigned: null);
             if (embarkAction != null) return embarkAction;
             return DecideRogueAssaultBreakerAction(unit, snapshot, plan);
         }
@@ -149,6 +326,9 @@ public partial class AIController
             assigned = criticalHome;
         }
 
+        if (IsActiveRallyAssemblyObjective(assigned))
+            return DecideRallyAssemblyAssaultAction(unit, snapshot, assigned);
+
         // Assalto com plano também pode depender de transporte. Antes, somente
         // o rogue passava por esta avaliação; um tanque separado de Charlie
         // pelo mar caía direto no batedor e "mantinha patrulha", mesmo com um
@@ -157,16 +337,13 @@ public partial class AIController
             TryDecideCombatPassengerTransportAction(
                 unit, snapshot, plan,
                 CombatPassengerTransportPolicy.Assault,
-                TowDeliveryThreshold);
+                assigned);
         if (assignedEmbarkAction != null)
         {
             Debug.Log($"{TL("Assalto")} {unit.InstanceId} {assigned.Sector} " +
                       $"prioriza embarque: rota terrestre insuficiente.");
             return assignedEmbarkAction;
         }
-
-        if (IsActiveRallyAssemblyObjective(assigned))
-            return DecideRallyAssemblyAssaultAction(unit, snapshot, assigned);
 
         return DecideAssignedAssaultEscortAction(unit, snapshot, assigned);
     }
