@@ -39,6 +39,12 @@ public partial class AIController
         PlayerAction repairAction = TryDecideRepairAction(unit, snapshot, plan);
         if (repairAction != null) return repairAction;
 
+        // A entrada legada permanece apenas como adaptador de ENTREGA para
+        // carga já embarcada. Pickup vazio é responsabilidade exclusiva de
+        // TransportOperationsService + MelhorEmbarque.
+        if (!HasTransportCargo(unit))
+            return null;
+
         // Ferido a bordo de um supridor ja foi tratado no roteador (modo hospital). Se o
         // fluxo chegou aqui carregando paciente, e porque nao havia servico nem recarga:
         // o courier/EVAC abaixo desembarca normalmente. Ver Transportador.Hospital.
@@ -50,22 +56,14 @@ public partial class AIController
         if (data.domain == Domain.Naval)
             return TryDecideNavalTransportAction(unit, snapshot, plan);
 
-        // Courier does NOT scan for new pickups — it is delivering existing cargo.
-        // The next rogue-shuttle turn (empty APC) handles new pickups.
-        bool hasCargo = HasTransportCargo(unit);
-
+        // Os adaptadores de dominio abaixo apenas entregam carga existente.
+        // A classificacao unificada ja decidiu pickups antes desta entrada.
         SectorObjective assigned = plan != null ? ResolveAssignedTransportObjective(unit, plan) : null;
 
         if (assigned != null)
-            return DecideAssignedTransportAction(unit, snapshot, plan, assigned, hasCargo);
-        if (hasCargo)
-            return DecideTransportadorCourierAction(unit, snapshot);
-
-        PlayerAction rogueAction = DecideRogueShuttleAction(unit, snapshot, plan);
-        if (rogueAction != null) return rogueAction;
-        PlayerAction towAction = TryDecideTowShuttleAction(unit, snapshot, plan);
-        if (towAction != null) return towAction;
-        return DecideIdleTransportReturnAction(unit, snapshot);
+            return DecideAssignedTransportAction(
+                unit, snapshot, plan, assigned, hasCargo: true);
+        return DecideTransportadorCourierAction(unit, snapshot);
     }
 
     // -------------------------------------------------------------------------
@@ -125,33 +123,6 @@ public partial class AIController
             return false;
 
         return data.roles[0] == UnitRole.Transportador;
-    }
-
-    private bool HasPotentialTransportPassenger(
-        UnitManager transporter,
-        AIWorldSnapshot snapshot,
-        TeamObjectivePlan plan)
-    {
-        if (transporter == null || snapshot == null)
-            return false;
-
-        if (transporter.GetDomain() == Domain.Air)
-            return HasPotentialAirShuttlePassenger(transporter, snapshot, plan);
-
-        Vector3Int fromCell = transporter.CurrentCellPosition;
-        fromCell.z = 0;
-        UnitManager candidate = FindBestShuttleCandidate(
-            transporter, snapshot, plan, fromCell, out _);
-        if (candidate != null)
-            return true;
-
-        int relaxed = Mathf.Max(
-            2,
-            GetEffectiveTransportThresholdForSlot(
-                PlayerSlotId.FromIndex(snapshot.AISlotIndex)) / 2);
-        return FindBestShuttleCandidate(
-            transporter, snapshot, plan, fromCell, out _,
-            thresholdReduction: relaxed) != null;
     }
 
     private PlayerAction DecideIdleTransportReturnAction(UnitManager unit, AIWorldSnapshot snapshot)

@@ -43,10 +43,10 @@ public partial class AIController
             boardTilemap, unit, unit.RemainingMovementPoints, terrainDatabase);
         HashSet<Vector3Int> occupied = BuildOccupied(unit);
 
-        if (hasCargo)
-            return DecideNavalDeliveryAction(unit, snapshot, plan, fromCell, paths, occupied);
-
-        return DecideNavalPickupAction(unit, snapshot, plan, fromCell, paths, occupied);
+        if (!hasCargo)
+            return null;
+        return DecideNavalDeliveryAction(
+            unit, snapshot, plan, fromCell, paths, occupied);
     }
 
     // -------------------------------------------------------------------------

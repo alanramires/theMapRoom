@@ -17,8 +17,8 @@ public partial class AIController
         if (passengers.Count == 0)
         {
             if (showAILogs)
-                Debug.LogWarning($"[AI] {TL("Transporte")} {unit.InstanceId} courier: cargo inconsistente, reverte para shuttle");
-            return DecideRogueShuttleAction(unit, snapshot, plan);
+                Debug.LogWarning($"[AI] {TL("Transporte")} {unit.InstanceId} courier: cargo inconsistente; libera outra atividade.");
+            return null;
         }
 
         UnitManager primaryPassenger = ResolvePrimaryPassenger(unit, passengers, plan);

@@ -23,17 +23,14 @@ public partial class AIController
         try
         {
             bool hasCargo = HasTransportCargo(unit);
+            if (!hasCargo)
+                return null;
             SectorObjective assigned = plan != null ? ResolveAssignedTransportObjective(unit, plan) : null;
 
             if (assigned != null)
-                return DecideAssignedAirTransportAction(unit, snapshot, plan, assigned, hasCargo);
-            if (hasCargo)
-                return DecideAirCourierAction(unit, snapshot);
-
-            PlayerAction evacAction = TryDecideAirEvacShuttleAction(unit, snapshot, plan);
-            if (evacAction != null) return evacAction;
-
-            return DecideAirShuttleAction(unit, snapshot, plan);
+                return DecideAssignedAirTransportAction(
+                    unit, snapshot, plan, assigned, hasCargo: true);
+            return DecideAirCourierAction(unit, snapshot);
         }
         finally
         {
@@ -61,8 +58,8 @@ public partial class AIController
         if (passengers.Count == 0)
         {
             if (showAILogs)
-                Debug.LogWarning($"[AI] {TL("Transporte")} heli {unit.InstanceId} courier: cargo inconsistente, reverte para shuttle");
-            return DecideAirShuttleAction(unit, snapshot, plan);
+                Debug.LogWarning($"[AI] {TL("Transporte")} heli {unit.InstanceId} courier: cargo inconsistente; libera outra atividade.");
+            return null;
         }
 
         UnitManager evacuee = passengers.Find(p => p.IsUnderRepair);
@@ -387,48 +384,6 @@ public partial class AIController
     // Air Shuttle — empty helicopter seeking pickup candidates.
     // First pass prefers candidates whose assigned sectors favour air transport.
     // -------------------------------------------------------------------------
-
-    private bool HasPotentialAirShuttlePassenger(
-        UnitManager unit,
-        AIWorldSnapshot snapshot,
-        TeamObjectivePlan plan)
-    {
-        if (unit == null || snapshot == null)
-            return false;
-
-        Vector3Int fromCell = unit.CurrentCellPosition;
-        fromCell.z = 0;
-
-        UnitManager candidate = FindBestAirShuttleCandidate(
-            unit, snapshot, plan, fromCell, out _, preferAirSectors: true);
-        if (candidate != null)
-            return true;
-
-        candidate = FindBestAirShuttleCandidate(
-            unit, snapshot, plan, fromCell, out _, preferAirSectors: false);
-        if (candidate != null)
-            return true;
-
-        int relaxed = Mathf.Max(
-            2,
-            GetEffectiveTransportThresholdForSlot(
-                PlayerSlotId.FromIndex(snapshot.AISlotIndex)) / 2);
-        candidate = FindBestAirShuttleCandidate(
-            unit, snapshot, plan, fromCell, out _,
-            preferAirSectors: false,
-            thresholdReduction: relaxed);
-        if (candidate != null)
-            return true;
-
-        candidate = FindBestShuttleCandidate(
-            unit, snapshot, plan, fromCell, out _);
-        if (candidate != null)
-            return true;
-
-        return FindBestShuttleCandidate(
-            unit, snapshot, plan, fromCell, out _,
-            thresholdReduction: relaxed) != null;
-    }
 
     private PlayerAction DecideAirShuttleAction(UnitManager unit, AIWorldSnapshot snapshot, TeamObjectivePlan plan)
     {

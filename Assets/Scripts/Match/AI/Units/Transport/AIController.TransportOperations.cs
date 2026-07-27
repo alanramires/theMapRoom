@@ -59,15 +59,19 @@ public partial class AIController
                 unit, snapshot, plan,
                 AIReachDecisionTier.Tactical,
                 tacticalBudget,
-                allowOpportunisticPickup: true,
-                onlyOpportunisticPickup: true,
+                includeOpportunisticPickup: true,
+                requiredDisposition:
+                    MelhorEmbarqueRideDisposition
+                        .OpportunisticFallback,
                 out decision)
             && !TryQueryTransportPickupOperation(
                 unit, snapshot, plan,
                 AIReachDecisionTier.Operational,
                 operationalBudget,
-                allowOpportunisticPickup: true,
-                onlyOpportunisticPickup: true,
+                includeOpportunisticPickup: true,
+                requiredDisposition:
+                    MelhorEmbarqueRideDisposition
+                        .OpportunisticFallback,
                 out decision))
         {
             return null;
@@ -142,7 +146,8 @@ public partial class AIController
 
             case TransportOperationType.Evac:
                 return TryQueryTransportEvacOperation(
-                    unit, snapshot, tier, movementBudget, out decision);
+                    unit, snapshot, plan, tier, movementBudget,
+                    out decision);
 
             case TransportOperationType.Supply:
                 return TryQueryTransportSupplyOperation(
@@ -151,8 +156,9 @@ public partial class AIController
             case TransportOperationType.Pickup:
                 return TryQueryTransportPickupOperation(
                     unit, snapshot, plan, tier, movementBudget,
-                    allowOpportunisticPickup,
-                    onlyOpportunisticPickup: false,
+                    includeOpportunisticPickup:
+                        allowOpportunisticPickup,
+                    requiredDisposition: null,
                     out decision);
         }
 
@@ -184,52 +190,21 @@ public partial class AIController
     private bool TryQueryTransportEvacOperation(
         UnitManager unit,
         AIWorldSnapshot snapshot,
+        TeamObjectivePlan plan,
         AIReachDecisionTier requestedTier,
         int movementBudget,
         out TransportOperationDecision decision)
     {
-        decision = null;
-        Vector3Int fromCell = unit.CurrentCellPosition;
-        fromCell.z = 0;
-        float tacticalLimit =
-            Mathf.Max(0, unit.RemainingMovementPoints) + EvacPickupRange;
-        float operationalLimit = Mathf.Max(
-            tacticalLimit,
-            Mathf.Max(0, movementBudget) + EvacPickupRange);
-        float searchLimit = requestedTier == AIReachDecisionTier.Tactical
-            ? tacticalLimit
-            : requestedTier == AIReachDecisionTier.Operational
-                ? operationalLimit
-                : float.MaxValue;
-        Dictionary<Vector3Int, List<Vector3Int>> paths =
-            UnitMovementPathRules.CalcularCaminhosValidos(
-                boardTilemap, unit,
-                Mathf.Max(0, unit.RemainingMovementPoints),
-                terrainDatabase);
-        UnitManager patient = FindBestEvacCandidate(
-            unit, snapshot, fromCell, paths, searchLimit);
-        if (patient == null)
+        bool found = TryQueryTransportPickupOperation(
+            unit, snapshot, plan, requestedTier, movementBudget,
+            includeOpportunisticPickup: false,
+            requiredDisposition:
+                MelhorEmbarqueRideDisposition.Emergency,
+            out decision);
+        if (!found || decision == null)
             return false;
 
-        Vector3Int patientCell = patient.CurrentCellPosition;
-        patientCell.z = 0;
-        float distance = SectorManager.HexDistance(fromCell, patientCell);
-        AIReachDecisionTier actualTier = distance <= tacticalLimit
-                ? AIReachDecisionTier.Tactical
-                : distance <= operationalLimit
-                    ? AIReachDecisionTier.Operational
-                    : AIReachDecisionTier.Strategic;
-        if (actualTier != requestedTier)
-            return false;
-        if (actualTier == AIReachDecisionTier.Strategic
-            && !IsTransportStrategicTargetSafe(
-                unit, patientCell, snapshot))
-            return false;
-
-        decision = CreateTransportDecision(
-            patient, patientCell, movementBudget,
-            80000f - distance * 100f,
-            $"paciente=#{patient.InstanceId} dist={distance:F0}");
+        decision.Reason = "EVAC " + decision.Reason;
         return true;
     }
 
@@ -282,8 +257,8 @@ public partial class AIController
         TeamObjectivePlan plan,
         AIReachDecisionTier requestedTier,
         int movementBudget,
-        bool allowOpportunisticPickup,
-        bool onlyOpportunisticPickup,
+        bool includeOpportunisticPickup,
+        MelhorEmbarqueRideDisposition? requiredDisposition,
         out TransportOperationDecision decision)
     {
         decision = null;
@@ -291,9 +266,6 @@ public partial class AIController
             || data == null
             || !data.isTransporter
             || IsTransporterAtCapacity(unit, data))
-            return false;
-
-        if (requestedTier == AIReachDecisionTier.Strategic)
             return false;
 
         int serviceTacticalBudget =
@@ -314,7 +286,9 @@ public partial class AIController
                     terrainDatabase = terrainDatabase,
                     tacticalBudget = serviceTacticalBudget,
                     operationalTurns = serviceOperationalTurns,
-                    includeStrategic = false,
+                    includeStrategic =
+                        requestedTier ==
+                        AIReachDecisionTier.Strategic,
                     allowPassenger = candidate =>
                         IsStructurallyEligiblePickupCandidate(
                             unit, candidate, snapshot, plan),
@@ -331,20 +305,25 @@ public partial class AIController
         MelhorEmbarqueTier serviceTier =
             requestedTier == AIReachDecisionTier.Tactical
                 ? MelhorEmbarqueTier.Tactical
-                : MelhorEmbarqueTier.Operational;
+                : requestedTier == AIReachDecisionTier.Operational
+                    ? MelhorEmbarqueTier.Operational
+                    : MelhorEmbarqueTier.Strategic;
         MelhorEmbarqueOption selectedOption =
             pickup.options.Find(option =>
                 option != null
                 && option.transporterTier == serviceTier
-                && (onlyOpportunisticPickup
-                    ? option.rideDisposition ==
+                && (!requiredDisposition.HasValue
+                    || option.rideDisposition ==
+                        requiredDisposition.Value)
+                && (includeOpportunisticPickup
+                    || option.rideDisposition !=
                         MelhorEmbarqueRideDisposition
-                            .OpportunisticFallback
-                    : allowOpportunisticPickup
-                        || option.rideDisposition !=
-                            MelhorEmbarqueRideDisposition
-                                .OpportunisticFallback));
+                            .OpportunisticFallback));
         if (selectedOption?.passenger == null)
+            return false;
+        if (requestedTier == AIReachDecisionTier.Strategic
+            && !IsTransportStrategicTargetSafe(
+                unit, selectedOption.lzCell, snapshot))
             return false;
 
         Vector3Int servicePassengerCell =
@@ -372,78 +351,6 @@ public partial class AIController
             selectedOption.transporterRouteCost;
         return true;
 
-#if false // Implementacao duplicada anterior ao MelhorEmbarqueService.
-        Vector3Int fromCell = unit.CurrentCellPosition;
-        fromCell.z = 0;
-        float tacticalLimit = Mathf.Max(0, unit.RemainingMovementPoints);
-        float operationalLimit = Mathf.Max(tacticalLimit, movementBudget);
-        Dictionary<Vector3Int, float> waveRendezvous =
-            CollectTransportPickupRendezvousForWave(
-                unit, snapshot.AITeam, fromCell, requestedTier,
-                tacticalLimit, operationalLimit);
-        if (waveRendezvous.Count == 0)
-        {
-            if (showAILogs)
-            {
-                Debug.Log($"{TL("Transporte")} {unit.InstanceId} pickup " +
-                          $"{requestedTier}: nenhum local aceito por " +
-                          "Allow Embark When Transporter At nesta onda.");
-            }
-            return false;
-        }
-
-        UnitManager bestCandidate = null;
-        Vector3Int bestCandidateCell = fromCell;
-        Vector3Int bestRendezvous = fromCell;
-        float bestDistance = float.MaxValue;
-        float bestScore = float.MinValue;
-
-        foreach (UnitManager candidate in UnitManager.AllActive)
-        {
-            if (!IsPickupCandidateForTransportWave(
-                    unit, data, candidate, snapshot, plan,
-                    out Vector3Int candidateCell,
-                    out float objectiveDistance))
-                continue;
-
-            HashSet<Vector3Int> passengerReachable =
-                BuildPassengerReachableSet(candidate);
-            if (!TryFindPassengerRendezvousInTransportWave(
-                    waveRendezvous, candidateCell, passengerReachable,
-                    out Vector3Int rendezvous,
-                    out float transportDistance))
-                continue;
-
-            if (requestedTier == AIReachDecisionTier.Strategic
-                && !IsTransportStrategicTargetSafe(
-                    unit, rendezvous, snapshot))
-                continue;
-
-            // A utilidade do passageiro continua importando, mas somente depois
-            // que a onda do transportador delimitou os candidatos comparáveis.
-            float score = 60000f
-                + objectiveDistance * 100f
-                - transportDistance * 1000f;
-            if (score <= bestScore)
-                continue;
-
-            bestScore = score;
-            bestDistance = transportDistance;
-            bestCandidate = candidate;
-            bestCandidateCell = candidateCell;
-            bestRendezvous = rendezvous;
-        }
-
-        if (bestCandidate == null)
-            return false;
-
-        decision = CreateTransportDecision(
-            bestCandidate, bestCandidateCell, movementBudget, bestScore,
-            $"passageiro=#{bestCandidate.InstanceId} " +
-            $"encontro={bestRendezvous} dist={bestDistance:F0}",
-            bestRendezvous);
-        return true;
-#endif
     }
 
     private QueroCaronaResult EvaluatePickupRideNeed(
@@ -488,143 +395,44 @@ public partial class AIController
             && candidate.SlotIndex == snapshot.AISlotIndex
             && !candidate.IsDead
             && !candidate.IsEmbarked
+            && !IsTransportPassengerClaimedByOther(
+                transporter, candidate)
             && !IsAlreadyFormalPassenger(
                 candidate, transporter, plan);
     }
 
-    private bool IsPickupCandidateForTransportWave(
+    private bool IsTransportPassengerClaimedByOther(
         UnitManager transporter,
-        UnitData transporterData,
-        UnitManager candidate,
-        AIWorldSnapshot snapshot,
-        TeamObjectivePlan plan,
-        out Vector3Int candidateCell,
-        out float objectiveDistance)
+        UnitManager passenger)
     {
-        candidateCell = Vector3Int.zero;
-        objectiveDistance = 0f;
-        if (candidate == null
-            || candidate == transporter
-            || candidate.SlotIndex != snapshot.AISlotIndex
-            || candidate.IsDead
-            || candidate.IsEmbarked
-            || candidate.HasActed
-            || !candidate.TryGetUnitData(out UnitData candidateData)
-            || candidateData == null
-            || !UnitRoleCompatibility.ParticipatesInBattle(candidateData)
-            || FindFittingSlotIndex(
-                transporter, transporterData, candidate, candidateData) < 0
-            || IsAlreadyFormalPassenger(candidate, transporter, plan))
+        if (transporter == null || passenger == null)
             return false;
 
-        candidateCell = candidate.CurrentCellPosition;
-        candidateCell.z = 0;
-        bool hasResolvedObjective = TryResolveCourierPassengerTarget(
-            candidate, plan, snapshot, Vector3Int.zero,
-            candidateCell, out Vector3Int objective);
-        if (!hasResolvedObjective)
+        foreach (KeyValuePair<int, int> claim in assignedTransportClaims)
         {
-            objectiveDistance = 2.5f;
-            return true;
+            if (claim.Key != transporter.InstanceId
+                && claim.Value == passenger.InstanceId)
+                return true;
         }
 
-        objectiveDistance =
-            SectorManager.HexDistance(candidateCell, objective);
-        int walkThreshold =
-            transporter.GetDomain() == Domain.Air
-                ? GetEffectiveTransportThresholdForSlot(
-                    PlayerSlotId.FromIndex(snapshot.AISlotIndex))
-                : ResolvePassengerWalkWithoutTransportBudget(candidate);
-        if (transporter.GetDomain() == Domain.Air
-            && candidate.MaxMovementPoints < 3)
-            walkThreshold +=
-                (3 - candidate.MaxMovementPoints) * 2;
-        int terrainCost = TerrainCostToCell(
-            candidate, candidateCell, objective, walkThreshold);
-        return terrainCost > walkThreshold;
+        return false;
     }
 
-    private Dictionary<Vector3Int, float>
-        CollectTransportPickupRendezvousForWave(
+    private PlayerAction BuildClaimedTransportPickupMove(
         UnitManager transporter,
-        TeamId aiTeam,
-        Vector3Int transporterCell,
-        AIReachDecisionTier tier,
-        float tacticalLimit,
-        float operationalLimit)
+        UnitManager passenger,
+        TeamId team,
+        Vector3Int fromCell,
+        Vector3Int destination,
+        Dictionary<Vector3Int, List<Vector3Int>> paths)
     {
-        var result = new Dictionary<Vector3Int, float>();
-        if (transporter == null || boardTilemap == null)
-            return result;
-
-        BoundsInt bounds = boardTilemap.cellBounds;
-        foreach (Vector3Int rawCell in bounds.allPositionsWithin)
-        {
-            Vector3Int cell = rawCell;
-            cell.z = 0;
-            if (!boardTilemap.HasTile(cell)
-                || !CanUseTransporterPickupCell(
-                    transporter, aiTeam, cell))
-                continue;
-
-            float distance =
-                SectorManager.HexDistance(transporterCell, cell);
-            AIReachDecisionTier cellTier = distance <= tacticalLimit
-                ? AIReachDecisionTier.Tactical
-                : distance <= operationalLimit
-                    ? AIReachDecisionTier.Operational
-                    : AIReachDecisionTier.Strategic;
-            if (cellTier == tier)
-                result[cell] = distance;
-        }
-
-        if (showAILogs)
-        {
-            Debug.Log($"{TL("Transporte")} {transporter.InstanceId} pickup " +
-                      $"{tier}: varreu {result.Count} local(is) aceito(s) por " +
-                      "Allow Embark When Transporter At.");
-        }
-        return result;
-    }
-
-    private static bool TryFindPassengerRendezvousInTransportWave(
-        Dictionary<Vector3Int, float> waveRendezvous,
-        Vector3Int passengerCell,
-        HashSet<Vector3Int> passengerReachable,
-        out Vector3Int bestCell,
-        out float bestTransportDistance)
-    {
-        bestCell = Vector3Int.zero;
-        bestTransportDistance = float.MaxValue;
-        if (waveRendezvous == null
-            || waveRendezvous.Count == 0
-            || passengerReachable == null
-            || passengerReachable.Count == 0)
-            return false;
-
-        float bestPassengerDistance = float.MaxValue;
-        foreach (KeyValuePair<Vector3Int, float> pair in waveRendezvous)
-        {
-            Vector3Int cell = pair.Key;
-            if (!CanPassengerReachEmbarkStopForTransporterCell(
-                    cell, passengerReachable))
-                continue;
-
-            float transportDistance = pair.Value;
-            float passengerDistance =
-                SectorManager.HexDistance(passengerCell, cell);
-            if (transportDistance > bestTransportDistance + 0.01f
-                || (Mathf.Abs(
-                        transportDistance - bestTransportDistance) <= 0.01f
-                    && passengerDistance >= bestPassengerDistance))
-                continue;
-
-            bestCell = cell;
-            bestTransportDistance = transportDistance;
-            bestPassengerDistance = passengerDistance;
-        }
-
-        return bestTransportDistance < float.MaxValue;
+        // Reserva de planejamento da Phase 2. Nao altera unidade, tabuleiro
+        // nem recurso confirmado; apenas impede outro transportador de
+        // materializar, na mesma passada, uma ordem para o mesmo passageiro.
+        assignedTransportClaims[transporter.InstanceId] =
+            passenger.InstanceId;
+        return BuildMoveBatch(
+            transporter, team, fromCell, destination, paths);
     }
 
     private PlayerAction MaterializeTransportOperation(
@@ -646,7 +454,7 @@ public partial class AIController
                 return TryDecideTransportadorAction(unit, snapshot, plan);
 
             case TransportOperationType.Evac:
-                return TryBuildTransportEvacOperation(
+                return TryBuildTransportPickupOperation(
                     unit, snapshot, plan, decision);
 
             case TransportOperationType.Supply:
@@ -691,9 +499,9 @@ public partial class AIController
                       $"{decision.ReachTier}: segue MelhorEmbarque " +
                       $"LZ={serviceRendezvous} passageiro=" +
                       $"#{decision.TargetUnit.InstanceId}.");
-            return BuildMoveBatch(
-                unit, snapshot.AITeam, fromCell,
-                serviceRendezvous, paths);
+            return BuildClaimedTransportPickupMove(
+                unit, decision.TargetUnit, snapshot.AITeam,
+                fromCell, serviceRendezvous, paths);
         }
 
         if (serviceRendezvous != fromCell
@@ -715,9 +523,9 @@ public partial class AIController
                       $"LZ={serviceRendezvous} via={progressionCell} " +
                       $"passageiro=#{decision.TargetUnit.InstanceId} " +
                       $"({progressionReason}).");
-            return BuildMoveBatch(
-                unit, snapshot.AITeam, fromCell,
-                progressionCell, paths);
+            return BuildClaimedTransportPickupMove(
+                unit, decision.TargetUnit, snapshot.AITeam,
+                fromCell, progressionCell, paths);
         }
 
         if (serviceRendezvous == fromCell)
@@ -728,45 +536,15 @@ public partial class AIController
                       $"#{decision.TargetUnit.InstanceId} " +
                       $"carona={decision.RideDisposition} " +
                       $"rotaPax={decision.PassengerRouteState}.");
-            return BuildMoveBatch(
-                unit, snapshot.AITeam, fromCell, fromCell, paths);
+            return BuildClaimedTransportPickupMove(
+                unit, decision.TargetUnit, snapshot.AITeam,
+                fromCell, fromCell, paths);
         }
 
         Debug.Log($"{TL("Transporte")} {unit.InstanceId} pickup " +
                   $"{decision.ReachTier}: LZ={serviceRendezvous} sem " +
                   "progressao materializavel; libera outras atividades.");
         return null;
-    }
-
-    private PlayerAction TryBuildTransportEvacOperation(
-        UnitManager unit,
-        AIWorldSnapshot snapshot,
-        TeamObjectivePlan plan,
-        TransportOperationDecision decision)
-    {
-        Vector3Int fromCell = unit.CurrentCellPosition;
-        fromCell.z = 0;
-        Dictionary<Vector3Int, List<Vector3Int>> paths =
-            UnitMovementPathRules.CalcularCaminhosValidos(
-                boardTilemap, unit,
-                Mathf.Max(0, unit.RemainingMovementPoints),
-                terrainDatabase);
-        HashSet<Vector3Int> occupied = unit.GetDomain() == Domain.Air
-            ? BuildAirOccupied(unit)
-            : BuildOccupied(unit);
-        float searchLimit =
-            decision.ReachTier == AIReachDecisionTier.Strategic
-                ? float.MaxValue
-                : Mathf.Max(0, decision.MovementBudget) + EvacPickupRange;
-
-        if (unit.GetDomain() == Domain.Naval)
-        {
-            return DecideNavalPickupAction(
-                unit, snapshot, plan, fromCell, paths, occupied, searchLimit);
-        }
-
-        return TryDecideEvacShuttleAction(
-            unit, snapshot, plan, paths, occupied, searchLimit);
     }
 
     private PlayerAction TryBuildTransportSupplyOperation(
