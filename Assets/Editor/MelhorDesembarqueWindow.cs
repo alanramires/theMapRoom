@@ -28,9 +28,9 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
     private bool pickingSecondTargetCell;
     private Vector3Int hoverCell;
 
-    [MenuItem("Tools/Transporte/Melhor Desembarque")]
+    [MenuItem("Tools/Transporte/Melhor LZ de Desembarque")]
     public static void Open() =>
-        GetWindow<MelhorDesembarqueWindow>("Melhor Desembarque").Show();
+        GetWindow<MelhorDesembarqueWindow>("Melhor LZ de Desembarque").Show();
 
     private void OnEnable()
     {
@@ -68,7 +68,7 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
 
     private void OnGUI()
     {
-        EditorGUILayout.LabelField("Melhor Desembarque", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField("Melhor LZ de Desembarque", EditorStyles.boldLabel);
         EditorGUILayout.HelpBox(
             "Consulta pura. Uma passada de Caminhos Validos do transportador; " +
             "cada LZ simula PodeDesembarcar sem mover a unidade.",
@@ -170,7 +170,7 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
 
         using (new EditorGUI.DisabledScope(transporter == null || map == null))
         {
-            if (GUILayout.Button("Calcular Melhor Desembarque", GUILayout.Height(28f)))
+            if (GUILayout.Button("Calcular Melhor LZ de Desembarque", GUILayout.Height(28f)))
                 Calculate();
         }
 

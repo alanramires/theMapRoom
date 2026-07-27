@@ -19,9 +19,9 @@ public sealed class MelhorEmbarqueWindow : EditorWindow
     private Vector2 scroll;
     private string status = "Selecione um transportador vazio.";
 
-    [MenuItem("Tools/Transporte/Melhor Embarque")]
+    [MenuItem("Tools/Transporte/Melhor LZ de Embarque")]
     public static void Open() =>
-        GetWindow<MelhorEmbarqueWindow>("Melhor Embarque").Show();
+        GetWindow<MelhorEmbarqueWindow>("Melhor LZ de Embarque").Show();
 
     private void OnEnable()
     {
@@ -57,7 +57,7 @@ public sealed class MelhorEmbarqueWindow : EditorWindow
     private void OnGUI()
     {
         EditorGUILayout.LabelField(
-            "Melhor Embarque", EditorStyles.boldLabel);
+            "Melhor LZ de Embarque", EditorStyles.boldLabel);
         EditorGUILayout.HelpBox(
             "Consulta pura. A varredura nasce no transportador: " +
             "Tactical → Operational → Strategic. Os LZs vêm de " +
@@ -110,7 +110,7 @@ public sealed class MelhorEmbarqueWindow : EditorWindow
                    || terrainDatabase == null))
         {
             if (GUILayout.Button(
-                    "Calcular Melhor Embarque",
+                    "Calcular Melhor LZ de Embarque",
                     GUILayout.Height(30f)))
                 Calculate();
         }

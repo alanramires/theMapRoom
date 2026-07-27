@@ -19,7 +19,9 @@ public enum UnitRole
     Transportador = 3,
     Logistica = 4,
     Intel = 6,
-    Suprimentos = 7,
+    // Antes chamado Suprimentos: o papel e movimentar carga, nao prestar servico de
+    // suprimento (quem supre e Logistica). Valor 7 preservado — esta serializado nos UnitData.
+    Estoque = 7,
     // Transporte AÉREO operacional (Chinook): mesma mecânica do Transportador, mas com
     // política de shopping própria — compra de início de jogo focada nos nós
     // INTERMEDIÁRIOS do eixo, enquanto o APC só gera demanda depois que os nós

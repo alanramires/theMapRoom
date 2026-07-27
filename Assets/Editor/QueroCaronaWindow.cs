@@ -67,7 +67,7 @@ public sealed class QueroCaronaWindow : EditorWindow
             "Quero Carona", EditorStyles.boldLabel);
         EditorGUILayout.HelpBox(
             "Estimativa de necessidade do passageiro. É o contrapeso do " +
-            "Melhor Embarque: verifica se a unidade já consegue cumprir sua " +
+            "Melhor LZ de Embarque: verifica se a unidade já consegue cumprir sua " +
             "rota em Tactical ou Operational. SIM não cria ordem nem supera " +
             "prioridades do papel da unidade.",
             MessageType.Info);
