@@ -561,7 +561,8 @@ public partial class AIController
                 foreach (PodeFundirOption opt in fuseOptions)
                 {
                     if (opt?.candidateUnit == null) continue;
-                    if (opt.candidateUnit.CurrentHP + unit.CurrentHP > 10)
+                    if (!IsRepairFusionHealthAllowed(
+                            unit, opt.candidateUnit))
                     {
                         Debug.Log($"[Repair] skip fusão {opt.candidateUnit.InstanceId} hp={unit.CurrentHP}+{opt.candidateUnit.CurrentHP}>10");
                         continue;
@@ -906,6 +907,9 @@ public partial class AIController
             return false;
         }
 
+        if (!IsRepairFusionHealthAllowed(receiver, candidate))
+            return false;
+
         string receiverId = receiver.UnitId;
         string candidateId = candidate.UnitId;
         if (!string.IsNullOrWhiteSpace(receiverId) && !string.IsNullOrWhiteSpace(candidateId))
@@ -920,6 +924,18 @@ public partial class AIController
             && candidate.TryGetUnitData(out UnitData candidateData)
             && receiverData != null
             && receiverData == candidateData;
+    }
+
+    // Politica da IA de reparo: fundir so quando a unidade resultante cabe na
+    // ficha de 10 HP. O jogador continua podendo usar PodeFundir sem este
+    // filtro e decidir livremente como quer administrar a fusao.
+    private static bool IsRepairFusionHealthAllowed(
+        UnitManager receiver,
+        UnitManager candidate)
+    {
+        return receiver != null
+            && candidate != null
+            && receiver.CurrentHP + candidate.CurrentHP <= 10;
     }
 
     private bool TryReleaseAirTransportRepairPassengers(

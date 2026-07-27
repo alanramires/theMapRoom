@@ -9,18 +9,21 @@ public partial class AIController
         public readonly string Kind;
         public readonly int ServiceRadius;
         public readonly int TacticalPriority;
+        public readonly UnitManager Transporter;
 
         public AircraftRecoveryAnchor(
             Vector3Int cell,
             string kind,
             int serviceRadius = 0,
-            int tacticalPriority = 0)
+            int tacticalPriority = 0,
+            UnitManager transporter = null)
         {
             cell.z = 0;
             Cell = cell;
             Kind = kind;
             ServiceRadius = Mathf.Max(0, serviceRadius);
             TacticalPriority = Mathf.Max(0, tacticalPriority);
+            Transporter = transporter;
         }
     }
 
@@ -88,6 +91,20 @@ public partial class AIController
         Vector3Int destination = recovery.Decision.ActionCell;
         destination.z = 0;
 
+        // Plataforma naval nao e apenas uma direcao de recuperacao: se o
+        // Apache consegue alcancar a zona de embarque agora, o mesmo batch
+        // precisa terminar no fluxo oficial mover -> embarcar. A legalidade,
+        // vaga e custo continuam sendo revalidados por PodeEmbarcar.
+        AircraftRecoveryAnchor chosenAnchor = recovery.Decision.Value;
+        if (recovery.Tier == AIReachDecisionTier.Tactical
+            && chosenAnchor.Transporter != null
+            && TryBuildAircraftRecoveryPlatformEmbarkAction(
+                aircraft, snapshot, fromCell, chosenAnchor.Transporter,
+                paths, out action))
+        {
+            return true;
+        }
+
         // No Operational o coordenador devolve a ancora; a aeronave so pode
         // materializar o trecho desta rodada. Escolhe o hex aereo valido que
         // mais reduz a distancia ate ela. No Tactical o ActionCell ja e a
@@ -121,6 +138,33 @@ public partial class AIController
                   $"via={destination}");
         action = BuildMoveBatch(
             aircraft, snapshot.AITeam, fromCell, destination, paths);
+        return true;
+    }
+
+    private bool TryBuildAircraftRecoveryPlatformEmbarkAction(
+        UnitManager aircraft,
+        AIWorldSnapshot snapshot,
+        Vector3Int fromCell,
+        UnitManager platform,
+        Dictionary<Vector3Int, List<Vector3Int>> paths,
+        out PlayerAction action)
+    {
+        action = null;
+        if (aircraft == null || platform == null || snapshot == null)
+            return false;
+
+        TeamObjectivePlan plan = ObjectiveManager.GetPlanForSlot(
+            PlayerSlotId.FromIndex(snapshot.AISlotIndex));
+        if (!TryBuildRepairEvacExtendedEmbarkAction(
+                aircraft, snapshot, plan, snapshot.AITeam, fromCell,
+                platform, paths, out action))
+        {
+            return false;
+        }
+
+        Debug.Log($"{TL("Repair")} aeronave #{aircraft.InstanceId} " +
+                  $"recuperacao Tactical: embarca na plataforma " +
+                  $"#{platform.InstanceId}.");
         return true;
     }
 
@@ -193,7 +237,9 @@ public partial class AIController
         AIWorldSnapshot snapshot)
     {
         var result = new List<AircraftRecoveryAnchor>();
+        var landingFallbacks = new List<AircraftRecoveryAnchor>();
         var seenCells = new HashSet<Vector3Int>();
+        bool hasPrimaryLandingRecovery = false;
         int aiSlot = ResolveAISlotKey(snapshot.AITeam);
 
         foreach (ConstructionManager construction in ConstructionManager.AllActive)
@@ -213,27 +259,38 @@ public partial class AIController
                     SensorMovementMode.MoveuAndando))
             {
                 if (seenCells.Add(cell))
+                {
                     result.Add(new AircraftRecoveryAnchor(
                         cell, "aerodromo/construcao de reparo"));
+                    hasPrimaryLandingRecovery = true;
+                }
             }
         }
 
-        // Um aviao em reparo nao procura apenas construcoes: uma LZ prevista
-        // no Terrain/Structure Aircraft Ops tambem e recuperacao valida.
-        // PodePousar e a fonte unica, logo a hierarquia construcao >
-        // estrutura+terreno > terreno e as skills configuradas em cada uma
-        // continuam identicas a ferramenta de debug.
-        if (boardTilemap != null)
+        // Um aviao em reparo nao procura apenas construcoes. A mesma consulta
+        // usada pela ferramenta Melhor Local para Pouso organiza LZs de
+        // Terrain/Structure Aircraft Ops dentro da autonomia real; o repair
+        // apenas converte suas respostas em ancoras.
+        if (boardTilemap != null && terrainDatabase != null)
         {
-            foreach (Vector3Int rawCell in boardTilemap.cellBounds.allPositionsWithin)
+            MelhorPousoResult landingOptions = MelhorPousoService.Evaluate(
+                new MelhorPousoRequest
+                {
+                    aircraft = aircraft,
+                    map = boardTilemap,
+                    terrainDatabase = terrainDatabase,
+                    tacticalBudget = Mathf.Max(
+                        0, aircraft.RemainingMovementPoints),
+                    operationalTurns = 2
+                });
+            for (int i = 0; i < landingOptions.options.Count; i++)
             {
-                Vector3Int cell = rawCell;
-                cell.z = 0;
-                if (!boardTilemap.HasTile(cell) || !seenCells.Add(cell))
+                MelhorPousoOption landingOption = landingOptions.options[i];
+                if (landingOption == null)
                     continue;
-                if (!PodePousarSensor.CanLandAtCell(
-                        aircraft, boardTilemap, terrainDatabase, cell,
-                        out _, SensorMovementMode.MoveuAndando))
+                Vector3Int cell = landingOption.cell;
+                cell.z = 0;
+                if (!seenCells.Add(cell))
                 {
                     continue;
                 }
@@ -244,7 +301,7 @@ public partial class AIController
                 string kind = context.landingSurface ==
                     LandingSurface.RoadRunway
                     ? "LZ estrada" : "LZ valida";
-                result.Add(new AircraftRecoveryAnchor(cell, kind));
+                landingFallbacks.Add(new AircraftRecoveryAnchor(cell, kind));
             }
         }
 
@@ -259,9 +316,12 @@ public partial class AIController
                 Vector3Int cell = ally.CurrentCellPosition;
                 cell.z = 0;
                 if (CanSupplierRecoverAircraft(ally, aircraft))
+                {
                     result.Add(new AircraftRecoveryAnchor(
                         cell, "supridor", serviceRadius: 1,
                         tacticalPriority: 5000));
+                    hasPrimaryLandingRecovery = true;
+                }
                 if (IsPotentialRepairFusionTarget(aircraft, ally))
                     result.Add(new AircraftRecoveryAnchor(cell, "fusao", serviceRadius: 1));
             }
@@ -270,13 +330,24 @@ public partial class AIController
         UnitManager platform = FindBestNavalRepairPlatform(
             aircraft, aircraft.CurrentCellPosition, snapshot.AITeam, out _, out _);
         if (platform != null)
+        {
             result.Add(new AircraftRecoveryAnchor(
-                platform.CurrentCellPosition, "plataforma naval", serviceRadius: 1));
+                platform.CurrentCellPosition, "plataforma naval",
+                serviceRadius: 1, transporter: platform));
+
+            hasPrimaryLandingRecovery = true;
+        }
+
+        // Pista, estrada STOVL e demais LZs validas sao o plano de pouso de
+        // emergencia. Elas nao roubam a prioridade de uma fonte que realmente
+        // possa atender/reparar a aeronave.
+        if (!hasPrimaryLandingRecovery)
+            result.AddRange(landingFallbacks);
 
         return result;
     }
 
-    private static bool CanSupplierRecoverAircraft(
+    private bool CanSupplierRecoverAircraft(
         UnitManager supplier,
         UnitManager aircraft)
     {
@@ -288,12 +359,30 @@ public partial class AIController
             return false;
         }
 
-        // Nao basta ser "logistica": o Navio Tanque, por exemplo, opera
-        // Naval/Surface e nao vira ancora de um caca em Air/High. O
-        // PodeSuprir confirmara a operacao final; este gate impede que um
-        // dominio impossivel ganhe a corrida de recovery.
-        return PodeSuprirSensor.SupportsOperationDomain(
-            supplierData, aircraft.GetDomain(), aircraft.GetHeightLevel());
+        // Primeiro tenta atender a aeronave na camada atual. Se o supridor
+        // opera Naval/Surface e a aeronave pode pousar na agua sob ela, o
+        // PodeSuprir executara esse pouso antes do atendimento; este e o caso
+        // do Hidroaviao atendido por Navio-Tanque. Nao aceitamos, porem, um
+        // pouso cuja camada final o supplier nao consiga operar.
+        if (PodeSuprirSensor.SupportsOperationDomain(
+                supplierData, aircraft.GetDomain(), aircraft.GetHeightLevel()))
+        {
+            return true;
+        }
+
+        if (boardTilemap == null || terrainDatabase == null)
+            return false;
+
+        PodePousarReport landing = PodePousarSensor.Evaluate(
+            aircraft, boardTilemap, terrainDatabase,
+            SensorMovementMode.MoveuAndando,
+            useManualRemainingMovement: false,
+            manualRemainingMovement: 0);
+        return landing != null
+            && landing.status
+            && PodeSuprirSensor.SupportsOperationDomain(
+                supplierData, landing.landingDomain,
+                landing.landingHeight);
     }
 
     private bool IsAircraftFuelCriticalForNextUpkeep(

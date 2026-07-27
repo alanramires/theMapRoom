@@ -248,10 +248,22 @@ public static class MelhorEmbarqueService
                 // que os sensores de embarque resolvam a transicao final.
                 // Sem esta distancia, o hex atual do transportador ganha
                 // por custo zero e ele fica esperando longe do passageiro.
+                // EVAC emergencial nao pode transformar "o Apache consegue
+                // voar ate mim" em motivo para a plataforma ficar parada.
+                // Nessa modalidade o transportador e que deve aproximar-se
+                // do anel de encontro adjacente ao passageiro; embarcar nao
+                // acontece no mesmo hex. Aguardar so e aceitavel quando a
+                // plataforma ja esta nesse anel. A mesma regra continua
+                // cobrindo a ausencia de rota explicita, comum na transicao
+                // Air -> plataforma naval.
+                bool emergencyEvac = disposition ==
+                    MelhorEmbarqueRideDisposition.Emergency;
+                float passengerMeetingDistance =
+                    SectorManager.HexDistance(passengerCell, cell);
                 float rescueApproachPenalty = routeState ==
-                    MelhorEmbarquePassengerRouteState.NoCurrentRoute
-                    ? SectorManager.HexDistance(passengerCell, cell)
-                        * 10000f
+                        MelhorEmbarquePassengerRouteState.NoCurrentRoute
+                    || emergencyEvac
+                    ? Mathf.Abs(passengerMeetingDistance - 1f) * 10000f
                     : 0f;
                 float optionScore = 100000f
                     - distance * 100f
@@ -282,7 +294,7 @@ public static class MelhorEmbarqueService
                         $"custoPax=" +
                         $"{(moveCost < int.MaxValue ? moveCost.ToString() : "n/a")} " +
                         $"distTransport={distance} " +
-                        $"aproxPax={SectorManager.HexDistance(passengerCell, cell):F0} " +
+                        $"aproxPax={passengerMeetingDistance:F0} " +
                         $"carona={disposition} " +
                         $"ajusteCarona={rideNeedAdjustment:0}"
                 };

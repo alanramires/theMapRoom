@@ -168,14 +168,42 @@ public static class PodeEmbarcarSensor
         {
             if (hasConstructionFilter)
             {
-                if (ConstructionFacilityTypeRules.MatchesAny(constructionData, transporterData.allowedEmbarkWhenTransporterAtFacilities))
-                    return true;
-
-                reason = "Construcao do hex nao permitida para embarque deste transportador.";
-                return false;
+                if (!ConstructionFacilityTypeRules.MatchesAny(constructionData, transporterData.allowedEmbarkWhenTransporterAtFacilities))
+                {
+                    reason = "Construcao do hex nao permitida para embarque deste transportador.";
+                    return false;
+                }
             }
 
-            // Lista vazia = sem restricao por construcao.
+            // Uma ficha pode exigir construçao E o par estrutura+terreno. O
+            // Trem, por exemplo, para numa estaçao somente se ela realmente
+            // contem Trilho; nao basta qualquer construçao da mesma categoria.
+            if (hasStructureFilter)
+            {
+                StructureData constructionStructure =
+                    StructureOccupancyRules.GetStructureAtCell(map, cell);
+                if (constructionStructure == null
+                    || !TryResolveTerrainAtCell(
+                        map, terrainDatabase, cell,
+                        out TerrainTypeData constructionTerrain)
+                    || constructionTerrain == null)
+                {
+                    reason = "Construcao exige estrutura+terreno compativeis para embarque.";
+                    return false;
+                }
+
+                PairRuleMatchResult constructionPair =
+                    EvaluateEmbarkStructureTerrainPair(
+                        transporterData.allowedEmbarkWhenTransporterAtTerrainStructures,
+                        constructionStructure, constructionTerrain);
+                if (constructionPair != PairRuleMatchResult.Allowed)
+                {
+                    reason = "Construcao nao contem o par estrutura+terreno exigido para embarque.";
+                    return false;
+                }
+            }
+
+            // Lista vazia = sem restricao por construcao/estrutura.
             return true;
         }
 
@@ -250,8 +278,35 @@ public static class PodeEmbarcarSensor
         if (construction != null && construction.TryResolveConstructionData(out ConstructionData constructionData) && constructionData != null)
         {
             if (hasConstructionFilter)
-                return ConstructionFacilityTypeRules.MatchesAny(constructionData, transporterData.allowedEmbarkWhenTransporterAtFacilities);
-            return true; // construction present, no filter = allowed
+            {
+                if (!ConstructionFacilityTypeRules.MatchesAny(
+                        constructionData,
+                        transporterData.allowedEmbarkWhenTransporterAtFacilities))
+                {
+                    return false;
+                }
+            }
+
+            if (hasStructureFilter)
+            {
+                StructureData constructionStructure =
+                    StructureOccupancyRules.GetStructureAtCell(map, cell);
+                if (constructionStructure == null
+                    || !TryResolveTerrainAtCell(
+                        map, terrainDatabase, cell,
+                        out TerrainTypeData constructionTerrain)
+                    || constructionTerrain == null)
+                {
+                    return false;
+                }
+
+                return EvaluateEmbarkStructureTerrainPair(
+                    transporterData.allowedEmbarkWhenTransporterAtTerrainStructures,
+                    constructionStructure,
+                    constructionTerrain) == PairRuleMatchResult.Allowed;
+            }
+
+            return true; // construction present, no additional filter = allowed
         }
 
         StructureData structure = StructureOccupancyRules.GetStructureAtCell(map, cell);

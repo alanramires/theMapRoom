@@ -49,7 +49,7 @@ Não se precipite. Um ataque mal feito ao QG, com tropa insuficiente ou sem cobe
 - *"Não consigo atravessar o mar/canal pra chegar nele."* → Transporte anfíbio (embarque a tropa num navio, desembarque na praia — `03`), ou avance por outro ponto de terra.
 - *"O QG dele está longe e minha tropa fica sem combustível no caminho."* → Estenda a logística: leve a artéria de suprimento (trem/caminhão) até perto do front e deixe os capilares curtos. Front sem cadeia avança rápido e para de repente.
 - *"Minha frente inteira está ferida e a fila da cidade não dá conta."* → Espalhe o reparo por vários prédios (um paciente por fonte, por turno), ou funda esquadrões desgastados dois em um pra devolver uma peça inteira sem esperar.
-- *"Tomei o mapa mas não fecho a partida."* → Pare de espalhar e **concentre**: junte um punho de artilharia + blindado + infantaria e vá pro QG. Território você já tem; agora falta o golpe.
+- *"Tomei o mapa mas não fecho a partida."* → Pare de espalhar e **concentre**: junte um punho de artilharia + blindado + infantaria e vá pro QG. Território você já tem; agora falta o golpe. *(Antes de concentrar, garanta que o caminho até o QG está revelado — não adianta reunir o exército e não saber por onde entrar.)*
 
 ## O jeito de pensar
 

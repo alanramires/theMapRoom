@@ -107,7 +107,8 @@ public sealed class MelhorLocalPousoWindow : EditorWindow
             GUI.backgroundColor = active
                 ? new Color(1f, .8f, .2f) : Color.white;
             if (GUILayout.Button(
-                    $"#{i + 1} {option.tier} LZ={option.cell} | " +
+                    $"#{i + 1} {option.tier} LZ={option.cell}" +
+                    $"{(option.IsPlatform ? " ⚓convés" : string.Empty)} | " +
                     $"dist={option.distance} | rota=" +
                     $"{(option.routeCost >= 0 ? option.routeCost.ToString() : "op")}",
                     EditorStyles.miniButton))
@@ -118,6 +119,24 @@ public sealed class MelhorLocalPousoWindow : EditorWindow
             GUI.backgroundColor = Color.white;
             if (!active)
                 continue;
+
+            if (option.IsPlatform)
+            {
+                string platformName = option.platform != null
+                    && !string.IsNullOrWhiteSpace(option.platform.UnitDisplayName)
+                        ? option.platform.UnitDisplayName
+                        : option.platform != null ? option.platform.name : "?";
+                EditorGUILayout.LabelField(
+                    $"Plataforma: {platformName} | slot {option.platformSlotIndex}",
+                    EditorStyles.wordWrappedMiniLabel);
+                EditorGUILayout.LabelField(
+                    "Contexto: convés de transportador — a aeronave vai para o " +
+                    "slot, não para a camada física do hex.",
+                    EditorStyles.wordWrappedMiniLabel);
+                EditorGUILayout.LabelField(option.platformReason,
+                    EditorStyles.wordWrappedMiniLabel);
+                continue;
+            }
 
             PodePousarReport landing = option.landing;
             AirOperationTileContext context =
@@ -168,7 +187,8 @@ public sealed class MelhorLocalPousoWindow : EditorWindow
         });
         selected = result.best;
         status = selected != null
-            ? $"Melhor LZ: {selected.tier} {selected.cell}."
+            ? $"Melhor LZ: {selected.tier} {selected.cell}" +
+              $"{(selected.IsPlatform ? " (convés)" : string.Empty)}."
             : "Nenhuma LZ autorizada em Tactical ou Operational.";
         SceneView.RepaintAll();
     }
@@ -186,8 +206,13 @@ public sealed class MelhorLocalPousoWindow : EditorWindow
                     ? Color.green : new Color(.2f, .7f, 1f);
             Handles.DrawWireDisc(world, Vector3.forward,
                 option == selected ? .42f : .26f);
+            // Convés ganha um anel interno para não se confundir com LZ de solo.
+            if (option.IsPlatform)
+                Handles.DrawWireDisc(world, Vector3.forward,
+                    option == selected ? .32f : .18f);
             Handles.Label(world + Vector3.up * .27f,
-                option.tier == MelhorPousoTier.Tactical ? "T" : "O");
+                (option.tier == MelhorPousoTier.Tactical ? "T" : "O")
+                + (option.IsPlatform ? "⚓" : string.Empty));
         }
     }
 }

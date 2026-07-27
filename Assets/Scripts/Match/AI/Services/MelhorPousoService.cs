@@ -15,7 +15,17 @@ public sealed class MelhorPousoOption
     public MelhorPousoTier tier;
     public int distance;
     public int routeCost = -1;
+
+    /// <summary>Laudo do pouso em superficie. Nulo quando a LZ e um conves.</summary>
     public PodePousarReport landing;
+
+    /// <summary>Transportador que recebe a aeronave. Nulo em LZ de superficie.</summary>
+    public UnitManager platform;
+    public int platformSlotIndex = -1;
+    public string platformReason;
+
+    public bool IsPlatform => platform != null;
+
     public float score;
 }
 
@@ -90,31 +100,48 @@ public static class MelhorPousoService
             if (!request.map.HasTile(cell))
                 continue;
 
-            // Pre-filtro barato: a LZ final sempre fica numa camada fisica do
-            // hex. A ficha da aeronave (nativa + modos adicionais) ja informa
-            // quais bandas ela suporta; Air nunca e uma LZ de solo. Assim nao
-            // chamamos PodePousar para mar/terra que ela jamais conseguiria
-            // ocupar.
-            if (!LayerTransitionRules.TryResolvePrimaryLayerAtCell(
-                    request.map, request.terrainDatabase, cell,
-                    out Domain physicalDomain,
-                    out HeightLevel physicalHeight,
-                    out _)
-                || physicalDomain == Domain.Air
-                || !aircraft.SupportsLayerMode(
-                    physicalDomain, physicalHeight))
-            {
-                continue;
-            }
+            // Uma passada so sobre os ocupantes do hex: ela responde tanto
+            // "tem alguem na superficie?" quanto "esse alguem e um conves que
+            // me recebe?".
+            InspectSurface(
+                request.map, cell, aircraft,
+                out bool hasSurfaceOccupant,
+                out UnitManager platform,
+                out int platformSlot,
+                out string platformReason);
 
-            // A LZ termina na banda Surface. A consulta generica de ocupacao
-            // so acusa o hex quando alcanca seu teto total e, portanto, deixa
-            // passar um tanque/navio sozinho sob uma aeronave. Aqui basta uma
-            // unidade de superficie para inutilizar a LZ; unidades em Air ou
-            // Sub continuam podendo coexistir no mesmo hex.
-            if (HasSurfaceOccupant(request.map, cell, aircraft))
+            // Pouso em plataforma nao passa pelos dois vetos abaixo, e por
+            // desenho: a aeronave vai para um SLOT do transportador, nao para a
+            // camada fisica do hex. Logo (a) nao precisa suportar Naval/Surface
+            // para pousar numa fragata no mar, e (b) o ocupante de superficie
+            // nao inutiliza a LZ — ele E a LZ.
+            if (platform == null)
             {
-                continue;
+                // Pre-filtro barato: a LZ final sempre fica numa camada fisica
+                // do hex. A ficha da aeronave (nativa + modos adicionais) ja
+                // informa quais bandas ela suporta; Air nunca e uma LZ de solo.
+                // Assim nao chamamos PodePousar para mar/terra que ela jamais
+                // conseguiria ocupar.
+                if (!LayerTransitionRules.TryResolvePrimaryLayerAtCell(
+                        request.map, request.terrainDatabase, cell,
+                        out Domain physicalDomain,
+                        out HeightLevel physicalHeight,
+                        out _)
+                    || physicalDomain == Domain.Air
+                    || !aircraft.SupportsLayerMode(
+                        physicalDomain, physicalHeight))
+                {
+                    continue;
+                }
+
+                // A LZ termina na banda Surface. A consulta generica de
+                // ocupacao so acusa o hex quando alcanca seu teto total e,
+                // portanto, deixa passar um tanque/navio sozinho sob uma
+                // aeronave. Aqui basta uma unidade de superficie para
+                // inutilizar a LZ; unidades em Air ou Sub continuam podendo
+                // coexistir no mesmo hex.
+                if (hasSurfaceOccupant)
+                    continue;
             }
 
             int distance = AIActionReachCoordinator.CubicDistance(
@@ -130,23 +157,34 @@ public static class MelhorPousoService
             else
                 continue;
 
-            PodePousarReport landing = PodePousarSensor.Evaluate(
-                aircraft, request.map, request.terrainDatabase,
-                SensorMovementMode.MoveuAndando,
-                useManualRemainingMovement: false,
-                manualRemainingMovement: 0,
-                atCell: cell);
-            if (landing == null || !landing.status)
-                continue;
+            PodePousarReport landing = null;
+            float surfaceBonus;
+            if (platform != null)
+            {
+                // Conves e pista dedicada: mesmo peso de uma RoadRunway.
+                surfaceBonus = 250f;
+            }
+            else
+            {
+                landing = PodePousarSensor.Evaluate(
+                    aircraft, request.map, request.terrainDatabase,
+                    SensorMovementMode.MoveuAndando,
+                    useManualRemainingMovement: false,
+                    manualRemainingMovement: 0,
+                    atCell: cell);
+                if (landing == null || !landing.status)
+                    continue;
+
+                AirOperationTileContext context =
+                    AirOperationResolver.ResolveContext(
+                        request.map, request.terrainDatabase, cell);
+                surfaceBonus = context.landingSurface ==
+                    LandingSurface.RoadRunway ? 250f : 0f;
+            }
 
             int routeCost = tacticalReachable && route != null
                 ? Mathf.Max(0, route.Count - 1)
                 : -1;
-            AirOperationTileContext context =
-                AirOperationResolver.ResolveContext(
-                    request.map, request.terrainDatabase, cell);
-            float surfaceBonus = context.landingSurface ==
-                LandingSurface.RoadRunway ? 250f : 0f;
             result.options.Add(new MelhorPousoOption
             {
                 cell = cell,
@@ -154,6 +192,9 @@ public static class MelhorPousoService
                 distance = distance,
                 routeCost = routeCost,
                 landing = landing,
+                platform = platform,
+                platformSlotIndex = platformSlot,
+                platformReason = platformReason,
                 score = (tier == MelhorPousoTier.Tactical
                     ? 100000f : 50000f)
                     + surfaceBonus - distance * 100f
@@ -170,24 +211,48 @@ public static class MelhorPousoService
         return result;
     }
 
-    private static bool HasSurfaceOccupant(
+    /// <summary>
+    /// Uma varredura dos ocupantes do hex respondendo as duas perguntas que a
+    /// LZ faz: a superficie esta tomada, e existe um conves que aceita esta
+    /// aeronave? A regra de conves e do PodePousar (slot, camada, classe,
+    /// skills, exclusividade, vaga) — aqui so se escolhe o primeiro que aceita.
+    /// </summary>
+    private static void InspectSurface(
         Tilemap map,
         Vector3Int cell,
-        UnitManager exceptUnit)
+        UnitManager aircraft,
+        out bool hasSurfaceOccupant,
+        out UnitManager platform,
+        out int platformSlotIndex,
+        out string platformReason)
     {
+        hasSurfaceOccupant = false;
+        platform = null;
+        platformSlotIndex = -1;
+        platformReason = string.Empty;
+
         List<UnitManager> occupants = UnitOccupancyRules.GetUnitsAtCell(
-            map, cell, exceptUnit);
+            map, cell, aircraft);
         for (int i = 0; i < occupants.Count; i++)
         {
             UnitManager occupant = occupants[i];
-            if (occupant != null
-                && OccupancyResolver.GetHeightBand(occupant)
-                    == HeightBand.Blocking)
+            if (occupant == null)
+                continue;
+
+            if (OccupancyResolver.GetHeightBand(occupant)
+                == HeightBand.Blocking)
             {
-                return true;
+                hasSurfaceOccupant = true;
+            }
+
+            if (platform == null
+                && PodePousarSensor.CanLandOnTransporter(
+                    aircraft, occupant, out int slot, out string reason))
+            {
+                platform = occupant;
+                platformSlotIndex = slot;
+                platformReason = reason;
             }
         }
-
-        return false;
     }
 }

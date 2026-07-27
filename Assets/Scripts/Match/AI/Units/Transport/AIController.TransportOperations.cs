@@ -378,10 +378,20 @@ public partial class AIController
                 : requestedTier == AIReachDecisionTier.Operational
                     ? MelhorEmbarqueTier.Operational
                     : MelhorEmbarqueTier.Strategic;
+        bool requiresPassengerRoute =
+            RequiresPassengerRouteToEmbark(data);
         MelhorEmbarqueOption selectedOption =
             pickup.options.Find(option =>
                 option != null
                 && option.transporterTier == serviceTier
+                // Trem/transportador de estacao nao pode transformar uma
+                // infantaria remota sem rota ate uma construcao em pickup
+                // Tactical. Para aeronaves, NoCurrentRoute continua valido:
+                // Apache e outros passageiros podem precisar que a plataforma
+                // se aproxime para o sensor resolver a transicao de camada.
+                && (!requiresPassengerRoute
+                    || option.passengerRouteState !=
+                        MelhorEmbarquePassengerRouteState.NoCurrentRoute)
                 && (!requiredDisposition.HasValue
                     || option.rideDisposition ==
                         requiredDisposition.Value)
@@ -421,6 +431,25 @@ public partial class AIController
             selectedOption.transporterRouteCost;
         return true;
 
+    }
+
+    private static bool RequiresPassengerRouteToEmbark(UnitData transporter)
+    {
+        if (transporter == null || transporter.domain == Domain.Air)
+            return false;
+
+        bool hasTerrainStop =
+            transporter.allowedEmbarkWhenTransporterAtTerrains != null
+            && transporter.allowedEmbarkWhenTransporterAtTerrains.Count > 0;
+        bool hasStructureStop =
+            transporter.allowedEmbarkWhenTransporterAtTerrainStructures != null
+            && transporter.allowedEmbarkWhenTransporterAtTerrainStructures.Count > 0;
+        bool constructionOnly =
+            !hasTerrainStop
+            && !hasStructureStop
+            && transporter.allowedEmbarkWhenTransporterAtFacilities
+                != ConstructionFacilityType.None;
+        return constructionOnly;
     }
 
     private QueroCaronaResult EvaluatePickupRideNeed(

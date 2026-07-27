@@ -218,7 +218,6 @@ public partial class AIController
         CombatPassengerTransportDecision best = null;
         int compatibleTransporters = 0;
         int offeredRendezvous = 0;
-        int rejectedByPolicy = 0;
         foreach (UnitManager transporter in UnitManager.AllActive)
         {
             if (transporter == null
@@ -265,32 +264,6 @@ public partial class AIController
                 continue;
             offeredRendezvous++;
 
-            Vector3Int safetyTarget = rideNeed.evaluatedTarget;
-            safetyTarget.z = 0;
-            if (policy == CombatPassengerTransportPolicy.FireSupport
-                && assigned == null
-                && rideNeed.evaluatedConstruction == null
-                && TryFindTowDeliveryTarget(
-                    unit, unit.CurrentCellPosition, snapshot, plan,
-                    out Vector3Int fireSupportTarget))
-            {
-                safetyTarget = fireSupportTarget;
-                safetyTarget.z = 0;
-            }
-            if (policy == CombatPassengerTransportPolicy.FireSupport
-                && !CanFireSupportTowEmbarkSafely(
-                    unit, transporter, snapshot, plan,
-                    unit.CurrentCellPosition, safetyTarget,
-                    out string safetyReason))
-            {
-                Debug.Log(
-                    $"{TL("FireSupport")} {unit.InstanceId} rejeita " +
-                    $"#{transporter.InstanceId} LZ={option.lzCell}: " +
-                    safetyReason);
-                rejectedByPolicy++;
-                continue;
-            }
-
             float policyScore = option.score
                 + ResolveCombatPassengerTransportPolicyAdjustment(
                     transporter, assigned, plan);
@@ -329,8 +302,7 @@ public partial class AIController
                 $"{TL("Transporte")} {unit.InstanceId} policy={policy} " +
                 "sem MelhorEmbarque materializavel " +
                 $"transporters={compatibleTransporters} " +
-                $"rendezvous={offeredRendezvous} " +
-                $"policyRejected={rejectedByPolicy}.");
+                $"rendezvous={offeredRendezvous}.");
         }
         return best;
     }

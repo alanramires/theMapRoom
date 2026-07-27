@@ -10,7 +10,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 5914ebc335c5ee440a156ee51579c517, type: 3}
-  m_Name: Reparaos
+  m_Name: Reparos
   m_EditorClassIdentifier: Assembly-CSharp::ConstructionServiceData
   id: Reparar
   displayName: Reparar

@@ -29,17 +29,6 @@ public partial class AIController
         if (unit == null || snapshot == null)
             return FireSupportTransportOutcome.NoAction;
 
-        // Unidade que precisa de reboque (skill "precisaReboque", ex.: Artilharia de Campanha) só
-        // embarca no supridor durante a INVASÃO (IsInvading). Fora dela, embarcar/desembarcar
-        // descoordenado confunde a AI; quando o GoGreen inicia a invasão, a operação é coordenada
-        // e o tow funciona certinho. Apoio de fogo SEM a skill de reboque não é afetado. (Navio de
-        // transporte é outro caso — tratar à parte quando chegar a hora.)
-        if (!snapshot.IsInvading && UnitNeedsTow(unit))
-        {
-            Debug.Log($"{TL("FireSupport")} {unit.InstanceId} (reboque) não embarca no supridor: fora de invasão (IsInvading=false)");
-            return FireSupportTransportOutcome.TransportRejected;
-        }
-
         Vector3Int fromCell = unit.CurrentCellPosition;
         fromCell.z = 0;
 

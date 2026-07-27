@@ -24,6 +24,31 @@ public partial class AIController
         if (TryFindProductionUnlockVacateAction(unit, snapshot, out PlayerAction productionUnlockAction))
             return productionUnlockAction;
 
+        // Reparos sao uma necessidade da propria unidade, inclusive quando ela
+        // tambem possui slots de transporte. Sem este gate um Hidroaviao quase
+        // sem autonomia entra primeiro na varredura de Pickup e pode ficar
+        // aguardando uma infantaria distante em vez de buscar combustivel ou
+        // uma LZ. Os papeis ainda podem cuidar de carga/passageiros quando a
+        // unidade nao esta em reparo.
+        PlayerAction selfRecoveryAction =
+            TryDecideRepairAction(unit, snapshot, plan);
+        if (selfRecoveryAction != null)
+            return selfRecoveryAction;
+
+        // Um transportador que tambem e Hub (como o Trem de Carga) precisa
+        // conferir a rede antes de sair procurando passageiro. Se houver uma
+        // construcao sem estoque no alcance, MelhorEstoque/PodeTransferir
+        // decide a transferencia; sem operacao de estoque, o fluxo normal de
+        // Transporte continua intacto.
+        if (!HasTransportCargo(unit)
+            && IsPrimaryTransportRole(unit)
+            && HasStockTransferCapability(unit)
+            && TryDecideStockAction(unit, snapshot, plan)
+                is PlayerAction stockNetworkAction)
+        {
+            return stockNetworkAction;
+        }
+
         PlayerAction transportOperationsAction =
             TryDecideTransportOperationsAction(unit, snapshot, plan);
         if (transportOperationsAction != null)
