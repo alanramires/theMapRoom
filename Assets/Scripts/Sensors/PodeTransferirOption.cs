@@ -18,4 +18,8 @@ public class PodeTransferirOption
     public Domain landingDomain;
     public HeightLevel landingHeight;
     public SensorMovementMode landingMovementMode;
+    public bool requiresTargetUnitLanding;
+    public Domain targetLandingDomain;
+    public HeightLevel targetLandingHeight;
+    public SensorMovementMode targetLandingMovementMode;
 }

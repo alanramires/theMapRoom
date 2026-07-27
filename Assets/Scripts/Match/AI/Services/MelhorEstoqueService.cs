@@ -231,11 +231,22 @@ public static class MelhorEstoqueService
             UnitManager target = UnitManager.AllActive[i];
             if (!IsEligibleUnitEndpoint(request.unit, target))
                 continue;
+            target.TryGetUnitData(out UnitData targetData);
+            bool unitSameCell =
+                RangeIncludesSameCell(actorData.collectionRange)
+                || (targetData != null
+                    && RangeIncludesSameCell(
+                        targetData.collectionRange));
+            bool unitAdjacent =
+                RangeIncludesAdjacent(actorData.collectionRange)
+                || (targetData != null
+                    && RangeIncludesAdjacent(
+                        targetData.collectionRange));
             AddMeetingCells(
                 request.map,
                 Normalize(target.CurrentCellPosition),
-                sameCell,
-                adjacent,
+                unitSameCell,
+                unitAdjacent,
                 neighbors,
                 result);
         }
@@ -256,6 +267,15 @@ public static class MelhorEstoqueService
         }
         return result;
     }
+
+    private static bool RangeIncludesSameCell(
+        SupplierRangeMode range) =>
+        range != SupplierRangeMode.Adjacent1Hex;
+
+    private static bool RangeIncludesAdjacent(
+        SupplierRangeMode range) =>
+        range == SupplierRangeMode.Adjacent1Hex
+        || range == SupplierRangeMode.Hybrid0Or1Hex;
 
     private static void AddMeetingCells(
         Tilemap map,

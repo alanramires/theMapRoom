@@ -144,14 +144,21 @@ public static class PodeTransferirSensor
             supplier.TeamId,
             operationDomain,
             operationHeight);
-        List<UnitManager> unitsInCollectionRange = CollectUnitsInCollectionRange(supplier, supplierData, boardMap, origin);
-        List<UnitManager> nearbyHubUnits = CollectNearbyHubUnits(unitsInCollectionRange, supplier.TeamId);
-        bool hasEmbarkedPassengerInCollection = HasEmbarkedPassengerInCollectionRange(unitsInCollectionRange, supplier);
+        List<UnitManager> unitsInExchangeNeighborhood =
+            CollectUnitsInExchangeNeighborhood(
+                supplier, boardMap, origin);
+        bool hasTransferPeerCandidate = HasTransferPeerCandidate(
+            supplier,
+            unitsInExchangeNeighborhood);
 
         bool isOnAlliedConstruction = alliedConstruction != null;
-        if (!isOnAlliedConstruction && nearbyHubUnits.Count <= 0 && constructionsInCollectionRange.Count <= 0 && !hasEmbarkedPassengerInCollection)
+        if (!isOnAlliedConstruction
+            && constructionsInCollectionRange.Count <= 0
+            && !hasTransferPeerCandidate)
         {
-            reason = "Transferencia exige construcao/hub aliado no collection range.";
+            reason =
+                "Transferencia exige construcao ou unidade logistica aliada " +
+                "com servico Transfer no collection range.";
             return false;
         }
 
@@ -163,8 +170,13 @@ public static class PodeTransferirSensor
                     supplierData,
                     alliedConstruction,
                     constructionsInCollectionRange,
-                    unitsInCollectionRange,
+                    unitsInExchangeNeighborhood,
                     origin,
+                    operationDomain,
+                    operationHeight,
+                    boardMap,
+                    terrainDatabase,
+                    movementMode,
                     output,
                     invalidOutput);
                 break;
@@ -174,8 +186,13 @@ public static class PodeTransferirSensor
                     supplierData,
                     alliedConstruction,
                     constructionsInCollectionRange,
-                    nearbyHubUnits,
+                    unitsInExchangeNeighborhood,
                     origin,
+                    operationDomain,
+                    operationHeight,
+                    boardMap,
+                    terrainDatabase,
+                    movementMode,
                     output,
                     invalidOutput);
                 break;
@@ -221,6 +238,11 @@ public static class PodeTransferirSensor
         List<ConstructionManager> constructionsInCollectionRange,
         List<UnitManager> unitsInCollectionRange,
         Vector3Int originCell,
+        Domain operationDomain,
+        HeightLevel operationHeight,
+        Tilemap boardMap,
+        TerrainDatabase terrainDatabase,
+        SensorMovementMode movementMode,
         List<PodeTransferirOption> output,
         List<PodeTransferirInvalidOption> invalidOutput)
     {
@@ -309,93 +331,21 @@ public static class PodeTransferirSensor
             }
         }
 
-        // UNIDADES: Hub-Hub permite receber e doar. Hub-Receiver permite apenas doar.
-        for (int i = 0; i < unitsInCollectionRange.Count; i++)
-        {
-            UnitManager unit = unitsInCollectionRange[i];
-            if (unit == null)
-                continue;
-            if (!PlayerSlotRelations.AreAllies(unit, supplier))
-                continue;
-            if (!TryGetSupplierData(unit, out UnitData targetData))
-                continue;
-            if (targetData.supplierTier != SupplierTier.Hub && targetData.supplierTier != SupplierTier.Receiver)
-                continue;
-            if (!HasTransferService(unit))
-                continue;
-            if (!IsDomainCompatibleForTransfer(supplier, supplierData, unit))
-                continue;
-
-            if (targetData.supplierTier == SupplierTier.Hub)
-            {
-                if (GetUnitTotalStock(unit) > 0)
-                {
-                    if (CanTransferAtLeastOneSupply(unit, null, supplier))
-                    {
-                        Vector3Int receiveCell = unit.CurrentCellPosition;
-                        receiveCell.z = 0;
-                        output.Add(new PodeTransferirOption
-                        {
-                            supplierUnit = supplier,
-                            targetUnit = unit,
-                            targetCell = receiveCell,
-                            flowMode = TransferFlowMode.Recebedor,
-                            displayLabel = BuildTransferDisplayLabel(supplier, TransferFlowMode.Recebedor, unit, null)
-                        });
-                    }
-                    else
-                    {
-                        AppendInvalid(
-                            invalidOutput,
-                            supplier,
-                            unit,
-                            null,
-                            unit.CurrentCellPosition,
-                            TransferFlowMode.Recebedor,
-                            "Supplier sem capacidade disponivel para receber recursos do hub.");
-                    }
-                }
-                else
-                {
-                    AppendInvalid(
-                        invalidOutput,
-                        supplier,
-                        unit,
-                        null,
-                        unit.CurrentCellPosition,
-                        TransferFlowMode.Recebedor,
-                        "Hub alvo sem estoque para modo receber.");
-                }
-            }
-
-            if (!hasEmbarkedStock)
-                continue;
-
-            if (!CanTransferAtLeastOneSupply(supplier, null, unit))
-            {
-                AppendInvalid(
-                    invalidOutput,
-                    supplier,
-                    unit,
-                    null,
-                    unit.CurrentCellPosition,
-                    TransferFlowMode.Fornecimento,
-                    "Alvo sem capacidade disponivel para receber recursos.");
-                continue;
-            }
-
-            foundDonationTarget = true;
-            Vector3Int donateCell = unit.CurrentCellPosition;
-            donateCell.z = 0;
-            output.Add(new PodeTransferirOption
-            {
-                supplierUnit = supplier,
-                targetUnit = unit,
-                targetCell = donateCell,
-                flowMode = TransferFlowMode.Fornecimento,
-                displayLabel = BuildTransferDisplayLabel(supplier, TransferFlowMode.Fornecimento, unit, null)
-            });
-        }
+        bool foundUnitReceiveSource = false;
+        CollectUnitExchangeOptions(
+            supplier,
+            supplierData,
+            unitsInCollectionRange,
+            originCell,
+            operationDomain,
+            operationHeight,
+            boardMap,
+            terrainDatabase,
+            movementMode,
+            output,
+            invalidOutput,
+            ref foundUnitReceiveSource,
+            ref foundDonationTarget);
 
         if (!hasEmbarkedStock)
         {
@@ -448,8 +398,13 @@ public static class PodeTransferirSensor
         UnitData supplierData,
         ConstructionManager alliedConstruction,
         List<ConstructionManager> constructionsInCollectionRange,
-        List<UnitManager> nearbyHubUnits,
+        List<UnitManager> unitsInCollectionRange,
         Vector3Int originCell,
+        Domain operationDomain,
+        HeightLevel operationHeight,
+        Tilemap boardMap,
+        TerrainDatabase terrainDatabase,
+        SensorMovementMode movementMode,
         List<PodeTransferirOption> output,
         List<PodeTransferirInvalidOption> invalidOutput)
     {
@@ -500,44 +455,21 @@ public static class PodeTransferirSensor
             }
         }
 
-        for (int i = 0; i < nearbyHubUnits.Count; i++)
-        {
-            UnitManager hub = nearbyHubUnits[i];
-            if (hub == null || hub == supplier)
-                continue;
-            if (!TryGetSupplierData(hub, out UnitData hubData) || hubData.supplierTier != SupplierTier.Hub)
-                continue;
-            if (!HasTransferService(hub))
-                continue;
-            if (GetUnitTotalStock(hub) <= 0)
-                continue;
-            if (!IsDomainCompatibleForTransfer(supplier, supplierData, hub))
-                continue;
-            if (!CanTransferAtLeastOneSupply(hub, null, supplier))
-            {
-                AppendInvalid(
-                    invalidOutput,
-                    supplier,
-                    hub,
-                    null,
-                    hub.CurrentCellPosition,
-                    TransferFlowMode.Recebedor,
-                    "Supplier sem capacidade disponivel para receber recursos do hub.");
-                continue;
-            }
-
-            hasValidHubSource = true;
-            Vector3Int hubCell = hub.CurrentCellPosition;
-            hubCell.z = 0;
-            output.Add(new PodeTransferirOption
-            {
-                supplierUnit = supplier,
-                targetUnit = hub,
-                targetCell = hubCell,
-                flowMode = TransferFlowMode.Recebedor,
-                displayLabel = BuildTransferDisplayLabel(supplier, TransferFlowMode.Recebedor, hub, null)
-            });
-        }
+        bool foundDonationTarget = false;
+        CollectUnitExchangeOptions(
+            supplier,
+            supplierData,
+            unitsInCollectionRange,
+            originCell,
+            operationDomain,
+            operationHeight,
+            boardMap,
+            terrainDatabase,
+            movementMode,
+            output,
+            invalidOutput,
+            ref hasValidHubSource,
+            ref foundDonationTarget);
 
         if (!hasValidHubSource)
         {
@@ -548,8 +480,260 @@ public static class PodeTransferirSensor
                 null,
                 origin: originCell,
                 mode: TransferFlowMode.Recebedor,
-                reason: "Receiver sem hub aliado valido no collection range.");
+                reason:
+                    "Receiver sem construcao ou unidade logistica aliada " +
+                    "com estoque compativel no collection range.");
         }
+    }
+
+    /// <summary>
+    /// Troca fisica entre unidades conforme a ficha:
+    /// Hub-Hub e bidirecional; Hub-Receiver flui apenas do Hub ao Receiver.
+    /// O alcance de cada sentido pertence a unidade que cede o estoque.
+    /// </summary>
+    private static void CollectUnitExchangeOptions(
+        UnitManager supplier,
+        UnitData supplierData,
+        List<UnitManager> unitsInCollectionRange,
+        Vector3Int supplierCell,
+        Domain supplierOperationDomain,
+        HeightLevel supplierOperationHeight,
+        Tilemap boardMap,
+        TerrainDatabase terrainDatabase,
+        SensorMovementMode movementMode,
+        List<PodeTransferirOption> output,
+        List<PodeTransferirInvalidOption> invalidOutput,
+        ref bool foundReceiveSource,
+        ref bool foundDonationTarget)
+    {
+        if (supplier == null
+            || supplierData == null
+            || unitsInCollectionRange == null)
+            return;
+
+        bool supplierHasStock = GetUnitTotalStock(supplier) > 0;
+        for (int i = 0; i < unitsInCollectionRange.Count; i++)
+        {
+            UnitManager peer = unitsInCollectionRange[i];
+            if (!TryGetTransferPeerData(
+                    supplier, peer, out UnitData peerData))
+                continue;
+
+            Vector3Int peerCell = peer.CurrentCellPosition;
+            peerCell.z = 0;
+            bool tierAllowsReceive =
+                peerData.supplierTier == SupplierTier.Hub;
+            bool tierAllowsDonation =
+                supplierData.supplierTier == SupplierTier.Hub;
+            string receiveRangeReason = string.Empty;
+            string donationRangeReason = string.Empty;
+            UnitManager receiveLandingUnit = null;
+            Domain receiveLandingDomain = Domain.Land;
+            HeightLevel receiveLandingHeight = HeightLevel.Surface;
+            UnitManager donationLandingUnit = null;
+            Domain donationLandingDomain = Domain.Land;
+            HeightLevel donationLandingHeight = HeightLevel.Surface;
+            bool canReceiveFromPeer =
+                tierAllowsReceive
+                && CanUseUnitTransferDirection(
+                    peer,
+                    peerData,
+                    peerCell,
+                    peer.GetDomain(),
+                    peer.GetHeightLevel(),
+                    supplier,
+                    supplierCell,
+                    supplierOperationDomain,
+                    supplierOperationHeight,
+                    boardMap,
+                    terrainDatabase,
+                    movementMode,
+                    out receiveLandingUnit,
+                    out receiveLandingDomain,
+                    out receiveLandingHeight,
+                    out receiveRangeReason);
+            bool canDonateToPeer =
+                tierAllowsDonation
+                && CanUseUnitTransferDirection(
+                    supplier,
+                    supplierData,
+                    supplierCell,
+                    supplierOperationDomain,
+                    supplierOperationHeight,
+                    peer,
+                    peerCell,
+                    peer.GetDomain(),
+                    peer.GetHeightLevel(),
+                    boardMap,
+                    terrainDatabase,
+                    movementMode,
+                    out donationLandingUnit,
+                    out donationLandingDomain,
+                    out donationLandingHeight,
+                    out donationRangeReason);
+
+            if (tierAllowsReceive && !canReceiveFromPeer)
+            {
+                AppendInvalid(
+                    invalidOutput,
+                    supplier,
+                    peer,
+                    null,
+                    peerCell,
+                    TransferFlowMode.Recebedor,
+                    receiveRangeReason);
+            }
+            else if (tierAllowsReceive
+                     && GetUnitTotalStock(peer) <= 0)
+            {
+                AppendInvalid(
+                    invalidOutput,
+                    supplier,
+                    peer,
+                    null,
+                    peerCell,
+                    TransferFlowMode.Recebedor,
+                    "Unidade logistica aliada sem estoque para ceder.");
+            }
+            else if (tierAllowsReceive
+                     && CanTransferAtLeastOneSupply(
+                         peer, null, supplier))
+            {
+                foundReceiveSource = true;
+                PodeTransferirOption option =
+                    new PodeTransferirOption
+                {
+                    supplierUnit = supplier,
+                    targetUnit = peer,
+                    targetCell = peerCell,
+                    flowMode = TransferFlowMode.Recebedor,
+                    displayLabel = BuildTransferDisplayLabel(
+                        supplier,
+                        TransferFlowMode.Recebedor,
+                        peer,
+                        null)
+                };
+                ApplyTransferLandingPlan(
+                    option,
+                    supplier,
+                    peer,
+                    receiveLandingUnit,
+                    receiveLandingDomain,
+                    receiveLandingHeight,
+                    movementMode);
+                output.Add(option);
+            }
+            else if (tierAllowsReceive)
+            {
+                AppendInvalid(
+                    invalidOutput,
+                    supplier,
+                    peer,
+                    null,
+                    peerCell,
+                    TransferFlowMode.Recebedor,
+                    "Sem carga compativel ou capacidade livre para receber desta unidade logistica.");
+            }
+
+            if (tierAllowsDonation && !canDonateToPeer)
+            {
+                AppendInvalid(
+                    invalidOutput,
+                    supplier,
+                    peer,
+                    null,
+                    peerCell,
+                    TransferFlowMode.Fornecimento,
+                    donationRangeReason);
+            }
+            else if (tierAllowsDonation
+                     && !supplierHasStock)
+            {
+                AppendInvalid(
+                    invalidOutput,
+                    supplier,
+                    peer,
+                    null,
+                    peerCell,
+                    TransferFlowMode.Fornecimento,
+                    "Unidade selecionada sem estoque para ceder.");
+            }
+            else if (tierAllowsDonation
+                     && CanTransferAtLeastOneSupply(
+                         supplier, null, peer))
+            {
+                foundDonationTarget = true;
+                PodeTransferirOption option =
+                    new PodeTransferirOption
+                {
+                    supplierUnit = supplier,
+                    targetUnit = peer,
+                    targetCell = peerCell,
+                    flowMode = TransferFlowMode.Fornecimento,
+                    displayLabel = BuildTransferDisplayLabel(
+                        supplier,
+                        TransferFlowMode.Fornecimento,
+                        peer,
+                        null)
+                };
+                ApplyTransferLandingPlan(
+                    option,
+                    supplier,
+                    peer,
+                    donationLandingUnit,
+                    donationLandingDomain,
+                    donationLandingHeight,
+                    movementMode);
+                output.Add(option);
+            }
+            else if (tierAllowsDonation)
+            {
+                AppendInvalid(
+                    invalidOutput,
+                    supplier,
+                    peer,
+                    null,
+                    peerCell,
+                    TransferFlowMode.Fornecimento,
+                    "Unidade logistica aliada sem capacidade para receber carga compativel.");
+            }
+        }
+    }
+
+    private static void ApplyTransferLandingPlan(
+        PodeTransferirOption option,
+        UnitManager supplier,
+        UnitManager peer,
+        UnitManager landingUnit,
+        Domain landingDomain,
+        HeightLevel landingHeight,
+        SensorMovementMode movementMode)
+    {
+        if (option == null || landingUnit == null)
+            return;
+
+        if (landingUnit == supplier)
+        {
+            option.requiresSupplierLanding = true;
+            option.landingDomain = landingDomain;
+            option.landingHeight = landingHeight;
+            option.landingMovementMode = movementMode;
+            option.displayLabel =
+                $"Pousar {ResolveUnitLabel(supplier)} + " +
+                option.displayLabel;
+            return;
+        }
+
+        if (landingUnit != peer)
+            return;
+
+        option.requiresTargetUnitLanding = true;
+        option.targetLandingDomain = landingDomain;
+        option.targetLandingHeight = landingHeight;
+        option.targetLandingMovementMode = movementMode;
+        option.displayLabel =
+            $"Pousar {ResolveUnitLabel(peer)} + " +
+            option.displayLabel;
     }
 
     private static string ResolveConstructionLabel(ConstructionManager construction)
@@ -619,66 +803,24 @@ public static class PodeTransferirSensor
         return "Transferir - Recebedor/Fornecedor";
     }
 
-    private static List<UnitManager> CollectUnitsInCollectionRange(
+    private static List<UnitManager> CollectUnitsInExchangeNeighborhood(
         UnitManager supplier,
-        UnitData supplierData,
         Tilemap boardMap,
         Vector3Int originCell)
     {
         var result = new List<UnitManager>();
-        if (supplier == null || supplierData == null || boardMap == null)
+        if (supplier == null || boardMap == null)
             return result;
 
-        bool adjacentRange = supplierData.collectionRange == SupplierRangeMode.Adjacent1Hex
-            || supplierData.collectionRange == SupplierRangeMode.Hybrid0Or1Hex;
-        bool includeOriginCell = supplierData.collectionRange == SupplierRangeMode.Hybrid0Or1Hex;
-        List<UnitManager> units = UnitManager.AllActive;
+        // Envelope de descoberta, nao permissao. Como todos os modos atuais
+        // alcancam no maximo um hex, coletamos proprio hex + adjacentes e cada
+        // sentido e filtrado depois pelo collectionRange da unidade que CEDE.
+        IReadOnlyList<UnitManager> units =
+            ResolveUnitsForTransferQuery();
         if (units == null || units.Count <= 0)
             return result;
 
         originCell.z = 0;
-        if (!adjacentRange)
-        {
-            for (int i = 0; i < units.Count; i++)
-            {
-                UnitManager target = units[i];
-                if (target == null || target == supplier)
-                    continue;
-
-                Vector3Int cell = target.CurrentCellPosition;
-                cell.z = 0;
-                if (cell == originCell)
-                    result.Add(target);
-            }
-
-            return result;
-        }
-
-        if (includeOriginCell)
-        {
-            for (int i = 0; i < units.Count; i++)
-            {
-                UnitManager target = units[i];
-                if (target == null || target == supplier)
-                    continue;
-
-                Vector3Int cell = target.CurrentCellPosition;
-                cell.z = 0;
-                if (cell == originCell && !result.Contains(target))
-                    result.Add(target);
-            }
-        }
-
-        List<Vector3Int> neighbors = new List<Vector3Int>(6);
-        UnitMovementPathRules.GetImmediateHexNeighbors(boardMap, originCell, neighbors);
-        HashSet<Vector3Int> adjacentLookup = new HashSet<Vector3Int>();
-        for (int n = 0; n < neighbors.Count; n++)
-        {
-            Vector3Int neighbor = neighbors[n];
-            neighbor.z = 0;
-            adjacentLookup.Add(neighbor);
-        }
-
         for (int i = 0; i < units.Count; i++)
         {
             UnitManager target = units[i];
@@ -687,11 +829,36 @@ public static class PodeTransferirSensor
 
             Vector3Int cell = target.CurrentCellPosition;
             cell.z = 0;
-            if (adjacentLookup.Contains(cell))
+            int distance = Mathf.RoundToInt(
+                SectorManager.HexDistance(originCell, cell));
+            if (distance <= 1)
                 result.Add(target);
         }
 
         return result;
+    }
+
+    private static IReadOnlyList<UnitManager>
+        ResolveUnitsForTransferQuery()
+    {
+        if (!Application.isPlaying)
+        {
+            return Object.FindObjectsByType<UnitManager>(
+                FindObjectsInactive.Exclude,
+                FindObjectsSortMode.None);
+        }
+
+        List<UnitManager> runtimeUnits =
+            UnitManager.AllActive;
+        if (runtimeUnits != null
+            && runtimeUnits.Count > 0)
+            return runtimeUnits;
+
+        // Fallback defensivo para cenas de teste que ainda nao registraram
+        // suas unidades ao iniciar o Play Mode.
+        return Object.FindObjectsByType<UnitManager>(
+            FindObjectsInactive.Exclude,
+            FindObjectsSortMode.None);
     }
 
     private static List<ConstructionManager> CollectConstructionsInCollectionRange(
@@ -746,25 +913,75 @@ public static class PodeTransferirSensor
         return result;
     }
 
-    private static List<UnitManager> CollectNearbyHubUnits(List<UnitManager> unitsInRange, TeamId teamId)
+    private static bool HasTransferPeerCandidate(
+        UnitManager supplier,
+        List<UnitManager> unitsInRange)
     {
-        var hubs = new List<UnitManager>();
         if (unitsInRange == null)
-            return hubs;
+            return false;
 
         for (int i = 0; i < unitsInRange.Count; i++)
         {
-            UnitManager candidate = unitsInRange[i];
-            if (candidate == null || (int)candidate.TeamId != (int)teamId)
-                continue;
-            if (!TryGetSupplierData(candidate, out UnitData data))
-                continue;
-            if (data.supplierTier != SupplierTier.Hub)
-                continue;
-            hubs.Add(candidate);
+            if (TryGetTransferPeerData(
+                    supplier,
+                    unitsInRange[i],
+                    out _))
+                return true;
         }
 
-        return hubs;
+        return false;
+    }
+
+    private static bool TryGetTransferPeerData(
+        UnitManager supplier,
+        UnitManager peer,
+        out UnitData peerData)
+    {
+        peerData = null;
+        if (supplier == null
+            || peer == null
+            || peer == supplier
+            || peer.IsDead
+            || !AreAlliedForTransferQuery(peer, supplier)
+            || !TryGetSupplierData(peer, out peerData)
+            || peerData == null
+            || !HasTransferService(peer))
+            return false;
+
+        bool tierAllowsExchange =
+            peerData.supplierTier == SupplierTier.Hub
+            || (supplier.TryGetUnitData(out UnitData supplierData)
+                && supplierData != null
+                && supplierData.supplierTier == SupplierTier.Hub);
+        if (!tierAllowsExchange)
+            return false;
+
+        // Passageiro do proprio supplier participa da distribuicao interna.
+        // Passageiro escondido em outro transportador nao fica exposto para
+        // uma troca externa apenas por compartilhar a coordenada.
+        if (peer.IsEmbarked
+            && peer.EmbarkedTransporter != supplier)
+            return false;
+
+        return true;
+    }
+
+    private static bool AreAlliedForTransferQuery(
+        UnitManager first,
+        UnitManager second)
+    {
+        if (PlayerSlotRelations.AreAllies(first, second))
+            return true;
+
+        // No Scene/Editor os slots podem ainda estar em -1. A ficha de time
+        // continua disponivel e permite a consulta pura da ferramenta.
+        return !Application.isPlaying
+            && first != null
+            && second != null
+            && first.SlotIndex < 0
+            && second.SlotIndex < 0
+            && first.TeamId != TeamId.Neutral
+            && first.TeamId == second.TeamId;
     }
 
     private static bool TryGetSupplierData(UnitManager unit, out UnitData data)
@@ -782,16 +999,34 @@ public static class PodeTransferirSensor
             return false;
 
         IReadOnlyList<ServiceData> services = unit.GetEmbarkedServices();
-        if (services == null)
-            return false;
-
-        for (int i = 0; i < services.Count; i++)
+        if (services != null)
         {
-            ServiceData service = services[i];
-            if (service != null && service.serviceType == ServiceType.Transfer)
-                return true;
+            for (int i = 0; i < services.Count; i++)
+            {
+                ServiceData service = services[i];
+                if (service != null
+                    && service.serviceType == ServiceType.Transfer)
+                    return true;
+            }
         }
 
+        // Em Scene/Editor a copia runtime pode ainda nao ter sido sincronizada.
+        // A permissao vem da ficha; estoque e capacidade continuam runtime.
+        if (!unit.TryGetUnitData(out UnitData data)
+            || data == null
+            || data.supplierServicesProvided == null)
+            return false;
+
+        for (int i = 0;
+             i < data.supplierServicesProvided.Count;
+             i++)
+        {
+            ServiceData service =
+                data.supplierServicesProvided[i];
+            if (service != null
+                && service.serviceType == ServiceType.Transfer)
+                return true;
+        }
         return false;
     }
 
@@ -810,42 +1045,176 @@ public static class PodeTransferirSensor
         return false;
     }
 
-    private static bool IsDomainCompatibleForTransfer(UnitManager supplier, UnitData supplierData, UnitManager target)
+    private static bool CanUseUnitTransferDirection(
+        UnitManager source,
+        UnitData sourceData,
+        Vector3Int sourceCell,
+        Domain sourceDomain,
+        HeightLevel sourceHeight,
+        UnitManager destination,
+        Vector3Int destinationCell,
+        Domain destinationDomain,
+        HeightLevel destinationHeight,
+        Tilemap boardMap,
+        TerrainDatabase terrainDatabase,
+        SensorMovementMode movementMode,
+        out UnitManager landingUnit,
+        out Domain landingDomain,
+        out HeightLevel landingHeight,
+        out string reason)
     {
-        if (supplier == null || supplierData == null || target == null)
-            return false;
-
-        // Excecao: unidade embarcada no proprio supplier sempre pode transferir,
-        // independente do dominio/altura atual do passageiro.
-        if (target.IsEmbarked && target.EmbarkedTransporter == supplier)
-            return true;
-
-        Domain supplierDomain = supplier.GetDomain();
-        HeightLevel supplierHeight = supplier.GetHeightLevel();
-        Domain targetDomain = target.GetDomain();
-        HeightLevel targetHeight = target.GetHeightLevel();
-
-        if (supplierDomain == targetDomain && supplierHeight == targetHeight)
-            return true;
-
-        return SupportsOperationDomain(supplierData, targetDomain, targetHeight);
-    }
-
-    private static bool HasEmbarkedPassengerInCollectionRange(List<UnitManager> unitsInRange, UnitManager supplier)
-    {
-        if (unitsInRange == null || supplier == null)
-            return false;
-
-        for (int i = 0; i < unitsInRange.Count; i++)
+        landingUnit = null;
+        landingDomain = Domain.Land;
+        landingHeight = HeightLevel.Surface;
+        reason = string.Empty;
+        if (source == null
+            || sourceData == null
+            || destination == null)
         {
-            UnitManager unit = unitsInRange[i];
-            if (unit == null)
-                continue;
-            if (unit.IsEmbarked && unit.EmbarkedTransporter == supplier)
-                return true;
+            reason = "Origem ou destino logistico invalido.";
+            return false;
         }
 
+        sourceCell.z = 0;
+        destinationCell.z = 0;
+        bool internalTransfer =
+            (destination.IsEmbarked
+             && destination.EmbarkedTransporter == source)
+            || (source.IsEmbarked
+                && source.EmbarkedTransporter == destination);
+        int distance = Mathf.RoundToInt(
+            SectorManager.HexDistance(sourceCell, destinationCell));
+        bool withinRange;
+        switch (sourceData.collectionRange)
+        {
+            case SupplierRangeMode.Adjacent1Hex:
+                withinRange = distance == 1;
+                break;
+            case SupplierRangeMode.Hybrid0Or1Hex:
+                withinRange = distance <= 1;
+                break;
+            default:
+                withinRange = internalTransfer || distance == 0;
+                break;
+        }
+        if (!withinRange)
+        {
+            reason =
+                $"Fora do collection range de quem cede " +
+                $"({sourceData.collectionRange}, distancia={distance}).";
+            return false;
+        }
+
+        if (internalTransfer)
+            return true;
+
+        if (sourceDomain == destinationDomain
+            && sourceHeight == destinationHeight
+            && SupportsOperationDomain(
+                sourceData,
+                sourceDomain,
+                sourceHeight))
+            return true;
+
+        if (TryPlanTransferLanding(
+                destination,
+                destinationCell,
+                boardMap,
+                terrainDatabase,
+                movementMode,
+                out Domain destinationLandingDomain,
+                out HeightLevel destinationLandingHeight,
+                out string destinationLandingReason)
+            && sourceDomain == destinationLandingDomain
+            && sourceHeight == destinationLandingHeight
+            && SupportsOperationDomain(
+                sourceData,
+                destinationLandingDomain,
+                destinationLandingHeight))
+        {
+            landingUnit = destination;
+            landingDomain = destinationLandingDomain;
+            landingHeight = destinationLandingHeight;
+            return true;
+        }
+
+        if (TryPlanTransferLanding(
+                source,
+                sourceCell,
+                boardMap,
+                terrainDatabase,
+                movementMode,
+                out Domain sourceLandingDomain,
+                out HeightLevel sourceLandingHeight,
+                out string sourceLandingReason)
+            && sourceLandingDomain == destinationDomain
+            && sourceLandingHeight == destinationHeight
+            && SupportsOperationDomain(
+                sourceData,
+                sourceLandingDomain,
+                sourceLandingHeight))
+        {
+            landingUnit = source;
+            landingDomain = sourceLandingDomain;
+            landingHeight = sourceLandingHeight;
+            return true;
+        }
+
+        reason =
+            $"Camadas incompativeis para transferencia: quem cede esta em " +
+            $"{sourceDomain}/{sourceHeight} e quem recebe em " +
+            $"{destinationDomain}/{destinationHeight}. " +
+            $"Pouso de quem recebe: {destinationLandingReason} " +
+            $"Pouso de quem cede: {sourceLandingReason}";
         return false;
+    }
+
+    private static bool TryPlanTransferLanding(
+        UnitManager aircraft,
+        Vector3Int cell,
+        Tilemap boardMap,
+        TerrainDatabase terrainDatabase,
+        SensorMovementMode movementMode,
+        out Domain landingDomain,
+        out HeightLevel landingHeight,
+        out string reason)
+    {
+        landingDomain = Domain.Land;
+        landingHeight = HeightLevel.Surface;
+        reason = "unidade nao esta em voo";
+        if (aircraft == null
+            || aircraft.GetDomain() != Domain.Air
+            || aircraft.IsAircraftGrounded)
+            return false;
+
+        if (boardMap == null || terrainDatabase == null)
+        {
+            reason = "tilemap ou Terrain Database indisponivel";
+            return false;
+        }
+
+        cell.z = 0;
+        PodePousarReport landing = PodePousarSensor.Evaluate(
+            aircraft,
+            boardMap,
+            terrainDatabase,
+            movementMode,
+            useManualRemainingMovement: false,
+            manualRemainingMovement: 0,
+            atCell: cell);
+        if (landing == null || !landing.status)
+        {
+            reason = landing != null
+                ? landing.explicacao
+                : "PodePousar sem resultado";
+            return false;
+        }
+
+        landingDomain = landing.landingDomain;
+        landingHeight = landing.landingHeight;
+        reason =
+            $"pouso autorizado em {landingDomain}/{landingHeight}";
+        return true;
     }
 
     private static int GetUnitTotalStock(UnitManager unit)

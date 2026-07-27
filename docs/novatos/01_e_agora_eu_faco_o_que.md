@@ -25,6 +25,8 @@ Você começa com um **Quartel General** (seu QG) e, por perto, pelo menos uma *
 **1. Compre um Soldado.**
 Clique na sua fábrica. Ela abre um catálogo do que sabe produzir. Escolha o **Soldado** — a tropa mais barata do jogo. A unidade nova nasce **em cima da fábrica**.
 
+> *(Se já tiver uma tropa sua parada em cima da fábrica, a compra não acontece — o espaço de saída precisa estar livre. Mova a tropa que está lá primeiro e compre depois.)*
+
 > Por que Soldado e não um tanque? Porque **só infantaria captura território.** Um tanque ganha brigas, mas não toma cidade nenhuma — e é a captura que te dá dinheiro. No começo, quem você quer é o capturador.
 
 **2. Ache uma cidade neutra por perto.**
@@ -33,8 +35,15 @@ Olhe o mapa em volta do seu QG. Cidades (e outras construções sem dono) são o
 **3. Mova o Soldado até ela.**
 Clique no seu Soldado. O jogo acende os hexágonos até onde ele consegue ir neste turno. Clique no hexágono da cidade (ou o mais perto que der) e confirme. Se a cidade estava longe, tudo bem — ele chega mais perto agora e termina o caminho no próximo turno.
 
-**4. Passe o turno.**
-Quando não tiver mais o que fazer, encerre seu turno. A IA joga a vez dela, e volta pra você.
+**4. Comande TODAS as suas peças — não só uma.**
+
+> **⚠️ Atenção, comandante: a vez é do exército inteiro, não de uma unidade.**
+> Se você vem de outro jogo de turno, cuidado: aqui **você não age com uma peça e passa a vez.** Você dá uma ordem para **cada uma** das suas unidades no mapa — andar, capturar, atacar, ou simplesmente pular a vez se ela não tiver o que fazer — e **só então** o turno acaba. Depois disso o inimigo comanda o exército dele inteiro, e volta pra você.
+
+Comprou um Soldado e mexeu nele? Ótimo — mas olhe o mapa: tem outras peças suas paradas? Selecione cada uma e dê uma ordem. Deixar tropa parada sem querer é o erro nº 1 de quem está começando: você perde um turno inteiro daquela unidade, de graça.
+
+**5. Passe o turno.**
+Quando **nenhuma peça sua** ainda precisar de ordem, encerre o turno. A IA joga a vez dela, e volta pra você.
 
 ## Capturar: o botão que ganha o jogo
 
@@ -76,6 +85,7 @@ Empurre esse conjunto na direção do **QG inimigo**, tomando construções pelo
 - Sem dinheiro? Você não capturou o bastante. Pegue mais cidades.
 - Sem nada pra capturar? Comprou blindado achando que ia tomar terreno — compre **Soldado**.
 - Tropa morrendo? Você avançou sem cobrir os capturadores. Junte combate com infantaria.
+- Sensação de que o jogo "anda pouco" por turno? Você provavelmente passou a vez com tropa parada. Antes de encerrar, cheque **cada** peça sua.
 - Não sabe o que um botão faz? Clique. Nada é definitivo até você confirmar.
 
 Isso é o suficiente pra jogar — e ganhar — a sua primeira partida. Tudo que existe além disto (névoa de guerra, combustível, transporte de tropa, o pedra-papel-tesoura das classes) só torna esse mesmo ciclo mais rico. Mas o ciclo é sempre este:

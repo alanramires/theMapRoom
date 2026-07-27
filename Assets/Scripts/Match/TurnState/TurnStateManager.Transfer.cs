@@ -369,55 +369,66 @@ public partial class TurnStateManager
                 yield break;
             }
 
+            if (option != null
+                && option.requiresSupplierLanding
+                && !CanApplyRequiredTransferLanding(
+                    selectedUnit,
+                    option.landingDomain,
+                    option.landingHeight,
+                    option.landingMovementMode,
+                    out string supplierLandingReason))
+            {
+                cursorController?.PlayErrorSfx();
+                Debug.Log(
+                    $"[Transfer] Pouso preparatorio de " +
+                    $"{selectedUnit?.name} deixou de ser valido: " +
+                    supplierLandingReason);
+                yield break;
+            }
+
+            UnitManager landingTarget =
+                option != null ? option.targetUnit : null;
+            if (option != null
+                && option.requiresTargetUnitLanding
+                && !CanApplyRequiredTransferLanding(
+                    landingTarget,
+                    option.targetLandingDomain,
+                    option.targetLandingHeight,
+                    option.targetLandingMovementMode,
+                    out string targetLandingReason))
+            {
+                cursorController?.PlayErrorSfx();
+                Debug.Log(
+                    $"[Transfer] Pouso preparatorio de " +
+                    $"{landingTarget?.name} deixou de ser valido: " +
+                    targetLandingReason);
+                yield break;
+            }
+
             if (option != null && option.requiresSupplierLanding)
             {
-                UnitManager landingSupplier = selectedUnit;
-                Tilemap landingMap = terrainTilemap != null ? terrainTilemap : landingSupplier?.BoardTilemap;
-                AircraftOperationDecision landingDecision = AircraftOperationRules.Evaluate(
-                    landingSupplier,
-                    landingMap,
-                    terrainDatabase,
-                    option.landingMovementMode);
-                if (!landingDecision.available || landingDecision.action != AircraftOperationAction.Land)
-                {
-                    cursorController?.PlayErrorSfx();
-                    Debug.Log(string.IsNullOrWhiteSpace(landingDecision.reason)
-                        ? "[Transfer] Pouso obrigatorio deixou de ser valido."
-                        : $"[Transfer] {landingDecision.reason}");
+                bool supplierLanded = false;
+                yield return ApplyRequiredTransferLanding(
+                    selectedUnit,
+                    option.landingDomain,
+                    option.landingHeight,
+                    option.landingMovementMode,
+                    success => supplierLanded = success);
+                if (!supplierLanded)
                     yield break;
-                }
+            }
 
-                PlayMovementStartSfx(landingSupplier);
-                bool startedHigh = landingSupplier.GetDomain() == Domain.Air && landingSupplier.GetHeightLevel() == HeightLevel.AirHigh;
-                if (startedHigh)
-                {
-                    float highToLowDuration = GetEmbarkAirHighToGroundDuration() * Mathf.Clamp01(GetEmbarkHighToLowNormalizedTime());
-                    if (highToLowDuration > 0f)
-                        yield return new WaitForSeconds(highToLowDuration);
-                    landingSupplier.TrySetCurrentLayerMode(Domain.Air, HeightLevel.AirLow);
-                }
-
-                float landingDuration = GetLayerOperationTransitionDuration();
-                if (landingDuration > 0f)
-                    yield return new WaitForSeconds(landingDuration);
-
-                if (!AircraftOperationRules.TryApplyOperation(
-                        landingSupplier,
-                        landingMap,
-                        terrainDatabase,
-                        option.landingMovementMode,
-                        out AircraftOperationDecision appliedLanding)
-                    || appliedLanding.action != AircraftOperationAction.Land)
-                {
-                    cursorController?.PlayErrorSfx();
-                    Debug.Log("[Transfer] Falha ao aplicar pouso obrigatorio; transferencia cancelada.");
+            if (option != null && option.requiresTargetUnitLanding)
+            {
+                bool targetLanded = false;
+                yield return ApplyRequiredTransferLanding(
+                    landingTarget,
+                    option.targetLandingDomain,
+                    option.targetLandingHeight,
+                    option.targetLandingMovementMode,
+                    success => targetLanded = success);
+                if (!targetLanded)
                     yield break;
-                }
-
-                float vtolFxDuration = animationManager != null ? animationManager.PlayVtolLandingEffect(landingSupplier) : 0f;
-                if (vtolFxDuration > 0f)
-                    yield return new WaitForSeconds(vtolFxDuration);
-                Debug.Log($"[Transfer] {landingSupplier.name} pousou em {option.landingDomain}/{option.landingHeight} para transferir e permanecera pousado.");
             }
 
             bool executed = TryExecuteTransferOptionRuntime(option, selectedUnit, GetSelectedTransferDonationPercent(), out int movedTotal, out string message, out Dictionary<SupplyData, int> movedBySupply);
@@ -439,6 +450,135 @@ public partial class TurnStateManager
             transferExecutionInProgress = false;
             ClearPendingTransferPrompt();
         }
+    }
+
+    private bool CanApplyRequiredTransferLanding(
+        UnitManager aircraft,
+        Domain plannedDomain,
+        HeightLevel plannedHeight,
+        SensorMovementMode movementMode,
+        out string reason)
+    {
+        reason = string.Empty;
+        if (aircraft == null)
+        {
+            reason = "aeronave ausente";
+            return false;
+        }
+
+        Tilemap boardMap =
+            terrainTilemap != null
+                ? terrainTilemap
+                : aircraft.BoardTilemap;
+        Vector3Int cell = aircraft.CurrentCellPosition;
+        cell.z = 0;
+        PodePousarReport report = PodePousarSensor.Evaluate(
+            aircraft,
+            boardMap,
+            terrainDatabase,
+            movementMode,
+            useManualRemainingMovement: false,
+            manualRemainingMovement: 0,
+            atCell: cell);
+        if (report == null || !report.status)
+        {
+            reason = report != null
+                ? report.explicacao
+                : "PodePousar sem resultado";
+            return false;
+        }
+
+        if (report.landingDomain != plannedDomain
+            || report.landingHeight != plannedHeight)
+        {
+            reason =
+                $"pouso agora resulta em " +
+                $"{report.landingDomain}/{report.landingHeight}, " +
+                $"mas a transferencia planejou " +
+                $"{plannedDomain}/{plannedHeight}";
+            return false;
+        }
+
+        return true;
+    }
+
+    private IEnumerator ApplyRequiredTransferLanding(
+        UnitManager aircraft,
+        Domain plannedDomain,
+        HeightLevel plannedHeight,
+        SensorMovementMode movementMode,
+        System.Action<bool> completed)
+    {
+        if (aircraft == null)
+        {
+            completed?.Invoke(false);
+            yield break;
+        }
+
+        Tilemap boardMap =
+            terrainTilemap != null
+                ? terrainTilemap
+                : aircraft.BoardTilemap;
+        PlayMovementStartSfx(aircraft);
+        bool startedHigh =
+            aircraft.GetDomain() == Domain.Air
+            && aircraft.GetHeightLevel() ==
+                HeightLevel.AirHigh;
+        if (startedHigh)
+        {
+            float highToLowDuration =
+                GetEmbarkAirHighToGroundDuration()
+                * Mathf.Clamp01(
+                    GetEmbarkHighToLowNormalizedTime());
+            if (highToLowDuration > 0f)
+                yield return new WaitForSeconds(
+                    highToLowDuration);
+            aircraft.TrySetCurrentLayerMode(
+                Domain.Air,
+                HeightLevel.AirLow);
+        }
+
+        float landingDuration =
+            GetLayerOperationTransitionDuration();
+        if (landingDuration > 0f)
+            yield return new WaitForSeconds(
+                landingDuration);
+
+        if (!AircraftOperationRules.TryApplyOperation(
+                aircraft,
+                boardMap,
+                terrainDatabase,
+                movementMode,
+                out AircraftOperationDecision appliedLanding)
+            || appliedLanding.action !=
+                AircraftOperationAction.Land
+            || aircraft.GetDomain() != plannedDomain
+            || aircraft.GetHeightLevel() != plannedHeight)
+        {
+            cursorController?.PlayErrorSfx();
+            Debug.Log(
+                $"[Transfer] Falha ao pousar " +
+                $"{aircraft.name} em " +
+                $"{plannedDomain}/{plannedHeight}; " +
+                "transferencia cancelada.");
+            completed?.Invoke(false);
+            yield break;
+        }
+
+        float landingFxDuration =
+            animationManager != null
+                ? animationManager.PlayVtolLandingEffect(
+                    aircraft)
+                : 0f;
+        if (landingFxDuration > 0f)
+            yield return new WaitForSeconds(
+                landingFxDuration);
+
+        Debug.Log(
+            $"[Transfer] {aircraft.name} pousou em " +
+            $"{plannedDomain}/{plannedHeight} para " +
+            "transferir e permanecera pousado.");
+        completed?.Invoke(true);
     }
 
     private bool TryCancelPendingTransferPrompt()

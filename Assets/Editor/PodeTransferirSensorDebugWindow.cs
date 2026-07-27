@@ -101,10 +101,11 @@ public class PodeTransferirSensorDebugWindow : EditorWindow
         EditorGUILayout.HelpBox(
             "Regras:\n" +
             "1) Unidade selecionada deve ser supplier com serviceType=Transfer\n" +
-            "2) Alcance sempre respeita collection range\n" +
-            "3) Hub x Hub: aparecem Receber e Doar\n" +
-            "4) Hub x Receiver: apenas Doar\n" +
-            "5) Construcao Hub infinita: somente Receber",
+            "2) Cada sentido respeita o collection range da unidade que cede\n" +
+            "3) Hub x Hub: podem Receber e Doar\n" +
+            "4) Hub x Receiver: estoque flui do Hub para o Receiver\n" +
+            "5) Estoque, capacidade, dominio e carga compativel continuam obrigatorios\n" +
+            "6) Construcao Hub infinita: somente Receber",
             MessageType.Info);
 
         selectedSupplier = (UnitManager)EditorGUILayout.ObjectField("Supplier", selectedSupplier, typeof(UnitManager), true);
@@ -191,6 +192,18 @@ public class PodeTransferirSensorDebugWindow : EditorWindow
             EditorGUILayout.LabelField("Hex", $"{option.targetCell.x},{option.targetCell.y}");
             EditorGUILayout.LabelField("Destino Unidade", option.targetUnit != null ? option.targetUnit.name : "-");
             EditorGUILayout.LabelField("Destino Construcao", option.targetConstruction != null ? ResolveConstructionDisplayName(option.targetConstruction) : "-");
+            if (option.requiresSupplierLanding)
+            {
+                EditorGUILayout.LabelField(
+                    "Pouso do selecionado",
+                    $"{option.landingDomain}/{option.landingHeight}");
+            }
+            if (option.requiresTargetUnitLanding)
+            {
+                EditorGUILayout.LabelField(
+                    "Pouso da outra unidade",
+                    $"{option.targetLandingDomain}/{option.targetLandingHeight}");
+            }
             EditorGUILayout.BeginHorizontal();
             if (GUILayout.Button("Desenhar Linha"))
             {
@@ -519,7 +532,12 @@ public class PodeTransferirSensorDebugWindow : EditorWindow
             selectedSupplier.TryGetUnitData(out UnitData data) &&
             data != null)
         {
-            return Mathf.Max(0, data.maxUnitsServedPerTurn);
+            // Transfer nao e atendimento de campo. Zero significa que a
+            // unidade nao possui limite de pacientes, nao que seu estoque
+            // esteja proibido de circular.
+            return data.maxUnitsServedPerTurn > 0
+                ? data.maxUnitsServedPerTurn
+                : int.MaxValue;
         }
 
         return 0;
