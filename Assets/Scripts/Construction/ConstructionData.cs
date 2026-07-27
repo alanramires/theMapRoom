@@ -134,8 +134,11 @@ public class ConstructionData : ScriptableObject
     public SupplierServiceProfile supplierServiceProfile = SupplierServiceProfile.None;
 
     [Header("Construction Resources")]
-    [Tooltip("Supplies fornecidos por esta construcao com capacidade maxima.")]
+    [Tooltip("Supplies fornecidos por esta construcao. Max Capacity define a reserva de referencia da IA; a construcao continua podendo armazenar acima dela.")]
     public List<ConstructionSupplierResourceCapacity> supplierResources = new List<ConstructionSupplierResourceCapacity>();
+    [Range(0, 100)]
+    [Tooltip("IA repoe o recurso da construcao quando ele cai para este percentual da reserva configurada. Zero so pede quando zerar. Padrao: 25%.")]
+    public int aiStockRestockTriggerPercent = 25;
 
     [Header("Rebel AI")]
     [Tooltip("A faccao sem QG (rebelde) NUNCA produz — nem no que captura — porque sua doutrina e negacao territorial, nao expansao produtiva. Esta flag e a excecao renegada: um predio marcado permite que o rebelde que o TOMAR compre unidades aqui, ignorando as regras de dono (OriginalOwner/FirstOwner) — afinal um insurgente jamais e o dono original do que conquista. So sellingRule=Disabled ainda barra. Default false: marque apenas os poucos predios que voce quer que abasteçam a insurgencia.")]
@@ -150,6 +153,8 @@ public class ConstructionData : ScriptableObject
     {
         visao = Mathf.Max(0, visao);
         maxUnitsServedPerTurn = Mathf.Max(0, maxUnitsServedPerTurn);
+        aiStockRestockTriggerPercent = Mathf.Clamp(
+            aiStockRestockTriggerPercent, 0, 100);
         if (supplierTier == SupplierTier.SelfSupplier)
             supplierTier = SupplierTier.Receiver;
         if (supplierOperationDomains == null)

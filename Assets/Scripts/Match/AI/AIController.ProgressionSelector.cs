@@ -13,6 +13,7 @@ public partial class AIController
         FireSupportRendezvous,
         LogisticsService,
         LogisticsReload,
+        StockNetwork,
         RepairReturn,
         TransportDelivery,
         TransportRendezvous,
@@ -323,6 +324,7 @@ public partial class AIController
                 break;
             case ToolProgressionIntent.LogisticsService:
             case ToolProgressionIntent.LogisticsReload:
+            case ToolProgressionIntent.StockNetwork:
                 score += candidate.Dpq * 30f;
                 score -= threat * 120f;
                 break;

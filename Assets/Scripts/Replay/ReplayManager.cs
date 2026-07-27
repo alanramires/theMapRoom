@@ -980,7 +980,36 @@ public class ReplayManager : MonoBehaviour
             if (cursorController != null && NormalizeCell(cursorController.CurrentCell) != targetCell)
                 yield return MoveCursorToCellWithTravel(targetCell);
 
-            if (!turnStateManager.TryExecuteAutomatedTransferReplayOrder(step.TargetInstanceId, targetCell))
+            bool stockSupply =
+                step.Label != null
+                && step.Label.StartsWith(
+                    "TransferSupply:",
+                    System.StringComparison.Ordinal);
+            TransferFlowMode? preferredFlowMode =
+                stockSupply
+                    ? TransferFlowMode.Fornecimento
+                    : step.Label == "TransferReceiveTargetConfirm"
+                        ? TransferFlowMode.Recebedor
+                        : null;
+            int? preferredDonationPercent = null;
+            if (stockSupply)
+            {
+                string[] labelParts = step.Label.Split(':');
+                if (labelParts.Length >= 2
+                    && int.TryParse(
+                        labelParts[1],
+                        out int parsedPercent))
+                {
+                    preferredDonationPercent =
+                        Mathf.Clamp(parsedPercent, 1, 100);
+                }
+            }
+            if (!turnStateManager.TryExecuteAutomatedTransferReplayOrder(
+                    step.TargetInstanceId,
+                    targetCell,
+                    preferredFlowMode,
+                    preferredDonationPercent,
+                    step.TargetConstructionId))
                 yield return ExecuteDoubleConfirmFallback();
             else
                 yield return WaitForSensorSubstepDelay();

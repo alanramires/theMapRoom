@@ -56,7 +56,8 @@ public class ConstructionDataEditor : Editor
             "supplierOperationDomains",
             "supplierServicesProvided",
             "supplierServiceProfile",
-            "supplierResources");
+            "supplierResources",
+            "aiStockRestockTriggerPercent");
         EditorGUILayout.Space();
         DrawUnitInformationSection();
         EditorGUILayout.Space();
@@ -104,6 +105,10 @@ public class ConstructionDataEditor : Editor
             }
 
             DrawIfExists(serializedObject.FindProperty("supplierResources"), "Supplier Services Supplies (Default)");
+            DrawIfExists(
+                serializedObject.FindProperty(
+                    "aiStockRestockTriggerPercent"),
+                "AI Stock Restock Trigger (%)");
         }
         else
         {

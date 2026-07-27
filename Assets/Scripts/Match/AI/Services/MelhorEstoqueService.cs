@@ -43,7 +43,9 @@ public sealed class MelhorEstoqueOption
     public int routeCost = -1;
     public int cubicDistance;
     public int estimatedAmount;
+    public StockNeedAssessment sourceStockNeed;
     public StockNeedAssessment stockNeed;
+    public ConstructionStockNeedAssessment constructionStockNeed;
     public readonly List<StockTransferEstimate> compatibleSupplies =
         new List<StockTransferEstimate>();
     public float threat;
@@ -443,6 +445,13 @@ public static class MelhorEstoqueService
             option.sourceConstruction =
                 transfer.targetConstruction;
             option.destinationUnit = request.unit;
+            if (option.sourceUnit != null)
+            {
+                option.sourceStockNeed =
+                    StockNeedAssessmentService.Evaluate(
+                        option.sourceUnit,
+                        request.emulateStockFromUnitData);
+            }
             option.stockNeed = StockNeedAssessmentService.Evaluate(
                 request.unit,
                 request.emulateStockFromUnitData);
@@ -450,6 +459,10 @@ public static class MelhorEstoqueService
         else
         {
             option.sourceUnit = request.unit;
+            option.sourceStockNeed =
+                StockNeedAssessmentService.Evaluate(
+                    request.unit,
+                    request.emulateStockFromUnitData);
             option.destinationUnit = transfer.targetUnit;
             option.destinationConstruction =
                 transfer.targetConstruction;
@@ -460,9 +473,29 @@ public static class MelhorEstoqueService
                         transfer.targetUnit,
                         request.emulateStockFromUnitData);
             }
+            else if (transfer.targetConstruction != null)
+            {
+                option.constructionStockNeed =
+                    StockNeedAssessmentService.Evaluate(
+                        transfer.targetConstruction);
+            }
+        }
+
+        if (option.intent == MelhorEstoqueIntent.RebalanceHub
+            && option.sourceStockNeed != null
+            && option.stockNeed != null
+            && option.sourceStockNeed.fillRatio
+                <= option.stockNeed.fillRatio + 0.15f)
+        {
+            // Evita que dois Hubs parcialmente usados fiquem devolvendo a
+            // mesma carga um ao outro. Rebalanceamento exige uma diferenca
+            // material entre a reserva de quem doa e a de quem recebe.
+            return null;
         }
 
         option.estimatedAmount = EstimateAmount(request, option);
+        if (option.estimatedAmount <= 0)
+            return null;
         int urgency = option.stockNeed != null
             ? (int)option.stockNeed.level
             : ResolveConstructionUrgency(option);
@@ -504,33 +537,10 @@ public static class MelhorEstoqueService
     private static int ResolveConstructionUrgency(
         MelhorEstoqueOption option)
     {
-        if (option?.destinationConstruction == null)
+        if (option?.destinationConstruction == null
+            || option.constructionStockNeed == null)
             return (int)StockNeedLevel.Preventive;
-        return GetConstructionStock(option.destinationConstruction) <= 0
-            ? (int)StockNeedLevel.Critical
-            : (int)StockNeedLevel.Operational;
-    }
-
-    private static int GetConstructionStock(
-        ConstructionManager construction)
-    {
-        if (construction == null || !construction.CanProvideSupplies)
-            return 0;
-        if (construction.HasInfiniteSuppliesFor())
-            return int.MaxValue;
-        long total = 0;
-        IReadOnlyList<ConstructionSupplyOffer> offers =
-            construction.OfferedSupplies;
-        for (int i = 0; offers != null && i < offers.Count; i++)
-        {
-            ConstructionSupplyOffer offer = offers[i];
-            if (offer?.supply == null)
-                continue;
-            total += Mathf.Max(0, offer.quantity);
-            if (total >= int.MaxValue)
-                return int.MaxValue;
-        }
-        return Mathf.Max(0, (int)total);
+        return (int)option.constructionStockNeed.level;
     }
 
     private static void RemoveDuplicateOptions(

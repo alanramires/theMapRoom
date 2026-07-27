@@ -122,13 +122,16 @@ public partial class AIController
             return false;
         }
 
-        if (!TryChooseLogisticsStockProgressCell(
+        if (!TryChooseStockProgressCell(
                 unit,
                 snapshot,
                 fromCell,
                 rendezvous,
                 paths,
                 occupied,
+                avoidThreat: true,
+                progressionIntent:
+                    ToolProgressionIntent.LogisticsReload,
                 out Vector3Int progressCell,
                 out string progressReason))
         {
@@ -151,13 +154,15 @@ public partial class AIController
         return true;
     }
 
-    private bool TryChooseLogisticsStockProgressCell(
+    private bool TryChooseStockProgressCell(
         UnitManager unit,
         AIWorldSnapshot snapshot,
         Vector3Int fromCell,
         Vector3Int rendezvous,
         Dictionary<Vector3Int, List<Vector3Int>> paths,
         HashSet<Vector3Int> occupied,
+        bool avoidThreat,
+        ToolProgressionIntent progressionIntent,
         out Vector3Int bestCell,
         out string reason)
     {
@@ -179,7 +184,7 @@ public partial class AIController
                 rendezvous,
                 paths,
                 occupied,
-                ToolProgressionIntent.LogisticsReload,
+                progressionIntent,
                 out Vector3Int toolCell,
                 out ToolProgressionCandidate candidate,
                 out string toolReason,
@@ -188,7 +193,7 @@ public partial class AIController
                     float threat =
                         CalculateThreatLevel(
                             cell, snapshot.AITeam);
-                    if (threat > 0f)
+                    if (avoidThreat && threat > 0f)
                         return float.MinValue;
 
                     float distance =
@@ -229,7 +234,7 @@ public partial class AIController
             float threat =
                 CalculateThreatLevel(
                     cell, snapshot.AITeam);
-            if (threat > 0f)
+            if (avoidThreat && threat > 0f)
                 continue;
 
             float distance =

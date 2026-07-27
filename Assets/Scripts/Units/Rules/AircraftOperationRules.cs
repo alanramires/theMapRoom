@@ -33,6 +33,55 @@ public readonly struct AircraftOperationDecision
 
 public static class AircraftOperationRules
 {
+    /// <summary>
+    /// Gates comuns de qualquer pouso: perfil da aeronave, voo atual e travas
+    /// de camada. O contexto (terreno/estrutura/construcao/plataforma) e
+    /// avaliado pelo consumidor especifico depois deste ponto.
+    /// </summary>
+    public static bool CanAttemptLanding(
+        UnitManager unit,
+        out string reason)
+    {
+        reason = string.Empty;
+        if (unit == null)
+        {
+            reason = "Unidade invalida.";
+            return false;
+        }
+        if (!unit.TryGetUnitData(out UnitData data) || data == null)
+        {
+            reason = "UnitData nao encontrado.";
+            return false;
+        }
+        if (!data.IsAircraft())
+        {
+            reason = "Unidade selecionada nao e aeronave.";
+            return false;
+        }
+        if (!HasAirOperationProfile(unit, data))
+        {
+            reason = "Unidade sem perfil de operacao aerea.";
+            return false;
+        }
+        if (unit.TryGetForcedLayerLock(
+                out _, out _, out _))
+        {
+            reason = "Camada travada por efeito forcado.";
+            return false;
+        }
+        if (unit.LayerLockTurnsRemaining > 0)
+        {
+            reason = "Unidade sob trava de camada.";
+            return false;
+        }
+        if (unit.GetDomain() != Domain.Air || unit.IsAircraftGrounded)
+        {
+            reason = "A aeronave precisa estar em voo para pousar.";
+            return false;
+        }
+        return true;
+    }
+
     // atCell responde "e se a aeronave estivesse NAQUELE hex?" sem mover a unidade.
     // Tudo abaixo desta funcao (ResolveContext, ResolveGroundedLayerForCell,
     // CanEndLayerTransitionAtCell) ja recebia a celula por parametro; so a entrada

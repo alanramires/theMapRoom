@@ -136,6 +136,14 @@ public partial class AIController
 
         if (logisticsAction != null) return logisticsAction;
 
+        // Estoque puro e transportadores-hub entram aqui somente depois de
+        // Transporte e Logistica terem tentado suas operacoes prioritarias.
+        // O branch usa exclusivamente a capacidade Transfer declarada na ficha.
+        PlayerAction stockAction =
+            TryDecideStockAction(unit, snapshot, plan);
+        if (stockAction != null)
+            return stockAction;
+
         // Passageiro que respondeu NAO ao Quero Carona continua como
         // oportunidade de baixa prioridade. So agora, depois de objetivos,
         // combate, intel e logistica, o transportador pode usar esse ranking

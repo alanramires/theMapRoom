@@ -420,7 +420,6 @@ public partial class AIController
         bestSlot = -1;
         bestDistance = float.MaxValue;
         if (aircraft == null
-            || !IsVtolStyleAircraft(aircraft)
             || !aircraft.TryGetUnitData(out UnitData aircraftData)
             || aircraftData == null)
         {
@@ -457,23 +456,11 @@ public partial class AIController
 
             // A capacidade efetiva e a fonte de verdade: skill/camada, vaga,
             // exclusividade e capacidade configuradas no proprio UnitData.
-            int fittingSlot = -1;
-            for (int slotIndex = 0; slotIndex < candidateData.transportSlots.Count; slotIndex++)
-            {
-                UnitTransportSlotRule slot = candidateData.transportSlots[slotIndex];
-                if (slot == null
-                    || !PodeEmbarcarSensor.CanUseSlot(aircraft, aircraftData, slot, out _)
-                    || !candidate.CanUseTransportSlotExclusivity(slotIndex, out _)
-                    || candidate.GetOccupiedTransportSeatCountForSlot(slotIndex) >= Mathf.Max(1, slot.capacity))
-                {
-                    continue;
-                }
-
-                fittingSlot = slotIndex;
-                break;
-            }
-
-            if (fittingSlot < 0)
+            // Nao e um atalho de transporte: a consulta passa pelo PodePousar
+            // para validar tambem voo/travas da aeronave antes de considerar
+            // a plataforma como destino de recuperacao.
+            if (!PodePousarSensor.CanLandOnTransporter(
+                    aircraft, candidate, out int fittingSlot, out _))
                 continue;
 
             Vector3Int candidateCell = candidate.CurrentCellPosition;

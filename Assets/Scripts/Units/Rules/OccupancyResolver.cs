@@ -30,7 +30,7 @@ public static class OccupancyResolver
 
     // O que E exclusivo do Total War: dois INIMIGOS dividirem a MESMA banda (hex disputado).
     // Fora dele, a mesma banda comporta uma presenca so, seja aliada ou inimiga.
-    private static bool AllowsEnemyShareInSameBand => UnitRulesDefinition.IsTotalWarEnabled();
+    public static bool AllowsEnemyShareInSameBand => UnitRulesDefinition.IsTotalWarEnabled();
 
     public static HeightBand GetHeightBand(UnitManager unit)
     {

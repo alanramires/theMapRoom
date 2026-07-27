@@ -280,6 +280,20 @@ public sealed class MelhorEstoqueWindow : EditorWindow
                 option.stockNeed.reason,
                 EditorStyles.wordWrappedMiniLabel);
         }
+        if (option.constructionStockNeed != null)
+        {
+            EditorGUILayout.LabelField(
+                "Necessidade da construcao",
+                option.constructionStockNeed.reason,
+                EditorStyles.wordWrappedMiniLabel);
+        }
+        if (option.sourceStockNeed != null)
+        {
+            EditorGUILayout.LabelField(
+                "Reserva da origem",
+                option.sourceStockNeed.reason,
+                EditorStyles.wordWrappedMiniLabel);
+        }
         EditorGUILayout.LabelField(
             option.reason, EditorStyles.wordWrappedMiniLabel);
         EditorGUILayout.EndVertical();

@@ -8,13 +8,19 @@ public partial class AIController
         public readonly Vector3Int Cell;
         public readonly string Kind;
         public readonly int ServiceRadius;
+        public readonly int TacticalPriority;
 
-        public AircraftRecoveryAnchor(Vector3Int cell, string kind, int serviceRadius = 0)
+        public AircraftRecoveryAnchor(
+            Vector3Int cell,
+            string kind,
+            int serviceRadius = 0,
+            int tacticalPriority = 0)
         {
             cell.z = 0;
             Cell = cell;
             Kind = kind;
             ServiceRadius = Mathf.Max(0, serviceRadius);
+            TacticalPriority = Mathf.Max(0, tacticalPriority);
         }
     }
 
@@ -24,10 +30,25 @@ public partial class AIController
         Vector3Int fromCell,
         Dictionary<Vector3Int, List<Vector3Int>> tacticalPaths)
     {
-        if (aircraft == null || snapshot == null || aircraft.GetAircraftType() == AircraftType.None)
-            return false;
+        return EvaluateAircraftRecoveryReach(
+            aircraft, snapshot, fromCell, tacticalPaths).Found;
+    }
 
-        List<AircraftRecoveryAnchor> anchors = CollectAircraftRecoveryAnchors(aircraft, snapshot);
+    private AIReachDecisionResult<AircraftRecoveryAnchor>
+        EvaluateAircraftRecoveryReach(
+            UnitManager aircraft,
+            AIWorldSnapshot snapshot,
+            Vector3Int fromCell,
+            Dictionary<Vector3Int, List<Vector3Int>> tacticalPaths)
+    {
+        if (aircraft == null || snapshot == null
+            || aircraft.GetAircraftType() == AircraftType.None)
+        {
+            return new AIReachDecisionResult<AircraftRecoveryAnchor>();
+        }
+
+        List<AircraftRecoveryAnchor> anchors =
+            CollectAircraftRecoveryAnchors(aircraft, snapshot);
         var request = new AIReachDecisionRequest<AircraftRecoveryAnchor>
         {
             Context = $"AircraftRepairRecovery#{aircraft.InstanceId}",
@@ -42,7 +63,65 @@ public partial class AIController
                     anchors, snapshot, fromCell, null, budget, tactical: false, out candidate),
             DiagnosticLog = showAILogs ? (System.Action<string>)Debug.Log : null
         };
-        return AIActionReachCoordinator.Evaluate(request).Found;
+        return AIActionReachCoordinator.Evaluate(request);
+    }
+
+    private bool TryBuildAircraftRecoveryApproachAction(
+        UnitManager aircraft,
+        AIWorldSnapshot snapshot,
+        Vector3Int fromCell,
+        Dictionary<Vector3Int, List<Vector3Int>> paths,
+        out PlayerAction action)
+    {
+        action = null;
+        AIReachDecisionResult<AircraftRecoveryAnchor> recovery =
+            EvaluateAircraftRecoveryReach(
+                aircraft, snapshot, fromCell, paths);
+        if (!recovery.Found || recovery.Decision == null
+            || paths == null || paths.Count == 0)
+        {
+            return false;
+        }
+
+        Vector3Int target = recovery.Decision.TargetCell;
+        target.z = 0;
+        Vector3Int destination = recovery.Decision.ActionCell;
+        destination.z = 0;
+
+        // No Operational o coordenador devolve a ancora; a aeronave so pode
+        // materializar o trecho desta rodada. Escolhe o hex aereo valido que
+        // mais reduz a distancia ate ela. No Tactical o ActionCell ja e a
+        // celula de atendimento encontrada no path map.
+        if (!paths.ContainsKey(destination))
+        {
+            float bestScore = float.MinValue;
+            destination = fromCell;
+            foreach (Vector3Int rawCell in paths.Keys)
+            {
+                Vector3Int cell = rawCell;
+                cell.z = 0;
+                float score = -AIActionReachCoordinator.CubicDistance(
+                    cell, target) * 1000f
+                    - CalculateThreatLevel(cell, snapshot.AITeam)
+                        * ThreatWeight;
+                if (score > bestScore)
+                {
+                    bestScore = score;
+                    destination = cell;
+                }
+            }
+        }
+
+        if (destination == fromCell)
+            return false;
+
+        Debug.Log($"{TL("Repair")} aeronave #{aircraft.InstanceId} " +
+                  $"recuperacao {recovery.Tier}: " +
+                  $"{recovery.Decision.Reason} alvo={target} " +
+                  $"via={destination}");
+        action = BuildMoveBatch(
+            aircraft, snapshot.AITeam, fromCell, destination, paths);
+        return true;
     }
 
     private bool TryEvaluateAircraftRecoveryAnchor(
@@ -85,7 +164,12 @@ public partial class AIController
                     continue;
             }
 
-            float score = 10000f - distance * 100f
+            // Tactical ja precede Operational no ReachCoordinator. Este
+            // bonus desempata apenas entre ancoras do mesmo horizonte: um
+            // supridor de campo que atende agora e preferivel a qualquer
+            // alternativa de recuperacao que tambem caiba nesta rodada.
+            float score = 10000f + (tactical ? anchor.TacticalPriority : 0)
+                - distance * 100f
                 - CalculateThreatLevel(actionCell, snapshot.AITeam) * ThreatWeight;
             if (score <= bestScore)
                 continue;
@@ -109,6 +193,7 @@ public partial class AIController
         AIWorldSnapshot snapshot)
     {
         var result = new List<AircraftRecoveryAnchor>();
+        var seenCells = new HashSet<Vector3Int>();
         int aiSlot = ResolveAISlotKey(snapshot.AITeam);
 
         foreach (ConstructionManager construction in ConstructionManager.AllActive)
@@ -127,7 +212,39 @@ public partial class AIController
                     aircraft, boardTilemap, terrainDatabase, cell, out _,
                     SensorMovementMode.MoveuAndando))
             {
-                result.Add(new AircraftRecoveryAnchor(cell, "aerodromo/construcao de reparo"));
+                if (seenCells.Add(cell))
+                    result.Add(new AircraftRecoveryAnchor(
+                        cell, "aerodromo/construcao de reparo"));
+            }
+        }
+
+        // Um aviao em reparo nao procura apenas construcoes: uma LZ prevista
+        // no Terrain/Structure Aircraft Ops tambem e recuperacao valida.
+        // PodePousar e a fonte unica, logo a hierarquia construcao >
+        // estrutura+terreno > terreno e as skills configuradas em cada uma
+        // continuam identicas a ferramenta de debug.
+        if (boardTilemap != null)
+        {
+            foreach (Vector3Int rawCell in boardTilemap.cellBounds.allPositionsWithin)
+            {
+                Vector3Int cell = rawCell;
+                cell.z = 0;
+                if (!boardTilemap.HasTile(cell) || !seenCells.Add(cell))
+                    continue;
+                if (!PodePousarSensor.CanLandAtCell(
+                        aircraft, boardTilemap, terrainDatabase, cell,
+                        out _, SensorMovementMode.MoveuAndando))
+                {
+                    continue;
+                }
+
+                AirOperationTileContext context =
+                    AirOperationResolver.ResolveContext(
+                        boardTilemap, terrainDatabase, cell);
+                string kind = context.landingSurface ==
+                    LandingSurface.RoadRunway
+                    ? "LZ estrada" : "LZ valida";
+                result.Add(new AircraftRecoveryAnchor(cell, kind));
             }
         }
 
@@ -141,8 +258,10 @@ public partial class AIController
 
                 Vector3Int cell = ally.CurrentCellPosition;
                 cell.z = 0;
-                if (IsPrimaryLogisticsUnit(ally))
-                    result.Add(new AircraftRecoveryAnchor(cell, "supridor", serviceRadius: 1));
+                if (CanSupplierRecoverAircraft(ally, aircraft))
+                    result.Add(new AircraftRecoveryAnchor(
+                        cell, "supridor", serviceRadius: 1,
+                        tacticalPriority: 5000));
                 if (IsPotentialRepairFusionTarget(aircraft, ally))
                     result.Add(new AircraftRecoveryAnchor(cell, "fusao", serviceRadius: 1));
             }
@@ -155,6 +274,26 @@ public partial class AIController
                 platform.CurrentCellPosition, "plataforma naval", serviceRadius: 1));
 
         return result;
+    }
+
+    private static bool CanSupplierRecoverAircraft(
+        UnitManager supplier,
+        UnitManager aircraft)
+    {
+        if (!IsPrimaryLogisticsUnit(supplier)
+            || supplier == null || aircraft == null
+            || !supplier.TryGetUnitData(out UnitData supplierData)
+            || supplierData == null)
+        {
+            return false;
+        }
+
+        // Nao basta ser "logistica": o Navio Tanque, por exemplo, opera
+        // Naval/Surface e nao vira ancora de um caca em Air/High. O
+        // PodeSuprir confirmara a operacao final; este gate impede que um
+        // dominio impossivel ganhe a corrida de recovery.
+        return PodeSuprirSensor.SupportsOperationDomain(
+            supplierData, aircraft.GetDomain(), aircraft.GetHeightLevel());
     }
 
     private bool IsAircraftFuelCriticalForNextUpkeep(

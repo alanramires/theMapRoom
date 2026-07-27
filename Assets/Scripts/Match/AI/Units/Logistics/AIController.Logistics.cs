@@ -75,6 +75,24 @@ public partial class AIController
             return supplyAction;
         }
 
+        // Logistica continua priorizando atendimento de campo. Quando nao ha
+        // paciente/cliente valido, um Hub com Transfer pode circular carga pela
+        // mesma rede usada pelo papel Estoque.
+        if (TryBuildStockNetworkAction(
+                unit,
+                snapshot,
+                fromCell,
+                paths,
+                occupied,
+                out PlayerAction distributionAction,
+                out string distributionReason))
+        {
+            Debug.Log(
+                $"{TL("Logistics")} {unit.InstanceId} " +
+                $"branch de estoque — {distributionReason}");
+            return distributionAction;
+        }
+
         // O envelope movimento + alcance de servico ja foi resolvido acima por
         // TryBuildLogisticsSupplyAction. Fora dele, somente uma unidade realmente
         // em manutencao pode orientar deslocamento futuro; preventivos distantes

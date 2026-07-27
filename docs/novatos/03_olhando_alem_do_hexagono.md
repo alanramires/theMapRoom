@@ -46,6 +46,8 @@ Cedo você vai querer jogar infantaria num ponto distante — atravessar um mar,
 
 Guarde assim: **seleciona a tropa pra embarcar, seleciona o veículo pra desembarcar.** Parece invertido no começo; depois faz todo sentido (quem corre pra dentro é a tropa; quem escolhe onde parar e abrir a rampa é o motorista).
 
+> **Na prática:** você tem um Soldado ao lado de um helicóptero. Pra colocá-lo dentro — **selecione o Soldado** e mande embarcar, apontando pro helicóptero. Turnos depois, quando o helicóptero chegar no destino — **selecione o helicóptero** e mande desembarcar, escolhendo em qual hexágono vizinho o Soldado vai pisar. Se você selecionar o helicóptero esperando embarcar a tropa por ele, não vai achar a opção: embarcar é sempre pelo lado de quem sobe.
+
 ### Quem embarca ou desembarca já gastou o turno
 
 Cuidado com uma pegadinha de ritmo: **tanto embarcar quanto desembarcar consomem a ação do transportador** — não só a da tropa. Pegar alguém ou largar alguém **é** o que o veículo faz naquele turno; ele não recolhe a tropa e sai dirigindo de brinde depois. E a tropa que **desce** também termina o turno ali (o passo pra fora do veículo foi o movimento dela).

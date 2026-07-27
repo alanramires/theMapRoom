@@ -550,7 +550,22 @@ public static class PodeSuprirSensor
             {
                 // PodePousarSensor ja resolveu a hierarquia fisica do hex,
                 // ocupacao e regras de Aircraft Ops (incluindo skills em
-                // AND/OU). O supply apenas consome a operacao autorizada.
+                // AND/OU). Pousar, porem, nao torna automaticamente a
+                // camada final compativel com o supridor: um caminhao em
+                // Land/Surface nao atende aeronave que pousou em
+                // Naval/Surface na praia.
+                if (!SupportsOperationDomain(
+                        supplierData,
+                        landing.landingDomain,
+                        landing.landingHeight))
+                {
+                    reason =
+                        $"Pouso valido em {landing.landingDomain}/" +
+                        $"{landing.landingHeight}, mas o supplier nao " +
+                        "opera nessa camada/dominio.";
+                    return false;
+                }
+
                 forceLandBeforeSupply = true;
                 plannedServiceDomain = landing.landingDomain;
                 plannedServiceHeight = landing.landingHeight;

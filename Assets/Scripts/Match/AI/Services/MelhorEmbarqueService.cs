@@ -240,10 +240,24 @@ public static class MelhorEmbarqueService
                 float rideNeedAdjustment =
                     ResolveRideNeedAdjustment(
                         disposition, rideNeed);
+                // A grade de movimento do passageiro pode nao conter uma
+                // LZ naval mesmo que o slot aceite a camada atual dele
+                // (ex.: Apache Air/High -> helipad da Fragata). Isso nao
+                // invalida o resgate: apenas significa que o transportador
+                // deve aproximar-se da LZ mais proxima do passageiro, para
+                // que os sensores de embarque resolvam a transicao final.
+                // Sem esta distancia, o hex atual do transportador ganha
+                // por custo zero e ele fica esperando longe do passageiro.
+                float rescueApproachPenalty = routeState ==
+                    MelhorEmbarquePassengerRouteState.NoCurrentRoute
+                    ? SectorManager.HexDistance(passengerCell, cell)
+                        * 10000f
+                    : 0f;
                 float optionScore = 100000f
                     - distance * 100f
                     - ResolvePassengerRoutePenalty(
                         routeState, moveCost)
+                    - rescueApproachPenalty
                     + rideNeedAdjustment;
                 var option = new MelhorEmbarqueOption
                 {
@@ -268,6 +282,7 @@ public static class MelhorEmbarqueService
                         $"custoPax=" +
                         $"{(moveCost < int.MaxValue ? moveCost.ToString() : "n/a")} " +
                         $"distTransport={distance} " +
+                        $"aproxPax={SectorManager.HexDistance(passengerCell, cell):F0} " +
                         $"carona={disposition} " +
                         $"ajusteCarona={rideNeedAdjustment:0}"
                 };

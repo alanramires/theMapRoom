@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Tilemaps;
 
@@ -11,8 +12,143 @@ public class PodePousarReport
     public HeightLevel landingHeight;
 }
 
+/// <summary>
+/// Diagnostico de um slot de plataforma transportadora como pista de pouso.
+/// Preenchido por <see cref="PodePousarSensor.DescribeTransporterLanding"/>.
+/// </summary>
+public struct PodePousarSlotReport
+{
+    public int slotIndex;
+    public string slotId;
+    public bool available;
+    public string reason;
+    public int occupiedSeats;
+    public int capacity;
+}
+
 public static class PodePousarSensor
 {
+    /// <summary>
+    /// Pouso/recuperacao em uma plataforma transportadora. A plataforma nao
+    /// e terreno, estrutura ou construcao: seu Aircraft Ops e o slot de
+    /// transporte. Ainda assim os gates comuns sao os mesmos do PodePousar
+    /// (aeronave em voo e sem lock), e o slot e a fonte de verdade para
+    /// camada, classe, skills, bloqueios e vaga.
+    /// </summary>
+    public static bool CanLandOnTransporter(
+        UnitManager aircraft,
+        UnitManager transporter,
+        out int slotIndex,
+        out string reason)
+    {
+        return DescribeTransporterLanding(
+            aircraft, transporter, null, out slotIndex, out reason);
+    }
+
+    /// <summary>
+    /// Mesma decisao de <see cref="CanLandOnTransporter"/>, opcionalmente
+    /// preenchendo o laudo slot a slot. Existe um unico laco: a ferramenta de
+    /// diagnostico le exatamente o que o jogo decide, nunca uma copia.
+    /// Quando <paramref name="slotOutput"/> e nulo o laco para no primeiro slot
+    /// valido, preservando o custo do caminho de decisao.
+    /// </summary>
+    public static bool DescribeTransporterLanding(
+        UnitManager aircraft,
+        UnitManager transporter,
+        List<PodePousarSlotReport> slotOutput,
+        out int slotIndex,
+        out string reason)
+    {
+        slotOutput?.Clear();
+        slotIndex = -1;
+        if (!AircraftOperationRules.CanAttemptLanding(
+                aircraft, out reason))
+            return false;
+        if (transporter == null || transporter.IsDead
+            || transporter.IsEmbarked)
+        {
+            reason = "Plataforma transportadora invalida.";
+            return false;
+        }
+        if (!PlayerSlotRelations.AreAllies(aircraft, transporter))
+        {
+            reason = "Plataforma de outro time.";
+            return false;
+        }
+        if (!aircraft.TryGetUnitData(out UnitData aircraftData)
+            || aircraftData == null
+            || !transporter.TryGetUnitData(out UnitData transporterData)
+            || transporterData == null
+            || !transporterData.isTransporter
+            || transporterData.transportSlots == null)
+        {
+            reason = "Plataforma sem transport slots configurados.";
+            return false;
+        }
+
+        string lastReason = "Nenhum slot de pouso compativel.";
+        for (int index = 0;
+             index < transporterData.transportSlots.Count;
+             index++)
+        {
+            UnitTransportSlotRule slot =
+                transporterData.transportSlots[index];
+            int capacity = slot != null ? Mathf.Max(1, slot.capacity) : 0;
+            int occupied =
+                transporter.GetOccupiedTransportSeatCountForSlot(index);
+
+            string slotReason;
+            bool available;
+            if (!PodeEmbarcarSensor.CanUseSlot(
+                    aircraft, aircraftData, slot, out slotReason)
+                || !transporter.CanUseTransportSlotExclusivity(
+                    index, out slotReason))
+            {
+                available = false;
+            }
+            else if (occupied >= capacity)
+            {
+                available = false;
+                slotReason = $"Slot lotado ({occupied}/{capacity}).";
+            }
+            else
+            {
+                available = true;
+                slotReason = "Slot compativel para pouso.";
+            }
+
+            slotOutput?.Add(new PodePousarSlotReport
+            {
+                slotIndex = index,
+                slotId = slot != null ? slot.slotId : "(slot nulo)",
+                available = available,
+                reason = slotReason,
+                occupiedSeats = occupied,
+                capacity = capacity
+            });
+
+            if (!available)
+            {
+                lastReason = slotReason;
+                continue;
+            }
+
+            if (slotIndex < 0)
+                slotIndex = index;
+            if (slotOutput == null)
+                break;
+        }
+
+        if (slotIndex >= 0)
+        {
+            reason = "Pouso autorizado na plataforma transportadora.";
+            return true;
+        }
+
+        reason = lastReason;
+        return false;
+    }
+
     /// <summary>
     /// "Posso pousar ALI?" — consulta pura por hex, sem mover a unidade nem tocar
     /// em estado. Use este overload quando o hex avaliado nao e o hex atual da

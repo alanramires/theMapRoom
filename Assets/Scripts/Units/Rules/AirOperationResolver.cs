@@ -106,6 +106,40 @@ public readonly struct AirDockEvaluation
     }
 }
 
+/// <summary>
+/// Regra de skills resolvida para um contexto de operacao aerea, ja com a
+/// semantica do conector: <see cref="requireAtLeastOne"/> = OU (basta uma),
+/// caso contrario E (exige todas). Serve para diagnostico/ferramentas lerem a
+/// MESMA regra que o resolver aplica, sem reimplementar a hierarquia.
+/// </summary>
+public readonly struct AirOperationSkillRequirement
+{
+    public readonly AirOperationRuleSource source;
+    public readonly bool contextAllows;
+    public readonly IReadOnlyList<SkillData> requiredSkills;
+    public readonly bool requireAtLeastOne;
+    public readonly string unresolvedReason;
+
+    public AirOperationSkillRequirement(
+        AirOperationRuleSource source,
+        bool contextAllows,
+        IReadOnlyList<SkillData> requiredSkills,
+        bool requireAtLeastOne,
+        string unresolvedReason)
+    {
+        this.source = source;
+        this.contextAllows = contextAllows;
+        this.requiredSkills = requiredSkills;
+        this.requireAtLeastOne = requireAtLeastOne;
+        this.unresolvedReason = unresolvedReason ?? string.Empty;
+    }
+
+    public bool HasExplicitSkills =>
+        requiredSkills != null && requiredSkills.Count > 0;
+
+    public bool Resolved => string.IsNullOrEmpty(unresolvedReason);
+}
+
 public static class AirOperationResolver
 {
     private const string SkillVtol = "vtol";
@@ -266,6 +300,62 @@ public static class AirOperationResolver
     public static bool UnitHasAnyAircraftSkill(UnitManager unit)
     {
         return HasAnySkill(unit, SkillVtol, SkillStovl, SkillAircraftLanding, SkillCarrierLanding);
+    }
+
+    /// <summary>
+    /// Mesma regra de skills que <see cref="EvaluateLanding"/> aplica, exposta
+    /// para leitura. Quem diagnostica pouso deve ler daqui em vez de repetir a
+    /// hierarquia Construcao > Estrutura+Terreno > Terreno.
+    /// </summary>
+    public static AirOperationSkillRequirement DescribeLandingRequirement(AirOperationTileContext tile)
+    {
+        if (!TryResolveLandingRules(
+                tile,
+                out bool allowLanding,
+                out IReadOnlyList<SkillData> requiredSkills,
+                out bool requireAtLeastOneSkill,
+                out string reason))
+        {
+            return new AirOperationSkillRequirement(tile.source, false, null, false, reason);
+        }
+
+        return new AirOperationSkillRequirement(
+            tile.source, allowLanding, requiredSkills, requireAtLeastOneSkill, string.Empty);
+    }
+
+    /// <summary>Contraparte de <see cref="DescribeLandingRequirement"/> para decolagem.</summary>
+    public static AirOperationSkillRequirement DescribeTakeoffRequirement(AirOperationTileContext tile)
+    {
+        if (!TryResolveTakeoffRules(
+                tile,
+                out bool allowTakeoff,
+                out IReadOnlyList<SkillData> requiredSkills,
+                out bool requireAtLeastOneSkill,
+                out string reason))
+        {
+            return new AirOperationSkillRequirement(tile.source, false, null, false, reason);
+        }
+
+        return new AirOperationSkillRequirement(
+            tile.source, allowTakeoff, requiredSkills, requireAtLeastOneSkill, string.Empty);
+    }
+
+    /// <summary>
+    /// Gate implicito aplicado quando o contexto NAO lista skills explicitas.
+    /// Sempre semantica OU (basta uma das devolvidas).
+    /// </summary>
+    public static string[] GetImplicitAirOperationSkillTokens(AirOperationTileContext tile)
+    {
+        if (tile.dockingSurface != DockingSurface.None)
+            return new[] { SkillCarrierLanding };
+
+        return new[] { SkillVtol, SkillStovl, SkillAircraftLanding };
+    }
+
+    /// <summary>Casamento fuzzy de skill por token, igual ao usado internamente.</summary>
+    public static bool UnitHasSkillToken(UnitManager unit, string token)
+    {
+        return HasSkill(unit, token);
     }
 
     // VTOL/STOVL pousa fora de aeroporto (cidade aliada etc. — as regras de pouso da

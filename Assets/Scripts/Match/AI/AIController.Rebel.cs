@@ -208,7 +208,16 @@ public partial class AIController
     // MatchController; aqui so a consultamos.
     private bool IsRebelCapturable(UnitManager unit, ConstructionManager construction)
     {
-        if (construction == null || matchController == null)
+        if (unit == null
+            || construction == null
+            || matchController == null)
+            return false;
+        // CanCaptureConstruction consulta a ficha e as regras de captura, mas
+        // nao e uma pergunta de objetivo: um predio ja pertencente ao mesmo
+        // time nao pode voltar a entrar no ranking de captura/desembarque.
+        // Centralizar a guarda aqui protege tanto a marcha rebelde quanto os
+        // resolvedores conjuntos do MelhorDesembarque.
+        if (construction.TeamId == unit.TeamId)
             return false;
         if (!construction.TryResolveConstructionData(out ConstructionData data) || data == null)
             return false;

@@ -15,7 +15,7 @@ public class ConstructionSupplierResourceCapacity
     [Tooltip("Quando ligado, esta construcao oferece supply infinito para este item.")]
     public bool hasInfiniteSupply = false;
 
-    [Tooltip("Capacidade maxima deste supply quando nao for infinito.")]
+    [Tooltip("Reserva inicial e referencia logistica da IA para este supply. A construcao pode armazenar acima deste valor.")]
     [FormerlySerializedAs("capacity")]
     [Min(0)] public int maxCapacity = 0;
 

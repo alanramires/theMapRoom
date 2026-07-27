@@ -21,6 +21,12 @@ public partial class AIController
             return null;
 
         bool hasCargo = capabilities.CanTransport && HasTransportCargo(unit);
+        PlayerAction criticalStockAction =
+            TryDecideCriticalTransportStockAction(
+                unit, snapshot, data);
+        if (criticalStockAction != null)
+            return criticalStockAction;
+
         var context = new TransportOperationContext
         {
             Unit = unit,
@@ -42,6 +48,70 @@ public partial class AIController
             TransportOperationsService.Evaluate(context);
         return MaterializeTransportOperation(
             unit, snapshot, plan, selected);
+    }
+
+    /// <summary>
+    /// Um transportador puro continua priorizando EVAC/Pickup. Ja um Hub que
+    /// presta servicos embarcados (por exemplo, Porta-Avioes) nao deve ficar
+    /// aguardando uma aeronave critica quando seus insumos essenciais estao
+    /// zerados: sem estoque ele nao consegue cumprir o atendimento que a
+    /// carona procura. A guarda exige criticidade real, a flag da ficha e
+    /// capacidade Transfer; meia carga ou um transporter de carga pura nao
+    /// passam por este desvio.
+    /// </summary>
+    private PlayerAction TryDecideCriticalTransportStockAction(
+        UnitManager unit,
+        AIWorldSnapshot snapshot,
+        UnitData data)
+    {
+        if (unit == null
+            || snapshot == null
+            || data == null
+            || ServiceData.ResolveSupplierServiceProfile(
+                    data.supplierServicesProvided)
+                != SupplierServiceProfile.FieldService
+            || !HasStockTransferCapability(unit, data)
+            || !ShouldRestockLogisticsUnit(
+                unit, out string restockReason))
+            return null;
+
+        StockNeedAssessment need =
+            StockNeedAssessmentService.Evaluate(unit);
+        if (need == null || need.level < StockNeedLevel.Critical)
+            return null;
+
+        Vector3Int fromCell = unit.CurrentCellPosition;
+        fromCell.z = 0;
+        Dictionary<Vector3Int, List<Vector3Int>> paths =
+            UnitMovementPathRules.CalcularCaminhosValidos(
+                boardTilemap,
+                unit,
+                Mathf.Max(0, unit.RemainingMovementPoints),
+                terrainDatabase);
+        HashSet<Vector3Int> occupied = BuildOccupied(unit);
+        if (!TryBuildStockNetworkAction(
+                unit,
+                snapshot,
+                fromCell,
+                paths,
+                occupied,
+                out PlayerAction action,
+                out string stockReason,
+                allowStrategicDirection: true))
+        {
+            Debug.Log(
+                $"{TL("Transport")} {unit.InstanceId} " +
+                $"estoque critico sem rota de estoque; " +
+                $"mantem prioridade de transporte ({restockReason}; " +
+                $"{stockReason})");
+            return null;
+        }
+
+        Debug.Log(
+            $"{TL("Transport")} {unit.InstanceId} " +
+            $"estoque critico preempta EVAC/Pickup " +
+            $"({restockReason}; {need.reason}; {stockReason})");
+        return action;
     }
 
     private PlayerAction TryDecideOpportunisticTransportPickupAction(

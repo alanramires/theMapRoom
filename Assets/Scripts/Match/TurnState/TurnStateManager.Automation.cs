@@ -834,11 +834,21 @@ public partial class TurnStateManager
         string targetId = selected != null && selected.targetUnit != null
             ? selected.targetUnit.InstanceId.ToString()
             : null;
+        string targetConstructionId =
+            selected != null
+            && selected.targetConstruction != null
+                ? selected.targetConstruction.InstanceId.ToString()
+                : null;
         Vector3Int targetCell = selected != null ? selected.targetCell : Vector3Int.zero;
         targetCell.z = 0;
 
         // Usa o mesmo caminho oficial de replay/execucao do transfer automatizado.
-        if (!TryExecuteAutomatedTransferReplayOrder(targetId, targetCell))
+        if (!TryExecuteAutomatedTransferReplayOrder(
+                targetId,
+                targetCell,
+                TransferFlowMode.Recebedor,
+                null,
+                targetConstructionId))
         {
             HandleCancel();
             return false;

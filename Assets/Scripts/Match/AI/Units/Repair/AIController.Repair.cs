@@ -746,6 +746,19 @@ public partial class AIController
             return emergencyHover;
         }
 
+        // A consulta de recovery ja encontrou um supridor, plataforma ou
+        // fusao em Tactical/Operational. Ela nao pode ser apenas um gate
+        // para desativar o hover: a aeronave deve materializar o trecho rumo
+        // a essa ancora antes da busca generica de construcoes/HQ.
+        if (aircraftRepair
+            && aircraftHasRecoveryInTacticalOrOperationalReach
+            && TryBuildAircraftRecoveryApproachAction(
+                unit, snapshot, fromCell, paths,
+                out PlayerAction recoveryApproach))
+        {
+            return recoveryApproach;
+        }
+
         ConstructionManager repairDest = FindRepairConstruction(
             unit, fromCell, aiTeam, occupiedForRepair, rejectBaseCluster, defenseReservedCells);
 

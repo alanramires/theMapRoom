@@ -348,11 +348,17 @@ public partial class TurnStateManager
             return true;
         }
 
+        string replayTransferLabel =
+            option.flowMode == TransferFlowMode.Fornecimento
+                ? $"TransferSupply:" +
+                  $"{GetSelectedTransferDonationPercent()}:" +
+                  "TargetConfirm"
+                : "TransferReceiveTargetConfirm";
         replayManager?.UpdateCurrentBufferTarget(
             option.targetUnit,
             option.targetConstruction,
             option.targetCell,
-            "TransferTargetConfirm");
+            replayTransferLabel);
         StartCoroutine(ExecuteTransferPromptSequence(option));
         return true;
     }
@@ -638,7 +644,12 @@ public partial class TurnStateManager
         return true;
     }
 
-    public bool TryExecuteAutomatedTransferReplayOrder(string targetInstanceId, Vector3Int targetCell)
+    public bool TryExecuteAutomatedTransferReplayOrder(
+        string targetInstanceId,
+        Vector3Int targetCell,
+        TransferFlowMode? preferredFlowMode = null,
+        int? preferredDonationPercent = null,
+        string targetConstructionId = null)
     {
         if (!IsTransferPromptActive() || transferExecutionInProgress)
             return false;
@@ -649,10 +660,18 @@ public partial class TurnStateManager
             PodeTransferirOption option = transferPromptOptions[i];
             if (option == null)
                 continue;
+            if (preferredFlowMode.HasValue
+                && option.flowMode != preferredFlowMode.Value)
+                continue;
 
             bool idMatch = !string.IsNullOrWhiteSpace(targetInstanceId)
                 && option.targetUnit != null
                 && option.targetUnit.InstanceId.ToString() == targetInstanceId;
+            bool constructionMatch =
+                !string.IsNullOrWhiteSpace(targetConstructionId)
+                && option.targetConstruction != null
+                && option.targetConstruction.InstanceId.ToString()
+                    == targetConstructionId;
 
             Vector3Int optionCell = option.targetCell;
             optionCell.z = 0;
@@ -660,7 +679,12 @@ public partial class TurnStateManager
             desiredCell.z = 0;
             bool cellMatch = optionCell == desiredCell;
 
-            if (!idMatch && !cellMatch)
+            bool hasExplicitEndpoint =
+                !string.IsNullOrWhiteSpace(targetInstanceId)
+                || !string.IsNullOrWhiteSpace(targetConstructionId);
+            if (hasExplicitEndpoint
+                    ? !idMatch && !constructionMatch
+                    : !cellMatch)
                 continue;
 
             selectedIndex = i;
@@ -681,7 +705,9 @@ public partial class TurnStateManager
 
         if (IsTransferDonationPercentageStepActive())
         {
-            transferDonationPercentIndex = TransferDonationPercentOptions.Length - 1;
+            transferDonationPercentIndex =
+                ResolveAutomatedTransferDonationPercentIndex(
+                    preferredDonationPercent);
             transferHelperFocusIndex = transferDonationPercentIndex;
             EnterTransferConfirmStep();
         }
@@ -690,6 +716,24 @@ public partial class TurnStateManager
             return TryConfirmPendingTransferPrompt();
 
         return transferExecutionInProgress || !IsTransferPromptActive();
+    }
+
+    private static int ResolveAutomatedTransferDonationPercentIndex(
+        int? preferredDonationPercent)
+    {
+        if (!preferredDonationPercent.HasValue)
+            return TransferDonationPercentOptions.Length - 1;
+
+        int requested = Mathf.Clamp(
+            preferredDonationPercent.Value, 1, 100);
+        for (int i = 0;
+             i < TransferDonationPercentOptions.Length;
+             i++)
+        {
+            if (TransferDonationPercentOptions[i] >= requested)
+                return i;
+        }
+        return TransferDonationPercentOptions.Length - 1;
     }
 
     private void ClearPendingTransferPrompt()

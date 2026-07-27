@@ -9,12 +9,32 @@ public static class UnitOccupancyRules
 
     private static int cachedUnitsFrame = -1;
     private static UnitManager[] cachedUnits = System.Array.Empty<UnitManager>();
+    private static bool cachedUnitsFromScene;
 
     private static UnitManager[] GetActiveUnitsSnapshot()
     {
         int frame = Time.frameCount;
-        if (cachedUnitsFrame == frame && cachedUnits != null)
+        bool playing = Application.isPlaying;
+        if (cachedUnitsFrame == frame && cachedUnits != null
+            && cachedUnitsFromScene == !playing)
             return cachedUnits;
+
+        cachedUnitsFromScene = !playing;
+
+        // UnitManager.AllActive so e populado com Application.isPlaying. Fora do
+        // Play a lista fica vazia e TODA consulta de ocupacao passaria a
+        // responder "hex livre" — as ferramentas de editor (LZ, embarque,
+        // desembarque, pouso) enxergariam o tabuleiro inteiro vago. No editor a
+        // fonte tem de ser a cena; em Play nada muda.
+        if (!playing)
+        {
+            // Qualificado: o arquivo importa System e UnityEngine, entao
+            // "Object" sozinho seria ambiguo.
+            cachedUnits = UnityEngine.Object.FindObjectsByType<UnitManager>(
+                FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+            cachedUnitsFrame = frame;
+            return cachedUnits;
+        }
 
         var all = UnitManager.AllActive;
         if (all == null || all.Count == 0)
