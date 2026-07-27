@@ -281,38 +281,29 @@ public partial class AIController
         Vector3Int originalCell = NormalizeRestockCell(
             receiver.CurrentCellPosition);
         prospectiveCell = NormalizeRestockCell(prospectiveCell);
-        receiver.SetCurrentCellPosition(
-            prospectiveCell, enforceFinalOccupancyRule: false);
-        try
-        {
-            var options = new List<PodeTransferirOption>();
-            if (!PodeTransferirSensor.CollectOptions(
-                    receiver,
-                    boardTilemap,
-                    terrainDatabase,
-                    prospectiveCell == originalCell
-                        ? SensorMovementMode.MoveuParado
-                        : SensorMovementMode.MoveuAndando,
-                    options,
-                    out _))
-                return false;
-
-            for (int i = 0; i < options.Count; i++)
-            {
-                PodeTransferirOption option = options[i];
-                if (!expectedSource.Matches(option))
-                    continue;
-                matchingOption = option;
-                return true;
-            }
-
+        var options = new List<PodeTransferirOption>();
+        if (!PodeTransferirSensor.CollectOptionsFromCell(
+                receiver,
+                boardTilemap,
+                terrainDatabase,
+                prospectiveCell == originalCell
+                    ? SensorMovementMode.MoveuParado
+                    : SensorMovementMode.MoveuAndando,
+                prospectiveCell,
+                options,
+                out _))
             return false;
-        }
-        finally
+
+        for (int i = 0; i < options.Count; i++)
         {
-            receiver.SetCurrentCellPosition(
-                originalCell, enforceFinalOccupancyRule: false);
+            PodeTransferirOption option = options[i];
+            if (!expectedSource.Matches(option))
+                continue;
+            matchingOption = option;
+            return true;
         }
+
+        return false;
     }
 
     private static Vector3Int NormalizeRestockCell(Vector3Int cell)

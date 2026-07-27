@@ -235,6 +235,14 @@ Vale ver onde as unidades caem nessa divisão, porque contraria a intuição. O 
 
 A leitura tática cai sozinha: você não faz logística enfileirando caminhões, porque um caminhão não abastece outro. Você faz logística levando a artéria até perto do front e deixando os capilares curtos.
 
+### Nem Todo Supridor Nasce Cheio
+
+Um detalhe de compra que decide se a cadeia tem função: **um supridor recém-comprado nasce com as reservas vazias, por padrão.** Nascer carregado é a exceção declarada na ficha, e ela segue um critério — nasce cheio quem foi comprado numa instalação que teria o que dar.
+
+Na prática do arsenal atual: o Caminhão de Suprimentos, o Avião-Tanque e o Porta-Aviões saem carregados (a construção que os vendeu tinha estoque para entregar), e o Trem de Carga nasce cheio por ser a fonte da malha. Já o que é comprado em instalação que não abastece aquele tipo de carga — o caminhão de longo curso, o navio-tanque comprado nas Docas, o hidroavião na Hidrobase — sai **vazio**, e precisa ser carregado por outro elo antes de servir para alguma coisa.
+
+Isso é o que impede o atalho que anularia a cadeia: se todo supridor viesse cheio, bastaria comprar o elo menor e usá-lo, e trem, navio-tanque e porta-aviões nunca teriam razão de existir. Nascer vazio força a corrente a ser montada.
+
 ### O Estoque Acaba
 
 Um detalhe que muda o planejamento de campanha inteiro: **construções gastam reserva ao prestar serviço.**

@@ -182,6 +182,14 @@ Os outros dois andares não travam nada. Uma aeronave sobrevoa tropas inimigas l
 
 Isso desenha a geografia real da guerra: **a linha de frente existe apenas na superfície.** O céu e o fundo do mar não têm frente — têm alcance e detecção.
 
+### A Ponte Sobre o Mar É Dois Andares
+
+Há uma exceção, e ela é física, não arbitrária: a **ponte sobre o mar**. Ali o convés fica acima da água, então terra e mar deixam de ser o mesmo andar naquele hexágono. Um tanque para em cima da ponte enquanto um navio passa por baixo — os dois coexistem, como coexistiriam um avião e um submarino. É o único lugar onde "superfície" se divide em dois.
+
+A ponte sobre a **praia** não faz isso. Ali a ponte encosta no chão — é a cabeceira, com aterro e estacas, não vão. Aquele hexágono continua sendo um andar só, e navio e tanque voltam a disputá-lo. Por isso o navio nem atraca numa praia com ponte: não há água navegável embaixo, há a base da obra.
+
+A regra geral que fica: fora da ponte sobre o mar, terra e mar ao nível do solo são sempre o mesmo andar — é o que impede um navio e um tanque de dividirem uma praia comum.
+
 ### Aliado Nunca Barra o Caminho
 
 Uma unidade sua jamais impede a passagem de outra unidade sua. Você atravessa suas próprias tropas à vontade.

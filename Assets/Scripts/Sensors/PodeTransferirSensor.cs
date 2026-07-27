@@ -15,6 +15,37 @@ public static class PodeTransferirSensor
         out string reason,
         List<PodeTransferirInvalidOption> invalidOutput = null)
     {
+        Vector3Int origin = supplier != null
+            ? supplier.CurrentCellPosition
+            : Vector3Int.zero;
+        return CollectOptionsFromCell(
+            supplier,
+            map,
+            terrainDatabase,
+            movementMode,
+            origin,
+            output,
+            out reason,
+            invalidOutput);
+    }
+
+    /// <summary>
+    /// Consulta prospectiva pura: responde quais transferencias seriam validas
+    /// se o supplier estivesse em <paramref name="originCell"/>. Nao move a
+    /// unidade e nao altera ocupacao, recursos, FOW ou estado transacional.
+    /// A chamada tradicional acima continua sendo a autoridade para o hex
+    /// corrente no momento de confirmar a acao.
+    /// </summary>
+    public static bool CollectOptionsFromCell(
+        UnitManager supplier,
+        Tilemap map,
+        TerrainDatabase terrainDatabase,
+        SensorMovementMode movementMode,
+        Vector3Int originCell,
+        List<PodeTransferirOption> output,
+        out string reason,
+        List<PodeTransferirInvalidOption> invalidOutput = null)
+    {
         reason = string.Empty;
         bool sensorLogs = SensorLogGate.IsPodeTransferirEnabled();
         if (output == null)
@@ -56,6 +87,7 @@ public static class PodeTransferirSensor
             return false;
         }
 
+        originCell.z = 0;
         bool sameHexOrEmbarked = supplierData.collectionRange == SupplierRangeMode.SameHexOrEmbarked;
         bool requiresLanding = sameHexOrEmbarked && supplier.GetDomain() == Domain.Air && !supplier.IsAircraftGrounded;
         Domain operationDomain = supplier.GetDomain();
@@ -63,7 +95,12 @@ public static class PodeTransferirSensor
         if (requiresLanding)
         {
             AircraftOperationDecision landingDecision = AircraftOperationRules.Evaluate(
-                supplier, map, terrainDatabase, movementMode);
+                supplier,
+                map,
+                terrainDatabase,
+                movementMode,
+                allowSameTeamAirBlockerForMovementTakeoff: false,
+                atCell: originCell);
             if (!landingDecision.available || landingDecision.action != AircraftOperationAction.Land)
             {
                 reason = string.IsNullOrWhiteSpace(landingDecision.reason)
@@ -72,10 +109,8 @@ public static class PodeTransferirSensor
                 return false;
             }
 
-            Vector3Int landingCell = supplier.CurrentCellPosition;
-            landingCell.z = 0;
             AircraftOperationRules.ResolveGroundedLayerForCell(
-                supplier, map, terrainDatabase, landingCell,
+                supplier, map, terrainDatabase, originCell,
                 out operationDomain, out operationHeight);
         }
 
@@ -94,8 +129,7 @@ public static class PodeTransferirSensor
             return false;
         }
 
-        Vector3Int origin = supplier.CurrentCellPosition;
-        origin.z = 0;
+        Vector3Int origin = originCell;
 
         ConstructionManager alliedConstruction = ResolveAlliedConstructionAtCell(
             boardMap,
@@ -130,6 +164,7 @@ public static class PodeTransferirSensor
                     alliedConstruction,
                     constructionsInCollectionRange,
                     unitsInCollectionRange,
+                    origin,
                     output,
                     invalidOutput);
                 break;
@@ -140,6 +175,7 @@ public static class PodeTransferirSensor
                     alliedConstruction,
                     constructionsInCollectionRange,
                     nearbyHubUnits,
+                    origin,
                     output,
                     invalidOutput);
                 break;
@@ -184,6 +220,7 @@ public static class PodeTransferirSensor
         ConstructionManager alliedConstruction,
         List<ConstructionManager> constructionsInCollectionRange,
         List<UnitManager> unitsInCollectionRange,
+        Vector3Int originCell,
         List<PodeTransferirOption> output,
         List<PodeTransferirInvalidOption> invalidOutput)
     {
@@ -386,7 +423,7 @@ public static class PodeTransferirSensor
                     supplier,
                     null,
                     alliedConstruction,
-                    supplier.CurrentCellPosition,
+                    originCell,
                     TransferFlowMode.Fornecimento,
                     "Hub sem estoque embarcado para doar.");
             }
@@ -400,7 +437,7 @@ public static class PodeTransferirSensor
                 supplier,
                 null,
                 alliedConstruction,
-                supplier.CurrentCellPosition,
+                originCell,
                 TransferFlowMode.Fornecimento,
                 "Hub sem alvo elegivel para doar (hub/receiver).");
         }
@@ -412,6 +449,7 @@ public static class PodeTransferirSensor
         ConstructionManager alliedConstruction,
         List<ConstructionManager> constructionsInCollectionRange,
         List<UnitManager> nearbyHubUnits,
+        Vector3Int originCell,
         List<PodeTransferirOption> output,
         List<PodeTransferirInvalidOption> invalidOutput)
     {
@@ -508,7 +546,7 @@ public static class PodeTransferirSensor
                 supplier,
                 null,
                 null,
-                origin: supplier.CurrentCellPosition,
+                origin: originCell,
                 mode: TransferFlowMode.Recebedor,
                 reason: "Receiver sem hub aliado valido no collection range.");
         }

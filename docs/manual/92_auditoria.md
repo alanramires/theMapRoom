@@ -87,7 +87,11 @@ Os IDs seguem o mesmo esquema de `90_pendencias_tecnicas.md` e não são reaprov
 | OCP-010 | Três andares valem em toda partida, independente de névoa | **Corrigido no código** | dependia de `IsTotalWarEnabled()`; separado — ver OCP-001 em `90` |
 | OCP-011 | Camada adicional de estrutura exige que o terreno base a suporte | **Corrigido no código** | ponte sobre planície concedia Naval/Submerged sem água embaixo; `CanTraverseUsingStructure` agora consulta `TerrainSupportsMode` |
 | OCP-012 | Skills da estrutura governam quem anda por cima, não quem passa por baixo | **Corrigido no código** | `requiredSkillsToEnter` da Ponte Ferroviária barrava navio e submarino no vão — era a causa da assimetria entre as duas pontes |
-| OCP-013 | Convés da ponte separa Land/Surface de Naval/Surface, por par estrutura+terreno | **Implementado** | `StructureNavalOpsTerrainRule.separaConvesEAgua`; marcar sobre Mar, deixar desmarcado sobre Praia |
+| OCP-013 | Convés da ponte separa Land/Surface de Naval/Surface, por par estrutura+terreno | **Implementado** | `StructureNavalOpsTerrainRule.separaConvesEAgua`; marcar sobre Mar, deixar desmarcado sobre Praia. Documentado em `02` |
+| OCP-014 | Ponte sobre praia veta unidade naval (cabeceira, não água) | **Implementado** | `StructureNavalOpsTerrainRule.bloqueiaNaval`; veto roda antes de toda concessão em `CanTraverseUsingStructure`. Documentado em `02` |
+| MOV-012 | Estrada na montanha exige entrada por rota declarada (desfiladeiro); construção no hex liberta | **Implementado** | `StructureData.ExigeRotaDeclaradaEm` + `exigeEstruturaNaConstrucao`; par Rodovia+Montanha = Exigir. Documentado em `03` |
+| MOV-013 | Falhar no gate de rota nega só a ESTRUTURA, não o hex — cai para o terreno | Confirmada | `UnitMovementPathRules.cs` — `routeGateBlocks` desvia a estrutura, terreno segue avaliado (soldado cruza trilho na planície, alpino sobe montanha com estrada) |
+| LOG-020 | Supridor comprado nasce vazio salvo exceção na ficha (`startsWithEmptySupplies`, padrão true) | **Implementado** | `ConstructionShopping.cs` nos dois caminhos (jogador e IA); `ClearSupplierReservesForFreshSpawn`. Documentado em `07`. Fichas ainda não marcadas — ver LOG-003 |
 
 ## Reclassificações
 

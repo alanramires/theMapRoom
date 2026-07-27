@@ -42,6 +42,8 @@ A **estrada** oferece bônus de velocidade para unidades motorizadas que percorr
 
 Na combinação com planície, a estrada funciona como pista improvisada — aeronaves conseguem pousar para receber reabastecimento de unidades logísticas como o caminhão de suprimentos. Na montanha, essa mesma aeronave não pousa. O terreno cancela o acesso que a estrutura abriria.
 
+**A estrada na montanha é um desfiladeiro.** Ela abre a passagem, mas não por qualquer flanco: para subir a serra por ela, você tem que **entrar pela boca da estrada** — o ponto onde ela encontra o terreno mais baixo — e seguir o traçado como se fosse um trilho. Não dá para atacar a montanha de lado e cair na estrada no meio. A exceção é chegar a uma construção na serra (uma cidade, por exemplo): construção liberta o movimento e encerra o desfiladeiro dali em diante. O efeito tático é grande — um passo de montanha vira gargalo, defensável pelas duas bocas.
+
 A **linha de trem** não dá bônus de velocidade a ninguém, apesar do traçado parecido com o da estrada.
 
 Quanto às **pontes**: a ponte rodoviária carrega o tráfego comum e bloqueia o Trem de Carga. A ponte ferroviária faz o oposto: exige a habilidade de linha de trem, e só o trem atravessa. Uma não substitui a outra.

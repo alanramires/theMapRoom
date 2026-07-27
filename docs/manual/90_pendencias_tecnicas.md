@@ -88,13 +88,15 @@ O argumento anti-oráculo justificaria bloquear o que revela presença inimiga. 
 
 ---
 
-### LOG-003 — Supridor comprado já vem cheio, o que curto-circuita a cadeia
+### LOG-003 — Supridor comprado nasce vazio *(implementado; falta marcar fichas)*
 
 **Problema de design.** Se todo supridor nasce com a reserva cheia, a cadeia logística perde a razão de existir: em vez de montar trem → caminhão → front, ou trem → navio-tanque → porta-aviões, basta comprar direto o nó menor e usá-lo cheio. O elo mais barato substitui a corrente inteira, e o `07` promete uma logística que precisa ser construída.
 
-**Proposta.** Um campo novo em `UnitData`, na seção de logística, logo abaixo de `isSupplier`: **"começa com 0 carga"**, com padrão **true**. Quem nasce cheio passa a ser a exceção declarada, não a regra silenciosa.
+**Implementado.** Campo `startsWithEmptySupplies` em `UnitData` (padrão **true**), aplicado no spawn de compra nos **dois** caminhos — jogador e IA (`TurnStateManager.ConstructionShopping.cs`). `ClearSupplierReservesForFreshSpawn` zera a quantidade preservando as entradas (tipo e teto vêm da ficha). A doutrina está escrita em `07`.
 
-**Valores pretendidos por unidade** (definidos pelo autor, ainda não aplicados):
+**Pendente:** hoje **todas** as fichas de supridor herdam o padrão `true`, então nascem vazias — inclusive as quatro que deveriam nascer cheias. Falta desmarcar no inspector: **Trem de Carga**, **Caminhão de Suprimentos**, **Avião-Tanque** e **Porta-Aviões**. As três que ficam vazias (18 rodas, Navio-Tanque, Hidroavião) já estão corretas pelo padrão.
+
+**Valores pretendidos por unidade:**
 
 | Unidade | Começa com 0 carga | Razão |
 |---|---|---|
@@ -110,7 +112,7 @@ O critério que emerge da tabela: nasce cheio quem foi comprado **em uma instala
 
 **Impacto.** Restaura o valor da cadeia e dá sentido econômico às Docas e à Hidrobase como pontos de carregamento, não só de compra.
 
-**Status.** Aberta, especificada. Implementação sugerida em duas partes: o campo e a aplicação no spawn em C#, e a marcação por ficha feita no inspector da Unity — assets não devem ser editados no disco com o editor aberto.
+**Status.** Código pronto; aguarda marcação das quatro fichas no inspector. Até lá, o comportamento em jogo é "todo supridor nasce vazio".
 
 ---
 
