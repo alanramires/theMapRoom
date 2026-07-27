@@ -53,6 +53,7 @@ public partial class AIController
             if (objectiveAction != null) return objectiveAction;
 
             bool preferFireSupportFirst = PreferFireSupportBeforeAssault(unit);
+            bool suppressAssaultTransportFallback = false;
 
             if (preferFireSupportFirst)
             {
@@ -64,10 +65,11 @@ public partial class AIController
                     : TryDecideFireSupportAction(unit, snapshot, plan);
                 if (earlyFireSupportAction != null) return earlyFireSupportAction;
 
-                // Artilheiro Combatente: após não encontrar tiro útil,
+                // Híbrido combatente: após não encontrar tiro útil,
                 // tenta explicitamente o transporte especializado antes do
-                // fallback Assault. Nesta etapa, rejeição ainda libera o
-                // fallback; a criticidade será refinada nas partes seguintes.
+                // fallback Assault. Uma rejeição de segurança libera o papel
+                // Assault, mas não permite repetir a carona pela política menos
+                // restritiva.
                 if (primaryHybrid)
                 {
                     SectorObjective fireSupportObjective =
@@ -84,15 +86,18 @@ public partial class AIController
                     if (transportOutcome
                         == FireSupportTransportOutcome.TransportRejected)
                     {
+                        suppressAssaultTransportFallback = true;
                         Debug.Log(
                             $"{TL("FireSupport")} {unit.InstanceId} " +
-                            "Artilheiro Combatente: transporte rejeitado; " +
-                            "fallback Assault provisoriamente liberado.");
+                            "hibrido combatente: transporte rejeitado; " +
+                            "fallback Assault liberado sem repetir transporte.");
                     }
                 }
             }
 
-            PlayerAction assaultAction = TryDecideAssaultAction(unit, snapshot, plan);
+            PlayerAction assaultAction = TryDecideAssaultAction(
+                unit, snapshot, plan,
+                allowTransport: !suppressAssaultTransportFallback);
 
             if (assaultAction != null) return assaultAction;
 

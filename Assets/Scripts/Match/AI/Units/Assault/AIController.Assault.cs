@@ -216,6 +216,9 @@ public partial class AIController
             QueroCaronaResult rideNeed)
     {
         CombatPassengerTransportDecision best = null;
+        int compatibleTransporters = 0;
+        int offeredRendezvous = 0;
+        int rejectedByPolicy = 0;
         foreach (UnitManager transporter in UnitManager.AllActive)
         {
             if (transporter == null
@@ -234,6 +237,7 @@ public partial class AIController
                 && claimedPassengerId != unit.InstanceId)
                 continue;
 
+            compatibleTransporters++;
             MelhorEmbarqueResult evaluated =
                 MelhorEmbarqueService.Evaluate(
                     new MelhorEmbarqueRequest
@@ -259,6 +263,7 @@ public partial class AIController
                             MelhorEmbarqueRideDisposition.Emergency));
             if (option == null)
                 continue;
+            offeredRendezvous++;
 
             Vector3Int safetyTarget = rideNeed.evaluatedTarget;
             safetyTarget.z = 0;
@@ -282,6 +287,7 @@ public partial class AIController
                     $"{TL("FireSupport")} {unit.InstanceId} rejeita " +
                     $"#{transporter.InstanceId} LZ={option.lzCell}: " +
                     safetyReason);
+                rejectedByPolicy++;
                 continue;
             }
 
@@ -311,7 +317,20 @@ public partial class AIController
                 $"MelhorEmbarque transporter=#{best.transporter.InstanceId} " +
                 $"LZ={best.option.lzCell} slot={best.option.slotIndex} " +
                 $"tier={best.option.transporterTier} " +
+                $"route={best.option.passengerRouteState} " +
+                $"ride={best.option.rideDisposition} " +
+                $"paxCost={best.option.passengerRouteCost} " +
+                $"transportCost={best.option.transporterRouteCost} " +
                 $"score={best.policyScore:F0}");
+        }
+        else
+        {
+            Debug.Log(
+                $"{TL("Transporte")} {unit.InstanceId} policy={policy} " +
+                "sem MelhorEmbarque materializavel " +
+                $"transporters={compatibleTransporters} " +
+                $"rendezvous={offeredRendezvous} " +
+                $"policyRejected={rejectedByPolicy}.");
         }
         return best;
     }
@@ -370,7 +389,11 @@ public partial class AIController
     // Assalto Batedor - protege e varre a zona do objetivo de captura atribuido.
     // -------------------------------------------------------------------------
 
-    private PlayerAction TryDecideAssaultAction(UnitManager unit, AIWorldSnapshot snapshot, TeamObjectivePlan plan)
+    private PlayerAction TryDecideAssaultAction(
+        UnitManager unit,
+        AIWorldSnapshot snapshot,
+        TeamObjectivePlan plan,
+        bool allowTransport = true)
     {
         if (unit == null || snapshot == null || plan == null)
             return null;
@@ -378,8 +401,6 @@ public partial class AIController
             || !UnitRoleCompatibility.CanSatisfy(data, UnitRole.Assalto))
             return null;
         SectorObjective assigned = ResolveAssignedAssaultObjective(unit, plan);
-        if (IsGroundAntiAirOnlyAssault(data))
-            return DecideGroundAntiAirAssaultAction(unit, snapshot, plan, assigned);
 
         if (assigned == null)
         {
@@ -389,12 +410,15 @@ public partial class AIController
                 return DecideAssignedAssaultEscortAction(unit, snapshot, rogueCriticalHome);
             }
 
-            PlayerAction embarkAction =
-                TryDecideCombatPassengerTransportAction(
-                    unit, snapshot, plan,
-                    CombatPassengerTransportPolicy.Assault,
-                    assigned: null);
-            if (embarkAction != null) return embarkAction;
+            if (allowTransport)
+            {
+                PlayerAction embarkAction =
+                    TryDecideCombatPassengerTransportAction(
+                        unit, snapshot, plan,
+                        CombatPassengerTransportPolicy.Assault,
+                        assigned: null);
+                if (embarkAction != null) return embarkAction;
+            }
             return DecideRogueAssaultBreakerAction(unit, snapshot, plan);
         }
 
@@ -412,11 +436,12 @@ public partial class AIController
         // o rogue passava por esta avaliação; um tanque separado de Charlie
         // pelo mar caía direto no batedor e "mantinha patrulha", mesmo com um
         // navio compatível disponível para embarque.
-        PlayerAction assignedEmbarkAction =
-            TryDecideCombatPassengerTransportAction(
+        PlayerAction assignedEmbarkAction = allowTransport
+            ? TryDecideCombatPassengerTransportAction(
                 unit, snapshot, plan,
                 CombatPassengerTransportPolicy.Assault,
-                assigned);
+                assigned)
+            : null;
         if (assignedEmbarkAction != null)
         {
             Debug.Log($"{TL("Assalto")} {unit.InstanceId} {assigned.Sector} " +
