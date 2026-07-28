@@ -69,8 +69,79 @@ public partial class AIController
         fromCell.z = 0;
         targetCell.z = 0;
 
-        float originDistance = CalculateRouteDistanceOrHex(unit, fromCell, targetCell);
-        bool originRouteFound = TryCalculateRouteDistance(unit, fromCell, targetCell, out float originRouteDistance);
+        int tacticalBudget =
+            Mathf.Max(0, unit.RemainingMovementPoints);
+        bool useTacticalRouteScoring =
+            unit.GetDomain() != Domain.Air
+            && SectorManager.HexDistance(
+                fromCell, targetCell) <= tacticalBudget;
+        AIDecisionPerf.AddCount(
+            useTacticalRouteScoring
+                ? "ToolProgressionTacticalRouteUses"
+                : "ToolProgressionCubicDirectionUses");
+
+        // Tactical decide com rota real. Operational/Strategic fornecem
+        // somente direcao cubica. Assim uma unidade de fogo indireto nao
+        // abre um Dijkstra do mapa inteiro para escolher entre os poucos
+        // hexes que ja pertencem ao movimento tatico atual.
+        Dictionary<Vector3Int, int> distanceToTargetMap = null;
+        if (useTacticalRouteScoring
+            && unit.TryGetUnitData(
+                out UnitData progressionUnitData)
+            && progressionUnitData != null)
+        {
+            int routeBudget = Mathf.Max(
+                tacticalBudget,
+                unit.MaxMovementPoints * 3);
+            SectorManager.TryBuildLandMovementDistanceToTargetMap(
+                targetCell,
+                progressionUnitData,
+                out distanceToTargetMap,
+                routeBudget);
+        }
+
+        float ResolveProgressionDistance(Vector3Int cell)
+        {
+            cell.z = 0;
+            if (distanceToTargetMap != null)
+            {
+                return distanceToTargetMap.TryGetValue(
+                    cell, out int routeCost)
+                    ? routeCost
+                    : SectorManager.HexDistance(
+                        cell, targetCell);
+            }
+            if (!useTacticalRouteScoring)
+            {
+                return SectorManager.HexDistance(
+                    cell, targetCell);
+            }
+            return CalculateRouteDistanceOrHex(
+                unit, cell, targetCell);
+        }
+
+        float originDistance =
+            ResolveProgressionDistance(fromCell);
+        bool originRouteFound = false;
+        float originRouteDistance = originDistance;
+        if (useTacticalRouteScoring)
+        {
+            if (distanceToTargetMap != null
+                && distanceToTargetMap.TryGetValue(
+                    fromCell, out int cachedOriginDistance))
+            {
+                originRouteFound = true;
+                originRouteDistance = cachedOriginDistance;
+            }
+            else
+            {
+                originRouteFound = TryCalculateRouteDistance(
+                    unit,
+                    fromCell,
+                    targetCell,
+                    out originRouteDistance);
+            }
+        }
         float threatScale = ResolveProgressionThreatScale(unit);
 
         // Alcancabilidade/custo do 1º passo (a partir da posicao atual) e a mesma para todos os
@@ -82,14 +153,6 @@ public partial class AIController
         // Mapa reverso de distancia ATE o target: 1 busca, depois lookups no loop interno do
         // two-turn (antes: N buscas ponto-a-ponto por candidato — o custo do naval). Mesma metrica
         // (SectorManager), bit-a-bit igual. Aereo usa distancia-hexa direta, entao nao precisa de mapa.
-        Dictionary<Vector3Int, int> distanceToTargetMap = null;
-        if (unit.GetDomain() != Domain.Air
-            && unit.TryGetUnitData(out UnitData progressionUnitData)
-            && progressionUnitData != null)
-        {
-            SectorManager.TryBuildLandMovementDistanceToTargetMap(
-                targetCell, progressionUnitData, out distanceToTargetMap);
-        }
         float bestScore = float.MinValue;
         bool found = false;
         bool debugTransportProgression = intent == ToolProgressionIntent.TransportDelivery
@@ -136,7 +199,9 @@ public partial class AIController
             if (!paths.TryGetValue(rawCell, out List<Vector3Int> path))
                 path = null;
 
-            float firstTurnProgress = originDistance - CalculateRouteDistanceOrHex(unit, cell, targetCell);
+            float firstTurnProgress =
+                originDistance
+                - ResolveProgressionDistance(cell);
             progressionCandidates.Add((cell, path, firstTurnProgress));
         }
 
@@ -181,7 +246,9 @@ public partial class AIController
                     out int moveCost,
                     costFromOrigin,
                     evaluateSecondMove,
-                    distanceToTargetMap))
+                    distanceToTargetMap,
+                    useHexDistanceOnly:
+                        !useTacticalRouteScoring))
             {
                 skipScore++;
                 continue;
@@ -192,7 +259,26 @@ public partial class AIController
 
             float firstTurnProgress = progressionCandidates[idx].firstTurnProgress;
             float twoTurnProgress = originDistance - nextDistance;
-            bool cellRouteFound = TryCalculateRouteDistance(unit, cell, targetCell, out float cellRouteDistance);
+            float cellRouteDistance =
+                ResolveProgressionDistance(cell);
+            bool cellRouteFound = false;
+            if (useTacticalRouteScoring)
+            {
+                if (distanceToTargetMap != null)
+                {
+                    cellRouteFound =
+                        distanceToTargetMap.ContainsKey(cell);
+                }
+                else
+                {
+                    cellRouteFound =
+                        TryCalculateRouteDistance(
+                            unit,
+                            cell,
+                            targetCell,
+                            out cellRouteDistance);
+                }
+            }
             float routeProgress = originRouteFound && cellRouteFound ? originRouteDistance - cellRouteDistance : 0f;
             float lineDeviation = DistanceFromHexLine(cell, fromCell, targetCell);
             float threat = CalculateThreatLevel(cell, snapshot.AITeam);

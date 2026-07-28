@@ -1346,6 +1346,7 @@ public class SaveGameManager : MonoBehaviour
             LogLoadPerf(normalizedSlot, "restore_jogadas.end", jogadasRestoreStartMs, PerfNowMs() - asyncStartMs);
             if (lastLoadRoutineSucceeded)
             {
+                matchController?.PrepareFogCachesForTurnPresentation();
                 int playerNumber = matchController != null ? matchController.ActivePlayerListIndex + 1 : 1;
                 double presentationStartMs = PerfNowMs();
                 LogLoadPerf(normalizedSlot, "turn_presentation.begin", presentationStartMs, presentationStartMs - asyncStartMs);

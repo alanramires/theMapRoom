@@ -237,6 +237,18 @@ public partial class AIController
                 && claimedPassengerId != unit.InstanceId)
                 continue;
 
+            if (!MelhorEmbarqueService
+                    .TryResolveCompatiblePassengerSlot(
+                        transporter,
+                        unit,
+                        out _,
+                        out _))
+            {
+                AIDecisionPerf.AddCount(
+                    "MelhorEmbarqueCompatibilityRejects");
+                continue;
+            }
+
             compatibleTransporters++;
             MelhorEmbarqueResult evaluated =
                 MelhorEmbarqueService.Evaluate(

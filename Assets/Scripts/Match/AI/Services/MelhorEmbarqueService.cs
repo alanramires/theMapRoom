@@ -136,6 +136,51 @@ public static class MelhorEmbarqueService
             || transporterData.transportSlots.Count == 0)
             return result;
 
+        // Compatibilidade e vaga sao filtros O(slots). Resolva-os ANTES de
+        // calcular caminhos do transportador ou percorrer a topologia. Isso
+        // evita que um transporte exclusivo de infantaria, por exemplo,
+        // visite o mapa inteiro para somente depois rejeitar uma artilharia.
+        var passengers = new List<UnitManager>();
+        var passengerSlots = new Dictionary<UnitManager, int>();
+        var passengerRideNeed =
+            new Dictionary<UnitManager, QueroCaronaResult>();
+        foreach (UnitManager unit in UnitManager.AllActive)
+        {
+            if (!TryResolvePassengerSlot(
+                    request, transporterData, unit,
+                    out int slotIndex, out string reason))
+            {
+                if (unit != null
+                    && unit != request.transporter
+                    && PlayerSlotRelations.AreAllies(
+                        request.transporter, unit))
+                {
+                    result.rejectedPassengers.Add(
+                        new MelhorEmbarqueReject
+                        {
+                            passenger = unit,
+                            reason = reason
+                        });
+                }
+                continue;
+            }
+
+            passengers.Add(unit);
+            passengerSlots[unit] = slotIndex;
+            passengerRideNeed[unit] =
+                request.evaluateRideNeed?.Invoke(unit);
+            request.diagnosticLog?.Invoke(
+                $"ACCEPT pax=#{unit.InstanceId} slot={slotIndex} " +
+                FormatRideNeedDiagnostic(passengerRideNeed[unit]));
+        }
+
+        if (passengers.Count == 0)
+        {
+            AIDecisionPerf.AddCount(
+                "MelhorEmbarqueCompatibilityEarlyOuts");
+            return result;
+        }
+
         Vector3Int origin = request.transporter.CurrentCellPosition;
         origin.z = 0;
         int tactical = Mathf.Max(0, request.tacticalBudget);
@@ -163,42 +208,15 @@ public static class MelhorEmbarqueService
         if (!usedTopologyIndex)
             AIDecisionPerf.AddCount("TopologyFullScans");
 
-        var passengers = new List<UnitManager>();
-        var passengerSlots = new Dictionary<UnitManager, int>();
         var passengerReach =
-            new Dictionary<UnitManager, PassengerReachProfile>();
-        var passengerRideNeed =
-            new Dictionary<UnitManager, QueroCaronaResult>();
-        foreach (UnitManager unit in UnitManager.AllActive)
+            new Dictionary<UnitManager, PassengerReachProfile>(
+                passengers.Count);
+        for (int i = 0; i < passengers.Count; i++)
         {
-            if (!TryResolvePassengerSlot(
-                    request, transporterData, unit,
-                    out int slotIndex, out string reason))
-            {
-                if (unit != null
-                    && unit != request.transporter
-                    && PlayerSlotRelations.AreAllies(
-                        request.transporter, unit))
-                {
-                    result.rejectedPassengers.Add(
-                        new MelhorEmbarqueReject
-                        {
-                            passenger = unit,
-                            reason = reason
-                        });
-                }
-                continue;
-            }
-
-            passengers.Add(unit);
-            passengerSlots[unit] = slotIndex;
-            passengerReach[unit] = BuildPassengerReachProfile(
-                request, unit, topology);
-            passengerRideNeed[unit] =
-                request.evaluateRideNeed?.Invoke(unit);
-            request.diagnosticLog?.Invoke(
-                $"ACCEPT pax=#{unit.InstanceId} slot={slotIndex} " +
-                FormatRideNeedDiagnostic(passengerRideNeed[unit]));
+            UnitManager passenger = passengers[i];
+            passengerReach[passenger] =
+                BuildPassengerReachProfile(
+                    request, passenger, topology);
         }
 
         int topologyCellsVisited = 0;
@@ -486,6 +504,39 @@ public static class MelhorEmbarqueService
 
         reason = lastReason;
         return false;
+    }
+
+    public static bool TryResolveCompatiblePassengerSlot(
+        UnitManager transporter,
+        UnitManager passenger,
+        out int slotIndex,
+        out string reason)
+    {
+        slotIndex = -1;
+        reason = string.Empty;
+        if (transporter == null
+            || !transporter.TryGetUnitData(
+                out UnitData transporterData)
+            || transporterData == null
+            || !transporterData.isTransporter
+            || transporterData.transportSlots == null
+            || transporterData.transportSlots.Count == 0)
+        {
+            reason = "transportador invalido ou sem slots";
+            return false;
+        }
+
+        return TryResolvePassengerSlot(
+            new MelhorEmbarqueRequest
+            {
+                transporter = transporter,
+                allowPassenger = candidate =>
+                    candidate == passenger
+            },
+            transporterData,
+            passenger,
+            out slotIndex,
+            out reason);
     }
 
     private static PassengerReachProfile BuildPassengerReachProfile(

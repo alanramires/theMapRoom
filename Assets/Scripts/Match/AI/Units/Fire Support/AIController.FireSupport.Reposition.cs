@@ -121,8 +121,22 @@ public partial class AIController
             && assigned.Status != ObjectiveStatus.Complete
             && assigned.Status != ObjectiveStatus.Abandoned;
         WeaponPriorityData weaponPriorityData = turnStateManager != null ? turnStateManager.WeaponPriorityDataRef : null;
+        int tacticalBudget =
+            Mathf.Max(0, unit.RemainingMovementPoints);
+        bool anchorInTactical =
+            SectorManager.HexDistance(
+                fromCell, anchor) <= tacticalBudget;
         Dictionary<Vector3Int, int> routeCostToAnchor =
-            UnitMovementPathRules.CalculateMovementCostMap(boardTilemap, unit, anchor, 160, terrainDatabase);
+            anchorInTactical
+                ? UnitMovementPathRules.CalculateMovementCostMap(
+                    boardTilemap,
+                    unit,
+                    anchor,
+                    Mathf.Max(
+                        tacticalBudget,
+                        unit.MaxMovementPoints * 3),
+                    terrainDatabase)
+                : null;
 
         float GetAnchorRouteCost(Vector3Int c) =>
             routeCostToAnchor != null && routeCostToAnchor.TryGetValue(c, out int v)
@@ -130,8 +144,13 @@ public partial class AIController
                 : float.MaxValue;
 
         float fromRouteDist = GetAnchorRouteCost(fromCell);
-        bool fromRouteFound = fromRouteDist < float.MaxValue
-            || TryCalculateFireSupportRouteDistance(unit, fromCell, anchor, out fromRouteDist);
+        bool fromRouteFound = anchorInTactical
+            && (fromRouteDist < float.MaxValue
+                || TryCalculateFireSupportRouteDistance(
+                    unit,
+                    fromCell,
+                    anchor,
+                    out fromRouteDist));
         float fromEffectiveDist = fromRouteFound ? fromRouteDist : fromDist;
         float fromScore = ScoreFireSupportRepositionCell(
             unit, snapshot, fromCell, fromCell, anchor, fromDist, 0,
@@ -261,8 +280,13 @@ public partial class AIController
             float tacticalPressure = CalculateFireSupportTacticalPressureScore(unit, snapshot, cell, weaponPriorityData);
             float rearLine = backlinePosture ? CalculateFireSupportRearLineScore(unit, snapshot, cell, rearAnchor) : 0f;
             float cellRouteDist = GetAnchorRouteCost(cell);
-            bool cellRouteFound = cellRouteDist < float.MaxValue
-                || TryCalculateFireSupportRouteDistance(unit, cell, anchor, out cellRouteDist);
+            bool cellRouteFound = anchorInTactical
+                && (cellRouteDist < float.MaxValue
+                    || TryCalculateFireSupportRouteDistance(
+                        unit,
+                        cell,
+                        anchor,
+                        out cellRouteDist));
             float routeProgress = fromRouteFound && cellRouteFound ? fromRouteDist - cellRouteDist : 0f;
             bool recoversMissingRoute = !fromRouteFound && cellRouteFound;
             bool advancesByRoute = recoversMissingRoute || routeProgress > 0f;

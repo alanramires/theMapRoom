@@ -67,6 +67,18 @@ public partial class AIController
         // Atualiza indicador/cursor antes da primeira decisao potencialmente cara.
         yield return null;
 
+        float phase2BatchDelay =
+            GetAdaptivePhase2BatchDelay(units.Count);
+        if (showAILogs
+            && !Mathf.Approximately(
+                phase2BatchDelay, GetBatchDelay()))
+        {
+            Debug.Log(
+                $"{TL()} Fase2 pacing adaptativo: " +
+                $"unidades={units.Count} " +
+                $"delay={phase2BatchDelay:F3}s.");
+        }
+
         // ---- Loop por unidade: decisão + execução ----
         var deferredUnitIds = new HashSet<int>();
         var perfSamples = new List<Phase2UnitPerfSample>();
@@ -227,7 +239,7 @@ public partial class AIController
             float snapshotMs = (Time.realtimeSinceStartup - snapshotStartedAt) * 1000f;
             perfSnapshotTotalMs += snapshotMs;
 
-            float delay = GetBatchDelay();
+            float delay = phase2BatchDelay;
             float delayMs = 0f;
             if (delay > 0f)
             {
@@ -728,42 +740,35 @@ public partial class AIController
             }
 
             AIWorldSnapshot airSnapshot = snapshot ??
-                AIWorldSnapshot.BuildLight(PlayerSlotId.FromIndex(currentAISlotIndex), matchController);
-            MatchController mc = GetMatchController();
-            bool hasAttackableAircraft = applyAirCombatTargetGates && HasAttackableAirCombatTarget(
-                airCombat,
-                airSnapshot,
-                fromCell,
-                paths,
-                occupied,
-                takeoffMoveOptions,
-                mc,
-                preferredOnly: false);
-            bool hasPreferredAttackableAircraft = applyAirCombatTargetGates && HasAttackableAirCombatTarget(
-                airCombat,
-                airSnapshot,
-                fromCell,
-                paths,
-                occupied,
-                takeoffMoveOptions,
-                mc,
-                preferredOnly: true);
+                AIWorldSnapshot.BuildLight(
+                    PlayerSlotId.FromIndex(currentAISlotIndex),
+                    matchController);
+            List<UnitManager> visibleEnemies =
+                CollectVisibleAirCombatEnemies(airCombat, airSnapshot);
+            List<AirCombatTacticalCandidate> candidates =
+                CollectAirCombatTacticalCandidates(
+                    airCombat,
+                    airSnapshot,
+                    fromCell,
+                    paths,
+                    occupied,
+                    takeoffMoveOptions,
+                    visibleEnemies);
+            ResolveAirCombatCandidateGates(
+                candidates,
+                out bool hasAttackableAircraft,
+                out bool hasPreferredAttackableAircraft);
             bool targetBlockedByAirPriority = false;
             bool targetReachedBySensor = false;
             string lastAttackDecisionReason = null;
 
-            foreach (Vector3Int rawCell in paths.Keys)
+            for (int i = 0; i < candidates.Count; i++)
             {
-                Vector3Int cell = rawCell;
-                cell.z = 0;
-                if (cell != fromCell && occupied != null && occupied.Contains(cell))
+                AirCombatTacticalCandidate candidate = candidates[i];
+                if (candidate == null || candidate.Target != target)
                     continue;
-                if (!IsAITakeoffDestinationAllowed(paths, cell, takeoffMoveOptions))
-                    continue;
-                if (!CanAttackTargetFrom(fromCell, cell, airCombat, target))
-                    continue;
-                if (!TryFindAttackDecisionOption(airCombat, target, cell, out _))
-                    continue;
+
+                Vector3Int cell = candidate.AttackCell;
                 targetReachedBySensor = true;
                 if (applyAirCombatTargetGates
                     && !ShouldConsiderAirCombatTarget(airCombat, target, hasAttackableAircraft, hasPreferredAttackableAircraft))

@@ -229,6 +229,22 @@ public partial class AIController
         return 0.5f;
     }
 
+    private float GetAdaptivePhase2BatchDelay(int armySize)
+    {
+        float configuredDelay = GetBatchDelay();
+        if (configuredDelay <= 0f || armySize <= 12)
+            return configuredDelay;
+
+        // Preserva o ritmo configurado em exercitos pequenos. Acima de 12,
+        // mantem aproximadamente seis segundos de respiro total por fase,
+        // com um piso curto para a troca de unidade continuar legivel.
+        float scaledDelay =
+            configuredDelay * 12f / Mathf.Max(1, armySize);
+        return Mathf.Min(
+            configuredDelay,
+            Mathf.Max(0.08f, scaledDelay));
+    }
+
     private IEnumerator ExecuteAIBatchWithDebugStep(PlayerAction action)
     {
         if (ShouldStopAIForMatchEnd("batch_start"))

@@ -892,12 +892,29 @@ public partial class TurnStateManager
         if (transporter != null)
             transporter.MarkAsActed();
 
-        // O desembarque compromete posicao/camada/estado de um ou mais
-        // passageiros e tambem o estado do transportador. O refresh incremental
-        // pendente guarda uma unica unidade e, portanto, podia publicar somente
-        // a visao do transportador. Solicita uma reconstrucao confirmada unica
-        // quando a maquina retornar a Neutral.
-        matchController?.NotifyCommittedMultiUnitBoardChangeForFog(transporter);
+        // O desembarque compromete posicao/camada/estado dos passageiros e
+        // do transportador. Enumera todas as fontes para que o MatchController
+        // aplique um delta confirmado quando a FSM retornar a Neutral, sem
+        // recolher a visao de todo o exercito.
+        List<UnitManager> committedFogUnits =
+            new List<UnitManager>(runtimeOrders.Count + 1);
+        if (transporter != null)
+            committedFogUnits.Add(transporter);
+        for (int i = 0; i < runtimeOrders.Count; i++)
+        {
+            UnitManager passenger =
+                runtimeOrders[i] != null
+                    ? runtimeOrders[i].passenger
+                    : null;
+            if (passenger != null
+                && !committedFogUnits.Contains(passenger))
+            {
+                committedFogUnits.Add(passenger);
+            }
+        }
+        matchController?.NotifyCommittedMultiUnitBoardChangeForFog(
+            transporter,
+            committedFogUnits);
 
         cursorController?.PlayDoneSfx();
         float afterTransporterDoneDelay = GetDisembarkAfterTransporterDoneDelay();

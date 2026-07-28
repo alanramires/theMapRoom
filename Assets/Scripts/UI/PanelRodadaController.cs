@@ -348,8 +348,22 @@ public sealed class PanelRodadaController : MonoBehaviour
             BeginLoadingPresentation();
         version = presentationVersion;
 
+        // Mantem a apresentacao estatica de "Carregando turno..." enquanto o
+        // tabuleiro (inclusive caches FOW) ainda trabalha no main thread. Iniciar
+        // o VideoPlayer antes desta barreira faria seu loop parecer quadro a
+        // quadro durante os picos de pre-cozimento.
+        yield return null;
+        if (version != presentationVersion)
+            yield break;
+        yield return new WaitUntil(() =>
+            version != presentationVersion ||
+            isBoardReady == null ||
+            isBoardReady());
+        if (version != presentationVersion)
+            yield break;
+
         // O audio de abertura e apenas apresentacao: ele pode continuar tocando,
-        // mas nunca deve segurar a liberacao do turno depois que o save foi restaurado.
+        // mas nunca deve segurar a liberacao do turno depois que o estado estiver pronto.
         RestorePlayerTextPosition();
         RestoreTurnTextPosition();
         SetButtonVisible(true);
@@ -366,16 +380,6 @@ public sealed class PanelRodadaController : MonoBehaviour
             textoTurno.text = $"Turno {turno}";
             textoTurno.color = TeamUtils.GetColor(team);
         }
-
-        yield return null;
-        if (version != presentationVersion)
-            yield break;
-        yield return new WaitUntil(() =>
-            version != presentationVersion ||
-            isBoardReady == null ||
-            isBoardReady());
-        if (version != presentationVersion)
-            yield break;
 
         aguardandoConfirmacao = true;
         SetButtonEnabled(true);

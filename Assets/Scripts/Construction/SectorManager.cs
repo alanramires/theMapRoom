@@ -639,7 +639,8 @@ public sealed class SectorManager : MonoBehaviour
         return TryComputeLandMovementDistance(from, to, ctx, out cost, null);
     }
 
-    // Distancia de movimento terrestre de TODAS as celulas ATE 'target', numa unica busca.
+    // Distancia de movimento terrestre das celulas ATE 'target', numa unica
+    // busca. maxCost permite manter a coleta dentro do envelope tatico.
     // Substitui N chamadas TryGetLandMovementDistance(cell, target) por 1 Dijkstra reverso (a
     // partir de target) + lookups baratos — o custo do two-turn da IA em unidades navais.
     //
@@ -650,7 +651,10 @@ public sealed class SectorManager : MonoBehaviour
     // Celula ausente do mapa = inalcancavel (mesmo criterio da ponto-a-ponto; o chamador cai no
     // fallback de HexDistance, igual a CalculateRouteDistanceOrHex).
     public static bool TryBuildLandMovementDistanceToTargetMap(
-        Vector3Int target, UnitData referenceUnitData, out Dictionary<Vector3Int, int> distanceToTarget)
+        Vector3Int target,
+        UnitData referenceUnitData,
+        out Dictionary<Vector3Int, int> distanceToTarget,
+        int maxCost = int.MaxValue)
     {
         distanceToTarget = null;
         SectorManager manager = EnsureInstance();
@@ -696,6 +700,8 @@ public sealed class SectorManager : MonoBehaviour
                     continue;
 
                 int nextCost = bestCost + enterCost;
+                if (nextCost > maxCost)
+                    continue;
                 if (costFromTarget.TryGetValue(next, out int knownCost) && knownCost <= nextCost)
                     continue;
 

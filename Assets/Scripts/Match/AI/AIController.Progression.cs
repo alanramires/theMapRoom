@@ -99,7 +99,8 @@ public partial class AIController
         out int firstMoveCost,
         Dictionary<Vector3Int, int> costFromOrigin = null,
         bool evaluateSecondMove = true,
-        Dictionary<Vector3Int, int> distanceToTargetMap = null)
+        Dictionary<Vector3Int, int> distanceToTargetMap = null,
+        bool useHexDistanceOnly = false)
     {
         score = 0;
         bestDistanceAfterNextMove = float.MaxValue;
@@ -116,8 +117,27 @@ public partial class AIController
         Vector3Int originalCell = unit.CurrentCellPosition;
         originalCell.z = 0;
 
-        float originDistance = CalculateRouteDistanceOrHex(unit, origin, target);
-        bestDistanceAfterNextMove = CalculateRouteDistanceOrHex(unit, firstStop, target);
+        float ResolveDistance(Vector3Int cell)
+        {
+            cell.z = 0;
+            if (distanceToTargetMap != null)
+            {
+                return distanceToTargetMap.TryGetValue(
+                    cell, out int routeCost)
+                    ? routeCost
+                    : SectorManager.HexDistance(
+                        cell, target);
+            }
+
+            return useHexDistanceOnly
+                ? SectorManager.HexDistance(cell, target)
+                : CalculateRouteDistanceOrHex(
+                    unit, cell, target);
+        }
+
+        float originDistance = ResolveDistance(origin);
+        bestDistanceAfterNextMove =
+            ResolveDistance(firstStop);
 
         int movementPoints = Mathf.Max(0, unit.RemainingMovementPoints);
         // Custo a partir de origin e INVARIANTE entre os candidatos desta decisao (origin e
@@ -165,11 +185,8 @@ public partial class AIController
                         // metrica, bit-a-bit igual: ausente do mapa = inalcancavel -> HexDistance,
                         // exatamente o fallback de CalculateRouteDistanceOrHex. Aereo (mapa null)
                         // segue pelo caminho antigo (distancia-hexa direta, ja barata).
-                        float nextDistance = distanceToTargetMap != null
-                            ? (distanceToTargetMap.TryGetValue(nextStop, out int nsd)
-                                ? nsd
-                                : SectorManager.HexDistance(nextStop, target))
-                            : CalculateRouteDistanceOrHex(unit, nextStop, target);
+                        float nextDistance =
+                            ResolveDistance(nextStop);
                         if (nextDistance < bestDistanceAfterNextMove)
                             bestDistanceAfterNextMove = nextDistance;
                     }
@@ -182,7 +199,8 @@ public partial class AIController
         }
 
         float twoTurnProgress = originDistance - bestDistanceAfterNextMove;
-        float firstTurnProgress = originDistance - CalculateRouteDistanceOrHex(unit, firstStop, target);
+        float firstTurnProgress =
+            originDistance - ResolveDistance(firstStop);
         float lineDeviation = DistanceFromHexLine(firstStop, origin, target);
 
         // Progressão = aproximar do alvo. 1T (avanço já no turno 1) é termo principal; 2T mantém a

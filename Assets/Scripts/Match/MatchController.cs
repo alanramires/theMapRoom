@@ -848,8 +848,11 @@ public class MatchController : MonoBehaviour
     public bool AreTurnStartEffectsPending =>
         pendingTurnStartUpkeep
         || pendingTurnStartEconomy;
+    public bool IsFogCacheWarmupInProgress =>
+        fogCacheWarmupRoutine != null;
     public bool IsTurnBoardReady =>
         !AreTurnStartEffectsPending &&
+        !IsFogCacheWarmupInProgress &&
         (turnStateManager == null ||
             (!turnStateManager.IsAutoCommandServiceBusy &&
              !turnStateManager.IsScannerActionExecutionInProgress &&
@@ -868,12 +871,21 @@ public class MatchController : MonoBehaviour
     {
         hotSeatGateActive = false;
     }
+
+    public void PrepareFogCachesForTurnPresentation()
+    {
+        // Saves atuais normalmente restauram o cache por observador. Para
+        // snapshots antigos ou incompletos, inicia o complemento ainda atrás do
+        // loading, antes que o botão de turno consulte IsTurnBoardReady.
+        ScheduleInactiveAiFogCacheWarmup();
+    }
     public bool EnableVictoryStars => enableVictoryStars;
     public int VictoryStarsToWin => ClampVictoryStarsGoal(victoryStarsToWin);
     public bool HasVictoryWinner => hasVictoryWinner;
     public TeamId VictoryWinnerTeam => victoryWinnerTeam;
     public PlayerSlotId VictoryWinnerSlotId => PlayerSlotId.FromIndex(victoryWinnerSlotIndex);
     private Coroutine advanceTurnTransitionRoutine;
+    private Coroutine fogCacheWarmupRoutine;
     private bool hotSeatGateActive;
 
     public int GetVictoryStars(PlayerSlotId slotId)
@@ -1291,8 +1303,25 @@ public class MatchController : MonoBehaviour
             requiresLocalPrivacy &&
             panelRodada != null &&
             IsTurnPanelPresentationEnabled;
-        if (useHotSeatPanel)
+        bool useFogWarmupLoading =
+            useHotSeatPanel &&
+            debugFogOfWarEnabled &&
+            enableTotalWar;
+        if (useFogWarmupLoading)
+        {
+            // O loading nao reproduz o video: ele pode ficar estatico enquanto
+            // o main thread constroi os primeiros caches FOW dos slots AI.
+            panelRodada.BeginLoadingPresentation();
+            panelRodada.SetLoadingTeam(ActiveTeam, currentTurn);
+            yield return null;
+        }
+        else if (useHotSeatPanel)
+        {
             panelRodada.CoverImmediatelyForPrivateTurnTransition();
+            // Permite que a cortina seja realmente renderizada antes do primeiro
+            // ApplyActiveTeam/FOW da cena.
+            yield return null;
+        }
         else if (panelRodada != null &&
             (panelRodada.IsPresenting || panelRodada.gameObject.activeInHierarchy))
             panelRodada.CancelLoadingPresentation();
@@ -1323,11 +1352,24 @@ public class MatchController : MonoBehaviour
             }
             else
             {
-                yield return panelRodada.Apresentar(
-                    ActiveTeam,
-                    activePlayerListIndex + 1,
-                    currentTurn,
-                    IsTurnBoardReadyForHumanConfirmation);
+                if (useFogWarmupLoading)
+                {
+                    // ReleaseLoadingPresentation mantem o texto de loading e so
+                    // inicia video/botao depois da barreira de prontidao.
+                    yield return panelRodada.ReleaseLoadingPresentation(
+                        ActiveTeam,
+                        activePlayerListIndex + 1,
+                        currentTurn,
+                        isBoardReady: IsTurnBoardReadyForHumanConfirmation);
+                }
+                else
+                {
+                    yield return panelRodada.Apresentar(
+                        ActiveTeam,
+                        activePlayerListIndex + 1,
+                        currentTurn,
+                        IsTurnBoardReadyForHumanConfirmation);
+                }
             }
         }
 
@@ -2055,6 +2097,11 @@ public class MatchController : MonoBehaviour
         if (useHotSeatPanel)
         {
             panelRodada.CoverImmediatelyForPrivateTurnTransition();
+            // CoverImmediately atualiza o Canvas, mas sem devolver um frame ao
+            // renderer o custo sincrono de AdvanceTurn ainda pode acontecer antes
+            // de a cortina chegar à tela. O painel continua sendo apenas cobertura:
+            // a transicao e a IA nao dependem dele para funcionar.
+            yield return null;
         }
 
         double advanceTurnStartMs = TurnPerfNowMs();
@@ -3087,6 +3134,11 @@ public class MatchController : MonoBehaviour
         FlushTurnStartAutonomyHelper();
         TurnPerfLog("ApplyActiveTeam.FlushTurnStartAutonomyHelper", stageStartMs);
         TurnPerfLog("ApplyActiveTeam.Total", totalStartMs);
+
+        // O primeiro snapshot de um slot AI nao deve ser construído na troca de
+        // turno. Durante um turno humano neutro, aquece somente as contribuicoes
+        // internas da IA, sem publicar FOW, memoria, intel ou visuais.
+        ScheduleInactiveAiFogCacheWarmup();
     }
 
     private void ApplyTeamFlipSettingsToSceneObjects()
@@ -4738,6 +4790,281 @@ public class MatchController : MonoBehaviour
         }
     }
 
+    private void ScheduleInactiveAiFogCacheWarmup()
+    {
+        if (!Application.isPlaying ||
+            !debugFogOfWarEnabled ||
+            !enableTotalWar ||
+            SuppressFogOfWarRefresh ||
+            !IsValidPlayerSlot(ActiveSlotId) ||
+            IsPlayerAI(ActiveSlotId))
+        {
+            return;
+        }
+
+        if (fogCacheWarmupRoutine != null)
+        {
+            StopCoroutine(fogCacheWarmupRoutine);
+            fogCacheWarmupRoutine = null;
+        }
+
+        fogCacheWarmupRoutine = StartCoroutine(
+            WarmInactiveAiFogCachesAcrossFrames(ActiveSlotId));
+    }
+
+    private IEnumerator WarmInactiveAiFogCachesAcrossFrames(PlayerSlotId hostSlot)
+    {
+        double totalStartMs = enableFogStepPerfLogs
+            ? Time.realtimeSinceStartupAsDouble
+            : 0d;
+        int warmedSources = 0;
+        int warmedSlots = 0;
+
+        try
+        {
+            // Nunca alonga o mesmo frame que acabou de publicar o FOW humano.
+            yield return null;
+
+            Tilemap boardMap = ResolveFogBoardTilemap();
+            if (boardMap == null || players == null || players.Count <= 1)
+                yield break;
+            PodeDetectarSensor.ClearRefreshScopedTerrainCache();
+
+            for (int offset = 1; offset < players.Count; offset++)
+            {
+                int slotIndex = (hostSlot.Value + offset) % players.Count;
+                PlayerSlotId observerSlot = PlayerSlotId.FromIndex(slotIndex);
+                if (!IsValidPlayerSlot(observerSlot) ||
+                    players[slotIndex].defeated ||
+                    !IsPlayerAI(observerSlot))
+                {
+                    continue;
+                }
+
+                List<UnitManager> unitsToWarm = new List<UnitManager>();
+                List<UnitManager> activeUnits = UnitManager.AllActive;
+                for (int i = 0; i < activeUnits.Count; i++)
+                {
+                    UnitManager unit = activeUnits[i];
+                    if (unit == null ||
+                        !unit.gameObject.activeInHierarchy ||
+                        unit.IsEmbarked ||
+                        unit.SlotIndex != observerSlot.Value ||
+                        !IsUnitOnBoard(unit, boardMap))
+                    {
+                        continue;
+                    }
+
+                    FogContributionSourceId sourceId =
+                        ResolveFogContributionSourceId(unit);
+                    int sourceStateHash = BuildFogUnitSourceStateHash(unit);
+                    if (fogContributionRuntimeBySlot.TryGetValue(
+                            observerSlot.Value,
+                            out FogSlotContributionRuntime stored) &&
+                        stored != null &&
+                        stored.sources.TryGetValue(
+                            sourceId,
+                            out FogSourceContributionCacheEntry existing) &&
+                        existing != null &&
+                        existing.sourceStateHash == sourceStateHash)
+                    {
+                        continue;
+                    }
+
+                    unitsToWarm.Add(unit);
+                }
+
+                for (int i = 0; i < unitsToWarm.Count; i++)
+                {
+                    while (IsValidPlayerSlot(hostSlot) &&
+                           ActiveSlotId == hostSlot &&
+                           turnStateManager != null &&
+                           turnStateManager.CurrentCursorState !=
+                               TurnStateManager.CursorState.Neutral)
+                    {
+                        yield return null;
+                    }
+
+                    // A troca de turno venceu a corrida. O cache parcial permanece
+                    // valido e o reconciliador de TurnStart completa apenas o resto.
+                    if (!IsValidPlayerSlot(hostSlot) ||
+                        ActiveSlotId != hostSlot ||
+                        IsPlayerAI(ActiveSlotId))
+                    {
+                        yield break;
+                    }
+
+                    UnitManager unit = unitsToWarm[i];
+                    if (unit != null &&
+                        unit.gameObject.activeInHierarchy &&
+                        !unit.IsEmbarked &&
+                        unit.SlotIndex == observerSlot.Value &&
+                        IsUnitOnBoard(unit, boardMap) &&
+                        TryWarmFogContributionSourceForInactiveSlot(
+                            observerSlot,
+                            hostSlot,
+                            unit,
+                            boardMap))
+                    {
+                        warmedSources++;
+                    }
+
+                    // Uma fonte por frame: o jogador deixa de pagar uma unica
+                    // parede de varios segundos durante Passar Turno.
+                    yield return null;
+                }
+
+                if (!IsValidPlayerSlot(hostSlot) ||
+                    ActiveSlotId != hostSlot ||
+                    IsPlayerAI(ActiveSlotId))
+                {
+                    yield break;
+                }
+
+                if (TryFinalizeFogCacheWarmupForInactiveSlot(
+                        observerSlot,
+                        hostSlot,
+                        boardMap))
+                {
+                    warmedSlots++;
+                }
+                yield return null;
+            }
+        }
+        finally
+        {
+            if (enableFogStepPerfLogs)
+            {
+                double totalMs =
+                    (Time.realtimeSinceStartupAsDouble - totalStartMs) * 1000d;
+                Debug.Log(
+                    $"[FoW][Warmup] host={hostSlot.Value} " +
+                    $"slots={warmedSlots} sources={warmedSources} total={totalMs:F3}ms");
+            }
+            fogCacheWarmupRoutine = null;
+        }
+    }
+
+    private bool TryWarmFogContributionSourceForInactiveSlot(
+        PlayerSlotId observerSlot,
+        PlayerSlotId hostSlot,
+        UnitManager unit,
+        Tilemap boardMap)
+    {
+        if (unit == null ||
+            boardMap == null ||
+            ActiveSlotId != hostSlot ||
+            fogCachedObserverSlotIndex != hostSlot.Value ||
+            !fogContributionRuntimeBySlot.ContainsKey(hostSlot.Value))
+        {
+            return false;
+        }
+
+        PlayerSlotId runtimeOwnerBefore =
+            PlayerSlotId.FromIndex(fogCachedObserverSlotIndex);
+        FogUpdateContext warmupContext = new FogUpdateContext(
+            observerSlot,
+            observerSlot,
+            observerSlot,
+            publishGameplayData: false,
+            publishVisuals: false,
+            recordExplorationMemory: false,
+            recordIntel: false);
+        FogObserverScopeState previous = EnterFogObserverScope(warmupContext);
+        bool warmed = false;
+        try
+        {
+            if (!TryActivateFogContributionRuntimeForSlot(
+                    observerSlot,
+                    boardMap))
+            {
+                // Inicializa somente o canal de contribuicoes do observador.
+                // ResetFogOfWarRuntime tambem invalidaria buffers da apresentacao
+                // humana, embora nenhum visual seja publicado por este contexto.
+                fogContributionsBySource.Clear();
+                fogGeographicContributorsByCell.Clear();
+                fogSensorContributorsByCell.Clear();
+                InitializeFogRuntimeData(boardMap);
+            }
+            if (!fogOverlayInitialized ||
+                fogCachedObserverSlotIndex != observerSlot.Value)
+            {
+                return false;
+            }
+
+            FogContributionSourceId sourceId =
+                ResolveFogContributionSourceId(unit);
+            int sourceStateHash = BuildFogUnitSourceStateHash(unit);
+            if (fogContributionsBySource.TryGetValue(
+                    sourceId,
+                    out FogSourceContributionCacheEntry existing) &&
+                existing != null &&
+                existing.sourceStateHash == sourceStateHash)
+            {
+                existing.unitCacheKey = BuildFogUnitCacheKey(unit, boardMap);
+            }
+            else
+            {
+                UpdateFogVisibilityForUnit(
+                    unit,
+                    boardMap,
+                    out _,
+                    out _,
+                    out _,
+                    updateVisual: false);
+                warmed = true;
+            }
+
+            StoreFogContributionRuntimeForSlot(observerSlot);
+        }
+        finally
+        {
+            ExitFogObserverScope(previous);
+            TryActivateFogContributionRuntimeForSlot(
+                runtimeOwnerBefore,
+                boardMap);
+        }
+
+        return warmed;
+    }
+
+    private bool TryFinalizeFogCacheWarmupForInactiveSlot(
+        PlayerSlotId observerSlot,
+        PlayerSlotId hostSlot,
+        Tilemap boardMap)
+    {
+        if (boardMap == null ||
+            ActiveSlotId != hostSlot ||
+            fogCachedObserverSlotIndex != hostSlot.Value)
+        {
+            return false;
+        }
+
+        PlayerSlotId runtimeOwnerBefore =
+            PlayerSlotId.FromIndex(fogCachedObserverSlotIndex);
+        FogUpdateContext warmupContext = new FogUpdateContext(
+            observerSlot,
+            observerSlot,
+            observerSlot,
+            publishGameplayData: false,
+            publishVisuals: false,
+            recordExplorationMemory: false,
+            recordIntel: false);
+        bool synchronized;
+        try
+        {
+            synchronized =
+                TrySynchronizeFogRuntimeAtTurnStart(warmupContext, boardMap);
+        }
+        finally
+        {
+            TryActivateFogContributionRuntimeForSlot(
+                runtimeOwnerBefore,
+                boardMap);
+        }
+        return synchronized;
+    }
+
     private int CountFogGeographicOnlyCells()
     {
         int count = 0;
@@ -4794,7 +5121,8 @@ public class MatchController : MonoBehaviour
     // custava um refresh completo O(unidades) (~4s em mapa com muitos aereos de visao grande),
     // porque a chave do cache de visao inclui o globalBoardRevision que o spawn incrementa. Rede
     // de seguranca: se o cache nao estiver pronto p/ o time ativo, o proprio caminho incremental
-    // cai em full (ver ProcessCommittedUnitFog). Multi-unidade continua full (NotifyCommittedMultiUnit...).
+    // cai em full (ver ProcessCommittedUnitFog). Multi-unidade enumerada,
+    // como desembarque, tambem segue pelo delta incremental.
     public void NotifyCommittedUnitSpawnedForFog(UnitManager unit)
     {
         ProcessCommittedUnitFog(
@@ -4805,14 +5133,63 @@ public class MatchController : MonoBehaviour
             CommittedBoardChangeKind.UnitSpawned);
     }
 
-    public void NotifyCommittedMultiUnitBoardChangeForFog(UnitManager contextUnit)
+    public void NotifyCommittedMultiUnitBoardChangeForFog(
+        UnitManager contextUnit,
+        IReadOnlyList<UnitManager> changedUnits)
     {
-        ProcessCommittedUnitFog(
-            contextUnit,
-            raiseActedEvent: false,
-            requireHasActed: false,
-            requireFullRefresh: true,
-            CommittedBoardChangeKind.MultiUnitChanged);
+        if (!Application.isPlaying
+            || SuppressFogOfWarRefresh
+            || !debugFogOfWarEnabled
+            || !enableTotalWar
+            || activeTeamId < 0)
+        {
+            return;
+        }
+
+        CommittedBoardDelta delta = new CommittedBoardDelta();
+        if (contextUnit != null
+            && contextUnit.gameObject.activeInHierarchy
+            && contextUnit.SlotIndex == ActiveSlotId.Value)
+        {
+            delta.AddUnit(
+                contextUnit,
+                CommittedBoardChangeKind.MultiUnitChanged);
+        }
+
+        if (changedUnits != null)
+        {
+            for (int i = 0; i < changedUnits.Count; i++)
+            {
+                UnitManager changed = changedUnits[i];
+                if (changed == null
+                    || !changed.gameObject.activeInHierarchy
+                    || changed.SlotIndex != ActiveSlotId.Value)
+                {
+                    continue;
+                }
+
+                delta.AddUnit(
+                    changed,
+                    CommittedBoardChangeKind.MultiUnitChanged);
+            }
+        }
+
+        if (turnStateManager != null
+            && turnStateManager.TryGetCommittedMovementPath(
+                out _,
+                out Vector3Int originCell,
+                out Vector3Int destinationCell))
+        {
+            delta.AddChangedCell(originCell);
+            delta.AddChangedCell(destinationCell);
+        }
+
+        // Multi-unidade nao significa full refresh. No desembarque, cada
+        // passageiro passa de embarcado (sem fonte) para uma fonte confirmada
+        // independente; o transportador apenas atualiza a propria fonte.
+        // O delta fica pendente ate Neutral e entao atualiza somente essas
+        // contribuicoes.
+        SubmitCommittedBoardDelta(delta);
     }
 
     private void ProcessCommittedUnitFog(
@@ -4897,8 +5274,8 @@ public class MatchController : MonoBehaviour
             return;
 
         ValidateFogOfWarSortingLayer();
-        // Refresh completo: reservado para mudancas MULTI-unidade no tabuleiro (varias unidades
-        // mudam de uma vez), onde recolher todas se justifica. Spawn de UMA unidade (compra) e
+        // Refresh completo: reservado para mutacoes cujo delta nao consegue
+        // enumerar as fontes afetadas. Spawn de UMA unidade (compra) e
         // movimento usam o delta incremental abaixo — a unidade nova/movida so soma/atualiza a
         // propria visao, e o snapshot de deteccao e republicado, mantendo overlay e consultas de
         // LOS consistentes sem varrer o time inteiro.

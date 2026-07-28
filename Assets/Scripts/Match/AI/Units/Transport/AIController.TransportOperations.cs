@@ -1,8 +1,11 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
 {
+    private const int TransportPlanningOperationalTurns = 2;
+
     private PlayerAction TryDecideTransportOperationsAction(
         UnitManager unit,
         AIWorldSnapshot snapshot,
@@ -27,6 +30,26 @@ public partial class AIController
         if (criticalStockAction != null)
             return criticalStockAction;
 
+        MelhorEmbarqueResult pickupPlanningSnapshot = null;
+        bool pickupPlanningSnapshotBuilt = false;
+        MelhorEmbarqueResult GetPickupPlanningSnapshot()
+        {
+            if (pickupPlanningSnapshotBuilt)
+            {
+                AIDecisionPerf.AddCount(
+                    "TransportPlanningSnapshotHits");
+                return pickupPlanningSnapshot;
+            }
+
+            pickupPlanningSnapshotBuilt = true;
+            AIDecisionPerf.AddCount(
+                "TransportPlanningSnapshotBuilds");
+            pickupPlanningSnapshot =
+                BuildTransportPickupPlanningSnapshot(
+                    unit, snapshot, plan);
+            return pickupPlanningSnapshot;
+        }
+
         var context = new TransportOperationContext
         {
             Unit = unit,
@@ -41,6 +64,7 @@ public partial class AIController
                 TryEvaluateTransportOperation(
                     unit, data, snapshot, plan, operation, tier,
                     movementBudget, allowOpportunisticPickup,
+                    GetPickupPlanningSnapshot,
                     out decision)
         };
 
@@ -186,6 +210,7 @@ public partial class AIController
         AIReachDecisionTier tier,
         int movementBudget,
         bool allowOpportunisticPickup,
+        Func<MelhorEmbarqueResult> getPickupPlanningSnapshot,
         out TransportOperationDecision decision)
     {
         decision = null;
@@ -237,6 +262,7 @@ public partial class AIController
             case TransportOperationType.Evac:
                 return TryQueryTransportEvacOperation(
                     unit, snapshot, plan, tier, movementBudget,
+                    getPickupPlanningSnapshot,
                     out decision);
 
             case TransportOperationType.Supply:
@@ -249,6 +275,8 @@ public partial class AIController
                     includeOpportunisticPickup:
                         allowOpportunisticPickup,
                     requiredDisposition: null,
+                    getPickupPlanningSnapshot:
+                        getPickupPlanningSnapshot,
                     out decision);
         }
 
@@ -283,6 +311,7 @@ public partial class AIController
         TeamObjectivePlan plan,
         AIReachDecisionTier requestedTier,
         int movementBudget,
+        Func<MelhorEmbarqueResult> getPickupPlanningSnapshot,
         out TransportOperationDecision decision)
     {
         bool found = TryQueryTransportPickupOperation(
@@ -290,6 +319,8 @@ public partial class AIController
             includeOpportunisticPickup: false,
             requiredDisposition:
                 MelhorEmbarqueRideDisposition.Emergency,
+            getPickupPlanningSnapshot:
+                getPickupPlanningSnapshot,
             out decision);
         if (!found || decision == null)
             return false;
@@ -349,49 +380,21 @@ public partial class AIController
         int movementBudget,
         bool includeOpportunisticPickup,
         MelhorEmbarqueRideDisposition? requiredDisposition,
+        Func<MelhorEmbarqueResult> getPickupPlanningSnapshot,
         out TransportOperationDecision decision)
     {
         decision = null;
         if (!unit.TryGetUnitData(out UnitData data)
             || data == null
             || !data.isTransporter
-            || IsTransporterAtCapacity(unit, data))
+            || IsTransporterAtCapacity(unit, data)
+            || getPickupPlanningSnapshot == null)
             return false;
 
-        int serviceTacticalBudget =
-            Mathf.Max(0, unit.RemainingMovementPoints);
-        int serviceOperationalTurns = serviceTacticalBudget > 0
-            ? Mathf.Max(
-                1,
-                Mathf.CeilToInt(
-                    Mathf.Max(serviceTacticalBudget, movementBudget)
-                    / (float)serviceTacticalBudget))
-            : 2;
         MelhorEmbarqueResult pickup =
-            MelhorEmbarqueService.Evaluate(
-                new MelhorEmbarqueRequest
-                {
-                    transporter = unit,
-                    map = boardTilemap,
-                    terrainDatabase = terrainDatabase,
-                    tacticalBudget = serviceTacticalBudget,
-                    operationalTurns = serviceOperationalTurns,
-                    includeStrategic =
-                        requestedTier ==
-                        AIReachDecisionTier.Strategic,
-                    allowPassenger = candidate =>
-                        IsStructurallyEligiblePickupCandidate(
-                            unit, candidate, snapshot, plan),
-                    includeInLegacyRanking = _ => false,
-                    evaluateRideNeed = candidate =>
-                        EvaluatePickupRideNeed(
-                            candidate, plan,
-                            serviceOperationalTurns),
-                    diagnosticLog = showAILogs
-                        ? message => Debug.Log(
-                            $"{TL("Transporte")}[MelhorEmbarque] {message}")
-                        : null
-                });
+            getPickupPlanningSnapshot();
+        if (pickup == null)
+            return false;
         MelhorEmbarqueTier serviceTier =
             requestedTier == AIReachDecisionTier.Tactical
                 ? MelhorEmbarqueTier.Tactical
@@ -444,6 +447,57 @@ public partial class AIController
             selectedOption.transporterRouteCost;
         return true;
 
+    }
+
+    private MelhorEmbarqueResult
+        BuildTransportPickupPlanningSnapshot(
+            UnitManager unit,
+            AIWorldSnapshot snapshot,
+            TeamObjectivePlan plan)
+    {
+        if (unit == null || snapshot == null)
+            return new MelhorEmbarqueResult();
+
+        int tacticalBudget =
+            Mathf.Max(0, unit.RemainingMovementPoints);
+        MelhorEmbarqueResult result =
+            MelhorEmbarqueService.Evaluate(
+                new MelhorEmbarqueRequest
+                {
+                    transporter = unit,
+                    map = boardTilemap,
+                    terrainDatabase = terrainDatabase,
+                    tacticalBudget = tacticalBudget,
+                    operationalTurns =
+                        TransportPlanningOperationalTurns,
+                    // Uma coleta produz Tactical, Operational e Strategic.
+                    // TransportOperations apenas filtra o resultado na ordem
+                    // de prioridade; nenhuma tentativa reconstrói o mundo.
+                    includeStrategic = true,
+                    allowPassenger = candidate =>
+                        IsStructurallyEligiblePickupCandidate(
+                            unit, candidate, snapshot, plan),
+                    includeInLegacyRanking = _ => false,
+                    evaluateRideNeed = candidate =>
+                        EvaluatePickupRideNeed(
+                            candidate, plan,
+                            TransportPlanningOperationalTurns),
+                    diagnosticLog = showAILogs
+                        ? message => Debug.Log(
+                            $"{TL("Transporte")}[MelhorEmbarque] {message}")
+                        : null
+                });
+
+        if (showAILogs)
+        {
+            Debug.Log(
+                $"{TL("Transporte")}[PlanningSnapshot] " +
+                $"unit=#{unit.InstanceId} rev=" +
+                $"{ThreatRevisionTracker.GlobalBoardRevision} " +
+                $"tiers=3 options={result.options.Count} " +
+                $"ranking={result.ranking.Count}");
+        }
+        return result;
     }
 
     private static bool CanMaterializePickupRendezvous(
