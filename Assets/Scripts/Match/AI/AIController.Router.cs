@@ -21,8 +21,18 @@ public partial class AIController
 
         TeamObjectivePlan plan = ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(snapshot.AISlotIndex));
 
-        if (TryFindProductionUnlockVacateAction(unit, snapshot, out PlayerAction productionUnlockAction))
-            return productionUnlockAction;
+        bool isAirSurveillance = IsAirSurveillanceUnit(unit);
+
+        // Preserva a ordem historica para os demais papeis. Somente
+        // Vigilancia Aerea antepoe emergencia ao desbloqueio da construcao.
+        if (!isAirSurveillance
+            && TryFindProductionUnlockVacateAction(
+                unit,
+                snapshot,
+                out PlayerAction regularProductionUnlockAction))
+        {
+            return regularProductionUnlockAction;
+        }
 
         // Reparos sao uma necessidade da propria unidade, inclusive quando ela
         // tambem possui slots de transporte. Sem este gate um Hidroaviao quase
@@ -33,7 +43,27 @@ public partial class AIController
         PlayerAction selfRecoveryAction =
             TryDecideRepairAction(unit, snapshot, plan);
         if (selfRecoveryAction != null)
+        {
+            if (isAirSurveillance)
+                LogAirSurveillancePolicyStage(
+                    unit,
+                    AirSurveillancePolicyStage.EmergencyAndRepair,
+                    "autoridade global de reparo");
             return selfRecoveryAction;
+        }
+
+        if (isAirSurveillance
+            && TryFindProductionUnlockVacateAction(
+                unit,
+                snapshot,
+                out PlayerAction productionUnlockAction))
+        {
+            LogAirSurveillancePolicyStage(
+                unit,
+                AirSurveillancePolicyStage.ExitObstructedPosition,
+                "desbloqueio global de producao");
+            return productionUnlockAction;
+        }
 
         // Um transportador que tambem e Hub (como o Trem de Carga) precisa
         // conferir a rede antes de sair procurando passageiro. Essa preempcao
@@ -53,7 +83,14 @@ public partial class AIController
         PlayerAction transportOperationsAction =
             TryDecideTransportOperationsAction(unit, snapshot, plan);
         if (transportOperationsAction != null)
+        {
+            if (isAirSurveillance)
+                LogAirSurveillancePolicyStage(
+                    unit,
+                    AirSurveillancePolicyStage.TransportOrPlatform,
+                    "operacao global de transporte");
             return transportOperationsAction;
+        }
 
         // Supridor que TAMBEM transporta, carregando um ferido: a manutencao a bordo (ou
         // a recarga que a viabiliza) e a acao da rodada, antes de qualquer papel. Vem

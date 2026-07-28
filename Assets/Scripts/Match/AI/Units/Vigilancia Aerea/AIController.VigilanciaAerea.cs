@@ -3,6 +3,16 @@ using UnityEngine;
 
 public partial class AIController
 {
+    private enum AirSurveillancePolicyStage
+    {
+        EmergencyAndRepair,
+        TransportOrPlatform,
+        ExitObstructedPosition,
+        ImproveAirCoverage,
+        ConservativeRear,
+        Hold
+    }
+
     private PlayerAction TryDecideAirSurveillanceAction(UnitManager unit, AIWorldSnapshot snapshot, TeamObjectivePlan plan)
     {
         if (!IsAirSurveillanceUnit(unit) || snapshot == null)
@@ -17,6 +27,10 @@ public partial class AIController
         if (paths != null && paths.Count > 0
             && TryFindHomeProductionVacateCombatAction(unit, snapshot, fromCell, paths, occupied, out PlayerAction vacateAction))
         {
+            LogAirSurveillancePolicyStage(
+                unit,
+                AirSurveillancePolicyStage.ExitObstructedPosition,
+                $"libera construcao em {fromCell}");
             return vacateAction;
         }
 
@@ -25,23 +39,53 @@ public partial class AIController
         {
             if (postureCell != fromCell)
             {
-                Debug.Log($"{TL("VigilanciaAerea")} {unit.InstanceId} reposiciona retaguarda via {postureCell} anchor={anchor} ({anchorReason}; {postureReason})");
+                LogAirSurveillancePolicyStage(
+                    unit,
+                    AirSurveillancePolicyStage.ImproveAirCoverage,
+                    $"reposiciona via {postureCell} anchor={anchor} ({anchorReason}; {postureReason})");
                 return BuildMoveBatch(unit, snapshot.AITeam, fromCell, postureCell, paths);
             }
 
-            Debug.Log($"{TL("VigilanciaAerea")} {unit.InstanceId} segura observacao @ {fromCell} anchor={anchor} ({anchorReason}; {postureReason})");
+            LogAirSurveillancePolicyStage(
+                unit,
+                AirSurveillancePolicyStage.Hold,
+                $"segura observacao em {fromCell} anchor={anchor} ({anchorReason}; {postureReason})");
             return BuildMoveBatch(unit, snapshot.AITeam, fromCell, fromCell, paths);
         }
 
-        Vector3Int conservative = FindConservativeRogueFireSupportCell(unit, snapshot, fromCell, paths, occupied);
-        if (conservative != fromCell)
+        PlayerAction conservativeAction =
+            TryBuildConservativeRearFollowAction(
+                unit,
+                snapshot,
+                paths,
+                context: "vigilancia-aerea");
+        if (conservativeAction != null)
         {
-            Debug.Log($"{TL("VigilanciaAerea")} {unit.InstanceId} sem anchor seguro, reagrupa retaguarda via {conservative}");
-            return BuildMoveBatch(unit, snapshot.AITeam, fromCell, conservative, paths);
+            LogAirSurveillancePolicyStage(
+                unit,
+                AirSurveillancePolicyStage.ConservativeRear,
+                "sem ancora operacional; acompanha retaguarda aliada");
+            return conservativeAction;
         }
 
-        Debug.Log($"{TL("VigilanciaAerea")} {unit.InstanceId} aguarda em retaguarda @ {fromCell}");
+        LogAirSurveillancePolicyStage(
+            unit,
+            AirSurveillancePolicyStage.Hold,
+            $"sem direcao segura; aguarda em {fromCell}");
         return BuildMoveBatch(unit, snapshot.AITeam, fromCell, fromCell, paths);
+    }
+
+    private void LogAirSurveillancePolicyStage(
+        UnitManager unit,
+        AirSurveillancePolicyStage stage,
+        string reason)
+    {
+        if (unit == null)
+            return;
+
+        Debug.Log(
+            $"{TL("VigilanciaAerea")} {unit.InstanceId} " +
+            $"policy={stage} {reason}");
     }
 
     private static bool IsAirSurveillanceUnit(UnitManager unit)
