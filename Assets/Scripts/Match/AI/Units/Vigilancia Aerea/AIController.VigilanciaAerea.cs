@@ -308,6 +308,11 @@ public partial class AIController
                 fromCell,
                 alliedAirLow,
                 alliedAirHigh);
+        AirSurveillanceSpacingSample fromSpacing =
+            EvaluateAirSurveillanceSpacing(
+                unit,
+                snapshot,
+                fromCell);
         float fromScore = ScoreAirSurveillancePostureCell(
             unit,
             snapshot,
@@ -317,7 +322,8 @@ public partial class AIController
             offensiveAnchor,
             0,
             out string fromReason)
-            + ScoreEwacsCoverageContribution(fromCoverage);
+            + ScoreEwacsCoverageContribution(fromCoverage)
+            - fromSpacing.Penalty;
         bool fromInsideRecoveryEnvelope =
             IsEwacsRecoveryCellSafe(
                 unit,
@@ -329,7 +335,9 @@ public partial class AIController
             fromScore -= 100000f;
         float bestScore = fromScore;
         string fromCoverageReason =
-            DescribeEwacsCoverageContribution(fromCoverage);
+            DescribeEwacsCoverageContribution(
+                fromCoverage,
+                fromSpacing);
         string bestReason =
             ewacsRecovery != null
                 ? $"{fromReason} {fromCoverageReason} recovery={fromRecoveryReason}"
@@ -368,6 +376,11 @@ public partial class AIController
                         cell,
                         alliedAirLow,
                         alliedAirHigh);
+                AirSurveillanceSpacingSample spacing =
+                    EvaluateAirSurveillanceSpacing(
+                        unit,
+                        snapshot,
+                        cell);
                 float score = ScoreAirSurveillancePostureCell(
                     unit,
                     snapshot,
@@ -377,14 +390,17 @@ public partial class AIController
                     offensiveAnchor,
                     GetPathStepCount(paths, cell),
                     out string scoreReason)
-                    + ScoreEwacsCoverageContribution(coverage);
+                    + ScoreEwacsCoverageContribution(coverage)
+                    - spacing.Penalty;
 
                 if (score > bestScore)
                 {
                     bestScore = score;
                     bestCell = cell;
                     string coverageReason =
-                        DescribeEwacsCoverageContribution(coverage);
+                        DescribeEwacsCoverageContribution(
+                            coverage,
+                            spacing);
                     bestReason = ewacsRecovery != null
                         ? $"{scoreReason} {coverageReason} recovery={recoveryReason}"
                         : $"{scoreReason} {coverageReason}";
@@ -405,6 +421,10 @@ public partial class AIController
         public readonly float Score;
 
         public int VisibleCells => AirLow + AirHigh;
+        public int OverlapAirLow =>
+            Mathf.Max(0, AirLow - MarginalAirLow);
+        public int OverlapAirHigh =>
+            Mathf.Max(0, AirHigh - MarginalAirHigh);
 
         public AirSurveillanceCoverageSample(
             int airLow,
@@ -425,7 +445,36 @@ public partial class AIController
             return
                 $"low={AirLow}(new={MarginalAirLow}) " +
                 $"high={AirHigh}(new={MarginalAirHigh}) " +
+                $"overlap={OverlapAirLow}/{OverlapAirHigh} " +
                 $"coverage={Score:F0}";
+        }
+    }
+
+    private readonly struct AirSurveillanceSpacingSample
+    {
+        public readonly int NearestDistance;
+        public readonly int PreferredDistance;
+        public readonly float Penalty;
+
+        public bool HasAlliedSensor =>
+            NearestDistance < int.MaxValue;
+
+        public AirSurveillanceSpacingSample(
+            int nearestDistance,
+            int preferredDistance,
+            float penalty)
+        {
+            NearestDistance = nearestDistance;
+            PreferredDistance = preferredDistance;
+            Penalty = penalty;
+        }
+
+        public override string ToString()
+        {
+            return HasAlliedSensor
+                ? $"spacing={NearestDistance}/{PreferredDistance} " +
+                    $"repel={Penalty:F0}"
+                : $"spacing=none/{PreferredDistance} repel=0";
         }
     }
 
@@ -602,9 +651,11 @@ public partial class AIController
                 snapshot,
                 target,
                 anchor,
-                originCoverage);
+                originCoverage,
+                out AirSurveillanceSpacingSample originSpacing);
         float bestScore = float.MinValue;
         AirSurveillanceCoverageSample bestCoverage = default;
+        AirSurveillanceSpacingSample bestSpacing = default;
 
         var frontier =
             new Queue<(Vector3Int cell, int depth)>();
@@ -655,12 +706,14 @@ public partial class AIController
                         snapshot,
                         cell,
                         anchor,
-                        coverage);
+                        coverage,
+                        out AirSurveillanceSpacingSample spacing);
                 if (score > bestScore)
                 {
                     bestScore = score;
                     target = cell;
                     bestCoverage = coverage;
+                    bestSpacing = spacing;
                 }
             }
 
@@ -689,7 +742,8 @@ public partial class AIController
             Mathf.Max(180f, originCoverage.Score * 0.12f);
         reason =
             $"anchor={anchor} {anchorReason} " +
-            $"{originCoverage}->{bestCoverage} " +
+            $"{originCoverage} {originSpacing} -> " +
+            $"{bestCoverage} {bestSpacing} " +
             $"gain={gain:F0} required={requiredGain:F0}";
         return !requireCoverageGain || gain >= requiredGain;
     }
@@ -699,8 +753,13 @@ public partial class AIController
         AIWorldSnapshot snapshot,
         Vector3Int cell,
         Vector3Int anchor,
-        AirSurveillanceCoverageSample coverage)
+        AirSurveillanceCoverageSample coverage,
+        out AirSurveillanceSpacingSample spacing)
     {
+        spacing = EvaluateAirSurveillanceSpacing(
+            radar,
+            snapshot,
+            cell);
         float anchorDistance =
             SectorManager.HexDistance(cell, anchor);
         float missionDirection =
@@ -716,7 +775,8 @@ public partial class AIController
             + missionDirection
             + cohesion * 0.25f
             + GetTerrainDpqPontos(cell) * 25f
-            - threat * 220f;
+            - threat * 220f
+            - spacing.Penalty;
     }
 
     private bool TryFindStationaryMobileRadarCell(
@@ -746,6 +806,11 @@ public partial class AIController
                 fromCell,
                 alliedAirLow,
                 alliedAirHigh);
+        AirSurveillanceSpacingSample fromSpacing =
+            EvaluateAirSurveillanceSpacing(
+                unit,
+                snapshot,
+                fromCell);
         float fromPosture = ScoreAirSurveillancePostureCell(
             unit,
             snapshot,
@@ -755,9 +820,13 @@ public partial class AIController
             offensiveAnchor,
             pathCost: 0,
             out _);
-        float fromScore = fromCoverage.Score + fromPosture * 0.2f;
+        float fromScore =
+            fromCoverage.Score
+            + fromPosture * 0.2f
+            - fromSpacing.Penalty;
         float bestScore = fromScore;
         AirSurveillanceCoverageSample bestCoverage = fromCoverage;
+        AirSurveillanceSpacingSample bestSpacing = fromSpacing;
         int bestPathCost = 0;
 
         TeamObjectivePlan capPlan =
@@ -819,6 +888,11 @@ public partial class AIController
                         cell,
                         alliedAirLow,
                         alliedAirHigh);
+                AirSurveillanceSpacingSample spacing =
+                    EvaluateAirSurveillanceSpacing(
+                        unit,
+                        snapshot,
+                        cell);
                 float posture =
                     ScoreAirSurveillancePostureCell(
                         unit,
@@ -829,13 +903,17 @@ public partial class AIController
                         offensiveAnchor,
                         pathCost,
                         out _);
-                float score = coverage.Score + posture * 0.2f;
+                float score =
+                    coverage.Score
+                    + posture * 0.2f
+                    - spacing.Penalty;
                 if (score <= bestScore)
                     continue;
 
                 bestScore = score;
                 bestCell = cell;
                 bestCoverage = coverage;
+                bestSpacing = spacing;
                 bestPathCost = pathCost;
             }
         }
@@ -848,14 +926,14 @@ public partial class AIController
         {
             bestCell = fromCell;
             reason =
-                $"radar stationary hold {fromCoverage} " +
+                $"radar stationary hold {fromCoverage} {fromSpacing} " +
                 $"bestGain={actualGain:F0} required={requiredGain:F0}";
             return true;
         }
 
         reason =
-            $"radar stationary move {fromCoverage} -> " +
-            $"{bestCoverage} gain={actualGain:F0} " +
+            $"radar stationary move {fromCoverage} {fromSpacing} -> " +
+            $"{bestCoverage} {bestSpacing} gain={actualGain:F0} " +
             $"required={requiredGain:F0} path={bestPathCost}";
         return true;
     }
@@ -897,11 +975,64 @@ public partial class AIController
     }
 
     private static string DescribeEwacsCoverageContribution(
-        AirSurveillanceCoverageSample coverage)
+        AirSurveillanceCoverageSample coverage,
+        AirSurveillanceSpacingSample spacing)
     {
         return
             $"{coverage} " +
-            $"covWeighted={ScoreEwacsCoverageContribution(coverage):F0}";
+            $"covWeighted={ScoreEwacsCoverageContribution(coverage):F0} " +
+            $"{spacing}";
+    }
+
+    private static AirSurveillanceSpacingSample
+        EvaluateAirSurveillanceSpacing(
+            UnitManager self,
+            AIWorldSnapshot snapshot,
+            Vector3Int cell)
+    {
+        int airVision = ResolveAirSurveillanceVision(self);
+        int preferredDistance = Mathf.Clamp(
+            Mathf.CeilToInt(airVision * 0.5f),
+            3,
+            5);
+        int nearestDistance = int.MaxValue;
+        if (snapshot != null && snapshot.MyUnits != null)
+        {
+            foreach (UnitManager ally in snapshot.MyUnits)
+            {
+                if (ally == null
+                    || ally == self
+                    || ally.IsDead
+                    || ally.IsEmbarked
+                    || ally.IsUnderRepair
+                    || !IsAirSurveillanceUnit(ally))
+                {
+                    continue;
+                }
+
+                Vector3Int allyCell = ally.CurrentCellPosition;
+                allyCell.z = 0;
+                int distance = Mathf.RoundToInt(SectorManager.HexDistance(
+                    cell,
+                    allyCell));
+                if (distance < nearestDistance)
+                    nearestDistance = distance;
+            }
+        }
+
+        float penalty = 0f;
+        if (nearestDistance < preferredDistance)
+        {
+            penalty =
+                (preferredDistance - nearestDistance) * 260f;
+            if (nearestDistance <= 1)
+                penalty += 260f;
+        }
+
+        return new AirSurveillanceSpacingSample(
+            nearestDistance,
+            preferredDistance,
+            penalty);
     }
 
     private void CollectAlliedAirSurveillanceCoverage(

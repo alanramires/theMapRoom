@@ -234,16 +234,27 @@ public static class AirSurveillanceCoverageService
                 Domain.Air,
                 HeightLevel.AirHigh);
 
+        int overlapLow = Mathf.Max(
+            0,
+            coverage.AirLow.Length - marginalLow);
+        int overlapHigh = Mathf.Max(
+            0,
+            coverage.AirHigh.Length - marginalHigh);
+
+        // A utilidade pertence ao time, nao ao sensor isolado. Uma celula nova
+        // recebe quase todo o valor; cobertura ja fornecida por um aliado vale
+        // apenas uma pequena redundancia operacional. O bonus stealth tambem
+        // incide principalmente onde o observador acrescenta cobertura.
         float score =
-            coverage.AirLow.Length * 8f
-            + coverage.AirHigh.Length * 10f
-            + marginalLow * 6f
-            + marginalHigh * 7f
+            marginalLow * 14f
+            + marginalHigh * 17f
+            + overlapLow * 1.5f
+            + overlapHigh * 2f
             + (detectsLowStealth
-                ? coverage.AirLow.Length * 2f
+                ? marginalLow * 2f
                 : 0f)
             + (detectsHighStealth
-                ? coverage.AirHigh.Length * 2f
+                ? marginalHigh * 2f
                 : 0f);
 
         return new Result(
