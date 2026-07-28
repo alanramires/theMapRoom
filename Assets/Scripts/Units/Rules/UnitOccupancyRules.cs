@@ -279,6 +279,68 @@ public static class UnitOccupancyRules
         return result;
     }
 
+    /// <summary>
+    /// Informa se existe um ocupante que realmente impede a unidade de usar a
+    /// célula na camada operacional atual. Compartilhar coordenada não basta:
+    /// Air, Sub e superfície podem coexistir quando pertencem a bandas
+    /// diferentes, e convés/água possui sua própria exceção.
+    /// </summary>
+    public static bool HasBlockingOccupantForUnitAtCell(
+        Tilemap referenceTilemap,
+        Vector3Int cell,
+        UnitManager unit,
+        bool alliedOnly = false)
+    {
+        if (unit == null)
+            return false;
+
+        cell.z = 0;
+        List<UnitManager> occupants =
+            GetUnitsAtCell(referenceTilemap, cell, unit);
+        if (occupants.Count == 0)
+            return false;
+
+        if (!OccupancyResolver.IsLayerAwareRulesActive)
+        {
+            for (int i = 0; i < occupants.Count; i++)
+            {
+                UnitManager occupant = occupants[i];
+                if (occupant == null)
+                    continue;
+                if (!alliedOnly ||
+                    PlayerSlotRelations.AreAllies(unit, occupant))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        IReadOnlyList<UnitManager> considered = occupants;
+        if (alliedOnly)
+        {
+            List<UnitManager> alliedOccupants =
+                new List<UnitManager>(occupants.Count);
+            for (int i = 0; i < occupants.Count; i++)
+            {
+                UnitManager occupant = occupants[i];
+                if (occupant != null &&
+                    PlayerSlotRelations.AreAllies(unit, occupant))
+                {
+                    alliedOccupants.Add(occupant);
+                }
+            }
+            if (alliedOccupants.Count == 0)
+                return false;
+            considered = alliedOccupants;
+        }
+
+        // CanEndMove é a autoridade: resolve bandas diferentes, aliados,
+        // convivência permitida pelo modo de jogo e a separação especial
+        // entre convés e água. A IA não deve inventar um bloqueio adicional.
+        return !OccupancyResolver.CanEndMove(unit, cell, considered);
+    }
+
     public static bool CanEndLayerTransitionAtCell(
         Tilemap referenceTilemap,
         Vector3Int cell,

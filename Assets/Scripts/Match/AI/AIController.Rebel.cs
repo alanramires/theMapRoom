@@ -187,9 +187,19 @@ public partial class AIController
             Vector3Int cell = construction.CurrentCellPosition;
             cell.z = 0;
 
-            // Ja ha aliado capturando aqui (persiste entre turnos), ou outro rebelde
-            // reservou este objetivo nesta passada? Pula para a bolha seguinte.
-            if (allyCells.Contains(cell) || rebelCaptureTargetReservations.Contains(cell))
+            // Ja ha aliado que realmente ocupa a camada de captura aqui
+            // (persiste entre turnos), ou outro rebelde reservou este objetivo
+            // nesta passada? Uma aeronave na mesma coordenada nao reivindica
+            // o predio para uma infantaria terrestre.
+            bool claimedByAlliedCapturer =
+                allyCells.Contains(cell) &&
+                UnitOccupancyRules.HasBlockingOccupantForUnitAtCell(
+                    boardTilemap,
+                    cell,
+                    unit,
+                    alliedOnly: true);
+            if (claimedByAlliedCapturer ||
+                rebelCaptureTargetReservations.Contains(cell))
                 continue;
 
             float dist = SectorManager.HexDistance(fromCell, cell);
@@ -247,9 +257,22 @@ public partial class AIController
             cell.z = 0;
             if (cell == fromCell)
                 continue;
-            if (occupied != null && occupied.Contains(cell))
+            if (occupied != null &&
+                occupied.Contains(cell) &&
+                UnitOccupancyRules.HasBlockingOccupantForUnitAtCell(
+                    boardTilemap,
+                    cell,
+                    unit))
                 continue;
-            if (plannedDestinations.Contains(cell))
+            // A reserva da fase guarda apenas a coordenada. Confirme pelo
+            // resolvedor de camada se o aliado planejado realmente disputa o
+            // destino; aeronave e infantaria podem reservar o mesmo hex.
+            if (plannedDestinations.Contains(cell) &&
+                UnitOccupancyRules.HasBlockingOccupantForUnitAtCell(
+                    boardTilemap,
+                    cell,
+                    unit,
+                    alliedOnly: true))
                 continue;
 
             float dist = SectorManager.HexDistance(cell, targetCell);

@@ -124,6 +124,35 @@ public static class PodeCapturarSensor
         out string reason,
         MatchController matchController = null)
     {
+        Vector3Int evaluatedCell = selectedUnit != null
+            ? selectedUnit.CurrentCellPosition
+            : default;
+        return TryGetCaptureTargetAtCell(
+            selectedUnit,
+            boardTilemap,
+            evaluatedCell,
+            movementMode,
+            out targetConstruction,
+            out operationType,
+            out reason,
+            matchController);
+    }
+
+    /// <summary>
+    /// Consulta a mesma regra oficial de captura em uma célula projetada, sem
+    /// alterar a posição ou qualquer estado confirmado da unidade. Usado por
+    /// planejadores para avaliar o resultado de um movimento provisório.
+    /// </summary>
+    public static bool TryGetCaptureTargetAtCell(
+        UnitManager selectedUnit,
+        Tilemap boardTilemap,
+        Vector3Int evaluatedCell,
+        SensorMovementMode movementMode,
+        out ConstructionManager targetConstruction,
+        out CaptureOperationType operationType,
+        out string reason,
+        MatchController matchController = null)
+    {
         targetConstruction = null;
         operationType = CaptureOperationType.None;
         reason = string.Empty;
@@ -172,7 +201,7 @@ public static class PodeCapturarSensor
             return false;
         }
 
-        Vector3Int cell = selectedUnit.CurrentCellPosition;
+        Vector3Int cell = evaluatedCell;
         cell.z = 0;
         if (matchController == null)
             matchController = Object.FindAnyObjectByType<MatchController>();

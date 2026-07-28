@@ -368,21 +368,15 @@ public static class QueroCaronaService
     {
         if (request?.unit == null || request.map == null)
             return false;
-        cell.z = 0;
-        List<UnitManager> occupants =
-            UnitOccupancyRules.GetUnitsAtCell(
-                request.map, cell, request.unit);
-        for (int i = 0; i < occupants.Count; i++)
-        {
-            UnitManager occupant = occupants[i];
-            if (occupant != null
-                && !occupant.IsDead
-                && !occupant.IsEmbarked
-                && PlayerSlotRelations.AreAllies(
-                    request.unit, occupant))
-                return true;
-        }
-        return false;
+
+        // Um aliado só reivindica o prédio se realmente disputar a camada do
+        // passageiro. Apache/avião sobre a mesma coordenada não ocupa a
+        // construção para um capturador terrestre.
+        return UnitOccupancyRules.HasBlockingOccupantForUnitAtCell(
+            request.map,
+            cell,
+            request.unit,
+            alliedOnly: true);
     }
 
     private static void SetReachAndDecision(

@@ -75,7 +75,13 @@ public partial class AIController
         Vector3Int currentCell = unit.CurrentCellPosition; currentCell.z = 0;
         foreach (Vector3Int cell in paths.Keys)
         {
-            if (cell != currentCell && occupied.Contains(cell)) continue;
+            if (cell != currentCell &&
+                occupied.Contains(cell) &&
+                UnitOccupancyRules.HasBlockingOccupantForUnitAtCell(
+                    boardTilemap,
+                    cell,
+                    unit))
+                continue;
             if (cell == excludeCell) continue;
             if (skippedCaptureCells != null && skippedCaptureCells.Contains(cell)) continue;
             if (excludeCurrentCell && cell == currentCell) continue;
@@ -237,27 +243,25 @@ public partial class AIController
         out ConstructionManager targetConstruction)
     {
         targetConstruction = null;
-        simulatedCell.z = 0;
-
-        // A simulacao da IA nao pode usar o sensor de captura como oraculo do
-        // mapa preto. A celula atual pertence ao snapshot confirmado da unidade;
-        // qualquer outro destino precisa estar visivel no cache confirmado.
-        Vector3Int currentCell = unit.CurrentCellPosition;
-        currentCell.z = 0;
-        if (simulatedCell != currentCell
-            && (matchController == null || !matchController.IsCellVisibleForActiveTeam(simulatedCell)))
+        if (unit == null)
             return false;
 
-        if (!unit.TryGetUnitData(out UnitData data)) return false;
-        if (!UnitRoleCompatibility.CanSatisfy(data, UnitRole.Capturador)) return false;
-        if (unit.TeamId == TeamId.Neutral) return false;
+        simulatedCell.z = 0;
+        Vector3Int currentCell = unit.CurrentCellPosition;
+        currentCell.z = 0;
+        SensorMovementMode movementMode = simulatedCell == currentCell
+            ? SensorMovementMode.MoveuParado
+            : SensorMovementMode.MoveuAndando;
 
-        ConstructionManager c = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, simulatedCell);
-        if (c == null || !c.IsCapturable || c.CapturePointsMax <= 0) return false;
-        if (c.SlotIndex == unit.SlotIndex && c.CurrentCapturePoints >= c.CapturePointsMax) return false;
-
-        targetConstruction = c;
-        return true;
+        return PodeCapturarSensor.TryGetCaptureTargetAtCell(
+            unit,
+            boardTilemap,
+            simulatedCell,
+            movementMode,
+            out targetConstruction,
+            out _,
+            out _,
+            matchController);
     }
 
     public static ConstructionManager FindCapturableInSector(ConstructionSector sector, TeamId aiTeam, Vector3Int? unitPos = null)

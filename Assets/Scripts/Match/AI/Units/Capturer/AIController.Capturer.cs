@@ -99,13 +99,16 @@ public partial class AIController
         ConstructionManager best = null;
         Vector3Int bestCell = fromCell;
         float bestScore = float.MinValue;
-        HashSet<Vector3Int> occupied = BuildOccupied(unit);
 
         foreach (Vector3Int rawCell in paths.Keys)
         {
             Vector3Int captureCell = rawCell;
             captureCell.z = 0;
-            if (captureCell != fromCell && occupied.Contains(captureCell))
+            if (captureCell != fromCell &&
+                UnitOccupancyRules.HasBlockingOccupantForUnitAtCell(
+                    boardTilemap,
+                    captureCell,
+                    unit))
                 continue;
             float distance = SectorManager.HexDistance(fromCell, captureCell);
             if (distance > 3f)
