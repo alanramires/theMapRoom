@@ -68,7 +68,7 @@ public partial class AIController
 
         Vector3Int anchor = assigned != null
             ? ResolveFireSupportObjectiveAnchor(assigned, snapshot.AITeam, fromCell)
-            : ResolveRogueFireSupportAnchor(snapshot, fromCell);
+            : ResolveRogueFireSupportAnchor(unit, snapshot, fromCell);
 
         if (IsArtilleryModeOnly(unit)
             && TryBuildBestFireSupportAttack(unit, snapshot, fromCell, paths, occupied, anchor,

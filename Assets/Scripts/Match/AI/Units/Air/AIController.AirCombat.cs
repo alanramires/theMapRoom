@@ -80,6 +80,7 @@ public partial class AIController
         List<UnitManager> visibleEnemies =
             CollectVisibleAirCombatEnemies(unit, snapshot);
         Vector3Int anchor = ResolveAirCombatFallbackAnchor(
+            unit,
             snapshot,
             fromCell,
             visibleEnemies,
@@ -123,7 +124,16 @@ public partial class AIController
             return platformAction;
         }
 
-        Vector3Int moveCell = FindAirCombatAdvanceMove(fromCell, anchor, paths, occupied, snapshot.AITeam, takeoffMoveOptions);
+        bool preferCapturerEscortBand =
+            anchorTier.StartsWith("CapturerMagnet:");
+        Vector3Int moveCell = FindAirCombatAdvanceMove(
+            fromCell,
+            anchor,
+            paths,
+            occupied,
+            snapshot.AITeam,
+            takeoffMoveOptions,
+            preferCapturerEscortBand);
         Debug.Log(
             $"{TL("AirCombat")} {unit.InstanceId} rogue avanca via {moveCell} " +
             $"alvo={anchor} tier={anchorTier} visibleEnemies={visibleEnemies.Count}");
@@ -194,12 +204,23 @@ public partial class AIController
     }
 
     private Vector3Int ResolveAirCombatFallbackAnchor(
+        UnitManager unit,
         AIWorldSnapshot snapshot,
         Vector3Int fromCell,
         List<UnitManager> visibleEnemies,
         out string tier)
     {
         tier = "None";
+        if (TryResolveCapturerMagnet(
+                unit,
+                snapshot,
+                fromCell,
+                out UnitManager capturer,
+                out Vector3Int capturerCell))
+        {
+            tier = $"CapturerMagnet:#{capturer.InstanceId}";
+            return capturerCell;
+        }
         UnitManager nearestEnemy = null;
         int nearestEnemyDistance = int.MaxValue;
         if (visibleEnemies != null)
@@ -770,7 +791,8 @@ public partial class AIController
         Dictionary<Vector3Int, List<Vector3Int>> paths,
         HashSet<Vector3Int> occupied,
         TeamId aiTeam,
-        List<int> takeoffMoveOptions = null)
+        List<int> takeoffMoveOptions = null,
+        bool preferOneHexEscortBand = false)
     {
         Vector3Int bestCell = fromCell;
         float startDist = SectorManager.HexDistance(fromCell, targetCell);
@@ -800,6 +822,18 @@ public partial class AIController
                 - routeLineDeviation * 420f
                 - threat * 120f
                 - pathSteps * 3f;
+
+            // Faixa de escolta, nao proibicao: 1h deixa a unidade-capita
+            // legivel no tabuleiro. Distancia zero perde no ranking quando
+            // existe alternativa boa, mas continua valida se for o unico
+            // avanco materializavel.
+            if (preferOneHexEscortBand)
+            {
+                if (Mathf.Abs(dist - 1f) <= 0.01f)
+                    score += 5000f;
+                else if (dist <= 0.01f)
+                    score -= 5000f;
+            }
 
             if (score > bestScore)
             {

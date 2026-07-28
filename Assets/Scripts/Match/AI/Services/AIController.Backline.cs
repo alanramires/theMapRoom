@@ -3,6 +3,65 @@ using UnityEngine;
 
 public partial class AIController
 {
+    // Emenda de coesao para combatentes sem uma tarefa formal: capturadores
+    // materializam a cabeca de ponte do time, inclusive depois de atravessarem
+    // uma ruptura de mobilidade. Assault, fire support e air combat podem usar
+    // esta ancora em vez de inventar, cada um, uma direcao estrategica solta.
+    //
+    // E uma consulta pura ao snapshot confirmado. Nao reserva destino, nao
+    // altera estado e e reavaliada depois de cada commit light.
+    private static bool TryResolveCapturerMagnet(
+        UnitManager follower,
+        AIWorldSnapshot snapshot,
+        Vector3Int fromCell,
+        out UnitManager capturer,
+        out Vector3Int anchor)
+    {
+        capturer = null;
+        anchor = fromCell;
+        anchor.z = 0;
+        if (follower == null || snapshot == null || snapshot.MyUnits == null)
+            return false;
+
+        int bestDistance = int.MaxValue;
+        for (int i = 0; i < snapshot.MyUnits.Count; i++)
+        {
+            UnitManager candidate = snapshot.MyUnits[i];
+            if (candidate == null
+                || candidate == follower
+                || candidate.IsDead
+                || candidate.IsEmbarked
+                || candidate.IsUnderRepair
+                || !candidate.gameObject.activeInHierarchy
+                || !candidate.TryGetUnitData(out UnitData data)
+                || data == null
+                || !UnitRoleCompatibility.CanSatisfy(
+                    data,
+                    UnitRole.Capturador))
+            {
+                continue;
+            }
+
+            Vector3Int candidateCell = candidate.CurrentCellPosition;
+            candidateCell.z = 0;
+            int distance =
+                AIActionReachCoordinator.CubicDistance(
+                    fromCell,
+                    candidateCell);
+            if (distance < bestDistance
+                || (distance == bestDistance
+                    && (capturer == null
+                        || candidate.InstanceId < capturer.InstanceId)))
+            {
+                bestDistance = distance;
+                capturer = candidate;
+                anchor = candidateCell;
+            }
+        }
+
+        return capturer != null;
+    }
+
     private AIBacklineSettings BuildBacklineSettings()
     {
         AIBacklineSettings settings = AIBacklineSettings.Default;

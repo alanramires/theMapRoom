@@ -55,7 +55,27 @@ public partial class AIController
         }
         else
         {
-            pressureTarget = ResolveAssaultPressureTarget(snapshot, enemies, fromCell);
+            if (TryResolveCapturerMagnet(
+                    unit,
+                    snapshot,
+                    fromCell,
+                    out UnitManager capturerMagnet,
+                    out Vector3Int capturerAnchor))
+            {
+                pressureTarget = capturerAnchor;
+                Debug.Log(
+                    $"{TL("Assalto")} {unit.InstanceId} rogue segue " +
+                    $"capturador #{capturerMagnet.InstanceId} em " +
+                    $"{capturerAnchor}.");
+            }
+            else
+            {
+                pressureTarget =
+                    ResolveAssaultPressureTarget(
+                        snapshot,
+                        enemies,
+                        fromCell);
+            }
         }
         Vector3Int bestMove = FindAssaultPressureMove(unit, snapshot, fromCell, pressureTarget, paths, occupied, out string pressureReason);
         if (bestMove != fromCell)

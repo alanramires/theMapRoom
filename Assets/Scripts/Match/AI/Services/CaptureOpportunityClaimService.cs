@@ -64,8 +64,9 @@ public sealed class CaptureOpportunityClaimSnapshot
 /// <summary>
 /// Distribui construcoes alcancaveis entre capturadores do mesmo slot.
 /// Plano formal vence oportunidade; dentro de cada grupo, um matching
-/// deterministico maximiza o numero de capturadores com alvo antes de
-/// minimizar custo. Toda a estrutura e somente leitura.
+/// deterministico maximiza o numero de capturadores com alvo. A prioridade
+/// estavel do capturador vence o desempate antes do custo: o claim representa
+/// a intencao do passageiro e o transporte apenas a consulta.
 /// </summary>
 public static class CaptureOpportunityClaimService
 {
@@ -545,6 +546,11 @@ public static class CaptureOpportunityClaimService
         candidates.Sort((left, right) =>
         {
             int compare =
+                left.Unit.InstanceId.CompareTo(
+                    right.Unit.InstanceId);
+            if (compare != 0)
+                return compare;
+            compare =
                 left.Edges.Count.CompareTo(
                     right.Edges.Count);
             if (compare != 0)
@@ -552,10 +558,7 @@ public static class CaptureOpportunityClaimService
             compare =
                 left.Edges[0].RouteCost.CompareTo(
                     right.Edges[0].RouteCost);
-            return compare != 0
-                ? compare
-                : left.Unit.InstanceId.CompareTo(
-                    right.Unit.InstanceId);
+            return compare;
         });
     }
 

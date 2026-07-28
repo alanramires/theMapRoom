@@ -139,6 +139,7 @@ public partial class AIController
                     snapshot);
             Vector3Int airCombatAnchor =
                 ResolveAirCombatFallbackAnchor(
+                    passenger,
                     snapshot,
                     fallbackCell,
                     visibleEnemies,

@@ -159,6 +159,158 @@ Resultado correto:
 - quando esses alvos estão BeyondOperational, declaram intenção `Capture`;
 - transportadores adjacentes reconhecem os pedidos e não abandonam o grupo.
 
+## Rupturas de mobilidade e mapas com ilhas
+
+O próximo laboratório do refactor são mapas com componentes de movimento
+desconectados.
+
+O problema não deve ser modelado como uma exceção chamada “ilha”. A pergunta
+geral é:
+
+> A unidade possui uma rota própria completa até a missão escolhida?
+
+Fluxo pretendido:
+
+```text
+objetivo operacional ou estratégico
+        ↓
+existe rota própria completa?
+   ├─ sim → marcha normalmente
+   └─ não → existe transportador capaz de atravessar a ruptura?
+              ├─ sim → declara intenção de carona
+              └─ não → procura outro objetivo ou aguarda em rally
+```
+
+Uma ruptura pode ser:
+
+- mar entre duas massas terrestres;
+- rio ou canal sem travessia compatível;
+- ferrovia desconectada para uma unidade ferroviária;
+- terreno ou camada que a unidade não consegue atravessar;
+- qualquer separação entre componentes do grafo de movimento.
+
+### Comportamento atual
+
+Em mapas continentais, Rebel, Assault e FireSupport escolhem direções próximas
+e se espalham de forma funcional.
+
+Em mapas com ilhas:
+
+- escolhem um objetivo pela direção ou proximidade;
+- marcham até a costa;
+- deixam de possuir progresso materializável;
+- acumulam-se na praia;
+- não publicam claramente que precisam atravessar uma ruptura;
+- transportadores não recebem missão suficiente para buscá-los.
+
+### Por que Capturadores já atravessam
+
+Capturadores já produzem parcialmente o comportamento desejado porque procuram
+qualquer construção ainda capturável, inclusive construções offshore.
+
+Esse alvo concreto permite que:
+
+- `QueroCarona` reconheça que a construção está BeyondOperational;
+- o capturador declare necessidade de transporte;
+- navios encontrem o passageiro;
+- a direção da travessia seja inferida pelo objetivo de captura.
+
+Assault e FireSupport normalmente possuem apenas direção, pressão ou apoio,
+sem um alvo de transporte igualmente explícito. Eles chegam à praia, mas a
+ruptura não se transforma em demanda.
+
+Essa diferença é evidência de que o contrato orientado por intenção deve ser
+generalizado, não substituído por uma regra especial para navios.
+
+### Pedido futuro
+
+Uma unidade bloqueada por ruptura deverá declarar:
+
+```text
+Finalidade: SectorPressure ou FireSupport
+Objetivo: setor operacional
+Rota própria: componente desconectado
+Origem possível: praia/LZ de embarque
+Destino desejado: praia/LZ de desembarque
+Capacidade exigida: classe/camada do passageiro
+```
+
+O transportador passa a atender demanda por eixo de travessia, em vez de
+escolher somente a unidade geometricamente mais próxima.
+
+### Evitar montinhos artificiais
+
+- somente passageiros com vaga/projeção compatível avançam até a LZ;
+- excedentes aguardam em rally de retaguarda;
+- cada assento atende uma intenção por vez;
+- transportadores não reservam corredores definitivos;
+- bloqueios posteriores provocam reavaliação, não movimento ilegal;
+- depois do desembarque, a unidade recalcula sua agenda.
+
+### Cache de topologia
+
+Como o tabuleiro não é destruído durante a partida, os componentes estáticos de
+movimento podem ser cacheados por:
+
+- mapa;
+- categoria de movimento;
+- domínio e camada;
+- versão/fingerprint da topologia.
+
+Unidades, ocupação e ameaças continuam dinâmicas. A conectividade estrutural
+não precisa ser reconstruída para cada decisão.
+
+### Estado do estudo
+
+Por enquanto, o comportamento caótico será mantido em observação. A partida
+completa deve mostrar:
+
+- onde Assault e FireSupport formam filas;
+- quais navios passam perto sem reconhecer demanda;
+- se o acúmulo ocorre por ausência de intenção, vaga, LZ ou compatibilidade;
+- como os Capturadores bem-sucedidos atravessam e quais dados já fornecem ao
+  transportador.
+
+### Emenda experimental: Capturador como ímã
+
+Antes do contrato completo de travessia, será testada uma regra de coesão
+simples:
+
+- Capturadores continuam escolhendo e atravessando rumo às construções;
+- combatentes não capturadores usam um Capturador aliado ativo como cabeça de
+  ponte;
+- o Capturador mais próximo vence, com desempate determinístico por
+  `InstanceId`;
+- combatentes preferem formar uma faixa a 1 hex do Capturador, sem tornar o
+  hex do capitão ilegal quando não houver alternativa útil;
+- ataque e demais necessidades Tactical continuam tendo precedência;
+- somente o fallback de direção usa o ímã;
+- a escolha é refeita a partir do snapshot confirmado depois de cada ação.
+
+O experimento cobre inicialmente:
+
+- Assault rogue;
+- FireSupport rogue;
+- Interceptador, Ataque Aéreo e Raid AntiSub;
+- destino de missão de uma aeronave combatente ainda embarcada.
+
+Essa regra não cria formação rígida, corredor reservado ou compromisso
+persistente. Ela apenas impede que combatentes sem tarefa local inventem uma
+guerra particular longe da infantaria que materializa a frente.
+
+O teste deve observar:
+
+- se caças deixam de cruzar o mapa sozinhos;
+- se Assault e FireSupport se distribuem entre diferentes cabeças de ponte;
+- se o Capturador mais próximo é uma âncora boa o bastante ou se será preciso
+  preferir Capturador com objetivo/reserva formal;
+- se o movimento até a praia passa a produzir pedidos de transporte úteis;
+- se a troca de ímã entre commits causa oscilação.
+
+Mesmo funcionando, a emenda não substitui o futuro pedido tipado de transporte:
+um combatente terrestre pode seguir a direção de um Capturador offshore e ainda
+precisar declarar explicitamente a ruptura de mobilidade ao navio.
+
 ## Quero Carona Aérea
 
 `QueroCaronaAereaService` deve ser absorvido por este contrato.

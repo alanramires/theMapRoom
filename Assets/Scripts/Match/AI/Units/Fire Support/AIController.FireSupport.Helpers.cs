@@ -235,8 +235,21 @@ public partial class AIController
         return true;
     }
 
-    private Vector3Int ResolveRogueFireSupportAnchor(AIWorldSnapshot snapshot, Vector3Int fallback)
+    private Vector3Int ResolveRogueFireSupportAnchor(
+        UnitManager unit,
+        AIWorldSnapshot snapshot,
+        Vector3Int fallback)
     {
+        if (TryResolveCapturerMagnet(
+                unit,
+                snapshot,
+                fallback,
+                out UnitManager capturer,
+                out Vector3Int capturerCell))
+        {
+            return capturerCell;
+        }
+
         if (snapshot != null && snapshot.EnemyHQ != null)
         {
             Vector3Int hq = snapshot.EnemyHQ.CurrentCellPosition;

@@ -14,7 +14,8 @@ public partial class AIController
 
         Dictionary<Vector3Int, List<Vector3Int>> paths = BuildFireSupportPaths(unit);
         HashSet<Vector3Int> occupied = BuildOccupied(unit);
-        Vector3Int anchor = ResolveRogueFireSupportAnchor(snapshot, fromCell);
+        Vector3Int anchor =
+            ResolveRogueFireSupportAnchor(unit, snapshot, fromCell);
         bool artilleryOnly = IsArtilleryModeOnly(unit);
 
         if (TryDecideCombatantFireSupportTacticalAction(
