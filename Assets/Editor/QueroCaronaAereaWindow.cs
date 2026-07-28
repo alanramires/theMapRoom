@@ -9,10 +9,14 @@ public sealed class QueroCaronaAereaWindow : EditorWindow
     [SerializeField] private int operationalTurns = 2;
     [SerializeField] private bool useMissionFocus;
     [SerializeField] private Vector3Int missionFocus;
+    [SerializeField] private float minimumMissionGain = 2f;
+    [SerializeField] private bool acceptOnlyCompatibleRecovery = true;
+    [SerializeField] private float maximumRecoveryRegression = 2f;
 
     private Tilemap map;
     private QueroCaronaAereaResult result;
-    private string status = "Selecione um Interceptador ou Ataque Aereo.";
+    private string status =
+        "Selecione Interceptador, Ataque Aereo ou Vigilancia Aerea.";
     private Vector2 scroll;
 
     [MenuItem("Tools/Operações Aéreas/Quero Carona Aérea")]
@@ -38,7 +42,7 @@ public sealed class QueroCaronaAereaWindow : EditorWindow
     {
         EditorGUILayout.LabelField("Quero Carona Aérea", EditorStyles.boldLabel);
         EditorGUILayout.HelpBox(
-            "Consulta pura para Interceptador e Ataque Aéreo. Recuperação aceita " +
+            "Consulta pura para Interceptador, Ataque Aéreo e Vigilância Aérea. Recuperação aceita " +
             "plataforma por emergência; em situação normal, um foco de missão testa " +
             "se o convés realmente melhora o rebasing. Slots e skills vêm do PodePousar.",
             MessageType.Info);
@@ -52,7 +56,25 @@ public sealed class QueroCaronaAereaWindow : EditorWindow
             "Turnos operacionais", operationalTurns));
         useMissionFocus = EditorGUILayout.Toggle("Usar foco de missão", useMissionFocus);
         if (useMissionFocus)
+        {
             missionFocus = EditorGUILayout.Vector3IntField("Hex da missão", missionFocus);
+            minimumMissionGain = Mathf.Max(
+                0.1f,
+                EditorGUILayout.FloatField(
+                    "Ganho mínimo (hex)",
+                    minimumMissionGain));
+            acceptOnlyCompatibleRecovery = EditorGUILayout.Toggle(
+                "Aceitar recuperação única",
+                acceptOnlyCompatibleRecovery);
+            if (acceptOnlyCompatibleRecovery)
+            {
+                maximumRecoveryRegression = Mathf.Max(
+                    0f,
+                    EditorGUILayout.FloatField(
+                        "Regressão máxima",
+                        maximumRecoveryRegression));
+            }
+        }
         if (EditorGUI.EndChangeCheck())
         {
             AutoDetect();
@@ -79,6 +101,24 @@ public sealed class QueroCaronaAereaWindow : EditorWindow
             result.wantsRide ? MessageType.Info : MessageType.Warning);
         EditorGUILayout.LabelField("Resultado", result.reason, EditorStyles.wordWrappedLabel);
         EditorGUILayout.LabelField("Emergência", result.isEmergency ? "Sim" : "Não");
+        EditorGUILayout.LabelField(
+            "Papel",
+            result.isAirSurveillanceRole
+                ? "Vigilância Aérea"
+                : result.isAirCombatRole
+                    ? "Combate Aéreo"
+                    : "Não suportado");
+        EditorGUILayout.LabelField(
+            "Recuperação única",
+            result.isOnlyCompatibleRecovery ? "Sim" : "Não");
+        if (useMissionFocus && result.bestPlatform != null)
+        {
+            EditorGUILayout.LabelField(
+                "Missão",
+                $"{result.currentMissionDistance:0.#} -> " +
+                $"{result.platformMissionDistance:0.#} " +
+                $"(ganho {result.missionDistanceGain:0.#})");
+        }
         EditorGUILayout.LabelField("Reparo", string.IsNullOrWhiteSpace(result.repairEvaluation)
             ? "Não avaliado." : result.repairEvaluation, EditorStyles.wordWrappedLabel);
         EditorGUILayout.LabelField("Alcance", $"Tactical {result.tacticalBudget} | Operational {result.operationalBudget}");
@@ -108,7 +148,12 @@ public sealed class QueroCaronaAereaWindow : EditorWindow
             operationalTurns = operationalTurns,
             emulateUnderRepairFromUnitData = !Application.isPlaying,
             hasMissionFocus = useMissionFocus,
-            missionFocus = missionFocus
+            missionFocus = missionFocus,
+            minimumMissionDistanceGain = minimumMissionGain,
+            acceptPlatformWhenOnlyRecovery =
+                acceptOnlyCompatibleRecovery,
+            maximumMissionRegressionForRecovery =
+                maximumRecoveryRegression
         });
         status = result.reason;
         SceneView.RepaintAll();

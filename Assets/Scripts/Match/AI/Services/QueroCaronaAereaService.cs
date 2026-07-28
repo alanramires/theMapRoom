@@ -3,9 +3,9 @@ using UnityEngine;
 using UnityEngine.Tilemaps;
 
 /// <summary>
-/// Pedido de plataforma para uma aeronave de combate. Esta consulta nao escolhe
-/// uma acao: a recuperacao e o embarque continuam sendo materializados pelos
-/// sensores e pelo controlador da IA.
+/// Pedido de plataforma para uma aeronave de combate ou Vigilancia Aerea. Esta
+/// consulta nao escolhe uma acao: a recuperacao e o embarque continuam sendo
+/// materializados pelos sensores e pelo controlador da IA.
 /// </summary>
 public sealed class QueroCaronaAereaRequest
 {
@@ -21,18 +21,30 @@ public sealed class QueroCaronaAereaRequest
     // realmente melhora o posicionamento da missao em vez de ser apenas carona.
     public bool hasMissionFocus;
     public Vector3Int missionFocus;
+    public float minimumMissionDistanceGain = 1f;
+
+    // Uma plataforma pode ser a unica recuperacao compativel no horizonte.
+    // Fora de emergencia ela so e aceita se nao afastar demais a missao.
+    public bool acceptPlatformWhenOnlyRecovery;
+    public float maximumMissionRegressionForRecovery;
 }
 
 public sealed class QueroCaronaAereaResult
 {
+    public bool isSupportedAirRole;
     public bool isAirCombatRole;
+    public bool isAirSurveillanceRole;
     public bool wantsRide;
     public bool isEmergency;
+    public bool isOnlyCompatibleRecovery;
     public string reason;
     public string repairEvaluation;
     public int tacticalBudget;
     public int operationalBudget;
     public int platformCount;
+    public float currentMissionDistance;
+    public float platformMissionDistance;
+    public float missionDistanceGain;
     public MelhorPousoOption bestPlatform;
     public readonly List<MelhorPousoOption> platforms =
         new List<MelhorPousoOption>();
@@ -70,14 +82,21 @@ public static class QueroCaronaAereaService
             return result;
         }
 
-        result.isAirCombatRole = data.domain == Domain.Air
+        bool nativeAir = data.domain == Domain.Air;
+        result.isAirCombatRole = nativeAir
             && data.roles != null
             && (data.roles.Contains(UnitRole.Interceptador)
                 || data.roles.Contains(UnitRole.AtaqueAereo));
-        if (!result.isAirCombatRole)
+        result.isAirSurveillanceRole = nativeAir
+            && data.roles != null
+            && data.roles.Contains(UnitRole.VigilanciaAerea);
+        result.isSupportedAirRole =
+            result.isAirCombatRole
+            || result.isAirSurveillanceRole;
+        if (!result.isSupportedAirRole)
         {
             result.reason =
-                "A ferramenta atende apenas aeronaves com papel Interceptador ou Ataque Aereo.";
+                "A ferramenta atende aeronaves com papel Interceptador, Ataque Aereo ou Vigilancia Aerea.";
             return result;
         }
 
@@ -129,13 +148,24 @@ public static class QueroCaronaAereaService
         }
         result.tacticalBudget = landing.tacticalBudget;
         result.operationalBudget = landing.operationalBudget;
+        bool hasSurfaceRecovery = false;
         for (int i = 0; i < landing.options.Count; i++)
         {
             MelhorPousoOption option = landing.options[i];
-            if (option != null && option.IsPlatform)
+            if (option == null)
+                continue;
+            if (option.IsPlatform)
+            {
                 result.platforms.Add(option);
+            }
+            else
+            {
+                hasSurfaceRecovery = true;
+            }
         }
         result.platformCount = result.platforms.Count;
+        result.isOnlyCompatibleRecovery =
+            result.platformCount > 0 && !hasSurfaceRecovery;
         if (result.platformCount == 0)
         {
             result.reason = result.isEmergency
@@ -183,10 +213,50 @@ public static class QueroCaronaAereaService
         }
 
         result.bestPlatform = best;
-        result.wantsRide = best != null && bestDistance < currentDistance;
-        result.reason = result.wantsRide
-            ? $"A plataforma aproxima a missao de {currentDistance:0} para {bestDistance:0} hex(es): aceita rebasing."
-            : $"A plataforma nao melhora a distancia da missao ({currentDistance:0} -> {bestDistance:0}): permanece em voo/base atual.";
+        result.currentMissionDistance = currentDistance;
+        result.platformMissionDistance = bestDistance;
+        result.missionDistanceGain =
+            best != null ? currentDistance - bestDistance : 0f;
+        float minimumGain =
+            Mathf.Max(0.1f, request.minimumMissionDistanceGain);
+        bool significantMissionGain =
+            best != null
+            && result.missionDistanceGain >= minimumGain;
+        bool preservesMissionForRecovery =
+            best != null
+            && bestDistance <= currentDistance
+                + Mathf.Max(
+                    0f,
+                    request.maximumMissionRegressionForRecovery);
+        bool necessaryRecovery =
+            request.acceptPlatformWhenOnlyRecovery
+            && result.isOnlyCompatibleRecovery
+            && preservesMissionForRecovery;
+        result.wantsRide =
+            significantMissionGain || necessaryRecovery;
+        if (significantMissionGain)
+        {
+            result.reason =
+                $"A plataforma aproxima a missao de {currentDistance:0.#} " +
+                $"para {bestDistance:0.#} hex(es), ganho " +
+                $"{result.missionDistanceGain:0.#} >= " +
+                $"{minimumGain:0.#}: aceita rebasing.";
+        }
+        else if (necessaryRecovery)
+        {
+            result.reason =
+                "Plataforma e a unica recuperacao compativel e preserva " +
+                $"a missao ({currentDistance:0.#} -> " +
+                $"{bestDistance:0.#}): aceita rebasing.";
+        }
+        else
+        {
+            result.reason =
+                $"Plataforma sem ganho operacional suficiente " +
+                $"({currentDistance:0.#} -> {bestDistance:0.#}, ganho " +
+                $"{result.missionDistanceGain:0.#} < " +
+                $"{minimumGain:0.#}): permanece em voo/base atual.";
+        }
         return result;
     }
 

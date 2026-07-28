@@ -104,6 +104,25 @@ public partial class AIController
                 target.InstanceId.ToString(), targetCell, paths);
         }
 
+        if (TryBuildAirPlatformRuntimeAction(
+                unit,
+                snapshot,
+                anchor,
+                paths,
+                landingSnapshot: null,
+                ewacsRecovery: null,
+                minimumMissionGain: 2f,
+                acceptOnlyRecovery: true,
+                maximumRecoveryRegression: 1f,
+                out PlayerAction platformAction,
+                out string platformReason))
+        {
+            Debug.Log(
+                $"{TL("AirCombat")} {unit.InstanceId} " +
+                $"plataforma: {platformReason}");
+            return platformAction;
+        }
+
         Vector3Int moveCell = FindAirCombatAdvanceMove(fromCell, anchor, paths, occupied, snapshot.AITeam, takeoffMoveOptions);
         Debug.Log(
             $"{TL("AirCombat")} {unit.InstanceId} rogue avanca via {moveCell} " +

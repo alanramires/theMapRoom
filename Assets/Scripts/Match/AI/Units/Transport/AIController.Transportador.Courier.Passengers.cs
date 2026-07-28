@@ -101,6 +101,57 @@ public partial class AIController
             return true;
         }
 
+        // Plataforma aerea le a intencao do passageiro pelo papel. Sem este
+        // ramo, EWACS/caca embarcado cairia no fallback de capturador e faria
+        // porta-avioes/fragata marchar para uma construcao inimiga.
+        if (IsAirborneAirSurveillanceUnit(passenger))
+        {
+            if (TryResolveAirSurveillanceAnchor(
+                    passenger,
+                    snapshot,
+                    plan,
+                    fallbackCell,
+                    out Vector3Int surveillanceAnchor,
+                    out _,
+                    out string surveillanceReason))
+            {
+                resolvedTarget = surveillanceAnchor;
+                Debug.Log(
+                    $"{TL("Transporte")} PassengerTarget " +
+                    $"EWACS#{passenger.InstanceId} -> " +
+                    $"{surveillanceAnchor} ({surveillanceReason})");
+                return true;
+            }
+
+            resolvedTarget = fallbackCell;
+            Debug.Log(
+                $"{TL("Transporte")} PassengerTarget " +
+                $"EWACS#{passenger.InstanceId} sem ancora; " +
+                $"mantem plataforma em {fallbackCell}");
+            return true;
+        }
+
+        if (IsAirCombatUnit(passenger))
+        {
+            List<UnitManager> visibleEnemies =
+                CollectVisibleAirCombatEnemies(
+                    passenger,
+                    snapshot);
+            Vector3Int airCombatAnchor =
+                ResolveAirCombatFallbackAnchor(
+                    snapshot,
+                    fallbackCell,
+                    visibleEnemies,
+                    out string airCombatTier);
+            airCombatAnchor.z = 0;
+            resolvedTarget = airCombatAnchor;
+            Debug.Log(
+                $"{TL("Transporte")} PassengerTarget " +
+                $"AirCombat#{passenger.InstanceId} -> " +
+                $"{airCombatAnchor} tier={airCombatTier}");
+            return true;
+        }
+
         // Facção sem QG: o passageiro nao tem slot de plano, entao o fluxo normal cairia no
         // funil rogue-para-o-QG-inimigo. O rebelde a pe ja captura por PROXIMIDADE (ver
         // AIController.Rebel); o mesmo criterio vale quando ele e carga, senao APC/Chinook/

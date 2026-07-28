@@ -63,6 +63,37 @@ public partial class AIController
             }
         }
 
+        bool hasSurveillanceAnchor =
+            TryResolveAirSurveillanceAnchor(
+                unit,
+                snapshot,
+                plan,
+                fromCell,
+                out Vector3Int anchor,
+                out bool offensiveAnchor,
+                out string anchorReason);
+        if (ewacsRecovery != null
+            && hasSurveillanceAnchor
+            && TryBuildAirPlatformRuntimeAction(
+                unit,
+                snapshot,
+                anchor,
+                paths,
+                ewacsRecovery.Landing,
+                ewacsRecovery,
+                minimumMissionGain: 2f,
+                acceptOnlyRecovery: true,
+                maximumRecoveryRegression: 2f,
+                out PlayerAction platformAction,
+                out string platformReason))
+        {
+            LogAirSurveillancePolicyStage(
+                unit,
+                AirSurveillancePolicyStage.TransportOrPlatform,
+                platformReason);
+            return platformAction;
+        }
+
         if (paths != null && paths.Count > 0
             && TryFindHomeProductionVacateCombatAction(unit, snapshot, fromCell, paths, occupied, out PlayerAction vacateAction))
         {
@@ -73,7 +104,7 @@ public partial class AIController
             return vacateAction;
         }
 
-        if (TryResolveAirSurveillanceAnchor(unit, snapshot, plan, fromCell, out Vector3Int anchor, out bool offensiveAnchor, out string anchorReason)
+        if (hasSurveillanceAnchor
             && TryFindAirSurveillancePostureCell(unit, snapshot, fromCell, anchor, offensiveAnchor, paths, occupied, ewacsRecovery, out Vector3Int postureCell, out string postureReason))
         {
             if (postureCell != fromCell)
