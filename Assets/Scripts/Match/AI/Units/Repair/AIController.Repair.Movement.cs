@@ -246,6 +246,13 @@ public partial class AIController
         bool conscriptionProducerBan = IsConscriptionParkingBanActive();
         bool logisticsProducerBan = IsPrimaryLogisticsUnit(unit);
         bool eliteRelaxSafety = EliteHoldsDangerousRepair(unit);
+        // Rebelde nao possui uma retaguarda territorial consolidada. O setor
+        // marcado como inseguro nao pode impedir que ela use uma instalacao
+        // aliada de reparo; os demais gates (dono, captura completa, ocupacao,
+        // ameaca visivel e compatibilidade do servico) continuam valendo.
+        bool rebelIgnoresSectorSafety = matchController != null
+            && matchController.IsSlotRebel(
+                PlayerSlotId.FromIndex(ResolveAISlotKey(aiTeam)));
         bool preferAircraftFacility = unit != null && unit.GetAircraftType() != AircraftType.None;
         bool needsPassengerRelease = IsAirTransporter(unit) && HasTransportCargo(unit);
         int passengerCount = needsPassengerRelease ? CollectPassengers(unit).Count : 0;
@@ -290,11 +297,16 @@ public partial class AIController
                 Debug.Log($"[Repair] skip {cc} cap={c.CurrentCapturePoints}/{c.CapturePointsMax} (incompleto) dist={dist:F1}");
                 continue;
             }
-            if (!isHomeRepair && !eliteRelaxSafety && !IsRepairConstructionSectorSafe(c, aiTeam))
+            if (!isHomeRepair
+                && !eliteRelaxSafety
+                && !rebelIgnoresSectorSafety
+                && !IsRepairConstructionSectorSafe(c, aiTeam))
             {
                 Debug.Log($"[Repair] skip {cc} setor inseguro sector={c.Sector} dist={dist:F1}");
                 continue;
             }
+            if (!isHomeRepair && rebelIgnoresSectorSafety)
+                Debug.Log($"[Repair] rebelde aceita {cc} apesar do setor={c.Sector}; avaliando servico e ameaca local.");
             bool occupiedCell = occupied.Contains(cc) && cc != fromCell;
             if (occupiedCell && !isHomeRepair)
             {

@@ -170,18 +170,9 @@ public partial class AIController
         if (stockAction != null)
             return stockAction;
 
-        // Passageiro que respondeu NAO ao Quero Carona continua como
-        // oportunidade de baixa prioridade. So agora, depois de objetivos,
-        // combate, intel e logistica, o transportador pode usar esse ranking
-        // para se posicionar sem transformar a estimativa em ordem obrigatoria.
-        PlayerAction opportunisticPickup =
-            TryDecideOpportunisticTransportPickupAction(
-                unit, snapshot, plan);
-        if (opportunisticPickup != null)
-            return opportunisticPickup;
-
         // Carga ja embarcada ainda pode materializar o courier residual. Um
-        // transportador vazio, porem, nao pode reabrir o seletor global antigo:
+        // transportador vazio, porem, nao pode reabrir o seletor global antigo
+        // nem transformar uma recusa do Quero Carona em espera obrigatoria:
         // Tactical -> Operational -> Strategic ja foram varridos pelo servico,
         // sempre a partir da posicao do proprio transportador.
         if (IsPrimaryTransportRole(unit))
@@ -195,18 +186,7 @@ public partial class AIController
             }
             else
             {
-                Vector3Int transportCell = unit.CurrentCellPosition;
-                transportCell.z = 0;
-                Dictionary<Vector3Int, List<Vector3Int>> transportPaths =
-                    UnitMovementPathRules.CalcularCaminhosValidos(
-                        boardTilemap, unit,
-                        Mathf.Max(0, unit.RemainingMovementPoints),
-                        terrainDatabase);
-                Debug.Log($"{TL("Transporte")} {unit.InstanceId} sem operacao " +
-                          "nas ondas Tactical/Operational/Strategic; aguarda.");
-                return BuildMoveBatch(
-                    unit, snapshot.AITeam, transportCell, transportCell,
-                    transportPaths);
+                return TryBuildEmptyTransportFallbackAction(unit, snapshot);
             }
         }
 

@@ -114,47 +114,67 @@ public partial class AIController
         return action;
     }
 
-    private PlayerAction TryDecideOpportunisticTransportPickupAction(
+    /// <summary>
+    /// Depois de varrer pedidos reais de EVAC/Pickup, um transportador vazio
+    /// nao fica esperando quem respondeu "Nao quero carona". Unidades normais
+    /// regressam para a area da propria producao/HQ; rebeldes ja consumiram a
+    /// varredura Strategic e aguardam, sem inventar uma carona local.
+    /// </summary>
+    private PlayerAction TryBuildEmptyTransportFallbackAction(
         UnitManager unit,
-        AIWorldSnapshot snapshot,
-        TeamObjectivePlan plan)
+        AIWorldSnapshot snapshot)
     {
-        int tacticalBudget = Mathf.Max(
-            0, unit.RemainingMovementPoints);
-        int operationalBudget = Mathf.Max(
-            tacticalBudget,
-            unit.MaxMovementPoints * 2);
-        TransportOperationDecision decision;
-        if (!TryQueryTransportPickupOperation(
-                unit, snapshot, plan,
-                AIReachDecisionTier.Tactical,
-                tacticalBudget,
-                includeOpportunisticPickup: true,
-                requiredDisposition:
-                    MelhorEmbarqueRideDisposition
-                        .OpportunisticFallback,
-                out decision)
-            && !TryQueryTransportPickupOperation(
-                unit, snapshot, plan,
-                AIReachDecisionTier.Operational,
-                operationalBudget,
-                includeOpportunisticPickup: true,
-                requiredDisposition:
-                    MelhorEmbarqueRideDisposition
-                        .OpportunisticFallback,
-                out decision))
-        {
+        if (unit == null || snapshot == null)
             return null;
+
+        Vector3Int fromCell = unit.CurrentCellPosition;
+        fromCell.z = 0;
+        Dictionary<Vector3Int, List<Vector3Int>> paths =
+            UnitMovementPathRules.CalcularCaminhosValidos(
+                boardTilemap, unit,
+                Mathf.Max(0, unit.RemainingMovementPoints),
+                terrainDatabase);
+        if (paths == null || paths.Count == 0)
+            return null;
+
+        bool isRebel = matchController != null
+            && matchController.IsSlotRebel(
+                PlayerSlotId.FromIndex(
+                    ResolveAISlotKey(snapshot.AITeam)));
+        if (isRebel)
+        {
+            Debug.Log($"{TL("Transporte")} {unit.InstanceId} sem pedido " +
+                "materializavel apos Tactical/Operational/Strategic; " +
+                "rebelde aguarda nova oportunidade.");
+            return BuildMoveBatch(
+                unit, snapshot.AITeam, fromCell, fromCell, paths);
         }
 
-        decision.Operation = TransportOperationType.Pickup;
-        decision.ReachTier =
-            decision.PickupOption?.transporterTier ==
-            MelhorEmbarqueTier.Tactical
-                ? AIReachDecisionTier.Tactical
-                : AIReachDecisionTier.Operational;
-        return MaterializeTransportOperation(
-            unit, snapshot, plan, decision);
+        Vector3Int home = FindTransportWaitTarget(
+            snapshot.AITeam, fromCell);
+        HashSet<Vector3Int> occupied = BuildOccupied(unit);
+        Vector3Int bestCell = fromCell;
+        float bestDistance = SectorManager.HexDistance(fromCell, home);
+        foreach (Vector3Int rawCell in paths.Keys)
+        {
+            Vector3Int cell = rawCell;
+            cell.z = 0;
+            if (cell != fromCell && occupied.Contains(cell))
+                continue;
+
+            float distance = SectorManager.HexDistance(cell, home);
+            if (distance < bestDistance)
+            {
+                bestCell = cell;
+                bestDistance = distance;
+            }
+        }
+
+        Debug.Log($"{TL("Transporte")} {unit.InstanceId} sem pedido " +
+            "materializavel apos Tactical/Operational/Strategic; " +
+            $"retorna para producao/HQ via {bestCell}.");
+        return BuildMoveBatch(
+            unit, snapshot.AITeam, fromCell, bestCell, paths);
     }
 
     private bool TryEvaluateTransportOperation(
@@ -378,20 +398,17 @@ public partial class AIController
                 : requestedTier == AIReachDecisionTier.Operational
                     ? MelhorEmbarqueTier.Operational
                     : MelhorEmbarqueTier.Strategic;
-        bool requiresPassengerRoute =
-            RequiresPassengerRouteToEmbark(data);
         MelhorEmbarqueOption selectedOption =
             pickup.options.Find(option =>
                 option != null
                 && option.transporterTier == serviceTier
-                // Trem/transportador de estacao nao pode transformar uma
-                // infantaria remota sem rota ate uma construcao em pickup
-                // Tactical. Para aeronaves, NoCurrentRoute continua valido:
-                // Apache e outros passageiros podem precisar que a plataforma
-                // se aproxime para o sensor resolver a transicao de camada.
-                && (!requiresPassengerRoute
-                    || option.passengerRouteState !=
-                        MelhorEmbarquePassengerRouteState.NoCurrentRoute)
+                && CanMaterializePickupRendezvous(option, serviceTier)
+                // Um primeiro candidato Strategic inseguro nao pode encerrar
+                // a onda inteira: continue procurando o proximo pedido que
+                // seja materializavel e seguro.
+                && (requestedTier != AIReachDecisionTier.Strategic
+                    || IsTransportStrategicTargetSafe(
+                        unit, option.lzCell, snapshot))
                 && (!requiredDisposition.HasValue
                     || option.rideDisposition ==
                         requiredDisposition.Value)
@@ -400,10 +417,6 @@ public partial class AIController
                         MelhorEmbarqueRideDisposition
                             .OpportunisticFallback));
         if (selectedOption?.passenger == null)
-            return false;
-        if (requestedTier == AIReachDecisionTier.Strategic
-            && !IsTransportStrategicTargetSafe(
-                unit, selectedOption.lzCell, snapshot))
             return false;
 
         Vector3Int servicePassengerCell =
@@ -433,23 +446,35 @@ public partial class AIController
 
     }
 
-    private static bool RequiresPassengerRouteToEmbark(UnitData transporter)
+    private static bool CanMaterializePickupRendezvous(
+        MelhorEmbarqueOption option,
+        MelhorEmbarqueTier serviceTier)
     {
-        if (transporter == null || transporter.domain == Domain.Air)
+        if (option?.passenger == null)
             return false;
 
-        bool hasTerrainStop =
-            transporter.allowedEmbarkWhenTransporterAtTerrains != null
-            && transporter.allowedEmbarkWhenTransporterAtTerrains.Count > 0;
-        bool hasStructureStop =
-            transporter.allowedEmbarkWhenTransporterAtTerrainStructures != null
-            && transporter.allowedEmbarkWhenTransporterAtTerrainStructures.Count > 0;
-        bool constructionOnly =
-            !hasTerrainStop
-            && !hasStructureStop
-            && transporter.allowedEmbarkWhenTransporterAtFacilities
-                != ConstructionFacilityType.None;
-        return constructionOnly;
+        // A falta de rota e uma excecao de CAMADA do passageiro aereo:
+        // Apache/jet podem precisar que o conves se aproxime para o
+        // PodeEmbarcar/PodePousar resolver a transicao Air -> slot. Ela nao
+        // vale para infantaria, veiculos ou artilharia; para eles um LZ na
+        // outra ilha nao e rendezvous, e sim um destino impossivel.
+        bool passengerIsAircraft = option.passenger.TryGetUnitData(
+                out UnitData passengerData)
+            && passengerData != null
+            && passengerData.domain == Domain.Air;
+        if (passengerIsAircraft)
+            return true;
+
+        if (option.passengerRouteState ==
+            MelhorEmbarquePassengerRouteState.NoCurrentRoute)
+            return false;
+
+        // Pickup Tactical significa embarque possivel nesta rodada. Um
+        // passageiro terrestre que so chega no Operational nao pode puxar o
+        // transportador para uma praia que ele ainda nao alcanca.
+        return serviceTier != MelhorEmbarqueTier.Tactical
+            || option.passengerRouteState ==
+                MelhorEmbarquePassengerRouteState.ReachableNow;
     }
 
     private QueroCaronaResult EvaluatePickupRideNeed(

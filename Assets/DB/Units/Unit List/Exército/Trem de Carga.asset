@@ -59,9 +59,9 @@ MonoBehaviour:
   repairTriggerAmmoPct: 0
   repairRecoverHpAbove: 8
   fuseWhileInRepair: 1
-  restockTriggerGallonPct: 0
-  restockTriggerAmmoBoxPct: 0
-  restockTriggerToolsPct: 0
+  restockTriggerGallonPct: 10
+  restockTriggerAmmoBoxPct: 10
+  restockTriggerToolsPct: 10
   restockWhenAnyRuntimeSupplyEmpty: 1
   aiPreventiveMaintenanceEnabled: 1
   aiPreventiveSupplyCanRunWithUnderRepair: 0
@@ -129,8 +129,9 @@ MonoBehaviour:
     legacyAllowedDomain: 0
     legacyAllowedHeight: 0
     legacyAllowedLayerModes: []
-    allowedClasses: 
+    allowedClasses: 00000000010000000200000003000000
     requiredSkills: []
-    blockedSkills: []
+    blockedSkills:
+    - {fileID: 11400000, guid: 44c13554a7f731f418bad4395bf10e52, type: 2}
   autonomia: 120
   cost: 7500

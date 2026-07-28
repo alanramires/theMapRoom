@@ -57,7 +57,7 @@ MonoBehaviour:
   repairTriggerAmmoPct: 0
   repairRecoverHpAbove: 8
   fuseWhileInRepair: 1
-  restockTriggerGallonPct: 0
+  restockTriggerGallonPct: 10
   restockTriggerAmmoBoxPct: 0
   restockTriggerToolsPct: 0
   restockWhenAnyRuntimeSupplyEmpty: 1
@@ -67,6 +67,7 @@ MonoBehaviour:
   aiPreventiveSupplyHpBelowPct: 70
   aiPreventiveSupplyAutonomyBelowPct: 60
   aiPreventiveSupplyWeaponAmmoAtOrBelow: 1
+  aiDisembarkWhenCannotSupply: 1
   eliteLevel: 0
   eliteFrom: {fileID: 0}
   combatModifiers: []
@@ -111,6 +112,7 @@ MonoBehaviour:
   supplierServicesProvided:
   - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
   - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
+  supplierServiceProfile: 2
   supplierResources:
   - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
     amount: 150

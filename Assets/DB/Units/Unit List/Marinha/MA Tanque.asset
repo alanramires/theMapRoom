@@ -57,9 +57,9 @@ MonoBehaviour:
   repairTriggerAmmoPct: 0
   repairRecoverHpAbove: 8
   fuseWhileInRepair: 0
-  restockTriggerGallonPct: 0
-  restockTriggerAmmoBoxPct: 0
-  restockTriggerToolsPct: 0
+  restockTriggerGallonPct: 10
+  restockTriggerAmmoBoxPct: 10
+  restockTriggerToolsPct: 10
   restockWhenAnyRuntimeSupplyEmpty: 1
   aiPreventiveMaintenanceEnabled: 1
   aiPreventiveSupplyCanRunWithUnderRepair: 0

@@ -103,22 +103,35 @@ public static class StockNeedAssessmentService
             int amount = current.TryGetValue(supply, out int stored)
                 ? Mathf.Clamp(stored, 0, max)
                 : 0;
-            int missing = Mathf.Max(0, max - amount);
+            float fillRatio = max > 0 ? (float)amount / max : 1f;
+            int triggerPercent = ResolveUnitRestockTriggerPercent(
+                data, supply);
+            bool emptyEmergency = amount <= 0
+                && data.restockWhenAnyRuntimeSupplyEmpty;
+            bool belowConfiguredTrigger = triggerPercent > 0
+                && fillRatio <= triggerPercent / 100f;
+            // O deficit fisico existe sempre, mas so vira demanda da IA quando
+            // a ficha da unidade o autorizou. Sem isso, qualquer carga parcial
+            // fazia o resolvedor inventar um "Operational" em 50%.
+            int missing = emptyEmergency || belowConfiguredTrigger
+                ? Mathf.Max(0, max - amount)
+                : 0;
             result.resources.Add(new StockResourceNeed
             {
                 supply = supply,
                 current = amount,
                 capacity = max,
                 missing = missing,
-                fillRatio = max > 0 ? (float)amount / max : 1f
+                fillRatio = fillRatio
             });
             result.totalCurrent += amount;
             result.totalCapacity += max;
             result.totalMissing += missing;
-            StockNeedLevel resourceLevel = ResolveLevel(
-                amount,
-                missing,
-                max > 0 ? (float)amount / max : 1f);
+            StockNeedLevel resourceLevel = emptyEmergency
+                ? StockNeedLevel.Critical
+                : belowConfiguredTrigger
+                    ? StockNeedLevel.Operational
+                    : StockNeedLevel.None;
             if (resourceLevel > worstResourceLevel)
                 worstResourceLevel = resourceLevel;
         }
@@ -127,13 +140,10 @@ public static class StockNeedAssessmentService
             ? Mathf.Clamp01(
                 (float)result.totalCurrent / result.totalCapacity)
             : 1f;
-        StockNeedLevel aggregateLevel = ResolveLevel(
-            result.totalCurrent,
-            result.totalMissing,
-            result.fillRatio);
-        result.level = aggregateLevel > worstResourceLevel
-            ? aggregateLevel
-            : worstResourceLevel;
+        // Unidade nao tem um percentual global escondido: cada reserva obedece
+        // ao slider correspondente da propria UnitData. O pior recurso ativo
+        // define a necessidade da unidade.
+        result.level = worstResourceLevel;
         result.blocksFieldService =
             result.totalCurrent <= 0
             && data.supplierServiceProfile ==
@@ -440,6 +450,26 @@ public static class StockNeedAssessmentService
         if (ratio <= 0.5f)
             return StockNeedLevel.Operational;
         return StockNeedLevel.Preventive;
+    }
+
+    private static int ResolveUnitRestockTriggerPercent(
+        UnitData data,
+        SupplyData supply)
+    {
+        if (data == null || supply == null)
+            return 0;
+
+        switch (supply.id)
+        {
+            case "gasolina":
+                return Mathf.Clamp(data.restockTriggerGallonPct, 0, 100);
+            case "caixaMunicao":
+                return Mathf.Clamp(data.restockTriggerAmmoBoxPct, 0, 100);
+            case "pecas":
+                return Mathf.Clamp(data.restockTriggerToolsPct, 0, 100);
+            default:
+                return 0;
+        }
     }
 
     private static string BuildReason(StockNeedAssessment result)

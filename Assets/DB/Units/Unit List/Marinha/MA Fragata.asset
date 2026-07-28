@@ -39,7 +39,7 @@ MonoBehaviour:
   militaryForce: 2
   unitClass: 8
   combatClassification: 2
-  roles: 0b000000
+  roles: 02000000
   aiInitiative: 2
   aiPurchaseMode: 0
   bannedOnHardMode: 0
@@ -62,15 +62,15 @@ MonoBehaviour:
   attackMustSurvive: 1
   ignoreAttackDecisionWhenDefending: 0
   defensiveAttackExtraHpLossPercent: 20
-  repairTriggerHpBelow: 0
-  repairTriggerAutonomyPct: 0
-  repairTriggerAmmoEnabled: 0
+  repairTriggerHpBelow: 3
+  repairTriggerAutonomyPct: 25
+  repairTriggerAmmoEnabled: 1
   repairTriggerAmmoPct: 0
   repairRecoverHpAbove: 8
-  fuseWhileInRepair: 0
-  restockTriggerGallonPct: 0
-  restockTriggerAmmoBoxPct: 0
-  restockTriggerToolsPct: 0
+  fuseWhileInRepair: 1
+  restockTriggerGallonPct: 10
+  restockTriggerAmmoBoxPct: 10
+  restockTriggerToolsPct: 10
   restockWhenAnyRuntimeSupplyEmpty: 1
   aiPreventiveMaintenanceEnabled: 1
   aiPreventiveSupplyCanRunWithUnderRepair: 0
