@@ -45,6 +45,7 @@ public class RoadNetworkManager : MonoBehaviour
 
     public Tilemap BoardTilemap => boardTilemap;
     public StructureDatabase StructureDatabase => structureDatabase;
+    public TerrainDatabase TerrainDatabase => terrainDatabase;
 
     public bool TryGetStructureAtCell(Vector3Int cell, out StructureData structure)
     {
