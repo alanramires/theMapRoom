@@ -50,6 +50,8 @@ public sealed class QueroCaronaResult
     public int operationalBudget;
     public int routeCost = int.MaxValue;
     public int rideNeedScore;
+    public int captureClaimsBlocked;
+    public int captureClaimOwnerUnitId = -1;
     public string reason;
 }
 
@@ -91,6 +93,7 @@ public static class QueroCaronaService
         public readonly bool emulateRepair;
         public readonly int occupancyRevision;
         public readonly int constructionStateHash;
+        public readonly int captureClaimStateHash;
         public readonly int topologyVersion;
         public readonly string topologyFingerprint;
 
@@ -137,6 +140,13 @@ public static class QueroCaronaService
             occupancyRevision = occupancy.ConfirmedRevision;
             constructionStateHash =
                 BuildConstructionStateHash(request);
+            captureClaimStateHash =
+                UnitRoleCompatibility.CanSatisfy(
+                    data,
+                    UnitRole.Capturador)
+                    ? CaptureOpportunityClaimService.ResolveStateHash(
+                        request)
+                    : 0;
             topologyVersion = topology.TopologyVersion;
             topologyFingerprint =
                 topology.TopologyFingerprint ?? string.Empty;
@@ -172,6 +182,8 @@ public static class QueroCaronaService
                 && occupancyRevision == other.occupancyRevision
                 && constructionStateHash
                     == other.constructionStateHash
+                && captureClaimStateHash
+                    == other.captureClaimStateHash
                 && topologyVersion == other.topologyVersion
                 && string.Equals(
                     topologyFingerprint,
@@ -216,6 +228,7 @@ public static class QueroCaronaService
                 hash = (hash * 397) ^ (emulateRepair ? 1 : 0);
                 hash = (hash * 397) ^ occupancyRevision;
                 hash = (hash * 397) ^ constructionStateHash;
+                hash = (hash * 397) ^ captureClaimStateHash;
                 hash = (hash * 397) ^ topologyVersion;
                 hash = (hash * 397)
                     ^ StringComparer.Ordinal.GetHashCode(
@@ -339,6 +352,15 @@ public static class QueroCaronaService
         if (canReuseOperationalReach)
             AIDecisionPerf.AddCount(
                 "QueroCaronaOperationalReachReuses");
+        CaptureOpportunityClaimSnapshot captureClaims =
+            UnitRoleCompatibility.CanSatisfy(
+                data,
+                UnitRole.Capturador)
+                ? CaptureOpportunityClaimService.GetOrBuild(
+                    request,
+                    reach,
+                    result.operationalBudget)
+                : null;
 
         if (request.useExplicitTarget)
         {
@@ -399,22 +421,32 @@ public static class QueroCaronaService
             if (TryFindBestAvailablePlannedTarget(
                     request,
                     reach,
+                    captureClaims,
                     info,
                     representative,
                     out Vector3Int plannedTarget,
                     out ConstructionManager plannedConstruction,
-                    out int plannedCost))
+                    out int plannedCost,
+                    out int claimBlocks,
+                    out int claimOwnerUnitId))
             {
                 result.evaluatedTarget = plannedTarget;
                 result.evaluatedConstruction = plannedConstruction;
                 result.routeCost = plannedCost;
+                result.captureClaimsBlocked = claimBlocks;
+                result.captureClaimOwnerUnitId =
+                    claimOwnerUnitId;
                 SetReachAndDecision(
                     result,
                     plannedCost,
-                    plannedTarget == representative
+                    FormatCaptureTargetLabel(
+                        captureClaims,
+                        plannedConstruction,
+                        request.unit,
+                        plannedTarget == representative
                         ? $"representante de {request.plannedSector}"
                         : $"alternativa livre no setor " +
-                          $"{request.plannedSector} {plannedTarget}");
+                          $"{request.plannedSector} {plannedTarget}"));
             }
             else
             {
@@ -422,10 +454,17 @@ public static class QueroCaronaService
                 result.reach =
                     QueroCaronaReach.BeyondOperational;
                 result.rideNeedScore = 1000;
+                result.captureClaimsBlocked = claimBlocks;
+                result.captureClaimOwnerUnitId =
+                    claimOwnerUnitId;
                 result.reason =
                     $"{ResolveUnitKind(result)} sem destino livre " +
                     $"alcançável no setor {request.plannedSector} " +
-                    "em Tactical ou Operational: aceita carona.";
+                    "em Tactical ou Operational" +
+                    FormatCaptureClaimSuffix(
+                        claimBlocks,
+                        claimOwnerUnitId) +
+                    ": aceita carona.";
             }
             request.diagnosticLog?.Invoke(result.reason);
             return Finish();
@@ -433,6 +472,8 @@ public static class QueroCaronaService
 
         ConstructionManager nearest = null;
         int nearestCost = int.MaxValue;
+        int captureClaimBlocks = 0;
+        int lastCaptureClaimOwnerId = -1;
         foreach (ConstructionManager construction
                  in ConstructionManager.AllActive)
         {
@@ -447,6 +488,19 @@ public static class QueroCaronaService
             if (!reach.TryGetValue(cell, out int cost)
                 || cost >= nearestCost)
                 continue;
+            if (IsClaimedByAnotherCapturer(
+                    captureClaims,
+                    construction,
+                    request.unit,
+                    out CaptureOpportunityClaim claim))
+            {
+                captureClaimBlocks++;
+                lastCaptureClaimOwnerId =
+                    claim.Capturer != null
+                        ? claim.Capturer.InstanceId
+                        : -1;
+                continue;
+            }
             nearest = construction;
             nearestCost = cost;
         }
@@ -458,18 +512,34 @@ public static class QueroCaronaService
             result.evaluatedTarget = target;
             result.evaluatedConstruction = nearest;
             result.routeCost = nearestCost;
+            result.captureClaimsBlocked =
+                captureClaimBlocks;
+            result.captureClaimOwnerUnitId =
+                lastCaptureClaimOwnerId;
             SetReachAndDecision(
                 result, nearestCost,
-                $"prédio capturável próximo {target}");
+                FormatCaptureTargetLabel(
+                    captureClaims,
+                    nearest,
+                    request.unit,
+                    $"prédio capturável próximo {target}"));
         }
         else
         {
             result.wantsRide = true;
             result.reach = QueroCaronaReach.BeyondOperational;
             result.rideNeedScore = 1000;
+            result.captureClaimsBlocked =
+                captureClaimBlocks;
+            result.captureClaimOwnerUnitId =
+                lastCaptureClaimOwnerId;
             result.reason =
                 $"{ResolveUnitKind(result)} rogue/rebelde sem prédio " +
-                "capturável alcançável em Tactical ou Operational: " +
+                "capturável livre alcançável em Tactical ou Operational" +
+                FormatCaptureClaimSuffix(
+                    captureClaimBlocks,
+                    lastCaptureClaimOwnerId) +
+                ": " +
                 "aceita carona.";
         }
 
@@ -708,6 +778,10 @@ public static class QueroCaronaService
             operationalBudget = source.operationalBudget,
             routeCost = source.routeCost,
             rideNeedScore = source.rideNeedScore,
+            captureClaimsBlocked =
+                source.captureClaimsBlocked,
+            captureClaimOwnerUnitId =
+                source.captureClaimOwnerUnitId,
             reason = source.reason
         };
     }
@@ -800,17 +874,40 @@ public static class QueroCaronaService
     private static bool TryFindBestAvailablePlannedTarget(
         QueroCaronaRequest request,
         IReadOnlyDictionary<Vector3Int, int> reach,
+        CaptureOpportunityClaimSnapshot captureClaims,
         SectorManager.SectorInfo info,
         Vector3Int representative,
         out Vector3Int target,
         out ConstructionManager construction,
-        out int routeCost)
+        out int routeCost,
+        out int claimBlocks,
+        out int claimOwnerUnitId)
     {
         target = Vector3Int.zero;
         construction = null;
         routeCost = int.MaxValue;
+        claimBlocks = 0;
+        claimOwnerUnitId = -1;
 
-        if (!IsClaimedByAlliedUnit(request, representative)
+        ConstructionManager representativeConstruction =
+            info.RepresentativeConstruction;
+        bool representativeClaimed =
+            IsClaimedByAnotherCapturer(
+                captureClaims,
+                representativeConstruction,
+                request.unit,
+                out CaptureOpportunityClaim representativeClaim);
+        if (representativeClaimed)
+        {
+            claimBlocks++;
+            claimOwnerUnitId =
+                representativeClaim.Capturer != null
+                    ? representativeClaim.Capturer.InstanceId
+                    : -1;
+        }
+
+        if (!representativeClaimed
+            && !IsClaimedByAlliedUnit(request, representative)
             && reach != null
             && reach.TryGetValue(
                 representative, out int representativeCost))
@@ -824,6 +921,7 @@ public static class QueroCaronaService
                  in ConstructionManager.AllActive)
         {
             if (candidate == null
+                || candidate == representativeConstruction
                 || candidate.Sector != request.plannedSector
                 || !candidate.IsCapturable
                 || candidate.TeamId == request.unit.TeamId
@@ -836,12 +934,77 @@ public static class QueroCaronaService
                 || !reach.TryGetValue(cell, out int cost)
                 || cost >= routeCost)
                 continue;
+            if (IsClaimedByAnotherCapturer(
+                    captureClaims,
+                    candidate,
+                    request.unit,
+                    out CaptureOpportunityClaim claim))
+            {
+                claimBlocks++;
+                claimOwnerUnitId =
+                    claim.Capturer != null
+                        ? claim.Capturer.InstanceId
+                        : -1;
+                continue;
+            }
             target = cell;
             construction = candidate;
             routeCost = cost;
         }
 
         return routeCost < int.MaxValue;
+    }
+
+    private static bool IsClaimedByAnotherCapturer(
+        CaptureOpportunityClaimSnapshot claims,
+        ConstructionManager construction,
+        UnitManager unit,
+        out CaptureOpportunityClaim claim)
+    {
+        claim = default;
+        return claims != null
+            && construction != null
+            && claims.TryGetClaim(
+                construction,
+                out claim)
+            && claim.Capturer != null
+            && claim.Capturer != unit;
+    }
+
+    private static string FormatCaptureClaimSuffix(
+        int claimBlocks,
+        int ownerUnitId)
+    {
+        if (claimBlocks <= 0)
+            return string.Empty;
+        return
+            $"; {claimBlocks} oportunidade(s) reservada(s) " +
+            "1:1 para outro capturador" +
+            (ownerUnitId >= 0
+                ? $" (ex.: #{ownerUnitId})"
+                : string.Empty);
+    }
+
+    private static string FormatCaptureTargetLabel(
+        CaptureOpportunityClaimSnapshot claims,
+        ConstructionManager construction,
+        UnitManager unit,
+        string targetLabel)
+    {
+        if (claims != null
+            && construction != null
+            && unit != null
+            && claims.TryGetClaim(
+                construction,
+                out CaptureOpportunityClaim claim)
+            && claim.Capturer == unit)
+        {
+            return
+                $"{targetLabel} [reserva 1:1 " +
+                $"capturador=#{unit.InstanceId}]";
+        }
+
+        return targetLabel;
     }
 
     private static bool IsClaimedByAlliedUnit(

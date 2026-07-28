@@ -375,9 +375,16 @@ public partial class AIController
         if (!Mathf.Approximately(
                 candidatePolicyScore, currentPolicyScore))
             return candidatePolicyScore > currentPolicyScore;
-        if (candidate.passengerRouteCost != current.passengerRouteCost)
-            return candidate.passengerRouteCost
-                < current.passengerRouteCost;
+        int candidateTotalCost =
+            candidate.passengerTotalCost >= 0
+                ? candidate.passengerTotalCost
+                : candidate.passengerRouteCost;
+        int currentTotalCost =
+            current.passengerTotalCost >= 0
+                ? current.passengerTotalCost
+                : current.passengerRouteCost;
+        if (candidateTotalCost != currentTotalCost)
+            return candidateTotalCost < currentTotalCost;
         return candidate.transporterDistance
             < current.transporterDistance;
     }

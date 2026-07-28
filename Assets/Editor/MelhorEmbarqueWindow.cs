@@ -188,7 +188,11 @@ public sealed class MelhorEmbarqueWindow : EditorWindow
                 $"Rota transportador: " +
                 $"{FormatCost(option.transporterRouteCost)} | " +
                 $"Rota passageiro: " +
-                $"{FormatCost(option.passengerRouteCost)}",
+                $"{FormatCost(option.passengerRouteCost)} | " +
+                $"Embarque: " +
+                $"{FormatCost(option.passengerEmbarkCost)} | " +
+                $"Total passageiro: " +
+                $"{FormatCost(option.passengerTotalCost)}",
                 EditorStyles.wordWrappedMiniLabel);
         }
 

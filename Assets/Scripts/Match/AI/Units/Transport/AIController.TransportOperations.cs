@@ -447,6 +447,9 @@ public partial class AIController
             $"tier={selectedOption.transporterTier} " +
             $"carona={selectedOption.rideDisposition} " +
             $"rotaPax={selectedOption.passengerRouteState} " +
+            $"custoPax={selectedOption.passengerRouteCost}+" +
+            $"{selectedOption.passengerEmbarkCost}=" +
+            $"{selectedOption.passengerTotalCost} " +
             $"dist={selectedOption.transporterDistance}",
             selectedOption.lzCell);
         decision.PickupOption = selectedOption;

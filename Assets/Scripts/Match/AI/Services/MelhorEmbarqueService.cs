@@ -40,6 +40,8 @@ public sealed class MelhorEmbarqueOption
     public int transporterRouteCost;
     public MelhorEmbarquePassengerRouteState passengerRouteState;
     public int passengerRouteCost = -1;
+    public int passengerEmbarkCost = -1;
+    public int passengerTotalCost = -1;
     public MelhorEmbarqueRideDisposition rideDisposition =
         MelhorEmbarqueRideDisposition.NotEvaluated;
     public QueroCaronaResult rideNeed;
@@ -122,6 +124,7 @@ public static class MelhorEmbarqueService
         public Dictionary<Vector3Int, int> now;
         public Dictionary<Vector3Int, int> later;
         public Dictionary<Vector3Int, int> laterStops;
+        public int nowBudget;
         public int laterStopsBudget;
     }
 
@@ -292,10 +295,13 @@ public static class MelhorEmbarqueService
                     passenger.CurrentCellPosition;
                 passengerCell.z = 0;
                 ResolvePassengerMeeting(
+                    request,
+                    passenger,
                     passengerReach[passenger],
                     cell,
                     out MelhorEmbarquePassengerRouteState routeState,
-                    out int moveCost);
+                    out int moveCost,
+                    out int embarkCost);
                 int slotIndex = passengerSlots[passenger];
                 QueroCaronaResult rideNeed =
                     passengerRideNeed[passenger];
@@ -324,6 +330,11 @@ public static class MelhorEmbarqueService
                     MelhorEmbarqueRideDisposition.Emergency;
                 float passengerMeetingDistance =
                     SectorManager.HexDistance(passengerCell, cell);
+                int passengerTotalCost =
+                    moveCost < int.MaxValue
+                    && embarkCost < int.MaxValue
+                        ? moveCost + embarkCost
+                        : int.MaxValue;
                 float rescueApproachPenalty = routeState ==
                         MelhorEmbarquePassengerRouteState.NoCurrentRoute
                     || emergencyEvac
@@ -332,7 +343,7 @@ public static class MelhorEmbarqueService
                 float optionScore = 100000f
                     - distance * 100f
                     - ResolvePassengerRoutePenalty(
-                        routeState, moveCost)
+                        routeState, passengerTotalCost)
                     - rescueApproachPenalty
                     + rideNeedAdjustment;
                 var option = new MelhorEmbarqueOption
@@ -348,6 +359,14 @@ public static class MelhorEmbarqueService
                     passengerRouteState = routeState,
                     passengerRouteCost =
                         moveCost < int.MaxValue ? moveCost : -1,
+                    passengerEmbarkCost =
+                        embarkCost < int.MaxValue
+                            ? embarkCost
+                            : -1,
+                    passengerTotalCost =
+                        passengerTotalCost < int.MaxValue
+                            ? passengerTotalCost
+                            : -1,
                     rideDisposition = disposition,
                     rideNeed = rideNeed,
                     rideNeedAdjustment = rideNeedAdjustment,
@@ -357,6 +376,10 @@ public static class MelhorEmbarqueService
                         $"rotaPax={routeState} " +
                         $"custoPax=" +
                         $"{(moveCost < int.MaxValue ? moveCost.ToString() : "n/a")} " +
+                        $"custoEmbarque=" +
+                        $"{(embarkCost < int.MaxValue ? embarkCost.ToString() : "n/a")} " +
+                        $"custoTotal=" +
+                        $"{(passengerTotalCost < int.MaxValue ? passengerTotalCost.ToString() : "n/a")} " +
                         $"distTransport={distance} " +
                         $"aproxPax={passengerMeetingDistance:F0} " +
                         $"carona={disposition} " +
@@ -591,6 +614,7 @@ public static class MelhorEmbarqueService
             later = BuildMeetingCostMap(
                 request.map, topology, laterStops),
             laterStops = laterStops,
+            nowBudget = nowBudget,
             laterStopsBudget = laterBudget
         };
     }
@@ -649,19 +673,52 @@ public static class MelhorEmbarqueService
     }
 
     private static void ResolvePassengerMeeting(
+        MelhorEmbarqueRequest request,
+        UnitManager passenger,
         PassengerReachProfile profile,
         Vector3Int transporterCell,
         out MelhorEmbarquePassengerRouteState state,
-        out int moveCost)
+        out int moveCost,
+        out int embarkCost)
     {
+        embarkCost = int.MaxValue;
+        if (request == null
+            || passenger == null
+            || profile == null
+            || !PodeEmbarcarSensor.TryGetEmbarkCostAtCell(
+                request.map,
+                request.terrainDatabase,
+                passenger,
+                transporterCell,
+                out embarkCost,
+                out _))
+        {
+            state =
+                MelhorEmbarquePassengerRouteState.NoCurrentRoute;
+            moveCost = int.MaxValue;
+            return;
+        }
+
         if (TryFindMeetingCost(
-                profile?.now, transporterCell, out moveCost))
+                profile.now,
+                transporterCell,
+                out moveCost)
+            && CanAffordMeeting(
+                moveCost,
+                embarkCost,
+                profile.nowBudget))
         {
             state = MelhorEmbarquePassengerRouteState.ReachableNow;
             return;
         }
         if (TryFindMeetingCost(
-                profile?.later, transporterCell, out moveCost))
+                profile.later,
+                transporterCell,
+                out moveCost)
+            && CanAffordMeeting(
+                moveCost,
+                embarkCost,
+                profile.laterStopsBudget))
         {
             state = MelhorEmbarquePassengerRouteState.ReachableLater;
             return;
@@ -669,6 +726,17 @@ public static class MelhorEmbarqueService
 
         state = MelhorEmbarquePassengerRouteState.NoCurrentRoute;
         moveCost = int.MaxValue;
+    }
+
+    private static bool CanAffordMeeting(
+        int movementCost,
+        int embarkCost,
+        int budget)
+    {
+        return movementCost >= 0
+            && embarkCost >= 1
+            && movementCost <= budget
+            && embarkCost <= budget - movementCost;
     }
 
     private static bool TryFindMeetingCost(

@@ -467,6 +467,28 @@ public static class PodeEmbarcarSensor
         return false;
     }
 
+    /// <summary>
+    /// Consulta pura do custo oficial para o passageiro entrar na celula do
+    /// transportador. Usa terreno, overrides de skill e o mesmo fallback da
+    /// coleta de Pode Embarcar.
+    /// </summary>
+    public static bool TryGetEmbarkCostAtCell(
+        Tilemap map,
+        TerrainDatabase terrainDatabase,
+        UnitManager passenger,
+        Vector3Int transporterCell,
+        out int cost,
+        out string reason)
+    {
+        return TryResolveEmbarkCost(
+            map,
+            terrainDatabase,
+            passenger,
+            transporterCell,
+            out cost,
+            out reason);
+    }
+
     private static bool TryResolveEmbarkCost(
         Tilemap map,
         TerrainDatabase terrainDatabase,
@@ -496,7 +518,10 @@ public static class PodeEmbarcarSensor
             return true;
         }
 
-        // Fallback de embarque: quando o passageiro nao pisaria no hex (ex.: naval), usa custo do terreno base.
+        // Fallback de transicao: quando o passageiro nao pisaria normalmente
+        // no hex (ex.: aeronave embarcando em navio), o embarque custa sempre
+        // 1. O terreno continua sendo validado para confirmar que o contexto
+        // existe e que seus requisitos de skill sao cumpridos.
         if (!TryResolveTerrainAtCell(map, terrainDatabase, transporterCell, out TerrainTypeData terrain) || terrain == null)
         {
             reason = "Sem terreno valido para fallback de custo de embarque.";
@@ -509,8 +534,7 @@ public static class PodeEmbarcarSensor
             return false;
         }
 
-        cost = GetAutonomyCostWithSkillOverrides(terrain.basicAutonomyCost, terrain.skillCostOverrides, passenger);
-        cost = Mathf.Max(1, cost);
+        cost = 1;
         return true;
     }
 
