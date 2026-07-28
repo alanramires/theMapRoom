@@ -310,6 +310,14 @@ MonoBehaviour:
       - {x: 7, y: 9, z: 0}
       - {x: 8, y: 9, z: 0}
       - {x: 9, y: 10, z: 0}
+      - {x: 9, y: 11, z: 0}
+      - {x: 10, y: 12, z: 0}
+      - {x: 10, y: 13, z: 0}
+      - {x: 9, y: 13, z: 0}
+      - {x: 8, y: 13, z: 0}
+      - {x: 7, y: 13, z: 0}
+      - {x: 6, y: 13, z: 0}
+      - {x: 5, y: 13, z: 0}
   - structure: {fileID: 11400000, guid: e0adc11a0eac5bc42811605fe2a45f9f, type: 2}
     routes:
     - routeName: Beira da Sujeira A

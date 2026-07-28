@@ -3418,3 +3418,87 @@ MonoBehaviour:
       - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
       - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
       - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
+  - id: "F\xE1bricaLeve_S0_C154"
+    construction: {fileID: 11400000, guid: e6171f1508dc1494aae624dbbb6d2f43, type: 2}
+    initialSlotIndex: 0
+    sector: 0
+    cellPosition: {x: -32, y: 10, z: 0}
+    initialCapturePoints: -1
+    useConstructionConfigurationOverride: 0
+    constructionConfiguration:
+      isPlayerHeadQuarter: 0
+      isVictoryBuilding: 0
+      isCapturable: 1
+      capturePointsMax: 30
+      capturedIncoming: 1500
+      sellingRule: 1
+      legacyCanProduceAndSellUnits: 
+      offeredUnits:
+      - {fileID: 11400000, guid: 4a3afdea0950dfc46a48dd7a659563ee, type: 2}
+      - {fileID: 11400000, guid: b28c15593869dae419f9b58292ef4845, type: 2}
+      - {fileID: 11400000, guid: c0e59b3e4bf2e4c49a67906805e43801, type: 2}
+      - {fileID: 11400000, guid: a5d9d72a15e061a4cbaf125b2b6b9d48, type: 2}
+      - {fileID: 11400000, guid: 70b7ea3ddea78fc4e9d744cee13b053a, type: 2}
+      - {fileID: 11400000, guid: 3dc9b119819519440820c81f5db4fdce, type: 2}
+      - {fileID: 11400000, guid: 70b98199c49882e44892f7ca76df6b33, type: 2}
+      - {fileID: 11400000, guid: 99b30df53878c69499853a4ef3cb5f81, type: 2}
+      - {fileID: 11400000, guid: 8c89f5278e312ad46af401333934721b, type: 2}
+      - {fileID: 11400000, guid: 5e69516e1944ffc43bae1a7cd3c7c69c, type: 2}
+      canProvideSupplies: 1
+      offeredSupplies:
+      - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+        quantity: 20
+        peakQuantity: 2147483647
+      - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+        quantity: 10
+        peakQuantity: 2147483647
+      - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+        quantity: 40
+        peakQuantity: 2147483647
+      offeredServices:
+      - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+      - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+      - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+      - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
+  - id: "F\xE1bricaLeve_S1_C155"
+    construction: {fileID: 11400000, guid: e6171f1508dc1494aae624dbbb6d2f43, type: 2}
+    initialSlotIndex: 1
+    sector: 0
+    cellPosition: {x: 3, y: 3, z: 0}
+    initialCapturePoints: -1
+    useConstructionConfigurationOverride: 0
+    constructionConfiguration:
+      isPlayerHeadQuarter: 0
+      isVictoryBuilding: 0
+      isCapturable: 1
+      capturePointsMax: 30
+      capturedIncoming: 1500
+      sellingRule: 1
+      legacyCanProduceAndSellUnits: 
+      offeredUnits:
+      - {fileID: 11400000, guid: 4a3afdea0950dfc46a48dd7a659563ee, type: 2}
+      - {fileID: 11400000, guid: b28c15593869dae419f9b58292ef4845, type: 2}
+      - {fileID: 11400000, guid: c0e59b3e4bf2e4c49a67906805e43801, type: 2}
+      - {fileID: 11400000, guid: a5d9d72a15e061a4cbaf125b2b6b9d48, type: 2}
+      - {fileID: 11400000, guid: 70b7ea3ddea78fc4e9d744cee13b053a, type: 2}
+      - {fileID: 11400000, guid: 3dc9b119819519440820c81f5db4fdce, type: 2}
+      - {fileID: 11400000, guid: 70b98199c49882e44892f7ca76df6b33, type: 2}
+      - {fileID: 11400000, guid: 99b30df53878c69499853a4ef3cb5f81, type: 2}
+      - {fileID: 11400000, guid: 8c89f5278e312ad46af401333934721b, type: 2}
+      - {fileID: 11400000, guid: 5e69516e1944ffc43bae1a7cd3c7c69c, type: 2}
+      canProvideSupplies: 1
+      offeredSupplies:
+      - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+        quantity: 20
+        peakQuantity: 2147483647
+      - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+        quantity: 10
+        peakQuantity: 2147483647
+      - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+        quantity: 40
+        peakQuantity: 2147483647
+      offeredServices:
+      - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+      - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+      - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+      - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}

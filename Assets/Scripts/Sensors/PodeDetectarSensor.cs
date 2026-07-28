@@ -421,7 +421,8 @@ public static class PodeDetectarSensor
         HeightLevel forcedVirtualTargetHeight = HeightLevel.Surface,
         int forcedDetectionRangeOverride = -1,
         bool skipSpecializedTargetLayers = false,
-        bool useRangeOnlyForAirHighWhenConfigured = false)
+        bool useRangeOnlyForAirHighWhenConfigured = false,
+        Vector3Int? virtualObserverCell = null)
     {
         if (visibleCellsOutput == null)
             return;
@@ -453,7 +454,8 @@ public static class PodeDetectarSensor
         if (maxRange <= 0)
             return;
 
-        Vector3Int observerCell = observer.CurrentCellPosition;
+        Vector3Int observerCell = virtualObserverCell
+            ?? observer.CurrentCellPosition;
         observerCell.z = 0;
         int globalBoardRevision = ThreatRevisionTracker.GlobalBoardRevision;
         int teamObserverRevision = observer != null
@@ -668,6 +670,45 @@ public static class PodeDetectarSensor
         for (int i = 0; i < collectVisibleCellsScratch.Count; i++)
             visibleCellsOutput.Add(collectVisibleCellsScratch[i]);
         StoreCollectVisibleCellsInCache(cacheKey, collectVisibleCellsScratch);
+    }
+
+    /// <summary>
+    /// Consulta pura da cobertura de uma camada aerea a partir de uma celula
+    /// candidata. Nao move a unidade e nao publica FOW, contatos ou deteccao.
+    /// Usa exatamente as regras de alcance e LoS da apresentacao por camada.
+    /// </summary>
+    public static void CollectVisibleAirCellsAt(
+        UnitManager observer,
+        Vector3Int observerCell,
+        Tilemap map,
+        TerrainDatabase terrainDatabase,
+        ICollection<Vector3Int> visibleCellsOutput,
+        HeightLevel targetHeight,
+        DPQAirHeightConfig dpqAirHeightConfig = null,
+        bool enableLosValidation = true)
+    {
+        if (targetHeight != HeightLevel.AirLow
+            && targetHeight != HeightLevel.AirHigh)
+        {
+            return;
+        }
+
+        observerCell.z = 0;
+        CollectVisibleCells(
+            observer,
+            map,
+            terrainDatabase,
+            visibleCellsOutput,
+            dpqAirHeightConfig,
+            enableLosValidation,
+            enableSpotter: false,
+            useOccupantLayerForTarget: false,
+            preserveObserverLayerRangeForHexVisibility: false,
+            forceVirtualTargetLayer: true,
+            forcedVirtualTargetDomain: Domain.Air,
+            forcedVirtualTargetHeight: targetHeight,
+            useRangeOnlyForAirHighWhenConfigured: true,
+            virtualObserverCell: observerCell);
     }
 
     // FoW individual: abre hexes apenas por visao direta da propria unidade.

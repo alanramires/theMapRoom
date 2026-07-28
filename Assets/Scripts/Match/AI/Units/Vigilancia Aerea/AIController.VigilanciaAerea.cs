@@ -200,6 +200,19 @@ public partial class AIController
         if (unit == null || snapshot == null)
             return false;
 
+        if (IsStationaryMobileAirSurveillanceRadar(unit))
+        {
+            return TryFindStationaryMobileRadarCell(
+                unit,
+                snapshot,
+                fromCell,
+                anchor,
+                offensiveAnchor,
+                paths,
+                out bestCell,
+                out reason);
+        }
+
         TeamObjectivePlan capPlan = ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(snapshot.AISlotIndex));
         float fromScore = ScoreAirSurveillancePostureCell(unit, snapshot, fromCell, fromCell, anchor, offensiveAnchor, 0, out string fromReason);
         float bestScore = fromScore;
@@ -241,6 +254,316 @@ public partial class AIController
 
         reason = $"{bestReason} score={bestScore:F0} hold={fromScore:F0}";
         return true;
+    }
+
+    private readonly struct MobileRadarCoverageSample
+    {
+        public readonly int AirLow;
+        public readonly int AirHigh;
+        public readonly int MarginalAirLow;
+        public readonly int MarginalAirHigh;
+        public readonly float Score;
+
+        public int VisibleCells => AirLow + AirHigh;
+
+        public MobileRadarCoverageSample(
+            int airLow,
+            int airHigh,
+            int marginalAirLow,
+            int marginalAirHigh,
+            float score)
+        {
+            AirLow = airLow;
+            AirHigh = airHigh;
+            MarginalAirLow = marginalAirLow;
+            MarginalAirHigh = marginalAirHigh;
+            Score = score;
+        }
+
+        public override string ToString()
+        {
+            return
+                $"low={AirLow}(new={MarginalAirLow}) " +
+                $"high={AirHigh}(new={MarginalAirHigh}) " +
+                $"coverage={Score:F0}";
+        }
+    }
+
+    private static bool IsStationaryMobileAirSurveillanceRadar(
+        UnitManager unit)
+    {
+        if (!IsAirSurveillanceUnit(unit)
+            || !unit.TryGetUnitData(out UnitData data)
+            || data == null)
+        {
+            return false;
+        }
+
+        return data.domain == Domain.Land
+            && data.longRangeStationary;
+    }
+
+    private bool TryFindStationaryMobileRadarCell(
+        UnitManager unit,
+        AIWorldSnapshot snapshot,
+        Vector3Int fromCell,
+        Vector3Int anchor,
+        bool offensiveAnchor,
+        Dictionary<Vector3Int, List<Vector3Int>> paths,
+        out Vector3Int bestCell,
+        out string reason)
+    {
+        bestCell = fromCell;
+        reason = "radar stationary";
+
+        var alliedAirLow = new HashSet<Vector3Int>();
+        var alliedAirHigh = new HashSet<Vector3Int>();
+        CollectAlliedAirSurveillanceCoverage(
+            unit,
+            snapshot,
+            alliedAirLow,
+            alliedAirHigh);
+
+        MobileRadarCoverageSample fromCoverage =
+            EvaluateMobileRadarCoverage(
+                unit,
+                fromCell,
+                alliedAirLow,
+                alliedAirHigh);
+        float fromPosture = ScoreAirSurveillancePostureCell(
+            unit,
+            snapshot,
+            fromCell,
+            fromCell,
+            anchor,
+            offensiveAnchor,
+            pathCost: 0,
+            out _);
+        float fromScore = fromCoverage.Score + fromPosture * 0.2f;
+        float bestScore = fromScore;
+        MobileRadarCoverageSample bestCoverage = fromCoverage;
+        int bestPathCost = 0;
+
+        TeamObjectivePlan capPlan =
+            ObjectiveManager.GetPlanForSlot(
+                PlayerSlotId.FromIndex(snapshot.AISlotIndex));
+
+        if (paths != null)
+        {
+            foreach (Vector3Int rawCell in paths.Keys)
+            {
+                Vector3Int cell = rawCell;
+                cell.z = 0;
+                if (cell == fromCell)
+                    continue;
+                List<UnitManager> occupants =
+                    UnitOccupancyRules.GetUnitsAtCell(
+                        boardTilemap,
+                        cell,
+                        unit);
+                if (!CanAIUnitEndMoveAtCell(
+                        unit,
+                        cell,
+                        occupants))
+                {
+                    continue;
+                }
+                if (IsCellACapturerTarget(
+                        cell,
+                        capPlan,
+                        snapshot.AITeam))
+                {
+                    continue;
+                }
+                if (!IsAirSurveillanceCellAllowedByRearLine(
+                        unit,
+                        snapshot,
+                        fromCell,
+                        cell,
+                        anchor,
+                        offensiveAnchor))
+                {
+                    continue;
+                }
+                if (TryScoreBacklineCell(
+                        unit,
+                        snapshot,
+                        cell,
+                        anchor,
+                        out AIBacklineScore rear)
+                    && rear.IsVanguard)
+                {
+                    continue;
+                }
+
+                int pathCost = GetPathStepCount(paths, cell);
+                MobileRadarCoverageSample coverage =
+                    EvaluateMobileRadarCoverage(
+                        unit,
+                        cell,
+                        alliedAirLow,
+                        alliedAirHigh);
+                float posture =
+                    ScoreAirSurveillancePostureCell(
+                        unit,
+                        snapshot,
+                        cell,
+                        fromCell,
+                        anchor,
+                        offensiveAnchor,
+                        pathCost,
+                        out _);
+                float score = coverage.Score + posture * 0.2f;
+                if (score <= bestScore)
+                    continue;
+
+                bestScore = score;
+                bestCell = cell;
+                bestCoverage = coverage;
+                bestPathCost = pathCost;
+            }
+        }
+
+        float requiredGain = fromCoverage.VisibleCells <= 2
+            ? 20f
+            : Mathf.Max(90f, fromCoverage.Score * 0.06f);
+        float actualGain = bestScore - fromScore;
+        if (bestCell == fromCell || actualGain < requiredGain)
+        {
+            bestCell = fromCell;
+            reason =
+                $"radar stationary hold {fromCoverage} " +
+                $"bestGain={actualGain:F0} required={requiredGain:F0}";
+            return true;
+        }
+
+        reason =
+            $"radar stationary move {fromCoverage} -> " +
+            $"{bestCoverage} gain={actualGain:F0} " +
+            $"required={requiredGain:F0} path={bestPathCost}";
+        return true;
+    }
+
+    private MobileRadarCoverageSample EvaluateMobileRadarCoverage(
+        UnitManager radar,
+        Vector3Int observerCell,
+        HashSet<Vector3Int> alliedAirLow,
+        HashSet<Vector3Int> alliedAirHigh)
+    {
+        var airLow = new HashSet<Vector3Int>();
+        var airHigh = new HashSet<Vector3Int>();
+        CollectAirSurveillanceCoverageAt(
+            radar,
+            observerCell,
+            airLow,
+            airHigh);
+
+        int marginalLow = 0;
+        foreach (Vector3Int cell in airLow)
+        {
+            if (alliedAirLow == null
+                || !alliedAirLow.Contains(cell))
+            {
+                marginalLow++;
+            }
+        }
+
+        int marginalHigh = 0;
+        foreach (Vector3Int cell in airHigh)
+        {
+            if (alliedAirHigh == null
+                || !alliedAirHigh.Contains(cell))
+            {
+                marginalHigh++;
+            }
+        }
+
+        radar.TryGetUnitData(out UnitData data);
+        bool detectsLowStealth = data != null
+            && data.CanDetectStealthFor(
+                Domain.Air,
+                HeightLevel.AirLow);
+        bool detectsHighStealth = data != null
+            && data.CanDetectStealthFor(
+                Domain.Air,
+                HeightLevel.AirHigh);
+
+        float score =
+            airLow.Count * 8f
+            + airHigh.Count * 10f
+            + marginalLow * 6f
+            + marginalHigh * 7f
+            + (detectsLowStealth ? airLow.Count * 2f : 0f)
+            + (detectsHighStealth ? airHigh.Count * 2f : 0f);
+        return new MobileRadarCoverageSample(
+            airLow.Count,
+            airHigh.Count,
+            marginalLow,
+            marginalHigh,
+            score);
+    }
+
+    private void CollectAlliedAirSurveillanceCoverage(
+        UnitManager self,
+        AIWorldSnapshot snapshot,
+        HashSet<Vector3Int> airLow,
+        HashSet<Vector3Int> airHigh)
+    {
+        if (snapshot == null || snapshot.MyUnits == null)
+            return;
+
+        foreach (UnitManager ally in snapshot.MyUnits)
+        {
+            if (ally == null
+                || ally == self
+                || ally.IsDead
+                || ally.IsEmbarked
+                || ally.IsUnderRepair
+                || !IsAirSurveillanceUnit(ally))
+            {
+                continue;
+            }
+
+            Vector3Int allyCell = ally.CurrentCellPosition;
+            allyCell.z = 0;
+            CollectAirSurveillanceCoverageAt(
+                ally,
+                allyCell,
+                airLow,
+                airHigh);
+        }
+    }
+
+    private void CollectAirSurveillanceCoverageAt(
+        UnitManager observer,
+        Vector3Int observerCell,
+        HashSet<Vector3Int> airLow,
+        HashSet<Vector3Int> airHigh)
+    {
+        DPQAirHeightConfig airConfig = turnStateManager != null
+            ? turnStateManager.DpqAirHeightConfigRef
+            : null;
+        bool enableLos = matchController == null
+            || matchController.EnableLosValidation;
+
+        PodeDetectarSensor.CollectVisibleAirCellsAt(
+            observer,
+            observerCell,
+            boardTilemap,
+            terrainDatabase,
+            airLow,
+            HeightLevel.AirLow,
+            airConfig,
+            enableLos);
+        PodeDetectarSensor.CollectVisibleAirCellsAt(
+            observer,
+            observerCell,
+            boardTilemap,
+            terrainDatabase,
+            airHigh,
+            HeightLevel.AirHigh,
+            airConfig,
+            enableLos);
     }
 
     private bool IsAirSurveillanceCellAllowedByRearLine(
