@@ -250,22 +250,12 @@ public partial class AIController
             }
 
             compatibleTransporters++;
+            TransportPlanningSnapshot transportPlanning =
+                GetOrCreateTransportPlanningSnapshot(
+                    transporter, snapshot, plan);
             MelhorEmbarqueResult evaluated =
-                MelhorEmbarqueService.Evaluate(
-                    new MelhorEmbarqueRequest
-                    {
-                        transporter = transporter,
-                        map = boardTilemap,
-                        terrainDatabase = terrainDatabase,
-                        tacticalBudget = Mathf.Max(
-                            0, transporter.RemainingMovementPoints),
-                        operationalTurns = 2,
-                        includeStrategic = false,
-                        allowPassenger = candidate => candidate == unit,
-                        includeInLegacyRanking = _ => false,
-                        evaluateRideNeed = candidate =>
-                            candidate == unit ? rideNeed : null
-                    });
+                GetOrBuildTransportPassengerProjection(
+                    transportPlanning, unit, rideNeed);
             MelhorEmbarqueOption option =
                 evaluated.options.Find(candidate =>
                     candidate?.passenger == unit

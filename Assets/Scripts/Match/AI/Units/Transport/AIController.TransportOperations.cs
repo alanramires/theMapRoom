@@ -5,6 +5,9 @@ using UnityEngine;
 public partial class AIController
 {
     private const int TransportPlanningOperationalTurns = 2;
+    private readonly Dictionary<int, TransportPlanningSnapshot>
+        transportPlanningSnapshots =
+            new Dictionary<int, TransportPlanningSnapshot>();
 
     private PlayerAction TryDecideTransportOperationsAction(
         UnitManager unit,
@@ -30,24 +33,22 @@ public partial class AIController
         if (criticalStockAction != null)
             return criticalStockAction;
 
-        MelhorEmbarqueResult pickupPlanningSnapshot = null;
-        bool pickupPlanningSnapshotBuilt = false;
-        MelhorEmbarqueResult GetPickupPlanningSnapshot()
+        TransportPlanningSnapshot planningSnapshot = null;
+        bool planningSnapshotRequested = false;
+        TransportPlanningSnapshot GetPlanningSnapshot()
         {
-            if (pickupPlanningSnapshotBuilt)
+            if (planningSnapshotRequested)
             {
                 AIDecisionPerf.AddCount(
                     "TransportPlanningSnapshotHits");
-                return pickupPlanningSnapshot;
+                return planningSnapshot;
             }
 
-            pickupPlanningSnapshotBuilt = true;
-            AIDecisionPerf.AddCount(
-                "TransportPlanningSnapshotBuilds");
-            pickupPlanningSnapshot =
-                BuildTransportPickupPlanningSnapshot(
+            planningSnapshotRequested = true;
+            planningSnapshot =
+                GetOrCreateTransportPlanningSnapshot(
                     unit, snapshot, plan);
-            return pickupPlanningSnapshot;
+            return planningSnapshot;
         }
 
         var context = new TransportOperationContext
@@ -64,7 +65,7 @@ public partial class AIController
                 TryEvaluateTransportOperation(
                     unit, data, snapshot, plan, operation, tier,
                     movementBudget, allowOpportunisticPickup,
-                    GetPickupPlanningSnapshot,
+                    GetPlanningSnapshot,
                     out decision)
         };
 
@@ -153,11 +154,15 @@ public partial class AIController
 
         Vector3Int fromCell = unit.CurrentCellPosition;
         fromCell.z = 0;
-        Dictionary<Vector3Int, List<Vector3Int>> paths =
-            UnitMovementPathRules.CalcularCaminhosValidos(
+        Dictionary<Vector3Int, List<Vector3Int>> paths;
+        if (!TryGetTransportPlanningReach(
+                unit, snapshot, out paths))
+        {
+            paths = UnitMovementPathRules.CalcularCaminhosValidos(
                 boardTilemap, unit,
                 Mathf.Max(0, unit.RemainingMovementPoints),
                 terrainDatabase);
+        }
         if (paths == null || paths.Count == 0)
             return null;
 
@@ -219,7 +224,7 @@ public partial class AIController
         AIReachDecisionTier tier,
         int movementBudget,
         bool allowOpportunisticPickup,
-        Func<MelhorEmbarqueResult> getPickupPlanningSnapshot,
+        Func<TransportPlanningSnapshot> getPlanningSnapshot,
         out TransportOperationDecision decision)
     {
         decision = null;
@@ -271,12 +276,13 @@ public partial class AIController
             case TransportOperationType.Evac:
                 return TryQueryTransportEvacOperation(
                     unit, snapshot, plan, tier, movementBudget,
-                    getPickupPlanningSnapshot,
+                    getPlanningSnapshot,
                     out decision);
 
             case TransportOperationType.Supply:
                 return TryQueryTransportSupplyOperation(
-                    unit, snapshot, tier, movementBudget, out decision);
+                    unit, snapshot, tier, movementBudget,
+                    getPlanningSnapshot, out decision);
 
             case TransportOperationType.Pickup:
                 return TryQueryTransportPickupOperation(
@@ -284,8 +290,8 @@ public partial class AIController
                     includeOpportunisticPickup:
                         allowOpportunisticPickup,
                     requiredDisposition: null,
-                    getPickupPlanningSnapshot:
-                        getPickupPlanningSnapshot,
+                    getPlanningSnapshot:
+                        getPlanningSnapshot,
                     out decision);
         }
 
@@ -320,7 +326,7 @@ public partial class AIController
         TeamObjectivePlan plan,
         AIReachDecisionTier requestedTier,
         int movementBudget,
-        Func<MelhorEmbarqueResult> getPickupPlanningSnapshot,
+        Func<TransportPlanningSnapshot> getPlanningSnapshot,
         out TransportOperationDecision decision)
     {
         bool found = TryQueryTransportPickupOperation(
@@ -328,8 +334,8 @@ public partial class AIController
             includeOpportunisticPickup: false,
             requiredDisposition:
                 MelhorEmbarqueRideDisposition.Emergency,
-            getPickupPlanningSnapshot:
-                getPickupPlanningSnapshot,
+            getPlanningSnapshot:
+                getPlanningSnapshot,
             out decision);
         if (!found || decision == null)
             return false;
@@ -343,6 +349,7 @@ public partial class AIController
         AIWorldSnapshot snapshot,
         AIReachDecisionTier requestedTier,
         int movementBudget,
+        Func<TransportPlanningSnapshot> getPlanningSnapshot,
         out TransportOperationDecision decision)
     {
         decision = null;
@@ -351,33 +358,26 @@ public partial class AIController
             || !data.isSupplier)
             return false;
 
-        Vector3Int fromCell = unit.CurrentCellPosition;
-        fromCell.z = 0;
-        Dictionary<Vector3Int, List<Vector3Int>> paths =
-            BuildLogisticsPaths(unit);
-        HashSet<Vector3Int> occupied = BuildOccupied(unit);
-        bool baseDefense = IsLogisticsBaseDefenseEmergency(snapshot);
-
-        UnitManager serviceTarget = FindLogisticsServiceTarget(
-            unit, snapshot, fromCell, paths, occupied, baseDefense,
-            AIReachDecisionStages.Operational);
-        if (serviceTarget == null)
+        TransportPlanningSnapshot planning =
+            getPlanningSnapshot?.Invoke();
+        EnsureTransportSupplyPlanning(
+            planning, snapshot);
+        if (planning == null
+            || !planning.SupplyEvaluated
+            || planning.SupplyTarget == null
+            || planning.SupplyTier != requestedTier)
             return false;
 
+        Vector3Int fromCell = planning.Origin;
+        UnitManager serviceTarget = planning.SupplyTarget;
         Vector3Int targetCell = serviceTarget.CurrentCellPosition;
         targetCell.z = 0;
         float distance = SectorManager.HexDistance(fromCell, targetCell);
-        AIReachDecisionTier actualTier =
-            distance <= Mathf.Max(0, unit.RemainingMovementPoints)
-                ? AIReachDecisionTier.Tactical
-                : AIReachDecisionTier.Operational;
-        if (actualTier != requestedTier)
-            return false;
-
         decision = CreateTransportDecision(
             serviceTarget, targetCell, movementBudget,
             70000f - distance * 100f,
             $"suprimento=#{serviceTarget.InstanceId} dist={distance:F0}");
+        decision.PlanningSnapshot = planning;
         return true;
     }
 
@@ -389,7 +389,7 @@ public partial class AIController
         int movementBudget,
         bool includeOpportunisticPickup,
         MelhorEmbarqueRideDisposition? requiredDisposition,
-        Func<MelhorEmbarqueResult> getPickupPlanningSnapshot,
+        Func<TransportPlanningSnapshot> getPlanningSnapshot,
         out TransportOperationDecision decision)
     {
         decision = null;
@@ -397,11 +397,14 @@ public partial class AIController
             || data == null
             || !data.isTransporter
             || IsTransporterAtCapacity(unit, data)
-            || getPickupPlanningSnapshot == null)
+            || getPlanningSnapshot == null)
             return false;
 
-        MelhorEmbarqueResult pickup =
-            getPickupPlanningSnapshot();
+        TransportPlanningSnapshot planning =
+            getPlanningSnapshot();
+        EnsureTransportPickupPlanning(
+            planning, snapshot, plan);
+        MelhorEmbarqueResult pickup = planning?.Pickup;
         if (pickup == null)
             return false;
         MelhorEmbarqueTier serviceTier =
@@ -454,42 +457,161 @@ public partial class AIController
             selectedOption.passengerRouteCost;
         decision.TransporterRouteCost =
             selectedOption.transporterRouteCost;
+        decision.PlanningSnapshot = planning;
         return true;
 
     }
 
-    private MelhorEmbarqueResult
-        BuildTransportPickupPlanningSnapshot(
+    private TransportPlanningSnapshot
+        GetOrCreateTransportPlanningSnapshot(
             UnitManager unit,
             AIWorldSnapshot snapshot,
             TeamObjectivePlan plan)
     {
         if (unit == null || snapshot == null)
-            return new MelhorEmbarqueResult();
+            return null;
 
-        int tacticalBudget =
-            Mathf.Max(0, unit.RemainingMovementPoints);
-        MelhorEmbarqueResult result =
+        int confirmedRevision =
+            ResolveTransportPlanningConfirmedRevision(unit);
+        if (transportPlanningSnapshots.TryGetValue(
+                unit.InstanceId,
+                out TransportPlanningSnapshot cached)
+            && cached != null
+            && cached.Matches(
+                unit, snapshot, plan, confirmedRevision))
+        {
+            AIDecisionPerf.AddCount(
+                "TransportPlanningSnapshotHits");
+            return cached;
+        }
+
+        Vector3Int origin = unit.CurrentCellPosition;
+        origin.z = 0;
+        var created = new TransportPlanningSnapshot
+        {
+            Transporter = unit,
+            WorldSnapshot = snapshot,
+            ObjectivePlan = plan,
+            ConfirmedOccupancyRevision = confirmedRevision,
+            Origin = origin,
+            MovementBudget =
+                Mathf.Max(0, unit.RemainingMovementPoints),
+            CurrentFuel = Mathf.Max(0, unit.CurrentFuel),
+            TransporterReach = BuildLogisticsPaths(unit)
+        };
+
+        // Somente um snapshot comprovadamente confirmado pode sobreviver a
+        // esta consulta. Durante qualquer estado provisório ele continua
+        // local e jamais é publicado no cache da Phase 2.
+        if (confirmedRevision >= 0)
+            transportPlanningSnapshots[unit.InstanceId] = created;
+
+        AIDecisionPerf.AddCount(
+            "TransportPlanningSnapshotBuilds");
+        return created;
+    }
+
+    private bool TryGetTransportPlanningReach(
+        UnitManager unit,
+        AIWorldSnapshot snapshot,
+        out Dictionary<Vector3Int, List<Vector3Int>> reach)
+    {
+        reach = null;
+        if (unit == null
+            || snapshot == null
+            || !transportPlanningSnapshots.TryGetValue(
+                unit.InstanceId,
+                out TransportPlanningSnapshot planning)
+            || planning == null
+            || !planning.Matches(
+                unit,
+                snapshot,
+                planning.ObjectivePlan,
+                ResolveTransportPlanningConfirmedRevision(unit))
+            || planning.TransporterReach == null)
+        {
+            return false;
+        }
+
+        reach = planning.TransporterReach;
+        AIDecisionPerf.AddCount(
+            "TransportPlanningReachReuses");
+        return true;
+    }
+
+    private int ResolveTransportPlanningConfirmedRevision(
+        UnitManager unit)
+    {
+        if (unit == null
+            || boardTilemap == null
+            || !ConfirmedOccupancyIndex.TryGetFor(
+                boardTilemap,
+                out ConfirmedOccupancyIndex occupancy)
+            || occupancy == null
+            || !occupancy.CanServeLiveQueries
+            || !occupancy.TryGetRecord(
+                unit,
+                out ConfirmedUnitOccupancyRecord record))
+        {
+            return -1;
+        }
+
+        Vector3Int liveCell = unit.CurrentCellPosition;
+        liveCell.z = 0;
+        return record.cell == liveCell
+            && record.domain == unit.GetDomain()
+            && record.height == unit.GetHeightLevel()
+            && record.slotIndex == unit.SlotIndex
+            && record.team == unit.TeamId
+            && record.isEmbarked == unit.IsEmbarked
+                ? occupancy.ConfirmedRevision
+                : -1;
+    }
+
+    private void EnsureTransportPickupPlanning(
+        TransportPlanningSnapshot planning,
+        AIWorldSnapshot snapshot,
+        TeamObjectivePlan plan)
+    {
+        if (planning == null || planning.PickupEvaluated)
+            return;
+
+        planning.PickupEvaluated = true;
+        UnitManager unit = planning.Transporter;
+        if (unit == null
+            || snapshot == null
+            || !unit.TryGetUnitData(out UnitData data)
+            || data == null
+            || !data.isTransporter
+            || IsTransporterAtCapacity(unit, data))
+        {
+            planning.Pickup = new MelhorEmbarqueResult();
+            return;
+        }
+
+        planning.Pickup =
             MelhorEmbarqueService.Evaluate(
                 new MelhorEmbarqueRequest
                 {
                     transporter = unit,
                     map = boardTilemap,
                     terrainDatabase = terrainDatabase,
-                    tacticalBudget = tacticalBudget,
+                    tacticalBudget = planning.MovementBudget,
                     operationalTurns =
                         TransportPlanningOperationalTurns,
                     // Uma coleta produz Tactical, Operational e Strategic.
-                    // TransportOperations apenas filtra o resultado na ordem
-                    // de prioridade; nenhuma tentativa reconstrói o mundo.
+                    // EVAC/Pickup apenas filtram esta mesma lista.
                     includeStrategic = true,
+                    transporterPaths = planning.TransporterReach,
                     allowPassenger = candidate =>
                         IsStructurallyEligiblePickupCandidate(
                             unit, candidate, snapshot, plan),
                     includeInLegacyRanking = _ => false,
                     evaluateRideNeed = candidate =>
-                        EvaluatePickupRideNeed(
-                            candidate, plan,
+                        GetOrEvaluateTransportRideNeed(
+                            planning,
+                            candidate,
+                            plan,
                             TransportPlanningOperationalTurns),
                     diagnosticLog = showAILogs
                         ? message => Debug.Log(
@@ -501,12 +623,135 @@ public partial class AIController
         {
             Debug.Log(
                 $"{TL("Transporte")}[PlanningSnapshot] " +
-                $"unit=#{unit.InstanceId} rev=" +
-                $"{ThreatRevisionTracker.GlobalBoardRevision} " +
-                $"tiers=3 options={result.options.Count} " +
-                $"ranking={result.ranking.Count}");
+                $"unit=#{unit.InstanceId} " +
+                $"confirmedRev={planning.ConfirmedOccupancyRevision} " +
+                $"reach={planning.TransporterReach?.Count ?? 0} " +
+                $"rideNeeds={planning.RideNeedByPassenger.Count} " +
+                $"tiers=3 options={planning.Pickup.options.Count} " +
+                $"ranking={planning.Pickup.ranking.Count}");
         }
-        return result;
+    }
+
+    private void EnsureTransportSupplyPlanning(
+        TransportPlanningSnapshot planning,
+        AIWorldSnapshot snapshot)
+    {
+        if (planning == null || planning.SupplyEvaluated)
+            return;
+
+        planning.SupplyEvaluated = true;
+        UnitManager unit = planning.Transporter;
+        if (unit == null
+            || snapshot == null
+            || !unit.TryGetUnitData(out UnitData data)
+            || data == null
+            || !data.isSupplier)
+        {
+            return;
+        }
+
+        HashSet<Vector3Int> occupied = BuildOccupied(unit);
+        planning.SupplyBaseDefense =
+            IsLogisticsBaseDefenseEmergency(snapshot);
+        planning.SupplyTarget = FindLogisticsServiceTarget(
+            unit,
+            snapshot,
+            planning.Origin,
+            planning.TransporterReach,
+            occupied,
+            planning.SupplyBaseDefense,
+            AIReachDecisionStages.Operational);
+        if (planning.SupplyTarget == null)
+            return;
+
+        Vector3Int targetCell =
+            planning.SupplyTarget.CurrentCellPosition;
+        targetCell.z = 0;
+        planning.SupplyTier =
+            SectorManager.HexDistance(
+                planning.Origin, targetCell)
+            <= planning.MovementBudget
+                ? AIReachDecisionTier.Tactical
+                : AIReachDecisionTier.Operational;
+    }
+
+    private QueroCaronaResult GetOrEvaluateTransportRideNeed(
+        TransportPlanningSnapshot planning,
+        UnitManager passenger,
+        TeamObjectivePlan plan,
+        int operationalTurns)
+    {
+        if (planning == null || passenger == null)
+            return null;
+        if (planning.RideNeedByPassenger.TryGetValue(
+                passenger.InstanceId,
+                out QueroCaronaResult cached))
+        {
+            AIDecisionPerf.AddCount(
+                "TransportPlanningRideNeedHits");
+            return cached;
+        }
+
+        QueroCaronaResult evaluated = EvaluatePickupRideNeed(
+            passenger, plan, operationalTurns);
+        planning.RideNeedByPassenger[passenger.InstanceId] =
+            evaluated;
+        return evaluated;
+    }
+
+    private MelhorEmbarqueResult
+        GetOrBuildTransportPassengerProjection(
+            TransportPlanningSnapshot planning,
+            UnitManager passenger,
+            QueroCaronaResult rideNeed)
+    {
+        if (planning == null || passenger == null)
+            return new MelhorEmbarqueResult();
+
+        // Se o transportador já produziu o panorama completo, Assault apenas
+        // filtra esse resultado. Caso contrário, cria uma projeção estreita
+        // para o passageiro, mas reutiliza o mesmo alcance do transportador.
+        if (planning.PickupEvaluated && planning.Pickup != null)
+        {
+            AIDecisionPerf.AddCount(
+                "TransportPlanningPassengerProjectionHits");
+            return planning.Pickup;
+        }
+
+        if (planning.PassengerPickupProjections.TryGetValue(
+                passenger.InstanceId,
+                out MelhorEmbarqueResult cached))
+        {
+            AIDecisionPerf.AddCount(
+                "TransportPlanningPassengerProjectionHits");
+            return cached;
+        }
+
+        planning.RideNeedByPassenger[passenger.InstanceId] =
+            rideNeed;
+        MelhorEmbarqueResult evaluated =
+            MelhorEmbarqueService.Evaluate(
+                new MelhorEmbarqueRequest
+                {
+                    transporter = planning.Transporter,
+                    map = boardTilemap,
+                    terrainDatabase = terrainDatabase,
+                    tacticalBudget = planning.MovementBudget,
+                    operationalTurns =
+                        TransportPlanningOperationalTurns,
+                    includeStrategic = false,
+                    transporterPaths = planning.TransporterReach,
+                    allowPassenger = candidate =>
+                        candidate == passenger,
+                    includeInLegacyRanking = _ => false,
+                    evaluateRideNeed = candidate =>
+                        candidate == passenger ? rideNeed : null
+                });
+        planning.PassengerPickupProjections[
+            passenger.InstanceId] = evaluated;
+        AIDecisionPerf.AddCount(
+            "TransportPlanningPassengerProjectionBuilds");
+        return evaluated;
     }
 
     private static bool CanMaterializePickupRendezvous(
@@ -668,10 +913,14 @@ public partial class AIController
         Vector3Int fromCell = unit.CurrentCellPosition;
         fromCell.z = 0;
         Dictionary<Vector3Int, List<Vector3Int>> paths =
-            UnitMovementPathRules.CalcularCaminhosValidos(
+            decision.PlanningSnapshot?.TransporterReach
+            ?? UnitMovementPathRules.CalcularCaminhosValidos(
                 boardTilemap, unit,
                 Mathf.Max(0, unit.RemainingMovementPoints),
                 terrainDatabase);
+        if (decision.PlanningSnapshot?.TransporterReach != null)
+            AIDecisionPerf.AddCount(
+                "TransportPlanningReachReuses");
         HashSet<Vector3Int> occupied = unit.GetDomain() == Domain.Air
             ? BuildAirOccupied(unit)
             : BuildOccupied(unit);
@@ -743,9 +992,16 @@ public partial class AIController
         Vector3Int fromCell = unit.CurrentCellPosition;
         fromCell.z = 0;
         Dictionary<Vector3Int, List<Vector3Int>> paths =
-            BuildLogisticsPaths(unit);
+            decision?.PlanningSnapshot?.TransporterReach
+            ?? BuildLogisticsPaths(unit);
+        if (decision?.PlanningSnapshot?.TransporterReach != null)
+            AIDecisionPerf.AddCount(
+                "TransportPlanningReachReuses");
         HashSet<Vector3Int> occupied = BuildOccupied(unit);
-        bool baseDefense = IsLogisticsBaseDefenseEmergency(snapshot);
+        bool baseDefense =
+            decision?.PlanningSnapshot != null
+                ? decision.PlanningSnapshot.SupplyBaseDefense
+                : IsLogisticsBaseDefenseEmergency(snapshot);
 
         if (decision.ReachTier == AIReachDecisionTier.Tactical)
         {

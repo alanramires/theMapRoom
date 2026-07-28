@@ -1,101 +1,153 @@
-# v4.5.6 — Pouso de Emergencia
+# v4.5.6 — TransportPlanningSnapshot
 
-## Objetivo
+## Visão geral
 
-Adicionar à tomada de decisão de aeronaves `IsUnderRepair` uma contingência de
-autonomia: quando não houver recuperação tática ou operacional disponível, a IA
-passa a procurar um hex válido para um futuro pouso de emergência.
+Este checkpoint implementa a Parte 6 do plano de otimização do tabuleiro:
+um `TransportPlanningSnapshot` compartilhado por transportador e snapshot
+confirmado.
 
-A IA não executa o pouso durante sua ação. Ela apenas termina o movimento
-pairando sobre o local escolhido; o pouso forçado continua sendo responsabilidade
-exclusiva do upkeep de início de turno.
+O planejamento de transporte deixa de reconstruir os mesmos alcances e
+avaliações ao alternar entre EVAC, Pickup, Supply, Tactical, Operational e
+Strategic. A decisão continua sendo materializada somente depois que uma opção
+vence; o snapshot não contém ordens, reservas definitivas ou efeitos de jogo.
 
-## Coordenação de recuperação
+## Conteúdo do snapshot
 
-- A busca usa `AIActionReachCoordinator`.
-- São avaliados os horizontes tático e operacional.
-- Entram como possibilidades de recuperação:
-  - aeródromos e construções de reparo compatíveis;
-  - supridores;
-  - unidades elegíveis para fusão;
-  - plataformas navais compatíveis.
-- O horizonte tático respeita os caminhos realmente alcançáveis na rodada.
-- O horizonte operacional considera a progressão configurada pelo coordenador.
-- A consulta apenas lê o estado confirmado e não move unidades nem reserva
-  ocupação.
+Cada `TransportPlanningSnapshot` registra:
 
-## Faixa crítica de autonomia
+- transportador, origem, movimento restante e combustível;
+- referência do `AIWorldSnapshot` e do plano de objetivos;
+- revisão confirmada do `ConfirmedOccupancyIndex`;
+- caminhos alcançáveis pelo transportador na rodada;
+- resultado classificado de `MelhorEmbarque`;
+- respostas de `QueroCarona` por passageiro;
+- projeções de embarque solicitadas pelo papel Assalto;
+- alvo e tier escolhidos para Supply;
+- opções Tactical, Operational e Strategic já validadas.
 
-A aeronave entra em urgência quando:
+O ranking e as razões produzidos pelos sensores permanecem os mesmos. O
+snapshot apenas conserva o resultado para os consumidores seguintes.
+
+## EVAC e Pickup
+
+EVAC e Pickup agora consultam a mesma execução de `MelhorEmbarque`.
+
+- EVAC filtra passageiros em emergência;
+- Pickup filtra pedidos normais e, quando permitido, oportunidades;
+- Tactical, Operational e Strategic filtram o tier correspondente;
+- rejeição de uma opção por segurança ou impossibilidade de materialização
+  continua procurando a próxima opção da lista;
+- nenhuma dessas tentativas reconstrói a malha.
+
+O alcance do transportador calculado durante o planejamento também é reutilizado
+na materialização do movimento até a LZ.
+
+## Supply
+
+A seleção de demanda de Supply passa a ser calculada uma vez por snapshot.
+
+Antes, as tentativas Tactical e Operational podiam repetir:
+
+- construção dos caminhos logísticos;
+- verificação de compatibilidade via `PodeSuprir`;
+- classificação das necessidades;
+- busca do melhor alvo.
+
+Agora o alvo é escolhido uma vez, recebe seu tier e é filtrado pelas tentativas
+do `TransportOperationsService`. A materialização reutiliza os caminhos e o
+estado de defesa de base já avaliados.
+
+## Assalto e projeções de passageiro
+
+O passageiro de Assalto também usa o `TransportPlanningSnapshot` do
+transportador.
+
+Quando o panorama completo de Pickup já existe, Assalto apenas filtra a opção
+da própria unidade. Caso contrário, cria uma projeção estreita para aquele
+passageiro, reutilizando o alcance do transportador. Isso evita transformar uma
+consulta individual em uma avaliação de todos os passageiros do exército.
+
+As projeções não reservam o transportador. A reserva provisória da Phase 2
+continua ocorrendo somente quando a decisão escolhida é materializada.
+
+## Integração com Movement Reach Cache
+
+`MelhorEmbarqueRequest` passou a aceitar caminhos pré-calculados do
+transportador. Quando fornecidos pelo snapshot, `MelhorEmbarqueService` não
+abre outra onda para a mesma origem e orçamento.
+
+O `MovementReachCache` da Parte 5 permanece como fonte compartilhada para
+outras consultas equivalentes. O snapshot adiciona uma camada semântica acima
+dele: além dos caminhos, conserva passageiros, LZs, `QueroCarona`, ranking,
+tiers e decisões de serviço.
+
+## Contrato transacional
+
+O snapshot não altera a verdade do tabuleiro.
+
+- não contém `PlayerAction`;
+- não move unidade nem altera ocupação;
+- não consome combustível, estoque ou recursos;
+- não marca `HasActed`;
+- não altera FOW, detecção ou inteligência;
+- não confirma reservas de passageiro;
+- não é publicado quando a unidade diverge da ocupação confirmada.
+
+Para entrar no cache da Phase 2, o transportador runtime deve coincidir com seu
+registro no `ConfirmedOccupancyIndex`. A chave lógica também exige a mesma
+revisão confirmada, o mesmo `AIWorldSnapshot`, o mesmo plano, origem, movimento
+e combustível.
+
+Se a ocupação ainda não estiver pronta ou houver estado provisório, o resultado
+fica restrito à consulta atual. O cache é limpo no começo de cada Phase 2.
+
+## Telemetria
+
+Foram adicionados contadores para observar a economia:
 
 ```text
-combustível atual <= movimento da unidade + consumo do próximo upkeep
+TransportPlanningSnapshotBuilds
+TransportPlanningSnapshotHits
+TransportPlanningReachReuses
+TransportPlanningRideNeedHits
+TransportPlanningPassengerProjectionBuilds
+TransportPlanningPassengerProjectionHits
 ```
 
-O movimento vem do perfil da unidade e o consumo de upkeep é consultado por
-`OperationalAutonomyRules`.
-
-Exemplo: uma aeronave com movimento `9` e upkeep `5` entra na faixa crítica com
-combustível menor ou igual a `14`.
-
-Quando crítica e sem recuperação tática ou operacional, a busca por uma posição
-de pouso futuro prevalece sobre oportunidades de combate.
-
-## Escolha da posição de espera
-
-- Cada candidato é validado por `PodePousarSensor.CanLandAtCell`.
-- A validação usa o hex hipotético sem alterar a posição runtime da aeronave.
-- Ocupação aérea, perfil da aeronave, terreno, estrutura, construção, skills e
-  demais regras de pouso continuam centralizados no sensor.
-- O caminho precisa estar disponível no turno e ser compatível com o combustível
-  atual.
-- A pontuação favorece:
-  - construções aliadas;
-  - estradas utilizáveis como pista;
-  - menor ameaça;
-  - maior combustível residual;
-  - menor custo de movimento;
-  - desempate determinístico por coordenada.
-
-## Aproximação sem LZ tática
-
-Se nenhuma posição válida de pouso estiver ao alcance imediato, a IA procura uma
-LZ futura no tabuleiro e escolhe o melhor passo alcançável em sua direção.
-
-A aeronave permanece em voo. Se nem mesmo uma aproximação válida existir, o
-sistema registra um diagnóstico explícito de risco inevitável de queda, sem
-inventar um pouso ou ignorar as regras existentes.
-
-## Upkeep e pouso efetivo
-
-- A ação produzida pela IA continua sendo somente um `BuildMoveBatch`.
-- Nenhum caminho novo chama pouso, decolagem, troca de camada ou engine state.
-- A aeronave paira sobre a LZ durante o restante da rodada.
-- O upkeep existente decide se ocorre pouso forçado ou queda.
-- Jogadores e IA continuam sem acesso direto a comandos livres de pouso e
-  decolagem.
-
-## Arquitetura transacional
-
-- A análise é pura e não altera posição, combustível, camada, ocupação, FOW,
-  detecção ou caches confirmados.
-- O destino escolhido é materializado como ação transacional normal.
-- Nenhum efeito definitivo ocorre durante a decisão.
-- O contrato `Neutral → ação provisória → compromisso → Neutral` permanece
-  preservado.
+`MelhorEmbarqueCalls`, `MovementCacheHits` e `MovementWavesBuilt` continuam
+permitindo comparar quantas avaliações semânticas e ondas reais aconteceram.
 
 ## Arquivos principais
 
-- `Assets/Scripts/Match/AI/Units/Repair/AIController.Repair.AirEmergency.cs`
-- `Assets/Scripts/Match/AI/Units/Repair/AIController.Repair.cs`
+- `Assets/Scripts/Match/AI/Services/Transport/TransportOperationsService.cs`;
+- `Assets/Scripts/Match/AI/Services/MelhorEmbarqueService.cs`;
+- `Assets/Scripts/Match/AI/Units/Transport/AIController.TransportOperations.cs`;
+- `Assets/Scripts/Match/AI/Units/Assault/AIController.Assault.cs`;
+- `Assets/Scripts/Match/AI/1. Phases/AIController.Phase2.cs`.
 
-O novo arquivo possui `.meta` próprio para preservação correta pelo Unity.
+## Validação
 
-## Verificação
+- `Assembly-CSharp.csproj`: 0 erros;
+- `git diff --check`: aprovado;
+- nenhuma alteração em regras de compatibilidade, pontuação ou prioridade;
+- nenhum estado provisório é publicado como snapshot confirmado;
+- EVAC, Pickup e Supply reutilizam o planejamento durante a decisão e a
+  materialização;
+- Assalto reutiliza o alcance sem avaliar passageiros alheios desnecessariamente.
 
-- `dotnet build Assembly-CSharp.csproj --no-restore`
-- Auditoria das chamadas de pouso e mudança de camada no fluxo novo.
-- Auditoria do uso de `PodePousarSensor` por hex hipotético.
-- Auditoria do `AIActionReachCoordinator` nos níveis tático e operacional.
-- `git diff --check` aplicado aos arquivos da implementação.
-- Resultado: build concluído com 0 erros.
+Os avisos já existentes de APIs obsoletas e serialização permanecem sem relação
+com este checkpoint.
+
+## Teste recomendado
+
+Em uma rodada grande com transportadores vazios, supridores e passageiros:
+
+- comparar `TransportPlanningSnapshotBuilds` com
+  `TransportPlanningSnapshotHits`;
+- confirmar que EVAC Tactical/Operational e Pickup
+  Tactical/Operational/Strategic não multiplicam `MelhorEmbarqueCalls`;
+- confirmar `TransportPlanningReachReuses` na seleção e materialização;
+- observar Assalto e fogo de apoio pedindo transporte;
+- testar Supply com alvo Tactical e com alvo Operational;
+- testar cancelamento, batch recusado, embarque e movimento comprometido;
+- confirmar que uma nova revisão de ocupação não reutiliza o snapshot anterior.

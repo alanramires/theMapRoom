@@ -83,6 +83,7 @@ public sealed class MelhorEmbarqueRequest
     public int tacticalBudget;
     public int operationalTurns = 2;
     public bool includeStrategic;
+    public Dictionary<Vector3Int, List<Vector3Int>> transporterPaths;
     public Func<UnitManager, bool> allowPassenger;
     public Func<UnitManager, bool> includeInLegacyRanking;
     public Func<UnitManager, QueroCaronaResult> evaluateRideNeed;
@@ -186,9 +187,13 @@ public static class MelhorEmbarqueService
         int tactical = Mathf.Max(0, request.tacticalBudget);
         int operational = tactical * Mathf.Max(1, request.operationalTurns);
         Dictionary<Vector3Int, List<Vector3Int>> tacticalPaths =
-            UnitMovementPathRules.CalcularCaminhosValidos(
+            request.transporterPaths
+            ?? UnitMovementPathRules.CalcularCaminhosValidos(
                 request.map, request.transporter, tactical,
                 request.terrainDatabase);
+        if (request.transporterPaths != null)
+            AIDecisionPerf.AddCount(
+                "TransportPlanningReachReuses");
 
         IReadOnlyList<Vector3Int> candidateCells =
             ResolveCandidateCells(

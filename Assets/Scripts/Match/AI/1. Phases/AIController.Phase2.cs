@@ -29,6 +29,7 @@ public partial class AIController
         plannedDestinations.Clear();
         rebelCaptureTargetReservations.Clear();
         assignedTransportClaims.Clear();
+        transportPlanningSnapshots.Clear();
 
         // ---- Setup: executado uma única vez por fase ----
         SyncAIUnitCellsFromTransforms();

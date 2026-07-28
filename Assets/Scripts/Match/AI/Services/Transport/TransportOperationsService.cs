@@ -69,6 +69,66 @@ public sealed class TransportOperationDecision
     public MelhorEmbarquePassengerRouteState PassengerRouteState;
     public int PassengerRouteCost = -1;
     public int TransporterRouteCost = -1;
+    public TransportPlanningSnapshot PlanningSnapshot;
+}
+
+/// <summary>
+/// Leitura pura do planejamento de um transportador em um snapshot confirmado.
+/// Nao contem PlayerAction, reserva, ocupacao provisoria nem qualquer efeito de
+/// jogo. Os consumidores apenas filtram os fatos coletados e materializam a
+/// acao vencedora fora deste objeto.
+/// </summary>
+public sealed class TransportPlanningSnapshot
+{
+    public UnitManager Transporter;
+    public AIWorldSnapshot WorldSnapshot;
+    public TeamObjectivePlan ObjectivePlan;
+    public int ConfirmedOccupancyRevision = -1;
+    public Vector3Int Origin;
+    public int MovementBudget;
+    public int CurrentFuel;
+
+    public Dictionary<Vector3Int, List<Vector3Int>> TransporterReach;
+    public MelhorEmbarqueResult Pickup;
+    public bool PickupEvaluated;
+
+    public UnitManager SupplyTarget;
+    public AIReachDecisionTier SupplyTier;
+    public bool SupplyEvaluated;
+    public bool SupplyBaseDefense;
+
+    public readonly Dictionary<int, QueroCaronaResult> RideNeedByPassenger =
+        new Dictionary<int, QueroCaronaResult>();
+    public readonly Dictionary<int, MelhorEmbarqueResult>
+        PassengerPickupProjections =
+            new Dictionary<int, MelhorEmbarqueResult>();
+
+    public bool Matches(
+        UnitManager transporter,
+        AIWorldSnapshot worldSnapshot,
+        TeamObjectivePlan objectivePlan,
+        int confirmedOccupancyRevision)
+    {
+        if (transporter == null
+            || confirmedOccupancyRevision < 0
+            || ConfirmedOccupancyRevision !=
+                confirmedOccupancyRevision
+            || !ReferenceEquals(Transporter, transporter)
+            || !ReferenceEquals(WorldSnapshot, worldSnapshot)
+            || !ReferenceEquals(ObjectivePlan, objectivePlan))
+        {
+            return false;
+        }
+
+        Vector3Int liveOrigin = transporter.CurrentCellPosition;
+        liveOrigin.z = 0;
+        return Origin == liveOrigin
+            && MovementBudget == Mathf.Max(
+                0, transporter.RemainingMovementPoints)
+            && CurrentFuel == Mathf.Max(0, transporter.CurrentFuel)
+            && !transporter.IsDead
+            && !transporter.IsEmbarked;
+    }
 }
 
 public delegate bool TransportOperationEvaluator(
