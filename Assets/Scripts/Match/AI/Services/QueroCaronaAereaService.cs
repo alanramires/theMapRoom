@@ -47,6 +47,10 @@ public static class QueroCaronaAereaService
     public static QueroCaronaAereaResult Evaluate(
         QueroCaronaAereaRequest request)
     {
+        using var perf = new AIDecisionPerfScope(
+            request?.aircraft,
+            "queroCaronaAerea");
+        AIDecisionPerf.AddCount("QueroCaronaAereaCalls");
         var result = new QueroCaronaAereaResult
         {
             reason = "Aeronave nao avaliada."

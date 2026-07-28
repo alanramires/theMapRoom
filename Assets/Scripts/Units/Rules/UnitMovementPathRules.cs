@@ -18,6 +18,10 @@ public static class UnitMovementPathRules
         if (terrainTilemap == null || unit == null || maxSteps < 0)
             return pathsByDestination;
 
+        AIDecisionPerf.AddCount("MovementWavesBuilt");
+        AIDecisionPerf.AddCount("MovementCacheMisses");
+        AIDecisionPerf.AddCount("ValidPathWaves");
+
         // Garante que o estado de camada usado na validacao vem da instancia em campo.
         unit.SyncLayerStateFromData(forceNativeDefault: false);
         int maxMovementCost = Mathf.Max(0, maxSteps);
@@ -146,6 +150,12 @@ public static class UnitMovementPathRules
 
         foreach (KeyValuePair<Vector3Int, PathNodeKey> pair in bestStateByDestination)
             pathsByDestination[pair.Key] = BuildPath(originKey, pair.Value, cameFrom);
+
+        AIDecisionPerf.AddCount("CellsVisited", expandedStateCount);
+        AIDecisionPerf.AddCount("PathStatesExpanded", expandedStateCount);
+        AIDecisionPerf.AddCount(
+            "ReachableCellsProduced",
+            pathsByDestination.Count);
 
         if (PathManager.IsPathfindingDebugLogsEnabled && Application.isPlaying)
         {
@@ -293,9 +303,16 @@ public static class UnitMovementPathRules
         int maxSteps,
         TerrainDatabase terrainDatabase = null)
     {
+        using var perf = new AIDecisionPerfScope(
+            unit,
+            "movementCostMap");
         var costByCell = new Dictionary<Vector3Int, int>();
         if (terrainTilemap == null || unit == null || maxSteps < 0)
             return costByCell;
+
+        AIDecisionPerf.AddCount("MovementWavesBuilt");
+        AIDecisionPerf.AddCount("MovementCacheMisses");
+        AIDecisionPerf.AddCount("MovementCostWaves");
 
         unit.SyncLayerStateFromData(forceNativeDefault: false);
         Vector3Int origin = startCell; origin.z = 0;
@@ -305,11 +322,13 @@ public static class UnitMovementPathRules
         var frontier = new Queue<(Vector3Int cell, int steps)>();
         frontier.Enqueue((origin, 0));
         var neighbors = new List<Vector3Int>(6);
+        int expandedCellCount = 0;
 
         while (frontier.Count > 0)
         {
             var (current, currentSteps) = frontier.Dequeue();
             if (costByCell.TryGetValue(current, out int recorded) && recorded < currentSteps) continue;
+            expandedCellCount++;
 
             GetImmediateHexNeighbors(terrainTilemap, current, neighbors);
             for (int i = 0; i < neighbors.Count; i++)
@@ -332,6 +351,13 @@ public static class UnitMovementPathRules
             }
         }
 
+        AIDecisionPerf.AddCount("CellsVisited", expandedCellCount);
+        AIDecisionPerf.AddCount(
+            "MovementCostCellsExpanded",
+            expandedCellCount);
+        AIDecisionPerf.AddCount(
+            "ReachableCellsProduced",
+            costByCell.Count);
         return costByCell;
     }
 
@@ -950,6 +976,7 @@ public static class UnitMovementPathRules
         {
             this.referenceTilemap = referenceTilemap;
             this.terrainDatabase = terrainDatabase;
+            AIDecisionPerf.AddCount("MovementQueryCachesBuilt");
 
             if (referenceTilemap != null && referenceTilemap.layoutGrid != null)
                 gridTilemaps = referenceTilemap.layoutGrid.GetComponentsInChildren<Tilemap>(includeInactive: true);

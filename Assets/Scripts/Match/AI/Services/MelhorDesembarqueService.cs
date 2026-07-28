@@ -64,6 +64,10 @@ public static class MelhorDesembarqueService
 {
     public static MelhorDesembarqueResult Evaluate(MelhorDesembarqueRequest request)
     {
+        using var perf = new AIDecisionPerfScope(
+            request?.transporter,
+            "melhorDesembarque");
+        AIDecisionPerf.AddCount("MelhorDesembarqueCalls");
         var result = new MelhorDesembarqueResult();
         if (request == null
             || request.transporter == null
@@ -86,8 +90,10 @@ public static class MelhorDesembarqueService
             paths[origin] = new List<Vector3Int>();
 
         var options = new List<PodeDesembarcarOption>();
+        int lzCellsVisited = 0;
         foreach (KeyValuePair<Vector3Int, List<Vector3Int>> path in paths)
         {
+            lzCellsVisited++;
             Vector3Int lzCell = path.Key;
             lzCell.z = 0;
             if (request.allowTransporterCell != null
@@ -148,6 +154,12 @@ public static class MelhorDesembarqueService
             }
         }
 
+        AIDecisionPerf.AddCount(
+            "DisembarkLzCellsVisited",
+            lzCellsVisited);
+        AIDecisionPerf.AddCount(
+            "CellsVisited",
+            lzCellsVisited);
         result.ranking.Sort(CompareLz);
         MelhorDesembarqueLzScore originLz =
             result.ranking.Find(lz => lz.cell == origin);

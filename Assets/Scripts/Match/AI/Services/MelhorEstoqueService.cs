@@ -89,6 +89,10 @@ public static class MelhorEstoqueService
     public static MelhorEstoqueResult Evaluate(
         MelhorEstoqueRequest request)
     {
+        using var perf = new AIDecisionPerfScope(
+            request?.unit,
+            "melhorEstoque");
+        AIDecisionPerf.AddCount("MelhorEstoqueCalls");
         var result = new MelhorEstoqueResult();
         if (!TryValidateRequest(request, result, out UnitData data))
             return result;

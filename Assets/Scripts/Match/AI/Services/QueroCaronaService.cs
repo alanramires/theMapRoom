@@ -59,6 +59,10 @@ public static class QueroCaronaService
     public static QueroCaronaResult Evaluate(
         QueroCaronaRequest request)
     {
+        using var perf = new AIDecisionPerfScope(
+            request?.unit,
+            "queroCarona");
+        AIDecisionPerf.AddCount("QueroCaronaCalls");
         var result = new QueroCaronaResult
         {
             wantsRide = false,

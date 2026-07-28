@@ -58,6 +58,10 @@ public static class MelhorPousoService
 {
     public static MelhorPousoResult Evaluate(MelhorPousoRequest request)
     {
+        using var perf = new AIDecisionPerfScope(
+            request?.aircraft,
+            "melhorPouso");
+        AIDecisionPerf.AddCount("MelhorPousoCalls");
         var result = new MelhorPousoResult();
         if (request?.aircraft == null || request.map == null
             || request.terrainDatabase == null)
@@ -92,9 +96,12 @@ public static class MelhorPousoService
                 request.map, aircraft, tactical,
                 request.terrainDatabase);
 
+        AIDecisionPerf.AddCount("TopologyFullScans");
+        int topologyCellsVisited = 0;
         foreach (Vector3Int rawCell in
                  request.map.cellBounds.allPositionsWithin)
         {
+            topologyCellsVisited++;
             Vector3Int cell = rawCell;
             cell.z = 0;
             if (!request.map.HasTile(cell))
@@ -201,6 +208,12 @@ public static class MelhorPousoService
             });
         }
 
+        AIDecisionPerf.AddCount(
+            "TopologyCellsVisited",
+            topologyCellsVisited);
+        AIDecisionPerf.AddCount(
+            "CellsVisited",
+            topologyCellsVisited);
         result.options.Sort((a, b) =>
         {
             int scoreCompare = b.score.CompareTo(a.score);

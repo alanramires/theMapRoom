@@ -75,6 +75,7 @@ public partial class AIController
         float perfSnapshotTotalMs = 0f;
         float perfDelayTotalMs = 0f;
         int perfDecisionCount = 0;
+        AIDecisionPerf.BeginPhase();
         int cursor = 0;
         bool secondPass = false;
 
@@ -245,6 +246,7 @@ public partial class AIController
             cursor++;
         }
 
+        string phaseDecisionBreakdown = AIDecisionPerf.EndPhase();
         LogPhase2PerfSummary(
             snapshot.TurnNumber,
             aiTeam,
@@ -253,7 +255,8 @@ public partial class AIController
             perfExecutionTotalMs,
             perfSnapshotTotalMs,
             perfDelayTotalMs,
-            perfSamples);
+            perfSamples,
+            phaseDecisionBreakdown);
 
         _initLogBuilder.Clear();
         int idleCount = 0;
@@ -299,7 +302,8 @@ public partial class AIController
         float executionTotalMs,
         float snapshotTotalMs,
         float delayTotalMs,
-        List<Phase2UnitPerfSample> samples)
+        List<Phase2UnitPerfSample> samples,
+        string phaseDecisionBreakdown)
     {
         samples.Sort((a, b) => b.TotalMs.CompareTo(a.TotalMs));
         _initLogBuilder.Clear();
@@ -310,6 +314,7 @@ public partial class AIController
             $"  decision={decisionTotalMs:F0}ms execution={executionTotalMs:F0}ms " +
             $"snapshot={snapshotTotalMs:F0}ms delay={delayTotalMs:F0}ms " +
             $"measuredTotal={decisionTotalMs + executionTotalMs + snapshotTotalMs + delayTotalMs:F0}ms");
+        _initLogBuilder.AppendLine($"  boardQueries {phaseDecisionBreakdown}");
 
         int topCount = Mathf.Min(5, samples.Count);
         for (int i = 0; i < topCount; i++)
@@ -870,40 +875,119 @@ internal static class AIDecisionPerf
     }
 
     private static readonly Dictionary<string, Entry> Entries = new Dictionary<string, Entry>();
+    private static readonly Dictionary<string, long> Counters = new Dictionary<string, long>();
+    private static readonly Dictionary<string, Entry> PhaseEntries = new Dictionary<string, Entry>();
+    private static readonly Dictionary<string, long> PhaseCounters = new Dictionary<string, long>();
     private static bool active;
+    private static bool phaseActive;
+
+    public static void BeginPhase()
+    {
+        PhaseEntries.Clear();
+        PhaseCounters.Clear();
+        phaseActive = true;
+    }
 
     public static void Begin()
     {
         Entries.Clear();
+        Counters.Clear();
         active = true;
     }
 
     public static void Add(string stage, float milliseconds)
     {
         if (!active || string.IsNullOrEmpty(stage)) return;
-        if (!Entries.TryGetValue(stage, out Entry entry))
-        {
-            entry = new Entry();
-            Entries.Add(stage, entry);
-        }
-        entry.Milliseconds += milliseconds;
-        entry.Calls++;
+        AddEntry(Entries, stage, milliseconds);
+        if (phaseActive)
+            AddEntry(PhaseEntries, stage, milliseconds);
+    }
+
+    public static void AddCount(string counter, long amount = 1)
+    {
+        if (!active || string.IsNullOrEmpty(counter) || amount == 0)
+            return;
+
+        AddCounter(Counters, counter, amount);
+        if (phaseActive)
+            AddCounter(PhaseCounters, counter, amount);
     }
 
     public static string End()
     {
         active = false;
-        if (Entries.Count == 0) return "stages=-";
+        return Format("stages", Entries, "metrics", Counters);
+    }
 
-        var ordered = new List<KeyValuePair<string, Entry>>(Entries);
+    public static string EndPhase()
+    {
+        phaseActive = false;
+        return Format(
+            "stages",
+            PhaseEntries,
+            "metrics",
+            PhaseCounters);
+    }
+
+    private static void AddEntry(
+        Dictionary<string, Entry> destination,
+        string stage,
+        float milliseconds)
+    {
+        if (!destination.TryGetValue(stage, out Entry entry))
+        {
+            entry = new Entry();
+            destination.Add(stage, entry);
+        }
+
+        entry.Milliseconds += milliseconds;
+        entry.Calls++;
+    }
+
+    private static void AddCounter(
+        Dictionary<string, long> destination,
+        string counter,
+        long amount)
+    {
+        destination.TryGetValue(counter, out long current);
+        destination[counter] = current + amount;
+    }
+
+    private static string Format(
+        string stageLabel,
+        Dictionary<string, Entry> entries,
+        string counterLabel,
+        Dictionary<string, long> counters)
+    {
+        var ordered = new List<KeyValuePair<string, Entry>>(entries);
         ordered.Sort((a, b) => b.Value.Milliseconds.CompareTo(a.Value.Milliseconds));
-        var sb = new System.Text.StringBuilder("stages=");
+        var sb = new System.Text.StringBuilder(stageLabel).Append('=');
+        if (ordered.Count == 0)
+            sb.Append('-');
         for (int i = 0; i < ordered.Count; i++)
         {
             if (i > 0) sb.Append(',');
             sb.Append(ordered[i].Key)
-              .Append(':').Append(ordered[i].Value.Milliseconds.ToString("F0"))
+              .Append(':').Append(ordered[i].Value.Milliseconds.ToString("F1"))
               .Append("ms/").Append(ordered[i].Value.Calls);
+        }
+
+        sb.Append(' ').Append(counterLabel).Append('=');
+        if (counters.Count == 0)
+        {
+            sb.Append('-');
+            return sb.ToString();
+        }
+
+        var orderedCounters =
+            new List<KeyValuePair<string, long>>(counters);
+        orderedCounters.Sort((a, b) =>
+            string.CompareOrdinal(a.Key, b.Key));
+        for (int i = 0; i < orderedCounters.Count; i++)
+        {
+            if (i > 0) sb.Append(',');
+            sb.Append(orderedCounters[i].Key)
+              .Append(':').Append(orderedCounters[i].Value);
         }
         return sb.ToString();
     }

@@ -120,6 +120,10 @@ public static class MelhorEmbarqueService
     public static MelhorEmbarqueResult Evaluate(
         MelhorEmbarqueRequest request)
     {
+        using var perf = new AIDecisionPerfScope(
+            request?.transporter,
+            "melhorEmbarque");
+        AIDecisionPerf.AddCount("MelhorEmbarqueCalls");
         var result = new MelhorEmbarqueResult();
         if (request?.transporter == null
             || request.map == null
@@ -180,8 +184,11 @@ public static class MelhorEmbarqueService
         }
 
         BoundsInt bounds = request.map.cellBounds;
+        AIDecisionPerf.AddCount("TopologyFullScans");
+        int topologyCellsVisited = 0;
         foreach (Vector3Int rawCell in bounds.allPositionsWithin)
         {
+            topologyCellsVisited++;
             Vector3Int cell = rawCell;
             cell.z = 0;
             if (!request.map.HasTile(cell)
@@ -351,6 +358,12 @@ public static class MelhorEmbarqueService
                 $"LZ={cell} {lz.reason}");
         }
 
+        AIDecisionPerf.AddCount(
+            "TopologyCellsVisited",
+            topologyCellsVisited);
+        AIDecisionPerf.AddCount(
+            "CellsVisited",
+            topologyCellsVisited);
         result.ranking.Sort(Compare);
         result.options.Sort(CompareOptions);
         return result;

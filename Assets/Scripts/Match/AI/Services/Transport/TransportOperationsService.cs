@@ -111,6 +111,10 @@ public static class TransportOperationsService
     public static TransportOperationDecision Evaluate(
         TransportOperationContext context)
     {
+        using var perf = new AIDecisionPerfScope(
+            context?.Unit,
+            "transportPlanning");
+        AIDecisionPerf.AddCount("TransportPlanningCalls");
         if (context == null
             || context.Unit == null
             || context.Capabilities == null
