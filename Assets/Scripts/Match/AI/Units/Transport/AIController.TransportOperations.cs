@@ -161,6 +161,15 @@ public partial class AIController
         if (paths == null || paths.Count == 0)
             return null;
 
+        PlayerAction rearFollowAction =
+            TryBuildConservativeRearFollowAction(
+                unit,
+                snapshot,
+                paths,
+                context: "transporte vazio");
+        if (rearFollowAction != null)
+            return rearFollowAction;
+
         bool isRebel = matchController != null
             && matchController.IsSlotRebel(
                 PlayerSlotId.FromIndex(

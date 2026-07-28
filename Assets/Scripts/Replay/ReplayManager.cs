@@ -78,6 +78,7 @@ public class ReplayManager : MonoBehaviour
     private string replayTransitionFeedbackText = string.Empty;
     private float replayTransitionFeedbackStartedAt;
     private bool replayBatchAbortRequested;
+    private bool lastLiveAIBatchSucceeded;
 
     private readonly Dictionary<string, ServiceData> cachedServicesById = new Dictionary<string, ServiceData>(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, SupplyData> cachedSuppliesById = new Dictionary<string, SupplyData>(StringComparer.OrdinalIgnoreCase);
@@ -101,6 +102,8 @@ public class ReplayManager : MonoBehaviour
     public PlayerAction CurrentBuffer => currentBuffer;
     public int CurrentReplayBatchCount => ResolveCurrentReplayBatchCount();
     public bool RuntimeLogsEnabled => enableReplayRuntimeLogs;
+    public bool LastLiveAIBatchSucceeded =>
+        lastLiveAIBatchSucceeded;
 
     private void ReplayLog(string message)
     {
@@ -504,8 +507,32 @@ public class ReplayManager : MonoBehaviour
             ReplayLog($"[Replay][CursorTravel] phase=unit-batch-destination current={FormatReplayCell(NormalizeCell(cursorController.CurrentCell))} destination={FormatReplayCell(destinationCell)}");
             if (!hasOriginCell || destinationCell != originCell)
                 yield return MoveCursorToCellWithTravel(destinationCell, action.MovementPath);
-            ExecuteReplayConfirmInput();
+            TurnStateManager.ActionSfx movementFeedback =
+                ExecuteReplayConfirmInput();
             yield return null;
+            if (movementFeedback ==
+                TurnStateManager.ActionSfx.Error)
+            {
+                string failure =
+                    $"movimento recusado em {destinationCell}; " +
+                    "HandleConfirm retornou Error";
+                if (isLiveAIBatchExecution)
+                {
+                    ReplayLogWarning(
+                        $"[LiveAI] {failure}. Cancelando batch sem compromisso.");
+                    replayBatchAbortRequested = true;
+                    turnStateManager.HandleCancel();
+                }
+                else
+                {
+                    AbortReplayBatchDueToError(
+                        "dialog.replay.error",
+                        "replay <erro>",
+                        failure,
+                        3.2f);
+                }
+                yield break;
+            }
             yield return WaitForSensorsReadyAfterMovementConfirmEvent();
             awaitedSensorsReadyAfterMove = true;
         }
@@ -1680,13 +1707,14 @@ public class ReplayManager : MonoBehaviour
             new Dictionary<string, string> { { "erro", safeError } });
         PanelDialogController.TrySetTransientText(message, Mathf.Max(0.5f, dialogDurationSeconds));
     }
-    private void ExecuteReplayConfirmInput()
+    private TurnStateManager.ActionSfx ExecuteReplayConfirmInput()
     {
         if (turnStateManager == null)
-            return;
+            return TurnStateManager.ActionSfx.None;
 
         TurnStateManager.ActionSfx feedback = turnStateManager.HandleConfirm();
         PlayReplayActionFeedback(feedback);
+        return feedback;
     }
 
     private void PlayReplayActionFeedback(TurnStateManager.ActionSfx feedback)
@@ -2413,6 +2441,7 @@ public class ReplayManager : MonoBehaviour
         if (action == null || actionStepExecutionRoutine != null)
             return;
 
+        lastLiveAIBatchSucceeded = false;
         liveAIFastMode = fastAI;
         actionStepExecutionRoutine = StartCoroutine(ExecuteLiveAIBatchRoutine(action));
     }
@@ -2426,9 +2455,13 @@ public class ReplayManager : MonoBehaviour
             bool canEmulateAction = action != null && CanReplayActionAsLiveInputs(action.ActionType);
             if (canEmulateAction)
                 yield return ExecuteRecordedActionBatch(action, null);
+            lastLiveAIBatchSucceeded =
+                canEmulateAction && !replayBatchAbortRequested;
         }
         finally
         {
+            if (replayBatchAbortRequested)
+                lastLiveAIBatchSucceeded = false;
             actionStepExecutionRoutine = null;
             isLiveAIBatchExecution = false;
             liveAIFastMode = true;

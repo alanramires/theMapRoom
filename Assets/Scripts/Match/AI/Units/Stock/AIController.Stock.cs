@@ -103,6 +103,7 @@ public partial class AIController
                 occupied,
                 out PlayerAction action,
                 out string reason,
+                allowStrategicDirection: primaryStock,
                 criticalOnly: criticalOnly))
         {
             Debug.Log(
@@ -113,7 +114,9 @@ public partial class AIController
 
         Debug.Log(
             $"{TL("Stock")} {unit.InstanceId} " +
-            $"sem operacao de estoque Tactical/Operational — {reason}");
+            $"sem operacao de estoque " +
+            $"{(primaryStock ? "Tactical/Operational/Strategic" : "Tactical/Operational")} — " +
+            $"{reason}");
         if (!primaryStock)
             return null;
 

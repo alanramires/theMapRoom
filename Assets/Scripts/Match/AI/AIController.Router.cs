@@ -200,6 +200,15 @@ public partial class AIController
 
                 boardTilemap, unit, Mathf.Max(0, unit.RemainingMovementPoints), terrainDatabase);
 
+        PlayerAction conservativeRearFollow =
+            TryBuildConservativeRearFollowAction(
+                unit,
+                snapshot,
+                paths,
+                context: "fallback geral");
+        if (conservativeRearFollow != null)
+            return conservativeRearFollow;
+
         var freeCells = new List<Vector3Int>();
 
         if (paths != null)

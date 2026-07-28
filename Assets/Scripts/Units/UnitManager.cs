@@ -95,6 +95,7 @@ public class UnitManager : MonoBehaviour
     [System.NonSerialized] private Canvas[] temporaryFogHudCanvases;
     [System.NonSerialized] private int[] temporaryFogHudLayerIds;
     [System.NonSerialized] private int[] temporaryFogHudOrders;
+    [System.NonSerialized] private SpriteRenderer fogDetectedContactRenderer;
     [SerializeField, HideInInspector] private bool hiddenByFogOfWar;
     [SerializeField, HideInInspector] private int cachedSpriteSortingOrder;
     [SerializeField, HideInInspector] private int cachedActedLockSortingOrder;
@@ -1036,6 +1037,96 @@ public class UnitManager : MonoBehaviour
         SetSpriteVisible(false);
         SetHudVisible(false);
         SetOwnedUiVisualsVisible(false);
+    }
+
+    /// <summary>
+    /// Eco exclusivamente visual para um contato confirmado cuja celula
+    /// geografica continua sob a camada de FOW. Nao altera deteccao, memoria,
+    /// ocupacao nem qualquer verdade confirmada do tabuleiro.
+    /// </summary>
+    public void SetFogDetectedContactPresentation(bool visible)
+    {
+        if (!visible || isDead || isEmbarked || !gameObject.activeInHierarchy)
+        {
+            if (fogDetectedContactRenderer != null)
+                fogDetectedContactRenderer.enabled = false;
+            return;
+        }
+
+        if (spriteRenderer == null)
+            spriteRenderer = GetComponentInChildren<SpriteRenderer>();
+        if (spriteRenderer == null)
+            return;
+
+        EnsureFogDetectedContactRenderer();
+        if (fogDetectedContactRenderer == null)
+            return;
+
+        fogDetectedContactRenderer.sprite = spriteRenderer.sprite;
+        fogDetectedContactRenderer.flipX = spriteRenderer.flipX;
+        fogDetectedContactRenderer.flipY = spriteRenderer.flipY;
+        fogDetectedContactRenderer.drawMode = spriteRenderer.drawMode;
+        fogDetectedContactRenderer.size = spriteRenderer.size;
+        fogDetectedContactRenderer.spriteSortPoint =
+            spriteRenderer.spriteSortPoint;
+        fogDetectedContactRenderer.maskInteraction =
+            SpriteMaskInteraction.None;
+
+        CacheSpriteMaterial();
+        fogDetectedContactRenderer.sharedMaterial =
+            defaultSpriteMaterial != null
+                ? defaultSpriteMaterial
+                : spriteRenderer.sharedMaterial;
+
+        Color source = spriteRenderer.color;
+        float luminance =
+            source.r * 0.2126f +
+            source.g * 0.7152f +
+            source.b * 0.0722f;
+        Color desaturated = Color.Lerp(
+            source,
+            new Color(luminance, luminance, luminance, source.a),
+            0.72f);
+        Color contact = Color.Lerp(
+            desaturated, Color.white, 0.28f);
+        contact.a = Mathf.Clamp01(source.a * 0.55f);
+        fogDetectedContactRenderer.color = contact;
+        fogDetectedContactRenderer.enabled = true;
+    }
+
+    private void EnsureFogDetectedContactRenderer()
+    {
+        if (fogDetectedContactRenderer != null || spriteRenderer == null)
+            return;
+
+        Transform existing =
+            spriteRenderer.transform.Find("FogDetectedContact");
+        if (existing != null)
+        {
+            fogDetectedContactRenderer =
+                existing.GetComponent<SpriteRenderer>();
+        }
+
+        if (fogDetectedContactRenderer == null)
+        {
+            var contactObject = new GameObject("FogDetectedContact")
+            {
+                hideFlags = HideFlags.DontSave
+            };
+            contactObject.transform.SetParent(
+                spriteRenderer.transform, false);
+            fogDetectedContactRenderer =
+                contactObject.AddComponent<SpriteRenderer>();
+        }
+
+        Transform contactTransform =
+            fogDetectedContactRenderer.transform;
+        contactTransform.localPosition = Vector3.zero;
+        contactTransform.localRotation = Quaternion.identity;
+        contactTransform.localScale = Vector3.one;
+        fogDetectedContactRenderer.sortingLayerName = "FogOfWar";
+        fogDetectedContactRenderer.sortingOrder = 20;
+        fogDetectedContactRenderer.enabled = false;
     }
 
     public void ResetActed()
@@ -3463,6 +3554,11 @@ public class UnitManager : MonoBehaviour
             spriteRenderer = GetComponentInChildren<SpriteRenderer>();
         if (unitHud == null)
             TryAutoAssignHud();
+        if (!visible && (isDead || isEmbarked) &&
+            fogDetectedContactRenderer != null)
+        {
+            fogDetectedContactRenderer.enabled = false;
+        }
 
         // Passenger embarked must stay visually hidden even if other
         // systems request visibility (selection cleanup, blink stop, etc).
@@ -3486,6 +3582,8 @@ public class UnitManager : MonoBehaviour
             if (renderer == null)
                 continue;
             if (renderer == spriteRenderer)
+                continue;
+            if (renderer == fogDetectedContactRenderer)
                 continue;
 
             UnitManager owner = renderer.GetComponentInParent<UnitManager>();

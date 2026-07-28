@@ -7452,6 +7452,7 @@ public class MatchController : MonoBehaviour
     private void ApplyRuntimeUnitFogVisibilityFromCache(Tilemap boardMap)
     {
         bool fogOverlayOwnsWorldOcclusion = UsesFogOverlayForWorldOcclusion();
+        PlayerSlotId visualObserverSlot = ResolveFogVisualObserverSlot();
         List<UnitManager> units = UnitManager.AllActive;
         for (int i = 0; i < units.Count; i++)
         {
@@ -7469,6 +7470,10 @@ public class MatchController : MonoBehaviour
                     visible = false;
             }
 
+            ApplyFogDetectedContactPresentation(
+                unit,
+                visualObserverSlot,
+                fogOverlayOwnsWorldOcclusion);
             unit.SetFogOfWarVisibility(ResolveFogRenderVisibility(
                 unit, visible, fogOverlayOwnsWorldOcclusion, ActiveSlotId));
         }
@@ -7764,6 +7769,37 @@ public class MatchController : MonoBehaviour
         return logicallyVisible;
     }
 
+    private void ApplyFogDetectedContactPresentation(
+        UnitManager unit,
+        PlayerSlotId observerSlot,
+        bool fogOverlayOwnsWorldOcclusion)
+    {
+        bool showContact = false;
+        if (unit != null
+            && fogOverlayOwnsWorldOcclusion
+            && unit.SlotIndex != observerSlot.Value
+            && TryGetFogGameplaySnapshot(
+                observerSlot.Value,
+                out FogSlotGameplaySnapshot snapshot))
+        {
+            int cacheIndex = ResolveFogCacheIndex(unit);
+            bool logicallyVisible =
+                snapshot.unitVisibility.TryGetValue(
+                    cacheIndex,
+                    out bool visible)
+                && visible;
+            if (logicallyVisible)
+            {
+                Vector3Int cell = unit.CurrentCellPosition;
+                cell.z = 0;
+                showContact =
+                    !snapshot.geographicallyVisibleCells.Contains(cell);
+            }
+        }
+
+        unit?.SetFogDetectedContactPresentation(showContact);
+    }
+
     private bool HasActiveIndividualFogConcealment(UnitManager unit)
     {
         if (unit == null || !enableStealthValidation)
@@ -7808,10 +7844,18 @@ public class MatchController : MonoBehaviour
 
         if (unit.IsTemporaryFogDetectionPresentationActive)
         {
+            ApplyFogDetectedContactPresentation(
+                unit,
+                observerSlot,
+                UsesFogOverlayForWorldOcclusion());
             unit.SetFogOfWarVisibility(true);
             return;
         }
 
+        ApplyFogDetectedContactPresentation(
+            unit,
+            observerSlot,
+            UsesFogOverlayForWorldOcclusion());
         unit.SetFogOfWarVisibility(ResolveFogRenderVisibility(
             unit,
             logicallyVisible,
@@ -9395,6 +9439,10 @@ public class MatchController : MonoBehaviour
             bool visible = unit.SlotIndex == observerSlot.Value
                 || ComputeIsUnitVisibleForSlotWithoutCache(unit, observerSlot);
             fogUnitVisibilityByCacheIndex[ResolveFogCacheIndex(unit)] = visible;
+            ApplyFogDetectedContactPresentation(
+                unit,
+                observerSlot,
+                fogOverlayOwnsWorldOcclusion);
             unit.SetFogOfWarVisibility(ResolveFogRenderVisibility(
                 unit, visible, fogOverlayOwnsWorldOcclusion, observerSlot));
         }
@@ -9444,6 +9492,10 @@ public class MatchController : MonoBehaviour
             bool visible = unit.SlotIndex == observerSlot.Value ||
                            ComputeIsUnitVisibleForSlotWithoutCache(unit, observerSlot);
             fogUnitVisibilityByCacheIndex[ResolveFogCacheIndex(unit)] = visible;
+            ApplyFogDetectedContactPresentation(
+                unit,
+                observerSlot,
+                fogOverlayOwnsWorldOcclusion);
             unit.SetFogOfWarVisibility(ResolveFogRenderVisibility(
                 unit,
                 visible,
@@ -9549,6 +9601,7 @@ public class MatchController : MonoBehaviour
 
             bool visible = !useConservativeFog || unit.SlotIndex == ActiveSlotId.Value;
             fogUnitVisibilityByCacheIndex[ResolveFogCacheIndex(unit)] = visible;
+            unit.SetFogDetectedContactPresentation(false);
             unit.SetFogOfWarVisibility(ResolveFogRenderVisibility(
                 unit, visible, fogOverlayOwnsWorldOcclusion, ActiveSlotId));
         }
@@ -9692,6 +9745,7 @@ public class MatchController : MonoBehaviour
                 continue;
 
             fogUnitVisibilityByCacheIndex[ResolveFogCacheIndex(unit)] = true;
+            unit.SetFogDetectedContactPresentation(false);
             unit.SetFogOfWarVisibility(true);
         }
     }

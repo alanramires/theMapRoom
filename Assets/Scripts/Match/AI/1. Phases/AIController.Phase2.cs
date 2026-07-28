@@ -121,12 +121,33 @@ public partial class AIController
             UnitManager unit = units[cursor];
             AIDecisionPerf.Begin();
             float decisionStartedAt = Time.realtimeSinceStartup;
-            PrepareAIThreatEnvelope(unit);
-            PlayerAction action = DecideUnitAction(unit, current);
+            PlayerAction action = null;
+            System.Exception decisionError = null;
+            try
+            {
+                PrepareAIThreatEnvelope(unit);
+                action = DecideUnitAction(unit, current);
+            }
+            catch (System.Exception ex)
+            {
+                decisionError = ex;
+            }
             float decisionMs = (Time.realtimeSinceStartup - decisionStartedAt) * 1000f;
             string decisionBreakdown = AIDecisionPerf.End();
             perfDecisionTotalMs += decisionMs;
             perfDecisionCount++;
+
+            if (decisionError != null)
+            {
+                Vector3Int heldCell = unit.CurrentCellPosition;
+                heldCell.z = 0;
+                Debug.LogException(decisionError);
+                Debug.LogWarning(
+                    $"{TL()} Fase2 — decisão de {FormatInitiativeUnitName(unit)} " +
+                    "falhou; executa Mover Parado para preservar o turno.");
+                action = BuildMoveBatch(
+                    unit, aiTeam, heldCell, heldCell);
+            }
 
             if (!secondPass
                 && ShouldDeferCapturerForAirTransportVacate(unit, action, activePlan, aiTeam,
@@ -192,10 +213,44 @@ public partial class AIController
                 continue;
             }
 
-            if (action.HasMoveTo && action.MoveTo != action.MoveFrom)
+            if (TryFindBlockingOccupantForAIMove(
+                    unit, action, out UnitManager moveBlocker))
             {
-                Vector3Int dest = action.MoveTo; dest.z = 0;
-                plannedDestinations.Add(dest);
+                Vector3Int blockedDestination = action.MoveTo;
+                blockedDestination.z = 0;
+                assignedTransportClaims.Remove(unit.InstanceId);
+                rebelCaptureTargetReservations.Remove(
+                    blockedDestination);
+
+                bool blockerCanYieldFirst =
+                    !secondPass
+                    && moveBlocker != null
+                    && moveBlocker.SlotIndex == snapshot.AISlotIndex
+                    && !moveBlocker.HasActed
+                    && units.Contains(moveBlocker);
+                if (blockerCanYieldFirst)
+                {
+                    deferredUnitIds.Add(unit.InstanceId);
+                    Debug.Log(
+                        $"{TL()} Fase2 — {FormatInitiativeUnitName(unit)} " +
+                        $"cede destino {blockedDestination} para " +
+                        $"{FormatInitiativeUnitName(moveBlocker)} agir primeiro.");
+                    cursor++;
+                    yield return null;
+                    continue;
+                }
+
+                Vector3Int heldCell = unit.CurrentCellPosition;
+                heldCell.z = 0;
+                Debug.LogWarning(
+                    $"{TL()} Fase2 — {FormatInitiativeUnitName(unit)} " +
+                    $"não pode terminar em {blockedDestination}" +
+                    (moveBlocker != null
+                        ? $" (ocupado por {FormatInitiativeUnitName(moveBlocker)})"
+                        : " (ocupação incompatível)") +
+                    "; executa Mover Parado.");
+                action = BuildMoveBatch(
+                    unit, aiTeam, heldCell, heldCell);
             }
 
             bool unitMoved    = action.HasMoveTo && action.MoveTo != action.MoveFrom;
@@ -204,14 +259,38 @@ public partial class AIController
             yield return ExecuteAIBatchWithDebugStep(action);
             float executionMs = (Time.realtimeSinceStartup - executionStartedAt) * 1000f;
             perfExecutionTotalMs += executionMs;
-            JogadasManager.RegistrarPlayerAction(action);
+            bool batchSucceeded = lastAIBatchSucceeded;
+            if (batchSucceeded)
+            {
+                if (action.HasMoveTo
+                    && action.MoveTo != action.MoveFrom)
+                {
+                    Vector3Int dest = action.MoveTo;
+                    dest.z = 0;
+                    plannedDestinations.Add(dest);
+                }
+                JogadasManager.RegistrarPlayerAction(action);
+            }
+            else
+            {
+                assignedTransportClaims.Remove(unit.InstanceId);
+                unitMoved = false;
+                unitAttacked = false;
+                Debug.LogWarning(
+                    $"{TL()} Fase2 — batch de " +
+                    $"{FormatInitiativeUnitName(unit)} foi abortado " +
+                    "sem compromisso; a fase continuará.");
+            }
             if (ShouldStopAIForMatchEnd("phase2_apos_batch"))
                 yield break;
             yield return WaitIfDebugPaused();
             if (ShouldStopAIForMatchEnd("phase2_apos_pause_batch"))
                 yield break;
 
-            if (!IsNoOpUnitAction(action) || unitMoved || unitAttacked)
+            if (batchSucceeded
+                && (!IsNoOpUnitAction(action)
+                    || unitMoved
+                    || unitAttacked))
             {
                 bool targetedConstruction = !string.IsNullOrEmpty(action.TargetConstructionId);
 
@@ -286,6 +365,94 @@ public partial class AIController
         else
             Debug.Log($"{TL()} Fase2 concluída — todas as {units.Count} unidades agiram.");
         _initLogBuilder.Clear();
+    }
+
+    private bool TryFindBlockingOccupantForAIMove(
+        UnitManager unit,
+        PlayerAction action,
+        out UnitManager blocker)
+    {
+        blocker = null;
+        if (unit == null
+            || action == null
+            || !action.HasMoveFrom
+            || !action.HasMoveTo
+            || action.MoveTo == action.MoveFrom
+            || boardTilemap == null)
+        {
+            return false;
+        }
+
+        Vector3Int destination = action.MoveTo;
+        destination.z = 0;
+        List<UnitManager> occupants =
+            UnitOccupancyRules.GetUnitsAtCell(
+                boardTilemap, destination, unit);
+        if (CanAIUnitEndMoveAtCell(
+                unit, destination, occupants))
+        {
+            return false;
+        }
+
+        // Descobre quem realmente bloqueia a camada da unidade. Apenas
+        // compartilhar a coordenada nao basta: aeronaves, submarinos e
+        // superficie podem coexistir conforme a autoridade de ocupacao.
+        var singleOccupant = new List<UnitManager>(1);
+        for (int i = 0; i < occupants.Count; i++)
+        {
+            UnitManager candidate = occupants[i];
+            if (candidate == null)
+                continue;
+
+            singleOccupant.Clear();
+            singleOccupant.Add(candidate);
+            if (!CanAIUnitEndMoveAtCell(
+                    unit, destination, singleOccupant))
+            {
+                blocker = candidate;
+                break;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool CanAIUnitEndMoveAtCell(
+        UnitManager unit,
+        Vector3Int destination,
+        IEnumerable<UnitManager> occupants)
+    {
+        if (unit == null)
+            return false;
+
+        Vector3Int origin = unit.CurrentCellPosition;
+        origin.z = 0;
+        destination.z = 0;
+        bool projectsToAir =
+            unit.GetDomain() == Domain.Air
+            && !unit.IsAircraftGrounded;
+        if (!projectsToAir
+            && unit.IsAircraftGrounded
+            && destination != origin)
+        {
+            projectsToAir = true;
+        }
+
+        if (projectsToAir)
+        {
+            HeightLevel finalHeight =
+                unit.GetDomain() == Domain.Air
+                    ? unit.GetHeightLevel()
+                    : HeightLevel.AirLow;
+            return OccupancyResolver.CanEndMoveAsLayer(
+                unit,
+                Domain.Air,
+                finalHeight,
+                occupants);
+        }
+
+        return OccupancyResolver.CanEndMove(
+            unit, destination, occupants);
     }
 
     private static string GetPhase2ActionKind(PlayerAction action)

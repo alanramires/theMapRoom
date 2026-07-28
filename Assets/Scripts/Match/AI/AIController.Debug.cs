@@ -245,8 +245,11 @@ public partial class AIController
             Mathf.Max(0.08f, scaledDelay));
     }
 
+    private bool lastAIBatchSucceeded;
+
     private IEnumerator ExecuteAIBatchWithDebugStep(PlayerAction action)
     {
+        lastAIBatchSucceeded = false;
         if (ShouldStopAIForMatchEnd("batch_start"))
             yield break;
         if (action == null)
@@ -279,6 +282,8 @@ public partial class AIController
         aiTurnBatchExecuting = true;
         replayManager.ExecuteLiveAIBatch(action, iaRapida);
         yield return new WaitUntil(() => !replayManager.IsStepExecutionBusy);
+        lastAIBatchSucceeded =
+            replayManager.LastLiveAIBatchSucceeded;
         aiTurnBatchExecuting = false;
         if (ShouldStopAIForMatchEnd("batch_end"))
             yield break;

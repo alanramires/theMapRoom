@@ -105,6 +105,23 @@ public partial class AIController
             return BuildMoveBatch(unit, snapshot.AITeam, fromCell, fromCell);
         }
 
+        // Sem cliente, emergencia ou recarga, Play Conservative deixa de
+        // orbitar o HQ: acompanha a retaguarda da linha aliada. E aqui que
+        // plataformas como o Porta-Avioes continuam junto da esquadra ate
+        // surgir uma solicitacao real de servico/transporte.
+        if (!baseDefense
+            && serviceTarget == null)
+        {
+            PlayerAction rearFollowAction =
+                TryBuildConservativeRearFollowAction(
+                    unit,
+                    snapshot,
+                    paths,
+                    context: "logistica sem cliente");
+            if (rearFollowAction != null)
+                return rearFollowAction;
+        }
+
         if (TryFindLogisticsRepositionCell(
                 unit,
                 snapshot,
