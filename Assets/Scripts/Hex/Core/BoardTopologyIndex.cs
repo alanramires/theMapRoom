@@ -48,6 +48,8 @@ public sealed class BoardTopologyIndex :
     private readonly Dictionary<BoardTopologyEdgeKey, List<StructureData>>
         structuresByRouteEdge =
             new Dictionary<BoardTopologyEdgeKey, List<StructureData>>();
+    private readonly List<Vector3Int> indexedCells =
+        new List<Vector3Int>();
     private readonly List<Vector3Int> beachCells =
         new List<Vector3Int>();
     private readonly List<Vector3Int> coastalCells =
@@ -76,6 +78,14 @@ public sealed class BoardTopologyIndex :
     public IReadOnlyList<BoardTopologyCellRecord> Cells => cells;
     public IReadOnlyList<BoardTopologyRouteEdgeRecord> RouteEdges =>
         routeEdges;
+    public IReadOnlyList<Vector3Int> IndexedCells
+    {
+        get
+        {
+            EnsureHydrated();
+            return indexedCells;
+        }
+    }
     public IReadOnlyList<Vector3Int> BeachCells
     {
         get
@@ -540,6 +550,7 @@ public sealed class BoardTopologyIndex :
     {
         cellByPosition.Clear();
         structuresByRouteEdge.Clear();
+        indexedCells.Clear();
         beachCells.Clear();
         coastalCells.Clear();
         potentialLandingCells.Clear();
@@ -556,7 +567,10 @@ public sealed class BoardTopologyIndex :
                 Vector3Int cell = record.cell;
                 cell.z = 0;
                 if (!cellByPosition.ContainsKey(cell))
+                {
                     cellByPosition.Add(cell, record);
+                    indexedCells.Add(cell);
+                }
                 if (record.isBeach)
                     beachCells.Add(cell);
                 if (record.isCoastal)
@@ -592,7 +606,27 @@ public sealed class BoardTopologyIndex :
                 }
             }
         }
+
+        indexedCells.Sort(CompareLegacyCellTraversal);
+        beachCells.Sort(CompareLegacyCellTraversal);
+        coastalCells.Sort(CompareLegacyCellTraversal);
+        potentialLandingCells.Sort(CompareLegacyCellTraversal);
+        potentialEmbarkCells.Sort(CompareLegacyCellTraversal);
+        potentialDisembarkCells.Sort(CompareLegacyCellTraversal);
         hydrated = true;
+    }
+
+    private static int CompareLegacyCellTraversal(
+        Vector3Int left,
+        Vector3Int right)
+    {
+        int z = left.z.CompareTo(right.z);
+        if (z != 0)
+            return z;
+        int y = left.y.CompareTo(right.y);
+        if (y != 0)
+            return y;
+        return left.x.CompareTo(right.x);
     }
 
     private void Register()

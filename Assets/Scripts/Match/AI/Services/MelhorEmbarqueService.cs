@@ -183,13 +183,25 @@ public static class MelhorEmbarqueService
                 FormatRideNeedDiagnostic(passengerRideNeed[unit]));
         }
 
-        BoundsInt bounds = request.map.cellBounds;
-        AIDecisionPerf.AddCount("TopologyFullScans");
+        IReadOnlyList<Vector3Int> candidateCells =
+            ResolveCandidateCells(
+                request,
+                out bool usedTopologyIndex);
+        AIDecisionPerf.AddCount("TopologyIndexQueries");
+        AIDecisionPerf.AddCount(
+            usedTopologyIndex
+                ? "TopologyIndexHits"
+                : "TopologyIndexMisses");
+        if (!usedTopologyIndex)
+            AIDecisionPerf.AddCount("TopologyFullScans");
+
         int topologyCellsVisited = 0;
-        foreach (Vector3Int rawCell in bounds.allPositionsWithin)
+        for (int candidateIndex = 0;
+             candidateIndex < candidateCells.Count;
+             candidateIndex++)
         {
             topologyCellsVisited++;
-            Vector3Int cell = rawCell;
+            Vector3Int cell = candidateCells[candidateIndex];
             cell.z = 0;
             if (!request.map.HasTile(cell)
                 || !PodeEmbarcarSensor.IsTransporterCellValidForEmbark(
@@ -364,9 +376,38 @@ public static class MelhorEmbarqueService
         AIDecisionPerf.AddCount(
             "CellsVisited",
             topologyCellsVisited);
+        if (usedTopologyIndex)
+        {
+            AIDecisionPerf.AddCount(
+                "TopologyIndexCandidateCells",
+                topologyCellsVisited);
+        }
         result.ranking.Sort(Compare);
         result.options.Sort(CompareOptions);
         return result;
+    }
+
+    private static IReadOnlyList<Vector3Int> ResolveCandidateCells(
+        MelhorEmbarqueRequest request,
+        out bool usedTopologyIndex)
+    {
+        BoardTopologyIndex topology =
+            BoardTopologyIndex.GetOrCreateRuntime(
+                request.map,
+                request.terrainDatabase);
+        usedTopologyIndex = topology != null && topology.IsReady;
+        if (usedTopologyIndex)
+            return topology.IndexedCells;
+
+        var fallback = new List<Vector3Int>();
+        foreach (Vector3Int rawCell in
+                 request.map.cellBounds.allPositionsWithin)
+        {
+            Vector3Int cell = rawCell;
+            cell.z = 0;
+            fallback.Add(cell);
+        }
+        return fallback;
     }
 
     private static bool TryResolvePassengerSlot(

@@ -96,13 +96,25 @@ public static class MelhorPousoService
                 request.map, aircraft, tactical,
                 request.terrainDatabase);
 
-        AIDecisionPerf.AddCount("TopologyFullScans");
+        List<Vector3Int> candidateCells = CollectCandidateCells(
+            request,
+            aircraft,
+            out bool usedTopologyIndex);
+        AIDecisionPerf.AddCount("TopologyIndexQueries");
+        AIDecisionPerf.AddCount(
+            usedTopologyIndex
+                ? "TopologyIndexHits"
+                : "TopologyIndexMisses");
+        if (!usedTopologyIndex)
+            AIDecisionPerf.AddCount("TopologyFullScans");
+
         int topologyCellsVisited = 0;
-        foreach (Vector3Int rawCell in
-                 request.map.cellBounds.allPositionsWithin)
+        for (int candidateIndex = 0;
+             candidateIndex < candidateCells.Count;
+             candidateIndex++)
         {
             topologyCellsVisited++;
-            Vector3Int cell = rawCell;
+            Vector3Int cell = candidateCells[candidateIndex];
             cell.z = 0;
             if (!request.map.HasTile(cell))
                 continue;
@@ -214,6 +226,12 @@ public static class MelhorPousoService
         AIDecisionPerf.AddCount(
             "CellsVisited",
             topologyCellsVisited);
+        if (usedTopologyIndex)
+        {
+            AIDecisionPerf.AddCount(
+                "TopologyIndexCandidateCells",
+                topologyCellsVisited);
+        }
         result.options.Sort((a, b) =>
         {
             int scoreCompare = b.score.CompareTo(a.score);
@@ -222,6 +240,92 @@ public static class MelhorPousoService
             return a.cell.GetHashCode().CompareTo(b.cell.GetHashCode());
         });
         return result;
+    }
+
+    private static List<Vector3Int> CollectCandidateCells(
+        MelhorPousoRequest request,
+        UnitManager aircraft,
+        out bool usedTopologyIndex)
+    {
+        var cells = new List<Vector3Int>();
+        var unique = new HashSet<Vector3Int>();
+        BoardTopologyIndex topology =
+            BoardTopologyIndex.GetOrCreateRuntime(
+                request.map,
+                request.terrainDatabase);
+        usedTopologyIndex = topology != null && topology.IsReady;
+
+        if (usedTopologyIndex)
+        {
+            IReadOnlyList<Vector3Int> landingCells =
+                topology.PotentialLandingCells;
+            for (int i = 0; i < landingCells.Count; i++)
+            {
+                Vector3Int cell = landingCells[i];
+                cell.z = 0;
+                if (request.map.HasTile(cell) && unique.Add(cell))
+                    cells.Add(cell);
+            }
+
+            IReadOnlyList<UnitManager> units =
+                ResolveUnitsForPlatformQuery();
+            for (int i = 0; i < units.Count; i++)
+            {
+                UnitManager candidate = units[i];
+                if (candidate == null
+                    || candidate == aircraft
+                    || !candidate.gameObject.activeInHierarchy
+                    || candidate.IsDead
+                    || candidate.IsEmbarked
+                    || !PodePousarSensor.CanLandOnTransporter(
+                        aircraft,
+                        candidate,
+                        out _,
+                        out _))
+                {
+                    continue;
+                }
+
+                Vector3Int cell = candidate.CurrentCellPosition;
+                cell.z = 0;
+                if (request.map.HasTile(cell) && unique.Add(cell))
+                    cells.Add(cell);
+            }
+
+            cells.Sort(CompareLegacyCellTraversal);
+            return cells;
+        }
+
+        foreach (Vector3Int rawCell in
+                 request.map.cellBounds.allPositionsWithin)
+        {
+            Vector3Int cell = rawCell;
+            cell.z = 0;
+            cells.Add(cell);
+        }
+        return cells;
+    }
+
+    private static IReadOnlyList<UnitManager>
+        ResolveUnitsForPlatformQuery()
+    {
+        if (Application.isPlaying)
+            return UnitManager.AllActive;
+        return Object.FindObjectsByType<UnitManager>(
+            FindObjectsInactive.Exclude);
+    }
+
+    private static int CompareLegacyCellTraversal(
+        Vector3Int left,
+        Vector3Int right)
+    {
+        int z = left.z.CompareTo(right.z);
+        if (z != 0)
+            return z;
+        int y = left.y.CompareTo(right.y);
+        if (y != 0)
+            return y;
+        return left.x.CompareTo(right.x);
     }
 
     /// <summary>

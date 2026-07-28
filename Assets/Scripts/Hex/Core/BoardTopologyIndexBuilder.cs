@@ -621,8 +621,14 @@ internal static class BoardTopologyIndexBuilder
             for (int i = 0; i < rules.Count; i++)
             {
                 StructureAirOpsTerrainRule rule = rules[i];
-                if (rule != null && rule.terrainData == terrain)
+                if (rule == null || rule.terrainData == null)
+                    continue;
+                if (rule.terrainData == terrain
+                    || (!string.IsNullOrWhiteSpace(terrain?.id)
+                        && rule.terrainData.id == terrain.id))
+                {
                     return rule.allowTakeoffAndLanding;
+                }
             }
             return false;
         }
