@@ -36,12 +36,12 @@ public partial class AIController
         if (unit == null || !unit.TryGetUnitData(out UnitData data) || data == null)
             return false;
 
-        if (data.domain != Domain.Air || data.roles == null || data.roles.Count == 0)
-            return false;
-
-        return data.roles[0] == UnitRole.AtaqueAereo
-            || data.roles[0] == UnitRole.Interceptador
-            || data.roles[0] == UnitRole.RaidAntiSub;
+        return AirCombatProfile.IsAirCombat(data)
+            // Raid Anti-Sub permanece no ramo legado por enquanto. Ele ainda
+            // participa do controller aereo atual, mas nao recebe a politica
+            // nova de Interceptador/Ataque Aereo deste refactor.
+            || (data.roles != null
+                && data.roles.Contains(UnitRole.RaidAntiSub));
     }
 
     private static bool IsOffensiveAirCombatUnit(UnitManager unit)
@@ -49,10 +49,9 @@ public partial class AIController
         if (unit == null || !unit.TryGetUnitData(out UnitData data) || data == null)
             return false;
 
-        return data.roles != null
-            && data.roles.Count > 0
-            && (data.roles[0] == UnitRole.AtaqueAereo
-                || data.roles[0] == UnitRole.RaidAntiSub);
+        return AirCombatProfile.IsOffensive(data)
+            || (data.roles != null
+                && data.roles.Contains(UnitRole.RaidAntiSub));
     }
 
     private PlayerAction DecideRogueAirCombatAction(UnitManager unit, AIWorldSnapshot snapshot, List<int> takeoffMoveOptions = null)
@@ -356,12 +355,8 @@ public partial class AIController
 
         float score = targetData.cost * 1.2f + targetData.eliteLevel * 6000f;
 
-        bool isAirAttack = targetData.roles != null
-            && targetData.roles.Count > 0
-            && targetData.roles[0] == UnitRole.AtaqueAereo;
-        bool isInterceptor = targetData.roles != null
-            && targetData.roles.Count > 0
-            && targetData.roles[0] == UnitRole.Interceptador;
+        bool isAirAttack = AirCombatProfile.IsAirAttack(targetData);
+        bool isInterceptor = AirCombatProfile.IsInterceptor(targetData);
         bool isTransport =
             UnitRoleCompatibility.ResolveCompositionRole(targetData) == UnitRole.Transportador;
 
@@ -513,4 +508,54 @@ public partial class AIController
 
         return takeoffMoveOptions.Contains(movementHexes);
     }
+}
+
+/// <summary>
+/// Perfil de missao usado pelo controller aereo. Ele traduz os papeis da
+/// ficha em uma unica especializacao operacional, sem depender da ordem em
+/// que UnitRole foi serializado no UnitData.
+/// </summary>
+public enum AirCombatMissionProfile
+{
+    None = 0,
+    Interceptor = 1,
+    AirAttack = 2
+}
+
+public static class AirCombatProfile
+{
+    public static AirCombatMissionProfile Resolve(UnitData data)
+    {
+        if (data == null
+            || data.domain != Domain.Air
+            || data.roles == null)
+        {
+            return AirCombatMissionProfile.None;
+        }
+
+        // Este perfil cobre somente Interceptador e Ataque Aereo. Raid
+        // Anti-Sub continua no comportamento legado ate ganhar um ciclo
+        // proprio, sem ser absorvido por uma politica terrestre/aerea generica.
+        if (data.roles.Contains(UnitRole.AtaqueAereo))
+            return AirCombatMissionProfile.AirAttack;
+        if (data.roles.Contains(UnitRole.Interceptador))
+            return AirCombatMissionProfile.Interceptor;
+
+        return AirCombatMissionProfile.None;
+    }
+
+    public static bool IsAirCombat(UnitData data) =>
+        Resolve(data) != AirCombatMissionProfile.None;
+
+    public static bool IsOffensive(UnitData data)
+    {
+        AirCombatMissionProfile profile = Resolve(data);
+        return profile == AirCombatMissionProfile.AirAttack;
+    }
+
+    public static bool IsAirAttack(UnitData data) =>
+        Resolve(data) == AirCombatMissionProfile.AirAttack;
+
+    public static bool IsInterceptor(UnitData data) =>
+        Resolve(data) == AirCombatMissionProfile.Interceptor;
 }
