@@ -6,11 +6,13 @@ public partial class AIController
     private enum AirSurveillancePolicyStage
     {
         EmergencyAndRepair,
+        Recovery,
         TransportOrPlatform,
         ExitObstructedPosition,
         ImproveAirCoverage,
         ConservativeRear,
-        Hold
+        Hold,
+        Orbit
     }
 
     private PlayerAction TryDecideAirSurveillanceAction(UnitManager unit, AIWorldSnapshot snapshot, TeamObjectivePlan plan)
@@ -20,6 +22,28 @@ public partial class AIController
 
         Vector3Int fromCell = unit.CurrentCellPosition;
         fromCell.z = 0;
+
+        Dictionary<Vector3Int, List<Vector3Int>> paths =
+            BuildFireSupportPaths(unit);
+        HashSet<Vector3Int> occupied = BuildOccupied(unit);
+        EwacsRecoverySnapshot ewacsRecovery =
+            BuildEwacsRecoverySnapshot(unit);
+        if (ewacsRecovery != null
+            && TryBuildEwacsEmergencyRecoveryAction(
+                unit,
+                snapshot,
+                fromCell,
+                paths,
+                ewacsRecovery,
+                out PlayerAction ewacsRecoveryAction,
+                out string ewacsRecoveryReason))
+        {
+            LogAirSurveillancePolicyStage(
+                unit,
+                AirSurveillancePolicyStage.Recovery,
+                ewacsRecoveryReason);
+            return ewacsRecoveryAction;
+        }
 
         if (IsStationaryMobileAirSurveillanceRadar(unit))
         {
@@ -39,9 +63,6 @@ public partial class AIController
             }
         }
 
-        Dictionary<Vector3Int, List<Vector3Int>> paths = BuildFireSupportPaths(unit);
-        HashSet<Vector3Int> occupied = BuildOccupied(unit);
-
         if (paths != null && paths.Count > 0
             && TryFindHomeProductionVacateCombatAction(unit, snapshot, fromCell, paths, occupied, out PlayerAction vacateAction))
         {
@@ -53,7 +74,7 @@ public partial class AIController
         }
 
         if (TryResolveAirSurveillanceAnchor(unit, snapshot, plan, fromCell, out Vector3Int anchor, out bool offensiveAnchor, out string anchorReason)
-            && TryFindAirSurveillancePostureCell(unit, snapshot, fromCell, anchor, offensiveAnchor, paths, occupied, out Vector3Int postureCell, out string postureReason))
+            && TryFindAirSurveillancePostureCell(unit, snapshot, fromCell, anchor, offensiveAnchor, paths, occupied, ewacsRecovery, out Vector3Int postureCell, out string postureReason))
         {
             if (postureCell != fromCell)
             {
@@ -66,8 +87,12 @@ public partial class AIController
 
             LogAirSurveillancePolicyStage(
                 unit,
-                AirSurveillancePolicyStage.Hold,
-                $"segura observacao em {fromCell} anchor={anchor} ({anchorReason}; {postureReason})");
+                ewacsRecovery != null
+                    ? AirSurveillancePolicyStage.Orbit
+                    : AirSurveillancePolicyStage.Hold,
+                ewacsRecovery != null
+                    ? $"mantem orbita segura em {fromCell} anchor={anchor} ({anchorReason}; {postureReason})"
+                    : $"segura observacao em {fromCell} anchor={anchor} ({anchorReason}; {postureReason})");
             return BuildMoveBatch(unit, snapshot.AITeam, fromCell, fromCell, paths);
         }
 
@@ -88,8 +113,12 @@ public partial class AIController
 
         LogAirSurveillancePolicyStage(
             unit,
-            AirSurveillancePolicyStage.Hold,
-            $"sem direcao segura; aguarda em {fromCell}");
+            ewacsRecovery != null
+                ? AirSurveillancePolicyStage.Orbit
+                : AirSurveillancePolicyStage.Hold,
+            ewacsRecovery != null
+                ? $"sem direcao segura; mantem orbita em {fromCell}"
+                : $"sem direcao segura; aguarda em {fromCell}");
         return BuildMoveBatch(unit, snapshot.AITeam, fromCell, fromCell, paths);
     }
 
@@ -210,6 +239,7 @@ public partial class AIController
         bool offensiveAnchor,
         Dictionary<Vector3Int, List<Vector3Int>> paths,
         HashSet<Vector3Int> occupied,
+        EwacsRecoverySnapshot ewacsRecovery,
         out Vector3Int bestCell,
         out string reason)
     {
@@ -233,8 +263,20 @@ public partial class AIController
 
         TeamObjectivePlan capPlan = ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(snapshot.AISlotIndex));
         float fromScore = ScoreAirSurveillancePostureCell(unit, snapshot, fromCell, fromCell, anchor, offensiveAnchor, 0, out string fromReason);
+        bool fromInsideRecoveryEnvelope =
+            IsEwacsRecoveryCellSafe(
+                unit,
+                fromCell,
+                path: null,
+                ewacsRecovery,
+                out string fromRecoveryReason);
+        if (!fromInsideRecoveryEnvelope)
+            fromScore -= 100000f;
         float bestScore = fromScore;
-        string bestReason = fromReason;
+        string bestReason =
+            ewacsRecovery != null
+                ? $"{fromReason} recovery={fromRecoveryReason}"
+                : fromReason;
 
         if (paths != null)
         {
@@ -250,6 +292,18 @@ public partial class AIController
                     continue;
                 if (!IsAirSurveillanceCellAllowedByRearLine(unit, snapshot, fromCell, cell, anchor, offensiveAnchor))
                     continue;
+                paths.TryGetValue(
+                    cell,
+                    out List<Vector3Int> candidatePath);
+                if (!IsEwacsRecoveryCellSafe(
+                        unit,
+                        cell,
+                        candidatePath,
+                        ewacsRecovery,
+                        out string recoveryReason))
+                {
+                    continue;
+                }
 
                 float score = ScoreAirSurveillancePostureCell(
                     unit,
@@ -265,7 +319,9 @@ public partial class AIController
                 {
                     bestScore = score;
                     bestCell = cell;
-                    bestReason = scoreReason;
+                    bestReason = ewacsRecovery != null
+                        ? $"{scoreReason} recovery={recoveryReason}"
+                        : scoreReason;
                 }
             }
         }
