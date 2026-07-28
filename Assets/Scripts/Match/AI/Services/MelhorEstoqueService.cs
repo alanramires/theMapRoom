@@ -23,6 +23,8 @@ public sealed class MelhorEstoqueRequest
     public int tacticalBudget;
     public int operationalTurns = 2;
     public bool includeStrategic;
+    public Dictionary<Vector3Int, List<Vector3Int>> tacticalPaths;
+    public Dictionary<Vector3Int, int> operationalCosts;
     public bool emulateStockFromUnitData;
     public float maxThreat = float.PositiveInfinity;
     public Func<Vector3Int, float> evaluateThreat;
@@ -106,21 +108,45 @@ public static class MelhorEstoqueService
                 * Mathf.Max(1, request.operationalTurns));
 
         Dictionary<Vector3Int, List<Vector3Int>> tacticalPaths =
-            UnitMovementPathRules.CalcularCaminhosValidos(
+            request.tacticalPaths
+            ?? UnitMovementPathRules.CalcularCaminhosValidos(
                 request.map,
                 actor,
                 tacticalBudget,
                 request.terrainDatabase);
+        if (request.tacticalPaths != null)
+            AIDecisionPerf.AddCount("MelhorEstoqueTacticalReachReuses");
         if (!tacticalPaths.ContainsKey(origin))
+        {
+            if (ReferenceEquals(
+                    tacticalPaths, request.tacticalPaths))
+            {
+                tacticalPaths =
+                    ClonePaths(tacticalPaths);
+            }
             tacticalPaths[origin] = new List<Vector3Int>();
+        }
         Dictionary<Vector3Int, int> routeCosts =
-            UnitMovementPathRules.CalculateMovementCostMap(
+            request.operationalCosts
+            ?? UnitMovementPathRules.CalculateMovementCostMap(
                 request.map,
                 actor,
                 origin,
                 operationalBudget,
                 request.terrainDatabase);
-        routeCosts[origin] = 0;
+        if (request.operationalCosts != null)
+            AIDecisionPerf.AddCount("MelhorEstoqueOperationalReachReuses");
+        if (!routeCosts.ContainsKey(origin))
+        {
+            if (ReferenceEquals(
+                    routeCosts, request.operationalCosts))
+            {
+                routeCosts =
+                    new Dictionary<Vector3Int, int>(
+                        routeCosts);
+            }
+            routeCosts[origin] = 0;
+        }
 
         HashSet<Vector3Int> actionCells =
             CollectProspectiveActionCells(request, data, origin);
@@ -262,9 +288,11 @@ public static class MelhorEstoqueService
                 SupplierRangeMode.Adjacent1Hex;
         var neighbors = new List<Vector3Int>(6);
 
-        for (int i = 0; i < UnitManager.AllActive.Count; i++)
+        IReadOnlyList<UnitManager> supplierUnits =
+            ResolveSupplierUnits(request.map);
+        for (int i = 0; i < supplierUnits.Count; i++)
         {
-            UnitManager target = UnitManager.AllActive[i];
+            UnitManager target = supplierUnits[i];
             if (!IsEligibleUnitEndpoint(request.unit, target))
                 continue;
             target.TryGetUnitData(out UnitData targetData);
@@ -287,21 +315,72 @@ public static class MelhorEstoqueService
                 result);
         }
 
-        for (int i = 0; i < ConstructionManager.AllActive.Count; i++)
-        {
-            ConstructionManager target = ConstructionManager.AllActive[i];
-            if (!IsEligibleConstructionEndpoint(
-                    request.unit, target))
-                continue;
-            AddMeetingCells(
+        BoardTopologyIndex topology =
+            BoardTopologyIndex.GetOrCreateRuntime(
                 request.map,
-                Normalize(target.CurrentCellPosition),
-                sameCell,
-                adjacent,
-                neighbors,
-                result);
+                request.terrainDatabase);
+        bool usedTopology = topology != null && topology.IsReady;
+        AIDecisionPerf.AddCount("TopologyIndexQueries");
+        AIDecisionPerf.AddCount(
+            usedTopology ? "TopologyIndexHits" : "TopologyIndexMisses");
+        if (usedTopology)
+        {
+            IReadOnlyList<Vector3Int> cells =
+                topology.SupplierConstructionCells;
+            for (int i = 0; i < cells.Count; i++)
+            {
+                AddMeetingCells(
+                    request.map,
+                    Normalize(cells[i]),
+                    sameCell,
+                    adjacent,
+                    neighbors,
+                    result);
+            }
+            AIDecisionPerf.AddCount(
+                "MelhorEstoqueIndexedConstructionQueries");
+        }
+        else
+        {
+            for (int i = 0;
+                 i < ConstructionManager.AllActive.Count;
+                 i++)
+            {
+                ConstructionManager target =
+                    ConstructionManager.AllActive[i];
+                if (!IsEligibleConstructionEndpoint(
+                        request.unit, target))
+                    continue;
+                AddMeetingCells(
+                    request.map,
+                    Normalize(target.CurrentCellPosition),
+                    sameCell,
+                    adjacent,
+                    neighbors,
+                    result);
+            }
         }
         return result;
+    }
+
+    private static IReadOnlyList<UnitManager> ResolveSupplierUnits(
+        Tilemap map)
+    {
+        if (Application.isPlaying
+            && ConfirmedOccupancyIndex.TryGetFor(
+                map,
+                out ConfirmedOccupancyIndex occupancy)
+            && occupancy != null
+            && occupancy.CanServeLiveQueries)
+        {
+            AIDecisionPerf.AddCount(
+                "MelhorEstoqueConfirmedSupplierQueries");
+            return occupancy.Suppliers;
+        }
+
+        AIDecisionPerf.AddCount(
+            "MelhorEstoqueLiveSupplierFallbacks");
+        return UnitManager.AllActive;
     }
 
     private static bool RangeIncludesSameCell(
@@ -687,5 +766,24 @@ public static class MelhorEstoqueService
     {
         cell.z = 0;
         return cell;
+    }
+
+    private static Dictionary<Vector3Int, List<Vector3Int>>
+        ClonePaths(
+            Dictionary<Vector3Int, List<Vector3Int>> source)
+    {
+        var clone =
+            new Dictionary<Vector3Int, List<Vector3Int>>(
+                source?.Count ?? 0);
+        if (source == null)
+            return clone;
+        foreach (KeyValuePair<Vector3Int, List<Vector3Int>> pair
+                 in source)
+        {
+            clone[pair.Key] = pair.Value != null
+                ? new List<Vector3Int>(pair.Value)
+                : null;
+        }
+        return clone;
     }
 }

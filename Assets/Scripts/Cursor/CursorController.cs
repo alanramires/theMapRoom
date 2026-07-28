@@ -638,7 +638,7 @@ public class CursorController : MonoBehaviour
 
         Vector2 pointerScreenPosition = GetMousePosition();
         TurnStateManager.CursorState state = turnStateManager.CurrentCursorState;
-        bool traceNeutralPointer = state == TurnStateManager.CursorState.Neutral && turnStateManager.ShowFrameSpikeLogs;
+        bool traceNeutralPointer = state == TurnStateManager.CursorState.Neutral && turnStateManager.ShowClickSpikeLogs;
         double pointerPerfStart = traceNeutralPointer ? Time.realtimeSinceStartupAsDouble : 0d;
         if (traceNeutralPointer)
             Debug.Log($"[PointerSelect] received frame={Time.frameCount} state={state} cursor={currentCell} screen=({pointerScreenPosition.x:0},{pointerScreenPosition.y:0})");
@@ -909,7 +909,7 @@ public class CursorController : MonoBehaviour
 
     private void TraceRawPrimaryPointerInput()
     {
-        if (turnStateManager == null || !turnStateManager.ShowFrameSpikeLogs)
+        if (turnStateManager == null || !turnStateManager.ShowClickSpikeLogs)
             return;
 
 #if ENABLE_INPUT_SYSTEM

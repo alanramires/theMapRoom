@@ -10,7 +10,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 0746e2e5fa3ba154eb1c64585653d260, type: 3}
-  m_Name: Aeroporto Hidrobase
+  m_Name: Hidrobase
   m_EditorClassIdentifier: Assembly-CSharp::ConstructionData
   id: aeroportoL
   displayName: Hidrobase
@@ -80,7 +80,7 @@ MonoBehaviour:
     hasInfiniteSupply: 0
     maxCapacity: 10
   aiStockRestockTriggerPercent: 25
-  allowRebelAIPurchase: 0
+  allowRebelAIPurchase: 1
   constructionConfiguration:
     isPlayerHeadQuarter: 0
     isVictoryBuilding: 0

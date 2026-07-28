@@ -45,4 +45,4 @@ MonoBehaviour:
   - skill: {fileID: 11400000, guid: b5c241bd4e3f15448b70c001b4a66dae, type: 2}
     autonomyCost: 1
   - skill: {fileID: 11400000, guid: 24a55ae6170e7a642865a4a34c736233, type: 2}
-    autonomyCost: 4
+    autonomyCost: 3

@@ -3,6 +3,98 @@ using UnityEngine;
 
 public partial class AIController
 {
+    private const int MaxDisembarkPassengerRouteEntries = 256;
+
+    private readonly struct DisembarkPassengerRouteKey :
+        System.IEquatable<DisembarkPassengerRouteKey>
+    {
+        public readonly int passengerObjectId;
+        public readonly int passengerInstanceId;
+        public readonly Vector3Int passengerCell;
+        public readonly Vector3Int target;
+        public readonly int horizon;
+        public readonly int confirmedRevision;
+        public readonly int fuel;
+        public readonly int movementRange;
+        public readonly MovementCategory movementCategory;
+        public readonly Domain domain;
+        public readonly HeightLevel height;
+        public readonly bool isEmbarked;
+
+        public DisembarkPassengerRouteKey(
+            UnitManager passenger,
+            Vector3Int target,
+            int horizon,
+            int confirmedRevision)
+        {
+            passengerObjectId =
+                passenger.GetEntityId().GetHashCode();
+            passengerInstanceId = passenger.InstanceId;
+            passengerCell = passenger.CurrentCellPosition;
+            passengerCell.z = 0;
+            target.z = 0;
+            this.target = target;
+            this.horizon = horizon;
+            this.confirmedRevision = confirmedRevision;
+            fuel = Mathf.Max(0, passenger.CurrentFuel);
+            movementRange = passenger.GetMovementRange();
+            movementCategory = passenger.GetMovementCategory();
+            domain = passenger.GetDomain();
+            height = passenger.GetHeightLevel();
+            isEmbarked = passenger.IsEmbarked;
+        }
+
+        public bool Equals(DisembarkPassengerRouteKey other)
+        {
+            return passengerObjectId == other.passengerObjectId
+                && passengerInstanceId == other.passengerInstanceId
+                && passengerCell == other.passengerCell
+                && target == other.target
+                && horizon == other.horizon
+                && confirmedRevision == other.confirmedRevision
+                && fuel == other.fuel
+                && movementRange == other.movementRange
+                && movementCategory == other.movementCategory
+                && domain == other.domain
+                && height == other.height
+                && isEmbarked == other.isEmbarked;
+        }
+
+        public override bool Equals(object obj)
+        {
+            return obj is DisembarkPassengerRouteKey other
+                && Equals(other);
+        }
+
+        public override int GetHashCode()
+        {
+            unchecked
+            {
+                int hash = passengerObjectId;
+                hash = (hash * 397) ^ passengerInstanceId;
+                hash = (hash * 397) ^ passengerCell.GetHashCode();
+                hash = (hash * 397) ^ target.GetHashCode();
+                hash = (hash * 397) ^ horizon;
+                hash = (hash * 397) ^ confirmedRevision;
+                hash = (hash * 397) ^ fuel;
+                hash = (hash * 397) ^ movementRange;
+                hash = (hash * 397) ^ (int)movementCategory;
+                hash = (hash * 397) ^ (int)domain;
+                hash = (hash * 397) ^ (int)height;
+                hash = (hash * 397) ^ (isEmbarked ? 1 : 0);
+                return hash;
+            }
+        }
+    }
+
+    private readonly Dictionary<
+        DisembarkPassengerRouteKey,
+        Dictionary<Vector3Int, int>>
+        disembarkPassengerRouteCache =
+            new Dictionary<
+                DisembarkPassengerRouteKey,
+                Dictionary<Vector3Int, int>>();
+
     // Adaptador da IA para o avaliador puro de desembarque. Cada comportamento
     // resolve a intencao das cargas (captura, patrulha, fogo ou logistica) e
     // entrega aqui apenas passageiro -> celula alvo. O resultado ja contem a
@@ -59,12 +151,11 @@ public partial class AIController
                     passenger.InstanceId,
                     out Dictionary<Vector3Int, int> reverseRoute))
             {
-                reverseRoute = UnitMovementPathRules.CalculateMovementCostMap(
-                    boardTilemap,
-                    passenger,
-                    target,
-                    Mathf.Max(1, routeHorizon),
-                    terrainDatabase);
+                reverseRoute =
+                    GetOrBuildDisembarkPassengerRoute(
+                        passenger,
+                        target,
+                        Mathf.Max(1, routeHorizon));
                 routeCache[passenger.InstanceId] = reverseRoute;
             }
 
@@ -92,6 +183,59 @@ public partial class AIController
                     : null
             });
         return result.best != null;
+    }
+
+    private Dictionary<Vector3Int, int>
+        GetOrBuildDisembarkPassengerRoute(
+            UnitManager passenger,
+            Vector3Int target,
+            int routeHorizon)
+    {
+        if (passenger == null)
+            return null;
+
+        target.z = 0;
+        int confirmedRevision =
+            ResolveTransportPlanningConfirmedRevision(passenger);
+        var key = new DisembarkPassengerRouteKey(
+            passenger,
+            target,
+            Mathf.Max(1, routeHorizon),
+            confirmedRevision);
+        if (confirmedRevision >= 0
+            && disembarkPassengerRouteCache.TryGetValue(
+                key,
+                out Dictionary<Vector3Int, int> cached))
+        {
+            AIDecisionPerf.AddCount(
+                "MelhorDesembarquePassengerRouteHits");
+            return cached;
+        }
+
+        Dictionary<Vector3Int, int> built =
+            UnitMovementPathRules.CalculateMovementCostMap(
+                boardTilemap,
+                passenger,
+                target,
+                Mathf.Max(1, routeHorizon),
+                terrainDatabase);
+        AIDecisionPerf.AddCount(
+            "MelhorDesembarquePassengerRouteBuilds");
+
+        // Sem revisão confirmada, o mapa só vive na chamada local acima.
+        // Nenhum estado provisório é publicado para a próxima avaliação.
+        if (confirmedRevision < 0 || built == null)
+            return built;
+
+        if (disembarkPassengerRouteCache.Count
+            >= MaxDisembarkPassengerRouteEntries)
+        {
+            disembarkPassengerRouteCache.Clear();
+            AIDecisionPerf.AddCount(
+                "MelhorDesembarquePassengerRouteEvictions");
+        }
+        disembarkPassengerRouteCache[key] = built;
+        return built;
     }
 
     private bool TryEvaluateBestDisembark(

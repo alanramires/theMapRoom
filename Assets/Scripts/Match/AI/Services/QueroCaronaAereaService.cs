@@ -14,6 +14,7 @@ public sealed class QueroCaronaAereaRequest
     public TerrainDatabase terrainDatabase;
     public int operationalTurns = 2;
     public bool emulateUnderRepairFromUnitData;
+    public MelhorPousoResult landingSnapshot;
 
     // Um foco e opcional porque patrulha/interceptacao ainda nao tem um plano
     // de setor proprio. Quando informado, ele permite testar se uma plataforma
@@ -80,9 +81,11 @@ public static class QueroCaronaAereaService
             return result;
         }
 
-        // Reusa o diagnostico ja existente apenas para o gatilho de emergencia;
-        // a decisao normal de predios do QueroCarona terrestre nao participa.
-        QueroCaronaResult repairProbe = QueroCaronaService.Evaluate(
+        // A emergência é uma consulta barata de estado. Não execute a análise
+        // terrestre de objetivo nem construa uma onda operacional só para
+        // saber se a aeronave precisa de reparo.
+        QueroCaronaResult repairProbe =
+            QueroCaronaService.EvaluateEmergencyOnly(
             new QueroCaronaRequest
             {
                 unit = aircraft,
@@ -98,15 +101,32 @@ public static class QueroCaronaAereaService
             ? repairProbe.repairEvaluation
             : string.Empty;
 
-        MelhorPousoResult landing = MelhorPousoService.Evaluate(
-            new MelhorPousoRequest
-            {
-                aircraft = aircraft,
-                map = request.map,
-                terrainDatabase = request.terrainDatabase,
-                tacticalBudget = Mathf.Max(0, aircraft.RemainingMovementPoints),
-                operationalTurns = Mathf.Max(1, request.operationalTurns)
-            });
+        MelhorPousoResult landing =
+            CanReuseLandingSnapshot(
+                request, aircraft, request.landingSnapshot)
+                ? request.landingSnapshot
+                : null;
+        if (landing != null)
+        {
+            AIDecisionPerf.AddCount(
+                "QueroCaronaAereaLandingSnapshotHits");
+        }
+        else
+        {
+            landing = MelhorPousoService.Evaluate(
+                new MelhorPousoRequest
+                {
+                    aircraft = aircraft,
+                    map = request.map,
+                    terrainDatabase = request.terrainDatabase,
+                    tacticalBudget = Mathf.Max(
+                        0, aircraft.RemainingMovementPoints),
+                    operationalTurns = Mathf.Max(
+                        1, request.operationalTurns)
+                });
+            AIDecisionPerf.AddCount(
+                "QueroCaronaAereaLandingSnapshotBuilds");
+        }
         result.tacticalBudget = landing.tacticalBudget;
         result.operationalBudget = landing.operationalBudget;
         for (int i = 0; i < landing.options.Count; i++)
@@ -168,5 +188,51 @@ public static class QueroCaronaAereaService
             ? $"A plataforma aproxima a missao de {currentDistance:0} para {bestDistance:0} hex(es): aceita rebasing."
             : $"A plataforma nao melhora a distancia da missao ({currentDistance:0} -> {bestDistance:0}): permanece em voo/base atual.";
         return result;
+    }
+
+    private static bool CanReuseLandingSnapshot(
+        QueroCaronaAereaRequest request,
+        UnitManager aircraft,
+        MelhorPousoResult landing)
+    {
+        if (request == null
+            || aircraft == null
+            || landing == null
+            || !ReferenceEquals(landing.aircraft, aircraft)
+            || !ReferenceEquals(landing.map, request.map)
+            || !ReferenceEquals(
+                landing.terrainDatabase,
+                request.terrainDatabase)
+            || landing.operationalTurns
+                != Mathf.Max(1, request.operationalTurns)
+            || landing.autonomyRemaining
+                != Mathf.Max(0, aircraft.CurrentFuel)
+            || landing.tacticalBudget
+                != Mathf.Min(
+                    Mathf.Max(
+                        0, aircraft.RemainingMovementPoints),
+                    Mathf.Max(0, aircraft.CurrentFuel)))
+        {
+            return false;
+        }
+
+        Vector3Int liveOrigin = aircraft.CurrentCellPosition;
+        liveOrigin.z = 0;
+        if (landing.origin != liveOrigin)
+            return false;
+
+        if (!Application.isPlaying)
+            return true;
+        if (landing.confirmedOccupancyRevision < 0
+            || !ConfirmedOccupancyIndex.TryGetFor(
+                request.map,
+                out ConfirmedOccupancyIndex occupancy)
+            || occupancy == null
+            || !occupancy.CanServeLiveQueries)
+        {
+            return false;
+        }
+        return landing.confirmedOccupancyRevision
+            == occupancy.ConfirmedRevision;
     }
 }

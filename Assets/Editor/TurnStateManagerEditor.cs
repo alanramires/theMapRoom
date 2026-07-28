@@ -12,6 +12,9 @@ public class TurnStateManagerEditor : Editor
     private SerializedProperty showPerfTakeoffPrepLineProp;
     private SerializedProperty enableTurnStateRuntimeLogsProp;
     private SerializedProperty showMovementLogsProp;
+    private SerializedProperty showFrameSpikeLogsProp;
+    private SerializedProperty showClickSpikeLogsProp;
+    private SerializedProperty frameSpikeThresholdMsProp;
 
     private void OnEnable()
     {
@@ -23,6 +26,9 @@ public class TurnStateManagerEditor : Editor
         showPerfTakeoffPrepLineProp = serializedObject.FindProperty("showPerfTakeoffPrepLine");
         enableTurnStateRuntimeLogsProp = serializedObject.FindProperty("enableTurnStateRuntimeLogs");
         showMovementLogsProp = serializedObject.FindProperty("showMovementLogs");
+        showFrameSpikeLogsProp = serializedObject.FindProperty("showFrameSpikeLogs");
+        showClickSpikeLogsProp = serializedObject.FindProperty("showClickSpikeLogs");
+        frameSpikeThresholdMsProp = serializedObject.FindProperty("frameSpikeThresholdMs");
     }
 
     public override void OnInspectorGUI()
@@ -33,6 +39,9 @@ public class TurnStateManagerEditor : Editor
             serializedObject,
             "enableTurnStateRuntimeLogs",
             "showMovementLogs",
+            "showFrameSpikeLogs",
+            "showClickSpikeLogs",
+            "frameSpikeThresholdMs",
             "enableRangeCacheDebugLogs",
             "showPerfRangeLine",
             "showPerfSensorsLine",
@@ -45,6 +54,22 @@ public class TurnStateManagerEditor : Editor
             EditorGUILayout.PropertyField(enableTurnStateRuntimeLogsProp, new GUIContent("Enable TurnState Runtime Logs"));
         if (showMovementLogsProp != null)
             EditorGUILayout.PropertyField(showMovementLogsProp, new GUIContent("Show Movement Logs"));
+        if (showClickSpikeLogsProp != null)
+            EditorGUILayout.PropertyField(showClickSpikeLogsProp, new GUIContent("Show Click Spike Logs"));
+        if (showFrameSpikeLogsProp != null)
+            EditorGUILayout.PropertyField(showFrameSpikeLogsProp, new GUIContent("Show Frame Spike Logs"));
+        // O limiar so tem efeito com os spikes de frame ligados; indentado e
+        // desabilitado para deixar a dependencia obvia no inspector.
+        if (frameSpikeThresholdMsProp != null)
+        {
+            using (new EditorGUI.DisabledScope(
+                       showFrameSpikeLogsProp != null && !showFrameSpikeLogsProp.boolValue))
+            using (new EditorGUI.IndentLevelScope())
+            {
+                EditorGUILayout.PropertyField(
+                    frameSpikeThresholdMsProp, new GUIContent("Frame Spike Threshold Ms"));
+            }
+        }
         if (enableRangeCacheDebugLogsProp != null)
             EditorGUILayout.PropertyField(enableRangeCacheDebugLogsProp, new GUIContent("Enable Range Cache Debug Logs"));
         if (showPerfRangeLineProp != null)

@@ -60,6 +60,8 @@ public sealed class BoardTopologyIndex :
         new List<Vector3Int>();
     private readonly List<Vector3Int> potentialDisembarkCells =
         new List<Vector3Int>();
+    private readonly List<Vector3Int> supplierConstructionCells =
+        new List<Vector3Int>();
 
     public Tilemap BoardTilemap => boardTilemap;
     public TerrainDatabase TerrainDatabase => terrainDatabase;
@@ -124,6 +126,14 @@ public sealed class BoardTopologyIndex :
         {
             EnsureHydrated();
             return potentialDisembarkCells;
+        }
+    }
+    public IReadOnlyList<Vector3Int> SupplierConstructionCells
+    {
+        get
+        {
+            EnsureHydrated();
+            return supplierConstructionCells;
         }
     }
 
@@ -556,6 +566,7 @@ public sealed class BoardTopologyIndex :
         potentialLandingCells.Clear();
         potentialEmbarkCells.Clear();
         potentialDisembarkCells.Clear();
+        supplierConstructionCells.Clear();
 
         if (cells != null)
         {
@@ -581,6 +592,15 @@ public sealed class BoardTopologyIndex :
                     potentialEmbarkCells.Add(cell);
                 if (record.isPotentialDisembarkCell)
                     potentialDisembarkCells.Add(cell);
+                if (record.construction != null
+                    && record.construction.isSupplier
+                    && (record.construction.supplierTier
+                            == SupplierTier.Hub
+                        || record.construction.supplierTier
+                            == SupplierTier.Receiver))
+                {
+                    supplierConstructionCells.Add(cell);
+                }
             }
         }
 
@@ -613,6 +633,7 @@ public sealed class BoardTopologyIndex :
         potentialLandingCells.Sort(CompareLegacyCellTraversal);
         potentialEmbarkCells.Sort(CompareLegacyCellTraversal);
         potentialDisembarkCells.Sort(CompareLegacyCellTraversal);
+        supplierConstructionCells.Sort(CompareLegacyCellTraversal);
         hydrated = true;
     }
 

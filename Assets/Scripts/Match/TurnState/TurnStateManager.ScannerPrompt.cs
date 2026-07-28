@@ -202,6 +202,10 @@ public partial class TurnStateManager
     [InspectorName("Show Frame Spike Logs")]
     [SerializeField] private bool showFrameSpikeLogs = false;
     public bool ShowFrameSpikeLogs => showFrameSpikeLogs;
+    [Tooltip("Exibe no Console a instrumentacao de clique: [PointerRaw] a cada mouse-down e [PointerSelect] recebido/processado.")]
+    [InspectorName("Show Click Spike Logs")]
+    [SerializeField] private bool showClickSpikeLogs = false;
+    public bool ShowClickSpikeLogs => showClickSpikeLogs;
     [Tooltip("Registra automaticamente frames acima deste tempo enquanto Show Frame Spike Logs estiver ligado.")]
     [SerializeField, Min(16f)] private float frameSpikeThresholdMs = 250f;
     private const int PerfFrameWindowSampleCount = 120;

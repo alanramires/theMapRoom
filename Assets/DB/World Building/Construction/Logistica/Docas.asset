@@ -83,7 +83,7 @@ MonoBehaviour:
     hasInfiniteSupply: 0
     maxCapacity: 20
   aiStockRestockTriggerPercent: 25
-  allowRebelAIPurchase: 0
+  allowRebelAIPurchase: 1
   constructionConfiguration:
     isPlayerHeadQuarter: 0
     isVictoryBuilding: 0

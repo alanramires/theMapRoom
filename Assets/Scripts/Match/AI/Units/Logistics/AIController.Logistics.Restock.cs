@@ -52,6 +52,7 @@ public partial class AIController
                         0, unit.RemainingMovementPoints),
                     operationalTurns = 2,
                     includeStrategic = false,
+                    tacticalPaths = paths,
                     emulateStockFromUnitData = false,
                     maxThreat = 0f,
                     evaluateThreat = cell =>

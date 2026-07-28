@@ -87,15 +87,27 @@ public static class MelhorDesembarqueService
         Vector3Int origin = request.transporter.CurrentCellPosition;
         origin.z = 0;
         if (!paths.ContainsKey(origin))
+        {
+            if (ReferenceEquals(
+                    paths, request.pathsByDestination))
+            {
+                paths = ClonePaths(paths);
+            }
             paths[origin] = new List<Vector3Int>();
+        }
 
+        HashSet<Vector3Int> structuralLzCells =
+            CollectStructuralLzCells(request);
         var options = new List<PodeDesembarcarOption>();
         int lzCellsVisited = 0;
         foreach (KeyValuePair<Vector3Int, List<Vector3Int>> path in paths)
         {
-            lzCellsVisited++;
             Vector3Int lzCell = path.Key;
             lzCell.z = 0;
+            if (structuralLzCells != null
+                && !structuralLzCells.Contains(lzCell))
+                continue;
+            lzCellsVisited++;
             if (request.allowTransporterCell != null
                 && !request.allowTransporterCell(lzCell))
                 continue;
@@ -177,6 +189,88 @@ public static class MelhorDesembarqueService
         }
 
         return result;
+    }
+
+    private static HashSet<Vector3Int> CollectStructuralLzCells(
+        MelhorDesembarqueRequest request)
+    {
+        // Aeronaves embarcadas possuem regras próprias de decolagem e algumas
+        // podem sair para terrenos cujo allowDisembark terrestre é falso.
+        // Nesse caso o índice genérico seria estreito demais; preserve a
+        // autoridade do PodeDesembarcar e use todos os caminhos alcançáveis.
+        if (HasEmbarkedAircraft(request))
+            return null;
+
+        BoardTopologyIndex topology =
+            BoardTopologyIndex.GetOrCreateRuntime(
+                request.map,
+                request.terrainDatabase);
+        bool usedTopology = topology != null && topology.IsReady;
+        AIDecisionPerf.AddCount("TopologyIndexQueries");
+        AIDecisionPerf.AddCount(
+            usedTopology ? "TopologyIndexHits" : "TopologyIndexMisses");
+        if (!usedTopology)
+            return null;
+
+        var lzCells = new HashSet<Vector3Int>();
+        IReadOnlyList<Vector3Int> spots =
+            topology.PotentialDisembarkCells;
+        for (int i = 0; i < spots.Count; i++)
+        {
+            Vector3Int spot = spots[i];
+            spot.z = 0;
+            IReadOnlyList<Vector3Int> neighbors =
+                topology.GetNeighbors(spot);
+            for (int n = 0; n < neighbors.Count; n++)
+            {
+                Vector3Int lz = neighbors[n];
+                lz.z = 0;
+                lzCells.Add(lz);
+            }
+        }
+        AIDecisionPerf.AddCount(
+            "MelhorDesembarqueStructuralLzCandidates",
+            lzCells.Count);
+        return lzCells;
+    }
+
+    private static bool HasEmbarkedAircraft(
+        MelhorDesembarqueRequest request)
+    {
+        if (request?.transporter == null)
+            return false;
+
+        IReadOnlyList<UnitManager> units = null;
+        if (Application.isPlaying
+            && ConfirmedOccupancyIndex.TryGetFor(
+                request.map,
+                out ConfirmedOccupancyIndex occupancy)
+            && occupancy != null
+            && occupancy.CanServeLiveQueries)
+        {
+            units = occupancy.GetEmbarkedPassengers(
+                request.transporter);
+        }
+        else
+        {
+            units = UnitManager.AllActive;
+        }
+
+        for (int i = 0; i < units.Count; i++)
+        {
+            UnitManager passenger = units[i];
+            if (passenger == null
+                || !passenger.IsEmbarked
+                || passenger.EmbarkedTransporter
+                    != request.transporter
+                || !passenger.TryGetUnitData(
+                    out UnitData data)
+                || data == null)
+                continue;
+            if (data.domain == Domain.Air)
+                return true;
+        }
+        return false;
     }
 
     private static int CompareLz(
@@ -333,6 +427,25 @@ public static class MelhorDesembarqueService
 
     private static int ResolvePathCost(List<Vector3Int> path) =>
         path == null ? 0 : Mathf.Max(0, path.Count - 1);
+
+    private static Dictionary<Vector3Int, List<Vector3Int>>
+        ClonePaths(
+            Dictionary<Vector3Int, List<Vector3Int>> source)
+    {
+        var clone =
+            new Dictionary<Vector3Int, List<Vector3Int>>(
+                source?.Count ?? 0);
+        if (source == null)
+            return clone;
+        foreach (KeyValuePair<Vector3Int, List<Vector3Int>> pair
+                 in source)
+        {
+            clone[pair.Key] = pair.Value != null
+                ? new List<Vector3Int>(pair.Value)
+                : null;
+        }
+        return clone;
+    }
 
     private static int ResolvePassengerPriority(
         MelhorDesembarqueRequest request,

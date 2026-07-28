@@ -26,6 +26,8 @@ public sealed class QueroCaronaRequest
     public ConstructionSector plannedSector;
     public int operationalTurns = 2;
     public bool emulateUnderRepairFromUnitData;
+    public IReadOnlyDictionary<Vector3Int, int> operationalReach;
+    public int operationalReachBudget = -1;
     public Action<string> diagnosticLog;
 }
 
@@ -56,6 +58,165 @@ public sealed class QueroCaronaResult
 /// </summary>
 public static class QueroCaronaService
 {
+    private const int MaxCacheEntries = 256;
+
+    private readonly struct CacheKey : IEquatable<CacheKey>
+    {
+        public readonly int mapObjectId;
+        public readonly int terrainDatabaseObjectId;
+        public readonly int unitObjectId;
+        public readonly int unitInstanceId;
+        public readonly int unitDataObjectId;
+        public readonly Vector3Int origin;
+        public readonly int remainingMovement;
+        public readonly int maxMovement;
+        public readonly int currentHp;
+        public readonly int currentFuel;
+        public readonly int maxFuel;
+        public readonly int repairStateHash;
+        public readonly bool isUnderRepair;
+        public readonly bool isEmbarked;
+        public readonly Domain domain;
+        public readonly HeightLevel height;
+        public readonly TeamId team;
+        public readonly int slotIndex;
+        public readonly QueroCaronaContext context;
+        public readonly ConstructionSector plannedSector;
+        public readonly int operationalTurns;
+        public readonly bool emulateRepair;
+        public readonly int occupancyRevision;
+        public readonly int constructionStateHash;
+        public readonly int topologyVersion;
+        public readonly string topologyFingerprint;
+
+        public CacheKey(
+            QueroCaronaRequest request,
+            UnitData data,
+            ConfirmedOccupancyIndex occupancy,
+            BoardTopologyIndex topology)
+        {
+            UnitManager unit = request.unit;
+            Vector3Int cell = unit.CurrentCellPosition;
+            cell.z = 0;
+            mapObjectId = request.map.GetEntityId().GetHashCode();
+            terrainDatabaseObjectId =
+                request.terrainDatabase.GetEntityId().GetHashCode();
+            unitObjectId = unit.GetEntityId().GetHashCode();
+            unitInstanceId = unit.InstanceId;
+            unitDataObjectId = data.GetEntityId().GetHashCode();
+            origin = cell;
+            remainingMovement =
+                Mathf.Max(0, unit.RemainingMovementPoints);
+            maxMovement = Mathf.Max(0, unit.MaxMovementPoints);
+            currentHp = unit.CurrentHP;
+            currentFuel = Mathf.Max(0, unit.CurrentFuel);
+            maxFuel = Mathf.Max(0, unit.GetMaxFuel());
+            repairStateHash = BuildRepairStateHash(unit);
+            isUnderRepair = unit.IsUnderRepair;
+            isEmbarked = unit.IsEmbarked;
+            domain = unit.GetDomain();
+            height = unit.GetHeightLevel();
+            team = unit.TeamId;
+            slotIndex = unit.SlotIndex;
+            context = request.context;
+            plannedSector = request.plannedSector;
+            operationalTurns = Mathf.Max(
+                1, request.operationalTurns);
+            emulateRepair =
+                request.emulateUnderRepairFromUnitData;
+            occupancyRevision = occupancy.ConfirmedRevision;
+            constructionStateHash =
+                BuildConstructionStateHash(request);
+            topologyVersion = topology.TopologyVersion;
+            topologyFingerprint =
+                topology.TopologyFingerprint ?? string.Empty;
+        }
+
+        public bool Equals(CacheKey other)
+        {
+            return mapObjectId == other.mapObjectId
+                && terrainDatabaseObjectId
+                    == other.terrainDatabaseObjectId
+                && unitObjectId == other.unitObjectId
+                && unitInstanceId == other.unitInstanceId
+                && unitDataObjectId == other.unitDataObjectId
+                && origin == other.origin
+                && remainingMovement == other.remainingMovement
+                && maxMovement == other.maxMovement
+                && currentHp == other.currentHp
+                && currentFuel == other.currentFuel
+                && maxFuel == other.maxFuel
+                && repairStateHash == other.repairStateHash
+                && isUnderRepair == other.isUnderRepair
+                && isEmbarked == other.isEmbarked
+                && domain == other.domain
+                && height == other.height
+                && team == other.team
+                && slotIndex == other.slotIndex
+                && context == other.context
+                && plannedSector == other.plannedSector
+                && operationalTurns == other.operationalTurns
+                && emulateRepair == other.emulateRepair
+                && occupancyRevision == other.occupancyRevision
+                && constructionStateHash
+                    == other.constructionStateHash
+                && topologyVersion == other.topologyVersion
+                && string.Equals(
+                    topologyFingerprint,
+                    other.topologyFingerprint,
+                    StringComparison.Ordinal);
+        }
+
+        public override bool Equals(object obj)
+        {
+            return obj is CacheKey other && Equals(other);
+        }
+
+        public override int GetHashCode()
+        {
+            unchecked
+            {
+                int hash = mapObjectId;
+                hash = (hash * 397) ^ terrainDatabaseObjectId;
+                hash = (hash * 397) ^ unitObjectId;
+                hash = (hash * 397) ^ unitInstanceId;
+                hash = (hash * 397) ^ unitDataObjectId;
+                hash = (hash * 397) ^ origin.GetHashCode();
+                hash = (hash * 397) ^ remainingMovement;
+                hash = (hash * 397) ^ maxMovement;
+                hash = (hash * 397) ^ currentHp;
+                hash = (hash * 397) ^ currentFuel;
+                hash = (hash * 397) ^ maxFuel;
+                hash = (hash * 397) ^ repairStateHash;
+                hash = (hash * 397) ^ (isUnderRepair ? 1 : 0);
+                hash = (hash * 397) ^ (isEmbarked ? 1 : 0);
+                hash = (hash * 397) ^ (int)domain;
+                hash = (hash * 397) ^ (int)height;
+                hash = (hash * 397) ^ (int)team;
+                hash = (hash * 397) ^ slotIndex;
+                hash = (hash * 397) ^ (int)context;
+                hash = (hash * 397) ^ (int)plannedSector;
+                hash = (hash * 397) ^ operationalTurns;
+                hash = (hash * 397) ^ (emulateRepair ? 1 : 0);
+                hash = (hash * 397) ^ occupancyRevision;
+                hash = (hash * 397) ^ constructionStateHash;
+                hash = (hash * 397) ^ topologyVersion;
+                hash = (hash * 397)
+                    ^ StringComparer.Ordinal.GetHashCode(
+                        topologyFingerprint ?? string.Empty);
+                return hash;
+            }
+        }
+    }
+
+    private static readonly Dictionary<CacheKey, QueroCaronaResult>
+        Cache = new Dictionary<CacheKey, QueroCaronaResult>();
+    private static readonly Dictionary<int, int>
+        ConstructionHashByScope =
+            new Dictionary<int, int>();
+    private static int constructionHashFrame = -1;
+    private static int constructionHashBoardRevision = -1;
+
     public static QueroCaronaResult Evaluate(
         QueroCaronaRequest request)
     {
@@ -74,6 +235,30 @@ public static class QueroCaronaService
             || !request.unit.TryGetUnitData(out UnitData data)
             || data == null)
             return result;
+
+        bool cacheable = TryBuildCacheKey(
+            request, data, out CacheKey cacheKey);
+        if (cacheable
+            && Cache.TryGetValue(
+                cacheKey,
+                out QueroCaronaResult cached))
+        {
+            AIDecisionPerf.AddCount("QueroCaronaCacheHits");
+            QueroCaronaResult hit = CloneResult(cached);
+            request.diagnosticLog?.Invoke(hit.reason);
+            return hit;
+        }
+        AIDecisionPerf.AddCount(
+            cacheable
+                ? "QueroCaronaCacheMisses"
+                : "QueroCaronaCacheBypasses");
+
+        QueroCaronaResult Finish()
+        {
+            if (cacheable)
+                Store(cacheKey, result);
+            return result;
+        }
 
         result.isInfantry =
             data.unitClass == GameUnitClass.Infantry;
@@ -119,16 +304,25 @@ public static class QueroCaronaService
                 "emergencial aceita carona antes da avaliação de objetivo. " +
                 "O resultado é um pedido, não uma ordem de transporte.";
             request.diagnosticLog?.Invoke(result.reason);
-            return result;
+            return Finish();
         }
 
-        Dictionary<Vector3Int, int> reach =
-            UnitMovementPathRules.CalculateMovementCostMap(
+        bool canReuseOperationalReach =
+            request.operationalReach != null
+            && request.operationalReachBudget
+                == result.operationalBudget;
+        IReadOnlyDictionary<Vector3Int, int> reach =
+            canReuseOperationalReach
+                ? request.operationalReach
+                : UnitMovementPathRules.CalculateMovementCostMap(
                 request.map,
                 request.unit,
                 origin,
                 Mathf.Max(0, result.operationalBudget),
                 request.terrainDatabase);
+        if (canReuseOperationalReach)
+            AIDecisionPerf.AddCount(
+                "QueroCaronaOperationalReachReuses");
 
         if (request.context == QueroCaronaContext.ComPlano)
         {
@@ -144,7 +338,7 @@ public static class QueroCaronaService
                 result.reason =
                     "Plano sem representante válido no SectorManager; " +
                     "estimativa aceita carona.";
-                return result;
+                return Finish();
             }
 
             Vector3Int representative = info.RepresentativeCell;
@@ -181,7 +375,7 @@ public static class QueroCaronaService
                     "em Tactical ou Operational: aceita carona.";
             }
             request.diagnosticLog?.Invoke(result.reason);
-            return result;
+            return Finish();
         }
 
         ConstructionManager nearest = null;
@@ -227,7 +421,242 @@ public static class QueroCaronaService
         }
 
         request.diagnosticLog?.Invoke(result.reason);
+        return Finish();
+    }
+
+    public static QueroCaronaResult EvaluateEmergencyOnly(
+        QueroCaronaRequest request)
+    {
+        AIDecisionPerf.AddCount("QueroCaronaEmergencyProbes");
+        var result = new QueroCaronaResult
+        {
+            wantsRide = false,
+            reason = "Contexto de emergência incompleto."
+        };
+        if (request?.unit == null
+            || !request.unit.TryGetUnitData(out UnitData data)
+            || data == null)
+            return result;
+
+        UnitManager unit = request.unit;
+        result.isInfantry =
+            data.unitClass == GameUnitClass.Infantry;
+        result.tacticalBudget = Mathf.Max(
+            0, unit.RemainingMovementPoints);
+        if (result.tacticalBudget <= 0)
+            result.tacticalBudget =
+                Mathf.Max(0, unit.MaxMovementPoints);
+        result.operationalBudget =
+            result.tacticalBudget
+            * Mathf.Max(1, request.operationalTurns);
+        Vector3Int origin = unit.CurrentCellPosition;
+        origin.z = 0;
+
+        string repairEvaluation = "Emulação desativada.";
+        bool emulatedUnderRepair =
+            request.emulateUnderRepairFromUnitData
+            && EvaluateRepairTriggers(
+                unit, data, out repairEvaluation);
+        result.isUnderRepairRuntime = unit.IsUnderRepair;
+        result.isUnderRepairEmulated =
+            !result.isUnderRepairRuntime && emulatedUnderRepair;
+        result.repairEvaluation = repairEvaluation;
+        result.isEmergency =
+            result.isUnderRepairRuntime
+            || result.isUnderRepairEmulated;
+        result.wantsRide = result.isEmergency;
+        result.reach = QueroCaronaReach.None;
+        result.evaluatedTarget = origin;
+        result.routeCost = 0;
+        result.rideNeedScore = result.isEmergency ? 2000 : 0;
+        result.reason = result.isEmergency
+            ? $"{ResolveUnitKind(result)} em emergência de reparo: " +
+              "aceita carona antes da avaliação de objetivo."
+            : $"{ResolveUnitKind(result)} sem emergência de reparo.";
+        request.diagnosticLog?.Invoke(result.reason);
         return result;
+    }
+
+    private static bool TryBuildCacheKey(
+        QueroCaronaRequest request,
+        UnitData data,
+        out CacheKey key)
+    {
+        key = default;
+        if (!Application.isPlaying
+            || request?.unit == null
+            || request.map == null
+            || request.terrainDatabase == null
+            || !ConfirmedOccupancyIndex.TryGetFor(
+                request.map,
+                out ConfirmedOccupancyIndex occupancy)
+            || occupancy == null
+            || !occupancy.CanServeLiveQueries
+            || !occupancy.TryGetRecord(
+                request.unit,
+                out ConfirmedUnitOccupancyRecord confirmed)
+            || !BoardTopologyIndex.TryGetFor(
+                request.map,
+                out BoardTopologyIndex topology)
+            || topology == null
+            || !topology.IsReady)
+        {
+            return false;
+        }
+
+        Vector3Int liveCell =
+            request.unit.CurrentCellPosition;
+        liveCell.z = 0;
+        if (confirmed.cell != liveCell
+            || confirmed.domain != request.unit.GetDomain()
+            || confirmed.height !=
+                request.unit.GetHeightLevel()
+            || confirmed.slotIndex != request.unit.SlotIndex
+            || confirmed.team != request.unit.TeamId
+            || confirmed.isEmbarked != request.unit.IsEmbarked)
+        {
+            return false;
+        }
+
+        key = new CacheKey(
+            request, data, occupancy, topology);
+        return true;
+    }
+
+    private static int BuildRepairStateHash(UnitManager unit)
+    {
+        unchecked
+        {
+            int hash = 17;
+            IReadOnlyList<UnitEmbarkedWeapon> weapons =
+                unit?.GetEmbarkedWeapons();
+            if (weapons == null)
+                return hash;
+            for (int i = 0; i < weapons.Count; i++)
+            {
+                UnitEmbarkedWeapon weapon = weapons[i];
+                hash = (hash * 31)
+                    + (weapon != null
+                        ? weapon.squadAmmunition
+                        : -1);
+            }
+            return hash;
+        }
+    }
+
+    private static int BuildConstructionStateHash(
+        QueroCaronaRequest request)
+    {
+        int scope = ((int)request.context * 397)
+            ^ (int)request.plannedSector;
+        if (Application.isPlaying)
+        {
+            int frame = Time.frameCount;
+            int boardRevision =
+                ThreatRevisionTracker.GlobalBoardRevision;
+            if (constructionHashFrame != frame
+                || constructionHashBoardRevision
+                    != boardRevision)
+            {
+                ConstructionHashByScope.Clear();
+                constructionHashFrame = frame;
+                constructionHashBoardRevision =
+                    boardRevision;
+            }
+            if (ConstructionHashByScope.TryGetValue(
+                    scope, out int cached))
+                return cached;
+        }
+
+        unchecked
+        {
+            int hash = 17;
+            IReadOnlyList<ConstructionManager> constructions =
+                ConstructionManager.AllActive;
+            for (int i = 0; i < constructions.Count; i++)
+            {
+                ConstructionManager construction =
+                    constructions[i];
+                if (construction == null)
+                {
+                    hash = (hash * 31) - 1;
+                    continue;
+                }
+
+                // Com plano, prédios fora do setor não participam da
+                // resposta. Rogue/rebelde continua cobrindo todos.
+                if (request.context == QueroCaronaContext.ComPlano
+                    && request.plannedSector
+                        != ConstructionSector.None
+                    && construction.Sector
+                        != request.plannedSector)
+                {
+                    continue;
+                }
+
+                Vector3Int cell =
+                    construction.CurrentCellPosition;
+                cell.z = 0;
+                hash = (hash * 31) + construction.InstanceId;
+                hash = (hash * 31) + cell.GetHashCode();
+                hash = (hash * 31)
+                    + (int)construction.TeamId;
+                hash = (hash * 31)
+                    + construction.CurrentCapturePoints;
+                hash = (hash * 31)
+                    + construction.CapturePointsMax;
+                hash = (hash * 31)
+                    + (construction.IsCapturable ? 1 : 0);
+            }
+            if (Application.isPlaying)
+                ConstructionHashByScope[scope] = hash;
+            return hash;
+        }
+    }
+
+    private static void Store(
+        CacheKey key,
+        QueroCaronaResult result)
+    {
+        if (result == null)
+            return;
+        if (Cache.Count >= MaxCacheEntries
+            && !Cache.ContainsKey(key))
+        {
+            Cache.Clear();
+            AIDecisionPerf.AddCount(
+                "QueroCaronaCacheEvictions");
+        }
+        Cache[key] = CloneResult(result);
+        AIDecisionPerf.AddCount("QueroCaronaCacheStores");
+    }
+
+    private static QueroCaronaResult CloneResult(
+        QueroCaronaResult source)
+    {
+        if (source == null)
+            return null;
+        return new QueroCaronaResult
+        {
+            wantsRide = source.wantsRide,
+            isEstimate = source.isEstimate,
+            isEmergency = source.isEmergency,
+            isUnderRepairRuntime =
+                source.isUnderRepairRuntime,
+            isUnderRepairEmulated =
+                source.isUnderRepairEmulated,
+            repairEvaluation = source.repairEvaluation,
+            isInfantry = source.isInfantry,
+            reach = source.reach,
+            evaluatedTarget = source.evaluatedTarget,
+            evaluatedConstruction =
+                source.evaluatedConstruction,
+            tacticalBudget = source.tacticalBudget,
+            operationalBudget = source.operationalBudget,
+            routeCost = source.routeCost,
+            rideNeedScore = source.rideNeedScore,
+            reason = source.reason
+        };
     }
 
     private static bool EvaluateRepairTriggers(
@@ -317,7 +746,7 @@ public static class QueroCaronaService
 
     private static bool TryFindBestAvailablePlannedTarget(
         QueroCaronaRequest request,
-        Dictionary<Vector3Int, int> reach,
+        IReadOnlyDictionary<Vector3Int, int> reach,
         SectorManager.SectorInfo info,
         Vector3Int representative,
         out Vector3Int target,

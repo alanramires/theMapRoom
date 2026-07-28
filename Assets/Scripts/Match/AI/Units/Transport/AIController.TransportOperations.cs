@@ -607,12 +607,16 @@ public partial class AIController
                         IsStructurallyEligiblePickupCandidate(
                             unit, candidate, snapshot, plan),
                     includeInLegacyRanking = _ => false,
-                    evaluateRideNeed = candidate =>
+                    evaluateRideNeedWithOperationalReach =
+                        (candidate, operationalReach,
+                            operationalReachBudget) =>
                         GetOrEvaluateTransportRideNeed(
                             planning,
                             candidate,
                             plan,
-                            TransportPlanningOperationalTurns),
+                            TransportPlanningOperationalTurns,
+                            operationalReach,
+                            operationalReachBudget),
                     diagnosticLog = showAILogs
                         ? message => Debug.Log(
                             $"{TL("Transporte")}[MelhorEmbarque] {message}")
@@ -679,7 +683,10 @@ public partial class AIController
         TransportPlanningSnapshot planning,
         UnitManager passenger,
         TeamObjectivePlan plan,
-        int operationalTurns)
+        int operationalTurns,
+        IReadOnlyDictionary<Vector3Int, int>
+            operationalReach = null,
+        int operationalReachBudget = -1)
     {
         if (planning == null || passenger == null)
             return null;
@@ -693,7 +700,11 @@ public partial class AIController
         }
 
         QueroCaronaResult evaluated = EvaluatePickupRideNeed(
-            passenger, plan, operationalTurns);
+            passenger,
+            plan,
+            operationalTurns,
+            operationalReach,
+            operationalReachBudget);
         planning.RideNeedByPassenger[passenger.InstanceId] =
             evaluated;
         return evaluated;
@@ -788,7 +799,10 @@ public partial class AIController
     private QueroCaronaResult EvaluatePickupRideNeed(
         UnitManager passenger,
         TeamObjectivePlan plan,
-        int operationalTurns)
+        int operationalTurns,
+        IReadOnlyDictionary<Vector3Int, int>
+            operationalReach = null,
+        int operationalReachBudget = -1)
     {
         SectorObjective assigned = plan != null
             ? ResolveAssignedObjective(passenger, plan)
@@ -807,6 +821,9 @@ public partial class AIController
                     : ConstructionSector.None,
                 operationalTurns = Mathf.Max(
                     1, operationalTurns),
+                operationalReach = operationalReach,
+                operationalReachBudget =
+                    operationalReachBudget,
                 emulateUnderRepairFromUnitData = false,
                 diagnosticLog = showAILogs
                     ? message => Debug.Log(

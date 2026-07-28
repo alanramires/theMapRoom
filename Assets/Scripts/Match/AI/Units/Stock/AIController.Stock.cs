@@ -174,6 +174,7 @@ public partial class AIController
                         0, unit.RemainingMovementPoints),
                     operationalTurns = 2,
                     includeStrategic = allowStrategicDirection,
+                    tacticalPaths = paths,
                     emulateStockFromUnitData = false,
                     maxThreat = avoidThreat
                         ? 0f

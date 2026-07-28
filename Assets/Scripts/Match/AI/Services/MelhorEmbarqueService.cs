@@ -87,6 +87,11 @@ public sealed class MelhorEmbarqueRequest
     public Func<UnitManager, bool> allowPassenger;
     public Func<UnitManager, bool> includeInLegacyRanking;
     public Func<UnitManager, QueroCaronaResult> evaluateRideNeed;
+    public Func<
+        UnitManager,
+        IReadOnlyDictionary<Vector3Int, int>,
+        int,
+        QueroCaronaResult> evaluateRideNeedWithOperationalReach;
     public Action<string> diagnosticLog;
 }
 
@@ -116,6 +121,8 @@ public static class MelhorEmbarqueService
     {
         public Dictionary<Vector3Int, int> now;
         public Dictionary<Vector3Int, int> later;
+        public Dictionary<Vector3Int, int> laterStops;
+        public int laterStopsBudget;
     }
 
     public static MelhorEmbarqueResult Evaluate(
@@ -168,11 +175,6 @@ public static class MelhorEmbarqueService
 
             passengers.Add(unit);
             passengerSlots[unit] = slotIndex;
-            passengerRideNeed[unit] =
-                request.evaluateRideNeed?.Invoke(unit);
-            request.diagnosticLog?.Invoke(
-                $"ACCEPT pax=#{unit.InstanceId} slot={slotIndex} " +
-                FormatRideNeedDiagnostic(passengerRideNeed[unit]));
         }
 
         if (passengers.Count == 0)
@@ -219,9 +221,22 @@ public static class MelhorEmbarqueService
         for (int i = 0; i < passengers.Count; i++)
         {
             UnitManager passenger = passengers[i];
-            passengerReach[passenger] =
+            PassengerReachProfile reachProfile =
                 BuildPassengerReachProfile(
                     request, passenger, topology);
+            passengerReach[passenger] = reachProfile;
+            passengerRideNeed[passenger] =
+                request.evaluateRideNeedWithOperationalReach != null
+                    ? request.evaluateRideNeedWithOperationalReach(
+                        passenger,
+                        reachProfile.laterStops,
+                        reachProfile.laterStopsBudget)
+                    : request.evaluateRideNeed?.Invoke(passenger);
+            request.diagnosticLog?.Invoke(
+                $"ACCEPT pax=#{passenger.InstanceId} " +
+                $"slot={passengerSlots[passenger]} " +
+                FormatRideNeedDiagnostic(
+                    passengerRideNeed[passenger]));
         }
 
         int topologyCellsVisited = 0;
@@ -574,7 +589,9 @@ public static class MelhorEmbarqueService
             now = BuildMeetingCostMap(
                 request.map, topology, nowStops),
             later = BuildMeetingCostMap(
-                request.map, topology, laterStops)
+                request.map, topology, laterStops),
+            laterStops = laterStops,
+            laterStopsBudget = laterBudget
         };
     }
 

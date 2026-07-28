@@ -40,6 +40,12 @@ public sealed class MelhorPousoRequest
 
 public sealed class MelhorPousoResult
 {
+    public UnitManager aircraft;
+    public Tilemap map;
+    public TerrainDatabase terrainDatabase;
+    public Vector3Int origin;
+    public int confirmedOccupancyRevision = -1;
+    public int operationalTurns;
     public readonly List<MelhorPousoOption> options =
         new List<MelhorPousoOption>();
     public int tacticalBudget;
@@ -78,6 +84,15 @@ public static class MelhorPousoService
 
         Vector3Int origin = aircraft.CurrentCellPosition;
         origin.z = 0;
+        result.aircraft = aircraft;
+        result.map = request.map;
+        result.terrainDatabase = request.terrainDatabase;
+        result.origin = origin;
+        result.confirmedOccupancyRevision =
+            ResolveConfirmedOccupancyRevision(
+                request.map, aircraft);
+        result.operationalTurns =
+            Mathf.Max(1, request.operationalTurns);
         // Autonomia e teto duro da consulta. Movimento restante define o que
         // ainda cabe neste turno; autonomia atual tambem limita a projeção
         // operacional, para um aviao quase seco nao procurar LZ do outro lado
@@ -240,6 +255,37 @@ public static class MelhorPousoService
             return a.cell.GetHashCode().CompareTo(b.cell.GetHashCode());
         });
         return result;
+    }
+
+    private static int ResolveConfirmedOccupancyRevision(
+        Tilemap map,
+        UnitManager unit)
+    {
+        if (!Application.isPlaying
+            || map == null
+            || unit == null
+            || !ConfirmedOccupancyIndex.TryGetFor(
+                map,
+                out ConfirmedOccupancyIndex occupancy)
+            || occupancy == null
+            || !occupancy.CanServeLiveQueries
+            || !occupancy.TryGetRecord(
+                unit,
+                out ConfirmedUnitOccupancyRecord record))
+        {
+            return -1;
+        }
+
+        Vector3Int liveCell = unit.CurrentCellPosition;
+        liveCell.z = 0;
+        return record.cell == liveCell
+            && record.domain == unit.GetDomain()
+            && record.height == unit.GetHeightLevel()
+            && record.slotIndex == unit.SlotIndex
+            && record.team == unit.TeamId
+            && record.isEmbarked == unit.IsEmbarked
+                ? occupancy.ConfirmedRevision
+                : -1;
     }
 
     private static List<Vector3Int> CollectCandidateCells(
