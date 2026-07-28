@@ -292,8 +292,32 @@ public partial class AIController
                 out reason);
         }
 
-        TeamObjectivePlan capPlan = ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(snapshot.AISlotIndex));
-        float fromScore = ScoreAirSurveillancePostureCell(unit, snapshot, fromCell, fromCell, anchor, offensiveAnchor, 0, out string fromReason);
+        TeamObjectivePlan capPlan =
+            ObjectiveManager.GetPlanForSlot(
+                PlayerSlotId.FromIndex(snapshot.AISlotIndex));
+        var alliedAirLow = new HashSet<Vector3Int>();
+        var alliedAirHigh = new HashSet<Vector3Int>();
+        CollectAlliedAirSurveillanceCoverage(
+            unit,
+            snapshot,
+            alliedAirLow,
+            alliedAirHigh);
+        AirSurveillanceCoverageSample fromCoverage =
+            EvaluateAirSurveillanceCoverage(
+                unit,
+                fromCell,
+                alliedAirLow,
+                alliedAirHigh);
+        float fromScore = ScoreAirSurveillancePostureCell(
+            unit,
+            snapshot,
+            fromCell,
+            fromCell,
+            anchor,
+            offensiveAnchor,
+            0,
+            out string fromReason)
+            + ScoreEwacsCoverageContribution(fromCoverage);
         bool fromInsideRecoveryEnvelope =
             IsEwacsRecoveryCellSafe(
                 unit,
@@ -304,10 +328,12 @@ public partial class AIController
         if (!fromInsideRecoveryEnvelope)
             fromScore -= 100000f;
         float bestScore = fromScore;
+        string fromCoverageReason =
+            DescribeEwacsCoverageContribution(fromCoverage);
         string bestReason =
             ewacsRecovery != null
-                ? $"{fromReason} recovery={fromRecoveryReason}"
-                : fromReason;
+                ? $"{fromReason} {fromCoverageReason} recovery={fromRecoveryReason}"
+                : $"{fromReason} {fromCoverageReason}";
 
         if (paths != null)
         {
@@ -336,6 +362,12 @@ public partial class AIController
                     continue;
                 }
 
+                AirSurveillanceCoverageSample coverage =
+                    EvaluateAirSurveillanceCoverage(
+                        unit,
+                        cell,
+                        alliedAirLow,
+                        alliedAirHigh);
                 float score = ScoreAirSurveillancePostureCell(
                     unit,
                     snapshot,
@@ -344,15 +376,18 @@ public partial class AIController
                     anchor,
                     offensiveAnchor,
                     GetPathStepCount(paths, cell),
-                    out string scoreReason);
+                    out string scoreReason)
+                    + ScoreEwacsCoverageContribution(coverage);
 
                 if (score > bestScore)
                 {
                     bestScore = score;
                     bestCell = cell;
+                    string coverageReason =
+                        DescribeEwacsCoverageContribution(coverage);
                     bestReason = ewacsRecovery != null
-                        ? $"{scoreReason} recovery={recoveryReason}"
-                        : scoreReason;
+                        ? $"{scoreReason} {coverageReason} recovery={recoveryReason}"
+                        : $"{scoreReason} {coverageReason}";
                 }
             }
         }
@@ -361,7 +396,7 @@ public partial class AIController
         return true;
     }
 
-    private readonly struct MobileRadarCoverageSample
+    private readonly struct AirSurveillanceCoverageSample
     {
         public readonly int AirLow;
         public readonly int AirHigh;
@@ -371,7 +406,7 @@ public partial class AIController
 
         public int VisibleCells => AirLow + AirHigh;
 
-        public MobileRadarCoverageSample(
+        public AirSurveillanceCoverageSample(
             int airLow,
             int airHigh,
             int marginalAirLow,
@@ -555,8 +590,8 @@ public partial class AIController
             alliedAirLow,
             alliedAirHigh);
 
-        MobileRadarCoverageSample originCoverage =
-            EvaluateMobileRadarCoverage(
+        AirSurveillanceCoverageSample originCoverage =
+            EvaluateAirSurveillanceCoverage(
                 radar,
                 target,
                 alliedAirLow,
@@ -569,7 +604,7 @@ public partial class AIController
                 anchor,
                 originCoverage);
         float bestScore = float.MinValue;
-        MobileRadarCoverageSample bestCoverage = default;
+        AirSurveillanceCoverageSample bestCoverage = default;
 
         var frontier =
             new Queue<(Vector3Int cell, int depth)>();
@@ -608,8 +643,8 @@ public partial class AIController
                         out AIBacklineScore rear)
                     || !rear.IsVanguard))
             {
-                MobileRadarCoverageSample coverage =
-                    EvaluateMobileRadarCoverage(
+                AirSurveillanceCoverageSample coverage =
+                    EvaluateAirSurveillanceCoverage(
                         radar,
                         cell,
                         alliedAirLow,
@@ -664,7 +699,7 @@ public partial class AIController
         AIWorldSnapshot snapshot,
         Vector3Int cell,
         Vector3Int anchor,
-        MobileRadarCoverageSample coverage)
+        AirSurveillanceCoverageSample coverage)
     {
         float anchorDistance =
             SectorManager.HexDistance(cell, anchor);
@@ -705,8 +740,8 @@ public partial class AIController
             alliedAirLow,
             alliedAirHigh);
 
-        MobileRadarCoverageSample fromCoverage =
-            EvaluateMobileRadarCoverage(
+        AirSurveillanceCoverageSample fromCoverage =
+            EvaluateAirSurveillanceCoverage(
                 unit,
                 fromCell,
                 alliedAirLow,
@@ -722,7 +757,7 @@ public partial class AIController
             out _);
         float fromScore = fromCoverage.Score + fromPosture * 0.2f;
         float bestScore = fromScore;
-        MobileRadarCoverageSample bestCoverage = fromCoverage;
+        AirSurveillanceCoverageSample bestCoverage = fromCoverage;
         int bestPathCost = 0;
 
         TeamObjectivePlan capPlan =
@@ -778,8 +813,8 @@ public partial class AIController
                 }
 
                 int pathCost = GetPathStepCount(paths, cell);
-                MobileRadarCoverageSample coverage =
-                    EvaluateMobileRadarCoverage(
+                AirSurveillanceCoverageSample coverage =
+                    EvaluateAirSurveillanceCoverage(
                         unit,
                         cell,
                         alliedAirLow,
@@ -825,8 +860,8 @@ public partial class AIController
         return true;
     }
 
-    private MobileRadarCoverageSample EvaluateMobileRadarCoverage(
-        UnitManager radar,
+    private AirSurveillanceCoverageSample EvaluateAirSurveillanceCoverage(
+        UnitManager observer,
         Vector3Int observerCell,
         HashSet<Vector3Int> alliedAirLow,
         HashSet<Vector3Int> alliedAirHigh)
@@ -838,20 +873,35 @@ public partial class AIController
             || matchController.EnableLosValidation;
         AirSurveillanceCoverageService.Result result =
             AirSurveillanceCoverageService.Evaluate(
-            radar,
-            observerCell,
-            boardTilemap,
-            terrainDatabase,
-            airConfig,
-            enableLos,
-            alliedAirLow,
-            alliedAirHigh);
-        return new MobileRadarCoverageSample(
+                observer,
+                observerCell,
+                boardTilemap,
+                terrainDatabase,
+                airConfig,
+                enableLos,
+                alliedAirLow,
+                alliedAirHigh);
+        return new AirSurveillanceCoverageSample(
             result.AirLow,
             result.AirHigh,
             result.MarginalAirLow,
             result.MarginalAirHigh,
             result.Score);
+    }
+
+    private static float ScoreEwacsCoverageContribution(
+        AirSurveillanceCoverageSample coverage)
+    {
+        const float coverageWeight = 0.35f;
+        return coverage.Score * coverageWeight;
+    }
+
+    private static string DescribeEwacsCoverageContribution(
+        AirSurveillanceCoverageSample coverage)
+    {
+        return
+            $"{coverage} " +
+            $"covWeighted={ScoreEwacsCoverageContribution(coverage):F0}";
     }
 
     private void CollectAlliedAirSurveillanceCoverage(
