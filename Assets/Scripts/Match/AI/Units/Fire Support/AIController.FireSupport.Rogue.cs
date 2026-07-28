@@ -558,6 +558,25 @@ public partial class AIController
         if (unit == null || snapshot == null)
             return false;
 
+        // Usa a mesma fonte de direcao do restante do Fire Support rogue.
+        // Antes, ResolveRogueFireSupportAnchor encontrava o capitao, mas este
+        // segundo resolvedor substituia a ancora por um aliado avancado no
+        // momento de calcular a progressao.
+        if (TryResolveFireSupportMagnet(
+                unit,
+                snapshot,
+                fromCell,
+                out UnitManager leader,
+                out Vector3Int leaderCell,
+                out string magnetKind))
+        {
+            anchor = leaderCell;
+            reason =
+                $"{magnetKind}=#{leader.InstanceId} " +
+                $"dist={SectorManager.HexDistance(fromCell, leaderCell):F0}h";
+            return true;
+        }
+
         float bestScore = float.MinValue;
         TeamObjectivePlan plan = ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(snapshot.AISlotIndex));
         if (plan != null && plan.Objectives != null)

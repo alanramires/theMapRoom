@@ -24,6 +24,102 @@ e pode escolher uma LZ correta para a geometria, mas errada para a missão.
 O passageiro declara a necessidade e a intenção. O transportador decide apenas
 como materializá-las.
 
+## Mapa de magnets
+
+`Magnet` é uma fonte de intenção operacional. Ele pode ser uma construção, uma
+unidade aliada ou uma necessidade confirmada. O papel seguidor decide como
+responder: marchar, escoltar, apoiar, permanecer numa faixa ou declarar
+carona.
+
+O grafo inicial observado no jogo é:
+
+```text
+Construção não controlada
+   ├─ Capturador                         prioridade alta
+   └─ Capturador Agressivo               prioridade baixa
+
+Capturador / cabeça de ponte
+   ├─ Assault
+   ├─ FireSupport
+   │    ├─ FireSupport combatente
+   │    └─ Antiaéreo combatente
+   ├─ Antiaéreo                          fallback
+   ├─ AirStrike
+   ├─ AirCombat
+   └─ AirSurveillance                    fallback de direção
+
+AirSurveillance
+   └─ Antiaéreo                          prioridade acima do Capturador
+
+Unidade ou construção com estoque baixo
+   └─ Stock
+
+Unidade UnderRepair
+   └─ Logistics
+
+Intenções produzidas pelos papéis
+   └─ Transporter                        alavanca/materialização
+```
+
+O grafo mistura relações já implementadas com prioridades pretendidas para o
+refactor. Em especial, a precedência dedicada de `Capturador` sobre
+`CapturadorAgressivo` e a produção tipada de intenções por todos os papéis ainda
+precisam ser formalizadas e testadas.
+
+### Prioridades e composição de papéis
+
+- `Capturador` possui prioridade maior que `CapturadorAgressivo` na
+  distribuição normal de construções.
+- `CapturadorAgressivo` continua podendo capturar, mas sua participação não
+  deve retirar a missão principal de um Capturador dedicado.
+- Assault e FireSupport usam a cabeça de ponte como direção quando não existe
+  ação Tactical ou plano mais específico.
+- seguir um Capturador não autoriza Assault a ocupar a construção que o
+  capitão declarou como próxima conquista;
+- o hex declarado é evitado no movimento normal, continua permitido durante
+  combate e só é tolerado como deslocamento quando não existe alternativa
+  materializável;
+- essa proteção deve cobrir tanto slots formais do `TeamObjectivePlan` quanto
+  alvos rogue/rebeldes escolhidos por proximidade;
+- `FireSupport combatente` preserva sua capacidade de lutar antes da atração.
+- `AntiaereoCombatente` pode entrar no roteador como FireSupport, mas sua
+  capacidade `Antiaereo` ativa a preferência especial por Vigilância Aérea.
+- Antiaéreo usa Radar Móvel, depois EWACS, antes de cair para Capturador.
+- AirStrike e AirCombat não devem iniciar guerras particulares longe da cabeça
+  de ponte quando não possuem alvo Tactical válido.
+- AirSurveillance possui seu ranking próprio de cobertura, retaguarda,
+  repulsão e plataforma; Capturador é apenas uma direção de fallback, nunca
+  substitui ganho de cobertura.
+- Stock é atraído por demanda real de estoque em unidades ou construções.
+- Logistics é atraída por `UnderRepair`, evacuação, reparo e demais
+  necessidades compatíveis declaradas.
+
+### Transportador como alavanca
+
+Transportador não é magnet estratégico e não inventa uma finalidade para o
+passageiro.
+
+Ele recebe intenções produzidas pelos demais papéis e pergunta:
+
+```text
+esta intenção já é materializável pelo passageiro?
+   ├─ sim → não interfere
+   └─ não → existe transporte compatível com ganho operacional?
+              ├─ sim → materializa pickup, travessia ou entrega
+              └─ não → passageiro mantém fallback próprio
+```
+
+Portanto:
+
+- construção não controlada motiva Capturador, não o Chinook;
+- cabeça de ponte motiva FireSupport, não o navio;
+- estoque baixo motiva Stock, não o trem por simples proximidade;
+- `UnderRepair` motiva Logistics, não o transportador por adivinhação;
+- somente a intenção resultante pode ser amplificada por um transportador.
+
+Esse modelo evita a inversão de autoridade observada durante os testes: o táxi
+não manda no passageiro; o passageiro declara por que precisa do táxi.
+
 Uma solicitação deve carregar:
 
 - unidade solicitante;
@@ -60,6 +156,8 @@ O modal deve perguntar:
 - [ ] `RevealFog` — revelar terreno ou contato necessário para a missão.
 - [ ] `AirSurveillance` — levar Radar Móvel ou EWACS a uma zona com ganho de
   cobertura aérea.
+- [ ] `CombinedArmsEscort` — acompanhar uma unidade aliada cuja função
+  complementa a do passageiro, como SAM escoltando Radar Móvel ou EWACS.
 - [ ] `LogisticsSupport` — alcançar setores, construções ou unidades aliadas
   com estoque crítico.
 - [ ] `RepairOrEvacuation` — alcançar reparo ou retirar uma unidade avariada.
@@ -311,6 +409,130 @@ Mesmo funcionando, a emenda não substitui o futuro pedido tipado de transporte:
 um combatente terrestre pode seguir a direção de um Capturador offshore e ainda
 precisar declarar explicitamente a ruptura de mobilidade ao navio.
 
+### Embrião de força combinada
+
+O ímã não deve ser universal. A âncora preferida depende do papel e das
+limitações funcionais do seguidor.
+
+Primeiro caso implementado: defesa antiaérea.
+
+Um SAM possui visão local limitada e pode não detectar aeronaves furtivas.
+Radar Móvel e EWACS fornecem a consciência aérea que permite ao SAM exercer sua
+função com mais coerência. Por isso, unidades que satisfazem `Antiaereo` usam:
+
+```text
+ação Tactical disponível?
+   ├─ sim → combate/necessidade local tem precedência
+   └─ não → Radar Móvel aliado com rota estrutural válida?
+              ├─ sim → usa Radar Móvel como âncora
+              └─ não → EWACS em posição estruturalmente alcançável?
+                         ├─ sim → usa EWACS como âncora
+                         └─ não → usa Capturador como cabeça de ponte
+```
+
+Regras atuais:
+
+- Radar Móvel vence EWACS porque compartilha o domínio terrestre com o SAM;
+- distância cúbica não basta: a âncora de Vigilância Aérea precisa possuir rota
+  estrutural válida para o seguidor;
+- EWACS sobre mar ou componente terrestre desconectado não arrasta o SAM para
+  uma costa sem saída;
+- Capturador permanece como fallback;
+- artilharia comum, Assault e AirCombat continuam usando Capturador;
+- a mesma âncora deve sobreviver às passagens internas de reposicionamento e
+  progressão da decisão;
+- logs identificam tipo, `InstanceId`, célula e distância da unidade capitã.
+
+Exemplos de diagnóstico:
+
+```text
+AirSurveillance:RadarMovel=#119 anchor=(...) dist=...h
+AirSurveillance:EWACS=#113 anchor=(...) dist=...h
+CapturerMagnet=#112 anchor=(...) dist=...h
+```
+
+Esse comportamento ainda é apenas um embrião: não cria uma formação militar
+persistente nem compartilha automaticamente sensores entre unidades. Ele
+produz coesão espacial a partir de uma dependência real já existente nas
+fichas e regras do jogo.
+
+No contrato futuro do `Quero Carona`, essa relação poderá gerar
+`CombinedArmsEscort` quando o seguidor não possuir rota própria até a unidade
+capitã. O transportador continuará sem autoridade para inventar a missão: ele
+apenas atenderá uma intenção declarada pelo passageiro.
+
+### Evidência runtime: Fire Support #39
+
+Durante o teste com o Lança-Foguetes #39, o fluxo atual produziu:
+
+```text
+policy=FireSupport
+QueroCarona=SIM
+reach=BeyondOperational
+motivo=sem prédio capturável livre
+transportador=#88
+LZ=(-27,-12)
+route=ReachableNow
+paxCost=2
+transportCost=0
+```
+
+Dois defeitos independentes foram observados.
+
+#### Finalidade incorreta
+
+O Lança-Foguetes pediu carona porque o serviço genérico não encontrou prédio
+capturável em Tactical ou Operational.
+
+Fire Support não deve usar disponibilidade de construção capturável como
+fonte de intenção. A pergunta correta é uma destas:
+
+- existe rota própria até a força/cabeça de ponte que deve apoiar?
+- existe uma ruptura de mobilidade entre a unidade e `SectorPressure`?
+- a unidade precisa acompanhar uma relação `CombinedArmsEscort`?
+- há posição de tiro, screen ou rendezvous materializável sem transporte?
+
+Somente depois dessas perguntas Fire Support pode declarar carona.
+
+#### `ReachableNow` não materializado
+
+O passageiro possuía pontos de movimento suficientes e o próprio planejamento
+classificou a opção como `ReachableNow`. Mesmo assim, o batch moveu #39 apenas
+de `(-29,-14)` para `(-28,-13)`, deixando-o a um passo da LZ e sem embarcar.
+
+Contrato esperado:
+
+```text
+passageiro ReachableNow
++ transportador já na LZ
++ custo de rota + custo de embarque <= movimento restante
+    → batch transacional mover + embarcar
+```
+
+Somente quando a soma não couber na rodada o resultado deve ser
+`TransportRendezvous` com aproximação parcial.
+
+O batch combinado continua sujeito à lei transacional:
+
+- movimento e embarque são provisórios até a confirmação;
+- falha em qualquer etapa cancela ou degrada de maneira explícita;
+- FOW, ocupação, combustível e `HasActed` só mudam no compromisso;
+- o resultado confirmado retorna a `Neutral`.
+
+#### Decisão de sequenciamento
+
+O refactor não será iniciado no meio da rodada de observação. Como o defeito não
+travou a partida, a rodada deve ser concluída para coletar:
+
+- outros papéis pedindo carona por finalidade incorreta;
+- opções `ReachableNow` que viram apenas progressão;
+- transportadores aguardando passageiros que mudam de agenda;
+- unidades que deveriam seguir capitão, setor ou suporte logístico;
+- divergências entre decisão, apresentação e batch executado.
+
+Essas evidências alimentarão os testes pequenos e previsíveis do contrato
+tipado.
+
 ## Quero Carona Aérea
 
 `QueroCaronaAereaService` deve ser absorvido por este contrato.
@@ -332,10 +554,11 @@ máxima.
 3. Separar `Capture` de `SectorPressure`.
 4. Adicionar `RevealFog`.
 5. Adicionar `LogisticsSupport`.
-6. Integrar `AirSurveillance`.
-7. Integrar `RepairOrEvacuation` e `LandingSupport`.
-8. Atualizar o modal, logs, save/load e ferramentas de comparação.
-9. Aposentar `QueroCaronaAereaService`.
+6. Adicionar `CombinedArmsEscort`.
+7. Integrar `AirSurveillance`.
+8. Integrar `RepairOrEvacuation` e `LandingSupport`.
+9. Atualizar o modal, logs, save/load e ferramentas de comparação.
+10. Aposentar `QueroCaronaAereaService`.
 
 ## Save e load
 

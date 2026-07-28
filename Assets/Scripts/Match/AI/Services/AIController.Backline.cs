@@ -62,6 +62,108 @@ public partial class AIController
         return capturer != null;
     }
 
+    // Hierarquia de escolta do Fire Support. Antiaereo protege primeiro a
+    // rede que lhe fornece consciencia do espaco aereo: Radar Movel terrestre,
+    // depois EWACS. Capturador continua sendo a cabeca de ponte de fallback.
+    private static bool TryResolveFireSupportMagnet(
+        UnitManager follower,
+        AIWorldSnapshot snapshot,
+        Vector3Int fromCell,
+        out UnitManager leader,
+        out Vector3Int anchor,
+        out string magnetKind)
+    {
+        leader = null;
+        anchor = fromCell;
+        anchor.z = 0;
+        magnetKind = null;
+        if (follower == null
+            || snapshot == null
+            || snapshot.MyUnits == null
+            || !follower.TryGetUnitData(out UnitData followerData)
+            || followerData == null)
+        {
+            return false;
+        }
+
+        if (UnitRoleCompatibility.CanSatisfy(
+                followerData,
+                UnitRole.Antiaereo))
+        {
+            int bestTier = int.MaxValue;
+            float bestRouteDistance = float.MaxValue;
+            for (int i = 0; i < snapshot.MyUnits.Count; i++)
+            {
+                UnitManager candidate = snapshot.MyUnits[i];
+                if (candidate == null
+                    || candidate == follower
+                    || candidate.IsDead
+                    || candidate.IsEmbarked
+                    || candidate.IsUnderRepair
+                    || !candidate.gameObject.activeInHierarchy
+                    || !IsAirSurveillanceUnit(candidate))
+                {
+                    continue;
+                }
+
+                Vector3Int candidateCell =
+                    candidate.CurrentCellPosition;
+                candidateCell.z = 0;
+
+                // Para um seguidor terrestre, "perto" por distancia cubica
+                // nao basta: EWACS sobre uma ilha ou no mar nao pode arrastar
+                // o SAM ate uma costa sem saida.
+                if (!TryCalculateRouteDistance(
+                        follower,
+                        fromCell,
+                        candidateCell,
+                        out float routeDistance))
+                {
+                    continue;
+                }
+
+                bool mobileRadar =
+                    IsStationaryMobileAirSurveillanceRadar(
+                        candidate);
+                int tier = mobileRadar ? 0 : 1;
+                if (tier < bestTier
+                    || (tier == bestTier
+                        && (routeDistance < bestRouteDistance
+                            || (Mathf.Approximately(
+                                    routeDistance,
+                                    bestRouteDistance)
+                                && (leader == null
+                                    || candidate.InstanceId
+                                        < leader.InstanceId)))))
+                {
+                    bestTier = tier;
+                    bestRouteDistance = routeDistance;
+                    leader = candidate;
+                    anchor = candidateCell;
+                    magnetKind = mobileRadar
+                        ? "AirSurveillance:RadarMovel"
+                        : "AirSurveillance:EWACS";
+                }
+            }
+
+            if (leader != null)
+                return true;
+        }
+
+        if (!TryResolveCapturerMagnet(
+                follower,
+                snapshot,
+                fromCell,
+                out leader,
+                out anchor))
+        {
+            return false;
+        }
+
+        magnetKind = "CapturerMagnet";
+        return true;
+    }
+
     private AIBacklineSettings BuildBacklineSettings()
     {
         AIBacklineSettings settings = AIBacklineSettings.Default;

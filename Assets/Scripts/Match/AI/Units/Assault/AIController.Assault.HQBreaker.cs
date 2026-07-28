@@ -48,6 +48,7 @@ public partial class AIController
         // concentrando massa numa das frentes. So pressiona o QG quando a invasao ja foi alocada
         // (aí faz sentido juntar-se ao ataque).
         Vector3Int pressureTarget;
+        Vector3Int? captainCaptureCell = null;
         if (TryResolveRogueAssaultRallyTarget(unit, plan, snapshot, out Vector3Int rogueRallyCell, out string rogueRallyReason))
         {
             pressureTarget = rogueRallyCell;
@@ -63,10 +64,30 @@ public partial class AIController
                     out Vector3Int capturerAnchor))
             {
                 pressureTarget = capturerAnchor;
+                if (ConstructionManager.IsHeadQuarterlessTeam(
+                        snapshot.AITeam))
+                {
+                    ConstructionManager captainTarget =
+                        FindNearestRebelCaptureTarget(
+                            capturerMagnet,
+                            snapshot,
+                            capturerAnchor);
+                    if (captainTarget != null)
+                    {
+                        Vector3Int declaredCell =
+                            captainTarget.CurrentCellPosition;
+                        declaredCell.z = 0;
+                        captainCaptureCell = declaredCell;
+                    }
+                }
                 Debug.Log(
                     $"{TL("Assalto")} {unit.InstanceId} rogue segue " +
                     $"capturador #{capturerMagnet.InstanceId} em " +
-                    $"{capturerAnchor}.");
+                    $"{capturerAnchor}" +
+                    (captainCaptureCell.HasValue
+                        ? $" preserva captura declarada " +
+                          $"{captainCaptureCell.Value}."
+                        : "."));
             }
             else
             {
@@ -77,7 +98,15 @@ public partial class AIController
                         fromCell);
             }
         }
-        Vector3Int bestMove = FindAssaultPressureMove(unit, snapshot, fromCell, pressureTarget, paths, occupied, out string pressureReason);
+        Vector3Int bestMove = FindAssaultPressureMove(
+            unit,
+            snapshot,
+            fromCell,
+            pressureTarget,
+            paths,
+            occupied,
+            out string pressureReason,
+            captainCaptureCell);
         if (bestMove != fromCell)
         {
             Debug.Log($"{TL("Assalto")} {unit.InstanceId} breaker — pressiona via {bestMove} alvo={pressureTarget} ({pressureReason})");
@@ -328,7 +357,8 @@ public partial class AIController
         Vector3Int pressureTarget,
         Dictionary<Vector3Int, List<Vector3Int>> paths,
         HashSet<Vector3Int> occupied,
-        out string reason)
+        out string reason,
+        Vector3Int? reservedCaptureCell = null)
     {
         using var perf = new AIDecisionPerfScope(unit, "assaultPressureMove");
         reason = "sem progresso";
@@ -348,6 +378,12 @@ public partial class AIController
         float bestFallbackThreat = float.MaxValue;
         float bestFallbackDpq = float.MinValue;
         bool foundMove = false;
+        Vector3Int reservedEmergencyCell = fromCell;
+        float reservedEmergencyProgress = float.MinValue;
+        float reservedEmergencyLine = float.MinValue;
+        int reservedEmergencyPathCost = int.MinValue;
+        float reservedEmergencyThreat = float.MaxValue;
+        float reservedEmergencyDpq = float.MinValue;
 
         foreach (Vector3Int cell in paths.Keys)
         {
@@ -370,6 +406,35 @@ public partial class AIController
                 : (fromRouteFound && cellRouteFound) ? routeProgress : fromDist - dist;
             float line = CalculateLineProgressTieBreak(fromCell, pressureTarget, cell);
             int pathCost = GetPathStepCount(paths, cell);
+
+            // O Assault acompanha o capitao sem ocupar a conquista que ele
+            // declarou. Mantemos o hex como emergencia para preservar a regra
+            // historica "exceto quando nao ha como"; combate ja foi avaliado
+            // antes deste movimento e continua podendo usar a construcao.
+            if (reservedCaptureCell.HasValue
+                && cell == reservedCaptureCell.Value)
+            {
+                if (IsBetterAssaultPressureMove(
+                        progress,
+                        line,
+                        pathCost,
+                        threat,
+                        dpq,
+                        reservedEmergencyProgress,
+                        reservedEmergencyLine,
+                        reservedEmergencyPathCost,
+                        reservedEmergencyThreat,
+                        reservedEmergencyDpq))
+                {
+                    reservedEmergencyProgress = progress;
+                    reservedEmergencyLine = line;
+                    reservedEmergencyPathCost = pathCost;
+                    reservedEmergencyThreat = threat;
+                    reservedEmergencyDpq = dpq;
+                    reservedEmergencyCell = cell;
+                }
+                continue;
+            }
 
             if (IsBetterAssaultPressureMove(progress, line, pathCost, threat, dpq,
                     bestFallbackProgress, bestFallbackLine, bestFallbackPathCost, bestFallbackThreat, bestFallbackDpq))
@@ -401,6 +466,15 @@ public partial class AIController
         }
 
         Vector3Int fallback = foundMove ? bestCell : bestFallbackCell;
+        if (fallback == fromCell
+            && reservedEmergencyCell != fromCell)
+        {
+            fallback = reservedEmergencyCell;
+            reason =
+                $"sem alternativa: tolera captura declarada " +
+                $"{reservedEmergencyCell}";
+            return fallback;
+        }
         if (fallback != fromCell)
         {
             reason = foundMove

@@ -240,14 +240,20 @@ public partial class AIController
         AIWorldSnapshot snapshot,
         Vector3Int fallback)
     {
-        if (TryResolveCapturerMagnet(
+        if (TryResolveFireSupportMagnet(
                 unit,
                 snapshot,
                 fallback,
-                out UnitManager capturer,
-                out Vector3Int capturerCell))
+                out UnitManager leader,
+                out Vector3Int leaderCell,
+                out string magnetKind))
         {
-            return capturerCell;
+            Debug.Log(
+                $"{TL("FireSupport")} {unit.InstanceId} " +
+                $"{magnetKind}=#{leader.InstanceId} " +
+                $"anchor={leaderCell} " +
+                $"dist={SectorManager.HexDistance(fallback, leaderCell):F0}h");
+            return leaderCell;
         }
 
         if (snapshot != null && snapshot.EnemyHQ != null)
