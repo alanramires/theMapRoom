@@ -154,7 +154,7 @@ public partial class TurnStateManager
         replayManager?.EnsureCurrentUnitActionBuffer(unit, unitCell);
         SetSelectedUnit(unit);
         ClearInspectedHelper();
-        Advance(CursorState.UnitSelected, "TryAutomatedSelectUnitByInstanceId");
+        Advance(CursorState.UnitSelected);
         DialogManager.Instance?.MarkHintLearned(PlayerSlotId.FromIndex(unit.SlotIndex), HelpHintId.Act);
         return selectedUnit == unit && CurrentCursorState == CursorState.UnitSelected;
     }
@@ -1450,7 +1450,7 @@ public partial class TurnStateManager
 
         string targetName = ResolveDebugUnitName(target);
         PanelDialogController.TrySetExternalText($"Destroy Unit :: {targetName} {FormatMapCellWithZ(cursorCell)} :: Confirm");
-        Advance(CursorState.RemovingUnit, "HandleAutomatedRemoveUnitRequested");
+        Advance(CursorState.RemovingUnit);
         return true;
     }
 }

@@ -102,10 +102,7 @@ public sealed class MelhorEmbarqueWindow : EditorWindow
             TryUseSelection(silent: false);
         if (GUILayout.Button("Auto Detect"))
         {
-            AutoDetect();
-            status = map != null
-                ? "Contexto detectado."
-                : "Tilemap não encontrado.";
+            AutoDetectRuntimeSelection();
         }
         EditorGUILayout.EndHorizontal();
 
@@ -275,6 +272,69 @@ public sealed class MelhorEmbarqueWindow : EditorWindow
         runtimePolicyOption = null;
         status = $"Transportador: {picked.name}.";
         SceneView.RepaintAll();
+    }
+
+    private void AutoDetectRuntimeSelection()
+    {
+        if (Application.isPlaying)
+        {
+            TurnStateManager turnState =
+                FindAnyObjectByType<TurnStateManager>();
+            UnitManager runtimeUnit = turnState != null
+                ? turnState.SelectedUnit
+                : null;
+            string runtimeSource = "TurnStateManager.SelectedUnit";
+            if (runtimeUnit == null)
+            {
+                AIController ai =
+                    FindAnyObjectByType<AIController>();
+                if (ai != null
+                    && ai.TryGetDebugStepPendingUnit(
+                        out UnitManager pendingStepUnit))
+                {
+                    runtimeUnit = pendingStepUnit;
+                    runtimeSource = "batch preparado pelo F11";
+                }
+            }
+            if (runtimeUnit != null)
+            {
+                transporter = runtimeUnit;
+                AutoDetect();
+                result = null;
+                runtimePolicyResult = null;
+                selected = null;
+                selectedOption = null;
+                runtimePolicyOption = null;
+                probableDirection = null;
+
+                Selection.activeGameObject =
+                    runtimeUnit.gameObject;
+                EditorGUIUtility.PingObject(runtimeUnit.gameObject);
+                SceneView.FrameLastActiveSceneView();
+                SceneView.RepaintAll();
+
+                bool isTransporter =
+                    runtimeUnit.TryGetUnitData(out UnitData data)
+                    && data != null
+                    && data.isTransporter;
+                status = isTransporter
+                    ? $"Unidade runtime da IA ({runtimeSource}): " +
+                      $"{runtimeUnit.name}. " +
+                      "Selecionada e enquadrada na Scene View."
+                    : $"Unidade runtime da IA ({runtimeSource}): " +
+                      $"{runtimeUnit.name}. " +
+                      "Selecionada e enquadrada, mas não é transportador.";
+                return;
+            }
+        }
+
+        AutoDetect();
+        status = Application.isPlaying
+            ? "A IA não possui unidade runtime selecionada neste instante."
+            : map != null
+                ? "Contexto detectado. Fora do Play Mode não existe " +
+                  "unidade runtime da IA."
+                : "Tilemap não encontrado.";
     }
 
     private void Calculate()

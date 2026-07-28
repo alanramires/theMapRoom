@@ -60,7 +60,10 @@
       "Bash(python -c ' *)",
       "Bash(timeout 110 python \"C:/Users/Alan/AppData/Local/Temp/claude/d--Unity-Projects-The-Map-Room/66969f76-1e2c-456f-9129-1f0cfc210fb1/scratchpad/patch_logistica.py\")",
       "PowerShell(& \"C:\\\\Users\\\\Alan\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\d--Unity-Projects-The-Map-Room\\\\bb378bc3-41d4-4980-ade9-5a76859b5839\\\\scratchpad\\\\split.ps1\")",
-      "PowerShell(& \"C:\\\\Users\\\\Alan\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\d--Unity-Projects-The-Map-Room\\\\bb378bc3-41d4-4980-ade9-5a76859b5839\\\\scratchpad\\\\verify.ps1\")"
+      "PowerShell(& \"C:\\\\Users\\\\Alan\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\d--Unity-Projects-The-Map-Room\\\\bb378bc3-41d4-4980-ade9-5a76859b5839\\\\scratchpad\\\\verify.ps1\")",
+      "Bash(git diff *)",
+      "Bash(python \"C:/Users/Alan/AppData/Local/Temp/claude/d--Unity-Projects-The-Map-Room/6584c852-82f7-4cbf-9fe9-123a57d66cff/scratchpad/repair_reason.py\")",
+      "Bash(awk 'NR>=1370 && NR<=1396 {printf \"%d: %s\\\\n\", NR, $0}' Assets/Scripts/Match/TurnStateManager.cs)"
     ],
     "additionalDirectories": [
       "d:\\Unity Projects\\The Map Room\\Assets\\Scripts\\Match\\AI\\Units\\Assault"

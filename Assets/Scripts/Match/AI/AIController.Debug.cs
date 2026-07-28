@@ -124,6 +124,31 @@ public partial class AIController
         return true;
     }
 
+    /// <summary>
+    /// Expõe somente para diagnóstico a unidade do batch preparado pelo F11.
+    /// Não seleciona, executa ou altera a ação pendente.
+    /// </summary>
+    public bool TryGetDebugStepPendingUnit(out UnitManager unit)
+    {
+        unit = null;
+        string instanceId = debugStepPendingAction?.UnitInstanceId;
+        if (string.IsNullOrWhiteSpace(instanceId))
+            return false;
+
+        for (int i = 0; i < UnitManager.AllActive.Count; i++)
+        {
+            UnitManager candidate = UnitManager.AllActive[i];
+            if (candidate != null
+                && candidate.InstanceId.ToString() == instanceId)
+            {
+                unit = candidate;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public void SetDebugShoppingPaused(bool paused)
     {
         isDebugShoppingPaused = paused;

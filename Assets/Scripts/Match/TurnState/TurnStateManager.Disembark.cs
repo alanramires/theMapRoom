@@ -305,7 +305,7 @@ public partial class TurnStateManager
         cursorController?.PlayConfirmSfx();
         replayManager?.UpdateCurrentBufferSensorAction(SensorActionType.Disembark, "DisembarkActionRequested");
         cursorStateBeforeDesembarcando = CurrentCursorState == CursorState.MoveuAndando ? CursorState.MoveuAndando : CursorState.MoveuParado;
-        Advance(CursorState.Desembarcando, "HandleDisembarkActionRequested");
+        Advance(CursorState.Desembarcando);
         ClearCommittedPathVisual();
         disembarkQueuedOrders.Clear();
         EnterDisembarkPassengerSelectStep();
@@ -595,7 +595,7 @@ public partial class TurnStateManager
         if (CurrentCursorState != CursorState.Desembarcando)
             return;
 
-        Retreat("ExitDisembarkStateToMovement");
+        Retreat();
         CursorState targetMovementState = CurrentCursorState;
         if (targetMovementState == CursorState.MoveuAndando && hasCommittedMovement && committedMovementPath.Count >= 2)
             DrawCommittedPathVisual(committedMovementPath);
@@ -655,7 +655,7 @@ public partial class TurnStateManager
             transporterSortingRaised = true;
         }
 
-        Advance(CursorState.DesembarcandoExecuting, "ExecuteQueuedDisembarkOrdersSequence: begin");
+        Advance(CursorState.DesembarcandoExecuting, "begin");
 
         try
         {
@@ -675,7 +675,7 @@ public partial class TurnStateManager
                     : $"[Desembarque] {landingDecision.reason}");
                 if (transporterSortingRaised && transporter != null)
                     transporter.ClearTemporarySortingOrder();
-                Retreat("DesembarcandoExecuting: air landing abort");
+                Retreat(scope: "DesembarcandoExecuting: air landing abort");
                 ExitDisembarkStateToMovement();
                 yield break;
             }
@@ -702,7 +702,7 @@ public partial class TurnStateManager
                 RuntimeLog("[Desembarque] Falha ao concluir pouso do transportador (Land/Surface).");
                 if (transporterSortingRaised && transporter != null)
                     transporter.ClearTemporarySortingOrder();
-                Retreat("DesembarcandoExecuting: layer mode abort");
+                Retreat(scope: "DesembarcandoExecuting: layer mode abort");
                 ExitDisembarkStateToMovement();
                 yield break;
             }

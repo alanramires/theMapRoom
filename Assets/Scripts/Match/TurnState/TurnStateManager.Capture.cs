@@ -41,7 +41,7 @@ public partial class TurnStateManager
 
         cursorController?.PlayConfirmSfx();
         replayManager?.UpdateCurrentBufferSensorAction(SensorActionType.Capture, "CaptureActionRequested");
-        Advance(CursorState.Capturando, "HandleCaptureActionRequested");
+        Advance(CursorState.Capturando);
         ClearCommittedPathVisual();
         StartCoroutine(ExecuteCaptureSequence(target, movementMode));
     }
@@ -49,7 +49,7 @@ public partial class TurnStateManager
     private IEnumerator ExecuteCaptureSequence(ConstructionManager targetConstruction, SensorMovementMode movementMode)
     {
         captureExecutionInProgress = true;
-        Advance(CursorState.CapturandoExecuting, "ExecuteCaptureSequence: begin");
+        Advance(CursorState.CapturandoExecuting, "begin");
 
         try
         {

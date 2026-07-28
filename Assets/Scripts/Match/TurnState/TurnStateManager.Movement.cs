@@ -6,13 +6,13 @@ public partial class TurnStateManager
 {
     private void EnterSensorsState(CursorState movementState)
     {
-        LogStateStep($"EnterSensorsState(anchor={movementState})");
+        LogStateStep(step: $"{nameof(EnterSensorsState)}(anchor={movementState})");
         CursorState resolvedMovementState = movementState == CursorState.MoveuAndando
             ? CursorState.MoveuAndando
             : CursorState.MoveuParado;
 
         TryApplyForcedEndMovementLayerBeforeSensors(resolvedMovementState);
-        Advance(resolvedMovementState, $"EnterSensorsState(anchor={resolvedMovementState})");
+        Advance(resolvedMovementState, scope: $"EnterSensorsState(anchor={resolvedMovementState})");
         // Garante que o scanner sempre volta ao passo base ao finalizar movimento.
         // Evita herdar substep de fluxos anteriores (suprir/fundir/etc).
         scannerPromptStep = ScannerPromptStep.AwaitingAction;
@@ -26,7 +26,7 @@ public partial class TurnStateManager
 
     private void BeginMovementToSelectedCell(List<Vector3Int> path)
     {
-        LogStateStep("BeginMovementToSelectedCell");
+        LogStateStep();
         if (selectedUnit == null || path == null || path.Count < 2)
             return;
 
@@ -66,7 +66,7 @@ public partial class TurnStateManager
 
     private bool BeginRollbackToSelection()
     {
-        LogStateStep("BeginRollbackToSelection", rollback: true);
+        LogStateStep(rollback: true);
         if (selectedUnit == null || !TryGetCommittedMovementPath(out List<Vector3Int> committedPath, out Vector3Int originCell, out Vector3Int destinationCell))
         {
             RuntimeLog("[Rollback] BeginRollbackToSelection abortado: unidade nula ou caminho comprometido indisponivel.");
@@ -116,7 +116,9 @@ public partial class TurnStateManager
 
     private void HandleMovementAnimationCompleted(CursorState onCompleteState)
     {
-        LogStateStep($"HandleMovementAnimationCompleted(target={onCompleteState})", rollback: onCompleteState == CursorState.UnitSelected);
+        LogStateStep(
+            rollback: onCompleteState == CursorState.UnitSelected,
+            step: $"{nameof(HandleMovementAnimationCompleted)}(target={onCompleteState})");
         if (selectedUnit != null)
         {
             if (onCompleteState == CursorState.UnitSelected)
@@ -163,9 +165,9 @@ public partial class TurnStateManager
         }
 
         if (onCompleteState == CursorState.UnitSelected)
-            Retreat($"HandleMovementAnimationCompleted(target={onCompleteState})");
+            Retreat(scope: $"HandleMovementAnimationCompleted(target={onCompleteState})");
         else
-            Advance(onCompleteState, $"HandleMovementAnimationCompleted(target={onCompleteState})");
+            Advance(onCompleteState, scope: $"HandleMovementAnimationCompleted(target={onCompleteState})");
 
         if (CurrentCursorState == CursorState.UnitSelected)
         {

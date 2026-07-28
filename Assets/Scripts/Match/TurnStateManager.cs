@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using System.Text;
 using UnityEngine;
 using UnityEngine.Tilemaps;
@@ -205,7 +206,12 @@ public partial class TurnStateManager : MonoBehaviour
         turnStartRallyExecutionInProgress
         || CurrentCursorState == CursorState.TurnStartRallyQueue;
 
-    private void LogStateStep(string step, bool rollback = false)
+    // step vem do CallerMemberName: o nome do metodo que loga e o proprio rotulo,
+    // entao renomear o handler renomeia o log junto. Quem precisa de contexto
+    // alem do nome passa step: explicitamente (ex.: "EnterSensorsState(anchor=X)").
+    private void LogStateStep(
+        bool rollback = false,
+        [CallerMemberName] string step = null)
     {
         if (!enableTurnStateRuntimeLogs)
             return;
@@ -266,8 +272,26 @@ public partial class TurnStateManager : MonoBehaviour
         Debug.Log($"[TurnState]{rollbackTag} transition={previous} -> {nextState} | reason={reason} | selected={selectedName} | stack={FormatStateStack()}");
     }
 
-    private void Advance(CursorState nextState, string reason)
+    // O rotulo de transicao e "<metodo>" ou "<metodo>: <detalhe>". O metodo vem do
+    // CallerMemberName, entao renomear o handler renomeia o log junto — antes a
+    // string era digitada a mao e ja havia divergido em pelo menos um ponto.
+    // Quem precisa de um rotulo que NAO e o nome do metodo (nome de estado, ou um
+    // reason recebido por parametro) passa scope: explicitamente.
+    private static string ComposeStateReason(string scope, string detail)
     {
+        if (string.IsNullOrEmpty(detail))
+            return scope ?? string.Empty;
+        if (string.IsNullOrEmpty(scope))
+            return detail;
+        return $"{scope}: {detail}";
+    }
+
+    private void Advance(
+        CursorState nextState,
+        string detail = null,
+        [CallerMemberName] string scope = null)
+    {
+        string reason = ComposeStateReason(scope, detail);
         EnsureStateStackInitialized();
         CursorState previous = CurrentCursorState;
         stateStack.Push(nextState);
@@ -277,8 +301,11 @@ public partial class TurnStateManager : MonoBehaviour
         RefreshFsmDebugText();
     }
 
-    private void Retreat(string reason)
+    private void Retreat(
+        string detail = null,
+        [CallerMemberName] string scope = null)
     {
+        string reason = ComposeStateReason(scope, detail);
         EnsureStateStackInitialized();
         CursorState previous = CurrentCursorState;
         ValidateRetreatSource(previous, reason);
@@ -291,8 +318,11 @@ public partial class TurnStateManager : MonoBehaviour
         RefreshFsmDebugText();
     }
 
-    private void ExecuteAndReset(string reason)
+    private void ExecuteAndReset(
+        string detail = null,
+        [CallerMemberName] string scope = null)
     {
+        string reason = ComposeStateReason(scope, detail);
         CursorState previous = CurrentCursorState;
         stateStack.Clear();
         stateStack.Push(CursorState.Neutral);
@@ -1360,7 +1390,7 @@ public partial class TurnStateManager : MonoBehaviour
             RestoreTemporaryTakeoffSelectionStateIfAny();
 
         selectedUnit = null;
-        ExecuteAndReset("ClearSelectionAndReturnToNeutral");
+        ExecuteAndReset();
         ClearMovementRange();
         ClearCommittedMovement(preserveConfirmedFogVisibility: keepPreparedFuelCost);
     }
@@ -1920,7 +1950,7 @@ public partial class TurnStateManager : MonoBehaviour
         if (CurrentCursorState == CursorState.AircraftFuelDepletionQueue)
             return;
 
-        Advance(CursorState.AircraftFuelDepletionQueue, "TurnStartFuelDepletionQueue: begin");
+        Advance(CursorState.AircraftFuelDepletionQueue, scope: "TurnStartFuelDepletionQueue: begin");
     }
 
     private void ExitTurnStartFuelDepletionCursorState()
@@ -1928,7 +1958,7 @@ public partial class TurnStateManager : MonoBehaviour
         if (CurrentCursorState != CursorState.AircraftFuelDepletionQueue)
             return;
 
-        ExecuteAndReset("TurnStartFuelDepletionQueue: completed");
+        ExecuteAndReset(scope: "TurnStartFuelDepletionQueue: completed");
         FlushEmergencyLandingFogRefreshIfNeeded();
     }
 

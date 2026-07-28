@@ -98,7 +98,7 @@ public partial class TurnStateManager
     private void EnterCommandServiceState(string reason)
     {
         if (CurrentCursorState != CursorState.CommandService)
-            Advance(CursorState.CommandService, reason);
+            Advance(CursorState.CommandService, scope: reason);
     }
 
     private void EnterCommandServiceExecutingState(string reason)
@@ -109,7 +109,7 @@ public partial class TurnStateManager
         if (CurrentCursorState != CursorState.CommandService)
             EnterCommandServiceState($"{reason}: ensure Command");
 
-        Advance(CursorState.CommandServiceExecuting, reason);
+        Advance(CursorState.CommandServiceExecuting, scope: reason);
     }
 
     // logica de input para acionar o Servico do Comando via hotkey.
@@ -796,7 +796,7 @@ public partial class TurnStateManager
                     2.6f);
             }
             cursorController?.PlayLoadSfx();
-            ExecuteAndReset("ExecuteCommandServiceOrderSequence: no served targets");
+            ExecuteAndReset(scope: "ExecuteCommandServiceOrderSequence: no served targets");
             yield break;
         }
 
@@ -832,7 +832,7 @@ public partial class TurnStateManager
         }
             CommandServiceLog(BuildCommandServiceDetailedReportLog(detailedReport));
             cursorController?.PlayLoadSfx();
-            ExecuteAndReset("ExecuteCommandServiceOrderSequence: completed");
+            ExecuteAndReset(scope: "ExecuteCommandServiceOrderSequence: completed");
         }
         finally
         {
@@ -846,7 +846,7 @@ public partial class TurnStateManager
             ClearCommandServicePreviewDimmedUnits();
             RestoreSupplyEmbarkedSelectionVisuals();
             commandServiceExecutionRoutine = null;
-            ExecuteAndReset("ExecuteCommandServiceOrderSequence: cleanup");
+            ExecuteAndReset(scope: "ExecuteCommandServiceOrderSequence: cleanup");
         }
     }
 
@@ -915,7 +915,7 @@ public partial class TurnStateManager
         if (!IsCommandServiceState)
             return;
         ClearPendingCommandServiceConfirmation();
-        Retreat("ExitCommandServiceStateToNeutral");
+        Retreat();
     }
 
     private void ClearPendingCommandServiceConfirmation()
@@ -941,7 +941,7 @@ public partial class TurnStateManager
         ClearPendingCommandServiceConfirmation();
         ClearCommandServicePreviewNavigation();
         if (CurrentCursorState == CursorState.CommandService || CurrentCursorState == CursorState.CommandServiceExecuting)
-            ExecuteAndReset("ResetCommandServiceReplayTransientState");
+            ExecuteAndReset();
     }
 
     private void RefreshCommandServiceServedCacheScope()

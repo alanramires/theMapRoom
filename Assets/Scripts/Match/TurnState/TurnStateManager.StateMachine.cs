@@ -7,7 +7,7 @@ public partial class TurnStateManager
 {
     public ActionSfx HandleConfirm()
     {
-        LogStateStep("HandleConfirm");
+        LogStateStep();
         if (IsMovementAnimationRunning())
             return ActionSfx.None;
         if (IsManualTurnStartAutonomyReportActive)
@@ -305,7 +305,7 @@ public partial class TurnStateManager
         replayManager?.EnsureCurrentUnitActionBuffer(unit, cell);
         SetSelectedUnit(unit);
         ClearInspectedHelper();
-        Advance(CursorState.UnitSelected, "SelectUnitFromNeutral: cycle to unit within hex");
+        Advance(CursorState.UnitSelected, "cycle to unit within hex");
         if (activeTeam >= 0)
             DialogManager.Instance?.MarkHintLearned(matchController.ActiveSlotId, HelpHintId.Act);
         return true;
@@ -375,7 +375,7 @@ public partial class TurnStateManager
 
     public ActionSfx HandleCancel()
     {
-        LogStateStep("HandleCancel", rollback: true);
+        LogStateStep(rollback: true);
         if (IsMovementAnimationRunning())
             return ActionSfx.None;
         if (CloseManualTurnStartAutonomyReport())
@@ -448,13 +448,13 @@ public partial class TurnStateManager
 
     private ActionSfx HandleConfirmWhileNeutral()
     {
-        LogStateStep("HandleConfirmWhileNeutral");
+        LogStateStep();
         return HandleConfirmFromNeutralLikeState();
     }
 
     private ActionSfx HandleConfirmWhileInspecting()
     {
-        LogStateStep("HandleConfirmWhileInspecting");
+        LogStateStep();
         if (TryShowInspectedCurrentWeaponRange())
             return ActionSfx.Confirm;
 
@@ -475,7 +475,7 @@ public partial class TurnStateManager
         }
 
         if (CurrentCursorState != CursorState.Neutral)
-            ExecuteAndReset("HandleConfirmFromNeutralLikeState: normalize");
+            ExecuteAndReset("normalize");
 
         if (cursorController == null)
             return ActionSfx.None;
@@ -499,7 +499,7 @@ public partial class TurnStateManager
             {
                 LogEnemyUnitInspection(unit, activeTeam);
                 BeginInspectedHelper(unit);
-                Advance(CursorState.InspectingUnit, "HandleConfirmFromNeutralLikeState: enemy inspect");
+                Advance(CursorState.InspectingUnit, "enemy inspect");
                 DialogManager.Instance?.MarkHintLearned(matchController.ActiveSlotId, HelpHintId.Inspect);
                 return ActionSfx.Confirm;
             }
@@ -508,7 +508,7 @@ public partial class TurnStateManager
             {
                 Debug.Log($"debug: inspecionando aliado que ja agiu (unit={unit.name}, unitTeam={(int)unit.TeamId}, activeTeam={activeTeam}, hasActed={unit.HasActed})");
                 BeginInspectedHelper(unit, paintThreatOverlay: true, nextTurnHotZone: true);
-                Advance(CursorState.InspectingUnit, "HandleConfirmFromNeutralLikeState: acted ally inspect");
+                Advance(CursorState.InspectingUnit, "acted ally inspect");
                 DialogManager.Instance?.MarkHintLearned(matchController.ActiveSlotId, HelpHintId.Inspect);
                 return ActionSfx.Confirm;
             }
@@ -522,7 +522,7 @@ public partial class TurnStateManager
             replayManager?.EnsureCurrentUnitActionBuffer(unit, cursorCell);
             SetSelectedUnit(unit);
             ClearInspectedHelper();
-            Advance(CursorState.UnitSelected, "HandleConfirmWhileNeutral: ally selected");
+            Advance(CursorState.UnitSelected, "ally selected");
             DialogManager.Instance?.MarkHintLearned(matchController.ActiveSlotId, HelpHintId.Act);
             return ActionSfx.Confirm;
         }
@@ -535,7 +535,7 @@ public partial class TurnStateManager
         if (!isConstructionAlly)
         {
             BeginInspectedConstructionHelper(construction);
-            Advance(CursorState.InspectingBuilding, "HandleConfirmFromNeutralLikeState: enemy construction inspect");
+            Advance(CursorState.InspectingBuilding, "enemy construction inspect");
             return ActionSfx.Confirm;
         }
 
@@ -546,7 +546,7 @@ public partial class TurnStateManager
         }
 
         BeginInspectedConstructionHelper(construction);
-        Advance(CursorState.InspectingBuilding, "HandleConfirmFromNeutralLikeState: ally construction inspect");
+        Advance(CursorState.InspectingBuilding, "ally construction inspect");
         return ActionSfx.Confirm;
     }
 
@@ -770,7 +770,7 @@ public partial class TurnStateManager
 
     private ActionSfx HandleConfirmWhileUnitSelected()
     {
-        LogStateStep("HandleConfirmWhileUnitSelected");
+        LogStateStep();
         if (cursorController == null || selectedUnit == null)
             return ActionSfx.None;
 
@@ -1004,7 +1004,7 @@ public partial class TurnStateManager
 
     private ActionSfx HandleConfirmWhileMoveuAndando()
     {
-        LogStateStep("HandleConfirmWhileMoveuAndando");
+        LogStateStep();
         if (SensorOptionCancelFocused)
             return HandleCancelWhileMoveuAndando();
         // Cada opcao do scanner ja emite o proprio feedback: entrada em submenu toca
@@ -1015,7 +1015,7 @@ public partial class TurnStateManager
 
     private ActionSfx HandleConfirmWhileMoveuParado()
     {
-        LogStateStep("HandleConfirmWhileMoveuParado");
+        LogStateStep();
         if (SensorOptionCancelFocused)
             return HandleCancelWhileMoveuParado();
         TryInvokeFocusedSensorOption();
@@ -1024,13 +1024,13 @@ public partial class TurnStateManager
 
     private ActionSfx HandleConfirmWhileCapturando()
     {
-        LogStateStep("HandleConfirmWhileCapturando");
+        LogStateStep();
         return ActionSfx.None;
     }
 
     private ActionSfx HandleCancelWhileMoveuAndando()
     {
-        LogStateStep("HandleCancelWhileMoveuAndando", rollback: true);
+        LogStateStep(rollback: true);
         RuntimeLog(
             $"[Rollback] ESC em fluxo andado (state={CurrentCursorState}) | hasCommittedMovement={hasCommittedMovement} | " +
             $"pathCount={committedMovementPath.Count} | selected={(selectedUnit != null ? selectedUnit.name : "(none)")}");
@@ -1047,7 +1047,7 @@ public partial class TurnStateManager
         if (!hasCommittedMovement || committedMovementPath.Count < 2)
         {
             RuntimeLog("[Rollback] Sem caminho comprometido valido. Fallback para UnitSelected.");
-            Retreat("HandleCancelWhileMoveuAndando: fallback without committed path");
+            Retreat("fallback without committed path");
             ClearSensorResults();
             PaintSelectedUnitMovementRange();
             return ActionSfx.Cancel;
@@ -1058,7 +1058,7 @@ public partial class TurnStateManager
         if (!BeginRollbackToSelection())
         {
             RuntimeLog("[Rollback] Falha ao iniciar animacao de rollback. Fallback para UnitSelected.");
-            Retreat("HandleCancelWhileMoveuAndando: rollback animation failed");
+            Retreat("rollback animation failed");
             ClearCommittedMovement();
             ClearSensorResults();
             PaintSelectedUnitMovementRange();
@@ -1072,10 +1072,10 @@ public partial class TurnStateManager
 
     private ActionSfx HandleCancelWhileMoveuParado()
     {
-        LogStateStep("HandleCancelWhileMoveuParado", rollback: true);
+        LogStateStep(rollback: true);
         pendingHeldPositionCompletion = false;
         RestoreForcedLayerAfterRollbackIfNeeded();
-        Retreat("HandleCancelWhileMoveuParado");
+        Retreat();
         ClearSensorResults();
         PaintSelectedUnitMovementRange();
         return ActionSfx.Cancel;
@@ -1083,13 +1083,13 @@ public partial class TurnStateManager
 
     private ActionSfx HandleCancelWhileCapturando()
     {
-        LogStateStep("HandleCancelWhileCapturando", rollback: true);
+        LogStateStep(rollback: true);
         return ActionSfx.None;
     }
 
     private ActionSfx HandleConfirmWhileMirando()
     {
-        LogStateStep("HandleConfirmWhileMirando");
+        LogStateStep();
         if (mirandoCancelFocused || (IsMirandoConfirmStep && mirandoConfirmButtonFocus == 1))
             return HandleCancelWhileMirando();
         if (TryConfirmScannerAttack())
@@ -1100,7 +1100,7 @@ public partial class TurnStateManager
 
     private ActionSfx HandleCancelWhileMirando()
     {
-        LogStateStep("HandleCancelWhileMirando", rollback: true);
+        LogStateStep(rollback: true);
         if (HandleScannerPromptCancel())
             return ActionSfx.Cancel;
 
@@ -1110,7 +1110,7 @@ public partial class TurnStateManager
 
     private ActionSfx HandleConfirmWhilePousando()
     {
-        LogStateStep("HandleConfirmWhilePousando");
+        LogStateStep();
         if (TryConfirmScannerLanding())
             return ActionSfx.Confirm;
 
@@ -1119,7 +1119,7 @@ public partial class TurnStateManager
 
     private ActionSfx HandleCancelWhilePousando()
     {
-        LogStateStep("HandleCancelWhilePousando", rollback: true);
+        LogStateStep(rollback: true);
         if (HandleScannerPromptCancel())
             return ActionSfx.Cancel;
 
@@ -1129,7 +1129,7 @@ public partial class TurnStateManager
 
     private ActionSfx HandleConfirmWhileEmbarcando()
     {
-        LogStateStep("HandleConfirmWhileEmbarcando");
+        LogStateStep();
         if (embarkCancelFocused || (IsEmbarkConfirmStep && embarkConfirmButtonFocus == 1))
             return HandleCancelWhileEmbarcando();
         if (TryConfirmScannerEmbark())
@@ -1140,7 +1140,7 @@ public partial class TurnStateManager
 
     private ActionSfx HandleCancelWhileEmbarcando()
     {
-        LogStateStep("HandleCancelWhileEmbarcando", rollback: true);
+        LogStateStep(rollback: true);
         if (HandleScannerPromptCancel())
             return ActionSfx.Cancel;
 
@@ -1150,7 +1150,7 @@ public partial class TurnStateManager
 
     private ActionSfx HandleConfirmWhileDesembarcando()
     {
-        LogStateStep("HandleConfirmWhileDesembarcando");
+        LogStateStep();
         if (IsDisembarkPassengerSelectStep)
         {
             if (DisembarkPassengerCancelFocused)
@@ -1168,7 +1168,7 @@ public partial class TurnStateManager
 
     private ActionSfx HandleConfirmWhileShoppingAndServices()
     {
-        LogStateStep("HandleConfirmWhileShoppingAndServices");
+        LogStateStep();
         // Enter com o slot CANCELAR em foco sai da loja em vez de comprar.
         if (ShoppingCancelFocused)
             return HandleCancelWhileShoppingAndServices();
@@ -1181,7 +1181,7 @@ public partial class TurnStateManager
 
     private ActionSfx HandleCancelWhileDesembarcando()
     {
-        LogStateStep("HandleCancelWhileDesembarcando", rollback: true);
+        LogStateStep(rollback: true);
         if (HandleScannerPromptCancel())
             return ActionSfx.Cancel;
 
@@ -1191,7 +1191,7 @@ public partial class TurnStateManager
 
     private ActionSfx HandleConfirmWhileFundindo()
     {
-        LogStateStep("HandleConfirmWhileFundindo");
+        LogStateStep();
         if (IsMergeParticipantSelectStep)
         {
             if (MergeHelperCancelFocused)
@@ -1209,7 +1209,7 @@ public partial class TurnStateManager
 
     private ActionSfx HandleCancelWhileFundindo()
     {
-        LogStateStep("HandleCancelWhileFundindo", rollback: true);
+        LogStateStep(rollback: true);
         if (HandleScannerPromptCancel())
             return ActionSfx.Cancel;
 
@@ -1219,21 +1219,21 @@ public partial class TurnStateManager
 
     private ActionSfx HandleCancelWhileShoppingAndServices()
     {
-        LogStateStep("HandleCancelWhileShoppingAndServices", rollback: true);
+        LogStateStep(rollback: true);
         ExitConstructionShoppingStateToNeutral(rollback: true);
         return ActionSfx.Cancel;
     }
 
     private ActionSfx HandleCancelWhileInspecting()
     {
-        LogStateStep("HandleCancelWhileInspecting", rollback: true);
+        LogStateStep(rollback: true);
         ExitInspectStateToNeutral();
         return ActionSfx.Cancel;
     }
 
     private ActionSfx HandleConfirmWhileCommandService()
     {
-        LogStateStep("HandleConfirmWhileCommandService");
+        LogStateStep();
         if (IsCommandServiceExecutionRunning)
             return ActionSfx.None;
         // Enter sobre um cartao apenas recentraliza a camera; nao compromete a ordem.
@@ -1252,7 +1252,7 @@ public partial class TurnStateManager
 
     private ActionSfx HandleCancelWhileCommandService()
     {
-        LogStateStep("HandleCancelWhileCommandService", rollback: true);
+        LogStateStep(rollback: true);
         if (IsCommandServiceExecutionRunning)
             return ActionSfx.None;
         ExitCommandServiceStateToNeutral();
@@ -1261,7 +1261,7 @@ public partial class TurnStateManager
 
     private ActionSfx HandleConfirmWhileRemovingUnit()
     {
-        LogStateStep("HandleConfirmWhileRemovingUnit");
+        LogStateStep();
         if (removingUnitFocusIndex == RemovingUnitCancelFocusIndex)
             return HandleCancelWhileRemovingUnit();
         return TryConfirmRemovingUnit()
@@ -1271,14 +1271,14 @@ public partial class TurnStateManager
 
     private ActionSfx HandleCancelWhileRemovingUnit()
     {
-        LogStateStep("HandleCancelWhileRemovingUnit", rollback: true);
+        LogStateStep(rollback: true);
         ExitRemovingUnitStateToNeutral(logCanceled: true);
         return ActionSfx.Cancel;
     }
 
     private ActionSfx HandleConfirmWhileEndingTurn()
     {
-        LogStateStep("HandleConfirmWhileEndingTurn");
+        LogStateStep();
         return TryExecuteEndingTurnFromConfirmation(out _)
             ? ActionSfx.Confirm
             : ActionSfx.Error;
@@ -1286,7 +1286,7 @@ public partial class TurnStateManager
 
     private ActionSfx HandleCancelWhileEndingTurn()
     {
-        LogStateStep("HandleCancelWhileEndingTurn", rollback: true);
+        LogStateStep(rollback: true);
         return TryCancelEndingTurnConfirmation()
             ? ActionSfx.Cancel
             : ActionSfx.None;
@@ -1294,7 +1294,7 @@ public partial class TurnStateManager
 
     private ActionSfx HandleConfirmWhileSuprindo()
     {
-        LogStateStep("HandleConfirmWhileSuprindo");
+        LogStateStep();
         if (IsSupplyCandidateSelectStep)
         {
             if (SupplyHelperCancelFocused)
@@ -1313,7 +1313,7 @@ public partial class TurnStateManager
 
     private ActionSfx HandleCancelWhileSuprindo()
     {
-        LogStateStep("HandleCancelWhileSuprindo", rollback: true);
+        LogStateStep(rollback: true);
         if (HandleScannerPromptCancel())
             return ActionSfx.Cancel;
 
@@ -1323,13 +1323,13 @@ public partial class TurnStateManager
 
     private ActionSfx HandleConfirmWhilePlanning()
     {
-        LogStateStep("HandleConfirmWhilePlanning");
+        LogStateStep();
         return ActionSfx.None;
     }
 
     private ActionSfx HandleCancelWhilePlanning()
     {
-        LogStateStep("HandleCancelWhilePlanning", rollback: true);
+        LogStateStep(rollback: true);
         ExitPlanningStateToNeutral(rollback: true);
         return ActionSfx.Cancel;
     }
@@ -1349,7 +1349,7 @@ public partial class TurnStateManager
             return false;
         }
 
-        Advance(CursorState.EndingTurn, "TryOpenEndingTurnConfirmation");
+        Advance(CursorState.EndingTurn);
         // Confirmacao clicavel/tocavel no helper panel, mesmo tratamento de Render-se/Sair.
         PanelDialogController.ClearExternalText();
         PanelHelperController.TrySetExternalText("PASSAR A VEZ", "Encerrar seu turno agora?");
@@ -1368,7 +1368,7 @@ public partial class TurnStateManager
 
         PanelDialogController.ClearExternalText();
         PanelHelperController.ClearExternalText();
-        Retreat("TryCancelEndingTurnConfirmation");
+        Retreat();
         return true;
     }
 
@@ -1411,17 +1411,17 @@ public partial class TurnStateManager
             PanelDialogController.ClearExternalText();
             PanelHelperController.ClearExternalText();
             if (CurrentCursorState == CursorState.EndingTurn)
-                Retreat($"{reason}: missing MatchController");
+                Retreat(scope: $"{reason}: missing MatchController");
             return false;
         }
 
         if (CurrentCursorState != CursorState.EndingTurnExecuting)
-            Advance(CursorState.EndingTurnExecuting, reason);
+            Advance(CursorState.EndingTurnExecuting, scope: reason);
 
         PanelDialogController.ClearExternalText();
         PanelHelperController.ClearExternalText();
         matchController.AdvanceTurnWithTransition();
-        ExecuteAndReset($"{reason}: dispatched");
+        ExecuteAndReset(scope: $"{reason}: dispatched");
         return true;
     }
 
@@ -1437,7 +1437,7 @@ public partial class TurnStateManager
             return false;
         }
 
-        Advance(CursorState.Saving, "TryEnterSavingState");
+        Advance(CursorState.Saving);
         return true;
     }
 
@@ -1453,7 +1453,7 @@ public partial class TurnStateManager
             return false;
         }
 
-        Advance(CursorState.Loading, "TryEnterLoadingState");
+        Advance(CursorState.Loading);
         return true;
     }
 
@@ -1462,7 +1462,7 @@ public partial class TurnStateManager
         if (CurrentCursorState != CursorState.Saving && CurrentCursorState != CursorState.Loading)
             return;
 
-        Retreat("TryExitPersistencePromptState");
+        Retreat();
     }
 
     public bool TryEnterPlayerMenuState()
@@ -1470,7 +1470,7 @@ public partial class TurnStateManager
         if (CurrentCursorState != CursorState.Neutral)
             return false;
 
-        Advance(CursorState.PlayerMenu, "TryEnterPlayerMenuState");
+        Advance(CursorState.PlayerMenu);
         return true;
     }
 
@@ -1479,7 +1479,7 @@ public partial class TurnStateManager
         if (CurrentCursorState != CursorState.PlayerMenu)
             return;
 
-        Retreat("TryExitPlayerMenuStateToNeutral");
+        Retreat();
         // Saída canônica do menu do jogador para Neutral → retoma a IA pausada pelo menu (pause de
         // jogador). Idempotente: se a IA não estava em pause de jogador, é no-op.
         AIController.Instance?.SetPlayerPaused(false);
@@ -1493,7 +1493,7 @@ public partial class TurnStateManager
         if (CurrentCursorState != CursorState.Neutral)
             return false;
 
-        Advance(CursorState.Replay, "TryEnterReplayState");
+        Advance(CursorState.Replay);
         return true;
     }
 
@@ -1502,6 +1502,6 @@ public partial class TurnStateManager
         if (CurrentCursorState != CursorState.Replay)
             return;
 
-        Retreat("TryExitReplayStateToNeutral");
+        Retreat();
     }
 }

@@ -196,7 +196,7 @@ public partial class TurnStateManager
 
         cursorController?.PlayConfirmSfx();
         cursorStateBeforeFundindo = CurrentCursorState == CursorState.MoveuAndando ? CursorState.MoveuAndando : CursorState.MoveuParado;
-        Advance(CursorState.Fundindo, "EnterMergeStateFromSensors");
+        Advance(CursorState.Fundindo);
         ClearCommittedPathVisual();
         mergeQueuedUnits.Clear();
         RebuildMergeQueuePreviewTracks();
@@ -442,7 +442,7 @@ public partial class TurnStateManager
         if (CurrentCursorState != CursorState.Fundindo)
             return;
 
-        Retreat("ExitMergeStateToMovement");
+        Retreat();
         CursorState targetMovementState = CurrentCursorState;
         if (targetMovementState == CursorState.MoveuAndando && hasCommittedMovement && committedMovementPath.Count >= 2)
             DrawCommittedPathVisual(committedMovementPath);
@@ -525,7 +525,7 @@ public partial class TurnStateManager
             yield break;
         }
 
-        Advance(CursorState.FundindoExecuting, "ExecuteQueuedMergeOrdersSequence: begin");
+        Advance(CursorState.FundindoExecuting, "begin");
 
         try
         {

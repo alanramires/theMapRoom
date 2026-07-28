@@ -585,7 +585,7 @@ public partial class TurnStateManager
         string targetName = ResolveDebugUnitName(target);
         PanelDialogController.TrySetExternalText($"Destroy Unit :: {targetName} {FormatMapCellWithZ(cursorCell)} :: Confirm");
         removingUnitFocusIndex = RemovingUnitConfirmFocusIndex;
-        Advance(CursorState.RemovingUnit, "ProcessDestroyUnitHotkeyInput");
+        Advance(CursorState.RemovingUnit);
         cursorController?.PlayConfirmSfx();
         RuntimeLog("[Destroy Unit] Confirmar com Enter | Cancelar com ESC.");
     }
@@ -634,7 +634,7 @@ public partial class TurnStateManager
         string targetName = ResolveDebugUnitName(target);
         PanelDialogController.TrySetExternalText($"Destroy Unit :: {targetName} {FormatMapCellWithZ(cursorCell)} :: Confirm");
         removingUnitFocusIndex = RemovingUnitConfirmFocusIndex;
-        Advance(CursorState.RemovingUnit, "TryOpenDestroyUnitPromptFromMenu");
+        Advance(CursorState.RemovingUnit);
         message = "[Destroy Unit] Confirmar com Enter | Cancelar com ESC.";
         RuntimeLog(message);
         return true;
@@ -679,9 +679,9 @@ public partial class TurnStateManager
             return;
 
         if (CurrentCursorState != CursorState.RemovingUnit)
-            Advance(CursorState.RemovingUnit, $"{reason}: ensure RemovingUnit");
+            Advance(CursorState.RemovingUnit, scope: $"{reason}: ensure RemovingUnit");
 
-        Advance(CursorState.RemovingUnitExecuting, reason);
+        Advance(CursorState.RemovingUnitExecuting, scope: reason);
     }
 
     private bool CanDestroyUnitTargetForActiveTeam(UnitManager target, TeamId activeTeam, out string reason)
@@ -768,9 +768,9 @@ public partial class TurnStateManager
             RuntimeLog("[Destroy Unit] Cancelado.");
         PanelDialogController.ClearExternalText();
         if (logCanceled && CurrentCursorState == CursorState.RemovingUnit)
-            Retreat("ExitRemovingUnitStateToNeutral");
+            Retreat();
         else
-            ExecuteAndReset("ExitRemovingUnitStateToNeutral");
+            ExecuteAndReset();
     }
 
     private bool HandleScannerPromptCancel()
@@ -911,7 +911,7 @@ public partial class TurnStateManager
             ClearEnemyThreatLayersOverlay();
             scannerPromptStep = ScannerPromptStep.AwaitingAction;
             if (CurrentCursorState == CursorState.InspectingHotZone)
-                Retreat("HandleScannerPromptCancel: threat hot zone close");
+                Retreat("threat hot zone close");
             return true;
         }
 
@@ -945,7 +945,7 @@ public partial class TurnStateManager
                     handledThreatLayerInput = true;
                     TryCloseThreatLayerHotzone();
                     if (CurrentCursorState == CursorState.InspectingHotZone)
-                        Retreat("ProcessScannerPromptInput: hot zone closed by Z");
+                        Retreat("hot zone closed by Z");
                     return;
                 }
 
@@ -980,7 +980,7 @@ public partial class TurnStateManager
                 {
                     TryCloseThreatLayerHotzone();
                     if (CurrentCursorState != CursorState.Neutral)
-                        Retreat("ProcessScannerPromptInput: hot zone auto-dismiss by input");
+                        Retreat("hot zone auto-dismiss by input");
                 }
                 return;
             }
@@ -1590,7 +1590,7 @@ public partial class TurnStateManager
 
         cursorStateBeforePousando = CurrentCursorState == CursorState.MoveuAndando ? CursorState.MoveuAndando : CursorState.MoveuParado;
         replayManager?.UpdateCurrentBufferSensorAction(SensorActionType.Land, "LandActionRequested");
-        Advance(CursorState.Pousando, "HandleLandingSensorRequested");
+        Advance(CursorState.Pousando);
         ClearCommittedPathVisual();
         scannerSelectedLandingIndex = 0;
         if (cachedLandingOptions.Count == 1)
@@ -1630,7 +1630,7 @@ public partial class TurnStateManager
         }
 
         scannerPromptStep = ScannerPromptStep.ThreatLayerTeamSelect;
-        Advance(CursorState.InspectingHotZone, "HandleThreatLayersActionRequested");
+        Advance(CursorState.InspectingHotZone);
         cursorController?.PlayConfirmSfx();
         RuntimeLog(PanelDialogController.ResolveDialogMessage(
             "threat_layers.open",
@@ -1652,7 +1652,7 @@ public partial class TurnStateManager
                 return false;
 
             SetSelectedUnit(unitUnderCursor);
-            Advance(CursorState.UnitSelected, "TryChangeAltitudeFromDebug(auto-select)");
+            Advance(CursorState.UnitSelected, scope: "TryChangeAltitudeFromDebug(auto-select)");
             message = $"Unidade auto-selecionada no cursor {FormatMapCellWithZ(cursorCell)}.";
         }
 
@@ -1694,7 +1694,7 @@ public partial class TurnStateManager
         if (CurrentCursorState != CursorState.Pousando)
         {
             cursorStateBeforePousando = CurrentCursorState == CursorState.MoveuAndando ? CursorState.MoveuAndando : CursorState.MoveuParado;
-            Advance(CursorState.Pousando, "TryChangeAltitudeFromDebug");
+            Advance(CursorState.Pousando);
             ClearCommittedPathVisual();
         }
 
@@ -1725,7 +1725,7 @@ public partial class TurnStateManager
         replayManager?.UpdateCurrentBufferSensorAction(SensorActionType.Embark, "EmbarkActionRequested");
         // Mesma regra do Mirando: ao entrar em um submenu de sensor, oculta o preview de movimento.
         cursorStateBeforeEmbarcando = CurrentCursorState == CursorState.MoveuAndando ? CursorState.MoveuAndando : CursorState.MoveuParado;
-        Advance(CursorState.Embarcando, "HandleEmbarkActionRequested");
+        Advance(CursorState.Embarcando);
         ClearCommittedPathVisual();
         scannerPromptStep = ScannerPromptStep.EmbarkCycleTarget;
         scannerSelectedEmbarkIndex = 0;
@@ -2113,8 +2113,8 @@ public partial class TurnStateManager
             return false;
         }
 
-        ExecuteAndReset("ExecuteLandingOptionSequence: debug keep turn reset");
-        Advance(CursorState.UnitSelected, "ExecuteLandingOptionSequence: debug keep turn");
+        ExecuteAndReset(scope: "ExecuteLandingOptionSequence: debug keep turn reset");
+        Advance(CursorState.UnitSelected, scope: "ExecuteLandingOptionSequence: debug keep turn");
         scannerPromptStep = ScannerPromptStep.AwaitingAction;
         ClearSensorResults();
         PaintSelectedUnitMovementRange();
@@ -2601,7 +2601,7 @@ public partial class TurnStateManager
             }
         }
 
-        Advance(CursorState.EmbarcandoExecuting, "ExecuteEmbarkSequence: begin");
+        Advance(CursorState.EmbarcandoExecuting, "begin");
 
         try
         {
@@ -2629,7 +2629,7 @@ public partial class TurnStateManager
                         ? "[Embarque] Transportador aereo sem pouso valido."
                         : $"[Embarque] {landingDecision.reason}");
                     scannerPromptStep = ScannerPromptStep.EmbarkCycleTarget;
-                    Retreat("EmbarcandoExecuting: air landing abort");
+                    Retreat(scope: "EmbarcandoExecuting: air landing abort");
                     ExitEmbarkStateToMovement();
                     RefreshSensorsForCurrentState();
                     yield break;
@@ -2658,7 +2658,7 @@ public partial class TurnStateManager
                 {
                     RuntimeLog("[Embarque] Falha ao concluir pouso do transportador (Land/Surface).");
                     scannerPromptStep = ScannerPromptStep.EmbarkCycleTarget;
-                    Retreat("EmbarcandoExecuting: layer mode abort");
+                    Retreat(scope: "EmbarcandoExecuting: layer mode abort");
                     ExitEmbarkStateToMovement();
                     RefreshSensorsForCurrentState();
                     yield break;
@@ -2787,7 +2787,7 @@ public partial class TurnStateManager
                     passenger.SetCurrentFuel(fuelBeforeEmbark);
                 RuntimeLog($"Pode Embarcar (\"E\"): {resultMessage}");
                 scannerPromptStep = ScannerPromptStep.EmbarkCycleTarget;
-                Retreat("EmbarcandoExecuting: embark failed");
+                Retreat(scope: "EmbarcandoExecuting: embark failed");
                 ExitEmbarkStateToMovement();
                 RefreshSensorsForCurrentState();
                 yield break;
@@ -3553,7 +3553,7 @@ public partial class TurnStateManager
         CombatResolutionResult combat)
     {
         combatExecutionInProgress = true;
-        Advance(CursorState.AttackingExecuting, "ExecuteConfirmedAttackSequence: begin");
+        Advance(CursorState.AttackingExecuting, "begin");
 
         try
         {
@@ -4307,7 +4307,7 @@ public partial class TurnStateManager
         cursorStateBeforeMirando = CurrentCursorState == CursorState.MoveuAndando
             ? CursorState.MoveuAndando
             : CursorState.MoveuParado;
-        Advance(CursorState.Mirando, "EnterMirandoState");
+        Advance(CursorState.Mirando);
         if (cursorController != null)
             RecordCinematicAimAction(cursorController.CurrentCell);
         scannerPromptStep = ScannerPromptStep.MirandoCycleTarget;
@@ -4699,7 +4699,7 @@ public partial class TurnStateManager
         if (CurrentCursorState != CursorState.Pousando)
             return;
 
-        Retreat("ExitLandingStateToMovement");
+        Retreat();
         CursorState targetMovementState = CurrentCursorState;
         if (targetMovementState == CursorState.MoveuAndando && hasCommittedMovement && committedMovementPath.Count >= 2)
             DrawCommittedPathVisual(committedMovementPath);
@@ -4721,7 +4721,7 @@ public partial class TurnStateManager
         if (CurrentCursorState != CursorState.Embarcando)
             return;
 
-        Retreat("ExitEmbarkStateToMovement");
+        Retreat();
         CursorState targetMovementState = CurrentCursorState;
         if (targetMovementState == CursorState.MoveuAndando && hasCommittedMovement && committedMovementPath.Count >= 2)
             DrawCommittedPathVisual(committedMovementPath);
@@ -4743,7 +4743,7 @@ public partial class TurnStateManager
         if (CurrentCursorState != CursorState.Mirando)
             return;
 
-        Retreat("ExitMirandoStateToMovement");
+        Retreat();
         CursorState targetMovementState = CurrentCursorState;
         if (targetMovementState == CursorState.MoveuAndando && hasCommittedMovement && committedMovementPath.Count >= 2)
             DrawCommittedPathVisual(committedMovementPath);

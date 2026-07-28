@@ -293,7 +293,7 @@ public partial class TurnStateManager
 
         cursorController?.PlayConfirmSfx();
         cursorStateBeforeSuprindo = CurrentCursorState == CursorState.MoveuAndando ? CursorState.MoveuAndando : CursorState.MoveuParado;
-        Advance(CursorState.Suprindo, "EnterSupplyStateFromSensors");
+        Advance(CursorState.Suprindo);
         ClearCommittedPathVisual();
         supplyQueuedOrders.Clear();
         RebuildSupplyQueuePreviewTracks();
@@ -514,7 +514,7 @@ public partial class TurnStateManager
         if (CurrentCursorState != CursorState.Suprindo)
             return;
 
-        Retreat("ExitSupplyStateToMovement");
+        Retreat();
         CursorState targetMovementState = CurrentCursorState;
         if (targetMovementState == CursorState.MoveuAndando && hasCommittedMovement && committedMovementPath.Count >= 2)
             DrawCommittedPathVisual(committedMovementPath);
@@ -604,7 +604,7 @@ public partial class TurnStateManager
             yield break;
         }
 
-        Advance(CursorState.SuprindoExecuting, "ExecuteQueuedSupplyOrdersSequence: begin");
+        Advance(CursorState.SuprindoExecuting, "begin");
 
         try
         {
@@ -617,7 +617,7 @@ public partial class TurnStateManager
             if (!CanUseSupplyServiceLayer(supplier, terrainTilemap != null ? terrainTilemap : supplier.BoardTilemap, supplierCell, serviceDomain, serviceHeight, out string supplierLayerReason))
             {
                 Debug.Log($"[Suprimento] Supplier nao pode operar em {serviceDomain}/{serviceHeight} no hex atual ({supplierLayerReason}).");
-                Retreat("SuprindoExecuting: retry layer");
+                Retreat(scope: "SuprindoExecuting: retry layer");
                 EnterSupplyCandidateSelectStep();
                 yield break;
             }
@@ -863,7 +863,7 @@ public partial class TurnStateManager
         if (servedTargets <= 0)
         {
             Debug.Log("[Suprimento] Nenhum alvo recebeu servico (necessidade/estoque).");
-            Retreat("SuprindoExecuting: retry no targets");
+            Retreat(scope: "SuprindoExecuting: retry no targets");
             EnterSupplyCandidateSelectStep();
             yield break;
         }
