@@ -1,78 +1,145 @@
-# v4.5.5 — Refactor de Mudança de camada 5/5
+# v4.5.5 — Movement Reach Cache
 
-## Objetivo
+## Visão geral
 
-Concluir o refactor de mudança de camada organizando a caixa de ferramentas do
-Editor, alinhando nomes de arquivos, classes, menus e sensores sem alterar as
-regras de gameplay.
+Este checkpoint implementa o cache compartilhado das duas ondas de movimento
+do tabuleiro:
 
-## Operações Aéreas
+- `UnitMovementPathRules.CalcularCaminhosValidos`;
+- `UnitMovementPathRules.CalculateMovementCostMap`.
 
-- `Tools > Operações Aéreas > Pode Decolar`
-- `Tools > Operações Aéreas > Pode Pousar`
-- `Tools > Operações Aéreas > Pode Mudar de Altitude`
-- `Tools > Operações Aéreas > Pode Arremeter`
+As rotinas continuam independentes e preservam suas regras históricas. Uma
+consulta idêntica no mesmo snapshot confirmado, porém, deixa de reconstruir a
+BFS e recebe uma cópia do resultado armazenado.
 
-Cada janela monta apenas o contexto necessário, chama seu sensor autoritativo e
-apresenta o relatório retornado.
+## Movement Reach Cache
 
-## Operações Navais
+O novo `MovementReachCache` diferencia consultas por:
 
-- `Tools > Operações Navais > Pode Emergir`
-- `Tools > Operações Navais > Pode Submergir`
-- `Tools > Operações Navais > Pode Submergir Rapidamente`
+- mapa e banco de terrenos;
+- tipo da onda;
+- unidade, origem e orçamento;
+- combustível e perfil de movimento;
+- domínio, altura, modos adicionais e skills;
+- time, slot e embarque;
+- configuração de ocupação e Total War;
+- revisão confirmada da ocupação;
+- versão e fingerprint da topologia.
 
-As ferramentas navais seguem o mesmo contrato: nenhuma janela reimplementa
-terreno, estrutura, construção, skills, ocupação, exposição ou locks.
+O cache possui limite de 96 entradas e peso máximo de 120.000 referências de
+células. O descarte usa ordem de uso recente. Uma entrada individual maior que
+o teto não é armazenada.
 
-## Arquivos e classes
+## Isolamento dos resultados
 
-- `PodeDecolarWindow.cs` corresponde a `PodeDecolarWindow`.
-- `PodePousarWindow.cs` corresponde a `PodePousarWindow`.
-- `PodeMudarAltitudeWindow.cs` corresponde a `PodeMudarAltitudeWindow`.
-- `PodeArremeterWindow.cs` corresponde a `PodeArremeterWindow`.
-- `PodeEmergirWindow.cs` corresponde a `PodeEmergirWindow`.
-- `PodeSubmergirWindow.cs` corresponde a `PodeSubmergirWindow`.
-- `PodeSubmergirRapidamenteWindow.cs` corresponde a
-  `PodeSubmergirRapidamenteWindow`.
+O resultado armazenado nunca é entregue diretamente.
 
-O antigo `PodePousarSensorDebugWindow` foi convertido em `PodePousarWindow`, e a
-janela anteriormente usada para a consulta genérica passou a representar
-exclusivamente `PodeMudarAltitudeWindow`.
+- no miss, o cache grava uma cópia e o consumidor conserva o resultado original;
+- no hit, o consumidor recebe uma nova cópia;
+- alterações locais em dicionários ou listas de caminho não modificam o cache.
 
-## Preservação dos metadados Unity
+Isso preserva os consumidores existentes que ajustam a coleção recebida durante
+suas avaliações.
 
-- Arquivos existentes foram movidos junto de seus respectivos `.meta`.
-- O GUID da antiga ferramenta de pouso foi preservado em `PodePousarWindow`.
-- O GUID da antiga ferramenta genérica foi preservado em
-  `PodeMudarAltitudeWindow`.
-- As novas janelas receberam `.meta` próprios.
-- Nenhuma referência Unity foi recriada desnecessariamente.
+## Topologia e ocupação
 
-## Ferramentas finas
+Uma onda confirmada passa a consultar:
 
-- As sete janelas chamam diretamente seus respectivos sensores.
-- Não existem consultas diretas a `LayerTransitionRules`,
-  `UnitOccupancyRules`, skills ou regras de terreno dentro dessas janelas.
-- Textos e menus foram ajustados para refletir a operação realmente avaliada.
-- A ferramenta genérica `Pode Mudar de Camada` não foi mantida porque deixou de
-  oferecer uma responsabilidade útil após a separação dos sensores.
+- terreno, estruturas e segmentos do `BoardTopologyIndex`;
+- unidades do `ConfirmedOccupancyIndex`;
+- construções registradas em `ConstructionManager.AllActive`.
 
-## Gameplay e arquitetura transacional
+O caminho normal deixa de executar `FindObjectsByType` a cada nova onda.
 
-- Esta etapa altera somente ferramentas e organização do Editor.
-- Nenhuma regra de gameplay, transição runtime ou estado confirmado foi
-  modificada.
-- As janelas permanecem consultas puras e não confirmam ações.
-- O contrato de ações transacionais continua preservado.
+Quando a topologia ou a ocupação ainda não pode servir consultas, o runtime usa
+o comportamento histórico. Esse fallback cobre bootstrap, cenas auxiliares,
+load incompleto e ações provisórias.
 
-## Verificação
+## Invalidação transacional
 
-- `dotnet build Assembly-CSharp.csproj --no-restore -v:minimal -clp:ErrorsOnly`
-- `dotnet build Assembly-CSharp-Editor.csproj --no-restore -v:minimal -clp:ErrorsOnly`
-- Auditoria das sete entradas `MenuItem`.
-- Auditoria dos nomes de arquivos e classes.
-- Comparação dos GUIDs antes e depois dos movimentos.
-- `git diff --check`
-- Resultado: builds concluídos com 0 erros e diff sem erros de whitespace.
-- Implementação final do refactor: `5/5`.
+O cache só pode ser lido ou publicado quando a unidade runtime coincide com seu
+registro confirmado e o índice não possui alterações pendentes.
+
+Movimento provisório, animação, rollback e cancelamento não substituem o
+snapshot confirmado. Depois de uma ação comprometida e do retorno a
+`CursorState.Neutral`, a ocupação é reconciliada e as entradas daquele mapa são
+invalidadas.
+
+O registro confirmado também passou a conter `TeamId`. Assim, troca de time ou
+configuração de slot não pode reutilizar um caminho calculado sob uma relação
+aliado/inimigo anterior.
+
+## Telemetria
+
+Os novos contadores incluem:
+
+```text
+MovementCacheHits
+ValidPathCacheHits
+MovementCostCacheHits
+MovementCacheMisses
+MovementCacheBypasses
+MovementCacheStores
+MovementCacheEvictions
+MovementCacheOversizedSkips
+MovementCacheInvalidatedEntries
+MovementQueryConfirmedOccupancyUses
+MovementQueryLiveOccupancyFallbacks
+```
+
+`MovementWavesBuilt` passa a contar somente BFS realmente executadas.
+
+## FOW e filas de início de turno
+
+O checkpoint também registra as correções de início de turno que já estavam no
+worktree:
+
+- mortes por falta de combustível são enfileiradas antes do FOW, mas só começam
+  depois que o snapshot visual do observador correto foi publicado;
+- filas de rally seguem a mesma barreira;
+- pouso de emergência marca a visão como suja;
+- o refresh definitivo acontece uma única vez depois que a fila termina e o
+  cursor retorna a `Neutral`.
+
+Isso evita que a apresentação permaneça presa no observador anterior e mantém o
+refresh de FOW fora dos estados provisórios da fila.
+
+## Arquivos principais
+
+- `Assets/Scripts/Units/Rules/MovementReachCache.cs`;
+- `Assets/Scripts/Units/Rules/UnitMovementPathRules.cs`;
+- `Assets/Scripts/Hex/Core/ConfirmedOccupancyIndex.cs`;
+- `Assets/Scripts/Match/ThreatRevisionTracker.cs`;
+- `Assets/Scripts/Match/MatchController.cs`;
+- `Assets/Scripts/Match/TurnStateManager.cs`;
+- `docs/relatorio_v5.0.5.md`.
+
+## Validação
+
+- `Assembly-CSharp.csproj`: 0 erros;
+- `Assembly-CSharp-Editor.csproj`: 0 erros;
+- `git diff --check`: aprovado;
+- resultados armazenados permanecem isolados dos consumidores;
+- cache é recusado fora de um snapshot confirmado coerente;
+- invalidação de movimento continua ocorrendo depois do compromisso e retorno a
+  `Neutral`;
+- FOW de pouso emergencial é atualizado somente depois da fila.
+
+Os avisos de APIs obsoletas e serialização já existentes permanecem sem relação
+com este checkpoint.
+
+## Teste recomendado
+
+Em uma rodada grande, repetir consultas equivalentes deve produzir
+`MovementCacheHits` sem incremento correspondente em `MovementWavesBuilt`.
+
+Também devem ser exercitados:
+
+- cancelamento de movimento;
+- movimento comprometido;
+- trem e segmentos ferroviários;
+- aeronaves em camadas diferentes;
+- embarque e desembarque;
+- spawn e morte;
+- pouso emergencial no início do turno;
+- mudança de observador humano/IA sob FOW.

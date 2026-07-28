@@ -3098,6 +3098,8 @@ public class MatchController : MonoBehaviour
             ResetFogOfWarRuntime(clearTilemap: true);
             ShowAllUnitsIgnoringFog();
             FlushTurnStartAutonomyHelper();
+            if (applyTurnStartEffects)
+                turnStateManager?.StartPendingTurnStartQueues();
             TurnPerfLog("ApplyActiveTeam.FogDisabled", stageStartMs);
             TurnPerfLog("ApplyActiveTeam.Total", totalStartMs);
             return;
@@ -3133,6 +3135,13 @@ public class MatchController : MonoBehaviour
         stageStartMs = TurnPerfNowMs();
         FlushTurnStartAutonomyHelper();
         TurnPerfLog("ApplyActiveTeam.FlushTurnStartAutonomyHelper", stageStartMs);
+
+        // Filas de inicio de turno so arrancam AQUI, com o FoW ja publicado para o
+        // slot certo. Antes elas subiam dentro do upkeep e a guarda de Neutral
+        // rejeitava o refresh que viria em seguida.
+        if (applyTurnStartEffects)
+            turnStateManager?.StartPendingTurnStartQueues();
+
         TurnPerfLog("ApplyActiveTeam.Total", totalStartMs);
 
         // O primeiro snapshot de um slot AI nao deve ser construído na troca de
@@ -3460,9 +3469,12 @@ public class MatchController : MonoBehaviour
         pendingTurnStartAutonomyHelperEntries = turnStartAutonomyEntries;
         TryAutoAssignTurnStateManager();
         stageStartMs = TurnPerfNowMs();
-        turnStateManager?.EnqueueTurnStartFuelDepletionDeaths(turnStartUnitsMarkedForFuelDepletionDeath);
-        if (turnStartUnitsMarkedForFuelDepletionDeath.Count <= 0)
-            turnStateManager?.TryExecuteTurnStartRallyQueueIfIdle();
+        // Apenas enfileira. O arranque e de ApplyActiveTeam, DEPOIS do estagio de
+        // FoW: as filas entram em cursor state proprio e, fora de Neutral, o
+        // refresh de inicio de turno e rejeitado — a apresentacao ficaria travada
+        // no observador do turno anterior enquanto a fila roda na tela.
+        turnStateManager?.EnqueueTurnStartFuelDepletionDeaths(
+            turnStartUnitsMarkedForFuelDepletionDeath, startImmediately: false);
         TurnPerfLog("ReleaseUnits.EnqueueFuelDepletionDeaths", stageStartMs);
 
         pendingTurnStartUpkeep = false;

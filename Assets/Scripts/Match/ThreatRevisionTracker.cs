@@ -106,6 +106,7 @@ public static class ThreatRevisionTracker
         if (!Application.isPlaying)
             return;
 
+        MovementReachCache.ClearAll();
         IncrementGlobalBoard();
         for (int slot = SlotMin; slot <= SlotMax; slot++)
             IncrementSlotObserver(slot);

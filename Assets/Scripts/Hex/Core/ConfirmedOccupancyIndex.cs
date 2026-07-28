@@ -13,6 +13,7 @@ public readonly struct ConfirmedUnitOccupancyRecord :
     public readonly HeightLevel height;
     public readonly HeightBand band;
     public readonly int slotIndex;
+    public readonly TeamId team;
     public readonly bool isEmbarked;
     public readonly UnitManager embarkedTransporter;
     public readonly bool isTransporter;
@@ -25,6 +26,7 @@ public readonly struct ConfirmedUnitOccupancyRecord :
         Domain domain,
         HeightLevel height,
         int slotIndex,
+        TeamId team,
         bool isEmbarked,
         UnitManager embarkedTransporter,
         bool isTransporter,
@@ -38,6 +40,7 @@ public readonly struct ConfirmedUnitOccupancyRecord :
         this.height = height;
         band = OccupancyResolver.GetHeightBand(domain, height);
         this.slotIndex = slotIndex;
+        this.team = team;
         this.isEmbarked = isEmbarked;
         this.embarkedTransporter = embarkedTransporter;
         this.isTransporter = isTransporter;
@@ -54,6 +57,7 @@ public readonly struct ConfirmedUnitOccupancyRecord :
             && domain == other.domain
             && height == other.height
             && slotIndex == other.slotIndex
+            && team == other.team
             && isEmbarked == other.isEmbarked
             && embarkedTransporter == other.embarkedTransporter
             && isTransporter == other.isTransporter
@@ -76,6 +80,7 @@ public readonly struct ConfirmedUnitOccupancyRecord :
             hash = (hash * 397) ^ (int)domain;
             hash = (hash * 397) ^ (int)height;
             hash = (hash * 397) ^ slotIndex;
+            hash = (hash * 397) ^ (int)team;
             hash = (hash * 397) ^ (isEmbarked ? 1 : 0);
             hash = (hash * 397)
                 ^ (embarkedTransporter != null
@@ -172,6 +177,7 @@ public sealed class ConfirmedOccupancyIndex : MonoBehaviour
     private TurnStateManager turnStateManager;
     private bool initialized;
     private bool fullRebuildPending;
+    private bool confirmedContextChangePending;
     private bool subscribed;
 
     public Tilemap BoardTilemap => boardTilemap;
@@ -204,6 +210,7 @@ public sealed class ConfirmedOccupancyIndex : MonoBehaviour
 
     private void OnDisable()
     {
+        MovementReachCache.InvalidateForMap(boardTilemap);
         Unsubscribe();
         ActiveIndices.Remove(this);
     }
@@ -297,7 +304,9 @@ public sealed class ConfirmedOccupancyIndex : MonoBehaviour
                 next[unit] = record;
         }
 
-        bool changed = !initialized || !RecordsEqual(next);
+        bool changed = !initialized
+            || confirmedContextChangePending
+            || !RecordsEqual(next);
         if (changed)
         {
             records.Clear();
@@ -308,10 +317,12 @@ public sealed class ConfirmedOccupancyIndex : MonoBehaviour
             }
             RebuildLookups();
             confirmedRevision++;
+            MovementReachCache.InvalidateForMap(boardTilemap);
         }
 
         initialized = boardTilemap != null;
         fullRebuildPending = false;
+        confirmedContextChangePending = false;
         dirtyUnits.Clear();
         return changed;
     }
@@ -363,7 +374,10 @@ public sealed class ConfirmedOccupancyIndex : MonoBehaviour
         dirtyScratch.Clear();
 
         if (changed)
+        {
             confirmedRevision++;
+            MovementReachCache.InvalidateForMap(boardTilemap);
+        }
         return changed;
     }
 
@@ -445,6 +459,7 @@ public sealed class ConfirmedOccupancyIndex : MonoBehaviour
             unit.GetDomain(),
             unit.GetHeightLevel(),
             unit.SlotIndex,
+            unit.TeamId,
             unit.IsEmbarked,
             unit.EmbarkedTransporter,
             hasData && data.isTransporter,
@@ -661,6 +676,7 @@ public sealed class ConfirmedOccupancyIndex : MonoBehaviour
     private void HandleSlotConfigChanged()
     {
         fullRebuildPending = true;
+        confirmedContextChangePending = true;
     }
 
     private bool IsAtConfirmedBoundary()

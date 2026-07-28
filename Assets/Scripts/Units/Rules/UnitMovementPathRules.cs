@@ -18,12 +18,25 @@ public static class UnitMovementPathRules
         if (terrainTilemap == null || unit == null || maxSteps < 0)
             return pathsByDestination;
 
+        // A chave precisa observar a camada runtime sincronizada. O cache so
+        // aceita o snapshot quando ela ainda coincide com a ocupacao
+        // confirmada; durante previews ou rollback pendente a consulta cai no
+        // calculo normal e nao publica resultado.
+        unit.SyncLayerStateFromData(forceNativeDefault: false);
+        if (MovementReachCache.TryGetValidPaths(
+                terrainTilemap,
+                unit,
+                maxSteps,
+                terrainDatabase,
+                out Dictionary<Vector3Int, List<Vector3Int>> cachedPaths))
+        {
+            return cachedPaths;
+        }
+
         AIDecisionPerf.AddCount("MovementWavesBuilt");
         AIDecisionPerf.AddCount("MovementCacheMisses");
         AIDecisionPerf.AddCount("ValidPathWaves");
 
-        // Garante que o estado de camada usado na validacao vem da instancia em campo.
-        unit.SyncLayerStateFromData(forceNativeDefault: false);
         int maxMovementCost = Mathf.Max(0, maxSteps);
         int maxAutonomyCost = Mathf.Max(0, unit.CurrentFuel);
         bool canUseRoadBonus = CanUseRoadFullMoveBonus(unit, maxMovementCost);
@@ -165,6 +178,12 @@ public static class UnitMovementPathRules
                 $"reachableHexes={pathsByDestination.Count}");
         }
 
+        MovementReachCache.StoreValidPaths(
+            terrainTilemap,
+            unit,
+            maxSteps,
+            terrainDatabase,
+            pathsByDestination);
         return pathsByDestination;
     }
 
@@ -310,12 +329,24 @@ public static class UnitMovementPathRules
         if (terrainTilemap == null || unit == null || maxSteps < 0)
             return costByCell;
 
+        unit.SyncLayerStateFromData(forceNativeDefault: false);
+        Vector3Int origin = startCell;
+        origin.z = 0;
+        if (MovementReachCache.TryGetMovementCosts(
+                terrainTilemap,
+                unit,
+                origin,
+                maxSteps,
+                terrainDatabase,
+                out Dictionary<Vector3Int, int> cachedCosts))
+        {
+            return cachedCosts;
+        }
+
         AIDecisionPerf.AddCount("MovementWavesBuilt");
         AIDecisionPerf.AddCount("MovementCacheMisses");
         AIDecisionPerf.AddCount("MovementCostWaves");
 
-        unit.SyncLayerStateFromData(forceNativeDefault: false);
-        Vector3Int origin = startCell; origin.z = 0;
         costByCell[origin] = 0;
 
         MovementQueryCache cache = new MovementQueryCache(terrainTilemap, terrainDatabase);
@@ -358,6 +389,13 @@ public static class UnitMovementPathRules
         AIDecisionPerf.AddCount(
             "ReachableCellsProduced",
             costByCell.Count);
+        MovementReachCache.StoreMovementCosts(
+            terrainTilemap,
+            unit,
+            origin,
+            maxSteps,
+            terrainDatabase,
+            costByCell);
         return costByCell;
     }
 
@@ -960,13 +998,14 @@ public static class UnitMovementPathRules
         private static readonly IReadOnlyList<UnitManager> EmptyUnits = System.Array.Empty<UnitManager>();
         private readonly Tilemap referenceTilemap;
         private readonly TerrainDatabase terrainDatabase;
+        private readonly BoardTopologyIndex topology;
+        private readonly bool topologyTerrainCompatible;
         private readonly Tilemap[] gridTilemaps;
-        private readonly UnitManager[] units;
-        private readonly ConstructionManager[] constructions;
         private readonly RoadNetworkManager[] roadNetworks;
         private readonly Dictionary<Vector3Int, List<UnitManager>> unitsByCell = new Dictionary<Vector3Int, List<UnitManager>>();
         private readonly Dictionary<Vector3Int, ConstructionManager> constructionByCell = new Dictionary<Vector3Int, ConstructionManager>();
         private readonly Dictionary<Vector3Int, StructureData> structureByCell = new Dictionary<Vector3Int, StructureData>();
+        private readonly Dictionary<Vector3Int, List<StructureData>> routeStructuresByCell = new Dictionary<Vector3Int, List<StructureData>>();
         private readonly Dictionary<Vector3Int, TerrainTypeData> terrainByCell = new Dictionary<Vector3Int, TerrainTypeData>();
         private readonly HashSet<Vector3Int> terrainMisses = new HashSet<Vector3Int>();
         private readonly Dictionary<Vector3Int, bool> hasAnyTileByCell = new Dictionary<Vector3Int, bool>();
@@ -978,63 +1017,88 @@ public static class UnitMovementPathRules
             this.terrainDatabase = terrainDatabase;
             AIDecisionPerf.AddCount("MovementQueryCachesBuilt");
 
+            BoardTopologyIndex.TryGetFor(
+                referenceTilemap,
+                out BoardTopologyIndex resolvedTopology);
+            topology = resolvedTopology;
+            topologyTerrainCompatible =
+                topology != null
+                && terrainDatabase != null
+                && topology.TerrainDatabase == terrainDatabase;
+
             if (referenceTilemap != null && referenceTilemap.layoutGrid != null)
                 gridTilemaps = referenceTilemap.layoutGrid.GetComponentsInChildren<Tilemap>(includeInactive: true);
             else
                 gridTilemaps = System.Array.Empty<Tilemap>();
 
-            units = Object.FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-            constructions = Object.FindObjectsByType<ConstructionManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-            roadNetworks = Object.FindObjectsByType<RoadNetworkManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-
-            for (int i = 0; i < units.Length; i++)
+            bool useConfirmedIndices =
+                ConfirmedOccupancyIndex.TryGetFor(
+                    referenceTilemap,
+                    out ConfirmedOccupancyIndex occupancy)
+                && occupancy != null
+                && occupancy.CanServeLiveQueries;
+            if (useConfirmedIndices)
             {
-                UnitManager unit = units[i];
-                if (unit == null || !unit.gameObject.activeInHierarchy || unit.IsEmbarked || unit.IsDead)
-                    continue;
-                if (!IsUnitOnReferenceMap(unit, referenceTilemap))
-                    continue;
-
-                Vector3Int occupiedCell = unit.CurrentCellPosition;
-                occupiedCell.z = 0;
-                if (!unitsByCell.TryGetValue(occupiedCell, out List<UnitManager> occupants))
-                {
-                    occupants = new List<UnitManager>(1);
-                    unitsByCell[occupiedCell] = occupants;
-                }
-
-                occupants.Add(unit);
+                IReadOnlyList<UnitManager> confirmedUnits =
+                    occupancy.BoardUnits;
+                for (int i = 0; i < confirmedUnits.Count; i++)
+                    IndexUnit(confirmedUnits[i]);
+                AIDecisionPerf.AddCount(
+                    "MovementQueryConfirmedOccupancyUses");
             }
+            else
+            {
+                UnitManager[] liveUnits =
+                    Object.FindObjectsByType<UnitManager>(
+                        FindObjectsInactive.Exclude,
+                        FindObjectsSortMode.None);
+                for (int i = 0; i < liveUnits.Length; i++)
+                    IndexUnit(liveUnits[i]);
+                AIDecisionPerf.AddCount(
+                    "MovementQueryLiveOccupancyFallbacks");
+            }
+
+            IReadOnlyList<ConstructionManager> activeConstructions =
+                ConstructionManager.AllActive;
+            if (useConfirmedIndices
+                && activeConstructions != null
+                && activeConstructions.Count > 0)
+            {
+                for (int i = 0;
+                     i < activeConstructions.Count;
+                     i++)
+                {
+                    IndexConstruction(activeConstructions[i]);
+                }
+            }
+            else
+            {
+                ConstructionManager[] liveConstructions =
+                    Object.FindObjectsByType<ConstructionManager>(
+                        FindObjectsInactive.Exclude,
+                        FindObjectsSortMode.None);
+                for (int i = 0; i < liveConstructions.Length; i++)
+                    IndexConstruction(liveConstructions[i]);
+            }
+
+            roadNetworks = topology != null
+                ? System.Array.Empty<RoadNetworkManager>()
+                : Object.FindObjectsByType<RoadNetworkManager>(
+                    FindObjectsInactive.Exclude,
+                    FindObjectsSortMode.None);
+
+            if (topology != null)
+                IndexTopologyRouteStructures();
         }
 
         public ConstructionManager GetConstructionAtCell(Vector3Int cell)
         {
             cell.z = 0;
-            if (constructionByCell.TryGetValue(cell, out ConstructionManager cachedConstruction))
-                return cachedConstruction;
-
-            ConstructionManager found = null;
-            for (int i = 0; i < constructions.Length; i++)
-            {
-                ConstructionManager construction = constructions[i];
-                if (construction == null || !construction.gameObject.activeInHierarchy)
-                    continue;
-
-                Vector3Int occupiedCell = construction.BoardTilemap == referenceTilemap
-                    ? construction.CurrentCellPosition
-                    : HexCoordinates.WorldToCell(referenceTilemap, construction.transform.position);
-
-                occupiedCell.z = 0;
-                if (occupiedCell != cell)
-                    continue;
-
-                if (!construction.IsFakeBuilding)
-                    found = construction;
-                break;
-            }
-
-            constructionByCell[cell] = found;
-            return found;
+            return constructionByCell.TryGetValue(
+                    cell,
+                    out ConstructionManager construction)
+                ? construction
+                : null;
         }
 
         public StructureData GetStructureAtCell(Vector3Int cell)
@@ -1044,7 +1108,17 @@ public static class UnitMovementPathRules
                 return cachedStructure;
 
             StructureData found = null;
-            for (int i = 0; i < roadNetworks.Length; i++)
+            if (topology != null
+                && topology.TryGetStructure(
+                    cell,
+                    out StructureData indexedStructure))
+            {
+                found = indexedStructure;
+            }
+
+            for (int i = 0;
+                 found == null && i < roadNetworks.Length;
+                 i++)
             {
                 RoadNetworkManager network = roadNetworks[i];
                 if (network == null || !network.gameObject.activeInHierarchy)
@@ -1075,6 +1149,22 @@ public static class UnitMovementPathRules
         public bool HasAnyRouteStructureAtCellAllowingUnit(Vector3Int cell, UnitManager unit)
         {
             cell.z = 0;
+            if (routeStructuresByCell.TryGetValue(
+                    cell,
+                    out List<StructureData> indexedStructures))
+            {
+                for (int i = 0; i < indexedStructures.Count; i++)
+                {
+                    if (StructureQualifiesAsRailForUnit(
+                            indexedStructures[i],
+                            unit))
+                    {
+                        return true;
+                    }
+                }
+                return false;
+            }
+
             bool found = false;
             for (int i = 0; i < roadNetworks.Length; i++)
             {
@@ -1148,6 +1238,35 @@ public static class UnitMovementPathRules
             if (routeSegmentByEdge.TryGetValue(edge, out bool cached))
                 return cached;
 
+            if (topology != null)
+            {
+                bool indexedAllows = false;
+                if (topology.TryGetRouteStructures(
+                        fromCell,
+                        toCell,
+                        out IReadOnlyList<StructureData>
+                            indexedStructures))
+                {
+                    for (int i = 0;
+                         i < indexedStructures.Count;
+                         i++)
+                    {
+                        if (StructureQualifiesAsRailForUnit(
+                                indexedStructures[i],
+                                unit))
+                        {
+                            indexedAllows = true;
+                            break;
+                        }
+                    }
+                }
+
+                routeSegmentByEdge[edge] = indexedAllows;
+                routeSegmentByEdge[(toCell, fromCell)] =
+                    indexedAllows;
+                return indexedAllows;
+            }
+
             for (int i = 0; i < roadNetworks.Length; i++)
             {
                 RoadNetworkManager network = roadNetworks[i];
@@ -1215,6 +1334,15 @@ public static class UnitMovementPathRules
             if (terrainMisses.Contains(cell))
                 return null;
 
+            if (topologyTerrainCompatible
+                && topology.TryGetTerrain(
+                    cell,
+                    out TerrainTypeData indexedTerrain))
+            {
+                terrainByCell[cell] = indexedTerrain;
+                return indexedTerrain;
+            }
+
             TileBase tile = referenceTilemap.GetTile(cell);
             if (tile != null && terrainDatabase.TryGetByPaletteTile(tile, out TerrainTypeData byMainTile) && byMainTile != null)
             {
@@ -1251,6 +1379,17 @@ public static class UnitMovementPathRules
             cell.z = 0;
             if (hasAnyTileByCell.TryGetValue(cell, out bool cached))
                 return cached;
+
+            if (topology != null)
+            {
+                bool indexed = topology.TryGetCell(
+                        cell,
+                        out BoardTopologyCellRecord record)
+                    && record != null
+                    && record.hasAnyPaintedTile;
+                hasAnyTileByCell[cell] = indexed;
+                return indexed;
+            }
 
             bool hasAny = referenceTilemap.GetTile(cell) != null;
             if (!hasAny)
@@ -1347,6 +1486,91 @@ public static class UnitMovementPathRules
             }
 
             return filtered ?? EmptyUnits;
+        }
+
+        private void IndexUnit(UnitManager unit)
+        {
+            if (unit == null
+                || !unit.gameObject.activeInHierarchy
+                || unit.IsEmbarked
+                || unit.IsDead
+                || !IsUnitOnReferenceMap(
+                    unit,
+                    referenceTilemap))
+            {
+                return;
+            }
+
+            Vector3Int occupiedCell = unit.CurrentCellPosition;
+            occupiedCell.z = 0;
+            if (!unitsByCell.TryGetValue(
+                    occupiedCell,
+                    out List<UnitManager> occupants))
+            {
+                occupants = new List<UnitManager>(1);
+                unitsByCell[occupiedCell] = occupants;
+            }
+            occupants.Add(unit);
+        }
+
+        private void IndexConstruction(
+            ConstructionManager construction)
+        {
+            if (construction == null
+                || !construction.gameObject.activeInHierarchy)
+            {
+                return;
+            }
+
+            Vector3Int occupiedCell =
+                construction.BoardTilemap == referenceTilemap
+                    ? construction.CurrentCellPosition
+                    : HexCoordinates.WorldToCell(
+                        referenceTilemap,
+                        construction.transform.position);
+            occupiedCell.z = 0;
+            if (constructionByCell.ContainsKey(occupiedCell))
+                return;
+
+            // Preserva a semantica historica da primeira construcao
+            // encontrada: uma construcao fake ocupa a entrada com null.
+            constructionByCell[occupiedCell] =
+                construction.IsFakeBuilding
+                    ? null
+                    : construction;
+        }
+
+        private void IndexTopologyRouteStructures()
+        {
+            IReadOnlyList<BoardTopologyRouteEdgeRecord> edges =
+                topology.RouteEdges;
+            if (edges == null)
+                return;
+
+            for (int i = 0; i < edges.Count; i++)
+            {
+                BoardTopologyRouteEdgeRecord edge = edges[i];
+                if (edge == null || edge.structure == null)
+                    continue;
+                AddRouteStructure(edge.from, edge.structure);
+                AddRouteStructure(edge.to, edge.structure);
+            }
+        }
+
+        private void AddRouteStructure(
+            Vector3Int cell,
+            StructureData structure)
+        {
+            cell.z = 0;
+            if (!routeStructuresByCell.TryGetValue(
+                    cell,
+                    out List<StructureData> structures))
+            {
+                structures = new List<StructureData>(1);
+                routeStructuresByCell[cell] = structures;
+            }
+            if (!structures.Contains(structure))
+                structures.Add(structure);
         }
 
         private static bool IsCompatibleReference(Tilemap referenceTilemap, Tilemap networkTilemap)

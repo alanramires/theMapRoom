@@ -160,6 +160,7 @@ public partial class TurnStateManager : MonoBehaviour
     private bool captureExecutionInProgress;
     private bool removeUnitExecutionInProgress;
     private readonly List<UnitManager> turnStartFuelDepletionDeathQueue = new List<UnitManager>();
+    private bool turnStartEmergencyLandingFogDirty;
     private bool turnStartFuelDepletionExecutionInProgress;
     private bool turnStartRallyExecutionInProgress;
     private readonly List<PlayerActionSubStep> turnStartFuelDepletionReplaySubSteps = new List<PlayerActionSubStep>();
@@ -1555,7 +1556,16 @@ public partial class TurnStateManager : MonoBehaviour
         yield return ExecuteUnitDeathPresentation(target, targetCell, worldPos, applyStartDelay: false);
     }
 
-    public void EnqueueTurnStartFuelDepletionDeaths(IReadOnlyList<UnitManager> units)
+    // startImmediately=false separa "enfileirar" de "arrancar". O upkeep enfileira
+    // durante ReleaseUnitsForActiveTeam, que roda ANTES do estagio de FoW do inicio
+    // de turno; se a fila arrancasse ali, ela entraria em cursor state ainda dentro
+    // do upkeep e o refresh seguinte seria rejeitado pela guarda de Neutral,
+    // deixando a apresentacao travada no observador do turno anterior. Quem arranca
+    // e StartPendingTurnStartQueues, depois do FoW. O replay, que ja roda em
+    // contexto proprio, continua arrancando na hora.
+    public void EnqueueTurnStartFuelDepletionDeaths(
+        IReadOnlyList<UnitManager> units,
+        bool startImmediately = true)
     {
         if (!Application.isPlaying || units == null || units.Count <= 0)
             return;
@@ -1572,11 +1582,45 @@ public partial class TurnStateManager : MonoBehaviour
             turnStartFuelDepletionDeathQueue.Add(unit);
         }
 
-        if (!turnStartFuelDepletionExecutionInProgress && turnStartFuelDepletionDeathQueue.Count > 0)
+        if (startImmediately)
+            StartPendingTurnStartQueues();
+    }
+
+    /// <summary>
+    /// Arranca as filas de inicio de turno (combustivel e, na ausencia dela,
+    /// rally). Precisa ser chamado DEPOIS do estagio de FoW: as filas entram em
+    /// cursor state proprio e, fora de Neutral, tanto o refresh incremental de
+    /// inicio de turno quanto a barreira de snapshot da IA sao rejeitados.
+    /// </summary>
+    public void StartPendingTurnStartQueues()
+    {
+        if (!Application.isPlaying)
+            return;
+
+        if (!turnStartFuelDepletionExecutionInProgress
+            && turnStartFuelDepletionDeathQueue.Count > 0)
         {
             replayManager?.BeginTurnRecording();
             StartCoroutine(ExecuteTurnStartFuelDepletionDeathQueue());
+            return;
         }
+
+        TryExecuteTurnStartRallyQueueIfIdle();
+    }
+
+    // O pouso de emergencia muda a camada da unidade e, com ela, a pegada de
+    // visao. O recalculo so pode acontecer com o cursor de volta em Neutral: o
+    // invariante transacional proibe refresh do tabuleiro confirmado no meio da
+    // fila. Uma passada so, independente de quantas aeronaves pousaram.
+    private void FlushEmergencyLandingFogRefreshIfNeeded()
+    {
+        if (!turnStartEmergencyLandingFogDirty)
+            return;
+        if (CurrentCursorState != CursorState.Neutral)
+            return;
+
+        turnStartEmergencyLandingFogDirty = false;
+        matchController?.RefreshFogOfWarForActiveTeam();
     }
 
     public bool TryStartAutomatedFuelDepletionReplayQueue(PlayerAction action)
@@ -1702,6 +1746,15 @@ public partial class TurnStateManager : MonoBehaviour
         }
 
         unit.SetAircraftForcedLandingAwaitingRefuel(true);
+
+        // O pouso e definitivo e troca a camada da unidade (Air -> Land/Surface),
+        // logo troca a pegada de visao dela. O estagio de FoW do inicio de turno
+        // ja rodou ANTES desta fila (a fila entra em cursor state ainda dentro do
+        // ReleaseUnitsForActiveTeam), entao o snapshot vigente ainda credita a
+        // aeronave com a visao de voo. Marca para recalcular quando a fila drenar
+        // e o cursor voltar a Neutral — o invariante transacional proibe
+        // recalcular o tabuleiro confirmado no meio da fila.
+        turnStartEmergencyLandingFogDirty = true;
 
         Vector3Int landedCell = unit.CurrentCellPosition;
         landedCell.z = 0;
@@ -1857,6 +1910,9 @@ public partial class TurnStateManager : MonoBehaviour
         }
 
         yield return ExecuteTurnStartRallyQueueRoutine();
+        // A rotina de rally devolve o cursor a Neutral por conta propria; este e
+        // o terceiro caminho de saida da fila e tambem precisa liberar o refresh.
+        FlushEmergencyLandingFogRefreshIfNeeded();
     }
 
     private void EnterTurnStartFuelDepletionCursorState()
@@ -1873,6 +1929,7 @@ public partial class TurnStateManager : MonoBehaviour
             return;
 
         ExecuteAndReset("TurnStartFuelDepletionQueue: completed");
+        FlushEmergencyLandingFogRefreshIfNeeded();
     }
 
     private void ClearSelectionForTurnStartFuelDepletionQueue()
