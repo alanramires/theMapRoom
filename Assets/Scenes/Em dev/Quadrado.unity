@@ -13962,7 +13962,7 @@ MonoBehaviour:
   m_PreserveAspect: 0
   m_FillCenter: 1
   m_FillMethod: 0
-  m_FillAmount: 0.075
+  m_FillAmount: 0.175
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
@@ -16659,7 +16659,7 @@ MonoBehaviour:
   flagMergedWithUnit: 
   currentAmmo: 3
   maxAmmo: 3
-  currentFuel: 3
+  currentFuel: 14
   maxFuel: 70
   remainingMovementPoints: 8
   usedRoadBoostOnLastMove: 0
@@ -23632,7 +23632,7 @@ MonoBehaviour:
   flagMergedWithUnit: 
   currentAmmo: 3
   maxAmmo: 3
-  currentFuel: 6
+  currentFuel: 14
   maxFuel: 80
   remainingMovementPoints: 9
   usedRoadBoostOnLastMove: 0
@@ -27991,8 +27991,8 @@ MonoBehaviour:
   appliedActiveTeamId: 2
   pendingTurnStartUpkeep: 1
   pendingTurnStartEconomy: 1
-  cachedConstructionIncomeSignature: -1761010090
-  cachedConstructionIncomeCount: 20
+  cachedConstructionIncomeSignature: 1574066193
+  cachedConstructionIncomeCount: 21
   constructionIncomeRefreshIntervalSeconds: 0.35
   continuousEditorRefresh: 0
   enableFogSourceDebugLogs: 0
@@ -99561,6 +99561,42 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1231579683}
   m_CullTransparentMesh: 1
+--- !u!21 &1232459269
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: Runtime_UnitActedGlow
+  m_Shader: {fileID: 4800000, guid: 1601771c0533c1946bb776c9688f0186, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _MainTex:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _GlowSize: 1.5
+    - _GlowStrength: 1.25
+    m_Colors:
+    - _Color: {r: 1, g: 1, b: 1, a: 1}
+    - _GlowColor: {r: 1, g: 1, b: 1, a: 1}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1
 --- !u!1 &1233211593
 GameObject:
   m_ObjectHideFlags: 0
@@ -107130,42 +107166,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1317697445}
   m_CullTransparentMesh: 1
---- !u!21 &1318508809
-Material:
-  serializedVersion: 8
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: Runtime_UnitActedGlow
-  m_Shader: {fileID: 4800000, guid: 1601771c0533c1946bb776c9688f0186, type: 3}
-  m_Parent: {fileID: 0}
-  m_ModifiedSerializedProperties: 0
-  m_ValidKeywords: []
-  m_InvalidKeywords: []
-  m_LightmapFlags: 4
-  m_EnableInstancingVariants: 0
-  m_DoubleSidedGI: 0
-  m_CustomRenderQueue: -1
-  stringTagMap: {}
-  disabledShaderPasses: []
-  m_LockedProperties: 
-  m_SavedProperties:
-    serializedVersion: 3
-    m_TexEnvs:
-    - _MainTex:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    m_Ints: []
-    m_Floats:
-    - _GlowSize: 1.5
-    - _GlowStrength: 1.25
-    m_Colors:
-    - _Color: {r: 1, g: 1, b: 1, a: 1}
-    - _GlowColor: {r: 1, g: 1, b: 1, a: 1}
-  m_BuildTextureStacks: []
-  m_AllowLocking: 1
 --- !u!1 &1318699571
 GameObject:
   m_ObjectHideFlags: 0
@@ -107898,7 +107898,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: 3/70
+  m_text: 14/70
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 3cb5543ccd204d54c9c34b6008539c4d, type: 2}
   m_sharedMaterial: {fileID: -7834541552760396438, guid: 3cb5543ccd204d54c9c34b6008539c4d, type: 2}
@@ -115686,7 +115686,7 @@ SpriteRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 1318508809}
+  - {fileID: 1232459269}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -183872,9 +183872,9 @@ MonoBehaviour:
     representativeConstruction: {fileID: 2043564668}
     representativeCell: {x: 14, y: -15, z: 0}
     representativeLabel: Cidade
-    totalCapturePointsMax: 190
-    totalCurrentCapturePoints: 190
-    constructionCount: 8
+    totalCapturePointsMax: 210
+    totalCurrentCapturePoints: 210
+    constructionCount: 9
     isFullyControlled: 0
     isDisputed: 1
     hasPartialCapture: 0
@@ -183914,6 +183914,14 @@ MonoBehaviour:
       currentCapturePoints: 20
       capturePointsMax: 20
       source: {fileID: 1679241683}
+    - instanceId: 32
+      displayName: "Esta\xE7\xE3o de Trem"
+      cell: {x: -14, y: -15, z: 0}
+      ownerTeam: -1
+      ownerSlotIndex: -1
+      currentCapturePoints: 20
+      capturePointsMax: 20
+      source: {fileID: 2063126291}
     - instanceId: 31
       displayName: Cidade
       cell: {x: 14, y: -15, z: 0}
@@ -183953,8 +183961,8 @@ MonoBehaviour:
       RiskLevel: 2
     - SlotIndex: 0
       Team: 2
-      RiskRatio: 0.5
-      RiskLevel: 2
+      RiskRatio: 0
+      RiskLevel: 0
     - SlotIndex: 1
       Team: 1
       RiskRatio: 0.5
@@ -183975,46 +183983,46 @@ MonoBehaviour:
       Entries:
       - ConstructionName: HQ
         InstanceId: 0
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
+        Distance: 22
+        VehicleDistance: 22
         AirDistance: 22
-        NavalDistance: 37
+        NavalDistance: 36
         IsHQ: 1
       - ConstructionName: "F\xE1brica"
         InstanceId: 26
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
+        Distance: 23
+        VehicleDistance: 23
         AirDistance: 23
-        NavalDistance: 36
+        NavalDistance: 35
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 25
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
+        Distance: 21
+        VehicleDistance: 21
         AirDistance: 21
-        NavalDistance: 23
+        NavalDistance: 22
         IsHQ: 0
     - SlotIndex: 1
       Team: 1
       Entries:
-      - ConstructionName: Logistica Naval
-        InstanceId: 29
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 24
-        NavalDistance: 24
-        IsHQ: 0
       - ConstructionName: "Esta\xE7\xE3o de Trem"
         InstanceId: 27
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
         AirDistance: 39
-        NavalDistance: 43
+        NavalDistance: 3.4028235e+38
         IsHQ: 0
-    closestNeighbor1: 0
-    closestNeighbor1Distance: 3.4028235e+38
-    closestNeighbor2: 0
-    closestNeighbor2Distance: 3.4028235e+38
+      - ConstructionName: Logistica Naval
+        InstanceId: 29
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 24
+        NavalDistance: 25
+        IsHQ: 0
+    closestNeighbor1: 5
+    closestNeighbor1Distance: 18
+    closestNeighbor2: 3
+    closestNeighbor2Distance: 20
   - sector: 1
     representativeConstruction: {fileID: 549100544}
     representativeCell: {x: 2, y: 3, z: 0}
@@ -184088,19 +184096,19 @@ MonoBehaviour:
     - SlotIndex: 1
       Team: 1
       Entries:
+      - ConstructionName: "Esta\xE7\xE3o de Trem"
+        InstanceId: 27
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 41
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
       - ConstructionName: Logistica Naval
         InstanceId: 29
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
         AirDistance: 42
         NavalDistance: 45
-        IsHQ: 0
-      - ConstructionName: "Esta\xE7\xE3o de Trem"
-        InstanceId: 27
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 41
-        NavalDistance: 50
         IsHQ: 0
     closestNeighbor1: 3
     closestNeighbor1Distance: 3
@@ -184179,19 +184187,19 @@ MonoBehaviour:
     - SlotIndex: 1
       Team: 1
       Entries:
+      - ConstructionName: "Esta\xE7\xE3o de Trem"
+        InstanceId: 27
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 38
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
       - ConstructionName: Logistica Naval
         InstanceId: 29
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
         AirDistance: 39
         NavalDistance: 43
-        IsHQ: 0
-      - ConstructionName: "Esta\xE7\xE3o de Trem"
-        InstanceId: 27
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 38
-        NavalDistance: 42
         IsHQ: 0
     closestNeighbor1: 3
     closestNeighbor1Distance: 4
@@ -184270,19 +184278,19 @@ MonoBehaviour:
     - SlotIndex: 1
       Team: 1
       Entries:
+      - ConstructionName: "Esta\xE7\xE3o de Trem"
+        InstanceId: 27
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 38
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
       - ConstructionName: Logistica Naval
         InstanceId: 29
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
         AirDistance: 39
         NavalDistance: 42
-        IsHQ: 0
-      - ConstructionName: "Esta\xE7\xE3o de Trem"
-        InstanceId: 27
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 38
-        NavalDistance: 47
         IsHQ: 0
     closestNeighbor1: 1
     closestNeighbor1Distance: 3
@@ -184377,18 +184385,18 @@ MonoBehaviour:
     - SlotIndex: 1
       Team: 1
       Entries:
-      - ConstructionName: Logistica Naval
-        InstanceId: 29
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 34
-        NavalDistance: 34
-        IsHQ: 0
       - ConstructionName: "Esta\xE7\xE3o de Trem"
         InstanceId: 27
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
         AirDistance: 33
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: Logistica Naval
+        InstanceId: 29
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 34
         NavalDistance: 34
         IsHQ: 0
     closestNeighbor1: 2
@@ -184449,14 +184457,14 @@ MonoBehaviour:
         Distance: 4
         VehicleDistance: 5
         AirDistance: 4
-        NavalDistance: 22
+        NavalDistance: 28
         IsHQ: 1
       - ConstructionName: "F\xE1brica"
         InstanceId: 26
         Distance: 5
         VehicleDistance: 6
         AirDistance: 5
-        NavalDistance: 21
+        NavalDistance: 27
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 25
@@ -184468,19 +184476,19 @@ MonoBehaviour:
     - SlotIndex: 1
       Team: 1
       Entries:
-      - ConstructionName: Logistica Naval
-        InstanceId: 29
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 36
-        NavalDistance: 36
-        IsHQ: 0
       - ConstructionName: "Esta\xE7\xE3o de Trem"
         InstanceId: 27
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
         AirDistance: 35
-        NavalDistance: 38
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: Logistica Naval
+        InstanceId: 29
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 36
+        NavalDistance: 39
         IsHQ: 0
     closestNeighbor1: 3
     closestNeighbor1Distance: 3
@@ -184515,8 +184523,8 @@ MonoBehaviour:
       RiskLevel: 2
     - SlotIndex: 0
       Team: 2
-      RiskRatio: 0.5
-      RiskLevel: 2
+      RiskRatio: 0
+      RiskLevel: 0
     - SlotIndex: 1
       Team: 1
       RiskRatio: 0.5
@@ -184537,28 +184545,35 @@ MonoBehaviour:
       Entries:
       - ConstructionName: HQ
         InstanceId: 0
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
+        Distance: 14
+        VehicleDistance: 14
         AirDistance: 13
-        NavalDistance: 15
+        NavalDistance: 16
         IsHQ: 1
       - ConstructionName: "F\xE1brica"
         InstanceId: 26
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
+        Distance: 13
+        VehicleDistance: 13
         AirDistance: 12
-        NavalDistance: 14
+        NavalDistance: 15
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 25
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
+        Distance: 15
+        VehicleDistance: 15
         AirDistance: 14
         NavalDistance: 26
         IsHQ: 0
     - SlotIndex: 1
       Team: 1
       Entries:
+      - ConstructionName: "Esta\xE7\xE3o de Trem"
+        InstanceId: 27
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 29
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
       - ConstructionName: Logistica Naval
         InstanceId: 29
         Distance: 3.4028235e+38
@@ -184566,17 +184581,10 @@ MonoBehaviour:
         AirDistance: 36
         NavalDistance: 36
         IsHQ: 0
-      - ConstructionName: "Esta\xE7\xE3o de Trem"
-        InstanceId: 27
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 29
-        NavalDistance: 31
-        IsHQ: 0
-    closestNeighbor1: 0
-    closestNeighbor1Distance: 3.4028235e+38
-    closestNeighbor2: 0
-    closestNeighbor2Distance: 3.4028235e+38
+    closestNeighbor1: 4
+    closestNeighbor1Distance: 9
+    closestNeighbor2: 2
+    closestNeighbor2Distance: 12
   - sector: 7
     representativeConstruction: {fileID: 1767052282}
     representativeCell: {x: -9, y: 8, z: 0}
@@ -184650,19 +184658,19 @@ MonoBehaviour:
     - SlotIndex: 1
       Team: 1
       Entries:
+      - ConstructionName: "Esta\xE7\xE3o de Trem"
+        InstanceId: 27
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 46
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
       - ConstructionName: Logistica Naval
         InstanceId: 29
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
         AirDistance: 47
         NavalDistance: 49
-        IsHQ: 0
-      - ConstructionName: "Esta\xE7\xE3o de Trem"
-        InstanceId: 27
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 46
-        NavalDistance: 48
         IsHQ: 0
     closestNeighbor1: 2
     closestNeighbor1Distance: 11
@@ -184741,19 +184749,19 @@ MonoBehaviour:
     - SlotIndex: 1
       Team: 1
       Entries:
+      - ConstructionName: "Esta\xE7\xE3o de Trem"
+        InstanceId: 27
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 47
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
       - ConstructionName: Logistica Naval
         InstanceId: 29
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
         AirDistance: 48
         NavalDistance: 49
-        IsHQ: 0
-      - ConstructionName: "Esta\xE7\xE3o de Trem"
-        InstanceId: 27
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 47
-        NavalDistance: 54
         IsHQ: 0
     closestNeighbor1: 0
     closestNeighbor1Distance: 3.4028235e+38
@@ -184833,19 +184841,19 @@ MonoBehaviour:
     - SlotIndex: 1
       Team: 1
       Entries:
+      - ConstructionName: "Esta\xE7\xE3o de Trem"
+        InstanceId: 27
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 38
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
       - ConstructionName: Logistica Naval
         InstanceId: 29
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
         AirDistance: 39
         NavalDistance: 45
-        IsHQ: 0
-      - ConstructionName: "Esta\xE7\xE3o de Trem"
-        InstanceId: 27
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 38
-        NavalDistance: 44
         IsHQ: 0
     closestNeighbor1: 0
     closestNeighbor1Distance: 3.4028235e+38
@@ -184924,19 +184932,19 @@ MonoBehaviour:
     - SlotIndex: 1
       Team: 1
       Entries:
+      - ConstructionName: "Esta\xE7\xE3o de Trem"
+        InstanceId: 27
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 53
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
       - ConstructionName: Logistica Naval
         InstanceId: 29
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
         AirDistance: 53
         NavalDistance: 54
-        IsHQ: 0
-      - ConstructionName: "Esta\xE7\xE3o de Trem"
-        InstanceId: 27
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 53
-        NavalDistance: 60
         IsHQ: 0
     closestNeighbor1: 0
     closestNeighbor1Distance: 3.4028235e+38
@@ -189685,7 +189693,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: 6/80
+  m_text: 14/80
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 3cb5543ccd204d54c9c34b6008539c4d, type: 2}
   m_sharedMaterial: {fileID: -7834541552760396438, guid: 3cb5543ccd204d54c9c34b6008539c4d, type: 2}
@@ -196831,7 +196839,7 @@ MonoBehaviour:
   m_PreserveAspect: 0
   m_FillCenter: 1
   m_FillMethod: 0
-  m_FillAmount: 0.042857144
+  m_FillAmount: 0.2
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
@@ -205742,7 +205750,7 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 1348457725607290348, guid: f7e44d7c210a32d4ba630ba660da88a1, type: 3}
       propertyPath: m_text
-      value: 0 / turn
+      value: 10500 / turn
       objectReference: {fileID: 0}
     - target: {fileID: 4985144350662451516, guid: f7e44d7c210a32d4ba630ba660da88a1, type: 3}
       propertyPath: m_Enabled
