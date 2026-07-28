@@ -831,57 +831,27 @@ public partial class AIController
         HashSet<Vector3Int> alliedAirLow,
         HashSet<Vector3Int> alliedAirHigh)
     {
-        var airLow = new HashSet<Vector3Int>();
-        var airHigh = new HashSet<Vector3Int>();
-        CollectAirSurveillanceCoverageAt(
+        DPQAirHeightConfig airConfig = turnStateManager != null
+            ? turnStateManager.DpqAirHeightConfigRef
+            : null;
+        bool enableLos = matchController == null
+            || matchController.EnableLosValidation;
+        AirSurveillanceCoverageService.Result result =
+            AirSurveillanceCoverageService.Evaluate(
             radar,
             observerCell,
-            airLow,
-            airHigh);
-
-        int marginalLow = 0;
-        foreach (Vector3Int cell in airLow)
-        {
-            if (alliedAirLow == null
-                || !alliedAirLow.Contains(cell))
-            {
-                marginalLow++;
-            }
-        }
-
-        int marginalHigh = 0;
-        foreach (Vector3Int cell in airHigh)
-        {
-            if (alliedAirHigh == null
-                || !alliedAirHigh.Contains(cell))
-            {
-                marginalHigh++;
-            }
-        }
-
-        radar.TryGetUnitData(out UnitData data);
-        bool detectsLowStealth = data != null
-            && data.CanDetectStealthFor(
-                Domain.Air,
-                HeightLevel.AirLow);
-        bool detectsHighStealth = data != null
-            && data.CanDetectStealthFor(
-                Domain.Air,
-                HeightLevel.AirHigh);
-
-        float score =
-            airLow.Count * 8f
-            + airHigh.Count * 10f
-            + marginalLow * 6f
-            + marginalHigh * 7f
-            + (detectsLowStealth ? airLow.Count * 2f : 0f)
-            + (detectsHighStealth ? airHigh.Count * 2f : 0f);
+            boardTilemap,
+            terrainDatabase,
+            airConfig,
+            enableLos,
+            alliedAirLow,
+            alliedAirHigh);
         return new MobileRadarCoverageSample(
-            airLow.Count,
-            airHigh.Count,
-            marginalLow,
-            marginalHigh,
-            score);
+            result.AirLow,
+            result.AirHigh,
+            result.MarginalAirLow,
+            result.MarginalAirHigh,
+            result.Score);
     }
 
     private void CollectAlliedAirSurveillanceCoverage(
@@ -927,24 +897,15 @@ public partial class AIController
         bool enableLos = matchController == null
             || matchController.EnableLosValidation;
 
-        PodeDetectarSensor.CollectVisibleAirCellsAt(
+        AirSurveillanceCoverageService.AppendStructuralCoverage(
             observer,
             observerCell,
             boardTilemap,
             terrainDatabase,
+            airConfig,
+            enableLos,
             airLow,
-            HeightLevel.AirLow,
-            airConfig,
-            enableLos);
-        PodeDetectarSensor.CollectVisibleAirCellsAt(
-            observer,
-            observerCell,
-            boardTilemap,
-            terrainDatabase,
-            airHigh,
-            HeightLevel.AirHigh,
-            airConfig,
-            enableLos);
+            airHigh);
     }
 
     private bool IsAirSurveillanceCellAllowedByRearLine(

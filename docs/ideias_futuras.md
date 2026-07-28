@@ -67,3 +67,33 @@ Estoque da construção sobrevive à captura (ofertas são da construção, não
 ### 8. Calibrar o "pin" de submarino (se necessário)
 
 Navio parado sobre submarino com emersão pendente o mantém revelado, sem atacar, indefinidamente. Se playtests mostrarem que o pin é forte demais, calibrar o **custo de ficar revelado** — a mecânica de lock pendente em si não muda.
+
+---
+
+## IA / Transporte
+
+### 9. "Quero Carona" orientado por intenção (e aposentadoria do Quero Carona Aérea)
+
+Hoje o `QueroCaronaService` responde uma pergunta booleana: *esta unidade quer carona?* Com o refactor de Vigilância Aérea introduzindo escolha de parâmetros, ele passa a ser o **ponto central de demanda por transporte** — e aí a resposta precisa carregar *para quê*.
+
+**Intenções previstas** (checklist do desenho original):
+
+- [ ] `CapturePressure` — capturar / pressionar setores. **Default**, é o comportamento atual.
+- [ ] `AirSurveillance` — levar Radar/EWACS a setores com ganho de cobertura.
+- [ ] `LogisticsSupport` — alcançar setores ou aliados com estoque crítico.
+- [ ] `LandingSupport` — procurar unidade com suporte de pouso compatível (porta-aviões, fragata para helicóptero).
+
+A quarta intenção é o que **aposenta o `QueroCaronaAereaService`**: "quero embarque aéreo" deixa de ser um serviço paralelo e vira um valor de intenção. Emergência de combustível é a mesma intenção com prioridade máxima — não um caminho próprio.
+
+**A solicitação passa a carregar**: unidade solicitante, intenção, setor/alvo desejado, urgência, tipo de suporte ou carga exigido, ganho esperado, e uma razão legível para ferramentas e logs.
+
+**Inversão de responsabilidade**: hoje o transportador decide sozinho o que fazer com quem quer carona. Depois, ele **lê a intenção** do pedido e decide apenas *como materializá-la* — sem atropelar as fontes oficiais:
+
+- `PodeEmbarcarSensor` valida compatibilidade (slot, camada, classe, skills, exclusividade, vaga);
+- `MelhorEmbarqueService` encontra o ponto de encontro;
+- `MelhorDesembarqueService` materializa o destino;
+- reservas impedem dois transportadores de atenderem o mesmo pedido.
+
+Para `LandingSupport`, plataformas com convés (porta-aviões, fragatas) entram como transportadores especiais — o que casa com a regra de pouso em plataforma que o `PodePousarSensor.CanLandOnTransporter` já aplica e que o `MelhorPousoService` já enxerga como LZ.
+
+**Sequenciamento**: fica **para depois** do refactor de Vigilância Aérea. A Parte 4 daquele trabalho já abre a porta ao usar alvo explícito; ampliar agora misturaria duas mudanças grandes. Entra como etapa própria logo em seguida.

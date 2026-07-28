@@ -584,6 +584,17 @@ public class UnitData : ScriptableObject
         return HasAnySkillMatch(entry.detectUnitsWithFollowingSkills, targetStealthSkills);
     }
 
+    public bool HasStealthDetectionFor(Domain targetDomain, HeightLevel targetHeightLevel)
+    {
+        return TryGetVisionException(
+                targetDomain,
+                targetHeightLevel,
+                out UnitVisionException entry)
+            && entry != null
+            && entry.detectUnitsWithFollowingSkills != null
+            && entry.detectUnitsWithFollowingSkills.Count > 0;
+    }
+
     public LosPolicy ResolveLosPolicyFor(Domain targetDomain, HeightLevel targetHeightLevel)
     {
         if (TryGetVisionException(targetDomain, targetHeightLevel, out UnitVisionException entry) && entry != null)
