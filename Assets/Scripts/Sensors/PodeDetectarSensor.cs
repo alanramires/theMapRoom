@@ -427,7 +427,9 @@ public static class PodeDetectarSensor
         if (visibleCellsOutput == null)
             return;
 
-        if (observer == null || observer.IsEmbarked)
+        if (observer == null
+            || (observer.IsEmbarked
+                && !virtualObserverCell.HasValue))
             return;
 
 

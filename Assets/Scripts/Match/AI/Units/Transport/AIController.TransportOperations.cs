@@ -719,14 +719,40 @@ public partial class AIController
         if (planning == null || passenger == null)
             return new MelhorEmbarqueResult();
 
+        bool rideNeedChanged =
+            !planning.RideNeedByPassenger.TryGetValue(
+                passenger.InstanceId,
+                out QueroCaronaResult previousRideNeed)
+            || !ReferenceEquals(previousRideNeed, rideNeed);
+        planning.RideNeedByPassenger[passenger.InstanceId] =
+            rideNeed;
+        if (rideNeedChanged)
+        {
+            planning.PassengerPickupProjections.Remove(
+                passenger.InstanceId);
+        }
+
         // Se o transportador já produziu o panorama completo, Assault apenas
         // filtra esse resultado. Caso contrário, cria uma projeção estreita
         // para o passageiro, mas reutiliza o mesmo alcance do transportador.
         if (planning.PickupEvaluated && planning.Pickup != null)
         {
-            AIDecisionPerf.AddCount(
-                "TransportPlanningPassengerProjectionHits");
-            return planning.Pickup;
+            bool containsPassenger =
+                planning.Pickup.options != null
+                && planning.Pickup.options.Exists(option =>
+                    option?.passenger == passenger
+                    && (option.rideDisposition
+                            == MelhorEmbarqueRideDisposition.Requested
+                        || option.rideDisposition
+                            == MelhorEmbarqueRideDisposition.Emergency));
+            if (containsPassenger)
+            {
+                AIDecisionPerf.AddCount(
+                    "TransportPlanningPassengerProjectionHits");
+                return planning.Pickup;
+            }
+
+            planning.PickupEvaluated = false;
         }
 
         if (planning.PassengerPickupProjections.TryGetValue(
@@ -738,8 +764,6 @@ public partial class AIController
             return cached;
         }
 
-        planning.RideNeedByPassenger[passenger.InstanceId] =
-            rideNeed;
         MelhorEmbarqueResult evaluated =
             MelhorEmbarqueService.Evaluate(
                 new MelhorEmbarqueRequest

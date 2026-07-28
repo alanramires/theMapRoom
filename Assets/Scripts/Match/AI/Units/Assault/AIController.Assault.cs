@@ -6,7 +6,8 @@ public partial class AIController
     private enum CombatPassengerTransportPolicy
     {
         Assault,
-        FireSupport
+        FireSupport,
+        AirSurveillance
     }
 
     private enum FireSupportTransportOutcome
@@ -30,10 +31,15 @@ public partial class AIController
         AIWorldSnapshot snapshot,
         TeamObjectivePlan plan,
         CombatPassengerTransportPolicy policy,
-        SectorObjective assigned)
+        SectorObjective assigned,
+        QueroCaronaResult evaluatedRideNeed = null)
     {
         QueroCaronaResult rideNeed =
-            EvaluateCombatPassengerRideNeed(unit, policy, assigned);
+            evaluatedRideNeed
+            ?? EvaluateCombatPassengerRideNeed(
+                unit,
+                policy,
+                assigned);
         if (rideNeed == null || !rideNeed.wantsRide)
             return null;
 
@@ -70,10 +76,19 @@ public partial class AIController
             if (legal != null)
             {
                 ClaimCombatPassengerTransportDecision(decision);
-                string roleLabel =
-                    policy == CombatPassengerTransportPolicy.FireSupport
-                        ? TL("FireSupport")
-                        : TL("Assalto");
+                string roleLabel;
+                switch (policy)
+                {
+                    case CombatPassengerTransportPolicy.FireSupport:
+                        roleLabel = TL("FireSupport");
+                        break;
+                    case CombatPassengerTransportPolicy.AirSurveillance:
+                        roleLabel = TL("VigilanciaAerea");
+                        break;
+                    default:
+                        roleLabel = TL("Assalto");
+                        break;
+                }
                 Debug.Log(
                     $"{roleLabel} {unit.InstanceId} embarca policy={policy} → " +
                     $"{decision.transporter.InstanceId} slot " +

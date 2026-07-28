@@ -72,6 +72,35 @@ public partial class AIController
         if (assignedSectorTarget != Vector3Int.zero) assignedSectorTarget.z = 0;
         fallbackCell.z = 0;
 
+        if (IsStationaryMobileAirSurveillanceRadar(passenger))
+        {
+            if (TryResolveMobileRadarTransportTarget(
+                    passenger,
+                    snapshot,
+                    plan,
+                    fallbackCell,
+                    requireCoverageGain: false,
+                    out Vector3Int surveillanceTarget,
+                    out float surveillanceGain,
+                    out string surveillanceReason))
+            {
+                Debug.Log(
+                    $"{TL("Transporte")} PassengerTarget " +
+                    $"Radar#{passenger.InstanceId} -> " +
+                    $"{surveillanceTarget} gain={surveillanceGain:F0} " +
+                    $"({surveillanceReason})");
+                resolvedTarget = surveillanceTarget;
+                return true;
+            }
+
+            resolvedTarget = fallbackCell;
+            Debug.Log(
+                $"{TL("Transporte")} PassengerTarget " +
+                $"Radar#{passenger.InstanceId} sem zona segura; " +
+                $"aguarda em {fallbackCell}");
+            return true;
+        }
+
         // Facção sem QG: o passageiro nao tem slot de plano, entao o fluxo normal cairia no
         // funil rogue-para-o-QG-inimigo. O rebelde a pe ja captura por PROXIMIDADE (ver
         // AIController.Rebel); o mesmo criterio vale quando ele e carga, senao APC/Chinook/

@@ -24,6 +24,9 @@ public sealed class QueroCaronaRequest
     public TerrainDatabase terrainDatabase;
     public QueroCaronaContext context;
     public ConstructionSector plannedSector;
+    public bool useExplicitTarget;
+    public Vector3Int explicitTarget;
+    public string explicitTargetLabel;
     public int operationalTurns = 2;
     public bool emulateUnderRepairFromUnitData;
     public IReadOnlyDictionary<Vector3Int, int> operationalReach;
@@ -82,6 +85,8 @@ public static class QueroCaronaService
         public readonly int slotIndex;
         public readonly QueroCaronaContext context;
         public readonly ConstructionSector plannedSector;
+        public readonly bool useExplicitTarget;
+        public readonly Vector3Int explicitTarget;
         public readonly int operationalTurns;
         public readonly bool emulateRepair;
         public readonly int occupancyRevision;
@@ -120,6 +125,11 @@ public static class QueroCaronaService
             slotIndex = unit.SlotIndex;
             context = request.context;
             plannedSector = request.plannedSector;
+            useExplicitTarget = request.useExplicitTarget;
+            Vector3Int normalizedExplicitTarget =
+                request.explicitTarget;
+            normalizedExplicitTarget.z = 0;
+            explicitTarget = normalizedExplicitTarget;
             operationalTurns = Mathf.Max(
                 1, request.operationalTurns);
             emulateRepair =
@@ -155,6 +165,8 @@ public static class QueroCaronaService
                 && slotIndex == other.slotIndex
                 && context == other.context
                 && plannedSector == other.plannedSector
+                && useExplicitTarget == other.useExplicitTarget
+                && explicitTarget == other.explicitTarget
                 && operationalTurns == other.operationalTurns
                 && emulateRepair == other.emulateRepair
                 && occupancyRevision == other.occupancyRevision
@@ -196,6 +208,10 @@ public static class QueroCaronaService
                 hash = (hash * 397) ^ slotIndex;
                 hash = (hash * 397) ^ (int)context;
                 hash = (hash * 397) ^ (int)plannedSector;
+                hash = (hash * 397)
+                    ^ (useExplicitTarget ? 1 : 0);
+                hash = (hash * 397)
+                    ^ explicitTarget.GetHashCode();
                 hash = (hash * 397) ^ operationalTurns;
                 hash = (hash * 397) ^ (emulateRepair ? 1 : 0);
                 hash = (hash * 397) ^ occupancyRevision;
@@ -323,6 +339,43 @@ public static class QueroCaronaService
         if (canReuseOperationalReach)
             AIDecisionPerf.AddCount(
                 "QueroCaronaOperationalReachReuses");
+
+        if (request.useExplicitTarget)
+        {
+            Vector3Int explicitTarget = request.explicitTarget;
+            explicitTarget.z = 0;
+            string targetLabel =
+                string.IsNullOrWhiteSpace(
+                    request.explicitTargetLabel)
+                    ? $"alvo explicito {explicitTarget}"
+                    : request.explicitTargetLabel;
+
+            result.evaluatedTarget = explicitTarget;
+            if (reach.TryGetValue(
+                    explicitTarget,
+                    out int explicitCost))
+            {
+                result.routeCost = explicitCost;
+                SetReachAndDecision(
+                    result,
+                    explicitCost,
+                    targetLabel);
+            }
+            else
+            {
+                result.wantsRide = true;
+                result.reach =
+                    QueroCaronaReach.BeyondOperational;
+                result.rideNeedScore = 1000;
+                result.reason =
+                    $"{ResolveUnitKind(result)} nao alcanca " +
+                    $"{targetLabel} em Tactical ou Operational: " +
+                    "aceita carona.";
+            }
+
+            request.diagnosticLog?.Invoke(result.reason);
+            return Finish();
+        }
 
         if (request.context == QueroCaronaContext.ComPlano)
         {

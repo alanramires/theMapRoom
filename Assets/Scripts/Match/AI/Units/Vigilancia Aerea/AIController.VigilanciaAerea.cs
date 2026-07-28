@@ -21,6 +21,24 @@ public partial class AIController
         Vector3Int fromCell = unit.CurrentCellPosition;
         fromCell.z = 0;
 
+        if (IsStationaryMobileAirSurveillanceRadar(unit))
+        {
+            PlayerAction transportAction =
+                TryDecideMobileRadarTransportAction(
+                    unit,
+                    snapshot,
+                    plan,
+                    fromCell);
+            if (transportAction != null)
+            {
+                LogAirSurveillancePolicyStage(
+                    unit,
+                    AirSurveillancePolicyStage.TransportOrPlatform,
+                    "radar solicita transporte terrestre");
+                return transportAction;
+            }
+        }
+
         Dictionary<Vector3Int, List<Vector3Int>> paths = BuildFireSupportPaths(unit);
         HashSet<Vector3Int> occupied = BuildOccupied(unit);
 
@@ -301,6 +319,282 @@ public partial class AIController
 
         return data.domain == Domain.Land
             && data.longRangeStationary;
+    }
+
+    private PlayerAction TryDecideMobileRadarTransportAction(
+        UnitManager radar,
+        AIWorldSnapshot snapshot,
+        TeamObjectivePlan plan,
+        Vector3Int fromCell)
+    {
+        if (!HasCompatibleMobileRadarTransport(radar))
+            return null;
+
+        if (!TryResolveMobileRadarTransportTarget(
+                radar,
+                snapshot,
+                plan,
+                fromCell,
+                requireCoverageGain: true,
+                out Vector3Int target,
+                out float coverageGain,
+                out string targetReason))
+        {
+            return null;
+        }
+
+        QueroCaronaResult rideNeed =
+            QueroCaronaService.Evaluate(
+                new QueroCaronaRequest
+                {
+                    unit = radar,
+                    map = boardTilemap,
+                    terrainDatabase = terrainDatabase,
+                    context =
+                        QueroCaronaContext.RogueOuRebelde,
+                    useExplicitTarget = true,
+                    explicitTarget = target,
+                    explicitTargetLabel =
+                        $"zona de vigilancia {target}",
+                    operationalTurns = 2,
+                    emulateUnderRepairFromUnitData = false,
+                    diagnosticLog = showAILogs
+                        ? message => Debug.Log(
+                            $"{TL("VigilanciaAerea")} " +
+                            $"Radar#{radar.InstanceId} " +
+                            $"QueroCarona: {message}")
+                        : null
+                });
+
+        Debug.Log(
+            $"{TL("VigilanciaAerea")} Radar#{radar.InstanceId} " +
+            $"transporte target={target} gain={coverageGain:F0} " +
+            $"QueroCarona={(rideNeed.wantsRide ? "SIM" : "NAO")} " +
+            $"reach={rideNeed.reach} ({targetReason}; " +
+            $"{rideNeed.reason})");
+        if (!rideNeed.wantsRide)
+            return null;
+
+        return TryDecideCombatPassengerTransportAction(
+            radar,
+            snapshot,
+            plan,
+            CombatPassengerTransportPolicy.AirSurveillance,
+            assigned: null,
+            evaluatedRideNeed: rideNeed);
+    }
+
+    private static bool HasCompatibleMobileRadarTransport(
+        UnitManager radar)
+    {
+        if (radar == null)
+            return false;
+
+        foreach (UnitManager transporter in UnitManager.AllActive)
+        {
+            if (transporter == null
+                || transporter == radar
+                || transporter.IsDead
+                || transporter.IsEmbarked
+                || transporter.IsUnderRepair
+                || !PlayerSlotRelations.AreAllies(
+                    radar,
+                    transporter)
+                || !transporter.TryGetUnitData(
+                    out UnitData transporterData)
+                || transporterData == null
+                || !transporterData.isTransporter)
+            {
+                continue;
+            }
+
+            if (MelhorEmbarqueService
+                .TryResolveCompatiblePassengerSlot(
+                    transporter,
+                    radar,
+                    out _,
+                    out _))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private bool TryResolveMobileRadarTransportTarget(
+        UnitManager radar,
+        AIWorldSnapshot snapshot,
+        TeamObjectivePlan plan,
+        Vector3Int origin,
+        bool requireCoverageGain,
+        out Vector3Int target,
+        out float gain,
+        out string reason)
+    {
+        target = origin;
+        target.z = 0;
+        gain = 0f;
+        reason = "sem ancora de vigilancia";
+        if (!IsStationaryMobileAirSurveillanceRadar(radar)
+            || snapshot == null
+            || !TryResolveAirSurveillanceAnchor(
+                radar,
+                snapshot,
+                plan,
+                target,
+                out Vector3Int anchor,
+                out bool offensiveAnchor,
+                out string anchorReason))
+        {
+            return false;
+        }
+
+        BoardTopologyIndex topology =
+            BoardTopologyIndex.GetOrCreateRuntime(
+                boardTilemap,
+                terrainDatabase);
+        if (topology == null || !topology.IsReady)
+        {
+            reason = "BoardTopology indisponivel";
+            return false;
+        }
+
+        var alliedAirLow = new HashSet<Vector3Int>();
+        var alliedAirHigh = new HashSet<Vector3Int>();
+        CollectAlliedAirSurveillanceCoverage(
+            radar,
+            snapshot,
+            alliedAirLow,
+            alliedAirHigh);
+
+        MobileRadarCoverageSample originCoverage =
+            EvaluateMobileRadarCoverage(
+                radar,
+                target,
+                alliedAirLow,
+                alliedAirHigh);
+        float originScore =
+            ScoreMobileRadarTransportTarget(
+                radar,
+                snapshot,
+                target,
+                anchor,
+                originCoverage);
+        float bestScore = float.MinValue;
+        MobileRadarCoverageSample bestCoverage = default;
+
+        var frontier =
+            new Queue<(Vector3Int cell, int depth)>();
+        var visited = new HashSet<Vector3Int>();
+        anchor.z = 0;
+        frontier.Enqueue((anchor, 0));
+        visited.Add(anchor);
+
+        const int targetRadius = 4;
+        while (frontier.Count > 0)
+        {
+            (Vector3Int cell, int depth) = frontier.Dequeue();
+            cell.z = 0;
+            if (UnitMovementPathRules.TryGetEnterCellCost(
+                    boardTilemap,
+                    radar,
+                    cell,
+                    terrainDatabase,
+                    out _)
+                && !IsCellACapturerTarget(
+                    cell,
+                    plan,
+                    snapshot.AITeam)
+                && IsAirSurveillanceCellAllowedByRearLine(
+                    radar,
+                    snapshot,
+                    origin,
+                    cell,
+                    anchor,
+                    offensiveAnchor)
+                && (!TryScoreBacklineCell(
+                        radar,
+                        snapshot,
+                        cell,
+                        anchor,
+                        out AIBacklineScore rear)
+                    || !rear.IsVanguard))
+            {
+                MobileRadarCoverageSample coverage =
+                    EvaluateMobileRadarCoverage(
+                        radar,
+                        cell,
+                        alliedAirLow,
+                        alliedAirHigh);
+                float score =
+                    ScoreMobileRadarTransportTarget(
+                        radar,
+                        snapshot,
+                        cell,
+                        anchor,
+                        coverage);
+                if (score > bestScore)
+                {
+                    bestScore = score;
+                    target = cell;
+                    bestCoverage = coverage;
+                }
+            }
+
+            if (depth >= targetRadius)
+                continue;
+            IReadOnlyList<Vector3Int> neighbors =
+                topology.GetNeighbors(cell);
+            for (int i = 0; i < neighbors.Count; i++)
+            {
+                Vector3Int neighbor = neighbors[i];
+                neighbor.z = 0;
+                if (visited.Add(neighbor))
+                    frontier.Enqueue((neighbor, depth + 1));
+            }
+        }
+
+        if (bestScore == float.MinValue)
+        {
+            reason =
+                $"ancora {anchorReason} sem celula terrestre compativel";
+            return false;
+        }
+
+        gain = bestScore - originScore;
+        float requiredGain =
+            Mathf.Max(180f, originCoverage.Score * 0.12f);
+        reason =
+            $"anchor={anchor} {anchorReason} " +
+            $"{originCoverage}->{bestCoverage} " +
+            $"gain={gain:F0} required={requiredGain:F0}";
+        return !requireCoverageGain || gain >= requiredGain;
+    }
+
+    private float ScoreMobileRadarTransportTarget(
+        UnitManager radar,
+        AIWorldSnapshot snapshot,
+        Vector3Int cell,
+        Vector3Int anchor,
+        MobileRadarCoverageSample coverage)
+    {
+        float anchorDistance =
+            SectorManager.HexDistance(cell, anchor);
+        float missionDirection =
+            Mathf.Max(0f, 600f - anchorDistance * 30f);
+        float threat =
+            CalculateThreatLevel(cell, snapshot.AITeam);
+        float cohesion =
+            CalculateFireSupportCohesionScore(
+                radar,
+                snapshot,
+                cell);
+        return coverage.Score
+            + missionDirection
+            + cohesion * 0.25f
+            + GetTerrainDpqPontos(cell) * 25f
+            - threat * 220f;
     }
 
     private bool TryFindStationaryMobileRadarCell(
