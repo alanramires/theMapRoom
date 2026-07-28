@@ -18,7 +18,9 @@ public enum UnitRole
     // UnitRole e serializado nos UnitData.
     Transportador = 3,
     Logistica = 4,
-    Intel = 6,
+    // Vigilância do espaço aéreo (Radar Móvel/EWACS). Valor 6 preservado
+    // porque UnitRole é serializado numericamente nos UnitData e saves.
+    VigilanciaAerea = 6,
     // Antes chamado Suprimentos: o papel e movimentar carga, nao prestar servico de
     // suprimento (quem supre e Logistica). Valor 7 preservado — esta serializado nos UnitData.
     Estoque = 7,

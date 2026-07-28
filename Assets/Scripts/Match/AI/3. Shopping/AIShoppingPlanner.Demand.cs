@@ -200,29 +200,39 @@ public partial class AIShoppingPlanner
         return demand;
     }
 
-    private static void ComputeIntelDemand(
+    private static void ComputeAirSurveillanceDemand(
         AIWorldSnapshot snapshot,
         AIIntelReport intel,
-        out int openAirIntelSlots,
-        out int openMobileAirIntelSlots)
+        out int openAirSurveillanceSlots,
+        out int openMobileAirSurveillanceSlots)
     {
-        openAirIntelSlots = 0;
-        openMobileAirIntelSlots = 0;
+        openAirSurveillanceSlots = 0;
+        openMobileAirSurveillanceSlots = 0;
         if (snapshot == null)
             return;
 
-        int minTurn = Instance != null ? Instance.MinTurnForIntel : 4;
+        int minTurn = Instance != null
+            ? Instance.MinTurnForAirSurveillance
+            : 4;
         bool tooEarly = snapshot.TurnNumber > 0 && snapshot.TurnNumber < minTurn;
         int visibleAir = CountTotalVisibleEnemyAircraft(snapshot);
         float inferredAir = intel != null ? intel.enemyAirThreatScore : 0f;
         float airThreshold = Instance != null ? Instance.IntelAirThreatAntiAirThreshold : 2f;
 
-        int activeAirIntel = CountActiveDedicatedIntel(snapshot, Domain.Air);
-        int activeMobileAirIntel = CountActiveDedicatedIntel(snapshot, Domain.Land);
+        int activeAirSurveillance =
+            CountActiveDedicatedAirSurveillance(snapshot, Domain.Air);
+        int activeMobileAirSurveillance =
+            CountActiveDedicatedAirSurveillance(snapshot, Domain.Land);
         int activeAirCombat = CountActiveAirCombatUnits(snapshot);
         bool enemyAirProduction = HasEnemyAirportProductionCapacity(snapshot);
-        bool ownAirIntelProduction = HasDedicatedIntelProduction(snapshot, Domain.Air);
-        int cheapestAirIntel = ownAirIntelProduction ? FindCheapestDedicatedIntelCost(snapshot, Domain.Air) : 0;
+        bool ownAirSurveillanceProduction =
+            HasDedicatedAirSurveillanceProduction(
+                snapshot, Domain.Air);
+        int cheapestAirSurveillance =
+            ownAirSurveillanceProduction
+                ? FindCheapestDedicatedAirSurveillanceCost(
+                    snapshot, Domain.Air)
+                : 0;
         bool offensivePlan = snapshot.Stance == AIStance.Offensive
             || snapshot.Stance == AIStance.Tactical
             || HasAnyOffensiveObjective(snapshot.AITeam);
@@ -234,34 +244,68 @@ public partial class AIShoppingPlanner
 
         if (tooEarly && visibleAir == 0 && inferredAir < airThreshold)
         {
-            Debug.Log($"[AI Shopping] intel_demand: 0 turn={snapshot.TurnNumber}<{minTurn} visibleAir={visibleAir} inferredAir={inferredAir:F1}");
+            Debug.Log(
+                $"[AI Shopping] vigilancia_aerea_demand: 0 " +
+                $"turn={snapshot.TurnNumber}<{minTurn} " +
+                $"visibleAir={visibleAir} inferredAir={inferredAir:F1}");
             return;
         }
 
         // EWACS cobre um mapa pequeno/medio quase inteiro. Plataforma aerea de
-        // Intel fica como peca estrategica unica; radar movel complementa o ceu.
-        int maxAir = Mathf.Min(1, Instance != null ? Instance.MaxAirIntel : 1);
-        int maxMobileAir = Instance != null ? Instance.MaxMobileAirIntel : 1;
-        int desiredAirIntel = needsAirPicture ? 1 : 0;
-        openAirIntelSlots = ownAirIntelProduction
-            ? Mathf.Max(0, Mathf.Min(maxAir, desiredAirIntel) - activeAirIntel)
+        // EWACS fica como peça estratégica única; Radar Móvel complementa o céu.
+        int maxAir = Mathf.Min(
+            1,
+            Instance != null
+                ? Instance.MaxAirSurveillance
+                : 1);
+        int maxMobileAir = Instance != null
+            ? Instance.MaxMobileAirSurveillance
+            : 1;
+        int desiredAirSurveillance =
+            needsAirPicture ? 1 : 0;
+        openAirSurveillanceSlots = ownAirSurveillanceProduction
+            ? Mathf.Max(
+                0,
+                Mathf.Min(maxAir, desiredAirSurveillance)
+                - activeAirSurveillance)
             : 0;
 
-        bool canBuyAirIntel = ownAirIntelProduction
-            && cheapestAirIntel > 0
-            && snapshot.Budget >= cheapestAirIntel;
-        bool hasOrWillHaveAirIntel = activeAirIntel > 0 || openAirIntelSlots > 0;
-        bool needsMobileAirIntel = desiredAirIntel > 0
-            && activeMobileAirIntel <= 0
-            && (activeAirIntel > 0
-                || !hasOrWillHaveAirIntel
-                || !ownAirIntelProduction
-                || !canBuyAirIntel
+        bool canBuyAirSurveillance =
+            ownAirSurveillanceProduction
+            && cheapestAirSurveillance > 0
+            && snapshot.Budget >= cheapestAirSurveillance;
+        bool hasOrWillHaveAirSurveillance =
+            activeAirSurveillance > 0
+            || openAirSurveillanceSlots > 0;
+        bool needsMobileAirSurveillance =
+            desiredAirSurveillance > 0
+            && activeMobileAirSurveillance <= 0
+            && (activeAirSurveillance > 0
+                || !hasOrWillHaveAirSurveillance
+                || !ownAirSurveillanceProduction
+                || !canBuyAirSurveillance
                 || snapshot.Budget < Mathf.Max(12000, Mathf.Max(1, snapshot.IncomePerTurn)));
-        int desiredMobileAirIntel = needsMobileAirIntel ? 1 : 0;
-        openMobileAirIntelSlots = Mathf.Max(0, Mathf.Min(maxMobileAir, desiredMobileAirIntel) - activeMobileAirIntel);
+        int desiredMobileAirSurveillance =
+            needsMobileAirSurveillance ? 1 : 0;
+        openMobileAirSurveillanceSlots = Mathf.Max(
+            0,
+            Mathf.Min(maxMobileAir, desiredMobileAirSurveillance)
+            - activeMobileAirSurveillance);
 
-        Debug.Log($"[AI Shopping] intel_demand: air={openAirIntelSlots} mobileAir={openMobileAirIntelSlots} desiredAir={desiredAirIntel} airCap={maxAir} mobileAirCap={maxMobileAir} needsMobileAir={needsMobileAirIntel} activeAir={activeAirIntel} activeMobileAir={activeMobileAirIntel} enemyAirProd={enemyAirProduction} ownAirIntelProd={ownAirIntelProduction} visibleAir={visibleAir} inferredAir={inferredAir:F1} airCombat={activeAirCombat} offensive={offensivePlan} budget={snapshot.Budget}");
+        Debug.Log(
+            $"[AI Shopping] vigilancia_aerea_demand: " +
+            $"air={openAirSurveillanceSlots} " +
+            $"mobileAir={openMobileAirSurveillanceSlots} " +
+            $"desiredAir={desiredAirSurveillance} " +
+            $"airCap={maxAir} mobileAirCap={maxMobileAir} " +
+            $"needsMobileAir={needsMobileAirSurveillance} " +
+            $"activeAir={activeAirSurveillance} " +
+            $"activeMobileAir={activeMobileAirSurveillance} " +
+            $"enemyAirProd={enemyAirProduction} " +
+            $"ownAirSurveillanceProd={ownAirSurveillanceProduction} " +
+            $"visibleAir={visibleAir} inferredAir={inferredAir:F1} " +
+            $"airCombat={activeAirCombat} offensive={offensivePlan} " +
+            $"budget={snapshot.Budget}");
     }
 
     private static int ComputeFireSupportDemand(
@@ -515,12 +559,15 @@ public partial class AIShoppingPlanner
         return count;
     }
 
-    private static int CountActiveDedicatedIntel(AIWorldSnapshot snapshot, Domain domain)
+    private static int CountActiveDedicatedAirSurveillance(
+        AIWorldSnapshot snapshot,
+        Domain domain)
     {
         if (snapshot == null)
             return 0;
 
-        int count = CountExistingDedicatedIntel(snapshot.AITeam, domain);
+        int count = CountExistingDedicatedAirSurveillance(
+            snapshot.AITeam, domain);
         if (count > 0 || snapshot.MyUnits == null)
             return count;
 
@@ -531,13 +578,15 @@ public partial class AIShoppingPlanner
                 continue;
             if (!unit.TryGetUnitData(out UnitData data) || data == null || data.domain != domain)
                 continue;
-            if (IsDedicatedIntelPurchase(data))
+            if (IsDedicatedAirSurveillancePurchase(data))
                 count++;
         }
         return count;
     }
 
-    private static int CountExistingDedicatedIntel(TeamId aiTeam, Domain domain)
+    private static int CountExistingDedicatedAirSurveillance(
+        TeamId aiTeam,
+        Domain domain)
     {
         int count = 0;
         foreach (UnitManager unit in UnitManager.AllActive)
@@ -546,7 +595,7 @@ public partial class AIShoppingPlanner
                 continue;
             if (!unit.TryGetUnitData(out UnitData data) || data == null || data.domain != domain)
                 continue;
-            if (IsDedicatedIntelPurchase(data))
+            if (IsDedicatedAirSurveillancePurchase(data))
                 count++;
         }
         return count;
@@ -570,9 +619,12 @@ public partial class AIShoppingPlanner
         return count;
     }
 
-    private static bool HasDedicatedIntelProduction(AIWorldSnapshot snapshot, Domain domain)
+    private static bool HasDedicatedAirSurveillanceProduction(
+        AIWorldSnapshot snapshot,
+        Domain domain)
     {
-        return FindCheapestDedicatedIntelCost(snapshot, domain) > 0;
+        return FindCheapestDedicatedAirSurveillanceCost(
+            snapshot, domain) > 0;
     }
 
     private static bool HasEnemyAirportProductionCapacity(AIWorldSnapshot snapshot)
@@ -601,7 +653,9 @@ public partial class AIShoppingPlanner
         return false;
     }
 
-    private static int FindCheapestDedicatedIntelCost(AIWorldSnapshot snapshot, Domain domain)
+    private static int FindCheapestDedicatedAirSurveillanceCost(
+        AIWorldSnapshot snapshot,
+        Domain domain)
     {
         if (snapshot == null || snapshot.MyBuildings == null)
             return 0;
@@ -618,7 +672,7 @@ public partial class AIShoppingPlanner
             {
                 if (unit == null || unit.domain != domain)
                     continue;
-                if (!IsDedicatedIntelPurchase(unit))
+                if (!IsDedicatedAirSurveillancePurchase(unit))
                     continue;
                 if (unit.cost > 0 && unit.cost < cheapest)
                     cheapest = unit.cost;
@@ -2589,11 +2643,16 @@ public partial class AIShoppingPlanner
             MergeRoleDemand(demands, bomber, false);
         }
 
-        if (HasEnemyAirProduction(snapshot) && CountCompositionRole(snapshot, UnitRole.Intel) == 0)
+        if (HasEnemyAirProduction(snapshot)
+            && CountCompositionRole(
+                snapshot, UnitRole.VigilanciaAerea) == 0)
         {
-            AIShoppingDemand intel = NewRoleDemand(UnitRole.Intel, 1, 20,
-                "intel", "oponente possui capacidade aeroportuaria", false);
-            MergeRoleDemand(demands, intel, false);
+            AIShoppingDemand surveillance = NewRoleDemand(
+                UnitRole.VigilanciaAerea, 1, 20,
+                "vigilancia-aerea",
+                "oponente possui capacidade aeroportuaria",
+                false);
+            MergeRoleDemand(demands, surveillance, false);
         }
 
         if (HasEnemySubmarineCapability(snapshot) && CountCompositionRole(snapshot, UnitRole.RaidAntiSub) == 0)
@@ -3506,7 +3565,9 @@ public partial class AIShoppingPlanner
         int count = 0;
         foreach (UnitManager unit in snapshot.MyUnits)
             if (unit != null && !unit.IsDead && unit.TryGetUnitData(out UnitData data)
-                && (role == UnitRole.Logistica || role == UnitRole.Intel || role == UnitRole.RaidAntiSub
+                && (role == UnitRole.Logistica
+                    || role == UnitRole.VigilanciaAerea
+                    || role == UnitRole.RaidAntiSub
                     ? UnitRoleCompatibility.CanSatisfy(data, role)
                     : UnitRoleCompatibility.ResolveCompositionRole(data) == role))
                 count++;

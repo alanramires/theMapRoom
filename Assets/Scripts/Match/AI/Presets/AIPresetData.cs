@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 // =====================================================================================
 // AIPresetData — perfil de doutrina da IA, no mesmo espírito do UnitData.
@@ -299,9 +300,12 @@ public class AIAirPreset
     [Range(0, 4)] public int minCacaBPresence = 1;
     [Range(0, 4)] public int minApachePresence = 1;
     [Range(0, 2)] public int minBombaPresence = 0;
-    [Range(1, 12)] public int minTurnForIntel = 4;
-    [Range(0, 3)] public int maxAirIntel = 1;
-    [Range(0, 3)] public int maxMobileAirIntel = 1;
+    [FormerlySerializedAs("minTurnForIntel")]
+    [Range(1, 12)] public int minTurnForAirSurveillance = 4;
+    [FormerlySerializedAs("maxAirIntel")]
+    [Range(0, 3)] public int maxAirSurveillance = 1;
+    [FormerlySerializedAs("maxMobileAirIntel")]
+    [Range(0, 3)] public int maxMobileAirSurveillance = 1;
 }
 
 // =====================================================================================

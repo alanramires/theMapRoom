@@ -21,7 +21,7 @@ public partial class AIController
     private const int RallyMaximumArtilleryUnits = 12;
     private const int RallyInfantryTransportDistance = 7;
     private const int RallyUsefulApcCapacity = 2;
-    private const int RallyIntelRadius = 6;
+    private const int RallyAirSurveillanceRadius = 6;
     private const int RallyLogisticsRadius = 5;
     private const int RallyAssemblyTimeoutTurns = 4;
     // Após o GoGreen a supressão NÃO solta mais no relógio: o release é por DESFECHO (a invasão
@@ -67,7 +67,7 @@ public partial class AIController
         public int RequiredArtillery;
         public ConstructionSector FocusSector;
         public bool IsFocus;
-        public int Intel;
+        public int AirSurveillance;
         public int Logistics;
         public int VisibleThreats;
         public int KnownEnemyForce;
@@ -88,7 +88,7 @@ public partial class AIController
         public float Assault;
         public int AirAttack;
         public float Artillery;
-        public int Intel;
+        public int AirSurveillance;
         public int Logistics;
         public ConstructionSector FocusSector;
     }
@@ -252,7 +252,9 @@ public partial class AIController
             $"held={readiness.Held} rallies={readiness.HeldRallies} focus={readiness.FocusSector} " +
             $"artGlobal={readiness.Artillery:0.#}/{readiness.RequiredArtillery} " +
             $"artLocal={readiness.LocalArtillery:0.#} cap={readiness.Capturers} " +
-            $"ass={readiness.Assault:0.#} airAtk={readiness.AirAttack} intel={readiness.Intel} log={readiness.Logistics} " +
+            $"ass={readiness.Assault:0.#} airAtk={readiness.AirAttack} " +
+            $"vigilancia={readiness.AirSurveillance} " +
+            $"log={readiness.Logistics} " +
             $"threat={readiness.VisibleThreats} knownEnemy={readiness.KnownEnemyForce} " +
             $"packages={readiness.RequiredPackages} force={readiness.ForceScore}/{readiness.RequiredForce} " +
             $"rallyState={readiness.State} goGreen={readiness.GoGreen} timeout={readiness.Timeout} " +
@@ -300,7 +302,8 @@ public partial class AIController
             bool capturer = HasRallyCaptureSkill(data);
             bool airAttack = IsOperationalRallyAirAttackUnit(unit, data);
             float artillery = GetRallyArtilleryWeight(data);
-            bool intelUnit = HasRole(data, UnitRole.Intel);
+            bool airSurveillanceUnit =
+                HasRole(data, UnitRole.VigilanciaAerea);
             bool logistics = HasRole(data, UnitRole.Logistica);
 
             if (dist <= RallyAssemblyForceRadius)
@@ -317,8 +320,11 @@ public partial class AIController
 
             if (dist <= RallyArtilleryRadius && artillery > 0f)
                 readiness.Artillery += artillery;
-            if (dist <= RallyIntelRadius && intelUnit)
-                readiness.Intel++;
+            if (dist <= RallyAirSurveillanceRadius
+                && airSurveillanceUnit)
+            {
+                readiness.AirSurveillance++;
+            }
             if (dist <= RallyLogisticsRadius && logistics)
                 readiness.Logistics++;
         }
@@ -335,7 +341,8 @@ public partial class AIController
             readiness.Assault = aggregate.Assault;
             readiness.AirAttack = aggregate.AirAttack;
             readiness.Artillery = aggregate.Artillery;
-            readiness.Intel = aggregate.Intel;
+            readiness.AirSurveillance =
+                aggregate.AirSurveillance;
             readiness.Logistics = aggregate.Logistics;
         }
 
@@ -502,7 +509,7 @@ public partial class AIController
             bool nearForce = false;
             bool nearAir = false;
             bool nearArtillery = false;
-            bool nearIntel = false;
+            bool nearAirSurveillance = false;
             bool nearLogistics = false;
             foreach (ConstructionManager rally in held)
             {
@@ -512,7 +519,8 @@ public partial class AIController
                 nearForce |= distance <= RallyAssemblyForceRadius;
                 nearAir |= distance <= RallyAirAttackRadius;
                 nearArtillery |= distance <= RallyArtilleryRadius;
-                nearIntel |= distance <= RallyIntelRadius;
+                nearAirSurveillance |=
+                    distance <= RallyAirSurveillanceRadius;
                 nearLogistics |= distance <= RallyLogisticsRadius;
             }
 
@@ -524,8 +532,11 @@ public partial class AIController
                 aggregate.AirAttack++;
             if (nearArtillery)
                 aggregate.Artillery += GetRallyArtilleryWeight(data);
-            if (nearIntel && HasRole(data, UnitRole.Intel))
-                aggregate.Intel++;
+            if (nearAirSurveillance
+                && HasRole(data, UnitRole.VigilanciaAerea))
+            {
+                aggregate.AirSurveillance++;
+            }
             if (nearLogistics && HasRole(data, UnitRole.Logistica))
                 aggregate.Logistics++;
         }
@@ -699,7 +710,9 @@ public partial class AIController
             $"ass={readiness.Assault:0.#} airAtk={readiness.AirAttack} " +
             $"artGlobal={readiness.Artillery:0.#}/{readiness.RequiredArtillery} " +
             $"artLocal={readiness.LocalArtillery:0.#} rallies={readiness.HeldRallies} " +
-            $"focus={readiness.FocusSector} intel={readiness.Intel} log={readiness.Logistics} " +
+            $"focus={readiness.FocusSector} " +
+            $"vigilancia={readiness.AirSurveillance} " +
+            $"log={readiness.Logistics} " +
             $"threat={readiness.VisibleThreats} knownEnemy={readiness.KnownEnemyForce} " +
             $"packages={readiness.RequiredPackages} force={readiness.ForceScore}/{readiness.RequiredForce} " +
             $"missing={readiness.Missing}";

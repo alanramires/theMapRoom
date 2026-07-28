@@ -135,9 +135,11 @@ public partial class AIController
 
         }
 
-        PlayerAction intelAction = TryDecideIntelAction(unit, snapshot, plan);
+        PlayerAction airSurveillanceAction =
+            TryDecideAirSurveillanceAction(unit, snapshot, plan);
 
-        if (intelAction != null) return intelAction;
+        if (airSurveillanceAction != null)
+            return airSurveillanceAction;
 
         PlayerAction airCombatAction = TryDecideAirCombatAction(unit, snapshot);
 

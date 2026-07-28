@@ -6,7 +6,9 @@ public partial class AIShoppingPlanner
 {
     private static UnitData PickAirUnit(
         ConstructionManager building, int budget,
-        bool wantsTransport, bool wantsCacaB, bool wantsCacaA, bool wantsApache, bool wantsBomba, bool wantsAirTanker, bool wantsIntel,
+        bool wantsTransport, bool wantsCacaB, bool wantsCacaA,
+        bool wantsApache, bool wantsBomba, bool wantsAirTanker,
+        bool wantsAirSurveillance,
         bool urgentCacaB,
         TeamId aiTeam)
     {
@@ -36,22 +38,39 @@ public partial class AIShoppingPlanner
             else if (primary == UnitRole.AtaqueAereo   && !elite && wantsApache) score = 20000 + u.cost;
             else if (primary == UnitRole.AtaqueAereo   &&  elite && wantsBomba)  score = 36000 + u.cost;
             else if (primary == UnitRole.Logistica && wantsAirTanker && IsAirTankerPurchase(u)) score = 24000 + u.cost;
-            else if (wantsIntel && IsDedicatedIntelPurchase(u))
+            else if (wantsAirSurveillance
+                && IsDedicatedAirSurveillancePurchase(u))
             {
-                if (CountExistingDedicatedIntel(aiTeam, Domain.Air) >= 1)
+                if (CountExistingDedicatedAirSurveillance(
+                        aiTeam, Domain.Air) >= 1)
                 {
-                    Debug.Log($"[AI Shopping Air] SKIP {u.displayName} — EWACS/intel aérea já existente");
+                    Debug.Log(
+                        $"[AI Shopping Air] SKIP {u.displayName} — " +
+                        "vigilância aérea já existente");
                     continue;
                 }
-                score = 26000 + GetIntelPurchaseVisionScore(u) + u.cost;
+                score = 26000
+                    + GetAirSurveillancePurchaseVisionScore(u)
+                    + u.cost;
             }
             else
             {
-                Debug.Log($"[AI Shopping Air] SKIP {u.displayName} — sem demanda role={primary} elite={elite} trans={wantsTransport} cacaB={wantsCacaB} cacaA={wantsCacaA} apache={wantsApache} bomba={wantsBomba} tanker={wantsAirTanker} intel={wantsIntel}");
+                Debug.Log(
+                    $"[AI Shopping Air] SKIP {u.displayName} — " +
+                    $"sem demanda role={primary} elite={elite} " +
+                    $"trans={wantsTransport} cacaB={wantsCacaB} " +
+                    $"cacaA={wantsCacaA} apache={wantsApache} " +
+                    $"bomba={wantsBomba} tanker={wantsAirTanker} " +
+                    $"vigilancia={wantsAirSurveillance}");
                 continue;
             }
 
-            Debug.Log($"[AI Shopping Air] candidato {u.displayName} ${u.cost} role={primary} elite={elite} urgentCacaB={urgentCacaB} bomba={wantsBomba} intel={wantsIntel && IsDedicatedIntelPurchase(u)} score={score}");
+            Debug.Log(
+                $"[AI Shopping Air] candidato {u.displayName} " +
+                $"${u.cost} role={primary} elite={elite} " +
+                $"urgentCacaB={urgentCacaB} bomba={wantsBomba} " +
+                $"vigilancia={wantsAirSurveillance && IsDedicatedAirSurveillancePurchase(u)} " +
+                $"score={score}");
             if (score > bestScore) { bestScore = score; best = u; }
         }
         return best;
@@ -93,7 +112,7 @@ public partial class AIShoppingPlanner
         bool urgentTransportDemand = false,
         int openLogisticsSlots = 0,
         int openFireSupportSlots = 0,
-        int openMobileAirIntelSlots = 0,
+        int openMobileAirSurveillanceSlots = 0,
         bool preferDefensiveFireSupport = false,
         UnitData eliteAssaultTarget = null,
         UnitData eliteFireSupportTarget = null,
@@ -183,7 +202,8 @@ public partial class AIShoppingPlanner
             bool isPrimaryTransporter = UnitRoleCompatibility.ResolveCompositionRole(u) == UnitRole.Transportador;
             bool isPrimaryLogistics = u.roles != null && u.roles.Count > 0 && u.roles[0] == UnitRole.Logistica;
             bool isPrimaryFireSupport = u.roles != null && u.roles.Count > 0 && u.roles[0] == UnitRole.FogoIndireto;
-            bool isPrimaryIntel = IsDedicatedIntelPurchase(u);
+            bool isPrimaryAirSurveillance =
+                IsDedicatedAirSurveillancePurchase(u);
             bool isFireSupportCapable = u.roles != null && u.roles.Contains(UnitRole.FogoIndireto);
             bool isHybridCapturer    = isPrimaryAssault && u.roles.Contains(UnitRole.Capturador);
             bool isSecondary       = !isPrimaryCapturer && u.roles != null && u.roles.Contains(UnitRole.Capturador);
@@ -209,8 +229,14 @@ public partial class AIShoppingPlanner
             if (isPrimaryLogistics && openLogisticsSlots <= 0)
             { Debug.Log($"[AI PickUnit] SKIP {u.displayName} — sem demanda logistics"); continue; }
 
-            if (isPrimaryIntel && openMobileAirIntelSlots <= 0)
-            { Debug.Log($"[AI PickUnit] SKIP {u.displayName} — sem demanda intel aérea móvel"); continue; }
+            if (isPrimaryAirSurveillance
+                && openMobileAirSurveillanceSlots <= 0)
+            {
+                Debug.Log(
+                    $"[AI PickUnit] SKIP {u.displayName} — " +
+                    "sem demanda de vigilância aérea móvel");
+                continue;
+            }
 
             if (isPrimaryAssault && !isHybridCapturer && openAssaultSlots <= 0 && !defensiveBaseThreat && !proactiveAntiAirAAABypass && !strategicArmorParityBypass)
             { Debug.Log($"[AI PickUnit] SKIP {u.displayName} — sem demanda assault"); continue; }
@@ -290,8 +316,12 @@ public partial class AIShoppingPlanner
                 score += openLogisticsSlots >= 2 ? 220000 : 185000;
                 if (defensiveBaseThreat) score -= 25000;
             }
-            if (openMobileAirIntelSlots > 0 && isPrimaryIntel)
-                score += 132000 + GetIntelPurchaseVisionScore(u);
+            if (openMobileAirSurveillanceSlots > 0
+                && isPrimaryAirSurveillance)
+            {
+                score += 132000
+                    + GetAirSurveillancePurchaseVisionScore(u);
+            }
             if (openFireSupportSlots > 0 && isFireSupportCapable)
             {
                 bool preferredProfile = preferDefensiveFireSupport
@@ -357,8 +387,28 @@ public partial class AIShoppingPlanner
             if (proactiveAntiAir && isSAMType && openFireSupportSlots > 0) score += 420000;
             if (!defensiveStance && u.movement < 3) score -= (3 - u.movement) * 1500;
 
-            string roleStr = isPrimaryIntel ? "INTEL" : isFireSupportCapable && !isPrimaryFireSupport ? "ASS/FIRE" : isPrimaryFireSupport ? "FIRE" : isPrimaryLogistics ? "LOG" : isPrimaryTransporter ? "TRANS" : isPrimaryCapturer ? "CAP" : isAggressiveCapturer ? "CAP-AGG" : isPrimaryAssault ? $"ASS(hybrid={isHybridCapturer})" : "other";
-            Debug.Log($"[AI PickUnit] {u.displayName} ${u.cost} role={roleStr} score={score} mov={u.movement} | trans={openTransportSlots} transUrg={urgentTransportDemand} log={openLogisticsSlots} intelMobileAir={openMobileAirIntelSlots} cap={openCapturerSlots} ass={openAssaultSlots} fire={openFireSupportSlots} fireDef={preferDefensiveFireSupport} defThreat={defensiveBaseThreat}");
+            string roleStr = isPrimaryAirSurveillance
+                ? "VIGILANCIA-AEREA"
+                : isFireSupportCapable && !isPrimaryFireSupport
+                    ? "ASS/FIRE"
+                    : isPrimaryFireSupport ? "FIRE"
+                    : isPrimaryLogistics ? "LOG"
+                    : isPrimaryTransporter ? "TRANS"
+                    : isPrimaryCapturer ? "CAP"
+                    : isAggressiveCapturer ? "CAP-AGG"
+                    : isPrimaryAssault
+                        ? $"ASS(hybrid={isHybridCapturer})"
+                        : "other";
+            Debug.Log(
+                $"[AI PickUnit] {u.displayName} ${u.cost} " +
+                $"role={roleStr} score={score} mov={u.movement} | " +
+                $"trans={openTransportSlots} transUrg={urgentTransportDemand} " +
+                $"log={openLogisticsSlots} " +
+                $"vigilanciaMovel={openMobileAirSurveillanceSlots} " +
+                $"cap={openCapturerSlots} ass={openAssaultSlots} " +
+                $"fire={openFireSupportSlots} " +
+                $"fireDef={preferDefensiveFireSupport} " +
+                $"defThreat={defensiveBaseThreat}");
             if (score > bestScore) { bestScore = score; best = u; }
         }
 
@@ -404,11 +454,12 @@ public partial class AIShoppingPlanner
             && IsPrimaryRole(unit, UnitRole.Logistica);
     }
 
-    private static bool IsDedicatedIntelPurchase(UnitData unit)
+    private static bool IsDedicatedAirSurveillancePurchase(
+        UnitData unit)
     {
         if (unit == null || unit.roles == null || unit.roles.Count == 0)
             return false;
-        if (unit.roles[0] != UnitRole.Intel)
+        if (unit.roles[0] != UnitRole.VigilanciaAerea)
             return false;
 
         return !unit.roles.Contains(UnitRole.Assalto)
@@ -420,7 +471,8 @@ public partial class AIShoppingPlanner
             && !unit.roles.Contains(UnitRole.Logistica);
     }
 
-    private static int GetIntelPurchaseVisionScore(UnitData unit)
+    private static int GetAirSurveillancePurchaseVisionScore(
+        UnitData unit)
     {
         if (unit == null)
             return 0;

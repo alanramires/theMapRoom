@@ -585,7 +585,8 @@ public class RetaguardaWindow : EditorWindow
         if (unit == null || !unit.TryGetUnitData(out UnitData data) || data == null || data.roles == null)
             return false;
 
-        return data.roles.Contains(UnitRole.FogoIndireto) || data.roles.Contains(UnitRole.Intel);
+        return data.roles.Contains(UnitRole.FogoIndireto)
+            || data.roles.Contains(UnitRole.VigilanciaAerea);
     }
 
     private void SetAnchorFromEnemies()

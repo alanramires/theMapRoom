@@ -176,9 +176,9 @@ public partial class AIController
         // recuar/curar/seguir continua sendo decidido pelo handler dela.
         if (unit.IsUnderRepair) return _sortIsInvading ? 1 : 5;
 
-        // Intel dedicada (EWACS/radar movel) age cedo para iluminar alvos
+        // Vigilancia Aerea (EWACS/radar movel) age cedo para iluminar alvos
         // antes da artilharia, aviação e assalto consumirem suas ações.
-        if (IsIntelUnit(unit)) return 1;
+        if (IsAirSurveillanceUnit(unit)) return 1;
 
         if (IsHelicopterInitiativeUnit(unit)) return 1;
 
@@ -927,7 +927,7 @@ public partial class AIController
 
     private static int GetEffectiveAiInitiative(UnitManager unit)
     {
-        if (IsIntelUnit(unit))
+        if (IsAirSurveillanceUnit(unit))
             return (int)AiInitiative.High;
 
         return unit != null && unit.TryGetUnitData(out UnitData data)

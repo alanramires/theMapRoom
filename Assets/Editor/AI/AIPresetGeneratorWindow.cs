@@ -284,9 +284,12 @@ public class AIPresetGeneratorWindow : EditorWindow
             preset.aeronautica.minCacaBPresence = shopping.MinCacaBPresence;
             preset.aeronautica.minApachePresence = shopping.MinApachePresence;
             preset.aeronautica.minBombaPresence = shopping.MinBombaPresence;
-            preset.aeronautica.minTurnForIntel = shopping.MinTurnForIntel;
-            preset.aeronautica.maxAirIntel = shopping.MaxAirIntel;
-            preset.aeronautica.maxMobileAirIntel = shopping.MaxMobileAirIntel;
+            preset.aeronautica.minTurnForAirSurveillance =
+                shopping.MinTurnForAirSurveillance;
+            preset.aeronautica.maxAirSurveillance =
+                shopping.MaxAirSurveillance;
+            preset.aeronautica.maxMobileAirSurveillance =
+                shopping.MaxMobileAirSurveillance;
         }
     }
 

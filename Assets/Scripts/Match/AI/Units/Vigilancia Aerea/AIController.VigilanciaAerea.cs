@@ -3,9 +3,9 @@ using UnityEngine;
 
 public partial class AIController
 {
-    private PlayerAction TryDecideIntelAction(UnitManager unit, AIWorldSnapshot snapshot, TeamObjectivePlan plan)
+    private PlayerAction TryDecideAirSurveillanceAction(UnitManager unit, AIWorldSnapshot snapshot, TeamObjectivePlan plan)
     {
-        if (!IsIntelUnit(unit) || snapshot == null)
+        if (!IsAirSurveillanceUnit(unit) || snapshot == null)
             return null;
 
         Vector3Int fromCell = unit.CurrentCellPosition;
@@ -20,44 +20,46 @@ public partial class AIController
             return vacateAction;
         }
 
-        if (TryResolveIntelAnchor(unit, snapshot, plan, fromCell, out Vector3Int anchor, out bool offensiveAnchor, out string anchorReason)
-            && TryFindIntelPostureCell(unit, snapshot, fromCell, anchor, offensiveAnchor, paths, occupied, out Vector3Int postureCell, out string postureReason))
+        if (TryResolveAirSurveillanceAnchor(unit, snapshot, plan, fromCell, out Vector3Int anchor, out bool offensiveAnchor, out string anchorReason)
+            && TryFindAirSurveillancePostureCell(unit, snapshot, fromCell, anchor, offensiveAnchor, paths, occupied, out Vector3Int postureCell, out string postureReason))
         {
             if (postureCell != fromCell)
             {
-                Debug.Log($"{TL("Intel")} {unit.InstanceId} reposiciona retaguarda via {postureCell} anchor={anchor} ({anchorReason}; {postureReason})");
+                Debug.Log($"{TL("VigilanciaAerea")} {unit.InstanceId} reposiciona retaguarda via {postureCell} anchor={anchor} ({anchorReason}; {postureReason})");
                 return BuildMoveBatch(unit, snapshot.AITeam, fromCell, postureCell, paths);
             }
 
-            Debug.Log($"{TL("Intel")} {unit.InstanceId} segura observacao @ {fromCell} anchor={anchor} ({anchorReason}; {postureReason})");
+            Debug.Log($"{TL("VigilanciaAerea")} {unit.InstanceId} segura observacao @ {fromCell} anchor={anchor} ({anchorReason}; {postureReason})");
             return BuildMoveBatch(unit, snapshot.AITeam, fromCell, fromCell, paths);
         }
 
         Vector3Int conservative = FindConservativeRogueFireSupportCell(unit, snapshot, fromCell, paths, occupied);
         if (conservative != fromCell)
         {
-            Debug.Log($"{TL("Intel")} {unit.InstanceId} sem anchor seguro, reagrupa retaguarda via {conservative}");
+            Debug.Log($"{TL("VigilanciaAerea")} {unit.InstanceId} sem anchor seguro, reagrupa retaguarda via {conservative}");
             return BuildMoveBatch(unit, snapshot.AITeam, fromCell, conservative, paths);
         }
 
-        Debug.Log($"{TL("Intel")} {unit.InstanceId} aguarda em retaguarda @ {fromCell}");
+        Debug.Log($"{TL("VigilanciaAerea")} {unit.InstanceId} aguarda em retaguarda @ {fromCell}");
         return BuildMoveBatch(unit, snapshot.AITeam, fromCell, fromCell, paths);
     }
 
-    private static bool IsIntelUnit(UnitManager unit)
+    private static bool IsAirSurveillanceUnit(UnitManager unit)
     {
         if (unit == null || !unit.TryGetUnitData(out UnitData data) || data == null)
             return false;
 
-        return data.roles != null && data.roles.Contains(UnitRole.Intel);
+        return data.roles != null
+            && data.roles.Contains(UnitRole.VigilanciaAerea);
     }
 
     private static bool IsBacklineSupportUnit(UnitManager unit)
     {
-        return IsFireSupportUnit(unit) || IsIntelUnit(unit);
+        return IsFireSupportUnit(unit)
+            || IsAirSurveillanceUnit(unit);
     }
 
-    private bool TryResolveIntelAnchor(
+    private bool TryResolveAirSurveillanceAnchor(
         UnitManager unit,
         AIWorldSnapshot snapshot,
         TeamObjectivePlan plan,
@@ -116,7 +118,7 @@ public partial class AIController
             return true;
         }
 
-        UnitManager airAsset = FindBestOwnAirAssetForIntel(unit, snapshot, fromCell);
+        UnitManager airAsset = FindBestOwnAirAssetForSurveillance(unit, snapshot, fromCell);
         if (airAsset != null)
         {
             anchor = airAsset.CurrentCellPosition;
@@ -126,7 +128,7 @@ public partial class AIController
             return true;
         }
 
-        ConstructionManager home = FindBestIntelHomeAnchor(snapshot, fromCell);
+        ConstructionManager home = FindBestAirSurveillanceHomeAnchor(snapshot, fromCell);
         if (home != null)
         {
             anchor = home.CurrentCellPosition;
@@ -138,7 +140,7 @@ public partial class AIController
         return false;
     }
 
-    private bool TryFindIntelPostureCell(
+    private bool TryFindAirSurveillancePostureCell(
         UnitManager unit,
         AIWorldSnapshot snapshot,
         Vector3Int fromCell,
@@ -155,7 +157,7 @@ public partial class AIController
             return false;
 
         TeamObjectivePlan capPlan = ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(snapshot.AISlotIndex));
-        float fromScore = ScoreIntelPostureCell(unit, snapshot, fromCell, fromCell, anchor, offensiveAnchor, 0, out string fromReason);
+        float fromScore = ScoreAirSurveillancePostureCell(unit, snapshot, fromCell, fromCell, anchor, offensiveAnchor, 0, out string fromReason);
         float bestScore = fromScore;
         string bestReason = fromReason;
 
@@ -171,10 +173,10 @@ public partial class AIController
                     continue;
                 if (IsCellACapturerTarget(cell, capPlan, snapshot.AITeam))
                     continue;
-                if (!IsIntelCellAllowedByRearLine(unit, snapshot, fromCell, cell, anchor, offensiveAnchor))
+                if (!IsAirSurveillanceCellAllowedByRearLine(unit, snapshot, fromCell, cell, anchor, offensiveAnchor))
                     continue;
 
-                float score = ScoreIntelPostureCell(
+                float score = ScoreAirSurveillancePostureCell(
                     unit,
                     snapshot,
                     cell,
@@ -197,7 +199,7 @@ public partial class AIController
         return true;
     }
 
-    private bool IsIntelCellAllowedByRearLine(
+    private bool IsAirSurveillanceCellAllowedByRearLine(
         UnitManager unit,
         AIWorldSnapshot snapshot,
         Vector3Int fromCell,
@@ -224,7 +226,7 @@ public partial class AIController
         return HasAlliedScreenAheadOfFireSupportCell(unit, snapshot, cell, anchor);
     }
 
-    private float ScoreIntelPostureCell(
+    private float ScoreAirSurveillancePostureCell(
         UnitManager unit,
         AIWorldSnapshot snapshot,
         Vector3Int cell,
@@ -239,13 +241,13 @@ public partial class AIController
         float dpq = GetTerrainDpqPontos(cell);
         float cohesion = CalculateFireSupportCohesionScore(unit, snapshot, cell);
         float lineGap = 0f;
-        float rearLine = offensiveAnchor ? CalculateIntelFrontlineRearScore(unit, snapshot, cell, anchor, out lineGap) : 0f;
+        float rearLine = offensiveAnchor ? CalculateAirSurveillanceFrontlineRearScore(unit, snapshot, cell, anchor, out lineGap) : 0f;
         float nearestAlly = DistanceToNearestNonSupportAlly(unit, snapshot, cell);
         float isolationPenalty = nearestAlly < float.MaxValue
             ? Mathf.Max(0f, nearestAlly - 3f) * (offensiveAnchor ? 180f : 95f)
             : 0f;
-        int airVision = ResolveIntelAirVision(unit);
-        int generalVision = ResolveIntelGeneralVision(unit);
+        int airVision = ResolveAirSurveillanceVision(unit);
+        int generalVision = ResolveAirSurveillanceGeneralVision(unit);
         float airEnvelope = airVision > 0
             ? Mathf.Max(0f, 420f - Mathf.Abs(anchorDist - Mathf.Min(airVision, 7)) * 70f)
             : 0f;
@@ -287,7 +289,7 @@ public partial class AIController
         return score;
     }
 
-    private float CalculateIntelFrontlineRearScore(UnitManager unit, AIWorldSnapshot snapshot, Vector3Int cell, Vector3Int anchor, out float gap)
+    private float CalculateAirSurveillanceFrontlineRearScore(UnitManager unit, AIWorldSnapshot snapshot, Vector3Int cell, Vector3Int anchor, out float gap)
     {
         gap = 0f;
         if (!TryScoreBacklineCell(unit, snapshot, cell, anchor, out AIBacklineScore score))
@@ -325,7 +327,7 @@ public partial class AIController
         return construction != null && construction.SlotIndex == ResolveAISlotKey(aiTeam);
     }
 
-    private static int ResolveIntelAirVision(UnitManager unit)
+    private static int ResolveAirSurveillanceVision(UnitManager unit)
     {
         if (unit == null || !unit.TryGetUnitData(out UnitData data) || data == null)
             return 0;
@@ -335,7 +337,7 @@ public partial class AIController
             data.ResolveVisionFor(Domain.Air, HeightLevel.AirHigh));
     }
 
-    private static int ResolveIntelGeneralVision(UnitManager unit)
+    private static int ResolveAirSurveillanceGeneralVision(UnitManager unit)
     {
         if (unit == null || !unit.TryGetUnitData(out UnitData data) || data == null)
             return 0;
@@ -365,7 +367,7 @@ public partial class AIController
         return count;
     }
 
-    private static UnitManager FindBestOwnAirAssetForIntel(UnitManager unit, AIWorldSnapshot snapshot, Vector3Int fromCell)
+    private static UnitManager FindBestOwnAirAssetForSurveillance(UnitManager unit, AIWorldSnapshot snapshot, Vector3Int fromCell)
     {
         if (snapshot == null || snapshot.MyUnits == null)
             return null;
@@ -401,7 +403,7 @@ public partial class AIController
         return best;
     }
 
-    private static ConstructionManager FindBestIntelHomeAnchor(AIWorldSnapshot snapshot, Vector3Int fromCell)
+    private static ConstructionManager FindBestAirSurveillanceHomeAnchor(AIWorldSnapshot snapshot, Vector3Int fromCell)
     {
         if (snapshot == null || snapshot.MyBuildings == null)
             return null;

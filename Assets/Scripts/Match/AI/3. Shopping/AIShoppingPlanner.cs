@@ -91,10 +91,13 @@ public partial class AIShoppingPlanner : MonoBehaviour
     [Range(0, 4)]    public int   MinCacaBPresence                 = 1;
     [Range(0, 4)]    public int   MinApachePresence                = 1;
     [Range(0, 2)]    public int   MinBombaPresence                 = 0;
-    [Range(1, 12)]   public int   MinTurnForIntel                  = 4;
-    [Range(0, 3)]    public int   MaxAirIntel                      = 1;
+    [FormerlySerializedAs("MinTurnForIntel")]
+    [Range(1, 12)]   public int   MinTurnForAirSurveillance        = 4;
+    [FormerlySerializedAs("MaxAirIntel")]
+    [Range(0, 3)]    public int   MaxAirSurveillance               = 1;
+    [FormerlySerializedAs("MaxMobileAirIntel")]
     [FormerlySerializedAs("MaxGroundIntel")]
-    [Range(0, 3)]    public int   MaxMobileAirIntel                = 1;
+    [Range(0, 3)]    public int   MaxMobileAirSurveillance         = 1;
 
     private static AIShoppingPlanner instance;
     public static AIShoppingPlanner Instance => EnsureInstance();
@@ -143,7 +146,10 @@ public partial class AIShoppingPlanner : MonoBehaviour
         int openBombaSlots  = ComputeBombaDemand(snapshot);
         int openAirTankerSlots = 0;
         AIIntelReport intelReport = BuildShoppingIntelReport(snapshot);
-        ComputeIntelDemand(snapshot, intelReport, out int openAirIntelSlots, out int openMobileAirIntelSlots);
+        ComputeAirSurveillanceDemand(
+            snapshot, intelReport,
+            out int openAirSurveillanceSlots,
+            out int openMobileAirSurveillanceSlots);
         bool intelArmorThreat = false;
         bool offensiveAntiInfantryFireSupport = false;
         bool proactiveDefFireSupport = !preferDefensiveFireSupport
@@ -612,7 +618,11 @@ public partial class AIShoppingPlanner : MonoBehaviour
 
         int cheapestTransportCost    = openTransportSlots    > 0 ? FindCheapestAvailableTransportCost(snapshot)    : 0;
         int cheapestAirTransportCost = openAirTransportSlots > 0 ? FindCheapestAirTransportCost(snapshot)         : 0;
-        int cheapestAirIntelCost     = openAirIntelSlots     > 0 ? FindCheapestDedicatedIntelCost(snapshot, Domain.Air) : 0;
+        int cheapestAirSurveillanceCost =
+            openAirSurveillanceSlots > 0
+                ? FindCheapestDedicatedAirSurveillanceCost(
+                    snapshot, Domain.Air)
+                : 0;
         int reserveForCapturerPassenger = 0;
         if (openCapturerSlots > 0)
         {
@@ -628,12 +638,24 @@ public partial class AIShoppingPlanner : MonoBehaviour
             reserveForAirTransport = Mathf.Min(airReserveBudget, cheapestAirTransportCost * openAirTransportSlots);
             Debug.Log($"[AI Shopping] reserva_ar: air_slots={openAirTransportSlots} custo={cheapestAirTransportCost} reserva={reserveForAirTransport} cap_passageiro_reserva={reserveForCapturerPassenger}");
         }
-        int reserveForAirIntel = 0;
-        if (cheapestAirIntelCost > 0 && openAirIntelSlots > 0)
+        int reserveForAirSurveillance = 0;
+        if (cheapestAirSurveillanceCost > 0
+            && openAirSurveillanceSlots > 0)
         {
-            int airIntelReserveBudget = Mathf.Max(0, remaining - reserveForCapturerPassenger - reserveForAirTransport);
-            reserveForAirIntel = Mathf.Min(airIntelReserveBudget, cheapestAirIntelCost * openAirIntelSlots);
-            Debug.Log($"[AI Shopping] reserva_intel_ar: slots={openAirIntelSlots} custo={cheapestAirIntelCost} reserva={reserveForAirIntel}");
+            int airSurveillanceReserveBudget = Mathf.Max(
+                0,
+                remaining
+                - reserveForCapturerPassenger
+                - reserveForAirTransport);
+            reserveForAirSurveillance = Mathf.Min(
+                airSurveillanceReserveBudget,
+                cheapestAirSurveillanceCost
+                * openAirSurveillanceSlots);
+            Debug.Log(
+                $"[AI Shopping] reserva_vigilancia_aerea: " +
+                $"slots={openAirSurveillanceSlots} " +
+                $"custo={cheapestAirSurveillanceCost} " +
+                $"reserva={reserveForAirSurveillance}");
         }
         int anyAirCombatDemand    = openCacaBSlots + openCacaASlots + openApacheSlots + openBombaSlots;
         int cheapestAirCombatCost = anyAirCombatDemand > 0 ? FindCheapestAirCombatCost(snapshot) : 0;
@@ -665,7 +687,28 @@ public partial class AIShoppingPlanner : MonoBehaviour
             Debug.Log($"[AI Shopping] reserva_combate_ar: slots={anyAirCombatDemand} custo={cheapestAirCombatCost} cacaB_custo={cacaBReserveCost} cacaA_custo={cacaAReserveCost} apache_custo={apacheReserveCost} bomber_custo={bomberReserveCost} ruptura={artilleryWallBreakthrough} armor_reserva={breakthroughArmorReserve} reserva={reserveForAirCombat} cap_passageiro_reserva={reserveForCapturerPassenger}");
         }
 
-        Debug.Log($"[AI Shopping] budget={remaining} cap_slots={openCapturerSlots} ass_slots={openAssaultSlots} trans_slots={openTransportSlots} trans_urgent={urgentTransportDemand} air_trans_slots={openAirTransportSlots} air_tanker_slots={openAirTankerSlots} intel_air_slots={openAirIntelSlots} intel_mobile_air_slots={openMobileAirIntelSlots} log_slots={openLogisticsSlots} repairs={repairDemandCount} active_log={activeLogisticsCount} fire_slots={openFireSupportSlots} fire_def={preferDefensiveFireSupport} cacaB_slots={openCacaBSlots} cacaA_slots={openCacaASlots} apache_slots={openApacheSlots} bomba_slots={openBombaSlots} cheapest_transport={cheapestTransportCost} cheapest_air={cheapestAirTransportCost} cheapest_air_intel={cheapestAirIntelCost} reserva_ar={reserveForAirTransport} reserva_intel_ar={reserveForAirIntel} cap_passageiro_reserva={reserveForCapturerPassenger} intel={(intelReport != null ? $"inf={intelReport.enemyInfantryPressureScore:F1} air={intelReport.enemyAirThreatScore:F1} armor={intelReport.enemyArmorThreatScore:F1} num={intelReport.numericalPressure:F1}" : "off")}");
+        Debug.Log(
+            $"[AI Shopping] budget={remaining} " +
+            $"cap_slots={openCapturerSlots} ass_slots={openAssaultSlots} " +
+            $"trans_slots={openTransportSlots} " +
+            $"trans_urgent={urgentTransportDemand} " +
+            $"air_trans_slots={openAirTransportSlots} " +
+            $"air_tanker_slots={openAirTankerSlots} " +
+            $"vigilancia_aerea_slots={openAirSurveillanceSlots} " +
+            $"vigilancia_movel_slots={openMobileAirSurveillanceSlots} " +
+            $"log_slots={openLogisticsSlots} repairs={repairDemandCount} " +
+            $"active_log={activeLogisticsCount} " +
+            $"fire_slots={openFireSupportSlots} " +
+            $"fire_def={preferDefensiveFireSupport} " +
+            $"cacaB_slots={openCacaBSlots} cacaA_slots={openCacaASlots} " +
+            $"apache_slots={openApacheSlots} bomba_slots={openBombaSlots} " +
+            $"cheapest_transport={cheapestTransportCost} " +
+            $"cheapest_air={cheapestAirTransportCost} " +
+            $"cheapest_air_surveillance={cheapestAirSurveillanceCost} " +
+            $"reserva_ar={reserveForAirTransport} " +
+            $"reserva_vigilancia={reserveForAirSurveillance} " +
+            $"cap_passageiro_reserva={reserveForCapturerPassenger} " +
+            $"intel={(intelReport != null ? $"inf={intelReport.enemyInfantryPressureScore:F1} air={intelReport.enemyAirThreatScore:F1} armor={intelReport.enemyArmorThreatScore:F1} num={intelReport.numericalPressure:F1}" : "off")}");
 
         bool strategicEliteAssaultReserve = eliteAssaultTarget != null
             && !dreamTeamPivot
@@ -1025,13 +1068,20 @@ public partial class AIShoppingPlanner : MonoBehaviour
                 && CanOfferUnit(building, eliteFireSupportTarget);
             // Reserva para transporte aéreo + combate aéreo. Defesa de base terrestre nao deve
             // drenar o caixa reservado quando ja existe demanda aerea e aerodromo disponivel.
-            if ((reserveForAirTransport > 0 || reserveForAirCombat > 0 || reserveForAirIntel > 0)
+            if ((reserveForAirTransport > 0
+                    || reserveForAirCombat > 0
+                    || reserveForAirSurveillance > 0)
                 && !forcedProduction
                 && !emergencyProductionDefense
                 && !canBuyEliteBreakthroughHere
                 && !canBuyEliteFireSupportHere)
             {
-                int spendAfterAirReserves = Mathf.Max(0, remaining - reserveForAirTransport - reserveForAirCombat - reserveForAirIntel);
+                int spendAfterAirReserves = Mathf.Max(
+                    0,
+                    remaining
+                    - reserveForAirTransport
+                    - reserveForAirCombat
+                    - reserveForAirSurveillance);
                 if (reserveForCapturerPassenger > 0 && openCapturerSlots > 0)
                     spendAfterAirReserves = Mathf.Max(spendAfterAirReserves, Mathf.Min(remaining, reserveForCapturerPassenger));
                 spendBudget = Mathf.Min(spendBudget, spendAfterAirReserves);
@@ -1058,7 +1108,11 @@ public partial class AIShoppingPlanner : MonoBehaviour
 
             int effectiveOpenCapturerSlots = openCapturerSlots + apcPassengerFollowupDemand;
             UnitData unit = PickUnit(building, snapshot, spendBudget,
-                effectiveOpenCapturerSlots, openAssaultSlots, openTransportSlots, urgentTransportDemand, openLogisticsSlots, openFireSupportSlots, openMobileAirIntelSlots, preferDefensiveFireSupport,
+                effectiveOpenCapturerSlots, openAssaultSlots,
+                openTransportSlots, urgentTransportDemand,
+                openLogisticsSlots, openFireSupportSlots,
+                openMobileAirSurveillanceSlots,
+                preferDefensiveFireSupport,
                 eliteAssaultTarget, eliteFireSupportTarget, defensiveBaseThreat,
                 allowDefensiveEliteAssault, defensiveTankReserveCost,
                 defensiveBaseManpowerShortage, defensiveMassReserveCost, defensiveBaseTankBought,
@@ -1128,8 +1182,9 @@ public partial class AIShoppingPlanner : MonoBehaviour
                 openLogisticsSlots--;
             else if (IsFireSupportPurchase(unit) && openFireSupportSlots > 0)
                 openFireSupportSlots--;
-            else if (IsDedicatedIntelPurchase(unit) && openMobileAirIntelSlots > 0)
-                openMobileAirIntelSlots--;
+            else if (IsDedicatedAirSurveillancePurchase(unit)
+                && openMobileAirSurveillanceSlots > 0)
+                openMobileAirSurveillanceSlots--;
             if (unit == eliteAssaultTarget)
                 eliteAssaultBought = true;
             if (unit == eliteFireSupportTarget)
@@ -1152,8 +1207,12 @@ public partial class AIShoppingPlanner : MonoBehaviour
             bool wantsApache       = openApacheSlots > 0;
             bool wantsBomba        = openBombaSlots  > 0;
             bool wantsAirTanker    = openAirTankerSlots > 0;
-            bool wantsAirIntel     = openAirIntelSlots > 0;
-            bool anyAirDemand      = wantsAirTransport || wantsCacaB || wantsCacaA || wantsApache || wantsBomba || wantsAirTanker || wantsAirIntel;
+            bool wantsAirSurveillance =
+                openAirSurveillanceSlots > 0;
+            bool anyAirDemand =
+                wantsAirTransport || wantsCacaB || wantsCacaA
+                || wantsApache || wantsBomba || wantsAirTanker
+                || wantsAirSurveillance;
             bool urgentCacaB       = HasUrgentCacaBThreat(snapshot, intelReport);
 
             if (airBuildings.Count > 0 && anyAirDemand)
@@ -1173,7 +1232,9 @@ public partial class AIShoppingPlanner : MonoBehaviour
                     }
 
                     UnitData airUnit = PickAirUnit(building, remaining,
-                        wantsAirTransport, wantsCacaB, wantsCacaA, wantsApache, wantsBomba, wantsAirTanker, wantsAirIntel,
+                        wantsAirTransport, wantsCacaB, wantsCacaA,
+                        wantsApache, wantsBomba, wantsAirTanker,
+                        wantsAirSurveillance,
                         urgentCacaB,
                         snapshot.AITeam);
                     if (airUnit == null)
@@ -1197,9 +1258,19 @@ public partial class AIShoppingPlanner : MonoBehaviour
                     else if (isAtaque    && !isElite)                   { if (openApacheSlots > 0) openApacheSlots--; wantsApache = openApacheSlots > 0; }
                     else if (isAtaque    &&  isElite)                   { if (openBombaSlots  > 0) openBombaSlots--;  wantsBomba  = openBombaSlots  > 0; }
                     else if (IsPrimaryRole(airUnit, UnitRole.Logistica)) { if (openAirTankerSlots > 0) openAirTankerSlots--; wantsAirTanker = openAirTankerSlots > 0; }
-                    else if (IsDedicatedIntelPurchase(airUnit))          { if (openAirIntelSlots > 0) openAirIntelSlots--; wantsAirIntel = openAirIntelSlots > 0; }
+                    else if (IsDedicatedAirSurveillancePurchase(airUnit))
+                    {
+                        if (openAirSurveillanceSlots > 0)
+                            openAirSurveillanceSlots--;
+                        wantsAirSurveillance =
+                            openAirSurveillanceSlots > 0;
+                    }
 
-                    if (!wantsAirTransport && !wantsCacaB && !wantsCacaA && !wantsApache && !wantsBomba && !wantsAirTanker && !wantsAirIntel) break;
+                    if (!wantsAirTransport && !wantsCacaB
+                        && !wantsCacaA && !wantsApache
+                        && !wantsBomba && !wantsAirTanker
+                        && !wantsAirSurveillance)
+                        break;
                     if (remaining <= 0) break;
                 }
             }
