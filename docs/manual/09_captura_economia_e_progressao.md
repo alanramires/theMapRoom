@@ -153,11 +153,11 @@ O **Aeroporto Avançado** também parte da Fábrica, num ramo próprio.
 
 Uma nota de vocabulário, porque a escada tem três degraus e só dois deles têm adjetivo: o degrau do meio chama-se **Fábrica**, e é esse o nome que aparece no jogo. Não existe "Fábrica Média". Quando este manual precisar falar de instalação industrial em geral, vai dizer "instalação de produção" — "Fábrica" com maiúscula é sempre o degrau intermediário, nunca a categoria.
 
-E a escada é obrigatória de verdade: **você nem consegue capturar o degrau seguinte sem ter o anterior.** Um capturador seu parado em cima de uma Fábrica Pesada, sem que o time jamais tenha tomado uma Fábrica, vê a opção de capturar aparecer — porém acinzentada, acompanhada do motivo: capture uma Fábrica primeiro.
+É possível capturar o degrau seguinte antes de conquistar o anterior, mas o trabalho fica mais lento. Enquanto faltar o pré-requisito, a força de captura é reduzida pela metade, com divisão inteira e mínimo de um ponto: Soldado com 10 HP captura 5; Bazooka ou Metralhadora com força-base 5 capturam 2.
 
-Repare na escolha de desenho. O jogo poderia simplesmente esconder a opção e deixar você adivinhando. Em vez disso, ele mostra a porta trancada **e diz qual é a chave**. É assim que a árvore de tecnologia se ensina sozinha: você descobre o próximo degrau tentando o degrau errado.
+Assim que o time captura o pré-requisito ao menos uma vez, a penalidade desaparece e as próximas ações voltam imediatamente à força normal. Recuperar uma construção aliada parcialmente capturada também usa força normal.
 
-Isso muda o que o mapa significa. A ordem em que você avança deixa de ser só geografia: não adianta correr para o prédio mais valioso do tabuleiro se você pulou os degraus. Ele fica lá, visível, explicado e intocável.
+Isso preserva a escada sem transformar o prédio adiantado em uma parede. Correr para o edifício mais valioso continua possível, mas custa mais turnos de infantaria exposta até que a progressão seja regularizada.
 
 ### O Que Cada Degrau Abre
 
@@ -173,7 +173,7 @@ Isso desenha uma pergunta estratégica nova, que não é sobre território nem s
 
 Vale juntar com a seção anterior, porque as duas regras operam ao mesmo tempo e são independentes:
 
-A **progressão** pergunta se o seu time já conquistou o pré-requisito, alguma vez. Ela age em dois momentos: barra a **captura** da construção seguinte, e barra a **produção** da unidade que depende dela.
+A **progressão** pergunta se o seu time já conquistou o pré-requisito, alguma vez. Ela age em dois momentos: reduz pela metade a força de **captura** da construção seguinte enquanto faltar o degrau anterior, e barra a **produção** da unidade que depende dele.
 
 A **política de venda** pergunta se este prédio, agora, produz para você.
 

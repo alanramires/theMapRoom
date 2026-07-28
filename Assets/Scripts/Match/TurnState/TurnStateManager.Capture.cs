@@ -57,7 +57,6 @@ public partial class TurnStateManager
             if (capturer == null || targetConstruction == null)
                 yield break;
 
-            int captureDamage = PodeCapturarSensor.GetCapturePower(capturer);
             float hp01 = Mathf.InverseLerp(1f, 10f, Mathf.Clamp(capturer.CurrentHP, 1, 10));
             float capturePitch = Mathf.Lerp(1f, 2f, hp01);
             float preSfxDelay = animationManager != null ? animationManager.CapturePreSfxDelay : 0.12f;
@@ -89,6 +88,12 @@ public partial class TurnStateManager
                 yield break;
             }
 
+            int captureDamage = PodeCapturarSensor.GetCapturePower(
+                capturer,
+                targetConstruction,
+                operationType,
+                matchController,
+                out bool prerequisitePenaltyApplied);
             int before = Mathf.Max(0, targetConstruction.CurrentCapturePoints);
             int safeMax = Mathf.Max(0, targetConstruction.CapturePointsMax);
             int after;
@@ -112,7 +117,8 @@ public partial class TurnStateManager
                 concluded = after <= 0;
                 RuntimeLog(
                     $"[Captura] {capturer.name} causou {captureDamage} de captura em {targetConstruction.ConstructionDisplayName} " +
-                    $"({before} -> {after}).");
+                    $"({before} -> {after})" +
+                    (prerequisitePenaltyApplied ? " [penalidade de pre-requisito: 50%]." : "."));
             }
 
             // Obs preciso para o log de Jogadas (aqui sabemos o tipo de operação):

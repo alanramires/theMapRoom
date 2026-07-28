@@ -36,6 +36,67 @@ public static class PodeCapturarSensor
         return hp;
     }
 
+    /// <summary>
+    /// Retorna a forca efetiva contra uma construcao. Capturas inimigas sem o
+    /// pre-requisito de progressao aplicam metade da forca base, arredondada
+    /// para baixo e com minimo de 1. Recuperacao aliada nunca recebe essa penalidade.
+    /// </summary>
+    public static int GetCapturePower(
+        UnitManager unit,
+        ConstructionManager construction,
+        CaptureOperationType operationType,
+        MatchController matchController,
+        out bool prerequisitePenaltyApplied)
+    {
+        prerequisitePenaltyApplied = false;
+        int basePower = GetCapturePower(unit);
+        if (basePower <= 0
+            || construction == null
+            || operationType != CaptureOperationType.CaptureEnemy)
+        {
+            return basePower;
+        }
+
+        if (!construction.TryResolveConstructionData(out ConstructionData constructionData)
+            || constructionData == null)
+        {
+            return basePower;
+        }
+
+        if (matchController == null)
+            matchController = Object.FindAnyObjectByType<MatchController>();
+        if (matchController == null
+            || !matchController.ShouldPenalizeCaptureForMissingPrerequisite(
+                PlayerSlotId.FromIndex(unit.SlotIndex),
+                constructionData,
+                out _))
+        {
+            return basePower;
+        }
+
+        prerequisitePenaltyApplied = true;
+        return Mathf.Max(1, basePower / 2);
+    }
+
+    public static int GetCapturePower(
+        UnitManager unit,
+        ConstructionManager construction,
+        MatchController matchController = null)
+    {
+        CaptureOperationType operationType =
+            unit != null
+            && construction != null
+            && PlayerSlotRelations.AreAllies(unit.SlotIndex, construction.SlotIndex)
+                ? CaptureOperationType.RecoverAlly
+                : CaptureOperationType.CaptureEnemy;
+        return GetCapturePower(
+            unit,
+            construction,
+            operationType,
+            matchController,
+            out _);
+    }
+
     public static bool TryGetCaptureTarget(
         UnitManager selectedUnit,
         Tilemap boardTilemap,
@@ -159,19 +220,6 @@ public static class PodeCapturarSensor
 
         targetConstruction = construction;
         operationType = CaptureOperationType.CaptureEnemy;
-        if (construction.TryResolveConstructionData(out ConstructionData constructionData))
-        {
-            if (matchController != null &&
-                !matchController.CanCaptureConstruction(
-                    PlayerSlotId.FromIndex(selectedUnit.SlotIndex),
-                    constructionData,
-                    out reason))
-            {
-                if (sensorLogs)
-                    SensorLogGate.Log("PodeCapturarSensor", $"result blocked construction={construction.name} reason={reason}");
-                return false;
-            }
-        }
         if (sensorLogs)
             SensorLogGate.Log("PodeCapturarSensor", $"result hasAny=true op={operationType} construction={construction.name}");
         return true;

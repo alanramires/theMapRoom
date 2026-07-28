@@ -166,6 +166,15 @@ public class UnitManager : MonoBehaviour
         ThreatRevisionTracker.NotifyUnitSlotChanged(previousSlot, slotIndex);
         ResolveTeamIdFromSlot();
         UpdateDynamicName();
+        if (Application.isPlaying && previousSlot != slotIndex)
+        {
+            Vector3Int cell = currentCellPosition;
+            cell.z = 0;
+            UnitOccupancyRules.NotifyUnitOccupancyChanged(
+                this,
+                cell,
+                cell);
+        }
     }
     public Tilemap BoardTilemap => boardTilemap;
     public Vector3Int CurrentCellPosition => currentCellPosition;
@@ -647,6 +656,15 @@ public class UnitManager : MonoBehaviour
         }
 
         UpdateDynamicName();
+        if (Application.isPlaying)
+        {
+            Vector3Int cell = currentCellPosition;
+            cell.z = 0;
+            UnitOccupancyRules.NotifyUnitOccupancyChanged(
+                this,
+                cell,
+                cell);
+        }
     }
 
     public void MarkDiedBy(UnitManager killer)

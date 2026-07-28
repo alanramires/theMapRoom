@@ -96,7 +96,10 @@ public partial class AIController
                     || (frontBlocksTarget && CandidateReachesTargetNeighbor(candidatePaths, targetCell)));
                 if (!reachesTarget && candidateExistingSlot == null) continue;
 
-                int capturePower = PodeCapturarSensor.GetCapturePower(candidate);
+                int capturePower = PodeCapturarSensor.GetCapturePower(
+                    candidate,
+                    target,
+                    matchController);
                 bool completesCapture = pts + capturePower >= max;
                 Vector3Int cc = candidate.CurrentCellPosition; cc.z = 0;
                 float dist = SectorManager.TryGetLandMovementDistance(cc, targetCell, out int landDistance)
@@ -178,7 +181,10 @@ public partial class AIController
                 obj.PreferredHandoffFromUnitId = assignedUnit.InstanceId;
                 ApplyPlanHUD(swapCandidate, obj);
 
-                bool swapCompletes = pts + PodeCapturarSensor.GetCapturePower(swapCandidate) >= max;
+                bool swapCompletes = pts + PodeCapturarSensor.GetCapturePower(
+                    swapCandidate,
+                    target,
+                    matchController) >= max;
                 Debug.Log($"{TL("Handoff")}[Swap] Unit{swapCandidate.InstanceId} " +
                           $"({swapFromObj.Sector} pri={swapFromObj.Priority}→{obj.Sector} pri={obj.Priority}) " +
                           $"já no prédio; Unit{assignedUnit.InstanceId} livre (era {assignedDist:F0}h)" +
@@ -186,7 +192,10 @@ public partial class AIController
                 continue;
             }
 
-            bool subCompletes = pts + PodeCapturarSensor.GetCapturePower(substitute) >= max;
+            bool subCompletes = pts + PodeCapturarSensor.GetCapturePower(
+                substitute,
+                target,
+                matchController) >= max;
             Debug.Log($"{TL("Handoff")} Unit{assignedUnit.InstanceId} hp={assignedUnit.CurrentHP} avança; " +
                       $"Unit{substitute.InstanceId} hp={substitute.CurrentHP} herda {obj.Sector} " +
                       $"({pts}/{max}){(subCompletes ? " → completa" : "")}" +

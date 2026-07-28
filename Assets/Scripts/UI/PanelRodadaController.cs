@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using TMPro;
 using UnityEngine;
@@ -119,7 +120,11 @@ public sealed class PanelRodadaController : MonoBehaviour
         teamVideoTexture = null;
     }
 
-    public IEnumerator Apresentar(TeamId team, int numeroJogador, int turno)
+    public IEnumerator Apresentar(
+        TeamId team,
+        int numeroJogador,
+        int turno,
+        Func<bool> isBoardReady = null)
     {
         int version = ++presentationVersion;
         IsPrivacyCurtainActive = false;
@@ -148,8 +153,7 @@ public sealed class PanelRodadaController : MonoBehaviour
             textoTurno.text = $"Turno {turno}";
             textoTurno.color = TeamUtils.GetColor(team);
         }
-        if (botaoRodada != null)
-            botaoRodada.interactable = false;
+        SetButtonEnabled(false);
 
         SetContentAlpha(0f);
         if (atrasoAntesMenuOpen > 0f)
@@ -158,6 +162,16 @@ public sealed class PanelRodadaController : MonoBehaviour
         yield return PlayClip(menuOpen, false);
         if (version != presentationVersion) yield break;
         yield return AnimateContent(0f, 1f);
+        if (version != presentationVersion) yield break;
+
+        // A capa pode aparecer enquanto o tabuleiro conclui filas e servicos de
+        // inicio de turno. O painel apenas observa essa prontidao: nunca a produz.
+        yield return null;
+        if (version != presentationVersion) yield break;
+        yield return new WaitUntil(() =>
+            version != presentationVersion ||
+            isBoardReady == null ||
+            isBoardReady());
         if (version != presentationVersion) yield break;
 
         aguardandoConfirmacao = true;
@@ -326,7 +340,8 @@ public sealed class PanelRodadaController : MonoBehaviour
         TeamId team,
         int numeroJogador,
         int turno,
-        System.Action onButtonReady = null)
+        Action onButtonReady = null,
+        Func<bool> isBoardReady = null)
     {
         int version = presentationVersion;
         if (!IsPresenting)
@@ -351,6 +366,16 @@ public sealed class PanelRodadaController : MonoBehaviour
             textoTurno.text = $"Turno {turno}";
             textoTurno.color = TeamUtils.GetColor(team);
         }
+
+        yield return null;
+        if (version != presentationVersion)
+            yield break;
+        yield return new WaitUntil(() =>
+            version != presentationVersion ||
+            isBoardReady == null ||
+            isBoardReady());
+        if (version != presentationVersion)
+            yield break;
 
         aguardandoConfirmacao = true;
         SetButtonEnabled(true);

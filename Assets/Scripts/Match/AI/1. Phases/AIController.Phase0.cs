@@ -16,6 +16,22 @@ public partial class AIController
         // (supply queue, auto command service) registrem suas coroutines primeiro.
         yield return null;
 
+        // OnActiveTeamChanged e disparado antes de ReleaseUnitsForActiveTeam
+        // terminar dentro da mesma troca confirmada de turno. O painel de rodada
+        // e apenas apresentacao e nunca participa desta barreira logica.
+        if (matchController != null)
+        {
+            yield return new WaitUntil(() =>
+                matchController == null
+                || !matchController.AreTurnStartEffectsPending
+                || IsMatchEnded());
+            if (ShouldStopAIForMatchEnd(
+                    "phase0_apos_efeitos_inicio_turno"))
+            {
+                yield break;
+            }
+        }
+
         if (turnStateManager != null)
         {
             yield return new WaitUntil(() => !turnStateManager.IsAutoCommandServiceBusy);

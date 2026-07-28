@@ -261,8 +261,8 @@ public partial class AIController
 
     private IEnumerator ResumeActiveAITurnAfterLoad()
     {
-        // OnAfterLoadSuccess dispara ainda dentro de LoadSlotAsync. Aguarda tambem a
-        // restauracao dos logs/replay e a liberacao da apresentacao de turno.
+        // OnAfterLoadSuccess dispara ainda dentro de LoadSlotAsync. Aguarda a
+        // restauracao integral dos logs/replay; o Panel_Rodada e apenas visual.
         while (SaveGameManager.IsAnyLoadInProgress)
             yield return null;
 

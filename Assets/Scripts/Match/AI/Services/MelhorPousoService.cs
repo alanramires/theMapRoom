@@ -268,7 +268,7 @@ public static class MelhorPousoService
             }
 
             IReadOnlyList<UnitManager> units =
-                ResolveUnitsForPlatformQuery();
+                ResolveUnitsForPlatformQuery(request.map);
             for (int i = 0; i < units.Count; i++)
             {
                 UnitManager candidate = units[i];
@@ -307,10 +307,20 @@ public static class MelhorPousoService
     }
 
     private static IReadOnlyList<UnitManager>
-        ResolveUnitsForPlatformQuery()
+        ResolveUnitsForPlatformQuery(Tilemap map)
     {
         if (Application.isPlaying)
+        {
+            if (ConfirmedOccupancyIndex.TryGetFor(
+                    map,
+                    out ConfirmedOccupancyIndex occupancy)
+                && occupancy != null
+                && occupancy.CanServeLiveQueries)
+            {
+                return occupancy.Transporters;
+            }
             return UnitManager.AllActive;
+        }
         return Object.FindObjectsByType<UnitManager>(
             FindObjectsInactive.Exclude);
     }

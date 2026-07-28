@@ -69,6 +69,24 @@ public static class UnitOccupancyRules
                 referenceTilemap, cell, PlayerSlotId.FromIndex(exceptUnit.SlotIndex), exceptUnit);
 
         cell.z = 0;
+        if (TryGetIndexedUnitsAtCell(
+                referenceTilemap,
+                cell,
+                out IReadOnlyList<UnitManager> indexedUnits))
+        {
+            int indexedCount = 0;
+            for (int i = 0; i < indexedUnits.Count; i++)
+            {
+                UnitManager unit = indexedUnits[i];
+                if (unit == null || unit == exceptUnit)
+                    continue;
+                indexedCount++;
+                if (indexedCount >= UnitRulesDefinition.MaxUnitsPerHex)
+                    return true;
+            }
+            return false;
+        }
+
         int count = 0;
 
         UnitManager[] units = GetActiveUnitsSnapshot();
@@ -101,6 +119,22 @@ public static class UnitOccupancyRules
     {
         cell.z = 0;
 
+        if (TryGetIndexedUnitsAtCell(
+                referenceTilemap,
+                cell,
+                out IReadOnlyList<UnitManager> indexedUnits))
+        {
+            for (int i = 0; i < indexedUnits.Count; i++)
+            {
+                UnitManager unit = indexedUnits[i];
+                if (unit != null
+                    && unit != exceptUnit
+                    && unit.SlotIndex == slot.Value)
+                    return true;
+            }
+            return false;
+        }
+
         UnitManager[] units = GetActiveUnitsSnapshot();
         for (int i = 0; i < units.Length; i++)
         {
@@ -124,6 +158,27 @@ public static class UnitOccupancyRules
     public static UnitManager GetUnitAtCell(Tilemap referenceTilemap, Vector3Int cell, UnitManager exceptUnit = null)
     {
         cell.z = 0;
+
+        if (TryGetIndexedUnitsAtCell(
+                referenceTilemap,
+                cell,
+                out IReadOnlyList<UnitManager> indexedUnits))
+        {
+            // A escolha de "qual" unidade retornar em coabitação faz parte do
+            // comportamento histórico de AllActive. Preserve a ordem antiga
+            // somente nesse caso raro; 0/1 ocupante usa o acesso direto.
+            if (indexedUnits.Count <= 1)
+            {
+                for (int i = 0; i < indexedUnits.Count; i++)
+                {
+                    UnitManager unit = indexedUnits[i];
+                    if (unit == null || unit == exceptUnit)
+                        continue;
+                    return unit;
+                }
+                return null;
+            }
+        }
 
         if (UnitRulesDefinition.IsTotalWarEnabled() && exceptUnit != null)
         {
@@ -182,6 +237,27 @@ public static class UnitOccupancyRules
 
     public static List<UnitManager> GetUnitsAtCell(Tilemap referenceTilemap, Vector3Int cell, UnitManager exceptUnit = null)
     {
+        if (TryGetIndexedUnitsAtCell(
+                referenceTilemap,
+                cell,
+                out IReadOnlyList<UnitManager> indexedUnits))
+        {
+            // Listas com coabitação mantêm a ordem histórica de AllActive,
+            // pois alguns consumidores escolhem o primeiro ocupante.
+            if (indexedUnits.Count <= 1)
+            {
+                var indexedCopy =
+                    new List<UnitManager>(indexedUnits.Count);
+                for (int i = 0; i < indexedUnits.Count; i++)
+                {
+                    UnitManager unit = indexedUnits[i];
+                    if (unit != null && unit != exceptUnit)
+                        indexedCopy.Add(unit);
+                }
+                return indexedCopy;
+            }
+        }
+
         List<UnitManager> result = new List<UnitManager>();
         cell.z = 0;
 
@@ -250,6 +326,27 @@ public static class UnitOccupancyRules
         }
 
         return false;
+    }
+
+    private static bool TryGetIndexedUnitsAtCell(
+        Tilemap referenceTilemap,
+        Vector3Int cell,
+        out IReadOnlyList<UnitManager> units)
+    {
+        units = null;
+        if (!Application.isPlaying
+            || referenceTilemap == null
+            || !ConfirmedOccupancyIndex.TryGetFor(
+                referenceTilemap,
+                out ConfirmedOccupancyIndex index)
+            || index == null
+            || !index.CanServeLiveQueries)
+        {
+            return false;
+        }
+
+        units = index.GetUnitsAtCell(cell);
+        return true;
     }
 
     private static bool IsUnitOnReferenceMap(UnitManager unit, Tilemap referenceTilemap)

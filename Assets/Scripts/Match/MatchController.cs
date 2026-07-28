@@ -845,10 +845,25 @@ public class MatchController : MonoBehaviour
     public int ActivePlayerListIndex => activePlayerListIndex;
     public bool IsTurnTransitionInProgress => hotSeatGateActive || advanceTurnTransitionRoutine != null;
     public bool IsHotSeatGateActive => hotSeatGateActive;
+    public bool AreTurnStartEffectsPending =>
+        pendingTurnStartUpkeep
+        || pendingTurnStartEconomy;
+    public bool IsTurnBoardReady =>
+        !AreTurnStartEffectsPending &&
+        (turnStateManager == null ||
+            (!turnStateManager.IsAutoCommandServiceBusy &&
+             !turnStateManager.IsScannerActionExecutionInProgress &&
+             turnStateManager.CurrentCursorState ==
+                TurnStateManager.CursorState.Neutral));
+    public bool IsTurnBoardReadyForHumanConfirmation() =>
+        !IsActiveTeamAI() && IsTurnBoardReady;
+    public bool IsTurnPanelPresentationEnabled =>
+        debugPanelRodadaEnabled &&
+        !DebugManager.IsPanelRodadaDisabledForHotSeat();
 
     // O load iniciado pela Tela de Entrada substitui a inicializacao normal da
-    // cena. Depois que o snapshot foi restaurado e o Panel_Rodada confirmado,
-    // libera o gate provisorio criado no Awake da cena-base.
+    // cena. Depois que o snapshot foi restaurado, libera o gate provisorio de
+    // input criado no Awake; a apresentacao do Panel_Rodada e opcional.
     public void ReleaseHotSeatGateAfterLoad()
     {
         hotSeatGateActive = false;
@@ -860,7 +875,6 @@ public class MatchController : MonoBehaviour
     public PlayerSlotId VictoryWinnerSlotId => PlayerSlotId.FromIndex(victoryWinnerSlotIndex);
     private Coroutine advanceTurnTransitionRoutine;
     private bool hotSeatGateActive;
-    private bool deferTurnStartEffectsForHotSeatGate;
 
     public int GetVictoryStars(PlayerSlotId slotId)
     {
@@ -1267,33 +1281,21 @@ public class MatchController : MonoBehaviour
             capturedBuildingHistory.Clear();
         RegisterCurrentlyOwnedBuildings();
 
-        // Esta e a barreira real de inicializacao: nenhum efeito de inicio de turno,
-        // camera, FoW ou musica da partida e liberado antes da confirmacao hot seat.
+        // O painel e somente uma cortina visual/de input. A verdade confirmada do
+        // turno e inicializada por ApplyActiveTeamIfChanged mesmo quando a
+        // apresentacao estiver desativada ou aguardando confirmacao.
         if (panelRodada == null)
             panelRodada = FindAnyObjectByType<PanelRodadaController>(FindObjectsInactive.Include);
-        bool skipHotSeatPanel =
-            DebugManager.IsPanelRodadaDisabledForHotSeat() &&
-            !IsHotSeatPrivacyRequired();
-        if (skipHotSeatPanel && panelRodada != null)
-            panelRodada.gameObject.SetActive(false);
         bool requiresLocalPrivacy = IsHotSeatPrivacyRequired();
-        if (requiresLocalPrivacy && panelRodada != null && !skipHotSeatPanel)
-        {
-            if (ShouldUseHotSeatPrivacyCurtain())
-            {
-                panelRodada.ShowPrivacyCurtain(
-                    ActiveTeam,
-                    currentTurn,
-                    IsActiveTeamAI());
-            }
-            else
-            {
-                yield return panelRodada.Apresentar(
-                    ActiveTeam,
-                    activePlayerListIndex + 1,
-                    currentTurn);
-            }
-        }
+        bool useHotSeatPanel =
+            requiresLocalPrivacy &&
+            panelRodada != null &&
+            IsTurnPanelPresentationEnabled;
+        if (useHotSeatPanel)
+            panelRodada.CoverImmediatelyForPrivateTurnTransition();
+        else if (panelRodada != null &&
+            (panelRodada.IsPresenting || panelRodada.gameObject.activeInHierarchy))
+            panelRodada.CancelLoadingPresentation();
 
         FindAnyObjectByType<ReplayManager>()?.CleanupReplayArtifactsForMatchStart();
         RecomputeTeamFlips();
@@ -1309,6 +1311,26 @@ public class MatchController : MonoBehaviour
         if (AreAllPlayerSlotsAI())
             SetFogOfWarDebugEnabled(true);
         TryAutoAssignTurnTransitionReferences();
+
+        if (useHotSeatPanel)
+        {
+            if (ShouldUseHotSeatPrivacyCurtain())
+            {
+                panelRodada.ShowPrivacyCurtain(
+                    ActiveTeam,
+                    currentTurn,
+                    IsActiveTeamAI());
+            }
+            else
+            {
+                yield return panelRodada.Apresentar(
+                    ActiveTeam,
+                    activePlayerListIndex + 1,
+                    currentTurn,
+                    IsTurnBoardReadyForHumanConfirmation);
+            }
+        }
+
         hotSeatGateActive = false;
         matchMusicAudioManager?.PrepareForMatchStart(forceRestartPlayback: true);
 
@@ -1738,7 +1760,7 @@ public class MatchController : MonoBehaviour
         CountActiveLocalHumanPlayers() >= 2;
 
     public bool ShouldUseHotSeatPrivacyCurtain() =>
-        debugPanelRodadaEnabled &&
+        IsTurnPanelPresentationEnabled &&
         IsHotSeatPrivacyRequired() &&
         (!IsValidPlayerSlot(ActiveSlotId) || !IsPlayerLocal(ActiveSlotId));
 
@@ -2022,30 +2044,21 @@ public class MatchController : MonoBehaviour
             panelRodada = FindAnyObjectByType<PanelRodadaController>(FindObjectsInactive.Include);
 
         // O painel preto sobe antes de trocar time/FoW/camera, preservando o hot seat.
-        bool skipHotSeatPanel =
-            DebugManager.IsPanelRodadaDisabledForHotSeat() &&
-            !IsHotSeatPrivacyRequired();
         bool useHotSeatPanel =
             IsHotSeatPrivacyRequired() &&
             panelRodada != null &&
-            !skipHotSeatPanel;
-        if (skipHotSeatPanel && panelRodada != null)
-            panelRodada.gameObject.SetActive(false);
+            IsTurnPanelPresentationEnabled;
+        if (!useHotSeatPanel &&
+            panelRodada != null &&
+            panelRodada.IsPresenting)
+            panelRodada.CancelLoadingPresentation();
         if (useHotSeatPanel)
         {
             panelRodada.CoverImmediatelyForPrivateTurnTransition();
         }
 
         double advanceTurnStartMs = TurnPerfNowMs();
-        deferTurnStartEffectsForHotSeatGate = useHotSeatPanel;
-        try
-        {
-            AdvanceTurn();
-        }
-        finally
-        {
-            deferTurnStartEffectsForHotSeatGate = false;
-        }
+        AdvanceTurn();
         TurnPerfLog("AdvanceTurn", advanceTurnStartMs);
 
         if (useHotSeatPanel && !hasVictoryWinner)
@@ -2056,7 +2069,6 @@ public class MatchController : MonoBehaviour
                     ActiveTeam,
                     currentTurn,
                     IsActiveTeamAI());
-                ApplyPendingTurnStartEffectsAfterHotSeatGate();
                 Debug.Log(
                     $"[PrivacyCurtain] hold activeSlot={ActiveSlotId.Value} " +
                     $"localHumans={CountActiveLocalHumanPlayers()}");
@@ -2066,8 +2078,8 @@ public class MatchController : MonoBehaviour
                 yield return panelRodada.Apresentar(
                     ActiveTeam,
                     activePlayerListIndex + 1,
-                    currentTurn);
-                ApplyPendingTurnStartEffectsAfterHotSeatGate();
+                    currentTurn,
+                    IsTurnBoardReadyForHumanConfirmation);
                 Debug.Log(
                     $"[PrivacyCurtain] exit confirmedSlot={ActiveSlotId.Value}");
             }
@@ -3024,13 +3036,13 @@ public class MatchController : MonoBehaviour
 
         List<ConstructionManager> activeConstructions = GetActiveConstructionsOnScene();
 
-        if (applyTurnStartEffects && !deferTurnStartEffectsForHotSeatGate)
+        if (applyTurnStartEffects)
         {
             stageStartMs = TurnPerfNowMs();
             ReleaseUnitsForActiveTeam(activeConstructions);
             TurnPerfLog("ApplyActiveTeam.ReleaseUnitsForActiveTeam", stageStartMs);
         }
-        else if (!deferTurnStartEffectsForHotSeatGate)
+        else
             pendingTurnStartAutonomyHelperEntries = null;
 
         stageStartMs = TurnPerfNowMs();
@@ -3075,43 +3087,6 @@ public class MatchController : MonoBehaviour
         FlushTurnStartAutonomyHelper();
         TurnPerfLog("ApplyActiveTeam.FlushTurnStartAutonomyHelper", stageStartMs);
         TurnPerfLog("ApplyActiveTeam.Total", totalStartMs);
-    }
-
-    private void ApplyPendingTurnStartEffectsAfterHotSeatGate()
-    {
-        if (!pendingTurnStartUpkeep && !pendingTurnStartEconomy)
-            return;
-
-        double totalStartMs = TurnPerfNowMs();
-        List<ConstructionManager> activeConstructions = GetActiveConstructionsOnScene();
-        ReleaseUnitsForActiveTeam(activeConstructions);
-
-        if (!debugFogOfWarEnabled)
-        {
-            ResetFogOfWarRuntime(clearTilemap: true);
-            ShowAllUnitsIgnoringFog();
-        }
-        else if (enableTotalWar)
-        {
-            if (!TryRefreshFogOfWarForTurnStartIncremental())
-            {
-                if (enableFogStepPerfLogs)
-                    Debug.Log($"[FoW][TurnStartCache] slot={ActiveSlotId.Value} fallback=full");
-                RefreshFogOfWarForActiveTeam();
-            }
-            if (!ShouldUseHotSeatPrivacyCurtain())
-                RefreshRuntimeUnitFogVisibility();
-            RunTurnStartStillObservedForActiveTeamStealthUnits();
-        }
-        else
-        {
-            ResetFogOfWarRuntime(clearTilemap: true);
-            if (!ShouldUseHotSeatPrivacyCurtain())
-                RefreshRuntimeUnitFogVisibility();
-        }
-
-        FlushTurnStartAutonomyHelper();
-        TurnPerfLog("ApplyPendingTurnStartEffectsAfterHotSeatGate.Total", totalStartMs);
     }
 
     private void ApplyTeamFlipSettingsToSceneObjects()
@@ -9307,7 +9282,14 @@ public class MatchController : MonoBehaviour
         if (panelRodada == null)
             return;
 
-        if (!enabled || !ShouldUseHotSeatPrivacyCurtain())
+        if (!enabled)
+        {
+            panelRodada.CancelLoadingPresentation();
+            hotSeatGateActive = false;
+            return;
+        }
+
+        if (!ShouldUseHotSeatPrivacyCurtain())
         {
             panelRodada.HidePrivacyCurtainForDebug();
             return;
@@ -9735,25 +9717,40 @@ public class MatchController : MonoBehaviour
         out string blockedReason)
     {
         blockedReason = string.Empty;
-        if (construction == null || construction.requiredBuilding == null)
-            return true;
+        if (construction == null)
+        {
+            blockedReason = "ConstructionData indisponivel.";
+            return false;
+        }
         if (!IsValidPlayerSlot(slotId))
         {
             blockedReason = "Slot de jogador invalido.";
             return false;
         }
-        if (ConstructionManager.IsHeadQuarterlessTeam(GetVisualTeamForSlot(slotId)))
-            return true;
-        if (HasCapturedBuilding(slotId, construction.requiredBuilding))
-            return true;
 
-        string article = construction.requiredBuilding.grammaticalGender ==
-                         ConstructionGrammaticalGender.Feminine
-            ? "uma"
-            : "um";
-        blockedReason =
-            $"Capture {article} {ResolveProgressionBuildingName(construction.requiredBuilding)} primeiro.";
-        return false;
+        // O pre-requisito deixou de bloquear a captura. Enquanto ele estiver
+        // ausente, a forca efetiva e reduzida por
+        // ShouldPenalizeCaptureForMissingPrerequisite.
+        return true;
+    }
+
+    public bool ShouldPenalizeCaptureForMissingPrerequisite(
+        PlayerSlotId slotId,
+        ConstructionData construction,
+        out string prerequisiteName)
+    {
+        prerequisiteName = string.Empty;
+        if (construction == null || construction.requiredBuilding == null)
+            return false;
+        if (!IsValidPlayerSlot(slotId))
+            return false;
+        if (ConstructionManager.IsHeadQuarterlessTeam(GetVisualTeamForSlot(slotId)))
+            return false;
+        if (HasCapturedBuilding(slotId, construction.requiredBuilding))
+            return false;
+
+        prerequisiteName = ResolveProgressionBuildingName(construction.requiredBuilding);
+        return true;
     }
 
     private static bool TryResolveSlotHeadQuarterCell(PlayerSlotId slotId, out Vector3Int cell)

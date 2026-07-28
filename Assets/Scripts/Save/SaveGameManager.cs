@@ -1344,13 +1344,32 @@ public class SaveGameManager : MonoBehaviour
             LogLoadPerf(normalizedSlot, "restore_jogadas.begin", jogadasRestoreStartMs, jogadasRestoreStartMs - asyncStartMs);
             RestoreJogadasFromContainer(preprocess.jogadasJson);
             LogLoadPerf(normalizedSlot, "restore_jogadas.end", jogadasRestoreStartMs, PerfNowMs() - asyncStartMs);
-            if (lastLoadRoutineSucceeded && panelRodada != null)
+            if (lastLoadRoutineSucceeded)
             {
                 int playerNumber = matchController != null ? matchController.ActivePlayerListIndex + 1 : 1;
                 double presentationStartMs = PerfNowMs();
                 LogLoadPerf(normalizedSlot, "turn_presentation.begin", presentationStartMs, presentationStartMs - asyncStartMs);
-                if (matchController != null &&
-                    matchController.ShouldUseHotSeatPrivacyCurtain())
+                if (panelRodada == null)
+                {
+                    LogLoadPerf(
+                        normalizedSlot,
+                        "turn_presentation.unavailable",
+                        presentationStartMs,
+                        PerfNowMs() - asyncStartMs);
+                }
+                else if (matchController != null &&
+                    !matchController.IsTurnPanelPresentationEnabled)
+                {
+                    panelRodada.CancelLoadingPresentation();
+                    LogLoadPerf(
+                        normalizedSlot,
+                        "turn_presentation.disabled",
+                        presentationStartMs,
+                        PerfNowMs() - asyncStartMs);
+                }
+                else if (matchController != null &&
+                    (matchController.IsActiveTeamAI() ||
+                     matchController.ShouldUseHotSeatPrivacyCurtain()))
                 {
                     panelRodada.CancelLoadingPresentation();
                     panelRodada.ShowPrivacyCurtain(
@@ -1373,7 +1392,9 @@ public class SaveGameManager : MonoBehaviour
                             normalizedSlot,
                             "turn_button.ready",
                             presentationStartMs,
-                            PerfNowMs() - asyncStartMs));
+                            PerfNowMs() - asyncStartMs),
+                        () => matchController == null ||
+                            matchController.IsTurnBoardReadyForHumanConfirmation());
                     LogLoadPerf(normalizedSlot, "turn_button.confirmed", presentationStartMs, PerfNowMs() - asyncStartMs);
                 }
                 matchController?.ReleaseHotSeatGateAfterLoad();

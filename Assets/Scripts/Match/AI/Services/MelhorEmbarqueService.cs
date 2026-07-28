@@ -145,6 +145,24 @@ public static class MelhorEmbarqueService
                 request.map, request.transporter, tactical,
                 request.terrainDatabase);
 
+        IReadOnlyList<Vector3Int> candidateCells =
+            ResolveCandidateCells(
+                request,
+                out bool usedTopologyIndex);
+        BoardTopologyIndex topology =
+            usedTopologyIndex
+                ? BoardTopologyIndex.GetOrCreateRuntime(
+                    request.map,
+                    request.terrainDatabase)
+                : null;
+        AIDecisionPerf.AddCount("TopologyIndexQueries");
+        AIDecisionPerf.AddCount(
+            usedTopologyIndex
+                ? "TopologyIndexHits"
+                : "TopologyIndexMisses");
+        if (!usedTopologyIndex)
+            AIDecisionPerf.AddCount("TopologyFullScans");
+
         var passengers = new List<UnitManager>();
         var passengerSlots = new Dictionary<UnitManager, int>();
         var passengerReach =
@@ -175,7 +193,7 @@ public static class MelhorEmbarqueService
             passengers.Add(unit);
             passengerSlots[unit] = slotIndex;
             passengerReach[unit] = BuildPassengerReachProfile(
-                request, unit);
+                request, unit, topology);
             passengerRideNeed[unit] =
                 request.evaluateRideNeed?.Invoke(unit);
             request.diagnosticLog?.Invoke(
@@ -183,19 +201,8 @@ public static class MelhorEmbarqueService
                 FormatRideNeedDiagnostic(passengerRideNeed[unit]));
         }
 
-        IReadOnlyList<Vector3Int> candidateCells =
-            ResolveCandidateCells(
-                request,
-                out bool usedTopologyIndex);
-        AIDecisionPerf.AddCount("TopologyIndexQueries");
-        AIDecisionPerf.AddCount(
-            usedTopologyIndex
-                ? "TopologyIndexHits"
-                : "TopologyIndexMisses");
-        if (!usedTopologyIndex)
-            AIDecisionPerf.AddCount("TopologyFullScans");
-
         int topologyCellsVisited = 0;
+        int lzWithoutReachableNow = 0;
         for (int candidateIndex = 0;
              candidateIndex < candidateCells.Count;
              candidateIndex++)
@@ -346,10 +353,7 @@ public static class MelhorEmbarqueService
                 continue;
             if (lz.passengers.Count == 0)
             {
-                request.diagnosticLog?.Invoke(
-                    $"LZ={cell} tier={tier} opcoes={optionCountForLz} " +
-                    "sem passageiro ReachableNow; preservada apenas no " +
-                    "ranking plano.");
+                lzWithoutReachableNow++;
                 continue;
             }
 
@@ -381,6 +385,13 @@ public static class MelhorEmbarqueService
             AIDecisionPerf.AddCount(
                 "TopologyIndexCandidateCells",
                 topologyCellsVisited);
+        }
+        if (lzWithoutReachableNow > 0)
+        {
+            request.diagnosticLog?.Invoke(
+                $"LZs sem passageiro ReachableNow=" +
+                $"{lzWithoutReachableNow}; preservadas apenas no " +
+                "ranking plano.");
         }
         result.ranking.Sort(Compare);
         result.options.Sort(CompareOptions);
@@ -479,7 +490,8 @@ public static class MelhorEmbarqueService
 
     private static PassengerReachProfile BuildPassengerReachProfile(
         MelhorEmbarqueRequest request,
-        UnitManager passenger)
+        UnitManager passenger,
+        BoardTopologyIndex topology)
     {
         Vector3Int origin = passenger.CurrentCellPosition;
         origin.z = 0;
@@ -489,15 +501,78 @@ public static class MelhorEmbarqueService
             nowBudget,
             passenger.MaxMovementPoints
             * Mathf.Max(1, request.operationalTurns));
+        Dictionary<Vector3Int, int> nowStops =
+            UnitMovementPathRules.CalculateMovementCostMap(
+                request.map, passenger, origin, nowBudget,
+                request.terrainDatabase);
+        Dictionary<Vector3Int, int> laterStops =
+            UnitMovementPathRules.CalculateMovementCostMap(
+                request.map, passenger, origin, laterBudget,
+                request.terrainDatabase);
         return new PassengerReachProfile
         {
-            now = UnitMovementPathRules.CalculateMovementCostMap(
-                request.map, passenger, origin, nowBudget,
-                request.terrainDatabase),
-            later = UnitMovementPathRules.CalculateMovementCostMap(
-                request.map, passenger, origin, laterBudget,
-                request.terrainDatabase)
+            // A consulta seguinte pergunta pela LZ, nao pela celula final
+            // do passageiro. Expandir cada parada uma unica vez para ela
+            // mesma e seus seis vizinhos troca a busca linear repetida por
+            // uma consulta O(1), preservando o mesmo encontro a distancia 1.
+            now = BuildMeetingCostMap(
+                request.map, topology, nowStops),
+            later = BuildMeetingCostMap(
+                request.map, topology, laterStops)
         };
+    }
+
+    private static Dictionary<Vector3Int, int> BuildMeetingCostMap(
+        Tilemap map,
+        BoardTopologyIndex topology,
+        Dictionary<Vector3Int, int> stopCosts)
+    {
+        var meetingCosts = new Dictionary<Vector3Int, int>();
+        if (stopCosts == null || stopCosts.Count == 0)
+            return meetingCosts;
+
+        var fallbackNeighbors = new List<Vector3Int>(6);
+        foreach (KeyValuePair<Vector3Int, int> pair in stopCosts)
+        {
+            Vector3Int stop = pair.Key;
+            stop.z = 0;
+            SetMinimumMeetingCost(
+                meetingCosts, stop, pair.Value);
+
+            IReadOnlyList<Vector3Int> neighbors;
+            if (topology != null && topology.IsReady)
+            {
+                neighbors = topology.GetNeighbors(stop);
+            }
+            else
+            {
+                UnitMovementPathRules.GetImmediateHexNeighbors(
+                    map, stop, fallbackNeighbors);
+                neighbors = fallbackNeighbors;
+            }
+
+            for (int i = 0; i < neighbors.Count; i++)
+            {
+                Vector3Int neighbor = neighbors[i];
+                neighbor.z = 0;
+                SetMinimumMeetingCost(
+                    meetingCosts, neighbor, pair.Value);
+            }
+        }
+
+        return meetingCosts;
+    }
+
+    private static void SetMinimumMeetingCost(
+        Dictionary<Vector3Int, int> costs,
+        Vector3Int cell,
+        int candidateCost)
+    {
+        if (!costs.TryGetValue(cell, out int currentCost)
+            || candidateCost < currentCost)
+        {
+            costs[cell] = candidateCost;
+        }
     }
 
     private static void ResolvePassengerMeeting(
@@ -531,17 +606,9 @@ public static class MelhorEmbarqueService
         moveCost = int.MaxValue;
         if (costs == null)
             return false;
-        foreach (KeyValuePair<Vector3Int, int> pair in costs)
-        {
-            Vector3Int stop = pair.Key;
-            stop.z = 0;
-            if (SectorManager.HexDistance(
-                    stop, transporterCell) > 1.5f)
-                continue;
-            if (pair.Value < moveCost)
-                moveCost = pair.Value;
-        }
-        return moveCost < int.MaxValue;
+        transporterCell.z = 0;
+        return costs.TryGetValue(
+            transporterCell, out moveCost);
     }
 
     private static float ResolvePassengerRoutePenalty(
