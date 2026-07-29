@@ -8,8 +8,8 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
 {
     private enum DebugView { Ambas, MelhorLZ, SpotsPassageiros }
 
+    [SerializeField] private UnitManager passenger;
     [SerializeField] private UnitManager transporter;
-    [SerializeField] private ConstructionManager forcedTarget;
     [SerializeField] private TerrainDatabase terrainDatabase;
     [SerializeField] private DebugView view = DebugView.Ambas;
     [SerializeField] private int routeHorizon = 120;
@@ -23,7 +23,8 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
         new List<MelhorDesembarqueLzScore>();
     private MelhorDesembarqueLzScore selected;
     private Vector2 scroll;
-    private string status = "Selecione um transportador carregado.";
+    private string status =
+        "Selecione o passageiro; o hex desejado e opcional.";
     private bool pickingTargetCell;
     private bool pickingSecondTargetCell;
     private Vector3Int hoverCell;
@@ -42,20 +43,22 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
 
     private void OnSelectionChange()
     {
-        UnitManager picked = Selection.activeGameObject != null
-            ? Selection.activeGameObject.GetComponent<UnitManager>()
-            : null;
-        if (picked != null)
-        {
-            transporter = picked;
-            AutoDetect();
-            Repaint();
-        }
+        Repaint();
     }
 
     private void AutoDetect()
     {
-        if (transporter != null && transporter.BoardTilemap != null)
+        if (passenger != null)
+        {
+            if (passenger.IsEmbarked
+                && passenger.EmbarkedTransporter != null)
+                transporter = passenger.EmbarkedTransporter;
+            if (passenger.BoardTilemap != null)
+                map = passenger.BoardTilemap;
+        }
+        if (map == null
+            && transporter != null
+            && transporter.BoardTilemap != null)
             map = transporter.BoardTilemap;
         if (terrainDatabase == null)
         {
@@ -70,18 +73,22 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
     {
         EditorGUILayout.LabelField("Melhor LZ de Desembarque", EditorStyles.boldLabel);
         EditorGUILayout.HelpBox(
-            "Consulta pura. Uma passada de Caminhos Validos do transportador; " +
-            "cada LZ simula PodeDesembarcar sem mover a unidade.",
+            "Consulta pura centrada no passageiro. O transportador e inferido " +
+            "da carga embarcada. Sem hex desejado, respeita a intencao atual " +
+            "do passageiro; com hex informado, procura a melhor LZ para " +
+            "entrega-lo naquele destino. Cada LZ simula PodeDesembarcar sem " +
+            "mover nenhuma unidade.",
             MessageType.Info);
 
         EditorGUILayout.LabelField("Contexto", EditorStyles.boldLabel);
         EditorGUI.BeginChangeCheck();
+        passenger = (UnitManager)EditorGUILayout.ObjectField(
+            "Passageiro", passenger, typeof(UnitManager), true);
         transporter = (UnitManager)EditorGUILayout.ObjectField(
-            "Transportador", transporter, typeof(UnitManager), true);
-        forcedTarget = (ConstructionManager)EditorGUILayout.ObjectField(
-            new GUIContent("Alvo forcado (opcional)",
-                "Vazio: usa o setor do plano do passageiro ou o capturavel com menor rota valida."),
-            forcedTarget, typeof(ConstructionManager), true);
+            new GUIContent(
+                "Transportador",
+                "Inferido automaticamente quando o passageiro esta embarcado."),
+            transporter, typeof(UnitManager), true);
         terrainDatabase = (TerrainDatabase)EditorGUILayout.ObjectField(
             "Terrain Database", terrainDatabase, typeof(TerrainDatabase), false);
         view = (DebugView)EditorGUILayout.EnumPopup("Visao", view);
@@ -97,34 +104,24 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
         EditorGUILayout.BeginHorizontal();
         if (GUILayout.Button("Usar Selecionado"))
             TryUseCurrentSelection();
+        if (GUILayout.Button("Usar como Transportador"))
+            TryUseCurrentSelectionAsTransporter();
         if (GUILayout.Button("Auto Detect"))
-        {
-            AutoDetect();
-            status = map != null ? "Contexto detectado." : "Tilemap nao encontrado.";
-        }
-        GUI.backgroundColor = pickingTargetCell
-            ? new Color(1f, 0.75f, 0.2f)
-            : Color.white;
-        if (GUILayout.Button(pickingTargetCell ? "Clique no Scene View..." : "Escolher Celula"))
-        {
-            pickingTargetCell = !pickingTargetCell;
-            pickingSecondTargetCell = false;
-            SceneView.RepaintAll();
-        }
-        GUI.backgroundColor = Color.white;
+            AutoDetectRuntimeSelection();
         EditorGUILayout.EndHorizontal();
+
+        DrawEmbarkedPassengerGrid();
 
         EditorGUILayout.BeginHorizontal();
         using (new EditorGUI.DisabledScope(true))
             EditorGUILayout.Vector3IntField(
-                "Celula alvo",
+                "Hex desejado — vaga 1",
                 hasPickedTargetCell ? pickedTargetCell : Vector3Int.zero);
         using (new EditorGUI.DisabledScope(!hasPickedTargetCell))
         {
             if (GUILayout.Button("Limpar", GUILayout.Width(55f)))
             {
                 hasPickedTargetCell = false;
-                hasSecondPickedTargetCell = false;
                 ranking.Clear();
                 selected = null;
                 SceneView.RepaintAll();
@@ -135,7 +132,7 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
         EditorGUILayout.BeginHorizontal();
         using (new EditorGUI.DisabledScope(true))
             EditorGUILayout.Vector3IntField(
-                "Segundo local",
+                "Hex desejado — vaga 2",
                 hasSecondPickedTargetCell
                     ? secondPickedTargetCell
                     : Vector3Int.zero);
@@ -151,15 +148,28 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
         }
         EditorGUILayout.EndHorizontal();
 
-        using (new EditorGUI.DisabledScope(!hasPickedTargetCell))
+        EditorGUILayout.BeginHorizontal();
+        using (new EditorGUI.DisabledScope(transporter == null))
         {
+            GUI.backgroundColor = pickingTargetCell
+                ? new Color(1f, 0.75f, 0.2f)
+                : Color.white;
+            if (GUILayout.Button(
+                    pickingTargetCell
+                        ? "Escolhendo destino da vaga 1..."
+                        : "Escolher destino da vaga 1"))
+            {
+                pickingTargetCell = !pickingTargetCell;
+                pickingSecondTargetCell = false;
+                SceneView.RepaintAll();
+            }
             GUI.backgroundColor = pickingSecondTargetCell
                 ? new Color(0.85f, 0.35f, 1f)
                 : Color.white;
             if (GUILayout.Button(
                     pickingSecondTargetCell
-                        ? "Clique no segundo local..."
-                        : "Selecione um segundo local"))
+                        ? "Escolhendo destino da vaga 2..."
+                        : "Escolher destino da vaga 2"))
             {
                 pickingSecondTargetCell = !pickingSecondTargetCell;
                 pickingTargetCell = false;
@@ -167,8 +177,11 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
             }
             GUI.backgroundColor = Color.white;
         }
+        EditorGUILayout.EndHorizontal();
 
-        using (new EditorGUI.DisabledScope(transporter == null || map == null))
+        using (new EditorGUI.DisabledScope(
+                   transporter == null
+                   || map == null))
         {
             if (GUILayout.Button("Calcular Melhor LZ de Desembarque", GUILayout.Height(28f)))
                 Calculate();
@@ -178,6 +191,11 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
         EditorGUILayout.LabelField(status, EditorStyles.wordWrappedLabel);
         if (ranking.Count == 0)
             return;
+        EditorGUILayout.HelpBox(
+            "Amarelo: LZ vencedora do transportador. " +
+            "Verde/laranja/vermelho: demais LZs do ranking. " +
+            "Azul/ciano: hex onde cada passageiro desembarca para a LZ selecionada.",
+            MessageType.None);
 
         scroll = EditorGUILayout.BeginScrollView(scroll);
         for (int i = 0; i < ranking.Count; i++)
@@ -211,6 +229,113 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
         EditorGUILayout.EndScrollView();
     }
 
+    private void DrawEmbarkedPassengerGrid()
+    {
+        EditorGUILayout.Space(4f);
+        EditorGUILayout.LabelField(
+            "Passageiros embarcados",
+            EditorStyles.boldLabel);
+
+        IReadOnlyList<UnitTransportSeatRuntime> seats =
+            transporter != null
+                ? transporter.TransportedUnitSlots
+                : null;
+        var embarkedSeats = new List<UnitTransportSeatRuntime>();
+        for (int i = 0; seats != null && i < seats.Count; i++)
+        {
+            UnitTransportSeatRuntime seat = seats[i];
+            if (seat?.embarkedUnit != null
+                && seat.embarkedUnit.IsEmbarked)
+                embarkedSeats.Add(seat);
+        }
+        embarkedSeats.Sort((a, b) =>
+        {
+            int byTurn = ResolveEmbarkedTurn(a)
+                .CompareTo(ResolveEmbarkedTurn(b));
+            if (byTurn != 0)
+                return byTurn;
+            int bySlot = a.slotIndex.CompareTo(b.slotIndex);
+            return bySlot != 0
+                ? bySlot
+                : a.seatIndex.CompareTo(b.seatIndex);
+        });
+
+        if (embarkedSeats.Count == 0)
+        {
+            EditorGUILayout.HelpBox(
+                transporter == null
+                    ? "Selecione um transportador para listar sua carga."
+                    : "Este transportador nao possui passageiros embarcados.",
+                MessageType.None);
+            return;
+        }
+
+        GUI.backgroundColor = passenger == null
+            ? new Color(1f, 0.8f, 0.2f)
+            : Color.white;
+        if (GUILayout.Button(
+                "Toda a carga — simular desembarque conjunto",
+                GUILayout.Height(28f)))
+        {
+            passenger = null;
+            ranking.Clear();
+            selected = null;
+            status =
+                "Toda a carga sera avaliada em conjunto; vaga 1 e vaga 2 " +
+                "usam seus respectivos hexes desejados.";
+            SceneView.RepaintAll();
+        }
+        GUI.backgroundColor = Color.white;
+
+        int columns = Mathf.Max(
+            1,
+            Mathf.FloorToInt(
+                Mathf.Max(180f, position.width - 24f) / 190f));
+        for (int i = 0; i < embarkedSeats.Count; i += columns)
+        {
+            EditorGUILayout.BeginHorizontal();
+            for (int c = 0; c < columns; c++)
+            {
+                int index = i + c;
+                if (index >= embarkedSeats.Count)
+                {
+                    GUILayout.FlexibleSpace();
+                    continue;
+                }
+
+                UnitTransportSeatRuntime seat = embarkedSeats[index];
+                UnitManager embarked = seat.embarkedUnit;
+                bool active = passenger == embarked;
+                GUI.backgroundColor = active
+                    ? new Color(0.25f, 0.9f, 1f)
+                    : Color.white;
+                string designation =
+                    embarked.AIHasDesignatedCaptureTarget
+                        ? $"\nAlvo #{embarked.AIDesignatedCaptureTargetInstanceId} " +
+                          $"{embarked.AIDesignatedCaptureTargetCell}"
+                        : "\nSem destino designado";
+                if (GUILayout.Button(
+                        $"Destino {index + 1} | " +
+                        $"{embarked.UnitDisplayName} #{embarked.InstanceId}" +
+                        $"\nVaga fisica {seat.slotIndex + 1}" +
+                        designation,
+                        GUILayout.MinWidth(170f),
+                        GUILayout.Height(54f)))
+                {
+                    passenger = embarked;
+                    AutoDetect();
+                    ranking.Clear();
+                    selected = null;
+                    status =
+                        $"Passageiro embarcado: {embarked.name}.";
+                    SceneView.RepaintAll();
+                }
+                GUI.backgroundColor = Color.white;
+            }
+            EditorGUILayout.EndHorizontal();
+        }
+    }
+
     private void TryUseCurrentSelection()
     {
         UnitManager picked = Selection.activeGameObject != null
@@ -222,14 +347,145 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
             return;
         }
 
-        transporter = picked;
+        passenger = picked;
         AutoDetect();
         ranking.Clear();
         selected = null;
-        status = $"Transportador selecionado: {transporter.name}.";
+        status = passenger.IsEmbarked && transporter != null
+            ? $"Passageiro selecionado: {passenger.name}; " +
+              $"transportador: {transporter.name}."
+            : $"Passageiro selecionado: {passenger.name}; " +
+              "nao esta embarcado.";
         Repaint();
         SceneView.RepaintAll();
     }
+
+    private void TryUseCurrentSelectionAsTransporter()
+    {
+        UnitManager picked = Selection.activeGameObject != null
+            ? Selection.activeGameObject.GetComponent<UnitManager>()
+            : null;
+        if (picked == null)
+        {
+            status =
+                "O GameObject selecionado nao possui UnitManager.";
+            return;
+        }
+
+        transporter = picked;
+        if (passenger != null
+            && (!passenger.IsEmbarked
+                || passenger.EmbarkedTransporter != transporter))
+            passenger = null;
+        AutoDetect();
+        ranking.Clear();
+        selected = null;
+        status =
+            $"Transportador selecionado: {transporter.name}. " +
+            "Escolha um de seus passageiros.";
+        Repaint();
+        SceneView.RepaintAll();
+    }
+
+    private void AutoDetectRuntimeSelection()
+    {
+        UnitManager runtimeUnit = null;
+        string runtimeSource = "";
+        if (Application.isPlaying)
+        {
+            TurnStateManager turnState =
+                FindAnyObjectByType<TurnStateManager>();
+            runtimeUnit = turnState != null
+                ? turnState.SelectedUnit
+                : null;
+            runtimeSource = "TurnStateManager.SelectedUnit";
+            if (runtimeUnit == null)
+            {
+                AIController ai =
+                    FindAnyObjectByType<AIController>();
+                if (ai != null
+                    && ai.TryGetDebugStepPendingUnit(
+                        out UnitManager pending))
+                {
+                    runtimeUnit = pending;
+                    runtimeSource = "batch preparado pelo F11";
+                }
+            }
+        }
+
+        if (runtimeUnit != null)
+        {
+            if (runtimeUnit.IsEmbarked
+                && runtimeUnit.EmbarkedTransporter != null)
+            {
+                passenger = runtimeUnit;
+                transporter = runtimeUnit.EmbarkedTransporter;
+            }
+            else if (TryResolveFirstEmbarkedPassenger(
+                         runtimeUnit,
+                         out UnitManager detectedPassenger))
+            {
+                transporter = runtimeUnit;
+                passenger = detectedPassenger;
+            }
+            else
+            {
+                status =
+                    $"{runtimeUnit.name} ({runtimeSource}) nao e " +
+                    "passageiro embarcado nem transportador carregado.";
+                return;
+            }
+
+            AutoDetect();
+            ranking.Clear();
+            selected = null;
+            Selection.activeGameObject = passenger.gameObject;
+            EditorGUIUtility.PingObject(passenger.gameObject);
+            SceneView.FrameLastActiveSceneView();
+            SceneView.RepaintAll();
+            status =
+                $"Passageiro runtime ({runtimeSource}): " +
+                $"{passenger.name}; transportador: {transporter.name}.";
+            return;
+        }
+
+        AutoDetect();
+        status = Application.isPlaying
+            ? "A IA nao possui batch runtime detectavel neste instante."
+            : "Contexto detectado. Fora do Play Mode, use os botoes de selecao.";
+    }
+
+    private static bool TryResolveFirstEmbarkedPassenger(
+        UnitManager candidateTransporter,
+        out UnitManager detectedPassenger)
+    {
+        detectedPassenger = null;
+        IReadOnlyList<UnitTransportSeatRuntime> seats =
+            candidateTransporter != null
+                ? candidateTransporter.TransportedUnitSlots
+                : null;
+        UnitTransportSeatRuntime oldestSeat = null;
+        for (int i = 0; seats != null && i < seats.Count; i++)
+        {
+            UnitTransportSeatRuntime seat = seats[i];
+            if (seat?.embarkedUnit == null
+                || !seat.embarkedUnit.IsEmbarked)
+                continue;
+            if (oldestSeat == null
+                || ResolveEmbarkedTurn(seat)
+                    < ResolveEmbarkedTurn(oldestSeat))
+                oldestSeat = seat;
+        }
+
+        detectedPassenger = oldestSeat?.embarkedUnit;
+        return detectedPassenger != null;
+    }
+
+    private static int ResolveEmbarkedTurn(
+        UnitTransportSeatRuntime seat) =>
+        seat != null && seat.embarkedOnTurn >= 0
+            ? seat.embarkedOnTurn
+            : int.MaxValue;
 
     private void Calculate()
     {
@@ -237,9 +493,19 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
         ranking.Clear();
         selected = null;
         AutoDetect();
-        if (transporter == null || map == null || terrainDatabase == null)
+        if (transporter == null
+            || map == null
+            || terrainDatabase == null)
         {
             status = "Contexto incompleto.";
+            return;
+        }
+        if (passenger != null
+            && (!passenger.IsEmbarked
+                || passenger.EmbarkedTransporter != transporter))
+        {
+            status =
+                "O passageiro selecionado nao esta embarcado neste transportador.";
             return;
         }
 
@@ -247,6 +513,7 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
             new MelhorDesembarqueRequest
             {
                 transporter = transporter,
+                passengerFilter = passenger,
                 map = map,
                 terrainDatabase = terrainDatabase,
                 movementBudget = transporter.RemainingMovementPoints,
@@ -285,16 +552,25 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
     {
         target = Vector3Int.zero;
         routeCost = int.MaxValue;
-        if (hasPickedTargetCell)
+        if (TryResolveManualTargetForPassenger(
+                passenger,
+                out Vector3Int manualTarget))
         {
-            Vector3Int manualTarget =
-                ResolveManualTargetForPassenger(passenger);
             return TryRouteTo(
                 passenger, from, manualTarget,
                 out target, out routeCost);
         }
-        if (forcedTarget != null)
-            return TryRouteTo(passenger, from, forcedTarget.CurrentCellPosition, out target, out routeCost);
+
+        if (TryResolveDesignatedCaptureTarget(
+                passenger,
+                out Vector3Int designatedTarget)
+            && TryRouteTo(
+                passenger,
+                from,
+                designatedTarget,
+                out target,
+                out routeCost))
+            return true;
 
         string planName = passenger.AIAssignedPlanName;
         ConstructionManager best = null;
@@ -358,12 +634,13 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
         return reverse.TryGetValue(from, out cost);
     }
 
-    private Vector3Int ResolveManualTargetForPassenger(UnitManager passenger)
+    private bool TryResolveManualTargetForPassenger(
+        UnitManager selectedPassenger,
+        out Vector3Int manualTarget)
     {
-        if (!hasSecondPickedTargetCell
-            || transporter == null
-            || passenger == null)
-            return pickedTargetCell;
+        manualTarget = Vector3Int.zero;
+        if (transporter == null || selectedPassenger == null)
+            return false;
 
         var ordered = new List<UnitTransportSeatRuntime>();
         IReadOnlyList<UnitTransportSeatRuntime> seats =
@@ -371,30 +648,67 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
         for (int i = 0; seats != null && i < seats.Count; i++)
         {
             UnitTransportSeatRuntime seat = seats[i];
-            if (seat?.embarkedUnit != null)
+            if (seat?.embarkedUnit != null
+                && seat.embarkedUnit.IsEmbarked)
                 ordered.Add(seat);
         }
         ordered.Sort((a, b) =>
         {
-            int turnA = a.embarkedOnTurn >= 0
-                ? a.embarkedOnTurn
-                : int.MaxValue;
-            int turnB = b.embarkedOnTurn >= 0
-                ? b.embarkedOnTurn
-                : int.MaxValue;
-            int byTurn = turnA.CompareTo(turnB);
-            if (byTurn != 0) return byTurn;
+            int byTurn = ResolveEmbarkedTurn(a)
+                .CompareTo(ResolveEmbarkedTurn(b));
+            if (byTurn != 0)
+                return byTurn;
             int bySlot = a.slotIndex.CompareTo(b.slotIndex);
             return bySlot != 0
                 ? bySlot
                 : a.seatIndex.CompareTo(b.seatIndex);
         });
 
-        int passengerIndex = ordered.FindIndex(
-            seat => seat.embarkedUnit == passenger);
-        return passengerIndex >= 1
-            ? secondPickedTargetCell
-            : pickedTargetCell;
+        int index = ordered.FindIndex(
+            seat => seat.embarkedUnit == selectedPassenger);
+        if (index == 0 && hasPickedTargetCell)
+        {
+            manualTarget = pickedTargetCell;
+            return true;
+        }
+        if (index == 1 && hasSecondPickedTargetCell)
+        {
+            manualTarget = secondPickedTargetCell;
+            return true;
+        }
+        return false;
+    }
+
+    private static bool TryResolveDesignatedCaptureTarget(
+        UnitManager selectedPassenger,
+        out Vector3Int target)
+    {
+        target = Vector3Int.zero;
+        if (selectedPassenger == null
+            || !selectedPassenger.AIHasDesignatedCaptureTarget)
+            return false;
+
+        int instanceId =
+            selectedPassenger.AIDesignatedCaptureTargetInstanceId;
+        Vector3Int designatedCell =
+            selectedPassenger.AIDesignatedCaptureTargetCell;
+        designatedCell.z = 0;
+        foreach (ConstructionManager construction
+                 in ConstructionManager.AllActive)
+        {
+            if (construction == null)
+                continue;
+            Vector3Int cell = construction.CurrentCellPosition;
+            cell.z = 0;
+            if (construction.InstanceId != instanceId
+                && cell != designatedCell)
+                continue;
+            if (construction.TeamId == selectedPassenger.TeamId)
+                return false;
+            target = cell;
+            return true;
+        }
+        return false;
     }
 
     private void OnSceneGUI(SceneView sceneView)
@@ -466,7 +780,7 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
             Handles.DrawWireDisc(targetWorld, Vector3.back, 0.34f);
             Handles.Label(
                 targetWorld + Vector3.up * 0.36f,
-                "ALVO 1",
+                "ALVO VAGA 1",
                 LabelStyle(targetColor));
         }
         if (hasSecondPickedTargetCell)
@@ -480,7 +794,7 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
                 targetWorld, Vector3.back, 0.34f);
             Handles.Label(
                 targetWorld + Vector3.up * 0.36f,
-                "ALVO 2",
+                "ALVO VAGA 2",
                 LabelStyle(targetColor));
         }
     }
@@ -521,16 +835,14 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
             pickedTargetCell = hoverCell;
             pickedTargetCell.z = 0;
             hasPickedTargetCell = true;
-            hasSecondPickedTargetCell = false;
         }
         pickingTargetCell = false;
         pickingSecondTargetCell = false;
-        forcedTarget = null;
         ranking.Clear();
         selected = null;
         status = selectingSecond
-            ? $"Segundo local escolhido: {secondPickedTargetCell}."
-            : $"Primeiro local escolhido: {pickedTargetCell}.";
+            ? $"Hex desejado da vaga 2: {secondPickedTargetCell}."
+            : $"Hex desejado da vaga 1: {pickedTargetCell}.";
         evt.Use();
         Repaint();
         SceneView.RepaintAll();

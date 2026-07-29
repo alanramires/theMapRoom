@@ -175,8 +175,15 @@ public partial class AIController
                 resolvePassengerTarget = ResolveTarget,
                 passengerPriorityByInstanceId =
                     passengerPriorityByInstanceId,
-                allowTransporterCell = IsConfirmedVisibleCellForAI,
-                allowDisembarkCell = IsConfirmedVisibleCellForAI,
+                // Regra oficial da LZ: o transportador pode terminar em
+                // terreno atualmente visível ou já explorado. Preto
+                // desconhecido continua proibido.
+                allowTransporterCell =
+                    IsConfirmedVisibleOrExploredCellForAI,
+                // O FoW do spot não veta a entrega. Depois que a LZ do
+                // transportador foi autorizada, PodeDesembarcar + caminhos
+                // válidos são a fonte de verdade para o passageiro.
+                allowDisembarkCell = null,
                 diagnosticLog = showAILogs
                     ? message => Debug.Log(
                         $"{TL("Transporte")}[MelhorDesembarque] {message}")
@@ -1012,6 +1019,21 @@ public partial class AIController
         return true;
     }
 
+    private bool IsConfirmedVisibleOrExploredCellForAI(Vector3Int cell)
+    {
+        cell.z = 0;
+        if (matchController == null)
+            return false;
+
+        return matchController.IsCellVisibleForActiveTeam(cell)
+            || matchController.IsCellExploredBySlot(
+                matchController.ActiveSlotId,
+                cell);
+    }
+
+    // Outros consumidores ainda exigem visibilidade corrente por regra
+    // própria. Melhor Desembarque usa conhecimento confirmado; não amplie
+    // silenciosamente supply/naval ao alterar esta política.
     private bool IsConfirmedVisibleCellForAI(Vector3Int cell)
     {
         cell.z = 0;
@@ -1129,6 +1151,40 @@ public partial class AIController
         for (int i = 0; i < ordered.Count; i++)
         {
             UnitManager passenger = ordered[i];
+
+            // A designacao persistida pertence ao passageiro, nao ao courier.
+            // O ranking conjunto apenas distribui oportunidades para cargas
+            // ainda sem destino; ele nunca pode substituir uma reserva valida
+            // porque existe um predio mais perto do transportador.
+            if (TryResolveUnitDesignatedCaptureTarget(
+                    passenger,
+                    out ConstructionManager designatedTarget))
+            {
+                Vector3Int designatedCell =
+                    designatedTarget.CurrentCellPosition;
+                designatedCell.z = 0;
+                if (claimed.Contains(designatedTarget))
+                {
+                    Debug.LogWarning(
+                        $"{TL("Transporte")} alvo conjunto rebelde: " +
+                        $"passageiro #{passenger.InstanceId} preserva " +
+                        $"DesignatedCaptureTarget " +
+                        $"#{designatedTarget.InstanceId}@{designatedCell}, " +
+                        "mas outro passageiro deste courier ja o reivindicou; " +
+                        "permanece embarcado.");
+                    continue;
+                }
+
+                claimed.Add(designatedTarget);
+                targets[passenger.InstanceId] = designatedCell;
+                Debug.Log(
+                    $"{TL("Transporte")} alvo conjunto rebelde: " +
+                    $"passageiro #{passenger.InstanceId} preserva " +
+                    $"DesignatedCaptureTarget " +
+                    $"#{designatedTarget.InstanceId}@{designatedCell}.");
+                continue;
+            }
+
             ConstructionManager best = null;
             float bestDistance = float.MaxValue;
             foreach (ConstructionManager building in ConstructionManager.AllActive)

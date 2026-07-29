@@ -34,6 +34,7 @@ public sealed class MelhorDesembarqueLzScore
 public sealed class MelhorDesembarqueRequest
 {
     public UnitManager transporter;
+    public UnitManager passengerFilter;
     public Tilemap map;
     public TerrainDatabase terrainDatabase;
     public int movementBudget;
@@ -110,7 +111,12 @@ public static class MelhorDesembarqueService
             lzCellsVisited++;
             if (request.allowTransporterCell != null
                 && !request.allowTransporterCell(lzCell))
+            {
+                request.diagnosticLog?.Invoke(
+                    $"LZ={lzCell} REJECT " +
+                    "reason=transporter_cell_not_visible_or_explored");
                 continue;
+            }
             List<UnitManager> lzOccupants =
                 UnitOccupancyRules.GetUnitsAtCell(
                     request.map, lzCell, request.transporter);
@@ -298,6 +304,9 @@ public static class MelhorDesembarqueService
         {
             PodeDesembarcarOption option = options[i];
             if (option?.passengerUnit == null)
+                continue;
+            if (request.passengerFilter != null
+                && option.passengerUnit != request.passengerFilter)
                 continue;
 
             Vector3Int spotCell = option.disembarkCell;
