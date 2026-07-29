@@ -363,24 +363,57 @@ public static class PodeFundirSensor
             return true;
         }
 
-        ConstructionManager construction = ConstructionOccupancyRules.GetConstructionAtCell(map, targetCell);
+        if (!TryResolveTerrainAtCell(
+                map,
+                terrainDatabase,
+                targetCell,
+                out TerrainTypeData terrain)
+            || terrain == null)
+        {
+            reason = "Sem terreno valido para calcular custo da fusao.";
+            return false;
+        }
+
+        ConstructionManager construction =
+            ConstructionOccupancyRules.GetConstructionAtCell(
+                map,
+                targetCell);
         if (construction != null)
         {
-            if (!ConstructionAllowsUnitBySkillRules(construction, mover))
+            if (construction.InheritsTerrainRulesOn(terrain))
+            {
+                if (!UnitPassesTerrainSkillRequirement(mover, terrain)
+                    || UnitBlockedByAnySkill(
+                        mover,
+                        terrain.blockedSkills))
+                {
+                    reason = "Unidade ativa nao cumpre as regras do terreno herdado pela construcao.";
+                    return false;
+                }
+
+                cost = GetAutonomyCostWithSkillOverrides(
+                    terrain.basicAutonomyCost,
+                    terrain.skillCostOverrides,
+                    mover);
+                cost = Mathf.Max(1, cost);
+                return true;
+            }
+
+            if (!ConstructionAllowsUnitBySkillRules(
+                    construction,
+                    terrain,
+                    mover))
             {
                 reason = "Unidade ativa nao cumpre as regras da construcao para fundir neste hex.";
                 return false;
             }
 
-            cost = GetAutonomyCostWithSkillOverrides(construction.GetBaseMovementCost(), construction.GetSkillCostOverrides(), mover);
+            cost = GetAutonomyCostWithSkillOverrides(
+                construction.GetBaseMovementCost(),
+                construction.GetSkillCostOverrides(terrain),
+                mover);
             cost = Mathf.Max(1, cost);
             return true;
-        }
-
-        if (!TryResolveTerrainAtCell(map, terrainDatabase, targetCell, out TerrainTypeData terrain) || terrain == null)
-        {
-            reason = "Sem terreno valido para fallback de custo da fusao.";
-            return false;
         }
 
         StructureData structure = StructureOccupancyRules.GetStructureAtCell(map, targetCell);
@@ -392,13 +425,16 @@ public static class PodeFundirSensor
                 return false;
             }
 
-            cost = GetAutonomyCostWithSkillOverrides(structure.baseMovementCost, terrain.skillCostOverrides, mover);
-            cost = GetAutonomyCostWithSkillOverrides(cost, structure.GetSkillCostOverrides(terrain), mover);
+            cost = GetAutonomyCostWithSkillOverrides(
+                structure.baseMovementCost,
+                structure.GetSkillCostOverrides(terrain),
+                mover);
             cost = Mathf.Max(1, cost);
             return true;
         }
 
-        if (!UnitPassesTerrainSkillRequirement(mover, terrain))
+        if (!UnitPassesTerrainSkillRequirement(mover, terrain)
+            || UnitBlockedByAnySkill(mover, terrain.blockedSkills))
         {
             reason = "Unidade ativa nao cumpre skill minima do terreno para fundir neste hex.";
             return false;
@@ -489,13 +525,18 @@ public static class PodeFundirSensor
         return false;
     }
 
-    private static bool ConstructionAllowsUnitBySkillRules(ConstructionManager construction, UnitManager unit)
+    private static bool ConstructionAllowsUnitBySkillRules(
+        ConstructionManager construction,
+        TerrainTypeData terrain,
+        UnitManager unit)
     {
         if (construction == null || unit == null)
             return false;
 
-        IReadOnlyList<SkillData> required = construction.GetRequiredSkillsToEnter();
-        IReadOnlyList<SkillData> blocked = construction.GetBlockedSkillsToEnter();
+        IReadOnlyList<SkillData> required =
+            construction.GetRequiredSkillsToEnter(terrain);
+        IReadOnlyList<SkillData> blocked =
+            construction.GetBlockedSkillsToEnter(terrain);
         if (UnitBlockedByAnySkill(unit, blocked))
             return false;
 

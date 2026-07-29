@@ -10,8 +10,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: aec5091123b209d4c8b513b772829f77, type: 3}
-  m_Name: "Motor Caminh\xE3o"
+  m_Name: Caminhoneiro
   m_EditorClassIdentifier: Assembly-CSharp::SkillData
-  id: motorC
-  displayName: "Motor Caminh\xE3o"
-  description: "Motor de Caminh\xE3o \xE9 ruim em florestas e montanhas"
+  id: caminhoneiro
+  displayName: Caminhoneiro
+  description: "Motor de Caminh\xE3o segue outras regras"

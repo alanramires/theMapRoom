@@ -55,6 +55,11 @@ public partial class AIController
         transporterCell.z = 0;
         Vector3Int selectedLz = decision.option.lzCell;
         selectedLz.z = 0;
+        Vector3Int passengerMeeting =
+            decision.option.hasPassengerMeetingCell
+                ? decision.option.passengerMeetingCell
+                : selectedLz;
+        passengerMeeting.z = 0;
 
         Vector3Int fromCell = unit.CurrentCellPosition;
         fromCell.z = 0;
@@ -103,7 +108,8 @@ public partial class AIController
         }
 
         return TryBuildCombatPassengerRendezvousAction(
-            unit, snapshot, decision, fromCell, selectedLz, paths);
+            unit, snapshot, decision, fromCell,
+            selectedLz, passengerMeeting, paths);
     }
 
     private PlayerAction TryBuildCombatPassengerRendezvousAction(
@@ -112,31 +118,35 @@ public partial class AIController
         CombatPassengerTransportDecision decision,
         Vector3Int fromCell,
         Vector3Int selectedLz,
+        Vector3Int passengerMeeting,
         Dictionary<Vector3Int, List<Vector3Int>> paths)
     {
         if (passenger == null || snapshot == null || decision?.transporter == null)
             return null;
 
         if (paths != null
-            && selectedLz != fromCell
-            && paths.ContainsKey(selectedLz))
+            && passengerMeeting != fromCell
+            && paths.ContainsKey(passengerMeeting))
         {
             ClaimCombatPassengerTransportDecision(decision);
             Debug.Log(
                 $"{TL("Transporte")} passageiro #{passenger.InstanceId} " +
-                $"policy={decision.policy} segue para LZ={selectedLz} " +
+                $"policy={decision.policy} segue para encontroPax=" +
+                $"{passengerMeeting} LZTransport={selectedLz} " +
                 $"do transportador #{decision.transporter.InstanceId} " +
                 $"tier={decision.option.transporterTier}.");
             return BuildMoveBatch(
-                passenger, snapshot.AITeam, fromCell, selectedLz, paths);
+                passenger, snapshot.AITeam, fromCell,
+                passengerMeeting, paths);
         }
 
-        if (selectedLz == fromCell)
+        if (passengerMeeting == fromCell)
         {
             ClaimCombatPassengerTransportDecision(decision);
             Debug.Log(
                 $"{TL("Transporte")} passageiro #{passenger.InstanceId} " +
-                $"policy={decision.policy} aguarda na LZ={selectedLz} " +
+                $"policy={decision.policy} aguarda no encontroPax=" +
+                $"{passengerMeeting} LZTransport={selectedLz} " +
                 $"transportador=#{decision.transporter.InstanceId}.");
             return BuildMoveBatch(
                 passenger, snapshot.AITeam, fromCell, fromCell, paths);
@@ -149,7 +159,7 @@ public partial class AIController
                 passenger,
                 snapshot,
                 fromCell,
-                selectedLz,
+                passengerMeeting,
                 paths,
                 occupied,
                 ToolProgressionIntent.TransportRendezvous,
@@ -161,7 +171,8 @@ public partial class AIController
             ClaimCombatPassengerTransportDecision(decision);
             Debug.Log(
                 $"{TL("Transporte")} passageiro #{passenger.InstanceId} " +
-                $"policy={decision.policy} progride para LZ={selectedLz} " +
+                $"policy={decision.policy} progride para encontroPax=" +
+                $"{passengerMeeting} LZTransport={selectedLz} " +
                 $"via={progressionCell} transportador=" +
                 $"#{decision.transporter.InstanceId} " +
                 $"({progressionReason}).");
@@ -172,7 +183,8 @@ public partial class AIController
 
         Debug.Log(
             $"{TL("Transporte")} passageiro #{passenger.InstanceId} " +
-            $"policy={decision.policy} LZ={selectedLz} sem progressão " +
+            $"policy={decision.policy} encontroPax={passengerMeeting} " +
+            $"LZTransport={selectedLz} sem progressão " +
             "materializável; libera o papel para outra ação.");
         return null;
     }
@@ -280,6 +292,16 @@ public partial class AIController
                             MelhorEmbarqueRideDisposition.Emergency));
             if (option == null)
                 continue;
+            if (!option.hasPassengerMeetingCell
+                && unit.GetDomain() != Domain.Air)
+            {
+                Debug.Log(
+                    $"{TL("Transporte")} {unit.InstanceId} rejeita " +
+                    $"#{transporter.InstanceId} LZ={option.lzCell}: " +
+                    "nenhum hex de encontro transitável pelo passageiro.");
+                rejectedByPolicy++;
+                continue;
+            }
             offeredRendezvous++;
 
             // Guarda provisoria para pecas rebocadas, hoje a Artilharia de
@@ -340,7 +362,9 @@ public partial class AIController
             Debug.Log(
                 $"{TL("Transporte")} {unit.InstanceId} policy={policy} " +
                 $"MelhorEmbarque transporter=#{best.transporter.InstanceId} " +
-                $"LZ={best.option.lzCell} slot={best.option.slotIndex} " +
+                $"LZ={best.option.lzCell} encontroPax=" +
+                $"{best.option.passengerMeetingCell} " +
+                $"slot={best.option.slotIndex} " +
                 $"tier={best.option.transporterTier} " +
                 $"route={best.option.passengerRouteState} " +
                 $"ride={best.option.rideDisposition} " +

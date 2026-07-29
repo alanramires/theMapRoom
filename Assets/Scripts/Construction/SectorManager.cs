@@ -644,10 +644,9 @@ public sealed class SectorManager : MonoBehaviour
     // Substitui N chamadas TryGetLandMovementDistance(cell, target) por 1 Dijkstra reverso (a
     // partir de target) + lookups baratos — o custo do two-turn da IA em unidades navais.
     //
-    // BIT-A-BIT identico a chamada ponto-a-ponto: o custo e por-no (enterCost) num grafo nao
-    // direcionado, entao o caminho minimo minimiza o mesmo somatorio de nos nos dois sentidos.
-    // Disso sai a correcao exata por celula:
-    //   D(cell->target) = D(target->cell) + enterCost(target) - enterCost(cell)
+    // A busca e reversa: ao expandir current para um possivel predecessor
+    // next, cobra a transicao next->current. Isso preserva o canal realmente
+    // usado (terreno, rodovia, ferrovia...) mesmo quando varios coexistem.
     // Celula ausente do mapa = inalcancavel (mesmo criterio da ponto-a-ponto; o chamador cai no
     // fallback de HexDistance, igual a CalculateRouteDistanceOrHex).
     public static bool TryBuildLandMovementDistanceToTargetMap(
@@ -663,7 +662,7 @@ public sealed class SectorManager : MonoBehaviour
         if (!ctx.IsValid || ctx.Tilemap == null) return false;
 
         target.z = 0;
-        if (!TryGetLandEnterCost(target, ctx, out int enterCostTarget))
+        if (!HasAnyPaintedTileAtCell(target, ctx))
             return false;
 
         // Dijkstra reverso a partir de target (mesma estrutura de TryComputeLandMovementDistance,
@@ -696,7 +695,11 @@ public sealed class SectorManager : MonoBehaviour
             {
                 Vector3Int next = neighbors[i];
                 next.z = 0;
-                if (!TryGetLandEnterCost(next, ctx, out int enterCost))
+                if (!TryGetLandTransitionCost(
+                        next,
+                        current,
+                        ctx,
+                        out int enterCost))
                     continue;
 
                 int nextCost = bestCost + enterCost;
@@ -711,18 +714,12 @@ public sealed class SectorManager : MonoBehaviour
             }
         }
 
-        // Converte D(target->cell) em D(cell->target) com a correcao por-no.
-        distanceToTarget = new Dictionary<Vector3Int, int>(costFromTarget.Count);
+        // A relaxacao reversa ja produziu diretamente D(cell->target).
+        distanceToTarget = new Dictionary<Vector3Int, int>(
+            costFromTarget.Count);
         foreach (KeyValuePair<Vector3Int, int> kv in costFromTarget)
         {
-            if (kv.Key == target)
-            {
-                distanceToTarget[kv.Key] = 0;
-                continue;
-            }
-            if (!TryGetLandEnterCost(kv.Key, ctx, out int enterCostCell))
-                continue;
-            distanceToTarget[kv.Key] = Mathf.Max(0, kv.Value + enterCostTarget - enterCostCell);
+            distanceToTarget[kv.Key] = Mathf.Max(0, kv.Value);
         }
         return true;
     }
@@ -952,6 +949,9 @@ public sealed class SectorManager : MonoBehaviour
             : neighborDistanceReferenceUnitData != null
             ? neighborDistanceReferenceUnitData
             : ResolveNeighborDistanceReferenceUnitData();
+        BoardTopologyIndex.TryGetFor(
+            map,
+            out BoardTopologyIndex topology);
 
         return new SectorNeighborDistanceContext
         {
@@ -959,6 +959,7 @@ public sealed class SectorManager : MonoBehaviour
             TerrainDatabase = terrainDb,
             GridTilemaps = gridMaps,
             RoadNetworks = roadNetworks,
+            Topology = topology,
             ConstructionsByCell = constructionsByCell,
             ReferenceUnitData = referenceUnitData,
             IsValid = true,
@@ -1204,7 +1205,7 @@ public sealed class SectorManager : MonoBehaviour
         // instantaneo. Era o custo real do two-turn naval: centenas de buscas condenadas a
         // ~10ms cada, todas terminando em HexDistance. 'from' nao precisa desta checagem — a
         // busca comeca nele (custo 0) e so exige transito nos vizinhos.
-        if (!TryGetLandEnterCost(to, context, out _))
+        if (!HasAnyPaintedTileAtCell(to, context))
             return false;
 
         var frontier = new List<Vector3Int> { from };
@@ -1244,7 +1245,11 @@ public sealed class SectorManager : MonoBehaviour
             {
                 Vector3Int next = neighbors[i];
                 next.z = 0;
-                if (!TryGetLandEnterCost(next, context, out int enterCost))
+                if (!TryGetLandTransitionCost(
+                        current,
+                        next,
+                        context,
+                        out int enterCost))
                     continue;
 
                 int nextCost = bestCost + enterCost;
@@ -1294,24 +1299,59 @@ public sealed class SectorManager : MonoBehaviour
         if (!HasAnyPaintedTileAtCell(cell, context))
             return false;
 
+        TerrainTypeData terrain =
+            ResolveTerrainAtCell(cell, context);
+        if (context.TerrainDatabase != null
+            && terrain == null)
+        {
+            return false;
+        }
+
         ConstructionManager construction = null;
         if (context.ConstructionsByCell != null)
             context.ConstructionsByCell.TryGetValue(cell, out construction);
 
         if (construction != null)
         {
-            if (context.ReferenceUnitData != null &&
-                !ConstructionSupportsUnitData(construction, context.ReferenceUnitData))
-                return false;
-            if (context.ReferenceUnitData == null && !construction.SupportsLayerMode(Domain.Land, HeightLevel.Surface))
-                return false;
+            if (context.ReferenceUnitData != null)
+            {
+                return TryGetUnitDataEnterCost(
+                    context.ReferenceUnitData,
+                    construction,
+                    null,
+                    terrain,
+                    out cost);
+            }
 
-            cost = 1;
+            if (construction.InheritsTerrainRulesOn(terrain))
+            {
+                if (terrain == null
+                    || !SupportsLayerMode(
+                        terrain.domain,
+                        terrain.heightLevel,
+                        terrain.aditionalDomainsAllowed,
+                        Domain.Land,
+                        HeightLevel.Surface))
+                {
+                    return false;
+                }
+
+                cost = Mathf.Max(1, terrain.basicAutonomyCost);
+                return true;
+            }
+
+            if (!construction.SupportsLayerMode(
+                    Domain.Land,
+                    HeightLevel.Surface))
+            {
+                return false;
+            }
+
+            cost = Mathf.Max(1, construction.GetBaseMovementCost());
             return true;
         }
 
         StructureData structure = ResolveStructureAtCell(cell, context);
-        TerrainTypeData terrain = ResolveTerrainAtCell(cell, context);
 
         if (context.ReferenceUnitData != null)
             return TryGetUnitDataEnterCost(context.ReferenceUnitData, null, structure, terrain, out cost);
@@ -1335,6 +1375,131 @@ public sealed class SectorManager : MonoBehaviour
         return true;
     }
 
+    private static bool TryGetLandTransitionCost(
+        Vector3Int from,
+        Vector3Int to,
+        SectorNeighborDistanceContext context,
+        out int cost)
+    {
+        cost = 1;
+        from.z = 0;
+        to.z = 0;
+
+        if (context.ReferenceUnitData == null)
+            return TryGetLandEnterCost(to, context, out cost);
+        if (!HasAnyPaintedTileAtCell(to, context))
+            return false;
+
+        TerrainTypeData terrain = ResolveTerrainAtCell(to, context);
+        if (context.TerrainDatabase != null
+            && terrain == null)
+        {
+            return false;
+        }
+
+        ConstructionManager construction = null;
+        if (context.ConstructionsByCell != null)
+        {
+            context.ConstructionsByCell.TryGetValue(
+                to,
+                out construction);
+        }
+
+        bool hasConnectedRoute =
+            TryGetConnectedRouteEnterCostForUnitData(
+                from,
+                to,
+                context,
+                terrain,
+                out int connectedRouteCost,
+                out bool hasDeclaredRouteEdge);
+
+        // A construcao e o canal mais especifico do hex.
+        if (construction != null)
+        {
+            if (construction.InheritsStructureRulesOn(terrain)
+                && hasDeclaredRouteEdge)
+            {
+                // A estrutura conectada assume completamente. Uma aresta que
+                // existe mas recusa a unidade nao pode cair nas regras mais
+                // permissivas da construcao.
+                if (!hasConnectedRoute)
+                    return false;
+                cost = connectedRouteCost;
+                return true;
+            }
+
+            if (construction.InheritsTerrainRulesOn(terrain))
+            {
+                return TryGetUnitDataTerrainEnterCost(
+                    context.ReferenceUnitData,
+                    terrain,
+                    out cost);
+            }
+
+            return TryGetUnitDataEnterCost(
+                context.ReferenceUnitData,
+                construction,
+                null,
+                terrain,
+                out cost);
+        }
+
+        // Entre duas celulas, uma estrutura de rota so participa se declarar
+        // exatamente esta aresta. Estruturas sobrepostas competem apenas entre
+        // os canais que aceitam a unidade.
+        if (hasConnectedRoute)
+        {
+            cost = connectedRouteCost;
+            return true;
+        }
+
+        StructureData dominantStructure =
+            ResolveStructureAtCell(to, context);
+        if (dominantStructure != null)
+        {
+            if (!TryGetUnitDataStructureEnterCost(
+                context.ReferenceUnitData,
+                dominantStructure,
+                terrain,
+                out cost,
+                out bool terrainPassage))
+            {
+                return false;
+            }
+
+            if (terrainPassage)
+                return true;
+
+            if (dominantStructure.routeNetworkType
+                != RouteNetworkType.None)
+            {
+                // Fora de uma aresta declarada, a infraestrutura continua
+                // aplicando suas regras/custo, mas o terreno tambem precisa
+                // aceitar a unidade. Isso impede o trem de deslizar e permite
+                // o cruzamento configurado por Estrutura+Terreno.
+                if (!TryGetUnitDataEnterCost(
+                        context.ReferenceUnitData,
+                        null,
+                        null,
+                        terrain,
+                        out _))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        return TryGetUnitDataEnterCost(
+            context.ReferenceUnitData,
+            null,
+            null,
+            terrain,
+            out cost);
+    }
+
     private static bool TryGetUnitDataEnterCost(
         UnitData unitData,
         ConstructionManager construction,
@@ -1348,39 +1513,48 @@ public sealed class SectorManager : MonoBehaviour
 
         if (construction != null)
         {
-            if (!ConstructionSupportsUnitData(construction, unitData))
+            if (construction.InheritsTerrainRulesOn(terrain))
+            {
+                return TryGetUnitDataTerrainEnterCost(
+                    unitData,
+                    terrain,
+                    out cost);
+            }
+
+            if (!ConstructionSupportsUnitData(
+                    construction,
+                    unitData,
+                    terrain))
                 return false;
 
-            cost = 1;
+            cost = GetCostWithUnitDataSkillOverrides(
+                construction.GetBaseMovementCost(),
+                construction.GetSkillCostOverrides(terrain),
+                unitData);
+            cost = Mathf.Max(1, cost);
             return true;
         }
 
         if (structure != null)
         {
-            if (!SupportsLayerMode(structure.domain, structure.heightLevel, structure.aditionalDomainsAllowed, unitData.domain, unitData.heightLevel))
-                return false;
-            if (!UnitDataPassesSkillRules(unitData, structure.GetRequiredSkillsToEnter(terrain), structure.GetBlockedSkillsToEnter(terrain)))
-                return false;
-
-            cost = GetCostWithUnitDataSkillOverrides(structure.baseMovementCost, terrain != null ? terrain.skillCostOverrides : null, unitData);
-            cost = GetCostWithUnitDataSkillOverrides(cost, structure.GetSkillCostOverrides(terrain), unitData);
-            cost = Mathf.Max(1, cost);
-            return true;
+            return TryGetUnitDataStructureEnterCost(
+                unitData,
+                structure,
+                terrain,
+                out cost,
+                out _);
         }
 
-        if (terrain == null)
-            return false;
-        if (!SupportsLayerMode(terrain.domain, terrain.heightLevel, terrain.aditionalDomainsAllowed, unitData.domain, unitData.heightLevel))
-            return false;
-        if (!UnitDataPassesSkillRules(unitData, terrain.requiredSkillsToEnter, terrain.blockedSkills))
-            return false;
-
-        cost = GetCostWithUnitDataSkillOverrides(terrain.basicAutonomyCost, terrain.skillCostOverrides, unitData);
-        cost = Mathf.Max(1, cost);
-        return true;
+        return TryGetUnitDataTerrainEnterCost(
+            unitData,
+            terrain,
+            out cost);
     }
 
-    private static bool ConstructionSupportsUnitData(ConstructionManager construction, UnitData unitData)
+    private static bool ConstructionSupportsUnitData(
+        ConstructionManager construction,
+        UnitData unitData,
+        TerrainTypeData terrain)
     {
         if (construction == null || unitData == null)
             return false;
@@ -1388,7 +1562,10 @@ public sealed class SectorManager : MonoBehaviour
         if (!construction.SupportsLayerMode(unitData.domain, unitData.heightLevel))
             return false;
 
-        return UnitDataPassesSkillRules(unitData, construction.GetRequiredSkillsToEnter(), construction.GetBlockedSkillsToEnter());
+        return UnitDataPassesSkillRules(
+            unitData,
+            construction.GetRequiredSkillsToEnter(terrain),
+            construction.GetBlockedSkillsToEnter(terrain));
     }
 
     private static int GetCostWithUnitDataSkillOverrides(
@@ -1462,6 +1639,369 @@ public sealed class SectorManager : MonoBehaviour
         }
 
         return false;
+    }
+
+    private static bool TryGetConnectedRouteEnterCostForUnitData(
+        Vector3Int from,
+        Vector3Int to,
+        SectorNeighborDistanceContext context,
+        TerrainTypeData destinationTerrain,
+        out int cost,
+        out bool hasDeclaredRouteEdge)
+    {
+        cost = 1;
+        hasDeclaredRouteEdge = false;
+        if (context.ReferenceUnitData == null)
+            return false;
+
+        StructureData bestStructure = null;
+        int bestStructureCost = 1;
+        if (context.Topology != null
+            && context.Topology.TryGetRouteStructures(
+                from,
+                to,
+                out IReadOnlyList<StructureData> indexedStructures))
+        {
+            for (int i = 0; i < indexedStructures.Count; i++)
+            {
+                StructureData structure = indexedStructures[i];
+                if (structure != null)
+                    hasDeclaredRouteEdge = true;
+                ConsiderRouteStructureForUnitData(
+                    structure,
+                    destinationTerrain,
+                    context.ReferenceUnitData,
+                    ref bestStructure,
+                    ref bestStructureCost);
+            }
+
+            if (bestStructure != null)
+            {
+                cost = bestStructureCost;
+                return true;
+            }
+
+            return false;
+        }
+
+        if (context.RoadNetworks == null)
+            return false;
+
+        for (int i = 0; i < context.RoadNetworks.Length; i++)
+        {
+            RoadNetworkManager network = context.RoadNetworks[i];
+            if (network == null)
+                continue;
+
+            Tilemap networkMap = network.BoardTilemap;
+            if (context.Tilemap != null
+                && networkMap != null
+                && networkMap != context.Tilemap
+                && networkMap.layoutGrid
+                    != context.Tilemap.layoutGrid)
+            {
+                continue;
+            }
+
+            StructureDatabase database = network.StructureDatabase;
+            IReadOnlyList<StructureData> structures =
+                database != null ? database.Structures : null;
+            if (structures == null)
+                continue;
+
+            for (int s = 0; s < structures.Count; s++)
+            {
+                StructureData structure = structures[s];
+                if (structure == null)
+                    continue;
+
+                IReadOnlyList<RoadRouteDefinition> routes =
+                    database.GetRoadRoutes(structure);
+                if (routes == null)
+                    routes = structure.roadRoutes;
+                if (routes == null)
+                    continue;
+
+                bool containsEdge = false;
+                for (int r = 0; r < routes.Count; r++)
+                {
+                    RoadRouteDefinition route = routes[r];
+                    if (route == null
+                        || route.cells == null
+                        || route.cells.Count < 2)
+                    {
+                        continue;
+                    }
+
+                    for (int c = 1; c < route.cells.Count; c++)
+                    {
+                        Vector3Int a = route.cells[c - 1];
+                        Vector3Int b = route.cells[c];
+                        a.z = 0;
+                        b.z = 0;
+                        if ((a == from && b == to)
+                            || (a == to && b == from))
+                        {
+                            containsEdge = true;
+                            break;
+                        }
+                    }
+
+                    if (containsEdge)
+                        break;
+                }
+
+                if (containsEdge)
+                {
+                    hasDeclaredRouteEdge = true;
+                    ConsiderRouteStructureForUnitData(
+                        structure,
+                        destinationTerrain,
+                        context.ReferenceUnitData,
+                        ref bestStructure,
+                        ref bestStructureCost);
+                }
+            }
+        }
+
+        if (bestStructure == null)
+            return false;
+
+        cost = bestStructureCost;
+        return true;
+    }
+
+    private static bool TryGetUnitDataStructureEnterCost(
+        UnitData unitData,
+        StructureData structure,
+        TerrainTypeData terrain,
+        out int cost,
+        out bool terrainPassage)
+    {
+        cost = 1;
+        terrainPassage = false;
+        if (unitData == null || structure == null)
+            return false;
+
+        if (structure.domain == unitData.domain
+            && structure.heightLevel == unitData.heightLevel)
+        {
+            return TryGetUnitDataNativeStructureCost(
+                unitData,
+                structure,
+                terrain,
+                out cost);
+        }
+
+        if (HasLayerMode(
+                structure.aditionalDomainsAllowed,
+                unitData.domain,
+                unitData.heightLevel)
+            && !structure.IsLayerBlockedAt(
+                terrain,
+                unitData.domain,
+                unitData.heightLevel)
+            && TryGetUnitDataTerrainEnterCostForMode(
+                unitData,
+                terrain,
+                unitData.domain,
+                unitData.heightLevel,
+                out cost))
+        {
+            terrainPassage = true;
+            return true;
+        }
+
+        if (unitData.aditionalDomainsAllowed != null)
+        {
+            for (int i = 0;
+                 i < unitData.aditionalDomainsAllowed.Count;
+                 i++)
+            {
+                UnitLayerMode unitMode =
+                    unitData.aditionalDomainsAllowed[i];
+                if (structure.domain == unitMode.domain
+                    && structure.heightLevel
+                        == unitMode.heightLevel)
+                {
+                    return TryGetUnitDataNativeStructureCost(
+                        unitData,
+                        structure,
+                        terrain,
+                        out cost);
+                }
+            }
+
+            for (int i = 0;
+                 i < unitData.aditionalDomainsAllowed.Count;
+                 i++)
+            {
+                UnitLayerMode unitMode =
+                    unitData.aditionalDomainsAllowed[i];
+                if (!HasLayerMode(
+                        structure.aditionalDomainsAllowed,
+                        unitMode.domain,
+                        unitMode.heightLevel)
+                    || structure.IsLayerBlockedAt(
+                        terrain,
+                        unitMode.domain,
+                        unitMode.heightLevel)
+                    || !TryGetUnitDataTerrainEnterCostForMode(
+                        unitData,
+                        terrain,
+                        unitMode.domain,
+                        unitMode.heightLevel,
+                        out cost))
+                {
+                    continue;
+                }
+
+                terrainPassage = true;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool TryGetUnitDataNativeStructureCost(
+        UnitData unitData,
+        StructureData structure,
+        TerrainTypeData terrain,
+        out int cost)
+    {
+        cost = 1;
+        if (unitData == null || structure == null)
+            return false;
+        if (structure.IsLayerBlockedAt(
+                terrain,
+                structure.domain,
+                structure.heightLevel))
+        {
+            return false;
+        }
+        if (!UnitDataPassesSkillRules(
+                unitData,
+                structure.GetRequiredSkillsToEnter(terrain),
+                structure.GetBlockedSkillsToEnter(terrain)))
+        {
+            return false;
+        }
+
+        cost = GetCostWithUnitDataSkillOverrides(
+            structure.baseMovementCost,
+            structure.GetSkillCostOverrides(terrain),
+            unitData);
+        cost = Mathf.Max(1, cost);
+        return true;
+    }
+
+    private static bool TryGetUnitDataTerrainEnterCost(
+        UnitData unitData,
+        TerrainTypeData terrain,
+        out int cost)
+    {
+        cost = 1;
+        if (unitData == null || terrain == null)
+            return false;
+
+        if (TryGetUnitDataTerrainEnterCostForMode(
+                unitData,
+                terrain,
+                unitData.domain,
+                unitData.heightLevel,
+                out cost))
+        {
+            return true;
+        }
+
+        if (unitData.aditionalDomainsAllowed == null)
+            return false;
+
+        for (int i = 0;
+             i < unitData.aditionalDomainsAllowed.Count;
+             i++)
+        {
+            UnitLayerMode mode =
+                unitData.aditionalDomainsAllowed[i];
+            if (TryGetUnitDataTerrainEnterCostForMode(
+                    unitData,
+                    terrain,
+                    mode.domain,
+                    mode.heightLevel,
+                    out cost))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool TryGetUnitDataTerrainEnterCostForMode(
+        UnitData unitData,
+        TerrainTypeData terrain,
+        Domain domain,
+        HeightLevel height,
+        out int cost)
+    {
+        cost = 1;
+        if (unitData == null || terrain == null)
+            return false;
+        if (!SupportsLayerMode(
+                terrain.domain,
+                terrain.heightLevel,
+                terrain.aditionalDomainsAllowed,
+                domain,
+                height))
+        {
+            return false;
+        }
+        if (!UnitDataPassesSkillRules(
+                unitData,
+                terrain.requiredSkillsToEnter,
+                terrain.blockedSkills))
+        {
+            return false;
+        }
+
+        cost = GetCostWithUnitDataSkillOverrides(
+            terrain.basicAutonomyCost,
+            terrain.skillCostOverrides,
+            unitData);
+        cost = Mathf.Max(1, cost);
+        return true;
+    }
+
+    private static void ConsiderRouteStructureForUnitData(
+        StructureData candidate,
+        TerrainTypeData destinationTerrain,
+        UnitData unitData,
+        ref StructureData bestStructure,
+        ref int bestCost)
+    {
+        if (candidate == null
+            || !TryGetUnitDataEnterCost(
+                unitData,
+                null,
+                candidate,
+                destinationTerrain,
+                out int candidateCost))
+        {
+            return;
+        }
+
+        bool isBetter = bestStructure == null
+            || candidate.priorityOrder > bestStructure.priorityOrder
+            || (candidate.priorityOrder == bestStructure.priorityOrder
+                && string.CompareOrdinal(
+                    candidate.id ?? string.Empty,
+                    bestStructure.id ?? string.Empty) < 0);
+        if (!isBetter)
+            return;
+
+        bestStructure = candidate;
+        bestCost = candidateCost;
     }
 
     private static StructureData ResolveStructureAtCell(Vector3Int cell, SectorNeighborDistanceContext context)
@@ -1553,6 +2093,27 @@ public sealed class SectorManager : MonoBehaviour
         return false;
     }
 
+    private static bool HasLayerMode(
+        IReadOnlyList<TerrainLayerMode> modes,
+        Domain targetDomain,
+        HeightLevel targetHeight)
+    {
+        if (modes == null)
+            return false;
+
+        for (int i = 0; i < modes.Count; i++)
+        {
+            TerrainLayerMode mode = modes[i];
+            if (mode.domain == targetDomain
+                && mode.heightLevel == targetHeight)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private struct SectorNeighborDistanceContext
     {
         public bool IsValid;
@@ -1560,6 +2121,7 @@ public sealed class SectorManager : MonoBehaviour
         public TerrainDatabase TerrainDatabase;
         public Tilemap[] GridTilemaps;
         public RoadNetworkManager[] RoadNetworks;
+        public BoardTopologyIndex Topology;
         public Dictionary<Vector3Int, ConstructionManager> ConstructionsByCell;
         public UnitData ReferenceUnitData;
     }

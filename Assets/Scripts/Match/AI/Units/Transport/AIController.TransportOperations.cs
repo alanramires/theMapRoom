@@ -778,6 +778,7 @@ public partial class AIController
                     operationalTurns =
                         TransportPlanningOperationalTurns,
                     includeStrategic = false,
+                    resolveLongRangePassengerMeeting = true,
                     transporterPaths = planning.TransporterReach,
                     allowPassenger = candidate =>
                         candidate == passenger,
@@ -812,7 +813,9 @@ public partial class AIController
             return true;
 
         if (option.passengerRouteState ==
-            MelhorEmbarquePassengerRouteState.NoCurrentRoute)
+                MelhorEmbarquePassengerRouteState.NoCurrentRoute
+            || option.passengerRouteState ==
+                MelhorEmbarquePassengerRouteState.ReachableStrategic)
             return false;
 
         // Pickup Tactical significa embarque possivel nesta rodada. Um

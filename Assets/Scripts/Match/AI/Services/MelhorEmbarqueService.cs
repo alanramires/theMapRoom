@@ -14,6 +14,7 @@ public enum MelhorEmbarquePassengerRouteState
 {
     ReachableNow,
     ReachableLater,
+    ReachableStrategic,
     NoCurrentRoute
 }
 
@@ -31,9 +32,12 @@ public enum MelhorEmbarqueRideDisposition
 /// </summary>
 public sealed class MelhorEmbarqueOption
 {
+    public UnitManager transporter;
     public UnitManager passenger;
     public int slotIndex;
     public Vector3Int passengerCell;
+    public Vector3Int passengerMeetingCell;
+    public bool hasPassengerMeetingCell;
     public Vector3Int lzCell;
     public MelhorEmbarqueTier transporterTier;
     public int transporterDistance;
@@ -55,12 +59,14 @@ public sealed class MelhorEmbarquePassengerScore
     public UnitManager passenger;
     public int slotIndex;
     public Vector3Int passengerCell;
+    public Vector3Int passengerMeetingCell;
     public int passengerMoveCost;
     public string reason;
 }
 
 public sealed class MelhorEmbarqueLzScore
 {
+    public UnitManager transporter;
     public Vector3Int cell;
     public MelhorEmbarqueTier tier;
     public int transporterDistance;
@@ -85,6 +91,7 @@ public sealed class MelhorEmbarqueRequest
     public int tacticalBudget;
     public int operationalTurns = 2;
     public bool includeStrategic;
+    public bool resolveLongRangePassengerMeeting;
     public Dictionary<Vector3Int, List<Vector3Int>> transporterPaths;
     public Func<UnitManager, bool> allowPassenger;
     public Func<UnitManager, bool> includeInLegacyRanking;
@@ -94,6 +101,23 @@ public sealed class MelhorEmbarqueRequest
         IReadOnlyDictionary<Vector3Int, int>,
         int,
         QueroCaronaResult> evaluateRideNeedWithOperationalReach;
+    public Action<string> diagnosticLog;
+}
+
+/// <summary>
+/// Consulta passageiro-centrica. O transportador e um filtro opcional:
+/// informado, responde somente para ele; ausente, compara todos os
+/// transportadores aliados compativeis.
+/// </summary>
+public sealed class MelhorEmbarquePassengerRequest
+{
+    public UnitManager passenger;
+    public UnitManager transporter;
+    public Tilemap map;
+    public TerrainDatabase terrainDatabase;
+    public int operationalTurns = 2;
+    public bool includeStrategic;
+    public Func<UnitManager, QueroCaronaResult> evaluateRideNeed;
     public Action<string> diagnosticLog;
 }
 
@@ -119,13 +143,104 @@ public sealed class MelhorEmbarqueResult
 /// </summary>
 public static class MelhorEmbarqueService
 {
+    private readonly struct PassengerMeeting
+    {
+        public readonly Vector3Int passengerCell;
+        public readonly int moveCost;
+
+        public PassengerMeeting(
+            Vector3Int passengerCell,
+            int moveCost)
+        {
+            passengerCell.z = 0;
+            this.passengerCell = passengerCell;
+            this.moveCost = moveCost;
+        }
+    }
+
     private sealed class PassengerReachProfile
     {
-        public Dictionary<Vector3Int, int> now;
-        public Dictionary<Vector3Int, int> later;
+        public Dictionary<Vector3Int, PassengerMeeting> now;
+        public Dictionary<Vector3Int, PassengerMeeting> later;
+        public Dictionary<Vector3Int, PassengerMeeting> longRange;
         public Dictionary<Vector3Int, int> laterStops;
+        public BoardTopologyIndex topology;
         public int nowBudget;
         public int laterStopsBudget;
+    }
+
+    public static MelhorEmbarqueResult EvaluateForPassenger(
+        MelhorEmbarquePassengerRequest request)
+    {
+        var merged = new MelhorEmbarqueResult();
+        if (request?.passenger == null
+            || request.map == null
+            || request.terrainDatabase == null)
+        {
+            return merged;
+        }
+
+        IEnumerable<UnitManager> candidates =
+            request.transporter != null
+                ? new[] { request.transporter }
+                : UnitManager.AllActive;
+        foreach (UnitManager transporter in candidates)
+        {
+            if (transporter == null
+                || transporter == request.passenger
+                || transporter.IsDead
+                || transporter.IsEmbarked
+                || transporter.IsUnderRepair
+                || !PlayerSlotRelations.AreAllies(
+                    request.passenger, transporter)
+                || !transporter.TryGetUnitData(
+                    out UnitData transporterData)
+                || transporterData == null
+                || !transporterData.isTransporter)
+            {
+                continue;
+            }
+
+            if (!TryResolveCompatiblePassengerSlot(
+                    transporter,
+                    request.passenger,
+                    out _,
+                    out string incompatibility))
+            {
+                merged.rejectedPassengers.Add(
+                    new MelhorEmbarqueReject
+                    {
+                        passenger = request.passenger,
+                        reason =
+                            $"{transporter.name}: {incompatibility}"
+                    });
+                continue;
+            }
+
+            MelhorEmbarqueResult evaluated = Evaluate(
+                new MelhorEmbarqueRequest
+                {
+                    transporter = transporter,
+                    map = request.map,
+                    terrainDatabase = request.terrainDatabase,
+                    tacticalBudget = Mathf.Max(
+                        0, transporter.RemainingMovementPoints),
+                    operationalTurns = Mathf.Max(
+                        1, request.operationalTurns),
+                    includeStrategic = request.includeStrategic,
+                    resolveLongRangePassengerMeeting = true,
+                    allowPassenger = candidate =>
+                        candidate == request.passenger,
+                    evaluateRideNeed = request.evaluateRideNeed,
+                    diagnosticLog = request.diagnosticLog
+                });
+            merged.options.AddRange(evaluated.options);
+            merged.ranking.AddRange(evaluated.ranking);
+        }
+
+        merged.ranking.Sort(Compare);
+        merged.options.Sort(CompareOptions);
+        return merged;
     }
 
     public static MelhorEmbarqueResult Evaluate(
@@ -163,6 +278,8 @@ public static class MelhorEmbarqueService
             {
                 if (unit != null
                     && unit != request.transporter
+                    && (request.allowPassenger == null
+                        || request.allowPassenger(unit))
                     && PlayerSlotRelations.AreAllies(
                         request.transporter, unit))
                 {
@@ -276,6 +393,7 @@ public static class MelhorEmbarqueService
 
             var lz = new MelhorEmbarqueLzScore
             {
+                transporter = request.transporter,
                 cell = cell,
                 tier = tier,
                 transporterDistance = distance,
@@ -301,7 +419,9 @@ public static class MelhorEmbarqueService
                     cell,
                     out MelhorEmbarquePassengerRouteState routeState,
                     out int moveCost,
-                    out int embarkCost);
+                    out int embarkCost,
+                    out Vector3Int passengerMeetingCell,
+                    out bool hasPassengerMeetingCell);
                 int slotIndex = passengerSlots[passenger];
                 QueroCaronaResult rideNeed =
                     passengerRideNeed[passenger];
@@ -348,9 +468,13 @@ public static class MelhorEmbarqueService
                     + rideNeedAdjustment;
                 var option = new MelhorEmbarqueOption
                 {
+                    transporter = request.transporter,
                     passenger = passenger,
                     slotIndex = slotIndex,
                     passengerCell = passengerCell,
+                    passengerMeetingCell = passengerMeetingCell,
+                    hasPassengerMeetingCell =
+                        hasPassengerMeetingCell,
                     lzCell = cell,
                     transporterTier = tier,
                     transporterDistance = distance,
@@ -372,7 +496,8 @@ public static class MelhorEmbarqueService
                     rideNeedAdjustment = rideNeedAdjustment,
                     score = optionScore,
                     reason =
-                        $"slot={slotIndex} encontro={cell} " +
+                        $"slot={slotIndex} LZ={cell} " +
+                        $"encontroPax={passengerMeetingCell} " +
                         $"rotaPax={routeState} " +
                         $"custoPax=" +
                         $"{(moveCost < int.MaxValue ? moveCost.ToString() : "n/a")} " +
@@ -402,6 +527,8 @@ public static class MelhorEmbarqueService
                             passenger = passenger,
                             slotIndex = slotIndex,
                             passengerCell = passengerCell,
+                            passengerMeetingCell =
+                                passengerMeetingCell,
                             passengerMoveCost = moveCost,
                             reason = option.reason
                         });
@@ -614,17 +741,20 @@ public static class MelhorEmbarqueService
             later = BuildMeetingCostMap(
                 request.map, topology, laterStops),
             laterStops = laterStops,
+            topology = topology,
             nowBudget = nowBudget,
             laterStopsBudget = laterBudget
         };
     }
 
-    private static Dictionary<Vector3Int, int> BuildMeetingCostMap(
+    private static Dictionary<Vector3Int, PassengerMeeting>
+        BuildMeetingCostMap(
         Tilemap map,
         BoardTopologyIndex topology,
         Dictionary<Vector3Int, int> stopCosts)
     {
-        var meetingCosts = new Dictionary<Vector3Int, int>();
+        var meetingCosts =
+            new Dictionary<Vector3Int, PassengerMeeting>();
         if (stopCosts == null || stopCosts.Count == 0)
             return meetingCosts;
 
@@ -634,7 +764,7 @@ public static class MelhorEmbarqueService
             Vector3Int stop = pair.Key;
             stop.z = 0;
             SetMinimumMeetingCost(
-                meetingCosts, stop, pair.Value);
+                meetingCosts, stop, stop, pair.Value);
 
             IReadOnlyList<Vector3Int> neighbors;
             if (topology != null && topology.IsReady)
@@ -653,7 +783,7 @@ public static class MelhorEmbarqueService
                 Vector3Int neighbor = neighbors[i];
                 neighbor.z = 0;
                 SetMinimumMeetingCost(
-                    meetingCosts, neighbor, pair.Value);
+                    meetingCosts, neighbor, stop, pair.Value);
             }
         }
 
@@ -661,14 +791,24 @@ public static class MelhorEmbarqueService
     }
 
     private static void SetMinimumMeetingCost(
-        Dictionary<Vector3Int, int> costs,
-        Vector3Int cell,
+        Dictionary<Vector3Int, PassengerMeeting> costs,
+        Vector3Int transporterCell,
+        Vector3Int passengerCell,
         int candidateCost)
     {
-        if (!costs.TryGetValue(cell, out int currentCost)
-            || candidateCost < currentCost)
+        if (!costs.TryGetValue(
+                transporterCell,
+                out PassengerMeeting current)
+            || candidateCost < current.moveCost
+            || (candidateCost == current.moveCost
+                && CompareCells(
+                    passengerCell,
+                    current.passengerCell) < 0))
         {
-            costs[cell] = candidateCost;
+            costs[transporterCell] =
+                new PassengerMeeting(
+                    passengerCell,
+                    candidateCost);
         }
     }
 
@@ -679,8 +819,15 @@ public static class MelhorEmbarqueService
         Vector3Int transporterCell,
         out MelhorEmbarquePassengerRouteState state,
         out int moveCost,
-        out int embarkCost)
+        out int embarkCost,
+        out Vector3Int passengerMeetingCell,
+        out bool hasPassengerMeetingCell)
     {
+        hasPassengerMeetingCell = false;
+        passengerMeetingCell = passenger != null
+            ? passenger.CurrentCellPosition
+            : transporterCell;
+        passengerMeetingCell.z = 0;
         embarkCost = int.MaxValue;
         if (request == null
             || passenger == null
@@ -702,30 +849,78 @@ public static class MelhorEmbarqueService
         if (TryFindMeetingCost(
                 profile.now,
                 transporterCell,
-                out moveCost)
+                out PassengerMeeting nowMeeting)
             && CanAffordMeeting(
-                moveCost,
+                nowMeeting.moveCost,
                 embarkCost,
                 profile.nowBudget))
         {
+            moveCost = nowMeeting.moveCost;
+            passengerMeetingCell = nowMeeting.passengerCell;
+            hasPassengerMeetingCell = true;
             state = MelhorEmbarquePassengerRouteState.ReachableNow;
             return;
         }
         if (TryFindMeetingCost(
                 profile.later,
                 transporterCell,
-                out moveCost)
+                out PassengerMeeting laterMeeting)
             && CanAffordMeeting(
-                moveCost,
+                laterMeeting.moveCost,
                 embarkCost,
                 profile.laterStopsBudget))
         {
+            moveCost = laterMeeting.moveCost;
+            passengerMeetingCell = laterMeeting.passengerCell;
+            hasPassengerMeetingCell = true;
             state = MelhorEmbarquePassengerRouteState.ReachableLater;
             return;
         }
 
+        if (request.resolveLongRangePassengerMeeting)
+        {
+            EnsureLongRangeMeetingMap(
+                request, passenger, profile);
+            if (TryFindMeetingCost(
+                    profile.longRange,
+                    transporterCell,
+                    out PassengerMeeting longRangeMeeting))
+            {
+                moveCost = longRangeMeeting.moveCost;
+                passengerMeetingCell =
+                    longRangeMeeting.passengerCell;
+                hasPassengerMeetingCell = true;
+                state =
+                    MelhorEmbarquePassengerRouteState.ReachableStrategic;
+                return;
+            }
+        }
+
         state = MelhorEmbarquePassengerRouteState.NoCurrentRoute;
         moveCost = int.MaxValue;
+    }
+
+    private static void EnsureLongRangeMeetingMap(
+        MelhorEmbarqueRequest request,
+        UnitManager passenger,
+        PassengerReachProfile profile)
+    {
+        if (profile.longRange != null)
+            return;
+
+        Vector3Int origin = passenger.CurrentCellPosition;
+        origin.z = 0;
+        Dictionary<Vector3Int, int> longRangeStops =
+            UnitMovementPathRules.CalculateMovementCostMap(
+                request.map,
+                passenger,
+                origin,
+                int.MaxValue / 4,
+                request.terrainDatabase);
+        profile.longRange = BuildMeetingCostMap(
+            request.map,
+            profile.topology,
+            longRangeStops);
     }
 
     private static bool CanAffordMeeting(
@@ -740,16 +935,27 @@ public static class MelhorEmbarqueService
     }
 
     private static bool TryFindMeetingCost(
-        Dictionary<Vector3Int, int> costs,
+        Dictionary<Vector3Int, PassengerMeeting> costs,
         Vector3Int transporterCell,
-        out int moveCost)
+        out PassengerMeeting meeting)
     {
-        moveCost = int.MaxValue;
+        meeting = default;
         if (costs == null)
             return false;
         transporterCell.z = 0;
         return costs.TryGetValue(
-            transporterCell, out moveCost);
+            transporterCell, out meeting);
+    }
+
+    private static int CompareCells(
+        Vector3Int a,
+        Vector3Int b)
+    {
+        int byX = a.x.CompareTo(b.x);
+        if (byX != 0)
+            return byX;
+        int byY = a.y.CompareTo(b.y);
+        return byY != 0 ? byY : a.z.CompareTo(b.z);
     }
 
     private static float ResolvePassengerRoutePenalty(
@@ -762,8 +968,10 @@ public static class MelhorEmbarqueService
                 return Mathf.Max(0, moveCost);
             case MelhorEmbarquePassengerRouteState.ReachableLater:
                 return 1000f + Mathf.Max(0, moveCost);
+            case MelhorEmbarquePassengerRouteState.ReachableStrategic:
+                return 5000f + Mathf.Max(0, moveCost);
             default:
-                return 5000f;
+                return 10000f;
         }
     }
 
@@ -822,7 +1030,16 @@ public static class MelhorEmbarqueService
         int byDistance =
             a.transporterDistance.CompareTo(b.transporterDistance);
         if (byDistance != 0) return byDistance;
-        return b.score.CompareTo(a.score);
+        int byScore = b.score.CompareTo(a.score);
+        if (byScore != 0) return byScore;
+        if (a.transporter != null && b.transporter != null)
+        {
+            return a.transporter.InstanceId.CompareTo(
+                b.transporter.InstanceId);
+        }
+        return a.transporter != null
+            ? -1
+            : b.transporter != null ? 1 : 0;
     }
 
     private static int CompareOptions(
@@ -840,6 +1057,12 @@ public static class MelhorEmbarqueService
                     b.passenger.InstanceId)
                 : 0;
         if (byPassenger != 0) return byPassenger;
+        int byTransporter =
+            a.transporter != null && b.transporter != null
+                ? a.transporter.InstanceId.CompareTo(
+                    b.transporter.InstanceId)
+                : 0;
+        if (byTransporter != 0) return byTransporter;
         int byX = a.lzCell.x.CompareTo(b.lzCell.x);
         return byX != 0 ? byX : a.lzCell.y.CompareTo(b.lzCell.y);
     }

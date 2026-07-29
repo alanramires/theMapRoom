@@ -12,6 +12,23 @@ public class ConstructionLandingSkillRule
     public TakeoffProcedure takeoffMode = TakeoffProcedure.InstantToPreferredHeight;
 }
 
+[System.Serializable]
+public class ConstructionSkillTerrainRule
+{
+    [Tooltip("Terreno base desta regra em par com a construcao.")]
+    public TerrainTypeData terrainData;
+
+    [Tooltip("Se houver skills nesta lista, a unidade precisa ter pelo menos uma para entrar nesta construcao neste terreno.")]
+    public List<SkillData> requiredSkillsToEnter = new List<SkillData>();
+
+    [Tooltip("Skills bloqueadas adicionalmente neste par Construcao+Terreno. Bloqueios globais da construcao continuam valendo.")]
+    public List<SkillData> blockedSkills = new List<SkillData>();
+
+    [Tooltip("Overrides opcionais de custo de autonomia por skill neste par Construcao+Terreno.")]
+    public List<TerrainSkillCostOverride> skillCostOverrides =
+        new List<TerrainSkillCostOverride>();
+}
+
 public enum ConstructionGrammaticalGender
 {
     Masculine = 0,
@@ -81,6 +98,19 @@ public class ConstructionData : ScriptableObject
     public List<SkillData> blockedSkills = new List<SkillData>();
     [Tooltip("Overrides opcionais de custo de autonomia por skill.")]
     public List<TerrainSkillCostOverride> skillCostOverrides = new List<TerrainSkillCostOverride>();
+    [Tooltip("Regras opcionais por par Construcao+Terreno. Requisitos e custos nao vazios substituem o campo global correspondente; listas vazias herdam o global. Bloqueios do par se somam aos bloqueios globais.")]
+    public List<ConstructionSkillTerrainRule> skillRulesByTerrain =
+        new List<ConstructionSkillTerrainRule>();
+    [Tooltip("Nestes terrenos, uma estrutura de rota conectada sob a construcao assume integralmente suas proprias regras e custo de movimento. Sem aresta estrutural conectada, continuam valendo as regras da construcao neste terreno.")]
+    public List<TerrainTypeData> inheritStructureRulesOnlyOn =
+        new List<TerrainTypeData>();
+    [Tooltip("Nestes terrenos, quando nenhuma estrutura conectada estiver sendo herdada, o terreno assume integralmente suas proprias regras e custo de movimento. A construcao continua existindo para captura, producao e demais sistemas.")]
+    public List<TerrainTypeData> inheritTerrainRulesOnlyOn =
+        new List<TerrainTypeData>();
+
+    [System.NonSerialized]
+    private Dictionary<TerrainTypeData, List<SkillData>>
+        combinedBlockedSkillsByTerrain;
 
     [Header("Native Domain")]
     [Tooltip("Dominio/altura nativo da construcao.")]
@@ -151,6 +181,8 @@ public class ConstructionData : ScriptableObject
 
     private void OnValidate()
     {
+        combinedBlockedSkillsByTerrain = null;
+
         visao = Mathf.Max(0, visao);
         maxUnitsServedPerTurn = Mathf.Max(0, maxUnitsServedPerTurn);
         aiStockRestockTriggerPercent = Mathf.Clamp(
@@ -171,12 +203,38 @@ public class ConstructionData : ScriptableObject
             blockedSkills = new List<SkillData>();
         if (skillCostOverrides == null)
             skillCostOverrides = new List<TerrainSkillCostOverride>();
+        if (skillRulesByTerrain == null)
+            skillRulesByTerrain = new List<ConstructionSkillTerrainRule>();
+        if (inheritStructureRulesOnlyOn == null)
+            inheritStructureRulesOnlyOn = new List<TerrainTypeData>();
+        if (inheritTerrainRulesOnlyOn == null)
+            inheritTerrainRulesOnlyOn = new List<TerrainTypeData>();
         if (requiredLandingSkillRules == null)
             requiredLandingSkillRules = new List<ConstructionLandingSkillRule>();
         if (forceEndMovementOnTerrainDomainForDomains == null)
             forceEndMovementOnTerrainDomainForDomains = new List<TerrainLayerMode>();
         if (forceDetectUnitsWithFollowingStealthSkills == null)
             forceDetectUnitsWithFollowingStealthSkills = new List<SkillData>();
+
+        for (int i = skillRulesByTerrain.Count - 1; i >= 0; i--)
+        {
+            ConstructionSkillTerrainRule rule = skillRulesByTerrain[i];
+            if (rule == null)
+            {
+                skillRulesByTerrain.RemoveAt(i);
+                continue;
+            }
+
+            if (rule.requiredSkillsToEnter == null)
+                rule.requiredSkillsToEnter = new List<SkillData>();
+            if (rule.blockedSkills == null)
+                rule.blockedSkills = new List<SkillData>();
+            if (rule.skillCostOverrides == null)
+            {
+                rule.skillCostOverrides =
+                    new List<TerrainSkillCostOverride>();
+            }
+        }
 
         for (int i = requiredLandingSkillRules.Count - 1; i >= 0; i--)
         {
@@ -216,6 +274,154 @@ public class ConstructionData : ScriptableObject
 
         SyncSupplierSettingsToConstructionConfiguration();
         constructionConfiguration.Sanitize();
+    }
+
+    public IReadOnlyList<SkillData> GetRequiredSkillsToEnter(
+        TerrainTypeData terrain)
+    {
+        if (TryGetSkillRuleForTerrain(
+                terrain,
+                out ConstructionSkillTerrainRule rule)
+            && rule.requiredSkillsToEnter != null
+            && rule.requiredSkillsToEnter.Count > 0)
+        {
+            return rule.requiredSkillsToEnter;
+        }
+
+        return requiredSkillsToEnter != null
+            ? requiredSkillsToEnter
+            : System.Array.Empty<SkillData>();
+    }
+
+    public IReadOnlyList<SkillData> GetBlockedSkillsToEnter(
+        TerrainTypeData terrain)
+    {
+        IReadOnlyList<SkillData> globalBlocked =
+            blockedSkills != null
+                ? blockedSkills
+                : System.Array.Empty<SkillData>();
+        TryGetSkillRuleForTerrain(
+            terrain,
+            out ConstructionSkillTerrainRule rule);
+        IReadOnlyList<SkillData> terrainBlocked =
+            rule != null && rule.blockedSkills != null
+                ? rule.blockedSkills
+                : System.Array.Empty<SkillData>();
+        if (terrainBlocked.Count == 0)
+        {
+            return globalBlocked;
+        }
+
+        combinedBlockedSkillsByTerrain ??=
+            new Dictionary<TerrainTypeData, List<SkillData>>();
+        if (terrain != null
+            && combinedBlockedSkillsByTerrain.TryGetValue(
+                terrain,
+                out List<SkillData> cached))
+        {
+            return cached;
+        }
+
+        var combined = new List<SkillData>(
+            globalBlocked.Count
+            + terrainBlocked.Count);
+        AddDistinctSkills(combined, globalBlocked);
+        AddDistinctSkills(combined, terrainBlocked);
+
+        if (terrain != null)
+            combinedBlockedSkillsByTerrain[terrain] = combined;
+        return combined;
+    }
+
+    public IReadOnlyList<TerrainSkillCostOverride> GetSkillCostOverrides(
+        TerrainTypeData terrain)
+    {
+        if (TryGetSkillRuleForTerrain(
+                terrain,
+                out ConstructionSkillTerrainRule rule)
+            && rule.skillCostOverrides != null
+            && rule.skillCostOverrides.Count > 0)
+        {
+            return rule.skillCostOverrides;
+        }
+
+        return skillCostOverrides != null
+            ? skillCostOverrides
+            : System.Array.Empty<TerrainSkillCostOverride>();
+    }
+
+    public bool TryGetSkillRuleForTerrain(
+        TerrainTypeData terrain,
+        out ConstructionSkillTerrainRule rule)
+    {
+        rule = null;
+        if (terrain == null
+            || skillRulesByTerrain == null
+            || skillRulesByTerrain.Count == 0)
+        {
+            return false;
+        }
+
+        for (int i = 0; i < skillRulesByTerrain.Count; i++)
+        {
+            ConstructionSkillTerrainRule candidate =
+                skillRulesByTerrain[i];
+            if (candidate != null
+                && candidate.terrainData == terrain)
+            {
+                rule = candidate;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public bool InheritsStructureRulesOn(TerrainTypeData terrain)
+    {
+        if (terrain == null
+            || inheritStructureRulesOnlyOn == null)
+            return false;
+
+        for (int i = 0; i < inheritStructureRulesOnlyOn.Count; i++)
+        {
+            if (inheritStructureRulesOnlyOn[i] == terrain)
+                return true;
+        }
+
+        return false;
+    }
+
+    public bool InheritsTerrainRulesOn(TerrainTypeData terrain)
+    {
+        if (terrain == null
+            || inheritTerrainRulesOnlyOn == null)
+        {
+            return false;
+        }
+
+        for (int i = 0; i < inheritTerrainRulesOnlyOn.Count; i++)
+        {
+            if (inheritTerrainRulesOnlyOn[i] == terrain)
+                return true;
+        }
+
+        return false;
+    }
+
+    private static void AddDistinctSkills(
+        List<SkillData> destination,
+        IReadOnlyList<SkillData> source)
+    {
+        if (destination == null || source == null)
+            return;
+
+        for (int i = 0; i < source.Count; i++)
+        {
+            SkillData skill = source[i];
+            if (skill != null && !destination.Contains(skill))
+                destination.Add(skill);
+        }
     }
 
     public void SyncSupplierSettingsToConstructionConfiguration()

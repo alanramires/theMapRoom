@@ -710,10 +710,60 @@ internal static class BoardTopologyIndexBuilder
     {
         if (structure == null)
             return "-";
-        return $"{StableId(structure.id)}:" +
-            $"{structure.priorityOrder}:{(int)structure.domain}:" +
-            $"{(int)structure.heightLevel}:" +
-            $"{(structure.exigeRotaDeclarada ? 1 : 0)}";
+
+        var signature = new StringBuilder()
+            .Append(StableId(structure.id)).Append(':')
+            .Append(structure.priorityOrder).Append(':')
+            .Append((int)structure.domain).Append(':')
+            .Append((int)structure.heightLevel).Append(':')
+            .Append((int)structure.routeNetworkType).Append(':')
+            .Append(structure.exigeRotaDeclarada ? 1 : 0).Append(':')
+            .Append(structure.roadBoost ? 1 : 0);
+
+        if (structure.skillRulesByTerrain != null)
+        {
+            for (int i = 0; i < structure.skillRulesByTerrain.Count; i++)
+            {
+                StructureSkillTerrainRule rule =
+                    structure.skillRulesByTerrain[i];
+                signature.Append("|rb:");
+                if (rule == null)
+                {
+                    signature.Append('-');
+                    continue;
+                }
+
+                signature
+                    .Append(StableId(
+                        rule.terrainData != null
+                            ? rule.terrainData.id
+                            : string.Empty))
+                    .Append('=')
+                    .Append((int)rule.roadBoost);
+            }
+        }
+
+        // Mantem o fingerprint sensivel ao fallback legado enquanto ainda houver
+        // assets antigos com roadBoostOff serializado.
+        if (structure.descriptionsByTerrain != null)
+        {
+            for (int i = 0; i < structure.descriptionsByTerrain.Count; i++)
+            {
+                StructureTerrainDescription pair =
+                    structure.descriptionsByTerrain[i];
+                if (pair == null || !pair.roadBoostOff)
+                    continue;
+
+                signature
+                    .Append("|legacy-rb-off:")
+                    .Append(StableId(
+                        pair.terrainData != null
+                            ? pair.terrainData.id
+                            : string.Empty));
+            }
+        }
+
+        return signature.ToString();
     }
 
     private static string ConstructionSignature(
@@ -721,10 +771,147 @@ internal static class BoardTopologyIndexBuilder
     {
         if (construction == null)
             return "-";
-        return $"{StableId(construction.id)}:" +
-            $"{(int)construction.domain}:" +
-            $"{(int)construction.heightLevel}:" +
-            $"{(construction.allowAircraftTakeoffAndLanding ? 1 : 0)}";
+
+        var signature = new StringBuilder()
+            .Append(StableId(construction.id)).Append(':')
+            .Append((int)construction.domain).Append(':')
+            .Append((int)construction.heightLevel).Append(':')
+            .Append(
+                construction.allowAircraftTakeoffAndLanding ? 1 : 0)
+            .Append(':')
+            .Append(Mathf.Max(1, construction.baseMovementCost));
+        AppendSkillListSignature(
+            signature,
+            "req",
+            construction.requiredSkillsToEnter);
+        AppendSkillListSignature(
+            signature,
+            "block",
+            construction.blockedSkills);
+        AppendCostOverrideSignature(
+            signature,
+            "cost",
+            construction.skillCostOverrides);
+
+        if (construction.skillRulesByTerrain != null)
+        {
+            for (int i = 0;
+                 i < construction.skillRulesByTerrain.Count;
+                 i++)
+            {
+                ConstructionSkillTerrainRule terrainRule =
+                    construction.skillRulesByTerrain[i];
+                signature.Append("|terrain:");
+                if (terrainRule == null)
+                {
+                    signature.Append('-');
+                    continue;
+                }
+
+                signature.Append(StableId(
+                    terrainRule.terrainData != null
+                        ? terrainRule.terrainData.id
+                        : string.Empty));
+                AppendSkillListSignature(
+                    signature,
+                    "req",
+                    terrainRule.requiredSkillsToEnter);
+                AppendSkillListSignature(
+                    signature,
+                    "block",
+                    terrainRule.blockedSkills);
+                AppendCostOverrideSignature(
+                    signature,
+                    "cost",
+                    terrainRule.skillCostOverrides);
+
+            }
+        }
+
+        if (construction.inheritStructureRulesOnlyOn != null)
+        {
+            for (int i = 0;
+                 i < construction.inheritStructureRulesOnlyOn.Count;
+                 i++)
+            {
+                TerrainTypeData terrain =
+                    construction.inheritStructureRulesOnlyOn[i];
+                signature
+                    .Append("|inherit-structure:")
+                    .Append(StableId(
+                        terrain != null
+                            ? terrain.id
+                            : string.Empty));
+            }
+        }
+
+        if (construction.inheritTerrainRulesOnlyOn != null)
+        {
+            for (int i = 0;
+                 i < construction.inheritTerrainRulesOnlyOn.Count;
+                 i++)
+            {
+                TerrainTypeData terrain =
+                    construction.inheritTerrainRulesOnlyOn[i];
+                signature
+                    .Append("|inherit-terrain:")
+                    .Append(StableId(
+                        terrain != null
+                            ? terrain.id
+                            : string.Empty));
+            }
+        }
+
+        return signature.ToString();
+    }
+
+    private static void AppendSkillListSignature(
+        StringBuilder signature,
+        string label,
+        IReadOnlyList<SkillData> skills)
+    {
+        signature.Append('|').Append(label).Append(':');
+        if (skills == null)
+            return;
+
+        for (int i = 0; i < skills.Count; i++)
+        {
+            if (i > 0)
+                signature.Append(',');
+            SkillData skill = skills[i];
+            signature.Append(StableId(
+                skill != null ? skill.id : string.Empty));
+        }
+    }
+
+    private static void AppendCostOverrideSignature(
+        StringBuilder signature,
+        string label,
+        IReadOnlyList<TerrainSkillCostOverride> overrides)
+    {
+        signature.Append('|').Append(label).Append(':');
+        if (overrides == null)
+            return;
+
+        for (int i = 0; i < overrides.Count; i++)
+        {
+            if (i > 0)
+                signature.Append(',');
+            TerrainSkillCostOverride entry = overrides[i];
+            if (entry == null)
+            {
+                signature.Append('-');
+                continue;
+            }
+
+            signature
+                .Append(StableId(
+                    entry.skill != null
+                        ? entry.skill.id
+                        : string.Empty))
+                .Append('=')
+                .Append(entry.autonomyCost);
+        }
     }
 
     private static int CompareCells(

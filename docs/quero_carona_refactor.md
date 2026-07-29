@@ -369,6 +369,109 @@ completa deve mostrar:
 - como os Capturadores bem-sucedidos atravessam e quais dados já fornecem ao
   transportador.
 
+### Capitão embarcado, comboio e persistência do magnet
+
+O magnet de Capturador não pode desaparecer simplesmente porque a unidade
+embarcou. Hoje `TryResolveCapturerMagnet` ignora unidades `IsEmbarked`, e cada
+seguidor reelege o Capturador desembarcado mais próximo a partir do snapshot
+atual. Não existe um capitão global nem um vínculo persistente de formação.
+
+Isso produz uma ruptura previsível:
+
+```text
+3 Capturadores + grupo de tanques na praia
+        ↓
+2 Capturadores embarcam
+        ↓
+o terceiro Capturador vira o magnet local dos tanques
+        ↓
+o terceiro também embarca
+        ↓
+os tanques perdem o magnet e voltam ao fallback de Assault
+```
+
+O embarque do capitão também não autoriza automaticamente o embarque dos
+seguidores. Cada tanque ainda precisa:
+
+- declarar a própria necessidade de travessia;
+- encontrar um transportador com slot, camada e classe compatíveis;
+- possuir uma LZ materializável;
+- preservar sua agenda quando não houver vaga no mesmo navio.
+
+Portanto, a solução não pode ser apenas usar a posição do navio como novo
+magnet. Isso faria unidades terrestres perseguirem uma coordenada no mar ou
+amontoarem-se na praia sem um plano de embarque.
+
+#### Contrato pretendido
+
+Durante uma travessia ativa:
+
+1. o Capturador embarcado continua elegível como capitão;
+2. o transportador que o carrega torna-se a âncora móvel/proxy da formação;
+3. o vínculo seguidor-capitão possui estabilidade durante a operação;
+4. seguidores não trocam de capitão a cada `commit light` apenas porque outro
+   Capturador desembarcado ficou momentaneamente mais perto;
+5. cada seguidor avalia sua própria ruptura e compatibilidade;
+6. seguidores compatíveis solicitam embarque no mesmo comboio;
+7. seguidores incompatíveis procuram outro transportador do mesmo eixo de
+   travessia;
+8. sem vaga materializável, aguardam numa LZ/rally de embarque em vez de
+   perseguir o navio;
+9. depois do desembarque do capitão, a formação volta a usar sua posição real;
+10. abandono da travessia, morte, mudança de missão ou impossibilidade
+    persistente liberam a eleição de outro capitão.
+
+O pedido do seguidor deve carregar, além da finalidade normal:
+
+```text
+Finalidade: CombinedArmsEscort ou SectorPressure
+Capitão: Capturador #id
+Capitão embarcado: sim
+Transportador proxy: unidade #id
+Eixo/compromisso de travessia: id estável
+LZ de embarque pretendida: célula
+LZ/setor de desembarque pretendido: célula/setor
+Compatibilidade exigida: slot, classe, domínio e camada
+Estado: seguir, reunir, aguardar vaga, embarcado ou desembarcado
+```
+
+O transportador continua sendo alavanca, não comandante. Um tanque não embarca
+“porque o capitão mandou”; ele declara que precisa acompanhar a cabeça de ponte
+e o `Quero Carona` materializa essa intenção quando houver ganho e
+compatibilidade.
+
+#### Persistência e save/load
+
+O capitão individual ainda pode ser uma projeção derivada enquanto não existe
+travessia. Quando um embarque inicia uma operação que atravessa turnos, o
+compromisso mínimo precisa sobreviver a save/load:
+
+- capitão;
+- transportador proxy;
+- eixo ou missão de travessia;
+- LZ de origem e destino;
+- seguidores já aceitos pelo comboio.
+
+Rankings, caminhos, vagas possíveis e candidatos excedentes continuam
+derivados e são reconstruídos do snapshot confirmado. Cancelamento ou rollback
+não pode publicar o compromisso provisório.
+
+#### Cenário de validação
+
+- três Capturadores e vários tanques chegam a uma praia;
+- dois Capturadores embarcam;
+- o terceiro permanece temporariamente em terra;
+- depois, o terceiro também embarca;
+- tanques compatíveis encontram transporte do mesmo comboio;
+- tanques sem transporte aguardam numa LZ coerente;
+- nenhum tanque tenta caminhar até a posição marítima do navio;
+- o grupo não troca de capitão apenas por oscilação de distância;
+- ao desembarcar, o capitão volta a ser o magnet físico da formação.
+
+Essa política depende do contrato tipado de intenção, de compatibilidade,
+capacidade, LZ e persistência. Ela não deve ser implementada como uma emenda
+isolada no `TryResolveCapturerMagnet`.
+
 ### Emenda experimental: Capturador como ímã
 
 Antes do contrato completo de travessia, será testada uma regra de coesão

@@ -94,7 +94,38 @@ public static class LayerTransitionRules
 
         ConstructionManager construction = ConstructionOccupancyRules.GetConstructionAtCell(boardMap, cell);
         if (construction != null)
-            return CanUseConstruction(unit, construction, targetDomain, targetHeight, out reason);
+        {
+            if (!TryResolveTerrainAtCell(
+                    boardMap,
+                    terrainDatabase,
+                    cell,
+                    out TerrainTypeData terrainWithConstruction)
+                || terrainWithConstruction == null)
+            {
+                reason = "Terreno sob a construcao nao encontrado para validar camada.";
+                return false;
+            }
+
+            if (construction.InheritsTerrainRulesOn(
+                    terrainWithConstruction))
+            {
+                return CanUseTerrain(
+                    unit,
+                    terrainWithConstruction,
+                    targetDomain,
+                    targetHeight,
+                    "terreno sob a construcao",
+                    out reason);
+            }
+
+            return CanUseConstruction(
+                unit,
+                construction,
+                terrainWithConstruction,
+                targetDomain,
+                targetHeight,
+                out reason);
+        }
 
         StructureData structure = StructureOccupancyRules.GetStructureAtCell(boardMap, cell);
         if (structure != null)
@@ -189,6 +220,7 @@ public static class LayerTransitionRules
     private static bool CanUseConstruction(
         UnitManager unit,
         ConstructionManager construction,
+        TerrainTypeData terrain,
         Domain domain,
         HeightLevel height,
         out string reason)
@@ -210,8 +242,8 @@ public static class LayerTransitionRules
 
         return PassesSkillRules(
             unit,
-            construction.GetRequiredSkillsToEnter(),
-            construction.GetBlockedSkillsToEnter(),
+            construction.GetRequiredSkillsToEnter(terrain),
+            construction.GetBlockedSkillsToEnter(terrain),
             "construcao",
             out reason);
     }

@@ -5,7 +5,35 @@ using UnityEngine.Tilemaps;
 public static class UnitMovementPathRules
 {
     private const int RoadBonusMinBaseMove = 4;
-    private const string RailSkillId = "Linha de Trem";
+
+    private enum TraversalSource
+    {
+        None = 0,
+        Construction = 1,
+        Structure = 2,
+        Terrain = 3
+    }
+
+    private enum StructureTraversalMode
+    {
+        None = 0,
+        NativeStructure = 1,
+        TerrainPassage = 2
+    }
+
+    private readonly struct TraversalDecision
+    {
+        public readonly TraversalSource source;
+        public readonly StructureData structure;
+
+        public TraversalDecision(
+            TraversalSource source,
+            StructureData structure = null)
+        {
+            this.source = source;
+            this.structure = structure;
+        }
+    }
 
     public static Dictionary<Vector3Int, List<Vector3Int>> CalcularCaminhosValidos(
         Tilemap terrainTilemap,
@@ -72,11 +100,36 @@ public static class UnitMovementPathRules
                 StructureData structure = cache.GetStructureAtCell(next);
                 TerrainTypeData terrainData = cache.ResolveTerrainAtCell(next);
                 bool hasAnyTile = cache.HasAnyPaintedTileAtCell(next);
-                if (!CanTraverseCell(next, cache, construction, structure, terrainData, hasAnyTile, terrainDatabase != null, unit, current))
+                if (!TryResolveTraversal(
+                        next,
+                        cache,
+                        construction,
+                        structure,
+                        terrainData,
+                        hasAnyTile,
+                        terrainDatabase != null,
+                        unit,
+                        current,
+                        out TraversalDecision traversal))
                     continue;
-                int movementCostBase = GetAutonomyCostToEnterCell(construction, structure, terrainData, unit, applyOperationalAutonomyModifier: false);
-                int autonomyCostToEnter = GetAutonomyCostToEnterCell(construction, structure, terrainData, unit, applyOperationalAutonomyModifier: true);
-                bool nextIsRoadBoost = cache.IsRoadBoostCell(next);
+                int movementCostBase = GetAutonomyCostToEnterCell(
+                    construction,
+                    terrainData,
+                    unit,
+                    applyOperationalAutonomyModifier: false,
+                    traversal);
+                int autonomyCostToEnter = GetAutonomyCostToEnterCell(
+                    construction,
+                    terrainData,
+                    unit,
+                    applyOperationalAutonomyModifier: true,
+                    traversal);
+                bool nextIsRoadBoost =
+                    traversal.source == TraversalSource.Structure
+                    && cache.IsRoadBoostEdge(
+                        current,
+                        next,
+                        unit);
 
                 bool useFreeRoadBonusStep =
                     canUseRoadBonus &&
@@ -208,9 +261,10 @@ public static class UnitMovementPathRules
             bool fullMoveWasOnRoad = true;
             for (int i = 1; i <= baseMove; i++)
             {
-                Vector3Int roadCell = path[i];
-                roadCell.z = 0;
-                if (!cache.IsRoadBoostCell(roadCell))
+                if (!cache.IsRoadBoostEdge(
+                        path[i - 1],
+                        path[i],
+                        unit))
                 {
                     fullMoveWasOnRoad = false;
                     break;
@@ -219,10 +273,13 @@ public static class UnitMovementPathRules
 
             if (fullMoveWasOnRoad)
             {
-                Vector3Int bonusCell = path[baseMove + 1];
-                bonusCell.z = 0;
-                if (cache.IsRoadBoostCell(bonusCell))
+                if (cache.IsRoadBoostEdge(
+                        path[baseMove],
+                        path[baseMove + 1],
+                        unit))
+                {
                     freeRoadStepIndex = baseMove + 1;
+                }
             }
         }
 
@@ -241,7 +298,33 @@ public static class UnitMovementPathRules
             ConstructionManager construction = cache.GetConstructionAtCell(cell);
             StructureData structure = cache.GetStructureAtCell(cell);
             TerrainTypeData terrainData = cache.ResolveTerrainAtCell(cell);
-            total += GetAutonomyCostToEnterCell(construction, structure, terrainData, unit, applyOperationalAutonomyModifier);
+            Vector3Int previousCell = path[i - 1];
+            previousCell.z = 0;
+            bool hasAnyTile = cache.HasAnyPaintedTileAtCell(cell);
+            TraversalDecision traversal;
+            if (!TryResolveTraversal(
+                    cell,
+                    cache,
+                    construction,
+                    structure,
+                    terrainData,
+                    hasAnyTile,
+                    terrainDatabase != null,
+                    unit,
+                    previousCell,
+                    out traversal))
+            {
+                traversal = ResolveDefaultTraversalDecision(
+                    construction,
+                    structure,
+                    terrainData);
+            }
+            total += GetAutonomyCostToEnterCell(
+                construction,
+                terrainData,
+                unit,
+                applyOperationalAutonomyModifier,
+                traversal);
         }
 
         return Mathf.Max(0, total);
@@ -267,15 +350,19 @@ public static class UnitMovementPathRules
 
         for (int i = 1; i <= baseMove; i++)
         {
-            Vector3Int roadCell = path[i];
-            roadCell.z = 0;
-            if (!cache.IsRoadBoostCell(roadCell))
+            if (!cache.IsRoadBoostEdge(
+                    path[i - 1],
+                    path[i],
+                    unit))
+            {
                 return false;
+            }
         }
 
-        Vector3Int bonusCell = path[baseMove + 1];
-        bonusCell.z = 0;
-        return cache.IsRoadBoostCell(bonusCell);
+        return cache.IsRoadBoostEdge(
+            path[baseMove],
+            path[baseMove + 1],
+            unit);
     }
 
     public static bool TryGetEnterCellCost(
@@ -295,10 +382,27 @@ public static class UnitMovementPathRules
         StructureData structure = StructureOccupancyRules.GetStructureAtCell(terrainTilemap, cell);
         TerrainTypeData terrainData = ResolveTerrainAtCell(terrainTilemap, terrainDatabase, cell);
         bool hasAnyTile = HasAnyPaintedTileAtCell(terrainTilemap, cell);
-        if (!CanTraverseCell(cell, null, construction, structure, terrainData, hasAnyTile, terrainDatabase != null, unit))
+        if (!TryResolveTraversal(
+                cell,
+                null,
+                construction,
+                structure,
+                terrainData,
+                hasAnyTile,
+                terrainDatabase != null,
+                unit,
+                previousCell: null,
+                out TraversalDecision traversal))
             return false;
 
-        cost = Mathf.Max(1, GetAutonomyCostToEnterCell(construction, structure, terrainData, unit, applyOperationalAutonomyModifier));
+        cost = Mathf.Max(
+            1,
+            GetAutonomyCostToEnterCell(
+                construction,
+                terrainData,
+                unit,
+                applyOperationalAutonomyModifier,
+                traversal));
         return true;
     }
 
@@ -369,10 +473,27 @@ public static class UnitMovementPathRules
                 StructureData structure = cache.GetStructureAtCell(next);
                 TerrainTypeData terrainData = cache.ResolveTerrainAtCell(next);
                 bool hasAnyTile = cache.HasAnyPaintedTileAtCell(next);
-                if (!CanTraverseCell(next, cache, construction, structure, terrainData, hasAnyTile, terrainDatabase != null, unit, current))
+                if (!TryResolveTraversal(
+                        next,
+                        cache,
+                        construction,
+                        structure,
+                        terrainData,
+                        hasAnyTile,
+                        terrainDatabase != null,
+                        unit,
+                        current,
+                        out TraversalDecision traversal))
                     continue;
 
-                int moveCost = Mathf.Max(1, GetAutonomyCostToEnterCell(construction, structure, terrainData, unit, applyOperationalAutonomyModifier: false));
+                int moveCost = Mathf.Max(
+                    1,
+                    GetAutonomyCostToEnterCell(
+                        construction,
+                        terrainData,
+                        unit,
+                        applyOperationalAutonomyModifier: false,
+                        traversal));
                 int nextSteps = currentSteps + moveCost;
                 if (nextSteps > maxSteps) continue;
 
@@ -410,7 +531,7 @@ public static class UnitMovementPathRules
         return unit.GetDomain() == Domain.Land && unit.GetHeightLevel() == HeightLevel.Surface;
     }
 
-    private static bool CanTraverseCell(
+    private static bool TryResolveTraversal(
         Vector3Int cell,
         MovementQueryCache cache,
         ConstructionManager construction,
@@ -419,84 +540,327 @@ public static class UnitMovementPathRules
         bool hasAnyTile,
         bool terrainRulesAvailable,
         UnitManager unit,
-        Vector3Int? previousCell = null)
+        Vector3Int? previousCell,
+        out TraversalDecision decision)
     {
+        decision = default;
         if (unit == null)
             return false;
 
-        // Regra especial: unidade com skill de linha de trem ignora desempate de hierarquia
-        // e passa no hex se existir ao menos uma estrutura de rota no hex que permita a unidade
-        // pelas regras de skill (required/blocked).
-        if (UnitHasRailSkill(unit))
-        {
-            if (cache != null)
-            {
-                return previousCell.HasValue
-                    ? cache.HasConnectedRouteSegmentAllowingUnit(previousCell.Value, cell, unit)
-                    : cache.HasAnyRouteStructureAtCellAllowingUnit(cell, unit);
-            }
-            return StructureQualifiesAsRailForUnit(structure, unit);
-        }
+        // Regra de terreno ausente nao e fallback de gameplay. Quando existe
+        // TerrainDatabase, todo hex consultado precisa resolver um
+        // TerrainTypeData antes que construcao ou estrutura possam governa-lo.
+        if (terrainRulesAvailable && terrainData == null)
+            return false;
 
         Domain currentDomain = unit.GetDomain();
         HeightLevel currentHeight = unit.GetHeightLevel();
         bool isAirUnit = currentDomain == Domain.Air;
+        bool constructionInheritsTerrain =
+            construction != null
+            && construction.InheritsTerrainRulesOn(terrainData);
 
-        // Para unidades aereas: tenta construcao/estrutura, mas se nao permitir ar faz fallback
-        // para o terreno base (em vez de bloquear completamente por sobrescrita).
         if (isAirUnit)
         {
-            if (construction != null && CanTraverseUsingConstruction(construction, unit, currentDomain, currentHeight))
-                return true;
+            if (constructionInheritsTerrain)
+            {
+                if (!CanTraverseUsingTerrain(
+                        terrainData,
+                        unit,
+                        currentDomain,
+                        currentHeight))
+                {
+                    return false;
+                }
 
-            if (structure != null && CanTraverseUsingStructure(structure, terrainData, unit, currentDomain, currentHeight))
+                decision = new TraversalDecision(
+                    TraversalSource.Terrain);
                 return true;
+            }
+
+            if (construction != null
+                && CanTraverseUsingConstruction(
+                    construction,
+                    terrainData,
+                    unit,
+                    currentDomain,
+                    currentHeight))
+            {
+                decision = new TraversalDecision(
+                    TraversalSource.Construction);
+                return true;
+            }
+
+            if (structure != null
+                && CanTraverseUsingStructure(
+                    structure,
+                    terrainData,
+                    unit,
+                    currentDomain,
+                    currentHeight))
+            {
+                decision = new TraversalDecision(
+                    TraversalSource.Structure,
+                    structure);
+                return true;
+            }
 
             if (terrainData == null)
-                return !terrainRulesAvailable && hasAnyTile;
+            {
+                if (terrainRulesAvailable || !hasAnyTile)
+                    return false;
+                decision = new TraversalDecision(TraversalSource.Terrain);
+                return true;
+            }
 
-            return CanTraverseUsingTerrain(terrainData, unit, currentDomain, currentHeight);
+            if (!CanTraverseUsingTerrain(
+                    terrainData,
+                    unit,
+                    currentDomain,
+                    currentHeight))
+            {
+                return false;
+            }
+
+            decision = new TraversalDecision(TraversalSource.Terrain);
+            return true;
         }
 
-        // Gate de conexao por rota declarada, resolvido pelo par Estrutura+Terreno.
-        // E um AND sobre a travessia normal, nao um atalho: a unidade continua pagando
-        // custo e obedecendo terreno/estrutura — ela apenas nao ENTRA por qualquer flanco.
-        // Modela a estrada de montanha como desfiladeiro: so se sobe pela boca da estrada.
+        // Em cruzamentos, a aresta escolhe qual representante de rede esta
+        // sendo usado. O par Estrutura+Terreno desse representante governa
+        // skills e custo; o no compartilhado, sozinho, nao mistura as redes.
+        if (previousCell.HasValue && cache != null)
+        {
+            bool routeAllows = cache
+                .TryGetConnectedRouteStructureAllowingUnit(
+                    previousCell.Value,
+                    cell,
+                    unit,
+                    RouteNetworkType.None,
+                    terrainData,
+                    out StructureData connectedRoute,
+                    out bool hasDeclaredRouteEdge);
+            bool constructionInheritsStructure =
+                construction != null
+                && construction.InheritsStructureRulesOn(
+                    terrainData);
+            if (constructionInheritsStructure
+                && hasDeclaredRouteEdge)
+            {
+                // Neste terreno, a construcao deixa a aresta estrutural
+                // conectada governar integralmente. Se a estrutura recusar a
+                // unidade, nao ha fallback para as regras da construcao.
+                if (!routeAllows
+                    || !TryResolveStructureTraversal(
+                        connectedRoute,
+                        terrainData,
+                        unit,
+                        currentDomain,
+                        currentHeight,
+                        out StructureTraversalMode inheritedMode))
+                {
+                    return false;
+                }
+
+                decision = inheritedMode
+                    == StructureTraversalMode.TerrainPassage
+                    ? new TraversalDecision(
+                        TraversalSource.Terrain)
+                    : new TraversalDecision(
+                        TraversalSource.Structure,
+                        connectedRoute);
+                return true;
+            }
+
+            if (constructionInheritsTerrain)
+            {
+                if (!CanTraverseUsingTerrain(
+                        terrainData,
+                        unit,
+                        currentDomain,
+                        currentHeight))
+                {
+                    return false;
+                }
+
+                decision = new TraversalDecision(
+                    TraversalSource.Terrain);
+                return true;
+            }
+
+            if (routeAllows)
+            {
+                if (construction != null)
+                {
+                    if (!CanTraverseUsingConstruction(
+                            construction,
+                            terrainData,
+                            unit,
+                            currentDomain,
+                            currentHeight))
+                    {
+                        return false;
+                    }
+
+                    decision = new TraversalDecision(
+                        TraversalSource.Construction);
+                }
+                else
+                {
+                    if (!TryResolveStructureTraversal(
+                            connectedRoute,
+                            terrainData,
+                            unit,
+                            currentDomain,
+                            currentHeight,
+                            out StructureTraversalMode routeMode))
+                    {
+                        return false;
+                    }
+
+                    decision = routeMode
+                        == StructureTraversalMode.TerrainPassage
+                        ? new TraversalDecision(
+                            TraversalSource.Terrain)
+                        : new TraversalDecision(
+                            TraversalSource.Structure,
+                            connectedRoute);
+                }
+                return true;
+            }
+        }
+
+        if (constructionInheritsTerrain)
+        {
+            if (!CanTraverseUsingTerrain(
+                    terrainData,
+                    unit,
+                    currentDomain,
+                    currentHeight))
+            {
+                return false;
+            }
+
+            decision = new TraversalDecision(
+                TraversalSource.Terrain);
+            return true;
+        }
+
         bool routeGateFailed = structure != null
             && previousCell.HasValue
             && cache != null
             && structure.ExigeRotaDeclaradaEm(terrainData)
-            && !cache.HasConnectedRouteSegmentAllowingUnit(previousCell.Value, cell, unit);
+            && !cache.TryGetConnectedRouteStructureAllowingUnit(
+                previousCell.Value,
+                cell,
+                unit,
+                structure.routeNetworkType,
+                terrainData,
+                out _,
+                out _);
 
-        // Uma construcao no hex normalmente encerra a exigencia — a cidade na serra liberta.
-        // A estrutura pode dizer o contrario (exigeEstruturaNaConstrucao): e o
-        // caso do trilho, onde a cidade so e alcancavel se a linha chegar ate ela.
-        bool routeGateBlocks = routeGateFailed && (construction == null || structure.exigeEstruturaNaConstrucao);
+        bool routeGateBlocks = routeGateFailed
+            && (construction == null
+                || structure.exigeEstruturaNaConstrucao);
 
         if (construction != null && !routeGateBlocks)
-            return CanTraverseUsingConstruction(construction, unit, currentDomain, currentHeight);
+        {
+            if (!CanTraverseUsingConstruction(
+                    construction,
+                    terrainData,
+                    unit,
+                    currentDomain,
+                    currentHeight))
+            {
+                return false;
+            }
 
-        // Falhar no gate de rota NEGA A ESTRUTURA, nao o hex. Quem nao veio pela rota apenas
-        // perde o beneficio de usar a via — segue podendo entrar se o TERRENO por baixo o
-        // aceitar. Sem isso a estrutura viraria um muro para quem nem precisava dela: o
-        // soldado deixaria de cruzar um trilho na planicie, e o alpino nao subiria uma
-        // montanha so porque passa uma estrada por ela.
-        if (structure != null && !routeGateBlocks)
-            return CanTraverseUsingStructure(structure, terrainData, unit, currentDomain, currentHeight);
-
-        // Atalho por estrutura de rota no hex — suprimido quando o gate barrou, senao ele
-        // devolveria pela janela o beneficio que a porta acabou de negar.
-        if (!routeGateBlocks && cache != null && cache.HasAnyRouteStructureAtCellAllowingUnit(cell, unit))
+            decision = new TraversalDecision(
+                TraversalSource.Construction);
             return true;
+        }
 
+        if (structure != null)
+        {
+            if (!TryResolveStructureTraversal(
+                    structure,
+                    terrainData,
+                    unit,
+                    currentDomain,
+                    currentHeight,
+                    out StructureTraversalMode structureMode))
+            {
+                // A estrutura existe fisicamente neste hex. Se ela nao oferece
+                // nem a camada nativa nem uma camada adicional compativel, o
+                // terreno de baixo nao atravessa a estrutura (ponte sem vao =
+                // dique/barragem para unidades navais).
+                return false;
+            }
+
+            if (structureMode
+                == StructureTraversalMode.TerrainPassage)
+            {
+                // Dominio adicional e permissao de passagem, nao uso do
+                // conves/estrutura. O terreno conserva suas regras e custo.
+                decision = new TraversalDecision(
+                    TraversalSource.Terrain);
+                return true;
+            }
+
+            bool crossingRouteOutsideDeclaredEdge =
+                structure.routeNetworkType != RouteNetworkType.None
+                && previousCell.HasValue
+                && cache != null;
+            if (crossingRouteOutsideDeclaredEdge
+                || routeGateBlocks)
+            {
+                // Cruzar a infraestrutura fora da aresta declarada continua
+                // sujeito ao par Estrutura+Terreno, mas exige que o terreno
+                // subjacente tambem aceite a unidade. Isso deixa um caminhao
+                // cruzar trilho+planicie e impede um trem de "deslizar" pela
+                // mesma planicie sem conexao ferroviaria.
+                if (!CanTraverseAcrossStructureUsingTerrainRules(
+                        structure,
+                        terrainData,
+                        unit,
+                        currentDomain,
+                        currentHeight))
+                {
+                    return false;
+                }
+            }
+
+            decision = new TraversalDecision(
+                TraversalSource.Structure,
+                structure);
+            return true;
+        }
+
+        // Sem estrutura, vale somente o terreno.
         if (terrainData == null)
-            return !terrainRulesAvailable && hasAnyTile;
+        {
+            if (terrainRulesAvailable || !hasAnyTile)
+                return false;
+            decision = new TraversalDecision(TraversalSource.Terrain);
+            return true;
+        }
 
-        return CanTraverseUsingTerrain(terrainData, unit, currentDomain, currentHeight);
+        if (!CanTraverseUsingTerrain(
+                terrainData,
+                unit,
+                currentDomain,
+                currentHeight))
+        {
+            return false;
+        }
+
+        decision = new TraversalDecision(TraversalSource.Terrain);
+        return true;
     }
 
     private static bool CanTraverseUsingConstruction(
         ConstructionManager construction,
+        TerrainTypeData terrainData,
         UnitManager unit,
         Domain currentDomain,
         HeightLevel currentHeight)
@@ -507,10 +871,18 @@ public static class UnitMovementPathRules
         if (currentDomain == Domain.Air)
         {
             if (construction.AllowsAirDomain())
-                return UnitPassesSkillRules(unit, construction.GetRequiredSkillsToEnter(), construction.GetBlockedSkillsToEnter());
+            {
+                return UnitPassesSkillRules(
+                    unit,
+                    construction.GetRequiredSkillsToEnter(terrainData),
+                    construction.GetBlockedSkillsToEnter(terrainData));
+            }
             if (!construction.SupportsLayerMode(currentDomain, currentHeight))
                 return false;
-            return UnitPassesSkillRules(unit, construction.GetRequiredSkillsToEnter(), construction.GetBlockedSkillsToEnter());
+            return UnitPassesSkillRules(
+                unit,
+                construction.GetRequiredSkillsToEnter(terrainData),
+                construction.GetBlockedSkillsToEnter(terrainData));
         }
 
         IReadOnlyList<UnitLayerMode> unitModes = unit.GetAllLayerModes();
@@ -518,7 +890,12 @@ public static class UnitMovementPathRules
         {
             UnitLayerMode mode = unitModes[i];
             if (construction.SupportsLayerMode(mode.domain, mode.heightLevel))
-                return UnitPassesSkillRules(unit, construction.GetRequiredSkillsToEnter(), construction.GetBlockedSkillsToEnter());
+            {
+                return UnitPassesSkillRules(
+                    unit,
+                    construction.GetRequiredSkillsToEnter(terrainData),
+                    construction.GetBlockedSkillsToEnter(terrainData));
+            }
         }
 
         return false;
@@ -531,6 +908,24 @@ public static class UnitMovementPathRules
         Domain currentDomain,
         HeightLevel currentHeight)
     {
+        return TryResolveStructureTraversal(
+            structure,
+            terrainData,
+            unit,
+            currentDomain,
+            currentHeight,
+            out _);
+    }
+
+    private static bool TryResolveStructureTraversal(
+        StructureData structure,
+        TerrainTypeData terrainData,
+        UnitManager unit,
+        Domain currentDomain,
+        HeightLevel currentHeight,
+        out StructureTraversalMode mode)
+    {
+        mode = StructureTraversalMode.None;
         if (structure == null || unit == null)
             return false;
 
@@ -542,10 +937,20 @@ public static class UnitMovementPathRules
         if (currentDomain == Domain.Air)
         {
             if (structure.alwaysAllowAirDomain)
-                return UnitPassesSkillRules(unit, structure.GetRequiredSkillsToEnter(terrainData), structure.GetBlockedSkillsToEnter(terrainData));
+            {
+                mode = StructureTraversalMode.NativeStructure;
+                return UnitPassesSkillRules(
+                    unit,
+                    structure.GetRequiredSkillsToEnter(terrainData),
+                    structure.GetBlockedSkillsToEnter(terrainData));
+            }
             if (!StructureSupportsMode(structure, currentDomain, currentHeight))
                 return false;
-            return UnitPassesSkillRules(unit, structure.GetRequiredSkillsToEnter(terrainData), structure.GetBlockedSkillsToEnter(terrainData));
+            mode = StructureTraversalMode.NativeStructure;
+            return UnitPassesSkillRules(
+                unit,
+                structure.GetRequiredSkillsToEnter(terrainData),
+                structure.GetBlockedSkillsToEnter(terrainData));
         }
 
         // Camada ADICIONAL da estrutura = atravessar por outro andar que nao o dela, tipicamente
@@ -560,25 +965,138 @@ public static class UnitMovementPathRules
         //    ponte ferroviaria exige a skill de trilho para o traçado superior; aplicar isso ao
         //    vao afundava a regra em quem so queria cruzar o rio — era por isso que o navio
         //    passava sob a ponte rodoviaria e nao sob a ferroviaria.
-        if (StructureSupportsAdditionalMode(structure, currentDomain, currentHeight))
-            return TerrainSupportsMode(terrainData, currentDomain, currentHeight);
+        if (structure.domain == currentDomain
+            && structure.heightLevel == currentHeight)
+        {
+            if (!UnitPassesSkillRules(
+                    unit,
+                    structure.GetRequiredSkillsToEnter(terrainData),
+                    structure.GetBlockedSkillsToEnter(terrainData)))
+            {
+                return false;
+            }
+
+            mode = StructureTraversalMode.NativeStructure;
+            return true;
+        }
+
+        if (StructureSupportsAdditionalMode(
+                structure,
+                currentDomain,
+                currentHeight))
+        {
+            if (!CanTraverseUsingTerrainLayerMode(
+                    terrainData,
+                    unit,
+                    currentDomain,
+                    currentHeight))
+            {
+                return false;
+            }
+
+            mode = StructureTraversalMode.TerrainPassage;
+            return true;
+        }
 
         IReadOnlyList<UnitLayerMode> unitModes = unit.GetAllLayerModes();
-        bool supportsAnyMode = false;
         for (int i = 0; i < unitModes.Count; i++)
         {
-            UnitLayerMode mode = unitModes[i];
-            if (StructureSupportsMode(structure, mode.domain, mode.heightLevel))
+            UnitLayerMode unitMode = unitModes[i];
+            if (structure.domain == unitMode.domain
+                && structure.heightLevel == unitMode.heightLevel)
             {
-                supportsAnyMode = true;
-                break;
+                if (!UnitPassesSkillRules(
+                        unit,
+                        structure.GetRequiredSkillsToEnter(terrainData),
+                        structure.GetBlockedSkillsToEnter(terrainData)))
+                {
+                    return false;
+                }
+
+                mode = StructureTraversalMode.NativeStructure;
+                return true;
             }
         }
 
-        if (!supportsAnyMode)
+        for (int i = 0; i < unitModes.Count; i++)
+        {
+            UnitLayerMode unitMode = unitModes[i];
+            if (!StructureSupportsAdditionalMode(
+                    structure,
+                    unitMode.domain,
+                    unitMode.heightLevel))
+            {
+                continue;
+            }
+            if (structure.IsLayerBlockedAt(
+                    terrainData,
+                    unitMode.domain,
+                    unitMode.heightLevel))
+            {
+                continue;
+            }
+            if (!CanTraverseUsingTerrainLayerMode(
+                    terrainData,
+                    unit,
+                    unitMode.domain,
+                    unitMode.heightLevel))
+            {
+                continue;
+            }
+
+            mode = StructureTraversalMode.TerrainPassage;
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool CanTraverseAcrossStructureUsingTerrainRules(
+        StructureData structure,
+        TerrainTypeData terrainData,
+        UnitManager unit,
+        Domain currentDomain,
+        HeightLevel currentHeight)
+    {
+        if (structure == null || unit == null)
+            return false;
+        if (structure.IsLayerBlockedAt(
+                terrainData,
+                currentDomain,
+                currentHeight))
+        {
+            return false;
+        }
+        if (!CanTraverseUsingTerrain(
+                terrainData,
+                unit,
+                currentDomain,
+                currentHeight))
+        {
+            return false;
+        }
+
+        return UnitPassesSkillRules(
+            unit,
+            structure.GetRequiredSkillsToEnter(terrainData),
+            structure.GetBlockedSkillsToEnter(terrainData));
+    }
+
+    private static bool CanTraverseUsingTerrainLayerMode(
+        TerrainTypeData terrainData,
+        UnitManager unit,
+        Domain domain,
+        HeightLevel height)
+    {
+        if (terrainData == null || unit == null)
+            return false;
+        if (!TerrainSupportsMode(terrainData, domain, height))
             return false;
 
-        return UnitPassesSkillRules(unit, structure.GetRequiredSkillsToEnter(terrainData), structure.GetBlockedSkillsToEnter(terrainData));
+        return UnitPassesSkillRules(
+            unit,
+            terrainData.requiredSkillsToEnter,
+            terrainData.blockedSkills);
     }
 
     private static bool CanTraverseUsingTerrain(
@@ -615,53 +1133,26 @@ public static class UnitMovementPathRules
         return UnitPassesSkillRules(unit, terrainData.requiredSkillsToEnter, terrainData.blockedSkills);
     }
 
-    private static bool StructureAllowsUnitBySkillRules(StructureData structure, UnitManager unit)
+    private static bool StructureQualifiesForRouteNetwork(
+        StructureData structure,
+        UnitManager unit,
+        RouteNetworkType requiredNetwork,
+        TerrainTypeData terrainData)
     {
         if (structure == null || unit == null)
             return false;
-        return UnitPassesSkillRules(unit, structure.GetRequiredSkillsToEnter(null), structure.GetBlockedSkillsToEnter(null));
-    }
-
-    private static bool StructureQualifiesAsRailForUnit(StructureData structure, UnitManager unit)
-    {
-        if (structure == null || unit == null)
-            return false;
-
-        return CanTraverseUsingStructure(structure, null, unit, unit.GetDomain(), unit.GetHeightLevel());
-    }
-
-    private static bool UnitHasRailSkill(UnitManager unit)
-    {
-        if (unit == null)
-            return false;
-
-        if (unit.HasSkillId(RailSkillId))
-            return true;
-
-        if (!unit.TryGetUnitData(out UnitData data) || data == null || data.skills == null)
-            return false;
-
-        for (int i = 0; i < data.skills.Count; i++)
+        if (requiredNetwork != RouteNetworkType.None
+            && structure.routeNetworkType != requiredNetwork)
         {
-            if (IsRailSkillDefinition(data.skills[i]))
-                return true;
+            return false;
         }
 
-        return false;
-    }
-
-    private static bool IsRailSkillDefinition(SkillData skill)
-    {
-        if (skill == null)
-            return false;
-
-        if (string.Equals(skill.id, RailSkillId, System.StringComparison.OrdinalIgnoreCase))
-            return true;
-
-        if (string.Equals(skill.displayName, RailSkillId, System.StringComparison.OrdinalIgnoreCase))
-            return true;
-
-        return string.Equals(skill.name, RailSkillId, System.StringComparison.OrdinalIgnoreCase);
+        return CanTraverseUsingStructure(
+            structure,
+            terrainData,
+            unit,
+            unit.GetDomain(),
+            unit.GetHeightLevel());
     }
 
     private static bool TerrainSupportsMode(TerrainTypeData terrainData, Domain domain, HeightLevel heightLevel)
@@ -708,29 +1199,70 @@ public static class UnitMovementPathRules
 
     private static int GetAutonomyCostToEnterCell(
         ConstructionManager construction,
-        StructureData structure,
         TerrainTypeData terrainData,
         UnitManager unit,
-        bool applyOperationalAutonomyModifier)
+        bool applyOperationalAutonomyModifier,
+        TraversalDecision traversal)
     {
         int baseCost;
         if (unit != null && unit.GetDomain() == Domain.Air)
             baseCost = 1;
-        else if (construction != null)
-            baseCost = GetAutonomyCostWithSkillOverrides(construction.GetBaseMovementCost(), construction.GetSkillCostOverrides(), unit);
-        else if (structure != null)
+        else if (traversal.source == TraversalSource.Construction
+            && construction != null)
         {
-            // O terreno fornece o custo geral; o par Estrutura+Terreno e mais
-            // especifico e, portanto, precisa ser aplicado por ultimo.
-            baseCost = GetAutonomyCostWithSkillOverrides(structure.baseMovementCost, terrainData != null ? terrainData.skillCostOverrides : null, unit);
-            baseCost = GetAutonomyCostWithSkillOverrides(baseCost, structure.GetSkillCostOverrides(terrainData), unit);
+            baseCost = GetAutonomyCostWithSkillOverrides(
+                construction.GetBaseMovementCost(),
+                construction.GetSkillCostOverrides(terrainData),
+                unit);
         }
-        else if (terrainData != null)
+        else if (traversal.source == TraversalSource.Structure
+            && traversal.structure != null)
+        {
+            // Uso nativo da estrutura: o par Estrutura+Terreno vence quando
+            // configurado; se nao houver override no par, cai no global da
+            // estrutura. Overrides do terreno so participam quando a decisao
+            // de travessia e Terrain (ex.: navio sob uma ponte).
+            StructureData structure = traversal.structure;
+            baseCost = GetAutonomyCostWithSkillOverrides(
+                structure.baseMovementCost,
+                structure.GetSkillCostOverrides(terrainData),
+                unit);
+        }
+        else if (traversal.source == TraversalSource.Terrain
+            && terrainData != null)
+        {
             baseCost = GetAutonomyCostWithSkillOverrides(terrainData.basicAutonomyCost, terrainData.skillCostOverrides, unit);
+        }
         else
             baseCost = 1;
 
         return OperationalAutonomyRules.ApplyMovementAutonomyCost(unit, baseCost, applyOperationalAutonomyModifier);
+    }
+
+    private static TraversalDecision ResolveDefaultTraversalDecision(
+        ConstructionManager construction,
+        StructureData structure,
+        TerrainTypeData terrainData)
+    {
+        if (construction != null)
+        {
+            if (construction.InheritsTerrainRulesOn(terrainData)
+                && terrainData != null)
+            {
+                return new TraversalDecision(
+                    TraversalSource.Terrain);
+            }
+            return new TraversalDecision(TraversalSource.Construction);
+        }
+        if (structure != null)
+        {
+            return new TraversalDecision(
+                TraversalSource.Structure,
+                structure);
+        }
+        return terrainData != null
+            ? new TraversalDecision(TraversalSource.Terrain)
+            : default;
     }
 
     private static int GetAutonomyCostWithSkillOverrides(
@@ -918,6 +1450,82 @@ public static class UnitMovementPathRules
             output.Add(candidates[i].cell);
     }
 
+    public static bool HasTraversableRouteIgnoringUnits(
+        Tilemap terrainTilemap,
+        TerrainDatabase terrainDatabase,
+        UnitManager unit,
+        Vector3Int origin,
+        Vector3Int destination,
+        int maxExpanded = 200000)
+    {
+        if (terrainTilemap == null || unit == null)
+            return false;
+
+        origin.z = 0;
+        destination.z = 0;
+        if (origin == destination)
+            return true;
+
+        var cache = new MovementQueryCache(
+            terrainTilemap,
+            terrainDatabase);
+        var queue = new Queue<Vector3Int>();
+        var visited = new HashSet<Vector3Int>();
+        var neighbors = new List<Vector3Int>(6);
+        queue.Enqueue(origin);
+        visited.Add(origin);
+
+        int expanded = 0;
+        int safeMaxExpanded = Mathf.Max(1, maxExpanded);
+        while (queue.Count > 0
+            && expanded++ < safeMaxExpanded)
+        {
+            Vector3Int current = queue.Dequeue();
+            GetImmediateHexNeighbors(
+                terrainTilemap,
+                current,
+                neighbors);
+            for (int i = 0; i < neighbors.Count; i++)
+            {
+                Vector3Int next = neighbors[i];
+                next.z = 0;
+                if (visited.Contains(next))
+                    continue;
+
+                ConstructionManager construction =
+                    cache.GetConstructionAtCell(next);
+                StructureData structure =
+                    cache.GetStructureAtCell(next);
+                TerrainTypeData terrainData =
+                    cache.ResolveTerrainAtCell(next);
+                bool hasAnyTile =
+                    cache.HasAnyPaintedTileAtCell(next);
+                if (!TryResolveTraversal(
+                        next,
+                        cache,
+                        construction,
+                        structure,
+                        terrainData,
+                        hasAnyTile,
+                        terrainDatabase != null,
+                        unit,
+                        current,
+                        out _))
+                {
+                    continue;
+                }
+
+                if (next == destination)
+                    return true;
+
+                visited.Add(next);
+                queue.Enqueue(next);
+            }
+        }
+
+        return false;
+    }
+
     private static List<Vector3Int> BuildPath(PathNodeKey origin, PathNodeKey destination, Dictionary<PathNodeKey, PathNodeKey> cameFrom)
     {
         List<Vector3Int> reversedPath = new List<Vector3Int>();
@@ -1009,7 +1617,12 @@ public static class UnitMovementPathRules
         private readonly Dictionary<Vector3Int, TerrainTypeData> terrainByCell = new Dictionary<Vector3Int, TerrainTypeData>();
         private readonly HashSet<Vector3Int> terrainMisses = new HashSet<Vector3Int>();
         private readonly Dictionary<Vector3Int, bool> hasAnyTileByCell = new Dictionary<Vector3Int, bool>();
-        private readonly Dictionary<(Vector3Int from, Vector3Int to), bool> routeSegmentByEdge = new Dictionary<(Vector3Int from, Vector3Int to), bool>();
+        private readonly Dictionary<(Vector3Int from, Vector3Int to, RouteNetworkType network), StructureData>
+            routeStructureByEdge =
+                new Dictionary<(Vector3Int from, Vector3Int to, RouteNetworkType network), StructureData>();
+        private readonly Dictionary<(Vector3Int from, Vector3Int to, RouteNetworkType network), bool>
+            routeStructureMisses =
+                new Dictionary<(Vector3Int from, Vector3Int to, RouteNetworkType network), bool>();
 
         public MovementQueryCache(Tilemap referenceTilemap, TerrainDatabase terrainDatabase)
         {
@@ -1139,15 +1752,34 @@ public static class UnitMovementPathRules
             return found;
         }
 
-        public bool IsRoadBoostCell(Vector3Int cell)
+        public bool IsRoadBoostEdge(
+            Vector3Int fromCell,
+            Vector3Int toCell,
+            UnitManager unit)
         {
-            StructureData structure = GetStructureAtCell(cell);
-            TerrainTypeData terrain = ResolveTerrainAtCell(cell);
-            return structure != null && structure.IsRoadBoostEnabled(terrain);
+            toCell.z = 0;
+            TerrainTypeData terrain =
+                ResolveTerrainAtCell(toCell);
+            return TryGetConnectedRouteStructureAllowingUnit(
+                    fromCell,
+                    toCell,
+                    unit,
+                    RouteNetworkType.Asfaltado,
+                    terrain,
+                    out StructureData structure,
+                    out _)
+                && structure != null
+                && structure.IsRoadBoostEnabled(terrain);
         }
 
-        public bool HasAnyRouteStructureAtCellAllowingUnit(Vector3Int cell, UnitManager unit)
+        public bool TryGetAnyRouteStructureAtCellAllowingUnit(
+            Vector3Int cell,
+            UnitManager unit,
+            RouteNetworkType requiredNetwork,
+            TerrainTypeData terrainData,
+            out StructureData matchedStructure)
         {
+            matchedStructure = null;
             cell.z = 0;
             if (routeStructuresByCell.TryGetValue(
                     cell,
@@ -1155,44 +1787,69 @@ public static class UnitMovementPathRules
             {
                 for (int i = 0; i < indexedStructures.Count; i++)
                 {
-                    if (StructureQualifiesAsRailForUnit(
-                            indexedStructures[i],
-                            unit))
+                    StructureData candidate = indexedStructures[i];
+                    if (!StructureQualifiesForRouteNetwork(
+                            candidate,
+                            unit,
+                            requiredNetwork,
+                            terrainData))
                     {
-                        return true;
+                        continue;
+                    }
+
+                    if (IsBetterRouteStructure(
+                            candidate,
+                            matchedStructure))
+                    {
+                        matchedStructure = candidate;
                     }
                 }
-                return false;
+                return matchedStructure != null;
             }
 
-            bool found = false;
             for (int i = 0; i < roadNetworks.Length; i++)
             {
                 RoadNetworkManager network = roadNetworks[i];
-                if (network == null || !network.gameObject.activeInHierarchy)
+                if (network == null
+                    || !network.gameObject.activeInHierarchy)
+                {
                     continue;
+                }
 
                 Tilemap networkTilemap = network.BoardTilemap;
-                if (!IsCompatibleReference(referenceTilemap, networkTilemap))
+                if (!IsCompatibleReference(
+                        referenceTilemap,
+                        networkTilemap))
+                {
                     continue;
+                }
 
                 StructureDatabase db = network.StructureDatabase;
-                IReadOnlyList<StructureData> structures = db != null ? db.Structures : null;
+                IReadOnlyList<StructureData> structures =
+                    db != null ? db.Structures : null;
                 if (structures == null)
                     continue;
 
                 for (int s = 0; s < structures.Count; s++)
                 {
                     StructureData structure = structures[s];
-                    if (structure == null)
+                    if (!StructureQualifiesForRouteNetwork(
+                            structure,
+                            unit,
+                            requiredNetwork,
+                            terrainData))
+                    {
                         continue;
+                    }
 
-                    IReadOnlyList<RoadRouteDefinition> routes = db.GetRoadRoutes(structure);
+                    IReadOnlyList<RoadRouteDefinition> routes =
+                        db.GetRoadRoutes(structure);
                     if (routes == null)
                         routes = structure.roadRoutes;
                     if (routes == null)
                         continue;
 
+                    bool containsCell = false;
                     for (int r = 0; r < routes.Count; r++)
                     {
                         RoadRouteDefinition route = routes[r];
@@ -1203,44 +1860,65 @@ public static class UnitMovementPathRules
                         {
                             Vector3Int routeCell = route.cells[c];
                             routeCell.z = 0;
-                            if (routeCell != cell)
-                                continue;
-
-                            if (StructureQualifiesAsRailForUnit(structure, unit))
+                            if (routeCell == cell)
                             {
-                                found = true;
+                                containsCell = true;
                                 break;
                             }
                         }
 
-                        if (found)
+                        if (containsCell)
                             break;
                     }
 
-                    if (found)
-                        break;
+                    if (containsCell
+                        && IsBetterRouteStructure(
+                            structure,
+                            matchedStructure))
+                    {
+                        matchedStructure = structure;
+                    }
                 }
-
-                if (found)
-                    break;
             }
-            return found;
+            return matchedStructure != null;
         }
 
-        public bool HasConnectedRouteSegmentAllowingUnit(Vector3Int fromCell, Vector3Int toCell, UnitManager unit)
+        public bool TryGetConnectedRouteStructureAllowingUnit(
+            Vector3Int fromCell,
+            Vector3Int toCell,
+            UnitManager unit,
+            RouteNetworkType requiredNetwork,
+            TerrainTypeData destinationTerrain,
+            out StructureData matchedStructure,
+            out bool hasDeclaredRouteEdge)
         {
+            matchedStructure = null;
+            hasDeclaredRouteEdge = false;
             fromCell.z = 0;
             toCell.z = 0;
             if (fromCell == toCell)
                 return false;
 
-            var edge = (from: fromCell, to: toCell);
-            if (routeSegmentByEdge.TryGetValue(edge, out bool cached))
-                return cached;
+            var edge = (
+                from: fromCell,
+                to: toCell,
+                network: requiredNetwork);
+            if (routeStructureByEdge.TryGetValue(
+                    edge,
+                    out matchedStructure))
+            {
+                hasDeclaredRouteEdge = true;
+                return matchedStructure != null;
+            }
+            if (routeStructureMisses.TryGetValue(
+                    edge,
+                    out hasDeclaredRouteEdge))
+            {
+                return false;
+            }
 
             if (topology != null)
             {
-                bool indexedAllows = false;
                 if (topology.TryGetRouteStructures(
                         fromCell,
                         toCell,
@@ -1251,76 +1929,184 @@ public static class UnitMovementPathRules
                          i < indexedStructures.Count;
                          i++)
                     {
-                        if (StructureQualifiesAsRailForUnit(
-                                indexedStructures[i],
-                                unit))
+                        StructureData candidate =
+                            indexedStructures[i];
+                        if (candidate == null
+                            || (requiredNetwork != RouteNetworkType.None
+                                && candidate.routeNetworkType
+                                    != requiredNetwork))
                         {
-                            indexedAllows = true;
-                            break;
+                            continue;
+                        }
+
+                        hasDeclaredRouteEdge = true;
+                        if (!StructureQualifiesForRouteNetwork(
+                                candidate,
+                                unit,
+                                requiredNetwork,
+                                destinationTerrain))
+                        {
+                            continue;
+                        }
+
+                        if (IsBetterRouteStructure(
+                                candidate,
+                                matchedStructure))
+                        {
+                            matchedStructure = candidate;
                         }
                     }
                 }
 
-                routeSegmentByEdge[edge] = indexedAllows;
-                routeSegmentByEdge[(toCell, fromCell)] =
-                    indexedAllows;
-                return indexedAllows;
+                CacheRouteStructure(
+                    fromCell,
+                    toCell,
+                    requiredNetwork,
+                    matchedStructure,
+                    hasDeclaredRouteEdge);
+                return matchedStructure != null;
             }
 
             for (int i = 0; i < roadNetworks.Length; i++)
             {
                 RoadNetworkManager network = roadNetworks[i];
-                if (network == null || !network.gameObject.activeInHierarchy)
+                if (network == null
+                    || !network.gameObject.activeInHierarchy)
+                {
                     continue;
+                }
 
                 Tilemap networkTilemap = network.BoardTilemap;
-                if (!IsCompatibleReference(referenceTilemap, networkTilemap))
+                if (!IsCompatibleReference(
+                        referenceTilemap,
+                        networkTilemap))
+                {
                     continue;
+                }
 
                 StructureDatabase db = network.StructureDatabase;
-                IReadOnlyList<StructureData> structures = db != null ? db.Structures : null;
+                IReadOnlyList<StructureData> structures =
+                    db != null ? db.Structures : null;
                 if (structures == null)
                     continue;
 
                 for (int s = 0; s < structures.Count; s++)
                 {
                     StructureData structure = structures[s];
-                    if (structure == null || !StructureQualifiesAsRailForUnit(structure, unit))
+                    if (structure == null
+                        || (requiredNetwork != RouteNetworkType.None
+                            && structure.routeNetworkType
+                                != requiredNetwork))
+                    {
                         continue;
+                    }
 
-                    IReadOnlyList<RoadRouteDefinition> routes = db.GetRoadRoutes(structure);
+                    IReadOnlyList<RoadRouteDefinition> routes =
+                        db.GetRoadRoutes(structure);
                     if (routes == null)
                         routes = structure.roadRoutes;
                     if (routes == null)
                         continue;
 
+                    bool containsEdge = false;
                     for (int r = 0; r < routes.Count; r++)
                     {
                         RoadRouteDefinition route = routes[r];
-                        if (route == null || route.cells == null || route.cells.Count < 2)
+                        if (route == null
+                            || route.cells == null
+                            || route.cells.Count < 2)
+                        {
                             continue;
+                        }
 
-                        for (int c = 1; c < route.cells.Count; c++)
+                        for (int c = 1;
+                             c < route.cells.Count;
+                             c++)
                         {
                             Vector3Int a = route.cells[c - 1];
                             Vector3Int b = route.cells[c];
                             a.z = 0;
                             b.z = 0;
 
-                            if ((a == fromCell && b == toCell) || (a == toCell && b == fromCell))
+                            if ((a == fromCell && b == toCell)
+                                || (a == toCell
+                                    && b == fromCell))
                             {
-                                routeSegmentByEdge[edge] = true;
-                                routeSegmentByEdge[(toCell, fromCell)] = true;
-                                return true;
+                                containsEdge = true;
+                                break;
                             }
                         }
+
+                        if (containsEdge)
+                            break;
+                    }
+
+                    if (containsEdge)
+                        hasDeclaredRouteEdge = true;
+
+                    if (containsEdge
+                        && StructureQualifiesForRouteNetwork(
+                            structure,
+                            unit,
+                            requiredNetwork,
+                            destinationTerrain)
+                        && IsBetterRouteStructure(
+                            structure,
+                            matchedStructure))
+                    {
+                        matchedStructure = structure;
                     }
                 }
             }
 
-            routeSegmentByEdge[edge] = false;
-            routeSegmentByEdge[(toCell, fromCell)] = false;
-            return false;
+            CacheRouteStructure(
+                fromCell,
+                toCell,
+                requiredNetwork,
+                matchedStructure,
+                hasDeclaredRouteEdge);
+            return matchedStructure != null;
+        }
+
+        private void CacheRouteStructure(
+            Vector3Int fromCell,
+            Vector3Int toCell,
+            RouteNetworkType network,
+            StructureData structure,
+            bool hasDeclaredRouteEdge)
+        {
+            var forward = (
+                from: fromCell,
+                to: toCell,
+                network);
+            if (structure != null)
+            {
+                routeStructureByEdge[forward] = structure;
+                routeStructureMisses.Remove(forward);
+                return;
+            }
+
+            routeStructureMisses[forward] = hasDeclaredRouteEdge;
+        }
+
+        private static bool IsBetterRouteStructure(
+            StructureData candidate,
+            StructureData current)
+        {
+            if (candidate == null)
+                return false;
+            if (current == null)
+                return true;
+            if (candidate.priorityOrder != current.priorityOrder)
+            {
+                return candidate.priorityOrder
+                    > current.priorityOrder;
+            }
+
+            return string.CompareOrdinal(
+                    candidate.id ?? string.Empty,
+                    current.id ?? string.Empty)
+                < 0;
         }
 
         public TerrainTypeData ResolveTerrainAtCell(Vector3Int cell)

@@ -5,6 +5,7 @@ using UnityEngine.Tilemaps;
 
 public sealed class MelhorEmbarqueWindow : EditorWindow
 {
+    [SerializeField] private UnitManager passenger;
     [SerializeField] private UnitManager transporter;
     [SerializeField] private TerrainDatabase terrainDatabase;
     [SerializeField] private int operationalTurns = 2;
@@ -20,7 +21,8 @@ public sealed class MelhorEmbarqueWindow : EditorWindow
     private MelhorEmbarqueLzScore probableDirection;
     private bool comparisonCapturedWhileRunning;
     private Vector2 scroll;
-    private string status = "Selecione um transportador vazio.";
+    private string status =
+        "Selecione o passageiro; o transportador é opcional.";
 
     [MenuItem("Tools/Transporte/Melhor LZ de Embarque")]
     public static void Open() =>
@@ -37,13 +39,16 @@ public sealed class MelhorEmbarqueWindow : EditorWindow
 
     private void OnSelectionChange()
     {
-        TryUseSelection(silent: true);
         Repaint();
     }
 
     private void AutoDetect()
     {
-        if (transporter != null)
+        if (passenger != null && transporter == passenger)
+            transporter = null;
+        if (passenger != null)
+            map = passenger.BoardTilemap;
+        else if (transporter != null)
             map = transporter.BoardTilemap;
         if (terrainDatabase != null)
             return;
@@ -62,14 +67,20 @@ public sealed class MelhorEmbarqueWindow : EditorWindow
         EditorGUILayout.LabelField(
             "Melhor LZ de Embarque", EditorStyles.boldLabel);
         EditorGUILayout.HelpBox(
-            "Consulta pura. A varredura nasce no transportador: " +
-            "Tactical → Operational → Strategic. Os LZs vêm de " +
-            "UnitData > Transport > Allow Embark When Transporter At.",
+            "Consulta pura centrada no passageiro. Sem filtro, compara " +
+            "todos os transportadores aliados compatíveis; com um " +
+            "transportador informado, responde somente para ele. A LZ " +
+            "vem de UnitData > Transport > Allow Embark When " +
+            "Transporter At; Encontro Pax é o hex onde o passageiro " +
+            "realmente consegue parar.",
             MessageType.Info);
 
         EditorGUI.BeginChangeCheck();
+        passenger = (UnitManager)EditorGUILayout.ObjectField(
+            "Passageiro", passenger,
+            typeof(UnitManager), true);
         transporter = (UnitManager)EditorGUILayout.ObjectField(
-            "Transportador", transporter,
+            "Transportador (opcional)", transporter,
             typeof(UnitManager), true);
         terrainDatabase =
             (TerrainDatabase)EditorGUILayout.ObjectField(
@@ -100,6 +111,8 @@ public sealed class MelhorEmbarqueWindow : EditorWindow
         EditorGUILayout.BeginHorizontal();
         if (GUILayout.Button("Usar Selecionado"))
             TryUseSelection(silent: false);
+        if (GUILayout.Button("Usar como Transportador"))
+            TryUseSelectionAsTransporter();
         if (GUILayout.Button("Auto Detect"))
         {
             AutoDetectRuntimeSelection();
@@ -107,7 +120,7 @@ public sealed class MelhorEmbarqueWindow : EditorWindow
         EditorGUILayout.EndHorizontal();
 
         using (new EditorGUI.DisabledScope(
-                   transporter == null
+                   passenger == null
                    || map == null
                    || terrainDatabase == null))
         {
@@ -154,16 +167,22 @@ public sealed class MelhorEmbarqueWindow : EditorWindow
             string passengerName = option.passenger != null
                 ? option.passenger.name
                 : "?";
+            string transporterName = option.transporter != null
+                ? option.transporter.name
+                : "?";
             if (GUILayout.Button(
                     $"{(runtimeChoice ? "[RUNTIME] " : "")}" +
                     $"#{i + 1} {option.transporterTier} " +
-                    $"{passengerName} → {option.lzCell} | " +
+                    $"{passengerName} → {transporterName} | " +
+                    $"Pax={option.passengerMeetingCell} " +
+                    $"LZ={option.lzCell} | " +
                     $"{option.passengerRouteState}",
                     EditorStyles.miniButton))
             {
                 selectedOption = option;
                 selected = result.ranking.Find(
-                    lz => lz.cell == option.lzCell);
+                    lz => lz.cell == option.lzCell
+                        && lz.transporter == option.transporter);
                 SceneView.RepaintAll();
             }
             GUI.backgroundColor = Color.white;
@@ -208,7 +227,8 @@ public sealed class MelhorEmbarqueWindow : EditorWindow
                 ? new Color(1f, 0.8f, 0.2f)
                 : Color.white;
             if (GUILayout.Button(
-                    $"#{i + 1} {lz.tier} LZ={lz.cell} " +
+                    $"#{i + 1} {lz.tier} " +
+                    $"{lz.transporter?.name ?? "?"} LZ={lz.cell} " +
                     $"pax={lz.passengers.Count} " +
                     $"dist={lz.transporterDistance}",
                     EditorStyles.miniButton))
@@ -228,6 +248,7 @@ public sealed class MelhorEmbarqueWindow : EditorWindow
                 EditorGUILayout.LabelField(
                     $"  {passenger.passenger.name} " +
                     $"@{passenger.passengerCell} " +
+                    $"→ encontro={passenger.passengerMeetingCell} " +
                     $"slot={passenger.slotIndex} " +
                     $"move={passenger.passengerMoveCost}",
                     EditorStyles.miniLabel);
@@ -236,7 +257,7 @@ public sealed class MelhorEmbarqueWindow : EditorWindow
 
         EditorGUILayout.Space(6f);
         EditorGUILayout.LabelField(
-            $"Passageiros descartados " +
+            $"Transportadores incompatíveis " +
             $"({result.rejectedPassengers.Count})",
             EditorStyles.boldLabel);
         for (int i = 0;
@@ -267,6 +288,47 @@ public sealed class MelhorEmbarqueWindow : EditorWindow
                     "O objeto selecionado não possui UnitManager.";
             return;
         }
+        passenger = picked;
+        if (transporter == picked)
+            transporter = null;
+        AutoDetect();
+        result = null;
+        runtimePolicyResult = null;
+        selected = null;
+        selectedOption = null;
+        runtimePolicyOption = null;
+        status = $"Passageiro: {picked.name}.";
+        SceneView.RepaintAll();
+    }
+
+    private void TryUseSelectionAsTransporter()
+    {
+        UnitManager picked =
+            Selection.activeGameObject != null
+                ? Selection.activeGameObject
+                    .GetComponent<UnitManager>()
+                : null;
+        if (picked == null)
+        {
+            status =
+                "O objeto selecionado não possui UnitManager.";
+            return;
+        }
+        if (picked == passenger)
+        {
+            status =
+                "Passageiro e transportador não podem ser a mesma unidade.";
+            return;
+        }
+        if (!picked.TryGetUnitData(out UnitData data)
+            || data == null
+            || !data.isTransporter)
+        {
+            status =
+                $"{picked.name} não está configurado como transportador.";
+            return;
+        }
+
         transporter = picked;
         AutoDetect();
         result = null;
@@ -274,6 +336,7 @@ public sealed class MelhorEmbarqueWindow : EditorWindow
         selected = null;
         selectedOption = null;
         runtimePolicyOption = null;
+        probableDirection = null;
         status = $"Transportador: {picked.name}.";
         SceneView.RepaintAll();
     }
@@ -302,7 +365,9 @@ public sealed class MelhorEmbarqueWindow : EditorWindow
             }
             if (runtimeUnit != null)
             {
-                transporter = runtimeUnit;
+                passenger = runtimeUnit;
+                if (transporter == runtimeUnit)
+                    transporter = null;
                 AutoDetect();
                 result = null;
                 runtimePolicyResult = null;
@@ -317,17 +382,10 @@ public sealed class MelhorEmbarqueWindow : EditorWindow
                 SceneView.FrameLastActiveSceneView();
                 SceneView.RepaintAll();
 
-                bool isTransporter =
-                    runtimeUnit.TryGetUnitData(out UnitData data)
-                    && data != null
-                    && data.isTransporter;
-                status = isTransporter
-                    ? $"Unidade runtime da IA ({runtimeSource}): " +
-                      $"{runtimeUnit.name}. " +
-                      "Selecionada e enquadrada na Scene View."
-                    : $"Unidade runtime da IA ({runtimeSource}): " +
-                      $"{runtimeUnit.name}. " +
-                      "Selecionada e enquadrada, mas não é transportador.";
+                status =
+                    $"Passageiro runtime da IA ({runtimeSource}): " +
+                    $"{runtimeUnit.name}. Selecionado e enquadrado na " +
+                    "Scene View; o filtro de transportador foi preservado.";
                 return;
             }
         }
@@ -347,14 +405,13 @@ public sealed class MelhorEmbarqueWindow : EditorWindow
         AutoDetect();
         comparisonCapturedWhileRunning =
             Application.isPlaying && !EditorApplication.isPaused;
-        result = MelhorEmbarqueService.Evaluate(
-            new MelhorEmbarqueRequest
+        result = MelhorEmbarqueService.EvaluateForPassenger(
+            new MelhorEmbarquePassengerRequest
             {
+                passenger = passenger,
                 transporter = transporter,
                 map = map,
                 terrainDatabase = terrainDatabase,
-                tacticalBudget = Mathf.Max(
-                    0, transporter.RemainingMovementPoints),
                 operationalTurns = operationalTurns,
                 includeStrategic = includeStrategic,
                 evaluateRideNeed = EvaluateRideNeed
@@ -374,14 +431,13 @@ public sealed class MelhorEmbarqueWindow : EditorWindow
         {
             MelhorEmbarqueResult directionProbe =
                 runtimePolicyResult ??
-                MelhorEmbarqueService.Evaluate(
-                    new MelhorEmbarqueRequest
+                MelhorEmbarqueService.EvaluateForPassenger(
+                    new MelhorEmbarquePassengerRequest
                     {
+                        passenger = passenger,
                         transporter = transporter,
                         map = map,
                         terrainDatabase = terrainDatabase,
-                        tacticalBudget = Mathf.Max(
-                            0, transporter.RemainingMovementPoints),
                         operationalTurns = operationalTurns,
                         includeStrategic = true,
                         evaluateRideNeed = EvaluateRideNeed
@@ -392,6 +448,8 @@ public sealed class MelhorEmbarqueWindow : EditorWindow
         status = selectedOption != null
             ? $"Melhor opção: {selectedOption.transporterTier} " +
               $"{selectedOption.passenger?.name} → " +
+              $"{selectedOption.transporter?.name} | encontro " +
+              $"{selectedOption.passengerMeetingCell} | LZ " +
               $"{selectedOption.lzCell} " +
               $"({selectedOption.passengerRouteState})."
             : "Nenhum encontro válido encontrado.";
@@ -399,14 +457,13 @@ public sealed class MelhorEmbarqueWindow : EditorWindow
     }
 
     private MelhorEmbarqueResult Evaluate(bool includeStrategic) =>
-        MelhorEmbarqueService.Evaluate(
-            new MelhorEmbarqueRequest
+        MelhorEmbarqueService.EvaluateForPassenger(
+            new MelhorEmbarquePassengerRequest
             {
+                passenger = passenger,
                 transporter = transporter,
                 map = map,
                 terrainDatabase = terrainDatabase,
-                tacticalBudget = Mathf.Max(
-                    0, transporter.RemainingMovementPoints),
                 operationalTurns = operationalTurns,
                 includeStrategic = includeStrategic,
                 evaluateRideNeed = EvaluateRideNeed
@@ -471,7 +528,8 @@ public sealed class MelhorEmbarqueWindow : EditorWindow
 
         EditorGUILayout.LabelField(
             $"{option.transporterTier} | {option.passenger.name} -> " +
-            $"{option.lzCell}",
+            $"{option.transporter?.name ?? "?"} | encontro " +
+            $"{option.passengerMeetingCell} | LZ {option.lzCell}",
             EditorStyles.wordWrappedLabel);
         EditorGUILayout.LabelField(
             $"{option.rideDisposition} | " +
@@ -522,7 +580,9 @@ public sealed class MelhorEmbarqueWindow : EditorWindow
         if (passengerIsAircraft)
             return true;
         if (option.passengerRouteState ==
-            MelhorEmbarquePassengerRouteState.NoCurrentRoute)
+                MelhorEmbarquePassengerRouteState.NoCurrentRoute
+            || option.passengerRouteState ==
+                MelhorEmbarquePassengerRouteState.ReachableStrategic)
             return false;
         return serviceTier != MelhorEmbarqueTier.Tactical
             || option.passengerRouteState ==
@@ -537,7 +597,11 @@ public sealed class MelhorEmbarqueWindow : EditorWindow
         && a.passenger != null
         && b.passenger != null
         && a.passenger.InstanceId == b.passenger.InstanceId
+        && a.transporter != null
+        && b.transporter != null
+        && a.transporter.InstanceId == b.transporter.InstanceId
         && a.transporterTier == b.transporterTier
+        && a.passengerMeetingCell == b.passengerMeetingCell
         && a.lzCell == b.lzCell;
 
     private static string FormatCost(int value) =>
@@ -624,17 +688,37 @@ public sealed class MelhorEmbarqueWindow : EditorWindow
 
         if (selectedOption != null)
         {
-            Vector3 optionWorld =
+            Vector3 lzWorld =
                 map.GetCellCenterWorld(selectedOption.lzCell);
             Handles.color = Color.yellow;
             Handles.DrawWireDisc(
-                optionWorld, Vector3.forward, 0.52f);
+                lzWorld, Vector3.forward, 0.52f);
             Handles.Label(
-                optionWorld + Vector3.up * 0.55f,
+                lzWorld + Vector3.up * 0.55f,
                 selectedOption.passenger != null
-                    ? $"{selectedOption.passenger.name} " +
+                    ? $"LZ DESTINO {selectedOption.transporter?.name} | " +
                       $"{selectedOption.passengerRouteState}"
                     : selectedOption.passengerRouteState.ToString());
+            DrawTransporterOriginToLz(
+                selectedOption,
+                lzWorld,
+                Color.yellow,
+                "TRANSPORTADOR AGORA",
+                "ROTA → LZ DESTINO");
+
+            if (selectedOption.hasPassengerMeetingCell)
+            {
+                Vector3 meetingWorld = map.GetCellCenterWorld(
+                    selectedOption.passengerMeetingCell);
+                Handles.color = new Color(0.2f, 1f, 0.45f);
+                Handles.DrawWireDisc(
+                    meetingWorld, Vector3.forward, 0.46f);
+                Handles.DrawDottedLine(
+                    meetingWorld, lzWorld, 4f);
+                Handles.Label(
+                    meetingWorld + Vector3.up * 0.48f,
+                    $"ENCONTRO PAX {selectedOption.passenger?.name}");
+            }
         }
 
         if (comparisonCapturedWhileRunning
@@ -648,15 +732,34 @@ public sealed class MelhorEmbarqueWindow : EditorWindow
                 runtimeWorld, Vector3.forward, 0.62f);
             Handles.Label(
                 runtimeWorld + Vector3.up * 0.75f,
-                $"RUNTIME {runtimePolicyOption.passenger?.name}");
+                $"RUNTIME LZ DESTINO " +
+                $"{runtimePolicyOption.transporter?.name}");
+            DrawTransporterOriginToLz(
+                runtimePolicyOption,
+                runtimeWorld,
+                new Color(0.2f, 0.9f, 1f),
+                "RUNTIME TRANSPORTADOR AGORA",
+                "RUNTIME ROTA → LZ");
+            if (runtimePolicyOption.hasPassengerMeetingCell)
+            {
+                Vector3 runtimeMeeting = map.GetCellCenterWorld(
+                    runtimePolicyOption.passengerMeetingCell);
+                Handles.DrawWireDisc(
+                    runtimeMeeting, Vector3.forward, 0.48f);
+                Handles.DrawDottedLine(
+                    runtimeMeeting, runtimeWorld, 4f);
+                Handles.Label(
+                    runtimeMeeting + Vector3.up * 0.52f,
+                    "RUNTIME ENCONTRO PAX");
+            }
         }
 
         if (showProbableDirection
             && probableDirection != null
-            && transporter != null)
+            && probableDirection.transporter != null)
         {
             Vector3 from = map.GetCellCenterWorld(
-                transporter.CurrentCellPosition);
+                probableDirection.transporter.CurrentCellPosition);
             Vector3 to = map.GetCellCenterWorld(
                 probableDirection.cell);
             Handles.color = new Color(1f, 0.3f, 0.8f);
@@ -672,5 +775,55 @@ public sealed class MelhorEmbarqueWindow : EditorWindow
                 Vector3.Lerp(from, to, 0.5f),
                 "Direção provável (debug)");
         }
+    }
+
+    private void DrawTransporterOriginToLz(
+        MelhorEmbarqueOption option,
+        Vector3 lzWorld,
+        Color color,
+        string originLabel,
+        string routeLabel)
+    {
+        if (option?.transporter == null || map == null)
+            return;
+
+        Vector3Int originCell =
+            option.transporter.CurrentCellPosition;
+        originCell.z = 0;
+        Vector3 originWorld =
+            map.GetCellCenterWorld(originCell);
+
+        Handles.color = color;
+        Handles.DrawWireDisc(
+            originWorld, Vector3.forward, 0.34f);
+        Handles.Label(
+            originWorld + Vector3.down * 0.48f,
+            $"{originLabel} {option.transporter.name} " +
+            $"{originCell}");
+
+        if (originCell == option.lzCell)
+        {
+            Handles.Label(
+                originWorld + Vector3.down * 0.68f,
+                "JÁ ESTÁ NA LZ DESTINO");
+            return;
+        }
+
+        Handles.DrawDottedLine(
+            originWorld, lzWorld, 5f);
+        Vector3 direction = lzWorld - originWorld;
+        if (direction.sqrMagnitude > 0.0001f)
+        {
+            Handles.ArrowHandleCap(
+                0,
+                lzWorld,
+                Quaternion.LookRotation(
+                    Vector3.forward, direction),
+                0.48f,
+                EventType.Repaint);
+        }
+        Handles.Label(
+            Vector3.Lerp(originWorld, lzWorld, 0.5f),
+            routeLabel);
     }
 }

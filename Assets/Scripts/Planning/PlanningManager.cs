@@ -655,44 +655,16 @@ public class PlanningManager : MonoBehaviour
         if (unit == null || terrainTilemap == null)
             return false;
 
-        Vector3Int origin = unit.CurrentCellPosition; origin.z = 0;
+        Vector3Int origin = unit.CurrentCellPosition;
+        origin.z = 0;
         destination.z = 0;
-        if (origin == destination)
-            return true;
-
-        Queue<Vector3Int> queue = new Queue<Vector3Int>();
-        HashSet<Vector3Int> visited = new HashSet<Vector3Int>();
-        List<Vector3Int> neighbors = new List<Vector3Int>(6);
-
-        queue.Enqueue(origin);
-        visited.Add(origin);
-        int guard = 0;
-        
-        while (queue.Count > 0 && guard++ < 200000)
-        {
-            Vector3Int current = queue.Dequeue();
-            if (current == destination)
-                return true;
-
-            neighbors.Clear();
-            UnitMovementPathRules.GetImmediateHexNeighbors(terrainTilemap, current, neighbors);
-            for (int i = 0; i < neighbors.Count; i++)
-            {
-                Vector3Int next = neighbors[i]; next.z = 0;
-                if (!visited.Add(next))
-                    continue;
-                    
-                if (next == destination)
-                    return true;
-                    
-                if (!UnitMovementPathRules.TryGetEnterCellCost(terrainTilemap, unit, next, terrainDatabase, out _))
-                    continue;
-                    
-                queue.Enqueue(next);
-            }
-        }
-
-        return false;
+        return UnitMovementPathRules
+            .HasTraversableRouteIgnoringUnits(
+                terrainTilemap,
+                terrainDatabase,
+                unit,
+                origin,
+                destination);
     }
 
     private int ComputeBoardDistance(Vector3Int fromCell, Vector3Int toCell)

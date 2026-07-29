@@ -18,6 +18,7 @@ MonoBehaviour:
     b\xF4nus de estrada."
   descriptionsByTerrain: []
   priorityOrder: 3
+  routeNetworkType: 2
   domain: 0
   heightLevel: 3
   aditionalDomainsAllowed: []
@@ -39,7 +40,8 @@ MonoBehaviour:
     rotaDeclarada: 0
   - terrainData: {fileID: 11400000, guid: f8bd8dc9dbe197d4f828ad72d3d90df6, type: 2}
     requiredSkillsToEnter: []
-    blockedSkills: []
+    blockedSkills:
+    - {fileID: 11400000, guid: 24a55ae6170e7a642865a4a34c736233, type: 2}
     skillCostOverrides:
     - skill: {fileID: 11400000, guid: ef10c9e820afc074b99ea8e0b709c2f4, type: 2}
       autonomyCost: 2
@@ -52,6 +54,7 @@ MonoBehaviour:
     requiredSkillsToEnter: []
     blockedSkills:
     - {fileID: 11400000, guid: ef10c9e820afc074b99ea8e0b709c2f4, type: 2}
+    - {fileID: 11400000, guid: 24a55ae6170e7a642865a4a34c736233, type: 2}
     skillCostOverrides:
     - skill: {fileID: 11400000, guid: 44c13554a7f731f418bad4395bf10e52, type: 2}
       autonomyCost: 2

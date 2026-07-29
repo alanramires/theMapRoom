@@ -81,6 +81,14 @@ public class CaminhosValidosWindow : EditorWindow
     // Caminhos Alcançáveis
     private HashSet<Vector3Int> reachableCells;
     private Vector3Int lastOrigin;
+    // Inspeção de gasto: clique numa célula alcançável para ver o PM passo a passo.
+    private Dictionary<Vector3Int, List<Vector3Int>> reachablePaths;
+    private Dictionary<Vector3Int, int> reachableCostMap;
+    private Vector3Int selectedReachableCell;
+    private bool hasSelectedReachableCell;
+    private List<string> reachableStepLines;
+    private string reachableSummary = string.Empty;
+    private int reachableBudget;
 
     // Distância até Destino
     private int distanceCost = -1;
@@ -273,7 +281,30 @@ public class CaminhosValidosWindow : EditorWindow
         EditorGUI.EndDisabledGroup();
 
         if (reachableCells != null)
+        {
             EditorGUILayout.LabelField($"{reachableCells.Count} hexes alcançáveis de {lastOrigin} com PM={movementPoints}", EditorStyles.miniLabel);
+            EditorGUILayout.LabelField("  Clique numa bolinha verde na Scene View para ver o gasto de PM até ela.", EditorStyles.miniLabel);
+        }
+
+        if (hasSelectedReachableCell)
+        {
+            EditorGUILayout.Space(2f);
+            EditorGUILayout.LabelField("Gasto de PM", EditorStyles.boldLabel);
+            if (!string.IsNullOrEmpty(reachableSummary))
+                EditorGUILayout.HelpBox(reachableSummary, MessageType.None);
+            if (reachableStepLines != null)
+            {
+                for (int i = 0; i < reachableStepLines.Count; i++)
+                    EditorGUILayout.LabelField("  " + reachableStepLines[i], EditorStyles.miniLabel);
+            }
+            if (GUILayout.Button("Limpar seleção do gasto", EditorStyles.miniButton))
+            {
+                hasSelectedReachableCell = false;
+                reachableStepLines = null;
+                reachableSummary = string.Empty;
+                SceneView.RepaintAll();
+            }
+        }
 
         EditorGUILayout.Space(8f);
 
@@ -468,6 +499,8 @@ public class CaminhosValidosWindow : EditorWindow
         hasWaypointResult = false;
         statusMessage = string.Empty;
 
+        ClearReachableInspection();
+
         Vector3Int origin = originHex; origin.z = 0;
         RunWithTempUnit(origin, unit =>
         {
@@ -478,6 +511,15 @@ public class CaminhosValidosWindow : EditorWindow
                 if (CanUseAsDebugStopCell(unit, cell, origin))
                     reachableCells.Add(cell);
             }
+            // Guarda o caminho de cada célula e o custo acumulado para a inspeção
+            // por clique. Nada aqui muda a regra: sao os mesmos resultados que a
+            // ferramenta ja calculava e descartava.
+            reachablePaths = new Dictionary<Vector3Int, List<Vector3Int>>(paths.Count);
+            foreach (var kv in paths)
+                reachablePaths[kv.Key] = kv.Value != null ? new List<Vector3Int>(kv.Value) : null;
+            reachableCostMap = UnitMovementPathRules.CalculateMovementCostMap(
+                tilemap, unit, origin, movementPoints, terrainDatabase);
+            reachableBudget = movementPoints;
             lastOrigin = origin;
         });
 
@@ -644,8 +686,101 @@ public class CaminhosValidosWindow : EditorWindow
         Repaint();
     }
 
+    private void ClearReachableInspection()
+    {
+        reachablePaths = null;
+        reachableCostMap = null;
+        hasSelectedReachableCell = false;
+        reachableStepLines = null;
+        reachableSummary = string.Empty;
+    }
+
+    // Monta o extrato de PM da célula clicada, passo a passo, como o jogo cobraria.
+    // Só leitura: os custos vêm do mesmo mapa que o cálculo já produziu.
+    private void BuildReachableBreakdown(Vector3Int cell)
+    {
+        reachableStepLines = new List<string>();
+        reachableSummary = string.Empty;
+        if (reachablePaths == null || !reachablePaths.TryGetValue(cell, out List<Vector3Int> path) || path == null)
+        {
+            reachableSummary = "Sem caminho registrado para esta célula.";
+            return;
+        }
+
+        int total = reachableCostMap != null && reachableCostMap.TryGetValue(cell, out int t) ? t : -1;
+
+        int previous = 0;
+        for (int i = 1; i < path.Count; i++)
+        {
+            Vector3Int step = path[i]; step.z = 0;
+            int cumulative = reachableCostMap != null && reachableCostMap.TryGetValue(step, out int c) ? c : -1;
+            string delta = cumulative >= 0 ? (cumulative - previous).ToString("+0;-0;0") : "?";
+            string running = cumulative >= 0 ? $"{cumulative}/{reachableBudget}" : "?";
+            reachableStepLines.Add(
+                $"{i}. ({step.x},{step.y})  {delta} PM  →  {running}   {DescribeCellSurface(step)}");
+            if (cumulative >= 0)
+                previous = cumulative;
+        }
+
+        bool roadBonus = false;
+        RunWithTempUnit(lastOrigin, unit =>
+        {
+            roadBonus = UnitMovementPathRules.DidUseRoadFullMoveBonus(tilemap, unit, path, terrainDatabase);
+        });
+
+        reachableSummary =
+            $"({cell.x},{cell.y})  total {(total >= 0 ? total.ToString() : "?")} de {reachableBudget} PM  |  " +
+            $"{Mathf.Max(0, path.Count - 1)} passo(s)  |  bônus de estrada: {(roadBonus ? "SIM (passo grátis)" : "não")}";
+    }
+
+    // Só apresentação: mesma precedência que o motor usa para nomear o hex.
+    private string DescribeCellSurface(Vector3Int cell)
+    {
+        if (tilemap == null)
+            return string.Empty;
+
+        cell.z = 0;
+        ConstructionManager construction = ConstructionOccupancyRules.GetConstructionAtCell(tilemap, cell);
+        if (construction != null && construction.TryResolveConstructionData(out ConstructionData cd) && cd != null)
+            return $"[{cd.displayName}]";
+
+        StructureData structure = StructureOccupancyRules.GetStructureAtCell(tilemap, cell);
+        TerrainTypeData terrain = ResolveTerrainForDisplay(cell);
+        if (structure != null)
+            return $"[{structure.displayName}{(terrain != null ? " / " + terrain.displayName : string.Empty)}]";
+
+        return terrain != null ? $"[{terrain.displayName}]" : "[?]";
+    }
+
+    private TerrainTypeData ResolveTerrainForDisplay(Vector3Int cell)
+    {
+        if (tilemap == null || terrainDatabase == null)
+            return null;
+
+        TileBase tile = tilemap.GetTile(cell);
+        if (tile != null && terrainDatabase.TryGetByPaletteTile(tile, out TerrainTypeData data))
+            return data;
+
+        GridLayout grid = tilemap.layoutGrid;
+        if (grid == null)
+            return null;
+
+        Tilemap[] maps = grid.GetComponentsInChildren<Tilemap>(includeInactive: true);
+        for (int i = 0; i < maps.Length; i++)
+        {
+            if (maps[i] == null || maps[i] == tilemap)
+                continue;
+            TileBase other = maps[i].GetTile(cell);
+            if (other != null && terrainDatabase.TryGetByPaletteTile(other, out TerrainTypeData otherData))
+                return otherData;
+        }
+
+        return null;
+    }
+
     private void ClearAll()
     {
+        ClearReachableInspection();
         reachableCells = null;
         hasDistResult = false;
         distanceCostMap = null;
@@ -1260,6 +1395,7 @@ public class CaminhosValidosWindow : EditorWindow
     {
         if (tilemap == null) return;
         HandlePickingInput();
+        HandleReachableClickInput();
 
         var labelStyle = new GUIStyle(EditorStyles.miniLabel)
         {
@@ -1277,6 +1413,40 @@ public class CaminhosValidosWindow : EditorWindow
 
             Handles.color = new Color(1f, 0.85f, 0f, 0.9f);
             Handles.DrawSolidDisc(tilemap.GetCellCenterWorld(lastOrigin), Vector3.back, 0.28f);
+
+            // Célula clicada: caminho destacado + PM acumulado em cada passo.
+            if (hasSelectedReachableCell
+                && reachablePaths != null
+                && reachablePaths.TryGetValue(selectedReachableCell, out List<Vector3Int> selectedPath))
+            {
+                DrawPathHighlight(selectedPath, new Color(1f, 0.55f, 0.1f, 0.95f), 0.18f, 6f);
+
+                var stepStyle = new GUIStyle(EditorStyles.boldLabel)
+                {
+                    alignment = TextAnchor.MiddleCenter,
+                    fontSize = 13,
+                    normal = { textColor = Color.white }
+                };
+
+                if (selectedPath != null)
+                {
+                    for (int i = 1; i < selectedPath.Count; i++)
+                    {
+                        Vector3Int step = selectedPath[i]; step.z = 0;
+                        int cumulative = reachableCostMap != null && reachableCostMap.TryGetValue(step, out int c) ? c : -1;
+                        Handles.Label(
+                            tilemap.GetCellCenterWorld(step) + Vector3.up * 0.02f,
+                            cumulative >= 0 ? cumulative.ToString() : "?",
+                            stepStyle);
+                    }
+                }
+
+                Vector3 sel = tilemap.GetCellCenterWorld(selectedReachableCell);
+                Handles.color = new Color(1f, 0.55f, 0.1f, 0.95f);
+                Handles.DrawWireDisc(sel, Vector3.back, 0.36f);
+                Handles.Label(sel + Vector3.up * 0.42f, reachableSummary,
+                    new GUIStyle(EditorStyles.boldLabel) { normal = { textColor = new Color(1f, 0.6f, 0.15f) } });
+            }
         }
 
         // Distância até destino
@@ -1526,6 +1696,51 @@ public class CaminhosValidosWindow : EditorWindow
 
         if (e.type == EventType.Layout)
             HandleUtility.AddDefaultControl(GUIUtility.GetControlID(FocusType.Passive));
+    }
+
+    // Clique numa bolinha verde = inspecionar o gasto até ela. O clique só é
+    // consumido quando cai numa célula alcançavel, para não roubar a seleção
+    // normal da Scene View no resto do mapa.
+    private void HandleReachableClickInput()
+    {
+        if (reachableCells == null || reachableCells.Count == 0)
+            return;
+        if (pickingOrigin || pickingDestination || pickingWaypoint)
+            return;
+
+        Event e = Event.current;
+
+        if (e.type == EventType.Layout)
+        {
+            Vector3Int over = ScreenToCell(e.mousePosition); over.z = 0;
+            if (reachableCells.Contains(over))
+                HandleUtility.AddDefaultControl(GUIUtility.GetControlID(FocusType.Passive));
+            return;
+        }
+
+        if (e.type != EventType.MouseDown || e.button != 0 || e.alt)
+            return;
+
+        Vector3Int cell = ScreenToCell(e.mousePosition); cell.z = 0;
+        if (!reachableCells.Contains(cell))
+            return;
+
+        if (hasSelectedReachableCell && selectedReachableCell == cell)
+        {
+            hasSelectedReachableCell = false;
+            reachableStepLines = null;
+            reachableSummary = string.Empty;
+        }
+        else
+        {
+            selectedReachableCell = cell;
+            hasSelectedReachableCell = true;
+            BuildReachableBreakdown(cell);
+        }
+
+        e.Use();
+        Repaint();
+        SceneView.RepaintAll();
     }
 
     private Vector3Int ScreenToCell(Vector2 mousePos)

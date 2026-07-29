@@ -2,6 +2,32 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Serialization;
 
+/// <summary>
+/// Familia topologica de uma estrutura de rota.
+///
+/// Estruturas diferentes da mesma familia podem formar uma rota continua
+/// quando suas definicoes compartilham um no. Ex.: Trilho e Ponte
+/// Ferroviaria pertencem ambos a MalhaFerroviaria.
+/// </summary>
+public enum RouteNetworkType
+{
+    None = 0,
+    Asfaltado = 1,
+    MalhaFerroviaria = 2,
+    Fluvial = 3
+}
+
+/// <summary>
+/// Override tri-state de Road Boost para um par Estrutura+Terreno.
+/// Herdar usa o valor global da estrutura; Ativar e Desativar vencem o global.
+/// </summary>
+public enum RoadBoostOverride
+{
+    HerdarDaEstrutura = 0,
+    Ativar = 1,
+    Desativar = 2
+}
+
 [System.Serializable]
 public class StructureLandingSkillRule
 {
@@ -48,6 +74,9 @@ public class StructureSkillTerrainRule
 
     [Tooltip("Exigencia de rota declarada NESTE par Estrutura+Terreno. Herdar = usa o valor global da estrutura. Ex.: Rodovia e livre na floresta (global false) mas canalizada na montanha (override Exigir).")]
     public ExigenciaDeRotaDeclarada rotaDeclarada = ExigenciaDeRotaDeclarada.HerdarDaEstrutura;
+
+    [Tooltip("Road Boost NESTE par Estrutura+Terreno. Herdar usa o valor global da estrutura; Ativar ou Desativar sobrescrevem o global.")]
+    public RoadBoostOverride roadBoost = RoadBoostOverride.HerdarDaEstrutura;
 }
 
 // Exigencia de conexao por rota declarada. Quando ativa, uma unidade so entra na celula
@@ -93,7 +122,8 @@ public class StructureTerrainDescription
     [Tooltip("Descricao exibida para esta estrutura quando estiver sobre este terreno.")]
     public string description;
 
-    [Tooltip("Se marcado, desativa o Road Boost especificamente neste par Estrutura+Terreno.")]
+    [HideInInspector]
+    [Tooltip("LEGADO: use Road Boost em Skill Rules By Terrain.")]
     public bool roadBoostOff;
 }
 
@@ -115,6 +145,10 @@ public class StructureData : ScriptableObject
 
     [Tooltip("Prioridade de sobreposicao da estrutura. Maior valor vence em hex com conflito.")]
     public int priorityOrder = 0;
+
+    [Header("Route Network")]
+    [Tooltip("Familia topologica desta rota. Estruturas da mesma familia podem se conectar por um no compartilhado, como Trilho + Ponte Ferroviaria.")]
+    public RouteNetworkType routeNetworkType = RouteNetworkType.None;
 
     [Header("Native Domain / Can be build on")]
     [Tooltip("Dominio/altura nativo da estrutura.")]
@@ -141,7 +175,7 @@ public class StructureData : ScriptableObject
     public List<SkillData> blockedSkills = new List<SkillData>();
     [Tooltip("Overrides opcionais de custo de autonomia por skill.")]
     public List<TerrainSkillCostOverride> skillCostOverrides = new List<TerrainSkillCostOverride>();
-    [Tooltip("Regras por par Estrutura+Terreno. Quando o terreno do hex casar, estas regras complementam/substituem as globais.")]
+    [Tooltip("Regras por par Estrutura+Terreno. Requisitos e custos nao vazios substituem o campo global correspondente; listas vazias herdam o global. Bloqueios do par se somam aos bloqueios globais.")]
     public List<StructureSkillTerrainRule> skillRulesByTerrain = new List<StructureSkillTerrainRule>();
     [Tooltip("Valor GLOBAL da exigencia de rota declarada. Marque na Linha de Trem para cobrir todos os terrenos de uma vez. Cada par Estrutura+Terreno pode sobrescrever este valor.")]
     public bool exigeRotaDeclarada = false;
@@ -180,12 +214,18 @@ public class StructureData : ScriptableObject
     [Tooltip("Se preenchido, somente unidades com essas Stealth Skills ficam livremente detectaveis neste par Estrutura+Terreno (nos dominios/alturas acima).")]
     public List<SkillData> forceDetectUnitsWithFollowingStealthSkills = new List<SkillData>();
 
+    [System.NonSerialized]
+    private Dictionary<TerrainTypeData, List<SkillData>>
+        combinedBlockedSkillsByTerrain;
+
     [Header("Road Routes")]
     [Tooltip("Rotas de rodovia desta estrutura (centro-a-centro dos hexes).")]
     public List<RoadRouteDefinition> roadRoutes = new List<RoadRouteDefinition>();
 
     private void OnValidate()
     {
+        combinedBlockedSkillsByTerrain = null;
+
         if (requiredSkillsToEnter == null)
             requiredSkillsToEnter = new List<SkillData>();
         if (descriptionsByTerrain == null)
@@ -268,6 +308,8 @@ public class StructureData : ScriptableObject
                 rule.blockedSkills = new List<SkillData>();
             if (rule.skillCostOverrides == null)
                 rule.skillCostOverrides = new List<TerrainSkillCostOverride>();
+            if (!System.Enum.IsDefined(typeof(RoadBoostOverride), rule.roadBoost))
+                rule.roadBoost = RoadBoostOverride.HerdarDaEstrutura;
         }
     }
 
@@ -305,10 +347,18 @@ public class StructureData : ScriptableObject
 
     public IReadOnlyList<SkillData> GetRequiredSkillsToEnter(TerrainTypeData terrain)
     {
-        if (TryGetSkillRuleForTerrain(terrain, out StructureSkillTerrainRule rule) && rule.requiredSkillsToEnter != null && rule.requiredSkillsToEnter.Count > 0)
+        if (TryGetSkillRuleForTerrain(
+                terrain,
+                out StructureSkillTerrainRule rule)
+            && rule.requiredSkillsToEnter != null
+            && rule.requiredSkillsToEnter.Count > 0)
+        {
             return rule.requiredSkillsToEnter;
+        }
 
-        return requiredSkillsToEnter;
+        return requiredSkillsToEnter != null
+            ? requiredSkillsToEnter
+            : System.Array.Empty<SkillData>();
     }
 
     public string GetDescription(TerrainTypeData terrain)
@@ -328,9 +378,19 @@ public class StructureData : ScriptableObject
 
     public bool IsRoadBoostEnabled(TerrainTypeData terrain)
     {
-        if (!roadBoost)
-            return false;
+        if (TryGetSkillRuleForTerrain(
+                terrain,
+                out StructureSkillTerrainRule rule)
+            && rule != null)
+        {
+            if (rule.roadBoost == RoadBoostOverride.Ativar)
+                return true;
+            if (rule.roadBoost == RoadBoostOverride.Desativar)
+                return false;
+        }
 
+        // Compatibilidade com assets anteriores ao override tri-state. O campo
+        // legado fica oculto e so e consultado quando a nova regra esta em Herdar.
         if (terrain != null && descriptionsByTerrain != null)
         {
             for (int i = 0; i < descriptionsByTerrain.Count; i++)
@@ -341,23 +401,71 @@ public class StructureData : ScriptableObject
             }
         }
 
-        return true;
+        return roadBoost;
     }
 
     public IReadOnlyList<SkillData> GetBlockedSkillsToEnter(TerrainTypeData terrain)
     {
-        if (TryGetSkillRuleForTerrain(terrain, out StructureSkillTerrainRule rule) && rule.blockedSkills != null && rule.blockedSkills.Count > 0)
+        IReadOnlyList<SkillData> globalBlocked =
+            blockedSkills != null
+                ? blockedSkills
+                : System.Array.Empty<SkillData>();
+        if (!TryGetSkillRuleForTerrain(
+                terrain,
+                out StructureSkillTerrainRule rule)
+            || rule.blockedSkills == null
+            || rule.blockedSkills.Count == 0)
+        {
+            return globalBlocked;
+        }
+
+        if (globalBlocked.Count == 0)
             return rule.blockedSkills;
 
-        return blockedSkills;
+        combinedBlockedSkillsByTerrain ??=
+            new Dictionary<TerrainTypeData, List<SkillData>>();
+        if (terrain != null
+            && combinedBlockedSkillsByTerrain.TryGetValue(
+                terrain,
+                out List<SkillData> cached))
+        {
+            return cached;
+        }
+
+        var combined = new List<SkillData>(
+            globalBlocked.Count + rule.blockedSkills.Count);
+        for (int i = 0; i < globalBlocked.Count; i++)
+        {
+            SkillData skill = globalBlocked[i];
+            if (skill != null && !combined.Contains(skill))
+                combined.Add(skill);
+        }
+        for (int i = 0; i < rule.blockedSkills.Count; i++)
+        {
+            SkillData skill = rule.blockedSkills[i];
+            if (skill != null && !combined.Contains(skill))
+                combined.Add(skill);
+        }
+
+        if (terrain != null)
+            combinedBlockedSkillsByTerrain[terrain] = combined;
+        return combined;
     }
 
     public IReadOnlyList<TerrainSkillCostOverride> GetSkillCostOverrides(TerrainTypeData terrain)
     {
-        if (TryGetSkillRuleForTerrain(terrain, out StructureSkillTerrainRule rule) && rule.skillCostOverrides != null && rule.skillCostOverrides.Count > 0)
+        if (TryGetSkillRuleForTerrain(
+                terrain,
+                out StructureSkillTerrainRule rule)
+            && rule.skillCostOverrides != null
+            && rule.skillCostOverrides.Count > 0)
+        {
             return rule.skillCostOverrides;
+        }
 
-        return skillCostOverrides;
+        return skillCostOverrides != null
+            ? skillCostOverrides
+            : System.Array.Empty<TerrainSkillCostOverride>();
     }
 
     // Exigencia de rota declarada para este par Estrutura+Terreno. O par manda; se ele

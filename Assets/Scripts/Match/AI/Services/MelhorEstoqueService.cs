@@ -78,6 +78,43 @@ public sealed class MelhorEstoqueResult
         reachDecision != null && reachDecision.Found
             ? reachDecision.Decision.Value
             : ranking.Count > 0 ? ranking[0] : null;
+
+    public string BuildRejectedSummary(int maxReasons = 4)
+    {
+        if (rejected.Count <= 0)
+            return "nenhum motivo registrado";
+
+        var counts = new Dictionary<string, int>();
+        for (int i = 0; i < rejected.Count; i++)
+        {
+            string reason = rejected[i]?.reason;
+            if (string.IsNullOrWhiteSpace(reason))
+                reason = "motivo vazio";
+            counts.TryGetValue(reason, out int count);
+            counts[reason] = count + 1;
+        }
+
+        var ordered =
+            new List<KeyValuePair<string, int>>(counts);
+        ordered.Sort((a, b) =>
+        {
+            int byCount = b.Value.CompareTo(a.Value);
+            return byCount != 0
+                ? byCount
+                : string.CompareOrdinal(a.Key, b.Key);
+        });
+
+        int limit = Mathf.Min(
+            Mathf.Max(1, maxReasons),
+            ordered.Count);
+        var parts = new List<string>(limit);
+        for (int i = 0; i < limit; i++)
+        {
+            parts.Add(
+                $"{ordered[i].Value}x {ordered[i].Key}");
+        }
+        return string.Join(" | ", parts);
+    }
 }
 
 /// <summary>
@@ -187,10 +224,17 @@ public static class MelhorEstoqueService
                 invalids);
             if (!valid)
             {
+                string rejectionReason = sensorReason;
+                if (invalids.Count > 0
+                    && !string.IsNullOrWhiteSpace(
+                        invalids[0]?.reason))
+                {
+                    rejectionReason = invalids[0].reason;
+                }
                 result.rejected.Add(new MelhorEstoqueReject
                 {
                     actionCell = actionCell,
-                    reason = sensorReason
+                    reason = rejectionReason
                 });
                 continue;
             }
@@ -206,7 +250,16 @@ public static class MelhorEstoqueService
                         data,
                         transfer);
                 if (!IntentMatches(request.intent, resolvedIntent))
+                {
+                    result.rejected.Add(new MelhorEstoqueReject
+                    {
+                        actionCell = actionCell,
+                        reason =
+                            $"Intent {resolvedIntent} nao atende " +
+                            $"{request.intent}."
+                    });
                     continue;
+                }
 
                 MelhorEstoqueOption candidate = BuildOption(
                     request,
@@ -215,9 +268,17 @@ public static class MelhorEstoqueService
                     tier,
                     origin,
                     actionCell,
-                    routeCosts);
+                    routeCosts,
+                    out string buildRejectionReason);
                 if (candidate == null)
+                {
+                    result.rejected.Add(new MelhorEstoqueReject
+                    {
+                        actionCell = actionCell,
+                        reason = buildRejectionReason
+                    });
                     continue;
+                }
                 if (candidate.threat > request.maxThreat)
                 {
                     result.rejected.Add(new MelhorEstoqueReject
@@ -329,9 +390,17 @@ public static class MelhorEstoqueService
                 topology.SupplierConstructionCells;
             for (int i = 0; i < cells.Count; i++)
             {
+                Vector3Int indexedCell = Normalize(cells[i]);
+                ConstructionManager target =
+                    ConstructionOccupancyRules.GetConstructionAtCell(
+                        request.map,
+                        indexedCell);
+                if (!IsEligibleConstructionEndpoint(
+                        request.unit, target))
+                    continue;
                 AddMeetingCells(
                     request.map,
-                    Normalize(cells[i]),
+                    Normalize(target.CurrentCellPosition),
                     sameCell,
                     adjacent,
                     neighbors,
@@ -517,8 +586,10 @@ public static class MelhorEstoqueService
         AIReachDecisionTier tier,
         Vector3Int origin,
         Vector3Int actionCell,
-        Dictionary<Vector3Int, int> routeCosts)
+        Dictionary<Vector3Int, int> routeCosts,
+        out string rejectionReason)
     {
+        rejectionReason = string.Empty;
         var option = new MelhorEstoqueOption
         {
             prospectiveTransfer = transfer,
@@ -587,12 +658,19 @@ public static class MelhorEstoqueService
             // Evita que dois Hubs parcialmente usados fiquem devolvendo a
             // mesma carga um ao outro. Rebalanceamento exige uma diferenca
             // material entre a reserva de quem doa e a de quem recebe.
+            rejectionReason =
+                "RebalanceHub sem diferenca material de estoque.";
             return null;
         }
 
         option.estimatedAmount = EstimateAmount(request, option);
         if (option.estimatedAmount <= 0)
+        {
+            rejectionReason =
+                $"Transferencia {intent} sem carga compativel " +
+                "ou sem demanda autorizada.";
             return null;
+        }
         int urgency = option.stockNeed != null
             ? (int)option.stockNeed.level
             : ResolveConstructionUrgency(option);

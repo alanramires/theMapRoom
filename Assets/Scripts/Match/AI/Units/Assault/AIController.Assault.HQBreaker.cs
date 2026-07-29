@@ -49,6 +49,7 @@ public partial class AIController
         // (aí faz sentido juntar-se ao ataque).
         Vector3Int pressureTarget;
         Vector3Int? captainCaptureCell = null;
+        bool followsCapturerCaptain = false;
         if (TryResolveRogueAssaultRallyTarget(unit, plan, snapshot, out Vector3Int rogueRallyCell, out string rogueRallyReason))
         {
             pressureTarget = rogueRallyCell;
@@ -64,6 +65,7 @@ public partial class AIController
                     out Vector3Int capturerAnchor))
             {
                 pressureTarget = capturerAnchor;
+                followsCapturerCaptain = true;
                 if (ConstructionManager.IsHeadQuarterlessTeam(
                         snapshot.AITeam))
                 {
@@ -98,6 +100,66 @@ public partial class AIController
                         fromCell);
             }
         }
+
+        if (followsCapturerCaptain)
+        {
+            if (AIActionReachCoordinator.CubicDistance(
+                    fromCell,
+                    pressureTarget) <= 1)
+            {
+                Debug.Log(
+                    $"{TL("Assalto")} {unit.InstanceId} segue capitao " +
+                    "a 1h; mantem formacao.");
+                return BuildMoveBatch(
+                    unit,
+                    snapshot.AITeam,
+                    fromCell,
+                    fromCell,
+                    paths);
+            }
+
+            if (TryFindBestToolProgressionCell(
+                    unit,
+                    snapshot,
+                    fromCell,
+                    pressureTarget,
+                    paths,
+                    occupied,
+                    ToolProgressionIntent.AssaultPressure,
+                    out Vector3Int progressionCell,
+                    out ToolProgressionCandidate progressionCandidate,
+                    out string progressionReason,
+                    allowCell: cell =>
+                        !captainCaptureCell.HasValue
+                        || cell != captainCaptureCell.Value,
+                    tacticalScore: (cell, _) =>
+                        ScoreNativeDomainPreference(unit, cell)))
+            {
+                Debug.Log(
+                    $"{TL("Assalto")} {unit.InstanceId} segue capitao " +
+                    $"via progressao oficial {progressionCell} " +
+                    $"alvo={pressureTarget} " +
+                    $"tool={progressionCandidate.ToolScore} " +
+                    $"({progressionReason})");
+                return BuildMoveBatch(
+                    unit,
+                    snapshot.AITeam,
+                    fromCell,
+                    progressionCell,
+                    paths);
+            }
+
+            Debug.Log(
+                $"{TL("Assalto")} {unit.InstanceId} segue capitao: " +
+                "progressao oficial sem movimento; mantem posicao.");
+            return BuildMoveBatch(
+                unit,
+                snapshot.AITeam,
+                fromCell,
+                fromCell,
+                paths);
+        }
+
         Vector3Int bestMove = FindAssaultPressureMove(
             unit,
             snapshot,
@@ -115,6 +177,60 @@ public partial class AIController
 
         Debug.Log($"{TL("Assalto")} {unit.InstanceId} breaker — mantém posição");
         return BuildMoveBatch(unit, snapshot.AITeam, fromCell, fromCell, paths);
+    }
+
+    private float ScoreNativeDomainPreference(
+        UnitManager unit,
+        Vector3Int cell)
+    {
+        if (unit == null
+            || !unit.TryGetUnitData(out UnitData data)
+            || data == null)
+        {
+            return 0f;
+        }
+
+        Domain nativeDomain = data.domain;
+        HeightLevel nativeHeight = data.heightLevel;
+        if (unit.IsLayerChangeBlockedByForcedLock(
+                nativeDomain,
+                nativeHeight,
+                out _))
+        {
+            return 0f;
+        }
+
+        bool canFinishInNativeDomain;
+        if (unit.GetDomain() == Domain.Naval
+            && unit.GetHeightLevel() == HeightLevel.Surface
+            && nativeDomain == Domain.Submarine
+            && nativeHeight == HeightLevel.Submerged)
+        {
+            canFinishInNativeDomain =
+                PodeSubmergirSensor.CanSubmergeAtCell(
+                    unit,
+                    boardTilemap,
+                    terrainDatabase,
+                    cell,
+                    out _);
+        }
+        else
+        {
+            canFinishInNativeDomain =
+                LayerTransitionRules.CanUseLayerModeAtCell(
+                    unit,
+                    boardTilemap,
+                    terrainDatabase,
+                    cell,
+                    nativeDomain,
+                    nativeHeight,
+                    out _);
+        }
+
+        // Preferencia de desempate: um ponto inteiro da progressao oficial
+        // ainda vale 1000. Assim a camada nativa escolhe entre avancos
+        // equivalentes, mas nunca transforma praia/emersao em bloqueio.
+        return canFinishInNativeDomain ? 250f : 0f;
     }
 
     // Alvo de "reforco" do rogue assault quando nao ha invasao ativa: o rally do PROPRIO eixo

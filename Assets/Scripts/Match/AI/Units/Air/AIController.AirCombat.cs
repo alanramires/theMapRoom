@@ -126,6 +126,117 @@ public partial class AIController
 
         bool preferCapturerEscortBand =
             anchorTier.StartsWith("CapturerMagnet:");
+        bool usesHalfMovementCaptainPatrol =
+            preferCapturerEscortBand
+            && unit.TryGetUnitData(out UnitData patrolData)
+            && patrolData != null
+            && patrolData.roles != null
+            && patrolData.roles.Count > 0
+            && (patrolData.roles[0] == UnitRole.AtaqueAereo
+                || patrolData.roles[0] == UnitRole.Interceptador);
+        if (usesHalfMovementCaptainPatrol)
+        {
+            int patrolRadius =
+                Mathf.Max(2, unit.MaxMovementPoints / 2);
+            bool hasPatrolGeometry =
+                TryBuildAirCombatPatrolGeometry(
+                    unit,
+                    snapshot,
+                    anchor,
+                    out List<Vector3Int> patrolCombatants,
+                    out List<Vector3Int> patrolEnemies,
+                    out Vector3Int patrolFrontAnchor,
+                    out AIBacklineSettings patrolSettings,
+                    out AIBacklineResult patrolGeometry);
+            List<Vector3Int> patrolAllyCells =
+                CollectAirCombatPatrolAllyCells(unit);
+            bool hasPreferredPatrolZone =
+                hasPatrolGeometry
+                && HasAirCombatPreferredPatrolCell(
+                    unit,
+                    paths,
+                    occupied,
+                    takeoffMoveOptions,
+                    patrolCombatants,
+                    patrolEnemies,
+                    patrolFrontAnchor,
+                    patrolSettings,
+                    patrolGeometry);
+
+            if (TryFindBestToolProgressionCell(
+                    unit,
+                    snapshot,
+                    fromCell,
+                    anchor,
+                    paths,
+                    occupied,
+                    ToolProgressionIntent.AssaultPressure,
+                    out Vector3Int progressionCell,
+                    out ToolProgressionCandidate progressionCandidate,
+                    out string progressionReason,
+                    allowCell: cell =>
+                        IsAITakeoffDestinationAllowed(
+                            paths,
+                            cell,
+                            takeoffMoveOptions)
+                        && (!hasPreferredPatrolZone
+                            || IsAirCombatPreferredPatrolCell(
+                                unit,
+                                cell,
+                                patrolCombatants,
+                                patrolEnemies,
+                                patrolFrontAnchor,
+                                patrolSettings,
+                                patrolGeometry)),
+                    tacticalScore: (cell, candidate) =>
+                        ScoreAirCombatPatrolCell(
+                            unit,
+                            cell,
+                            anchor,
+                            patrolRadius,
+                            hasPatrolGeometry,
+                            patrolCombatants,
+                            patrolEnemies,
+                            patrolFrontAnchor,
+                            patrolSettings,
+                            patrolGeometry,
+                            patrolAllyCells)))
+            {
+                string patrolZone =
+                    ResolveAirCombatPatrolZone(
+                        progressionCell,
+                        hasPatrolGeometry,
+                        patrolCombatants,
+                        patrolEnemies,
+                        patrolFrontAnchor,
+                        patrolSettings,
+                        patrolGeometry);
+                Debug.Log(
+                    $"{TL("AirCombat")} {unit.InstanceId} patrulha capitao " +
+                    $"via progressao oficial {progressionCell} " +
+                    $"tier={anchorTier} " +
+                    $"raio={patrolRadius}h zona={patrolZone} " +
+                    $"tool={progressionCandidate.ToolScore} " +
+                    $"({progressionReason})");
+                return BuildMoveBatch(
+                    unit,
+                    snapshot.AITeam,
+                    fromCell,
+                    progressionCell,
+                    paths);
+            }
+
+            Debug.Log(
+                $"{TL("AirCombat")} {unit.InstanceId} patrulha capitao: " +
+                "progressao oficial sem movimento; mantem posicao.");
+            return BuildMoveBatch(
+                unit,
+                snapshot.AITeam,
+                fromCell,
+                fromCell,
+                paths);
+        }
+
         Vector3Int moveCell = FindAirCombatAdvanceMove(
             fromCell,
             anchor,
@@ -138,6 +249,264 @@ public partial class AIController
             $"{TL("AirCombat")} {unit.InstanceId} rogue avanca via {moveCell} " +
             $"alvo={anchor} tier={anchorTier} visibleEnemies={visibleEnemies.Count}");
         return BuildMoveBatch(unit, snapshot.AITeam, fromCell, moveCell, paths);
+    }
+
+    private bool TryBuildAirCombatPatrolGeometry(
+        UnitManager unit,
+        AIWorldSnapshot snapshot,
+        Vector3Int fallbackAnchor,
+        out List<Vector3Int> combatants,
+        out List<Vector3Int> enemies,
+        out Vector3Int frontAnchor,
+        out AIBacklineSettings settings,
+        out AIBacklineResult geometry)
+    {
+        combatants = null;
+        enemies = null;
+        frontAnchor = fallbackAnchor;
+        frontAnchor.z = 0;
+        settings = BuildBacklineSettings();
+        geometry = null;
+
+        if (!TryBuildBacklineContext(
+                unit,
+                snapshot,
+                out combatants,
+                out enemies))
+        {
+            return false;
+        }
+
+        if (enemies != null && enemies.Count > 0)
+        {
+            frontAnchor = ResolveBacklineAnchor(
+                enemies,
+                fallbackAnchor);
+        }
+        else if (snapshot != null && snapshot.EnemyHQ != null)
+        {
+            frontAnchor = snapshot.EnemyHQ.CurrentCellPosition;
+            frontAnchor.z = 0;
+        }
+        else
+        {
+            return false;
+        }
+        geometry = AIBacklineAnalyzer.Analyze(
+            combatants,
+            enemies,
+            frontAnchor,
+            settings);
+        return geometry != null && geometry.Success;
+    }
+
+    private static List<Vector3Int>
+        CollectAirCombatPatrolAllyCells(UnitManager unit)
+    {
+        var cells = new List<Vector3Int>();
+        if (unit == null)
+            return cells;
+
+        foreach (UnitManager ally in UnitManager.AllActive)
+        {
+            if (ally == null
+                || ally == unit
+                || ally.IsDead
+                || ally.IsEmbarked
+                || ally.IsAircraftGrounded
+                || ally.SlotIndex != unit.SlotIndex
+                || !IsAirCombatUnit(ally))
+            {
+                continue;
+            }
+
+            Vector3Int allyCell = ally.CurrentCellPosition;
+            allyCell.z = 0;
+            cells.Add(allyCell);
+        }
+
+        return cells;
+    }
+
+    private bool HasAirCombatPreferredPatrolCell(
+        UnitManager unit,
+        Dictionary<Vector3Int, List<Vector3Int>> paths,
+        HashSet<Vector3Int> occupied,
+        List<int> takeoffMoveOptions,
+        IReadOnlyList<Vector3Int> combatants,
+        IReadOnlyList<Vector3Int> enemies,
+        Vector3Int frontAnchor,
+        AIBacklineSettings settings,
+        AIBacklineResult geometry)
+    {
+        if (paths == null || geometry == null)
+            return false;
+
+        Vector3Int fromCell = unit.CurrentCellPosition;
+        fromCell.z = 0;
+        foreach (Vector3Int rawCell in paths.Keys)
+        {
+            Vector3Int cell = rawCell;
+            cell.z = 0;
+            if (cell == fromCell
+                || (occupied != null && occupied.Contains(cell))
+                || !IsAITakeoffDestinationAllowed(
+                    paths,
+                    cell,
+                    takeoffMoveOptions))
+            {
+                continue;
+            }
+
+            if (IsAirCombatPreferredPatrolCell(
+                    unit,
+                    cell,
+                    combatants,
+                    enemies,
+                    frontAnchor,
+                    settings,
+                    geometry))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsAirCombatPreferredPatrolCell(
+        UnitManager unit,
+        Vector3Int cell,
+        IReadOnlyList<Vector3Int> combatants,
+        IReadOnlyList<Vector3Int> enemies,
+        Vector3Int frontAnchor,
+        AIBacklineSettings settings,
+        AIBacklineResult geometry)
+    {
+        if (unit == null || geometry == null)
+            return true;
+
+        AIBacklineScore position =
+            AIBacklineAnalyzer.ScoreCell(
+                combatants,
+                enemies,
+                cell,
+                frontAnchor,
+                settings,
+                geometry);
+        return IsOffensiveAirCombatUnit(unit)
+            ? !position.IsVanguard
+            : !position.InRearSlice;
+    }
+
+    private float ScoreAirCombatPatrolCell(
+        UnitManager unit,
+        Vector3Int cell,
+        Vector3Int captainCell,
+        int patrolRadius,
+        bool hasPatrolGeometry,
+        IReadOnlyList<Vector3Int> combatants,
+        IReadOnlyList<Vector3Int> enemies,
+        Vector3Int frontAnchor,
+        AIBacklineSettings settings,
+        AIBacklineResult geometry,
+        IReadOnlyList<Vector3Int> patrolAllyCells)
+    {
+        float distance =
+            SectorManager.HexDistance(cell, captainCell);
+        float radialError =
+            Mathf.Abs(distance - patrolRadius);
+        float outsideBand =
+            Mathf.Max(0f, radialError - 1f);
+
+        // O anel e a missao ociosa: dentro de +/-1h, a geometria da frente
+        // decide o posto de patrulha. Fora dele, aproximar-se do anel domina.
+        float score =
+            -outsideBand * 20000f
+            -radialError * 250f;
+
+        if (hasPatrolGeometry)
+        {
+            AIBacklineScore position =
+                AIBacklineAnalyzer.ScoreCell(
+                    combatants,
+                    enemies,
+                    cell,
+                    frontAnchor,
+                    settings,
+                    geometry);
+            bool offensive =
+                IsOffensiveAirCombatUnit(unit);
+            if (offensive)
+            {
+                // Ataque aereo/bombardeiro nunca e a tela da formacao.
+                // Flancos e retaguarda sao postos validos; vanguarda perde.
+                score += position.IsVanguard
+                    ? -30000f
+                    : position.InRearSlice
+                        ? 7000f
+                        : 6500f;
+            }
+            else
+            {
+                // Interceptador forma a cobertura adiante e nos flancos.
+                // Retaguarda continua materializavel, mas e o ultimo posto.
+                score += position.IsVanguard
+                    ? 7000f
+                    : position.InRearSlice
+                        ? -2500f
+                        : 6500f;
+            }
+        }
+
+        // Evita transformar o anel em outro montinho. Como cada batch e
+        // confirmado antes da proxima decisao, a separacao acompanha os
+        // postos ocupados no snapshot corrente sem reserva paralela.
+        float nearestPatrolAlly = float.MaxValue;
+        if (patrolAllyCells != null)
+        {
+            for (int i = 0; i < patrolAllyCells.Count; i++)
+            {
+                nearestPatrolAlly = Mathf.Min(
+                    nearestPatrolAlly,
+                    SectorManager.HexDistance(
+                        cell,
+                        patrolAllyCells[i]));
+            }
+        }
+        if (nearestPatrolAlly <= 1f)
+            score -= 2500f;
+        else if (nearestPatrolAlly <= 2f)
+            score -= 600f;
+
+        return score;
+    }
+
+    private static string ResolveAirCombatPatrolZone(
+        Vector3Int cell,
+        bool hasPatrolGeometry,
+        IReadOnlyList<Vector3Int> combatants,
+        IReadOnlyList<Vector3Int> enemies,
+        Vector3Int frontAnchor,
+        AIBacklineSettings settings,
+        AIBacklineResult geometry)
+    {
+        if (!hasPatrolGeometry)
+            return "SemGeometria";
+
+        AIBacklineScore position =
+            AIBacklineAnalyzer.ScoreCell(
+                combatants,
+                enemies,
+                cell,
+                frontAnchor,
+                settings,
+                geometry);
+        return position.IsVanguard
+            ? "Vanguarda"
+            : position.InRearSlice
+                ? "Retaguarda"
+                : "Flanco";
     }
 
     private bool TryGetAITakeoffMoveOptions(UnitManager unit, out List<int> moveOptions, out string reason)

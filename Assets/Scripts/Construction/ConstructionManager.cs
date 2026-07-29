@@ -278,28 +278,49 @@ public class ConstructionManager : MonoBehaviour
         return 1;
     }
 
-    public IReadOnlyList<SkillData> GetRequiredSkillsToEnter()
+    public IReadOnlyList<SkillData> GetRequiredSkillsToEnter(
+        TerrainTypeData terrain = null)
     {
-        if (TryGetConstructionData(out ConstructionData data) && data.requiredSkillsToEnter != null)
-            return data.requiredSkillsToEnter;
+        if (TryGetConstructionData(out ConstructionData data))
+        {
+            return data.GetRequiredSkillsToEnter(terrain);
+        }
 
         return System.Array.Empty<SkillData>();
     }
 
-    public IReadOnlyList<SkillData> GetBlockedSkillsToEnter()
+    public IReadOnlyList<SkillData> GetBlockedSkillsToEnter(
+        TerrainTypeData terrain = null)
     {
-        if (TryGetConstructionData(out ConstructionData data) && data.blockedSkills != null)
-            return data.blockedSkills;
+        if (TryGetConstructionData(out ConstructionData data))
+        {
+            return data.GetBlockedSkillsToEnter(terrain);
+        }
 
         return System.Array.Empty<SkillData>();
     }
 
-    public IReadOnlyList<TerrainSkillCostOverride> GetSkillCostOverrides()
+    public IReadOnlyList<TerrainSkillCostOverride> GetSkillCostOverrides(
+        TerrainTypeData terrain = null)
     {
-        if (TryGetConstructionData(out ConstructionData data) && data.skillCostOverrides != null)
-            return data.skillCostOverrides;
+        if (TryGetConstructionData(out ConstructionData data))
+        {
+            return data.GetSkillCostOverrides(terrain);
+        }
 
         return System.Array.Empty<TerrainSkillCostOverride>();
+    }
+
+    public bool InheritsStructureRulesOn(TerrainTypeData terrain)
+    {
+        return TryGetConstructionData(out ConstructionData data)
+            && data.InheritsStructureRulesOn(terrain);
+    }
+
+    public bool InheritsTerrainRulesOn(TerrainTypeData terrain)
+    {
+        return TryGetConstructionData(out ConstructionData data)
+            && data.InheritsTerrainRulesOn(terrain);
     }
 
     public bool TryResolveConstructionData(out ConstructionData data)

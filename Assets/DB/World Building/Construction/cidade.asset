@@ -35,6 +35,20 @@ MonoBehaviour:
   requiredSkillsToEnter: []
   blockedSkills: []
   skillCostOverrides: []
+  skillRulesByTerrain:
+  - terrainData: {fileID: 11400000, guid: 75d32a51167ec98409039b6f5d4d287f, type: 2}
+    requiredSkillsToEnter: []
+    blockedSkills: []
+    skillCostOverrides:
+    - skill: {fileID: 11400000, guid: ef10c9e820afc074b99ea8e0b709c2f4, type: 2}
+      autonomyCost: 4
+    - skill: {fileID: 11400000, guid: 24a55ae6170e7a642865a4a34c736233, type: 2}
+      autonomyCost: 4
+    - skill: {fileID: 11400000, guid: fc7763e126a22974d87a6869f87beea4, type: 2}
+      autonomyCost: 2
+  inheritStructureRulesOnlyOn:
+  - {fileID: 11400000, guid: 75d32a51167ec98409039b6f5d4d287f, type: 2}
+  inheritTerrainRulesOnlyOn: []
   domain: 0
   heightLevel: 3
   aditionalDomainsAllowed: []

@@ -40,7 +40,7 @@ MonoBehaviour:
   aiTargetPreferenceByClass: []
   aiSensorPriority: 0000000002000000
   prioritizeDpqAtBattle: 0
-  playConservative: 0
+  playConservative: 1
   preferMoveOnBestDPQ: 0
   preferMaxDisplacement: 0
   longRangeStationary: 0

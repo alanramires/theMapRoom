@@ -10,28 +10,26 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: f69f8ff2970547247ab0bb6a5a5f3dc1, type: 3}
-  m_Name: Ponte Ferroviaria
+  m_Name: Ponte Rodoviaria Baixa
   m_EditorClassIdentifier: Assembly-CSharp::StructureData
-  id: trainBridge
-  displayName: "Ponte Ferrovi\xE1ria"
-  description: "Trens cruzam por cima.\nNavios passam por baixo.\nSem b\xF4nus de
-    vis\xE3o."
+  id: bridges
+  displayName: Ponte
+  description: "Terrestres cruzam por cima.\nNavios passam por baixo.\nN\xE3o d\xE1
+    vis\xE3o elevada."
   descriptionsByTerrain: []
   priorityOrder: 2
-  routeNetworkType: 2
+  routeNetworkType: 1
   domain: 0
   heightLevel: 3
   aditionalDomainsAllowed:
-  - domain: 1
-    heightLevel: 3
   - domain: 2
     heightLevel: 2
   alwaysAllowAirDomain: 1
   baseMovementCost: 1
   dpqData: {fileID: 11400000, guid: 24e0fd1ecd7c6bf4eb8f3d8c215d14ef, type: 2}
-  requiredSkillsToEnter:
+  requiredSkillsToEnter: []
+  blockedSkills:
   - {fileID: 11400000, guid: 44c13554a7f731f418bad4395bf10e52, type: 2}
-  blockedSkills: []
   skillCostOverrides: []
   skillRulesByTerrain: []
   exigeRotaDeclarada: 0
@@ -39,7 +37,7 @@ MonoBehaviour:
   canAlsoBeBuiltOnTheFollowDomains:
   - domain: 1
     heightLevel: 3
-  roadSegmentSprite: {fileID: 21300000, guid: 2140a2412a6503046a251fcf5d57e4df, type: 3}
+  roadSegmentSprite: {fileID: 21300000, guid: 2e1875e40106486478ecfb5881cbb13a, type: 3}
   roadColor: {r: 1, g: 1, b: 1, a: 1}
   roadWidth: 0.206
   segmentOverlap: 0.088
@@ -73,14 +71,19 @@ MonoBehaviour:
   forceDetectOnForcedEndMovementDomains: 0
   forceDetectUnitsWithFollowingStealthSkills: []
   roadRoutes:
-  - routeName: Ponte do Trem Norte
+  - routeName: Ponte Hudson
     ownerDatabase: {fileID: 11400000, guid: e7a21940dac0b9443a34ab7f4e469f23, type: 2}
     cells:
-    - {x: 8, y: 5, z: 0}
-    - {x: 9, y: 6, z: 0}
-    - {x: 9, y: 7, z: 0}
-    - {x: 10, y: 8, z: 0}
-    - {x: 10, y: 9, z: 0}
-    - {x: 11, y: 9, z: 0}
-    - {x: 12, y: 9, z: 0}
-    - {x: 13, y: 9, z: 0}
+    - {x: 8, y: -8, z: 0}
+    - {x: 8, y: -9, z: 0}
+    - {x: 9, y: -10, z: 0}
+    - {x: 9, y: -11, z: 0}
+  - routeName: Ponte do rio que cai
+    ownerDatabase: {fileID: 11400000, guid: e7a21940dac0b9443a34ab7f4e469f23, type: 2}
+    cells:
+    - {x: 22, y: 9, z: 0}
+    - {x: 23, y: 8, z: 0}
+    - {x: 23, y: 7, z: 0}
+    - {x: 24, y: 6, z: 0}
+    - {x: 24, y: 5, z: 0}
+    - {x: 25, y: 4, z: 0}

@@ -18,6 +18,7 @@ MonoBehaviour:
     vis\xE3o elevada."
   descriptionsByTerrain: []
   priorityOrder: 2
+  routeNetworkType: 1
   domain: 0
   heightLevel: 3
   aditionalDomainsAllowed:

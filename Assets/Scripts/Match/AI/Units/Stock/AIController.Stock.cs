@@ -120,6 +120,29 @@ public partial class AIController
         if (!primaryStock)
             return null;
 
+        PlayerAction captainFollow =
+            TryBuildStockCaptainFollowAction(
+                unit,
+                snapshot,
+                fromCell,
+                paths,
+                occupied,
+                out bool hasStockRearCaptain);
+        if (captainFollow != null)
+            return captainFollow;
+
+        if (!hasStockRearCaptain)
+        {
+            PlayerAction troopRearFollow =
+                TryBuildConservativeRearFollowAction(
+                    unit,
+                    snapshot,
+                    paths,
+                    context: "StockSemMissao");
+            if (troopRearFollow != null)
+                return troopRearFollow;
+        }
+
         return BuildMoveBatch(
             unit,
             snapshot.AITeam,
@@ -194,7 +217,8 @@ public partial class AIController
         {
             reason =
                 $"MelhorEstoque {requestedIntent} sem encontro " +
-                $"(rejeitados={result?.rejected.Count ?? 0})";
+                $"(rejeitados={result?.rejected.Count ?? 0}; " +
+                $"motivos={result?.BuildRejectedSummary() ?? "resultado nulo"})";
             return false;
         }
 
@@ -275,6 +299,169 @@ public partial class AIController
             $"{stock.intent} {reachTier} encontro={rendezvous} " +
             $"{progressReason} {stock.reason}";
         return true;
+    }
+
+    /// <summary>
+    /// Fallback de coesao do papel Estoque. Sem transferencia materializavel,
+    /// a unidade nao inventa demanda nem toma a frente: acompanha um supridor
+    /// aliado conservador, que ja sabe permanecer na retaguarda, e tenta
+    /// encerrar a 1h dele. A faixa e preferencia, nao proibicao, e toda demanda
+    /// real de estoque preempta este fallback.
+    /// </summary>
+    private PlayerAction TryBuildStockCaptainFollowAction(
+        UnitManager unit,
+        AIWorldSnapshot snapshot,
+        Vector3Int fromCell,
+        Dictionary<Vector3Int, List<Vector3Int>> paths,
+        HashSet<Vector3Int> occupied,
+        out bool hasCaptain)
+    {
+        hasCaptain = false;
+        if (unit == null
+            || snapshot == null
+            || paths == null
+            || paths.Count == 0
+            || !unit.TryGetUnitData(out UnitData data)
+            || data == null
+            || !data.playConservative
+            || !TryResolveStockRearCaptain(
+                unit,
+                snapshot,
+                fromCell,
+                out UnitManager captain,
+                out Vector3Int captainCell))
+        {
+            return null;
+        }
+        hasCaptain = true;
+
+        int fromDistance =
+            AIActionReachCoordinator.CubicDistance(
+                fromCell,
+                captainCell);
+        if (fromDistance <= 1)
+        {
+            Debug.Log(
+                $"{TL("Stock")} {unit.InstanceId} sem fluxo: " +
+                $"mantem retaguarda do capitao #{captain.InstanceId} " +
+                $"a {fromDistance}h.");
+            return BuildMoveBatch(
+                unit,
+                snapshot.AITeam,
+                fromCell,
+                fromCell,
+                paths);
+        }
+
+        var progressionOccupied = occupied != null
+            ? new HashSet<Vector3Int>(occupied)
+            : new HashSet<Vector3Int>();
+        foreach (Vector3Int rawCell in paths.Keys)
+        {
+            Vector3Int cell = rawCell;
+            cell.z = 0;
+            if (IsReservedAssaultEscortCaptureCell(
+                    cell,
+                    snapshot.AITeam))
+            {
+                progressionOccupied.Add(cell);
+            }
+        }
+
+        if (!TryFindBestToolProgressionCell(
+                unit,
+                snapshot,
+                fromCell,
+                captainCell,
+                paths,
+                progressionOccupied,
+                ToolProgressionIntent.StockNetwork,
+                out Vector3Int bestCell,
+                out ToolProgressionCandidate progressionCandidate,
+                out string progressionReason))
+        {
+            return null;
+        }
+
+        int bestDistance =
+            AIActionReachCoordinator.CubicDistance(
+                bestCell,
+                captainCell);
+
+        Debug.Log(
+            $"{TL("Stock")} {unit.InstanceId} sem fluxo: segue " +
+            $"capitao #{captain.InstanceId} {fromCell}->{bestCell} " +
+            $"dist={fromDistance}h->{bestDistance}h " +
+            $"tool={progressionCandidate.ToolScore} " +
+            $"{progressionReason}.");
+        return BuildMoveBatch(
+            unit,
+            snapshot.AITeam,
+            fromCell,
+            bestCell,
+            paths);
+    }
+
+    private static bool TryResolveStockRearCaptain(
+        UnitManager follower,
+        AIWorldSnapshot snapshot,
+        Vector3Int fromCell,
+        out UnitManager captain,
+        out Vector3Int captainCell)
+    {
+        captain = null;
+        captainCell = fromCell;
+        captainCell.z = 0;
+        if (follower == null
+            || snapshot == null
+            || snapshot.MyUnits == null)
+        {
+            return false;
+        }
+
+        int bestDistance = int.MaxValue;
+        for (int i = 0; i < snapshot.MyUnits.Count; i++)
+        {
+            UnitManager candidate = snapshot.MyUnits[i];
+            if (candidate == null
+                || candidate == follower
+                || candidate.IsDead
+                || candidate.IsEmbarked
+                || candidate.IsUnderRepair
+                || !candidate.gameObject.activeInHierarchy
+                || !candidate.TryGetUnitData(
+                    out UnitData candidateData)
+                || candidateData == null
+                || !candidateData.playConservative
+                || candidateData.roles == null
+                || candidateData.roles.Count == 0
+                || candidateData.roles[0] != UnitRole.Logistica
+                || !HasStockTransferCapability(
+                    candidate,
+                    candidateData))
+            {
+                continue;
+            }
+
+            Vector3Int cell = candidate.CurrentCellPosition;
+            cell.z = 0;
+            int distance =
+                AIActionReachCoordinator.CubicDistance(
+                    fromCell,
+                    cell);
+            if (distance < bestDistance
+                || (distance == bestDistance
+                    && (captain == null
+                        || candidate.InstanceId
+                            < captain.InstanceId)))
+            {
+                bestDistance = distance;
+                captain = candidate;
+                captainCell = cell;
+            }
+        }
+
+        return captain != null;
     }
 
     private static bool IsCriticalStockOperation(

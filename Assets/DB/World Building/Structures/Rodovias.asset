@@ -26,6 +26,7 @@ MonoBehaviour:
       bloqueado."
     roadBoostOff: 1
   priorityOrder: 3
+  routeNetworkType: 1
   domain: 0
   heightLevel: 3
   aditionalDomainsAllowed: []
@@ -48,6 +49,7 @@ MonoBehaviour:
     - skill: {fileID: 11400000, guid: 24a55ae6170e7a642865a4a34c736233, type: 2}
       autonomyCost: 4
     rotaDeclarada: 1
+    roadBoost: 2
   - terrainData: {fileID: 11400000, guid: f8bd8dc9dbe197d4f828ad72d3d90df6, type: 2}
     requiredSkillsToEnter: []
     blockedSkills: []
@@ -59,6 +61,7 @@ MonoBehaviour:
     - skill: {fileID: 11400000, guid: 5ef7a75e35294b68ac315145f98dcd17, type: 2}
       autonomyCost: 1
     rotaDeclarada: 0
+    roadBoost: 0
   - terrainData: {fileID: 11400000, guid: f00a773f2a7664042bbabe8e117528f7, type: 2}
     requiredSkillsToEnter: []
     blockedSkills: []
@@ -70,6 +73,7 @@ MonoBehaviour:
     - skill: {fileID: 11400000, guid: 5ef7a75e35294b68ac315145f98dcd17, type: 2}
       autonomyCost: 1
     rotaDeclarada: 0
+    roadBoost: 0
   exigeRotaDeclarada: 0
   exigeEstruturaNaConstrucao: 0
   canAlsoBeBuiltOnTheFollowDomains: []
