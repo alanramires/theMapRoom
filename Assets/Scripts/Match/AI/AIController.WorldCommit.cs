@@ -214,13 +214,19 @@ public partial class AIController
             $"[AI Commit Heavy] FogBarrier: {(Time.realtimeSinceStartup - tFoW) * 1000f:F0}ms " +
             $"slot={aiSlot.Value} result={fogBarrier}");
 
-        SectorManager.RequestRebuildFromActiveConstructions($"ai-commit:{reason}");
+        bool sectorRebuildPending =
+            SectorManager.RequestRebuildFromActiveConstructions(
+                $"ai-commit:{reason}");
 
         float tYield = Time.realtimeSinceStartup;
-        // SectorManager rebuilds on the next frame in play mode. Wait for that
-        // barrier so the next AI decision uses the same consolidated world a load does.
-        yield return null;
-        Debug.Log($"[AI Commit Heavy] yield+SectorRebuild: {(Time.realtimeSinceStartup - tYield) * 1000f:F0}ms");
+        // Se o load ja consolidou esta mesma revisao, nao ceda um frame nem
+        // reconstrua novamente. Caso contrario, aguarde a barreira pendente.
+        if (sectorRebuildPending)
+            yield return null;
+        Debug.Log(
+            $"[AI Commit Heavy] SectorRebuild: " +
+            $"{(Time.realtimeSinceStartup - tYield) * 1000f:F0}ms " +
+            $"reused={!sectorRebuildPending}");
 
         float tSync2 = Time.realtimeSinceStartup;
         SyncAIUnitCellsFromTransforms();

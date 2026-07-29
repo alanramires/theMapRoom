@@ -15,6 +15,7 @@ public partial class AIController
     private bool aiTurnBatchExecuting;
     private Coroutine postLoadResumeRoutine;
     private PanelRodadaController privacyPanelRodada;
+    private bool postLoadReadyBeepPending;
 
     private bool IsMatchEnded()
     {
@@ -254,9 +255,24 @@ public partial class AIController
 
     private void HandleAfterLoadSuccess()
     {
+        postLoadReadyBeepPending =
+            matchController != null &&
+            matchController.IsActiveTeamAI();
         if (postLoadResumeRoutine != null)
             StopCoroutine(postLoadResumeRoutine);
         postLoadResumeRoutine = StartCoroutine(ResumeActiveAITurnAfterLoad());
+    }
+
+    private void SignalPostLoadAiPreparationReady()
+    {
+        if (!postLoadReadyBeepPending)
+            return;
+
+        postLoadReadyBeepPending = false;
+        CursorController cursor = FindAnyObjectByType<CursorController>();
+        cursor?.PlayBeepSfx();
+        Debug.Log(
+            "[AI Perf][PostLoadReady] iniciativa preparada; beep liberado.");
     }
 
     private IEnumerator ResumeActiveAITurnAfterLoad()

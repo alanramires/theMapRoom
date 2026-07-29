@@ -23,14 +23,25 @@ public partial class AIController
         }
         _sortAiTeam = aiTeam;
         _sortActivePlan = ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(ResolveAISlotKey(aiTeam)));
+        _availableDistanceCache.Clear();
+        for (int i = 0; i < _availableUnitsBuffer.Count; i++)
+        {
+            UnitManager unit = _availableUnitsBuffer[i];
+            _availableDistanceCache[unit.InstanceId] =
+                GetDistanceToAssignedTarget(unit, _sortAiTeam, _sortActivePlan);
+        }
         _availableUnitsBuffer.Sort(_availableUnitsComparison);
         return _availableUnitsBuffer;
     }
 
     private int CompareAvailableUnits(UnitManager a, UnitManager b)
     {
-        float da = GetDistanceToAssignedTarget(a, _sortAiTeam, _sortActivePlan);
-        float db = GetDistanceToAssignedTarget(b, _sortAiTeam, _sortActivePlan);
+        float da = _availableDistanceCache.TryGetValue(a.InstanceId, out float cachedA)
+            ? cachedA
+            : float.MaxValue;
+        float db = _availableDistanceCache.TryGetValue(b.InstanceId, out float cachedB)
+            ? cachedB
+            : float.MaxValue;
         int cmp = da.CompareTo(db);
         if (cmp != 0) return cmp;
         int ia = GetEffectiveAiInitiative(a);
@@ -43,36 +54,35 @@ public partial class AIController
     {
         int groupA = _groupCache[a.InstanceId];
         int groupB = _groupCache[b.InstanceId];
+        InitiativeSortFacts factsA = _initiativeSortFacts[a.InstanceId];
+        InitiativeSortFacts factsB = _initiativeSortFacts[b.InstanceId];
 
         if (groupA != groupB) return groupA.CompareTo(groupB);
 
         if (groupA == 0 && _sortActivePlan != null)
         {
-            bool blockerA = IsBlockingCaptureTarget(a, _sortActivePlan, _sortAiTeam);
-            bool blockerB = IsBlockingCaptureTarget(b, _sortActivePlan, _sortAiTeam);
-            if (blockerA != blockerB) return blockerA ? -1 : 1;
+            if (factsA.IsBlocker != factsB.IsBlocker)
+                return factsA.IsBlocker ? -1 : 1;
 
-            int fireCmp = CompareFireSupportAttackInitiative(a, b, _sortAiTeam);
+            int fireCmp = CompareCachedFireSupportAttackInitiative(a, factsA, b, factsB);
             if (fireCmp != 0) return fireCmp;
         }
 
         if (groupA == 2)
         {
-            bool fireSupportA = HasFireSupportAttackInCurrentPosition(a, _sortAiTeam);
-            bool fireSupportB = HasFireSupportAttackInCurrentPosition(b, _sortAiTeam);
-            if (fireSupportA != fireSupportB) return fireSupportA ? -1 : 1;
-            int fireCmp = CompareFireSupportAttackInitiative(a, b, _sortAiTeam);
+            if (factsA.HasFireSupportAttack != factsB.HasFireSupportAttack)
+                return factsA.HasFireSupportAttack ? -1 : 1;
+            int fireCmp = CompareCachedFireSupportAttackInitiative(a, factsA, b, factsB);
             if (fireCmp != 0) return fireCmp;
 
-            bool combatA = HasInitiativeCombatOpportunity(a, _sortAiTeam);
-            bool combatB = HasInitiativeCombatOpportunity(b, _sortAiTeam);
-            if (combatA != combatB) return combatA ? -1 : 1;
+            if (factsA.HasCombatOpportunity != factsB.HasCombatOpportunity)
+                return factsA.HasCombatOpportunity ? -1 : 1;
         }
 
         if (groupA == 3 && _sortActivePlan != null)
         {
-            SectorObjective objA = ResolveAnyAssignedObjective(a, _sortActivePlan);
-            SectorObjective objB = ResolveAnyAssignedObjective(b, _sortActivePlan);
+            SectorObjective objA = factsA.AssignedObjective;
+            SectorObjective objB = factsB.AssignedObjective;
             if (objA == null && objB == null) return b.CurrentHP.CompareTo(a.CurrentHP);
             if (objA == null) return 1;
             if (objB == null) return -1;
@@ -85,8 +95,8 @@ public partial class AIController
 
         if (groupA == 4)
         {
-            float transA = GetDistanceToNearestAvailableTransporter(a, _sortAiTeam);
-            float transB = GetDistanceToNearestAvailableTransporter(b, _sortAiTeam);
+            float transA = factsA.TransportDistance;
+            float transB = factsB.TransportDistance;
             if (Mathf.Abs(transA - transB) > 0.5f)
                 return transA.CompareTo(transB);
         }
@@ -99,14 +109,91 @@ public partial class AIController
         // então Intel/helicóptero no grupo 1 seguem pela iniciativa do tipo, intocados.
         if (a.IsUnderRepair && b.IsUnderRepair)
         {
-            int eliteCmp = GetUnitEliteLevel(b).CompareTo(GetUnitEliteLevel(a));
+            int eliteCmp = factsB.EliteLevel.CompareTo(factsA.EliteLevel);
             if (eliteCmp != 0) return eliteCmp;
             int repairHpCmp = a.CurrentHP.CompareTo(b.CurrentHP);
             if (repairHpCmp != 0) return repairHpCmp;
         }
 
-        int initiativeCmp = CompareUnitInitiative(a, b);
+        int initiativeCmp =
+            factsA.EffectiveInitiative.CompareTo(factsB.EffectiveInitiative);
         return initiativeCmp != 0 ? initiativeCmp : b.CurrentHP.CompareTo(a.CurrentHP);
+    }
+
+    private void BuildInitiativeSortFacts(
+        List<UnitManager> units,
+        TeamObjectivePlan activePlan,
+        TeamId aiTeam)
+    {
+        _initiativeSortFacts.Clear();
+        for (int i = 0; i < units.Count; i++)
+        {
+            UnitManager unit = units[i];
+            int group = _groupCache[unit.InstanceId];
+            InitiativeSortFacts facts = new InitiativeSortFacts
+            {
+                EliteLevel = GetUnitEliteLevel(unit),
+                EffectiveInitiative = GetEffectiveAiInitiative(unit)
+            };
+
+            if (group == 0 && activePlan != null)
+                facts.IsBlocker = IsBlockingCaptureTarget(unit, activePlan, aiTeam);
+
+            if (group == 0 || group == 2)
+            {
+                bool fireSupport = TryGetFireSupportCurrentAttackInitiative(
+                    unit,
+                    aiTeam,
+                    out bool primary,
+                    out int fireElite,
+                    out BazookaTargetPriority preference);
+                facts.HasFireSupportAttack = fireSupport;
+                facts.HasFireSupportPrimaryTarget = primary;
+                facts.FireSupportElite = fireElite;
+                facts.FireSupportPreference = preference;
+                facts.HasCombatOpportunity =
+                    fireSupport ||
+                    HasPrimaryAssaultAttackOpportunity(unit, aiTeam);
+            }
+
+            if (group == 3 && activePlan != null)
+                facts.AssignedObjective =
+                    ResolveAnyAssignedObjective(unit, activePlan);
+
+            if (group == 4)
+                facts.TransportDistance =
+                    GetDistanceToNearestAvailableTransporter(unit, aiTeam);
+
+            _initiativeSortFacts[unit.InstanceId] = facts;
+        }
+    }
+
+    private static int CompareCachedFireSupportAttackInitiative(
+        UnitManager a,
+        InitiativeSortFacts factsA,
+        UnitManager b,
+        InitiativeSortFacts factsB)
+    {
+        if (!IsFireSupportUnit(a) || !IsFireSupportUnit(b))
+            return 0;
+        if (factsA.HasFireSupportAttack != factsB.HasFireSupportAttack)
+            return factsA.HasFireSupportAttack ? -1 : 1;
+        if (!factsA.HasFireSupportAttack)
+            return 0;
+        if (factsA.HasFireSupportPrimaryTarget !=
+            factsB.HasFireSupportPrimaryTarget)
+        {
+            return factsA.HasFireSupportPrimaryTarget ? -1 : 1;
+        }
+        if (!factsA.HasFireSupportPrimaryTarget)
+        {
+            int eliteCmp =
+                factsB.FireSupportElite.CompareTo(factsA.FireSupportElite);
+            if (eliteCmp != 0)
+                return eliteCmp;
+        }
+        return factsB.FireSupportPreference.CompareTo(
+            factsA.FireSupportPreference);
     }
 
     private static Vector3Int? GetAssignedTargetCell(UnitManager unit, TeamObjectivePlan plan)

@@ -1760,6 +1760,7 @@ public class SaveGameManager : MonoBehaviour
 
         if (matchController != null)
         {
+            matchController.CancelFogCacheWarmupForLoad();
             matchController.SuppressFogOfWarRefresh = true;
             suppressedFogRefresh = true;
         }
@@ -1800,7 +1801,11 @@ public class SaveGameManager : MonoBehaviour
             error => batchedRestoreError = error);
         DestroyConstructionsNotInSnapshot(existingConstructionsById, restoredConstructions);
         LogLoadPerf(loadedSlot, "restore_constructions.end", spawnConstructionsStartMs, PerfNowMs() - routineStartMs);
-        SectorManager.RequestRebuildFromActiveConstructions("post-restore-constructions");
+        // Setores dependem apenas das construcoes confirmadas. Consolide ainda
+        // sob o painel de load; after-load e o commit da IA reutilizam a mesma
+        // revisao em vez de cobrar duas passadas nos frames seguintes.
+        SectorManager.RebuildNowFromActiveConstructions(
+            "post-restore-constructions");
 
         if (string.IsNullOrEmpty(batchedRestoreError))
         {
@@ -1967,9 +1972,10 @@ public class SaveGameManager : MonoBehaviour
                 // Ensure spawned constructions/units finished enable-cycle and static lists are up-to-date.
                 double refreshFogStartMs = PerfNowMs();
                 LogLoadPerf(loadedSlot, "refresh_fog_after_load.begin", refreshFogStartMs, refreshFogStartMs - routineStartMs);
-                yield return null;
-                matchController.SuppressFogOfWarRefresh = false;
-                suppressedFogRefresh = false;
+                // Spawns, OnEnable e listas estáticas já foram concluídos nas
+                // etapas batched acima. Não ceda um frame aqui: a troca de
+                // equipe pendente poderia executar TurnStartCache frio antes
+                // de o snapshot de FOW ser restaurado.
                 // Fast path somente para fotografia integralmente validada.
                 // Cada slot e validado isoladamente; o ativo preserva cold fallback.
                 bool fogCacheRestored = false;
@@ -2037,8 +2043,17 @@ public class SaveGameManager : MonoBehaviour
                     Debug.Log($"[FoW][LoadCacheRestore] slot={activeFogObserverSlot} success=true retained=true {fogCacheRestoreResult}");
                 else
                 {
+                    // O fallback frio precisa da supressao liberada; somente
+                    // snapshots validados chegam aqui sem pagar esse custo.
+                    matchController.SuppressFogOfWarRefresh = false;
+                    suppressedFogRefresh = false;
                     Debug.Log($"[FoW][LoadCacheRestore] slot={activeFogObserverSlot} success=false retained=false fallback=cold reason={fogCacheRestoreResult}");
                     matchController.RefreshFogOfWarForActiveTeam();
+                }
+                if (suppressedFogRefresh)
+                {
+                    matchController.SuppressFogOfWarRefresh = false;
+                    suppressedFogRefresh = false;
                 }
                 LogLoadPerf(loadedSlot, "refresh_fog_after_load.end", refreshFogStartMs, PerfNowMs() - routineStartMs);
 
@@ -2058,7 +2073,11 @@ public class SaveGameManager : MonoBehaviour
             stage = "refresh-construction-occupancy";
             RefreshConstructionOccupancyAfterLoad(unitsById);
 
-            cursorController?.PlayBeepSfx();
+            // No turno da IA o load fisico terminou, mas a iniciativa ainda
+            // precisa ser preparada. O AIController toca o beep somente quando
+            // essa barreira estiver pronta.
+            if (matchController == null || !matchController.IsActiveTeamAI())
+                cursorController?.PlayBeepSfx();
             if (verboseLogs)
                 Debug.Log($"[SaveGame] Load concluido: {data.units?.Count ?? 0} unidades, {data.constructions?.Count ?? 0} construcoes.");
             string loadedText = ResolveDialog(

@@ -15,9 +15,12 @@ public partial class AIController
 
         TeamId aiTeam = snapshot.AITeam;
 
+        double setupStart = Time.realtimeSinceStartupAsDouble;
         List<UnitManager> units = GetAvailableUnits(PlayerSlotId.FromIndex(snapshot.AISlotIndex), aiTeam);
+        double availableDone = Time.realtimeSinceStartupAsDouble;
         if (units.Count == 0)
         {
+            SignalPostLoadAiPreparationReady();
             Debug.Log($"{TL()} Fase 2 — sem unidades em campo, pulando.");
             if (matchController == null ||
                 !matchController.IsPlayerCommandServiceAutomatic(PlayerSlotId.FromIndex(snapshot.AISlotIndex)))
@@ -38,21 +41,27 @@ public partial class AIController
         AIWorldSnapshot current = AIWorldSnapshot.BuildLight(PlayerSlotId.FromIndex(snapshot.AISlotIndex), matchController);
         TeamObjectivePlan activePlan = ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(ResolveAISlotKey(aiTeam)));
         InvalidateStaleThreatObjectives(activePlan, aiTeam);
+        double snapshotDone = Time.realtimeSinceStartupAsDouble;
 
         foreach (UnitManager u in UnitManager.AllActive)
         {
             if (u.SlotIndex == snapshot.AISlotIndex && !u.IsDead)
                 UpdateRepairState(u, activePlan);
         }
+        double repairDone = Time.realtimeSinceStartupAsDouble;
 
         _sortIsInvading = snapshot.IsInvading;
         _groupCache.Clear();
         foreach (UnitManager u in units)
             _groupCache[u.InstanceId] = GetInitiativeGroup(u, activePlan, aiTeam);
+        double groupsDone = Time.realtimeSinceStartupAsDouble;
 
         _sortAiTeam = aiTeam;
         _sortActivePlan = activePlan;
+        BuildInitiativeSortFacts(units, activePlan, aiTeam);
+        double factsDone = Time.realtimeSinceStartupAsDouble;
         units.Sort(_initiativeComparison);
+        double sortDone = Time.realtimeSinceStartupAsDouble;
 
         _initLogBuilder.Clear();
         _initLogBuilder.AppendLine($"{TL()} Fase2 iniciativa ({units.Count} unidades):");
@@ -66,6 +75,17 @@ public partial class AIController
         }
         Debug.Log(_initLogBuilder.ToString());
         _initLogBuilder.Clear();
+        double logDone = Time.realtimeSinceStartupAsDouble;
+        Debug.Log(
+            $"[AI Perf][InitiativeSetup] total={(logDone - setupStart) * 1000d:F1}ms " +
+            $"available={(availableDone - setupStart) * 1000d:F1}ms " +
+            $"snapshot={(snapshotDone - availableDone) * 1000d:F1}ms " +
+            $"repair={(repairDone - snapshotDone) * 1000d:F1}ms " +
+            $"groups={(groupsDone - repairDone) * 1000d:F1}ms " +
+            $"facts={(factsDone - groupsDone) * 1000d:F1}ms " +
+            $"sort={(sortDone - factsDone) * 1000d:F1}ms " +
+            $"log={(logDone - sortDone) * 1000d:F1}ms");
+        SignalPostLoadAiPreparationReady();
 
         // Atualiza indicador/cursor antes da primeira decisao potencialmente cara.
         yield return null;

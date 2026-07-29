@@ -92,6 +92,10 @@ public sealed class MelhorEmbarqueRequest
     public int operationalTurns = 2;
     public bool includeStrategic;
     public bool resolveLongRangePassengerMeeting;
+    // Consumidores runtime podem encerrar a coleta depois de provar uma
+    // solução Requested + ReachableNow no Tactical, desde que nenhuma carga
+    // esteja em emergência. Ferramentas/editor mantêm o ranking integral.
+    public bool stopAfterDecisiveTactical;
     public Dictionary<Vector3Int, List<Vector3Int>> transporterPaths;
     public Func<UnitManager, bool> allowPassenger;
     public Func<UnitManager, bool> includeInLegacyRanking;
@@ -359,15 +363,69 @@ public static class MelhorEmbarqueService
                     passengerRideNeed[passenger]));
         }
 
+        bool hasEmergencyRideNeed = false;
+        foreach (QueroCaronaResult rideNeed in passengerRideNeed.Values)
+        {
+            if (ResolveRideDisposition(rideNeed)
+                == MelhorEmbarqueRideDisposition.Emergency)
+            {
+                hasEmergencyRideNeed = true;
+                break;
+            }
+        }
+
+        // O índice topológico não possui ordem de alcance. Tactical precisa
+        // ser materializado primeiro para que o runtime possa encerrar antes
+        // de construir milhares de opções Operational/Strategic que não
+        // participarão da decisão desta rodada.
+        var orderedCandidateCells =
+            new List<Vector3Int>(candidateCells);
+        orderedCandidateCells.Sort((left, right) =>
+        {
+            int leftDistance = Mathf.RoundToInt(
+                SectorManager.HexDistance(origin, left));
+            int rightDistance = Mathf.RoundToInt(
+                SectorManager.HexDistance(origin, right));
+            int byDistance = leftDistance.CompareTo(rightDistance);
+            if (byDistance != 0)
+                return byDistance;
+            int byX = left.x.CompareTo(right.x);
+            if (byX != 0)
+                return byX;
+            int byY = left.y.CompareTo(right.y);
+            return byY != 0
+                ? byY
+                : left.z.CompareTo(right.z);
+        });
+
         int topologyCellsVisited = 0;
         int lzWithoutReachableNow = 0;
+        bool hasDecisiveTacticalPickup = false;
+        bool stoppedAfterTactical = false;
         for (int candidateIndex = 0;
-             candidateIndex < candidateCells.Count;
+             candidateIndex < orderedCandidateCells.Count;
              candidateIndex++)
         {
-            topologyCellsVisited++;
-            Vector3Int cell = candidateCells[candidateIndex];
+            Vector3Int cell = orderedCandidateCells[candidateIndex];
             cell.z = 0;
+            int distance = Mathf.RoundToInt(
+                SectorManager.HexDistance(origin, cell));
+            MelhorEmbarqueTier tier = distance <= tactical
+                ? MelhorEmbarqueTier.Tactical
+                : distance <= operational
+                    ? MelhorEmbarqueTier.Operational
+                    : MelhorEmbarqueTier.Strategic;
+
+            if (tier != MelhorEmbarqueTier.Tactical
+                && request.stopAfterDecisiveTactical
+                && !hasEmergencyRideNeed
+                && hasDecisiveTacticalPickup)
+            {
+                stoppedAfterTactical = true;
+                break;
+            }
+
+            topologyCellsVisited++;
             if (!request.map.HasTile(cell)
                 || !PodeEmbarcarSensor.IsTransporterCellValidForEmbark(
                     request.map, request.terrainDatabase,
@@ -380,15 +438,15 @@ public static class MelhorEmbarqueService
                     request.terrainDatabase, cell, out _))
                 continue;
 
-            int distance = Mathf.RoundToInt(
-                SectorManager.HexDistance(origin, cell));
-            MelhorEmbarqueTier tier = distance <= tactical
-                ? MelhorEmbarqueTier.Tactical
-                : distance <= operational
-                    ? MelhorEmbarqueTier.Operational
-                    : MelhorEmbarqueTier.Strategic;
             if (tier == MelhorEmbarqueTier.Strategic
                 && !request.includeStrategic)
+                continue;
+            // Distância cúbica classifica o setor, mas não prova um caminho.
+            // Uma opção Tactical só pode decidir a rodada quando Caminhos
+            // Válidos realmente alcança a LZ.
+            if (tier == MelhorEmbarqueTier.Tactical
+                && (tacticalPaths == null
+                    || !tacticalPaths.ContainsKey(cell)))
                 continue;
 
             var lz = new MelhorEmbarqueLzScore
@@ -511,6 +569,15 @@ public static class MelhorEmbarqueService
                         $"ajusteCarona={rideNeedAdjustment:0}"
                 };
                 result.options.Add(option);
+                if (tier == MelhorEmbarqueTier.Tactical
+                    && lz.transporterRouteCost >= 0
+                    && routeState
+                        == MelhorEmbarquePassengerRouteState.ReachableNow
+                    && disposition
+                        == MelhorEmbarqueRideDisposition.Requested)
+                {
+                    hasDecisiveTacticalPickup = true;
+                }
 
                 // Compatibilidade da parte 1: o controller atual enxerga a
                 // coleção legada somente quando o passageiro chega agora.
@@ -573,6 +640,14 @@ public static class MelhorEmbarqueService
             AIDecisionPerf.AddCount(
                 "TopologyIndexCandidateCells",
                 topologyCellsVisited);
+        }
+        if (stoppedAfterTactical)
+        {
+            AIDecisionPerf.AddCount(
+                "MelhorEmbarqueDecisiveTacticalEarlyOuts");
+            request.diagnosticLog?.Invoke(
+                "Ranking encerrado no Tactical: existe passageiro " +
+                "Requested + ReachableNow e nenhuma emergência pendente.");
         }
         if (lzWithoutReachableNow > 0)
         {

@@ -254,6 +254,10 @@ public partial class AIController : MonoBehaviour
     // Buffers e caches para otimiza��o de performance
     private readonly List<UnitManager> _availableUnitsBuffer = new List<UnitManager>();
     private readonly Dictionary<int, int> _groupCache = new Dictionary<int, int>();
+    private readonly Dictionary<int, float> _availableDistanceCache =
+        new Dictionary<int, float>();
+    private readonly Dictionary<int, InitiativeSortFacts> _initiativeSortFacts =
+        new Dictionary<int, InitiativeSortFacts>();
     private static readonly System.Text.StringBuilder _initLogBuilder = new System.Text.StringBuilder();
     private Comparison<UnitManager> _availableUnitsComparison;
     private Comparison<UnitManager> _initiativeComparison;
@@ -261,6 +265,20 @@ public partial class AIController : MonoBehaviour
     private TeamObjectivePlan _sortActivePlan;
     // Contexto de invasão para a ordenação de iniciativa: durante a invasão, feridas saem na frente.
     private bool _sortIsInvading;
+
+    private sealed class InitiativeSortFacts
+    {
+        public bool IsBlocker;
+        public bool HasFireSupportAttack;
+        public bool HasFireSupportPrimaryTarget;
+        public int FireSupportElite;
+        public BazookaTargetPriority FireSupportPreference;
+        public bool HasCombatOpportunity;
+        public SectorObjective AssignedObjective;
+        public float TransportDistance = float.MaxValue;
+        public int EliteLevel;
+        public int EffectiveInitiative;
+    }
 
     // Estado da IA
     private bool   isActive;

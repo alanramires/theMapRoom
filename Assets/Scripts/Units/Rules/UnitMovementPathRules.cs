@@ -1416,14 +1416,66 @@ public static class UnitMovementPathRules
         return false;
     }
 
+    // A vizinhanca imediata de um hex depende apenas do layout do Grid, nunca do
+    // conteudo do Tilemap: esta funcao nao consulta HasTile. O resultado tambem e
+    // invariante a translacao/rotacao do GameObject, porque so a ORDENACAO das
+    // distancias relativas importa. Por isso a memoizacao vale pela vida do Tilemap.
+    //
+    // Sem o cache, cada chamada custava 25 GetCellCenterWorld (interop nativo),
+    // uma alocacao de lista e um Sort. Com ~62 call sites -- BFS de movimento,
+    // supersampling de LoS, cost maps -- isso dominava o custo de um turno.
+    private static readonly Dictionary<HexGeometryCellKey, Vector3Int[]> immediateHexNeighborsCache =
+        new Dictionary<HexGeometryCellKey, Vector3Int[]>(8192);
+    private static readonly List<CellDistance> immediateHexNeighborScratch =
+        new List<CellDistance>(24);
+    private static readonly System.Comparison<CellDistance> immediateHexNeighborComparison =
+        (a, b) => a.distance.CompareTo(b.distance);
+
+    // Escape hatch para quem alterar o layout do Grid em runtime ou quiser
+    // liberar a memoria de mapas ja descarregados.
+    public static void ClearHexGeometryCaches()
+    {
+        immediateHexNeighborsCache.Clear();
+    }
+
+    // O Tilemap de uma cena descarregada nunca volta: sem isto as entradas dela
+    // ficariam residentes a cada troca de mapa. Reaquecer custa uma passada,
+    // entao descartar tudo e preferivel a varrer o dicionario por instancia.
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void RegisterHexGeometryCacheInvalidation()
+    {
+        UnityEngine.SceneManagement.SceneManager.sceneUnloaded -= OnSceneUnloadedClearHexGeometry;
+        UnityEngine.SceneManagement.SceneManager.sceneUnloaded += OnSceneUnloadedClearHexGeometry;
+    }
+
+    private static void OnSceneUnloadedClearHexGeometry(
+        UnityEngine.SceneManagement.Scene scene)
+    {
+        ClearHexGeometryCaches();
+    }
+
     public static void GetImmediateHexNeighbors(Tilemap terrainTilemap, Vector3Int cell, List<Vector3Int> output)
     {
         output.Clear();
         if (terrainTilemap == null)
             return;
 
+        HexGeometryCellKey cacheKey = new HexGeometryCellKey(
+            terrainTilemap.GetEntityId().GetHashCode(),
+            cell.x,
+            cell.y);
+        if (immediateHexNeighborsCache.TryGetValue(cacheKey, out Vector3Int[] cachedNeighbors))
+        {
+            // Copia para a lista do chamador: o array do cache nunca escapa,
+            // senao um caller que ordena/remove corromperia todos os demais.
+            for (int i = 0; i < cachedNeighbors.Length; i++)
+                output.Add(cachedNeighbors[i]);
+            return;
+        }
+
         Vector3 centerWorld = terrainTilemap.GetCellCenterWorld(cell);
-        List<CellDistance> candidates = new List<CellDistance>(24);
+        List<CellDistance> candidates = immediateHexNeighborScratch;
+        candidates.Clear();
 
         // Busca local para capturar os 6 vizinhos de um hex, respeitando o offset real do Tilemap.
         for (int dx = -2; dx <= 2; dx++)
@@ -1443,11 +1495,18 @@ public static class UnitMovementPathRules
             }
         }
 
-        candidates.Sort((a, b) => a.distance.CompareTo(b.distance));
+        candidates.Sort(immediateHexNeighborComparison);
 
         int count = Mathf.Min(6, candidates.Count);
+        Vector3Int[] neighbors = new Vector3Int[count];
         for (int i = 0; i < count; i++)
-            output.Add(candidates[i].cell);
+        {
+            neighbors[i] = candidates[i].cell;
+            output.Add(neighbors[i]);
+        }
+
+        candidates.Clear();
+        immediateHexNeighborsCache[cacheKey] = neighbors;
     }
 
     public static bool HasTraversableRouteIgnoringUnits(
@@ -1598,6 +1657,45 @@ public static class UnitMovementPathRules
         {
             this.cell = cell;
             this.distance = distance;
+        }
+    }
+
+    // Chave da memoizacao geometrica: identidade do Tilemap + celula no plano.
+    private readonly struct HexGeometryCellKey : System.IEquatable<HexGeometryCellKey>
+    {
+        private readonly int tilemapInstanceId;
+        private readonly int cellX;
+        private readonly int cellY;
+
+        public HexGeometryCellKey(int tilemapInstanceId, int cellX, int cellY)
+        {
+            this.tilemapInstanceId = tilemapInstanceId;
+            this.cellX = cellX;
+            this.cellY = cellY;
+        }
+
+        public bool Equals(HexGeometryCellKey other)
+        {
+            return tilemapInstanceId == other.tilemapInstanceId
+                && cellX == other.cellX
+                && cellY == other.cellY;
+        }
+
+        public override bool Equals(object obj)
+        {
+            return obj is HexGeometryCellKey other && Equals(other);
+        }
+
+        public override int GetHashCode()
+        {
+            unchecked
+            {
+                int hash = 17;
+                hash = (hash * 31) + tilemapInstanceId;
+                hash = (hash * 31) + cellX;
+                hash = (hash * 31) + cellY;
+                return hash;
+            }
         }
     }
 

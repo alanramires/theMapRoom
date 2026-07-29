@@ -8572,6 +8572,9 @@ MonoBehaviour:
   aiAssignedPlanBadge: 
   aiAssignedPlanRole: 2
   aiAssignedPlanBadgeVisible: 0
+  aiHasDesignatedCaptureTarget: 0
+  aiDesignatedCaptureTargetInstanceId: -1
+  aiDesignatedCaptureTargetCell: {x: 0, y: 0, z: 0}
   aiEixo: 0
   aiHasStance: 0
   aiStance: 0
@@ -10057,6 +10060,9 @@ MonoBehaviour:
   aiAssignedPlanBadge: 
   aiAssignedPlanRole: 2
   aiAssignedPlanBadgeVisible: 0
+  aiHasDesignatedCaptureTarget: 0
+  aiDesignatedCaptureTargetInstanceId: -1
+  aiDesignatedCaptureTargetCell: {x: 0, y: 0, z: 0}
   aiEixo: 0
   aiHasStance: 0
   aiStance: 0
@@ -10750,6 +10756,9 @@ MonoBehaviour:
   aiAssignedPlanBadge: 
   aiAssignedPlanRole: 2
   aiAssignedPlanBadgeVisible: 0
+  aiHasDesignatedCaptureTarget: 0
+  aiDesignatedCaptureTargetInstanceId: -1
+  aiDesignatedCaptureTargetCell: {x: 0, y: 0, z: 0}
   aiEixo: 0
   aiHasStance: 0
   aiStance: 0
@@ -13250,6 +13259,9 @@ MonoBehaviour:
   aiAssignedPlanBadge: 
   aiAssignedPlanRole: 2
   aiAssignedPlanBadgeVisible: 0
+  aiHasDesignatedCaptureTarget: 0
+  aiDesignatedCaptureTargetInstanceId: -1
+  aiDesignatedCaptureTargetCell: {x: 0, y: 0, z: 0}
   aiEixo: 0
   aiHasStance: 0
   aiStance: 0
@@ -15471,6 +15483,9 @@ MonoBehaviour:
   aiAssignedPlanBadge: 
   aiAssignedPlanRole: 2
   aiAssignedPlanBadgeVisible: 0
+  aiHasDesignatedCaptureTarget: 0
+  aiDesignatedCaptureTargetInstanceId: -1
+  aiDesignatedCaptureTargetCell: {x: 0, y: 0, z: 0}
   aiEixo: 0
   aiHasStance: 0
   aiStance: 0
@@ -28350,6 +28365,9 @@ MonoBehaviour:
   aiAssignedPlanBadge: 
   aiAssignedPlanRole: 2
   aiAssignedPlanBadgeVisible: 0
+  aiHasDesignatedCaptureTarget: 0
+  aiDesignatedCaptureTargetInstanceId: -1
+  aiDesignatedCaptureTargetCell: {x: 0, y: 0, z: 0}
   aiEixo: 0
   aiHasStance: 0
   aiStance: 0
@@ -30489,6 +30507,9 @@ MonoBehaviour:
   aiAssignedPlanBadge: 
   aiAssignedPlanRole: 2
   aiAssignedPlanBadgeVisible: 0
+  aiHasDesignatedCaptureTarget: 0
+  aiDesignatedCaptureTargetInstanceId: -1
+  aiDesignatedCaptureTargetCell: {x: 0, y: 0, z: 0}
   aiEixo: 0
   aiHasStance: 0
   aiStance: 0
@@ -38470,6 +38491,9 @@ MonoBehaviour:
   aiAssignedPlanBadge: 
   aiAssignedPlanRole: 2
   aiAssignedPlanBadgeVisible: 0
+  aiHasDesignatedCaptureTarget: 0
+  aiDesignatedCaptureTargetInstanceId: -1
+  aiDesignatedCaptureTargetCell: {x: 0, y: 0, z: 0}
   aiEixo: 0
   aiHasStance: 0
   aiStance: 0
@@ -39466,6 +39490,9 @@ MonoBehaviour:
   aiAssignedPlanBadge: 
   aiAssignedPlanRole: 2
   aiAssignedPlanBadgeVisible: 0
+  aiHasDesignatedCaptureTarget: 0
+  aiDesignatedCaptureTargetInstanceId: -1
+  aiDesignatedCaptureTargetCell: {x: 0, y: 0, z: 0}
   aiEixo: 0
   aiHasStance: 0
   aiStance: 0
@@ -40788,6 +40815,9 @@ MonoBehaviour:
   aiAssignedPlanBadge: 
   aiAssignedPlanRole: 2
   aiAssignedPlanBadgeVisible: 0
+  aiHasDesignatedCaptureTarget: 0
+  aiDesignatedCaptureTargetInstanceId: -1
+  aiDesignatedCaptureTargetCell: {x: 0, y: 0, z: 0}
   aiEixo: 0
   aiHasStance: 0
   aiStance: 0
@@ -41363,7 +41393,7 @@ MonoBehaviour:
     defeated: 0
     startMoney: 0
     actualMoney: 0
-    incomePerTurn: 14500
+    incomePerTurn: 5000
     startMoneyApplied: 1
   - teamId: 3
     flipX: 1
@@ -41376,13 +41406,13 @@ MonoBehaviour:
     defeated: 0
     startMoney: 0
     actualMoney: 0
-    incomePerTurn: 17500
+    incomePerTurn: 4000
     startMoneyApplied: 1
   - teamId: 1
     flipX: 1
     flipXOverride: 0
     isAI: 1
-    isRebelRuntime: 1
+    isRebelRuntime: 0
     isLocal: 0
     localityConfigured: 1
     commandServiceAutomatic: 1
@@ -41450,7 +41480,7 @@ MonoBehaviour:
   appliedActiveTeamId: 2
   pendingTurnStartUpkeep: 1
   pendingTurnStartEconomy: 1
-  cachedConstructionIncomeSignature: -1110784900
+  cachedConstructionIncomeSignature: -1894643010
   cachedConstructionIncomeCount: 65
   constructionIncomeRefreshIntervalSeconds: 0.35
   continuousEditorRefresh: 0
@@ -45307,6 +45337,9 @@ MonoBehaviour:
   aiAssignedPlanBadge: 
   aiAssignedPlanRole: 2
   aiAssignedPlanBadgeVisible: 0
+  aiHasDesignatedCaptureTarget: 0
+  aiDesignatedCaptureTargetInstanceId: -1
+  aiDesignatedCaptureTargetCell: {x: 0, y: 0, z: 0}
   aiEixo: 0
   aiHasStance: 0
   aiStance: 0
@@ -48062,6 +48095,9 @@ MonoBehaviour:
   aiAssignedPlanBadge: 
   aiAssignedPlanRole: 2
   aiAssignedPlanBadgeVisible: 0
+  aiHasDesignatedCaptureTarget: 0
+  aiDesignatedCaptureTargetInstanceId: -1
+  aiDesignatedCaptureTargetCell: {x: 0, y: 0, z: 0}
   aiEixo: 0
   aiHasStance: 0
   aiStance: 0
@@ -53608,6 +53644,9 @@ MonoBehaviour:
   aiAssignedPlanBadge: 
   aiAssignedPlanRole: 2
   aiAssignedPlanBadgeVisible: 0
+  aiHasDesignatedCaptureTarget: 0
+  aiDesignatedCaptureTargetInstanceId: -1
+  aiDesignatedCaptureTargetCell: {x: 0, y: 0, z: 0}
   aiEixo: 0
   aiHasStance: 0
   aiStance: 0
@@ -61181,6 +61220,9 @@ MonoBehaviour:
   aiAssignedPlanBadge: 
   aiAssignedPlanRole: 2
   aiAssignedPlanBadgeVisible: 0
+  aiHasDesignatedCaptureTarget: 0
+  aiDesignatedCaptureTargetInstanceId: -1
+  aiDesignatedCaptureTargetCell: {x: 0, y: 0, z: 0}
   aiEixo: 0
   aiHasStance: 0
   aiStance: 0
@@ -75706,6 +75748,9 @@ MonoBehaviour:
   aiAssignedPlanBadge: 
   aiAssignedPlanRole: 2
   aiAssignedPlanBadgeVisible: 0
+  aiHasDesignatedCaptureTarget: 0
+  aiDesignatedCaptureTargetInstanceId: -1
+  aiDesignatedCaptureTargetCell: {x: 0, y: 0, z: 0}
   aiEixo: 0
   aiHasStance: 0
   aiStance: 0
@@ -76543,6 +76588,9 @@ MonoBehaviour:
   aiAssignedPlanBadge: 
   aiAssignedPlanRole: 2
   aiAssignedPlanBadgeVisible: 0
+  aiHasDesignatedCaptureTarget: 0
+  aiDesignatedCaptureTargetInstanceId: -1
+  aiDesignatedCaptureTargetCell: {x: 0, y: 0, z: 0}
   aiEixo: 0
   aiHasStance: 0
   aiStance: 0
@@ -81130,6 +81178,9 @@ MonoBehaviour:
   aiAssignedPlanBadge: 
   aiAssignedPlanRole: 2
   aiAssignedPlanBadgeVisible: 0
+  aiHasDesignatedCaptureTarget: 0
+  aiDesignatedCaptureTargetInstanceId: -1
+  aiDesignatedCaptureTargetCell: {x: 0, y: 0, z: 0}
   aiEixo: 0
   aiHasStance: 0
   aiStance: 0
@@ -84661,6 +84712,9 @@ MonoBehaviour:
   aiAssignedPlanBadge: 
   aiAssignedPlanRole: 2
   aiAssignedPlanBadgeVisible: 0
+  aiHasDesignatedCaptureTarget: 0
+  aiDesignatedCaptureTargetInstanceId: -1
+  aiDesignatedCaptureTargetCell: {x: 0, y: 0, z: 0}
   aiEixo: 0
   aiHasStance: 0
   aiStance: 0
@@ -87446,6 +87500,9 @@ MonoBehaviour:
   aiAssignedPlanBadge: 
   aiAssignedPlanRole: 2
   aiAssignedPlanBadgeVisible: 0
+  aiHasDesignatedCaptureTarget: 0
+  aiDesignatedCaptureTargetInstanceId: -1
+  aiDesignatedCaptureTargetCell: {x: 0, y: 0, z: 0}
   aiEixo: 0
   aiHasStance: 0
   aiStance: 0
@@ -88735,6 +88792,9 @@ MonoBehaviour:
   aiAssignedPlanBadge: 
   aiAssignedPlanRole: 2
   aiAssignedPlanBadgeVisible: 0
+  aiHasDesignatedCaptureTarget: 0
+  aiDesignatedCaptureTargetInstanceId: -1
+  aiDesignatedCaptureTargetCell: {x: 0, y: 0, z: 0}
   aiEixo: 0
   aiHasStance: 0
   aiStance: 0
@@ -88958,6 +89018,9 @@ MonoBehaviour:
   aiAssignedPlanBadge: 
   aiAssignedPlanRole: 2
   aiAssignedPlanBadgeVisible: 0
+  aiHasDesignatedCaptureTarget: 0
+  aiDesignatedCaptureTargetInstanceId: -1
+  aiDesignatedCaptureTargetCell: {x: 0, y: 0, z: 0}
   aiEixo: 0
   aiHasStance: 0
   aiStance: 0
@@ -90225,6 +90288,9 @@ MonoBehaviour:
   aiAssignedPlanBadge: 
   aiAssignedPlanRole: 2
   aiAssignedPlanBadgeVisible: 0
+  aiHasDesignatedCaptureTarget: 0
+  aiDesignatedCaptureTargetInstanceId: -1
+  aiDesignatedCaptureTargetCell: {x: 0, y: 0, z: 0}
   aiEixo: 0
   aiHasStance: 0
   aiStance: 0
@@ -95455,6 +95521,9 @@ MonoBehaviour:
   aiAssignedPlanBadge: 
   aiAssignedPlanRole: 2
   aiAssignedPlanBadgeVisible: 0
+  aiHasDesignatedCaptureTarget: 0
+  aiDesignatedCaptureTargetInstanceId: -1
+  aiDesignatedCaptureTargetCell: {x: 0, y: 0, z: 0}
   aiEixo: 0
   aiHasStance: 0
   aiStance: 0
@@ -100429,6 +100498,9 @@ MonoBehaviour:
   aiAssignedPlanBadge: 
   aiAssignedPlanRole: 2
   aiAssignedPlanBadgeVisible: 0
+  aiHasDesignatedCaptureTarget: 0
+  aiDesignatedCaptureTargetInstanceId: -1
+  aiDesignatedCaptureTargetCell: {x: 0, y: 0, z: 0}
   aiEixo: 0
   aiHasStance: 0
   aiStance: 0
@@ -100948,6 +101020,9 @@ MonoBehaviour:
   aiAssignedPlanBadge: 
   aiAssignedPlanRole: 2
   aiAssignedPlanBadgeVisible: 0
+  aiHasDesignatedCaptureTarget: 0
+  aiDesignatedCaptureTargetInstanceId: -1
+  aiDesignatedCaptureTargetCell: {x: 0, y: 0, z: 0}
   aiEixo: 0
   aiHasStance: 0
   aiStance: 0
@@ -105862,6 +105937,9 @@ MonoBehaviour:
   aiAssignedPlanBadge: 
   aiAssignedPlanRole: 2
   aiAssignedPlanBadgeVisible: 0
+  aiHasDesignatedCaptureTarget: 0
+  aiDesignatedCaptureTargetInstanceId: -1
+  aiDesignatedCaptureTargetCell: {x: 0, y: 0, z: 0}
   aiEixo: 0
   aiHasStance: 0
   aiStance: 0
@@ -114489,6 +114567,9 @@ MonoBehaviour:
   aiAssignedPlanBadge: 
   aiAssignedPlanRole: 2
   aiAssignedPlanBadgeVisible: 0
+  aiHasDesignatedCaptureTarget: 0
+  aiDesignatedCaptureTargetInstanceId: -1
+  aiDesignatedCaptureTargetCell: {x: 0, y: 0, z: 0}
   aiEixo: 0
   aiHasStance: 0
   aiStance: 0
@@ -114869,6 +114950,9 @@ MonoBehaviour:
   aiAssignedPlanBadge: 
   aiAssignedPlanRole: 2
   aiAssignedPlanBadgeVisible: 0
+  aiHasDesignatedCaptureTarget: 0
+  aiDesignatedCaptureTargetInstanceId: -1
+  aiDesignatedCaptureTargetCell: {x: 0, y: 0, z: 0}
   aiEixo: 0
   aiHasStance: 0
   aiStance: 0
@@ -132452,6 +132536,9 @@ MonoBehaviour:
   aiAssignedPlanBadge: 
   aiAssignedPlanRole: 2
   aiAssignedPlanBadgeVisible: 0
+  aiHasDesignatedCaptureTarget: 0
+  aiDesignatedCaptureTargetInstanceId: -1
+  aiDesignatedCaptureTargetCell: {x: 0, y: 0, z: 0}
   aiEixo: 0
   aiHasStance: 0
   aiStance: 0
@@ -138689,6 +138776,9 @@ MonoBehaviour:
   aiAssignedPlanBadge: 
   aiAssignedPlanRole: 2
   aiAssignedPlanBadgeVisible: 0
+  aiHasDesignatedCaptureTarget: 0
+  aiDesignatedCaptureTargetInstanceId: -1
+  aiDesignatedCaptureTargetCell: {x: 0, y: 0, z: 0}
   aiEixo: 0
   aiHasStance: 0
   aiStance: 0
@@ -141023,6 +141113,9 @@ MonoBehaviour:
   aiAssignedPlanBadge: 
   aiAssignedPlanRole: 2
   aiAssignedPlanBadgeVisible: 0
+  aiHasDesignatedCaptureTarget: 0
+  aiDesignatedCaptureTargetInstanceId: -1
+  aiDesignatedCaptureTargetCell: {x: 0, y: 0, z: 0}
   aiEixo: 0
   aiHasStance: 0
   aiStance: 0
@@ -148942,6 +149035,9 @@ MonoBehaviour:
   aiAssignedPlanBadge: 
   aiAssignedPlanRole: 2
   aiAssignedPlanBadgeVisible: 0
+  aiHasDesignatedCaptureTarget: 0
+  aiDesignatedCaptureTargetInstanceId: -1
+  aiDesignatedCaptureTargetCell: {x: 0, y: 0, z: 0}
   aiEixo: 0
   aiHasStance: 0
   aiStance: 0
@@ -149242,6 +149338,9 @@ MonoBehaviour:
   aiAssignedPlanBadge: 
   aiAssignedPlanRole: 2
   aiAssignedPlanBadgeVisible: 0
+  aiHasDesignatedCaptureTarget: 0
+  aiDesignatedCaptureTargetInstanceId: -1
+  aiDesignatedCaptureTargetCell: {x: 0, y: 0, z: 0}
   aiEixo: 0
   aiHasStance: 0
   aiStance: 0
@@ -150795,6 +150894,9 @@ MonoBehaviour:
   aiAssignedPlanBadge: 
   aiAssignedPlanRole: 2
   aiAssignedPlanBadgeVisible: 0
+  aiHasDesignatedCaptureTarget: 0
+  aiDesignatedCaptureTargetInstanceId: -1
+  aiDesignatedCaptureTargetCell: {x: 0, y: 0, z: 0}
   aiEixo: 0
   aiHasStance: 0
   aiStance: 0
@@ -151858,6 +151960,9 @@ MonoBehaviour:
   aiAssignedPlanBadge: 
   aiAssignedPlanRole: 2
   aiAssignedPlanBadgeVisible: 0
+  aiHasDesignatedCaptureTarget: 0
+  aiDesignatedCaptureTargetInstanceId: -1
+  aiDesignatedCaptureTargetCell: {x: 0, y: 0, z: 0}
   aiEixo: 0
   aiHasStance: 0
   aiStance: 0
@@ -152996,6 +153101,9 @@ MonoBehaviour:
   aiAssignedPlanBadge: 
   aiAssignedPlanRole: 2
   aiAssignedPlanBadgeVisible: 0
+  aiHasDesignatedCaptureTarget: 0
+  aiDesignatedCaptureTargetInstanceId: -1
+  aiDesignatedCaptureTargetCell: {x: 0, y: 0, z: 0}
   aiEixo: 0
   aiHasStance: 0
   aiStance: 0
@@ -153997,6 +154105,9 @@ MonoBehaviour:
   aiAssignedPlanBadge: 
   aiAssignedPlanRole: 2
   aiAssignedPlanBadgeVisible: 0
+  aiHasDesignatedCaptureTarget: 0
+  aiDesignatedCaptureTargetInstanceId: -1
+  aiDesignatedCaptureTargetCell: {x: 0, y: 0, z: 0}
   aiEixo: 0
   aiHasStance: 0
   aiStance: 0
@@ -156146,6 +156257,9 @@ MonoBehaviour:
   aiAssignedPlanBadge: 
   aiAssignedPlanRole: 2
   aiAssignedPlanBadgeVisible: 0
+  aiHasDesignatedCaptureTarget: 0
+  aiDesignatedCaptureTargetInstanceId: -1
+  aiDesignatedCaptureTargetCell: {x: 0, y: 0, z: 0}
   aiEixo: 0
   aiHasStance: 0
   aiStance: 0
@@ -157429,6 +157543,9 @@ MonoBehaviour:
   aiAssignedPlanBadge: 
   aiAssignedPlanRole: 2
   aiAssignedPlanBadgeVisible: 0
+  aiHasDesignatedCaptureTarget: 0
+  aiDesignatedCaptureTargetInstanceId: -1
+  aiDesignatedCaptureTargetCell: {x: 0, y: 0, z: 0}
   aiEixo: 0
   aiHasStance: 0
   aiStance: 0
@@ -158865,6 +158982,9 @@ MonoBehaviour:
   aiAssignedPlanBadge: 
   aiAssignedPlanRole: 2
   aiAssignedPlanBadgeVisible: 0
+  aiHasDesignatedCaptureTarget: 0
+  aiDesignatedCaptureTargetInstanceId: -1
+  aiDesignatedCaptureTargetCell: {x: 0, y: 0, z: 0}
   aiEixo: 0
   aiHasStance: 0
   aiStance: 0
@@ -162010,6 +162130,9 @@ MonoBehaviour:
   aiAssignedPlanBadge: 
   aiAssignedPlanRole: 2
   aiAssignedPlanBadgeVisible: 0
+  aiHasDesignatedCaptureTarget: 0
+  aiDesignatedCaptureTargetInstanceId: -1
+  aiDesignatedCaptureTargetCell: {x: 0, y: 0, z: 0}
   aiEixo: 0
   aiHasStance: 0
   aiStance: 0
@@ -162922,6 +163045,9 @@ MonoBehaviour:
   aiAssignedPlanBadge: 
   aiAssignedPlanRole: 2
   aiAssignedPlanBadgeVisible: 0
+  aiHasDesignatedCaptureTarget: 0
+  aiDesignatedCaptureTargetInstanceId: -1
+  aiDesignatedCaptureTargetCell: {x: 0, y: 0, z: 0}
   aiEixo: 0
   aiHasStance: 0
   aiStance: 0
@@ -168164,6 +168290,9 @@ MonoBehaviour:
   aiAssignedPlanBadge: 
   aiAssignedPlanRole: 2
   aiAssignedPlanBadgeVisible: 0
+  aiHasDesignatedCaptureTarget: 0
+  aiDesignatedCaptureTargetInstanceId: -1
+  aiDesignatedCaptureTargetCell: {x: 0, y: 0, z: 0}
   aiEixo: 0
   aiHasStance: 0
   aiStance: 0
@@ -171476,6 +171605,9 @@ MonoBehaviour:
   aiAssignedPlanBadge: 
   aiAssignedPlanRole: 2
   aiAssignedPlanBadgeVisible: 0
+  aiHasDesignatedCaptureTarget: 0
+  aiDesignatedCaptureTargetInstanceId: -1
+  aiDesignatedCaptureTargetCell: {x: 0, y: 0, z: 0}
   aiEixo: 0
   aiHasStance: 0
   aiStance: 0
@@ -175963,6 +176095,9 @@ MonoBehaviour:
   aiAssignedPlanBadge: 
   aiAssignedPlanRole: 2
   aiAssignedPlanBadgeVisible: 0
+  aiHasDesignatedCaptureTarget: 0
+  aiDesignatedCaptureTargetInstanceId: -1
+  aiDesignatedCaptureTargetCell: {x: 0, y: 0, z: 0}
   aiEixo: 0
   aiHasStance: 0
   aiStance: 0
@@ -178333,6 +178468,9 @@ MonoBehaviour:
   aiAssignedPlanBadge: 
   aiAssignedPlanRole: 2
   aiAssignedPlanBadgeVisible: 0
+  aiHasDesignatedCaptureTarget: 0
+  aiDesignatedCaptureTargetInstanceId: -1
+  aiDesignatedCaptureTargetCell: {x: 0, y: 0, z: 0}
   aiEixo: 0
   aiHasStance: 0
   aiStance: 0
@@ -181843,6 +181981,9 @@ MonoBehaviour:
   aiAssignedPlanBadge: 
   aiAssignedPlanRole: 2
   aiAssignedPlanBadgeVisible: 0
+  aiHasDesignatedCaptureTarget: 0
+  aiDesignatedCaptureTargetInstanceId: -1
+  aiDesignatedCaptureTargetCell: {x: 0, y: 0, z: 0}
   aiEixo: 0
   aiHasStance: 0
   aiStance: 0
@@ -184703,6 +184844,9 @@ MonoBehaviour:
   aiAssignedPlanBadge: 
   aiAssignedPlanRole: 2
   aiAssignedPlanBadgeVisible: 0
+  aiHasDesignatedCaptureTarget: 0
+  aiDesignatedCaptureTargetInstanceId: -1
+  aiDesignatedCaptureTargetCell: {x: 0, y: 0, z: 0}
   aiEixo: 0
   aiHasStance: 0
   aiStance: 0
@@ -188385,6 +188529,9 @@ MonoBehaviour:
   aiAssignedPlanBadge: 
   aiAssignedPlanRole: 2
   aiAssignedPlanBadgeVisible: 0
+  aiHasDesignatedCaptureTarget: 0
+  aiDesignatedCaptureTargetInstanceId: -1
+  aiDesignatedCaptureTargetCell: {x: 0, y: 0, z: 0}
   aiEixo: 0
   aiHasStance: 0
   aiStance: 0
@@ -195891,6 +196038,9 @@ MonoBehaviour:
   aiAssignedPlanBadge: 
   aiAssignedPlanRole: 2
   aiAssignedPlanBadgeVisible: 0
+  aiHasDesignatedCaptureTarget: 0
+  aiDesignatedCaptureTargetInstanceId: -1
+  aiDesignatedCaptureTargetCell: {x: 0, y: 0, z: 0}
   aiEixo: 0
   aiHasStance: 0
   aiStance: 0
@@ -198616,6 +198766,9 @@ MonoBehaviour:
   aiAssignedPlanBadge: 
   aiAssignedPlanRole: 2
   aiAssignedPlanBadgeVisible: 0
+  aiHasDesignatedCaptureTarget: 0
+  aiDesignatedCaptureTargetInstanceId: -1
+  aiDesignatedCaptureTargetCell: {x: 0, y: 0, z: 0}
   aiEixo: 0
   aiHasStance: 0
   aiStance: 0
@@ -228929,6 +229082,9 @@ MonoBehaviour:
   aiAssignedPlanBadge: 
   aiAssignedPlanRole: 2
   aiAssignedPlanBadgeVisible: 0
+  aiHasDesignatedCaptureTarget: 0
+  aiDesignatedCaptureTargetInstanceId: -1
+  aiDesignatedCaptureTargetCell: {x: 0, y: 0, z: 0}
   aiEixo: 0
   aiHasStance: 0
   aiStance: 0
@@ -229468,6 +229624,9 @@ MonoBehaviour:
   aiAssignedPlanBadge: 
   aiAssignedPlanRole: 2
   aiAssignedPlanBadgeVisible: 0
+  aiHasDesignatedCaptureTarget: 0
+  aiDesignatedCaptureTargetInstanceId: -1
+  aiDesignatedCaptureTargetCell: {x: 0, y: 0, z: 0}
   aiEixo: 0
   aiHasStance: 0
   aiStance: 0
@@ -231862,6 +232021,9 @@ MonoBehaviour:
   aiAssignedPlanBadge: 
   aiAssignedPlanRole: 2
   aiAssignedPlanBadgeVisible: 0
+  aiHasDesignatedCaptureTarget: 0
+  aiDesignatedCaptureTargetInstanceId: -1
+  aiDesignatedCaptureTargetCell: {x: 0, y: 0, z: 0}
   aiEixo: 0
   aiHasStance: 0
   aiStance: 0
@@ -232265,7 +232427,7 @@ MonoBehaviour:
   supplyMiddle: {fileID: 1187682110}
   supplyBottom: {fileID: 534642419}
   supplierStockAlertThreshold: 0.5
-  appliedHasActed: 1
+  appliedHasActed: 0
   appliedActiveTeamId: 2
   isEmbarked: 0
   embarkedAtUnit: 
@@ -232315,6 +232477,9 @@ MonoBehaviour:
   aiAssignedPlanBadge: 
   aiAssignedPlanRole: 2
   aiAssignedPlanBadgeVisible: 0
+  aiHasDesignatedCaptureTarget: 0
+  aiDesignatedCaptureTargetInstanceId: -1
+  aiDesignatedCaptureTargetCell: {x: 0, y: 0, z: 0}
   aiEixo: 0
   aiHasStance: 0
   aiStance: 0
@@ -236248,6 +236413,9 @@ MonoBehaviour:
   aiAssignedPlanBadge: 
   aiAssignedPlanRole: 2
   aiAssignedPlanBadgeVisible: 0
+  aiHasDesignatedCaptureTarget: 0
+  aiDesignatedCaptureTargetInstanceId: -1
+  aiDesignatedCaptureTargetCell: {x: 0, y: 0, z: 0}
   aiEixo: 0
   aiHasStance: 0
   aiStance: 0
@@ -243189,6 +243357,9 @@ MonoBehaviour:
   aiAssignedPlanBadge: 
   aiAssignedPlanRole: 2
   aiAssignedPlanBadgeVisible: 0
+  aiHasDesignatedCaptureTarget: 0
+  aiDesignatedCaptureTargetInstanceId: -1
+  aiDesignatedCaptureTargetCell: {x: 0, y: 0, z: 0}
   aiEixo: 0
   aiHasStance: 0
   aiStance: 0
@@ -247522,6 +247693,9 @@ MonoBehaviour:
   aiAssignedPlanBadge: 
   aiAssignedPlanRole: 2
   aiAssignedPlanBadgeVisible: 0
+  aiHasDesignatedCaptureTarget: 0
+  aiDesignatedCaptureTargetInstanceId: -1
+  aiDesignatedCaptureTargetCell: {x: 0, y: 0, z: 0}
   aiEixo: 0
   aiHasStance: 0
   aiStance: 0
@@ -254198,6 +254372,9 @@ MonoBehaviour:
   aiAssignedPlanBadge: 
   aiAssignedPlanRole: 2
   aiAssignedPlanBadgeVisible: 0
+  aiHasDesignatedCaptureTarget: 0
+  aiDesignatedCaptureTargetInstanceId: -1
+  aiDesignatedCaptureTargetCell: {x: 0, y: 0, z: 0}
   aiEixo: 0
   aiHasStance: 0
   aiStance: 0
@@ -258642,11 +258819,11 @@ MonoBehaviour:
         NavalDistance: 51
         IsHQ: 1
       - ConstructionName: Porto Naval
-        InstanceId: 71
+        InstanceId: 72
         Distance: 30
         VehicleDistance: 30
-        AirDistance: 30
-        NavalDistance: 44
+        AirDistance: 29
+        NavalDistance: 43
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 117
@@ -258656,25 +258833,11 @@ MonoBehaviour:
         NavalDistance: 50
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 119
-        Distance: 27
-        VehicleDistance: 27
-        AirDistance: 27
-        NavalDistance: 44
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
         InstanceId: 154
         Distance: 28
         VehicleDistance: 28
         AirDistance: 28
         NavalDistance: 44
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 120
-        Distance: 29
-        VehicleDistance: 29
-        AirDistance: 29
-        NavalDistance: 49
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 118
@@ -258683,12 +258846,26 @@ MonoBehaviour:
         AirDistance: 29
         NavalDistance: 45
         IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 120
+        Distance: 29
+        VehicleDistance: 29
+        AirDistance: 29
+        NavalDistance: 49
+        IsHQ: 0
       - ConstructionName: Porto Naval
-        InstanceId: 72
+        InstanceId: 71
         Distance: 30
         VehicleDistance: 30
-        AirDistance: 29
-        NavalDistance: 43
+        AirDistance: 30
+        NavalDistance: 44
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 119
+        Distance: 27
+        VehicleDistance: 27
+        AirDistance: 27
+        NavalDistance: 44
         IsHQ: 0
       - ConstructionName: Aeroporto
         InstanceId: 8
@@ -258722,13 +258899,6 @@ MonoBehaviour:
         NavalDistance: 30
         IsHQ: 1
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 133
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 14
-        NavalDistance: 29
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
         InstanceId: 134
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
@@ -258736,11 +258906,11 @@ MonoBehaviour:
         NavalDistance: 12
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 155
+        InstanceId: 133
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
         AirDistance: 14
-        NavalDistance: 28
+        NavalDistance: 29
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 135
@@ -258749,12 +258919,12 @@ MonoBehaviour:
         AirDistance: 13
         NavalDistance: 13
         IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 11
+      - ConstructionName: Porto Naval
+        InstanceId: 73
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
-        AirDistance: 12
-        NavalDistance: 12
+        AirDistance: 15
+        NavalDistance: 27
         IsHQ: 0
       - ConstructionName: Aeroporto
         InstanceId: 9
@@ -258763,12 +258933,12 @@ MonoBehaviour:
         AirDistance: 13
         NavalDistance: 29
         IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 73
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 132
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
-        AirDistance: 15
-        NavalDistance: 27
+        AirDistance: 14
+        NavalDistance: 29
         IsHQ: 0
       - ConstructionName: "Esta\xE7\xE3o de Trem"
         InstanceId: 148
@@ -258777,19 +258947,26 @@ MonoBehaviour:
         AirDistance: 12
         NavalDistance: 28
         IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 155
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 14
+        NavalDistance: 28
+        IsHQ: 0
+      - ConstructionName: Aeroporto
+        InstanceId: 11
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 12
+        NavalDistance: 12
+        IsHQ: 0
       - ConstructionName: Porto Naval
         InstanceId: 74
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
         AirDistance: 15
         NavalDistance: 28
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 132
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 14
-        NavalDistance: 29
         IsHQ: 0
     closestNeighbor1: 0
     closestNeighbor1Distance: 3.4028235e+38
@@ -260624,7 +260801,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::UnitSpawner
   unitDatabase: {fileID: 11400000, guid: e8814965e8c2b764c881f833b39e19f1, type: 2}
   matchController: {fileID: 327617512}
-  currentId: 125
+  currentId: 128
   showUnitSpawnerLogs: 0
   unitPrefab: {fileID: 1817672200303259516, guid: 530b4fee239c9904cbceb477236210f2, type: 3}
   boardTilemap: {fileID: 1566606925}
@@ -261270,6 +261447,9 @@ MonoBehaviour:
   aiAssignedPlanBadge: 
   aiAssignedPlanRole: 2
   aiAssignedPlanBadgeVisible: 0
+  aiHasDesignatedCaptureTarget: 0
+  aiDesignatedCaptureTargetInstanceId: -1
+  aiDesignatedCaptureTargetCell: {x: 0, y: 0, z: 0}
   aiEixo: 0
   aiHasStance: 0
   aiStance: 0
@@ -261768,6 +261948,9 @@ MonoBehaviour:
   aiAssignedPlanBadge: 
   aiAssignedPlanRole: 2
   aiAssignedPlanBadgeVisible: 0
+  aiHasDesignatedCaptureTarget: 0
+  aiDesignatedCaptureTargetInstanceId: -1
+  aiDesignatedCaptureTargetCell: {x: 0, y: 0, z: 0}
   aiEixo: 0
   aiHasStance: 0
   aiStance: 0
@@ -265978,6 +266161,9 @@ MonoBehaviour:
   aiAssignedPlanBadge: 
   aiAssignedPlanRole: 2
   aiAssignedPlanBadgeVisible: 0
+  aiHasDesignatedCaptureTarget: 0
+  aiDesignatedCaptureTargetInstanceId: -1
+  aiDesignatedCaptureTargetCell: {x: 0, y: 0, z: 0}
   aiEixo: 0
   aiHasStance: 0
   aiStance: 0
@@ -267990,6 +268176,9 @@ MonoBehaviour:
   aiAssignedPlanBadge: 
   aiAssignedPlanRole: 2
   aiAssignedPlanBadgeVisible: 0
+  aiHasDesignatedCaptureTarget: 0
+  aiDesignatedCaptureTargetInstanceId: -1
+  aiDesignatedCaptureTargetCell: {x: 0, y: 0, z: 0}
   aiEixo: 0
   aiHasStance: 0
   aiStance: 0
@@ -280162,6 +280351,9 @@ MonoBehaviour:
   aiAssignedPlanBadge: 
   aiAssignedPlanRole: 2
   aiAssignedPlanBadgeVisible: 0
+  aiHasDesignatedCaptureTarget: 0
+  aiDesignatedCaptureTargetInstanceId: -1
+  aiDesignatedCaptureTargetCell: {x: 0, y: 0, z: 0}
   aiEixo: 0
   aiHasStance: 0
   aiStance: 0
@@ -282464,6 +282656,9 @@ MonoBehaviour:
   aiAssignedPlanBadge: 
   aiAssignedPlanRole: 2
   aiAssignedPlanBadgeVisible: 0
+  aiHasDesignatedCaptureTarget: 0
+  aiDesignatedCaptureTargetInstanceId: -1
+  aiDesignatedCaptureTargetCell: {x: 0, y: 0, z: 0}
   aiEixo: 0
   aiHasStance: 0
   aiStance: 0
@@ -282805,6 +283000,9 @@ MonoBehaviour:
   aiAssignedPlanBadge: 
   aiAssignedPlanRole: 2
   aiAssignedPlanBadgeVisible: 0
+  aiHasDesignatedCaptureTarget: 0
+  aiDesignatedCaptureTargetInstanceId: -1
+  aiDesignatedCaptureTargetCell: {x: 0, y: 0, z: 0}
   aiEixo: 0
   aiHasStance: 0
   aiStance: 0
@@ -287021,6 +287219,9 @@ MonoBehaviour:
   aiAssignedPlanBadge: 
   aiAssignedPlanRole: 2
   aiAssignedPlanBadgeVisible: 0
+  aiHasDesignatedCaptureTarget: 0
+  aiDesignatedCaptureTargetInstanceId: -1
+  aiDesignatedCaptureTargetCell: {x: 0, y: 0, z: 0}
   aiEixo: 0
   aiHasStance: 0
   aiStance: 0
@@ -290141,6 +290342,9 @@ MonoBehaviour:
   aiAssignedPlanBadge: 
   aiAssignedPlanRole: 2
   aiAssignedPlanBadgeVisible: 0
+  aiHasDesignatedCaptureTarget: 0
+  aiDesignatedCaptureTargetInstanceId: -1
+  aiDesignatedCaptureTargetCell: {x: 0, y: 0, z: 0}
   aiEixo: 0
   aiHasStance: 0
   aiStance: 0
@@ -292490,7 +292694,7 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 1348457725607290348, guid: f7e44d7c210a32d4ba630ba660da88a1, type: 3}
       propertyPath: m_text
-      value: 14500 / turn
+      value: 5000 / turn
       objectReference: {fileID: 0}
     - target: {fileID: 4985144350662451516, guid: f7e44d7c210a32d4ba630ba660da88a1, type: 3}
       propertyPath: m_Enabled

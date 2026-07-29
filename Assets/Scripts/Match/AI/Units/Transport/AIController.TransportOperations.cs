@@ -605,6 +605,7 @@ public partial class AIController
                     // Uma coleta produz Tactical, Operational e Strategic.
                     // EVAC/Pickup apenas filtram esta mesma lista.
                     includeStrategic = true,
+                    stopAfterDecisiveTactical = true,
                     transporterPaths = planning.TransporterReach,
                     allowPassenger = candidate =>
                         IsStructurallyEligiblePickupCandidate(

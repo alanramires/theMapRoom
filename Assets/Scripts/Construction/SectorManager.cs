@@ -373,6 +373,8 @@ public sealed class SectorManager : MonoBehaviour
     private readonly Dictionary<ConstructionSector, SectorInfo> sectorInfoBySector = new Dictionary<ConstructionSector, SectorInfo>();
     private readonly Dictionary<ConstructionSector, SectorInfo> baseInfoBySector   = new Dictionary<ConstructionSector, SectorInfo>();
     private Coroutine pendingRebuildRoutine;
+    private int lastCompletedBoardRevision = int.MinValue;
+    private int pendingRebuildBoardRevision = int.MinValue;
 
     public static SectorManager Instance => EnsureInstance();
     public IReadOnlyList<SectorInfo> SectorInfos => sectorInfos;
@@ -491,13 +493,28 @@ public sealed class SectorManager : MonoBehaviour
         return manager.baseInfoBySector.TryGetValue(sector, out info);
     }
 
-    public static void RequestRebuildFromActiveConstructions(string reason = null)
+    public static bool RequestRebuildFromActiveConstructions(string reason = null)
+    {
+        SectorManager manager = EnsureInstance();
+        if (manager == null)
+            return false;
+
+        return manager.QueueRebuild(reason);
+    }
+
+    public static void RebuildNowFromActiveConstructions(string reason = null)
     {
         SectorManager manager = EnsureInstance();
         if (manager == null)
             return;
 
-        manager.QueueRebuild(reason);
+        if (manager.pendingRebuildRoutine != null)
+        {
+            manager.StopCoroutine(manager.pendingRebuildRoutine);
+            manager.pendingRebuildRoutine = null;
+        }
+        manager.pendingRebuildBoardRevision = int.MinValue;
+        manager.RebuildFromActiveConstructions(reason);
     }
 
     private static SectorManager EnsureInstance()
@@ -581,24 +598,40 @@ public sealed class SectorManager : MonoBehaviour
         QueueRebuild("after-load-success");
     }
 
-    private void QueueRebuild(string reason)
+    private bool QueueRebuild(string reason)
     {
         if (!Application.isPlaying)
         {
             RebuildFromActiveConstructions(reason);
-            return;
+            return false;
+        }
+
+        int boardRevision = ThreatRevisionTracker.GlobalBoardRevision;
+        if (pendingRebuildRoutine != null &&
+            pendingRebuildBoardRevision == boardRevision)
+        {
+            return true;
+        }
+        if (pendingRebuildRoutine == null &&
+            lastCompletedBoardRevision == boardRevision)
+        {
+            return false;
         }
 
         if (pendingRebuildRoutine != null)
             StopCoroutine(pendingRebuildRoutine);
 
-        pendingRebuildRoutine = StartCoroutine(RebuildNextFrameRoutine(reason));
+        pendingRebuildBoardRevision = boardRevision;
+        pendingRebuildRoutine = StartCoroutine(
+            RebuildNextFrameRoutine(reason));
+        return true;
     }
 
     private IEnumerator RebuildNextFrameRoutine(string reason)
     {
         yield return null;
         pendingRebuildRoutine = null;
+        pendingRebuildBoardRevision = int.MinValue;
         RebuildFromActiveConstructions(reason);
     }
 
@@ -726,6 +759,7 @@ public sealed class SectorManager : MonoBehaviour
 
     private void RebuildFromActiveConstructions(string reason)
     {
+        double rebuildStart = Time.realtimeSinceStartupAsDouble;
         sectorInfos.Clear();
         sectorInfoBySector.Clear();
         baseInfos.Clear();
@@ -911,6 +945,16 @@ public sealed class SectorManager : MonoBehaviour
 
         if (sectorLog)
             Debug.Log($"[SectorManager] rebuild reason={reason ?? "none"} sectors={sectorInfos.Count} bases={baseInfos.Count} constructions={constructions.Count}");
+
+        lastCompletedBoardRevision = ThreatRevisionTracker.GlobalBoardRevision;
+        if (Application.isPlaying)
+        {
+            Debug.Log(
+                $"[SectorManager][Perf] rebuild reason={reason ?? "none"} " +
+                $"revision={lastCompletedBoardRevision} " +
+                $"sectors={sectorInfos.Count} bases={baseInfos.Count} " +
+                $"total={(Time.realtimeSinceStartupAsDouble - rebuildStart) * 1000d:F1}ms");
+        }
     }
 
     private SectorNeighborDistanceContext BuildNeighborDistanceContext(UnitData referenceUnitOverride = null)

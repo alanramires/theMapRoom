@@ -879,6 +879,18 @@ public class MatchController : MonoBehaviour
         // loading, antes que o botão de turno consulte IsTurnBoardReady.
         ScheduleInactiveAiFogCacheWarmup();
     }
+
+    public void CancelFogCacheWarmupForLoad()
+    {
+        // Invalida tambem uma execucao agendada no mesmo frame do load.
+        // A geracao impede que o warmup antigo retome quando a supressao acabar.
+        fogCacheWarmupGeneration++;
+        if (fogCacheWarmupRoutine != null)
+        {
+            StopCoroutine(fogCacheWarmupRoutine);
+            fogCacheWarmupRoutine = null;
+        }
+    }
     public bool EnableVictoryStars => enableVictoryStars;
     public int VictoryStarsToWin => ClampVictoryStarsGoal(victoryStarsToWin);
     public bool HasVictoryWinner => hasVictoryWinner;
@@ -886,6 +898,7 @@ public class MatchController : MonoBehaviour
     public PlayerSlotId VictoryWinnerSlotId => PlayerSlotId.FromIndex(victoryWinnerSlotIndex);
     private Coroutine advanceTurnTransitionRoutine;
     private Coroutine fogCacheWarmupRoutine;
+    private int fogCacheWarmupGeneration;
     private bool hotSeatGateActive;
 
     public int GetVictoryStars(PlayerSlotId slotId)
@@ -3093,7 +3106,15 @@ public class MatchController : MonoBehaviour
             pendingTurnStartAutonomyHelperEntries = null;
 
         stageStartMs = TurnPerfNowMs();
-        if (!debugFogOfWarEnabled)
+        if (SuppressFogOfWarRefresh)
+        {
+            // Durante o load, a troca de slot ainda precisa notificar os
+            // sistemas e atualizar o cursor, mas o snapshot salvo continua
+            // sendo a autoridade do FOW. Recalcular aqui seria provisório e
+            // seria descartado poucos instantes depois pela restauração.
+            TurnPerfLog("ApplyActiveTeam.FogAndVisibility.Suppressed", stageStartMs);
+        }
+        else if (!debugFogOfWarEnabled)
         {
             ResetFogOfWarRuntime(clearTilemap: true);
             ShowAllUnitsIgnoringFog();
@@ -3105,7 +3126,7 @@ public class MatchController : MonoBehaviour
             return;
         }
 
-        if (enableTotalWar)
+        else if (enableTotalWar)
         {
             if (Application.isPlaying)
             {
@@ -3130,7 +3151,8 @@ public class MatchController : MonoBehaviour
             if (!ShouldUseHotSeatPrivacyCurtain())
                 RefreshRuntimeUnitFogVisibility();
         }
-        TurnPerfLog("ApplyActiveTeam.FogAndVisibility", stageStartMs);
+        if (!SuppressFogOfWarRefresh)
+            TurnPerfLog("ApplyActiveTeam.FogAndVisibility", stageStartMs);
 
         stageStartMs = TurnPerfNowMs();
         FlushTurnStartAutonomyHelper();
@@ -4820,11 +4842,16 @@ public class MatchController : MonoBehaviour
             fogCacheWarmupRoutine = null;
         }
 
+        int warmupGeneration = ++fogCacheWarmupGeneration;
         fogCacheWarmupRoutine = StartCoroutine(
-            WarmInactiveAiFogCachesAcrossFrames(ActiveSlotId));
+            WarmInactiveAiFogCachesAcrossFrames(
+                ActiveSlotId,
+                warmupGeneration));
     }
 
-    private IEnumerator WarmInactiveAiFogCachesAcrossFrames(PlayerSlotId hostSlot)
+    private IEnumerator WarmInactiveAiFogCachesAcrossFrames(
+        PlayerSlotId hostSlot,
+        int warmupGeneration)
     {
         double totalStartMs = enableFogStepPerfLogs
             ? Time.realtimeSinceStartupAsDouble
@@ -4836,6 +4863,13 @@ public class MatchController : MonoBehaviour
         {
             // Nunca alonga o mesmo frame que acabou de publicar o FOW humano.
             yield return null;
+
+            // Um load pode começar depois que esta coroutine foi agendada.
+            // Nesse caso o snapshot salvo é a autoridade; não reconstrua em
+            // paralelo caches que serão restaurados ao fim da carga.
+            if (SuppressFogOfWarRefresh ||
+                warmupGeneration != fogCacheWarmupGeneration)
+                yield break;
 
             Tilemap boardMap = ResolveFogBoardTilemap();
             if (boardMap == null || players == null || players.Count <= 1)
@@ -4890,6 +4924,8 @@ public class MatchController : MonoBehaviour
                 {
                     while (IsValidPlayerSlot(hostSlot) &&
                            ActiveSlotId == hostSlot &&
+                           !SuppressFogOfWarRefresh &&
+                           warmupGeneration == fogCacheWarmupGeneration &&
                            turnStateManager != null &&
                            turnStateManager.CurrentCursorState !=
                                TurnStateManager.CursorState.Neutral)
@@ -4901,6 +4937,8 @@ public class MatchController : MonoBehaviour
                     // valido e o reconciliador de TurnStart completa apenas o resto.
                     if (!IsValidPlayerSlot(hostSlot) ||
                         ActiveSlotId != hostSlot ||
+                        SuppressFogOfWarRefresh ||
+                        warmupGeneration != fogCacheWarmupGeneration ||
                         IsPlayerAI(ActiveSlotId))
                     {
                         yield break;
@@ -4928,6 +4966,8 @@ public class MatchController : MonoBehaviour
 
                 if (!IsValidPlayerSlot(hostSlot) ||
                     ActiveSlotId != hostSlot ||
+                    SuppressFogOfWarRefresh ||
+                    warmupGeneration != fogCacheWarmupGeneration ||
                     IsPlayerAI(ActiveSlotId))
                 {
                     yield break;
@@ -4953,7 +4993,8 @@ public class MatchController : MonoBehaviour
                     $"[FoW][Warmup] host={hostSlot.Value} " +
                     $"slots={warmedSlots} sources={warmedSources} total={totalMs:F3}ms");
             }
-            fogCacheWarmupRoutine = null;
+            if (warmupGeneration == fogCacheWarmupGeneration)
+                fogCacheWarmupRoutine = null;
         }
     }
 
