@@ -10,8 +10,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: aec5091123b209d4c8b513b772829f77, type: 3}
-  m_Name: Unit Precisa de Reboque
+  m_Name: SUB Ops
   m_EditorClassIdentifier: Assembly-CSharp::SkillData
-  id: precisaReboque
-  displayName: Precisa de Reboque
-  description: Unidade so pode embarcar em slots dedicados de reboque.
+  id: submerseOps
+  displayName: Submerse Operations
+  description: for submarines

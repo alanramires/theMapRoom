@@ -287,6 +287,10 @@ public class UnitSaveData
     public string aiAssignedPlanBadge;
     public int aiAssignedPlanRole = 0;
     public bool aiAssignedPlanBadgeVisible;
+    public bool aiHasDesignatedCaptureTarget;
+    public int aiDesignatedCaptureTargetInstanceId = -1;
+    public int aiDesignatedCaptureTargetCellX;
+    public int aiDesignatedCaptureTargetCellY;
     public int aiEixo = 0;
     public List<int> embarkedWeaponAmmo = new List<int>();
     public List<RuntimeSupplySaveData> embarkedSupplies = new List<RuntimeSupplySaveData>();

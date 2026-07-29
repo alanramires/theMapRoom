@@ -962,6 +962,19 @@ public static class QueroCaronaService
         out CaptureOpportunityClaim claim)
     {
         claim = default;
+        if (TryGetDesignatedCaptureOwner(
+                construction,
+                unit,
+                out UnitManager designatedOwner))
+        {
+            claim = new CaptureOpportunityClaim(
+                construction,
+                designatedOwner,
+                int.MaxValue,
+                false);
+            return designatedOwner != unit;
+        }
+
         return claims != null
             && construction != null
             && claims.TryGetClaim(
@@ -969,6 +982,56 @@ public static class QueroCaronaService
                 out claim)
             && claim.Capturer != null
             && claim.Capturer != unit;
+    }
+
+    private static bool TryGetDesignatedCaptureOwner(
+        ConstructionManager construction,
+        UnitManager requestingUnit,
+        out UnitManager owner)
+    {
+        owner = null;
+        if (construction == null
+            || requestingUnit == null)
+            return false;
+
+        Vector3Int constructionCell =
+            construction.CurrentCellPosition;
+        constructionCell.z = 0;
+        foreach (UnitManager candidate
+                 in UnitManager.AllActive)
+        {
+            if (candidate == null
+                || candidate.IsDead
+                || candidate.SlotIndex
+                    != requestingUnit.SlotIndex
+                || !candidate.AIHasDesignatedCaptureTarget
+                || candidate.TeamId == construction.TeamId
+                || !candidate.TryGetUnitData(
+                    out UnitData data)
+                || data == null
+                || !UnitRoleCompatibility.CanSatisfy(
+                    data,
+                    UnitRole.Capturador))
+            {
+                continue;
+            }
+
+            Vector3Int designatedCell =
+                candidate.AIDesignatedCaptureTargetCell;
+            designatedCell.z = 0;
+            if (candidate
+                    .AIDesignatedCaptureTargetInstanceId
+                    != construction.InstanceId
+                && designatedCell != constructionCell)
+            {
+                continue;
+            }
+
+            owner = candidate;
+            return true;
+        }
+
+        return false;
     }
 
     private static string FormatCaptureClaimSuffix(

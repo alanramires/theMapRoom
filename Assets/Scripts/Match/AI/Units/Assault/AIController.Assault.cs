@@ -128,6 +128,53 @@ public partial class AIController
             && passengerMeeting != fromCell
             && paths.ContainsKey(passengerMeeting))
         {
+            Vector3Int liveTransporterCell =
+                decision.transporter.CurrentCellPosition;
+            liveTransporterCell.z = 0;
+            if (selectedLz == liveTransporterCell)
+            {
+                List<Vector3Int> pathToMeeting = paths[passengerMeeting];
+                int remainingMovement =
+                    CalculateRemainingMovementAfterPath(passenger, pathToMeeting);
+                if (PodeEmbarcarSensor.CanEmbarkFromProjectedCell(
+                        passenger,
+                        passengerMeeting,
+                        decision.transporter,
+                        decision.option.slotIndex,
+                        boardTilemap,
+                        terrainDatabase,
+                        remainingMovement,
+                        out int embarkCost,
+                        out string embarkReason))
+                {
+                    ClaimCombatPassengerTransportDecision(decision);
+                    Debug.Log(
+                        $"{TL("Transporte")} passageiro #{passenger.InstanceId} " +
+                        $"policy={decision.policy} move e embarca: encontroPax=" +
+                        $"{passengerMeeting} LZTransport={selectedLz} " +
+                        $"transportador=#{decision.transporter.InstanceId} " +
+                        $"slot={decision.option.slotIndex} " +
+                        $"movRest={remainingMovement} custoEmbarque={embarkCost}.");
+                    var embarkPaths =
+                        new Dictionary<Vector3Int, List<Vector3Int>>
+                        {
+                            [selectedLz] = pathToMeeting
+                        };
+                    return BuildEmbarcarBatch(
+                        passenger,
+                        snapshot.AITeam,
+                        fromCell,
+                        decision.transporter,
+                        decision.option.slotIndex,
+                        embarkPaths);
+                }
+
+                Debug.Log(
+                    $"{TL("Transporte")} passageiro #{passenger.InstanceId} " +
+                    $"policy={decision.policy} nao encadeia embarque projetado: " +
+                    $"{embarkReason}");
+            }
+
             ClaimCombatPassengerTransportDecision(decision);
             Debug.Log(
                 $"{TL("Transporte")} passageiro #{passenger.InstanceId} " +

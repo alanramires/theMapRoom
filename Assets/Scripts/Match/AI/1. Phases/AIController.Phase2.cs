@@ -28,6 +28,7 @@ public partial class AIController
         Debug.Log($"{TL()} Fase2 — iniciando ações.");
         plannedDestinations.Clear();
         rebelCaptureTargetReservations.Clear();
+        pendingRebelCaptureTargets.Clear();
         assignedTransportClaims.Clear();
         transportPlanningSnapshots.Clear();
         disembarkPassengerRouteCache.Clear();
@@ -264,6 +265,7 @@ public partial class AIController
             bool batchSucceeded = lastAIBatchSucceeded;
             if (batchSucceeded)
             {
+                CommitPendingRebelCaptureTarget(unit);
                 if (action.HasMoveTo
                     && action.MoveTo != action.MoveFrom)
                 {
@@ -275,6 +277,8 @@ public partial class AIController
             }
             else
             {
+                pendingRebelCaptureTargets.Remove(
+                    unit.InstanceId);
                 assignedTransportClaims.Remove(unit.InstanceId);
                 unitMoved = false;
                 unitAttacked = false;

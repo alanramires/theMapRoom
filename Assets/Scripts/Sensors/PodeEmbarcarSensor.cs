@@ -113,6 +113,79 @@ public static class PodeEmbarcarSensor
         return hasAny;
     }
 
+    /// <summary>
+    /// Consulta pura da mesma legalidade de Pode Embarcar para uma posicao
+    /// projetada do passageiro. Nao move unidades nem altera ocupacao; serve
+    /// para montar atomicamente batches de mover + embarcar.
+    /// </summary>
+    public static bool CanEmbarkFromProjectedCell(
+        UnitManager passenger,
+        Vector3Int passengerCell,
+        UnitManager transporter,
+        int slotIndex,
+        Tilemap map,
+        TerrainDatabase terrainDatabase,
+        int remainingMovementPoints,
+        out int embarkCost,
+        out string reason)
+    {
+        embarkCost = -1;
+        reason = string.Empty;
+        if (passenger == null || map == null || passenger.IsEmbarked)
+        {
+            reason = "Passageiro/mapa invalido ou passageiro ja embarcado.";
+            return false;
+        }
+        if (!passenger.TryGetUnitData(out UnitData passengerData) || passengerData == null)
+        {
+            reason = "Passageiro sem UnitData valido.";
+            return false;
+        }
+        if (!IsValidTransporter(passenger, transporter, out UnitData transporterData, out reason))
+            return false;
+
+        passengerCell.z = 0;
+        Vector3Int transporterCell = transporter.CurrentCellPosition;
+        transporterCell.z = 0;
+        if (SectorManager.HexDistance(passengerCell, transporterCell) != 1)
+        {
+            reason = $"Passageiro projetado nao esta adjacente ao transportador ({passengerCell} -> {transporterCell}).";
+            return false;
+        }
+        if (!CanEmbarkAtTransporterContext(map, terrainDatabase, transporter, transporterData, out reason))
+            return false;
+        if (slotIndex < 0 || slotIndex >= transporterData.transportSlots.Count)
+        {
+            reason = "Slot de transporte inexistente.";
+            return false;
+        }
+
+        UnitTransportSlotRule slot = transporterData.transportSlots[slotIndex];
+        if (!CanUseSlot(passenger, passengerData, slot, out reason))
+            return false;
+        if (!transporter.CanUseTransportSlotExclusivity(slotIndex, out reason))
+            return false;
+        if (!TryResolveEmbarkCost(
+                map, terrainDatabase, passenger, transporterCell,
+                out embarkCost, out reason))
+            return false;
+        if (remainingMovementPoints < embarkCost)
+        {
+            reason =
+                $"Movimento insuficiente para embarcar (restante={remainingMovementPoints}, custo={embarkCost}).";
+            return false;
+        }
+
+        int occupied = CountSlotOccupancy(transporter, slotIndex);
+        if (occupied >= Mathf.Max(1, slot.capacity))
+        {
+            reason = $"Slot lotado ({occupied}/{Mathf.Max(1, slot.capacity)}).";
+            return false;
+        }
+
+        return true;
+    }
+
     public static bool CanEmbarkAtTransporterContext(
         Tilemap map,
         TerrainDatabase terrainDatabase,

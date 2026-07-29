@@ -10,8 +10,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: aec5091123b209d4c8b513b772829f77, type: 3}
-  m_Name: Unit OFF Road
+  m_Name: Precisa de Reboque
   m_EditorClassIdentifier: Assembly-CSharp::SkillData
-  id: offRoad
-  displayName: Off - Road
-  description: custo 6 pra 1 para veiculos
+  id: precisaReboque
+  displayName: Precisa de Reboque
+  description: Unidade so pode embarcar em slots dedicados de reboque.

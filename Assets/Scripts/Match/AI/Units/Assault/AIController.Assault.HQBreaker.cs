@@ -118,28 +118,89 @@ public partial class AIController
                     paths);
             }
 
-            if (TryFindBestToolProgressionCell(
+            int captainDistance =
+                AIActionReachCoordinator.CubicDistance(
+                    fromCell,
+                    pressureTarget);
+            bool hasNativeNonRegressiveCandidate =
+                HasNativeDomainCaptainFollowCandidate(
                     unit,
-                    snapshot,
                     fromCell,
                     pressureTarget,
                     paths,
                     occupied,
-                    ToolProgressionIntent.AssaultPressure,
-                    out Vector3Int progressionCell,
-                    out ToolProgressionCandidate progressionCandidate,
-                    out string progressionReason,
-                    allowCell: cell =>
-                        !captainCaptureCell.HasValue
-                        || cell != captainCaptureCell.Value,
-                    tacticalScore: (cell, _) =>
-                        ScoreNativeDomainPreference(unit, cell)))
+                    captainCaptureCell,
+                    captainDistance);
+
+            Vector3Int progressionCell = fromCell;
+            ToolProgressionCandidate progressionCandidate =
+                new ToolProgressionCandidate();
+            string progressionReason = "";
+            bool usedNativeDomainPreference = false;
+            bool foundProgression = false;
+
+            if (hasNativeNonRegressiveCandidate)
+            {
+                foundProgression =
+                    TryFindBestToolProgressionCell(
+                        unit,
+                        snapshot,
+                        fromCell,
+                        pressureTarget,
+                        paths,
+                        occupied,
+                        ToolProgressionIntent.AssaultPressure,
+                        out progressionCell,
+                        out progressionCandidate,
+                        out progressionReason,
+                        allowCell: cell =>
+                            (!captainCaptureCell.HasValue
+                             || cell != captainCaptureCell.Value)
+                            && AIActionReachCoordinator.CubicDistance(
+                                cell,
+                                pressureTarget) <= captainDistance
+                            && CanFinishInNativeDomain(unit, cell),
+                        tacticalScore: (cell, _) =>
+                            ScoreNativeDomainPreference(unit, cell));
+                usedNativeDomainPreference = foundProgression;
+            }
+
+            // A camada nativa e a primeira politica, mas nao vira uma
+            // barreira: se nenhum passo nativo nao-regressivo puder ser
+            // materializado pela Progressao oficial, superficie/praia
+            // continua disponivel como fallback.
+            if (!foundProgression)
+            {
+                foundProgression =
+                    TryFindBestToolProgressionCell(
+                        unit,
+                        snapshot,
+                        fromCell,
+                        pressureTarget,
+                        paths,
+                        occupied,
+                        ToolProgressionIntent.AssaultPressure,
+                        out progressionCell,
+                        out progressionCandidate,
+                        out progressionReason,
+                        allowCell: cell =>
+                            !captainCaptureCell.HasValue
+                            || cell != captainCaptureCell.Value,
+                        tacticalScore: (cell, _) =>
+                            ScoreNativeDomainPreference(unit, cell));
+            }
+
+            if (foundProgression)
             {
                 Debug.Log(
                     $"{TL("Assalto")} {unit.InstanceId} segue capitao " +
                     $"via progressao oficial {progressionCell} " +
                     $"alvo={pressureTarget} " +
                     $"tool={progressionCandidate.ToolScore} " +
+                    $"dominioNativo=" +
+                    (usedNativeDomainPreference
+                        ? "preferido "
+                        : "fallback-superficie ") +
                     $"({progressionReason})");
                 return BuildMoveBatch(
                     unit,
@@ -179,7 +240,57 @@ public partial class AIController
         return BuildMoveBatch(unit, snapshot.AITeam, fromCell, fromCell, paths);
     }
 
+    private bool HasNativeDomainCaptainFollowCandidate(
+        UnitManager unit,
+        Vector3Int fromCell,
+        Vector3Int captainCell,
+        Dictionary<Vector3Int, List<Vector3Int>> paths,
+        HashSet<Vector3Int> occupied,
+        Vector3Int? captainCaptureCell,
+        int captainDistance)
+    {
+        if (unit == null || paths == null || paths.Count == 0)
+            return false;
+
+        fromCell.z = 0;
+        captainCell.z = 0;
+        foreach (Vector3Int rawCell in paths.Keys)
+        {
+            Vector3Int cell = rawCell;
+            cell.z = 0;
+            if (cell == fromCell
+                || (occupied != null && occupied.Contains(cell))
+                || (captainCaptureCell.HasValue
+                    && cell == captainCaptureCell.Value)
+                || !CanUseAsToolProgressStopCell(
+                    unit,
+                    cell,
+                    fromCell)
+                || AIActionReachCoordinator.CubicDistance(
+                    cell,
+                    captainCell) > captainDistance)
+            {
+                continue;
+            }
+
+            if (CanFinishInNativeDomain(unit, cell))
+                return true;
+        }
+
+        return false;
+    }
+
     private float ScoreNativeDomainPreference(
+        UnitManager unit,
+        Vector3Int cell)
+    {
+        // Continua util como desempate dentro da mesma politica. A
+        // preferencia forte ao seguir capitao e feita pelo primeiro passe
+        // restrito da Progressao oficial.
+        return CanFinishInNativeDomain(unit, cell) ? 250f : 0f;
+    }
+
+    private bool CanFinishInNativeDomain(
         UnitManager unit,
         Vector3Int cell)
     {
@@ -187,7 +298,7 @@ public partial class AIController
             || !unit.TryGetUnitData(out UnitData data)
             || data == null)
         {
-            return 0f;
+            return false;
         }
 
         Domain nativeDomain = data.domain;
@@ -197,7 +308,7 @@ public partial class AIController
                 nativeHeight,
                 out _))
         {
-            return 0f;
+            return false;
         }
 
         bool canFinishInNativeDomain;
@@ -227,10 +338,7 @@ public partial class AIController
                     out _);
         }
 
-        // Preferencia de desempate: um ponto inteiro da progressao oficial
-        // ainda vale 1000. Assim a camada nativa escolhe entre avancos
-        // equivalentes, mas nunca transforma praia/emersao em bloqueio.
-        return canFinishInNativeDomain ? 250f : 0f;
+        return canFinishInNativeDomain;
     }
 
     // Alvo de "reforco" do rogue assault quando nao ha invasao ativa: o rally do PROPRIO eixo

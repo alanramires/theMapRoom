@@ -245,6 +245,11 @@ public partial class AIController : MonoBehaviour
     // unidade terminara o movimento; este reserva o predio distante para que a
     // proxima unidade rebelde varra a bolha seguinte.
     private readonly HashSet<Vector3Int> rebelCaptureTargetReservations = new HashSet<Vector3Int>();
+    // Intencoes calculadas nesta decisao. So viram estado persistente da
+    // unidade depois que o batch retorna comprometido com sucesso.
+    private readonly Dictionary<int, ConstructionManager>
+        pendingRebelCaptureTargets =
+            new Dictionary<int, ConstructionManager>();
 
     // Buffers e caches para otimiza��o de performance
     private readonly List<UnitManager> _availableUnitsBuffer = new List<UnitManager>();

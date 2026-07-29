@@ -57,6 +57,9 @@ public class UnitManagerEditor : Editor
     private SerializedProperty aiAssignedPlanBadgeProp;
     private SerializedProperty aiAssignedPlanRoleProp;
     private SerializedProperty aiAssignedPlanBadgeVisibleProp;
+    private SerializedProperty aiHasDesignatedCaptureTargetProp;
+    private SerializedProperty aiDesignatedCaptureTargetInstanceIdProp;
+    private SerializedProperty aiDesignatedCaptureTargetCellProp;
 
     private void OnEnable()
     {
@@ -111,6 +114,9 @@ public class UnitManagerEditor : Editor
         aiAssignedPlanBadgeProp = serializedObject.FindProperty("aiAssignedPlanBadge");
         aiAssignedPlanRoleProp = serializedObject.FindProperty("aiAssignedPlanRole");
         aiAssignedPlanBadgeVisibleProp = serializedObject.FindProperty("aiAssignedPlanBadgeVisible");
+        aiHasDesignatedCaptureTargetProp = serializedObject.FindProperty("aiHasDesignatedCaptureTarget");
+        aiDesignatedCaptureTargetInstanceIdProp = serializedObject.FindProperty("aiDesignatedCaptureTargetInstanceId");
+        aiDesignatedCaptureTargetCellProp = serializedObject.FindProperty("aiDesignatedCaptureTargetCell");
     }
 
     public override void OnInspectorGUI()
@@ -343,7 +349,9 @@ public class UnitManagerEditor : Editor
             return;
 
         EditorGUILayout.Space(6f);
-        EditorGUILayout.LabelField("AI", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField(
+            "AI Plan Runtime",
+            EditorStyles.boldLabel);
 
         using (new EditorGUI.DisabledScope(true))
         {
@@ -358,6 +366,12 @@ public class UnitManagerEditor : Editor
                 EditorGUILayout.PropertyField(aiAssignedPlanBadgeProp, new GUIContent("Plan Badge"));
             if (aiAssignedPlanBadgeVisibleProp != null)
                 EditorGUILayout.PropertyField(aiAssignedPlanBadgeVisibleProp, new GUIContent("Badge Visible"));
+            if (aiHasDesignatedCaptureTargetProp != null)
+                EditorGUILayout.PropertyField(aiHasDesignatedCaptureTargetProp, new GUIContent("Has Designated Capture Target"));
+            if (aiDesignatedCaptureTargetInstanceIdProp != null)
+                EditorGUILayout.PropertyField(aiDesignatedCaptureTargetInstanceIdProp, new GUIContent("Designated Target Instance ID"));
+            if (aiDesignatedCaptureTargetCellProp != null)
+                EditorGUILayout.PropertyField(aiDesignatedCaptureTargetCellProp, new GUIContent("Designated Target Cell"));
         }
     }
 

@@ -455,7 +455,6 @@ public static class CaptureOpportunityClaimService
     {
         return unit != null
             && unit.SlotIndex == slotIndex
-            && !unit.HasActed
             && !unit.IsDead
             && !unit.IsEmbarked
             && !unit.IsUnderRepair
@@ -622,6 +621,17 @@ public static class CaptureOpportunityClaimService
                     + (unit.IsEmbarked ? 1 : 0);
                 hash = (hash * 31)
                     + (unit.IsUnderRepair ? 1 : 0);
+                hash = (hash * 31)
+                    + (unit.AIHasDesignatedCaptureTarget
+                        ? 1
+                        : 0);
+                hash = (hash * 31)
+                    + unit
+                        .AIDesignatedCaptureTargetInstanceId;
+                hash = (hash * 31)
+                    + unit
+                        .AIDesignatedCaptureTargetCell
+                        .GetHashCode();
             }
 
             foreach (ConstructionManager construction

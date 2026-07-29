@@ -81,12 +81,14 @@ public partial class AIController
         ConstructionManager target = FindNearestRebelCaptureTarget(unit, snapshot, fromCell);
         if (target == null)
         {
+            pendingRebelCaptureTargets[unit.InstanceId] = null;
             Debug.Log($"{TL("Rebelde")} {unit.InstanceId} sem capturavel alcancavel na visao — cai no fluxo normal.");
             return null;
         }
 
         Vector3Int targetCell = target.CurrentCellPosition;
         targetCell.z = 0;
+        pendingRebelCaptureTargets[unit.InstanceId] = target;
 
         // Mesma fronteira usada pelo APC: se o capturador alcanca um predio
         // livre em ate duas rodadas do proprio movimento, marcha em vez de
@@ -158,8 +160,22 @@ public partial class AIController
         AIWorldSnapshot snapshot,
         Vector3Int fromCell)
     {
+        if (TryResolveUnitDesignatedCaptureTarget(
+                unit,
+                out ConstructionManager designated))
+        {
+            Debug.Log(
+                $"{TL("Rebelde")} {unit.InstanceId} mantem " +
+                $"DesignatedCaptureTarget " +
+                $"#{designated.InstanceId} em " +
+                $"{designated.CurrentCellPosition}.");
+            return designated;
+        }
+
         // Celulas onde ja ha aliado parado — proxy de "predio ja sendo capturado por nos".
         HashSet<Vector3Int> allyCells = new HashSet<Vector3Int>();
+        HashSet<int> designatedByOtherCapturers =
+            new HashSet<int>();
         if (snapshot.MyUnits != null)
         {
             for (int i = 0; i < snapshot.MyUnits.Count; i++)
@@ -169,11 +185,36 @@ public partial class AIController
                     continue;
                 Vector3Int ac = ally.CurrentCellPosition; ac.z = 0;
                 allyCells.Add(ac);
+                if (TryResolveUnitDesignatedCaptureTarget(
+                        ally,
+                        out ConstructionManager allyDesignated))
+                {
+                    designatedByOtherCapturers.Add(
+                        allyDesignated.InstanceId);
+                }
             }
         }
 
         ConstructionManager best = null;
         float bestDist = float.MaxValue;
+        CaptureOpportunityClaimSnapshot collectiveClaims =
+            CaptureOpportunityClaimService.GetOrBuild(
+                new QueroCaronaRequest
+                {
+                    unit = unit,
+                    map = boardTilemap,
+                    terrainDatabase = terrainDatabase,
+                    context =
+                        QueroCaronaContext.RogueOuRebelde,
+                    plannedSector =
+                        ConstructionSector.None,
+                    operationalTurns =
+                        TransportPassengerWalkTurns,
+                    emulateUnderRepairFromUnitData =
+                        false
+                },
+                requestReach: null,
+                requestReachBudget: -1);
 
         foreach (ConstructionManager construction in ConstructionManager.AllActive)
         {
@@ -198,7 +239,17 @@ public partial class AIController
                     cell,
                     unit,
                     alliedOnly: true);
+            bool claimedByOtherCollectiveCapturer =
+                collectiveClaims != null
+                && collectiveClaims.TryGetClaim(
+                    construction,
+                    out CaptureOpportunityClaim collectiveClaim)
+                && collectiveClaim.Capturer != null
+                && collectiveClaim.Capturer != unit;
             if (claimedByAlliedCapturer ||
+                claimedByOtherCollectiveCapturer ||
+                designatedByOtherCapturers.Contains(
+                    construction.InstanceId) ||
                 rebelCaptureTargetReservations.Contains(cell))
                 continue;
 
@@ -211,6 +262,91 @@ public partial class AIController
         }
 
         return best;
+    }
+
+    private bool TryResolveUnitDesignatedCaptureTarget(
+        UnitManager unit,
+        out ConstructionManager target)
+    {
+        target = null;
+        if (unit == null
+            || unit.IsDead
+            || !unit.AIHasDesignatedCaptureTarget
+            || !unit.TryGetUnitData(out UnitData data)
+            || data == null
+            || !UnitRoleCompatibility.CanSatisfy(
+                data,
+                UnitRole.Capturador))
+        {
+            return false;
+        }
+
+        int targetInstanceId =
+            unit.AIDesignatedCaptureTargetInstanceId;
+        Vector3Int targetCell =
+            unit.AIDesignatedCaptureTargetCell;
+        targetCell.z = 0;
+        foreach (ConstructionManager construction
+                 in ConstructionManager.AllActive)
+        {
+            if (construction == null)
+                continue;
+            Vector3Int cell =
+                construction.CurrentCellPosition;
+            cell.z = 0;
+            if (construction.InstanceId != targetInstanceId
+                && cell != targetCell)
+            {
+                continue;
+            }
+            if (!IsRebelCapturable(unit, construction))
+                return false;
+            if (UnitOccupancyRules
+                .HasBlockingOccupantForUnitAtCell(
+                    boardTilemap,
+                    cell,
+                    unit,
+                    alliedOnly: true))
+            {
+                return false;
+            }
+
+            target = construction;
+            return true;
+        }
+
+        return false;
+    }
+
+    private void CommitPendingRebelCaptureTarget(
+        UnitManager unit)
+    {
+        if (unit == null
+            || !pendingRebelCaptureTargets.TryGetValue(
+                unit.InstanceId,
+                out ConstructionManager target))
+        {
+            return;
+        }
+
+        pendingRebelCaptureTargets.Remove(unit.InstanceId);
+        if (target == null
+            || unit.IsDead
+            || !IsRebelCapturable(unit, target))
+        {
+            unit.ClearAIDesignatedCaptureTarget();
+            return;
+        }
+
+        Vector3Int cell = target.CurrentCellPosition;
+        cell.z = 0;
+        unit.SetAIDesignatedCaptureTarget(
+            target.InstanceId,
+            cell);
+        Debug.Log(
+            $"{TL("Rebelde")} {unit.InstanceId} confirma " +
+            $"DesignatedCaptureTarget " +
+            $"#{target.InstanceId} em {cell}.");
     }
 
     // Capturavel para a rebelde: predio nao-aliado que o motor deixa este time tomar.

@@ -143,6 +143,10 @@ public class UnitManager : MonoBehaviour
     [Tooltip("Role da unidade dentro do plano. Usa os valores de UnitRole.")]
     [SerializeField] private int aiAssignedPlanRole = 0;
     [SerializeField] private bool aiAssignedPlanBadgeVisible;
+    [Tooltip("Objetivo de captura individual confirmado. Persiste entre turnos e save/load para impedir que outro capturador reivindique o mesmo predio.")]
+    [SerializeField] private bool aiHasDesignatedCaptureTarget;
+    [SerializeField] private int aiDesignatedCaptureTargetInstanceId = -1;
+    [SerializeField] private Vector3Int aiDesignatedCaptureTargetCell = Vector3Int.zero;
     [Header("AI Eixo Runtime")]
     [Tooltip("Eixo ao qual a unidade pertence: 1, 2 ou 3 = eixos regulares; 4 = invasão final. 0 = nenhum (rogue / fora de eixo).")]
     [Range(0, 4)]
@@ -253,6 +257,12 @@ public class UnitManager : MonoBehaviour
     public string AIAssignedPlanBadge => aiAssignedPlanBadge ?? string.Empty;
     public int AIAssignedPlanRole => aiAssignedPlanRole;
     public bool AIAssignedPlanBadgeVisible => aiAssignedPlanBadgeVisible;
+    public bool AIHasDesignatedCaptureTarget =>
+        aiHasDesignatedCaptureTarget;
+    public int AIDesignatedCaptureTargetInstanceId =>
+        aiDesignatedCaptureTargetInstanceId;
+    public Vector3Int AIDesignatedCaptureTargetCell =>
+        aiDesignatedCaptureTargetCell;
     public int AIEixo => aiEixo;
     public void SetAIEixo(int eixo)
     {
@@ -302,6 +312,25 @@ public class UnitManager : MonoBehaviour
         // atribuicao, para a unidade ser tentada a voltar ao MESMO eixo (estabilidade).
         // O HUD ja esconde o badge pelo gate (aiAssignedPlanBadgeVisible=false).
         RefreshAIAssignedPlanBadge();
+    }
+
+    public void SetAIDesignatedCaptureTarget(
+        int constructionInstanceId,
+        Vector3Int cell)
+    {
+        cell.z = 0;
+        aiHasDesignatedCaptureTarget =
+            constructionInstanceId >= 0;
+        aiDesignatedCaptureTargetInstanceId =
+            constructionInstanceId;
+        aiDesignatedCaptureTargetCell = cell;
+    }
+
+    public void ClearAIDesignatedCaptureTarget()
+    {
+        aiHasDesignatedCaptureTarget = false;
+        aiDesignatedCaptureTargetInstanceId = -1;
+        aiDesignatedCaptureTargetCell = Vector3Int.zero;
     }
 
     public void SetAIStance(int stance, Sprite icon = null, bool visible = false)

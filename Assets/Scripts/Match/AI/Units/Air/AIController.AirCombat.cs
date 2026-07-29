@@ -163,6 +163,39 @@ public partial class AIController
                     patrolSettings,
                     patrolGeometry);
 
+            // Ataque aereo/bombardeiro nao atravessa a propria politica de
+            // postura so porque nenhum posto seguro cabe no movimento desta
+            // rodada. Antes, hasPreferredPatrolZone=false reabria todas as
+            // celulas e permitia que a Progressao escolhesse Vanguarda. O
+            // passageiro aereo agora aguarda ate Flanco/Retaguarda ser
+            // materializavel; interceptadores conservam o fallback de
+            // progressao para formar cobertura adiante.
+            if (hasPatrolGeometry
+                && IsOffensiveAirCombatUnit(unit)
+                && !hasPreferredPatrolZone)
+            {
+                string currentPatrolZone =
+                    ResolveAirCombatPatrolZone(
+                        fromCell,
+                        hasPatrolGeometry,
+                        patrolCombatants,
+                        patrolEnemies,
+                        patrolFrontAnchor,
+                        patrolSettings,
+                        patrolGeometry);
+                Debug.Log(
+                    $"{TL("AirCombat")} {unit.InstanceId} patrulha capitao " +
+                    $"tier={anchorTier} raio={patrolRadius}h " +
+                    $"zonaAtual={currentPatrolZone}: " +
+                    "sem Flanco/Retaguarda materializavel; mantem posicao.");
+                return BuildMoveBatch(
+                    unit,
+                    snapshot.AITeam,
+                    fromCell,
+                    fromCell,
+                    paths);
+            }
+
             if (TryFindBestToolProgressionCell(
                     unit,
                     snapshot,
