@@ -333,15 +333,13 @@ public static class AirSurveillanceCoverageService
             "AirSurveillanceCoverageCacheMisses");
         var airLow = new List<Vector3Int>();
         var airHigh = new List<Vector3Int>();
-        PodeDetectarSensor.CollectVisibleAirCellsAt(
-            observer,
-            observerCell,
-            map,
-            terrainDatabase,
-            airLow,
-            HeightLevel.AirLow,
-            airConfig,
-            enableLos);
+        // Politica do papel Vigilancia Aerea: EWACS e Radar Movel escolhem
+        // postura pelo ganho primario em Air/High. Air/Low e secundario e nao
+        // justifica uma segunda passada cara para cada hex candidato. Isto
+        // afeta somente o ranking puro; o commit do tabuleiro continua
+        // recalculando e publicando o FOW oficial de todas as camadas.
+        AIDecisionPerf.AddCount(
+            "AirSurveillanceCoverageAirLowSkippedByPolicy");
         PodeDetectarSensor.CollectVisibleAirCellsAt(
             observer,
             observerCell,

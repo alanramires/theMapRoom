@@ -800,10 +800,19 @@ public sealed class SectorManager : MonoBehaviour
         List<ConstructionSector> sectors = new List<ConstructionSector>(grouped.Keys);
         sectors.Sort((a, b) => ((int)a).CompareTo((int)b));
 
+        ResetSectorSearchDebugCounters();
+        double contextsStartMs = Time.realtimeSinceStartupAsDouble;
         SectorNeighborDistanceContext neighborDistanceContext = BuildNeighborDistanceContext();
         SectorNeighborDistanceContext vehicleDistanceContext = BuildNeighborDistanceContext(neighborDistanceVehicleUnitData);
         SectorNeighborDistanceContext navalDistanceContext = BuildNavalDistanceContext();
+        double contextsMs =
+            (Time.realtimeSinceStartupAsDouble - contextsStartMs) * 1000d;
+        // Os contextos tambem rodam buscas? Separar o que eles gastaram do que os
+        // loops de setor gastaram, senao o total nao diz onde esta o tempo.
+        double contextsSearchMs = searchDebugMs;
+        int contextsSearchCalls = searchDebugCalls;
         var navalApproachCache = new Dictionary<Vector3Int, List<Vector3Int>>();
+        double sectorLoopStartMs = Time.realtimeSinceStartupAsDouble;
 
         for (int i = 0; i < sectors.Count; i++)
         {
@@ -915,6 +924,10 @@ public sealed class SectorManager : MonoBehaviour
             }
         }
 
+        double sectorLoopMs =
+            (Time.realtimeSinceStartupAsDouble - sectorLoopStartMs) * 1000d;
+        double neighborPassStartMs = Time.realtimeSinceStartupAsDouble;
+
         // Segundo passo: 2 vizinhos capturáveis mais próximos por setor (células representativas)
         for (int i = 0; i < sectorInfos.Count; i++)
         {
@@ -946,14 +959,31 @@ public sealed class SectorManager : MonoBehaviour
         if (sectorLog)
             Debug.Log($"[SectorManager] rebuild reason={reason ?? "none"} sectors={sectorInfos.Count} bases={baseInfos.Count} constructions={constructions.Count}");
 
+        double neighborPassMs =
+            (Time.realtimeSinceStartupAsDouble - neighborPassStartMs) * 1000d;
+
         lastCompletedBoardRevision = ThreatRevisionTracker.GlobalBoardRevision;
         if (Application.isPlaying)
         {
+            double totalMs =
+                (Time.realtimeSinceStartupAsDouble - rebuildStart) * 1000d;
             Debug.Log(
                 $"[SectorManager][Perf] rebuild reason={reason ?? "none"} " +
                 $"revision={lastCompletedBoardRevision} " +
                 $"sectors={sectorInfos.Count} bases={baseInfos.Count} " +
-                $"total={(Time.realtimeSinceStartupAsDouble - rebuildStart) * 1000d:F1}ms");
+                $"total={totalMs:F1}ms");
+            Debug.Log(
+                $"[SectorManager][Perf][Steps] contexts={contextsMs:F1}ms " +
+                $"(search={contextsSearchMs:F1}ms calls={contextsSearchCalls}) " +
+                $"sectorLoop={sectorLoopMs:F1}ms neighborPass={neighborPassMs:F1}ms | " +
+                $"search.calls={searchDebugCalls} search.ms={searchDebugMs:F1} " +
+                $"search.hits={searchDebugHits} " +
+                $"search.failures={searchDebugFailures} " +
+                $"search.exhausted={searchDebugExhausted} " +
+                $"search.expanded={searchDebugExpanded} " +
+                $"cache.size={landDistanceCache.Count} | " +
+                $"constructions={GetTrackedConstructions().Count} " +
+                $"unaccounted={(totalMs - contextsMs - sectorLoopMs - neighborPassMs):F1}ms");
         }
     }
 
@@ -1223,7 +1253,227 @@ public sealed class SectorManager : MonoBehaviour
         return ComputeHexDistance(from, to);
     }
 
+    // Contadores de diagnostico da busca: o rebuild inteiro so reporta um total,
+    // e sem separar quantas buscas rodaram e quantos nos cada uma expandiu nao da
+    // para distinguir "muitas buscas baratas" de "poucas buscas varrendo o mapa".
+    private static int searchDebugCalls;
+    private static int searchDebugFailures;
+    private static int searchDebugExpanded;
+    private static int searchDebugExhausted;
+    private static double searchDebugMs;
+
+    private static void ResetSectorSearchDebugCounters()
+    {
+        searchDebugCalls = 0;
+        searchDebugFailures = 0;
+        searchDebugExpanded = 0;
+        searchDebugExhausted = 0;
+        searchDebugHits = 0;
+        searchDebugMs = 0d;
+    }
+
+    // Memoizacao das distancias de movimento entre celulas.
+    //
+    // O rebuild rodava 88 buscas identicas a cada mudanca de turno (medido:
+    // search.calls=88, expanded=47537, ms=1814 -- os mesmos numeros nos tres
+    // rebuilds seguidos) porque o gatilho e GlobalBoardRevision, e comprar uma
+    // unidade incrementa a revisao global. Distancia entre PREDIOS nao muda
+    // quando nasce um soldado.
+    //
+    // O custo de travessia depende de: terreno, estrutura/rota, presenca e tipo
+    // da construcao no hex, e a UnitData de referencia do contexto. Conferido em
+    // TryGetLandEnterCost/TryGetLandTransitionCost: NAO le dono, capture points
+    // nem unidades. Logo a impressao digital abaixo cobre todas as entradas.
+    //
+    // Repintar terreno em runtime nao e mecanica deste jogo; se passar a ser,
+    // chame InvalidateLandDistanceCache() no ponto que repinta.
+    private readonly struct LandDistanceCacheKey : System.IEquatable<LandDistanceCacheKey>
+    {
+        private readonly int fromX;
+        private readonly int fromY;
+        private readonly int toX;
+        private readonly int toY;
+        private readonly int contextId;
+
+        public LandDistanceCacheKey(
+            Vector3Int from,
+            Vector3Int to,
+            int contextId)
+        {
+            fromX = from.x;
+            fromY = from.y;
+            toX = to.x;
+            toY = to.y;
+            this.contextId = contextId;
+        }
+
+        public bool Equals(LandDistanceCacheKey other)
+        {
+            return fromX == other.fromX
+                && fromY == other.fromY
+                && toX == other.toX
+                && toY == other.toY
+                && contextId == other.contextId;
+        }
+
+        public override bool Equals(object obj)
+        {
+            return obj is LandDistanceCacheKey other && Equals(other);
+        }
+
+        public override int GetHashCode()
+        {
+            unchecked
+            {
+                int hash = 17;
+                hash = (hash * 31) + fromX;
+                hash = (hash * 31) + fromY;
+                hash = (hash * 31) + toX;
+                hash = (hash * 31) + toY;
+                hash = (hash * 31) + contextId;
+                return hash;
+            }
+        }
+    }
+
+    private const int LandDistanceUnreachable = int.MinValue;
+    private static readonly Dictionary<LandDistanceCacheKey, int> landDistanceCache =
+        new Dictionary<LandDistanceCacheKey, int>(512);
+    private static int landDistanceCacheFingerprint = int.MinValue;
+    private static int searchDebugHits;
+
+    public static void InvalidateLandDistanceCache()
+    {
+        landDistanceCache.Clear();
+        landDistanceCacheFingerprint = int.MinValue;
+    }
+
+    private static int BuildLandDistanceContextId(SectorNeighborDistanceContext context)
+    {
+        unchecked
+        {
+            int hash = 17;
+            hash = (hash * 31) + (context.Tilemap != null
+                ? context.Tilemap.GetEntityId().GetHashCode()
+                : 0);
+            hash = (hash * 31) + (context.TerrainDatabase != null
+                ? context.TerrainDatabase.GetEntityId().GetHashCode()
+                : 0);
+            hash = (hash * 31) + (context.ReferenceUnitData != null
+                ? context.ReferenceUnitData.GetEntityId().GetHashCode()
+                : 0);
+            return hash;
+        }
+    }
+
+    // Impressao digital do LAYOUT: so o que a funcao de custo consegue ler.
+    // Ordem-independente de proposito (a ordem do registro nao e garantida),
+    // por isso cada construcao contribui via soma comutativa.
+    private static int BuildLandDistanceLayoutFingerprint()
+    {
+        IReadOnlyList<ConstructionManager> constructions = GetTrackedConstructions();
+        unchecked
+        {
+            int accumulated = 0;
+            int counted = 0;
+            for (int i = 0; i < constructions.Count; i++)
+            {
+                ConstructionManager construction = constructions[i];
+                if (construction == null)
+                    continue;
+
+                Vector3Int cell = construction.CurrentCellPosition;
+                int entry = 17;
+                entry = (entry * 31) + cell.x;
+                entry = (entry * 31) + cell.y;
+                entry = (entry * 31) + construction.GetBaseMovementCost();
+                // Sem a identidade, trocar um predio por outro de mesmo custo no
+                // mesmo hex passaria batido, e SupportsLayerMode/InheritsTerrainRules
+                // do novo tipo poderiam diferir.
+                entry = (entry * 31) + construction.InstanceId;
+                accumulated += entry;
+                counted++;
+            }
+
+            return (accumulated * 397) ^ counted;
+        }
+    }
+
+    private static void EnsureLandDistanceCacheFresh()
+    {
+        int fingerprint = BuildLandDistanceLayoutFingerprint();
+        if (landDistanceCacheFingerprint == fingerprint)
+            return;
+
+        landDistanceCache.Clear();
+        landDistanceCacheFingerprint = fingerprint;
+    }
+
     private static bool TryComputeLandMovementDistance(
+        Vector3Int from,
+        Vector3Int to,
+        SectorNeighborDistanceContext context,
+        out int movementCost,
+        List<Vector3Int> path)
+    {
+        searchDebugCalls++;
+        double searchStartMs = Time.realtimeSinceStartupAsDouble;
+        try
+        {
+            // Quem pede o caminho reconstruido nao pode ser servido pelo cache:
+            // ele guarda custo, nao rota. Passa direto para a busca.
+            bool cacheable = path == null && context.IsValid;
+            LandDistanceCacheKey cacheKey = default;
+            if (cacheable)
+            {
+                Vector3Int cacheFrom = from;
+                Vector3Int cacheTo = to;
+                cacheFrom.z = 0;
+                cacheTo.z = 0;
+                EnsureLandDistanceCacheFresh();
+                cacheKey = new LandDistanceCacheKey(
+                    cacheFrom,
+                    cacheTo,
+                    BuildLandDistanceContextId(context));
+                if (landDistanceCache.TryGetValue(cacheKey, out int cachedCost))
+                {
+                    searchDebugHits++;
+                    if (cachedCost == LandDistanceUnreachable)
+                    {
+                        movementCost = 0;
+                        searchDebugFailures++;
+                        return false;
+                    }
+
+                    movementCost = cachedCost;
+                    return true;
+                }
+            }
+
+            bool found = TryComputeLandMovementDistanceInternal(
+                from,
+                to,
+                context,
+                out movementCost,
+                path);
+            if (!found)
+                searchDebugFailures++;
+            if (cacheable)
+            {
+                landDistanceCache[cacheKey] = found
+                    ? movementCost
+                    : LandDistanceUnreachable;
+            }
+            return found;
+        }
+        finally
+        {
+            searchDebugMs +=
+                (Time.realtimeSinceStartupAsDouble - searchStartMs) * 1000d;
+        }
+    }
+
+    private static bool TryComputeLandMovementDistanceInternal(
         Vector3Int from,
         Vector3Int to,
         SectorNeighborDistanceContext context,
@@ -1281,6 +1531,7 @@ public sealed class SectorManager : MonoBehaviour
             {
                 movementCost = bestCost;
                 BuildSectorPath(from, to, cameFrom, path);
+                searchDebugExpanded += expanded;
                 return true;
             }
 
@@ -1307,6 +1558,11 @@ public sealed class SectorManager : MonoBehaviour
             }
         }
 
+        // Estourar o teto significa que a busca varreu o tabuleiro inteiro para
+        // devolver false. Contabilizar separado de uma falha barata.
+        searchDebugExpanded += expanded;
+        if (expanded >= maxExpanded)
+            searchDebugExhausted++;
         return false;
     }
 

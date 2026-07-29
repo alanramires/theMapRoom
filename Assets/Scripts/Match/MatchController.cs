@@ -289,12 +289,26 @@ public class MatchController : MonoBehaviour
     private readonly struct FogCollectPerfEntry
     {
         public readonly string unitName;
+        // UnitDisplayName e o nome do TIPO ("APC"), insuficiente para achar a
+        // instancia na cena. objectName carrega o formato Tipo_T#_U#.
+        public readonly string objectName;
+        public readonly int slotIndex;
+        public readonly Vector3Int cell;
         public readonly double collectMs;
         public readonly int visibleCellCount;
 
-        public FogCollectPerfEntry(string unitName, double collectMs, int visibleCellCount)
+        public FogCollectPerfEntry(
+            string unitName,
+            string objectName,
+            int slotIndex,
+            Vector3Int cell,
+            double collectMs,
+            int visibleCellCount)
         {
             this.unitName = unitName ?? string.Empty;
+            this.objectName = objectName ?? string.Empty;
+            this.slotIndex = slotIndex;
+            this.cell = cell;
             this.collectMs = Math.Max(0d, collectMs);
             this.visibleCellCount = Math.Max(0, visibleCellCount);
         }
@@ -590,6 +604,17 @@ public class MatchController : MonoBehaviour
     [SerializeField] private bool enablePodeEnxergarRuntimeLogs = false;
     [SerializeField] private bool enableTurnPerfLogs = true;
     [SerializeField] [Range(1, 8)] private int fogStepPerfTopUnits = 3;
+
+    // Orcamento de CPU por frame do warm de FoW. Antes era UMA fonte por frame,
+    // e com o custo por fonte em ~10ms o warm passava a maior parte do tempo
+    // apenas esperando 63 frames chegarem (medido: cpu=678ms de 4335ms totais).
+    //
+    // A troca e direta: orcamento maior = menos frames, cada um mais longo.
+    // Com ~48ms de custo de frame alheio ao warm e F fontes por frame, o total
+    // aproximado e (63/F) * (48 + 10*F) ms -- 1 fonte/frame da ~3,6s; 4 da ~1,4s;
+    // 8 da ~1,0s, ao preco de engasgos de ~126ms. 40ms e o meio: ~4 fontes por
+    // frame. Aumente se preferir terminar antes, diminua se sentir o engasgo.
+    [SerializeField] [Range(8f, 120f)] private float fogWarmupFrameBudgetMs = 40f;
     public bool SuppressFogOfWarRefresh { get; set; } = false;
 
     private bool ShouldLogPodeEnxergarRuntime => enableFogSourceDebugLogs || enablePodeEnxergarRuntimeLogs;
@@ -899,6 +924,15 @@ public class MatchController : MonoBehaviour
     private Coroutine advanceTurnTransitionRoutine;
     private Coroutine fogCacheWarmupRoutine;
     private int fogCacheWarmupGeneration;
+
+    // Decomposicao do custo por fonte aquecida. O warm reporta so um total, e
+    // 203ms/fonte contra 96-145ms de collect medido deixa ~60-100ms sem dono:
+    // pode ser o clone do runtime, o CollectBoardCells ou o proprio collect.
+    [System.NonSerialized] private double fogWarmupActivateMs;
+    [System.NonSerialized] private double fogWarmupWorkMs;
+    [System.NonSerialized] private double fogWarmupStoreMs;
+    [System.NonSerialized] private double fogWarmupRestoreMs;
+    [System.NonSerialized] private int fogWarmupClonedSources;
     private bool hotSeatGateActive;
 
     public int GetVictoryStars(PlayerSlotId slotId)
@@ -4417,7 +4451,11 @@ public class MatchController : MonoBehaviour
             ? new List<FogCollectPerfEntry>(Mathf.Clamp(fogStepPerfTopUnits, 1, 8))
             : null;
 
+        double unitScanStartMs = enableFogStepPerfLogs ? Time.realtimeSinceStartupAsDouble : 0d;
         UnitManager[] units = FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        double unitScanMs = enableFogStepPerfLogs
+            ? (Time.realtimeSinceStartupAsDouble - unitScanStartMs) * 1000d
+            : 0d;
         int unitsIncluded = 0;
         for (int i = 0; i < units.Length; i++)
         {
@@ -4481,6 +4519,16 @@ public class MatchController : MonoBehaviour
         double constructionVisionMs = enableFogStepPerfLogs
             ? (Time.realtimeSinceStartupAsDouble - constructionVisionStartMs) * 1000d
             : 0d;
+        // Estas seis etapas respondiam por ~550ms de um refresh de 695ms sem
+        // nenhum timer: o collect levava a culpa por ser o unico medido.
+        double stepStartMs = enableFogStepPerfLogs ? Time.realtimeSinceStartupAsDouble : 0d;
+        double publishMs = 0d;
+        double unitVisibilityMs = 0d;
+        double intelMs = 0d;
+        double renderMs = 0d;
+        double callbacksMs = 0d;
+        double storeMs = 0d;
+
         if (context.publishGameplayData)
         {
             PublishFogGameplaySnapshot(
@@ -4489,19 +4537,50 @@ public class MatchController : MonoBehaviour
                 units,
                 context.recordExplorationMemory);
         }
+        if (enableFogStepPerfLogs)
+        {
+            publishMs = (Time.realtimeSinceStartupAsDouble - stepStartMs) * 1000d;
+            stepStartMs = Time.realtimeSinceStartupAsDouble;
+        }
+
         if (context.publishVisuals)
             RefreshRuntimeUnitFogVisibility();
+        if (enableFogStepPerfLogs)
+        {
+            unitVisibilityMs = (Time.realtimeSinceStartupAsDouble - stepStartMs) * 1000d;
+            stepStartMs = Time.realtimeSinceStartupAsDouble;
+        }
+
         if (context.recordIntel)
             AIIntelLedger.RecordVisibleContactsForSlot(observerSlot, currentTurn, this);
+        if (enableFogStepPerfLogs)
+        {
+            intelMs = (Time.realtimeSinceStartupAsDouble - stepStartMs) * 1000d;
+            stepStartMs = Time.realtimeSinceStartupAsDouble;
+        }
+
         if (context.publishVisuals)
         {
             RenderFogOverlayFromRuntimeCache(boardMap);
+            if (enableFogStepPerfLogs)
+            {
+                renderMs = (Time.realtimeSinceStartupAsDouble - stepStartMs) * 1000d;
+                stepStartMs = Time.realtimeSinceStartupAsDouble;
+            }
             if (Application.isPlaying)
             {
                 OnFogOfWarUpdated?.Invoke();
             }
+            if (enableFogStepPerfLogs)
+            {
+                callbacksMs = (Time.realtimeSinceStartupAsDouble - stepStartMs) * 1000d;
+                stepStartMs = Time.realtimeSinceStartupAsDouble;
+            }
         }
+
         StoreFogContributionRuntimeForSlot(observerSlot);
+        if (enableFogStepPerfLogs)
+            storeMs = (Time.realtimeSinceStartupAsDouble - stepStartMs) * 1000d;
 
         if (enableFogStepPerfLogs)
         {
@@ -4514,6 +4593,15 @@ public class MatchController : MonoBehaviour
                 $"[FoW][Perf] total={refreshTotalMs:F3}ms | " +
                 $"collect.total={collectTotalMs:F3}ms collect.avg/unit={collectAvgMs:F3}ms collect.units={collectUnitsMeasured} collect.cells={collectVisibleCellsTotal} | " +
                 $"constructionVision={constructionVisionMs:F3}ms constructions={constructionsIncluded} | dominant={dominant}");
+            double stepsMeasuredMs =
+                unitScanMs + collectTotalMs + constructionVisionMs + publishMs +
+                unitVisibilityMs + intelMs + renderMs + callbacksMs + storeMs;
+            Debug.Log(
+                $"[FoW][Perf][Steps] unitScan={unitScanMs:F3}ms publish={publishMs:F3}ms " +
+                $"unitVisibility={unitVisibilityMs:F3}ms intel={intelMs:F3}ms " +
+                $"render={renderMs:F3}ms callbacks={callbacksMs:F3}ms store={storeMs:F3}ms | " +
+                $"boardCells={fogBoardCellsBuffer.Count} unitsScanned={units.Length} " +
+                $"unaccounted={(refreshTotalMs - stepsMeasuredMs):F3}ms");
             PodeDetectarSensor.GetFogDebugCounters(
                 out int cacheHits,
                 out int cacheMisses,
@@ -4522,6 +4610,38 @@ public class MatchController : MonoBehaviour
                 out int fragataCollectWorkspaceRents,
                 out int fragataCollectWorkspaceReleases);
             Debug.Log($"[FoW][Cache] hits={cacheHits} misses={cacheMisses}");
+            PodeDetectarSensor.GetCollectDebugCounters(
+                out int collectRuns,
+                out int collectDistanceCells,
+                out int collectMaxRange,
+                out int collectLayerChecks,
+                out int collectSpecChecks,
+                out int collectLosCalls,
+                out int collectLosHits,
+                out int collectAquaticMaps);
+            Debug.Log(
+                $"[FoW][Perf][Collect] runs={collectRuns} maxRange={collectMaxRange} " +
+                $"distanceCells={collectDistanceCells} " +
+                $"outCells={collectVisibleCellsTotal} " +
+                $"layerChecks={collectLayerChecks} specChecks={collectSpecChecks} " +
+                $"los.calls={collectLosCalls} los.hits={collectLosHits} " +
+                $"los.misses={(collectLosCalls - collectLosHits)} " +
+                $"aquaticMaps={collectAquaticMaps}");
+            PodeDetectarSensor.GetCollectLosDebugCounters(
+                out double losMs,
+                out int cellVisionCalls,
+                out double constructionMs,
+                out double structureMs,
+                out double lerpMs,
+                out int lerpCells);
+            Debug.Log(
+                $"[FoW][Perf][Los] los.ms={losMs:F3} " +
+                $"cellVision.calls={cellVisionCalls} " +
+                $"construction.ms={constructionMs:F3} " +
+                $"structure.ms={structureMs:F3} " +
+                $"lerp.ms={lerpMs:F3} lerp.cells={lerpCells} | " +
+                $"collect.total={collectTotalMs:F3}ms " +
+                $"outsideLos={(collectTotalMs - losMs):F3}ms");
             Debug.Log(
                 $"[FoW][Coverage] geographic={fogGeographicContributorsByCell.Count} " +
                 $"sensor={fogSensorContributorsByCell.Count} " +
@@ -4538,7 +4658,11 @@ public class MatchController : MonoBehaviour
                 for (int i = 0; i < topCollectEntries.Count; i++)
                 {
                     FogCollectPerfEntry entry = topCollectEntries[i];
-                    Debug.Log($"[FoW][Perf][CollectTop{(i + 1)}] unit={entry.unitName} ms={entry.collectMs:F3} cells={entry.visibleCellCount}");
+                    Debug.Log(
+                        $"[FoW][Perf][CollectTop{(i + 1)}] unit={entry.unitName} " +
+                        $"object={entry.objectName} slot={entry.slotIndex} " +
+                        $"cell=({entry.cell.x},{entry.cell.y}) " +
+                        $"ms={entry.collectMs:F3} cells={entry.visibleCellCount}");
                 }
             }
         }
@@ -4858,6 +4982,12 @@ public class MatchController : MonoBehaviour
             : 0d;
         int warmedSources = 0;
         int warmedSlots = 0;
+        int warmedFrames = 0;
+        fogWarmupActivateMs = 0d;
+        fogWarmupWorkMs = 0d;
+        fogWarmupStoreMs = 0d;
+        fogWarmupRestoreMs = 0d;
+        fogWarmupClonedSources = 0;
 
         try
         {
@@ -4920,8 +5050,10 @@ public class MatchController : MonoBehaviour
                     unitsToWarm.Add(unit);
                 }
 
+                double frameStartMs = Time.realtimeSinceStartupAsDouble;
                 for (int i = 0; i < unitsToWarm.Count; i++)
                 {
+                    bool waitedForNeutral = false;
                     while (IsValidPlayerSlot(hostSlot) &&
                            ActiveSlotId == hostSlot &&
                            !SuppressFogOfWarRefresh &&
@@ -4931,7 +5063,13 @@ public class MatchController : MonoBehaviour
                                TurnStateManager.CursorState.Neutral)
                     {
                         yield return null;
+                        waitedForNeutral = true;
                     }
+
+                    // Esperar pelo Neutral tambem consome frames: o orcamento
+                    // vale para o frame atual, nao para o que ficou para tras.
+                    if (waitedForNeutral)
+                        frameStartMs = Time.realtimeSinceStartupAsDouble;
 
                     // A troca de turno venceu a corrida. O cache parcial permanece
                     // valido e o reconciliador de TurnStart completa apenas o resto.
@@ -4959,9 +5097,19 @@ public class MatchController : MonoBehaviour
                         warmedSources++;
                     }
 
-                    // Uma fonte por frame: o jogador deixa de pagar uma unica
-                    // parede de varios segundos durante Passar Turno.
-                    yield return null;
+                    // Orcamento de CPU por frame, nao uma fonte por frame. O
+                    // objetivo original -- nao entregar ao jogador uma parede de
+                    // varios segundos durante Passar Turno -- e o mesmo; o que
+                    // mudou e que uma fonte deixou de custar ~108ms e passou a
+                    // custar ~10ms, e ceder o frame a cada uma delas fazia o warm
+                    // esperar mais do que trabalhar.
+                    if ((Time.realtimeSinceStartupAsDouble - frameStartMs) * 1000d >=
+                        fogWarmupFrameBudgetMs)
+                    {
+                        yield return null;
+                        warmedFrames++;
+                        frameStartMs = Time.realtimeSinceStartupAsDouble;
+                    }
                 }
 
                 if (!IsValidPlayerSlot(hostSlot) ||
@@ -4992,6 +5140,16 @@ public class MatchController : MonoBehaviour
                 Debug.Log(
                     $"[FoW][Warmup] host={hostSlot.Value} " +
                     $"slots={warmedSlots} sources={warmedSources} total={totalMs:F3}ms");
+                double cpuMs =
+                    fogWarmupActivateMs + fogWarmupWorkMs +
+                    fogWarmupStoreMs + fogWarmupRestoreMs;
+                Debug.Log(
+                    $"[FoW][Warmup][Steps] activate={fogWarmupActivateMs:F1}ms " +
+                    $"work={fogWarmupWorkMs:F1}ms store={fogWarmupStoreMs:F1}ms " +
+                    $"restore={fogWarmupRestoreMs:F1}ms | cpu={cpuMs:F1}ms " +
+                    $"clonedSources={fogWarmupClonedSources} " +
+                    $"frames={warmedFrames} budget={fogWarmupFrameBudgetMs:F0}ms " +
+                    $"idleBetweenFrames={(totalMs - cpuMs):F1}ms");
             }
             if (warmupGeneration == fogCacheWarmupGeneration)
                 fogCacheWarmupRoutine = null;
@@ -5025,8 +5183,19 @@ public class MatchController : MonoBehaviour
             recordIntel: false);
         FogObserverScopeState previous = EnterFogObserverScope(warmupContext);
         bool warmed = false;
+        double stepStartMs = Time.realtimeSinceStartupAsDouble;
         try
         {
+            // Quantas fontes esta ativacao vai clonar. Cresce a cada unidade
+            // aquecida: e a assinatura do O(n^2), se ele existir.
+            if (fogContributionRuntimeBySlot.TryGetValue(
+                    observerSlot.Value,
+                    out FogSlotContributionRuntime pendingRuntime) &&
+                pendingRuntime != null)
+            {
+                fogWarmupClonedSources += pendingRuntime.sources.Count;
+            }
+
             if (!TryActivateFogContributionRuntimeForSlot(
                     observerSlot,
                     boardMap))
@@ -5039,6 +5208,10 @@ public class MatchController : MonoBehaviour
                 fogSensorContributorsByCell.Clear();
                 InitializeFogRuntimeData(boardMap);
             }
+            fogWarmupActivateMs +=
+                (Time.realtimeSinceStartupAsDouble - stepStartMs) * 1000d;
+            stepStartMs = Time.realtimeSinceStartupAsDouble;
+
             if (!fogOverlayInitialized ||
                 fogCachedObserverSlotIndex != observerSlot.Value)
             {
@@ -5068,14 +5241,23 @@ public class MatchController : MonoBehaviour
                 warmed = true;
             }
 
+            fogWarmupWorkMs +=
+                (Time.realtimeSinceStartupAsDouble - stepStartMs) * 1000d;
+            stepStartMs = Time.realtimeSinceStartupAsDouble;
+
             StoreFogContributionRuntimeForSlot(observerSlot);
+            fogWarmupStoreMs +=
+                (Time.realtimeSinceStartupAsDouble - stepStartMs) * 1000d;
         }
         finally
         {
+            stepStartMs = Time.realtimeSinceStartupAsDouble;
             ExitFogObserverScope(previous);
             TryActivateFogContributionRuntimeForSlot(
                 runtimeOwnerBefore,
                 boardMap);
+            fogWarmupRestoreMs +=
+                (Time.realtimeSinceStartupAsDouble - stepStartMs) * 1000d;
         }
 
         return warmed;
@@ -7995,6 +8177,11 @@ public class MatchController : MonoBehaviour
             fogGameplaySnapshotsBySlot[slotIndex] = snapshot;
         }
 
+        // publish custa 10,6ms no primeiro refresh e 488ms na troca de turno, no
+        // mesmo tabuleiro. Um destes seis blocos e condicional a algo que muda
+        // entre os dois momentos; medir todos em vez de escolher um.
+        double pubStartMs = enableFogStepPerfLogs ? Time.realtimeSinceStartupAsDouble : 0d;
+
         snapshot.geographicallyVisibleCells.Clear();
         foreach (var entry in fogGeographicContributorsByCell)
         {
@@ -8008,13 +8195,34 @@ public class MatchController : MonoBehaviour
             if (entry.Value > 0)
                 snapshot.sensorCoveredCells.Add(entry.Key);
         }
+        double pubContributorsMs = 0d;
+        double pubKnownCellsMs = 0d;
+        double pubMemoryMs = 0d;
+        double pubGeoOnlyMs = 0d;
+        double pubUnitLoopMs = 0d;
+        if (enableFogStepPerfLogs)
+        {
+            pubContributorsMs = (Time.realtimeSinceStartupAsDouble - pubStartMs) * 1000d;
+            pubStartMs = Time.realtimeSinceStartupAsDouble;
+        }
 
         snapshot.knownCells.Clear();
         BuildFogDisplayVisibleCellsForAllModes(boardMap, snapshot.knownCells);
+        if (enableFogStepPerfLogs)
+        {
+            pubKnownCellsMs = (Time.realtimeSinceStartupAsDouble - pubStartMs) * 1000d;
+            pubStartMs = Time.realtimeSinceStartupAsDouble;
+        }
+
         if (recordExplorationMemory)
         {
             RecordConfirmedExploredCells(slotIndex, snapshot.knownCells);
             RecordConfirmedConstructionMemory(slotIndex, boardMap, snapshot.knownCells);
+        }
+        if (enableFogStepPerfLogs)
+        {
+            pubMemoryMs = (Time.realtimeSinceStartupAsDouble - pubStartMs) * 1000d;
+            pubStartMs = Time.realtimeSinceStartupAsDouble;
         }
 
         snapshot.geographicOnlyCells.Clear();
@@ -8022,6 +8230,11 @@ public class MatchController : MonoBehaviour
         {
             if (!snapshot.sensorCoveredCells.Contains(cell))
                 snapshot.geographicOnlyCells.Add(cell);
+        }
+        if (enableFogStepPerfLogs)
+        {
+            pubGeoOnlyMs = (Time.realtimeSinceStartupAsDouble - pubStartMs) * 1000d;
+            pubStartMs = Time.realtimeSinceStartupAsDouble;
         }
 
         bool targetOnly = hadSnapshot &&
@@ -8034,6 +8247,7 @@ public class MatchController : MonoBehaviour
             return;
 
         int evaluatedTargets = 0;
+        int visibilityProbes = 0;
         for (int i = 0; i < units.Length; i++)
         {
             UnitManager unit = units[i];
@@ -8047,10 +8261,32 @@ public class MatchController : MonoBehaviour
             if (targetOnly && !affectedTargetCells.Contains(unitCell))
                 continue;
 
-            bool visible = unit.SlotIndex == slotIndex ||
-                           ComputeIsUnitVisibleForSlotWithoutCache(unit, observerSlot);
+            // O short-circuit por dono e o que separa barato de caro: unidade do
+            // proprio observador nao paga sondagem de visibilidade.
+            bool visible;
+            if (unit.SlotIndex == slotIndex)
+            {
+                visible = true;
+            }
+            else
+            {
+                visibilityProbes++;
+                visible = ComputeIsUnitVisibleForSlotWithoutCache(unit, observerSlot);
+            }
             snapshot.unitVisibility[ResolveFogCacheIndex(unit)] = visible;
             evaluatedTargets++;
+        }
+
+        if (enableFogStepPerfLogs)
+        {
+            pubUnitLoopMs = (Time.realtimeSinceStartupAsDouble - pubStartMs) * 1000d;
+            Debug.Log(
+                $"[FoW][Perf][Publish] slot={slotIndex} contributors={pubContributorsMs:F3}ms " +
+                $"knownCells={pubKnownCellsMs:F3}ms memory={pubMemoryMs:F3}ms " +
+                $"geoOnly={pubGeoOnlyMs:F3}ms unitLoop={pubUnitLoopMs:F3}ms | " +
+                $"recordMemory={recordExplorationMemory} targetOnly={targetOnly} " +
+                $"evaluated={evaluatedTargets} visibilityProbes={visibilityProbes} " +
+                $"knownCells.count={snapshot.knownCells.Count}");
         }
 
         if (enableFogStepPerfLogs && targetOnly)
@@ -9441,7 +9677,15 @@ public class MatchController : MonoBehaviour
             return;
 
         string unitName = !string.IsNullOrWhiteSpace(unit.UnitDisplayName) ? unit.UnitDisplayName : unit.name;
-        FogCollectPerfEntry candidate = new FogCollectPerfEntry(unitName, collectMs, visibleCellsCollected);
+        Vector3Int unitCell = unit.CurrentCellPosition;
+        unitCell.z = 0;
+        FogCollectPerfEntry candidate = new FogCollectPerfEntry(
+            unitName,
+            unit.name,
+            unit.SlotIndex,
+            unitCell,
+            collectMs,
+            visibleCellsCollected);
 
         int insertIndex = topEntries.Count;
         for (int i = 0; i < topEntries.Count; i++)

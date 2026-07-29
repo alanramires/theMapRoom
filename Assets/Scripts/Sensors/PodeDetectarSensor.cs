@@ -285,6 +285,14 @@ public static class PodeDetectarSensor
     private static readonly Dictionary<int, Tilemap[]> gridTilemapsCache = new Dictionary<int, Tilemap[]>();
     private static readonly Dictionary<int, bool> tilemapOddRowOffsetCache = new Dictionary<int, bool>();
     private static readonly Dictionary<TerrainCellCacheKey, TerrainTypeData> terrainCacheForRefresh = new Dictionary<TerrainCellCacheKey, TerrainTypeData>(4096);
+    // GetConstructionAtCell e GetStructureAtCell fazem FindObjectsByType a CADA
+    // chamada (varredura de cena inteira por celula): ~312us e ~300us medidos.
+    // Somavam 68ms dos 106ms de um collect e 490ms do knownCells do publish.
+    // Escopo de refresh identico ao terrainCacheForRefresh, ao lado do qual eram
+    // chamados sem cache. Valor null e cacheado de proposito: a maioria das
+    // celulas nao tem construcao nem estrutura, e "ausente" precisa ser um hit.
+    private static readonly Dictionary<TerrainCellCacheKey, ConstructionData> constructionCacheForRefresh = new Dictionary<TerrainCellCacheKey, ConstructionData>(4096);
+    private static readonly Dictionary<TerrainCellCacheKey, StructureData> structureCacheForRefresh = new Dictionary<TerrainCellCacheKey, StructureData>(4096);
     private static readonly Dictionary<LosCacheKey, bool> losCacheForRefresh = new Dictionary<LosCacheKey, bool>(8192);
     private static readonly Dictionary<CollectVisibleCellsCacheKey, List<Vector3Int>> collectVisibleCellsCache = new Dictionary<CollectVisibleCellsCacheKey, List<Vector3Int>>(128);
     private static readonly List<Vector3Int> collectVisibleCellsScratch = new List<Vector3Int>(128);
@@ -297,6 +305,24 @@ public static class PodeDetectarSensor
     private static int debugFragataCollectWorkspaceRents;
     private static int debugFragataCollectWorkspaceReleases;
 
+    // Decomposicao do custo interno de CollectVisibleCells. A saida (26-31 celulas)
+    // nao diz o trabalho feito: maxRange e o MAXIMO entre as camadas de visao, e o
+    // mapa de distancias cobre esse raio inteiro antes de qualquer filtro.
+    private static int debugCollectRuns;
+    private static int debugCollectDistanceCells;
+    private static int debugCollectMaxRange;
+    private static int debugCollectLayerChecks;
+    private static int debugCollectSpecializationChecks;
+    private static int debugCollectLosCalls;
+    private static int debugCollectLosHits;
+    private static int debugCollectAquaticMaps;
+    private static double debugCollectLosMs;
+    private static int debugCollectCellVisionCalls;
+    private static double debugCollectConstructionMs;
+    private static double debugCollectStructureMs;
+    private static double debugCollectLerpMs;
+    private static int debugCollectLerpCells;
+
     public static void ResetFogDebugCounters()
     {
         debugCacheHits = 0;
@@ -305,6 +331,56 @@ public static class PodeDetectarSensor
         debugPoolReleases = 0;
         debugFragataCollectWorkspaceRents = 0;
         debugFragataCollectWorkspaceReleases = 0;
+        debugCollectRuns = 0;
+        debugCollectDistanceCells = 0;
+        debugCollectMaxRange = 0;
+        debugCollectLayerChecks = 0;
+        debugCollectSpecializationChecks = 0;
+        debugCollectLosCalls = 0;
+        debugCollectLosHits = 0;
+        debugCollectAquaticMaps = 0;
+        debugCollectLosMs = 0d;
+        debugCollectCellVisionCalls = 0;
+        debugCollectConstructionMs = 0d;
+        debugCollectStructureMs = 0d;
+        debugCollectLerpMs = 0d;
+        debugCollectLerpCells = 0;
+    }
+
+    public static void GetCollectDebugCounters(
+        out int runs,
+        out int distanceCells,
+        out int maxRange,
+        out int layerChecks,
+        out int specializationChecks,
+        out int losCalls,
+        out int losHits,
+        out int aquaticMaps)
+    {
+        runs = debugCollectRuns;
+        distanceCells = debugCollectDistanceCells;
+        maxRange = debugCollectMaxRange;
+        layerChecks = debugCollectLayerChecks;
+        specializationChecks = debugCollectSpecializationChecks;
+        losCalls = debugCollectLosCalls;
+        losHits = debugCollectLosHits;
+        aquaticMaps = debugCollectAquaticMaps;
+    }
+
+    public static void GetCollectLosDebugCounters(
+        out double losMs,
+        out int cellVisionCalls,
+        out double constructionMs,
+        out double structureMs,
+        out double lerpMs,
+        out int lerpCells)
+    {
+        losMs = debugCollectLosMs;
+        cellVisionCalls = debugCollectCellVisionCalls;
+        constructionMs = debugCollectConstructionMs;
+        structureMs = debugCollectStructureMs;
+        lerpMs = debugCollectLerpMs;
+        lerpCells = debugCollectLerpCells;
     }
 
     public static void GetFogDebugCounters(
@@ -333,6 +409,8 @@ public static class PodeDetectarSensor
     {
         terrainCacheForRefresh.Clear();
         losCacheForRefresh.Clear();
+        constructionCacheForRefresh.Clear();
+        structureCacheForRefresh.Clear();
     }
 
     public static bool IsTargetObservedByTeam(
@@ -499,6 +577,10 @@ public static class PodeDetectarSensor
         try
         {
             BuildDistanceMapInto(boardMap, observerCell, maxRange, workspace);
+            debugCollectRuns++;
+            debugCollectDistanceCells += workspace.distances.Count;
+            if (maxRange > debugCollectMaxRange)
+                debugCollectMaxRange = maxRange;
             // O modo agregado (All) consulta a camada nativa do terreno primeiro.
             // Mar costuma ser Naval/Surface com Submarine/Submerged adicional; portanto,
             // a especializacao submarina precisa conservar sua propria distancia conectada
@@ -514,6 +596,7 @@ public static class PodeDetectarSensor
                     HeightLevel.Submerged) > 0)
             {
                 aquaticWorkspace = RentDistanceMapWorkspace();
+                debugCollectAquaticMaps++;
                 BuildDistanceMapInto(
                     boardMap,
                     observerCell,
@@ -577,6 +660,7 @@ public static class PodeDetectarSensor
                     if (aquaticWorkspace == null)
                     {
                         aquaticWorkspace = RentDistanceMapWorkspace();
+                debugCollectAquaticMaps++;
                         BuildDistanceMapInto(
                             boardMap,
                             observerCell,
@@ -815,6 +899,7 @@ public static class PodeDetectarSensor
                 }
             }
 
+            debugCollectSpecializationChecks++;
             if (CanObserveCellWithLayer(
                     observer,
                     observerData,
@@ -852,6 +937,7 @@ public static class PodeDetectarSensor
         bool enableSpotter,
         bool useRangeOnlyForAirHighWhenConfigured)
     {
+        debugCollectLayerChecks++;
         int detectionRange = ResolveDetectionRange(observer, observerData, null, targetDomain, targetHeight);
         if (distance > detectionRange)
             return false;
@@ -1781,7 +1867,7 @@ public static class PodeDetectarSensor
             return true;
         }
 
-        StructureData structure = StructureOccupancyRules.GetStructureAtCell(map, cell);
+        StructureData structure = ResolveStructureAtCellCachedForRefresh(map, cell);
         if (structure != null &&
             SupportsLayerMode(
                 structure.domain,
@@ -2055,9 +2141,14 @@ public static class PodeDetectarSensor
             terrainDatabase,
             dpqAirHeightConfig);
 
+        debugCollectLosCalls++;
         if (losCacheForRefresh.TryGetValue(cacheKey, out bool cachedLos))
+        {
+            debugCollectLosHits++;
             return cachedLos;
+        }
 
+        double losStartMs = Time.realtimeSinceStartupAsDouble;
         bool hasDirectLos = HasValidStraightObservationLine(
             boardMap,
             terrainDatabase,
@@ -2072,6 +2163,8 @@ public static class PodeDetectarSensor
             enableLosValidation: true,
             forcedTargetDomain: targetDomain,
             forcedTargetHeightLevel: targetHeight);
+        debugCollectLosMs +=
+            (Time.realtimeSinceStartupAsDouble - losStartMs) * 1000d;
         losCacheForRefresh[cacheKey] = hasDirectLos;
         return hasDirectLos;
     }
@@ -2108,7 +2201,7 @@ public static class PodeDetectarSensor
             return true;
         }
 
-        StructureData structureData = StructureOccupancyRules.GetStructureAtCell(map, cell);
+        StructureData structureData = ResolveStructureAtCellCachedForRefresh(map, cell);
         if (structureData != null)
         {
             domain = structureData.domain;
@@ -2185,7 +2278,11 @@ public static class PodeDetectarSensor
         }
 
         evPath.Add(originEv);
+        double lerpStartMs = Time.realtimeSinceStartupAsDouble;
         List<Vector3Int> crossedCells = GetIntermediateCellsByCellLerp(tilemap, originCell, targetCell);
+        debugCollectLerpMs +=
+            (Time.realtimeSinceStartupAsDouble - lerpStartMs) * 1000d;
+        debugCollectLerpCells += crossedCells.Count;
         intermediateCells.AddRange(crossedCells);
 
         // A altura da linha em cada hex cruzado usa a distancia REAL projetada do
@@ -2290,8 +2387,15 @@ public static class PodeDetectarSensor
         if (!TryResolveTerrainAtCell(tilemap, terrainDatabase, cell, out TerrainTypeData terrain) || terrain == null)
             return false;
 
+        debugCollectCellVisionCalls++;
+        double constructionStartMs = Time.realtimeSinceStartupAsDouble;
         TryResolveConstructionAtCell(tilemap, cell, out ConstructionData constructionData);
-        StructureData structureData = StructureOccupancyRules.GetStructureAtCell(tilemap, cell);
+        double structureStartMs = Time.realtimeSinceStartupAsDouble;
+        debugCollectConstructionMs +=
+            (structureStartMs - constructionStartMs) * 1000d;
+        StructureData structureData = ResolveStructureAtCellCachedForRefresh(tilemap, cell);
+        debugCollectStructureMs +=
+            (Time.realtimeSinceStartupAsDouble - structureStartMs) * 1000d;
 
         Domain domain = Domain.Land;
         HeightLevel height = HeightLevel.Surface;
@@ -2335,20 +2439,53 @@ public static class PodeDetectarSensor
         if (tilemap == null)
             return false;
 
+        cell.z = 0;
+        TerrainCellCacheKey cacheKey = new TerrainCellCacheKey(
+            tilemap.GetEntityId().GetHashCode(),
+            cell.x,
+            cell.y);
+        if (constructionCacheForRefresh.TryGetValue(cacheKey, out ConstructionData cached))
+        {
+            constructionData = cached;
+            return constructionData != null;
+        }
+
         ConstructionManager construction = ConstructionOccupancyRules.GetConstructionAtCell(tilemap, cell);
-        if (construction == null)
-            return false;
+        ConstructionData resolved = null;
+        if (construction != null)
+        {
+            ConstructionDatabase db = construction.ConstructionDatabase;
+            string id = construction.ConstructionId;
+            if (db != null &&
+                !string.IsNullOrWhiteSpace(id) &&
+                db.TryGetById(id, out ConstructionData data))
+            {
+                resolved = data;
+            }
+        }
 
-        ConstructionDatabase db = construction.ConstructionDatabase;
-        string id = construction.ConstructionId;
-        if (db == null || string.IsNullOrWhiteSpace(id))
-            return false;
+        constructionCacheForRefresh[cacheKey] = resolved;
+        constructionData = resolved;
+        return constructionData != null;
+    }
 
-        if (!db.TryGetById(id, out ConstructionData data) || data == null)
-            return false;
+    // Espelha TryResolveConstructionAtCell: mesma chave, mesmo escopo de refresh.
+    private static StructureData ResolveStructureAtCellCachedForRefresh(Tilemap tilemap, Vector3Int cell)
+    {
+        if (tilemap == null)
+            return StructureOccupancyRules.GetStructureAtCell(tilemap, cell);
 
-        constructionData = data;
-        return true;
+        cell.z = 0;
+        TerrainCellCacheKey cacheKey = new TerrainCellCacheKey(
+            tilemap.GetEntityId().GetHashCode(),
+            cell.x,
+            cell.y);
+        if (structureCacheForRefresh.TryGetValue(cacheKey, out StructureData cached))
+            return cached;
+
+        StructureData resolved = StructureOccupancyRules.GetStructureAtCell(tilemap, cell);
+        structureCacheForRefresh[cacheKey] = resolved;
+        return resolved;
     }
 
     private static bool TryResolveTerrainAtCell(Tilemap terrainTilemap, TerrainDatabase terrainDatabase, Vector3Int cell, out TerrainTypeData terrain)
