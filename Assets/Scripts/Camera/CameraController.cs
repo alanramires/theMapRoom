@@ -685,14 +685,22 @@ public class CameraController : MonoBehaviour
         Vector3 target = new Vector3(worldPosition.x, worldPosition.y, transform.position.z);
         target = GetClampedPosition(target);
 
+        // Um foco instantaneo tambem precisa cancelar uma panoramica em voo.
+        // Sem isto, o SmoothFocus pendente -- iniciado por AdjustCameraForCursor,
+        // que anima o ajuste de borda -- continua interpolando nos frames
+        // seguintes e arrasta a camera para longe da posicao que acabou de ser
+        // fixada aqui. Valia para todos os chamadores com instant: true.
+        if (_focusRoutine != null)
+        {
+            StopCoroutine(_focusRoutine);
+            _focusRoutine = null;
+        }
+
         if (instant)
         {
             transform.position = target;
             return;
         }
-
-        if (_focusRoutine != null)
-            StopCoroutine(_focusRoutine);
 
         _focusRoutine = StartCoroutine(SmoothFocus(target));
     }

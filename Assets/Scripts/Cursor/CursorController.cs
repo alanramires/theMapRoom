@@ -1231,6 +1231,17 @@ public class CursorController : MonoBehaviour
         return null;
     }
 
+    // Centraliza a camera no cursor, ao contrario de TryAdjustCameraToCursor,
+    // que so empurra o minimo para trazer o cursor para dentro da margem de
+    // borda. Quem quer "focar" precisa disto; o ajuste de borda nao centraliza.
+    public void FocusCameraOnCursor(bool instant)
+    {
+        if (cameraController == null)
+            return;
+
+        cameraController.FocusOn(transform.position, instant);
+    }
+
     public void TryAdjustCameraToCursor()
     {
         if (cameraController == null)

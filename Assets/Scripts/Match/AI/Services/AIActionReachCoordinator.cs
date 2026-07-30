@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Tilemaps;
 
 [Flags]
 public enum AIReachDecisionStages
@@ -115,6 +116,149 @@ public sealed class AIReachDecisionResult<T>
 /// </summary>
 public static class AIActionReachCoordinator
 {
+    /// <summary>
+    /// Politica geografica compartilhada dos setores da IA.
+    /// Aeronaves usam distancia cubica em todos os setores; unidades que
+    /// dependem da geografia usam caminhos reais em Tactical/Operational.
+    /// A classificacao nao substitui sensores, FOW ou validacao da acao.
+    /// </summary>
+    public static bool UsesCubicSectorReach(UnitManager unit)
+    {
+        return unit != null
+               && unit.TryGetUnitData(out UnitData data)
+               && data != null
+               && data.IsAircraft();
+    }
+
+    public static int ResolveTacticalBudget(UnitManager unit)
+    {
+        if (unit == null)
+            return 0;
+        int remaining = Mathf.Max(0, unit.RemainingMovementPoints);
+        return remaining > 0
+            ? remaining
+            : Mathf.Max(0, unit.MaxMovementPoints);
+    }
+
+    public static int ResolveOperationalBudget(
+        UnitManager unit,
+        int operationalTurns = 2)
+    {
+        return Mathf.Max(0, unit != null ? unit.MaxMovementPoints : 0)
+               * Mathf.Max(1, operationalTurns);
+    }
+
+    /// <summary>
+    /// Malha de classificacao setorial. Para aeronaves nao abre pathfinding:
+    /// materializa apenas as celulas do tabuleiro dentro do raio cubico.
+    /// Para as demais unidades preserva custo, dominio e geografia reais.
+    /// </summary>
+    public static Dictionary<Vector3Int, int> BuildSectorReachMap(
+        UnitManager unit,
+        Tilemap boardMap,
+        TerrainDatabase terrainDatabase,
+        Vector3Int origin,
+        int budget)
+    {
+        origin.z = 0;
+        int normalizedBudget = Mathf.Max(0, budget);
+        if (!UsesCubicSectorReach(unit))
+        {
+            return UnitMovementPathRules.CalculateMovementCostMap(
+                boardMap,
+                unit,
+                origin,
+                normalizedBudget,
+                terrainDatabase);
+        }
+
+        var result = new Dictionary<Vector3Int, int>();
+        if (boardMap == null)
+            return result;
+        BoundsInt bounds = boardMap.cellBounds;
+        int minX = Mathf.Max(
+            bounds.xMin, origin.x - normalizedBudget * 2);
+        int maxX = Mathf.Min(
+            bounds.xMax - 1, origin.x + normalizedBudget * 2);
+        int minY = Mathf.Max(
+            bounds.yMin, origin.y - normalizedBudget);
+        int maxY = Mathf.Min(
+            bounds.yMax - 1, origin.y + normalizedBudget);
+        for (int y = minY; y <= maxY; y++)
+        {
+            for (int x = minX; x <= maxX; x++)
+            {
+                var cell = new Vector3Int(x, y, 0);
+                int distance = CubicDistance(origin, cell);
+                if (distance > normalizedBudget
+                    || boardMap.GetTile(cell) == null)
+                    continue;
+                result[cell] = distance;
+            }
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// Testa se um alvo pertence ao setor Operational.
+    /// Aeronaves: cubico puro. Demais unidades: malha de custo real ate MP x2,
+    /// aceitando uma origem de ataque dentro do alcance da arma.
+    /// </summary>
+    public static bool TryResolveOperationalAttackReach(
+        UnitManager unit,
+        Tilemap boardMap,
+        TerrainDatabase terrainDatabase,
+        Vector3Int origin,
+        Vector3Int target,
+        int weaponRange,
+        out int reachCost,
+        out int attackDistance,
+        int operationalTurns = 2,
+        IReadOnlyDictionary<Vector3Int, int> prebuiltReach = null)
+    {
+        reachCost = int.MaxValue;
+        attackDistance = int.MaxValue;
+        if (unit == null)
+            return false;
+
+        origin.z = 0;
+        target.z = 0;
+        int budget = ResolveOperationalBudget(unit, operationalTurns);
+        if (UsesCubicSectorReach(unit))
+        {
+            int distance = CubicDistance(origin, target);
+            if (distance > budget)
+                return false;
+            reachCost = distance;
+            attackDistance = distance;
+            return true;
+        }
+
+        IReadOnlyDictionary<Vector3Int, int> reach =
+            prebuiltReach
+            ?? BuildSectorReachMap(
+                unit,
+                boardMap,
+                terrainDatabase,
+                origin,
+                budget);
+        int effectiveWeaponRange = Mathf.Max(1, weaponRange);
+        foreach (KeyValuePair<Vector3Int, int> candidate in reach)
+        {
+            int distance = CubicDistance(candidate.Key, target);
+            if (distance > effectiveWeaponRange)
+                continue;
+            if (candidate.Value < reachCost
+                || (candidate.Value == reachCost
+                    && distance < attackDistance))
+            {
+                reachCost = candidate.Value;
+                attackDistance = distance;
+            }
+        }
+        return reachCost != int.MaxValue && reachCost <= budget;
+    }
+
     public static AIReachDecisionResult<T> Evaluate<T>(
         AIReachDecisionRequest<T> request)
     {

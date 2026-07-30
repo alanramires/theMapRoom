@@ -72,7 +72,7 @@ public partial class AIController
         int tacticalBudget =
             Mathf.Max(0, unit.RemainingMovementPoints);
         bool useTacticalRouteScoring =
-            unit.GetDomain() != Domain.Air
+            !AIActionReachCoordinator.UsesCubicSectorReach(unit)
             && SectorManager.HexDistance(
                 fromCell, targetCell) <= tacticalBudget;
         AIDecisionPerf.AddCount(

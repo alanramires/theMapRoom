@@ -45,6 +45,46 @@ public partial class AIController
             return ewacsRecoveryAction;
         }
 
+        if (IsStationaryMobileAirSurveillanceRadar(unit)
+            && paths != null
+            && paths.Count > 0
+            && IsUncontrolledConstructionCellForAirSurveillance(
+                unit,
+                snapshot,
+                fromCell))
+        {
+            TeamObjectivePlan vacatePlan =
+                ObjectiveManager.GetPlanForSlot(
+                    PlayerSlotId.FromIndex(snapshot.AISlotIndex));
+            Vector3Int vacateCell =
+                FindFireSupportCapturerVacateCell(
+                    unit,
+                    snapshot,
+                    fromCell,
+                    vacatePlan,
+                    paths,
+                    occupied);
+            if (vacateCell != fromCell)
+            {
+                LogAirSurveillancePolicyStage(
+                    unit,
+                    AirSurveillancePolicyStage.ExitObstructedPosition,
+                    $"radar desocupa construcao nao controlada " +
+                    $"{fromCell} via {vacateCell}");
+                PlayerAction radarVacateAction =
+                    BuildMoveBatch(
+                        unit,
+                        snapshot.AITeam,
+                        fromCell,
+                        vacateCell,
+                        paths);
+                radarVacateAction.DebugLabel =
+                    $"Radar Movel desocupa construcao nao controlada " +
+                    $"{fromCell} para liberar captura";
+                return radarVacateAction;
+            }
+        }
+
         if (IsStationaryMobileAirSurveillanceRadar(unit))
         {
             PlayerAction transportAction =
@@ -164,6 +204,27 @@ public partial class AIController
         Debug.Log(
             $"{TL("VigilanciaAerea")} {unit.InstanceId} " +
             $"policy={stage} {reason}");
+    }
+
+    private bool IsUncontrolledConstructionCellForAirSurveillance(
+        UnitManager unit,
+        AIWorldSnapshot snapshot,
+        Vector3Int cell)
+    {
+        if (unit == null
+            || snapshot == null
+            || !IsStationaryMobileAirSurveillanceRadar(unit))
+            return false;
+
+        cell.z = 0;
+        ConstructionManager construction =
+            ConstructionOccupancyRules.GetConstructionAtCell(
+                boardTilemap, cell);
+        return construction != null
+            && construction.IsCapturable
+            && construction.CapturePointsMax > 0
+            && construction.SlotIndex
+                != ResolveAISlotKey(snapshot.AITeam);
     }
 
     private static bool IsAirSurveillanceUnit(UnitManager unit)
@@ -354,6 +415,9 @@ public partial class AIController
                 if (occupied != null && occupied.Contains(cell))
                     continue;
                 if (IsCellACapturerTarget(cell, capPlan, snapshot.AITeam))
+                    continue;
+                if (IsUncontrolledConstructionCellForAirSurveillance(
+                        unit, snapshot, cell))
                     continue;
                 if (!IsAirSurveillanceCellAllowedByRearLine(unit, snapshot, fromCell, cell, anchor, offensiveAnchor))
                     continue;
@@ -857,6 +921,11 @@ public partial class AIController
                         cell,
                         capPlan,
                         snapshot.AITeam))
+                {
+                    continue;
+                }
+                if (IsUncontrolledConstructionCellForAirSurveillance(
+                        unit, snapshot, cell))
                 {
                     continue;
                 }

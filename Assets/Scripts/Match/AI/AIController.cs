@@ -250,6 +250,35 @@ public partial class AIController : MonoBehaviour
     private readonly Dictionary<int, ConstructionManager>
         pendingRebelCaptureTargets =
             new Dictionary<int, ConstructionManager>();
+    private readonly struct PendingAIDesignatedMission
+    {
+        public readonly AIPlanRuntimeIntent Intent;
+        public readonly Vector3Int TargetCell;
+        public readonly int TargetUnitInstanceId;
+        public readonly int TargetConstructionInstanceId;
+        public readonly int Sector;
+
+        public PendingAIDesignatedMission(
+            AIPlanRuntimeIntent intent,
+            Vector3Int targetCell,
+            int targetUnitInstanceId,
+            int targetConstructionInstanceId,
+            int sector)
+        {
+            Intent = intent;
+            TargetCell = targetCell;
+            TargetUnitInstanceId = targetUnitInstanceId;
+            TargetConstructionInstanceId =
+                targetConstructionInstanceId;
+            Sector = sector;
+        }
+    }
+
+    // Como as reservas de captura, esta memoria so e aplicada depois que o
+    // batch compromete com sucesso. F11/rollback nao deixa missao fantasma.
+    private readonly Dictionary<int, PendingAIDesignatedMission>
+        pendingAIDesignatedMissions =
+            new Dictionary<int, PendingAIDesignatedMission>();
 
     // Buffers e caches para otimiza��o de performance
     private readonly List<UnitManager> _availableUnitsBuffer = new List<UnitManager>();

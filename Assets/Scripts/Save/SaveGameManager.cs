@@ -2165,6 +2165,9 @@ public class SaveGameManager : MonoBehaviour
         {
             sceneName = activeScene.name,
             savedAtUtcTicks = DateTime.UtcNow.Ticks,
+            cursorSaved = matchState.cursorSaved,
+            cursorCellX = matchState.cursorCellX,
+            cursorCellY = matchState.cursorCellY,
             currentTurn = matchState.currentTurn,
             activeTeamId = matchState.activeTeamId,
             activeSlotIndex = matchState.activeSlotIndex,
@@ -2322,6 +2325,9 @@ public class SaveGameManager : MonoBehaviour
         {
             includeNeutralTeam = data.includeNeutralTeam,
             activeSlotIndex = data.activeSlotIndex,
+            cursorSaved = data.cursorSaved,
+            cursorCellX = data.cursorCellX,
+            cursorCellY = data.cursorCellY,
             players = data.players != null ? data.players : new List<MatchPlayerSaveData>(),
             victoryStars = data.victoryStars != null ? data.victoryStars : new List<MatchVictoryStarSaveData>(),
             victoryStarsEnabled = data.victoryStarsEnabled,

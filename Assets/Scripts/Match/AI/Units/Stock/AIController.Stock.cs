@@ -215,6 +215,8 @@ public partial class AIController
             || !result.reachDecision.Found
             || result.reachDecision.Decision?.Value == null)
         {
+            if (IsPrimaryStockMissionOwner(unit))
+                QueueClearAIDesignatedMission(unit);
             reason =
                 $"MelhorEstoque {requestedIntent} sem encontro " +
                 $"(rejeitados={result?.rejected.Count ?? 0}; " +
@@ -255,6 +257,7 @@ public partial class AIController
                 transfer,
                 stock.estimatedAmount,
                 paths);
+            QueueClearAIDesignatedMission(unit);
             reason =
                 $"{stock.intent} Tactical {stock.reason}";
             return true;
@@ -295,10 +298,102 @@ public partial class AIController
             fromCell,
             progressCell,
             paths);
+        QueueRestockMission(
+            unit,
+            stock,
+            reachTier);
+        action.DebugLabel =
+            $"AI Restock {unit.InstanceId} -> " +
+            $"{stock.endpointCell} ({reachTier})";
         reason =
             $"{stock.intent} {reachTier} encontro={rendezvous} " +
             $"{progressReason} {stock.reason}";
         return true;
+    }
+
+    private static bool IsPrimaryStockMissionOwner(UnitManager unit)
+    {
+        return IsPrimaryStockUnit(unit);
+    }
+
+    private void QueueRestockMission(
+        UnitManager unit,
+        MelhorEstoqueOption stock,
+        AIReachDecisionTier tier)
+    {
+        if (unit == null || stock == null)
+            return;
+
+        Vector3Int targetCell = stock.endpointCell;
+        targetCell.z = 0;
+        int targetUnitId =
+            stock.destinationUnit != null
+                ? stock.destinationUnit.InstanceId
+                : -1;
+        int targetConstructionId =
+            stock.destinationConstruction != null
+                ? stock.destinationConstruction.InstanceId
+                : -1;
+        pendingAIDesignatedMissions[unit.InstanceId] =
+            new PendingAIDesignatedMission(
+                AIPlanRuntimeIntent.Restock,
+                targetCell,
+                targetUnitId,
+                targetConstructionId,
+                (int)tier);
+    }
+
+    private void QueueClearAIDesignatedMission(UnitManager unit)
+    {
+        if (unit == null
+            || (unit.AIHasDesignatedMission
+                && unit.AIDesignatedMissionIntent
+                    != AIPlanRuntimeIntent.Restock))
+            return;
+
+        pendingAIDesignatedMissions[unit.InstanceId] =
+            new PendingAIDesignatedMission(
+                AIPlanRuntimeIntent.None,
+                Vector3Int.zero,
+                -1,
+                -1,
+                0);
+    }
+
+    private void CommitPendingAIDesignatedMission(UnitManager unit)
+    {
+        if (unit == null
+            || !pendingAIDesignatedMissions.TryGetValue(
+                unit.InstanceId,
+                out PendingAIDesignatedMission pending))
+            return;
+
+        pendingAIDesignatedMissions.Remove(unit.InstanceId);
+        if (pending.Intent == AIPlanRuntimeIntent.None)
+        {
+            if (unit.AIDesignatedMissionIntent
+                == AIPlanRuntimeIntent.Restock)
+            {
+                unit.ClearAIDesignatedMission();
+                Debug.Log(
+                    $"{TL("Stock")} {unit.InstanceId} conclui/abandona " +
+                    "missao Restock confirmada.");
+            }
+            return;
+        }
+
+        unit.SetAIDesignatedMission(
+            pending.Intent,
+            pending.TargetCell,
+            pending.TargetUnitInstanceId,
+            pending.TargetConstructionInstanceId,
+            pending.Sector);
+        Debug.Log(
+            $"{TL("Stock")} {unit.InstanceId} confirma missao " +
+            $"{pending.Intent} destino={pending.TargetCell} " +
+            $"unit=#{pending.TargetUnitInstanceId} " +
+            $"construction=#{pending.TargetConstructionInstanceId} " +
+            $"tier={(AIReachDecisionTier)pending.Sector}.");
     }
 
     /// <summary>

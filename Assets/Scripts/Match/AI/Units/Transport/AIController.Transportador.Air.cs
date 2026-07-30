@@ -101,6 +101,7 @@ public partial class AIController
                 assignedSectorTarget,
                 paths,
                 AirDropOffRange,
+                true,
                 "Aereo",
                 out PlayerAction bestDropAction))
             return bestDropAction;

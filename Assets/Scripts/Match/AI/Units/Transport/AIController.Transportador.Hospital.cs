@@ -36,8 +36,7 @@ public partial class AIController
             && unit.TryGetUnitData(out UnitData data)
             && data != null
             && data.isSupplier
-            && data.isTransporter
-            && data.aiDisembarkWhenCannotSupply;
+            && data.isTransporter;
     }
 
     // Paciente = passageiro em reparo. Com mais de um, o mais critico manda.
@@ -49,6 +48,9 @@ public partial class AIController
         {
             UnitManager passenger = passengers[i];
             if (passenger == null || passenger.IsDead || !passenger.IsUnderRepair)
+                continue;
+            if (!PodeSuprirSensor.CanServeEmbarkedTargetIgnoringAvailability(
+                    transporter, passenger, out _))
                 continue;
             if (worst == null || passenger.CurrentHP < worst.CurrentHP)
                 worst = passenger;
@@ -84,7 +86,7 @@ public partial class AIController
         // 1. Suprir a bordo. O sensor e quem responde se ha servico; nao replicamos regra.
         if (TryBuildHospitalSupplyAction(
                 unit, snapshot, patient, fromCell, paths, limit,
-                out PlayerAction supplyAction, out string supplyReason, out bool waitOneTurn))
+                out PlayerAction supplyAction, out string supplyReason))
         {
             Debug.Log($"{TL("Hospital")} {unit.InstanceId} supre paciente {patientTag} a bordo — {supplyReason}");
             return supplyAction;
@@ -117,24 +119,22 @@ public partial class AIController
                 $"{TL("Hospital")} {unit.InstanceId} " +
                 $"sem recarga Tactical/Operational — " +
                 $"{restockReason} MelhorEstoque={stockReason}; " +
-                $"libera EVAC normal para {patientTag}");
-            return null;
+                $"mantem hospital vinculado a {patientTag}");
         }
 
-        // 3. Impedimento ESTRUTURAL (o sensor nao aceita este paciente de jeito nenhum:
-        //    servico nao coberto, alcance que nao alcanca embarcado etc.). Segurar aqui
-        //    seria congelar o ferido dentro de um transporte que nunca vai trata-lo —
-        //    e exatamente o caso que a flag nomeia. Devolve o turno ao EVAC.
-        if (!waitOneTurn)
+        // A compatibilidade foi confirmada antes de entrar no modo hospital.
+        // Revalida para proteger alteracoes runtime de configuracao: somente uma
+        // incapacidade estrutural real devolve o passageiro ao EVAC.
+        if (!PodeSuprirSensor.CanServeEmbarkedTargetIgnoringAvailability(
+                unit, patient, out string compatibilityReason))
         {
-            Debug.Log($"{TL("Hospital")} {unit.InstanceId} nao consegue suprir {patientTag} " +
-                      $"(impedimento estrutural) — libera desembarque pelo EVAC normal");
+            Debug.Log($"{TL("Hospital")} {unit.InstanceId} deixa de ser hospital de {patientTag} " +
+                      $"({compatibilityReason}) — libera EVAC normal");
             return null;
         }
 
-        // 4. Impedimento passageiro (o ferido ja recebeu suprimento nesta rodada): o
-        //    tratamento continua no proximo turno. Segura: tiro parado, senao recolhe
-        //    pra retaguarda. Nunca avanca com paciente a bordo.
+        // O tratamento continua no proximo turno. Segura: tiro parado, senao
+        // recolhe pra retaguarda. Nunca avanca com paciente a bordo.
         if (TryBuildStationaryHospitalAttack(
                 unit, snapshot, fromCell, occupied, out PlayerAction attackAction, out string attackReason))
         {
@@ -172,14 +172,13 @@ public partial class AIController
         Dictionary<Vector3Int, List<Vector3Int>> paths,
         int limit,
         out PlayerAction action,
-        out string reason,
-        out bool waitOneTurn)
+        out string reason)
     {
         action = null;
         reason = "";
-        // Impedimento que se resolve sozinho no proximo turno — nao justifica largar o
-        // ferido. Tudo que nao for isto e tratado como impedimento estrutural.
-        waitOneTurn = false;
+        // Esta rotina tenta o atendimento disponivel agora. A decisao estrutural
+        // de reter ou liberar o paciente pertence a
+        // CanServeEmbarkedTargetIgnoringAvailability.
         if (limit <= 0)
         {
             reason = "maxUnitsServedPerTurn=0";
@@ -188,7 +187,6 @@ public partial class AIController
         if (patient.ReceivedSuppliesThisTurn)
         {
             reason = "paciente ja recebeu suprimento nesta rodada";
-            waitOneTurn = true;
             return false;
         }
 

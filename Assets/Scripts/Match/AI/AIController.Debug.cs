@@ -333,7 +333,7 @@ public partial class AIController
         bool previewShown = turnStateManager != null &&
             turnStateManager.TryShowAIDebugStepPreview(action, out previewMessage);
 
-        Debug.Log($"[AI Step] {description}");
+        Debug.Log($"[AI DecisionPreview] {description}");
         if (!string.IsNullOrWhiteSpace(previewMessage))
             Debug.Log($"[AI Step] {previewMessage}");
 
@@ -372,19 +372,79 @@ public partial class AIController
                 switch (action.SensorAction)
                 {
                     case SensorActionType.Attack:
-                        return $"{unitLabel} vai de {from} ate {to} e vai atacar {action.TargetInstanceId} no hex {FormatCell(action.TargetHex)}.";
+                        return $"{unitLabel} vai atacar {ResolveUnitLabel(action.TargetInstanceId)} no hex {FormatCell(action.TargetHex)}, movendo de {from} para {to}.";
+                    case SensorActionType.Embark:
+                        return $"{unitLabel} vai embarcar em {ResolveUnitLabel(action.TargetInstanceId)}, movendo de {from} para {to}.";
+                    case SensorActionType.Disembark:
+                        return $"{unitLabel} vai desembarcar {DescribeSubSteps(action)} após mover de {from} para {to}.";
                     case SensorActionType.Capture:
-                        return $"{unitLabel} vai de {from} ate {to} e vai capturar.";
+                        return $"{unitLabel} vai capturar no hex {ResolveActionTargetHex(action, to)}, movendo de {from} para {to}.";
                     case SensorActionType.Merge:
-                        return $"{unitLabel} vai de {from} ate {to} e vai fundir.";
+                        return $"{unitLabel} vai fundir com {ResolveUnitLabel(action.TargetInstanceId)}, movendo de {from} para {to}.";
                     case SensorActionType.Supply:
-                        return $"{unitLabel} vai de {from} ate {to} e vai suprir.";
+                        return $"{unitLabel} vai suprir {DescribeActionTargets(action)}, movendo de {from} para {to}.";
+                    case SensorActionType.Transfer:
+                        return $"{unitLabel} vai transferir recursos para {DescribeActionTargets(action)}, movendo de {from} para {to}.";
+                    case SensorActionType.Land:
+                        return $"{unitLabel} vai pousar no hex {ResolveActionTargetHex(action, to)}, movendo de {from} para {to}.";
                     default:
-                        return $"{unitLabel} vai de {from} ate {to}.";
+                        return $"{unitLabel} vai apenas mover de {from} para {to}." +
+                            (!string.IsNullOrWhiteSpace(action.DebugLabel)
+                                ? $" Decisão: {action.DebugLabel}."
+                                : "");
                 }
             default:
                 return !string.IsNullOrWhiteSpace(action.DebugLabel) ? action.DebugLabel : action.ActionType.ToString();
         }
+    }
+
+    private static string ResolveActionTargetHex(
+        PlayerAction action,
+        string fallback)
+    {
+        return action != null && action.HasTargetHex
+            ? FormatCell(action.TargetHex)
+            : fallback;
+    }
+
+    private static string DescribeActionTargets(PlayerAction action)
+    {
+        if (action == null)
+            return "o alvo planejado";
+        if (!string.IsNullOrWhiteSpace(action.TargetInstanceId))
+            return ResolveUnitLabel(action.TargetInstanceId);
+        if (action.SubSteps != null && action.SubSteps.Count > 0)
+            return DescribeSubSteps(action);
+        if (action.HasTargetHex)
+            return $"o hex {FormatCell(action.TargetHex)}";
+        return "o alvo planejado";
+    }
+
+    private static string DescribeSubSteps(PlayerAction action)
+    {
+        if (action?.SubSteps == null || action.SubSteps.Count == 0)
+            return "a carga planejada";
+
+        List<string> targets = new List<string>();
+        for (int i = 0; i < action.SubSteps.Count; i++)
+        {
+            PlayerActionSubStep step = action.SubSteps[i];
+            if (step == null)
+                continue;
+
+            string target = !string.IsNullOrWhiteSpace(step.TargetInstanceId)
+                ? ResolveUnitLabel(step.TargetInstanceId)
+                : !string.IsNullOrWhiteSpace(step.Label)
+                    ? step.Label
+                    : "subação";
+            if (step.HasTargetHex)
+                target += $" em {FormatCell(step.TargetHex)}";
+            targets.Add(target);
+        }
+
+        return targets.Count > 0
+            ? string.Join(", ", targets)
+            : $"{action.SubSteps.Count} subação(ões)";
     }
 
     private static string FormatCell(Vector3Int cell)

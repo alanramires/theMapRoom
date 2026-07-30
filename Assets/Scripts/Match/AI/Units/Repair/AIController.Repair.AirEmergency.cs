@@ -479,6 +479,37 @@ public partial class AIController
             return false;
         }
 
+        AirOperationTileContext emergencyLandingContext =
+            AirOperationResolver.ResolveContext(
+                boardTilemap,
+                terrainDatabase,
+                bestCell);
+        bool landsOnFirmGround =
+            emergencyLandingContext.landingSurface
+                != LandingSurface.None;
+        if (landsOnFirmGround
+            && HasTransportCargo(aircraft)
+            && TryBuildAirTransportRepairArrivalRelease(
+                aircraft,
+                snapshot,
+                fromCell,
+                bestCell,
+                paths,
+                out PlayerAction emergencyDropAction,
+                forceEmergencyRelease: true))
+        {
+            Debug.Log(
+                $"{TL("Repair")} aeronave #{aircraft.InstanceId} " +
+                $"segue para LZ terrestre de emergencia {bestCell} e " +
+                "tenta desembarcar a carga antes do pouso no upkeep " +
+                $"({bestReason} score={bestScore:F0}).");
+            emergencyDropAction.DebugLabel =
+                $"EmergencyLandingCargoRelease " +
+                $"{aircraft.InstanceId} via {bestCell}";
+            action = emergencyDropAction;
+            return true;
+        }
+
         Debug.Log(
             $"{TL("Repair")} aeronave #{aircraft.InstanceId} {(critical ? "CRITICA" : "sem recuperacao")} " +
             $"permanece em voo sobre LZ {bestCell}; pouso somente no upkeep " +

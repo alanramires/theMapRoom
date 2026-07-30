@@ -988,7 +988,8 @@ public partial class AIController
         Vector3Int fromCell,
         Vector3Int destinationCell,
         Dictionary<Vector3Int, List<Vector3Int>> paths,
-        out PlayerAction action)
+        out PlayerAction action,
+        bool forceEmergencyRelease = false)
     {
         action = null;
         if (unit == null || snapshot == null || !IsAirTransporter(unit) || !HasTransportCargo(unit))
@@ -1001,7 +1002,16 @@ public partial class AIController
 
         List<UnitManager> passengers = CollectPassengers(unit);
         TeamObjectivePlan plan = ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(snapshot.AISlotIndex));
-        List<PodeDesembarcarOption> selected = SelectBestDisembarkPerPassenger(options, passengers, plan, snapshot);
+        List<PodeDesembarcarOption> selected =
+            forceEmergencyRelease
+                ? SelectEmergencyLandingDisembarkOrders(
+                    options,
+                    passengers)
+                : SelectBestDisembarkPerPassenger(
+                    options,
+                    passengers,
+                    plan,
+                    snapshot);
         if (selected.Count == 0)
             return false;
         if (paths == null || !paths.TryGetValue(destinationCell, out List<Vector3Int> movementPath))
@@ -1017,6 +1027,76 @@ public partial class AIController
             destinationCell,
             movementPath);
         return true;
+    }
+
+    /// <summary>
+    /// Pouso de emergencia preempta a agenda do passageiro. O sensor continua
+    /// sendo a fonte de verdade das celulas legais, mas reserva uma celula
+    /// distinta para cada carga que puder sair. Assim a politica rebelde de
+    /// "aguardar LZ conjunta" nao mantem pessoas dentro de uma aeronave que
+    /// vai pousar por falta de autonomia.
+    /// </summary>
+    private static List<PodeDesembarcarOption>
+        SelectEmergencyLandingDisembarkOrders(
+            List<PodeDesembarcarOption> options,
+            List<UnitManager> passengers)
+    {
+        var selected = new List<PodeDesembarcarOption>();
+        if (options == null || passengers == null)
+            return selected;
+
+        var reservedCells = new HashSet<Vector3Int>();
+        for (int passengerIndex = 0;
+             passengerIndex < passengers.Count;
+             passengerIndex++)
+        {
+            UnitManager passenger = passengers[passengerIndex];
+            if (passenger == null)
+                continue;
+
+            Vector3Int preferred = passenger.CurrentCellPosition;
+            if (passenger.AIHasDesignatedCaptureTarget)
+                preferred =
+                    passenger.AIDesignatedCaptureTargetCell;
+            else if (passenger.AIHasDesignatedMission)
+                preferred =
+                    passenger.AIDesignatedMissionTargetCell;
+            preferred.z = 0;
+
+            PodeDesembarcarOption best = null;
+            int bestDistance = int.MaxValue;
+            for (int optionIndex = 0;
+                 optionIndex < options.Count;
+                 optionIndex++)
+            {
+                PodeDesembarcarOption option = options[optionIndex];
+                if (option == null
+                    || option.passengerUnit != passenger)
+                    continue;
+
+                Vector3Int cell = option.disembarkCell;
+                cell.z = 0;
+                if (reservedCells.Contains(cell))
+                    continue;
+
+                int distance =
+                    AIActionReachCoordinator.CubicDistance(
+                        cell,
+                        preferred);
+                if (distance >= bestDistance)
+                    continue;
+                bestDistance = distance;
+                best = option;
+            }
+
+            if (best == null)
+                continue;
+            Vector3Int reserved = best.disembarkCell;
+            reserved.z = 0;
+            reservedCells.Add(reserved);
+            selected.Add(best);
+        }
+        return selected;
     }
 
 }

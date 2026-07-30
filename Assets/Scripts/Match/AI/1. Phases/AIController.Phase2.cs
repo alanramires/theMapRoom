@@ -32,6 +32,7 @@ public partial class AIController
         plannedDestinations.Clear();
         rebelCaptureTargetReservations.Clear();
         pendingRebelCaptureTargets.Clear();
+        pendingAIDesignatedMissions.Clear();
         assignedTransportClaims.Clear();
         transportPlanningSnapshots.Clear();
         disembarkPassengerRouteCache.Clear();
@@ -286,6 +287,7 @@ public partial class AIController
             if (batchSucceeded)
             {
                 CommitPendingRebelCaptureTarget(unit);
+                CommitPendingAIDesignatedMission(unit);
                 if (action.HasMoveTo
                     && action.MoveTo != action.MoveFrom)
                 {
@@ -298,6 +300,8 @@ public partial class AIController
             else
             {
                 pendingRebelCaptureTargets.Remove(
+                    unit.InstanceId);
+                pendingAIDesignatedMissions.Remove(
                     unit.InstanceId);
                 assignedTransportClaims.Remove(unit.InstanceId);
                 unitMoved = false;

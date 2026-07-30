@@ -43,6 +43,7 @@ public sealed class MelhorDesembarqueRequest
     public IReadOnlyDictionary<int, int> passengerPriorityByInstanceId;
     public Func<Vector3Int, bool> allowTransporterCell;
     public Func<Vector3Int, bool> allowDisembarkCell;
+    public Func<UnitManager, Vector3Int, bool> allowPassengerDisembarkCell;
     public Action<string> diagnosticLog;
 }
 
@@ -317,6 +318,16 @@ public static class MelhorDesembarqueService
                 diagnostics?.Add(
                     $"  REJECT pax=#{option.passengerUnit.InstanceId} " +
                     $"spot={spotCell} reason=confirmed_visibility");
+                continue;
+            }
+            if (request.allowPassengerDisembarkCell != null
+                && !request.allowPassengerDisembarkCell(
+                    option.passengerUnit,
+                    spotCell))
+            {
+                diagnostics?.Add(
+                    $"  REJECT pax=#{option.passengerUnit.InstanceId} " +
+                    $"spot={spotCell} reason=passenger_policy");
                 continue;
             }
             List<UnitManager> spotOccupants =

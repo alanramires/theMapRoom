@@ -343,12 +343,12 @@ public static class QueroCaronaService
         IReadOnlyDictionary<Vector3Int, int> reach =
             canReuseOperationalReach
                 ? request.operationalReach
-                : UnitMovementPathRules.CalculateMovementCostMap(
-                request.map,
+                : AIActionReachCoordinator.BuildSectorReachMap(
                 request.unit,
+                request.map,
+                request.terrainDatabase,
                 origin,
-                Mathf.Max(0, result.operationalBudget),
-                request.terrainDatabase);
+                Mathf.Max(0, result.operationalBudget));
         if (canReuseOperationalReach)
             AIDecisionPerf.AddCount(
                 "QueroCaronaOperationalReachReuses");

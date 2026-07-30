@@ -18,6 +18,13 @@ public static class SaveDataMapper
         if (matchController == null)
             return result;
 
+        if (matchController.TryExportCursorCell(out Vector3Int cursorCell))
+        {
+            result.cursorSaved = true;
+            result.cursorCellX = cursorCell.x;
+            result.cursorCellY = cursorCell.y;
+        }
+
         List<int> teamIds = new List<int>();
         List<bool> flipXs = new List<bool>();
         List<bool> isAIs = new List<bool>();
@@ -162,6 +169,15 @@ public static class SaveDataMapper
                 : (matchController.TryGetUniqueSlotForTeam((TeamId)data.victoryWinnerTeamId, out PlayerSlotId migratedWinner)
                     ? migratedWinner.Value
                     : -1));
+
+        // Por ultimo: ImportCursorCell arma a supressao do teleport de QG, e nada
+        // depois dela deve reposicionar o cursor. Saves anteriores ao campo caem
+        // no comportamento antigo (cursorSaved false -> enquadra o QG).
+        if (data.cursorSaved)
+        {
+            matchController.ImportCursorCell(
+                new Vector3Int(data.cursorCellX, data.cursorCellY, 0));
+        }
     }
 
     public static UnitSaveData BuildUnitSaveData(UnitManager unit)
@@ -230,6 +246,20 @@ public static class SaveDataMapper
                 unit.AIDesignatedCaptureTargetCell.x,
             aiDesignatedCaptureTargetCellY =
                 unit.AIDesignatedCaptureTargetCell.y,
+            aiHasDesignatedMission =
+                unit.AIHasDesignatedMission,
+            aiDesignatedMissionIntent =
+                (int)unit.AIDesignatedMissionIntent,
+            aiDesignatedMissionTargetUnitInstanceId =
+                unit.AIDesignatedMissionTargetUnitInstanceId,
+            aiDesignatedMissionTargetConstructionInstanceId =
+                unit.AIDesignatedMissionTargetConstructionInstanceId,
+            aiDesignatedMissionTargetCellX =
+                unit.AIDesignatedMissionTargetCell.x,
+            aiDesignatedMissionTargetCellY =
+                unit.AIDesignatedMissionTargetCell.y,
+            aiDesignatedMissionSector =
+                unit.AIDesignatedMissionSector,
             aiEixo = unit.AIEixo
         };
 
@@ -358,6 +388,23 @@ public static class SaveDataMapper
         else
         {
             unit.ClearAIDesignatedCaptureTarget();
+        }
+
+        if (saved.aiHasDesignatedMission)
+        {
+            unit.SetAIDesignatedMission(
+                (AIPlanRuntimeIntent)saved.aiDesignatedMissionIntent,
+                new Vector3Int(
+                    saved.aiDesignatedMissionTargetCellX,
+                    saved.aiDesignatedMissionTargetCellY,
+                    0),
+                saved.aiDesignatedMissionTargetUnitInstanceId,
+                saved.aiDesignatedMissionTargetConstructionInstanceId,
+                saved.aiDesignatedMissionSector);
+        }
+        else
+        {
+            unit.ClearAIDesignatedMission();
         }
 
         // aiEixo e independente do plano (persiste como memoria entre handoffs); restaura sempre.

@@ -22,6 +22,48 @@ public partial class AIController
         }
 
         TeamObjectivePlan capBlockPlan = ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(snapshot.AISlotIndex));
+        ConstructionManager currentConstruction =
+            ConstructionOccupancyRules.GetConstructionAtCell(
+                boardTilemap, fromCell);
+        bool blocksUncontrolledConstruction =
+            currentConstruction != null
+            && currentConstruction.IsCapturable
+            && currentConstruction.CapturePointsMax > 0
+            && currentConstruction.SlotIndex
+                != ResolveAISlotKey(snapshot.AITeam)
+            && unit.TryGetUnitData(out UnitData fireSupportData)
+            && fireSupportData != null
+            && !UnitRoleCompatibility.CanSatisfy(
+                fireSupportData, UnitRole.Capturador);
+        if (blocksUncontrolledConstruction)
+        {
+            Vector3Int vacateCell =
+                FindFireSupportCapturerVacateCell(
+                    unit,
+                    snapshot,
+                    fromCell,
+                    capBlockPlan,
+                    vacatePaths ?? BuildFireSupportPaths(unit),
+                    vacateOccupied);
+            if (vacateCell != fromCell)
+            {
+                Debug.Log(
+                    $"{TL("FireSupport")} {unit.InstanceId} desocupa " +
+                    $"construcao nao controlada em {fromCell} via " +
+                    $"{vacateCell} para liberar captura.");
+                PlayerAction uncontrolledVacate =
+                    BuildMoveBatch(
+                        unit,
+                        snapshot.AITeam,
+                        fromCell,
+                        vacateCell,
+                        vacatePaths);
+                uncontrolledVacate.DebugLabel =
+                    $"FireSupport desocupa construcao nao controlada " +
+                    $"{fromCell} para liberar captura";
+                return uncontrolledVacate;
+            }
+        }
         if (capBlockPlan != null && IsCellACapturerTarget(fromCell, capBlockPlan, snapshot.AITeam))
         {
             Vector3Int vacateCell = FindFireSupportCapturerVacateCell(unit, snapshot, fromCell, capBlockPlan, vacatePaths ?? BuildFireSupportPaths(unit), vacateOccupied);
@@ -38,6 +80,17 @@ public partial class AIController
         SectorObjective assigned = ResolveAssignedFireSupportObjective(unit, plan);
         if (assigned == null)
         {
+            // Rogue sem slot ainda deve aproveitar um tiro legal antes de
+            // aceitar carona. Antes, o embarque vinha primeiro e eclipsava
+            // exatamente o alvo que o ramo rogue so consultaria depois.
+            PlayerAction rogueAttack =
+                TryDecideFireSupportAttackOnlyAction(
+                    unit,
+                    snapshot,
+                    plan);
+            if (rogueAttack != null)
+                return rogueAttack;
+
             if (TryDecideRallyAssemblyFireSupportAction(unit, snapshot, plan, fromCell, vacatePaths, vacateOccupied, out PlayerAction rallyAction))
                 return rallyAction;
 

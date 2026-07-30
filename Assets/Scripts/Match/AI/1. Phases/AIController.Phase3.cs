@@ -15,6 +15,21 @@ public partial class AIController
 
         Debug.Log($"{TL()} Fase3 — compras.");
 
+        PlayerSlotId shoppingSlot = PlayerSlotId.FromIndex(snapshot.AISlotIndex);
+
+        // Teto de unidades do time: mesmo predicado que a compra usa em
+        // TurnStateManager.TryPurchaseShoppingUnitByIndex. Sem este gate a IA abria
+        // o menu, tentava comprar e colhia um LogError com o batch revertido.
+        if (matchController != null &&
+            matchController.HasReachedMaxUnitsForSlot(shoppingSlot))
+        {
+            Debug.Log(
+                $"{TL("Shopping")} Teto de unidades atingido " +
+                $"({matchController.MaxUnitsPerTeam}) — nao ha o que comprar.");
+            Debug.Log($"{TL()} Fase3 concluída.");
+            yield break;
+        }
+
         yield return CommitAIWorldHeavy(
             PlayerSlotId.FromIndex(snapshot.AISlotIndex),
             "phase3:pre-shopping");
@@ -36,6 +51,19 @@ public partial class AIController
         foreach (AIShoppingPlanner.ShoppingOrder order in orders)
         {
             if (!isActive || ShouldStopAIForMatchEnd("phase3_loop")) break;
+
+            // Recheca por ordem, nao so na entrada da fase: cada compra bem
+            // sucedida adiciona uma unidade, e uma lista de N ordens pode cruzar o
+            // teto na ordem k. O gate de entrada nao cobre esse caso.
+            if (matchController != null &&
+                matchController.HasReachedMaxUnitsForSlot(shoppingSlot))
+            {
+                Debug.Log(
+                    $"{TL("Shopping")} Teto de unidades atingido " +
+                    $"({matchController.MaxUnitsPerTeam}) — ordens restantes canceladas.");
+                break;
+            }
+
             yield return WaitIfDebugPaused();
             if (ShouldStopAIForMatchEnd("phase3_apos_pause_loop"))
                 yield break;

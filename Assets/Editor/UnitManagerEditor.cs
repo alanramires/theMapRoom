@@ -60,6 +60,12 @@ public class UnitManagerEditor : Editor
     private SerializedProperty aiHasDesignatedCaptureTargetProp;
     private SerializedProperty aiDesignatedCaptureTargetInstanceIdProp;
     private SerializedProperty aiDesignatedCaptureTargetCellProp;
+    private SerializedProperty aiHasDesignatedMissionProp;
+    private SerializedProperty aiDesignatedMissionIntentProp;
+    private SerializedProperty aiDesignatedMissionTargetUnitInstanceIdProp;
+    private SerializedProperty aiDesignatedMissionTargetConstructionInstanceIdProp;
+    private SerializedProperty aiDesignatedMissionTargetCellProp;
+    private SerializedProperty aiDesignatedMissionSectorProp;
 
     private void OnEnable()
     {
@@ -117,6 +123,12 @@ public class UnitManagerEditor : Editor
         aiHasDesignatedCaptureTargetProp = serializedObject.FindProperty("aiHasDesignatedCaptureTarget");
         aiDesignatedCaptureTargetInstanceIdProp = serializedObject.FindProperty("aiDesignatedCaptureTargetInstanceId");
         aiDesignatedCaptureTargetCellProp = serializedObject.FindProperty("aiDesignatedCaptureTargetCell");
+        aiHasDesignatedMissionProp = serializedObject.FindProperty("aiHasDesignatedMission");
+        aiDesignatedMissionIntentProp = serializedObject.FindProperty("aiDesignatedMissionIntent");
+        aiDesignatedMissionTargetUnitInstanceIdProp = serializedObject.FindProperty("aiDesignatedMissionTargetUnitInstanceId");
+        aiDesignatedMissionTargetConstructionInstanceIdProp = serializedObject.FindProperty("aiDesignatedMissionTargetConstructionInstanceId");
+        aiDesignatedMissionTargetCellProp = serializedObject.FindProperty("aiDesignatedMissionTargetCell");
+        aiDesignatedMissionSectorProp = serializedObject.FindProperty("aiDesignatedMissionSector");
     }
 
     public override void OnInspectorGUI()
@@ -372,6 +384,18 @@ public class UnitManagerEditor : Editor
                 EditorGUILayout.PropertyField(aiDesignatedCaptureTargetInstanceIdProp, new GUIContent("Designated Target Instance ID"));
             if (aiDesignatedCaptureTargetCellProp != null)
                 EditorGUILayout.PropertyField(aiDesignatedCaptureTargetCellProp, new GUIContent("Designated Target Cell"));
+            if (aiHasDesignatedMissionProp != null)
+                EditorGUILayout.PropertyField(aiHasDesignatedMissionProp, new GUIContent("Has Designated Mission"));
+            if (aiDesignatedMissionIntentProp != null)
+                EditorGUILayout.PropertyField(aiDesignatedMissionIntentProp, new GUIContent("Mission Intent"));
+            if (aiDesignatedMissionTargetUnitInstanceIdProp != null)
+                EditorGUILayout.PropertyField(aiDesignatedMissionTargetUnitInstanceIdProp, new GUIContent("Mission Target Unit ID"));
+            if (aiDesignatedMissionTargetConstructionInstanceIdProp != null)
+                EditorGUILayout.PropertyField(aiDesignatedMissionTargetConstructionInstanceIdProp, new GUIContent("Mission Target Construction ID"));
+            if (aiDesignatedMissionTargetCellProp != null)
+                EditorGUILayout.PropertyField(aiDesignatedMissionTargetCellProp, new GUIContent("Mission Target Cell"));
+            if (aiDesignatedMissionSectorProp != null)
+                EditorGUILayout.PropertyField(aiDesignatedMissionSectorProp, new GUIContent("Mission Sector"));
         }
     }
 

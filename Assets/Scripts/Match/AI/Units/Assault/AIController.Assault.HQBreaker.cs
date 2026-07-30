@@ -138,6 +138,11 @@ public partial class AIController
             string progressionReason = "";
             bool usedNativeDomainPreference = false;
             bool foundProgression = false;
+            bool requiresNativeDomain =
+                unit.TryGetUnitData(out UnitData followData)
+                && followData != null
+                && followData.domain == Domain.Submarine
+                && followData.heightLevel == HeightLevel.Submerged;
 
             if (hasNativeNonRegressiveCandidate)
             {
@@ -165,11 +170,36 @@ public partial class AIController
                 usedNativeDomainPreference = foundProgression;
             }
 
-            // A camada nativa e a primeira politica, mas nao vira uma
-            // barreira: se nenhum passo nativo nao-regressivo puder ser
-            // materializado pela Progressao oficial, superficie/praia
-            // continua disponivel como fallback.
-            if (!foundProgression)
+            // Submarino nao escolhe praia/superficie por vontade propria. Se
+            // nenhum passo nativo tambem aproximar o capitao, permite um passo
+            // submerso lateral/regressivo para sair do bloqueio, ainda usando a
+            // Progressao oficial. Combate e emergencias pertencem a outros ramos.
+            if (!foundProgression && requiresNativeDomain)
+            {
+                foundProgression =
+                    TryFindBestToolProgressionCell(
+                        unit,
+                        snapshot,
+                        fromCell,
+                        pressureTarget,
+                        paths,
+                        occupied,
+                        ToolProgressionIntent.AssaultPressure,
+                        out progressionCell,
+                        out progressionCandidate,
+                        out progressionReason,
+                        allowCell: cell =>
+                            (!captainCaptureCell.HasValue
+                             || cell != captainCaptureCell.Value)
+                            && CanFinishInNativeDomain(unit, cell),
+                        tacticalScore: (cell, _) =>
+                            ScoreNativeDomainPreference(unit, cell));
+                usedNativeDomainPreference = foundProgression;
+            }
+
+            // Para os demais dominios, a preferencia nativa continua sendo um
+            // desempate e a superficie permanece disponivel como fallback.
+            if (!foundProgression && !requiresNativeDomain)
             {
                 foundProgression =
                     TryFindBestToolProgressionCell(

@@ -107,7 +107,8 @@ public partial class AIController
         int movementBudget = -1,
         int maxRemainingRouteCost = int.MaxValue,
         Dictionary<Vector3Int, List<Vector3Int>> pathsByDestination = null,
-        IReadOnlyDictionary<int, int> passengerPriorityByInstanceId = null)
+        IReadOnlyDictionary<int, int> passengerPriorityByInstanceId = null,
+        IReadOnlyDictionary<int, int> passengerRouteLimitByInstanceId = null)
     {
         result = new MelhorDesembarqueResult();
         if (transporter == null
@@ -159,9 +160,19 @@ public partial class AIController
                 routeCache[passenger.InstanceId] = reverseRoute;
             }
 
+            int passengerRouteLimit = maxRemainingRouteCost;
+            if (passengerRouteLimitByInstanceId != null
+                && passengerRouteLimitByInstanceId.TryGetValue(
+                    passenger.InstanceId,
+                    out int configuredPassengerLimit))
+            {
+                passengerRouteLimit = Mathf.Max(
+                    0, configuredPassengerLimit);
+            }
+
             return reverseRoute != null
                 && reverseRoute.TryGetValue(from, out routeCost)
-                && routeCost <= maxRemainingRouteCost;
+                && routeCost <= passengerRouteLimit;
         }
 
         result = MelhorDesembarqueService.Evaluate(
@@ -184,12 +195,45 @@ public partial class AIController
                 // transportador foi autorizada, PodeDesembarcar + caminhos
                 // válidos são a fonte de verdade para o passageiro.
                 allowDisembarkCell = null,
+                allowPassengerDisembarkCell =
+                    IsDisembarkCellAllowedForPassengerRole,
                 diagnosticLog = showAILogs
                     ? message => Debug.Log(
                         $"{TL("Transporte")}[MelhorDesembarque] {message}")
                     : null
             });
         return result.best != null;
+    }
+
+    private bool IsDisembarkCellAllowedForPassengerRole(
+        UnitManager passenger,
+        Vector3Int cell)
+    {
+        if (passenger == null
+            || !passenger.TryGetUnitData(out UnitData data)
+            || data == null)
+            return true;
+
+        bool nonCapturingFireSupport =
+            UnitRoleCompatibility.CanSatisfy(
+                data, UnitRole.FogoIndireto)
+            && !UnitRoleCompatibility.CanSatisfy(
+                data, UnitRole.Capturador);
+        bool mobileGroundAirSurveillance =
+            data.domain == Domain.Land
+            && UnitRoleCompatibility.CanSatisfy(
+                data, UnitRole.VigilanciaAerea);
+        if (!nonCapturingFireSupport
+            && !mobileGroundAirSurveillance)
+            return true;
+
+        cell.z = 0;
+        ConstructionManager construction =
+            ConstructionOccupancyRules.GetConstructionAtCell(
+                boardTilemap, cell);
+        return construction == null
+            || construction.SlotIndex
+                == ResolveAISlotKey(passenger.TeamId);
     }
 
     private Dictionary<Vector3Int, int>
@@ -254,7 +298,8 @@ public partial class AIController
         int movementBudget = -1,
         int maxRemainingRouteCost = int.MaxValue,
         Dictionary<Vector3Int, List<Vector3Int>> pathsByDestination = null,
-        IReadOnlyDictionary<int, int> passengerPriorityByInstanceId = null)
+        IReadOnlyDictionary<int, int> passengerPriorityByInstanceId = null,
+        IReadOnlyDictionary<int, int> passengerRouteLimitByInstanceId = null)
     {
         var targets = new Dictionary<int, Vector3Int>();
         if (passenger != null)
@@ -271,7 +316,8 @@ public partial class AIController
             movementBudget,
             maxRemainingRouteCost,
             pathsByDestination,
-            passengerPriorityByInstanceId);
+            passengerPriorityByInstanceId,
+            passengerRouteLimitByInstanceId);
     }
 
     private bool TryBuildBestCourierDisembarkAction(
@@ -282,6 +328,7 @@ public partial class AIController
         Vector3Int assignedSectorTarget,
         Dictionary<Vector3Int, List<Vector3Int>> paths,
         int maxRemainingRouteCost,
+        bool usePassengerMovementRouteLimits,
         string consumer,
         out PlayerAction action)
     {
@@ -326,6 +373,14 @@ public partial class AIController
             requiredJointDeliveries >= 2
                 ? int.MaxValue
                 : maxRemainingRouteCost;
+        IReadOnlyDictionary<int, int> tacticalPassengerRouteLimits =
+            usePassengerMovementRouteLimits
+                ? BuildPassengerRouteLimits(passengers, 1)
+                : null;
+        IReadOnlyDictionary<int, int> operationalPassengerRouteLimits =
+            usePassengerMovementRouteLimits
+                ? BuildPassengerRouteLimits(passengers, 2)
+                : null;
 
         bool EvaluateTacticalDisembark(
             int budget,
@@ -343,7 +398,9 @@ public partial class AIController
                     pathsByDestination: paths,
                     passengerPriorityByInstanceId:
                         BuildPassengerDeliveryPriority(
-                            transporter, passengers))
+                            transporter, passengers),
+                    passengerRouteLimitByInstanceId:
+                        tacticalPassengerRouteLimits)
                 || immediateEvaluation.best == null)
                 return false;
 
@@ -396,6 +453,7 @@ public partial class AIController
                     effectiveRemainingRouteCost,
                     requiredJointDeliveries,
                     usesFreeCargoFlow,
+                    operationalPassengerRouteLimits,
                     consumer,
                     out action,
                     out _))
@@ -411,64 +469,21 @@ public partial class AIController
         MelhorDesembarqueLzScore best = evaluation.best;
         if (best.delivered < requiredJointDeliveries)
         {
-            string partialReleaseReason = string.Empty;
-            bool releaseUsefulPartialNow =
-                usesFreeCargoFlow
-                && ShouldReleasePartialFreeCargoAtTacticalLz(
-                    transporter,
-                    passengers,
-                    best,
-                    operationalTurns: 2,
-                    out partialReleaseReason);
-            if (releaseUsefulPartialNow)
-            {
-                Debug.Log($"{TL("Transporte")} {consumer} " +
-                          $"{transporter.InstanceId} libera desembarque parcial util: " +
-                          $"pax={best.delivered}/{requiredJointDeliveries}; " +
-                          $"{partialReleaseReason}.");
-            }
-
-            bool jointLzKnown = false;
-            if (!releaseUsefulPartialNow
-                && TryBuildJointDisembarkProgressionAction(
-                    transporter,
-                    passengers,
-                    snapshot,
-                    targets,
-                    paths,
-                    effectiveRemainingRouteCost,
-                    requiredJointDeliveries,
-                    usesFreeCargoFlow,
-                    consumer,
-                    out action,
-                    out jointLzKnown))
-                return true;
-
-            if (!releaseUsefulPartialNow && jointLzKnown)
-            {
-                Debug.Log($"{TL("Transporte")} {consumer} " +
-                          $"{transporter.InstanceId} rejeita desembarque parcial: " +
-                          $"pax={best.delivered}/{requiredJointDeliveries}; " +
-                          $"LZ conjunta conhecida ainda nao alcancada.");
-                return false;
-            }
-
-            // A busca longa percorreu todo o envelope conhecido do
-            // transportador e provou que esta geografia nao oferece spots
-            // exclusivos para o grupo inteiro. Nao transforme uma ilha de um
-            // unico hex em deadlock: entrega o passageiro prioritario e
-            // conserva os demais a bordo.
+            // A LZ conjunta continua sendo preferida pelo ranking quando ela
+            // consegue entregar mais passageiros neste turno. Ela nao pode,
+            // porem, vetar uma entrega Tactical ja valida: cada passageiro
+            // possui sua propria missao e o taxi conserva a carga restante
+            // para a proxima entrega.
             Debug.Log($"{TL("Transporte")} {consumer} " +
-                      $"{transporter.InstanceId} libera desembarque parcial por " +
-                      $"capacidade fisica: melhor global={best.delivered}p, " +
-                      $"grupo={requiredJointDeliveries}p; sem LZ conjunta.");
+                      $"{transporter.InstanceId} libera desembarque Tactical parcial: " +
+                      $"pax={best.delivered}/{requiredJointDeliveries}; " +
+                      $"LZ conjunta nao possui poder de veto.");
         }
 
         var selected = new List<PodeDesembarcarOption>();
         for (int i = 0; i < best.spots.Count; i++)
             selected.Add(best.spots[i].option);
-        if (selected.Count == 0
-            || !selected.Exists(o => o.passengerUnit == primary))
+        if (selected.Count == 0)
             return false;
 
         Vector3Int fromCell = transporter.CurrentCellPosition;
@@ -492,6 +507,27 @@ public partial class AIController
                 transporter, snapshot.AITeam, fromCell, selected,
                 best.cell, movePath);
         return true;
+    }
+
+    private static IReadOnlyDictionary<int, int> BuildPassengerRouteLimits(
+        List<UnitManager> passengers,
+        int turns)
+    {
+        var limits = new Dictionary<int, int>();
+        if (passengers == null)
+            return limits;
+
+        int safeTurns = Mathf.Max(1, turns);
+        for (int i = 0; i < passengers.Count; i++)
+        {
+            UnitManager passenger = passengers[i];
+            if (passenger == null)
+                continue;
+            limits[passenger.InstanceId] =
+                Mathf.Max(1, passenger.GetMovementRange())
+                * safeTurns;
+        }
+        return limits;
     }
 
     private bool ShouldReleasePartialFreeCargoAtTacticalLz(
@@ -661,6 +697,7 @@ public partial class AIController
         int maxRemainingRouteCost,
         int requiredJointDeliveries,
         bool usesFreeCargoFlow,
+        IReadOnlyDictionary<int, int> passengerRouteLimitByInstanceId,
         string consumer,
         out PlayerAction action,
         out bool jointLzKnown)
@@ -698,7 +735,9 @@ public partial class AIController
                     pathsByDestination: tierPaths,
                     passengerPriorityByInstanceId:
                         BuildPassengerDeliveryPriority(
-                            transporter, passengers))
+                            transporter, passengers),
+                    passengerRouteLimitByInstanceId:
+                        passengerRouteLimitByInstanceId)
                 || tierEvaluation.best == null
                 || tierEvaluation.best.delivered
                     < requiredJointDeliveries)
@@ -890,6 +929,51 @@ public partial class AIController
         fromCell.z = 0;
         Vector3Int jointLz = longEvaluation.best.cell;
         jointLz.z = 0;
+        if (currentPaths.TryGetValue(
+                jointLz,
+                out List<Vector3Int> reachableLzPath))
+        {
+            var selected =
+                new List<PodeDesembarcarOption>();
+            for (int i = 0;
+                 i < longEvaluation.best.spots.Count;
+                 i++)
+            {
+                PodeDesembarcarOption option =
+                    longEvaluation.best.spots[i]?.option;
+                if (option != null)
+                    selected.Add(option);
+            }
+
+            if (selected.Count > 0)
+            {
+                string delivered = string.Join(
+                    ", ",
+                    selected.ConvertAll(
+                        option =>
+                            $"#{option.passengerUnit.InstanceId}" +
+                            $"->{option.disembarkCell}"));
+                Debug.Log($"{TL("Transporte")} {consumer} " +
+                          $"{transporter.InstanceId} alcanca LZ " +
+                          $"{reachDecision.Tier} {jointLz} nesta rodada e " +
+                          $"desembarca {selected.Count}p [{delivered}].");
+                action = jointLz == fromCell
+                    ? BuildDesembarcarBatch(
+                        transporter,
+                        snapshot.AITeam,
+                        fromCell,
+                        selected)
+                    : BuildDesembarcarBatch(
+                        transporter,
+                        snapshot.AITeam,
+                        fromCell,
+                        selected,
+                        jointLz,
+                        reachableLzPath);
+                return true;
+            }
+        }
+
         if (jointLz == fromCell)
             return false;
 
@@ -1152,6 +1236,22 @@ public partial class AIController
         {
             UnitManager passenger = ordered[i];
 
+            // Passageiros combatentes carregam a propria missao. O courier
+            // entrega na direcao dessa agenda em vez de inventar uma
+            // construcao capturavel como destino para qualquer tipo de carga.
+            if (TryResolvePassengerDesignatedMissionTarget(
+                    passenger,
+                    out Vector3Int missionTarget))
+            {
+                targets[passenger.InstanceId] = missionTarget;
+                Debug.Log(
+                    $"{TL("Transporte")} alvo conjunto por missao: " +
+                    $"passageiro #{passenger.InstanceId} intent=" +
+                    $"{passenger.AIDesignatedMissionIntent} -> " +
+                    $"{missionTarget}.");
+                continue;
+            }
+
             // A designacao persistida pertence ao passageiro, nao ao courier.
             // O ranking conjunto apenas distribui oportunidades para cargas
             // ainda sem destino; ele nunca pode substituir uma reserva valida
@@ -1249,6 +1349,39 @@ public partial class AIController
         }
 
         return targets.Count > 0;
+    }
+
+    private static bool TryResolvePassengerDesignatedMissionTarget(
+        UnitManager passenger,
+        out Vector3Int target)
+    {
+        target = Vector3Int.zero;
+        if (passenger == null
+            || !passenger.AIHasDesignatedMission
+            || passenger.AIDesignatedMissionIntent
+                == AIPlanRuntimeIntent.None)
+            return false;
+
+        int targetUnitId =
+            passenger.AIDesignatedMissionTargetUnitInstanceId;
+        if (targetUnitId >= 0)
+        {
+            for (int i = 0; i < UnitManager.AllActive.Count; i++)
+            {
+                UnitManager candidate = UnitManager.AllActive[i];
+                if (candidate == null
+                    || candidate.IsDead
+                    || candidate.InstanceId != targetUnitId)
+                    continue;
+                target = candidate.CurrentCellPosition;
+                target.z = 0;
+                return true;
+            }
+        }
+
+        target = passenger.AIDesignatedMissionTargetCell;
+        target.z = 0;
+        return true;
     }
 
     private bool TryResolveSharedHotCaptureTarget(

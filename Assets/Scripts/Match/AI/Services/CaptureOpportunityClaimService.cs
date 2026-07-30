@@ -257,12 +257,12 @@ public static class CaptureOpportunityClaimService
             else
             {
                 reach =
-                    UnitMovementPathRules.CalculateMovementCostMap(
-                        request.map,
+                    AIActionReachCoordinator.BuildSectorReachMap(
                         unit,
+                        request.map,
+                        request.terrainDatabase,
                         origin,
-                        operationalBudget,
-                        request.terrainDatabase);
+                        operationalBudget);
                 AIDecisionPerf.AddCount(
                     "CaptureClaimReachBuilds");
             }

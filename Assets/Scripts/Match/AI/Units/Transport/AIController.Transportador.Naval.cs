@@ -69,6 +69,20 @@ public partial class AIController
         if (navalEvacuee != null)
             return DecideNavalEvacDeliveryAction(unit, navalEvacuee, snapshot, fromCell, paths, occupied);
 
+        // Qualquer aeronave que ja saiu de UnderRepair fica autorizada a
+        // decolar, mas nao dita uma rota de entrega ao porta-avioes. O navio
+        // executa a propria politica e, se ela resultar em movimento/espera
+        // com LZ valida, libera as aeronaves prontas no destino escolhido.
+        if (TryBuildReadyAircraftReleaseAfterNavalPosture(
+                unit,
+                snapshot,
+                plan,
+                fromCell,
+                out PlayerAction aircraftRelease))
+        {
+            return aircraftRelease;
+        }
+
         Vector3Int objective = ResolveNavalDeliveryObjective(unit, snapshot, plan);
         List<UnitManager> carriedPassengers = CollectPassengers(unit);
         if (TryBuildBestCourierDisembarkAction(
@@ -79,6 +93,7 @@ public partial class AIController
                 Vector3Int.zero,
                 paths,
                 TransportDropOffRange,
+                false,
                 "Naval",
                 out PlayerAction bestDropAction))
             return bestDropAction;
@@ -176,6 +191,131 @@ public partial class AIController
 
         Debug.Log($"{TL("NavalTransport")} {unit.InstanceId} sem ponto de desembarque alcancavel — aguarda.");
         return null;
+    }
+
+    private bool TryBuildReadyAircraftReleaseAfterNavalPosture(
+        UnitManager transporter,
+        AIWorldSnapshot snapshot,
+        TeamObjectivePlan plan,
+        Vector3Int fromCell,
+        out PlayerAction action)
+    {
+        action = null;
+        List<UnitManager> passengers = CollectPassengers(transporter);
+        var readyAircraft = new List<UnitManager>();
+        for (int i = 0; i < passengers.Count; i++)
+        {
+            UnitManager passenger = passengers[i];
+            if (passenger == null
+                || passenger.IsUnderRepair
+                || !PodeSuprirSensor.IsAirFamilyUnit(passenger))
+            {
+                continue;
+            }
+
+            readyAircraft.Add(passenger);
+        }
+        if (readyAircraft.Count == 0)
+            return false;
+
+        PlayerAction posture = null;
+        if (transporter.TryGetUnitData(out UnitData data)
+            && data != null)
+        {
+            if (UnitRoleCompatibility.CanSatisfy(
+                    data,
+                    UnitRole.FogoIndireto))
+            {
+                posture = TryDecideFireSupportAction(
+                    transporter,
+                    snapshot,
+                    plan);
+            }
+            else if (UnitRoleCompatibility.CanSatisfy(
+                         data,
+                         UnitRole.Assalto))
+            {
+                posture = TryDecideAssaultAction(
+                    transporter,
+                    snapshot,
+                    plan);
+            }
+
+            // Porta-avioes normalmente declara PlayConservative em vez de um
+            // papel terrestre de Assalto/Fogo Indireto. Essa e a agenda
+            // propria dele: seguir protegido pela retaguarda aliada.
+            if (posture == null && data.playConservative)
+            {
+                Dictionary<Vector3Int, List<Vector3Int>> posturePaths =
+                    UnitMovementPathRules.CalcularCaminhosValidos(
+                        boardTilemap,
+                        transporter,
+                        Mathf.Max(
+                            0,
+                            transporter.RemainingMovementPoints),
+                        terrainDatabase);
+                posture = TryBuildConservativeRearFollowAction(
+                    transporter,
+                    snapshot,
+                    posturePaths,
+                    context:
+                        "porta-avioes com aeronaves prontas");
+            }
+        }
+
+        if (posture == null)
+            return false;
+
+        // Ataque ou outra acao propria continua tendo precedencia; a aeronave
+        // permanece a bordo ate uma rodada em que o navio possa desembarcar.
+        if (posture.SensorAction != SensorActionType.None
+            || !posture.HasMoveTo)
+        {
+            action = posture;
+            return true;
+        }
+
+        Vector3Int destination = posture.MoveTo;
+        destination.z = 0;
+        List<PodeDesembarcarOption> options =
+            SimulateDisembarkFromCell(
+                transporter,
+                destination);
+        var selected =
+            new List<PodeDesembarcarOption>();
+        var selectedPassengerIds = new HashSet<int>();
+        for (int i = 0; i < options.Count; i++)
+        {
+            PodeDesembarcarOption option = options[i];
+            if (option == null
+                || option.passengerUnit == null
+                || !readyAircraft.Contains(option.passengerUnit)
+                || !selectedPassengerIds.Add(
+                    option.passengerUnit.InstanceId))
+            {
+                continue;
+            }
+
+            selected.Add(option);
+        }
+        if (selected.Count == 0)
+        {
+            action = posture;
+            return true;
+        }
+
+        Debug.Log(
+            $"{TL("NavalTransport")} {transporter.InstanceId} " +
+            $"executa postura propria ate {destination} e autoriza " +
+            $"decolagem de {selected.Count} aeronave(s) fora de UnderRepair.");
+        action = BuildDesembarcarBatch(
+            transporter,
+            snapshot.AITeam,
+            fromCell,
+            selected,
+            destination,
+            posture.MovementPath);
+        return true;
     }
 
     // -------------------------------------------------------------------------

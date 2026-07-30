@@ -135,6 +135,22 @@ public partial class AIController
                 // restritiva.
                 if (primaryHybrid)
                 {
+                    // O papel estacionario/especializado tentou o tiro acima.
+                    // Sem tiro, o lado combatente procura contato
+                    // Tactical/Operational antes de aceitar transporte:
+                    // parado atira; sem tiro, vai para cima.
+                    if (TryDecideAssaultAttackBeforeTransport(
+                            unit,
+                            snapshot,
+                            out PlayerAction hybridCombatPressure))
+                    {
+                        Debug.Log(
+                            $"{TL("Assalto")} {unit.InstanceId} hibrido " +
+                            "sem tiro estacionario: prioriza combate " +
+                            "Tactical/Operational antes do transporte.");
+                        return hybridCombatPressure;
+                    }
+
                     SectorObjective fireSupportObjective =
                         ResolveAssignedFireSupportObjective(unit, plan);
                     FireSupportTransportOutcome transportOutcome =

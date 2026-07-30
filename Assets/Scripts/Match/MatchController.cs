@@ -925,6 +925,9 @@ public class MatchController : MonoBehaviour
     private Coroutine fogCacheWarmupRoutine;
     private int fogCacheWarmupGeneration;
 
+    // Marcado por ImportCursorCell, consumido pelo teleport de virada de turno.
+    [System.NonSerialized] private bool suppressNextHeadQuarterCursorFocus;
+
     // Decomposicao do custo por fonte aquecida. O warm reporta so um total, e
     // 203ms/fonte contra 96-145ms de collect medido deixa ~60-100ms sem dono:
     // pode ser o clone do runtime, o CollectBoardCells ou o proprio collect.
@@ -1829,6 +1832,41 @@ public class MatchController : MonoBehaviour
         IsValidPlayerSlot(slotId) &&
         !players[slotId.Value].isAI &&
         players[slotId.Value].isLocal;
+
+    public bool TryExportCursorCell(out Vector3Int cell)
+    {
+        cell = default;
+        if (cursorController == null)
+            return false;
+
+        cell = cursorController.CurrentCell;
+        cell.z = 0;
+        return true;
+    }
+
+    /// <summary>
+    /// Restaura o cursor de um save e cancela o enquadramento de QG que viria em
+    /// seguida — o load tem uma posicao autoritativa, e o teleport de virada de
+    /// turno a sobrescreveria.
+    ///
+    /// A celula do cursor e estado logico e sempre restaura. Mover a CAMERA para
+    /// la e apresentacao, e obedece a mesma politica do enquadramento de QG: num
+    /// save carregado no turno de uma AI (ou de um humano remoto) sob sigilo, a
+    /// posicao volta mas a camera nao vai atras revelar onde ela estava.
+    /// </summary>
+    public void ImportCursorCell(Vector3Int cell)
+    {
+        suppressNextHeadQuarterCursorFocus = true;
+        if (cursorController == null)
+            return;
+
+        cell.z = 0;
+        if (!cursorController.SetCell(cell, playMoveSfx: false, adjustCamera: false))
+            return;
+
+        if (ShouldFocusCameraOnActiveHeadQuarter())
+            cursorController.FocusCameraOnCursor(instant: true);
+    }
 
     public int CountActiveLocalHumanPlayers()
     {
@@ -6667,6 +6705,31 @@ public class MatchController : MonoBehaviour
     }
 
     /// <summary>
+    /// A camera deve enquadrar o QG do participante ativo na virada?
+    ///
+    /// Sem sigilo na partida (presets sem Total War) nao existe nada a proteger:
+    /// todos veem o mesmo tabuleiro, entao o enquadramento vale sempre, inclusive
+    /// quando o time ativo e uma AI.
+    ///
+    /// Com sigilo, enquadrar o QG revela onde ele fica. So o humano LOCAL pode
+    /// receber esse enquadramento, porque so ele e o dono daquela informacao.
+    /// Uma AI nao tem observador a servir nesta maquina, e um humano REMOTO
+    /// recebe o enquadramento na maquina dele.
+    ///
+    /// IsPlayerLocal ja e exatamente "humano E local" (!isAI && isLocal), que e
+    /// a condicao pedida — nao basta "nao e AI", senao um slot remoto passaria.
+    /// </summary>
+    public bool ShouldFocusCameraOnActiveHeadQuarter()
+    {
+        if (!Application.isPlaying)
+            return false;
+        if (!ConcealsInformationFromObservers())
+            return true;
+
+        return IsPlayerLocal(ActiveSlotId);
+    }
+
+    /// <summary>
     /// Indica que a acao do participante ativo pode ser apresentada ao observador
     /// desta maquina acima do FOW. A origem dos comandos (humano, AI ou futuramente
     /// jogador remoto/replay) e deliberadamente separada desta politica visual.
@@ -10331,6 +10394,30 @@ public class MatchController : MonoBehaviour
     }
 
     private void TeleportCursorToActiveTeamHeadQuarterSilently()
+    {
+        // Consumido uma vez so: o load ja posicionou o cursor onde o jogador
+        // estava, e este teleport pertence a virada de turno, nao ao load.
+        if (suppressNextHeadQuarterCursorFocus)
+        {
+            suppressNextHeadQuarterCursorFocus = false;
+            return;
+        }
+
+        ResolveAndTeleportCursorToActiveTeamAnchor();
+
+        // O cursor ja parou no destino final (QG, ou a unidade mais proxima
+        // quando o time nao tem QG). Enquadrar aqui cobre as quatro saidas do
+        // metodo acima com uma unica chamada.
+        //
+        // Instantaneo de proposito: na virada de turno o jogador nao acompanha
+        // uma panoramica de A para B, e no inicio da partida nao existe um "de"
+        // que signifique algo. SmoothFocus tambem seria interrompido pelo
+        // proximo ClampCamera do Update.
+        if (cursorController != null && ShouldFocusCameraOnActiveHeadQuarter())
+            cursorController.FocusCameraOnCursor(instant: true);
+    }
+
+    private void ResolveAndTeleportCursorToActiveTeamAnchor()
     {
         if (!Application.isPlaying)
             return;

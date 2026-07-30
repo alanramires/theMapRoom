@@ -34,6 +34,19 @@ public partial class AIController
         SectorObjective assigned,
         QueroCaronaResult evaluatedRideNeed = null)
     {
+        RememberCombatPassengerMission(
+            unit, snapshot, policy, assigned);
+        if (IsCombatPassengerMissionLocallyFulfilled(
+                unit,
+                policy,
+                out string fulfilledReason))
+        {
+            Debug.Log(
+                $"{TL("Transporte")} {unit.InstanceId} " +
+                $"policy={policy} nao pede carona: {fulfilledReason}");
+            return null;
+        }
+
         QueroCaronaResult rideNeed =
             evaluatedRideNeed
             ?? EvaluateCombatPassengerRideNeed(
@@ -112,6 +125,124 @@ public partial class AIController
             selectedLz, passengerMeeting, paths);
     }
 
+    private static bool IsCombatPassengerMissionLocallyFulfilled(
+        UnitManager passenger,
+        CombatPassengerTransportPolicy policy,
+        out string reason)
+    {
+        reason = "";
+        if (passenger == null
+            || !passenger.AIHasDesignatedMission)
+            return false;
+
+        bool isFireSupport =
+            policy == CombatPassengerTransportPolicy.FireSupport;
+        bool isAssault =
+            policy == CombatPassengerTransportPolicy.Assault;
+        if (!isFireSupport && !isAssault)
+            return false;
+
+        Vector3Int fromCell = passenger.CurrentCellPosition;
+        fromCell.z = 0;
+        Vector3Int targetCell =
+            ResolveLiveDesignatedMissionTargetCell(passenger);
+        int distance =
+            AIActionReachCoordinator.CubicDistance(
+                fromCell,
+                targetCell);
+        // Check deliberadamente cubico e barato: estamos medindo formacao nos
+        // arredores do capitao, nao comprovando uma rota. Terreno e caminhos
+        // pertencem a decisao de movimento posterior.
+        const int fulfilledRadius = 3;
+        if (distance > fulfilledRadius)
+            return false;
+
+        reason =
+            $"missao {(isFireSupport ? "FireSupport" : "Pressure")} " +
+            $"ja atendida nos arredores do alvo " +
+            $"{targetCell}: dist={distance}h <= " +
+            $"{fulfilledRadius}h (distancia cubica)";
+        return true;
+    }
+
+    private static Vector3Int ResolveLiveDesignatedMissionTargetCell(
+        UnitManager passenger)
+    {
+        Vector3Int fallback =
+            passenger != null
+                ? passenger.AIDesignatedMissionTargetCell
+                : Vector3Int.zero;
+        fallback.z = 0;
+        if (passenger == null)
+            return fallback;
+
+        int targetId =
+            passenger.AIDesignatedMissionTargetUnitInstanceId;
+        if (targetId < 0)
+            return fallback;
+
+        for (int i = 0; i < UnitManager.AllActive.Count; i++)
+        {
+            UnitManager candidate = UnitManager.AllActive[i];
+            if (candidate == null
+                || candidate.IsDead
+                || candidate.InstanceId != targetId)
+                continue;
+            Vector3Int live = candidate.CurrentCellPosition;
+            live.z = 0;
+            return live;
+        }
+        return fallback;
+    }
+
+    private void RememberCombatPassengerMission(
+        UnitManager passenger,
+        AIWorldSnapshot snapshot,
+        CombatPassengerTransportPolicy policy,
+        SectorObjective assigned)
+    {
+        if (passenger == null || snapshot == null)
+            return;
+
+        Vector3Int fromCell = passenger.CurrentCellPosition;
+        fromCell.z = 0;
+        if (!TryResolveCapturerMagnet(
+                passenger,
+                snapshot,
+                fromCell,
+                out UnitManager captain,
+                out Vector3Int targetCell))
+            return;
+
+        AIPlanRuntimeIntent intent;
+        switch (policy)
+        {
+            case CombatPassengerTransportPolicy.FireSupport:
+                intent = AIPlanRuntimeIntent.FireSupport;
+                break;
+            case CombatPassengerTransportPolicy.AirSurveillance:
+                intent = AIPlanRuntimeIntent.AirSurveillance;
+                break;
+            default:
+                intent = AIPlanRuntimeIntent.Pressure;
+                break;
+        }
+
+        passenger.SetAIDesignatedMission(
+            intent,
+            targetCell,
+            targetUnitInstanceId:
+                captain != null ? captain.InstanceId : -1,
+            sector:
+                assigned != null ? (int)assigned.Sector : 0);
+        Debug.Log(
+            $"{TL("Transporte")} passageiro #{passenger.InstanceId} " +
+            $"registra missao {intent}: alvoUnidade=" +
+            $"#{(captain != null ? captain.InstanceId : -1)} " +
+            $"destino={targetCell} setor=" +
+            $"{(assigned != null ? assigned.Sector.ToString() : "rogue")}.");
+    }
+
     private PlayerAction TryBuildCombatPassengerRendezvousAction(
         UnitManager passenger,
         AIWorldSnapshot snapshot,
@@ -182,9 +313,14 @@ public partial class AIController
                 $"{passengerMeeting} LZTransport={selectedLz} " +
                 $"do transportador #{decision.transporter.InstanceId} " +
                 $"tier={decision.option.transporterTier}.");
-            return BuildMoveBatch(
-                passenger, snapshot.AITeam, fromCell,
-                passengerMeeting, paths);
+            return AnnotateCombatPassengerRendezvous(
+                BuildMoveBatch(
+                    passenger, snapshot.AITeam, fromCell,
+                    passengerMeeting, paths),
+                decision,
+                passengerMeeting,
+                selectedLz,
+                "vai ao encontro");
         }
 
         if (passengerMeeting == fromCell)
@@ -195,8 +331,13 @@ public partial class AIController
                 $"policy={decision.policy} aguarda no encontroPax=" +
                 $"{passengerMeeting} LZTransport={selectedLz} " +
                 $"transportador=#{decision.transporter.InstanceId}.");
-            return BuildMoveBatch(
-                passenger, snapshot.AITeam, fromCell, fromCell, paths);
+            return AnnotateCombatPassengerRendezvous(
+                BuildMoveBatch(
+                    passenger, snapshot.AITeam, fromCell, fromCell, paths),
+                decision,
+                passengerMeeting,
+                selectedLz,
+                "aguarda no encontro");
         }
 
         HashSet<Vector3Int> occupied = passenger.GetDomain() == Domain.Air
@@ -223,9 +364,14 @@ public partial class AIController
                 $"via={progressionCell} transportador=" +
                 $"#{decision.transporter.InstanceId} " +
                 $"({progressionReason}).");
-            return BuildMoveBatch(
-                passenger, snapshot.AITeam, fromCell,
-                progressionCell, paths);
+            return AnnotateCombatPassengerRendezvous(
+                BuildMoveBatch(
+                    passenger, snapshot.AITeam, fromCell,
+                    progressionCell, paths),
+                decision,
+                passengerMeeting,
+                selectedLz,
+                "progride ao encontro");
         }
 
         Debug.Log(
@@ -234,6 +380,32 @@ public partial class AIController
             $"LZTransport={selectedLz} sem progressão " +
             "materializável; libera o papel para outra ação.");
         return null;
+    }
+
+    private static PlayerAction AnnotateCombatPassengerRendezvous(
+        PlayerAction action,
+        CombatPassengerTransportDecision decision,
+        Vector3Int passengerMeeting,
+        Vector3Int transporterLz,
+        string verb)
+    {
+        if (action == null || decision?.transporter == null)
+            return action;
+
+        UnitManager passenger = decision.option?.passenger;
+        string mission =
+            passenger != null && passenger.AIHasDesignatedMission
+                ? $"; missao={passenger.AIDesignatedMissionIntent} " +
+                  $"destino={passenger.AIDesignatedMissionTargetCell}"
+                : "";
+        action.DebugLabel =
+            $"{verb} do transportador " +
+            $"{decision.transporter.UnitDisplayName}" +
+            $"#{decision.transporter.InstanceId} para embarcar; " +
+            $"encontroPax={passengerMeeting}, " +
+            $"LZTransport={transporterLz}, policy={decision.policy}" +
+            mission;
+        return action;
     }
 
     private void ClaimCombatPassengerTransportDecision(
@@ -505,6 +677,20 @@ public partial class AIController
             return null;
         SectorObjective assigned = ResolveAssignedAssaultObjective(unit, plan);
 
+        // AAA barata/porradeira tem politica propria: tiro Tactical e, sem
+        // tiro, aproximacao de alvo aereo Operational. Este ramo precisa vir
+        // antes do embarque Assault generico.
+        if (IsGroundAntiAirOnlyAssault(data))
+            return DecideGroundAntiAirAssaultAction(
+                unit, snapshot, plan, assigned);
+
+        // Regra da familia Assault: oportunidade de combate do turno vence
+        // mobilidade logistica. O transportador e alavanca para chegar a outra
+        // frente, nao uma fuga quando a unidade ja pode ir para o combate.
+        if (TryDecideAssaultAttackBeforeTransport(
+                unit, snapshot, out PlayerAction immediateAttack))
+            return immediateAttack;
+
         if (assigned == null)
         {
             if (TryFindCriticalHomeDefenseObjectiveForUnit(plan, snapshot.AITeam, unit, unit.CurrentCellPosition, "Assalto Rogue", out SectorObjective rogueCriticalHome))
@@ -553,6 +739,202 @@ public partial class AIController
         }
 
         return DecideAssignedAssaultEscortAction(unit, snapshot, assigned);
+    }
+
+    private bool TryDecideAssaultAttackBeforeTransport(
+        UnitManager unit,
+        AIWorldSnapshot snapshot,
+        out PlayerAction action)
+    {
+        action = null;
+        if (unit == null || snapshot == null)
+            return false;
+
+        Vector3Int fromCell = unit.CurrentCellPosition;
+        fromCell.z = 0;
+        Dictionary<Vector3Int, List<Vector3Int>> paths =
+            UnitMovementPathRules.CalcularCaminhosValidos(
+                boardTilemap,
+                unit,
+                Mathf.Max(0, unit.RemainingMovementPoints),
+                terrainDatabase);
+        if (paths == null || paths.Count == 0)
+            return false;
+
+        HashSet<Vector3Int> occupied = BuildOccupied(unit);
+        List<UnitManager> enemies =
+            CollectVisibleAssaultEnemies(snapshot.AITeam);
+        if (TryFindAssaultBreakerAttack(
+                unit,
+                snapshot,
+                fromCell,
+                paths,
+                occupied,
+                enemies,
+                out Vector3Int attackCell,
+                out UnitManager attackTarget,
+                out string attackReason))
+        {
+            Vector3Int targetCell = attackTarget.CurrentCellPosition;
+            targetCell.z = 0;
+            Debug.Log(
+                $"{TL("Assalto")} {unit.InstanceId} combate pre-embarque — " +
+                $"ataca via {attackCell} → {attackTarget.UnitDisplayName}" +
+                $"#{attackTarget.InstanceId} ({attackReason})");
+            action = BuildAttackBatch(
+                unit,
+                snapshot.AITeam,
+                fromCell,
+                attackCell,
+                attackTarget.InstanceId.ToString(),
+                targetCell,
+                paths);
+            return action != null;
+        }
+
+        if (!TryFindAssaultOperationalEnemyApproach(
+                unit, snapshot, fromCell, paths, occupied, enemies,
+                out Vector3Int approachCell,
+                out UnitManager operationalTarget,
+                out string operationalReason))
+            return false;
+
+        Debug.Log(
+            $"{TL("Assalto")} {unit.InstanceId} sem inimigo Tactical; " +
+            $"avanca sobre inimigo Operational " +
+            $"{operationalTarget.UnitDisplayName}" +
+            $"#{operationalTarget.InstanceId} via {approachCell} " +
+            $"({operationalReason})");
+        action = BuildMoveBatch(
+            unit, snapshot.AITeam, fromCell, approachCell, paths);
+        action.DebugLabel =
+            $"Assault avanca sobre inimigo Operational " +
+            $"{operationalTarget.UnitDisplayName}" +
+            $"#{operationalTarget.InstanceId}: {operationalReason}";
+        return true;
+    }
+
+    private bool TryFindAssaultOperationalEnemyApproach(
+        UnitManager unit,
+        AIWorldSnapshot snapshot,
+        Vector3Int fromCell,
+        Dictionary<Vector3Int, List<Vector3Int>> paths,
+        HashSet<Vector3Int> occupied,
+        List<UnitManager> enemies,
+        out Vector3Int bestCell,
+        out UnitManager bestTarget,
+        out string reason)
+    {
+        bestCell = fromCell;
+        bestTarget = null;
+        reason = "";
+        if (unit == null
+            || snapshot == null
+            || paths == null
+            || paths.Count == 0
+            || enemies == null)
+            return false;
+
+        int weaponRange =
+            Mathf.Max(1, GetFireSupportMaxWeaponRange(unit));
+        int operationalBudget =
+            AIActionReachCoordinator.ResolveOperationalBudget(unit);
+        IReadOnlyDictionary<Vector3Int, int> operationalReach = null;
+        if (!AIActionReachCoordinator.UsesCubicSectorReach(unit))
+        {
+            operationalReach =
+                AIActionReachCoordinator.BuildSectorReachMap(
+                    unit,
+                    boardTilemap,
+                    terrainDatabase,
+                    fromCell,
+                    operationalBudget);
+        }
+        int nearestRouteCost = int.MaxValue;
+        int nearestAttackDistance = int.MaxValue;
+        for (int i = 0; i < enemies.Count; i++)
+        {
+            UnitManager enemy = enemies[i];
+            if (enemy == null
+                || enemy.IsDead
+                || enemy.IsEmbarked
+                || !CanAssaultEventuallyEngageTarget(unit, enemy))
+                continue;
+
+            Vector3Int enemyCell = enemy.CurrentCellPosition;
+            enemyCell.z = 0;
+            if (!AIActionReachCoordinator.TryResolveOperationalAttackReach(
+                    unit,
+                    boardTilemap,
+                    terrainDatabase,
+                    fromCell,
+                    enemyCell,
+                    weaponRange,
+                    out int targetRouteCost,
+                    out int targetAttackDistance,
+                    prebuiltReach: operationalReach)
+                || targetRouteCost > nearestRouteCost
+                || (targetRouteCost == nearestRouteCost
+                    && targetAttackDistance >= nearestAttackDistance))
+                continue;
+            nearestRouteCost = targetRouteCost;
+            nearestAttackDistance = targetAttackDistance;
+            bestTarget = enemy;
+        }
+        if (bestTarget == null)
+            return false;
+
+        Vector3Int targetCell = bestTarget.CurrentCellPosition;
+        targetCell.z = 0;
+        if (!TryFindBestToolProgressionCell(
+                unit,
+                snapshot,
+                fromCell,
+                targetCell,
+                paths,
+                occupied,
+                ToolProgressionIntent.AssaultPressure,
+                out bestCell,
+                out ToolProgressionCandidate candidate,
+                out string progressionReason)
+            || bestCell == fromCell)
+        {
+            bestTarget = null;
+            bestCell = fromCell;
+            return false;
+        }
+
+        reason =
+            $"rotaOperational={nearestRouteCost}<={operationalBudget} " +
+            $"distAtaque={nearestAttackDistance}<={weaponRange} " +
+            $"tool={candidate.ToolScore}; {progressionReason}";
+        return true;
+    }
+
+    private static bool CanAssaultEventuallyEngageTarget(
+        UnitManager attacker,
+        UnitManager target)
+    {
+        if (attacker == null || target == null)
+            return false;
+
+        IReadOnlyList<UnitEmbarkedWeapon> weapons =
+            attacker.GetEmbarkedWeapons();
+        if (weapons == null)
+            return false;
+        Domain targetDomain = target.GetDomain();
+        HeightLevel targetHeight = target.GetHeightLevel();
+        for (int i = 0; i < weapons.Count; i++)
+        {
+            UnitEmbarkedWeapon embarked = weapons[i];
+            if (embarked?.weapon == null
+                || embarked.squadAmmunition <= 0)
+                continue;
+            if (embarked.weapon.SupportsOperationOn(
+                    targetDomain, targetHeight))
+                return true;
+        }
+        return false;
     }
 
     private PlayerAction DecideAssignedAssaultEscortAction(UnitManager unit, AIWorldSnapshot snapshot, SectorObjective assigned)
@@ -715,6 +1097,34 @@ public partial class AIController
                 target.InstanceId.ToString(), targetCell, paths);
         }
 
+        if (TryFindGroundAntiAirOperationalApproach(
+                unit,
+                snapshot,
+                fromCell,
+                paths,
+                occupied,
+                out Vector3Int operationalCell,
+                out UnitManager operationalTarget,
+                out string operationalReason))
+        {
+            Debug.Log(
+                $"{TL("Assalto")} {unit.InstanceId} AAA sem alvo Tactical; " +
+                $"aproxima alvo Operational {operationalTarget.UnitDisplayName}" +
+                $"#{operationalTarget.InstanceId} via {operationalCell} " +
+                $"({operationalReason})");
+            PlayerAction approachAction = BuildMoveBatch(
+                unit,
+                snapshot.AITeam,
+                fromCell,
+                operationalCell,
+                paths);
+            approachAction.DebugLabel =
+                $"AAA aproxima alvo Operational " +
+                $"{operationalTarget.UnitDisplayName}" +
+                $"#{operationalTarget.InstanceId}: {operationalReason}";
+            return approachAction;
+        }
+
         if (TryFindGroundAntiAirEscortGroupMove(unit, snapshot, assigned, fromCell, paths, occupied, out Vector3Int escortCell, out string escortReason))
         {
             if (escortCell != fromCell)
@@ -817,6 +1227,104 @@ public partial class AIController
                 $"lastDecision=[{lastDecisionRejection}] paths={paths.Count}");
         }
         return bestTarget != null;
+    }
+
+    private bool TryFindGroundAntiAirOperationalApproach(
+        UnitManager unit,
+        AIWorldSnapshot snapshot,
+        Vector3Int fromCell,
+        Dictionary<Vector3Int, List<Vector3Int>> paths,
+        HashSet<Vector3Int> occupied,
+        out Vector3Int bestCell,
+        out UnitManager bestTarget,
+        out string reason)
+    {
+        bestCell = fromCell;
+        bestTarget = null;
+        reason = "";
+        if (unit == null || snapshot == null
+            || paths == null || paths.Count == 0)
+            return false;
+
+        int operationalBudget =
+            AIActionReachCoordinator.ResolveOperationalBudget(unit);
+        int weaponRange =
+            Mathf.Max(1, GetFireSupportMaxWeaponRange(unit));
+        IReadOnlyDictionary<Vector3Int, int> operationalReach = null;
+        if (!AIActionReachCoordinator.UsesCubicSectorReach(unit))
+        {
+            operationalReach =
+                AIActionReachCoordinator.BuildSectorReachMap(
+                    unit,
+                    boardTilemap,
+                    terrainDatabase,
+                    fromCell,
+                    operationalBudget);
+        }
+        List<UnitManager> enemies =
+            CollectVisibleAssaultEnemies(snapshot.AITeam);
+        if (enemies == null)
+            return false;
+
+        int nearestReachCost = int.MaxValue;
+        int nearestAttackDistance = int.MaxValue;
+        for (int i = 0; i < enemies.Count; i++)
+        {
+            UnitManager enemy = enemies[i];
+            if (enemy == null || enemy.IsDead
+                || enemy.IsEmbarked
+                || enemy.GetDomain() != Domain.Air)
+                continue;
+
+            Vector3Int enemyCell = enemy.CurrentCellPosition;
+            enemyCell.z = 0;
+            if (!AIActionReachCoordinator.TryResolveOperationalAttackReach(
+                    unit,
+                    boardTilemap,
+                    terrainDatabase,
+                    fromCell,
+                    enemyCell,
+                    weaponRange,
+                    out int reachCost,
+                    out int attackDistance,
+                    prebuiltReach: operationalReach)
+                || reachCost > nearestReachCost
+                || (reachCost == nearestReachCost
+                    && attackDistance >= nearestAttackDistance))
+                continue;
+
+            nearestReachCost = reachCost;
+            nearestAttackDistance = attackDistance;
+            bestTarget = enemy;
+        }
+        if (bestTarget == null)
+            return false;
+
+        Vector3Int targetCell = bestTarget.CurrentCellPosition;
+        targetCell.z = 0;
+        if (!TryFindBestToolProgressionCell(
+                unit,
+                snapshot,
+                fromCell,
+                targetCell,
+                paths,
+                occupied,
+                ToolProgressionIntent.AssaultPressure,
+                out bestCell,
+                out ToolProgressionCandidate candidate,
+                out string progressionReason)
+            || bestCell == fromCell)
+        {
+            bestTarget = null;
+            bestCell = fromCell;
+            return false;
+        }
+
+        reason =
+            $"reach={nearestReachCost}<={operationalBudget} " +
+            $"distAtaque={nearestAttackDistance} " +
+            $"tool={candidate.ToolScore}; {progressionReason}";
+        return true;
     }
 
     private bool TryFindGroundAntiAirEscortGroupMove(
@@ -983,7 +1491,14 @@ public partial class AIController
     {
         if (data == null || data.domain != Domain.Land || data.roles == null || data.roles.Count == 0)
             return false;
-        if (data.roles[0] != UnitRole.Assalto)
+        // A AAA atual declara AntiaereoCombatente como papel primario. Esse
+        // papel satisfaz Assalto no roteamento, mas ResolveCompositionRole o
+        // preserva como AntiaereoCombatente. Portanto a identificacao precisa
+        // aceitar explicitamente os dois papeis; o SAM (Antiaereo/FogoIndireto)
+        // continua fora desta politica kamikaze.
+        UnitRole primaryRole = data.roles[0];
+        if (primaryRole != UnitRole.Assalto
+            && primaryRole != UnitRole.AntiaereoCombatente)
             return false;
         if (data.embarkedWeapons == null || data.embarkedWeapons.Count == 0)
             return false;

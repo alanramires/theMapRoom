@@ -33,6 +33,30 @@ public partial class AIController
         if (criticalStockAction != null)
             return criticalStockAction;
 
+        // Esta autorizacao precisa viver antes do roteador Courier: do
+        // contrario, "carga embarcada" vence e transforma a aeronave pronta
+        // em uma missao de entrega. Havendo paciente ainda em UnderRepair, o
+        // Hospital continua soberano e segura o grupo.
+        if (hasCargo
+            && unit.GetDomain() == Domain.Naval
+            && FindEmbarkedPatient(unit) == null)
+        {
+            Vector3Int fromCell = unit.CurrentCellPosition;
+            fromCell.z = 0;
+            if (TryBuildReadyAircraftReleaseAfterNavalPosture(
+                    unit,
+                    snapshot,
+                    plan,
+                    fromCell,
+                    out PlayerAction aircraftRelease))
+            {
+                Debug.Log(
+                    $"{TL("TransportOps")} {unit.InstanceId} " +
+                    "flag=ReadyAircraftToLaunch preempta Courier.");
+                return aircraftRelease;
+            }
+        }
+
         TransportPlanningSnapshot planningSnapshot = null;
         bool planningSnapshotRequested = false;
         TransportPlanningSnapshot GetPlanningSnapshot()

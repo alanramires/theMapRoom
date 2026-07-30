@@ -248,14 +248,27 @@ public static class UnitThreatEnvelopeService
 
         if (includeMovement)
         {
-            paths = UnitMovementPathRules.CalcularCaminhosValidos(
-                map, unit, movementSteps, terrainDatabase);
-            foreach (Vector3Int rawCell in paths.Keys)
+            bool cubicAircraft =
+                AIActionReachCoordinator.UsesCubicSectorReach(unit);
+            if (!cubicAircraft)
             {
-                Vector3Int cell = rawCell;
-                cell.z = 0;
-                if (map.GetTile(cell) != null)
-                    movementCells.Add(cell);
+                paths = UnitMovementPathRules.CalcularCaminhosValidos(
+                    map, unit, movementSteps, terrainDatabase);
+                foreach (Vector3Int rawCell in paths.Keys)
+                {
+                    Vector3Int cell = rawCell;
+                    cell.z = 0;
+                    if (map.GetTile(cell) != null)
+                        movementCells.Add(cell);
+                }
+            }
+            else
+            {
+                CollectCubicMovementCells(
+                    map,
+                    unit.CurrentCellPosition,
+                    movementSteps,
+                    movementCells);
             }
 
             Vector3Int origin = unit.CurrentCellPosition;
@@ -299,6 +312,34 @@ public static class UnitThreatEnvelopeService
         envelope = new UnitThreatEnvelope(paths, movementCells, attackable, lineCells);
         Cache[cacheIndex] = new CacheEntry { KeyHash = keyHash, Envelope = envelope };
         return true;
+    }
+
+    private static void CollectCubicMovementCells(
+        Tilemap map,
+        Vector3Int origin,
+        int radius,
+        HashSet<Vector3Int> destination)
+    {
+        if (map == null || destination == null)
+            return;
+        origin.z = 0;
+        BoundsInt bounds = map.cellBounds;
+        int minX = Mathf.Max(bounds.xMin, origin.x - radius * 2);
+        int maxX = Mathf.Min(bounds.xMax - 1, origin.x + radius * 2);
+        int minY = Mathf.Max(bounds.yMin, origin.y - radius);
+        int maxY = Mathf.Min(bounds.yMax - 1, origin.y + radius);
+        for (int y = minY; y <= maxY; y++)
+        {
+            for (int x = minX; x <= maxX; x++)
+            {
+                var cell = new Vector3Int(x, y, 0);
+                if (map.GetTile(cell) == null
+                    || AIActionReachCoordinator.CubicDistance(
+                        origin, cell) > radius)
+                    continue;
+                destination.Add(cell);
+            }
+        }
     }
 
     private static void RemoveCellsOutsideBoard(Tilemap map, HashSet<Vector3Int> cells)

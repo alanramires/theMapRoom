@@ -65,6 +65,7 @@ public partial class AIController
                 assignedSectorTarget,
                 paths,
                 dropOffRange,
+                false,
                 "Terrestre",
                 out PlayerAction bestDropAction))
             return bestDropAction;

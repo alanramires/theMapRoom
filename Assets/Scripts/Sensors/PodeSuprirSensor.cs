@@ -766,6 +766,70 @@ public static class PodeSuprirSensor
         return unit != null && unit.TryGetUnitData(out UnitData data) && data != null && data.isSupplier;
     }
 
+    /// <summary>
+    /// Consulta estrutural do vinculo hospital-paciente embarcado. Ignora
+    /// disponibilidade momentanea (estoque, dinheiro e atendimento ja realizado
+    /// nesta rodada), mas preserva a configuracao real do supridor e dos servicos.
+    /// </summary>
+    public static bool CanServeEmbarkedTargetIgnoringAvailability(
+        UnitManager supplier,
+        UnitManager target,
+        out string reason)
+    {
+        reason = string.Empty;
+        if (supplier == null || target == null)
+        {
+            reason = "Supridor ou paciente ausente.";
+            return false;
+        }
+        if (!supplier.TryGetUnitData(out UnitData supplierData)
+            || supplierData == null
+            || !supplierData.isSupplier
+            || !supplierData.isTransporter)
+        {
+            reason = "Unidade nao e supridor transportador.";
+            return false;
+        }
+        if (supplierData.maxUnitsServedPerTurn <= 0)
+        {
+            reason = "Supridor sem capacidade de atendimento por turno.";
+            return false;
+        }
+        if (supplierData.serviceRange != SupplierRangeMode.SameHexOrEmbarked)
+        {
+            reason = "Alcance de servico nao atende passageiro embarcado.";
+            return false;
+        }
+        if (!target.IsEmbarked || target.EmbarkedTransporter != supplier)
+        {
+            reason = "Unidade nao esta embarcada neste supridor.";
+            return false;
+        }
+
+        List<ServiceData> services = GetDistinctServicesFromUnit(supplier);
+        for (int i = 0; i < services.Count; i++)
+        {
+            ServiceData service = services[i];
+            if (service == null || !service.isService)
+                continue;
+            if (service.apenasEntreSupridores && !IsSupplier(target))
+                continue;
+
+            bool canRepair = service.recuperaHp && target.GetMaxHP() > 0;
+            bool canRefuel = service.recuperaAutonomia && target.GetMaxFuel() > 0;
+            bool canRearm = service.recuperaMunicao
+                && target.TryGetUnitData(out UnitData targetData)
+                && targetData != null
+                && targetData.embarkedWeapons != null
+                && targetData.embarkedWeapons.Count > 0;
+            if (canRepair || canRefuel || canRearm)
+                return true;
+        }
+
+        reason = "Nenhum servico configurado e compativel com o paciente.";
+        return false;
+    }
+
     private static bool HasAtLeastOneOperationalServiceWithStock(UnitManager supplier, List<ServiceData> services)
     {
         if (supplier == null || services == null)

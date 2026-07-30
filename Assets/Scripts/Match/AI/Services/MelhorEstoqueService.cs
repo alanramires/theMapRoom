@@ -165,12 +165,12 @@ public static class MelhorEstoqueService
         }
         Dictionary<Vector3Int, int> routeCosts =
             request.operationalCosts
-            ?? UnitMovementPathRules.CalculateMovementCostMap(
-                request.map,
+            ?? AIActionReachCoordinator.BuildSectorReachMap(
                 actor,
+                request.map,
+                request.terrainDatabase,
                 origin,
-                operationalBudget,
-                request.terrainDatabase);
+                operationalBudget);
         if (request.operationalCosts != null)
             AIDecisionPerf.AddCount("MelhorEstoqueOperationalReachReuses");
         if (!routeCosts.ContainsKey(origin))

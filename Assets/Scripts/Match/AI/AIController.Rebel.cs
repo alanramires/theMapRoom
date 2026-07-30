@@ -160,17 +160,10 @@ public partial class AIController
         AIWorldSnapshot snapshot,
         Vector3Int fromCell)
     {
-        if (TryResolveUnitDesignatedCaptureTarget(
+        bool hasDesignated =
+            TryResolveUnitDesignatedCaptureTarget(
                 unit,
-                out ConstructionManager designated))
-        {
-            Debug.Log(
-                $"{TL("Rebelde")} {unit.InstanceId} mantem " +
-                $"DesignatedCaptureTarget " +
-                $"#{designated.InstanceId} em " +
-                $"{designated.CurrentCellPosition}.");
-            return designated;
-        }
+                out ConstructionManager designated);
 
         // Celulas onde ja ha aliado parado — proxy de "predio ja sendo capturado por nos".
         HashSet<Vector3Int> allyCells = new HashSet<Vector3Int>();
@@ -261,7 +254,46 @@ public partial class AIController
             }
         }
 
-        return best;
+        if (!hasDesignated)
+            return best;
+
+        // A designacao persistente impede troca caotica de objetivo entre turnos,
+        // mas nao pode eclipsar uma captura materializavel agora. O snapshot de
+        // claims acima continua sendo a fonte de verdade: so desviamos para um
+        // predio livre que nao pertence a outro capturador.
+        if (best != null && best != designated)
+        {
+            Vector3Int bestCell = best.CurrentCellPosition;
+            bestCell.z = 0;
+            int immediateBudget = Mathf.Max(
+                0,
+                unit.RemainingMovementPoints);
+            int immediateCost = TerrainCostToCell(
+                unit,
+                fromCell,
+                bestCell,
+                immediateBudget);
+            float designatedDistance = SectorManager.HexDistance(
+                fromCell,
+                designated.CurrentCellPosition);
+            if (immediateCost <= immediateBudget
+                && bestDist < designatedDistance)
+            {
+                Debug.Log(
+                    $"{TL("Rebelde")} {unit.InstanceId} substitui " +
+                    $"DesignatedCaptureTarget #{designated.InstanceId} " +
+                    $"por oportunidade imediata #{best.InstanceId} em " +
+                    $"{bestCell} custo={immediateCost}<={immediateBudget}.");
+                return best;
+            }
+        }
+
+        Debug.Log(
+            $"{TL("Rebelde")} {unit.InstanceId} mantem " +
+            $"DesignatedCaptureTarget " +
+            $"#{designated.InstanceId} em " +
+            $"{designated.CurrentCellPosition}.");
+        return designated;
     }
 
     private bool TryResolveUnitDesignatedCaptureTarget(

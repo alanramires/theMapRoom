@@ -5,6 +5,19 @@ using UnityEngine;
 using UnityEngine.Tilemaps;
 using UnityEngine.UI;
 
+public enum AIPlanRuntimeIntent
+{
+    None = 0,
+    Capture = 1,
+    Pressure = 2,
+    FireSupport = 3,
+    AntiAir = 4,
+    AirSurveillance = 5,
+    Repair = 6,
+    Supply = 7,
+    Restock = 8
+}
+
 [ExecuteAlways]
 public class UnitManager : MonoBehaviour
 {
@@ -147,6 +160,13 @@ public class UnitManager : MonoBehaviour
     [SerializeField] private bool aiHasDesignatedCaptureTarget;
     [SerializeField] private int aiDesignatedCaptureTargetInstanceId = -1;
     [SerializeField] private Vector3Int aiDesignatedCaptureTargetCell = Vector3Int.zero;
+    [Tooltip("Missao individual persistente usada pelo transporte e retomada da agenda apos desembarque.")]
+    [SerializeField] private bool aiHasDesignatedMission;
+    [SerializeField] private AIPlanRuntimeIntent aiDesignatedMissionIntent = AIPlanRuntimeIntent.None;
+    [SerializeField] private int aiDesignatedMissionTargetUnitInstanceId = -1;
+    [SerializeField] private int aiDesignatedMissionTargetConstructionInstanceId = -1;
+    [SerializeField] private Vector3Int aiDesignatedMissionTargetCell = Vector3Int.zero;
+    [SerializeField] private int aiDesignatedMissionSector;
     [Header("AI Eixo Runtime")]
     [Tooltip("Eixo ao qual a unidade pertence: 1, 2 ou 3 = eixos regulares; 4 = invasão final. 0 = nenhum (rogue / fora de eixo).")]
     [Range(0, 4)]
@@ -263,6 +283,12 @@ public class UnitManager : MonoBehaviour
         aiDesignatedCaptureTargetInstanceId;
     public Vector3Int AIDesignatedCaptureTargetCell =>
         aiDesignatedCaptureTargetCell;
+    public bool AIHasDesignatedMission => aiHasDesignatedMission;
+    public AIPlanRuntimeIntent AIDesignatedMissionIntent => aiDesignatedMissionIntent;
+    public int AIDesignatedMissionTargetUnitInstanceId => aiDesignatedMissionTargetUnitInstanceId;
+    public int AIDesignatedMissionTargetConstructionInstanceId => aiDesignatedMissionTargetConstructionInstanceId;
+    public Vector3Int AIDesignatedMissionTargetCell => aiDesignatedMissionTargetCell;
+    public int AIDesignatedMissionSector => aiDesignatedMissionSector;
     public int AIEixo => aiEixo;
     public void SetAIEixo(int eixo)
     {
@@ -331,6 +357,32 @@ public class UnitManager : MonoBehaviour
         aiHasDesignatedCaptureTarget = false;
         aiDesignatedCaptureTargetInstanceId = -1;
         aiDesignatedCaptureTargetCell = Vector3Int.zero;
+    }
+
+    public void SetAIDesignatedMission(
+        AIPlanRuntimeIntent intent,
+        Vector3Int targetCell,
+        int targetUnitInstanceId = -1,
+        int targetConstructionInstanceId = -1,
+        int sector = 0)
+    {
+        targetCell.z = 0;
+        aiHasDesignatedMission = intent != AIPlanRuntimeIntent.None;
+        aiDesignatedMissionIntent = intent;
+        aiDesignatedMissionTargetUnitInstanceId = targetUnitInstanceId;
+        aiDesignatedMissionTargetConstructionInstanceId = targetConstructionInstanceId;
+        aiDesignatedMissionTargetCell = targetCell;
+        aiDesignatedMissionSector = sector;
+    }
+
+    public void ClearAIDesignatedMission()
+    {
+        aiHasDesignatedMission = false;
+        aiDesignatedMissionIntent = AIPlanRuntimeIntent.None;
+        aiDesignatedMissionTargetUnitInstanceId = -1;
+        aiDesignatedMissionTargetConstructionInstanceId = -1;
+        aiDesignatedMissionTargetCell = Vector3Int.zero;
+        aiDesignatedMissionSector = 0;
     }
 
     public void SetAIStance(int stance, Sprite icon = null, bool visible = false)

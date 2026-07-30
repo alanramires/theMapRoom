@@ -5,9 +5,17 @@ using UnityEngine;
 [Serializable]
 public class SaveGameData
 {
-    public int version = 18;
+    public int version = 19;
     public string sceneName;
     public long savedAtUtcTicks;
+
+    // Ver MatchStateSaveData.cursorSaved. version 19 introduziu estes campos;
+    // saves 18 ou anteriores desserializam com cursorSaved false e caem no
+    // enquadramento de QG, que era o comportamento deles.
+    public bool cursorSaved;
+    public int cursorCellX;
+    public int cursorCellY;
+
     public int currentTurn;
     public int activeTeamId;
     public int activeSlotIndex = -1;
@@ -147,6 +155,14 @@ public class MatchStateSaveData
     public bool hasVictoryWinner;
     public int victoryWinnerTeamId = (int)TeamId.Neutral;
     public int victoryWinnerSlotIndex = -1;
+
+    // Onde o jogador estava olhando. Um save e a foto de um momento: restaurar
+    // no QG devolveria a atencao dele a um canto que nao era o dele.
+    // cursorSaved distingue "save antigo, sem o campo" de "save na celula 0,0".
+    public bool cursorSaved;
+    public int cursorCellX;
+    public int cursorCellY;
+
     public List<MatchPlayerSaveData> players = new List<MatchPlayerSaveData>();
     public List<MatchVictoryStarSaveData> victoryStars = new List<MatchVictoryStarSaveData>();
 }
@@ -291,6 +307,13 @@ public class UnitSaveData
     public int aiDesignatedCaptureTargetInstanceId = -1;
     public int aiDesignatedCaptureTargetCellX;
     public int aiDesignatedCaptureTargetCellY;
+    public bool aiHasDesignatedMission;
+    public int aiDesignatedMissionIntent;
+    public int aiDesignatedMissionTargetUnitInstanceId = -1;
+    public int aiDesignatedMissionTargetConstructionInstanceId = -1;
+    public int aiDesignatedMissionTargetCellX;
+    public int aiDesignatedMissionTargetCellY;
+    public int aiDesignatedMissionSector;
     public int aiEixo = 0;
     public List<int> embarkedWeaponAmmo = new List<int>();
     public List<RuntimeSupplySaveData> embarkedSupplies = new List<RuntimeSupplySaveData>();
