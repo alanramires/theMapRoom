@@ -263,13 +263,10 @@ public static class HexEvaluator
         }
 
         // ----------------------------------------------------------
-        // Prioridade 5: PrudentFow — rush ao HQ inimigo, apenas se a unidade
-        //   tiver Capture na sua aiSensorPriority (capturadores fazem rush;
-        //   unidades de apoio retornam hasTarget = false).
+        // Prioridade 5: PrudentFow — rush ao HQ inimigo apenas quando a
+        //   unidade possui a skill oficial Captura Construcoes.
         // ----------------------------------------------------------
-        bool isCapturador = unitData != null
-            && unitData.aiSensorPriority != null
-            && unitData.aiSensorPriority.Contains(AISensorPriority.Capture);
+        bool isCapturador = PodeCapturarSensor.HasCaptureConstructionSkill(unitData);
 
         if (isCapturador)
         {

@@ -718,7 +718,11 @@ public partial class AIController
     {
         action = null;
         reason = "";
-        if (unit == null || snapshot == null || snapshot.MyUnits == null)
+        if (unit == null
+            || snapshot == null
+            || serviceTarget == null
+            || !unit.TryGetUnitData(out UnitData supplierData)
+            || supplierData == null)
             return false;
 
         int limit = GetLogisticsServiceLimit(unit);
@@ -737,28 +741,45 @@ public partial class AIController
         float bestScore = float.MinValue;
         string bestDetails = "";
 
-        for (int u = 0; u < snapshot.MyUnits.Count; u++)
+        UnitManager candidateTarget = serviceTarget;
+        if (!IsLogisticsServiceTarget(
+                unit,
+                candidateTarget,
+                allowPreventiveMaintenance))
+            return false;
+
+        Vector3Int targetCell =
+            candidateTarget.CurrentCellPosition;
+        targetCell.z = 0;
+        bool critical = candidateTarget.IsUnderRepair;
+        bool ownEmbarkedTarget =
+            candidateTarget.IsEmbarked
+            && IsOwnEmbarkedPassenger(unit, candidateTarget);
+
+        foreach (Vector3Int rawCell in paths.Keys)
         {
-            UnitManager candidateTarget = snapshot.MyUnits[u];
-            if (!IsLogisticsServiceTarget(unit, candidateTarget, allowPreventiveMaintenance))
+            Vector3Int cell = rawCell;
+            cell.z = 0;
+            if (!ownEmbarkedTarget
+                && !IsInsideSupplierServiceGeometry(
+                    supplierData.serviceRange,
+                    cell,
+                    targetCell))
                 continue;
-
-            Vector3Int targetCell = candidateTarget.CurrentCellPosition;
-            targetCell.z = 0;
-            bool critical = candidateTarget.IsUnderRepair;
-
-            foreach (Vector3Int rawCell in paths.Keys)
-            {
-                Vector3Int cell = rawCell;
-                cell.z = 0;
-                if (cell != fromCell && occupied != null && occupied.Contains(cell))
-                    continue;
-                if (IsLogisticsProductionCell(snapshot.AITeam, cell)
-                    && (cell != fromCell || mustVacateProducer))
-                    continue;
-                if (!IsLogisticsServiceCellAllowed(unit, snapshot, cell))
-                    continue;
-                List<UnitManager> targets = CollectLogisticsTargetsBySupplySensorAtCell(
+            if (cell != fromCell
+                && occupied != null
+                && occupied.Contains(cell))
+                continue;
+            if (IsLogisticsProductionCell(snapshot.AITeam, cell)
+                && (cell != fromCell || mustVacateProducer))
+                continue;
+            if (!IsLogisticsServiceCellAllowed(
+                    unit,
+                    snapshot,
+                    cell))
+                continue;
+            List<UnitManager> targets =
+                CollectLogisticsTargetsBySupplySensorAtCell(
                     unit,
                     snapshot,
                     cell,
@@ -767,48 +788,64 @@ public partial class AIController
                     out _,
                     out _,
                     out _);
-                bool containsTarget = false;
-                for (int i = 0; i < targets.Count; i++)
+            bool containsTarget = false;
+            for (int i = 0; i < targets.Count; i++)
+            {
+                if (targets[i] != null
+                    && targets[i].InstanceId
+                        == candidateTarget.InstanceId)
                 {
-                    if (targets[i] != null && targets[i].InstanceId == candidateTarget.InstanceId)
-                    {
-                        containsTarget = true;
-                        break;
-                    }
+                    containsTarget = true;
+                    break;
                 }
-                if (!containsTarget)
-                    continue;
+            }
+            if (!containsTarget)
+                continue;
 
-                float threat = CalculateThreatLevel(cell, snapshot.AITeam);
-                float dpq = GetTerrainDpqPontos(cell);
-                float rearArea = CalculateLogisticsRearAreaScore(unit, snapshot, cell, anchor);
-                float targetNeed = ScoreLogisticsTargetNeed(snapshot, cell, candidateTarget);
-                float serviceDist = SectorManager.HexDistance(cell, targetCell);
-                int pathCost = GetPathStepCount(paths, cell);
-                bool forward = !baseDefense && IsLogisticsForwardOfMainLine(unit, snapshot, cell, anchor);
-                bool preferred = serviceTarget != null && candidateTarget.InstanceId == serviceTarget.InstanceId;
+            float threat =
+                CalculateThreatLevel(cell, snapshot.AITeam);
+            float dpq = GetTerrainDpqPontos(cell);
+            float rearArea =
+                CalculateLogisticsRearAreaScore(
+                    unit, snapshot, cell, anchor);
+            float targetNeed =
+                ScoreLogisticsTargetNeed(
+                    snapshot, cell, candidateTarget);
+            float serviceDist =
+                SectorManager.HexDistance(cell, targetCell);
+            int pathCost = GetPathStepCount(paths, cell);
+            bool forward =
+                !baseDefense
+                && IsLogisticsForwardOfMainLine(
+                    unit, snapshot, cell, anchor);
 
-                float score = targetNeed
-                    + (critical ? 8000f : 0f)
-                    + (preferred ? 2500f : 0f)
-                    + targets.Count * 1200f
-                    + dpq * 80f
-                    + rearArea * 0.45f
-                    - threat * (baseDefense ? 35f : 120f)
-                    - pathCost * 14f
-                    - serviceDist * 50f
-                    - candidateTarget.InstanceId * 0.001f;
+            float score = targetNeed
+                + (critical ? 8000f : 0f)
+                + 2500f
+                + targets.Count * 1200f
+                + dpq * 80f
+                + rearArea * 0.45f
+                - threat * (baseDefense ? 35f : 120f)
+                - pathCost * 14f
+                - serviceDist * 50f
+                - candidateTarget.InstanceId * 0.001f;
 
-                if (forward)
-                    score -= critical ? 900f : 2600f;
+            if (forward)
+                score -= critical ? 900f : 2600f;
 
-                if (score > bestScore)
-                {
-                    bestScore = score;
-                    bestCell = cell;
-                    bestTargets = targets;
-                    bestDetails = $"target={candidateTarget.UnitDisplayName}#{candidateTarget.InstanceId} critical={critical} preferred={preferred} count={targets.Count} need={targetNeed:F0} threat={threat:F1} dpq={dpq:F1} rear={rearArea:F0} path={pathCost} forward={forward}";
-                }
+            if (score > bestScore)
+            {
+                bestScore = score;
+                bestCell = cell;
+                bestTargets = targets;
+                bestDetails =
+                    $"target={candidateTarget.UnitDisplayName}" +
+                    $"#{candidateTarget.InstanceId} " +
+                    $"critical={critical} preferred=True " +
+                    $"count={targets.Count} need={targetNeed:F0} " +
+                    $"threat={threat:F1} dpq={dpq:F1} " +
+                    $"rear={rearArea:F0} path={pathCost} " +
+                    $"forward={forward}";
             }
         }
 
@@ -818,6 +855,26 @@ public partial class AIController
         action = BuildSupplyBatch(unit, snapshot.AITeam, fromCell, bestCell, bestTargets, paths);
         reason = $"via={bestCell} score={bestScore:F0} {bestDetails}";
         return true;
+    }
+
+    private static bool IsInsideSupplierServiceGeometry(
+        SupplierRangeMode range,
+        Vector3Int supplierCell,
+        Vector3Int targetCell)
+    {
+        supplierCell.z = 0;
+        targetCell.z = 0;
+        float distance =
+            SectorManager.HexDistance(supplierCell, targetCell);
+        switch (range)
+        {
+            case SupplierRangeMode.Adjacent1Hex:
+                return distance == 1;
+            case SupplierRangeMode.Hybrid0Or1Hex:
+                return distance <= 1;
+            default:
+                return distance == 0;
+        }
     }
 
     private float ScoreLogisticsSupplyOption(AIWorldSnapshot snapshot, Vector3Int serviceCell, PodeSuprirOption option)

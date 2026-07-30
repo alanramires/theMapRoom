@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: ff62338cd52aa1642ac9ea2c1a05ede6
+guid: 67c98a1545792e44891ec62f2c7f9029
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: 4012048843444522911
-    second: rio_0
+      213: 5278554548527647446
+    second: white ring tools_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -113,13 +113,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: rio_0
+      name: white ring tools_0
       rect:
         serializedVersion: 2
-        x: 434
+        x: 68
         y: 0
-        width: 385
-        height: 1254
+        width: 890
+        height: 1024
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -128,8 +128,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: f9f07079a29ada730800000000000000
-      internalID: 4012048843444522911
+      spriteID: 6da43881561314940800000000000000
+      internalID: 5278554548527647446
       vertices: []
       indices: 
       edges: []
@@ -148,7 +148,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      rio_0: 4012048843444522911
+      white ring tools_0: 5278554548527647446
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

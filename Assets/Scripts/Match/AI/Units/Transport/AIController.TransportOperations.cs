@@ -1094,6 +1094,26 @@ public partial class AIController
         }
 
         Vector3Int anchor = ResolveLogisticsAnchor(snapshot, fromCell);
+        if (TryBuildTargetedLogisticsSupplyAction(
+                unit,
+                snapshot,
+                fromCell,
+                serviceTarget,
+                paths,
+                occupied,
+                baseDefense,
+                out PlayerAction targetedSupply,
+                out string targetedSupplyReason))
+        {
+            Debug.Log(
+                $"{TL("Transporte")} {unit.InstanceId} supply " +
+                $"{decision.ReachTier}: move e atende " +
+                $"{serviceTarget.UnitDisplayName}#" +
+                $"{serviceTarget.InstanceId} " +
+                $"({targetedSupplyReason}).");
+            return targetedSupply;
+        }
+
         if (!TryFindLogisticsRepositionCell(
                 unit, snapshot, fromCell, anchor, serviceTarget,
                 baseDefense, paths, occupied,

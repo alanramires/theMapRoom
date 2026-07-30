@@ -5,6 +5,17 @@ using UnityEngine.Tilemaps;
 
 public sealed class HotzoneWindow : EditorWindow
 {
+    // Espelha ReachIntent. A janela nao interpreta a intencao: apenas escolhe
+    // qual delas pedir ao servico unificado.
+    private enum IntentMode
+    {
+        Combate,
+        Logistica,
+        Transferencia,
+        Fusao,
+        Embarque
+    }
+
     private enum ViewMode
     {
         Todas,
@@ -17,6 +28,7 @@ public sealed class HotzoneWindow : EditorWindow
     [SerializeField] private Tilemap tilemap;
     [SerializeField] private TerrainDatabase terrainDatabase;
     [SerializeField] private DPQAirHeightConfig dpqAirHeightConfig;
+    [SerializeField] private IntentMode intentMode = IntentMode.Combate;
     [SerializeField] private ViewMode viewMode = ViewMode.Todas;
     [SerializeField] private bool showCellCosts;
 
@@ -60,10 +72,14 @@ public sealed class HotzoneWindow : EditorWindow
             "Hotzone — Tactical / Operational / Strategic",
             EditorStyles.boldLabel);
         EditorGUILayout.HelpBox(
-            "Tactical mostra a Hotzone confirmada da unidade. " +
+            "Escolha a intenção: combate, atendimento logístico, " +
+            "transferência de estoque, fusão ou embarque. Tactical mostra a " +
+            "Hotzone confirmada dessa intenção na rodada atual, com o custo " +
+            "de entrada resolvido pelo sensor Pode* correspondente. " +
             "Operational usa MP base x2: cúbico para aeronáuticas e " +
             "geográfico para as demais. Strategic é o restante do tabuleiro " +
-            "e serve apenas como direção.",
+            "e serve apenas como direção — o serviço não materializa células " +
+            "para ela.",
             MessageType.Info);
 
         unit = (UnitManager)EditorGUILayout.ObjectField(
@@ -88,6 +104,8 @@ public sealed class HotzoneWindow : EditorWindow
             AutoDetect();
         EditorGUILayout.EndHorizontal();
 
+        intentMode = (IntentMode)EditorGUILayout.EnumPopup(
+            "Intenção", intentMode);
         viewMode = (ViewMode)EditorGUILayout.EnumPopup(
             "Modalidade", viewMode);
         showCellCosts = EditorGUILayout.Toggle(
@@ -116,7 +134,8 @@ public sealed class HotzoneWindow : EditorWindow
             EditorStyles.miniLabel);
         EditorGUILayout.Space(3f);
         EditorGUILayout.LabelField(
-            "Verde = Tactical | Azul = Operational | Cinza = Strategic",
+            $"{ResolveIntentLabel()} | Verde = Tactical | " +
+            "Azul = Operational | Cinza = Strategic",
             EditorStyles.miniLabel);
     }
 
@@ -201,38 +220,62 @@ public sealed class HotzoneWindow : EditorWindow
             return;
         }
 
-        UnitThreatEnvelopeService.TryGet(
-            unit,
-            tilemap,
-            terrainDatabase,
-            UnitThreatEnvelopeMovement.Potential,
-            dpqAirHeightConfig,
-            enableLdt: true,
-            enableLos: true,
-            enableSpotter: true,
-            out UnitThreatEnvelope tacticalEnvelope,
-            out bool cacheHit);
-        if (tacticalEnvelope != null)
-            tactical.UnionWith(tacticalEnvelope.AttackableCells);
+        if (!unit.TryGetUnitData(out UnitData unitData)
+            || unitData == null)
+        {
+            status = "UnitData ausente.";
+            hasResult = false;
+            return;
+        }
 
-        Vector3Int origin = unit.CurrentCellPosition;
-        origin.z = 0;
+        if (!TryResolveIntent(unitData, out ReachIntent intent))
+        {
+            hasResult = false;
+            return;
+        }
+
+        // A janela nao calcula mais nada: pede as duas bandas materializaveis
+        // ao servico unificado e apenas pinta o resultado. Strategic continua
+        // sendo o complemento — o servico nao materializa celulas para ela.
+        UnitReachProfile profile =
+            UnitReachEnvelopeService.BuildProfile(new UnitReachRequest
+            {
+                Unit = unit,
+                BoardMap = tilemap,
+                TerrainDatabase = terrainDatabase,
+                Intent = intent,
+                Band = ReachBand.Tactical,
+                MovementBudget = Mathf.Max(0, unit.MaxMovementPoints),
+                FilterByOperationDomain = intent != ReachIntent.Combat,
+                MovementMode = UnitThreatEnvelopeMovement.Potential,
+                DpqAirHeightConfig = dpqAirHeightConfig,
+                EnableLdt = true,
+                EnableLos = true,
+                EnableSpotter = true
+            });
+
+        if (profile.Tactical != null)
+            tactical.UnionWith(profile.Tactical.ActionCells);
+
         int operationalBudget =
             AIActionReachCoordinator.ResolveOperationalBudget(unit);
-        Dictionary<Vector3Int, int> reach =
-            AIActionReachCoordinator.BuildSectorReachMap(
-                unit,
-                tilemap,
-                terrainDatabase,
-                origin,
-                operationalBudget);
-        foreach (KeyValuePair<Vector3Int, int> pair in reach)
+        if (profile.Operational != null)
         {
-            Vector3Int cell = pair.Key;
-            cell.z = 0;
-            operationalCosts[cell] = pair.Value;
-            if (!tactical.Contains(cell))
-                operational.Add(cell);
+            foreach (KeyValuePair<Vector3Int, int> pair
+                     in profile.Operational.CostByCell)
+            {
+                Vector3Int costCell = pair.Key;
+                costCell.z = 0;
+                operationalCosts[costCell] = pair.Value;
+            }
+
+            foreach (Vector3Int rawCell in profile.Operational.ActionCells)
+            {
+                Vector3Int cell = rawCell;
+                cell.z = 0;
+                if (!tactical.Contains(cell))
+                    operational.Add(cell);
+            }
         }
 
         foreach (Vector3Int rawCell in tilemap.cellBounds.allPositionsWithin)
@@ -251,12 +294,74 @@ public sealed class HotzoneWindow : EditorWindow
                 ? "cúbica (aeronáutica)"
                 : "geográfica (caminhos e custos)";
         status =
-            $"{unit.name}: Tactical={tactical.Count}; " +
+            $"{unit.name}: intenção={ResolveIntentLabel()}; " +
+            $"Tactical={tactical.Count}; " +
             $"Operational={operational.Count}, orçamento={operationalBudget}, " +
-            $"regra={geometry}; Strategic={strategic.Count}. " +
-            $"Hotzone cache={(cacheHit ? "HIT" : "MISS")}.";
+            $"regra={geometry}; Strategic={strategic.Count} (só direção).";
         hasResult = true;
         SceneView.RepaintAll();
+    }
+
+    private bool TryResolveIntent(UnitData unitData, out ReachIntent intent)
+    {
+        switch (intentMode)
+        {
+            case IntentMode.Logistica:
+                intent = ReachIntent.Service;
+                if (!unitData.isSupplier
+                    || unitData.supplierServiceProfile
+                        == SupplierServiceProfile.StockTransfer)
+                {
+                    status =
+                        "A unidade não oferece atendimento logístico de campo.";
+                    return false;
+                }
+                return true;
+
+            case IntentMode.Transferencia:
+                intent = ReachIntent.Transfer;
+                if (!unitData.isSupplier
+                    || unitData.supplierTier != SupplierTier.Hub)
+                {
+                    status = "A unidade não é Hub de transferência.";
+                    return false;
+                }
+                return true;
+
+            case IntentMode.Embarque:
+                intent = ReachIntent.Embark;
+                if (unit.IsEmbarked)
+                {
+                    status = "A unidade já está embarcada.";
+                    return false;
+                }
+                return true;
+
+            case IntentMode.Fusao:
+                intent = ReachIntent.Fusion;
+                return true;
+
+            default:
+                intent = ReachIntent.Combat;
+                return true;
+        }
+    }
+
+    private string ResolveIntentLabel()
+    {
+        switch (intentMode)
+        {
+            case IntentMode.Logistica:
+                return "Logística";
+            case IntentMode.Transferencia:
+                return "Transferência";
+            case IntentMode.Embarque:
+                return "Embarque";
+            case IntentMode.Fusao:
+                return "Fusão";
+            default:
+                return "Combate";
+        }
     }
 
     private void OnSceneGUI(SceneView sceneView)

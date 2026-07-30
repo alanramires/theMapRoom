@@ -163,7 +163,8 @@ public class UnitData : ScriptableObject
     public List<AITargetPreferenceByClassRule> aiTargetPreferenceByClass = new List<AITargetPreferenceByClassRule>();
 
     [Header("Combat Behavior")]
-    [Tooltip("Ordem de prioridade das acoes que a IA executara com esta unidade. A IA tenta cada entrada em sequencia e executa a primeira que for possivel.")]
+    [HideInInspector]
+    [Tooltip("LEGADO AI_Legacy: mantido temporariamente apenas para desserializar assets antigos; nenhum sistema runtime consome este campo.")]
     public List<AISensorPriority> aiSensorPriority = new List<AISensorPriority> { AISensorPriority.Attack, AISensorPriority.Reposition };
     [Tooltip("Ao se posicionar para combate (inimigo engajado), prioriza celulas DPQ favoraveis (construcoes, estruturas) em vez de avancar em linha reta.")]
     public bool prioritizeDpqAtBattle = false;

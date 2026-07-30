@@ -11,6 +11,36 @@ public static class PodeCapturarSensor
     }
 
     /// <summary>
+    /// Fonte de verdade da capacidade de capturar construcoes.
+    /// O papel da IA define comportamento; a permissao vem de
+    /// UnitData > Training > Skills > Captura Construcoes.
+    /// </summary>
+    public static bool HasCaptureConstructionSkill(UnitManager unit)
+    {
+        return unit != null
+            && unit.TryGetUnitData(out UnitData unitData)
+            && HasCaptureConstructionSkill(unitData);
+    }
+
+    public static bool HasCaptureConstructionSkill(UnitData unitData)
+    {
+        if (unitData == null || unitData.skills == null)
+            return false;
+
+        for (int i = 0; i < unitData.skills.Count; i++)
+        {
+            SkillData skill = unitData.skills[i];
+            if (skill == null)
+                continue;
+
+            if (skill.canCaptureConstructions)
+                return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
     /// Retorna quantos pontos esta unidade aplica ao capturar ou recuperar uma construcao.
     /// Capturadores agressivos trocam eficiencia de captura pelo alcance: 2 HP por ponto,
     /// arredondando para cima e com minimo de 1 enquanto estiverem vivos.
@@ -185,12 +215,11 @@ public static class PodeCapturarSensor
             return false;
         }
 
-        // Aceita qualquer papel que SATISFAÇA Capturador (Capturador e CapturadorAgressivo) — o check
-        // canônico de compatibilidade, mesmo que a AI usa. O Contains estrito anterior rejeitava o
-        // CapturadorAgressivo (ex.: Bazooka) e fazia o batch de captura falhar mesmo com slots ok.
-        if (!UnitRoleCompatibility.CanSatisfy(unitData, UnitRole.Capturador))
+        // A capacidade e declarada pela skill, independentemente do papel de IA.
+        // Assim Soldado, Bazooka, Metranca e futuras unidades usam a mesma regra.
+        if (!HasCaptureConstructionSkill(unitData))
         {
-            reason = "Apenas unidades com papel de Capturador (ou Capturador Agressivo) podem capturar.";
+            reason = "A unidade nao possui a skill Captura Construcoes.";
             return false;
         }
 

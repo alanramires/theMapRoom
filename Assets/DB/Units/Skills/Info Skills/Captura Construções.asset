@@ -15,3 +15,4 @@ MonoBehaviour:
   id: capturaConstrucoes
   displayName: "Captura Constru\xE7\xF5es"
   description: "a unidade pode capturar constru\xE7\xF5es"
+  canCaptureConstructions: 1

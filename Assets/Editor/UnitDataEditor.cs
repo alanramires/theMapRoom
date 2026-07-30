@@ -190,7 +190,6 @@ public class UnitDataEditor : Editor
         SerializedProperty aiPurchaseModeProp    = serializedObject.FindProperty("aiPurchaseMode");
         SerializedProperty bannedOnHardModeProp  = serializedObject.FindProperty("bannedOnHardMode");
         SerializedProperty aiTargetPrefProp      = serializedObject.FindProperty("aiTargetPreferenceByClass");
-        SerializedProperty sensorPriorityProp    = serializedObject.FindProperty("aiSensorPriority");
         SerializedProperty rolesProp             = serializedObject.FindProperty("roles");
         SerializedProperty combatClassificationProp = serializedObject.FindProperty("combatClassification");
         if (aiInitiativeProp != null)
@@ -208,9 +207,6 @@ public class UnitDataEditor : Editor
 
         EditorGUILayout.Space(4f);
         EditorGUILayout.LabelField("Combat Behavior", EditorStyles.boldLabel);
-        if (sensorPriorityProp != null)
-            EditorGUILayout.PropertyField(sensorPriorityProp, new GUIContent("Ai Sensor Priority"), includeChildren: true);
-
         SerializedProperty dpqProp              = serializedObject.FindProperty("prioritizeDpqAtBattle");
         SerializedProperty conservativeProp     = serializedObject.FindProperty("playConservative");
         SerializedProperty preferDpqMoveProp    = serializedObject.FindProperty("preferMoveOnBestDPQ");

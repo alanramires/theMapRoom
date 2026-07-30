@@ -62,7 +62,7 @@ public class PodeCapturarSensorDebugWindow : EditorWindow
         EditorGUILayout.LabelField("Sensor Pode Capturar", EditorStyles.boldLabel);
         EditorGUILayout.HelpBox(
             "Regras:\n" +
-            "1) Unidade com sensor de captura habilitado no perfil\n" +
+            "1) Training > Skills exige uma skill com Can Capture Constructions ativo\n" +
             "2) Runtime: exige estado real Moveu Parado/Andando e acao C disponivel\n" +
             "3) Scene Manual: usa o sensor puro no modo escolhido, sem fingir estado do TurnState\n" +
             "4) Unidade em construcao inimiga/neutra captura; aliada danificada recupera",

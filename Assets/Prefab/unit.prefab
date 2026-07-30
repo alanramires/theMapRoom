@@ -619,6 +619,12 @@ MonoBehaviour:
   aiHasDesignatedCaptureTarget: 0
   aiDesignatedCaptureTargetInstanceId: -1
   aiDesignatedCaptureTargetCell: {x: 0, y: 0, z: 0}
+  aiHasDesignatedMission: 0
+  aiDesignatedMissionIntent: 0
+  aiDesignatedMissionTargetUnitInstanceId: -1
+  aiDesignatedMissionTargetConstructionInstanceId: -1
+  aiDesignatedMissionTargetCell: {x: 0, y: 0, z: 0}
+  aiDesignatedMissionSector: 0
   aiEixo: 0
   aiHasStance: 0
   aiStance: 0

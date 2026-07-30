@@ -458,6 +458,12 @@ public partial class TurnStateManager
         if (TryShowInspectedCurrentWeaponRange())
             return ActionSfx.Confirm;
 
+        if (TryShowInspectedServiceRange())
+            return ActionSfx.Confirm;
+
+        if (TryShowInspectedTransferRange())
+            return ActionSfx.Confirm;
+
         if (TryShowInspectedVisionRange())
             return ActionSfx.Confirm;
 

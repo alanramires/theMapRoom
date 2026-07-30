@@ -12,5 +12,8 @@ public class SkillData : ScriptableObject
 
     [TextArea]
     public string description;
-}
 
+    [Header("Capabilities")]
+    [Tooltip("Quando ativo, esta skill autoriza a unidade a capturar ou recuperar construcoes pelo PodeCapturarSensor.")]
+    public bool canCaptureConstructions;
+}

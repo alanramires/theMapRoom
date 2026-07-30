@@ -3945,6 +3945,13 @@ public class PanelHelperController : MonoBehaviour
 
         cancelActionButton.onClick.AddListener(() =>
         {
+            if (turnStateManager != null
+                && turnStateManager
+                    .CloseTurnStartAutonomyReportFromPointer())
+            {
+                cursorController?.PlayCancelSfx();
+                return;
+            }
             if (turnStateManager != null)
             {
                 turnStateManager.SetCommandServicePreviewFocus(1);
@@ -4270,7 +4277,7 @@ public class PanelHelperController : MonoBehaviour
     {
         if (turnStateManager == null)
             return false;
-        if (turnStateManager.IsManualTurnStartAutonomyReportActive)
+        if (turnStateManager.IsTurnStartAutonomyReportActive)
             return true;
 
         switch (turnStateManager.CurrentCursorState)
@@ -4368,6 +4375,33 @@ public class PanelHelperController : MonoBehaviour
             return false;
 
         return instance.ContainsScreenPoint(screenPoint);
+    }
+
+    public static bool IsCurrentPointerOverHelperPanel()
+    {
+        if (instance == null)
+            return false;
+
+#if ENABLE_INPUT_SYSTEM
+        Mouse mouse = Mouse.current;
+        if (mouse != null)
+        {
+            return instance.ContainsScreenPoint(
+                mouse.position.ReadValue());
+        }
+
+        Touchscreen touchscreen = Touchscreen.current;
+        if (touchscreen != null
+            && touchscreen.primaryTouch.press.isPressed)
+        {
+            return instance.ContainsScreenPoint(
+                touchscreen.primaryTouch.position.ReadValue());
+        }
+
+        return false;
+#else
+        return instance.ContainsScreenPoint(Input.mousePosition);
+#endif
     }
 
     private bool ContainsScreenPoint(Vector2 screenPoint)

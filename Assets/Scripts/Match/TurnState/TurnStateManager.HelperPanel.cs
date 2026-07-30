@@ -147,6 +147,8 @@ public partial class TurnStateManager
     private ConstructionManager inspectedHelperConstruction;
     private bool inspectedHelperTerrain;
     private bool inspectedHelperCurrentWeaponRange;
+    private bool inspectedHelperServiceRange;
+    private bool inspectedHelperTransferRange;
     private bool inspectedHelperVisionRange;
     private readonly List<Vector3Int> inspectedThreatRangeCells = new List<Vector3Int>();
     private readonly HashSet<Vector3Int> inspectedThreatRangeLookup = new HashSet<Vector3Int>();
@@ -180,6 +182,8 @@ public partial class TurnStateManager
 
     public bool IsManualTurnStartAutonomyReportActive =>
         turnStartAutonomyHelperOpenedFromMenu && IsTurnStartAutonomyHelperActive();
+    public bool IsTurnStartAutonomyReportActive =>
+        IsTurnStartAutonomyHelperActive();
     public bool HasTurnStartAutonomyReport => lastTurnStartAutonomyHelperLines.Count > 0;
     public bool IsTurnStartAutonomyReportCancelFocused => IsManualTurnStartAutonomyReportActive &&
         turnStartAutonomyHelperFocusIndex == turnStartAutonomyHelperLines.Count;
@@ -218,10 +222,30 @@ public partial class TurnStateManager
     {
         if (!IsManualTurnStartAutonomyReportActive)
             return false;
+        return CloseActiveTurnStartAutonomyReport(
+            restoreMenuState: true);
+    }
+
+    public bool CloseTurnStartAutonomyReportFromPointer()
+    {
+        if (!IsTurnStartAutonomyHelperActive())
+            return false;
+        return CloseActiveTurnStartAutonomyReport(
+            restoreMenuState:
+                turnStartAutonomyHelperOpenedFromMenu);
+    }
+
+    private bool CloseActiveTurnStartAutonomyReport(
+        bool restoreMenuState)
+    {
         ClearTurnStartAutonomyHelper();
         UiInputBlocker.SuppressGameplayInputForFrames(2);
         BattleMapMenuRootController.SuppressMenuOpenForCurrentFrame();
-        BattleMapMenuRootController.TryRestoreMenuFromStateStack(TurnStateManager.CursorState.Neutral);
+        if (restoreMenuState)
+        {
+            BattleMapMenuRootController.TryRestoreMenuFromStateStack(
+                TurnStateManager.CursorState.Neutral);
+        }
         return true;
     }
 
@@ -1718,6 +1742,8 @@ public partial class TurnStateManager
         inspectedHelperConstruction = null;
         inspectedHelperTerrain = true;
         inspectedHelperCurrentWeaponRange = false;
+        inspectedHelperServiceRange = false;
+        inspectedHelperTransferRange = false;
         inspectedHelperVisionRange = false;
         ClearEnemyThreatLayersOverlay();
         ClearInspectedThreatOverlay();
@@ -1739,12 +1765,23 @@ public partial class TurnStateManager
         inspectedHelperConstruction = null;
         inspectedHelperTerrain = false;
         inspectedHelperCurrentWeaponRange = false;
+        inspectedHelperServiceRange = false;
+        inspectedHelperTransferRange = false;
         inspectedHelperVisionRange = false;
         ClearEnemyThreatLayersOverlay();
-        if (paintThreatOverlay)
+        bool hasArmedWeapon = HasAnyArmedWeapon(unit);
+        inspectedHelperCurrentWeaponRange = !hasArmedWeapon;
+        if (paintThreatOverlay && hasArmedWeapon)
             ApplyInspectedThreatOverlay(unit, nextTurnHotZone);
         else
             ClearInspectedThreatOverlay();
+        if (!hasArmedWeapon)
+        {
+            bool logisticsRangeShown =
+                ShowPrimaryInspectedLogisticsRange();
+            if (!logisticsRangeShown)
+                TryShowInspectedVisionRange();
+        }
         inspectedHelperVisibleUntil = Time.time + Mathf.Max(0.1f, GetInspectUnitHelperDurationSeconds());
         inspectedHelperActivatedFrame = Time.frameCount;
         inspectedHelperCursorCell = cursorController.CurrentCell;
@@ -1762,6 +1799,8 @@ public partial class TurnStateManager
         inspectedHelperUnit = null;
         inspectedHelperTerrain = false;
         inspectedHelperCurrentWeaponRange = false;
+        inspectedHelperServiceRange = false;
+        inspectedHelperTransferRange = false;
         inspectedHelperVisionRange = false;
         ClearEnemyThreatLayersOverlay();
         ClearInspectedThreatOverlay();
@@ -1789,6 +1828,8 @@ public partial class TurnStateManager
         inspectedHelperConstruction = null;
         inspectedHelperTerrain = false;
         inspectedHelperCurrentWeaponRange = false;
+        inspectedHelperServiceRange = false;
+        inspectedHelperTransferRange = false;
         inspectedHelperVisionRange = false;
         ClearInspectedThreatOverlay();
         inspectedHelperVisibleUntil = -1f;
@@ -1881,6 +1922,301 @@ public partial class TurnStateManager
         inspectedHelperVisibleUntil = Time.time + InspectedHelperDurationSeconds;
         inspectedHelperActivatedFrame = Time.frameCount;
         return true;
+    }
+
+    private bool TryShowInspectedServiceRange()
+    {
+        if (inspectedHelperUnit == null
+            || inspectedHelperServiceRange
+            || !inspectedHelperUnit.TryGetUnitData(
+                out UnitData supplierData)
+            || supplierData == null
+            || !supplierData.isSupplier
+            || supplierData.supplierServiceProfile
+                == SupplierServiceProfile.StockTransfer)
+        {
+            return false;
+        }
+
+        Tilemap boardMap = terrainTilemap != null
+            ? terrainTilemap
+            : inspectedHelperUnit.BoardTilemap;
+        if (boardMap == null)
+            return false;
+        if (lineOfFireMapTilemap == null)
+            lineOfFireMapTilemap = FindLineOfFireMapTilemap();
+        if (lineOfFireMapTilemap == null)
+            return false;
+
+        TileBase toolsTile =
+            Resources.Load<TileBase>("white ring tools");
+        if (toolsTile == null)
+        {
+            Debug.LogWarning(
+                "[Inspect] Tile Resources/white ring tools nao encontrado.");
+            return false;
+        }
+
+        UnitReachEnvelope serviceEnvelope =
+            BuildInspectedLogisticsEnvelope(
+                boardMap,
+                ReachIntent.Service,
+                supplierData.serviceRange);
+        IReadOnlyCollection<Vector3Int> cellsToPaint =
+            ResolveInspectedLogisticsCells(serviceEnvelope);
+        if (cellsToPaint.Count == 0)
+        {
+            inspectedHelperServiceRange = true;
+            return false;
+        }
+
+        ClearInspectedThreatOverlay();
+        ClearLineOfFireArea();
+        PaintInspectedLogisticsMovement(
+            boardMap,
+            serviceEnvelope,
+            cellsToPaint);
+
+        Color teamColor =
+            TeamUtils.GetColor(inspectedHelperUnit.TeamId);
+        Color toolsColor = new Color(
+            teamColor.r,
+            teamColor.g,
+            teamColor.b,
+            Mathf.Clamp01(lineOfFireAlpha));
+        foreach (Vector3Int rawCell in cellsToPaint)
+        {
+            Vector3Int cell = rawCell;
+            cell.z = 0;
+            if (boardMap.GetTile(cell) == null
+                || !CanPaintInspectedLogisticsCell(cell)
+                || inspectedThreatLineLookup.Contains(cell))
+            {
+                continue;
+            }
+
+            lineOfFireMapTilemap.SetTile(cell, toolsTile);
+            lineOfFireMapTilemap.SetTileFlags(
+                cell,
+                TileFlags.None);
+            lineOfFireMapTilemap.SetColor(cell, toolsColor);
+            inspectedThreatLineCells.Add(cell);
+            inspectedThreatLineLookup.Add(cell);
+        }
+
+        inspectedHelperServiceRange = true;
+        inspectedHelperVisibleUntil =
+            Time.time + InspectedHelperDurationSeconds;
+        inspectedHelperActivatedFrame = Time.frameCount;
+        return inspectedThreatLineCells.Count > 0;
+    }
+
+    private bool TryShowInspectedTransferRange()
+    {
+        if (inspectedHelperUnit == null
+            || inspectedHelperTransferRange
+            || !inspectedHelperUnit.TryGetUnitData(
+                out UnitData supplierData)
+            || supplierData == null
+            || !supplierData.isSupplier
+            || supplierData.supplierTier != SupplierTier.Hub)
+        {
+            return false;
+        }
+
+        Tilemap boardMap = terrainTilemap != null
+            ? terrainTilemap
+            : inspectedHelperUnit.BoardTilemap;
+        if (boardMap == null)
+            return false;
+        if (lineOfFireMapTilemap == null)
+            lineOfFireMapTilemap = FindLineOfFireMapTilemap();
+        if (lineOfFireMapTilemap == null)
+            return false;
+
+        TileBase transferTile =
+            Resources.Load<TileBase>("white ring transfer");
+        if (transferTile == null)
+        {
+            Debug.LogWarning(
+                "[Inspect] Tile Resources/white ring transfer nao encontrado.");
+            return false;
+        }
+
+        UnitReachEnvelope transferEnvelope =
+            BuildInspectedLogisticsEnvelope(
+                boardMap,
+                ReachIntent.Transfer,
+                supplierData.collectionRange);
+        IReadOnlyCollection<Vector3Int> cellsToPaint =
+            ResolveInspectedLogisticsCells(transferEnvelope);
+        if (cellsToPaint.Count == 0)
+        {
+            inspectedHelperTransferRange = true;
+            return false;
+        }
+
+        ClearInspectedThreatOverlay();
+        ClearLineOfFireArea();
+        PaintInspectedLogisticsMovement(
+            boardMap,
+            transferEnvelope,
+            cellsToPaint);
+
+        Color teamColor =
+            TeamUtils.GetColor(inspectedHelperUnit.TeamId);
+        Color transferColor = new Color(
+            teamColor.r,
+            teamColor.g,
+            teamColor.b,
+            Mathf.Clamp01(lineOfFireAlpha));
+        foreach (Vector3Int rawCell in cellsToPaint)
+        {
+            Vector3Int cell = rawCell;
+            cell.z = 0;
+            if (boardMap.GetTile(cell) == null
+                || !CanPaintInspectedLogisticsCell(cell)
+                || inspectedThreatLineLookup.Contains(cell))
+            {
+                continue;
+            }
+
+            lineOfFireMapTilemap.SetTile(cell, transferTile);
+            lineOfFireMapTilemap.SetTileFlags(
+                cell,
+                TileFlags.None);
+            lineOfFireMapTilemap.SetColor(cell, transferColor);
+            inspectedThreatLineCells.Add(cell);
+            inspectedThreatLineLookup.Add(cell);
+        }
+
+        inspectedHelperTransferRange = true;
+        inspectedHelperVisibleUntil =
+            Time.time + InspectedHelperDurationSeconds;
+        inspectedHelperActivatedFrame = Time.frameCount;
+        return inspectedThreatLineCells.Count > 0;
+    }
+
+    private void PaintInspectedLogisticsMovement(
+        Tilemap boardMap,
+        UnitReachEnvelope envelope,
+        IReadOnlyCollection<Vector3Int> logisticsCells)
+    {
+        if (boardMap == null
+            || envelope == null
+            || envelope.RangeCells.Count == 0)
+        {
+            return;
+        }
+
+        if (rangeMapTilemap == null)
+            rangeMapTilemap = FindRangeMapTilemap();
+        if (rangeMapTilemap == null || rangeOverlayTile == null)
+            return;
+
+        // Repete a composição usada pela hotzone de combate: RangeMap pinta o
+        // deslocamento com white ring black; LineOfFireMap recebe o ícone da
+        // ferramenta. Como RangeMap fica acima, não pinta o preto nas células
+        // compartilhadas para não esconder/lavar o sprite de serviço.
+        HashSet<Vector3Int> logisticsLookup =
+            logisticsCells != null && logisticsCells.Count > 0
+                ? new HashSet<Vector3Int>(logisticsCells)
+                : null;
+        Color teamColor =
+            TeamUtils.GetColor(inspectedHelperUnit.TeamId);
+        Color movementColor = new Color(
+            teamColor.r,
+            teamColor.g,
+            teamColor.b,
+            Mathf.Clamp01(movementRangeAlpha));
+
+        for (int i = 0; i < envelope.RangeCells.Count; i++)
+        {
+            Vector3Int cell = envelope.RangeCells[i];
+            cell.z = 0;
+            if (boardMap.GetTile(cell) == null
+                || !CanPaintInspectedLogisticsCell(cell)
+                || inspectedThreatRangeLookup.Contains(cell)
+                || (logisticsLookup != null
+                    && logisticsLookup.Contains(cell)))
+            {
+                continue;
+            }
+
+            rangeMapTilemap.SetTile(cell, rangeOverlayTile);
+            rangeMapTilemap.SetTileFlags(cell, TileFlags.None);
+            rangeMapTilemap.SetColor(cell, movementColor);
+            inspectedThreatRangeCells.Add(cell);
+            inspectedThreatRangeLookup.Add(cell);
+        }
+    }
+
+    private bool CanPaintInspectedLogisticsCell(Vector3Int cell)
+    {
+        return matchController == null
+            || matchController
+                .IsCellVisibleOrExploredInFogPresentation(cell);
+    }
+
+    // O envelope de inspeção vem inteiro do serviço unificado, inclusive o
+    // filtro de camada de operação (PodeSuprirSensor.SupportsOperationDomain),
+    // que antes vivia duplicado aqui e na janela de Editor.
+    private UnitReachEnvelope BuildInspectedLogisticsEnvelope(
+        Tilemap boardMap,
+        ReachIntent intent,
+        SupplierRangeMode rangeMode)
+    {
+        return UnitReachEnvelopeService.Build(new UnitReachRequest
+        {
+            Unit = inspectedHelperUnit,
+            BoardMap = boardMap,
+            TerrainDatabase = terrainDatabase,
+            Intent = intent,
+            Band = ReachBand.Tactical,
+            MovementBudget = Mathf.Max(
+                0, inspectedHelperUnit.MaxMovementPoints),
+            RangeOverride = rangeMode,
+            FilterByOperationDomain = true
+        });
+    }
+
+    private bool ShowPrimaryInspectedLogisticsRange()
+    {
+        if (inspectedHelperUnit == null
+            || !inspectedHelperUnit.TryGetUnitData(out UnitData data)
+            || data == null
+            || !data.isSupplier)
+        {
+            return false;
+        }
+
+        // A ordem do inspect é por capacidade: serviço de campo antes da
+        // transferência. Um Hub StockTransfer pula naturalmente a chave.
+        if (data.supplierServiceProfile
+                == SupplierServiceProfile.FieldService
+            && TryShowInspectedServiceRange())
+        {
+            return true;
+        }
+
+        if (data.supplierTier == SupplierTier.Hub)
+            return TryShowInspectedTransferRange();
+
+        return false;
+    }
+
+    private static IReadOnlyCollection<Vector3Int>
+        ResolveInspectedLogisticsCells(UnitReachEnvelope envelope)
+    {
+        if (envelope == null)
+            return System.Array.Empty<Vector3Int>();
+
+        // O anel externo é a área da ferramenta. SameHexOrEmbarked não tem
+        // anel: a área é exatamente onde a intenção se materializa, que para
+        // esse alcance coincide com o deslocamento da própria unidade.
+        return envelope.OuterCells.Count > 0
+            ? (IReadOnlyCollection<Vector3Int>)envelope.OuterCells
+            : envelope.ActionCells;
     }
 
     private bool TryShowInspectedVisionRange()
@@ -2874,10 +3210,15 @@ public partial class TurnStateManager
         if (Time.frameCount <= turnStartAutonomyHelperActivatedFrame)
             return;
 
-        if (!turnStartAutonomyHelperOpenedFromMenu &&
-            cursorController != null && cursorController.CurrentCell != turnStartAutonomyHelperCursorCell)
+        if (!turnStartAutonomyHelperOpenedFromMenu
+            && PanelHelperController
+                .IsCurrentPointerOverHelperPanel())
         {
-            ClearTurnStartAutonomyHelper();
+            // O relatorio automatico continua vivo enquanto o jogador o le ou
+            // usa seus botoes. Como o prazo usa Time.time, prorrogar pelo delta
+            // deste frame congela tambem a barra de progresso.
+            turnStartAutonomyHelperVisibleUntil +=
+                Mathf.Max(0f, Time.deltaTime);
             return;
         }
 

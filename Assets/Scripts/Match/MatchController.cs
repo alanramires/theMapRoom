@@ -6685,6 +6685,20 @@ public class MatchController : MonoBehaviour
         return fogGeographicContributorsByCell.TryGetValue(cell, out int contributors) && contributors > 0;
     }
 
+    public bool IsCellVisibleOrExploredInFogPresentation(Vector3Int cell)
+    {
+        if (!debugFogOfWarEnabled || !enableTotalWar)
+            return true;
+
+        cell.z = 0;
+        if (IsCellVisibleInFogPresentation(cell))
+            return true;
+
+        PlayerSlotId presentationSlot = ResolveFogVisualObserverSlot();
+        return IsValidPlayerSlot(presentationSlot)
+            && IsCellExploredBySlot(presentationSlot, cell);
+    }
+
 
     public bool ShouldHideActiveAiActionPresentation()
     {
