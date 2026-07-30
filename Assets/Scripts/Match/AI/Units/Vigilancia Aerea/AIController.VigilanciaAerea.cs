@@ -10,6 +10,7 @@ public partial class AIController
         TransportOrPlatform,
         ExitObstructedPosition,
         ImproveAirCoverage,
+        FollowMagnet,
         ConservativeRear,
         Hold,
         Orbit
@@ -23,12 +24,21 @@ public partial class AIController
         Vector3Int fromCell = unit.CurrentCellPosition;
         fromCell.z = 0;
 
-        Dictionary<Vector3Int, List<Vector3Int>> paths =
-            BuildFireSupportPaths(unit);
-        HashSet<Vector3Int> occupied = BuildOccupied(unit);
         EwacsRecoverySnapshot ewacsRecovery =
             BuildEwacsRecoverySnapshot(unit);
-        if (ewacsRecovery != null
+        bool needsPreciseRecoveryPaths =
+            ewacsRecovery != null
+            && (ewacsRecovery.FuelCritical
+                || unit.IsUnderRepair
+                || (unit.TryGetUnitData(out UnitData recoveryData)
+                    && recoveryData != null
+                    && EvaluateRepairTriggers(unit, recoveryData)));
+        Dictionary<Vector3Int, List<Vector3Int>> paths =
+            needsPreciseRecoveryPaths
+                ? BuildFireSupportPaths(unit)
+                : BuildAirSurveillanceDecisionReach(unit, fromCell);
+        HashSet<Vector3Int> occupied = BuildOccupied(unit);
+        if (needsPreciseRecoveryPaths
             && TryBuildEwacsEmergencyRecoveryAction(
                 unit,
                 snapshot,
@@ -112,7 +122,7 @@ public partial class AIController
                 out Vector3Int anchor,
                 out bool offensiveAnchor,
                 out string anchorReason);
-        if (ewacsRecovery != null
+        if (needsPreciseRecoveryPaths
             && hasSurveillanceAnchor
             && TryBuildAirPlatformRuntimeAction(
                 unit,
@@ -151,7 +161,9 @@ public partial class AIController
             {
                 LogAirSurveillancePolicyStage(
                     unit,
-                    AirSurveillancePolicyStage.ImproveAirCoverage,
+                    IsStationaryMobileAirSurveillanceRadar(unit)
+                        ? AirSurveillancePolicyStage.ImproveAirCoverage
+                        : AirSurveillancePolicyStage.FollowMagnet,
                     $"reposiciona via {postureCell} anchor={anchor} ({anchorReason}; {postureReason})");
                 return BuildMoveBatch(unit, snapshot.AITeam, fromCell, postureCell, paths);
             }
@@ -191,6 +203,33 @@ public partial class AIController
                 ? $"sem direcao segura; mantem orbita em {fromCell}"
                 : $"sem direcao segura; aguarda em {fromCell}");
         return BuildMoveBatch(unit, snapshot.AITeam, fromCell, fromCell, paths);
+    }
+
+    private Dictionary<Vector3Int, List<Vector3Int>>
+        BuildAirSurveillanceDecisionReach(
+            UnitManager unit,
+            Vector3Int origin)
+    {
+        if (!IsAirborneAirSurveillanceUnit(unit))
+            return BuildFireSupportPaths(unit);
+
+        Dictionary<Vector3Int, int> hotzone =
+            AIActionReachCoordinator.BuildSectorReachMap(
+                unit,
+                boardTilemap,
+                terrainDatabase,
+                origin,
+                AIActionReachCoordinator.ResolveTacticalBudget(unit));
+        var reach =
+            new Dictionary<Vector3Int, List<Vector3Int>>(
+                hotzone.Count);
+        foreach (Vector3Int cell in hotzone.Keys)
+            reach[cell] = null;
+
+        AIDecisionPerf.AddCount(
+            "AirSurveillanceHotzoneCandidates",
+            reach.Count);
+        return reach;
     }
 
     private void LogAirSurveillancePolicyStage(
@@ -254,6 +293,23 @@ public partial class AIController
         anchor = fromCell;
         offensiveAnchor = false;
         reason = "fallback";
+
+        // O EWACS acompanha a cabeca de ponte. Ele nao tenta descobrir uma
+        // missao propria varrendo o tabuleiro: o capturador e o seu ima.
+        // Radar Movel permanece na politica estacionaria de cobertura.
+        if (!IsStationaryMobileAirSurveillanceRadar(unit)
+            && TryResolveCapturerMagnet(
+                unit,
+                snapshot,
+                fromCell,
+                out UnitManager captain,
+                out Vector3Int captainCell))
+        {
+            anchor = captainCell;
+            offensiveAnchor = true;
+            reason = $"CapturerMagnet=#{captain.InstanceId}";
+            return true;
+        }
 
         if (TryResolveRallyInfluence(plan, snapshot.AITeam, fromCell, includeGoGreen: false, out AIRallyInfluence rally)
             && rally.Active
@@ -356,34 +412,25 @@ public partial class AIController
         TeamObjectivePlan capPlan =
             ObjectiveManager.GetPlanForSlot(
                 PlayerSlotId.FromIndex(snapshot.AISlotIndex));
-        var alliedAirLow = new HashSet<Vector3Int>();
-        var alliedAirHigh = new HashSet<Vector3Int>();
-        CollectAlliedAirSurveillanceCoverage(
-            unit,
-            snapshot,
-            alliedAirLow,
-            alliedAirHigh);
-        AirSurveillanceCoverageSample fromCoverage =
-            EvaluateAirSurveillanceCoverage(
-                unit,
-                fromCell,
-                alliedAirLow,
-                alliedAirHigh);
+        int preferredEscortDistance = Mathf.Clamp(
+            ResolveAirSurveillanceVision(unit),
+            4,
+            7);
         AirSurveillanceSpacingSample fromSpacing =
             EvaluateAirSurveillanceSpacing(
                 unit,
                 snapshot,
                 fromCell);
-        float fromScore = ScoreAirSurveillancePostureCell(
-            unit,
-            snapshot,
-            fromCell,
-            fromCell,
-            anchor,
-            offensiveAnchor,
-            0,
-            out string fromReason)
-            + ScoreEwacsCoverageContribution(fromCoverage)
+        int fromAnchorDistance =
+            AIActionReachCoordinator.CubicDistance(
+                fromCell,
+                anchor);
+        float fromThreat =
+            CalculateThreatLevel(fromCell, snapshot.AITeam);
+        float fromScore =
+            -Mathf.Abs(
+                fromAnchorDistance - preferredEscortDistance) * 160f
+            - fromThreat * 240f
             - fromSpacing.Penalty;
         bool fromInsideRecoveryEnvelope =
             IsEwacsRecoveryCellSafe(
@@ -395,17 +442,22 @@ public partial class AIController
         if (!fromInsideRecoveryEnvelope)
             fromScore -= 100000f;
         float bestScore = fromScore;
-        string fromCoverageReason =
-            DescribeEwacsCoverageContribution(
-                fromCoverage,
-                fromSpacing);
+        string fromReason =
+            $"magnetDist={fromAnchorDistance} " +
+            $"escort={preferredEscortDistance} " +
+            $"threat={fromThreat:F1}";
         string bestReason =
             ewacsRecovery != null
-                ? $"{fromReason} {fromCoverageReason} recovery={fromRecoveryReason}"
-                : $"{fromReason} {fromCoverageReason}";
+                ? $"{fromReason} {fromSpacing} recovery={fromRecoveryReason}"
+                : $"{fromReason} {fromSpacing}";
 
         if (paths != null)
         {
+            using var perf = new AIDecisionPerfScope(
+                unit,
+                "airSurveillanceMagnetRanking");
+            var ranking =
+                new List<(Vector3Int cell, int distance, int pathCost, float score)>();
             foreach (Vector3Int rawCell in paths.Keys)
             {
                 Vector3Int cell = rawCell;
@@ -419,11 +471,45 @@ public partial class AIController
                 if (IsUncontrolledConstructionCellForAirSurveillance(
                         unit, snapshot, cell))
                     continue;
-                if (!IsAirSurveillanceCellAllowedByRearLine(unit, snapshot, fromCell, cell, anchor, offensiveAnchor))
-                    continue;
-                paths.TryGetValue(
-                    cell,
-                    out List<Vector3Int> candidatePath);
+
+                int distance =
+                    AIActionReachCoordinator.CubicDistance(
+                        cell,
+                        anchor);
+                int pathCost =
+                    AIActionReachCoordinator.CubicDistance(
+                        fromCell,
+                        cell);
+                float approximateScore =
+                    -Mathf.Abs(
+                        distance - preferredEscortDistance) * 160f
+                    - pathCost * 8f;
+                ranking.Add(
+                    (cell, distance, pathCost, approximateScore));
+            }
+
+            ranking.Sort((left, right) =>
+            {
+                int byScore = right.score.CompareTo(left.score);
+                if (byScore != 0)
+                    return byScore;
+                int byPath = left.pathCost.CompareTo(right.pathCost);
+                if (byPath != 0)
+                    return byPath;
+                int byX = left.cell.x.CompareTo(right.cell.x);
+                return byX != 0
+                    ? byX
+                    : left.cell.y.CompareTo(right.cell.y);
+            });
+
+            int preciseCount = Mathf.Min(12, ranking.Count);
+            for (int i = 0; i < preciseCount; i++)
+            {
+                var candidate = ranking[i];
+                Vector3Int cell = candidate.cell;
+                int distance = candidate.distance;
+                int pathCost = candidate.pathCost;
+                paths.TryGetValue(cell, out List<Vector3Int> candidatePath);
                 if (!IsEwacsRecoveryCellSafe(
                         unit,
                         cell,
@@ -434,42 +520,40 @@ public partial class AIController
                     continue;
                 }
 
-                AirSurveillanceCoverageSample coverage =
-                    EvaluateAirSurveillanceCoverage(
-                        unit,
-                        cell,
-                        alliedAirLow,
-                        alliedAirHigh);
+                float threat =
+                    CalculateThreatLevel(cell, snapshot.AITeam);
                 AirSurveillanceSpacingSample spacing =
                     EvaluateAirSurveillanceSpacing(
                         unit,
                         snapshot,
                         cell);
-                float score = ScoreAirSurveillancePostureCell(
-                    unit,
-                    snapshot,
-                    cell,
-                    fromCell,
-                    anchor,
-                    offensiveAnchor,
-                    GetPathStepCount(paths, cell),
-                    out string scoreReason)
-                    + ScoreEwacsCoverageContribution(coverage)
+                float score =
+                    -Mathf.Abs(
+                        distance - preferredEscortDistance) * 160f
+                    - pathCost * 8f
+                    - threat * 240f
                     - spacing.Penalty;
 
                 if (score > bestScore)
                 {
                     bestScore = score;
                     bestCell = cell;
-                    string coverageReason =
-                        DescribeEwacsCoverageContribution(
-                            coverage,
-                            spacing);
+                    string scoreReason =
+                        $"magnetDist={distance} " +
+                        $"escort={preferredEscortDistance} " +
+                        $"threat={threat:F1} path={pathCost}";
                     bestReason = ewacsRecovery != null
-                        ? $"{scoreReason} {coverageReason} recovery={recoveryReason}"
-                        : $"{scoreReason} {coverageReason}";
+                        ? $"{scoreReason} {spacing} recovery={recoveryReason}"
+                        : $"{scoreReason} {spacing}";
                 }
             }
+
+            AIDecisionPerf.AddCount(
+                "AirSurveillanceMagnetCandidates",
+                ranking.Count);
+            AIDecisionPerf.AddCount(
+                "AirSurveillanceMagnetPreciseCandidates",
+                preciseCount);
         }
 
         reason = $"{bestReason} score={bestScore:F0} hold={fromScore:F0}";
@@ -482,6 +566,7 @@ public partial class AIController
         public readonly int AirHigh;
         public readonly int MarginalAirLow;
         public readonly int MarginalAirHigh;
+        public readonly int UnexploredMarginalAirHigh;
         public readonly float Score;
 
         public int VisibleCells => AirLow + AirHigh;
@@ -495,12 +580,15 @@ public partial class AIController
             int airHigh,
             int marginalAirLow,
             int marginalAirHigh,
+            int unexploredMarginalAirHigh,
             float score)
         {
             AirLow = airLow;
             AirHigh = airHigh;
             MarginalAirLow = marginalAirLow;
             MarginalAirHigh = marginalAirHigh;
+            UnexploredMarginalAirHigh =
+                unexploredMarginalAirHigh;
             Score = score;
         }
 
@@ -509,6 +597,7 @@ public partial class AIController
             return
                 $"low={AirLow}(new={MarginalAirLow}) " +
                 $"high={AirHigh}(new={MarginalAirHigh}) " +
+                $"fogNew={UnexploredMarginalAirHigh} " +
                 $"overlap={OverlapAirLow}/{OverlapAirHigh} " +
                 $"coverage={Score:F0}";
         }
@@ -863,6 +952,14 @@ public partial class AIController
             snapshot,
             alliedAirLow,
             alliedAirHigh);
+        HashSet<Vector3Int> precisionCoverageCandidates =
+            SelectAirSurveillancePrecisionCoverageCandidates(
+                unit,
+                fromCell,
+                anchor,
+                paths,
+                alliedAirHigh,
+                maxCandidates: 12);
 
         AirSurveillanceCoverageSample fromCoverage =
             EvaluateAirSurveillanceCoverage(
@@ -949,6 +1046,8 @@ public partial class AIController
                 {
                     continue;
                 }
+                if (!precisionCoverageCandidates.Contains(cell))
+                    continue;
 
                 int pathCost = GetPathStepCount(paths, cell);
                 AirSurveillanceCoverageSample coverage =
@@ -1007,6 +1106,124 @@ public partial class AIController
         return true;
     }
 
+    private HashSet<Vector3Int>
+        SelectAirSurveillancePrecisionCoverageCandidates(
+            UnitManager unit,
+            Vector3Int fromCell,
+            Vector3Int anchor,
+            Dictionary<Vector3Int, List<Vector3Int>> paths,
+            HashSet<Vector3Int> alliedAirHigh,
+            int maxCandidates)
+    {
+        using var perf = new AIDecisionPerfScope(
+            unit,
+            "airSurveillanceCubicPrefilter");
+        var selected = new HashSet<Vector3Int>();
+        fromCell.z = 0;
+        anchor.z = 0;
+        selected.Add(fromCell);
+        if (unit == null
+            || paths == null
+            || paths.Count == 0
+            || maxCandidates <= 0)
+        {
+            return selected;
+        }
+
+        BoardTopologyIndex.TryGetFor(
+            boardTilemap,
+            out BoardTopologyIndex topology);
+        IReadOnlyList<Vector3Int> boardCells =
+            topology != null && topology.IsReady
+                ? topology.IndexedCells
+                : null;
+        int vision = Mathf.Max(
+            1,
+            ResolveAirSurveillanceVision(unit));
+        PlayerSlotId observerSlot =
+            PlayerSlotId.FromIndex(unit.SlotIndex);
+        var ranking =
+            new List<(Vector3Int cell, float score)>();
+
+        foreach (KeyValuePair<Vector3Int, List<Vector3Int>> pair
+                 in paths)
+        {
+            Vector3Int cell = pair.Key;
+            cell.z = 0;
+            if (cell == fromCell)
+                continue;
+
+            int marginal = 0;
+            int overlap = 0;
+            int unexploredMarginal = 0;
+            if (boardCells != null)
+            {
+                for (int i = 0; i < boardCells.Count; i++)
+                {
+                    Vector3Int covered = boardCells[i];
+                    covered.z = 0;
+                    if (AIActionReachCoordinator.CubicDistance(
+                            cell, covered) > vision)
+                    {
+                        continue;
+                    }
+
+                    if (alliedAirHigh != null
+                        && alliedAirHigh.Contains(covered))
+                    {
+                        overlap++;
+                    }
+                    else
+                    {
+                        marginal++;
+                        if (matchController != null
+                            && !matchController.IsCellExploredBySlot(
+                                observerSlot,
+                                covered))
+                        {
+                            unexploredMarginal++;
+                        }
+                    }
+                }
+            }
+
+            int pathCost = pair.Value != null
+                ? Mathf.Max(0, pair.Value.Count - 1)
+                : 0;
+            float approximateScore =
+                marginal * 3f
+                + unexploredMarginal * 25f
+                + overlap
+                - AIActionReachCoordinator.CubicDistance(
+                    cell, anchor) * 8f
+                - pathCost;
+            ranking.Add((cell, approximateScore));
+        }
+
+        ranking.Sort((left, right) =>
+        {
+            int byScore = right.score.CompareTo(left.score);
+            if (byScore != 0)
+                return byScore;
+            int byX = left.cell.x.CompareTo(right.cell.x);
+            return byX != 0
+                ? byX
+                : left.cell.y.CompareTo(right.cell.y);
+        });
+
+        int take = Mathf.Min(maxCandidates, ranking.Count);
+        for (int i = 0; i < take; i++)
+            selected.Add(ranking[i].cell);
+
+        AIDecisionPerf.AddCount(
+            "AirSurveillanceCubicPrefilterCandidates",
+            paths.Count);
+        AIDecisionPerf.AddCount(
+            "AirSurveillancePrecisionCandidates",
+            selected.Count);
+        return selected;
+    }
+
     private AirSurveillanceCoverageSample EvaluateAirSurveillanceCoverage(
         UnitManager observer,
         Vector3Int observerCell,
@@ -1027,12 +1244,18 @@ public partial class AIController
                 airConfig,
                 enableLos,
                 alliedAirLow,
-                alliedAirHigh);
+                alliedAirHigh,
+                matchController != null
+                    ? cell => matchController.IsCellExploredBySlot(
+                        PlayerSlotId.FromIndex(observer.SlotIndex),
+                        cell)
+                    : null);
         return new AirSurveillanceCoverageSample(
             result.AirLow,
             result.AirHigh,
             result.MarginalAirLow,
             result.MarginalAirHigh,
+            result.UnexploredMarginalAirHigh,
             result.Score);
     }
 

@@ -21,6 +21,7 @@ public static class AirSurveillanceCoverageService
         public readonly int AirHigh;
         public readonly int MarginalAirLow;
         public readonly int MarginalAirHigh;
+        public readonly int UnexploredMarginalAirHigh;
         public readonly bool DetectsLowStealth;
         public readonly bool DetectsHighStealth;
         public readonly float Score;
@@ -32,6 +33,7 @@ public static class AirSurveillanceCoverageService
             int airHigh,
             int marginalAirLow,
             int marginalAirHigh,
+            int unexploredMarginalAirHigh,
             bool detectsLowStealth,
             bool detectsHighStealth,
             float score)
@@ -40,6 +42,8 @@ public static class AirSurveillanceCoverageService
             AirHigh = airHigh;
             MarginalAirLow = marginalAirLow;
             MarginalAirHigh = marginalAirHigh;
+            UnexploredMarginalAirHigh =
+                unexploredMarginalAirHigh;
             DetectsLowStealth = detectsLowStealth;
             DetectsHighStealth = detectsHighStealth;
             Score = score;
@@ -205,8 +209,12 @@ public static class AirSurveillanceCoverageService
         DPQAirHeightConfig airConfig,
         bool enableLos,
         ISet<Vector3Int> alliedAirLow = null,
-        ISet<Vector3Int> alliedAirHigh = null)
+        ISet<Vector3Int> alliedAirHigh = null,
+        Func<Vector3Int, bool> isExplored = null)
     {
+        using var perf = new AIDecisionPerfScope(
+            observer,
+            "airSurveillancePreciseCoverage");
         StructuralCoverage coverage = GetStructuralCoverage(
             observer,
             observerCell,
@@ -221,6 +229,20 @@ public static class AirSurveillanceCoverageService
         int marginalHigh = CountMarginal(
             coverage.AirHigh,
             alliedAirHigh);
+        int unexploredMarginalHigh = 0;
+        if (isExplored != null)
+        {
+            for (int i = 0; i < coverage.AirHigh.Length; i++)
+            {
+                Vector3Int cell = coverage.AirHigh[i];
+                if ((alliedAirHigh == null
+                        || !alliedAirHigh.Contains(cell))
+                    && !isExplored(cell))
+                {
+                    unexploredMarginalHigh++;
+                }
+            }
+        }
 
         UnitData data = null;
         if (observer != null)
@@ -246,10 +268,11 @@ public static class AirSurveillanceCoverageService
         // apenas uma pequena redundancia operacional. O bonus stealth tambem
         // incide principalmente onde o observador acrescenta cobertura.
         float score =
-            marginalLow * 14f
-            + marginalHigh * 17f
+            marginalLow * 3f
+            + marginalHigh * 3f
+            + unexploredMarginalHigh * 25f
             + overlapLow * 1.5f
-            + overlapHigh * 2f
+            + overlapHigh
             + (detectsLowStealth
                 ? marginalLow * 2f
                 : 0f)
@@ -262,6 +285,7 @@ public static class AirSurveillanceCoverageService
             coverage.AirHigh.Length,
             marginalLow,
             marginalHigh,
+            unexploredMarginalHigh,
             detectsLowStealth,
             detectsHighStealth,
             score);

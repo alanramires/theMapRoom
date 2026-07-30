@@ -366,6 +366,20 @@ public partial class AIController
             Vector3Int cell = rawCell; cell.z = 0;
             if (cell == fromCell || occupied.Contains(cell)) continue;
             if (IsCellACapturerTarget(cell, plan, snapshot.AITeam)) continue;
+            ConstructionManager destinationConstruction =
+                ConstructionOccupancyRules.GetConstructionAtCell(
+                    boardTilemap, cell);
+            if (destinationConstruction != null
+                && destinationConstruction.IsCapturable
+                && destinationConstruction.CapturePointsMax > 0
+                && destinationConstruction.SlotIndex
+                    != ResolveAISlotKey(snapshot.AITeam))
+            {
+                // Desocupar uma oportunidade de captura parando sobre outra
+                // apenas transfere o bloqueio. Radar movel e fogo de suporte
+                // podem usar construcoes aliadas, mas nao neutras/inimigas.
+                continue;
+            }
             float score = GetTerrainDpqPontos(cell) * 25f - CalculateThreatLevel(cell, snapshot.AITeam) * 50f;
             if (score > bestScore) { bestScore = score; best = cell; }
         }

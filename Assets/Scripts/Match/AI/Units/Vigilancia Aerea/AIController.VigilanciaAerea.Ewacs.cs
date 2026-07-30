@@ -155,7 +155,9 @@ public partial class AIController
                 path,
                 terrainDatabase,
                 applyOperationalAutonomyModifier: true)
-            : 0;
+            : AIActionReachCoordinator.CubicDistance(
+                ewacs.CurrentCellPosition,
+                candidate);
         int availableAfterMoveAndUpkeep =
             ewacs.CurrentFuel
             - movementFuel

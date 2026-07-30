@@ -613,12 +613,43 @@ public partial class AIController
         out string tier)
     {
         tier = "None";
-        if (TryResolveCapturerMagnet(
+        bool isInterceptor = unit != null
+            && unit.TryGetUnitData(out UnitData airData)
+            && airData != null
+            && airData.roles != null
+            && airData.roles.Count > 0
+            && airData.roles[0] == UnitRole.Interceptador;
+
+        bool hasCaptain = TryResolveCapturerMagnet(
                 unit,
                 snapshot,
                 fromCell,
                 out UnitManager capturer,
-                out Vector3Int capturerCell))
+                out Vector3Int capturerCell);
+
+        // Interceptadores protegem o elo mais proximo da rede: EWACS ou
+        // capitao. Ataque aereo e RaidAntiSub continuam magnetizados apenas
+        // pela cabeca de ponte.
+        if (isInterceptor
+            && TryResolveNearestEwacsMagnet(
+                unit,
+                snapshot,
+                fromCell,
+                out UnitManager ewacs,
+                out Vector3Int ewacsCell)
+            && (!hasCaptain
+                || AIActionReachCoordinator.CubicDistance(
+                    fromCell,
+                    ewacsCell)
+                <= AIActionReachCoordinator.CubicDistance(
+                    fromCell,
+                    capturerCell)))
+        {
+            tier = $"AirSurveillance:EWACS#{ewacs.InstanceId}";
+            return ewacsCell;
+        }
+
+        if (hasCaptain)
         {
             tier = $"CapturerMagnet:#{capturer.InstanceId}";
             return capturerCell;
@@ -684,6 +715,55 @@ public partial class AIController
         }
 
         return fromCell;
+    }
+
+    private static bool TryResolveNearestEwacsMagnet(
+        UnitManager follower,
+        AIWorldSnapshot snapshot,
+        Vector3Int fromCell,
+        out UnitManager ewacs,
+        out Vector3Int anchor)
+    {
+        ewacs = null;
+        anchor = fromCell;
+        anchor.z = 0;
+        if (snapshot == null || snapshot.MyUnits == null)
+            return false;
+
+        int bestDistance = int.MaxValue;
+        for (int i = 0; i < snapshot.MyUnits.Count; i++)
+        {
+            UnitManager candidate = snapshot.MyUnits[i];
+            if (candidate == null
+                || candidate == follower
+                || candidate.IsDead
+                || candidate.IsEmbarked
+                || candidate.IsUnderRepair
+                || !candidate.gameObject.activeInHierarchy
+                || !candidate.TryGetUnitData(out UnitData data)
+                || data == null
+                || data.domain != Domain.Air
+                || !IsAirSurveillanceUnit(candidate))
+            {
+                continue;
+            }
+
+            Vector3Int cell = candidate.CurrentCellPosition;
+            cell.z = 0;
+            int distance =
+                AIActionReachCoordinator.CubicDistance(fromCell, cell);
+            if (distance < bestDistance
+                || (distance == bestDistance
+                    && (ewacs == null
+                        || candidate.InstanceId < ewacs.InstanceId)))
+            {
+                bestDistance = distance;
+                ewacs = candidate;
+                anchor = cell;
+            }
+        }
+
+        return ewacs != null;
     }
 
     private bool TryFindAirCombatAttack(
