@@ -260,6 +260,8 @@ public static class SaveDataMapper
                 unit.AIDesignatedMissionTargetCell.y,
             aiDesignatedMissionSector =
                 unit.AIDesignatedMissionSector,
+            aiRideWaitSinceTurn =
+                unit.AIRideWaitSinceTurn,
             aiEixo = unit.AIEixo
         };
 
@@ -406,6 +408,11 @@ public static class SaveDataMapper
         {
             unit.ClearAIDesignatedMission();
         }
+
+        // Antiguidade na fila da carona. Restaura direto, sem passar pela
+        // regra de idempotencia do Mark: aqui e reconstrucao de estado, nao
+        // entrada na fila.
+        unit.RestoreAIRideWaitSinceTurn(saved.aiRideWaitSinceTurn);
 
         // aiEixo e independente do plano (persiste como memoria entre handoffs); restaura sempre.
         unit.SetAIEixo(saved.aiEixo);

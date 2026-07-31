@@ -1014,6 +1014,11 @@ public static class UnitReachEnvelopeService
         Tilemap boardMap,
         TerrainDatabase terrainDatabase)
     {
+        // Flood fill do tabuleiro inteiro. Caro por construcao; o cronometro
+        // fica aqui para que ele apareca nominalmente no
+        // [AI Perf][Phase2 Breakdown] em vez de virar suspeita.
+        using var perf = new AIDecisionPerfScope(unit, "ownMovementComponent");
+        AIDecisionPerf.AddCount("OwnMovementComponentBuilds");
         var reached = new Dictionary<Vector3Int, int>();
         if (unit == null)
             return reached;
@@ -1046,44 +1051,32 @@ public static class UnitReachEnvelopeService
             return reached;
         }
 
-        var queue = new Queue<Vector3Int>();
-        var neighbors = new List<Vector3Int>(6);
-        reached[origin] = 0;
-        queue.Enqueue(origin);
-
-        while (queue.Count > 0)
-        {
-            Vector3Int current = queue.Dequeue();
-            int currentCost = reached[current];
-            UnitMovementPathRules.GetImmediateHexNeighbors(map, current, neighbors);
-            for (int i = 0; i < neighbors.Count; i++)
-            {
-                Vector3Int next = neighbors[i];
-                next.z = 0;
-                if (map.GetTile(next) == null || reached.ContainsKey(next))
-                    continue;
-
-                if (!UnitMovementPathRules.TryGetEnterCellCost(
-                        map,
-                        unit,
-                        next,
-                        terrainDatabase,
-                        applyOperationalAutonomyModifier: false,
-                        out int enterCost))
-                {
-                    continue;
-                }
-
-                if (Mathf.Max(1, enterCost) > perTurn)
-                    continue;
-
-                reached[next] = currentCost + Mathf.Max(1, enterCost);
-                queue.Enqueue(next);
-            }
-        }
-
-        return reached;
+        // DELEGACAO, nao BFS proprio. A busca encadeada por turno ja implementa
+        // exatamente esta regra — teto de MP por turno, hex mais caro que o
+        // teto e intransponivel para sempre e bloqueia o corredor — e, ao
+        // contrario da versao manual que vivia aqui, ela monta um
+        // MovementQueryCache: terreno, construcao e estrutura resolvidos UMA
+        // vez por celula em vez de seis.
+        //
+        // A versao manual custava ~1s por chamada em mapa grande e, com quinze
+        // unidades pedindo carona no mesmo turno, dominava a Fase 2 inteira.
+        return UnitMovementPathRules.CalculateTurnChainedCostMap(
+            map,
+            unit,
+            origin,
+            perTurn,
+            perTurn,
+            ComponentTurnHorizon,
+            terrainDatabase,
+            out _);
     }
+
+    /// <summary>
+    /// Horizonte do componente. Nao e regra de jogo: e so um teto para a busca
+    /// terminar. Componente e "onde a unidade chega DADO TEMPO SUFICIENTE", e
+    /// quinhentos turnos atravessam qualquer mapa deste jogo varias vezes.
+    /// </summary>
+    private const int ComponentTurnHorizon = 512;
 
     /// <summary>
     /// Classifica uma celula contra o grafo de movimento da unidade.

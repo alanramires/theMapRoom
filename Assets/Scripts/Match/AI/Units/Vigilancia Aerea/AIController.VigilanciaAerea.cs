@@ -690,6 +690,7 @@ public partial class AIController
                         : null
                 });
 
+        ApplyRideWaitStamp(radar, rideNeed);
         Debug.Log(
             $"{TL("VigilanciaAerea")} Radar#{radar.InstanceId} " +
             $"transporte target={target} gain={coverageGain:F0} " +

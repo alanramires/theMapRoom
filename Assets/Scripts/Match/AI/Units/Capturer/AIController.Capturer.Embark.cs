@@ -214,6 +214,8 @@ public partial class AIController
                 emulateUnderRepairFromUnitData = false
             });
 
+        ApplyRideWaitStamp(unit, result);
+
         string target = result.evaluatedConstruction != null
             ? $"{result.evaluatedConstruction.name}@{result.evaluatedTarget}"
             : result.evaluatedTarget.ToString();

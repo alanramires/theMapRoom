@@ -167,6 +167,8 @@ public class UnitManager : MonoBehaviour
     [SerializeField] private int aiDesignatedMissionTargetConstructionInstanceId = -1;
     [SerializeField] private Vector3Int aiDesignatedMissionTargetCell = Vector3Int.zero;
     [SerializeField] private int aiDesignatedMissionSector;
+    [Tooltip("Turno em que a unidade comecou a esperar por uma carona que nao veio. 0 = nao esta esperando. E CARIMBO, nao contador: a espera e derivada (turno atual - carimbo), entao ler mil vezes no mesmo turno da o mesmo numero. Zero como sentinela mantem save antigo correto, porque turno comeca em 1.")]
+    [SerializeField] private int aiRideWaitSinceTurn;
     [Header("AI Eixo Runtime")]
     [Tooltip("Eixo ao qual a unidade pertence: 1, 2 ou 3 = eixos regulares; 4 = invasão final. 0 = nenhum (rogue / fora de eixo).")]
     [Range(0, 4)]
@@ -289,6 +291,56 @@ public class UnitManager : MonoBehaviour
     public int AIDesignatedMissionTargetConstructionInstanceId => aiDesignatedMissionTargetConstructionInstanceId;
     public Vector3Int AIDesignatedMissionTargetCell => aiDesignatedMissionTargetCell;
     public int AIDesignatedMissionSector => aiDesignatedMissionSector;
+
+    /// <summary>
+    /// Turno em que esta unidade comecou a esperar por carona. 0 = nao espera.
+    /// </summary>
+    public int AIRideWaitSinceTurn => aiRideWaitSinceTurn;
+
+    /// <summary>Esta unidade esta na fila da carona?</summary>
+    public bool AIIsWaitingForRide => aiRideWaitSinceTurn > 0;
+
+    /// <summary>
+    /// Ha quantos turnos ela espera. Zero quando nao esta na fila.
+    ///
+    /// E derivado do carimbo, nunca incrementado: o pedido de carona e
+    /// reavaliado muitas vezes por turno (dezenas, num planejamento de
+    /// transporte), e um contador incremental viraria contagem dupla na
+    /// primeira reentrada.
+    /// </summary>
+    public int ResolveAIRideWaitTurns(int currentTurn)
+    {
+        if (aiRideWaitSinceTurn <= 0)
+            return 0;
+        return Mathf.Max(0, currentTurn - aiRideWaitSinceTurn);
+    }
+
+    /// <summary>
+    /// Entra na fila da carona. Idempotente: chamar de novo NAO reinicia a
+    /// espera — quem ja esperava continua com a antiguidade dele, que e o
+    /// ponto todo da fila.
+    /// </summary>
+    public void MarkAIRideWaitStart(int currentTurn)
+    {
+        if (currentTurn <= 0 || aiRideWaitSinceTurn > 0)
+            return;
+        aiRideWaitSinceTurn = currentTurn;
+    }
+
+    /// <summary>
+    /// Sai da fila: embarcou, chegou ao objetivo, ou parou de querer carona.
+    /// </summary>
+    public void ClearAIRideWait()
+    {
+        aiRideWaitSinceTurn = 0;
+    }
+
+    /// <summary>Restauracao de save. Nao passa pela regra de idempotencia.</summary>
+    public void RestoreAIRideWaitSinceTurn(int sinceTurn)
+    {
+        aiRideWaitSinceTurn = Mathf.Max(0, sinceTurn);
+    }
+
     public int AIEixo => aiEixo;
     public void SetAIEixo(int eixo)
     {

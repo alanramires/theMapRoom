@@ -314,6 +314,9 @@ public class UnitSaveData
     public int aiDesignatedMissionTargetCellX;
     public int aiDesignatedMissionTargetCellY;
     public int aiDesignatedMissionSector;
+    // Carimbo da fila da carona. Zero e o sentinela de "nao espera", entao save
+    // antigo (sem o campo) desserializa como 0 e ja significa a coisa certa.
+    public int aiRideWaitSinceTurn;
     public int aiEixo = 0;
     public List<int> embarkedWeaponAmmo = new List<int>();
     public List<RuntimeSupplySaveData> embarkedSupplies = new List<RuntimeSupplySaveData>();

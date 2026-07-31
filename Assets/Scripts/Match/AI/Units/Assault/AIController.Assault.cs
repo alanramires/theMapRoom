@@ -441,6 +441,7 @@ public partial class AIController
                 operationalTurns = 2,
                 emulateUnderRepairFromUnitData = false
             });
+        ApplyRideWaitStamp(unit, result);
         Debug.Log(
             $"{TL("Transporte")} {unit.InstanceId} policy={policy} " +
             $"QueroCarona={(result.wantsRide ? "SIM" : "NAO")} " +

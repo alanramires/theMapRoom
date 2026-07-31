@@ -50,6 +50,13 @@ public sealed class QueroCaronaResult
     /// </summary>
     public bool isStranded;
 
+    /// <summary>
+    /// Ha quantos turnos esta unidade esta na fila da carona. Preenchido pela
+    /// IA (o servico e puro e nao conhece turno); zero quando consultado por
+    /// ferramenta de Editor.
+    /// </summary>
+    public int rideWaitTurns;
+
     public QueroCaronaReach reach;
     public Vector3Int evaluatedTarget;
     public ConstructionManager evaluatedConstruction;
@@ -634,17 +641,23 @@ public static class QueroCaronaService
     private const int MaxMobilityComponentEntries = 32;
 
     /// <summary>
-    /// O componente de movimento nao olha ocupacao de unidade: e terreno,
-    /// construcao e teto de MP por turno. Por isso a chave NAO usa
-    /// GlobalBoardRevision — que muda a cada passo de unidade e ja custou caro
-    /// neste projeto. Invalida por topologia e pela identidade de movimento.
+    /// Chave do componente: PERFIL DE MOVIMENTO, sem origem.
+    ///
+    /// Duas unidades do mesmo perfil na mesma massa de terra tem literalmente o
+    /// mesmo componente — reconhecer isso e a diferenca entre um flood fill por
+    /// unidade e um por perfil. Com quinze rogues pedindo carona no mesmo
+    /// turno, a versao com origem na chave custou dezenas de segundos.
+    ///
+    /// O teto de MP entra porque o componente depende dele: hex mais caro que o
+    /// teto de um turno e intransponivel para sempre. NAO entra
+    /// GlobalBoardRevision — o componente e terreno e construcao, nao ocupacao,
+    /// e essa revisao muda a cada passo de unidade.
     /// </summary>
-    private readonly struct MobilityComponentKey
-        : IEquatable<MobilityComponentKey>
+    private readonly struct MobilityProfileKey
+        : IEquatable<MobilityProfileKey>
     {
         private readonly int unitDataObjectId;
         private readonly int mapObjectId;
-        private readonly Vector3Int origin;
         private readonly int maxMovement;
         private readonly Domain domain;
         private readonly HeightLevel height;
@@ -652,19 +665,16 @@ public static class QueroCaronaService
         private readonly int topologyVersion;
         private readonly string topologyFingerprint;
 
-        public MobilityComponentKey(
+        public MobilityProfileKey(
             QueroCaronaRequest request,
             UnitData data,
             BoardTopologyIndex topology)
         {
             UnitManager unit = request.unit;
-            Vector3Int cell = unit.CurrentCellPosition;
-            cell.z = 0;
             unitDataObjectId = data != null
                 ? data.GetEntityId().GetHashCode()
                 : 0;
             mapObjectId = request.map.GetEntityId().GetHashCode();
-            origin = cell;
             maxMovement = Mathf.Max(0, unit.MaxMovementPoints);
             domain = unit.GetDomain();
             height = unit.GetHeightLevel();
@@ -677,11 +687,10 @@ public static class QueroCaronaService
                 : string.Empty;
         }
 
-        public bool Equals(MobilityComponentKey other)
+        public bool Equals(MobilityProfileKey other)
         {
             return unitDataObjectId == other.unitDataObjectId
                 && mapObjectId == other.mapObjectId
-                && origin == other.origin
                 && maxMovement == other.maxMovement
                 && domain == other.domain
                 && height == other.height
@@ -695,7 +704,7 @@ public static class QueroCaronaService
 
         public override bool Equals(object obj)
         {
-            return obj is MobilityComponentKey other && Equals(other);
+            return obj is MobilityProfileKey other && Equals(other);
         }
 
         public override int GetHashCode()
@@ -704,7 +713,6 @@ public static class QueroCaronaService
             {
                 int hash = unitDataObjectId;
                 hash = (hash * 397) ^ mapObjectId;
-                hash = (hash * 397) ^ origin.GetHashCode();
                 hash = (hash * 397) ^ maxMovement;
                 hash = (hash * 397) ^ (int)domain;
                 hash = (hash * 397) ^ (int)height;
@@ -719,16 +727,17 @@ public static class QueroCaronaService
     }
 
     private static readonly Dictionary<
-        MobilityComponentKey,
-        Dictionary<Vector3Int, int>> MobilityComponentCache =
+        MobilityProfileKey,
+        List<Dictionary<Vector3Int, int>>> MobilityComponentCache =
             new Dictionary<
-                MobilityComponentKey,
-                Dictionary<Vector3Int, int>>();
+                MobilityProfileKey,
+                List<Dictionary<Vector3Int, int>>>();
 
     /// <summary>
     /// Malha de movimento proprio SEM TETO de turnos. Cara — flood fill do
     /// tabuleiro — entao so e construida para quem ja falhou as duas bandas,
-    /// ou seja, para quem vai pedir carona de qualquer jeito.
+    /// ou seja, para quem vai pedir carona de qualquer jeito. E, dentro disso,
+    /// uma vez por PERFIL por massa de terra, nao uma vez por unidade.
     /// </summary>
     private static Dictionary<Vector3Int, int> ResolveOwnMovementComponent(
         QueroCaronaRequest request)
@@ -740,12 +749,28 @@ public static class QueroCaronaService
                 request.map, out BoardTopologyIndex resolved)
                 ? resolved
                 : null;
-        var key = new MobilityComponentKey(request, data, topology);
-        if (MobilityComponentCache.TryGetValue(
-                key, out Dictionary<Vector3Int, int> cached))
+
+        Vector3Int origin = request.unit.CurrentCellPosition;
+        origin.z = 0;
+        var key = new MobilityProfileKey(request, data, topology);
+        if (!MobilityComponentCache.TryGetValue(
+                key, out List<Dictionary<Vector3Int, int>> known))
         {
-            AIDecisionPerf.AddCount("QueroCaronaMobilityComponentHits");
-            return cached;
+            if (MobilityComponentCache.Count >= MaxMobilityComponentEntries)
+                MobilityComponentCache.Clear();
+            known = new List<Dictionary<Vector3Int, int>>(2);
+            MobilityComponentCache[key] = known;
+        }
+
+        // Ja conheco um componente deste perfil que contem a origem? Entao e
+        // exatamente o componente dela.
+        for (int i = 0; i < known.Count; i++)
+        {
+            if (known[i].ContainsKey(origin))
+            {
+                AIDecisionPerf.AddCount("QueroCaronaMobilityComponentHits");
+                return known[i];
+            }
         }
 
         AIDecisionPerf.AddCount("QueroCaronaMobilityComponentBuilds");
@@ -754,9 +779,7 @@ public static class QueroCaronaService
                 request.unit,
                 request.map,
                 request.terrainDatabase);
-        if (MobilityComponentCache.Count >= MaxMobilityComponentEntries)
-            MobilityComponentCache.Clear();
-        MobilityComponentCache[key] = component;
+        known.Add(component);
         return component;
     }
 
@@ -1103,6 +1126,7 @@ public static class QueroCaronaService
             repairEvaluation = source.repairEvaluation,
             isInfantry = source.isInfantry,
             isStranded = source.isStranded,
+            rideWaitTurns = source.rideWaitTurns,
             reach = source.reach,
             evaluatedTarget = source.evaluatedTarget,
             evaluatedConstruction =

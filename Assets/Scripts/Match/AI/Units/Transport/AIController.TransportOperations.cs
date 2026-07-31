@@ -729,6 +729,7 @@ public partial class AIController
             passenger,
             plan,
             operationalTurns);
+        ApplyRideWaitStamp(passenger, evaluated);
         planning.RideNeedByPassenger[passenger.InstanceId] =
             evaluated;
         return evaluated;
@@ -884,15 +885,35 @@ public partial class AIController
         AIWorldSnapshot snapshot,
         TeamObjectivePlan plan)
     {
-        return candidate != null
-            && candidate != transporter
-            && candidate.SlotIndex == snapshot.AISlotIndex
-            && !candidate.IsDead
-            && !candidate.IsEmbarked
-            && !IsTransportPassengerClaimedByOther(
-                transporter, candidate)
-            && !IsAlreadyFormalPassenger(
-                candidate, transporter, plan);
+        if (candidate == null
+            || candidate == transporter
+            || candidate.SlotIndex != snapshot.AISlotIndex
+            || candidate.IsDead
+            || candidate.IsEmbarked
+            || IsTransportPassengerClaimedByOther(transporter, candidate)
+            || IsAlreadyFormalPassenger(candidate, transporter, plan))
+        {
+            return false;
+        }
+
+        // Promessa que o veiculo nao pode cumprir e pior do que promessa
+        // nenhuma: ela reserva o passageiro, gasta o turno do transportador e
+        // ainda suspende o encerramento antecipado da varredura por causa de
+        // alguem que este APC jamais alcancara. Se os componentes de movimento
+        // nao se tocam, este par nao existe.
+        if (!CanTransporterMeetPassenger(transporter, candidate))
+        {
+            if (showAILogs)
+            {
+                Debug.Log(
+                    $"{TL("Transporte")} #{transporter.InstanceId} descarta " +
+                    $"pax=#{candidate.InstanceId}: componentes de movimento " +
+                    "nao se tocam (o veiculo nao chega ate ele).");
+            }
+            return false;
+        }
+
+        return true;
     }
 
     private bool IsTransportPassengerClaimedByOther(

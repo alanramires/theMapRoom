@@ -66,6 +66,7 @@ public class UnitManagerEditor : Editor
     private SerializedProperty aiDesignatedMissionTargetConstructionInstanceIdProp;
     private SerializedProperty aiDesignatedMissionTargetCellProp;
     private SerializedProperty aiDesignatedMissionSectorProp;
+    private SerializedProperty aiRideWaitSinceTurnProp;
 
     private void OnEnable()
     {
@@ -129,6 +130,7 @@ public class UnitManagerEditor : Editor
         aiDesignatedMissionTargetConstructionInstanceIdProp = serializedObject.FindProperty("aiDesignatedMissionTargetConstructionInstanceId");
         aiDesignatedMissionTargetCellProp = serializedObject.FindProperty("aiDesignatedMissionTargetCell");
         aiDesignatedMissionSectorProp = serializedObject.FindProperty("aiDesignatedMissionSector");
+        aiRideWaitSinceTurnProp = serializedObject.FindProperty("aiRideWaitSinceTurn");
     }
 
     public override void OnInspectorGUI()
@@ -396,7 +398,41 @@ public class UnitManagerEditor : Editor
                 EditorGUILayout.PropertyField(aiDesignatedMissionTargetCellProp, new GUIContent("Mission Target Cell"));
             if (aiDesignatedMissionSectorProp != null)
                 EditorGUILayout.PropertyField(aiDesignatedMissionSectorProp, new GUIContent("Mission Sector"));
+            if (aiRideWaitSinceTurnProp != null)
+            {
+                EditorGUILayout.PropertyField(
+                    aiRideWaitSinceTurnProp,
+                    new GUIContent(
+                        "Ride Wait Since Turn",
+                        "Turno em que entrou na fila da carona. 0 = não espera. " +
+                        "A espera é derivada (turno atual − carimbo), não incrementada."));
+            }
         }
+
+        // Fila da carona em linguagem de humano. O carimbo sozinho não responde
+        // "há quanto tempo", que é a pergunta que a decisão usa.
+        if (aiRideWaitSinceTurnProp != null
+            && aiRideWaitSinceTurnProp.intValue > 0)
+        {
+            int currentTurn = ResolveCurrentTurnForInspector();
+            int waited = currentTurn > 0
+                ? Mathf.Max(0, currentTurn - aiRideWaitSinceTurnProp.intValue)
+                : 0;
+            EditorGUILayout.HelpBox(
+                currentTurn > 0
+                    ? $"Na fila da carona desde o turno " +
+                      $"{aiRideWaitSinceTurnProp.intValue} — esperando há " +
+                      $"{waited} turno(s)."
+                    : $"Na fila da carona desde o turno " +
+                      $"{aiRideWaitSinceTurnProp.intValue}.",
+                MessageType.Info);
+        }
+    }
+
+    private static int ResolveCurrentTurnForInspector()
+    {
+        MatchController match = Object.FindFirstObjectByType<MatchController>();
+        return match != null ? match.CurrentTurn : 0;
     }
 
     private void DrawTransportRuntimeSection(UnitManager unit)

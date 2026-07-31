@@ -363,13 +363,17 @@ public static class MelhorEmbarqueService
                     passengerRideNeed[passenger]));
         }
 
-        bool hasEmergencyRideNeed = false;
+        // Quem suspende o encerramento antecipado da varredura. Era so
+        // emergencia de reparo; passou a incluir quem nao tem rota propria e ja
+        // esperou demais. Sem isso o ilhado nao perdia a disputa — ele nao
+        // entrava nela, porque a busca parava no primeiro vizinho que embarca
+        // agora e as LZs distantes nunca viravam opcao.
+        bool hasNonNegotiableRideNeed = false;
         foreach (QueroCaronaResult rideNeed in passengerRideNeed.Values)
         {
-            if (ResolveRideDisposition(rideNeed)
-                == MelhorEmbarqueRideDisposition.Emergency)
+            if (IsNonNegotiableRideNeed(rideNeed))
             {
-                hasEmergencyRideNeed = true;
+                hasNonNegotiableRideNeed = true;
                 break;
             }
         }
@@ -418,7 +422,7 @@ public static class MelhorEmbarqueService
 
             if (tier != MelhorEmbarqueTier.Tactical
                 && request.stopAfterDecisiveTactical
-                && !hasEmergencyRideNeed
+                && !hasNonNegotiableRideNeed
                 && hasDecisiveTacticalPickup)
             {
                 stoppedAfterTactical = true;
@@ -518,10 +522,35 @@ public static class MelhorEmbarqueService
                     || emergencyEvac
                     ? Mathf.Abs(passengerMeetingDistance - 1f) * 10000f
                     : 0f;
+
+                // "Nao tem rota" e defeito da OPCAO ou condicao do PASSAGEIRO?
+                //
+                // Para quem tem pernas, e defeito: entre duas LZ, a que ele nao
+                // alcanca vale menos, e a penalidade ordena isso direito.
+                //
+                // Para quem nunca tera rota — ilha, corredor bloqueado, camada
+                // incompativel — ela nao descreve a opcao, descreve a vida
+                // dele. Cobrada assim, o mais necessitado vira o mais caro de
+                // servir e perde sempre: "quero carona" pagava +1000 enquanto
+                // "nao tenho rota nenhuma" custava -10000. Quem precisa de
+                // resgate era penalizado por precisar de resgate.
+                //
+                // O anel de aproximacao (rescueApproachPenalty) continua
+                // valendo e e ele que ordena as LZ desse passageiro: o
+                // transportador tem de encostar, porque quem nao anda nao vai
+                // ao encontro.
+                float routePenalty = ResolvePassengerRoutePenalty(
+                    routeState, passengerTotalCost);
+                if (routeState ==
+                        MelhorEmbarquePassengerRouteState.NoCurrentRoute
+                    && IsNonNegotiableRideNeed(rideNeed))
+                {
+                    routePenalty = 0f;
+                }
+
                 float optionScore = 100000f
                     - distance * 100f
-                    - ResolvePassengerRoutePenalty(
-                        routeState, passengerTotalCost)
+                    - routePenalty
                     - rescueApproachPenalty
                     + rideNeedAdjustment;
                 var option = new MelhorEmbarqueOption
@@ -1062,6 +1091,34 @@ public static class MelhorEmbarqueService
             : MelhorEmbarqueRideDisposition.OpportunisticFallback;
     }
 
+    /// <summary>
+    /// Turnos na fila a partir dos quais o pedido deixa de ser negociavel.
+    ///
+    /// Nao e "todo ilhado suspende tudo": um ilhado recem-chegado nao pode
+    /// custar a varredura completa todo turno. E a ESPERA que promove — quem
+    /// foi ignorado tres vezes seguidas para de ser ignoravel.
+    /// </summary>
+    private const int NonNegotiableRideWaitTurns = 3;
+
+    /// <summary>
+    /// Pedido que a esteira nao pode mais adiar: emergencia de reparo, ou
+    /// alguem sem rota propria que ja esperou demais.
+    ///
+    /// Existe porque as duas regras de eficiencia do ranking — parar cedo e
+    /// punir quem nao tem rota — foram desenhadas olhando UM passageiro por
+    /// vez, e juntas produzem fome: o mais necessitado e sempre o mais caro de
+    /// servir, entao ele perde sempre.
+    /// </summary>
+    private static bool IsNonNegotiableRideNeed(QueroCaronaResult rideNeed)
+    {
+        if (rideNeed == null || !rideNeed.wantsRide)
+            return false;
+        if (rideNeed.isEmergency)
+            return true;
+        return rideNeed.isStranded
+               && rideNeed.rideWaitTurns >= NonNegotiableRideWaitTurns;
+    }
+
     private static float ResolveRideNeedAdjustment(
         MelhorEmbarqueRideDisposition disposition,
         QueroCaronaResult rideNeed)
@@ -1090,6 +1147,12 @@ public static class MelhorEmbarqueService
             ResolveRideDisposition(rideNeed);
         return $"carona={disposition} " +
                $"ajuste={ResolveRideNeedAdjustment(disposition, rideNeed):0} " +
+               (rideNeed.rideWaitTurns > 0
+                   ? $"fila={rideNeed.rideWaitTurns}t "
+                   : string.Empty) +
+               (IsNonNegotiableRideNeed(rideNeed)
+                   ? "INEGOCIÁVEL "
+                   : string.Empty) +
                $"motivo={rideNeed.reason}";
     }
 

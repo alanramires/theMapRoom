@@ -36,6 +36,11 @@ public partial class AIController
         assignedTransportClaims.Clear();
         transportPlanningSnapshots.Clear();
         disembarkPassengerRouteCache.Clear();
+        // Componente de movimento nao muda quando a unidade anda — andar so
+        // acontece dentro dele. Limpar por fase basta, e evita reconstruir o
+        // flood fill por candidato.
+        mobilityComponentsByProfile.Clear();
+        transporterMeetCache.Clear();
 
         // ---- Setup: executado uma única vez por fase ----
         SyncAIUnitCellsFromTransforms();
@@ -47,7 +52,10 @@ public partial class AIController
         foreach (UnitManager u in UnitManager.AllActive)
         {
             if (u.SlotIndex == snapshot.AISlotIndex && !u.IsDead)
+            {
                 UpdateRepairState(u, activePlan);
+                UpdateRideWaitState(u);
+            }
         }
         double repairDone = Time.realtimeSinceStartupAsDouble;
 
