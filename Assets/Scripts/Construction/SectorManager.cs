@@ -982,6 +982,14 @@ public sealed class SectorManager : MonoBehaviour
                 $"search.exhausted={searchDebugExhausted} " +
                 $"search.expanded={searchDebugExpanded} " +
                 $"cache.size={landDistanceCache.Count} | " +
+                $"vizinhos={(searchDebugNeighborTicks * 1000d / System.Diagnostics.Stopwatch.Frequency):F1}ms " +
+                $"transicoes={searchDebugTransitionCalls} " +
+                $"rota.calls={searchDebugRouteCalls} " +
+                $"rota.cache={searchDebugRouteCacheHits} " +
+                $"rota.topologia={searchDebugRouteTopologyHits} " +
+                $"rota.varreduraRede={searchDebugRouteNetworkScans} " +
+                $"terreno={searchDebugTerrainCacheHits}/{searchDebugTerrainResolves} " +
+                $"tile={searchDebugPaintedCacheHits}/{searchDebugPaintedResolves} | " +
                 $"constructions={GetTrackedConstructions().Count} " +
                 $"unaccounted={(totalMs - contextsMs - sectorLoopMs - neighborPassMs):F1}ms");
         }
@@ -1262,6 +1270,20 @@ public sealed class SectorManager : MonoBehaviour
     private static int searchDebugExhausted;
     private static double searchDebugMs;
 
+    // Recorte do custo DENTRO da busca. Contadores sao int++ (praticamente de
+    // graca, mesmo em milhoes de chamadas); o tempo e medido so por EXPANSAO,
+    // nao por vizinho, para o proprio cronometro nao virar o custo dominante.
+    private static long searchDebugNeighborTicks;
+    private static int searchDebugTransitionCalls;
+    private static int searchDebugRouteCalls;
+    private static int searchDebugRouteCacheHits;
+    private static int searchDebugRouteTopologyHits;
+    private static int searchDebugRouteNetworkScans;
+    private static int searchDebugTerrainResolves;
+    private static int searchDebugTerrainCacheHits;
+    private static int searchDebugPaintedResolves;
+    private static int searchDebugPaintedCacheHits;
+
     private static void ResetSectorSearchDebugCounters()
     {
         searchDebugCalls = 0;
@@ -1270,6 +1292,16 @@ public sealed class SectorManager : MonoBehaviour
         searchDebugExhausted = 0;
         searchDebugHits = 0;
         searchDebugMs = 0d;
+        searchDebugNeighborTicks = 0;
+        searchDebugTransitionCalls = 0;
+        searchDebugRouteCalls = 0;
+        searchDebugRouteCacheHits = 0;
+        searchDebugRouteTopologyHits = 0;
+        searchDebugRouteNetworkScans = 0;
+        searchDebugTerrainResolves = 0;
+        searchDebugTerrainCacheHits = 0;
+        searchDebugPaintedResolves = 0;
+        searchDebugPaintedCacheHits = 0;
     }
 
     // Memoizacao das distancias de movimento entre celulas.
@@ -1340,11 +1372,47 @@ public sealed class SectorManager : MonoBehaviour
     private static readonly Dictionary<LandDistanceCacheKey, int> landDistanceCache =
         new Dictionary<LandDistanceCacheKey, int>(512);
     private static int landDistanceCacheFingerprint = int.MinValue;
+
+    // Terreno e "existe tile aqui" dependem SO dos tilemaps, nao da unidade de
+    // referencia — e nao mudam durante um rebuild. Sem memoizar, cada uma das
+    // ~2 milhoes de transicoes reabria Tilemap.GetTile em todas as camadas do
+    // grid: interop gerenciado->nativo, milhoes de vezes, resolvendo os mesmos
+    // hexes. Invalida junto com landDistanceCache, pelo mesmo fingerprint de
+    // layout.
+    // Custo de rota por PAR de celulas vizinhas. Medido: 1,9 milhao de chamadas
+    // sobre ~9.700 pares possiveis no tabuleiro — ~196 consultas repetidas por
+    // par, porque as buscas atravessam os mesmos hexes de novo e de novo. E o
+    // fallback e caro: o indice de topologia responde <1% das vezes e o resto
+    // varre RoadNetworks linearmente.
+    private readonly struct RouteEnterCostResult
+    {
+        public readonly bool Found;
+        public readonly int Cost;
+        public readonly bool HasDeclaredRouteEdge;
+
+        public RouteEnterCostResult(bool found, int cost, bool hasDeclaredRouteEdge)
+        {
+            Found = found;
+            Cost = cost;
+            HasDeclaredRouteEdge = hasDeclaredRouteEdge;
+        }
+    }
+
+    private static readonly Dictionary<LandDistanceCacheKey, RouteEnterCostResult> routeEnterCostCache =
+        new Dictionary<LandDistanceCacheKey, RouteEnterCostResult>();
+
+    private static readonly Dictionary<Vector3Int, TerrainTypeData> terrainByCellCache =
+        new Dictionary<Vector3Int, TerrainTypeData>();
+    private static readonly Dictionary<Vector3Int, bool> paintedByCellCache =
+        new Dictionary<Vector3Int, bool>();
     private static int searchDebugHits;
 
     public static void InvalidateLandDistanceCache()
     {
         landDistanceCache.Clear();
+        routeEnterCostCache.Clear();
+        terrainByCellCache.Clear();
+        paintedByCellCache.Clear();
         landDistanceCacheFingerprint = int.MinValue;
     }
 
@@ -1406,6 +1474,9 @@ public sealed class SectorManager : MonoBehaviour
             return;
 
         landDistanceCache.Clear();
+        routeEnterCostCache.Clear();
+        terrainByCellCache.Clear();
+        paintedByCellCache.Clear();
         landDistanceCacheFingerprint = fingerprint;
     }
 
@@ -1420,8 +1491,13 @@ public sealed class SectorManager : MonoBehaviour
         double searchStartMs = Time.realtimeSinceStartupAsDouble;
         try
         {
-            // Quem pede o caminho reconstruido nao pode ser servido pelo cache:
-            // ele guarda custo, nao rota. Passa direto para a busca.
+            // Incondicional: os caches de terreno por celula sao consultados
+            // mesmo por chamadas nao-cacheaveis (as que pedem rota), entao a
+            // invalidacao por fingerprint precisa acontecer sempre.
+            EnsureLandDistanceCacheFresh();
+
+            // Quem pede o caminho reconstruido nao pode ser servido pelo cache
+            // de custo: ele guarda custo, nao rota. Passa direto para a busca.
             bool cacheable = path == null && context.IsValid;
             LandDistanceCacheKey cacheKey = default;
             if (cacheable)
@@ -1430,7 +1506,6 @@ public sealed class SectorManager : MonoBehaviour
                 Vector3Int cacheTo = to;
                 cacheFrom.z = 0;
                 cacheTo.z = 0;
-                EnsureLandDistanceCacheFresh();
                 cacheKey = new LandDistanceCacheKey(
                     cacheFrom,
                     cacheTo,
@@ -1473,6 +1548,73 @@ public sealed class SectorManager : MonoBehaviour
         }
     }
 
+    // Entrada da fronteira do Dijkstra setorial. A ordem de insercao e chave
+    // secundaria para o desempate ficar identico ao da varredura linear antiga.
+    private readonly struct SectorSearchEntry
+    {
+        public readonly int Cost;
+        public readonly int Sequence;
+        public readonly Vector3Int Cell;
+
+        public SectorSearchEntry(int cost, int sequence, Vector3Int cell)
+        {
+            Cost = cost;
+            Sequence = sequence;
+            Cell = cell;
+        }
+
+        public bool IsBetterThan(in SectorSearchEntry other)
+        {
+            if (Cost != other.Cost)
+                return Cost < other.Cost;
+            return Sequence < other.Sequence;
+        }
+    }
+
+    private static void PushSectorSearchEntry(
+        List<SectorSearchEntry> heap, SectorSearchEntry entry)
+    {
+        heap.Add(entry);
+        int child = heap.Count - 1;
+        while (child > 0)
+        {
+            int parent = (child - 1) / 2;
+            if (!heap[child].IsBetterThan(heap[parent]))
+                break;
+            (heap[parent], heap[child]) = (heap[child], heap[parent]);
+            child = parent;
+        }
+    }
+
+    private static SectorSearchEntry PopSectorSearchEntry(
+        List<SectorSearchEntry> heap)
+    {
+        SectorSearchEntry top = heap[0];
+        int last = heap.Count - 1;
+        heap[0] = heap[last];
+        heap.RemoveAt(last);
+
+        int parent = 0;
+        while (true)
+        {
+            int left = parent * 2 + 1;
+            if (left >= heap.Count)
+                break;
+
+            int best = left;
+            int right = left + 1;
+            if (right < heap.Count && heap[right].IsBetterThan(heap[left]))
+                best = right;
+            if (!heap[best].IsBetterThan(heap[parent]))
+                break;
+
+            (heap[parent], heap[best]) = (heap[best], heap[parent]);
+            parent = best;
+        }
+
+        return top;
+    }
+
     private static bool TryComputeLandMovementDistanceInternal(
         Vector3Int from,
         Vector3Int to,
@@ -1502,29 +1644,42 @@ public sealed class SectorManager : MonoBehaviour
         if (!HasAnyPaintedTileAtCell(to, context))
             return false;
 
-        var frontier = new List<Vector3Int> { from };
+        // Fronteira em heap binario com chave (custo, ordem de insercao).
+        //
+        // A versao anterior usava List e pagava DOIS laços O(n) dentro do laço
+        // principal: varredura linear para achar o minimo a cada pop, e
+        // frontier.Contains por vizinho. Numa busca que expande centenas de
+        // celulas isso vira quadratico, e o rebuild frio do mapa cobrava
+        // segundos por causa disso. maxExpanded nao ajudava: ele limita quantas
+        // celulas sao expandidas, nao o custo de cada expansao.
+        //
+        // A ordem de insercao como chave secundaria reproduz o desempate
+        // antigo — a List ficava em ordem de insercao e a varredura guardava o
+        // PRIMEIRO minimo —, entao custo e rota saem identicos.
+        var frontier = new List<SectorSearchEntry>();
         var costByCell = new Dictionary<Vector3Int, int> { [from] = 0 };
         var cameFrom = new Dictionary<Vector3Int, Vector3Int> { [from] = from };
         var neighbors = new List<Vector3Int>(6);
         int expanded = 0;
+        int sequence = 0;
         int maxExpanded = Mathf.Max(512, context.Tilemap.cellBounds.size.x * context.Tilemap.cellBounds.size.y);
+        PushSectorSearchEntry(frontier, new SectorSearchEntry(0, sequence++, from));
 
         while (frontier.Count > 0 && expanded < maxExpanded)
         {
-            int bestIndex = 0;
-            int bestCost = costByCell[frontier[0]];
-            for (int i = 1; i < frontier.Count; i++)
-            {
-                int candidateCost = costByCell[frontier[i]];
-                if (candidateCost >= bestCost)
-                    continue;
+            SectorSearchEntry entry = PopSectorSearchEntry(frontier);
+            Vector3Int current = entry.Cell;
+            int bestCost = entry.Cost;
 
-                bestIndex = i;
-                bestCost = candidateCost;
+            // Entrada obsoleta: a celula ja foi alcancada mais barato depois
+            // que esta foi empilhada. Descarte preguicoso, sem remocao no meio
+            // do heap.
+            if (costByCell.TryGetValue(current, out int recordedCost)
+                && bestCost > recordedCost)
+            {
+                continue;
             }
 
-            Vector3Int current = frontier[bestIndex];
-            frontier.RemoveAt(bestIndex);
             expanded++;
 
             if (current == to)
@@ -1535,11 +1690,13 @@ public sealed class SectorManager : MonoBehaviour
                 return true;
             }
 
+            long neighborStart = System.Diagnostics.Stopwatch.GetTimestamp();
             UnitMovementPathRules.GetImmediateHexNeighbors(context.Tilemap, current, neighbors);
             for (int i = 0; i < neighbors.Count; i++)
             {
                 Vector3Int next = neighbors[i];
                 next.z = 0;
+                searchDebugTransitionCalls++;
                 if (!TryGetLandTransitionCost(
                         current,
                         next,
@@ -1553,9 +1710,11 @@ public sealed class SectorManager : MonoBehaviour
 
                 costByCell[next] = nextCost;
                 cameFrom[next] = current;
-                if (!frontier.Contains(next))
-                    frontier.Add(next);
+                PushSectorSearchEntry(
+                    frontier, new SectorSearchEntry(nextCost, sequence++, next));
             }
+            searchDebugNeighborTicks +=
+                System.Diagnostics.Stopwatch.GetTimestamp() - neighborStart;
         }
 
         // Estourar o teto significa que a busca varreu o tabuleiro inteiro para
@@ -1954,6 +2113,41 @@ public sealed class SectorManager : MonoBehaviour
         if (context.ReferenceUnitData == null)
             return false;
 
+        searchDebugRouteCalls++;
+
+        // A chave inclui o contexto porque o custo depende da UnitData de
+        // referencia. destinationTerrain e derivado de `to`, entao ja esta
+        // coberto pela celula.
+        var routeKey = new LandDistanceCacheKey(
+            from, to, BuildLandDistanceContextId(context));
+        if (routeEnterCostCache.TryGetValue(routeKey, out RouteEnterCostResult cachedRoute))
+        {
+            searchDebugRouteCacheHits++;
+            cost = cachedRoute.Cost;
+            hasDeclaredRouteEdge = cachedRoute.HasDeclaredRouteEdge;
+            return cachedRoute.Found;
+        }
+
+        bool routeFound = TryGetConnectedRouteEnterCostForUnitDataUncached(
+            from, to, context, destinationTerrain, out cost, out hasDeclaredRouteEdge);
+        routeEnterCostCache[routeKey] =
+            new RouteEnterCostResult(routeFound, cost, hasDeclaredRouteEdge);
+        return routeFound;
+    }
+
+    private static bool TryGetConnectedRouteEnterCostForUnitDataUncached(
+        Vector3Int from,
+        Vector3Int to,
+        SectorNeighborDistanceContext context,
+        TerrainTypeData destinationTerrain,
+        out int cost,
+        out bool hasDeclaredRouteEdge)
+    {
+        cost = 1;
+        hasDeclaredRouteEdge = false;
+        if (context.ReferenceUnitData == null)
+            return false;
+
         StructureData bestStructure = null;
         int bestStructureCost = 1;
         if (context.Topology != null
@@ -1962,6 +2156,7 @@ public sealed class SectorManager : MonoBehaviour
                 to,
                 out IReadOnlyList<StructureData> indexedStructures))
         {
+            searchDebugRouteTopologyHits++;
             for (int i = 0; i < indexedStructures.Count; i++)
             {
                 StructureData structure = indexedStructures[i];
@@ -1987,6 +2182,7 @@ public sealed class SectorManager : MonoBehaviour
         if (context.RoadNetworks == null)
             return false;
 
+        searchDebugRouteNetworkScans++;
         for (int i = 0; i < context.RoadNetworks.Length; i++)
         {
             RoadNetworkManager network = context.RoadNetworks[i];
@@ -2331,6 +2527,21 @@ public sealed class SectorManager : MonoBehaviour
         if (context.TerrainDatabase == null)
             return null;
 
+        cell.z = 0;
+        if (terrainByCellCache.TryGetValue(cell, out TerrainTypeData cached))
+        {
+            searchDebugTerrainCacheHits++;
+            return cached;
+        }
+        searchDebugTerrainResolves++;
+        TerrainTypeData resolved = ResolveTerrainAtCellUncached(cell, context);
+        terrainByCellCache[cell] = resolved;
+        return resolved;
+    }
+
+    private static TerrainTypeData ResolveTerrainAtCellUncached(Vector3Int cell, SectorNeighborDistanceContext context)
+    {
+
         TileBase tile = context.Tilemap != null ? context.Tilemap.GetTile(cell) : null;
         if (tile != null && context.TerrainDatabase.TryGetByPaletteTile(tile, out TerrainTypeData terrain) && terrain != null)
             return terrain;
@@ -2353,6 +2564,20 @@ public sealed class SectorManager : MonoBehaviour
     }
 
     private static bool HasAnyPaintedTileAtCell(Vector3Int cell, SectorNeighborDistanceContext context)
+    {
+        cell.z = 0;
+        if (paintedByCellCache.TryGetValue(cell, out bool cached))
+        {
+            searchDebugPaintedCacheHits++;
+            return cached;
+        }
+        searchDebugPaintedResolves++;
+        bool painted = HasAnyPaintedTileAtCellUncached(cell, context);
+        paintedByCellCache[cell] = painted;
+        return painted;
+    }
+
+    private static bool HasAnyPaintedTileAtCellUncached(Vector3Int cell, SectorNeighborDistanceContext context)
     {
         if (context.Tilemap != null && context.Tilemap.GetTile(cell) != null)
             return true;
