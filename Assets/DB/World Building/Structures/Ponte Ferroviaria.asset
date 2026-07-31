@@ -33,8 +33,18 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 44c13554a7f731f418bad4395bf10e52, type: 2}
   blockedSkills: []
   skillCostOverrides: []
-  skillRulesByTerrain: []
-  exigeRotaDeclarada: 0
+  skillRulesByTerrain:
+  - terrainData: {fileID: 11400000, guid: 75d32a51167ec98409039b6f5d4d287f, type: 2}
+    requiredSkillsToEnter: []
+    blockedSkills:
+    - {fileID: 11400000, guid: ef10c9e820afc074b99ea8e0b709c2f4, type: 2}
+    - {fileID: 11400000, guid: 24a55ae6170e7a642865a4a34c736233, type: 2}
+    skillCostOverrides:
+    - skill: {fileID: 11400000, guid: fc7763e126a22974d87a6869f87beea4, type: 2}
+      autonomyCost: 2
+    rotaDeclarada: 0
+    roadBoost: 0
+  exigeRotaDeclarada: 1
   exigeEstruturaNaConstrucao: 0
   canAlsoBeBuiltOnTheFollowDomains:
   - domain: 1

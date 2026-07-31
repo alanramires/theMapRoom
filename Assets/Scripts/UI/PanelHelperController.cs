@@ -4412,6 +4412,13 @@ public class PanelHelperController : MonoBehaviour
         if (rect == null || panelHelper == null || !panelHelper.activeInHierarchy)
             return false;
 
+        // Quando o painel e' o proprio GameObject do controller, sumir e' alpha 0:
+        // o objeto continua ativo e o rect continua ocupando a area do dock. Sem
+        // esta guarda o painel invisivel ainda "engole" o scroll da camera (zoom
+        // morre) e o clique fora do Inspect, ate ele abrir e fugir do cursor.
+        if (!IsPanelActuallyVisible())
+            return false;
+
         Canvas canvas = rect.GetComponentInParent<Canvas>();
         Camera cam = (canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay)
             ? canvas.worldCamera
@@ -4817,6 +4824,19 @@ public class PanelHelperController : MonoBehaviour
             return new Rect();
 
         return Rect.MinMaxRect(minX, minY, maxX, maxY);
+    }
+
+    // Fonte unica de "o painel esta realmente aparecendo". Cobre os dois modos de
+    // SetPanelVisible: alpha (painel == este GameObject) e SetActive (painel filho).
+    private bool IsPanelActuallyVisible()
+    {
+        if (panelHelper == null || !panelHelper.activeInHierarchy)
+            return false;
+
+        if (selfPanelCanvasGroup != null && selfPanelCanvasGroup.alpha <= 0.01f)
+            return false;
+
+        return lastPanelVisible;
     }
 
     private void SetPanelVisible(bool visible)

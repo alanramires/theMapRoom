@@ -29,8 +29,6 @@ public sealed class QueroCaronaRequest
     public string explicitTargetLabel;
     public int operationalTurns = 2;
     public bool emulateUnderRepairFromUnitData;
-    public IReadOnlyDictionary<Vector3Int, int> operationalReach;
-    public int operationalReachBudget = -1;
     public Action<string> diagnosticLog;
 }
 
@@ -43,6 +41,15 @@ public sealed class QueroCaronaResult
     public bool isUnderRepairEmulated;
     public string repairEvaluation;
     public bool isInfantry;
+
+    /// <summary>
+    /// Nao existe rota propria a pe ate o objetivo — nem em mil turnos. Nao e
+    /// "longe": e ilha, corredor bloqueado por hex mais caro que o teto de um
+    /// turno, ou dominio incompativel. Quem esta assim so chega de carona, e
+    /// perde de todo mundo num ranking ordenado por proximidade.
+    /// </summary>
+    public bool isStranded;
+
     public QueroCaronaReach reach;
     public Vector3Int evaluatedTarget;
     public ConstructionManager evaluatedConstruction;
@@ -60,6 +67,13 @@ public sealed class QueroCaronaResult
 /// transporte depois de verificar se consegue cumprir seu objetivo sozinha
 /// dentro dos envelopes Tactical e Operational. Nao reserva transporte, nao
 /// move unidades e nao substitui prioridades operacionais do papel da unidade.
+///
+/// POLITICA, NAO ALCANCE. A escala de urgencia, o curto-circuito de
+/// emergencia, a reserva 1:1 e a escolha do objetivo sao daqui. Quao longe a
+/// unidade chega e de quanto custa a rota vem do UnitReachEnvelopeService, na
+/// intencao Capture — inclusive a resposta "nao alcanca", que e a ausencia de
+/// banda e nao a ausencia de chave num dicionario de orcamento.
+/// Ver docs/contrato_envelope_alcance.md.
 /// </summary>
 public static class QueroCaronaService
 {
@@ -291,14 +305,7 @@ public static class QueroCaronaService
 
         result.isInfantry =
             data.unitClass == GameUnitClass.Infantry;
-        result.tacticalBudget = Mathf.Max(
-            0, request.unit.RemainingMovementPoints);
-        if (result.tacticalBudget <= 0)
-            result.tacticalBudget =
-                Mathf.Max(0, request.unit.MaxMovementPoints);
-        result.operationalBudget =
-            result.tacticalBudget
-            * Mathf.Max(1, request.operationalTurns);
+        ResolveDiagnosticBudgets(request, result);
 
         Vector3Int origin = request.unit.CurrentCellPosition;
         origin.z = 0;
@@ -336,30 +343,24 @@ public static class QueroCaronaService
             return Finish();
         }
 
-        bool canReuseOperationalReach =
-            request.operationalReach != null
-            && request.operationalReachBudget
-                == result.operationalBudget;
-        IReadOnlyDictionary<Vector3Int, int> reach =
-            canReuseOperationalReach
-                ? request.operationalReach
-                : AIActionReachCoordinator.BuildSectorReachMap(
-                request.unit,
-                request.map,
-                request.terrainDatabase,
-                origin,
-                Mathf.Max(0, result.operationalBudget));
-        if (canReuseOperationalReach)
-            AIDecisionPerf.AddCount(
-                "QueroCaronaOperationalReachReuses");
+        // Alcance vem do envelope de Captura, nas duas bandas. Nao ha mais
+        // dicionario de orcamento MP x N: o turno atual vale o que sobrou, os
+        // seguintes valem MP cheio, e um hex mais caro que o teto de um turno e
+        // intransponivel. E o que impede a recusa de carona por alcance
+        // fantasma — soldado de 3 MP numa cordilheira de custo 2 entra em UMA
+        // montanha por turno, nao em tres com um bolso de 6.
+        UnitReachProfile captureReach = BuildCaptureReachProfile(request);
+        AIDecisionPerf.AddCount("QueroCaronaCaptureReachBuilds");
         CaptureOpportunityClaimSnapshot captureClaims =
             UnitRoleCompatibility.CanSatisfy(
                 data,
                 UnitRole.Capturador)
+                // Mesmo envelope para os dois servicos: unidade + intencao +
+                // banda. O reuso deixou de ser igualdade de orcamento inteiro e
+                // virou identidade de envelope.
                 ? CaptureOpportunityClaimService.GetOrBuild(
                     request,
-                    reach,
-                    result.operationalBudget)
+                    captureReach)
                 : null;
 
         if (request.useExplicitTarget)
@@ -373,26 +374,30 @@ public static class QueroCaronaService
                     : request.explicitTargetLabel;
 
             result.evaluatedTarget = explicitTarget;
-            if (reach.TryGetValue(
+            if (TryResolveCaptureBand(
+                    captureReach,
                     explicitTarget,
-                    out int explicitCost))
+                    out int explicitCost,
+                    out ReachBand explicitBand))
             {
                 result.routeCost = explicitCost;
                 SetReachAndDecision(
                     result,
+                    request,
+                    captureReach,
+                    explicitTarget,
                     explicitCost,
+                    explicitBand,
                     targetLabel);
             }
             else
             {
-                result.wantsRide = true;
-                result.reach =
-                    QueroCaronaReach.BeyondOperational;
-                result.rideNeedScore = 1000;
+                ApplyBeyondReachRideNeed(
+                    request, result, explicitTarget);
                 result.reason =
                     $"{ResolveUnitKind(result)} nao alcanca " +
-                    $"{targetLabel} em Tactical ou Operational: " +
-                    "aceita carona.";
+                    $"{targetLabel} em Tactical ou Operational" +
+                    FormatStrandedSuffix(result) + ": aceita carona.";
             }
 
             request.diagnosticLog?.Invoke(result.reason);
@@ -407,9 +412,12 @@ public static class QueroCaronaService
                     out SectorManager.SectorInfo info)
                 || info == null)
             {
+                // Sem representante nao ha celula de objetivo, entao nao da
+                // para perguntar se existe rota propria: fica na urgencia
+                // basica, sem classificar fome estrutural.
                 result.wantsRide = true;
                 result.reach = QueroCaronaReach.BeyondOperational;
-                result.rideNeedScore = 1000;
+                result.rideNeedScore = BeyondOperationalRideNeedScore;
                 result.reason =
                     "Plano sem representante válido no SectorManager; " +
                     "estimativa aceita carona.";
@@ -420,13 +428,14 @@ public static class QueroCaronaService
             representative.z = 0;
             if (TryFindBestAvailablePlannedTarget(
                     request,
-                    reach,
+                    captureReach,
                     captureClaims,
                     info,
                     representative,
                     out Vector3Int plannedTarget,
                     out ConstructionManager plannedConstruction,
                     out int plannedCost,
+                    out ReachBand plannedBand,
                     out int claimBlocks,
                     out int claimOwnerUnitId))
             {
@@ -438,7 +447,11 @@ public static class QueroCaronaService
                     claimOwnerUnitId;
                 SetReachAndDecision(
                     result,
+                    request,
+                    captureReach,
+                    plannedTarget,
                     plannedCost,
+                    plannedBand,
                     FormatCaptureTargetLabel(
                         captureClaims,
                         plannedConstruction,
@@ -450,10 +463,8 @@ public static class QueroCaronaService
             }
             else
             {
-                result.wantsRide = true;
-                result.reach =
-                    QueroCaronaReach.BeyondOperational;
-                result.rideNeedScore = 1000;
+                ApplyBeyondReachRideNeed(
+                    request, result, representative);
                 result.captureClaimsBlocked = claimBlocks;
                 result.captureClaimOwnerUnitId =
                     claimOwnerUnitId;
@@ -464,6 +475,7 @@ public static class QueroCaronaService
                     FormatCaptureClaimSuffix(
                         claimBlocks,
                         claimOwnerUnitId) +
+                    FormatStrandedSuffix(result) +
                     ": aceita carona.";
             }
             request.diagnosticLog?.Invoke(result.reason);
@@ -472,6 +484,7 @@ public static class QueroCaronaService
 
         ConstructionManager nearest = null;
         int nearestCost = int.MaxValue;
+        ReachBand nearestBand = ReachBand.Tactical;
         int captureClaimBlocks = 0;
         int lastCaptureClaimOwnerId = -1;
         foreach (ConstructionManager construction
@@ -485,7 +498,11 @@ public static class QueroCaronaService
                 continue;
             Vector3Int cell = construction.CurrentCellPosition;
             cell.z = 0;
-            if (!reach.TryGetValue(cell, out int cost)
+            if (!TryResolveCaptureBand(
+                    captureReach,
+                    cell,
+                    out int cost,
+                    out ReachBand band)
                 || cost >= nearestCost)
                 continue;
             if (IsClaimedByAnotherCapturer(
@@ -503,6 +520,7 @@ public static class QueroCaronaService
             }
             nearest = construction;
             nearestCost = cost;
+            nearestBand = band;
         }
 
         if (nearest != null)
@@ -517,7 +535,8 @@ public static class QueroCaronaService
             result.captureClaimOwnerUnitId =
                 lastCaptureClaimOwnerId;
             SetReachAndDecision(
-                result, nearestCost,
+                result, request, captureReach, target,
+                nearestCost, nearestBand,
                 FormatCaptureTargetLabel(
                     captureClaims,
                     nearest,
@@ -526,9 +545,7 @@ public static class QueroCaronaService
         }
         else
         {
-            result.wantsRide = true;
-            result.reach = QueroCaronaReach.BeyondOperational;
-            result.rideNeedScore = 1000;
+            ApplyBeyondReachRideNeedForAnyCapturable(request, result);
             result.captureClaimsBlocked =
                 captureClaimBlocks;
             result.captureClaimOwnerUnitId =
@@ -539,8 +556,8 @@ public static class QueroCaronaService
                 FormatCaptureClaimSuffix(
                     captureClaimBlocks,
                     lastCaptureClaimOwnerId) +
-                ": " +
-                "aceita carona.";
+                FormatStrandedSuffix(result) +
+                ": aceita carona.";
         }
 
         request.diagnosticLog?.Invoke(result.reason);
@@ -564,14 +581,7 @@ public static class QueroCaronaService
         UnitManager unit = request.unit;
         result.isInfantry =
             data.unitClass == GameUnitClass.Infantry;
-        result.tacticalBudget = Mathf.Max(
-            0, unit.RemainingMovementPoints);
-        if (result.tacticalBudget <= 0)
-            result.tacticalBudget =
-                Mathf.Max(0, unit.MaxMovementPoints);
-        result.operationalBudget =
-            result.tacticalBudget
-            * Mathf.Max(1, request.operationalTurns);
+        ResolveDiagnosticBudgets(request, result);
         Vector3Int origin = unit.CurrentCellPosition;
         origin.z = 0;
 
@@ -598,6 +608,328 @@ public static class QueroCaronaService
             : $"{ResolveUnitKind(result)} sem emergência de reparo.";
         request.diagnosticLog?.Invoke(result.reason);
         return result;
+    }
+
+    // ------------------------------------------------------------------
+    // Fome do caroneiro: quem NAO TEM ROTA PROPRIA vs quem so esta longe.
+    //
+    // O envelope tem duas bandas e para no 2o turno — por contrato. Ele nao
+    // sabe dizer se o que ficou de fora e turno 3 ou ilha. Sem essa distincao
+    // todo pedido vale o mesmo, e o ilhado perde para sempre de quem esta a
+    // tres hexes, porque o ranking do transporte ordena por proximidade.
+    //
+    // A pergunta certa e a consulta dirigida do contrato: "a unidade possui
+    // rota propria completa ate a missao?". MobilityRelation.OtherComponent e,
+    // literalmente, "pedido de carona".
+    // ------------------------------------------------------------------
+
+    private const int BeyondOperationalRideNeedScore = 1000;
+
+    /// <summary>
+    /// Entre "quero carona" (1000) e emergencia de reparo (2000). Ferido morre;
+    /// ilhado so espera — mas espera para sempre, e nenhum dos dois anda.
+    /// </summary>
+    private const int StrandedRideNeedScore = 1500;
+
+    private const int MaxMobilityComponentEntries = 32;
+
+    /// <summary>
+    /// O componente de movimento nao olha ocupacao de unidade: e terreno,
+    /// construcao e teto de MP por turno. Por isso a chave NAO usa
+    /// GlobalBoardRevision — que muda a cada passo de unidade e ja custou caro
+    /// neste projeto. Invalida por topologia e pela identidade de movimento.
+    /// </summary>
+    private readonly struct MobilityComponentKey
+        : IEquatable<MobilityComponentKey>
+    {
+        private readonly int unitDataObjectId;
+        private readonly int mapObjectId;
+        private readonly Vector3Int origin;
+        private readonly int maxMovement;
+        private readonly Domain domain;
+        private readonly HeightLevel height;
+        private readonly bool isEmbarked;
+        private readonly int topologyVersion;
+        private readonly string topologyFingerprint;
+
+        public MobilityComponentKey(
+            QueroCaronaRequest request,
+            UnitData data,
+            BoardTopologyIndex topology)
+        {
+            UnitManager unit = request.unit;
+            Vector3Int cell = unit.CurrentCellPosition;
+            cell.z = 0;
+            unitDataObjectId = data != null
+                ? data.GetEntityId().GetHashCode()
+                : 0;
+            mapObjectId = request.map.GetEntityId().GetHashCode();
+            origin = cell;
+            maxMovement = Mathf.Max(0, unit.MaxMovementPoints);
+            domain = unit.GetDomain();
+            height = unit.GetHeightLevel();
+            isEmbarked = unit.IsEmbarked;
+            topologyVersion = topology != null
+                ? topology.TopologyVersion
+                : -1;
+            topologyFingerprint = topology != null
+                ? topology.TopologyFingerprint ?? string.Empty
+                : string.Empty;
+        }
+
+        public bool Equals(MobilityComponentKey other)
+        {
+            return unitDataObjectId == other.unitDataObjectId
+                && mapObjectId == other.mapObjectId
+                && origin == other.origin
+                && maxMovement == other.maxMovement
+                && domain == other.domain
+                && height == other.height
+                && isEmbarked == other.isEmbarked
+                && topologyVersion == other.topologyVersion
+                && string.Equals(
+                    topologyFingerprint,
+                    other.topologyFingerprint,
+                    StringComparison.Ordinal);
+        }
+
+        public override bool Equals(object obj)
+        {
+            return obj is MobilityComponentKey other && Equals(other);
+        }
+
+        public override int GetHashCode()
+        {
+            unchecked
+            {
+                int hash = unitDataObjectId;
+                hash = (hash * 397) ^ mapObjectId;
+                hash = (hash * 397) ^ origin.GetHashCode();
+                hash = (hash * 397) ^ maxMovement;
+                hash = (hash * 397) ^ (int)domain;
+                hash = (hash * 397) ^ (int)height;
+                hash = (hash * 397) ^ (isEmbarked ? 1 : 0);
+                hash = (hash * 397) ^ topologyVersion;
+                hash = (hash * 397)
+                    ^ StringComparer.Ordinal.GetHashCode(
+                        topologyFingerprint ?? string.Empty);
+                return hash;
+            }
+        }
+    }
+
+    private static readonly Dictionary<
+        MobilityComponentKey,
+        Dictionary<Vector3Int, int>> MobilityComponentCache =
+            new Dictionary<
+                MobilityComponentKey,
+                Dictionary<Vector3Int, int>>();
+
+    /// <summary>
+    /// Malha de movimento proprio SEM TETO de turnos. Cara — flood fill do
+    /// tabuleiro — entao so e construida para quem ja falhou as duas bandas,
+    /// ou seja, para quem vai pedir carona de qualquer jeito.
+    /// </summary>
+    private static Dictionary<Vector3Int, int> ResolveOwnMovementComponent(
+        QueroCaronaRequest request)
+    {
+        if (!request.unit.TryGetUnitData(out UnitData data))
+            data = null;
+        BoardTopologyIndex topology =
+            BoardTopologyIndex.TryGetFor(
+                request.map, out BoardTopologyIndex resolved)
+                ? resolved
+                : null;
+        var key = new MobilityComponentKey(request, data, topology);
+        if (MobilityComponentCache.TryGetValue(
+                key, out Dictionary<Vector3Int, int> cached))
+        {
+            AIDecisionPerf.AddCount("QueroCaronaMobilityComponentHits");
+            return cached;
+        }
+
+        AIDecisionPerf.AddCount("QueroCaronaMobilityComponentBuilds");
+        Dictionary<Vector3Int, int> component =
+            UnitReachEnvelopeService.BuildOwnMovementComponent(
+                request.unit,
+                request.map,
+                request.terrainDatabase);
+        if (MobilityComponentCache.Count >= MaxMobilityComponentEntries)
+            MobilityComponentCache.Clear();
+        MobilityComponentCache[key] = component;
+        return component;
+    }
+
+    /// <summary>
+    /// Necessidade de carona de quem ficou fora das duas bandas, dirigida a UM
+    /// objetivo ja escolhido. Fora do componente proprio a unidade nunca chega
+    /// andando: a carona deixa de ser conveniencia e vira a unica rota.
+    /// </summary>
+    private static void ApplyBeyondReachRideNeed(
+        QueroCaronaRequest request,
+        QueroCaronaResult result,
+        Vector3Int objectiveCell)
+    {
+        result.wantsRide = true;
+        result.reach = QueroCaronaReach.BeyondOperational;
+        result.rideNeedScore = BeyondOperationalRideNeedScore;
+        result.isStranded = false;
+
+        objectiveCell.z = 0;
+        MobilityRelation relation =
+            UnitReachEnvelopeService.ClassifyMobility(
+                request.unit,
+                request.map,
+                request.terrainDatabase,
+                objectiveCell,
+                ResolveOwnMovementComponent(request));
+        if (relation == MobilityRelation.OwnComponent)
+            return;
+
+        result.isStranded = true;
+        result.rideNeedScore = StrandedRideNeedScore;
+    }
+
+    /// <summary>
+    /// Versao do rogue/rebelde, que nao tem UM objetivo: a pergunta vira
+    /// "existe ALGUM capturavel dentro do meu componente?". Nenhum = ilhado.
+    /// </summary>
+    private static void ApplyBeyondReachRideNeedForAnyCapturable(
+        QueroCaronaRequest request,
+        QueroCaronaResult result)
+    {
+        result.wantsRide = true;
+        result.reach = QueroCaronaReach.BeyondOperational;
+        result.rideNeedScore = BeyondOperationalRideNeedScore;
+        result.isStranded = false;
+
+        Dictionary<Vector3Int, int> component =
+            ResolveOwnMovementComponent(request);
+        IReadOnlyList<ConstructionManager> constructions =
+            ConstructionManager.AllActive;
+        for (int i = 0; i < constructions.Count; i++)
+        {
+            ConstructionManager construction = constructions[i];
+            if (construction == null
+                || !construction.IsCapturable
+                || construction.TeamId == request.unit.TeamId)
+            {
+                continue;
+            }
+
+            Vector3Int cell = construction.CurrentCellPosition;
+            cell.z = 0;
+            if (component.ContainsKey(cell))
+                return;
+        }
+
+        result.isStranded = true;
+        result.rideNeedScore = StrandedRideNeedScore;
+    }
+
+    /// <summary>Sufixo de diagnostico da fome estrutural.</summary>
+    private static string FormatStrandedSuffix(QueroCaronaResult result)
+    {
+        return result.isStranded
+            ? " SEM ROTA PRÓPRIA (só chega de carona)"
+            : string.Empty;
+    }
+
+    /// <summary>
+    /// Envelope de Captura da unidade, nas duas bandas. E a UNICA fonte de
+    /// alcance deste servico.
+    ///
+    /// A subetapa e sempre Terrestre porque a arvore da Captura nao tem ramo
+    /// aereo; para quem e isAircraft o proprio servico resolve a geometria
+    /// cubica. IncludeMovementCosts liga o custo real por celula na banda
+    /// Tactical — este servico precisa do numero, nao so da pertinencia.
+    /// </summary>
+    private static UnitReachProfile BuildCaptureReachProfile(
+        QueroCaronaRequest request)
+    {
+        return UnitReachEnvelopeService.BuildProfile(
+            new UnitReachRequest
+            {
+                Unit = request.unit,
+                BoardMap = request.map,
+                TerrainDatabase = request.terrainDatabase,
+                Intent = ReachIntent.Capture,
+                SubStep = ReachSubStep.Terrestre,
+                Band = ReachBand.Tactical,
+                OperationalTurns = Mathf.Max(
+                    1, request.operationalTurns),
+                IncludeMovementCosts = true
+            });
+    }
+
+    /// <summary>
+    /// Em qual banda a unidade materializa a captura desta celula, e a que
+    /// custo. Quem responde e o envelope; nao ha teste numerico de orcamento
+    /// aqui. Fora das duas bandas devolve false — e o que a IA le como
+    /// "preciso de carona".
+    /// </summary>
+    private static bool TryResolveCaptureBand(
+        UnitReachProfile captureReach,
+        Vector3Int cell,
+        out int routeCost,
+        out ReachBand band)
+    {
+        routeCost = int.MaxValue;
+        band = ReachBand.Tactical;
+        if (captureReach == null
+            || !captureReach.TryClassify(cell, out band))
+        {
+            return false;
+        }
+
+        // O custo sai do envelope que classificou a celula: ele ja o calculou
+        // para responder a pertinencia. O outro envelope serve de reserva
+        // porque as duas bandas usam a mesma metrica de MP a partir da origem.
+        UnitReachEnvelope classifier =
+            band == ReachBand.Tactical
+                ? captureReach.Tactical
+                : captureReach.Operational;
+        if (classifier != null
+            && classifier.TryGetCost(cell, out routeCost))
+        {
+            return true;
+        }
+
+        UnitReachEnvelope fallback =
+            band == ReachBand.Tactical
+                ? captureReach.Operational
+                : captureReach.Tactical;
+        if (fallback != null
+            && fallback.TryGetCost(cell, out routeCost))
+        {
+            return true;
+        }
+
+        // Alcance sem custo publicado nao acontece nas duas bandas de Captura.
+        // Se acontecer, a falha e conservadora: sem numero, o servico prefere
+        // pedir carona a inventar uma rota barata. Pedido, nao ordem.
+        routeCost = int.MaxValue;
+        return false;
+    }
+
+    /// <summary>
+    /// Numeros de DIAGNOSTICO, nao de decisao. O alcance real e o envelope;
+    /// estes tetos existem para o painel e para o texto da razao. O teto
+    /// Operational segue o contrato — turno atual vale o que sobrou, os
+    /// seguintes valem MP cheio — e nunca MP x N num bolso so.
+    /// </summary>
+    private static void ResolveDiagnosticBudgets(
+        QueroCaronaRequest request,
+        QueroCaronaResult result)
+    {
+        UnitManager unit = request.unit;
+        int tactical =
+            AIActionReachCoordinator.ResolveTacticalBudget(unit);
+        int laterTurns = Mathf.Max(1, request.operationalTurns) - 1;
+        result.tacticalBudget = tactical;
+        result.operationalBudget =
+            tactical
+            + Mathf.Max(0, unit.MaxMovementPoints) * laterTurns;
     }
 
     private static bool TryBuildCacheKey(
@@ -770,6 +1102,7 @@ public static class QueroCaronaService
                 source.isUnderRepairEmulated,
             repairEvaluation = source.repairEvaluation,
             isInfantry = source.isInfantry,
+            isStranded = source.isStranded,
             reach = source.reach,
             evaluatedTarget = source.evaluatedTarget,
             evaluatedConstruction =
@@ -873,19 +1206,21 @@ public static class QueroCaronaService
 
     private static bool TryFindBestAvailablePlannedTarget(
         QueroCaronaRequest request,
-        IReadOnlyDictionary<Vector3Int, int> reach,
+        UnitReachProfile captureReach,
         CaptureOpportunityClaimSnapshot captureClaims,
         SectorManager.SectorInfo info,
         Vector3Int representative,
         out Vector3Int target,
         out ConstructionManager construction,
         out int routeCost,
+        out ReachBand routeBand,
         out int claimBlocks,
         out int claimOwnerUnitId)
     {
         target = Vector3Int.zero;
         construction = null;
         routeCost = int.MaxValue;
+        routeBand = ReachBand.Tactical;
         claimBlocks = 0;
         claimOwnerUnitId = -1;
 
@@ -908,13 +1243,16 @@ public static class QueroCaronaService
 
         if (!representativeClaimed
             && !IsClaimedByAlliedUnit(request, representative)
-            && reach != null
-            && reach.TryGetValue(
-                representative, out int representativeCost))
+            && TryResolveCaptureBand(
+                captureReach,
+                representative,
+                out int representativeCost,
+                out ReachBand representativeBand))
         {
             target = representative;
             construction = info.RepresentativeConstruction;
             routeCost = representativeCost;
+            routeBand = representativeBand;
         }
 
         foreach (ConstructionManager candidate
@@ -930,8 +1268,11 @@ public static class QueroCaronaService
                 continue;
             Vector3Int cell = candidate.CurrentCellPosition;
             cell.z = 0;
-            if (reach == null
-                || !reach.TryGetValue(cell, out int cost)
+            if (!TryResolveCaptureBand(
+                    captureReach,
+                    cell,
+                    out int cost,
+                    out ReachBand band)
                 || cost >= routeCost)
                 continue;
             if (IsClaimedByAnotherCapturer(
@@ -950,6 +1291,7 @@ public static class QueroCaronaService
             target = cell;
             construction = candidate;
             routeCost = cost;
+            routeBand = band;
         }
 
         return routeCost < int.MaxValue;
@@ -1087,28 +1429,70 @@ public static class QueroCaronaService
             alliedOnly: true);
     }
 
+    /// <summary>
+    /// A banda vem do envelope, nao de comparacao de inteiro.
+    ///
+    /// O teste antigo (routeCost &lt;= tacticalBudget, com Operational inferido
+    /// de "estar no dicionario") media alcance contra um orcamento de MP x N
+    /// num bolso so. Ele dava alcance que o jogo nao aceita — e recusar carona
+    /// por alcance que nao existe e o pior erro possivel deste servico, porque
+    /// deixa a unidade andando sozinha rumo a um objetivo inalcancavel.
+    ///
+    /// O DIAGNOSTICO PUBLICA O TURNO, NAO UM TETO. O que e fixo aqui e a banda
+    /// — duas rodadas, por definicao do contrato. O alcance dentro dela e
+    /// variavel e depende do terreno: a 3a montanha de custo 2, para 3 MP,
+    /// acumula 6 e cai no TURNO 3, fora das bandas. Imprimir um teto de MP x N
+    /// ao lado do custo ressuscita justamente o predicado que foi removido.
+    /// </summary>
     private static void SetReachAndDecision(
         QueroCaronaResult result,
+        QueroCaronaRequest request,
+        UnitReachProfile captureReach,
+        Vector3Int cell,
         int routeCost,
+        ReachBand band,
         string targetLabel)
     {
+        int bandTurns = Mathf.Max(1, request.operationalTurns);
         result.wantsRide = false;
         result.rideNeedScore = 0;
-        if (routeCost <= result.tacticalBudget)
+        int turns = ResolveTurnsToCell(
+            captureReach, cell, band, bandTurns);
+        if (band == ReachBand.Tactical)
         {
             result.reach = QueroCaronaReach.Tactical;
             result.reason =
                 $"{ResolveUnitKind(result)} alcança {targetLabel} " +
-                $"no Tactical: custo={routeCost}<=" +
-                $"{result.tacticalBudget}. Recusa carona.";
+                $"no Tactical: custo={routeCost} no turno {turns} " +
+                "(nesta rodada). Recusa carona.";
             return;
         }
 
         result.reach = QueroCaronaReach.Operational;
         result.reason =
             $"{ResolveUnitKind(result)} alcança {targetLabel} " +
-            $"no Operational: custo={routeCost}<=" +
-            $"{result.operationalBudget}. Recusa carona.";
+            $"no Operational: custo={routeCost} no turno {turns} " +
+            $"de {bandTurns}. Recusa carona.";
+    }
+
+    /// <summary>
+    /// Em qual turno a unidade chega nesta celula, segundo o envelope que a
+    /// classificou. E o numero que descreve o alcance de verdade — o custo
+    /// acumulado sozinho nao diz nada, porque MP nao acumula entre turnos.
+    /// </summary>
+    private static int ResolveTurnsToCell(
+        UnitReachProfile captureReach,
+        Vector3Int cell,
+        ReachBand band,
+        int bandTurns)
+    {
+        UnitReachEnvelope envelope =
+            band == ReachBand.Tactical
+                ? captureReach?.Tactical
+                : captureReach?.Operational;
+        return envelope != null && envelope.TryGetTurns(cell, out int turns)
+            ? Mathf.Max(1, turns)
+            : band == ReachBand.Tactical ? 1 : bandTurns;
     }
 
     private static string ResolveUnitKind(

@@ -205,9 +205,7 @@ public partial class AIController
                         TransportPassengerWalkTurns,
                     emulateUnderRepairFromUnitData =
                         false
-                },
-                requestReach: null,
-                requestReachBudget: -1);
+                });
 
         foreach (ConstructionManager construction in ConstructionManager.AllActive)
         {

@@ -1293,13 +1293,31 @@ public partial class AIController
         if (map == null)
             return new HashSet<Vector3Int>();
 
-        // Fonte compartilhada da hotzone: exatamente os destinos legais de
-        // movimento, expandidos pelo alcance da ferramenta de servico.
-        UnitThreatEnvelope hotzone = UnitThreatEnvelopeService.BuildServiceEnvelope(
-            unit,
-            map,
-            paths,
-            data.serviceRange);
+        // Mesma fonte que TryDecideLogisticsSupplyTarget usa para escolher QUEM
+        // atender. As duas perguntas — "quem justifica eu me mover" e "de onde
+        // eu atendo" — passaram a sair do MESMO servico, com a mesma intencao e
+        // as mesmas regras. Antes cada uma montava a sua, e elas podiam
+        // divergir: em teste, uma escolheu #121 e a execucao atendeu #123.
+        UnitReachEnvelope hotzone =
+            UnitReachEnvelopeService.Build(new UnitReachRequest
+            {
+                Unit = unit,
+                BoardMap = map,
+                TerrainDatabase = terrainDatabase,
+                Intent = ReachIntent.Service,
+                SubStep =
+                    AIActionReachCoordinator.UsesCubicSectorReach(unit)
+                        ? ReachSubStep.Aereo
+                        : ReachSubStep.Terrestre,
+                Band = ReachBand.Tactical,
+                PrebuiltPaths = paths,
+                RangeOverride = data.serviceRange,
+                // A IA valida dominio/camada por candidato via PodeSuprir.
+                FilterByOperationDomain = false
+            });
+        if (hotzone == null)
+            return new HashSet<Vector3Int>();
+
         HashSet<Vector3Int> zone = new HashSet<Vector3Int>();
         bool allowPreventiveMaintenance =
             IsPreventiveLogisticsAllowed(unit, snapshot, unit.CurrentCellPosition, null, null);
@@ -1312,7 +1330,7 @@ public partial class AIController
 
             Vector3Int allyCell = ally.CurrentCellPosition;
             allyCell.z = 0;
-            if (!hotzone.CanThreaten(allyCell))
+            if (!hotzone.CanAct(allyCell))
                 continue;
 
             // A hotzone determina se o alvo pertence a esta rodada. Depois,

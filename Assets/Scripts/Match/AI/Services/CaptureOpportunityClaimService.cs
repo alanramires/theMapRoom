@@ -67,6 +67,12 @@ public sealed class CaptureOpportunityClaimSnapshot
 /// deterministico maximiza o numero de capturadores com alvo. A prioridade
 /// estavel do capturador vence o desempate antes do custo: o claim representa
 /// a intencao do passageiro e o transporte apenas a consulta.
+///
+/// POLITICA, NAO ALCANCE. Elegibilidade, precedencia plano-formal-vence-
+/// oportunidade, matching 1:1 e desempate sao deste servico. Quao longe cada
+/// capturador chega e de quanto custa a rota vem do UnitReachEnvelopeService,
+/// na intencao Capture: o envelope devolve so alcance, sem consultar
+/// PodeCapturar. Ver docs/contrato_envelope_alcance.md.
 /// </summary>
 public static class CaptureOpportunityClaimService
 {
@@ -149,10 +155,15 @@ public static class CaptureOpportunityClaimService
                 CacheKey,
                 CaptureOpportunityClaimSnapshot>();
 
+    /// <summary>
+    /// <paramref name="requestReach"/> e o envelope de Captura que o chamador
+    /// ja construiu para <c>request.unit</c>. O reuso e por IDENTIDADE de
+    /// envelope — mesma unidade, mesma intencao, mesma banda, mesmos turnos —
+    /// e nao mais por igualdade de orcamento inteiro, que deixou de existir.
+    /// </summary>
     public static CaptureOpportunityClaimSnapshot GetOrBuild(
         QueroCaronaRequest request,
-        IReadOnlyDictionary<Vector3Int, int> requestReach,
-        int requestReachBudget)
+        UnitReachProfile requestReach = null)
     {
         if (request?.unit == null
             || request.map == null
@@ -192,8 +203,7 @@ public static class CaptureOpportunityClaimService
             plan,
             confirmedRevision,
             stateHash,
-            requestReach,
-            requestReachBudget);
+            requestReach);
         if (Cache.Count >= MaxCacheEntries)
             Cache.Clear();
         Cache[key] = built;
@@ -218,8 +228,7 @@ public static class CaptureOpportunityClaimService
         TeamObjectivePlan plan,
         int confirmedRevision,
         int stateHash,
-        IReadOnlyDictionary<Vector3Int, int> requestReach,
-        int requestReachBudget)
+        UnitReachProfile requestReach)
     {
         var formalCandidates = new List<Candidate>();
         var rogueCandidates = new List<Candidate>();
@@ -235,37 +244,48 @@ public static class CaptureOpportunityClaimService
                 continue;
             }
 
-            int tacticalBudget = Mathf.Max(
-                0, unit.RemainingMovementPoints);
-            if (tacticalBudget <= 0)
-                tacticalBudget = Mathf.Max(
-                    0, unit.MaxMovementPoints);
-            int operationalBudget =
-                tacticalBudget
-                * Mathf.Max(1, request.operationalTurns);
-            Vector3Int origin = unit.CurrentCellPosition;
-            origin.z = 0;
-            IReadOnlyDictionary<Vector3Int, int> reach;
+            // Alcance vem do envelope, nunca daqui. A intencao Capture devolve
+            // SO alcance — a construcao ainda passa pela elegibilidade abaixo e
+            // pelo PodeCapturarSensor na hora de agir.
+            //
+            // O orcamento deixou de ser MP x N num bolso so: o turno atual vale
+            // o que ainda sobrou e os seguintes valem MP cheio (banda
+            // Operational). O alcance encolhe em terreno caro e conforme a
+            // unidade age na rodada, que e o comportamento real do jogo.
+            //
+            // Aeronave: a arvore da Captura nao tem ramo aereo, mas o servico
+            // resolve a geometria cubica internamente para quem e isAircraft.
+            UnitReachEnvelope reach;
             if (unit == request.unit
                 && requestReach != null
-                && requestReachBudget == operationalBudget)
+                && requestReach.Operational != null)
             {
-                reach = requestReach;
+                // Mesma unidade, mesma intencao, mesma banda: e o mesmo
+                // envelope. Reconstruir seria repetir a travessia encadeada.
+                reach = requestReach.Operational;
                 AIDecisionPerf.AddCount(
                     "CaptureClaimReachReuses");
             }
             else
             {
-                reach =
-                    AIActionReachCoordinator.BuildSectorReachMap(
-                        unit,
-                        request.map,
-                        request.terrainDatabase,
-                        origin,
-                        operationalBudget);
+                reach = UnitReachEnvelopeService.Build(
+                    new UnitReachRequest
+                    {
+                        Unit = unit,
+                        BoardMap = request.map,
+                        TerrainDatabase = request.terrainDatabase,
+                        Intent = ReachIntent.Capture,
+                        SubStep = ReachSubStep.Terrestre,
+                        Band = ReachBand.Operational,
+                        OperationalTurns = Mathf.Max(
+                            1, request.operationalTurns)
+                    });
                 AIDecisionPerf.AddCount(
                     "CaptureClaimReachBuilds");
             }
+
+            if (reach == null)
+                continue;
 
             bool formal = TryResolveFormalCaptureSector(
                 unit,
@@ -471,7 +491,7 @@ public static class CaptureOpportunityClaimService
         ConstructionManager construction,
         bool formal,
         ConstructionSector formalSector,
-        IReadOnlyDictionary<Vector3Int, int> reach,
+        UnitReachEnvelope reach,
         out int routeCost)
     {
         routeCost = int.MaxValue;
@@ -487,9 +507,13 @@ public static class CaptureOpportunityClaimService
         Vector3Int cell =
             construction.CurrentCellPosition;
         cell.z = 0;
+        // Pertencer a banda e uma pergunta ao envelope; o custo da rota e o que
+        // ele ja calculou para responde-la. Nao ha segunda varredura aqui.
         if (reach == null
-            || !reach.TryGetValue(cell, out routeCost))
+            || !reach.CanAct(cell)
+            || !reach.TryGetCost(cell, out routeCost))
         {
+            routeCost = int.MaxValue;
             return false;
         }
 

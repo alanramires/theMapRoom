@@ -635,16 +635,17 @@ public partial class AIController
                         IsStructurallyEligiblePickupCandidate(
                             unit, candidate, snapshot, plan),
                     includeInLegacyRanking = _ => false,
-                    evaluateRideNeedWithOperationalReach =
-                        (candidate, operationalReach,
-                            operationalReachBudget) =>
+                    // O Quero Carona monta o proprio envelope de Captura
+                    // (turnos encadeados). A malha do MelhorEmbarque continua
+                    // sendo MP x N num bolso so — emprestar ela de volta era
+                    // justamente o alcance fantasma que fazia o passageiro
+                    // recusar carona. Ver Fase 4 da migracao do envelope.
+                    evaluateRideNeed = candidate =>
                         GetOrEvaluateTransportRideNeed(
                             planning,
                             candidate,
                             plan,
-                            TransportPlanningOperationalTurns,
-                            operationalReach,
-                            operationalReachBudget),
+                            TransportPlanningOperationalTurns),
                     diagnosticLog = showAILogs
                         ? message => Debug.Log(
                             $"{TL("Transporte")}[MelhorEmbarque] {message}")
@@ -711,10 +712,7 @@ public partial class AIController
         TransportPlanningSnapshot planning,
         UnitManager passenger,
         TeamObjectivePlan plan,
-        int operationalTurns,
-        IReadOnlyDictionary<Vector3Int, int>
-            operationalReach = null,
-        int operationalReachBudget = -1)
+        int operationalTurns)
     {
         if (planning == null || passenger == null)
             return null;
@@ -730,9 +728,7 @@ public partial class AIController
         QueroCaronaResult evaluated = EvaluatePickupRideNeed(
             passenger,
             plan,
-            operationalTurns,
-            operationalReach,
-            operationalReachBudget);
+            operationalTurns);
         planning.RideNeedByPassenger[passenger.InstanceId] =
             evaluated;
         return evaluated;
@@ -854,10 +850,7 @@ public partial class AIController
     private QueroCaronaResult EvaluatePickupRideNeed(
         UnitManager passenger,
         TeamObjectivePlan plan,
-        int operationalTurns,
-        IReadOnlyDictionary<Vector3Int, int>
-            operationalReach = null,
-        int operationalReachBudget = -1)
+        int operationalTurns)
     {
         SectorObjective assigned = plan != null
             ? ResolveAssignedObjective(passenger, plan)
@@ -876,9 +869,6 @@ public partial class AIController
                     : ConstructionSector.None,
                 operationalTurns = Mathf.Max(
                     1, operationalTurns),
-                operationalReach = operationalReach,
-                operationalReachBudget =
-                    operationalReachBudget,
                 emulateUnderRepairFromUnitData = false,
                 diagnosticLog = showAILogs
                     ? message => Debug.Log(
