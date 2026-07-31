@@ -56,6 +56,10 @@ public class CaminhosValidosWindow : EditorWindow
 
     [SerializeField] private Vector3Int originHex;
     [SerializeField] private int movementPoints = 3;
+    // MP dos turnos seguintes. O contrato manda: turno atual vale o que sobrou,
+    // os seguintes valem MP cheio. Usar um numero so nos dois era o que fazia a
+    // progressao dizer 3+3=6 para um soldado que na verdade tinha 1+3=4.
+    [SerializeField] private int laterTurnMovementPoints = 3;
     [SerializeField] private Vector3Int destinationHex;
     [SerializeField] private Vector3Int waypointHex;
     [SerializeField] private int progressHorizonTurns = 2;
@@ -152,9 +156,66 @@ public class CaminhosValidosWindow : EditorWindow
 
     private void RefreshSceneUnit()
     {
+        UnitManager previous = sceneUnit;
         sceneUnit = null;
         if (Selection.activeGameObject != null)
             sceneUnit = Selection.activeGameObject.GetComponent<UnitManager>();
+
+        // Ao selecionar uma unidade real, o MP passa a ser o dela. O slider
+        // continua servindo para emular unidade ninja, mas parar de herdar um
+        // numero de outra selecao evita o caso que trava: MP alto numa
+        // aeronave, que abre uma onda de caminhos validos gigante.
+        if (sceneUnit != null && sceneUnit != previous)
+            AdoptSelectedUnitMovement();
+    }
+
+    private void AdoptSelectedUnitMovement()
+    {
+        if (sceneUnit == null)
+            return;
+        int remaining = Mathf.Max(0, sceneUnit.RemainingMovementPoints);
+        int max = sceneUnit.TryGetUnitData(out UnitData data) && data != null
+            ? Mathf.Max(1, data.movement)
+            : Mathf.Max(1, sceneUnit.MaxMovementPoints);
+        movementPoints = remaining > 0 ? remaining : max;
+        laterTurnMovementPoints = max;
+    }
+
+    /// <summary>
+    /// Aeronave nao anda por caminhos validos: o alcance dela e cubico. Rodar a
+    /// onda geografica numa unidade aerea com MP alto e o que trava a
+    /// ferramenta. A subetapa do contrato decide a geometria.
+    /// </summary>
+    private ReachSubStep ResolveSubStepForUnit(UnitManager unit)
+    {
+        return UnitReachEnvelopeService.SupportsSubStep(unit, ReachSubStep.Aereo)
+            ? ReachSubStep.Aereo
+            : ReachSubStep.Terrestre;
+    }
+
+    /// <summary>
+    /// Onda de movimento pelo servico unificado: geometria correta por
+    /// subetapa e custo real por celula. Devolve null quando a unidade nao
+    /// resolve envelope.
+    /// </summary>
+    private UnitReachEnvelope BuildReachEnvelope(
+        UnitManager unit, int budget, ReachBand band)
+    {
+        if (unit == null || tilemap == null)
+            return null;
+
+        return UnitReachEnvelopeService.Build(new UnitReachRequest
+        {
+            Unit = unit,
+            BoardMap = tilemap,
+            TerrainDatabase = terrainDatabase,
+            Intent = ReachIntent.Mobility,
+            SubStep = ResolveSubStepForUnit(unit),
+            Band = band,
+            MovementBudget = Mathf.Max(0, budget),
+            OperationalTurns = 2,
+            IncludeMovementCosts = true
+        });
     }
 
     private static readonly FieldInfo s_spawnerUnitDatabaseField =
@@ -236,15 +297,16 @@ public class CaminhosValidosWindow : EditorWindow
                     Vector3Int p = sceneUnit.CurrentCellPosition; p.z = 0;
                     originHex = p;
                 }
-                EditorGUI.BeginDisabledGroup(d == null || sceneUnit.RemainingMovementPoints <= 0);
-                if (GUILayout.Button("PM atuais", GUILayout.Width(90)))
-                    movementPoints = Mathf.Max(1, sceneUnit.RemainingMovementPoints);
-                EditorGUI.EndDisabledGroup();
                 EditorGUI.BeginDisabledGroup(d == null);
-                if (GUILayout.Button("PM máx", GUILayout.Width(90)))
-                    movementPoints = d != null ? Mathf.Max(1, d.movement) : movementPoints;
+                if (GUILayout.Button("PM da unidade", GUILayout.Width(120)))
+                    AdoptSelectedUnitMovement();
                 EditorGUI.EndDisabledGroup();
                 EditorGUILayout.EndHorizontal();
+
+                EditorGUILayout.LabelField(
+                    $"  geometria={ResolveSubStepForUnit(sceneUnit)} " +
+                    $"(turno atual={movementPoints}, seguintes={laterTurnMovementPoints})",
+                    EditorStyles.miniLabel);
             }
             else
             {
@@ -273,7 +335,10 @@ public class CaminhosValidosWindow : EditorWindow
         // ── Caminhos Alcançáveis ──
         EditorGUILayout.LabelField("Caminhos Alcançáveis", EditorStyles.boldLabel);
         DrawHexField("Origem", ref originHex, ref pickingOrigin, ref pickingDestination, Color.yellow);
-        movementPoints = EditorGUILayout.IntSlider("Pontos de Movimento", movementPoints, 1, 99);
+        movementPoints = EditorGUILayout.IntSlider(
+            "PM turno atual", movementPoints, 1, 99);
+        laterTurnMovementPoints = EditorGUILayout.IntSlider(
+            "PM turnos seguintes", laterTurnMovementPoints, 1, 99);
 
         EditorGUI.BeginDisabledGroup(!HasValidUnit());
         if (GUILayout.Button("Calcular Caminhos", GUILayout.Height(26)))
@@ -504,7 +569,11 @@ public class CaminhosValidosWindow : EditorWindow
         Vector3Int origin = originHex; origin.z = 0;
         RunWithTempUnit(origin, unit =>
         {
-            var paths = UnitMovementPathRules.CalcularCaminhosValidos(tilemap, unit, movementPoints, terrainDatabase);
+            UnitReachEnvelope firstTurn =
+                BuildReachEnvelope(unit, movementPoints, ReachBand.Tactical);
+            var paths = firstTurn != null
+                ? firstTurn.PathsByDestination
+                : new Dictionary<Vector3Int, List<Vector3Int>>();
             reachableCells = new HashSet<Vector3Int>();
             foreach (Vector3Int cell in paths.Keys)
             {
@@ -583,7 +652,11 @@ public class CaminhosValidosWindow : EditorWindow
 
         RunWithTempUnit(origin, unit =>
         {
-            var paths = UnitMovementPathRules.CalcularCaminhosValidos(tilemap, unit, movementPoints, terrainDatabase);
+            UnitReachEnvelope firstTurn =
+                BuildReachEnvelope(unit, movementPoints, ReachBand.Tactical);
+            var paths = firstTurn != null
+                ? firstTurn.PathsByDestination
+                : new Dictionary<Vector3Int, List<Vector3Int>>();
             // costMap dá o custo real em PM para cada célula, considerando bônus de estrada.
             var costMap = UnitMovementPathRules.CalculateMovementCostMap(tilemap, unit, origin, movementPoints, terrainDatabase);
             progressOriginCost = Mathf.CeilToInt(RouteDistanceOrHexDebug(unit, origin, dest));
@@ -668,7 +741,11 @@ public class CaminhosValidosWindow : EditorWindow
             waypointLeg2Cost = waypointCostFromDest.TryGetValue(waypoint, out int l2) ? l2 : -1;
 
             // Células alcançáveis de A no turno atual (respeita ocupação — mostra congestionamento real)
-            var reachPaths = UnitMovementPathRules.CalcularCaminhosValidos(tilemap, unit, movementPoints, terrainDatabase);
+            UnitReachEnvelope reachEnv =
+                BuildReachEnvelope(unit, movementPoints, ReachBand.Tactical);
+            var reachPaths = reachEnv != null
+                ? reachEnv.PathsByDestination
+                : new Dictionary<Vector3Int, List<Vector3Int>>();
             waypointReachable = new HashSet<Vector3Int>();
             foreach (Vector3Int cell in reachPaths.Keys)
             {
@@ -1029,8 +1106,15 @@ public class CaminhosValidosWindow : EditorWindow
         try
         {
             tempUnit.SetCurrentCellPosition(firstStop, enforceFinalOccupancyRule: false);
-            var nextPaths = UnitMovementPathRules.CalcularCaminhosValidos(tilemap, tempUnit, movementPoints, terrainDatabase);
-            foreach (Vector3Int nextStop in nextPaths.Keys)
+            // Segundo turno vale MP CHEIO, nao o que sobrou no primeiro. E a
+            // geometria vem da subetapa: aeronave e cubica, nao caminhos
+            // validos — rodar a onda geografica nela com MP alto trava.
+            UnitReachEnvelope nextReach = BuildReachEnvelope(
+                tempUnit, laterTurnMovementPoints, ReachBand.Tactical);
+            IEnumerable<Vector3Int> nextStops = nextReach != null
+                ? (IEnumerable<Vector3Int>)nextReach.MovementCells
+                : System.Array.Empty<Vector3Int>();
+            foreach (Vector3Int nextStop in nextStops)
             {
                 if (!CanUseAsDebugStopCell(tempUnit, nextStop, firstStop))
                     continue;
@@ -1040,7 +1124,11 @@ public class CaminhosValidosWindow : EditorWindow
                 {
                     bestDistanceAfterNextMove = nextDistance;
                     bestNextStop = nextStop; bestNextStop.z = 0;
-                    bestNextPath = nextPaths.TryGetValue(nextStop, out List<Vector3Int> np) ? np : null;
+                    bestNextPath =
+                        nextReach.PathsByDestination.TryGetValue(
+                            nextStop, out List<Vector3Int> np)
+                            ? np
+                            : null;
                 }
             }
         }

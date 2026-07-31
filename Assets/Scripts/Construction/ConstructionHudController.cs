@@ -188,8 +188,9 @@ public class ConstructionHudController : MonoBehaviour
 
         if (show)
         {
-            string name = sector.ToString();
-            sectorBadge.text = name.Length > 0 ? name[0].ToString().ToUpper() : string.Empty;
+            // Badge vem do helper, nao da inicial: os setores gregos colidiriam
+            // com os OTAN (Bravo/Beta, Golf/Gamma, Papa/Pi...).
+            sectorBadge.text = ConstructionSectorHelper.GetBadge(sector);
         }
     }
 

@@ -139,9 +139,13 @@ public partial class AIController
             Vector3Int target = best.CurrentCellPosition;
             target.z = 0;
 
-            // O envelope ja sabe de ONDE atender e com quanto sobrando.
+            // O envelope ja sabe de ONDE atender, com quanto sobrando e em
+            // quantos turnos. A banda REAL vem dele: o envelope Operational
+            // contem o Tactical, entao a maior parte das respostas se completa
+            // nesta rodada — o rotulo da etapa do coordenador nao descreve isso.
             string origin = envelope.TryGetOrigin(target, out ReachOrigin from)
-                ? $" de={from.FromCell} sobra={from.RemainingMovement}"
+                ? $" de={from.FromCell} sobra={from.RemainingMovement}" +
+                  $" turnos={(envelope.TryGetTurns(from.FromCell, out int t) ? t : 1)}"
                 : string.Empty;
             candidate = new AIReachDecisionCandidate<UnitManager>
             {
@@ -149,7 +153,8 @@ public partial class AIController
                 ActionCell = target,
                 TargetCell = target,
                 Score = bestScore,
-                Reason = $"service_hotzone_2t{origin}"
+                Reason =
+                    $"service_hotzone banda={envelope.ResolveActionBand(target)}{origin}"
             };
             return true;
         }

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 
@@ -41,29 +42,45 @@ public class ConstructionManagerEditor : Editor
     private SerializedProperty anchorSectorSlotIndexProp;
     private ForceCopyFilter forceCopyFilter = ForceCopyFilter.Army;
 
-    private static readonly Color[] SectorColors = new Color[]
+    // Chaveado pelo SETOR, nao pelo indice do dropdown: acrescentar nomes ao enum
+    // deslocava o indice e cada setor herdava a cor do vizinho.
+    private static readonly Dictionary<ConstructionSector, Color> HandPickedSectorColors =
+        new Dictionary<ConstructionSector, Color>
     {
-        new Color(0.30f, 0.60f, 1.00f), // Alpha
-        new Color(0.20f, 0.75f, 0.35f), // Bravo
-        new Color(1.00f, 0.55f, 0.10f), // Charlie
-        new Color(0.85f, 0.20f, 0.20f), // Delta
-        new Color(0.75f, 0.35f, 0.90f), // Echo
-        new Color(0.15f, 0.80f, 0.85f), // Foxtrot
-        new Color(1.00f, 0.85f, 0.10f), // Golf
-        new Color(0.95f, 0.40f, 0.65f), // Hotel
-        new Color(0.48f, 0.48f, 0.95f), // India
-        new Color(0.40f, 0.85f, 0.55f), // Juliet
-        new Color(0.85f, 0.65f, 0.25f), // Kilo
-        new Color(0.65f, 0.30f, 0.80f), // Lima
-        new Color(0.25f, 0.70f, 0.95f), // Mike
-        new Color(0.90f, 0.45f, 0.35f), // November
-        new Color(0.55f, 0.70f, 0.25f), // Oscar
-        new Color(0.95f, 0.70f, 0.45f), // Papa
-        new Color(0.30f, 0.60f, 0.55f), // Quebec
-        new Color(0.85f, 0.35f, 0.50f), // Romeo
-        new Color(0.70f, 0.70f, 0.70f), // Tango
-        new Color(0.95f, 0.95f, 0.95f), // BaseTeam
+        { ConstructionSector.Alpha,    new Color(0.30f, 0.60f, 1.00f) },
+        { ConstructionSector.Bravo,    new Color(0.20f, 0.75f, 0.35f) },
+        { ConstructionSector.Charlie,  new Color(1.00f, 0.55f, 0.10f) },
+        { ConstructionSector.Delta,    new Color(0.85f, 0.20f, 0.20f) },
+        { ConstructionSector.Echo,     new Color(0.75f, 0.35f, 0.90f) },
+        { ConstructionSector.Foxtrot,  new Color(0.15f, 0.80f, 0.85f) },
+        { ConstructionSector.Golf,     new Color(1.00f, 0.85f, 0.10f) },
+        { ConstructionSector.Hotel,    new Color(0.95f, 0.40f, 0.65f) },
+        { ConstructionSector.India,    new Color(0.48f, 0.48f, 0.95f) },
+        { ConstructionSector.Juliet,   new Color(0.40f, 0.85f, 0.55f) },
+        { ConstructionSector.Kilo,     new Color(0.85f, 0.65f, 0.25f) },
+        { ConstructionSector.Lima,     new Color(0.65f, 0.30f, 0.80f) },
+        { ConstructionSector.Mike,     new Color(0.25f, 0.70f, 0.95f) },
+        { ConstructionSector.November, new Color(0.90f, 0.45f, 0.35f) },
+        { ConstructionSector.Oscar,    new Color(0.55f, 0.70f, 0.25f) },
+        { ConstructionSector.Papa,     new Color(0.95f, 0.70f, 0.45f) },
+        { ConstructionSector.Quebec,   new Color(0.30f, 0.60f, 0.55f) },
+        { ConstructionSector.Romeo,    new Color(0.85f, 0.35f, 0.50f) },
+        { ConstructionSector.Tango,    new Color(0.70f, 0.70f, 0.70f) },
     };
+
+    private static readonly Color BaseSectorColor = new Color(0.95f, 0.95f, 0.95f);
+
+    private static Color GetSectorColor(ConstructionSector sector)
+    {
+        if (HandPickedSectorColors.TryGetValue(sector, out Color color))
+            return color;
+        if (ConstructionSectorHelper.IsBase(sector))
+            return BaseSectorColor;
+        // Setores acrescentados depois (Sierra..Zulu, bloco grego): matiz pelo angulo
+        // aureo sobre o valor do enum — estavel entre sessoes e sempre distinto.
+        float hue = Mathf.Repeat((int)sector * 0.6180339f, 1f);
+        return Color.HSVToRGB(hue, 0.55f, 0.95f);
+    }
 
     private void OnEnable()
     {
@@ -278,22 +295,29 @@ public class ConstructionManagerEditor : Editor
         if (sectorProp == null)
             return;
 
-        int current = sectorProp.enumValueIndex;
-        string[] names = sectorProp.enumNames;
+        // Ordem exibida vem de ConstructionSectorOrder (bases no topo), nao da ordem
+        // crua do enum. enumValueIndex e o indice na declaracao, nunca o valor.
+        int current = ConstructionSectorOrder.ToDisplayIndex(sectorProp.enumValueIndex);
+        current = Mathf.Max(0, current);
 
         EditorGUILayout.BeginHorizontal();
         EditorGUILayout.PrefixLabel("Sector");
 
         Color prev = GUI.backgroundColor;
-        if (current > 0 && current - 1 < SectorColors.Length)
-            GUI.backgroundColor = SectorColors[current - 1];
+        ConstructionSector currentSector = ConstructionSectorOrder.SectorAtDisplayIndex(current);
+        if (currentSector != ConstructionSector.None)
+            GUI.backgroundColor = GetSectorColor(currentSector);
 
-        int next = EditorGUILayout.Popup(current, names);
+        int next = EditorGUILayout.Popup(current, ConstructionSectorOrder.Labels);
         GUI.backgroundColor = prev;
         EditorGUILayout.EndHorizontal();
 
         if (next != current)
-            sectorProp.enumValueIndex = next;
+        {
+            int decl = ConstructionSectorOrder.ToEnumValueIndex(next);
+            if (decl >= 0)
+                sectorProp.enumValueIndex = decl;
+        }
     }
 
     private void DrawEixoOverrideBlock()
@@ -412,19 +436,16 @@ public class ConstructionManagerEditor : Editor
         {
             if (axis.IsInvasionAxis)
                 continue;
-            string firstSec = axis.Corridor.Count > 0
-                ? axis.Corridor[0].ToString()
-                : axis.RallySector.ToString();
+            ConstructionSector firstSec = axis.Corridor.Count > 0
+                ? axis.Corridor[0]
+                : axis.RallySector;
             string here = map.GetEixo(sector) == axis.EixoIndex ? "  (atual)" : "";
-            lbls.Add($"E{axis.EixoIndex}: {Initial(firstSec)}-{Initial(axis.RallySector.ToString())}{here}");
+            lbls.Add($"E{axis.EixoIndex}: {ConstructionSectorHelper.GetBadge(firstSec)}-{ConstructionSectorHelper.GetBadge(axis.RallySector)}{here}");
             vals.Add(axis.EixoIndex);
         }
         labels = lbls.ToArray();
         values = vals.ToArray();
     }
-
-    private static string Initial(string s)
-        => string.IsNullOrEmpty(s) ? "?" : s.Substring(0, 1).ToUpperInvariant();
 
     private void DrawOwnershipSlotPopup(string label, SerializedProperty slotProp)
     {

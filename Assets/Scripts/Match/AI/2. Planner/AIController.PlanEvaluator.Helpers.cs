@@ -29,10 +29,7 @@ public partial class AIController
             // Identifica qual massa de invasão a unidade está montando. O antigo "+"
             // escondia o destino quando havia mais de um rally ativo (C+ = Charlie,
             // H+ = Hotel etc.). O planKey continua guardando o nome completo do setor.
-            string sectorInitial = sectorName.Length > 0
-                ? sectorName[0].ToString().ToUpper()
-                : "?";
-            badge = sectorInitial + "+";
+            badge = ConstructionSectorHelper.GetBadge(obj.Sector) + "+";
         }
         else if (ConstructionSectorHelper.IsBase(obj.Sector))
         {
@@ -43,7 +40,7 @@ public partial class AIController
         }
         else
         {
-            badge = sectorName.Length > 0 ? sectorName[0].ToString().ToUpper() : "?";
+            badge = ConstructionSectorHelper.GetBadge(obj.Sector);
         }
         unit.SetAIAssignedPlan(sectorName, sectorName, badge, (int)role, showAIUnitHUD);
         // A unidade herda o eixo do setor do seu objetivo (0 = fora de eixo).

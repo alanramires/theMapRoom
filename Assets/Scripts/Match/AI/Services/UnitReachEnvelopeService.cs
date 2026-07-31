@@ -170,6 +170,15 @@ public class UnitReachEnvelope
     /// </summary>
     public readonly Dictionary<Vector3Int, ReachOrigin> OriginByActionCell;
 
+    /// <summary>
+    /// Em QUANTOS TURNOS cada celula de movimento e alcancada. 1 = nesta
+    /// rodada. Como o envelope Operational CONTEM o Tactical, sem isto o
+    /// consumidor nao sabe se a resposta e para agora ou para o turno seguinte
+    /// — e o diagnostico acaba rotulando de Operational uma acao que se
+    /// completa hoje.
+    /// </summary>
+    public readonly Dictionary<Vector3Int, int> TurnsByCell;
+
     internal UnitReachEnvelope(
         ReachIntent intent,
         ReachBand band,
@@ -178,8 +187,10 @@ public class UnitReachEnvelope
         HashSet<Vector3Int> movementCells,
         HashSet<Vector3Int> actionCells,
         HashSet<Vector3Int> lineCells,
-        Dictionary<Vector3Int, ReachOrigin> originByActionCell = null)
+        Dictionary<Vector3Int, ReachOrigin> originByActionCell = null,
+        Dictionary<Vector3Int, int> turnsByCell = null)
     {
+        TurnsByCell = turnsByCell ?? new Dictionary<Vector3Int, int>();
         Intent = intent;
         Band = band;
         PathsByDestination = paths ?? new Dictionary<Vector3Int, List<Vector3Int>>();
@@ -197,6 +208,28 @@ public class UnitReachEnvelope
     {
         actionCell.z = 0;
         return OriginByActionCell.TryGetValue(actionCell, out origin);
+    }
+
+    /// <summary>Em quantos turnos a unidade chega nesta celula. 1 = nesta rodada.</summary>
+    public bool TryGetTurns(Vector3Int cell, out int turns)
+    {
+        cell.z = 0;
+        return TurnsByCell.TryGetValue(cell, out turns);
+    }
+
+    /// <summary>
+    /// Banda REAL desta celula de acao, independente da banda pedida.
+    /// Um envelope Operational responde Tactical para o que se completa nesta
+    /// rodada — que e a maior parte dele.
+    /// </summary>
+    public ReachBand ResolveActionBand(Vector3Int actionCell)
+    {
+        actionCell.z = 0;
+        if (!OriginByActionCell.TryGetValue(actionCell, out ReachOrigin origin))
+            return Band;
+        return TryGetTurns(origin.FromCell, out int turns) && turns <= 1
+            ? ReachBand.Tactical
+            : ReachBand.Operational;
     }
 
     /// <summary>
@@ -251,7 +284,8 @@ public sealed class UnitThreatEnvelope : UnitReachEnvelope
         HashSet<Vector3Int> movementCells,
         HashSet<Vector3Int> actionCells,
         HashSet<Vector3Int> lineCells,
-        Dictionary<Vector3Int, ReachOrigin> originByActionCell = null)
+        Dictionary<Vector3Int, ReachOrigin> originByActionCell = null,
+        Dictionary<Vector3Int, int> turnsByCell = null)
         : base(
             intent,
             band,
@@ -260,7 +294,8 @@ public sealed class UnitThreatEnvelope : UnitReachEnvelope
             movementCells,
             actionCells,
             lineCells,
-            originByActionCell)
+            originByActionCell,
+            turnsByCell)
     {
     }
 }
@@ -564,7 +599,8 @@ public static class UnitReachEnvelopeService
             map,
             budget,
             out Dictionary<Vector3Int, List<Vector3Int>> paths,
-            out Dictionary<Vector3Int, int> costByCell);
+            out Dictionary<Vector3Int, int> costByCell,
+            out Dictionary<Vector3Int, int> turnsByCell);
 
         IEnumerable<Vector3Int> reachableKeys = paths.Count > 0
             ? (IEnumerable<Vector3Int>)paths.Keys
@@ -576,6 +612,15 @@ public static class UnitReachEnvelopeService
             cell.z = 0;
             if (map.GetTile(cell) != null)
                 movementCells.Add(cell);
+        }
+
+        // Sem encadeamento por turno (banda Tactical, ou malha vinda pronta do
+        // chamador), tudo o que esta no conjunto e desta rodada.
+        if (turnsByCell == null)
+        {
+            turnsByCell = new Dictionary<Vector3Int, int>(movementCells.Count);
+            foreach (Vector3Int cell in movementCells)
+                turnsByCell[cell] = 1;
         }
 
         // Custo real por celula de movimento. Sem isso a ferramenta nao
@@ -656,7 +701,8 @@ public static class UnitReachEnvelopeService
             movementCells,
             actionCells,
             lineCells,
-            origins)
+            origins,
+            turnsByCell)
         {
             SubStep = subStep,
             Diagnostic =
@@ -699,12 +745,15 @@ public static class UnitReachEnvelopeService
         Tilemap map,
         int budget,
         out Dictionary<Vector3Int, List<Vector3Int>> paths,
-        out Dictionary<Vector3Int, int> costByCell)
+        out Dictionary<Vector3Int, int> costByCell,
+        out Dictionary<Vector3Int, int> turnsByCell)
     {
+        // Malha vinda pronta do chamador: e sempre desta rodada.
         if (request.PrebuiltPaths != null)
         {
             paths = request.PrebuiltPaths;
             costByCell = request.PrebuiltCosts ?? new Dictionary<Vector3Int, int>();
+            turnsByCell = null;
             return;
         }
 
@@ -712,11 +761,13 @@ public static class UnitReachEnvelopeService
         {
             paths = new Dictionary<Vector3Int, List<Vector3Int>>();
             costByCell = request.PrebuiltCosts;
+            turnsByCell = null;
             return;
         }
 
         Vector3Int origin = request.Unit.CurrentCellPosition;
         origin.z = 0;
+        turnsByCell = null;
 
         if (request.Band == ReachBand.Operational
             || UsesCubicGeometry(subStep))
@@ -728,7 +779,8 @@ public static class UnitReachEnvelopeService
                         map,
                         request.TerrainDatabase,
                         origin,
-                        request.OperationalTurns)
+                        request.OperationalTurns,
+                        out turnsByCell)
                     : AIActionReachCoordinator.BuildSectorReachMap(
                         request.Unit,
                         map,
@@ -768,11 +820,16 @@ public static class UnitReachEnvelopeService
         Tilemap map,
         TerrainDatabase terrainDatabase,
         Vector3Int origin,
-        int turns)
+        int turns,
+        out Dictionary<Vector3Int, int> turnsByCell)
     {
+        turnsByCell = new Dictionary<Vector3Int, int>();
         int maxPerTurn = Mathf.Max(0, unit != null ? unit.MaxMovementPoints : 0);
         if (maxPerTurn <= 0)
+        {
+            turnsByCell[origin] = 1;
             return new Dictionary<Vector3Int, int> { [origin] = 0 };
+        }
 
         // O turno ATUAL vale o que ainda sobrou; os seguintes valem MP cheio.
         // Uma unidade que ja gastou movimento nesta rodada projeta menos, e o
@@ -787,12 +844,23 @@ public static class UnitReachEnvelopeService
         // o alcance e cubico puro sobre a soma dos tetos.
         if (AIActionReachCoordinator.UsesCubicSectorReach(unit))
         {
-            return AIActionReachCoordinator.BuildSectorReachMap(
-                unit,
-                map,
-                terrainDatabase,
-                origin,
-                firstTurn + maxPerTurn * Mathf.Max(0, turns - 1));
+            Dictionary<Vector3Int, int> cubic =
+                AIActionReachCoordinator.BuildSectorReachMap(
+                    unit,
+                    map,
+                    terrainDatabase,
+                    origin,
+                    firstTurn + maxPerTurn * Mathf.Max(0, turns - 1));
+            // Sem geografia o turno sai direto do custo: o que cabe no que
+            // sobrou hoje e desta rodada; o resto e do turno seguinte.
+            foreach (KeyValuePair<Vector3Int, int> pair in cubic)
+            {
+                turnsByCell[pair.Key] = pair.Value <= firstTurn
+                    ? 1
+                    : 1 + Mathf.CeilToInt(
+                        (pair.Value - firstTurn) / (float)maxPerTurn);
+            }
+            return cubic;
         }
 
         // UMA passada. A versao anterior encadeava um BFS por celula da
@@ -806,7 +874,7 @@ public static class UnitReachEnvelopeService
             maxPerTurn,
             turns,
             terrainDatabase,
-            out _);
+            out turnsByCell);
     }
 
     private static UnitReachRequest CloneForBand(
@@ -1475,6 +1543,12 @@ public static class UnitReachEnvelopeService
             }
         }
 
+        // BuildCombat so atende a banda Tactical: tudo aqui e desta rodada.
+        var combatTurns =
+            new Dictionary<Vector3Int, int>(movementCells.Count);
+        foreach (Vector3Int moveCell in movementCells)
+            combatTurns[moveCell] = 1;
+
         var envelope = new UnitThreatEnvelope(
             ReachIntent.Combat,
             request.Band,
@@ -1483,7 +1557,8 @@ public static class UnitReachEnvelopeService
             movementCells,
             attackable,
             lineCells,
-            origins)
+            origins,
+            combatTurns)
         {
             Diagnostic =
                 $"orçamento={movementSteps}; movimento={movementCells.Count}; " +

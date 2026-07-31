@@ -83,9 +83,7 @@ public sealed class QueroCaronaWindow : EditorWindow
             "Situação", context);
         if (context == QueroCaronaContext.ComPlano)
         {
-            plannedSector =
-                (ConstructionSector)EditorGUILayout.EnumPopup(
-                    "Setor do plano", plannedSector);
+            plannedSector = ConstructionSectorOrder.Popup("Setor do plano", plannedSector);
         }
         operationalTurns = Mathf.Max(
             1, EditorGUILayout.IntField(
