@@ -700,6 +700,7 @@ public sealed class SectorManager : MonoBehaviour
 
         // Dijkstra reverso a partir de target (mesma estrutura de TryComputeLandMovementDistance,
         // mas sem parada antecipada: espalha por tudo dentro do teto de expansao).
+        int ctxId = BuildLandDistanceContextId(ctx);
         var costFromTarget = new Dictionary<Vector3Int, int> { [target] = 0 };
         var frontier = new List<Vector3Int> { target };
         var neighbors = new List<Vector3Int>(6);
@@ -732,6 +733,7 @@ public sealed class SectorManager : MonoBehaviour
                         next,
                         current,
                         ctx,
+                        ctxId,
                         out int enterCost))
                     continue;
 
@@ -1656,6 +1658,10 @@ public sealed class SectorManager : MonoBehaviour
         // A ordem de insercao como chave secundaria reproduz o desempate
         // antigo — a List ficava em ordem de insercao e a varredura guardava o
         // PRIMEIRO minimo —, entao custo e rota saem identicos.
+        // Uma vez por busca: o id percorre todas as construcoes rastreadas e e
+        // constante enquanto a busca roda.
+        int contextId = BuildLandDistanceContextId(context);
+
         var frontier = new List<SectorSearchEntry>();
         var costByCell = new Dictionary<Vector3Int, int> { [from] = 0 };
         var cameFrom = new Dictionary<Vector3Int, Vector3Int> { [from] = from };
@@ -1701,6 +1707,7 @@ public sealed class SectorManager : MonoBehaviour
                         current,
                         next,
                         context,
+                        contextId,
                         out int enterCost))
                     continue;
 
@@ -1838,6 +1845,7 @@ public sealed class SectorManager : MonoBehaviour
         Vector3Int from,
         Vector3Int to,
         SectorNeighborDistanceContext context,
+        int contextId,
         out int cost)
     {
         cost = 1;
@@ -1869,6 +1877,7 @@ public sealed class SectorManager : MonoBehaviour
                 from,
                 to,
                 context,
+                contextId,
                 terrain,
                 out int connectedRouteCost,
                 out bool hasDeclaredRouteEdge);
@@ -2104,6 +2113,7 @@ public sealed class SectorManager : MonoBehaviour
         Vector3Int from,
         Vector3Int to,
         SectorNeighborDistanceContext context,
+        int contextId,
         TerrainTypeData destinationTerrain,
         out int cost,
         out bool hasDeclaredRouteEdge)
@@ -2118,8 +2128,11 @@ public sealed class SectorManager : MonoBehaviour
         // A chave inclui o contexto porque o custo depende da UnitData de
         // referencia. destinationTerrain e derivado de `to`, entao ja esta
         // coberto pela celula.
-        var routeKey = new LandDistanceCacheKey(
-            from, to, BuildLandDistanceContextId(context));
+        // O id do contexto vem PRONTO de cima. Antes era recalculado aqui, em
+        // cada uma das ~1,9 milhao de chamadas, so para montar a chave — e ele
+        // percorre todas as construcoes rastreadas. E constante durante uma
+        // busca inteira, entao basta calcular uma vez por busca.
+        var routeKey = new LandDistanceCacheKey(from, to, contextId);
         if (routeEnterCostCache.TryGetValue(routeKey, out RouteEnterCostResult cachedRoute))
         {
             searchDebugRouteCacheHits++;
