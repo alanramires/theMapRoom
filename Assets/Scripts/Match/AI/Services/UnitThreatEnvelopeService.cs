@@ -141,6 +141,9 @@ public static class UnitThreatEnvelopeService
                 BoardMap = map,
                 TerrainDatabase = terrainDatabase,
                 Intent = ReachIntent.Combat,
+                // Chamador herdado nao informa subetapa: deriva do armamento
+                // para preservar o comportamento de hoje. A API nova exige.
+                SubStep = UnitReachEnvelopeService.ResolveLegacyCombatSubStep(unit),
                 Band = ReachBand.Tactical,
                 MovementMode = movementMode,
                 DpqAirHeightConfig = dpqAirHeightConfig,

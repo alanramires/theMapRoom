@@ -507,16 +507,33 @@ public partial class AIController
             PodeFundirOption bestFuseOpt = null;
             float bestFuseScore = float.MinValue;
 
-            // Fusao consome o custo de entrada no hex do aliado. Sua hotzone
-            // especializada reserva esse MP (1 em planicie, 2 em terreno caro
-            // sem skill etc.); PodeFundir fica como validacao final.
-            UnitThreatEnvelope fuseHotzone = UnitThreatEnvelopeService.BuildFusionEnvelope(
-                unit,
-                boardTilemap,
-                terrainDatabase,
-                paths);
+            // Fusao consome o custo de entrada no hex do aliado. O envelope
+            // reserva esse MP (1 em planicie, 2 em terreno caro sem skill etc.)
+            // e ja publica, por celula de acao, DE ONDE ela e materializavel e
+            // com quanto sobrando. PodeFundir fica como validacao final.
+            UnitReachEnvelope fuseHotzone =
+                UnitReachEnvelopeService.Build(new UnitReachRequest
+                {
+                    Unit = unit,
+                    BoardMap = boardTilemap,
+                    TerrainDatabase = terrainDatabase,
+                    Intent = ReachIntent.Fusion,
+                    SubStep =
+                        AIActionReachCoordinator.UsesCubicSectorReach(unit)
+                            ? ReachSubStep.Aereo
+                            : ReachSubStep.Terrestre,
+                    Band = ReachBand.Tactical,
+                    MovementBudget = totalMovement,
+                    PrebuiltPaths = paths,
+                    // Pede o custo real por celula: e o que substitui o
+                    // CalculateAutonomyCostForPath que era feito aqui na mao.
+                    IncludeMovementCosts = true
+                });
+
+            // Todas as celulas de parada adjacentes ao aliado continuam
+            // candidatas — uma pode estar ocupada e outra nao.
             var fuseOrigins = new HashSet<Vector3Int>();
-            if (snapshot.MyUnits != null)
+            if (fuseHotzone != null && snapshot.MyUnits != null)
             {
                 for (int allyIndex = 0; allyIndex < snapshot.MyUnits.Count; allyIndex++)
                 {
@@ -526,7 +543,7 @@ public partial class AIController
 
                     Vector3Int allyCell = ally.CurrentCellPosition;
                     allyCell.z = 0;
-                    if (!fuseHotzone.CanThreaten(allyCell))
+                    if (!fuseHotzone.CanAct(allyCell))
                         continue;
 
                     foreach (Vector3Int rawOrigin in fuseHotzone.MovementCells)
@@ -543,13 +560,8 @@ public partial class AIController
             {
                 if (cell != fromCell && occupied.Contains(cell)) continue;
 
-                if (!paths.TryGetValue(cell, out List<Vector3Int> pathToCell))
-                    continue;
-                int costToCell = pathToCell != null && pathToCell.Count > 0
-                    ? Mathf.Max(0, UnitMovementPathRules.CalculateAutonomyCostForPath(
-                        boardTilemap, unit, pathToCell, terrainDatabase,
-                        applyOperationalAutonomyModifier: false))
-                    : 0;
+                // Custo do caminho ate a celula de parada: vem do envelope.
+                fuseHotzone.TryGetCost(cell, out int costToCell);
                 int remainingAfterMove = Mathf.Max(0, totalMovement - costToCell);
 
                 fuseOptions.Clear();

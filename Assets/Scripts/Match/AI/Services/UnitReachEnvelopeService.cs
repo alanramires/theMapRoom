@@ -21,11 +21,70 @@ public enum UnitThreatEnvelopeMovement
 /// </summary>
 public enum ReachIntent
 {
+    /// <summary>Expansao: alcance de arma a partir de cada celula de parada. O tiro nao custa MP.</summary>
     Combat = 0,
+
+    /// <summary>Expansao: alcance de servico do supridor (serviceRange).</summary>
     Service = 1,
+
+    /// <summary>Expansao: alcance de coleta do Hub (collectionRange).</summary>
     Transfer = 2,
+
+    /// <summary>Expansao com custo: entrar no hex do receptor consome MP.</summary>
     Fusion = 3,
-    Embark = 4
+
+    /// <summary>Expansao com custo: entrar no hex do transportador consome MP.</summary>
+    Embark = 4,
+
+    /// <summary>
+    /// So alcance. A captura acontece no hex onde a unidade PARA, entao o
+    /// envelope nao expande — e nao consulta PodeCapturar. Cruzar alcance com
+    /// objetivo e da IA (CaptureOpportunityClaimService).
+    /// </summary>
+    Capture = 5,
+
+    /// <summary>Identidade: onde a unidade poderia estar, sem acao nenhuma.</summary>
+    Mobility = 6
+}
+
+/// <summary>
+/// Subetapa do envelope. E PARAMETRO DE ENTRADA, como a intencao: o servico
+/// nao a deduz. Ela decide apenas a GEOMETRIA e se a unidade se desloca.
+///
+/// O alcance de arma (vermelho) e decidido pela INTENCAO Combate, nao pela
+/// subetapa. "Hibrido" nao existe aqui: tentar Artilheiro e cair para
+/// Terrestre/Aereo e comportamento da IA, nao etapa do servico.
+///
+/// Ver docs/contrato_envelope_alcance.md.
+/// </summary>
+public enum ReachSubStep
+{
+    /// <summary>Caminhos validos. Padrao de qualquer unidade de superficie.</summary>
+    Terrestre = 0,
+
+    /// <summary>Distancia cubica.</summary>
+    Aereo = 1,
+
+    /// <summary>Nao move (MP=0); mira em cubica. So sob a intencao Combate.</summary>
+    Artilheiro = 2
+}
+
+/// <summary>
+/// Relacao de uma celula com o grafo de movimento proprio da unidade.
+///
+/// Responde a pergunta geral do refactor — "a unidade possui uma rota propria
+/// completa ate a missao?" — sem modelar excecao chamada "ilha".
+/// </summary>
+public enum MobilityRelation
+{
+    /// <summary>A unidade chega andando, dado tempo suficiente.</summary>
+    OwnComponent = 0,
+
+    /// <summary>A unidade PARARIA ali se fosse entregue, mas nao chega sozinha. Pedido de carona.</summary>
+    OtherComponent = 1,
+
+    /// <summary>A unidade nunca ocupa esta celula. Nao e destino de nada.</summary>
+    NotOccupiable = 2
 }
 
 /// <summary>
@@ -33,14 +92,44 @@ public enum ReachIntent
 ///
 /// Tactical    - rodada atual, com o movimento disponivel agora.
 /// Operational - rota propria em MP x N turnos; custo real por celula.
-/// Strategic   - fora da rota propria. NAO materializa celulas: e apenas
-///               direcao. Ver <see cref="UnitReachProfile.TryResolveStrategicBearing"/>.
+///
+/// Nao existe banda estrategica aqui. O que fazer com o que esta fora destas
+/// duas — direcao, alvo distante, pedido de carona — e decisao da IA, nao
+/// retorno do envelope.
 /// </summary>
 public enum ReachBand
 {
     Tactical = 0,
-    Operational = 1,
-    Strategic = 2
+    Operational = 1
+}
+
+/// <summary>
+/// De onde a unidade materializa uma acao, e com quanto sobrando.
+///
+/// E a informacao que separa as duas contas de MP do jogo:
+///   combate  - o tiro nao custa MP. Anda 3, atira no 4: EnterCost = 0 e o
+///              RemainingMovement pode ser 0.
+///   fusao /  - entrar no hex custa. Anda 2 na montanha (2 MP), sobra 1, e so
+///   embarque   funde/embarca no 3 se aquele hex custar 1.
+/// </summary>
+public readonly struct ReachOrigin
+{
+    /// <summary>Celula onde a unidade precisa parar para materializar a acao.</summary>
+    public readonly Vector3Int FromCell;
+
+    /// <summary>MP restante ao chegar em <see cref="FromCell"/>.</summary>
+    public readonly int RemainingMovement;
+
+    /// <summary>MP consumido para entrar na celula de acao. Zero quando a acao nao move.</summary>
+    public readonly int EnterCost;
+
+    public ReachOrigin(Vector3Int fromCell, int remainingMovement, int enterCost)
+    {
+        fromCell.z = 0;
+        FromCell = fromCell;
+        RemainingMovement = remainingMovement;
+        EnterCost = enterCost;
+    }
 }
 
 /// <summary>
@@ -52,6 +141,9 @@ public class UnitReachEnvelope
 {
     public readonly ReachIntent Intent;
     public readonly ReachBand Band;
+
+    /// <summary>Subetapa efetivamente usada para construir este envelope.</summary>
+    public ReachSubStep SubStep { get; internal set; }
 
     /// <summary>Caminhos legais por destino. Vazio quando a origem veio de um mapa de custo.</summary>
     public readonly Dictionary<Vector3Int, List<Vector3Int>> PathsByDestination;
@@ -71,6 +163,13 @@ public class UnitReachEnvelope
     /// <summary>Anel externo: acao menos movimento. E o que as ferramentas pintam como alcance.</summary>
     public readonly List<Vector3Int> LineCells;
 
+    /// <summary>
+    /// De onde cada celula de acao e materializavel. Evita que o consumidor
+    /// reconstrua na mao a origem, o custo do caminho e o MP restante — coisas
+    /// que o servico ja calculou para decidir que a celula entra no envelope.
+    /// </summary>
+    public readonly Dictionary<Vector3Int, ReachOrigin> OriginByActionCell;
+
     internal UnitReachEnvelope(
         ReachIntent intent,
         ReachBand band,
@@ -78,7 +177,8 @@ public class UnitReachEnvelope
         Dictionary<Vector3Int, int> costByCell,
         HashSet<Vector3Int> movementCells,
         HashSet<Vector3Int> actionCells,
-        HashSet<Vector3Int> lineCells)
+        HashSet<Vector3Int> lineCells,
+        Dictionary<Vector3Int, ReachOrigin> originByActionCell = null)
     {
         Intent = intent;
         Band = band;
@@ -88,7 +188,23 @@ public class UnitReachEnvelope
         AttackableCells = actionCells ?? new HashSet<Vector3Int>();
         RangeCells = new List<Vector3Int>(MovementCells);
         LineCells = lineCells != null ? new List<Vector3Int>(lineCells) : new List<Vector3Int>();
+        OriginByActionCell = originByActionCell
+                             ?? new Dictionary<Vector3Int, ReachOrigin>();
     }
+
+    /// <summary>De onde materializar a acao nesta celula.</summary>
+    public bool TryGetOrigin(Vector3Int actionCell, out ReachOrigin origin)
+    {
+        actionCell.z = 0;
+        return OriginByActionCell.TryGetValue(actionCell, out origin);
+    }
+
+    /// <summary>
+    /// Funil da construcao, em texto, para ferramentas e logs. Diz em qual
+    /// etapa o envelope ficou vazio: orcamento, movimento ou custo de entrada.
+    /// Nunca participa de decisao.
+    /// </summary>
+    public string Diagnostic { get; internal set; } = string.Empty;
 
     /// <summary>Nome preferido de <see cref="AttackableCells"/> fora do contexto de combate.</summary>
     public HashSet<Vector3Int> ActionCells => AttackableCells;
@@ -134,8 +250,17 @@ public sealed class UnitThreatEnvelope : UnitReachEnvelope
         Dictionary<Vector3Int, int> costByCell,
         HashSet<Vector3Int> movementCells,
         HashSet<Vector3Int> actionCells,
-        HashSet<Vector3Int> lineCells)
-        : base(intent, band, paths, costByCell, movementCells, actionCells, lineCells)
+        HashSet<Vector3Int> lineCells,
+        Dictionary<Vector3Int, ReachOrigin> originByActionCell = null)
+        : base(
+            intent,
+            band,
+            paths,
+            costByCell,
+            movementCells,
+            actionCells,
+            lineCells,
+            originByActionCell)
     {
     }
 }
@@ -162,61 +287,24 @@ public sealed class UnitReachProfile
     }
 
     /// <summary>
-    /// Classifica uma celula nas tres bandas. Strategic e o complemento: nao
-    /// existe conjunto de celulas Strategic, existe ausencia de rota propria.
+    /// Em qual banda esta celula e materializavel. Devolve false quando esta
+    /// fora das duas — o que fazer com isso e decisao da IA.
     /// </summary>
-    public ReachBand Classify(Vector3Int cell)
+    public bool TryClassify(Vector3Int cell, out ReachBand band)
     {
         cell.z = 0;
         if (Tactical != null && Tactical.CanAct(cell))
-            return ReachBand.Tactical;
-        if (Operational != null && Operational.CanAct(cell))
-            return ReachBand.Operational;
-        return ReachBand.Strategic;
-    }
-
-    /// <summary>
-    /// Unico uso legitimo da banda Strategic: direcao.
-    ///
-    /// Devolve a celula da rota propria (Operational, ou Tactical quando nao ha
-    /// Operational) que mais aproxima a unidade do alvo distante, junto da
-    /// distancia cubica restante. Nao abre pathfinding novo: consome a malha ja
-    /// calculada. A distancia apenas ordena; nunca substitui caminhos ou sensores.
-    /// </summary>
-    public bool TryResolveStrategicBearing(
-        Vector3Int target,
-        out Vector3Int bearingCell,
-        out int remainingCubicDistance)
-    {
-        target.z = 0;
-        bearingCell = target;
-        remainingCubicDistance = int.MaxValue;
-
-        UnitReachEnvelope source = Operational ?? Tactical;
-        if (source == null || source.MovementCells.Count == 0)
-            return false;
-
-        int bestCost = int.MaxValue;
-        foreach (Vector3Int cell in source.MovementCells)
         {
-            int distance = AIActionReachCoordinator.CubicDistance(cell, target);
-            if (distance > remainingCubicDistance)
-                continue;
-
-            int cost = source.CostByCell.TryGetValue(cell, out int known)
-                ? known
-                : 0;
-            // Empate de direcao resolve pelo menor custo: aproxima sem gastar
-            // rota a mais do que o necessario.
-            if (distance == remainingCubicDistance && cost >= bestCost)
-                continue;
-
-            remainingCubicDistance = distance;
-            bestCost = cost;
-            bearingCell = cell;
+            band = ReachBand.Tactical;
+            return true;
         }
-
-        return remainingCubicDistance != int.MaxValue;
+        if (Operational != null && Operational.CanAct(cell))
+        {
+            band = ReachBand.Operational;
+            return true;
+        }
+        band = ReachBand.Tactical;
+        return false;
     }
 }
 
@@ -252,6 +340,13 @@ public sealed class UnitReachRequest
     /// <summary>Sobrescreve o alcance de servico. Sem valor, resolve pela intencao.</summary>
     public SupplierRangeMode? RangeOverride;
 
+    /// <summary>
+    /// Preenche CostByCell com o custo real de cada celula de movimento.
+    /// Custa uma varredura de custo por caminho, entao fica desligado por
+    /// padrao: ferramentas ligam, a IA so liga onde precisa do numero.
+    /// </summary>
+    public bool IncludeMovementCosts;
+
     // Combate.
     public UnitThreatEnvelopeMovement MovementMode = UnitThreatEnvelopeMovement.CurrentTurn;
     public DPQAirHeightConfig DpqAirHeightConfig;
@@ -261,6 +356,12 @@ public sealed class UnitReachRequest
 
     // Embarque.
     public UnitManager EmbarkPassenger;
+
+    /// <summary>
+    /// Subetapa pedida. É PARÂMETRO DE ENTRADA: o serviço não a deduz.
+    /// Quem classifica a unidade e escolhe a subetapa é o chamador — a IA.
+    /// </summary>
+    public ReachSubStep SubStep = ReachSubStep.Terrestre;
 }
 
 /// <summary>
@@ -283,8 +384,10 @@ public sealed class UnitReachRequest
 /// o reach setorial e a metrica cubica das aeronaves. O servico NAO implementa
 /// pathfinding proprio e aceita malhas ja calculadas pelo chamador.
 ///
-/// Strategic nao materializa celulas. E o complemento das duas bandas com rota
-/// propria e serve apenas como direcao.
+/// So devolve resposta materializavel: Tactical, Operational, movimento, acao,
+/// custo e origem da acao. Nao existe banda estrategica — objetivo fora dessas
+/// duas bandas e pergunta da IA, nao retorno do envelope. Pelo mesmo motivo o
+/// servico nao varre o tabuleiro atras de objetivo nem conclui sobre carona.
 ///
 /// CONTRATO TRANSACIONAL: o servico e puro. Nao move unidades, nao altera
 /// ocupacao, FOW, deteccao, recursos, revisoes nem estado de turno. Pode ser
@@ -315,6 +418,94 @@ public static class UnitReachEnvelopeService
     }
 
     /// <summary>
+    /// A subetapa pedida usa distancia cubica? Depende SO da subetapa: quem
+    /// classificou a unidade foi o chamador ao escolhe-la.
+    /// </summary>
+    public static bool UsesCubicGeometry(ReachSubStep subStep)
+    {
+        return subStep == ReachSubStep.Aereo;
+    }
+
+    /// <summary>
+    /// Subetapas validas de cada intencao — a arvore do contrato.
+    /// Captura e Desembarque nao tem ramo: sao sempre terrestres.
+    /// Artilheiro so existe sob Combate.
+    /// </summary>
+    public static IReadOnlyList<ReachSubStep> GetSubSteps(ReachIntent intent)
+    {
+        switch (intent)
+        {
+            case ReachIntent.Combat:
+                return CombatSubSteps;
+            // Desembarque entra aqui quando existir (sem zepelim, sem ramo).
+            case ReachIntent.Capture:
+                return GroundOnlySubSteps;
+            default:
+                return GroundAndAirSubSteps;
+        }
+    }
+
+    /// <summary>
+    /// A UNIDADE suporta esta subetapa? `Aereo` exige isAircraft no UnitData:
+    /// pedir geometria cúbica para uma unidade de superfície é pedido inválido,
+    /// não um envelope vazio. Validação de entrada, não dedução.
+    /// </summary>
+    public static bool SupportsSubStep(UnitManager unit, ReachSubStep subStep)
+    {
+        if (subStep != ReachSubStep.Aereo)
+            return true;
+        return AIActionReachCoordinator.UsesCubicSectorReach(unit);
+    }
+
+    public static bool IsSubStepValid(
+        ReachIntent intent, ReachSubStep subStep, UnitManager unit = null)
+    {
+        IReadOnlyList<ReachSubStep> valid = GetSubSteps(intent);
+        bool inTree = false;
+        for (int i = 0; i < valid.Count; i++)
+        {
+            if (valid[i] == subStep)
+            {
+                inTree = true;
+                break;
+            }
+        }
+
+        if (!inTree)
+            return false;
+        return unit == null || SupportsSubStep(unit, subStep);
+    }
+
+    /// <summary>Subetapas da intencao que ESTA unidade suporta.</summary>
+    public static List<ReachSubStep> GetSubSteps(
+        ReachIntent intent, UnitManager unit)
+    {
+        IReadOnlyList<ReachSubStep> tree = GetSubSteps(intent);
+        var result = new List<ReachSubStep>(tree.Count);
+        for (int i = 0; i < tree.Count; i++)
+        {
+            if (SupportsSubStep(unit, tree[i]))
+                result.Add(tree[i]);
+        }
+        return result;
+    }
+
+    private static readonly ReachSubStep[] CombatSubSteps =
+    {
+        ReachSubStep.Terrestre, ReachSubStep.Aereo, ReachSubStep.Artilheiro
+    };
+
+    private static readonly ReachSubStep[] GroundAndAirSubSteps =
+    {
+        ReachSubStep.Terrestre, ReachSubStep.Aereo
+    };
+
+    private static readonly ReachSubStep[] GroundOnlySubSteps =
+    {
+        ReachSubStep.Terrestre
+    };
+
+    /// <summary>
     /// Constroi as duas bandas materializaveis de uma intencao numa passada.
     ///
     /// Orcamento e reuso (PrebuiltPaths/PrebuiltCosts) valem apenas para a
@@ -343,22 +534,14 @@ public static class UnitReachEnvelopeService
             return null;
 
         UnitManager unit = request.Unit;
+        ReachSubStep subStep = request.SubStep;
         Tilemap map = request.BoardMap != null ? request.BoardMap : unit.BoardTilemap;
         if (map == null)
             return null;
 
-        // Strategic nao materializa. Quem precisa de direcao usa o profile.
-        if (request.Band == ReachBand.Strategic)
-        {
-            return new UnitReachEnvelope(
-                request.Intent,
-                ReachBand.Strategic,
-                null,
-                null,
-                null,
-                null,
-                null);
-        }
+        // Pedido invalido, nao envelope vazio: `Aereo` exige isAircraft.
+        if (!IsSubStepValid(request.Intent, subStep, unit))
+            return null;
 
         // A expansao de tiro so e confirmada na rodada atual, onde o sensor
         // responde sobre o tabuleiro real. Na banda Operational o combate vale
@@ -367,12 +550,17 @@ public static class UnitReachEnvelopeService
         if (request.Intent == ReachIntent.Combat
             && request.Band == ReachBand.Tactical)
         {
-            return BuildCombat(request, map, out _);
+            UnitReachEnvelope combat = BuildCombat(request, map, out _);
+            if (combat != null)
+                combat.SubStep = subStep;
+            return combat;
         }
 
+        lastEntryRejection = null;
         int budget = ResolveBudget(request);
         ResolveMovement(
             request,
+            subStep,
             map,
             budget,
             out Dictionary<Vector3Int, List<Vector3Int>> paths,
@@ -390,30 +578,71 @@ public static class UnitReachEnvelopeService
                 movementCells.Add(cell);
         }
 
+        // Custo real por celula de movimento. Sem isso a ferramenta nao
+        // consegue mostrar "montanha custou 2, sobrou 1" — que e exatamente a
+        // conta que explica onde a unidade para. So preenche quando o servico
+        // e dono do dicionario; malha pronta do chamador nao se mexe.
+        if (request.IncludeMovementCosts
+            && request.PrebuiltCosts == null
+            && paths.Count > 0)
+        {
+            foreach (Vector3Int cell in movementCells)
+            {
+                costByCell[cell] = ResolveSpentMovement(
+                    request, map, cell, paths, costByCell);
+            }
+        }
+
+        var origins = new Dictionary<Vector3Int, ReachOrigin>();
         HashSet<Vector3Int> actionCells;
         switch (request.Intent)
         {
             case ReachIntent.Service:
             case ReachIntent.Transfer:
                 actionCells = ExpandByServiceRange(
-                    request, map, movementCells);
+                    request, map, movementCells, costByCell, budget, origins);
                 break;
             case ReachIntent.Fusion:
                 actionCells = ExpandByEntryCost(
                     request, map, movementCells, paths, costByCell, budget,
-                    ResolveFusionEnterCost);
+                    ResolveFusionEnterCost, origins);
                 break;
             case ReachIntent.Embark:
                 actionCells = ExpandByEntryCost(
                     request, map, movementCells, paths, costByCell, budget,
-                    ResolveEmbarkEnterCost);
+                    CanEmbarkAtCell, origins);
                 break;
             default:
+                // Captura e mobilidade devolvem SO alcance. Cruzar alcance com
+                // objetivo (e chamar PodeCapturar) e trabalho da IA, nao do
+                // envelope: ver CaptureOpportunityClaimService.
                 actionCells = new HashSet<Vector3Int>(movementCells);
                 break;
         }
 
-        if (request.FilterByOperationDomain)
+        // Captura e mobilidade materializam na propria celula de parada: a
+        // origem e ela mesma e a entrada ja foi paga pelo movimento.
+        if (request.Intent == ReachIntent.Capture
+            || request.Intent == ReachIntent.Mobility)
+        {
+            foreach (Vector3Int cell in actionCells)
+            {
+                origins[cell] = new ReachOrigin(
+                    cell,
+                    Mathf.Max(0, budget - ResolveKnownCost(costByCell, cell)),
+                    0);
+            }
+        }
+
+        // SupportsOperationDomain e um predicado de SUPRIDOR. Aplicar em fusao
+        // ou embarque reprova tudo, porque a unidade nao e supridora — foi
+        // exatamente assim que a hotzone de embarque zerou na primeira versao.
+        bool domainFilterApplies =
+            request.FilterByOperationDomain
+            && (request.Intent == ReachIntent.Service
+                || request.Intent == ReachIntent.Transfer);
+        int beforeDomainFilter = actionCells.Count;
+        if (domainFilterApplies)
             ApplyOperationDomainFilter(request, map, actionCells);
 
         var lineCells = new HashSet<Vector3Int>(actionCells);
@@ -426,8 +655,28 @@ public static class UnitReachEnvelopeService
             costByCell,
             movementCells,
             actionCells,
-            lineCells);
+            lineCells,
+            origins)
+        {
+            SubStep = subStep,
+            Diagnostic =
+                $"orçamento={budget}; movimento={movementCells.Count}; " +
+                $"ação={beforeDomainFilter}"
+                + (domainFilterApplies
+                    ? $"→{actionCells.Count} (filtro de camada)"
+                    : string.Empty)
+                + (lastEntryRejection != null
+                    ? $"; 1ª rejeição de entrada: {lastEntryRejection}"
+                    : string.Empty)
+        };
     }
+
+    /// <summary>
+    /// Primeira recusa do sensor de custo de entrada na ultima construcao.
+    /// Existe so para diagnostico de ferramenta; nao e lido por decisao alguma.
+    /// </summary>
+    [ThreadStatic]
+    private static string lastEntryRejection;
 
     // ------------------------------------------------------------------
     // Orcamento e movimento — reuso, nunca pathfinding novo.
@@ -446,6 +695,7 @@ public static class UnitReachEnvelopeService
 
     private static void ResolveMovement(
         UnitReachRequest request,
+        ReachSubStep subStep,
         Tilemap map,
         int budget,
         out Dictionary<Vector3Int, List<Vector3Int>> paths,
@@ -468,17 +718,23 @@ public static class UnitReachEnvelopeService
         Vector3Int origin = request.Unit.CurrentCellPosition;
         origin.z = 0;
 
-        // Aeronaves e a banda Operational ja tem malha propria no coordenador:
-        // custo real para unidades geograficas, cubico para aeronauticas.
         if (request.Band == ReachBand.Operational
-            || AIActionReachCoordinator.UsesCubicSectorReach(request.Unit))
+            || UsesCubicGeometry(subStep))
         {
-            costByCell = AIActionReachCoordinator.BuildSectorReachMap(
-                request.Unit,
-                map,
-                request.TerrainDatabase,
-                origin,
-                Mathf.Max(0, budget));
+            costByCell =
+                request.Band == ReachBand.Operational
+                    ? BuildTurnChainedReach(
+                        request.Unit,
+                        map,
+                        request.TerrainDatabase,
+                        origin,
+                        request.OperationalTurns)
+                    : AIActionReachCoordinator.BuildSectorReachMap(
+                        request.Unit,
+                        map,
+                        request.TerrainDatabase,
+                        origin,
+                        Mathf.Max(0, budget));
             // A malha setorial nao produz caminhos. Publicar os destinos com
             // caminho nulo mantem PathsByDestination como indice de alcance,
             // que e o formato que os consumidores herdados ja esperavam.
@@ -494,6 +750,63 @@ public static class UnitReachEnvelopeService
             Mathf.Max(0, budget),
             request.TerrainDatabase);
         costByCell = new Dictionary<Vector3Int, int>();
+    }
+
+    /// <summary>
+    /// Alcance de N turnos como SOMA de turnos, nao como orcamento unico.
+    ///
+    /// MP e teto por turno (UnitData) e nao acumula. Um soldado de 3 MP faz
+    /// 3+3, nao 6: na montanha de custo 2 ele entra em UMA por turno, porque
+    /// depois da primeira sobra 1 e a segunda pede 2. Um BFS de orcamento 6
+    /// daria tres montanhas — alcance que nao existe no jogo.
+    ///
+    /// Cada turno reinicia o teto, entao a busca e encadeada: o alcance do
+    /// turno seguinte parte de cada celula alcancada no anterior.
+    /// </summary>
+    private static Dictionary<Vector3Int, int> BuildTurnChainedReach(
+        UnitManager unit,
+        Tilemap map,
+        TerrainDatabase terrainDatabase,
+        Vector3Int origin,
+        int turns)
+    {
+        int maxPerTurn = Mathf.Max(0, unit != null ? unit.MaxMovementPoints : 0);
+        if (maxPerTurn <= 0)
+            return new Dictionary<Vector3Int, int> { [origin] = 0 };
+
+        // O turno ATUAL vale o que ainda sobrou; os seguintes valem MP cheio.
+        // Uma unidade que ja gastou movimento nesta rodada projeta menos, e o
+        // Operational encolhe conforme ela age — que e o comportamento real.
+        // Zero restante cai para o teto cheio, mesma regra do
+        // AIActionReachCoordinator.ResolveTacticalBudget.
+        int firstTurn = Mathf.Max(0, unit.RemainingMovementPoints);
+        if (firstTurn <= 0)
+            firstTurn = maxPerTurn;
+
+        // Aeronave ignora geografia: o encadeamento por turno nao muda nada,
+        // o alcance e cubico puro sobre a soma dos tetos.
+        if (AIActionReachCoordinator.UsesCubicSectorReach(unit))
+        {
+            return AIActionReachCoordinator.BuildSectorReachMap(
+                unit,
+                map,
+                terrainDatabase,
+                origin,
+                firstTurn + maxPerTurn * Mathf.Max(0, turns - 1));
+        }
+
+        // UMA passada. A versao anterior encadeava um BFS por celula da
+        // fronteira — dezenas de travessias completas por decisao, cada uma com
+        // origem diferente (portanto sem reuso do MovementReachCache).
+        return UnitMovementPathRules.CalculateTurnChainedCostMap(
+            map,
+            unit,
+            origin,
+            firstTurn,
+            maxPerTurn,
+            turns,
+            terrainDatabase,
+            out _);
     }
 
     private static UnitReachRequest CloneForBand(
@@ -513,6 +826,7 @@ public static class UnitReachEnvelopeService
             PrebuiltCosts = band == source.Band ? source.PrebuiltCosts : null,
             FilterByOperationDomain = source.FilterByOperationDomain,
             RangeOverride = source.RangeOverride,
+            SubStep = source.SubStep,
             MovementMode = band == ReachBand.Operational
                 ? UnitThreatEnvelopeMovement.Potential
                 : source.MovementMode,
@@ -520,7 +834,8 @@ public static class UnitReachEnvelopeService
             EnableLdt = source.EnableLdt,
             EnableLos = source.EnableLos,
             EnableSpotter = source.EnableSpotter,
-            EmbarkPassenger = source.EmbarkPassenger
+            EmbarkPassenger = source.EmbarkPassenger,
+            IncludeMovementCosts = source.IncludeMovementCosts
         };
     }
 
@@ -531,7 +846,10 @@ public static class UnitReachEnvelopeService
     private static HashSet<Vector3Int> ExpandByServiceRange(
         UnitReachRequest request,
         Tilemap map,
-        HashSet<Vector3Int> movementCells)
+        HashSet<Vector3Int> movementCells,
+        Dictionary<Vector3Int, int> costByCell,
+        int budget,
+        Dictionary<Vector3Int, ReachOrigin> origins)
     {
         var actionCells = new HashSet<Vector3Int>();
         SupplierRangeMode range = ResolveServiceRange(request);
@@ -543,6 +861,8 @@ public static class UnitReachEnvelopeService
                 || range == SupplierRangeMode.SameHexOrEmbarked)
             {
                 actionCells.Add(moveCell);
+                RecordServiceOrigin(
+                    origins, costByCell, budget, moveCell, moveCell);
             }
 
             if (range != SupplierRangeMode.Adjacent1Hex
@@ -556,12 +876,180 @@ public static class UnitReachEnvelopeService
             {
                 Vector3Int targetCell = neighbors[i];
                 targetCell.z = 0;
-                if (map.GetTile(targetCell) != null)
-                    actionCells.Add(targetCell);
+                if (map.GetTile(targetCell) == null)
+                    continue;
+                actionCells.Add(targetCell);
+                RecordServiceOrigin(
+                    origins, costByCell, budget, moveCell, targetCell);
             }
         }
 
         return actionCells;
+    }
+
+    /// <summary>
+    /// Servico nao move para o alvo: o custo de entrada e zero e a origem e a
+    /// celula de onde o supridor atende.
+    ///
+    /// Guarda a origem MAIS BARATA, com desempate estavel por coordenada. Sem
+    /// isso a origem publicada dependia da ordem de iteracao do HashSet e
+    /// mudava sozinha quando a travessia mudava — diagnostico nao reproduzivel.
+    /// </summary>
+    private static void RecordServiceOrigin(
+        Dictionary<Vector3Int, ReachOrigin> origins,
+        Dictionary<Vector3Int, int> costByCell,
+        int budget,
+        Vector3Int fromCell,
+        Vector3Int actionCell)
+    {
+        int cost = ResolveKnownCost(costByCell, fromCell);
+        if (origins.TryGetValue(actionCell, out ReachOrigin known))
+        {
+            int knownCost = ResolveKnownCost(costByCell, known.FromCell);
+            if (knownCost < cost)
+                return;
+            if (knownCost == cost
+                && CompareCells(known.FromCell, fromCell) <= 0)
+            {
+                return;
+            }
+        }
+
+        origins[actionCell] = new ReachOrigin(
+            fromCell, Mathf.Max(0, budget - cost), 0);
+    }
+
+    private static int CompareCells(Vector3Int a, Vector3Int b)
+    {
+        if (a.x != b.x)
+            return a.x < b.x ? -1 : 1;
+        if (a.y != b.y)
+            return a.y < b.y ? -1 : 1;
+        return 0;
+    }
+
+    // ------------------------------------------------------------------
+    // Mobilidade: componente de movimento proprio da unidade.
+    //
+    // CONSULTA DIRIGIDA. A IA entrega UM objetivo ja escolhido e pergunta a
+    // relacao dele com o grafo de movimento. O envelope nunca varre o tabuleiro
+    // classificando celulas distantes: isso nao e resposta materializavel.
+    //
+    // O componente e a malha de custo SEM TETO — a mesma funcao do Operational
+    // com orcamento ilimitado. Nao existe algoritmo novo aqui, so a ausencia
+    // de limite. Caro por decisao: cacheie por unidade/revisao antes de usar
+    // isso em loop de IA.
+    // ------------------------------------------------------------------
+
+    public static Dictionary<Vector3Int, int> BuildOwnMovementComponent(
+        UnitManager unit,
+        Tilemap boardMap,
+        TerrainDatabase terrainDatabase)
+    {
+        var reached = new Dictionary<Vector3Int, int>();
+        if (unit == null)
+            return reached;
+
+        Tilemap map = boardMap != null ? boardMap : unit.BoardTilemap;
+        if (map == null)
+            return reached;
+
+        Vector3Int origin = unit.CurrentCellPosition;
+        origin.z = 0;
+
+        // MP e teto POR TURNO (UnitData). Como o movimento nao acumula entre
+        // turnos, um hex cujo custo de entrada passa desse teto e intransponivel
+        // para sempre — nao adianta ter mais turnos. Logo, a conectividade nao
+        // depende de distancia nenhuma: e flood fill sobre "consigo pagar a
+        // entrada deste hex num turno". Obus de 2 MP nunca entra em floresta 3,
+        // e a floresta ainda BLOQUEIA o corredor atras dela.
+        int perTurn = Mathf.Max(1, unit.MaxMovementPoints);
+        if (AIActionReachCoordinator.UsesCubicSectorReach(unit))
+        {
+            // Aeronautica ignora geografia: o componente e o tabuleiro.
+            BoundsInt airBounds = map.cellBounds;
+            foreach (Vector3Int raw in airBounds.allPositionsWithin)
+            {
+                Vector3Int cell = raw;
+                cell.z = 0;
+                if (map.GetTile(cell) != null)
+                    reached[cell] = AIActionReachCoordinator.CubicDistance(origin, cell);
+            }
+            return reached;
+        }
+
+        var queue = new Queue<Vector3Int>();
+        var neighbors = new List<Vector3Int>(6);
+        reached[origin] = 0;
+        queue.Enqueue(origin);
+
+        while (queue.Count > 0)
+        {
+            Vector3Int current = queue.Dequeue();
+            int currentCost = reached[current];
+            UnitMovementPathRules.GetImmediateHexNeighbors(map, current, neighbors);
+            for (int i = 0; i < neighbors.Count; i++)
+            {
+                Vector3Int next = neighbors[i];
+                next.z = 0;
+                if (map.GetTile(next) == null || reached.ContainsKey(next))
+                    continue;
+
+                if (!UnitMovementPathRules.TryGetEnterCellCost(
+                        map,
+                        unit,
+                        next,
+                        terrainDatabase,
+                        applyOperationalAutonomyModifier: false,
+                        out int enterCost))
+                {
+                    continue;
+                }
+
+                if (Mathf.Max(1, enterCost) > perTurn)
+                    continue;
+
+                reached[next] = currentCost + Mathf.Max(1, enterCost);
+                queue.Enqueue(next);
+            }
+        }
+
+        return reached;
+    }
+
+    /// <summary>
+    /// Classifica uma celula contra o grafo de movimento da unidade.
+    /// Passe <paramref name="ownComponent"/> pronto para nao reconstruir a
+    /// malha a cada celula.
+    /// </summary>
+    public static MobilityRelation ClassifyMobility(
+        UnitManager unit,
+        Tilemap boardMap,
+        TerrainDatabase terrainDatabase,
+        Vector3Int cell,
+        IReadOnlyDictionary<Vector3Int, int> ownComponent)
+    {
+        cell.z = 0;
+        if (ownComponent != null && ownComponent.ContainsKey(cell))
+            return MobilityRelation.OwnComponent;
+
+        Tilemap map = boardMap != null && unit != null
+            ? boardMap
+            : unit != null ? unit.BoardTilemap : null;
+        if (map == null)
+            return MobilityRelation.NotOccupiable;
+
+        // Fora do componente, so interessa se a unidade PARARIA ali caso fosse
+        // entregue. Mar para infantaria reprova aqui: nao e destino de nada.
+        return UnitMovementPathRules.TryGetEnterCellCost(
+            map,
+            unit,
+            cell,
+            terrainDatabase,
+            applyOperationalAutonomyModifier: false,
+            out _)
+            ? MobilityRelation.OtherComponent
+            : MobilityRelation.NotOccupiable;
     }
 
     private static SupplierRangeMode ResolveServiceRange(UnitReachRequest request)
@@ -585,11 +1073,19 @@ public static class UnitReachEnvelopeService
     // Nao existe hard-code de "orcamento - 1": em terreno de custo 2 sobra 2.
     // ------------------------------------------------------------------
 
-    private delegate bool EntryCostResolver(
+    /// <summary>
+    /// Decide se a intencao se materializa em targetCell partindo de fromCell
+    /// com remainingMovement pontos. O predicado inteiro — legalidade E custo
+    /// conservado — pertence ao sensor; o servico so varre a geometria.
+    /// </summary>
+    private delegate bool EntryPredicate(
         UnitReachRequest request,
         Tilemap map,
+        Vector3Int fromCell,
         Vector3Int targetCell,
-        out int enterCost);
+        int remainingMovement,
+        out int enterCost,
+        out string reason);
 
     private static HashSet<Vector3Int> ExpandByEntryCost(
         UnitReachRequest request,
@@ -598,7 +1094,8 @@ public static class UnitReachEnvelopeService
         Dictionary<Vector3Int, List<Vector3Int>> paths,
         Dictionary<Vector3Int, int> costByCell,
         int budget,
-        EntryCostResolver resolveEnterCost)
+        EntryPredicate canMaterialize,
+        Dictionary<Vector3Int, ReachOrigin> origins)
     {
         var actionCells = new HashSet<Vector3Int>();
         int totalMovement = Mathf.Max(0, budget);
@@ -623,10 +1120,19 @@ public static class UnitReachEnvelopeService
                     continue;
                 }
 
-                if (!resolveEnterCost(request, map, targetCell, out int enterCost))
-                    continue;
-                if (remaining >= Mathf.Max(1, enterCost))
+                if (canMaterialize(
+                        request, map, moveCell, targetCell,
+                        remaining, out int enterCost, out string reason))
+                {
                     actionCells.Add(targetCell);
+                    origins[targetCell] = new ReachOrigin(
+                        moveCell, remaining, enterCost);
+                    continue;
+                }
+
+                lastEntryRejection = lastEntryRejection
+                    ?? $"{targetCell} partindo de {moveCell} " +
+                       $"(restante={remaining}): {reason}";
             }
         }
 
@@ -663,38 +1169,86 @@ public static class UnitReachEnvelopeService
     private static bool ResolveFusionEnterCost(
         UnitReachRequest request,
         Tilemap map,
+        Vector3Int fromCell,
         Vector3Int targetCell,
-        out int enterCost)
+        int remainingMovement,
+        out int enterCost,
+        out string reason)
     {
-        return PodeFundirSensor.TryResolveMergeEnterCost(
-            map,
-            request.TerrainDatabase,
-            request.Unit,
-            targetCell,
-            out enterCost,
-            out _);
+        if (!PodeFundirSensor.TryResolveMergeEnterCost(
+                map,
+                request.TerrainDatabase,
+                request.Unit,
+                targetCell,
+                out enterCost,
+                out reason))
+        {
+            return false;
+        }
+
+        enterCost = Mathf.Max(1, enterCost);
+        if (remainingMovement >= enterCost)
+            return true;
+
+        reason = $"MP insuficiente para fundir (custo={enterCost}).";
+        return false;
     }
 
-    private static bool ResolveEmbarkEnterCost(
+    private static bool CanEmbarkAtCell(
         UnitReachRequest request,
         Tilemap map,
+        Vector3Int fromCell,
         Vector3Int targetCell,
-        out int enterCost)
+        int remainingMovement,
+        out int enterCost,
+        out string reason)
     {
-        // O passageiro e quem paga a entrada. Sem passageiro explicito, a
-        // propria unidade do pedido e o passageiro: o envelope responde "onde
-        // esta unidade consegue embarcar", nao "onde este transportador recebe".
+        enterCost = 0;
+        // O passageiro e quem embarca. Sem passageiro explicito, a propria
+        // unidade do pedido: o envelope responde "onde esta unidade consegue
+        // embarcar", nao "onde este transportador recebe".
         UnitManager passenger = request.EmbarkPassenger != null
             ? request.EmbarkPassenger
             : request.Unit;
 
-        return PodeEmbarcarSensor.TryGetEmbarkCostAtCell(
-            map,
-            request.TerrainDatabase,
-            passenger,
-            targetCell,
-            out enterCost,
-            out _);
+        UnitManager transporter =
+            UnitOccupancyRules.GetUnitAtCell(map, targetCell, passenger);
+        if (transporter == null
+            || !transporter.TryGetUnitData(out UnitData transporterData)
+            || transporterData == null
+            || transporterData.transportSlots == null)
+        {
+            reason = "Sem transportador na celula.";
+            return false;
+        }
+
+        // O predicado completo — transportador valido, contexto do terreno,
+        // slot compativel, exclusividade, vaga E o MP conservado para entrar —
+        // pertence inteiro ao PodeEmbarcarSensor. Basta um slot servir.
+        reason = "Nenhum slot compativel.";
+        for (int slotIndex = 0;
+             slotIndex < transporterData.transportSlots.Count;
+             slotIndex++)
+        {
+            if (PodeEmbarcarSensor.CanEmbarkFromProjectedCell(
+                    passenger,
+                    fromCell,
+                    transporter,
+                    slotIndex,
+                    map,
+                    request.TerrainDatabase,
+                    remainingMovement,
+                    out int slotCost,
+                    out string slotReason))
+            {
+                enterCost = slotCost;
+                return true;
+            }
+
+            reason = slotReason;
+        }
+
+        return false;
     }
 
     // ------------------------------------------------------------------
@@ -762,9 +1316,11 @@ public static class UnitReachEnvelopeService
     {
         cacheHit = false;
         UnitManager unit = request.Unit;
+        ReachSubStep subStep = request.SubStep;
 
-        CombatProfile profile = ResolveCombatProfile(unit);
-        if (profile == CombatProfile.None)
+        // Reativo, nao dedutivo: pediram Combate e a unidade nao tem arma
+        // utilizavel. Nada a devolver.
+        if (ResolveCombatProfile(unit) == CombatProfile.None)
             return null;
 
         int movementSteps = request.MovementBudget > 0
@@ -776,7 +1332,8 @@ public static class UnitReachEnvelopeService
         long cacheIndex = ((long)ResolveUnitIndex(unit) << 2) | (uint)request.MovementMode;
         int keyHash = BuildKeyHash(
             unit, map, movementSteps,
-            request.EnableLdt, request.EnableLos, request.EnableSpotter);
+            request.EnableLdt, request.EnableLos, request.EnableSpotter,
+            request.IncludeMovementCosts, subStep);
         if (Cache.TryGetValue(cacheIndex, out CacheEntry existing)
             && existing != null
             && existing.KeyHash == keyHash
@@ -786,14 +1343,24 @@ public static class UnitReachEnvelopeService
             return existing.Envelope;
         }
 
-        bool includeStatic = profile == CombatProfile.DistanceStatic
-                             || profile == CombatProfile.Hybrid;
-        bool includeMovement = profile == CombatProfile.Movement
-                               || profile == CombatProfile.Hybrid;
+        // A intencao Combate sempre expoe o vermelho. A SUBETAPA decide apenas
+        // a geometria e se ha deslocamento:
+        //   Artilheiro — nao move: verde em MP=0, vermelho do tiro parado.
+        //   Terrestre  — caminhos validos.
+        //   Aereo      — distancia cubica.
+        //
+        // O tiro parado entra SEMPRE: numa arma de alcance minimo 1 e maximo 2,
+        // o tiro pos-movimento colapsa para 1, entao MoveuParado alcanca alvos
+        // que MoveuAndando nao alcanca. Era o que o antigo perfil "Hibrido"
+        // fazia — deixou de ser etapa e virou regra.
+        bool includeStatic = true;
+        bool includeMovement = subStep != ReachSubStep.Artilheiro;
         var staticThreat = new HashSet<Vector3Int>();
         var mobileThreat = new HashSet<Vector3Int>();
         var movementCells = new HashSet<Vector3Int>();
         var paths = new Dictionary<Vector3Int, List<Vector3Int>>();
+        var costByCell = new Dictionary<Vector3Int, int>();
+        var origins = new Dictionary<Vector3Int, ReachOrigin>();
 
         if (includeStatic)
         {
@@ -804,9 +1371,16 @@ public static class UnitReachEnvelopeService
             staticThreat.RemoveWhere(cell => map.GetTile(cell) == null);
         }
 
+        // Artilheiro tem verde em MP=0: o hex onde ela esta continua sendo
+        // celula de parada valida, so nao ha deslocamento.
+        Vector3Int stand = unit.CurrentCellPosition;
+        stand.z = 0;
+        if (!includeMovement && map.GetTile(stand) != null)
+            movementCells.Add(stand);
+
         if (includeMovement)
         {
-            if (!AIActionReachCoordinator.UsesCubicSectorReach(unit))
+            if (!UsesCubicGeometry(subStep))
             {
                 paths = UnitMovementPathRules.CalcularCaminhosValidos(
                     map, unit, movementSteps, request.TerrainDatabase);
@@ -829,6 +1403,15 @@ public static class UnitReachEnvelopeService
             if (map.GetTile(origin) != null)
                 movementCells.Add(origin);
 
+            if (request.IncludeMovementCosts && paths.Count > 0)
+            {
+                foreach (Vector3Int cell in movementCells)
+                {
+                    costByCell[cell] = ResolveSpentMovement(
+                        request, map, cell, paths, costByCell);
+                }
+            }
+
             var localThreat = new HashSet<Vector3Int>();
             foreach (Vector3Int moveCell in movementCells)
             {
@@ -848,8 +1431,24 @@ public static class UnitReachEnvelopeService
                 {
                     Vector3Int target = rawTarget;
                     target.z = 0;
-                    if (map.GetTile(target) != null)
-                        mobileThreat.Add(target);
+                    if (map.GetTile(target) == null)
+                        continue;
+                    mobileThreat.Add(target);
+                    // O tiro nao custa MP: EnterCost = 0 e o resto e o que
+                    // sobrou ao chegar em moveCell. Guarda a origem mais barata,
+                    // que e a resposta a "de onde eu atiro nesse alvo".
+                    if (!origins.TryGetValue(target, out ReachOrigin known)
+                        || ResolveKnownCost(costByCell, moveCell)
+                           < ResolveKnownCost(costByCell, known.FromCell))
+                    {
+                        origins[target] = new ReachOrigin(
+                            moveCell,
+                            Mathf.Max(
+                                0,
+                                movementSteps
+                                - ResolveKnownCost(costByCell, moveCell)),
+                            0);
+                    }
                 }
             }
         }
@@ -862,16 +1461,44 @@ public static class UnitReachEnvelopeService
         lineCells.UnionWith(mobileThreat);
         lineCells.ExceptWith(movementCells);
 
+        // Celula de movimento e materializavel a partir de si mesma.
+        foreach (Vector3Int moveCell in movementCells)
+        {
+            if (!origins.ContainsKey(moveCell))
+            {
+                origins[moveCell] = new ReachOrigin(
+                    moveCell,
+                    Mathf.Max(
+                        0,
+                        movementSteps - ResolveKnownCost(costByCell, moveCell)),
+                    0);
+            }
+        }
+
         var envelope = new UnitThreatEnvelope(
             ReachIntent.Combat,
             request.Band,
             paths,
-            new Dictionary<Vector3Int, int>(),
+            costByCell,
             movementCells,
             attackable,
-            lineCells);
+            lineCells,
+            origins)
+        {
+            Diagnostic =
+                $"orçamento={movementSteps}; movimento={movementCells.Count}; " +
+                $"ação={attackable.Count} (anel de tiro={lineCells.Count}); " +
+                $"subetapa={subStep}"
+        };
         Cache[cacheIndex] = new CacheEntry { KeyHash = keyHash, Envelope = envelope };
         return envelope;
+    }
+
+    private static int ResolveKnownCost(
+        Dictionary<Vector3Int, int> costByCell, Vector3Int cell)
+    {
+        cell.z = 0;
+        return costByCell.TryGetValue(cell, out int cost) ? cost : 0;
     }
 
     private static void CollectCubicMovementCells(
@@ -899,6 +1526,22 @@ public static class UnitReachEnvelopeService
                 destination.Add(cell);
             }
         }
+    }
+
+    /// <summary>
+    /// USO EXCLUSIVO DA FACHADA HERDADA. Os chamadores antigos de
+    /// UnitThreatEnvelopeService.TryGet nao informam subetapa, entao ela e
+    /// derivada do armamento para preservar o comportamento de hoje. A API
+    /// nova exige subetapa explicita — quem classifica a unidade e a IA.
+    /// </summary>
+    internal static ReachSubStep ResolveLegacyCombatSubStep(UnitManager unit)
+    {
+        if (ResolveCombatProfile(unit) == CombatProfile.DistanceStatic)
+            return ReachSubStep.Artilheiro;
+
+        return AIActionReachCoordinator.UsesCubicSectorReach(unit)
+            ? ReachSubStep.Aereo
+            : ReachSubStep.Terrestre;
     }
 
     private static CombatProfile ResolveCombatProfile(UnitManager unit)
@@ -945,7 +1588,9 @@ public static class UnitReachEnvelopeService
         int movementSteps,
         bool enableLdt,
         bool enableLos,
-        bool enableSpotter)
+        bool enableSpotter,
+        bool includeMovementCosts,
+        ReachSubStep subStep)
     {
         unchecked
         {
@@ -966,6 +1611,8 @@ public static class UnitReachEnvelopeService
             hash = hash * 31 + (enableLdt ? 1 : 0);
             hash = hash * 31 + (enableLos ? 1 : 0);
             hash = hash * 31 + (enableSpotter ? 1 : 0);
+            hash = hash * 31 + (includeMovementCosts ? 1 : 0);
+            hash = hash * 31 + (int)subStep;
 
             IReadOnlyList<UnitEmbarkedWeapon> weapons = unit.GetEmbarkedWeapons();
             int count = weapons != null ? weapons.Count : 0;

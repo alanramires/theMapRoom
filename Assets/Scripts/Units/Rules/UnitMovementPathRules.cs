@@ -419,6 +419,140 @@ public static class UnitMovementPathRules
     // Returns the real MP cost (using this unit's movement rules) from startCell to every
     // reachable cell within maxSteps. Used by AI to compare candidates by true travel cost
     // instead of unit-agnostic hex distance.
+    /// <summary>
+    /// Malha de custo de N TURNOS, com o teto de MP reiniciando a cada turno.
+    ///
+    /// MP nao acumula entre turnos: um soldado de 3 MP faz 3+3, nunca 6. Na
+    /// montanha de custo 2 ele entra em UMA por turno, porque depois da
+    /// primeira sobra 1 e a segunda pede 2. E um hex que custa mais do que o
+    /// teto de um turno e intransponivel para sempre — e BLOQUEIA o corredor
+    /// atras dele.
+    ///
+    /// Numa unica passada: a chave de relaxamento e o par
+    /// (turnos usados, MP gasto no turno corrente), minimizado
+    /// lexicograficamente. Reusa o mesmo TryResolveTraversal com previousCell
+    /// de <see cref="CalculateMovementCostMap"/>, entao as regras de travessia
+    /// e transicao de camada respondem identico.
+    ///
+    /// Devolve o custo ACUMULADO por celula, no mesmo formato do mapa de um
+    /// turno so; <paramref name="turnsByCell"/> diz em quantos turnos cada
+    /// celula e alcancada (1 = nesta rodada).
+    /// </summary>
+    public static Dictionary<Vector3Int, int> CalculateTurnChainedCostMap(
+        Tilemap terrainTilemap,
+        UnitManager unit,
+        Vector3Int startCell,
+        int firstTurnBudget,
+        int laterTurnBudget,
+        int turns,
+        TerrainDatabase terrainDatabase,
+        out Dictionary<Vector3Int, int> turnsByCell)
+    {
+        using var perf = new AIDecisionPerfScope(unit, "turnChainedCostMap");
+        var costByCell = new Dictionary<Vector3Int, int>();
+        turnsByCell = new Dictionary<Vector3Int, int>();
+        int totalTurns = Mathf.Max(1, turns);
+        int firstBudget = Mathf.Max(0, firstTurnBudget);
+        int laterBudget = Mathf.Max(0, laterTurnBudget);
+        if (terrainTilemap == null || unit == null)
+            return costByCell;
+        if (firstBudget <= 0 && laterBudget <= 0)
+            return costByCell;
+
+        unit.SyncLayerStateFromData(forceNativeDefault: false);
+        Vector3Int origin = startCell;
+        origin.z = 0;
+
+        // Estado por celula: melhor (turno, gasto no turno). Menor turno vence;
+        // empatando, menor gasto no turno corrente, porque sobra mais MP para
+        // seguir adiante dentro do mesmo turno.
+        var bestTurn = new Dictionary<Vector3Int, int>();
+        var bestSpent = new Dictionary<Vector3Int, int>();
+        bestTurn[origin] = 1;
+        bestSpent[origin] = 0;
+        costByCell[origin] = 0;
+        turnsByCell[origin] = 1;
+
+        MovementQueryCache cache =
+            new MovementQueryCache(terrainTilemap, terrainDatabase);
+        var frontier = new Queue<Vector3Int>();
+        frontier.Enqueue(origin);
+        var neighbors = new List<Vector3Int>(6);
+        int expandedCellCount = 0;
+
+        while (frontier.Count > 0)
+        {
+            Vector3Int current = frontier.Dequeue();
+            int currentTurn = bestTurn[current];
+            int currentSpent = bestSpent[current];
+            int currentCost = costByCell[current];
+            expandedCellCount++;
+
+            GetImmediateHexNeighbors(terrainTilemap, current, neighbors);
+            for (int i = 0; i < neighbors.Count; i++)
+            {
+                Vector3Int next = neighbors[i];
+                ConstructionManager construction = cache.GetConstructionAtCell(next);
+                StructureData structure = cache.GetStructureAtCell(next);
+                TerrainTypeData terrainData = cache.ResolveTerrainAtCell(next);
+                bool hasAnyTile = cache.HasAnyPaintedTileAtCell(next);
+                if (!TryResolveTraversal(
+                        next,
+                        cache,
+                        construction,
+                        structure,
+                        terrainData,
+                        hasAnyTile,
+                        terrainDatabase != null,
+                        unit,
+                        current,
+                        out TraversalDecision traversal))
+                    continue;
+
+                int moveCost = Mathf.Max(
+                    1,
+                    GetAutonomyCostToEnterCell(
+                        construction,
+                        terrainData,
+                        unit,
+                        applyOperationalAutonomyModifier: false,
+                        traversal));
+
+                int turn = currentTurn;
+                int spent = currentSpent + moveCost;
+                int budget = turn == 1 ? firstBudget : laterBudget;
+                if (spent > budget)
+                {
+                    // Nao cabe no turno corrente: vira o turno e recomeca o
+                    // teto. O hex ainda precisa caber num turno INTEIRO — senao
+                    // e intransponivel, por mais turnos que passem.
+                    turn++;
+                    spent = moveCost;
+                    if (turn > totalTurns || spent > laterBudget)
+                        continue;
+                }
+
+                if (bestTurn.TryGetValue(next, out int knownTurn)
+                    && (knownTurn < turn
+                        || (knownTurn == turn && bestSpent[next] <= spent)))
+                {
+                    continue;
+                }
+
+                bestTurn[next] = turn;
+                bestSpent[next] = spent;
+                costByCell[next] = currentCost + moveCost;
+                turnsByCell[next] = turn;
+                frontier.Enqueue(next);
+            }
+        }
+
+        AIDecisionPerf.AddCount("CellsVisited", expandedCellCount);
+        AIDecisionPerf.AddCount("TurnChainedCellsExpanded", expandedCellCount);
+        AIDecisionPerf.AddCount("ReachableCellsProduced", costByCell.Count);
+        return costByCell;
+    }
+
     public static Dictionary<Vector3Int, int> CalculateMovementCostMap(
         Tilemap terrainTilemap,
         UnitManager unit,

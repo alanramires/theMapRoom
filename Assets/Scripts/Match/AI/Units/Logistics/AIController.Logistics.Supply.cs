@@ -88,25 +88,33 @@ public partial class AIController
             out AIReachDecisionCandidate<UnitManager> candidate)
         {
             candidate = null;
-            Dictionary<Vector3Int, List<Vector3Int>> operationalPaths =
-                UnitMovementPathRules.CalcularCaminhosValidos(
-                    boardTilemap,
-                    logistics,
-                    Mathf.Max(0, budget),
-                    terrainDatabase);
-            if (operationalPaths == null
-                || operationalPaths.Count == 0
-                || !logistics.TryGetUnitData(
-                    out UnitData logisticsData)
-                || logisticsData == null)
+
+            // A politica escolhe intencao + subetapa; o envelope responde a
+            // banda. O orcamento `budget` do coordenador nao e mais usado aqui:
+            // Operational deixou de ser MP x2 num bolso so e passou a ser soma
+            // de turnos (restante agora + MP cheio depois), que e o alcance que
+            // a unidade realmente tem.
+            UnitReachEnvelope envelope =
+                UnitReachEnvelopeService.Build(new UnitReachRequest
+                {
+                    Unit = logistics,
+                    BoardMap = boardTilemap,
+                    TerrainDatabase = terrainDatabase,
+                    Intent = ReachIntent.Service,
+                    SubStep =
+                        AIActionReachCoordinator.UsesCubicSectorReach(logistics)
+                            ? ReachSubStep.Aereo
+                            : ReachSubStep.Terrestre,
+                    Band = ReachBand.Operational,
+                    OperationalTurns = 2,
+                    // A IA valida dominio/camada por candidato, via PodeSuprir
+                    // (CanSupplyLogisticsTargetFromAnyLegalOrigin). Ligar o
+                    // filtro aqui mudaria o conjunto de candidatos.
+                    FilterByOperationDomain = false
+                });
+            if (envelope == null || envelope.ActionCells.Count == 0)
                 return false;
 
-            UnitThreatEnvelope envelope =
-                UnitThreatEnvelopeService.BuildServiceEnvelope(
-                    logistics,
-                    boardTilemap,
-                    operationalPaths,
-                    logisticsData.serviceRange);
             UnitManager best = null;
             float bestScore = float.MinValue;
             for (int i = 0; i < snapshot.MyUnits.Count; i++)
@@ -117,7 +125,7 @@ public partial class AIController
                 Vector3Int allyCell =
                     ally.CurrentCellPosition;
                 allyCell.z = 0;
-                if (!envelope.CanThreaten(allyCell))
+                if (!envelope.CanAct(allyCell))
                     continue;
                 float score = ScoreCandidate(ally);
                 if (score <= bestScore)
@@ -130,13 +138,18 @@ public partial class AIController
                 return false;
             Vector3Int target = best.CurrentCellPosition;
             target.z = 0;
+
+            // O envelope ja sabe de ONDE atender e com quanto sobrando.
+            string origin = envelope.TryGetOrigin(target, out ReachOrigin from)
+                ? $" de={from.FromCell} sobra={from.RemainingMovement}"
+                : string.Empty;
             candidate = new AIReachDecisionCandidate<UnitManager>
             {
                 Value = best,
                 ActionCell = target,
                 TargetCell = target,
                 Score = bestScore,
-                Reason = "service_hotzone_2t"
+                Reason = $"service_hotzone_2t{origin}"
             };
             return true;
         }
