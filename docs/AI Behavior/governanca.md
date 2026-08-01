@@ -529,30 +529,166 @@ detecto) e **Alguém me vê** (quem me detecta).
 
 ---
 
-# A consequência para os papéis
+# Hotzone
 
-Esta seção não é do contrato; é o que sai dele.
+A Hotzone nasceu de uma necessidade básica:
 
-Se **toda** unidade lê **estas** ações, então papel não é um conjunto de
-sensores. É uma **consulta diferente sobre os mesmos sensores**:
+> Onde posso me posicionar sem sofrer o ataque de uma unidade que move 6
+> hexágonos e ataca no sétimo?
+
+Com o tempo, essa leitura deu origem a dois conceitos baseados em movimento: as
+bandas **Tática** e **Operacional**.
+
+O serviço de Hotzone **não escolhe** a melhor posição nem executa ações. Ele
+apenas devolve uma área conforme as instruções recebidas. Essa área serve de base
+para diversos serviços da IA, permitindo que movimento, combate, transporte,
+logística e vigilância usem o **mesmo vocabulário espacial**.
+
+Definição completa em `docs/AI Behavior/hotzone e bandas de alcance.md` e, como
+norma, em `docs/AI Behavior/contrato_envelope_alcance.md`.
+
+Em resumo:
+
+| conceito | o quê | estado |
+|---|---|---|
+| **Tático** | usa o MP restante da unidade | ✅ `ReachBand.Tactical` |
+| **Operacional** | projeta **duas bandas sucessivas** de MP | ✅ `ReachBand.Operational` |
+| **Range** | alcance da arma, do serviço ou de outro efeito produzido pela unidade | ⚠️ **não é uma banda** |
+
+**"Sucessivas" é a palavra que carrega a regra.** O Operacional é `Remaining +
+Max × (turnos − 1)`, encadeado — **nunca** `MP × 2` empoçado. Um soldado de 3 MP
+diante de duas montanhas de custo 2 alcança 2 hexes por turno, não 3.
+
+⚠️ **`ReachBand` tem só dois valores: `Tactical` e `Operational`.** Não existe
+banda `Range`. Alcance de arma e de serviço entram como `ActionCells` dentro de
+uma das duas bandas — e é por isso que o artilheiro precisou de tratamento
+especial: para ele, a banda **é** o alcance da arma, não o do movimento. Ver a
+inversão do artilheiro no contrato do envelope.
+
+O contrato acerta ao listar os três como conceitos; o código só não os
+representa como irmãos.
+
+---
+
+# Papéis da IA
+
+A IA organiza as unidades por **papéis**. Cada papel interpreta de maneira
+diferente as Hotzones e as opções devolvidas pelos sensores `PodeX`.
+
+> Os sensores são **os mesmos** para todas as unidades. O papel determina apenas
+> quais intenções serão priorizadas e como as opções válidas serão avaliadas.
+
+Essa frase é a chave de leitura de todos os contratos de papel desta pasta, e ela
+tem uma consequência de arquitetura: papel **não é um conjunto de sensores**, é
+uma **consulta** sobre os mesmos sensores —
 
 ```text
 papel  =  intenção  ×  subetapa  ×  banda      (sobre o mesmo PodeX)
 ```
 
-Que é exatamente a assinatura do `UnitReachEnvelopeService`. O envelope não foi
-inventado para o transporte nem para a artilharia: é a forma geral de "perguntar
-como um papel".
+— que é exatamente a assinatura do `UnitReachEnvelopeService`. Daí: arquivo de
+papel não deveria conter lógica de alcance nenhuma, só **política** (prioridade,
+recusa, desempate, quando desistir). É por isso que consumir a Hotzone **encolhe**
+os arquivos de papel: não é otimização, é o papel voltando a ser só o que ele é.
 
-**Consequência direta:** arquivo de papel não deveria conter lógica de alcance
-nenhuma. Só **política** — prioridade, recusa, desempate, quando desistir. Todo
-cálculo de "até onde" pertence ao serviço.
+## Papéis principais
 
-É por isso que consumir a Hotzone **encolhe** os arquivos de papel. Não é
-otimização: é o papel voltando a ser só o que ele é.
+| papel | prioriza | no código |
+|---|---|---|
+| **Capturador** | captura de construções. Combate quando necessário, normalmente depois de avaliar a captura | `UnitRole.Capturador = 1` ✅ |
+| **Assalto** | combate de contato, avanço e ruptura da linha inimiga | `UnitRole.Assalto = 2` ✅ |
+| **Fire Support** | combate à distância e posicionamento de apoio na **Retaguarda** | ⚠️ `UnitRole.FogoIndireto = 5` |
+| **Transportador** | coordena passageiros, pontos de encontro, embarque, desembarque e transporte entre objetivos. Atua como **pickup**, **courier** ou **táxi** | `UnitRole.Transportador = 3` ✅ |
+| **Logística** | presta serviços de campo, mantém unidades operacionais, participa da cadeia de suprimentos | `UnitRole.Logistica = 4` ✅ |
+| **Vigilância** | revelação da névoa, observação e detecção de unidades ocultas | ⚠️ `UnitRole.VigilanciaAerea = 6` |
 
-As relações de governo **entre** papéis estão em
-`docs/AI Behavior/governanca_entre_papeis.md`.
+**Vigilância** foi criada originalmente para operações em `Air/High`, mas passará
+a ser baseada na **visão especializada e nas habilidades de detecção** da
+unidade. O nome no código ainda carrega o `Aerea` da origem.
+
+⚠️ Duas divergências de vocabulário, ambas de nome e não de comportamento:
+**Fire Support** é `FogoIndireto` no enum, e **Vigilância** é `VigilanciaAerea`.
+Os valores numéricos estão serializados em `UnitData` e saves, então renomear é
+seguro **desde que os números não mudem**.
+
+## Especializações de papel
+
+Modificam o comportamento de um papel principal, ou participam de mais de uma
+categoria.
+
+| especialização | de quem | o quê | no código |
+|---|---|---|---|
+| **Capturador Agressivo** | Capturador | prefere **atacar primeiro e capturar depois**. Captura com eficiência menor que um Capturador | `CapturadorAgressivo = 12` ✅ |
+| **Interceptador** | Assalto | contra alvos **aéreos**. Usado por unidades aéreas de contato | `Interceptador = 8` ✅ |
+| **Ataque Aéreo** | Assalto | aeronaves atacando alvos de **superfície** | `AtaqueAereo = 9` ✅ |
+| **Artilheiro Combatente** | Fire Support → Assalto | tenta primeiro o combate **à distância**; sem solução válida de longo alcance, passa para Assalto | `ArtilheiroCombatente = 13` ✅ |
+| **Antiaéreo Combatente** | Fire Support → Assalto | mesma lógica, contra alvos **aéreos** | `AntiaereoCombatente = 14` ✅ |
+| **Antiaéreo** | Fire Support | especialização **estacionária**, controle do espaço aéreo | `Antiaereo = 10` ✅ |
+| **Estoque** | Logística | movimentação de consumíveis: entre unidades, de unidade para construção, de construção para unidade, e entre agentes logísticos compatíveis | `Estoque = 7` ✅ |
+
+O comentário do enum já registra a distinção que o contrato faz: *"Antes chamado
+Suprimentos: o papel é movimentar carga, não prestar serviço de suprimento — quem
+supre é Logistica."*
+
+Nota sobre participação em batalha: o código classifica os papéis em
+`UnitBattleParticipation` **Direct** ou **Indirect**, e `FogoIndireto` é o
+**único** Indirect. Artilheiro Combatente e Antiaéreo Combatente são Direct — o
+que é coerente com a especialização deles ter uma perna em Assalto.
+
+## Papéis incorporados ou descontinuados
+
+| papel | destino | estado |
+|---|---|---|
+| **Raid Antissubmarino** | será incorporado à **Vigilância**. Pode virar a especialização **Vigilância Naval** | ⚠️ `RaidAntiSub = 11` ainda existe no enum |
+| **Transportador Aéreo** | **foi** incorporado ao Transportador. O mesmo papel receberá regras específicas para transporte naval | ⚠️ `TransportadorAereo = 15` **ainda existe no enum**, com política de shopping própria documentada no comentário |
+
+A segunda linha merece atenção: o contrato usa o **passado** ("foi
+incorporado"), e o comportamento realmente está unificado — os arquivos aéreos
+vivem em `Units/Transport/`. Mas o **valor do enum continua lá**, com uma regra
+própria de compra: o Chinook mira os nós **intermediários** do eixo, enquanto o
+APC só gera demanda depois que os nós iniciais foram conquistados. Ou essa regra
+migra para uma condição dentro do Transportador, ou o papel não foi incorporado —
+foi só mudado de pasta.
+
+## Hierarquia
+
+```text
+Capturador
+└── Capturador Agressivo
+
+Assalto
+├── Interceptador
+├── Ataque Aéreo
+├── Artilheiro Combatente
+└── Antiaéreo Combatente
+
+Fire Support
+└── Antiaéreo
+
+Transportador
+
+Logística
+└── Estoque
+
+Vigilância
+└── Vigilância Naval
+```
+
+⚠️ A hierarquia é **doutrina, não estrutura**: o `UnitRole` é um enum plano, sem
+relação de pai e filho. Quem materializa o parentesco é
+`UnitRoleCompatibility.CanSatisfy` — e é por isso que todo portão de papel em
+sensor ou execução precisa usar `CanSatisfy`, e nunca `roles.Contains` estrito.
+Com o teste estrito, `CapturadorAgressivo` não passa por um portão de
+`Capturador`, embora seja um.
+
+Note também que Artilheiro Combatente e Antiaéreo Combatente aparecem sob
+**Assalto** nesta hierarquia, embora o texto diga que eles "participam primeiro
+de Fire Support". Não é contradição: a hierarquia responde *"que papel ele
+satisfaz"*, e a descrição responde *"em que ordem ele tenta"*. São perguntas
+diferentes.
+
+As relações de governo **entre** papéis — quem é âncora de quem, quem adota a
+agenda de quem — estão em `docs/AI Behavior/governanca_entre_papeis.md`.
 
 ---
 
@@ -571,3 +707,9 @@ As relações de governo **entre** papéis estão em
 | G11 | ~~`PodePousar` distingue VTOL / SVTOL / pista~~ | ✅ **fechada** — e melhor: as skills são **dados** (`SkillData.id` + `ConstructionData.requiredLandingSkillRules`), não código. Falta só decidir entre **SVTOL** e **STOVL** |
 | G12 | transferir consome a ação de quem iniciou | ⚠️ `TurnStateManager.Transfer.cs` não marca ação de **nenhum** lado. Cuidado: a segunda metade da regra depende disso |
 | G13 | armas de `rangeMin = 0` atacam outra camada no mesmo hex | ❓ marcado pelo próprio autor como experimental. Não cabe na banda do envelope |
+| G14 | **Range** é um dos três conceitos da Hotzone | ⚠️ `ReachBand` só tem `Tactical` e `Operational`. Alcance entra como `ActionCells` dentro de uma delas — e a inversão do artilheiro existe justamente porque, para ele, a banda **é** o alcance |
+| G15 | o papel se chama **Fire Support** | ⚠️ o enum diz `FogoIndireto` |
+| G16 | o papel se chama **Vigilância** | ⚠️ o enum diz `VigilanciaAerea`, nome da origem em `Air/High` |
+| G17 | **Transportador Aéreo foi incorporado** | ⚠️ `TransportadorAereo = 15` ainda existe, com política de shopping própria. Mudou de pasta; a regra não migrou |
+| G18 | **Raid Antissubmarino** vai para Vigilância | ⚠️ `RaidAntiSub = 11` ainda existe |
+| G19 | a hierarquia de papéis | ⚠️ é doutrina, não estrutura: o enum é plano. Quem materializa o parentesco é `UnitRoleCompatibility.CanSatisfy` — portão que usa `roles.Contains` estrito barra especializações |
