@@ -312,10 +312,10 @@ Verificado em `Assets/Scripts/Match/AI/Services/UnitReachEnvelopeService.cs`.
 |---|---|---|
 | 1 | Fusão não tem azul | `BuildProfile` sempre devolve Tactical + Operational |
 | 1b | **Artilheiro: verde = 0→alcance, azul = 2×alcance** | banda de MOVIMENTO nos dois casos; `BuildFireSupportPaths` devolve `CalcularCaminhosValidos(RemainingMovementPoints)`, consumido por 11 sítios |
-| 1c | a **ferramenta Hotzone** precisa pintar essa inversão | a janela usa a mesma banda de movimento; falta modalidade de artilheiro |
+| ~~1c~~ | ~~a **ferramenta Hotzone** precisa pintar essa inversão~~ | **feito** — a subetapa `Artilheiro` pinta `ActionCells` por cima do verde |
 | 2 | Suprir/Estoque expõem o range como vermelho | range de serviço entra em `ActionCells`, sem distinção de "arma" |
 | 3 | Estoque é intenção própria ("arma de caixa") | não existe; só `Service` e `Transfer` |
-| 4 | Desembarque é intenção própria, com projeção invertida, `null` sem carga e `null` sem alvo | não existe; a janela também não tem campo de célula-alvo |
+| 4 | Desembarque é intenção própria, com projeção invertida, `null` sem carga e `null` sem alvo | **parcial** — a janela já tem hex de referência e modalidade `Desembarque`, montada sobre `Mobility` + `OriginOverride`; falta a intenção no serviço (o `+1MP`, o `null` sem carga e o alvo lido de `AIDesignatedMissionTargetCell`) |
 | 5 | **a IA consome a banda do artilheiro** | `BuildFireSupportPaths` devolve malha de MOVIMENTO em 11 sítios; a ferramenta já pinta a banda certa, nenhuma decisão a usa |
 
 ### Dívida de migração

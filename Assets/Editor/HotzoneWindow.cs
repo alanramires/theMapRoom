@@ -17,9 +17,10 @@ public sealed class HotzoneWindow : EditorWindow
         Captura,
         Mobilidade,
         // Projecao INVERTIDA: nao pergunta "ate onde eu chego", pergunta "de
-        // onde eu chego no objetivo". Por isso exige hex de referencia e so
-        // pinta a Tactical — a banda seguinte nao e zona de largada, e tempo
-        // extra de caminhada.
+        // onde eu chego no objetivo". Por isso exige hex de referencia.
+        // Tactical = largada boa (chega no mesmo turno). Operational = largada
+        // degradada (chega no turno seguinte), que existe para o caso raro de
+        // nao haver hex livre no verde.
         Desembarque
     }
 
@@ -155,13 +156,7 @@ public sealed class HotzoneWindow : EditorWindow
         DrawSubStepPopup();
 
         // Modal fica junto de intenção e subetapa: os três são a pergunta.
-        // Desembarque só tem Tactical: a banda seguinte não é zona de largada,
-        // é tempo extra de caminhada. Pintar azul aqui sugeriria que dá para
-        // largar o passageiro lá, e não dá.
-        bool tacticalOnly = intentMode == IntentMode.Desembarque;
-        if (tacticalOnly)
-            viewMode = ViewMode.Tactical;
-        using (new EditorGUI.DisabledScope(!paintReach || tacticalOnly))
+        using (new EditorGUI.DisabledScope(!paintReach))
         {
             viewMode = (ViewMode)EditorGUILayout.EnumPopup(
                 "Modal (Tático/Oper)", viewMode);
@@ -569,8 +564,10 @@ public sealed class HotzoneWindow : EditorWindow
                 "A unidade NÃO é movida: a banda é calculada como se ela " +
                 "estivesse no hex de referência. " +
                 "Desembarque: escolha o passageiro em Unidade e clique no hex " +
-                "do prédio pretendido — o VERDE resultante é a zona onde ele " +
-                "pode ser largado.",
+                "do prédio pretendido — o VERDE é a zona de largada boa (ele " +
+                "chega no mesmo turno) e o AZUL é a zona de largada degradada " +
+                "(chega no turno seguinte), para o caso raro de não haver " +
+                "hex livre no verde.",
                 MessageType.None);
         }
     }
