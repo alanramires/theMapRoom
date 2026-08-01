@@ -198,15 +198,69 @@ descobre isso é a IA, via `ClassifyMobility` dirigida ao alvo escolhido.
 
 ### Desembarque
 
-Verde `+MP` `+1MP`, azul `+MP`.
+**Projeção invertida.** Não começa no passageiro nem no transportador: começa no
+**objetivo**. A pergunta é *"em quais hexes o passageiro pode ser largado para
+alcançar o objetivo depois?"*.
 
-Desembarque é adjacente e exige 1 MP válido, por isso o `+1MP` entra.
-Embarcados `isAircraft` decolam, então qualquer hex é válido.
+Verde: o MP do **passageiro** projetado ao redor do objetivo. Azul: `+MP`.
+
+Um helicóptero carregando um soldado de 3 MP pode largá-lo em cima do prédio ou
+a até 3 hexes dele — em qualquer desses pontos o soldado fecha na rodada
+seguinte. Um bazuca de 2 MP projeta 2 hexes.
+
+Desembarque exige **1 MP válido**, por isso o `+1MP` entra; embarcado
+`isAircraft` decola, então qualquer hex serve.
+
+Quando o objetivo está cercado — montanhas, ilha — e o passageiro não alcança
+por meios normais, o desembarque ainda aproxima, mas o destino **deixa de ser
+Tactical**: vira Operational e a unidade precisa de rodadas extras.
 
 ## Cobertura
 
 Toda missão de unidade cai em alguma categoria acima — seguir o capitão,
 abastecimento, e as demais.
+
+---
+
+## MP e Range
+
+**MP é o movimento RESTANTE**, não o máximo. A banda Tactical consulta
+`RemainingMovementPoints` e cai para o máximo só quando já está zerado.
+Consequência aceita: **a banda encolhe conforme a unidade age na rodada**. Uma
+peça de 4 MP com 2 restantes projeta a partir de 2.
+
+**Range é o alcance do efeito** — arma, serviço, coleta, estoque. Nem sempre é
+número: serviço e coleta usam **modos**.
+
+```text
+SameHexOrEmbarked   mesmo hex, ou sobre embarcados quando a regra permitir
+Adjacent1Hex        expande a área de movimento em um hex
+Hybrid0Or1Hex       mesmo hex ou um de distância
+```
+
+Nesses casos **não se soma `MP + Range`**. O procedimento é:
+
+1. calcular a área alcançável pelo movimento;
+2. expandir essa área conforme o modo.
+
+## Resumo das bandas
+
+| intenção | Tactical | Operational | geometria |
+|---|---|---|---|
+| Mobilidade | MP | MP + MP | caminhos válidos |
+| Captura | MP | MP + MP | caminhos válidos |
+| Combate — combatente | MP + Range | MP + MP (sem arma) | conforme a unidade |
+| Combate — **artilheiro** | **0 → Range máximo** | **2 × Range máximo** | **cúbica** |
+| Fusão | MP − custo de entrada | **não tem** | caminhos válidos |
+| Embarque | MP − custo de entrada | MP + MP | caminhos válidos |
+| Desembarque | MP do passageiro **projetado do objetivo** | MP + MP | invertida |
+| Suprir | MP expandido pelo modo de serviço | MP + MP | caminhos válidos |
+| Transferir | MP expandido pelo modo de coleta | MP + MP | caminhos válidos |
+| Estoque | conforme `operationalRange` | conforme a ficha | conforme a fonte |
+
+O Operational **não é o Tactical vezes dois**. Cada intenção define a sua regra:
+no artilheiro é área de preservação, no desembarque é o custo extra de rodadas,
+na fusão não existe.
 
 ---
 
@@ -234,7 +288,8 @@ Verificado em `Assets/Scripts/Match/AI/Services/UnitReachEnvelopeService.cs`.
 | 1c | a **ferramenta Hotzone** precisa pintar essa inversão | a janela usa a mesma banda de movimento; falta modalidade de artilheiro |
 | 2 | Suprir/Estoque expõem o range como vermelho | range de serviço entra em `ActionCells`, sem distinção de "arma" |
 | 3 | Estoque é intenção própria ("arma de caixa") | não existe; só `Service` e `Transfer` |
-| 4 | Desembarque é intenção própria (`+1MP`) | não existe |
+| 4 | Desembarque é intenção própria, com projeção invertida | não existe |
+| 5 | **a IA consome a banda do artilheiro** | `BuildFireSupportPaths` devolve malha de MOVIMENTO em 11 sítios; a ferramenta já pinta a banda certa, nenhuma decisão a usa |
 
 ### Dívida de migração
 

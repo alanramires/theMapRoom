@@ -8,6 +8,26 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Read `docs/arquitetura/acoes_transacionais.md` before changing TurnState, movement, FOW, sensors, combat, capture, transport, supply, merge, replay or AI action execution.
 
+## Versioning and reports
+
+`vX.Y.Z`, a scheme defined by the author:
+
+| digit | meaning |
+|---|---|
+| **X** | large architecture change — throwing an AI away and writing another, altering an already-validated sensor rule, changing game speed |
+| **Y** | important localized change — taking one part (the capturer, say) and working it and its children |
+| **Z** | end-of-work save point |
+
+**Every version has a report** (`docs/relatorio_vX.Y.Z.md`) that explains the
+*why*, not just the *what*, and each report is tagged in git.
+
+**Report location is a convention:** the **current** major lives in `docs/`;
+when a major closes, its reports are archived into `docs/Versões/`. Do not move
+current-major reports there.
+
+`CHANGELOG.md` is the index. 329 tags and 325 reports exist — do not try to list
+them all; the current major is detailed and closed majors are pointers.
+
 ## Build & Run
 
 This is a Unity project — there is no CLI build. Open in Unity Editor (Windows) and use Play mode to test. Scripts auto-compile when files are saved. Check the Unity Console for compilation errors and runtime logs.
