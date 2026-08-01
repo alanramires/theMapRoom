@@ -215,6 +215,30 @@ Quando o objetivo está cercado — montanhas, ilha — e o passageiro não alca
 por meios normais, o desembarque ainda aproxima, mas o destino **deixa de ser
 Tactical**: vira Operational e a unidade precisa de rodadas extras.
 
+#### Três decisões desta intenção
+
+**1. Transportador sem carga devolve `null`.** Pedir "onde eu largo" sem ter o
+que largar é pedido inválido, não envelope vazio — mesma regra do `Aereo` sem
+`isAircraft` e do Combate sem arma utilizável. Capacidade que a intenção exige,
+ausente, é `null`.
+
+**2. A banda é do PASSAGEIRO, e podem ser vários.** Um caminhão com um soldado
+de 3 MP e um bazuca de 2 MP carrega **duas bandas ao mesmo tempo**. O envelope
+publica a de um passageiro por consulta; quem precisa da largada conjunta pede a
+**interseção** — onde *todos* chegam.
+
+A interseção é a resposta à pergunta real do transporte (*"posso soltar os dois
+aqui?"*) e é a mesma ideia do encontro por cruzamento de zonas que o
+`MelhorEmbarque` já usa do lado do embarque.
+
+**3. A projeção precisa de um objetivo.** Ela começa no alvo, não na unidade —
+então a consulta exige uma célula de destino. A fonte natural é o alvo designado
+(`AIDesignatedMissionTargetCell`, ou o alvo de captura), que é o que a IA usa de
+verdade; a ferramenta deve aceitar sobrescrita manual, para testar hipóteses sem
+mexer no estado da unidade.
+
+> Sem alvo não há desembarque a calcular. Também é `null`.
+
 ## Cobertura
 
 Toda missão de unidade cai em alguma categoria acima — seguir o capitão,
@@ -288,7 +312,7 @@ Verificado em `Assets/Scripts/Match/AI/Services/UnitReachEnvelopeService.cs`.
 | 1c | a **ferramenta Hotzone** precisa pintar essa inversão | a janela usa a mesma banda de movimento; falta modalidade de artilheiro |
 | 2 | Suprir/Estoque expõem o range como vermelho | range de serviço entra em `ActionCells`, sem distinção de "arma" |
 | 3 | Estoque é intenção própria ("arma de caixa") | não existe; só `Service` e `Transfer` |
-| 4 | Desembarque é intenção própria, com projeção invertida | não existe |
+| 4 | Desembarque é intenção própria, com projeção invertida, `null` sem carga e `null` sem alvo | não existe; a janela também não tem campo de célula-alvo |
 | 5 | **a IA consome a banda do artilheiro** | `BuildFireSupportPaths` devolve malha de MOVIMENTO em 11 sítios; a ferramenta já pinta a banda certa, nenhuma decisão a usa |
 
 ### Dívida de migração
