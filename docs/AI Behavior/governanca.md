@@ -236,6 +236,10 @@ A supridora converte reservas em **serviços prestados em campo**.
 O atendimento ocorre **na camada do supridor**; quando possível, o supridor tenta
 **igualar sua camada à do atendido**.
 
+Mas a camada do encontro é um **acordo entre os dois**, não uma imposição de um
+lado: o caminhão não decola, e o caça pode pousar. Ver *A camada do encontro é um
+acordo*, em `PodeMudarDeAltitude`.
+
 - Aeronaves **pousam**, recebem e **arremetem**.
 - Submersíveis **emergem**, recebem e **permanecem na superfície**.
 
@@ -364,9 +368,25 @@ suprimento. ✅ (`PodeMudarAltitudeSensor`)
 > **desce** para `Air/Low` e os caças **nivelam** nessa camada. Com todos na mesma
 > altitude, o reabastecimento em voo acontece.
 
-Este exemplo é a regra do `PodeSuprir` — *"o supridor tenta igualar sua camada à
-do atendido"* — vista de perto: quem **não pode** mudar de camada dita a camada
-do encontro.
+### A camada do encontro é um acordo
+
+O sistema **procura um acordo**, e qualquer um dos dois lados pode ceder.
+
+> O caminhão de suprimentos **não decola** para encontrar o caça — mas o caça
+> **pode pousar**. Havendo acordo, o serviço acontece.
+
+Não é "quem não pode mudar dita a camada". É **interseção**: cada lado tem o
+conjunto de camadas que consegue ocupar, e o serviço ocorre se a interseção não
+for vazia. O caminhão tem um conjunto de um elemento só; o caça tem três. Por
+isso o acordo cai sempre no do caminhão — não por regra de precedência, mas
+porque é o único ponto comum.
+
+No exemplo do KC-130 o acordo é `Air/Low`: o helicóptero não sobe, mas o tanker
+desce e os caças nivelam. Três conjuntos, um ponto comum.
+
+É a mesma forma do `MelhorEmbarque` e do `MelhorDesembarque` — pergunta-se uma
+vez por participante e cruza-se o resultado. Cruzar, ordenar e desempatar são do
+**consumidor**, nunca do serviço. Ver "As três camadas" no `CLAUDE.md`.
 
 ## Sensores Navais
 
