@@ -397,6 +397,22 @@ public sealed class UnitReachRequest
     /// Quem classifica a unidade e escolhe a subetapa é o chamador — a IA.
     /// </summary>
     public ReachSubStep SubStep = ReachSubStep.Terrestre;
+
+    /// <summary>
+    /// Calcula a partir de OUTRA célula que não a atual da unidade: "e se ela
+    /// estivesse ali?". Nada é movido — só muda o ponto de partida.
+    ///
+    /// A origem era o único parâmetro implícito que sobrava neste pedido, e o
+    /// projeto já aprendeu que banda, âncora e camada têm de ser parâmetro.
+    /// Ela sustenta pelo menos três coisas da doutrina:
+    ///
+    ///   desembarque — teleporta o passageiro para cima do objetivo e a banda
+    ///                 dele vira a zona de largada (projeção invertida);
+    ///   fogo indireto — o teste da "unidade fantasma": há vanguarda naquele
+    ///                 destino antes de eu aceitar carona?
+    ///   retaguarda  — a faixa relativa ao capitão, com origem nele.
+    /// </summary>
+    public Vector3Int? OriginOverride;
 }
 
 /// <summary>
@@ -797,6 +813,18 @@ public static class UnitReachEnvelopeService
     // Orcamento e movimento — reuso, nunca pathfinding novo.
     // ------------------------------------------------------------------
 
+    /// <summary>
+    /// Origem do calculo: a sobrescrita quando existe, a celula atual quando
+    /// nao. Nada e movido — o override so troca o ponto de partida.
+    /// </summary>
+    private static Vector3Int ResolveOrigin(UnitReachRequest request)
+    {
+        Vector3Int origin = request.OriginOverride
+                            ?? request.Unit.CurrentCellPosition;
+        origin.z = 0;
+        return origin;
+    }
+
     private static int ResolveBudget(UnitReachRequest request)
     {
         if (request.MovementBudget > 0)
@@ -834,8 +862,7 @@ public static class UnitReachEnvelopeService
             return;
         }
 
-        Vector3Int origin = request.Unit.CurrentCellPosition;
-        origin.z = 0;
+        Vector3Int origin = ResolveOrigin(request);
         turnsByCell = null;
 
         if (request.Band == ReachBand.Operational
@@ -869,7 +896,8 @@ public static class UnitReachEnvelopeService
             map,
             request.Unit,
             Mathf.Max(0, budget),
-            request.TerrainDatabase);
+            request.TerrainDatabase,
+            request.OriginOverride);
         costByCell = new Dictionary<Vector3Int, int>();
     }
 
@@ -964,6 +992,7 @@ public static class UnitReachEnvelopeService
             FilterByOperationDomain = source.FilterByOperationDomain,
             RangeOverride = source.RangeOverride,
             SubStep = source.SubStep,
+            OriginOverride = source.OriginOverride,
             MovementMode = band == ReachBand.Operational
                 ? UnitThreatEnvelopeMovement.Potential
                 : source.MovementMode,
@@ -1490,8 +1519,7 @@ public static class UnitReachEnvelopeService
             ? maxRange * 2
             : maxRange;
 
-        Vector3Int origin = unit.CurrentCellPosition;
-        origin.z = 0;
+        Vector3Int origin = ResolveOrigin(request);
 
         var bandCells = new HashSet<Vector3Int>();
         CollectCubicMovementCells(map, origin, bandRadius, bandCells);
@@ -1603,15 +1631,14 @@ public static class UnitReachEnvelopeService
         {
             PodeMirarSensor.CollectValidFireCellsFromOrigin(
                 unit, map, request.TerrainDatabase, SensorMovementMode.MoveuParado,
-                unit.CurrentCellPosition, staticThreat, request.DpqAirHeightConfig,
+                ResolveOrigin(request), staticThreat, request.DpqAirHeightConfig,
                 request.EnableLdt, request.EnableLos, request.EnableSpotter);
             staticThreat.RemoveWhere(cell => map.GetTile(cell) == null);
         }
 
         // Artilheiro tem verde em MP=0: o hex onde ela esta continua sendo
         // celula de parada valida, so nao ha deslocamento.
-        Vector3Int stand = unit.CurrentCellPosition;
-        stand.z = 0;
+        Vector3Int stand = ResolveOrigin(request);
         if (!includeMovement && map.GetTile(stand) != null)
             movementCells.Add(stand);
 
@@ -1620,7 +1647,8 @@ public static class UnitReachEnvelopeService
             if (!UsesCubicGeometry(subStep))
             {
                 paths = UnitMovementPathRules.CalcularCaminhosValidos(
-                    map, unit, movementSteps, request.TerrainDatabase);
+                    map, unit, movementSteps, request.TerrainDatabase,
+                    request.OriginOverride);
                 foreach (Vector3Int rawCell in paths.Keys)
                 {
                     Vector3Int cell = rawCell;
@@ -1632,11 +1660,10 @@ public static class UnitReachEnvelopeService
             else
             {
                 CollectCubicMovementCells(
-                    map, unit.CurrentCellPosition, movementSteps, movementCells);
+                    map, ResolveOrigin(request), movementSteps, movementCells);
             }
 
-            Vector3Int origin = unit.CurrentCellPosition;
-            origin.z = 0;
+            Vector3Int origin = ResolveOrigin(request);
             if (map.GetTile(origin) != null)
                 movementCells.Add(origin);
 

@@ -15,7 +15,12 @@ public sealed class HotzoneWindow : EditorWindow
         Fusao,
         Embarque,
         Captura,
-        Mobilidade
+        Mobilidade,
+        // Projecao INVERTIDA: nao pergunta "ate onde eu chego", pergunta "de
+        // onde eu chego no objetivo". Por isso exige hex de referencia e so
+        // pinta a Tactical — a banda seguinte nao e zona de largada, e tempo
+        // extra de caminhada.
+        Desembarque
     }
 
     private enum ViewMode
@@ -33,6 +38,15 @@ public sealed class HotzoneWindow : EditorWindow
     [SerializeField] private ViewMode viewMode = ViewMode.Todas;
     [SerializeField] private ReachSubStep subStep = ReachSubStep.Terrestre;
     [SerializeField] private bool showCellCosts;
+    // "E se ela estivesse ali?" — calcula a partir de outro hex sem mover nada.
+    // É o que responde a projeção invertida do desembarque (teleporta o
+    // passageiro para cima do objetivo e a banda dele vira a zona de largada) e
+    // o teste da unidade fantasma da doutrina de fogo indireto.
+    [SerializeField] private bool useOriginOverride;
+    [SerializeField] private Vector3Int originOverride;
+    // Seleção de hex pela cena, mesmo padrão da janela de Retaguarda.
+    private bool pickingOrigin;
+    private Vector3Int hoverCell;
     [SerializeField] private bool paintReach = true;
     // A ferramenta PASSA TUDO. Aplicar FoW e descartar o que a unidade não
     // deveria ver é função da IA e dos sensores Pode* na hora da decisão, não
@@ -131,12 +145,28 @@ public sealed class HotzoneWindow : EditorWindow
             AutoDetect();
         EditorGUILayout.EndHorizontal();
 
+        DrawOriginOverride();
+
         intentMode = (IntentMode)EditorGUILayout.EnumPopup(
             "Intenção", intentMode);
 
         // Subetapa é parâmetro de entrada, igual à intenção. Só aparecem as
         // válidas para a intenção escolhida — a árvore do contrato.
         DrawSubStepPopup();
+
+        // Modal fica junto de intenção e subetapa: os três são a pergunta.
+        // Desembarque só tem Tactical: a banda seguinte não é zona de largada,
+        // é tempo extra de caminhada. Pintar azul aqui sugeriria que dá para
+        // largar o passageiro lá, e não dá.
+        bool tacticalOnly = intentMode == IntentMode.Desembarque;
+        if (tacticalOnly)
+            viewMode = ViewMode.Tactical;
+        using (new EditorGUI.DisabledScope(!paintReach || tacticalOnly))
+        {
+            viewMode = (ViewMode)EditorGUILayout.EnumPopup(
+                "Modal (Tático/Oper)", viewMode);
+        }
+
         paintReach = EditorGUILayout.Toggle(
             "Pintar alcance (terreno)", paintReach);
 
@@ -149,8 +179,6 @@ public sealed class HotzoneWindow : EditorWindow
             "  Exigir observação", enableSpotter);
         using (new EditorGUI.DisabledScope(!paintReach))
         {
-            viewMode = (ViewMode)EditorGUILayout.EnumPopup(
-                "Modalidade", viewMode);
             showCellCosts = EditorGUILayout.Toggle(
                 "Mostrar custos por célula", showCellCosts);
         }
@@ -239,18 +267,58 @@ public sealed class HotzoneWindow : EditorWindow
     private void AutoDetect()
     {
         UseSelectedIfAvailable();
-        if (tilemap == null && unit != null)
-            tilemap = unit.BoardTilemap;
         if (tilemap == null)
-        {
-            UnitSpawner spawner = FindFirstObjectByType<UnitSpawner>();
-            if (spawner != null)
-                tilemap = spawner.GetComponentInChildren<Tilemap>();
-            if (tilemap == null)
-                tilemap = FindFirstObjectByType<Tilemap>();
-        }
+            tilemap = ResolveBoardTilemap();
         AutoDetectAssets();
         Repaint();
+    }
+
+    /// <summary>
+    /// O tabuleiro NÃO é "o primeiro Tilemap da cena".
+    ///
+    /// A cena tem vários — AmeacaMap e outros overlays —, e pegar o primeiro
+    /// escolhia um mapa de calor no lugar do board. Quem sabe qual é o board são
+    /// os objetos que já operam sobre ele; a busca cega fica como último
+    /// recurso, e ainda avisa.
+    /// </summary>
+    private Tilemap ResolveBoardTilemap()
+    {
+        if (unit != null && unit.BoardTilemap != null)
+            return unit.BoardTilemap;
+
+        foreach (UnitManager sceneUnit
+                 in FindObjectsByType<UnitManager>(
+                     FindObjectsInactive.Include, FindObjectsSortMode.None))
+        {
+            if (sceneUnit != null && sceneUnit.BoardTilemap != null)
+                return sceneUnit.BoardTilemap;
+        }
+
+        foreach (ConstructionManager construction
+                 in FindObjectsByType<ConstructionManager>(
+                     FindObjectsInactive.Include, FindObjectsSortMode.None))
+        {
+            if (construction != null && construction.BoardTilemap != null)
+                return construction.BoardTilemap;
+        }
+
+        foreach (BoardTopologyIndex topology
+                 in FindObjectsByType<BoardTopologyIndex>(
+                     FindObjectsInactive.Include, FindObjectsSortMode.None))
+        {
+            if (topology != null && topology.BoardTilemap != null)
+                return topology.BoardTilemap;
+        }
+
+        Tilemap fallback = FindFirstObjectByType<Tilemap>();
+        if (fallback != null)
+        {
+            Debug.LogWarning(
+                $"[Hotzone] Tabuleiro resolvido por busca cega: '{fallback.name}'. " +
+                "Nenhuma unidade, construção ou índice de topologia da cena " +
+                "declarou o board — confira se é o mapa certo.");
+        }
+        return fallback;
     }
 
     private void UseSelectedIfAvailable()
@@ -323,6 +391,7 @@ public sealed class HotzoneWindow : EditorWindow
                 TerrainDatabase = terrainDatabase,
                 Intent = intent,
                 SubStep = subStep,
+                OriginOverride = ResolveOriginOverride(),
                 Band = ReachBand.Tactical,
                 MovementBudget = Mathf.Max(0, unit.MaxMovementPoints),
                 IncludeMovementCosts = true,
@@ -454,6 +523,122 @@ public sealed class HotzoneWindow : EditorWindow
             : envelope.Diagnostic;
     }
 
+    /// <summary>
+    /// "E se ela estivesse ali?" — origem alternativa, sem mover nada.
+    ///
+    /// É o que a projeção invertida do desembarque pede: teleporta o passageiro
+    /// para cima do objetivo e o VERDE resultante é a zona de largada. Serve
+    /// também para o teste da unidade fantasma do fogo indireto.
+    /// </summary>
+    private void DrawOriginOverride()
+    {
+        useOriginOverride = EditorGUILayout.ToggleLeft(
+            "Usar hex de referência",
+            useOriginOverride);
+
+        using (new EditorGUI.DisabledScope(!useOriginOverride))
+        {
+            EditorGUILayout.BeginHorizontal();
+            Vector3Int edited = EditorGUILayout.Vector3IntField(
+                "Hex de referência", originOverride);
+            edited.z = 0;
+            originOverride = edited;
+
+            GUI.backgroundColor = pickingOrigin ? Color.red : Color.white;
+            if (GUILayout.Button(
+                    pickingOrigin ? "Clique no mapa..." : "Escolher no mapa",
+                    GUILayout.Width(130f)))
+            {
+                pickingOrigin = !pickingOrigin;
+                SceneView.RepaintAll();
+            }
+            GUI.backgroundColor = Color.white;
+            EditorGUILayout.EndHorizontal();
+
+            if (GUILayout.Button("Usar hex da unidade") && unit != null)
+            {
+                Vector3Int cell = unit.CurrentCellPosition;
+                cell.z = 0;
+                originOverride = cell;
+            }
+        }
+
+        if (useOriginOverride)
+        {
+            EditorGUILayout.HelpBox(
+                "A unidade NÃO é movida: a banda é calculada como se ela " +
+                "estivesse no hex de referência. " +
+                "Desembarque: escolha o passageiro em Unidade e clique no hex " +
+                "do prédio pretendido — o VERDE resultante é a zona onde ele " +
+                "pode ser largado.",
+                MessageType.None);
+        }
+    }
+
+    private Vector3Int? ResolveOriginOverride()
+    {
+        if (!useOriginOverride)
+            return null;
+        Vector3Int cell = originOverride;
+        cell.z = 0;
+        return cell;
+    }
+
+    /// <summary>
+    /// Mesmo padrão da janela de Retaguarda: clique esquerdo escolhe, direito
+    /// ou ESC cancela.
+    /// </summary>
+    private void HandleOriginPicking()
+    {
+        if (!pickingOrigin)
+            return;
+
+        Event e = Event.current;
+        if (e.type == EventType.MouseMove || e.type == EventType.MouseDrag)
+        {
+            hoverCell = ScreenToCell(e.mousePosition);
+            HandleUtility.Repaint();
+        }
+
+        if (e.type == EventType.MouseDown && e.button == 0 && !e.alt)
+        {
+            Vector3Int picked = ScreenToCell(e.mousePosition);
+            picked.z = 0;
+            originOverride = picked;
+            useOriginOverride = true;
+            pickingOrigin = false;
+            e.Use();
+            Repaint();
+            return;
+        }
+
+        if ((e.type == EventType.MouseDown && e.button == 1)
+            || (e.type == EventType.KeyDown && e.keyCode == KeyCode.Escape))
+        {
+            pickingOrigin = false;
+            e.Use();
+            Repaint();
+        }
+    }
+
+    private void DrawOriginPicker()
+    {
+        Handles.color = Color.yellow;
+        Vector3 hoverWorld = tilemap.GetCellCenterWorld(hoverCell);
+        Handles.DrawWireDisc(hoverWorld, Vector3.back, 0.35f);
+        Handles.Label(
+            hoverWorld + Vector3.up * 0.42f, $"Referência {hoverCell}");
+    }
+
+    private Vector3Int ScreenToCell(Vector2 mousePos)
+    {
+        Ray ray = HandleUtility.GUIPointToWorldRay(mousePos);
+        float t = ray.direction.z != 0f
+            ? -ray.origin.z / ray.direction.z
+            : 0f;
+        return tilemap.WorldToCell(ray.origin + ray.direction * t);
+    }
+
     private void DrawSubStepPopup()
     {
         ReachIntent intent = ResolveIntentForPopup();
@@ -493,6 +678,7 @@ public sealed class HotzoneWindow : EditorWindow
             case IntentMode.Embarque: return ReachIntent.Embark;
             case IntentMode.Captura: return ReachIntent.Capture;
             case IntentMode.Mobilidade: return ReachIntent.Mobility;
+            case IntentMode.Desembarque: return ReachIntent.Mobility;
             default: return ReachIntent.Combat;
         }
     }
@@ -549,6 +735,21 @@ public sealed class HotzoneWindow : EditorWindow
                 intent = ReachIntent.Mobility;
                 return true;
 
+            case IntentMode.Desembarque:
+                // ReachIntent.Disembark ainda nao existe. A ferramenta compoe a
+                // resposta com o que existe: alcance de movimento do PASSAGEIRO
+                // projetado a partir da referencia. Quando a intencao propria
+                // nascer (com a regra do +1MP), so este mapeamento muda.
+                intent = ReachIntent.Mobility;
+                if (!useOriginOverride)
+                {
+                    status =
+                        "Desembarque precisa do hex de referência: escolha o " +
+                        "prédio pretendido no mapa.";
+                    return false;
+                }
+                return true;
+
             default:
                 intent = ReachIntent.Combat;
                 return true;
@@ -571,6 +772,8 @@ public sealed class HotzoneWindow : EditorWindow
                 return "Mobilidade";
             case IntentMode.Fusao:
                 return "Fusão";
+            case IntentMode.Desembarque:
+                return "Desembarque";
             default:
                 return "Combate";
         }
@@ -578,7 +781,16 @@ public sealed class HotzoneWindow : EditorWindow
 
     private void OnSceneGUI(SceneView sceneView)
     {
-        if (!hasResult || tilemap == null)
+        if (tilemap == null)
+            return;
+
+        // A escolha do hex acontece mesmo sem resultado calculado: é ela que
+        // define O QUE calcular.
+        HandleOriginPicking();
+        if (pickingOrigin)
+            DrawOriginPicker();
+
+        if (!hasResult)
             return;
 
         if (!paintReach)

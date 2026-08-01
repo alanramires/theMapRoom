@@ -35,11 +35,21 @@ public static class UnitMovementPathRules
         }
     }
 
+    /// <summary>
+    /// <paramref name="originOverride"/> calcula a onda a partir de OUTRA
+    /// celula que nao a atual da unidade: "e se ela estivesse ali?".
+    ///
+    /// E o que sustenta a projecao invertida do desembarque — teleporta o
+    /// passageiro para cima do objetivo e a banda dele vira a zona de largada —
+    /// e o teste da unidade fantasma que a doutrina de fogo indireto pede.
+    /// Nao move nada: so troca o ponto de partida da busca.
+    /// </summary>
     public static Dictionary<Vector3Int, List<Vector3Int>> CalcularCaminhosValidos(
         Tilemap terrainTilemap,
         UnitManager unit,
         int maxSteps,
-        TerrainDatabase terrainDatabase = null)
+        TerrainDatabase terrainDatabase = null,
+        Vector3Int? originOverride = null)
     {
         using var perf = new AIDecisionPerfScope(unit, "validPaths");
         Dictionary<Vector3Int, List<Vector3Int>> pathsByDestination = new Dictionary<Vector3Int, List<Vector3Int>>();
@@ -56,7 +66,8 @@ public static class UnitMovementPathRules
                 unit,
                 maxSteps,
                 terrainDatabase,
-                out Dictionary<Vector3Int, List<Vector3Int>> cachedPaths))
+                out Dictionary<Vector3Int, List<Vector3Int>> cachedPaths,
+                originOverride))
         {
             return cachedPaths;
         }
@@ -69,7 +80,7 @@ public static class UnitMovementPathRules
         int maxAutonomyCost = Mathf.Max(0, unit.CurrentFuel);
         bool canUseRoadBonus = CanUseRoadFullMoveBonus(unit, maxMovementCost);
 
-        Vector3Int origin = unit.CurrentCellPosition;
+        Vector3Int origin = originOverride ?? unit.CurrentCellPosition;
         origin.z = 0;
         MovementQueryCache cache = new MovementQueryCache(terrainTilemap, terrainDatabase);
 
@@ -236,7 +247,8 @@ public static class UnitMovementPathRules
             unit,
             maxSteps,
             terrainDatabase,
-            pathsByDestination);
+            pathsByDestination,
+            originOverride);
         return pathsByDestination;
     }
 

@@ -158,21 +158,28 @@ public static class MovementReachCache
         new LinkedList<CacheKey>();
     private static int totalCellWeight;
 
+    /// <summary>
+    /// <paramref name="originOverride"/> permite consultar a onda a partir de
+    /// OUTRA celula que nao a atual da unidade — "e se ela estivesse ali?".
+    /// A chave do cache ja distingue origem, entao a resposta continua correta
+    /// sem invalidar nada da consulta normal.
+    /// </summary>
     public static bool TryGetValidPaths(
         Tilemap map,
         UnitManager unit,
         int budget,
         TerrainDatabase terrainDatabase,
-        out Dictionary<Vector3Int, List<Vector3Int>> result)
+        out Dictionary<Vector3Int, List<Vector3Int>> result,
+        Vector3Int? originOverride = null)
     {
         result = null;
         if (!TryBuildKey(
                 QueryKind.ValidPaths,
                 map,
                 unit,
-                unit != null
+                originOverride ?? (unit != null
                     ? unit.CurrentCellPosition
-                    : Vector3Int.zero,
+                    : Vector3Int.zero),
                 budget,
                 terrainDatabase,
                 out CacheKey key))
@@ -197,16 +204,17 @@ public static class MovementReachCache
         UnitManager unit,
         int budget,
         TerrainDatabase terrainDatabase,
-        Dictionary<Vector3Int, List<Vector3Int>> paths)
+        Dictionary<Vector3Int, List<Vector3Int>> paths,
+        Vector3Int? originOverride = null)
     {
         if (paths == null
             || !TryBuildKey(
                 QueryKind.ValidPaths,
                 map,
                 unit,
-                unit != null
+                originOverride ?? (unit != null
                     ? unit.CurrentCellPosition
-                    : Vector3Int.zero,
+                    : Vector3Int.zero),
                 budget,
                 terrainDatabase,
                 out CacheKey key))
