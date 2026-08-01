@@ -116,6 +116,36 @@ Capturers can intercept to embark via `TryDecideCapturerEmbarkAction` in `AICont
 
 **Extended embark (pass-2)**: `movePaths` computed with `remainingMP - 1` may include friendly-occupied hexes (passable for pathfinding) but the capturer cannot stop there. Always filter with `BuildOccupied(unit)` before treating a hex as a valid intermediate stop.
 
+### Military dialect — read this before any AI doctrine doc
+
+The project speaks a deliberate military vocabulary. Every contract in
+`docs/AI Behavior/` is written in it, and the Hotzone tool exists to make it
+visible. These are not loose words: each one names a computed answer.
+
+| term | meaning |
+|---|---|
+| **Tático** (Tactical) | what the unit materializes **this round**. Band of `UnitReachEnvelopeService` |
+| **Operacional** (Operational) | the **next turn** — `+MP`, chained, never `MP × 2` pooled |
+| **vanguarda** | the forward line. Where assault belongs and fire support must never be |
+| **retaguarda** | behind the line. Where fire support, logistics and repair belong |
+| **flancos** | the sides of the advance. Assault may hold them; fire support may not |
+| **âncora** | the cell an agenda advances toward (objective, captain, capturable) |
+| **capitão / magnético** | the unit another unit orbits. Capturer for assault, maritime assault for navy, Radar/EWACS for AA |
+| **camada** | operation layer (domain + height). Native layer = where the unit prefers to end its turn |
+
+**The one rule that generates the rest:** *banda, âncora e camada são sempre
+parâmetro da unidade avaliada — nunca constante do papel.*
+
+Every regression this project has hit in these areas came from freezing one of
+the three: a fixed hex range instead of a band, a fixed enemy-HQ anchor instead
+of the nearest capturable, a fixed air layer instead of the specialized vision
+layer.
+
+**Known inversion:** for `Artilheiro` (stationary long-range), the band is the
+**weapon's**, not the movement's — green from hex 0 to max range, blue at
+`2 × max range`. A 1 MP howitzer with a movement band would have an Operational
+of hex 2. See `docs/contrato_envelope_alcance.md`.
+
 ### Ranges are bands, not hex numbers
 
 **Doctrine:** an AI "range" is a band of the reach envelope — `Tactical` or

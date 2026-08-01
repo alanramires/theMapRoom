@@ -77,6 +77,48 @@ Duas frentes, então:
 
 ---
 
+## 2-PA. O Porta-Aviões é deste papel
+
+Papel primário **Transportador**, com três pernas que ele **consulta**:
+
+| perna | o quê |
+|---|---|
+| Fire Support | duas armas antiaéreas de longo alcance — tenta o tiro, volta à agenda |
+| Logística | suporte |
+| Transferência | é **Hub**: recebe do porto naval e repassa ao avião-tanque (perna no controlador de Estoque) |
+
+Ele segue a agenda **courier/pickup** deste documento. Não herda a doutrina de
+retaguarda, iniciativa alta nem recusa de embarque do `FireSupport.md`: aquilo é
+de quem tem Fire Support como papel primário.
+
+Mesmo mecanismo do Artilheiro Combatente, com os lados trocados — *"tento o
+tiro; se não der, volto para a minha agenda"*. A diferença é qual agenda espera
+a bola de volta.
+
+❌ A perna de Fire Support do transportador não existe no roteador: hoje o
+transporte é consultado antes dos papéis de combate e não volta.
+
+### Quando o Porta-Aviões atira — rascunho do autor
+
+> Anotado como veio, ainda sem lapidar. Fica aqui porque é política **do
+> transportador**, e este é o documento dele.
+
+| estado | comportamento |
+|---|---|
+| **vazio** | atira contra aeronaves no seu raio **Tático** |
+| **com carga aérea** | atira **apenas contra ataque aéreo** (bombardeiros), porque deles não dá para fugir — são mais rápidos |
+| **com carga aérea, sob caças** | **ergue os caças** — reconhecidamente tarde demais |
+
+A lógica por trás: com o convés cheio, gastar o tiro em caça é desperdício
+(caça se evita manobrando), enquanto bombardeiro é ameaça inescapável. E a
+resposta contra caça não é a arma do navio, é o próprio convés.
+
+"Erguer os caças tarde demais" é a admissão de que a decisão de decolar deveria
+ter acontecido antes — provavelmente ao **detectar** o caça, não ao ser atacado
+por ele.
+
+---
+
 ## 3. Esteira (implementado nas v6.1.0/v6.1.1)
 
 A doutrina completa está no `docs/relatorio_v6.1.1.md`. Resumo:

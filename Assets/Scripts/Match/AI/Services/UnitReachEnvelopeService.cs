@@ -492,6 +492,32 @@ public static class UnitReachEnvelopeService
         return AIActionReachCoordinator.UsesCubicSectorReach(unit);
     }
 
+    /// <summary>
+    /// A unidade tem arma que dispara a partir do alcance 1?
+    ///
+    /// E o que separa "move e atira" de "atira parada". Depois de mover, o tiro
+    /// colapsa para alcance 1: numa arma de minimo 1 e maximo 2 ele ainda sai,
+    /// numa de minimo 2 nao sai de jeito nenhum.
+    /// </summary>
+    private static bool HasCloseQuartersWeapon(UnitManager unit)
+    {
+        if (unit == null)
+            return false;
+        IReadOnlyList<UnitEmbarkedWeapon> weapons = unit.GetEmbarkedWeapons();
+        if (weapons == null)
+            return false;
+
+        for (int i = 0; i < weapons.Count; i++)
+        {
+            UnitEmbarkedWeapon embarked = weapons[i];
+            if (embarked?.weapon == null || embarked.squadAmmunition <= 0)
+                continue;
+            if (embarked.GetRangeMin() <= 1)
+                return true;
+        }
+        return false;
+    }
+
     public static bool IsSubStepValid(
         ReachIntent intent, ReachSubStep subStep, UnitManager unit = null)
     {
@@ -508,10 +534,32 @@ public static class UnitReachEnvelopeService
 
         if (!inTree)
             return false;
-        return unit == null || SupportsSubStep(unit, subStep);
+        if (unit != null && !SupportsSubStep(unit, subStep))
+            return false;
+
+        // COMBATE TERRESTRE EXIGE ARMA DE ALCANCE MINIMO 1.
+        //
+        // Terrestre e "move e atira": o tiro pos-movimento colapsa para 1. Uma
+        // peca de minimo 2 nao dispara depois de andar — pedir Terrestre para
+        // ela e pedido INVALIDO, nao envelope vazio, do mesmo jeito que pedir
+        // geometria cubica para unidade de superficie. A pergunta certa para
+        // ela e a subetapa Artilheiro, cuja banda e da arma.
+        if (intent == ReachIntent.Combat
+            && subStep == ReachSubStep.Terrestre
+            && unit != null
+            && !HasCloseQuartersWeapon(unit))
+        {
+            return false;
+        }
+
+        return true;
     }
 
-    /// <summary>Subetapas da intencao que ESTA unidade suporta.</summary>
+    /// <summary>
+    /// Subetapas da intencao que ESTA unidade suporta. E o que a ferramenta usa
+    /// para nem oferecer a opcao — por isso valida pelo mesmo predicado do
+    /// Build, e nao so pela geometria.
+    /// </summary>
     public static List<ReachSubStep> GetSubSteps(
         ReachIntent intent, UnitManager unit)
     {
@@ -519,7 +567,7 @@ public static class UnitReachEnvelopeService
         var result = new List<ReachSubStep>(tree.Count);
         for (int i = 0; i < tree.Count; i++)
         {
-            if (SupportsSubStep(unit, tree[i]))
+            if (IsSubStepValid(intent, tree[i], unit))
                 result.Add(tree[i]);
         }
         return result;
@@ -582,6 +630,27 @@ public static class UnitReachEnvelopeService
         // responde sobre o tabuleiro real. Na banda Operational o combate vale
         // como alcance/posicionamento, nao como promessa de tiro: devolve a
         // malha de progressao pura, sem projetar fogo a dois turnos.
+        // ARTILHEIRO INVERTE A BANDA: ela e da ARMA, nao do movimento.
+        //
+        // Medir banda em movimento e absurdo para quem atira parado: a
+        // Artilharia de Campanha move 1, entao o Operational dela seria o hex 2
+        // — para uma peca cuja razao de existir e alcancar longe.
+        //
+        //   verde  = do hex 0 ate o alcance maximo
+        //   azul   = o dobro do alcance maximo
+        //
+        // O azul aqui nao responde "para onde eu ando"; responde "de onde eu
+        // posso ser alcancado, ou alcancar, se a situacao mudar". E por isso que
+        // artilharia de alcance 4 nao embarca com inimigo no raio 8: embarcar e
+        // ficar indefeso, e o blindado rapido cobre essa distancia.
+        //
+        // Ver docs/contrato_envelope_alcance.md e docs/AI Behavior/FireSupport.md.
+        if (request.Intent == ReachIntent.Combat
+            && subStep == ReachSubStep.Artilheiro)
+        {
+            return BuildArtilleryBand(request, map, subStep);
+        }
+
         if (request.Intent == ReachIntent.Combat
             && request.Band == ReachBand.Tactical)
         {
@@ -1369,6 +1438,113 @@ public static class UnitReachEnvelopeService
     // ------------------------------------------------------------------
     // Intencao: combate (PodeMirarSensor). Preserva cache e perfis.
     // ------------------------------------------------------------------
+
+    /// <summary>
+    /// Maior alcance util entre as armas com municao. Zero quando nao ha arma
+    /// utilizavel — e ai o pedido de artilheiro e invalido, como combate sem
+    /// arma.
+    /// </summary>
+    private static int ResolveMaxWeaponRange(UnitManager unit)
+    {
+        if (unit == null)
+            return 0;
+        IReadOnlyList<UnitEmbarkedWeapon> weapons = unit.GetEmbarkedWeapons();
+        if (weapons == null)
+            return 0;
+
+        int best = 0;
+        for (int i = 0; i < weapons.Count; i++)
+        {
+            UnitEmbarkedWeapon embarked = weapons[i];
+            if (embarked?.weapon == null || embarked.squadAmmunition <= 0)
+                continue;
+            best = Mathf.Max(best, embarked.GetRangeMax());
+        }
+        return best;
+    }
+
+    /// <summary>
+    /// Banda do artilheiro. NAO ha deslocamento aqui: a unidade atira parada, e
+    /// o que a banda descreve e o raio da ARMA.
+    ///
+    ///   MovementCells — o disco 0..raio da banda. E o "verde": nao e onde ela
+    ///                   anda, e a area que a banda cobre.
+    ///   ActionCells   — o que a arma REALMENTE atinge parada, pelo sensor. E o
+    ///                   "vermelho", e ele sobrescreve o verde.
+    ///
+    /// A diferenca entre os dois e informacao util, nao ruido: numa arma de
+    /// alcance minimo 2, os hexes 0 e 1 aparecem no verde e ficam FORA do
+    /// vermelho — a zona morta em que ela nao consegue atirar.
+    /// </summary>
+    private static UnitReachEnvelope BuildArtilleryBand(
+        UnitReachRequest request,
+        Tilemap map,
+        ReachSubStep subStep)
+    {
+        UnitManager unit = request.Unit;
+        int maxRange = ResolveMaxWeaponRange(unit);
+        if (maxRange <= 0)
+            return null;
+
+        int bandRadius = request.Band == ReachBand.Operational
+            ? maxRange * 2
+            : maxRange;
+
+        Vector3Int origin = unit.CurrentCellPosition;
+        origin.z = 0;
+
+        var bandCells = new HashSet<Vector3Int>();
+        CollectCubicMovementCells(map, origin, bandRadius, bandCells);
+        if (map.GetTile(origin) != null)
+            bandCells.Add(origin);
+
+        var fireCells = new HashSet<Vector3Int>();
+        PodeMirarSensor.CollectValidFireCellsFromOrigin(
+            unit, map, request.TerrainDatabase,
+            SensorMovementMode.MoveuParado, origin, fireCells,
+            request.DpqAirHeightConfig,
+            request.EnableLdt, request.EnableLos, request.EnableSpotter);
+        fireCells.RemoveWhere(cell => map.GetTile(cell) == null);
+
+        var costByCell = new Dictionary<Vector3Int, int>(bandCells.Count);
+        var turnsByCell = new Dictionary<Vector3Int, int>(bandCells.Count);
+        foreach (Vector3Int cell in bandCells)
+        {
+            costByCell[cell] =
+                AIActionReachCoordinator.CubicDistance(origin, cell);
+            turnsByCell[cell] = 1;
+        }
+
+        // O tiro sai sempre do hex onde ela esta: nao ha deslocamento, entao a
+        // origem da acao e a propria unidade e a entrada nao custa MP.
+        var origins = new Dictionary<Vector3Int, ReachOrigin>(fireCells.Count);
+        foreach (Vector3Int cell in fireCells)
+            origins[cell] = new ReachOrigin(origin, 0, 0);
+
+        var lineCells = new HashSet<Vector3Int>(fireCells);
+        lineCells.ExceptWith(bandCells);
+
+        return new UnitReachEnvelope(
+            request.Intent,
+            request.Band,
+            new Dictionary<Vector3Int, List<Vector3Int>>(),
+            costByCell,
+            bandCells,
+            fireCells,
+            lineCells,
+            origins,
+            turnsByCell)
+        {
+            SubStep = subStep,
+            Diagnostic =
+                $"artilheiro: alcance máximo={maxRange}; " +
+                $"banda={bandRadius} ({(request.Band == ReachBand.Operational ? "2× alcance" : "alcance")}); " +
+                $"disco={bandCells.Count}; tiro real={fireCells.Count}" +
+                (fireCells.Count == 0
+                    ? " — nenhuma célula de tiro (sem alvo válido ou zona morta)"
+                    : string.Empty)
+        };
+    }
 
     internal static UnitThreatEnvelope BuildCombat(
         UnitReachRequest request,

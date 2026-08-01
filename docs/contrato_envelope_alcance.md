@@ -96,6 +96,11 @@ Desembarque ─ (sem ramo)
 unidade de superfície é **pedido inválido**, não envelope vazio: `Build`
 devolve `null`. Isso é validação de entrada, não dedução.
 
+**Combate + `Terrestre` exige arma de alcance mínimo 1.** Terrestre é "move e
+atira", e o tiro pós-movimento colapsa para 1: uma peça de mínimo 2 não dispara
+depois de andar. Pedir Terrestre para ela é pedido inválido pelo mesmo motivo —
+a pergunta certa é a subetapa `Artilheiro`, cuja banda é da arma.
+
 `GetSubSteps(intent, unit)` devolve a árvore já filtrada pelo que a unidade
 suporta; é o que a ferramenta usa para nem oferecer a opção.
 
@@ -115,7 +120,28 @@ vanguarda, bombardeiros na retaguarda.
 |---|---|
 | `Terrestre` | verde em MP + vermelho no alcance da arma; azul em `+MP` |
 | `Aereo` | verde em MP (cúbica) + vermelho no alcance da arma |
-| `Artilheiro` | verde em MP=0, vermelho no alcance da arma; **sem azul** |
+| `Artilheiro` | **verde do hex 0 até o alcance máximo** (vermelho sobrescreve); **azul no dobro do alcance máximo** |
+
+### Artilheiro inverte a banda: ela é da ARMA, não do movimento
+
+Para quem atira parado, medir banda em movimento é absurdo. A Artilharia de
+Campanha move **1**: o Operational dela seria o hex 2, para uma peça cuja razão
+de existir é alcançar longe.
+
+| banda | artilheiro | todo o resto |
+|---|---|---|
+| Tactical (verde) | 0 → alcance máximo da arma | alcance de movimento |
+| Operational (azul) | **2 × alcance máximo** | movimento do turno seguinte |
+
+O azul aqui não é "para onde eu ando" — é **de onde eu posso ser alcançado, ou
+alcançar, se a situação mudar**. É a banda de ameaça recíproca, e ela existe por
+um motivo concreto:
+
+> Artilharia de alcance 4 **não embarca** se houver inimigo no raio 8. Embarcar é
+> ficar indefeso; um blindado rápido a 8 hexes chega e pega a peça com as calças
+> na mão.
+
+Ver `docs/AI Behavior/FireSupport.md` §0 e §7.
 
 - Terrestre: a IA decide atacar ou avançar até o oponente no azul.
 - Artilheiro: é comum atirar se estiver no tactical. No operational depende —
@@ -203,7 +229,9 @@ Verificado em `Assets/Scripts/Match/AI/Services/UnitReachEnvelopeService.cs`.
 
 | # | contrato | código hoje |
 |---|---|---|
-| 1 | Fusão e Artilheiro não têm azul | `BuildProfile` sempre devolve Tactical + Operational |
+| 1 | Fusão não tem azul | `BuildProfile` sempre devolve Tactical + Operational |
+| 1b | **Artilheiro: verde = 0→alcance, azul = 2×alcance** | banda de MOVIMENTO nos dois casos; `BuildFireSupportPaths` devolve `CalcularCaminhosValidos(RemainingMovementPoints)`, consumido por 11 sítios |
+| 1c | a **ferramenta Hotzone** precisa pintar essa inversão | a janela usa a mesma banda de movimento; falta modalidade de artilheiro |
 | 2 | Suprir/Estoque expõem o range como vermelho | range de serviço entra em `ActionCells`, sem distinção de "arma" |
 | 3 | Estoque é intenção própria ("arma de caixa") | não existe; só `Service` e `Transfer` |
 | 4 | Desembarque é intenção própria (`+1MP`) | não existe |

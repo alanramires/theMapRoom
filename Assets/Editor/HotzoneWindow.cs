@@ -345,7 +345,17 @@ public sealed class HotzoneWindow : EditorWindow
         if (profile.Tactical != null)
         {
             tacticalMovement.UnionWith(profile.Tactical.MovementCells);
-            tacticalAction.UnionWith(profile.Tactical.OuterCells);
+            // Regra geral: vermelho é o ANEL EXTERNO — o que a arma alcança
+            // além de onde a unidade pisa.
+            //
+            // Artilheiro é a exceção, porque a banda dele é da ARMA e não do
+            // movimento: verde é o disco 0..alcance e o vermelho SOBRESCREVE,
+            // marcando o que ela realmente atinge. A diferença entre os dois é
+            // a zona morta do alcance mínimo — e ela precisa aparecer.
+            if (subStep == ReachSubStep.Artilheiro)
+                tacticalAction.UnionWith(profile.Tactical.ActionCells);
+            else
+                tacticalAction.UnionWith(profile.Tactical.OuterCells);
             tactical.UnionWith(profile.Tactical.ActionCells);
             tactical.UnionWith(profile.Tactical.MovementCells);
 
@@ -577,28 +587,51 @@ public sealed class HotzoneWindow : EditorWindow
         if (viewMode == ViewMode.Todas
             || viewMode == ViewMode.Operational)
         {
-            // Operational é SEMPRE azul.
+            // Operational é SEMPRE azul. No artilheiro o teto não é orçamento
+            // de MP — é o dobro do alcance da arma, que já está no custo.
             DrawCells(
                 operationalMovement,
                 new Color(0.10f, 0.55f, 1f, 0.25f),
                 operationalCosts,
-                AIActionReachCoordinator.ResolveOperationalBudget(unit));
+                subStep == ReachSubStep.Artilheiro
+                    ? ResolveMaxCost(operationalCosts)
+                    : AIActionReachCoordinator.ResolveOperationalBudget(unit));
         }
         if (viewMode == ViewMode.Todas
             || viewMode == ViewMode.Tactical)
         {
             // Verde = onde ele PARA (e quanto custou chegar).
+            // No artilheiro, verde = o disco do alcance da arma: ele não pisa
+            // ali, alcança dali.
             DrawCells(
                 tacticalMovement,
                 new Color(0.15f, 1f, 0.35f, 0.32f),
                 tacticalCosts,
-                unit != null ? Mathf.Max(0, unit.MaxMovementPoints) : 0);
+                subStep == ReachSubStep.Artilheiro
+                    ? ResolveMaxCost(tacticalCosts)
+                    : unit != null ? Mathf.Max(0, unit.MaxMovementPoints) : 0);
             // Vermelho = onde ele SÓ ALCANÇA com a arma, não pisa.
+            // No artilheiro, vermelho = o tiro real, sobrescrevendo o verde.
             DrawCells(
                 tacticalAction,
                 new Color(0.90f, 0.10f, 0.10f, 0.40f),
                 null);
         }
+    }
+
+    /// <summary>
+    /// Maior custo publicado, usado como teto do degradê quando a banda não é
+    /// de movimento — caso do artilheiro, em que o custo é distância cúbica e o
+    /// teto é o próprio raio da banda.
+    /// </summary>
+    private static int ResolveMaxCost(Dictionary<Vector3Int, int> costs)
+    {
+        int max = 0;
+        if (costs == null)
+            return max;
+        foreach (KeyValuePair<Vector3Int, int> pair in costs)
+            max = Mathf.Max(max, pair.Value);
+        return max;
     }
 
     private void DrawCells(
