@@ -184,7 +184,7 @@ layer.
 **Known inversion:** for `Artilheiro` (stationary long-range), the band is the
 **weapon's**, not the movement's — green from hex 0 to max range, blue at
 `2 × max range`. A 1 MP howitzer with a movement band would have an Operational
-of hex 2. See `docs/contrato_envelope_alcance.md`.
+of hex 2. See `docs/AI Behavior/contrato_envelope_alcance.md`.
 
 ### Ranges are bands, not hex numbers
 
@@ -205,7 +205,7 @@ still run; do not read them as the rule. Each one names what it should become:
 
 Doctrine and per-role rules: `docs/AI Behavior/Transporte.md` and
 `docs/AI Behavior/Capturador.md`. Envelope contract:
-`docs/contrato_envelope_alcance.md`.
+`docs/AI Behavior/contrato_envelope_alcance.md`.
 
 ### Shopping (`AIShoppingPlanner.cs`)
 

@@ -2,7 +2,7 @@
 
 > **Documento de apresentação e avaliação — não é a norma.**
 >
-> A especificação oficial é `docs/contrato_envelope_alcance.md`. Onde os dois
+> A especificação oficial é `docs/AI Behavior/contrato_envelope_alcance.md`. Onde os dois
 > divergirem, o contrato vence. Este texto existe para explicar o conceito a
 > quem chega de fora; o contrato existe para ser obedecido pelo código.
 >

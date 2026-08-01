@@ -43,12 +43,12 @@ para consumi-la, e a doutrina de cada papel passa a existir por escrito.
 
 | documento | papel |
 |---|---|
-| [contrato_envelope_alcance.md](docs/contrato_envelope_alcance.md) | **norma** das bandas de alcance |
+| [contrato_envelope_alcance.md](docs/AI%20Behavior/contrato_envelope_alcance.md) | **norma** das bandas de alcance |
 | [AI Behavior/Capturador.md](docs/AI%20Behavior/Capturador.md) | doutrina do capturador |
 | [AI Behavior/Assalto.md](docs/AI%20Behavior/Assalto.md) | doutrina do assalto e da marinha |
 | [AI Behavior/FireSupport.md](docs/AI%20Behavior/FireSupport.md) | doutrina do fogo indireto |
 | [AI Behavior/Transporte.md](docs/AI%20Behavior/Transporte.md) | doutrina do transporte |
-| [hotzone e bandas de alcance.md](docs/hotzone%20e%20bandas%20de%20alcance.md) | apresentação do conceito (não-normativo) |
+| [hotzone e bandas de alcance.md](docs/AI%20Behavior/hotzone%20e%20bandas%20de%20alcance.md) | apresentação do conceito (não-normativo) |
 | [refactor/ai_sem_plano.md](docs/refactor/ai_sem_plano.md) | plano do refactor de unidade sem plano |
 | [implementar_logistica.md](docs/implementar_logistica.md) | investigação parqueada da fome da artilharia |
 

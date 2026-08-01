@@ -26,7 +26,7 @@ alcançar longe.
 ✅ **O contrato do envelope foi emendado pelo autor** e agora diz o mesmo:
 `Artilheiro` devolve verde do hex 0 até o alcance máximo (com o vermelho
 sobrescrevendo) e azul no dobro do alcance máximo. Ver
-`docs/contrato_envelope_alcance.md`, seção *"Artilheiro inverte a banda"*.
+`docs/AI Behavior/contrato_envelope_alcance.md`, seção *"Artilheiro inverte a banda"*.
 
 ⚠️ **O código não faz nem o antigo nem o novo.** `BuildFireSupportPaths` —
 consumido por 11 sítios — devolve
