@@ -563,12 +563,48 @@ public static class CaptureOpportunityClaimService
         return false;
     }
 
+    /// <summary>
+    /// Capturador puro escolhe antes do Capturador Agressivo.
+    ///
+    /// O agressivo e BACKUP de captura: ele satisfaz o papel (CanSatisfy) e por
+    /// isso disputa, mas a vocacao dele e abrir caminho. Quando os dois querem o
+    /// MESMO predio, o puro leva e o agressivo cai para o proximo — que e a
+    /// regra "no empate, o agressivo cede a vez".
+    ///
+    /// Isso e ordem de ESCOLHA, nao de distancia: cada candidato ja tem as
+    /// arestas ordenadas por custo de rota (CompareEdges), entao um capturador
+    /// puro distante nao rouba predio que ele nao quer — ele pega o dele. A
+    /// precedencia so decide o desempate quando ha disputa pelo mesmo alvo.
+    ///
+    /// Vale igual com e sem plano: as duas listas (formal e rogue) passam por
+    /// esta mesma ordenacao.
+    /// </summary>
+    private static int ResolveCapturerRolePrecedence(UnitManager unit)
+    {
+        if (unit == null
+            || !unit.TryGetUnitData(out UnitData data)
+            || data == null
+            || data.roles == null
+            || data.roles.Count == 0)
+        {
+            return 0;
+        }
+
+        return data.roles[0] == UnitRole.CapturadorAgressivo ? 1 : 0;
+    }
+
     private static void SortCandidates(
         List<Candidate> candidates)
     {
         candidates.Sort((left, right) =>
         {
             int compare =
+                ResolveCapturerRolePrecedence(left.Unit)
+                    .CompareTo(
+                        ResolveCapturerRolePrecedence(right.Unit));
+            if (compare != 0)
+                return compare;
+            compare =
                 left.Unit.InstanceId.CompareTo(
                     right.Unit.InstanceId);
             if (compare != 0)

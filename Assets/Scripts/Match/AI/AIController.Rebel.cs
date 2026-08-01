@@ -57,10 +57,20 @@ public partial class AIController
         return TryDecideCapturerAction(unit, snapshot, plan: null);
     }
 
+    /// <summary>
+    /// Capturavel livre mais proximo que ainda nao esta sendo tratado.
+    ///
+    /// <paramref name="requireOwnMovementReach"/> exige que o predio esteja no
+    /// componente de movimento PROPRIO da unidade — "alcancavel a pe". So quem
+    /// vai MARCHAR ate la usa isso. O transporte NAO usa: ele pergunta por um
+    /// alvo para largar o passageiro, e passageiro embarcado tem componente do
+    /// veiculo (agua, no caso do navio), que reprovaria todo predio em terra.
+    /// </summary>
     private ConstructionManager FindNearestPlanlessCaptureTarget(
         UnitManager unit,
         AIWorldSnapshot snapshot,
-        Vector3Int fromCell)
+        Vector3Int fromCell,
+        bool requireOwnMovementReach = false)
     {
         bool hasDesignated =
             TryResolveUnitDesignatedCaptureTarget(
@@ -145,6 +155,20 @@ public partial class AIController
                     construction.InstanceId) ||
                 rebelCaptureTargetReservations.Contains(cell))
                 continue;
+
+            // "Alcancavel": esta no componente de movimento proprio. Predio do
+            // outro lado do mar nao e destino de marcha — e pedido de carona,
+            // e quem responde isso e o Quero Carona.
+            if (requireOwnMovementReach)
+            {
+                MobilityComponent ownComponent =
+                    GetOrBuildMobilityComponent(unit);
+                if (ownComponent?.Cells == null
+                    || !ownComponent.Cells.ContainsKey(cell))
+                {
+                    continue;
+                }
+            }
 
             float dist = SectorManager.HexDistance(fromCell, cell);
             if (dist < bestDist)

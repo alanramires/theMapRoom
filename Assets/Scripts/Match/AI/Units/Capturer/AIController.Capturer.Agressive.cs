@@ -17,12 +17,27 @@ public partial class AIController
     {
         using var perf = new AIDecisionPerfScope(unit, "aggressive");
         action = null;
-        if (unit == null || snapshot == null || assigned == null || paths == null)
+        // assigned NULO e caso normal: unidade sem plano tambem tem ramo
+        // agressivo. Antes esta guarda exigia objetivo atribuido, e o resultado
+        // era que agressivo de faccao sem QG — ou rogue de IA com QG — nao
+        // tinha comportamento agressivo nenhum.
+        if (unit == null || snapshot == null || paths == null)
             return false;
+        // CanSatisfy, nao roles[0]: papel em posicao secundaria continua sendo
+        // o papel. Gate estrito ja mordeu este projeto antes.
         if (!unit.TryGetUnitData(out UnitData data) || data == null
-            || data.roles == null || data.roles.Count == 0
-            || data.roles[0] != UnitRole.CapturadorAgressivo)
+            || !UnitRoleCompatibility.CanSatisfy(
+                data, UnitRole.CapturadorAgressivo))
             return false;
+
+        // Sem objetivo nao ha status de defesa, e o rotulo do log passa a ser a
+        // ancora — que e o que faz papel de objetivo para quem nao tem plano.
+        bool defensiveContext =
+            assigned != null
+            && assigned.Status == ObjectiveStatus.Defending;
+        string objectiveLabel = assigned != null
+            ? assigned.Sector.ToString()
+            : $"âncora {targetCell}";
 
         List<UnitManager> threats = CollectAssaultEscortThreats(
             snapshot.AITeam, targetCell, AggressiveCapturerEngagementRadius);
@@ -43,7 +58,7 @@ public partial class AIController
                 fromCell,
                 targetCell,
                 AggressiveCapturerEngagementRadius,
-                assigned.Status == ObjectiveStatus.Defending,
+                defensiveContext,
                 stationaryPath,
                 occupied,
                 threats,
@@ -53,7 +68,7 @@ public partial class AIController
         {
             Vector3Int rangedTargetCell = rangedTarget.CurrentCellPosition;
             rangedTargetCell.z = 0;
-            Debug.Log($"{TL("CapturadorAgressivo")} {unit.InstanceId} atira parado para {assigned.Sector} "
+            Debug.Log($"{TL("CapturadorAgressivo")} {unit.InstanceId} atira parado para {objectiveLabel} "
                 + $"de {fromCell} -> {rangedTarget.UnitDisplayName}#{rangedTarget.InstanceId} ({rangedReason})");
             action = BuildAttackBatch(unit, snapshot.AITeam, fromCell, fromCell,
                 rangedTarget.InstanceId.ToString(), rangedTargetCell, paths);
@@ -66,7 +81,7 @@ public partial class AIController
                 fromCell,
                 targetCell,
                 AggressiveCapturerEngagementRadius,
-                assigned.Status == ObjectiveStatus.Defending,
+                defensiveContext,
                 paths,
                 occupied,
                 threats,
@@ -77,7 +92,7 @@ public partial class AIController
 
         Vector3Int enemyCell = attackTarget.CurrentCellPosition;
         enemyCell.z = 0;
-        Debug.Log($"{TL("CapturadorAgressivo")} {unit.InstanceId} abre caminho para {assigned.Sector} "
+        Debug.Log($"{TL("CapturadorAgressivo")} {unit.InstanceId} abre caminho para {objectiveLabel} "
             + $"via {attackCell} -> {attackTarget.UnitDisplayName}#{attackTarget.InstanceId} ({attackReason})");
         action = BuildAttackBatch(unit, snapshot.AITeam, fromCell, attackCell,
             attackTarget.InstanceId.ToString(), enemyCell, paths);

@@ -191,7 +191,24 @@ public partial class AIController
             }
         }
 
-        // Avança para o hex mais próximo do HQ
+        // Ramo agressivo tambem vale sem plano: a ancora faz o papel do
+        // objetivo, e o agressivo abre caminho ate ela em vez de so marchar.
+        // Vem depois da captura oportunista e das tentativas de avanço com
+        // ataque — mesma posicao relativa que ele ocupa no fluxo com objetivo.
+        if (TryDecideAggressiveCapturerAction(
+                unit,
+                snapshot,
+                assigned: null,
+                from,
+                target,
+                paths,
+                occupied,
+                out PlayerAction aggressiveRogueAction))
+        {
+            return aggressiveRogueAction;
+        }
+
+        // Avança para o hex mais próximo da âncora
         Vector3Int best     = from;
         float      bestDist = CalculateRouteDistanceOrHex(unit, from, target);
         foreach (Vector3Int cell in paths.Keys)
@@ -210,17 +227,23 @@ public partial class AIController
     }
 
     /// <summary>
-    /// Para onde a unidade SEM PLANO avança.
+    /// Para onde a unidade SEM PLANO avança: o próximo prédio **alcançável e
+    /// capturável**. Sempre. Não existe mais funil para o QG inimigo.
     ///
-    ///   tem QG proprio → QG inimigo. E o eixo de sempre: a IA com plano usa o
-    ///                    proprio QG como referencia e empurra para o oposto.
-    ///   sem QG         → capturavel livre mais proximo. Nao existe eixo sem
-    ///                    base, e as coisas flutuam ao redor da faccao.
+    /// O QG inimigo continua sendo um destino possível — ele é um capturável
+    /// como outro qualquer, e será escolhido quando for o mais próximo. O que
+    /// deixou de existir é a marcha cega até ele: capturador rogue atravessando
+    /// o mapa inteiro para morrer na base adversária, ignorando cada prédio do
+    /// caminho.
     ///
-    /// A escolha do capturavel tambem REGISTRA a intencao (alvo designado e
-    /// reserva da passada), porque para quem nao tem plano e essa designacao
-    /// que faz o papel do objetivo: e ela que o Quero Carona e o transporte
-    /// leem para saber para onde a unidade quer ir.
+    /// "Alcançável" é literal: dentro do componente de movimento próprio. Prédio
+    /// do outro lado do mar não é destino de marcha — é pedido de carona, e quem
+    /// responde isso é o Quero Carona.
+    ///
+    /// A escolha também REGISTRA a intenção (alvo designado + reserva da
+    /// passada), porque para quem não tem plano é essa designação que faz o
+    /// papel do objetivo: é o que o Quero Carona e o transporte leem para saber
+    /// para onde a unidade quer ir.
     /// </summary>
     private bool TryResolvePlanlessCapturerAnchor(
         UnitManager unit,
@@ -231,30 +254,16 @@ public partial class AIController
         if (unit == null || snapshot == null)
             return false;
 
-        bool hasOwnHeadquarters =
-            matchController == null
-            || !matchController.IsSlotRebel(
-                PlayerSlotId.FromIndex(snapshot.AISlotIndex));
-
-        if (hasOwnHeadquarters)
-        {
-            if (snapshot.EnemyHQ == null)
-                return false;
-            anchorCell = snapshot.EnemyHQ.CurrentCellPosition;
-            anchorCell.z = 0;
-            return true;
-        }
-
         Vector3Int fromCell = unit.CurrentCellPosition;
         fromCell.z = 0;
-        ConstructionManager target =
-            FindNearestPlanlessCaptureTarget(unit, snapshot, fromCell);
+        ConstructionManager target = FindNearestPlanlessCaptureTarget(
+            unit, snapshot, fromCell, requireOwnMovementReach: true);
         if (target == null)
         {
             pendingRebelCaptureTargets[unit.InstanceId] = null;
             Debug.Log(
                 $"{TL("SemPlano")} {unit.InstanceId} sem capturável alcançável " +
-                "na visão — cai no fluxo normal.");
+                "a pé — cai no fluxo normal (carona ou HexEvaluator).");
             return false;
         }
 
@@ -264,7 +273,7 @@ public partial class AIController
         rebelCaptureTargetReservations.Add(anchorCell);
         Debug.Log(
             $"{TL("SemPlano")} {unit.InstanceId} âncora = capturável " +
-            $"{anchorCell} por proximidade.");
+            $"{anchorCell} (mais próximo alcançável a pé).");
         return true;
     }
 }
