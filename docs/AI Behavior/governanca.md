@@ -376,16 +376,36 @@ O sistema **procura um acordo**, e qualquer um dos dois lados pode ceder.
 > **pode pousar**. Havendo acordo, o serviço acontece.
 
 Não é "quem não pode mudar dita a camada". É **interseção**: cada lado tem o
-conjunto de camadas que consegue ocupar, e o serviço ocorre se a interseção não
-for vazia. O caminhão tem um conjunto de um elemento só; o caça tem três. Por
-isso o acordo cai sempre no do caminhão — não por regra de precedência, mas
-porque é o único ponto comum.
+conjunto de camadas em que consegue **prestar ou receber** o serviço, e o
+atendimento ocorre se a interseção não for vazia. O caminhão tem um conjunto de
+um elemento só; o caça tem três. Por isso o acordo cai no do caminhão — não por
+regra de precedência, mas porque é o único ponto comum.
 
-No exemplo do KC-130 o acordo é `Air/Low`: o helicóptero não sobe, mas o tanker
-desce e os caças nivelam. Três conjuntos, um ponto comum.
+**O conjunto é de camadas de serviço, não de camadas ocupáveis**, e os dois nem
+sempre coincidem. O KC-130 **só atende no ar**: `{Air/High, Air/Low}`. Que ele
+consiga pousar é irrelevante — pousado, ele não presta o serviço.
 
-É a mesma forma do `MelhorEmbarque` e do `MelhorDesembarque` — pergunta-se uma
-vez por participante e cruza-se o resultado. Cruzar, ordenar e desempatar são do
+### Interseção vazia é resultado legítimo
+
+Encontro de três: avião-tanque, helicóptero e **blindado**.
+
+| participante | camadas de serviço |
+|---|---|
+| KC-130 | `Air/High`, `Air/Low` |
+| helicóptero | `Air/Low` |
+| blindado | `Land/Surface` |
+
+O acordo entre tanker e helicóptero é `Air/Low`. **O blindado fica de fora** — a
+interseção dele com o tanker é vazia, e vazio não é erro nem caso especial: é
+simplesmente "não há serviço".
+
+Isso é o que a formulação por interseção compra. Com "o menos móvel dita a
+camada", o blindado seria o menos móvel dos três e puxaria o encontro para o
+chão, onde o tanker não atende ninguém. A regra errada não só erra o caso de três
+— ela erra **para o lado pior**.
+
+É a mesma forma do `MelhorEmbarque` e do `MelhorDesembarque`: pergunta-se uma vez
+por participante e cruza-se o resultado. Cruzar, ordenar e desempatar são do
 **consumidor**, nunca do serviço. Ver "As três camadas" no `CLAUDE.md`.
 
 ## Sensores Navais
