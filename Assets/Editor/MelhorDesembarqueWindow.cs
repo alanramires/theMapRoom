@@ -19,6 +19,21 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
     [SerializeField] private Vector3Int secondPickedTargetCell;
 
     private Tilemap map;
+    // Uma inundação de tabuleiro por (passageiro, alvo). O mapa reverso sai do
+    // ALVO e vale para todas as células de largada de uma vez — recalculá-lo
+    // por LZ e por spot era o que travava a janela. O runtime já faz isso em
+    // GetOrBuildDisembarkPassengerRoute; aqui fora não havia nada, porque o
+    // MovementReachCache se desliga sozinho fora do Play Mode
+    // (TryBuildKey exige Application.isPlaying).
+    private readonly Dictionary<(int passenger, Vector3Int target),
+        Dictionary<Vector3Int, int>> routeCache =
+        new Dictionary<(int, Vector3Int), Dictionary<Vector3Int, int>>();
+    // Teto duro: uma ferramenta de diagnóstico pode devolver resultado parcial,
+    // mas não pode pendurar o editor. Fica exposto porque quem conhece o mapa
+    // sabe quantos alvos ele tem.
+    [SerializeField] private int maxRouteFloods = 256;
+    private int routeFloods;
+    private bool routeBudgetExhausted;
     private readonly List<MelhorDesembarqueLzScore> ranking =
         new List<MelhorDesembarqueLzScore>();
     private MelhorDesembarqueLzScore selected;
@@ -93,6 +108,14 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
             "Terrain Database", terrainDatabase, typeof(TerrainDatabase), false);
         view = (DebugView)EditorGUILayout.EnumPopup("Visao", view);
         routeHorizon = Mathf.Max(10, EditorGUILayout.IntField("Horizonte de rota", routeHorizon));
+        maxRouteFloods = Mathf.Max(
+            16,
+            EditorGUILayout.IntField(
+                new GUIContent(
+                    "Teto de mapas de rota",
+                    "Um mapa por (passageiro, alvo). Atingido o teto, o " +
+                    "ranking sai parcial em vez de pendurar o editor."),
+                maxRouteFloods));
         if (EditorGUI.EndChangeCheck())
         {
             AutoDetect();
@@ -492,6 +515,12 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
         SyncEditorUnitRegistryForSensors();
         ranking.Clear();
         selected = null;
+        // O memo vale por cálculo: entre um clique e outro o tabuleiro pode ter
+        // mudado, e uma rota velha seria uma resposta provisória disfarçada de
+        // confirmada.
+        routeCache.Clear();
+        routeFloods = 0;
+        routeBudgetExhausted = false;
         AutoDetect();
         if (transporter == null
             || map == null
@@ -509,22 +538,37 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
             return;
         }
 
-        MelhorDesembarqueResult result = MelhorDesembarqueService.Evaluate(
-            new MelhorDesembarqueRequest
-            {
-                transporter = transporter,
-                passengerFilter = passenger,
-                map = map,
-                terrainDatabase = terrainDatabase,
-                movementBudget = transporter.RemainingMovementPoints,
-                resolvePassengerTarget = TryResolvePassengerTargetAndRoute
-            });
+        MelhorDesembarqueResult result;
+        try
+        {
+            result = MelhorDesembarqueService.Evaluate(
+                new MelhorDesembarqueRequest
+                {
+                    transporter = transporter,
+                    passengerFilter = passenger,
+                    map = map,
+                    terrainDatabase = terrainDatabase,
+                    movementBudget = transporter.RemainingMovementPoints,
+                    resolvePassengerTarget = TryResolvePassengerTargetAndRoute
+                });
+        }
+        finally
+        {
+            EditorUtility.ClearProgressBar();
+        }
         ranking.AddRange(result.ranking);
         selected = ranking.Count > 0 ? ranking[0] : null;
         status = ranking.Count > 0
             ? $"{ranking.Count} LZ(s). Melhor: {selected.cell}, " +
-              $"{selected.delivered} passageiro(s), rota restante {selected.totalRouteCost}."
-            : "Nenhum LZ com desembarque e rota comprovados.";
+              $"{selected.delivered} passageiro(s), rota restante {selected.totalRouteCost}. " +
+              $"({routeFloods} mapa(s) de rota)"
+            : $"Nenhum LZ com desembarque e rota comprovados. " +
+              $"({routeFloods} mapa(s) de rota)";
+        if (routeBudgetExhausted)
+            status +=
+                $" ATENÇÃO: teto de {maxRouteFloods} mapas de rota atingido; " +
+                "o ranking está PARCIAL. Reduza o horizonte de rota ou fixe " +
+                "um hex desejado para restringir os alvos avaliados.";
         SceneView.RepaintAll();
     }
 
@@ -623,15 +667,50 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
         target = rawTarget;
         target.z = 0;
         from.z = 0;
+        cost = int.MaxValue;
         if (from == target)
         {
             cost = 0;
             return true;
         }
         Dictionary<Vector3Int, int> reverse =
+            GetOrBuildReverseRoute(passenger, target);
+        return reverse != null && reverse.TryGetValue(from, out cost);
+    }
+
+    /// <summary>
+    /// O mapa reverso depende só de (passageiro, alvo) — nunca da LZ nem do
+    /// spot de onde a pergunta veio. Memorizar por esse par troca
+    /// "LZs × spots × construções" inundações por uma por par.
+    /// </summary>
+    private Dictionary<Vector3Int, int> GetOrBuildReverseRoute(
+        UnitManager routePassenger,
+        Vector3Int target)
+    {
+        var key = (
+            routePassenger != null ? routePassenger.InstanceId : 0,
+            target);
+        if (routeCache.TryGetValue(
+                key,
+                out Dictionary<Vector3Int, int> cached))
+            return cached;
+
+        if (routeFloods >= maxRouteFloods)
+        {
+            routeBudgetExhausted = true;
+            return null;
+        }
+
+        routeFloods++;
+        EditorUtility.DisplayProgressBar(
+            "Melhor LZ de Desembarque",
+            $"Mapa de rota {routeFloods}/{maxRouteFloods} — alvo {target}",
+            routeFloods / (float)maxRouteFloods);
+        Dictionary<Vector3Int, int> built =
             UnitMovementPathRules.CalculateMovementCostMap(
-                map, passenger, target, routeHorizon, terrainDatabase);
-        return reverse.TryGetValue(from, out cost);
+                map, routePassenger, target, routeHorizon, terrainDatabase);
+        routeCache[key] = built;
+        return built;
     }
 
     private bool TryResolveManualTargetForPassenger(
