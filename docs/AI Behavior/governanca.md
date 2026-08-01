@@ -122,26 +122,44 @@ Dois comportamentos já fixados:
 
 Governam a caça e a detecção contra unidades **stealth**.
 
-| família | sensores | estado |
+| sensor | o quê | estado |
 |---|---|---|
-| **Neblina de guerra** | `PodeEnxergar`, `PodeDetectar` | ⚠️ ver abaixo |
+| **`PodeEnxergar`** | revela **hexes**. Usa a **linha ascendente ou descendente** entre observador e alvo | ✅ o comportamento existe; ver a nota de arquivo abaixo |
+| **`PodeDetectar`** | detecta **unidades** furtivas. É quem **possui** a linha de observação | ✅ arquivo próprio, com `PodeDetectarOption` |
 
-⚠️ **Duas divergências nesta família, e é a menos assentada das três.**
+**A linha.** Traça-se do observador ao alvo comparando a elevação (EV) de cada
+célula do caminho contra a altura da linha naquele ponto. A linha **sobe ou
+desce** conforme a diferença entre as duas pontas, e a serra bloqueia quando a EV
+dela supera a altura da linha ali. Quatro tools em `Tools > FoW` mostram isso:
 
-1. O contrato diz "mais **3** sensores" e lista `PodeEnxergar`, `PodeDetectar`,
-   `PodeEnxergar` — o primeiro nome repetido. O terceiro não existe no código sob
-   nenhum nome `Pode*`: o catálogo completo de identificadores `Pode[A-Z]…` tem
-   exatamente estes dois nesta família. Ou o terceiro ainda não nasceu, ou o nome
-   se perdeu na escrita.
-2. **`PodeEnxergar` não tem arquivo de sensor.** Existe só como
-   `PodeEnxergarRuntime` / `PodeEnxergarRuntimeLogs` dentro do
-   `MatchController` — o comportamento está lá, a chave de log tem o nome, mas
-   ele nunca foi extraído para `Assets/Scripts/Sensors/`. É o único `PodeX` do
-   contrato nessa situação.
+| ferramenta | pergunta que responde |
+|---|---|
+| **Pode Enxergar** | quais hexes **esta unidade** enxerga — com o traço da subida da linha, célula bloqueadora e célula que passou |
+| **Hex Enxergado** | o inverso: quais unidades enxergam **este hex** |
+| **Alguém me vê** | quem **me** detecta — a recíproca, do lado do furtivo |
+| **Pode Detectar** | detecção de unidade, direto |
 
-`PodeDetectar` é sensor de verdade, com `PodeDetectarOption` e arquivo próprio.
-Semântica já fixada: o olho significa que uma unidade **com skill de ocultação**
-foi detectada — sem filtro de camada, intencionalmente.
+**Quem faz a conta é o `PodeDetectar`.** A janela do `PodeEnxergar` chama
+`PodeDetectarSensor.TryGetObservationLineDebug`, e a de Hex Enxergado chama
+`PodeDetectarSensor.CollectVisibleCells` "usando as regras do PodeEnxergar". Ou
+seja: revelar hex e detectar unidade compartilham a **mesma** geometria; o que
+muda é o que se pergunta no fim dela.
+
+⚠️ **Duas divergências, e esta é a família menos assentada das três.**
+
+1. O contrato diz "mais **3** sensores" e lista `PodeEnxergar` duas vezes. No
+   catálogo completo de identificadores `Pode[A-Z]…` do projeto existem
+   **dois** nesta família. Mas há **quatro ferramentas** em `Tools > FoW`, e duas
+   delas — *Hex Enxergado* e *Alguém me vê* — são perguntas distintas, não vistas
+   da mesma. É provável que o terceiro nome perdido seja uma delas.
+2. **`PodeEnxergar` não tem arquivo de sensor.** Existe como
+   `PodeEnxergarRuntime` / `PodeEnxergarRuntimeLogs` dentro do `MatchController`,
+   e como janela de Editor — mas nunca foi extraído para
+   `Assets/Scripts/Sensors/`. É o único `PodeX` do contrato nessa situação, e
+   hoje ele empresta a matemática do vizinho.
+
+Semântica já fixada do `PodeDetectar`: o olho significa que uma unidade **com
+skill de ocultação** foi detectada — sem filtro de camada, intencionalmente.
 
 ---
 
@@ -216,9 +234,13 @@ ficha dela.
 ✅ o alcance por modo existe (`Adjacent1Hex`, `SameHexOrEmbarked`) e é o que
 sustenta o modo Hospital do transporte.
 
-A linha do submersível é a mesma forma da aeronave, com o sinal trocado: quem
-sobe para receber **fica em cima**, quem desce para receber **fica embaixo**. Nos
-dois casos o serviço deixa a unidade exposta — e isso é intencional, é o preço.
+A aeronave **desce** (ou nivela) para receber, e **arremete** depois: volta ao
+lugar dela. O submersível **sobe** para receber, e **não** mergulha de volta:
+fica exposto.
+
+Não é simetria — é assimetria, e é o ponto. O único que paga preço permanente
+pelo suprimento é o furtivo, porque o que o serviço tira dele é justamente o que
+o define.
 
 ### PodeTransferir
 
@@ -294,8 +316,8 @@ As relações de governo **entre** papéis estão em
 | G1 | ~~`ApenasMover` é sensor~~ | ✅ **fechada** na 2ª reescrita: o contrato passou a dizer que é ação, não sensor. Código e doutrina concordam |
 | G2 | as três categorias de combate são nomeadas | ⚠️ só existe `operationRangeMin`; a classificação vive espalhada em testes soltos |
 | G3 | ~~são 6 sensores de sistema~~ | ✅ **fechada**: `PodeSubmergirRapidamente` entrou na lista. Falta só corrigir o "6" do cabeçalho para 7 |
-| G4 | a família de detecção tem 3 sensores | ⚠️ tem **2** — `PodeEnxergar` e `PodeDetectar`. O terceiro não existe sob nenhum nome `Pode*` |
-| G5 | `PodeEnxergar` é sensor | ⚠️ **não tem arquivo**: vive dentro do `MatchController` como `PodeEnxergarRuntime`. Único `PodeX` do contrato nessa situação |
+| G4 | a família de detecção tem 3 sensores | ⚠️ tem **2** nomes `Pode*`, mas **4** ferramentas em `Tools > FoW`. O terceiro nome é provavelmente *Hex Enxergado* ou *Alguém me vê* |
+| G5 | `PodeEnxergar` é sensor | ⚠️ **não tem arquivo**: vive no `MatchController` e na janela de Editor, e a conta da linha ele pega emprestada do `PodeDetectarSensor`. Único `PodeX` do contrato nessa situação |
 | G6 | `PodeDecolar` é sempre chamado ao selecionar/ativar | ❓ |
 | G7 | os dois redutores de −50% da captura | ❓ |
 | G8 | ordem ≠ sensor | ⚠️ o Serviço do Comando **é** um sensor no código; a distinção só existe aqui |
