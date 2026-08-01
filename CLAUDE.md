@@ -8,6 +8,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Read `docs/arquitetura/acoes_transacionais.md` before changing TurnState, movement, FOW, sensors, combat, capture, transport, supply, merge, replay or AI action execution.
 
+## Start here
+
+`docs/resumo.md` is the handoff: current state, the five-rung architecture ladder,
+what to read in what order, the next concrete task, and the traps that already
+cost time. Read it before planning any AI work.
+
 ## Versioning and reports
 
 `vX.Y.Z`, a scheme defined by the author:
