@@ -80,92 +80,7 @@ fundação, não como detalhe de interface.
 > Dependendo de onde você estiver, **depois** de segurar posição ou escolher um
 > hex, o jogo calcula as opções de ação disponíveis.
 
-| família | ação | estado |
-|---|---|---|
-| **Fonte de renda** | `PodeCapturar` | ✅ |
-| **Combate** | `PodeMirar` | ✅ |
-| **Transporte** | `PodeEmbarcar`, `PodeDesembarcar` | ✅ |
-| **Logística** | `PodeSuprir` | ✅ |
-| **Estoque** | `PodeTransferir` | ✅ |
-| **Sobrevivência** | `PodeFundir` | ✅ |
-| **Mobilidade** | **`ApenasMover`** *(antes `PodeMover`)* — **não é um sensor, é uma ação disponível** | ✅ pela definição do contrato: não existe `PodeMoverSensor`, e não deve existir |
-
-A distinção da última linha resolve o que parecia divergência: `ApenasMover` não
-tem arquivo de sensor porque **não é um sensor**. É a ação que sobra quando
-nenhuma outra é escolhida — e escolher ficar é uma decisão, não um resto.
-
----
-
-## 5. Sensores aéreos e navais
-
-Não são acessados pelo jogador. Governam **transição de domínio** e são chamados
-pelos demais `PodeX`.
-
-| domínio | sensores | estado |
-|---|---|---|
-| **Aéreos** | `PodeDecolar`, `PodeArremeter`, `PodePousar`, `PodeMudarDeAltitude` | ✅ (o arquivo é `PodeMudarAltitudeSensor`) |
-| **Navais** | `PodeEmergir`, `PodeSubmergir`, `PodeSubmergirRapidamente` | ✅ |
-
-⚠️ O cabeçalho do contrato ainda diz "6 `PodeX`"; a lista tem **7**. O sétimo é o
-`PodeSubmergirRapidamente`, que ganhou linha própria nesta reescrita.
-
-Dois comportamentos já fixados:
-
-- **Pouso de emergência** chama `PodePousar` antes de destruir, e desliga os
-  motores. ✅
-- **`PodeDecolar` é sempre chamado** quando a unidade é selecionada, ou ativada
-  por receber embarque. ❓ não conferido.
-
----
-
-## 6. Sensores de busca e detecção de furtivos
-
-Governam a caça e a detecção contra unidades **stealth**.
-
-| sensor | o quê | estado |
-|---|---|---|
-| **`PodeEnxergar`** | revela **hexes**. Usa a **linha ascendente ou descendente** entre observador e alvo | ✅ o comportamento existe; ver a nota de arquivo abaixo |
-| **`PodeDetectar`** | detecta **unidades** furtivas. É quem **possui** a linha de observação | ✅ arquivo próprio, com `PodeDetectarOption` |
-
-**A linha.** Traça-se do observador ao alvo comparando a elevação (EV) de cada
-célula do caminho contra a altura da linha naquele ponto. A linha **sobe ou
-desce** conforme a diferença entre as duas pontas, e a serra bloqueia quando a EV
-dela supera a altura da linha ali. Quatro tools em `Tools > FoW` mostram isso:
-
-| ferramenta | pergunta que responde |
-|---|---|
-| **Pode Enxergar** | quais hexes **esta unidade** enxerga — com o traço da subida da linha, célula bloqueadora e célula que passou |
-| **Hex Enxergado** | o inverso: quais unidades enxergam **este hex** |
-| **Alguém me vê** | quem **me** detecta — a recíproca, do lado do furtivo |
-| **Pode Detectar** | detecção de unidade, direto |
-
-**Quem faz a conta é o `PodeDetectar`.** A janela do `PodeEnxergar` chama
-`PodeDetectarSensor.TryGetObservationLineDebug`, e a de Hex Enxergado chama
-`PodeDetectarSensor.CollectVisibleCells` "usando as regras do PodeEnxergar". Ou
-seja: revelar hex e detectar unidade compartilham a **mesma** geometria; o que
-muda é o que se pergunta no fim dela.
-
-⚠️ **Duas divergências, e esta é a família menos assentada das três.**
-
-1. O contrato diz "mais **3** sensores" e lista `PodeEnxergar` duas vezes. No
-   catálogo completo de identificadores `Pode[A-Z]…` do projeto existem
-   **dois** nesta família. Mas há **quatro ferramentas** em `Tools > FoW`, e duas
-   delas — *Hex Enxergado* e *Alguém me vê* — são perguntas distintas, não vistas
-   da mesma. É provável que o terceiro nome perdido seja uma delas.
-2. **`PodeEnxergar` não tem arquivo de sensor.** Existe como
-   `PodeEnxergarRuntime` / `PodeEnxergarRuntimeLogs` dentro do `MatchController`,
-   e como janela de Editor — mas nunca foi extraído para
-   `Assets/Scripts/Sensors/`. É o único `PodeX` do contrato nessa situação, e
-   hoje ele empresta a matemática do vizinho.
-
-Semântica já fixada do `PodeDetectar`: o olho significa que uma unidade **com
-skill de ocultação** foi detectada — sem filtro de camada, intencionalmente.
-
----
-
-## 7. Notas dos sensores do jogador
-
-### PodeCapturar
+### 4.1 Fonte de renda — `PodeCapturar`
 
 Requer a skill **"Captura Construções"**. ✅ `PodeCapturarSensor.cs:36` exige
 `skill.canCaptureConstructions`.
@@ -182,7 +97,7 @@ Converte **HP em captura**. Dois redutores de −50%, que **compõem**:
 
 ❓ os redutores não foram conferidos no código.
 
-### PodeMirar
+### 4.2 Combate — `PodeMirar`
 
 Requer **`EmbarkedWeapons`**. Três categorias, derivadas do alcance mínimo:
 
@@ -199,15 +114,15 @@ três nomes**. A classificação é doutrina; hoje vive espalhada em testes solt
 desse campo. É o mesmo `rangeMin ≥ 1` que a Hotzone usa para devolver `null` em
 Combate + Terrestre.
 
-### PodeEmbarcar
+### 4.3 Transporte — `PodeEmbarcar` e `PodeDesembarcar`
 
-Requer **pontos de movimento sobrando** para pagar o custo do terreno **do
-transportador** — esse custo *é* o custo do embarque.
+**`PodeEmbarcar`** requer **pontos de movimento sobrando** para pagar o custo do
+terreno **do transportador** — esse custo *é* o custo do embarque.
 
 - O transportador **limita** onde aceita embarque e que **tipo de vaga** oferece.
 - **Não** entra multiplicador de autonomia.
 
-### PodeDesembarcar
+**`PodeDesembarcar`:**
 
 - O **transportador** deve estar em local válido segundo a ficha dele.
 - O **transportador** também elege os locais válidos **para a carga**.
@@ -217,7 +132,7 @@ transportador** — esse custo *é* o custo do embarque.
 > Desembarque é sempre ação do **transportador**; embarque é sempre ação do
 > **passageiro**. As duas fichas participam, mas o dono da ação não muda.
 
-### PodeSuprir
+### 4.4 Logística — `PodeSuprir`
 
 A supridora **converte recursos em serviços** e presta em campo, no alcance da
 ficha dela.
@@ -226,7 +141,7 @@ ficha dela.
 |---|---|
 | alcance | range 1, apenas embarcados, ou combinação dos dois |
 | camada | o serviço acontece **na camada do supridor**, por um custo |
-| aeronaves | pousam e **arremetem** depois de supridas |
+| aeronaves | **pousam** e **arremetem** depois de supridas |
 | **submersíveis** | **emergem, recebem, e NÃO mergulham de volta** |
 | aproximação | o supridor tenta chegar à camada do atendido, se tiver condições |
 | ação | consome a ação **do supridor**, não a do suprido |
@@ -234,15 +149,13 @@ ficha dela.
 ✅ o alcance por modo existe (`Adjacent1Hex`, `SameHexOrEmbarked`) e é o que
 sustenta o modo Hospital do transporte.
 
-A aeronave **desce** (ou nivela) para receber, e **arremete** depois: volta ao
-lugar dela. O submersível **sobe** para receber, e **não** mergulha de volta:
-fica exposto.
+A aeronave **desce** (ou nivela) para receber e **arremete** depois: volta ao
+lugar dela. O submersível **sobe** para receber e **não** mergulha de volta: fica
+exposto. Não é simetria, é assimetria — e é o ponto. O único que paga preço
+permanente pelo suprimento é o furtivo, porque o que o serviço tira dele é
+justamente o que o define.
 
-Não é simetria — é assimetria, e é o ponto. O único que paga preço permanente
-pelo suprimento é o furtivo, porque o que o serviço tira dele é justamente o que
-o define.
-
-### PodeTransferir
+### 4.5 Estoque — `PodeTransferir`
 
 | regra | detalhe |
 |---|---|
@@ -256,7 +169,7 @@ o define.
 Contraste que vale marcar: **suprir custa e arremete; transferir não custa e não
 arremete.** Mesma geometria, economias opostas.
 
-### PodeFundir
+### 4.6 Sobrevivência — `PodeFundir`
 
 > Para todos os efeitos é **exatamente igual ao embarque** — custo de terreno,
 > etc.
@@ -275,14 +188,104 @@ arremete.** Mesma geometria, economias opostas.
 (`ResolveFusionEnterCost`). ⚠️ Fusão **não tem banda Operational** — ver
 `contrato_envelope_alcance.md`.
 
-### ApenasMover
+### 4.7 Mobilidade — `ApenasMover`
+
+*(antes `PodeMover`)* — **não é um sensor, é uma ação disponível.**
 
 > Você segura a posição onde estiver. Às vezes a melhor ação é continuar onde
 > está: segurar a linha, servir de **observador avançado**, etc.
 
+✅ Pela definição do contrato: não existe `PodeMoverSensor`, e não deve existir.
+É a ação que sobra quando nenhuma outra é escolhida — e escolher ficar é uma
+decisão, não um resto.
+
 ---
 
-## 8. A consequência para os papéis
+## 5. Sensores aéreos e navais
+
+O sistema usa **7** `PodeX` que **não** são acessados pelo jogador. Governam
+**transição de domínio** e são chamados pelos demais.
+
+### Aéreos
+
+| sensor | o quê | estado |
+|---|---|---|
+| **`PodeDecolar`** | verifica condições de decolar até a altitude desejada — ou **1 casa** em pistas improvisadas | ✅ |
+| **`PodeArremeter`** | faz a aeronave pousar, algo acontece (ser suprida, p. ex.), e **ela já chama o `PodeDecolar`** | ✅ confirmado: `PodeArremeterSensor` chama `PodeDecolarSensor.Evaluate` e loga *"decolagem final validada por PodeDecolar"* |
+| **`PodePousar`** | verifica se há as skills necessárias para pouso em cada tipo de local: VTOL, SVTOL, pista | ❓ os nomes das skills não foram localizados |
+| **`PodeMudarDeAltitude`** | reposiciona a aeronave entre altitudes, geralmente durante o suprir | ✅ (`PodeMudarAltitudeSensor`) |
+
+`PodeArremeter` é o único que **compõe** dois outros: é pouso-mais-decolagem num
+gesto só. Por isso o pouso de emergência precisa desligar o motor — senão a
+aeronave sem combustível arremeteria de volta ao ar assim que fosse suprida.
+
+### Navais
+
+| sensor | o quê | estado |
+|---|---|---|
+| **`PodeEmergir`** | verifica se o submarino pode subir à superfície | ✅ |
+| **`PodeSubmergir`** | verifica se pode voltar a submerso. **Submarino atingido ou que disparou fica trancado** e não pode submergir | ✅ existe o mecanismo (`IsLayerChangeBlockedByForcedLock`); ❓ não conferi que atingir/disparar são os gatilhos |
+| **`PodeSubmergirRapidamente`** | a unidade **termina submersa** tendo começado emersa, mas precisa verificar as condições para isso | ✅ |
+
+O lock do `PodeSubmergir` é a peça que dá custo ao tiro do submarino: atirar
+**revela e prende** na superfície. É a mesma economia da §4.4 — o furtivo é o
+único que paga com a própria natureza.
+
+> **`PodeDecolar` é sempre chamado** quando a unidade é selecionada, ou ativada
+> por receber embarque. ❓ não conferido.
+
+---
+
+## 6. Sensores de busca e detecção de furtivos
+
+Governam a caça e a detecção contra unidades **stealth**.
+
+### `PodeEnxergar` — libera tiles
+
+Libera tiles no tabuleiro. **Hoje o padrão é a curva descendente ou nivelada.**
+
+> Hex liberado **não** necessariamente revela o que há lá: isso depende do
+> alcance de visão e das skills de detecção que a unidade tenha — ou não tenha.
+
+Essa separação é a regra inteira em uma frase: **terreno e ocupante são duas
+perguntas diferentes.** É o mesmo motivo pelo qual construção com `visão = N`
+revela terreno no raio N mas só spotta unidade no raio 0 — prédio não é
+observador.
+
+**Hex Enxergado** é uma **função**, não um sensor: parte do hex para quem o vê.
+
+### `PodeDetectar` — encontra o furtivo
+
+Unidades com **visão especializada** procuram por unidades com a skill oposta
+correspondente — caça submarina procura sub ops; detector de stealth procura ar
+stealth. Encontrando, a unidade **aparece**.
+
+**Alguém me vê** é o `PodeDetectar` ao contrário.
+
+Semântica já fixada: o olho significa que uma unidade **com skill de ocultação**
+foi detectada — sem filtro de camada, intencionalmente.
+
+### Estado
+
+⚠️ **O contrato anuncia "mais 3 sensores" e descreve 2** — `PodeEnxergar` e
+`PodeDetectar`. Os outros dois nomes que aparecem, *Hex Enxergado* e *Alguém me
+vê*, o próprio texto define como **função** e como **inverso**, não como sensores
+próprios. Quatro ferramentas em `Tools > FoW`, duas perguntas de verdade.
+
+⚠️ **`PodeEnxergar` não tem arquivo de sensor.** Existe como
+`PodeEnxergarRuntime` / `PodeEnxergarRuntimeLogs` dentro do `MatchController` e
+como janela de Editor — nunca foi extraído para `Assets/Scripts/Sensors/`. Pior:
+a conta da linha ele **pega emprestada do vizinho** — a janela do `PodeEnxergar`
+chama `PodeDetectarSensor.TryGetObservationLineDebug`, e a de *Hex Enxergado*
+chama `PodeDetectarSensor.CollectVisibleCells` embora a própria ajuda dela diga
+"usando as regras do PodeEnxergar".
+
+Ou seja: liberar tile e detectar unidade **compartilham a geometria** e estão
+implementados num arquivo só, com o nome do outro.
+
+---
+
+## 7. A consequência para os papéis
 
 Esta seção não é do contrato; é o que sai dele.
 
@@ -313,12 +316,14 @@ As relações de governo **entre** papéis estão em
 
 | # | contrato | código hoje |
 |---|---|---|
-| G1 | ~~`ApenasMover` é sensor~~ | ✅ **fechada** na 2ª reescrita: o contrato passou a dizer que é ação, não sensor. Código e doutrina concordam |
+| G1 | ~~`ApenasMover` é sensor~~ | ✅ **fechada**: o contrato diz que é ação, não sensor. Código e doutrina concordam |
 | G2 | as três categorias de combate são nomeadas | ⚠️ só existe `operationRangeMin`; a classificação vive espalhada em testes soltos |
-| G3 | ~~são 6 sensores de sistema~~ | ✅ **fechada**: `PodeSubmergirRapidamente` entrou na lista. Falta só corrigir o "6" do cabeçalho para 7 |
-| G4 | a família de detecção tem 3 sensores | ⚠️ tem **2** nomes `Pode*`, mas **4** ferramentas em `Tools > FoW`. O terceiro nome é provavelmente *Hex Enxergado* ou *Alguém me vê* |
-| G5 | `PodeEnxergar` é sensor | ⚠️ **não tem arquivo**: vive no `MatchController` e na janela de Editor, e a conta da linha ele pega emprestada do `PodeDetectarSensor`. Único `PodeX` do contrato nessa situação |
+| G3 | ~~são 6 sensores de sistema~~ | ✅ **fechada**: são 7, e o cabeçalho já diz 7 |
+| G4 | a família de detecção tem 3 sensores | ⚠️ tem **2**. *Hex Enxergado* e *Alguém me vê* são função e inverso, pelo próprio texto |
+| G5 | `PodeEnxergar` é sensor | ⚠️ **não tem arquivo** e empresta a matemática do `PodeDetectarSensor` |
 | G6 | `PodeDecolar` é sempre chamado ao selecionar/ativar | ❓ |
 | G7 | os dois redutores de −50% da captura | ❓ |
-| G8 | ordem ≠ sensor | ⚠️ o Serviço do Comando **é** um sensor no código; a distinção só existe aqui |
-| G9 | submersível emerge, recebe e não mergulha | ❓ regra nova nesta reescrita, não conferida |
+| G8 | ordem ≠ sensor | ⚠️ o Serviço do Comando **é** um sensor no código |
+| G9 | submersível emerge, recebe e não mergulha | ❓ |
+| G10 | submarino atingido ou que disparou não submerge | ❓ o lock existe (`IsLayerChangeBlockedByForcedLock`); os gatilhos não foram conferidos |
+| G11 | `PodePousar` distingue VTOL / SVTOL / pista | ❓ não localizei as skills por esses nomes |
