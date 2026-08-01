@@ -1,139 +1,234 @@
-# Governança entre papéis — as arestas
+# Governança — o que existe acima de todos os papéis
 
-Os outros documentos desta pasta descrevem **papéis**. Este descreve o que
-existe **entre** eles.
+Contrato do autor. Este documento fica **acima** dos contratos de papel: o que
+está aqui vale para toda unidade do jogo, tenha ela papel, plano ou nenhum dos
+dois.
 
-Ele nasceu de uma observação do autor, escrevendo o quarto contrato:
+| marca | significado |
+|---|---|
+| ✅ | implementado e conferido |
+| ⚠️ | existe, mas diverge do que está escrito aqui |
+| ❌ | não existe no código |
+| ❓ | não conferido — a busca não fecha a questão |
 
-> *"cada papel lê todos os sensores, mas de maneira diferente, e alguns governam
-> como outros papéis se comportam"*
+> O jogador sempre tem à mão **2 ordens** e **diversos sensores**.
 
 ---
 
-## 1. A primeira metade: papel é uma consulta, não um conjunto
+## 1. As duas ordens
 
-Todo papel pergunta aos mesmos sensores. O capturador consulta `PodeMirar`; o
-assalto consulta `PodeCapturar`; o transporte consulta os dois e mais quatro. Não
-existe sensor "do capturador".
+Ordem não é ação de unidade: não consome movimento nem passa pela cadeia
+`PodeX`. É o jogador agindo sobre o tabuleiro.
 
-O que muda entre papéis é **como** se pergunta:
+| ordem | o que faz | estado |
+|---|---|---|
+| **Serviço do Comando** | rotina de suprimento para unidades que **não agiram** e **não receberam suprimento** na rodada | ✅ `ServicoDoComandoSensor` |
+| **Dispensar Unidades** | destrói uma unidade. Útil ao alcançar o limite do tabuleiro, ou quando uma unidade está há muito tempo sem pickup | ✅ `SensorActionType.RemoveUnit` |
+
+⚠️ Nota de nomenclatura: o Serviço do Comando é implementado **como sensor**
+(`ServicoDoComandoSensor`), e Dispensar aparece no código como `RemoveUnit`.
+Nenhum dos dois usa a palavra "ordem". A distinção conceitual deste documento não
+tem contraparte no código.
+
+---
+
+## 2. Os sensores do jogador
+
+> Qualquer unidade no jogo pode **mover + agir**. As ações são governadas pelos
+> `PodeX` abaixo.
+
+| família | sensor | estado |
+|---|---|---|
+| **Fonte de renda** | `PodeCapturar` | ✅ |
+| **Combate** | `PodeMirar` | ✅ |
+| **Transporte** | `PodeEmbarcar`, `PodeDesembarcar` | ✅ |
+| **Logística** | `PodeSuprir` | ✅ |
+| **Estoque** | `PodeTransferir` | ✅ |
+| **Sobrevivência** | `PodeFundir` | ✅ |
+| **Mobilidade** | `ApenasMover` *(`PodeMover`, nome antigo descontinuado)* | ⚠️ não é um sensor: movimento é `UnitMovementPathRules`. Não existe arquivo `PodeMoverSensor` nem `ApenasMoverSensor` |
+
+### O que a lista não cobre
+
+**`PodeDetectar` existe e não está em nenhuma família.** É um sensor de verdade
+(`PodeDetectarSensor`), com `PodeDetectarOption`, e governa quem enxerga quem.
+Não é ação do jogador — mas também não é transição de domínio, então não cabe na
+lista da §3. Fica registrado como buraco na taxonomia, a resolver.
+
+---
+
+## 3. Os sensores do sistema
+
+> Não são acessados pelo jogador. Governam **transição de domínios** e são
+> chamados pelos demais `PodeX`.
+
+| domínio | sensor | estado |
+|---|---|---|
+| **Aéreos** | `PodeDecolar`, `PodeArremeter`, `PodePousar`, `PodeMudarDeAltitude` | ✅ (`PodeMudarAltitudeSensor`) |
+| **Navais** | `PodeEmergir`, `PodeSubmergir` | ✅ |
+
+⚠️ São **7**, não 6: existe também `PodeSubmergirRapidamenteSensor` (mergulho
+rápido), separado do `PodeSubmergirSensor`.
+
+Dois comportamentos já fixados:
+
+- **Pouso de emergência** testa `PodePousar` **antes** de destruir a aeronave, e
+  desliga os motores dela: pousada não arremete depois de ser suprida. ✅
+- **`PodeDecolar` é sempre chamado** quando a unidade é selecionada, ou ativada
+  por receber embarque. ❓ não conferido.
+
+> Cada um será detalhado individualmente depois.
+
+---
+
+## 4. Os sensores, um a um
+
+### PodeCapturar
+
+Requer a skill **"Captura Construções"**. ✅ `PodeCapturarSensor.cs:36` exige
+`skill.canCaptureConstructions`.
+
+Converte **HP em captura**. Dois redutores de −50%:
+
+| redutor | quando |
+|---|---|
+| papel | alguns papéis convertem a −50% |
+| prédio | pré-requisitos não atendidos impõem −50% na entrada |
+
+❓ os dois redutores não foram conferidos.
+
+### PodeMirar
+
+Requer **`EmbarkedWeapons`**. Três categorias, derivadas do alcance mínimo da
+arma:
+
+| categoria | quando acontece | `rangeMin` | revide |
+|---|---|---|---|
+| **Combate corporal** | parado **ou** após movimento | `= 1` | **gera** |
+| **Combate à distância** | apenas parado | `> 1` | não gera |
+| **Combate híbrido** | tem armas nos dois critérios: tenta a distância primeiro, e se não conseguir vai para o corporal | — | conforme a arma usada |
+
+A **mina naval** é `rangeMin = 0`, portanto também não gera revide.
+
+⚠️ O código tem o campo (`WeaponData.operationRangeMin`, default 1) mas **não tem
+os três nomes**: não existe `CombateCorporal`, `CombateADistancia` nem
+`CombateHibrido`. A classificação é doutrina; hoje ela vive espalhada em testes
+de `operationRangeMin`. É o mesmo `rangeMin ≥ 1` que a Hotzone usa para devolver
+`null` em Combate + Terrestre.
+
+### PodeEmbarcar
+
+Requer **pontos de movimento sobrando** para pagar o custo do terreno **do
+transportador** — esse custo *é* o custo do embarque.
+
+- O transportador **limita** onde aceita embarque e que **tipo de vaga** oferece.
+- **Não** entra multiplicador de autonomia.
+
+### PodeDesembarcar
+
+- O **transportador** deve estar em local válido segundo a ficha dele.
+- O **transportador** também elege os locais válidos **para a carga**, segundo a
+  ficha dele.
+- O **passageiro** paga o custo de MP do desembarque — esse custo *é* o custo do
+  desembarque —, **sem** multiplicador de autonomia.
+
+> Desembarque é sempre ação do **transportador**; embarque é sempre ação do
+> **passageiro**. As duas fichas participam, mas o dono da ação não muda.
+
+### PodeSuprir
+
+A unidade supridora **converte recursos em serviços** e presta em campo, no
+alcance da ficha dela.
+
+| regra | detalhe |
+|---|---|
+| alcance | range 1, apenas embarcados, ou combinação dos dois |
+| camada | o serviço acontece **na camada do supridor**, por um custo |
+| aeronaves | pousam, e **arremetem** depois de supridas |
+| aproximação | o supridor tenta chegar à camada do atendido, se tiver condições |
+| ação | consome a ação **do supridor**, não a do suprido |
+
+✅ o alcance por modo existe (`Adjacent1Hex`, `SameHexOrEmbarked`) e é o que
+sustenta o modo Hospital do transporte.
+
+### PodeTransferir
+
+| regra | detalhe |
+|---|---|
+| classificação | **Hub** (trocam recursos entre si) e **Receiver** (apenas recebem) |
+| custo | **não tem** |
+| camada | mesma camada do supridor |
+| aeronaves de carga | pousam e **não** arremetem |
+
+✅ `SupplierTier.Hub` / `Receiver` em `PodeTransferirSensor`.
+
+Contraste que vale marcar: **suprir custa e arremete; transferir não custa e não
+arremete.** São a mesma geometria com economias opostas.
+
+### PodeFundir
+
+> Para todos os efeitos é **exatamente igual ao embarque** — custo de terreno,
+> etc.
+
+- Apenas entre unidades **aliadas e idênticas**.
+- A diferença: você "embarca" no candidato e é **absorvido** por ele, tornando-se
+  uma **unidade nova**.
+
+| grandeza | como combina |
+|---|---|
+| munição | média ponderada |
+| autonomia | média ponderada |
+| HP | **soma simples** |
+
+✅ o envelope já trata Fusão como embarque para efeito de custo
+(`ResolveFusionEnterCost`). ⚠️ Fusão **não tem banda Operational** — ver
+`contrato_envelope_alcance.md`.
+
+### ApenasMover
+
+> Você segura a posição onde estiver. Às vezes a melhor ação é continuar onde
+> está: segurar a linha, servir de **observador avançado**, etc.
+
+⚠️ Não existe como sensor. É a ausência de ação, não uma ação — mas o contrato a
+trata como uma das oito, e há razão: "ficar" é uma decisão, não um resto.
+
+---
+
+## 5. A consequência para os papéis
+
+Esta seção não é do contrato; é o que sai dele.
+
+Se **toda** unidade lê **estes** sensores, então papel não é um conjunto de
+sensores. É uma **consulta diferente sobre os mesmos sensores**:
 
 ```text
-papel  =  intenção  ×  subetapa  ×  banda      (sobre o mesmo sensor)
+papel  =  intenção  ×  subetapa  ×  banda      (sobre o mesmo PodeX)
 ```
 
 Que é exatamente a assinatura do `UnitReachEnvelopeService`. O envelope não foi
 inventado para o transporte nem para a artilharia: ele é a forma geral de
 "perguntar como um papel".
 
-**Consequência direta:** o arquivo de um papel não deveria conter lógica de
-alcance nenhuma. Só **política** — prioridade, recusa, desempate, quando desistir.
-Todo cálculo de "até onde" pertence ao serviço.
+**Consequência direta:** arquivo de papel não deveria conter lógica de alcance
+nenhuma. Só **política** — prioridade, recusa, desempate, quando desistir. Todo
+cálculo de "até onde" pertence ao serviço.
 
 É por isso que consumir a Hotzone **encolhe** os arquivos de papel. Não é
-otimização; é o papel voltando a ser só o que ele é. Ver "As três camadas" no
-`CLAUDE.md`: serviço burro → consumidor → organizador.
+otimização: é o papel voltando a ser só o que ele é.
+
+As relações de governo **entre** papéis — quem é âncora de quem, quem adota a
+agenda de quem — são outro assunto, em
+`docs/AI Behavior/governanca_entre_papeis.md`.
 
 ---
 
-## 2. A segunda metade: três tipos de governo
+## Pendências
 
-"Governar" não é uma coisa só. São três, e confundi-las é o que produz o mesmo
-bug repetido.
-
-| tipo | governa | mecanismo |
+| # | contrato | código hoje |
 |---|---|---|
-| **magnético** | o **onde** | o papel A vira a **âncora** do papel B |
-| **por agenda** | o **para quê** | o papel A **adota o objetivo** do papel B |
-| **por exclusão** | o **onde não** | o papel A é definido por onde o papel B **está** |
-
-### 2.1 Magnético — governa o onde
-
-O papel governado orbita o governante. Não precisa ficar colado: fica entre 1 e
-o **Tactical do capitão**.
-
-| capitão | orbita | estado |
-|---|---|---|
-| Capturador | Assalto | ✅ `AIController.Assault.cs:213` resolve o capitão e loga o id |
-| Assalto marítimo (`isMaritime`) | Marinha (fragata, submarino) | ⚠️ **hoje a marinha segue o capitão terrestre** — hardcode para o jogo de testes continuar rodando. É o item M3 do `Assalto.md` |
-| Radar / EWACS | Antiaéreo | ver `FireSupport.md` |
-
-### 2.2 Por agenda — governa o para quê
-
-O papel governado **não tem objetivo próprio**: adota o de quem ele serve.
-
-O transporte é o caso puro. *"O passageiro mais antigo assume o volante e leva o
-transportador até onde quer ir."* O destino do veículo **é** o destino da carga —
-e por isso o `AIDesignatedMission` dele deveria herdar o objetivo do passageiro
-(pendência T11 do `Transporte.md`).
-
-É o único papel governado por **todos** os outros. Isso não é acidente de
-implementação, é a definição da função dele: alavancar.
-
-### 2.3 Por exclusão — governa o onde não
-
-O papel governado é definido, em parte, por uma região **proibida**, e essa
-região é a posição de outro papel.
-
-Fire Support não pode estar na vanguarda. Mas "vanguarda" não é uma constante do
-mapa: é **onde o assalto está**. Mover o assalto move a proibição do fire
-support, sem ninguém tocar em fire support.
-
-O mesmo vale, invertido, para o transporte: ele não pode largar âncora em cima de
-capturável porque essa célula é do capturador (§6.5 do `Transporte.md`).
-
----
-
-## 3. Por que isso importa: ordem de refactor
-
-**As arestas determinam a ordem, e a ordem não é negociável.**
-
-O caso que já foi esbarrado, e que motivou este documento:
-
-> A lógica de camada nativa do submarino mora **dentro** do fluxo de perseguir o
-> capitão. O M3 remove esse fluxo. Fazer M4 antes de M3 apagaria a camada nativa
-> junto; fazer M3 antes de M4b apagaria sem ter onde recolocá-la. Daí a ordem
-> obrigatória **M4b → M3 → M4**.
-
-Ninguém deduziu isso do plano. Descobriu-se batendo. Com o grafo escrito, a
-regra é mecânica:
-
-> **Antes de arrancar um fluxo de governo, verifique o que está morando dentro
-> dele.** Um fluxo magnético é um lugar tentador para pendurar lógica que não tem
-> nada a ver com o capitão — e ela morre junto quando o fluxo sai.
-
----
-
-## 4. O bug que este documento explica
-
-Os quatro contratos produziram tabelas de pendência que **rimam**. Sempre uma
-destas três formas:
-
-| forma | exemplos |
-|---|---|
-| **número fixo onde devia ter banda** | `TransportDropOffRange = 4`, `FireSupportDropOffRange = 3`, `ShuttlePickupRange = 2`, `AirDropOffRange = 2` |
-| **âncora congelada onde devia ter parâmetro** | o funil do QG no capturador rogue — derrubado na v6.1.2/6.1.3 e **ainda vivo** na sua cópia dentro do transporte (T2) |
-| **cópia paralela onde devia ter parâmetro** | `Rebel.cs` como espelho do capturador; e a segunda cópia do mesmo funil no desembarque |
-
-Não são quatro problemas. É um, aparecendo quatro vezes — e é o que a regra
-geradora do `CLAUDE.md` já dizia antes de existirem os casos:
-
-> *banda, âncora e camada são sempre parâmetro da unidade avaliada — nunca
-> constante do papel.*
-
-Este documento acrescenta a razão de a violação ser **tão fácil de cometer**:
-quando o papel A governa o papel B, a tentação é escrever em B a constante que
-descreve A hoje, em vez de perguntar a A. Funciona, e continua funcionando até A
-mudar — aí B fica com a doutrina velha, e ninguém percebe, porque B compila e
-roda.
-
----
-
-## 5. Aviso de método
-
-Contrato escreve mais rápido do que código implementa. Quatro contratos já
-produziram dezenas de pendências, e boa parte é doutrina do zero.
-
-Uma lista grande, organizada e marcada **parece progresso**. O antídoto é o ritmo
-que o autor já usava por instinto: **uma classe por vez — mexe, compila, roda no
-jogo, comita antes da próxima.** Não emenda fases.
+| G1 | `ApenasMover` é um dos sensores | ⚠️ não existe sensor de movimento; é `UnitMovementPathRules` |
+| G2 | as três categorias de combate são nomeadas | ⚠️ só existe `operationRangeMin`; a classificação vive espalhada em testes soltos |
+| G3 | são 6 sensores de sistema | ⚠️ são 7 — falta `PodeSubmergirRapidamente` na lista |
+| G4 | `PodeDetectar` tem lugar na taxonomia | ❌ existe e não está em nenhuma família |
+| G5 | `PodeDecolar` é sempre chamado ao selecionar/ativar | ❓ |
+| G6 | os dois redutores de −50% da captura | ❓ |
+| G7 | ordem ≠ sensor | ⚠️ o Serviço do Comando **é** um sensor no código; a distinção só existe aqui |
