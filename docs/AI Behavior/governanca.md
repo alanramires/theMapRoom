@@ -692,6 +692,175 @@ agenda de quem — estão em `docs/AI Behavior/governanca_entre_papeis.md`.
 
 ---
 
+# Usos da Hotzone
+
+As unidades usam a Hotzone de maneiras diferentes conforme a **intenção**.
+
+A Hotzone delimita a **área relevante**. Os serviços especializados usam esse
+retorno para localizar candidatos, comparar opções e decidir quais sensores
+`PodeX` consultar.
+
+> É a camada do **consumidor** das três camadas: a Hotzone é serviço burro e
+> devolve área; o `Melhor*` cruza, ordena e desempata; o `AIController` decide.
+
+## Mapa do que existe
+
+| serviço | contrato | código |
+|---|---|---|
+| Melhor Captura | ainda não implementado | ⚠️ **parcialmente existe** — `CaptureOpportunityClaimService` (746 linhas) já faz o matching 1:1 de capturáveis |
+| Melhor Combate | ainda não implementado | ❌ confirmado |
+| Melhor Embarque | em desenvolvimento | ✅ `MelhorEmbarqueService` — **1.207 linhas** |
+| Quero Carona | — | ✅ `QueroCaronaService` (1.525) + `QueroCaronaAereaService` (308) |
+| Melhor Desembarque | em aperfeiçoamento | ✅ `MelhorDesembarqueService` (481) |
+| Melhor Atendimento | ainda não implementado | ⚠️ o serviço não existe, mas `StockNeedAssessmentService` (572) já responde "quem precisa mais" |
+| Melhor Estoque | ainda não implementado | ⚠️ **existe e é grande** — `MelhorEstoqueService`, **867 linhas** |
+| Melhor Fusão | não existe | ❌ confirmado |
+| **Melhor Pouso** | *não está no contrato* | ✅ `MelhorPousoService` (431) — consumidor de `PodePousar` |
+
+Duas linhas merecem leitura:
+
+**Melhor Estoque não está por fazer — está feito.** O cabeçalho dele descreve o
+contrato quase palavra por palavra: *"a onda nasce na unidade que tomará a
+decisão, classifica encontros em Tactical, Operational e Strategic e usa a
+consulta prospectiva do `PodeTransferir` para validar cada rendezvous. Não
+transfere, move ou altera qualquer estado confirmado."* Vale conferir se o que
+falta é o serviço ou o **consumo** dele pela IA.
+
+*(O `Strategic` que aparece ali não contradiz "não existe banda estratégica": é
+`AIReachDecisionTier`, um tier de decisão, não uma banda do envelope.)*
+
+**Melhor Pouso existe e não está no contrato.** `PodePousar` também tem
+consumidor, e ele é o único da lista que não nasceu de uma intenção do jogador —
+nasceu de uma transição de domínio.
+
+---
+
+## Baseado em `PodeCapturar` — Melhor Captura
+
+Serviço principal do papel **Capturador**.
+
+Para unidades sem plano — **Rogues** —, procura a construção capturável mais
+próxima alcançável dentro das bandas Tática ou Operacional. Unidades com plano já
+têm construção ou setor atribuído pelas ordens.
+
+O serviço também considera **construções aliadas que não estejam com os pontos de
+captura no máximo**: isso indica que estão sob captura e precisam ser defendidas
+ou reconquistadas.
+
+Usa a Hotzone **geográfica de Movimento**, baseada em Caminhos Válidos — a
+infantaria precisa alcançar fisicamente a construção.
+
+> A Hotzone devolve os candidatos alcançáveis. O serviço decide qual construção
+> priorizar.
+
+## Baseado em `PodeMirar` — Melhor Combate
+
+Serviço principal dos papéis **Assault** e **Fire Support**.
+
+**Assault**, sem plano: ataca oponentes na Banda **Tática**; aproxima-se dos que
+estão na **Operacional**; permanece atraído pelo **Capitão** quando não há
+combate relevante.
+
+**Fire Support**: ataca na Tática; **reposiciona-se para obter tiro** contra
+oponentes na Operacional; **recua** quando não consegue preservar posição
+adequada de fogo.
+
+> As bandas Tática e Operacional de Fire Support são baseadas no **alcance máximo
+> das armas**, não no movimento da unidade.
+
+✅ Essa última linha é a inversão do artilheiro, já implementada no envelope e
+pintada pela ferramenta Hotzone — ver `contrato_envelope_alcance.md`. É a única
+peça deste bloco que já está de pé.
+
+**Híbridas** tentam primeiro o comportamento de Fire Support; sem solução válida
+de combate à distância, usam o de Assault.
+
+> Artilheiros Combatentes são **prioritariamente unidades de Assault**: são
+> resistentes, acompanham a Vanguarda, e apenas *preferem* disparar à distância
+> antes de fechar para o contato.
+
+## Baseado em `PodeEmbarcar`
+
+### Melhor Embarque
+
+Baseado na unidade que deseja embarcar, no destino que ela pretende alcançar, e
+nos transportadores disponíveis.
+
+Procura preferencialmente um transportador dentro da **Banda Operacional da
+unidade**. Não alcançando nenhum diretamente, a unidade se aproxima do **melhor
+ponto de encontro** possível.
+
+### Quero Carona
+
+Serviço do **passageiro**, para comunicar a necessidade aos transportadores. A
+solicitação carrega a **referência magnética** ou o destino pretendido.
+
+Os transportadores usam essas solicitações para escolher passageiros, pontos de
+encontro, ordem de coleta e destino da operação.
+
+> Note a divisão: **Quero Carona** é o lado de quem pede, **Melhor Embarque** é o
+> lado de quem avalia o encontro. Coerente com "embarque é sempre ação do
+> passageiro".
+
+## Baseado em `PodeDesembarcar` — Melhor Desembarque
+
+Executado pelo **transportador**. Avalia:
+
+- os destinos dos passageiros;
+- as bandas Tática e Operacional **projetadas ao redor desses destinos**;
+- os locais válidos para desembarque;
+- o **cruzamento** entre as áreas úteis dos passageiros.
+
+> O objetivo é um ponto de desembarque que otimize a entrega, permitindo que o
+> maior número possível de passageiros siga até seus destinos em poucas rodadas.
+
+✅ O cruzamento existe (`SearchMatching` maximiza entregues e depois minimiza
+rota). ⚠️ A projeção ao redor do destino ainda é constante fixa do veículo — é a
+pendência T6 do `Transporte.md`.
+
+## Baseado em `PodeSuprir` — Melhor Atendimento
+
+Para unidades com `isLogistic`, localizar quem precisa de serviços de campo.
+Prioriza:
+
+1. unidades em estado **crítico**;
+2. unidades em **manutenção preventiva**;
+3. **Capitão** ou formação acompanhada, sem atendimento prioritário.
+
+> A Hotzone de Logística determina **quem pode ser alcançado e atendido**. O
+> serviço decide **quem tem maior necessidade**.
+
+Essa é a separação de camadas dita da forma mais limpa de todo o documento: a
+área é do serviço burro, a prioridade é do consumidor.
+
+## Baseado em `PodeTransferir` — Melhor Estoque
+
+Ajuda o papel **Estoque** a identificar construções aliadas sem recursos,
+supridores a reabastecer, HUBs disponíveis e Receivers que precisam receber.
+
+A Hotzone de Transferência determina quem pode participar, a faixa de coleta e
+entrega, e quais **encontros logísticos** são possíveis. O serviço decide de onde
+retirar e para onde enviar.
+
+## Baseado em `PodeFundir` — Melhor Fusão
+
+Não existe serviço especializado.
+
+**Regra geral:** voltar à **Retaguarda** antes de procurar unidade idêntica para
+fundir. A preparação usa a Hotzone de **Movimento**; a fusão em si existe apenas
+na Banda **Tática**.
+
+✅ Coerente com o envelope, onde Fusão **não tem banda Operational**.
+
+Exceções por papel:
+
+- unidades **Elite** podem ignorar reparos ou fusões de baixo valor;
+- **Fire Support** tende a recuar quando precisa se recompor;
+- unidades em **risco imediato** podem fundir fora da Retaguarda quando isso for
+  necessário para sobreviver.
+
+---
+
 # Pendências
 
 | # | contrato | código hoje |
@@ -712,4 +881,8 @@ agenda de quem — estão em `docs/AI Behavior/governanca_entre_papeis.md`.
 | G16 | o papel se chama **Vigilância** | ⚠️ o enum diz `VigilanciaAerea`, nome da origem em `Air/High` |
 | G17 | **Transportador Aéreo foi incorporado** | ⚠️ `TransportadorAereo = 15` ainda existe, com política de shopping própria. Mudou de pasta; a regra não migrou |
 | G18 | **Raid Antissubmarino** vai para Vigilância | ⚠️ `RaidAntiSub = 11` ainda existe |
+| G20 | **Melhor Estoque** ainda não implementado | ⚠️ **existe**: `MelhorEstoqueService`, 867 linhas, e o cabeçalho descreve o contrato quase palavra por palavra. Conferir se falta o serviço ou o **consumo** dele |
+| G21 | **Melhor Captura** ainda não implementado | ⚠️ parcial: `CaptureOpportunityClaimService` (746) já faz o matching 1:1 de capturáveis |
+| G22 | **Melhor Atendimento** ainda não implementado | ⚠️ o serviço não existe, mas `StockNeedAssessmentService` (572) já responde "quem precisa mais" |
+| G23 | **Melhor Pouso** não está no contrato | ⚠️ existe (`MelhorPousoService`, 431) — consumidor de `PodePousar`, o único que nasce de transição de domínio |
 | G19 | a hierarquia de papéis | ⚠️ é doutrina, não estrutura: o enum é plano. Quem materializa o parentesco é `UnitRoleCompatibility.CanSatisfy` — portão que usa `roles.Contains` estrito barra especializações |
