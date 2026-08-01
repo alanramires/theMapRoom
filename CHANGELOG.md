@@ -16,28 +16,39 @@ major fecha, os relatórios dele são arquivados em `docs/Versões/`.
 
 ---
 
-## v6 — Envelope de alcance e contratos de IA *(em curso)*
+## v7 — Terminais burros e desacoplamento da IA *(em curso)*
 
-A Hotzone deixa de ser ferramenta de inspeção e vira **serviço**: uma única
-fonte de alcance, consultada por intenção e banda. A IA migra papel por papel
-para consumi-la, e a doutrina de cada papel passa a existir por escrito.
+A arquitetura da IA deixa de ser "cada papel resolve o seu alcance" e passa a ser
+uma **escada**: sensores `PodeX` → serviços de área → consumidores `Melhor*` →
+papéis → variações de papel. Cada degrau só começa depois de o de baixo estar de
+pé.
+
+O impacto no jogo é mínimo por construção: a IA é **consumidora** dos sensores,
+não dona deles. O tabuleiro, os `PodeX`, o FoW e o ciclo transacional seguem
+intactos.
 
 | versão | título | relatório |
 |---|---|---|
-| v6.1.5 | Contratos de AI: Capturador, Assault, Fire Support | [relatório](docs/relatorio_v6.1.5.md) |
-| v6.1.4 | Unificação de AI Capturador: Constantes | [relatório](docs/relatorio_v6.1.4.md) |
-| v6.1.3 | Unificação de AI Capturador: Planos e Atribuição | [relatório](docs/relatorio_v6.1.3.md) |
-| v6.1.2 | Fix — Rebel: Capturador de volta pro AI Controller | [relatório](docs/relatorio_v6.1.2.md) |
-| v6.1.1 | Táxi e Carona | [relatório](docs/relatorio_v6.1.1.md) |
-| v6.1.0 | Táxi e Carona — antes do refactor | [relatório](docs/relatorio_v6.1.0.md) |
-| v6.0.7 | Game start tunning | [relatório](docs/relatorio_v6.0.7.md) |
-| v6.0.6 | Hotzone como Serviço: Progressão | [relatório](docs/relatorio_v6.0.6.md) |
-| v6.0.5 | Hotzone como Serviço: Logística Terrestre | [relatório](docs/relatorio_v6.0.5.md) |
-| v6.0.4 | Hotzone como Envelope de Serviço | [relatório](docs/relatorio_v6.0.4.md) |
-| v6.0.3 | Vigilância Aérea | [relatório](docs/relatorio_v6.0.3.md) |
-| v6.0.2 | Desembarque parcial e novo Hotzone tool | [relatório](docs/relatorio_v6.0.2.md) |
-| v6.0.1 | Start and loading optimization | [relatório](docs/relatorio_v6.0.1.md) |
-| v6.0.0 | Board baking e loading optimization | [relatório](docs/relatorio_v6.0.0.md) |
+| v7.0.0 | Fundação, desacoplamento e generalização do uso dos sensores | [relatório](docs/relatorio_v7.0.0.md) |
+
+### Documentos normativos criados neste major
+
+| documento | papel |
+|---|---|
+| [AI Behavior/governanca.md](docs/AI%20Behavior/governanca.md) | **norma** acima de todos os papéis: ordens, ciclo, ações, sensores de sistema, visão |
+| [AI Behavior/governanca_entre_papeis.md](docs/AI%20Behavior/governanca_entre_papeis.md) | as arestas: os três tipos de governo e o Comportamento Magnético |
+| [refactor/plano_de_trabalho.md](docs/refactor/plano_de_trabalho.md) | a escada e a fila das pendências, ordenada por dependência |
+
+---
+
+## v6 — Envelope de alcance e contratos de IA *(fechado)*
+
+A Hotzone deixou de ser ferramenta de inspeção e virou **serviço**: uma única
+fonte de alcance, consultada por intenção e banda. A doutrina de cada papel
+passou a existir por escrito.
+
+14 versões, de `v6.0.0` a `v6.1.5`. Relatórios arquivados em
+[`docs/Versões/`](docs/Versões/).
 
 ### Documentos normativos criados neste major
 
