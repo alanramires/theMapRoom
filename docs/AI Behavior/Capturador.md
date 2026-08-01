@@ -88,10 +88,20 @@ Pursuer, HQBreaker, Rogue e — desde a v6.1.2 — no ataque preemptivo de papel
 para cima de um prédio capturável, ele **tenta lutar em outro lugar** — não
 ocupa o capturável para brigar.
 
-⚠️ Não verificado em `TryFindAssaultEscortAttack`. Existe guarda equivalente em
-Assault e Capturer (`IsOtherAssignedCapturerTarget`, produção própria), mas ela
-protege o capturável **de outro capturador designado** e devolve `false` quando
-não há plano — não é a mesma regra.
+✅ `IsReservedAssaultEscortCaptureCell` é a **primeira guarda** do laço de células
+em `TryFindAssaultEscortAttack` — a função que o ramo agressivo usa nas duas
+chamadas. A célula é descartada quando há capturável que ainda importa:
+
+```csharp
+return construction.SlotIndex != ResolveAISlotKey(aiTeam)               // não é meu
+    || construction.CurrentCapturePoints < construction.CapturePointsMax; // meu, incompleto
+```
+
+Só libera quando o prédio já é meu e está com captura cheia — aí não há o que
+atrapalhar. O `continue` é literalmente "tenta lutar em outro lugar": segue
+procurando outra célula.
+
+Não depende de plano, então vale igual para unidade sem plano.
 
 ---
 
@@ -277,12 +287,60 @@ decisão.
 
 ---
 
-## Resumo do que falta
+## Pendências
 
-| # | regra | estado |
-|---|---|---|
-| 3 | agressivo larga captura para lutar | ⚠️ ordem invertida hoje |
-| 11 | destino de unidade sem plano (gate por facção, praia, embarcado) | ❌ |
-| 4 | agressivo não briga em cima de capturável | ⚠️ não verificado |
-| 5 | ferido na vanguarda ganha iniciativa para recuar | ⚠️ age por último |
-| 7 | distância de largada por papel (3 / 2) | ❌ |
+Lista viva. `§` aponta a seção deste documento; itens sem `§` são de outras
+frentes que tocam o capturador.
+
+### Doutrina do capturador
+
+| # | o que falta | onde | tamanho |
+|---|---|---|---|
+| **C4** | agressivo **larga a captura para lutar** — hoje a captura oportunista é avaliada antes do ramo agressivo (§3) | `Capturer.cs:241-244` | M |
+| **C6** | ferido na vanguarda **ganha iniciativa** para recuar e liberar espaço; hoje reparo age por último, grupo 5 (§5) | `Initiative.cs` | M |
+| **C7** | zona de largada = **banda da unidade**, não hex fixo (§7) | `MelhorDesembarque`, `Courier`, `Assigned` | M |
+| **C8** | destino de unidade **sem plano**: gate por facção, efeito praia, embarcado (§11) | `Courier.Passengers`, `Courier.Invasion` ×2, `Naval`, `QueroCarona` | M |
+| **C9** | transporte **não pousa em capturável**; se for inevitável, sobe na iniciativa para sair | LZ + `Initiative.cs` | M |
+
+### Herança do refactor do sem-plano
+
+| # | o que falta | onde | tamanho |
+|---|---|---|---|
+| **R1** | tirar nomes de rebelde dos auxiliares que são gerais (`IsRebelCapturable` e cia.) | `Rebel.cs` → capturador | P |
+| **R2** | `IsOtherAssignedCapturerTarget` valer **sem plano** — hoje devolve `false` e a regra some | `Capturer.cs:514` | P |
+| **R3** | guardas de célula no `TryBuildRolePreemptiveAttack` (produção própria, capturável alheio) | `Router.cs` | P |
+
+### Transporte, que o capturador consome
+
+| # | o que falta | onde | tamanho |
+|---|---|---|---|
+| **T1** | transporte com vaga livre volta a coletar — ⚠️ **sozinho piora a fome** | `BuildAttempts` (o `return`) | PP |
+| **T2** | promessa reserva **uma vaga**, não o veículo | `MelhorEmbarque` / slots | M |
+| **T3** | espera vira **pressão de compra** de transporte | `AIShoppingPlanner` + demanda | M |
+| **T4** | `IsAlreadyFormalPassenger` sai; a promessa assume a exclusividade | `TransportOperations` | P |
+
+### Fora do papel, mas afetam a decisão
+
+| # | o que falta | onde | tamanho |
+|---|---|---|---|
+| **A1** | infantaria trocando 5 HP por 2 contra helicóptero: RPS −2 devia apertar o limite de perda | `PassesAttackDecision` | M |
+| **D2** | varredura de conferência do `CLAUDE.md` contra o código | `CLAUDE.md` | M |
+| **L1** | fome da artilharia | `docs/implementar_logistica.md` | — |
+| **E1** | Fases 2, 4 e 5 da migração do envelope | plano original | G |
+
+### Cascatas registradas
+
+- **T1 nunca sozinho.** Encher a vaga deixa o veículo ocupado mais tempo e
+  aumenta a espera de quem ficou. Entra junto com T2 ou T3.
+- **C6 por último dos médios.** Mexer na ordem de iniciativa altera todas as
+  unidades da Fase 2 de uma vez e contamina qualquer teste em paralelo.
+- **C7 começa pela `ShuttlePickupRange`.** Ela já é `MP + folga` em todos os
+  chamadores — é o caso mais barato para provar o padrão antes das duas
+  constantes de largada.
+
+### Fechados
+
+C1 (precedência capturador > agressivo, com e sem plano) · C2 (ramo agressivo
+sem plano) · C3 (`CanSatisfy` no lugar de `roles[0]`) · C5 (não brigar em cima de
+capturável — já existia) · D1 (constantes erradas no `CLAUDE.md`) · âncora do
+rogue (§10) · `prioritizeDpqAtBattle` no ataque preemptivo.

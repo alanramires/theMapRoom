@@ -95,8 +95,8 @@ A `PlayerAction` is a batch of sub-steps executed atomically. Key builders:
 
 Split into four files:
 
-- `AIController.Transportador.cs` — entry point `TryDecideTransportadorAction`, shared helpers, constants (`MinDistanceForTransportSlot = 7`, `TransportDropOffRange = 3`)
-- `AIController.Transportador.Shuttle.cs` — empty APC scanning for pickup candidates; `ShuttlePickupRange = 2`
+- `AIController.Transportador.cs` — entry point `TryDecideTransportadorAction`, shared helpers, legacy range constants (see "Ranges are bands, not hex numbers" below)
+- `AIController.Transportador.Shuttle.cs` — empty APC scanning for pickup candidates
 - `AIController.Transportador.Courier.cs` — APC with embarked passengers, delivers toward objectives
 - `AIController.Transportador.Assigned.cs` — APC with an explicit plan-assigned slot
 
@@ -105,7 +105,7 @@ Capturers can intercept to embark via `TryDecideCapturerEmbarkAction` in `AICont
 **Hospital mode** (`AIController.Transportador.Hospital.cs`): a unit that is both `isSupplier` and `isTransporter` carrying a passenger with `IsUnderRepair` does maintenance before delivery. `TryDecideSupplierHospitalAction` is called at the **top of `DecideUnitAction`** (before every role) because a transporter at capacity skips the universal courier gate. Priority: supply aboard → restock keeping the patient aboard → hold (stationary shot / rear reposition) → return `null` so the normal EVAC disembarks. The `UnitData.aiDisembarkWhenCannotSupply` flag (default `true`, Logistics AI section) gates the whole mode; `serviceRange = SameHexOrEmbarked` means the supplier can only serve its **own** embarked passengers, so an `Adjacent1Hex` truck structurally can't nurse its cargo and keeps disembarking as before. The patient leaves the mode on its own: Phase 2 runs `UpdateRepairState` on embarked units too, so `repairRecoverHpAbove` releases it.
 
 **Courier decision priority** (`DecideTransportadorCourierAction`):
-1. Move + disembark — if moving gains >1h toward target AND simulated drop-off lands within `TransportDropOffRange`
+1. Move + disembark — if moving gains >1h toward target AND the simulated drop-off lands inside the passenger's drop band (today: `TransportDropOffRange`)
 2. Disembark in place — if moving gains ≤1h and current position already qualifies for drop-off
 3. Opportunistic attack — near-dead enemies (HP ≤ 2), ≤2h route deviation
 4. Move toward target
@@ -116,9 +116,30 @@ Capturers can intercept to embark via `TryDecideCapturerEmbarkAction` in `AICont
 
 **Extended embark (pass-2)**: `movePaths` computed with `remainingMP - 1` may include friendly-occupied hexes (passable for pathfinding) but the capturer cannot stop there. Always filter with `BuildOccupied(unit)` before treating a hex as a valid intermediate stop.
 
+### Ranges are bands, not hex numbers
+
+**Doctrine:** an AI "range" is a band of the reach envelope — `Tactical` or
+`Operational` — **of the unit being evaluated**, resolved by
+`UnitReachEnvelopeService`. It is never a fixed hex count, because a 2 MP
+howitzer and a 3 MP rifleman do not share a reach.
+
+The fixed constants below are **legacy**, from before the envelope existed. They
+still run; do not read them as the rule. Each one names what it should become:
+
+| constant | value in code | should be |
+|---|---|---|
+| `TransportDropOffRange` | 4 | passenger's `Tactical`, computed from the objective cell (reverse: "teleport the unit onto the target, that area is the drop zone") |
+| `FireSupportDropOffRange` | 3 | same — it exists only because the number differs per role, which is what a per-unit band already solves |
+| `ShuttlePickupRange` | 2 | already close: every call site adds it to `RemainingMovementPoints` as slack, so it behaves as "Tactical + margin". Pickup itself is decided by `MelhorEmbarqueService` on the unit's Tactical |
+| `MinDistanceForTransportSlot` | serialized tunable on `AIController`, default 7 (also in `AIPresetData`) | the evaluated unit's `Operational`. Today it is a cap over a map-derived value (`Min(tunable, Max(3, farthestSector))`) and never looks at the unit |
+
+Doctrine and per-role rules: `docs/AI Behavior/Transporte.md` and
+`docs/AI Behavior/Capturador.md`. Envelope contract:
+`docs/contrato_envelope_alcance.md`.
+
 ### Shopping (`AIShoppingPlanner.cs`)
 
-`AIShoppingPlanner.Decide(snapshot)` returns a list of `ShoppingOrder`. Scoring uses `CountOpenSlots(team, role)` to detect plan gaps. Transport slots appear in objectives when distance to HQ ≥ `MinDistanceForTransportSlot`.
+`AIShoppingPlanner.Decide(snapshot)` returns a list of `ShoppingOrder`. Scoring uses `CountOpenSlots(team, role)` to detect plan gaps. Transport slots appear in objectives when the objective is beyond the unit's own reach — see "Ranges are bands, not hex numbers". The current gate still uses `MinDistanceForTransportSlot`.
 
 ### Hex utilities
 
