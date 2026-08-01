@@ -233,6 +233,11 @@ public partial class AIController
 
     private static SectorObjective ResolveAssignedObjective(UnitManager unit, TeamObjectivePlan plan)
     {
+        // Sem plano nao ha objetivo atribuido — e isso e um estado normal, nao
+        // um erro: faccao sem QG nao produz plano nenhum, e a IA com QG produz
+        // unidades sem objetivo o tempo todo.
+        if (plan?.Objectives == null)
+            return null;
         foreach (SectorObjective obj in plan.Objectives)
             foreach (SlotNeed slot in obj.Slots)
                 if (slot.Role == UnitRole.Capturador && slot.Filled && slot.AssignedUnitId == unit.InstanceId) return obj;

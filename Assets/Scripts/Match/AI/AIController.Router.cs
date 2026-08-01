@@ -493,6 +493,18 @@ public partial class AIController
         float bestScore = float.MinValue;
         string bestDecision = "";
 
+        // Flag da ficha e contrato, nao sugestao. Este caminho — usado pelo
+        // ataque oportunista do rebelde e pelo modo hospital — era o unico que
+        // escolhia celula de ataque sem olhar DPQ, enquanto Assalto,
+        // Capturador, Defensor, Explorador, Perseguidor e HQBreaker ja
+        // honravam. Mesmo peso dos outros: 2000 com a flag, 40 sem, para que a
+        // preferencia troque a celula em vez de so desempatar.
+        bool preferDpq =
+            unit.TryGetUnitData(out UnitData attackerData)
+            && attackerData != null
+            && attackerData.prioritizeDpqAtBattle;
+        float dpqWeight = preferDpq ? 2000f : 40f;
+
         foreach (Vector3Int rawCell in paths.Keys)
         {
             Vector3Int cell = rawCell;
@@ -516,9 +528,11 @@ public partial class AIController
                 enemyCell.z = 0;
                 BazookaTargetPriority preference =
                     ResolveAssaultTargetPreference(unit, enemy);
+                float dpq = GetTerrainDpqPontos(cell);
                 float score =
                     GetAssaultTargetPreferenceScore(preference)
                     + Mathf.Max(0, 20 - enemy.CurrentHP) * 900f
+                    + dpq * dpqWeight
                     - SectorManager.HexDistance(cell, enemyCell) * 100f
                     - GetPathStepCount(paths, cell) * 25f
                     - enemy.InstanceId * 0.001f;
@@ -528,7 +542,9 @@ public partial class AIController
                 bestScore = score;
                 bestCell = cell;
                 bestTarget = enemy;
-                bestDecision = decisionReason;
+                bestDecision =
+                    $"dpq={dpq:F1} dpqW={dpqWeight:F0} " +
+                    $"preferDpq={preferDpq} {decisionReason}";
             }
         }
 

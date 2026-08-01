@@ -4,21 +4,28 @@ using UnityEngine;
 public partial class AIController
 {
     // -------------------------------------------------------------------------
-    // Facção sem QG (rebeldes/dissidentes).
+    // Facção sem QG (rebeldes/dissidentes) — ROTEADOR.
     //
-    // O planner normal assume o triangulo ancora -> eixo -> setor: ele nasce do proprio
-    // QG e aponta para o inimigo. A rebelde nao tem nenhuma das pontas, entao cai por
-    // todos os buracos e vira "todo passageiro rogue rumo ao QG inimigo" — um funil unico
-    // que ignora o mapa inteiro.
+    // Existem duas coisas no jogo: unidade COM plano e unidade SEM plano. A IA
+    // com QG usa as duas (tem setores, planos, eixos); a IA sem QG so tem
+    // unidades sem plano — sem setor, sem eixo, alvo por proximidade.
     //
-    // O comportamento dela e outro, e mais simples: nao ha plano, ha proximidade. Cada
-    // unidade captura o que estiver mais perto; se ja tem alguem indo naquele predio,
-    // varre a bolha seguinte e vai para o proximo. Sem eixo, sem massa, sem produção —
-    // coerente com o conceito (captura livre, nunca produz, imune a derrota por 0).
+    // "Sem plano" NAO e sinonimo de rebelde: a IA com QG tambem produz unidade
+    // sem plano (rogue). O que a faccao sem QG tem de particular e que TODAS as
+    // dela sao assim, e que a ancora do avanco nao pode ser o proprio QG.
     //
-    // Este caminho e um curto-circuito ANTES do planner. Reaproveita os mesmos sensores
-    // e batches de captura das outras unidades; o que muda e so a ESCOLHA do alvo, que
-    // passa a ser geografica em vez de vir do plano.
+    // Por isso este arquivo nao decide nada: rebelde e um CONJUNTO DE
+    // PARAMETROS sobre o controlador que ja existe, nao um controlador
+    // paralelo. Ele ja foi um espelho do capturador — 454 linhas com busca de
+    // alvo, aproximacao e portao de deslocamento proprios — e cada regra nova
+    // do jogo precisava ser escrita duas vezes. A segunda sempre atrasava: a
+    // flag prioritizeDpqAtBattle da ficha era ignorada, o alcance a pe usava
+    // MP x 2 num bolso so, e a carona era decidida antes de consultar o
+    // servico. Ver docs/refactor/ai_sem_plano.md.
+    //
+    // O que sobrou aqui sao auxiliares que nunca foram de rebelde nenhum e tem
+    // chamadores gerais (transporte, desembarque, HQBreaker); eles mudam de
+    // casa depois, sem pressa e sem risco.
     // -------------------------------------------------------------------------
 
     private PlayerAction TryDecideRebelAction(
@@ -32,130 +39,25 @@ public partial class AIController
         if (matchController == null || !matchController.IsSlotRebel(rebelSlot))
             return null;
 
-        // Transporte e logistica rebeldes seguem seus proprios caminhos (o aereo/naval ja
-        // resolvem entrega por conta). Aqui tratamos apenas quem CAPTURA — que e a razao
-        // de existir da facção. Unidades sem papel de captura caem no fluxo normal, que
-        // para elas ja funciona (o funil-para-o-QG so afeta capturadores rogue).
+        // Transporte e logistica rebeldes seguem seus proprios caminhos (o
+        // aereo/naval ja resolvem entrega por conta). Aqui tratamos apenas quem
+        // CAPTURA — que e a razao de existir da faccao.
         if (!unit.TryGetUnitData(out UnitData unitData) || unitData == null
             || !UnitRoleCompatibility.CanSatisfy(unitData, UnitRole.Capturador))
             return null;
 
-        Vector3Int fromCell = unit.CurrentCellPosition;
-        fromCell.z = 0;
-
-        Dictionary<Vector3Int, List<Vector3Int>> paths = UnitMovementPathRules.CalcularCaminhosValidos(
-            boardTilemap, unit, unit.RemainingMovementPoints, terrainDatabase);
-        HashSet<Vector3Int> occupied = BuildOccupied(unit);
-
-        // 1) Combate oportunista vem antes da marcha de captura. A faccao sem QG
-        // continua orientada por proximidade, mas nao ignora um inimigo que o
-        // sensor confirma que pode atacar nesta rodada.
-        if (TryBuildRolePreemptiveAttack(
-                unit,
-                snapshot,
-                paths,
-                occupied,
-                defensiveContext: false,
-                out PlayerAction attackAction,
-                out string attackReason))
-        {
-            Debug.Log($"{TL("Rebelde")} {unit.InstanceId} ataque oportunista antes da captura - {attackReason}");
-            return attackAction;
-        }
-
-        // 2) Capturar agora, se ja estamos em cima de um capturavel valido. O sensor decide
-        //    — nao inventamos elegibilidade aqui.
-        if (SimulateCaptureSensor(unit, fromCell, out _))
-        {
-            // Reserva a propria celula: outro rebelde (a pe ou transportado) nesta mesma
-            // passada nao deve escolher este predio como alvo.
-            plannedDestinations.Add(fromCell);
-            rebelCaptureTargetReservations.Add(fromCell);
-            Debug.Log($"{TL("Rebelde")} {unit.InstanceId} captura em {fromCell}.");
-            return BuildCaptureBatch(unit, snapshot.AITeam, fromCell, fromCell, paths);
-        }
-
-        // 3) Alvo por PROXIMIDADE, pulando o que ja tem rebelde a caminho.
-        //    rebelCaptureTargetReservations e a bolha que evita o empilhamento:
-        //    dois rebeldes nao marcham para o mesmo predio distante.
-        ConstructionManager target = FindNearestRebelCaptureTarget(unit, snapshot, fromCell);
-        if (target == null)
-        {
-            pendingRebelCaptureTargets[unit.InstanceId] = null;
-            Debug.Log($"{TL("Rebelde")} {unit.InstanceId} sem capturavel alcancavel na visao — cai no fluxo normal.");
-            return null;
-        }
-
-        Vector3Int targetCell = target.CurrentCellPosition;
-        targetCell.z = 0;
-        pendingRebelCaptureTargets[unit.InstanceId] = target;
-
-        // Mesma fronteira usada pelo APC: se o capturador alcanca um predio
-        // livre em ate duas rodadas do proprio movimento, marcha em vez de
-        // reembarcar logo depois de desembarcar.
-        int walkBudget =
-            ResolvePassengerWalkWithoutTransportBudget(unit);
-        int walkCost = TerrainCostToCell(
-            unit,
-            fromCell,
-            targetCell,
-            walkBudget);
-        bool reachesOnFoot =
-            walkCost <= walkBudget;
-
-        if (!reachesOnFoot)
-        {
-            PlayerAction embarkAction =
-                TryDecideCapturerEmbarkAction(unit, snapshot, plan);
-            if (embarkAction != null)
-            {
-                Debug.Log($"{TL("Rebelde")} {unit.InstanceId} aceita embarque: " +
-                          $"objetivo livre {targetCell} nao alcancavel a pe " +
-                          $"em {TransportPassengerWalkTurns} turnos " +
-                          $"(move={unit.MaxMovementPoints}, budget={walkBudget}, custo={walkCost}).");
-                return embarkAction;
-            }
-        }
-        else
-        {
-            Debug.Log($"{TL("Rebelde")} {unit.InstanceId} ignora embarque: " +
-                      $"objetivo livre {targetCell} alcancavel a pe " +
-                      $"custo={walkCost}<={walkBudget} " +
-                      $"({TransportPassengerWalkTurns} turnos x move={unit.MaxMovementPoints}).");
-        }
-
-        rebelCaptureTargetReservations.Add(targetCell);
-        Debug.Log($"{TL("Rebelde")} {unit.InstanceId} reserva objetivo {targetCell} por proximidade.");
-
-        // 5) Se um passo deste turno ja encosta no capturavel (destino = o proprio predio
-        //    ou adjacente valido), tenta capturar/avancar; senao, marcha na direcao dele.
-        Vector3Int approach = FindRebelApproachCell(unit, targetCell, fromCell, paths, occupied);
-        if (approach == fromCell)
-        {
-            Debug.Log($"{TL("Rebelde")} {unit.InstanceId} sem avanço util rumo a {targetCell} — aguarda.");
-            return BuildMoveBatch(unit, snapshot.AITeam, fromCell, fromCell, paths);
-        }
-
-        if (SimulateCaptureSensor(unit, approach, out _))
-        {
-            plannedDestinations.Add(approach);
-            Debug.Log($"{TL("Rebelde")} {unit.InstanceId} move {fromCell}->{approach} e captura {targetCell}.");
-            return BuildCaptureBatch(unit, snapshot.AITeam, fromCell, approach, paths);
-        }
-
-        plannedDestinations.Add(approach);
-        Debug.Log($"{TL("Rebelde")} {unit.InstanceId} marcha {fromCell}->{approach} rumo a {targetCell}.");
-        return BuildMoveBatch(unit, snapshot.AITeam, fromCell, approach, paths);
+        // ROTEADOR, e so isso. Passa plano NULO de proposito: faccao sem QG nao
+        // tem plano, e "sem plano" e um modo do capturador — nao outra IA.
+        //
+        // Com isso a rebelde herda, sem uma linha escrita para ela: DPQ da
+        // ficha, alcance pelo envelope, fila da carona, reserva 1:1, handoff,
+        // swap e as guardas de celula (nao parar em producao propria nem no
+        // capturavel de outro). Antes cada uma dessas regras precisava ser
+        // reescrita aqui, e a copia sempre atrasava.
+        return TryDecideCapturerAction(unit, snapshot, plan: null);
     }
 
-    // Capturavel mais proximo (distancia de hex) que ja nao esteja sendo tratado. Ondas
-    // concentricas na pratica: o mais perto primeiro, e se ele ja tem dono, o de-fora
-    // seguinte assume. Duas razoes para pular um predio:
-    //   1) um aliado ja esta EM CIMA dele — capturando, e persiste entre turnos (o caso
-    //      que o helicoptero ignorava: a tropa a pe estava la desde o turno anterior);
-    //   2) outro rebelde reservou o hex NESTA passada da Fase 2 (coordena a pe + transporte
-    //      no mesmo turno, antes de qualquer um chegar).
-    private ConstructionManager FindNearestRebelCaptureTarget(
+    private ConstructionManager FindNearestPlanlessCaptureTarget(
         UnitManager unit,
         AIWorldSnapshot snapshot,
         Vector3Int fromCell)
@@ -400,55 +302,5 @@ public partial class AIController
 
         return matchController.CanCaptureConstruction(
             PlayerSlotId.FromIndex(unit.SlotIndex), data, out _);
-    }
-
-    // Celula alcancavel neste turno que mais aproxima do alvo. Prioriza pisar no proprio
-    // predio (captura no mesmo passo) e, na falta, o hex de menor distancia de hex ate ele.
-    private Vector3Int FindRebelApproachCell(
-        UnitManager unit,
-        Vector3Int targetCell,
-        Vector3Int fromCell,
-        Dictionary<Vector3Int, List<Vector3Int>> paths,
-        HashSet<Vector3Int> occupied)
-    {
-        if (paths == null || paths.Count == 0)
-            return fromCell;
-
-        Vector3Int best = fromCell;
-        float bestDist = SectorManager.HexDistance(fromCell, targetCell);
-
-        foreach (Vector3Int rawCell in paths.Keys)
-        {
-            Vector3Int cell = rawCell;
-            cell.z = 0;
-            if (cell == fromCell)
-                continue;
-            if (occupied != null &&
-                occupied.Contains(cell) &&
-                UnitOccupancyRules.HasBlockingOccupantForUnitAtCell(
-                    boardTilemap,
-                    cell,
-                    unit))
-                continue;
-            // A reserva da fase guarda apenas a coordenada. Confirme pelo
-            // resolvedor de camada se o aliado planejado realmente disputa o
-            // destino; aeronave e infantaria podem reservar o mesmo hex.
-            if (plannedDestinations.Contains(cell) &&
-                UnitOccupancyRules.HasBlockingOccupantForUnitAtCell(
-                    boardTilemap,
-                    cell,
-                    unit,
-                    alliedOnly: true))
-                continue;
-
-            float dist = SectorManager.HexDistance(cell, targetCell);
-            if (dist < bestDist)
-            {
-                bestDist = dist;
-                best = cell;
-            }
-        }
-
-        return best;
     }
 }

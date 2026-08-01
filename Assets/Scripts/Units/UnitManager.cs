@@ -15,7 +15,16 @@ public enum AIPlanRuntimeIntent
     AirSurveillance = 5,
     Repair = 6,
     Supply = 7,
-    Restock = 8
+    Restock = 8,
+
+    /// <summary>
+    /// Promessa de resgate: este TRANSPORTADOR comprometeu uma viagem para
+    /// buscar o passageiro em <c>AIDesignatedMissionTargetUnitInstanceId</c>.
+    ///
+    /// Valor novo entra sempre NO FIM: o save grava o enum como int, e
+    /// renumerar transforma missao antiga em missao trocada.
+    /// </summary>
+    Transport = 9
 }
 
 [ExecuteAlways]

@@ -55,6 +55,7 @@ public partial class AIController
             {
                 UpdateRepairState(u, activePlan);
                 UpdateRideWaitState(u);
+                UpdateRidePromiseState(u);
             }
         }
         double repairDone = Time.realtimeSinceStartupAsDouble;

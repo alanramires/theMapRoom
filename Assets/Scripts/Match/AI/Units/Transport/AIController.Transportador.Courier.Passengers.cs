@@ -160,7 +160,7 @@ public partial class AIController
         // so precisa saber PARA ONDE levar.
         if (ConstructionManager.IsHeadQuarterlessTeam(snapshot.AITeam))
         {
-            ConstructionManager rebelTarget = FindNearestRebelCaptureTarget(passenger, snapshot, fallbackCell);
+            ConstructionManager rebelTarget = FindNearestPlanlessCaptureTarget(passenger, snapshot, fallbackCell);
             if (rebelTarget != null)
             {
                 Vector3Int rc = rebelTarget.CurrentCellPosition; rc.z = 0;

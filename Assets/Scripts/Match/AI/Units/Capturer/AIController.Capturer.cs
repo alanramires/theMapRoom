@@ -71,9 +71,28 @@ public partial class AIController
 
         if (assigned == null)
         {
-            if (!plan.RogueUnitIds.Contains(unit.InstanceId)) return null;
-            if (snapshot.EnemyHQ == null) return null;
-            return DecideRogueCapturerAction(unit, snapshot);
+            // SEM PLANO E UM MODO DESTE CAPTURADOR, NAO OUTRA IA.
+            //
+            // Faccao sem QG nao produz plano, entao TODA unidade dela e sem
+            // plano — nao ha lista de rogue para consultar. A IA com QG segue
+            // consultando: la, "sem objetivo" e excecao e precisa ter sido
+            // declarada pelo planner.
+            //
+            // A ancora do avanco e o unico parametro que muda entre os dois
+            // casos, e por isso ela e resolvida fora daqui.
+            if (plan != null
+                && !plan.RogueUnitIds.Contains(unit.InstanceId))
+            {
+                return null;
+            }
+
+            if (!TryResolvePlanlessCapturerAnchor(
+                    unit, snapshot, out Vector3Int anchorCell))
+            {
+                return null;
+            }
+
+            return DecideRogueCapturerAction(unit, snapshot, anchorCell);
         }
 
         return DecideAssignedCapturerAction(unit, snapshot, assigned);

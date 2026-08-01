@@ -437,8 +437,8 @@ public partial class AIController
                 : requestedTier == AIReachDecisionTier.Operational
                     ? MelhorEmbarqueTier.Operational
                     : MelhorEmbarqueTier.Strategic;
-        MelhorEmbarqueOption selectedOption =
-            pickup.options.Find(option =>
+        System.Predicate<MelhorEmbarqueOption> isMaterializable =
+            option =>
                 option != null
                 && option.transporterTier == serviceTier
                 && CanMaterializePickupRendezvous(option, serviceTier)
@@ -454,7 +454,30 @@ public partial class AIController
                 && (includeOpportunisticPickup
                     || option.rideDisposition !=
                         MelhorEmbarqueRideDisposition
-                            .OpportunisticFallback));
+                            .OpportunisticFallback)
+                // Exclusividade de VIAGEM, nao de passageiro: dois veiculos
+                // cruzando o mapa pelo mesmo cara e desperdicio. Coleta que
+                // termina nesta rodada ignora a regra — recusar um embarque
+                // que esta acontecendo porque "outro prometeu" seria a fome
+                // outra vez, so que com dono.
+                && (serviceTier == MelhorEmbarqueTier.Tactical
+                    || !IsPassengerPromisedToAnotherTransporter(
+                        unit, option.passenger));
+
+        // O FAROL. Se este transportador tem viagem devida e ela e
+        // materializavel neste tier, ela vem primeiro — mas so isso. Nao ha
+        // preempcao: promessa que nao se materializa agora nao trava o veiculo,
+        // que segue com a coleta normal e volta a puxar no proximo turno.
+        MelhorEmbarqueOption selectedOption = null;
+        if (TryGetRidePromise(unit, out UnitManager promisedPassenger))
+        {
+            selectedOption = pickup.options.Find(option =>
+                option != null
+                && option.passenger == promisedPassenger
+                && isMaterializable(option));
+        }
+
+        selectedOption ??= pickup.options.Find(isMaterializable);
         if (selectedOption?.passenger == null)
             return false;
 
@@ -485,6 +508,16 @@ public partial class AIController
         decision.TransporterRouteCost =
             selectedOption.transporterRouteCost;
         decision.PlanningSnapshot = planning;
+
+        // Viagem que NAO termina hoje vira promessa. Coleta Tactical se resolve
+        // na rodada e nao tem o que prometer — prometer tudo encheria o Mission
+        // Intent de ruido.
+        if (serviceTier != MelhorEmbarqueTier.Tactical)
+        {
+            CommitRidePromise(
+                unit, selectedOption.passenger, selectedOption.lzCell);
+        }
+
         return true;
 
     }

@@ -70,7 +70,7 @@ public partial class AIController
                         snapshot.AITeam))
                 {
                     ConstructionManager captainTarget =
-                        FindNearestRebelCaptureTarget(
+                        FindNearestPlanlessCaptureTarget(
                             capturerMagnet,
                             snapshot,
                             capturerAnchor);

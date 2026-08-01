@@ -7,10 +7,21 @@ public partial class AIController
     // Capturador Rogue — captura HQ e construções no caminho, engaja para abrir passagem
     // -------------------------------------------------------------------------
 
-    private PlayerAction DecideRogueCapturerAction(UnitManager unit, AIWorldSnapshot snapshot)
+    /// <summary>
+    /// A ANCORA E PARAMETRO, nao mais o QG inimigo fixo.
+    ///
+    /// Era essa unica linha — `target = snapshot.EnemyHQ...` — que fazia todo
+    /// capturador de uma faccao sem QG marchar para a base inimiga, e foi por
+    /// causa dela que nasceu um controlador paralelo inteiro (AIController.Rebel)
+    /// em vez de um parametro. Ver docs/refactor/ai_sem_plano.md.
+    /// </summary>
+    private PlayerAction DecideRogueCapturerAction(
+        UnitManager unit,
+        AIWorldSnapshot snapshot,
+        Vector3Int anchorCell)
     {
         Vector3Int from   = unit.CurrentCellPosition; from.z = 0;
-        Vector3Int target = snapshot.EnemyHQ.CurrentCellPosition; target.z = 0;
+        Vector3Int target = anchorCell; target.z = 0;
 
         // Rogue abre caminho: ataca diretamente — não delega ao HexEvaluator (que evitaria o combate)
         if (HasAttackTargetAtCurrentPos(unit))
@@ -194,7 +205,66 @@ public partial class AIController
             }
         }
 
-        Debug.Log($"{TL("Rogue")} {unit.InstanceId} marcha para HQ inimigo via {best}");
+        Debug.Log($"{TL("Rogue")} {unit.InstanceId} marcha para âncora {target} via {best}");
         return BuildMoveBatch(unit, snapshot.AITeam, from, best, paths);
+    }
+
+    /// <summary>
+    /// Para onde a unidade SEM PLANO avança.
+    ///
+    ///   tem QG proprio → QG inimigo. E o eixo de sempre: a IA com plano usa o
+    ///                    proprio QG como referencia e empurra para o oposto.
+    ///   sem QG         → capturavel livre mais proximo. Nao existe eixo sem
+    ///                    base, e as coisas flutuam ao redor da faccao.
+    ///
+    /// A escolha do capturavel tambem REGISTRA a intencao (alvo designado e
+    /// reserva da passada), porque para quem nao tem plano e essa designacao
+    /// que faz o papel do objetivo: e ela que o Quero Carona e o transporte
+    /// leem para saber para onde a unidade quer ir.
+    /// </summary>
+    private bool TryResolvePlanlessCapturerAnchor(
+        UnitManager unit,
+        AIWorldSnapshot snapshot,
+        out Vector3Int anchorCell)
+    {
+        anchorCell = Vector3Int.zero;
+        if (unit == null || snapshot == null)
+            return false;
+
+        bool hasOwnHeadquarters =
+            matchController == null
+            || !matchController.IsSlotRebel(
+                PlayerSlotId.FromIndex(snapshot.AISlotIndex));
+
+        if (hasOwnHeadquarters)
+        {
+            if (snapshot.EnemyHQ == null)
+                return false;
+            anchorCell = snapshot.EnemyHQ.CurrentCellPosition;
+            anchorCell.z = 0;
+            return true;
+        }
+
+        Vector3Int fromCell = unit.CurrentCellPosition;
+        fromCell.z = 0;
+        ConstructionManager target =
+            FindNearestPlanlessCaptureTarget(unit, snapshot, fromCell);
+        if (target == null)
+        {
+            pendingRebelCaptureTargets[unit.InstanceId] = null;
+            Debug.Log(
+                $"{TL("SemPlano")} {unit.InstanceId} sem capturável alcançável " +
+                "na visão — cai no fluxo normal.");
+            return false;
+        }
+
+        anchorCell = target.CurrentCellPosition;
+        anchorCell.z = 0;
+        pendingRebelCaptureTargets[unit.InstanceId] = target;
+        rebelCaptureTargetReservations.Add(anchorCell);
+        Debug.Log(
+            $"{TL("SemPlano")} {unit.InstanceId} âncora = capturável " +
+            $"{anchorCell} por proximidade.");
+        return true;
     }
 }

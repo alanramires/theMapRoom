@@ -734,7 +734,7 @@ public partial class AIController
         if (ConstructionManager.IsHeadQuarterlessTeam(snapshot.AITeam))
         {
             Vector3Int shipCell = unit.CurrentCellPosition; shipCell.z = 0;
-            ConstructionManager rebelTarget = FindNearestRebelCaptureTarget(unit, snapshot, shipCell);
+            ConstructionManager rebelTarget = FindNearestPlanlessCaptureTarget(unit, snapshot, shipCell);
             if (rebelTarget != null)
             {
                 Vector3Int rc = rebelTarget.CurrentCellPosition; rc.z = 0;
