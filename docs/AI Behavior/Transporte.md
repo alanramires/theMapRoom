@@ -138,3 +138,65 @@ A doutrina completa está no `docs/relatorio_v6.1.1.md`. Resumo:
 ⚠️ **Cascata registrada:** implementar "encher a vaga livre" sozinho **piora** a
 fome do passageiro esquecido — o veículo passa a ficar ocupado mais tempo. Só
 entra junto com a reserva de vaga ou com a pressão de compra.
+
+---
+
+## 4. Para onde levar — as quatro combinações
+
+Levantado com o autor em 2026-08-01. Duas perguntas independentes decidem o
+alvo de cada passageiro, e elas se cruzam em quatro casos:
+
+| | **sem atribuição** | **com atribuição** |
+|---|---|---|
+| **passageiro rogue** | alvo = capturável livre mais próximo | alvo = a coordenada da atribuição |
+| **passageiro com plano** | alvo = o capturável do setor do slot dele | alvo = a coordenada da atribuição (pode ser outro prédio do plano, não só o do slot) |
+
+Em todos os quatro, o transportador faz a **mesma** coisa depois de saber o
+alvo: chama o Melhor LZ de Desembarque para achar onde largar. A atribuição
+não muda o mecanismo, muda só a âncora.
+
+**Atribuição** é o `AIDesignatedMission*` do `AI Plan Runtime` no `UnitManager`.
+Ela resolve **unidade antes de célula**: com
+`AIDesignatedMissionTargetUnitInstanceId` válido o alvo persegue a unidade, e só
+sem ela é que cai em `AIDesignatedMissionTargetCell`. Uma atribuição pode,
+portanto, mirar um alvo móvel.
+
+Quem atribui é a IA de alocação. Espera-se dela que não mande dois passageiros
+para o mesmo prédio — o desembarque não conserta atribuição ruim, só a executa.
+
+### Tático ou operacional
+
+O transportador pode largar o passageiro no **Tactical** ou no **Operational**
+dele em relação ao objetivo. Verde é largada boa (o passageiro fecha no mesmo
+turno); azul é largada degradada (fecha no turno seguinte), e existe para o caso
+raro de o objetivo estar cercado — montanha, ilha, LZ ocupada. Ver a projeção
+invertida em `docs/contrato_envelope_alcance.md`.
+
+### Dois passageiros
+
+| regra | estado |
+|---|---|
+| tenta o principal primeiro, Tactical **ou** Operational | ✅ |
+| carona só entra se houver LZ que atenda **ambos** | ✅ (`SearchMatching` maximiza entregues, depois minimiza rota) |
+| desembarcado o principal, o carona vira principal | ✅ — emergente: o principal é recalculado a cada decisão a partir de quem ainda está a bordo |
+| **carona aceita só o Tactical**; o Operational é privilégio do principal | ❌ regra nova |
+
+O último item é doutrina que ainda não existe. Hoje `BuildPassengerRouteLimits`
+aplica o mesmo teto a todos (1× alcance no passe tático, 2× no operacional): o
+tier é do **passe de avaliação**, não do papel do passageiro. O que hoje separa
+principal de carona é outra coisa — `ApplyOperationalDisembarkCapacity`: dois
+passageiros mirando o **mesmo** alvo, e o alvo não estando sob pressão
+confirmada, o não-principal fica a bordo.
+
+### Pendências
+
+| # | contrato | código hoje |
+|---|---|---|
+| P1 | a atribuição vale para todo passageiro | ⚠️ lida **só** no ramo rebelde — um único call site, dentro de `if (IsRuntimeRebelSnapshot)`, em `AIController.MelhorDesembarque.cs:1242`. Numa IA com QG a atribuição é ignorada no desembarque |
+| P2 | rogue mira o capturável livre mais próximo | ⚠️ rogue de IA **com** QG ainda usa `TryResolveRogueCorridorCaptureTarget` — o corredor rumo ao QG, doutrina derrubada na v6.1.2/v6.1.3 e viva no transporte |
+| P3 | passageiro com plano mira o capturável do setor | ⚠️ mira, mas cai no `RepresentativeCell` quando não acha (`Courier.Passengers.cs:228`) **contra o comentário logo acima** (211-213), que manda não cair: em setor já capturado o RepCell é a célula do próprio caminhão, e sai desembarque de distância zero |
+| P4 | carona limitado ao Tactical | ❌ não existe |
+| P5 | o Melhor LZ consome a hotzone | ❌ hoje varre as LZs por `CalcularCaminhosValidos` + `PodeDesembarcarSensor` e cruza com um mapa de custo reverso por passageiro. A **forma** já é a certa (uma pergunta por passageiro, interseção no consumidor); a fonte de alcance é que ainda não é o envelope |
+
+P1 e P2 morrem no refactor de `docs/refactor/ai_sem_plano.md` — são a cópia que
+o transporte fez do funil do QG. P3 é independente e sobrevive a ele.

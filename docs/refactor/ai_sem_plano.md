@@ -106,16 +106,25 @@ está sendo tratado?"* — vale para **toda** unidade sem plano, rebelde ou rogu
 da IA com QG. Renomear e generalizar; hoje ela já é chamada por três sítios que
 não são rebeldes.
 
-### 3. A âncora do rogue passa a ser parâmetro
+### 3. A âncora do rogue deixa de ser o QG — sem ramo
 
-O capturador rogue hoje funila para o QG inimigo. Isso vira uma escolha:
+Primeira versão deste plano tratava a âncora como uma escolha (*tem QG? funila
+para o QG; não tem? capturável mais próximo*). **Decisão do autor: não há ramo.**
 
-```text
-tem QG?  → âncora = eixo/QG inimigo (comportamento atual)
-não tem? → âncora = capturável livre mais próximo
-```
+> *"é pra rogue se comportar como rebel agora, inclusive rebel vai deixar de
+> existir no nosso refactor, vai virar tudo rogue."*
 
-Com isso o curto-circuito perde a razão de existir.
+Ou seja: o funil para o QG inimigo **acaba**, para rogue de qualquer facção. A
+âncora do rogue é sempre o capturável livre mais próximo. "Rebelde" deixa de ser
+uma categoria de comportamento e sobra só como propriedade da facção (não tem
+QG, não produz, imune à derrota por zero unidades).
+
+Isso simplifica o refactor em vez de complicá-lo: some o parâmetro, some o
+ramo, e some a necessidade de testar as duas metades. Um comportamento só.
+
+Consequência de vocabulário: onde o código hoje diz *rebelde* querendo dizer
+*sem plano*, passa a dizer **rogue**. Onde diz *rogue* querendo dizer *funila
+para o QG*, é código a apagar.
 
 ### 4. `Rebel.cs` vira o que deveria ter sido
 
@@ -127,6 +136,27 @@ O gate `plan != null` do roteador não é bloqueio real: o caminho rogue do
 capturador já roda com objetivo nulo por dentro (`AIController.Capturer.Rogue.cs`
 existe exatamente para isso). O que falta é aceitar `plan == null` na entrada e
 não assumir QG na âncora.
+
+### 5. O desembarque também funila para o QG — e é o mesmo bug
+
+Levantado em 2026-08-01, ao conferir a doutrina de desembarque contra o código.
+O transporte tem a **sua própria cópia** do funil, e ela não foi tocada pela
+v6.1.2/v6.1.3: o caminhão ainda entrega o rogue pela regra velha.
+
+| # | achado | onde |
+|---|---|---|
+| T-A | rogue de IA **com** QG resolve alvo por `TryResolveRogueCorridorCaptureTarget` — "corredor rumo ao QG". É a doutrina derrubada, viva no transporte | `AIController.Transportador.Courier.Passengers.cs:236-252` e `AIController.MelhorDesembarque.cs:1156-1191` |
+| T-B | o comentário de `MelhorDesembarque.cs:1151-1155` **já afirma** que o rogue "é irmão da IA rebelde: escolhe o capturável livre mais próximo", mas o código chama o corredor primeiro. Comentário atualizado, código não | idem |
+| T-C | a atribuição (`AIDesignatedMission*`) só é lida no ramo rebelde — **um único** call site, dentro de `if (IsRuntimeRebelSnapshot)`. Numa IA com QG a Designated Mission é ignorada no desembarque | `AIController.MelhorDesembarque.cs:1242` |
+| T-D | `TryResolveCourierPassengerTarget` cai no `RepresentativeCell` do setor (linha 228) contra o comentário logo acima (linha 211-213), que manda **não** cair — em setor já capturado o RepCell é a própria célula do caminhão, e sai um desembarque de distância zero | `AIController.Transportador.Courier.Passengers.cs:211-229` |
+
+T-A e T-B morrem junto com o funil do item 3 — é o mesmo código escrito duas
+vezes, exatamente o custo que este documento descreve. **T-C some sozinho**
+quando `IsRuntimeRebelSnapshot` deixar de ser um ramo: com um comportamento só,
+a atribuição passa a ser lida para todo mundo, que é o que o autor já assume.
+
+T-D é independente e sobrevive ao refactor. Não é dívida de rebelde: é um
+fallback que contradiz o próprio comentário. Tratar à parte.
 
 ## O que NÃO muda
 
