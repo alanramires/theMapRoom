@@ -44,7 +44,7 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
     private bool pickingSecondTargetCell;
     private Vector3Int hoverCell;
 
-    [MenuItem("Tools/Transporte/Melhor LZ de Desembarque")]
+    [MenuItem("Tools/Hotzone/Melhor LZ de Desembarque")]
     public static void Open() =>
         GetWindow<MelhorDesembarqueWindow>("Melhor LZ de Desembarque").Show();
 

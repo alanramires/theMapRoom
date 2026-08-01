@@ -22,7 +22,7 @@ public sealed class MelhorEstoqueWindow : EditorWindow
     private string status =
         "Selecione uma unidade com serviço Transfer.";
 
-    [MenuItem("Tools/Logistica/Melhor Estoque")]
+    [MenuItem("Tools/Hotzone/Melhor Estoque")]
     public static void Open() =>
         GetWindow<MelhorEstoqueWindow>(
             "Melhor Estoque").Show();

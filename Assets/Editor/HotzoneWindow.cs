@@ -85,7 +85,7 @@ public sealed class HotzoneWindow : EditorWindow
     private string status = "Selecione uma unidade e calcule.";
     private bool hasResult;
 
-    [MenuItem("Tools/Utils/Hotzone")]
+    [MenuItem("Tools/Hotzone/Hotzone")]
     public static void Open()
     {
         GetWindow<HotzoneWindow>("Hotzone").Show();

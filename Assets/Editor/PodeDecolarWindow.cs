@@ -35,7 +35,7 @@ public class PodeDecolarWindow : EditorWindow
         GetWindow(windowType, false, "Pode Pousar", true).Show();
     }
 
-    [MenuItem("Tools/Operações Aéreas/Melhor Local para Pouso")]
+    [MenuItem("Tools/Hotzone/Melhor Local para Pouso")]
     private static void OpenMelhorLocalParaPouso()
     {
         MelhorLocalPousoWindow.Open();

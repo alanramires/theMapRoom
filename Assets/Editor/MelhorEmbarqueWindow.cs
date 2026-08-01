@@ -24,7 +24,7 @@ public sealed class MelhorEmbarqueWindow : EditorWindow
     private string status =
         "Selecione o passageiro; o transportador é opcional.";
 
-    [MenuItem("Tools/Transporte/Melhor LZ de Embarque")]
+    [MenuItem("Tools/Hotzone/Melhor LZ de Embarque")]
     public static void Open() =>
         GetWindow<MelhorEmbarqueWindow>("Melhor LZ de Embarque").Show();
 
