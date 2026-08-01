@@ -35,6 +35,11 @@ MonoBehaviour:
   requiredSkillsToEnter: []
   blockedSkills: []
   skillCostOverrides: []
+  skillRulesByTerrain: []
+  inheritStructureRulesOnlyOn:
+  - {fileID: 11400000, guid: 75d32a51167ec98409039b6f5d4d287f, type: 2}
+  inheritTerrainRulesOnlyOn:
+  - {fileID: 11400000, guid: 75d32a51167ec98409039b6f5d4d287f, type: 2}
   domain: 0
   heightLevel: 3
   aditionalDomainsAllowed: []
