@@ -223,13 +223,16 @@ que largar é pedido inválido, não envelope vazio — mesma regra do `Aereo` s
 ausente, é `null`.
 
 **2. A banda é do PASSAGEIRO, e podem ser vários.** Um caminhão com um soldado
-de 3 MP e um bazuca de 2 MP carrega **duas bandas ao mesmo tempo**. O envelope
-publica a de um passageiro por consulta; quem precisa da largada conjunta pede a
-**interseção** — onde *todos* chegam.
+de 3 MP e um bazuca de 2 MP carrega **duas bandas ao mesmo tempo**.
 
-A interseção é a resposta à pergunta real do transporte (*"posso soltar os dois
-aqui?"*) e é a mesma ideia do encontro por cruzamento de zonas que o
-`MelhorEmbarque` já usa do lado do embarque.
+O envelope responde **um passageiro por consulta** e nada além disso. A
+interseção — *"onde os dois chegam"* — é trabalho do **consumidor**
+(`MelhorDesembarque`), que pergunta uma vez por embarcado e cruza os resultados.
+É a mesma forma do encontro por cruzamento de zonas que o `MelhorEmbarque` já
+usa do lado do embarque.
+
+Ver "As três camadas" no `CLAUDE.md`: cruzar, ordenar e desempatar nunca são do
+serviço.
 
 **3. A projeção precisa de um objetivo.** Ela começa no alvo, não na unidade —
 então a consulta exige uma célula de destino. A fonte natural é o alvo designado

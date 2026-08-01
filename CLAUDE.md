@@ -136,6 +136,26 @@ Capturers can intercept to embark via `TryDecideCapturerEmbarkAction` in `AICont
 
 **Extended embark (pass-2)**: `movePaths` computed with `remainingMP - 1` may include friendly-occupied hexes (passable for pathfinding) but the capturer cannot stop there. Always filter with `BuildOccupied(unit)` before treating a hex as a valid intermediate stop.
 
+### The three layers — dumb service, consumer, organizer
+
+Where a piece of logic belongs is decided by this, and almost every "where does
+this go?" question answers itself with it.
+
+| layer | examples | job |
+|---|---|---|
+| **serviço burro** | `UnitReachEnvelopeService` (Hotzone), `UnitMovementPathRules`, the `Pode*` sensors | receives a unit or a cell, returns the area. Knows no policy, no priority, no objective |
+| **consumidor** | `MelhorDesembarque`, `MelhorEmbarque`, `MelhorEstoque`, `MelhorPouso`, `QueroCaronaService`, `CaptureOpportunityClaimService` | queries the service **once per subject** — each passenger, each candidate — and aggregates: intersections, rankings, scores, 1:1 matching |
+| **organizador** | `AIController.*` | decides with the consumer's answer plus its own policies and priorities |
+
+**The rule:** intersecting, ranking and tie-breaking are **never** the service's
+job. If you catch yourself adding "…and also return the best one" to a service,
+it belongs one layer up.
+
+Concretely: the envelope answers "where can *this* passenger be dropped";
+`MelhorDesembarque` asks once per embarked unit and crosses the results into a
+joint drop zone; the transport AI decides whether the joint drop is worth it
+against the promise it made and the conveyor it is running.
+
 ### Military dialect — read this before any AI doctrine doc
 
 The project speaks a deliberate military vocabulary. Every contract in
