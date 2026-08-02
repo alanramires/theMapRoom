@@ -232,8 +232,6 @@ public static class CaptureOpportunityClaimService
     {
         var formalCandidates = new List<Candidate>();
         var rogueCandidates = new List<Candidate>();
-        IReadOnlyList<ConstructionManager> constructions =
-            ConstructionManager.AllActive;
 
         foreach (UnitManager unit in UnitManager.AllActive)
         {
@@ -244,53 +242,64 @@ public static class CaptureOpportunityClaimService
                 continue;
             }
 
-            // Alcance vem do envelope, nunca daqui. A intencao Capture devolve
-            // SO alcance — a construcao ainda passa pela elegibilidade abaixo e
-            // pelo PodeCapturarSensor na hora de agir.
-            //
-            // O orcamento deixou de ser MP x N num bolso so: o turno atual vale
-            // o que ainda sobrou e os seguintes valem MP cheio (banda
-            // Operational). O alcance encolhe em terreno caro e conforme a
-            // unidade age na rodada, que e o comportamento real do jogo.
-            //
-            // Aeronave: a arvore da Captura nao tem ramo aereo, mas o servico
-            // resolve a geometria cubica internamente para quem e isAircraft.
-            UnitReachEnvelope reach;
-            if (unit == request.unit
-                && requestReach != null
-                && requestReach.Operational != null)
-            {
-                // Mesma unidade, mesma intencao, mesma banda: e o mesmo
-                // envelope. Reconstruir seria repetir a travessia encadeada.
-                reach = requestReach.Operational;
-                AIDecisionPerf.AddCount(
-                    "CaptureClaimReachReuses");
-            }
-            else
-            {
-                reach = UnitReachEnvelopeService.Build(
-                    new UnitReachRequest
-                    {
-                        Unit = unit,
-                        BoardMap = request.map,
-                        TerrainDatabase = request.terrainDatabase,
-                        Intent = ReachIntent.Capture,
-                        SubStep = ReachSubStep.Terrestre,
-                        Band = ReachBand.Operational,
-                        OperationalTurns = Mathf.Max(
-                            1, request.operationalTurns)
-                    });
-                AIDecisionPerf.AddCount(
-                    "CaptureClaimReachBuilds");
-            }
-
-            if (reach == null)
-                continue;
-
+            // O PLANO E DAQUI, O ALVO NAO E. Saber se esta unidade tem vaga
+            // formal, e em que setor, e leitura de plano — coisa de organizador.
+            // Qual construcao daquele conjunto vale mais e consulta, e mora no
+            // MelhorCapturaService.
             bool formal = TryResolveFormalCaptureSector(
                 unit,
                 plan,
                 out ConstructionSector formalSector);
+
+            // O setor desce como FILTRO sobre o conjunto, nunca como "o setor
+            // C": a consulta recebe construcoes, nao nomes de setor. Junto vai
+            // o teste de ocupacao aliada, que e a mesma pergunta de sempre —
+            // "eu consigo parar ali?" — e continua sendo politica de quem
+            // organiza, nao regra de captura.
+            Tilemap map = request.map;
+            UnitManager evaluated = unit;
+            ConstructionSector wantedSector = formalSector;
+            bool formalOnly = formal;
+            Func<ConstructionManager, bool> gate = construction =>
+            {
+                if (construction == null)
+                    return false;
+                if (formalOnly
+                    && construction.Sector != wantedSector)
+                    return false;
+                Vector3Int cell =
+                    construction.CurrentCellPosition;
+                cell.z = 0;
+                return !UnitOccupancyRules
+                    .HasBlockingOccupantForUnitAtCell(
+                        map,
+                        cell,
+                        evaluated,
+                        alliedOnly: true);
+            };
+
+            // Reuso por identidade: mesma unidade, mesma intencao, mesmas
+            // bandas. Sem isso a travessia encadeada roda de novo por
+            // capturador, e era exatamente o que o codigo anterior evitava.
+            MelhorCapturaResult captura =
+                MelhorCapturaService.Evaluate(new MelhorCapturaRequest
+                {
+                    unit = unit,
+                    map = request.map,
+                    terrainDatabase = request.terrainDatabase,
+                    operationalTurns = Mathf.Max(
+                        1, request.operationalTurns),
+                    reachProfile = unit == request.unit
+                        ? requestReach
+                        : null,
+                    includeConstruction = gate,
+                    matchController = null,
+                    // A nevoa nao entra na reivindicacao, como nunca entrou: o
+                    // recorte do que o time conhece e cruzado depois, por quem
+                    // decide agir. Ver o cabecalho do MelhorCapturaService.
+                    applyFogOfWar = false
+                });
+
             var candidate = new Candidate
             {
                 Unit = unit,
@@ -298,32 +307,30 @@ public static class CaptureOpportunityClaimService
                 FormalSector = formalSector
             };
 
-            for (int i = 0;
-                 i < constructions.Count;
-                 i++)
+            for (int i = 0; i < captura.ranking.Count; i++)
             {
-                ConstructionManager construction =
-                    constructions[i];
-                if (!IsEligibleConstruction(
-                        request.map,
-                        unit,
-                        construction,
-                        formal,
-                        formalSector,
-                        reach,
-                        out int routeCost))
-                {
+                MelhorCapturaAlvoScore alvo = captura.ranking[i];
+                // FORA DO ENVELOPE NAO VIRA ARESTA. A consulta pontua o que
+                // esta longe para responder "para que lado", com distancia
+                // cubica; reivindicar isso seria prometer um predio que a
+                // unidade nao alcanca em duas rodadas.
+                if (alvo.tier == MelhorCapturaTier.BeyondOperational)
                     continue;
-                }
-
                 candidate.Edges.Add(
                     new Edge
                     {
-                        Construction = construction,
-                        RouteCost = routeCost
+                        Construction = alvo.construction,
+                        RouteCost = alvo.effectiveCost
                     });
             }
 
+            // Ordena por CUSTO DE ROTA, e nao pela nota da consulta.
+            //
+            // De proposito: esta troca muda a FONTE da lista, nao a ORDEM dela.
+            // A nota do MelhorCaptura pesa banda e turnos de captura, o que
+            // provavelmente e melhor — mas mexer nas duas coisas no mesmo passo
+            // deixaria qualquer diferenca em jogo sem causa identificavel.
+            // Trocar o criterio e passo proprio.
             candidate.Edges.Sort(CompareEdges);
             if (candidate.Edges.Count == 0)
                 continue;
@@ -483,46 +490,6 @@ public static class CaptureOpportunityClaimService
             && UnitRoleCompatibility.CanSatisfy(
                 data,
                 UnitRole.Capturador);
-    }
-
-    private static bool IsEligibleConstruction(
-        Tilemap map,
-        UnitManager unit,
-        ConstructionManager construction,
-        bool formal,
-        ConstructionSector formalSector,
-        UnitReachEnvelope reach,
-        out int routeCost)
-    {
-        routeCost = int.MaxValue;
-        if (construction == null
-            || !construction.IsCapturable
-            || construction.TeamId == unit.TeamId
-            || (formal
-                && construction.Sector != formalSector))
-        {
-            return false;
-        }
-
-        Vector3Int cell =
-            construction.CurrentCellPosition;
-        cell.z = 0;
-        // Pertencer a banda e uma pergunta ao envelope; o custo da rota e o que
-        // ele ja calculou para responde-la. Nao ha segunda varredura aqui.
-        if (reach == null
-            || !reach.CanAct(cell)
-            || !reach.TryGetCost(cell, out routeCost))
-        {
-            routeCost = int.MaxValue;
-            return false;
-        }
-
-        return !UnitOccupancyRules
-            .HasBlockingOccupantForUnitAtCell(
-                map,
-                cell,
-                unit,
-                alliedOnly: true);
     }
 
     private static bool TryResolveFormalCaptureSector(

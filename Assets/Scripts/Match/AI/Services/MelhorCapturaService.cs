@@ -98,6 +98,17 @@ public sealed class MelhorCapturaRequest
     public ReachSubStep subStep = ReachSubStep.Terrestre;
 
     /// <summary>
+    /// Envelope ja construido para ESTA unidade, nesta intencao e nestas
+    /// bandas. Informado, o servico nao reconstroi — e o mesmo reuso por
+    /// identidade que o CaptureOpportunityClaimService ja fazia, e sem ele a
+    /// travessia encadeada roda de novo por capturador. Mesma ideia do
+    /// `pathsByDestination` do MelhorDesembarque.
+    ///
+    /// Ninguem valida se o perfil confere com o pedido: quem passa, garante.
+    /// </summary>
+    public UnitReachProfile reachProfile;
+
+    /// <summary>
     /// Conjunto de candidatas. NULO cai para ConstructionManager.AllActive, que
     /// e o registro de runtime. Ferramenta de Editor passa a varredura da cena.
     /// </summary>
@@ -311,24 +322,41 @@ public static class MelhorCapturaService
         origin.z = 0;
         result.origin = origin;
 
+        // ZERO CAI PARA A CONTA DO PROJETO, e nao para "o MP da ficha".
+        //
+        // ResolveTacticalBudget e `restante > 0 ? restante : maximo`, que e
+        // exatamente a regra do primeiro turno da cadeia Operational. Usar o MP
+        // maximo aqui fazia a banda Tatica de uma unidade que ja andou discordar
+        // da Operacional dela mesma — o predio perto saia com um custo pela
+        // Tatica e outro pela Operacional, no mesmo hex. Com a mesma fonte, as
+        // duas bandas concordam por construcao.
         int tactical = request.tacticalBudget > 0
             ? request.tacticalBudget
-            : Mathf.Max(0, unit.MaxMovementPoints);
+            : AIActionReachCoordinator.ResolveTacticalBudget(unit);
         int operationalTurns = Mathf.Max(1, request.operationalTurns);
 
-        UnitReachProfile profile =
-            UnitReachEnvelopeService.BuildProfile(new UnitReachRequest
-            {
-                Unit = unit,
-                BoardMap = request.map,
-                TerrainDatabase = request.terrainDatabase,
-                Intent = ReachIntent.Capture,
-                SubStep = request.subStep,
-                Band = ReachBand.Tactical,
-                MovementBudget = tactical,
-                OperationalTurns = operationalTurns,
-                IncludeMovementCosts = true
-            });
+        UnitReachProfile profile = request.reachProfile;
+        if (profile != null)
+        {
+            AIDecisionPerf.AddCount("MelhorCapturaReachReuses");
+        }
+        else
+        {
+            profile =
+                UnitReachEnvelopeService.BuildProfile(new UnitReachRequest
+                {
+                    Unit = unit,
+                    BoardMap = request.map,
+                    TerrainDatabase = request.terrainDatabase,
+                    Intent = ReachIntent.Capture,
+                    SubStep = request.subStep,
+                    Band = ReachBand.Tactical,
+                    MovementBudget = tactical,
+                    OperationalTurns = operationalTurns,
+                    IncludeMovementCosts = true
+                });
+            AIDecisionPerf.AddCount("MelhorCapturaReachBuilds");
+        }
 
         result.tacticalBudget = tactical;
         result.operationalBudget =

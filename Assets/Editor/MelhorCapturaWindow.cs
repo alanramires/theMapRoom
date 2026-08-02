@@ -320,7 +320,10 @@ public sealed class MelhorCapturaWindow : EditorWindow
             unit = unit,
             map = tilemap,
             terrainDatabase = terrainDatabase,
-            tacticalBudget = Mathf.Max(0, unit.MaxMovementPoints),
+            // Zero de propósito: deixa o serviço aplicar a mesma conta que a IA
+            // aplica. A ferramenta tem que mostrar o que a IA vê, e um orçamento
+            // escolhido aqui faria a janela discordar do jogo.
+            tacticalBudget = 0,
             operationalTurns = operationalTurns,
             subStep = subStep,
             constructions = constructions,
