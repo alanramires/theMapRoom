@@ -18,7 +18,7 @@ public class PodeDesembarcarOption
     [Tooltip("Hex de destino para o desembarque.")]
     public Vector3Int disembarkCell;
 
-    [Tooltip("Custo de desembarque (fixo para este sensor).")]
+    [Tooltip("Custo de autonomia do desembarque. Para unidades terrestres, corresponde ao custo de entrada no destino; aeronaves usam custo 1.")]
     public int disembarkCost = 1;
 
     [Tooltip("Custo de entrada no hex calculado pelas regras de movimento (sem multiplicador de autonomia).")]

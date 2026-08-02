@@ -23,12 +23,14 @@ public partial class TurnStateManager
         public int slotIndex;
         public int seatIndex;
         public Vector3Int targetCell;
+        public int disembarkCost;
     }
 
     private sealed class DisembarkRuntimeOrder
     {
         public UnitManager passenger;
         public Vector3Int targetCell;
+        public int disembarkCost;
     }
 
     private readonly List<DisembarkPassengerEntry> disembarkPassengerEntries = new List<DisembarkPassengerEntry>();
@@ -431,7 +433,8 @@ public partial class TurnStateManager
             passenger = entry.passenger,
             slotIndex = entry.slotIndex,
             seatIndex = entry.seatIndex,
-            targetCell = targetCell
+            targetCell = targetCell,
+            disembarkCost = Mathf.Max(1, option.disembarkCost)
         });
         cursorController?.PlayLoadSfx();
         disembarkSuppressDefaultConfirmSfxOnce = true;
@@ -644,6 +647,20 @@ public partial class TurnStateManager
             yield break;
         }
 
+        // Revalida imediatamente antes do compromisso. As opcoes exibidas sao
+        // apenas uma preparacao cancelavel; custo e validade precisam refletir
+        // o snapshot confirmado no instante em que a execucao comeca.
+        if (!TryRefreshQueuedDisembarkCostsForCommit(
+                transporter,
+                boardMap,
+                out string commitValidationReason))
+        {
+            RuntimeLog($"[Desembarque] Execucao cancelada: {commitValidationReason}");
+            disembarkExecutionInProgress = false;
+            ExitDisembarkStateToMovement();
+            yield break;
+        }
+
         bool transporterSortingRaised = false;
         bool airTransporterForcedLandedForDisembark = false;
         bool showDisembarkAboveFog = matchController == null
@@ -762,7 +779,8 @@ public partial class TurnStateManager
             runtimeOrders.Add(new DisembarkRuntimeOrder
             {
                 passenger = passenger,
-                targetCell = order.targetCell
+                targetCell = order.targetCell,
+                disembarkCost = Mathf.Max(1, order.disembarkCost)
             });
 
             // 3) Passageiros surgem um de cada vez.
@@ -807,7 +825,8 @@ public partial class TurnStateManager
             }
 
             int beforeFuel = passenger.CurrentFuel;
-            passenger.SetCurrentFuel(Mathf.Max(0, beforeFuel - 1));
+            int disembarkCost = Mathf.Max(1, runtimeOrder.disembarkCost);
+            passenger.SetCurrentFuel(Mathf.Max(0, beforeFuel - disembarkCost));
 
             List<Vector3Int> path = new List<Vector3Int>(2)
             {
@@ -941,6 +960,74 @@ public partial class TurnStateManager
             }
             disembarkExecutionInProgress = false;
         }
+    }
+
+    private bool TryRefreshQueuedDisembarkCostsForCommit(
+        UnitManager transporter,
+        Tilemap boardMap,
+        out string reason)
+    {
+        reason = string.Empty;
+        if (transporter == null || boardMap == null || disembarkQueuedOrders.Count <= 0)
+        {
+            reason = "fila, transportador ou mapa invalido";
+            return false;
+        }
+
+        var currentOptions = new List<PodeDesembarcarOption>();
+        if (!PodeDesembarcarSensor.CollectOptions(
+                transporter,
+                boardMap,
+                terrainDatabase,
+                currentOptions))
+        {
+            reason = "o sensor nao encontrou destinos validos no momento do compromisso";
+            return false;
+        }
+
+        for (int i = 0; i < disembarkQueuedOrders.Count; i++)
+        {
+            DisembarkOrder order = disembarkQueuedOrders[i];
+            if (order == null || order.passenger == null)
+            {
+                reason = "ordem de desembarque invalida";
+                return false;
+            }
+
+            Vector3Int targetCell = order.targetCell;
+            targetCell.z = 0;
+            PodeDesembarcarOption matchingOption = null;
+            for (int optionIndex = 0; optionIndex < currentOptions.Count; optionIndex++)
+            {
+                PodeDesembarcarOption option = currentOptions[optionIndex];
+                if (option == null ||
+                    option.passengerUnit != order.passenger ||
+                    option.transporterSlotIndex != order.slotIndex ||
+                    option.transporterSeatIndex != order.seatIndex)
+                {
+                    continue;
+                }
+
+                Vector3Int optionCell = option.disembarkCell;
+                optionCell.z = 0;
+                if (optionCell == targetCell)
+                {
+                    matchingOption = option;
+                    break;
+                }
+            }
+
+            if (matchingOption == null)
+            {
+                reason = $"destino {FormatMapCell(targetCell)} deixou de ser valido para {ResolveUnitRuntimeName(order.passenger)}";
+                return false;
+            }
+
+            order.targetCell = targetCell;
+            order.disembarkCost = Mathf.Max(1, matchingOption.disembarkCost);
+        }
+
+        return true;
     }
 
     private IEnumerator ExecutePostDisembarkAirTransporterTakeoff(UnitManager transporter, Tilemap boardMap)

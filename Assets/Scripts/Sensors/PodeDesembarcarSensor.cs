@@ -68,7 +68,7 @@ public static class PodeDesembarcarSensor
                     transporterSlotIndex = seat.slotIndex,
                     transporterSeatIndex = seat.seatIndex,
                     disembarkCell = targetCell,
-                    disembarkCost = 1,
+                    disembarkCost = enterCost,
                     enterCost = enterCost,
                     displayLabel = $"{passenger.name} | {seat.slotId} vaga {seat.seatIndex + 1} -> {targetCell}"
                 });
@@ -263,7 +263,7 @@ public static class PodeDesembarcarSensor
                     transporterSlotIndex = seat.slotIndex,
                     transporterSeatIndex = seat.seatIndex,
                     disembarkCell = targetCell,
-                    disembarkCost = 1,
+                    disembarkCost = enterCost,
                     enterCost = enterCost,
                     displayLabel = $"{passengerName} | {slotLabel} vaga {seat.seatIndex + 1} -> hex {targetCell.x},{targetCell.y} | custo={enterCost}"
                 });
@@ -410,6 +410,29 @@ public static class PodeDesembarcarSensor
             return false;
         }
 
+        // Passageiro aereo desembarca por uma decolagem curta para Air/Low.
+        // O destino nao e uma entrada terrestre e, portanto, nao participa das
+        // listas Disembark Valid Locations nem do custo do terreno local.
+        if (passenger.TryGetUnitData(out UnitData passengerData) &&
+            passengerData != null &&
+            passengerData.IsAircraft())
+        {
+            enterCost = 1;
+            reason = string.Empty;
+            return true;
+        }
+
+        if (!IsDestinationAllowedByTransporterDisembarkRules(
+                map,
+                terrainDatabase,
+                targetCell,
+                transporterData,
+                out string destinationReason))
+        {
+            reason = destinationReason;
+            return false;
+        }
+
         ConstructionManager targetConstruction = ConstructionOccupancyRules.GetConstructionAtCell(map, targetCell);
         if (targetConstruction == null &&
             terrainDatabase != null &&
@@ -419,15 +442,6 @@ public static class PodeDesembarcarSensor
         {
             reason = $"Terreno '{ResolveTerrainLabel(targetTerrain)}' nao permite desembarque.";
             return false;
-        }
-
-        // Aeronave desembarcante segue regra de decolagem (0/1/full) e sai em Air/Low.
-        // Nao deve ser bloqueada por custo de entrada terrestre do hex de destino.
-        if (passenger.TryGetUnitData(out UnitData passengerData) && passengerData != null && passengerData.IsAircraft())
-        {
-            enterCost = 1;
-            reason = string.Empty;
-            return true;
         }
 
         if (!UnitMovementPathRules.TryGetEnterCellCost(
@@ -442,14 +456,108 @@ public static class PodeDesembarcarSensor
             return false;
         }
 
-        if (enterCost > 1)
+        return true;
+    }
+
+    private static bool IsDestinationAllowedByTransporterDisembarkRules(
+        Tilemap map,
+        TerrainDatabase terrainDatabase,
+        Vector3Int cell,
+        UnitData transporterData,
+        out string reason)
+    {
+        reason = string.Empty;
+        if (map == null || transporterData == null)
         {
-            reason = $"Custo de desembarque maior que 1 (custo={enterCost}).";
+            reason = "Contexto invalido para validar destino de desembarque.";
             return false;
         }
 
-        enterCost = 1;
-        return true;
+        bool hasConstructionFilter =
+            transporterData.validDisembarkLocationFacilities != ConstructionFacilityType.None;
+        bool hasStructureFilter =
+            transporterData.validDisembarkLocationTerrainStructures != null &&
+            transporterData.validDisembarkLocationTerrainStructures.Count > 0;
+        bool hasTerrainFilter =
+            transporterData.validDisembarkLocationTerrains != null &&
+            transporterData.validDisembarkLocationTerrains.Count > 0;
+        if (!hasConstructionFilter && !hasStructureFilter && !hasTerrainFilter)
+            return true;
+
+        cell.z = 0;
+        ConstructionManager construction =
+            ConstructionOccupancyRules.GetConstructionAtCell(map, cell);
+        if (construction != null &&
+            construction.TryResolveConstructionData(out ConstructionData constructionData) &&
+            constructionData != null)
+        {
+            if (!hasConstructionFilter)
+                return true;
+
+            if (ConstructionFacilityTypeRules.MatchesAny(
+                    constructionData,
+                    transporterData.validDisembarkLocationFacilities))
+            {
+                return true;
+            }
+
+            reason = "Construcao do destino nao permitida para desembarque deste transportador.";
+            return false;
+        }
+
+        StructureData structure = StructureOccupancyRules.GetStructureAtCell(map, cell);
+        if (structure != null)
+        {
+            if (!hasStructureFilter)
+            {
+                reason = "Estrutura do destino nao permitida para desembarque deste transportador.";
+                return false;
+            }
+
+            if (!TryResolveTerrainAtCell(
+                    map,
+                    terrainDatabase,
+                    cell,
+                    out TerrainTypeData baseTerrain) ||
+                baseTerrain == null)
+            {
+                reason = "Estrutura do destino sem terreno base valido.";
+                return false;
+            }
+
+            PairRuleMatchResult pairResult = EvaluateDisembarkStructureTerrainPair(
+                transporterData.validDisembarkLocationTerrainStructures,
+                structure,
+                baseTerrain);
+            if (pairResult == PairRuleMatchResult.Blocked)
+            {
+                reason = "Par estrutura+terreno base bloqueado como destino de desembarque.";
+                return false;
+            }
+
+            if (pairResult != PairRuleMatchResult.Allowed)
+            {
+                reason = "Par estrutura+terreno base nao permitido como destino de desembarque.";
+                return false;
+            }
+
+            return true;
+        }
+
+        if (hasTerrainFilter &&
+            TryResolveTerrainAtCell(
+                map,
+                terrainDatabase,
+                cell,
+                out TerrainTypeData terrain) &&
+            terrain != null &&
+            transporterData.validDisembarkLocationTerrains.Contains(terrain))
+        {
+            return true;
+        }
+
+        reason = "Destino fora dos terrenos, estruturas ou construcoes validos para desembarque.";
+        return false;
     }
 
     private static bool CanPassengerAircraftUseTakeoffRuleForDisembark(
