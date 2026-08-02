@@ -188,7 +188,11 @@ public class CaminhosValidosWindow : EditorWindow
     /// </summary>
     private ReachSubStep ResolveSubStepForUnit(UnitManager unit)
     {
-        return UnitReachEnvelopeService.SupportsSubStep(unit, ReachSubStep.Aereo)
+        // A pergunta aqui e "esta unidade e aeronave?", e quem responde isso e
+        // UsesCubicSectorReach. SupportsSubStep respondia por tabela e virou
+        // sempre-verdadeiro quando a medicao deixou de ser propriedade da
+        // unidade — usa-lo aqui passaria a mandar infantaria medir em cubica.
+        return AIActionReachCoordinator.UsesCubicSectorReach(unit)
             ? ReachSubStep.Aereo
             : ReachSubStep.Terrestre;
     }

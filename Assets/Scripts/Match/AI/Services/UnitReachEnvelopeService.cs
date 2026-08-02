@@ -479,33 +479,36 @@ public static class UnitReachEnvelopeService
 
     /// <summary>
     /// Subetapas validas de cada intencao — a arvore do contrato.
-    /// Captura e Desembarque nao tem ramo: sao sempre terrestres.
-    /// Artilheiro so existe sob Combate.
+    /// Artilheiro so existe sob Combate: ele nao e geometria, e "nao move e a
+    /// banda e da arma", e so o combate tem arma.
+    ///
+    /// GEOMETRIA NAO E RAMO DE INTENCAO. Captura media so em caminhos era regra
+    /// gravada aqui dentro: o servico decidia por conta propria que quem captura
+    /// anda. Como medir e pergunta do chamador, igual a intencao.
     /// </summary>
     public static IReadOnlyList<ReachSubStep> GetSubSteps(ReachIntent intent)
     {
-        switch (intent)
-        {
-            case ReachIntent.Combat:
-                return CombatSubSteps;
-            // Desembarque entra aqui quando existir (sem zepelim, sem ramo).
-            case ReachIntent.Capture:
-                return GroundOnlySubSteps;
-            default:
-                return GroundAndAirSubSteps;
-        }
+        return intent == ReachIntent.Combat
+            ? CombatSubSteps
+            : GroundAndAirSubSteps;
     }
 
     /// <summary>
-    /// A UNIDADE suporta esta subetapa? `Aereo` exige isAircraft no UnitData:
-    /// pedir geometria cúbica para uma unidade de superfície é pedido inválido,
-    /// não um envelope vazio. Validação de entrada, não dedução.
+    /// A UNIDADE suporta esta subetapa?
+    ///
+    /// Sim, todas. A subetapa e PARAMETRO DE ENTRADA e diz como medir, nao o que
+    /// a unidade e — perguntar a distancia cubica de uma unidade de superficie e
+    /// pergunta legitima ("de quantos hexes em linha reta ela esta?"), nao pedido
+    /// invalido. O que a unidade E continua decidindo sozinho pela geometria
+    /// PADRAO, em UsesCubicSectorReach: aeronave mede em cubica mesmo quando o
+    /// chamador nao pediu.
+    ///
+    /// Mantido como ponto de extensao — subetapa que exija capacidade da unidade
+    /// entra aqui, e nao espalhada pelos chamadores.
     /// </summary>
     public static bool SupportsSubStep(UnitManager unit, ReachSubStep subStep)
     {
-        if (subStep != ReachSubStep.Aereo)
-            return true;
-        return AIActionReachCoordinator.UsesCubicSectorReach(unit);
+        return true;
     }
 
     /// <summary>
@@ -553,13 +556,31 @@ public static class UnitReachEnvelopeService
         if (unit != null && !SupportsSubStep(unit, subStep))
             return false;
 
+        // SOB COMBATE, A GEOMETRIA VOLTA A SER PROPRIEDADE DA UNIDADE.
+        //
+        // Nas demais intencoes a medicao e pergunta pura ("a quantos hexes em
+        // linha reta isto esta?") e qualquer unidade responde. Combate e o caso
+        // em que o verde afirma "paro AQUI e atiro DALI" — e ai a geometria da
+        // banda e uma afirmacao sobre deslocamento, nao uma regua. Medir um obus
+        // de superficie em cubica diria que ele estaciona atravessando serra e
+        // oceano. Pedido INVALIDO, nao envelope vazio.
+        if (intent == ReachIntent.Combat
+            && subStep == ReachSubStep.Aereo
+            && unit != null
+            && !AIActionReachCoordinator.UsesCubicSectorReach(unit))
+        {
+            return false;
+        }
+
         // COMBATE TERRESTRE EXIGE ARMA DE ALCANCE MINIMO 1.
         //
         // Terrestre e "move e atira": o tiro pos-movimento colapsa para 1. Uma
-        // peca de minimo 2 nao dispara depois de andar — pedir Terrestre para
-        // ela e pedido INVALIDO, nao envelope vazio, do mesmo jeito que pedir
-        // geometria cubica para unidade de superficie. A pergunta certa para
-        // ela e a subetapa Artilheiro, cuja banda e da arma.
+        // peca de minimo 2 nao dispara depois de andar. Devolver o verde e o
+        // azul do MOVIMENTO seria pior que devolver nada: sao bandas de
+        // deslocamento respondendo a uma pergunta de combate, e quem lesse
+        // concluiria que a peca briga onde ela so consegue andar. Pedido
+        // INVALIDO. A pergunta certa para ela e Artilheiro, cuja banda e da
+        // arma.
         if (intent == ReachIntent.Combat
             && subStep == ReachSubStep.Terrestre
             && unit != null
@@ -597,11 +618,6 @@ public static class UnitReachEnvelopeService
     private static readonly ReachSubStep[] GroundAndAirSubSteps =
     {
         ReachSubStep.Terrestre, ReachSubStep.Aereo
-    };
-
-    private static readonly ReachSubStep[] GroundOnlySubSteps =
-    {
-        ReachSubStep.Terrestre
     };
 
     /// <summary>
@@ -868,6 +884,10 @@ public static class UnitReachEnvelopeService
         if (request.Band == ReachBand.Operational
             || UsesCubicGeometry(subStep))
         {
+            // A medicao PEDIDA desce ate o builder. Sem isso o popup oferecia
+            // "Linear (cubica)" e o servico devolvia caminhos, porque a
+            // geometria era reinferida da ficha da unidade la embaixo.
+            bool cubicGeometry = UsesCubicGeometry(subStep);
             costByCell =
                 request.Band == ReachBand.Operational
                     ? BuildTurnChainedReach(
@@ -876,13 +896,15 @@ public static class UnitReachEnvelopeService
                         request.TerrainDatabase,
                         origin,
                         request.OperationalTurns,
+                        cubicGeometry,
                         out turnsByCell)
                     : AIActionReachCoordinator.BuildSectorReachMap(
                         request.Unit,
                         map,
                         request.TerrainDatabase,
                         origin,
-                        Mathf.Max(0, budget));
+                        Mathf.Max(0, budget),
+                        cubicGeometry);
             // A malha setorial nao produz caminhos. Publicar os destinos com
             // caminho nulo mantem PathsByDestination como indice de alcance,
             // que e o formato que os consumidores herdados ja esperavam.
@@ -918,6 +940,7 @@ public static class UnitReachEnvelopeService
         TerrainDatabase terrainDatabase,
         Vector3Int origin,
         int turns,
+        bool cubicGeometry,
         out Dictionary<Vector3Int, int> turnsByCell)
     {
         turnsByCell = new Dictionary<Vector3Int, int>();
@@ -937,9 +960,11 @@ public static class UnitReachEnvelopeService
         if (firstTurn <= 0)
             firstTurn = maxPerTurn;
 
-        // Aeronave ignora geografia: o encadeamento por turno nao muda nada,
-        // o alcance e cubico puro sobre a soma dos tetos.
-        if (AIActionReachCoordinator.UsesCubicSectorReach(unit))
+        // Quem mede em cubica ignora geografia: o encadeamento por turno nao
+        // muda nada, o alcance e cubico puro sobre a soma dos tetos. Vale para
+        // aeronave (geometria da ficha) e para quem PEDIU a medicao linear.
+        if (cubicGeometry
+            || AIActionReachCoordinator.UsesCubicSectorReach(unit))
         {
             Dictionary<Vector3Int, int> cubic =
                 AIActionReachCoordinator.BuildSectorReachMap(
@@ -947,7 +972,8 @@ public static class UnitReachEnvelopeService
                     map,
                     terrainDatabase,
                     origin,
-                    firstTurn + maxPerTurn * Mathf.Max(0, turns - 1));
+                    firstTurn + maxPerTurn * Mathf.Max(0, turns - 1),
+                    cubicGeometry);
             // Sem geografia o turno sai direto do custo: o que cabe no que
             // sobrou hoje e desta rodada; o resto e do turno seguinte.
             foreach (KeyValuePair<Vector3Int, int> pair in cubic)
@@ -1493,17 +1519,55 @@ public static class UnitReachEnvelopeService
     }
 
     /// <summary>
+    /// A distancia cai dentro do alcance de ALGUMA arma utilizavel?
+    ///
+    /// E a UNIAO dos intervalos [min,max], nao o intervalo da arma mais longa:
+    /// uma unidade com um obus 3-4 e uma metralhadora 1-2 nao tem zona morta
+    /// nenhuma, e tratar o minimo do obus como minimo da unidade abriria um
+    /// buraco onde ela de fato atira.
+    /// </summary>
+    private static bool IsWithinAnyWeaponRange(UnitManager unit, int distance)
+    {
+        IReadOnlyList<UnitEmbarkedWeapon> weapons = unit?.GetEmbarkedWeapons();
+        if (weapons == null)
+            return false;
+
+        for (int i = 0; i < weapons.Count; i++)
+        {
+            UnitEmbarkedWeapon embarked = weapons[i];
+            if (embarked?.weapon == null || embarked.squadAmmunition <= 0)
+                continue;
+            if (distance >= embarked.GetRangeMin()
+                && distance <= embarked.GetRangeMax())
+                return true;
+        }
+        return false;
+    }
+
+    /// <summary>
     /// Banda do artilheiro. NAO ha deslocamento aqui: a unidade atira parada, e
     /// o que a banda descreve e o raio da ARMA.
     ///
-    ///   MovementCells — o disco 0..raio da banda. E o "verde": nao e onde ela
-    ///                   anda, e a area que a banda cobre.
+    ///   MovementCells — os aneis que alguma arma cobre. E o "verde".
     ///   ActionCells   — o que a arma REALMENTE atinge parada, pelo sensor. E o
     ///                   "vermelho", e ele sobrescreve o verde.
     ///
-    /// A diferenca entre os dois e informacao util, nao ruido: numa arma de
-    /// alcance minimo 2, os hexes 0 e 1 aparecem no verde e ficam FORA do
-    /// vermelho — a zona morta em que ela nao consegue atirar.
+    /// A ZONA MORTA NAO E BANDA, E O HEX DA UNIDADE TAMBEM NAO. A versao
+    /// anterior publicava o disco cheio 0..alcance e contava com o vermelho por
+    /// cima para revelar o buraco do alcance minimo. Isso pintava de verde hexes
+    /// onde a unidade nao faz nada: ela nao anda ate la (nao ha deslocamento)
+    /// nem atira la (esta abaixo do minimo). Verde quer dizer "materializa aqui"
+    /// em toda a ferramenta, e ali nada se materializa — jogador e IA liam
+    /// alcance onde ha buraco.
+    ///
+    /// O hex 0 sai pelo mesmo motivo, e nao por ser menos importante: pintado,
+    /// ele afirma que a peca ataca no alcance 0. Ela esta ali, nao age ali.
+    ///
+    /// Num obus 3-4 a banda Tactical e {3, 4}. Os hexes 0, 1 e 2 saem VAZIOS.
+    ///
+    /// Na banda Operational o anel ALEM do alcance maximo continua na resposta
+    /// — ele responde "de onde me alcancam se a situacao mudar". A zona morta
+    /// nao: ela e buraco permanente de quem atira parado, nao distancia.
     /// </summary>
     private static UnitReachEnvelope BuildArtilleryBand(
         UnitReachRequest request,
@@ -1523,8 +1587,18 @@ public static class UnitReachEnvelopeService
 
         var bandCells = new HashSet<Vector3Int>();
         CollectCubicMovementCells(map, origin, bandRadius, bandCells);
-        if (map.GetTile(origin) != null)
-            bandCells.Add(origin);
+
+        // Fura a zona morta, e o proprio hex da unidade vai junto: ficam os
+        // aneis que alguma arma cobre e, na banda Operational, o anel alem do
+        // alcance maximo. Todo o resto e buraco e sai da banda.
+        int deadZoneCells = bandCells.RemoveWhere(cell =>
+        {
+            int distance =
+                AIActionReachCoordinator.CubicDistance(origin, cell);
+            if (IsWithinAnyWeaponRange(unit, distance))
+                return false;
+            return distance <= maxRange;
+        });
 
         var fireCells = new HashSet<Vector3Int>();
         PodeMirarSensor.CollectValidFireCellsFromOrigin(
@@ -1567,9 +1641,10 @@ public static class UnitReachEnvelopeService
             Diagnostic =
                 $"artilheiro: alcance máximo={maxRange}; " +
                 $"banda={bandRadius} ({(request.Band == ReachBand.Operational ? "2× alcance" : "alcance")}); " +
-                $"disco={bandCells.Count}; tiro real={fireCells.Count}" +
+                $"banda={bandCells.Count}; tiro real={fireCells.Count}; " +
+                $"zona morta removida={deadZoneCells} hexes" +
                 (fireCells.Count == 0
-                    ? " — nenhuma célula de tiro (sem alvo válido ou zona morta)"
+                    ? " — nenhuma célula de tiro (sem alvo válido)"
                     : string.Empty)
         };
     }

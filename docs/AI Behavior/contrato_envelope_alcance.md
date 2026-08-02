@@ -80,26 +80,44 @@ comportamento da IA. **Ficção também não existe**: o jogo não tem zepelins.
 ```text
 Mobilidade ── Terrestre, Aereo
 Combate ───── Terrestre, Aereo, Artilheiro
-Captura ───── (sem ramo: sempre terrestre)
+Captura ───── Terrestre, Aereo
 Fusão ─────── Terrestre, Aereo
 Suprir ────── Terrestre, Aereo
 Estoque ───── Terrestre, Aereo
 Embarque ──── Terrestre, Aereo
-Desembarque ─ (sem ramo)
+Desembarque ─ Terrestre, Aereo
 ```
 
-`UnitReachEnvelopeService.GetSubSteps(intent)` é a fonte dessa árvore.
+`UnitReachEnvelopeService.GetSubSteps(intent)` é a fonte dessa árvore. Só o
+Combate tem ramo próprio, e é por causa do `Artilheiro`: ele não é geometria, é
+"não move e a banda é da arma" — e só o combate tem arma.
+
+**Geometria não é ramo de intenção.** Captura media só em caminhos porque a regra
+estava gravada no serviço: ele decidia sozinho que quem captura anda. *Como*
+medir é pergunta do chamador, igual à intenção.
 
 ### Validação pela unidade
 
-`Aereo` exige `isAircraft` no `UnitData`. Pedir geometria cúbica para uma
-unidade de superfície é **pedido inválido**, não envelope vazio: `Build`
-devolve `null`. Isso é validação de entrada, não dedução.
+**A medição não é propriedade da unidade.** Perguntar a distância cúbica de uma
+unidade de superfície é pergunta legítima — *"a quantos hexes em linha reta isto
+está?"* — e qualquer unidade responde. O que a unidade **é** continua decidindo
+sozinho a geometria **padrão**, em `UsesCubicSectorReach`: aeronave mede em
+cúbica mesmo quando o chamador não pediu.
 
-**Combate + `Terrestre` exige arma de alcance mínimo 1.** Terrestre é "move e
-atira", e o tiro pós-movimento colapsa para 1: uma peça de mínimo 2 não dispara
-depois de andar. Pedir Terrestre para ela é pedido inválido pelo mesmo motivo —
-a pergunta certa é a subetapa `Artilheiro`, cuja banda é da arma.
+**Combate é a exceção, e só ele.** Ali o verde afirma *"paro AQUI e atiro DALI"*:
+a geometria da banda vira afirmação sobre deslocamento, não régua. Duas
+validações caem sob Combate, e nas duas o `Build` devolve `null` — **pedido
+inválido, não envelope vazio**:
+
+| pedido | por quê |
+|---|---|
+| Combate + `Aereo` numa unidade de superfície | diria que ela estaciona atravessando serra e oceano |
+| Combate + `Terrestre` numa arma de mínimo > 1 | Terrestre é "move e atira" e o tiro pós-movimento colapsa para 1: ela não dispara depois de andar |
+
+No segundo caso, devolver o verde e o azul do **movimento** seria pior que
+devolver nada — são bandas de deslocamento respondendo a uma pergunta de combate,
+e quem lesse concluiria que a peça briga onde ela só consegue andar. A pergunta
+certa para ela é `Artilheiro`, cuja banda é da arma.
 
 `GetSubSteps(intent, unit)` devolve a árvore já filtrada pelo que a unidade
 suporta; é o que a ferramenta usa para nem oferecer a opção.
@@ -120,7 +138,7 @@ vanguarda, bombardeiros na retaguarda.
 |---|---|
 | `Terrestre` | verde em MP + vermelho no alcance da arma; azul em `+MP` |
 | `Aereo` | verde em MP (cúbica) + vermelho no alcance da arma |
-| `Artilheiro` | **verde do hex 0 até o alcance máximo** (vermelho sobrescreve); **azul no dobro do alcance máximo** |
+| `Artilheiro` | **verde nos anéis que alguma arma cobre** (vermelho sobrescreve); **azul no dobro do alcance máximo** |
 
 ### Artilheiro inverte a banda: ela é da ARMA, não do movimento
 
@@ -130,8 +148,27 @@ de existir é alcançar longe.
 
 | banda | artilheiro | todo o resto |
 |---|---|---|
-| Tactical (verde) | 0 → alcance máximo da arma | alcance de movimento |
+| Tactical (verde) | os anéis que alguma arma cobre | alcance de movimento |
 | Operational (azul) | **2 × alcance máximo** | movimento do turno seguinte |
+
+#### A zona morta não é banda — e o hex da própria peça também não
+
+A versão anterior devolvia o **disco cheio** `0 → alcance máximo` e contava com o
+vermelho por cima para revelar o buraco do alcance mínimo. Isso pintava de verde
+hexes onde a peça não faz nada: ela não anda até lá (não há deslocamento) nem
+atira lá (está abaixo do mínimo). **Verde quer dizer "materializa aqui"** em toda
+a ferramenta — jogador e IA liam alcance onde há buraco.
+
+O hex 0 sai pelo mesmo motivo: pintado, ele afirma que a peça ataca no alcance 0.
+Ela está ali, não age ali.
+
+> Um obus **3-4** tem Tactical `{3, 4}`. Os hexes **0, 1 e 2 voltam vazios**.
+
+A cobertura é a **união** dos intervalos `[min, max]` de todas as armas com
+munição, não o intervalo da mais longa: um obus 3-4 com uma metralhadora 1-2 não
+tem zona morta nenhuma. No azul, o anel **além** do alcance máximo continua na
+resposta (é ameaça recíproca); a zona morta não, porque ela é buraco permanente
+de quem atira parado, não distância.
 
 O azul aqui não é "para onde eu ando" — é **de onde eu posso ser alcançado, ou
 alcançar, se a situação mudar**. É a banda de ameaça recíproca, e ela existe por

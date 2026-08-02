@@ -152,17 +152,23 @@ public static class AIActionReachCoordinator
     /// Malha de classificacao setorial. Para aeronaves nao abre pathfinding:
     /// materializa apenas as celulas do tabuleiro dentro do raio cubico.
     /// Para as demais unidades preserva custo, dominio e geografia reais.
+    ///
+    /// `cubicGeometry` e a medicao PEDIDA pelo chamador, e ganha da inferencia
+    /// pela ficha: com ele ligado qualquer unidade responde em linha reta. Sem
+    /// ele — o padrao, e por isso nenhum chamador existente muda — a geometria
+    /// continua saindo de UsesCubicSectorReach.
     /// </summary>
     public static Dictionary<Vector3Int, int> BuildSectorReachMap(
         UnitManager unit,
         Tilemap boardMap,
         TerrainDatabase terrainDatabase,
         Vector3Int origin,
-        int budget)
+        int budget,
+        bool cubicGeometry = false)
     {
         origin.z = 0;
         int normalizedBudget = Mathf.Max(0, budget);
-        if (!UsesCubicSectorReach(unit))
+        if (!cubicGeometry && !UsesCubicSectorReach(unit))
         {
             return UnitMovementPathRules.CalculateMovementCostMap(
                 boardMap,
@@ -172,6 +178,20 @@ public static class AIActionReachCoordinator
                 terrainDatabase);
         }
 
+        return BuildCubicReachMap(boardMap, origin, normalizedBudget);
+    }
+
+    /// <summary>
+    /// Distancia cubica pura sobre as celulas que existem no tabuleiro. Nao
+    /// recebe unidade de proposito: e geometria, nao propriedade de quem mede.
+    /// </summary>
+    public static Dictionary<Vector3Int, int> BuildCubicReachMap(
+        Tilemap boardMap,
+        Vector3Int origin,
+        int budget)
+    {
+        origin.z = 0;
+        int normalizedBudget = Mathf.Max(0, budget);
         var result = new Dictionary<Vector3Int, int>();
         if (boardMap == null)
             return result;

@@ -19,9 +19,9 @@ public sealed class QueroCaronaAereaWindow : EditorWindow
         "Selecione Interceptador, Ataque Aereo ou Vigilancia Aerea.";
     private Vector2 scroll;
 
-    [MenuItem("Tools/Operações Aéreas/Quero Carona Aérea")]
+    [MenuItem("Tools/Hotzone/Melhor Carona Aérea")]
     public static void Open() =>
-        GetWindow<QueroCaronaAereaWindow>("Quero Carona Aérea").Show();
+        GetWindow<QueroCaronaAereaWindow>("Melhor Carona Aérea").Show();
 
     private void OnEnable()
     {
@@ -40,7 +40,7 @@ public sealed class QueroCaronaAereaWindow : EditorWindow
 
     private void OnGUI()
     {
-        EditorGUILayout.LabelField("Quero Carona Aérea", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField("Melhor Carona Aérea", EditorStyles.boldLabel);
         EditorGUILayout.HelpBox(
             "Consulta pura para Interceptador, Ataque Aéreo e Vigilância Aérea. Recuperação aceita " +
             "plataforma por emergência; em situação normal, um foco de missão testa " +

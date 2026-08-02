@@ -188,9 +188,16 @@ of the nearest capturable, a fixed air layer instead of the specialized vision
 layer.
 
 **Known inversion:** for `Artilheiro` (stationary long-range), the band is the
-**weapon's**, not the movement's — green from hex 0 to max range, blue at
-`2 × max range`. A 1 MP howitzer with a movement band would have an Operational
-of hex 2. See `docs/AI Behavior/contrato_envelope_alcance.md`.
+**weapon's**, not the movement's — green is the set of rings some usable weapon
+covers, blue at `2 × max range`. A 1 MP howitzer with a movement band would have
+an Operational of hex 2.
+
+The band is **not** the full disc: the minimum-range dead zone and the unit's own
+hex are excluded, because green means "materializes here" everywhere else in the
+tool and the piece does nothing in either. A 3-4 howitzer has Tactical `{3, 4}` —
+hexes 0, 1 and 2 come back empty. Coverage is the **union** of every loaded
+weapon's `[min, max]`, so a second short weapon closes the hole.
+See `docs/AI Behavior/contrato_envelope_alcance.md`.
 
 ### Ranges are bands, not hex numbers
 

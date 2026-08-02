@@ -151,15 +151,15 @@ public sealed class HotzoneWindow : EditorWindow
         intentMode = (IntentMode)EditorGUILayout.EnumPopup(
             "Intenção", intentMode);
 
-        // Subetapa é parâmetro de entrada, igual à intenção. Só aparecem as
+        // Medição é parâmetro de entrada, igual à intenção. Só aparecem as
         // válidas para a intenção escolhida — a árvore do contrato.
         DrawSubStepPopup();
 
-        // Modal fica junto de intenção e subetapa: os três são a pergunta.
+        // O envelope fica junto de intenção e medição: os três são a pergunta.
         using (new EditorGUI.DisabledScope(!paintReach))
         {
             viewMode = (ViewMode)EditorGUILayout.EnumPopup(
-                "Modal (Tático/Oper)", viewMode);
+                "Envelope (Tático/Oper)", viewMode);
         }
 
         paintReach = EditorGUILayout.Toggle(
@@ -204,7 +204,7 @@ public sealed class HotzoneWindow : EditorWindow
             $"Tactical: {tactical.Count} células " +
             $"(movimento {tacticalMovement.Count} + ação {tacticalAction.Count})\n" +
             $"Operational: {operational.Count} células\n\n" +
-            $"{ResolveIntentLabel()} / {subStep}\n" +
+            $"{ResolveIntentLabel()} / {ResolveSubStepLabel(subStep)}\n" +
             "VERDE = onde para (rótulo: custo/MP restante)\n" +
             "VERMELHO = onde só alcança com a arma, não pisa\n" +
             "AZUL = Operational (turno seguinte)");
@@ -413,9 +413,10 @@ public sealed class HotzoneWindow : EditorWindow
             // além de onde a unidade pisa.
             //
             // Artilheiro é a exceção, porque a banda dele é da ARMA e não do
-            // movimento: verde é o disco 0..alcance e o vermelho SOBRESCREVE,
-            // marcando o que ela realmente atinge. A diferença entre os dois é
-            // a zona morta do alcance mínimo — e ela precisa aparecer.
+            // movimento: o verde já vem sem a zona morta e sem o hex da própria
+            // unidade, e o vermelho SOBRESCREVE marcando o que ela realmente
+            // atinge. Num obus 3-4 o tático é {3, 4} — 0, 1 e 2 ficam vazios,
+            // porque a peça não age em nenhum dos três.
             if (subStep == ReachSubStep.Artilheiro)
                 tacticalAction.UnionWith(profile.Tactical.ActionCells);
             else
@@ -474,7 +475,7 @@ public sealed class HotzoneWindow : EditorWindow
             $"Tactical={tactical.Count}; " +
             $"Operational={operational.Count}, orçamento={operationalBudget}, " +
             $"regra={geometry}." +
-            $"\nSubetapa: {(profile.Tactical != null ? profile.Tactical.SubStep.ToString() : "—")}" +
+            $"\nMedição: {(profile.Tactical != null ? ResolveSubStepLabel(profile.Tactical.SubStep) : "—")}" +
             $"\nFunil Tactical: {ResolveDiagnostic(profile.Tactical)}" +
             $"\nFunil Operational: {ResolveDiagnostic(profile.Operational)}" +
             $"\nOrigem={unit.CurrentCellPosition} " +
@@ -648,7 +649,7 @@ public sealed class HotzoneWindow : EditorWindow
         {
             subStep = valid.Count == 1 ? valid[0] : ReachSubStep.Terrestre;
             using (new EditorGUI.DisabledScope(true))
-                EditorGUILayout.EnumPopup("Subetapa", subStep);
+                EditorGUILayout.TextField("Medição", ResolveSubStepLabel(subStep));
             return;
         }
 
@@ -656,13 +657,37 @@ public sealed class HotzoneWindow : EditorWindow
         int selected = 0;
         for (int i = 0; i < valid.Count; i++)
         {
-            labels[i] = valid[i].ToString();
+            labels[i] = ResolveSubStepLabel(valid[i]);
             if (valid[i] == subStep)
                 selected = i;
         }
 
-        selected = EditorGUILayout.Popup("Subetapa", selected, labels);
+        selected = EditorGUILayout.Popup("Medição", selected, labels);
         subStep = valid[Mathf.Clamp(selected, 0, valid.Count - 1)];
+    }
+
+    /// <summary>
+    /// A medição é COMO se mede, não o que a unidade é. Os nomes do enum ainda
+    /// dizem domínio (Terrestre/Aereo) porque o rename do tipo é fase própria;
+    /// o rótulo já fala a língua certa.
+    ///
+    /// `Artilheiro` fica de fora do par: ele não é geometria, é "não move e a
+    /// banda é da arma". Chamá-lo de linear seria mentira — a cúbica dele vem do
+    /// BuildArtilleryBand, que só existe sob a intenção Combate.
+    /// </summary>
+    private static string ResolveSubStepLabel(ReachSubStep subStep)
+    {
+        switch (subStep)
+        {
+            case ReachSubStep.Terrestre:
+                return "Geográfico (caminhos)";
+            case ReachSubStep.Aereo:
+                return "Linear (cúbica)";
+            case ReachSubStep.Artilheiro:
+                return "Artilheiro (parado, banda da arma)";
+            default:
+                return subStep.ToString();
+        }
     }
 
     private ReachIntent ResolveIntentForPopup()
@@ -810,8 +835,8 @@ public sealed class HotzoneWindow : EditorWindow
             || viewMode == ViewMode.Tactical)
         {
             // Verde = onde ele PARA (e quanto custou chegar).
-            // No artilheiro, verde = o disco do alcance da arma: ele não pisa
-            // ali, alcança dali.
+            // No artilheiro, verde = os anéis que a arma cobre: ele não pisa
+            // ali, alcança dali. Sem o hex dele e sem a zona morta.
             DrawCells(
                 tacticalMovement,
                 new Color(0.15f, 1f, 0.35f, 0.32f),

@@ -17,9 +17,9 @@ public sealed class QueroCaronaWindow : EditorWindow
     private QueroCaronaResult result;
     private string status = "Selecione uma unidade em campo.";
 
-    [MenuItem("Tools/Transporte/Quero Carona")]
+    [MenuItem("Tools/Hotzone/Melhor Carona")]
     public static void Open() =>
-        GetWindow<QueroCaronaWindow>("Quero Carona").Show();
+        GetWindow<QueroCaronaWindow>("Melhor Carona").Show();
 
     private void OnEnable()
     {
@@ -64,7 +64,7 @@ public sealed class QueroCaronaWindow : EditorWindow
     private void OnGUI()
     {
         EditorGUILayout.LabelField(
-            "Quero Carona", EditorStyles.boldLabel);
+            "Melhor Carona", EditorStyles.boldLabel);
         EditorGUILayout.HelpBox(
             "Estimativa de necessidade do passageiro. É o contrapeso do " +
             "Melhor LZ de Embarque: verifica se a unidade já consegue cumprir sua " +
