@@ -126,9 +126,6 @@ MonoBehaviour:
   allowedDisembarkWhenTransporterAtTerrains: []
   allowedDisembarkWhenTransporterAtTerrainStructures: []
   allowedDisembarkWhenTransporterAtFacilities: 0
-  passengersCanDisembarkAndGoesToTerrains: []
-  passengersCanDisembarkAndGoesToTerrainStructures: []
-  passengersCanDisembarkAndGoesToFacilities: 0
-  transportSlots: []
-  autonomia: 90
-  cost: 30000
+  validDisembarkLocationTerrains: []
+  validDisembarkLocationTerrainStructures: []
+  validDisembarkLocationFacilities: 0

@@ -311,12 +311,10 @@ public class UnitData : ScriptableObject
     [FormerlySerializedAs("embarkedSupplies")]
     [Tooltip("Recursos/logistica padrao de fabrica desta unidade fornecedora (Supply + quantidade).")]
     public List<UnitEmbarkedSupply> supplierResources = new List<UnitEmbarkedSupply>();
-    [Header("Transport")]
     [Tooltip("Se true, esta unidade pode transportar outras unidades.")]
     public bool isTransporter = false;
     [Tooltip("Sprite opcional exibido quando este transportador estiver com unidades embarcadas. Se vazio, usa o sprite padrao da unidade.")]
     public Sprite spriteTransport;
-    [Header("Allowed Embark Terrain When Transporter At")]
     [FormerlySerializedAs("allowedEmbarkTerrains")]
     [Tooltip("Terrain: Terrenos validos para o HEX atual do transportador no embarque. Vazio = sem restricao por terreno.")]
     public List<TerrainTypeData> allowedEmbarkWhenTransporterAtTerrains = new List<TerrainTypeData>();
@@ -325,7 +323,6 @@ public class UnitData : ScriptableObject
     public List<TransportStructureTerrainRule> allowedEmbarkWhenTransporterAtTerrainStructures = new List<TransportStructureTerrainRule>();
     [Tooltip("Facilities: categorias de construcao validas para o HEX atual do transportador no embarque. Basta corresponder a uma categoria. None = sem restricao por construcao.")]
     public ConstructionFacilityType allowedEmbarkWhenTransporterAtFacilities = ConstructionFacilityType.Harbor;
-    [Header("Allowed Disembark Terrain When Transporter At")]
     [FormerlySerializedAs("allowedDisembarkTerrains")]
     [Tooltip("Terrain: Terrenos validos para o HEX atual do transportador no desembarque. Vazio = sem restricao por terreno.")]
     public List<TerrainTypeData> allowedDisembarkWhenTransporterAtTerrains = new List<TerrainTypeData>();
@@ -334,6 +331,12 @@ public class UnitData : ScriptableObject
     public List<TransportStructureTerrainRule> allowedDisembarkWhenTransporterAtTerrainStructures = new List<TransportStructureTerrainRule>();
     [Tooltip("Facilities: categorias de construcao validas para o HEX atual do transportador no desembarque. Basta corresponder a uma categoria. None = sem restricao por construcao.")]
     public ConstructionFacilityType allowedDisembarkWhenTransporterAtFacilities = ConstructionFacilityType.Harbor | ConstructionFacilityType.Airport;
+    [Tooltip("Terrain: terrenos validos para o HEX de destino do passageiro no desembarque.")]
+    public List<TerrainTypeData> validDisembarkLocationTerrains = new List<TerrainTypeData>();
+    [Tooltip("Structures: pares estrutura+terreno base validos para o HEX de destino do passageiro no desembarque.")]
+    public List<TransportStructureTerrainRule> validDisembarkLocationTerrainStructures = new List<TransportStructureTerrainRule>();
+    [Tooltip("Constructions: categorias de construcao validas para o HEX de destino do passageiro no desembarque.")]
+    public ConstructionFacilityType validDisembarkLocationFacilities = ConstructionFacilityType.None;
     [Tooltip("Slots de transporte e regras de embarque.")]
     public List<UnitTransportSlotRule> transportSlots = new List<UnitTransportSlotRule>();
 
@@ -381,6 +384,10 @@ public class UnitData : ScriptableObject
             allowedDisembarkWhenTransporterAtTerrains = new List<TerrainTypeData>();
         if (allowedDisembarkWhenTransporterAtTerrainStructures == null)
             allowedDisembarkWhenTransporterAtTerrainStructures = new List<TransportStructureTerrainRule>();
+        if (validDisembarkLocationTerrains == null)
+            validDisembarkLocationTerrains = new List<TerrainTypeData>();
+        if (validDisembarkLocationTerrainStructures == null)
+            validDisembarkLocationTerrainStructures = new List<TransportStructureTerrainRule>();
         eliteLevel = Mathf.Max(0, eliteLevel);
         visao = Mathf.Max(1, visao);
         attackAcceptHpLossPercent = Mathf.Clamp(attackAcceptHpLossPercent, 0, 100);

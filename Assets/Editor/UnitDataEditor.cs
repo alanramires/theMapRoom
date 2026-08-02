@@ -18,6 +18,9 @@ public class UnitDataEditor : Editor
     private SerializedProperty stealthSkillRulesProperty;
     private SerializedProperty aiUnitProfileProperty;
     private bool showTransportSection = false;
+    private bool showEmbarkRules = false;
+    private bool showDisembarkRules = false;
+    private bool showTransportSlots = false;
     private bool showLogisticsSection = false;
     private bool showWeaponsSection = false;
     private bool showEmbarkedWeaponsSection = false;
@@ -161,6 +164,9 @@ public class UnitDataEditor : Editor
             "allowedDisembarkWhenTransporterAtTerrains",
             "allowedDisembarkWhenTransporterAtTerrainStructures",
             "allowedDisembarkWhenTransporterAtFacilities",
+            "validDisembarkLocationTerrains",
+            "validDisembarkLocationTerrainStructures",
+            "validDisembarkLocationFacilities",
             "transportSlots");
         EditorGUILayout.Space();
         DrawWeaponsSection();
@@ -642,13 +648,69 @@ public class UnitDataEditor : Editor
         EditorGUI.indentLevel++;
         DrawIfExists(serializedObject.FindProperty("isTransporter"), "Is Transporter");
         DrawIfExists(serializedObject.FindProperty("spriteTransport"), "Sprite Transport");
-        DrawIfExists(serializedObject.FindProperty("allowedEmbarkWhenTransporterAtTerrains"), "Allowed Embark Terrain When Transporter At: Terrain");
-        DrawIfExists(serializedObject.FindProperty("allowedEmbarkWhenTransporterAtTerrainStructures"), "Allowed Embark Terrain When Transporter At: Terrain + Structure");
-        DrawIfExists(serializedObject.FindProperty("allowedEmbarkWhenTransporterAtFacilities"), "Allowed Embark when Transporter At: Construction");
-        DrawIfExists(serializedObject.FindProperty("allowedDisembarkWhenTransporterAtTerrains"), "Allowed Disembark Terrain When Transporter At: Terrain");
-        DrawIfExists(serializedObject.FindProperty("allowedDisembarkWhenTransporterAtTerrainStructures"), "Allowed Disembark Terrain When Transporter At: Terrain + Structure");
-        DrawIfExists(serializedObject.FindProperty("allowedDisembarkWhenTransporterAtFacilities"), "Allowed Disembark when Transporter At: Construction");
-        DrawIfExists(serializedObject.FindProperty("transportSlots"), "Transport Slots");
+
+        EditorGUILayout.Space();
+        showEmbarkRules = EditorGUILayout.Foldout(
+            showEmbarkRules,
+            "Embark Rules",
+            toggleOnLabelClick: true);
+        if (showEmbarkRules)
+        {
+            EditorGUI.indentLevel++;
+            EditorGUILayout.LabelField("Embark Allowed When Transporter At", EditorStyles.boldLabel);
+            DrawIfExists(serializedObject.FindProperty("allowedEmbarkWhenTransporterAtTerrains"), "Terrain");
+            DrawIfExists(serializedObject.FindProperty("allowedEmbarkWhenTransporterAtTerrainStructures"), "Structures");
+            DrawIfExists(serializedObject.FindProperty("allowedEmbarkWhenTransporterAtFacilities"), "Constructions");
+            EditorGUI.indentLevel--;
+        }
+
+        EditorGUILayout.Space();
+        showDisembarkRules = EditorGUILayout.Foldout(
+            showDisembarkRules,
+            "Disembark Rules",
+            toggleOnLabelClick: true);
+        if (showDisembarkRules)
+        {
+            EditorGUI.indentLevel++;
+            EditorGUILayout.LabelField("Disembark Allowed When Transporter At", EditorStyles.boldLabel);
+            DrawIfExists(serializedObject.FindProperty("allowedDisembarkWhenTransporterAtTerrains"), "Terrain");
+            DrawIfExists(serializedObject.FindProperty("allowedDisembarkWhenTransporterAtTerrainStructures"), "Structures");
+            DrawIfExists(serializedObject.FindProperty("allowedDisembarkWhenTransporterAtFacilities"), "Constructions");
+
+            EditorGUILayout.Space();
+            EditorGUILayout.LabelField("Disembark Valid Locations", EditorStyles.boldLabel);
+            DrawIfExists(serializedObject.FindProperty("validDisembarkLocationTerrains"), "Terrain");
+            DrawIfExists(serializedObject.FindProperty("validDisembarkLocationTerrainStructures"), "Structures");
+            DrawIfExists(serializedObject.FindProperty("validDisembarkLocationFacilities"), "Constructions");
+            EditorGUI.indentLevel--;
+        }
+
+        EditorGUILayout.Space();
+        showTransportSlots = EditorGUILayout.Foldout(
+            showTransportSlots,
+            "Transport Slots",
+            toggleOnLabelClick: true);
+        if (showTransportSlots)
+        {
+            SerializedProperty transportSlots = serializedObject.FindProperty("transportSlots");
+            if (transportSlots != null)
+            {
+                EditorGUI.indentLevel++;
+                SerializedProperty size = transportSlots.FindPropertyRelative("Array.size");
+                if (size != null)
+                    EditorGUILayout.PropertyField(size, new GUIContent("Size"));
+
+                for (int i = 0; i < transportSlots.arraySize; i++)
+                {
+                    SerializedProperty slot = transportSlots.GetArrayElementAtIndex(i);
+                    EditorGUILayout.PropertyField(
+                        slot,
+                        new GUIContent($"Element {i}"),
+                        includeChildren: true);
+                }
+                EditorGUI.indentLevel--;
+            }
+        }
         EditorGUI.indentLevel--;
     }
 

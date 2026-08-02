@@ -108,6 +108,10 @@ MonoBehaviour:
   - {fileID: 11400000, guid: adc0bfc8c2e8f9a41be0abda3e29e582, type: 2}
   allowedDisembarkWhenTransporterAtTerrainStructures: []
   allowedDisembarkWhenTransporterAtFacilities: 1
+  validDisembarkLocationTerrains:
+  - {fileID: 11400000, guid: adc0bfc8c2e8f9a41be0abda3e29e582, type: 2}
+  validDisembarkLocationTerrainStructures: []
+  validDisembarkLocationFacilities: 1
   transportSlots:
   - slotId: Cargo
     capacity: 2

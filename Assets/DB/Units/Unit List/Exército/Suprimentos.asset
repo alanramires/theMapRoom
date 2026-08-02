@@ -129,6 +129,13 @@ MonoBehaviour:
     baseTerrain: {fileID: 11400000, guid: f00a773f2a7664042bbabe8e117528f7, type: 2}
     isBlocked: 0
   allowedDisembarkWhenTransporterAtFacilities: -1
+  validDisembarkLocationTerrains:
+  - {fileID: 11400000, guid: f00a773f2a7664042bbabe8e117528f7, type: 2}
+  validDisembarkLocationTerrainStructures:
+  - structure: {fileID: 11400000, guid: 2c50b52605f4f1c4ca013ba4bd7acee3, type: 2}
+    baseTerrain: {fileID: 11400000, guid: f00a773f2a7664042bbabe8e117528f7, type: 2}
+    isBlocked: 0
+  validDisembarkLocationFacilities: -1
   transportSlots:
   - slotId: reboque
     capacity: 1
