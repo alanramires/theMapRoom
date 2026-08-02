@@ -173,6 +173,20 @@ public sealed class MelhorCapturaRequest
     /// </summary>
     public bool includeCaptureEffort = true;
 
+    /// <summary>
+    /// Pontua tambem o que esta fora das duas bandas, com distancia cubica.
+    ///
+    /// Ligado por padrao: e o que responde "para que lado eu vou?" quando nada
+    /// esta ao alcance, e a ferramenta mostra o mapa inteiro.
+    ///
+    /// DESLIGUE quando so o alcancavel interessa. Nao e cosmetico — o corte
+    /// acontece ANTES do sensor, entao ele economiza a pergunta cara nas
+    /// dezenas de construcoes distantes em vez de fazer e descartar. Os dois
+    /// consumidores da IA ja descartavam essa faixa depois; agora ela nem e
+    /// avaliada.
+    /// </summary>
+    public bool includeBeyondOperational = true;
+
     public Action<string> diagnosticLog;
 }
 
@@ -199,6 +213,13 @@ public sealed class MelhorCapturaResult
 
     /// <summary>Quantas sobreviveram ao filtro e foram de fato avaliadas.</summary>
     public int candidatesVisited;
+
+    /// <summary>
+    /// Quantas cairam fora das duas bandas e foram cortadas ANTES do sensor,
+    /// por `includeBeyondOperational = false`. E a economia da consulta, nao
+    /// uma recusa — elas nunca chegaram a ser perguntadas.
+    /// </summary>
+    public int candidatesOutOfBand;
 
     public bool hasCaptureSkill;
 
@@ -423,6 +444,32 @@ public static class MelhorCapturaService
             Vector3Int cell = construction.CurrentCellPosition;
             cell.z = 0;
 
+            // A BANDA VEM ANTES DO SENSOR, e a ordem importa.
+            //
+            // Classificar custa duas consultas de dicionario; perguntar ao
+            // sensor custa ordens de grandeza mais. Com a ordem invertida, um
+            // capturador pagava o sensor nas ~64 construcoes do mapa para o
+            // chamador descartar as ~59 que estavam fora do envelope logo
+            // depois — e a Fase 2 faz isso uma vez por capturador.
+            int cubic =
+                AIActionReachCoordinator.CubicDistance(origin, cell);
+            ResolveTier(
+                profile,
+                cell,
+                cubic,
+                out MelhorCapturaTier tier,
+                out int routeCost,
+                out int effectiveCost);
+            if (tier == MelhorCapturaTier.BeyondOperational
+                && !request.includeBeyondOperational)
+            {
+                // Contador, nao lista: sao dezenas por chamada, e alocar um
+                // objeto de recusa para cada uma so criaria lixo de GC no
+                // caminho mais quente da IA.
+                result.candidatesOutOfBand++;
+                continue;
+            }
+
             bool hasCapturer = TryFindCapturerOnCell(
                 request, cell, out UnitManager occupant);
             if (hasCapturer && request.skipConstructionsWithCapturer)
@@ -475,16 +522,6 @@ public static class MelhorCapturaService
                     "a celula responde por outra construcao");
                 continue;
             }
-
-            int cubic =
-                AIActionReachCoordinator.CubicDistance(origin, cell);
-            ResolveTier(
-                profile,
-                cell,
-                cubic,
-                out MelhorCapturaTier tier,
-                out int routeCost,
-                out int effectiveCost);
 
             int power = 0;
             bool prerequisitePenalty = false;
@@ -555,10 +592,16 @@ public static class MelhorCapturaService
             "MelhorCapturaCandidates", result.candidatesVisited);
         AIDecisionPerf.AddCount(
             "MelhorCapturaTargets", result.ranking.Count);
+        // O que NAO foi perguntado ao sensor. Sem este contador nao da para
+        // saber se o corte por banda esta economizando ou se esta comendo
+        // alvo legitimo.
+        AIDecisionPerf.AddCount(
+            "MelhorCapturaOutOfBandSkips", result.candidatesOutOfBand);
         request.diagnosticLog?.Invoke(
             $"ofertadas={result.candidatesOffered}; " +
             $"cortadas pelo filtro do chamador={result.candidatesFilteredOut}; " +
             $"avaliadas={result.candidatesVisited}; " +
+            $"fora de banda (sem sensor)={result.candidatesOutOfBand}; " +
             $"alvos={result.ranking.Count}; " +
             $"recusas={result.rejected.Count} ({result.BuildRejectedSummary()})");
         return result;

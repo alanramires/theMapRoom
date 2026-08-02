@@ -303,7 +303,11 @@ public static class CaptureOpportunityClaimService
                     // Calcular esforco de captura por candidata era pagar a
                     // ficha da construcao e a penalidade de pre-requisito de
                     // todo predio do mapa para jogar fora.
-                    includeCaptureEffort = false
+                    includeCaptureEffort = false,
+                    // Fora do envelope nao vira aresta logo abaixo. Pedir para
+                    // nem avaliar poupa a pergunta ao sensor nas dezenas de
+                    // construcoes distantes do mapa, por capturador.
+                    includeBeyondOperational = false
                 });
 
             var candidate = new Candidate

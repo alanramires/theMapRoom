@@ -499,7 +499,8 @@ public static class QueroCaronaService
                 request,
                 captureReach,
                 candidate => !IsClaimedByAlliedUnit(
-                    request, candidate.CurrentCellPosition));
+                    request, candidate.CurrentCellPosition),
+                includeBeyondOperational: false);
         for (int i = 0; i < planlessCandidates.Count; i++)
         {
             ConstructionManager construction =
@@ -845,8 +846,15 @@ public static class QueroCaronaService
         // Sem filtro: a pergunta e "existe algum", em qualquer setor e a
         // qualquer distancia. A banda nao entra — quem responde alcance aqui e
         // o componente de movimento, que ignora distancia por construcao.
+        // TRUE aqui, e so aqui: a pergunta e "existe algum, a qualquer
+        // distancia?". Quem responde alcance neste caso e o componente de
+        // movimento logo abaixo, que ignora banda por construcao.
         IReadOnlyList<MelhorCapturaAlvoScore> candidates =
-            CollectCaptureCandidates(request, captureReach, gate: null);
+            CollectCaptureCandidates(
+                request,
+                captureReach,
+                gate: null,
+                includeBeyondOperational: true);
         for (int i = 0; i < candidates.Count; i++)
         {
             if (component.ContainsKey(candidates[i].cell))
@@ -910,10 +918,18 @@ public static class QueroCaronaService
     /// Banda e custo continuam saindo do TryResolveCaptureBand, de proposito:
     /// esta troca muda QUEM entra na conta, nao a conta.
     /// </summary>
+    /// <param name="includeBeyondOperational">
+    /// FALSE para escolha de alvo — o TryResolveCaptureBand descartaria essa
+    /// faixa logo depois, e cortar antes poupa a pergunta ao sensor.
+    /// TRUE para a fome estrutural, que pergunta exatamente sobre o que esta
+    /// LONGE: cortar ali declararia encalhada uma unidade que tem capturavel
+    /// alcancavel a pe, so que a muitos turnos.
+    /// </param>
     private static IReadOnlyList<MelhorCapturaAlvoScore> CollectCaptureCandidates(
         QueroCaronaRequest request,
         UnitReachProfile captureReach,
-        Func<ConstructionManager, bool> gate)
+        Func<ConstructionManager, bool> gate,
+        bool includeBeyondOperational)
     {
         return MelhorCapturaService.Evaluate(new MelhorCapturaRequest
         {
@@ -930,7 +946,8 @@ public static class QueroCaronaService
             // Banda e custo saem do TryResolveCaptureBand logo abaixo; a nota
             // da consulta nunca e lida por aqui. Calcular esforco de captura
             // por candidata era custo puro sem leitor.
-            includeCaptureEffort = false
+            includeCaptureEffort = false,
+            includeBeyondOperational = includeBeyondOperational
         }).ranking;
     }
 
@@ -1335,7 +1352,8 @@ public static class QueroCaronaService
                 c => c != seeded
                      && c.Sector == wantedSector
                      && !IsClaimedByAlliedUnit(
-                         request, c.CurrentCellPosition));
+                         request, c.CurrentCellPosition),
+                includeBeyondOperational: false);
         for (int i = 0; i < sectorCandidates.Count; i++)
         {
             ConstructionManager candidate =
