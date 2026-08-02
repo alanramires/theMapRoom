@@ -172,6 +172,16 @@ public static class PodeCapturarSensor
     /// Consulta a mesma regra oficial de captura em uma célula projetada, sem
     /// alterar a posição ou qualquer estado confirmado da unidade. Usado por
     /// planejadores para avaliar o resultado de um movimento provisório.
+    ///
+    /// `applyFogOfWar` liga o descarte por terreno desconhecido. Ele é ON por
+    /// padrão, que é a resposta da HORA DE AGIR: ali a névoa vale e a unidade
+    /// não age no que não conhece.
+    ///
+    /// Planejamento pede OFF. A névoa não é regra de captura, é recorte do que
+    /// o time enxerga — e cruzar alcance com o que se conhece é trabalho de
+    /// quem organiza, não do sensor. Uma consulta que já chega recortada não
+    /// consegue responder "vale a pena ir descobrir aquilo?", porque o alvo
+    /// sumiu antes de ser pontuado. Mesmo padrão dos `enable*` do PodeMirar.
     /// </summary>
     public static bool TryGetCaptureTargetAtCell(
         UnitManager selectedUnit,
@@ -181,7 +191,8 @@ public static class PodeCapturarSensor
         out ConstructionManager targetConstruction,
         out CaptureOperationType operationType,
         out string reason,
-        MatchController matchController = null)
+        MatchController matchController = null,
+        bool applyFogOfWar = true)
     {
         targetConstruction = null;
         operationType = CaptureOperationType.None;
@@ -234,7 +245,8 @@ public static class PodeCapturarSensor
         cell.z = 0;
         if (matchController == null)
             matchController = Object.FindAnyObjectByType<MatchController>();
-        if (matchController != null && matchController.IsFogOfWarDebugEnabled &&
+        if (applyFogOfWar &&
+            matchController != null && matchController.IsFogOfWarDebugEnabled &&
             !matchController.IsCellVisibleForActiveTeam(cell) &&
             !matchController.IsCellExploredBySlot(PlayerSlotId.FromIndex(selectedUnit.SlotIndex), cell))
         {
