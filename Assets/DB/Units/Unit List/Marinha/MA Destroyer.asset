@@ -129,3 +129,6 @@ MonoBehaviour:
   validDisembarkLocationTerrains: []
   validDisembarkLocationTerrainStructures: []
   validDisembarkLocationFacilities: 0
+  transportSlots: []
+  autonomia: 90
+  cost: 30000
