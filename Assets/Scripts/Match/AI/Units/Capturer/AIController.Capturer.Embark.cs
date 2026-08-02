@@ -192,27 +192,71 @@ public partial class AIController
         return null;
     }
 
+    /// <summary>
+    /// Um lugar so descreve o pedido de carona do capturador. Os dois pontos
+    /// que precisam da reivindicacao — a avaliacao de carona e a ancora do
+    /// rogue — tem que montar o MESMO pedido, senao caem em entradas
+    /// diferentes do cache e voltam a divergir por outro caminho.
+    /// </summary>
+    private QueroCaronaRequest BuildCapturerRideRequest(
+        UnitManager unit,
+        SectorObjective assigned = null)
+    {
+        return new QueroCaronaRequest
+        {
+            unit = unit,
+            map = boardTilemap,
+            terrainDatabase = terrainDatabase,
+            context = assigned != null
+                ? QueroCaronaContext.ComPlano
+                : QueroCaronaContext.RogueOuRebelde,
+            plannedSector = assigned != null
+                ? assigned.Sector
+                : ConstructionSector.None,
+            operationalTurns = CapturerRideOperationalTurns,
+            emulateUnderRepairFromUnitData = false
+        };
+    }
+
+    /// <summary>
+    /// "Eu chego sozinho no MEU alvo?" — e o alvo vem da alocacao, nao do
+    /// servico de carona.
+    ///
+    /// A ORDEM ESTAVA INVERTIDA. Antes esta chamada so dizia "tenho plano" ou
+    /// "sou rogue" e o QueroCarona ESCOLHIA um alvo para conseguir responder.
+    /// Depois o capturador resolvia o alvo de novo, por outro caminho, e jogava
+    /// o primeiro fora — duas resolucoes independentes para a mesma unidade, na
+    /// mesma decisao, livres para discordar.
+    ///
+    /// Quem aloca e o matching 1:1, que ja escolheu UM alvo por capturador. Ler
+    /// a alocacao e de graca e nao tem como divergir dela. Sem alvo alocado o
+    /// pedido segue sem alvo explicito, e o servico cai na avaliacao de fome
+    /// estrutural — que e a pergunta certa para quem nao recebeu nada.
+    /// </summary>
     private QueroCaronaResult EvaluateCapturerRideNeed(
         UnitManager unit,
         SectorObjective assigned)
     {
-        QueroCaronaContext context = assigned != null
-            ? QueroCaronaContext.ComPlano
-            : QueroCaronaContext.RogueOuRebelde;
-        ConstructionSector sector = assigned != null
-            ? assigned.Sector
-            : ConstructionSector.None;
-        QueroCaronaResult result = QueroCaronaService.Evaluate(
-            new QueroCaronaRequest
-            {
-                unit = unit,
-                map = boardTilemap,
-                terrainDatabase = terrainDatabase,
-                context = context,
-                plannedSector = sector,
-                operationalTurns = CapturerRideOperationalTurns,
-                emulateUnderRepairFromUnitData = false
-            });
+        QueroCaronaRequest request =
+            BuildCapturerRideRequest(unit, assigned);
+
+        if (CaptureOpportunityClaimService
+                .GetOrBuild(request)
+                .TryGetClaimForUnit(
+                    unit, out CaptureOpportunityClaim claim)
+            && claim.Construction != null)
+        {
+            Vector3Int claimed = claim.Construction.CurrentCellPosition;
+            claimed.z = 0;
+            request.useExplicitTarget = true;
+            request.explicitTarget = claimed;
+            request.explicitTargetLabel =
+                $"alvo reservado {claim.Construction.ConstructionDisplayName}" +
+                $"@{claimed}" +
+                (claim.FormalPlan ? " (plano)" : " (oportunidade)");
+        }
+
+        QueroCaronaResult result = QueroCaronaService.Evaluate(request);
 
         ApplyRideWaitStamp(unit, result);
 
@@ -225,7 +269,12 @@ public partial class AIController
         Debug.Log(
             $"{TL("Capturador")} {unit.InstanceId} QueroCarona=" +
             $"{(result.wantsRide ? "SIM" : "NAO")} " +
-            $"contexto={context} setor={sector} " +
+            $"contexto={request.context} setor={request.plannedSector} " +
+            // De onde veio o alvo. "reserva" = leu a alocacao do matching;
+            // "servico" = nao havia alocacao e o QueroCarona resolveu sozinho.
+            // Se isto disser "servico" para um capturador que deveria ter alvo,
+            // o problema esta no matching, nao aqui.
+            $"origemAlvo={(request.useExplicitTarget ? "reserva" : "servico")} " +
             $"emergencia={result.isEmergency} " +
             $"envelope={result.reach} custo={routeCost} " +
             $"alvo={target} motivo={result.reason}");

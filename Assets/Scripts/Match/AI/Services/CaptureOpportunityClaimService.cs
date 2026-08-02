@@ -35,6 +35,8 @@ public sealed class CaptureOpportunityClaimSnapshot
 
     private readonly Dictionary<int, CaptureOpportunityClaim>
         claimsByConstructionId;
+    private readonly Dictionary<int, CaptureOpportunityClaim>
+        claimsByCapturerId;
 
     internal CaptureOpportunityClaimSnapshot(
         int stateHash,
@@ -47,6 +49,37 @@ public sealed class CaptureOpportunityClaimSnapshot
         this.claimsByConstructionId =
             claimsByConstructionId
             ?? new Dictionary<int, CaptureOpportunityClaim>();
+
+        // Indice reverso. O matching ja decidiu UM alvo por capturador; sem
+        // este lado da tabela, quem quer saber "o que sobrou pra mim?" e
+        // obrigado a re-derivar o alvo por conta propria — foi assim que
+        // nasceram duas resolucoes independentes para a mesma unidade.
+        claimsByCapturerId =
+            new Dictionary<int, CaptureOpportunityClaim>(
+                this.claimsByConstructionId.Count);
+        foreach (CaptureOpportunityClaim claim
+                 in this.claimsByConstructionId.Values)
+        {
+            if (claim.Capturer != null)
+                claimsByCapturerId[claim.Capturer.InstanceId] = claim;
+        }
+    }
+
+    /// <summary>
+    /// O alvo que o matching reservou para ESTA unidade.
+    ///
+    /// E a alocacao, nao uma sugestao: quem pergunta nao precisa (nem deve)
+    /// escolher de novo. Falso quando a unidade nao recebeu alvo — sem
+    /// capturavel na banda, ou tudo o que alcancava ja tinha dono.
+    /// </summary>
+    public bool TryGetClaimForUnit(
+        UnitManager unit,
+        out CaptureOpportunityClaim claim)
+    {
+        claim = default;
+        return unit != null
+            && claimsByCapturerId.TryGetValue(
+                unit.InstanceId, out claim);
     }
 
     public bool TryGetClaim(

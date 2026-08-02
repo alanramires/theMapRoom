@@ -256,8 +256,29 @@ public partial class AIController
 
         Vector3Int fromCell = unit.CurrentCellPosition;
         fromCell.z = 0;
-        ConstructionManager target = FindNearestPlanlessCaptureTarget(
-            unit, snapshot, fromCell, requireOwnMovementReach: true);
+
+        // A ALOCACAO VEM PRIMEIRO. O matching 1:1 ja reservou um alvo para esta
+        // unidade, e e o mesmo alvo que a avaliacao de carona acabou de usar —
+        // re-derivar aqui era o segundo lado da divergencia, com a unidade
+        // recusando carona por um predio e marchando para outro.
+        //
+        // A busca continua como reserva, e nao por seguranca: o claim so cobre
+        // as duas bandas, e um capturavel a muitos turnos de caminhada nao
+        // aparece nele. Para esse caso a resposta certa continua sendo "ande
+        // naquela direcao".
+        ConstructionManager target = null;
+        if (CaptureOpportunityClaimService
+                .GetOrBuild(BuildCapturerRideRequest(unit))
+                .TryGetClaimForUnit(
+                    unit, out CaptureOpportunityClaim claim))
+        {
+            target = claim.Construction;
+        }
+        if (target == null)
+        {
+            target = FindNearestPlanlessCaptureTarget(
+                unit, snapshot, fromCell, requireOwnMovementReach: true);
+        }
         if (target == null)
         {
             pendingRebelCaptureTargets[unit.InstanceId] = null;

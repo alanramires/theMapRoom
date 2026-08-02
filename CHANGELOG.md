@@ -30,6 +30,7 @@ intactos.
 | versão | título | relatório |
 |---|---|---|
 | v7.0.0 | Fundação, desacoplamento e generalização do uso dos sensores | [relatório](docs/relatorio_v7.0.0.md) |
+| v7.0.1 | O alvo de captura tem um dono, e o desembarque tem um preço | [relatório](docs/relatorio_v7.0.1.md) |
 
 ### Documentos normativos criados neste major
 
