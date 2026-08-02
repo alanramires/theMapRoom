@@ -188,6 +188,12 @@ public static class PodeCapturarSensor
     /// o que quem chamou acabou de lhe entregar — barato uma vez, O(n²) dentro
     /// de um laço por candidata. A dica é validada (mesma célula, não é prédio
     /// falso) antes de ser aceita; errada, cai na busca normal.
+    ///
+    /// `applyEmbarkedGate` é o terceiro filtro de hora-de-agir. ON por padrão:
+    /// embarcado não captura. Desligue ao perguntar por um passageiro que ainda
+    /// está no veículo — "este prédio serve de destino para ele?" —, porque
+    /// projetar a unidade numa célula já pressupõe que ela desembarcou lá. Com
+    /// o portão ligado essa pergunta não tem resposta possível.
     /// </summary>
     public static bool TryGetCaptureTargetAtCell(
         UnitManager selectedUnit,
@@ -199,7 +205,8 @@ public static class PodeCapturarSensor
         out string reason,
         MatchController matchController = null,
         bool applyFogOfWar = true,
-        ConstructionManager knownConstruction = null)
+        ConstructionManager knownConstruction = null,
+        bool applyEmbarkedGate = true)
     {
         targetConstruction = null;
         operationType = CaptureOperationType.None;
@@ -215,7 +222,12 @@ public static class PodeCapturarSensor
             return false;
         }
 
-        if (selectedUnit.IsEmbarked)
+        // Portao de HORA DE AGIR, como a nevoa. Embarcado nao captura, ponto —
+        // mas quem PROJETA a unidade numa celula ja hipotetizou que ela
+        // desembarcou la. E a pergunta do transporte: "onde eu largo este
+        // passageiro?". Com o portao ligado ela nao tem resposta possivel, e o
+        // transporte fica sem destino.
+        if (applyEmbarkedGate && selectedUnit.IsEmbarked)
         {
             reason = "Unidade embarcada nao pode capturar.";
             return false;

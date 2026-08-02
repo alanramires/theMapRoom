@@ -10,6 +10,15 @@ Leia isto primeiro; ele diz o que ler depois.
 **`v7.0.1` tagueada e no ar.** O degrau 2 saiu do papel: existe um
 `MelhorCapturaService`, e dois consumidores reais o chamam.
 
+> ⚠️ **DEPOIS DA TAG, e ainda NÃO COMPILADO:** o passo 3a foi feito —
+> `IsRebelCapturable` passou a delegar ao `PodeCapturarSensor`, e o sensor
+> ganhou `applyEmbarkedGate` (default `true`, ninguém muda). **A primeira coisa
+> a fazer numa sessão nova é abrir o Unity e compilar.** Se der erro, é aí.
+>
+> A mudança liga **reconquista de prédio aliado em quatro papéis de uma vez** —
+> capturador rogue, transporte (courier + naval), assalto (`HQBreaker`) e
+> desembarque. Nunca rodou em partida. O que olhar está no fim deste documento.
+
 A descoberta que organiza tudo o que vem — e que a v7.0.1 confirmou em jogo:
 
 > **Consertar a fonte conserta o vizinho de graça.** O navio de transporte
@@ -156,6 +165,31 @@ do fluxo de perseguir o capitão, que o M3 remove.
 **Não rodar junto do degrau 4** — as duas mexem em âncora.
 
 Falta escrever o **magnético naval** no `governanca_entre_papeis.md` §2.3.
+
+---
+
+## Como testar o 3a (não compilado, não rodado)
+
+O projeto **não tem teste automatizado** — sem `.asmdef`, sem NUnit. O laço é
+compilar, rodar em Play mode e ler o log.
+
+O 3a afrouxou dois portões, então a falha esperada é **permissivo demais**,
+nunca restritivo:
+
+| sintoma | veredito |
+|---|---|
+| courier larga passageiro em prédio aliado quase capturado (19/20) | desperdício — reconquista entrou onde não valia |
+| assalto desvia pra reconquistar em vez de avançar | reconquista pesando demais |
+| **unidade embarcada capturando de verdade** | grave — o portão vazou pro gameplay |
+| transporte **para** de achar destino | o inverso do esperado; erro no delegate |
+
+O terceiro é o único sério, e é improvável: `applyEmbarkedGate` só cai onde foi
+passado `false` explicitamente, e o `TurnStateManager` usa o default.
+
+**Ideia barata para testar sem rodar turno:** expor o portão de embarcado como
+toggle no bloco *"Filtros do sensor"* da janela `Melhor Captura` — aí dá para
+apontar a ferramenta para um soldado **dentro do navio** e ver exatamente o que
+o `MelhorDesembarque` vai ver. São ~6 linhas.
 
 ---
 

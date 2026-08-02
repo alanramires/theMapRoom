@@ -308,23 +308,55 @@ public partial class AIController
     // Capturavel para a rebelde: predio nao-aliado que o motor deixa este time tomar.
     // A regra de elegibilidade (rebelde ignora pre-requisito de progressao) vive no
     // MatchController; aqui so a consultamos.
+    /// <summary>
+    /// Esta construcao e alvo de captura legitimo para ESTA unidade?
+    ///
+    /// NAO TEM NADA DE REBELDE. O nome e fossil de quando este arquivo era um
+    /// controlador paralelo; hoje os nove chamadores sao o rogue do capturador,
+    /// o MelhorDesembarque (4), o Courier (2) e uso interno. O Transportador
+    /// Naval chega a guardar o resultado numa variavel chamada `rebelTarget`.
+    ///
+    /// O corpo passou a delegar ao PodeCapturarSensor. O que saiu daqui:
+    ///
+    ///   `construction.TeamId == unit.TeamId` — EIXO ERRADO, time em vez de
+    ///   slot, e apagava a reconquista inteira. O comentario antigo declarava a
+    ///   intencao ("predio do mesmo time nao volta ao ranking"), e o sensor diz
+    ///   o contrario: aliado abaixo do maximo e RecoverAlly, alvo legitimo. Como
+    ///   quatro papeis herdavam este predicado, os quatro eram cegos para
+    ///   reconquista.
+    ///
+    ///   `CanCaptureConstruction` direto no matchController — meia regra. O
+    ///   sensor aplica essa e as outras, e continua aplicando se mudarem.
+    ///
+    /// Dois portoes de hora-de-agir ficam desligados, porque esta e uma
+    /// pergunta de PLANEJAMENTO: a nevoa (o recorte do que o time conhece e
+    /// cruzado por quem decide agir) e o embarque (o passageiro ainda esta no
+    /// veiculo justamente porque queremos saber onde larga-lo).
+    /// </summary>
     private bool IsRebelCapturable(UnitManager unit, ConstructionManager construction)
     {
-        if (unit == null
-            || construction == null
-            || matchController == null)
-            return false;
-        // CanCaptureConstruction consulta a ficha e as regras de captura, mas
-        // nao e uma pergunta de objetivo: um predio ja pertencente ao mesmo
-        // time nao pode voltar a entrar no ranking de captura/desembarque.
-        // Centralizar a guarda aqui protege tanto a marcha rebelde quanto os
-        // resolvedores conjuntos do MelhorDesembarque.
-        if (construction.TeamId == unit.TeamId)
-            return false;
-        if (!construction.TryResolveConstructionData(out ConstructionData data) || data == null)
+        if (unit == null || construction == null)
             return false;
 
-        return matchController.CanCaptureConstruction(
-            PlayerSlotId.FromIndex(unit.SlotIndex), data, out _);
+        Vector3Int cell = construction.CurrentCellPosition;
+        cell.z = 0;
+        Vector3Int from = unit.CurrentCellPosition;
+        from.z = 0;
+
+        return PodeCapturarSensor.TryGetCaptureTargetAtCell(
+                   unit,
+                   boardTilemap,
+                   cell,
+                   cell == from
+                       ? SensorMovementMode.MoveuParado
+                       : SensorMovementMode.MoveuAndando,
+                   out ConstructionManager target,
+                   out _,
+                   out _,
+                   matchController,
+                   applyFogOfWar: false,
+                   knownConstruction: construction,
+                   applyEmbarkedGate: false)
+               && (target == null || target == construction);
     }
 }
