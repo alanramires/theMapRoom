@@ -494,17 +494,19 @@ public static class QueroCaronaService
         ReachBand nearestBand = ReachBand.Tactical;
         int captureClaimBlocks = 0;
         int lastCaptureClaimOwnerId = -1;
-        foreach (ConstructionManager construction
-                 in ConstructionManager.AllActive)
+        IReadOnlyList<MelhorCapturaAlvoScore> planlessCandidates =
+            CollectCaptureCandidates(
+                request,
+                captureReach,
+                candidate => !IsClaimedByAlliedUnit(
+                    request, candidate.CurrentCellPosition));
+        for (int i = 0; i < planlessCandidates.Count; i++)
         {
-            if (construction == null
-                || !construction.IsCapturable
-                || construction.TeamId == request.unit.TeamId
-                || IsClaimedByAlliedUnit(
-                    request, construction.CurrentCellPosition))
+            ConstructionManager construction =
+                planlessCandidates[i].construction;
+            if (construction == null)
                 continue;
-            Vector3Int cell = construction.CurrentCellPosition;
-            cell.z = 0;
+            Vector3Int cell = planlessCandidates[i].cell;
             if (!TryResolveCaptureBand(
                     captureReach,
                     cell,
@@ -552,7 +554,8 @@ public static class QueroCaronaService
         }
         else
         {
-            ApplyBeyondReachRideNeedForAnyCapturable(request, result);
+            ApplyBeyondReachRideNeedForAnyCapturable(
+                request, result, captureReach);
             result.captureClaimsBlocked =
                 captureClaimBlocks;
             result.captureClaimOwnerUnitId =
@@ -817,9 +820,20 @@ public static class QueroCaronaService
     /// Versao do rogue/rebelde, que nao tem UM objetivo: a pergunta vira
     /// "existe ALGUM capturavel dentro do meu componente?". Nenhum = ilhado.
     /// </summary>
+    /// <summary>
+    /// Fome estrutural: existe ALGUM capturavel dentro do componente de
+    /// movimento proprio? Nao havendo, a unidade so chega de carona.
+    ///
+    /// A elegibilidade vem da mesma fonte da escolha de alvo. Ficar com os
+    /// predicados a mao aqui produzia o pior tipo de divergencia: uma unidade
+    /// cujo unico alcancavel fosse predio aliado sob captura era declarada
+    /// ENCALHADA — com nota de urgencia maxima — enquanto o resto do servico ja
+    /// enxergava aquele predio como alvo legitimo de reconquista.
+    /// </summary>
     private static void ApplyBeyondReachRideNeedForAnyCapturable(
         QueroCaronaRequest request,
-        QueroCaronaResult result)
+        QueroCaronaResult result,
+        UnitReachProfile captureReach)
     {
         result.wantsRide = true;
         result.reach = QueroCaronaReach.BeyondOperational;
@@ -828,21 +842,14 @@ public static class QueroCaronaService
 
         Dictionary<Vector3Int, int> component =
             ResolveOwnMovementComponent(request);
-        IReadOnlyList<ConstructionManager> constructions =
-            ConstructionManager.AllActive;
-        for (int i = 0; i < constructions.Count; i++)
+        // Sem filtro: a pergunta e "existe algum", em qualquer setor e a
+        // qualquer distancia. A banda nao entra — quem responde alcance aqui e
+        // o componente de movimento, que ignora distancia por construcao.
+        IReadOnlyList<MelhorCapturaAlvoScore> candidates =
+            CollectCaptureCandidates(request, captureReach, gate: null);
+        for (int i = 0; i < candidates.Count; i++)
         {
-            ConstructionManager construction = constructions[i];
-            if (construction == null
-                || !construction.IsCapturable
-                || construction.TeamId == request.unit.TeamId)
-            {
-                continue;
-            }
-
-            Vector3Int cell = construction.CurrentCellPosition;
-            cell.z = 0;
-            if (component.ContainsKey(cell))
+            if (component.ContainsKey(candidates[i].cell))
                 return;
         }
 
@@ -891,6 +898,42 @@ public static class QueroCaronaService
     /// aqui. Fora das duas bandas devolve false — e o que a IA le como
     /// "preciso de carona".
     /// </summary>
+    /// <summary>
+    /// Candidatas de captura para ESTA unidade, sem varrer o tabuleiro.
+    ///
+    /// Quem diz "isto e capturavel por esta unidade" e o MelhorCapturaService,
+    /// que por sua vez pergunta ao PodeCapturar. Os predicados que moravam aqui
+    /// — `IsCapturable`, `TeamId == meu` — sairam: o primeiro era copia, e o
+    /// segundo estava no EIXO ERRADO (time, nao slot) e apagava a reconquista,
+    /// porque descartava prédio aliado sob captura antes de perguntar.
+    ///
+    /// Banda e custo continuam saindo do TryResolveCaptureBand, de proposito:
+    /// esta troca muda QUEM entra na conta, nao a conta.
+    /// </summary>
+    private static IReadOnlyList<MelhorCapturaAlvoScore> CollectCaptureCandidates(
+        QueroCaronaRequest request,
+        UnitReachProfile captureReach,
+        Func<ConstructionManager, bool> gate)
+    {
+        return MelhorCapturaService.Evaluate(new MelhorCapturaRequest
+        {
+            unit = request.unit,
+            map = request.map,
+            terrainDatabase = request.terrainDatabase,
+            operationalTurns = Mathf.Max(1, request.operationalTurns),
+            // Mesmo envelope, sem reconstruir: identidade de unidade,
+            // intencao e bandas.
+            reachProfile = captureReach,
+            includeConstruction = gate,
+            // A nevoa nao recorta a consulta, como nunca recortou aqui.
+            applyFogOfWar = false,
+            // Banda e custo saem do TryResolveCaptureBand logo abaixo; a nota
+            // da consulta nunca e lida por aqui. Calcular esforco de captura
+            // por candidata era custo puro sem leitor.
+            includeCaptureEffort = false
+        }).ranking;
+    }
+
     private static bool TryResolveCaptureBand(
         UnitReachProfile captureReach,
         Vector3Int cell,
@@ -1279,19 +1322,27 @@ public static class QueroCaronaService
             routeBand = representativeBand;
         }
 
-        foreach (ConstructionManager candidate
-                 in ConstructionManager.AllActive)
+        // O SETOR DESCE COMO FILTRO, o representante segue sendo caso a parte:
+        // ele ja foi semeado acima e so perde para uma alternativa ESTRITAMENTE
+        // mais barata. Um setor tem mais que o representante, e representante
+        // ocupado nunca quis dizer setor ocupado.
+        ConstructionSector wantedSector = request.plannedSector;
+        ConstructionManager seeded = representativeConstruction;
+        IReadOnlyList<MelhorCapturaAlvoScore> sectorCandidates =
+            CollectCaptureCandidates(
+                request,
+                captureReach,
+                c => c != seeded
+                     && c.Sector == wantedSector
+                     && !IsClaimedByAlliedUnit(
+                         request, c.CurrentCellPosition));
+        for (int i = 0; i < sectorCandidates.Count; i++)
         {
-            if (candidate == null
-                || candidate == representativeConstruction
-                || candidate.Sector != request.plannedSector
-                || !candidate.IsCapturable
-                || candidate.TeamId == request.unit.TeamId
-                || IsClaimedByAlliedUnit(
-                    request, candidate.CurrentCellPosition))
+            ConstructionManager candidate =
+                sectorCandidates[i].construction;
+            if (candidate == null)
                 continue;
-            Vector3Int cell = candidate.CurrentCellPosition;
-            cell.z = 0;
+            Vector3Int cell = sectorCandidates[i].cell;
             if (!TryResolveCaptureBand(
                     captureReach,
                     cell,

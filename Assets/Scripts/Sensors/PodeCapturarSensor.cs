@@ -182,6 +182,12 @@ public static class PodeCapturarSensor
     /// quem organiza, não do sensor. Uma consulta que já chega recortada não
     /// consegue responder "vale a pena ir descobrir aquilo?", porque o alvo
     /// sumiu antes de ser pontuado. Mesmo padrão dos `enable*` do PodeMirar.
+    ///
+    /// `knownConstruction` é a construção que o chamador já tem na mão. Sem
+    /// ela o sensor faz um `FindObjectsByType` da cena inteira para redescobrir
+    /// o que quem chamou acabou de lhe entregar — barato uma vez, O(n²) dentro
+    /// de um laço por candidata. A dica é validada (mesma célula, não é prédio
+    /// falso) antes de ser aceita; errada, cai na busca normal.
     /// </summary>
     public static bool TryGetCaptureTargetAtCell(
         UnitManager selectedUnit,
@@ -192,7 +198,8 @@ public static class PodeCapturarSensor
         out CaptureOperationType operationType,
         out string reason,
         MatchController matchController = null,
-        bool applyFogOfWar = true)
+        bool applyFogOfWar = true,
+        ConstructionManager knownConstruction = null)
     {
         targetConstruction = null;
         operationType = CaptureOperationType.None;
@@ -243,18 +250,41 @@ public static class PodeCapturarSensor
 
         Vector3Int cell = evaluatedCell;
         cell.z = 0;
-        if (matchController == null)
-            matchController = Object.FindAnyObjectByType<MatchController>();
-        if (applyFogOfWar &&
-            matchController != null && matchController.IsFogOfWarDebugEnabled &&
-            !matchController.IsCellVisibleForActiveTeam(cell) &&
-            !matchController.IsCellExploredBySlot(PlayerSlotId.FromIndex(selectedUnit.SlotIndex), cell))
+        // O MatchController so e necessario para a nevoa, e resolve-lo custa um
+        // FindAnyObjectByType da cena. Fora do teste ele nao e usado em mais
+        // nada aqui — e com a nevoa desligada era varredura de cena inteira,
+        // por candidata, para nada.
+        if (applyFogOfWar)
         {
-            reason = "Terreno ainda desconhecido.";
-            return false;
+            if (matchController == null)
+                matchController = Object.FindAnyObjectByType<MatchController>();
+            if (matchController != null && matchController.IsFogOfWarDebugEnabled &&
+                !matchController.IsCellVisibleForActiveTeam(cell) &&
+                !matchController.IsCellExploredBySlot(PlayerSlotId.FromIndex(selectedUnit.SlotIndex), cell))
+            {
+                reason = "Terreno ainda desconhecido.";
+                return false;
+            }
         }
 
-        ConstructionManager construction = ConstructionOccupancyRules.GetConstructionAtCell(map, cell);
+        // A construcao pode vir do chamador. Quem varre candidatas JA a tem na
+        // mao, e GetConstructionAtCell faz um FindObjectsByType da cena inteira
+        // por chamada — num laco por candidata isso vira O(n²) varreduras de
+        // cena, que e a armadilha que ja custou 43 s nesta base.
+        //
+        // Nao e voto de confianca: a dica so vale se estiver mesmo na celula
+        // avaliada e nao for predio falso, exatamente os dois testes que a busca
+        // faria. Errou a dica, cai na busca e ninguem quebra.
+        ConstructionManager construction = null;
+        if (knownConstruction != null && !knownConstruction.IsFakeBuilding)
+        {
+            Vector3Int knownCell = knownConstruction.CurrentCellPosition;
+            knownCell.z = 0;
+            if (knownCell == cell)
+                construction = knownConstruction;
+        }
+        if (construction == null)
+            construction = ConstructionOccupancyRules.GetConstructionAtCell(map, cell);
         if (construction == null)
         {
             reason = "Nao ha construcao no hex atual.";

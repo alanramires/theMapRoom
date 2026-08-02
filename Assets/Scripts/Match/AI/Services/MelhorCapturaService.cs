@@ -159,6 +159,20 @@ public sealed class MelhorCapturaRequest
     /// </summary>
     public bool skipConstructionsWithCapturer;
 
+    /// <summary>
+    /// Calcula poder, pontos restantes e turnos de captura por candidata.
+    ///
+    /// Ligado por padrao, porque e o que a ferramenta mostra e o que a nota usa.
+    /// DESLIGUE quando so importam banda e custo: `GetCapturePower` resolve a
+    /// ficha da construcao e consulta a penalidade de pre-requisito, e num laco
+    /// por candidata isso e o grosso do custo. Medido: os dois consumidores da
+    /// IA reordenam por custo proprio e nunca leem a nota — pagavam a conta
+    /// inteira para joga-la fora.
+    ///
+    /// Desligado, `turnsToCapture` fica -1 e sai do score.
+    /// </summary>
+    public bool includeCaptureEffort = true;
+
     public Action<string> diagnosticLog;
 }
 
@@ -373,6 +387,16 @@ public static class MelhorCapturaService
         float turnCostWeight =
             Mathf.Max(1, unit.MaxMovementPoints) * CostTerm;
 
+        // UMA VEZ, nao por candidata. GetCapturePower resolve o MatchController
+        // sozinho quando recebe null, e isso e um FindAnyObjectByType da cena —
+        // dentro do laco vira uma varredura de cena por construcao do mapa.
+        MatchController matchController = request.matchController;
+        if (matchController == null)
+        {
+            matchController =
+                UnityEngine.Object.FindAnyObjectByType<MatchController>();
+        }
+
         IReadOnlyList<ConstructionManager> candidates =
             request.constructions ?? ConstructionManager.AllActive;
         if (candidates == null)
@@ -425,8 +449,11 @@ public static class MelhorCapturaService
                     out ConstructionManager target,
                     out PodeCapturarSensor.CaptureOperationType operation,
                     out string sensorReason,
-                    request.matchController,
-                    request.applyFogOfWar))
+                    matchController,
+                    request.applyFogOfWar,
+                    // A candidata ja esta na mao: sem isso o sensor varre a
+                    // cena inteira para redescobri-la, uma vez por candidata.
+                    construction))
             {
                 Reject(
                     result,
@@ -459,18 +486,25 @@ public static class MelhorCapturaService
                 out int routeCost,
                 out int effectiveCost);
 
-            int power = PodeCapturarSensor.GetCapturePower(
-                unit,
-                construction,
-                operation,
-                request.matchController,
-                out bool prerequisitePenalty);
-            ResolveCaptureEffort(
-                construction,
-                operation,
-                power,
-                out int remainingPoints,
-                out int turnsToCapture);
+            int power = 0;
+            bool prerequisitePenalty = false;
+            int remainingPoints = 0;
+            int turnsToCapture = -1;
+            if (request.includeCaptureEffort)
+            {
+                power = PodeCapturarSensor.GetCapturePower(
+                    unit,
+                    construction,
+                    operation,
+                    matchController,
+                    out prerequisitePenalty);
+                ResolveCaptureEffort(
+                    construction,
+                    operation,
+                    power,
+                    out remainingPoints,
+                    out turnsToCapture);
+            }
 
             var alvo = new MelhorCapturaAlvoScore
             {

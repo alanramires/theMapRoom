@@ -297,7 +297,13 @@ public static class CaptureOpportunityClaimService
                     // A nevoa nao entra na reivindicacao, como nunca entrou: o
                     // recorte do que o time conhece e cruzado depois, por quem
                     // decide agir. Ver o cabecalho do MelhorCapturaService.
-                    applyFogOfWar = false
+                    applyFogOfWar = false,
+                    // Aqui so importam banda e custo — as arestas sao
+                    // reordenadas por CompareEdges e a nota nunca e lida.
+                    // Calcular esforco de captura por candidata era pagar a
+                    // ficha da construcao e a penalidade de pre-requisito de
+                    // todo predio do mapa para jogar fora.
+                    includeCaptureEffort = false
                 });
 
             var candidate = new Candidate
