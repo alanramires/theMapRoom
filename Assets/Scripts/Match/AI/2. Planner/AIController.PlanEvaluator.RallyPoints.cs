@@ -303,7 +303,7 @@ public partial class AIController
             bool airAttack = IsOperationalRallyAirAttackUnit(unit, data);
             float artillery = GetRallyArtilleryWeight(data);
             bool airSurveillanceUnit =
-                HasRole(data, UnitRole.VigilanciaAerea);
+                IsAirSurveillanceUnit(unit);
             bool logistics = HasRole(data, UnitRole.Logistica);
 
             if (dist <= RallyAssemblyForceRadius)
@@ -533,7 +533,7 @@ public partial class AIController
             if (nearArtillery)
                 aggregate.Artillery += GetRallyArtilleryWeight(data);
             if (nearAirSurveillance
-                && HasRole(data, UnitRole.VigilanciaAerea))
+                && IsAirSurveillanceUnit(unit))
             {
                 aggregate.AirSurveillance++;
             }

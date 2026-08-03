@@ -117,6 +117,8 @@ public class AIShoppingDemand
     public UnitRole Role;
     public UnitRole ExactRole = UnitRole.None;
     public Domain? Domain;
+    public Domain? RequiredVisionDomain;
+    public HeightLevel? RequiredVisionHeight;
     public GameUnitClass? TargetClass;
     public BazookaTargetPriority MinTargetPriority = BazookaTargetPriority.Tertiary;
     public WeaponCategory? RequiredWeaponCategory;

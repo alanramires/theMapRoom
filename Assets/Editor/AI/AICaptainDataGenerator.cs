@@ -78,11 +78,11 @@ public static class AICaptainDataGenerator
                 Captain()),
 
             Profile(UnitRole.Antiaereo,
-                Role(UnitRole.VigilanciaAerea),
+                Role(UnitRole.Vigilancia),
                 Captain()),
 
             Profile(UnitRole.Interceptador,
-                Role(UnitRole.VigilanciaAerea),
+                Role(UnitRole.Vigilancia),
                 Role(UnitRole.AtaqueAereo),
                 Captain()),
 
@@ -108,7 +108,7 @@ public static class AICaptainDataGenerator
             // revelados, e ela passa para a próxima. A vigilância NAVAL não tem
             // prédio embaixo d'água — esse caso entra como célula, vinda de outro
             // serviço. Ver docs/magnetic_tabela.md.
-            Profile(UnitRole.VigilanciaAerea,
+            Profile(UnitRole.Vigilancia,
                 Kind(AICaptainAttractionKind.PontoDeObservacao),
                 Captain())
         };

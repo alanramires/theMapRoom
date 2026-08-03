@@ -40,6 +40,21 @@ public partial class AIController
         }
     }
 
+    /// <summary>
+    /// Aeronave que consulta o pipeline de combate aereo.
+    ///
+    /// Testava `roles[0] == RaidAntiSub` — papel que NENHUMA ficha carrega desde
+    /// que as cinco unidades de vigilancia viraram `Vigilancia`. Ramo morto, e o
+    /// efeito era concreto: o Super Tucano deixou de ser reconhecido como
+    /// combatente aereo.
+    ///
+    /// O substituto nao e outro papel: e CAPACIDADE. Vigilancia aerea ARMADA
+    /// consulta o pipeline; quem nao tem arma nao. Radar e EWACS continuam de
+    /// fora sozinhos, sem precisar de excecao por nome, porque nao tem arma.
+    ///
+    /// Isto apenas AUTORIZA a consulta. A legalidade do tiro continua inteira no
+    /// PodeMirar.
+    /// </summary>
     private static bool IsAirCombatUnit(UnitManager unit)
     {
         if (unit == null || !unit.TryGetUnitData(out UnitData data) || data == null)
@@ -50,7 +65,7 @@ public partial class AIController
 
         return data.roles[0] == UnitRole.AtaqueAereo
             || data.roles[0] == UnitRole.Interceptador
-            || data.roles[0] == UnitRole.RaidAntiSub;
+            || IsArmedSurveillance(unit, data);
     }
 
     private static bool IsOffensiveAirCombatUnit(UnitManager unit)
@@ -61,7 +76,33 @@ public partial class AIController
         return data.roles != null
             && data.roles.Count > 0
             && (data.roles[0] == UnitRole.AtaqueAereo
-                || data.roles[0] == UnitRole.RaidAntiSub);
+                || IsArmedSurveillance(unit, data));
+    }
+
+    /// <summary>
+    /// Vigilancia que pode atirar. E o que devolve o Super Tucano ao combate sem
+    /// ressuscitar um papel: o antissubmarino e vigilancia `Submarine/Submerged`
+    /// com arma, nao uma categoria propria.
+    /// </summary>
+    private static bool IsArmedSurveillance(UnitManager unit, UnitData data)
+    {
+        return UnitRoleCompatibility.CanSatisfy(data, UnitRole.Vigilancia)
+            && HasUsableWeapon(unit);
+    }
+
+    private static bool HasUsableWeapon(UnitManager unit)
+    {
+        IReadOnlyList<UnitEmbarkedWeapon> weapons =
+            unit != null ? unit.GetEmbarkedWeapons() : null;
+        if (weapons == null)
+            return false;
+
+        for (int i = 0; i < weapons.Count; i++)
+        {
+            if (weapons[i]?.weapon != null && weapons[i].squadAmmunition > 0)
+                return true;
+        }
+        return false;
     }
 
     private PlayerAction DecideRogueAirCombatAction(UnitManager unit, AIWorldSnapshot snapshot, List<int> takeoffMoveOptions = null)
@@ -628,7 +669,7 @@ public partial class AIController
                 out Vector3Int capturerCell);
 
         // Interceptadores protegem o elo mais proximo da rede: EWACS ou
-        // capitao. Ataque aereo e RaidAntiSub continuam magnetizados apenas
+        // capitao. Ataque aereo e vigilancia armada continuam magnetizados apenas
         // pela cabeca de ponte.
         if (isInterceptor
             && TryResolveNearestEwacsMagnet(

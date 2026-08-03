@@ -75,6 +75,7 @@ MonoBehaviour:
   aiPreventiveSupplyHpBelowPct: 70
   aiPreventiveSupplyAutonomyBelowPct: 60
   aiPreventiveSupplyWeaponAmmoAtOrBelow: 1
+  aiDisembarkWhenCannotSupply: 1
   eliteLevel: 0
   eliteFrom: {fileID: 0}
   combatModifiers:
@@ -91,7 +92,7 @@ MonoBehaviour:
   emergeAfterAttackHeight: 3
   emergeAfterAttackTurns: 2
   skills:
-  - {fileID: 11400000, guid: 9c22b855a2e730f4faced0e069dc2a8d, type: 2}
+  - {fileID: 11400000, guid: d3847c3b663e5434aaa12bcba9fed6f9, type: 2}
   - {fileID: 11400000, guid: b5c241bd4e3f15448b70c001b4a66dae, type: 2}
   - {fileID: 11400000, guid: fc7763e126a22974d87a6869f87beea4, type: 2}
   stealthSkills: []
@@ -114,12 +115,14 @@ MonoBehaviour:
     lastSyncedWeapon: {fileID: 11400000, guid: bea1f97758f951a40ad7dbad2c86ca93, type: 2}
   cantUseWeaponsOnTheFollowDomain: []
   isSupplier: 0
+  startsWithEmptySupplies: 1
   supplierTier: 0
   maxUnitsServedPerTurn: 0
   serviceRange: 0
   collectionRange: 0
   supplierOperationDomains: []
   supplierServicesProvided: []
+  supplierServiceProfile: 0
   supplierResources: []
   isTransporter: 0
   spriteTransport: {fileID: 0}

@@ -243,7 +243,7 @@ public sealed class MelhorCapitaoWindow : EditorWindow
         {
             case Preset.Antiaereo:
                 list.Add(RoleAttraction(
-                    "Vigilância Aérea", UnitRole.VigilanciaAerea));
+                    "Vigilância", UnitRole.Vigilancia));
                 list.Add(RoleAttraction("Capitão", UnitRole.Capturador));
                 break;
 

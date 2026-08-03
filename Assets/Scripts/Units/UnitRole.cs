@@ -10,7 +10,18 @@ public enum UnitRole
     Interceptador = 8,
     AtaqueAereo = 9,
     Antiaereo = 10,
-    RaidAntiSub = 11,
+    // 11 reservado — antigo RaidAntiSub; nao reutilizar.
+    //
+    // Removido porque nunca foi papel: "encontrar submarino" e visao
+    // (Vigilancia com camada principal Submarine/Submerged) e "destruir
+    // submarino" e arma. Nenhuma ficha o usava, mas o shopping o pedia — e a
+    // contagem dava zero para sempre, entao a demanda disparava todo turno sem
+    // poder ser preenchida.
+    //
+    // O numero fica de fora do enum, e nao como membro obsoleto executavel:
+    // nenhum save persiste UnitData.roles (o load recupera a ficha pelo unitId),
+    // e nao existe 11 em asset, prefab ou cena. O comentario existe so para
+    // ninguem reaproveitar o valor e ressuscitar dados antigos por acidente.
     CapturadorAgressivo = 12,
     ArtilheiroCombatente = 13,
     AntiaereoCombatente = 14,
@@ -18,9 +29,10 @@ public enum UnitRole
     // UnitRole e serializado nos UnitData.
     Transportador = 3,
     Logistica = 4,
-    // Vigilância do espaço aéreo (Radar Móvel/EWACS). Valor 6 preservado
-    // porque UnitRole é serializado numericamente nos UnitData e saves.
-    VigilanciaAerea = 6,
+    // Observação e detecção orientadas pela camada principal da ficha. O papel
+    // diz O QUE a unidade faz; Domain/Height dizem o que ela observa e como se
+    // move. Valor 6 preservado porque UnitRole é serializado numericamente.
+    Vigilancia = 6,
     // Antes chamado Suprimentos: o papel e movimentar carga, nao prestar servico de
     // suprimento (quem supre e Logistica). Valor 7 preservado — esta serializado nos UnitData.
     Estoque = 7,
@@ -53,7 +65,6 @@ public static class UnitRoleCompatibility
             case UnitRole.Interceptador:
             case UnitRole.AtaqueAereo:
             case UnitRole.Antiaereo:
-            case UnitRole.RaidAntiSub:
             case UnitRole.CapturadorAgressivo:
             case UnitRole.ArtilheiroCombatente:
             case UnitRole.AntiaereoCombatente:

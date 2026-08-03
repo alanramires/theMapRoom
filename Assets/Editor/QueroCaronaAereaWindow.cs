@@ -16,7 +16,7 @@ public sealed class QueroCaronaAereaWindow : EditorWindow
     private Tilemap map;
     private QueroCaronaAereaResult result;
     private string status =
-        "Selecione Interceptador, Ataque Aereo ou Vigilancia Aerea.";
+        "Selecione Interceptador, Ataque Aereo ou Vigilancia.";
     private Vector2 scroll;
 
     [MenuItem("Tools/Hotzone/Melhor Carona Aérea")]
@@ -42,7 +42,7 @@ public sealed class QueroCaronaAereaWindow : EditorWindow
     {
         EditorGUILayout.LabelField("Melhor Carona Aérea", EditorStyles.boldLabel);
         EditorGUILayout.HelpBox(
-            "Consulta pura para Interceptador, Ataque Aéreo e Vigilância Aérea. Recuperação aceita " +
+            "Consulta pura para Interceptador, Ataque Aéreo e Vigilância. Recuperação aceita " +
             "plataforma por emergência; em situação normal, um foco de missão testa " +
             "se o convés realmente melhora o rebasing. Slots e skills vêm do PodePousar.",
             MessageType.Info);
@@ -104,7 +104,7 @@ public sealed class QueroCaronaAereaWindow : EditorWindow
         EditorGUILayout.LabelField(
             "Papel",
             result.isAirSurveillanceRole
-                ? "Vigilância Aérea"
+                ? "Vigilância"
                 : result.isAirCombatRole
                     ? "Combate Aéreo"
                     : "Não suportado");

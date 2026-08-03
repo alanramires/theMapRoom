@@ -271,8 +271,14 @@ public partial class AIController
         if (unit == null || !unit.TryGetUnitData(out UnitData data) || data == null)
             return false;
 
-        return data.roles != null
-            && data.roles.Contains(UnitRole.VigilanciaAerea);
+        if (data.roles == null
+            || !data.roles.Contains(UnitRole.Vigilancia))
+            return false;
+
+        VisionCoverageLayer principal =
+            VisionCoverageLayerResolver.ResolvePrincipal(data);
+        return !principal.IsAll
+            && principal.Domain == Domain.Air;
     }
 
     private static bool IsBacklineSupportUnit(UnitManager unit)

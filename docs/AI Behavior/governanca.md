@@ -631,14 +631,14 @@ os arquivos de papel: não é otimização, é o papel voltando a ser só o que 
 | **Fire Support** | combate à distância e posicionamento de apoio na **Retaguarda** | ⚠️ `UnitRole.FogoIndireto = 5` |
 | **Transportador** | coordena passageiros, pontos de encontro, embarque, desembarque e transporte entre objetivos. Atua como **pickup**, **courier** ou **táxi** | `UnitRole.Transportador = 3` ✅ |
 | **Logística** | presta serviços de campo, mantém unidades operacionais, participa da cadeia de suprimentos | `UnitRole.Logistica = 4` ✅ |
-| **Vigilância** | revelação da névoa, observação e detecção de unidades ocultas | ⚠️ `UnitRole.VigilanciaAerea = 6` |
+| **Vigilância** | revelação da névoa, observação e detecção de unidades ocultas | ✅ `UnitRole.Vigilancia = 6` |
 
 **Vigilância** foi criada originalmente para operações em `Air/High`, mas passará
 a ser baseada na **visão especializada e nas habilidades de detecção** da
 unidade. O nome no código ainda carrega o `Aerea` da origem.
 
 ⚠️ Duas divergências de vocabulário, ambas de nome e não de comportamento:
-**Fire Support** é `FogoIndireto` no enum, e **Vigilância** é `VigilanciaAerea`.
+**Fire Support** é `FogoIndireto` no enum, e **Vigilância** é `Vigilancia`.
 Os valores numéricos estão serializados em `UnitData` e saves, então renomear é
 seguro **desde que os números não mudem**.
 
@@ -931,7 +931,7 @@ Exceções por papel:
 | G13 | armas de `rangeMin = 0` atacam outra camada no mesmo hex | ❓ marcado pelo próprio autor como experimental. Não cabe na banda do envelope |
 | G14 | **Range** é um dos três conceitos da Hotzone | ⚠️ `ReachBand` só tem `Tactical` e `Operational`. Alcance entra como `ActionCells` dentro de uma delas — e a inversão do artilheiro existe justamente porque, para ele, a banda **é** o alcance |
 | G15 | o papel se chama **Fire Support** | ⚠️ o enum diz `FogoIndireto` |
-| G16 | o papel se chama **Vigilância** | ⚠️ o enum diz `VigilanciaAerea`, nome da origem em `Air/High` |
+| G16 | o papel se chama **Vigilância** | ✅ `UnitRole.Vigilancia = 6`; a camada principal da ficha especializa Air, Surface ou Submerged |
 | G17 | **Transportador Aéreo foi incorporado** | ⚠️ `TransportadorAereo = 15` ainda existe, com política de shopping própria. Mudou de pasta; a regra não migrou |
 | G18 | **Raid Antissubmarino** vai para Vigilância | ⚠️ `RaidAntiSub = 11` ainda existe |
 | G20 | ~~**Melhor Estoque** ainda não implementado~~ | ✅ **fechada** — `MelhorEstoqueService` existe e corresponde à doutrina |

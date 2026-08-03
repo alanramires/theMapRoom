@@ -3,7 +3,7 @@ using UnityEngine;
 using UnityEngine.Tilemaps;
 
 /// <summary>
-/// Pedido de plataforma para uma aeronave de combate ou Vigilancia Aerea. Esta
+/// Pedido de plataforma para uma aeronave de combate ou Vigilancia. Esta
 /// consulta nao escolhe uma acao: a recuperacao e o embarque continuam sendo
 /// materializados pelos sensores e pelo controlador da IA.
 /// </summary>
@@ -89,14 +89,14 @@ public static class QueroCaronaAereaService
                 || data.roles.Contains(UnitRole.AtaqueAereo));
         result.isAirSurveillanceRole = nativeAir
             && data.roles != null
-            && data.roles.Contains(UnitRole.VigilanciaAerea);
+            && data.roles.Contains(UnitRole.Vigilancia);
         result.isSupportedAirRole =
             result.isAirCombatRole
             || result.isAirSurveillanceRole;
         if (!result.isSupportedAirRole)
         {
             result.reason =
-                "A ferramenta atende aeronaves com papel Interceptador, Ataque Aereo ou Vigilancia Aerea.";
+                "A ferramenta atende aeronaves com papel Interceptador, Ataque Aereo ou Vigilancia.";
             return result;
         }
 

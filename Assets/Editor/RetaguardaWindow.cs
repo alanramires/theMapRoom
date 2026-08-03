@@ -586,7 +586,7 @@ public class RetaguardaWindow : EditorWindow
             return false;
 
         return data.roles.Contains(UnitRole.FogoIndireto)
-            || data.roles.Contains(UnitRole.VigilanciaAerea);
+            || data.roles.Contains(UnitRole.Vigilancia);
     }
 
     private void SetAnchorFromEnemies()

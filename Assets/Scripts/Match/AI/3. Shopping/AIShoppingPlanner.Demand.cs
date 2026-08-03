@@ -584,6 +584,25 @@ public partial class AIShoppingPlanner
         return count;
     }
 
+    private static int CountActiveDedicatedAirSurveillance(
+        AIWorldSnapshot snapshot)
+    {
+        if (snapshot == null || snapshot.MyUnits == null)
+            return 0;
+
+        int count = 0;
+        foreach (UnitManager unit in snapshot.MyUnits)
+        {
+            if (unit == null || unit.IsDead || unit.IsEmbarked)
+                continue;
+            if (!unit.TryGetUnitData(out UnitData data) || data == null)
+                continue;
+            if (IsDedicatedAirSurveillancePurchase(data))
+                count++;
+        }
+        return count;
+    }
+
     private static int CountExistingDedicatedAirSurveillance(
         TeamId aiTeam,
         Domain domain)
@@ -2644,21 +2663,38 @@ public partial class AIShoppingPlanner
         }
 
         if (HasEnemyAirProduction(snapshot)
-            && CountCompositionRole(
-                snapshot, UnitRole.VigilanciaAerea) == 0)
+            && CountActiveDedicatedAirSurveillance(snapshot) == 0)
         {
             AIShoppingDemand surveillance = NewRoleDemand(
-                UnitRole.VigilanciaAerea, 1, 20,
+                UnitRole.Vigilancia, 1, 20,
                 "vigilancia-aerea",
                 "oponente possui capacidade aeroportuaria",
                 false);
+            surveillance.RequiredVisionDomain = Domain.Air;
+            surveillance.RequiredVisionHeight = HeightLevel.AirHigh;
             MergeRoleDemand(demands, surveillance, false);
         }
 
-        if (HasEnemySubmarineCapability(snapshot) && CountCompositionRole(snapshot, UnitRole.RaidAntiSub) == 0)
+        // ANTI-SUB E DEMANDA DE VIGILANCIA POR CAMADA, nao um papel proprio.
+        //
+        // Pedia UnitRole.RaidAntiSub, e NENHUMA ficha do projeto tem esse papel:
+        // as cinco unidades de vigilancia sao `roles: Vigilancia`. A contagem
+        // dava zero para sempre, entao com submarino inimigo a vista a demanda
+        // disparava todo turno e nao podia ser preenchida por ninguem — gate
+        // inaplicavel, que nao separa "ainda nao satisfeito" de "impossivel".
+        //
+        // "Encontrar submarino" e visao. "Destruir submarino" e arma. Nenhum dos
+        // dois e papel.
+        if (HasEnemySubmarineCapability(snapshot)
+            && CountSurveillanceForLayer(
+                snapshot, Domain.Submarine, HeightLevel.Submerged) == 0)
         {
-            MergeRoleDemand(demands, NewRoleDemand(UnitRole.RaidAntiSub, 1, 18,
-                "anti-sub", "submarino visivel ou porto inimigo", false), false);
+            AIShoppingDemand antiSub = NewRoleDemand(
+                UnitRole.Vigilancia, 1, 18,
+                "anti-sub", "submarino visivel ou porto inimigo", false);
+            antiSub.RequiredVisionDomain = Domain.Submarine;
+            antiSub.RequiredVisionHeight = HeightLevel.Submerged;
+            MergeRoleDemand(demands, antiSub, false);
         }
 
         int repairWork = CountUnitsUnderRepair(snapshot);
@@ -2869,7 +2905,10 @@ public partial class AIShoppingPlanner
             if (currentRally != incomingRally)
                 continue;
             if (current.Role != incoming.Role || current.ExactRole != incoming.ExactRole
-                || current.Domain != incoming.Domain || current.MinEliteLevel != incoming.MinEliteLevel
+                || current.Domain != incoming.Domain
+                || current.RequiredVisionDomain != incoming.RequiredVisionDomain
+                || current.RequiredVisionHeight != incoming.RequiredVisionHeight
+                || current.MinEliteLevel != incoming.MinEliteLevel
                 || current.MaxEliteLevel != incoming.MaxEliteLevel
                 || !Mathf.Approximately(current.MinRallyArtilleryWeight,
                     incoming.MinRallyArtilleryWeight)
@@ -2901,6 +2940,20 @@ public partial class AIShoppingPlanner
             return false;
         if (demand.Domain.HasValue && unit.domain != demand.Domain.Value)
             return false;
+        if (demand.RequiredVisionDomain.HasValue
+            || demand.RequiredVisionHeight.HasValue)
+        {
+            VisionCoverageLayer principal =
+                VisionCoverageLayerResolver.ResolvePrincipal(unit);
+            if (principal.IsAll)
+                return false;
+            if (demand.RequiredVisionDomain.HasValue
+                && principal.Domain != demand.RequiredVisionDomain.Value)
+                return false;
+            if (demand.RequiredVisionHeight.HasValue
+                && principal.Height != demand.RequiredVisionHeight.Value)
+                return false;
+        }
         if (unit.eliteLevel < demand.MinEliteLevel || unit.eliteLevel > demand.MaxEliteLevel)
             return false;
         if (demand.ExactRole != UnitRole.None && unit.roles[0] != demand.ExactRole)
@@ -2946,6 +2999,12 @@ public partial class AIShoppingPlanner
                 : $"{demand.Role}/{demand.ExactRole}";
         if (demand.RequiredWeaponCategory.HasValue)
             label += $"+{demand.RequiredWeaponCategory.Value}";
+        if (demand.RequiredVisionDomain.HasValue)
+        {
+            label += $"+visao:{demand.RequiredVisionDomain.Value}";
+            if (demand.RequiredVisionHeight.HasValue)
+                label += $"/{demand.RequiredVisionHeight.Value}";
+        }
         if (demand.MinRallyArtilleryWeight > 0f)
             label += $"+rallyArt>={demand.MinRallyArtilleryWeight:0.#}";
         if (demand.TargetClass.HasValue)
@@ -3566,11 +3625,48 @@ public partial class AIShoppingPlanner
         foreach (UnitManager unit in snapshot.MyUnits)
             if (unit != null && !unit.IsDead && unit.TryGetUnitData(out UnitData data)
                 && (role == UnitRole.Logistica
-                    || role == UnitRole.VigilanciaAerea
-                    || role == UnitRole.RaidAntiSub
+                    || role == UnitRole.Vigilancia
                     ? UnitRoleCompatibility.CanSatisfy(data, role)
                     : UnitRoleCompatibility.ResolveCompositionRole(data) == role))
                 count++;
+        return count;
+    }
+
+    /// <summary>
+    /// Vigilancia que cobre ESTA camada.
+    ///
+    /// Contar so o papel nao serve para demanda de visao: um EWACS e um
+    /// submarino sao os dois `Vigilancia`, e um nao substitui o outro. A camada
+    /// principal sai da ficha, pelo mesmo resolvedor que o MelhorVisao usa —
+    /// nenhuma unidade e reconhecida por nome aqui.
+    /// </summary>
+    private static int CountSurveillanceForLayer(
+        AIWorldSnapshot snapshot,
+        Domain domain,
+        HeightLevel height)
+    {
+        if (snapshot?.MyUnits == null)
+            return 0;
+
+        int count = 0;
+        foreach (UnitManager unit in snapshot.MyUnits)
+        {
+            if (unit == null || unit.IsDead)
+                continue;
+            if (!unit.TryGetUnitData(out UnitData data) || data == null)
+                continue;
+            if (!UnitRoleCompatibility.CanSatisfy(data, UnitRole.Vigilancia))
+                continue;
+
+            VisionCoverageLayer principal =
+                VisionCoverageLayerResolver.ResolvePrincipal(data);
+            if (!principal.IsAll
+                && principal.Domain == domain
+                && principal.Height == height)
+            {
+                count++;
+            }
+        }
         return count;
     }
 

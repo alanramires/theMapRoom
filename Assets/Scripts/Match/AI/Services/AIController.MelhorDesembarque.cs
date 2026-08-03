@@ -219,12 +219,12 @@ public partial class AIController
                 data, UnitRole.FogoIndireto)
             && !UnitRoleCompatibility.CanSatisfy(
                 data, UnitRole.Capturador);
-        bool mobileGroundAirSurveillance =
+        bool mobileGroundSurveillance =
             data.domain == Domain.Land
             && UnitRoleCompatibility.CanSatisfy(
-                data, UnitRole.VigilanciaAerea);
+                data, UnitRole.Vigilancia);
         if (!nonCapturingFireSupport
-            && !mobileGroundAirSurveillance)
+            && !mobileGroundSurveillance)
             return true;
 
         cell.z = 0;

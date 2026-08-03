@@ -459,7 +459,12 @@ public partial class AIShoppingPlanner
     {
         if (unit == null || unit.roles == null || unit.roles.Count == 0)
             return false;
-        if (unit.roles[0] != UnitRole.VigilanciaAerea)
+        if (unit.roles[0] != UnitRole.Vigilancia)
+            return false;
+
+        VisionCoverageLayer principal =
+            VisionCoverageLayerResolver.ResolvePrincipal(unit);
+        if (principal.IsAll || principal.Domain != Domain.Air)
             return false;
 
         return !unit.roles.Contains(UnitRole.Assalto)
