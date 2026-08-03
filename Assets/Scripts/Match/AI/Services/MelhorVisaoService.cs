@@ -185,6 +185,13 @@ public sealed class MelhorVisaoRequest
     public ISet<Vector3Int> FocusCells;
     public Func<Vector3Int, bool> IsKnown;
     public Func<Vector3Int, bool> IsExplored;
+    /// <summary>
+    /// Politica do consumidor para decidir quais aliados realmente cobrem a
+    /// mesma missao de observacao. Nulo preserva o comportamento geral da
+    /// ferramenta e aceita qualquer aliado capaz de produzir cobertura na
+    /// camada consultada.
+    /// </summary>
+    public Func<UnitManager, bool> AlliedObserverFilter;
     public int MovementBudget;
     public bool EnableLos = true;
     public bool IncludeAlliedCoverage;
@@ -370,6 +377,12 @@ public static class MelhorVisaoService
                 || !PlayerSlotRelations.AreAllies(ally, request.Unit)
                 || ally.BoardTilemap != null
                     && ally.BoardTilemap != request.Map)
+            {
+                continue;
+            }
+
+            if (request.AlliedObserverFilter != null
+                && !request.AlliedObserverFilter(ally))
             {
                 continue;
             }

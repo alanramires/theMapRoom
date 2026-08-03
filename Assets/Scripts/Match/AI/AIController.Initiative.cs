@@ -263,9 +263,10 @@ public partial class AIController
         // recuar/curar/seguir continua sendo decidido pelo handler dela.
         if (unit.IsUnderRepair) return _sortIsInvading ? 1 : 5;
 
-        // Vigilancia Aerea (EWACS/radar movel) age cedo para iluminar alvos
+        // Vigilancia (EWACS, radar movel, Super Tucano, fragata e submarino)
+        // age cedo para iluminar alvos na camada especializada da ficha
         // antes da artilharia, aviação e assalto consumirem suas ações.
-        if (IsAirSurveillanceUnit(unit)) return 1;
+        if (IsSurveillanceUnit(unit)) return 1;
 
         if (IsHelicopterInitiativeUnit(unit)) return 1;
 
@@ -1014,7 +1015,7 @@ public partial class AIController
 
     private static int GetEffectiveAiInitiative(UnitManager unit)
     {
-        if (IsAirSurveillanceUnit(unit))
+        if (IsSurveillanceUnit(unit))
             return (int)AiInitiative.High;
 
         return unit != null && unit.TryGetUnitData(out UnitData data)

@@ -23,8 +23,8 @@ public partial class AIController
 
         bool isAirSurveillance = IsAirSurveillanceUnit(unit);
 
-        // Preserva a ordem historica para os demais papeis. Somente
-        // Vigilancia Aerea antepoe emergencia ao desbloqueio da construcao.
+        // Preserva a ordem historica para os demais papeis. Somente a
+        // Vigilancia aerea antepoe emergencia ao desbloqueio da construcao.
         if (!isAirSurveillance
             && TryFindProductionUnlockVacateAction(
                 unit,
@@ -45,9 +45,9 @@ public partial class AIController
         if (selfRecoveryAction != null)
         {
             if (isAirSurveillance)
-                LogAirSurveillancePolicyStage(
+                LogSurveillancePolicyStage(
                     unit,
-                    AirSurveillancePolicyStage.EmergencyAndRepair,
+                    SurveillancePolicyStage.EmergencyAndRepair,
                     "autoridade global de reparo");
             return selfRecoveryAction;
         }
@@ -58,9 +58,9 @@ public partial class AIController
                 snapshot,
                 out PlayerAction productionUnlockAction))
         {
-            LogAirSurveillancePolicyStage(
+            LogSurveillancePolicyStage(
                 unit,
-                AirSurveillancePolicyStage.ExitObstructedPosition,
+                SurveillancePolicyStage.ExitObstructedPosition,
                 "desbloqueio global de producao");
             return productionUnlockAction;
         }
@@ -85,9 +85,9 @@ public partial class AIController
         if (transportOperationsAction != null)
         {
             if (isAirSurveillance)
-                LogAirSurveillancePolicyStage(
+                LogSurveillancePolicyStage(
                     unit,
-                    AirSurveillancePolicyStage.TransportOrPlatform,
+                    SurveillancePolicyStage.TransportOrPlatform,
                     "operacao global de transporte");
             return transportOperationsAction;
         }
@@ -188,11 +188,11 @@ public partial class AIController
 
         }
 
-        PlayerAction airSurveillanceAction =
-            TryDecideAirSurveillanceAction(unit, snapshot, plan);
+        PlayerAction surveillanceAction =
+            TryDecideSurveillanceAction(unit, snapshot, plan);
 
-        if (airSurveillanceAction != null)
-            return airSurveillanceAction;
+        if (surveillanceAction != null)
+            return surveillanceAction;
 
         PlayerAction airCombatAction = TryDecideAirCombatAction(unit, snapshot);
 
@@ -771,4 +771,3 @@ public partial class AIController
 
     }
 }
-

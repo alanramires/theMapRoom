@@ -101,7 +101,7 @@ public partial class AIController
                         roleLabel = TL("FireSupport");
                         break;
                     case CombatPassengerTransportPolicy.AirSurveillance:
-                        roleLabel = TL("VigilanciaAerea");
+                        roleLabel = TL("Vigilancia");
                         break;
                     default:
                         roleLabel = TL("Assalto");

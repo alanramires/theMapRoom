@@ -3,7 +3,38 @@ using UnityEngine;
 
 public partial class AIController
 {
-    private enum AirSurveillancePolicyStage
+    private readonly struct SurveillanceProfile
+    {
+        public readonly VisionCoverageLayer Layer;
+        public readonly bool DetectsStealth;
+
+        public bool IsAirLayer =>
+            !Layer.IsAll && Layer.Domain == Domain.Air;
+
+        public SurveillanceProfile(
+            VisionCoverageLayer layer,
+            bool detectsStealth)
+        {
+            Layer = layer;
+            DetectsStealth = detectsStealth;
+        }
+    }
+
+    private static readonly VisionCoverageScoringPolicy
+        SurveillanceVisionPolicy =
+            new VisionCoverageScoringPolicy(
+                visibleWeight: 0.25f,
+                marginalWeight: 3f,
+                unexploredMarginalWeight: 25f,
+                recoveredWeight: 6f,
+                retainedUniqueWeight: 2f,
+                overlapWeight: 0.1f,
+                lostUniqueWeight: -8f,
+                focusWeight: 10f,
+                lostFocusedWeight: -20f,
+                movementCostWeight: -0.25f);
+
+    private enum SurveillancePolicyStage
     {
         EmergencyAndRepair,
         Recovery,
@@ -16,10 +47,19 @@ public partial class AIController
         Orbit
     }
 
-    private PlayerAction TryDecideAirSurveillanceAction(UnitManager unit, AIWorldSnapshot snapshot, TeamObjectivePlan plan)
+    private PlayerAction TryDecideSurveillanceAction(UnitManager unit, AIWorldSnapshot snapshot, TeamObjectivePlan plan)
     {
-        if (!IsAirSurveillanceUnit(unit) || snapshot == null)
+        if (!TryResolveSurveillanceProfile(
+                unit,
+                out SurveillanceProfile profile)
+            || snapshot == null)
             return null;
+
+        if (!profile.IsAirLayer)
+            return TryDecideLayerSurveillanceAction(
+                unit,
+                snapshot,
+                profile);
 
         Vector3Int fromCell = unit.CurrentCellPosition;
         fromCell.z = 0;
@@ -36,7 +76,7 @@ public partial class AIController
         Dictionary<Vector3Int, List<Vector3Int>> paths =
             needsPreciseRecoveryPaths
                 ? BuildFireSupportPaths(unit)
-                : BuildAirSurveillanceDecisionReach(unit, fromCell);
+                : BuildSurveillanceDecisionReach(unit, fromCell);
         HashSet<Vector3Int> occupied = BuildOccupied(unit);
         if (needsPreciseRecoveryPaths
             && TryBuildEwacsEmergencyRecoveryAction(
@@ -48,9 +88,9 @@ public partial class AIController
                 out PlayerAction ewacsRecoveryAction,
                 out string ewacsRecoveryReason))
         {
-            LogAirSurveillancePolicyStage(
+            LogSurveillancePolicyStage(
                 unit,
-                AirSurveillancePolicyStage.Recovery,
+                SurveillancePolicyStage.Recovery,
                 ewacsRecoveryReason);
             return ewacsRecoveryAction;
         }
@@ -76,9 +116,9 @@ public partial class AIController
                     occupied);
             if (vacateCell != fromCell)
             {
-                LogAirSurveillancePolicyStage(
+                LogSurveillancePolicyStage(
                     unit,
-                    AirSurveillancePolicyStage.ExitObstructedPosition,
+                    SurveillancePolicyStage.ExitObstructedPosition,
                     $"radar desocupa construcao nao controlada " +
                     $"{fromCell} via {vacateCell}");
                 PlayerAction radarVacateAction =
@@ -105,9 +145,9 @@ public partial class AIController
                     fromCell);
             if (transportAction != null)
             {
-                LogAirSurveillancePolicyStage(
+                LogSurveillancePolicyStage(
                     unit,
-                    AirSurveillancePolicyStage.TransportOrPlatform,
+                    SurveillancePolicyStage.TransportOrPlatform,
                     "radar solicita transporte terrestre");
                 return transportAction;
             }
@@ -137,9 +177,9 @@ public partial class AIController
                 out PlayerAction platformAction,
                 out string platformReason))
         {
-            LogAirSurveillancePolicyStage(
+            LogSurveillancePolicyStage(
                 unit,
-                AirSurveillancePolicyStage.TransportOrPlatform,
+                SurveillancePolicyStage.TransportOrPlatform,
                 platformReason);
             return platformAction;
         }
@@ -147,9 +187,9 @@ public partial class AIController
         if (paths != null && paths.Count > 0
             && TryFindHomeProductionVacateCombatAction(unit, snapshot, fromCell, paths, occupied, out PlayerAction vacateAction))
         {
-            LogAirSurveillancePolicyStage(
+            LogSurveillancePolicyStage(
                 unit,
-                AirSurveillancePolicyStage.ExitObstructedPosition,
+                SurveillancePolicyStage.ExitObstructedPosition,
                 $"libera construcao em {fromCell}");
             return vacateAction;
         }
@@ -159,20 +199,20 @@ public partial class AIController
         {
             if (postureCell != fromCell)
             {
-                LogAirSurveillancePolicyStage(
+                LogSurveillancePolicyStage(
                     unit,
                     IsStationaryMobileAirSurveillanceRadar(unit)
-                        ? AirSurveillancePolicyStage.ImproveAirCoverage
-                        : AirSurveillancePolicyStage.FollowMagnet,
+                        ? SurveillancePolicyStage.ImproveAirCoverage
+                        : SurveillancePolicyStage.FollowMagnet,
                     $"reposiciona via {postureCell} anchor={anchor} ({anchorReason}; {postureReason})");
                 return BuildMoveBatch(unit, snapshot.AITeam, fromCell, postureCell, paths);
             }
 
-            LogAirSurveillancePolicyStage(
+            LogSurveillancePolicyStage(
                 unit,
                 ewacsRecovery != null
-                    ? AirSurveillancePolicyStage.Orbit
-                    : AirSurveillancePolicyStage.Hold,
+                    ? SurveillancePolicyStage.Orbit
+                    : SurveillancePolicyStage.Hold,
                 ewacsRecovery != null
                     ? $"mantem orbita segura em {fromCell} anchor={anchor} ({anchorReason}; {postureReason})"
                     : $"segura observacao em {fromCell} anchor={anchor} ({anchorReason}; {postureReason})");
@@ -187,30 +227,218 @@ public partial class AIController
                 context: "vigilancia-aerea");
         if (conservativeAction != null)
         {
-            LogAirSurveillancePolicyStage(
+            LogSurveillancePolicyStage(
                 unit,
-                AirSurveillancePolicyStage.ConservativeRear,
+                SurveillancePolicyStage.ConservativeRear,
                 "sem ancora operacional; acompanha retaguarda aliada");
             return conservativeAction;
         }
 
-        LogAirSurveillancePolicyStage(
+        LogSurveillancePolicyStage(
             unit,
             ewacsRecovery != null
-                ? AirSurveillancePolicyStage.Orbit
-                : AirSurveillancePolicyStage.Hold,
+                ? SurveillancePolicyStage.Orbit
+                : SurveillancePolicyStage.Hold,
             ewacsRecovery != null
                 ? $"sem direcao segura; mantem orbita em {fromCell}"
                 : $"sem direcao segura; aguarda em {fromCell}");
         return BuildMoveBatch(unit, snapshot.AITeam, fromCell, fromCell, paths);
     }
 
+    /// <summary>
+    /// Agenda comum das unidades de Vigilancia cuja camada principal nao e Air.
+    /// A arma tem precedencia quando o PodeMirar materializa um tiro; sem tiro,
+    /// a unidade escolhe a posicao pela camada principal declarada na ficha.
+    /// </summary>
+    private PlayerAction TryDecideLayerSurveillanceAction(
+        UnitManager unit,
+        AIWorldSnapshot snapshot,
+        SurveillanceProfile profile)
+    {
+        Vector3Int fromCell = unit.CurrentCellPosition;
+        fromCell.z = 0;
+        Dictionary<Vector3Int, List<Vector3Int>> paths =
+            BuildSurveillanceDecisionReach(unit, fromCell);
+        HashSet<Vector3Int> occupied = BuildOccupied(unit);
+
+        if (HasUsableWeapon(unit))
+        {
+            if (unit.TryGetUnitData(out UnitData data)
+                && data != null
+                && data.domain == Domain.Air)
+            {
+                PlayerAction airAttack =
+                    TryDecideAirCombatAttackOnly(unit, snapshot);
+                if (airAttack != null)
+                    return airAttack;
+            }
+            else if (TryBuildRolePreemptiveAttack(
+                    unit,
+                    snapshot,
+                    paths,
+                    occupied,
+                    defensiveContext: false,
+                    out PlayerAction attack,
+                    out string attackReason))
+            {
+                Debug.Log(
+                    $"{TL("Vigilancia")} {unit.InstanceId} " +
+                    $"ataca antes de reposicionar - {attackReason}");
+                return attack;
+            }
+        }
+
+        MelhorVisaoResult vision =
+            EvaluateSurveillanceVision(unit, profile);
+        MelhorVisaoCellScore origin = vision?.Origin;
+        if (origin == null)
+        {
+            return BuildMoveBatch(
+                unit,
+                snapshot.AITeam,
+                fromCell,
+                fromCell,
+                paths);
+        }
+
+        float originThreat =
+            CalculateThreatLevel(fromCell, snapshot.AITeam);
+        float originOperationalScore =
+            origin.Score - originThreat * 40f;
+        MelhorVisaoCellScore best = origin;
+        float bestOperationalScore = originOperationalScore;
+
+        for (int i = 0; i < vision.Ranking.Count; i++)
+        {
+            MelhorVisaoCellScore candidate = vision.Ranking[i];
+            if (candidate == null)
+                continue;
+            Vector3Int cell = candidate.Cell;
+            cell.z = 0;
+            if (cell != fromCell
+                && (paths == null || !paths.ContainsKey(cell)))
+            {
+                continue;
+            }
+
+            float threat =
+                CalculateThreatLevel(cell, snapshot.AITeam);
+            float operationalScore =
+                candidate.Score - threat * 40f;
+            if (operationalScore > bestOperationalScore)
+            {
+                best = candidate;
+                bestOperationalScore = operationalScore;
+            }
+        }
+
+        float requiredGain = origin.Coverage == null
+            || origin.Coverage.VisibleCount <= 2
+                ? 4f
+                : Mathf.Max(8f, Mathf.Abs(origin.Score) * 0.04f);
+        float actualGain =
+            bestOperationalScore - originOperationalScore;
+        if (best == origin
+            || best.Cell == fromCell
+            || actualGain < requiredGain)
+        {
+            Debug.Log(
+                $"{TL("Vigilancia")} {unit.InstanceId} " +
+                $"layer={profile.Layer.Label} hold={fromCell} " +
+                $"gain={actualGain:F1}/{requiredGain:F1} " +
+                $"({origin.Reason})");
+            return BuildMoveBatch(
+                unit,
+                snapshot.AITeam,
+                fromCell,
+                fromCell,
+                paths);
+        }
+
+        Vector3Int destination = best.Cell;
+        destination.z = 0;
+        Debug.Log(
+            $"{TL("Vigilancia")} {unit.InstanceId} " +
+            $"layer={profile.Layer.Label} move={fromCell}->{destination} " +
+            $"gain={actualGain:F1} deltaVisao={best.DeltaFromOrigin:F1} " +
+            $"({best.Reason})");
+        PlayerAction move = BuildMoveBatch(
+            unit,
+            snapshot.AITeam,
+            fromCell,
+            destination,
+            paths);
+        move.DebugLabel =
+            $"Vigilancia {profile.Layer.Label} " +
+            $"{unit.InstanceId} -> {destination}";
+        return move;
+    }
+
+    private MelhorVisaoResult EvaluateSurveillanceVision(
+        UnitManager unit,
+        SurveillanceProfile profile)
+    {
+        PlayerSlotId observerSlot =
+            PlayerSlotId.FromIndex(unit.SlotIndex);
+        bool hasConfirmedFog = matchController != null
+            && matchController.ConcealsInformationFromObservers();
+        return MelhorVisaoService.Evaluate(
+            new MelhorVisaoRequest
+            {
+                Unit = unit,
+                Map = boardTilemap,
+                TerrainDatabase = terrainDatabase,
+                DpqAirHeightConfig = turnStateManager != null
+                    ? turnStateManager.DpqAirHeightConfigRef
+                    : null,
+                Layer = profile.Layer,
+                ScoringPolicy = SurveillanceVisionPolicy,
+                IsKnown = matchController != null
+                    ? cell => !hasConfirmedFog
+                        || matchController.IsCellKnownForActiveTeam(cell)
+                    : null,
+                IsExplored = matchController != null
+                    ? cell => !hasConfirmedFog
+                        || matchController.IsCellExploredBySlot(
+                            observerSlot,
+                            cell)
+                    : null,
+                AlliedObserverFilter = ally =>
+                    IsEquivalentSurveillanceObserver(
+                        ally,
+                        profile),
+                MovementBudget = Mathf.Max(
+                    0,
+                    unit.RemainingMovementPoints),
+                EnableLos = matchController == null
+                    || matchController.EnableLosValidation,
+                IncludeAlliedCoverage = true,
+                ValidateFinalOccupancy = true
+            });
+    }
+
+    private static bool IsEquivalentSurveillanceObserver(
+        UnitManager ally,
+        SurveillanceProfile observedProfile)
+    {
+        if (!TryResolveSurveillanceProfile(
+                ally,
+                out SurveillanceProfile allyProfile)
+            || !allyProfile.Layer.Equals(observedProfile.Layer))
+        {
+            return false;
+        }
+
+        return !observedProfile.DetectsStealth
+            || allyProfile.DetectsStealth;
+    }
+
     private Dictionary<Vector3Int, List<Vector3Int>>
-        BuildAirSurveillanceDecisionReach(
+        BuildSurveillanceDecisionReach(
             UnitManager unit,
             Vector3Int origin)
     {
-        if (!IsAirborneAirSurveillanceUnit(unit))
+        if (!AIActionReachCoordinator.UsesCubicSectorReach(unit))
             return BuildFireSupportPaths(unit);
 
         Dictionary<Vector3Int, int> hotzone =
@@ -232,16 +460,16 @@ public partial class AIController
         return reach;
     }
 
-    private void LogAirSurveillancePolicyStage(
+    private void LogSurveillancePolicyStage(
         UnitManager unit,
-        AirSurveillancePolicyStage stage,
+        SurveillancePolicyStage stage,
         string reason)
     {
         if (unit == null)
             return;
 
         Debug.Log(
-            $"{TL("VigilanciaAerea")} {unit.InstanceId} " +
+            $"{TL("Vigilancia")} {unit.InstanceId} " +
             $"policy={stage} {reason}");
     }
 
@@ -268,17 +496,39 @@ public partial class AIController
 
     private static bool IsAirSurveillanceUnit(UnitManager unit)
     {
-        if (unit == null || !unit.TryGetUnitData(out UnitData data) || data == null)
-            return false;
+        return TryResolveSurveillanceProfile(
+                unit,
+                out SurveillanceProfile profile)
+            && profile.IsAirLayer;
+    }
 
-        if (data.roles == null
+    private static bool IsSurveillanceUnit(UnitManager unit) =>
+        TryResolveSurveillanceProfile(unit, out _);
+
+    private static bool TryResolveSurveillanceProfile(
+        UnitManager unit,
+        out SurveillanceProfile profile)
+    {
+        profile = default;
+        if (unit == null
+            || !unit.TryGetUnitData(out UnitData data)
+            || data == null
+            || data.roles == null
             || !data.roles.Contains(UnitRole.Vigilancia))
+        {
             return false;
+        }
 
         VisionCoverageLayer principal =
             VisionCoverageLayerResolver.ResolvePrincipal(data);
-        return !principal.IsAll
-            && principal.Domain == Domain.Air;
+        bool detectsStealth = !principal.IsAll
+            && data.HasStealthDetectionFor(
+                principal.Domain,
+                principal.Height);
+        profile = new SurveillanceProfile(
+            principal,
+            detectsStealth);
+        return true;
     }
 
     private static bool IsBacklineSupportUnit(UnitManager unit)
@@ -415,6 +665,30 @@ public partial class AIController
                 out reason);
         }
 
+        if (!TryResolveSurveillanceProfile(
+                unit,
+                out SurveillanceProfile profile))
+        {
+            return false;
+        }
+
+        MelhorVisaoResult vision =
+            EvaluateSurveillanceVision(unit, profile);
+        var visionByCell =
+            new Dictionary<Vector3Int, MelhorVisaoCellScore>();
+        if (vision != null)
+        {
+            for (int i = 0; i < vision.Ranking.Count; i++)
+            {
+                MelhorVisaoCellScore item = vision.Ranking[i];
+                if (item != null)
+                    visionByCell[item.Cell] = item;
+            }
+        }
+        float fromVisionScore = vision?.Origin != null
+            ? vision.Origin.Score
+            : 0f;
+
         TeamObjectivePlan capPlan =
             ObjectiveManager.GetPlanForSlot(
                 PlayerSlotId.FromIndex(snapshot.AISlotIndex));
@@ -434,7 +708,8 @@ public partial class AIController
         float fromThreat =
             CalculateThreatLevel(fromCell, snapshot.AITeam);
         float fromScore =
-            -Mathf.Abs(
+            fromVisionScore
+            - Mathf.Abs(
                 fromAnchorDistance - preferredEscortDistance) * 160f
             - fromThreat * 240f
             - fromSpacing.Penalty;
@@ -487,7 +762,12 @@ public partial class AIController
                         fromCell,
                         cell);
                 float approximateScore =
-                    -Mathf.Abs(
+                    (visionByCell.TryGetValue(
+                            cell,
+                            out MelhorVisaoCellScore approximateVision)
+                        ? approximateVision.Score
+                        : 0f)
+                    - Mathf.Abs(
                         distance - preferredEscortDistance) * 160f
                     - pathCost * 8f;
                 ranking.Add(
@@ -533,8 +813,14 @@ public partial class AIController
                         unit,
                         snapshot,
                         cell);
+                float visionScore = visionByCell.TryGetValue(
+                        cell,
+                        out MelhorVisaoCellScore preciseVision)
+                    ? preciseVision.Score
+                    : 0f;
                 float score =
-                    -Mathf.Abs(
+                    visionScore
+                    - Mathf.Abs(
                         distance - preferredEscortDistance) * 160f
                     - pathCost * 8f
                     - threat * 240f
@@ -547,7 +833,8 @@ public partial class AIController
                     string scoreReason =
                         $"magnetDist={distance} " +
                         $"escort={preferredEscortDistance} " +
-                        $"threat={threat:F1} path={pathCost}";
+                        $"threat={threat:F1} path={pathCost} " +
+                        $"vision={visionScore:F1}";
                     bestReason = ewacsRecovery != null
                         ? $"{scoreReason} {spacing} recovery={recoveryReason}"
                         : $"{scoreReason} {spacing}";
@@ -562,7 +849,9 @@ public partial class AIController
                 preciseCount);
         }
 
-        reason = $"{bestReason} score={bestScore:F0} hold={fromScore:F0}";
+        reason =
+            $"{bestReason} layer={profile.Layer.Label} " +
+            $"score={bestScore:F0} hold={fromScore:F0}";
         return true;
     }
 
@@ -690,7 +979,7 @@ public partial class AIController
                     emulateUnderRepairFromUnitData = false,
                     diagnosticLog = showAILogs
                         ? message => Debug.Log(
-                            $"{TL("VigilanciaAerea")} " +
+                            $"{TL("Vigilancia")} " +
                             $"Radar#{radar.InstanceId} " +
                             $"QueroCarona: {message}")
                         : null
@@ -698,7 +987,7 @@ public partial class AIController
 
         ApplyRideWaitStamp(radar, rideNeed);
         Debug.Log(
-            $"{TL("VigilanciaAerea")} Radar#{radar.InstanceId} " +
+            $"{TL("Vigilancia")} Radar#{radar.InstanceId} " +
             $"transporte target={target} gain={coverageGain:F0} " +
             $"QueroCarona={(rideNeed.wantsRide ? "SIM" : "NAO")} " +
             $"reach={rideNeed.reach} ({targetReason}; " +
@@ -951,29 +1240,19 @@ public partial class AIController
     {
         bestCell = fromCell;
         reason = "radar stationary";
-
-        var alliedAirLow = new HashSet<Vector3Int>();
-        var alliedAirHigh = new HashSet<Vector3Int>();
-        CollectAlliedAirSurveillanceCoverage(
-            unit,
-            snapshot,
-            alliedAirLow,
-            alliedAirHigh);
-        HashSet<Vector3Int> precisionCoverageCandidates =
-            SelectAirSurveillancePrecisionCoverageCandidates(
+        if (!TryResolveSurveillanceProfile(
                 unit,
-                fromCell,
-                anchor,
-                paths,
-                alliedAirHigh,
-                maxCandidates: 12);
+                out SurveillanceProfile profile))
+        {
+            return false;
+        }
 
-        AirSurveillanceCoverageSample fromCoverage =
-            EvaluateAirSurveillanceCoverage(
-                unit,
-                fromCell,
-                alliedAirLow,
-                alliedAirHigh);
+        MelhorVisaoResult vision =
+            EvaluateSurveillanceVision(unit, profile);
+        MelhorVisaoCellScore fromVision = vision?.Origin;
+        if (fromVision == null)
+            return false;
+
         AirSurveillanceSpacingSample fromSpacing =
             EvaluateAirSurveillanceSpacing(
                 unit,
@@ -989,11 +1268,11 @@ public partial class AIController
             pathCost: 0,
             out _);
         float fromScore =
-            fromCoverage.Score
+            fromVision.Score
             + fromPosture * 0.2f
             - fromSpacing.Penalty;
         float bestScore = fromScore;
-        AirSurveillanceCoverageSample bestCoverage = fromCoverage;
+        MelhorVisaoCellScore bestVision = fromVision;
         AirSurveillanceSpacingSample bestSpacing = fromSpacing;
         int bestPathCost = 0;
 
@@ -1001,13 +1280,18 @@ public partial class AIController
             ObjectiveManager.GetPlanForSlot(
                 PlayerSlotId.FromIndex(snapshot.AISlotIndex));
 
-        if (paths != null)
+        if (paths != null && vision != null)
         {
-            foreach (Vector3Int rawCell in paths.Keys)
+            for (int i = 0; i < vision.Ranking.Count; i++)
             {
-                Vector3Int cell = rawCell;
+                MelhorVisaoCellScore candidate = vision.Ranking[i];
+                if (candidate == null)
+                    continue;
+                Vector3Int cell = candidate.Cell;
                 cell.z = 0;
                 if (cell == fromCell)
+                    continue;
+                if (!paths.ContainsKey(cell))
                     continue;
                 List<UnitManager> occupants =
                     UnitOccupancyRules.GetUnitsAtCell(
@@ -1053,16 +1337,8 @@ public partial class AIController
                 {
                     continue;
                 }
-                if (!precisionCoverageCandidates.Contains(cell))
-                    continue;
 
-                int pathCost = GetPathStepCount(paths, cell);
-                AirSurveillanceCoverageSample coverage =
-                    EvaluateAirSurveillanceCoverage(
-                        unit,
-                        cell,
-                        alliedAirLow,
-                        alliedAirHigh);
+                int pathCost = candidate.MovementCost;
                 AirSurveillanceSpacingSample spacing =
                     EvaluateAirSurveillanceSpacing(
                         unit,
@@ -1076,10 +1352,10 @@ public partial class AIController
                         fromCell,
                         anchor,
                         offensiveAnchor,
-                        pathCost,
-                        out _);
+                    pathCost,
+                    out _);
                 float score =
-                    coverage.Score
+                    candidate.Score
                     + posture * 0.2f
                     - spacing.Penalty;
                 if (score <= bestScore)
@@ -1087,148 +1363,33 @@ public partial class AIController
 
                 bestScore = score;
                 bestCell = cell;
-                bestCoverage = coverage;
+                bestVision = candidate;
                 bestSpacing = spacing;
                 bestPathCost = pathCost;
             }
         }
 
-        float requiredGain = fromCoverage.VisibleCells <= 2
+        float requiredGain = fromVision.Coverage == null
+            || fromVision.Coverage.VisibleCount <= 2
             ? 20f
-            : Mathf.Max(90f, fromCoverage.Score * 0.06f);
+            : Mathf.Max(30f, Mathf.Abs(fromVision.Score) * 0.06f);
         float actualGain = bestScore - fromScore;
         if (bestCell == fromCell || actualGain < requiredGain)
         {
             bestCell = fromCell;
             reason =
-                $"radar stationary hold {fromCoverage} {fromSpacing} " +
+                $"radar stationary layer={profile.Layer.Label} hold " +
+                $"{fromVision.Reason} {fromSpacing} " +
                 $"bestGain={actualGain:F0} required={requiredGain:F0}";
             return true;
         }
 
         reason =
-            $"radar stationary move {fromCoverage} {fromSpacing} -> " +
-            $"{bestCoverage} {bestSpacing} gain={actualGain:F0} " +
+            $"radar stationary layer={profile.Layer.Label} move " +
+            $"{fromVision.Reason} {fromSpacing} -> " +
+            $"{bestVision.Reason} {bestSpacing} gain={actualGain:F0} " +
             $"required={requiredGain:F0} path={bestPathCost}";
         return true;
-    }
-
-    private HashSet<Vector3Int>
-        SelectAirSurveillancePrecisionCoverageCandidates(
-            UnitManager unit,
-            Vector3Int fromCell,
-            Vector3Int anchor,
-            Dictionary<Vector3Int, List<Vector3Int>> paths,
-            HashSet<Vector3Int> alliedAirHigh,
-            int maxCandidates)
-    {
-        using var perf = new AIDecisionPerfScope(
-            unit,
-            "airSurveillanceCubicPrefilter");
-        var selected = new HashSet<Vector3Int>();
-        fromCell.z = 0;
-        anchor.z = 0;
-        selected.Add(fromCell);
-        if (unit == null
-            || paths == null
-            || paths.Count == 0
-            || maxCandidates <= 0)
-        {
-            return selected;
-        }
-
-        BoardTopologyIndex.TryGetFor(
-            boardTilemap,
-            out BoardTopologyIndex topology);
-        IReadOnlyList<Vector3Int> boardCells =
-            topology != null && topology.IsReady
-                ? topology.IndexedCells
-                : null;
-        int vision = Mathf.Max(
-            1,
-            ResolveAirSurveillanceVision(unit));
-        PlayerSlotId observerSlot =
-            PlayerSlotId.FromIndex(unit.SlotIndex);
-        var ranking =
-            new List<(Vector3Int cell, float score)>();
-
-        foreach (KeyValuePair<Vector3Int, List<Vector3Int>> pair
-                 in paths)
-        {
-            Vector3Int cell = pair.Key;
-            cell.z = 0;
-            if (cell == fromCell)
-                continue;
-
-            int marginal = 0;
-            int overlap = 0;
-            int unexploredMarginal = 0;
-            if (boardCells != null)
-            {
-                for (int i = 0; i < boardCells.Count; i++)
-                {
-                    Vector3Int covered = boardCells[i];
-                    covered.z = 0;
-                    if (AIActionReachCoordinator.CubicDistance(
-                            cell, covered) > vision)
-                    {
-                        continue;
-                    }
-
-                    if (alliedAirHigh != null
-                        && alliedAirHigh.Contains(covered))
-                    {
-                        overlap++;
-                    }
-                    else
-                    {
-                        marginal++;
-                        if (matchController != null
-                            && !matchController.IsCellExploredBySlot(
-                                observerSlot,
-                                covered))
-                        {
-                            unexploredMarginal++;
-                        }
-                    }
-                }
-            }
-
-            int pathCost = pair.Value != null
-                ? Mathf.Max(0, pair.Value.Count - 1)
-                : 0;
-            float approximateScore =
-                marginal * 3f
-                + unexploredMarginal * 25f
-                + overlap
-                - AIActionReachCoordinator.CubicDistance(
-                    cell, anchor) * 8f
-                - pathCost;
-            ranking.Add((cell, approximateScore));
-        }
-
-        ranking.Sort((left, right) =>
-        {
-            int byScore = right.score.CompareTo(left.score);
-            if (byScore != 0)
-                return byScore;
-            int byX = left.cell.x.CompareTo(right.cell.x);
-            return byX != 0
-                ? byX
-                : left.cell.y.CompareTo(right.cell.y);
-        });
-
-        int take = Mathf.Min(maxCandidates, ranking.Count);
-        for (int i = 0; i < take; i++)
-            selected.Add(ranking[i].cell);
-
-        AIDecisionPerf.AddCount(
-            "AirSurveillanceCubicPrefilterCandidates",
-            paths.Count);
-        AIDecisionPerf.AddCount(
-            "AirSurveillancePrecisionCandidates",
-            selected.Count);
-        return selected;
     }
 
     private AirSurveillanceCoverageSample EvaluateAirSurveillanceCoverage(
@@ -1237,50 +1398,60 @@ public partial class AIController
         HashSet<Vector3Int> alliedAirLow,
         HashSet<Vector3Int> alliedAirHigh)
     {
-        DPQAirHeightConfig airConfig = turnStateManager != null
-            ? turnStateManager.DpqAirHeightConfigRef
-            : null;
-        bool enableLos = matchController == null
-            || matchController.EnableLosValidation;
-        AirSurveillanceCoverageService.Result result =
-            AirSurveillanceCoverageService.Evaluate(
-                observer,
-                observerCell,
-                boardTilemap,
-                terrainDatabase,
-                airConfig,
-                enableLos,
-                alliedAirLow,
-                alliedAirHigh,
-                matchController != null
-                    ? cell => matchController.IsCellExploredBySlot(
-                        PlayerSlotId.FromIndex(observer.SlotIndex),
-                        cell)
-                    : null);
+        VisionCoverageResult result =
+            VisionCoverageService.Evaluate(
+                new VisionCoverageRequest
+                {
+                    Observer = observer,
+                    ObserverCell = observerCell,
+                    Map = boardTilemap,
+                    TerrainDatabase = terrainDatabase,
+                    DpqAirHeightConfig = turnStateManager != null
+                        ? turnStateManager.DpqAirHeightConfigRef
+                        : null,
+                    Layer = VisionCoverageLayer.Specific(
+                        Domain.Air,
+                        HeightLevel.AirHigh),
+                    EnableLos = matchController == null
+                        || matchController.EnableLosValidation
+                });
+        int marginalHigh = 0;
+        int unexploredMarginalHigh = 0;
+        foreach (Vector3Int cell in result.VisibleCells)
+        {
+            if (alliedAirHigh != null
+                && alliedAirHigh.Contains(cell))
+            {
+                continue;
+            }
+
+            marginalHigh++;
+            if (matchController != null
+                && !matchController.IsCellExploredBySlot(
+                    PlayerSlotId.FromIndex(observer.SlotIndex),
+                    cell))
+            {
+                unexploredMarginalHigh++;
+            }
+        }
+
+        int overlapHigh = Mathf.Max(
+            0,
+            result.VisibleCount - marginalHigh);
+        float score =
+            marginalHigh * 3f
+            + unexploredMarginalHigh * 25f
+            + overlapHigh
+            + (result.DetectsStealth
+                ? marginalHigh * 2f
+                : 0f);
         return new AirSurveillanceCoverageSample(
-            result.AirLow,
-            result.AirHigh,
-            result.MarginalAirLow,
-            result.MarginalAirHigh,
-            result.UnexploredMarginalAirHigh,
-            result.Score);
-    }
-
-    private static float ScoreEwacsCoverageContribution(
-        AirSurveillanceCoverageSample coverage)
-    {
-        const float coverageWeight = 0.35f;
-        return coverage.Score * coverageWeight;
-    }
-
-    private static string DescribeEwacsCoverageContribution(
-        AirSurveillanceCoverageSample coverage,
-        AirSurveillanceSpacingSample spacing)
-    {
-        return
-            $"{coverage} " +
-            $"covWeighted={ScoreEwacsCoverageContribution(coverage):F0} " +
-            $"{spacing}";
+            airLow: 0,
+            airHigh: result.VisibleCount,
+            marginalAirLow: 0,
+            marginalAirHigh: marginalHigh,
+            unexploredMarginalAirHigh: unexploredMarginalHigh,
+            score: score);
     }
 
     private static AirSurveillanceSpacingSample
@@ -1371,21 +1542,24 @@ public partial class AIController
         HashSet<Vector3Int> airLow,
         HashSet<Vector3Int> airHigh)
     {
-        DPQAirHeightConfig airConfig = turnStateManager != null
-            ? turnStateManager.DpqAirHeightConfigRef
-            : null;
-        bool enableLos = matchController == null
-            || matchController.EnableLosValidation;
-
-        AirSurveillanceCoverageService.AppendStructuralCoverage(
-            observer,
-            observerCell,
-            boardTilemap,
-            terrainDatabase,
-            airConfig,
-            enableLos,
-            airLow,
-            airHigh);
+        VisionCoverageResult coverage =
+            VisionCoverageService.Evaluate(
+                new VisionCoverageRequest
+                {
+                    Observer = observer,
+                    ObserverCell = observerCell,
+                    Map = boardTilemap,
+                    TerrainDatabase = terrainDatabase,
+                    DpqAirHeightConfig = turnStateManager != null
+                        ? turnStateManager.DpqAirHeightConfigRef
+                        : null,
+                    Layer = VisionCoverageLayer.Specific(
+                        Domain.Air,
+                        HeightLevel.AirHigh),
+                    EnableLos = matchController == null
+                        || matchController.EnableLosValidation
+                });
+        airHigh?.UnionWith(coverage.VisibleCells);
     }
 
     private bool IsAirSurveillanceCellAllowedByRearLine(

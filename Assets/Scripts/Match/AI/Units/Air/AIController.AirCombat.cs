@@ -41,6 +41,96 @@ public partial class AIController
     }
 
     /// <summary>
+    /// Versao somente-tiro usada pela agenda de Vigilancia. Reaproveita os
+    /// mesmos candidatos, PodeMirar, prioridades e regras de decolagem do
+    /// combate aereo, mas nao materializa a patrulha/fallback de movimento: se
+    /// nao existe ataque legal, MelhorVisao conserva a autoridade sobre a
+    /// posicao da unidade.
+    /// </summary>
+    private PlayerAction TryDecideAirCombatAttackOnly(
+        UnitManager unit,
+        AIWorldSnapshot snapshot)
+    {
+        if (!IsAirCombatUnit(unit) || snapshot == null)
+            return null;
+
+        bool wasGrounded = unit.IsAircraftGrounded;
+        List<int> takeoffMoveOptions = null;
+        if (wasGrounded
+            && !TryGetAITakeoffMoveOptions(
+                unit,
+                out takeoffMoveOptions,
+                out _))
+        {
+            return null;
+        }
+
+        if (wasGrounded)
+            unit.SetAircraftGrounded(false);
+
+        try
+        {
+            Vector3Int fromCell = unit.CurrentCellPosition;
+            fromCell.z = 0;
+            Dictionary<Vector3Int, List<Vector3Int>> paths =
+                UnitMovementPathRules.CalcularCaminhosValidos(
+                    boardTilemap,
+                    unit,
+                    Mathf.Max(0, unit.RemainingMovementPoints),
+                    terrainDatabase);
+            if (paths == null || paths.Count == 0)
+                return null;
+
+            HashSet<Vector3Int> occupied = BuildAirOccupied(unit);
+            List<UnitManager> visibleEnemies =
+                CollectVisibleAirCombatEnemies(unit, snapshot);
+            Vector3Int anchor = ResolveAirCombatFallbackAnchor(
+                unit,
+                snapshot,
+                fromCell,
+                visibleEnemies,
+                out _);
+            anchor.z = 0;
+            if (!TryFindAirCombatAttack(
+                    unit,
+                    snapshot,
+                    fromCell,
+                    paths,
+                    occupied,
+                    anchor,
+                    takeoffMoveOptions,
+                    visibleEnemies,
+                    out Vector3Int attackCell,
+                    out UnitManager target,
+                    out string attackReason))
+            {
+                return null;
+            }
+
+            Vector3Int targetCell = target.CurrentCellPosition;
+            targetCell.z = 0;
+            Debug.Log(
+                $"{TL("Vigilancia")} {unit.InstanceId} " +
+                $"ataca via {attackCell} -> " +
+                $"{target.UnitDisplayName}#{target.InstanceId} " +
+                $"({attackReason})");
+            return BuildAttackBatch(
+                unit,
+                snapshot.AITeam,
+                fromCell,
+                attackCell,
+                target.InstanceId.ToString(),
+                targetCell,
+                paths);
+        }
+        finally
+        {
+            if (wasGrounded)
+                unit.SetAircraftGrounded(true);
+        }
+    }
+
+    /// <summary>
     /// Aeronave que consulta o pipeline de combate aereo.
     ///
     /// Testava `roles[0] == RaidAntiSub` — papel que NENHUMA ficha carrega desde
