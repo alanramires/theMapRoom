@@ -41039,7 +41039,7 @@ MonoBehaviour:
     defeated: 0
     startMoney: 0
     actualMoney: 0
-    incomePerTurn: 0
+    incomePerTurn: 22500
     startMoneyApplied: 1
   - teamId: 3
     flipX: 1
@@ -41052,20 +41052,20 @@ MonoBehaviour:
     defeated: 0
     startMoney: 0
     actualMoney: 0
-    incomePerTurn: 0
+    incomePerTurn: 22500
     startMoneyApplied: 1
   - teamId: 1
     flipX: 1
     flipXOverride: 0
     isAI: 1
-    isRebelRuntime: 0
+    isRebelRuntime: 1
     isLocal: 0
     localityConfigured: 1
     commandServiceAutomatic: 1
     defeated: 0
     startMoney: 0
     actualMoney: 0
-    incomePerTurn: 0
+    incomePerTurn: 1000
     startMoneyApplied: 0
   includeNeutralTeam: 0
   capturedBuildingHistory: []
@@ -41126,7 +41126,7 @@ MonoBehaviour:
   appliedActiveTeamId: 2
   pendingTurnStartUpkeep: 1
   pendingTurnStartEconomy: 1
-  cachedConstructionIncomeSignature: -2111899905
+  cachedConstructionIncomeSignature: 1120945617
   cachedConstructionIncomeCount: 66
   constructionIncomeRefreshIntervalSeconds: 0.35
   continuousEditorRefresh: 0
@@ -255966,13 +255966,6 @@ MonoBehaviour:
         NavalDistance: 58
         IsHQ: 1
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 133
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 38
-        NavalDistance: 57
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
         InstanceId: 134
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
@@ -255987,38 +255980,10 @@ MonoBehaviour:
         NavalDistance: 50
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 135
+        InstanceId: 133
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
-        AirDistance: 37
-        NavalDistance: 49
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 155
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 40
-        NavalDistance: 58
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 132
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 39
-        NavalDistance: 57
-        IsHQ: 0
-      - ConstructionName: "Esta\xE7\xE3o de Trem"
-        InstanceId: 148
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 39
-        NavalDistance: 60
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 73
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 41
+        AirDistance: 38
         NavalDistance: 57
         IsHQ: 0
       - ConstructionName: Porto Naval
@@ -256035,6 +256000,41 @@ MonoBehaviour:
         AirDistance: 39
         NavalDistance: 59
         IsHQ: 0
+      - ConstructionName: "Esta\xE7\xE3o de Trem"
+        InstanceId: 148
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 39
+        NavalDistance: 60
+        IsHQ: 0
+      - ConstructionName: Porto Naval
+        InstanceId: 73
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 41
+        NavalDistance: 57
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 155
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 40
+        NavalDistance: 58
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 132
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 39
+        NavalDistance: 57
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 135
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 37
+        NavalDistance: 49
+        IsHQ: 0
     - SlotIndex: 0
       Team: 2
       Entries:
@@ -256045,6 +256045,41 @@ MonoBehaviour:
         AirDistance: 4
         NavalDistance: 8
         IsHQ: 1
+      - ConstructionName: Aeroporto
+        InstanceId: 8
+        Distance: 3
+        VehicleDistance: 3
+        AirDistance: 3
+        NavalDistance: 6
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 119
+        Distance: 4
+        VehicleDistance: 4
+        AirDistance: 4
+        NavalDistance: 14
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 117
+        Distance: 4
+        VehicleDistance: 4
+        AirDistance: 4
+        NavalDistance: 7
+        IsHQ: 0
+      - ConstructionName: Porto Naval
+        InstanceId: 72
+        Distance: 7
+        VehicleDistance: 7
+        AirDistance: 7
+        NavalDistance: 10
+        IsHQ: 0
+      - ConstructionName: "Esta\xE7\xE3o de Trem"
+        InstanceId: 102
+        Distance: 1
+        VehicleDistance: 1
+        AirDistance: 1
+        NavalDistance: 4
+        IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 154
         Distance: 5
@@ -256059,26 +256094,12 @@ MonoBehaviour:
         AirDistance: 5
         NavalDistance: 8
         IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 117
-        Distance: 4
-        VehicleDistance: 4
-        AirDistance: 4
+      - ConstructionName: Aeroporto
+        InstanceId: 6
+        Distance: 3
+        VehicleDistance: 3
+        AirDistance: 3
         NavalDistance: 7
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 71
-        Distance: 7
-        VehicleDistance: 7
-        AirDistance: 7
-        NavalDistance: 9
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 72
-        Distance: 7
-        VehicleDistance: 7
-        AirDistance: 7
-        NavalDistance: 10
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 118
@@ -256087,33 +256108,12 @@ MonoBehaviour:
         AirDistance: 6
         NavalDistance: 10
         IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 119
-        Distance: 4
-        VehicleDistance: 4
-        AirDistance: 4
-        NavalDistance: 14
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 8
-        Distance: 3
-        VehicleDistance: 3
-        AirDistance: 3
-        NavalDistance: 6
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 6
-        Distance: 3
-        VehicleDistance: 3
-        AirDistance: 3
-        NavalDistance: 7
-        IsHQ: 0
-      - ConstructionName: "Esta\xE7\xE3o de Trem"
-        InstanceId: 102
-        Distance: 1
-        VehicleDistance: 1
-        AirDistance: 1
-        NavalDistance: 4
+      - ConstructionName: Porto Naval
+        InstanceId: 71
+        Distance: 7
+        VehicleDistance: 7
+        AirDistance: 7
+        NavalDistance: 9
         IsHQ: 0
     closestNeighbor1: 2
     closestNeighbor1Distance: 6
@@ -256162,13 +256162,6 @@ MonoBehaviour:
         NavalDistance: 43
         IsHQ: 1
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 133
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 31
-        NavalDistance: 42
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
         InstanceId: 134
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
@@ -256183,38 +256176,10 @@ MonoBehaviour:
         NavalDistance: 35
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 135
+        InstanceId: 133
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
-        AirDistance: 30
-        NavalDistance: 34
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 155
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 33
-        NavalDistance: 43
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 132
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 32
-        NavalDistance: 42
-        IsHQ: 0
-      - ConstructionName: "Esta\xE7\xE3o de Trem"
-        InstanceId: 148
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 32
-        NavalDistance: 45
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 73
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 34
+        AirDistance: 31
         NavalDistance: 42
         IsHQ: 0
       - ConstructionName: Porto Naval
@@ -256231,6 +256196,41 @@ MonoBehaviour:
         AirDistance: 32
         NavalDistance: 44
         IsHQ: 0
+      - ConstructionName: "Esta\xE7\xE3o de Trem"
+        InstanceId: 148
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 32
+        NavalDistance: 45
+        IsHQ: 0
+      - ConstructionName: Porto Naval
+        InstanceId: 73
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 34
+        NavalDistance: 42
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 155
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 33
+        NavalDistance: 43
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 132
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 32
+        NavalDistance: 42
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 135
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 30
+        NavalDistance: 34
+        IsHQ: 0
     - SlotIndex: 0
       Team: 2
       Entries:
@@ -256241,6 +256241,41 @@ MonoBehaviour:
         AirDistance: 8
         NavalDistance: 17
         IsHQ: 1
+      - ConstructionName: Aeroporto
+        InstanceId: 8
+        Distance: 8
+        VehicleDistance: 8
+        AirDistance: 8
+        NavalDistance: 17
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 119
+        Distance: 7
+        VehicleDistance: 7
+        AirDistance: 7
+        NavalDistance: 9
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 117
+        Distance: 9
+        VehicleDistance: 9
+        AirDistance: 9
+        NavalDistance: 16
+        IsHQ: 0
+      - ConstructionName: Porto Naval
+        InstanceId: 72
+        Distance: 9
+        VehicleDistance: 9
+        AirDistance: 9
+        NavalDistance: 9
+        IsHQ: 0
+      - ConstructionName: "Esta\xE7\xE3o de Trem"
+        InstanceId: 102
+        Distance: 9
+        VehicleDistance: 9
+        AirDistance: 9
+        NavalDistance: 19
+        IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 154
         Distance: 8
@@ -256255,26 +256290,12 @@ MonoBehaviour:
         AirDistance: 9
         NavalDistance: 15
         IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 117
-        Distance: 9
-        VehicleDistance: 9
-        AirDistance: 9
-        NavalDistance: 16
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 71
-        Distance: 10
-        VehicleDistance: 10
-        AirDistance: 10
-        NavalDistance: 10
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 72
-        Distance: 9
-        VehicleDistance: 9
-        AirDistance: 9
-        NavalDistance: 9
+      - ConstructionName: Aeroporto
+        InstanceId: 6
+        Distance: 7
+        VehicleDistance: 7
+        AirDistance: 7
+        NavalDistance: 18
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 118
@@ -256283,33 +256304,12 @@ MonoBehaviour:
         AirDistance: 9
         NavalDistance: 11
         IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 119
-        Distance: 7
-        VehicleDistance: 7
-        AirDistance: 7
-        NavalDistance: 9
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 8
-        Distance: 8
-        VehicleDistance: 8
-        AirDistance: 8
-        NavalDistance: 17
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 6
-        Distance: 7
-        VehicleDistance: 7
-        AirDistance: 7
-        NavalDistance: 18
-        IsHQ: 0
-      - ConstructionName: "Esta\xE7\xE3o de Trem"
-        InstanceId: 102
-        Distance: 9
-        VehicleDistance: 9
-        AirDistance: 9
-        NavalDistance: 19
+      - ConstructionName: Porto Naval
+        InstanceId: 71
+        Distance: 10
+        VehicleDistance: 10
+        AirDistance: 10
+        NavalDistance: 10
         IsHQ: 0
     closestNeighbor1: 3
     closestNeighbor1Distance: 8
@@ -256358,13 +256358,6 @@ MonoBehaviour:
         NavalDistance: 65
         IsHQ: 1
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 133
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 36
-        NavalDistance: 64
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
         InstanceId: 134
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
@@ -256379,24 +256372,24 @@ MonoBehaviour:
         NavalDistance: 56
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 135
+        InstanceId: 133
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 36
+        NavalDistance: 64
+        IsHQ: 0
+      - ConstructionName: Porto Naval
+        InstanceId: 74
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 37
+        NavalDistance: 63
+        IsHQ: 0
+      - ConstructionName: Aeroporto
+        InstanceId: 9
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
         AirDistance: 35
-        NavalDistance: 56
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 155
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 36
-        NavalDistance: 63
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 132
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 36
         NavalDistance: 64
         IsHQ: 0
       - ConstructionName: "Esta\xE7\xE3o de Trem"
@@ -256413,19 +256406,26 @@ MonoBehaviour:
         AirDistance: 37
         NavalDistance: 62
         IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 74
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 155
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
-        AirDistance: 37
+        AirDistance: 36
         NavalDistance: 63
         IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 9
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 132
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 36
+        NavalDistance: 64
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 135
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
         AirDistance: 35
-        NavalDistance: 64
+        NavalDistance: 56
         IsHQ: 0
     - SlotIndex: 0
       Team: 2
@@ -256437,6 +256437,41 @@ MonoBehaviour:
         AirDistance: 10
         NavalDistance: 15
         IsHQ: 1
+      - ConstructionName: Aeroporto
+        InstanceId: 8
+        Distance: 9
+        VehicleDistance: 9
+        AirDistance: 9
+        NavalDistance: 13
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 119
+        Distance: 10
+        VehicleDistance: 10
+        AirDistance: 10
+        NavalDistance: 21
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 117
+        Distance: 10
+        VehicleDistance: 10
+        AirDistance: 10
+        NavalDistance: 14
+        IsHQ: 0
+      - ConstructionName: Porto Naval
+        InstanceId: 72
+        Distance: 13
+        VehicleDistance: 13
+        AirDistance: 13
+        NavalDistance: 17
+        IsHQ: 0
+      - ConstructionName: "Esta\xE7\xE3o de Trem"
+        InstanceId: 102
+        Distance: 7
+        VehicleDistance: 7
+        AirDistance: 7
+        NavalDistance: 11
+        IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 154
         Distance: 11
@@ -256451,26 +256486,12 @@ MonoBehaviour:
         AirDistance: 11
         NavalDistance: 15
         IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 117
-        Distance: 10
-        VehicleDistance: 10
-        AirDistance: 10
+      - ConstructionName: Aeroporto
+        InstanceId: 6
+        Distance: 9
+        VehicleDistance: 9
+        AirDistance: 9
         NavalDistance: 14
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 71
-        Distance: 13
-        VehicleDistance: 13
-        AirDistance: 13
-        NavalDistance: 16
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 72
-        Distance: 13
-        VehicleDistance: 13
-        AirDistance: 13
-        NavalDistance: 17
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 118
@@ -256479,33 +256500,12 @@ MonoBehaviour:
         AirDistance: 12
         NavalDistance: 17
         IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 119
-        Distance: 10
-        VehicleDistance: 10
-        AirDistance: 10
-        NavalDistance: 21
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 8
-        Distance: 9
-        VehicleDistance: 9
-        AirDistance: 9
-        NavalDistance: 13
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 6
-        Distance: 9
-        VehicleDistance: 9
-        AirDistance: 9
-        NavalDistance: 14
-        IsHQ: 0
-      - ConstructionName: "Esta\xE7\xE3o de Trem"
-        InstanceId: 102
-        Distance: 7
-        VehicleDistance: 7
-        AirDistance: 7
-        NavalDistance: 11
+      - ConstructionName: Porto Naval
+        InstanceId: 71
+        Distance: 13
+        VehicleDistance: 13
+        AirDistance: 13
+        NavalDistance: 16
         IsHQ: 0
     closestNeighbor1: 17
     closestNeighbor1Distance: 5
@@ -256554,13 +256554,6 @@ MonoBehaviour:
         NavalDistance: 3.4028235e+38
         IsHQ: 1
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 133
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 30
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
         InstanceId: 134
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
@@ -256575,38 +256568,10 @@ MonoBehaviour:
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 135
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 29
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 155
+        InstanceId: 133
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
         AirDistance: 30
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 132
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 30
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "Esta\xE7\xE3o de Trem"
-        InstanceId: 148
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 29
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 73
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 31
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: Porto Naval
@@ -256623,6 +256588,41 @@ MonoBehaviour:
         AirDistance: 29
         NavalDistance: 3.4028235e+38
         IsHQ: 0
+      - ConstructionName: "Esta\xE7\xE3o de Trem"
+        InstanceId: 148
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 29
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: Porto Naval
+        InstanceId: 73
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 31
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 155
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 30
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 132
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 30
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 135
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 29
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
     - SlotIndex: 0
       Team: 2
       Entries:
@@ -256633,6 +256633,41 @@ MonoBehaviour:
         AirDistance: 11
         NavalDistance: 3.4028235e+38
         IsHQ: 1
+      - ConstructionName: Aeroporto
+        InstanceId: 8
+        Distance: 11
+        VehicleDistance: 11
+        AirDistance: 11
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 119
+        Distance: 10
+        VehicleDistance: 10
+        AirDistance: 10
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 117
+        Distance: 12
+        VehicleDistance: 12
+        AirDistance: 12
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: Porto Naval
+        InstanceId: 72
+        Distance: 13
+        VehicleDistance: 13
+        AirDistance: 12
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "Esta\xE7\xE3o de Trem"
+        InstanceId: 102
+        Distance: 10
+        VehicleDistance: 10
+        AirDistance: 10
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 154
         Distance: 11
@@ -256647,8 +256682,15 @@ MonoBehaviour:
         AirDistance: 12
         NavalDistance: 3.4028235e+38
         IsHQ: 0
+      - ConstructionName: Aeroporto
+        InstanceId: 6
+        Distance: 10
+        VehicleDistance: 10
+        AirDistance: 10
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 117
+        InstanceId: 118
         Distance: 12
         VehicleDistance: 12
         AirDistance: 12
@@ -256659,48 +256701,6 @@ MonoBehaviour:
         Distance: 13
         VehicleDistance: 13
         AirDistance: 13
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 72
-        Distance: 13
-        VehicleDistance: 13
-        AirDistance: 12
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 118
-        Distance: 12
-        VehicleDistance: 12
-        AirDistance: 12
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 119
-        Distance: 10
-        VehicleDistance: 10
-        AirDistance: 10
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 8
-        Distance: 11
-        VehicleDistance: 11
-        AirDistance: 11
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 6
-        Distance: 10
-        VehicleDistance: 10
-        AirDistance: 10
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "Esta\xE7\xE3o de Trem"
-        InstanceId: 102
-        Distance: 10
-        VehicleDistance: 10
-        AirDistance: 10
         NavalDistance: 3.4028235e+38
         IsHQ: 0
     closestNeighbor1: 2
@@ -256766,13 +256766,6 @@ MonoBehaviour:
         NavalDistance: 47
         IsHQ: 1
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 133
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 24
-        NavalDistance: 46
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
         InstanceId: 134
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
@@ -256787,38 +256780,10 @@ MonoBehaviour:
         NavalDistance: 39
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 135
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 23
-        NavalDistance: 38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 155
+        InstanceId: 133
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
         AirDistance: 24
-        NavalDistance: 47
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 132
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 24
-        NavalDistance: 46
-        IsHQ: 0
-      - ConstructionName: "Esta\xE7\xE3o de Trem"
-        InstanceId: 148
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 23
-        NavalDistance: 49
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 73
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 25
         NavalDistance: 46
         IsHQ: 0
       - ConstructionName: Porto Naval
@@ -256835,6 +256800,41 @@ MonoBehaviour:
         AirDistance: 23
         NavalDistance: 48
         IsHQ: 0
+      - ConstructionName: "Esta\xE7\xE3o de Trem"
+        InstanceId: 148
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 23
+        NavalDistance: 49
+        IsHQ: 0
+      - ConstructionName: Porto Naval
+        InstanceId: 73
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 25
+        NavalDistance: 46
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 155
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 24
+        NavalDistance: 47
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 132
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 24
+        NavalDistance: 46
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 135
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 23
+        NavalDistance: 38
+        IsHQ: 0
     - SlotIndex: 0
       Team: 2
       Entries:
@@ -256845,6 +256845,41 @@ MonoBehaviour:
         AirDistance: 17
         NavalDistance: 29
         IsHQ: 1
+      - ConstructionName: Aeroporto
+        InstanceId: 8
+        Distance: 17
+        VehicleDistance: 17
+        AirDistance: 17
+        NavalDistance: 29
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 119
+        Distance: 16
+        VehicleDistance: 16
+        AirDistance: 16
+        NavalDistance: 22
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 117
+        Distance: 18
+        VehicleDistance: 18
+        AirDistance: 18
+        NavalDistance: 28
+        IsHQ: 0
+      - ConstructionName: Porto Naval
+        InstanceId: 72
+        Distance: 19
+        VehicleDistance: 19
+        AirDistance: 18
+        NavalDistance: 21
+        IsHQ: 0
+      - ConstructionName: "Esta\xE7\xE3o de Trem"
+        InstanceId: 102
+        Distance: 16
+        VehicleDistance: 16
+        AirDistance: 16
+        NavalDistance: 31
+        IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 154
         Distance: 17
@@ -256859,26 +256894,12 @@ MonoBehaviour:
         AirDistance: 18
         NavalDistance: 27
         IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 117
-        Distance: 18
-        VehicleDistance: 18
-        AirDistance: 18
-        NavalDistance: 28
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 71
-        Distance: 19
-        VehicleDistance: 19
-        AirDistance: 19
-        NavalDistance: 22
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 72
-        Distance: 19
-        VehicleDistance: 19
-        AirDistance: 18
-        NavalDistance: 21
+      - ConstructionName: Aeroporto
+        InstanceId: 6
+        Distance: 16
+        VehicleDistance: 16
+        AirDistance: 16
+        NavalDistance: 30
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 118
@@ -256887,33 +256908,12 @@ MonoBehaviour:
         AirDistance: 18
         NavalDistance: 23
         IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 119
-        Distance: 16
-        VehicleDistance: 16
-        AirDistance: 16
+      - ConstructionName: Porto Naval
+        InstanceId: 71
+        Distance: 19
+        VehicleDistance: 19
+        AirDistance: 19
         NavalDistance: 22
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 8
-        Distance: 17
-        VehicleDistance: 17
-        AirDistance: 17
-        NavalDistance: 29
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 6
-        Distance: 16
-        VehicleDistance: 16
-        AirDistance: 16
-        NavalDistance: 30
-        IsHQ: 0
-      - ConstructionName: "Esta\xE7\xE3o de Trem"
-        InstanceId: 102
-        Distance: 16
-        VehicleDistance: 16
-        AirDistance: 16
-        NavalDistance: 31
         IsHQ: 0
     closestNeighbor1: 12
     closestNeighbor1Distance: 4
@@ -256962,13 +256962,6 @@ MonoBehaviour:
         NavalDistance: 34
         IsHQ: 1
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 133
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 22
-        NavalDistance: 33
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
         InstanceId: 134
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
@@ -256983,38 +256976,10 @@ MonoBehaviour:
         NavalDistance: 26
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 135
+        InstanceId: 133
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
-        AirDistance: 21
-        NavalDistance: 25
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 155
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 24
-        NavalDistance: 34
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 132
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 23
-        NavalDistance: 33
-        IsHQ: 0
-      - ConstructionName: "Esta\xE7\xE3o de Trem"
-        InstanceId: 148
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 23
-        NavalDistance: 36
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 73
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 25
+        AirDistance: 22
         NavalDistance: 33
         IsHQ: 0
       - ConstructionName: Porto Naval
@@ -257031,6 +256996,41 @@ MonoBehaviour:
         AirDistance: 23
         NavalDistance: 35
         IsHQ: 0
+      - ConstructionName: "Esta\xE7\xE3o de Trem"
+        InstanceId: 148
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 23
+        NavalDistance: 36
+        IsHQ: 0
+      - ConstructionName: Porto Naval
+        InstanceId: 73
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 25
+        NavalDistance: 33
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 155
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 24
+        NavalDistance: 34
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 132
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 23
+        NavalDistance: 33
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 135
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 21
+        NavalDistance: 25
+        IsHQ: 0
     - SlotIndex: 0
       Team: 2
       Entries:
@@ -257041,6 +257041,41 @@ MonoBehaviour:
         AirDistance: 17
         NavalDistance: 27
         IsHQ: 1
+      - ConstructionName: Aeroporto
+        InstanceId: 8
+        Distance: 28
+        VehicleDistance: 28
+        AirDistance: 17
+        NavalDistance: 27
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 119
+        Distance: 27
+        VehicleDistance: 27
+        AirDistance: 16
+        NavalDistance: 20
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 117
+        Distance: 29
+        VehicleDistance: 29
+        AirDistance: 18
+        NavalDistance: 26
+        IsHQ: 0
+      - ConstructionName: Porto Naval
+        InstanceId: 72
+        Distance: 30
+        VehicleDistance: 30
+        AirDistance: 18
+        NavalDistance: 19
+        IsHQ: 0
+      - ConstructionName: "Esta\xE7\xE3o de Trem"
+        InstanceId: 102
+        Distance: 27
+        VehicleDistance: 27
+        AirDistance: 18
+        NavalDistance: 29
+        IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 154
         Distance: 28
@@ -257055,26 +257090,12 @@ MonoBehaviour:
         AirDistance: 18
         NavalDistance: 25
         IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 117
-        Distance: 29
-        VehicleDistance: 29
-        AirDistance: 18
-        NavalDistance: 26
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 71
-        Distance: 30
-        VehicleDistance: 30
-        AirDistance: 19
-        NavalDistance: 20
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 72
-        Distance: 30
-        VehicleDistance: 30
-        AirDistance: 18
-        NavalDistance: 19
+      - ConstructionName: Aeroporto
+        InstanceId: 6
+        Distance: 27
+        VehicleDistance: 27
+        AirDistance: 16
+        NavalDistance: 28
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 118
@@ -257083,33 +257104,12 @@ MonoBehaviour:
         AirDistance: 18
         NavalDistance: 21
         IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 119
-        Distance: 27
-        VehicleDistance: 27
-        AirDistance: 16
+      - ConstructionName: Porto Naval
+        InstanceId: 71
+        Distance: 30
+        VehicleDistance: 30
+        AirDistance: 19
         NavalDistance: 20
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 8
-        Distance: 28
-        VehicleDistance: 28
-        AirDistance: 17
-        NavalDistance: 27
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 6
-        Distance: 27
-        VehicleDistance: 27
-        AirDistance: 16
-        NavalDistance: 28
-        IsHQ: 0
-      - ConstructionName: "Esta\xE7\xE3o de Trem"
-        InstanceId: 102
-        Distance: 27
-        VehicleDistance: 27
-        AirDistance: 18
-        NavalDistance: 29
         IsHQ: 0
     closestNeighbor1: 6
     closestNeighbor1Distance: 6
@@ -257158,13 +257158,6 @@ MonoBehaviour:
         NavalDistance: 28
         IsHQ: 1
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 133
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 16
-        NavalDistance: 27
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
         InstanceId: 134
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
@@ -257179,38 +257172,10 @@ MonoBehaviour:
         NavalDistance: 16
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 135
+        InstanceId: 133
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
-        AirDistance: 15
-        NavalDistance: 15
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 155
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 18
-        NavalDistance: 28
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 132
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 17
-        NavalDistance: 27
-        IsHQ: 0
-      - ConstructionName: "Esta\xE7\xE3o de Trem"
-        InstanceId: 148
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 17
-        NavalDistance: 30
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 73
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 19
+        AirDistance: 16
         NavalDistance: 27
         IsHQ: 0
       - ConstructionName: Porto Naval
@@ -257227,6 +257192,41 @@ MonoBehaviour:
         AirDistance: 17
         NavalDistance: 29
         IsHQ: 0
+      - ConstructionName: "Esta\xE7\xE3o de Trem"
+        InstanceId: 148
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 17
+        NavalDistance: 30
+        IsHQ: 0
+      - ConstructionName: Porto Naval
+        InstanceId: 73
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 19
+        NavalDistance: 27
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 155
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 18
+        NavalDistance: 28
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 132
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 17
+        NavalDistance: 27
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 135
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 15
+        NavalDistance: 15
+        IsHQ: 0
     - SlotIndex: 0
       Team: 2
       Entries:
@@ -257237,6 +257237,41 @@ MonoBehaviour:
         AirDistance: 23
         NavalDistance: 44
         IsHQ: 1
+      - ConstructionName: Aeroporto
+        InstanceId: 8
+        Distance: 29
+        VehicleDistance: 29
+        AirDistance: 23
+        NavalDistance: 44
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 119
+        Distance: 28
+        VehicleDistance: 28
+        AirDistance: 22
+        NavalDistance: 37
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 117
+        Distance: 30
+        VehicleDistance: 30
+        AirDistance: 24
+        NavalDistance: 43
+        IsHQ: 0
+      - ConstructionName: Porto Naval
+        InstanceId: 72
+        Distance: 31
+        VehicleDistance: 31
+        AirDistance: 24
+        NavalDistance: 36
+        IsHQ: 0
+      - ConstructionName: "Esta\xE7\xE3o de Trem"
+        InstanceId: 102
+        Distance: 28
+        VehicleDistance: 28
+        AirDistance: 22
+        NavalDistance: 46
+        IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 154
         Distance: 29
@@ -257251,26 +257286,12 @@ MonoBehaviour:
         AirDistance: 24
         NavalDistance: 42
         IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 117
-        Distance: 30
-        VehicleDistance: 30
-        AirDistance: 24
-        NavalDistance: 43
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 71
-        Distance: 31
-        VehicleDistance: 31
-        AirDistance: 25
-        NavalDistance: 37
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 72
-        Distance: 31
-        VehicleDistance: 31
-        AirDistance: 24
-        NavalDistance: 36
+      - ConstructionName: Aeroporto
+        InstanceId: 6
+        Distance: 28
+        VehicleDistance: 28
+        AirDistance: 22
+        NavalDistance: 45
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 118
@@ -257279,33 +257300,12 @@ MonoBehaviour:
         AirDistance: 24
         NavalDistance: 38
         IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 119
-        Distance: 28
-        VehicleDistance: 28
-        AirDistance: 22
+      - ConstructionName: Porto Naval
+        InstanceId: 71
+        Distance: 31
+        VehicleDistance: 31
+        AirDistance: 25
         NavalDistance: 37
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 8
-        Distance: 29
-        VehicleDistance: 29
-        AirDistance: 23
-        NavalDistance: 44
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 6
-        Distance: 28
-        VehicleDistance: 28
-        AirDistance: 22
-        NavalDistance: 45
-        IsHQ: 0
-      - ConstructionName: "Esta\xE7\xE3o de Trem"
-        InstanceId: 102
-        Distance: 28
-        VehicleDistance: 28
-        AirDistance: 22
-        NavalDistance: 46
         IsHQ: 0
     closestNeighbor1: 7
     closestNeighbor1Distance: 4
@@ -257354,13 +257354,6 @@ MonoBehaviour:
         NavalDistance: 26
         IsHQ: 1
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 133
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 16
-        NavalDistance: 25
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
         InstanceId: 134
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
@@ -257375,38 +257368,10 @@ MonoBehaviour:
         NavalDistance: 18
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 135
+        InstanceId: 133
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
-        AirDistance: 15
-        NavalDistance: 17
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 155
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 18
-        NavalDistance: 26
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 132
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 17
-        NavalDistance: 25
-        IsHQ: 0
-      - ConstructionName: "Esta\xE7\xE3o de Trem"
-        InstanceId: 148
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 17
-        NavalDistance: 28
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 73
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 19
+        AirDistance: 16
         NavalDistance: 25
         IsHQ: 0
       - ConstructionName: Porto Naval
@@ -257423,6 +257388,41 @@ MonoBehaviour:
         AirDistance: 17
         NavalDistance: 27
         IsHQ: 0
+      - ConstructionName: "Esta\xE7\xE3o de Trem"
+        InstanceId: 148
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 17
+        NavalDistance: 28
+        IsHQ: 0
+      - ConstructionName: Porto Naval
+        InstanceId: 73
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 19
+        NavalDistance: 25
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 155
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 18
+        NavalDistance: 26
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 132
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 17
+        NavalDistance: 25
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 135
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 15
+        NavalDistance: 17
+        IsHQ: 0
     - SlotIndex: 0
       Team: 2
       Entries:
@@ -257433,6 +257433,41 @@ MonoBehaviour:
         AirDistance: 24
         NavalDistance: 32
         IsHQ: 1
+      - ConstructionName: Aeroporto
+        InstanceId: 8
+        Distance: 33
+        VehicleDistance: 33
+        AirDistance: 25
+        NavalDistance: 32
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 119
+        Distance: 32
+        VehicleDistance: 32
+        AirDistance: 23
+        NavalDistance: 25
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 117
+        Distance: 34
+        VehicleDistance: 34
+        AirDistance: 25
+        NavalDistance: 31
+        IsHQ: 0
+      - ConstructionName: Porto Naval
+        InstanceId: 72
+        Distance: 35
+        VehicleDistance: 35
+        AirDistance: 24
+        NavalDistance: 24
+        IsHQ: 0
+      - ConstructionName: "Esta\xE7\xE3o de Trem"
+        InstanceId: 102
+        Distance: 32
+        VehicleDistance: 32
+        AirDistance: 26
+        NavalDistance: 34
+        IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 154
         Distance: 33
@@ -257447,26 +257482,12 @@ MonoBehaviour:
         AirDistance: 24
         NavalDistance: 30
         IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 117
-        Distance: 34
-        VehicleDistance: 34
-        AirDistance: 25
-        NavalDistance: 31
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 71
-        Distance: 35
-        VehicleDistance: 35
-        AirDistance: 25
-        NavalDistance: 25
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 72
-        Distance: 35
-        VehicleDistance: 35
+      - ConstructionName: Aeroporto
+        InstanceId: 6
+        Distance: 32
+        VehicleDistance: 32
         AirDistance: 24
-        NavalDistance: 24
+        NavalDistance: 33
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 118
@@ -257475,33 +257496,12 @@ MonoBehaviour:
         AirDistance: 24
         NavalDistance: 26
         IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 119
-        Distance: 32
-        VehicleDistance: 32
-        AirDistance: 23
-        NavalDistance: 25
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 8
-        Distance: 33
-        VehicleDistance: 33
+      - ConstructionName: Porto Naval
+        InstanceId: 71
+        Distance: 35
+        VehicleDistance: 35
         AirDistance: 25
-        NavalDistance: 32
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 6
-        Distance: 32
-        VehicleDistance: 32
-        AirDistance: 24
-        NavalDistance: 33
-        IsHQ: 0
-      - ConstructionName: "Esta\xE7\xE3o de Trem"
-        InstanceId: 102
-        Distance: 32
-        VehicleDistance: 32
-        AirDistance: 26
-        NavalDistance: 34
+        NavalDistance: 25
         IsHQ: 0
     closestNeighbor1: 6
     closestNeighbor1Distance: 4
@@ -257558,13 +257558,6 @@ MonoBehaviour:
         NavalDistance: 30
         IsHQ: 1
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 133
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 12
-        NavalDistance: 29
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
         InstanceId: 134
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
@@ -257579,21 +257572,21 @@ MonoBehaviour:
         NavalDistance: 12
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 135
+        InstanceId: 133
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
-        AirDistance: 11
-        NavalDistance: 13
+        AirDistance: 12
+        NavalDistance: 29
         IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 155
+      - ConstructionName: Porto Naval
+        InstanceId: 74
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
         AirDistance: 13
         NavalDistance: 28
         IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 132
+      - ConstructionName: Aeroporto
+        InstanceId: 9
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
         AirDistance: 12
@@ -257613,19 +257606,26 @@ MonoBehaviour:
         AirDistance: 14
         NavalDistance: 27
         IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 74
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 155
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
         AirDistance: 13
         NavalDistance: 28
         IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 9
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 132
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
         AirDistance: 12
         NavalDistance: 29
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 135
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 11
+        NavalDistance: 13
         IsHQ: 0
     - SlotIndex: 0
       Team: 2
@@ -257637,6 +257637,41 @@ MonoBehaviour:
         AirDistance: 28
         NavalDistance: 51
         IsHQ: 1
+      - ConstructionName: Aeroporto
+        InstanceId: 8
+        Distance: 29
+        VehicleDistance: 29
+        AirDistance: 28
+        NavalDistance: 51
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 119
+        Distance: 28
+        VehicleDistance: 28
+        AirDistance: 27
+        NavalDistance: 44
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 117
+        Distance: 30
+        VehicleDistance: 30
+        AirDistance: 29
+        NavalDistance: 50
+        IsHQ: 0
+      - ConstructionName: Porto Naval
+        InstanceId: 72
+        Distance: 31
+        VehicleDistance: 31
+        AirDistance: 29
+        NavalDistance: 43
+        IsHQ: 0
+      - ConstructionName: "Esta\xE7\xE3o de Trem"
+        InstanceId: 102
+        Distance: 28
+        VehicleDistance: 28
+        AirDistance: 27
+        NavalDistance: 53
+        IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 154
         Distance: 29
@@ -257651,26 +257686,12 @@ MonoBehaviour:
         AirDistance: 29
         NavalDistance: 49
         IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 117
-        Distance: 30
-        VehicleDistance: 30
-        AirDistance: 29
-        NavalDistance: 50
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 71
-        Distance: 31
-        VehicleDistance: 31
-        AirDistance: 30
-        NavalDistance: 44
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 72
-        Distance: 31
-        VehicleDistance: 31
-        AirDistance: 29
-        NavalDistance: 43
+      - ConstructionName: Aeroporto
+        InstanceId: 6
+        Distance: 28
+        VehicleDistance: 28
+        AirDistance: 27
+        NavalDistance: 52
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 118
@@ -257679,33 +257700,12 @@ MonoBehaviour:
         AirDistance: 29
         NavalDistance: 45
         IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 119
-        Distance: 28
-        VehicleDistance: 28
-        AirDistance: 27
+      - ConstructionName: Porto Naval
+        InstanceId: 71
+        Distance: 31
+        VehicleDistance: 31
+        AirDistance: 30
         NavalDistance: 44
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 8
-        Distance: 29
-        VehicleDistance: 29
-        AirDistance: 28
-        NavalDistance: 51
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 6
-        Distance: 28
-        VehicleDistance: 28
-        AirDistance: 27
-        NavalDistance: 52
-        IsHQ: 0
-      - ConstructionName: "Esta\xE7\xE3o de Trem"
-        InstanceId: 102
-        Distance: 28
-        VehicleDistance: 28
-        AirDistance: 27
-        NavalDistance: 53
         IsHQ: 0
     closestNeighbor1: 6
     closestNeighbor1Distance: 5
@@ -257754,13 +257754,6 @@ MonoBehaviour:
         NavalDistance: 49
         IsHQ: 1
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 133
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 20
-        NavalDistance: 48
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
         InstanceId: 134
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
@@ -257775,38 +257768,10 @@ MonoBehaviour:
         NavalDistance: 41
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 135
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 19
-        NavalDistance: 40
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 155
+        InstanceId: 133
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
         AirDistance: 20
-        NavalDistance: 49
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 132
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 20
-        NavalDistance: 48
-        IsHQ: 0
-      - ConstructionName: "Esta\xE7\xE3o de Trem"
-        InstanceId: 148
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 19
-        NavalDistance: 51
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 73
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 21
         NavalDistance: 48
         IsHQ: 0
       - ConstructionName: Porto Naval
@@ -257823,6 +257788,41 @@ MonoBehaviour:
         AirDistance: 19
         NavalDistance: 50
         IsHQ: 0
+      - ConstructionName: "Esta\xE7\xE3o de Trem"
+        InstanceId: 148
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 19
+        NavalDistance: 51
+        IsHQ: 0
+      - ConstructionName: Porto Naval
+        InstanceId: 73
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 21
+        NavalDistance: 48
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 155
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 20
+        NavalDistance: 49
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 132
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 20
+        NavalDistance: 48
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 135
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 19
+        NavalDistance: 40
+        IsHQ: 0
     - SlotIndex: 0
       Team: 2
       Entries:
@@ -257833,6 +257833,41 @@ MonoBehaviour:
         AirDistance: 21
         NavalDistance: 31
         IsHQ: 1
+      - ConstructionName: Aeroporto
+        InstanceId: 8
+        Distance: 21
+        VehicleDistance: 21
+        AirDistance: 21
+        NavalDistance: 31
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 119
+        Distance: 20
+        VehicleDistance: 20
+        AirDistance: 20
+        NavalDistance: 24
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 117
+        Distance: 22
+        VehicleDistance: 22
+        AirDistance: 22
+        NavalDistance: 30
+        IsHQ: 0
+      - ConstructionName: Porto Naval
+        InstanceId: 72
+        Distance: 23
+        VehicleDistance: 23
+        AirDistance: 22
+        NavalDistance: 23
+        IsHQ: 0
+      - ConstructionName: "Esta\xE7\xE3o de Trem"
+        InstanceId: 102
+        Distance: 20
+        VehicleDistance: 20
+        AirDistance: 20
+        NavalDistance: 33
+        IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 154
         Distance: 21
@@ -257847,26 +257882,12 @@ MonoBehaviour:
         AirDistance: 22
         NavalDistance: 29
         IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 117
-        Distance: 22
-        VehicleDistance: 22
-        AirDistance: 22
-        NavalDistance: 30
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 71
-        Distance: 23
-        VehicleDistance: 23
-        AirDistance: 23
-        NavalDistance: 24
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 72
-        Distance: 23
-        VehicleDistance: 23
-        AirDistance: 22
-        NavalDistance: 23
+      - ConstructionName: Aeroporto
+        InstanceId: 6
+        Distance: 20
+        VehicleDistance: 20
+        AirDistance: 20
+        NavalDistance: 32
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 118
@@ -257875,33 +257896,12 @@ MonoBehaviour:
         AirDistance: 22
         NavalDistance: 25
         IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 119
-        Distance: 20
-        VehicleDistance: 20
-        AirDistance: 20
+      - ConstructionName: Porto Naval
+        InstanceId: 71
+        Distance: 23
+        VehicleDistance: 23
+        AirDistance: 23
         NavalDistance: 24
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 8
-        Distance: 21
-        VehicleDistance: 21
-        AirDistance: 21
-        NavalDistance: 31
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 6
-        Distance: 20
-        VehicleDistance: 20
-        AirDistance: 20
-        NavalDistance: 32
-        IsHQ: 0
-      - ConstructionName: "Esta\xE7\xE3o de Trem"
-        InstanceId: 102
-        Distance: 20
-        VehicleDistance: 20
-        AirDistance: 20
-        NavalDistance: 33
         IsHQ: 0
     closestNeighbor1: 4
     closestNeighbor1Distance: 4
@@ -257950,13 +257950,6 @@ MonoBehaviour:
         NavalDistance: 33
         IsHQ: 1
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 133
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 18
-        NavalDistance: 33
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
         InstanceId: 134
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
@@ -257971,24 +257964,24 @@ MonoBehaviour:
         NavalDistance: 16
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 135
+        InstanceId: 133
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 18
+        NavalDistance: 33
+        IsHQ: 0
+      - ConstructionName: Porto Naval
+        InstanceId: 74
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 19
+        NavalDistance: 31
+        IsHQ: 0
+      - ConstructionName: Aeroporto
+        InstanceId: 9
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
         AirDistance: 17
-        NavalDistance: 17
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 155
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 18
-        NavalDistance: 31
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 132
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 18
         NavalDistance: 32
         IsHQ: 0
       - ConstructionName: "Esta\xE7\xE3o de Trem"
@@ -258005,19 +257998,26 @@ MonoBehaviour:
         AirDistance: 19
         NavalDistance: 30
         IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 74
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 155
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
-        AirDistance: 19
+        AirDistance: 18
         NavalDistance: 31
         IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 9
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 132
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 18
+        NavalDistance: 32
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 135
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
         AirDistance: 17
-        NavalDistance: 32
+        NavalDistance: 17
         IsHQ: 0
     - SlotIndex: 0
       Team: 2
@@ -258029,6 +258029,41 @@ MonoBehaviour:
         AirDistance: 29
         NavalDistance: 55
         IsHQ: 1
+      - ConstructionName: Aeroporto
+        InstanceId: 8
+        Distance: 29
+        VehicleDistance: 29
+        AirDistance: 29
+        NavalDistance: 55
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 119
+        Distance: 28
+        VehicleDistance: 28
+        AirDistance: 28
+        NavalDistance: 48
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 117
+        Distance: 30
+        VehicleDistance: 30
+        AirDistance: 30
+        NavalDistance: 54
+        IsHQ: 0
+      - ConstructionName: Porto Naval
+        InstanceId: 72
+        Distance: 31
+        VehicleDistance: 31
+        AirDistance: 30
+        NavalDistance: 47
+        IsHQ: 0
+      - ConstructionName: "Esta\xE7\xE3o de Trem"
+        InstanceId: 102
+        Distance: 28
+        VehicleDistance: 28
+        AirDistance: 28
+        NavalDistance: 57
+        IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 154
         Distance: 29
@@ -258043,26 +258078,12 @@ MonoBehaviour:
         AirDistance: 30
         NavalDistance: 53
         IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 117
-        Distance: 30
-        VehicleDistance: 30
-        AirDistance: 30
-        NavalDistance: 54
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 71
-        Distance: 31
-        VehicleDistance: 31
-        AirDistance: 31
-        NavalDistance: 48
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 72
-        Distance: 31
-        VehicleDistance: 31
-        AirDistance: 30
-        NavalDistance: 47
+      - ConstructionName: Aeroporto
+        InstanceId: 6
+        Distance: 28
+        VehicleDistance: 28
+        AirDistance: 28
+        NavalDistance: 56
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 118
@@ -258071,33 +258092,12 @@ MonoBehaviour:
         AirDistance: 30
         NavalDistance: 49
         IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 119
-        Distance: 28
-        VehicleDistance: 28
-        AirDistance: 28
+      - ConstructionName: Porto Naval
+        InstanceId: 71
+        Distance: 31
+        VehicleDistance: 31
+        AirDistance: 31
         NavalDistance: 48
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 8
-        Distance: 29
-        VehicleDistance: 29
-        AirDistance: 29
-        NavalDistance: 55
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 6
-        Distance: 28
-        VehicleDistance: 28
-        AirDistance: 28
-        NavalDistance: 56
-        IsHQ: 0
-      - ConstructionName: "Esta\xE7\xE3o de Trem"
-        InstanceId: 102
-        Distance: 28
-        VehicleDistance: 28
-        AirDistance: 28
-        NavalDistance: 57
         IsHQ: 0
     closestNeighbor1: 12
     closestNeighbor1Distance: 8
@@ -258146,13 +258146,6 @@ MonoBehaviour:
         NavalDistance: 35
         IsHQ: 1
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 133
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 25
-        NavalDistance: 36
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
         InstanceId: 134
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
@@ -258167,24 +258160,24 @@ MonoBehaviour:
         NavalDistance: 26
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 135
+        InstanceId: 133
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 25
+        NavalDistance: 36
+        IsHQ: 0
+      - ConstructionName: Porto Naval
+        InstanceId: 74
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 26
+        NavalDistance: 33
+        IsHQ: 0
+      - ConstructionName: Aeroporto
+        InstanceId: 9
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
         AirDistance: 24
-        NavalDistance: 27
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 155
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 25
-        NavalDistance: 33
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 132
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 25
         NavalDistance: 34
         IsHQ: 0
       - ConstructionName: "Esta\xE7\xE3o de Trem"
@@ -258201,19 +258194,26 @@ MonoBehaviour:
         AirDistance: 26
         NavalDistance: 32
         IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 74
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 155
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
-        AirDistance: 26
+        AirDistance: 25
         NavalDistance: 33
         IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 9
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 132
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 25
+        NavalDistance: 34
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 135
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
         AirDistance: 24
-        NavalDistance: 34
+        NavalDistance: 27
         IsHQ: 0
     - SlotIndex: 0
       Team: 2
@@ -258225,6 +258225,41 @@ MonoBehaviour:
         AirDistance: 27
         NavalDistance: 45
         IsHQ: 1
+      - ConstructionName: Aeroporto
+        InstanceId: 8
+        Distance: 29
+        VehicleDistance: 29
+        AirDistance: 27
+        NavalDistance: 43
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 119
+        Distance: 28
+        VehicleDistance: 28
+        AirDistance: 26
+        NavalDistance: 51
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 117
+        Distance: 30
+        VehicleDistance: 30
+        AirDistance: 28
+        NavalDistance: 44
+        IsHQ: 0
+      - ConstructionName: Porto Naval
+        InstanceId: 72
+        Distance: 31
+        VehicleDistance: 31
+        AirDistance: 28
+        NavalDistance: 47
+        IsHQ: 0
+      - ConstructionName: "Esta\xE7\xE3o de Trem"
+        InstanceId: 102
+        Distance: 28
+        VehicleDistance: 28
+        AirDistance: 26
+        NavalDistance: 41
+        IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 154
         Distance: 29
@@ -258239,26 +258274,12 @@ MonoBehaviour:
         AirDistance: 28
         NavalDistance: 45
         IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 117
-        Distance: 30
-        VehicleDistance: 30
-        AirDistance: 28
+      - ConstructionName: Aeroporto
+        InstanceId: 6
+        Distance: 28
+        VehicleDistance: 28
+        AirDistance: 26
         NavalDistance: 44
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 71
-        Distance: 31
-        VehicleDistance: 31
-        AirDistance: 29
-        NavalDistance: 46
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 72
-        Distance: 31
-        VehicleDistance: 31
-        AirDistance: 28
-        NavalDistance: 47
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 118
@@ -258267,33 +258288,12 @@ MonoBehaviour:
         AirDistance: 28
         NavalDistance: 47
         IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 119
-        Distance: 28
-        VehicleDistance: 28
-        AirDistance: 26
-        NavalDistance: 51
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 8
-        Distance: 29
-        VehicleDistance: 29
-        AirDistance: 27
-        NavalDistance: 43
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 6
-        Distance: 28
-        VehicleDistance: 28
-        AirDistance: 26
-        NavalDistance: 44
-        IsHQ: 0
-      - ConstructionName: "Esta\xE7\xE3o de Trem"
-        InstanceId: 102
-        Distance: 28
-        VehicleDistance: 28
-        AirDistance: 26
-        NavalDistance: 41
+      - ConstructionName: Porto Naval
+        InstanceId: 71
+        Distance: 31
+        VehicleDistance: 31
+        AirDistance: 29
+        NavalDistance: 46
         IsHQ: 0
     closestNeighbor1: 13
     closestNeighbor1Distance: 8
@@ -258342,13 +258342,6 @@ MonoBehaviour:
         NavalDistance: 44
         IsHQ: 1
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 133
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 32
-        NavalDistance: 45
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
         InstanceId: 134
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
@@ -258363,24 +258356,24 @@ MonoBehaviour:
         NavalDistance: 35
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 135
+        InstanceId: 133
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 32
+        NavalDistance: 45
+        IsHQ: 0
+      - ConstructionName: Porto Naval
+        InstanceId: 74
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 33
+        NavalDistance: 42
+        IsHQ: 0
+      - ConstructionName: Aeroporto
+        InstanceId: 9
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
         AirDistance: 31
-        NavalDistance: 36
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 155
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 32
-        NavalDistance: 42
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 132
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 32
         NavalDistance: 43
         IsHQ: 0
       - ConstructionName: "Esta\xE7\xE3o de Trem"
@@ -258397,19 +258390,26 @@ MonoBehaviour:
         AirDistance: 33
         NavalDistance: 41
         IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 74
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 155
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
-        AirDistance: 33
+        AirDistance: 32
         NavalDistance: 42
         IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 9
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 132
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 32
+        NavalDistance: 43
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 135
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
         AirDistance: 31
-        NavalDistance: 43
+        NavalDistance: 36
         IsHQ: 0
     - SlotIndex: 0
       Team: 2
@@ -258421,6 +258421,41 @@ MonoBehaviour:
         AirDistance: 20
         NavalDistance: 36
         IsHQ: 1
+      - ConstructionName: Aeroporto
+        InstanceId: 8
+        Distance: 21
+        VehicleDistance: 21
+        AirDistance: 20
+        NavalDistance: 34
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 119
+        Distance: 20
+        VehicleDistance: 20
+        AirDistance: 20
+        NavalDistance: 42
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 117
+        Distance: 22
+        VehicleDistance: 22
+        AirDistance: 21
+        NavalDistance: 35
+        IsHQ: 0
+      - ConstructionName: Porto Naval
+        InstanceId: 72
+        Distance: 23
+        VehicleDistance: 23
+        AirDistance: 23
+        NavalDistance: 38
+        IsHQ: 0
+      - ConstructionName: "Esta\xE7\xE3o de Trem"
+        InstanceId: 102
+        Distance: 20
+        VehicleDistance: 20
+        AirDistance: 19
+        NavalDistance: 32
+        IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 154
         Distance: 21
@@ -258435,26 +258470,12 @@ MonoBehaviour:
         AirDistance: 21
         NavalDistance: 36
         IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 117
-        Distance: 22
-        VehicleDistance: 22
-        AirDistance: 21
+      - ConstructionName: Aeroporto
+        InstanceId: 6
+        Distance: 20
+        VehicleDistance: 20
+        AirDistance: 19
         NavalDistance: 35
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 71
-        Distance: 23
-        VehicleDistance: 23
-        AirDistance: 23
-        NavalDistance: 37
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 72
-        Distance: 23
-        VehicleDistance: 23
-        AirDistance: 23
-        NavalDistance: 38
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 118
@@ -258463,33 +258484,12 @@ MonoBehaviour:
         AirDistance: 22
         NavalDistance: 38
         IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 119
-        Distance: 20
-        VehicleDistance: 20
-        AirDistance: 20
-        NavalDistance: 42
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 8
-        Distance: 21
-        VehicleDistance: 21
-        AirDistance: 20
-        NavalDistance: 34
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 6
-        Distance: 20
-        VehicleDistance: 20
-        AirDistance: 19
-        NavalDistance: 35
-        IsHQ: 0
-      - ConstructionName: "Esta\xE7\xE3o de Trem"
-        InstanceId: 102
-        Distance: 20
-        VehicleDistance: 20
-        AirDistance: 19
-        NavalDistance: 32
+      - ConstructionName: Porto Naval
+        InstanceId: 71
+        Distance: 23
+        VehicleDistance: 23
+        AirDistance: 23
+        NavalDistance: 37
         IsHQ: 0
     closestNeighbor1: 16
     closestNeighbor1Distance: 5
@@ -258538,13 +258538,6 @@ MonoBehaviour:
         NavalDistance: 3.4028235e+38
         IsHQ: 1
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 133
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 30
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
         InstanceId: 134
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
@@ -258559,38 +258552,10 @@ MonoBehaviour:
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 135
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 29
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 155
+        InstanceId: 133
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
         AirDistance: 30
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 132
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 30
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "Esta\xE7\xE3o de Trem"
-        InstanceId: 148
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 28
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 73
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 31
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: Porto Naval
@@ -258607,6 +258572,41 @@ MonoBehaviour:
         AirDistance: 29
         NavalDistance: 3.4028235e+38
         IsHQ: 0
+      - ConstructionName: "Esta\xE7\xE3o de Trem"
+        InstanceId: 148
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 28
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: Porto Naval
+        InstanceId: 73
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 31
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 155
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 30
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 132
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 30
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 135
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 29
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
     - SlotIndex: 0
       Team: 2
       Entries:
@@ -258617,6 +258617,41 @@ MonoBehaviour:
         AirDistance: 17
         NavalDistance: 3.4028235e+38
         IsHQ: 1
+      - ConstructionName: Aeroporto
+        InstanceId: 8
+        Distance: 17
+        VehicleDistance: 17
+        AirDistance: 17
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 119
+        Distance: 16
+        VehicleDistance: 16
+        AirDistance: 16
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 117
+        Distance: 18
+        VehicleDistance: 18
+        AirDistance: 18
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: Porto Naval
+        InstanceId: 72
+        Distance: 19
+        VehicleDistance: 19
+        AirDistance: 18
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "Esta\xE7\xE3o de Trem"
+        InstanceId: 102
+        Distance: 16
+        VehicleDistance: 16
+        AirDistance: 16
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 154
         Distance: 17
@@ -258631,8 +258666,15 @@ MonoBehaviour:
         AirDistance: 18
         NavalDistance: 3.4028235e+38
         IsHQ: 0
+      - ConstructionName: Aeroporto
+        InstanceId: 6
+        Distance: 16
+        VehicleDistance: 16
+        AirDistance: 16
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 117
+        InstanceId: 118
         Distance: 18
         VehicleDistance: 18
         AirDistance: 18
@@ -258643,48 +258685,6 @@ MonoBehaviour:
         Distance: 19
         VehicleDistance: 19
         AirDistance: 19
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 72
-        Distance: 19
-        VehicleDistance: 19
-        AirDistance: 18
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 118
-        Distance: 18
-        VehicleDistance: 18
-        AirDistance: 18
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 119
-        Distance: 16
-        VehicleDistance: 16
-        AirDistance: 16
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 8
-        Distance: 17
-        VehicleDistance: 17
-        AirDistance: 17
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 6
-        Distance: 16
-        VehicleDistance: 16
-        AirDistance: 16
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "Esta\xE7\xE3o de Trem"
-        InstanceId: 102
-        Distance: 16
-        VehicleDistance: 16
-        AirDistance: 16
         NavalDistance: 3.4028235e+38
         IsHQ: 0
     closestNeighbor1: 15
@@ -258734,13 +258734,6 @@ MonoBehaviour:
         NavalDistance: 3.4028235e+38
         IsHQ: 1
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 133
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 35
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
         InstanceId: 134
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
@@ -258755,38 +258748,10 @@ MonoBehaviour:
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 135
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 34
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 155
+        InstanceId: 133
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
         AirDistance: 35
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 132
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 35
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "Esta\xE7\xE3o de Trem"
-        InstanceId: 148
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 33
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 73
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 36
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: Porto Naval
@@ -258803,6 +258768,41 @@ MonoBehaviour:
         AirDistance: 34
         NavalDistance: 3.4028235e+38
         IsHQ: 0
+      - ConstructionName: "Esta\xE7\xE3o de Trem"
+        InstanceId: 148
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 33
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: Porto Naval
+        InstanceId: 73
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 36
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 155
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 35
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 132
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 35
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 135
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 34
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
     - SlotIndex: 0
       Team: 2
       Entries:
@@ -258813,6 +258813,41 @@ MonoBehaviour:
         AirDistance: 13
         NavalDistance: 3.4028235e+38
         IsHQ: 1
+      - ConstructionName: Aeroporto
+        InstanceId: 8
+        Distance: 12
+        VehicleDistance: 12
+        AirDistance: 12
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 119
+        Distance: 13
+        VehicleDistance: 13
+        AirDistance: 13
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 117
+        Distance: 13
+        VehicleDistance: 13
+        AirDistance: 13
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: Porto Naval
+        InstanceId: 72
+        Distance: 16
+        VehicleDistance: 16
+        AirDistance: 16
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "Esta\xE7\xE3o de Trem"
+        InstanceId: 102
+        Distance: 10
+        VehicleDistance: 10
+        AirDistance: 10
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 154
         Distance: 14
@@ -258827,25 +258862,11 @@ MonoBehaviour:
         AirDistance: 14
         NavalDistance: 3.4028235e+38
         IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 117
-        Distance: 13
-        VehicleDistance: 13
-        AirDistance: 13
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 71
-        Distance: 16
-        VehicleDistance: 16
-        AirDistance: 16
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 72
-        Distance: 16
-        VehicleDistance: 16
-        AirDistance: 16
+      - ConstructionName: Aeroporto
+        InstanceId: 6
+        Distance: 12
+        VehicleDistance: 12
+        AirDistance: 12
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
@@ -258855,32 +258876,11 @@ MonoBehaviour:
         AirDistance: 15
         NavalDistance: 3.4028235e+38
         IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 119
-        Distance: 13
-        VehicleDistance: 13
-        AirDistance: 13
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 8
-        Distance: 12
-        VehicleDistance: 12
-        AirDistance: 12
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 6
-        Distance: 12
-        VehicleDistance: 12
-        AirDistance: 12
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "Esta\xE7\xE3o de Trem"
-        InstanceId: 102
-        Distance: 10
-        VehicleDistance: 10
-        AirDistance: 10
+      - ConstructionName: Porto Naval
+        InstanceId: 71
+        Distance: 16
+        VehicleDistance: 16
+        AirDistance: 16
         NavalDistance: 3.4028235e+38
         IsHQ: 0
     closestNeighbor1: 2
@@ -258938,13 +258938,6 @@ MonoBehaviour:
         NavalDistance: 53
         IsHQ: 1
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 133
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 38
-        NavalDistance: 54
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
         InstanceId: 134
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
@@ -258959,24 +258952,24 @@ MonoBehaviour:
         NavalDistance: 44
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 135
+        InstanceId: 133
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 38
+        NavalDistance: 54
+        IsHQ: 0
+      - ConstructionName: Porto Naval
+        InstanceId: 74
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 39
+        NavalDistance: 51
+        IsHQ: 0
+      - ConstructionName: Aeroporto
+        InstanceId: 9
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
         AirDistance: 37
-        NavalDistance: 45
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 155
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 38
-        NavalDistance: 51
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 132
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 38
         NavalDistance: 52
         IsHQ: 0
       - ConstructionName: "Esta\xE7\xE3o de Trem"
@@ -258993,19 +258986,26 @@ MonoBehaviour:
         AirDistance: 39
         NavalDistance: 50
         IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 74
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 155
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
-        AirDistance: 39
+        AirDistance: 38
         NavalDistance: 51
         IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 9
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 132
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 38
+        NavalDistance: 52
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 135
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
         AirDistance: 37
-        NavalDistance: 52
+        NavalDistance: 45
         IsHQ: 0
     - SlotIndex: 0
       Team: 2
@@ -259017,6 +259017,41 @@ MonoBehaviour:
         AirDistance: 17
         NavalDistance: 24
         IsHQ: 1
+      - ConstructionName: Aeroporto
+        InstanceId: 8
+        Distance: 18
+        VehicleDistance: 18
+        AirDistance: 16
+        NavalDistance: 22
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 119
+        Distance: 19
+        VehicleDistance: 19
+        AirDistance: 17
+        NavalDistance: 30
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 117
+        Distance: 19
+        VehicleDistance: 19
+        AirDistance: 17
+        NavalDistance: 23
+        IsHQ: 0
+      - ConstructionName: Porto Naval
+        InstanceId: 72
+        Distance: 22
+        VehicleDistance: 22
+        AirDistance: 20
+        NavalDistance: 26
+        IsHQ: 0
+      - ConstructionName: "Esta\xE7\xE3o de Trem"
+        InstanceId: 102
+        Distance: 16
+        VehicleDistance: 16
+        AirDistance: 14
+        NavalDistance: 20
+        IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 154
         Distance: 20
@@ -259031,26 +259066,12 @@ MonoBehaviour:
         AirDistance: 18
         NavalDistance: 24
         IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 117
-        Distance: 19
-        VehicleDistance: 19
-        AirDistance: 17
+      - ConstructionName: Aeroporto
+        InstanceId: 6
+        Distance: 18
+        VehicleDistance: 18
+        AirDistance: 16
         NavalDistance: 23
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 71
-        Distance: 22
-        VehicleDistance: 22
-        AirDistance: 20
-        NavalDistance: 25
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 72
-        Distance: 22
-        VehicleDistance: 22
-        AirDistance: 20
-        NavalDistance: 26
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 118
@@ -259059,33 +259080,12 @@ MonoBehaviour:
         AirDistance: 19
         NavalDistance: 26
         IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 119
-        Distance: 19
-        VehicleDistance: 19
-        AirDistance: 17
-        NavalDistance: 30
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 8
-        Distance: 18
-        VehicleDistance: 18
-        AirDistance: 16
-        NavalDistance: 22
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 6
-        Distance: 18
-        VehicleDistance: 18
-        AirDistance: 16
-        NavalDistance: 23
-        IsHQ: 0
-      - ConstructionName: "Esta\xE7\xE3o de Trem"
-        InstanceId: 102
-        Distance: 16
-        VehicleDistance: 16
-        AirDistance: 14
-        NavalDistance: 20
+      - ConstructionName: Porto Naval
+        InstanceId: 71
+        Distance: 22
+        VehicleDistance: 22
+        AirDistance: 20
+        NavalDistance: 25
         IsHQ: 0
     closestNeighbor1: 17
     closestNeighbor1Distance: 6
@@ -259134,13 +259134,6 @@ MonoBehaviour:
         NavalDistance: 56
         IsHQ: 1
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 133
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 45
-        NavalDistance: 57
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
         InstanceId: 134
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
@@ -259155,24 +259148,24 @@ MonoBehaviour:
         NavalDistance: 47
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 135
+        InstanceId: 133
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 45
+        NavalDistance: 57
+        IsHQ: 0
+      - ConstructionName: Porto Naval
+        InstanceId: 74
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 46
+        NavalDistance: 54
+        IsHQ: 0
+      - ConstructionName: Aeroporto
+        InstanceId: 9
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
         AirDistance: 44
-        NavalDistance: 48
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 155
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 45
-        NavalDistance: 54
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 132
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 45
         NavalDistance: 55
         IsHQ: 0
       - ConstructionName: "Esta\xE7\xE3o de Trem"
@@ -259189,19 +259182,26 @@ MonoBehaviour:
         AirDistance: 46
         NavalDistance: 53
         IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 74
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 155
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
-        AirDistance: 46
+        AirDistance: 45
         NavalDistance: 54
         IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 9
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 132
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 45
+        NavalDistance: 55
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 135
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
         AirDistance: 44
-        NavalDistance: 55
+        NavalDistance: 48
         IsHQ: 0
     - SlotIndex: 0
       Team: 2
@@ -259213,6 +259213,41 @@ MonoBehaviour:
         AirDistance: 22
         NavalDistance: 26
         IsHQ: 1
+      - ConstructionName: Aeroporto
+        InstanceId: 8
+        Distance: 25
+        VehicleDistance: 25
+        AirDistance: 21
+        NavalDistance: 24
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 119
+        Distance: 26
+        VehicleDistance: 26
+        AirDistance: 22
+        NavalDistance: 32
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 117
+        Distance: 26
+        VehicleDistance: 26
+        AirDistance: 22
+        NavalDistance: 25
+        IsHQ: 0
+      - ConstructionName: Porto Naval
+        InstanceId: 72
+        Distance: 29
+        VehicleDistance: 29
+        AirDistance: 25
+        NavalDistance: 28
+        IsHQ: 0
+      - ConstructionName: "Esta\xE7\xE3o de Trem"
+        InstanceId: 102
+        Distance: 23
+        VehicleDistance: 23
+        AirDistance: 19
+        NavalDistance: 22
+        IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 154
         Distance: 27
@@ -259227,26 +259262,12 @@ MonoBehaviour:
         AirDistance: 23
         NavalDistance: 26
         IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 117
-        Distance: 26
-        VehicleDistance: 26
-        AirDistance: 22
+      - ConstructionName: Aeroporto
+        InstanceId: 6
+        Distance: 25
+        VehicleDistance: 25
+        AirDistance: 21
         NavalDistance: 25
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 71
-        Distance: 29
-        VehicleDistance: 29
-        AirDistance: 25
-        NavalDistance: 27
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 72
-        Distance: 29
-        VehicleDistance: 29
-        AirDistance: 25
-        NavalDistance: 28
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 118
@@ -259255,33 +259276,12 @@ MonoBehaviour:
         AirDistance: 24
         NavalDistance: 28
         IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 119
-        Distance: 26
-        VehicleDistance: 26
-        AirDistance: 22
-        NavalDistance: 32
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 8
-        Distance: 25
-        VehicleDistance: 25
-        AirDistance: 21
-        NavalDistance: 24
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 6
-        Distance: 25
-        VehicleDistance: 25
-        AirDistance: 21
-        NavalDistance: 25
-        IsHQ: 0
-      - ConstructionName: "Esta\xE7\xE3o de Trem"
-        InstanceId: 102
-        Distance: 23
-        VehicleDistance: 23
-        AirDistance: 19
-        NavalDistance: 22
+      - ConstructionName: Porto Naval
+        InstanceId: 71
+        Distance: 29
+        VehicleDistance: 29
+        AirDistance: 25
+        NavalDistance: 27
         IsHQ: 0
     closestNeighbor1: 20
     closestNeighbor1Distance: 6
@@ -259330,13 +259330,6 @@ MonoBehaviour:
         NavalDistance: 50
         IsHQ: 1
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 133
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 42
-        NavalDistance: 51
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
         InstanceId: 134
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
@@ -259351,24 +259344,24 @@ MonoBehaviour:
         NavalDistance: 41
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 135
+        InstanceId: 133
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 42
+        NavalDistance: 51
+        IsHQ: 0
+      - ConstructionName: Porto Naval
+        InstanceId: 74
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 43
+        NavalDistance: 48
+        IsHQ: 0
+      - ConstructionName: Aeroporto
+        InstanceId: 9
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
         AirDistance: 41
-        NavalDistance: 42
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 155
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 42
-        NavalDistance: 48
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 132
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 42
         NavalDistance: 49
         IsHQ: 0
       - ConstructionName: "Esta\xE7\xE3o de Trem"
@@ -259385,19 +259378,26 @@ MonoBehaviour:
         AirDistance: 43
         NavalDistance: 47
         IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 74
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 155
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
-        AirDistance: 43
+        AirDistance: 42
         NavalDistance: 48
         IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 9
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 132
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 42
+        NavalDistance: 49
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 135
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
         AirDistance: 41
-        NavalDistance: 49
+        NavalDistance: 42
         IsHQ: 0
     - SlotIndex: 0
       Team: 2
@@ -259409,6 +259409,41 @@ MonoBehaviour:
         AirDistance: 25
         NavalDistance: 31
         IsHQ: 1
+      - ConstructionName: Aeroporto
+        InstanceId: 8
+        Distance: 26
+        VehicleDistance: 26
+        AirDistance: 24
+        NavalDistance: 29
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 119
+        Distance: 25
+        VehicleDistance: 25
+        AirDistance: 25
+        NavalDistance: 37
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 117
+        Distance: 27
+        VehicleDistance: 27
+        AirDistance: 25
+        NavalDistance: 30
+        IsHQ: 0
+      - ConstructionName: Porto Naval
+        InstanceId: 72
+        Distance: 28
+        VehicleDistance: 28
+        AirDistance: 28
+        NavalDistance: 33
+        IsHQ: 0
+      - ConstructionName: "Esta\xE7\xE3o de Trem"
+        InstanceId: 102
+        Distance: 24
+        VehicleDistance: 24
+        AirDistance: 22
+        NavalDistance: 27
+        IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 154
         Distance: 26
@@ -259423,26 +259458,12 @@ MonoBehaviour:
         AirDistance: 26
         NavalDistance: 31
         IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 117
-        Distance: 27
-        VehicleDistance: 27
-        AirDistance: 25
+      - ConstructionName: Aeroporto
+        InstanceId: 6
+        Distance: 25
+        VehicleDistance: 25
+        AirDistance: 24
         NavalDistance: 30
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 71
-        Distance: 28
-        VehicleDistance: 28
-        AirDistance: 28
-        NavalDistance: 32
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 72
-        Distance: 28
-        VehicleDistance: 28
-        AirDistance: 28
-        NavalDistance: 33
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 118
@@ -259451,33 +259472,12 @@ MonoBehaviour:
         AirDistance: 27
         NavalDistance: 33
         IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 119
-        Distance: 25
-        VehicleDistance: 25
-        AirDistance: 25
-        NavalDistance: 37
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 8
-        Distance: 26
-        VehicleDistance: 26
-        AirDistance: 24
-        NavalDistance: 29
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 6
-        Distance: 25
-        VehicleDistance: 25
-        AirDistance: 24
-        NavalDistance: 30
-        IsHQ: 0
-      - ConstructionName: "Esta\xE7\xE3o de Trem"
-        InstanceId: 102
-        Distance: 24
-        VehicleDistance: 24
-        AirDistance: 22
-        NavalDistance: 27
+      - ConstructionName: Porto Naval
+        InstanceId: 71
+        Distance: 28
+        VehicleDistance: 28
+        AirDistance: 28
+        NavalDistance: 32
         IsHQ: 0
     closestNeighbor1: 19
     closestNeighbor1Distance: 6
@@ -259526,13 +259526,6 @@ MonoBehaviour:
         NavalDistance: 39
         IsHQ: 1
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 133
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 32
-        NavalDistance: 40
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
         InstanceId: 134
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
@@ -259547,24 +259540,24 @@ MonoBehaviour:
         NavalDistance: 30
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 135
+        InstanceId: 133
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 32
+        NavalDistance: 40
+        IsHQ: 0
+      - ConstructionName: Porto Naval
+        InstanceId: 74
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 33
+        NavalDistance: 37
+        IsHQ: 0
+      - ConstructionName: Aeroporto
+        InstanceId: 9
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
         AirDistance: 31
-        NavalDistance: 31
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 155
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 32
-        NavalDistance: 37
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 132
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 32
         NavalDistance: 38
         IsHQ: 0
       - ConstructionName: "Esta\xE7\xE3o de Trem"
@@ -259581,19 +259574,26 @@ MonoBehaviour:
         AirDistance: 33
         NavalDistance: 36
         IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 74
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 155
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
-        AirDistance: 33
+        AirDistance: 32
         NavalDistance: 37
         IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 9
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 132
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 32
+        NavalDistance: 38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 135
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
         AirDistance: 31
-        NavalDistance: 38
+        NavalDistance: 31
         IsHQ: 0
     - SlotIndex: 0
       Team: 2
@@ -259605,6 +259605,41 @@ MonoBehaviour:
         AirDistance: 27
         NavalDistance: 42
         IsHQ: 1
+      - ConstructionName: Aeroporto
+        InstanceId: 8
+        Distance: 30
+        VehicleDistance: 30
+        AirDistance: 27
+        NavalDistance: 40
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 119
+        Distance: 29
+        VehicleDistance: 29
+        AirDistance: 27
+        NavalDistance: 48
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 117
+        Distance: 31
+        VehicleDistance: 31
+        AirDistance: 28
+        NavalDistance: 41
+        IsHQ: 0
+      - ConstructionName: Porto Naval
+        InstanceId: 72
+        Distance: 32
+        VehicleDistance: 32
+        AirDistance: 30
+        NavalDistance: 44
+        IsHQ: 0
+      - ConstructionName: "Esta\xE7\xE3o de Trem"
+        InstanceId: 102
+        Distance: 29
+        VehicleDistance: 29
+        AirDistance: 26
+        NavalDistance: 38
+        IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 154
         Distance: 30
@@ -259619,26 +259654,12 @@ MonoBehaviour:
         AirDistance: 28
         NavalDistance: 42
         IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 117
-        Distance: 31
-        VehicleDistance: 31
-        AirDistance: 28
+      - ConstructionName: Aeroporto
+        InstanceId: 6
+        Distance: 29
+        VehicleDistance: 29
+        AirDistance: 26
         NavalDistance: 41
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 71
-        Distance: 32
-        VehicleDistance: 32
-        AirDistance: 30
-        NavalDistance: 43
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 72
-        Distance: 32
-        VehicleDistance: 32
-        AirDistance: 30
-        NavalDistance: 44
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 118
@@ -259647,33 +259668,12 @@ MonoBehaviour:
         AirDistance: 29
         NavalDistance: 44
         IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 119
-        Distance: 29
-        VehicleDistance: 29
-        AirDistance: 27
-        NavalDistance: 48
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 8
-        Distance: 30
-        VehicleDistance: 30
-        AirDistance: 27
-        NavalDistance: 40
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 6
-        Distance: 29
-        VehicleDistance: 29
-        AirDistance: 26
-        NavalDistance: 41
-        IsHQ: 0
-      - ConstructionName: "Esta\xE7\xE3o de Trem"
-        InstanceId: 102
-        Distance: 29
-        VehicleDistance: 29
-        AirDistance: 26
-        NavalDistance: 38
+      - ConstructionName: Porto Naval
+        InstanceId: 71
+        Distance: 32
+        VehicleDistance: 32
+        AirDistance: 30
+        NavalDistance: 43
         IsHQ: 0
     closestNeighbor1: 15
     closestNeighbor1Distance: 9
@@ -259738,13 +259738,6 @@ MonoBehaviour:
         NavalDistance: 24
         IsHQ: 1
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 133
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 18
-        NavalDistance: 25
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
         InstanceId: 134
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
@@ -259759,24 +259752,24 @@ MonoBehaviour:
         NavalDistance: 20
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 135
+        InstanceId: 133
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 18
+        NavalDistance: 25
+        IsHQ: 0
+      - ConstructionName: Porto Naval
+        InstanceId: 74
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
         AirDistance: 18
         NavalDistance: 22
         IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 155
+      - ConstructionName: Aeroporto
+        InstanceId: 9
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
-        AirDistance: 17
-        NavalDistance: 22
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 132
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 17
+        AirDistance: 16
         NavalDistance: 23
         IsHQ: 0
       - ConstructionName: "Esta\xE7\xE3o de Trem"
@@ -259793,19 +259786,26 @@ MonoBehaviour:
         AirDistance: 18
         NavalDistance: 21
         IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 74
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 155
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 17
+        NavalDistance: 22
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 132
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 17
+        NavalDistance: 23
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 135
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
         AirDistance: 18
         NavalDistance: 22
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 9
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 16
-        NavalDistance: 23
         IsHQ: 0
     - SlotIndex: 0
       Team: 2
@@ -259817,6 +259817,41 @@ MonoBehaviour:
         AirDistance: 40
         NavalDistance: 55
         IsHQ: 1
+      - ConstructionName: Aeroporto
+        InstanceId: 8
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 40
+        NavalDistance: 53
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 119
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 39
+        NavalDistance: 57
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 117
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 41
+        NavalDistance: 54
+        IsHQ: 0
+      - ConstructionName: Porto Naval
+        InstanceId: 72
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 41
+        NavalDistance: 56
+        IsHQ: 0
+      - ConstructionName: "Esta\xE7\xE3o de Trem"
+        InstanceId: 102
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 39
+        NavalDistance: 51
+        IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 154
         Distance: 3.4028235e+38
@@ -259831,26 +259866,12 @@ MonoBehaviour:
         AirDistance: 41
         NavalDistance: 55
         IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 117
+      - ConstructionName: Aeroporto
+        InstanceId: 6
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
-        AirDistance: 41
+        AirDistance: 39
         NavalDistance: 54
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 71
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 42
-        NavalDistance: 56
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 72
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 41
-        NavalDistance: 56
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 118
@@ -259859,33 +259880,12 @@ MonoBehaviour:
         AirDistance: 41
         NavalDistance: 57
         IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 119
+      - ConstructionName: Porto Naval
+        InstanceId: 71
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
-        AirDistance: 39
-        NavalDistance: 57
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 8
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 40
-        NavalDistance: 53
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 6
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 39
-        NavalDistance: 54
-        IsHQ: 0
-      - ConstructionName: "Esta\xE7\xE3o de Trem"
-        InstanceId: 102
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 39
-        NavalDistance: 51
+        AirDistance: 42
+        NavalDistance: 56
         IsHQ: 0
     closestNeighbor1: 0
     closestNeighbor1Distance: 3.4028235e+38
@@ -259966,13 +259966,6 @@ MonoBehaviour:
         NavalDistance: 19
         IsHQ: 1
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 133
-        Distance: 20
-        VehicleDistance: 20
-        AirDistance: 17
-        NavalDistance: 20
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
         InstanceId: 134
         Distance: 19
         VehicleDistance: 19
@@ -259987,24 +259980,24 @@ MonoBehaviour:
         NavalDistance: 23
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 135
+        InstanceId: 133
         Distance: 20
         VehicleDistance: 20
         AirDistance: 17
-        NavalDistance: 25
+        NavalDistance: 20
         IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 155
-        Distance: 18
-        VehicleDistance: 18
-        AirDistance: 15
-        NavalDistance: 17
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 132
+      - ConstructionName: Porto Naval
+        InstanceId: 74
         Distance: 19
         VehicleDistance: 19
         AirDistance: 16
+        NavalDistance: 17
+        IsHQ: 0
+      - ConstructionName: Aeroporto
+        InstanceId: 9
+        Distance: 18
+        VehicleDistance: 18
+        AirDistance: 15
         NavalDistance: 18
         IsHQ: 0
       - ConstructionName: "Esta\xE7\xE3o de Trem"
@@ -260021,19 +260014,26 @@ MonoBehaviour:
         AirDistance: 15
         NavalDistance: 16
         IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 74
-        Distance: 19
-        VehicleDistance: 19
-        AirDistance: 16
-        NavalDistance: 17
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 9
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 155
         Distance: 18
         VehicleDistance: 18
         AirDistance: 15
+        NavalDistance: 17
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 132
+        Distance: 19
+        VehicleDistance: 19
+        AirDistance: 16
         NavalDistance: 18
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 135
+        Distance: 20
+        VehicleDistance: 20
+        AirDistance: 17
+        NavalDistance: 25
         IsHQ: 0
     - SlotIndex: 0
       Team: 2
@@ -260045,6 +260045,41 @@ MonoBehaviour:
         AirDistance: 54
         NavalDistance: 67
         IsHQ: 1
+      - ConstructionName: Aeroporto
+        InstanceId: 8
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 54
+        NavalDistance: 66
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 119
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 53
+        NavalDistance: 60
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 117
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 55
+        NavalDistance: 66
+        IsHQ: 0
+      - ConstructionName: Porto Naval
+        InstanceId: 72
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 55
+        NavalDistance: 59
+        IsHQ: 0
+      - ConstructionName: "Esta\xE7\xE3o de Trem"
+        InstanceId: 102
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 53
+        NavalDistance: 64
+        IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 154
         Distance: 3.4028235e+38
@@ -260059,26 +260094,12 @@ MonoBehaviour:
         AirDistance: 55
         NavalDistance: 65
         IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 117
+      - ConstructionName: Aeroporto
+        InstanceId: 6
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
-        AirDistance: 55
-        NavalDistance: 66
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 71
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 56
-        NavalDistance: 60
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 72
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 55
-        NavalDistance: 59
+        AirDistance: 53
+        NavalDistance: 67
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 118
@@ -260087,33 +260108,12 @@ MonoBehaviour:
         AirDistance: 55
         NavalDistance: 61
         IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 119
+      - ConstructionName: Porto Naval
+        InstanceId: 71
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
-        AirDistance: 53
+        AirDistance: 56
         NavalDistance: 60
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 8
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 54
-        NavalDistance: 66
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 6
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 53
-        NavalDistance: 67
-        IsHQ: 0
-      - ConstructionName: "Esta\xE7\xE3o de Trem"
-        InstanceId: 102
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 53
-        NavalDistance: 64
         IsHQ: 0
     closestNeighbor1: 24
     closestNeighbor1Distance: 8
@@ -260162,13 +260162,6 @@ MonoBehaviour:
         NavalDistance: 11
         IsHQ: 1
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 133
-        Distance: 13
-        VehicleDistance: 13
-        AirDistance: 11
-        NavalDistance: 12
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
         InstanceId: 134
         Distance: 12
         VehicleDistance: 12
@@ -260183,23 +260176,23 @@ MonoBehaviour:
         NavalDistance: 24
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 135
+        InstanceId: 133
         Distance: 13
         VehicleDistance: 13
-        AirDistance: 12
-        NavalDistance: 26
+        AirDistance: 11
+        NavalDistance: 12
         IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 155
-        Distance: 11
-        VehicleDistance: 11
+      - ConstructionName: Porto Naval
+        InstanceId: 74
+        Distance: 12
+        VehicleDistance: 12
         AirDistance: 9
         NavalDistance: 9
         IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 132
-        Distance: 12
-        VehicleDistance: 12
+      - ConstructionName: Aeroporto
+        InstanceId: 9
+        Distance: 11
+        VehicleDistance: 11
         AirDistance: 10
         NavalDistance: 10
         IsHQ: 0
@@ -260217,19 +260210,26 @@ MonoBehaviour:
         AirDistance: 8
         NavalDistance: 8
         IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 74
-        Distance: 12
-        VehicleDistance: 12
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 155
+        Distance: 11
+        VehicleDistance: 11
         AirDistance: 9
         NavalDistance: 9
         IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 9
-        Distance: 11
-        VehicleDistance: 11
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 132
+        Distance: 12
+        VehicleDistance: 12
         AirDistance: 10
         NavalDistance: 10
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 135
+        Distance: 13
+        VehicleDistance: 13
+        AirDistance: 12
+        NavalDistance: 26
         IsHQ: 0
     - SlotIndex: 0
       Team: 2
@@ -260241,6 +260241,41 @@ MonoBehaviour:
         AirDistance: 50
         NavalDistance: 63
         IsHQ: 1
+      - ConstructionName: Aeroporto
+        InstanceId: 8
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 50
+        NavalDistance: 63
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 119
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 49
+        NavalDistance: 56
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 117
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 51
+        NavalDistance: 62
+        IsHQ: 0
+      - ConstructionName: Porto Naval
+        InstanceId: 72
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 51
+        NavalDistance: 55
+        IsHQ: 0
+      - ConstructionName: "Esta\xE7\xE3o de Trem"
+        InstanceId: 102
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 49
+        NavalDistance: 65
+        IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 154
         Distance: 3.4028235e+38
@@ -260255,26 +260290,12 @@ MonoBehaviour:
         AirDistance: 51
         NavalDistance: 61
         IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 117
+      - ConstructionName: Aeroporto
+        InstanceId: 6
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
-        AirDistance: 51
-        NavalDistance: 62
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 71
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 52
-        NavalDistance: 56
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 72
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 51
-        NavalDistance: 55
+        AirDistance: 49
+        NavalDistance: 64
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 118
@@ -260283,33 +260304,12 @@ MonoBehaviour:
         AirDistance: 51
         NavalDistance: 57
         IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 119
+      - ConstructionName: Porto Naval
+        InstanceId: 71
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
-        AirDistance: 49
+        AirDistance: 52
         NavalDistance: 56
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 8
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 50
-        NavalDistance: 63
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 6
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 49
-        NavalDistance: 64
-        IsHQ: 0
-      - ConstructionName: "Esta\xE7\xE3o de Trem"
-        InstanceId: 102
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 49
-        NavalDistance: 65
         IsHQ: 0
     closestNeighbor1: 23
     closestNeighbor1Distance: 8
@@ -260366,13 +260366,6 @@ MonoBehaviour:
         NavalDistance: 15
         IsHQ: 1
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 133
-        Distance: 11
-        VehicleDistance: 11
-        AirDistance: 11
-        NavalDistance: 16
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
         InstanceId: 134
         Distance: 10
         VehicleDistance: 10
@@ -260387,24 +260380,24 @@ MonoBehaviour:
         NavalDistance: 12
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 135
+        InstanceId: 133
         Distance: 11
         VehicleDistance: 11
         AirDistance: 11
-        NavalDistance: 14
+        NavalDistance: 16
         IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 155
-        Distance: 9
-        VehicleDistance: 9
-        AirDistance: 9
-        NavalDistance: 13
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 132
+      - ConstructionName: Porto Naval
+        InstanceId: 74
         Distance: 10
         VehicleDistance: 10
         AirDistance: 10
+        NavalDistance: 13
+        IsHQ: 0
+      - ConstructionName: Aeroporto
+        InstanceId: 9
+        Distance: 9
+        VehicleDistance: 9
+        AirDistance: 9
         NavalDistance: 14
         IsHQ: 0
       - ConstructionName: "Esta\xE7\xE3o de Trem"
@@ -260421,18 +260414,25 @@ MonoBehaviour:
         AirDistance: 9
         NavalDistance: 12
         IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 74
-        Distance: 10
-        VehicleDistance: 10
-        AirDistance: 10
-        NavalDistance: 13
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 9
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 155
         Distance: 9
         VehicleDistance: 9
         AirDistance: 9
+        NavalDistance: 13
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 132
+        Distance: 10
+        VehicleDistance: 10
+        AirDistance: 10
+        NavalDistance: 14
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 135
+        Distance: 11
+        VehicleDistance: 11
+        AirDistance: 11
         NavalDistance: 14
         IsHQ: 0
     - SlotIndex: 0
@@ -260445,6 +260445,41 @@ MonoBehaviour:
         AirDistance: 43
         NavalDistance: 56
         IsHQ: 1
+      - ConstructionName: Aeroporto
+        InstanceId: 8
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 43
+        NavalDistance: 56
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 119
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 42
+        NavalDistance: 49
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 117
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 44
+        NavalDistance: 55
+        IsHQ: 0
+      - ConstructionName: Porto Naval
+        InstanceId: 72
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 44
+        NavalDistance: 48
+        IsHQ: 0
+      - ConstructionName: "Esta\xE7\xE3o de Trem"
+        InstanceId: 102
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 42
+        NavalDistance: 57
+        IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 154
         Distance: 3.4028235e+38
@@ -260459,26 +260494,12 @@ MonoBehaviour:
         AirDistance: 44
         NavalDistance: 54
         IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 117
+      - ConstructionName: Aeroporto
+        InstanceId: 6
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
-        AirDistance: 44
-        NavalDistance: 55
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 71
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 45
-        NavalDistance: 49
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 72
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 44
-        NavalDistance: 48
+        AirDistance: 42
+        NavalDistance: 57
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 118
@@ -260487,33 +260508,12 @@ MonoBehaviour:
         AirDistance: 44
         NavalDistance: 50
         IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 119
+      - ConstructionName: Porto Naval
+        InstanceId: 71
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
-        AirDistance: 42
+        AirDistance: 45
         NavalDistance: 49
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 8
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 43
-        NavalDistance: 56
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 6
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 42
-        NavalDistance: 57
-        IsHQ: 0
-      - ConstructionName: "Esta\xE7\xE3o de Trem"
-        InstanceId: 102
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 42
-        NavalDistance: 57
         IsHQ: 0
     closestNeighbor1: 30
     closestNeighbor1Distance: 4
@@ -260562,13 +260562,6 @@ MonoBehaviour:
         NavalDistance: 21
         IsHQ: 1
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 133
-        Distance: 7
-        VehicleDistance: 7
-        AirDistance: 7
-        NavalDistance: 22
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
         InstanceId: 134
         Distance: 6
         VehicleDistance: 6
@@ -260583,24 +260576,24 @@ MonoBehaviour:
         NavalDistance: 8
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 135
+        InstanceId: 133
         Distance: 7
         VehicleDistance: 7
         AirDistance: 7
-        NavalDistance: 10
+        NavalDistance: 22
         IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 155
-        Distance: 5
-        VehicleDistance: 5
-        AirDistance: 5
-        NavalDistance: 19
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 132
+      - ConstructionName: Porto Naval
+        InstanceId: 74
         Distance: 6
         VehicleDistance: 6
         AirDistance: 6
+        NavalDistance: 19
+        IsHQ: 0
+      - ConstructionName: Aeroporto
+        InstanceId: 9
+        Distance: 5
+        VehicleDistance: 5
+        AirDistance: 5
         NavalDistance: 20
         IsHQ: 0
       - ConstructionName: "Esta\xE7\xE3o de Trem"
@@ -260617,19 +260610,26 @@ MonoBehaviour:
         AirDistance: 5
         NavalDistance: 18
         IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 74
-        Distance: 6
-        VehicleDistance: 6
-        AirDistance: 6
-        NavalDistance: 19
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 9
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 155
         Distance: 5
         VehicleDistance: 5
         AirDistance: 5
+        NavalDistance: 19
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 132
+        Distance: 6
+        VehicleDistance: 6
+        AirDistance: 6
         NavalDistance: 20
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 135
+        Distance: 7
+        VehicleDistance: 7
+        AirDistance: 7
+        NavalDistance: 10
         IsHQ: 0
     - SlotIndex: 0
       Team: 2
@@ -260641,6 +260641,41 @@ MonoBehaviour:
         AirDistance: 42
         NavalDistance: 52
         IsHQ: 1
+      - ConstructionName: Aeroporto
+        InstanceId: 8
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 42
+        NavalDistance: 52
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 119
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 41
+        NavalDistance: 45
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 117
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 43
+        NavalDistance: 51
+        IsHQ: 0
+      - ConstructionName: Porto Naval
+        InstanceId: 72
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 43
+        NavalDistance: 44
+        IsHQ: 0
+      - ConstructionName: "Esta\xE7\xE3o de Trem"
+        InstanceId: 102
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 41
+        NavalDistance: 54
+        IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 154
         Distance: 3.4028235e+38
@@ -260655,26 +260690,12 @@ MonoBehaviour:
         AirDistance: 43
         NavalDistance: 50
         IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 117
+      - ConstructionName: Aeroporto
+        InstanceId: 6
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
-        AirDistance: 43
-        NavalDistance: 51
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 71
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 44
-        NavalDistance: 45
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 72
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 43
-        NavalDistance: 44
+        AirDistance: 41
+        NavalDistance: 53
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 118
@@ -260683,33 +260704,12 @@ MonoBehaviour:
         AirDistance: 43
         NavalDistance: 46
         IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 119
+      - ConstructionName: Porto Naval
+        InstanceId: 71
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
-        AirDistance: 41
+        AirDistance: 44
         NavalDistance: 45
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 8
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 42
-        NavalDistance: 52
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 6
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 41
-        NavalDistance: 53
-        IsHQ: 0
-      - ConstructionName: "Esta\xE7\xE3o de Trem"
-        InstanceId: 102
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 41
-        NavalDistance: 54
         IsHQ: 0
     closestNeighbor1: 25
     closestNeighbor1Distance: 4
@@ -260766,13 +260766,6 @@ MonoBehaviour:
         NavalDistance: 7
         IsHQ: 1
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 133
-        Distance: 16
-        VehicleDistance: 16
-        AirDistance: 6
-        NavalDistance: 6
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
         InstanceId: 134
         Distance: 15
         VehicleDistance: 15
@@ -260787,39 +260780,11 @@ MonoBehaviour:
         NavalDistance: 24
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 135
+        InstanceId: 133
         Distance: 16
         VehicleDistance: 16
-        AirDistance: 7
-        NavalDistance: 22
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 155
-        Distance: 14
-        VehicleDistance: 14
         AirDistance: 6
         NavalDistance: 6
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 132
-        Distance: 15
-        VehicleDistance: 15
-        AirDistance: 6
-        NavalDistance: 6
-        IsHQ: 0
-      - ConstructionName: "Esta\xE7\xE3o de Trem"
-        InstanceId: 148
-        Distance: 13
-        VehicleDistance: 13
-        AirDistance: 8
-        NavalDistance: 8
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 73
-        Distance: 15
-        VehicleDistance: 15
-        AirDistance: 5
-        NavalDistance: 5
         IsHQ: 0
       - ConstructionName: Porto Naval
         InstanceId: 74
@@ -260835,6 +260800,41 @@ MonoBehaviour:
         AirDistance: 7
         NavalDistance: 7
         IsHQ: 0
+      - ConstructionName: "Esta\xE7\xE3o de Trem"
+        InstanceId: 148
+        Distance: 13
+        VehicleDistance: 13
+        AirDistance: 8
+        NavalDistance: 8
+        IsHQ: 0
+      - ConstructionName: Porto Naval
+        InstanceId: 73
+        Distance: 15
+        VehicleDistance: 15
+        AirDistance: 5
+        NavalDistance: 5
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 155
+        Distance: 14
+        VehicleDistance: 14
+        AirDistance: 6
+        NavalDistance: 6
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 132
+        Distance: 15
+        VehicleDistance: 15
+        AirDistance: 6
+        NavalDistance: 6
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 135
+        Distance: 16
+        VehicleDistance: 16
+        AirDistance: 7
+        NavalDistance: 22
+        IsHQ: 0
     - SlotIndex: 0
       Team: 2
       Entries:
@@ -260845,6 +260845,41 @@ MonoBehaviour:
         AirDistance: 45
         NavalDistance: 55
         IsHQ: 1
+      - ConstructionName: Aeroporto
+        InstanceId: 8
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 45
+        NavalDistance: 55
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 119
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 44
+        NavalDistance: 48
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 117
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 46
+        NavalDistance: 54
+        IsHQ: 0
+      - ConstructionName: Porto Naval
+        InstanceId: 72
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 46
+        NavalDistance: 47
+        IsHQ: 0
+      - ConstructionName: "Esta\xE7\xE3o de Trem"
+        InstanceId: 102
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 44
+        NavalDistance: 57
+        IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 154
         Distance: 3.4028235e+38
@@ -260859,26 +260894,12 @@ MonoBehaviour:
         AirDistance: 46
         NavalDistance: 53
         IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 117
+      - ConstructionName: Aeroporto
+        InstanceId: 6
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
-        AirDistance: 46
-        NavalDistance: 54
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 71
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 47
-        NavalDistance: 48
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 72
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 46
-        NavalDistance: 47
+        AirDistance: 44
+        NavalDistance: 56
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 118
@@ -260887,33 +260908,12 @@ MonoBehaviour:
         AirDistance: 46
         NavalDistance: 49
         IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 119
+      - ConstructionName: Porto Naval
+        InstanceId: 71
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
-        AirDistance: 44
+        AirDistance: 47
         NavalDistance: 48
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 8
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 45
-        NavalDistance: 55
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 6
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 44
-        NavalDistance: 56
-        IsHQ: 0
-      - ConstructionName: "Esta\xE7\xE3o de Trem"
-        InstanceId: 102
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 44
-        NavalDistance: 57
         IsHQ: 0
     closestNeighbor1: 24
     closestNeighbor1Distance: 11
@@ -260962,13 +260962,6 @@ MonoBehaviour:
         NavalDistance: 19
         IsHQ: 1
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 133
-        Distance: 4
-        VehicleDistance: 4
-        AirDistance: 4
-        NavalDistance: 18
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
         InstanceId: 134
         Distance: 6
         VehicleDistance: 6
@@ -260983,38 +260976,10 @@ MonoBehaviour:
         NavalDistance: 9
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 135
-        Distance: 5
-        VehicleDistance: 5
+        InstanceId: 133
+        Distance: 4
+        VehicleDistance: 4
         AirDistance: 4
-        NavalDistance: 7
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 155
-        Distance: 6
-        VehicleDistance: 6
-        AirDistance: 6
-        NavalDistance: 19
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 132
-        Distance: 5
-        VehicleDistance: 5
-        AirDistance: 5
-        NavalDistance: 18
-        IsHQ: 0
-      - ConstructionName: "Esta\xE7\xE3o de Trem"
-        InstanceId: 148
-        Distance: 7
-        VehicleDistance: 7
-        AirDistance: 7
-        NavalDistance: 21
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 73
-        Distance: 6
-        VehicleDistance: 6
-        AirDistance: 6
         NavalDistance: 18
         IsHQ: 0
       - ConstructionName: Porto Naval
@@ -261031,6 +260996,41 @@ MonoBehaviour:
         AirDistance: 6
         NavalDistance: 20
         IsHQ: 0
+      - ConstructionName: "Esta\xE7\xE3o de Trem"
+        InstanceId: 148
+        Distance: 7
+        VehicleDistance: 7
+        AirDistance: 7
+        NavalDistance: 21
+        IsHQ: 0
+      - ConstructionName: Porto Naval
+        InstanceId: 73
+        Distance: 6
+        VehicleDistance: 6
+        AirDistance: 6
+        NavalDistance: 18
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 155
+        Distance: 6
+        VehicleDistance: 6
+        AirDistance: 6
+        NavalDistance: 19
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 132
+        Distance: 5
+        VehicleDistance: 5
+        AirDistance: 5
+        NavalDistance: 18
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 135
+        Distance: 5
+        VehicleDistance: 5
+        AirDistance: 4
+        NavalDistance: 7
+        IsHQ: 0
     - SlotIndex: 0
       Team: 2
       Entries:
@@ -261041,6 +261041,41 @@ MonoBehaviour:
         AirDistance: 37
         NavalDistance: 46
         IsHQ: 1
+      - ConstructionName: Aeroporto
+        InstanceId: 8
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 37
+        NavalDistance: 46
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 119
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 36
+        NavalDistance: 39
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 117
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 38
+        NavalDistance: 45
+        IsHQ: 0
+      - ConstructionName: Porto Naval
+        InstanceId: 72
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 38
+        NavalDistance: 38
+        IsHQ: 0
+      - ConstructionName: "Esta\xE7\xE3o de Trem"
+        InstanceId: 102
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 36
+        NavalDistance: 48
+        IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 154
         Distance: 3.4028235e+38
@@ -261055,26 +261090,12 @@ MonoBehaviour:
         AirDistance: 38
         NavalDistance: 44
         IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 117
+      - ConstructionName: Aeroporto
+        InstanceId: 6
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
-        AirDistance: 38
-        NavalDistance: 45
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 71
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 39
-        NavalDistance: 39
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 72
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 38
-        NavalDistance: 38
+        AirDistance: 36
+        NavalDistance: 47
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 118
@@ -261083,33 +261104,12 @@ MonoBehaviour:
         AirDistance: 38
         NavalDistance: 40
         IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 119
+      - ConstructionName: Porto Naval
+        InstanceId: 71
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
-        AirDistance: 36
+        AirDistance: 39
         NavalDistance: 39
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 8
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 37
-        NavalDistance: 46
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 6
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 36
-        NavalDistance: 47
-        IsHQ: 0
-      - ConstructionName: "Esta\xE7\xE3o de Trem"
-        InstanceId: 102
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 36
-        NavalDistance: 48
         IsHQ: 0
     closestNeighbor1: 30
     closestNeighbor1Distance: 11
@@ -261166,13 +261166,6 @@ MonoBehaviour:
         NavalDistance: 13
         IsHQ: 1
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 133
-        Distance: 20
-        VehicleDistance: 20
-        AirDistance: 8
-        NavalDistance: 12
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
         InstanceId: 134
         Distance: 22
         VehicleDistance: 22
@@ -261187,38 +261180,10 @@ MonoBehaviour:
         NavalDistance: 16
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 135
-        Distance: 21
-        VehicleDistance: 21
+        InstanceId: 133
+        Distance: 20
+        VehicleDistance: 20
         AirDistance: 8
-        NavalDistance: 14
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 155
-        Distance: 22
-        VehicleDistance: 22
-        AirDistance: 10
-        NavalDistance: 13
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 132
-        Distance: 21
-        VehicleDistance: 21
-        AirDistance: 9
-        NavalDistance: 12
-        IsHQ: 0
-      - ConstructionName: "Esta\xE7\xE3o de Trem"
-        InstanceId: 148
-        Distance: 23
-        VehicleDistance: 23
-        AirDistance: 11
-        NavalDistance: 15
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 73
-        Distance: 22
-        VehicleDistance: 22
-        AirDistance: 10
         NavalDistance: 12
         IsHQ: 0
       - ConstructionName: Porto Naval
@@ -261235,6 +261200,41 @@ MonoBehaviour:
         AirDistance: 10
         NavalDistance: 14
         IsHQ: 0
+      - ConstructionName: "Esta\xE7\xE3o de Trem"
+        InstanceId: 148
+        Distance: 23
+        VehicleDistance: 23
+        AirDistance: 11
+        NavalDistance: 15
+        IsHQ: 0
+      - ConstructionName: Porto Naval
+        InstanceId: 73
+        Distance: 22
+        VehicleDistance: 22
+        AirDistance: 10
+        NavalDistance: 12
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 155
+        Distance: 22
+        VehicleDistance: 22
+        AirDistance: 10
+        NavalDistance: 13
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 132
+        Distance: 21
+        VehicleDistance: 21
+        AirDistance: 9
+        NavalDistance: 12
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 135
+        Distance: 21
+        VehicleDistance: 21
+        AirDistance: 8
+        NavalDistance: 14
+        IsHQ: 0
     - SlotIndex: 0
       Team: 2
       Entries:
@@ -261245,6 +261245,41 @@ MonoBehaviour:
         AirDistance: 39
         NavalDistance: 47
         IsHQ: 1
+      - ConstructionName: Aeroporto
+        InstanceId: 8
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 40
+        NavalDistance: 47
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 119
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 38
+        NavalDistance: 40
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 117
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 40
+        NavalDistance: 46
+        IsHQ: 0
+      - ConstructionName: Porto Naval
+        InstanceId: 72
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 39
+        NavalDistance: 39
+        IsHQ: 0
+      - ConstructionName: "Esta\xE7\xE3o de Trem"
+        InstanceId: 102
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 41
+        NavalDistance: 49
+        IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 154
         Distance: 3.4028235e+38
@@ -261259,26 +261294,12 @@ MonoBehaviour:
         AirDistance: 39
         NavalDistance: 45
         IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 117
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 40
-        NavalDistance: 46
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 71
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 40
-        NavalDistance: 40
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 72
+      - ConstructionName: Aeroporto
+        InstanceId: 6
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
         AirDistance: 39
-        NavalDistance: 39
+        NavalDistance: 48
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 118
@@ -261287,33 +261308,12 @@ MonoBehaviour:
         AirDistance: 39
         NavalDistance: 41
         IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 119
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 38
-        NavalDistance: 40
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 8
+      - ConstructionName: Porto Naval
+        InstanceId: 71
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
         AirDistance: 40
-        NavalDistance: 47
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 6
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 39
-        NavalDistance: 48
-        IsHQ: 0
-      - ConstructionName: "Esta\xE7\xE3o de Trem"
-        InstanceId: 102
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 41
-        NavalDistance: 49
+        NavalDistance: 40
         IsHQ: 0
     closestNeighbor1: 34
     closestNeighbor1Distance: 8
@@ -261378,13 +261378,6 @@ MonoBehaviour:
         NavalDistance: 14
         IsHQ: 1
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 133
-        Distance: 12
-        VehicleDistance: 12
-        AirDistance: 10
-        NavalDistance: 13
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
         InstanceId: 134
         Distance: 14
         VehicleDistance: 14
@@ -261399,39 +261392,11 @@ MonoBehaviour:
         NavalDistance: 22
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 135
-        Distance: 13
-        VehicleDistance: 13
-        AirDistance: 11
-        NavalDistance: 20
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 155
-        Distance: 14
-        VehicleDistance: 14
+        InstanceId: 133
+        Distance: 12
+        VehicleDistance: 12
         AirDistance: 10
         NavalDistance: 13
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 132
-        Distance: 13
-        VehicleDistance: 13
-        AirDistance: 10
-        NavalDistance: 13
-        IsHQ: 0
-      - ConstructionName: "Esta\xE7\xE3o de Trem"
-        InstanceId: 148
-        Distance: 15
-        VehicleDistance: 15
-        AirDistance: 12
-        NavalDistance: 15
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 73
-        Distance: 14
-        VehicleDistance: 14
-        AirDistance: 9
-        NavalDistance: 12
         IsHQ: 0
       - ConstructionName: Porto Naval
         InstanceId: 74
@@ -261447,6 +261412,41 @@ MonoBehaviour:
         AirDistance: 11
         NavalDistance: 14
         IsHQ: 0
+      - ConstructionName: "Esta\xE7\xE3o de Trem"
+        InstanceId: 148
+        Distance: 15
+        VehicleDistance: 15
+        AirDistance: 12
+        NavalDistance: 15
+        IsHQ: 0
+      - ConstructionName: Porto Naval
+        InstanceId: 73
+        Distance: 14
+        VehicleDistance: 14
+        AirDistance: 9
+        NavalDistance: 12
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 155
+        Distance: 14
+        VehicleDistance: 14
+        AirDistance: 10
+        NavalDistance: 13
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 132
+        Distance: 13
+        VehicleDistance: 13
+        AirDistance: 10
+        NavalDistance: 13
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 135
+        Distance: 13
+        VehicleDistance: 13
+        AirDistance: 11
+        NavalDistance: 20
+        IsHQ: 0
     - SlotIndex: 0
       Team: 2
       Entries:
@@ -261457,6 +261457,41 @@ MonoBehaviour:
         AirDistance: 43
         NavalDistance: 53
         IsHQ: 1
+      - ConstructionName: Aeroporto
+        InstanceId: 8
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 43
+        NavalDistance: 53
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 119
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 42
+        NavalDistance: 46
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 117
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 44
+        NavalDistance: 52
+        IsHQ: 0
+      - ConstructionName: Porto Naval
+        InstanceId: 72
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 44
+        NavalDistance: 45
+        IsHQ: 0
+      - ConstructionName: "Esta\xE7\xE3o de Trem"
+        InstanceId: 102
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 44
+        NavalDistance: 55
+        IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 154
         Distance: 3.4028235e+38
@@ -261471,26 +261506,12 @@ MonoBehaviour:
         AirDistance: 44
         NavalDistance: 51
         IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 117
+      - ConstructionName: Aeroporto
+        InstanceId: 6
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
-        AirDistance: 44
-        NavalDistance: 52
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 71
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 45
-        NavalDistance: 46
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 72
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 44
-        NavalDistance: 45
+        AirDistance: 42
+        NavalDistance: 54
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 118
@@ -261499,33 +261520,12 @@ MonoBehaviour:
         AirDistance: 44
         NavalDistance: 47
         IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 119
+      - ConstructionName: Porto Naval
+        InstanceId: 71
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
-        AirDistance: 42
+        AirDistance: 45
         NavalDistance: 46
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 8
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 43
-        NavalDistance: 53
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 6
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 42
-        NavalDistance: 54
-        IsHQ: 0
-      - ConstructionName: "Esta\xE7\xE3o de Trem"
-        InstanceId: 102
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 44
-        NavalDistance: 55
         IsHQ: 0
     closestNeighbor1: 33
     closestNeighbor1Distance: 9
@@ -261655,13 +261655,6 @@ MonoBehaviour:
         NavalDistance: 56
         IsHQ: 1
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 133
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 39
-        NavalDistance: 55
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
         InstanceId: 134
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
@@ -261676,38 +261669,10 @@ MonoBehaviour:
         NavalDistance: 48
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 135
+        InstanceId: 133
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
-        AirDistance: 38
-        NavalDistance: 47
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 155
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 41
-        NavalDistance: 56
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 132
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 40
-        NavalDistance: 55
-        IsHQ: 0
-      - ConstructionName: "Esta\xE7\xE3o de Trem"
-        InstanceId: 148
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 40
-        NavalDistance: 58
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 73
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 42
+        AirDistance: 39
         NavalDistance: 55
         IsHQ: 0
       - ConstructionName: Porto Naval
@@ -261724,6 +261689,41 @@ MonoBehaviour:
         AirDistance: 40
         NavalDistance: 57
         IsHQ: 0
+      - ConstructionName: "Esta\xE7\xE3o de Trem"
+        InstanceId: 148
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 40
+        NavalDistance: 58
+        IsHQ: 0
+      - ConstructionName: Porto Naval
+        InstanceId: 73
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 42
+        NavalDistance: 55
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 155
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 41
+        NavalDistance: 56
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 132
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 40
+        NavalDistance: 55
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 135
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 38
+        NavalDistance: 47
+        IsHQ: 0
     - SlotIndex: 0
       Team: 2
       Entries:
@@ -261734,6 +261734,41 @@ MonoBehaviour:
         AirDistance: 0
         NavalDistance: 6
         IsHQ: 1
+      - ConstructionName: Aeroporto
+        InstanceId: 8
+        Distance: 1
+        VehicleDistance: 1
+        AirDistance: 1
+        NavalDistance: 5
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 119
+        Distance: 1
+        VehicleDistance: 1
+        AirDistance: 1
+        NavalDistance: 12
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 117
+        Distance: 1
+        VehicleDistance: 1
+        AirDistance: 1
+        NavalDistance: 5
+        IsHQ: 0
+      - ConstructionName: Porto Naval
+        InstanceId: 72
+        Distance: 3
+        VehicleDistance: 3
+        AirDistance: 3
+        NavalDistance: 8
+        IsHQ: 0
+      - ConstructionName: "Esta\xE7\xE3o de Trem"
+        InstanceId: 102
+        Distance: 3
+        VehicleDistance: 3
+        AirDistance: 3
+        NavalDistance: 7
+        IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 154
         Distance: 1
@@ -261748,26 +261783,12 @@ MonoBehaviour:
         AirDistance: 1
         NavalDistance: 6
         IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 117
+      - ConstructionName: Aeroporto
+        InstanceId: 6
         Distance: 1
         VehicleDistance: 1
         AirDistance: 1
-        NavalDistance: 5
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 71
-        Distance: 3
-        VehicleDistance: 3
-        AirDistance: 3
-        NavalDistance: 7
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 72
-        Distance: 3
-        VehicleDistance: 3
-        AirDistance: 3
-        NavalDistance: 8
+        NavalDistance: 6
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 118
@@ -261776,29 +261797,8 @@ MonoBehaviour:
         AirDistance: 2
         NavalDistance: 8
         IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 119
-        Distance: 1
-        VehicleDistance: 1
-        AirDistance: 1
-        NavalDistance: 12
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 8
-        Distance: 1
-        VehicleDistance: 1
-        AirDistance: 1
-        NavalDistance: 5
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 6
-        Distance: 1
-        VehicleDistance: 1
-        AirDistance: 1
-        NavalDistance: 6
-        IsHQ: 0
-      - ConstructionName: "Esta\xE7\xE3o de Trem"
-        InstanceId: 102
+      - ConstructionName: Porto Naval
+        InstanceId: 71
         Distance: 3
         VehicleDistance: 3
         AirDistance: 3
@@ -261931,13 +261931,6 @@ MonoBehaviour:
         NavalDistance: 4
         IsHQ: 1
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 133
-        Distance: 1
-        VehicleDistance: 1
-        AirDistance: 1
-        NavalDistance: 5
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
         InstanceId: 134
         Distance: 1
         VehicleDistance: 1
@@ -261952,39 +261945,11 @@ MonoBehaviour:
         NavalDistance: 6
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 135
+        InstanceId: 133
         Distance: 1
         VehicleDistance: 1
         AirDistance: 1
-        NavalDistance: 6
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 155
-        Distance: 2
-        VehicleDistance: 2
-        AirDistance: 2
-        NavalDistance: 4
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 132
-        Distance: 1
-        VehicleDistance: 1
-        AirDistance: 1
-        NavalDistance: 3
-        IsHQ: 0
-      - ConstructionName: "Esta\xE7\xE3o de Trem"
-        InstanceId: 148
-        Distance: 2
-        VehicleDistance: 2
-        AirDistance: 2
-        NavalDistance: 6
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 73
-        Distance: 3
-        VehicleDistance: 3
-        AirDistance: 3
-        NavalDistance: 3
+        NavalDistance: 5
         IsHQ: 0
       - ConstructionName: Porto Naval
         InstanceId: 74
@@ -262000,6 +261965,41 @@ MonoBehaviour:
         AirDistance: 1
         NavalDistance: 5
         IsHQ: 0
+      - ConstructionName: "Esta\xE7\xE3o de Trem"
+        InstanceId: 148
+        Distance: 2
+        VehicleDistance: 2
+        AirDistance: 2
+        NavalDistance: 6
+        IsHQ: 0
+      - ConstructionName: Porto Naval
+        InstanceId: 73
+        Distance: 3
+        VehicleDistance: 3
+        AirDistance: 3
+        NavalDistance: 3
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 155
+        Distance: 2
+        VehicleDistance: 2
+        AirDistance: 2
+        NavalDistance: 4
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 132
+        Distance: 1
+        VehicleDistance: 1
+        AirDistance: 1
+        NavalDistance: 3
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 135
+        Distance: 1
+        VehicleDistance: 1
+        AirDistance: 1
+        NavalDistance: 6
+        IsHQ: 0
     - SlotIndex: 0
       Team: 2
       Entries:
@@ -262010,6 +262010,41 @@ MonoBehaviour:
         AirDistance: 39
         NavalDistance: 48
         IsHQ: 1
+      - ConstructionName: Aeroporto
+        InstanceId: 8
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 39
+        NavalDistance: 48
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 119
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 38
+        NavalDistance: 41
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 117
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 40
+        NavalDistance: 47
+        IsHQ: 0
+      - ConstructionName: Porto Naval
+        InstanceId: 72
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 40
+        NavalDistance: 40
+        IsHQ: 0
+      - ConstructionName: "Esta\xE7\xE3o de Trem"
+        InstanceId: 102
+        Distance: 3.4028235e+38
+        VehicleDistance: 3.4028235e+38
+        AirDistance: 38
+        NavalDistance: 50
+        IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 154
         Distance: 3.4028235e+38
@@ -262024,26 +262059,12 @@ MonoBehaviour:
         AirDistance: 40
         NavalDistance: 46
         IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 117
+      - ConstructionName: Aeroporto
+        InstanceId: 6
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
-        AirDistance: 40
-        NavalDistance: 47
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 71
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 41
-        NavalDistance: 41
-        IsHQ: 0
-      - ConstructionName: Porto Naval
-        InstanceId: 72
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 40
-        NavalDistance: 40
+        AirDistance: 38
+        NavalDistance: 49
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
         InstanceId: 118
@@ -262052,33 +262073,12 @@ MonoBehaviour:
         AirDistance: 40
         NavalDistance: 42
         IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 119
+      - ConstructionName: Porto Naval
+        InstanceId: 71
         Distance: 3.4028235e+38
         VehicleDistance: 3.4028235e+38
-        AirDistance: 38
+        AirDistance: 41
         NavalDistance: 41
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 8
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 39
-        NavalDistance: 48
-        IsHQ: 0
-      - ConstructionName: Aeroporto
-        InstanceId: 6
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 38
-        NavalDistance: 49
-        IsHQ: 0
-      - ConstructionName: "Esta\xE7\xE3o de Trem"
-        InstanceId: 102
-        Distance: 3.4028235e+38
-        VehicleDistance: 3.4028235e+38
-        AirDistance: 38
-        NavalDistance: 50
         IsHQ: 0
     closestNeighbor1: 0
     closestNeighbor1Distance: 3.4028235e+38
@@ -274227,7 +274227,7 @@ MonoBehaviour:
   eixoOverrides: []
   constructionId: cidade
   instanceId: 54
-  currentPosition: {x: -7.793789, y: 3, z: 0}
+  currentPosition: {x: -7.7937884, y: 3, z: 0}
   constructionDisplayName: "Port\xE3o do Sul"
   lastAutoConstructionDisplayName: Cidade
   isVisible: 1
@@ -295151,7 +295151,7 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 1348457725607290348, guid: f7e44d7c210a32d4ba630ba660da88a1, type: 3}
       propertyPath: m_text
-      value: 0 / turn
+      value: 22500 / turn
       objectReference: {fileID: 0}
     - target: {fileID: 4985144350662451516, guid: f7e44d7c210a32d4ba630ba660da88a1, type: 3}
       propertyPath: m_Enabled
