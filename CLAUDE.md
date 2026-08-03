@@ -55,6 +55,19 @@ the world already knows how to answer them.
 **Every version has a report** (`docs/relatorio_vX.Y.Z.md`) that explains the
 *why*, not just the *what*, and each report is tagged in git.
 
+### Closing the day — the author's ritual, in this order
+
+1. write `docs/relatorio_vX.Y.Z.md` and add the row to `CHANGELOG.md`
+2. **one commit per work frontier**, not one commit for the whole batch
+3. `git add .` for what is left (Editor churn), saying in the message that it *is*
+   churn
+4. `git tag -a vX.Y.Z`, then push the commit **and** the tag
+5. update `docs/resumo.md` — a stale handoff is worse than none
+
+Step 2 is what makes a single frontier revertible without touching the others.
+Step 3 is where `git add .` is allowed; everywhere else it sweeps Unity Editor
+work in — check what went in.
+
 **Report location is a convention:** the **current** major lives in `docs/`;
 when a major closes, its reports are archived into `docs/Versões/`. Do not move
 current-major reports there.

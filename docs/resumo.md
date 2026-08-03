@@ -1,30 +1,25 @@
 # Resumo — onde estamos e o que vem
 
-Ponto de retomada. Escrito em 2026-08-02, logo depois de fechar a `v7.0.1`.
+Ponto de retomada. Escrito em 2026-08-03, logo depois de fechar a `v7.0.2`.
 Leia isto primeiro; ele diz o que ler depois.
 
 ---
 
 ## Estado
 
-**`v7.0.1` tagueada e no ar.** O degrau 2 saiu do papel: existe um
-`MelhorCapturaService`, e dois consumidores reais o chamam.
+**`v7.0.2` tagueada e no ar.** Cinco frentes num dia só, três delas amarradas
+pelo mesmo fio.
 
-> ⚠️ **DEPOIS DA TAG, e ainda NÃO COMPILADO:** o passo 3a foi feito —
-> `IsRebelCapturable` passou a delegar ao `PodeCapturarSensor`, e o sensor
-> ganhou `applyEmbarkedGate` (default `true`, ninguém muda). **A primeira coisa
-> a fazer numa sessão nova é abrir o Unity e compilar.** Se der erro, é aí.
->
-> A mudança liga **reconquista de prédio aliado em quatro papéis de uma vez** —
-> capturador rogue, transporte (courier + naval), assalto (`HQBreaker`) e
-> desembarque. Nunca rodou em partida. O que olhar está no fim deste documento.
+A descoberta que organiza o que vem, e que custou três propostas erradas antes
+de alguém mandar ler o manual:
 
-A descoberta que organiza tudo o que vem — e que a v7.0.1 confirmou em jogo:
+> **Uma habilidade não é um poder. É uma chave.** O nome na ficha não faz nada
+> sozinho; quem define o que a etiqueta abre é o alvo. A montanha diz "só entra
+> quem for alpino"; a construção diz quem a captura.
 
-> **Consertar a fonte conserta o vizinho de graça.** O navio de transporte
-> voltou a esperar na praia sem uma linha tocada no transporte, porque o
-> `MelhorEmbarque` recebe a necessidade de carona por delegate e é inteiramente
-> downstream dela. Foi o único resultado da versão que ninguém programou.
+Três regras do projeto estavam do lado errado dessa frase. Todas voltaram na
+v7.0.2. **O teste, antes de acrescentar qualquer campo:** o designer consegue
+renomear a etiqueta para qualquer coisa e tudo continua funcionando?
 
 ---
 
@@ -33,16 +28,13 @@ A descoberta que organiza tudo o que vem — e que a v7.0.1 confirmou em jogo:
 ```text
 0. sensores PodeX              → a resposta legal            ✅ prontos
 1. serviços de área (Hotzone)  → devolvem ÁREA               ✅ prontos
-2. consumidores Melhor*        → cruzam, ranqueiam, decidem  ⚠️ 9 existem, 3 faltam
+2. consumidores Melhor*        → cruzam, ranqueiam, decidem  ⚠️ 10 existem, 3 faltam
 3. papéis                      → só POLÍTICA                 encolhem junto do 2
 4. variações de papel          → sem plano, agressivo, jipe  vira PARÂMETRO
 ```
 
-**Um degrau nunca começa antes de o de baixo estar de pé.** Ordem por
-dependência, não por custo.
-
-Faltam de verdade **Combate** e **Fusão**. O terceiro buraco é o `Rebel.cs` —
-ver abaixo, porque ele mudou de lugar na fila.
+Faltam **Combate**, **Fusão** e — descoberto na v7.0.2 — **Visão**, que é o
+"para onde revelar" hoje escrito três vezes.
 
 ---
 
@@ -50,69 +42,57 @@ ver abaixo, porque ele mudou de lugar na fila.
 
 | # | documento | por quê |
 |---|---|---|
-| 1 | `docs/relatorio_v7.0.1.md` | **o que acabou de acontecer**, incluindo o que não terminou |
-| 2 | `docs/refactor/plano_de_trabalho.md` | a fila. A escada, o que falta em cada degrau, o que está adiado |
-| 3 | `docs/AI Behavior/governanca.md` | a norma acima dos papéis |
+| 1 | `docs/manual/01_principios_e_vocabulario.md` | **as regras do JOGO**, que a IA só consome. Decide *onde uma regra pode morar*, e isso não se recupera lendo código |
+| 2 | `docs/relatorio_v7.0.2.md` | o que acabou de acontecer, incluindo o que não terminou |
+| 3 | `docs/refactor/plano_de_trabalho.md` | a fila, ordenada por dependência |
 | 4 | `docs/AI Behavior/contrato_envelope_alcance.md` | **norma** das bandas. Inclui a inversão do artilheiro |
-| 5 | o contrato do papel em que for mexer | `Capturador.md`, `Assalto.md`, `FireSupport.md`, `Transporte.md` |
+| 5 | `docs/magnetic_tabela.md` | quem cada papel acompanha, e o que virou asset |
+| 6 | o contrato do papel em que for mexer | `Capturador.md`, `Assalto.md`, `FireSupport.md`, `Transporte.md` |
 
 ---
 
-## Onde eu parei — o 2.1 pela metade
+## Onde eu parei
 
-`MelhorCapturaService` existe, é consumido, e a ferramenta
-`Tools > Hotzone > Melhor Captura` mostra o que ele responde.
+### Melhor Captura — degrau 2.1, quase inteiro
 
-**Feito:**
+Consumido pelo `CaptureOpportunityClaimService` e pelo `QueroCaronaService`. A
+ordem foi invertida: o matching **aloca**, e carona e âncora **leem** a alocação
+por `TryGetClaimForUnit`.
 
-- o `CaptureOpportunityClaimService` chama o serviço uma vez por capturador e
-  ficou só com o matching 1:1. `IsEligibleConstruction` foi deletado
-- o `QueroCaronaService` parou de varrer o tabuleiro (sobrou o hash de cache)
-- **a ordem foi invertida:** o matching aloca → carona e âncora *leem* a
-  alocação por `TryGetClaimForUnit`. Antes eram duas resoluções independentes,
-  livres para discordar
+**Falta:** 7 varreduras de tabuleiro no `Capturer/`, o `QueroCaronaContext`, e o
+`Rebel.cs`.
 
-**Falta:**
+### Melhor Capitão — nasceu, ninguém consome
 
-- 7 varreduras de tabuleiro no `Capturer/` — Blitzkrieg (2), Explorer (2),
-  Embark (rally), Helpers, e as 2 do `Rebel.cs`
-- `QueroCaronaContext { ComPlano, RogueOuRebelde }`. Matar exige o chamador
-  passar o filtro, o que muda a assinatura do request
-- o `Rebel.cs`
+Serviço + janela + `AICaptainData` (asset em `DB/AI/AICaptain.asset`). Os quatro
+resolvedores antigos continuam mandando.
 
-**Sobre a métrica `IsCapturable`:** ela ainda aparece em 27 arquivos da IA. Nos
-dois que passaram pelo refactor ele sobrou **só no hash de cache** — a decisão
-saiu. Nos outros 25 ele ainda decide. Não use a contagem crua de arquivos como
-progresso; ela não distingue decisão de hash.
+**Falta:** o tradutor `AICaptainData → List<MelhorCapitaoAttraction>` e os
+predicados que ainda não existem (`AliadoFerido`, `AeronaveInimigaDetectada`,
+`PontoDeObservacao`…). `ConstrucaoCapturavel` já existe via Melhor Captura.
 
 ### O achado que reordena a fila
 
-**O `Rebel.cs` vazou para fora do capturador.** `FindNearestPlanlessCaptureTarget`
-e `IsRebelCapturable` são chamados por:
+**O `Rebel.cs` vazou para fora do capturador.**
+`FindNearestPlanlessCaptureTarget` é chamado por Transporte (2 sítios), Assalto
+(`HQBreaker`) e o rogue do capturador. `IsRebelCapturable` já foi consertado por
+dentro na v7.0.2 — delega ao sensor —, mas o nome e os chamadores continuam.
 
-| quem | onde |
-|---|---|
-| `AIController.MelhorDesembarque.cs` | 5 sítios |
-| `Transportador.Courier.Disembark.cs` | 2 |
-| `Transportador.Courier.Passengers.cs` | 1 |
-| `Transportador.Naval.cs` | 1 |
-| `Assault.HQBreaker.cs` | 1 |
-| `Phase2.cs` | `CommitPendingRebelCaptureTarget` |
-| `Router.cs:107` | `TryDecideRebelAction`, antes do planner |
-
-Transporte, Assalto e Desembarque decidem alvo de captura chamando funções do
-rebelde. **Ele não é "o passo depois do capturador" — é a ponte para os degraus
-4 e 5.** Matar aquelas duas funções converte três papéis de uma vez.
+**Ele não é "o passo depois do capturador" — é a ponte para os degraus 4 e 5.**
 
 **Cuidado com o nome:** há duas coisas chamadas "rebelde". A *facção sem QG* é
-conceito de jogo (derivado de não possuir `isPlayerHeadQuarter`) e **fica**. O
-`AIController.Rebel.cs` é controlador paralelo de IA e **evapora**.
+conceito de jogo e **fica**. O `AIController.Rebel.cs` é controlador paralelo e
+**evapora** — e já é só um roteador que chama
+`TryDecideCapturerAction(plan: null)`.
 
 ### Critério de aceite, inalterado
 
 > Um `UnitData` novo com a skill de captura — o "jipe capturador" — passa a
-> capturar **sem uma linha de IA escrita para ele**. Há um `jeep.png` e um
-> `soldado_jetpack.png` no repo esperando esse teste.
+> capturar **sem uma linha de IA escrita para ele**. Há `jeep.png` e
+> `soldado_jetpack.png` no repo esperando o teste.
+
+Depois da v7.0.2 o teste tem um segundo passo: dar a skill à unidade **e**
+listar a skill em `Required Skills To Capture` da construção.
 
 ---
 
@@ -120,12 +100,26 @@ conceito de jogo (derivado de não possuir `isPlayerHeadQuarter`) e **fica**. O
 
 - **Uma classe por vez.** Você mexe, o autor compila e roda no jogo, e comita
   antes da próxima. **Não emenda fases.**
-- **Verificar antes de documentar.** E **busca vazia não prova ausência** —
-  procurar o conceito por sinônimos antes de afirmar que não existe.
+- **Verificar antes de documentar.** E **busca vazia não prova ausência**.
+- **Ler o manual antes de decidir onde uma regra mora.** Custou três propostas
+  erradas na v7.0.2.
 - **Tem relatório, tem tag. Não tem relatório, é só commit.**
 - **Medir antes de otimizar.** Ler código não acha gargalo.
-- **Não editar `.asset` no disco com o inspector aberto** — o reimport descarta
-  a memória da Unity.
+- **Não editar `.asset` no disco com o inspector aberto.**
+
+### O ritual de encerrar o dia
+
+Ordem fixa, do autor:
+
+1. escrever `docs/relatorio_vX.Y.Z.md` e a linha no `CHANGELOG.md`
+2. **commits separados por frente de trabalho** — não um commit único do lote
+3. `git add .` no que sobrou (churn do Editor), com mensagem dizendo que é churn
+4. criar a tag `vX.Y.Z` e `push` do commit e da tag
+5. atualizar este arquivo
+
+O passo 2 é o mais novo. O ganho é reverter uma frente sem tocar nas outras: na
+v7.0.2 foram seis commits (3a, Melhor Capitão, chave de captura, desembarque,
+replay, relatório), e qualquer um deles volta sozinho.
 
 ---
 
@@ -133,70 +127,47 @@ conceito de jogo (derivado de não possuir `isPlayerHeadQuarter`) e **fica**. O
 
 | armadilha | lição |
 |---|---|
-| **otimizar por hipótese** | cortei 80% das chamadas ao sensor por candidata e o tempo **não se mexeu**. O custo estava nos 16 envelopes que o claim service constrói, um por capturador. Ler o log inteiro antes de escolher o alvo |
-| **comparar rodadas incomparáveis** | pós-load a IA reembaralha a ordem das unidades e o cache está frio (`MovementCacheMisses` de 1 para 52). Só compare turnos com o mesmo save, mesma ordem |
-| **`FrameSpike` com F11** | mede o frame inteiro, incluindo o input do humano. Não serve de métrica de IA. Use `decision=` da linha `[AI Perf][Unit]` |
-| **uma função, duas perguntas opostas** | `CollectCaptureCandidates` serve escolha de alvo (quer o alcançável) e fome estrutural (pergunta sobre o que está longe). Fixar o corte declarava encalhada quem tinha alvo a pé. Parâmetro obrigatório, sem default |
-| **`FindObjectsByType` dentro de laço** | `GetConstructionAtCell` varre a cena por chamada. Barato uma vez, O(n²) por candidata. Se o chamador já tem o objeto, passe-o |
-| inundação de tabuleiro por candidato | duas vezes já: 43 s na v6.0.x e a janela de LZ pendurando o editor |
-| cache de movimento no Editor | `MovementReachCache.TryBuildKey` exige `Application.isPlaying` |
-| ferramenta contra o contrato | ler o contrato antes de "melhorar" a ferramenta |
-| **`git add .`** | varre trabalho do editor Unity junto. Numa sessão a cena veio com **12.530 linhas** alteradas. Não é erro, mas confira o que entrou |
-| `roles.Contains` estrito | barra especializações. Portão de papel usa `UnitRoleCompatibility.CanSatisfy` |
-| predicado no eixo errado | `construction.TeamId == unit.TeamId` é **time**, não slot — e apagava a reconquista inteira. Relação entre lados é `PlayerSlotRelations.AreAllies(slot, slot)` |
+| **projetar sem ler o manual** | o `CLAUDE.md` não apontava `docs/manual/` e uma sessão nova projetou três arquiteturas contra o princípio da primeira página. Agora aponta |
+| **skill que se declara** | `canCaptureConstructions` era a única regra do projeto em que a etiqueta tinha poder. Se renomear quebra, o poder está no lugar errado |
+| **ferramenta que elege por GUID** | a janela do PodeCapturar varria assets e pegava "o primeiro com a flag". Com duas skills, ela reprovaria o que o jogo aprova |
+| **otimizar por hipótese** | cortei 80% das chamadas ao sensor e o tempo **não se mexeu**. O custo estava nos 16 envelopes do claim service |
+| **comparar rodadas incomparáveis** | pós-load a IA reembaralha a ordem e o cache está frio. Só compare com o mesmo save e mesma ordem |
+| **`FrameSpike` com F11** | mede o frame inteiro, incluindo o input humano. Use `decision=` da linha `[AI Perf][Unit]` |
+| **uma função, duas perguntas opostas** | `CollectCaptureCandidates` serve escolha de alvo e fome estrutural. Parâmetro obrigatório, sem default |
+| **`FindObjectsByType` dentro de laço** | `GetConstructionAtCell` varre a cena por chamada. Se o chamador já tem o objeto, passe-o |
+| **rota é cara** | 12-16ms por pathfind naval, e já produziu 71 s numa decisão. A cúbica é limite inferior — dá para podar exato |
+| **`git add .`** | varre trabalho do Editor junto. Não é erro, mas confira o que entrou |
+| **predicado no eixo errado** | `TeamId == unit.TeamId` é **time**, não slot — e apagava a reconquista em quatro papéis |
 
 ---
 
-## Aquecimento barato, se quiser
+## Aquecimento barato
 
 | # | tarefa | estado |
 |---|---|---|
-| L1 | apagar `AIController.Transportador.Courier.Attack.cs` — sem chamador | **ainda de pé** |
-| L2 | descobrir se `MelhorEstoqueService` é consumido | ✅ **é** — `AIController.Stock.cs:189` e `Logistics.Restock.cs:44` |
+| L1 | apagar `AIController.Transportador.Courier.Attack.cs` — sem chamador | ainda de pé |
+| L2 | `MelhorEstoqueService` é consumido? | ✅ é — `Stock.cs:189` e `Logistics.Restock.cs:44` |
 | L3 | T3 do `Transporte.md` — `RepresentativeCell` com desembarque de distância zero | não conferido |
+| L4 | rodar `Tools > AI > Auditar Chaves de Captura` de vez em quando | pega prédio capturável sem chave, que some do jogo em silêncio |
 
 ---
 
 ## Trilha paralela — Naval
 
-Ordem **obrigatória**: `M4b → M3 → M4`. A camada nativa do submarino mora dentro
-do fluxo de perseguir o capitão, que o M3 remove.
+Ordem **obrigatória**: `M4b → M3 → M4`. **Não rodar junto do degrau 4** — as duas
+mexem em âncora.
 
-**Não rodar junto do degrau 4** — as duas mexem em âncora.
-
-Falta escrever o **magnético naval** no `governanca_entre_papeis.md` §2.3.
-
----
-
-## Como testar o 3a (não compilado, não rodado)
-
-O projeto **não tem teste automatizado** — sem `.asmdef`, sem NUnit. O laço é
-compilar, rodar em Play mode e ler o log.
-
-O 3a afrouxou dois portões, então a falha esperada é **permissivo demais**,
-nunca restritivo:
-
-| sintoma | veredito |
-|---|---|
-| courier larga passageiro em prédio aliado quase capturado (19/20) | desperdício — reconquista entrou onde não valia |
-| assalto desvia pra reconquistar em vez de avançar | reconquista pesando demais |
-| **unidade embarcada capturando de verdade** | grave — o portão vazou pro gameplay |
-| transporte **para** de achar destino | o inverso do esperado; erro no delegate |
-
-O terceiro é o único sério, e é improvável: `applyEmbarkedGate` só cai onde foi
-passado `false` explicitamente, e o `TurnStateManager` usa o default.
-
-**Ideia barata para testar sem rodar turno:** expor o portão de embarcado como
-toggle no bloco *"Filtros do sensor"* da janela `Melhor Captura` — aí dá para
-apontar a ferramenta para um soldado **dentro do navio** e ver exatamente o que
-o `MelhorDesembarque` vai ver. São ~6 linhas.
+Falta escrever o **magnético naval** no `governanca_entre_papeis.md` §2.3. E a
+`docs/magnetic_tabela.md` já registra o caso que ele precisa: vigilância naval
+não tem prédio embaixo d'água, então a referência vem do `MelhorVisão` como
+célula de fronteira.
 
 ---
 
 ## Aviso
 
-Os contratos produziram 40+ pendências. Lista grande, organizada e marcada
-**parece progresso**. O antídoto é o ritmo acima.
+Lista grande, organizada e marcada **parece progresso**. O antídoto é o ritmo
+acima.
 
-E o teste final continua sendo um só: **os 7 perfis chamando uma fonte única,
-não 7 perfis com 7 definições diferentes.**
+O teste final continua sendo um só: **os 7 perfis chamando uma fonte única, não
+7 perfis com 7 definições diferentes.**
