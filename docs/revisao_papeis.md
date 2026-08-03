@@ -79,9 +79,9 @@ Papéis vivos hoje (`UnitRole`):
 | | AtaqueAereo | |
 | | Antiaéreo | |
 
-`RaidAntiSub` está em extinção: **nenhuma ficha o usa** (todas as cinco unidades
-de vigilância já são `roles: 06`), mas o shopping ainda o pede e o `AirCombat`
-ainda o testa. Ver a seção de pendências.
+`RaidAntiSub` foi removido: todas as cinco unidades usam `roles: 06`; shopping e
+operação especializam a demanda pela camada principal da ficha, e o valor 11
+permanece apenas reservado para não ser reutilizado.
 
 Aproximadamente **14 linhas × 12 colunas = 168 células**. A matriz cheia é
 impraticável e não é o objetivo: **a maioria das células é o padrão.** Uma raça
@@ -140,30 +140,25 @@ virou dado.**
 existirem, cada papel responde essas duas por conta própria — que é exatamente o
 estado que a matriz quer terminar.
 
-### `RaidAntiSub`: demanda inaplicável
+### ~~`RaidAntiSub`: demanda inaplicável~~ — resolvida
 
-Nenhuma unidade tem o papel, mas `AIShoppingPlanner.Demand.cs:2678` pede:
+O gate antigo pedia um papel sem representantes. Agora a demanda pede:
 
 ```csharp
-if (HasEnemySubmarineCapability(snapshot)
-    && CountCompositionRole(snapshot, UnitRole.RaidAntiSub) == 0)
-    → demanda prioridade 18
+Vigilancia
+  + RequiredVisionDomain = Submarine
+  + RequiredVisionHeight = Submerged
 ```
 
-A contagem é **sempre zero**. Com submarino inimigo visível, a demanda dispara
-todo turno e não pode ser preenchida. É a armadilha do *gate inaplicável*: ele
-não separa "ainda não satisfeito" de "impossível neste projeto".
-
-E `AirCombat.cs:53` e `:64` testam `roles[0] == RaidAntiSub` — ramos mortos.
-Consequência prática: **o Super Tucano não é reconhecido como combatente aéreo
-ofensivo**, porque o `roles[0]` dele hoje é `Vigilancia`.
+A contagem usa papel + camada principal. Um EWACS não satisfaz a demanda
+submarina, e Super Tucano/Fragata/Submarino podem satisfazê-la.
 
 ### "Pode atirar" precisa de dono
 
-Com todos virando `Vigilancia`, o teste `roles[0] == AtaqueAereo || RaidAntiSub`
-morre. O substituto não é outro papel — é **ter arma utilizável**, que o
-`PodeMirar` responde. Vira *"vigilância que pode atirar"*, e volta a ser
-capacidade em vez de rótulo.
+O substituto implementado não é outro papel: **vigilância armada** entra na
+consulta de combate, e o `PodeMirar` conserva a autoridade sobre a legalidade do
+tiro. Sem tiro materializável, o `MelhorVisao` conserva a autoridade sobre o
+reposicionamento.
 
 É o mesmo movimento que a captura fez: o papel deixou de governar a permissão.
 
@@ -171,8 +166,9 @@ capacidade em vez de rótulo.
 
 Uma unidade comum que enxerga o mar não pode fazer a Fragata acreditar que a
 cobertura `Submerged` já está garantida. O `MelhorVisao` já recebe
-`AlliedCoverageWithoutObserver` como conjunto pronto — **o filtro é de quem monta
-o conjunto**, e precisa estar escrito onde o chamador vê.
+`AlliedCoverageWithoutObserver` como conjunto pronto. O chamador agora declara
+`AlliedObserverFilter`; `AIController.Vigilancia` aceita somente aliados da mesma
+camada principal e, quando necessário, com detecção stealth equivalente.
 
 ---
 
@@ -276,6 +272,134 @@ AI Role: Capturador
 
 Três marcas de trabalho: **um branco real** (`Fundir`), **uma coluna respondida
 sem sensor** (`Ver`) e **duas hipertrofiadas** (`Mirar`, `Embarcar`).
+
+---
+
+## As raças que a matriz destrava
+
+> *Agora que eu sei que papel é raça, dá pra pensar em coisas interessantes.*
+
+O levantamento acima marcou quatro colunas do Capturador como *"(não se
+aplica)"*. **A ironia é que "não se aplica" nunca foi propriedade do papel — era
+propriedade da ficha.** O capturador raiz não supre porque *aquele* `UnitData`
+não tem `isSupplier`. Outro capturador pode ter.
+
+Cada raça é uma coluna em branco sendo preenchida:
+
+| raça | coluna que preenche | estava marcada como |
+|---|---|---|
+| capturador **raiz** | — | a linha base |
+| capturador **agressivo** | `PodeMirar` + `PodeCapturar` | já existe |
+| capturador **field medic** | `PodeSuprir` | *(não se aplica)* |
+| capturador **peão** — carrega caixas na mochila | `PodeTransferir` | *(não se aplica)* |
+| capturador **transportador** — leva o outro nas costas | `PodeEmbarcar`/`PodeDesembarcar` pelo lado do veículo | *(não se aplica)* |
+| capturador **vigilante** — o spotter que a artilharia pede, ou sniper | `Ver/Detectar` | ⚠️ respondido à mão |
+
+### O mecanismo já existe
+
+Nenhuma dessas precisa de `UnitRole` novo — e a lição do `RaidAntiSub` é
+exatamente essa. O `UnitRoleCompatibility.CanSatisfy` já faz a ponte, e o
+comentário dele já declara a doutrina:
+
+```csharp
+// Capacidade mecânica é a fonte de verdade: quem carrega satisfaz Transportador
+// e quem supre satisfaz Logística — sem precisar de papel híbrido.
+if (requestedRole == UnitRole.Transportador && data.isTransporter) return true;
+if (requestedRole == UnitRole.Logistica && data.isSupplier) return true;
+```
+
+O **field medic já é expressável hoje**: `roles: [Capturador]` + `isSupplier`. O
+jogo já o reconhece como logística quando alguém pergunta. O que falta é a
+política: ninguém pergunta *"capturador, o que você faz com sua capacidade de
+suprir?"*, porque o `AIController.Capturer` nunca chega perto do `PodeSuprir`.
+
+```text
+ficha diz o que a unidade PODE          →  isSupplier, isTransporter, skills
+matriz diz o que o papel FAZ com isso   →  a política daquela coluna
+```
+
+Mesma divisão da captura: a chave é da construção, o rendimento é do par, e o
+papel decide se prioriza.
+
+---
+
+## Raças mistas — cadeia dentro da coluna
+
+As raças acima **acrescentam** colunas. As mistas fazem outra coisa: elas
+**encadeiam parentes dentro de uma coluna**.
+
+### Labradoodle — o capturador agressivo
+
+> *Vira mistura de Fire Support com Assault. Consulta o `PodeMirar` do FS, e se
+> não der, o `PodeMirar` do Assault.*
+
+Não é "meio de cada". É **ordem**: tenta a resposta do primeiro parente; não
+havendo solução, tenta a do segundo. A doutrina já descreve isso para o
+Artilheiro Combatente — `docs/AI Behavior/rascunho de governanca.md`, linhas
+758-760:
+
+> *É principalmente uma unidade de Assault, mas tenta primeiro utilizar suas
+> armas de longo alcance. Quando não encontra uma solução de tiro à distância,
+> continua o avanço e combate por contato.*
+
+E a linha 554 do mesmo documento nomeia a cadeia sem rodeio: *"Quando não
+encontra uma solução válida de longo alcance, **passa para Assalto**."*
+
+E o `CanSatisfy` já registra o parentesco:
+
+```csharp
+case UnitRole.ArtilheiroCombatente:
+    return requestedRole == UnitRole.Assalto
+        || requestedRole == UnitRole.FogoIndireto;
+```
+
+**A forma é a mesma da lista de atração do `MelhorCapitao`:** sequência ordenada,
+a primeira faixa que produzir candidato vence, mesmo que a seguinte pareça mais
+próxima. O que vale para "quem eu sigo" vale para "como eu luto".
+
+### Caramelo — o porta-aviões
+
+> *Mistura de Transportador com supridor, estoquista e Fire Support. Consulta
+> pernas em vários papéis, mas em essência é um transportador.*
+
+Duas coisas ficam claras aqui, e valem para toda raça mista:
+
+**1. Existe uma essência.** `roles[0]` é o que a unidade **é** quando as colunas
+discordam. O porta-aviões que pode atirar, suprir e estocar continua sendo
+transporte — se a agenda de transporte e a de fogo pedirem coisas opostas, o
+transporte ganha. Sem essência declarada, a mistura vira empate sem
+desempatador.
+
+**2. As demais colunas não são secundárias — são só outras colunas.** O
+porta-aviões supre *de verdade*; ele apenas não deixa de ser transporte por
+causa disso.
+
+### O que isso pede da matriz
+
+Uma célula deixa de ser "uma política" e passa a poder ser **uma cadeia**:
+
+```text
+AI Role: Capturador Agressivo
+  PodeMirar   FireSupport → Assault      (tenta longe; sem solução, contato)
+
+AI Role: Porta-aviões        essência: Transportador
+  PodeEmbarcar     Transportador
+  PodeDesembarcar  Transportador
+  PodeSuprir       Logística
+  PodeTransferir   Estoque
+  PodeMirar        FireSupport
+```
+
+Três formas de célula, e todas já existem em algum lugar do projeto:
+
+| forma | exemplo já implementado |
+|---|---|
+| **política única** | `MelhorCaptura` — o capturador tem uma só |
+| **cadeia ordenada** | lista de atração do `AICaptainData` |
+| **herdada do parente** | `CanSatisfy` traduzindo papel especializado |
+
+**Nenhuma raça nova precisa de código.** Precisa de ficha, essência declarada e
+linha na matriz.
 
 ---
 
