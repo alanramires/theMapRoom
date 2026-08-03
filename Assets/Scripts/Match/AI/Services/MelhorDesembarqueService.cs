@@ -201,10 +201,9 @@ public static class MelhorDesembarqueService
     private static HashSet<Vector3Int> CollectStructuralLzCells(
         MelhorDesembarqueRequest request)
     {
-        // Aeronaves embarcadas possuem regras próprias de decolagem e algumas
-        // podem sair para terrenos cujo allowDisembark terrestre é falso.
-        // Nesse caso o índice genérico seria estreito demais; preserve a
-        // autoridade do PodeDesembarcar e use todos os caminhos alcançáveis.
+        // Aeronaves embarcadas possuem regras proprias de decolagem. Nao aplique
+        // nelas um pre-filtro estrutural terrestre: preserve a autoridade do
+        // PodeDesembarcar e use todos os caminhos alcancaveis.
         if (HasEmbarkedAircraft(request))
             return null;
 

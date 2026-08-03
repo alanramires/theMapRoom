@@ -433,17 +433,6 @@ public static class PodeDesembarcarSensor
             return false;
         }
 
-        ConstructionManager targetConstruction = ConstructionOccupancyRules.GetConstructionAtCell(map, targetCell);
-        if (targetConstruction == null &&
-            terrainDatabase != null &&
-            TryResolveTerrainAtCell(map, terrainDatabase, targetCell, out TerrainTypeData targetTerrain) &&
-            targetTerrain != null &&
-            !targetTerrain.allowDisembark)
-        {
-            reason = $"Terreno '{ResolveTerrainLabel(targetTerrain)}' nao permite desembarque.";
-            return false;
-        }
-
         if (!UnitMovementPathRules.TryGetEnterCellCost(
                 map,
                 passenger,

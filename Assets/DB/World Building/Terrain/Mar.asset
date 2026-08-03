@@ -22,7 +22,6 @@ MonoBehaviour:
   - domain: 2
     heightLevel: 2
   alwaysAllowAirDomain: 1
-  allowDisembark: 1
   allowAircraftTakeoffAndLanding: 1
   allowedLandingClasses: 
   requiredLandingSkills:

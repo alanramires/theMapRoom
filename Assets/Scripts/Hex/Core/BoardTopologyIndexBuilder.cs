@@ -127,8 +127,8 @@ internal static class BoardTopologyIndexBuilder
                 isPotentialDisembarkCell =
                     primaryDomain != Domain.Air
                     && (construction != null
-                        || (terrain != null
-                            && terrain.allowDisembark))
+                        || structure != null
+                        || terrain != null)
             };
             record.SetSourceTileSignature(
                 BuildTileSignature(cell, tilemaps));
@@ -702,7 +702,6 @@ internal static class BoardTopologyIndexBuilder
             return "-";
         return $"{StableId(terrain.id)}:{(int)terrain.domain}:" +
             $"{(int)terrain.heightLevel}:" +
-            $"{(terrain.allowDisembark ? 1 : 0)}:" +
             $"{(terrain.allowAircraftTakeoffAndLanding ? 1 : 0)}";
     }
 
