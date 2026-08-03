@@ -317,6 +317,112 @@ canônico que aceite HP atual e a opção do `PodeMirar`; ferramenta, Shopping e
 
 ---
 
+## 3.5 O corte do MVP — eram dois projetos
+
+Decisão fechada. Estávamos misturando duas coisas:
+
+```text
+1. "qual é o melhor combate desta unidade agora?"     ferramenta contida
+2. "como todos os papéis passam a consumir isso?"     o major de 8 etapas
+```
+
+**O MVP é só o primeiro.** Sem papel, capitão, missão, captura, rally ou router.
+Entrega:
+
+```text
+CombatEvaluationService
+MelhorCombateService
+Tools > Hotzone > Melhor Combate
+   ── e para aqui, para teste visual ──
+```
+
+Precedente: `MelhorCaptura`, `MelhorCapitao` e `MelhorVisao` **todos** nasceram
+como ferramenta sem consumidor.
+
+### Os três modos que a ferramenta mostra
+
+| modo | consulta | ficha exemplo |
+|---|---|---|
+| **Parado** | `MoveuParado` na célula atual | Artilharia — *"quem eu arraso mais?"* |
+| **Mover e atacar** | `MoveuAndando` em cada célula alcançável | Soldado — bolinha na célula, nota do melhor combate dali |
+| **Híbrido** | os dois rankings, separados | Tanque Z — com `preferArtilleryModeBeforeCombatant`, o modo "Auto da ficha" tenta o parado antes |
+
+### Fica de fora do MVP
+
+`PreparedNextTurn`, reposicionamento futuro de artilharia, `playConservative`,
+`longRangeStationary`, faixas de missão, e a migração de Assault / Capturer /
+Fire Support / HexEvaluator.
+
+`PreparedNextTurn` responde **outra pergunta** — *"onde posiciono a artilharia
+para talvez atirar na próxima rodada?"*. Útil, e não é esta ferramenta.
+
+### ⚠️ Mas o MVP não pula os passos 1–3 — pula os 6–8
+
+O `CombatResult` do MVP lista `AttackDecisionStatus`, `AttackerDpq` e
+`DefenderDpq`. Isso **exige** os três primeiros refactors.
+
+E o passo 2 é obrigatório por motivo técnico, não estético:
+
+```csharp
+// Capturer.Attack.cs:691 — privado, de instância, usa cache de instância
+private PositionDpqForAttackDecision ResolveDpqForAttackDecision(Vector3Int cell)
+{
+    if (aiDpqByCell.TryGetValue(cell, out ...))
+```
+
+Um serviço **não consegue chamar isto**. O MVP força a extração — e com ela
+entrega limpeza do maior arquivo da pasta `Capturer/` de graça.
+
+### A ferramenta é o pagamento do passo 1
+
+Estruturar o `Attack Decision` não tem benefício visível até que **alguma coisa
+exiba o status**. A ferramenta exibe. Passo 1 + ferramenta é o menor incremento
+que se justifica sozinho — e é a primeira vez que `SimulationUnavailable` deixa
+de se disfarçar de `Allowed`.
+
+### ⚠️ Esta ferramenta é runtime-only
+
+Diferente das outras `Melhor*`, que têm caminho de edit-mode. Combate depende de
+**HP atual, munição carregada e DPQ da posição** — em edit-mode nada disso
+existe, e o resultado seria ficha em HP máximo.
+
+É exatamente o defeito pelo qual o `UnitCounterEvaluator` foi rejeitado como nota
+runtime. Não construa o caminho de edição: ele seria enganoso, não incompleto.
+
+### ⚠️ A ordem do score é PROPOSTA, e diverge do que a IA faz hoje
+
+```text
+1. admitido pelo Attack Decision      5. preferência de alvo da ficha
+2. kill                               6. DPQ, quando prioritizeDpqAtBattle
+3. sobrevivência                      7. menor custo de movimento
+4. melhor troca (dano × perda)        8. desempate determinístico
+```
+
+Hoje a preferência de classe vale `150000f` no Assault — ou seja, **domina tudo**.
+Nesta ordem ela é o critério **5**, abaixo da troca.
+
+Isso é mudança de comportamento, não neutralidade. Como não há consumidor, não
+quebra nada — mas **o autor vai clicar e ver divergência em relação ao que a IA
+decide hoje.** Essa divergência é esperada e é o primeiro assunto a inspecionar,
+não um bug da ferramenta.
+
+### Critério de aceite
+
+Não "parece certo". Três fichas × os modos que cada uma suporta, com o painel
+explicando **todo combate bloqueado**:
+
+- [ ] Artilharia (parado) — alvos ordenados, e a zona morta de alcance mínimo não
+      aparece como alvo
+- [ ] Soldado (mover e atacar) — bolinha por célula, linha da célula ao melhor
+      alvo, célula onde o ataque é **bloqueado** visivelmente distinta
+- [ ] Tanque Z (híbrido) — os dois rankings, e o "Auto da ficha" respeitando
+      `preferArtilleryModeBeforeCombatant`
+- [ ] pelo menos um caso de **`SimulationUnavailable`** visível no painel — é a
+      coisa que hoje ninguém consegue ver
+- [ ] a arma exibida é a **canônica do `PodeMirar`**, marcada como tal
+
+---
+
 ## 4. Ordem de execução
 
 | quando | o quê | risco |
@@ -327,9 +433,15 @@ canônico que aceite HP atual e a opção do `PodeMirar`; ferramenta, Shopping e
 | — | **decisão do autor sobre os dois campos ambíguos** (§2.4) | não é código |
 | **4** | `MelhorCombate` como **consulta apenas**, sem consumidor | sem risco runtime |
 | **5** | ferramenta `Tools > Hotzone > Melhor Combate` | valida antes de migrar |
+| ══ | **FIM DO MVP — parar aqui e testar visualmente** | ══ |
 | **6** | migrar **um** consumidor simples | primeiro risco real |
 | **7** | comparar ranking antigo × novo nos logs | **é aqui que o tempo vai** |
 | **8** | migrar FS, Assault, Capturer, Repair, **HexEvaluator** | uma classe por vez |
+
+Os passos **1 a 5 são o MVP** e cabem num Y. Os passos **6 a 8 são o major** e
+só começam depois que o autor clicar em Soldado, Artilharia e Tanque Z e disser
+*"sim, é exatamente essa resposta"*. Só então se discute **qual cachorro consome
+essa resposta, e de que maneira**.
 
 ### Enquadramento
 
