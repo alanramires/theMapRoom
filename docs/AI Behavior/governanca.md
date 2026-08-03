@@ -670,7 +670,7 @@ que é coerente com a especialização deles ter uma perna em Assalto.
 
 | papel | destino | estado |
 |---|---|---|
-| **Raid Antissubmarino** | será incorporado à **Vigilância**. Pode virar a especialização **Vigilância Naval** | ⚠️ `RaidAntiSub = 11` ainda existe no enum |
+| **Raid Antissubmarino** | incorporado à **Vigilância** especializada em `Submarine/Submerged`; capacidade ofensiva vem das armas | ✅ removido do enum; valor 11 reservado e não reutilizável |
 | **Transportador Aéreo** | **foi** incorporado ao Transportador. O mesmo papel receberá regras específicas para transporte naval | ⚠️ `TransportadorAereo = 15` **ainda existe no enum**, com política de shopping própria documentada no comentário |
 
 A segunda linha merece atenção: o contrato usa o **passado** ("foi
@@ -933,7 +933,7 @@ Exceções por papel:
 | G15 | o papel se chama **Fire Support** | ⚠️ o enum diz `FogoIndireto` |
 | G16 | o papel se chama **Vigilância** | ✅ `UnitRole.Vigilancia = 6`; a camada principal da ficha especializa Air, Surface ou Submerged |
 | G17 | **Transportador Aéreo foi incorporado** | ⚠️ `TransportadorAereo = 15` ainda existe, com política de shopping própria. Mudou de pasta; a regra não migrou |
-| G18 | **Raid Antissubmarino** vai para Vigilância | ⚠️ `RaidAntiSub = 11` ainda existe |
+| G18 | ~~**Raid Antissubmarino** vai para Vigilância~~ | ✅ **fechada** — shopping, operação e combate usam `Vigilancia` + camada principal + capacidade de arma |
 | G20 | ~~**Melhor Estoque** ainda não implementado~~ | ✅ **fechada** — `MelhorEstoqueService` existe e corresponde à doutrina |
 | G21 | ~~**Melhor Captura** ainda não implementado~~ | ✅ **fechada** — `MelhorCapturaService` faz a consulta por unidade; `CaptureOpportunityClaimService` resolve o matching global |
 | G22 | **Melhor Atendimento** ainda não implementado | ⚠️ o serviço com esse nome não existe, mas `StockNeedAssessmentService` já responde "quem precisa mais" |

@@ -5,13 +5,11 @@
 > **campo** e não de ponto, e que faltava um serviço para reduzir campo a ponto.
 > É este.
 >
-> A mesma pergunta está hoje respondida em **três lugares independentes**, cada
-> um com pesos próprios: `AIController.Capturer.Explorer.cs` (seis constantes
-> `ExplorerForwardObserver*`), `AIController.Transportador.cs`
-> (`FindTransportExplorationMove`) e `AIController.VigilanciaAerea.cs`
-> (`unexploredMarginal * 25f`). É o mesmo padrão do `IsRebelCapturable`: uma
-> pergunta genérica escrita à mão, várias vezes, com respostas que podem
-> discordar.
+> A mesma pergunta chegou a ser respondida em **três lugares independentes**.
+> A Vigilância já foi migrada para o núcleo geral; ainda restam
+> `AIController.Capturer.Explorer.cs` (seis constantes
+> `ExplorerForwardObserver*`) e `AIController.Transportador.cs`
+> (`FindTransportExplorationMove`) com respostas próprias que podem discordar.
 
 ## Objetivo
 
@@ -129,9 +127,10 @@ As candidatas aéreas ainda precisam passar pela validação pura de ocupação 
 da camada, pois o mapa cúbico materializa alcance geométrico, mas não promete por
 si só que o empilhamento final é válido.
 
-### AirSurveillanceCoverageService como protótipo parcial
+### AirSurveillanceCoverageService como protótipo parcial removido
 
-`AirSurveillanceCoverageService` já calcula parte da resposta desejada:
+`AirSurveillanceCoverageService` calculava parte da resposta desejada e serviu
+como protótipo até a migração para os serviços gerais:
 
 - cobertura estrutural a partir de uma posição virtual;
 - cobertura marginal em relação a aliados;
@@ -141,7 +140,7 @@ si só que o empilhamento final é válido.
 - pontuação de cobertura;
 - cache estrutural por posição e perfil.
 
-Ele está preso hoje à política de Vigilância Aérea:
+Ele estava preso à política de Vigilância Aérea:
 
 - nomes e resultado fixos em `AirLow` e `AirHigh`;
 - coleta precisa deliberadamente restrita a `Air/High`;
@@ -281,8 +280,8 @@ conseguir olhar qualquer camada. O runtime usa a principal.
 
 #### Consequência para o `Result`
 
-O retorno **não pode nomear camada**. O `AirSurveillanceCoverageService` atual
-carrega `AirLow`, `AirHigh`, `MarginalAirLow`, `MarginalAirHigh`,
+O retorno **não pode nomear camada**. O `AirSurveillanceCoverageService` legado
+carregava `AirLow`, `AirHigh`, `MarginalAirLow`, `MarginalAirHigh`,
 `UnexploredMarginalAirHigh`, `DetectsLowStealth` e `DetectsHighStealth` — sete
 campos com o nome da camada dentro do tipo. Generalizar não é trocar um
 parâmetro: é o `Result` passar a devolver `Layer` + os números daquela camada.
@@ -531,20 +530,23 @@ Ao selecionar uma bolinha, a janela pode pintar:
 - cobertura perdida em relação à origem;
 - célula ou conjunto de foco.
 
-## Consumidores futuros
+## Consumidores runtime
 
-Na primeira etapa, nenhum `AIController` será migrado. O novo núcleo será usado
-somente pela ferramenta de auditoria.
+O núcleo nasceu primeiro na ferramenta de auditoria. A agenda
+`AIController.Vigilancia` agora é o primeiro consumidor runtime: resolve a camada
+principal da ficha, pede a hotzone `Mobility` e usa cobertura aliada filtrada pela
+mesma missão e capacidade stealth.
 
-### Vigilância Aérea
+### Vigilância Air/High
 
-Migração futura:
+Migração concluída:
 
 - EWACS consulta `Air/High`;
 - Radar Móvel consulta `Air/High`; sua cobertura `Air/Low` é secundária e não
   disputa a decisão;
-- `AirSurveillanceCoverageService` pode virar wrapper temporário do serviço geral;
-- comportamento e pesos atuais devem permanecer iguais durante a migração.
+- o serviço aéreo legado foi removido; ranking local usa `MelhorVisaoService` e
+  alvos operacionais fora da hotzone usam `VisionCoverageService`;
+- recuperação, magnetismo e postura estacionária continuam políticas do controller.
 
 ### Super Tucano
 
@@ -732,7 +734,11 @@ Exemplos:
 
 Isso preserva a caixa de Lego: mesma medição, prioridades diferentes.
 
-## Sequência sugerida de implementação
+## Sequência de implementação
+
+As etapas 1 a 4 estão concluídas. Na etapa 5, Vigilância Aérea, Fragata,
+Super Tucano e Submarino já foram migrados; Capturer, Transportador e a
+coordenação avançada com Fire Support continuam pendentes.
 
 ### Etapa 1 — Serviço estrutural geral
 
@@ -769,13 +775,13 @@ Isso preserva a caixa de Lego: mesma medição, prioridades diferentes.
 5. Pintar bolinhas e detalhes de cobertura.
 6. Validar manualmente os cenários de floresta, montanha, Air e Submerged.
 
-### Etapa 5 — Migrações futuras, uma por vez
+### Etapa 5 — Migrações por consumidor
 
 1. Capturer e sua aproximação para abrir FOW.
-2. Vigilância Aérea, preservando comportamento atual por wrapper.
-3. Fragata.
-4. Super Tucano.
-5. Submarino.
+2. Vigilância Aérea. **Concluída**, preservando sua política especializada.
+3. Fragata. **Concluída** pela camada principal da ficha.
+4. Super Tucano. **Concluída** pela camada principal da ficha.
+5. Submarino. **Concluída** pela camada principal da ficha.
 6. Coordenação entre vanguarda e Fire Support.
 7. Remoção de flags autorais comprovadamente obsoletas.
 

@@ -144,19 +144,19 @@ O critério que emerge da tabela: nasce cheio quem foi comprado **em uma instala
 
 ---
 
-### IA-003 — A fragata é comprada como caçadora e operada como unidade genérica
+### IA-003 — A fragata é comprada e operada pela vigilância submarina
 
 **Regra canônica.** A fragata existe para caçar submarino: sensor antissubmarino mais carga de profundidade de alcance 0 (`06_combate.md`).
 
-**Comportamento atual.** O shopping funciona pelo motivo certo — há demanda explícita de `RaidAntiSub` quando a IA detecta capacidade submarina inimiga. A **operação** não existe: `RaidAntiSub` não tem tratador no roteador, e o único lugar que reconhece o papel é o combate aéreo, que exige `data.domain == Domain.Air`. Sendo Naval, a fragata passa por todos os tratadores e cai no `HexEvaluator` genérico.
+**Comportamento atual.** O shopping pede `Vigilancia` cuja camada principal seja `Submarine/Submerged`. O roteador entrega todas as unidades do papel ao `AIController.Vigilancia`; armas legais têm precedência via `PodeMirar` e, sem tiro, o `MelhorVisaoService` escolhe a posição na camada da ficha.
 
-**Evidência.** `AIShoppingPlanner.Demand.cs:2582` (demanda); `AIController.AirCombat.cs:39-44` (`IsAirCombatUnit` exige domínio aéreo); `AIController.Router.cs` (sem ramo para `RaidAntiSub`).
+**Evidência.** `AIShoppingPlanner.Demand.cs` (`RequiredVisionDomain/Height`); `AIController.Vigilancia.cs` (perfil, ataque e ranking); `MelhorVisaoService.cs` (hotzone e cobertura aliada filtrável).
 
-**Impacto.** A IA compra a unidade certa e a usa como barco armado qualquer. Não mantém contato, não fica sobre o alvo, não usa o sensor. Soma-se ao `IA-001`: mesmo que caçasse, o ataque de alcance 0 seria subavaliado.
+**Impacto.** Fragata, Submarino e Super Tucano compartilham a agenda de vigilância submarina sem compartilhar geometria de movimento. Cada um conserva a própria mobilidade e armamento.
 
-**Decisão necessária.** Não resolver empurrando a fragata para o tratador aéreo — ele lida com decolagem, altitude e duelo aéreo, e produziria comportamento pior que o genérico. O que falta é lógica de caça antissubmarino própria.
+**Decisão tomada.** Caça antissubmarino não é papel separado: é `Vigilancia` na camada `Submarine/Submerged`, combinada com capacidade de arma quando existir.
 
-**Status.** Aberta. Lacuna de escopo, não bug de uma linha.
+**Status.** Fechada na agenda básica. Táticas navais avançadas, como hit-and-run do Submarino e capitão marítimo, permanecem evoluções separadas.
 
 ---
 

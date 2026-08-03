@@ -275,18 +275,16 @@ encalhe enquanto persegue alguém que não deveria estar perseguindo.
 (Radar Móvel → EWACS → capturador como fallback). O magnético naval é uma
 terceira hierarquia no mesmo lugar, e a remoção da perseguição vem junto.
 
-**Proposta do autor:** `AIController.VigilanciaAerea` vira
-**`AIController.Vigilancia`** — a agenda deixa de ser "aérea" e passa a ser da
+**Implementado:** `AIController.VigilanciaAerea` virou
+**`AIController.Vigilancia`** — a agenda deixou de ser "aérea" e passou a ser da
 **camada da visão especializada**. Radar móvel vigia o chão, EWACS vigia o ar,
 submarino/fragata vigiam a água: é a mesma agenda com camada diferente, do mesmo
 jeito que artilheiro e antiaéreo combatente são o mesmo pipeline com alvo
 diferente (§1).
 
-⚠️ Hoje o módulo é aéreo por construção: `Units/Vigilancia Aerea/` tem só dois
-arquivos, e a porta de entrada é `IsAirborneAirSurveillanceUnit` — o nome já
-denuncia. O contrato do envelope prevê o substituto —
-`SupportsSubStep(unit, Aereo)` — mas isso troca uma camada fixa por outra; o que
-a regra pede é a camada virar **parâmetro**.
+O módulo vive em `Units/Vigilancia/`. A porta genérica resolve a camada principal
+da ficha e delega a geometria ao envelope `Mobility`; helpers especificamente
+aéreos permanecem apenas para recuperação, formação e plataforma do EWACS/Radar.
 
 É o mesmo movimento do §10 do `Capturador.md`: lá a âncora do rogue deixou de
 ser fixa no QG e virou parâmetro. Aqui é a camada da vigilância.
@@ -469,7 +467,7 @@ Não se aplica ao papel.
 | # | o que falta | onde | tamanho |
 |---|---|---|---|
 | **M1** | assalto passa a usar `IsMaritime()` em vez de `GetDomain() == Naval` — a derivada existe justamente porque hidroavião é aeronave **e** marítimo | `Assault.HQBreaker.cs:345` | P |
-| **M2** | `VigilanciaAerea` → **`AIController.Vigilancia`**: a agenda deixa de ser aérea e passa a ser da **camada da visão especializada** | `Units/Vigilancia Aerea/` → renomear | M |
+| **M2** | ✅ `VigilanciaAerea` → **`AIController.Vigilancia`**: a agenda usa a **camada principal da visão especializada** | `Units/Vigilancia/` | M |
 | **M3** | **parar de seguir o capitão terrestre** (gambiarra de teste) e criar o magnético naval: capitão é assalto com `IsMaritime()` | `Backline.cs`, `Assault.HQBreaker.cs` | M |
 | **M8** | `FireSupport.Naval` — roteador de armas mistas: Destroyer tenta terra, depois ar, depois reposiciona | novo | M |
 | **M9** | `Assault.Naval` — fragata: assalto puro **sem magnético**. Fino por natureza: a recusa do capitão e a agenda de vigilância. Submarino **não** entra, fica como `Assault.ArtilheiroCombatente` | novo | M |
