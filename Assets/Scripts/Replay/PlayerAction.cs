@@ -54,7 +54,8 @@ public class PlayerAction
     // Usado para filtragem no debug e para anotacoes visuais no replay.
     public bool IsAIGenerated;
 
-    // Snapshot do estado do mapa associado a esta acao na timeline.
+    // Checkpoint excepcional de estado. No formato compacto, a timeline usa o
+    // snapshot de inicio do turno e reexecuta as PlayerActions intermediarias.
     public TurnStartSnapshot Snapshot;
 
     public bool IsTurnMarker;

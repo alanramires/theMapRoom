@@ -378,6 +378,8 @@ public class ConstructionSaveData
 [Serializable]
 public class ReplaySaveData
 {
+    public const int CompactTimelineFormatVersion = 2;
+    public int formatVersion;
     public List<ReplayTurnRecordSaveData> matchHistory = new List<ReplayTurnRecordSaveData>();
     public bool hasCurrentRecord;
     public ReplayTurnRecordSaveData currentRecord;

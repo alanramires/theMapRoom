@@ -73,6 +73,9 @@ public class ReplayManager : MonoBehaviour
     private Coroutine restoreFogRefreshRoutine;
     private Coroutine attackStepExecutionRoutine;
     private Coroutine actionStepExecutionRoutine;
+    private Coroutine replaySeekRoutine;
+    private bool replaySeekPreviousFastReplayMode;
+    private bool replaySeekOverridesFastReplayMode;
     private Coroutine autoplayAdvanceRetryRoutine;
     private Coroutine replayTransitionFeedbackRoutine;
     private string replayTransitionFeedbackText = string.Empty;
@@ -201,6 +204,9 @@ public class ReplayManager : MonoBehaviour
             StopCoroutine(actionStepExecutionRoutine);
             actionStepExecutionRoutine = null;
         }
+
+
+        StopReplaySeekRoutine();
 
         StopAutoplayAdvanceRetryRoutine();
         automatedPlayer?.StopPlaying();
@@ -426,6 +432,11 @@ public class ReplayManager : MonoBehaviour
         // RemoveUnit can drift in runtime (target resolution / async death sequencing).
         // Reapply recorded post-action snapshot to keep replay deterministic.
         return action.ActionType == PlayerActionType.RemoveUnit;
+    }
+
+    private static bool RequiresPostActionCheckpoint(PlayerAction action)
+    {
+        return ShouldApplyPostSnapshotAfterLiveEmulation(action);
     }
 
     private IEnumerator ExecuteRecordedActionBatch(PlayerAction action, TurnStartSnapshot preActionSnapshot)
@@ -1744,7 +1755,8 @@ public class ReplayManager : MonoBehaviour
     {
         TryAutoAssignReferences();
 
-        if (includeCinematicStepRoutine && (attackStepExecutionRoutine != null || actionStepExecutionRoutine != null))
+        if (includeCinematicStepRoutine &&
+            (attackStepExecutionRoutine != null || actionStepExecutionRoutine != null || replaySeekRoutine != null))
             return true;
 
         if (animationManager != null && animationManager.IsAnimatingMovement)
@@ -1812,7 +1824,7 @@ public class ReplayManager : MonoBehaviour
         };
 
         currentRecord.Steps.Add(step);
-        stepSnapshots[step.StepIndex] = BuildTurnStartSnapshot("RecordCommand.PostStep");
+        stepSnapshots.Remove(step.StepIndex);
     }
 
     public void EndTurnRecording()
@@ -1905,6 +1917,8 @@ public class ReplayManager : MonoBehaviour
             StopCoroutine(actionStepExecutionRoutine);
             actionStepExecutionRoutine = null;
         }
+
+        StopReplaySeekRoutine();
         bool shouldPreserveStepSnapshots =
             preReplayWasRecording
             && preReplayRecordingRecord != null
@@ -1945,11 +1959,12 @@ public class ReplayManager : MonoBehaviour
     {
         ReplaySaveData data = new ReplaySaveData
         {
+            formatVersion = ReplaySaveData.CompactTimelineFormatVersion,
             selectedTurnIndex = selectedTurnIndex,
             observerTeamId = (int)observerTeam,
             observerSlotIndex = observerSlotIndex,
             visionMode = (int)visionMode,
-            actionStack = actionStack ?? new ActionStack()
+            actionStack = BuildCompactActionStack(actionStack)
         };
 
         if (matchHistory != null)
@@ -1991,7 +2006,12 @@ public class ReplayManager : MonoBehaviour
             return;
 
         if (data.actionStack != null)
+        {
             actionStack = data.actionStack;
+            int prunedSnapshots = PruneRedundantActionSnapshots(actionStack);
+            if (prunedSnapshots > 0)
+                ReplayLog($"[Replay][Compact] discarded {prunedSnapshots} redundant action snapshots while loading legacy replay data.");
+        }
 
         if (data.matchHistory != null)
         {
@@ -2305,13 +2325,20 @@ public class ReplayManager : MonoBehaviour
             return;
 
         int actionIndex = ResolveCurrentRecordActionCount() - 1;
-        if (actionIndex >= 0)
-        {
-            TurnStartSnapshot postActionSnapshot = BuildTurnStartSnapshot("RecordStandaloneAction.PostStep");
-            action.Snapshot = postActionSnapshot;
-            if (postActionSnapshot != null)
-                stepSnapshots[actionIndex] = postActionSnapshot;
-        }
+        if (actionIndex < 0)
+            return;
+
+        // The turn-start snapshot is the timeline anchor. Most actions are replayed
+        // from their compact PlayerAction data and no longer duplicate the whole board.
+        // Keep a full post-action checkpoint only for explicitly non-deterministic cases.
+        action.Snapshot = RequiresPostActionCheckpoint(action)
+            ? BuildTurnStartSnapshot("RecordStandaloneAction.ExceptionCheckpoint")
+            : null;
+
+        if (action.Snapshot != null)
+            stepSnapshots[actionIndex] = action.Snapshot;
+        else
+            stepSnapshots.Remove(actionIndex);
     }
 
     public void PromoteCurrentBuffer(string debugLabel)
@@ -2362,7 +2389,13 @@ public class ReplayManager : MonoBehaviour
             return false;
 
         isPlaying = false;
-        return NavigateToSnapshotIndex(targetIndex);
+
+        // Old saves may still have a full snapshot for this action. New compact
+        // timelines advance by replaying the recorded action from the current state.
+        if (TryResolveSnapshotForCurrentRecordActionIndex(targetIndex, cacheWhenFound: true) != null)
+            return NavigateToSnapshotIndex(targetIndex);
+
+        return ExecuteStepAtIndex(targetIndex, allowCinematic: true, out _);
     }
 
 
@@ -2379,7 +2412,11 @@ public class ReplayManager : MonoBehaviour
         isPlaying = false;
 
         int targetIndex = currentStepIndex - 1;
-        return NavigateToSnapshotIndex(targetIndex);
+        if (targetIndex < 0 || TryResolveSnapshotForCurrentRecordActionIndex(targetIndex, cacheWhenFound: true) != null)
+            return NavigateToSnapshotIndex(targetIndex);
+
+        replaySeekRoutine = StartCoroutine(SeekFromTurnAnchorRoutine(targetIndex));
+        return true;
     }
     public void TogglePlayPause()
     {
@@ -2570,6 +2607,88 @@ public class ReplayManager : MonoBehaviour
 
         ReplayLogWarning($"[Replay][SnapshotNav] snapshot ausente para targetStep={targetIndex} | cachedSnapshots={stepSnapshots.Count}");
         return false;
+    }
+
+    private IEnumerator SeekFromTurnAnchorRoutine(int targetIndex)
+    {
+        replaySeekPreviousFastReplayMode = fastReplayMode;
+        replaySeekOverridesFastReplayMode = true;
+        replayBatchAbortRequested = false;
+        fastReplayMode = true;
+
+        RestoreSnapshot(currentRecord.StartSnapshot);
+        currentStepIndex = -1;
+        ApplyReplayVision();
+
+        for (int index = 0; index <= targetIndex; index++)
+        {
+            PlayerAction action = TryResolveCurrentRecordActionByIndex(index);
+            if (action != null)
+            {
+                TurnStartSnapshot preActionSnapshot = index == 0
+                    ? currentRecord.StartSnapshot
+                    : TryResolveSnapshotForCurrentRecordActionIndex(index - 1, cacheWhenFound: true);
+                TurnStartSnapshot postActionSnapshot = TryResolveSnapshotForCurrentRecordActionIndex(index, cacheWhenFound: true);
+
+                if (CanReplayActionAsLiveInputs(action.ActionType))
+                {
+                    yield return ExecuteRecordedActionBatch(action, preActionSnapshot);
+                    if (ShouldApplyPostSnapshotAfterLiveEmulation(action) && postActionSnapshot != null)
+                        RestoreSnapshot(postActionSnapshot);
+                }
+                else if (postActionSnapshot != null)
+                {
+                    RestoreSnapshot(postActionSnapshot);
+                }
+                else
+                {
+                    ReplayLogWarning($"[Replay][Seek] action type {action.ActionType} has no compact executor or checkpoint.");
+                    replayBatchAbortRequested = true;
+                }
+            }
+            else if (currentRecord.Steps != null && index < currentRecord.Steps.Count)
+            {
+                ReplayStep step = currentRecord.Steps[index];
+                if (step?.Command == null)
+                {
+                    replayBatchAbortRequested = true;
+                }
+                else
+                {
+                    step.Command.Execute(BuildExecutionContext());
+                }
+            }
+            else
+            {
+                replayBatchAbortRequested = true;
+            }
+
+            if (replayBatchAbortRequested)
+                break;
+
+            currentStepIndex = index;
+            ApplyReplayVision();
+            yield return null;
+        }
+
+        fastReplayMode = replaySeekPreviousFastReplayMode;
+        replaySeekOverridesFastReplayMode = false;
+        replaySeekRoutine = null;
+    }
+
+    private void StopReplaySeekRoutine()
+    {
+        if (replaySeekRoutine != null)
+        {
+            StopCoroutine(replaySeekRoutine);
+            replaySeekRoutine = null;
+        }
+
+        if (replaySeekOverridesFastReplayMode)
+        {
+            fastReplayMode = replaySeekPreviousFastReplayMode;
+            replaySeekOverridesFastReplayMode = false;
+        }
     }
 
     private bool ExecuteStepAtIndex(int index, bool allowCinematic, out bool startedAsyncExecution)
@@ -2887,6 +3006,100 @@ public class ReplayManager : MonoBehaviour
 
             actionIndex++;
         }
+    }
+
+    private static ActionStack BuildCompactActionStack(ActionStack source)
+    {
+        ActionStack compact = new ActionStack();
+        if (source?.Actions == null)
+            return compact;
+
+        for (int i = 0; i < source.Actions.Count; i++)
+        {
+            PlayerAction action = CloneActionForCompactSave(source.Actions[i]);
+            if (action != null)
+                compact.Actions.Add(action);
+        }
+
+        return compact;
+    }
+
+    private static int PruneRedundantActionSnapshots(ActionStack source)
+    {
+        if (source?.Actions == null)
+            return 0;
+
+        int pruned = 0;
+        for (int i = 0; i < source.Actions.Count; i++)
+        {
+            PlayerAction action = source.Actions[i];
+            if (action == null || action.Snapshot == null || RequiresPostActionCheckpoint(action))
+                continue;
+
+            action.Snapshot = null;
+            pruned++;
+        }
+
+        return pruned;
+    }
+
+    private static PlayerAction CloneActionForCompactSave(PlayerAction source)
+    {
+        if (source == null)
+            return null;
+
+        PlayerAction clone = new PlayerAction
+        {
+            ActionType = source.ActionType,
+            TurnNumber = source.TurnNumber,
+            ActingTeam = source.ActingTeam,
+            ActingSlotIndex = source.ActingSlotIndex,
+            CursorHex = source.CursorHex,
+            HasCursorHex = source.HasCursorHex,
+            UnitInstanceId = source.UnitInstanceId,
+            MoveFrom = source.MoveFrom,
+            HasMoveFrom = source.HasMoveFrom,
+            MoveTo = source.MoveTo,
+            HasMoveTo = source.HasMoveTo,
+            MovementPath = source.MovementPath != null ? new List<Vector3Int>(source.MovementPath) : null,
+            LayerBefore = source.LayerBefore,
+            LayerAfter = source.LayerAfter,
+            SensorAction = source.SensorAction,
+            TargetInstanceId = source.TargetInstanceId,
+            TargetConstructionId = source.TargetConstructionId,
+            TargetHex = source.TargetHex,
+            HasTargetHex = source.HasTargetHex,
+            ShoppingSelectedIndex = source.ShoppingSelectedIndex,
+            ShoppingUnitTypeId = source.ShoppingUnitTypeId,
+            SubStepLabel = source.SubStepLabel,
+            Confirmed = source.Confirmed,
+            IsAIGenerated = source.IsAIGenerated,
+            Snapshot = RequiresPostActionCheckpoint(source) ? source.Snapshot : null,
+            IsTurnMarker = source.IsTurnMarker,
+            DebugLabel = source.DebugLabel
+        };
+
+        clone.SubSteps = new List<PlayerActionSubStep>();
+        if (source.SubSteps != null)
+        {
+            for (int i = 0; i < source.SubSteps.Count; i++)
+            {
+                PlayerActionSubStep step = source.SubSteps[i];
+                if (step == null)
+                    continue;
+
+                clone.SubSteps.Add(new PlayerActionSubStep
+                {
+                    Label = step.Label,
+                    TargetInstanceId = step.TargetInstanceId,
+                    TargetConstructionId = step.TargetConstructionId,
+                    TargetHex = step.TargetHex,
+                    HasTargetHex = step.HasTargetHex
+                });
+            }
+        }
+
+        return clone;
     }
 
     private TurnStartSnapshot TryResolveSnapshotForCurrentRecordActionIndex(int actionIndex, bool cacheWhenFound)
