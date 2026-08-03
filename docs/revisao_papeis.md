@@ -176,6 +176,109 @@ o conjunto**, e precisa estar escrito onde o chamador vê.
 
 ---
 
+## Levantamento — Capturador
+
+Primeira linha preenchida contra o código real. **19 arquivos, 5.823 linhas.**
+
+Contagem de referências a cada coluna, por arquivo:
+
+| arquivo | ln | Mover | Captur | Mirar | Embarc | Rally | Defesa |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| `C.Attack` | 899 | 2 | – | 3 | – | – | 9 |
+| `C` (entrada) | 618 | 6 | 4 | 3 | – | 12 | 2 |
+| `C.Vacate` | 593 | 3 | – | 3 | – | – | 3 |
+| `C.Defender` | 500 | 8 | 1 | 10 | – | 12 | 11 |
+| `C.Explorer` | 462 | 6 | – | 2 | – | – | – |
+| `C.Embark.Transporter` | 373 | – | – | – | 6 | – | – |
+| `C.Embark` | 340 | 2 | – | 2 | 5 | 21 | – |
+| `C.Helpers` | 304 | 2 | 6 | – | – | – | – |
+| `C.Rogue` | 300 | 7 | 4 | 7 | – | – | – |
+| `C.Swap` | 251 | 4 | – | 1 | – | – | – |
+| `C.Embark.Pathing` | 246 | – | – | – | – | – | – |
+| `C.Blitzkrieg` | 217 | 3 | 4 | – | – | 1 | – |
+| `C.Embark.Scan` | 176 | – | – | – | – | – | – |
+| `C.Pursuer` | 163 | – | – | 5 | – | – | – |
+| `C.Embark.Extended` | 152 | – | – | – | – | – | – |
+| `C.Agressive` | 101 | – | – | 2 | – | – | 1 |
+| `C.PontaLanca` | 44 | 1 | 4 | – | – | – | – |
+| `C.Opportunist` | 21 | – | 1 | – | – | – | – |
+
+**Colunas ausentes por completo:** Desembarcar, Fundir, Suprir, Transferir,
+Ver/Detectar, Pousar.
+
+### O que o levantamento revela
+
+**1. O capturador gasta mais código atirando do que capturando.**
+`Mirar` aparece 38 vezes contra 13 de `Capturar`, e o maior arquivo da pasta —
+`C.Attack`, 899 linhas — é sobre combate. O papel chamado "capturador" é, em
+volume, um papel de combate com uma agenda de captura em cima.
+
+**2. Embarcar está espalhado por cinco arquivos.**
+`Embark`, `Embark.Transporter`, `Embark.Pathing`, `Embark.Scan` e
+`Embark.Extended` somam **1.287 linhas** — mais que a coluna de captura inteira.
+Três deles não referenciam sensor nenhum: são pathfinding e varredura próprios.
+
+**3. `Ver/Detectar` está em branco, mas a pergunta é respondida.**
+`C.Explorer` tem 462 linhas sobre onde revelar névoa, com seis constantes de peso
+próprias (`ExplorerForwardObserver*`) — e **zero** referências a
+`PodeDetectar`/`PodeEnxergar`. É a coluna respondida sem o sensor, à mão. Uma das
+três implementações que o `MelhorVisao` existe para substituir.
+
+**4. `Fundir` é branco de verdade.**
+Nenhuma referência a `PodeFundirSensor` em 5.823 linhas. Não é "não se aplica" —
+infantaria fundir para se curar é mecânica central. É **ninguém decidiu ainda**,
+que é exatamente o que a matriz quer tornar visível.
+
+**5. Quatro colunas são "(não se aplica)" legítimas.**
+`Suprir` e `Transferir` (o capturador não tem capacidade logística), `Pousar`
+(não é aeronave) e `Desembarcar` — esta última por doutrina: *desembarque é
+sempre ação do transportador*.
+
+**6. Rally e Defesa estão presentes e concentrados.**
+46 e 26 referências, com massa em `C.Defender` (12/11) e `C.Embark` (21 de
+rally). As duas colunas transversais já existem de fato — só não estão
+declaradas como política, e sim espalhadas em condicionais.
+
+### Os dez modos
+
+O capturador já tem, na prática, dez variações de comportamento em arquivo
+próprio:
+
+```
+Rogue · Defender · Explorer · Blitzkrieg · PontaLanca
+Opportunist · Agressive · Pursuer · Swap · Vacate
+```
+
+Isso é o **degrau 4** — "variações de papel viram parâmetro" — já materializado
+como arquivos. A matriz não precisa criar essas variações; precisa transformá-las
+em linhas que declaram só o que difere.
+
+### A linha, como deveria ficar declarada
+
+```text
+AI Role: Capturador
+
+  Mover/Posicionar  capitão = capturável; fallback = RepCell do setor
+  PodeCapturar      primário; ponta de lança cede o prédio e segue o eixo
+  PodeMirar         ⚠️ hoje é o maior bloco do papel — precisa virar política,
+                    não 899 linhas
+  PodeEmbarcar      não embarca montando massa em rally ativo;
+                    ⚠️ 1.287 linhas em cinco arquivos
+  PodeDesembarcar   (não se aplica — ação do transportador)
+  PodeFundir        ❌ EM BRANCO — ninguém decidiu
+  PodeSuprir        (não se aplica)
+  PodeTransferir    (não se aplica)
+  Ver/Detectar      ⚠️ respondido à mão em C.Explorer, sem sensor
+  PodePousar        (não se aplica)
+  Rally             conta presença; sair atrasa o GoGreen
+  Defesa            recolhe para os arredores do HQ
+```
+
+Três marcas de trabalho: **um branco real** (`Fundir`), **uma coluna respondida
+sem sensor** (`Ver`) e **duas hipertrofiadas** (`Mirar`, `Embarcar`).
+
+---
+
 ## Critério de pronto da matriz
 
 O teste do autor, inalterado:
