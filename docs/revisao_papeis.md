@@ -510,10 +510,14 @@ regressão quando aparecer "e se crítico fosse 30% em vez de 25%".
 | `CapturadorAgressivo = 12` | morre → `Capturador` + trait |
 | `ArtilheiroCombatente = 13` | morre → cadeia dentro de `PodeMirar` |
 | `AntiaereoCombatente = 14` | morre → mesma forma |
-| `TransportadorAereo = 15` | **preferência de COMPRA, não de ação.** Ou os traits cobrem shopping, ou ele sobrevive |
-| `Antiaereo = 10` | sobrevive — capacidade de arma real |
+| `TransportadorAereo = 15` | ~~sobrevive como preferência de compra~~ → **morre**, ver auditoria abaixo |
+| `Antiaereo = 10` | ~~sobrevive — capacidade de arma real~~ → **morre**, ver auditoria abaixo |
 | `Vigilancia = 6` | sobrevive — agenda real, camada como parâmetro |
 | ~~`RaidAntiSub = 11`~~ | já morreu na `v7.0.3`: era capacidade + camada |
+
+⚠️ **As duas linhas tachadas são erro desta revisão, corrigido na auditoria da
+próxima seção.** Ficam visíveis de propósito: as duas foram defendidas com o
+argumento que a própria doutrina refuta.
 
 Ganho colateral: `CanSatisfy` e `ResolveCompositionRole` existem hoje quase só
 para traduzir esses híbridos. Três mortes esvaziam os dois.
@@ -537,6 +541,131 @@ palpite.
 
 É o mesmo padrão da `v7.0.3`: lá o **órgão unificado destrancou a coluna**; aqui
 a **linha extraída destranca o trait**.
+
+---
+
+## Auditoria da seção anterior — quatro correções
+
+Revisada por auditor externo, com um acréscimo do autor. **Duas correções são
+erro da seção acima**, não refinamento.
+
+### 1. ❌ `Antiaereo` — o veredito estava contraditório
+
+A seção acima o salvou dizendo *"sobrevive — capacidade de arma real"*. Pela
+doutrina aplicada duas linhas antes, **isso é motivo para morrer**: capacidade
+pertence à ficha, não ao papel.
+
+Ele só sobreviveria se significasse uma **política** — priorizar alvo aéreo,
+proteger um capitão, guardar corredor. Se significa "consegue atirar no ar", é
+capacidade.
+
+**E o dado já existe** (observação do autor, verificada):
+
+```csharp
+// WeaponData.cs:47-49
+[Tooltip("Dominios/alturas adicionais onde a arma pode operar.")]
+public List<WeaponLayerMode> aditionalDomainsAllowed;   // Domain + HeightLevel
+```
+
+O sistema **já pode ver que a arma atira pra cima**. Perguntar
+`roles.Contains(Antiaereo)` é perguntar à etiqueta o que a arma declara — o erro
+exato do `RaidAntiSub`.
+
+### 2. ❌ `TransportadorAereo` — também morre
+
+A seção acima o salvou como "preferência de compra, não de ação". Mas a demanda
+**já sabe carregar camada**, e o precedente é da própria `v7.0.3`:
+
+```csharp
+antiSub.RequiredVisionDomain = Domain.Submarine;   // AIShoppingPlanner.Demand.cs
+```
+
+`RequiredDomain = Air` numa demanda de `Transportador` é a mesma peça. Uma
+preferência de composição pode viver no shopping **sem ocupar um `UnitRole` que a
+IA de ação também lê**.
+
+### 3. ⚠️ Nem todo o router pode virar dado
+
+A seção acima disse "a ordem do router deixa de ser código e vira dado da ficha".
+**Incompleto, e perigoso se lido ao pé da letra.** O router mistura duas
+espécies, e só a segunda é reordenável:
+
+```text
+Router.cs  43–85    auto-reparo · desbloqueio de produção · transporte
+                    ── INVARIANTE. Nunca ultrapassável por trait ──
+Router.cs  107+     rebelde · capturador · assalto · FS · vigilância ·
+                    combate aéreo · logística · estoque · HexEvaluator
+                    ── AGENDA. Só esta parte aceita reordenação ──
+```
+
+Obrigação transacional e gate universal ficam **acima** da política. A fronteira
+já está desenhada no arquivo; o que falta é declará-la para que ninguém a
+atravesse por engano.
+
+### 4. O campo novo aponta para um perfil, não para uma lista de enums
+
+```text
+AIBehaviorProfile
+  essência
+  faixas de ação + predicados de entrada
+  política/cadeia por coluna
+  traits modificadores
+```
+
+Continua sendo **um** campo em `UnitData`, mas apontando para dado estruturado.
+Precedente duplo no projeto: `AIPresetData` e `AICaptainData`.
+
+Ganho que não estava na proposta: **perfis são compartilhados.** Dez fichas de
+fuzileiro apontam para o mesmo perfil; só Bazooka e Metralhadora divergem. A
+explosão combinatória morre também no nível de asset.
+
+---
+
+### O "7 perfis" do critério de aceite — verificado
+
+A tabela de `## As linhas` classifica 14 papéis vivos: **4 principais**
+(Capturador, Assalto, FogoIndireto, Vigilância), **4 de apoio** (Transportador,
+Logística, Estoque, TransportadorAéreo) e **6 secundários**.
+
+São 8 sobreviventes — *a menos que* `TransportadorAereo` morra (correção 2). Aí:
+
+```text
+14 papéis  =  7 que ficam  +  7 que morrem
+              4 principais    6 secundários
+            + 3 de apoio    + TransportadorAereo
+```
+
+**O critério de aceite do autor já contava 7.** Quando "os 7 perfis chamando uma
+fonte única" foi escrito, já assumia que o Transportador Aéreo colapsa. A
+correção 2 não propõe — **lê o que já estava decidido**.
+
+---
+
+### Os seis secundários não morrem do mesmo jeito
+
+Acréscimo desta revisão. São dois grupos, com mecanismos distintos:
+
+| grupo | papéis | mecanismo |
+|---|---|---|
+| **preferência / cadeia** | CapturadorAgressivo, ArtilheiroCombatente, AntiaereoCombatente | ordem entre colunas, ou cadeia dentro de uma |
+| **agenda + camada** | Interceptador, AtaqueAereo, Antiaéreo | **uma agenda só, parametrizada pela camada do ALVO** |
+
+O segundo grupo **não é caso de trait — é a solução da Vigilância outra vez.** Lá
+foi uma agenda com a camada da *visão* como parâmetro; aqui é combate aéreo com a
+camada do *alvo* como parâmetro, e quem responde é o `aditionalDomainsAllowed` da
+arma.
+
+Consequência prática, e ela encurta o caminho:
+
+```text
+3 papéis  →  traits          (esperam o degrau 4)
+3 papéis  →  parâmetro de camada  (é órgão unificado — não espera)
+1 papel   →  campo de demanda no shopping
+```
+
+**Nenhum dos sete precisa esperar o sistema de traits ficar pronto**, e dois dos
+três caminhos já foram percorridos este ano. O grupo "agenda + camada" entra na
+**fila dos órgãos**, não na do degrau 4.
 
 ---
 
