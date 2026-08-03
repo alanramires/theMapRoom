@@ -166,3 +166,88 @@ continuar capturando. Isso é dele e fica.
 
 Pré-requisito: a metade da IA do critério de aceite do jipe precisa estar
 validada antes — hoje só o lado do jogador foi testado.
+
+---
+
+## Engenharia
+
+### 11. O capturador engenheiro — a raça que muda o mapa
+
+Saiu do brainstorming de raças (`docs/revisao_papeis.md`). Fica aqui porque é a
+única que **não** cabe na matriz sem obra.
+
+> *Hoje o route manager monta uma estrada pronta. Mas se por um trecho oculto
+> falta uma seção da ponte, o capturador engenheiro vai lá e ela aparece.*
+
+#### Por que ela é diferente de todas as outras raças
+
+Field medic, peão e Kradschützen reusam colunas que **já existem** — `PodeSuprir`,
+`PodeTransferir`, `PodeEmbarcar`. Falta política, não maquinário: um capturador
+com `isSupplier` já satisfaz `Logistica` hoje, ninguém apenas lhe pergunta nada.
+
+**O engenheiro é a única que pede coluna nova.** Não existe `PodeConstruir` em
+`Assets/Scripts/Sensors/` — verificado, a pasta vai de `PodeArremeter` a
+`PodeTransferir` sem nada de construção.
+
+#### O que já está pronto (e é a parte difícil)
+
+`StructureData` já carrega a topologia da ponte, que é onde a complexidade mora:
+
+- **`Ponte + Mar`** — o convés fica acima da água: `Land/Surface` e
+  `Naval/Surface` deixam de ser o mesmo andar. Tanque para em cima, navio passa
+  embaixo;
+- **`Ponte + Praia`** — ali é cabeceira (encontro, aterro, estacas). Não há vão,
+  e naval de superfície é proibido no par;
+- **família topológica** — `Trilho + Ponte Ferroviária` se conectam por nó
+  compartilhado, e a ponte ferroviária exige a skill de trilho no traçado
+  superior sem afetar quem passa por baixo.
+
+Logo: **a seção faltante não é caso especial — é um nó ausente da família.** O
+`RoadNetworkManager` já desenha segmento por estrutura
+(`StructureData.cs:191`).
+
+#### A permissão segue a chave, como sempre
+
+Quem decide quem fecha o vão é a **estrutura**, não a etiqueta do sujeito —
+mesmo padrão de `requiredSkillsToCapture`. O teste do manual continua valendo:
+o designer renomeia a etiqueta para *"eu conserto"* e nada quebra.
+
+Se a eficiência por par (item 10) já estiver de pé, ela cai aqui de graça:
+engenheiro pesado fecha o vão em 1 turno, capturador improvisado em 3.
+
+#### O achado — o engenheiro inverte plano e realidade
+
+Esta é a parte que some se não for escrita agora.
+
+```text
+hoje         descobrir um vão na névoa  →  o plano era MENTIRA  →  replaneja
+engenheiro   descobrir um vão na névoa  →  o plano virou TAREFA
+```
+
+É a primeira vez que a IA pode **tornar o próprio plano verdadeiro** em vez de
+ser corrigida pelo mundo. Para o planner isso não é feature nova — é uma
+**categoria nova de resposta** a um plano invalidado, ao lado de "replaneja" e
+"desiste".
+
+#### E é a segunda instância de um padrão já nomeado
+
+| papel | pede | a quem |
+|---|---|---|
+| artilheiro | **visão** que não tem | vigilância |
+| engenheiro | **terreno** que não tem | engenharia |
+
+Os dois são *um papel requisitando uma precondição a outro papel* — assunto de
+`docs/AI Behavior/governanca_entre_papeis.md`. O pedido de spotter da artilharia
+(`docs/ideias_melhorFow.md`) não era caso isolado: é o mesmo mecanismo, e quem
+resolver um deles deve resolver o outro com a mesma peça.
+
+#### Ordem sugerida
+
+1. `PodeConstruirSensor` — o vão como nó ausente, permissão pela estrutura;
+2. lado do jogador primeiro, como sempre (o jipe ensinou);
+3. só então a IA — e a IA **só depois** que "plano virou tarefa" existir como
+   resposta no planner. Sem isso, o engenheiro conserta a ponte e o planner
+   segue achando que a rota é mentira.
+
+É **X ou Y** pelo esquema do autor: sensor novo mexe em regra de jogo, e a
+terceira resposta do planner é mudança de arquitetura.
