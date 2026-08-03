@@ -832,86 +832,23 @@ public partial class AIController
         return SectorManager.HexDistance(cell, hq);
     }
 
-    // Memo de route distance por (unidade, from, to), valido dentro de uma revisao de
-    // tabuleiro. E funcao pura de (perfil de movimento da unidade, from, to, terreno): o
-    // terreno e estatico e, dentro de UMA decisao, o tabuleiro nao muda (a revisao global so
-    // sobe quando a acao comprometida executa). O tool-progression e o two-turn chamam este
-    // metodo com os MESMOS (from,to) centenas/milhares de vezes por decisao — para naval,
-    // onde cada calculo e um pathfind sobre mar aberto (~12-16ms), isso explodia para dezenas
-    // de segundos (Destroyer: 4486 chamadas = 71s). O memo colapsa isso para os pares
-    // distintos (~dezenas), sem mudar resultado. Zera quando a revisao muda (a cada acao),
-    // limitando a memoria a uma decisao.
-    private static readonly Dictionary<(int unitId, Vector3Int from, Vector3Int to), float> routeDistanceCache
-        = new Dictionary<(int, Vector3Int, Vector3Int), float>();
-    private static int routeDistanceCacheRevision = -1;
-
+    // O corpo e o memo mudaram de casa para AIRouteDistance (Services/), sem
+    // uma linha alterada. Motivo: a ferramenta de Editor tambem precisa desta
+    // resposta, e `private static` aqui dentro nao alcanca — e ferramenta que
+    // calcula por conta propria e ferramenta que discorda da IA.
+    //
+    // O memo continua valendo o que valia: e funcao pura de (perfil de
+    // movimento da unidade, from, to, terreno), o terreno e estatico e dentro
+    // de UMA decisao o tabuleiro nao muda. O tool-progression e o two-turn
+    // chamam com os MESMOS (from,to) centenas/milhares de vezes por decisao —
+    // para naval, onde cada calculo e um pathfind sobre mar aberto (~12-16ms),
+    // isso explodia para dezenas de segundos (Destroyer: 4486 chamadas = 71s).
+    //
+    // Este wrapper fica porque tem vinte e poucos chamadores internos, e trocar
+    // todos seria ruido sem ganho.
     private static bool TryCalculateRouteDistance(UnitManager unit, Vector3Int fromCell, Vector3Int targetCell, out float distance)
     {
-        using var perf = new AIDecisionPerfScope(unit, "routeDistance");
-        distance = 0f;
-        fromCell.z = 0;
-        targetCell.z = 0;
-
-        int revision = ThreatRevisionTracker.GlobalBoardRevision;
-        if (revision != routeDistanceCacheRevision)
-        {
-            routeDistanceCache.Clear();
-            routeDistanceCacheRevision = revision;
-        }
-
-        bool cacheable = unit != null;
-        (int, Vector3Int, Vector3Int) key = default;
-        if (cacheable)
-        {
-            key = (unit.InstanceId, fromCell, targetCell);
-            if (routeDistanceCache.TryGetValue(key, out float cached))
-            {
-                // NaN = "sem rota" memoizado (o metodo devolve false neste caso).
-                if (float.IsNaN(cached))
-                    return false;
-                distance = cached;
-                return true;
-            }
-        }
-
-        if (TryCalculateRouteDistanceUncached(unit, fromCell, targetCell, out distance))
-        {
-            if (cacheable)
-                routeDistanceCache[key] = distance;
-            return true;
-        }
-
-        if (cacheable)
-            routeDistanceCache[key] = float.NaN;
-        return false;
-    }
-
-    private static bool TryCalculateRouteDistanceUncached(UnitManager unit, Vector3Int fromCell, Vector3Int targetCell, out float distance)
-    {
-        distance = 0f;
-
-        if (unit != null && unit.GetDomain() == Domain.Air)
-        {
-            distance = SectorManager.HexDistance(fromCell, targetCell);
-            return true;
-        }
-
-        if (unit != null
-            && unit.TryGetUnitData(out UnitData unitData)
-            && unitData != null
-            && SectorManager.TryGetLandMovementDistance(fromCell, targetCell, unitData, out int unitCost))
-        {
-            distance = unitCost;
-            return true;
-        }
-
-        if (SectorManager.TryGetLandMovementDistance(fromCell, targetCell, out int fallbackCost))
-        {
-            distance = fallbackCost;
-            return true;
-        }
-
-        return false;
+        return AIRouteDistance.TryGet(unit, fromCell, targetCell, out distance);
     }
 
     private static float CalculateRouteDistanceOrHex(UnitManager unit, Vector3Int fromCell, Vector3Int targetCell)

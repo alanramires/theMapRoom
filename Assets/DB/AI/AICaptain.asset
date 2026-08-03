@@ -1,0 +1,177 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5611ac36d35c7684f99b9bc04016e6bd, type: 3}
+  m_Name: AICaptain
+  m_EditorClassIdentifier: Assembly-CSharp::AICaptainData
+  observacoes: 'Quem cada papel acompanha. A ordem dentro de cada lista e a prioridade:
+    a primeira faixa que produzir candidato vence, mesmo que alguem de faixa inferior
+    esteja mais perto.'
+  perfis:
+  - papel: 1
+    semPlano:
+    - procura: 1
+      papel: 1
+      aceitarEmbarcado: 0
+      restringirAoSetorDoPlano: 0
+      rotulo: 
+    comPlano:
+    - procura: 1
+      papel: 1
+      aceitarEmbarcado: 0
+      restringirAoSetorDoPlano: 0
+      rotulo: 
+  - papel: 12
+    semPlano:
+    - procura: 1
+      papel: 1
+      aceitarEmbarcado: 0
+      restringirAoSetorDoPlano: 0
+      rotulo: 
+    comPlano: []
+  - papel: 2
+    semPlano:
+    - procura: 0
+      papel: 1
+      aceitarEmbarcado: 0
+      restringirAoSetorDoPlano: 0
+      rotulo: "Capit\xE3o"
+    comPlano: []
+  - papel: 13
+    semPlano:
+    - procura: 0
+      papel: 1
+      aceitarEmbarcado: 0
+      restringirAoSetorDoPlano: 0
+      rotulo: "Capit\xE3o"
+    comPlano: []
+  - papel: 5
+    semPlano:
+    - procura: 0
+      papel: 1
+      aceitarEmbarcado: 0
+      restringirAoSetorDoPlano: 0
+      rotulo: "Capit\xE3o"
+    comPlano: []
+  - papel: 14
+    semPlano:
+    - procura: 5
+      papel: 1
+      aceitarEmbarcado: 0
+      restringirAoSetorDoPlano: 0
+      rotulo: 
+    - procura: 0
+      papel: 1
+      aceitarEmbarcado: 0
+      restringirAoSetorDoPlano: 0
+      rotulo: "Capit\xE3o"
+    comPlano: []
+  - papel: 10
+    semPlano:
+    - procura: 0
+      papel: 6
+      aceitarEmbarcado: 0
+      restringirAoSetorDoPlano: 0
+      rotulo: 
+    - procura: 0
+      papel: 1
+      aceitarEmbarcado: 0
+      restringirAoSetorDoPlano: 0
+      rotulo: "Capit\xE3o"
+    comPlano: []
+  - papel: 8
+    semPlano:
+    - procura: 0
+      papel: 6
+      aceitarEmbarcado: 0
+      restringirAoSetorDoPlano: 0
+      rotulo: 
+    - procura: 0
+      papel: 9
+      aceitarEmbarcado: 0
+      restringirAoSetorDoPlano: 0
+      rotulo: 
+    - procura: 0
+      papel: 1
+      aceitarEmbarcado: 0
+      restringirAoSetorDoPlano: 0
+      rotulo: "Capit\xE3o"
+    comPlano: []
+  - papel: 9
+    semPlano:
+    - procura: 6
+      papel: 1
+      aceitarEmbarcado: 0
+      restringirAoSetorDoPlano: 0
+      rotulo: 
+    - procura: 0
+      papel: 1
+      aceitarEmbarcado: 0
+      restringirAoSetorDoPlano: 0
+      rotulo: "Capit\xE3o"
+    comPlano: []
+  - papel: 3
+    semPlano:
+    - procura: 7
+      papel: 1
+      aceitarEmbarcado: 0
+      restringirAoSetorDoPlano: 0
+      rotulo: 
+    comPlano: []
+  - papel: 4
+    semPlano:
+    - procura: 3
+      papel: 1
+      aceitarEmbarcado: 0
+      restringirAoSetorDoPlano: 0
+      rotulo: 
+    - procura: 4
+      papel: 1
+      aceitarEmbarcado: 0
+      restringirAoSetorDoPlano: 0
+      rotulo: 
+    - procura: 0
+      papel: 1
+      aceitarEmbarcado: 0
+      restringirAoSetorDoPlano: 0
+      rotulo: "Capit\xE3o"
+    comPlano: []
+  - papel: 7
+    semPlano:
+    - procura: 2
+      papel: 1
+      aceitarEmbarcado: 0
+      restringirAoSetorDoPlano: 0
+      rotulo: 
+    - procura: 0
+      papel: 4
+      aceitarEmbarcado: 0
+      restringirAoSetorDoPlano: 0
+      rotulo: 
+    - procura: 0
+      papel: 1
+      aceitarEmbarcado: 0
+      restringirAoSetorDoPlano: 0
+      rotulo: "Capit\xE3o"
+    comPlano: []
+  - papel: 6
+    semPlano:
+    - procura: 8
+      papel: 1
+      aceitarEmbarcado: 0
+      restringirAoSetorDoPlano: 0
+      rotulo: 
+    - procura: 0
+      papel: 1
+      aceitarEmbarcado: 0
+      restringirAoSetorDoPlano: 0
+      rotulo: "Capit\xE3o"
+    comPlano: []
