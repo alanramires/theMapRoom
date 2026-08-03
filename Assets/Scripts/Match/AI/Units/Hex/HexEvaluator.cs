@@ -266,7 +266,7 @@ public static class HexEvaluator
         // Prioridade 5: PrudentFow — rush ao HQ inimigo apenas quando a
         //   unidade possui a skill oficial Captura Construcoes.
         // ----------------------------------------------------------
-        bool isCapturador = PodeCapturarSensor.HasCaptureConstructionSkill(unitData);
+        bool isCapturador = PodeCapturarSensor.HasAnyCaptureKey(unitData);
 
         if (isCapturador)
         {

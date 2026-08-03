@@ -13,7 +13,6 @@ public class PodeCapturarSensorDebugWindow : EditorWindow
     }
 
     [SerializeField] private UnitManager selectedUnit;
-    [SerializeField] private SkillData requiredCaptureSkill;
     [SerializeField] private TurnStateManager turnStateManager;
     [SerializeField] private Tilemap overrideTilemap;
     [SerializeField] private EvaluationMode evaluationMode = EvaluationMode.SceneManual;
@@ -47,7 +46,6 @@ public class PodeCapturarSensorDebugWindow : EditorWindow
 
     private void OnEnable()
     {
-        AutoDetectRequiredCaptureSkill();
         AutoDetectContext();
         SceneView.duringSceneGui += OnSceneGUI;
     }
@@ -70,11 +68,6 @@ public class PodeCapturarSensorDebugWindow : EditorWindow
             "4) Unidade em construcao inimiga/neutra captura; aliada danificada recupera",
             MessageType.Info);
 
-        requiredCaptureSkill = (SkillData)EditorGUILayout.ObjectField(
-            "Skill Required",
-            requiredCaptureSkill,
-            typeof(SkillData),
-            false);
         selectedUnit = (UnitManager)EditorGUILayout.ObjectField("Unidade", selectedUnit, typeof(UnitManager), true);
         turnStateManager = (TurnStateManager)EditorGUILayout.ObjectField("TurnStateManager", turnStateManager, typeof(TurnStateManager), true);
         overrideTilemap = (Tilemap)EditorGUILayout.ObjectField("Tilemap", overrideTilemap, typeof(Tilemap), true);
@@ -118,11 +111,6 @@ public class PodeCapturarSensorDebugWindow : EditorWindow
 
         string unitName = selectedUnit != null ? selectedUnit.name : "(null)";
         EditorGUILayout.LabelField("Unidade", unitName);
-        EditorGUILayout.LabelField(
-            "Skill Required",
-            requiredCaptureSkill != null
-                ? requiredCaptureSkill.name
-                : "(nao definida)");
         EditorGUILayout.LabelField("HP Atual", selectedUnit.CurrentHP.ToString());
         EditorGUILayout.LabelField("Team", $"{TeamUtils.GetName(selectedUnit.TeamId)} ({(int)selectedUnit.TeamId})");
         EditorGUILayout.LabelField("Avaliacao Ativa", evaluationMode.ToString());
@@ -182,14 +170,6 @@ public class PodeCapturarSensorDebugWindow : EditorWindow
             return;
         }
 
-        if (!ValidateRequiredCaptureSkill(out string skillReason))
-        {
-            runtimeReason = skillReason;
-            sceneReason = skillReason;
-            sensorReason = skillReason;
-            statusMessage = skillReason;
-            return;
-        }
 
         Tilemap map = ResolveTilemap();
         if (map == null)
@@ -396,9 +376,6 @@ public class PodeCapturarSensorDebugWindow : EditorWindow
         validatedOperation = PodeCapturarSensor.CaptureOperationType.None;
         validatedReason = string.Empty;
 
-        if (!ValidateRequiredCaptureSkill(out validatedReason))
-            return false;
-
         if (evaluationMode == EvaluationMode.RuntimeStrict)
         {
             if (turnStateManager == null)
@@ -449,58 +426,15 @@ public class PodeCapturarSensorDebugWindow : EditorWindow
             out validatedReason);
     }
 
-    private bool ValidateRequiredCaptureSkill(out string reason)
-    {
-        reason = string.Empty;
-        if (requiredCaptureSkill == null)
-        {
-            reason = "Defina a Skill Required do Pode Capturar.";
-            return false;
-        }
-
-        if (!requiredCaptureSkill.canCaptureConstructions)
-        {
-            reason =
-                $"A skill {requiredCaptureSkill.name} nao possui " +
-                "Can Capture Constructions.";
-            return false;
-        }
-
-        if (selectedUnit == null || !selectedUnit.HasSkill(requiredCaptureSkill))
-        {
-            reason =
-                $"A unidade nao possui a skill requerida " +
-                $"{requiredCaptureSkill.name}.";
-            return false;
-        }
-
-        return true;
-    }
-
-    private void AutoDetectRequiredCaptureSkill()
-    {
-        if (requiredCaptureSkill != null
-            && requiredCaptureSkill.canCaptureConstructions)
-        {
-            return;
-        }
-
-        string[] guids = AssetDatabase.FindAssets("t:SkillData");
-        for (int i = 0; i < guids.Length; i++)
-        {
-            string path = AssetDatabase.GUIDToAssetPath(guids[i]);
-            SkillData candidate =
-                AssetDatabase.LoadAssetAtPath<SkillData>(path);
-            if (candidate == null
-                || !candidate.canCaptureConstructions)
-            {
-                continue;
-            }
-
-            requiredCaptureSkill = candidate;
-            return;
-        }
-    }
+    // A janela nao elege mais "a skill de captura".
+    //
+    // Ela mantinha um campo `requiredCaptureSkill` e o preenchia varrendo os
+    // assets atras do primeiro com `canCaptureConstructions` — ordem de GUID.
+    // Com duas skills de captura no projeto, o jogo aceitava as duas e a janela
+    // exigia uma; ela reprovava o que o jogo aprovava.
+    //
+    // Agora a pergunta e a mesma do jogo: quem diz quem captura e a construcao,
+    // em requiredSkillsToCapture, e o PodeCapturar responde por ela.
 
     private void TryUseCurrentSelection()
     {

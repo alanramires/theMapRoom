@@ -92,6 +92,11 @@ public class ConstructionData : ScriptableObject
     public DPQData dpqData;
 
     [Header("Skill Rules")]
+    [Tooltip("Se houver skills nesta lista, a unidade precisa ter pelo menos uma para CAPTURAR ou reconquistar esta construcao.\n\n" +
+             "Lista vazia = ninguem captura por skill. Nao e o interruptor de 'isto e capturavel' — esse continua sendo os pontos de captura da construcao; esta lista diz POR QUEM.\n\n" +
+             "A habilidade e uma chave, nao um poder: quem define o que a etiqueta abre e o alvo, aqui, e nunca a propria skill. " +
+             "Ver docs/manual/01_principios_e_vocabulario.md.")]
+    public List<SkillData> requiredSkillsToCapture = new List<SkillData>();
     [Tooltip("Se houver skills nesta lista, a unidade precisa ter pelo menos uma para entrar nesta construcao.")]
     public List<SkillData> requiredSkillsToEnter = new List<SkillData>();
     [Tooltip("Se a unidade possuir qualquer skill desta lista, entrada nesta construcao e bloqueada.")]

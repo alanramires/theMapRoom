@@ -345,7 +345,7 @@ public static class MelhorCapturaService
         // PodeCapturarSensor; ler UnitData aqui seria uma segunda copia da
         // regra, e um UnitData novo com a skill deixaria de funcionar sozinho.
         result.hasCaptureSkill =
-            PodeCapturarSensor.HasCaptureConstructionSkill(unit);
+            PodeCapturarSensor.HasAnyCaptureKey(unit);
         if (!result.hasCaptureSkill)
         {
             request.diagnosticLog?.Invoke(
@@ -471,7 +471,7 @@ public static class MelhorCapturaService
             }
 
             bool hasCapturer = TryFindCapturerOnCell(
-                request, cell, out UnitManager occupant);
+                request, cell, construction, out UnitManager occupant);
             if (hasCapturer && request.skipConstructionsWithCapturer)
             {
                 Reject(
@@ -620,9 +620,17 @@ public static class MelhorCapturaService
     private static bool TryFindCapturerOnCell(
         MelhorCapturaRequest request,
         Vector3Int cell,
+        ConstructionManager construction,
         out UnitManager occupant)
     {
         occupant = null;
+        // A pergunta exata e "este ocupante tem a chave DESTA construcao?", e
+        // nao "ele e capturador em abstrato". Como a construcao esta na mao,
+        // sai de graca e sai mais preciso: uma unidade pode ter a chave do
+        // galpao e nao ter a do bunker.
+        ConstructionData captureRules = null;
+        construction?.TryResolveConstructionData(out captureRules);
+
         List<UnitManager> occupants =
             UnitOccupancyRules.GetUnitsAtCell(
                 request.map, cell, request.unit);
@@ -634,7 +642,7 @@ public static class MelhorCapturaService
             UnitManager candidate = occupants[i];
             if (candidate == null || candidate.IsDead)
                 continue;
-            if (!PodeCapturarSensor.HasCaptureConstructionSkill(candidate))
+            if (!PodeCapturarSensor.HasCaptureKeyFor(candidate, captureRules))
                 continue;
             occupant = candidate;
             return true;

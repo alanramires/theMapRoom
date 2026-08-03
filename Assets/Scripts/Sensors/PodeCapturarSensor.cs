@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Tilemaps;
 
@@ -11,33 +12,100 @@ public static class PodeCapturarSensor
     }
 
     /// <summary>
-    /// Fonte de verdade da capacidade de capturar construcoes.
-    /// O papel da IA define comportamento; a permissao vem de
-    /// UnitData > Training > Skills > Captura Construcoes.
+    /// Esta unidade tem a chave que ESTA construcao pede?
+    ///
+    /// A HABILIDADE E CHAVE, NAO PODER. Quem define o que a etiqueta abre e o
+    /// alvo — aqui, a construcao, em `requiredSkillsToCapture` — e nunca a
+    /// propria skill. E o mesmo desenho da montanha que pede alpino e da
+    /// floresta que pede guerrilha: o lugar pendura a etiqueta e define ali o
+    /// que ela significa.
+    ///
+    /// A consequencia pratica e que a etiqueta pode se chamar qualquer coisa. Se
+    /// voce renomear "Captura Construcoes" para "sai que isso e meu", nada
+    /// quebra: quem aponta para o asset e a construcao.
+    ///
+    /// Lista vazia = ninguem captura esta construcao por skill. Nao e o
+    /// interruptor de "isto e capturavel" — esse continua sendo
+    /// CapturePointsMax; esta lista diz POR QUEM.
+    ///
+    /// Ver docs/manual/01_principios_e_vocabulario.md.
     /// </summary>
-    public static bool HasCaptureConstructionSkill(UnitManager unit)
+    public static bool HasCaptureKeyFor(
+        UnitManager unit,
+        ConstructionData construction)
     {
         return unit != null
             && unit.TryGetUnitData(out UnitData unitData)
-            && HasCaptureConstructionSkill(unitData);
+            && HasCaptureKeyFor(unitData, construction);
     }
 
-    public static bool HasCaptureConstructionSkill(UnitData unitData)
+    public static bool HasCaptureKeyFor(
+        UnitData unitData,
+        ConstructionData construction)
     {
-        if (unitData == null || unitData.skills == null)
-            return false;
-
-        for (int i = 0; i < unitData.skills.Count; i++)
+        if (unitData == null
+            || unitData.skills == null
+            || construction == null
+            || construction.requiredSkillsToCapture == null
+            || construction.requiredSkillsToCapture.Count == 0)
         {
-            SkillData skill = unitData.skills[i];
-            if (skill == null)
-                continue;
+            return false;
+        }
 
-            if (skill.canCaptureConstructions)
-                return true;
+        for (int i = 0; i < construction.requiredSkillsToCapture.Count; i++)
+        {
+            SkillData required = construction.requiredSkillsToCapture[i];
+            if (required == null)
+                continue;
+            for (int j = 0; j < unitData.skills.Count; j++)
+            {
+                if (unitData.skills[j] == required)
+                    return true;
+            }
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// A unidade carrega ALGUMA chave de captura?
+    ///
+    /// Pergunta de PLANEJAMENTO, nao de permissao: serve para o "vale a pena
+    /// nem olhar para captura com esta unidade?" antes de haver um alvo. Quem
+    /// autoriza de fato e HasCaptureKeyFor, contra a construcao concreta —
+    /// uma unidade pode ter a chave do galpao e nao ter a do bunker.
+    ///
+    /// Varre as construcoes conhecidas procurando alguma que aceite alguma
+    /// skill desta unidade.
+    /// </summary>
+    public static bool HasAnyCaptureKey(UnitData unitData)
+    {
+        if (unitData?.skills == null || unitData.skills.Count == 0)
+            return false;
+
+        IReadOnlyList<ConstructionManager> all = ConstructionManager.AllActive;
+        if (all == null)
+            return false;
+
+        for (int i = 0; i < all.Count; i++)
+        {
+            ConstructionManager construction = all[i];
+            if (construction == null)
+                continue;
+            if (!construction.TryResolveConstructionData(
+                    out ConstructionData data))
+                continue;
+            if (HasCaptureKeyFor(unitData, data))
+                return true;
+        }
+        return false;
+    }
+
+    public static bool HasAnyCaptureKey(UnitManager unit)
+    {
+        return unit != null
+            && unit.TryGetUnitData(out UnitData unitData)
+            && HasAnyCaptureKey(unitData);
     }
 
     /// <summary>
@@ -245,13 +313,10 @@ public static class PodeCapturarSensor
             return false;
         }
 
-        // A capacidade e declarada pela skill, independentemente do papel de IA.
-        // Assim Soldado, Bazooka, Metranca e futuras unidades usam a mesma regra.
-        if (!HasCaptureConstructionSkill(unitData))
-        {
-            reason = "A unidade nao possui a skill Captura Construcoes.";
-            return false;
-        }
+        // A CHECAGEM DE CHAVE MUDOU DE LUGAR, e nao por estilo: ela so existe
+        // depois de saber QUAL construcao. Quem pergunta pela etiqueta e o
+        // alvo, entao nao ha resposta antes de ter alvo. Ver mais abaixo,
+        // depois de a construcao ser resolvida.
 
         Tilemap map = boardTilemap != null ? boardTilemap : selectedUnit.BoardTilemap;
         if (map == null)
@@ -306,6 +371,26 @@ public static class PodeCapturarSensor
         if (!construction.IsCapturable || construction.CapturePointsMax <= 0)
         {
             reason = "Construcao atual nao e capturavel.";
+            return false;
+        }
+
+        // AGORA da para perguntar pela chave: existe alvo, e e o alvo que diz
+        // qual etiqueta abre. Antes disso a pergunta nao tinha a quem ser feita.
+        if (!construction.TryResolveConstructionData(
+                out ConstructionData captureRules)
+            || captureRules == null)
+        {
+            reason = "Construcao sem ficha para validar captura.";
+            return false;
+        }
+
+        if (!HasCaptureKeyFor(unitData, captureRules))
+        {
+            reason = captureRules.requiredSkillsToCapture == null
+                     || captureRules.requiredSkillsToCapture.Count == 0
+                ? "Esta construcao nao aceita captura por skill nenhuma."
+                : "A unidade nao possui a habilidade que esta construcao pede "
+                  + "para ser capturada.";
             return false;
         }
 

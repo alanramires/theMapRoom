@@ -205,7 +205,58 @@ public class ConstructionDataEditor : Editor
         DrawIfExists(configProperty.FindPropertyRelative("capturePointsMax"), "Capture Points Max");
         DrawIfExists(configProperty.FindPropertyRelative("capturedIncoming"), "Captured Incoming");
 
+        DrawCaptureKeys(configProperty);
+
         EditorGUI.indentLevel--;
+    }
+
+    /// <summary>
+    /// Quem captura ESTA construção.
+    ///
+    /// Fica colada em Is Capturable de propósito: as duas juntas são a regra
+    /// inteira. "Is Capturable" é o interruptor — isto pode ser tomado. A lista
+    /// diz POR QUEM. Ligar uma sem a outra produz um prédio que parece
+    /// capturável e não é.
+    ///
+    /// A habilidade é uma chave, não um poder: quem define o que a etiqueta
+    /// abre é o alvo. Ver docs/manual/01_principios_e_vocabulario.md.
+    /// </summary>
+    private void DrawCaptureKeys(SerializedProperty configProperty)
+    {
+        SerializedProperty keys =
+            serializedObject.FindProperty("requiredSkillsToCapture");
+        if (keys == null)
+            return;
+
+        EditorGUILayout.PropertyField(
+            keys,
+            new GUIContent(
+                "Required Skills To Capture",
+                "Habilidades que abrem a captura desta construção. Vazio = " +
+                "ninguém captura. A unidade precisa ter pelo menos uma."),
+            includeChildren: true);
+
+        SerializedProperty isCapturable =
+            configProperty.FindPropertyRelative("isCapturable");
+        bool capturable = isCapturable == null || isCapturable.boolValue;
+        bool hasKeys = keys.arraySize > 0;
+
+        if (capturable && !hasKeys)
+        {
+            EditorGUILayout.HelpBox(
+                "Marcada como capturável, mas SEM nenhuma habilidade na lista.\n\n" +
+                "Ninguém consegue capturar esta construção — nem o jogador, nem " +
+                "a IA. Arraste aqui a habilidade que deve abri-la (ex.: Captura " +
+                "Construções).",
+                MessageType.Error);
+        }
+        else if (!capturable && hasKeys)
+        {
+            EditorGUILayout.HelpBox(
+                "Tem habilidades de captura listadas, mas Is Capturable está " +
+                "desligado. A lista não faz nada enquanto isso.",
+                MessageType.Warning);
+        }
     }
 
     private void DrawAIBehaviorSection()

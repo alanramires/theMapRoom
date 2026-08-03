@@ -31,9 +31,14 @@ MonoBehaviour:
   baseMovementCost: 1
   isFakeBuilding: 1
   dpqData: {fileID: 11400000, guid: 151bdc82ef06071449424d30a1d567a5, type: 2}
+  requiredSkillsToCapture:
+  - {fileID: 11400000, guid: 9c22b855a2e730f4faced0e069dc2a8d, type: 2}
   requiredSkillsToEnter: []
   blockedSkills: []
   skillCostOverrides: []
+  skillRulesByTerrain: []
+  inheritStructureRulesOnlyOn: []
+  inheritTerrainRulesOnlyOn: []
   domain: 0
   heightLevel: 3
   aditionalDomainsAllowed: []
@@ -57,7 +62,10 @@ MonoBehaviour:
   collectionRange: 0
   supplierOperationDomains: []
   supplierServicesProvided: []
+  supplierServiceProfile: 0
   supplierResources: []
+  aiStockRestockTriggerPercent: 25
+  allowRebelAIPurchase: 0
   constructionConfiguration:
     isPlayerHeadQuarter: 0
     isVictoryBuilding: 0

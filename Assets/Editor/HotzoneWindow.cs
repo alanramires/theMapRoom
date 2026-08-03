@@ -746,7 +746,7 @@ public sealed class HotzoneWindow : EditorWindow
 
             case IntentMode.Captura:
                 intent = ReachIntent.Capture;
-                if (!PodeCapturarSensor.HasCaptureConstructionSkill(unit))
+                if (!PodeCapturarSensor.HasAnyCaptureKey(unit))
                 {
                     status = "A unidade não possui skill de captura.";
                     return false;

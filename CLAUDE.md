@@ -14,6 +14,34 @@ Read `docs/arquitetura/acoes_transacionais.md` before changing TurnState, moveme
 what to read in what order, the next concrete task, and the traps that already
 cost time. Read it before planning any AI work.
 
+`docs/manual/` is the **game** manual — the rules the AI merely consumes. Read
+`01_principios_e_vocabulario.md` before designing anything that touches skills,
+terrain, occupancy or capture; it decides *where a rule is allowed to live*, and
+that is not recoverable from the code.
+
+### A skill is a key, not a power
+
+> *Uma habilidade não é um poder. É uma chave. O nome que aparece na ficha —
+> alpino, guerrilha, fora-de-estrada — não faz nada sozinho. Não concede bônus,
+> não altera atributo, não dispara efeito. É um rótulo, e só.*
+>
+> *Quem dá sentido a ele é o resto do mundo. A montanha diz "só entra quem for
+> alpino". A floresta diz "guerrilha passa por 1". **Cada lugar pendura a mesma
+> etiqueta e define, ali, o que ela significa.***
+
+`SkillData` carries **identity only** — id, display name, description. It must
+never carry a boolean that grants an ability. The **target** owns the list:
+`TerrainTypeData.requiredSkillsToEnter`, `ConstructionData.blockedSkills`,
+`StructureData.forceDetectUnitsWithFollowingStealthSkills`, and so on.
+
+The practical test before adding any field: *does this let the designer rename
+the skill to anything and still work?* If renaming breaks it, the power is in the
+wrong place. And the rename must be free — the label may be called "sai que isso
+é meu" and nothing should care.
+
+This is why the game grows in labels, not in rules: a new unit brings keys, and
+the world already knows how to answer them.
+
 ## Versioning and reports
 
 `vX.Y.Z`, a scheme defined by the author:

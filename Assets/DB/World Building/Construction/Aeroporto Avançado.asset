@@ -32,6 +32,8 @@ MonoBehaviour:
   baseMovementCost: 1
   isFakeBuilding: 0
   dpqData: {fileID: 11400000, guid: 1ff1954ba402c104b837d28d29e3d69d, type: 2}
+  requiredSkillsToCapture:
+  - {fileID: 11400000, guid: 9c22b855a2e730f4faced0e069dc2a8d, type: 2}
   requiredSkillsToEnter: []
   blockedSkills: []
   skillCostOverrides: []
