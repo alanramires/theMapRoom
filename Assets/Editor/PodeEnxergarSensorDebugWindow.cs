@@ -57,7 +57,10 @@ public class PodeEnxergarSensorDebugWindow : EditorWindow
     [SerializeField] private TerrainDatabase terrainDatabase;
     [SerializeField] private DPQAirHeightConfig dpqAirHeightConfig;
     [SerializeField] private bool useGameplaySensorContext = true;
-    [SerializeField] private bool restrictToActiveTeam = true;
+    // Terminal burro: a ferramenta responde por QUALQUER unidade por padrao. O
+    // time ativo e filtro do consumidor, nao propriedade do sensor — diagnosticar
+    // o que o inimigo enxerga e uso legitimo, e o mais comum fora de partida.
+    [SerializeField] private bool restrictToActiveTeam = false;
     [SerializeField] private bool logToConsole = true;
     [SerializeField] private bool forceVirtualTargetLayer = false;
     [SerializeField] private Domain forcedVirtualTargetDomain = Domain.Land;
@@ -106,7 +109,12 @@ public class PodeEnxergarSensorDebugWindow : EditorWindow
         terrainDatabase = (TerrainDatabase)EditorGUILayout.ObjectField("Terrain Database", terrainDatabase, typeof(TerrainDatabase), false);
         dpqAirHeightConfig = (DPQAirHeightConfig)EditorGUILayout.ObjectField("DPQ Air Height", dpqAirHeightConfig, typeof(DPQAirHeightConfig), false);
         useGameplaySensorContext = EditorGUILayout.ToggleLeft("Usar contexto do gameplay (MatchController)", useGameplaySensorContext);
-        restrictToActiveTeam = EditorGUILayout.ToggleLeft("Exigir unidade do time ativo", restrictToActiveTeam);
+        restrictToActiveTeam = EditorGUILayout.ToggleLeft(
+            new GUIContent(
+                "Restringir ao time ativo",
+                "Desmarcado (padrao): responde por qualquer unidade, de qualquer time. "
+                + "Marque apenas para reproduzir a restricao de uma partida em andamento."),
+            restrictToActiveTeam);
         logToConsole = EditorGUILayout.ToggleLeft("Log no Console", logToConsole);
         forceVirtualTargetLayer = EditorGUILayout.ToggleLeft("Forcar camada virtual alvo", forceVirtualTargetLayer);
         if (forceVirtualTargetLayer)
@@ -242,7 +250,7 @@ public class PodeEnxergarSensorDebugWindow : EditorWindow
         {
             statusMessage =
                 $"Unidade pertence a {selectedUnit.TeamId}, mas o time ativo e {matchController.ActiveTeam}. " +
-                "Desmarque 'Exigir unidade do time ativo' apenas para diagnostico global.";
+                "Desmarque 'Restringir ao time ativo' para responder por qualquer unidade.";
             return;
         }
 
