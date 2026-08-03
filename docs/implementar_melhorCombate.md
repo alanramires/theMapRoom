@@ -114,34 +114,98 @@ Diagnóstico imediato, risco nulo. Não deve esperar dois passos.
 ### 2.3 Falta o `HexEvaluator` na lista de migração
 
 O passo 8 cita FS, Assault, Capturer, Repair "e os demais". Mas o `HexEvaluator`
-é o **fallback** — o que roda quando nenhum papel responde, ou seja, o caminho
-mais comum do tabuleiro.
+é o **fallback** — o que roda quando nenhum papel devolve ação.
 
-Se ele mantiver pontuação de combate própria, **sobrevivem duas fontes de verdade
-justamente no caso padrão**, e o objetivo do serviço não é atingido.
+Se ele mantiver pontuação de combate própria, **sobrevive uma segunda fonte de
+verdade exatamente no caminho de escape**, e o objetivo do serviço não é
+atingido.
 
-### 2.4 `longRangeStationary` e `playConservative` travam — não são ressalvas
+> **Correção de uma afirmação anterior deste documento.** Uma versão anterior
+> dizia que o `HexEvaluator` é "o caminho mais comum do tabuleiro". O código prova
+> que ele é **fallback**, não com que frequência é atingido — isso exige medição
+> runtime e não foi medida. A necessidade de migrá-lo não depende da frequência.
 
-A investigação os lista como "não prontos para interpretação automática". O
-status correto é mais forte: **são decisões de design que bloqueiam**, e vêm
-antes do passo 1.
+### 2.4 `longRangeStationary` e `playConservative` — desmembrar, não reinterpretar
 
-`longRangeStationary` tem hoje dois contratos em uso — o tooltip diz "não
-reposiciona após compra/spawn"; vários consumidores tratam como "jamais
-reposiciona".
+São campos cujo significado é decidido pelo **leitor**, não pelo dono. O serviço
+não pode adivinhar qual contrato vale, e escolher um em silêncio muda combate sem
+que o diff denuncie.
 
-Repare no que esses dois campos são: **campos cujo significado é decidido pelo
-leitor, não pelo dono.** O serviço burro estruturalmente não pode adivinhar qual
-contrato vale — e escolher um dos dois em silêncio muda comportamento de combate
-sem que nada no diff denuncie.
+**Onde eles travam:** não nos passos 1–3, que são refactor puro e não interpretam
+nenhum dos dois. Travam o **passo 4**, o ranking. Ver §4.
 
-**Só o autor fecha isto.** Duas perguntas, e a implementação destrava:
+#### A evidência está nos próprios tooltips
 
-1. `longRangeStationary` — "não reposiciona **após compra/spawn**" ou "**jamais**
-   reposiciona"?
-2. `playConservative` no combate — significa "priorizar **menor perda própria**"
-   ou "**não piorar exposição**"? (hoje o campo também governa retaguarda,
-   logística e transporte, então precisa de um significado *só de combate*)
+Verificado em `UnitData.cs`. Os dois campos **já denunciam o desmembramento**:
+
+```csharp
+// UnitData.cs:179 — o campo nasceu sabendo que ia crescer
+[Tooltip("Se ativo, a IA nao reposiciona esta unidade apos compra/spawn.
+          Outros casos especiais podem mover a unidade em regras futuras.")]
+public bool longRangeStationary = false;
+
+// UnitData.cs:171 — já é por-coluna, e NUNCA menciona perda de HP
+[Tooltip("Quando ativo, a IA joga com cautela e, sem tarefa prioritaria,
+          acompanha pela retaguarda a linha de combatentes aliados. Tambem
+          preserva as regras conservadoras especificas de captura, suporte,
+          logistica e transporte.")]
+public bool playConservative = false;
+```
+
+**Isto decide a questão do `playConservative`:** o tooltip enumera captura,
+suporte, logística e transporte — e em nenhum momento fala de tolerância a perda.
+Ler o campo como "menor perda própria" seria **invenção**, não interpretação.
+
+#### O dono da tolerância já existe, e são três campos
+
+Confirmado em `UnitData.cs:190-199`:
+
+| campo | tooltip |
+|---|---|
+| `attackAcceptHpLossPercent` | "perda máxima de HP que a unidade aceita sofrer ao iniciar combate" |
+| `attackMustSurvive` | "rejeita ataques em que a simulação indica que ela morre no contra-ataque" |
+| `defensiveAttackExtraHpLossPercent` | "tolerância extra de HP quando estiver defendendo setor/base" |
+
+Usar `playConservative` para o mesmo assunto **duplicaria política com dono**.
+
+#### A divisão proposta
+
+```text
+Attack Decision  →  tolerância à troca e à sobrevivência
+Conservative     →  não piorar exposição / posição
+```
+
+E, para o `longRangeStationary`, dois conceitos onde hoje há um bool:
+
+```text
+skipInitialSpawnReposition : bool
+combatRepositionMode       : Allowed | HoldCurrent | TransportOnly
+```
+
+`TransportOnly` descreve uma peça que **não anda sozinha mas pode ser rebocada** —
+e isso não é hipotético: é exatamente o caminhão-supridor rebocando artilharia
+que já existe no projeto.
+
+**Por que desmembrar é melhor que escolher um significado:** se os dois
+comportamentos existem no jogo, escolher um **perde o outro**. E desmembrar é
+*extração*, que é pré-requisito de qualquer parametrização futura — vale a regra
+já registrada em `revisao_papeis.md`: *não dá pra parametrizar uma política que
+ainda não foi extraída*.
+
+#### O horizonte
+
+Depois, `playConservative` deixa de ser bool universal e cada coluna ganha sua
+expressão:
+
+```text
+combate     não piorar exposição
+logística   atender pela retaguarda
+transporte  evitar LZ ameaçada
+estoque     evitar rota exposta
+```
+
+Isso é degrau 4 e **não bloqueia o `MelhorCombate`** — basta que o combate tenha
+um significado próprio e explícito.
 
 ### 2.5 Unificar a medição **não** unifica a escala
 
@@ -151,14 +215,42 @@ Os `150k / 30k / 18k` existem porque cada papel pendurou preferência na
 **própria** pontuação. Se os papéis continuarem multiplicando a saída do serviço
 por pesos próprios, as escalas voltam com outro nome.
 
-O conserto não é arquitetural, é **disciplina declarada**:
+Uma regra escrita **não impede a recaída**. O retorno precisa tornar a reescala
+difícil — em vez de entregar um `float Score` reescalável, entregar uma **chave
+canônica**:
 
-> **O papel consome os componentes do `MelhorCombate` e não os reescala.** Se
-> precisa de mais peso, o ajuste vai na ficha ou no predicado de admissão — nunca
-> num multiplicador local.
+```text
+CombatRankKey
+  AdmissionStatus · CombatMode · Kill · Survives · Trade
+  Damage · OwnLoss · TargetPreference · RangeFit
+  PositionQuality · MovementCost
+```
 
-Sem essa regra escrita, o serviço vira mais uma fonte que cada consumidor
-tempera, e o problema volta em seis meses.
+**Mas a struct sozinha não basta** — um papel ainda pode escrever
+`key.Damage * 3000 + key.TargetPreference * 150000`. O que fecha a porta é o
+serviço **também ser dono da comparação**:
+
+```text
+MelhorCombate   entrega a chave E o comparador canônico
+o papel         filtra por missão, escolhe a FAIXA, desempata dentro dela
+                — nunca faz aritmética sobre os componentes
+```
+
+Composição segura:
+
+```text
+faixa da missão  →  ranking canônico do MelhorCombate  →  desempate determinístico
+```
+
+Assim o Capturador põe "ocupante do meu objetivo" numa faixa superior **sem
+reinventar quanto vale uma eliminação**.
+
+> **Nota de camada, para não arquivarem isto errado:** o `CLAUDE.md` diz que
+> ranquear e desempatar **nunca** são trabalho do serviço. Isso vale para o
+> **serviço burro** (`PodeMirar`, `UnitReachEnvelopeService`). O `MelhorCombate` é
+> **consumidor**, e a definição de consumidor no mesmo documento é literalmente
+> "agrega: interseções, **rankings**, notas, pareamento 1:1". Portanto ele pode e
+> deve possuir o comparador.
 
 ---
 
@@ -184,10 +276,10 @@ canônico que aceite HP atual e a opção do `PodeMirar`; ferramenta, Shopping e
 
 | quando | o quê | risco |
 |---|---|---|
-| **antes de tudo** | fechar `longRangeStationary` e `playConservative` (§2.4) | decisão do autor, não código |
 | **1** | `Attack Decision` → resultado estruturado + wrapper booleano | refactor puro |
 | **2** | extrair o resolver geral de DPQ | refactor puro |
-| **3** | extrair o avaliador puro de um combate | refactor puro |
+| **3** | extrair o avaliador canônico de um combate | refactor puro |
+| — | **decisão do autor sobre os dois campos ambíguos** (§2.4) | não é código |
 | **4** | `MelhorCombate` como **consulta apenas**, sem consumidor | sem risco runtime |
 | **5** | ferramenta `Tools > Hotzone > Melhor Combate` | valida antes de migrar |
 | **6** | migrar **um** consumidor simples | primeiro risco real |
