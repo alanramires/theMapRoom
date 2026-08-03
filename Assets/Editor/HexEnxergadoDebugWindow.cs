@@ -25,7 +25,12 @@ public class HexEnxergadoDebugWindow : EditorWindow
     [SerializeField] private bool enableLos = true;
     [SerializeField] private bool enableSpotter = true;
     [SerializeField] private FogOfWarVisionMode visionMode = FogOfWarVisionMode.All;
-    [SerializeField] private bool restrictToActiveTeam = true;
+    // Terminal burro: varre observadores de TODOS os times por padrao. "Quem
+    // enxerga este hex" e pergunta naturalmente bilateral — restringir a um time
+    // esconde metade da resposta, que costuma ser a metade interessante.
+    [SerializeField] private bool restrictToActiveTeam = false;
+    [SerializeField] private int settingsVersion;
+    private const int CurrentSettingsVersion = 1;
 
     private readonly List<ObserverEntry> observers = new List<ObserverEntry>();
     private readonly HashSet<Vector3Int> visibleCells = new HashSet<Vector3Int>();
@@ -40,8 +45,20 @@ public class HexEnxergadoDebugWindow : EditorWindow
 
     private void OnEnable()
     {
+        MigrateSettings();
         AutoDetectContext();
         SceneView.duringSceneGui += OnSceneGUI;
+    }
+
+    // Ver PodeEnxergarSensorDebugWindow: [SerializeField] em EditorWindow
+    // persiste entre sessoes, entao o default novo nao alcanca janela ja aberta.
+    private void MigrateSettings()
+    {
+        if (settingsVersion >= CurrentSettingsVersion)
+            return;
+
+        restrictToActiveTeam = false;
+        settingsVersion = CurrentSettingsVersion;
     }
 
     private void OnDisable()
@@ -70,7 +87,12 @@ public class HexEnxergadoDebugWindow : EditorWindow
         enableLos = EditorGUILayout.ToggleLeft("Validar linha de visão", enableLos);
         enableSpotter = EditorGUILayout.ToggleLeft("Considerar spotter", enableSpotter);
         visionMode = (FogOfWarVisionMode)EditorGUILayout.EnumPopup("Camada consultada", visionMode);
-        restrictToActiveTeam = EditorGUILayout.ToggleLeft("Somente observadores do time ativo", restrictToActiveTeam);
+        restrictToActiveTeam = EditorGUILayout.ToggleLeft(
+            new GUIContent(
+                "Restringir ao time ativo",
+                "Desmarcado (padrao): varre observadores de qualquer time. "
+                + "Marque apenas para reproduzir a visao de uma partida em andamento."),
+            restrictToActiveTeam);
         autoRefresh = EditorGUILayout.ToggleLeft("Atualizar automaticamente", autoRefresh);
 
         EditorGUILayout.BeginHorizontal();
@@ -176,7 +198,13 @@ public class HexEnxergadoDebugWindow : EditorWindow
             ConstructionManager construction = constructions[i];
             if (construction == null || !construction.gameObject.activeInHierarchy) continue;
             if (construction.BoardTilemap != null && construction.BoardTilemap != boardTilemap) continue;
-            bool owned = construction.TeamId == activeTeam;
+            // Mesma trava que as unidades tinham, e esta o toggle nao cobria: a
+            // visao da construcao so era avaliada para o time ativo. Agora o
+            // filtro e o mesmo, e desmarcado avalia a visao de qualquer time.
+            bool evaluateVision = !restrictToActiveTeam
+                || activeTeam == TeamId.Neutral
+                || construction.TeamId == activeTeam;
+            bool owned = evaluateVision;
             if (!owned && !construction.IsPlayerHeadQuarter) continue;
             Vector3Int sourceCell = construction.CurrentCellPosition;
             sourceCell.z = 0;

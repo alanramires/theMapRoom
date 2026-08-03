@@ -61,6 +61,8 @@ public class PodeEnxergarSensorDebugWindow : EditorWindow
     // time ativo e filtro do consumidor, nao propriedade do sensor — diagnosticar
     // o que o inimigo enxerga e uso legitimo, e o mais comum fora de partida.
     [SerializeField] private bool restrictToActiveTeam = false;
+    [SerializeField] private int settingsVersion;
+    private const int CurrentSettingsVersion = 1;
     [SerializeField] private bool logToConsole = true;
     [SerializeField] private bool forceVirtualTargetLayer = false;
     [SerializeField] private Domain forcedVirtualTargetDomain = Domain.Land;
@@ -82,8 +84,22 @@ public class PodeEnxergarSensorDebugWindow : EditorWindow
 
     private void OnEnable()
     {
+        MigrateSettings();
         AutoDetectContext();
         SceneView.duringSceneGui += OnSceneGUI;
+    }
+
+    // [SerializeField] em EditorWindow persiste entre sessoes, entao trocar o
+    // valor inicial do campo NAO alcanca janela ja aberta uma vez: a Unity
+    // restaura o valor salvo e o default novo nunca vale. A migracao zera a
+    // trava uma unica vez por janela; depois disso a escolha do usuario manda.
+    private void MigrateSettings()
+    {
+        if (settingsVersion >= CurrentSettingsVersion)
+            return;
+
+        restrictToActiveTeam = false;
+        settingsVersion = CurrentSettingsVersion;
     }
 
     private void OnDisable()
