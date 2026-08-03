@@ -1,8 +1,20 @@
-# Governança do Sistema
+# Governança do Sistema — contrato técnico
 
-Contrato do autor. Este documento fica **acima** dos contratos de papel: o que
-está aqui vale para toda unidade do jogo, tenha ela papel, plano ou nenhum dos
-dois.
+Este documento é a **tradução técnica** da doutrina apresentada em
+`rascunho de governanca.md`. O rascunho explica o comportamento esperado em
+prosa para autores e revisores; este arquivo liga cada regra a conceitos,
+contratos, classes e divergências da implementação.
+
+A ordem documental é:
+
+1. `rascunho de governanca.md` — doutrina e intenção do autor;
+2. `governanca.md` — especificação técnica e auditoria dessa doutrina;
+3. contratos de papel — especialização da regra para cada consumidor.
+
+Este documento fica **acima** dos contratos de papel: o que está aqui vale para
+toda unidade do jogo, tenha ela papel, plano ou nenhum dos dois. Quando o código
+diverge da doutrina, a doutrina não é reescrita para justificar o código; a
+divergência é registrada aqui.
 
 | marca | significado |
 |---|---|
@@ -196,8 +208,10 @@ campo. É o mesmo `rangeMin ≥ 1` que a Hotzone usa para devolver `null` em Com
 
 ### `PodeEmbarcar`
 
-O **passageiro** precisa conservar MP suficiente para pagar o custo do terreno
-**onde está o transportador** — esse valor torna-se o custo do embarque.
+O **passageiro** precisa conservar MP suficiente para pagar o custo de entrada
+da célula **onde está o transportador** — esse valor torna-se o custo do
+embarque. A resolução considera construção, estrutura e terreno por
+`UnitMovementPathRules.TryGetEnterCellCost`. ✅
 
 O transportador define **onde** aceita embarque, **quais tipos** de unidade
 aceita e **quais vagas** oferece.
@@ -212,8 +226,14 @@ Multiplicadores de consumo de autonomia **não** se aplicam ao embarque.
 O transportador precisa estar em local válido conforme a ficha dele; a mesma
 ficha determina quais locais podem **receber a carga**.
 
-O passageiro paga o custo de movimento do terreno de desembarque, sem
-multiplicadores de autonomia.
+O passageiro terrestre paga o custo de entrada da célula de desembarque, sem
+multiplicadores de autonomia. A resolução considera construção, estrutura e
+terreno por `UnitMovementPathRules.TryGetEnterCellCost`. Aeronaves mantêm o
+fallback especializado de 1 ponto de autonomia para a saída. ✅
+
+As listas `Disembark Valid Locations` da ficha do transportador autorizam o
+destino separadamente das listas `Disembark Allowed When Transporter At`, que
+autorizam o local atual do transportador. ✅
 
 > Desembarcar encerra o turno **do transportador e de todas as unidades
 > desembarcadas**. ✅
@@ -324,8 +344,19 @@ Verifica se a aeronave consegue decolar até a altitude desejada. Em **pistas
 improvisadas**, a decolagem pode ficar limitada a uma única camada ou a um único
 hexágono.
 
-> Exemplo: ao decolar de um porta-aviões, qualquer aeronave avança **um** hexágono
-> e permanece em `Air/Low`.
+Na doutrina, uma aeronave embarcada também deve passar por `PodeDecolar`, usando
+a plataforma e o compartimento como contexto. A camada atual da plataforma e a
+regra de lançamento determinam degraus verticais, deslocamento, custo e camada
+final.
+
+> Exemplo: um porta-aviões em `Naval/Surface` lança a aeronave um degrau acima;
+> ela avança **um** hexágono e termina em `Air/Low`. Uma plataforma em
+> `Air/High` pode lançá-la sem rebaixá-la, mantendo `Air/High`.
+
+⚠️ **Ainda diverge:** `PodeDecolarSensor` rejeita `selectedUnit.IsEmbarked`.
+O porta-aviões é tratado como exceção em `PodeDesembarcarSensor` e o executor de
+desembarque ainda força `Air/Low`. O plano de extração da escada de camadas e da
+regra de lançamento por slot está em `docs/ideias_futuras_decolagem.md`.
 
 ### `PodeArremeter`
 
@@ -344,7 +375,7 @@ Daí a necessidade de o pouso de emergência desligar o motor.
 ### `PodePousar`
 
 Verifica se a aeronave tem as **habilidades** necessárias para pousar no local:
-`VTOL`, `SVTOL`, `Aircraft Landing`, `Aircraft Carrier Landing`, `Sea Landing`.
+`VTOL`, `STOVL`, `Aircraft Landing`, `Aircraft Carrier Landing`, `Sea Landing`.
 
 > Exemplo: um hidroavião sobrevoando o mar pousa quando fica sem combustível ou
 > quando recebe suprimento de um navio-tanque.
@@ -355,8 +386,8 @@ aircraft landing"*, e é a **construção** que declara o que exige, em
 `ConstructionData.requiredLandingSkillRules` — com
 `requireAtLeastOneLandingSkill` escolhendo entre "basta uma" e "exige todas".
 
-⚠️ Divergência de nome: o contrato escreve **SVTOL**; o código escreve **STOVL**
-(*Short Take-Off, Vertical Landing*). Um dos dois precisa ceder.
+O vocabulário da doutrina e do dado usa **STOVL** (*Short Take-Off, Vertical
+Landing*). ✅
 
 ### `PodeMudarDeAltitude`
 
@@ -707,31 +738,35 @@ retorno para localizar candidatos, comparar opções e decidir quais sensores
 
 | serviço | contrato | código |
 |---|---|---|
-| Melhor Captura | ainda não implementado | ⚠️ **parcialmente existe** — `CaptureOpportunityClaimService` (746 linhas) já faz o matching 1:1 de capturáveis |
-| Melhor Combate | ainda não implementado | ❌ confirmado |
-| Melhor Embarque | em desenvolvimento | ✅ `MelhorEmbarqueService` — **1.207 linhas** |
-| Quero Carona | — | ✅ `QueroCaronaService` (1.525) + `QueroCaronaAereaService` (308) |
-| Melhor Desembarque | em aperfeiçoamento | ✅ `MelhorDesembarqueService` (481) |
-| Melhor Atendimento | ainda não implementado | ⚠️ o serviço não existe, mas `StockNeedAssessmentService` (572) já responde "quem precisa mais" |
-| Melhor Estoque | ainda não implementado | ⚠️ **existe e é grande** — `MelhorEstoqueService`, **867 linhas** |
-| Melhor Fusão | não existe | ❌ confirmado |
-| **Melhor Pouso** | *não está no contrato* | ✅ `MelhorPousoService` (431) — consumidor de `PodePousar` |
+| Melhor Captura | classificar capturáveis para uma unidade | ✅ `MelhorCapturaService`; o matching 1:1 entre unidades fica um andar acima, em `CaptureOpportunityClaimService` |
+| Melhor Combate | escolher alvo e solução de combate | ❌ não existe serviço especializado com esse nome |
+| Melhor Embarque | organizar encontro para embarque | ✅ `MelhorEmbarqueService` |
+| Quero Carona | comunicar a necessidade do passageiro | ✅ `QueroCaronaService` + `QueroCaronaAereaService` |
+| Melhor Desembarque | otimizar a entrega dos passageiros | ✅ `MelhorDesembarqueService` |
+| Melhor Atendimento | priorizar quem precisa de serviço de campo | ⚠️ o serviço com esse nome não existe, mas `StockNeedAssessmentService` já responde "quem precisa mais" |
+| Melhor Estoque | planejar coleta, redistribuição e entrega | ✅ `MelhorEstoqueService` |
+| Melhor Fusão | organizar recomposição segura | ❌ não existe serviço especializado com esse nome |
+| Melhor Pouso | organizar LZs e plataformas autorizadas | ✅ `MelhorPousoService` — consumidor de `PodePousar` |
 
-Duas linhas merecem leitura:
+Três linhas merecem leitura:
 
-**Melhor Estoque não está por fazer — está feito.** O cabeçalho dele descreve o
+**Melhor Captura existe.** Ele classifica construções para uma unidade sem
+decidir a distribuição global. `CaptureOpportunityClaimService` consome esses
+rankings para resolver o matching 1:1 compartilhado. Essa divisão preserva a
+regra de que consulta individual não pode reservar alvo por conta própria.
+
+**Melhor Estoque está feito.** O cabeçalho dele descreve o
 contrato quase palavra por palavra: *"a onda nasce na unidade que tomará a
 decisão, classifica encontros em Tactical, Operational e Strategic e usa a
 consulta prospectiva do `PodeTransferir` para validar cada rendezvous. Não
-transfere, move ou altera qualquer estado confirmado."* Vale conferir se o que
-falta é o serviço ou o **consumo** dele pela IA.
+transfere, move ou altera qualquer estado confirmado."*
 
 *(O `Strategic` que aparece ali não contradiz "não existe banda estratégica": é
 `AIReachDecisionTier`, um tier de decisão, não uma banda do envelope.)*
 
-**Melhor Pouso existe e não está no contrato.** `PodePousar` também tem
-consumidor, e ele é o único da lista que não nasceu de uma intenção do jogador —
-nasceu de uma transição de domínio.
+**Melhor Pouso agora faz parte da doutrina.** `PodePousar` também tem consumidor,
+e ele é o único da lista que não nasceu de uma intenção do jogador: nasceu de
+uma transição de domínio.
 
 ---
 
@@ -752,6 +787,10 @@ infantaria precisa alcançar fisicamente a construção.
 
 > A Hotzone devolve os candidatos alcançáveis. O serviço decide qual construção
 > priorizar.
+
+✅ `MelhorCapturaService` faz a consulta pura por unidade. A distribuição 1:1
+de alvos entre vários capturadores pertence a
+`CaptureOpportunityClaimService`, um consumidor acima dele.
 
 ## Baseado em `PodeMirar` — Melhor Combate
 
@@ -818,6 +857,16 @@ Executado pelo **transportador**. Avalia:
 rota). ⚠️ A projeção ao redor do destino ainda é constante fixa do veículo — é a
 pendência T6 do `Transporte.md`.
 
+## Baseado em `PodePousar` — Melhor Pouso
+
+Organiza LZs de superfície e plataformas que `PodePousar` autorizou, comparando
+as alternativas nas bandas Tática e Operacional.
+
+> A permissão continua inteiramente no sensor. `MelhorPousoService` não inventa
+> habilidade de pouso, não move a aeronave e não altera estado confirmado.
+
+✅ `MelhorPousoService` implementa essa consulta pura.
+
 ## Baseado em `PodeSuprir` — Melhor Atendimento
 
 Para unidades com `isLogistic`, localizar quem precisa de serviços de campo.
@@ -841,6 +890,10 @@ supridores a reabastecer, HUBs disponíveis e Receivers que precisam receber.
 A Hotzone de Transferência determina quem pode participar, a faixa de coleta e
 entrega, e quais **encontros logísticos** são possíveis. O serviço decide de onde
 retirar e para onde enviar.
+
+✅ `MelhorEstoqueService` implementa a consulta prospectiva e valida cada
+encontro por `PodeTransferir`, sem executar transferência nem alterar estado
+confirmado.
 
 ## Baseado em `PodeFundir` — Melhor Fusão
 
@@ -868,12 +921,12 @@ Exceções por papel:
 | G2 | as três categorias de combate são nomeadas | ⚠️ só existe `operationRangeMin`; a classificação vive espalhada em testes soltos |
 | G4 | a família de detecção tem 3 sensores | ⚠️ tem **2**. `HexEnxergado` e "alguém me vê" o próprio contrato define como **consultas**, não sensores |
 | G5 | `PodeEnxergar` é sensor | ⚠️ **não tem arquivo** e empresta a matemática do `PodeDetectarSensor` |
-| G6 | `PodeDecolar` é sempre chamado ao selecionar/ativar | ❓ |
+| G6 | toda decolagem, inclusive saída de plataforma transportadora, passa por `PodeDecolar` | ⚠️ decolagens normais consultam o sensor; aeronaves embarcadas são recusadas e o porta-aviões ainda usa o bypass de desembarque com `Air/Low` |
 | G7 | as duas penalidades de −50% da captura | ❓ |
 | G8 | ordem ≠ sensor | ⚠️ o Serviço do Comando **é** um sensor no código |
 | G9 | submersível emerge, recebe e permanece na superfície | ❓ |
 | G10 | submarino atingido ou que disparou não submerge | ❓ o lock existe; os gatilhos não foram conferidos |
-| G11 | ~~`PodePousar` distingue VTOL / SVTOL / pista~~ | ✅ **fechada** — e melhor: as skills são **dados** (`SkillData.id` + `ConstructionData.requiredLandingSkillRules`), não código. Falta só decidir entre **SVTOL** e **STOVL** |
+| G11 | ~~`PodePousar` distingue VTOL / STOVL / pista~~ | ✅ **fechada** — as skills são dados (`SkillData.id` + `ConstructionData.requiredLandingSkillRules`), não hardcode do sensor |
 | G12 | transferir consome a ação de quem iniciou | ⚠️ `TurnStateManager.Transfer.cs` não marca ação de **nenhum** lado. Cuidado: a segunda metade da regra depende disso |
 | G13 | armas de `rangeMin = 0` atacam outra camada no mesmo hex | ❓ marcado pelo próprio autor como experimental. Não cabe na banda do envelope |
 | G14 | **Range** é um dos três conceitos da Hotzone | ⚠️ `ReachBand` só tem `Tactical` e `Operational`. Alcance entra como `ActionCells` dentro de uma delas — e a inversão do artilheiro existe justamente porque, para ele, a banda **é** o alcance |
@@ -881,8 +934,8 @@ Exceções por papel:
 | G16 | o papel se chama **Vigilância** | ⚠️ o enum diz `VigilanciaAerea`, nome da origem em `Air/High` |
 | G17 | **Transportador Aéreo foi incorporado** | ⚠️ `TransportadorAereo = 15` ainda existe, com política de shopping própria. Mudou de pasta; a regra não migrou |
 | G18 | **Raid Antissubmarino** vai para Vigilância | ⚠️ `RaidAntiSub = 11` ainda existe |
-| G20 | **Melhor Estoque** ainda não implementado | ⚠️ **existe**: `MelhorEstoqueService`, 867 linhas, e o cabeçalho descreve o contrato quase palavra por palavra. Conferir se falta o serviço ou o **consumo** dele |
-| G21 | **Melhor Captura** ainda não implementado | ⚠️ parcial: `CaptureOpportunityClaimService` (746) já faz o matching 1:1 de capturáveis |
-| G22 | **Melhor Atendimento** ainda não implementado | ⚠️ o serviço não existe, mas `StockNeedAssessmentService` (572) já responde "quem precisa mais" |
-| G23 | **Melhor Pouso** não está no contrato | ⚠️ existe (`MelhorPousoService`, 431) — consumidor de `PodePousar`, o único que nasce de transição de domínio |
+| G20 | ~~**Melhor Estoque** ainda não implementado~~ | ✅ **fechada** — `MelhorEstoqueService` existe e corresponde à doutrina |
+| G21 | ~~**Melhor Captura** ainda não implementado~~ | ✅ **fechada** — `MelhorCapturaService` faz a consulta por unidade; `CaptureOpportunityClaimService` resolve o matching global |
+| G22 | **Melhor Atendimento** ainda não implementado | ⚠️ o serviço com esse nome não existe, mas `StockNeedAssessmentService` já responde "quem precisa mais" |
+| G23 | ~~**Melhor Pouso** não está na doutrina~~ | ✅ **fechada** — incorporado ao rascunho e mapeado aqui para `MelhorPousoService` |
 | G19 | a hierarquia de papéis | ⚠️ é doutrina, não estrutura: o enum é plano. Quem materializa o parentesco é `UnitRoleCompatibility.CanSatisfy` — portão que usa `roles.Contains` estrito barra especializações |

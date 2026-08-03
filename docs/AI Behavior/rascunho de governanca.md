@@ -1,55 +1,62 @@
-# Governança do Sistema
+# GovernanÃ§a do Sistema â€” doutrina em prosa
+
+> **Natureza deste documento:** esta Ã© a apresentaÃ§Ã£o da doutrina do jogo em
+> prosa, destinada a autores e revisores. Ela descreve **como o sistema deve se
+> comportar**, sem misturar nomes de classes, auditoria do cÃ³digo ou estado de
+> implementaÃ§Ã£o. A traduÃ§Ã£o tÃ©cnica desta doutrina vive em `governanca.md`.
 
 ## Upkeep
 
-No início de cada rodada, o sistema executa três rotinas obrigatórias.
+No inÃ­cio de cada rodada, o sistema executa trÃªs rotinas obrigatÃ³rias.
 
 ### Consumo de Autonomia
 
 Unidades cujo `autonomyData` possui consumo de upkeep deduzem autonomia automaticamente.
 
-### Pouso de Emergência
+### Pouso de EmergÃªncia
 
-Aeronaves que chegam a zero de autonomia após o upkeep chamam `PodePousar`.
+Aeronaves que chegam a zero de autonomia apÃ³s o upkeep chamam `PodePousar`.
 
-Se não houver pouso válido, são destruídas.
+Se nÃ£o houver pouso vÃ¡lido, sÃ£o destruÃ­das.
+
+Quando o pouso Ã© de emergÃªncia, a aeronave permanece com os motores desligados e nÃ£o arremete automaticamente depois de ser suprida.
 
 ### Jornal do Comando
 
-Apresenta um resumo da rodada anterior, especialmente útil em partidas assíncronas, incluindo acontecimentos relevantes e o estado das aeronaves.
+Apresenta um resumo da rodada anterior, especialmente Ãºtil em partidas assÃ­ncronas, incluindo acontecimentos relevantes e o estado das aeronaves.
 
 ---
 
 # Ordens do Comandante
 
-O jogador possui cinco ordens globais, disponíveis a qualquer momento durante seu turno.
+O jogador possui cinco ordens globais, disponÃ­veis a qualquer momento durante seu turno.
 
-## Serviço do Comando
+## ServiÃ§o do Comando
 
 Executa uma rotina de suprimento sobre unidades que:
 
-- ainda não agiram;
+- ainda nÃ£o agiram;
     
-- ainda não receberam atendimento na rodada;
+- ainda nÃ£o receberam atendimento na rodada;
     
-- estão em uma construção aliada ou embarcadas em um supridor.
+- estÃ£o em uma construÃ§Ã£o aliada ou embarcadas em um supridor.
     
 
-A validação utiliza `PodeSuprir`.
+A validaÃ§Ã£o utiliza `PodeSuprir`.
 
-O Serviço do Comando não encerra a ação da unidade atendida. Ela ainda pode agir normalmente após receber o serviço.
+O ServiÃ§o do Comando nÃ£o encerra a aÃ§Ã£o da unidade atendida. Ela ainda pode agir normalmente apÃ³s receber o serviÃ§o.
 
 ## Dispensar Unidade
 
-Destrói voluntariamente uma unidade.
+DestrÃ³i voluntariamente uma unidade.
 
-É útil ao atingir o limite de unidades do tabuleiro ou quando uma unidade permanece tempo demais sem possibilidade de resgate, por exemplo.
+Ã‰ Ãºtil ao atingir o limite de unidades do tabuleiro ou quando uma unidade permanece tempo demais sem possibilidade de resgate, por exemplo.
 
-O dinheiro investido na unidade não é recuperado.
+O dinheiro investido na unidade nÃ£o Ã© recuperado.
 
 ## Comprar Unidade
 
-Ao acessar uma construção produtora controlada, o jogador pode comprar unidades disponíveis em seu catálogo mediante pagamento em dinheiro.
+Ao acessar uma construÃ§Ã£o produtora controlada, o jogador pode comprar unidades disponÃ­veis em seu catÃ¡logo mediante pagamento em dinheiro.
 
 ## Passar a Vez
 
@@ -59,14 +66,14 @@ Encerra o turno independentemente de quantas unidades tenham agido.
 
 Permite inspecionar:
 
-- unidades aliadas que já agiram;
+- unidades aliadas que jÃ¡ agiram;
     
 - unidades inimigas;
     
-- construções.
+- construÃ§Ãµes.
     
 
-Cada clique consecutivo sobre uma unidade revela novas informações, como área de ameaça, visão na névoa de guerra e outros dados disponíveis.
+Cada clique consecutivo sobre uma unidade revela novas informaÃ§Ãµes, como Ã¡rea de ameaÃ§a, visÃ£o na nÃ©voa de guerra e outros dados disponÃ­veis.
 
 ---
 
@@ -76,42 +83,42 @@ Toda unidade selecionada deve obrigatoriamente:
 
 1. posicionar-se;
     
-2. executar uma ação.
+2. executar uma aÃ§Ã£o.
     
 
 ## Posicionamento
 
-### Segurar Posição
+### Segurar PosiÃ§Ã£o
 
-A unidade permanece no hexágono atual.
+A unidade permanece no hexÃ¡gono atual.
 
-### Escolher um Hexágono
+### Escolher um HexÃ¡gono
 
-A unidade assume provisoriamente uma nova posição.
+A unidade assume provisoriamente uma nova posiÃ§Ã£o.
 
-Durante o posicionamento, o tabuleiro não recalcula seu estado definitivo.
+Durante o posicionamento, o tabuleiro nÃ£o recalcula seu estado definitivo.
 
-O jogador pode cancelar e reposicionar a unidade quantas vezes quiser antes de escolher uma ação.
+O jogador pode cancelar e reposicionar a unidade quantas vezes quiser antes de escolher uma aÃ§Ã£o.
 
 ---
 
-# Ações
+# AÃ§Ãµes
 
-Após o posicionamento, o sistema calcula as ações disponíveis por meio dos sensores `PodeX`.
+ApÃ³s o posicionamento, o sistema calcula as aÃ§Ãµes disponÃ­veis por meio dos sensores `PodeX`.
 
 ## Fonte de Renda
 
 ### `PodeCapturar`
 
-Requer a habilidade `Captura Construções`.
+Requer a habilidade `Captura ConstruÃ§Ãµes`.
 
 A unidade converte HP em progresso de captura.
 
-Alguns papéis capturam com penalidade de 50%.
+Alguns papÃ©is capturam com penalidade de 50%.
 
-Construções cujos pré-requisitos não foram atendidos aplicam outra penalidade de 50% sobre o valor já reduzido.
+ConstruÃ§Ãµes cujos prÃ©-requisitos nÃ£o foram atendidos aplicam outra penalidade de 50% sobre o valor jÃ¡ reduzido.
 
-As penalidades são multiplicativas: metade da metade, e não uma redução total de 100%.
+As penalidades sÃ£o multiplicativas: metade da metade, e nÃ£o uma reduÃ§Ã£o total de 100%.
 
 ---
 
@@ -123,33 +130,33 @@ Requer armas em `EmbarkedWeapons`.
 
 #### Combate de Contato
 
-- Pode ocorrer parado ou após movimento.
+- Pode ocorrer parado ou apÃ³s movimento.
     
 - Utiliza armas com `rangeMin = 1`.
     
 - Pode gerar revide.
     
 
-#### Combate à Distância
+#### Combate Ã  DistÃ¢ncia
 
 - Ocorre normalmente apenas sem deslocamento.
     
 - Utiliza armas com `rangeMin > 1`.
     
-- Não gera revide.
+- NÃ£o gera revide.
     
 
-Armas com `rangeMin = 0` são um tipo especial e ainda experimental de Combate à Distância.
+Armas com `rangeMin = 0` sÃ£o um tipo especial e ainda experimental de Combate Ã  DistÃ¢ncia.
 
-Elas atacam alvos localizados no mesmo hexágono da unidade, mas em outra camada ou altura.
+Elas atacam alvos localizados no mesmo hexÃ¡gono da unidade, mas em outra camada ou altura.
 
-Ataques de alcance zero não geram revide.
+Ataques de alcance zero nÃ£o geram revide.
 
-#### Combate Híbrido
+#### Combate HÃ­brido
 
 A unidade possui armas de contato e de longo alcance.
 
-Primeiro tenta combater à distância. Se isso não for possível, tenta o Combate de Contato.
+Primeiro tenta combater Ã  distÃ¢ncia. Se isso nÃ£o for possÃ­vel, tenta o Combate de Contato.
 
 ---
 
@@ -157,7 +164,9 @@ Primeiro tenta combater à distância. Se isso não for possível, tenta o Combate d
 
 ### `PodeEmbarcar`
 
-O passageiro precisa conservar Pontos de Movimento suficientes para pagar o custo do terreno onde está o transportador.
+O passageiro precisa conservar Pontos de Movimento suficientes para pagar o custo de entrada da cÃ©lula onde estÃ¡ o transportador.
+
+Esse custo considera o local efetivamente ocupado: construÃ§Ã£o, estrutura e terreno.
 
 Esse valor torna-se o custo do embarque.
 
@@ -170,17 +179,19 @@ O transportador define:
 - quais vagas oferece.
     
 
-Multiplicadores de consumo de autonomia não são aplicados ao embarque.
+Multiplicadores de consumo de autonomia nÃ£o sÃ£o aplicados ao embarque.
 
-Quando uma unidade embarca, o turno do transportador também é encerrado, mesmo que ele ainda não tenha agido.
+Quando uma unidade embarca, o turno do transportador tambÃ©m Ã© encerrado, mesmo que ele ainda nÃ£o tenha agido.
 
 ### `PodeDesembarcar`
 
-O transportador precisa estar em um local válido conforme sua ficha.
+O transportador precisa estar em um local vÃ¡lido conforme sua ficha.
 
-A ficha do transportador também determina quais locais podem receber sua carga.
+A ficha do transportador tambÃ©m determina quais locais podem receber sua carga.
 
-O passageiro paga o custo de movimento do terreno de desembarque.
+O passageiro paga o custo de entrada da cÃ©lula de desembarque.
+
+Esse custo considera o local efetivamente ocupado: construÃ§Ã£o, estrutura e terreno.
 
 Esse valor torna-se o custo do desembarque, sem multiplicadores de autonomia.
 
@@ -188,34 +199,34 @@ Desembarcar encerra o turno do transportador e de todas as unidades desembarcada
 
 ---
 
-## Logística
+## LogÃ­stica
 
 ### `PodeSuprir`
 
-Uma unidade supridora converte suas reservas em serviços prestados em campo.
+Uma unidade supridora converte suas reservas em serviÃ§os prestados em campo.
 
 O alcance pode ser:
 
-- mesmo hexágono ou unidades embarcadas;
+- mesmo hexÃ¡gono ou unidades embarcadas;
     
-- um hexágono adjacente;
+- um hexÃ¡gono adjacente;
     
-- combinação das duas modalidades.
+- combinaÃ§Ã£o das duas modalidades.
     
 
 O atendimento ocorre na camada do supridor.
 
-Quando possível, o supridor tenta igualar sua camada à do atendido.
+Quando possÃ­vel, o supridor tenta igualar sua camada Ã  do atendido.
 
-Aeronaves pousam, recebem o serviço e arremetem.
+Aeronaves pousam, recebem o serviÃ§o e arremetem.
 
-Submersíveis emergem, recebem o serviço e permanecem na superfície.
+SubmersÃ­veis emergem, recebem o serviÃ§o e permanecem na superfÃ­cie.
 
-O serviço possui custo e consome a ação do supridor, não a do atendido.
+O serviÃ§o possui custo e consome a aÃ§Ã£o do supridor, nÃ£o a do atendido.
 
-O sistema tenta encontrar um acordo... o caminhão de suprimentos não decola para encontrar o caça, mas o caça pode pousar! como houve acordo, o serviço ocorre; Entre Aviao tanker, helicoptero e um blindado, o blindado fica fora, o kc-130 só atende no ar, não no chao
+O sistema tenta encontrar um acordo... o caminhÃ£o de suprimentos nÃ£o decola para encontrar o caÃ§a, mas o caÃ§a pode pousar! como houve acordo, o serviÃ§o ocorre; Entre Aviao tanker, helicoptero e um blindado, o blindado fica fora, o kc-130 sÃ³ atende no ar, nÃ£o no chao
 
-Suprir encerra o turno do supridor, mas não o da unidade atendida.
+Suprir encerra o turno do supridor, mas nÃ£o o da unidade atendida.
 
 ---
 
@@ -223,52 +234,52 @@ Suprir encerra o turno do supridor, mas não o da unidade atendida.
 
 ### `PodeTransferir`
 
-Unidades logísticas são classificadas como:
+Unidades logÃ­sticas sÃ£o classificadas como:
 
 - **HUB:** trocam recursos entre si;
     
 - **Receiver:** apenas recebem recursos.
     
 
-A transferência:
+A transferÃªncia:
 
-- não possui custo financeiro;
+- nÃ£o possui custo financeiro;
     
 - ocorre na mesma camada do supridor;
     
-- consome a ação da unidade que iniciou a transferência.
+- consome a aÃ§Ã£o da unidade que iniciou a transferÃªncia.
     
 
-Uma unidade ainda pode receber ou fornecer estoque depois de já ter agido, desde que a outra unidade se aproxime e inicie a operação.
+Uma unidade ainda pode receber ou fornecer estoque depois de jÃ¡ ter agido, desde que a outra unidade se aproxime e inicie a operaÃ§Ã£o.
 
-Exemplo: um navio-tanque que já transferiu recursos para um porta-aviões encerrou sua ação. Ainda assim, uma fragata Receiver pode se aproximar e iniciar uma nova transferência, recebendo recursos desse navio-tanque.
+Exemplo: um navio-tanque que jÃ¡ transferiu recursos para um porta-aviÃµes encerrou sua aÃ§Ã£o. Ainda assim, uma fragata Receiver pode se aproximar e iniciar uma nova transferÃªncia, recebendo recursos desse navio-tanque.
 
-Aeronaves de carga pousam para transferir e não arremetem.
+Aeronaves de carga pousam para transferir e nÃ£o arremetem.
 
 ---
 
-## Sobrevivência
+## SobrevivÃªncia
 
 ### `PodeFundir`
 
-Utiliza a mesma lógica de aproximação e custo de entrada do embarque.
+Utiliza a mesma lÃ³gica de aproximaÃ§Ã£o e custo de entrada do embarque.
 
-Só ocorre entre unidades:
+SÃ³ ocorre entre unidades:
 
 - aliadas;
     
-- idênticas;
+- idÃªnticas;
     
-- compatíveis para fusão.
+- compatÃ­veis para fusÃ£o.
     
 
-A unidade selecionada entra no candidato e é absorvida, formando uma única unidade consolidada.
+A unidade selecionada entra no candidato e Ã© absorvida, formando uma Ãºnica unidade consolidada.
 
-O HP é somado diretamente.
+O HP Ã© somado diretamente.
 
-Munição e autonomia são redistribuídas por média ponderada.
+MuniÃ§Ã£o e autonomia sÃ£o redistribuÃ­das por mÃ©dia ponderada.
 
-Após a fusão, a unidade resultante encerra sua vez.
+ApÃ³s a fusÃ£o, a unidade resultante encerra sua vez.
 
 ---
 
@@ -276,48 +287,50 @@ Após a fusão, a unidade resultante encerra sua vez.
 
 ### `ApenasMover`
 
-Confirma a posição provisória sem executar outra ação.
+Confirma a posiÃ§Ã£o provisÃ³ria sem executar outra aÃ§Ã£o.
 
 A unidade pode ter se deslocado ou permanecido parada.
 
-Segurar posição pode ser útil para:
+Segurar posiÃ§Ã£o pode ser Ãºtil para:
 
 - manter uma linha;
     
-- preservar uma posição;
+- preservar uma posiÃ§Ã£o;
     
-- servir como observador avançado;
+- servir como observador avanÃ§ado;
     
 - aguardar uma oportunidade futura.
     
 
 ---
 
-# Sensores Aéreos e Navais
+# Sensores AÃ©reos e Navais
 
-Esses sensores não são apresentados diretamente ao jogador.
+Esses sensores nÃ£o sÃ£o apresentados diretamente ao jogador.
 
-São utilizados internamente por outras ações.
+SÃ£o utilizados internamente por outras aÃ§Ãµes.
 
-## Sensores Aéreos
+## Sensores AÃ©reos
 
 ### `PodeDecolar`
 
-Verifica se a aeronave consegue decolar até a altitude desejada.
+Verifica se a aeronave consegue decolar atÃ© a altitude desejada.
 
-Em pistas improvisadas, a decolagem pode ser limitada a uma única camada ou a um único hexágono.
+Em pistas improvisadas, a decolagem pode ser limitada a uma Ãºnica camada ou a um Ãºnico hexÃ¡gono.
 
-Exemplo: ao decolar de um porta-aviões, qualquer aeronave avança um hexágono e permanece em `Air/Low`.
+Quando a aeronave parte de uma plataforma transportadora, a camada atual da plataforma e a regra de lanÃ§amento do compartimento determinam quantos degraus ela sobe, quantos hexÃ¡gonos percorre e em qual camada termina.
+
+Exemplo: um porta-aviÃµes em `Naval/Surface` lanÃ§a a aeronave um degrau acima; ela avanÃ§a um hexÃ¡gono e termina em `Air/Low`. Uma plataforma aÃ©rea em `Air/High` pode lanÃ§Ã¡-la sem rebaixÃ¡-la, mantendo-a em `Air/High`.
 
 ### `PodeArremeter`
 
-Faz a aeronave pousar, aguarda a operação que acionou o sensor e chama `PodeDecolar` em seguida.
+Faz a aeronave pousar, aguarda a operaÃ§Ã£o que acionou o sensor e chama `PodeDecolar` em seguida.
 
-Exemplo: um caça em `Air/High` sobrevoa uma pista. Um supridor na planície o aciona, o caça pousa, recebe reabastecimento e decola novamente para `Air/Low`.
+Exemplo: um caÃ§a em `Air/High` sobrevoa uma pista. Um supridor na planÃ­cie o aciona, o caÃ§a pousa, recebe reabastecimento e decola novamente para `Air/Low`.
 
 ### `PodePousar`
 
-Verifica se a aeronave possui as habilidades necessárias para pousar no local, como:
+Verifica se a aeronave possui as habilidades necessÃ¡rias para pousar no local, como:
 
 - `VTOL`;
     
@@ -330,258 +343,258 @@ Verifica se a aeronave possui as habilidades necessárias para pousar no local, c
 - `Sea Landing`.
     
 
-Exemplo: um hidroavião sobrevoando o mar pousa quando fica sem combustível ou quando recebe suprimentos de um navio-tanque.
+Exemplo: um hidroaviÃ£o sobrevoando o mar pousa quando fica sem combustÃ­vel ou quando recebe suprimentos de um navio-tanque.
 
 ### `PodeMudarDeAltitude`
 
-Permite reposicionar a aeronave entre altitudes, geralmente durante operações de suprimento.
+Permite reposicionar a aeronave entre altitudes, geralmente durante operaÃ§Ãµes de suprimento.
 
-Exemplo: um KC-130 em `Air/High` aproxima-se de helicópteros em `Air/Low` e caças em `Air/High`.
+Exemplo: um KC-130 em `Air/High` aproxima-se de helicÃ³pteros em `Air/Low` e caÃ§as em `Air/High`.
 
-Como o helicóptero não pode subir, o avião-tanque desce para `Air/Low`, e os caças também nivelam nessa camada. Com todos na mesma altitude, o reabastecimento em voo pode acontecer.
+Como o helicÃ³ptero nÃ£o pode subir, o aviÃ£o-tanque desce para `Air/Low`, e os caÃ§as tambÃ©m nivelam nessa camada. Com todos na mesma altitude, o reabastecimento em voo pode acontecer.
 
 ## Sensores Navais
 
 ### `PodeEmergir`
 
-Verifica se o submarino pode subir à superfície.
+Verifica se o submarino pode subir Ã  superfÃ­cie.
 
-É utilizado, por exemplo, quando um navio passa sobre sua posição ou quando outra operação exige que ele esteja na superfície.
+Ã‰ utilizado, por exemplo, quando um navio passa sobre sua posiÃ§Ã£o ou quando outra operaÃ§Ã£o exige que ele esteja na superfÃ­cie.
 
 ### `PodeSubmergir`
 
-Verifica se o submarino pode retornar à camada submersa.
+Verifica se o submarino pode retornar Ã  camada submersa.
 
 Submarinos atingidos ou que dispararam permanecem temporariamente impedidos de submergir.
 
 ### `PodeSubmergirRapidamente`
 
-Permite que uma unidade termine submersa mesmo tendo iniciado a ação na superfície, desde que todas as condições sejam atendidas.
+Permite que uma unidade termine submersa mesmo tendo iniciado a aÃ§Ã£o na superfÃ­cie, desde que todas as condiÃ§Ãµes sejam atendidas.
 
 ---
 
-# Visão, Busca e Detecção
+# VisÃ£o, Busca e DetecÃ§Ã£o
 
-## Camadas de Visualização
+## Camadas de VisualizaÃ§Ã£o
 
-O jogo apresenta ao jogador as seguintes camadas de revelação de hexágonos.
+O jogo apresenta ao jogador as seguintes camadas de revelaÃ§Ã£o de hexÃ¡gonos.
 
 ### `ALL`
 
-Exibe no tabuleiro todos os hexágonos liberados pela combinação dos sensores.
+Exibe no tabuleiro todos os hexÃ¡gonos liberados pela combinaÃ§Ã£o dos sensores.
 
-### Aéreo
+### AÃ©reo
 
-Exibe apenas os hexágonos e contatos revelados pelas unidades de vigilância aérea.
+Exibe apenas os hexÃ¡gonos e contatos revelados pelas unidades de vigilÃ¢ncia aÃ©rea.
 
-### Superfície
+### SuperfÃ­cie
 
-Exibe apenas os hexágonos revelados pela visão de superfície das unidades.
+Exibe apenas os hexÃ¡gonos revelados pela visÃ£o de superfÃ­cie das unidades.
 
 ### Submarina
 
-Exibe o fundo do mar e mantém o restante do tabuleiro escurecido.
+Exibe o fundo do mar e mantÃ©m o restante do tabuleiro escurecido.
 
-Na visualização padrão, considera-se a linha de visão descendente da posição da unidade até a superfície.
+Na visualizaÃ§Ã£o padrÃ£o, considera-se a linha de visÃ£o descendente da posiÃ§Ã£o da unidade atÃ© a superfÃ­cie.
 
-Se essa linha encontrar um obstáculo geográfico, os hexágonos posteriores não são revelados na camada padrão.
+Se essa linha encontrar um obstÃ¡culo geogrÃ¡fico, os hexÃ¡gonos posteriores nÃ£o sÃ£o revelados na camada padrÃ£o.
 
 Ainda assim, uma unidade pode detectar contatos pertencentes a outra camada.
 
-Exemplo: um Super Tucano está em `Air/Low`, atrás de uma montanha. O jogo revela três hexágonos ao jogador, mas não revela o quarto, pois a linha descendente foi bloqueada pela geografia.
+Exemplo: um Super Tucano estÃ¡ em `Air/Low`, atrÃ¡s de uma montanha. O jogo revela trÃªs hexÃ¡gonos ao jogador, mas nÃ£o revela o quarto, pois a linha descendente foi bloqueada pela geografia.
 
-Entretanto, o Super Tucano possui visão aérea global de quatro hexágonos e detecta um helicóptero inimigo. Na visualização padrão, o helicóptero aparece desfocado sobre a névoa. Ao mudar para a camada aérea, o jogador consegue visualizá-lo corretamente.
+Entretanto, o Super Tucano possui visÃ£o aÃ©rea global de quatro hexÃ¡gonos e detecta um helicÃ³ptero inimigo. Na visualizaÃ§Ã£o padrÃ£o, o helicÃ³ptero aparece desfocado sobre a nÃ©voa. Ao mudar para a camada aÃ©rea, o jogador consegue visualizÃ¡-lo corretamente.
 
 ---
 
-## Névoa de Guerra
+## NÃ©voa de Guerra
 
 ### `PodeEnxergar`
 
-Libera hexágonos do tabuleiro conforme:
+Libera hexÃ¡gonos do tabuleiro conforme:
 
 - alcance;
     
-- elevação;
+- elevaÃ§Ã£o;
     
-- linha de visão.
+- linha de visÃ£o.
     
 
-O padrão da visão é projetado em direção ao chão.
+O padrÃ£o da visÃ£o Ã© projetado em direÃ§Ã£o ao chÃ£o.
 
-A curva de visão pode permanecer nivelada ou descer ao longo do percurso.
+A curva de visÃ£o pode permanecer nivelada ou descer ao longo do percurso.
 
-Enxergar um hexágono não significa necessariamente detectar todas as unidades presentes nele.
+Enxergar um hexÃ¡gono nÃ£o significa necessariamente detectar todas as unidades presentes nele.
 
 O resultado depende:
 
-- do alcance de visão;
+- do alcance de visÃ£o;
     
-- das habilidades de detecção;
+- das habilidades de detecÃ§Ã£o;
     
-- das ocultações presentes no local.
+- das ocultaÃ§Ãµes presentes no local.
     
 
-`HexEnxergado` é uma consulta que parte do hexágono e identifica quem consegue vê-lo.
+`HexEnxergado` Ã© uma consulta que parte do hexÃ¡gono e identifica quem consegue vÃª-lo.
 
-Na visualização padrão do tabuleiro, o jogador vê os hexágonos revelados pela visão de superfície.
+Na visualizaÃ§Ã£o padrÃ£o do tabuleiro, o jogador vÃª os hexÃ¡gonos revelados pela visÃ£o de superfÃ­cie.
 
 ### `PodeDetectar`
 
-Unidades com sensores especializados procuram ocultações específicas.
+Unidades com sensores especializados procuram ocultaÃ§Ãµes especÃ­ficas.
 
-O sensor e a ocultação precisam possuir etiquetas compatíveis.
+O sensor e a ocultaÃ§Ã£o precisam possuir etiquetas compatÃ­veis.
 
 Exemplos:
 
-- caça submarina procura unidades com operações submarinas;
+- caÃ§a submarina procura unidades com operaÃ§Ãµes submarinas;
     
-- detector de furtivos procura ocultação aérea `Stealth`.
+- detector de furtivos procura ocultaÃ§Ã£o aÃ©rea `Stealth`.
     
 
-Quando a correspondência é encontrada, a unidade oculta é revelada.
+Quando a correspondÃªncia Ã© encontrada, a unidade oculta Ã© revelada.
 
-Se a unidade for detectada atrás da névoa de guerra, ela aparece desfocada sobre a névoa.
+Se a unidade for detectada atrÃ¡s da nÃ©voa de guerra, ela aparece desfocada sobre a nÃ©voa.
 
-A consulta inversa — “alguém consegue me detectar?” — utiliza a mesma lógica a partir do ponto de vista da unidade observada.
+A consulta inversa â€” â€œalguÃ©m consegue me detectar?â€ â€” utiliza a mesma lÃ³gica a partir do ponto de vista da unidade observada.
 
 ---
 # Hotzone
 
-A Hotzone nasceu de uma necessidade básica:
+A Hotzone nasceu de uma necessidade bÃ¡sica:
 
-> Onde posso me posicionar sem sofrer o ataque de uma unidade que move 6 hexágonos e ataca no sétimo?
+> Onde posso me posicionar sem sofrer o ataque de uma unidade que move 6 hexÃ¡gonos e ataca no sÃ©timo?
 
-Com o tempo, essa leitura deu origem a dois conceitos baseados em movimento: as bandas **Tática** e **Operacional**.
+Com o tempo, essa leitura deu origem a dois conceitos baseados em movimento: as bandas **TÃ¡tica** e **Operacional**.
 
-O serviço de Hotzone não escolhe a melhor posição nem executa ações. Ele apenas devolve uma área conforme as instruções recebidas.
+O serviÃ§o de Hotzone nÃ£o escolhe a melhor posiÃ§Ã£o nem executa aÃ§Ãµes. Ele apenas devolve uma Ã¡rea conforme as instruÃ§Ãµes recebidas.
 
-Essa área serve de base para diversos serviços da IA, permitindo que movimento, combate, transporte, logística e vigilância utilizem o mesmo vocabulário espacial.
+Essa Ã¡rea serve de base para diversos serviÃ§os da IA, permitindo que movimento, combate, transporte, logÃ­stica e vigilÃ¢ncia utilizem o mesmo vocabulÃ¡rio espacial.
 
-Consulte `hotzone e bandas de alcance.md` para a definição completa.
+Consulte `hotzone e bandas de alcance.md` para a definiÃ§Ã£o completa.
 
 Em resumo:
 
-- **Tático:** utiliza o MP restante da unidade;
+- **TÃ¡tico:** utiliza o MP restante da unidade;
     
 - **Operacional:** projeta duas bandas sucessivas de MP;
     
-- **Range:** alcance da arma, serviço ou outro efeito produzido pela unidade.
+- **Range:** alcance da arma, serviÃ§o ou outro efeito produzido pela unidade.
     
 
 ---
 
-# Papéis da IA
+# PapÃ©is da IA
 
-A IA organiza as unidades por papéis.
+A IA organiza as unidades por papÃ©is.
 
-Cada papel interpreta de maneira diferente as Hotzones e as opções devolvidas pelos sensores `PodeX`.
+Cada papel interpreta de maneira diferente as Hotzones e as opÃ§Ãµes devolvidas pelos sensores `PodeX`.
 
-Os sensores são os mesmos para todas as unidades. O papel determina apenas quais intenções serão priorizadas e como as opções válidas serão avaliadas.
+Os sensores sÃ£o os mesmos para todas as unidades. O papel determina apenas quais intenÃ§Ãµes serÃ£o priorizadas e como as opÃ§Ãµes vÃ¡lidas serÃ£o avaliadas.
 
-## Papéis principais
+## PapÃ©is principais
 
 ### Capturador
 
-Prioriza a captura de construções.
+Prioriza a captura de construÃ§Ãµes.
 
-Combate quando necessário, normalmente depois de avaliar a possibilidade de captura.
+Combate quando necessÃ¡rio, normalmente depois de avaliar a possibilidade de captura.
 
 ### Assalto
 
-Prioriza combate de contato, avanço e ruptura da linha inimiga.
+Prioriza combate de contato, avanÃ§o e ruptura da linha inimiga.
 
 ### Fire Support
 
-Prioriza combate à distância e posicionamento de apoio na Retaguarda.
+Prioriza combate Ã  distÃ¢ncia e posicionamento de apoio na Retaguarda.
 
 ### Transportador
 
 Coordena passageiros, pontos de encontro, embarque, desembarque e transporte entre objetivos.
 
-Pode atuar como pickup, courier ou táxi.
+Pode atuar como pickup, courier ou tÃ¡xi.
 
-### Logística
+### LogÃ­stica
 
-Presta serviços de campo, mantém unidades operacionais e participa da cadeia de suprimentos.
+Presta serviÃ§os de campo, mantÃ©m unidades operacionais e participa da cadeia de suprimentos.
 
-### Vigilância
+### VigilÃ¢ncia
 
-Prioriza revelação da névoa de guerra, observação e detecção de unidades ocultas.
+Prioriza revelaÃ§Ã£o da nÃ©voa de guerra, observaÃ§Ã£o e detecÃ§Ã£o de unidades ocultas.
 
-Foi criada originalmente para operações em `Air/High`, mas passará a ser baseada na visão especializada e nas habilidades de detecção da unidade.
+Foi criada originalmente para operaÃ§Ãµes em `Air/High`, mas passarÃ¡ a ser baseada na visÃ£o especializada e nas habilidades de detecÃ§Ã£o da unidade.
 
 ---
 
-# Especializações de Papel
+# EspecializaÃ§Ãµes de Papel
 
-Algumas funções modificam o comportamento de um papel principal ou participam de mais de uma categoria.
+Algumas funÃ§Ãµes modificam o comportamento de um papel principal ou participam de mais de uma categoria.
 
 ### Capturador Agressivo
 
-Especialização de Capturador.
+EspecializaÃ§Ã£o de Capturador.
 
 Prefere atacar primeiro e capturar depois.
-Captura com uma eficiência menor que um Capturador.
+Captura com uma eficiÃªncia menor que um Capturador.
 
 ### Interceptador
 
-Especialização de Assalto voltada contra alvos aéreos.
-Usado por unidades aéreas de contato
+EspecializaÃ§Ã£o de Assalto voltada contra alvos aÃ©reos.
+Usado por unidades aÃ©reas de contato
 
-### Ataque Aéreo
+### Ataque AÃ©reo
 
-Especialização de Assalto para aeronaves atacando alvos de superfície.
-Usado por unidades aéreas de ataque ao solo
+EspecializaÃ§Ã£o de Assalto para aeronaves atacando alvos de superfÃ­cie.
+Usado por unidades aÃ©reas de ataque ao solo
 
 ### Artilheiro Combatente
 
-Participa primeiro de Fire Support, tentando combater à distância.
+Participa primeiro de Fire Support, tentando combater Ã  distÃ¢ncia.
 
-Quando não encontra uma solução válida de longo alcance, passa para Assalto.
+Quando nÃ£o encontra uma soluÃ§Ã£o vÃ¡lida de longo alcance, passa para Assalto.
 
-### Antiaéreo Combatente
+### AntiaÃ©reo Combatente
 
-Segue a mesma lógica do Artilheiro Combatente, mas contra alvos aéreos.
+Segue a mesma lÃ³gica do Artilheiro Combatente, mas contra alvos aÃ©reos.
 
-Tenta primeiro o combate antiaéreo à distância e, quando aplicável, recorre ao comportamento de Assalto.
+Tenta primeiro o combate antiaÃ©reo Ã  distÃ¢ncia e, quando aplicÃ¡vel, recorre ao comportamento de Assalto.
 
-### Antiaéreo
+### AntiaÃ©reo
 
-Especialização estacionária de Fire Support voltada ao controle do espaço aéreo.
+EspecializaÃ§Ã£o estacionÃ¡ria de Fire Support voltada ao controle do espaÃ§o aÃ©reo.
 
 ### Estoque
 
-Especialização de Logística responsável pela movimentação de consumíveis:
+EspecializaÃ§Ã£o de LogÃ­stica responsÃ¡vel pela movimentaÃ§Ã£o de consumÃ­veis:
 
 - entre unidades;
     
-- de unidades para construções;
+- de unidades para construÃ§Ãµes;
     
-- de construções para unidades;
+- de construÃ§Ãµes para unidades;
     
-- entre agentes logísticos compatíveis.
+- entre agentes logÃ­sticos compatÃ­veis.
     
 
 ---
 
-# Papéis Incorporados ou Descontinuados
+# PapÃ©is Incorporados ou Descontinuados
 
 ### Raid Antissubmarino
 
-Será incorporado à Vigilância.
+SerÃ¡ incorporado Ã  VigilÃ¢ncia.
 
-Pode tornar-se uma especialização chamada **Vigilância Naval**.
+Pode tornar-se uma especializaÃ§Ã£o chamada **VigilÃ¢ncia Naval**.
 
-### Transportador Aéreo
+### Transportador AÃ©reo
 
 Foi incorporado ao papel Transportador.
 
-O mesmo papel também receberá regras específicas para transporte naval.
+O mesmo papel tambÃ©m receberÃ¡ regras especÃ­ficas para transporte naval.
 
 ---
 
-# Hierarquia dos Papéis
+# Hierarquia dos PapÃ©is
 
 - **Capturador**
     
@@ -591,77 +604,77 @@ O mesmo papel também receberá regras específicas para transporte naval.
     
     - Interceptador
         
-    - Ataque Aéreo
+    - Ataque AÃ©reo
         
     - Artilheiro Combatente
         
-    - Antiaéreo Combatente
+    - AntiaÃ©reo Combatente
         
 - **Fire Support**
     
-    - Antiaéreo
+    - AntiaÃ©reo
         
 - **Transportador**
     
-- **Logística**
+- **LogÃ­stica**
     
     - Estoque
         
-- **Vigilância**
+- **VigilÃ¢ncia**
     
-    - Vigilância Naval
+    - VigilÃ¢ncia Naval
 
-# Comportamento Magnético
+# Comportamento MagnÃ©tico
 
-O comportamento Magnético determina qual referência espacial cada unidade procura acompanhar.
+O comportamento MagnÃ©tico determina qual referÃªncia espacial cada unidade procura acompanhar.
 
-A unidade não recebe uma posição fixa. Ela é atraída por um líder, objetivo ou necessidade compatível com seu papel.
+A unidade nÃ£o recebe uma posiÃ§Ã£o fixa. Ela Ã© atraÃ­da por um lÃ­der, objetivo ou necessidade compatÃ­vel com seu papel.
 
 ## Unidades sem Plano
 
-Uma unidade sem plano escolhe uma referência próxima para seguir.
+Uma unidade sem plano escolhe uma referÃªncia prÃ³xima para seguir.
 
-Normalmente, essa referência é um Capturador eleito como **Capitão**.
+Normalmente, essa referÃªncia Ã© um Capturador eleito como **CapitÃ£o**.
 
-Se o Capitão for destruído, a unidade procura outro Capturador próximo.
+Se o CapitÃ£o for destruÃ­do, a unidade procura outro Capturador prÃ³ximo.
 
-Quando o Capitão embarca, as unidades sem plano procuram temporariamente outro Capitão.
+Quando o CapitÃ£o embarca, as unidades sem plano procuram temporariamente outro CapitÃ£o.
 
-O acompanhamento de Capitães embarcados ainda precisa ser definido.
+O acompanhamento de CapitÃ£es embarcados ainda precisa ser definido.
 
 ## Unidades com Plano
 
-Uma unidade com plano viaja até o setor designado.
+Uma unidade com plano viaja atÃ© o setor designado.
 
 Ao chegar:
 
-1. procura um Capturador no setor para eleger como Capitão;
+1. procura um Capturador no setor para eleger como CapitÃ£o;
     
-2. se não houver Capturador, utiliza a própria `RepCell` do setor como referência.
+2. se nÃ£o houver Capturador, utiliza a prÃ³pria `RepCell` do setor como referÃªncia.
     
 
-A `RepCell` funciona como um Capitão abstrato até que uma liderança real esteja disponível.
+A `RepCell` funciona como um CapitÃ£o abstrato atÃ© que uma lideranÃ§a real esteja disponÃ­vel.
 
 ---
 
-# Atração dos Papéis Principais
+# AtraÃ§Ã£o dos PapÃ©is Principais
 
 ## Capturador
 
-É atraído por:
+Ã‰ atraÃ­do por:
 
-- construções capturáveis;
+- construÃ§Ãµes capturÃ¡veis;
     
-- construções aliadas sob captura ou ataque.
+- construÃ§Ãµes aliadas sob captura ou ataque.
     
 
 ## Assault
 
-É atraído por Capturadores próximos.
+Ã‰ atraÃ­do por Capturadores prÃ³ximos.
 
-Um deles é eleito Capitão.
+Um deles Ã© eleito CapitÃ£o.
 
-A unidade procura posições de:
+A unidade procura posiÃ§Ãµes de:
 
 - Vanguarda;
     
@@ -670,133 +683,133 @@ A unidade procura posições de:
 
 ## Fire Support
 
-É atraído por Capturadores próximos.
+Ã‰ atraÃ­do por Capturadores prÃ³ximos.
 
-O Capturador escolhido torna-se seu Capitão.
+O Capturador escolhido torna-se seu CapitÃ£o.
 
-A unidade se posiciona dentro do envelope da formação, ocupando a região definida para apoio de fogo.
+A unidade se posiciona dentro do envelope da formaÃ§Ã£o, ocupando a regiÃ£o definida para apoio de fogo.
 
 ## Transportador
 
-É atraído por unidades que desejam alcançar objetivos além da própria Banda Operacional.
+Ã‰ atraÃ­do por unidades que desejam alcanÃ§ar objetivos alÃ©m da prÃ³pria Banda Operacional.
 
-Algumas unidades também podem solicitar transporte para objetivos dentro da Banda Operacional, conforme seu papel, autonomia ou modalidade de emprego.
+Algumas unidades tambÃ©m podem solicitar transporte para objetivos dentro da Banda Operacional, conforme seu papel, autonomia ou modalidade de emprego.
 
-## Logística
+## LogÃ­stica
 
-É atraída, nesta ordem geral, por:
+Ã‰ atraÃ­da, nesta ordem geral, por:
 
-1. unidades em estado crítico;
+1. unidades em estado crÃ­tico;
     
-2. unidades que precisam de manutenção preventiva;
+2. unidades que precisam de manutenÃ§Ã£o preventiva;
     
-3. Capitão, quando não existe atendimento prioritário.
-    
-
-## Vigilância
-
-É atraída por:
-
-- áreas ainda cobertas pela névoa de guerra;
-    
-- Capitão, quando não há setor prioritário para observar.
+3. CapitÃ£o, quando nÃ£o existe atendimento prioritÃ¡rio.
     
 
-A Vigilância não deve necessariamente utilizar todo o seu movimento.
+## VigilÃ¢ncia
 
-Para evitar avançar sobre forças inimigas ainda não detectadas, pode limitar seu deslocamento a uma fração da Banda Tática, como:
+Ã‰ atraÃ­da por:
 
-**Tático ÷ 2**
+- Ã¡reas ainda cobertas pela nÃ©voa de guerra;
+    
+- CapitÃ£o, quando nÃ£o hÃ¡ setor prioritÃ¡rio para observar.
+    
 
-Essa limitação ainda está em avaliação.
+A VigilÃ¢ncia nÃ£o deve necessariamente utilizar todo o seu movimento.
+
+Para evitar avanÃ§ar sobre forÃ§as inimigas ainda nÃ£o detectadas, pode limitar seu deslocamento a uma fraÃ§Ã£o da Banda TÃ¡tica, como:
+
+**TÃ¡tico Ã· 2**
+
+Essa limitaÃ§Ã£o ainda estÃ¡ em avaliaÃ§Ã£o.
 
 ---
 
-# Atração dos Papéis Secundários
+# AtraÃ§Ã£o dos PapÃ©is SecundÃ¡rios
 
 ## Capturador Agressivo
 
-Utiliza as mesmas referências do Capturador.
+Utiliza as mesmas referÃªncias do Capturador.
 
-A diferença está na decisão local: tende a atacar antes de continuar a captura.
+A diferenÃ§a estÃ¡ na decisÃ£o local: tende a atacar antes de continuar a captura.
 
 ## Interceptador
 
-É atraído por:
+Ã‰ atraÃ­do por:
 
-- unidades de Vigilância Aérea;
+- unidades de VigilÃ¢ncia AÃ©rea;
     
-- Capitão.
+- CapitÃ£o.
     
 
-Entre as referências disponíveis, acompanha a mais próxima ou mais relevante.
+Entre as referÃªncias disponÃ­veis, acompanha a mais prÃ³xima ou mais relevante.
 
-## Ataque Aéreo
+## Ataque AÃ©reo
 
-É atraído por:
+Ã‰ atraÃ­do por:
 
 - Interceptador;
     
-- Capitão, quando não há Interceptador adequado.
+- CapitÃ£o, quando nÃ£o hÃ¡ Interceptador adequado.
     
 
-## **Artilheiro Combatente**  
+## Artilheiro Combatente
 
-É atraído pelo Capitão e acompanha a Vanguarda. É principalmente uma unidade de Assault, mas tenta primeiro utilizar suas armas de longo alcance. 
+Ã‰ atraÃ­do pelo CapitÃ£o e acompanha a Vanguarda. Ã‰ principalmente uma unidade de Assault, mas tenta primeiro utilizar suas armas de longo alcance.
 
-Quando não encontra uma solução de tiro à distância, continua o avanço e combate por contato.
+Quando nÃ£o encontra uma soluÃ§Ã£o de tiro Ã  distÃ¢ncia, continua o avanÃ§o e combate por contato.
 
-## Antiaéreo Combatente
+## AntiaÃ©reo Combatente
 
-É atraído por:
+Ã‰ atraÃ­do por:
 
 - aeronaves inimigas detectadas;
     
-- Capitão, quando não há ameaça aérea prioritária.
+- CapitÃ£o, quando nÃ£o hÃ¡ ameaÃ§a aÃ©rea prioritÃ¡ria.
     
 
-## Antiaéreo
+## AntiaÃ©reo
 
-É atraído por:
+Ã‰ atraÃ­do por:
 
-- Vigilância Aérea;
+- VigilÃ¢ncia AÃ©rea;
     
-- Capitão.
+- CapitÃ£o.
     
 
-A Vigilância oferece informação e orientação; o Capitão mantém a unidade integrada à formação.
+A VigilÃ¢ncia oferece informaÃ§Ã£o e orientaÃ§Ã£o; o CapitÃ£o mantÃ©m a unidade integrada Ã  formaÃ§Ã£o.
 
 ## Estoque
 
-É atraído por:
+Ã‰ atraÃ­do por:
 
-- construções aliadas sem recursos;
+- construÃ§Ãµes aliadas sem recursos;
     
 - unidades supridoras;
     
-- Capitão, quando não há demanda logística prioritária.
+- CapitÃ£o, quando nÃ£o hÃ¡ demanda logÃ­stica prioritÃ¡ria.
     
 
 ---
 
-# Princípio Magnético
+# PrincÃ­pio MagnÃ©tico
 
-Cada papel possui uma referência preferencial.
+Cada papel possui uma referÃªncia preferencial.
 
-A unidade se desloca em direção a essa referência até entrar na região adequada para exercer seu papel.
+A unidade se desloca em direÃ§Ã£o a essa referÃªncia atÃ© entrar na regiÃ£o adequada para exercer seu papel.
 
-O Magnetismo não escolhe obrigatoriamente um hexágono exato. Ele define:
+O Magnetismo nÃ£o escolhe obrigatoriamente um hexÃ¡gono exato. Ele define:
 
 - quem ou o que a unidade acompanha;
     
-- em qual direção deve progredir;
+- em qual direÃ§Ã£o deve progredir;
     
 - qual Hotzone deve procurar;
     
-- qual região da formação deve ocupar.
+- qual regiÃ£o da formaÃ§Ã£o deve ocupar.
     
 
-A posição final é escolhida pelo serviço responsável, considerando:
+A posiÃ§Ã£o final Ã© escolhida pelo serviÃ§o responsÃ¡vel, considerando:
 
 - Hotzones;
     
@@ -806,48 +819,74 @@ A posição final é escolhida pelo serviço responsável, considerando:
     
 - Flancos;
     
-- caminhos válidos;
+- caminhos vÃ¡lidos;
     
-- segurança;
+- seguranÃ§a;
     
 - utilidade para o papel.
     
 
-Assim, o Capitão organiza a formação sem controlar diretamente cada unidade.
+Assim, o CapitÃ£o organiza a formaÃ§Ã£o sem controlar diretamente cada unidade.
 
-# Usos de hotzone
-As unidades utilizam a hotzone de diferentes maneiras, dependendo de suas intenções
+# Usos da Hotzone
 
-baseado em PodeCapturar
-* Melhor Captura
-	esse serviço ainda não existe, mas é a base do capturador. Para unidades sem planos chamadas de rogues, represnta o predio capturavel mais proxmio que ele consegue alcancar dentro de seu envelope tatico ou operacional. As unidade scom plano atribuido já tem suas ordens.
-	A melhor captura tambem é ativada quando o predio já conquistado não tem os pontos de captura maximos restantes, pois está sobre ataque e precisa ser defendido ou reconquistado	
-	A melhor captura chama a hotzone de movimento geografico (baseado em caminhos validos) por conta da infantaria, e com base no retorno, a AI toma suas decisões
+As unidades utilizam a Hotzone de maneiras diferentes, conforme a intenÃ§Ã£o.
 
-baseado em PodeMirar
-* Melhor Combate
-	esse serviço tambem não existe, mas é a base das unidades de assalto. Unidades sem plano combatem os oponentes proximos em seu leque tatico. e deslocam ate as unidades que nao alcançam no operacional.  Unidades de FireSupport atacam oponentes no tatico, e se reposicionam para mirar no operacional.  Unidades hibridas tentam FS depois Assault.
-	Nota sobre o tatico/operacional de FireSupport: eles são baseados no alcance de suas armas, não no movimento da unidade.
+A Hotzone delimita a Ã¡rea relevante. Os serviÃ§os especializados localizam candidatos nessa Ã¡rea, consultam os sensores `PodeX`, comparam as respostas e apresentam as melhores opÃ§Ãµes. O papel da unidade decide o que fazer com elas.
 
-baseado em PodeEmbarcar
-* Melhor Embarque
-	esse serviço está sendo desenvolvido, ele é baseado na unidade e aonde ela quer ir. procura pelo transportador na banda operacional preferencialmente ou aproxima como puder.
-* Quero Carona
-  esse serviço aciona aos transportadores em relação aos magneticos de onde quem pede o taxi quer ir
+## Melhor Captura
 
-baseado em PodeDesembarcar
-* Melhor Desembarque
-   esse serviço está sendo aperfeiçoado, ele é baseado no transportador que avalia os destinos de seus passageiros e encontra o cruzamento dos envelopes taticos e operacionais deles em relação ao local onde querem ir. otimizando a entrega
+Baseia-se em `PodeCapturar` e serve principalmente ao Capturador.
 
-baseado em PodeSuprir
-* melhor Atendimento
-  esse serviço não existe, mas ele pode ser usado por unidades que tem isLogistic para encontrar unidades que precisam dela
-  
-baseado em PodeTransferir
-  melhor estoque
-  esse serviço tambem não existe, ele auxilia unidades de estoque a saberem quem precisa de seus estoques e a faixa a ser transferida
-  
-  
-baseado em PodeFundir
-por enquanto não tem serviço, a regra geral é retornar pra retaguarda e fundir, salvo algumas excessoes como elite nao se importar em reparos e fire support sempre recuar
+Para unidades sem plano, procura a construÃ§Ã£o capturÃ¡vel mais adequada dentro das bandas TÃ¡tica e Operacional. Unidades com plano recebem seus destinos das ordens atribuÃ­das.
+
+ConstruÃ§Ãµes aliadas que perderam pontos de captura tambÃ©m sÃ£o candidatas, pois podem precisar de defesa ou reconquista.
+
+A busca usa movimento geogrÃ¡fico e caminhos vÃ¡lidos: nÃ£o basta uma construÃ§Ã£o estar perto; a unidade precisa conseguir alcanÃ§Ã¡-la.
+
+## Melhor Combate
+
+Baseia-se em `PodeMirar` e atende principalmente Assalto e Fire Support.
+
+Unidades de Assalto combatem oponentes na banda TÃ¡tica e se aproximam dos que estÃ£o na Operacional. Unidades de Fire Support atacam na TÃ¡tica e se reposicionam para obter soluÃ§Ã£o de tiro contra alvos na Operacional.
+
+Para Fire Support, as bandas relevantes sÃ£o orientadas pelo alcance das armas, nÃ£o apenas pelo movimento da unidade. Unidades hÃ­bridas tentam primeiro o comportamento de Fire Support e, sem soluÃ§Ã£o vÃ¡lida, passam ao comportamento de Assalto.
+
+## Melhor Embarque e Quero Carona
+
+Baseiam-se em `PodeEmbarcar`.
+
+Melhor Embarque avalia a unidade que deseja embarcar, o destino que ela pretende alcanÃ§ar, os transportadores disponÃ­veis e os pontos de encontro possÃ­veis. A preferÃªncia Ã© encontrar uma soluÃ§Ã£o dentro da banda Operacional; quando isso nÃ£o for possÃ­vel, a unidade se aproxima do melhor encontro disponÃ­vel.
+
+Quero Carona representa o pedido do passageiro. Ele comunica aos transportadores a referÃªncia magnÃ©tica ou o destino pretendido, permitindo que eles organizem coleta, encontro e entrega.
+
+## Melhor Desembarque
+
+Baseia-se em `PodeDesembarcar` e pertence ao lado do transportador.
+
+O transportador avalia os destinos de seus passageiros, os locais vÃ¡lidos para desembarque e o cruzamento das bandas TÃ¡tica e Operacional projetadas ao redor desses destinos. A melhor entrega permite que o maior nÃºmero possÃ­vel de passageiros prossiga atÃ© seus objetivos em poucas rodadas.
+
+## Melhor Atendimento
+
+Baseia-se em `PodeSuprir` e serve Ã s unidades de LogÃ­stica.
+
+A Hotzone determina quem pode ser alcanÃ§ado e atendido. Melhor Atendimento compara as necessidades encontradas e prioriza unidades crÃ­ticas, manutenÃ§Ã£o preventiva e a formaÃ§Ã£o acompanhada.
+
+## Melhor Estoque
+
+Baseia-se em `PodeTransferir` e serve ao papel Estoque.
+
+Identifica quem possui recursos, quem precisa recebÃª-los, quais faixas podem ser transferidas e onde os encontros logÃ­sticos podem acontecer. O objetivo Ã© organizar coleta, redistribuiÃ§Ã£o e entrega sem confundir movimentaÃ§Ã£o de estoque com atendimento de campo.
+
+## Melhor Pouso
+
+Baseia-se em `PodePousar`.
+
+Organiza locais e plataformas de pouso vÃ¡lidos dentro das bandas TÃ¡tica e Operacional. A permissÃ£o para pousar continua pertencendo ao sensor; o serviÃ§o apenas compara as alternativas autorizadas.
+
+## Melhor FusÃ£o
+
+Baseia-se em `PodeFundir`.
+
+A regra geral Ã© retornar Ã  Retaguarda antes de procurar uma unidade idÃªntica para fusÃ£o. Unidades Elite podem ignorar recomposiÃ§Ãµes de pouco valor, Fire Support tende a recuar quando precisa se recompor, e unidades em risco imediato podem fundir fora da Retaguarda para sobreviver.
 
