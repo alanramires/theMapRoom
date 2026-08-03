@@ -32,6 +32,7 @@ intactos.
 | v7.0.0 | Fundação, desacoplamento e generalização do uso dos sensores | [relatório](docs/relatorio_v7.0.0.md) |
 | v7.0.1 | O alvo de captura tem um dono, e o desembarque tem um preço | [relatório](docs/relatorio_v7.0.1.md) |
 | v7.0.2 | A habilidade é uma chave, e o capitão virou dado | [relatório](docs/relatorio_v7.0.2.md) |
+| v7.0.3 | A camada virou parâmetro, e a taxonomia destrancou | [relatório](docs/relatorio_v7.0.3.md) |
 
 ### Documentos normativos criados neste major
 
