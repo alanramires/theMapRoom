@@ -82,3 +82,63 @@ documento próprio:
 O documento cobre captura, pressão, revelação de FOW, Vigilância Aérea,
 logística, reparo/evacuação, suporte de pouso, reserva coletiva de construções,
 save/load e aposentadoria futura de `QueroCaronaAereaService`.
+
+---
+
+## Captura
+
+### 10. Eficiência de captura por par (chave × construção)
+
+Hoje `PodeCapturarSensor.GetCapturePower(unit)` tem isto:
+
+```csharp
+unitData.roles[0] == UnitRole.CapturadorAgressivo
+    → Mathf.Max(1, CeilToInt(hp / 2f))
+```
+
+Uma linha com **três** problemas empilhados:
+
+1. **`roles[0]` estrito.** Unidade com `[Assalto, CapturadorAgressivo]` captura a
+   100%. É a mesma armadilha que `UnitRoleCompatibility.CanSatisfy` existe para
+   evitar.
+2. **Papel de IA governando regra de jogo.** O papel é comportamento; a chave é a
+   permissão. Aqui o papel decide *quanto* se captura — inclusive para o jogador
+   humano, que não tem papel de IA nenhum.
+3. **A eficiência é da unidade, não do par.** Não há como dizer "o robô é bom em
+   cidade e ruim em bunker".
+
+**Proposta do autor:** a v7.0.2 criou o espaço certo — a construção já lista quem
+a captura. A lista passa a carregar eficiência:
+
+```text
+Required Skills To Capture
+    Captura Construções      1.0
+    Capturador Alternativo   0.5
+    Robô Capturador          1.5
+```
+
+E a conta vira:
+
+```text
+poder = HP × eficiência do par × (0.5 se pré-requisito faltando)
+```
+
+Os dois 50% param de se confundir: um é **dado do par**, o outro é **regra de
+pré-requisito**. Continuam multiplicativos, como o manual manda.
+
+#### Decisões em aberto
+
+| # | pergunta | inclinação |
+|---|---|---|
+| 1 | unidade com duas chaves da mesma construção usa qual eficiência? | **a maior** — usa a melhor ferramenta que tem. "A menor" é defensável se carregar chave ruim deve ser ônus |
+| 2 | `CapturadorAgressivo` sai da conta? | pela proposta, sim: quem captura pela metade passa a ser quem **carrega a chave 0.5**. Exige criar a skill e trocá-la nas fichas hoje agressivas — **muda comportamento** se alguma ficar sem |
+| 3 | eficiência `0` é permitida? | provavelmente **não** — "tem a chave e não consegue" é confuso; para isso basta não listar |
+
+#### Quando
+
+É degrau de **regra de jogo**, não de IA, e toca `PodeCapturarSensor`,
+`ConstructionData`, o editor customizado e as fichas. Pelo esquema do autor é
+**Y**, não Z: pega uma parte e trabalha ela e os filhos dela.
+
+Pré-requisito: a metade da IA do critério de aceite do jipe precisa estar
+validada antes — hoje só o lado do jogador foi testado.
