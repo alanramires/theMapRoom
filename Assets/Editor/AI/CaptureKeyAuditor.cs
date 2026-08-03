@@ -30,6 +30,7 @@ public static class CaptureKeyAuditor
         // capturavel por ninguem — falha silenciosa.
         var broken = new List<ConstructionData>();
         var inertKeys = new List<ConstructionData>();
+        var malformed = new List<string>();
         int capturableCount = 0;
 
         for (int i = 0; i < all.Count; i++)
@@ -37,8 +38,8 @@ public static class CaptureKeyAuditor
             ConstructionData data = all[i];
             bool capturable = data.constructionConfiguration != null
                               && data.constructionConfiguration.isCapturable;
-            bool hasKeys = data.requiredSkillsToCapture != null
-                           && data.requiredSkillsToCapture.Count > 0;
+            int usableKeys = CountUsableKeys(data, malformed);
+            bool hasKeys = usableKeys > 0;
 
             if (capturable)
                 capturableCount++;
@@ -73,12 +74,55 @@ public static class CaptureKeyAuditor
                 report.AppendLine($"  • {inertKeys[i].name}");
         }
 
-        if (broken.Count > 0)
+        if (malformed.Count > 0)
+        {
+            report.AppendLine();
+            report.AppendLine(
+                $"ERRO — {malformed.Count} entrada(s) inútil(eis). " +
+                "Linha sem skill, ou com eficiência zero/negativa — ocupa " +
+                "espaço na lista e não abre nada:");
+            for (int i = 0; i < malformed.Count; i++)
+                report.AppendLine($"  • {malformed[i]}");
+        }
+
+        if (broken.Count > 0 || malformed.Count > 0)
             Debug.LogError(report.ToString());
         else if (inertKeys.Count > 0)
             Debug.LogWarning(report.ToString());
         else
             Debug.Log(report.ToString() + "\nNenhum problema.");
+    }
+
+    /// <summary>
+    /// Chaves que realmente abrem alguma coisa. Entrada sem skill ou com
+    /// eficiência <= 0 é ruído: aparece na lista, sugere que a construção é
+    /// capturável, e não é.
+    /// </summary>
+    private static int CountUsableKeys(
+        ConstructionData data, List<string> malformed)
+    {
+        if (data.requiredSkillsToCapture == null)
+            return 0;
+
+        int usable = 0;
+        for (int i = 0; i < data.requiredSkillsToCapture.Count; i++)
+        {
+            CaptureSkillEfficiency entry = data.requiredSkillsToCapture[i];
+            if (entry == null || entry.skill == null)
+            {
+                malformed.Add($"{data.name} [{i}] sem skill");
+                continue;
+            }
+            if (entry.efficiency <= 0f)
+            {
+                malformed.Add(
+                    $"{data.name} [{i}] {entry.skill.name} " +
+                    $"com eficiência {entry.efficiency}");
+                continue;
+            }
+            usable++;
+        }
+        return usable;
     }
 
     /// <summary>

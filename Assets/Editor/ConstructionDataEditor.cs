@@ -232,8 +232,11 @@ public class ConstructionDataEditor : Editor
             keys,
             new GUIContent(
                 "Required Skills To Capture",
-                "Habilidades que abrem a captura desta construção. Vazio = " +
-                "ninguém captura. A unidade precisa ter pelo menos uma."),
+                "Quem captura esta construção, e com que rendimento.\n\n" +
+                "Vazio = ninguém captura. Unidade com mais de uma chave daqui " +
+                "usa a MAIOR eficiência.\n\n" +
+                "1 = normal. 0,5 = metade. 1,5 = uma vez e meia. Multiplica " +
+                "com a penalidade de pré-requisito, que é outra conta."),
             includeChildren: true);
 
         SerializedProperty isCapturable =

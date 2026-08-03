@@ -34,37 +34,60 @@ public static class PodeCapturarSensor
         UnitManager unit,
         ConstructionData construction)
     {
-        return unit != null
-            && unit.TryGetUnitData(out UnitData unitData)
-            && HasCaptureKeyFor(unitData, construction);
+        return ResolveCaptureEfficiency(unit, construction) > 0f;
     }
 
     public static bool HasCaptureKeyFor(
         UnitData unitData,
         ConstructionData construction)
     {
-        if (unitData == null
-            || unitData.skills == null
-            || construction == null
-            || construction.requiredSkillsToCapture == null
-            || construction.requiredSkillsToCapture.Count == 0)
+        return ResolveCaptureEfficiency(unitData, construction) > 0f;
+    }
+
+    /// <summary>
+    /// Quanto a melhor chave desta unidade rende NESTA construcao.
+    /// Zero quando ela nao tem chave nenhuma daqui — e o mesmo que "nao captura".
+    ///
+    /// A MAIOR vence, por decisao do autor: a unidade emprega a melhor
+    /// ferramenta que carrega, e levar junto uma chave pior nunca e onus.
+    /// </summary>
+    public static float ResolveCaptureEfficiency(
+        UnitManager unit,
+        ConstructionData construction)
+    {
+        return unit != null
+               && unit.TryGetUnitData(out UnitData unitData)
+            ? ResolveCaptureEfficiency(unitData, construction)
+            : 0f;
+    }
+
+    public static float ResolveCaptureEfficiency(
+        UnitData unitData,
+        ConstructionData construction)
+    {
+        if (unitData?.skills == null
+            || construction?.requiredSkillsToCapture == null)
         {
-            return false;
+            return 0f;
         }
 
+        float best = 0f;
         for (int i = 0; i < construction.requiredSkillsToCapture.Count; i++)
         {
-            SkillData required = construction.requiredSkillsToCapture[i];
-            if (required == null)
+            CaptureSkillEfficiency entry =
+                construction.requiredSkillsToCapture[i];
+            if (entry?.skill == null || entry.efficiency <= 0f)
                 continue;
             for (int j = 0; j < unitData.skills.Count; j++)
             {
-                if (unitData.skills[j] == required)
-                    return true;
+                if (unitData.skills[j] == entry.skill
+                    && entry.efficiency > best)
+                {
+                    best = entry.efficiency;
+                }
             }
         }
-
-        return false;
+        return best;
     }
 
     /// <summary>
@@ -148,18 +171,26 @@ public static class PodeCapturarSensor
     {
         prerequisitePenaltyApplied = false;
         int basePower = GetCapturePower(unit);
-        if (basePower <= 0
-            || construction == null
-            || operationType != CaptureOperationType.CaptureEnemy)
-        {
+        if (basePower <= 0 || construction == null)
             return basePower;
-        }
 
         if (!construction.TryResolveConstructionData(out ConstructionData constructionData)
             || constructionData == null)
         {
             return basePower;
         }
+
+        // A EFICIENCIA E DO PAR (chave x construcao), e vale para captura E
+        // reconquista — quem e ruim de tomar um bunker tambem e ruim de
+        // retomar. A penalidade de pre-requisito abaixo e outra conta, e as
+        // duas se multiplicam: 0,8 aqui com pre-requisito faltando da 0,4.
+        float efficiency =
+            ResolveCaptureEfficiency(unit, constructionData);
+        if (efficiency > 0f && !Mathf.Approximately(efficiency, 1f))
+            basePower = Mathf.Max(1, Mathf.CeilToInt(basePower * efficiency));
+
+        if (operationType != CaptureOperationType.CaptureEnemy)
+            return basePower;
 
         if (matchController == null)
             matchController = Object.FindAnyObjectByType<MatchController>();

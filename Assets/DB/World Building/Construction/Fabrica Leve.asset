@@ -33,7 +33,12 @@ MonoBehaviour:
   isFakeBuilding: 0
   dpqData: {fileID: 11400000, guid: 1ff1954ba402c104b837d28d29e3d69d, type: 2}
   requiredSkillsToCapture:
-  - {fileID: 11400000, guid: 9c22b855a2e730f4faced0e069dc2a8d, type: 2}
+  - skill: {fileID: 0}
+    efficiency: 1
+  - skill: {fileID: 11400000, guid: 9c22b855a2e730f4faced0e069dc2a8d, type: 2}
+    efficiency: 1
+  - skill: {fileID: 11400000, guid: d3847c3b663e5434aaa12bcba9fed6f9, type: 2}
+    efficiency: 0.5
   requiredSkillsToEnter: []
   blockedSkills: []
   skillCostOverrides: []
