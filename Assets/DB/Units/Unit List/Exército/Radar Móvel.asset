@@ -40,8 +40,7 @@ MonoBehaviour:
     allHeights: 0
     heightLevel: 4
     vision: 4
-    detectUnitsWithFollowingSkills:
-    - {fileID: 11400000, guid: 3ae2d2213e72ea144a307a743470d032, type: 2}
+    detectUnitsWithFollowingSkills: []
     losPolicy: 0
   movementCategory: 6
   militaryForce: 0
@@ -82,6 +81,7 @@ MonoBehaviour:
   aiPreventiveSupplyHpBelowPct: 70
   aiPreventiveSupplyAutonomyBelowPct: 60
   aiPreventiveSupplyWeaponAmmoAtOrBelow: 1
+  aiDisembarkWhenCannotSupply: 1
   eliteLevel: 0
   eliteFrom: {fileID: 0}
   combatModifiers: []
@@ -104,12 +104,14 @@ MonoBehaviour:
   embarkedWeapons: []
   cantUseWeaponsOnTheFollowDomain: []
   isSupplier: 0
+  startsWithEmptySupplies: 1
   supplierTier: 0
   maxUnitsServedPerTurn: 0
   serviceRange: 0
   collectionRange: 0
   supplierOperationDomains: []
   supplierServicesProvided: []
+  supplierServiceProfile: 0
   supplierResources: []
   isTransporter: 0
   spriteTransport: {fileID: 0}
