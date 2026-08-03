@@ -126,13 +126,37 @@ poder = HP × eficiência do par × (0.5 se pré-requisito faltando)
 Os dois 50% param de se confundir: um é **dado do par**, o outro é **regra de
 pré-requisito**. Continuam multiplicativos, como o manual manda.
 
-#### Decisões em aberto
+#### Decisões — fechadas pelo autor
 
-| # | pergunta | inclinação |
+| # | pergunta | decisão |
 |---|---|---|
-| 1 | unidade com duas chaves da mesma construção usa qual eficiência? | **a maior** — usa a melhor ferramenta que tem. "A menor" é defensável se carregar chave ruim deve ser ônus |
-| 2 | `CapturadorAgressivo` sai da conta? | pela proposta, sim: quem captura pela metade passa a ser quem **carrega a chave 0.5**. Exige criar a skill e trocá-la nas fichas hoje agressivas — **muda comportamento** se alguma ficar sem |
-| 3 | eficiência `0` é permitida? | provavelmente **não** — "tem a chave e não consegue" é confuso; para isso basta não listar |
+| 1 | unidade com duas chaves da mesma construção usa qual eficiência? | **a maior.** A unidade usa a melhor ferramenta que tem; carregar uma chave pior nunca é ônus |
+| 2 | `CapturadorAgressivo` sai da conta? | **sai.** Quem captura pela metade passa a ser quem **carrega a chave 0.5**, não quem tem o papel |
+| 3 | eficiência `0` é permitida? | **não.** "Tem a chave e não consegue" é confuso — para isso basta não listar a skill. Validar `> 0` no editor |
+
+#### O que a decisão 2 exige, e o risco dela
+
+Tirar o papel da conta **muda comportamento de jogo**, e o modo da falha é
+silencioso: unidade hoje agressiva que não receber a chave `0.5` passa a
+capturar a **100%**, e nada reclama — captura mais rápida é resultado legítimo.
+
+Ordem segura:
+
+1. criar a chave de eficiência reduzida (`Capturador Alternativo`, já existe)
+2. listá-la nas construções, ao lado da chave normal
+3. trocá-la nas fichas hoje `CapturadorAgressivo`
+4. **auditar**: nenhuma ficha com `CapturadorAgressivo` pode ficar sem a chave
+   reduzida — o `CaptureKeyAuditor` é o lugar natural desse aviso
+5. só então remover o `roles[0] == CapturadorAgressivo` do
+   `PodeCapturarSensor.GetCapturePower`
+
+Enquanto os passos 1-4 não estiverem prontos, o hardcoded **fica**. As duas
+regras convivendo por um tempo é preferível a uma janela em que ninguém captura
+pela metade.
+
+Repare que o papel `CapturadorAgressivo` **continua existindo** — ele só perde a
+parte de regra de jogo. O que ele governa é comportamento de IA: atacar antes de
+continuar capturando. Isso é dele e fica.
 
 #### Quando
 
