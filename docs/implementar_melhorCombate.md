@@ -156,6 +156,51 @@ public bool playConservative = false;
 suporte, logística e transporte — e em nenhum momento fala de tolerância a perda.
 Ler o campo como "menor perda própria" seria **invenção**, não interpretação.
 
+#### E os consumidores confirmam: `playConservative` é política de POSIÇÃO
+
+Decisão do autor, e o código sustenta. Os **dez** consumidores do campo:
+
+```text
+HexEvaluator · Backline · Transportador (×3) · TransportOperationsService
+Stock · Logistics.Helpers · Capturer · FireSupport.Helpers
+```
+
+**Nenhum é arquivo de ataque.** Não aparece em `AttackDecision.cs`, nem em
+`Assault.Targeting.cs`, nem em `Capturer.Attack.cs`, nem em `AirCombat.cs`.
+
+O campo governa posicionamento, retaguarda, transporte e logística — e o próprio
+tooltip diz o que ele escolhe: *"acompanha pela **retaguarda** a linha de
+combatentes aliados"*. Isso é **estação na linha**, vocabulário que o projeto já
+tem (vanguarda / retaguarda / flancos), não cautela genérica.
+
+> **A pergunta nunca foi "deve sair do Attack Decision" — ele nunca esteve lá.**
+> O risco era deixá-lo *entrar* agora, junto com o `MelhorCombate`. Não deixe.
+
+#### As duas famílias, separadas
+
+```text
+ACEITAÇÃO — "que combate eu aceito"          dono: Attack Decision
+    attackAcceptHpLossPercent
+    attackMustSurvive
+    defensiveAttackExtraHpLossPercent
+    → vira AdmissionStatus DENTRO do serviço, por combate
+
+POSICIONAMENTO — "onde eu fico"              dono: nenhum ainda
+    combatRepositionMode         posso me mover para combater?
+    playConservative / estação   vanguarda ou retaguarda?
+    skipInitialSpawnReposition   caso de spawn
+    → NÃO entra na nota de combate
+```
+
+São eixos diferentes: um é **permissão de mover**, o outro é **profundidade
+preferida na linha**. E cada um entra no `MelhorCombate` por uma porta distinta:
+
+| campo | como entra |
+|---|---|
+| `combatRepositionMode` | **filtro de origens** na requisição — `HoldCurrent` pede só a célula atual |
+| aceitação | `AdmissionStatus` de cada combate, dentro do serviço |
+| `playConservative` | **não entra.** É o papel que prefere retaguarda ao escolher entre células admissíveis |
+
 #### O dono da tolerância já existe, e são três campos
 
 Confirmado em `UnitData.cs:190-199`:
@@ -168,11 +213,11 @@ Confirmado em `UnitData.cs:190-199`:
 
 Usar `playConservative` para o mesmo assunto **duplicaria política com dono**.
 
-#### A divisão proposta
+#### A divisão fechada pelo autor
 
 ```text
-Attack Decision  →  tolerância à troca e à sobrevivência
-Conservative     →  não piorar exposição / posição
+Attack Decision  →  tolerância à troca e à sobrevivência   (entra no serviço)
+playConservative →  política de POSICIONAMENTO             (fica fora do serviço)
 ```
 
 E, para o `longRangeStationary`, dois conceitos onde hoje há um bool:
