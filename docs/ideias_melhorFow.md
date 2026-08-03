@@ -1,4 +1,4 @@
-# Ideias — Melhor Cobertura de FOW
+# Ideias — Melhor Visão
 
 > **Este documento é o `MelhorVisão`.** A `docs/magnetic_tabela.md` registrou, ao
 > descrever a atração da Vigilância, que "para onde revelar" é pergunta de
@@ -20,7 +20,7 @@ Criar uma consulta geral, pura e orientada por camada capaz de responder:
 > Se esta unidade terminasse seu movimento neste hex, qual cobertura de visão ela
 > acrescentaria, preservaria ou perderia para o seu time?
 
-A primeira entrega será a ferramenta de Scene View `Melhor Cobertura de FOW`,
+A primeira entrega será a ferramenta de Scene View `Melhor Visão`,
 auditada a partir de uma unidade selecionada. O mesmo núcleo poderá ser consumido
 mais tarde por papéis da IA, sem recriar regras de visão dentro de cada
 `AIController`.
@@ -93,7 +93,7 @@ nova ferramenta:
 - gradiente verde para ganho, amarelo para neutro e laranja/vermelho para perda;
 - rótulo curto sobre cada candidato.
 
-`MelhorCoberturaFow` deve repetir essa anatomia, trocando passageiros/rotas por
+`MelhorVisao` deve repetir essa anatomia, trocando passageiros/rotas por
 cobertura projetada, ganho, redundância e perda.
 
 ### PodeDetectar/PodeEnxergar como autoridade
@@ -388,7 +388,7 @@ A cobertura aliada deve ser calculada sem a unidade selecionada. Caso contrário
 a contribuição atual da própria unidade contaminaria todos os candidatos e
 esconderia a perda causada por abandonar a posição.
 
-### 3. MelhorCoberturaFowService
+### 3. MelhorVisaoService
 
 Responsável por:
 
@@ -420,7 +420,7 @@ DisplayScore
 Reason
 ```
 
-### 4. MelhorCoberturaFowWindow
+### 4. MelhorVisaoWindow
 
 Primeiro consumidor do novo núcleo.
 
@@ -579,7 +579,7 @@ O encaixe não precisa de nada novo. O `MelhorCapitaoAttraction` já tem
 `hasFixedCell`, criado para a `RepCell` ser "capitão abstrato":
 
 ```text
-MelhorCoberturaFow (campo → ponto)          MelhorCapitao (ponto → referência)
+MelhorVisao (campo → ponto)                 MelhorCapitao (ponto → referência)
   "qual hex revela mais Submerged?"  ─────►   entra como atração de célula fixa
 ```
 
@@ -595,7 +595,7 @@ dela é calculada em vez de existir no tabuleiro.
 
 **Consequência para o `AICaptainData`:** o enum `AICaptainAttractionKind` já tem
 `PontoDeObservacao` reservado para isto. O predicado por trás dele é uma chamada
-ao `MelhorCoberturaFow`, e é o único da tabela que depende deste documento.
+ao `MelhorVisao`, e é o único da tabela que depende deste documento.
 
 ### Submarino
 
@@ -682,7 +682,7 @@ qualquer unidade que se move:
 ```
 
 **O soldado não precisa saber que artilharia existe.** Ele recebe um conjunto de
-foco e o `MelhorCoberturaFow` faz o resto.
+foco e o `MelhorVisao` faz o resto.
 
 E o outro lado fecha sem regra nova: o soldado que abandona a montanha e apaga o
 único contato leva a penalidade **porque perdeu cobertura exclusiva de um hex em
@@ -727,8 +727,8 @@ Exemplos:
 - `VisionCoverageService` responde quantos hexes `Air/High` o EWACS cobriria;
 - a política do EWACS combina cobertura com distância do capitão, ameaça e
   recuperação;
-- `MelhorCoberturaFowService` possui pesos didáticos para auditoria, não uma
-  doutrina universal imposta aos controladores.
+- `MelhorVisaoWindow` passa explicitamente seus pesos didáticos para auditoria;
+  o serviço não possui uma doutrina universal imposta aos controladores.
 
 Isso preserva a caixa de Lego: mesma medição, prioridades diferentes.
 
@@ -760,7 +760,7 @@ Isso preserva a caixa de Lego: mesma medição, prioridades diferentes.
 4. Incluir a posição atual.
 5. Gerar ranking completo.
 
-### Etapa 4 — Janela Melhor Cobertura de FOW
+### Etapa 4 — Janela Melhor Visão
 
 1. Criar janela em `Tools/Hotzone` ou `Tools/FoW`.
 2. Implementar seleção e autodetecção.
@@ -797,7 +797,7 @@ reversível sem exigir que todos os papéis mudem juntos.
 
 ### Pesos didáticos podem não ter leitor
 
-O documento propõe que `MelhorCoberturaFowService` tenha "pesos didáticos para
+O documento propõe que `MelhorVisaoService` tenha "pesos didáticos para
 auditoria". Cuidado: na v7.0.2 foi **medido** que nenhum dos dois consumidores de
 IA do `MelhorCapturaService` lê a nota dele — os dois reordenam por critério
 próprio. O serviço calculava poder, pontos restantes e turnos de captura para
@@ -897,7 +897,7 @@ altura, locks pendentes e `OccupancyResolver`.
 
 ## Visão de longo prazo
 
-`MelhorCoberturaFow` é a primeira peça de uma auditoria de decisão por unidade.
+`MelhorVisao` é a primeira peça de uma auditoria de decisão por unidade.
 
 A ferramenta não tenta prever sozinha toda a jogada da IA. Ela responde uma
 pergunta reutilizável e verificável: onde esta unidade presta o melhor serviço de
