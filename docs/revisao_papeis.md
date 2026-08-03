@@ -403,6 +403,143 @@ linha na matriz.
 
 ---
 
+## Preferência não é identidade — a morte dos papéis secundários
+
+**Avaliação, não plano de execução.** Direção aceita; a sequência no fim da
+seção é a parte que muda o quando.
+
+### O problema, na formulação do autor
+
+> *No dia que eu inventar o Field Medic, ele vai precisar de um papel novo só
+> pra dizer que "logística" pesa mais que "captura"? Hoje o Capturador Agressivo
+> diz que capturar é a prioridade secundária, e por isso criamos um papel só pra
+> ele. A combinação explode em 10×10.*
+
+Correto, e o nome disso é preciso: **`CapturadorAgressivo` não é uma identidade,
+é uma ordem entre duas agendas.** Cadastrar cada cruzamento como `UnitRole` faz o
+catálogo crescer no quadrado das características.
+
+```text
+Soldado        essência Capturador · capacidades Capturar          · padrão
+Bazooka        essência Capturador · capacidades Capturar, AT      · Agressivo
+Metralhadora   essência Capturador · capacidades Capturar, defesa  · Defensivo
+Field Medic    essência Capturador · capacidades Capturar, Suprir  · Logística antes de Captura
+```
+
+### Não são quatro conceitos novos — é um
+
+A proposta separa **capacidade / essência / preferência / sensores**. Três já
+existem:
+
+| conceito | onde já mora hoje |
+|---|---|
+| capacidade | `isSupplier`, `isTransporter`, armas, skills |
+| essência | `roles[0]` — já é o desempate |
+| sensores | os `PodeX` |
+| **preferência** | **não existe** |
+
+Isso encolhe a obra de "refundação" para **um campo novo**. Vale registrar
+porque a proposta parece maior do que é.
+
+### O teste para separar trait de chave
+
+O colaborador do autor avisa para não misturar preferências com skills mecânicas
+como `Alpino`. Está certo, e o motivo é derivável do manual — **a direção da
+leitura**:
+
+| | quem lê | exemplo |
+|---|---|---|
+| **chave** | o **mundo** lê sobre você | a montanha pergunta se você é alpino; a construção pergunta se você tem a chave |
+| **trait** | **você** lê sobre si mesmo | só o próprio laço de decisão consulta |
+
+O teste já classifica o caso difícil da `v7.0.2`: `Capturador Alternativo` é
+**chave** (a construção lê, e por isso a eficiência mora no par `chave ×
+construção`); `Agressivo` é **trait** (ninguém no mundo pergunta se você é
+agressivo).
+
+### ⚠️ A distinção que a proposta apaga
+
+A lista de mortes junta dois mecanismos **diferentes**:
+
+```text
+CapturadorAgressivo   combater ANTES de capturar      ordem ENTRE colunas
+ArtilheiroCombatente  tiro longo, senão contato       cadeia DENTRO da coluna
+```
+
+O segundo não reordena agendas — responde **uma pergunta só** (`PodeMirar`)
+consultando dois pais em sequência. É o Labradoodle desta mesma revisão.
+
+**Se o sistema de preferências só souber reordenar colunas, o Artilheiro
+Combatente não é expressável e volta como papel.** São necessários os dois.
+
+### O reframe que torna isso pequeno
+
+O router **já é a lista de prioridade** — só que fixa e global:
+
+```text
+AIController.Router.cs
+  auto-reparo → desbloqueio de produção → transporte → papel → HexEvaluator
+```
+
+Então "Action Priority" não é arquitetura nova. É: **a ordem do router deixa de
+ser código e vira dado da ficha.**
+
+### Ordem estrita não elimina o arbitrário — muda de lugar
+
+A proposta argumenta que faixas ordenadas evitam comparar "87 pontos de
+suprimento com 92 de captura". Verdade, mas repare no que segura a faixa 1:
+
+```text
+1. Suprir CRÍTICO     ← a palavra "crítico" é que faz a faixa funcionar
+2. Capturar
+3. Combater
+```
+
+Sem o limiar, **o Field Medic em cima de um capturável, com um aliado a 90% de HP
+ao lado, nunca captura.** Ordem lexicográfica ignora magnitude por construção.
+
+Logo: **cada faixa precisa de um predicado de entrada**, e o ajuste fino migra do
+peso para o limiar. É um ganho real — limiar é legível, peso não — mas não é "sem
+números"; é números em outro lugar. Entrar de olhos abertos evita a sensação de
+regressão quando aparecer "e se crítico fosse 30% em vez de 25%".
+
+### O que morre, contado
+
+| papel | veredito |
+|---|---|
+| `CapturadorAgressivo = 12` | morre → `Capturador` + trait |
+| `ArtilheiroCombatente = 13` | morre → cadeia dentro de `PodeMirar` |
+| `AntiaereoCombatente = 14` | morre → mesma forma |
+| `TransportadorAereo = 15` | **preferência de COMPRA, não de ação.** Ou os traits cobrem shopping, ou ele sobrevive |
+| `Antiaereo = 10` | sobrevive — capacidade de arma real |
+| `Vigilancia = 6` | sobrevive — agenda real, camada como parâmetro |
+| ~~`RaidAntiSub = 11`~~ | já morreu na `v7.0.3`: era capacidade + camada |
+
+Ganho colateral: `CanSatisfy` e `ResolveCompositionRole` existem hoje quase só
+para traduzir esses híbridos. Três mortes esvaziam os dois.
+
+### Sequência — a única objeção de fundo
+
+Traits são **degrau 4** ("variação de papel vira parâmetro"). O degrau 3 tem
+**1 linha de 7**.
+
+O caso concreto que mostra o risco: o `Agressivo` de hoje está espalhado —
+inclusive o `roles[0] == CapturadorAgressivo` com 50% hardcoded no
+`GetCapturePower`, que continua de pé. Transformá-lo em trait agora não
+centraliza a política; **move o espalhamento para um campo novo.**
+
+> **Não dá pra parametrizar uma política que ainda não foi extraída.**
+
+Quando as 7 linhas existirem, a diferença entre `Capturador` e
+`CapturadorAgressivo` estará visível como **duas células divergentes numa linha
+só** — e aí o trait é a forma óbvia de registrar a divergência. Hoje seria
+palpite.
+
+É o mesmo padrão da `v7.0.3`: lá o **órgão unificado destrancou a coluna**; aqui
+a **linha extraída destranca o trait**.
+
+---
+
 ## Critério de pronto da matriz
 
 O teste do autor, inalterado:
