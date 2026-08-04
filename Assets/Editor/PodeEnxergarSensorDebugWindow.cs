@@ -318,70 +318,30 @@ public class PodeEnxergarSensorDebugWindow : EditorWindow
                 preserveObserverLayerRange: false);
             scenarioResults.Add(manualScenario);
         }
-        else if (specializations.Count > 0)
-        {
-            int baseRange = observerData != null
-                ? Mathf.Max(1, observerData.visao)
-                : Mathf.Max(1, selectedUnit.Visao);
-            VisionScenarioResult baseScenario = BuildScenarioResult(
-                map,
-                db,
-                enableLos,
-                enableSpotter,
-                "Visao Geral (base, sem especializacao)",
-                Domain.Land,
-                HeightLevel.Surface,
-                baseRange,
-                forceLayer: false,
-                preserveObserverLayerRange: false,
-                forcedDetectionRangeOverride: baseRange,
-                skipSpecializedTargetLayers: true);
-            scenarioResults.Add(baseScenario);
-
-            for (int i = 0; i < specializations.Count; i++)
-            {
-                UnitVisionException entry = specializations[i];
-                if (entry == null)
-                    continue;
-
-                int specializedRange = observerData != null
-                    ? Mathf.Max(0, observerData.ResolveVisionFor(entry.domain, entry.heightLevel))
-                    : Mathf.Max(1, selectedUnit.Visao);
-                VisionScenarioResult specializedScenario = BuildScenarioResult(
-                    map,
-                    db,
-                    enableLos,
-                    enableSpotter,
-                    $"Especializacao {entry.domain}/{entry.heightLevel}",
-                    entry.domain,
-                    entry.heightLevel,
-                    specializedRange,
-                    forceLayer: true,
-                    preserveObserverLayerRange: false,
-                    forcedDetectionRangeOverride: specializedRange,
-                    skipSpecializedTargetLayers: false);
-                scenarioResults.Add(specializedScenario);
-            }
-        }
         else
         {
+            // Esta janela responde por VISAO: quais hexes saem do preto. Ela
+            // nao lista cenario de especializacao, porque especializacao e
+            // DETECCAO — faz unidade aparecer, nunca hexagono. Quem audita
+            // deteccao e a janela do PodeDetectar.
             int baseRange = observerData != null
                 ? Mathf.Max(1, observerData.visao)
                 : Mathf.Max(1, selectedUnit.Visao);
-            VisionScenarioResult defaultScenario = BuildScenarioResult(
+            VisionScenarioResult visionScenario = BuildScenarioResult(
                 map,
                 db,
                 enableLos,
                 enableSpotter,
-                "Basico (camada virtual do mapa)",
+                "Visao (campo visao da ficha)",
                 Domain.Land,
                 HeightLevel.Surface,
                 baseRange,
                 forceLayer: false,
                 preserveObserverLayerRange: false,
                 forcedDetectionRangeOverride: baseRange,
-                skipSpecializedTargetLayers: true);
-            scenarioResults.Add(defaultScenario);
+                skipSpecializedTargetLayers: true,
+                ignoreDetectSpecializations: true);
+            scenarioResults.Add(visionScenario);
         }
 
         if (scenarioResults.Count > 0)
@@ -538,7 +498,8 @@ public class PodeEnxergarSensorDebugWindow : EditorWindow
         bool forceLayer,
         bool preserveObserverLayerRange,
         int forcedDetectionRangeOverride = -1,
-        bool skipSpecializedTargetLayers = false)
+        bool skipSpecializedTargetLayers = false,
+        bool ignoreDetectSpecializations = false)
     {
         VisionScenarioResult result = new VisionScenarioResult
         {
@@ -572,6 +533,7 @@ public class PodeEnxergarSensorDebugWindow : EditorWindow
             forcedVirtualTargetHeight: heightLevel,
             forcedDetectionRangeOverride: forcedDetectionRangeOverride,
             skipSpecializedTargetLayers: skipSpecializedTargetLayers,
+            ignoreDetectSpecializations: ignoreDetectSpecializations,
             useRangeOnlyForAirHighWhenConfigured: true);
 
         bool useAquaticDistanceForScenario = ShouldUseAquaticDistanceForScenario(domain, heightLevel);
