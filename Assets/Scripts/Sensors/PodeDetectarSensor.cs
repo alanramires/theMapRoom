@@ -664,7 +664,7 @@ public static class PodeDetectarSensor
                 }
 
                 int effectiveDistance = distance;
-                bool useAquaticDistance = ShouldUseAquaticDistanceForDetection(targetDomain, targetHeight) && terrainDatabase != null;
+                bool useAquaticDistance = ShouldUseAquaticDistanceForDetection(observerData, targetDomain, targetHeight) && terrainDatabase != null;
                 if (useAquaticDistance)
                 {
                     if (aquaticWorkspace == null)
@@ -1110,7 +1110,7 @@ public static class PodeDetectarSensor
 
                 Domain targetDomain = target.GetDomain();
                 HeightLevel targetHeight = target.GetHeightLevel();
-                bool useAquaticDistance = ShouldUseAquaticDistanceForDetection(targetDomain, targetHeight) && terrainDatabase != null;
+                bool useAquaticDistance = ShouldUseAquaticDistanceForDetection(observerData, targetDomain, targetHeight) && terrainDatabase != null;
                 Dictionary<Vector3Int, int> distanceMap = defaultDistanceMap;
                 if (useAquaticDistance)
                 {
@@ -1828,9 +1828,28 @@ public static class PodeDetectarSensor
         return observerData.ResolveLosValidationFor(targetDomain, targetHeight, enableLosValidationGlobal);
     }
 
-    private static bool ShouldUseAquaticDistanceForDetection(Domain targetDomain, HeightLevel targetHeight)
+    /// <summary>
+    /// Propagacao pelo meio em vez de reta. Quem decide e a FICHA — o
+    /// DetectionMethod declarado para aquela camada de alvo —, nao a camada por
+    /// si so. O meio continua vindo da camada: hoje o unico meio modelado e a
+    /// agua conectada de Submarine/Submerged.
+    ///
+    /// Antes disso, toda deteccao de alvo submerso propagava, tivesse a ficha
+    /// declarado ou nao. As tres unidades que caçam submerso hoje — Submarino,
+    /// Fragata e Super Tucano — estao todas em Propagated, entao a troca do
+    /// gatilho nao muda comportamento; muda quem manda.
+    /// </summary>
+    private static bool ShouldUseAquaticDistanceForDetection(
+        UnitData observerData,
+        Domain targetDomain,
+        HeightLevel targetHeight)
     {
-        return targetDomain == Domain.Submarine && targetHeight == HeightLevel.Submerged;
+        if (targetDomain != Domain.Submarine || targetHeight != HeightLevel.Submerged)
+            return false;
+
+        return observerData != null
+            && observerData.ResolveDetectionMethodFor(targetDomain, targetHeight)
+                == DetectionMethod.Propagated;
     }
 
     private static bool IsAquaticCellForSubmergedDetection(Tilemap map, TerrainDatabase terrainDatabase, Vector3Int cell)
@@ -1955,7 +1974,7 @@ public static class PodeDetectarSensor
         Domain targetDomain = target.GetDomain();
         HeightLevel targetHeight = target.GetHeightLevel();
         int detectionRange = ResolveDetectionRange(observer, observerData, target, targetDomain, targetHeight);
-        bool useAquaticDistance = ShouldUseAquaticDistanceForDetection(targetDomain, targetHeight) && terrainDatabase != null;
+        bool useAquaticDistance = ShouldUseAquaticDistanceForDetection(observerData, targetDomain, targetHeight) && terrainDatabase != null;
 
         DistanceMapWorkspace observeWorkspace = RentDistanceMapWorkspace();
         int distance;
