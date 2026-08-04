@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Tilemaps;
@@ -276,7 +276,7 @@ public static class PodeDetectarSensor
     private static readonly Stack<DistanceMapWorkspace> distanceMapWorkspacePool = new Stack<DistanceMapWorkspace>(8);
     // Os caches de terreno, construcao e estrutura mudaram de casa: agora vivem
     // no ObservationCellService, junto do codigo que os preenche. Eles nao eram
-    // do PodeDetectar — eram fato de tabuleiro que o PodeEnxergar tambem
+    // do PodeDetectar â€” eram fato de tabuleiro que o PodeEnxergar tambem
     // precisa. A medicao que os criou continua valendo: GetConstructionAtCell e
     // GetStructureAtCell varrem a cena a cada chamada, ~312us e ~300us, e
     // somavam 68ms dos 106ms de um collect.
@@ -590,7 +590,12 @@ public static class PodeDetectarSensor
                     observerCell,
                     maxRange,
                     aquaticWorkspace,
-                    c => IsAquaticCellForSubmergedDetection(boardMap, terrainDatabase, c));
+                    c => IsCellPassableForPropagation(
+                        boardMap,
+                        terrainDatabase,
+                        c,
+                        Domain.Submarine,
+                        HeightLevel.Submerged));
             }
 
             foreach (KeyValuePair<Vector3Int, int> pair in workspace.distances)
@@ -642,7 +647,7 @@ public static class PodeDetectarSensor
                 }
 
                 int effectiveDistance = distance;
-                bool useAquaticDistance = ShouldUseAquaticDistanceForDetection(observerData, targetDomain, targetHeight) && terrainDatabase != null;
+                bool useAquaticDistance = ShouldUsePropagatedDistance(observerData, targetDomain, targetHeight) && terrainDatabase != null;
                 if (useAquaticDistance)
                 {
                     if (aquaticWorkspace == null)
@@ -654,7 +659,12 @@ public static class PodeDetectarSensor
                             observerCell,
                             maxRange,
                             aquaticWorkspace,
-                            c => IsAquaticCellForSubmergedDetection(boardMap, terrainDatabase, c));
+                            c => IsCellPassableForPropagation(
+                                boardMap,
+                                terrainDatabase,
+                                c,
+                                targetDomain,
+                                targetHeight));
                     }
 
                     if (!aquaticWorkspace.distances.TryGetValue(cell, out effectiveDistance))
@@ -799,7 +809,7 @@ public static class PodeDetectarSensor
         DPQAirHeightConfig dpqAirHeightConfig = null,
         bool enableLosValidation = true)
     {
-        // Pergunta de HEXES — delegada ao PodeEnxergar, que e quem responde por
+        // Pergunta de HEXES â€” delegada ao PodeEnxergar, que e quem responde por
         // ela desde o split. Visao padrao da ficha, reta pura, uma passada por
         // superficie, e a lista de Detect Specializations invisivel.
         //
@@ -871,8 +881,8 @@ public static class PodeDetectarSensor
             if (domain == resolvedTargetDomain && height == resolvedTargetHeight)
                 continue;
 
-            // Só permite cruzar tipos de terreno dentro da família aquática (Naval ↔ Submarine).
-            // Impede que visão sub/submerged revele hexes de terra ou ar.
+            // SÃ³ permite cruzar tipos de terreno dentro da famÃ­lia aquÃ¡tica (Naval â†” Submarine).
+            // Impede que visÃ£o sub/submerged revele hexes de terra ou ar.
             bool specIsAquatic = domain == Domain.Submarine || domain == Domain.Naval;
             bool terrainIsAquatic = resolvedTargetDomain == Domain.Submarine || resolvedTargetDomain == Domain.Naval;
             if (specIsAquatic != terrainIsAquatic)
@@ -1088,7 +1098,7 @@ public static class PodeDetectarSensor
 
                 Domain targetDomain = target.GetDomain();
                 HeightLevel targetHeight = target.GetHeightLevel();
-                bool useAquaticDistance = ShouldUseAquaticDistanceForDetection(observerData, targetDomain, targetHeight) && terrainDatabase != null;
+                bool useAquaticDistance = ShouldUsePropagatedDistance(observerData, targetDomain, targetHeight) && terrainDatabase != null;
                 Dictionary<Vector3Int, int> distanceMap = defaultDistanceMap;
                 if (useAquaticDistance)
                 {
@@ -1100,7 +1110,7 @@ public static class PodeDetectarSensor
                             observerCell,
                             maxRange,
                             aquaticDetectWorkspace,
-                            cell => IsAquaticCellForSubmergedDetection(boardMap, terrainDatabase, cell));
+                            cell => IsCellPassableForPropagation(boardMap, terrainDatabase, cell, targetDomain, targetHeight));
                     }
 
                     distanceMap = aquaticDetectWorkspace.distances;
@@ -1807,30 +1817,44 @@ public static class PodeDetectarSensor
     }
 
     /// <summary>
-    /// Propagacao pelo meio em vez de reta. Quem decide e a FICHA — o
-    /// DetectionMethod declarado para aquela camada de alvo —, nao a camada por
-    /// si so. O meio continua vindo da camada: hoje o unico meio modelado e a
-    /// agua conectada de Submarine/Submerged.
+    /// Propagacao pelo meio em vez de reta. Quem decide e a FICHA â€” o
+    /// DetectionMethod declarado para aquela camada de alvo.
     ///
     /// Antes disso, toda deteccao de alvo submerso propagava, tivesse a ficha
-    /// declarado ou nao. As tres unidades que caçam submerso hoje — Submarino,
-    /// Fragata e Super Tucano — estao todas em Propagated, entao a troca do
-    /// gatilho nao muda comportamento; muda quem manda.
+    /// declarado ou nao, e nenhuma outra camada podia. As tres unidades que
+    /// caÃ§am submerso hoje estao todas em Propagated, entao nenhuma ficha muda
+    /// de comportamento; o que muda e quem manda, e que agora qualquer camada
+    /// pode declarar propagacao.
     /// </summary>
-    private static bool ShouldUseAquaticDistanceForDetection(
+    private static bool ShouldUsePropagatedDistance(
         UnitData observerData,
         Domain targetDomain,
         HeightLevel targetHeight)
     {
-        if (targetDomain != Domain.Submarine || targetHeight != HeightLevel.Submerged)
-            return false;
-
+        // Sem privilegio de camada. Quem propaga e quem a ficha declarou como
+        // Propagated, e o MEIO sai da propria camada do alvo: a propagacao anda
+        // pelas celulas que aquela camada aceita.
+        //
+        // E por isso que um "detect land/surface 5 propagate" inventa um
+        // megafone sem precisar de codigo novo â€” o som contorna o morro pelas
+        // celulas de superficie, do mesmo jeito que o sonar contorna a
+        // peninsula pelas celulas de agua.
         return observerData != null
             && observerData.ResolveDetectionMethodFor(targetDomain, targetHeight)
                 == DetectionMethod.Propagated;
     }
 
-    private static bool IsAquaticCellForSubmergedDetection(Tilemap map, TerrainDatabase terrainDatabase, Vector3Int cell)
+    /// <summary>
+    /// Por onde a propagacao anda: pelas celulas que a CAMADA DO ALVO aceita.
+    /// Agua conectada para submerso, superficie para um sensor de superficie, e
+    /// assim por diante â€” a regra e a mesma, o meio e que muda.
+    /// </summary>
+    private static bool IsCellPassableForPropagation(
+        Tilemap map,
+        TerrainDatabase terrainDatabase,
+        Vector3Int cell,
+        Domain targetDomain,
+        HeightLevel targetHeight)
     {
         if (map == null || terrainDatabase == null)
             return true;
@@ -1952,7 +1976,7 @@ public static class PodeDetectarSensor
         Domain targetDomain = target.GetDomain();
         HeightLevel targetHeight = target.GetHeightLevel();
         int detectionRange = ResolveDetectionRange(observer, observerData, target, targetDomain, targetHeight);
-        bool useAquaticDistance = ShouldUseAquaticDistanceForDetection(observerData, targetDomain, targetHeight) && terrainDatabase != null;
+        bool useAquaticDistance = ShouldUsePropagatedDistance(observerData, targetDomain, targetHeight) && terrainDatabase != null;
 
         DistanceMapWorkspace observeWorkspace = RentDistanceMapWorkspace();
         int distance;
@@ -1964,7 +1988,7 @@ public static class PodeDetectarSensor
                 detectionRange,
                 observeWorkspace,
                 useAquaticDistance
-                    ? cell => IsAquaticCellForSubmergedDetection(boardMap, terrainDatabase, cell)
+                    ? cell => IsCellPassableForPropagation(boardMap, terrainDatabase, cell, targetDomain, targetHeight)
                     : null);
             Dictionary<Vector3Int, int> distanceMap = observeWorkspace.distances;
             if (!distanceMap.TryGetValue(targetCell, out distance))
@@ -2339,7 +2363,7 @@ public static class PodeDetectarSensor
         HeightLevel height = observer.GetHeightLevel();
 
         // A unidade observa do EV do lugar onde ela esta. Ar e submerso nao sao
-        // terreno, entao o EV deles vem da politica do DPQ Air Height Config —
+        // terreno, entao o EV deles vem da politica do DPQ Air Height Config â€”
         // por consulta, nao por fallback. Sem clamp: se um dia o submerso for
         // -1, a linha sobe em vez de descer, e isso e decisao do dado.
         if (domain == Domain.Air ||
@@ -2426,7 +2450,7 @@ public static class PodeDetectarSensor
     {
         // Mantem o mesmo algoritmo robusto do PodeMirar:
         // supersampling + expansao apenas em fronteira ambigua.
-        // O traçado por cube-line pode escolher um unico caminho em diagonais/ties
+        // O traÃ§ado por cube-line pode escolher um unico caminho em diagonais/ties
         // e deixar passar casos de bloqueio por relevo entre hexes.
         if (useLegacyLoSLerp)
             return GetIntermediateCellsByCellLerpLegacy(tilemap, originCell, targetCell);
