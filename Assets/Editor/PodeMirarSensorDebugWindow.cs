@@ -371,6 +371,7 @@ public class PodeMirarSensorDebugWindow : EditorWindow
         EditorGUILayout.LabelField("Posicao do Atacante", string.IsNullOrWhiteSpace(item.attackerPositionLabel) ? "-" : item.attackerPositionLabel);
         EditorGUILayout.LabelField("Posicao do Defensor", string.IsNullOrWhiteSpace(item.defenderPositionLabel) ? "-" : item.defenderPositionLabel);
         EditorGUILayout.LabelField("Layer do Alvo", targetLayer);
+        DrawTargetKnowledge(item.targetUnit);
         EditorGUILayout.LabelField("Defensor revida ?", item.defenderCanCounterAttack ? "Sim" : "Nao");
         EditorGUILayout.LabelField("Com que arma", counterWeapon);
         EditorGUILayout.LabelField("Distancia (revide)", item.defenderCanCounterAttack ? item.defenderCounterDistance.ToString() : "-");
@@ -384,6 +385,32 @@ public class PodeMirarSensorDebugWindow : EditorWindow
         if (GUILayout.Button("Desenhar Linha no Scene View"))
             SelectLineForDrawing(item.attackerUnit, item.targetUnit, item.lineOfFireIntermediateCells, Color.green, $"VAL: {attackerName} -> {targetName}", item.forwardObserverCandidates);
         EditorGUILayout.EndVertical();
+    }
+
+    /// <summary>
+    /// As duas verdades que o split do PodeEnxergar separou, lado a lado.
+    /// Detectar o alvo e revelar o hex dele deixaram de ser a mesma coisa, e
+    /// "detectado / hex preto" e o caso normal — nao sintoma.
+    /// </summary>
+    private void DrawTargetKnowledge(UnitManager target)
+    {
+        if (target == null || matchController == null)
+            return;
+
+        PlayerSlotId observerSlot = matchController.ActiveSlotId;
+        if (!observerSlot.IsValid)
+            return;
+
+        Vector3Int cell = target.CurrentCellPosition;
+        cell.z = 0;
+        bool detected = matchController.IsUnitVisibleForSlot(target, observerSlot);
+        bool cellKnown = matchController.IsCellKnownForActiveTeam(cell);
+        EditorGUILayout.LabelField(
+            "Alvo detectado",
+            detected ? "Sim" : "Nao");
+        EditorGUILayout.LabelField(
+            "Hex do alvo revelado",
+            cellKnown ? "Sim" : "Nao (contato sobre o preto)");
     }
 
     private void DrawInvalidResultItem(int index, PodeMirarInvalidOption item)
