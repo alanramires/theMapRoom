@@ -826,6 +826,12 @@ public class PodeEnxergarSensorDebugWindow : EditorWindow
             terrainDatabase = FindFirstAsset<TerrainDatabase>();
         if (dpqAirHeightConfig == null)
             dpqAirHeightConfig = FindFirstAsset<DPQAirHeightConfig>();
+
+        // No Edit Mode nao existe unidade ativa de partida, mas existe a
+        // selecao da Scene. Auto Detect passa a aproveita-la, para o botao
+        // significar a mesma coisa nos dois modos.
+        if (selectedUnit == null)
+            TryUseCurrentSelection();
     }
 
     private static Tilemap FindPreferredTilemap()
