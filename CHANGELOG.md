@@ -36,6 +36,7 @@ intactos.
 | v7.0.4 | A partida começou a caber no Scene View | [relatório](docs/relatorio_v7.0.4.md) |
 | v7.1.0 | Enxergar e detectar deixaram de ser a mesma pergunta | [relatório](docs/relatorio_v7.1.0.md) |
 | v7.1.1 | Uma pergunta, uma implementação | [relatório](docs/relatorio_v7.1.1.md) |
+| v7.1.2 | A reta virou uma só | [relatório](docs/relatorio_v7.1.2.md) |
 
 ### Documentos normativos criados neste major
 
