@@ -34,6 +34,7 @@ intactos.
 | v7.0.2 | A habilidade é uma chave, e o capitão virou dado | [relatório](docs/relatorio_v7.0.2.md) |
 | v7.0.3 | A camada virou parâmetro, e a taxonomia destrancou | [relatório](docs/relatorio_v7.0.3.md) |
 | v7.0.4 | A partida começou a caber no Scene View | [relatório](docs/relatorio_v7.0.4.md) |
+| v7.1.0 | Enxergar e detectar deixaram de ser a mesma pergunta | [relatório](docs/relatorio_v7.1.0.md) |
 
 ### Documentos normativos criados neste major
 
