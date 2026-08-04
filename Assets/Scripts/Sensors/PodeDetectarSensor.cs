@@ -34,6 +34,7 @@ public static class PodeDetectarSensor
         public readonly bool preserveObserverLayerRangeForHexVisibility;
         public readonly bool forceVirtualTargetLayer;
         public readonly bool skipSpecializedTargetLayers;
+        public readonly bool ignoreDetectSpecializations;
         public readonly bool useRangeOnlyForAirHighWhenConfigured;
         public readonly int globalBoardRevision;
         public readonly int teamObserverRevision;
@@ -55,6 +56,7 @@ public static class PodeDetectarSensor
             HeightLevel forcedVirtualTargetHeight,
             int forcedDetectionRangeOverride,
             bool skipSpecializedTargetLayers,
+            bool ignoreDetectSpecializations,
             bool useRangeOnlyForAirHighWhenConfigured,
             int globalBoardRevision,
             int teamObserverRevision)
@@ -77,6 +79,7 @@ public static class PodeDetectarSensor
             this.preserveObserverLayerRangeForHexVisibility = preserveObserverLayerRangeForHexVisibility;
             this.forceVirtualTargetLayer = forceVirtualTargetLayer;
             this.skipSpecializedTargetLayers = skipSpecializedTargetLayers;
+            this.ignoreDetectSpecializations = ignoreDetectSpecializations;
             this.useRangeOnlyForAirHighWhenConfigured = useRangeOnlyForAirHighWhenConfigured;
             this.globalBoardRevision = globalBoardRevision;
             this.teamObserverRevision = teamObserverRevision;
@@ -102,6 +105,7 @@ public static class PodeDetectarSensor
                 && preserveObserverLayerRangeForHexVisibility == other.preserveObserverLayerRangeForHexVisibility
                 && forceVirtualTargetLayer == other.forceVirtualTargetLayer
                 && skipSpecializedTargetLayers == other.skipSpecializedTargetLayers
+                && ignoreDetectSpecializations == other.ignoreDetectSpecializations
                 && useRangeOnlyForAirHighWhenConfigured == other.useRangeOnlyForAirHighWhenConfigured
                 && globalBoardRevision == other.globalBoardRevision
                 && teamObserverRevision == other.teamObserverRevision;
@@ -135,6 +139,7 @@ public static class PodeDetectarSensor
                 hash = (hash * 31) + (preserveObserverLayerRangeForHexVisibility ? 1 : 0);
                 hash = (hash * 31) + (forceVirtualTargetLayer ? 1 : 0);
                 hash = (hash * 31) + (skipSpecializedTargetLayers ? 1 : 0);
+                hash = (hash * 31) + (ignoreDetectSpecializations ? 1 : 0);
                 hash = (hash * 31) + (useRangeOnlyForAirHighWhenConfigured ? 1 : 0);
                 hash = (hash * 31) + globalBoardRevision;
                 hash = (hash * 31) + teamObserverRevision;
@@ -499,6 +504,10 @@ public static class PodeDetectarSensor
         HeightLevel forcedVirtualTargetHeight = HeightLevel.Surface,
         int forcedDetectionRangeOverride = -1,
         bool skipSpecializedTargetLayers = false,
+        // Pergunta de HEXES: a lista de Detect Specializations fica invisivel.
+        // Nem alcance, nem metodo de deteccao, nem chave. Quem revela terreno e
+        // o campo visao, e a linha e sempre reta. Usado pelo PodeEnxergar.
+        bool ignoreDetectSpecializations = false,
         bool useRangeOnlyForAirHighWhenConfigured = false,
         Vector3Int? virtualObserverCell = null)
     {
@@ -519,7 +528,7 @@ public static class PodeDetectarSensor
         observer.TryGetUnitData(out observerData);
         Domain observerDomain = observer.GetDomain();
         HeightLevel observerHeight = observer.GetHeightLevel();
-        if (forceVirtualTargetLayer && observerData != null &&
+        if (forceVirtualTargetLayer && !ignoreDetectSpecializations && observerData != null &&
             observerData.ResolveVisionFor(forcedVirtualTargetDomain, forcedVirtualTargetHeight) <= 0)
         {
             return;
@@ -560,6 +569,7 @@ public static class PodeDetectarSensor
             forcedVirtualTargetHeight,
             forcedDetectionRangeOverride,
             skipSpecializedTargetLayers,
+            ignoreDetectSpecializations,
             useRangeOnlyForAirHighWhenConfigured,
             globalBoardRevision,
             teamObserverRevision);
@@ -705,7 +715,12 @@ public static class PodeDetectarSensor
                 if (effectiveDistance > detectionRange)
                     continue;
 
-                bool effectiveLosValidation = ResolveEffectiveLosValidation(observerData, targetDomain, targetHeight, enableLosValidation);
+                // Revelacao de terreno e reta pura: o metodo declarado numa
+                // Detect Specialization (o Propagated do sonar, por exemplo)
+                // nao pode acender hex contornando a peninsula.
+                bool effectiveLosValidation = ignoreDetectSpecializations
+                    ? enableLosValidation
+                    : ResolveEffectiveLosValidation(observerData, targetDomain, targetHeight, enableLosValidation);
                 bool bypassLosByPolicy = !effectiveLosValidation;
                 bool skipLosForCurrentTarget = observer.GetDomain() == Domain.Air &&
                     useRangeOnlyForAirHighWhenConfigured &&

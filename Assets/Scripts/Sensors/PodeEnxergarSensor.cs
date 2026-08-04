@@ -118,6 +118,10 @@ public static class PodeEnxergarSensor
             // unidade aparecer, nao terreno.
             forcedDetectionRangeOverride: terrainRange,
             skipSpecializedTargetLayers: true,
+            // A lista de Detect Specializations fica invisivel: nem alcance,
+            // nem metodo, nem chave. Terreno se revela por reta e pela visao
+            // padrao, e nada pendurado na ficha muda isso.
+            ignoreDetectSpecializations: true,
             useRangeOnlyForAirHighWhenConfigured: false,
             virtualObserverCell: virtualObserverCell);
     }
