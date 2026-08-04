@@ -926,7 +926,16 @@ public class UnitDataEditor : Editor
         SerializedProperty visionSpecializationsProperty = serializedObject.FindProperty("visionSpecializations");
 
         if (visaoProperty != null) EditorGUILayout.PropertyField(visaoProperty);
-        if (visionSpecializationsProperty != null) EditorGUILayout.PropertyField(visionSpecializationsProperty, new GUIContent("Vision Specializations"), includeChildren: true);
+        // O rotulo diz para que a lista serve: ela faz UNIDADE aparecer, nunca
+        // hexagono. Quem revela terreno e o campo visao acima, sozinho.
+        if (visionSpecializationsProperty != null) EditorGUILayout.PropertyField(
+            visionSpecializationsProperty,
+            new GUIContent(
+                "Detect Specializations",
+                "Alcance e chaves de DETECCAO por dominio/altura do alvo. Nao "
+                + "revela hexagonos: a revelacao de terreno usa o campo visao "
+                + "acima. Sem match, vale a visao padrao."),
+            includeChildren: true);
 
         EditorGUI.indentLevel--;
     }

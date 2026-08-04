@@ -291,46 +291,11 @@ public partial class TurnStateManager
             matchController.EnableStealthValidation,
             respectTotalWarVisibility: true);
 
-        for (int i = cachedPodeMirarTargets.Count - 1; i >= 0; i--)
-        {
-            PodeMirarTargetOption option = cachedPodeMirarTargets[i];
-            if (option == null)
-            {
-                cachedPodeMirarTargets.RemoveAt(i);
-                continue;
-            }
-
-            // Regra dura do escuro: alem do alvo confirmado, a CELULA do alvo
-            // precisa ser conhecida pelo time. Alvo em hex que o time nao ve
-            // sai SILENCIOSAMENTE (entrada invalida nomeada tambem vazaria a
-            // existencia dele). O log abaixo e o diagnostico de fonte: se um
-            // alvo passou o filtro confirmado mas caiu aqui, o cache de
-            // visibilidade de unidades foi populado por um caminho errado.
-            UnitManager targetUnit = option.targetUnit;
-            if (targetUnit != null)
-            {
-                Vector3Int targetCell = targetUnit.CurrentCellPosition;
-                targetCell.z = 0;
-                if (!matchController.IsCellKnownForActiveTeam(targetCell, selectedUnit))
-                {
-                    Debug.Log(
-                        $"[MiraNoEscuro][LEAK] alvo={targetUnit.name} cell=({targetCell.x},{targetCell.y}) " +
-                        $"passou confirmado={matchController.IsUnitVisibleForActiveTeamConfirmed(targetUnit)} " +
-                        $"mas celula NAO conhecida pelo time ativo={matchController.ActiveTeamId} — removido da mira.");
-                    cachedPodeMirarTargets.RemoveAt(i);
-                    continue;
-                }
-            }
-
-            if (IsLineOfFireCorridorConfirmedVisible(option.lineOfFireIntermediateCells))
-                continue;
-
-            cachedPodeMirarInvalidTargets.Add(BuildCorridorUnscoutedInvalidOption(
-                option.attackerUnit, option.targetUnit, option.weapon, option.embarkedWeaponIndex,
-                option.distance, option.attackerPositionLabel, option.defenderPositionLabel));
-            cachedPodeMirarTargets.RemoveAt(i);
-        }
-
+        // Alvo valido nao e mais rebaixado por corredor nem por celula escura.
+        // A unidade esta DETECTADA: onde ela esta e conhecimento do time, e o
+        // PodeMirar ja resolveu LoS, LdT, alcance e arma a partir da posicao
+        // provisoria. Ele e a autoridade do tiro; o estado de revelacao do
+        // terreno nao opina sobre isso.
         for (int i = cachedPodeMirarInvalidTargets.Count - 1; i >= 0; i--)
         {
             PodeMirarInvalidOption invalid = cachedPodeMirarInvalidTargets[i];
@@ -340,25 +305,11 @@ public partial class TurnStateManager
                 continue;
             }
 
-            // Mesma regra dura, POR ENTRADA (cada arma gera a sua): alvo em
-            // celula desconhecida sai silenciosamente tambem dos invalidos —
-            // a entrada nomeada ("Apache, HP...") vazaria a existencia da
-            // unidade exatamente como a valida.
-            UnitManager invalidTarget = invalid.targetUnit;
-            if (invalidTarget != null)
-            {
-                Vector3Int invalidCell = invalidTarget.CurrentCellPosition;
-                invalidCell.z = 0;
-                if (!matchController.IsCellKnownForActiveTeam(invalidCell, selectedUnit))
-                {
-                    Debug.Log(
-                        $"[MiraNoEscuro][LEAK] entrada INVALIDA alvo={invalidTarget.name} cell=({invalidCell.x},{invalidCell.y}) " +
-                        $"em celula nao conhecida pelo time ativo={matchController.ActiveTeamId} — removida da lista.");
-                    cachedPodeMirarInvalidTargets.RemoveAt(i);
-                    continue;
-                }
-            }
-
+            // A entrada nomeada de um alvo DETECTADO nao vaza nada: o time ja
+            // sabe que ele existe e onde esta. O que ainda vaza e o MOTIVO
+            // detalhado — "LOS bloqueada em (x,y), EV 3" descreve terreno que
+            // ninguem reconheceu. Por isso o motivo continua sendo neutralizado
+            // abaixo, e so ele.
             if (invalid.reasonId == PodeMirarInvalidOption.ReasonIdCorridorUnscouted)
                 continue;
             if (IsLineOfFireCorridorConfirmedVisible(invalid.lineOfFireIntermediateCells))

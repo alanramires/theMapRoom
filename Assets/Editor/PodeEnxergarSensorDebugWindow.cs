@@ -57,16 +57,16 @@ public class PodeEnxergarSensorDebugWindow : EditorWindow
     [SerializeField] private TerrainDatabase terrainDatabase;
     [SerializeField] private DPQAirHeightConfig dpqAirHeightConfig;
     [SerializeField] private bool useGameplaySensorContext = true;
-    // Terminal burro: a ferramenta responde por QUALQUER unidade por padrao. O
-    // time ativo e filtro do consumidor, nao propriedade do sensor — diagnosticar
-    // o que o inimigo enxerga e uso legitimo, e o mais comum fora de partida.
-    [SerializeField] private bool restrictToActiveTeam = false;
+    // Terminal burro: a ferramenta responde por QUALQUER unidade, sempre. O time
+    // ativo e filtro do consumidor, nao propriedade do sensor — auditar o que o
+    // inimigo enxerga e uso legitimo, e o mais comum fora de partida.
+    //
+    // Camada virtual forcada tambem saiu: forcar a camada do ALVO e pergunta de
+    // deteccao, e mora na janela do PodeDetectar. Aqui a camada e sempre a
+    // superficie do terreno da celula.
     [SerializeField] private int settingsVersion;
     private const int CurrentSettingsVersion = 1;
     [SerializeField] private bool logToConsole = true;
-    [SerializeField] private bool forceVirtualTargetLayer = false;
-    [SerializeField] private Domain forcedVirtualTargetDomain = Domain.Land;
-    [SerializeField] private HeightLevel forcedVirtualTargetHeight = HeightLevel.Surface;
 
     private readonly List<VisionScenarioResult> scenarioResults = new List<VisionScenarioResult>();
     private readonly List<VisibleHexEntry> visibleHexes = new List<VisibleHexEntry>();
@@ -98,7 +98,6 @@ public class PodeEnxergarSensorDebugWindow : EditorWindow
         if (settingsVersion >= CurrentSettingsVersion)
             return;
 
-        restrictToActiveTeam = false;
         settingsVersion = CurrentSettingsVersion;
     }
 
@@ -114,8 +113,9 @@ public class PodeEnxergarSensorDebugWindow : EditorWindow
 
         EditorGUILayout.LabelField("Sensor Pode Enxergar", EditorStyles.boldLabel);
         EditorGUILayout.HelpBox(
-            "Irmao do Pode Detectar focado em visibilidade de hex. " +
-            "Em vez de procurar unidades reais, resolve uma unidade virtual por celula visivel.",
+            "Irmao do Pode Detectar focado em revelacao de hexagonos nas camadas "
+            + "de */surface. Obtem o EV da unidade e traca a linha descendente "
+            + "dentro de seu raio de visao.",
             MessageType.Info);
 
         selectedUnit = (UnitManager)EditorGUILayout.ObjectField("Unidade", selectedUnit, typeof(UnitManager), true);
@@ -125,19 +125,7 @@ public class PodeEnxergarSensorDebugWindow : EditorWindow
         terrainDatabase = (TerrainDatabase)EditorGUILayout.ObjectField("Terrain Database", terrainDatabase, typeof(TerrainDatabase), false);
         dpqAirHeightConfig = (DPQAirHeightConfig)EditorGUILayout.ObjectField("DPQ Air Height", dpqAirHeightConfig, typeof(DPQAirHeightConfig), false);
         useGameplaySensorContext = EditorGUILayout.ToggleLeft("Usar contexto do gameplay (MatchController)", useGameplaySensorContext);
-        restrictToActiveTeam = EditorGUILayout.ToggleLeft(
-            new GUIContent(
-                "Restringir ao time ativo",
-                "Desmarcado (padrao): responde por qualquer unidade, de qualquer time. "
-                + "Marque apenas para reproduzir a restricao de uma partida em andamento."),
-            restrictToActiveTeam);
         logToConsole = EditorGUILayout.ToggleLeft("Log no Console", logToConsole);
-        forceVirtualTargetLayer = EditorGUILayout.ToggleLeft("Forcar camada virtual alvo", forceVirtualTargetLayer);
-        if (forceVirtualTargetLayer)
-        {
-            forcedVirtualTargetDomain = (Domain)EditorGUILayout.EnumPopup("Domain virtual", forcedVirtualTargetDomain);
-            forcedVirtualTargetHeight = (HeightLevel)EditorGUILayout.EnumPopup("Height virtual", forcedVirtualTargetHeight);
-        }
 
         EditorGUILayout.BeginHorizontal();
         if (GUILayout.Button("Usar Selecionado"))
@@ -260,16 +248,6 @@ public class PodeEnxergarSensorDebugWindow : EditorWindow
             return;
         }
 
-        if (restrictToActiveTeam && matchController != null
-            && matchController.ActiveTeam != TeamId.Neutral
-            && selectedUnit.TeamId != matchController.ActiveTeam)
-        {
-            statusMessage =
-                $"Unidade pertence a {selectedUnit.TeamId}, mas o time ativo e {matchController.ActiveTeam}. " +
-                "Desmarque 'Restringir ao time ativo' para responder por qualquer unidade.";
-            return;
-        }
-
         Tilemap map = ResolveBoardTilemapForSimulation();
         TerrainDatabase db = terrainDatabase != null ? terrainDatabase : FindFirstAsset<TerrainDatabase>();
         bool enableLos = true;
@@ -300,88 +278,33 @@ public class PodeEnxergarSensorDebugWindow : EditorWindow
             }
         }
 
-        if (forceVirtualTargetLayer)
         {
-            int forcedRange = observerData != null
-                ? Mathf.Max(0, observerData.ResolveVisionFor(forcedVirtualTargetDomain, forcedVirtualTargetHeight))
-                : Mathf.Max(1, selectedUnit.Visao);
-            VisionScenarioResult manualScenario = BuildScenarioResult(
-                map,
-                db,
-                enableLos,
-                enableSpotter,
-                $"Manual {forcedVirtualTargetDomain}/{forcedVirtualTargetHeight}",
-                forcedVirtualTargetDomain,
-                forcedVirtualTargetHeight,
-                forcedRange,
-                forceLayer: true,
-                preserveObserverLayerRange: false);
-            scenarioResults.Add(manualScenario);
-        }
-        else if (specializations.Count > 0)
-        {
+            // Esta janela responde por VISAO: quais hexes saem do preto. Ela
+            // nao lista cenario de especializacao, porque especializacao e
+            // DETECCAO — faz unidade aparecer, nunca hexagono. Quem audita
+            // deteccao e a janela do PodeDetectar.
             int baseRange = observerData != null
                 ? Mathf.Max(1, observerData.visao)
                 : Mathf.Max(1, selectedUnit.Visao);
-            VisionScenarioResult baseScenario = BuildScenarioResult(
+            VisionScenarioResult visionScenario = BuildScenarioResult(
                 map,
                 db,
                 enableLos,
                 enableSpotter,
-                "Visao Geral (base, sem especializacao)",
+                "Visao (campo visao da ficha)",
                 Domain.Land,
                 HeightLevel.Surface,
                 baseRange,
                 forceLayer: false,
                 preserveObserverLayerRange: false,
                 forcedDetectionRangeOverride: baseRange,
-                skipSpecializedTargetLayers: true);
-            scenarioResults.Add(baseScenario);
-
-            for (int i = 0; i < specializations.Count; i++)
-            {
-                UnitVisionException entry = specializations[i];
-                if (entry == null)
-                    continue;
-
-                int specializedRange = observerData != null
-                    ? Mathf.Max(0, observerData.ResolveVisionFor(entry.domain, entry.heightLevel))
-                    : Mathf.Max(1, selectedUnit.Visao);
-                VisionScenarioResult specializedScenario = BuildScenarioResult(
-                    map,
-                    db,
-                    enableLos,
-                    enableSpotter,
-                    $"Especializacao {entry.domain}/{entry.heightLevel}",
-                    entry.domain,
-                    entry.heightLevel,
-                    specializedRange,
-                    forceLayer: true,
-                    preserveObserverLayerRange: false,
-                    forcedDetectionRangeOverride: specializedRange,
-                    skipSpecializedTargetLayers: false);
-                scenarioResults.Add(specializedScenario);
-            }
-        }
-        else
-        {
-            int baseRange = observerData != null
-                ? Mathf.Max(1, observerData.visao)
-                : Mathf.Max(1, selectedUnit.Visao);
-            VisionScenarioResult defaultScenario = BuildScenarioResult(
-                map,
-                db,
-                enableLos,
-                enableSpotter,
-                "Basico (camada virtual do mapa)",
-                Domain.Land,
-                HeightLevel.Surface,
-                baseRange,
-                forceLayer: false,
-                preserveObserverLayerRange: false,
-                forcedDetectionRangeOverride: baseRange,
-                skipSpecializedTargetLayers: true);
-            scenarioResults.Add(defaultScenario);
+                // skipSpecializedTargetLayers descarta a CELULA quando a camada
+                // dela tem Detect Specialization — era ele que sumia com o mar
+                // do submarino e listava o hex como invalido mesmo com a linha
+                // limpa. Quem ignora a lista e o parametro abaixo.
+                skipSpecializedTargetLayers: false,
+                ignoreDetectSpecializations: true);
+            scenarioResults.Add(visionScenario);
         }
 
         if (scenarioResults.Count > 0)
@@ -538,7 +461,8 @@ public class PodeEnxergarSensorDebugWindow : EditorWindow
         bool forceLayer,
         bool preserveObserverLayerRange,
         int forcedDetectionRangeOverride = -1,
-        bool skipSpecializedTargetLayers = false)
+        bool skipSpecializedTargetLayers = false,
+        bool ignoreDetectSpecializations = false)
     {
         VisionScenarioResult result = new VisionScenarioResult
         {
@@ -572,6 +496,7 @@ public class PodeEnxergarSensorDebugWindow : EditorWindow
             forcedVirtualTargetHeight: heightLevel,
             forcedDetectionRangeOverride: forcedDetectionRangeOverride,
             skipSpecializedTargetLayers: skipSpecializedTargetLayers,
+            ignoreDetectSpecializations: ignoreDetectSpecializations,
             useRangeOnlyForAirHighWhenConfigured: true);
 
         bool useAquaticDistanceForScenario = ShouldUseAquaticDistanceForScenario(domain, heightLevel);
@@ -587,6 +512,9 @@ public class PodeEnxergarSensorDebugWindow : EditorWindow
         {
             Vector3Int cell = rawCell;
             cell.z = 0;
+            // Fora da borda nao existe hexagono para enxergar.
+            if (map != null && !map.HasTile(cell))
+                continue;
 
             ResolveVirtualLayerForCell(
                 map,
@@ -627,6 +555,10 @@ public class PodeEnxergarSensorDebugWindow : EditorWindow
             if (pair.Value <= 0)
                 continue;
             if (localVisibleCells.Contains(cell))
+                continue;
+            // Fora da borda nao existe hexagono. Ele nao e invalido — nao ha o
+            // que enxergar la, e listar isso so polui o relatorio.
+            if (map != null && !map.HasTile(cell))
                 continue;
 
             ResolveVirtualLayerForCell(
@@ -894,6 +826,12 @@ public class PodeEnxergarSensorDebugWindow : EditorWindow
             terrainDatabase = FindFirstAsset<TerrainDatabase>();
         if (dpqAirHeightConfig == null)
             dpqAirHeightConfig = FindFirstAsset<DPQAirHeightConfig>();
+
+        // No Edit Mode nao existe unidade ativa de partida, mas existe a
+        // selecao da Scene. Auto Detect passa a aproveita-la, para o botao
+        // significar a mesma coisa nos dois modos.
+        if (selectedUnit == null)
+            TryUseCurrentSelection();
     }
 
     private static Tilemap FindPreferredTilemap()

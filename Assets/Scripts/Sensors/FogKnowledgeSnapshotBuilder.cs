@@ -211,7 +211,10 @@ public static class FogKnowledgeSnapshotBuilder
             snapshot.KnownCells.UnionWith(visible);
             foreach (Vector3Int cell in visible)
                 snapshot.AddVisibilityContributor(cell, observer);
-            AddSpecializedAirKnowledge(request, observer, snapshot.KnownCells);
+            // DETECCAO NAO REVELA FOW. O conhecimento aereo especializado
+            // (EWACS) fazia aeronave aparecer, e era despejado aqui dentro do
+            // mesmo balde que pinta terreno. O bake segue o runtime: quem
+            // revela hexagono e o campo visao, pelo PodeEnxergar acima.
         }
 
         AddConstructionKnowledge(request, constructions, snapshot);
