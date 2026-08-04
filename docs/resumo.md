@@ -1,74 +1,91 @@
 # Resumo — onde estamos e o que vem
 
-Ponto de retomada. Escrito em 2026-08-03, depois da `v7.0.3`. Leia isto
-primeiro; ele diz o que ler depois.
+Ponto de retomada. Escrito em 2026-08-03, **depois** da tag `v7.0.4`. Leia isto
+primeiro; ele descreve o estado pós-versão e não pertence à tag.
 
 ---
 
 ## Primeira coisa a fazer
 
-**Rodar a Vigilância no Unity.** Ela foi migrada e tagueada compilando, mas
-**nunca executou**. Cinco fichas para observar — EWACS, Radar Móvel, Super
-Tucano, Fragata, Submarino — e três perguntas concretas:
+Implementar a **etapa 1 do Melhor Spotting** em
+`docs/implementar_melhor_spotting.md`: levar o snapshot/bake ao
+`MelhorVisaoService` e à janela.
 
-1. a **fragata** ganha iniciativa 1 e ilumina **antes** de a artilharia gastar a
-   ação? (era o motivo da mudança)
-2. o `AlliedObserverFilter` impede que um aliado qualquer "satisfaça" a cobertura
-   `Submerged` e faça a fragata parar de caçar?
-3. sem tiro legal, o `TryDecideAirCombatAttackOnly` devolve autoridade ao
-   `MelhorVisao` — ou a unidade congela?
+O ponto exato é este:
 
-Depois: `Tools > AI > Semear Chaves de Captura` e `Tools > AI > Auditar Chaves de
-Captura` — havia 11 fichas com entrada fantasma.
+```text
+MelhorVisaoService.cs
+  FocusCells                         hoje é peso, não requisito
+  CollectAlliedCoverage              hoje recalcula os aliados
+
+FogKnowledgeSnapshot
+  VisibilityContributorsByCell       já permite retirar a contribuição
+                                      da própria unidade sem chamar sensores
+```
+
+Preservar dois caminhos:
+
+- com snapshot runtime ou bake: consumir conhecimento já pronto;
+- sem snapshot: cálculo estrutural bruto, útil no Scene Edit.
+
+Não cozinhar FOW automaticamente ao pintar, remover ou mover peças. O autor
+monta o tabuleiro livremente e aperta `Cozinhar FOW 0` quando quiser fotografar
+a rodada.
+
+Depois: criar `MelhorSpottingService` plural e somente então a janela
+`Tools > Hotzone > Melhor Spotting`. Nenhum `AIController` deve consumir a
+primeira entrega.
 
 ---
 
 ## Estado
 
-`v7.0.3` tagueada. O dia teve três frentes: **Vigilância genérica**, **matriz de
-papéis** e o **engenheiro** (só registrado).
+`v7.0.4` tagueada e publicada. Relatório:
+`docs/relatorio_v7.0.4.md`.
 
-### A descoberta que organiza o resto
+### A descoberta que organiza o próximo trabalho
 
-> *Terminei a migração do MelhorVisão para a Vigilância… e isso destrancou a
-> biologia.*
-
-**Taxonomia não serve para nada enquanto cada bicho tem órgão próprio.** Enquanto
-três lugares respondiam "para onde revelar" cada um à sua maneira, classificar
-papéis era decorar nomes. Quando o órgão virou **um só**, a pergunta mudou:
+> **Previsão precisa de duas verdades separadas.**
 
 ```text
-antes    "como ESTE aqui enxerga?"      →  implementação, uma por papel
-depois   "este aqui EXPRESSA o órgão?"  →  coluna, e colunas viram tabela
+geometria hipotética     “o que esta unidade enxergaria/atacaria dali?”
+conhecimento confirmado  “o que o time sabe antes de comprometer a ação?”
 ```
 
-**A matriz não destrancou a biologia — a unificação do primeiro órgão
-destrancou.** Daí a ordem do trabalho que vem: *unifique o órgão, e a linha da
-matriz se escreve quase sozinha.* Não o contrário.
+Misturar as duas permitiu ao primeiro protótipo do Melhor Combate mover uma
+unidade, descobrir um alvo e atirar nele dentro da mesma consulta. Isso viola o
+ciclo real: movimento provisório não publica FOW, e uma unidade não ganha um
+ataque retroativo contra algo que só descobriria depois de chegar.
 
-### Os dois princípios que já custaram propostas erradas
+O `FogKnowledgeSnapshot` passou a ser a fotografia compartilhada; as posições
+virtuais continuam sendo projeções puras.
 
-> **Uma habilidade não é um poder. É uma chave.** Quem define o que a etiqueta
-> abre é o **alvo**. Teste: *o designer renomeia a etiqueta para qualquer coisa e
-> tudo continua funcionando?*
+### O Scene View mudou de função
 
-> **"Não se aplica" nunca foi propriedade do papel — era propriedade da ficha.**
-> O capturador raiz não supre porque *aquele* `UnitData` não tem `isSupplier`.
+O autor descreveu o resultado: *“aos poucos vai parecendo com uma partida
+jogada offline”.* O Scene View é o tapete onde ele distribui peças e audita uma
+unidade selecionada. Os sliders do `UnitManager` já fornecem HP, munição e
+autonomia; por isso a hipótese de que Melhor Combate deveria ser runtime-only
+foi descartada.
 
 ---
 
 ## A escada
 
 ```text
-0. sensores PodeX              ✅ prontos (falta PodeConstruir, se o engenheiro nascer)
-1. serviços de área (Hotzone)  ✅ prontos
-2. consumidores Melhor*        ⚠️ faltam DOIS: Combate e Fusão
-3. papéis → só POLÍTICA        docs/revisao_papeis.md — 1 linha de 7 levantada
-4. variações de papel          vira PARÂMETRO
+0. sensores PodeX               ✅ prontos (falta PodeConstruir se o engenheiro nascer)
+1. serviços de área (Hotzone)   ✅ prontos
+2. consumidores Melhor*         ⚠️ Melhor Combate existe; falta Fusão;
+                                   Melhor Spotting está planejado
+3. papéis → só POLÍTICA         docs/revisao_papeis.md — 1 linha de 7 levantada
+4. variações de papel           vira perfil/trait depois da extração das linhas
 ```
 
-Consumidores existentes: **Captura, Capitão, Visão, Desembarque, Embarque,
-Estoque, Pouso**, mais `QueroCarona`.
+Consumidores existentes: **Captura, Capitão, Visão, Combate, Desembarque,
+Embarque, Estoque, Pouso**, mais `QueroCarona`.
+
+O Melhor Spotting será um consumidor orientado a missão sobre Melhor Visão, não
+um sensor novo.
 
 ---
 
@@ -76,105 +93,147 @@ Estoque, Pouso**, mais `QueroCarona`.
 
 | # | documento | por quê |
 |---|---|---|
-| 1 | `docs/manual/01_principios_e_vocabulario.md` | as regras do **jogo**. Decide *onde uma regra pode morar* — não se recupera lendo código |
-| 2 | `docs/revisao_papeis.md` | **a matriz papel × sensor**, o levantamento do Capturador e o brainstorming das raças |
-| 3 | `docs/relatorio_v7.0.3.md` | a última versão fechada |
-| 4 | `docs/AI Behavior/contrato_envelope_alcance.md` | norma das bandas |
-| 5 | `docs/magnetic_tabela.md` | quem cada papel acompanha |
+| 1 | `docs/manual/01_principios_e_vocabulario.md` | decide onde uma regra pode morar |
+| 2 | `docs/relatorio_v7.0.4.md` | explica o fio e os erros corrigidos nesta versão |
+| 3 | `docs/implementar_melhor_spotting.md` | ponto de execução atual e critérios de aceite |
+| 4 | `docs/implementar_melhorCombate.md` | contrato e limite do MVP já entregue |
+| 5 | `docs/revisao_papeis.md` | matriz, traits e correções da taxonomia |
+| 6 | `docs/arquitetura/acoes_transacionais.md` | obrigatório antes de ligar ferramenta a runtime |
 
 ---
 
 ## Onde eu parei
 
-### Vigilância genérica — feita, não rodada
+### Melhor Combate — ferramenta pronta, consumidor runtime não
 
-`Units/Vigilancia Aerea/` → `Units/Vigilancia/` (GUIDs dos `.meta` preservados).
-O núcleo é `SurveillanceProfile`, que **carrega** a camada da ficha em vez de
-assumi-la; `IsAirLayer` virou pergunta, não premissa.
+Arquivos centrais:
 
-Dois helpers coexistem **de propósito** — não unifique:
+- `Assets/Scripts/Combat/CombatEvaluationService.cs`;
+- `Assets/Scripts/Combat/AttackDecisionResult.cs`;
+- `Assets/Scripts/DPQ/PositionDpqResolver.cs`;
+- `Assets/Scripts/Match/AI/Services/MelhorCombateService.cs`;
+- `Assets/Editor/MelhorCombateWindow.cs`.
 
-| helper | significa |
-|---|---|
-| `IsAirSurveillanceUnit` | Vigilância cuja camada principal é **Air**. É o que interceptador, rally e plataforma precisam perguntar |
-| `IsSurveillanceUnit` | **qualquer** camada. Governa a iniciativa |
+O serviço cruza origens, alvos, opção canônica do `PodeMirar`, HP, DPQ, Attack
+Decision e preferências da ficha. A janela funciona em Scene Edit e runtime,
+separa tiro parado de assalto, mostra LoS/LdT, arma, spotter e rejeições.
 
-`AirSurveillanceCoverageService` (435 linhas) foi removido — era protótipo
-parcial do `MelhorVisaoService`. Saldo da frente: **−2.368 / +273**.
+Os `AIController` antigos já reutilizam `CombatEvaluationService` pelo wrapper,
+mas **não consomem `MelhorCombateService`** e mantêm políticas/escalas próprias.
+O batch ainda não carrega `weaponIndex`; alternativas à arma canônica não podem
+ser prometidas.
 
-### A matriz — 1 linha de 7
+### FOW cozido — infraestrutura pronta
 
-O Capturador foi levantado (19 arquivos, 5.823 linhas). Três marcas de trabalho:
+Arquivos centrais:
 
-- **`Fundir` é branco de verdade** — zero referências ao `PodeFundirSensor`, e
-  não é "não se aplica": infantaria fundir para se curar é mecânica central;
-- **`Ver` é respondido sem sensor** — `C.Explorer`, 462 linhas, seis constantes
-  de peso próprias;
-- **`Mirar` e `Embarcar` são hipertróficos** — o papel gasta mais código atirando
-  (38 ocorrências) do que capturando (13), e `Embarcar` ocupa 1.287 linhas em
-  cinco arquivos.
+- `Assets/Scripts/Sensors/FogKnowledgeSnapshotBuilder.cs`;
+- `Assets/Scripts/Match/MatchController.cs`;
+- `Assets/Editor/MatchControllerEditor.cs`.
 
-Os **dez modos** do capturador já são o degrau 4 materializado como arquivos. A
-matriz não precisa criá-los — precisa transformá-los em linhas que declaram só o
-que difere.
+Runtime copia o snapshot confirmado. Edit Mode usa o bake manual persistido por
+slot no `MatchController`. Melhor Combate e Melhor Captura têm atalho
+`Cozinhar FOW 0`.
 
-**Faltam seis linhas.** O autor pediu para começar pelo capturador; não avance
-para os outros papéis sem confirmar.
+O snapshot inclui contribuições por célula e por alvo. Ferramentas consumidoras
+não devem voltar a chamar `PodeEnxergar`, `PodeDetectar`, `Alguém Me Vê` ou
+`Hex Enxergado` para reconstruir a mesma percepção.
 
-### Raças mistas — a forma da célula
+### Melhor Captura — resposta tripla pronta, IA não migrada
 
-Uma célula da matriz pode ser **uma cadeia**, não só uma política. Três formas, e
-as três já rodam no projeto:
+Arquivos centrais:
 
-| forma | onde já roda |
-|---|---|
-| política única | `MelhorCaptura` |
-| cadeia ordenada | lista de atração do `AICaptainData` |
-| herdada do parente | `CanSatisfy` |
+- `Assets/Scripts/Match/AI/Services/MelhorCapturaService.cs`;
+- `Assets/Editor/MelhorCapturaWindow.cs`.
+
+Com FOW ligado, cada alvo separa:
+
+```text
+Arrival          chegada/ocupação
+ImmediateAction  fow/ação
+Eligibility      captura/reconquista
+```
+
+Prédio conhecido e encoberto continua no ranking como captura futura. Prédio
+ocupado informa a melhor chegada adjacente, não “inalcançável”. Construção
+aliada parcialmente perdida entra como reconquista; só sai quando a captura
+está no máximo. Linhas de contribuição mostram quem ilumina o local usando o
+snapshot.
+
+O `AIController.Capturer` ainda não consome essa resposta.
+
+### Melhor Spotting — somente plano
+
+`docs/implementar_melhor_spotting.md` define:
+
+```text
+unidade + ObjectiveCells + política All/Any/Maximize
+    → origens táticas que realmente iluminam a missão
+```
+
+Um alvo é um conjunto com um elemento. O contrato já nasce plural para a futura
+cobertura de artilharia. “Iluminar o objetivo” é gate; cobertura geral só
+ranqueia as origens admissíveis.
+
+### Revisão de papéis — avaliação, não implementação
+
+`docs/revisao_papeis.md` corrigiu dois vereditos próprios:
+
+- `Antiaereo` morre como papel se significa apenas capacidade da arma;
+- `TransportadorAereo` morre porque shopping já pode demandar domínio.
+
+Somente a agenda reordenável do router pode virar perfil. Auto-reparo,
+desbloqueio de produção e transporte obrigatório continuam invariantes acima
+de traits. Não parametrizar antes de extrair as sete linhas.
 
 ---
 
 ## Pendências abertas
 
-**Dois dos três "para onde revelar" continuam à mão** — `Capturer.Explorer` e
-`Transportador`. São as próximas colunas que o órgão unificado libera, e pela
-lição do dia é por aí que se avança.
+**Melhor Visão ainda não consome o bake.** É o primeiro degrau do próximo
+trabalho e pré-requisito do Melhor Spotting.
+
+**`FocusCells` é peso, não obrigação.** Não reutilizar o campo silenciosamente
+como se fosse gate; o Spotting precisa de contrato explícito.
+
+**Cobertura de artilharia é plano B.** Primeiro uma unidade e um conjunto de
+objetivos. Selecionar vários spotters é cobertura incremental e pertence ao
+coordenador.
+
+**A Vigilância da `v7.0.3` continua sem validação registrada no Unity.** Conferir
+iniciativa da fragata, `AlliedObserverFilter` em `Submerged` e devolução de
+autoridade ao Melhor Visão quando não há tiro legal.
+
+**Dois “para onde revelar” continuam locais:** `Capturer.Explorer` e
+`Transportador`. Não migrar antes de o Melhor Spotting ficar auditável.
 
 **`MelhorCapitao` continua sem consumidor.** Falta o tradutor `AICaptainData →
-List<MelhorCapitaoAttraction>` e os predicados (`AliadoFerido`,
-`AeronaveInimigaDetectada`, `PontoDeObservacao`).
+List<MelhorCapitaoAttraction>` e seus predicados.
 
-**`roles[0] == CapturadorAgressivo` de pé** no `GetCapturePower`. Sai só depois
-que as fichas agressivas trocarem para a chave `Capturador Alternativo` (0.5) e a
-auditoria confirmar. Ordem e risco em `docs/ideias_futuras.md` item 10 — **o modo
-de falha é silencioso**.
+**`roles[0] == CapturadorAgressivo` continua no `GetCapturePower`.** Só remover
+depois da migração das fichas para a chave `Capturador Alternativo` e auditoria;
+o modo de falha é silencioso.
 
-**O `Rebel.cs` vazou para fora do capturador.**
-`FindNearestPlanlessCaptureTarget` é chamado por Transporte (2), Assalto
-(`HQBreaker`) e o rogue do capturador. É a ponte para os degraus 4 e 5.
+**O `Rebel.cs` ainda vaza para outros papéis.**
+`FindNearestPlanlessCaptureTarget` é usado por Transporte, Assalto e capturador
+rogue.
 
-**Sobram 7 varreduras de tabuleiro no `Capturer/`** e o `QueroCaronaContext`.
-
-**A metade de IA do critério do jipe** nunca foi testada; só o lado do jogador.
-
-**`TransportadorAereo = 15` ainda existe** no enum com política de shopping
-própria, apesar de a governança dizer que "foi incorporado". Mudou de pasta; a
-regra não migrou.
+**Melhor Combate não governa a IA.** Migrar todos os papéis e o HexEvaluator é
+um trabalho maior que o MVP da ferramenta.
 
 ---
 
-## Regras de trabalho (não são sugestão)
+## Regras de trabalho
 
-- **Uma classe por vez.** O autor compila e roda no jogo, e comita antes da
-  próxima. **Não emenda fases.**
-- **Avaliar não é executar.** Quando o autor pede avaliação de um plano, entregue
-  a avaliação — não o código.
-- **Verificar antes de documentar.** Busca vazia não prova ausência.
+- **Uma classe por vez.** Compilar e rodar no jogo antes da próxima fase.
+- **Avaliar não é executar.** Plano pedido não autoriza implementação.
+- **Verificar antes de documentar.** Ler diff e contrato real.
 - **Ler `docs/manual/` antes de decidir onde uma regra mora.**
+- **Nada provisório publica verdade confirmada.** Movimento hipotético não abre
+  FOW nem cria contato utilizável.
 - **Tem relatório, tem tag. Não tem relatório, é só commit.**
-- **Medir antes de otimizar.** Ler código não acha gargalo.
-- **Não editar `.asset` no disco com o inspector aberto.**
-- Fechar o dia: skill `fechamento-do-dia`.
+- **Não editar `.asset` no disco com o Inspector aberto.**
+- Fechar o dia: skill `.claude/skills/fechamento-do-dia/SKILL.md`.
 
 ---
 
@@ -182,27 +241,26 @@ regra não migrou.
 
 | armadilha | lição |
 |---|---|
-| **classificar antes de unificar o órgão** | a matriz existia desde a manhã e não produziu nada; o que produziu foi a Vigilância consumindo o `MelhorVisao` |
-| **executar em vez de avaliar** | o autor pediu revisão de plano e recebeu quatro arquivos alterados |
-| **projetar sem ler o manual** | três arquiteturas propostas contra o princípio da primeira página |
-| **skill que se declara** | se renomear quebra, o poder está no lugar errado |
-| **cobertura aliada sem filtro** | um aliado qualquer que enxerga o mar faria a fragata achar que `Submerged` está coberto e parar de caçar |
-| **troca de tipo em lista serializada** | a Unity **preserva a contagem** do array antigo e deixa o conteúdo nulo. Volta com fantasma, não vazia |
-| **gate inaplicável** | o shopping pedia papel que nenhuma ficha tem. Todo gate precisa separar "ainda não satisfeito" de "impossível" |
-| **otimizar por hipótese** | cortar 80% das chamadas ao sensor não moveu o tempo |
-| **comparar rodadas pós-load** | ordem reembaralhada e cache frio |
-| **`FrameSpike` com F11** | mede o input humano junto. Use `decision=` |
-| **`FindObjectsByType` dentro de laço** | se o chamador já tem o objeto, passe-o |
-| **rota é cara** | 12-16ms por pathfind naval. Cúbica é limite inferior — dá pra podar exato |
-| **`git add .`** | varre trabalho do Editor junto. Só no passo de churn |
-| **tag antes do commit final** | obriga a mover referência já publicada com `--force` |
-| **predicado no eixo errado** | `TeamId == unit.TeamId` é time, não slot — apagou a reconquista em quatro papéis |
+| **posição hipotética criando conhecimento** | mover no cálculo não permite detectar e atirar antes do compromisso; reuse o snapshot confirmado |
+| **foco tratado como gate** | `FocusCells` hoje só soma pontos; missão obrigatória precisa de admissibilidade explícita |
+| **recalcular percepção por candidato** | snapshot/bake já possui conhecimento e contribuições; sensor por origem serve apenas à projeção daquela unidade |
+| **mudar inicializador de `EditorWindow`** | campo serializado preserva o valor antigo; default novo exige migração versionada |
+| **ocupado = inalcançável** | a unidade pode chegar ao entorno sem poder terminar no hex; reporte chegada e ocupação separadamente |
+| **runtime-only por hipótese** | `UnitManager` já tinha sliders suficientes para simular combate no Scene Edit |
+| **classificar antes de unificar o órgão** | primeiro extraia a fonte única; depois a matriz descreve quem a consome |
+| **skill que se declara** | se renomear a etiqueta quebra, o poder está no lugar errado |
+| **cobertura aliada sem filtro** | um observador comum pode satisfazer por engano uma missão especializada |
+| **troca de tipo em lista serializada** | Unity preserva a contagem e deixa conteúdo nulo; volta com fantasma |
+| **gate inaplicável** | separar “não satisfeito” de “impossível/desconhecido” |
+| **otimizar por hipótese** | medir antes; cortar chamadas pode não mover o gargalo |
+| **`FindObjectsByType` dentro de laço** | se o chamador já possui o objeto, passe-o |
+| **`git add .`** | só usar no passo de churn do fechamento |
+| **tag antes do commit final** | obriga a mover referência publicada; tag é a última coisa da versão |
 
 ---
 
-## Aviso
+## Critério de retomada
 
-Lista grande e organizada **parece progresso**. O antídoto é o ritmo acima.
-
-O teste final é um só: **os 7 perfis chamando uma fonte única, não 7 perfis com 7
-definições diferentes.**
+O próximo incremento está pronto quando o Melhor Visão consegue receber um
+snapshot/bake sem recalcular o time, continua funcionando sem fotografia e não
+altera FOW, ocupação, memória ou recursos durante a consulta.
