@@ -86,7 +86,13 @@ public static class PodeEnxergarSensor
             // O alcance e a visao padrao da ficha. Curto-circuita o
             // ResolveDetectionRange e, com ele, qualquer especializacao.
             forcedDetectionRangeOverride: Mathf.Max(1, observerData.visao),
-            skipSpecializedTargetLayers: true,
+            // NAO ligar skipSpecializedTargetLayers aqui: ele nao ignora o
+            // alcance das especializacoes, ele DESCARTA toda celula cuja camada
+            // tenha uma Detect Specialization. O submarino tem uma para
+            // Naval/Surface, e com a flag ligada todo hex de mar sumia antes de
+            // qualquer conta de linha. Quem ignora a lista e o parametro
+            // abaixo.
+            skipSpecializedTargetLayers: false,
             // Nem alcance, nem metodo, nem chave da lista de Detect.
             ignoreDetectSpecializations: true,
             useRangeOnlyForAirHighWhenConfigured: false,
