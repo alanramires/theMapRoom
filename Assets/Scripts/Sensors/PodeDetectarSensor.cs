@@ -306,8 +306,8 @@ public static class PodeDetectarSensor
     private static int debugCollectCellVisionCalls;
     private static double debugCollectConstructionMs;
     private static double debugCollectStructureMs;
-    private static double debugCollectLerpMs;
-    private static int debugCollectLerpCells;
+    // Os contadores do traçado mudaram de casa junto com o traçado: agora vivem
+    // no ObservationLineService, e este sensor apenas os reporta.
 
     public static void ResetFogDebugCounters()
     {
@@ -327,8 +327,7 @@ public static class PodeDetectarSensor
         debugCollectAquaticMaps = 0;
         debugCollectLosMs = 0d;
         ObservationCellService.ResetCounters();
-        debugCollectLerpMs = 0d;
-        debugCollectLerpCells = 0;
+        ObservationLineService.ResetCounters();
     }
 
     public static void GetCollectDebugCounters(
@@ -363,8 +362,8 @@ public static class PodeDetectarSensor
         cellVisionCalls = ObservationCellService.CellVisionCalls;
         constructionMs = ObservationCellService.ConstructionMs;
         structureMs = ObservationCellService.StructureMs;
-        lerpMs = debugCollectLerpMs;
-        lerpCells = debugCollectLerpCells;
+        lerpMs = ObservationLineService.LerpMs;
+        lerpCells = ObservationLineService.LerpCells;
     }
 
     public static void GetFogDebugCounters(
@@ -2208,109 +2207,10 @@ public static class PodeDetectarSensor
         Domain? forcedTargetDomain = null,
         HeightLevel? forcedTargetHeightLevel = null)
     {
-        intermediateCells = new List<Vector3Int>();
-        evPath = new List<float>();
-        blockedCell = Vector3Int.zero;
-        if (tilemap == null)
-            return false;
-
-        if (!TryResolveCellVision(
-                tilemap,
-                terrainDatabase,
-                originCell,
-                observer,
-                dpqAirHeightConfig,
-                out float originEv,
-                out _))
-        {
-            originEv = 0;
-        }
-        originEv = ResolveOriginEvForLos(tilemap, terrainDatabase, originCell, observer, dpqAirHeightConfig, originEv);
-
-        if (!forcedTargetDomain.HasValue &&
-            !forcedTargetHeightLevel.HasValue &&
-            target == null &&
-            TryResolveObservationTargetLayer(
-                tilemap,
-                terrainDatabase,
-                targetCell,
-                out Domain resolvedTargetDomain,
-                out HeightLevel resolvedTargetHeightLevel,
-                useOccupantLayerForTarget: false))
-        {
-            forcedTargetDomain = resolvedTargetDomain;
-            forcedTargetHeightLevel = resolvedTargetHeightLevel;
-        }
-
-        if (!TryResolveCellVision(
-                tilemap,
-                terrainDatabase,
-                targetCell,
-                target,
-                dpqAirHeightConfig,
-                out float targetEv,
-                out _,
-                forcedDomain: forcedTargetDomain,
-                forcedHeightLevel: forcedTargetHeightLevel))
-        {
-            targetEv = 0;
-        }
-
-        evPath.Add(originEv);
-        double lerpStartMs = Time.realtimeSinceStartupAsDouble;
-        List<Vector3Int> crossedCells = GetIntermediateCellsByCellLerp(tilemap, originCell, targetCell);
-        debugCollectLerpMs +=
-            (Time.realtimeSinceStartupAsDouble - lerpStartMs) * 1000d;
-        debugCollectLerpCells += crossedCells.Count;
-        intermediateCells.AddRange(crossedCells);
-
-        // A altura da linha em cada hex cruzado usa a distancia REAL projetada do
-        // centro do hex sobre a reta origem->alvo, nao o indice na lista. Sem isso,
-        // a duplicacao de hexes na fronteira entre dois hexagonos distorce o "t":
-        // dois hexes empatados na mesma distancia ganhariam limiares diferentes.
-        Vector2 losOriginWorld2 = ToWorld2(tilemap.GetCellCenterWorld(originCell));
-        Vector2 losTargetWorld2 = ToWorld2(tilemap.GetCellCenterWorld(targetCell));
-        Vector2 losDir = losTargetWorld2 - losOriginWorld2;
-        float losLenSq = Vector2.Dot(losDir, losDir);
-
-        for (int i = 0; i < crossedCells.Count; i++)
-        {
-            Vector3Int cell = crossedCells[i];
-            float t = losLenSq > 0.0001f
-                ? Mathf.Clamp01(Vector2.Dot(ToWorld2(tilemap.GetCellCenterWorld(cell)) - losOriginWorld2, losDir) / losLenSq)
-                : (i + 1f) / (crossedCells.Count + 1f);
-            float losHeightAtCell = Mathf.Lerp(originEv, targetEv, t);
-            evPath.Add(losHeightAtCell);
-
-            if (!enableLosValidation)
-                continue;
-
-            if (!TryResolveCellVision(
-                    tilemap,
-                    terrainDatabase,
-                    cell,
-                    null,
-                    dpqAirHeightConfig,
-                    out float cellEv,
-                    out bool cellBlocksLoS,
-                    forcedDomain: forcedTargetDomain,
-                    forcedHeightLevel: forcedTargetHeightLevel))
-            {
-                continue;
-            }
-
-            if (!cellBlocksLoS || cellEv <= 0)
-                continue;
-
-            if (cellEv > losHeightAtCell + LosGrazeEpsilon)
-            {
-                blockedCell = cell;
-                return false;
-            }
-        }
-
-        evPath.Add(targetEv);
-        return true;
+        return ObservationLineService.TryTrace(
+            tilemap, terrainDatabase, originCell, targetCell, observer, target,
+            dpqAirHeightConfig, out intermediateCells, out evPath, out blockedCell,
+            enableLosValidation, forcedTargetDomain, forcedTargetHeightLevel);
     }
 
     private static float ResolveOriginEvForLos(
@@ -2321,43 +2221,8 @@ public static class PodeDetectarSensor
         DPQAirHeightConfig dpqAirHeightConfig,
         float fallbackEv)
     {
-        if (observer == null)
-            return Mathf.Max(0f, fallbackEv);
-
-        Domain domain = observer.GetDomain();
-        HeightLevel height = observer.GetHeightLevel();
-
-        // A unidade observa do EV do lugar onde ela esta. Ar e submerso nao sao
-        // terreno, entao o EV deles vem da politica do DPQ Air Height Config â€”
-        // por consulta, nao por fallback. Sem clamp: se um dia o submerso for
-        // -1, a linha sobe em vez de descer, e isso e decisao do dado.
-        if (domain == Domain.Air ||
-            (domain == Domain.Submarine && height == HeightLevel.Submerged))
-        {
-            if (dpqAirHeightConfig != null &&
-                dpqAirHeightConfig.TryGetVisionFor(domain, height, out int layerEv, out _))
-            {
-                return layerEv;
-            }
-
-            return fallbackEv;
-        }
-
-        // Sobre terreno: herda o EV dele. O soldado na montanha observa de 2 e
-        // a linha desce ate a planicie em 0; na planicie ele observa de 0 e a
-        // linha corre nivelada por planicie, praia e mar.
-        originCell.z = 0;
-        if (tilemap != null &&
-            terrainDatabase != null &&
-            TryResolveTerrainAtCell(tilemap, terrainDatabase, originCell, out TerrainTypeData originTerrain) &&
-            originTerrain != null)
-        {
-            return originTerrain.shooterInheritsTerrainEv
-                ? originTerrain.ResolveShooterInheritedEv()
-                : originTerrain.ev;
-        }
-
-        return 0;
+        return ObservationLineService.ResolveOriginEv(
+            tilemap, terrainDatabase, originCell, observer, dpqAirHeightConfig, fallbackEv);
     }
 
     private static bool TryResolveCellVision(
@@ -2413,119 +2278,7 @@ public static class PodeDetectarSensor
 
     private static List<Vector3Int> GetIntermediateCellsByCellLerp(Tilemap tilemap, Vector3Int originCell, Vector3Int targetCell)
     {
-        // Mantem o mesmo algoritmo robusto do PodeMirar:
-        // supersampling + expansao apenas em fronteira ambigua.
-        // O traÃ§ado por cube-line pode escolher um unico caminho em diagonais/ties
-        // e deixar passar casos de bloqueio por relevo entre hexes.
-        List<Vector3Int> cells = new List<Vector3Int>();
-
-        originCell.z = 0;
-        targetCell.z = 0;
-        if (tilemap == null)
-            return cells;
-
-        Vector3 originWorld = tilemap.GetCellCenterWorld(originCell);
-        Vector3 targetWorld = tilemap.GetCellCenterWorld(targetCell);
-        Vector2 originWorld2 = new Vector2(originWorld.x, originWorld.y);
-        Vector2 targetWorld2 = new Vector2(targetWorld.x, targetWorld.y);
-        float neighborStep = 1f;
-        List<Vector3Int> originNeighbors = new List<Vector3Int>(6);
-        UnitMovementPathRules.GetImmediateHexNeighbors(tilemap, originCell, originNeighbors);
-        if (originNeighbors.Count > 0)
-        {
-            Vector3 n = tilemap.GetCellCenterWorld(originNeighbors[0]);
-            neighborStep = Vector2.Distance(originWorld2, new Vector2(n.x, n.y));
-            if (neighborStep <= 0.0001f)
-                neighborStep = 1f;
-        }
-
-        float worldDistance = Vector2.Distance(originWorld2, targetWorld2);
-        if (worldDistance <= 0.0001f)
-            return cells;
-
-        int approxHexes = Mathf.Max(1, Mathf.CeilToInt(worldDistance / Mathf.Max(0.0001f, neighborStep)));
-        if (approxHexes <= 1)
-            return cells;
-
-        float borderEpsilon = Mathf.Max(0.01f, neighborStep * 0.08f);
-        int sampleCount = approxHexes * 10;
-        if (sampleCount <= 1)
-            sampleCount = approxHexes * 6;
-
-        HashSet<Vector3Int> seen = new HashSet<Vector3Int>();
-        List<Vector3Int> centerNeighbors = new List<Vector3Int>(6);
-        for (int i = 1; i < sampleCount; i++)
-        {
-            float t = i / (float)sampleCount;
-            Vector2 sample2 = Vector2.Lerp(originWorld2, targetWorld2, t);
-
-            Vector3Int centerCell = tilemap.WorldToCell(new Vector3(sample2.x, sample2.y, 0f));
-            centerCell.z = 0;
-            if (centerCell != originCell && centerCell != targetCell && seen.Add(centerCell))
-                cells.Add(centerCell);
-
-            Vector2 centerWorld2 = ToWorld2(tilemap.GetCellCenterWorld(centerCell));
-            float distToCenter = Vector2.Distance(sample2, centerWorld2);
-
-            UnitMovementPathRules.GetImmediateHexNeighbors(tilemap, centerCell, centerNeighbors);
-            for (int n = 0; n < centerNeighbors.Count; n++)
-            {
-                Vector3Int neighborCell = centerNeighbors[n];
-                neighborCell.z = 0;
-                if (neighborCell == originCell || neighborCell == targetCell)
-                    continue;
-
-                Vector2 neighborWorld2 = ToWorld2(tilemap.GetCellCenterWorld(neighborCell));
-                float distToNeighbor = Vector2.Distance(sample2, neighborWorld2);
-                if (Mathf.Abs(distToCenter - distToNeighbor) > borderEpsilon)
-                    continue;
-
-                if (seen.Add(neighborCell))
-                    cells.Add(neighborCell);
-            }
-        }
-
-        return cells;
-    }
-
-    private static List<Vector3Int> GetIntermediateCellsByCubeLine(Tilemap tilemap, Vector3Int originCell, Vector3Int targetCell)
-    {
-        List<Vector3Int> cells = new List<Vector3Int>();
-        if (tilemap == null)
-            return cells;
-
-        originCell.z = 0;
-        targetCell.z = 0;
-        if (originCell == targetCell)
-            return cells;
-
-        if (!HexGridGeometry.TryResolveOddRowOffset(tilemap, out bool oddRowOffset))
-            return null;
-
-        HexGridGeometry.CubeCoord originCube =
-            HexGridGeometry.OffsetToCube(originCell, oddRowOffset);
-        HexGridGeometry.CubeCoord targetCube =
-            HexGridGeometry.OffsetToCube(targetCell, oddRowOffset);
-        int steps = HexGridGeometry.CubeDistance(originCube, targetCube);
-        if (steps <= 1)
-            return cells;
-
-        HashSet<Vector3Int> seen = new HashSet<Vector3Int>();
-        for (int i = 1; i < steps; i++)
-        {
-            float t = i / (float)steps;
-            HexGridGeometry.CubeCoord lerped =
-                HexGridGeometry.CubeLerp(originCube, targetCube, t);
-            HexGridGeometry.CubeCoord rounded = HexGridGeometry.CubeRound(lerped);
-            Vector3Int cell = HexGridGeometry.CubeToOffset(rounded, oddRowOffset);
-            cell.z = 0;
-            if (cell == originCell || cell == targetCell)
-                continue;
-            if (seen.Add(cell))
-                cells.Add(cell);
-        }
-
-        return cells;
+        return ObservationLineService.GetIntermediateCellsByCellLerp(tilemap, originCell, targetCell);
     }
 
     private static Vector2 ToWorld2(Vector3 world)
