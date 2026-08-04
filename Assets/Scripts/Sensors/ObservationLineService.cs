@@ -61,7 +61,8 @@ public static class ObservationLineService
         out Vector3Int blockedCell,
         bool enableLosValidation,
         Domain? forcedTargetDomain = null,
-        HeightLevel? forcedTargetHeightLevel = null)
+        HeightLevel? forcedTargetHeightLevel = null,
+        bool inheritTerrainEv = true)
     {
         intermediateCells = new List<Vector3Int>();
         evPath = new List<float>();
@@ -80,13 +81,20 @@ public static class ObservationLineService
         {
             originEv = 0;
         }
+
+        // De onde a linha parte e decisao de QUEM PERGUNTA, nao da geometria.
+        // A unidade herda o EV do terreno para REVELAR HEX e DETECTAR UNIDADE,
+        // e so para isso. Tiro nao herda: o atirador parte do EV da camada dele.
+        // Por isso a reta e uma so e a origem e um booleano nomeado, nao uma
+        // segunda implementacao.
         originEv = ResolveOriginEv(
             tilemap,
             terrainDatabase,
             originCell,
             observer,
             dpqAirHeightConfig,
-            originEv);
+            originEv,
+            inheritTerrainEv);
 
         if (!forcedTargetDomain.HasValue &&
             !forcedTargetHeightLevel.HasValue &&
@@ -177,12 +185,19 @@ public static class ObservationLineService
     }
 
     /// <summary>
-    /// De que altura a linha parte. Quem esta sobre terreno herda o EV DELE — o
-    /// soldado na montanha observa de 2, na planicie de 0. Ar e submerso nao sao
-    /// terreno: o EV vem da politica do DPQ Air Height Config, por consulta.
+    /// De que altura a linha parte.
     ///
-    /// Sem clamp em zero de proposito: se um dia o submerso for -1, a linha sobe
-    /// em vez de descer, e isso e decisao do dado.
+    /// Camada que nao e terreno — ar e submerso — sempre consulta a politica do
+    /// DPQ Air Height Config. Sem clamp em zero de proposito: se um dia o
+    /// submerso for -1, a linha sobe em vez de descer, e isso e decisao do dado.
+    ///
+    /// Sobre terreno, <paramref name="inheritTerrainEv"/> decide:
+    ///
+    ///   true   herda o EV do terreno. O soldado na montanha observa de 2 e a
+    ///          linha desce ate a planicie em 0. E o caso de REVELAR HEX e
+    ///          DETECTAR UNIDADE — e so esses dois.
+    ///   false  parte do EV da camada, que na superficie e 0. E o caso do TIRO:
+    ///          a unidade nao herda altura para atirar.
     /// </summary>
     public static float ResolveOriginEv(
         Tilemap tilemap,
@@ -190,7 +205,8 @@ public static class ObservationLineService
         Vector3Int originCell,
         UnitManager observer,
         DPQAirHeightConfig dpqAirHeightConfig,
-        float fallbackEv)
+        float fallbackEv,
+        bool inheritTerrainEv = true)
     {
         if (observer == null)
             return Mathf.Max(0f, fallbackEv);
@@ -210,6 +226,9 @@ public static class ObservationLineService
             return fallbackEv;
         }
 
+        if (!inheritTerrainEv)
+            return 0;
+
         originCell.z = 0;
         if (tilemap != null &&
             terrainDatabase != null &&
@@ -220,9 +239,7 @@ public static class ObservationLineService
                 out TerrainTypeData originTerrain) &&
             originTerrain != null)
         {
-            return originTerrain.shooterInheritsTerrainEv
-                ? originTerrain.ResolveShooterInheritedEv()
-                : originTerrain.ev;
+            return originTerrain.ev;
         }
 
         return 0;

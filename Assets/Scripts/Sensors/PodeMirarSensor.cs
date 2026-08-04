@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Tilemaps;
 
@@ -1571,7 +1571,16 @@ public static class PodeMirarSensor
         {
             originEv = 0;
         }
-        originEv = ResolveOriginEvForLos(tilemap, terrainDatabase, originCell, attacker, dpqAirHeightConfig, originEv);
+        // inheritTerrainEv: false — o atirador nao herda a altura do terreno. A
+        // unidade herda EV para revelar hex e para detectar unidade, e so.
+        originEv = ObservationLineService.ResolveOriginEv(
+            tilemap,
+            terrainDatabase,
+            originCell,
+            attacker,
+            dpqAirHeightConfig,
+            originEv,
+            inheritTerrainEv: false);
 
         if (!TryResolveCellVision(
                 tilemap,
@@ -1586,7 +1595,10 @@ public static class PodeMirarSensor
         }
 
         evPath.Add(originEv);
-        List<Vector3Int> crossedCells = GetIntermediateCellsByCellLerp(tilemap, originCell, targetCell);
+        List<Vector3Int> crossedCells = ObservationLineService.GetIntermediateCellsByCellLerp(
+            tilemap,
+            originCell,
+            targetCell);
         intermediateCells.AddRange(crossedCells);
         for (int i = 0; i < crossedCells.Count; i++)
         {
@@ -1636,6 +1648,9 @@ public static class PodeMirarSensor
         return true;
     }
 
+    // A reta e uma so no projeto: ObservationLineService. Aqui ela parte SEM
+    // herdar o EV do terreno — a unidade herda altura para revelar hex e para
+    // detectar unidade, nao para atirar.
     private static bool HasValidStraightObservationLine(
         Tilemap tilemap,
         TerrainDatabase terrainDatabase,
@@ -1649,125 +1664,11 @@ public static class PodeMirarSensor
         out Vector3Int blockedCell,
         bool enableLosValidation)
     {
-        intermediateCells = new List<Vector3Int>();
-        evPath = new List<float>();
-        blockedCell = Vector3Int.zero;
-        if (tilemap == null)
-            return false;
-
-        if (!TryResolveCellVision(
-                tilemap,
-                terrainDatabase,
-                originCell,
-                observer,
-                dpqAirHeightConfig,
-                out float originEv,
-                out _))
-        {
-            originEv = 0;
-        }
-        originEv = ResolveOriginEvForLos(tilemap, terrainDatabase, originCell, observer, dpqAirHeightConfig, originEv);
-
-        if (!TryResolveCellVision(
-                tilemap,
-                terrainDatabase,
-                targetCell,
-                target,
-                dpqAirHeightConfig,
-                out float targetEv,
-                out _))
-        {
-            targetEv = 0;
-        }
-
-        evPath.Add(originEv);
-        List<Vector3Int> crossedCells = GetIntermediateCellsByCellLerp(tilemap, originCell, targetCell);
-        intermediateCells.AddRange(crossedCells);
-
-        // Mesma geometria usada pelo PodeDetectar/AlguemMeVe: a altura da LOS
-        // deve ser interpolada pela posicao real do centro do hex projetada na
-        // reta observador->alvo. Assim o PodeMirar aceita exatamente os aliados
-        // cuja observacao direta ja foi confirmada pelo sensor de deteccao.
-        Vector2 losOriginWorld2 = ToWorld2(tilemap.GetCellCenterWorld(originCell));
-        Vector2 losTargetWorld2 = ToWorld2(tilemap.GetCellCenterWorld(targetCell));
-        Vector2 losDir = losTargetWorld2 - losOriginWorld2;
-        float losLenSq = Vector2.Dot(losDir, losDir);
-
-        for (int i = 0; i < crossedCells.Count; i++)
-        {
-            Vector3Int cell = crossedCells[i];
-            float t = losLenSq > 0.0001f
-                ? Mathf.Clamp01(Vector2.Dot(ToWorld2(tilemap.GetCellCenterWorld(cell)) - losOriginWorld2, losDir) / losLenSq)
-                : (i + 1f) / (crossedCells.Count + 1f);
-            float losHeightAtCell = Mathf.Lerp(originEv, targetEv, t);
-            evPath.Add(losHeightAtCell);
-
-            if (!enableLosValidation)
-                continue;
-
-            if (!TryResolveCellVision(
-                    tilemap,
-                    terrainDatabase,
-                    cell,
-                    null,
-                    dpqAirHeightConfig,
-                    out float cellEv,
-                    out bool cellBlocksLoS))
-            {
-                continue;
-            }
-
-            if (!cellBlocksLoS || cellEv <= 0)
-                continue;
-
-            if (cellEv > losHeightAtCell + ObservationLosGrazeEpsilon)
-            {
-                blockedCell = cell;
-                return false;
-            }
-        }
-
-        evPath.Add(targetEv);
-        return true;
-    }
-
-    private static float ResolveOriginEvForLos(
-        Tilemap tilemap,
-        TerrainDatabase terrainDatabase,
-        Vector3Int originCell,
-        UnitManager attacker,
-        DPQAirHeightConfig dpqAirHeightConfig,
-        float fallbackEv)
-    {
-        if (attacker == null)
-            return Mathf.Max(0f, fallbackEv);
-
-        Domain domain = attacker.GetDomain();
-        HeightLevel height = attacker.GetHeightLevel();
-        if (domain == Domain.Air)
-        {
-            if (dpqAirHeightConfig != null &&
-                dpqAirHeightConfig.TryGetVisionFor(domain, height, out int airEv, out _))
-            {
-                return Mathf.Max(0f, airEv);
-            }
-
-            return Mathf.Max(0f, fallbackEv);
-        }
-
-        // Regra de origem da LoS: unidades no chao partem do EV de sua camada (Surface = 0),
-        // a menos que o terreno marque explicitamente que o atirador herda EV do terreno.
-        originCell.z = 0;
-        if (tilemap != null &&
-            terrainDatabase != null &&
-            TryResolveTerrainAtCell(tilemap, terrainDatabase, originCell, out TerrainTypeData originTerrain) &&
-            originTerrain != null &&
-            originTerrain.shooterInheritsTerrainEv)
-        {
-            return originTerrain.ResolveShooterInheritedEv();
-        }
-
-        return 0;
+        return ObservationLineService.TryTrace(
+            tilemap, terrainDatabase, originCell, targetCell, observer, target,
+            dpqAirHeightConfig, out intermediateCells, out evPath, out blockedCell,
+            enableLosValidation, forcedTargetDomain: null, forcedTargetHeightLevel: null,
+            inheritTerrainEv: false);
     }
 
     private static bool TerrainAllowsWeaponTrajectory(TerrainTypeData terrain, WeaponData weapon)
@@ -1792,88 +1693,6 @@ public static class PodeMirarSensor
         }
 
         return false;
-    }
-
-    private static List<Vector3Int> GetIntermediateCellsByCellLerp(Tilemap tilemap, Vector3Int originCell, Vector3Int targetCell)
-    {
-        List<Vector3Int> cells = new List<Vector3Int>();
-
-        originCell.z = 0;
-        targetCell.z = 0;
-        if (tilemap == null)
-            return cells;
-
-        Vector3 originWorld = tilemap.GetCellCenterWorld(originCell);
-        Vector3 targetWorld = tilemap.GetCellCenterWorld(targetCell);
-        Vector2 originWorld2 = new Vector2(originWorld.x, originWorld.y);
-        Vector2 targetWorld2 = new Vector2(targetWorld.x, targetWorld.y);
-        float neighborStep = 1f;
-        List<Vector3Int> originNeighbors = new List<Vector3Int>(6);
-        UnitMovementPathRules.GetImmediateHexNeighbors(tilemap, originCell, originNeighbors);
-        if (originNeighbors.Count > 0)
-        {
-            Vector3 n = tilemap.GetCellCenterWorld(originNeighbors[0]);
-            neighborStep = Vector2.Distance(originWorld2, new Vector2(n.x, n.y));
-            if (neighborStep <= 0.0001f)
-                neighborStep = 1f;
-        }
-
-        float worldDistance = Vector2.Distance(originWorld2, targetWorld2);
-        if (worldDistance <= 0.0001f)
-            return cells;
-
-        // Densidade por distancia real do mundo (nao por delta de celula),
-        // para nao "pular" obstaculos em diagonais/offset de hex.
-        int approxHexes = Mathf.Max(1, Mathf.CeilToInt(worldDistance / Mathf.Max(0.0001f, neighborStep)));
-        if (approxHexes <= 1)
-            return cells;
-
-        // Em hex, so expande para celulas adjacentes quando o ponto da linha cai proximo
-        // da fronteira (caso ambiguo). Evita falso bloqueio por terreno "ao lado" da linha.
-        float borderEpsilon = Mathf.Max(0.01f, neighborStep * 0.08f);
-        int sampleCount = approxHexes * 10; // supersampling mais denso para LoS robusta.
-        if (sampleCount <= 1)
-            sampleCount = approxHexes * 6;
-
-        HashSet<Vector3Int> seen = new HashSet<Vector3Int>();
-        List<Vector3Int> centerNeighbors = new List<Vector3Int>(6);
-        for (int i = 1; i < sampleCount; i++)
-        {
-            float t = i / (float)sampleCount;
-            Vector2 sample2 = Vector2.Lerp(originWorld2, targetWorld2, t);
-
-            Vector3Int centerCell = tilemap.WorldToCell(new Vector3(sample2.x, sample2.y, 0f));
-            centerCell.z = 0;
-            if (centerCell != originCell && centerCell != targetCell && seen.Add(centerCell))
-                cells.Add(centerCell);
-
-            Vector2 centerWorld2 = ToWorld2(tilemap.GetCellCenterWorld(centerCell));
-            float distToCenter = Vector2.Distance(sample2, centerWorld2);
-
-            UnitMovementPathRules.GetImmediateHexNeighbors(tilemap, centerCell, centerNeighbors);
-            for (int n = 0; n < centerNeighbors.Count; n++)
-            {
-                Vector3Int neighborCell = centerNeighbors[n];
-                neighborCell.z = 0;
-                if (neighborCell == originCell || neighborCell == targetCell)
-                    continue;
-
-                Vector2 neighborWorld2 = ToWorld2(tilemap.GetCellCenterWorld(neighborCell));
-                float distToNeighbor = Vector2.Distance(sample2, neighborWorld2);
-                if (Mathf.Abs(distToCenter - distToNeighbor) > borderEpsilon)
-                    continue;
-
-                if (seen.Add(neighborCell))
-                    cells.Add(neighborCell);
-            }
-        }
-
-        return cells;
-    }
-
-    private static Vector2 ToWorld2(Vector3 world)
-    {
-        return new Vector2(world.x, world.y);
     }
 
     private static bool TryResolveTerrainAtCell(Tilemap terrainTilemap, TerrainDatabase terrainDatabase, Vector3Int cell, out TerrainTypeData terrain)
