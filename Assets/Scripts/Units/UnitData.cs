@@ -60,11 +60,28 @@ public enum AIPurchaseMode
 }
 
 [System.Serializable]
-public enum LosPolicy
+/// <summary>
+/// Como a conta da deteccao e feita. NAO fala de tecnologia: radar e
+/// instrumento e mesmo assim e LineOfSight, porque o pulso viaja reto e o
+/// terreno no caminho bloqueia. O que este par separa e a geometria.
+/// </summary>
+public enum DetectionMethod
 {
-    InheritGlobal = 0,
-    ForceOn = 1,
-    ForceOff = 2
+    /// <summary>
+    /// A conta e uma reta do observador ate o alvo; terreno no caminho
+    /// bloqueia. Obedece o toggle global de LoS da partida.
+    /// </summary>
+    LineOfSight = 0,
+
+    // O numero 1 foi ForceOn (exigir reta mesmo com o toggle global
+    // desligado). Nenhuma ficha do projeto usava. Fica vago de proposito,
+    // para o valor serializado nunca ser reaproveitado com outro sentido.
+
+    /// <summary>
+    /// A conta propaga pelo meio da camada do alvo, contornando peninsula e
+    /// acidente geografico. Sonar contra submerso e o caso vivo.
+    /// </summary>
+    Propagated = 2
 }
 
 [System.Serializable]
@@ -95,8 +112,9 @@ public class UnitVisionException
     [Tooltip("Detecta unidades que possuam qualquer skill desta lista (match por referencia ou ID).")]
     public List<SkillData> detectUnitsWithFollowingSkills = new List<SkillData>();
 
-    [Tooltip("Politica de LOS para esta especializacao. InheritGlobal usa o toggle global da partida.")]
-    public LosPolicy losPolicy = LosPolicy.InheritGlobal;
+    [FormerlySerializedAs("losPolicy")]
+    [Tooltip("Como esta deteccao e calculada. LineOfSight: reta ate o alvo, terreno bloqueia, obedece o toggle global. Propagated: contorna pelo meio da camada do alvo (sonar).")]
+    public DetectionMethod detectionMethod = DetectionMethod.LineOfSight;
 }
 
 [System.Serializable]
@@ -603,21 +621,21 @@ public class UnitData : ScriptableObject
             && entry.detectUnitsWithFollowingSkills.Count > 0;
     }
 
-    public LosPolicy ResolveLosPolicyFor(Domain targetDomain, HeightLevel targetHeightLevel)
+    public DetectionMethod ResolveDetectionMethodFor(Domain targetDomain, HeightLevel targetHeightLevel)
     {
         if (TryGetVisionException(targetDomain, targetHeightLevel, out UnitVisionException entry) && entry != null)
-            return entry.losPolicy;
+            return entry.detectionMethod;
 
-        return LosPolicy.InheritGlobal;
+        return DetectionMethod.LineOfSight;
     }
 
     public bool ResolveLosValidationFor(Domain targetDomain, HeightLevel targetHeightLevel, bool enableLosValidationGlobal)
     {
-        LosPolicy policy = ResolveLosPolicyFor(targetDomain, targetHeightLevel);
-        if (policy == LosPolicy.InheritGlobal)
-            return enableLosValidationGlobal;
-
-        return policy == LosPolicy.ForceOn;
+        // Propagacao nao usa reta, entao a validacao de LoS nao se aplica a ela.
+        // LineOfSight continua obedecendo o toggle global da partida.
+        return ResolveDetectionMethodFor(targetDomain, targetHeightLevel)
+            != DetectionMethod.Propagated
+            && enableLosValidationGlobal;
     }
 
     public bool IsStealthUnit()
