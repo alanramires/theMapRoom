@@ -142,7 +142,7 @@ public class UnitData : ScriptableObject
     public int movement = 3;
     [Min(1)] public int visao = 3;
     [FormerlySerializedAs("visionExceptions")]
-    [Tooltip("Vision Specializations por dominio/altura do alvo. Se nao houver match, usa o campo visao padrao.")]
+    [Tooltip("Detect Specializations: alcance e chaves de DETECCAO por dominio/altura do alvo. Nao revela hexagonos — quem revela terreno e o campo visao. Sem match, vale a visao padrao.")]
     public List<UnitVisionException> visionSpecializations = new List<UnitVisionException>();
     public MovementCategory movementCategory = MovementCategory.Marcha;
     public MilitaryForce militaryForce = MilitaryForce.Army;
