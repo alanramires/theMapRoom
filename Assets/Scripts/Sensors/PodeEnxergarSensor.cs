@@ -28,6 +28,60 @@ using UnityEngine.Tilemaps;
 public static class PodeEnxergarSensor
 {
     /// <summary>
+    /// Diagnostico opcional. Liga pelo nome da unidade (substring, case
+    /// insensitive) e escreve uma linha por chamada em PodeEnxergar.log na raiz
+    /// do projeto. Serve para responder o que rodou, nao o que se supoe.
+    /// </summary>
+    public static string DebugUnitNameFilter;
+
+    private static void LogDebug(
+        UnitManager observer,
+        UnitData observerData,
+        int appliedRange,
+        ICollection<Vector3Int> output,
+        Vector3Int ownCell,
+        int countBefore)
+    {
+        if (string.IsNullOrEmpty(DebugUnitNameFilter)
+            || observer == null
+            || observer.name.IndexOf(
+                   DebugUnitNameFilter,
+                   System.StringComparison.OrdinalIgnoreCase) < 0)
+        {
+            return;
+        }
+
+        int maxDistance = 0;
+        foreach (Vector3Int cell in output)
+        {
+            int distance = Mathf.RoundToInt(
+                SectorManager.HexDistance(ownCell, cell));
+            if (distance > maxDistance)
+                maxDistance = distance;
+        }
+
+        string line =
+            $"[PodeEnxergar] unit={observer.name} " +
+            $"domain={observer.GetDomain()}/{observer.GetHeightLevel()} " +
+            $"cell=({ownCell.x},{ownCell.y}) " +
+            $"visao={(observerData != null ? observerData.visao : -1)} " +
+            $"alcanceAplicado={appliedRange} " +
+            $"celulas={output.Count - countBefore} " +
+            $"maiorDistancia={maxDistance}";
+        Debug.Log(line, observer);
+        try
+        {
+            System.IO.File.AppendAllText(
+                "PodeEnxergar.log",
+                line + System.Environment.NewLine);
+        }
+        catch (System.Exception)
+        {
+            // Diagnostico nunca derruba partida.
+        }
+    }
+
+    /// <summary>
     /// Acrescenta a <paramref name="output"/> as celulas cujo terreno o
     /// observador conhece. As duas passadas de superficie sao unidas ali, entao
     /// <paramref name="output"/> deve ser um conjunto.
@@ -58,8 +112,10 @@ public static class PodeEnxergarSensor
         // conhece o terreno onde esta pisando.
         Vector3Int ownCell = virtualObserverCell ?? observer.CurrentCellPosition;
         ownCell.z = 0;
+        int countBefore = output.Count;
         output.Add(ownCell);
 
+        int appliedRange = Mathf.Max(1, observerData.visao);
         PodeDetectarSensor.CollectVisibleCells(
             observer,
             map,
@@ -86,12 +142,14 @@ public static class PodeEnxergarSensor
             forcedVirtualTargetHeight: HeightLevel.Surface,
             // O alcance e a visao padrao da ficha. Curto-circuita o
             // ResolveDetectionRange e, com ele, qualquer especializacao.
-            forcedDetectionRangeOverride: Mathf.Max(1, observerData.visao),
+            forcedDetectionRangeOverride: appliedRange,
             skipSpecializedTargetLayers: true,
             // Nem alcance, nem metodo, nem chave da lista de Detect.
             ignoreDetectSpecializations: true,
             useRangeOnlyForAirHighWhenConfigured: false,
             virtualObserverCell: virtualObserverCell);
+
+        LogDebug(observer, observerData, appliedRange, output, ownCell, countBefore);
     }
 
 }
