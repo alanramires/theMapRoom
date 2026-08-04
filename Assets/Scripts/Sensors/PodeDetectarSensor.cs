@@ -752,10 +752,11 @@ public static class PodeDetectarSensor
                     targetHeight,
                     enableLosValidation);
                 bool bypassLosByPolicy = !effectiveLosValidation;
-                bool skipLosForCurrentTarget = observer.GetDomain() == Domain.Air &&
-                    useRangeOnlyForAirHighWhenConfigured &&
-                    IsAirHighRangeOnlyVision(dpqAirHeightConfig, targetDomain, targetHeight);
-                bool hasDirectLos = skipLosForCurrentTarget || HasValidStraightObservationLine(
+                // A linha SEMPRE e validada. Nao existe camada que dispense a
+                // reta: o alvo alto atras de relevo pode ficar escondido de quem
+                // esta atras da floresta, porque a linha ascendente ainda nao
+                // subiu o bastante naquele ponto.
+                bool hasDirectLos = HasValidStraightObservationLine(
                     boardMap,
                     terrainDatabase,
                     observerCell,
@@ -997,11 +998,11 @@ public static class PodeDetectarSensor
 
         bool effectiveLosValidation = ResolveEffectiveLosValidation(observerData, targetDomain, targetHeight, enableLosValidation);
         bool bypassLosByPolicy = !effectiveLosValidation;
-        bool skipLosForCurrentTarget = observer != null && observer.GetDomain() == Domain.Air &&
-            useRangeOnlyForAirHighWhenConfigured &&
-            IsAirHighRangeOnlyVision(dpqAirHeightConfig, targetDomain, targetHeight);
-        bool hasDirectLos = skipLosForCurrentTarget ||
-            TryGetDirectLosCachedForRefresh(
+        // A linha SEMPRE e validada, inclusive contra alvo aereo. Nao existe
+        // camada que dispense a reta: propagacao contorna obstaculo no plano do
+        // meio, e linha ascendente nao tem do que desviar — nao ha montanha
+        // flutuante.
+        bool hasDirectLos = TryGetDirectLosCachedForRefresh(
                 boardMap,
                 terrainDatabase,
                 observerCell,
