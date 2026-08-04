@@ -12,11 +12,13 @@ using UnityEngine.Tilemaps;
 /// duas respostas sao independentes nos dois sentidos, e por isso moram em
 /// entidades separadas — quem responde por unidades e o PodeDetectar.
 ///
-/// Por isso a assinatura NAO aceita camada. O alcance e sempre resolvido na
-/// superficie da CELULA ALVO: Land/Surface em terra, Naval/Surface na agua.
-/// Uma especializacao de ar ou de submerso nunca alarga a revelacao, e uma
-/// especializacao de superficie que estreite continua valendo — os dois
-/// sentidos saem de graca do ResolveVisionFor da camada certa.
+/// Por isso a assinatura NAO aceita camada, e o alcance e SEMPRE o campo
+/// UnitData.visao — a visao padrao da ficha, que e o que revela hexes.
+/// Toda visao adicional pendurada em visionSpecializations existe para o
+/// PodeDetectar: ela faz unidade aparecer, nunca terreno. Nem alarga (EWACS,
+/// submarino) nem estreita. A celula alvo so decide QUAL superficie e
+/// consultada — Land/Surface em terra, Naval/Surface na agua —, nunca o
+/// alcance.
 ///
 /// Consulta pura: nao move unidade, nao publica FOW, nao grava exploracao e
 /// nao registra contato.
@@ -43,7 +45,13 @@ public static class PodeEnxergarSensor
     {
         if (output == null || observer == null)
             return;
+        if (!observer.TryGetUnitData(out UnitData observerData)
+            || observerData == null)
+        {
+            return;
+        }
 
+        int terrainRange = Mathf.Max(1, observerData.visao);
         CollectForSurfaceDomain(
             observer,
             map,
@@ -52,7 +60,8 @@ public static class PodeEnxergarSensor
             dpqAirHeightConfig,
             enableLosValidation,
             virtualObserverCell,
-            Domain.Land);
+            Domain.Land,
+            terrainRange);
         CollectForSurfaceDomain(
             observer,
             map,
@@ -61,7 +70,8 @@ public static class PodeEnxergarSensor
             dpqAirHeightConfig,
             enableLosValidation,
             virtualObserverCell,
-            Domain.Naval);
+            Domain.Naval,
+            terrainRange);
     }
 
     /// <summary>
@@ -78,7 +88,8 @@ public static class PodeEnxergarSensor
         DPQAirHeightConfig dpqAirHeightConfig,
         bool enableLosValidation,
         Vector3Int? virtualObserverCell,
-        Domain surfaceDomain)
+        Domain surfaceDomain,
+        int terrainRange)
     {
         PodeDetectarSensor.CollectVisibleCells(
             observer,
@@ -101,11 +112,12 @@ public static class PodeEnxergarSensor
             forceVirtualTargetLayer: true,
             forcedVirtualTargetDomain: surfaceDomain,
             forcedVirtualTargetHeight: HeightLevel.Surface,
-            forcedDetectionRangeOverride: -1,
-            // As especializacoes continuam valendo: quem decide o alcance desta
-            // passada e o ResolveVisionFor da superficie consultada, que ja
-            // considera a excecao daquela camada quando ela existe.
-            skipSpecializedTargetLayers: false,
+            // O alcance de revelacao e a visao padrao da ficha, imposta aqui.
+            // Isto curto-circuita o ResolveDetectionRange e, com ele, qualquer
+            // especializacao — que e o ponto: visao adicional na ficha faz
+            // unidade aparecer, nao terreno.
+            forcedDetectionRangeOverride: terrainRange,
+            skipSpecializedTargetLayers: true,
             useRangeOnlyForAirHighWhenConfigured: false,
             virtualObserverCell: virtualObserverCell);
     }
