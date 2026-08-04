@@ -339,7 +339,11 @@ public class PodeEnxergarSensorDebugWindow : EditorWindow
                 forceLayer: false,
                 preserveObserverLayerRange: false,
                 forcedDetectionRangeOverride: baseRange,
-                skipSpecializedTargetLayers: true,
+                // skipSpecializedTargetLayers descarta a CELULA quando a camada
+                // dela tem Detect Specialization — era ele que sumia com o mar
+                // do submarino e listava o hex como invalido mesmo com a linha
+                // limpa. Quem ignora a lista e o parametro abaixo.
+                skipSpecializedTargetLayers: false,
                 ignoreDetectSpecializations: true);
             scenarioResults.Add(visionScenario);
         }
