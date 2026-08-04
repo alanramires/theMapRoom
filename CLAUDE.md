@@ -79,6 +79,20 @@ them all; the current major is detailed and closed majors are pointers.
 
 This is a Unity project — there is no CLI build. Open in Unity Editor (Windows) and use Play mode to test. Scripts auto-compile when files are saved. Check the Unity Console for compilation errors and runtime logs.
 
+## Distribution state — nothing is shipped yet
+
+The game **is not on Steam**. It exists only on the author's machine, and release
+is forecast for **mid-2027 to 2028**.
+
+The practical consequence, and the reason this is written down: **save and bake
+architecture can be changed as many times as the design needs.** There is no
+installed base, no player save to preserve, no migration debt owed to anyone.
+
+So do not propose format-version shims, back-compat readers or "migrate on load"
+scaffolding to protect saves — that cost buys nothing today. If a data shape is
+wrong, change the shape. The only thing worth preserving is the author's own
+scenes and unit assets, and those he re-authors deliberately when he wants to.
+
 ## Project Overview
 
 Turn-based hex strategy game. Two teams alternate turns; the AI controls one (or both) teams. All AI code lives in `Assets/Scripts/Match/AI/`.
