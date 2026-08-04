@@ -59,11 +59,17 @@ public static class PodeEnxergarSensor
         Vector3Int ownCell = virtualObserverCell ?? observer.CurrentCellPosition;
         ownCell.z = 0;
         output.Add(ownCell);
+
+        // Fora da borda nao existe hexagono. O que sai do coletor passa por um
+        // filtro proprio antes de virar terreno conhecido — celula sem tile nao
+        // e hex recusado, e ausencia de tabuleiro.
+        Tilemap boardMap = map != null ? map : observer.BoardTilemap;
+        var collected = new HashSet<Vector3Int>();
         PodeDetectarSensor.CollectVisibleCells(
             observer,
             map,
             terrainDatabase,
-            output,
+            collected,
             dpqAirHeightConfig,
             enableLosValidation,
             // Observador avancado designa CONTATO, nao mapa.
@@ -97,6 +103,15 @@ public static class PodeEnxergarSensor
             ignoreDetectSpecializations: true,
             useRangeOnlyForAirHighWhenConfigured: false,
             virtualObserverCell: virtualObserverCell);
+
+        foreach (Vector3Int rawCell in collected)
+        {
+            Vector3Int cell = rawCell;
+            cell.z = 0;
+            if (boardMap != null && !boardMap.HasTile(cell))
+                continue;
+            output.Add(cell);
+        }
     }
 
 }

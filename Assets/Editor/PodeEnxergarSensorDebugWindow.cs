@@ -553,6 +553,9 @@ public class PodeEnxergarSensorDebugWindow : EditorWindow
         {
             Vector3Int cell = rawCell;
             cell.z = 0;
+            // Fora da borda nao existe hexagono para enxergar.
+            if (map != null && !map.HasTile(cell))
+                continue;
 
             ResolveVirtualLayerForCell(
                 map,
