@@ -417,14 +417,14 @@ public partial class AIController
         }
 
         string simDetails = "";
-        if (TrySimulateAttackForAI(attacker, target, attackCell, out AIAttackSimulationSummary sim))
+        if (TrySimulateAttackForAI(attacker, target, attackCell, out CombatEvaluationResult sim))
         {
-            float damageScore = sim.targetDamage * 3000f;
-            float damagePctScore = sim.targetDamagePct * 80f;
-            float killScore = sim.result.killGuaranteed ? 12000f : 0f;
-            float survivalPenalty = sim.result.attackerSurvives ? 0f : 4000f;
+            float damageScore = sim.TargetDamage * 3000f;
+            float damagePctScore = sim.TargetDamagePercent * 80f;
+            float killScore = sim.Simulation.killGuaranteed ? 12000f : 0f;
+            float survivalPenalty = sim.Simulation.attackerSurvives ? 0f : 4000f;
             score += damageScore + damagePctScore + killScore - survivalPenalty;
-            simDetails = $" simDmg={sim.targetDamage} dmgPct={sim.targetDamagePct}% kill={sim.result.killGuaranteed} simScore={(damageScore + damagePctScore + killScore - survivalPenalty):F0}";
+            simDetails = $" simDmg={sim.TargetDamage} dmgPct={sim.TargetDamagePercent}% kill={sim.Simulation.killGuaranteed} simScore={(damageScore + damagePctScore + killScore - survivalPenalty):F0}";
         }
 
         ConstructionManager construction = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, targetCell);

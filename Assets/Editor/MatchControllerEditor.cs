@@ -244,6 +244,35 @@ public class MatchControllerEditor : Editor
             EditorGUILayout.PropertyField(fogStepPerfTopUnitsProp, new GUIContent("Fog Step Perf Top Units"));
         }
 
+        EditorGUILayout.Space(4f);
+        EditorGUILayout.LabelField("Rodada 0", EditorStyles.miniBoldLabel);
+        EditorGUILayout.HelpBox(
+            match.DescribeRoundZeroFogBake() + "\n" +
+            "O bake so muda por este botao. Pintar, remover ou mover unidades " +
+            "na Scene nao recalcula o FOW automaticamente.",
+            MessageType.None);
+        using (new EditorGUI.DisabledScope(Application.isPlaying))
+        {
+            if (GUILayout.Button("Cozinhar FOW da Rodada 0", GUILayout.Height(26f)))
+            {
+                serializedObject.ApplyModifiedProperties();
+                Undo.RecordObject(match, "Cozinhar FOW da Rodada 0");
+                bool cooked = match.TryCookRoundZeroFogForAllSlots(out string bakeResult);
+                if (cooked)
+                {
+                    EditorUtility.SetDirty(match);
+                    UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(
+                        match.gameObject.scene);
+                    Debug.Log($"[FoW][RoundZeroBake] {bakeResult}", match);
+                }
+                else
+                {
+                    Debug.LogError($"[FoW][RoundZeroBake] {bakeResult}", match);
+                }
+                serializedObject.Update();
+            }
+        }
+
         EditorGUILayout.Space();
         EditorGUILayout.LabelField("Victory Overlay", EditorStyles.boldLabel);
         if (allowDefeatForZeroUnitsProp != null)

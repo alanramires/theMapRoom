@@ -1,7 +1,7 @@
 using UnityEngine;
 
 /// <summary>
-/// Simulador de combate para uso exclusivo da IA.
+/// Simulador de combate consultivo usado pela IA e pelas ferramentas de auditoria.
 /// Estima o resultado de um duelo (HP restante de cada lado) usando a mesma formula
 /// da Matriz de HP, sem aplicar dano real ao jogo.
 /// Pode receber DPQ real das posicoes para aproximar a decisao do combate resolvido.

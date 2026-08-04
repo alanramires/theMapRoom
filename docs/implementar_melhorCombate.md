@@ -3,23 +3,31 @@
 Documento de trabalho. A investigação preliminar é do auditor; esta versão
 acrescenta **verificação no código**, cinco ajustes e a ordem de execução.
 
-Nada foi alterado no código para escrever isto.
+**Estado atual:** etapas 1, 2, 3, 4 e 5 implementadas. O `Attack Decision` já produz
+resultado estruturado mantendo o wrapper booleano, e o DPQ de posição já possui
+resolver geral fora do Capturer. O `CombatEvaluationService` já simula uma opção
+canônica do `PodeMirar` e aplica as preferências de `Attack Decision` sem depender
+do `AIController`. O `MelhorCombateService` já agrega origens, células e alvos
+sem consumidor runtime. `Tools > Hotzone > Melhor Combate` expõe os rankings no
+Scene View e no painel. O MVP terminou aqui para validação visual antes de qualquer
+migração de consumidor runtime.
 
 ---
 
-## 0. O que foi verificado
+## 0. O que foi verificado antes da implementação
 
-Quatro afirmações da investigação foram conferidas no código. **As quatro são
-verdadeiras**, e uma é mais grave do que estava descrita.
+Quatro afirmações da investigação foram conferidas no código de partida. **As
+quatro eram verdadeiras**, e uma era mais grave do que estava descrita. Os dois
+últimos itens abaixo registram a linha de base que as etapas 1 e 2 já corrigiram.
 
 ```csharp
 // Batches.cs:106 — nenhum parametro de arma
 BuildAttackBatch(unit, team, from, to, targetId, targetCell, paths)
 
-// AttackDecision.cs:167 — devolve bool e descarta o resto
+// AttackDecision.cs:167 — antes devolvia bool e descartava o resto
 private bool PassesAttackDecision(...)
 
-// Capturer.Attack.cs:691 — logica geral agachada em arquivo de papel
+// Capturer.Attack.cs:691 — antes mantinha logica geral em arquivo de papel
 private PositionDpqForAttackDecision ResolveDpqForAttackDecision(Vector3Int cell)
 ```
 
@@ -98,18 +106,20 @@ multi-arma, e ninguém percebe até uma unidade escolher mal.
 **recusa-se a ranquear alternativas** enquanto o batch não carregar
 `weaponIndex`. Limitação alta e visível, não implícita.
 
-### 2.2 O passo 3 deve ser o passo 1
+### 2.2 ✅ O passo 3 virou o passo 1 e está concluído
 
 Transformar `Attack Decision` em resultado estruturado é o item **mais barato e
 mais valioso** da lista:
 
-- **`SimulationUnavailable` hoje se disfarça de `Allowed`.** Um ataque aprovado
-  *porque a simulação falhou* é indistinguível de um aprovado de verdade;
+- **`SimulationUnavailable` se disfarçava de `Allowed`.** Agora o fallback ainda
+  aprova para preservar comportamento, mas retorna status próprio e deixa de ser
+  indistinguível de uma aprovação simulada;
 - é a armadilha do **gate inaplicável**, que já custou tempo aqui: todo gate
   precisa separar *"não satisfeito"* de *"impossível/desconhecido"*;
 - é refactor puro, com wrapper booleano, **zero mudança de comportamento**.
 
-Diagnóstico imediato, risco nulo. Não deve esperar dois passos.
+O wrapper `PassesAttackDecision` preserva todos os consumidores e as mesmas
+strings de diagnóstico. Nenhum papel precisou ser migrado nesta etapa.
 
 ### 2.3 Falta o `HexEvaluator` na lista de migração
 
@@ -304,10 +314,16 @@ reinventar quanto vale uma eliminação**.
 Independente do resto, duas peças são refactor puro e melhoram a pasta
 `Capturer/` sem mudar comportamento:
 
-| extrair | de onde | ganho |
-|---|---|---|
-| resolver geral de DPQ de posição | `Capturer.Attack.cs:691` | tira lógica geral do maior arquivo da pasta (899 linhas) |
-| avaliador puro de um combate | espalhado | base do `CombatEvaluationService` |
+| estado | extrair | de onde | ganho |
+|---|---|---|---|
+| ✅ | resolver geral de DPQ de posição | `Capturer.Attack.cs:691` | tirou lógica geral do maior arquivo da pasta e criou `PositionDpqResolver` |
+| ✅ | avaliador puro de um combate | antes espalhado no `AIController` | criou `CombatEvaluationService`, compartilhável por runtime e Edit Mode |
+
+O serviço separa explicitamente a opção canônica retornada pelo `PodeMirar` do
+fallback automático antigo. O futuro `MelhorCombate` não autoriza fallback: se
+não recebeu uma opção canônica, não promete uma arma que o executor talvez não
+use. O fallback permanece apenas no adaptador legado do `AIController`, para esta
+extração não alterar comportamento existente.
 
 Sobre o `UnitCounterEvaluator`: a ressalva da investigação procede — ele avalia
 fichas em HP máximo, escolhe arma sozinho e não trabalha com a opção exata do
@@ -361,6 +377,19 @@ para talvez atirar na próxima rodada?"*. Útil, e não é esta ferramenta.
 O `CombatResult` do MVP lista `AttackDecisionStatus`, `AttackerDpq` e
 `DefenderDpq`. Isso **exige** os três primeiros refactors.
 
+**Os três já estão concluídos.** `CombatEvaluationOutcome` reúne a simulação de
+HP/arma/DPQ e o `AttackDecisionResult` de um combate específico. A etapa 4 pode
+agregar — e agora agrega — esses resultados por célula e alvo, sem reimplementar
+a fórmula.
+
+O agregador mantém `StationaryRanking` e `MobileRanking` separados, devolve a
+melhor opção de cada célula por máximo (nunca soma), registra rejeições do
+`PodeMirar` e expõe `CombatRankKey` junto do comparador canônico. O modo Auto usa
+`preferArtilleryModeBeforeCombatant` para escolher qual ranking tentar primeiro,
+sem transformar a preferência de modo em peso de combate. Alternativas de arma
+do mesmo alvo são ignoradas: só a primeira opção canônica que o executor usaria
+é avaliada.
+
 E o passo 2 é obrigatório por motivo técnico, não estético:
 
 ```csharp
@@ -370,8 +399,10 @@ private PositionDpqForAttackDecision ResolveDpqForAttackDecision(Vector3Int cell
     if (aiDpqByCell.TryGetValue(cell, out ...))
 ```
 
-Um serviço **não consegue chamar isto**. O MVP força a extração — e com ela
-entrega limpeza do maior arquivo da pasta `Capturer/` de graça.
+Um serviço **não conseguia chamar isto**. A etapa 2 extraiu a precedência
+construção → estrutura → terreno, o fallback entre tilemaps e o DPQ aéreo por
+altura para `PositionDpqResolver`. O cache continua no AIController, preservando
+o custo e a invalidação que já existiam.
 
 ### A ferramenta é o pagamento do passo 1
 
@@ -380,14 +411,90 @@ exiba o status**. A ferramenta exibe. Passo 1 + ferramenta é o menor incremento
 que se justifica sozinho — e é a primeira vez que `SimulationUnavailable` deixa
 de se disfarçar de `Allowed`.
 
-### ⚠️ Esta ferramenta é runtime-only
+### A ferramenta deve funcionar no Scene:Edit Mode e no runtime
 
-Diferente das outras `Melhor*`, que têm caminho de edit-mode. Combate depende de
-**HP atual, munição carregada e DPQ da posição** — em edit-mode nada disso
-existe, e o resultado seria ficha em HP máximo.
+> **Correção de uma premissa anterior deste documento.** Uma versão anterior
+> afirmava que HP atual, munição carregada e estado de movimento não existiam no
+> Edit Mode. Isso é falso: esses dados pertencem à instância de `UnitManager` e
+> são serializados na Scene.
 
-É exatamente o defeito pelo qual o `UnitCounterEvaluator` foi rejeitado como nota
-runtime. Não construa o caminho de edição: ele seria enganoso, não incompleto.
+Verificado em `UnitManager.cs` e `UnitManagerEditor.cs`:
+
+| estado da instância | origem usada pela ferramenta |
+|---|---|
+| HP atual | `UnitManager.CurrentHP` / slider **Current HP** |
+| autonomia atual | `UnitManager.CurrentFuel` / slider **Current Fuel** |
+| movimento restante | `UnitManager.RemainingMovementPoints` / slider **Movement Remaining** |
+| munição da arma | `embarkedWeaponsRuntime[].squadAmmunition` / campo **Ammo / Attacks Remaining** |
+| arma e alcance atuais | `embarkedWeaponsRuntime` da própria instância |
+| DPQ da posição simulada | construção → estrutura → terreno da célula avaliada |
+
+Portanto, a Scene já é um **cenário tático simulável**. O autor pode ajustar HP,
+autonomia e munição das peças no Inspector, selecionar uma unidade e auditar qual
+combate ela prefere sem entrar em Play Mode. Isso é parte central do propósito da
+ferramenta, não um fallback aproximado.
+
+Os dois contextos compartilham o mesmo núcleo de avaliação e diferem somente na
+fonte do tabuleiro observável:
+
+| contexto | contrato |
+|---|---|
+| **Scene:Edit Mode** | lê o bake persistente da rodada 0, cozido manualmente para todos os slots pelo botão do `MatchController`; pintar, remover ou mover peças não dispara recálculo. Um modo experimental explícito pode montar uma fotografia temporária somente ao apertar **Calcular**, sem sobrescrever o bake |
+| **Runtime** | lê o estado vivo das instâncias e recebe uma cópia dos contatos inimigos visíveis já publicados no snapshot confirmado do slot; a mesma lista é reutilizada em todas as origens e o `PodeMirar` não percorre o tabuleiro nem consulta visibilidade novamente |
+
+O `PodeMirarSensor` já possui coleta própria para Edit Mode e aceita uma célula
+hipotética de origem. O `MelhorCombate` deve reutilizar esse caminho; não deve
+substituí-lo por uma comparação entre fichas em HP máximo.
+
+No Scene:Edit, `FogKnowledgeSnapshotBuilder` é executado pelo comando manual
+**Cozinhar FOW da Rodada 0** do `MatchController`. O comando processa todos os
+slots como uma única transação e persiste na Scene as células geográficas,
+cobertura de sensor, conhecimento por camada, contatos e contribuidores, além
+das contribuições por fonte no formato validável pelo runtime. A receita usa
+`CollectVisibleCellsForFogOfWar` por unidade; raio geográfico das construções
+com sensor apenas no próprio hex; especializações de visão por camada; e
+`PodeDetectar` sem observador avançado para formar os contatos do slot.
+
+O bake **não** é invalidado nem refeito por `OnValidate`, spawners, pintura,
+seleção ou pela janela Melhor Combate. Se a Scene mudou desde o último bake, a
+ferramenta apenas informa que a fotografia está antiga e continua respeitando a
+escolha autoral. Para experiências, a opção **Experimento: recalcular FOW** cria
+uma fotografia efêmera no momento do cálculo e nunca escreve no `MatchController`.
+
+Uma origem móvel hipotética pode melhorar a linha de tiro contra um contato já
+cozido, mas não pode descobrir e atacar outro alvo na mesma ação. O `PodeMirar`
+continua sendo dono de LoS, LdT e `forwardObserver` para autorizar o disparo.
+
+Esse snapshot offline não representa exploração histórica: `KnownCells` quer
+dizer **conhecido na rodada 0 no instante do bake**. O cozimento manual não pinta
+tilemap, não publica eventos e não escreve memória ou `AIIntelLedger`. A
+assinatura da Scene é diagnóstica; diferença de assinatura nunca aciona um novo
+cozimento.
+
+Ao iniciar uma partida, o `MatchController` tenta restaurar as contribuições de
+todos os slots antes do primeiro `ApplyActiveTeamIfChanged`. Hashes, checksums e
+identidade das fontes são validados. Um bake incompatível é rejeitado sem ser
+sobrescrito, e o runtime segue pelo fallback normal de FOW para preservar a
+correção da partida.
+
+Autonomia não altera diretamente o dano simulado, mas participa da viabilidade e
+do custo para alcançar uma origem de ataque. HP e munição entram diretamente no
+combate. Movimento restante limita as origens disponíveis quando a consulta pede
+o estado atual da instância.
+
+Nos dois contextos a consulta é **pura e transacional**: não move peças, não
+consome movimento, autonomia ou munição, não aplica dano e não atualiza FOW,
+detecção, caches confirmados ou `HasActed`. Uma origem hipotética existe apenas
+na requisição e no resultado visual da ferramenta.
+
+No runtime não existe fallback dinâmico para percepção. O `MatchController`
+fornece um `FogKnowledgeSnapshot` por
+`TryCopyConfirmedFogKnowledgeSnapshotForSlot`, copiando o snapshot já publicado.
+Se ele ainda não existe para o slot selecionado, a janela interrompe a consulta
+e pede que se aguarde a publicação em `Neutral`; ela não chama `PodeDetectar`,
+não refresca FOW e não usa a posição provisória.
+`MelhorCombateRequest.TargetCandidates` recebe os contatos uma vez, e todas as
+origens hipotéticas compartilham a mesma lista no runtime e no Scene:Edit.
 
 ### ⚠️ A ordem do score é PROPOSTA, e diverge do que a IA faz hoje
 
@@ -411,6 +518,16 @@ não um bug da ferramenta.
 Não "parece certo". Três fichas × os modos que cada uma suporta, com o painel
 explicando **todo combate bloqueado**:
 
+- [ ] os mesmos valores serializados de HP, munição e autonomia produzem o mesmo
+      resultado no Scene:Edit Mode e no runtime, quando FOW não remove candidatos
+- [ ] alterar HP ou munição de uma instância pelo `UnitManagerEditor` muda a
+      simulação sem alterar a ficha `UnitData`
+- [ ] esgotar a munição da arma preferida (ex.: roofgun do tanque contra
+      infantaria) faz o `PodeMirar` rejeitá-la por munição, promove a próxima
+      arma executável (ex.: canhão) e a ferramenta exibe o resultado ruim dessa
+      arma — sem fingir que a roofgun ainda dispararia
+- [ ] executar a ferramenta no Edit Mode não altera nenhum estado serializado da
+      Scene e não marca a Scene como modificada
 - [ ] Artilharia (parado) — alvos ordenados, e a zona morta de alcance mínimo não
       aparece como alvo
 - [ ] Soldado (mover e atacar) — bolinha por célula, linha da célula ao melhor
@@ -427,12 +544,12 @@ explicando **todo combate bloqueado**:
 
 | quando | o quê | risco |
 |---|---|---|
-| **1** | `Attack Decision` → resultado estruturado + wrapper booleano | refactor puro |
-| **2** | extrair o resolver geral de DPQ | refactor puro |
-| **3** | extrair o avaliador canônico de um combate | refactor puro |
+| **1 ✅** | `Attack Decision` → resultado estruturado + wrapper booleano | concluído; comportamento preservado |
+| **2 ✅** | extrair o resolver geral de DPQ | concluído; comportamento e cache preservados |
+| **3 ✅** | extrair o avaliador canônico de um combate | concluído; `AIController` virou adaptador |
 | — | **decisão do autor sobre os dois campos ambíguos** (§2.4) | não é código |
-| **4** | `MelhorCombate` como **consulta apenas**, sem consumidor | sem risco runtime |
-| **5** | ferramenta `Tools > Hotzone > Melhor Combate` | valida antes de migrar |
+| **4 ✅** | `MelhorCombate` como **consulta apenas**, sem consumidor | concluído; nenhum consumidor runtime |
+| **5 ✅** | ferramenta `Tools > Hotzone > Melhor Combate` | implementada; aguarda validação visual do autor |
 | ══ | **FIM DO MVP — parar aqui e testar visualmente** | ══ |
 | **6** | migrar **um** consumidor simples | primeiro risco real |
 | **7** | comparar ranking antigo × novo nos logs | **é aqui que o tempo vai** |
@@ -460,7 +577,7 @@ validado). Podem andar juntos.
 ```text
 PodeMirar        diz "pode"
 simulação        diz "o que acontece"
-Attack Decision  diz "aceito"      ← hoje joga fora tudo menos o bool
+Attack Decision  diz "aceito"      ← resultado estruturado; wrapper legado ainda entrega bool
 MelhorCombate    diz "entre todas as células e combates aceitos,
                   estes são os melhores segundo a ficha"
 o papel          diz "por que este combate interessa à missão"

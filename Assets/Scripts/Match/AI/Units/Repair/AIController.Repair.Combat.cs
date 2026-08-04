@@ -53,8 +53,8 @@ public partial class AIController
                 ConstructionManager enemyBldg = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, enemyCell);
                 bool enemyOnOwnBuilding = enemyBldg != null && enemyBldg.SlotIndex == snapshot.AISlotIndex;
                 float targetPriority = AttackTargetPriority(enemyCell, cell);
-                bool hasSim = TrySimulateAttackForAI(unit, enemy, cell, out AIAttackSimulationSummary simSummary);
-                if (hasSim && simSummary.targetDamage <= 0)
+                bool hasSim = TrySimulateAttackForAI(unit, enemy, cell, out CombatEvaluationResult simSummary);
+                if (hasSim && simSummary.TargetDamage <= 0)
                     continue;
 
                 float combatScore = 0f;
@@ -62,16 +62,16 @@ public partial class AIController
                 if (hasSim)
                 {
                     combatScore =
-                        simSummary.targetDamagePct * 650f
-                        + simSummary.targetDamage * 120f
-                        - simSummary.attackerLossPct * 520f
-                        - simSummary.attackerLoss * 80f
-                        + (simSummary.result.killGuaranteed ? 18000f : 0f)
-                        + (simSummary.result.attackerSurvives ? 2500f : -8000f);
+                        simSummary.TargetDamagePercent * 650f
+                        + simSummary.TargetDamage * 120f
+                        - simSummary.AttackerLossPercent * 520f
+                        - simSummary.AttackerLoss * 80f
+                        + (simSummary.Simulation.killGuaranteed ? 18000f : 0f)
+                        + (simSummary.Simulation.attackerSurvives ? 2500f : -8000f);
 
-                    PositionDpqForAttackDecision attackerDpq = ResolveDpqForAttackDecision(unit, cell);
-                    PositionDpqForAttackDecision defenderDpq = ResolveDpqForAttackDecision(enemy, enemyCell);
-                    simDetails = $"sim dmg={simSummary.targetDamagePct}% loss={simSummary.attackerLossPct}% hp={simSummary.attackerHpBefore}->{simSummary.result.attackerHpAfter} target={simSummary.targetHpBefore}->{simSummary.result.defenderHpAfter} dpq={attackerDpq.points}/{defenderDpq.points} def={attackerDpq.defenseBonus}/{defenderDpq.defenseBonus} kill={simSummary.result.killGuaranteed} survive={simSummary.result.attackerSurvives}";
+                    PositionDpqResult attackerDpq = ResolveDpqForAttackDecision(unit, cell);
+                    PositionDpqResult defenderDpq = ResolveDpqForAttackDecision(enemy, enemyCell);
+                    simDetails = $"sim dmg={simSummary.TargetDamagePercent}% loss={simSummary.AttackerLossPercent}% hp={simSummary.AttackerHpBefore}->{simSummary.Simulation.attackerHpAfter} target={simSummary.TargetHpBefore}->{simSummary.Simulation.defenderHpAfter} dpq={attackerDpq.Points}/{defenderDpq.Points} def={attackerDpq.DefenseBonus}/{defenderDpq.DefenseBonus} kill={simSummary.Simulation.killGuaranteed} survive={simSummary.Simulation.attackerSurvives}";
                 }
 
                 float score = combatScore

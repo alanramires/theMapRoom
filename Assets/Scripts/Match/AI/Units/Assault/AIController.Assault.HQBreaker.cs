@@ -476,8 +476,8 @@ public partial class AIController
                 int targetElite = enemy.TryGetUnitData(out UnitData enemyUd) && enemyUd != null
                     ? Mathf.Max(0, enemyUd.eliteLevel)
                     : 0;
-                bool hasSim = TrySimulateAttackForAI(unit, enemy, cell, out AIAttackSimulationSummary simSummary);
-                if (hasSim && simSummary.targetDamage <= 0)
+                bool hasSim = TrySimulateAttackForAI(unit, enemy, cell, out CombatEvaluationResult simSummary);
+                if (hasSim && simSummary.TargetDamage <= 0)
                     continue;
 
                 float combatScore = 0f;
@@ -485,19 +485,19 @@ public partial class AIController
                 if (hasSim)
                 {
                     combatScore =
-                        simSummary.targetDamagePct * 700f
-                        + simSummary.targetDamage * 130f
-                        - simSummary.attackerLossPct * 620f
-                        - simSummary.attackerLoss * 100f
-                        + (simSummary.result.killGuaranteed ? 22000f : 0f)
-                        + (simSummary.result.attackerSurvives ? 2500f : -10000f);
+                        simSummary.TargetDamagePercent * 700f
+                        + simSummary.TargetDamage * 130f
+                        - simSummary.AttackerLossPercent * 620f
+                        - simSummary.AttackerLoss * 100f
+                        + (simSummary.Simulation.killGuaranteed ? 22000f : 0f)
+                        + (simSummary.Simulation.attackerSurvives ? 2500f : -10000f);
 
-                    if (simSummary.attackerLossPct >= 75 && !simSummary.result.killGuaranteed && !inOwnConstruction)
+                    if (simSummary.AttackerLossPercent >= 75 && !simSummary.Simulation.killGuaranteed && !inOwnConstruction)
                         combatScore -= 14000f;
 
-                    PositionDpqForAttackDecision attackerDpq = ResolveDpqForAttackDecision(unit, cell);
-                    PositionDpqForAttackDecision defenderDpq = ResolveDpqForAttackDecision(enemy, enemyCell);
-                    simDetails = $"sim dmg={simSummary.targetDamagePct}% loss={simSummary.attackerLossPct}% hp={simSummary.attackerHpBefore}->{simSummary.result.attackerHpAfter} target={simSummary.targetHpBefore}->{simSummary.result.defenderHpAfter} dpq={attackerDpq.points}/{defenderDpq.points} def={attackerDpq.defenseBonus}/{defenderDpq.defenseBonus} kill={simSummary.result.killGuaranteed} survive={simSummary.result.attackerSurvives}";
+                    PositionDpqResult attackerDpq = ResolveDpqForAttackDecision(unit, cell);
+                    PositionDpqResult defenderDpq = ResolveDpqForAttackDecision(enemy, enemyCell);
+                    simDetails = $"sim dmg={simSummary.TargetDamagePercent}% loss={simSummary.AttackerLossPercent}% hp={simSummary.AttackerHpBefore}->{simSummary.Simulation.attackerHpAfter} target={simSummary.TargetHpBefore}->{simSummary.Simulation.defenderHpAfter} dpq={attackerDpq.Points}/{defenderDpq.Points} def={attackerDpq.DefenseBonus}/{defenderDpq.DefenseBonus} kill={simSummary.Simulation.killGuaranteed} survive={simSummary.Simulation.attackerSurvives}";
                 }
                 // enemyHqDist penalises enemies far from their HQ (advancing enemies).
                 // If they are on OUR building, distance to their HQ is irrelevant — skip the penalty.

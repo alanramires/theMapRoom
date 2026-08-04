@@ -962,16 +962,16 @@ public partial class AIController
                     unit,
                     enemy,
                     cell,
-                    out AIAttackSimulationSummary simSummary))
+                    out CombatEvaluationResult simSummary))
             {
                 combatScore =
-                    (simSummary.result.killGuaranteed ? 26000f : 0f)
-                    + simSummary.targetDamagePct * 420f
-                    + simSummary.targetDamage * 1100f
-                    - simSummary.attackerLossPct * 260f
-                    - simSummary.attackerLoss * 900f;
+                    (simSummary.Simulation.killGuaranteed ? 26000f : 0f)
+                    + simSummary.TargetDamagePercent * 420f
+                    + simSummary.TargetDamage * 1100f
+                    - simSummary.AttackerLossPercent * 260f
+                    - simSummary.AttackerLoss * 900f;
                 combatScoreReason =
-                    $" combatScore={combatScore:F0} kill={simSummary.result.killGuaranteed} dmg={simSummary.targetDamage}/{simSummary.targetDamagePct}% loss={simSummary.attackerLoss}/{simSummary.attackerLossPct}%";
+                    $" combatScore={combatScore:F0} kill={simSummary.Simulation.killGuaranteed} dmg={simSummary.TargetDamage}/{simSummary.TargetDamagePercent}% loss={simSummary.AttackerLoss}/{simSummary.AttackerLossPercent}%";
             }
 
             Vector3Int enemyCell = enemy.CurrentCellPosition;

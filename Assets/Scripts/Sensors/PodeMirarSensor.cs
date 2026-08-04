@@ -2,6 +2,20 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Tilemaps;
 
+/// <summary>
+/// Percepcao ja confirmada pelo FOW para uma consulta projetada. Quando
+/// fornecida, o PodeMirar nao reabre PodeDetectar/PodeEnxergar para descobrir
+/// novamente os mesmos contatos e observadores em cada origem hipotetica.
+/// As regras fisicas do tiro continuam pertencendo ao sensor.
+/// </summary>
+public sealed class PodeMirarPerceptionSnapshot
+{
+    public System.Predicate<UnitManager> IsTargetDetected;
+    public System.Func<UnitManager, IReadOnlyList<UnitManager>>
+        ResolveDetectionContributors;
+    public System.Predicate<UnitManager> IsObservedByConstruction;
+}
+
 public static class PodeMirarSensor
 {
     private const float ObservationLosGrazeEpsilon = 0.05f;
@@ -63,7 +77,9 @@ public static class PodeMirarSensor
         bool enableSpotter = true,
         bool enableStealthValidation = true,
         bool respectTotalWarVisibility = true,
-        Vector3Int? fromCell = null)
+        Vector3Int? fromCell = null,
+        IReadOnlyList<UnitManager> targetCandidates = null,
+        PodeMirarPerceptionSnapshot perceptionSnapshot = null)
     {
         if (output == null)
             return false;
@@ -145,7 +161,7 @@ public static class PodeMirarSensor
         string attackerPositionLabel = ResolveUnitPositionLabel(map, terrainDatabase, attacker, origin);
 
         int sensorOrderCounter = 0;
-        List<UnitManager> units = CollectUnitsForSensor();
+        IReadOnlyList<UnitManager> units = targetCandidates ?? CollectUnitsForSensor();
         for (int i = 0; i < units.Count; i++)
         {
             UnitManager target = units[i];
@@ -338,14 +354,22 @@ public static class PodeMirarSensor
                     bool requiresForwardObserver = distance > 1 && enableLosValidation && enableSpotter && distance > attackerObservationRange;
                     if (requiresForwardObserver)
                     {
-                        if (!TryFindForwardObserverForIndirectFire(
+                        bool foundObserver = perceptionSnapshot != null
+                            ? TryResolveForwardObserverFromSnapshot(
+                                perceptionSnapshot,
+                                attacker,
+                                target,
+                                out UnitManager longRangeObserver,
+                                out forwardObserverCandidates)
+                            : TryFindForwardObserverForIndirectFire(
                                 attacker,
                                 target,
                                 map,
                                 terrainDatabase,
                                 dpqAirHeightConfig,
-                                out UnitManager longRangeObserver,
-                                enableLosValidation))
+                                out longRangeObserver,
+                                enableLosValidation);
+                        if (!foundObserver)
                         {
                             AppendInvalid(
                                 invalidOutput,
@@ -383,6 +407,14 @@ public static class PodeMirarSensor
                             {
                                 shooterSeesTarget = true;
                             }
+                            else if (perceptionSnapshot != null)
+                            {
+                                shooterSeesTarget =
+                                    IsObserverInPerceptionSnapshot(
+                                        perceptionSnapshot,
+                                        attacker,
+                                        target);
+                            }
                             else if (distance <= attackerObservationRange)
                             {
                                 shooterSeesTarget = HasValidStraightObservationLine(
@@ -401,14 +433,21 @@ public static class PodeMirarSensor
 
                             if (!shooterSeesTarget)
                             {
-                                allowParabolic = TryFindForwardObserverForIndirectFire(
-                                    attacker,
-                                    target,
-                                    map,
-                                    terrainDatabase,
-                                    dpqAirHeightConfig,
-                                    out UnitManager indirectObserver,
-                                    enableLosValidation);
+                                allowParabolic = perceptionSnapshot != null
+                                    ? TryResolveForwardObserverFromSnapshot(
+                                        perceptionSnapshot,
+                                        attacker,
+                                        target,
+                                        out UnitManager indirectObserver,
+                                        out forwardObserverCandidates)
+                                    : TryFindForwardObserverForIndirectFire(
+                                        attacker,
+                                        target,
+                                        map,
+                                        terrainDatabase,
+                                        dpqAirHeightConfig,
+                                        out indirectObserver,
+                                        enableLosValidation);
                                 if (allowParabolic)
                                 {
                                     usedForwardObserver = true;
@@ -439,8 +478,16 @@ public static class PodeMirarSensor
                     }
                 }
 
+                bool targetDetected = perceptionSnapshot != null
+                    ? perceptionSnapshot.IsTargetDetected == null
+                      || perceptionSnapshot.IsTargetDetected(target)
+                    : IsTargetDetectableByAttacker(
+                        attacker,
+                        target,
+                        map,
+                        terrainDatabase);
                 if (enableStealthValidation && !usedForwardObserver &&
-                    !IsTargetDetectableByAttacker(attacker, target, map, terrainDatabase))
+                    !targetDetected)
                 {
                     AppendInvalid(
                         invalidOutput,
@@ -469,7 +516,7 @@ public static class PodeMirarSensor
                 GameUnitClass targetClass = ResolveUnitClass(target);
                 WeaponCategory weaponCategory = weapon.WeaponCategory;
                 bool preferredTarget = EvaluateWeaponPriority(weaponPriorityData, weaponCategory, targetClass);
-                if (usedForwardObserver)
+                if (usedForwardObserver && perceptionSnapshot == null)
                     forwardObserverCandidates = CollectForwardObserversForTarget(attacker, target, map, terrainDatabase, dpqAirHeightConfig, enableLosValidation);
 
                 output.Add(new PodeMirarTargetOption
@@ -1006,6 +1053,76 @@ public static class PodeMirarSensor
 
         observer = observers[0];
         return true;
+    }
+
+    private static bool TryResolveForwardObserverFromSnapshot(
+        PodeMirarPerceptionSnapshot snapshot,
+        UnitManager attacker,
+        UnitManager target,
+        out UnitManager observer,
+        out List<UnitManager> candidates)
+    {
+        observer = null;
+        candidates = new List<UnitManager>();
+        if (snapshot == null || attacker == null || target == null)
+            return false;
+
+        IReadOnlyList<UnitManager> contributors =
+            snapshot.ResolveDetectionContributors != null
+                ? snapshot.ResolveDetectionContributors(target)
+                : null;
+        if (contributors != null)
+        {
+            for (int i = 0; i < contributors.Count; i++)
+            {
+                UnitManager contributor = contributors[i];
+                if (contributor == null
+                    || contributor == attacker
+                    || contributor.IsDead
+                    || contributor.IsEmbarked
+                    || !contributor.gameObject.activeInHierarchy
+                    || !PlayerSlotRelations.AreAllies(contributor, attacker)
+                    || candidates.Contains(contributor))
+                {
+                    continue;
+                }
+                candidates.Add(contributor);
+            }
+        }
+
+        candidates.Sort((a, b) => a.InstanceId.CompareTo(b.InstanceId));
+        if (candidates.Count > 0)
+        {
+            observer = candidates[0];
+            return true;
+        }
+
+        return snapshot.IsObservedByConstruction != null
+            && snapshot.IsObservedByConstruction(target);
+    }
+
+    private static bool IsObserverInPerceptionSnapshot(
+        PodeMirarPerceptionSnapshot snapshot,
+        UnitManager observer,
+        UnitManager target)
+    {
+        if (snapshot?.ResolveDetectionContributors == null
+            || observer == null
+            || target == null)
+        {
+            return false;
+        }
+
+        IReadOnlyList<UnitManager> contributors =
+            snapshot.ResolveDetectionContributors(target);
+        if (contributors == null)
+            return false;
+        for (int i = 0; i < contributors.Count; i++)
+        {
+            if (contributors[i] == observer)
+                return true;
+        }
+        return false;
     }
 
     private static bool TryFindForwardObserverForVirtualCell(

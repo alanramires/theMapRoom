@@ -409,8 +409,8 @@ public partial class AIController
                 targetCell.z = 0;
                 BazookaTargetPriority targetPreference = ResolveAssaultTargetPreference(unit, opt.targetUnit);
                 float targetPreferenceScore = GetAssaultTargetPreferenceScore(targetPreference) * 2f;
-                bool hasSim = TrySimulateAttackForAI(unit, opt.targetUnit, cell, out AIAttackSimulationSummary simSummary);
-                if (hasSim && simSummary.targetDamage <= 0)
+                bool hasSim = TrySimulateAttackForAI(unit, opt.targetUnit, cell, out CombatEvaluationResult simSummary);
+                if (hasSim && simSummary.TargetDamage <= 0)
                     continue;
 
                 float combatScore = 0f;
@@ -418,19 +418,19 @@ public partial class AIController
                 if (hasSim)
                 {
                     combatScore =
-                        (simSummary.result.killGuaranteed ? 24000f : 0f)
-                        + simSummary.targetDamagePct * 650f
-                        + simSummary.targetDamage * 140f
-                        - simSummary.attackerLossPct * 520f
-                        - simSummary.attackerLoss * 180f
-                        + (simSummary.result.attackerSurvives ? 2500f : -10000f);
+                        (simSummary.Simulation.killGuaranteed ? 24000f : 0f)
+                        + simSummary.TargetDamagePercent * 650f
+                        + simSummary.TargetDamage * 140f
+                        - simSummary.AttackerLossPercent * 520f
+                        - simSummary.AttackerLoss * 180f
+                        + (simSummary.Simulation.attackerSurvives ? 2500f : -10000f);
 
-                    if (simSummary.attackerLossPct >= 75 && !simSummary.result.killGuaranteed)
+                    if (simSummary.AttackerLossPercent >= 75 && !simSummary.Simulation.killGuaranteed)
                         combatScore -= 14000f;
 
-                    PositionDpqForAttackDecision attackerDpq = ResolveDpqForAttackDecision(unit, cell);
-                    PositionDpqForAttackDecision defenderDpq = ResolveDpqForAttackDecision(opt.targetUnit, targetCell);
-                    simDetails = $"sim dmg={simSummary.targetDamage}/{simSummary.targetDamagePct}% loss={simSummary.attackerLoss}/{simSummary.attackerLossPct}% hp={simSummary.attackerHpBefore}->{simSummary.result.attackerHpAfter} target={simSummary.targetHpBefore}->{simSummary.result.defenderHpAfter} dpq={attackerDpq.points}/{defenderDpq.points} def={attackerDpq.defenseBonus}/{defenderDpq.defenseBonus} kill={simSummary.result.killGuaranteed} survive={simSummary.result.attackerSurvives}";
+                    PositionDpqResult attackerDpq = ResolveDpqForAttackDecision(unit, cell);
+                    PositionDpqResult defenderDpq = ResolveDpqForAttackDecision(opt.targetUnit, targetCell);
+                    simDetails = $"sim dmg={simSummary.TargetDamage}/{simSummary.TargetDamagePercent}% loss={simSummary.AttackerLoss}/{simSummary.AttackerLossPercent}% hp={simSummary.AttackerHpBefore}->{simSummary.Simulation.attackerHpAfter} target={simSummary.TargetHpBefore}->{simSummary.Simulation.defenderHpAfter} dpq={attackerDpq.Points}/{defenderDpq.Points} def={attackerDpq.DefenseBonus}/{defenderDpq.DefenseBonus} kill={simSummary.Simulation.killGuaranteed} survive={simSummary.Simulation.attackerSurvives}";
                 }
 
                 float score =

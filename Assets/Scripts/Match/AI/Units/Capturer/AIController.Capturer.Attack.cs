@@ -10,8 +10,8 @@ public partial class AIController
     private UnitManager aiThreatEnvelopeUnit;
     private UnitThreatEnvelope aiThreatEnvelope;
     private bool aiThreatEnvelopeResolved;
-    private readonly Dictionary<Vector3Int, PositionDpqForAttackDecision> aiDpqByCell =
-        new Dictionary<Vector3Int, PositionDpqForAttackDecision>();
+    private readonly Dictionary<Vector3Int, PositionDpqResult> aiDpqByCell =
+        new Dictionary<Vector3Int, PositionDpqResult>();
 
     private void PrepareAIThreatEnvelope(UnitManager unit)
     {
@@ -684,91 +684,31 @@ public partial class AIController
         if (boardTilemap == null || terrainDatabase == null) return 0f;
         cell.z = 0;
 
-        PositionDpqForAttackDecision dpq = ResolveDpqForAttackDecision(cell);
-        return dpq.points;
+        PositionDpqResult dpq = ResolveDpqForAttackDecision(cell);
+        return dpq.Points;
     }
 
-    private PositionDpqForAttackDecision ResolveDpqForAttackDecision(Vector3Int cell)
+    private PositionDpqResult ResolveDpqForAttackDecision(Vector3Int cell)
     {
         cell.z = 0;
-        if (aiDpqByCell.TryGetValue(cell, out PositionDpqForAttackDecision cached))
+        if (aiDpqByCell.TryGetValue(cell, out PositionDpqResult cached))
             return cached;
 
-        PositionDpqForAttackDecision resolved = ResolveDpqForAttackDecisionUncached(cell);
+        PositionDpqResult resolved = PositionDpqResolver.Resolve(cell, boardTilemap, terrainDatabase);
         aiDpqByCell[cell] = resolved;
         return resolved;
     }
 
-    private PositionDpqForAttackDecision ResolveDpqForAttackDecisionUncached(Vector3Int cell)
+    private PositionDpqResult ResolveDpqForAttackDecision(UnitManager unit, Vector3Int cell)
     {
-        cell.z = 0;
+        DPQAirHeightConfig airHeightConfig = turnStateManager != null
+            ? turnStateManager.DpqAirHeightConfigRef
+            : null;
 
-        if (boardTilemap == null || terrainDatabase == null)
-            return PositionDpqForAttackDecision.None;
-
-        ConstructionManager construction = ConstructionOccupancyRules.GetConstructionAtCell(boardTilemap, cell);
-        if (construction != null && !construction.IsForwardObserverSpot
-            && construction.TryResolveConstructionData(out ConstructionData constructionData)
-            && constructionData != null
-            && constructionData.dpqData != null)
-        {
-            return new PositionDpqForAttackDecision(constructionData.dpqData.Pontos, constructionData.dpqData.DefesaBonus);
-        }
-
-        StructureData structure = StructureOccupancyRules.GetStructureAtCell(boardTilemap, cell);
-        if (structure != null && structure.dpqData != null)
-            return new PositionDpqForAttackDecision(structure.dpqData.Pontos, structure.dpqData.DefesaBonus);
-
-        TileBase tile = boardTilemap.GetTile(cell);
-        if (tile != null && terrainDatabase.TryGetByPaletteTile(tile, out TerrainTypeData data) && data?.dpqData != null)
-            return new PositionDpqForAttackDecision(data.dpqData.Pontos, data.dpqData.DefesaBonus);
-
-        GridLayout grid = boardTilemap.layoutGrid;
-        if (grid != null)
-        {
-            Tilemap[] maps = grid.GetComponentsInChildren<Tilemap>(includeInactive: true);
-            for (int i = 0; i < maps.Length; i++)
-            {
-                Tilemap map = maps[i];
-                if (map == null || map == boardTilemap)
-                    continue;
-
-                TileBase other = map.GetTile(cell);
-                if (other != null && terrainDatabase.TryGetByPaletteTile(other, out TerrainTypeData otherData) && otherData?.dpqData != null)
-                    return new PositionDpqForAttackDecision(otherData.dpqData.Pontos, otherData.dpqData.DefesaBonus);
-            }
-        }
-
-        return PositionDpqForAttackDecision.None;
-    }
-
-    private PositionDpqForAttackDecision ResolveDpqForAttackDecision(UnitManager unit, Vector3Int cell)
-    {
-        if (unit != null
-            && unit.GetDomain() == Domain.Air
-            && turnStateManager != null
-            && turnStateManager.DpqAirHeightConfigRef != null
-            && turnStateManager.DpqAirHeightConfigRef.TryGetFor(unit.GetDomain(), unit.GetHeightLevel(), out DPQData airDpq)
-            && airDpq != null)
-        {
-            return new PositionDpqForAttackDecision(airDpq.Pontos, airDpq.DefesaBonus);
-        }
+        if (PositionDpqResolver.TryResolveUnitLayer(unit, airHeightConfig, out PositionDpqResult layerDpq))
+            return layerDpq;
 
         return ResolveDpqForAttackDecision(cell);
-    }
-
-    private readonly struct PositionDpqForAttackDecision
-    {
-        public static PositionDpqForAttackDecision None => new PositionDpqForAttackDecision(0, 0);
-
-        public readonly int points;
-        public readonly int defenseBonus;
-
-        public PositionDpqForAttackDecision(int points, int defenseBonus)
-        {
-            this.points = Mathf.Max(0, points);
-            this.defenseBonus = defenseBonus;
-        }
     }
 
     private static bool IsBetterAttackCandidate(

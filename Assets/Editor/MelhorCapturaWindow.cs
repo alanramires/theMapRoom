@@ -24,6 +24,7 @@ public sealed class MelhorCapturaWindow : EditorWindow
     private string status = "Selecione um capturador em campo.";
     private Vector2 scroll;
     private GUIStyle listStyle;
+    private MatchController matchController;
 
     [MenuItem("Tools/Hotzone/Melhor Captura")]
     public static void Open() =>
@@ -56,10 +57,9 @@ public sealed class MelhorCapturaWindow : EditorWindow
             "A permissão é toda do PodeCapturar — a ferramenta não lê skill, " +
             "não compara time e não conhece plano. O setor aqui é só um filtro " +
             "sobre o conjunto de candidatas.\n\n" +
-            "A névoa vem desligada: ela não é regra de captura, é recorte do " +
-            "que o time enxerga, e cruzar isso com o alcance é trabalho da IA. " +
-            "Ligada, a consulta deixa de responder 'vale a pena ir descobrir " +
-            "aquilo?', porque o alvo some antes de receber nota.",
+            "A névoa vem desligada. Ligada, ela separa o que pode ser capturado " +
+            "agora do objetivo conhecido que ainda precisa ser revelado. O " +
+            "segundo continua no ranking como captura da próxima rodada.",
             MessageType.Info);
 
         EditorGUI.BeginChangeCheck();
@@ -89,19 +89,31 @@ public sealed class MelhorCapturaWindow : EditorWindow
             TryUseSelection(silent: false);
         if (GUILayout.Button("Auto Detect"))
             AutoDetect();
+        if (GUILayout.Button("Limpar"))
+            ClearEvaluation();
+        using (new EditorGUI.DisabledScope(
+                   Application.isPlaying || matchController == null))
+        {
+            if (GUILayout.Button("Cozinhar FOW 0"))
+                CookRoundZeroFog();
+        }
         EditorGUILayout.EndHorizontal();
 
         EditorGUILayout.LabelField(
             "Filtros do sensor (a ferramenta passa tudo por padrão)",
             EditorStyles.miniBoldLabel);
         applyFogOfWar = EditorGUILayout.Toggle(
-            "  Aplicar névoa", applyFogOfWar);
+            new GUIContent(
+                "  Aplicar névoa",
+                "No Edit Mode usa o bake manual da rodada 0 para o slot da " +
+                "unidade. No runtime usa o snapshot confirmado do mesmo slot."),
+            applyFogOfWar);
         skipConstructionsWithCapturer = EditorGUILayout.Toggle(
             new GUIContent(
-                "  Descartar com capturador",
-                "Desligado, a construção continua pontuada e o ocupante sai " +
-                "reportado na linha. A IA já é atraída pelo capturador que " +
-                "chegou — o fato basta, o veredito é dela."),
+                "  Descartar capturador no máximo",
+                "Só descarta quando existe capturador sobre a construção e " +
+                "os pontos atuais já estão no máximo. Abaixo do máximo ela " +
+                "está em disputa e continua no ranking para reconquista."),
             skipConstructionsWithCapturer);
 
         drawRejected = EditorGUILayout.Toggle(
@@ -176,11 +188,21 @@ public sealed class MelhorCapturaWindow : EditorWindow
         }
 
         EditorGUILayout.HelpBox(
-            "Âmbar: o alvo vencedor. Verde/azul/laranja: Tactical, " +
+            "Âmbar: alvo vencedor capturável agora. Verde/azul/laranja: Tactical, " +
             "Operational e fora do envelope. Anel branco: já tem capturador " +
-            "em cima. Cinza: recusada, com o motivo no hex.\n" +
+            "em cima. Roxo: objetivo conhecido para aproximação; a névoa " +
+            "impede capturar nesta rodada. Anel âmbar: o roxo é o vencedor. " +
+            "Cinza: recusas, com o motivo no hex.\n" +
             "Clique numa linha para abrir as parcelas e destacá-la na cena.",
             MessageType.None);
+
+        if (result.best != null)
+        {
+            EditorGUILayout.HelpBox(
+                "Saídas do melhor alvo:\n" +
+                BuildPositionsText(result.best, numbered: true),
+                MessageType.None);
+        }
 
         scroll = EditorGUILayout.BeginScrollView(scroll);
         for (int i = 0; i < result.ranking.Count; i++)
@@ -199,6 +221,10 @@ public sealed class MelhorCapturaWindow : EditorWindow
                     $"{name} {alvo.cell} | custo={alvo.effectiveCost} " +
                     $"turnos={(alvo.turnsToCapture >= 0 ? alvo.turnsToCapture.ToString() : "∞")} " +
                     $"pontos={alvo.displayScore}" +
+                    (alvo.blockedByFog ? " | PRÓXIMA RODADA (NÉVOA)" : string.Empty) +
+                    (alvo.visibilityContributors.Count > 0
+                        ? $" | SPOTTER x{alvo.visibilityContributors.Count}"
+                        : string.Empty) +
                     (alvo.capturerOnCell != null ? " | ⛳" : string.Empty),
                     EditorStyles.miniButton))
             {
@@ -209,6 +235,9 @@ public sealed class MelhorCapturaWindow : EditorWindow
 
             if (!isSelected)
                 continue;
+            EditorGUILayout.LabelField(
+                BuildPositionsText(alvo, numbered: true),
+                ResolveListStyle());
             EditorGUILayout.LabelField(alvo.reason, ResolveListStyle());
             EditorGUILayout.ObjectField(
                 "   Construção",
@@ -305,6 +334,36 @@ public sealed class MelhorCapturaWindow : EditorWindow
         AutoDetect();
         selected = null;
         List<ConstructionManager> constructions = CollectConstructions();
+        FogKnowledgeSnapshot fogKnowledge = null;
+        string fogReason = string.Empty;
+        if (applyFogOfWar)
+        {
+            if (matchController == null)
+            {
+                result = null;
+                status = "MatchController indisponivel para consultar a nevoa.";
+                return;
+            }
+
+            PlayerSlotId observerSlot = PlayerSlotId.FromIndex(unit.SlotIndex);
+            bool copied = Application.isPlaying
+                ? matchController.TryCopyConfirmedFogKnowledgeSnapshotForSlot(
+                    observerSlot,
+                    tilemap,
+                    out fogKnowledge,
+                    out fogReason)
+                : matchController.TryCopyRoundZeroFogKnowledgeSnapshotForSlot(
+                    observerSlot,
+                    tilemap,
+                    out fogKnowledge,
+                    out fogReason);
+            if (!copied || fogKnowledge == null)
+            {
+                result = null;
+                status = fogReason;
+                return;
+            }
+        }
 
         // O setor é FILTRO sobre o conjunto, não conhecimento de plano: o
         // serviço recebe "estas construções", nunca "o setor C".
@@ -328,12 +387,21 @@ public sealed class MelhorCapturaWindow : EditorWindow
             subStep = subStep,
             constructions = constructions,
             includeConstruction = sectorGate,
-            matchController = Application.isPlaying
-                ? FindFirstObjectByType<MatchController>()
-                : null,
+            matchController = matchController,
             applyFogOfWar = applyFogOfWar,
+            isCellActionVisible = fogKnowledge != null
+                ? cell => fogKnowledge.GeographicallyVisibleCells.Contains(cell)
+                : null,
+            isUnitVisible = fogKnowledge != null
+                ? target => fogKnowledge.IsEnemyVisible(target)
+                : null,
+            resolveVisibilityContributors = fogKnowledge != null
+                ? cell => ResolveVisibilityContributors(fogKnowledge, cell)
+                : null,
             skipConstructionsWithCapturer = skipConstructionsWithCapturer,
-            diagnosticLog = message => status = message
+            diagnosticLog = message => status = applyFogOfWar
+                ? message + " | " + fogReason
+                : message
         });
 
         SceneView.RepaintAll();
@@ -371,6 +439,8 @@ public sealed class MelhorCapturaWindow : EditorWindow
 
     private void AutoDetect()
     {
+        if (matchController == null)
+            matchController = FindAnyObjectByType<MatchController>();
         if (unit != null && unit.BoardTilemap != null)
             tilemap = unit.BoardTilemap;
         if (terrainDatabase != null)
@@ -382,6 +452,50 @@ public sealed class MelhorCapturaWindow : EditorWindow
                 AssetDatabase.LoadAssetAtPath<TerrainDatabase>(
                     AssetDatabase.GUIDToAssetPath(guids[0]));
         }
+    }
+
+    private void CookRoundZeroFog()
+    {
+        if (Application.isPlaying)
+        {
+            status = "O FOW da rodada 0 so pode ser cozido no Edit Mode.";
+            return;
+        }
+        if (matchController == null)
+            matchController = FindAnyObjectByType<MatchController>();
+        if (matchController == null)
+        {
+            status = "MatchController nao encontrado na Scene.";
+            return;
+        }
+
+        Undo.RecordObject(matchController, "Cozinhar FOW da Rodada 0");
+        if (!matchController.TryCookRoundZeroFogForAllSlots(out string bakeResult))
+        {
+            status = bakeResult;
+            Debug.LogError($"[FoW][RoundZeroBake] {bakeResult}", matchController);
+            return;
+        }
+
+        EditorUtility.SetDirty(matchController);
+        UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(
+            matchController.gameObject.scene);
+        result = null;
+        selected = null;
+        status = bakeResult + " O Melhor Captura usara este bake na proxima consulta.";
+        SceneView.RepaintAll();
+        Debug.Log($"[FoW][RoundZeroBake] {bakeResult}", matchController);
+    }
+
+    private void ClearEvaluation()
+    {
+        result = null;
+        selected = null;
+        status = unit != null
+            ? $"Unidade: {unit.name}. Resultado limpo."
+            : "Resultado limpo.";
+        Repaint();
+        SceneView.RepaintAll();
     }
 
     private void TryUseSelection(bool silent)
@@ -409,15 +523,18 @@ public sealed class MelhorCapturaWindow : EditorWindow
         if (result == null || unit == null || tilemap == null)
             return;
 
-        // Recusadas primeiro, para o campeão desenhar por cima delas.
+        // Recusadas primeiro, para os alvos pontuados desenharem por cima.
         if (drawRejected)
         {
-            Handles.color = new Color(0.45f, 0.45f, 0.45f, 0.75f);
             for (int i = 0; i < result.rejected.Count; i++)
             {
                 MelhorCapturaReject reject = result.rejected[i];
                 Vector3 cell = tilemap.GetCellCenterWorld(reject.cell);
-                Handles.DrawSolidDisc(cell, Vector3.back, 0.18f);
+                Handles.color = new Color(0.45f, 0.45f, 0.45f, 0.75f);
+                Handles.DrawSolidDisc(
+                    cell,
+                    Vector3.back,
+                    0.18f);
                 Handles.Label(
                     cell,
                     ShortenReason(reject.reason),
@@ -433,10 +550,21 @@ public sealed class MelhorCapturaWindow : EditorWindow
             // Clicou na lista, manda na cena: o selecionado assume o destaque
             // do campeão, que é como se compara "por que este e não aquele".
             bool champion = selected != null ? alvo == selected : i == 0;
-            Handles.color = champion
-                ? new Color(1f, 0.75f, 0.05f, 0.95f)
-                : ResolveTierColor(alvo.tier);
+            Color targetColor = alvo.blockedByFog
+                ? new Color(0.72f, 0.32f, 1f, 0.92f)
+                : champion
+                    ? new Color(1f, 0.75f, 0.05f, 0.95f)
+                    : ResolveTierColor(alvo.tier);
+            Handles.color = targetColor;
             Handles.DrawSolidDisc(to, Vector3.back, champion ? 0.32f : 0.24f);
+            // Roxo preserva o significado "captura futura". O anel âmbar
+            // informa que, apesar disso, ele ganhou o ranking e o tracejado.
+            if (champion && alvo.blockedByFog)
+            {
+                Handles.color = new Color(1f, 0.75f, 0.05f, 0.95f);
+                Handles.DrawWireDisc(to, Vector3.back, 0.39f);
+                Handles.color = targetColor;
+            }
             // Anel branco = já tem capturador em cima. O alvo continua na
             // lista; o anel é o fato, não a exclusão.
             if (alvo.capturerOnCell != null)
@@ -444,19 +572,103 @@ public sealed class MelhorCapturaWindow : EditorWindow
                 Handles.color = Color.white;
                 Handles.DrawWireDisc(
                     to, Vector3.back, champion ? 0.38f : 0.30f);
-                Handles.color = champion
-                    ? new Color(1f, 0.75f, 0.05f, 0.95f)
-                    : ResolveTierColor(alvo.tier);
+                Handles.color = targetColor;
             }
             // Só o campeão ganha linha: com dezenas de candidatas o resto vira
             // teia e esconde exatamente o que a ferramenta quer mostrar.
             if (champion)
+            {
                 Handles.DrawDottedLine(from, to, 4f);
+                DrawVisibilityContributorLines(alvo, to);
+            }
             Handles.Label(
                 to,
-                $"{alvo.displayScore}\n{ResolveTierTag(alvo.tier)} R{alvo.effectiveCost}",
-                ScoreLabelStyle(Color.black, champion ? 14 : 12));
+                champion
+                    ? BuildPositionsText(alvo, numbered: false) + "\n" +
+                      $"{alvo.displayScore} {ResolveTierTag(alvo.tier)} R{alvo.effectiveCost}"
+                    : $"{alvo.displayScore}\n{ResolveTierTag(alvo.tier)} R{alvo.effectiveCost}",
+                ScoreLabelStyle(
+                    alvo.blockedByFog ? Color.white : Color.black,
+                    champion ? 14 : 12));
         }
+    }
+
+    private void DrawVisibilityContributorLines(
+        MelhorCapturaAlvoScore alvo,
+        Vector3 targetWorld)
+    {
+        if (alvo == null || alvo.visibilityContributors.Count == 0)
+            return;
+
+        Handles.color = new Color(1f, 0.8f, 0.1f, 1f);
+        for (int i = 0; i < alvo.visibilityContributors.Count; i++)
+        {
+            UnitManager observer = alvo.visibilityContributors[i];
+            if (observer == null || !observer.gameObject.activeInHierarchy)
+                continue;
+
+            Vector3Int observerCell = observer.CurrentCellPosition;
+            observerCell.z = 0;
+            Vector3 observerWorld = tilemap.GetCellCenterWorld(observerCell);
+            if (Vector3.Distance(observerWorld, targetWorld) <= 0.0001f)
+                continue;
+
+            Handles.DrawDottedLine(observerWorld, targetWorld, 4f);
+            Handles.SphereHandleCap(
+                0,
+                observerWorld,
+                Quaternion.identity,
+                0.10f,
+                EventType.Repaint);
+            Handles.Label(
+                Vector3.Lerp(observerWorld, targetWorld, 0.5f)
+                    + new Vector3(0.08f, -0.08f, 0f),
+                $"SPOTTER: {ResolveUnitLabel(observer)}",
+                ScoreLabelStyle(new Color(1f, 0.85f, 0.2f)));
+        }
+    }
+
+    private static IReadOnlyList<UnitManager> ResolveVisibilityContributors(
+        FogKnowledgeSnapshot snapshot,
+        Vector3Int cell)
+    {
+        if (snapshot != null
+            && snapshot.TryGetVisibilityContributors(
+                cell,
+                out IReadOnlyList<UnitManager> contributors))
+        {
+            return contributors;
+        }
+        return System.Array.Empty<UnitManager>();
+    }
+
+    private static string ResolveUnitLabel(UnitManager observer)
+    {
+        if (observer == null)
+            return "?";
+        return string.IsNullOrWhiteSpace(observer.UnitDisplayName)
+            ? observer.name
+            : observer.UnitDisplayName;
+    }
+
+    private static string BuildPositionsText(
+        MelhorCapturaAlvoScore alvo,
+        bool numbered)
+    {
+        if (alvo == null || alvo.positions.Count == 0)
+            return "sem saídas";
+
+        var lines = new List<string>(alvo.positions.Count);
+        for (int i = 0; i < alvo.positions.Count; i++)
+        {
+            MelhorCapturaPosition position = alvo.positions[i];
+            if (position == null || string.IsNullOrWhiteSpace(position.text))
+                continue;
+            lines.Add(numbered
+                ? $"{i + 1}. {position.text}"
+                : position.text);
+        }
+        return string.Join("\n", lines);
     }
 
     /// <summary>Cabe num hex; o motivo inteiro fica na lista da janela.</summary>

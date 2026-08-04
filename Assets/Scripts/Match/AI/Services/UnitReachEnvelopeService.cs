@@ -389,6 +389,13 @@ public sealed class UnitReachRequest
     public bool EnableLos = true;
     public bool EnableSpotter = true;
 
+    /// <summary>
+    /// Consumidor quer somente as origens de movimento e avaliara os alvos
+    /// reais depois. Evita construir a zona virtual de tiro — e procurar
+    /// spotters nela — para um resultado que sera descartado.
+    /// </summary>
+    public bool CombatMovementOriginsOnly;
+
     // Embarque.
     public UnitManager EmbarkPassenger;
 
@@ -1673,7 +1680,8 @@ public static class UnitReachEnvelopeService
         int keyHash = BuildKeyHash(
             unit, map, movementSteps,
             request.EnableLdt, request.EnableLos, request.EnableSpotter,
-            request.IncludeMovementCosts, subStep);
+            request.IncludeMovementCosts, subStep,
+            request.CombatMovementOriginsOnly);
         if (Cache.TryGetValue(cacheIndex, out CacheEntry existing)
             && existing != null
             && existing.KeyHash == keyHash
@@ -1702,7 +1710,7 @@ public static class UnitReachEnvelopeService
         var costByCell = new Dictionary<Vector3Int, int>();
         var origins = new Dictionary<Vector3Int, ReachOrigin>();
 
-        if (includeStatic)
+        if (includeStatic && !request.CombatMovementOriginsOnly)
         {
             PodeMirarSensor.CollectValidFireCellsFromOrigin(
                 unit, map, request.TerrainDatabase, SensorMovementMode.MoveuParado,
@@ -1752,41 +1760,44 @@ public static class UnitReachEnvelopeService
             }
 
             var localThreat = new HashSet<Vector3Int>();
-            foreach (Vector3Int moveCell in movementCells)
+            if (!request.CombatMovementOriginsOnly)
             {
-                // Nao pular celulas de movimento que caiam dentro do staticThreat: uma
-                // coisa e a celula estar no alcance parado, outra e tudo que se atinge
-                // DE LA ja estar coberto. Numa hibrida (min 1 / max 2) o tiro pos-movimento
-                // colapsa para alcance 1, entao a partir de uma celula na borda do alcance
-                // parado ela alcanca alvos que o tiro parado nao alcanca. Pular aqui abria
-                // um buraco no envelope e o CanAct barrava o ataque antes do sensor:
-                // a artilheira combatente parava ao lado do alvo sem atirar.
-                localThreat.Clear();
-                PodeMirarSensor.CollectValidFireCellsFromOrigin(
-                    unit, map, request.TerrainDatabase, SensorMovementMode.MoveuAndando,
-                    moveCell, localThreat, request.DpqAirHeightConfig,
-                    request.EnableLdt, request.EnableLos, request.EnableSpotter);
-                foreach (Vector3Int rawTarget in localThreat)
+                foreach (Vector3Int moveCell in movementCells)
                 {
-                    Vector3Int target = rawTarget;
-                    target.z = 0;
-                    if (map.GetTile(target) == null)
-                        continue;
-                    mobileThreat.Add(target);
-                    // O tiro nao custa MP: EnterCost = 0 e o resto e o que
-                    // sobrou ao chegar em moveCell. Guarda a origem mais barata,
-                    // que e a resposta a "de onde eu atiro nesse alvo".
-                    if (!origins.TryGetValue(target, out ReachOrigin known)
-                        || ResolveKnownCost(costByCell, moveCell)
-                           < ResolveKnownCost(costByCell, known.FromCell))
+                    // Nao pular celulas de movimento que caiam dentro do staticThreat: uma
+                    // coisa e a celula estar no alcance parado, outra e tudo que se atinge
+                    // DE LA ja estar coberto. Numa hibrida (min 1 / max 2) o tiro pos-movimento
+                    // colapsa para alcance 1, entao a partir de uma celula na borda do alcance
+                    // parado ela alcanca alvos que o tiro parado nao alcanca. Pular aqui abria
+                    // um buraco no envelope e o CanAct barrava o ataque antes do sensor:
+                    // a artilheira combatente parava ao lado do alvo sem atirar.
+                    localThreat.Clear();
+                    PodeMirarSensor.CollectValidFireCellsFromOrigin(
+                        unit, map, request.TerrainDatabase, SensorMovementMode.MoveuAndando,
+                        moveCell, localThreat, request.DpqAirHeightConfig,
+                        request.EnableLdt, request.EnableLos, request.EnableSpotter);
+                    foreach (Vector3Int rawTarget in localThreat)
                     {
-                        origins[target] = new ReachOrigin(
-                            moveCell,
-                            Mathf.Max(
-                                0,
-                                movementSteps
-                                - ResolveKnownCost(costByCell, moveCell)),
-                            0);
+                        Vector3Int target = rawTarget;
+                        target.z = 0;
+                        if (map.GetTile(target) == null)
+                            continue;
+                        mobileThreat.Add(target);
+                        // O tiro nao custa MP: EnterCost = 0 e o resto e o que
+                        // sobrou ao chegar em moveCell. Guarda a origem mais barata,
+                        // que e a resposta a "de onde eu atiro nesse alvo".
+                        if (!origins.TryGetValue(target, out ReachOrigin known)
+                            || ResolveKnownCost(costByCell, moveCell)
+                               < ResolveKnownCost(costByCell, known.FromCell))
+                        {
+                            origins[target] = new ReachOrigin(
+                                moveCell,
+                                Mathf.Max(
+                                    0,
+                                    movementSteps
+                                    - ResolveKnownCost(costByCell, moveCell)),
+                                0);
+                        }
                     }
                 }
             }
@@ -1834,7 +1845,8 @@ public static class UnitReachEnvelopeService
             Diagnostic =
                 $"orçamento={movementSteps}; movimento={movementCells.Count}; " +
                 $"ação={attackable.Count} (anel de tiro={lineCells.Count}); " +
-                $"subetapa={subStep}"
+                $"subetapa={subStep}; " +
+                $"somenteOrigens={request.CombatMovementOriginsOnly}"
         };
         Cache[cacheIndex] = new CacheEntry { KeyHash = keyHash, Envelope = envelope };
         return envelope;
@@ -1936,7 +1948,8 @@ public static class UnitReachEnvelopeService
         bool enableLos,
         bool enableSpotter,
         bool includeMovementCosts,
-        ReachSubStep subStep)
+        ReachSubStep subStep,
+        bool combatMovementOriginsOnly)
     {
         unchecked
         {
@@ -1959,6 +1972,7 @@ public static class UnitReachEnvelopeService
             hash = hash * 31 + (enableSpotter ? 1 : 0);
             hash = hash * 31 + (includeMovementCosts ? 1 : 0);
             hash = hash * 31 + (int)subStep;
+            hash = hash * 31 + (combatMovementOriginsOnly ? 1 : 0);
 
             IReadOnlyList<UnitEmbarkedWeapon> weapons = unit.GetEmbarkedWeapons();
             int count = weapons != null ? weapons.Count : 0;

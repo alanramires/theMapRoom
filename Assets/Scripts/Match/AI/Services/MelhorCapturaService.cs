@@ -15,6 +15,40 @@ public enum MelhorCapturaTier
     BeyondOperational
 }
 
+public enum MelhorCapturaPositionKind
+{
+    Arrival,
+    ImmediateAction,
+    Eligibility
+}
+
+public enum MelhorCapturaPositionStatus
+{
+    TacticalEmpty,
+    TacticalOccupied,
+    OperationalEmpty,
+    OperationalOccupied,
+    BeyondOperationalEmpty,
+    BeyondOperationalOccupied,
+    CannotCaptureFog,
+    CanEngageVisibleEnemy,
+    FogAllowsAction,
+    EligibleCapture,
+    EligibleRecapture
+}
+
+/// <summary>
+/// Um fato ordenado do alvo. O consumidor le status/relatedUnit; text e apenas
+/// a traducao humana usada pela ferramenta.
+/// </summary>
+public sealed class MelhorCapturaPosition
+{
+    public MelhorCapturaPositionKind kind;
+    public MelhorCapturaPositionStatus status;
+    public string text;
+    public UnitManager relatedUnit;
+}
+
 /// <summary>
 /// Uma construcao classificada para UMA unidade. E um fato da consulta, nao uma
 /// ordem para ir capturar.
@@ -72,6 +106,34 @@ public sealed class MelhorCapturaAlvoScore
     public int displayScore;
     public float score;
     public string reason;
+
+    /// <summary>
+    /// O alvo e conhecido estrategicamente e passou por todas as regras do
+    /// PodeCapturar, mas a fotografia de FOW ainda nao permite materializar a
+    /// captura nesta rodada. Ele continua no ranking: e um destino valido de
+    /// aproximacao para revelar agora e capturar depois.
+    /// </summary>
+    public bool blockedByFog;
+
+    /// <summary>
+    /// Outras unidades do slot que abriram o hex nesta fotografia. Sao fatos
+    /// do FOW, nao candidatos recalculados; por isso a propria unidade avaliada
+    /// nao entra nesta lista.
+    /// </summary>
+    public readonly List<UnitManager> visibilityContributors =
+        new List<UnitManager>();
+
+    public bool destinationOccupied;
+    public bool canStopAtDestination;
+    public UnitManager blockingOccupant;
+    public UnitManager visibleEnemyOccupant;
+
+    /// <summary>
+    /// Com FOW aplicado: chegada, acao imediata, elegibilidade. Sem FOW: a
+    /// posicao intermediaria e omitida, restando chegada e elegibilidade.
+    /// </summary>
+    public readonly List<MelhorCapturaPosition> positions =
+        new List<MelhorCapturaPosition>();
 }
 
 public sealed class MelhorCapturaReject
@@ -140,20 +202,35 @@ public sealed class MelhorCapturaRequest
     public MatchController matchController;
 
     /// <summary>
-    /// A CONSULTA PASSA TUDO. Desligado por padrao: nevoa nao e regra de
-    /// captura, e recorte do que o time enxerga, e cruzar o alcance com o que
-    /// se conhece e trabalho de quem organiza. Uma consulta que ja chega
-    /// recortada nao consegue responder "vale a pena ir descobrir aquilo?",
-    /// porque o alvo sumiu antes de ser pontuado.
-    ///
-    /// Ligue para ver exatamente o que a nevoa cortaria — mesmo uso dos
-    /// `enable*` da Hotzone, que tambem nascem desligados.
+    /// Desligado por padrao: nevoa nao e regra de elegibilidade da captura.
+    /// Ligado, separa o que pode ser capturado agora do objetivo conhecido que
+    /// ainda precisa ser revelado. O segundo continua pontuado, porque a nevoa
+    /// bloqueia a acao presente, nao apaga o destino estrategico.
     /// </summary>
     public bool applyFogOfWar;
 
     /// <summary>
-    /// Remove da lista a construcao que ja tem um capturador em cima.
-    /// Desligado por padrao, pelo mesmo motivo da nevoa: e recorte, nao regra.
+    /// Fotografia de visibilidade ATUAL preparada pelo chamador para o slot da
+    /// unidade. Memoria de hex explorado nao basta: o predio pode continuar
+    /// conhecido como objetivo e ainda exigir spotting para agir nesta rodada.
+    /// Todas as demais regras continuam no sensor oficial.
+    /// </summary>
+    public Func<Vector3Int, bool> isCellActionVisible;
+
+    /// <summary>Visibilidade confirmada de ocupantes no snapshot do slot.</summary>
+    public Predicate<UnitManager> isUnitVisible;
+
+    /// <summary>
+    /// Consulta opcional dos observadores que ja abriram o hex na fotografia
+    /// fornecida. O servico apenas copia o dado; nunca recalcula visao.
+    /// </summary>
+    public Func<Vector3Int, IReadOnlyList<UnitManager>>
+        resolveVisibilityContributors;
+
+    /// <summary>
+    /// Remove da lista a construcao que ja tem um capturador em cima SOMENTE
+    /// quando os pontos atuais estao no maximo. Abaixo do maximo, a construcao
+    /// esta em disputa/captura e continua elegivel para reconquista.
     /// Ligado ou nao, o ocupante sempre sai reportado em `capturerOnCell` —
     /// o fato e da consulta, o veredito e de quem organiza.
     /// </summary>
@@ -300,11 +377,10 @@ public sealed class MelhorCapturaResult
 /// —, e todo capturador le o mesmo. Se voce precisa que a nota caia por causa
 /// de uma reserva ja feita, o canal e `evaluateAdjustment`, nao um filtro aqui.
 ///
-/// A NEVOA NAO E DAQUI. A consulta passa tudo: cruzar o resultado com o que o
-/// time enxerga, e descartar o que ele nao deveria saber, e trabalho de quem
-/// organiza. Recortar aqui destruiria a unica pergunta que so este servico
-/// responde — "vale a pena ir descobrir aquilo?" — porque o alvo sumiria antes
-/// de receber nota. Ver `applyFogOfWar`, que nasce desligado.
+/// A NEVOA NAO APAGA O ALVO. Quando o chamador fornece a fotografia de
+/// conhecimento, ela informa se a captura pode acontecer agora; um predio
+/// conhecido ainda coberto continua no ranking como destino de aproximacao.
+/// Ver `applyFogOfWar`, que nasce desligado.
 ///
 /// O ALCANCE NAO E DAQUI. As bandas Tactical e Operational vem do
 /// UnitReachEnvelopeService na intencao Capture. Fora das duas bandas o servico
@@ -444,6 +520,13 @@ public static class MelhorCapturaService
             Vector3Int cell = construction.CurrentCellPosition;
             cell.z = 0;
 
+            ResolveDestinationOccupancy(
+                request,
+                cell,
+                out bool destinationOccupied,
+                out UnitManager blockingOccupant,
+                out UnitManager visibleEnemyOccupant);
+
             // A BANDA VEM ANTES DO SENSOR, e a ordem importa.
             //
             // Classificar custa duas consultas de dicionario; perguntar ao
@@ -455,8 +538,10 @@ public static class MelhorCapturaService
                 AIActionReachCoordinator.CubicDistance(origin, cell);
             ResolveTier(
                 profile,
+                request.map,
                 cell,
                 cubic,
+                destinationOccupied,
                 out MelhorCapturaTier tier,
                 out int routeCost,
                 out int effectiveCost);
@@ -472,13 +557,21 @@ public static class MelhorCapturaService
 
             bool hasCapturer = TryFindCapturerOnCell(
                 request, cell, construction, out UnitManager occupant);
-            if (hasCapturer && request.skipConstructionsWithCapturer)
+            bool captureAtMaximum =
+                construction.CurrentCapturePoints
+                >= construction.CapturePointsMax;
+            if (hasCapturer
+                && request.skipConstructionsWithCapturer
+                && captureAtMaximum)
             {
                 Reject(
                     result,
                     construction,
                     cell,
-                    $"capturador em cima ({occupant.UnitDisplayName})");
+                    $"capturador em cima e captura no maximo " +
+                    $"({construction.CurrentCapturePoints}/" +
+                    $"{construction.CapturePointsMax}; " +
+                    $"{occupant.UnitDisplayName})");
                 continue;
             }
 
@@ -488,6 +581,15 @@ public static class MelhorCapturaService
             SensorMovementMode movementMode = cell == origin
                 ? SensorMovementMode.MoveuParado
                 : SensorMovementMode.MoveuAndando;
+            // A nevoa e um estado da ACAO, nao da elegibilidade do objetivo.
+            // Guardamos se a captura pode ser materializada agora e perguntamos
+            // ao sensor com apenas este recorte desligado. Assim o predio
+            // escondido ainda precisa passar por TODAS as outras regras do
+            // PodeCapturar antes de virar uma aproximacao futura.
+            bool blockedByFog =
+                request.applyFogOfWar
+                && request.isCellActionVisible != null
+                && !request.isCellActionVisible(cell);
             if (!PodeCapturarSensor.TryGetCaptureTargetAtCell(
                     unit,
                     request.map,
@@ -497,7 +599,7 @@ public static class MelhorCapturaService
                     out PodeCapturarSensor.CaptureOperationType operation,
                     out string sensorReason,
                     matchController,
-                    request.applyFogOfWar,
+                    request.applyFogOfWar && request.isCellActionVisible == null,
                     // A candidata ja esta na mao: sem isso o sensor varre a
                     // cena inteira para redescobri-la, uma vez por candidata.
                     construction))
@@ -556,8 +658,22 @@ public static class MelhorCapturaService
                 prerequisitePenalty = prerequisitePenalty,
                 remainingCapturePoints = remainingPoints,
                 turnsToCapture = turnsToCapture,
-                capturerOnCell = hasCapturer ? occupant : null
+                capturerOnCell = hasCapturer ? occupant : null,
+                blockedByFog = blockedByFog,
+                destinationOccupied = destinationOccupied,
+                canStopAtDestination =
+                    tier != MelhorCapturaTier.BeyondOperational
+                    && routeCost >= 0
+                    && !destinationOccupied,
+                blockingOccupant = blockingOccupant,
+                visibleEnemyOccupant = visibleEnemyOccupant
             };
+            BuildPositions(request, alvo);
+            CopyVisibilityContributors(
+                request,
+                unit,
+                cell,
+                alvo.visibilityContributors);
 
             int tierWeight = ResolveTierWeight(tier);
             int turnPenalty = Mathf.Max(0, turnsToCapture);
@@ -581,6 +697,9 @@ public static class MelhorCapturaService
                 $"faltam={remainingPoints} | " +
                 $"rota={(routeCost >= 0 ? routeCost.ToString() : "fora do envelope")} | " +
                 $"cúbica={cubic} | operacao={operation}" +
+                (alvo.blockedByFog
+                    ? " | consegue chegar, mas nao capturar nesta rodada (nevoa)"
+                    : string.Empty) +
                 (alvo.capturerOnCell != null
                     ? $" | capturador em cima={alvo.capturerOnCell.UnitDisplayName}"
                     : string.Empty);
@@ -612,10 +731,9 @@ public static class MelhorCapturaService
     /// habilitada, aliada ou nao. A habilitacao sai do sensor, nunca de leitura
     /// de skill aqui.
     ///
-    /// O resultado e informativo por padrao. Quem organiza ja e atraido pelo
-    /// capturador que chegou e sabe o que fazer com o fato; remover a
-    /// construcao da lista aqui esconderia dele uma coisa que ele ja sabia
-    /// tratar. Ver `skipConstructionsWithCapturer`.
+    /// O resultado e informativo por padrao. Mesmo com o descarte ligado, uma
+    /// construcao abaixo do maximo permanece na consulta: a perda de pontos e
+    /// justamente o fato que a torna candidata a reconquista.
     /// </summary>
     private static bool TryFindCapturerOnCell(
         MelhorCapturaRequest request,
@@ -659,8 +777,10 @@ public static class MelhorCapturaService
     /// </summary>
     private static void ResolveTier(
         UnitReachProfile profile,
+        Tilemap map,
         Vector3Int cell,
         int cubicDistance,
+        bool destinationOccupied,
         out MelhorCapturaTier tier,
         out int routeCost,
         out int effectiveCost)
@@ -675,6 +795,23 @@ public static class MelhorCapturaService
             return;
         }
 
+        // Ocupacao impede PARAR no predio, mas nao transforma uma chegada
+        // tatica em objetivo distante. Classifica pela melhor casa adjacente
+        // onde a unidade consegue terminar o movimento.
+        if (destinationOccupied
+            && TryResolveApproachCost(
+                profile?.Tactical,
+                map,
+                cell,
+                Mathf.Max(0, cubicDistance - 1),
+                out int tacticalApproachCost))
+        {
+            tier = MelhorCapturaTier.Tactical;
+            routeCost = tacticalApproachCost;
+            effectiveCost = tacticalApproachCost;
+            return;
+        }
+
         if (profile?.Operational != null
             && profile.Operational.CanAct(cell)
             && profile.Operational.TryGetCost(cell, out int operationalCost))
@@ -685,9 +822,58 @@ public static class MelhorCapturaService
             return;
         }
 
+        if (destinationOccupied
+            && TryResolveApproachCost(
+                profile?.Operational,
+                map,
+                cell,
+                Mathf.Max(0, cubicDistance - 1),
+                out int operationalApproachCost))
+        {
+            tier = MelhorCapturaTier.Operational;
+            routeCost = operationalApproachCost;
+            effectiveCost = operationalApproachCost;
+            return;
+        }
+
         tier = MelhorCapturaTier.BeyondOperational;
         routeCost = -1;
         effectiveCost = cubicDistance;
+    }
+
+    private static bool TryResolveApproachCost(
+        UnitReachEnvelope envelope,
+        Tilemap map,
+        Vector3Int occupiedCell,
+        int fallbackCost,
+        out int cost)
+    {
+        cost = -1;
+        if (envelope == null || map == null)
+            return false;
+
+        var neighbors = new List<Vector3Int>(6);
+        UnitMovementPathRules.GetImmediateHexNeighbors(
+            map,
+            occupiedCell,
+            neighbors);
+        bool reachable = false;
+        int best = int.MaxValue;
+        for (int i = 0; i < neighbors.Count; i++)
+        {
+            Vector3Int neighbor = neighbors[i];
+            neighbor.z = 0;
+            if (!envelope.CanReach(neighbor))
+                continue;
+            reachable = true;
+            if (envelope.TryGetCost(neighbor, out int neighborCost))
+                best = Mathf.Min(best, neighborCost);
+        }
+
+        if (!reachable)
+            return false;
+        cost = best != int.MaxValue ? best : fallbackCost;
+        return true;
     }
 
     /// <summary>
@@ -756,6 +942,128 @@ public static class MelhorCapturaService
         return idA.CompareTo(idB);
     }
 
+    private static void ResolveDestinationOccupancy(
+        MelhorCapturaRequest request,
+        Vector3Int cell,
+        out bool occupied,
+        out UnitManager blocker,
+        out UnitManager visibleEnemy)
+    {
+        occupied = UnitOccupancyRules.HasBlockingOccupantForUnitAtCell(
+            request.map,
+            cell,
+            request.unit);
+        blocker = null;
+        visibleEnemy = null;
+
+        List<UnitManager> occupants = UnitOccupancyRules.GetUnitsAtCell(
+            request.map,
+            cell,
+            request.unit);
+        for (int i = 0; i < occupants.Count; i++)
+        {
+            UnitManager occupant = occupants[i];
+            if (occupant == null || occupant.IsDead || occupant.IsEmbarked)
+                continue;
+            if (occupied && blocker == null)
+                blocker = occupant;
+            if (visibleEnemy == null
+                && PlayerSlotRelations.AreEnemies(request.unit, occupant)
+                && request.isUnitVisible != null
+                && request.isUnitVisible(occupant))
+            {
+                visibleEnemy = occupant;
+            }
+        }
+    }
+
+    private static void BuildPositions(
+        MelhorCapturaRequest request,
+        MelhorCapturaAlvoScore alvo)
+    {
+        if (request == null || alvo == null)
+            return;
+
+        bool recapture = alvo.operation
+            == PodeCapturarSensor.CaptureOperationType.RecoverAlly;
+        MelhorCapturaPositionStatus arrivalStatus;
+        string arrivalBand;
+        switch (alvo.tier)
+        {
+            case MelhorCapturaTier.Tactical:
+                arrivalBand = "no alcance tático";
+                arrivalStatus = alvo.destinationOccupied
+                    ? MelhorCapturaPositionStatus.TacticalOccupied
+                    : MelhorCapturaPositionStatus.TacticalEmpty;
+                break;
+            case MelhorCapturaTier.Operational:
+                arrivalBand = "no alcance operacional";
+                arrivalStatus = alvo.destinationOccupied
+                    ? MelhorCapturaPositionStatus.OperationalOccupied
+                    : MelhorCapturaPositionStatus.OperationalEmpty;
+                break;
+            default:
+                arrivalBand = "fora do alcance operacional";
+                arrivalStatus = alvo.destinationOccupied
+                    ? MelhorCapturaPositionStatus.BeyondOperationalOccupied
+                    : MelhorCapturaPositionStatus.BeyondOperationalEmpty;
+                break;
+        }
+        alvo.positions.Add(new MelhorCapturaPosition
+        {
+            kind = MelhorCapturaPositionKind.Arrival,
+            status = arrivalStatus,
+            text = $"chegada/ocupação: {arrivalBand}, prédio " +
+                   (alvo.destinationOccupied ? "ocupado" : "desocupado"),
+            relatedUnit = alvo.blockingOccupant
+        });
+
+        if (request.applyFogOfWar)
+        {
+            if (alvo.blockedByFog)
+            {
+                alvo.positions.Add(new MelhorCapturaPosition
+                {
+                    kind = MelhorCapturaPositionKind.ImmediateAction,
+                    status = MelhorCapturaPositionStatus.CannotCaptureFog,
+                    text = "fow/ação: encoberto pela névoa, spotting necessário"
+                });
+            }
+            else if (alvo.visibleEnemyOccupant != null)
+            {
+                alvo.positions.Add(new MelhorCapturaPosition
+                {
+                    kind = MelhorCapturaPositionKind.ImmediateAction,
+                    status = MelhorCapturaPositionStatus.CanEngageVisibleEnemy,
+                    text = "fow/ação: consegue engajar (inimigo visível no hex)",
+                    relatedUnit = alvo.visibleEnemyOccupant
+                });
+            }
+            else
+            {
+                alvo.positions.Add(new MelhorCapturaPosition
+                {
+                    kind = MelhorCapturaPositionKind.ImmediateAction,
+                    status = MelhorCapturaPositionStatus.FogAllowsAction,
+                    text = recapture
+                        ? "fow/ação: local visível, reconquista liberada"
+                        : "fow/ação: local visível, captura liberada"
+                });
+            }
+        }
+
+        alvo.positions.Add(new MelhorCapturaPosition
+        {
+            kind = MelhorCapturaPositionKind.Eligibility,
+            status = recapture
+                ? MelhorCapturaPositionStatus.EligibleRecapture
+                : MelhorCapturaPositionStatus.EligibleCapture,
+            text = recapture
+                ? "cap/reconquista: elegível para reconquista (não está totalmente controlado)"
+                : "cap/reconquista: elegível para captura (não controlado)"
+        });
+    }
+
     private static void Reject(
         MelhorCapturaResult result,
         ConstructionManager construction,
@@ -769,4 +1077,39 @@ public static class MelhorCapturaService
             reason = reason
         });
     }
+
+    private static void CopyVisibilityContributors(
+        MelhorCapturaRequest request,
+        UnitManager evaluatedUnit,
+        Vector3Int cell,
+        List<UnitManager> destination)
+    {
+        if (request.resolveVisibilityContributors == null
+            || destination == null)
+        {
+            return;
+        }
+
+        IReadOnlyList<UnitManager> contributors =
+            request.resolveVisibilityContributors(cell);
+        if (contributors == null)
+            return;
+
+        for (int i = 0; i < contributors.Count; i++)
+        {
+            UnitManager contributor = contributors[i];
+            if (contributor == null
+                || contributor == evaluatedUnit
+                || contributor.IsDead
+                || contributor.IsEmbarked
+                || destination.Contains(contributor))
+            {
+                continue;
+            }
+            destination.Add(contributor);
+        }
+
+        destination.Sort((a, b) => a.InstanceId.CompareTo(b.InstanceId));
+    }
+
 }

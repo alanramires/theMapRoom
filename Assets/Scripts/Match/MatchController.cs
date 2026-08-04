@@ -443,6 +443,8 @@ public class MatchController : MonoBehaviour
     [SerializeField] private DPQAirHeightConfig fogOfWarDpqAirHeightConfig;
     [SerializeField, HideInInspector] [Range(0f, 1f)] private float fogOfWarAlpha = 0.65f;
     [SerializeField] private FogOfWarVisionMode fogOfWarVisionMode = FogOfWarVisionMode.All;
+    [SerializeField, HideInInspector] private List<FogRoundZeroSlotBake> fogRoundZeroBakes =
+        new List<FogRoundZeroSlotBake>();
     [System.NonSerialized] private readonly Dictionary<int, FogOfWarVisionMode> fogVisionModeByPlayerIndex = new Dictionary<int, FogOfWarVisionMode>();
     [Header("Victory Overlay")]
     [SerializeField] private bool showVictoryOverlay = true;
@@ -1379,6 +1381,7 @@ public class MatchController : MonoBehaviour
         FindAnyObjectByType<ReplayManager>()?.CleanupReplayArtifactsForMatchStart();
         RecomputeTeamFlips();
         ResetUnfundedStartMoneyFlagsForFreshMatch();
+        RestoreRoundZeroFogBakesForRuntime();
         ApplyActiveTeamIfChanged(force: true);
         // Neste ponto todos os objetos da cena ja passaram por OnEnable.
         // Reaplica SFX nos presets sem FOW Total caso o cursor ainda nao
@@ -6399,6 +6402,519 @@ public class MatchController : MonoBehaviour
         return fogCachedObserverSlotIndex == observerSlotIndex &&
                fogUnitVisibilityByCacheIndex.TryGetValue(cacheIndex, out bool cachedVisible) &&
                cachedVisible;
+    }
+
+    /// <summary>
+    /// Copia o conhecimento ja publicado do runtime. Nunca recalcula sensores.
+    /// </summary>
+    public bool TryCopyConfirmedFogKnowledgeSnapshotForSlot(
+        PlayerSlotId observerSlot,
+        Tilemap boardMap,
+        out FogKnowledgeSnapshot knowledge,
+        out string reason)
+    {
+        knowledge = null;
+        reason = string.Empty;
+        if (!IsValidPlayerSlot(observerSlot) || boardMap == null)
+        {
+            reason = "Slot ou tabuleiro invalido.";
+            return false;
+        }
+
+        knowledge = new FogKnowledgeSnapshot(observerSlot, boardMap)
+        {
+            SourceHash = ThreatRevisionTracker.GlobalBoardRevision
+        };
+
+        bool visibilityDisabled = !debugFogOfWarEnabled || !enableTotalWar;
+        FogSlotGameplaySnapshot runtimeSnapshot = null;
+        if (!visibilityDisabled &&
+            !TryGetFogGameplaySnapshot(observerSlot.Value, out runtimeSnapshot))
+        {
+            knowledge = null;
+            reason = "Snapshot confirmado de FOW ainda nao foi publicado.";
+            return false;
+        }
+
+        if (visibilityDisabled)
+        {
+            var allBoardCells = new List<Vector3Int>();
+            CollectBoardCells(boardMap, allBoardCells);
+            knowledge.GeographicallyVisibleCells.UnionWith(allBoardCells);
+            knowledge.SensorCoveredCells.UnionWith(allBoardCells);
+            knowledge.KnownCells.UnionWith(allBoardCells);
+        }
+        else
+        {
+            knowledge.GeographicallyVisibleCells.UnionWith(
+                runtimeSnapshot.geographicallyVisibleCells);
+            knowledge.SensorCoveredCells.UnionWith(
+                runtimeSnapshot.sensorCoveredCells);
+            knowledge.KnownCells.UnionWith(runtimeSnapshot.knownCells);
+            knowledge.GeographicOnlyCells.UnionWith(
+                runtimeSnapshot.geographicOnlyCells);
+            if (fogExploredCellsBySlot.TryGetValue(
+                    observerSlot.Value,
+                    out HashSet<Vector3Int> explored))
+            {
+                knowledge.KnownCells.UnionWith(explored);
+            }
+            CopyRuntimeFogVisibilityContributors(
+                observerSlot.Value,
+                knowledge);
+        }
+
+        IReadOnlyList<UnitManager> units = UnitManager.AllActive;
+        for (int i = 0; i < units.Count; i++)
+        {
+            UnitManager target = units[i];
+            if (target == null || !target.gameObject.activeInHierarchy ||
+                target.IsEmbarked || target.IsDead ||
+                !PlayerSlotRelations.AreEnemies(
+                    observerSlot.Value,
+                    target.SlotIndex))
+            {
+                continue;
+            }
+
+            bool visible = visibilityDisabled;
+            if (!visible)
+            {
+                int cacheIndex = ResolveFogCacheIndex(target);
+                visible = runtimeSnapshot.unitVisibility.TryGetValue(
+                    cacheIndex,
+                    out bool snapshotVisible) && snapshotVisible;
+            }
+            if (visible)
+                knowledge.VisibleEnemyUnits.Add(target);
+        }
+
+        reason =
+            $"snapshot confirmado slot={observerSlot.Value} " +
+            $"known={knowledge.KnownCells.Count} " +
+            $"visibleEnemies={knowledge.VisibleEnemyUnits.Count}";
+        return true;
+    }
+
+    /// <summary>
+    /// Cozinha manualmente a rodada zero de todos os slots e grava o resultado
+    /// no MatchController. Nao e chamado por OnValidate, pintura, spawner ou
+    /// ferramenta de auditoria.
+    /// </summary>
+    public bool TryCookRoundZeroFogForAllSlots(out string result)
+    {
+        result = string.Empty;
+        if (Application.isPlaying)
+        {
+            result = "O bake da rodada 0 so pode ser escrito no Edit Mode.";
+            return false;
+        }
+        if (fogOfWarTilemap == null)
+            TryAutoAssignFogOfWarReferences();
+        Tilemap boardMap = ResolveFogBoardTilemap();
+        TerrainDatabase terrain = ResolveFogTerrainDatabase();
+        if (fogOfWarTilemap == null || boardMap == null || terrain == null)
+        {
+            result =
+                "Fog Tilemap, Tilemap do tabuleiro ou Terrain Database indisponivel.";
+            return false;
+        }
+        if (players == null || players.Count == 0)
+        {
+            result = "A partida nao possui slots para cozinhar.";
+            return false;
+        }
+
+        var cooked = new List<FogRoundZeroSlotBake>(players.Count);
+        int totalKnown = 0;
+        int totalContacts = 0;
+        int totalSources = 0;
+        for (int slotIndex = 0; slotIndex < players.Count; slotIndex++)
+        {
+            PlayerSlotId observerSlot = PlayerSlotId.FromIndex(slotIndex);
+            var request = new FogKnowledgeBuildRequest
+            {
+                ObserverSlot = observerSlot,
+                BoardMap = boardMap,
+                TerrainDatabase = terrain,
+                DpqAirHeightConfig = ResolveFogDpqAirHeightConfig(),
+                EnableLos = enableLosValidation,
+                EnableStealth = enableStealthValidation
+            };
+            if (!FogKnowledgeSnapshotBuilder.TryBuild(
+                    request,
+                    out FogKnowledgeSnapshot knowledge,
+                    out string reason))
+            {
+                result = $"Slot {slotIndex} falhou: {reason}";
+                return false;
+            }
+
+            // O builder acima e a autoridade da fotografia de conhecimento.
+            // Esta passagem DataOnly produz tambem as contribuicoes por fonte,
+            // no formato que o runtime/save ja sabe validar e restaurar.
+            ExecuteFogRefreshContext(new FogUpdateContext(
+                observerSlot,
+                observerSlot,
+                observerSlot,
+                publishGameplayData: false,
+                publishVisuals: false,
+                recordExplorationMemory: false,
+                recordIntel: false));
+            if (!fogOverlayInitialized || fogCachedObserverSlotIndex != slotIndex)
+            {
+                result = $"Slot {slotIndex} falhou ao produzir contribuicoes DataOnly.";
+                return false;
+            }
+
+            FogRoundZeroSlotBake bake = BuildRoundZeroSlotBake(
+                knowledge,
+                boardMap,
+                request.EnableLos,
+                request.EnableStealth);
+            cooked.Add(bake);
+            totalKnown += bake.knownCells.Count;
+            totalContacts += bake.visibleEnemyUnits.Count;
+            totalSources += bake.sourceContributions.Count;
+        }
+
+        // A lista serializada so e substituida depois que todos os slots
+        // terminaram. Uma falha intermediaria preserva o bake anterior inteiro.
+        fogRoundZeroBakes = cooked;
+        result =
+            $"Rodada 0 cozida: slots={cooked.Count}, fontes={totalSources}, " +
+            $"hexes conhecidos={totalKnown}, contatos={totalContacts}.";
+        return true;
+    }
+
+    public bool TryCopyRoundZeroFogKnowledgeSnapshotForSlot(
+        PlayerSlotId observerSlot,
+        Tilemap boardMap,
+        out FogKnowledgeSnapshot knowledge,
+        out string reason)
+    {
+        knowledge = null;
+        reason = string.Empty;
+        if (!IsValidPlayerSlot(observerSlot) || boardMap == null)
+        {
+            reason = "Slot ou tabuleiro invalido.";
+            return false;
+        }
+
+        FogRoundZeroSlotBake bake = FindRoundZeroFogBake(observerSlot.Value);
+        if (bake == null || bake.formatVersion != FogRoundZeroSlotBake.CurrentFormatVersion)
+        {
+            reason =
+                $"Nao existe FOW de rodada 0 cozido para o slot {observerSlot.Value}. " +
+                "Selecione o MatchController e use 'Cozinhar FOW da Rodada 0'.";
+            return false;
+        }
+        if (bake.boardMap != null && bake.boardMap != boardMap)
+        {
+            reason = "O bake da rodada 0 pertence a outro Tilemap.";
+            return false;
+        }
+
+        knowledge = new FogKnowledgeSnapshot(observerSlot, boardMap)
+        {
+            SourceHash = bake.sourceHash
+        };
+        UnionSerializedCells(bake.geographicallyVisibleCells, knowledge.GeographicallyVisibleCells);
+        UnionSerializedCells(bake.sensorCoveredCells, knowledge.SensorCoveredCells);
+        UnionSerializedCells(bake.knownCells, knowledge.KnownCells);
+        UnionSerializedCells(bake.geographicOnlyCells, knowledge.GeographicOnlyCells);
+        CopyBakedFogVisibilityContributors(
+            bake.sourceContributions,
+            knowledge);
+        CopyValidUnits(bake.visibleEnemyUnits, knowledge.VisibleEnemyUnits);
+        CopyValidUnits(
+            bake.constructionDetectedTargets,
+            knowledge.ConstructionDetectedTargets);
+
+        if (bake.detectionByTarget != null)
+        {
+            for (int i = 0; i < bake.detectionByTarget.Count; i++)
+            {
+                FogRoundZeroDetectionBake saved = bake.detectionByTarget[i];
+                if (saved == null || saved.target == null)
+                    continue;
+                var contributors = new List<UnitManager>();
+                CopyValidUnits(saved.contributors, contributors);
+                knowledge.DetectionContributorsByTarget[saved.target] = contributors;
+            }
+        }
+
+        int currentHash = FogKnowledgeSnapshotBuilder.ComputeSourceHash(
+            new FogKnowledgeBuildRequest
+            {
+                ObserverSlot = observerSlot,
+                BoardMap = boardMap,
+                TerrainDatabase = ResolveFogTerrainDatabase(),
+                DpqAirHeightConfig = ResolveFogDpqAirHeightConfig(),
+                EnableLos = bake.enableLos,
+                EnableStealth = bake.enableStealth
+            });
+        bool stale = currentHash != bake.sourceHash;
+        reason =
+            $"rodada 0 manual slot={observerSlot.Value}, " +
+            $"known={knowledge.KnownCells.Count}, " +
+            $"visibleEnemies={knowledge.VisibleEnemyUnits.Count}, " +
+            $"estado={(stale ? "Scene alterada depois do bake" : "atual")}; " +
+            "nenhum recozimento automatico foi executado";
+        return true;
+    }
+
+    /// <summary>
+    /// Copia QUEM abriu cada hex a partir das contribuicoes confirmadas ja
+    /// existentes. Nao recalcula sensores e nao publica estado de FOW.
+    /// </summary>
+    private void CopyRuntimeFogVisibilityContributors(
+        int observerSlotIndex,
+        FogKnowledgeSnapshot knowledge)
+    {
+        if (knowledge == null)
+            return;
+
+        IReadOnlyDictionary<
+            FogContributionSourceId,
+            FogSourceContributionCacheEntry> sources = null;
+        if (observerSlotIndex == fogCachedObserverSlotIndex)
+        {
+            sources = fogContributionsBySource;
+        }
+        else if (fogContributionRuntimeBySlot.TryGetValue(
+                     observerSlotIndex,
+                     out FogSlotContributionRuntime runtime))
+        {
+            sources = runtime.sources;
+        }
+
+        if (sources == null || sources.Count == 0)
+            return;
+
+        Dictionary<int, UnitManager> unitsBySourceId =
+            BuildFogUnitsBySourceId();
+        foreach (KeyValuePair<
+                     FogContributionSourceId,
+                     FogSourceContributionCacheEntry> pair in sources)
+        {
+            if (pair.Key.type != FogContributionSourceType.Unit
+                || pair.Value == null
+                || !unitsBySourceId.TryGetValue(
+                    pair.Key.instanceId,
+                    out UnitManager contributor))
+            {
+                continue;
+            }
+
+            foreach (Vector3Int cell in pair.Value.geographicCells)
+            {
+                if (knowledge.GeographicallyVisibleCells.Contains(cell))
+                    knowledge.AddVisibilityContributor(cell, contributor);
+            }
+        }
+    }
+
+    /// <summary>Mesmo vinculo, lido do bake manual da rodada zero.</summary>
+    private static void CopyBakedFogVisibilityContributors(
+        IReadOnlyList<FogSourceContributionSaveData> sources,
+        FogKnowledgeSnapshot knowledge)
+    {
+        if (knowledge == null || sources == null || sources.Count == 0)
+            return;
+
+        Dictionary<int, UnitManager> unitsBySourceId =
+            BuildFogUnitsBySourceId();
+        for (int i = 0; i < sources.Count; i++)
+        {
+            FogSourceContributionSaveData source = sources[i];
+            if (source == null
+                || source.sourceType != (int)FogContributionSourceType.Unit
+                || !unitsBySourceId.TryGetValue(
+                    source.sourceInstanceId,
+                    out UnitManager contributor)
+                || source.geographicCells == null)
+            {
+                continue;
+            }
+
+            for (int cellIndex = 0;
+                 cellIndex < source.geographicCells.Count;
+                 cellIndex++)
+            {
+                Vector3Int cell = source.geographicCells[cellIndex];
+                if (knowledge.GeographicallyVisibleCells.Contains(cell))
+                    knowledge.AddVisibilityContributor(cell, contributor);
+            }
+        }
+    }
+
+    private static Dictionary<int, UnitManager> BuildFogUnitsBySourceId()
+    {
+        var result = new Dictionary<int, UnitManager>();
+        IReadOnlyList<UnitManager> units =
+            Application.isPlaying && UnitManager.AllActive.Count > 0
+                ? UnitManager.AllActive
+                : UnityEngine.Object.FindObjectsByType<UnitManager>(
+                    FindObjectsInactive.Exclude,
+                    FindObjectsSortMode.None);
+        for (int i = 0; i < units.Count; i++)
+        {
+            UnitManager unit = units[i];
+            if (unit != null)
+                result[ResolveFogCacheIndex(unit)] = unit;
+        }
+        return result;
+    }
+
+    public string DescribeRoundZeroFogBake()
+    {
+        if (fogRoundZeroBakes == null || fogRoundZeroBakes.Count == 0)
+            return "Rodada 0 ainda nao foi cozida.";
+
+        int sources = 0;
+        int contacts = 0;
+        string cookedAt = string.Empty;
+        for (int i = 0; i < fogRoundZeroBakes.Count; i++)
+        {
+            FogRoundZeroSlotBake bake = fogRoundZeroBakes[i];
+            if (bake == null)
+                continue;
+            sources += bake.sourceContributions?.Count ?? 0;
+            contacts += bake.visibleEnemyUnits?.Count ?? 0;
+            if (string.IsNullOrEmpty(cookedAt))
+                cookedAt = bake.cookedAtUtc;
+        }
+        return
+            $"{fogRoundZeroBakes.Count} slot(s), {sources} fonte(s), " +
+            $"{contacts} contato(s). UTC: {cookedAt}";
+    }
+
+    private FogRoundZeroSlotBake BuildRoundZeroSlotBake(
+        FogKnowledgeSnapshot knowledge,
+        Tilemap boardMap,
+        bool enableLos,
+        bool enableStealth)
+    {
+        var bake = new FogRoundZeroSlotBake
+        {
+            observerSlotIndex = knowledge.ObserverSlot.Value,
+            sourceHash = knowledge.SourceHash,
+            sourceCacheFormat = FogSourceCacheFormatVersion,
+            sourceCacheConfigHash = BuildFogSourceCacheConfigHash(boardMap),
+            enableLos = enableLos,
+            enableStealth = enableStealth,
+            cookedAtUtc = DateTime.UtcNow.ToString("O"),
+            boardMap = boardMap
+        };
+        AppendFogSourceContributionsForSave(
+            knowledge.ObserverSlot.Value,
+            fogContributionsBySource,
+            bake.sourceContributions);
+        bake.geographicallyVisibleCells.AddRange(knowledge.GeographicallyVisibleCells);
+        bake.sensorCoveredCells.AddRange(knowledge.SensorCoveredCells);
+        bake.knownCells.AddRange(knowledge.KnownCells);
+        bake.geographicOnlyCells.AddRange(knowledge.GeographicOnlyCells);
+        SortFogCellList(bake.geographicallyVisibleCells);
+        SortFogCellList(bake.sensorCoveredCells);
+        SortFogCellList(bake.knownCells);
+        SortFogCellList(bake.geographicOnlyCells);
+        bake.visibleEnemyUnits.AddRange(knowledge.VisibleEnemyUnits);
+        bake.constructionDetectedTargets.AddRange(knowledge.ConstructionDetectedTargets);
+        foreach (KeyValuePair<UnitManager, List<UnitManager>> pair in
+                 knowledge.DetectionContributorsByTarget)
+        {
+            var saved = new FogRoundZeroDetectionBake { target = pair.Key };
+            if (pair.Value != null)
+                saved.contributors.AddRange(pair.Value);
+            bake.detectionByTarget.Add(saved);
+        }
+        return bake;
+    }
+
+    private FogRoundZeroSlotBake FindRoundZeroFogBake(int observerSlotIndex)
+    {
+        if (fogRoundZeroBakes == null)
+            return null;
+        for (int i = 0; i < fogRoundZeroBakes.Count; i++)
+        {
+            FogRoundZeroSlotBake bake = fogRoundZeroBakes[i];
+            if (bake != null && bake.observerSlotIndex == observerSlotIndex)
+                return bake;
+        }
+        return null;
+    }
+
+    private static void UnionSerializedCells(
+        IList<Vector3Int> source,
+        HashSet<Vector3Int> destination)
+    {
+        if (source == null || destination == null)
+            return;
+        for (int i = 0; i < source.Count; i++)
+            destination.Add(source[i]);
+    }
+
+    private static void CopyValidUnits(
+        IList<UnitManager> source,
+        ICollection<UnitManager> destination)
+    {
+        if (source == null || destination == null)
+            return;
+        for (int i = 0; i < source.Count; i++)
+        {
+            UnitManager unit = source[i];
+            if (unit != null && unit.gameObject.activeInHierarchy &&
+                !unit.IsEmbarked && !unit.IsDead && !destination.Contains(unit))
+            {
+                destination.Add(unit);
+            }
+        }
+    }
+
+    private void RestoreRoundZeroFogBakesForRuntime()
+    {
+        if (!Application.isPlaying || fogRoundZeroBakes == null ||
+            fogRoundZeroBakes.Count == 0 || !debugFogOfWarEnabled ||
+            !enableTotalWar)
+        {
+            return;
+        }
+
+        int restored = 0;
+        for (int i = 0; i < fogRoundZeroBakes.Count; i++)
+        {
+            FogRoundZeroSlotBake bake = fogRoundZeroBakes[i];
+            if (bake == null || bake.formatVersion != FogRoundZeroSlotBake.CurrentFormatVersion ||
+                bake.sourceContributions == null || bake.sourceContributions.Count == 0)
+            {
+                continue;
+            }
+
+            PlayerSlotId slot = PlayerSlotId.FromIndex(bake.observerSlotIndex);
+            if (TryRestoreFogSourceRuntimeForSlotFromSave(
+                    slot,
+                    bake.observerSlotIndex,
+                    bake.sourceCacheFormat,
+                    bake.sourceCacheConfigHash,
+                    bake.sourceContributions,
+                    out string restoreResult))
+            {
+                restored++;
+            }
+            else if (enableFogValidationLogs)
+            {
+                Debug.LogWarning(
+                    $"[FoW][RoundZeroBake] slot={bake.observerSlotIndex} " +
+                    $"rejected={restoreResult}; runtime fara o fallback normal.");
+            }
+        }
+
+        if (enableFogStepPerfLogs)
+        {
+            Debug.Log(
+                $"[FoW][RoundZeroBake] restored={restored}/{fogRoundZeroBakes.Count}");
+        }
     }
 
     public bool IsUnitVisibleForSlot(UnitManager unit, PlayerSlotId observerSlot)
