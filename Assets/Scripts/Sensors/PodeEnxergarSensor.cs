@@ -53,6 +53,13 @@ public static class PodeEnxergarSensor
             return;
         }
 
+        // O proprio hex. O coletor pula distancia 0 ("if (distance <= 0)
+        // continue"), entao ele nunca sai de la — e a unidade obviamente
+        // conhece o terreno onde esta pisando.
+        Vector3Int ownCell = virtualObserverCell ?? observer.CurrentCellPosition;
+        ownCell.z = 0;
+        output.Add(ownCell);
+
         PodeDetectarSensor.CollectVisibleCells(
             observer,
             map,
