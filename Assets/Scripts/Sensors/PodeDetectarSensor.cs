@@ -821,17 +821,23 @@ public static class PodeDetectarSensor
         DPQAirHeightConfig dpqAirHeightConfig = null,
         bool enableLosValidation = true)
     {
-        CollectVisibleCells(
+        // Pergunta de HEXES — delegada ao PodeEnxergar, que e quem responde por
+        // ela desde o split. Visao padrao da ficha, reta pura, uma passada por
+        // superficie, e a lista de Detect Specializations invisivel.
+        //
+        // O que sai daqui: preserveObserverLayerRangeForHexVisibility levava a
+        // CanObserveCellByAnyObserverVisionLayer, que aceitava a celula se
+        // QUALQUER camada do observador a alcancasse. Com o cruzamento da
+        // familia aquatica, a entrada "Submarine/Submerged 7" do submarino
+        // revelava mar no alcance de cacar submarino. Ele revela pelo
+        // periscopio, que e a visao padrao.
+        PodeEnxergarSensor.CollectKnownTerrainCells(
             observer,
             map,
             terrainDatabase,
             visibleCellsOutput,
             dpqAirHeightConfig,
-            enableLosValidation,
-            enableSpotter: false,
-            useOccupantLayerForTarget: false,
-            preserveObserverLayerRangeForHexVisibility: true,
-            useRangeOnlyForAirHighWhenConfigured: true);
+            enableLosValidation);
     }
 
     private static bool CanObserveCellByAnyObserverVisionLayer(
