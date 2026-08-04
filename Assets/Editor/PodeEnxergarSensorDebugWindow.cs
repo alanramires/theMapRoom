@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Tilemaps;
@@ -297,13 +297,7 @@ public class PodeEnxergarSensorDebugWindow : EditorWindow
                 baseRange,
                 forceLayer: false,
                 preserveObserverLayerRange: false,
-                forcedDetectionRangeOverride: baseRange,
-                // skipSpecializedTargetLayers descarta a CELULA quando a camada
-                // dela tem Detect Specialization — era ele que sumia com o mar
-                // do submarino e listava o hex como invalido mesmo com a linha
-                // limpa. Quem ignora a lista e o parametro abaixo.
-                skipSpecializedTargetLayers: false,
-                ignoreDetectSpecializations: true);
+                forcedDetectionRangeOverride: baseRange);
             scenarioResults.Add(visionScenario);
         }
 
@@ -461,8 +455,7 @@ public class PodeEnxergarSensorDebugWindow : EditorWindow
         bool forceLayer,
         bool preserveObserverLayerRange,
         int forcedDetectionRangeOverride = -1,
-        bool skipSpecializedTargetLayers = false,
-        bool ignoreDetectSpecializations = false)
+        bool skipSpecializedTargetLayers = false)
     {
         VisionScenarioResult result = new VisionScenarioResult
         {
@@ -480,24 +473,18 @@ public class PodeEnxergarSensorDebugWindow : EditorWindow
             dpqAirHeightConfig.TryGetVisionFor(Domain.Air, HeightLevel.AirHigh, out _, out bool airHighBlockLoS) &&
             !airHighBlockLoS;
 
+        // A janela audita O SENSOR, nao uma reconstrucao dele. Enquanto ela
+        // remontava a resposta chamando o PodeDetectar com flags, podia
+        // discordar do jogo — e discordou, num caca que aparecia aqui e nao no
+        // tabuleiro. Aqui e ali, o mesmo laco.
         HashSet<Vector3Int> localVisibleCells = new HashSet<Vector3Int>();
-        PodeDetectarSensor.CollectVisibleCells(
+        PodeEnxergarSensor.CollectKnownTerrainCells(
             selectedUnit,
             map,
             db,
             localVisibleCells,
             dpqAirHeightConfig,
-            enableLos,
-            enableSpotter,
-            useOccupantLayerForTarget: false,
-            preserveObserverLayerRangeForHexVisibility: preserveObserverLayerRange,
-            forceVirtualTargetLayer: forceLayer,
-            forcedVirtualTargetDomain: domain,
-            forcedVirtualTargetHeight: heightLevel,
-            forcedDetectionRangeOverride: forcedDetectionRangeOverride,
-            skipSpecializedTargetLayers: skipSpecializedTargetLayers,
-            ignoreDetectSpecializations: ignoreDetectSpecializations,
-            useRangeOnlyForAirHighWhenConfigured: true);
+            enableLos);
 
         bool useAquaticDistanceForScenario = ShouldUseAquaticDistanceForScenario(domain, heightLevel);
         Dictionary<Vector3Int, int> distances = BuildDistanceMap(

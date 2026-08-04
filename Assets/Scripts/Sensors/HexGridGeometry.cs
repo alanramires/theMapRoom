@@ -46,6 +46,60 @@ public static class HexGridGeometry
     }
 
     /// <summary>
+    /// Celulas do tabuleiro ate <paramref name="radius"/> passos de
+    /// <paramref name="origin"/>, incluindo a origem.
+    ///
+    /// Anda pela vizinhanca real do tilemap, entao respeita o formato da grade
+    /// em vez de assumir um. So entra celula que tem tile: fora da borda nao
+    /// existe hexagono, e isso nao e recusa, e ausencia de tabuleiro.
+    ///
+    /// Nao consulta terreno, unidade nem alcance de nada — e a forma da grade,
+    /// nada mais.
+    /// </summary>
+    public static void CollectCellsInRadius(
+        Tilemap map,
+        Vector3Int origin,
+        int radius,
+        ICollection<Vector3Int> output)
+    {
+        if (map == null || output == null || radius < 0)
+            return;
+
+        origin.z = 0;
+        if (!map.HasTile(origin))
+            return;
+
+        var visited = new HashSet<Vector3Int> { origin };
+        var distance = new Dictionary<Vector3Int, int> { [origin] = 0 };
+        var queue = new Queue<Vector3Int>();
+        var neighbors = new List<Vector3Int>(6);
+        queue.Enqueue(origin);
+        output.Add(origin);
+
+        while (queue.Count > 0)
+        {
+            Vector3Int current = queue.Dequeue();
+            int currentDistance = distance[current];
+            if (currentDistance >= radius)
+                continue;
+
+            neighbors.Clear();
+            UnitMovementPathRules.GetImmediateHexNeighbors(map, current, neighbors);
+            for (int i = 0; i < neighbors.Count; i++)
+            {
+                Vector3Int next = neighbors[i];
+                next.z = 0;
+                if (!map.HasTile(next) || !visited.Add(next))
+                    continue;
+
+                distance[next] = currentDistance + 1;
+                queue.Enqueue(next);
+                output.Add(next);
+            }
+        }
+    }
+
+    /// <summary>
     /// Descobre, pela forma real da vizinhanca do tilemap, se a grade desloca
     /// as linhas impares ou as pares. Perguntar ao mapa em vez de assumir e o
     /// que permite trocar o layout sem reescrever a geometria. Cacheado por
