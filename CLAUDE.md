@@ -79,6 +79,34 @@ them all; the current major is detailed and closed majors are pointers.
 
 This is a Unity project — there is no CLI build. Open in Unity Editor (Windows) and use Play mode to test. Scripts auto-compile when files are saved. Check the Unity Console for compilation errors and runtime logs.
 
+## The two truths: `PodeEnxergar` and `PodeDetectar`
+
+They are **different entities** and answer different questions:
+
+```text
+PodeEnxergar   revela HEXAGONOS   (naval/surface e land/surface)
+PodeDetectar   faz UNIDADES aparecerem
+```
+
+Everything else is a **derivation**: Melhor Visão, Melhor Spotting, revealing
+FOW, photographing `explored`, the round-zero bake cache. None of them is a
+source of truth; they all read from the two above.
+
+Underneath both sits `ObservationCellService` — a dumb service that answers
+*facts* about a cell (terrain, construction, structure, layer, EV, `blockLoS`)
+and knows nothing about range, keys, method, specialization, stealth or team.
+
+**Detection never reveals fog.** A sonar hearing an engine must not teach where
+the coast is. The four quadrants all exist — hex known + contact detected, hex
+known + no contact (sniper), contact + hex black (EWACS), neither — so neither
+answer derives from the other, and they must not share a set.
+
+The failure mode this replaced: one function answering both questions, with the
+caller neutralizing the half it didn't want via a table of flags. A detection
+flag silently deleted the sea from a submarine's vision that way. If you find
+yourself turning a flag off to make one of the two behave, the entity is wrong,
+not the flag.
+
 ## Distribution state — nothing is shipped yet
 
 The game **is not on Steam**. It exists only on the author's machine, and release
