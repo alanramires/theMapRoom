@@ -9639,53 +9639,14 @@ public class MatchController : MonoBehaviour
                 output.Add(entry.Key);
         }
 
-        TerrainDatabase terrainDatabase = ResolveFogTerrainDatabase();
-        DPQAirHeightConfig dpqConfig = ResolveFogDpqAirHeightConfig();
-        UnitManager[] units = FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-        for (int i = 0; i < units.Length; i++)
-        {
-            UnitManager unit = units[i];
-            // excludeUnit: unidade em posicao provisoria nao radia a propria
-            // visao (a view especializada usa a posicao ATUAL, que ainda e
-            // cancelavel durante MoveuAndando).
-            if (unit == excludeUnit)
-                continue;
-            if (unit == null || !unit.gameObject.activeInHierarchy || unit.IsEmbarked ||
-                unit.SlotIndex != ActiveSlotId.Value || !IsUnitOnBoard(unit, boardMap) ||
-                !unit.TryGetUnitData(out UnitData unitData) || unitData == null ||
-                unitData.visionSpecializations == null || unitData.visionSpecializations.Count == 0)
-                continue;
-
-            // A coleta geografica agregada ja avalia a camada
-            // nativa do terreno e todas as especializacoes compativeis com ela.
-            // Repetir Land/Naval/Sub aqui reconstruia os mesmos distance maps.
-            // Air e a unica familia independente do terreno sob o hex e, por isso,
-            // ainda precisa da passagem virtual para cobrir tanto terra quanto mar.
-            bool airLowAdded = false;
-            bool airHighAdded = false;
-            for (int j = 0; j < unitData.visionSpecializations.Count; j++)
-            {
-                UnitVisionException specialization = unitData.visionSpecializations[j];
-                if (specialization == null)
-                    continue;
-
-                Domain domain = specialization.domain;
-                HeightLevel height = specialization.heightLevel;
-                if (domain != Domain.Air)
-                    continue;
-
-                bool alreadyAdded =
-                    (domain == Domain.Air && height == HeightLevel.AirLow && airLowAdded) ||
-                    (domain == Domain.Air && height == HeightLevel.AirHigh && airHighAdded);
-                if (alreadyAdded)
-                    continue;
-
-                AddCachedFogLayerVisibleCellsForUnit(unit, boardMap, terrainDatabase, dpqConfig, domain, height, output);
-                if (domain == Domain.Air && height == HeightLevel.AirLow) airLowAdded = true;
-                else if (domain == Domain.Air && height == HeightLevel.AirHigh) airHighAdded = true;
-            }
-        }
-
+        // DETECCAO NAO REVELA FOW. As Detect Specializations — o radar aereo do
+        // EWACS, o sonar do submarino — fazem UNIDADE aparecer, nunca hexagono.
+        // Quem revela terreno e o campo visao, pelo PodeEnxergar, e ele ja
+        // alimentou fogGeographicContributorsByCell acima.
+        //
+        // A varredura de especializacoes de Air que existia aqui era a segunda
+        // porta pela qual o alcance aereo virava terreno conhecido, e daqui ela
+        // seguia para knownCells e para a memoria permanente de exploracao.
         AddFriendlyConstructionDisplayCells(boardMap, output);
     }
 
