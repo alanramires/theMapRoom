@@ -1,55 +1,81 @@
 # Resumo — onde estamos e o que vem
 
-Ponto de retomada. Escrito em 2026-08-04, **depois** da tag `v7.1.0`. Leia isto
+Ponto de retomada. Escrito em 2026-08-04, **depois** da tag `v7.1.1`. Leia isto
 primeiro; ele descreve o estado pós-versão e não pertence à tag.
 
 ---
 
 ## Primeira coisa a fazer
 
-**A perna de detecção** — a irmã do `PodeEnxergar`, que hoje ficou pronta.
+**Medir a perf de um turno de IA com muitas unidades.** Não é a tarefa mais
+interessante da lista, é a que pode invalidar as outras.
 
-A `v7.1.0` separou quem revela hexágono de quem faz unidade aparecer, mas só
-terminou o primeiro lado. O `PodeDetectar` continua carregando as duas
-responsabilidades no mesmo arquivo, e ainda decide por `if` coisas que deveriam
-estar na ficha.
+A `v7.1.1` trocou filtro por varredura em **três** pontos do caminho quente, na
+mesma sessão, sem medir nenhum:
 
-Antes ou junto disso, uma dívida que o autor cravou como princípio:
+```text
+IsTargetObservedByTeam   par-a-par  →  CollectDetection por observador
+refresh de visibilidade  delta      →  cheio, por commit
+publish do snapshot      delta      →  cheio, por commit
+```
+
+Cada uma é defensável sozinha. As três juntas multiplicam trabalho. O
+`FrameSpike` é o instrumento; o suspeito provável é o `CollectDetection` por
+observador, que faz muito mais do que o par-a-par fazia.
+
+Se estiver limpo, a fila continua na **tarefa 3 abaixo**. Se não estiver, ela
+muda de ordem.
+
+---
+
+## A fila, na ordem
+
+```text
+1. medir perf do turno de IA                       ← acima
+2. mover a linha para casa propria                 HasValidStraightObservationLine,
+                                                   ResolveOriginEvForLos, o lerp, o cube-line
+3. laco proprio do PodeEnxergar                    mata skipSpecializedTargetLayers,
+                                                   preserveObserverLayerRangeForHexVisibility
+                                                   e o ignoreDetectSpecializations (andaime)
+4. linha de quem detectou no resultado             como o PodeEnxergar ja mostra
+5. delta de contatos novos no publish              gancho do som e do Jornal
+6. decidir skipLosForCurrentTarget                 meio (DPQ) ou metodo na ficha?
+7. eixo de camada no FogKnowledgeSnapshot          destrava o Melhor Spotting
+8. apagar residuo de exploracao nos saves          trivial: nada foi distribuido
+```
+
+A dívida que o autor cravou como princípio, e que a tarefa 3 fecha:
 
 > *O `PodeEnxergar` não pode usar regras que pertençam ao `PodeDetectar` para
 > liberar hexágonos.*
 
-Hoje ele **não tem laço próprio**: monta a resposta chamando `CollectVisibleCells`
-e desligando regras uma a uma por flag. Foi exatamente assim que o mar do
-submarino sumiu — uma flag de detecção descartando célula antes de qualquer conta
-de linha. Enquanto for flag, toda regra nova do `PodeDetectar` volta a vazar
-para cá sem aviso.
-
-O laço próprio precisa de duas primitivas expostas como **geometria pura**, sem
-política dentro:
-
-```text
-GetIntermediateCellsByCellLerp   a caminhada dos hexes da linha
-TryResolveCellVision             EV e blockLoS de uma célula
-```
-
-As duas são `private` no `PodeDetectarSensor`. Expor não é duplicar regra — é o
-serviço burro sendo dividido, com cada sensor dono da política dele.
+Ele ainda monta a resposta chamando `CollectVisibleCells` e desligando regras uma
+a uma por flag. Foi assim que o mar do submarino sumiu — uma flag de detecção
+descartando célula antes de qualquer conta de linha.
 
 ---
 
 ## Estado
 
-`v7.1.0` tagueada e publicada na `main`. Relatório:
-`docs/relatorio_v7.1.0.md`.
+`v7.1.1` tagueada e publicada na `main`. Relatórios:
+`docs/relatorio_v7.1.0.md` e `docs/relatorio_v7.1.1.md`.
 
-**Primeira versão desta série que muda comportamento em partida.** Até a
-`v7.0.4` tudo era ferramenta e consumidor; agora o FOW revela terreno por uma
-fonte diferente.
+**As duas mudam comportamento em partida.** Até a `v7.0.4` tudo era ferramenta e
+consumidor. A `v7.1.0` trocou a fonte da revelação de terreno; a `v7.1.1` trocou
+a implementação que decide se **cada unidade inimiga aparece**.
 
-### A descoberta que organiza o próximo trabalho
+Validado em jogo pelo autor: o submarino revela 3, os caças detectados aparecem,
+o combate se resolveu junto e o recálculo ao destruir unidade também.
+
+### As duas descobertas que organizam o próximo trabalho
 
 > **Detecção não revela FOW.**
+
+> **Uma pergunta, uma implementação.**
+
+A segunda veio da primeira: existiam duas respostas para "eu detecto este alvo",
+a que as ferramentas auditavam e a que o jogo usava. Elas discordavam, e a janela
+dava confiança falsa sobre uma ficha correta.
 
 Quatro quadrantes, todos existem, nenhum derivável do outro:
 
@@ -80,16 +106,19 @@ O submarino em `Submerged` sai de EV 0 e **é um soldado em cima da água**.
 ## A escada
 
 ```text
-0. sensores PodeX               ⚠️ PodeEnxergar nasceu; PodeDetectar ainda mistura
-1. serviços de área (Hotzone)   ✅ prontos
-2. consumidores Melhor*         ⚠️ Melhor Visão consome a fotografia; falta Fusão
-                                   e o Melhor Spotting
-3. papéis → só POLÍTICA         docs/revisao_papeis.md — 1 linha de 7 levantada
-4. variações de papel           vira perfil/trait depois da extração das linhas
+-1. serviços burros do tabuleiro  ✅ ObservationCellService, HexGridGeometry
+ 0. sensores PodeX                ⚠️ PodeDetectar é fonte única; PodeEnxergar
+                                    ainda é ele com flags desligadas
+ 1. serviços de área (Hotzone)    ✅ prontos
+ 2. consumidores Melhor*          ⚠️ Melhor Visão consome a fotografia; falta Fusão
+                                    e o Melhor Spotting
+ 3. papéis → só POLÍTICA          docs/revisao_papeis.md — 1 linha de 7 levantada
+ 4. variações de papel            vira perfil/trait depois da extração das linhas
 ```
 
-O degrau 0 reabriu. Ele estava marcado como pronto e não estava: um sensor
-respondia duas perguntas.
+O degrau 0 reabriu e ganhou um degrau **abaixo** dele: o que nunca foi regra de
+sensor — fato de célula e geometria de grade — saiu para serviço próprio, porque
+as duas verdades precisam dos mesmos fatos sem uma depender da outra.
 
 ---
 
@@ -97,7 +126,8 @@ respondia duas perguntas.
 
 | # | documento | por quê |
 |---|---|---|
-| 1 | `docs/relatorio_v7.1.0.md` | o fio do dia, e a seção 9 (o erro que custou o dia) |
+| 1 | `docs/relatorio_v7.1.1.md` | o fio mais recente, e a seção 8 (dívidas criadas) |
+| 1b | `docs/relatorio_v7.1.0.md` | a separação, e a seção 9 (o erro que custou o dia) |
 | 2 | `docs/manual/01_principios_e_vocabulario.md` | decide onde uma regra pode morar |
 | 3 | `docs/implementar_melhor_spotting.md` | ponto de execução do consumidor, bloqueado pelo eixo de camada |
 | 4 | `docs/arquitetura/acoes_transacionais.md` | obrigatório antes de ligar ferramenta a runtime |
@@ -125,15 +155,45 @@ Fechar o vazamento exigiu achar três caminhos independentes:
   conjunto que pinta terreno, e dali para a **memória permanente**;
 - `AddSpecializedAirKnowledge` — o gêmeo no bake.
 
+### `PodeDetectar` é fonte única
+
+`IsTargetObservedByTeam` consome `CollectDetection` — a mesma coleta que as
+janelas auditam. Antes havia duas implementações da mesma pergunta e elas
+divergiam. Todo consumidor de visibilidade de unidade herda daí.
+
+`CanObserverObserveTarget`, a segunda implementação, foi apagada.
+
 ### `DetectionMethod`
 
 `LosPolicy` virou `DetectionMethod` com os números preservados:
 `LineOfSight = 0`, `Propagated = 2`, o `1` morto sem herdeiro. Nenhuma ficha
 precisou de edição manual.
 
-`Propagated` já existia escondido em dois `if`: o mapa de distância aquático
-soldado a `Submarine/Submerged` e o `range only` de `AirHigh`. **Continuam
-soldados** — declará-los na ficha é trabalho da perna de detecção.
+`Propagated` agora **decide o mapa de distância**, não só a linha, e vale para
+**qualquer camada** — o meio sai da camada do alvo. Um `detect land/surface 5
+propagate` é um megafone sem código novo.
+
+Ainda soldado num `if`: o `range only` de `AirHigh`, via `skipLosForCurrentTarget`,
+que vem do `DPQAirHeightConfig` e fala do **meio**, não do sensor.
+
+### Os serviços que saíram do `PodeDetectar`
+
+```text
+ObservationCellService   terreno, construcao, estrutura, camada, EV, blockLoS
+                         + os tres caches de refresh e o de grid
+HexGridGeometry          CubeCoord, offset↔cubo, distancia, lerp, round, odd-row
+```
+
+Movimentação literal, com wrappers privados no `PodeDetectar` — nenhum dos ~20
+chamadores internos mudou.
+
+### O recálculo no compromisso
+
+O delta por células afetadas assumia que revelar e detectar eram a mesma coisa.
+Depois da separação, um radar que detecta sem revelar não põe a célula do alvo no
+conjunto, e o inimigo ficava com o valor velho. **Dois** lugares tinham o filtro:
+`RefreshRuntimeUnitFogVisibilityForCells` e `PublishFogGameplaySnapshot` — este
+último é de onde a apresentação de contato lê. No commit, os dois são completos.
 
 ### `PodeMirar` aceita alvo detectado em hex preto
 
@@ -151,15 +211,28 @@ fotografia não se aplica". Nenhum `AIController` consome.
 
 ## Pendências abertas
 
-**A perna de detecção não começou.** É a próxima.
+**Perf não medida.** A dívida mais urgente — ver "Primeira coisa a fazer".
+
+**A linha ainda mora no `PodeDetectar`.** `HasValidStraightObservationLine`,
+`ResolveOriginEvForLos`, o lerp e o cube-line. Com a geometria e o fato de célula
+já fora, ela deixou de arrastar a teia.
+
+**A linha de quem detectou não aparece no resultado.** O autor pediu que o
+`PodeDetectar` mostre subida ou descida, como o `PodeEnxergar` já mostra.
+
+**O alerta sonoro precisa de um gancho que não existe.** O certo não é
+"detectou", é **"passou a detectar"** — o delta entre o conjunto anterior e o
+novo no publish. Sem isso o sonar toca a cada refresh. O `radar.MP3` já está no
+repositório, sem nada referenciando.
 
 **`KnownCells` continua um balde só.** Não recebe mais conhecimento aéreo
 especializado, mas ainda mistura terreno e memória de exploração, e o
 `FogKnowledgeSnapshot` segue **sem eixo de camada**. O Melhor Spotting depende
-disso, e o contato desenhado sobre o preto também.
+disso.
 
 **Saves antigos têm resíduo.** Hexes revelados pelo alcance de detecção antes da
-`v7.1.0` já estão gravados como explorados e não são limpos.
+`v7.1.0` já estão gravados como explorados. Como nada foi distribuído, é só
+apagar.
 
 **Contato sobre o preto ainda não foi validado em jogo.**
 `ApplyFogDetectedContactPresentation` já faz `detectado && !geograficamenteVisível
@@ -186,6 +259,10 @@ atrás do overlay, que assume oclusão onde há tile.
 - **Nada provisório publica verdade confirmada.**
 - **Tem relatório, tem tag. Não tem relatório, é só commit.**
 - **Não editar `.asset` no disco com o Inspector aberto.**
+- **Não classificar arquivo do autor como churn sem perguntar.** Cena e `.asset`
+  grandes podem ser o estado que ele usou para validar.
+- **Nada foi distribuído** — save e bake podem mudar de forma quantas vezes o
+  design precisar. Não propor shim de versão nem retrocompatibilidade.
 - **Um commit por frente de trabalho**, não um pelo lote.
 - **Número de build só entra em relatório se veio de build COM restore.**
   `dotnet build Assembly-CSharp.csproj -v q --nologo` — e o Editor é outro
@@ -198,6 +275,11 @@ atrás do overlay, que assume oclusão onde há tile.
 
 | armadilha | lição |
 |---|---|
+| **uma pergunta, duas implementações** | a janela auditava `CollectDetection` e o jogo usava `CanObserverObserveTarget`. A ferramenta não estava errada — estava olhando outro caminho, e deu confiança falsa sobre uma ficha correta |
+| **premissa que funcionava por acidente** | o delta do FOW filtrava unidades por célula com revelação alterada. Isso cobria detecção só enquanto revelar e detectar eram a mesma coisa. Separar as duas quebrou o delta sem tocar nele |
+| **consertar metade e achar que acabou** | o mesmo filtro existia em `RefreshRuntimeUnitFogVisibilityForCells` **e** em `PublishFogGameplaySnapshot`. O segundo só apareceu depois de o primeiro ser corrigido |
+| **generalizar e abrir buraco** | ao tirar o privilégio do submarino no `Propagated`, o mapa de distância continuou sendo montado uma vez sem guardar de que camada era |
+| **`Get-Content` do PS 5.1 em arquivo sem BOM** | lê como ANSI e corrompe acentos. Pego porque o diffstat de uma **deleção pura** mostrava 11 inserções — esse número tem que ser zero |
 | **afirmar mecanismo lendo um trecho** | o `PodeDetectarSensor` tem quatro caminhos parecidos. Ler um pedaço não permite dizer qual roda. Cinco hipóteses erradas seguidas na `v7.1.0`, uma delas piorando o sintoma e exigindo revert |
 | **`skipSpecializedTargetLayers`** | não ignora o alcance das especializações: **descarta a célula** cuja camada tenha Detect Specialization. Foi ela que apagou o mar do submarino |
 | **sensor com flags em vez de laço próprio** | toda flag desligada traz junto uma regra que ninguém pediu |
