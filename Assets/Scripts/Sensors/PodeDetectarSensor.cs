@@ -592,7 +592,16 @@ public static class PodeDetectarSensor
         collectVisibleCellsScratch.Clear();
         collectVisibleCellsScratch.Add(observerCell);
         DistanceMapWorkspace workspace = RentDistanceMapWorkspace();
+        // O mapa de propagacao pertence a UMA camada de alvo: ele anda pelas
+        // celulas que aquela camada aceita. Guardamos qual camada esta
+        // carregada porque, desde que Propagated deixou de ser privilegio do
+        // submarino, uma ficha pode declarar propagacao em mais de uma camada —
+        // e entregar a distancia pela agua a um alvo de superficie seria erro
+        // silencioso, nao excecao.
         DistanceMapWorkspace aquaticWorkspace = null;
+        bool propagationMapReady = false;
+        Domain propagationDomain = Domain.Land;
+        HeightLevel propagationHeight = HeightLevel.Surface;
         if (isFragataCollect)
             debugFragataCollectWorkspaceRents++;
         try
@@ -629,6 +638,9 @@ public static class PodeDetectarSensor
                         c,
                         Domain.Submarine,
                         HeightLevel.Submerged));
+                propagationMapReady = true;
+                propagationDomain = Domain.Submarine;
+                propagationHeight = HeightLevel.Submerged;
             }
 
             foreach (KeyValuePair<Vector3Int, int> pair in workspace.distances)
@@ -683,10 +695,16 @@ public static class PodeDetectarSensor
                 bool useAquaticDistance = ShouldUsePropagatedDistance(observerData, targetDomain, targetHeight) && terrainDatabase != null;
                 if (useAquaticDistance)
                 {
-                    if (aquaticWorkspace == null)
+                    // Remonta quando a camada pedida nao e a que esta carregada.
+                    // BuildDistanceMapInto limpa o workspace, entao reusar o
+                    // mesmo aluguel e seguro e evita devolver e pegar de novo.
+                    if (!propagationMapReady ||
+                        propagationDomain != targetDomain ||
+                        propagationHeight != targetHeight)
                     {
-                        aquaticWorkspace = RentDistanceMapWorkspace();
-                debugCollectAquaticMaps++;
+                        if (aquaticWorkspace == null)
+                            aquaticWorkspace = RentDistanceMapWorkspace();
+                        debugCollectAquaticMaps++;
                         BuildDistanceMapInto(
                             boardMap,
                             observerCell,
@@ -698,6 +716,9 @@ public static class PodeDetectarSensor
                                 c,
                                 targetDomain,
                                 targetHeight));
+                        propagationMapReady = true;
+                        propagationDomain = targetDomain;
+                        propagationHeight = targetHeight;
                     }
 
                     if (!aquaticWorkspace.distances.TryGetValue(cell, out effectiveDistance))
@@ -1113,6 +1134,9 @@ public static class PodeDetectarSensor
         observerCell.z = 0;
         DistanceMapWorkspace detectWorkspace = RentDistanceMapWorkspace();
         DistanceMapWorkspace aquaticDetectWorkspace = null;
+        bool detectPropagationReady = false;
+        Domain detectPropagationDomain = Domain.Land;
+        HeightLevel detectPropagationHeight = HeightLevel.Surface;
         try
         {
             BuildDistanceMapInto(boardMap, observerCell, maxRange, detectWorkspace);
@@ -1135,15 +1159,25 @@ public static class PodeDetectarSensor
                 Dictionary<Vector3Int, int> distanceMap = defaultDistanceMap;
                 if (useAquaticDistance)
                 {
-                    if (aquaticDetectWorkspace == null)
+                    // Mesmo cuidado do coletor de celulas: o mapa de propagacao
+                    // pertence a UMA camada, e a ficha pode declarar Propagated
+                    // em mais de uma. Entregar a distancia pela agua a um alvo
+                    // de superficie seria erro silencioso.
+                    if (!detectPropagationReady ||
+                        detectPropagationDomain != targetDomain ||
+                        detectPropagationHeight != targetHeight)
                     {
-                        aquaticDetectWorkspace = RentDistanceMapWorkspace();
+                        if (aquaticDetectWorkspace == null)
+                            aquaticDetectWorkspace = RentDistanceMapWorkspace();
                         BuildDistanceMapInto(
                             boardMap,
                             observerCell,
                             maxRange,
                             aquaticDetectWorkspace,
                             cell => IsCellPassableForPropagation(boardMap, terrainDatabase, cell, targetDomain, targetHeight));
+                        detectPropagationReady = true;
+                        detectPropagationDomain = targetDomain;
+                        detectPropagationHeight = targetHeight;
                     }
 
                     distanceMap = aquaticDetectWorkspace.distances;
