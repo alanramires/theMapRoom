@@ -14,11 +14,13 @@ using UnityEngine.Tilemaps;
 ///
 /// Por isso a assinatura NAO aceita camada, e o alcance e SEMPRE o campo
 /// UnitData.visao — a visao padrao da ficha, que e o que revela hexes.
-/// Toda visao adicional pendurada em visionSpecializations existe para o
-/// PodeDetectar: ela faz unidade aparecer, nunca terreno. Nem alarga (EWACS,
-/// submarino) nem estreita. A celula alvo so decide QUAL superficie e
-/// consultada — Land/Surface em terra, Naval/Surface na agua —, nunca o
-/// alcance.
+/// Toda visao adicional pendurada na lista de Detect Specializations existe
+/// para o PodeDetectar: ela faz unidade aparecer, nunca terreno. Nem alarga
+/// (EWACS, submarino) nem estreita.
+///
+/// Revelacao tambem nao tem MEIO, so alcance: um submarino encostado na praia
+/// revela praia, planicie, floresta e mar dentro do mesmo raio. Cada celula
+/// responde pela camada nativa do terreno dela; o observador nao impoe a sua.
 ///
 /// Consulta pura: nao move unidade, nao publica FOW, nao grava exploracao e
 /// nao registra contato.
@@ -51,46 +53,6 @@ public static class PodeEnxergarSensor
             return;
         }
 
-        int terrainRange = Mathf.Max(1, observerData.visao);
-        CollectForSurfaceDomain(
-            observer,
-            map,
-            terrainDatabase,
-            output,
-            dpqAirHeightConfig,
-            enableLosValidation,
-            virtualObserverCell,
-            Domain.Land,
-            terrainRange);
-        CollectForSurfaceDomain(
-            observer,
-            map,
-            terrainDatabase,
-            output,
-            dpqAirHeightConfig,
-            enableLosValidation,
-            virtualObserverCell,
-            Domain.Naval,
-            terrainRange);
-    }
-
-    /// <summary>
-    /// Uma passada por familia de superficie. O proprio PodeDetectar descarta
-    /// as celulas que nao aceitam a camada forcada, entao Land cobre a terra,
-    /// Naval cobre a agua, e a uniao das duas cobre o tabuleiro sem que este
-    /// sensor precise inspecionar terreno por conta propria.
-    /// </summary>
-    private static void CollectForSurfaceDomain(
-        UnitManager observer,
-        Tilemap map,
-        TerrainDatabase terrainDatabase,
-        ICollection<Vector3Int> output,
-        DPQAirHeightConfig dpqAirHeightConfig,
-        bool enableLosValidation,
-        Vector3Int? virtualObserverCell,
-        Domain surfaceDomain,
-        int terrainRange)
-    {
         PodeDetectarSensor.CollectVisibleCells(
             observer,
             map,
@@ -98,31 +60,31 @@ public static class PodeEnxergarSensor
             output,
             dpqAirHeightConfig,
             enableLosValidation,
-            // Observador avancado designa CONTATO, nao mapa. Terreno revelado
-            // por spotter seria conhecimento que ninguem olhou.
+            // Observador avancado designa CONTATO, nao mapa.
             enableSpotter: false,
-            // A camada do alvo e imposta abaixo; a do ocupante nao opina sobre
-            // o terreno da celula.
+            // A camada do alvo e a do TERRENO da celula, nao a do ocupante:
+            // o que se revela e o hex, e quem esta em cima nao opina.
             useOccupantLayerForTarget: false,
-            // O ponto do split. Com true, o alcance de revelacao e elevado ao
-            // alcance da camada do PROPRIO observador — e por isso que hoje o
-            // EWACS em AirHigh revela chao no alcance aereo dele e o submarino
-            // revela superficie naval no alcance submerso.
+            // Com true, o alcance de revelacao era elevado ao alcance da
+            // camada do proprio observador — o EWACS em AirHigh revelando
+            // chao no alcance aereo, o submarino revelando mar no alcance de
+            // cacar submarino.
             preserveObserverLayerRangeForHexVisibility: false,
-            forceVirtualTargetLayer: true,
-            forcedVirtualTargetDomain: surfaceDomain,
+            // Sem camada forcada: cada celula responde pela camada nativa
+            // dela. E por isso que o submarino encostado na praia revela
+            // praia, planicie, floresta e mar no mesmo raio — revelacao nao
+            // tem meio, so alcance.
+            forceVirtualTargetLayer: false,
+            forcedVirtualTargetDomain: Domain.Land,
             forcedVirtualTargetHeight: HeightLevel.Surface,
-            // O alcance de revelacao e a visao padrao da ficha, imposta aqui.
-            // Isto curto-circuita o ResolveDetectionRange e, com ele, qualquer
-            // especializacao — que e o ponto: visao adicional na ficha faz
-            // unidade aparecer, nao terreno.
-            forcedDetectionRangeOverride: terrainRange,
+            // O alcance e a visao padrao da ficha. Curto-circuita o
+            // ResolveDetectionRange e, com ele, qualquer especializacao.
+            forcedDetectionRangeOverride: Mathf.Max(1, observerData.visao),
             skipSpecializedTargetLayers: true,
-            // A lista de Detect Specializations fica invisivel: nem alcance,
-            // nem metodo, nem chave. Terreno se revela por reta e pela visao
-            // padrao, e nada pendurado na ficha muda isso.
+            // Nem alcance, nem metodo, nem chave da lista de Detect.
             ignoreDetectSpecializations: true,
             useRangeOnlyForAirHighWhenConfigured: false,
             virtualObserverCell: virtualObserverCell);
     }
+
 }
