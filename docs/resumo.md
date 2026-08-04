@@ -1,57 +1,54 @@
 # Resumo — onde estamos e o que vem
 
-Ponto de retomada. Escrito em 2026-08-04, **depois** da tag `v7.1.1`. Leia isto
+Ponto de retomada. Escrito em 2026-08-04, **depois** da tag `v7.1.2`. Leia isto
 primeiro; ele descreve o estado pós-versão e não pertence à tag.
 
 ---
 
 ## Primeira coisa a fazer
 
-**Medir a perf de um turno de IA com muitas unidades.** Não é a tarefa mais
-interessante da lista, é a que pode invalidar as outras.
+**Uma partida de teste.** Não é tarefa de código, e é a mais importante da fila.
 
-A `v7.1.1` trocou filtro por varredura em **três** pontos do caminho quente, na
-mesma sessão, sem medir nenhum:
+Os refactors estruturais acabaram. Nesta sequência de três versões entraram
+mudanças de comportamento que **nunca rodaram juntas**:
 
 ```text
-IsTargetObservedByTeam   par-a-par  →  CollectDetection por observador
-refresh de visibilidade  delta      →  cheio, por commit
-publish do snapshot      delta      →  cheio, por commit
+revelacao de terreno    fonte trocada (PodeEnxergar)
+deteccao                fonte unica (CollectDetection)
+FOW no commit           refresh e publish completos, nao mais delta
+tiro da montanha        parte de EV 2 — quebrei e consertei na v7.1.2
+"atirador ve o alvo"    passou a herdar EV, alinhando com o PodeDetectar
 ```
 
-Cada uma é defensável sozinha. As três juntas multiplicam trabalho. O
-`FrameSpike` é o instrumento; o suspeito provável é o `CollectDetection` por
-observador, que faz muito mais do que o par-a-par fazia.
+O que olhar:
 
-Se estiver limpo, a fila continua na **tarefa 3 abaixo**. Se não estiver, ela
-muda de ordem.
+- bazuca de alcance 2 na montanha acertando quem está atrás da floresta;
+- tiro de terreno plano seguindo igual;
+- caças detectados aparecendo, e **cinza sobre o preto** quando o hex do alvo
+  não está revelado — esse caminho nunca disparou em partida;
+- submarino revelando 3, não 7;
+- **`FrameSpike` num turno de IA com muitas unidades.**
+
+Esse último é o que pode reordenar a fila inteira: a `v7.1.1` trocou filtro por
+varredura em três pontos do caminho quente sem medir nenhum. O suspeito é o
+`CollectDetection` por observador, que faz muito mais do que o par-a-par fazia.
 
 ---
 
-## A fila, na ordem
+## A fila depois do teste
 
 ```text
-1. medir perf do turno de IA                       ← acima
-2. mover a linha para casa propria                 HasValidStraightObservationLine,
-                                                   ResolveOriginEvForLos, o lerp, o cube-line
-3. laco proprio do PodeEnxergar                    mata skipSpecializedTargetLayers,
-                                                   preserveObserverLayerRangeForHexVisibility
-                                                   e o ignoreDetectSpecializations (andaime)
-4. linha de quem detectou no resultado             como o PodeEnxergar ja mostra
-5. delta de contatos novos no publish              gancho do som e do Jornal
-6. decidir skipLosForCurrentTarget                 meio (DPQ) ou metodo na ficha?
-7. eixo de camada no FogKnowledgeSnapshot          destrava o Melhor Spotting
-8. apagar residuo de exploracao nos saves          trivial: nada foi distribuido
+1. linha de quem detectou no resultado    o TryTrace ja devolve evPath,
+                                          intermediateCells e blockedCell
+2. delta de contatos novos no publish     gancho do radar.MP3 e do Jornal;
+                                          o certo e "passou a detectar"
+3. decidir skipLosForCurrentTarget        DECISAO DO AUTOR: propriedade do
+                                          MEIO (DPQ) ou metodo na ficha?
+4. eixo de camada no FogKnowledgeSnapshot destrava o Melhor Spotting
+5. apagar residuo de exploracao nos saves trivial: nada foi distribuido
 ```
 
-A dívida que o autor cravou como princípio, e que a tarefa 3 fecha:
-
-> *O `PodeEnxergar` não pode usar regras que pertençam ao `PodeDetectar` para
-> liberar hexágonos.*
-
-Ele ainda monta a resposta chamando `CollectVisibleCells` e desligando regras uma
-a uma por flag. Foi assim que o mar do submarino sumiu — uma flag de detecção
-descartando célula antes de qualquer conta de linha.
+Só depois disso o **Melhor Spotting** — foi o combinado.
 
 ---
 
@@ -106,9 +103,10 @@ O submarino em `Submerged` sai de EV 0 e **é um soldado em cima da água**.
 ## A escada
 
 ```text
--1. serviços burros do tabuleiro  ✅ ObservationCellService, HexGridGeometry
- 0. sensores PodeX                ⚠️ PodeDetectar é fonte única; PodeEnxergar
-                                    ainda é ele com flags desligadas
+-1. serviços burros do tabuleiro  ✅ HexGridGeometry, ObservationCellService,
+                                    ObservationLineService
+ 0. sensores PodeX                ✅ PodeEnxergar com laço próprio, PodeDetectar
+                                    fonte única, PodeMirar consumindo a mesma reta
  1. serviços de área (Hotzone)    ✅ prontos
  2. consumidores Melhor*          ⚠️ Melhor Visão consome a fotografia; falta Fusão
                                     e o Melhor Spotting
@@ -116,9 +114,13 @@ O submarino em `Submerged` sai de EV 0 e **é um soldado em cima da água**.
  4. variações de papel            vira perfil/trait depois da extração das linhas
 ```
 
-O degrau 0 reabriu e ganhou um degrau **abaixo** dele: o que nunca foi regra de
-sensor — fato de célula e geometria de grade — saiu para serviço próprio, porque
-as duas verdades precisam dos mesmos fatos sem uma depender da outra.
+O degrau 0 fechou de novo, e agora com um degrau **abaixo** dele. O que nunca foi
+regra de sensor — fato de célula, geometria de grade e traçado de reta — saiu
+para serviço próprio, porque as três verdades precisam dos mesmos fatos sem uma
+depender da outra.
+
+**830 linhas saíram do `PodeDetectarSensor`** nesta sequência; só 193 eram lixo,
+as outras 637 mudaram de casa.
 
 ---
 
@@ -179,13 +181,37 @@ que vem do `DPQAirHeightConfig` e fala do **meio**, não do sensor.
 ### Os serviços que saíram do `PodeDetectar`
 
 ```text
+HexGridGeometry          CubeCoord, offset↔cubo, distancia, lerp, round, odd-row,
+                         CollectCellsInRadius
 ObservationCellService   terreno, construcao, estrutura, camada, EV, blockLoS
                          + os tres caches de refresh e o de grid
-HexGridGeometry          CubeCoord, offset↔cubo, distancia, lerp, round, odd-row
+ObservationLineService   TryTrace, ResolveOriginEv, o lerp, o cube-line,
+                         LosGrazeEpsilon e os contadores do traçado
 ```
 
 Movimentação literal, com wrappers privados no `PodeDetectar` — nenhum dos ~20
 chamadores internos mudou.
+
+### A origem da reta é uma regra nomeada
+
+Os três sensores usam a **mesma** reta. O que difere é de onde ela parte:
+
+```text
+InheritTerrain                    revelar hexagono, detectar unidade
+ShooterInheritsWhenTerrainAllows  linha de tiro
+```
+
+A segunda lê `shooterInheritsTerrainEv` do terreno — Montanha é o único com ele
+ligado. É o que faz a bazuca de alcance 2 na montanha acertar quem está atrás da
+floresta: parte de EV 2 e passa por cima do EV 1 da árvore.
+
+**Confirmado a pedido do autor:** EV nunca foi fator de combate.
+`TurnStateManager.Combat.cs` — herdeiro do antigo `CombatResolver.cs`, hoje
+inexistente — não tem uma ocorrência de EV, nem o `CombatModifierResolver`. EV
+existe em um lugar só: a linha de visada.
+
+**E o spotter empresta olho, não trajetória.** Em tiro reto, sem LdT a opção
+morre num `continue` antes de o observador avançado ser cogitado.
 
 ### O recálculo no compromisso
 
@@ -211,14 +237,18 @@ fotografia não se aplica". Nenhum `AIController` consome.
 
 ## Pendências abertas
 
-**Perf não medida.** A dívida mais urgente — ver "Primeira coisa a fazer".
+**Nada foi validado em partida.** A dívida mais urgente — ver "Primeira coisa a
+fazer".
 
-**A linha ainda mora no `PodeDetectar`.** `HasValidStraightObservationLine`,
-`ResolveOriginEvForLos`, o lerp e o cube-line. Com a geometria e o fato de célula
-já fora, ela deixou de arrastar a teia.
+**Perf não medida.** Três varreduras novas no caminho quente, nenhuma com número.
 
 **A linha de quem detectou não aparece no resultado.** O autor pediu que o
-`PodeDetectar` mostre subida ou descida, como o `PodeEnxergar` já mostra.
+`PodeDetectar` mostre subida ou descida, como o `PodeEnxergar` já mostra. Agora é
+barato: o `TryTrace` já devolve `evPath`, `intermediateCells` e `blockedCell`.
+
+**A janela do `PodeEnxergar` ainda usa `TryGetObservationLineDebug`** do
+`PodeDetectar` para o diagnóstico por célula. É a mesma reta por baixo, mas o
+nome com `Debug` vira dívida quando o perfil da linha virar contrato.
 
 **O alerta sonoro precisa de um gancho que não existe.** O certo não é
 "detectou", é **"passou a detectar"** — o delta entre o conjunto anterior e o
@@ -276,6 +306,9 @@ atrás do overlay, que assume oclusão onde há tile.
 | armadilha | lição |
 |---|---|
 | **uma pergunta, duas implementações** | a janela auditava `CollectDetection` e o jogo usava `CanObserverObserveTarget`. A ferramenta não estava errada — estava olhando outro caminho, e deu confiança falsa sobre uma ficha correta |
+| **uma regra aplicada onde ela não vale** | *"a unidade herda EV só para revelar hex e detectar"* virou, na minha mão, o `PodeMirar` inteiro sem herança — e a bazuca da montanha perdeu a linha. A LdT precisa da herança; e o `PodeMirar` usa **duas** retas, tiro e observação, com regras diferentes |
+| **declarar dado órfão cedo demais** | cheguei a propor apagar `shooterInheritsTerrainEv` porque tinha ficado sem leitor. Ele tinha ficado sem leitor **porque eu quebrei a regra** que o lia |
+| **editar `.cs` por script no PS 5.1** | `Get-Content` sem BOM lê como ANSI e corrompe acentos; `Set-Content -Encoding utf8` põe BOM em mensagem de commit. Use `ReadAllLines`/`WriteAllLines` com UTF-8 explícito — e confira o **diffstat**: deleção pura com inserções é sinal de reescrita não intencional |
 | **premissa que funcionava por acidente** | o delta do FOW filtrava unidades por célula com revelação alterada. Isso cobria detecção só enquanto revelar e detectar eram a mesma coisa. Separar as duas quebrou o delta sem tocar nele |
 | **consertar metade e achar que acabou** | o mesmo filtro existia em `RefreshRuntimeUnitFogVisibilityForCells` **e** em `PublishFogGameplaySnapshot`. O segundo só apareceu depois de o primeiro ser corrigido |
 | **generalizar e abrir buraco** | ao tirar o privilégio do submarino no `Propagated`, o mapa de distância continuou sendo montado uma vez sem guardar de que camada era |
