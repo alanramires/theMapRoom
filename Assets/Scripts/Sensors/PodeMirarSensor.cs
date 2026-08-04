@@ -1571,8 +1571,9 @@ public static class PodeMirarSensor
         {
             originEv = 0;
         }
-        // inheritTerrainEv: false — o atirador nao herda a altura do terreno. A
-        // unidade herda EV para revelar hex e para detectar unidade, e so.
+        // LINHA DE TIRO: o atirador herda a altura quando o terreno autoriza. E
+        // o que permite a bazuca de alcance 2 na montanha acertar quem esta
+        // atras da floresta — ela parte de 2 e passa por cima do EV 1 da arvore.
         originEv = ObservationLineService.ResolveOriginEv(
             tilemap,
             terrainDatabase,
@@ -1580,7 +1581,7 @@ public static class PodeMirarSensor
             attacker,
             dpqAirHeightConfig,
             originEv,
-            inheritTerrainEv: false);
+            OriginEvRule.ShooterInheritsWhenTerrainAllows);
 
         if (!TryResolveCellVision(
                 tilemap,
@@ -1648,9 +1649,10 @@ public static class PodeMirarSensor
         return true;
     }
 
-    // A reta e uma so no projeto: ObservationLineService. Aqui ela parte SEM
-    // herdar o EV do terreno — a unidade herda altura para revelar hex e para
-    // detectar unidade, nao para atirar.
+    // A reta e uma so no projeto: ObservationLineService. Esta aqui e a de
+    // OBSERVACAO — "o atirador ve o alvo" —, entao segue a regra de observacao e
+    // herda o EV do terreno. Quem usa a regra do atirador e a
+    // HasValidStraightLineOfFire, que valida a LdT.
     private static bool HasValidStraightObservationLine(
         Tilemap tilemap,
         TerrainDatabase terrainDatabase,
@@ -1668,7 +1670,7 @@ public static class PodeMirarSensor
             tilemap, terrainDatabase, originCell, targetCell, observer, target,
             dpqAirHeightConfig, out intermediateCells, out evPath, out blockedCell,
             enableLosValidation, forcedTargetDomain: null, forcedTargetHeightLevel: null,
-            inheritTerrainEv: false);
+            OriginEvRule.InheritTerrain);
     }
 
     private static bool TerrainAllowsWeaponTrajectory(TerrainTypeData terrain, WeaponData weapon)

@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Tilemaps;
 
@@ -14,6 +14,28 @@ using UnityEngine.Tilemaps;
 /// depender da outra. Consome dois servicos abaixo dele: ObservationCellService
 /// para o fato da celula e HexGridGeometry para a grade.
 /// </summary>
+/// <summary>
+/// De onde a linha parte. E decisao de quem pergunta, nao da geometria.
+/// </summary>
+public enum OriginEvRule
+{
+    /// <summary>
+    /// Observacao — revelar hexagono e detectar unidade. A unidade herda o EV
+    /// do terreno onde esta: o soldado na montanha observa de 2.
+    /// </summary>
+    InheritTerrain = 0,
+
+    /// <summary>
+    /// Linha de tiro. Herda o EV do terreno apenas quando o terreno autoriza o
+    /// atirador (shooterInheritsTerrainEv), com o override quando houver.
+    ///
+    /// E o que permite a bazuca de alcance 2 na montanha acertar quem esta
+    /// atras da floresta: ela parte de 2 e passa por cima do EV 1 da arvore.
+    /// Fora dos terrenos que autorizam, o atirador parte do EV da camada.
+    /// </summary>
+    ShooterInheritsWhenTerrainAllows = 1
+}
+
 public static class ObservationLineService
 {
     /// <summary>
@@ -62,7 +84,7 @@ public static class ObservationLineService
         bool enableLosValidation,
         Domain? forcedTargetDomain = null,
         HeightLevel? forcedTargetHeightLevel = null,
-        bool inheritTerrainEv = true)
+        OriginEvRule rule = OriginEvRule.InheritTerrain)
     {
         intermediateCells = new List<Vector3Int>();
         evPath = new List<float>();
@@ -83,10 +105,8 @@ public static class ObservationLineService
         }
 
         // De onde a linha parte e decisao de QUEM PERGUNTA, nao da geometria.
-        // A unidade herda o EV do terreno para REVELAR HEX e DETECTAR UNIDADE,
-        // e so para isso. Tiro nao herda: o atirador parte do EV da camada dele.
-        // Por isso a reta e uma so e a origem e um booleano nomeado, nao uma
-        // segunda implementacao.
+        // Observar e atirar usam a MESMA reta e regras de origem diferentes; por
+        // isso a origem e uma regra nomeada, e nao uma segunda implementacao.
         originEv = ResolveOriginEv(
             tilemap,
             terrainDatabase,
@@ -94,7 +114,7 @@ public static class ObservationLineService
             observer,
             dpqAirHeightConfig,
             originEv,
-            inheritTerrainEv);
+            rule);
 
         if (!forcedTargetDomain.HasValue &&
             !forcedTargetHeightLevel.HasValue &&
@@ -191,13 +211,7 @@ public static class ObservationLineService
     /// DPQ Air Height Config. Sem clamp em zero de proposito: se um dia o
     /// submerso for -1, a linha sobe em vez de descer, e isso e decisao do dado.
     ///
-    /// Sobre terreno, <paramref name="inheritTerrainEv"/> decide:
-    ///
-    ///   true   herda o EV do terreno. O soldado na montanha observa de 2 e a
-    ///          linha desce ate a planicie em 0. E o caso de REVELAR HEX e
-    ///          DETECTAR UNIDADE — e so esses dois.
-    ///   false  parte do EV da camada, que na superficie e 0. E o caso do TIRO:
-    ///          a unidade nao herda altura para atirar.
+    /// Sobre terreno, <paramref name="rule"/> decide (ver OriginEvRule).
     /// </summary>
     public static float ResolveOriginEv(
         Tilemap tilemap,
@@ -206,7 +220,7 @@ public static class ObservationLineService
         UnitManager observer,
         DPQAirHeightConfig dpqAirHeightConfig,
         float fallbackEv,
-        bool inheritTerrainEv = true)
+        OriginEvRule rule = OriginEvRule.InheritTerrain)
     {
         if (observer == null)
             return Mathf.Max(0f, fallbackEv);
@@ -226,9 +240,6 @@ public static class ObservationLineService
             return fallbackEv;
         }
 
-        if (!inheritTerrainEv)
-            return 0;
-
         originCell.z = 0;
         if (tilemap != null &&
             terrainDatabase != null &&
@@ -239,7 +250,12 @@ public static class ObservationLineService
                 out TerrainTypeData originTerrain) &&
             originTerrain != null)
         {
-            return originTerrain.ev;
+            if (rule == OriginEvRule.InheritTerrain)
+                return originTerrain.ev;
+
+            return originTerrain.shooterInheritsTerrainEv
+                ? originTerrain.ResolveShooterInheritedEv()
+                : 0;
         }
 
         return 0;
