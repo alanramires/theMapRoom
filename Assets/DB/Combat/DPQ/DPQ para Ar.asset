@@ -22,7 +22,7 @@ MonoBehaviour:
   airLowEv: 3
   airHighEv: 4
   fallbackEv: 0
-  airLowBlockLoS: 1
+  airLowBlockLoS: 0
   airHighBlockLoS: 0
   fallbackBlockLoS: 0
   subDpq: {fileID: 11400000, guid: 151bdc82ef06071449424d30a1d567a5, type: 2}
