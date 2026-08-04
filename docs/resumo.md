@@ -1,101 +1,95 @@
 # Resumo — onde estamos e o que vem
 
-Ponto de retomada. Escrito em 2026-08-03, **depois** da tag `v7.0.4`. Leia isto
+Ponto de retomada. Escrito em 2026-08-04, **depois** da tag `v7.1.0`. Leia isto
 primeiro; ele descreve o estado pós-versão e não pertence à tag.
 
 ---
 
 ## Primeira coisa a fazer
 
-Implementar a **etapa 1 do Melhor Spotting** em
-`docs/implementar_melhor_spotting.md`: levar o snapshot/bake ao
-`MelhorVisaoService` e à janela.
+**A perna de detecção** — a irmã do `PodeEnxergar`, que hoje ficou pronta.
 
-O ponto exato é este:
+A `v7.1.0` separou quem revela hexágono de quem faz unidade aparecer, mas só
+terminou o primeiro lado. O `PodeDetectar` continua carregando as duas
+responsabilidades no mesmo arquivo, e ainda decide por `if` coisas que deveriam
+estar na ficha.
+
+Antes ou junto disso, uma dívida que o autor cravou como princípio:
+
+> *O `PodeEnxergar` não pode usar regras que pertençam ao `PodeDetectar` para
+> liberar hexágonos.*
+
+Hoje ele **não tem laço próprio**: monta a resposta chamando `CollectVisibleCells`
+e desligando regras uma a uma por flag. Foi exatamente assim que o mar do
+submarino sumiu — uma flag de detecção descartando célula antes de qualquer conta
+de linha. Enquanto for flag, toda regra nova do `PodeDetectar` volta a vazar
+para cá sem aviso.
+
+O laço próprio precisa de duas primitivas expostas como **geometria pura**, sem
+política dentro:
 
 ```text
-MelhorVisaoService.cs
-  FocusCells                         hoje é peso, não requisito
-  CollectAlliedCoverage              hoje recalcula os aliados
-
-FogKnowledgeSnapshot
-  VisibilityContributorsByCell       já permite retirar a contribuição
-                                      da própria unidade sem chamar sensores
+GetIntermediateCellsByCellLerp   a caminhada dos hexes da linha
+TryResolveCellVision             EV e blockLoS de uma célula
 ```
 
-Preservar dois caminhos:
-
-- com snapshot runtime ou bake: consumir conhecimento já pronto;
-- sem snapshot: cálculo estrutural bruto, útil no Scene Edit.
-
-Não cozinhar FOW automaticamente ao pintar, remover ou mover peças. O autor
-monta o tabuleiro livremente e aperta `Cozinhar FOW 0` quando quiser fotografar
-a rodada.
-
-Depois: criar `MelhorSpottingService` plural e somente então a janela
-`Tools > Hotzone > Melhor Spotting`. Nenhum `AIController` deve consumir a
-primeira entrega.
+As duas são `private` no `PodeDetectarSensor`. Expor não é duplicar regra — é o
+serviço burro sendo dividido, com cada sensor dono da política dele.
 
 ---
 
 ## Estado
 
-`v7.0.4` tagueada e publicada. Relatório:
-`docs/relatorio_v7.0.4.md`.
+`v7.1.0` tagueada e publicada na `main`. Relatório:
+`docs/relatorio_v7.1.0.md`.
 
-**Build medido depois da tag:** `0 erros, 264 avisos` — todos pré-existentes
-(`CS0618` de API obsoleta da Unity, `UAC1009` de serialização). O relatório dizia
-"0 avisos"; corrigido lá, e a causa virou armadilha registrada abaixo.
-
-**A sanidade do `PodeMirar` foi conferida.** Ele ganhou 147 linhas nesta versão,
-e alterar regra de sensor validado seria **X**. Não é: a mudança é aditiva e o
-caminho de jogo continua no `perceptionSnapshot == null`. Só a janela de Editor
-passa snapshot — **nenhum `AIController` passa**. Se algum dia um passar, aí sim
-o comportamento em partida muda.
+**Primeira versão desta série que muda comportamento em partida.** Até a
+`v7.0.4` tudo era ferramenta e consumidor; agora o FOW revela terreno por uma
+fonte diferente.
 
 ### A descoberta que organiza o próximo trabalho
 
-> **Previsão precisa de duas verdades separadas.**
+> **Detecção não revela FOW.**
+
+Quatro quadrantes, todos existem, nenhum derivável do outro:
+
+| | hex conhecido | contato detectado |
+|---|---|---|
+| soldado comum | sim | sim |
+| EWACS a 7 | **não** | sim |
+| sniper ao lado | sim | **não** |
+
+Por isso as duas respostas não podem morar no mesmo conjunto. Um sonar ouvindo
+um motor não pode ensinar onde fica a costa.
+
+### A regra do `PodeEnxergar`, como o autor a definiu
 
 ```text
-geometria hipotética     “o que esta unidade enxergaria/atacaria dali?”
-conhecimento confirmado  “o que o time sabe antes de comprometer a ação?”
+alcance    UnitData.visao — nada da lista de Detect alarga ou estreita
+camada     a superfície do terreno da célula; revelação não tem meio, só alcance
+origem     o EV do lugar onde a unidade está
+linha      descendente até o EV do destino; para só se um bloqueador tiver EV MAIOR
+borda      célula sem tile não é hex recusado, é ausência de tabuleiro
 ```
 
-Misturar as duas permitiu ao primeiro protótipo do Melhor Combate mover uma
-unidade, descobrir um alvo e atirar nele dentro da mesma consulta. Isso viola o
-ciclo real: movimento provisório não publica FOW, e uma unidade não ganha um
-ataque retroativo contra algo que só descobriria depois de chegar.
-
-O `FogKnowledgeSnapshot` passou a ser a fotografia compartilhada; as posições
-virtuais continuam sendo projeções puras.
-
-### O Scene View mudou de função
-
-O autor descreveu o resultado: *“aos poucos vai parecendo com uma partida
-jogada offline”.* O Scene View é o tapete onde ele distribui peças e audita uma
-unidade selecionada. Os sliders do `UnitManager` já fornecem HP, munição e
-autonomia; por isso a hipótese de que Melhor Combate deveria ser runtime-only
-foi descartada.
+Ar e submerso não são terreno: o EV vem do `DPQAirHeightConfig`, por consulta.
+O submarino em `Submerged` sai de EV 0 e **é um soldado em cima da água**.
 
 ---
 
 ## A escada
 
 ```text
-0. sensores PodeX               ✅ prontos (falta PodeConstruir se o engenheiro nascer)
+0. sensores PodeX               ⚠️ PodeEnxergar nasceu; PodeDetectar ainda mistura
 1. serviços de área (Hotzone)   ✅ prontos
-2. consumidores Melhor*         ⚠️ Melhor Combate existe; falta Fusão;
-                                   Melhor Spotting está planejado
+2. consumidores Melhor*         ⚠️ Melhor Visão consome a fotografia; falta Fusão
+                                   e o Melhor Spotting
 3. papéis → só POLÍTICA         docs/revisao_papeis.md — 1 linha de 7 levantada
 4. variações de papel           vira perfil/trait depois da extração das linhas
 ```
 
-Consumidores existentes: **Captura, Capitão, Visão, Combate, Desembarque,
-Embarque, Estoque, Pouso**, mais `QueroCarona`.
-
-O Melhor Spotting será um consumidor orientado a missão sobre Melhor Visão, não
-um sensor novo.
+O degrau 0 reabriu. Ele estava marcado como pronto e não estava: um sensor
+respondia duas perguntas.
 
 ---
 
@@ -103,133 +97,83 @@ um sensor novo.
 
 | # | documento | por quê |
 |---|---|---|
-| 1 | `docs/manual/01_principios_e_vocabulario.md` | decide onde uma regra pode morar |
-| 2 | `docs/relatorio_v7.0.4.md` | explica o fio e os erros corrigidos nesta versão |
-| 3 | `docs/implementar_melhor_spotting.md` | ponto de execução atual e critérios de aceite |
-| 4 | `docs/implementar_melhorCombate.md` | contrato e limite do MVP já entregue |
+| 1 | `docs/relatorio_v7.1.0.md` | o fio do dia, e a seção 9 (o erro que custou o dia) |
+| 2 | `docs/manual/01_principios_e_vocabulario.md` | decide onde uma regra pode morar |
+| 3 | `docs/implementar_melhor_spotting.md` | ponto de execução do consumidor, bloqueado pelo eixo de camada |
+| 4 | `docs/arquitetura/acoes_transacionais.md` | obrigatório antes de ligar ferramenta a runtime |
 | 5 | `docs/revisao_papeis.md` | matriz, traits e correções da taxonomia |
-| 6 | `docs/arquitetura/acoes_transacionais.md` | obrigatório antes de ligar ferramenta a runtime |
 
 ---
 
 ## Onde eu parei
 
-### Melhor Combate — ferramenta pronta, consumidor runtime não
+### `PodeEnxergar` — entidade viva, sem laço próprio
 
-Arquivos centrais:
+`Assets/Scripts/Sensors/PodeEnxergarSensor.cs`. Responde só por hexágonos e é a
+fonte do FOW: `CollectVisibleCellsForFogOfWar` delega a ele, e os três
+consumidores herdam — FOW de runtime, bake da rodada zero, `RetaguardaWindow`.
 
-- `Assets/Scripts/Combat/CombatEvaluationService.cs`;
-- `Assets/Scripts/Combat/AttackDecisionResult.cs`;
-- `Assets/Scripts/DPQ/PositionDpqResolver.cs`;
-- `Assets/Scripts/Match/AI/Services/MelhorCombateService.cs`;
-- `Assets/Editor/MelhorCombateWindow.cs`.
+Falta o laço próprio (ver "Primeira coisa a fazer").
 
-O serviço cruza origens, alvos, opção canônica do `PodeMirar`, HP, DPQ, Attack
-Decision e preferências da ficha. A janela funciona em Scene Edit e runtime,
-separa tiro parado de assalto, mostra LoS/LdT, arma, spotter e rejeições.
+### As três portas fechadas
 
-Os `AIController` antigos já reutilizam `CombatEvaluationService` pelo wrapper,
-mas **não consomem `MelhorCombateService`** e mantêm políticas/escalas próprias.
-O batch ainda não carrega `weaponIndex`; alternativas à arma canônica não podem
-ser prometidas.
+Fechar o vazamento exigiu achar três caminhos independentes:
 
-### FOW cozido — infraestrutura pronta
+- `preserveObserverLayerRangeForHexVisibility` — elevava a revelação ao alcance
+  da camada do próprio observador;
+- `BuildFogDisplayVisibleCellsForAllModes` — somava especialização de Air no
+  conjunto que pinta terreno, e dali para a **memória permanente**;
+- `AddSpecializedAirKnowledge` — o gêmeo no bake.
 
-Arquivos centrais:
+### `DetectionMethod`
 
-- `Assets/Scripts/Sensors/FogKnowledgeSnapshotBuilder.cs`;
-- `Assets/Scripts/Match/MatchController.cs`;
-- `Assets/Editor/MatchControllerEditor.cs`.
+`LosPolicy` virou `DetectionMethod` com os números preservados:
+`LineOfSight = 0`, `Propagated = 2`, o `1` morto sem herdeiro. Nenhuma ficha
+precisou de edição manual.
 
-Runtime copia o snapshot confirmado. Edit Mode usa o bake manual persistido por
-slot no `MatchController`. Melhor Combate e Melhor Captura têm atalho
-`Cozinhar FOW 0`.
+`Propagated` já existia escondido em dois `if`: o mapa de distância aquático
+soldado a `Submarine/Submerged` e o `range only` de `AirHigh`. **Continuam
+soldados** — declará-los na ficha é trabalho da perna de detecção.
 
-O snapshot inclui contribuições por célula e por alvo. Ferramentas consumidoras
-não devem voltar a chamar `PodeEnxergar`, `PodeDetectar`, `Alguém Me Vê` ou
-`Hex Enxergado` para reconstruir a mesma percepção.
+### `PodeMirar` aceita alvo detectado em hex preto
 
-### Melhor Captura — resposta tripla pronta, IA não migrada
+Contato confirmado autoriza o tiro; o estado do terreno não opina. O que ficou é
+a neutralização do **motivo** das entradas inválidas — o alvo pode aparecer
+nomeado, a descrição do obstáculo não.
 
-Arquivos centrais:
+### Melhor Visão consome a fotografia
 
-- `Assets/Scripts/Match/AI/Services/MelhorCapturaService.cs`;
-- `Assets/Editor/MelhorCapturaWindow.cs`.
-
-Com FOW ligado, cada alvo separa:
-
-```text
-Arrival          chegada/ocupação
-ImmediateAction  fow/ação
-Eligibility      captura/reconquista
-```
-
-Prédio conhecido e encoberto continua no ranking como captura futura. Prédio
-ocupado informa a melhor chegada adjacente, não “inalcançável”. Construção
-aliada parcialmente perdida entra como reconquista; só sai quando a captura
-está no máximo. Linhas de contribuição mostram quem ilumina o local usando o
-snapshot.
-
-O `AIController.Capturer` ainda não consome essa resposta.
-
-### Melhor Spotting — somente plano
-
-`docs/implementar_melhor_spotting.md` define:
-
-```text
-unidade + ObjectiveCells + política All/Any/Maximize
-    → origens táticas que realmente iluminam a missão
-```
-
-Um alvo é um conjunto com um elemento. O contrato já nasce plural para a futura
-cobertura de artilharia. “Iluminar o objetivo” é gate; cobertura geral só
-ranqueia as origens admissíveis.
-
-### Revisão de papéis — avaliação, não implementação
-
-`docs/revisao_papeis.md` corrigiu dois vereditos próprios:
-
-- `Antiaereo` morre como papel se significa apenas capacidade da arma;
-- `TransportadorAereo` morre porque shopping já pode demandar domínio.
-
-Somente a agenda reordenável do router pode virar perfil. Auto-reparo,
-desbloqueio de produção e transporte obrigatório continuam invariantes acima
-de traits. Não parametrizar antes de extrair as sete linhas.
+`MelhorVisaoService` aceita `FogKnowledgeSnapshot` e lê a cobertura aliada das
+contribuições por hex. `ResolveUsableSnapshot` separa "não há fotografia" de "a
+fotografia não se aplica". Nenhum `AIController` consome.
 
 ---
 
 ## Pendências abertas
 
-**Melhor Visão ainda não consome o bake.** É o primeiro degrau do próximo
-trabalho e pré-requisito do Melhor Spotting.
+**A perna de detecção não começou.** É a próxima.
 
-**`FocusCells` é peso, não obrigação.** Não reutilizar o campo silenciosamente
-como se fosse gate; o Spotting precisa de contrato explícito.
+**`KnownCells` continua um balde só.** Não recebe mais conhecimento aéreo
+especializado, mas ainda mistura terreno e memória de exploração, e o
+`FogKnowledgeSnapshot` segue **sem eixo de camada**. O Melhor Spotting depende
+disso, e o contato desenhado sobre o preto também.
 
-**Cobertura de artilharia é plano B.** Primeiro uma unidade e um conjunto de
-objetivos. Selecionar vários spotters é cobertura incremental e pertence ao
-coordenador.
+**Saves antigos têm resíduo.** Hexes revelados pelo alcance de detecção antes da
+`v7.1.0` já estão gravados como explorados e não são limpos.
 
-**A Vigilância da `v7.0.3` continua sem validação registrada no Unity.** Conferir
-iniciativa da fragata, `AlliedObserverFilter` em `Submerged` e devolução de
-autoridade ao Melhor Visão quando não há tiro legal.
+**Contato sobre o preto ainda não foi validado em jogo.**
+`ApplyFogDetectedContactPresentation` já faz `detectado && !geograficamenteVisível
+→ cinza`, mas isso só passa a ser o caminho normal agora. O sprite pode ficar
+atrás do overlay, que assume oclusão onde há tile.
 
-**Dois “para onde revelar” continuam locais:** `Capturer.Explorer` e
-`Transportador`. Não migrar antes de o Melhor Spotting ficar auditável.
+**A Vigilância da `v7.0.3` continua sem validação registrada no Unity.**
 
-**`MelhorCapitao` continua sem consumidor.** Falta o tradutor `AICaptainData →
-List<MelhorCapitaoAttraction>` e seus predicados.
+**`MelhorCapitao` continua sem consumidor.** Falta o tradutor
+`AICaptainData → List<MelhorCapitaoAttraction>`.
 
-**`roles[0] == CapturadorAgressivo` continua no `GetCapturePower`.** Só remover
-depois da migração das fichas para a chave `Capturador Alternativo` e auditoria;
-o modo de falha é silencioso.
+**`roles[0] == CapturadorAgressivo` continua no `GetCapturePower`.**
 
-**O `Rebel.cs` ainda vaza para outros papéis.**
-`FindNearestPlanlessCaptureTarget` é usado por Transporte, Assalto e capturador
-rogue.
-
-**Melhor Combate não governa a IA.** Migrar todos os papéis e o HexEvaluator é
-um trabalho maior que o MVP da ferramenta.
+**Melhor Combate e Melhor Captura não governam a IA.**
 
 ---
 
@@ -239,25 +183,14 @@ um trabalho maior que o MVP da ferramenta.
 - **Avaliar não é executar.** Plano pedido não autoriza implementação.
 - **Verificar antes de documentar.** Ler diff e contrato real.
 - **Ler `docs/manual/` antes de decidir onde uma regra mora.**
-- **Nada provisório publica verdade confirmada.** Movimento hipotético não abre
-  FOW nem cria contato utilizável.
+- **Nada provisório publica verdade confirmada.**
 - **Tem relatório, tem tag. Não tem relatório, é só commit.**
 - **Não editar `.asset` no disco com o Inspector aberto.**
-- **Um commit por frente de trabalho**, não um pelo lote. É o que torna uma
-  frente revertível sem tocar nas outras.
+- **Um commit por frente de trabalho**, não um pelo lote.
 - **Número de build só entra em relatório se veio de build COM restore.**
-  `dotnet build Assembly-CSharp.csproj -v q --nologo` — sem `--no-restore`.
+  `dotnet build Assembly-CSharp.csproj -v q --nologo` — e o Editor é outro
+  assembly: `Assembly-CSharp-Editor.csproj`.
 - Fechar o dia: skill `.claude/skills/fechamento-do-dia/SKILL.md`.
-
-### Calibragem do dígito de versão
-
-A `v7.0.4` saiu como **Z** e provavelmente era **Y**: trouxe três serviços
-novos, a infraestrutura de snapshot de FOW, um parâmetro novo no `PodeMirar` e
-uma ferramenta — 5.635 inserções. Z é *"salvamento de fim de trabalho"*; isto foi
-*"pega uma parte e trabalha ela e os filhos dela"*.
-
-A tag publicada **fica como está** — mover referência já publicada custa mais que
-o erro. É calibragem para a próxima.
 
 ---
 
@@ -265,28 +198,35 @@ o erro. É calibragem para a próxima.
 
 | armadilha | lição |
 |---|---|
-| **`dotnet build --no-restore` com `Temp/obj` limpo** | a Unity apaga a pasta, o build aborta em `NETSDK1004` e imprime **"0 Warning(s)"** porque nada compilou. Já produziu "0 avisos" falso no relatório da `v7.0.4` e um falso "não compila" na revisão. **Sempre com restore quando for afirmar número** |
-| **um commit para o lote inteiro** | `eb47d08` juntou quatro frentes em 27 arquivos: hoje não dá para reverter a mudança do `PodeMirar` sem derrubar Melhor Combate, FOW cozido e Melhor Captura |
-| **posição hipotética criando conhecimento** | mover no cálculo não permite detectar e atirar antes do compromisso; reuse o snapshot confirmado |
-| **foco tratado como gate** | `FocusCells` hoje só soma pontos; missão obrigatória precisa de admissibilidade explícita |
-| **recalcular percepção por candidato** | snapshot/bake já possui conhecimento e contribuições; sensor por origem serve apenas à projeção daquela unidade |
-| **mudar inicializador de `EditorWindow`** | campo serializado preserva o valor antigo; default novo exige migração versionada |
-| **ocupado = inalcançável** | a unidade pode chegar ao entorno sem poder terminar no hex; reporte chegada e ocupação separadamente |
-| **runtime-only por hipótese** | `UnitManager` já tinha sliders suficientes para simular combate no Scene Edit |
-| **classificar antes de unificar o órgão** | primeiro extraia a fonte única; depois a matriz descreve quem a consome |
+| **afirmar mecanismo lendo um trecho** | o `PodeDetectarSensor` tem quatro caminhos parecidos. Ler um pedaço não permite dizer qual roda. Cinco hipóteses erradas seguidas na `v7.1.0`, uma delas piorando o sintoma e exigindo revert |
+| **`skipSpecializedTargetLayers`** | não ignora o alcance das especializações: **descarta a célula** cuja camada tenha Detect Specialization. Foi ela que apagou o mar do submarino |
+| **sensor com flags em vez de laço próprio** | toda flag desligada traz junto uma regra que ninguém pediu |
+| **contraste lido como causa** | "o soldado funciona e o submarino não" era sobre *ter especialização*, não sobre água |
+| **correlação tratada como mecanismo** | um revert feito por coincidência temporal; a detecção nunca passou pelo código alterado |
+| **`Set-Content -Encoding utf8` em mensagem de commit** | PowerShell 5.1 escreve BOM, e ele aparece no `git log`. Usar o editor de arquivos |
+| **here-string do PS 5.1 com aspas para native exe** | o argumento é re-quebrado. Mensagem de commit vai por `-F arquivo` |
+| **`dotnet build --no-restore` com `Temp/obj` limpo** | imprime "0 Warning(s)" porque nada compilou |
+| **um commit para o lote inteiro** | impede reverter uma frente sem derrubar as outras |
+| **posição hipotética criando conhecimento** | movimento no cálculo não permite detectar e atirar antes do compromisso |
+| **foco tratado como gate** | `FocusCells` só soma pontos; missão obrigatória precisa de admissibilidade explícita |
+| **recalcular percepção por candidato** | snapshot/bake já possui conhecimento e contribuições |
+| **mudar inicializador de `EditorWindow`** | campo serializado preserva o valor antigo |
+| **ocupado = inalcançável** | reporte chegada e ocupação separadamente |
+| **classificar antes de unificar o órgão** | primeiro extraia a fonte única |
 | **skill que se declara** | se renomear a etiqueta quebra, o poder está no lugar errado |
-| **cobertura aliada sem filtro** | um observador comum pode satisfazer por engano uma missão especializada |
-| **troca de tipo em lista serializada** | Unity preserva a contagem e deixa conteúdo nulo; volta com fantasma |
-| **gate inaplicável** | separar “não satisfeito” de “impossível/desconhecido” |
-| **otimizar por hipótese** | medir antes; cortar chamadas pode não mover o gargalo |
-| **`FindObjectsByType` dentro de laço** | se o chamador já possui o objeto, passe-o |
-| **`git add .`** | só usar no passo de churn do fechamento |
-| **tag antes do commit final** | obriga a mover referência publicada; tag é a última coisa da versão |
+| **troca de tipo em lista serializada** | Unity preserva a contagem e deixa conteúdo nulo |
+| **gate inaplicável** | separar "não satisfeito" de "impossível/desconhecido" |
+| **otimizar por hipótese** | medir antes |
+| **`git add .`** | só no passo de churn do fechamento |
+| **tag antes do commit final** | tag é a última coisa da versão |
 
 ---
 
 ## Critério de retomada
 
-O próximo incremento está pronto quando o Melhor Visão consegue receber um
-snapshot/bake sem recalcular o time, continua funcionando sem fotografia e não
-altera FOW, ocupação, memória ou recursos durante a consulta.
+A perna de detecção está pronta quando o `PodeDetectar` responder **só por
+unidades**, sem nenhum caminho que contribua para conjunto de células de terreno,
+e quando `Propagated` for escolhido pela ficha em vez de por `if` na camada.
+
+E o `PodeEnxergar` está pronto quando puder ser lido sem abrir o
+`PodeDetectarSensor`.
