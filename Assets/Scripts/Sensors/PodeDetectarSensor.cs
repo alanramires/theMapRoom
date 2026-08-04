@@ -284,7 +284,6 @@ public static class PodeDetectarSensor
     private static readonly Dictionary<CollectVisibleCellsCacheKey, List<Vector3Int>> collectVisibleCellsCache = new Dictionary<CollectVisibleCellsCacheKey, List<Vector3Int>>(128);
     private static readonly List<Vector3Int> collectVisibleCellsScratch = new List<Vector3Int>(128);
     private static int collectVisibleCellsCacheRevision = int.MinValue;
-    private static bool useLegacyLoSLerp = false;
     private static int debugCacheHits;
     private static int debugCacheMisses;
     private static int debugPoolRents;
@@ -382,12 +381,6 @@ public static class PodeDetectarSensor
         poolReleases = debugPoolReleases;
         fragataCollectWorkspaceRents = debugFragataCollectWorkspaceRents;
         fragataCollectWorkspaceReleases = debugFragataCollectWorkspaceReleases;
-    }
-
-    public static bool UseLegacyLoSLerp
-    {
-        get => useLegacyLoSLerp;
-        set => useLegacyLoSLerp = value;
     }
 
     public static void ClearRefreshScopedTerrainCache()
@@ -1988,116 +1981,6 @@ public static class PodeDetectarSensor
         return false;
     }
 
-    // MORTA. Era a segunda implementacao de "eu detecto este alvo", par a par,
-    // enquanto as ferramentas auditavam a coleta por observador. As duas
-    // discordavam — um caca detectado por chave de Stealth aparecia na janela e
-    // nao no tabuleiro. O IsTargetObservedByTeam passou a usar CollectDetection,
-    // que e a fonte de verdade, e ninguem mais chama isto aqui.
-    //
-    // Fica um commit sem uso de proposito, para o diff que a apagar ser legivel
-    // sozinho. NAO voltar a chamar: uma pergunta, uma implementacao.
-    private static bool CanObserverObserveTarget(
-        UnitManager observer,
-        UnitManager target,
-        Tilemap boardMap,
-        TerrainDatabase terrainDatabase,
-        DPQAirHeightConfig dpqAirHeightConfig,
-        bool enableLosValidation,
-        bool enableSpotter,
-        bool enableStealthValidation)
-    {
-        if (observer == null || target == null || boardMap == null)
-            return false;
-        if (!IsUnitOnBoard(observer, boardMap) || !IsUnitOnBoard(target, boardMap))
-            return false;
-
-        UnitData observerData = null;
-        observer.TryGetUnitData(out observerData);
-        UnitData targetData = null;
-        target.TryGetUnitData(out targetData);
-
-        Vector3Int observerCell = observer.CurrentCellPosition;
-        observerCell.z = 0;
-        Vector3Int targetCell = target.CurrentCellPosition;
-        targetCell.z = 0;
-
-        Domain targetDomain = target.GetDomain();
-        HeightLevel targetHeight = target.GetHeightLevel();
-        int detectionRange = ResolveDetectionRange(observer, observerData, target, targetDomain, targetHeight);
-        bool useAquaticDistance = ShouldUsePropagatedDistance(observerData, targetDomain, targetHeight) && terrainDatabase != null;
-
-        DistanceMapWorkspace observeWorkspace = RentDistanceMapWorkspace();
-        int distance;
-        try
-        {
-            BuildDistanceMapInto(
-                boardMap,
-                observerCell,
-                detectionRange,
-                observeWorkspace,
-                useAquaticDistance
-                    ? cell => IsCellPassableForPropagation(boardMap, terrainDatabase, cell, targetDomain, targetHeight)
-                    : null);
-            Dictionary<Vector3Int, int> distanceMap = observeWorkspace.distances;
-            if (!distanceMap.TryGetValue(targetCell, out distance))
-                return false;
-            if (distance > detectionRange)
-                return false;
-        }
-        finally
-        {
-            ReleaseDistanceMapWorkspace(observeWorkspace);
-        }
-
-        bool effectiveLosValidation = ResolveEffectiveLosValidation(observerData, targetDomain, targetHeight, enableLosValidation);
-        bool bypassLosByPolicy = !effectiveLosValidation;
-        bool skipLosForCurrentTarget = observer.GetDomain() == Domain.Air &&
-            IsAirHighRangeOnlyVision(dpqAirHeightConfig, targetDomain, targetHeight);
-        bool hasDirectLos = skipLosForCurrentTarget || HasValidStraightObservationLine(
-            boardMap,
-            terrainDatabase,
-            observerCell,
-            targetCell,
-            observer,
-            target,
-            dpqAirHeightConfig,
-            out _,
-            out _,
-            out _,
-            enableLosValidation: true);
-
-        bool usedForwardObserver = false;
-        if (!hasDirectLos)
-        {
-            if (enableSpotter && ShouldUseForwardObserverRule(targetDomain, targetHeight))
-            {
-                List<UnitManager> forwardObservers = CollectForwardObserversForTarget(
-                    observer,
-                    target,
-                    boardMap,
-                    terrainDatabase,
-                    dpqAirHeightConfig,
-                    enableLosValidation: true);
-                usedForwardObserver = forwardObservers.Count > 0 ||
-                    HasControlledConstructionObserverForTarget(
-                        observer, target, boardMap, terrainDatabase, dpqAirHeightConfig, enableLosValidation: true);
-            }
-        }
-
-        bool hasObservation = hasDirectLos || bypassLosByPolicy || usedForwardObserver;
-        if (!hasObservation)
-            return false;
-
-        bool isStealthTarget = targetData != null && targetData.IsStealthUnit(targetDomain, targetHeight);
-        if (!isStealthTarget || !enableStealthValidation)
-            return true;
-
-        if (usedForwardObserver)
-            return true;
-
-        return observerData != null && observerData.CanDetectStealthFor(targetDomain, targetHeight, targetData);
-    }
-
     private static bool IsUnitOnBoard(UnitManager unit, Tilemap boardMap)
     {
         if (unit == null || boardMap == null)
@@ -2500,82 +2383,6 @@ public static class PodeDetectarSensor
         // supersampling + expansao apenas em fronteira ambigua.
         // O traÃ§ado por cube-line pode escolher um unico caminho em diagonais/ties
         // e deixar passar casos de bloqueio por relevo entre hexes.
-        if (useLegacyLoSLerp)
-            return GetIntermediateCellsByCellLerpLegacy(tilemap, originCell, targetCell);
-
-        List<Vector3Int> cells = new List<Vector3Int>();
-
-        originCell.z = 0;
-        targetCell.z = 0;
-        if (tilemap == null)
-            return cells;
-
-        Vector3 originWorld = tilemap.GetCellCenterWorld(originCell);
-        Vector3 targetWorld = tilemap.GetCellCenterWorld(targetCell);
-        Vector2 originWorld2 = new Vector2(originWorld.x, originWorld.y);
-        Vector2 targetWorld2 = new Vector2(targetWorld.x, targetWorld.y);
-        float neighborStep = 1f;
-        List<Vector3Int> originNeighbors = new List<Vector3Int>(6);
-        UnitMovementPathRules.GetImmediateHexNeighbors(tilemap, originCell, originNeighbors);
-        if (originNeighbors.Count > 0)
-        {
-            Vector3 n = tilemap.GetCellCenterWorld(originNeighbors[0]);
-            neighborStep = Vector2.Distance(originWorld2, new Vector2(n.x, n.y));
-            if (neighborStep <= 0.0001f)
-                neighborStep = 1f;
-        }
-
-        float worldDistance = Vector2.Distance(originWorld2, targetWorld2);
-        if (worldDistance <= 0.0001f)
-            return cells;
-
-        int approxHexes = Mathf.Max(1, Mathf.CeilToInt(worldDistance / Mathf.Max(0.0001f, neighborStep)));
-        if (approxHexes <= 1)
-            return cells;
-
-        float borderEpsilon = Mathf.Max(0.01f, neighborStep * 0.08f);
-        int sampleCount = approxHexes * 10;
-        if (sampleCount <= 1)
-            sampleCount = approxHexes * 6;
-
-        HashSet<Vector3Int> seen = new HashSet<Vector3Int>();
-        List<Vector3Int> centerNeighbors = new List<Vector3Int>(6);
-        for (int i = 1; i < sampleCount; i++)
-        {
-            float t = i / (float)sampleCount;
-            Vector2 sample2 = Vector2.Lerp(originWorld2, targetWorld2, t);
-
-            Vector3Int centerCell = tilemap.WorldToCell(new Vector3(sample2.x, sample2.y, 0f));
-            centerCell.z = 0;
-            if (centerCell != originCell && centerCell != targetCell && seen.Add(centerCell))
-                cells.Add(centerCell);
-
-            Vector2 centerWorld2 = ToWorld2(tilemap.GetCellCenterWorld(centerCell));
-            float distToCenter = Vector2.Distance(sample2, centerWorld2);
-
-            UnitMovementPathRules.GetImmediateHexNeighbors(tilemap, centerCell, centerNeighbors);
-            for (int n = 0; n < centerNeighbors.Count; n++)
-            {
-                Vector3Int neighborCell = centerNeighbors[n];
-                neighborCell.z = 0;
-                if (neighborCell == originCell || neighborCell == targetCell)
-                    continue;
-
-                Vector2 neighborWorld2 = ToWorld2(tilemap.GetCellCenterWorld(neighborCell));
-                float distToNeighbor = Vector2.Distance(sample2, neighborWorld2);
-                if (Mathf.Abs(distToCenter - distToNeighbor) > borderEpsilon)
-                    continue;
-
-                if (seen.Add(neighborCell))
-                    cells.Add(neighborCell);
-            }
-        }
-
-        return cells;
-    }
-
-    private static List<Vector3Int> GetIntermediateCellsByCellLerpLegacy(Tilemap tilemap, Vector3Int originCell, Vector3Int targetCell)
-    {
         List<Vector3Int> cells = new List<Vector3Int>();
 
         originCell.z = 0;
