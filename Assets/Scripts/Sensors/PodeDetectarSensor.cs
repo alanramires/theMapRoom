@@ -418,6 +418,14 @@ public static class PodeDetectarSensor
         if (!IsUnitOnBoard(target, boardMap))
             return false;
 
+        // FONTE DE VERDADE: se o PodeDetectar coletou o alvo, ele aparece no
+        // tabuleiro. Ponto.
+        //
+        // Antes daqui existiam DUAS implementacoes da mesma pergunta — esta
+        // varredura par-a-par e a coleta por observador que as ferramentas
+        // auditam. Elas podiam discordar, e discordavam: a janela mostrava um
+        // caca detectado por chave de Stealth com LOS direta e o jogo nao o
+        // desenhava. Uma pergunta, uma implementacao.
         IReadOnlyList<UnitManager> units = GetUnitsForSensorQueries();
         for (int i = 0; i < units.Count; i++)
         {
@@ -429,20 +437,52 @@ public static class PodeDetectarSensor
             if (!IsUnitOnBoard(observer, boardMap))
                 continue;
 
-            if (CanObserverObserveTarget(
-                    observer,
-                    target,
-                    boardMap,
-                    terrainDatabase,
-                    dpqAirHeightConfig,
-                    enableLosValidation,
-                    enableSpotter,
-                    enableStealthValidation))
+            observedTeamDetectedStealth.Clear();
+            observedTeamUndetectedStealth.Clear();
+            observedTeamSpotted.Clear();
+            observedTeamBlocked.Clear();
+            CollectDetection(
+                observer,
+                boardMap,
+                terrainDatabase,
+                observedTeamDetectedStealth,
+                observedTeamUndetectedStealth,
+                observedTeamSpotted,
+                observedTeamBlocked,
+                out _,
+                dpqAirHeightConfig,
+                enableLosValidation,
+                enableSpotter,
+                enableStealthValidation);
+
+            if (ContainsDetectedTarget(observedTeamDetectedStealth, target) ||
+                ContainsDetectedTarget(observedTeamSpotted, target))
             {
                 return true;
             }
         }
 
+        return false;
+    }
+
+    private static readonly List<PodeDetectarOption> observedTeamDetectedStealth =
+        new List<PodeDetectarOption>(32);
+    private static readonly List<PodeDetectarOption> observedTeamUndetectedStealth =
+        new List<PodeDetectarOption>(32);
+    private static readonly List<PodeDetectarOption> observedTeamSpotted =
+        new List<PodeDetectarOption>(32);
+    private static readonly List<PodeDetectarOption> observedTeamBlocked =
+        new List<PodeDetectarOption>(32);
+
+    private static bool ContainsDetectedTarget(
+        List<PodeDetectarOption> options,
+        UnitManager target)
+    {
+        for (int i = 0; i < options.Count; i++)
+        {
+            if (options[i] != null && options[i].targetUnit == target)
+                return true;
+        }
         return false;
     }
 
@@ -1948,6 +1988,14 @@ public static class PodeDetectarSensor
         return false;
     }
 
+    // MORTA. Era a segunda implementacao de "eu detecto este alvo", par a par,
+    // enquanto as ferramentas auditavam a coleta por observador. As duas
+    // discordavam — um caca detectado por chave de Stealth aparecia na janela e
+    // nao no tabuleiro. O IsTargetObservedByTeam passou a usar CollectDetection,
+    // que e a fonte de verdade, e ninguem mais chama isto aqui.
+    //
+    // Fica um commit sem uso de proposito, para o diff que a apagar ser legivel
+    // sozinho. NAO voltar a chamar: uma pergunta, uma implementacao.
     private static bool CanObserverObserveTarget(
         UnitManager observer,
         UnitManager target,
