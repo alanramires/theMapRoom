@@ -73,6 +73,8 @@ public class PodeDetectarSensorDebugWindow : EditorWindow
             AutoDetectContext();
         if (GUILayout.Button("Simular"))
             RunSimulation();
+        if (GUILayout.Button("Limpar"))
+            ClearResults();
         EditorGUILayout.EndHorizontal();
 
         EditorGUILayout.Space(6f);
@@ -375,6 +377,24 @@ public class PodeDetectarSensorDebugWindow : EditorWindow
         selectedLineColor = lineColor;
         selectedLineLabel = label;
         SceneView.RepaintAll();
+    }
+
+    /// <summary>
+    /// Devolve a janela ao estado vazio: listas, indicadores forcados no Scene
+    /// View e a linha desenhada. Nao mexe na unidade nem no contexto — limpar
+    /// resultado nao e recomecar a configuracao.
+    /// </summary>
+    private void ClearResults()
+    {
+        detectedStealth.Clear();
+        undetectedStealth.Clear();
+        spottedCandidates.Clear();
+        inRangeButLosBlocked.Clear();
+        ClearForcedDetectedIndicators();
+        ClearSelectedLine();
+        statusMessage = "Limpo.";
+        SceneView.RepaintAll();
+        Repaint();
     }
 
     private void ClearSelectedLine()
