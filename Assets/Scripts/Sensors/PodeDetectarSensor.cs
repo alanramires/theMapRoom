@@ -155,19 +155,6 @@ public static class PodeDetectarSensor
         public readonly List<Vector3Int> neighbors = new List<Vector3Int>(6);
     }
 
-    private readonly struct CubeCoord
-    {
-        public readonly float x;
-        public readonly float y;
-        public readonly float z;
-
-        public CubeCoord(float x, float y, float z)
-        {
-            this.x = x;
-            this.y = y;
-            this.z = z;
-        }
-    }
 
     private readonly struct TerrainCellCacheKey : IEquatable<TerrainCellCacheKey>
     {
@@ -287,7 +274,6 @@ public static class PodeDetectarSensor
     }
 
     private static readonly Stack<DistanceMapWorkspace> distanceMapWorkspacePool = new Stack<DistanceMapWorkspace>(8);
-    private static readonly Dictionary<int, bool> tilemapOddRowOffsetCache = new Dictionary<int, bool>();
     // Os caches de terreno, construcao e estrutura mudaram de casa: agora vivem
     // no ObservationCellService, junto do codigo que os preenche. Eles nao eram
     // do PodeDetectar — eram fato de tabuleiro que o PodeEnxergar tambem
@@ -2600,12 +2586,14 @@ public static class PodeDetectarSensor
         if (originCell == targetCell)
             return cells;
 
-        if (!TryResolveOddRowOffset(tilemap, out bool oddRowOffset))
+        if (!HexGridGeometry.TryResolveOddRowOffset(tilemap, out bool oddRowOffset))
             return null;
 
-        CubeCoord originCube = OffsetToCube(originCell, oddRowOffset);
-        CubeCoord targetCube = OffsetToCube(targetCell, oddRowOffset);
-        int steps = CubeDistance(originCube, targetCube);
+        HexGridGeometry.CubeCoord originCube =
+            HexGridGeometry.OffsetToCube(originCell, oddRowOffset);
+        HexGridGeometry.CubeCoord targetCube =
+            HexGridGeometry.OffsetToCube(targetCell, oddRowOffset);
+        int steps = HexGridGeometry.CubeDistance(originCube, targetCube);
         if (steps <= 1)
             return cells;
 
@@ -2613,9 +2601,10 @@ public static class PodeDetectarSensor
         for (int i = 1; i < steps; i++)
         {
             float t = i / (float)steps;
-            CubeCoord lerped = CubeLerp(originCube, targetCube, t);
-            CubeCoord rounded = CubeRound(lerped);
-            Vector3Int cell = CubeToOffset(rounded, oddRowOffset);
+            HexGridGeometry.CubeCoord lerped =
+                HexGridGeometry.CubeLerp(originCube, targetCube, t);
+            HexGridGeometry.CubeCoord rounded = HexGridGeometry.CubeRound(lerped);
+            Vector3Int cell = HexGridGeometry.CubeToOffset(rounded, oddRowOffset);
             cell.z = 0;
             if (cell == originCell || cell == targetCell)
                 continue;
@@ -2628,122 +2617,12 @@ public static class PodeDetectarSensor
 
     private static Vector2 ToWorld2(Vector3 world)
     {
-        return new Vector2(world.x, world.y);
+        return HexGridGeometry.ToWorld2(world);
     }
 
     private static bool TryResolveOddRowOffset(Tilemap tilemap, out bool oddRowOffset)
     {
-        oddRowOffset = true;
-        if (tilemap == null)
-            return false;
-
-        int tilemapId = tilemap.GetEntityId().GetHashCode();
-        if (tilemapOddRowOffsetCache.TryGetValue(tilemapId, out bool cached))
-        {
-            oddRowOffset = cached;
-            return true;
-        }
-
-        List<Vector3Int> neighbors = new List<Vector3Int>(6);
-        UnitMovementPathRules.GetImmediateHexNeighbors(tilemap, Vector3Int.zero, neighbors);
-        if (neighbors.Count <= 0)
-            return false;
-
-        int oddScore = 0;
-        int evenScore = 0;
-        for (int i = 0; i < neighbors.Count; i++)
-        {
-            Vector3Int n = neighbors[i];
-            if (IsExpectedNeighborForOddRowOffsetEvenRow(n))
-                oddScore++;
-            if (IsExpectedNeighborForEvenRowOffsetEvenRow(n))
-                evenScore++;
-        }
-
-        oddRowOffset = oddScore >= evenScore;
-        tilemapOddRowOffsetCache[tilemapId] = oddRowOffset;
-        return true;
-    }
-
-    private static bool IsExpectedNeighborForOddRowOffsetEvenRow(Vector3Int cell)
-    {
-        return (cell.x == 1 && cell.y == 0) ||
-               (cell.x == -1 && cell.y == 0) ||
-               (cell.x == 0 && cell.y == -1) ||
-               (cell.x == -1 && cell.y == -1) ||
-               (cell.x == 0 && cell.y == 1) ||
-               (cell.x == -1 && cell.y == 1);
-    }
-
-    private static bool IsExpectedNeighborForEvenRowOffsetEvenRow(Vector3Int cell)
-    {
-        return (cell.x == 1 && cell.y == 0) ||
-               (cell.x == -1 && cell.y == 0) ||
-               (cell.x == 1 && cell.y == -1) ||
-               (cell.x == 0 && cell.y == -1) ||
-               (cell.x == 1 && cell.y == 1) ||
-               (cell.x == 0 && cell.y == 1);
-    }
-
-    private static CubeCoord OffsetToCube(Vector3Int cell, bool oddRowOffset)
-    {
-        int row = cell.y;
-        int rowParity = Mathf.Abs(row) & 1;
-        float q = oddRowOffset
-            ? cell.x - ((row - rowParity) / 2f)
-            : cell.x - ((row + rowParity) / 2f);
-        float r = row;
-        float x = q;
-        float z = r;
-        float y = -x - z;
-        return new CubeCoord(x, y, z);
-    }
-
-    private static Vector3Int CubeToOffset(CubeCoord cube, bool oddRowOffset)
-    {
-        int q = Mathf.RoundToInt(cube.x);
-        int r = Mathf.RoundToInt(cube.z);
-        int rowParity = Mathf.Abs(r) & 1;
-        int col = oddRowOffset
-            ? q + ((r - rowParity) / 2)
-            : q + ((r + rowParity) / 2);
-        return new Vector3Int(col, r, 0);
-    }
-
-    private static int CubeDistance(CubeCoord a, CubeCoord b)
-    {
-        float dx = Mathf.Abs(a.x - b.x);
-        float dy = Mathf.Abs(a.y - b.y);
-        float dz = Mathf.Abs(a.z - b.z);
-        return Mathf.RoundToInt(Mathf.Max(dx, Mathf.Max(dy, dz)));
-    }
-
-    private static CubeCoord CubeLerp(CubeCoord a, CubeCoord b, float t)
-    {
-        return new CubeCoord(
-            Mathf.Lerp(a.x, b.x, t),
-            Mathf.Lerp(a.y, b.y, t),
-            Mathf.Lerp(a.z, b.z, t));
-    }
-
-    private static CubeCoord CubeRound(CubeCoord fractional)
-    {
-        float rx = Mathf.Round(fractional.x);
-        float ry = Mathf.Round(fractional.y);
-        float rz = Mathf.Round(fractional.z);
-
-        float xDiff = Mathf.Abs(rx - fractional.x);
-        float yDiff = Mathf.Abs(ry - fractional.y);
-        float zDiff = Mathf.Abs(rz - fractional.z);
-
-        if (xDiff > yDiff && xDiff > zDiff)
-            rx = -ry - rz;
-        else if (yDiff > zDiff)
-            ry = -rx - rz;
-        else
-            rz = -rx - ry;
-
-        return new CubeCoord(rx, ry, rz);
+        return HexGridGeometry.TryResolveOddRowOffset(tilemap, out oddRowOffset);
     }
 
     private static int ResolveUnitCacheInstanceId(UnitManager unit)
