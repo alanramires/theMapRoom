@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Tilemaps;
@@ -269,8 +269,7 @@ public class HexEnxergadoDebugWindow : EditorWindow
             preserveObserverLayerRangeForHexVisibility: false,
             forceVirtualTargetLayer: forceLayer,
             forcedVirtualTargetDomain: domain,
-            forcedVirtualTargetHeight: height,
-            useRangeOnlyForAirHighWhenConfigured: forceLayer);
+            forcedVirtualTargetHeight: height);
         return visibleCells.Contains(selectedCell);
     }
 

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Tilemaps;
@@ -250,7 +250,6 @@ public static class VisionCoverageService
                 enableSpotter: false,
                 useOccupantLayerForTarget: false,
                 preserveObserverLayerRangeForHexVisibility: true,
-                useRangeOnlyForAirHighWhenConfigured: true,
                 virtualObserverCell: observerCell);
         }
         else
@@ -268,7 +267,6 @@ public static class VisionCoverageService
                 forceVirtualTargetLayer: true,
                 forcedVirtualTargetDomain: layer.Domain,
                 forcedVirtualTargetHeight: layer.Height,
-                useRangeOnlyForAirHighWhenConfigured: true,
                 virtualObserverCell: observerCell);
         }
 

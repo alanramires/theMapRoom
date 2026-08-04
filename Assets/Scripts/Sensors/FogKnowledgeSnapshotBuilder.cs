@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Tilemaps;
@@ -354,8 +354,7 @@ public static class FogKnowledgeSnapshotBuilder
                 preserveObserverLayerRangeForHexVisibility: false,
                 forceVirtualTargetLayer: true,
                 forcedVirtualTargetDomain: Domain.Air,
-                forcedVirtualTargetHeight: height,
-                useRangeOnlyForAirHighWhenConfigured: true);
+                forcedVirtualTargetHeight: height);
 
             if (height == HeightLevel.AirLow)
                 airLowAdded = true;

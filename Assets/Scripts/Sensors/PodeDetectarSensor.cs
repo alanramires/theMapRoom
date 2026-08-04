@@ -34,7 +34,6 @@ public static class PodeDetectarSensor
         public readonly bool preserveObserverLayerRangeForHexVisibility;
         public readonly bool forceVirtualTargetLayer;
         public readonly bool skipSpecializedTargetLayers;
-        public readonly bool useRangeOnlyForAirHighWhenConfigured;
         public readonly int globalBoardRevision;
         public readonly int teamObserverRevision;
 
@@ -55,7 +54,6 @@ public static class PodeDetectarSensor
             HeightLevel forcedVirtualTargetHeight,
             int forcedDetectionRangeOverride,
             bool skipSpecializedTargetLayers,
-            bool useRangeOnlyForAirHighWhenConfigured,
             int globalBoardRevision,
             int teamObserverRevision)
         {
@@ -77,7 +75,6 @@ public static class PodeDetectarSensor
             this.preserveObserverLayerRangeForHexVisibility = preserveObserverLayerRangeForHexVisibility;
             this.forceVirtualTargetLayer = forceVirtualTargetLayer;
             this.skipSpecializedTargetLayers = skipSpecializedTargetLayers;
-            this.useRangeOnlyForAirHighWhenConfigured = useRangeOnlyForAirHighWhenConfigured;
             this.globalBoardRevision = globalBoardRevision;
             this.teamObserverRevision = teamObserverRevision;
         }
@@ -102,7 +99,6 @@ public static class PodeDetectarSensor
                 && preserveObserverLayerRangeForHexVisibility == other.preserveObserverLayerRangeForHexVisibility
                 && forceVirtualTargetLayer == other.forceVirtualTargetLayer
                 && skipSpecializedTargetLayers == other.skipSpecializedTargetLayers
-                && useRangeOnlyForAirHighWhenConfigured == other.useRangeOnlyForAirHighWhenConfigured
                 && globalBoardRevision == other.globalBoardRevision
                 && teamObserverRevision == other.teamObserverRevision;
         }
@@ -135,7 +131,6 @@ public static class PodeDetectarSensor
                 hash = (hash * 31) + (preserveObserverLayerRangeForHexVisibility ? 1 : 0);
                 hash = (hash * 31) + (forceVirtualTargetLayer ? 1 : 0);
                 hash = (hash * 31) + (skipSpecializedTargetLayers ? 1 : 0);
-                hash = (hash * 31) + (useRangeOnlyForAirHighWhenConfigured ? 1 : 0);
                 hash = (hash * 31) + globalBoardRevision;
                 hash = (hash * 31) + teamObserverRevision;
                 return hash;
@@ -509,7 +504,6 @@ public static class PodeDetectarSensor
         HeightLevel forcedVirtualTargetHeight = HeightLevel.Surface,
         int forcedDetectionRangeOverride = -1,
         bool skipSpecializedTargetLayers = false,
-        bool useRangeOnlyForAirHighWhenConfigured = false,
         Vector3Int? virtualObserverCell = null)
     {
         if (visibleCellsOutput == null)
@@ -570,7 +564,6 @@ public static class PodeDetectarSensor
             forcedVirtualTargetHeight,
             forcedDetectionRangeOverride,
             skipSpecializedTargetLayers,
-            useRangeOnlyForAirHighWhenConfigured,
             globalBoardRevision,
             teamObserverRevision);
 
@@ -729,7 +722,6 @@ public static class PodeDetectarSensor
                             targetHeight,
                             enableLosValidation,
                             enableSpotter,
-                            useRangeOnlyForAirHighWhenConfigured,
                             aquaticWorkspace))
                     {
                         collectVisibleCellsScratch.Add(cell);
@@ -839,7 +831,6 @@ public static class PodeDetectarSensor
             forceVirtualTargetLayer: true,
             forcedVirtualTargetDomain: Domain.Air,
             forcedVirtualTargetHeight: targetHeight,
-            useRangeOnlyForAirHighWhenConfigured: true,
             virtualObserverCell: observerCell);
     }
 
@@ -884,7 +875,6 @@ public static class PodeDetectarSensor
         HeightLevel resolvedTargetHeight,
         bool enableLosValidation,
         bool enableSpotter,
-        bool useRangeOnlyForAirHighWhenConfigured,
         DistanceMapWorkspace aquaticWorkspace)
     {
         if (CanObserveCellWithLayer(
@@ -899,8 +889,7 @@ public static class PodeDetectarSensor
                 resolvedTargetDomain,
                 resolvedTargetHeight,
                 enableLosValidation,
-                enableSpotter,
-                useRangeOnlyForAirHighWhenConfigured))
+                enableSpotter))
         {
             return true;
         }
@@ -964,8 +953,7 @@ public static class PodeDetectarSensor
                     domain,
                     height,
                     enableLosValidation,
-                    enableSpotter,
-                    useRangeOnlyForAirHighWhenConfigured))
+                    enableSpotter))
             {
                 return true;
             }
@@ -986,8 +974,7 @@ public static class PodeDetectarSensor
         Domain targetDomain,
         HeightLevel targetHeight,
         bool enableLosValidation,
-        bool enableSpotter,
-        bool useRangeOnlyForAirHighWhenConfigured)
+        bool enableSpotter)
     {
         debugCollectLayerChecks++;
         int detectionRange = ResolveDetectionRange(observer, observerData, null, targetDomain, targetHeight);
@@ -1045,18 +1032,6 @@ public static class PodeDetectarSensor
         }
 
         return false;
-    }
-
-    private static bool IsAirHighRangeOnlyVision(DPQAirHeightConfig dpqAirHeightConfig, Domain targetDomain, HeightLevel targetHeight)
-    {
-        if (targetDomain != Domain.Air || targetHeight != HeightLevel.AirHigh)
-            return false;
-        if (dpqAirHeightConfig == null)
-            return false;
-        if (!dpqAirHeightConfig.TryGetVisionFor(targetDomain, targetHeight, out _, out bool blockLoS))
-            return false;
-
-        return !blockLoS;
     }
 
     public static bool CollectDetection(
@@ -1185,9 +1160,13 @@ public static class PodeDetectarSensor
                 Vector3Int blockedCell = Vector3Int.zero;
                 bool effectiveLosValidation = ResolveEffectiveLosValidation(observerData, targetDomain, targetHeight, enableLosValidation);
                 bool bypassLosByPolicy = !effectiveLosValidation;
-                bool skipLosForCurrentTarget = observer.GetDomain() == Domain.Air &&
-                    IsAirHighRangeOnlyVision(dpqAirHeightConfig, targetDomain, targetHeight);
-                bool hasDirectLos = skipLosForCurrentTarget || HasValidStraightObservationLine(
+                // Este pulo estava VIVO: observador aereo contra alvo em AirHigh
+                // nao tracava linha nenhuma, e sem o gate de parametro que os
+                // outros dois tinham. Caca contra caca era so alcance.
+                //
+                // A linha e sempre validada. Propagacao contorna obstaculo no
+                // plano do meio; linha ascendente nao tem do que desviar.
+                bool hasDirectLos = HasValidStraightObservationLine(
                     boardMap,
                     terrainDatabase,
                     observerCell,

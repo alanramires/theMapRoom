@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using System.Collections.Generic;
 using System.Collections;
 using System;
@@ -9771,8 +9771,7 @@ public class MatchController : MonoBehaviour
             preserveObserverLayerRangeForHexVisibility: false,
             forceVirtualTargetLayer: true,
             forcedVirtualTargetDomain: targetDomain,
-            forcedVirtualTargetHeight: targetHeight,
-            useRangeOnlyForAirHighWhenConfigured: true);
+            forcedVirtualTargetHeight: targetHeight);
     }
 
     /// <summary>
