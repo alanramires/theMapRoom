@@ -43,6 +43,16 @@ primeira entrega.
 `v7.0.4` tagueada e publicada. Relatório:
 `docs/relatorio_v7.0.4.md`.
 
+**Build medido depois da tag:** `0 erros, 264 avisos` — todos pré-existentes
+(`CS0618` de API obsoleta da Unity, `UAC1009` de serialização). O relatório dizia
+"0 avisos"; corrigido lá, e a causa virou armadilha registrada abaixo.
+
+**A sanidade do `PodeMirar` foi conferida.** Ele ganhou 147 linhas nesta versão,
+e alterar regra de sensor validado seria **X**. Não é: a mudança é aditiva e o
+caminho de jogo continua no `perceptionSnapshot == null`. Só a janela de Editor
+passa snapshot — **nenhum `AIController` passa**. Se algum dia um passar, aí sim
+o comportamento em partida muda.
+
 ### A descoberta que organiza o próximo trabalho
 
 > **Previsão precisa de duas verdades separadas.**
@@ -233,7 +243,21 @@ um trabalho maior que o MVP da ferramenta.
   FOW nem cria contato utilizável.
 - **Tem relatório, tem tag. Não tem relatório, é só commit.**
 - **Não editar `.asset` no disco com o Inspector aberto.**
+- **Um commit por frente de trabalho**, não um pelo lote. É o que torna uma
+  frente revertível sem tocar nas outras.
+- **Número de build só entra em relatório se veio de build COM restore.**
+  `dotnet build Assembly-CSharp.csproj -v q --nologo` — sem `--no-restore`.
 - Fechar o dia: skill `.claude/skills/fechamento-do-dia/SKILL.md`.
+
+### Calibragem do dígito de versão
+
+A `v7.0.4` saiu como **Z** e provavelmente era **Y**: trouxe três serviços
+novos, a infraestrutura de snapshot de FOW, um parâmetro novo no `PodeMirar` e
+uma ferramenta — 5.635 inserções. Z é *"salvamento de fim de trabalho"*; isto foi
+*"pega uma parte e trabalha ela e os filhos dela"*.
+
+A tag publicada **fica como está** — mover referência já publicada custa mais que
+o erro. É calibragem para a próxima.
 
 ---
 
@@ -241,6 +265,8 @@ um trabalho maior que o MVP da ferramenta.
 
 | armadilha | lição |
 |---|---|
+| **`dotnet build --no-restore` com `Temp/obj` limpo** | a Unity apaga a pasta, o build aborta em `NETSDK1004` e imprime **"0 Warning(s)"** porque nada compilou. Já produziu "0 avisos" falso no relatório da `v7.0.4` e um falso "não compila" na revisão. **Sempre com restore quando for afirmar número** |
+| **um commit para o lote inteiro** | `eb47d08` juntou quatro frentes em 27 arquivos: hoje não dá para reverter a mudança do `PodeMirar` sem derrubar Melhor Combate, FOW cozido e Melhor Captura |
 | **posição hipotética criando conhecimento** | mover no cálculo não permite detectar e atirar antes do compromisso; reuse o snapshot confirmado |
 | **foco tratado como gate** | `FocusCells` hoje só soma pontos; missão obrigatória precisa de admissibilidade explícita |
 | **recalcular percepção por candidato** | snapshot/bake já possui conhecimento e contribuições; sensor por origem serve apenas à projeção daquela unidade |

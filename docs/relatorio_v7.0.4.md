@@ -199,9 +199,16 @@ faltam os testes da iniciativa da fragata, filtro de cobertura aliada submarina
 e devolução de autoridade ao Melhor Visão quando não existe tiro legal.
 
 **Não houve suíte de regressão de gameplay.** O código fecha com
-`dotnet build Assembly-CSharp.csproj` em 0 erros e 0 avisos, e as ferramentas
-foram exercitadas visualmente no Scene View, mas a partida completa não foi
-percorrida após todo o lote.
+`dotnet build Assembly-CSharp.csproj` em **0 erros e 264 avisos** (todos
+pré-existentes: `CS0618` de API obsoleta da Unity e `UAC1009` de serialização),
+e as ferramentas foram exercitadas visualmente no Scene View, mas a partida
+completa não foi percorrida após todo o lote.
+
+> **Correção pós-tag.** Esta linha dizia "0 erros e 0 avisos". A contagem de
+> avisos estava errada — foram medidos 264, contra 258 antes do lote. A causa
+> provável é a armadilha registrada no `resumo.md`: com `Temp/obj` limpo pela
+> Unity, `dotnet build --no-restore` aborta em `NETSDK1004` e imprime
+> **"0 Warning(s)"** porque nada chegou a compilar. O número de erros não mudou.
 
 ---
 
