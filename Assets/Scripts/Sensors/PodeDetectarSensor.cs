@@ -287,17 +287,13 @@ public static class PodeDetectarSensor
     }
 
     private static readonly Stack<DistanceMapWorkspace> distanceMapWorkspacePool = new Stack<DistanceMapWorkspace>(8);
-    private static readonly Dictionary<int, Tilemap[]> gridTilemapsCache = new Dictionary<int, Tilemap[]>();
     private static readonly Dictionary<int, bool> tilemapOddRowOffsetCache = new Dictionary<int, bool>();
-    private static readonly Dictionary<TerrainCellCacheKey, TerrainTypeData> terrainCacheForRefresh = new Dictionary<TerrainCellCacheKey, TerrainTypeData>(4096);
-    // GetConstructionAtCell e GetStructureAtCell fazem FindObjectsByType a CADA
-    // chamada (varredura de cena inteira por celula): ~312us e ~300us medidos.
-    // Somavam 68ms dos 106ms de um collect e 490ms do knownCells do publish.
-    // Escopo de refresh identico ao terrainCacheForRefresh, ao lado do qual eram
-    // chamados sem cache. Valor null e cacheado de proposito: a maioria das
-    // celulas nao tem construcao nem estrutura, e "ausente" precisa ser um hit.
-    private static readonly Dictionary<TerrainCellCacheKey, ConstructionData> constructionCacheForRefresh = new Dictionary<TerrainCellCacheKey, ConstructionData>(4096);
-    private static readonly Dictionary<TerrainCellCacheKey, StructureData> structureCacheForRefresh = new Dictionary<TerrainCellCacheKey, StructureData>(4096);
+    // Os caches de terreno, construcao e estrutura mudaram de casa: agora vivem
+    // no ObservationCellService, junto do codigo que os preenche. Eles nao eram
+    // do PodeDetectar — eram fato de tabuleiro que o PodeEnxergar tambem
+    // precisa. A medicao que os criou continua valendo: GetConstructionAtCell e
+    // GetStructureAtCell varrem a cena a cada chamada, ~312us e ~300us, e
+    // somavam 68ms dos 106ms de um collect.
     private static readonly Dictionary<LosCacheKey, bool> losCacheForRefresh = new Dictionary<LosCacheKey, bool>(8192);
     private static readonly Dictionary<CollectVisibleCellsCacheKey, List<Vector3Int>> collectVisibleCellsCache = new Dictionary<CollectVisibleCellsCacheKey, List<Vector3Int>>(128);
     private static readonly List<Vector3Int> collectVisibleCellsScratch = new List<Vector3Int>(128);
@@ -345,9 +341,7 @@ public static class PodeDetectarSensor
         debugCollectLosHits = 0;
         debugCollectAquaticMaps = 0;
         debugCollectLosMs = 0d;
-        debugCollectCellVisionCalls = 0;
-        debugCollectConstructionMs = 0d;
-        debugCollectStructureMs = 0d;
+        ObservationCellService.ResetCounters();
         debugCollectLerpMs = 0d;
         debugCollectLerpCells = 0;
     }
@@ -381,9 +375,9 @@ public static class PodeDetectarSensor
         out int lerpCells)
     {
         losMs = debugCollectLosMs;
-        cellVisionCalls = debugCollectCellVisionCalls;
-        constructionMs = debugCollectConstructionMs;
-        structureMs = debugCollectStructureMs;
+        cellVisionCalls = ObservationCellService.CellVisionCalls;
+        constructionMs = ObservationCellService.ConstructionMs;
+        structureMs = ObservationCellService.StructureMs;
         lerpMs = debugCollectLerpMs;
         lerpCells = debugCollectLerpCells;
     }
@@ -412,10 +406,8 @@ public static class PodeDetectarSensor
 
     public static void ClearRefreshScopedTerrainCache()
     {
-        terrainCacheForRefresh.Clear();
         losCacheForRefresh.Clear();
-        constructionCacheForRefresh.Clear();
-        structureCacheForRefresh.Clear();
+        ObservationCellService.ClearRefreshScopedCaches();
     }
 
     public static bool IsTargetObservedByTeam(
@@ -2217,41 +2209,13 @@ public static class PodeDetectarSensor
         out HeightLevel height,
         bool useOccupantLayerForTarget = true)
     {
-        domain = Domain.Land;
-        height = HeightLevel.Surface;
-
-        if (useOccupantLayerForTarget)
-        {
-            UnitManager occupant = HexOccupancyQuery.FindUnitAtCell(cell);
-            if (occupant != null)
-            {
-                domain = occupant.GetDomain();
-                height = occupant.GetHeightLevel();
-                return true;
-            }
-        }
-
-        if (!TryResolveTerrainAtCell(map, terrainDatabase, cell, out TerrainTypeData terrain) || terrain == null)
-            return true;
-
-        if (TryResolveConstructionAtCell(map, cell, out ConstructionData constructionData) && constructionData != null)
-        {
-            domain = constructionData.domain;
-            height = constructionData.heightLevel;
-            return true;
-        }
-
-        StructureData structureData = ResolveStructureAtCellCachedForRefresh(map, cell);
-        if (structureData != null)
-        {
-            domain = structureData.domain;
-            height = structureData.heightLevel;
-            return true;
-        }
-
-        domain = terrain.domain;
-        height = terrain.heightLevel;
-        return true;
+        return ObservationCellService.TryResolveObservationLayer(
+            map,
+            terrainDatabase,
+            cell,
+            out domain,
+            out height,
+            useOccupantLayerForTarget);
     }
 
     private static bool HasValidStraightObservationLine(
@@ -2432,177 +2396,44 @@ public static class PodeDetectarSensor
         Domain? forcedDomain = null,
         HeightLevel? forcedHeightLevel = null)
     {
-        ev = 0f;
-        blockLoS = true;
-        if (!TryResolveTerrainAtCell(tilemap, terrainDatabase, cell, out TerrainTypeData terrain) || terrain == null)
-            return false;
-
-        debugCollectCellVisionCalls++;
-        double constructionStartMs = Time.realtimeSinceStartupAsDouble;
-        TryResolveConstructionAtCell(tilemap, cell, out ConstructionData constructionData);
-        double structureStartMs = Time.realtimeSinceStartupAsDouble;
-        debugCollectConstructionMs +=
-            (structureStartMs - constructionStartMs) * 1000d;
-        StructureData structureData = ResolveStructureAtCellCachedForRefresh(tilemap, cell);
-        debugCollectStructureMs +=
-            (Time.realtimeSinceStartupAsDouble - structureStartMs) * 1000d;
-
-        Domain domain = Domain.Land;
-        HeightLevel height = HeightLevel.Surface;
-        if (forcedDomain.HasValue && forcedHeightLevel.HasValue)
-        {
-            domain = forcedDomain.Value;
-            height = forcedHeightLevel.Value;
-        }
-        else if (occupantUnit != null)
-        {
-            domain = occupantUnit.GetDomain();
-            height = occupantUnit.GetHeightLevel();
-        }
-        else
-        {
-            TryResolveObservationTargetLayer(
-                tilemap,
-                terrainDatabase,
-                cell,
-                out domain,
-                out height,
-                useOccupantLayerForTarget: false);
-        }
-
-        TerrainVisionResolver.Resolve(
-            terrain,
-            domain,
-            height,
+        // Fato de celula: uma fonte so, o ObservationCellService.
+        return ObservationCellService.TryResolveCellVision(
+            tilemap,
+            terrainDatabase,
+            cell,
+            occupantUnit,
             dpqAirHeightConfig,
-            constructionData,
-            structureData,
             out ev,
-            out blockLoS);
-
-        return true;
+            out blockLoS,
+            forcedDomain,
+            forcedHeightLevel);
     }
 
     private static bool TryResolveConstructionAtCell(Tilemap tilemap, Vector3Int cell, out ConstructionData constructionData)
     {
-        constructionData = null;
-        if (tilemap == null)
-            return false;
-
-        cell.z = 0;
-        TerrainCellCacheKey cacheKey = new TerrainCellCacheKey(
-            tilemap.GetEntityId().GetHashCode(),
-            cell.x,
-            cell.y);
-        if (constructionCacheForRefresh.TryGetValue(cacheKey, out ConstructionData cached))
-        {
-            constructionData = cached;
-            return constructionData != null;
-        }
-
-        ConstructionManager construction = ConstructionOccupancyRules.GetConstructionAtCell(tilemap, cell);
-        ConstructionData resolved = null;
-        if (construction != null)
-        {
-            ConstructionDatabase db = construction.ConstructionDatabase;
-            string id = construction.ConstructionId;
-            if (db != null &&
-                !string.IsNullOrWhiteSpace(id) &&
-                db.TryGetById(id, out ConstructionData data))
-            {
-                resolved = data;
-            }
-        }
-
-        constructionCacheForRefresh[cacheKey] = resolved;
-        constructionData = resolved;
-        return constructionData != null;
+        return ObservationCellService.TryResolveConstruction(
+            tilemap,
+            cell,
+            out constructionData);
     }
 
-    // Espelha TryResolveConstructionAtCell: mesma chave, mesmo escopo de refresh.
     private static StructureData ResolveStructureAtCellCachedForRefresh(Tilemap tilemap, Vector3Int cell)
     {
-        if (tilemap == null)
-            return StructureOccupancyRules.GetStructureAtCell(tilemap, cell);
-
-        cell.z = 0;
-        TerrainCellCacheKey cacheKey = new TerrainCellCacheKey(
-            tilemap.GetEntityId().GetHashCode(),
-            cell.x,
-            cell.y);
-        if (structureCacheForRefresh.TryGetValue(cacheKey, out StructureData cached))
-            return cached;
-
-        StructureData resolved = StructureOccupancyRules.GetStructureAtCell(tilemap, cell);
-        structureCacheForRefresh[cacheKey] = resolved;
-        return resolved;
+        return ObservationCellService.ResolveStructure(tilemap, cell);
     }
 
     private static bool TryResolveTerrainAtCell(Tilemap terrainTilemap, TerrainDatabase terrainDatabase, Vector3Int cell, out TerrainTypeData terrain)
     {
-        terrain = null;
-        if (terrainTilemap == null || terrainDatabase == null)
-            return false;
-
-        cell.z = 0;
-        TerrainCellCacheKey cacheKey = new TerrainCellCacheKey(terrainTilemap.GetEntityId().GetHashCode(), cell.x, cell.y);
-        if (terrainCacheForRefresh.TryGetValue(cacheKey, out TerrainTypeData cachedTerrain))
-        {
-            terrain = cachedTerrain;
-            return terrain != null;
-        }
-
-        TileBase tile = terrainTilemap.GetTile(cell);
-        if (tile != null && terrainDatabase.TryGetByPaletteTile(tile, out TerrainTypeData byMainTile) && byMainTile != null)
-        {
-            terrain = byMainTile;
-            terrainCacheForRefresh[cacheKey] = terrain;
-            return true;
-        }
-
-        GridLayout grid = terrainTilemap.layoutGrid;
-        if (grid == null)
-            return false;
-
-        Tilemap[] maps = GetCachedTilemapsForGrid(grid);
-        for (int i = 0; i < maps.Length; i++)
-        {
-            Tilemap scan = maps[i];
-            if (scan == null)
-                continue;
-
-            TileBase other = scan.GetTile(cell);
-            if (other == null)
-                continue;
-
-            if (terrainDatabase.TryGetByPaletteTile(other, out TerrainTypeData byGridTile) && byGridTile != null)
-            {
-                terrain = byGridTile;
-                terrainCacheForRefresh[cacheKey] = terrain;
-                return true;
-            }
-        }
-
-        terrainCacheForRefresh[cacheKey] = null;
-        return false;
+        return ObservationCellService.TryResolveTerrain(
+            terrainTilemap,
+            terrainDatabase,
+            cell,
+            out terrain);
     }
 
     private static Tilemap[] GetCachedTilemapsForGrid(GridLayout grid)
     {
-        if (grid == null)
-            return Array.Empty<Tilemap>();
-
-        int gridId = grid.GetEntityId().GetHashCode();
-        if (gridTilemapsCache.TryGetValue(gridId, out Tilemap[] cached) &&
-            cached != null &&
-            cached.Length > 0)
-        {
-            return cached;
-        }
-
-        Tilemap[] maps = grid.GetComponentsInChildren<Tilemap>(includeInactive: true);
-        gridTilemapsCache[gridId] = maps ?? Array.Empty<Tilemap>();
-        return gridTilemapsCache[gridId];
+        return ObservationCellService.GetCachedTilemapsForGrid(grid);
     }
 
     private static List<Vector3Int> GetIntermediateCellsByCellLerp(Tilemap tilemap, Vector3Int originCell, Vector3Int targetCell)
