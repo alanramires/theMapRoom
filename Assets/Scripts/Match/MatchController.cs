@@ -5653,7 +5653,21 @@ public class MatchController : MonoBehaviour
         }
         StoreFogContributionRuntimeForSlot(gameplaySlot);
         if (gameplayContext.publishVisuals)
-            RefreshRuntimeUnitFogVisibilityForCells(affectedTargetCells);
+        {
+            // Ponto de compromisso: aqui o tabuleiro confirmado e reconstruido, e
+            // a visibilidade de unidade precisa ser recalculada INTEIRA.
+            //
+            // O delta por celulas afetadas nao serve mais. Ele filtrava as
+            // unidades por "a celula dela esta no conjunto que mudou de
+            // revelacao", e isso so cobria a deteccao enquanto revelar hexagono
+            // e detectar unidade eram a mesma coisa. Depois da separacao, um
+            // radar que detecta a 7 sem revelar terreno nao poe a celula do alvo
+            // no conjunto — e o inimigo ficava com o valor velho para sempre.
+            //
+            // A lentidao que motivou o delta era refresh cheio a CADA PASSO do
+            // movimento provisorio; isto aqui roda uma vez por acao comprometida.
+            RefreshRuntimeUnitFogVisibility();
+        }
         double runtimeVisibilityMs = enableFogStepPerfLogs ? (Time.realtimeSinceStartupAsDouble - stageStartMs) * 1000d : 0d;
         stageStartMs = enableFogStepPerfLogs ? Time.realtimeSinceStartupAsDouble : 0d;
         if (gameplayContext.recordIntel)
