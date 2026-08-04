@@ -594,6 +594,10 @@ public class PodeEnxergarSensorDebugWindow : EditorWindow
                 continue;
             if (localVisibleCells.Contains(cell))
                 continue;
+            // Fora da borda nao existe hexagono. Ele nao e invalido — nao ha o
+            // que enxergar la, e listar isso so polui o relatorio.
+            if (map != null && !map.HasTile(cell))
+                continue;
 
             ResolveVirtualLayerForCell(
                 map,
