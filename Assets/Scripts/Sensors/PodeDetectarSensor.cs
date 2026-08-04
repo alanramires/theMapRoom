@@ -2368,25 +2368,35 @@ public static class PodeDetectarSensor
 
         Domain domain = observer.GetDomain();
         HeightLevel height = observer.GetHeightLevel();
-        if (domain == Domain.Air)
+
+        // A unidade observa do EV do lugar onde ela esta. Ar e submerso nao sao
+        // terreno, entao o EV deles vem da politica do DPQ Air Height Config —
+        // por consulta, nao por fallback. Sem clamp: se um dia o submerso for
+        // -1, a linha sobe em vez de descer, e isso e decisao do dado.
+        if (domain == Domain.Air ||
+            (domain == Domain.Submarine && height == HeightLevel.Submerged))
         {
             if (dpqAirHeightConfig != null &&
-                dpqAirHeightConfig.TryGetVisionFor(domain, height, out int airEv, out _))
+                dpqAirHeightConfig.TryGetVisionFor(domain, height, out int layerEv, out _))
             {
-                return Mathf.Max(0f, airEv);
+                return layerEv;
             }
 
-            return Mathf.Max(0f, fallbackEv);
+            return fallbackEv;
         }
 
+        // Sobre terreno: herda o EV dele. O soldado na montanha observa de 2 e
+        // a linha desce ate a planicie em 0; na planicie ele observa de 0 e a
+        // linha corre nivelada por planicie, praia e mar.
         originCell.z = 0;
         if (tilemap != null &&
             terrainDatabase != null &&
             TryResolveTerrainAtCell(tilemap, terrainDatabase, originCell, out TerrainTypeData originTerrain) &&
-            originTerrain != null &&
-            originTerrain.shooterInheritsTerrainEv)
+            originTerrain != null)
         {
-            return originTerrain.ResolveShooterInheritedEv();
+            return originTerrain.shooterInheritsTerrainEv
+                ? originTerrain.ResolveShooterInheritedEv()
+                : originTerrain.ev;
         }
 
         return 0;
