@@ -5644,12 +5644,21 @@ public class MatchController : MonoBehaviour
         stageStartMs = enableFogStepPerfLogs ? Time.realtimeSinceStartupAsDouble : 0d;
         if (gameplayContext.publishGameplayData)
         {
+            // affectedTargetCells: null de proposito. No ponto de compromisso o
+            // snapshot publica a visibilidade de TODAS as unidades, nao so das
+            // que estao em celula que mudou de revelacao.
+            //
+            // E deste snapshot que ApplyFogDetectedContactPresentation le para
+            // decidir o contato cinza sobre o preto. Com o filtro por celula, um
+            // caca detectado por radar — que nao revela terreno — nunca entrava
+            // no publish e ficava invisivel no tabuleiro mesmo com o PodeDetectar
+            // afirmando que o viu.
             PublishFogGameplaySnapshot(
                 gameplayContext.observerSlot.Value,
                 boardMap,
                 snapshotUnits,
                 gameplayContext.recordExplorationMemory,
-                affectedTargetCells);
+                affectedTargetCells: null);
         }
         StoreFogContributionRuntimeForSlot(gameplaySlot);
         if (gameplayContext.publishVisuals)
