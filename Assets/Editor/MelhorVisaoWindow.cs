@@ -31,6 +31,8 @@ public sealed class MelhorVisaoWindow : EditorWindow
     [SerializeField] private HeightLevel manualHeight = HeightLevel.Surface;
     [SerializeField] private bool useFullTurnMovement = true;
     [SerializeField] private bool useRuntimeContext = true;
+    [SerializeField] private bool usePerceptionSnapshot = true;
+    [SerializeField] private bool treatBakeAsExploration;
     [SerializeField] private bool validateFinalOccupancy = true;
     [SerializeField] private bool enableLos = true;
     [SerializeField] private CoverageView coverageView;
@@ -113,6 +115,25 @@ public sealed class MelhorVisaoWindow : EditorWindow
             "Movimento potencial (turno cheio)", useFullTurnMovement);
         useRuntimeContext = EditorGUILayout.ToggleLeft(
             "Contexto runtime: aliados + explorado", useRuntimeContext);
+        usePerceptionSnapshot = EditorGUILayout.ToggleLeft(
+            new GUIContent(
+                "Consumir FOW confirmado / bake da rodada 0",
+                "Le a cobertura aliada das contribuicoes ja fotografadas em vez "
+                + "de rodar os sensores de cada aliado outra vez. Sem "
+                + "fotografia, o calculo estrutural bruto continua valendo."),
+            usePerceptionSnapshot);
+        using (new EditorGUI.DisabledScope(!usePerceptionSnapshot))
+        {
+            EditorGUI.indentLevel++;
+            treatBakeAsExploration = EditorGUILayout.ToggleLeft(
+                new GUIContent(
+                    "Rodada 0: explorado = conhecido agora",
+                    "So para o bake manual, onde nao existe historico anterior. "
+                    + "No runtime a exploracao real do MatchController tem "
+                    + "precedencia e este campo e ignorado."),
+                treatBakeAsExploration);
+            EditorGUI.indentLevel--;
+        }
         validateFinalOccupancy = EditorGUILayout.ToggleLeft(
             "Validar ocupacao final", validateFinalOccupancy);
         enableLos = EditorGUILayout.ToggleLeft(
@@ -183,6 +204,12 @@ public sealed class MelhorVisaoWindow : EditorWindow
             AutoDetectContext();
         if (GUILayout.Button("Calcular"))
             Calculate();
+        using (new EditorGUI.DisabledScope(
+                   Application.isPlaying || matchController == null))
+        {
+            if (GUILayout.Button("Cozinhar FOW 0"))
+                CookRoundZeroFog();
+        }
         EditorGUILayout.EndHorizontal();
 
         EditorGUILayout.BeginHorizontal();
@@ -215,6 +242,13 @@ public sealed class MelhorVisaoWindow : EditorWindow
             IsRuntimeContextActive()
                 ? "Runtime confirmado por camada"
                 : "Edit/raw: ganho e perda relativos a origem");
+        EditorGUILayout.LabelField(
+            "Cobertura aliada",
+            result.PerceptionSource == MelhorVisaoPerceptionSource.Snapshot
+                ? "Fotografia (contribuicoes por hex)"
+                : "Estrutural (sensores dos aliados recalculados)");
+        if (!string.IsNullOrEmpty(result.PerceptionDiagnostic))
+            EditorGUILayout.LabelField(" ", result.PerceptionDiagnostic);
 
         int shown = Mathf.Min(result.Ranking.Count, 80);
         for (int i = 0; i < shown; i++)
@@ -272,6 +306,8 @@ public sealed class MelhorVisaoWindow : EditorWindow
             ? cell => matchController.IsCellExploredBySlot(
                 PlayerSlotId.FromIndex(unit.SlotIndex), cell)
             : null;
+        FogKnowledgeSnapshot fogKnowledge = ResolvePerceptionSnapshot(
+            out string fogReason);
 
         result = MelhorVisaoService.Evaluate(new MelhorVisaoRequest
         {
@@ -283,9 +319,11 @@ public sealed class MelhorVisaoWindow : EditorWindow
             ScoringPolicy = BuildPolicy(),
             FocusCells = focus,
             IsExplored = isExplored,
+            PerceptionSnapshot = fogKnowledge,
+            TreatSnapshotKnowledgeAsExploration = treatBakeAsExploration,
             MovementBudget = movementBudget,
             EnableLos = effectiveLos,
-            IncludeAlliedCoverage = runtime,
+            IncludeAlliedCoverage = runtime || fogKnowledge != null,
             ValidateFinalOccupancy = validateFinalOccupancy
         });
         selected = result.Best;
@@ -293,8 +331,73 @@ public sealed class MelhorVisaoWindow : EditorWindow
             ? $"{result.Ranking.Count} hexes avaliados em {layer.Label}. "
                 + $"Melhor: {result.Best.Cell.x},{result.Best.Cell.y}."
             : result.Diagnostic;
+        if (!string.IsNullOrEmpty(fogReason))
+            status += $"\nFOW: {fogReason}";
         Repaint();
         SceneView.RepaintAll();
+    }
+
+    /// <summary>
+    /// Runtime copia o snapshot confirmado do slot; Edit Mode le o bake manual.
+    /// Nenhum dos dois cozinha nada aqui: o bake so muda no botao.
+    /// </summary>
+    private FogKnowledgeSnapshot ResolvePerceptionSnapshot(out string reason)
+    {
+        reason = string.Empty;
+        if (!usePerceptionSnapshot)
+            return null;
+        if (matchController == null)
+        {
+            reason = "MatchController indisponivel; calculo estrutural bruto.";
+            return null;
+        }
+
+        PlayerSlotId observerSlot = PlayerSlotId.FromIndex(unit.SlotIndex);
+        FogKnowledgeSnapshot knowledge;
+        bool copied = Application.isPlaying
+            ? matchController.TryCopyConfirmedFogKnowledgeSnapshotForSlot(
+                observerSlot,
+                resolvedMap,
+                out knowledge,
+                out reason)
+            : matchController.TryCopyRoundZeroFogKnowledgeSnapshotForSlot(
+                observerSlot,
+                resolvedMap,
+                out knowledge,
+                out reason);
+        return copied ? knowledge : null;
+    }
+
+    private void CookRoundZeroFog()
+    {
+        if (Application.isPlaying)
+        {
+            status = "O FOW da rodada 0 so pode ser cozido no Edit Mode.";
+            return;
+        }
+        if (matchController == null)
+            matchController = FindAnyObjectByType<MatchController>();
+        if (matchController == null)
+        {
+            status = "MatchController nao encontrado na Scene.";
+            return;
+        }
+
+        Undo.RecordObject(matchController, "Cozinhar FOW da Rodada 0");
+        if (!matchController.TryCookRoundZeroFogForAllSlots(out string bakeResult))
+        {
+            status = bakeResult;
+            Debug.LogError($"[FoW][RoundZeroBake] {bakeResult}", matchController);
+            return;
+        }
+
+        EditorUtility.SetDirty(matchController);
+        UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(
+            matchController.gameObject.scene);
+        ClearResult();
+        status = bakeResult
+            + " O Melhor Visao usara este bake na proxima consulta.";
+        Debug.Log($"[FoW][RoundZeroBake] {bakeResult}", matchController);
     }
 
     private VisionCoverageScoringPolicy BuildPolicy() =>

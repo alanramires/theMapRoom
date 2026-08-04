@@ -192,10 +192,38 @@ public sealed class MelhorVisaoRequest
     /// camada consultada.
     /// </summary>
     public Func<UnitManager, bool> AlliedObserverFilter;
+
+    /// <summary>
+    /// Conhecimento ja confirmado do slot observador. Com ele a cobertura
+    /// aliada sai das contribuicoes por celula ja fotografadas e nenhum sensor
+    /// aliado e reexecutado. Sem ele o servico mantem o caminho estrutural
+    /// bruto, que continua util no Scene Edit sem bake.
+    /// A fotografia nunca substitui a projecao: origem e candidatas seguem
+    /// vindo do VisionCoverageService, porque posicao hipotetica nao publica
+    /// conhecimento.
+    /// </summary>
+    public FogKnowledgeSnapshot PerceptionSnapshot;
+
+    /// <summary>
+    /// So faz sentido para o bake manual da rodada zero, onde nao existe
+    /// historico: nada foi explorado antes do que a fotografia ja conhece.
+    /// Ignorado quando o chamador forneceu IsExplored ou nao ha fotografia.
+    /// </summary>
+    public bool TreatSnapshotKnowledgeAsExploration;
+
     public int MovementBudget;
     public bool EnableLos = true;
     public bool IncludeAlliedCoverage;
     public bool ValidateFinalOccupancy = true;
+}
+
+/// <summary>
+/// De onde saiu a cobertura aliada usada na comparacao.
+/// </summary>
+public enum MelhorVisaoPerceptionSource
+{
+    Structural = 0,
+    Snapshot = 1
 }
 
 public sealed class MelhorVisaoCellScore
@@ -218,6 +246,8 @@ public sealed class MelhorVisaoResult
         new HashSet<Vector3Int>();
     public readonly List<MelhorVisaoCellScore> Ranking =
         new List<MelhorVisaoCellScore>();
+    public MelhorVisaoPerceptionSource PerceptionSource;
+    public string PerceptionDiagnostic;
     public string Diagnostic;
 
     public MelhorVisaoCellScore Best =>
@@ -259,9 +289,32 @@ public static class MelhorVisaoService
         VisionCoverageResult originCoverage = BuildCoverage(
             request, request.Unit, origin);
 
-        if (request.IncludeAlliedCoverage)
-            CollectAlliedCoverage(request, result.AlliedCoverageWithoutObserver);
+        FogKnowledgeSnapshot snapshot = ResolveUsableSnapshot(
+            request,
+            out string perceptionReason);
+        result.PerceptionSource = snapshot != null
+            ? MelhorVisaoPerceptionSource.Snapshot
+            : MelhorVisaoPerceptionSource.Structural;
+        result.PerceptionDiagnostic = perceptionReason;
 
+        if (request.IncludeAlliedCoverage)
+        {
+            if (snapshot != null)
+            {
+                CollectAlliedCoverageFromSnapshot(
+                    request,
+                    snapshot,
+                    result.AlliedCoverageWithoutObserver);
+            }
+            else
+            {
+                CollectAlliedCoverage(
+                    request,
+                    result.AlliedCoverageWithoutObserver);
+            }
+        }
+
+        Func<Vector3Int, bool> isExplored = ResolveIsExplored(request, snapshot);
         Dictionary<Vector3Int, int> candidates =
             CollectCandidates(request, origin);
         foreach (KeyValuePair<Vector3Int, int> pair in candidates)
@@ -289,7 +342,7 @@ public static class MelhorVisaoService
                         FocusCells = request.FocusCells,
                         IsKnown = request.IsKnown,
                         IsExplored = request.IncludeAlliedCoverage
-                            ? request.IsExplored
+                            ? isExplored
                             : null,
                         ScoringPolicy = request.ScoringPolicy,
                         HasTeamContext = request.IncludeAlliedCoverage,
@@ -316,7 +369,8 @@ public static class MelhorVisaoService
                 request,
                 result,
                 origin,
-                originCoverage);
+                originCoverage,
+                isExplored);
             result.Ranking.Add(result.Origin);
         }
 
@@ -328,6 +382,7 @@ public static class MelhorVisaoService
         result.Diagnostic =
             $"camada={request.Layer.Label} candidatos={result.Ranking.Count} "
             + $"aliados={result.AlliedCoverageWithoutObserver.Count} "
+            + $"percepcao={result.PerceptionSource} "
             + $"melhor={(result.Best != null ? result.Best.Cell.ToString() : "-")}";
         AIDecisionPerf.AddCount(
             "MelhorVisaoCandidatesEvaluated",
@@ -350,6 +405,109 @@ public static class MelhorVisaoService
             Layer = request.Layer,
             EnableLos = request.EnableLos
         });
+
+    /// <summary>
+    /// Separa "nao ha fotografia" de "a fotografia existe mas nao se aplica".
+    /// Falha conservadora: qualquer duvida devolve null e o chamador cai no
+    /// caminho estrutural bruto, que continua correto, so mais caro.
+    /// </summary>
+    private static FogKnowledgeSnapshot ResolveUsableSnapshot(
+        MelhorVisaoRequest request,
+        out string reason)
+    {
+        FogKnowledgeSnapshot snapshot = request.PerceptionSnapshot;
+        if (snapshot == null)
+        {
+            reason =
+                "sem fotografia: cobertura aliada recalculada estruturalmente";
+            return null;
+        }
+        if (snapshot.BoardMap != null && snapshot.BoardMap != request.Map)
+        {
+            reason = "fotografia de outro tabuleiro: ignorada";
+            return null;
+        }
+        if (snapshot.ObserverSlot.Value != request.Unit.SlotIndex)
+        {
+            reason =
+                $"fotografia do slot {snapshot.ObserverSlot.Value} nao cobre a "
+                + $"unidade do slot {request.Unit.SlotIndex}: ignorada";
+            return null;
+        }
+        // Fotografia sem contribuicoes nao e o mesmo que "nenhum aliado
+        // enxerga": e o caso do FOW desligado, que conhece o tabuleiro inteiro
+        // sem registrar quem abriu cada hex. Cair no calculo bruto custa mais e
+        // acerta; aceitar aqui mentiria dizendo que ninguem cobre nada.
+        if (snapshot.VisibilityContributorsByCell.Count == 0)
+        {
+            reason =
+                "fotografia sem contribuicoes por hex: calculo estrutural bruto";
+            return null;
+        }
+
+        reason =
+            $"fotografia slot={snapshot.ObserverSlot.Value} "
+            + $"hexes={snapshot.VisibilityContributorsByCell.Count} "
+            + "(cobertura aliada limitada as fontes deste slot)";
+        return snapshot;
+    }
+
+    /// <summary>
+    /// Le QUEM ja ilumina cada hex na fotografia e retira a contribuicao da
+    /// propria unidade avaliada. Nenhum sensor aliado e reexecutado.
+    /// </summary>
+    private static void CollectAlliedCoverageFromSnapshot(
+        MelhorVisaoRequest request,
+        FogKnowledgeSnapshot snapshot,
+        HashSet<Vector3Int> output)
+    {
+        foreach (KeyValuePair<Vector3Int, List<UnitManager>> pair in
+                 snapshot.VisibilityContributorsByCell)
+        {
+            List<UnitManager> contributors = pair.Value;
+            if (contributors == null)
+                continue;
+
+            for (int i = 0; i < contributors.Count; i++)
+            {
+                UnitManager ally = contributors[i];
+                if (ally == null || ally == request.Unit)
+                    continue;
+                if (request.AlliedObserverFilter != null
+                    && !request.AlliedObserverFilter(ally))
+                {
+                    continue;
+                }
+
+                Vector3Int cell = pair.Key;
+                cell.z = 0;
+                output.Add(cell);
+                break;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Exploracao continua sendo do chamador. A fotografia so responde por ela
+    /// quando o chamador declarou explicitamente que aquele bake e a rodada
+    /// zero, onde nao existe historico anterior.
+    /// </summary>
+    private static Func<Vector3Int, bool> ResolveIsExplored(
+        MelhorVisaoRequest request,
+        FogKnowledgeSnapshot snapshot)
+    {
+        if (request.IsExplored != null)
+            return request.IsExplored;
+        if (snapshot == null || !request.TreatSnapshotKnowledgeAsExploration)
+            return null;
+
+        HashSet<Vector3Int> known = snapshot.KnownCells;
+        return cell =>
+        {
+            cell.z = 0;
+            return known.Contains(cell);
+        };
+    }
 
     private static void CollectAlliedCoverage(
         MelhorVisaoRequest request,
@@ -473,7 +631,8 @@ public static class MelhorVisaoService
         MelhorVisaoRequest request,
         MelhorVisaoResult result,
         Vector3Int origin,
-        VisionCoverageResult originCoverage)
+        VisionCoverageResult originCoverage,
+        Func<Vector3Int, bool> isExplored)
     {
         VisionCoverageEvaluation evaluation =
             VisionCoverageEvaluator.Evaluate(
@@ -486,7 +645,7 @@ public static class MelhorVisaoService
                     FocusCells = request.FocusCells,
                     IsKnown = request.IsKnown,
                     IsExplored = request.IncludeAlliedCoverage
-                        ? request.IsExplored
+                        ? isExplored
                         : null,
                     ScoringPolicy = request.ScoringPolicy,
                     HasTeamContext = request.IncludeAlliedCoverage,
