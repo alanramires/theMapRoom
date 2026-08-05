@@ -237,6 +237,9 @@ public partial class TurnStateManager
     {
         UpdateAiActionOverlayPresentation();
         RecordFramePerfSample();
+        // Antes da barreira: o prazo do Jornal precisa ser segurado JUSTAMENTE
+        // enquanto o input esta bloqueado (cortina do hot seat, load).
+        HoldTurnStartBriefingClockWhileInputBlocked();
         if (PanelRodadaController.IsGameplayInputBlocked)
             return;
         ProcessPerformanceSnapshotHotkeyInput();

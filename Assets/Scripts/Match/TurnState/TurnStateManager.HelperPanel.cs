@@ -3198,6 +3198,31 @@ public partial class TurnStateManager
         }
     }
 
+    // O relogio do Jornal nao corre atras da cortina. Em hot seat o relatorio e
+    // montado DENTRO de AdvanceTurn, com a tela preta ja no ar e o proximo
+    // jogador ainda nem sentado: os segundos de exibicao venciam antes de
+    // alguem ler a primeira linha, e o auto-dismiss varria as linhas assim que
+    // o input voltava. Dava a impressao de relatorio incompleto — enquanto o
+    // mesmo relatorio, intacto, abria pelo menu.
+    //
+    // Enquanto o input estiver bloqueado (cortina ou load), o prazo e rearmado
+    // para a duracao INTEIRA a partir de agora: quem senta na cadeira recebe o
+    // relatorio do zero, nao o resto dele. O quadro de ativacao acompanha, pra
+    // que a tecla que derruba a cortina nao seja lida como "ja li, pode fechar".
+    // O relatorio aberto pelo menu nao tem prazo e fica de fora.
+    private void HoldTurnStartBriefingClockWhileInputBlocked()
+    {
+        if (turnStartAutonomyHelperOpenedFromMenu)
+            return;
+        if (turnStartAutonomyHelperLines.Count <= 0 || turnStartAutonomyHelperDuration <= 0f)
+            return;
+        if (!PanelRodadaController.IsGameplayInputBlocked)
+            return;
+
+        turnStartAutonomyHelperVisibleUntil = Time.time + turnStartAutonomyHelperDuration;
+        turnStartAutonomyHelperActivatedFrame = Time.frameCount;
+    }
+
     private void UpdateTurnStartAutonomyHelperAutoDismiss()
     {
         if (!IsTurnStartAutonomyHelperActive())
