@@ -1587,24 +1587,24 @@ public class BattleMapMenuRootController : MonoBehaviour
             menuRootRect = menuRoot.GetComponent<RectTransform>();
         CacheOriginalDockLayoutIfNeeded();
 
-        if (btnStatus == null) btnStatus = FindButtonByNames(panelMenu, "btn_status", "button_status");
-        if (btnComando == null) btnComando = FindButtonByNames(panelMenu, "btn_comando", "button_comando");
-        if (btnRodada == null) btnRodada = FindButtonByNames(panelMenu, "btn_rodada", "button_rodada");
-        if (btnOpcoes == null) btnOpcoes = FindButtonByNames(panelMenu, "btn_opcoes", "button_opcoes", "button_opções");
+        if (btnStatus == null) btnStatus = FindMenuButtonByNames(panelMenu, "btn_status", "button_status");
+        if (btnComando == null) btnComando = FindMenuButtonByNames(panelMenu, "btn_comando", "button_comando");
+        if (btnRodada == null) btnRodada = FindMenuButtonByNames(panelMenu, "btn_rodada", "button_rodada");
+        if (btnOpcoes == null) btnOpcoes = FindMenuButtonByNames(panelMenu, "btn_opcoes", "button_opcoes", "button_opções");
         if (btnVoltarMenu == null) btnVoltarMenu = FindButtonByNames(panelMenu, "btn_voltar", "button_voltar");
-        if (btnCamada == null) btnCamada = FindButtonByNames(panelMenu, "btn_camada", "button_camada", "button_layer");
+        if (btnCamada == null) btnCamada = FindMenuButtonByNames(panelMenu, "btn_camada", "button_camada", "button_layer");
 
-        if (btnMinimapa == null) btnMinimapa = FindButtonByNames(panelOptions, "btn_minimapa", "button_minimapa", "button_miniMapa");
-        if (btnConfig == null) btnConfig = FindButtonByNames(panelOptions, "btn_config", "button_config");
-        if (btnSave == null) btnSave = FindButtonByNames(panelOptions, "button_save", "btn_save");
-        if (btnLoad == null) btnLoad = FindButtonByNames(panelOptions, "button_load", "btn_load");
-        if (btnGerenciar == null) btnGerenciar = FindButtonByNames(panelOptions, "btn_gerenciar", "button_gerenciar");
+        if (btnMinimapa == null) btnMinimapa = FindMenuButtonByNames(panelOptions, "btn_minimapa", "button_minimapa", "button_miniMapa");
+        if (btnConfig == null) btnConfig = FindMenuButtonByNames(panelOptions, "btn_config", "button_config");
+        if (btnSave == null) btnSave = FindMenuButtonByNames(panelOptions, "button_save", "btn_save");
+        if (btnLoad == null) btnLoad = FindMenuButtonByNames(panelOptions, "button_load", "btn_load");
+        if (btnGerenciar == null) btnGerenciar = FindMenuButtonByNames(panelOptions, "btn_gerenciar", "button_gerenciar");
         if (btnVoltarOptions == null) btnVoltarOptions = FindButtonByNames(panelOptions, "btn_voltar", "button_voltar");
-        if (btnConsumo == null) btnConsumo = FindButtonByNames(panelOptions, "button_consumo", "btn_consumo");
+        if (btnConsumo == null) btnConsumo = FindMenuButtonByNames(panelOptions, "button_consumo", "btn_consumo");
 
-        if (btnDestruir == null) btnDestruir = FindButtonByNames(panelGerenciar, "btn_destruir", "button_destruir");
-        if (btnRender == null) btnRender = FindButtonByNames(panelGerenciar, "btn_render", "button_render");
-        if (btnSair == null) btnSair = FindButtonByNames(panelGerenciar, "btn_sair", "button_sair");
+        if (btnDestruir == null) btnDestruir = FindMenuButtonByNames(panelGerenciar, "btn_destruir", "button_destruir");
+        if (btnRender == null) btnRender = FindMenuButtonByNames(panelGerenciar, "btn_render", "button_render");
+        if (btnSair == null) btnSair = FindMenuButtonByNames(panelGerenciar, "btn_sair", "button_sair");
         if (btnVoltarGerenciar == null) btnVoltarGerenciar = FindButtonByNames(panelGerenciar, "btn_voltar", "button_voltar");
 
         if (cursorController == null) cursorController = FindInActiveScene<CursorController>();
@@ -1818,6 +1818,22 @@ public class BattleMapMenuRootController : MonoBehaviour
 
         Transform found = FindChildByName(panel.transform, buttonName);
         return found != null ? found.GetComponent<Button>() : null;
+    }
+
+    // Botao de nome unico: procura no painel de origem e, se nao achar, em todo
+    // o menuRoot. Mover um botao de painel e ato de DESIGN — a fiacao nao pode
+    // depender de onde ele mora, senao o botao continua na tela, navegavel, e
+    // sem acao nenhuma (foi o que aconteceu com o Consumo ao sair do Options).
+    // Os "Voltar" ficam de fora de proposito: cada painel tem o seu, e a busca
+    // larga traria o do vizinho.
+    private Button FindMenuButtonByNames(GameObject preferredPanel, params string[] buttonNames)
+    {
+        Button button = FindButtonByNames(preferredPanel, buttonNames);
+        if (button != null)
+            return button;
+        return menuRoot != null && menuRoot != preferredPanel
+            ? FindButtonByNames(menuRoot, buttonNames)
+            : null;
     }
 
     private static Button FindButtonByNames(GameObject panel, params string[] buttonNames)

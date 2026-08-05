@@ -1409,7 +1409,9 @@ public class ReplayManager : MonoBehaviour
         float stepDelay = GetEffectivePlayerMenuStepDelay();
         if (stepDelay > 0f) yield return new WaitForSecondsRealtime(stepDelay);
 
-        // Navega até btnRodada: ESC abriu no índice 0 (Status), 2× DOWN chega em Rodada
+        // Navega até btnRodada por PREDICADO, não por contagem: o painel é
+        // reorganizável (botão entra, botão sai) e o número de DOWNs muda junto.
+        // A navegação dá a volta, então basta a guarda ser maior que a lista.
         int guard = 0;
         while (!menu.IsRodadaButtonSelected && guard++ < 10)
         {
