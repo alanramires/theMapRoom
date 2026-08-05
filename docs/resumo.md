@@ -1,54 +1,142 @@
 # Resumo — onde estamos e o que vem
 
-Ponto de retomada. Escrito em 2026-08-04, **depois** da tag `v7.1.2`. Leia isto
-primeiro; ele descreve o estado pós-versão e não pertence à tag.
+Ponto de retomada. Escrito em 2026-08-05, **depois** da tag `v7.1.2` e da
+partida de validação. Leia isto primeiro; ele descreve o estado pós-versão e não
+pertence à tag.
+
+---
+
+## A partida de teste aconteceu — e passou
+
+O autor validou cinco dos seis itens em jogo. **Nenhum voltou atrás:**
+
+```text
+bazuca da montanha atras da floresta   OK
+deteccao ar-ar exigindo linha          OK
+radar.mp3 no caca furtivo              OK  ("ficou muito legal")
+contato cinza sobre o preto            OK
+botao Camadas fora do painel           OK  (o autor deletou o objeto)
+```
+
+Isso encerra a dívida de validação das três versões. **O que ficou sem número é
+a perf**: `FrameSpike` num turno de IA com muitas unidades nunca foi medido. A
+`v7.1.1` trocou filtro por varredura em três pontos do caminho quente; o
+suspeito é o `CollectDetection` por observador, que faz muito mais do que o
+par-a-par fazia. Enquanto não houver número, não há problema **nem** garantia.
 
 ---
 
 ## Primeira coisa a fazer
 
-**Uma partida de teste.** Não é tarefa de código, e é a mais importante da fila.
+**Padronizar a saída das duas janelas de sensor.** É o pedido direto do autor,
+com print dos dois relatórios lado a lado, e a frase que importa:
+*"eu gostava daquele relatório, sabe"*.
 
-Os refactors estruturais acabaram. Nesta sequência de três versões entraram
-mudanças de comportamento que **nunca rodaram juntas**:
+O `PodeEnxergar` diz, quando a linha morre:
 
 ```text
-revelacao de terreno    fonte trocada (PodeEnxergar)
-deteccao                fonte unica (CollectDetection)
-FOW no commit           refresh e publish completos, nao mais delta
-tiro da montanha        parte de EV 2 — quebrei e consertei na v7.1.2
-"atirador ve o alvo"    passou a herdar EV, alinhando com o PodeDetectar
+Subida da linha   0,00 -> 0,00      (passo a passo, string pronta)
+EV na parada      0,00
+Tentou ver EV     2,25
+EV Bloqueador     Montanha (EV: 2,25)
 ```
 
-O que olhar:
+O `PodeDetectar`, para a **mesma** reta, diz só `Altura por hex: 0 > 2` e
+`Bloqueio LOS: -23,11`. Não conta quanto a linha tinha subido quando parou, nem
+contra o quê — o leitor precisa deduzir que 2,25 > 2.
 
-- bazuca de alcance 2 na montanha acertando quem está atrás da floresta;
-- tiro de terreno plano seguindo igual;
-- caças detectados aparecendo, e **cinza sobre o preto** quando o hex do alvo
-  não está revelado — esse caminho nunca disparou em partida;
-- submarino revelando 3, não 7;
-- **`FrameSpike` num turno de IA com muitas unidades.**
+A causa é rasa e a correção é estrutural. O `PodeEnxergar` tem campos
+construídos para o relatório (`lineRiseTrace`, `losHeightAtPassedCell`,
+`passedLayerLabel`, `finalReachedEv`). O `PodeDetectar` recebeu na `v7.1.2` só
+um `List<float> lineOfSightEvPath` cru, e a janela o imprime juntando os
+números.
 
-Esse último é o que pode reordenar a fila inteira: a `v7.1.1` trocou filtro por
-varredura em três pontos do caminho quente sem medir nenhum. O suspeito é o
-`CollectDetection` por observador, que faz muito mais do que o par-a-par fazia.
+**O lugar certo é o `ObservationLineService`.** Ele já calcula tudo isso no
+traçado detalhado; o que falta é ele devolver o *perfil da linha* como um tipo
+só, e as duas janelas formatarem a partir dele. Mesma reta, mesmo relatório —
+é a mesma lição de "uma pergunta, uma implementação", agora aplicada à saída.
+
+Enquanto forem dois formatos, comparar as duas janelas continua sendo trabalho
+manual de tradução, e é exatamente para isso que elas existem.
 
 ---
 
-## A fila depois do teste
+## A fila depois disso
 
 ```text
-1. linha de quem detectou no resultado    o TryTrace ja devolve evPath,
-                                          intermediateCells e blockedCell
-2. delta de contatos novos no publish     gancho do radar.MP3 e do Jornal;
-                                          o certo e "passou a detectar"
-3. decidir skipLosForCurrentTarget        DECISAO DO AUTOR: propriedade do
+1. delta de "passou a detectar"           UM gancho, DOIS consumidores:
+                                          o som e o Jornal (ver abaixo)
+2. jornal para contato nao-furtivo        hoje so unidade stealth entra
+3. exclamacao no contato novo             + foco pela linha do jornal;
+                                          NAO pan automatico
+4. decidir skipLosForCurrentTarget        DECISAO DO AUTOR: propriedade do
                                           MEIO (DPQ) ou metodo na ficha?
-4. eixo de camada no FogKnowledgeSnapshot destrava o Melhor Spotting
-5. apagar residuo de exploracao nos saves trivial: nada foi distribuido
+5. medir FrameSpike em turno de IA        a unica divida da v7.1.1 sem numero
+6. apagar residuo de exploracao nos saves trivial: nada foi distribuido
 ```
 
-Só depois disso o **Melhor Spotting** — foi o combinado.
+O eixo de camada no `FogKnowledgeSnapshot` **saiu da fila** — ver "O item que
+deixou de existir".
+
+Só depois disso o **Melhor Spotting** — foi o combinado, e agora ele não tem
+pré-requisito nenhum.
+
+---
+
+## O alerta de contato — o que já existe e o que falta
+
+O autor levantou o caso: reposiciona o radar móvel, ele flagra um helicóptero
+voando baixo atrás da montanha, sobre névoa preta. Sem aviso, o jogador pode
+nunca saber que viu.
+
+**O som já cobre isso.** O fallback da `v7.1.0` dispara em
+`detectedStealth.Count > 0 || spottedCandidates.Count > 0` — qualquer detecção,
+não só furtiva. Unidade comum entra em `spottedCandidates`; é de lá que
+`IsTargetObservedByTeam` tira o "sim" para qualquer alvo. Observador sem chave
+de sensor e sem clipe na skill fica calado, que é o gate desejado.
+
+O problema é o inverso: **toca demais.** O radar reencontra os mesmos inimigos
+toda vez que age. Repetição no furtivo é feedback ("continuo te vendo") e o
+autor a quis de propósito; generalizada vira ruído de fundo.
+
+**O jornal não cobre.** Dois portões barram:
+
+```text
+IsStealthUnit()                     MatchController.cs:5890
+                                    so unidade furtiva chega ao NewContact
+detectorSlotIndex != ActiveSlotId   MatchController.cs:6008
+                                    "deteccao no proprio turno foi vista ao vivo"
+```
+
+O segundo é a premissa a revisar. "Viu ao vivo" vale para quem se move dentro
+do seu campo de visão. **Não vale para um sensor que alcança onde seus olhos não
+estão** — e é justamente o caso do radar sobre o preto. A regra fog-honesta não
+é "turno de quem", é *"o jogador teve chance de ver isto acontecer?"*.
+
+**Pan automático não.** Rouba a câmera no meio da jogada e, com três contatos
+novos, o "primeiro" é arbitrário. Exclamação no contato (o marcador de
+combustível já existe) mais a linha do jornal, que já sabe centralizar
+(`isFocused` em `HelperTurnStartAutonomyLine`). O jogador decide quando ir.
+
+---
+
+## O item que deixou de existir
+
+O **eixo de camada no `FogKnowledgeSnapshot`** estava escrito aqui como
+pré-requisito do Melhor Spotting. Ele foi cancelado pelo autor, e não por ter
+sido feito:
+
+> *"se o terreno é conhecido, ele é conhecido/explorado. seu primeiro item
+> 'conhecido em qual camada' realmente não importa"*
+
+Depois da separação, só o `PodeEnxergar` libera hexágono, e só no alcance da
+visão da ficha. EWACS e Supertucano são excelentes detectores de unidade
+escondida — e não são mais reveladores de hexágono. Não existindo revelação por
+camada, não existe conhecimento por camada. A pergunta perdeu o sentido.
+
+Consequência: o atalho `L` virou no-op documentado e o botão de Camadas saiu do
+painel (o autor deletou o objeto da cena). `CycleFogOfWarVisionMode` continua
+público para depuração.
 
 ---
 
@@ -139,13 +227,15 @@ as outras 637 mudaram de casa.
 
 ## Onde eu parei
 
-### `PodeEnxergar` — entidade viva, sem laço próprio
+### `PodeEnxergar` — entidade completa, com laço próprio
 
 `Assets/Scripts/Sensors/PodeEnxergarSensor.cs`. Responde só por hexágonos e é a
 fonte do FOW: `CollectVisibleCellsForFogOfWar` delega a ele, e os três
 consumidores herdam — FOW de runtime, bake da rodada zero, `RetaguardaWindow`.
 
-Falta o laço próprio (ver "Primeira coisa a fazer").
+O laço é dele: raio pela `visao` da ficha, `HexGridGeometry.CollectCellsInRadius`,
+e uma chamada ao `ObservationLineService.TryTrace` por célula. **O arquivo não
+menciona `PodeDetectar` em lugar nenhum** — que era o critério de retomada.
 
 ### As três portas fechadas
 
@@ -237,37 +327,26 @@ fotografia não se aplica". Nenhum `AIController` consome.
 
 ## Pendências abertas
 
-**Nada foi validado em partida.** A dívida mais urgente — ver "Primeira coisa a
-fazer".
-
 **Perf não medida.** Três varreduras novas no caminho quente, nenhuma com número.
+É a última dívida da `v7.1.1` sem resposta, e a única capaz de reordenar a fila.
 
-**A linha de quem detectou não aparece no resultado.** O autor pediu que o
-`PodeDetectar` mostre subida ou descida, como o `PodeEnxergar` já mostra. Agora é
-barato: o `TryTrace` já devolve `evPath`, `intermediateCells` e `blockedCell`.
+**As duas janelas de sensor descrevem a mesma reta em formatos diferentes.** A
+primeira tarefa da fila — ver "Primeira coisa a fazer".
 
-**A janela do `PodeEnxergar` ainda usa `TryGetObservationLineDebug`** do
-`PodeDetectar` para o diagnóstico por célula. É a mesma reta por baixo, mas o
-nome com `Debug` vira dívida quando o perfil da linha virar contrato.
+**O som de detecção não tem noção de novidade.** Toca a cada reconstrução, para
+qualquer contato. Foi decisão consciente no furtivo; generalizado precisa do
+delta "passou a detectar". Mesmo gancho que o Jornal precisa.
 
-**O alerta sonoro precisa de um gancho que não existe.** O certo não é
-"detectou", é **"passou a detectar"** — o delta entre o conjunto anterior e o
-novo no publish. Sem isso o sonar toca a cada refresh. O `radar.MP3` já está no
-repositório, sem nada referenciando.
+**O Jornal só registra contato furtivo, e só em turno alheio.** Ver "O alerta de
+contato". A premissa a revisar é a segunda, não a primeira.
 
 **`KnownCells` continua um balde só.** Não recebe mais conhecimento aéreo
-especializado, mas ainda mistura terreno e memória de exploração, e o
-`FogKnowledgeSnapshot` segue **sem eixo de camada**. O Melhor Spotting depende
-disso.
+especializado, mas ainda mistura terreno e memória de exploração. Já **não**
+bloqueia o Melhor Spotting — o eixo de camada foi cancelado.
 
 **Saves antigos têm resíduo.** Hexes revelados pelo alcance de detecção antes da
 `v7.1.0` já estão gravados como explorados. Como nada foi distribuído, é só
 apagar.
-
-**Contato sobre o preto ainda não foi validado em jogo.**
-`ApplyFogDetectedContactPresentation` já faz `detectado && !geograficamenteVisível
-→ cinza`, mas isso só passa a ser o caminho normal agora. O sprite pode ficar
-atrás do overlay, que assume oclusão onde há tile.
 
 **A Vigilância da `v7.0.3` continua sem validação registrada no Unity.**
 
@@ -306,6 +385,8 @@ atrás do overlay, que assume oclusão onde há tile.
 | armadilha | lição |
 |---|---|
 | **uma pergunta, duas implementações** | a janela auditava `CollectDetection` e o jogo usava `CanObserverObserveTarget`. A ferramenta não estava errada — estava olhando outro caminho, e deu confiança falsa sobre uma ficha correta |
+| **uma pergunta, dois relatórios** | a versão de saída do mesmo erro. `PodeEnxergar` e `PodeDetectar` traçam a **mesma** reta e a descrevem com campos diferentes. Comparar as duas janelas vira tradução manual, que é o oposto do que elas existem para fazer |
+| **testar só o caso especial** | o som generalizado já funcionava para unidade comum desde a `v7.1.0`, e passou despercebido porque todo teste usou furtivo — que casa chave própria e nunca chega ao fallback. O caminho geral só aparece quando o caso especial não se aplica |
 | **uma regra aplicada onde ela não vale** | *"a unidade herda EV só para revelar hex e detectar"* virou, na minha mão, o `PodeMirar` inteiro sem herança — e a bazuca da montanha perdeu a linha. A LdT precisa da herança; e o `PodeMirar` usa **duas** retas, tiro e observação, com regras diferentes |
 | **declarar dado órfão cedo demais** | cheguei a propor apagar `shooterInheritsTerrainEv` porque tinha ficado sem leitor. Ele tinha ficado sem leitor **porque eu quebrei a regra** que o lia |
 | **editar `.cs` por script no PS 5.1** | `Get-Content` sem BOM lê como ANSI e corrompe acentos; `Set-Content -Encoding utf8` põe BOM em mensagem de commit. Use `ReadAllLines`/`WriteAllLines` com UTF-8 explícito — e confira o **diffstat**: deleção pura com inserções é sinal de reescrita não intencional |
@@ -339,9 +420,15 @@ atrás do overlay, que assume oclusão onde há tile.
 
 ## Critério de retomada
 
-A perna de detecção está pronta quando o `PodeDetectar` responder **só por
-unidades**, sem nenhum caminho que contribua para conjunto de células de terreno,
-e quando `Propagated` for escolhido pela ficha em vez de por `if` na camada.
+O critério anterior foi cumprido: o `PodeDetectar` responde só por unidades, o
+`PodeEnxergar` pode ser lido sem abrir o `PodeDetectarSensor`, e a partida
+confirmou os dois em jogo.
 
-E o `PodeEnxergar` está pronto quando puder ser lido sem abrir o
-`PodeDetectarSensor`.
+O que sobrou dele é uma linha só: **`Propagated` ainda não é escolhido pela
+ficha em toda camada** — o `range only` de `AirHigh` continua vindo de um `if`
+sobre o `DPQAirHeightConfig`. É decisão do autor (item 4 da fila), porque a flag
+fala do *meio*, não do sensor.
+
+O novo critério é de **saída**: a perna de percepção está pronta quando as duas
+janelas descreverem a mesma reta com as mesmas palavras, e quando um contato
+novo avisar o jogador uma vez — em vez de calar no Jornal e repetir no alto-falante.
