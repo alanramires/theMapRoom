@@ -37,6 +37,7 @@ intactos.
 | v7.1.0 | Enxergar e detectar deixaram de ser a mesma pergunta | [relatório](docs/relatorio_v7.1.0.md) |
 | v7.1.1 | Uma pergunta, uma implementação | [relatório](docs/relatorio_v7.1.1.md) |
 | v7.1.2 | A reta virou uma só | [relatório](docs/relatorio_v7.1.2.md) |
+| v7.2.0 | Apagar também é publicar | [relatório](docs/relatorio_v7.2.0.md) |
 
 ### Documentos normativos criados neste major
 
