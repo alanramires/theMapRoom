@@ -38,6 +38,7 @@ intactos.
 | v7.1.1 | Uma pergunta, uma implementação | [relatório](docs/relatorio_v7.1.1.md) |
 | v7.1.2 | A reta virou uma só | [relatório](docs/relatorio_v7.1.2.md) |
 | v7.2.0 | Apagar também é publicar | [relatório](docs/relatorio_v7.2.0.md) |
+| v7.2.1 | A pergunta errada também responde | [relatório](docs/relatorio_v7.2.1.md) |
 
 ### Documentos normativos criados neste major
 
