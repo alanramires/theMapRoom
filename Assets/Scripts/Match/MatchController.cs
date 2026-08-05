@@ -5893,22 +5893,30 @@ public class MatchController : MonoBehaviour
             if (matchedDetectorSkill == null)
                 continue;
 
-            if (!canPlaySkillSfx || playedSkillSfx || !IsSubmarineLikeDetectionTarget(option))
+            // Sem gate de camada: quem escolhe o som e a CHAVE que casou. O
+            // TryResolveSkillMatchedDetectorSkill ja devolve a skill do alvo que
+            // este observador sabe caçar, e o CursorController tem o vinculo
+            // skill -> clipe. SUB Ops toca sonar, AR Stealth toca radar, e uma
+            // etiqueta nova traz o som dela sem uma linha de codigo.
+            //
+            // Toca a cada reconstrucao de proposito: repetir e o feedback de
+            // "continuo te vendo". Fugiu e ainda aparece, toca de novo.
+            if (!canPlaySkillSfx || playedSkillSfx)
                 continue;
 
             cursorController.TryPlaySkillSfx(matchedDetectorSkill, 1f);
             playedSkillSfx = true;
         }
 
-        if (!playedSkillSfx &&
-            canPlaySkillSfx &&
-            IsSubmarineLikeObserver(observer))
+        if (!playedSkillSfx && canPlaySkillSfx)
         {
             bool hasAnyDetection = detectedStealth.Count > 0 || spottedCandidates.Count > 0;
             if (hasAnyDetection)
             {
-                // Fallback: em deteccoes de submarino para alvos de superficie (ex.: fragata),
-                // toca o sonar mesmo quando nao houver match de skill por stealth-target.
+                // Fallback quando nenhuma chave do ALVO casou: o observador toca
+                // o som da propria skill de sensor. Era exclusivo do submarino
+                // detectando superficie; agora vale para qualquer sensor com
+                // vinculo, e sem vinculo simplesmente nao toca.
                 if (TryResolveSonarSkill(observerData, out SkillData sonarSkill) && sonarSkill != null)
                     playedSkillSfx = cursorController.TryPlaySkillSfx(sonarSkill, 1f);
 
@@ -6033,22 +6041,6 @@ public class MatchController : MonoBehaviour
         }
 
         return false;
-    }
-
-    private static bool IsSubmarineLikeDetectionTarget(PodeDetectarOption option)
-    {
-        if (option == null)
-            return false;
-
-        return option.targetDomain == Domain.Submarine || option.targetHeightLevel == HeightLevel.Submerged;
-    }
-
-    private static bool IsSubmarineLikeObserver(UnitManager observer)
-    {
-        if (observer == null)
-            return false;
-
-        return observer.GetDomain() == Domain.Submarine || observer.GetHeightLevel() == HeightLevel.Submerged;
     }
 
     private static bool TryResolveSonarSkill(UnitData observerData, out SkillData sonarSkill)
