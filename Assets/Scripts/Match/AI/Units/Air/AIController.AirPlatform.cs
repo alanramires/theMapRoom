@@ -3,6 +3,33 @@ using UnityEngine;
 
 public partial class AIController
 {
+    // Quantos TURNOS de voo proprio a plataforma precisa economizar para o
+    // rebasing valer. Um: embarcar custa a rodada inteira (mover, embarcar, e
+    // decolar de novo depois), entao a plataforma so compensa se ela adianta
+    // mais do que a aeronave adiantaria voando sozinha no mesmo tempo.
+    private const float AirPlatformRebasingGainInTacticalTurns = 1f;
+
+    /// <summary>
+    /// Ganho minimo de posicionamento para aceitar rebasing, em hexes, medido
+    /// como BANDA da aeronave avaliada — nao numero fixo.
+    ///
+    /// Era 2f cravado na chamada, e por isso um caca de 9 MP embarcava por 3
+    /// hexes de ganho: menos de meio turno de voo, pago com o turno inteiro.
+    /// Com a banda, o mesmo 3 e recusado e um aviao lento (ou com pouco MP
+    /// restante, que voaria pouco de qualquer jeito) volta a aceitar carona
+    /// por ganhos pequenos — que para ele nao sao pequenos.
+    /// </summary>
+    private static float ResolveAirPlatformMinimumMissionGain(
+        UnitManager aircraft)
+    {
+        int tactical = aircraft != null
+            ? Mathf.Max(0, aircraft.RemainingMovementPoints)
+            : 0;
+        return Mathf.Max(
+            0.1f,
+            tactical * AirPlatformRebasingGainInTacticalTurns);
+    }
+
     /// <summary>
     /// Consome a intenção pura do QueroCaronaAerea e materializa somente o
     /// trecho Tactical permitido nesta rodada. Compatibilidade e vaga
@@ -86,7 +113,9 @@ public partial class AIController
                 fromCell,
                 platform,
                 paths,
-                out action))
+                out action,
+                logCategory: "AirPlatform",
+                logVerb: "REBASING"))
         {
             reason =
                 $"plataforma #{platform.InstanceId} " +

@@ -396,6 +396,9 @@ public partial class AIController
         return BuildMoveBatch(unit, aiTeam, fromCell, best, paths);
     }
 
+    // logCategory/logVerb: o mecanismo (mover ate o transporte e embarcar) e o
+    // mesmo para EVAC de reparo e para rebasing aereo, mas o MOTIVO nao. Sem
+    // isso um caca 10/10 trocando de base aparecia no log como "Repair EVAC".
     private bool TryBuildRepairEvacExtendedEmbarkAction(
         UnitManager unit,
         AIWorldSnapshot snapshot,
@@ -404,7 +407,9 @@ public partial class AIController
         Vector3Int fromCell,
         UnitManager transporter,
         Dictionary<Vector3Int, List<Vector3Int>> paths,
-        out PlayerAction action)
+        out PlayerAction action,
+        string logCategory = "Repair",
+        string logVerb = "EVAC")
     {
         action = null;
         if (unit == null || transporter == null || snapshot == null)
@@ -468,7 +473,7 @@ public partial class AIController
                     && TryEmbarkFromHex(fromCell, null, unit.RemainingMovementPoints,
                             transporterCell, unit, unitData, plan, null, snapshot, out action,
                             requireSectorMatch: false, allowOverflow: true, requireFormalPassenger: false,
-                            expectedTransporter: transporter))
+                            expectedTransporter: transporter, logCategory: logCategory))
                     return true;
                 continue;
             }
@@ -486,9 +491,9 @@ public partial class AIController
             if (TryEmbarkFromHex(stopCell, pathToStop, remainingMPAtStop,
                     transporterCell, unit, unitData, plan, null, snapshot, out action,
                     requireSectorMatch: false, allowOverflow: true, requireFormalPassenger: false,
-                    expectedTransporter: transporter))
+                    expectedTransporter: transporter, logCategory: logCategory))
             {
-                Debug.Log($"{TL("Repair")} {unit.InstanceId} EVAC — move+embarca em transporter #{transporter.InstanceId} via {stopCell}");
+                Debug.Log($"{TL(logCategory)} {unit.InstanceId} {logVerb} — move+embarca em transporter #{transporter.InstanceId} via {stopCell}");
                 return true;
             }
         }

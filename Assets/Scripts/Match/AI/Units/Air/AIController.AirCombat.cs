@@ -243,7 +243,8 @@ public partial class AIController
                 paths,
                 landingSnapshot: null,
                 ewacsRecovery: null,
-                minimumMissionGain: 2f,
+                minimumMissionGain:
+                    ResolveAirPlatformMinimumMissionGain(unit),
                 acceptOnlyRecovery: true,
                 maximumRecoveryRegression: 1f,
                 out PlayerAction platformAction,

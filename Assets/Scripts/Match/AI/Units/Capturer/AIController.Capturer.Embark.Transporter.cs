@@ -55,13 +55,19 @@ public partial class AIController
     // Executor físico compartilhado. O Capturer chega aqui pelo wrapper acima,
     // já autorizado pelo Quero Carona; EVAC reutiliza a legalidade de embarque
     // sem precisar fabricar uma decisão de agenda do Capturer.
+    // logCategory: quem MANDOU embarcar, para o log dizer o motivo verdadeiro.
+    // Esta rotina e compartilhada — capturador, EVAC de reparo e rebasing aereo
+    // passam todos por aqui — e carimbar tudo como "Capturador" fazia um caca
+    // inteiro, que so estava mudando de base, aparecer no log como capturador em
+    // evacuacao. O default preserva o chamador historico.
     private bool TryEmbarkFromHex(
         Vector3Int fromHex, List<Vector3Int> pathToHex, int remainingMPAtHex,
         Vector3Int tCell, UnitManager unit, UnitData unitData,
         TeamObjectivePlan plan, SectorObjective assigned,
         AIWorldSnapshot snapshot, out PlayerAction action,
         bool requireSectorMatch = false, bool allowOverflow = false, bool requireFormalPassenger = false,
-        UnitManager expectedTransporter = null)
+        UnitManager expectedTransporter = null,
+        string logCategory = "Capturador")
     {
         action = null;
 
@@ -73,7 +79,7 @@ public partial class AIController
         if (!PodeEmbarcarSensor.CanEmbarkAtTransporterContext(
                 boardTilemap, terrainDatabase, transporter, tData, out string contextReason))
         {
-            Debug.Log($"{TL("Capturador")} {unit.InstanceId} TryEmbarkFromHex BLOQUEADO contexto: transporter={transporter.InstanceId}@{tCell} {contextReason}");
+            Debug.Log($"{TL(logCategory)} {unit.InstanceId} TryEmbarkFromHex BLOQUEADO contexto: transporter={transporter.InstanceId}@{tCell} {contextReason}");
             return false;
         }
         // Não embarcar em transporter ainda no aeroporto/fábrica — espera ele sair primeiro.
@@ -120,19 +126,19 @@ public partial class AIController
             && !compatibleTransportObjective
             && !queuedPassengerSeat)
         {
-            Debug.Log($"{TL("Capturador")} {unit.InstanceId} TryEmbarkFromHex BLOQUEADO setor distante: assigned={assigned.Sector} tObj={tObj.Sector} transporter={transporter.InstanceId}");
+            Debug.Log($"{TL(logCategory)} {unit.InstanceId} TryEmbarkFromHex BLOQUEADO setor distante: assigned={assigned.Sector} tObj={tObj.Sector} transporter={transporter.InstanceId}");
             return false;
         }
         if (assigned == null && tObj != null && !shuttleFree)
         {
-            Debug.Log($"{TL("Capturador")} {unit.InstanceId} TryEmbarkFromHex BLOQUEADO reserva: rogue nao usa transporter={transporter.InstanceId} reservado para {tObj.Sector}");
+            Debug.Log($"{TL(logCategory)} {unit.InstanceId} TryEmbarkFromHex BLOQUEADO reserva: rogue nao usa transporter={transporter.InstanceId} reservado para {tObj.Sector}");
             return false;
         }
         if (!sameSector && !shuttleFree && !queuedPassengerSeat)
         {
             if (!allowOverflow)
             {
-                Debug.Log($"{TL("Capturador")} {unit.InstanceId} TryEmbarkFromHex BLOQUEADO setor: assigned={assigned?.Sector} tObj={tObj?.Sector} sameSector={sameSector} compatible={compatibleSector} navalRoute={compatibleNavalRoute} shuttleFree={shuttleFree} isPrimary={isPrimary} transporter={transporter.InstanceId}");
+                Debug.Log($"{TL(logCategory)} {unit.InstanceId} TryEmbarkFromHex BLOQUEADO setor: assigned={assigned?.Sector} tObj={tObj?.Sector} sameSector={sameSector} compatible={compatibleSector} navalRoute={compatibleNavalRoute} shuttleFree={shuttleFree} isPrimary={isPrimary} transporter={transporter.InstanceId}");
                 return false;
             }
             // overflow: slot físico check abaixo confirma capacidade disponível
@@ -144,7 +150,7 @@ public partial class AIController
         float pickupDist = SectorManager.HexDistance(pickupRef, tCell);
         if (pickupDist > ShuttlePickupRange + 1 + 0.5f)
         {
-            Debug.Log($"{TL("Capturador")} {unit.InstanceId} TryEmbarkFromHex BLOQUEADO pickup: pickupDist={pickupDist:F0}h > {ShuttlePickupRange + 1 + 0.5f} fromHex={fromHex} tCell={tCell}");
+            Debug.Log($"{TL(logCategory)} {unit.InstanceId} TryEmbarkFromHex BLOQUEADO pickup: pickupDist={pickupDist:F0}h > {ShuttlePickupRange + 1 + 0.5f} fromHex={fromHex} tCell={tCell}");
             return false;
         }
 
@@ -155,7 +161,7 @@ public partial class AIController
         embarkCost = Mathf.Max(1, embarkCost);
         if (remainingMPAtHex < embarkCost)
         {
-            Debug.Log($"{TL("Capturador")} {unit.InstanceId} TryEmbarkFromHex BLOQUEADO MP: remainingMPAtHex={remainingMPAtHex} < embarkCost={embarkCost} tCell={tCell}");
+            Debug.Log($"{TL(logCategory)} {unit.InstanceId} TryEmbarkFromHex BLOQUEADO MP: remainingMPAtHex={remainingMPAtHex} < embarkCost={embarkCost} tCell={tCell}");
             return false;
         }
 
@@ -166,7 +172,7 @@ public partial class AIController
             slotIdx = FindFittingSlotIndexRespectingFormalReservation(transporter, tData, unit, unitData, formalPassenger);
         if (slotIdx < 0)
         {
-            Debug.Log($"{TL("Capturador")} {unit.InstanceId} TryEmbarkFromHex BLOQUEADO slot: sem slot disponível em transporter={transporter.InstanceId}");
+            Debug.Log($"{TL(logCategory)} {unit.InstanceId} TryEmbarkFromHex BLOQUEADO slot: sem slot disponível em transporter={transporter.InstanceId}");
             return false;
         }
 
@@ -176,7 +182,7 @@ public partial class AIController
 
         if (queuedPassengerSeat && !compatibleTransportObjective)
         {
-            Debug.Log($"{TL("Capturador")} {unit.InstanceId} usa banco courier #2 de " +
+            Debug.Log($"{TL(logCategory)} {unit.InstanceId} usa banco courier #2 de " +
                       $"{transporter.InstanceId}: entrega atual={tObj.Sector}, fila seguinte={assigned.Sector}.");
         }
 
@@ -186,7 +192,7 @@ public partial class AIController
             : null;
 
         string overflowTag = allowOverflow && !sameSector && !shuttleFree ? " [overflow→" + tObj?.Sector + "]" : "";
-        Debug.Log($"{TL("Capturador")} {unit.InstanceId} embarca{overflowTag} (ext {(int)SectorManager.HexDistance(fromCell, tCell)}h) → {transporter.InstanceId} slot {slotIdx} via {fromHex}");
+        Debug.Log($"{TL(logCategory)} {unit.InstanceId} embarca{overflowTag} (ext {(int)SectorManager.HexDistance(fromCell, tCell)}h) → {transporter.InstanceId} slot {slotIdx} via {fromHex}");
         action = BuildEmbarcarBatch(unit, snapshot.AITeam, fromCell, transporter, slotIdx, pathsForBatch);
         return true;
     }
