@@ -1157,6 +1157,7 @@ public static class PodeDetectarSensor
                     continue;
 
                 List<Vector3Int> lineCells = new List<Vector3Int>();
+                List<float> lineEvPath = new List<float>();
                 Vector3Int blockedCell = Vector3Int.zero;
                 bool effectiveLosValidation = ResolveEffectiveLosValidation(observerData, targetDomain, targetHeight, enableLosValidation);
                 bool bypassLosByPolicy = !effectiveLosValidation;
@@ -1175,7 +1176,7 @@ public static class PodeDetectarSensor
                     target,
                     dpqAirHeightConfig,
                     out lineCells,
-                    out _,
+                    out lineEvPath,
                     out blockedCell,
                     enableLosValidation: true);
 
@@ -1226,6 +1227,9 @@ public static class PodeDetectarSensor
                             usedForwardObserver = false,
                             forwardObserverUnit = null,
                             lineOfSightIntermediateCells = lineCells != null ? new List<Vector3Int>(lineCells) : new List<Vector3Int>(),
+                            lineOfSightEvPath = lineEvPath != null ? new List<float>(lineEvPath) : new List<float>(),
+                            lineOriginEv = lineEvPath != null && lineEvPath.Count > 0 ? lineEvPath[0] : 0f,
+                            lineTargetEv = lineEvPath != null && lineEvPath.Count > 0 ? lineEvPath[lineEvPath.Count - 1] : 0f,
                             blockedCell = blockedCell,
                             reason = $"Furtiva no alcance{rangeContext}, mas nao detectada por falta de LOS."
                         });
@@ -1245,6 +1249,9 @@ public static class PodeDetectarSensor
                         usedForwardObserver = false,
                         forwardObserverUnit = null,
                         lineOfSightIntermediateCells = lineCells != null ? new List<Vector3Int>(lineCells) : new List<Vector3Int>(),
+                        lineOfSightEvPath = lineEvPath != null ? new List<float>(lineEvPath) : new List<float>(),
+                        lineOriginEv = lineEvPath != null && lineEvPath.Count > 0 ? lineEvPath[0] : 0f,
+                        lineTargetEv = lineEvPath != null && lineEvPath.Count > 0 ? lineEvPath[lineEvPath.Count - 1] : 0f,
                         blockedCell = blockedCell,
                         reason = $"No alcance{rangeContext}, mas sem LOS."
                     });
@@ -1269,6 +1276,9 @@ public static class PodeDetectarSensor
                             usedForwardObserver = usedForwardObserver,
                             forwardObserverUnit = forwardObserver,
                             lineOfSightIntermediateCells = lineCells != null ? new List<Vector3Int>(lineCells) : new List<Vector3Int>(),
+                            lineOfSightEvPath = lineEvPath != null ? new List<float>(lineEvPath) : new List<float>(),
+                            lineOriginEv = lineEvPath != null && lineEvPath.Count > 0 ? lineEvPath[0] : 0f,
+                            lineTargetEv = lineEvPath != null && lineEvPath.Count > 0 ? lineEvPath[lineEvPath.Count - 1] : 0f,
                             blockedCell = blockedCell,
                             reason = "Detectado (Stealth validation desativada no Game Setup)."
                         });
@@ -1293,6 +1303,9 @@ public static class PodeDetectarSensor
                             usedForwardObserver = usedForwardObserver,
                             forwardObserverUnit = forwardObserver,
                             lineOfSightIntermediateCells = lineCells != null ? new List<Vector3Int>(lineCells) : new List<Vector3Int>(),
+                            lineOfSightEvPath = lineEvPath != null ? new List<float>(lineEvPath) : new List<float>(),
+                            lineOriginEv = lineEvPath != null && lineEvPath.Count > 0 ? lineEvPath[0] : 0f,
+                            lineTargetEv = lineEvPath != null && lineEvPath.Count > 0 ? lineEvPath[lineEvPath.Count - 1] : 0f,
                             blockedCell = blockedCell,
                             reason = "Furtiva no alcance/visao, mas sem especializacao de deteccao stealth."
                         });
@@ -1328,6 +1341,9 @@ public static class PodeDetectarSensor
                         usedForwardObserver = usedForwardObserver,
                         forwardObserverUnit = forwardObserver,
                         lineOfSightIntermediateCells = lineCells != null ? new List<Vector3Int>(lineCells) : new List<Vector3Int>(),
+                        lineOfSightEvPath = lineEvPath != null ? new List<float>(lineEvPath) : new List<float>(),
+                        lineOriginEv = lineEvPath != null && lineEvPath.Count > 0 ? lineEvPath[0] : 0f,
+                        lineTargetEv = lineEvPath != null && lineEvPath.Count > 0 ? lineEvPath[lineEvPath.Count - 1] : 0f,
                         blockedCell = blockedCell,
                         reason = detectedReason
                     });
@@ -1348,6 +1364,9 @@ public static class PodeDetectarSensor
                     usedForwardObserver = usedForwardObserver,
                     forwardObserverUnit = forwardObserver,
                     lineOfSightIntermediateCells = lineCells != null ? new List<Vector3Int>(lineCells) : new List<Vector3Int>(),
+                    lineOfSightEvPath = lineEvPath != null ? new List<float>(lineEvPath) : new List<float>(),
+                    lineOriginEv = lineEvPath != null && lineEvPath.Count > 0 ? lineEvPath[0] : 0f,
+                    lineTargetEv = lineEvPath != null && lineEvPath.Count > 0 ? lineEvPath[lineEvPath.Count - 1] : 0f,
                     blockedCell = blockedCell,
                     reason = useAquaticDistance
                         ? (usedForwardObserver ? "Avistado via observador avancado com distancia aquatica." : "Avistado com LOS direta e distancia aquatica.")

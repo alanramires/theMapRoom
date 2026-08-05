@@ -117,6 +117,7 @@ public class PodeDetectarSensorDebugWindow : EditorWindow
             EditorGUILayout.LabelField("Distancia", $"{item.distance} / alcance {item.detectionRangeUsed}");
             EditorGUILayout.LabelField("Camada", $"{item.targetDomain}/{item.targetHeightLevel}");
             EditorGUILayout.LabelField("LOS direta", item.hasDirectLos ? "SIM" : "NAO");
+            DrawLineProfile(item);
             if (item.usedForwardObserver)
             {
                 string observerName = item.forwardObserverUnit != null ? item.forwardObserverUnit.name : "(desconhecido)";
@@ -128,6 +129,43 @@ public class PodeDetectarSensorDebugWindow : EditorWindow
                 EditorGUILayout.LabelField("Obs", item.reason);
             EditorGUILayout.EndVertical();
         }
+    }
+
+    /// <summary>
+    /// A viagem da linha, do EV de origem ao EV do alvo, com a altura em cada
+    /// hex cruzado. Vem do mesmo tracado que decidiu a deteccao — nao e um
+    /// calculo paralelo da janela, que foi como ferramenta e jogo ja
+    /// discordaram uma vez.
+    /// </summary>
+    private static void DrawLineProfile(PodeDetectarOption item)
+    {
+        if (item == null || item.lineOfSightEvPath == null || item.lineOfSightEvPath.Count == 0)
+            return;
+
+        float origin = item.lineOriginEv;
+        float target = item.lineTargetEv;
+        string direction =
+            Mathf.Abs(target - origin) < 0.001f ? "nivelada"
+            : target > origin ? "ascendente"
+            : "descendente";
+
+        EditorGUILayout.LabelField(
+            "Viagem da linha",
+            $"{direction}  {origin:0.##} -> {target:0.##}");
+
+        List<float> path = item.lineOfSightEvPath;
+        int shown = Mathf.Min(path.Count, 12);
+        System.Text.StringBuilder sb = new System.Text.StringBuilder();
+        for (int i = 0; i < shown; i++)
+        {
+            if (i > 0)
+                sb.Append(" > ");
+            sb.Append(path[i].ToString("0.##"));
+        }
+        if (path.Count > shown)
+            sb.Append(" ...");
+
+        EditorGUILayout.LabelField("Altura por hex", sb.ToString());
     }
 
     private void TryUseCurrentSelection()
