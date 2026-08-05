@@ -99,4 +99,59 @@ public static class PodeEnxergarSensor
             }
         }
     }
+
+    /// <summary>
+    /// A MESMA linha do <see cref="CollectKnownTerrainCells"/>, para um hex so,
+    /// com o perfil preenchido — de onde partiu, por onde passou, ate onde subiu
+    /// e contra o que parou.
+    ///
+    /// Existe para a auditoria: a janela precisa contar a viagem da reta, e
+    /// refazer a conta por fora foi como ferramenta e jogo ja discordaram. Aqui
+    /// e o mesmo traçado, com o mesmo alvo nulo de proposito — quem responde
+    /// pelo EV do destino e o TERRENO da celula, porque o que se revela e o hex.
+    ///
+    /// <paramref name="forcedTargetDomain"/> e o par dele existem so para a
+    /// ferramenta projetar uma camada hipotetica; a revelacao real nunca forca
+    /// camada.
+    /// </summary>
+    public static bool TryProfileVisionLine(
+        UnitManager observer,
+        Tilemap map,
+        TerrainDatabase terrainDatabase,
+        Vector3Int targetCell,
+        DPQAirHeightConfig dpqAirHeightConfig,
+        bool enableLosValidation,
+        ObservationLineProfile profile,
+        Domain? forcedTargetDomain = null,
+        HeightLevel? forcedTargetHeightLevel = null)
+    {
+        profile?.Clear();
+        if (observer == null)
+            return false;
+
+        Tilemap boardMap = map != null ? map : observer.BoardTilemap;
+        if (boardMap == null)
+            return false;
+
+        Vector3Int originCell = observer.CurrentCellPosition;
+        originCell.z = 0;
+        targetCell.z = 0;
+
+        return ObservationLineService.TryTrace(
+            boardMap,
+            terrainDatabase,
+            originCell,
+            targetCell,
+            observer,
+            target: null,
+            dpqAirHeightConfig,
+            out _,
+            out _,
+            out _,
+            enableLosValidation,
+            forcedTargetDomain,
+            forcedTargetHeightLevel,
+            OriginEvRule.InheritTerrain,
+            profile);
+    }
 }

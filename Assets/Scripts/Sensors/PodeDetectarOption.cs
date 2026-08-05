@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using UnityEngine;
 
 public sealed class PodeDetectarOption
@@ -14,21 +13,17 @@ public sealed class PodeDetectarOption
     public bool hasDirectLos;
     public bool usedForwardObserver;
     public UnitManager forwardObserverUnit;
-    public List<Vector3Int> lineOfSightIntermediateCells = new List<Vector3Int>();
 
     /// <summary>
-    /// Altura da linha em cada ponto: EV de origem, um valor por hex cruzado, e
-    /// o EV do alvo. E o que diz se a linha SUBIU ou DESCEU — o radar terrestre
-    /// olhando um caca alto sobe; o caca olhando o chao desce.
+    /// A reta que decidiu esta deteccao, inteira: de onde partiu, por onde
+    /// passou, ate onde subiu e contra o que parou.
     ///
-    /// Vem do mesmo tracado que decide a deteccao, nao de um calculo paralelo.
+    /// Vem do mesmo traçado que decidiu — nao de um calculo paralelo, que foi
+    /// como ferramenta e jogo ja discordaram uma vez. Quem transforma isto em
+    /// texto e o <see cref="ObservationLineReport"/>, o mesmo que atende o
+    /// PodeEnxergar: mesma reta, mesmo relatorio.
     /// </summary>
-    public List<float> lineOfSightEvPath = new List<float>();
+    public ObservationLineProfile lineProfile = new ObservationLineProfile();
 
-    public Vector3Int blockedCell = Vector3Int.zero;
     public string reason;
-
-    /// <summary>EV de onde a linha partiu, e EV onde ela deveria chegar.</summary>
-    public float lineOriginEv;
-    public float lineTargetEv;
 }

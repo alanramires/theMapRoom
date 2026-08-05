@@ -19,6 +19,13 @@ public class PodeDetectarSensorDebugWindow : EditorWindow
     private readonly List<PodeDetectarOption> spottedCandidates = new List<PodeDetectarOption>();
     private readonly List<PodeDetectarOption> inRangeButLosBlocked = new List<PodeDetectarOption>();
     private readonly HashSet<UnitManager> forcedDetectedIndicatorUnits = new HashSet<UnitManager>();
+
+    // Contexto do relatorio: o tabuleiro e a base de terreno que a simulacao
+    // usou. Guardados para que o texto da linha descreva a MESMA consulta que a
+    // decidiu, e nao uma resolvida de novo a cada repaint.
+    private Tilemap reportTilemap;
+    private TerrainDatabase reportTerrainDatabase;
+    private readonly List<ObservationLineReportRow> reportRows = new List<ObservationLineReportRow>();
     private Vector2 windowScroll;
     private string statusMessage = "Ready.";
     private bool hasSelectedLine;
@@ -116,15 +123,12 @@ public class PodeDetectarSensorDebugWindow : EditorWindow
             EditorGUILayout.LabelField("Hex", $"{item.targetCell.x},{item.targetCell.y}");
             EditorGUILayout.LabelField("Distancia", $"{item.distance} / alcance {item.detectionRangeUsed}");
             EditorGUILayout.LabelField("Camada", $"{item.targetDomain}/{item.targetHeightLevel}");
-            EditorGUILayout.LabelField("LOS direta", item.hasDirectLos ? "SIM" : "NAO");
-            DrawLineProfile(item);
+            DrawLineReport(item);
             if (item.usedForwardObserver)
             {
                 string observerName = item.forwardObserverUnit != null ? item.forwardObserverUnit.name : "(desconhecido)";
                 EditorGUILayout.LabelField("Observador avancado", observerName);
             }
-            if (item.blockedCell != Vector3Int.zero)
-                EditorGUILayout.LabelField("Bloqueio LOS", $"{item.blockedCell.x},{item.blockedCell.y}");
             if (!string.IsNullOrWhiteSpace(item.reason))
                 EditorGUILayout.LabelField("Obs", item.reason);
             EditorGUILayout.EndVertical();
@@ -132,40 +136,25 @@ public class PodeDetectarSensorDebugWindow : EditorWindow
     }
 
     /// <summary>
-    /// A viagem da linha, do EV de origem ao EV do alvo, com a altura em cada
-    /// hex cruzado. Vem do mesmo tracado que decidiu a deteccao — nao e um
-    /// calculo paralelo da janela, que foi como ferramenta e jogo ja
-    /// discordaram uma vez.
+    /// A viagem da linha que decidiu esta deteccao. O texto nao e montado aqui:
+    /// vem do <see cref="ObservationLineReport"/>, o mesmo que atende a janela
+    /// do Pode Enxergar. Mesma reta, mesmas palavras, mesmos rotulos — e a
+    /// diferenca entre as duas janelas volta a ser a resposta, nao o formato.
     /// </summary>
-    private static void DrawLineProfile(PodeDetectarOption item)
+    private void DrawLineReport(PodeDetectarOption item)
     {
-        if (item == null || item.lineOfSightEvPath == null || item.lineOfSightEvPath.Count == 0)
+        if (item == null)
             return;
 
-        float origin = item.lineOriginEv;
-        float target = item.lineTargetEv;
-        string direction =
-            Mathf.Abs(target - origin) < 0.001f ? "nivelada"
-            : target > origin ? "ascendente"
-            : "descendente";
-
-        EditorGUILayout.LabelField(
-            "Viagem da linha",
-            $"{direction}  {origin:0.##} -> {target:0.##}");
-
-        List<float> path = item.lineOfSightEvPath;
-        int shown = Mathf.Min(path.Count, 12);
-        System.Text.StringBuilder sb = new System.Text.StringBuilder();
-        for (int i = 0; i < shown; i++)
+        ObservationLineReport.Build(item.lineProfile, reportTilemap, reportTerrainDatabase, reportRows);
+        if (reportRows.Count <= 0)
         {
-            if (i > 0)
-                sb.Append(" > ");
-            sb.Append(path[i].ToString("0.##"));
+            EditorGUILayout.LabelField("LoS direta", item.hasDirectLos ? "sim" : "nao");
+            return;
         }
-        if (path.Count > shown)
-            sb.Append(" ...");
 
-        EditorGUILayout.LabelField("Altura por hex", sb.ToString());
+        for (int i = 0; i < reportRows.Count; i++)
+            EditorGUILayout.LabelField(reportRows[i].label, reportRows[i].value);
     }
 
     private void TryUseCurrentSelection()
@@ -197,6 +186,8 @@ public class PodeDetectarSensorDebugWindow : EditorWindow
 
         Tilemap map = ResolveBoardTilemapForSimulation();
         TerrainDatabase db = terrainDatabase != null ? terrainDatabase : FindFirstAsset<TerrainDatabase>();
+        reportTilemap = map;
+        reportTerrainDatabase = db;
         bool enableLos = true;
         bool enableSpotter = true;
         bool enableStealth = true;
@@ -602,7 +593,7 @@ public class PodeDetectarSensorDebugWindow : EditorWindow
         return false;
     }
 
-    private static void LogOptionList(string tag, List<PodeDetectarOption> items)
+    private void LogOptionList(string tag, List<PodeDetectarOption> items)
     {
         for (int i = 0; i < items.Count; i++)
         {
@@ -613,10 +604,14 @@ public class PodeDetectarSensorDebugWindow : EditorWindow
             string observerName = item.observerUnit != null ? item.observerUnit.name : "(null)";
             string targetName = item.targetUnit.name;
             string forwardObserverName = item.forwardObserverUnit != null ? item.forwardObserverUnit.name : "-";
+            string lineReport = ObservationLineReport.BuildSingleLine(
+                item.lineProfile,
+                reportTilemap,
+                reportTerrainDatabase);
             Debug.Log(
                 $"[PodeDetectarSensorDebug][{tag}] {i + 1}. {observerName} -> {targetName} | " +
                 $"dist={item.distance}/{item.detectionRangeUsed} | layer={item.targetDomain}/{item.targetHeightLevel} | " +
-                $"losDireta={(item.hasDirectLos ? "sim" : "nao")} | forwardObserver={forwardObserverName} | motivo={item.reason}");
+                $"forwardObserver={forwardObserverName} | motivo={item.reason} | {lineReport}");
         }
     }
 

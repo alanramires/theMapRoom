@@ -25,6 +25,12 @@ public class AlguemMeVeDebugWindow : EditorWindow
     private readonly List<ObserverHit> undetectedStealthByEnemies = new List<ObserverHit>();
     private readonly List<ObserverHit> blockedByLos = new List<ObserverHit>();
     private readonly HashSet<UnitManager> forcedDetectedIndicatorUnits = new HashSet<UnitManager>();
+
+    // Contexto do relatorio da reta — o mesmo tabuleiro e a mesma base que a
+    // varredura usou.
+    private Tilemap reportTilemap;
+    private TerrainDatabase reportTerrainDatabase;
+    private readonly List<ObservationLineReportRow> reportRows = new List<ObservationLineReportRow>();
     private bool hasSelectedLine;
     private Vector3 selectedLineStartWorld;
     private Vector3 selectedLineEndWorld;
@@ -117,9 +123,11 @@ public class AlguemMeVeDebugWindow : EditorWindow
             EditorGUILayout.LabelField("Hex alvo", $"{hit.option.targetCell.x},{hit.option.targetCell.y}");
             EditorGUILayout.LabelField("Distancia", $"{hit.option.distance} / alcance {hit.option.detectionRangeUsed}");
             EditorGUILayout.LabelField("Camada", $"{hit.option.targetDomain}/{hit.option.targetHeightLevel}");
-            EditorGUILayout.LabelField("LOS direta", hit.option.hasDirectLos ? "SIM" : "NAO");
-            if (hit.option.blockedCell != Vector3Int.zero)
-                EditorGUILayout.LabelField("Bloqueio LOS", $"{hit.option.blockedCell.x},{hit.option.blockedCell.y}");
+            // Mesmo relatorio das janelas do Pode Enxergar e do Pode Detectar.
+            // Esta pergunta e a inversa — quem me ve — mas a reta e a mesma.
+            ObservationLineReport.Build(hit.option.lineProfile, reportTilemap, reportTerrainDatabase, reportRows);
+            for (int r = 0; r < reportRows.Count; r++)
+                EditorGUILayout.LabelField(reportRows[r].label, reportRows[r].value);
             if (!string.IsNullOrWhiteSpace(hit.option.reason))
                 EditorGUILayout.LabelField("Obs", hit.option.reason);
             EditorGUILayout.EndVertical();
@@ -154,6 +162,8 @@ public class AlguemMeVeDebugWindow : EditorWindow
 
         Tilemap map = ResolveBoardTilemapForSimulation();
         TerrainDatabase db = terrainDatabase != null ? terrainDatabase : FindFirstAsset<TerrainDatabase>();
+        reportTilemap = map;
+        reportTerrainDatabase = db;
         bool enableLos = true;
         bool enableSpotter = true;
         bool enableStealth = true;

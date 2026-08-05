@@ -1156,9 +1156,10 @@ public static class PodeDetectarSensor
                 if (distance > detectionRange)
                     continue;
 
-                List<Vector3Int> lineCells = new List<Vector3Int>();
-                List<float> lineEvPath = new List<float>();
-                Vector3Int blockedCell = Vector3Int.zero;
+                // Um perfil por candidato, preenchido pelo proprio traçado. Ele
+                // substitui as duas listas cruas que este laco copiava por
+                // opcao: a resposta e o relatorio dela sao o mesmo objeto.
+                ObservationLineProfile lineProfile = new ObservationLineProfile();
                 bool effectiveLosValidation = ResolveEffectiveLosValidation(observerData, targetDomain, targetHeight, enableLosValidation);
                 bool bypassLosByPolicy = !effectiveLosValidation;
                 // Este pulo estava VIVO: observador aereo contra alvo em AirHigh
@@ -1175,10 +1176,11 @@ public static class PodeDetectarSensor
                     observer,
                     target,
                     dpqAirHeightConfig,
-                    out lineCells,
-                    out lineEvPath,
-                    out blockedCell,
-                    enableLosValidation: true);
+                    out _,
+                    out _,
+                    out _,
+                    enableLosValidation: true,
+                    profile: lineProfile);
 
                 bool usedForwardObserver = false;
                 UnitManager forwardObserver = null;
@@ -1226,11 +1228,7 @@ public static class PodeDetectarSensor
                             hasDirectLos = false,
                             usedForwardObserver = false,
                             forwardObserverUnit = null,
-                            lineOfSightIntermediateCells = lineCells != null ? new List<Vector3Int>(lineCells) : new List<Vector3Int>(),
-                            lineOfSightEvPath = lineEvPath != null ? new List<float>(lineEvPath) : new List<float>(),
-                            lineOriginEv = lineEvPath != null && lineEvPath.Count > 0 ? lineEvPath[0] : 0f,
-                            lineTargetEv = lineEvPath != null && lineEvPath.Count > 0 ? lineEvPath[lineEvPath.Count - 1] : 0f,
-                            blockedCell = blockedCell,
+                            lineProfile = lineProfile,
                             reason = $"Furtiva no alcance{rangeContext}, mas nao detectada por falta de LOS."
                         });
                     }
@@ -1248,11 +1246,7 @@ public static class PodeDetectarSensor
                         hasDirectLos = false,
                         usedForwardObserver = false,
                         forwardObserverUnit = null,
-                        lineOfSightIntermediateCells = lineCells != null ? new List<Vector3Int>(lineCells) : new List<Vector3Int>(),
-                        lineOfSightEvPath = lineEvPath != null ? new List<float>(lineEvPath) : new List<float>(),
-                        lineOriginEv = lineEvPath != null && lineEvPath.Count > 0 ? lineEvPath[0] : 0f,
-                        lineTargetEv = lineEvPath != null && lineEvPath.Count > 0 ? lineEvPath[lineEvPath.Count - 1] : 0f,
-                        blockedCell = blockedCell,
+                        lineProfile = lineProfile,
                         reason = $"No alcance{rangeContext}, mas sem LOS."
                     });
                     continue;
@@ -1275,11 +1269,7 @@ public static class PodeDetectarSensor
                             hasDirectLos = hasDirectLos,
                             usedForwardObserver = usedForwardObserver,
                             forwardObserverUnit = forwardObserver,
-                            lineOfSightIntermediateCells = lineCells != null ? new List<Vector3Int>(lineCells) : new List<Vector3Int>(),
-                            lineOfSightEvPath = lineEvPath != null ? new List<float>(lineEvPath) : new List<float>(),
-                            lineOriginEv = lineEvPath != null && lineEvPath.Count > 0 ? lineEvPath[0] : 0f,
-                            lineTargetEv = lineEvPath != null && lineEvPath.Count > 0 ? lineEvPath[lineEvPath.Count - 1] : 0f,
-                            blockedCell = blockedCell,
+                            lineProfile = lineProfile,
                             reason = "Detectado (Stealth validation desativada no Game Setup)."
                         });
                         continue;
@@ -1302,11 +1292,7 @@ public static class PodeDetectarSensor
                             hasDirectLos = hasDirectLos,
                             usedForwardObserver = usedForwardObserver,
                             forwardObserverUnit = forwardObserver,
-                            lineOfSightIntermediateCells = lineCells != null ? new List<Vector3Int>(lineCells) : new List<Vector3Int>(),
-                            lineOfSightEvPath = lineEvPath != null ? new List<float>(lineEvPath) : new List<float>(),
-                            lineOriginEv = lineEvPath != null && lineEvPath.Count > 0 ? lineEvPath[0] : 0f,
-                            lineTargetEv = lineEvPath != null && lineEvPath.Count > 0 ? lineEvPath[lineEvPath.Count - 1] : 0f,
-                            blockedCell = blockedCell,
+                            lineProfile = lineProfile,
                             reason = "Furtiva no alcance/visao, mas sem especializacao de deteccao stealth."
                         });
                         continue;
@@ -1340,11 +1326,7 @@ public static class PodeDetectarSensor
                         hasDirectLos = hasDirectLos,
                         usedForwardObserver = usedForwardObserver,
                         forwardObserverUnit = forwardObserver,
-                        lineOfSightIntermediateCells = lineCells != null ? new List<Vector3Int>(lineCells) : new List<Vector3Int>(),
-                        lineOfSightEvPath = lineEvPath != null ? new List<float>(lineEvPath) : new List<float>(),
-                        lineOriginEv = lineEvPath != null && lineEvPath.Count > 0 ? lineEvPath[0] : 0f,
-                        lineTargetEv = lineEvPath != null && lineEvPath.Count > 0 ? lineEvPath[lineEvPath.Count - 1] : 0f,
-                        blockedCell = blockedCell,
+                        lineProfile = lineProfile,
                         reason = detectedReason
                     });
                     continue;
@@ -1363,11 +1345,7 @@ public static class PodeDetectarSensor
                     hasDirectLos = hasDirectLos,
                     usedForwardObserver = usedForwardObserver,
                     forwardObserverUnit = forwardObserver,
-                    lineOfSightIntermediateCells = lineCells != null ? new List<Vector3Int>(lineCells) : new List<Vector3Int>(),
-                    lineOfSightEvPath = lineEvPath != null ? new List<float>(lineEvPath) : new List<float>(),
-                    lineOriginEv = lineEvPath != null && lineEvPath.Count > 0 ? lineEvPath[0] : 0f,
-                    lineTargetEv = lineEvPath != null && lineEvPath.Count > 0 ? lineEvPath[lineEvPath.Count - 1] : 0f,
-                    blockedCell = blockedCell,
+                    lineProfile = lineProfile,
                     reason = useAquaticDistance
                         ? (usedForwardObserver ? "Avistado via observador avancado com distancia aquatica." : "Avistado com LOS direta e distancia aquatica.")
                         : (usedForwardObserver ? "Avistado via observador avancado." : "Avistado com LOS direta.")
@@ -1384,133 +1362,6 @@ public static class PodeDetectarSensor
         reason = $"FurtivasDetectadas={detectedStealthOutput.Count} | FurtivasNaoDetectadas={undetectedStealthOutput.Count} | Avistadas={spottedCandidatesOutput.Count} | SemLOS={inRangeButLosBlockedOutput.Count}";
 
         return detectedStealthOutput.Count > 0 || spottedCandidatesOutput.Count > 0;
-    }
-
-    public static bool TryTraceObservationLineDetailed(
-        UnitManager observer,
-        Tilemap map,
-        TerrainDatabase terrainDatabase,
-        Vector3Int targetCell,
-        DPQAirHeightConfig dpqAirHeightConfig,
-        bool enableLosValidation,
-        Domain? forcedTargetDomain,
-        HeightLevel? forcedTargetHeightLevel,
-        out float finalReachedEv,
-        out float losHeightAtBlockedCell,
-        out float blockedCellEv,
-        out Vector3Int blockedCell,
-        out float losHeightAtStrongestPassedCell,
-        out float strongestPassedCellEv,
-        out Vector3Int strongestPassedCell,
-        out List<float> lineRiseHeights)
-    {
-        finalReachedEv = 0f;
-        losHeightAtBlockedCell = 0f;
-        blockedCellEv = 0f;
-        blockedCell = Vector3Int.zero;
-        losHeightAtStrongestPassedCell = 0f;
-        strongestPassedCellEv = 0f;
-        strongestPassedCell = Vector3Int.zero;
-        lineRiseHeights = new List<float>();
-
-        if (observer == null)
-            return false;
-
-        Tilemap boardMap = map != null ? map : observer.BoardTilemap;
-        if (boardMap == null)
-            return false;
-
-        Vector3Int originCell = observer.CurrentCellPosition;
-        originCell.z = 0;
-        targetCell.z = 0;
-
-        bool hasDirectLos = HasValidStraightObservationLine(
-            boardMap,
-            terrainDatabase,
-            originCell,
-            targetCell,
-            observer,
-            null,
-            dpqAirHeightConfig,
-            out List<Vector3Int> intermediateCells,
-            out List<float> evPath,
-            out blockedCell,
-            enableLosValidation: enableLosValidation,
-            forcedTargetDomain: forcedTargetDomain,
-            forcedTargetHeightLevel: forcedTargetHeightLevel);
-
-        if (evPath != null && evPath.Count > 0)
-        {
-            finalReachedEv = evPath[evPath.Count - 1];
-            lineRiseHeights.AddRange(evPath);
-        }
-        losHeightAtBlockedCell = finalReachedEv;
-
-        if (blockedCell != Vector3Int.zero && intermediateCells != null && evPath != null)
-        {
-            int blockedIndex = intermediateCells.IndexOf(blockedCell);
-            if (blockedIndex >= 0)
-            {
-                int evPathIndex = blockedIndex + 1; // +1 because index 0 is origin EV.
-                if (evPathIndex >= 0 && evPathIndex < evPath.Count)
-                    losHeightAtBlockedCell = evPath[evPathIndex];
-            }
-
-            if (TryResolveCellVision(
-                    boardMap,
-                    terrainDatabase,
-                    blockedCell,
-                    null,
-                    dpqAirHeightConfig,
-                    out float resolvedBlockedEv,
-                    out _,
-                    forcedDomain: forcedTargetDomain,
-                    forcedHeightLevel: forcedTargetHeightLevel))
-            {
-                blockedCellEv = resolvedBlockedEv;
-            }
-        }
-
-        if (intermediateCells != null && evPath != null)
-        {
-            for (int i = 0; i < intermediateCells.Count; i++)
-            {
-                Vector3Int cell = intermediateCells[i];
-                int evPathIndex = i + 1; // index 0 is origin EV
-                if (evPathIndex < 0 || evPathIndex >= evPath.Count)
-                    continue;
-
-                if (!TryResolveCellVision(
-                        boardMap,
-                        terrainDatabase,
-                        cell,
-                        null,
-                        dpqAirHeightConfig,
-                        out float cellEv,
-                        out bool cellBlocksLoS,
-                        forcedDomain: forcedTargetDomain,
-                        forcedHeightLevel: forcedTargetHeightLevel))
-                {
-                    continue;
-                }
-
-                if (cellEv <= 0)
-                    continue;
-
-                float losHeightAtCell = evPath[evPathIndex];
-                if (cellEv > losHeightAtCell + LosGrazeEpsilon)
-                    continue;
-
-                if (cellEv > strongestPassedCellEv)
-                {
-                    strongestPassedCellEv = cellEv;
-                    strongestPassedCell = cell;
-                    losHeightAtStrongestPassedCell = losHeightAtCell;
-                }
-            }
-        }
-
-        return hasDirectLos;
     }
 
     private static int ResolveObserverMaxVisionRange(UnitData observerData, UnitManager observer)
@@ -2193,12 +2044,14 @@ public static class PodeDetectarSensor
         out Vector3Int blockedCell,
         bool enableLosValidation,
         Domain? forcedTargetDomain = null,
-        HeightLevel? forcedTargetHeightLevel = null)
+        HeightLevel? forcedTargetHeightLevel = null,
+        ObservationLineProfile profile = null)
     {
         return ObservationLineService.TryTrace(
             tilemap, terrainDatabase, originCell, targetCell, observer, target,
             dpqAirHeightConfig, out intermediateCells, out evPath, out blockedCell,
-            enableLosValidation, forcedTargetDomain, forcedTargetHeightLevel);
+            enableLosValidation, forcedTargetDomain, forcedTargetHeightLevel,
+            OriginEvRule.InheritTerrain, profile);
     }
 
     private static float ResolveOriginEvForLos(

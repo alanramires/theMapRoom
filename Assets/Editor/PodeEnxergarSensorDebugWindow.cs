@@ -14,17 +14,14 @@ public class PodeEnxergarSensorDebugWindow : EditorWindow
         public HeightLevel heightLevel;
         public string layerSource;
         public bool rangeOnlyMode;
-        public bool hasDirectLos;
-        public float finalReachedEv;
-        public float losHeightAtBlockedCell;
-        public float blockedCellEv;
-        public Vector3Int blockedCell;
-        public string blockedLayerLabel;
-        public float losHeightAtPassedCell;
-        public float passedCellEv;
-        public Vector3Int passedCell;
-        public string passedLayerLabel;
-        public string lineRiseTrace;
+
+        /// <summary>
+        /// A reta inteira, do jeito que o traçado a viu. A janela nao guarda
+        /// mais um campo por numero: o relatorio sai do perfil, e e o MESMO
+        /// relatorio que a janela do Pode Detectar imprime.
+        /// </summary>
+        public readonly ObservationLineProfile lineProfile = new ObservationLineProfile();
+        public readonly List<ObservationLineReportRow> reportRows = new List<ObservationLineReportRow>();
     }
 
     private sealed class VisionScenarioResult
@@ -168,25 +165,7 @@ public class PodeEnxergarSensorDebugWindow : EditorWindow
             EditorGUILayout.LabelField("Cenario", item.scenarioLabel);
         EditorGUILayout.LabelField("Virtual Domain/Height", $"{item.domain}/{item.heightLevel}");
         EditorGUILayout.LabelField("Fonte da Camada", item.layerSource);
-        if (item.rangeOnlyMode)
-        {
-            EditorGUILayout.LabelField("LoS", "Range only (AirHigh blockLoS=false)");
-        }
-        else
-        {
-            EditorGUILayout.LabelField("LoS direta", item.hasDirectLos ? "sim" : "nao");
-            if (!string.IsNullOrWhiteSpace(item.lineRiseTrace))
-                EditorGUILayout.LabelField("Subida da linha", item.lineRiseTrace);
-            string passedEvText = item.passedCell != Vector3Int.zero
-                ? item.losHeightAtPassedCell.ToString("0.00")
-                : "-";
-            EditorGUILayout.LabelField("EV passou", passedEvText);
-            string passedByText = !string.IsNullOrWhiteSpace(item.passedLayerLabel)
-                ? item.passedLayerLabel
-                : "nenhum bloqueador relevante";
-            EditorGUILayout.LabelField("Passou por", passedByText);
-            EditorGUILayout.LabelField("EV final (chegou)", item.finalReachedEv.ToString("0.00"));
-        }
+        DrawLineReport(item);
         EditorGUILayout.EndVertical();
     }
 
@@ -206,21 +185,28 @@ public class PodeEnxergarSensorDebugWindow : EditorWindow
             EditorGUILayout.LabelField("Cenario", item.scenarioLabel);
         EditorGUILayout.LabelField("Virtual Domain/Height", $"{item.domain}/{item.heightLevel}");
         EditorGUILayout.LabelField("Fonte da Camada", item.layerSource);
+        DrawLineReport(item);
+        EditorGUILayout.EndVertical();
+    }
+
+    /// <summary>
+    /// O relatorio da reta. Nao e montado aqui — vem pronto do
+    /// <see cref="ObservationLineReport"/>, o mesmo que atende a janela do Pode
+    /// Detectar. Mesma reta, mesmas palavras.
+    /// </summary>
+    private static void DrawLineReport(VisibleHexEntry item)
+    {
+        if (item == null)
+            return;
+
         if (item.rangeOnlyMode)
         {
             EditorGUILayout.LabelField("LoS", "Range only (AirHigh blockLoS=false)");
+            return;
         }
-        else
-        {
-            EditorGUILayout.LabelField("LoS direta", item.hasDirectLos ? "sim" : "nao");
-            if (!string.IsNullOrWhiteSpace(item.lineRiseTrace))
-                EditorGUILayout.LabelField("Subida da linha", item.lineRiseTrace);
-            EditorGUILayout.LabelField("EV na parada", item.losHeightAtBlockedCell.ToString("0.00"));
-            EditorGUILayout.LabelField("Tentou ver EV", item.blockedCellEv.ToString());
-            if (!string.IsNullOrWhiteSpace(item.blockedLayerLabel))
-                EditorGUILayout.LabelField("EV Bloqueador", item.blockedLayerLabel);
-        }
-        EditorGUILayout.EndVertical();
+
+        for (int i = 0; i < item.reportRows.Count; i++)
+            EditorGUILayout.LabelField(item.reportRows[i].label, item.reportRows[i].value);
     }
 
     private void TryUseCurrentSelection()
@@ -602,113 +588,22 @@ public class PodeEnxergarSensorDebugWindow : EditorWindow
         if (rangeOnlyForAirHigh)
             return;
 
-        Domain? forcedTargetDomain = forceLayer ? forcedDomain : null;
-        HeightLevel? forcedTargetHeight = forceLayer ? forcedHeight : null;
-        bool hasDirectLos = PodeDetectarSensor.TryTraceObservationLineDetailed(
+        // A janela do Pode Enxergar pergunta ao Pode Enxergar. Ela chamava o
+        // PodeDetectarSensor para conseguir o detalhe da reta, e era a ultima
+        // amarra entre as duas entidades: auditar revelacao de hexagono nao pode
+        // depender do sensor que faz unidade aparecer.
+        PodeEnxergarSensor.TryProfileVisionLine(
             selectedUnit,
             map,
             db,
             targetCell,
             dpqAirHeightConfig,
             enableLos,
-            forcedTargetDomain,
-            forcedTargetHeight,
-            out float finalReachedEv,
-            out float losHeightAtBlockedCell,
-            out float blockedCellEv,
-            out Vector3Int blockedCell,
-            out float losHeightAtPassedCell,
-            out float passedCellEv,
-            out Vector3Int passedCell,
-            out List<float> lineRiseHeights);
+            entry.lineProfile,
+            forceLayer ? forcedDomain : (Domain?)null,
+            forceLayer ? forcedHeight : (HeightLevel?)null);
 
-        entry.hasDirectLos = hasDirectLos;
-        entry.finalReachedEv = finalReachedEv;
-        entry.losHeightAtBlockedCell = losHeightAtBlockedCell;
-        entry.blockedCellEv = blockedCellEv;
-        entry.blockedCell = blockedCell;
-        entry.blockedLayerLabel = ResolveBlockedLayerLabel(map, db, blockedCell, blockedCellEv);
-        entry.losHeightAtPassedCell = losHeightAtPassedCell;
-        entry.passedCellEv = passedCellEv;
-        entry.passedCell = passedCell;
-        entry.passedLayerLabel = ResolveBlockedLayerLabel(map, db, passedCell, passedCellEv);
-        entry.lineRiseTrace = FormatLineRiseTrace(lineRiseHeights);
-    }
-
-    private static string FormatLineRiseTrace(List<float> heights)
-    {
-        if (heights == null || heights.Count <= 0)
-            return string.Empty;
-
-        System.Text.StringBuilder sb = new System.Text.StringBuilder();
-        for (int i = 0; i < heights.Count; i++)
-        {
-            if (i > 0)
-                sb.Append(" -> ");
-            sb.Append(heights[i].ToString("0.00"));
-        }
-
-        return sb.ToString();
-    }
-
-    private static string ResolveBlockedLayerLabel(Tilemap map, TerrainDatabase db, Vector3Int blockedCell, float blockedEv)
-    {
-        if (blockedCell == Vector3Int.zero)
-            return string.Empty;
-
-        blockedCell.z = 0;
-        bool hasTerrain = TryResolveTerrainAtCell(map, db, blockedCell, out TerrainTypeData terrain) && terrain != null;
-        if (map != null)
-        {
-            ConstructionManager construction = ConstructionOccupancyRules.GetConstructionAtCell(map, blockedCell);
-            if (construction != null)
-            {
-                ConstructionDatabase constructionDb = construction.ConstructionDatabase;
-                string constructionId = construction.ConstructionId;
-                if (constructionDb != null &&
-                    !string.IsNullOrWhiteSpace(constructionId) &&
-                    constructionDb.TryGetById(constructionId, out ConstructionData constructionData) &&
-                    constructionData != null)
-                {
-                    string constructionName = ResolveEntityLabel(constructionData.displayName, constructionData.id, constructionData.name);
-                    float displayEv = hasTerrain &&
-                        terrain.TryGetConstructionVisionOverride(constructionData, out int overrideEv, out _)
-                        ? Mathf.Max(0, overrideEv)
-                        : (hasTerrain ? Mathf.Max(0, terrain.ev) : Mathf.Max(0, blockedEv));
-                    return $"{constructionName} (EV: {displayEv})";
-                }
-            }
-
-            StructureData structure = StructureOccupancyRules.GetStructureAtCell(map, blockedCell);
-            if (structure != null)
-            {
-                string structureName = ResolveEntityLabel(structure.displayName, structure.id, structure.name);
-                    float displayEv = hasTerrain &&
-                    terrain.TryGetStructureVisionOverride(structure, out int overrideEv, out _)
-                    ? Mathf.Max(0, overrideEv)
-                    : (hasTerrain ? Mathf.Max(0, terrain.ev) : Mathf.Max(0, blockedEv));
-                return $"{structureName} (EV: {displayEv})";
-            }
-        }
-
-        if (hasTerrain)
-        {
-            string terrainName = ResolveEntityLabel(terrain.displayName, terrain.id, terrain.name);
-            return $"{terrainName} (EV: {Mathf.Max(0, terrain.ev)})";
-        }
-
-        return $"bloqueador sem nome (EV: {Mathf.Max(0, blockedEv)})";
-    }
-
-    private static string ResolveEntityLabel(string displayName, string id, string assetName)
-    {
-        if (!string.IsNullOrWhiteSpace(displayName))
-            return displayName.Trim();
-        if (!string.IsNullOrWhiteSpace(id))
-            return id.Trim();
-        if (!string.IsNullOrWhiteSpace(assetName))
-            return assetName.Trim();
-        return "sem_nome";
+        ObservationLineReport.Build(entry.lineProfile, map, db, entry.reportRows);
     }
 
     private static void SortVisibleHexEntries(List<VisibleHexEntry> entries)

@@ -69,6 +69,11 @@ public static class ObservationLineService
     ///
     /// Bloqueia quem tem blockLoS e EV MAIOR que a linha naquele ponto. EV 0
     /// nunca bloqueia, e empate passa.
+    ///
+    /// <paramref name="profile"/> e opcional e nao muda decisao nenhuma: quando
+    /// vem preenchido, o traçado ANOTA no caminho o que ja esta calculando, para
+    /// que quem relata a linha nao precise refaze-la. Era exatamente por refazer
+    /// que as duas janelas descreviam a mesma reta em formatos diferentes.
     /// </summary>
     public static bool TryTrace(
         Tilemap tilemap,
@@ -84,11 +89,13 @@ public static class ObservationLineService
         bool enableLosValidation,
         Domain? forcedTargetDomain = null,
         HeightLevel? forcedTargetHeightLevel = null,
-        OriginEvRule rule = OriginEvRule.InheritTerrain)
+        OriginEvRule rule = OriginEvRule.InheritTerrain,
+        ObservationLineProfile profile = null)
     {
         intermediateCells = new List<Vector3Int>();
         evPath = new List<float>();
         blockedCell = Vector3Int.zero;
+        profile?.Clear();
         if (tilemap == null)
             return false;
 
@@ -145,7 +152,21 @@ public static class ObservationLineService
             targetEv = 0;
         }
 
+        if (profile != null)
+        {
+            Vector3Int profileOrigin = originCell;
+            Vector3Int profileTarget = targetCell;
+            profileOrigin.z = 0;
+            profileTarget.z = 0;
+            profile.originCell = profileOrigin;
+            profile.targetCell = profileTarget;
+            profile.originEv = originEv;
+            profile.targetEv = targetEv;
+            profile.losValidationEnabled = enableLosValidation;
+        }
+
         evPath.Add(originEv);
+        profile?.evPath.Add(originEv);
         double lerpStartMs = Time.realtimeSinceStartupAsDouble;
         List<Vector3Int> crossedCells = GetIntermediateCellsByCellLerp(
             tilemap,
@@ -154,6 +175,7 @@ public static class ObservationLineService
         LerpMs += (Time.realtimeSinceStartupAsDouble - lerpStartMs) * 1000d;
         LerpCells += crossedCells.Count;
         intermediateCells.AddRange(crossedCells);
+        profile?.crossedCells.AddRange(crossedCells);
 
         Vector2 losOriginWorld2 = HexGridGeometry.ToWorld2(
             tilemap.GetCellCenterWorld(originCell));
@@ -172,8 +194,12 @@ public static class ObservationLineService
                 : (i + 1f) / (crossedCells.Count + 1f);
             float losHeightAtCell = Mathf.Lerp(originEv, targetEv, t);
             evPath.Add(losHeightAtCell);
+            profile?.evPath.Add(losHeightAtCell);
 
-            if (!enableLosValidation)
+            // Sem validacao o traçado nao consulta a celula, porque nada pode
+            // deter a linha. Com perfil pedido ele consulta assim mesmo: o
+            // relatorio conta por onde a linha PASSOU, nao so o que a deteve.
+            if (!enableLosValidation && profile == null)
                 continue;
 
             if (!ObservationCellService.TryResolveCellVision(
@@ -195,12 +221,38 @@ public static class ObservationLineService
 
             if (cellEv > losHeightAtCell + LosGrazeEpsilon)
             {
+                if (!enableLosValidation)
+                    continue;
+
                 blockedCell = cell;
+                if (profile != null)
+                {
+                    profile.hasBlocker = true;
+                    profile.blockedCell = cell;
+                    profile.blockedCellEv = cellEv;
+                    profile.lineHeightAtBlockedCell = losHeightAtCell;
+                    profile.reached = false;
+                }
+
                 return false;
+            }
+
+            if (profile != null && (!profile.hasStrongestPassed || cellEv > profile.strongestPassedCellEv))
+            {
+                profile.hasStrongestPassed = true;
+                profile.strongestPassedCell = cell;
+                profile.strongestPassedCellEv = cellEv;
+                profile.lineHeightAtStrongestPassed = losHeightAtCell;
             }
         }
 
         evPath.Add(targetEv);
+        if (profile != null)
+        {
+            profile.evPath.Add(targetEv);
+            profile.reached = true;
+        }
+
         return true;
     }
 
