@@ -604,7 +604,7 @@ public class PodeEnxergarSensorDebugWindow : EditorWindow
 
         Domain? forcedTargetDomain = forceLayer ? forcedDomain : null;
         HeightLevel? forcedTargetHeight = forceLayer ? forcedHeight : null;
-        bool hasDirectLos = PodeDetectarSensor.TryGetObservationLineDebug(
+        bool hasDirectLos = PodeDetectarSensor.TryTraceObservationLineDetailed(
             selectedUnit,
             map,
             db,

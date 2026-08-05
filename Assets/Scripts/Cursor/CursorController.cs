@@ -109,7 +109,6 @@ public class CursorController : MonoBehaviour
     [Tooltip("Vinculo entre MovementCategory e AudioClip de movimento. Pode ser ajustado sem hardcode.")]
     [SerializeField] private List<MovementCategorySfxBinding> movementCategorySfx = new List<MovementCategorySfxBinding>();
     [Header("Skill Custom SFX")]
-    [SerializeField] private AudioClip sonarSkillSfx;
     [Tooltip("Vinculo entre uma ou mais skills e um AudioClip customizado.")]
     [SerializeField] private List<SkillSfxBinding> skillSfxBindings = new List<SkillSfxBinding>();
     [Header("Per-SFX Volume")]
@@ -1125,8 +1124,6 @@ public class CursorController : MonoBehaviour
             navalMoveSfx = UnityEditor.AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/audio/move/naval.MP3");
         if (motorMoveSfx == null)
             motorMoveSfx = UnityEditor.AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/audio/move/motor.MP3");
-        if (sonarSkillSfx == null)
-            sonarSkillSfx = UnityEditor.AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/audio/UI/sonar.MP3");
         if (defeatSfx == null)
             defeatSfx = UnityEditor.AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/audio/UI/derrota.mp3");
 #endif
@@ -2161,13 +2158,9 @@ public class CursorController : MonoBehaviour
         if (skillSfxBindings == null)
             skillSfxBindings = new List<SkillSfxBinding>();
 
-        if (skillSfxBindings.Count == 0 && sonarSkillSfx != null)
-        {
-            skillSfxBindings.Add(new SkillSfxBinding
-            {
-                clip = sonarSkillSfx
-            });
-        }
+        // O campo sonarSkillSfx saiu. Ele semeava aqui um binding SEM skills,
+        // que o BindingContainsSkill nunca casava — o clipe existia e nao tocava
+        // nunca. O vinculo agora e so o que o autor montar na lista.
     }
 
     private static bool BindingContainsSkill(List<SkillData> candidateSkills, SkillData targetSkill)

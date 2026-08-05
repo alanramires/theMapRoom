@@ -1386,7 +1386,7 @@ public static class PodeDetectarSensor
         return detectedStealthOutput.Count > 0 || spottedCandidatesOutput.Count > 0;
     }
 
-    public static bool TryGetObservationLineDebug(
+    public static bool TryTraceObservationLineDetailed(
         UnitManager observer,
         Tilemap map,
         TerrainDatabase terrainDatabase,
