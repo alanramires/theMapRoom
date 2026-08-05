@@ -7533,6 +7533,39 @@ public class MatchController : MonoBehaviour
         return authorized;
     }
 
+    /// <summary>
+    /// A metade TRANSACIONAL da barreira, para quem vai APAGAR o overlay.
+    ///
+    /// Apagar tambem publica, entao obedece ao ponto de compromisso: fora de
+    /// Neutral ninguem limpa o tabuleiro. Mas apagar NAO e uma pergunta de
+    /// perspectiva — nao existe "limpar a nevoa do slot errado" —, e por isso
+    /// esta versao nao exige `fogCachedObserverSlotIndex == apresentacao`.
+    ///
+    /// Exigir aquilo aqui quebrava os presets sem nevoa: o proprio reset zera
+    /// `fogCachedObserverSlotIndex`, entao a partir da segunda chamada a barreira
+    /// recusaria sempre e a nevoa velha ficaria pintada num modo que nao tem
+    /// nevoa.
+    /// </summary>
+    private bool IsFogVisualEraseAuthorized(string operation)
+    {
+        bool isNeutral = turnStateManager == null ||
+                         turnStateManager.CurrentCursorState == TurnStateManager.CursorState.Neutral;
+        bool contextAllowsVisuals =
+            !activeFogUpdateContext.HasValue ||
+            activeFogUpdateContext.Value.publishVisuals;
+        bool authorized = contextAllowsVisuals && isNeutral;
+        if (!authorized)
+        {
+            LogFogWriteBarrierRejection(
+                operation,
+                fogCachedObserverSlotIndex,
+                ResolveFogVisualObserverSlot().Value,
+                isNeutral);
+        }
+
+        return authorized;
+    }
+
     private void LogFogWriteBarrierRejection(
         string operation,
         int requestedSlotIndex,
@@ -9300,6 +9333,24 @@ public class MatchController : MonoBehaviour
 
     private void ResetFogOfWarRuntime(bool clearTilemap)
     {
+        // APAGAR TAMBEM E PUBLICAR.
+        //
+        // A barreira de escrita cobria so o desenho: `RenderFogOverlayFromRuntimeCache`
+        // e `InitializeFogOverlay` consultam `IsFogVisualWriteAuthorized`, e este
+        // metodo chamava `ClearAllTiles` direto. Fora de Neutral isso produzia o
+        // pior par possivel — o apagamento passava e a reposicao era recusada,
+        // deixando o tabuleiro inteiro aberto sem ninguem para repor. Voltar a
+        // Neutral consertava, o que fazia o sintoma parecer aleatorio.
+        //
+        // Usa a metade TRANSACIONAL da barreira, nao a completa: apagar nao e
+        // pergunta de perspectiva, e exigir o slot em cache aqui quebraria os
+        // presets sem nevoa (ver IsFogVisualEraseAuthorized).
+        //
+        // Recusado, o overlay fica velho em vez de vazio. Isso e seguro por
+        // construcao: `fogRenderedVisibleCellsValid` vira false aqui de qualquer
+        // jeito, e o proximo render autorizado repinta tudo do zero.
+        bool mayClearVisuals = clearTilemap && IsFogVisualEraseAuthorized("reset_overlay");
+
         fogBoardCellsBuffer.Clear();
         fogVisibleCellsBuffer.Clear();
         fogDisplayVisibleCellsBuffer.Clear();
@@ -9313,18 +9364,23 @@ public class MatchController : MonoBehaviour
         fogCachedObserverSlotIndex = int.MinValue;
         fogRenderedObserverSlotIndex = int.MinValue;
         fogOverlayInitialized = false;
-        if (clearTilemap && fogOfWarTilemap != null)
-            fogOfWarTilemap.ClearAllTiles();
-        if (clearTilemap && fogOfWarMemoryTilemap != null)
-            fogOfWarMemoryTilemap.ClearAllTiles();
-        if (clearTilemap && fogOfWarBreakwaterMemoryTilemap != null)
-            fogOfWarBreakwaterMemoryTilemap.ClearAllTiles();
+        // Dado, nao visual: o cache de contribuicao por slot so acelera a troca
+        // de observador. Zera-lo forca recalculo e nao mostra nada errado, entao
+        // ele nao passa pela barreira.
         if (clearTilemap)
-        {
             fogContributionRuntimeBySlot.Clear();
-            SetFogConstructionMemoryRenderersActive(0);
-            SetFogStructureMemoryRenderersActive(0);
-        }
+
+        if (!mayClearVisuals)
+            return;
+
+        if (fogOfWarTilemap != null)
+            fogOfWarTilemap.ClearAllTiles();
+        if (fogOfWarMemoryTilemap != null)
+            fogOfWarMemoryTilemap.ClearAllTiles();
+        if (fogOfWarBreakwaterMemoryTilemap != null)
+            fogOfWarBreakwaterMemoryTilemap.ClearAllTiles();
+        SetFogConstructionMemoryRenderersActive(0);
+        SetFogStructureMemoryRenderersActive(0);
     }
 
     private void StoreFogContributionRuntimeForSlot(PlayerSlotId observerSlot)
@@ -10629,6 +10685,7 @@ public class MatchController : MonoBehaviour
             ShowAllUnitsIgnoringFog();
             ConstructionManager.RefreshAllOccupancyVisuals();
             Debug.Log("[Debug Command] FoW OFF (debug).");
+            LogFogDebugState("OFF");
             return;
         }
 
@@ -10639,6 +10696,56 @@ public class MatchController : MonoBehaviour
 
         RefreshRuntimeUnitFogVisibility();
         Debug.Log("[Debug Command] FoW ON (debug).");
+        LogFogDebugState("ON");
+    }
+
+    /// <summary>
+    /// Estado da nevoa em numeros, para o `fow on|off|partial`.
+    ///
+    /// Existe porque nenhum log atual imprime os dois valores que decidem uma
+    /// discussao de "o tabuleiro nao voltou a esconder": quantas celulas estao
+    /// na MEMORIA PERMANENTE de exploracao, e quantos tiles de nevoa sobraram
+    /// desenhados no overlay. Sem esses dois, "esconder demais" e "esconder de
+    /// menos" produzem a mesma queixa.
+    ///
+    /// `nevoaTiles` e a medida direta do que esta na tela: 0 significa tabuleiro
+    /// inteiro aberto, independente do que o calculo disse. `explorado` cresce
+    /// com o `fow off` ligado se o pipeline nao estiver pausado — comparar o
+    /// numero antes e depois de um ciclo responde isso sozinho.
+    ///
+    /// Varre o cellBounds do overlay: e caro num mapa grande, e por isso so roda
+    /// no comando explicito.
+    /// </summary>
+    private void LogFogDebugState(string tag)
+    {
+        PlayerSlotId presentationSlot = ResolveFogVisualObserverSlot();
+        int slotIndex = presentationSlot.Value;
+        int exploredCount =
+            IsValidPlayerSlotIndex(slotIndex) &&
+            fogExploredCellsBySlot.TryGetValue(slotIndex, out HashSet<Vector3Int> explored) &&
+            explored != null
+                ? explored.Count
+                : 0;
+
+        int fogTiles = 0;
+        if (fogOfWarTilemap != null)
+        {
+            BoundsInt bounds = fogOfWarTilemap.cellBounds;
+            foreach (Vector3Int cell in bounds.allPositionsWithin)
+            {
+                if (fogOfWarTilemap.HasTile(cell))
+                    fogTiles++;
+            }
+        }
+
+        Debug.Log(
+            $"[FoW][Estado][{tag}] slotApresentacao={slotIndex} slotAtivo={ActiveSlotId.Value} " +
+            $"debugLigado={debugFogOfWarEnabled} parcial={debugFogOfWarPartial} totalWar={enableTotalWar} | " +
+            $"explorado={exploredCount} nevoaTiles={fogTiles} celulasTabuleiro={fogBoardCellsBuffer.Count} " +
+            $"displayVisivel={fogDisplayVisibleCellsBuffer.Count} | " +
+            $"bakes={(fogRoundZeroBakes != null ? fogRoundZeroBakes.Count : 0)} " +
+            $"overlayInit={fogOverlayInitialized} renderValido={fogRenderedVisibleCellsValid} " +
+            $"observadorCache={fogCachedObserverSlotIndex}");
     }
 
     public void SetFogOfWarAlphaPercent(int alphaPercent)
@@ -10707,6 +10814,7 @@ public class MatchController : MonoBehaviour
             ? $"slot AI {aiSlot.Value}"
             : "slot ativo (nenhuma AI configurada)";
         Debug.Log($"[Debug Command] FoW PARTIAL (debug): perspectiva no {perspective}.");
+        LogFogDebugState("PARTIAL");
     }
 
     public void SetPanelRodadaDebugEnabled(bool enabled)

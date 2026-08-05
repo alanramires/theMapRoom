@@ -523,6 +523,10 @@ public class PanelDebugController : MonoBehaviour
             {
                 Debug.Log("[Debug Command] MatchController nao encontrado.");
             }
+            else if (!IsBoardNeutralForFogCommand(out string partialBlockReason))
+            {
+                Debug.Log($"[Debug Command] FoW PARTIAL recusado: {partialBlockReason}");
+            }
             else
             {
                 matchController.SetFogOfWarDebugPartial();
@@ -536,6 +540,11 @@ public class PanelDebugController : MonoBehaviour
             if (matchController == null)
             {
                 Debug.Log("[Debug Command] MatchController nao encontrado.");
+            }
+            else if (!IsBoardNeutralForFogCommand(out string fogBlockReason))
+            {
+                Debug.Log(
+                    $"[Debug Command] FoW {(fogEnabled ? "ON" : "OFF")} recusado: {fogBlockReason}");
             }
             else
             {
@@ -1439,6 +1448,34 @@ public class PanelDebugController : MonoBehaviour
             return true;
         }
 
+        return false;
+    }
+
+    /// <summary>
+    /// O `fow` e uma LENTE, nao uma acao de tabuleiro — mas ele reconstroi o
+    /// overlay confirmado, e por isso obedece a mesma regra de todo o resto:
+    /// so a partir de Neutral.
+    ///
+    /// Fora de Neutral a reconstrucao e recusada pela barreira de escrita, e o
+    /// comando so conseguia fazer a metade destrutiva do trabalho. A barreira do
+    /// `ResetFogOfWarRuntime` ja impede o estrago; isto aqui existe para o
+    /// comando dizer NAO em vez de nao fazer nada em silencio.
+    /// </summary>
+    private bool IsBoardNeutralForFogCommand(out string reason)
+    {
+        reason = string.Empty;
+        if (turnStateManager == null)
+            turnStateManager = FindAnyObjectByType<TurnStateManager>();
+        if (turnStateManager == null)
+            return true;
+
+        TurnStateManager.CursorState state = turnStateManager.CurrentCursorState;
+        if (state == TurnStateManager.CursorState.Neutral)
+            return true;
+
+        reason =
+            $"o tabuleiro esta em {state}, nao em Neutral. " +
+            "Conclua ou cancele a acao antes de mexer na nevoa.";
         return false;
     }
 
