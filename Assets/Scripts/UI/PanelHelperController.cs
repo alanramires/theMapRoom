@@ -191,14 +191,28 @@ public class PanelHelperController : MonoBehaviour
     private TMP_Text aimConfirmLocalText;
     private const float AimConfirmDetailsHeight = 206f;
     private GameObject autonomyUpkeepRoot;
+    private GameObject autonomyUpkeepViewportRoot;
+    private RectTransform autonomyUpkeepViewportRect;
+    private TMP_Text autonomyUpkeepTitleLabel;
     private readonly List<GameObject> autonomyUpkeepRows = new List<GameObject>();
     private string autonomyUpkeepSignature = string.Empty;
     private const float AutonomyUpkeepHeaderHeight = 34f;
     private const float AutonomyUpkeepRowHeight = 82f;
     private const float AutonomyUpkeepTierHeaderHeight = 28f;
-    // Altura total do conteudo do Jornal (titulo + cabecalhos de tier + linhas),
-    // computada no rebuild e reusada pelo scroll layout.
+    // Altura total do conteudo rolavel do Jornal (cabecalhos de tier + linhas),
+    // computada no rebuild e reusada pelo scroll layout. O titulo fica fora.
     private float autonomyUpkeepContentHeight;
+    // Rolagem propria do Jornal: um turno movimentado passa facil de dez
+    // noticias, entao o painel para de crescer na altura do viewport e a lista
+    // desliza dentro da mascara (roda do mouse, arraste, ou seguindo o foco).
+    private float autonomyUpkeepScrollOffset;
+    private float autonomyUpkeepViewportHeight;
+    // Enquadramento de cada linha dentro do conteudo: o topo inclui o cabecalho
+    // de tier quando a linha abre um tier (o rotulo entra junto no foco).
+    private readonly List<float> autonomyUpkeepRowFrameTops = new List<float>();
+    private readonly List<float> autonomyUpkeepRowBottoms = new List<float>();
+    private int autonomyUpkeepFocusedRowIndex = -1;
+    private const float AutonomyUpkeepMaxListHeight = 620f;
     private GameObject commandServiceRowsRoot;
     private GameObject commandServiceViewportRoot;
     private RectTransform commandServiceViewportRect;
@@ -1689,9 +1703,9 @@ public class PanelHelperController : MonoBehaviour
         }
         else if (autonomyUpkeepActive)
         {
-            bodyHeight = autonomyUpkeepContentHeight > 0f
-                ? autonomyUpkeepContentHeight
-                : AutonomyUpkeepHeaderHeight + 4f + autonomyUpkeepRows.Count * (AutonomyUpkeepRowHeight + 4f);
+            // Titulo fixo + viewport: passando do teto, o excedente vira rolagem
+            // em vez de esticar o painel pra fora da tela.
+            bodyHeight = GetAutonomyUpkeepPreferredHeight();
         }
         else if (commandServiceRowsActive)
         {
@@ -1944,8 +1958,17 @@ public class PanelHelperController : MonoBehaviour
                       data.TurnStartAutonomyLines != null && data.TurnStartAutonomyLines.Count > 0;
         if (!active)
         {
+            // Jornal fechado: a proxima abertura comeca do topo da lista (a
+            // posicao e devolvida ANTES de desligar, senao uma reabertura sem
+            // rebuild reaparece rolada).
+            autonomyUpkeepScrollOffset = 0f;
+            ApplyAutonomyUpkeepScrollPosition();
             if (autonomyUpkeepRoot != null)
                 autonomyUpkeepRoot.SetActive(false);
+            if (autonomyUpkeepViewportRoot != null)
+                autonomyUpkeepViewportRoot.SetActive(false);
+            if (autonomyUpkeepTitleLabel != null)
+                autonomyUpkeepTitleLabel.gameObject.SetActive(false);
             autonomyUpkeepSignature = string.Empty;
             return;
         }
@@ -1969,9 +1992,15 @@ public class PanelHelperController : MonoBehaviour
         {
             RebuildAutonomyUpkeepRows(data.TurnStartAutonomyLines);
             autonomyUpkeepSignature = signature;
+            // A altura do painel depende do viewport recem-medido.
+            disembarkLayoutDirty = true;
         }
 
         autonomyUpkeepRoot.SetActive(true);
+        if (autonomyUpkeepViewportRoot != null)
+            autonomyUpkeepViewportRoot.SetActive(true);
+        if (autonomyUpkeepTitleLabel != null)
+            autonomyUpkeepTitleLabel.gameObject.SetActive(true);
         if (helperTxt != null)
             helperTxt.enabled = false;
         ApplyFooterButtonFocus(
@@ -1989,13 +2018,49 @@ public class PanelHelperController : MonoBehaviour
     {
         if (!Application.isPlaying || autonomyUpkeepRoot != null || helperRect == null)
             return;
+
+        // Titulo do Jornal fixo FORA da area rolavel (mesmo arranjo do resumo do
+        // Servico do Comando): rolar as noticias nao deve levar o nome do
+        // relatorio embora.
+        GameObject titleObject = new GameObject(
+            "helper_autonomy_upkeep_title", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
+        RectTransform titleRect = titleObject.GetComponent<RectTransform>();
+        titleRect.SetParent(helperRect, false);
+        titleRect.anchorMin = new Vector2(0.04f, 1f);
+        titleRect.anchorMax = new Vector2(0.96f, 1f);
+        titleRect.pivot = new Vector2(0.5f, 1f);
+        titleRect.anchoredPosition = new Vector2(0f, -48f);
+        titleRect.sizeDelta = new Vector2(0f, AutonomyUpkeepHeaderHeight);
+        autonomyUpkeepTitleLabel = titleObject.GetComponent<TMP_Text>();
+        autonomyUpkeepTitleLabel.fontSize = 20f;
+        autonomyUpkeepTitleLabel.fontStyle = FontStyles.Bold;
+        autonomyUpkeepTitleLabel.alignment = TextAlignmentOptions.Center;
+        autonomyUpkeepTitleLabel.enableAutoSizing = true;
+        autonomyUpkeepTitleLabel.fontSizeMin = 14f;
+        autonomyUpkeepTitleLabel.fontSizeMax = 20f;
+        autonomyUpkeepTitleLabel.margin = new Vector4(8f, 3f, 8f, 3f);
+        autonomyUpkeepTitleLabel.raycastTarget = false;
+        titleObject.SetActive(false);
+
+        // Viewport com RectMask2D propria: a lista corta por baixo do titulo em
+        // vez de deslizar as noticias por cima dele.
+        autonomyUpkeepViewportRoot = new GameObject(
+            "helper_autonomy_upkeep_viewport", typeof(RectTransform), typeof(RectMask2D));
+        autonomyUpkeepViewportRect = autonomyUpkeepViewportRoot.GetComponent<RectTransform>();
+        autonomyUpkeepViewportRect.SetParent(helperRect, false);
+        autonomyUpkeepViewportRect.anchorMin = new Vector2(0.04f, 1f);
+        autonomyUpkeepViewportRect.anchorMax = new Vector2(0.96f, 1f);
+        autonomyUpkeepViewportRect.pivot = new Vector2(0.5f, 1f);
+        autonomyUpkeepViewportRect.anchoredPosition = new Vector2(0f, -48f - AutonomyUpkeepHeaderHeight - 4f);
+        autonomyUpkeepViewportRect.sizeDelta = new Vector2(0f, AutonomyUpkeepRowHeight);
+
         autonomyUpkeepRoot = new GameObject("helper_autonomy_upkeep", typeof(RectTransform), typeof(VerticalLayoutGroup));
         RectTransform rect = autonomyUpkeepRoot.GetComponent<RectTransform>();
-        rect.SetParent(helperRect, false);
-        rect.anchorMin = new Vector2(0.04f, 1f);
-        rect.anchorMax = new Vector2(0.96f, 1f);
+        rect.SetParent(autonomyUpkeepViewportRect, false);
+        rect.anchorMin = new Vector2(0f, 1f);
+        rect.anchorMax = new Vector2(1f, 1f);
         rect.pivot = new Vector2(0.5f, 1f);
-        rect.anchoredPosition = new Vector2(0f, -48f);
+        rect.anchoredPosition = Vector2.zero;
         VerticalLayoutGroup layout = autonomyUpkeepRoot.GetComponent<VerticalLayoutGroup>();
         layout.spacing = 4f;
         layout.childControlWidth = true;
@@ -2003,6 +2068,7 @@ public class PanelHelperController : MonoBehaviour
         layout.childForceExpandWidth = true;
         layout.childForceExpandHeight = false;
         autonomyUpkeepRoot.SetActive(false);
+        autonomyUpkeepViewportRoot.SetActive(false);
     }
 
     private void RebuildAutonomyUpkeepRows(List<TurnStateManager.HelperTurnStartAutonomyLine> lines)
@@ -2010,14 +2076,23 @@ public class PanelHelperController : MonoBehaviour
         for (int i = autonomyUpkeepRoot.transform.childCount - 1; i >= 0; i--)
             Destroy(autonomyUpkeepRoot.transform.GetChild(i).gameObject);
         autonomyUpkeepRows.Clear();
+        autonomyUpkeepRowFrameTops.Clear();
+        autonomyUpkeepRowBottoms.Clear();
+        autonomyUpkeepFocusedRowIndex = -1;
 
-        CreateAutonomyUpkeepTextRow("Jornal do Comandante", AutonomyUpkeepHeaderHeight, 20f, TextAlignmentOptions.Center, null);
-        int tierHeaderCount = 0;
+        if (autonomyUpkeepTitleLabel != null)
+            autonomyUpkeepTitleLabel.color = currentTeamColor;
+
+        // Percorre o conteudo medindo: o topo de cada noticia e o que o scroll
+        // usa para enquadrar a linha focada.
+        float contentCursor = 0f;
         int lastTier = int.MinValue;
         for (int i = 0; i < lines.Count; i++)
         {
             TurnStateManager.HelperTurnStartAutonomyLine line = lines[i];
             if (line == null) continue;
+
+            float frameTop = contentCursor;
 
             // Cabecalho do tier de severidade, na troca de tier. Cor fixa (nao
             // por time): severidade e universal e precisa saltar aos olhos.
@@ -2026,8 +2101,14 @@ public class PanelHelperController : MonoBehaviour
                 lastTier = line.severityTier;
                 GetSeverityTierHeader(line.severityTier, out string tierLabel, out Color tierColor);
                 CreateAutonomyUpkeepTextRow(tierLabel, AutonomyUpkeepTierHeaderHeight, 16f, TextAlignmentOptions.Left, tierColor);
-                tierHeaderCount++;
+                contentCursor += AutonomyUpkeepTierHeaderHeight + 4f;
             }
+
+            autonomyUpkeepRowFrameTops.Add(frameTop);
+            autonomyUpkeepRowBottoms.Add(contentCursor + AutonomyUpkeepRowHeight);
+            contentCursor += AutonomyUpkeepRowHeight + 4f;
+            if (line.isFocused)
+                autonomyUpkeepFocusedRowIndex = autonomyUpkeepRows.Count;
 
             bool isBriefingLine = !string.IsNullOrWhiteSpace(line.customText);
             GameObject row = new GameObject("autonomy_upkeep_unit", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button), typeof(LayoutElement));
@@ -2039,6 +2120,7 @@ public class PanelHelperController : MonoBehaviour
             rowButton.transition = Selectable.Transition.None;
             int targetIndex = i;
             rowButton.onClick.AddListener(() => turnStateManager?.TryPanToTurnStartAutonomyUnitFromPointer(targetIndex));
+            row.AddComponent<PanelHelperJournalScrollDragHandle>().Configure(this);
             LayoutElement element = row.GetComponent<LayoutElement>();
             element.minHeight = AutonomyUpkeepRowHeight;
             element.preferredHeight = AutonomyUpkeepRowHeight;
@@ -2078,10 +2160,77 @@ public class PanelHelperController : MonoBehaviour
             autonomyUpkeepRows.Add(row);
         }
 
-        autonomyUpkeepContentHeight = AutonomyUpkeepHeaderHeight + 4f
-            + tierHeaderCount * (AutonomyUpkeepTierHeaderHeight + 4f)
-            + autonomyUpkeepRows.Count * (AutonomyUpkeepRowHeight + 4f);
+        autonomyUpkeepContentHeight = contentCursor;
         autonomyUpkeepRoot.GetComponent<RectTransform>().sizeDelta = new Vector2(0f, autonomyUpkeepContentHeight);
+        autonomyUpkeepViewportHeight = GetAutonomyUpkeepViewportHeight();
+        if (autonomyUpkeepViewportRect != null)
+            autonomyUpkeepViewportRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, autonomyUpkeepViewportHeight);
+
+        // Quando sobra noticia fora do viewport, o titulo avisa quantas existem
+        // — sem isso o corte da mascara parece o fim do relatorio.
+        if (autonomyUpkeepTitleLabel != null)
+            autonomyUpkeepTitleLabel.text = autonomyUpkeepContentHeight > autonomyUpkeepViewportHeight + 0.5f
+                ? $"Jornal do Comandante ({autonomyUpkeepRows.Count} notícias)"
+                : "Jornal do Comandante";
+
+        EnsureFocusedAutonomyUpkeepRowVisible();
+        ApplyAutonomyUpkeepScrollPosition();
+    }
+
+    // Teto do que fica visivel de uma vez: o painel nao cresce alem disso e o
+    // resto do Jornal passa a existir na rolagem.
+    private float GetAutonomyUpkeepViewportHeight()
+    {
+        float screenLimit = Mathf.Clamp(
+            Screen.height * 0.52f, AutonomyUpkeepRowHeight * 2f, AutonomyUpkeepMaxListHeight);
+        return autonomyUpkeepContentHeight > 0f
+            ? Mathf.Min(autonomyUpkeepContentHeight, screenLimit)
+            : screenLimit;
+    }
+
+    private float GetAutonomyUpkeepPreferredHeight()
+    {
+        return AutonomyUpkeepHeaderHeight + 4f + GetAutonomyUpkeepViewportHeight();
+    }
+
+    private void ApplyAutonomyUpkeepScrollPosition()
+    {
+        if (autonomyUpkeepRoot == null)
+            return;
+        RectTransform content = autonomyUpkeepRoot.GetComponent<RectTransform>();
+        if (content == null)
+            return;
+
+        float maxOffset = Mathf.Max(0f, autonomyUpkeepContentHeight - autonomyUpkeepViewportHeight);
+        autonomyUpkeepScrollOffset = Mathf.Clamp(autonomyUpkeepScrollOffset, 0f, maxOffset);
+        content.anchoredPosition = new Vector2(content.anchoredPosition.x, autonomyUpkeepScrollOffset);
+    }
+
+    // Navegacao por setas no relatorio aberto pelo menu: a linha destacada tem
+    // de estar dentro do viewport, senao o foco desaparece embaixo da mascara.
+    private void EnsureFocusedAutonomyUpkeepRowVisible()
+    {
+        if (autonomyUpkeepFocusedRowIndex < 0 ||
+            autonomyUpkeepFocusedRowIndex >= autonomyUpkeepRowFrameTops.Count ||
+            autonomyUpkeepViewportHeight <= 0f)
+            return;
+
+        float top = autonomyUpkeepRowFrameTops[autonomyUpkeepFocusedRowIndex];
+        float bottom = autonomyUpkeepRowBottoms[autonomyUpkeepFocusedRowIndex];
+        if (top < autonomyUpkeepScrollOffset)
+            autonomyUpkeepScrollOffset = top;
+        else if (bottom > autonomyUpkeepScrollOffset + autonomyUpkeepViewportHeight)
+            autonomyUpkeepScrollOffset = bottom - autonomyUpkeepViewportHeight;
+    }
+
+    // Arraste (toque/mouse) sobre as noticias: o conteudo acompanha o ponteiro
+    // — puxar pra cima traz as proximas linhas.
+    public void ScrollTurnBriefingByPointerDelta(float screenDeltaY)
+    {
+        if (autonomyUpkeepRoot == null || !autonomyUpkeepRoot.activeSelf)
+            return;
+        autonomyUpkeepScrollOffset += screenDeltaY;
+        ApplyAutonomyUpkeepScrollPosition();
     }
 
     private static void GetSeverityTierHeader(int tier, out string label, out Color color)
@@ -4957,7 +5106,13 @@ public class PanelHelperController : MonoBehaviour
 
     private void HandleHelperScrollInput()
     {
-        if (!helperScrollActive || !lastPanelVisible || helperRect == null)
+        if (!lastPanelVisible || helperRect == null)
+            return;
+
+        // O Jornal tem rolagem propria (viewport mascarado), independente do
+        // scroll do corpo de texto do helper.
+        bool journalActive = autonomyUpkeepRoot != null && autonomyUpkeepRoot.activeSelf;
+        if (!helperScrollActive && !journalActive)
             return;
 
         Vector2 scrollDelta = ReadMouseScrollDelta();
@@ -4968,6 +5123,16 @@ public class PanelHelperController : MonoBehaviour
         Vector3 mouseScreen = ReadMouseScreenPosition();
         if (!panelScreenRect.Contains(new Vector2(mouseScreen.x, mouseScreen.y)))
             return;
+
+        if (journalActive)
+        {
+            // So a DIRECAO da roda importa: o Input System entrega ±120 por
+            // clique e o legado ±1 — multiplicar o valor cru mandaria a lista
+            // pro fim num clique so. Cada clique anda pouco mais de meia linha.
+            autonomyUpkeepScrollOffset -= Mathf.Sign(scrollDelta.y) * Mathf.Max(1f, helperScrollStep) * 2f;
+            ApplyAutonomyUpkeepScrollPosition();
+            return;
+        }
 
         helperScrollOffset = Mathf.Clamp(
             helperScrollOffset - scrollDelta.y * Mathf.Max(1f, helperScrollStep),
@@ -5331,6 +5496,18 @@ public sealed class PanelHelperAimScrollDragHandle : MonoBehaviour, IBeginDragHa
     public void Configure(PanelHelperController controller) => owner = controller;
     public void OnBeginDrag(PointerEventData eventData) { }
     public void OnDrag(PointerEventData eventData) => owner?.ScrollAimTargetsByPointerDelta(eventData.delta.y);
+    public void OnEndDrag(PointerEventData eventData) { }
+}
+
+// Arraste nas noticias do Jornal do Comandante: o conteudo acompanha o
+// dedo/ponteiro (puxar pra cima traz as proximas linhas).
+public sealed class PanelHelperJournalScrollDragHandle : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler
+{
+    private PanelHelperController owner;
+
+    public void Configure(PanelHelperController controller) => owner = controller;
+    public void OnBeginDrag(PointerEventData eventData) { }
+    public void OnDrag(PointerEventData eventData) => owner?.ScrollTurnBriefingByPointerDelta(eventData.delta.y);
     public void OnEndDrag(PointerEventData eventData) { }
 }
 
