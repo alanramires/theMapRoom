@@ -126,19 +126,24 @@ public class PanelRemainingController : MonoBehaviour
         matchController.CycleFogOfWarVisionMode();
     }
 
+    /// <summary>
+    /// O botao de Camadas fica escondido. Ele alternava a visao por camada, que
+    /// so fazia sentido quando cada camada tinha conhecimento de terreno
+    /// proprio: o EWACS revelava chao no alcance aereo e era preciso conferir de
+    /// onde vinha cada hex.
+    ///
+    /// Depois da separacao entre enxergar e detectar, so o PodeEnxergar libera
+    /// hexagono, e so no alcance da visao da ficha. Nao existe mais "conhecido
+    /// em qual camada" — conhecido e conhecido. O botao nao tem o que alternar.
+    /// </summary>
     private void RefreshLayerButton()
     {
         if (buttonCamada == null)
             return;
-        int count = matchController != null
-            ? matchController.GetAvailableFogOfWarVisionModes(availableVisionModes)
-            : 0;
-        bool visible = count > 1;
-        if (buttonCamada.gameObject.activeSelf != visible)
-            buttonCamada.gameObject.SetActive(visible);
-        buttonCamada.interactable = visible && matchController != null &&
-            !matchController.HasVictoryWinner && !matchController.IsTurnTransitionInProgress &&
-            !matchController.IsPlayerInputLockedByActiveAI();
+
+        if (buttonCamada.gameObject.activeSelf)
+            buttonCamada.gameObject.SetActive(false);
+        buttonCamada.interactable = false;
     }
 
     private void HookRoundButton()

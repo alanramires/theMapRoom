@@ -1664,14 +1664,21 @@ public class MatchController : MonoBehaviour
         Debug.Log($"[FogOfWar] VisionMode={fogOfWarVisionMode}");
     }
 
+    /// <summary>
+    /// DESATIVADO. A visao por camada existia quando cada camada tinha o proprio
+    /// conhecimento de terreno — o EWACS revelava chao no alcance aereo, e o "L"
+    /// servia para conferir de qual camada vinha cada hex.
+    ///
+    /// Depois da separacao, so o PodeEnxergar libera hexagono, e so no alcance
+    /// da visao da ficha. EWACS e Super Tucano continuam excelentes detectores de
+    /// unidade escondida, mas nao revelam terreno. Logo nao existe mais
+    /// "conhecido em qual camada": terreno conhecido e conhecido, e o "L" nao
+    /// tem o que alternar.
+    ///
+    /// O ciclo continua acessivel por CycleFogOfWarVisionMode para depuracao.
+    /// </summary>
     private void HandleFogOfWarVisionModeHotkey()
     {
-        if (!debugFogOfWarEnabled || !enableTotalWar)
-            return;
-        if (UiInputBlocker.IsTextInputFocused())
-            return;
-        if (Input.GetKeyDown(KeyCode.L))
-            CycleFogOfWarVisionMode();
     }
 
     private FogOfWarVisionMode GetNextAvailableFogOfWarVisionMode(FogOfWarVisionMode current)
