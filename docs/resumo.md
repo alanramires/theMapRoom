@@ -1,14 +1,17 @@
 # Resumo — onde estamos e o que vem
 
-Ponto de retomada. Escrito em 2026-08-05, **depois** da tag `v7.2.0`. Leia isto
+Ponto de retomada. Escrito em 2026-08-05, **depois** da tag `v7.2.1`. Leia isto
 primeiro; ele descreve o estado pós-versão e não pertence à tag.
 
 ---
 
 ## A dívida de validação em jogo
 
-A `v7.2.0` inteira **compila e não rodou em Play**. Três coisas precisam de
-partida antes de virar verdade:
+**Duas versões seguidas sem partida.** A `v7.2.0` compila e não rodou; a `v7.2.1`
+**não foi nem compilada** — o Console do Editor não foi aberto uma vez no dia
+dela. É a maior dívida aberta do projeto agora, e ela cresce.
+
+Da `v7.2.0`:
 
 ```text
 1. as duas janelas lado a lado         o teste do relatorio unificado
@@ -16,6 +19,19 @@ partida antes de virar verdade:
    mesmos inimigos                     calar na segunda
 3. aeronave no meio do voo -> fow off  deve RECUSAR com a mensagem; e depois,
                                        em Neutral, fow off/on -> nevoaTiles ~1700
+```
+
+Da `v7.2.1`, na ordem de quem quebra mais barato:
+
+```text
+4. compilar                            5 frentes, nenhuma vista pelo compilador
+5. turno com 2+ cidades vazias         as duas tem que aparecer no Jornal
+6. passar turno em hot seat DEMORANDO  o Jornal tem que abrir inteiro, com a
+   de proposito na cortina             barra cheia, no instante em que a tela abre
+7. menu > resumo do turno              o botao movido tem que abrir o Jornal
+8. turno 1 do mesmo mapa               nenhum [FilaCarona] pode citar caca
+9. linha [AI Perf][Unit] do APC #31    ela nunca chegou; sem ela o detalhe dos
+                                       3,3 s restantes e estimativa
 ```
 
 O item 3 tem instrumento: `LogFogDebugState` imprime `[FoW][Estado][ON|OFF|PARTIAL]`
@@ -98,52 +114,88 @@ opostos. Recomendação: (a) como base, (b) como peso depois.
 
 ## Estado
 
-`v7.2.0` tagueada e publicada na `main`. Relatório: `docs/relatorio_v7.2.0.md`.
+`v7.2.1` tagueada e publicada na `main`. Relatório: `docs/relatorio_v7.2.1.md`.
 
-Seis frentes, em commits separados: relatório unificado da linha, delta de
-detecção, barreira de apagar, botão de Camadas, relatório, cena reautorada.
+Sete commits, cinco frentes: Jornal (conteúdo, apresentação, ciclo de vida),
+fiação do menu, MelhorEmbarque, rebasing aéreo, pergunta de carona da aeronave.
 
 ### A frase que organiza esta versão
 
-> **Apagar também é publicar.**
+> **A pergunta errada também responde.**
 
-O CLAUDE.md diz *"nada provisório publica verdade confirmada"*. A barreira de
-escrita da névoa leu isso pela metade: protegia o desenho e deixava o apagamento
-passar. Fora de `Neutral`, o par vira o pior possível — apaga e não repõe.
+Nenhum defeito do dia apareceu como erro. O caça dizia *"sem rota própria"* com a
+naturalidade de quem sabe do que fala; o Jornal listava uma cidade vazia com nome
+e coordenada; o botão aparecia na tela e as setas chegavam nele. Em cinco frentes
+o conserto não foi calcular melhor — foi **perguntar a coisa certa, a quem sabe
+responder, na ordem certa**.
+
+A frase da `v7.2.0` (*"apagar também é publicar"*) segue valendo e está no
+relatório dela.
 
 ---
 
 ## Onde eu parei
 
-### O relatório da linha é um só
+### Jornal — três frentes que não se tocam
 
-`Assets/Scripts/Sensors/ObservationLineProfile.cs` guarda a reta inteira num tipo
-só. `ObservationLineReport.cs` a transforma em linhas rotuladas e **não calcula
-nada**. O `TryTrace` anota o perfil no mesmo laço que decide a linha; com
-`profile == null` o comportamento é idêntico ao anterior.
+**Conteúdo.** `ConstructionManager.CollectDepletedSupplies` é agora o ponto único
+do *"o que está zerado aqui"*, no mesmo universo do ícone do hex (catálogo ∪
+ofertas runtime). O Jornal só redige, e emite **uma linha por prédio**. Categoria
+nova `OCUPAÇÃO INIMIGA` (tier Atenção), que cala quando `SOB CAPTURA` fala.
 
-Três janelas imprimem o mesmo relatório: Pode Enxergar, Pode Detectar, Alguém me
-vê. `TryTraceObservationLineDetailed` (127 linhas) morreu, e com ela a última
-amarra: a **janela** do `PodeEnxergar` não chama mais o `PodeDetectarSensor`.
+**Apresentação.** `PanelHelperController`: viewport com máscara própria, título
+fixo fora da área rolável, roda/arraste/setas. Teto `min(conteúdo, 52% da tela,
+620px)`.
 
-### O delta de detecção
+**Ciclo de vida.** `HoldTurnStartBriefingClockWhileInputBlocked`
+(`TurnStateManager.HelperPanel.cs`), chamada **antes** da barreira de input em
+`ScannerPrompt.cs:240`. O prazo rearma enquanto a cortina do hot seat estiver no
+ar.
 
-`FogSlotGameplaySnapshot.gainedContacts`, calculado no `PublishFogGameplaySnapshot`.
-Consultado por `HasGainedDetectionContact`. Dois consumidores, ambos rodando
-**depois** do publish: o fallback do som e o Jornal.
+**O que falta:** as varreduras de estado ainda são **fotografia**. Estoque, sob
+captura e ocupação são calculados no início do turno e não recalculam quando o
+relatório é reaberto pelo menu — reabastecer uma cidade e reabrir ainda mostra o
+aviso velho. A separação evento/varredura resolve os dois lados de uma vez:
+evento congela (drenado do ledger, salvo), varredura recalcula a cada abertura.
 
-O portão `detectorSlotIndex != ActiveSlotId` do Jornal **continua lá** — é o item
-1 da fila.
+### Menu — a fiação parou de depender do painel
 
-### A barreira de apagar
+`FindMenuButtonByNames` (`BattleMapMenuRootController`) tenta o painel de origem
+e cai para o `menuRoot` inteiro. Os três "Voltar" ficaram de fora **de
+propósito**: cada painel tem o seu.
 
-`IsFogVisualEraseAuthorized` guarda só a metade transacional (`isNeutral` +
-contexto), sem a comparação de slot em cache — que faz sentido para desenhar e
-nenhum para apagar. `ResetFogOfWarRuntime` a consulta antes de tocar nos
-tilemaps; recusado, o overlay fica **velho em vez de vazio**, e se cura sozinho
-no próximo render autorizado.
+Descoberta que vale guardar: `btnConsumo` e `btnCamada` estão `{fileID: 0}` no
+prefab. Nunca estiveram no Inspector — sempre dependeram da auto-fiação.
 
-`fow on|off|partial` recusa fora de `Neutral` com a razão na tela.
+### MelhorEmbarque — a inversão, e o que ficou medido pela metade
+
+`ResolvePassengerMeeting` faz o encontro (dicionário) **antes** da sonda de
+embarque. Resultado medido: frame da decisão do APC #31 de 11.808 ms para
+3.308 ms; sondas do Suprimentos #24 de 92 para 11.
+
+**Instrumentado e ainda não medido:** `melhorEmbarque.lzGates` +
+`MelhorEmbarqueLzGateProbes/Rejects`. A hipótese é que o portão por LZ candidata
+(a mesma sonda, uma por célula) domine o laço agora — no #24 sobraram ~82 ms de
+91 no laço depois da inversão.
+
+**A raiz continua lá:** `UnitMovementPathRules.TryGetEnterCellCost` faz quatro
+consultas de tabuleiro **sem cache** por chamada (construção, estrutura, terreno,
+tile). Dar um `MovementQueryCache` a ela barateia a sonda para todos os
+consumidores — `melhorCaptura`, `validPaths`, o portão por LZ —, não só para o
+transporte. É o conserto de raiz, e não foi feito.
+
+### Aéreo — banda, rótulo, e a pergunta certa
+
+`ResolveAirPlatformMinimumMissionGain` (`AIController.AirPlatform.cs`) devolve um
+turno de voo da aeronave avaliada, no lugar do `2f` cravado. `logCategory`/
+`logVerb` fizeram o rebasing parar de se anunciar como `[Repair] EVAC`.
+`EvaluatePickupRideNeed` bifurca: aeronave responde só a `EvaluateEmergencyOnly`.
+
+**A porta que continua aberta:** `acceptOnlyRecovery: true` aceita rebasing
+quando a plataforma é a única recuperação no alcance, **sem olhar combustível**.
+Um caça com 65/75 de autonomia não precisa de recuperação nenhuma. Se os caças
+continuarem embarcando depois da banda, é por aqui — e o log agora dirá a frase
+*"unica recuperacao compativel"* em vez do ganho.
 
 ---
 
@@ -182,6 +234,26 @@ terreno e memória de exploração.
 **Saves antigos têm resíduo.** Hexes revelados por alcance de detecção antes da
 `v7.1.0` estão gravados como explorados. Nada foi distribuído — é só apagar.
 
+**`OCUPAÇÃO INIMIGA` cobre prédio que É seu, não que ERA.** O caso do prédio que
+o inimigo tomou e continua ocupando exige guardar o **dono anterior** da
+construção e persistir no save. Hoje `previousOwnerSlot` só existe como variável
+local no instante da captura (`TurnStateManager.Capture.cs:153`).
+
+**Três predicados de aeronave no mesmo subsistema.** `GetAircraftType()`,
+`UnitData.IsAircraft()` e `passengerData.domain == Domain.Air` (em
+`CanMaterializePickupRendezvous`) respondem à mesma pergunta de jeitos
+diferentes. O terceiro deixa de fora um hidroavião declarado como naval.
+
+**O QueroCarona é recalculado por transportador.** Três transportadores no mesmo
+turno perguntam aos mesmos passageiros; o cache morre junto com a decisão da
+unidade (`QueroCaronaCalls: 15`, `CacheMisses: 15`, ~684 ms por transportador).
+**Não verificado:** se `laterStopsBudget` carrega algo do transportador. Se não
+carregar, dá para responder uma vez por passageiro por turno.
+
+**`TryInferActionFromButton` é código morto** (zero chamadores) e tem a mesma
+armadilha do painel: infere "consumo" só sob `MenuPanel.Options`. Se algum dia
+voltar a ser chamado, quebra igual.
+
 **A Vigilância da `v7.0.3` continua sem validação registrada no Unity.**
 
 **`MelhorCapitao` continua sem consumidor.** Falta o tradutor
@@ -217,11 +289,13 @@ hexágono para quatro chamadores.
 
 | # | documento | por quê |
 |---|---|---|
-| 1 | `docs/relatorio_v7.2.0.md` | o fio mais recente; a seção 4 (hipóteses erradas) e a 7 (o paradigma) |
-| 2 | `docs/relatorio_v7.1.0.md` | a separação, e a seção 9 (o erro que custou o dia) |
-| 3 | `docs/manual/01_principios_e_vocabulario.md` | decide onde uma regra pode morar |
-| 4 | `docs/arquitetura/acoes_transacionais.md` | obrigatório antes de ligar ferramenta a runtime |
-| 5 | `docs/revisao_papeis.md` | matriz, traits e correções da taxonomia |
+| 1 | `docs/relatorio_v7.2.1.md` | o fio mais recente; a seção 5 (onde eu errei) e a 6 (o que não terminou) |
+| 2 | `docs/relatorio_v7.2.0.md` | a seção 4 (hipóteses erradas) e a 7 (o paradigma dos três consumidores) |
+| 3 | `docs/relatorio_v7.1.0.md` | a separação, e a seção 9 (o erro que custou o dia) |
+| 4 | `docs/manual/01_principios_e_vocabulario.md` | decide onde uma regra pode morar |
+| 5 | `docs/arquitetura/acoes_transacionais.md` | obrigatório antes de ligar ferramenta a runtime |
+| 6 | `docs/revisao_papeis.md` | matriz, traits e correções da taxonomia |
+| 7 | `docs/AI Behavior/contrato_missoes.md` | vocabulário de missão. **Brainstorming** — as três missões descritas não existem no runtime |
 
 ---
 
@@ -252,6 +326,13 @@ hexágono para quatro chamadores.
 
 | armadilha | lição |
 |---|---|
+| **sensor caro antes da rejeição barata** | `ResolvePassengerMeeting` sondava o embarque (0,73 ms, quatro consultas de tabuleiro sem cache) **antes** do dicionário de encontros, que rejeitava 93% dos pares. A ordem custava 9,8 s por decisão. Rejeição barata primeiro, sempre |
+| **atribuir custo dentro do laço por dedução** | com 67 ms sobrando no laço, apostei na interpolação do `reason` montada para 12.195 pares. O contador mostrou outra coisa: era a **sonda irmã**, uma por LZ candidata. A string não custava nada perto disso. Instrumentar o trecho é mais barato que a aposta errada |
+| **referência serializada vazia + auto-fiação escopada** | `btnConsumo: {fileID: 0}` sobrevivia porque a auto-fiação procurava dentro do `panelOptions`. Mover o botão de painel matou a fiação sem sintoma óbvio: ele continuava na tela e navegável, só não tinha ouvinte. Reference vazia + busca escopada = bomba-relógio no dia em que o objeto se move |
+| **relógio de UI correndo atrás da cortina** | o prazo do Jornal arrancava dentro do `AdvanceTurn`, com a tela preta no ar. Quem sentava na cadeira já pegava o relatório vencido, e o auto-dismiss varria as linhas. Prazo de leitura só corre quando há alguém podendo ler |
+| **duas verdades sobre o mesmo estado** | o ícone do hex lia catálogo ∪ ofertas runtime; o Jornal lia só as ofertas. A cidade mais vazia — a que não tem nem linha de oferta — sumia do relatório e acendia no mapa. Quando duas telas discordam, o fato tem que virar uma função só |
+| **pergunta de um domínio feita a outro** | o `QueroCarona` mede necessidade de carona pelo envelope de **captura**. Perguntado sobre um caça, respondia "sem rota própria" — sempre, e sempre falso. Resposta plausível de pergunta inaplicável é pior que erro, porque não levanta suspeita |
+| **limiar fixo onde devia ser banda** | `minimumMissionGain: 2f` para um caça de 9 MP: ele pagava o turno inteiro para ganhar meia rodada de voo. A doutrina já dizia "banda, não número de hex" — e mesmo assim aconteceu de novo, num arquivo que ninguém associava a alcance |
 | **barreira que só cobre um sentido** | a de escrita da névoa protegia desenhar e deixava apagar passar. Fora de Neutral, apaga e não repõe — e voltar a Neutral conserta, o que faz o sintoma parecer aleatório |
 | **a mesma barreira em dois usos diferentes** | a de desenhar exige o slot em cache; a de apagar não pode exigir, porque o próprio reset zera o campo. Copiar a barreira inteira teria deixado névoa velha nos presets sem névoa |
 | **três hipóteses erradas antes do log** | duas minhas e uma do autor, todas mortas por **um log de partida real**. O que apontou o mecanismo foi o detalhe que nenhuma explicava: *"quando desfaço o movimento, volta ao normal"* — correlação reversível, e só a barreira produz isso |
@@ -284,13 +365,22 @@ hexágono para quatro chamadores.
 
 ## Critério de retomada
 
+**Compilar vem antes de qualquer coisa.** Duas versões seguidas foram escritas
+sem o Console: a `v7.2.0` compila mas não rodou, e a `v7.2.1` não foi nem
+compilada. Cinco frentes de uma vez, nenhuma vista pelo compilador. Qualquer
+plano que comece antes disso está construindo sobre suposição.
+
 O critério da `v7.1.2` era de **saída**: as duas janelas descrevendo a mesma reta
 com as mesmas palavras, e um contato novo avisando o jogador uma vez. As duas
-coisas estão escritas e compilam; **nenhuma foi vista em jogo**.
+coisas estão escritas; **nenhuma foi vista em jogo**.
 
-O novo critério é de **prova**: a perna de percepção está pronta quando o autor
-abrir as duas janelas lado a lado sem traduzir nada, e quando um radar movido
-duas vezes sobre os mesmos inimigos tocar uma vez só.
+O critério de **prova** da perna de percepção continua: o autor abrindo as duas
+janelas lado a lado sem traduzir nada, e um radar movido duas vezes sobre os
+mesmos inimigos tocando uma vez só.
+
+E o da `v7.2.1` é de **honestidade do relatório**: o Jornal está pronto quando um
+turno com duas cidades vazias mostrar as duas, quando ele abrir inteiro depois de
+uma cortina demorada, e quando nenhum `[FilaCarona]` citar caça.
 
 Depois disso, o degrau 0 tem uma linha que reabriu: **tirar o laço de hexágono de
 dentro do `PodeDetectar`**. Enquanto ele for público lá, "PodeDetectar responde
