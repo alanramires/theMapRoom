@@ -487,6 +487,24 @@ public class MatchController : MonoBehaviour
         public readonly HashSet<Vector3Int> knownCells = new HashSet<Vector3Int>();
         public readonly HashSet<Vector3Int> geographicOnlyCells = new HashSet<Vector3Int>();
         public readonly Dictionary<int, bool> unitVisibility = new Dictionary<int, bool>();
+
+        /// <summary>
+        /// Quem PASSOU a ser detectado no ultimo publish deste slot — o delta,
+        /// nao o estado. Um contato que ja estava aqui no publish anterior nao
+        /// entra: novidade e a transicao, e e ela que o alto-falante e o Jornal
+        /// precisam para avisar UMA vez em vez de a cada reconstrucao.
+        ///
+        /// Vive um publish. O proximo publish deste slot o reescreve.
+        /// </summary>
+        public readonly HashSet<int> gainedContacts = new HashSet<int>();
+
+        /// <summary>
+        /// O primeiro publish de um slot nao tem delta: nao existe "antes" com
+        /// que comparar. Comeco de partida e save recem-carregado sao linha de
+        /// base, nao noticia — senao o jogador chega e o Jornal anuncia como
+        /// novo todo inimigo que ele ja estava vendo.
+        /// </summary>
+        public bool hasBaseline;
     }
     private readonly struct FogUpdateContext
     {
@@ -554,6 +572,9 @@ public class MatchController : MonoBehaviour
         new Dictionary<int, FogSlotGameplaySnapshot>();
     [System.NonSerialized] private readonly Dictionary<int, FogSlotContributionRuntime> fogContributionRuntimeBySlot =
         new Dictionary<int, FogSlotContributionRuntime>();
+    // Fotografia do conjunto de contatos ANTES do publish, para calcular o
+    // delta. Reusada porque o publish e caminho quente.
+    [System.NonSerialized] private readonly HashSet<int> fogPreviousContactsScratch = new HashSet<int>();
     [System.NonSerialized] private readonly Dictionary<int, HashSet<Vector3Int>> fogExploredCellsBySlot =
         new Dictionary<int, HashSet<Vector3Int>>();
     [System.NonSerialized] private readonly Dictionary<int, Dictionary<Vector3Int, FogConstructionMemoryEntry>> fogConstructionMemoryBySlot =
@@ -5917,8 +5938,19 @@ public class MatchController : MonoBehaviour
 
         if (!playedSkillSfx && canPlaySkillSfx)
         {
-            bool hasAnyDetection = detectedStealth.Count > 0 || spottedCandidates.Count > 0;
-            if (hasAnyDetection)
+            // Aqui, e SO aqui, o delta manda. O bloco de cima — chave do alvo
+            // casada — repete a cada reconstrucao de proposito: no furtivo,
+            // repetir e o feedback de "continuo te vendo", e o autor o quis.
+            //
+            // Este fallback e o generalizado: ele pega qualquer contato, e o
+            // radar reencontra os mesmos inimigos toda vez que age. Repetido,
+            // vira ruido de fundo e o jogador para de escutar — que e o oposto
+            // de um alerta. Sem novidade, silencio.
+            bool hasNewContact = HasAnyGainedDetectionContact(
+                observer.SlotIndex,
+                detectedStealth,
+                spottedCandidates);
+            if (hasNewContact)
             {
                 // Fallback quando nenhuma chave do ALVO casou: toca a chave de
                 // SENSOR do observador — o que ele declara saber cacar. E o
@@ -5992,6 +6024,61 @@ public class MatchController : MonoBehaviour
             Debug.Log($"[Sensors][Bootstrap] unitsProcessed={observersProcessed}");
     }
 
+    /// <summary>
+    /// UM GANCHO, DOIS CONSUMIDORES: este slot PASSOU a detectar esta unidade
+    /// no ultimo publish? O som pergunta para nao repetir o mesmo contato a cada
+    /// reconstrucao, e o Jornal pergunta para registrar a novidade uma vez.
+    ///
+    /// Novidade e propriedade do TABULEIRO CONFIRMADO, nao do sensor: quem
+    /// responde e o snapshot publicado no ponto de compromisso. Por isso os dois
+    /// consumidores rodam DEPOIS do publish (ver ApplyCommittedUnitFog) e leem a
+    /// mesma resposta — se um deles fosse consultado antes, veria o estado velho
+    /// e discordaria do outro.
+    ///
+    /// Deliberadamente NAO usa currentlyObservedByTeamIds: aquele conjunto e o
+    /// olho, e o olho so fala de unidade com etiqueta de ocultacao. Contato e
+    /// pergunta mais larga.
+    /// </summary>
+    private bool HasGainedDetectionContact(int detectorSlotIndex, UnitManager target)
+    {
+        if (target == null || !IsValidPlayerSlotIndex(detectorSlotIndex))
+            return false;
+        if (!fogGameplaySnapshotsBySlot.TryGetValue(detectorSlotIndex, out FogSlotGameplaySnapshot snapshot) ||
+            snapshot == null ||
+            snapshot.gainedContacts.Count <= 0)
+        {
+            return false;
+        }
+
+        return snapshot.gainedContacts.Contains(ResolveFogCacheIndex(target));
+    }
+
+    private bool HasAnyGainedDetectionContact(
+        int detectorSlotIndex,
+        List<PodeDetectarOption> first,
+        List<PodeDetectarOption> second)
+    {
+        return HasAnyGainedDetectionContact(detectorSlotIndex, first) ||
+            HasAnyGainedDetectionContact(detectorSlotIndex, second);
+    }
+
+    private bool HasAnyGainedDetectionContact(int detectorSlotIndex, List<PodeDetectarOption> options)
+    {
+        if (options == null)
+            return false;
+
+        for (int i = 0; i < options.Count; i++)
+        {
+            PodeDetectarOption option = options[i];
+            if (option == null || option.targetUnit == null)
+                continue;
+            if (HasGainedDetectionContact(detectorSlotIndex, option.targetUnit))
+                return true;
+        }
+
+        return false;
+    }
+
     private void RegisterStealthRevealFromDetection(UnitManager observer, UnitManager target)
     {
         if (observer == null || target == null)
@@ -6005,7 +6092,13 @@ public class MatchController : MonoBehaviour
         // Jornal do Comandante — novo contato: deteccao PASSIVA durante o turno
         // alheio (meus sensores flagraram algo enquanto o inimigo se movia).
         // Deteccao no proprio turno foi vista ao vivo e nao entra.
-        if (detectorSlotIndex != ActiveSlotId.Value &&
+        //
+        // NOVO e o delta do tabuleiro confirmado, nao "o sensor apontou de
+        // novo". O dedupe por celula+turno abaixo continua, mas ele so cobria
+        // repeticao DENTRO do turno: um contato reencontrado turno apos turno
+        // passava como noticia toda vez. Agora so a transicao entra.
+        if (HasGainedDetectionContact(detectorSlotIndex, target) &&
+            detectorSlotIndex != ActiveSlotId.Value &&
             observer.SlotIndex != target.SlotIndex &&
             detectorSlotIndex >= 0)
         {
@@ -8872,6 +8965,17 @@ public class MatchController : MonoBehaviour
                           snapshot.unitVisibility.Count > 0 &&
                           affectedTargetCells != null &&
                           affectedTargetCells.Count > 0;
+
+        // O delta de contato tem que ser fotografado ANTES do laco mexer no
+        // dicionario — depois do Clear nao existe mais "antes" com que comparar.
+        fogPreviousContactsScratch.Clear();
+        foreach (KeyValuePair<int, bool> entry in snapshot.unitVisibility)
+        {
+            if (entry.Value)
+                fogPreviousContactsScratch.Add(entry.Key);
+        }
+        snapshot.gainedContacts.Clear();
+
         if (!targetOnly)
             snapshot.unitVisibility.Clear();
         if (units == null)
@@ -8904,9 +9008,24 @@ public class MatchController : MonoBehaviour
                 visibilityProbes++;
                 visible = ComputeIsUnitVisibleForSlotWithoutCache(unit, observerSlot);
             }
-            snapshot.unitVisibility[ResolveFogCacheIndex(unit)] = visible;
+            int fogCacheIndex = ResolveFogCacheIndex(unit);
+            snapshot.unitVisibility[fogCacheIndex] = visible;
+
+            // "Passou a detectar": estava fora do conjunto anterior e entrou
+            // agora. Unidade do proprio slot nunca e contato — ela nao e
+            // detectada, ela e dele.
+            if (visible &&
+                snapshot.hasBaseline &&
+                unit.SlotIndex != slotIndex &&
+                !fogPreviousContactsScratch.Contains(fogCacheIndex))
+            {
+                snapshot.gainedContacts.Add(fogCacheIndex);
+            }
+
             evaluatedTargets++;
         }
+
+        snapshot.hasBaseline = true;
 
         if (enableFogStepPerfLogs)
         {
