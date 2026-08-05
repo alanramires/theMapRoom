@@ -312,19 +312,34 @@ public static class MelhorEmbarqueService
         origin.z = 0;
         int tactical = Mathf.Max(0, request.tacticalBudget);
         int operational = tactical * Mathf.Max(1, request.operationalTurns);
-        Dictionary<Vector3Int, List<Vector3Int>> tacticalPaths =
-            request.transporterPaths
-            ?? UnitMovementPathRules.CalcularCaminhosValidos(
-                request.map, request.transporter, tactical,
-                request.terrainDatabase);
+        Dictionary<Vector3Int, List<Vector3Int>> tacticalPaths;
+        using (new AIDecisionPerfScope(
+                   request.transporter,
+                   "melhorEmbarque.transporterPaths"))
+        {
+            tacticalPaths =
+                request.transporterPaths
+                ?? UnitMovementPathRules.CalcularCaminhosValidos(
+                    request.map, request.transporter, tactical,
+                    request.terrainDatabase);
+        }
         if (request.transporterPaths != null)
             AIDecisionPerf.AddCount(
                 "TransportPlanningReachReuses");
 
-        IReadOnlyList<Vector3Int> candidateCells =
-            ResolveCandidateCells(
+        IReadOnlyList<Vector3Int> candidateCells;
+        bool usedTopologyIndex;
+        using (new AIDecisionPerfScope(
+                   request.transporter,
+                   "melhorEmbarque.candidateCells"))
+        {
+            candidateCells = ResolveCandidateCells(
                 request,
-                out bool usedTopologyIndex);
+                out usedTopologyIndex);
+        }
+        AIDecisionPerf.AddCount(
+            "MelhorEmbarqueCandidateCells",
+            candidateCells != null ? candidateCells.Count : 0);
         BoardTopologyIndex topology =
             usedTopologyIndex
                 ? BoardTopologyIndex.GetOrCreateRuntime(
@@ -342,26 +357,33 @@ public static class MelhorEmbarqueService
         var passengerReach =
             new Dictionary<UnitManager, PassengerReachProfile>(
                 passengers.Count);
-        for (int i = 0; i < passengers.Count; i++)
+        using (new AIDecisionPerfScope(
+                   request.transporter,
+                   "melhorEmbarque.passengerReach"))
         {
-            UnitManager passenger = passengers[i];
-            PassengerReachProfile reachProfile =
-                BuildPassengerReachProfile(
-                    request, passenger, topology);
-            passengerReach[passenger] = reachProfile;
-            passengerRideNeed[passenger] =
-                request.evaluateRideNeedWithOperationalReach != null
-                    ? request.evaluateRideNeedWithOperationalReach(
-                        passenger,
-                        reachProfile.laterStops,
-                        reachProfile.laterStopsBudget)
-                    : request.evaluateRideNeed?.Invoke(passenger);
-            request.diagnosticLog?.Invoke(
-                $"ACCEPT pax=#{passenger.InstanceId} " +
-                $"slot={passengerSlots[passenger]} " +
-                FormatRideNeedDiagnostic(
-                    passengerRideNeed[passenger]));
+            for (int i = 0; i < passengers.Count; i++)
+            {
+                UnitManager passenger = passengers[i];
+                PassengerReachProfile reachProfile =
+                    BuildPassengerReachProfile(
+                        request, passenger, topology);
+                passengerReach[passenger] = reachProfile;
+                passengerRideNeed[passenger] =
+                    request.evaluateRideNeedWithOperationalReach != null
+                        ? request.evaluateRideNeedWithOperationalReach(
+                            passenger,
+                            reachProfile.laterStops,
+                            reachProfile.laterStopsBudget)
+                        : request.evaluateRideNeed?.Invoke(passenger);
+                request.diagnosticLog?.Invoke(
+                    $"ACCEPT pax=#{passenger.InstanceId} " +
+                    $"slot={passengerSlots[passenger]} " +
+                    FormatRideNeedDiagnostic(
+                        passengerRideNeed[passenger]));
+            }
         }
+        AIDecisionPerf.AddCount(
+            "MelhorEmbarquePassengers", passengers.Count);
 
         // Quem suspende o encerramento antecipado da varredura. Era so
         // emergencia de reparo; passou a incluir quem nao tem rota propria e ja
@@ -406,6 +428,14 @@ public static class MelhorEmbarqueService
         int lzWithoutReachableNow = 0;
         bool hasDecisiveTacticalPickup = false;
         bool stoppedAfterTactical = false;
+        // Medicao do laco LZ x passageiro: e aqui que mora o produto cartesiano
+        // (options = LZs aceitas x passageiros) e o unico trecho pesado do
+        // servico que nenhum cronometro cobria. O tempo de ResolvePassengerMeeting
+        // e acumulado num float local e publicado UMA vez no fim — cronometrar
+        // par a par por AIDecisionPerfScope custaria um dicionario por par.
+        float resolveMeetingMs = 0f;
+        float lzGateMs = 0f;
+        float lzLoopStartedAt = Time.realtimeSinceStartup;
         for (int candidateIndex = 0;
              candidateIndex < orderedCandidateCells.Count;
              candidateIndex++)
@@ -430,17 +460,28 @@ public static class MelhorEmbarqueService
             }
 
             topologyCellsVisited++;
-            if (!request.map.HasTile(cell)
-                || !PodeEmbarcarSensor.IsTransporterCellValidForEmbark(
+            // Sonda de tabuleiro POR LZ CANDIDATA — a irma da sonda por par.
+            // Depois que a inversao do par derrubou resolveMeeting, e ela que
+            // domina o laco (no Suprimentos#24 sobraram ~82 ms de 91 aqui).
+            // Medida a parte porque atribuir por deducao ja errou uma vez.
+            float lzGateStartedAt = Time.realtimeSinceStartup;
+            bool lzGateOk =
+                request.map.HasTile(cell)
+                && PodeEmbarcarSensor.IsTransporterCellValidForEmbark(
                     request.map, request.terrainDatabase,
-                    transporterData, cell))
+                    transporterData, cell)
+                && (request.transporter.GetDomain() != Domain.Air
+                    || PodePousarSensor.CanLandAtCell(
+                        request.transporter, request.map,
+                        request.terrainDatabase, cell, out _));
+            lzGateMs +=
+                (Time.realtimeSinceStartup - lzGateStartedAt) * 1000f;
+            AIDecisionPerf.AddCount("MelhorEmbarqueLzGateProbes");
+            if (!lzGateOk)
+            {
+                AIDecisionPerf.AddCount("MelhorEmbarqueLzGateRejects");
                 continue;
-
-            if (request.transporter.GetDomain() == Domain.Air
-                && !PodePousarSensor.CanLandAtCell(
-                    request.transporter, request.map,
-                    request.terrainDatabase, cell, out _))
-                continue;
+            }
 
             if (tier == MelhorEmbarqueTier.Strategic
                 && !request.includeStrategic)
@@ -474,6 +515,8 @@ public static class MelhorEmbarqueService
                 Vector3Int passengerCell =
                     passenger.CurrentCellPosition;
                 passengerCell.z = 0;
+                AIDecisionPerf.AddCount("MelhorEmbarquePairs");
+                float meetingStartedAt = Time.realtimeSinceStartup;
                 ResolvePassengerMeeting(
                     request,
                     passenger,
@@ -484,11 +527,24 @@ public static class MelhorEmbarqueService
                     out int embarkCost,
                     out Vector3Int passengerMeetingCell,
                     out bool hasPassengerMeetingCell);
+                resolveMeetingMs +=
+                    (Time.realtimeSinceStartup - meetingStartedAt) * 1000f;
+                AIDecisionPerf.AddCount(
+                    ResolvePairRouteCounter(routeState));
                 int slotIndex = passengerSlots[passenger];
                 QueroCaronaResult rideNeed =
                     passengerRideNeed[passenger];
                 MelhorEmbarqueRideDisposition disposition =
                     ResolveRideDisposition(rideNeed);
+                // Par gerado por quem JA recusou a carona (alcanca o proprio
+                // objetivo). Entra no cruzamento como OpportunisticFallback e
+                // paga o laco inteiro para ser classificado por ultimo: e o
+                // candidato numero um a poda, e este contador diz o tamanho
+                // exato do desperdicio antes de mexer na regra.
+                if (disposition ==
+                    MelhorEmbarqueRideDisposition.OpportunisticFallback)
+                    AIDecisionPerf.AddCount(
+                        "MelhorEmbarquePairsOpportunistic");
                 float rideNeedAdjustment =
                     ResolveRideNeedAdjustment(
                         disposition, rideNeed);
@@ -658,6 +714,13 @@ public static class MelhorEmbarqueService
                 $"LZ={cell} {lz.reason}");
         }
 
+        AIDecisionPerf.Add(
+            "melhorEmbarque.lzLoop",
+            (Time.realtimeSinceStartup - lzLoopStartedAt) * 1000f);
+        AIDecisionPerf.Add(
+            "melhorEmbarque.resolveMeeting", resolveMeetingMs);
+        AIDecisionPerf.Add(
+            "melhorEmbarque.lzGates", lzGateMs);
         AIDecisionPerf.AddCount(
             "TopologyCellsVisited",
             topologyCellsVisited);
@@ -933,10 +996,54 @@ public static class MelhorEmbarqueService
             : transporterCell;
         passengerMeetingCell.z = 0;
         embarkCost = int.MaxValue;
-        if (request == null
-            || passenger == null
-            || profile == null
-            || !PodeEmbarcarSensor.TryGetEmbarkCostAtCell(
+        moveCost = int.MaxValue;
+        state = MelhorEmbarquePassengerRouteState.NoCurrentRoute;
+        if (request == null || passenger == null || profile == null)
+            return;
+
+        // ORDEM: encontro primeiro (dicionario), sensor depois.
+        //
+        // A sonda de embarque custa ~0,7 ms — sao quatro consultas de tabuleiro
+        // SEM cache (construcao, estrutura, terreno, tile) dentro de
+        // TryGetEnterCellCost. Ela era paga uma vez POR PAR, antes da busca
+        // barata que rejeita a maioria: no Suprimentos#24, 86 dos 92 pares
+        // terminavam em NoCurrentRoute e nenhum deles falhou por embarque — a
+        // sonda respondia certo e o dicionario descartava logo depois.
+        //
+        // Invertido, o sensor so roda quando existe encontro para pontuar. Onde
+        // nao ha encontro o veredito e NoCurrentRoute de qualquer jeito, e a
+        // pontuacao daquele par nao le embarkCost (routePenalty e 10000 fixo).
+        // Mesmo resultado, sem a sonda.
+        bool hasNow = TryFindMeetingCost(
+            profile.now,
+            transporterCell,
+            out PassengerMeeting nowMeeting);
+        bool hasLater = TryFindMeetingCost(
+            profile.later,
+            transporterCell,
+            out PassengerMeeting laterMeeting);
+        bool hasLongRange = false;
+        PassengerMeeting longRangeMeeting = default;
+        if (!hasNow
+            && !hasLater
+            && request.resolveLongRangePassengerMeeting)
+        {
+            EnsureLongRangeMeetingMap(
+                request, passenger, profile);
+            hasLongRange = TryFindMeetingCost(
+                profile.longRange,
+                transporterCell,
+                out longRangeMeeting);
+        }
+
+        if (!hasNow && !hasLater && !hasLongRange)
+        {
+            AIDecisionPerf.AddCount("MelhorEmbarqueEmbarkProbeSkips");
+            return;
+        }
+
+        AIDecisionPerf.AddCount("MelhorEmbarqueEmbarkProbes");
+        if (!PodeEmbarcarSensor.TryGetEmbarkCostAtCell(
                 request.map,
                 request.terrainDatabase,
                 passenger,
@@ -944,16 +1051,12 @@ public static class MelhorEmbarqueService
                 out embarkCost,
                 out _))
         {
-            state =
-                MelhorEmbarquePassengerRouteState.NoCurrentRoute;
-            moveCost = int.MaxValue;
+            AIDecisionPerf.AddCount("MelhorEmbarqueEmbarkProbeRejects");
+            embarkCost = int.MaxValue;
             return;
         }
 
-        if (TryFindMeetingCost(
-                profile.now,
-                transporterCell,
-                out PassengerMeeting nowMeeting)
+        if (hasNow
             && CanAffordMeeting(
                 nowMeeting.moveCost,
                 embarkCost,
@@ -965,10 +1068,7 @@ public static class MelhorEmbarqueService
             state = MelhorEmbarquePassengerRouteState.ReachableNow;
             return;
         }
-        if (TryFindMeetingCost(
-                profile.later,
-                transporterCell,
-                out PassengerMeeting laterMeeting)
+        if (hasLater
             && CanAffordMeeting(
                 laterMeeting.moveCost,
                 embarkCost,
@@ -981,26 +1081,30 @@ public static class MelhorEmbarqueService
             return;
         }
 
-        if (request.resolveLongRangePassengerMeeting)
+        // Encontro existia mas nenhum coube no orcamento: o longo alcance ainda
+        // e a ultima chance, exatamente como antes da inversao. So aqui ele e
+        // materializado para quem tinha now/later — a consulta la em cima cobre
+        // apenas quem nao tinha encontro nenhum.
+        if (!hasLongRange && request.resolveLongRangePassengerMeeting)
         {
             EnsureLongRangeMeetingMap(
                 request, passenger, profile);
-            if (TryFindMeetingCost(
-                    profile.longRange,
-                    transporterCell,
-                    out PassengerMeeting longRangeMeeting))
-            {
-                moveCost = longRangeMeeting.moveCost;
-                passengerMeetingCell =
-                    longRangeMeeting.passengerCell;
-                hasPassengerMeetingCell = true;
-                state =
-                    MelhorEmbarquePassengerRouteState.ReachableStrategic;
-                return;
-            }
+            hasLongRange = TryFindMeetingCost(
+                profile.longRange,
+                transporterCell,
+                out longRangeMeeting);
         }
 
-        state = MelhorEmbarquePassengerRouteState.NoCurrentRoute;
+        if (hasLongRange)
+        {
+            moveCost = longRangeMeeting.moveCost;
+            passengerMeetingCell = longRangeMeeting.passengerCell;
+            hasPassengerMeetingCell = true;
+            state =
+                MelhorEmbarquePassengerRouteState.ReachableStrategic;
+            return;
+        }
+
         moveCost = int.MaxValue;
     }
 
@@ -1012,6 +1116,12 @@ public static class MelhorEmbarqueService
         if (profile.longRange != null)
             return;
 
+        // Varredura de tabuleiro INTEIRO (orcamento int.MaxValue/4) por
+        // passageiro. Memoizada no perfil, mas basta um par cair aqui para
+        // pagar o mapa todo — por isso ela e cronometrada a parte.
+        using var perf = new AIDecisionPerfScope(
+            passenger, "melhorEmbarque.longRangeMap");
+        AIDecisionPerf.AddCount("MelhorEmbarqueLongRangeMapBuilds");
         Vector3Int origin = passenger.CurrentCellPosition;
         origin.z = 0;
         Dictionary<Vector3Int, int> longRangeStops =
@@ -1025,6 +1135,26 @@ public static class MelhorEmbarqueService
             request.map,
             profile.topology,
             longRangeStops);
+    }
+
+    // Distribuicao dos pares por estado de rota do passageiro. Diz de que tipo
+    // sao os milhares de opcoes: se quase tudo volta NoRoute, o cruzamento esta
+    // sendo pago para produzir lixo; se e Strategic, o mapa de longo alcance e
+    // que esta cobrando.
+    private static string ResolvePairRouteCounter(
+        MelhorEmbarquePassengerRouteState state)
+    {
+        switch (state)
+        {
+            case MelhorEmbarquePassengerRouteState.ReachableNow:
+                return "MelhorEmbarquePairsReachableNow";
+            case MelhorEmbarquePassengerRouteState.ReachableLater:
+                return "MelhorEmbarquePairsReachableLater";
+            case MelhorEmbarquePassengerRouteState.ReachableStrategic:
+                return "MelhorEmbarquePairsStrategic";
+            default:
+                return "MelhorEmbarquePairsNoRoute";
+        }
     }
 
     private static bool CanAffordMeeting(
