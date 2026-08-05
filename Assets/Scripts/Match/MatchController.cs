@@ -3623,7 +3623,8 @@ public class MatchController : MonoBehaviour
         FuelCrash = 5,
         ForcedSurfaceApplied = 6,
         NewContact = 7,
-        SupplyDepleted = 8
+        SupplyDepleted = 8,
+        EnemyOccupation = 9
     }
 
     [System.NonSerialized] private readonly List<TurnBriefingEventSaveData> turnBriefingLedger = new List<TurnBriefingEventSaveData>();
@@ -3682,6 +3683,7 @@ public class MatchController : MonoBehaviour
                 return TurnBriefingSeverity.Critical;
             case TurnBriefingCategory.CaptureInProgress:
             case TurnBriefingCategory.SupplyDepleted:
+            case TurnBriefingCategory.EnemyOccupation:
                 return TurnBriefingSeverity.Warning;
             default:
                 return TurnBriefingSeverity.Info;
@@ -3701,6 +3703,7 @@ public class MatchController : MonoBehaviour
             case TurnBriefingCategory.ForcedSurfaceApplied: return "EMERSÃO AUTOMÁTICA";
             case TurnBriefingCategory.NewContact: return "NOVO CONTATO";
             case TurnBriefingCategory.SupplyDepleted: return "ESTOQUE ZERADO";
+            case TurnBriefingCategory.EnemyOccupation: return "OCUPAÇÃO INIMIGA";
             default: return "EVENTO";
         }
     }
@@ -3759,6 +3762,11 @@ public class MatchController : MonoBehaviour
 
         // 2) Varreduras de estado do proprio time (lembretes persistentes).
         List<ConstructionManager> constructions = ConstructionManager.AllActive;
+        var depletedSupplies = new List<SupplyData>(4);
+        var depletedSupplyNames = new List<string>(4);
+        var occupantNames = new List<string>(2);
+        Tilemap occupancyBoard = ResolveFogBoardTilemap();
+        TeamId activeTeamForBriefing = GetTeamIdForSlot(ActiveSlotId.Value);
         for (int i = 0; i < constructions.Count; i++)
         {
             ConstructionManager construction = constructions[i];
@@ -3772,8 +3780,9 @@ public class MatchController : MonoBehaviour
             string name = construction.ConstructionDisplayName;
 
             // Captura parcial em andamento contra voce (e seu predio: voce sabe).
-            if (construction.IsCapturable &&
-                construction.CurrentCapturePoints < construction.CapturePointsMax)
+            bool captureInProgress = construction.IsCapturable &&
+                construction.CurrentCapturePoints < construction.CapturePointsMax;
+            if (captureInProgress)
             {
                 lines.Add(new TurnStateManager.HelperTurnStartAutonomyLine
                 {
@@ -3784,23 +3793,71 @@ public class MatchController : MonoBehaviour
                 });
             }
 
-            // Estoques zerados (supply nao-infinito com oferta runtime em 0).
-            if (construction.CanProvideSupplies && !construction.HasInfiniteSuppliesOverride)
+            // Ocupacao inimiga: unidade dele parada em cima de um predio seu.
+            // E o aviso que ANTECEDE a captura — assim que ela comeca, "SOB
+            // CAPTURA" conta a historia melhor e este cala, pra nao render duas
+            // noticias do mesmo hex. Fog-honesto: so entra o ocupante que voce
+            // enxerga agora (IsUnitVisibleForSlot), nunca o que voce deduziria.
+            if (!captureInProgress && occupancyBoard != null)
             {
-                IReadOnlyList<ConstructionSupplyOffer> offers = construction.OfferedSupplies;
-                for (int o = 0; o < offers.Count; o++)
+                occupantNames.Clear();
+                List<UnitManager> occupants = UnitOccupancyRules.GetUnitsAtCell(occupancyBoard, cell);
+                for (int o = 0; o < occupants.Count; o++)
                 {
-                    ConstructionSupplyOffer offer = offers[o];
-                    if (offer == null || offer.supply == null)
+                    UnitManager occupant = occupants[o];
+                    if (occupant == null || occupant.IsEmbarked)
                         continue;
-                    if (offer.quantity > 0 || construction.HasInfiniteSuppliesFor(offer.supply))
+                    // Aliado em cima do predio nao e ocupacao — e guarnicao.
+                    if (occupant.SlotIndex == ActiveSlotId.Value ||
+                        GetTeamIdForSlot(occupant.SlotIndex) == activeTeamForBriefing)
+                        continue;
+                    if (!IsUnitVisibleForSlot(occupant, ActiveSlotId))
                         continue;
 
+                    string occupantName = ResolveRuntimeUnitName(occupant);
+                    if (!string.IsNullOrWhiteSpace(occupantName) && !occupantNames.Contains(occupantName))
+                        occupantNames.Add(occupantName);
+                }
+
+                if (occupantNames.Count > 0)
+                {
                     lines.Add(new TurnStateManager.HelperTurnStartAutonomyLine
                     {
                         unitName = name,
                         cell = cell,
-                        customText = $"{ResolveBriefingCategoryLabel(TurnBriefingCategory.SupplyDepleted)}\n{name}: sem {offer.supply.displayName}\n({cell.x},{cell.y})",
+                        customText = $"{ResolveBriefingCategoryLabel(TurnBriefingCategory.EnemyOccupation)}\n{name}: {string.Join(", ", occupantNames)} no local\n({cell.x},{cell.y})",
+                        severityTier = (int)ResolveBriefingSeverity(TurnBriefingCategory.EnemyOccupation)
+                    });
+                }
+            }
+
+            // Estoques zerados. O fato ("o que esta zerado aqui") e da propria
+            // construcao — mesma resposta que acende o icone no hex, catalogo
+            // UNIAO ofertas runtime. O Jornal so redige. Uma noticia POR PREDIO,
+            // nao por insumo: o predio e o sujeito do aviso.
+            if (construction.CollectDepletedSupplies(depletedSupplies) > 0)
+            {
+                depletedSupplyNames.Clear();
+                for (int o = 0; o < depletedSupplies.Count; o++)
+                {
+                    SupplyData supply = depletedSupplies[o];
+                    if (supply == null)
+                        continue;
+                    string supplyName = !string.IsNullOrWhiteSpace(supply.displayName)
+                        ? supply.displayName
+                        : supply.id;
+                    if (!string.IsNullOrWhiteSpace(supplyName) && !depletedSupplyNames.Contains(supplyName))
+                        depletedSupplyNames.Add(supplyName);
+                }
+
+                if (depletedSupplyNames.Count > 0)
+                {
+                    string missing = "sem " + string.Join(", sem ", depletedSupplyNames);
+                    lines.Add(new TurnStateManager.HelperTurnStartAutonomyLine
+                    {
+                        unitName = name,
+                        cell = cell,
+                        customText = $"{ResolveBriefingCategoryLabel(TurnBriefingCategory.SupplyDepleted)}\n{name}: {missing}\n({cell.x},{cell.y})",
                         severityTier = (int)ResolveBriefingSeverity(TurnBriefingCategory.SupplyDepleted)
                     });
                 }

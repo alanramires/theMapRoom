@@ -816,6 +816,65 @@ public class ConstructionManager : MonoBehaviour
         return false;
     }
 
+    // Ponto unico do "esta zerado", no mesmo universo que a pilha de alerta do
+    // hex enxerga: CATALOGO da construcao UNIAO ofertas runtime, deduplicado.
+    // Supply do catalogo SEM oferta runtime conta como zerado — a construcao
+    // deveria estocar aquilo e nao tem nada. Ler so as ofertas runtime (o que o
+    // Jornal fazia) deixa passar exatamente a cidade mais vazia de todas.
+    // Infinito nunca entra. Devolve quantos itens estao zerados.
+    public int CollectDepletedSupplies(List<SupplyData> depleted)
+    {
+        if (depleted == null)
+            return 0;
+        depleted.Clear();
+        if (!CanProvideSupplies || hasInfiniteSuppliesOverride)
+            return 0;
+
+        IReadOnlyList<ConstructionSupplyOffer> offers = OfferedSupplies;
+
+        // Catalogo primeiro: a ordem do designer manda na leitura da noticia.
+        if (TryResolveConstructionData(out ConstructionData constructionData) &&
+            constructionData != null &&
+            constructionData.supplierResources != null)
+        {
+            for (int i = 0; i < constructionData.supplierResources.Count; i++)
+            {
+                ConstructionSupplierResourceCapacity entry = constructionData.supplierResources[i];
+                TryAddDepletedSupply(entry != null ? entry.supply : null, offers, depleted);
+            }
+        }
+
+        for (int i = 0; i < offers.Count; i++)
+        {
+            ConstructionSupplyOffer offer = offers[i];
+            TryAddDepletedSupply(offer != null ? offer.supply : null, offers, depleted);
+        }
+
+        return depleted.Count;
+    }
+
+    private void TryAddDepletedSupply(
+        SupplyData supply,
+        IReadOnlyList<ConstructionSupplyOffer> offers,
+        List<SupplyData> depleted)
+    {
+        if (supply == null || depleted.Contains(supply))
+            return;
+        if (HasInfiniteSuppliesFor(supply))
+            return;
+
+        int current = 0;
+        for (int i = 0; i < offers.Count; i++)
+        {
+            ConstructionSupplyOffer offer = offers[i];
+            if (offer != null && offer.supply == supply)
+                current += Mathf.Max(0, offer.quantity);
+        }
+
+        if (current <= 0)
+            depleted.Add(supply);
+    }
+
     private void TryAutoAssignSupplyAlertSlots()
     {
         supplyAlertSlotsResolved = true;
