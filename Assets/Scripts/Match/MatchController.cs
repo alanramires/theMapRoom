@@ -5913,12 +5913,14 @@ public class MatchController : MonoBehaviour
             bool hasAnyDetection = detectedStealth.Count > 0 || spottedCandidates.Count > 0;
             if (hasAnyDetection)
             {
-                // Fallback quando nenhuma chave do ALVO casou: o observador toca
-                // o som da propria skill de sensor. Era exclusivo do submarino
-                // detectando superficie; agora vale para qualquer sensor com
-                // vinculo, e sem vinculo simplesmente nao toca.
-                if (TryResolveSonarSkill(observerData, out SkillData sonarSkill) && sonarSkill != null)
-                    playedSkillSfx = cursorController.TryPlaySkillSfx(sonarSkill, 1f);
+                // Fallback quando nenhuma chave do ALVO casou: toca a chave de
+                // SENSOR do observador — o que ele declara saber cacar. E o
+                // submarino achando a fragata, que nao tem etiqueta nenhuma.
+                //
+                // Quem apenas E furtivo nao entra aqui: carregar AR Stealth
+                // significa se esconder, nao detectar.
+                if (TryResolveObserverSensorSkill(observerData, out SkillData sensorSkill) && sensorSkill != null)
+                    playedSkillSfx = cursorController.TryPlaySkillSfx(sensorSkill, 1f);
 
                 if (!playedSkillSfx)
                     playedSkillSfx = cursorController.TryPlayUnitSkillSfx(observer, 1f);
@@ -6043,27 +6045,41 @@ public class MatchController : MonoBehaviour
         return false;
     }
 
-    private static bool TryResolveSonarSkill(UnitData observerData, out SkillData sonarSkill)
+    /// <summary>
+    /// A CHAVE DE SENSOR do observador: a primeira etiqueta que ele declara
+    /// saber caçar, em detectUnitsWithFollowingSkills das Detect
+    /// Specializations. E o que toca quando o sensor pingou mas o alvo nao
+    /// carregava etiqueta nenhuma — o submarino achando a fragata.
+    ///
+    /// Duas coisas que isto NAO faz mais, e as duas eram bugs:
+    ///
+    /// Nao procura a palavra "sonar" no id/nome da skill. Etiqueta que se
+    /// declara pelo proprio nome quebra ao ser renomeada, e o projeto proibe
+    /// isso — o poder mora em quem pendura a chave, nao no texto dela.
+    ///
+    /// Nao le observerData.skills. Carregar AR Stealth significa SE ESCONDER,
+    /// nao detectar; lendo dali, todo caca furtivo apitava ao enxergar
+    /// qualquer coisa.
+    /// </summary>
+    private static bool TryResolveObserverSensorSkill(UnitData observerData, out SkillData sensorSkill)
     {
-        sonarSkill = null;
-        if (observerData == null || observerData.skills == null || observerData.skills.Count == 0)
+        sensorSkill = null;
+        if (observerData == null || observerData.visionSpecializations == null)
             return false;
 
-        for (int i = 0; i < observerData.skills.Count; i++)
+        for (int i = 0; i < observerData.visionSpecializations.Count; i++)
         {
-            SkillData skill = observerData.skills[i];
-            if (skill == null)
+            UnitVisionException entry = observerData.visionSpecializations[i];
+            if (entry == null || entry.detectUnitsWithFollowingSkills == null)
                 continue;
 
-            string id = string.IsNullOrWhiteSpace(skill.id) ? string.Empty : skill.id.Trim();
-            string display = string.IsNullOrWhiteSpace(skill.displayName) ? string.Empty : skill.displayName.Trim();
-            string name = string.IsNullOrWhiteSpace(skill.name) ? string.Empty : skill.name.Trim();
-
-            if (id.IndexOf("sonar", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                display.IndexOf("sonar", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                name.IndexOf("sonar", StringComparison.OrdinalIgnoreCase) >= 0)
+            for (int j = 0; j < entry.detectUnitsWithFollowingSkills.Count; j++)
             {
-                sonarSkill = skill;
+                SkillData skill = entry.detectUnitsWithFollowingSkills[j];
+                if (skill == null)
+                    continue;
+
+                sensorSkill = skill;
                 return true;
             }
         }
