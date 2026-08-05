@@ -881,11 +881,56 @@ public partial class AIController
                 MelhorEmbarquePassengerRouteState.ReachableNow;
     }
 
+    // Classificacao ESTRUTURAL, nao por altura: uma aeronave pousada continua
+    // aeronave e continua sem responder a pergunta terrestre. Cobre asa fixa,
+    // helicoptero e hibridos (GetAircraftType deriva de UnitData.IsAircraft).
+    private static bool IsAircraftPassenger(UnitManager passenger)
+    {
+        return passenger != null
+            && passenger.GetAircraftType() != AircraftType.None;
+    }
+
     private QueroCaronaResult EvaluatePickupRideNeed(
         UnitManager passenger,
         TeamObjectivePlan plan,
         int operationalTurns)
     {
+        // AERONAVE NAO RESPONDE A PERGUNTA TERRESTRE.
+        //
+        // O QueroCarona mede necessidade de carona pelo envelope de CAPTURA
+        // (Intent=Capture, SubStep=Terrestre). Um caca nunca captura, entao a
+        // resposta era sempre a mesma e sempre falsa: "sem predio capturavel
+        // alcancavel, SEM ROTA PROPRIA (so chega de carona)" — dito de uma
+        // aeronave com 9 MP e tanque cheio, que voa o mapa inteiro. Com score
+        // 1500 ela entrava na fila do transportador na frente de quem estava
+        // de fato encalhado.
+        //
+        // Quem decide rebasing e a propria aeronave, no turno dela, pelo
+        // QueroCaronaAerea — que compara a plataforma com a MISSAO dela, algo
+        // que o transportador nao tem como saber. Do lado do transportador
+        // sobra a unica necessidade que ele consegue enxergar sozinho: a
+        // emergencia de recuperacao. Embarque e acao do passageiro; a carona
+        // aerea nao se planeja de fora.
+        if (IsAircraftPassenger(passenger))
+        {
+            return QueroCaronaService.EvaluateEmergencyOnly(
+                new QueroCaronaRequest
+                {
+                    unit = passenger,
+                    map = boardTilemap,
+                    terrainDatabase = terrainDatabase,
+                    context = QueroCaronaContext.RogueOuRebelde,
+                    operationalTurns = Mathf.Max(
+                        1, operationalTurns),
+                    emulateUnderRepairFromUnitData = true,
+                    diagnosticLog = showAILogs
+                        ? message => Debug.Log(
+                            $"{TL("Transporte")}[QueroCaronaAerea] " +
+                            $"pax=#{passenger.InstanceId} {message}")
+                        : null
+                });
+        }
+
         SectorObjective assigned = plan != null
             ? ResolveAssignedObjective(passenger, plan)
             : null;
