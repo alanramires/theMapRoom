@@ -96,7 +96,16 @@ moram no segundo porque o primeiro nao estava la quando eles nasceram.
 arma x classe, `WeaponCategory`, custo), nunca de um nome de papel. Papel
 responde *pode preencher o slot*; capacidade responde *vale a pena agora*.
 
-### 3.1 A ordem de remocao
+### 3.1 A ordem de remocao — ⚠️ SUPERADA em 2026-08-06
+
+> **O autor decidiu que nenhum valor sai do enum.** Eles sao REBAIXADOS de PAPEL
+> (comportamento) para ROTULO (identidade para demanda e subvariante). Quatro
+> papeis, onze rotulos, e a traducao ja existe em
+> `UnitRoleCompatibility.ResolveCompositionRole`.
+>
+> Isso resolve a objecao deste documento — o rotulo fica, entao a demanda
+> defensiva barata nao perde o gancho. Ver `docs/AI Behavior/ficha_do_papel.md`
+> §7.7. O roteiro abaixo fica como registro do que se pensou antes.
 
 `UnitRole` tem precedente de remocao e ele esta comentado no proprio enum
 (`UnitRole.cs:13-24`, o antigo `RaidAntiSub = 11`), com a garantia que torna isso

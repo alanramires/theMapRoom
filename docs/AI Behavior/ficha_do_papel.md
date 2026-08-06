@@ -329,6 +329,68 @@ existir, o campo se justifica.
 
 ---
 
+## 7.7 PAPEL e RÓTULO — a separação que fecha o degrau 3
+
+**CONTRATO — decidido pelo autor em 2026-08-06.** É a resolução de tudo que este
+documento discute: os valores do enum **não saem**. Eles são **rebaixados**.
+
+```text
+PAPEL    comportamento    ordem do questionário, moeda, posicionamento, marcha
+RÓTULO   identidade       o que o shopping pede, o que a ficha declara,
+                          o que nomeia a subvariante
+```
+
+| papel | rótulos / subvariantes |
+|---|---|
+| **Capturador** | Capturador, Capturador Agressivo |
+| **Transportador** | Transportador Terrestre, Transportador Aéreo, Transportador Naval |
+| **Assalto** | Assalto, Caça Interceptador, Ataque Aéreo |
+| **Fogo de Suporte** | Fogo de Suporte, Antiaéreo, Artilheiro Combatente, Antiaéreo Combatente |
+
+**Quatro papéis. Onze rótulos.** Quatro questionários, quatro moedas, quatro
+marchas — e onze nomes para o shopping distinguir demanda.
+
+### A tradução JÁ EXISTE, e mora no mesmo arquivo do enum
+
+```csharp
+// UnitRole.cs — UnitRoleCompatibility.ResolveCompositionRole(UnitData)
+CapturadorAgressivo   -> Capturador
+ArtilheiroCombatente  -> data.unitClass == Armored ? Assalto : FogoIndireto
+TransportadorAereo    -> Transportador
+```
+
+`ResolveCompositionRole` **é** *"rótulo → papel"*. Até o rótulo de transporte já
+está lá — os três tipos de transporte não eram invenção nova, eram os que
+faltavam nomear.
+
+E repare na linha do `ArtilheiroCombatente`: ela decide o papel **pela
+`unitClass`**. É exatamente a regra que a discussão chegou por outro caminho —
+**a armadura decide a posição; a arma decide o tiro** — já implementada. O que
+falta é ela ser **regra declarada** em vez de um `if` dentro de um resolvedor.
+
+### O que muda: quem consulta o quê
+
+```text
+roteador e IA        consultam o PAPEL      via ResolveCompositionRole
+shopping e ficha     consultam o RÓTULO     demanda, pressão, subvariante
+```
+
+**Consequência:** o roteiro de remoção do `Shopping.md` §3.1 fica **superado**.
+Não é preciso tirar valor nenhum do enum — o que resolve a objeção registrada lá
+(*"remover o papel apaga a demanda defensiva barata sem substituto"*). O rótulo
+fica; só o comportamento consolida.
+
+### E a decisão sobre os combatentes
+
+`ArtilheiroCombatente` e `AntiaereoCombatente` são rótulos de **Fogo de Suporte**,
+não de Assalto. A base é o fogo de suporte, e a falha das três primeiras casas
+(`Detectar`, `Enxergar`, `Mirar` no alcance) é o que autoriza o avanço ao contato
+— **e não é preciso caminho de volta**: o turno seguinte roda o questionário do
+começo, e a regra *"sozinha na vanguarda → recua"* (`FireSupport.md`) já traz a
+peça de volta sem código novo.
+
+---
+
 ## 8. O que este documento NÃO cobre
 
 - **Variações de papel** (degrau 4): `CapturadorAgressivo` e parentes viram
