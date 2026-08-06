@@ -296,13 +296,24 @@ public partial class AIController
 
         Vector3Int cell = target.CurrentCellPosition;
         cell.z = 0;
-        unit.SetAIDesignatedCaptureTarget(
-            target.InstanceId,
-            cell);
+        bool kept = unit.AIHasDesignatedCaptureTarget
+            && unit.AIDesignatedCaptureTargetInstanceId == target.InstanceId;
+        if (!unit.SetAIDesignatedCaptureTarget(target.InstanceId, cell))
+        {
+            // A unidade ja carrega missao de outro verbo e ela manda. Antes de
+            // a captura virar missao isto nao podia acontecer, porque os dois
+            // viviam em campos separados e nunca precisavam concordar.
+            Debug.Log(
+                $"{TL("Rebelde")} {unit.InstanceId} NAO grava captura " +
+                $"#{target.InstanceId}: ja tem missao " +
+                $"{unit.AIDesignatedMissionIntent}.");
+            return;
+        }
+
         Debug.Log(
-            $"{TL("Rebelde")} {unit.InstanceId} confirma " +
-            $"DesignatedCaptureTarget " +
-            $"#{target.InstanceId} em {cell}.");
+            $"{TL("Missao")} {unit.InstanceId} Capture -> {cell} " +
+            $"predio=#{target.InstanceId} " +
+            $"({(kept ? "mantida" : "adquirida")}).");
     }
 
     // Capturavel para a rebelde: predio nao-aliado que o motor deixa este time tomar.

@@ -165,11 +165,11 @@ public class UnitManager : MonoBehaviour
     [Tooltip("Role da unidade dentro do plano. Usa os valores de UnitRole.")]
     [SerializeField] private int aiAssignedPlanRole = 0;
     [SerializeField] private bool aiAssignedPlanBadgeVisible;
-    [Tooltip("Objetivo de captura individual confirmado. Persiste entre turnos e save/load para impedir que outro capturador reivindique o mesmo predio.")]
-    [SerializeField] private bool aiHasDesignatedCaptureTarget;
-    [SerializeField] private int aiDesignatedCaptureTargetInstanceId = -1;
-    [SerializeField] private Vector3Int aiDesignatedCaptureTargetCell = Vector3Int.zero;
-    [Tooltip("Missao individual persistente usada pelo transporte e retomada da agenda apos desembarque.")]
+    // O objetivo de captura NAO tem campo proprio: ele e a missao com intent
+    // Capture. Enquanto foram dois armazenamentos, a mesma peca podia dizer
+    // "estou capturando (0,0)" num campo e "Mission Intent: None" no outro, na
+    // mesma tela — duas verdades sobre o que a unidade esta fazendo.
+    [Tooltip("Missao individual persistente: captura, transporte, agenda retomada apos desembarque.")]
     [SerializeField] private bool aiHasDesignatedMission;
     [SerializeField] private AIPlanRuntimeIntent aiDesignatedMissionIntent = AIPlanRuntimeIntent.None;
     [SerializeField] private int aiDesignatedMissionTargetUnitInstanceId = -1;
@@ -288,12 +288,18 @@ public class UnitManager : MonoBehaviour
     public string AIAssignedPlanBadge => aiAssignedPlanBadge ?? string.Empty;
     public int AIAssignedPlanRole => aiAssignedPlanRole;
     public bool AIAssignedPlanBadgeVisible => aiAssignedPlanBadgeVisible;
+    // Derivados da missao. Nao ha o que sincronizar porque nao ha dois donos.
     public bool AIHasDesignatedCaptureTarget =>
-        aiHasDesignatedCaptureTarget;
+        aiHasDesignatedMission
+        && aiDesignatedMissionIntent == AIPlanRuntimeIntent.Capture;
     public int AIDesignatedCaptureTargetInstanceId =>
-        aiDesignatedCaptureTargetInstanceId;
+        AIHasDesignatedCaptureTarget
+            ? aiDesignatedMissionTargetConstructionInstanceId
+            : -1;
     public Vector3Int AIDesignatedCaptureTargetCell =>
-        aiDesignatedCaptureTargetCell;
+        AIHasDesignatedCaptureTarget
+            ? aiDesignatedMissionTargetCell
+            : Vector3Int.zero;
     public bool AIHasDesignatedMission => aiHasDesignatedMission;
     public AIPlanRuntimeIntent AIDesignatedMissionIntent => aiDesignatedMissionIntent;
     public int AIDesignatedMissionTargetUnitInstanceId => aiDesignatedMissionTargetUnitInstanceId;
@@ -401,23 +407,46 @@ public class UnitManager : MonoBehaviour
         RefreshAIAssignedPlanBadge();
     }
 
-    public void SetAIDesignatedCaptureTarget(
+    /// <summary>
+    /// Grava o alvo de captura COMO missao. Nao pisa em missao de outro dono —
+    /// mesma guarda que CommitRidePromise usa: sobrescrever a agenda alheia
+    /// para anotar uma captura seria trocar um problema por outro.
+    ///
+    /// Enquanto eram dois campos, a colisao nao existia porque os dois nunca
+    /// precisavam concordar. Unificar obriga a decidir, e a decisao e: quem ja
+    /// tem missao de outro verbo mantem a dela.
+    /// </summary>
+    public bool SetAIDesignatedCaptureTarget(
         int constructionInstanceId,
         Vector3Int cell)
     {
-        cell.z = 0;
-        aiHasDesignatedCaptureTarget =
-            constructionInstanceId >= 0;
-        aiDesignatedCaptureTargetInstanceId =
-            constructionInstanceId;
-        aiDesignatedCaptureTargetCell = cell;
+        if (aiHasDesignatedMission
+            && aiDesignatedMissionIntent != AIPlanRuntimeIntent.Capture)
+        {
+            return false;
+        }
+
+        if (constructionInstanceId < 0)
+        {
+            ClearAIDesignatedCaptureTarget();
+            return true;
+        }
+
+        SetAIDesignatedMission(
+            AIPlanRuntimeIntent.Capture,
+            cell,
+            targetConstructionInstanceId: constructionInstanceId);
+        return true;
     }
 
     public void ClearAIDesignatedCaptureTarget()
     {
-        aiHasDesignatedCaptureTarget = false;
-        aiDesignatedCaptureTargetInstanceId = -1;
-        aiDesignatedCaptureTargetCell = Vector3Int.zero;
+        // So limpa o que e captura: baixa de captura nao pode apagar Transport
+        // nem Restock de quem estiver com outra agenda.
+        if (!AIHasDesignatedCaptureTarget)
+            return;
+
+        ClearAIDesignatedMission();
     }
 
     public void SetAIDesignatedMission(

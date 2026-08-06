@@ -1,4 +1,4 @@
-using UnityEditor;
+﻿using UnityEditor;
 using UnityEngine;
 using UnityEditor.SceneManagement;
 using System.Collections.Generic;
@@ -57,9 +57,6 @@ public class UnitManagerEditor : Editor
     private SerializedProperty aiAssignedPlanBadgeProp;
     private SerializedProperty aiAssignedPlanRoleProp;
     private SerializedProperty aiAssignedPlanBadgeVisibleProp;
-    private SerializedProperty aiHasDesignatedCaptureTargetProp;
-    private SerializedProperty aiDesignatedCaptureTargetInstanceIdProp;
-    private SerializedProperty aiDesignatedCaptureTargetCellProp;
     private SerializedProperty aiHasDesignatedMissionProp;
     private SerializedProperty aiDesignatedMissionIntentProp;
     private SerializedProperty aiDesignatedMissionTargetUnitInstanceIdProp;
@@ -121,9 +118,6 @@ public class UnitManagerEditor : Editor
         aiAssignedPlanBadgeProp = serializedObject.FindProperty("aiAssignedPlanBadge");
         aiAssignedPlanRoleProp = serializedObject.FindProperty("aiAssignedPlanRole");
         aiAssignedPlanBadgeVisibleProp = serializedObject.FindProperty("aiAssignedPlanBadgeVisible");
-        aiHasDesignatedCaptureTargetProp = serializedObject.FindProperty("aiHasDesignatedCaptureTarget");
-        aiDesignatedCaptureTargetInstanceIdProp = serializedObject.FindProperty("aiDesignatedCaptureTargetInstanceId");
-        aiDesignatedCaptureTargetCellProp = serializedObject.FindProperty("aiDesignatedCaptureTargetCell");
         aiHasDesignatedMissionProp = serializedObject.FindProperty("aiHasDesignatedMission");
         aiDesignatedMissionIntentProp = serializedObject.FindProperty("aiDesignatedMissionIntent");
         aiDesignatedMissionTargetUnitInstanceIdProp = serializedObject.FindProperty("aiDesignatedMissionTargetUnitInstanceId");
@@ -380,16 +374,20 @@ public class UnitManagerEditor : Editor
                 EditorGUILayout.PropertyField(aiAssignedPlanBadgeProp, new GUIContent("Plan Badge"));
             if (aiAssignedPlanBadgeVisibleProp != null)
                 EditorGUILayout.PropertyField(aiAssignedPlanBadgeVisibleProp, new GUIContent("Badge Visible"));
-            if (aiHasDesignatedCaptureTargetProp != null)
-                EditorGUILayout.PropertyField(aiHasDesignatedCaptureTargetProp, new GUIContent("Has Designated Capture Target"));
-            if (aiDesignatedCaptureTargetInstanceIdProp != null)
-                EditorGUILayout.PropertyField(aiDesignatedCaptureTargetInstanceIdProp, new GUIContent("Designated Target Instance ID"));
-            if (aiDesignatedCaptureTargetCellProp != null)
-                EditorGUILayout.PropertyField(aiDesignatedCaptureTargetCellProp, new GUIContent("Designated Target Cell"));
             if (aiHasDesignatedMissionProp != null)
                 EditorGUILayout.PropertyField(aiHasDesignatedMissionProp, new GUIContent("Has Designated Mission"));
+            // Unico editavel do bloco: o autor precisa abrir o dropdown para ver
+            // os verbos que existem. Editar aqui e ferramenta de inspecao, nao
+            // caminho de jogo — o runtime reescreve no proximo commit de missao.
             if (aiDesignatedMissionIntentProp != null)
-                EditorGUILayout.PropertyField(aiDesignatedMissionIntentProp, new GUIContent("Mission Intent"));
+            {
+                using (new EditorGUI.DisabledScope(false))
+                {
+                    EditorGUILayout.PropertyField(
+                        aiDesignatedMissionIntentProp,
+                        new GUIContent("Mission Intent"));
+                }
+            }
             if (aiDesignatedMissionTargetUnitInstanceIdProp != null)
                 EditorGUILayout.PropertyField(aiDesignatedMissionTargetUnitInstanceIdProp, new GUIContent("Mission Target Unit ID"));
             if (aiDesignatedMissionTargetConstructionInstanceIdProp != null)

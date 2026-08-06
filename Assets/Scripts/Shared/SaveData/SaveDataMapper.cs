@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -238,14 +238,6 @@ public static class SaveDataMapper
             aiAssignedPlanBadge = unit.AIAssignedPlanBadge,
             aiAssignedPlanRole = unit.AIAssignedPlanRole,
             aiAssignedPlanBadgeVisible = unit.AIAssignedPlanBadgeVisible,
-            aiHasDesignatedCaptureTarget =
-                unit.AIHasDesignatedCaptureTarget,
-            aiDesignatedCaptureTargetInstanceId =
-                unit.AIDesignatedCaptureTargetInstanceId,
-            aiDesignatedCaptureTargetCellX =
-                unit.AIDesignatedCaptureTargetCell.x,
-            aiDesignatedCaptureTargetCellY =
-                unit.AIDesignatedCaptureTargetCell.y,
             aiHasDesignatedMission =
                 unit.AIHasDesignatedMission,
             aiDesignatedMissionIntent =
@@ -377,20 +369,6 @@ public static class SaveDataMapper
             unit.SetAIAssignedPlan(saved.aiAssignedPlanKey, saved.aiAssignedPlanName, saved.aiAssignedPlanBadge, saved.aiAssignedPlanRole, saved.aiAssignedPlanBadgeVisible);
         else
             unit.ClearAIAssignedPlan();
-
-        if (saved.aiHasDesignatedCaptureTarget)
-        {
-            unit.SetAIDesignatedCaptureTarget(
-                saved.aiDesignatedCaptureTargetInstanceId,
-                new Vector3Int(
-                    saved.aiDesignatedCaptureTargetCellX,
-                    saved.aiDesignatedCaptureTargetCellY,
-                    0));
-        }
-        else
-        {
-            unit.ClearAIDesignatedCaptureTarget();
-        }
 
         if (saved.aiHasDesignatedMission)
         {

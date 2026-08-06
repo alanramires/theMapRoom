@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -303,10 +303,6 @@ public class UnitSaveData
     public string aiAssignedPlanBadge;
     public int aiAssignedPlanRole = 0;
     public bool aiAssignedPlanBadgeVisible;
-    public bool aiHasDesignatedCaptureTarget;
-    public int aiDesignatedCaptureTargetInstanceId = -1;
-    public int aiDesignatedCaptureTargetCellX;
-    public int aiDesignatedCaptureTargetCellY;
     public bool aiHasDesignatedMission;
     public int aiDesignatedMissionIntent;
     public int aiDesignatedMissionTargetUnitInstanceId = -1;
