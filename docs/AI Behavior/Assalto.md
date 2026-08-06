@@ -1,4 +1,4 @@
-# Assalto e Antiaéreo — doutrina
+﻿# Assalto e Antiaéreo — doutrina
 
 Doutrina definida pelo autor. Onde o código divergir dela, o código está errado.
 
@@ -509,3 +509,109 @@ precisa reescrevê-la.
 | C9/S6 | não pousar/parar em capturável | `Transporte.md` §2 |
 | A1 | infantaria trocando 5 HP por 2 contra helicóptero | `Capturador.md` |
 | E1 | Fase 2 da migração do envelope (Assault e Fire Support) | plano do envelope |
+
+---
+
+# Apêndice — A ficha do papel (2026-08-06)
+
+**Descrição do autor:**
+
+> *"Tá difícil seguir em frente? Me chama — eu rompo barreiras, seja em terra ou
+> no ar!"*
+
+`Assalto` (chão) e `AtaqueAereo` (ar) são o **mesmo papel**. A função das unidades
+de alcance 1 é partir pra briga.
+
+| eixo | valor |
+|---|---|
+| **modalidade** | **combatente** — combate em contato, mover e atacar em alcance de contato (mín. 1) |
+| **posicionamento** | **vanguarda** — a posição entre a massa oponente e o capitão eleito, **à frente dele** |
+
+## Prioridade de sensor
+
+```text
+Detectar, Mirar, Embarcar, Reposicionar, Capturar,
+Transferir, Suprir, Desembarcar, Enxergar, Fundir
+```
+
+### 1. `Detectar` no topo — e é a TERCEIRA pergunta desta casa
+
+O assalto precisa saber **exatamente onde estão os elites que deve destruir**.
+Repare que a mesma casa faz perguntas diferentes em papéis diferentes:
+
+```text
+capturador   "quem ocupa o prédio que eu quero?"     precondição
+assalto      "onde está o elite que eu cacei?"        AQUISIÇÃO DE ALVO
+```
+
+A do assalto é `MelhorSpotting` (contato sobre célula/camada específica); a do
+capturador é `RevelacaoDeContato`. **Nenhuma das duas existe no runtime.**
+
+**Pedido dentro do próprio papel:** uma unidade de assalto pode **passar a vez**
+para outra reposicionar na vanguarda e iluminar alvos — especialmente
+bombardeiros (`AtaqueAereo`), para destruir logo a artilharia de elite inimiga.
+
+### 2. `Mirar` — a missão é o alvo preferido
+
+Sempre focam em **destruir seu alvo preferido de elite** (tanque caça canhão de
+elite). Não encontrando, procuram **o melhor local de defesa** para lutar com
+vantagem. Não conseguindo, **o papel muda**.
+
+### 3-4. `Embarcar` antes de `Reposicionar` — e só no fim das possibilidades
+
+Embarcam **só depois de esgotar combate e detecção**, e apenas se o **capitão
+atribuído estiver muito longe**.
+
+**Com plano:** vanguarda perto do capitão.
+**Rogue:** *"avança igual imbecil na frente, na direção do alvo."*
+
+> **Variante inteligente (❌ não existe):** ler a **hotzone do alvo** e
+> posicionar-se **1 hex na beirada**, para ter avanço total no próximo turno. O
+> serviço para isso já existe — `UnitReachEnvelopeService`.
+
+### 5-8. Capturar, Transferir, Suprir, Desembarcar — ocasionais
+
+Em testes alguns assaltos capturam oportunisticamente, **mas não é o papel
+deles**. Raramente movem estoque ou prestam serviço a aliados. Como blindados de
+assalto raramente levam tropa, mal desembarcam.
+
+### 9. `Enxergar` quase no fim — porque ELE é a revelação
+
+> *"Minha função é contato! Mesmo que fosse ideal alguém revelar quem está ali —
+> como ninguém revelou, deixa comigo! Minha armadura pesada aguenta."*
+
+**Ignoram totalmente terreno oculto pela névoa.** O capturador *pede* revelação
+(casas 2 e 3 dele); o assalto **é** a revelação de último recurso, e por isso não
+precisa da casa.
+
+### 10. `Fundir` — negado, e por um motivo próprio
+
+**Não fundem nem fora nem dentro do estado de reparo.**
+
+```text
+fora de reparo   dois tanques avariados ainda são DUAS armas anti-veículo
+em reparo        não fundem para NÃO ENCOLHER O EXÉRCITO
+```
+
+## O padrão das três moedas
+
+Com três papéis na mesa, a regra *"cada papel tem uma moeda, e a moeda decide se
+fundir é ganho ou perda"* fica visível:
+
+| papel | onde o valor mora | fundir |
+|---|---|---|
+| **capturador** | o **corpo** — HP é a taxa de captura | **ganha** (concentrar acelera) |
+| **transportador** | as **vagas** — capacidade não degrada com HP | perde (dois cascos, duas viagens) |
+| **assalto** | a **arma** — cada casco é uma ameaça a responder | perde (dois canhões, dois problemas) |
+
+O segundo motivo do assalto (*não encolher o exército*) é diferente dos outros
+dois: trata **contagem de unidades** como grandeza estratégica por si — o mesmo
+raciocínio da doutrina de conscrição em Collapsing (`Shopping.md` §6).
+
+## Variantes pendentes
+
+`ArtilheiroCombatente` e `AntiaereoCombatente`. **O autor precisa explicar fogo
+de suporte primeiro** — e o `Shopping.md` §2.2 já registra que os dois
+compartilham **um único predicado** no código
+(`AIController.FireSupport.Combatant.cs:8-9`), o que sugere que são um
+comportamento só com famílias de arma diferentes.
