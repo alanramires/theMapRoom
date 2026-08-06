@@ -1,4 +1,4 @@
-# Capturador — doutrina
+﻿# Capturador — doutrina
 
 Doutrina definida pelo autor. Onde o código divergir dela, o código está errado.
 
@@ -9,6 +9,64 @@ Cada regra abaixo está marcada com o estado verificado no código:
 | ✅ | implementado e conferido |
 | ⚠️ | existe, mas diverge do que está escrito aqui |
 | ❌ | não existe no código |
+
+---
+
+## 0. O lema — tudo abaixo deriva daqui
+
+> ## O capturador adianta a renda do exército.
+> ## Nenhum prédio é dele, e o HP é o relógio.
+
+> *"O capturador é a mosca atraída pela luz roxa. Ele não consegue evitar."*
+
+Definido pelo autor em 2026-08-06. As ~20 exceções espalhadas em
+`AIController.Capturer*.cs` não são vinte regras: são vinte expressões de **um**
+objetivo, descobertas separadamente e escritas como `if`.
+
+Cada cláusula gera uma família inteira:
+
+| cláusula | o que ela produz |
+|---|---|
+| **adianta a renda** | pressa; carona quando o alvo está no Operacional; desembarque no Tático do alvo. Renda antecipada **compra** a próxima captura — compõe, não só soma |
+| **nenhum prédio é dele** | handoff, swap, ceder ao oportunista, ceder hex alheio, não estorvar. **Cinco das seis formas de ceder** caem daqui |
+| **o HP é o relógio** | `GetCapturePower` devolve HP: HP não é vida, é **velocidade**. Daí evitar luta, capturar com HP cheio, e fundir |
+
+**As seis formas de ceder são o contrapeso da compulsão.** Se a atração não fosse
+irresistível, não seriam precisas seis regras mandando a peça sair de cima da
+luz. As exceções não contradizem o lema — existem porque ele é obedecido demais.
+
+### A postura não muda o objetivo, muda qual termo domina
+
+| postura | o capturador | o termo |
+|---|---|---|
+| Ofensiva | captura | renda **adicionada** |
+| Defensiva | fica em cima do prédio conquistado | renda **protegida** |
+| Collapsing | arrisca sair se o time segura | renda futura > risco |
+| sempre | libera produtora | quem protege a renda melhor que ele |
+
+Ele não defende **território** — defende a **linha de renda**. Se o score tiver
+os dois termos, `AIStance` vira **peso**, não ramo.
+
+❌ Nenhum termo do score de hoje fala em **turnos** nem em **renda**:
+`CaptureProximityBase 500`, `DpqWeight 200`, `ThreatWeight 50`,
+`AttackHexBonus 800` — proximidade, DPQ e ameaça são vocabulário de **combate**.
+A IA de conquista foi escrita com a régua da IA de briga, e cada vez que a régua
+não media o que importava nasceu uma exceção.
+
+### O teste de cada exceção
+
+> **Esta exceção adianta renda, ou existe porque a peça se achou dona?**
+
+As que adiantam renda viram **termo do score**. As que existem por posse
+**dissolvem** quando a peça para de se achar dona. O que sobrar das duas peneiras
+é **gosto** — e só isso vira política em `Services/CapturePolicy/`.
+
+```text
+GOSTO (vira política)     capturador burro (Iniciante), agressivo,
+                          limiar do blitz, apetite do playConservative
+CONTA (vira score)        swap, handoff, fusão de eficiência,
+                          ceder ao oportunista, não estorvar
+```
 
 ---
 
@@ -32,6 +90,29 @@ posição relativa que ele ocupa no fluxo com objetivo.
 não `roles[0]` estrito: papel em posição secundária continua sendo o papel.
 Capturador puro não dispara o ramo — `CanSatisfy(Capturador, CapturadorAgressivo)`
 cai no `default: return false`.
+
+### ⚠️ REVISTO em 2026-08-06 — ele não precisa ser ramo, nem papel
+
+Decomposto, `CapturadorAgressivo` é a soma de três coisas que **já existem em
+outro lugar**:
+
+```text
+chave 0.5        PodeCapturarSensor.cs:152 — o relógio dele anda pela metade
+a mesma ordem    mesma lista de categorias do capturador
+gancho de compra 5 dos 8 usos no código são de SHOPPING, não de comportamento
+```
+
+O comportamento sai **de graça** do terceiro passo do gate: sem tiro que renda
+mais que meio relógio, `Capturar` aceita; havendo tiro, declina e a ordem segue
+até `Mirar`. Dito pelo lado positivo, como o autor formulou: **sem combate no seu
+Tático e sem capturador de maior cap power alcançando o Tático dele, ele captura
+para quebrar o galho.** Meio relógio bate relógio nenhum.
+
+Uma skill que "promove Mirar" seria **poder disfarçado de chave** e falharia o
+teste do renome. A chave 0.5 é legítima porque **quem a lista é a construção**.
+
+Ver `Assets/Scripts/Match/AI/3. Shopping/Shopping.md` (o gancho de compra) e
+`docs/ideias_futuras.md` item 10 (o roteiro seguro de remoção).
 
 ---
 
@@ -73,6 +154,20 @@ captura em vez de lutar.
 
 ✅ Para o capturador puro, "captura mesmo em condição ruim" é o comportamento
 atual — ele não consulta gate de combate para decidir capturar.
+
+**RESOLUÇÃO (2026-08-06).** O ⚠️ acima não se conserta invertendo a ordem do ramo
+— conserta-se no **terceiro passo do gate** do `Capturar`:
+
+```text
+1. o sensor devolveu opção?              senão → NÃO SE APLICA
+2. alguém com CAP POWER maior fecha antes?  → cedo (swap)
+3. vale o meu turno?                     ← a chave 0.5 morde aqui
+```
+
+O passo 3 pergunta *"há alvo no meu Tático?"* — que é **fato**, respondido pelo
+`PodeMirar`. Não pergunta *"o que o Mirar decidiria"*, que acoplaria as duas
+casas. O gate fica auto-contido e o questionário continua **primeira não-nula
+ganha**.
 
 ---
 
