@@ -439,3 +439,145 @@ C1 (precedência capturador > agressivo, com e sem plano) · C2 (ramo agressivo
 sem plano) · C3 (`CanSatisfy` no lugar de `roles[0]`) · C5 (não brigar em cima de
 capturável — já existia) · D1 (constantes erradas no `CLAUDE.md`) · âncora do
 rogue (§10) · `prioritizeDpqAtBattle` no ataque preemptivo.
+
+---
+
+# Apêndice — Marcha do Capturador
+
+Escrita pelo autor em 2026-08-06, no dia em que o lema apareceu. **Ela é a
+doutrina**, e cobre as dez casas do questionário exceto `Suprir` e `Transferir`
+(hoje NÃO SE APLICA ao capturador).
+
+Vale a mesma regra do cabeçalho deste documento: **onde o código divergir de um
+verso, o código está errado.** Três trechos já divergem hoje, e os três estão
+marcados como `MUDA REGRA` no corpo do doc e no `Shopping.md`:
+
+| verso | o que o código faz hoje |
+|---|---|
+| *"Se o prédio é de outro eixo / não espero o responsável"* | `IsOtherAssignedCapturerTarget` barra alvo alheio **incondicionalmente** |
+| *"Não disputa a cidade com quem fecha primeiro"* | `FindSwapIncomingCapturer` compara **HP cru**, não cap power |
+| *"não guardo uma bandeira, eu guardo a produção"* | `Demand.cs:3092` nega o bônus de Collapsing ao capturador, *"porque é expansão"* |
+
+---
+
+## Marcha do Capturador
+
+**[Introdução — caixa clara, metais e coro]**
+
+Um, dois! / Passo ligeiro! / Antes do tiro, / vem o dinheiro!
+
+Um, dois! / Sem se atrasar! / Prédio parado / tem que começar!
+
+**[Primeira estrofe]**
+
+Não quero medalha, / não quero brasão, / eu quero a cidade / rendendo ao batalhão.
+
+Não guardo conquista, / não planto bandeira; / se outro termina, / eu sigo a carreira.
+
+O mapa me chama, / o eixo conduz; / sou mosca marchando / na direção da luz.
+
+**[Refrão]**
+
+Avança! Captura! / Não deixa esperar! / Dinheiro mais cedo / faz outro avançar!
+
+A renda não dorme, / o turno não para; / um prédio tomado / amanhã compra a tropa!
+
+Avança! Captura! / O caixa é o tambor! / Se a renda começa, / o exército é maior!
+
+**[Segunda estrofe — transporte]**
+
+Se o alvo está longe, / eu chamo o transporte; / não gasto marchando / o tempo da sorte.
+
+No Operacional, / já mando buscar; / no Tático eu desço, / prontinho para entrar.
+
+Se comecei a obra / e a frente está vazia, / deixo alguém fechando / e avanço a economia.
+
+Nenhum prédio é meu, / não existe vaidade: / o dono é o exército, / meu dever é velocidade.
+
+**[Terceira estrofe — névoa]**
+
+Mas se a cidade / se esconde no breu, / não entro às cegas / como se já fosse meu.
+
+Chamo olhos à frente / para o setor revelar: / quem chega sem ver / perde o turno de capturar.
+
+Se a estrada está livre, / mas não posso avançar, / há presença escondida / que alguém deve encontrar.
+
+Detecta o bloqueio, / faz a névoa ceder; / um olho abre o caminho, / e o caixa faz render.
+
+**[Ponte — HP e fusão]**
+
+Meu HP é relógio, / cada baixa é demora; / quem perde seus homens / perde renda lá fora.
+
+Dois relógios cansados, / sem trabalho a cumprir, / viram um só bem forte, / pronto para seguir.
+
+Mas se há dois destinos, / cada qual toma um chão: / não se funde trabalho / que trabalha em divisão!
+
+Dois prédios, duas tropas! / Um prédio, união! / Sem prédio, força inteira / para a próxima missão!
+
+**[Quarta estrofe — cessão]**
+
+Se outro fecha antes, / eu cedo o lugar; / não importa o meu nome, / importa arrecadar.
+
+Se alguém vem mais forte, / assume a construção; / eu libero o caminho / e procuro outra missão.
+
+Se o prédio é de outro eixo / e eu posso completar, / não espero o responsável: / faço a renda começar.
+
+Não existe posse / no serviço financeiro; / quem conclui primeiro / serve melhor o dinheiro.
+
+**[Quinta estrofe — defesa e cerco]**
+
+Quando a frente vacila, / eu permaneço no chão; / não guardo uma bandeira, / eu guardo a produção.
+
+O prédio não é meu, / mas a renda é do batalhão; / se o inimigo o retoma, / fecha-se a arrecadação.
+
+Se o exército sustenta, / posso ainda avançar: / a renda que vem depois / vale o risco de deixar.
+
+Mas se ninguém me cobre, / não abandono o lugar: / dinheiro protegido / também é adiantar.
+
+**[Sexta estrofe — Capturador Agressivo]**
+
+E vem o agressivo / com a chave no bornal; / seu relógio anda lento, / mas seu tiro é fatal.
+
+Quando existe combate, / ele limpa o caminho; / quando ninguém captura, / ele toma o predinho.
+
+Não disputa a cidade / com quem fecha primeiro; / é soldado de assalto / com instinto financeiro.
+
+Se não há tiro útil / nem relógio melhor, / meia renda ainda vence / uma renda igual a zero.
+
+**[Marcha intermediária — chamada e resposta]**
+
+— Quem toma a cidade? / — Quem termina primeiro!
+
+— Quem guarda o edifício? / — Quem protege o dinheiro!
+
+— De quem é a conquista? / — Do exército inteiro!
+
+— E o HP, o que marca? / — O tempo do ponteiro!
+
+**[Refrão final — coro completo]**
+
+Avança! Captura! / Não deixa esperar! / Dinheiro mais cedo / faz outro avançar!
+
+A renda não dorme, / o turno não para; / um prédio tomado / amanhã compra a tropa!
+
+Avança! Captura! / O caixa é o tambor! / Se a renda começa, / o exército é maior!
+
+Protege! Captura! / Recua ou vai além! / O prédio não é nosso, / mas o rendimento vem!
+
+Avança! Captura! / Sem nunca se deter! / O mapa vira dinheiro, / e o dinheiro vira poder!
+
+**[Coda]**
+
+— De quem é o prédio? / — Do exército!
+
+— O que vale o HP? / — O nosso tempo!
+
+— E qual é a missão? / — Fazer render!
+
+Um, dois! / Sem se deter!
+
+Um, dois! / Capturar e crescer!
+
+Money, money! / Passo certeiro!
+
+A luz está acesa — / avança, Capturador!
