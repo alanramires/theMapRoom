@@ -565,7 +565,7 @@ atribuído estiver muito longe**.
 **Com plano:** vanguarda perto do capitão.
 **Rogue:** *"avança igual imbecil na frente, na direção do alvo."*
 
-> **Variante inteligente (❌ não existe):** ler a **hotzone do alvo** e
+> **Variante (ver a correcao no apendice):** ler a **hotzone do alvo** e
 > posicionar-se **1 hex na beirada**, para ter avanço total no próximo turno. O
 > serviço para isso já existe — `UnitReachEnvelopeService`.
 
@@ -649,3 +649,159 @@ de suporte primeiro** — e o `Shopping.md` §2.2 já registra que os dois
 compartilham **um único predicado** no código
 (`AIController.FireSupport.Combatant.cs:8-9`), o que sugere que são um
 comportamento só com famílias de arma diferentes.
+
+---
+
+# Apêndice — Marcha do Assalto
+
+Escrita pelo autor em 2026-08-06. **Ela é a doutrina**, e vale a regra do
+cabeçalho: **onde o código divergir de um verso, o código está errado.**
+
+Terceira marcha do projeto, e a terceira que se define **por comparação com o
+capturador**. Foi assim que a regra da moeda ficou visível:
+
+| verso | o que ele fixa |
+|---|---|
+| *"Se ninguém sabe o que existe, / eu atravesso e dou de frente"* | o assalto é a **revelação de último recurso** — por isso `Enxergar` é a nona casa |
+| *"Primeiro eu quero o nome, / a posição e o setor"* | `Detectar` no topo é **aquisição de alvo**, não precondição (`MelhorSpotting`) |
+| *"Se alguém puder iluminar, / que avance para detectar"* | o pedido **dentro do próprio papel**: passar a vez para outro assalto iluminar |
+| *"Meu lugar é na vanguarda, / entre o capitão e o inimigo"* | o posicionamento, literal |
+| *"Um tanque é uma arma, / dois sustentam posição; / quando a coluna se concentra, / começa a invasão"* | a massa que abre o portão do rally (GoGreen) |
+| *"Para quem captura prédios, / dois relógios podem unir; / mas duas armas de Assalto / têm dois alvos a atingir"* | a **moeda**: o valor mora na arma, e por isso fundir perde |
+
+### ⚠️ Correção registrada: as duas variantes do rogue são LEGÍTIMAS
+
+> *O prudente mede a Hotzone, / o mais bruto encara o oponente.*
+> *Um espera junto à borda / para inteiro avançar;*
+> *outro entra como um louco: **os dois nasceram para lutar!***
+
+A ficha acima marcava a variante da hotzone como `❌ não existe`, subentendendo
+defeito. **Não é defeito — são duas variantes do mesmo papel.** É `gosto`, não
+`conta`, e o destino dela é **política** (`Services/…Policy/`), não correção de
+score. O serviço para a versão prudente já existe: `UnitReachEnvelopeService`.
+
+---
+
+**[Introdução — caixa seca, bumbo e metais graves]**
+
+Firmar a linha! / Preparar o chão! / Quando a frente não avança, / chamem o Assalto então!
+
+Um, dois! / Blindagem à frente! / Um, dois! / Contato com o oponente!
+
+**[Estrofe 1]**
+
+Não carrego a missão, / não recolho produção; / eu sou a arma pesada / que abre passagem ao batalhão.
+
+Se existe uma barreira / segurando a progressão, / eu encontro a peça-chave / e destruo a posição.
+
+Não procuro o mais próximo, / nem disparo sem razão: / eu persigo aquele elite / que sustenta a formação.
+
+**[Refrão]**
+
+Deixa comigo! / Minha armadura aguenta! / Se ninguém sabe o que existe, / eu atravesso e dou de frente!
+
+Deixa comigo! / Eu vou romper a barreira! / Onde a força não avança, / minha arma abre a fronteira!
+
+Avança, Assalto! / Vai buscar o defensor! / Destrói o que nos impede / e deixa o exército passar!
+
+**[Estrofe 2 — detectar e caçar]**
+
+Primeiro eu quero o nome, / a posição e o setor; / quero saber onde se esconde / o mais perigoso defensor.
+
+Tanque caça o grande canhão, / bombardeiro busca a bateria; / cada arma tem sua presa, / cada elite, o seu dia.
+
+Se alguém puder iluminar, / que avance para detectar; / eu espero o alvo certo / para então o eliminar.
+
+Mas se ninguém abre os olhos / e é preciso prosseguir, / não vou parar diante da névoa: / alguém precisa descobrir!
+
+**[Refrão]**
+
+Deixa comigo! / Minha armadura aguenta! / Se ninguém sabe o que existe, / eu atravesso e dou de frente!
+
+Deixa comigo! / Eu vou romper a barreira! / Onde a força não avança, / minha arma abre a fronteira!
+
+**[Estrofe 3 — vanguarda]**
+
+Meu lugar é na vanguarda, / entre o capitão e o inimigo; / se a ameaça busca a tropa, / ela vai encontrar comigo.
+
+Eu protejo a retaguarda / ocupando a direção; / sou a massa que recebe / o primeiro impacto da invasão.
+
+Com um plano, sigo o eixo; / sem um plano, sigo em frente. / O prudente mede a Hotzone, / o mais bruto encara o oponente.
+
+Um espera junto à borda / para inteiro avançar; / outro entra como um louco: / os dois nasceram para lutar!
+
+**[Ponte — concentração de força]**
+
+Um tanque é uma arma, / dois sustentam posição; / quando a coluna se concentra, / começa a invasão.
+
+Junte o aço! / Junte o fogo! / Feche toda formação!
+
+Ataque em terra! / Ataque Aéreo! / Rompimento em conjunção!
+
+Não tomo a cidade, / não conduzo o batalhão: / eu destruo o que impedia / os demais de cumprir sua missão!
+
+**[Estrofe 4 — Ataque Aéreo]**
+
+Se a muralha está na terra / e o caminho não abriu, / ouve-se o rugido no alto: / o Ataque Aéreo surgiu!
+
+Sobre montes, sobre linhas, / vai direto ao coração; / busca a peça de artilharia / que governa a posição.
+
+Não bombardeia por vaidade, / nem por simples destruição; / arranca os dentes da defesa / para começar a invasão.
+
+Terra e céu falam juntos, / cada força em seu setor: / um abre o chão com blindagem, / outro mergulha com furor!
+
+**[Refrão forte]**
+
+Deixa comigo! / Minha armadura aguenta! / Se ninguém sabe o que existe, / eu atravesso e dou de frente!
+
+Deixa comigo! / Eu vou romper a barreira! / Onde a força não avança, / minha arma abre a fronteira!
+
+Avança, Assalto! / O elite é tua missão! / Destrói a peça mais forte, / faz ruir a formação!
+
+**[Estrofe 5 — duas armas]**
+
+Mesmo avariado, / ainda posso combater; / meu valor está na arma / que ainda posso oferecer.
+
+Dois blindados machucados / ainda atiram duas vezes; / duas armas sobre o campo, / duas ameaças aos seus chefes.
+
+Não me funda para poupar-me, / não reduza a formação; / devolva cada arma ao campo, / sem encolher o batalhão.
+
+Para quem captura prédios, / dois relógios podem unir; / mas duas armas de Assalto / têm dois alvos a atingir!
+
+**[Estrofe 6 — defesa]**
+
+Se a postura é defensiva, / não desaparece o meu valor; / uma linha só resiste / quando elimina o agressor.
+
+Posso aguardar em terreno forte, / posso formar contra-ataque; / posso proteger o capitão / e depois partir ao choque.
+
+A defesa não é silêncio, / nem somente suportar; / é concentrar a força certa / e escolher quando esmagar.
+
+**[Chamada e resposta]**
+
+— Quem entra primeiro? / — O Assalto!
+
+— Quem rompe a defesa? / — O Assalto!
+
+— E se a névoa não abrir? / — Deixa comigo!
+
+— E se houver um elite ali? / — Foi para isso que eu vim!
+
+**[Refrão final — coro completo]**
+
+Deixa comigo! / Minha armadura aguenta! / Se ninguém sabe o que existe, / eu atravesso e dou de frente!
+
+Deixa comigo! / Eu vou romper a barreira! / Onde a força não avança, / minha arma abre a fronteira!
+
+Por terra ou pelo alto, / sob fumaça ou sob calor, / quando o caminho está fechado, / chamem logo o Assalto!
+
+Eu encontro a barreira! / Eu alcanço a posição! / Eu destruo a barreira! / E atrás de mim passa o batalhão!
+
+**[Coda]**
+
+Um, dois! / Blindagem à frente!
+
+Um, dois! / Contato com o oponente!
+
+Não vim guardar passagem, / nem esperar o agressor:
+
+**Eu vim abrir o caminho! / Eu sou o Assalto!**
