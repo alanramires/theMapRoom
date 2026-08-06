@@ -316,6 +316,26 @@ barrando o APC cheio de entrar no navio.
 
 O que falta é o **Courier pedir carona**, que é justamente o `Embarcar` no topo.
 
+### ⚠️ O preço: a cadeia concentra risco, e o dano DESCE por ela
+
+```csharp
+// TurnStateManager.ScannerPrompt.cs:4071-4104
+ApplyRatioDamageToEmbarkedRecursive(directlyHitUnit, ratio);
+// Regra de sobrevida: dano proporcional em embarcados nao mata enquanto ...
+    ApplyRatioDamageToEmbarkedRecursive(child, ratio);   // RECURSIVO
+```
+
+Tiro no casco aplica dano proporcional aos embarcados — e **desce a cadeia
+inteira**. Soldado dentro do APC dentro do navio recebe proporcional de cada tiro
+que o navio leva. (Há regra de sobrevida: o proporcional não mata.)
+
+**Aninhar estende alcance E concentra risco**, e o preço é cobrado na moeda do
+**capturador**: HP é o relógio dele (`Capturador.md` §0), então um tiro no navio
+**atrasa o relógio de todos os capturadores dentro dele**.
+
+Consequência para a política: a cadeia não é de graça. Quanto mais longo o
+aninhamento, mais capturadores um único tiro desacelera.
+
 ---
 
 ## 8. EVAC
@@ -472,11 +492,19 @@ operação, baldeação navio↔caminhão), mas a IA ainda não a opera.
 
 ## 15.1 Postura — defesa e Collapsing
 
-**❓ EM ABERTO — o autor não decidiu, e há uma discordância registrada.**
+**✅ RESOLVIDO pelo autor, na Marcha do Transportador (apêndice):**
 
-Posição do autor: *"como a AI usa em modo de defesa ou collapsing eu ainda não
-sei. Mover tropas não rola, então só a função de tiro. Mas em modo de defesa o
-embarque seria negado."*
+> *Em colapso não se nega / a quem precisa embarcar:*
+> ***nego apenas a viagem / que não pode mais ganhar.***
+>
+> *Avançar ou retirar, / é o mesmo movimento:*
+> *a missão muda o vetor, / não muda o meu talento!*
+
+**Nega-se a VIAGEM, não o embarque.** A posição inicial era *"em modo de defesa o
+embarque seria negado"* — o que mataria o EVAC junto, e EVAC em colapso é
+preservar relógio de capturador.
+
+O registro do raciocínio, que continua valendo:
 
 **Onde eu discordo, e por quê.** Pelo lema — *o transportador serve a carga* —,
 em colapso a carga não some: ela **muda de direção**.
@@ -498,11 +526,10 @@ verbo com o vetor trocado, e são exatamente o que um exército em colapso preci
 que a estrofe do cerco fez com o capturador — o lema não muda com a postura, muda
 qual termo domina (`Capturador.md` §0).
 
-**A decidir pelo autor**, e a decisão muda o que se escreve:
-
-1. embarque negado em defesa, ou só embarque-para-avanço?
-2. o que é exatamente a "função de tiro" — a arma do próprio casco
-   (`embarkedWeapons`), ou o transportador entrando na conta de combate?
+**Continua ❓:** o que é exatamente a "função de tiro" em colapso — a arma do
+próprio casco (`embarkedWeapons`), ou o transportador entrando na conta de
+combate? A marcha diz *"eu atiro para abrir, não atiro por valor"*, o que sugere
+a primeira, mas não fecha.
 
 ---
 
@@ -573,3 +600,185 @@ trabalho** — porque metade destas pendências não é trabalho próprio.
 | **Precisam de decisão antes de código** | T8, T9, T13 | a ordem do roteador (transporte antes ou depois do combate), qual regra do porta-aviões sobrevive, e se iniciativa passa a ordenar por papel. Nada disso se decide lendo código |
 | **Pergunta em aberto** | T16 | não é pendência até se confirmar que falta. Pode já existir onde não procurei |
 | **Doutrina nova, sem base** | T4, T11, T12, T14, T15, T17 | trabalho de verdade, do zero |
+
+---
+
+# Apêndice — Marcha do Transportador
+
+Escrita pelo autor em 2026-08-06. **Ela é a doutrina**, e vale a regra do
+cabeçalho: **onde o código divergir de um verso, o código está errado.**
+
+Ela **resolveu o §15.1** (postura em Collapsing) e confirma, em verso, coisas que
+o código já faz e o doc não registrava:
+
+| verso | o que ele confirma |
+|---|---|
+| *"Uma vaga prometida não será esquecida: / quem espera há mais tempo ganha força na corrida"* | `RidePromise` + a antiguidade **idempotente** da `FilaCarona` — o anti-fome |
+| *"Se a névoa cobre a praia, eu peço observação: / primeiro abram meus olhos, depois abro o porão"* | `Enxergar` antes de `Desembarcar` é **precondição**, não valor — a disciplina do modal (§0.1) |
+| *"Reparar não abre vagas... compra distância entre meu casco e morrer"* | o limiar quase-zero do §13, e o porquê |
+| *"um tiro contra o casco atinge todos lá atrás"* | ✅ `ApplyRatioDamageToEmbarkedRecursive` — e desce a cadeia inteira (§7) |
+| *"Para o capturador, dois relógios podem unir; / para quem transporta tropas, dois caminhos devem existir"* | o princípio da moeda (§12), comparando os dois papéis |
+
+---
+
+**[Introdução — metais em galope]**
+
+Abre a estrada! / Limpa o corredor! / Quem ficou distante / chama o Transportador!
+
+Um, dois! / Motor a girar! / Eu sou o táxi — / vim para buscar!
+
+**[Primeira estrofe — a voz do papel]**
+
+Não quero a cidade, / não quero o poder; / eu quero levar-te / aonde vais vencer.
+
+Não sou teu destino, / não tomo teu lugar; / encurto a distância / que tens de enfrentar.
+
+Se a tropa está longe, / eu chego primeiro; / o tempo da missão / é meu passageiro!
+
+**[Refrão]**
+
+Embarca! Embarca! / Não vamos esperar! / A carga é a missão, / meu dever é transportar!
+
+Avança! Acelera! / O motor é o tambor! / Eu corto a distância — / sou o Transportador!
+
+Por terra, céu ou mar, / não importa o setor: / onde a tropa é necessária, / chega o Transportador!
+
+**[Segunda estrofe — Pickup]**
+
+Se estou vazio, / eu busco a demanda; / escuto quem chama / do outro lado da banda.
+
+Não fico esperando / a tropa me encontrar; / eu vou ao encontro / de quem precisa embarcar.
+
+Escolho o caminho, / o ponto e o momento; / não é o mais perto — / é o melhor deslocamento.
+
+Uma vaga prometida / não será esquecida: / quem espera há mais tempo / ganha força na corrida!
+
+**[Chamada e resposta]**
+
+— Quem está esperando? / — Eu vou buscar!
+
+— Quem precisa de apoio? / — Eu vou chegar!
+
+— Quem ficou distante? / — Pode me chamar!
+
+— Qual é o meu trabalho? / — Reposicionar!
+
+**[Terceira estrofe — Embarcar]**
+
+Mas antes da estrada, / eu olho ao redor: / talvez outro transporte / me leve ainda melhor.
+
+O Soldado no APC, / o APC no navio; / um carrega o outro / para atravessar o rio.
+
+O trem corta a terra, / o barco cruza o mar; / o helicóptero sobe / onde ninguém pode passar.
+
+Eu também sou passageiro / se isso encurta a missão: / não importa quem dirige, / importa a conexão!
+
+**[Refrão]**
+
+Embarca! Embarca! / Não vamos esperar! / A carga é a missão, / meu dever é transportar!
+
+Avança! Acelera! / O motor é o tambor! / Eu corto a distância — / sou o Transportador!
+
+Por terra, céu ou mar, / não importa o setor: / onde a tropa é necessária, / chega o Transportador!
+
+**[Quarta estrofe — Courier]**
+
+Quando estou carregado, / meu rumo está traçado; / a missão do passageiro / é o meu dever sagrado.
+
+Não solto a tropa / em qualquer posição; / procuro o ponto exato / para entrar em operação.
+
+Se a névoa cobre a praia, / eu peço observação: / primeiro abram meus olhos, / depois abro o porão.
+
+Quem desembarca pronto / não perde a ocasião; / a melhor zona de entrega / é o começo da missão!
+
+**[Quinta estrofe — serviço à carga]**
+
+Se carrego aeronaves, / eu cuido da esquadrilha; / combustível, munição, / cada peça na mochila.
+
+Reparo antes da entrega, / reabasteço para voar; / não percorri o mundo / para soltá-las sem lutar.
+
+Eu sirvo a minha carga / enquanto a faço avançar; / não basta chegar viva — / ela precisa operar!
+
+**[Ponte — casco e sobrevivência]**
+
+Meu casco é capacidade, / não velocidade ou poder; / com um ponto ou com dez, / a mesma carga posso ter.
+
+Reparar não abre vagas, / não faz a viagem correr; / reparar compra distância / entre meu casco e morrer.
+
+Mas se eu for Porta-Aviões, / há mais para proteger: / se afundar a minha pista, / uma força deixa de existir!
+
+**[Sexta estrofe — não fundir]**
+
+Dois cascos machucados / ainda fazem duas viagens; / dois pontos de coleta, / dois caminhos, duas margens.
+
+Se eu fundir dois veículos / para um só sobreviver, / ganho força num casco / e perco o dobro a fazer.
+
+Para o capturador, / dois relógios podem unir; / para quem transporta tropas, / dois caminhos devem existir!
+
+**[Refrão forte]**
+
+Embarca! Embarca! / Não vamos esperar! / A carga é a missão, / meu dever é transportar!
+
+Avança! Acelera! / O motor é o tambor! / Eu corto a distância — / sou o Transportador!
+
+Por terra, céu ou mar, / não importa o setor: / onde a tropa é necessária, / chega o Transportador!
+
+**[Sétima estrofe — combate]**
+
+Eu não busco combate, / minha carga vale mais; / um tiro contra o casco / atinge todos lá atrás.
+
+Mas se fecham a estrada, / se ameaçam o embarque, / eu cubro a retirada / e limpo o ponto de embarque.
+
+Eu atiro para abrir, / não atiro por valor; / a batalha só me serve / se ela serve ao passageiro!
+
+**[Oitava estrofe — Collapsing]**
+
+Quando o exército avança, / eu empurro para a frente; / quando a linha recua, / mudo o rumo simplesmente.
+
+Busco o ferido, / retiro o defensor; / salvo a artilharia / e protejo o supridor.
+
+Em colapso não se nega / a quem precisa embarcar: / nego apenas a viagem / que não pode mais ganhar.
+
+Avançar ou retirar, / é o mesmo movimento: / a missão muda o vetor, / não muda o meu talento!
+
+**[Marcha crescente — três transportes]**
+
+Sobre rodas! / Pela estrada!
+
+Sobre trilhos! / Na jornada!
+
+Pelo alto! / Sobre o chão!
+
+Pelo mar! / No meu porão!
+
+Cada domínio / tem seu condutor; / cada distância / tem um Transportador!
+
+**[Refrão final — coro completo]**
+
+Embarca! Embarca! / Não vamos esperar! / A carga é a missão, / meu dever é transportar!
+
+Avança! Acelera! / O motor é o tambor! / Eu corto a distância — / sou o Transportador!
+
+Se a tropa está distante, / eu encontro a solução; / se o terreno interrompe, / eu construo a conexão!
+
+Embarca! Embarca! / Que o caminho já se abriu! / Soldado dentro do APC, / APC dentro do navio!
+
+Por terra, céu ou mar, / não importa o setor: / onde a tropa é necessária, / chega o Transportador!
+
+**[Coda — chamada e resposta]**
+
+— De quem é a missão? / — Da carga!
+
+— O que é a distância? / — Atraso!
+
+— Para onde nós vamos? / — Onde somos necessários!
+
+— E quem abre o caminho? / — O Transportador!
+
+Um, dois! / Motor a rugir!
+
+Um, dois! / Buscar e conduzir!
+
+Eu não sou o destino, / escutem meu clamor:
+
+**Eu sou o caminho mais curto — / eu sou o Transportador!**
