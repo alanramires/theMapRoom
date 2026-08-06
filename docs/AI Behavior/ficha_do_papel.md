@@ -516,12 +516,33 @@ Transferir, Suprir, Desembarcar, Capturar, Fundir
 
 ---
 
+## Vigilância — *"tem uma guerra acontecendo em algum lugar e eu não me importo, contanto que eu ache minha presa"*
+
+**Subpapéis:** Aérea (EWACS, Radar Móvel), Anti-Sub (Super Tucano, Fragata ASW,
+Submarino)
+
+```text
+Detectar, Mirar, Reposicionar, Suprir, Transferir,
+Desembarcar, Embarcar, Capturar, Fundir, Enxergar
+```
+
+| eixo | valor |
+|---|---|
+| **modalidade** | **híbrida** — segue a linha do Artilheiro Combatente: primeiro fogo de suporte, depois assalto |
+| **posicionamento** | **bifurca**: aérea **repele** (maximiza área, que envelhece); anti-sub **agrupa** (âncora no leito e nos canais) |
+| **magnético** | só quem tem `playConservative`; os outros **não têm**, salvo alocação em plano |
+
+**`Detectar` em 1º e `Enxergar` em 10º** — a separação mais extrema das duas
+verdades no projeto. Ficha completa em `Vigilancia.md`.
+
+---
+
 ## O que este quadro fixa
 
 ```text
 3 modalidades    combatente, artilheiro, HÍBRIDA
-4 papéis         questionário, moeda, posicionamento, marcha
-13 subpapéis     o que o shopping pede e o que a ficha declara
+5 papéis         questionário, moeda, posicionamento, marcha
+15 subpapéis     o que o shopping pede e o que a ficha declara
 ```
 
 E as quatro moedas, que respondem sozinhas se uma peça funde:
@@ -532,6 +553,7 @@ E as quatro moedas, que respondem sozinhas se uma peça funde:
 | Transportador | as **vagas** | perde |
 | Assalto | a **arma** — cada casco é ameaça | perde |
 | Fogo de Suporte | a **formação** — cones cobrindo pontos cegos | perde, e **agrupar também** |
+| Vigilância | a **área coberta e a idade dela** | perde — *menos cobertura do tabuleiro* |
 
 ---
 
