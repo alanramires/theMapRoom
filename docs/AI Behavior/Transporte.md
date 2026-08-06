@@ -1,4 +1,4 @@
-# Transporte — contrato
+﻿# Transporte — contrato
 
 Doutrina definida pelo autor. Onde o código divergir dela, o código está errado.
 
@@ -26,6 +26,69 @@ ainda disser rebelde, ver `docs/refactor/ai_sem_plano.md`.
 Não existe "parcialmente vazio". ✅ O código já se comporta assim: o scanner de
 pickup (`Shuttle`) só roda vazio, e encher a vaga livre no caminho não existe
 (`BuildAttempts` retorna cedo com carga).
+
+---
+
+## 0.1 A ficha do papel
+
+**Descrição do autor:**
+
+> *"Eu sou o Táxi! Eu acelero a sua missão e quero chegar o mais rápido possível
+> onde sou necessário!"*
+
+**Lema:**
+
+> ## O transportador serve a carga.
+> ## Chegar cedo é entregar; o casco é a capacidade, e o destino nunca é meu.
+
+| cláusula | o que ela produz |
+|---|---|
+| **serve a carga** | a promessa, o modo Hospital, não brigar, **não escolher o destino** — ele é do passageiro |
+| **chegar cedo é entregar** | velocidade, aninhamento, desembarque no Tático do alvo |
+| **o casco é a capacidade** | fusão negada, lotar o máximo, aninhar para estender alcance |
+
+### Prioridade de sensor — MODAL
+
+```text
+Pickup (vazio)   Embarcar, Reposicionar, Enxergar, Detectar, Mirar,
+                 Desembarcar, Transferir, Suprir, Capturar, Fundir
+
+Courier (carga)  Embarcar, Reposicionar, Enxergar, Suprir, Transferir,
+                 Desembarcar, Detectar, Mirar, Capturar, Fundir
+```
+
+**Por que `Embarcar` é o topo nos DOIS modos:** aninhamento. Um transportador
+que sabe que não entrega sozinho **pede carona também** — e continua andando até
+o ponto de encontro enquanto espera. O APC atravessa o canal dentro do navio; o
+APC atravessa o território dentro do trem e **desembarca com o tanque cheio**.
+Ver §7.
+
+### ⚠️ Disciplina do modal — para os modos não se multiplicarem
+
+Duas trocas de posição da lista têm naturezas diferentes:
+
+```text
+Mirar cai quando carregado           por VALOR — carregando, o tiro rende menos
+Enxergar sobe antes de Desembarcar   por PRECONDIÇÃO — não se desembarca na névoa
+```
+
+A segunda é ordem de verdade: é **causal**. A primeira já é o **terceiro passo do
+gate** (*"vale o meu turno?"*) — foi assim que o `CapturadorAgressivo` se dissolveu
+sem virar papel novo (`docs/AI Behavior/Capturador.md` §1).
+
+**Regra:** modo só onde o motivo é **precondição**. Valor resolve no gate. Sem
+isso nascem modos para Collapsing, para HP baixo, para combustível baixo.
+
+E note que o `Suprir` **não precisa** de modo: `serviceRange = SameHexOrEmbarked`
+faz a casa cair sozinha quando não há embarcado a servir (§14).
+
+### Os três tipos, cada um com sua variante
+
+| tipo | foco |
+|---|---|
+| **terrestre** | trilho ou rodas — reposicionamento de unidades em superfície |
+| **aéreo** | helicóptero ou aeronave — travessia de terreno difícil ou do mar |
+| **naval** | barco — travessia naval não só dos capturadores, mas do **restante do exército** |
 
 ---
 
@@ -218,6 +281,41 @@ parado em cima do prédio **não é reconhecido como bloqueador**.
 O transportador aninhado que carrega transportador **lê os destinos das suas
 cargas**, como faria transportando qualquer outra unidade. ❓ não conferido.
 
+### Aninhar é como se ESTENDE alcance
+
+Esta é a razão de `Embarcar` ser o topo dos dois modos, e ela faltava aqui.
+
+> Você compra soldado e APC, mas a demanda é do outro lado do canal. Os navios
+> não estão na praia e o APC está perto. O soldado pede carona e embarca. **O
+> APC, sabendo que não vai conseguir cumprir a entrega, pede carona também** — e
+> isso não o impede de andar até a praia. Quando o navio vier fazer o rendezvous,
+> o APC embarca com o soldado dentro e cruza o canal.
+
+Dois ganhos, e o segundo é fácil de esquecer:
+
+```text
+alcance      a cadeia entrega onde nenhum elo entregaria sozinho
+combustível  quem viaja embarcado não gasta. O APC que atravessa o território
+             dentro do trem DESEMBARCA COM O TANQUE CHEIO
+```
+
+**Nem todo elo existe ainda.** Um trem precisaria de um navio de tipo especial;
+um navio talvez precisasse de um heli carrier. A cadeia é limitada pelas vagas
+que as fichas declaram, não por regra de IA.
+
+### ✅ O motor suporta — é capacidade não usada, não feature faltando
+
+```csharp
+// TurnStateManager.SupplyQueue.cs:2422
+// Sync sprite so nested transporters show their transport sprite (not the default one).
+```
+
+E o portão do `PodeEmbarcarSensor` é `CanUseSlot(passenger, passengerData, slot)`
+— compatibilidade de **vaga**, não *"o passageiro está carregando"*. Não há regra
+barrando o APC cheio de entrar no navio.
+
+O que falta é o **Courier pedir carona**, que é justamente o `Embarcar` no topo.
+
 ---
 
 ## 8. EVAC
@@ -294,6 +392,21 @@ de fundirem". Procurei por `isTransporter` cruzado com merge/fusão em
 `Assets/Scripts/Match/AI` e não localizei — o que **não prova ausência**: pode
 estar no sensor de fusão ou no `TurnStateManager.Merge`. A conferir.
 
+### O princípio geral: cada papel tem uma moeda, e a moeda decide fundir
+
+A **mesma ação** é boa para o capturador e proibida para o transportador, e o
+motivo é o que HP *significa* em cada um:
+
+```text
+capturador     HP é o RELÓGIO           GetCapturePower devolve HP
+                                        → concentrar ACELERA → fundir GANHA
+transportador  o CASCO é a capacidade    capacidade é por casco, não por HP
+                                        → concentrar DESTRÓI → fundir PERDE
+```
+
+Não é exceção do transporte. É a regra que o próximo papel vai perguntar, e a
+resposta dele sai da mesma conta.
+
 ---
 
 ## 13. Reparos
@@ -301,6 +414,37 @@ estar no sensor de fusão ou no `TurnStateManager.Merge`. A conferir.
 Qualquer construção **capturada que aceite pouso** serve. Unidades com carga
 **não desembarcam a carga**: na construção ambos serão tratados (regra do Serviço
 do Comando). ❓ não conferido.
+
+### Limiar de reparo — quase zero, e o motivo cai do lema
+
+**Transportador opera até o fim.** Um Chinook com 1 de HP leva a mesma coisa que
+um com 10: HP não é velocidade para ele, é só a **distância até a morte**.
+Reparar não compra operação nenhuma — compra sobrevivência, que é outro produto.
+
+> *"Ficar 4 turnos parado esperando o HP recuperar é desperdício de missão."*
+
+**A política é DADO, não código.** Os campos existem em `UnitData`:
+
+```csharp
+repairTriggerHpBelow     = 0    (0-9)     0 = nunca dispara por HP
+repairTriggerAutonomyPct        (0-100)   o gatilho que importa: combustível
+repairRecoverHpAbove     = 8    (1-10)    quando SAI do reparo
+```
+
+**⚠️ A ARMADILHA está no segundo número, não no primeiro.** `repairRecoverHpAbove`
+é **8** por padrão: um transportador que parou por **combustível** fica preso até
+o HP passar de 8. Zerar o gatilho não o solta — quem solta é o limiar de saída.
+**Os dois precisam descer juntos**, senão os quatro turnos parados continuam
+exatamente onde estavam.
+
+| unidade | `repairTriggerHpBelow` | por quê |
+|---|---|---|
+| Chinook, APC, caminhão | 0 — só combustível | operam até o fim; capacidade não cai com HP |
+| **Porta-Aviões** | ~5 | **exceção por externalidade, não por tamanho** |
+
+O HP do porta-aviões não protege a capacidade **dele** — protege a
+**disponibilidade da pista**. Se ele afunda, a asa aérea inteira perde a base.
+É a única unidade do papel cuja morte tira operação de terceiros. Ver §16.
 
 ---
 
@@ -323,6 +467,42 @@ para buscar suprimento quando acabam.
 
 ❌ para a IA: a cadeia `PodeTransferir` existe (tiers Hub/Receiver, domínio de
 operação, baldeação navio↔caminhão), mas a IA ainda não a opera.
+
+---
+
+## 15.1 Postura — defesa e Collapsing
+
+**❓ EM ABERTO — o autor não decidiu, e há uma discordância registrada.**
+
+Posição do autor: *"como a AI usa em modo de defesa ou collapsing eu ainda não
+sei. Mover tropas não rola, então só a função de tiro. Mas em modo de defesa o
+embarque seria negado."*
+
+**Onde eu discordo, e por quê.** Pelo lema — *o transportador serve a carga* —,
+em colapso a carga não some: ela **muda de direção**.
+
+```text
+EVAC                  §8 já existe. Levar ferido para a retaguarda é PRESERVAR
+                      RELÓGIO de capturador (Capturador.md §0: HP é o relógio).
+                      Em colapso é o trabalho mais valioso que existe, e negar
+                      embarque o mata junto
+
+redistribuir defesa   tirar defensor de setor quieto e pôr no ameaçado É
+                      reposicionamento — a função central do papel, não exceção
+```
+
+*"Mover tropas não rola"* vale para **avançar**. Recuar e redistribuir são o mesmo
+verbo com o vetor trocado, e são exatamente o que um exército em colapso precisa.
+
+**Proposta:** negar embarque **para avanço**, não embarque. É o mesmo movimento
+que a estrofe do cerco fez com o capturador — o lema não muda com a postura, muda
+qual termo domina (`Capturador.md` §0).
+
+**A decidir pelo autor**, e a decisão muda o que se escreve:
+
+1. embarque negado em defesa, ou só embarque-para-avanço?
+2. o que é exatamente a "função de tiro" — a arma do próprio casco
+   (`embarkedWeapons`), ou o transportador entrando na conta de combate?
 
 ---
 
