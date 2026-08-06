@@ -2086,10 +2086,9 @@ public static class UnitMovementPathRules
                         continue;
                     }
 
+                    // Rota deste tabuleiro vem da cena, nao do catalogo.
                     IReadOnlyList<RoadRouteDefinition> routes =
-                        db.GetRoadRoutes(structure);
-                    if (routes == null)
-                        routes = structure.roadRoutes;
+                        network.GetRoadRoutes(structure);
                     if (routes == null)
                         continue;
 
@@ -2245,10 +2244,9 @@ public static class UnitMovementPathRules
                         continue;
                     }
 
+                    // Rota deste tabuleiro vem da cena, nao do catalogo.
                     IReadOnlyList<RoadRouteDefinition> routes =
-                        db.GetRoadRoutes(structure);
-                    if (routes == null)
-                        routes = structure.roadRoutes;
+                        network.GetRoadRoutes(structure);
                     if (routes == null)
                         continue;
 

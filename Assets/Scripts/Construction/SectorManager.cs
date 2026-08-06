@@ -2224,10 +2224,9 @@ public sealed class SectorManager : MonoBehaviour
                 if (structure == null)
                     continue;
 
+                // Rota deste tabuleiro vem da cena, nao do catalogo.
                 IReadOnlyList<RoadRouteDefinition> routes =
-                    database.GetRoadRoutes(structure);
-                if (routes == null)
-                    routes = structure.roadRoutes;
+                    network.GetRoadRoutes(structure);
                 if (routes == null)
                     continue;
 

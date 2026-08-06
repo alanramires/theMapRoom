@@ -381,10 +381,10 @@ internal static class BoardTopologyIndexBuilder
                 if (structure == null)
                     continue;
 
+                // Layout de campo e da CENA: quem responde por rota deste
+                // tabuleiro e o RoadNetworkManager, nao o catalogo.
                 IReadOnlyList<RoadRouteDefinition> routes =
-                    database.GetRoadRoutes(structure);
-                if (routes == null)
-                    routes = structure.roadRoutes;
+                    network.GetRoadRoutes(structure);
                 if (routes == null)
                     continue;
 
@@ -394,15 +394,11 @@ internal static class BoardTopologyIndexBuilder
                     if (route == null || route.cells == null)
                         continue;
 
-                    if (route.ownerDatabase != null
-                        && route.ownerDatabase != database)
-                    {
-                        validation.AddWarning(
-                            $"Rota '{ResolveRouteName(route, r)}' de " +
-                            $"'{StableId(structure.id)}' referencia outro " +
-                            "StructureDatabase. Mantida por compatibilidade.");
-                    }
-
+                    // O filtro por ownerDatabase saiu daqui: rota de outro
+                    // catalogo nao chega mais, porque o RoadNetworkManager a
+                    // descarta na origem. Avisar e depois validar as celulas
+                    // dela produzia ERROR para um layout que nunca foi deste
+                    // tabuleiro — "nao se aplica" reportado como "quebrado".
                     for (int c = 0; c < route.cells.Count; c++)
                     {
                         Vector3Int cell = route.cells[c];

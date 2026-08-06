@@ -13,6 +13,21 @@ public class RoadNetworkManager : MonoBehaviour
     [SerializeField] private Tilemap boardTilemap;
     [SerializeField] private TerrainDatabase terrainDatabase;
 
+    // LAYOUT DE CAMPO PERTENCE A CENA.
+    //
+    // O StructureDatabase e CATALOGO: diz o que uma rodovia E (custo, chaves,
+    // familia topologica), e cinquenta mapas compartilham o mesmo. Onde a
+    // rodovia ESTA e deste tabuleiro, e por isso mora aqui.
+    //
+    // Enquanto routesMigratedToScene for false, a leitura ainda cai no catalogo
+    // — e por isso a migracao e verificavel mapa a mapa em vez de um flag day.
+    [Header("Road Routes (Map Scope)")]
+    [Tooltip("Rotas deste tabuleiro, por estrutura. Layout de campo e da CENA; o StructureDatabase e catalogo compartilhado.")]
+    [SerializeField] private List<StructureRoadRouteBucket> roadRoutesByStructure =
+        new List<StructureRoadRouteBucket>();
+    [Tooltip("Marcado pela migracao. Enquanto false, rotas ainda sao lidas do StructureDatabase/StructureData; true torna a cena a unica fonte.")]
+    [SerializeField] private bool routesMigratedToScene;
+
     [Header("Default Road Visual")]
     [SerializeField] private Sprite roadSegmentSprite;
     [SerializeField] private Color roadColor = Color.white;
@@ -34,6 +49,9 @@ public class RoadNetworkManager : MonoBehaviour
     [SerializeField] [Range(0.05f, 1f)] private float livePreviewInterval = 0.2f;
 
     private readonly List<GameObject> generatedRoadObjects = new List<GameObject>();
+    private readonly Dictionary<StructureData, List<RoadRouteDefinition>> routesByStructure =
+        new Dictionary<StructureData, List<RoadRouteDefinition>>();
+    private bool routesLookupBuilt;
     private readonly Dictionary<Vector3Int, StructureData> structureByCell = new Dictionary<Vector3Int, StructureData>();
     private readonly Dictionary<SpriteRenderer, Vector3Int[]> generatedVisualCells =
         new Dictionary<SpriteRenderer, Vector3Int[]>();
@@ -69,6 +87,7 @@ public class RoadNetworkManager : MonoBehaviour
     private void Awake()
     {
         EnsureDefaults();
+        InvalidateRoutesLookup();
         TryAutoAssignBoardTilemap();
         RebuildRoadVisuals();
     }
@@ -76,6 +95,7 @@ public class RoadNetworkManager : MonoBehaviour
     private void OnEnable()
     {
         EnsureDefaults();
+        InvalidateRoutesLookup();
         TryAutoAssignBoardTilemap();
         RebuildRoadVisuals();
     }
@@ -103,6 +123,7 @@ public class RoadNetworkManager : MonoBehaviour
     private void OnValidate()
     {
         EnsureDefaults();
+        InvalidateRoutesLookup();
         TryAutoAssignBoardTilemap();
         QueueValidateRebuild();
     }
@@ -602,6 +623,11 @@ public class RoadNetworkManager : MonoBehaviour
 
         boardTilemap = null;
 
+        // "Primeiro hexagonal que aparecer" nao e criterio: FindObjectsSortMode.None
+        // devolve ordem arbitraria, e cena com mais de um tilemap hexagonal
+        // (tabuleiro, overlay, decoracao) fazia o manager adotar o errado EM
+        // SILENCIO — rota gravada num tabuleiro e lida noutro.
+        var candidates = new List<Tilemap>();
         Tilemap[] maps = FindObjectsByType<Tilemap>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
         for (int i = 0; i < maps.Length; i++)
         {
@@ -611,12 +637,43 @@ public class RoadNetworkManager : MonoBehaviour
 
             GridLayout.CellLayout layout = map.layoutGrid != null ? map.layoutGrid.cellLayout : GridLayout.CellLayout.Rectangle;
             if (layout == GridLayout.CellLayout.Hexagon)
+                candidates.Add(map);
+        }
+
+        if (candidates.Count == 0)
+            return;
+
+        if (candidates.Count == 1)
+        {
+            boardTilemap = candidates[0];
+            return;
+        }
+
+        // Desempate pelo nome do tabuleiro — o mesmo que a topologia usa na
+        // chave 'cena::TileMap'.
+        for (int i = 0; i < candidates.Count; i++)
+        {
+            if (string.Equals(
+                    candidates[i].gameObject.name,
+                    BoardTilemapObjectName,
+                    System.StringComparison.OrdinalIgnoreCase))
             {
-                boardTilemap = map;
+                boardTilemap = candidates[i];
                 return;
             }
         }
+
+        boardTilemap = candidates[0];
+        Debug.LogWarning(
+            $"[RoadNetworkManager] {candidates.Count} tilemaps hexagonais em "
+            + $"'{gameObject.scene.name}' e nenhum chamado "
+            + $"'{BoardTilemapObjectName}'. Adotei '{boardTilemap.gameObject.name}' "
+            + "por falta de criterio — CONFIRA o campo Board Tilemap a mao. "
+            + "Rota pintada com o tilemap errado nao aparece no tabuleiro.",
+            this);
     }
+
+    private const string BoardTilemapObjectName = "TileMap";
 
     private void EnsureDefaults()
     {
@@ -757,19 +814,210 @@ public class RoadNetworkManager : MonoBehaviour
         }
     }
 
-    private IReadOnlyList<RoadRouteDefinition> GetRoutesForStructure(StructureData structure)
+    private IReadOnlyList<RoadRouteDefinition> GetRoutesForStructure(StructureData structure) =>
+        GetRoadRoutes(structure);
+
+    /// <summary>
+    /// Ponto UNICO de leitura de rota. Antes esta cadeia estava copiada em
+    /// quatro chamadores (setor, topologia e as duas do custo de movimento), e
+    /// cada copia podia divergir.
+    ///
+    /// Ordem: cena manda. So enquanto a migracao nao aconteceu e que o catalogo
+    /// e o StructureData legado ainda respondem — depois de migrado, bucket
+    /// vazio significa "nao ha rodovia deste tipo AQUI", e nao "ainda nao
+    /// migrei". Separar as duas coisas e o motivo do flag existir.
+    /// </summary>
+    public IReadOnlyList<RoadRouteDefinition> GetRoadRoutes(StructureData structure)
     {
         if (structure == null)
             return null;
 
-        if (structureDatabase != null)
+        EnsureRoutesLookup();
+        return routesByStructure.TryGetValue(
+            structure,
+            out List<RoadRouteDefinition> routes)
+            ? routes
+            : null;
+    }
+
+    public bool RoutesMigratedToScene => routesMigratedToScene;
+
+    public IReadOnlyList<StructureRoadRouteBucket> RoadRoutesByStructure =>
+        roadRoutesByStructure;
+
+    public bool HasAnyRoadRoutesForStructure(StructureData structure)
+    {
+        IReadOnlyList<RoadRouteDefinition> routes = GetRoadRoutes(structure);
+        return routes != null && routes.Count > 0;
+    }
+
+    /// <summary>
+    /// Para o pintor de rotas. Espelha a API que vivia no StructureDatabase.
+    /// </summary>
+    public List<RoadRouteDefinition> GetOrCreateRoadRoutes(StructureData structure)
+    {
+        if (structure == null)
+            return null;
+
+        if (roadRoutesByStructure == null)
+            roadRoutesByStructure = new List<StructureRoadRouteBucket>();
+
+        // ATENCAO: procura no bucket SERIALIZADO, nunca no lookup.
+        //
+        // Antes da migracao o lookup vem preenchido com listas TEMPORARIAS
+        // montadas a partir do catalogo (FilterRoutesOwnedByThisNetwork devolve
+        // uma lista nova). Devolver uma dessas faria a escrita cair num objeto
+        // que ninguem serializa — foi exatamente assim que a primeira migracao
+        // copiou 23 rotas para lugar nenhum.
+        for (int i = 0; i < roadRoutesByStructure.Count; i++)
         {
-            IReadOnlyList<RoadRouteDefinition> dbRoutes = structureDatabase.GetRoadRoutes(structure);
-            if (dbRoutes != null)
-                return dbRoutes;
+            StructureRoadRouteBucket bucket = roadRoutesByStructure[i];
+            if (bucket == null || bucket.structure != structure)
+                continue;
+
+            if (bucket.routes == null)
+                bucket.routes = new List<RoadRouteDefinition>();
+
+            InvalidateRoutesLookup();
+            return bucket.routes;
         }
 
-        // Fallback legado: rotas antigas salvas no StructureData.
-        return structure.roadRoutes;
+        var created = new StructureRoadRouteBucket
+        {
+            structure = structure,
+            routes = new List<RoadRouteDefinition>()
+        };
+        roadRoutesByStructure.Add(created);
+        InvalidateRoutesLookup();
+        return created.routes;
+    }
+
+    /// <summary>
+    /// Zera o layout de rotas DESTA cena. Existe para a migracao poder
+    /// SUBSTITUIR em vez de empilhar — rodar a migracao duas vezes tem que dar
+    /// o mesmo numero, nao o dobro.
+    /// </summary>
+    public void ClearSceneRoadRoutes()
+    {
+        if (roadRoutesByStructure == null)
+            roadRoutesByStructure = new List<StructureRoadRouteBucket>();
+        else
+            roadRoutesByStructure.Clear();
+
+        InvalidateRoutesLookup();
+    }
+
+    public void MarkRoutesMigratedToScene(bool migrated)
+    {
+        routesMigratedToScene = migrated;
+        InvalidateRoutesLookup();
+    }
+
+    public void InvalidateRoutesLookup()
+    {
+        routesLookupBuilt = false;
+        routesByStructure.Clear();
+    }
+
+    private void EnsureRoutesLookup()
+    {
+        if (routesLookupBuilt)
+            return;
+
+        routesByStructure.Clear();
+        if (roadRoutesByStructure != null)
+        {
+            for (int i = 0; i < roadRoutesByStructure.Count; i++)
+            {
+                StructureRoadRouteBucket bucket = roadRoutesByStructure[i];
+                if (bucket == null
+                    || bucket.structure == null
+                    || bucket.routes == null)
+                {
+                    continue;
+                }
+
+                if (routesByStructure.ContainsKey(bucket.structure))
+                {
+                    Debug.LogWarning(
+                        "[RoadNetworkManager] Bucket duplicado para "
+                        + $"'{bucket.structure.id}'. Mantendo o primeiro.",
+                        this);
+                    continue;
+                }
+
+                routesByStructure[bucket.structure] = bucket.routes;
+            }
+        }
+
+        if (!routesMigratedToScene)
+            AppendPreMigrationFallback();
+
+        routesLookupBuilt = true;
+    }
+
+    /// <summary>
+    /// Cadeia de compatibilidade, resolvida UMA vez no lookup e nao a cada
+    /// leitura — o custo de movimento consulta rota celula a celula.
+    ///
+    /// A rota legada do StructureData e filtrada por ownerDatabase aqui, no
+    /// unico lugar que le. Rota autorada para OUTRO catalogo nao e rota
+    /// quebrada: ela simplesmente nao se aplica a este tabuleiro, e quem a
+    /// deixava passar produzia erro de validacao em mapa que nunca a teve.
+    /// </summary>
+    private void AppendPreMigrationFallback()
+    {
+        IReadOnlyList<StructureData> catalogue =
+            structureDatabase != null ? structureDatabase.Structures : null;
+        if (catalogue == null)
+            return;
+
+        for (int i = 0; i < catalogue.Count; i++)
+        {
+            StructureData structure = catalogue[i];
+            if (structure == null
+                || routesByStructure.ContainsKey(structure))
+            {
+                continue;
+            }
+
+            IReadOnlyList<RoadRouteDefinition> dbRoutes =
+                structureDatabase.GetRoadRoutes(structure);
+            if (dbRoutes != null)
+            {
+                routesByStructure[structure] =
+                    FilterRoutesOwnedByThisNetwork(dbRoutes);
+                continue;
+            }
+
+            if (structure.roadRoutes != null
+                && structure.roadRoutes.Count > 0)
+            {
+                routesByStructure[structure] =
+                    FilterRoutesOwnedByThisNetwork(structure.roadRoutes);
+            }
+        }
+    }
+
+    private List<RoadRouteDefinition> FilterRoutesOwnedByThisNetwork(
+        IReadOnlyList<RoadRouteDefinition> source)
+    {
+        var kept = new List<RoadRouteDefinition>(source.Count);
+        for (int i = 0; i < source.Count; i++)
+        {
+            RoadRouteDefinition route = source[i];
+            if (route == null)
+                continue;
+            if (filterRoutesByOwnerDatabase
+                && route.ownerDatabase != null
+                && route.ownerDatabase != structureDatabase)
+            {
+                continue;
+            }
+
+            kept.Add(route);
+        }
+
+        return kept;
     }
 }
