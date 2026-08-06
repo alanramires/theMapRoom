@@ -181,13 +181,13 @@ public class RoadRoutePainterWindow : EditorWindow
         if (newName == currentName)
             return;
 
-        StructureDatabase db = GetContextDatabase();
-        if (db == null)
+        UnityEngine.Object target = GetRouteWriteTarget();
+        if (target == null)
             return;
 
-        Undo.RecordObject(db, "Rename Road Route");
+        Undo.RecordObject(target, "Rename Road Route");
         route.routeName = newName;
-        EditorUtility.SetDirty(db);
+        MarkRouteTargetDirty(target);
         roadNetworkManager?.RebuildRoadVisuals();
     }
 
@@ -205,13 +205,13 @@ public class RoadRoutePainterWindow : EditorWindow
         StructureDatabase chosen = (StructureDatabase)EditorGUILayout.ObjectField("Route Database", current, typeof(StructureDatabase), false);
         if (chosen != current)
         {
-            StructureDatabase db = GetContextDatabase();
-            if (db == null)
+            UnityEngine.Object target = GetRouteWriteTarget();
+            if (target == null)
                 return;
 
-            Undo.RecordObject(db, "Set Road Route Owner Database");
+            Undo.RecordObject(target, "Set Road Route Owner Database");
             route.ownerDatabase = chosen;
-            EditorUtility.SetDirty(db);
+            MarkRouteTargetDirty(target);
             roadNetworkManager?.RebuildRoadVisuals();
         }
 
@@ -219,13 +219,13 @@ public class RoadRoutePainterWindow : EditorWindow
         {
             if (GUILayout.Button("Use Road Manager Database"))
             {
-                StructureDatabase db = GetContextDatabase();
-                if (db == null)
+                UnityEngine.Object target = GetRouteWriteTarget();
+                if (target == null)
                     return;
 
-                Undo.RecordObject(db, "Set Road Route Owner Database");
+                Undo.RecordObject(target, "Set Road Route Owner Database");
                 route.ownerDatabase = managerDb;
-                EditorUtility.SetDirty(db);
+                MarkRouteTargetDirty(target);
                 roadNetworkManager?.RebuildRoadVisuals();
             }
         }
@@ -296,7 +296,7 @@ public class RoadRoutePainterWindow : EditorWindow
             return;
         }
 
-        StructureDatabase dbForUndo = GetContextDatabase();
+        UnityEngine.Object dbForUndo = GetRouteWriteTarget();
         if (dbForUndo == null)
             return;
 
@@ -322,7 +322,7 @@ public class RoadRoutePainterWindow : EditorWindow
             route.cells.Add(cell);
         }
 
-        EditorUtility.SetDirty(dbForUndo);
+        MarkRouteTargetDirty(dbForUndo);
         roadNetworkManager.RebuildRoadVisuals();
         e.Use();
     }
@@ -407,11 +407,11 @@ public class RoadRoutePainterWindow : EditorWindow
         if (structureData == null)
             return;
 
-        StructureDatabase db = GetContextDatabase();
-        if (db == null)
+        UnityEngine.Object target = GetRouteWriteTarget();
+        if (target == null)
             return;
 
-        Undo.RecordObject(db, "Create Road Route");
+        Undo.RecordObject(target, "Create Road Route");
         List<RoadRouteDefinition> routes = GetEditableRoutes(createIfMissing: true);
         if (routes == null)
             return;
@@ -427,7 +427,7 @@ public class RoadRoutePainterWindow : EditorWindow
 
         routes.Add(route);
         selectedRouteIndex = Mathf.Max(0, routes.Count - 1);
-        EditorUtility.SetDirty(db);
+        MarkRouteTargetDirty(target);
         roadNetworkManager?.RebuildRoadVisuals();
     }
 
@@ -440,13 +440,13 @@ public class RoadRoutePainterWindow : EditorWindow
         if (route == null)
             return;
 
-        StructureDatabase db = GetContextDatabase();
-        if (db == null)
+        UnityEngine.Object target = GetRouteWriteTarget();
+        if (target == null)
             return;
 
-        Undo.RecordObject(db, "Clear Road Route");
+        Undo.RecordObject(target, "Clear Road Route");
         route.cells.Clear();
-        EditorUtility.SetDirty(db);
+        MarkRouteTargetDirty(target);
         roadNetworkManager?.RebuildRoadVisuals();
     }
 
@@ -459,13 +459,13 @@ public class RoadRoutePainterWindow : EditorWindow
         if (route == null || route.cells == null || route.cells.Count == 0)
             return;
 
-        StructureDatabase db = GetContextDatabase();
-        if (db == null)
+        UnityEngine.Object target = GetRouteWriteTarget();
+        if (target == null)
             return;
 
-        Undo.RecordObject(db, "Remove Road Route Point");
+        Undo.RecordObject(target, "Remove Road Route Point");
         route.cells.RemoveAt(route.cells.Count - 1);
-        EditorUtility.SetDirty(db);
+        MarkRouteTargetDirty(target);
         roadNetworkManager?.RebuildRoadVisuals();
     }
 
@@ -474,17 +474,17 @@ public class RoadRoutePainterWindow : EditorWindow
         if (!HasValidSelectedRoute())
             return;
 
-        StructureDatabase db = GetContextDatabase();
+        UnityEngine.Object target = GetRouteWriteTarget();
         List<RoadRouteDefinition> routes = GetEditableRoutes(createIfMissing: false);
-        if (db == null || routes == null)
+        if (target == null || routes == null)
             return;
 
-        Undo.RecordObject(db, "Delete Road Route");
+        Undo.RecordObject(target, "Delete Road Route");
         int selectedIndex = selectedRouteIndex;
         routes.RemoveAt(selectedIndex);
         selectedRouteIndex = selectedIndex;
         EnsureRouteSelectionInBounds();
-        EditorUtility.SetDirty(db);
+        MarkRouteTargetDirty(target);
         roadNetworkManager?.RebuildRoadVisuals();
     }
 
@@ -852,10 +852,50 @@ public class RoadRoutePainterWindow : EditorWindow
         return roadNetworkManager != null ? roadNetworkManager.StructureDatabase : null;
     }
 
+    /// <summary>
+    /// Onde a rota e GRAVADA. Depois da migracao e a CENA (o RoadNetworkManager);
+    /// antes dela, ainda o catalogo — para o pintor nao parar de funcionar no
+    /// meio da transicao.
+    /// </summary>
+    private UnityEngine.Object GetRouteWriteTarget()
+    {
+        if (roadNetworkManager != null && roadNetworkManager.RoutesMigratedToScene)
+            return roadNetworkManager;
+
+        return GetContextDatabase();
+    }
+
+    // Asset suja com SetDirty; componente de cena precisa da CENA suja tambem,
+    // senao o Ctrl+S nao leva a rota junto.
+    private void MarkRouteTargetDirty(UnityEngine.Object target)
+    {
+        if (target == null)
+            return;
+
+        EditorUtility.SetDirty(target);
+        if (target is Component component)
+        {
+            UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(
+                component.gameObject.scene);
+        }
+    }
+
     private List<RoadRouteDefinition> GetEditableRoutes(bool createIfMissing)
     {
         if (structureData == null)
             return null;
+
+        if (roadNetworkManager != null && roadNetworkManager.RoutesMigratedToScene)
+        {
+            IReadOnlyList<RoadRouteDefinition> sceneRoutes =
+                roadNetworkManager.GetRoadRoutes(structureData);
+            if (sceneRoutes is List<RoadRouteDefinition> sceneList)
+                return sceneList;
+
+            return createIfMissing
+                ? roadNetworkManager.GetOrCreateRoadRoutes(structureData)
+                : null;
+        }
 
         StructureDatabase db = GetContextDatabase();
         if (db == null)
