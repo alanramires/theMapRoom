@@ -340,6 +340,25 @@ própria peça; este guarda na **posição relativa entre as peças**.
 do próprio tático. Amontoar destrói o ativo tanto quanto fundir destruiria.
 **Nunca fundem, jamais.**
 
+### ⚠️ O auto-repelir é da MOEDA, não do posicionamento
+
+Ele **não desliga** quando o papel troca de lugar:
+
+> *"Mesmo sendo capitão do mar, eles ainda se repelem — para cobrir os pontos
+> cegos da linha de navios e ficar bombardeando a praia."*
+
+```text
+posicionamento   retaguarda / flancos / vanguarda   MUDA com o contexto
+auto-repelir     a malha de cones                    INVARIANTE — vem da moeda
+```
+
+Três destroyers colados na praia são **um alvo**; espalhados, são uma **malha**
+que bombardeia e se cobre. O Destroyer-capitão troca de posição (§ abaixo) sem
+trocar de moeda.
+
+É o mesmo formato do capturador: **a postura não muda o objetivo, muda qual termo
+domina** (`Capturador.md` §0). Aqui, a moeda é invariante e o lugar não é.
+
 ## Tático e Operacional são INVERTIDOS e sempre CÚBICOS
 
 ```text
