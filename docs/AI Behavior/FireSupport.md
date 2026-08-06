@@ -448,3 +448,193 @@ peso a `FogoIndireto` e `Antiaereo` quando o time perde o mapa.
 esta ficha escrita, a diferença deles fica nomeável: são unidades que **têm arma
 de contato**, ao contrário do artilheiro puro definido aqui. Ver `Shopping.md`
 §2.2.
+
+---
+
+# Apêndice — Marcha do Fogo de Suporte
+
+Escrita pelo autor em 2026-08-06. **Ela é a doutrina**, e vale a regra do
+cabeçalho: **onde o código divergir de um verso, o código está errado.**
+
+Quarta marcha do projeto, e a quarta que se define por comparação com o
+capturador — foi assim que a regra da moeda ficou visível.
+
+## Duas coisas que a marcha trouxe e nenhum documento tinha
+
+**1. A zona morta é a RAZÃO da vanguarda existir.**
+
+> *Minha arma não atira / quando o inimigo vem colar;*
+> ***por isso a vanguarda luta / para ninguém me alcançar.***
+
+O buraco de alcance mínimo (`contrato_envelope_alcance.md`: um obus 3-4 tem
+Tático `{3, 4}`, e os hexes 0, 1 e 2 voltam vazios) deixa de ser detalhe de
+implementação e vira **doutrina de formação**. A vanguarda não é cortesia: é o
+que mantém o inimigo fora do buraco.
+
+**2. O antiaéreo protege o OBSERVADOR.**
+
+> *quem tentar calar seus olhos / encontra a bateria pronta.*
+> *Artilharia guarda a terra, / o SAM fecha a direção;*
+> *um protege a força inteira, / **outro protege a observação**.*
+
+Completa a atração que a ficha declarava sem explicar — antiaéreo fica com a
+vigilância **porque o alvo prioritário do inimigo é o radar**. Casa com o
+vocabulário do `CLAUDE.md`: *capitão/magnético — Radar/EWACS para AA*.
+
+## E o Destroyer resolve a tensão do posicionamento
+
+> *Quando o Rally cruza o oceano, / ele assume a direção;*
+> ***vai à frente não para o choque, / mas para cobrir a formação.***
+
+Posição muda, **moeda não**. É a correção registrada acima, em verso.
+
+| verso | o que ele fixa |
+|---|---|
+| *"Detectar! Enxergar! / Coordenadas para atirar!"* | as duas casas do topo, na ordem |
+| *"No alcance mais distante, / eu dependo da detecção"* | `Detectar` é **habilitação da arma** — o quarto sentido da casa |
+| *"Três canhões amontoados / viram alvo para o Assalto"* | o `auto repelir`, e por quê |
+| *"Eu não movo para atirar, / eu atiro onde já estou"* | a modalidade artilheiro |
+| *"não persigo uma unidade, / reposiciono a destruição"* | por que ela **raramente** reposiciona para mirar no tático |
+| *"Duas armas de Assalto são dois golpes a atingir; / duas peças de suporte são dois lugares onde é proibido prosseguir"* | a moeda: **ameaça** contra **negação de área** |
+
+---
+
+**[Introdução — caixa lenta, metais graves]**
+
+Firmar posição! / Medir direção! / Olhos sobre a frente, / canhões em formação!
+
+Não corra até nós. / Não tente alcançar. / Nós cobrimos o caminho / por onde terá de passar.
+
+**[Estrofe 1]**
+
+Eu não entro em contato, / não avanço por furor; / fico atrás do capitão, / transformando espaço em temor.
+
+Minha arma não atira / quando o inimigo vem colar; / por isso a vanguarda luta / para ninguém me alcançar.
+
+Enquanto o Assalto rompe, / eu sustento a progressão; / ele abre pela blindagem, / eu abro pela explosão.
+
+**[Refrão]**
+
+A morte vem do alto! / Você nem vai me ver! / Quando ouvir o estampido, / já não há como correr!
+
+A morte vem do alto! / Do outro lado da visão! / Se conseguir achar meu fogo, / boa sorte na evasão!
+
+Detectar! Enxergar! / Coordenadas para atirar! / Eu não preciso perseguir: / você é quem vai se aproximar!
+
+**[Estrofe 2 — detectar e enxergar]**
+
+Primeiro encontro o alvo / que ameaça a formação; / elite, tanque ou aeronave, / cada qual na minha missão.
+
+No alcance mais distante, / eu dependo da detecção; / quem revela a coordenada / assina a sua destruição.
+
+Depois abro a visão, / vanguarda, esquerda e direita; / o cone vira semicírculo, / a cobertura fica perfeita.
+
+Se estou atrás da montanha / e meus olhos podem ver, / o inimigo sente a queda / sem saber de onde veio o poder.
+
+**[Refrão]**
+
+A morte vem do alto! / Você nem vai me ver! / Quando ouvir o estampido, / já não há como correr!
+
+A morte vem do alto! / Do outro lado da visão! / Se conseguir achar meu fogo, / boa sorte na evasão!
+
+**[Estrofe 3 — retaguarda e flancos]**
+
+Meu lugar é na retaguarda, / atrás do nosso capitão; / não por medo do combate, / mas por boa posição.
+
+Um canhão fecha a frente, / outro guarda o flanco esquerdo; / outro espera pela direita, / todos cobrem o terreno.
+
+Três canhões amontoados / viram alvo para o Assalto; / três canhões formando um delta / fazem morte em cada lado.
+
+Se você alcançar um deles, / outro aponta em sua direção: / meu ponto cego está guardado / por um irmão de formação.
+
+**[Ponte — auto repelir]**
+
+Afasta! / Espalha! / Não ofereça concentração!
+
+Frente! / Flancos! / Cruzem toda a proteção!
+
+Um canhão é uma ameaça, / três em delta são o chão / onde toda força inimiga / entra em zona de destruição!
+
+**[Estrofe 4 — mirar parado]**
+
+Eu não movo para atirar, / eu atiro onde já estou; / uma posição bem escolhida / vale mais que aonde o alvo andou.
+
+Só abandono minha base / quando o fogo se esgotar, / quando a frente houver passado / e outro campo precisar.
+
+Eu não corro atrás da presa, / nem desfaço a proteção; / não persigo uma unidade, / reposiciono a destruição.
+
+**[Estrofe 5 — antiaéreo]**
+
+Se a ameaça vem do céu, / o meu míssil vai subir; / junto à nossa vigilância, / eu não deixo o golpe cair.
+
+O radar encontra a asa, / o meu fogo dá resposta; / quem tentar calar seus olhos / encontra a bateria pronta.
+
+Artilharia guarda a terra, / o SAM fecha a direção; / um protege a força inteira, / outro protege a observação.
+
+**[Refrão forte]**
+
+A morte vem do alto! / Você nem vai me ver! / Quando ouvir o estampido, / já não há como correr!
+
+A morte vem do alto! / Canhão, míssil e explosão! / Se a vanguarda está coberta, / ninguém rompe a formação!
+
+Detectar! Enxergar! / Coordenadas para atirar! / Eu não preciso perseguir: / você é quem vai se aproximar!
+
+**[Estrofe 6 — Destroyer]**
+
+Pela costa vem o Destroyer, / protegendo a invasão; / míssil sobre a superfície, / canhão contra a aviação.
+
+Segue o capitão na praia, / cobre o porto e o corredor; / não possui arma de contato, / mas alcança o agressor.
+
+Quando o Rally cruza o oceano, / ele assume a direção; / vai à frente não para o choque, / mas para cobrir a formação.
+
+**[Estrofe 7 — recuo e colapso]**
+
+Se me encontro na vanguarda / e sozinho estou no chão, / não confundo inteligência / com morrer por posição.
+
+Volto atrás do meu capitão, / vou ao prédio ou ao quartel; / um canhão cercado é sucata, / protegido é fogo cruel.
+
+Quando o exército desaba, / meu destino é o HQ: / blindados fecham o contato, / meu alcance impede você.
+
+Artilharia de Campanha, / SAM pronto para o ar; / um núcleo duro na defesa, / esperando você chegar.
+
+**[Estrofe 8 — não fundir]**
+
+Dois canhões avariados / ainda cobrem dois setores; / dois disparos preparados, / dois caminhos de horrores.
+
+Não me funda, não me encolha, / não destrua a formação; / mesmo ferida, cada peça / ainda fecha uma direção.
+
+Duas armas de Assalto / são dois golpes a atingir; / duas peças de suporte / são dois lugares onde é proibido prosseguir.
+
+**[Chamada e resposta]**
+
+— Quem vê o inimigo? / — A Vigilância!
+
+— Quem marca o contato? / — A Detecção!
+
+— Quem guarda a vanguarda? / — A Artilharia!
+
+— Quem fecha o céu? / — O Antiaéreo!
+
+— E quem entra no alcance? / — Não sai inteiro!
+
+**[Refrão final]**
+
+A morte vem do alto! / Você nem vai me ver! / Quando ouvir o estampido, / já não há como correr!
+
+A morte vem do alto! / De uma oculta posição! / Se conseguir achar meu fogo, / boa sorte na evasão!
+
+Eu cubro a vanguarda! / Eu fecho cada flanco! / Eu guardo a retaguarda! / Eu transformo avanço em pranto!
+
+Não avanço com a linha, / mas permito ela avançar:
+
+Eu sou o Fogo de Suporte! / Entre no alcance — / e espere o céu desabar!
+
+**[Coda]**
+
+Firmar posição! / Coordenada confirmada!
+
+Ele não nos viu.
+
+Bateria preparada!
+
+**Fogo!**
