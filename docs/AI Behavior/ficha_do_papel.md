@@ -404,6 +404,137 @@ peça de volta sem código novo.
 
 ---
 
+---
+
+# 7.8 Os quatro papéis — quadro canônico
+
+**Consolidado pelo autor em 2026-08-06, no fim da sessão.** Onde este quadro
+divergir das fichas por papel, **este vale** — as divergências estão marcadas em
+`⚠️ DELTA` e as fichas precisam ser corrigidas.
+
+---
+
+## Capturador — *"converter $ pro exército"*
+
+**Subpapéis:** Capturador (Soldados), Capturador Combatente (Bazookas, Metranca)
+
+```text
+Enxergar, Detectar, Capturar, Embarcar, Reposicionar,
+Mirar, Fundir, Suprir, Transferir, Desembarcar
+```
+
+> **⚠️ DELTA vs `Capturador.md`.** A ficha anterior tinha `Capturar` em 1º e
+> `Reposicionar` em 10º. Mudou:
+>
+> ```text
+> antes   Capturar, Detectar, Enxergar, Embarcar, Desembarcar, Mirar, ...Reposicionar
+> agora   Enxergar, Detectar, Capturar, Embarcar, Reposicionar, Mirar, ...Desembarcar
+> ```
+>
+> **Enxergar e Detectar passaram na frente de Capturar** — coerente com a
+> justificativa que já estava escrita: *chegar na névoa impede capturar no mesmo
+> turno*, então a visibilidade se resolve **antes** de comprometer o turno.
+> E `Reposicionar` subiu de 10º para 5º: deixou de ser só a ação nula do fim.
+>
+> A **Marcha do Capturador** não precisa de ajuste — a estrofe da névoa já vem
+> antes das de deslocamento.
+
+---
+
+## Transportador — *"leva e traz unidades"*
+
+**Subpapéis:** Terrestre (APC), Aéreo (Chinook), Naval (Porta-Aviões)
+
+```text
+Pickup (vazio)    Embarcar, Reposicionar, Enxergar, Detectar, Mirar,
+                  Transferir, Suprir, Capturar, Desembarcar, Fundir
+
+Courier (carga)   Embarcar, Reposicionar, Enxergar, Detectar, Suprir,
+                  Transferir, Desembarcar, Mirar, Capturar, Fundir
+```
+
+> **⚠️ DELTA vs `Transporte.md` §0.1.**
+> - **Pickup:** `Desembarcar` caiu de 6º para 9º — vazio, não há o que largar.
+> - **Courier:** `Detectar` subiu de 7º para **4º**, antes de `Suprir`.
+>
+> O `Detectar` alto no Courier reforça a disciplina do modal: com carga, saber
+> quem está no ponto de largada é **precondição**, não valor.
+
+---
+
+## Assalto — *"eu rompo barreiras, seja em terra ou no ar!"*
+
+**Subpapéis:** Assalto (tanques), Interceptadores (caças), Ataque Aéreo
+(bombardeiros)
+
+```text
+Detectar, Mirar, Embarcar, Reposicionar, Capturar,
+Transferir, Suprir, Desembarcar, Enxergar, Fundir
+```
+
+| eixo | valor |
+|---|---|
+| **modalidade** | **combatente** — combate em contato (alcance mín 1) |
+| **posicionamento** | **vanguarda** — entre a massa oponente e o capitão, **à frente dele** |
+
+✅ Sem delta: bate com `Assalto.md`.
+
+---
+
+## Fogo de Suporte — *"A morte vem do alto, e você nem verá de onde veio"*
+
+**Subpapéis:** Fogo de Suporte (Art. Campanha), **Bombarda Naval (Destroyer)**,
+Antiaéreo (SAM), Antiaéreo Combatente (AAA com lagarta), Artilheiro Combatente
+(**Morteiro**)
+
+```text
+Detectar, Enxergar, Mirar, Reposicionar, Embarcar,
+Transferir, Suprir, Desembarcar, Capturar, Fundir
+```
+
+| eixo | valor |
+|---|---|
+| **modalidade artilheiro** | atira **parado**, segurando a posição. **Sem arma de contato** (alcance mín > 1) |
+| **modalidade híbrida** (× combatente) | tenta os **três primeiros sensores** no fogo de suporte; **se falhar, vai pro assalto** |
+| **retaguarda** | entre a massa oponente e o capitão, **atrás dele** |
+| **flancos** | esquerda e direita do capitão, como cobertura de fogo |
+| **auto-repelir** | repele os seus dentro do tático. Três canhões juntos: basta um assalto. Três em delta cobrindo os pontos cegos: nada entra |
+| **atração** | fogo de suporte com o **capitão**; antiaéreos com as **vigilâncias aéreas** |
+
+**Tático e Operacional invertidos, e sempre cúbicos** (ignoram geografia):
+`Tático` = alcance da arma (min–max); `Operacional` = o dobro.
+**O movimento não serve para medir a cobertura.**
+
+> **⚠️ DELTA vs `FireSupport.md`.**
+> - **`modalidade híbrida` é o nome certo** do que a ficha registrava como
+>   "decisão (a)". Não é rótulo nem papel: é uma **terceira modalidade**, ao lado
+>   de combatente e artilheiro. Mais limpo, e resolve a pergunta (a)/(b) sem
+>   inventar caminho de volta.
+> - **Subpapéis expandidos:** o Destroyer ganhou rótulo próprio — **Bombarda
+>   Naval** — e o exemplo do Artilheiro Combatente é o **Morteiro** (arma longa
+>   *e* de contato), não um obus.
+
+---
+
+## O que este quadro fixa
+
+```text
+3 modalidades    combatente, artilheiro, HÍBRIDA
+4 papéis         questionário, moeda, posicionamento, marcha
+13 subpapéis     o que o shopping pede e o que a ficha declara
+```
+
+E as quatro moedas, que respondem sozinhas se uma peça funde:
+
+| papel | onde o valor mora | fundir |
+|---|---|---|
+| Capturador | o **corpo** — HP é a taxa | **ganha** |
+| Transportador | as **vagas** | perde |
+| Assalto | a **arma** — cada casco é ameaça | perde |
+| Fogo de Suporte | a **formação** — cones cobrindo pontos cegos | perde, e **agrupar também** |
+
+---
+
 ## 8. O que este documento NÃO cobre
 
 - **Variações de papel** (degrau 4): `CapturadorCombatente` e parentes viram
