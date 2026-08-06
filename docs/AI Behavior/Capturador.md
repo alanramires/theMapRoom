@@ -445,8 +445,17 @@ rogue (§10) · `prioritizeDpqAtBattle` no ataque preemptivo.
 # Apêndice — Marcha do Capturador
 
 Escrita pelo autor em 2026-08-06, no dia em que o lema apareceu. **Ela é a
-doutrina**, e cobre as dez casas do questionário exceto `Suprir` e `Transferir`
-(hoje NÃO SE APLICA ao capturador).
+doutrina**, e cobre as **dez casas** do questionário.
+
+`Suprir` e `Transferir` entram pela passagem dos especialistas — e a última quadra
+dela declara a relação de ordem: são as casas 8 e 9, abaixo até do `Fundir`. Um
+field medic capturador não é um médico que às vezes captura; é um **capturador
+que por acaso carrega remédio**, e larga a maleta quando a captura aparece.
+
+O `ideias_futuras.md` item 11 registra que a máquina para isso já existe —
+*"um capturador com `isSupplier` já satisfaz `Logistica` hoje, ninguém apenas lhe
+pergunta nada"*. A passagem é a política que faltava. A única linha do verso que
+pede coluna nova é a do engenheiro: `PodeConstruir` **não existe**.
 
 Vale a mesma regra do cabeçalho deste documento: **onde o código divergir de um
 verso, o código está errado.** Três trechos já divergem hoje, e os três estão
@@ -543,6 +552,14 @@ Quando existe combate, / ele limpa o caminho; / quando ninguém captura, / ele t
 Não disputa a cidade / com quem fecha primeiro; / é soldado de assalto / com instinto financeiro.
 
 Se não há tiro útil / nem relógio melhor, / meia renda ainda vence / uma renda igual a zero.
+
+**[Passagem — especialistas]**
+
+Se eu levo remédio, / cuido de quem vai tomar; / um soldado recuperado / volta cedo a capturar.
+
+Se eu carrego ferramentas, / faço o estoque circular; / o engenheiro abre o caminho / para a renda não parar.
+
+Mas serviço não me prende, / nem me faz esquecer: / quando a luz roxa chama, / minha ordem é fazer render!
 
 **[Marcha intermediária — chamada e resposta]**
 
