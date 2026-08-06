@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -3732,7 +3732,7 @@ public partial class TurnStateManager
         });
     }
 
-    // Papel de composicao Capturador (inclui CapturadorAgressivo via ResolveCompositionRole).
+    // Papel de composicao Capturador (inclui CapturadorCombatente via ResolveCompositionRole).
     // Usado para priorizar "Capturar" no topo do painel de opcoes do sensor.
     private bool IsSelectedUnitPrimaryCapturer()
     {

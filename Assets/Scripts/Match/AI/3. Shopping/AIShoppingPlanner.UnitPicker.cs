@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 // Seleção de unidade por edifício: PickUnit, PickAirUnit e helpers de classificação.
@@ -198,7 +198,7 @@ public partial class AIShoppingPlanner
 
             bool isPrimaryCapturer   = u.roles != null && u.roles.Count > 0 && u.roles[0] == UnitRole.Capturador;
             bool isPrimaryAssault    = u.roles != null && u.roles.Count > 0 && u.roles[0] == UnitRole.Assalto;
-            bool isAggressiveCapturer = u.roles != null && u.roles.Count > 0 && u.roles[0] == UnitRole.CapturadorAgressivo;
+            bool isAggressiveCapturer = u.roles != null && u.roles.Count > 0 && u.roles[0] == UnitRole.CapturadorCombatente;
             bool isPrimaryTransporter = UnitRoleCompatibility.ResolveCompositionRole(u) == UnitRole.Transportador;
             bool isPrimaryLogistics = u.roles != null && u.roles.Count > 0 && u.roles[0] == UnitRole.Logistica;
             bool isPrimaryFireSupport = u.roles != null && u.roles.Count > 0 && u.roles[0] == UnitRole.FogoIndireto;
@@ -424,7 +424,7 @@ public partial class AIShoppingPlanner
                 continue;
             if (!manager.TryGetUnitData(out UnitData data) || data == null
                 || data.roles == null || data.roles.Count == 0
-                || data.roles[0] != UnitRole.CapturadorAgressivo)
+                || data.roles[0] != UnitRole.CapturadorCombatente)
                 continue;
             if (data.ResolveAiTargetPriorityForTargetClass(targetClass) == BazookaTargetPriority.Primary)
                 count++;

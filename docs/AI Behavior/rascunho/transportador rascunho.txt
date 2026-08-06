@@ -1,0 +1,52 @@
+Role: Transporter
+description: Eu sou o Taxi! eu acelero a sua missão e eu quero chegar o mais rapido possivel onde sou necessario!
+
+Sensor Priority Modal: 
+	Pickup (vazio): Embarcar, Reposicionar, Enxergar, Detectar, Mirar, Desembarcar, Transferir, Suprir, Capturar, Fundir
+	Courier (entregas): Embarcar, Reposicionar, Enxergar, Suprir, Transferir, Desembarcar, Detectar, Mirar, Capturar, Fundir
+
+Existem 3 tipos de transporte e cada um tem uma variante:
+	transporte terrestre: linhas de trem ou sobre rodas, focam em reposicionamento de unidades em superficie.
+	transporte aéreo: por helicoptero ou aeronaves, focam em travessia de terreno dificil ou cruzar o mar
+	transporte naval: por barco, focam em travessia naval nao apenas dos capturadores, mas tambem do restante do exercito.
+	
+Justificativa: Um transportador acelera o tempo do capturador ou o deslocamento de tropas. E ele muda conforme seu estado com carga ou sem carga. Estando vazio é chamado de Pickup, e estando com passageiro é chamado de Courier. Sua funçao principal estando vazio é fazer uso de melhor embarque para encontrar dentre os que precisam de carona para chegar onde querem ir, o melhor lugar onde ele é demandado, ou consiga fazer embarcar sua quantidade maxima de passageiros. Lembrando a missão e reposicionar a maior quantidade de recursos onde são necessários.
+Porque o Embarque dispara para primeiro quando levando carga? alguns transportadores podem aninhar em outro transportador para extender ainda mais o alcance. Imagine o seguinte cenario. vc compra soldado e apc, mas a demanda é do outro lado do canal! entretanto os navios não estão na praia e o apc está proximo. o soldado pede carona e embarca, e o apc, sabendo q nao conseguira cumprir a entrega tambem pede carona. porem isso nao impede o apc de deslocar ate a praia! quando o navio vier fazer rendevouz com o apc, o apc embarca  no navio e cruza o canal. 
+Note que tambem é o topo quando vazio. Se o apc puder entrar em um trem e o trem cruzar o territorio ate o front, o apc estara com tanque cheio qdo desembarcar. Eventualmente alguns transportadores não conseguem embarcar pois ainda não tem unidades que os levem (um trem precisaria de um tipo especial de navio, um outro navio talvez precisasse de uma heli carrier). 
+Enxergar e Detectar estando vazio sobe em prioridade pois ele fornece fogo de cobertura para EVAC de tropas feridas (lembre-se ele reposicionou primeiro, mas pode combater pra ajudar na mobilidade). 
+Estando com cargas o Mirar despenca na prioridade pois o foco é movimentar a carga, e enxergar passa na frente do desembarcar, pois é preciso ver o terreno antes de liberar a tropa. o transportador pede entao algum serviço de liberação de hexes para alguma escolta para evitar de perder 1 turno de desembarque só porque não viu o terreno a frente. 
+Estando vazios a transferencia vem a frente para manter as operações funcionando caso estejam em baixa. Transportadores que não prestam serviços mas movimentam estoque fazem o caminho oposto, doam para quem precisa de forma secundaria. Como muitos transportadores suprem apenas os embarcados, estando vazio esse sensor cai pro final, Mas sobe muito quando transportando, até mesmo na frente do desembarque, para garantir que solte aviões em capacidade operacional reparados. Note que Transferir tambem vem na frente, mas para atender sua demanda interna (avião tanque) ou puxar de portos para ter sempre estoque.
+Capturar seria ocasional e fundir seria negado, pois mesmo um transportador com 2 de hp e outro com 1 de hp, ainda são 2 transportadores que podem levar 4 cargas!
+O transportador serve a sua carga, e cuida dela enquanto a leva. Evitando entrar em combate porque o dano levado propagaria a carga.
+
+
+--
+ falta algumas politicas: capturador     HP é o RELÓGIO        reparar ACELERA a captura
+transportador  o CASCO é a capacidade   reparar não acelera nada
+Um Chinook com 1 de HP leva a mesma quantidade que um com 10. HP, para ele, não é velocidade — é só a distância até a morte. Reparar não compra operação nenhuma; compra sobrevivência, que é outro produto.
+
+E o porta-aviões é exceção por um motivo diferente do tamanho. O HP dele não protege a capacidade dele — protege a disponibilidade da pista. Se ele afunda, a asa aérea inteira perde a base. É externalidade, não capacidade, e é por isso que 5 faz sentido nele e não no Chinook. (O §16 do doc já reserva lugar para isso: "O Porta-Aviões é deste papel".)
+
+A promessa contra a fome já existe em código
+Você disse que não pôs no doc. A máquina está lá:
+
+
+AIController.RideWait.cs      MarkAIRideWaitStart é IDEMPOTENTE de propósito —
+                              quem já está na fila MANTÉM a antiguidade, e a
+                              urgência escala com os turnos esperados
+AIController.RidePromise.cs   o transportador grava Transport + o id do passageiro,
+                              e só promete quando a coleta NÃO se resolve neste turno
+Antiguidade que não zera é o anti-fome. Sétima vez hoje.
+
+Onde eu discordo: "embarque negado em defesa"
+Pelo lema — o transportador serve a carga —, em Collapsing a carga não some, ela muda de direção:
+
+
+EVAC                 §8 já existe. Levar ferido para a retaguarda é PRESERVAR
+                     RELÓGIO de capturador. Em colapso é o trabalho mais valioso
+                     que existe, e negar embarque o mata
+redistribuir defesa  tirar defensor de setor quieto e pôr no ameaçado É
+                     reposicionamento — a função central, não uma exceção
+"Mover tropas não rola" vale para avançar. Recuar e redistribuir são o mesmo verbo com o vetor trocado, e são exatamente o que um exército em colapso precisa.
+
+Eu negaria embarque para avanço, não embarque. E aí nem é regra nova: é o Reposicionar do capturador com o sinal invertido — o mesmo que a estrofe do cerco diz.

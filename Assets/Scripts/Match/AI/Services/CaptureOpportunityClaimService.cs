@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Tilemaps;
@@ -600,7 +600,7 @@ public static class CaptureOpportunityClaimService
             return 0;
         }
 
-        return data.roles[0] == UnitRole.CapturadorAgressivo ? 1 : 0;
+        return data.roles[0] == UnitRole.CapturadorCombatente ? 1 : 0;
     }
 
     private static void SortCandidates(

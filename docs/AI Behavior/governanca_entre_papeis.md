@@ -1,4 +1,4 @@
-# Governança entre papéis — as arestas
+﻿# Governança entre papéis — as arestas
 
 Os contratos desta pasta descrevem **papéis**. O `governanca.md` descreve o que
 vale **acima** de todos eles — as duas ordens e os sensores. Este descreve o que
@@ -124,7 +124,7 @@ autor marca como *"ainda em avaliação"*.
 
 | papel | é atraído por | estado |
 |---|---|---|
-| **Capturador Agressivo** | as mesmas referências do Capturador. A diferença é **local**: tende a atacar antes de continuar a captura | ✅ |
+| **Capturador Combatente** | as mesmas referências do Capturador. A diferença é **local**: tende a atacar antes de continuar a captura | ✅ |
 | **Interceptador** | unidades de **Vigilância Aérea**; Capitão. Acompanha a mais próxima ou mais relevante | ❓ |
 | **Ataque Aéreo** | **Interceptador**; Capitão, quando não há Interceptador adequado | ❓ |
 | **Artilheiro Combatente** | Capitão, acompanhando a **Vanguarda**. É principalmente Assalto, mas tenta primeiro as armas de longo alcance; sem solução de tiro, avança e combate por contato | ✅ coerente com `UnitBattleParticipation.Direct` |

@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 
 public enum UnitRole
 {
@@ -22,7 +22,7 @@ public enum UnitRole
     // nenhum save persiste UnitData.roles (o load recupera a ficha pelo unitId),
     // e nao existe 11 em asset, prefab ou cena. O comentario existe so para
     // ninguem reaproveitar o valor e ressuscitar dados antigos por acidente.
-    CapturadorAgressivo = 12,
+    CapturadorCombatente = 12,
     ArtilheiroCombatente = 13,
     AntiaereoCombatente = 14,
     // Apoio operacional. Os valores numericos permanecem estaveis porque
@@ -65,7 +65,7 @@ public static class UnitRoleCompatibility
             case UnitRole.Interceptador:
             case UnitRole.AtaqueAereo:
             case UnitRole.Antiaereo:
-            case UnitRole.CapturadorAgressivo:
+            case UnitRole.CapturadorCombatente:
             case UnitRole.ArtilheiroCombatente:
             case UnitRole.AntiaereoCombatente:
                 return UnitBattleParticipation.Direct;
@@ -103,7 +103,7 @@ public static class UnitRoleCompatibility
 
         switch (actualRole)
         {
-            case UnitRole.CapturadorAgressivo:
+            case UnitRole.CapturadorCombatente:
                 return requestedRole == UnitRole.Capturador
                     || requestedRole == UnitRole.Assalto;
             case UnitRole.ArtilheiroCombatente:
@@ -159,7 +159,7 @@ public static class UnitRoleCompatibility
             return UnitRole.None;
 
         UnitRole primary = data.roles[0];
-        if (primary == UnitRole.CapturadorAgressivo)
+        if (primary == UnitRole.CapturadorCombatente)
             return UnitRole.Capturador;
         if (primary == UnitRole.ArtilheiroCombatente)
             return data.unitClass == GameUnitClass.Armored

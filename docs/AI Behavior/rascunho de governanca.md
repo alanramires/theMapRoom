@@ -1,4 +1,4 @@
-# Governança do Sistema — doutrina em prosa
+﻿# Governança do Sistema — doutrina em prosa
 
 > **Natureza deste documento:** esta é a apresentação da doutrina do jogo em
 > prosa, destinada a autores e revisores. Ela descreve **como o sistema deve se
@@ -530,7 +530,7 @@ Foi criada originalmente para operações em `Air/High`, mas passará a ser base
 
 Algumas funções modificam o comportamento de um papel principal ou participam de mais de uma categoria.
 
-### Capturador Agressivo
+### Capturador Combatente
 
 Especialização de Capturador.
 
@@ -598,7 +598,7 @@ O mesmo papel também receberá regras específicas para transporte naval.
 
 - **Capturador**
     
-    - Capturador Agressivo
+    - Capturador Combatente
         
 - **Assalto**
     
@@ -727,7 +727,7 @@ Essa limitação ainda está em avaliação.
 
 # Atração dos Papéis Secundários
 
-## Capturador Agressivo
+## Capturador Combatente
 
 Utiliza as mesmas referências do Capturador.
 

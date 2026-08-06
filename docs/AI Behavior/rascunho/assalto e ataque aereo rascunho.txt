@@ -1,0 +1,22 @@
+Role: Assalto, Interceptadores e Ataque Aereo
+description: Tá dificil seguir em frente? me chama, eu rompo barreiras, seja em terra ou no ar!
+
+Sensor: Detectar, Mirar, Embarcar, Reposicionar, Capturar, Transferir, Suprir, Desembarcar, Enxergar, Fundir
+	
+Modalidade - combatente: feito para combate em contato, mover e atacar em alcance de contato. (alcance min 1)
+	
+Posicionamento - vanguarda: a posição entre a massa oponente e o capitão eleito "a frente" dele
+	
+Detectar é o top prioridade para a unidade de assalto saber exatamente onde está os elites que ele deve destruir. Unidades de assalto podem passar a vez para uma outra reposiconar na vanguarda para iluminar alvos. Especialmente bombardeiros (ataque aereo) para destruir logo a artilharia de elite do inimigo.
+Em combate (Mirar) Sempre focam em sua missão que é destruir seu alvo preferido de elite (assim tanques sempre caçam os canhões de elite). não encontrando, procuram o melhor local de defesa para lutar com a melhor vantagem.  Se não conseguirem o papel muda. Estando atribuido a uma missão com plano, posicionam a vanguarda proximo do capitao, se forem rogues, avançam igual imbecil na frente na direção do alvo. (uma variante inteligente saberá ler a hotzone do alvo e posicionar-se 1 hex na beirada para ter avanço total no proximo turno). 
+Só embarcam após esgotar as possibilidades de combater ou detectar e o capitão atribuido estiver muito longe. Em testes algumas unidades de assalto capturam oportunisticamente, mas não é o papel delas; raramente movem estoques, prestam serviços a aliados.
+Quanto a fusão sem estar em reparo, elas não fundem. 2 tanques avariados ainda são duas armas anti-veiculos. e estando em estado de repair tambem não fundem para nao encolher o exercito. Como raramente blindados de assalto levam tropas eles mal a desembarcam e ignoram totalmente terreno oculto pela nevoa. 
+minha função é contato! mesmo q seria ideal q alguem revelasse quem está ali, mas como ninguem revelou deixa comigo! minha armadura pesada aguenta.
+
+Seja uma unidade de aereo de assalto (chamada de Ataque Aéreo), lutando contra outras aeronaves no ar (Interceptadores) ou no chão (Assalto puro) a função dessas unidades de alcance 1 é partir pra briga!
+
+Em modo de defesa: a produção segue tentando chegar no elite junto com o recrutamento avançado, mas cada politica pode variar dependendo da AI.
+
+Unidades de assalto e ataque aereo tambem são pre-requisitos para concentração de força antes de uma invasão final
+
+variantes pendentes: artilheiro combatente, antiaereo combatente (preciso explicar fogo de suporte primeiro)

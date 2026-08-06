@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -76,7 +76,7 @@ public class AICaptainAttractionEntry
 
     [Tooltip("So vale para 'Unidade com papel'. O papel que serve de referencia.\n\n" +
              "A comparacao usa UnitRoleCompatibility.CanSatisfy, entao especializacoes " +
-             "servem: pedir Capturador aceita CapturadorAgressivo.")]
+             "servem: pedir Capturador aceita CapturadorCombatente.")]
     public UnitRole papel = UnitRole.Capturador;
 
     [Tooltip("LIGADO: aceita capitao EMBARCADO nesta faixa.\n\n" +

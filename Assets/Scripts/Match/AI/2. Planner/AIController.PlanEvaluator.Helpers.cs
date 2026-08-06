@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -488,7 +488,7 @@ public partial class AIController
 
     // Algum produtor do time oferta unidade que RESOLVE para este papel de composição?
     // Espelha CanAnyOfferedUnitCloseCore do shopping: usa ResolveCompositionRole (mesmo predicado
-    // de CountCompositionRole), NÃO CanSatisfy — senão um CapturadorAgressivo "prometeria" fechar
+    // de CountCompositionRole), NÃO CanSatisfy — senão um CapturadorCombatente "prometeria" fechar
     // um slot de Assalto/Fogo que ele nunca conta.
     //
     // Sem informação de oferta (MyBuildings null): retorna TRUE — não remove slot por dúvida.

@@ -92,13 +92,13 @@ save/load e aposentadoria futura de `QueroCaronaAereaService`.
 Hoje `PodeCapturarSensor.GetCapturePower(unit)` tem isto:
 
 ```csharp
-unitData.roles[0] == UnitRole.CapturadorAgressivo
+unitData.roles[0] == UnitRole.CapturadorCombatente
     → Mathf.Max(1, CeilToInt(hp / 2f))
 ```
 
 Uma linha com **três** problemas empilhados:
 
-1. **`roles[0]` estrito.** Unidade com `[Assalto, CapturadorAgressivo]` captura a
+1. **`roles[0]` estrito.** Unidade com `[Assalto, CapturadorCombatente]` captura a
    100%. É a mesma armadilha que `UnitRoleCompatibility.CanSatisfy` existe para
    evitar.
 2. **Papel de IA governando regra de jogo.** O papel é comportamento; a chave é a
@@ -131,7 +131,7 @@ pré-requisito**. Continuam multiplicativos, como o manual manda.
 | # | pergunta | decisão |
 |---|---|---|
 | 1 | unidade com duas chaves da mesma construção usa qual eficiência? | **a maior.** A unidade usa a melhor ferramenta que tem; carregar uma chave pior nunca é ônus |
-| 2 | `CapturadorAgressivo` sai da conta? | **sai.** Quem captura pela metade passa a ser quem **carrega a chave 0.5**, não quem tem o papel |
+| 2 | `CapturadorCombatente` sai da conta? | **sai.** Quem captura pela metade passa a ser quem **carrega a chave 0.5**, não quem tem o papel |
 | 3 | eficiência `0` é permitida? | **não.** "Tem a chave e não consegue" é confuso — para isso basta não listar a skill. Validar `> 0` no editor |
 
 #### O que a decisão 2 exige, e o risco dela
@@ -144,17 +144,17 @@ Ordem segura:
 
 1. criar a chave de eficiência reduzida (`Capturador Alternativo`, já existe)
 2. listá-la nas construções, ao lado da chave normal
-3. trocá-la nas fichas hoje `CapturadorAgressivo`
-4. **auditar**: nenhuma ficha com `CapturadorAgressivo` pode ficar sem a chave
+3. trocá-la nas fichas hoje `CapturadorCombatente`
+4. **auditar**: nenhuma ficha com `CapturadorCombatente` pode ficar sem a chave
    reduzida — o `CaptureKeyAuditor` é o lugar natural desse aviso
-5. só então remover o `roles[0] == CapturadorAgressivo` do
+5. só então remover o `roles[0] == CapturadorCombatente` do
    `PodeCapturarSensor.GetCapturePower`
 
 Enquanto os passos 1-4 não estiverem prontos, o hardcoded **fica**. As duas
 regras convivendo por um tempo é preferível a uma janela em que ninguém captura
 pela metade.
 
-Repare que o papel `CapturadorAgressivo` **continua existindo** — ele só perde a
+Repare que o papel `CapturadorCombatente` **continua existindo** — ele só perde a
 parte de regra de jogo. O que ele governa é comportamento de IA: atacar antes de
 continuar capturando. Isso é dele e fica.
 

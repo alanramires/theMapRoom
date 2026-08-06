@@ -1,4 +1,4 @@
-# Revisão dos Papéis — a matriz papel × sensor
+﻿# Revisão dos Papéis — a matriz papel × sensor
 
 > **Todos os papéis atiram, mas nem todos atiram da mesma maneira. Todos
 > capturam, mas nem todos têm a skill ou a priorizam. Todos embarcam, mas alguns
@@ -72,7 +72,7 @@ Papéis vivos hoje (`UnitRole`):
 
 | principais | secundários | apoio |
 |---|---|---|
-| Capturador | CapturadorAgressivo | Transportador |
+| Capturador | CapturadorCombatente | Transportador |
 | Assalto | ArtilheiroCombatente | Logística |
 | FogoIndireto | AntiaereoCombatente | Estoque |
 | Vigilância | Interceptador | TransportadorAéreo |
@@ -328,7 +328,7 @@ papel decide se prioriza.
 As raças acima **acrescentam** colunas. As mistas fazem outra coisa: elas
 **encadeiam parentes dentro de uma coluna**.
 
-### Labradoodle — o capturador agressivo
+### Labradoodle — o capturador combatente
 
 > *Vira mistura de Fire Support com Assault. Consulta o `PodeMirar` do FS, e se
 > não der, o `PodeMirar` do Assault.*
@@ -379,7 +379,7 @@ causa disso.
 Uma célula deixa de ser "uma política" e passa a poder ser **uma cadeia**:
 
 ```text
-AI Role: Capturador Agressivo
+AI Role: Capturador Combatente
   PodeMirar   FireSupport → Assault      (tenta longe; sem solução, contato)
 
 AI Role: Porta-aviões        essência: Transportador
@@ -411,11 +411,11 @@ seção é a parte que muda o quando.
 ### O problema, na formulação do autor
 
 > *No dia que eu inventar o Field Medic, ele vai precisar de um papel novo só
-> pra dizer que "logística" pesa mais que "captura"? Hoje o Capturador Agressivo
+> pra dizer que "logística" pesa mais que "captura"? Hoje o Capturador Combatente
 > diz que capturar é a prioridade secundária, e por isso criamos um papel só pra
 > ele. A combinação explode em 10×10.*
 
-Correto, e o nome disso é preciso: **`CapturadorAgressivo` não é uma identidade,
+Correto, e o nome disso é preciso: **`CapturadorCombatente` não é uma identidade,
 é uma ordem entre duas agendas.** Cadastrar cada cruzamento como `UnitRole` faz o
 catálogo crescer no quadrado das características.
 
@@ -462,7 +462,7 @@ agressivo).
 A lista de mortes junta dois mecanismos **diferentes**:
 
 ```text
-CapturadorAgressivo   combater ANTES de capturar      ordem ENTRE colunas
+CapturadorCombatente   combater ANTES de capturar      ordem ENTRE colunas
 ArtilheiroCombatente  tiro longo, senão contato       cadeia DENTRO da coluna
 ```
 
@@ -507,7 +507,7 @@ regressão quando aparecer "e se crítico fosse 30% em vez de 25%".
 
 | papel | veredito |
 |---|---|
-| `CapturadorAgressivo = 12` | morre → `Capturador` + trait |
+| `CapturadorCombatente = 12` | morre → `Capturador` + trait |
 | `ArtilheiroCombatente = 13` | morre → cadeia dentro de `PodeMirar` |
 | `AntiaereoCombatente = 14` | morre → mesma forma |
 | `TransportadorAereo = 15` | ~~sobrevive como preferência de compra~~ → **morre**, ver auditoria abaixo |
@@ -528,14 +528,14 @@ Traits são **degrau 4** ("variação de papel vira parâmetro"). O degrau 3 tem
 **1 linha de 7**.
 
 O caso concreto que mostra o risco: o `Agressivo` de hoje está espalhado —
-inclusive o `roles[0] == CapturadorAgressivo` com 50% hardcoded no
+inclusive o `roles[0] == CapturadorCombatente` com 50% hardcoded no
 `GetCapturePower`, que continua de pé. Transformá-lo em trait agora não
 centraliza a política; **move o espalhamento para um campo novo.**
 
 > **Não dá pra parametrizar uma política que ainda não foi extraída.**
 
 Quando as 7 linhas existirem, a diferença entre `Capturador` e
-`CapturadorAgressivo` estará visível como **duas células divergentes numa linha
+`CapturadorCombatente` estará visível como **duas células divergentes numa linha
 só** — e aí o trait é a forma óbvia de registrar a divergência. Hoje seria
 palpite.
 
@@ -647,7 +647,7 @@ Acréscimo desta revisão. São dois grupos, com mecanismos distintos:
 
 | grupo | papéis | mecanismo |
 |---|---|---|
-| **preferência / cadeia** | CapturadorAgressivo, ArtilheiroCombatente, AntiaereoCombatente | ordem entre colunas, ou cadeia dentro de uma |
+| **preferência / cadeia** | CapturadorCombatente, ArtilheiroCombatente, AntiaereoCombatente | ordem entre colunas, ou cadeia dentro de uma |
 | **agenda + camada** | Interceptador, AtaqueAereo, Antiaéreo | **uma agenda só, parametrizada pela camada do ALVO** |
 
 O segundo grupo **não é caso de trait — é a solução da Vigilância outra vez.** Lá

@@ -1,4 +1,4 @@
-# Governança do Sistema — contrato técnico
+﻿# Governança do Sistema — contrato técnico
 
 Este documento é a **tradução técnica** da doutrina apresentada em
 `rascunho de governanca.md`. O rascunho explica o comportamento esperado em
@@ -649,7 +649,7 @@ categoria.
 
 | especialização | de quem | o quê | no código |
 |---|---|---|---|
-| **Capturador Agressivo** | Capturador | prefere **atacar primeiro e capturar depois**. Captura com eficiência menor que um Capturador | `CapturadorAgressivo = 12` ✅ |
+| **Capturador Combatente** | Capturador | prefere **atacar primeiro e capturar depois**. Captura com eficiência menor que um Capturador | `CapturadorCombatente = 12` ✅ |
 | **Interceptador** | Assalto | contra alvos **aéreos**. Usado por unidades aéreas de contato | `Interceptador = 8` ✅ |
 | **Ataque Aéreo** | Assalto | aeronaves atacando alvos de **superfície** | `AtaqueAereo = 9` ✅ |
 | **Artilheiro Combatente** | Fire Support → Assalto | tenta primeiro o combate **à distância**; sem solução válida de longo alcance, passa para Assalto | `ArtilheiroCombatente = 13` ✅ |
@@ -685,7 +685,7 @@ foi só mudado de pasta.
 
 ```text
 Capturador
-└── Capturador Agressivo
+└── Capturador Combatente
 
 Assalto
 ├── Interceptador
@@ -709,7 +709,7 @@ Vigilância
 relação de pai e filho. Quem materializa o parentesco é
 `UnitRoleCompatibility.CanSatisfy` — e é por isso que todo portão de papel em
 sensor ou execução precisa usar `CanSatisfy`, e nunca `roles.Contains` estrito.
-Com o teste estrito, `CapturadorAgressivo` não passa por um portão de
+Com o teste estrito, `CapturadorCombatente` não passa por um portão de
 `Capturador`, embora seja um.
 
 Note também que Artilheiro Combatente e Antiaéreo Combatente aparecem sob

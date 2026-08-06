@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Tilemaps;
 
@@ -149,7 +149,7 @@ public static class PodeCapturarSensor
             && unitData != null
             && unitData.roles != null
             && unitData.roles.Count > 0
-            && unitData.roles[0] == UnitRole.CapturadorAgressivo)
+            && unitData.roles[0] == UnitRole.CapturadorCombatente)
         {
             return Mathf.Max(1, Mathf.CeilToInt(hp / 2f));
         }

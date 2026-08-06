@@ -24,7 +24,7 @@ devem ser preservadas ao alterar planner, shopping, transporte ou combate.
   `UnitRoleCompatibility.CanSatisfy(data, UnitRole.Capturador)` for verdadeiro.
 - Regras de composicao que exigem um capturador principal usam
   `UnitRoleCompatibility.ResolveCompositionRole(data) == UnitRole.Capturador`.
-- `CapturadorAgressivo` mantem a agenda de captura, mas recebe uma etapa de
+- `CapturadorCombatente` mantem a agenda de captura, mas recebe uma etapa de
   combate de abertura antes do avanco comum.
 - As decisoes nao devem depender do nome da unidade ou do prefab.
 
@@ -57,7 +57,7 @@ capturavel no setor.
 - O `Perseguidor` resolve primeiro combates imediatos ligados ao avanco.
 - Capturas oportunistas sao avaliadas antes do combate agressivo e do avanco
   normal.
-- `CapturadorAgressivo` pode abrir caminho contra uma ameaca proxima.
+- `CapturadorCombatente` pode abrir caminho contra uma ameaca proxima.
 - Depois sao avaliados ataque defensivo de oportunidade, exploracao de alvo
   oculto e o scoring normal de movimento/ataque.
 
@@ -86,10 +86,10 @@ O `Perseguidor` trata o combate que bloqueia ou acompanha a captura:
 - pode trocar progresso por DPQ quando a situacao de combate justificar;
 - todo ataque ainda precisa passar pela simulacao de sobrevivencia e dano.
 
-## Capturador Agressivo
+## Capturador Combatente
 
 `AIController.Capturer.Agressive` e aplicado somente quando o papel primario e
-`CapturadorAgressivo`.
+`CapturadorCombatente`.
 
 - Atua depois das capturas diretas e oportunistas, portanto nunca troca uma
   captura segura por uma briga desnecessaria.
@@ -103,7 +103,7 @@ O papel continua sendo capturador: o comportamento agressivo e uma capacidade
 adicional, nao uma agenda independente de assalto.
 
 > **SUPERADO PELO DESENHO.** Ver "Correcao 3 — o capturador alternativo nao
-> precisa de papel proprio". A conclusao de la: `CapturadorAgressivo` e a soma de
+> precisa de papel proprio". A conclusao de la: `CapturadorCombatente` e a soma de
 > uma **chave 0.5** com uma **ordem**, e cinco dos oito usos dele no codigo sao
 > de shopping, nao de comportamento. O que sobrevive desta secao e o "abre
 > passagem ao objetivo" — se isso for **selecao de alvo**, e politica de Mirar e
@@ -241,7 +241,7 @@ As categorias principais sao:
 - `Capturador`: fluxo geral e movimento atribuido;
 - `PontaLanca`: chegada e captura direta;
 - `Perseguidor`: combate ligado ao avanco;
-- `CapturadorAgressivo`: abertura de caminho;
+- `CapturadorCombatente`: abertura de caminho;
 - `Oportunista`: captura local e reservas;
 - `Explorador`: revelacao e observador avancado;
 - `Defensor`: manutencao ou liberacao do setor;
@@ -413,14 +413,14 @@ controlador do capturador joga a bola.
 ### 1. Capturar — capturar rapido e com maior eficiencia
 
 **HP e a taxa de captura** (`PodeCapturarSensor.GetCapturePower` devolve HP;
-metade para `CapturadorAgressivo`). Tudo abaixo decorre disso.
+metade para `CapturadorCombatente`). Tudo abaixo decorre disso.
 
 - **Largar meia captura** quando a da frente esta vazia e alguem atras fecha.
   Economia de turno. **MUDA REGRA:** hoje isso e o handoff blitzkrieg,
   `hardMode`-only e guiado por eixo, com dicionario `unidade -> predio aberto`.
   Como politica base vira aritmetica, e o blitz vira so um limiar mais frouxo.
 - **Capturar sempre com HP cheio.** Nao e preferencia, e a taxa — dai o swap
-  (cede para quem tem mais HP) e o `CapturadorAgressivo` como reserva.
+  (cede para quem tem mais HP) e o `CapturadorCombatente` como reserva.
 - **Capturador de outro plano da uma forcinha** quando o dono do objetivo esta
   no Operacional (nao chega neste turno). **MUDA REGRA:**
   `IsOtherAssignedCapturerTarget` (`Capturer.cs:52`) hoje barra alvo alheio
@@ -457,7 +457,7 @@ fora do Tatico. Ver `docs/AI Behavior/Transporte.md`.
 
 ### 6. Mirar — abaixo do transporte de proposito
 
-O `CapturadorAgressivo` **inverte** isto. Em ficha, inverter nao e codigo novo:
+O `CapturadorCombatente` **inverte** isto. Em ficha, inverter nao e codigo novo:
 e **outra lista**, outro `RoleData`.
 
 ### 7. Fundir — regra de recuo E politica de eficiencia
@@ -616,6 +616,6 @@ Zero copia de papel, zero skill nova. Uma skill que "promove Mirar" seria poder
 disfarcado de chave e falharia o teste do renome; a chave 0.5 e legitima porque
 **quem a lista e a construcao**.
 
-Consequencia: `CapturadorAgressivo` pode sair do enum algum dia, pelo roteiro
+Consequencia: `CapturadorCombatente` pode sair do enum algum dia, pelo roteiro
 seguro do item 10 — e a discussao de renomea-lo ("Capturador Alternativo" ja e o
 nome da CHAVE, nao pode ser o do papel) deixa de precisar de decisao.

@@ -33,7 +33,7 @@ de enum, porque nao havia outro lugar.
 Sao papeis que existem para o shopping conseguir comprar, nao para descrever
 comportamento. O autor confirmou a intencao dos tres.
 
-### 2.1 `CapturadorAgressivo` (12) — bazooka e metranca
+### 2.1 `CapturadorCombatente` (12) — bazooka e metranca
 
 **Cinco dos oito usos reais sao de shopping:**
 
@@ -124,11 +124,11 @@ barato:
 12       depende do item 10 do docs/ideias_futuras.md (chave de eficiencia):
          1. chave "Capturador Alternativo" 0.5              ja existe
          2. listar nas construcoes capturaveis
-         3. trocar nas fichas hoje CapturadorAgressivo
+         3. trocar nas fichas hoje CapturadorCombatente
          4. auditar (CaptureKeyAuditor): nenhuma ficha com o papel sem a chave
          5. FindSwapIncomingCapturer passa a comparar CAP POWER, nao HP    <- senao
             fica uma janela em que a chave vale e o swap ainda compara errado
-         6. tirar o roles[0] == CapturadorAgressivo do GetCapturePower
+         6. tirar o roles[0] == CapturadorCombatente do GetCapturePower
          7. dar ao shopping o gancho de preferencia pela matriz
          8. tirar o 12 do enum
 ```

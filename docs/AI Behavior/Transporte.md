@@ -73,7 +73,7 @@ Enxergar sobe antes de Desembarcar   por PRECONDIÇÃO — não se desembarca na
 ```
 
 A segunda é ordem de verdade: é **causal**. A primeira já é o **terceiro passo do
-gate** (*"vale o meu turno?"*) — foi assim que o `CapturadorAgressivo` se dissolveu
+gate** (*"vale o meu turno?"*) — foi assim que o `CapturadorCombatente` se dissolveu
 sem virar papel novo (`docs/AI Behavior/Capturador.md` §1).
 
 **Regra:** modo só onde o motivo é **precondição**. Valor resolve no gate. Sem

@@ -1,0 +1,25 @@
+Role: Fogo de Suporte & Antiaereo
+description: A morte vem do alto, e você nem verá de onde veio. Ou se conseguir ver, boa sorte pra esquivar! 
+
+Sensor: Detectar, Enxergar, Mirar, Reposicionar, Embarcar, Transferir, Suprir, Desembarcar, Capturar, Fundir,
+	
+Modalidade artilheiro: feito para atirar parado segurando a posição. nao tem armas de contato. (alcance min > 1)
+	
+Posicionamento
+	retaguarda: a posição entre a massa oponente e o capitão eleito "atras" dele. 
+	flancos: a esquerda e direita do capitao, mas usado como cobertura de fogo (ver justificativa)
+	auto repelir: uma unidade de fogo de suporte repele os seus em taticos, 3 canhoes juntos basta 1 assalto para acabar com a festa. 3 canhoes em deltas cobrindo os pontos cegos uns dos outros e nada entra!
+	atração: fogo de suporte fica junto com o capitao, antiaereos junto com as vigilancias aereas!
+	
+Tatico e Operacional são invertidos e sempre cubicos (ignorando geografia)
+	Tatico: alcance da arma min e max
+	Operacional: dobro do tatico
+	O movimento não serve para medir a cobertura.
+	
+Justificativa: Artilharia não consegue atirar no que não vê, especialmente no alcance máximo de 4 hexes que exige oponente detectado, por isso esse sensor é top prioridade, inclusive para o cone de cobertura da vanguarda, para liberar a unidade a se mover quando a força principal ocupar o cone de cobertura na vanguarda.  Enxergar é a segunda prioridade para extender o cone afim q ele se torne um semi-circulo cobrindo os flancos e a vanguarda a formação. Se a artilharia detectar e enxergar e estiver atras de montanha, o inimigo nem saberá o que o atingiu. Só quando esgotarem a artilharia pode se reposicionar, mas ela raramente reposicionará para mirar o inimigo no tatico! e se a artilharia se ver sozinha na vanguarda ela recua. Artilharias nunca se reparam na vanguarda (ao contrario dos assaltos que não ligam) e em colapso o melhor lugar pra ela ficar é no HQ com a melhor defesa. de preferencia uma artilharia de campanha. Algumas artilharias tem requisitos como reboque para serem movidas.
+Artilharias raramente capturam, carregam estoques ou prestam serviços, sequer levam carona e não se fundem, jamais! 
+Destroyer (marinha), Obuses, artilharia de campanha e SAM representam essa categoria. Um destroyer segue o capitão pela praia para prestar fogo de suporte com suas duas armas de superficie (cruise) ou canhao anti aereo. mas ambas as armas ainda são fogo de suporte pois o navio não tem armas de contato. 
+
+Em modo de rally no mar (invasão) o Destroyer se torna o capitão do mar e temporariamente assume a vanguarda do grupo naval (destroyer, porta avioes, subs, navio de transporte e fragatas)
+
+em colapso: o foco é a artilharia de campanha, mas apenas se houverem blindados o bastante. pelo menos 1 artilharia de campanha e 1 SAM constitui o core defensivo basico que pode ser comprado mesmo em even ou advantage.

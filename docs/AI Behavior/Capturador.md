@@ -70,13 +70,13 @@ CONTA (vira score)        swap, handoff, fusão de eficiência,
 
 ---
 
-## 1. Capturador Agressivo é um ramo do Capturador
+## 1. Capturador Combatente é um ramo do Capturador
 
 Não é outro papel: **segue as mesmas políticas**, muda só a prioridade e a forma
 de se comportar.
 
-✅ `UnitRole.CapturadorAgressivo = 12`, e
-`UnitRoleCompatibility.CanSatisfy(CapturadorAgressivo, Capturador) == true` — ele
+✅ `UnitRole.CapturadorCombatente = 12`, e
+`UnitRoleCompatibility.CanSatisfy(CapturadorCombatente, Capturador) == true` — ele
 também satisfaz `Assalto`. O ramo agressivo é decidido **dentro** do fluxo do
 capturador (`AIController.Capturer.cs:244`), depois da captura oportunista e
 antes do avanço normal.
@@ -86,14 +86,14 @@ objetivo não há status de defesa, e o rótulo passa a ser a âncora. O caminho
 plano (`Capturer.Rogue.cs`) chama o ramo agressivo antes da marcha final — mesma
 posição relativa que ele ocupa no fluxo com objetivo.
 
-✅ O teste do ramo é `UnitRoleCompatibility.CanSatisfy(data, CapturadorAgressivo)`,
+✅ O teste do ramo é `UnitRoleCompatibility.CanSatisfy(data, CapturadorCombatente)`,
 não `roles[0]` estrito: papel em posição secundária continua sendo o papel.
-Capturador puro não dispara o ramo — `CanSatisfy(Capturador, CapturadorAgressivo)`
+Capturador puro não dispara o ramo — `CanSatisfy(Capturador, CapturadorCombatente)`
 cai no `default: return false`.
 
 ### ⚠️ REVISTO em 2026-08-06 — ele não precisa ser ramo, nem papel
 
-Decomposto, `CapturadorAgressivo` é a soma de três coisas que **já existem em
+Decomposto, `CapturadorCombatente` é a soma de três coisas que **já existem em
 outro lugar**:
 
 ```text
@@ -118,11 +118,11 @@ Ver `Assets/Scripts/Match/AI/3. Shopping/Shopping.md` (o gancho de compra) e
 
 ## 2. Alocação de capturas
 
-**a) Com plano:** capturador tem preferência; capturador agressivo é **backup**.
+**a) Com plano:** capturador tem preferência; capturador combatente é **backup**.
 Distância exatamente igual ao objetivo ⇒ **o agressivo cede a vez**.
 
 **b) Sem plano (atribuição rebelde):** capturador tem preferência sobre
-capturador agressivo. Distância exatamente igual ⇒ **o agressivo cede a vez**.
+capturador combatente. Distância exatamente igual ⇒ **o agressivo cede a vez**.
 
 ✅ `SortCandidates` ordena por **papel primeiro** — capturador puro antes de
 agressivo — depois `InstanceId`, arestas e custo.
@@ -179,7 +179,7 @@ Segue as flags do `UnitData` da unidade.
 Pursuer, HQBreaker, Rogue e — desde a v6.1.2 — no ataque preemptivo de papel
 (`TryBuildRolePreemptiveAttack`), que era o último caminho que a ignorava.
 
-**Regra adicional:** se o capturador agressivo for lutar mas o movimento o levar
+**Regra adicional:** se o capturador combatente for lutar mas o movimento o levar
 para cima de um prédio capturável, ele **tenta lutar em outro lugar** — não
 ocupa o capturável para brigar.
 
@@ -249,7 +249,7 @@ se fossem teleportados até lá:
 | papel | distância de largada aceitável |
 |---|---|
 | Capturador | 0 (em cima do alvo) a **3** hexes |
-| Capturador Agressivo | 0 (em cima do alvo) a **2** hexes |
+| Capturador Combatente | 0 (em cima do alvo) a **2** hexes |
 
 ❌ Não existe distinção por papel. O código tem `TransportDropOffRange = 4`
 (entrega terrestre) e `AirDropOffRange = 2` (helicóptero — mais preciso porque
@@ -544,7 +544,7 @@ Se o exército sustenta, / posso ainda avançar: / a renda que vem depois / vale
 
 Mas se ninguém me cobre, / não abandono o lugar: / dinheiro protegido / também é adiantar.
 
-**[Sexta estrofe — Capturador Agressivo]**
+**[Sexta estrofe — Capturador Combatente]**
 
 E vem o agressivo / com a chave no bornal; / seu relógio anda lento, / mas seu tiro é fatal.
 

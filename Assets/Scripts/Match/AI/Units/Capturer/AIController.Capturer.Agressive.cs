@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -27,7 +27,7 @@ public partial class AIController
         // o papel. Gate estrito ja mordeu este projeto antes.
         if (!unit.TryGetUnitData(out UnitData data) || data == null
             || !UnitRoleCompatibility.CanSatisfy(
-                data, UnitRole.CapturadorAgressivo))
+                data, UnitRole.CapturadorCombatente))
             return false;
 
         // Sem objetivo nao ha status de defesa, e o rotulo do log passa a ser a
@@ -68,7 +68,7 @@ public partial class AIController
         {
             Vector3Int rangedTargetCell = rangedTarget.CurrentCellPosition;
             rangedTargetCell.z = 0;
-            Debug.Log($"{TL("CapturadorAgressivo")} {unit.InstanceId} atira parado para {objectiveLabel} "
+            Debug.Log($"{TL("CapturadorCombatente")} {unit.InstanceId} atira parado para {objectiveLabel} "
                 + $"de {fromCell} -> {rangedTarget.UnitDisplayName}#{rangedTarget.InstanceId} ({rangedReason})");
             action = BuildAttackBatch(unit, snapshot.AITeam, fromCell, fromCell,
                 rangedTarget.InstanceId.ToString(), rangedTargetCell, paths);
@@ -92,7 +92,7 @@ public partial class AIController
 
         Vector3Int enemyCell = attackTarget.CurrentCellPosition;
         enemyCell.z = 0;
-        Debug.Log($"{TL("CapturadorAgressivo")} {unit.InstanceId} abre caminho para {objectiveLabel} "
+        Debug.Log($"{TL("CapturadorCombatente")} {unit.InstanceId} abre caminho para {objectiveLabel} "
             + $"via {attackCell} -> {attackTarget.UnitDisplayName}#{attackTarget.InstanceId} ({attackReason})");
         action = BuildAttackBatch(unit, snapshot.AITeam, fromCell, attackCell,
             attackTarget.InstanceId.ToString(), enemyCell, paths);

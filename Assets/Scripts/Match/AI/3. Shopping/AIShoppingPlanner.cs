@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Serialization;
 // --------------------------------------------------------------------------------------------
@@ -1154,7 +1154,7 @@ public partial class AIShoppingPlanner : MonoBehaviour
 
             remaining -= unit.cost;
             occupied.Add(cell);
-            bool boughtAggressiveCapturer = IsPrimaryRole(unit, UnitRole.CapturadorAgressivo);
+            bool boughtAggressiveCapturer = IsPrimaryRole(unit, UnitRole.CapturadorCombatente);
             if ((IsPrimaryRole(unit, UnitRole.Capturador) || boughtAggressiveCapturer) && openCapturerSlots > 0)
             {
                 openCapturerSlots--;

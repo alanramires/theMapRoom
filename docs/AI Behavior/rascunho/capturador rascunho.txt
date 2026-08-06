@@ -1,0 +1,387 @@
+Role: Capturer
+description: Focado em Capturar primeiro, combater depois
+
+Sensor Priority: Enxergar, Detectar, Capturar, Embarcar, Reposicionar, Mirar, Fundir, Suprir,Transferir, Desembarcar,
+Justificativa: Capturar rapido e com maior eficiencia. Se ele puder deixar meia captura pq a da frente está vazia, ele deixa! alguem de traz vem e termina o serviço (economia de turno). O capturador sempre vai tentar capturar com full hp (por isso troca se tem alguem melhor e cap. agressivo entra como reserva) e capturadores de outros planos dão uma forcinha se o capturador daquele plano estiver no operational (não chega no mesmo turno). O capturador rogue passa a ser atraido magneticamente por missoes proximas incluindo reconquista. O foco do capturador é aumentar o income do exercito rapidamente chamando carona sempre q o que desejam estão no operational, e desembarcando no tatico ou no operacional do alvo. Eles preferem não lutar (a excessão do capturador agressivo que inverte o sensor), já q hp é precioso para captura. mas morder no caminho uma vitoria sem perder hp seria sweet, sempre respeitando o attack decision.
+Detecção e Enxergar subiram na prioridade porque na névoa é preciso ver quem está ocupando o alvo desejado e enxergar antes economiza 1 turno de ação - já q chegar na nevoa impede de capturar no mesmo turno, entao chamariam alguem pra revelar o quanto antes. Detectar é quando apesar dos caminhos estarem livres, algo o impede, entao eles mesmos ou outra unidade vai na frente pra revelar quem está ali.
+Fundir faz parte da regra de recuo, e top prioridade faz ele abandonar a vanguarda e ir pra retaguarda pra não atrapalhar outros capturadores que terminem o serviço
+Suprir e Transferir são para unidades futuras como fieldMedic e Engineering
+Reposicionar é o magnetico que é o repCell ou o plano quando nada é possivel de fazer no momento.
+
+--
+Em modo de defesa ou collapsing: a AI aciona o recrutamento obrigatorio. sempre compra capturadores em todos os produtores, e com o excedente compra unidades de elite de outras forças.
+
+roteador consulta
+
+ANTES DE QUALQUER OBJETIVO — AIController.Capturer.cs:21
+ 0  reparo                          TryDecideRepairAction               vence tudo
+ 1  handoff blitzkrieg          ⇢   TryDecideHardBlitzkriegHandoff      só hardMode
+ 2  swap                        ⇢   FindSwapIncomingCapturer
+ 3  oportunista da célula atual     já em cima de capturável não reservado
+ 4  rally próximo antes de embarcar TryDecideNearbyRallyCaptureBeforeEmbark
+ 5  defesa do próprio prédio        TryDecideCapturerOwnedBuildingDefenseBeforeEmbark
+ 6  embarque                        TryDecideCapturerEmbarkAction
+
+COM OBJETIVO — DecideAssignedCapturerAction
+ 7  defensor                        setor já conquistado
+ 8  cede hex de objetivo alheio ⇢   está sobre alvo de OUTRO setor com capturador ativo
+ 9  ponta de lança                  chegada e captura direta
+10  perseguidor                     ataca defensor visível
+11  oportunista com reserva     ⇢   laço while; CEDE quando reservado para outro
+12  capturador agressivo
+13  ataque de oportunidade defensivo
+14  explorador
+15  scoring / progressão 2 turnos   o avanço normal
+16  cede objetivo alheio bloqueado ⇢ preso em cima do alvo de outro → sai pra qualquer hex livre
+17  captura oportunista de emergência  bloqueado, IGNORA reservas
+18  espera                      ⇢   aliado ocupa o alvo → BuildMoveBatch(from, from)
+
+SEM PLANO
+19  rogue / SemPlano                TryResolvePlanlessCapturerAnchor
+
+FORA DO ROTEADOR
+20  "sai do meu prédio"         ⇢   Capturer.Vacate.cs — DOIS motivos distintos
+21  rebelde                         Router.cs:107, curto-circuito antes do plano
+
+
+ceder — seis mecanismos, seis gatilhos diferentes
+É aqui que mora a caixinha de surpresas, porque cada um cede por um motivo que não se parece com os outros:
+
+#	nome	quem cede	para quem / por quê
+1	handoff blitzkrieg	quem abriu a captura	ninguém — ela não termina o prédio, segue no eixo e outra infantaria fecha atrás
+2	swap	capturador fraco em cima do alvo	outro do mesmo objetivo com HP maior que chega este turno
+8	cede hex alheio	quem está sobre alvo de outro setor	marca o próprio hex como ocupado para se forçar a sair no scoring
+11	cede oportunista	quem ia capturar de graça	o capturável está reservado para outro capturador
+16	cede alheio bloqueado	preso sobre alvo de outro	sai para qualquer hex livre, sem escolher
+20	libera produção	qualquer um em cima de produtora	duas razões separadas (abaixo)
+E o 20 são de fato dois:
+
+
+IsActiveUnitBlockingThreatenedHomeProduction   "libera producao (AMEACADA)"
+TryFindProductionUnlockVacateAction            "libera produtora travada
+                                                (3/5 ocupadas, cheapest=$1200)"
+												
+												---
+												
+---
+# Marcha do Capturador
+
+**[Introdução — caixa clara, metais e coro]**
+
+Um, dois!
+Passo ligeiro!
+Antes do tiro,
+vem o dinheiro!
+
+Um, dois!
+Sem se atrasar!
+Prédio parado
+tem que começar!
+
+---
+
+## [Primeira estrofe]
+
+Não quero medalha,
+não quero brasão,
+eu quero a cidade
+rendendo ao batalhão.
+
+Não guardo conquista,
+não planto bandeira;
+se outro termina,
+eu sigo a carreira.
+
+O mapa me chama,
+o eixo conduz;
+sou mosca marchando
+na direção da luz.
+
+---
+
+## [Refrão]
+
+Avança! Captura!
+Não deixa esperar!
+Dinheiro mais cedo
+faz outro avançar!
+
+A renda não dorme,
+o turno não para;
+um prédio tomado
+amanhã compra a tropa!
+
+Avança! Captura!
+O caixa é o tambor!
+Se a renda começa,
+o exército é maior!
+
+---
+
+## [Segunda estrofe — transporte]
+
+Se o alvo está longe,
+eu chamo o transporte;
+não gasto marchando
+o tempo da sorte.
+
+No Operacional,
+já mando buscar;
+no Tático eu desço,
+prontinho para entrar.
+
+Se comecei a obra
+e a frente está vazia,
+deixo alguém fechando
+e avanço a economia.
+
+Nenhum prédio é meu,
+não existe vaidade:
+o dono é o exército,
+meu dever é velocidade.
+
+---
+
+## [Refrão]
+
+Avança! Captura!
+Não deixa esperar!
+Dinheiro mais cedo
+faz outro avançar!
+
+A renda não dorme,
+o turno não para;
+um prédio tomado
+amanhã compra a tropa!
+
+Avança! Captura!
+O caixa é o tambor!
+Se a renda começa,
+o exército é maior!
+
+---
+
+## [Terceira estrofe — névoa]
+
+Mas se a cidade
+se esconde no breu,
+não entro às cegas
+como se já fosse meu.
+
+Chamo olhos à frente
+para o setor revelar:
+quem chega sem ver
+perde o turno de capturar.
+
+Se a estrada está livre,
+mas não posso avançar,
+há presença escondida
+que alguém deve encontrar.
+
+Detecta o bloqueio,
+faz a névoa ceder;
+um olho abre o caminho,
+e o caixa faz render.
+
+---
+
+## [Ponte — HP e fusão]
+
+Meu HP é relógio,
+cada baixa é demora;
+quem perde seus homens
+perde renda lá fora.
+
+Dois relógios cansados,
+sem trabalho a cumprir,
+viram um só bem forte,
+pronto para seguir.
+
+Mas se há dois destinos,
+cada qual toma um chão:
+não se funde trabalho
+que trabalha em divisão!
+
+Dois prédios, duas tropas!
+Um prédio, união!
+Sem prédio, força inteira
+para a próxima missão!
+
+---
+
+## [Quarta estrofe — cessão]
+
+Se outro fecha antes,
+eu cedo o lugar;
+não importa o meu nome,
+importa arrecadar.
+
+Se alguém vem mais forte,
+assume a construção;
+eu libero o caminho
+e procuro outra missão.
+
+Se o prédio é de outro eixo
+e eu posso completar,
+não espero o responsável:
+faço a renda começar.
+
+Não existe posse
+no serviço financeiro;
+quem conclui primeiro
+serve melhor o dinheiro.
+
+---
+
+## [Refrão]
+
+Avança! Captura!
+Não deixa esperar!
+Dinheiro mais cedo
+faz outro avançar!
+
+A renda não dorme,
+o turno não para;
+um prédio tomado
+amanhã compra a tropa!
+
+Avança! Captura!
+O caixa é o tambor!
+Se a renda começa,
+o exército é maior!
+
+---
+
+## [Quinta estrofe — defesa e cerco]
+
+Quando a frente vacila,
+eu permaneço no chão;
+não guardo uma bandeira,
+eu guardo a produção.
+
+O prédio não é meu,
+mas a renda é do batalhão;
+se o inimigo o retoma,
+fecha-se a arrecadação.
+
+Se o exército sustenta,
+posso ainda avançar:
+a renda que vem depois
+vale o risco de deixar.
+
+Mas se ninguém me cobre,
+não abandono o lugar:
+dinheiro protegido
+também é adiantar.
+
+---
+
+## [Sexta estrofe — Capturador Agressivo]
+
+E vem o agressivo
+com a chave no bornal;
+seu relógio anda lento,
+mas seu tiro é fatal.
+
+Quando existe combate,
+ele limpa o caminho;
+quando ninguém captura,
+ele toma o predinho.
+
+Não disputa a cidade
+com quem fecha primeiro;
+é soldado de assalto
+com instinto financeiro.
+
+Se não há tiro útil
+nem relógio melhor,
+meia renda ainda vence
+uma renda igual a zero.
+
+---
+
+## [Marcha intermediária — chamada e resposta]
+
+— Quem toma a cidade?
+— Quem termina primeiro!
+
+— Quem guarda o edifício?
+— Quem protege o dinheiro!
+
+— De quem é a conquista?
+— Do exército inteiro!
+
+— E o HP, o que marca?
+— O tempo do ponteiro!
+
+---
+
+## [Refrão final — coro completo]
+
+Avança! Captura!
+Não deixa esperar!
+Dinheiro mais cedo
+faz outro avançar!
+
+A renda não dorme,
+o turno não para;
+um prédio tomado
+amanhã compra a tropa!
+
+Avança! Captura!
+O caixa é o tambor!
+Se a renda começa,
+o exército é maior!
+
+Protege! Captura!
+Recua ou vai além!
+O prédio não é nosso,
+mas o rendimento vem!
+
+Avança! Captura!
+Sem nunca se deter!
+O mapa vira dinheiro,
+e o dinheiro vira poder!
+
+---
+
+## [Coda]
+
+— De quem é o prédio?
+— Do exército!
+
+— O que vale o HP?
+— O nosso tempo!
+
+— E qual é a missão?
+— Fazer render!
+
+Um, dois!
+Sem se deter!
+
+Um, dois!
+Capturar e crescer!
+
+Money, money!
+Passo certeiro!
+
+A luz está acesa —
+avança, Capturador!
+
+
+## [Passagem — especialistas]
+
+Se eu levo remédio,
+cuido de quem vai tomar;
+um soldado recuperado
+volta cedo a capturar.
+
+Se eu carrego ferramentas,
+faço o estoque circular;
+o engenheiro abre o caminho
+para a renda não parar.
+
+Mas serviço não me prende,
+nem me faz esquecer:
+quando a luz roxa chama,
+minha ordem é fazer render!

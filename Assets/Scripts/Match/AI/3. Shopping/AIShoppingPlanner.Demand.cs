@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 // CÃ¡lculo de demanda por role e progressÃ£o de compra de capturadores.
@@ -2080,7 +2080,7 @@ public partial class AIShoppingPlanner
 
     // Algum produtor da IA oferta unidade que CONTA para este componente do núcleo?
     // Usa ResolveCompositionRole de propósito — é o mesmo predicado de CountCompositionRole. Usar
-    // CanSatisfy aqui faria um CapturadorAgressivo "prometer" fechar o slot de Assalto que ele nunca
+    // CanSatisfy aqui faria um CapturadorCombatente "prometer" fechar o slot de Assalto que ele nunca
     // conta, e o alvo continuaria inalcançável.
     private static bool CanAnyOfferedUnitCloseCore(AIWorldSnapshot snapshot, UnitRole role)
     {
@@ -3064,14 +3064,14 @@ public partial class AIShoppingPlanner
             score -= 25000;
 
         // Demanda de CAPTURA pura: o capturador dedicado (roles[0]==Capturador, ex.: Soldado) tem que
-        // ganhar do capturador AGRESSIVO (CapturadorAgressivo, ex.: Machine Gunner), que só captura a
+        // ganhar do capturador AGRESSIVO (CapturadorCombatente, ex.: Machine Gunner), que só captura a
         // 50% e é quebra-galho. Sem isso, CanSatisfy/ResolveCompositionRole achatam os dois em
         // "Capturador" e o viés de custo (cost/2) escolhe o agressivo por ser mais caro — torrando o
         // caixa da expansão em unidades de combate. A penalidade domina qualquer diferença de custo,
         // mas como coverage vem antes de QualityScore no desempate do carrinho, o agressivo ainda entra
         // como FALLBACK quando nenhum capturador dedicado está ofertado pro slot. Demandas de combate
         // (Assalto/anti-infantaria) seguem inalteradas: lá o agressivo é um corpo de combate legítimo.
-        if (demand.Role == UnitRole.Capturador && IsPrimaryRole(unit, UnitRole.CapturadorAgressivo))
+        if (demand.Role == UnitRole.Capturador && IsPrimaryRole(unit, UnitRole.CapturadorCombatente))
             score -= DedicatedCapturerPreferencePenalty;
 
         // Perdendo (Collapsing) conta como emergência defensiva: unidade de modo Defensivo ganha o

@@ -1,0 +1,30 @@
+capturador     o CORPO      HP é a taxa            fundir ganha
+transportador  as VAGAS     capacidade por casco   fundir perde
+assalto        a ARMA       cada casco é ameaça    fundir perde
+fogo de suporte  a FORMAÇÃO   o cone, e os cones    fundir perde — e AGRUPAR também cobrindo os pontos cegos uns dos outros
+
+
+Progresso dos Papeis |	Rótulos/Subpapeis para pressão em Shopping ou subvariantes
+Capturador 		 	 |	Capturador, Capturador Agressivo
+Transportador		 | 	Transportador Terrestre, Transportador Aereo, Transportador Naval
+Assalto				 |	Assalto, Caça Interceptador, Ataque Aereo 
+Fogo de Suporte		 |	Fogo de Suporte, Antiaereo, Artilheiro Combatente, Antiaereo Combatente 
+	
+	
+	
+Capturador
+"converter $ pro exercito"
+prioridades: Enxergar, Detectar, Capturar, Embarcar, Reposicionar, Mirar, Fundir, Suprir,Transferir, Desembarcar, 
+
+Em resumo: o soldado capturador precisa enxergar a construção alvo pra não perder uma rodada de aproximação (Enxergar: nevoa de guerra); detectar quem está nela ou pedir pra alguem detectar se esta vazia (Detectar); pra só então Capturar; caso esteja muito longe deve pedir carona a um transportador (Embarcar); Reposicionando no tabuleiro para o rendevous  (Reposicionar); Evitando lutas pra não diminuir seu hp capture rate (Mirar); mesclando com outros esquadrões enfraquecidos para aumentar o capture rate (Fundir); prestar serviços médicos se field medic (Suprir); mover estoque entre locais (transferir) e deixar os feridos no hospital (desembarcar)
+
+---
+
+Transportador
+"leva e traz unidades"
+	Pickup (vazio): Embarcar, Reposicionar, Enxergar, Detectar, Mirar, Transferir, Suprir, Capturar, Desembarcar,Fundir
+	Courier (entregas): Embarcar, Reposicionar, Enxergar, Detectar, Suprir, Transferir, Desembarcar,  Mirar, Capturar, Fundir
+
+O transportador vazio (ex: Humvee) pode alavancar sua distancia embarcando em outros transportadores para ir ate quem precisa ou vai até quem precisa de carona (resposiciona) e oferece o embarque/EVAC, enxerga ou detecta para mirar enquanto a unidade precisa de evac ou setor livre (Enxergar, Detectar, Mirar), Transfere recursos, presta serviços ou captura oportunista se der mas não é o foco, como está vazio o desembarque é vetado e não funde pq o foco está em representação no tabuleiro
+
+o transportador carregado (ex: humvee) muda de politica para garantir a sobrevivencia da carga durante a entrega:  ele embarca aninhado para longas distancias (humvee embarca em trem ou navio), ou resposiciona viajando, enxerga e detecta para desviar de ameaças, supre passageiros a bordo, transfere recursos para passageiros abordo, e só entao os desembarca na LZ, nao entra em combate enquanto com carga, nao captura e não funde.

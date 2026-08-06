@@ -1,4 +1,4 @@
-# Resumo — onde estamos e o que vem
+﻿# Resumo — onde estamos e o que vem
 
 Ponto de retomada. Escrito em 2026-08-06, **depois** da tag `v8.0.0` e de dez
 commits que vieram depois dela. Leia isto primeiro.
@@ -166,7 +166,7 @@ preventiva), `Fundir` (fundir na retaguarda — hoje dentro do `AIRepair`),
 `contrato_missoes.md` marca como brainstorming.
 
 **Três papéis-fantasma no enum**, que existem para o shopping conseguir comprar:
-`CapturadorAgressivo` (12), `ArtilheiroCombatente` (13), `AntiaereoCombatente`
+`CapturadorCombatente` (12), `ArtilheiroCombatente` (13), `AntiaereoCombatente`
 (14). Roteiro seguro de remoção em `Shopping.md` §3.1 — e `UnitData.roles` **não é
 persistido no save**, então o risco é asset e cena, não arquivo de partida.
 

@@ -156,7 +156,7 @@ sensor** e **reimplementar a regra dele** — e reimplementar é como a tabela d
 flags cresceu da primeira vez.
 
 Corolário: gates de papel usam `UnitRoleCompatibility.CanSatisfy`, nunca
-`roles.Contains` estrito, senão `CapturadorAgressivo` e parentes são barrados
+`roles.Contains` estrito, senão `CapturadorCombatente` e parentes são barrados
 por variação de nome.
 
 ---
@@ -342,10 +342,23 @@ RÓTULO   identidade       o que o shopping pede, o que a ficha declara,
 
 | papel | rótulos / subvariantes |
 |---|---|
-| **Capturador** | Capturador, Capturador Agressivo |
+| **Capturador** | Capturador, **Capturador Combatente** |
 | **Transportador** | Transportador Terrestre, Transportador Aéreo, Transportador Naval |
 | **Assalto** | Assalto, Caça Interceptador, Ataque Aéreo |
 | **Fogo de Suporte** | Fogo de Suporte, Antiaéreo, Artilheiro Combatente, Antiaéreo Combatente |
+
+> **Por que `Capturador Combatente` e não `Agressivo`** (renomeado em 2026-08-06):
+> o autor levou o rótulo antigo a várias IAs e **todas leram como "captura
+> avidamente"** — o oposto do que ele significa, que é *briga em vez de capturar*.
+> O nome não era impreciso: estava dizendo outra coisa, e o erro se repetia em
+> todo leitor.
+>
+> Com `Combatente`, o sufixo passa a significar **sempre a mesma coisa em toda a
+> família** — *tem arma de contato*: `Capturador Combatente`,
+> `Artilheiro Combatente`, `Antiaéreo Combatente`.
+>
+> O valor do enum continua `= 12`; só o identificador mudou, então asset, cena e
+> save não sentem.
 
 **Quatro papéis. Onze rótulos.** Quatro questionários, quatro moedas, quatro
 marchas — e onze nomes para o shopping distinguir demanda.
@@ -354,7 +367,7 @@ marchas — e onze nomes para o shopping distinguir demanda.
 
 ```csharp
 // UnitRole.cs — UnitRoleCompatibility.ResolveCompositionRole(UnitData)
-CapturadorAgressivo   -> Capturador
+CapturadorCombatente   -> Capturador
 ArtilheiroCombatente  -> data.unitClass == Armored ? Assalto : FogoIndireto
 TransportadorAereo    -> Transportador
 ```
@@ -393,7 +406,7 @@ peça de volta sem código novo.
 
 ## 8. O que este documento NÃO cobre
 
-- **Variações de papel** (degrau 4): `CapturadorAgressivo` e parentes viram
+- **Variações de papel** (degrau 4): `CapturadorCombatente` e parentes viram
   perfil/trait depois da extração das linhas. Ver `docs/revisao_papeis.md`.
 - **A política de cada célula.** Esta é a forma da ficha, não o conteúdo. O que
   um Artilheiro faz na linha `combat` mora em `docs/AI Behavior/` por papel.
