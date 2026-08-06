@@ -157,7 +157,8 @@ espalhar maximiza área (aérea); agrupar protege quem caça a presa (anti-sub).
 estoque — *"a Fragata transporta Apaches"* — e os **liberam quando curados**
 (desembarque). É o modo Hospital do transporte, aqui como função secundária.
 
-**Raramente capturam. Embarcam em último caso.**
+**Raramente capturam.** E embarcar é caso raro — mas quando acontece, o par
+`Desembarcar`/`Embarcar` anda junto, acima das três casas fracas.
 
 ---
 
@@ -167,5 +168,5 @@ estoque — *"a Fragata transporta Apaches"* — e os **liberam quando curados**
 |---|---|
 | `contrato_recencia_de_cobertura.md` | o ledger de idade, a bifurcação aérea × naval, e o valor de N ainda ABERTO |
 | `ficha_do_papel.md` §7.8 | o quadro canônico dos papéis e as três modalidades |
-| `CLAUDE.md`, "As duas verdades" | por que `Detectar` em 1º e `Enxergar` em 9º não é contradição |
+| `CLAUDE.md`, "As duas verdades" | por que `Detectar` em 1º e `Enxergar` em 10º não é contradição |
 | `FireSupport.md` | a modalidade híbrida, que este papel também usa |
