@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
@@ -303,7 +303,7 @@ public sealed class MelhorCapitaoWindow : EditorWindow
 
     /// <summary>
     /// `CanSatisfy`, nunca `roles[0] ==`. O estrito barra especializações —
-    /// CapturadorAgressivo deixaria de servir de capitão, e é exatamente o bug
+    /// CapturadorCombatente deixaria de servir de capitão, e é exatamente o bug
     /// que sobrou num dos resolvedores antigos.
     /// </summary>
     private static bool SatisfiesRole(UnitManager candidate, UnitRole role)

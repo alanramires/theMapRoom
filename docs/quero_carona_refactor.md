@@ -1,4 +1,4 @@
-# Refactor do Quero Carona
+﻿# Refactor do Quero Carona
 
 ## Problema atual
 
@@ -36,7 +36,7 @@ O grafo inicial observado no jogo é:
 ```text
 Construção não controlada
    ├─ Capturador                         prioridade alta
-   └─ Capturador Agressivo               prioridade baixa
+   └─ Capturador Combatente               prioridade baixa
 
 Capturador / cabeça de ponte
    ├─ Assault
@@ -63,14 +63,14 @@ Intenções produzidas pelos papéis
 
 O grafo mistura relações já implementadas com prioridades pretendidas para o
 refactor. Em especial, a precedência dedicada de `Capturador` sobre
-`CapturadorAgressivo` e a produção tipada de intenções por todos os papéis ainda
+`CapturadorCombatente` e a produção tipada de intenções por todos os papéis ainda
 precisam ser formalizadas e testadas.
 
 ### Prioridades e composição de papéis
 
-- `Capturador` possui prioridade maior que `CapturadorAgressivo` na
+- `Capturador` possui prioridade maior que `CapturadorCombatente` na
   distribuição normal de construções.
-- `CapturadorAgressivo` continua podendo capturar, mas sua participação não
+- `CapturadorCombatente` continua podendo capturar, mas sua participação não
   deve retirar a missão principal de um Capturador dedicado.
 - Assault e FireSupport usam a cabeça de ponte como direção quando não existe
   ação Tactical ou plano mais específico.

@@ -16,7 +16,7 @@ Raid Anti-sub: Foco em alvos navais
 
 Exército     | Papel                     | Elite | Stance    | Combate (Foco)
 Soldado      | Capturador                |       | Qualquer  | Anti-Infantaria
-Bazooka      | Capturador Agressivo      |       | Defesa    | Anti-Tank (Veículos)
+Bazooka      | Capturador Combatente      |       | Defesa    | Anti-Tank (Veículos)
 Tank B       | Assalto                   |       | Qualquer  | Anti-infantaria 
 Tank A       | Assalto                   |  1    | Ofensivo  | Anti-Tank (Artilharia)
 Tank Z       | Artilheiro Combatente     |  2    | Ofensivo  | Anti-Tank (Blindados)

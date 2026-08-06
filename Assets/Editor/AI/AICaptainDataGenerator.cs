@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.IO;
 using UnityEditor;
 using UnityEngine;
@@ -60,7 +60,7 @@ public static class AICaptainDataGenerator
             Profile(UnitRole.Capturador,
                 Kind(AICaptainAttractionKind.ConstrucaoCapturavel)),
 
-            Profile(UnitRole.CapturadorAgressivo,
+            Profile(UnitRole.CapturadorCombatente,
                 Kind(AICaptainAttractionKind.ConstrucaoCapturavel)),
 
             Profile(UnitRole.Assalto,
