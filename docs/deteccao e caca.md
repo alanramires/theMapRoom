@@ -409,6 +409,54 @@ O Caça F ou Bombardeiro Furtivo:
 
 ---
 
+## 10.1 DESATIVAÇÃO DO ELITE POR DETECÇÃO — O CAÇA F
+
+**Regra nova (2026-08-06).** A furtividade do Caça F deixa de ser propriedade e
+passa a ser **estado**. Ela já tinha duas saídas — mudar de camada (§5) e disparar
+(§10) — e ganha a terceira: **ser detectado**.
+
+### Os três estados
+
+| estado | condição | o que ele é |
+|---|---|---|
+| **OCULTO** | em Air/High, não detectado, não disparou | Caça F pleno: camuflagem + **Elite 2** |
+| **COMUM** | **detectado** por sensor inimigo | vira um caça comum, do nível do Caça A. **Perde o Elite 2** |
+| **EXPOSTO** | disparou neste turno | detectável por 1 rodada (§10) |
+
+### A ordem é tudo
+
+Se ele **ataca primeiro**, partindo de OCULTO, o disparo usa **a camuflagem e o
+Elite 2** — e só depois ele vira EXPOSTO. Ser detectado **antes** de atacar tira o
+bônus: ele entra no duelo como um caça qualquer.
+
+```text
+OCULTO -> ataca      usa camuflagem + Elite 2, depois EXPOSTO por 1 rodada
+detectado -> ataca   ataca como Caça comum, sem o Elite 2
+```
+
+Isso transforma o Caça F num duelista de **uma pancada e saída**: o valor dele
+não está em trocar tiros, está em **escolher o instante do primeiro tiro**. Um
+EWACS ou Radar Móvel que o encontre antes não o mata — rebaixa.
+
+### Por que o Bombardeiro Furtivo NÃO segue esta regra
+
+O Bombardeiro Furtivo Elite 2 **mantém o nível mesmo detectado**. Não é exceção
+arbitrária — as duas furtividades servem a coisas diferentes:
+
+```text
+Caça F        furtividade TATICA       ela existe para escolher o duelo.
+                                       Visto, a emboscada acabou: nao ha o que
+                                       o Elite 2 pague
+
+Bombardeiro   furtividade ESTRATEGICA  ela existe para CHEGAR. Visto, a carga
+                                       nao encolhe, o alvo nao se move e o
+                                       trabalho continua o mesmo
+```
+
+Ser visto arruina uma emboscada; não arruína um bombardeio.
+
+---
+
 ## 11. SUBMARINO PÓS-DISPARO
 
 O submarino não apenas perde uma flag.
