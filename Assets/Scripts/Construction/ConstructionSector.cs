@@ -10,9 +10,19 @@ using System.Collections.Generic;
 /// Nunca reaproveitar um numero ja usado; para acrescentar nomes, use os buracos
 /// no fim de cada bloco.
 ///
-/// A ordem de DECLARACAO aqui nao decide nada: o Unity monta o dropdown com
-/// Enum.GetNames, que ordena pelo valor binario. Quem manda na ordem exibida e
-/// ConstructionSectorOrder (Assets/Editor) — as bases vao pro topo por la.
+/// A ordem de DECLARACAO aqui nao decide nada para quem le o dado: quem manda na
+/// ordem EXIBIDA e ConstructionSectorOrder (Assets/Editor) — as bases vao pro topo
+/// por la. Editor que precise ler ou gravar um destes le e grava o VALOR
+/// (SerializedProperty.intValue). O indice do Unity (enumValueIndex) NAO e o indice
+/// de Enum.GetValues neste enum, e a diferenca e silenciosa: gravava o setor vizinho
+/// e mostrava de volta o rotulo escolhido. Um QG marcado "Base0" foi parar em Omega
+/// assim, e so o SectorManager viu.
+///
+/// ARMADILHA PERMANENTE: default(ConstructionSector) e ALPHA, nao None — Alpha vale
+/// 0 e None vale -1, e renumerar quebraria toda cena e save ja gravados. Entao
+/// "sem setor" se escreve ConstructionSector.None, sempre, em campo, em retorno e em
+/// comparacao. Quem usou `!= default` como "tem vizinho" apagou Alpha do grafo de
+/// setores sem que nada reclamasse.
 /// </summary>
 public enum ConstructionSector
 {
@@ -105,6 +115,17 @@ public static class ConstructionSectorHelper
     {
         int v = (int)sector;
         return v >= BaseRangeStart && v <= BaseRangeEnd;
+    }
+
+    /// <summary>
+    /// Setor de verdade — nao None e nao lixo. Use isto para decidir se algo entra no
+    /// grafo de setores: None e a AUSENCIA de setor, nao um setor chamado "None", e
+    /// um int que nao existe mais no enum nao vira o vizinho por cast.
+    /// </summary>
+    public static bool IsRealSector(ConstructionSector sector)
+    {
+        return sector != ConstructionSector.None
+            && System.Enum.IsDefined(typeof(ConstructionSector), sector);
     }
 
     /// <summary>Versao string para validacoes em editors e save data.</summary>

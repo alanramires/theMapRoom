@@ -364,16 +364,10 @@ public class SectorManagerEditor : Editor
     {
         if (sectorProp == null)
             return default;
-        // enumValueIndex e o indice na declaracao, nao o valor: None=-1 ocupa o
-        // indice 0, entao castar o indice devolvia sempre o setor seguinte (e nunca
-        // as bases, que valem 100+). Converter pelo nome e o unico jeito correto.
-        string[] names = sectorProp.enumNames;
-        int idx = sectorProp.enumValueIndex;
-        if (names == null || idx < 0 || idx >= names.Length)
-            return default;
-        return System.Enum.TryParse(names[idx], out ConstructionSector sector)
-            ? sector
-            : ConstructionSector.None;
+        // Pelo VALOR, nunca pelo indice: enumValueIndex nao e o indice de
+        // Enum.GetValues (castar ou reindexar devolve o setor vizinho, e as bases,
+        // que valem 100+, nunca aparecem). O int gravado e o contrato.
+        return ConstructionSectorOrder.ReadSector(sectorProp);
     }
 
     private static void DrawLinesForSector(SectorManager manager, ConstructionSector sector, Color color, bool replaceExisting)

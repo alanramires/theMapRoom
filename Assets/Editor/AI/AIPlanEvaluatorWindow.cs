@@ -189,9 +189,9 @@ public class AIPlanEvaluatorWindow : EditorWindow
                 $"Risco:{risk}  HQ:{(hq==float.MaxValue?"—":$"{hq:F1}h")}  Fábr:{(fct==float.MaxValue?"—":$"{fct:F1}h")}",
                 EditorStyles.miniLabel);
 
-            string n1 = row.SectorInfo.ClosestNeighbor1 == default ? "—"
+            string n1 = row.SectorInfo.ClosestNeighbor1 == ConstructionSector.None ? "—"
                 : $"{row.SectorInfo.ClosestNeighbor1} ({row.SectorInfo.ClosestNeighbor1Distance:F1}h)";
-            string n2 = row.SectorInfo.ClosestNeighbor2 == default ? "—"
+            string n2 = row.SectorInfo.ClosestNeighbor2 == ConstructionSector.None ? "—"
                 : $"{row.SectorInfo.ClosestNeighbor2} ({row.SectorInfo.ClosestNeighbor2Distance:F1}h)";
             EditorGUILayout.LabelField($"N1:{n1}", EditorStyles.miniLabel);
             EditorGUILayout.LabelField($"N2:{n2}", EditorStyles.miniLabel);
@@ -773,16 +773,18 @@ public class AIPlanEvaluatorWindow : EditorWindow
     {
         if (!SectorManager.TryGetSectorInfo(sector, out SectorManager.SectorInfo info)) return;
         float myHQDist = info.GetDistanceToHQ(ResolveSelectedSlot());
-        ConstructionSector candidate = default;
-        if (info.ClosestNeighbor1 != default
+        // None explicito: default(ConstructionSector) e Alpha, entao a simulacao
+        // nunca marcava Alpha como vizinho coberto (e o AIController marca).
+        ConstructionSector candidate = ConstructionSector.None;
+        if (info.ClosestNeighbor1 != ConstructionSector.None
             && SectorManager.TryGetSectorInfo(info.ClosestNeighbor1, out SectorManager.SectorInfo n1)
             && n1.GetDistanceToHQ(ResolveSelectedSlot()) > myHQDist)
             candidate = info.ClosestNeighbor1;
-        else if (info.ClosestNeighbor2 != default
+        else if (info.ClosestNeighbor2 != ConstructionSector.None
             && SectorManager.TryGetSectorInfo(info.ClosestNeighbor2, out SectorManager.SectorInfo n2)
             && n2.GetDistanceToHQ(ResolveSelectedSlot()) > myHQDist)
             candidate = info.ClosestNeighbor2;
-        if (candidate != default) covered.Add(candidate);
+        if (candidate != ConstructionSector.None) covered.Add(candidate);
     }
 
     private static void SolveAssignment(

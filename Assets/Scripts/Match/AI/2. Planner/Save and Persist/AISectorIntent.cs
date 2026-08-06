@@ -308,19 +308,22 @@ public static class AISectorIntentAnalyzer
 
     private static ConstructionSector ComputeForwardNeighborSector(ConstructionSector sector, TeamId team)
     {
+        // "Nenhum" e None. Devolvendo default isto respondia ALPHA, e o chamador
+        // compara o retorno com um setor: perguntar "Alpha e o forward de alguem?"
+        // dava true pra todo objetivo que nao tinha forward nenhum.
         if (!SectorManager.TryGetSectorInfo(sector, out SectorManager.SectorInfo info))
-            return default;
+            return ConstructionSector.None;
 
         float myHQDist = info.GetDistanceToHQ(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(team)));
-        if (info.ClosestNeighbor1 != default
+        if (info.ClosestNeighbor1 != ConstructionSector.None
             && SectorManager.TryGetSectorInfo(info.ClosestNeighbor1, out SectorManager.SectorInfo n1)
             && n1.GetDistanceToHQ(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(team))) > myHQDist)
             return info.ClosestNeighbor1;
-        if (info.ClosestNeighbor2 != default
+        if (info.ClosestNeighbor2 != ConstructionSector.None
             && SectorManager.TryGetSectorInfo(info.ClosestNeighbor2, out SectorManager.SectorInfo n2)
             && n2.GetDistanceToHQ(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(team))) > myHQDist)
             return info.ClosestNeighbor2;
-        return default;
+        return ConstructionSector.None;
     }
 
     public static AISectorRelation ClassifyRelation(PlayerSlotId slotId, SectorManager.SectorInfo info)

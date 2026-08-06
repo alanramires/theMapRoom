@@ -14,17 +14,24 @@ using UnityEngine;
 ///
 /// A lista se monta sozinha por reflexao: acrescentar Base5 ou um setor grego novo
 /// aparece na posicao certa sem tocar neste arquivo.
+///
+/// NUNCA use SerializedProperty.enumValueIndex aqui. A ordem interna do Unity nao
+/// e a de Enum.GetValues, e a diferenca e silenciosa: o popup mostra o rotulo que
+/// voce escolheu e a cena grava o setor vizinho — foi assim que um QG marcado
+/// "Base0" foi gravado como Omega e a Cidade marcada "Alpha" como None, sem que o
+/// inspector desse um pio (ele rele pelo mesmo indice torto e fecha o circulo).
+/// O contrato de serializacao e o VALOR do enum; leia e escreva por intValue.
 /// </summary>
 public static class ConstructionSectorOrder
 {
-    /// <summary>Valores indexados por enumValueIndex (Enum.GetValues ja vem ordenado por valor).</summary>
+    /// <summary>Todos os setores, na ordem de Enum.GetValues (crescente por valor).</summary>
     private static readonly ConstructionSector[] ByDeclarationIndex =
         (ConstructionSector[])Enum.GetValues(typeof(ConstructionSector));
 
-    /// <summary>Para cada posicao exibida, o enumValueIndex correspondente.</summary>
+    /// <summary>Para cada posicao exibida, o indice em ByDeclarationIndex.</summary>
     private static readonly int[] DeclarationIndexByDisplay;
 
-    /// <summary>Para cada enumValueIndex, a posicao exibida.</summary>
+    /// <summary>Para cada indice em ByDeclarationIndex, a posicao exibida.</summary>
     private static readonly int[] DisplayByDeclarationIndex;
 
     /// <summary>Rotulos na ordem de exibicao — pronto pra EditorGUI.Popup.</summary>
@@ -61,24 +68,39 @@ public static class ConstructionSectorOrder
         }
     }
 
-    public static int ToDisplayIndex(int enumValueIndex)
-    {
-        if (enumValueIndex < 0 || enumValueIndex >= DisplayByDeclarationIndex.Length)
-            return -1;
-        return DisplayByDeclarationIndex[enumValueIndex];
-    }
-
-    public static int ToEnumValueIndex(int displayIndex)
-    {
-        if (displayIndex < 0 || displayIndex >= DeclarationIndexByDisplay.Length)
-            return -1;
-        return DeclarationIndexByDisplay[displayIndex];
-    }
-
     public static ConstructionSector SectorAtDisplayIndex(int displayIndex)
     {
-        int decl = ToEnumValueIndex(displayIndex);
-        return decl >= 0 ? ByDeclarationIndex[decl] : ConstructionSector.None;
+        if (displayIndex < 0 || displayIndex >= DeclarationIndexByDisplay.Length)
+            return ConstructionSector.None;
+        return ByDeclarationIndex[DeclarationIndexByDisplay[displayIndex]];
+    }
+
+    /// <summary>
+    /// Setor gravado na propriedade, lido pelo VALOR. Valor desconhecido (enum
+    /// renumerado, cena antiga) cai em None em vez de virar o vizinho.
+    /// </summary>
+    public static ConstructionSector ReadSector(SerializedProperty property)
+    {
+        if (property == null)
+            return ConstructionSector.None;
+        int raw = property.intValue;
+        return Enum.IsDefined(typeof(ConstructionSector), raw)
+            ? (ConstructionSector)raw
+            : ConstructionSector.None;
+    }
+
+    /// <summary>Grava o VALOR do setor — o mesmo int que a cena e o save carregam.</summary>
+    public static void WriteSector(SerializedProperty property, ConstructionSector sector)
+    {
+        if (property == null)
+            return;
+        property.intValue = (int)sector;
+    }
+
+    /// <summary>Posicao exibida do setor gravado na propriedade (0 se desconhecido).</summary>
+    public static int DisplayIndexOfProperty(SerializedProperty property)
+    {
+        return Mathf.Max(0, DisplayIndexOf(ReadSector(property)));
     }
 
     public static int DisplayIndexOf(ConstructionSector sector)
@@ -118,7 +140,7 @@ public sealed class ConstructionSectorDrawer : PropertyDrawer
         Rect field = EditorGUI.PrefixLabel(
             position, GUIUtility.GetControlID(FocusType.Passive), label);
 
-        int display = ConstructionSectorOrder.ToDisplayIndex(property.enumValueIndex);
+        int display = ConstructionSectorOrder.DisplayIndexOfProperty(property);
         bool prevMixed = EditorGUI.showMixedValue;
         EditorGUI.showMixedValue = property.hasMultipleDifferentValues;
         // PrefixLabel ja consumiu o recuo; sem zerar, o popup indenta de novo.
@@ -129,9 +151,8 @@ public sealed class ConstructionSectorDrawer : PropertyDrawer
         int next = EditorGUI.Popup(field, Mathf.Max(0, display), ConstructionSectorOrder.Labels);
         if (EditorGUI.EndChangeCheck() && next != display)
         {
-            int decl = ConstructionSectorOrder.ToEnumValueIndex(next);
-            if (decl >= 0)
-                property.enumValueIndex = decl;
+            ConstructionSectorOrder.WriteSector(
+                property, ConstructionSectorOrder.SectorAtDisplayIndex(next));
         }
 
         EditorGUI.indentLevel = prevIndent;

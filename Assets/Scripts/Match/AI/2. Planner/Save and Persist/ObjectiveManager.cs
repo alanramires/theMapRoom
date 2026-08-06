@@ -312,7 +312,11 @@ public class ObjectiveManager : MonoBehaviour
             if (savedPlan.vacaterForwardSectors != null)
             {
                 foreach (int sector in savedPlan.vacaterForwardSectors)
-                    plan.VacaterForwardSectors.Add((ConstructionSector)sector);
+                {
+                    ConstructionSector forward = ReadSavedSector(sector);
+                    if (forward != ConstructionSector.None)
+                        plan.VacaterForwardSectors.Add(forward);
+                }
             }
 
             // Repõe o estado GoGreen/Invasão estático. Limpa as entradas do time antes para o load
@@ -325,7 +329,10 @@ public class ObjectiveManager : MonoBehaviour
                 {
                     if (gg == null)
                         continue;
-                    AIController.RestoreGoGreenTurn(planSlot, (ConstructionSector)gg.sector, gg.turn);
+                    ConstructionSector goGreenSector = ReadSavedSector(gg.sector);
+                    if (goGreenSector == ConstructionSector.None)
+                        continue;
+                    AIController.RestoreGoGreenTurn(planSlot, goGreenSector, gg.turn);
                 }
             }
             AIController.RestoreInvasionMonitor(planSlot, savedPlan.invasionBestDistance, savedPlan.invasionStallCounter);
@@ -337,9 +344,15 @@ public class ObjectiveManager : MonoBehaviour
                     if (savedObj == null)
                         continue;
 
+                    // Objetivo sem setor nao e objetivo: nao tem ancora, nao tem
+                    // celula, e o plano inteiro se apoia no setor pra achar as duas.
+                    ConstructionSector objSector = ReadSavedSector(savedObj.sector);
+                    if (objSector == ConstructionSector.None)
+                        continue;
+
                     var obj = new SectorObjective
                     {
-                        Sector = (ConstructionSector)savedObj.sector,
+                        Sector = objSector,
                         AssignedTeam = (TeamId)savedObj.assignedTeam,
                         Status = (ObjectiveStatus)savedObj.status,
                         ObjectiveType = System.Enum.IsDefined(typeof(AIObjectiveType), savedObj.objectiveType)
@@ -392,6 +405,19 @@ public class ObjectiveManager : MonoBehaviour
         if (match.IsValidPlayerSlot(slot) && match.GetVisualTeamForSlot(slot) == team)
             return true;
         return match.TryGetUniqueSlotForTeam(team, out slot);
+    }
+
+    /// <summary>
+    /// Setor vindo do save. O que o arquivo carrega e o VALOR do enum, e valor que
+    /// nao existe mais (setor removido, save de outra numeracao) tem que virar None,
+    /// nao um setor qualquer: castar o int cru inventa um objetivo que o planner
+    /// depois persegue. Mesmo cuidado que objectiveType e rallyState ja tomavam.
+    /// </summary>
+    private static ConstructionSector ReadSavedSector(int raw)
+    {
+        return System.Enum.IsDefined(typeof(ConstructionSector), raw)
+            ? (ConstructionSector)raw
+            : ConstructionSector.None;
     }
 
     private static int ResolveSavedSlot(AIObjectivePlanSaveData savedPlan)

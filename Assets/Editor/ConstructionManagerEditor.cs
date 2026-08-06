@@ -296,9 +296,9 @@ public class ConstructionManagerEditor : Editor
             return;
 
         // Ordem exibida vem de ConstructionSectorOrder (bases no topo), nao da ordem
-        // crua do enum. enumValueIndex e o indice na declaracao, nunca o valor.
-        int current = ConstructionSectorOrder.ToDisplayIndex(sectorProp.enumValueIndex);
-        current = Mathf.Max(0, current);
+        // crua do enum. Le e escreve pelo VALOR: enumValueIndex nao bate com
+        // Enum.GetValues e gravava o setor vizinho sem mudar o rotulo exibido.
+        int current = ConstructionSectorOrder.DisplayIndexOfProperty(sectorProp);
 
         EditorGUILayout.BeginHorizontal();
         EditorGUILayout.PrefixLabel("Sector");
@@ -314,9 +314,8 @@ public class ConstructionManagerEditor : Editor
 
         if (next != current)
         {
-            int decl = ConstructionSectorOrder.ToEnumValueIndex(next);
-            if (decl >= 0)
-                sectorProp.enumValueIndex = decl;
+            ConstructionSectorOrder.WriteSector(
+                sectorProp, ConstructionSectorOrder.SectorAtDisplayIndex(next));
         }
     }
 

@@ -238,7 +238,7 @@ public partial class AIController
         float myHQDist = info.GetDistanceToHQ(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam)));
         float bestDist = float.MinValue;
 
-        if (info.ClosestNeighbor1 != default
+        if (info.ClosestNeighbor1 != ConstructionSector.None
             && SectorManager.TryGetSectorInfo(info.ClosestNeighbor1, out SectorManager.SectorInfo n1))
         {
             float d = n1.GetDistanceToHQ(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam)));
@@ -249,7 +249,7 @@ public partial class AIController
             }
         }
 
-        if (info.ClosestNeighbor2 != default
+        if (info.ClosestNeighbor2 != ConstructionSector.None
             && SectorManager.TryGetSectorInfo(info.ClosestNeighbor2, out SectorManager.SectorInfo n2))
         {
             float d = n2.GetDistanceToHQ(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam)));

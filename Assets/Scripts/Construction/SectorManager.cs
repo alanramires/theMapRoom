@@ -164,9 +164,10 @@ public sealed class SectorManager : MonoBehaviour
         [SerializeField] private List<SectorConstructionInfo> constructions    = new List<SectorConstructionInfo>();
         [SerializeField] private List<SectorRiskEntry>        riskEntries      = new List<SectorRiskEntry>();
         [SerializeField] private List<SectorTeamDistances>    sectorDistances  = new List<SectorTeamDistances>();
-        [HideInInspector][SerializeField] private ConstructionSector closestNeighbor1;
+        // "Sem vizinho" e None, nao default: o enum nao tem 0 neutro (Alpha = 0).
+        [HideInInspector][SerializeField] private ConstructionSector closestNeighbor1 = ConstructionSector.None;
         [HideInInspector][SerializeField] private float              closestNeighbor1Distance = float.MaxValue;
-        [HideInInspector][SerializeField] private ConstructionSector closestNeighbor2;
+        [HideInInspector][SerializeField] private ConstructionSector closestNeighbor2 = ConstructionSector.None;
         [HideInInspector][SerializeField] private float              closestNeighbor2Distance = float.MaxValue;
 
         public ConstructionSector Sector => sector;
@@ -784,11 +785,26 @@ public sealed class SectorManager : MonoBehaviour
 
         var grouped = new Dictionary<ConstructionSector, List<ConstructionManager>>();
         IReadOnlyList<ConstructionManager> constructions = allConstructions;
+        int unassignedCapturables = 0;
+        List<string> unassignedNames = sectorLog ? new List<string>() : null;
         for (int i = 0; i < constructions.Count; i++)
         {
             ConstructionManager construction = constructions[i];
             if (construction == null || !construction.IsCapturable || construction.CapturePointsMax <= 0)
                 continue;
+
+            // None nao e um setor: e a AUSENCIA de setor. Agrupando por ele, todo
+            // predio solto do mapa caia num setor fantasma "None" — com uma celula
+            // representativa arbitraria, vizinhos, distancias e um objetivo no
+            // planner. Quem nao tem setor fica de fora do grafo e e capturado pela
+            // oportunidade, nao pelo plano.
+            if (!ConstructionSectorHelper.IsRealSector(construction.Sector))
+            {
+                unassignedCapturables++;
+                unassignedNames?.Add(
+                    $"{construction.ConstructionDisplayName}@{construction.CurrentCellPosition.x},{construction.CurrentCellPosition.y}");
+                continue;
+            }
 
             if (!grouped.TryGetValue(construction.Sector, out List<ConstructionManager> list))
             {
@@ -936,8 +952,11 @@ public sealed class SectorManager : MonoBehaviour
             SectorInfo  infoA  = sectorInfos[i];
             Vector3Int  cellA  = infoA.RepresentativeCell;
 
-            ConstructionSector best1 = default; float dist1 = float.MaxValue;
-            ConstructionSector best2 = default; float dist2 = float.MaxValue;
+            // None EXPLICITO, nunca default: Alpha vale 0, entao default(ConstructionSector)
+            // e um setor de verdade. Um setor sozinho no mapa (ou sem rota ate ninguem)
+            // saia daqui apontando Alpha como vizinho, e o consumidor acreditava.
+            ConstructionSector best1 = ConstructionSector.None; float dist1 = float.MaxValue;
+            ConstructionSector best2 = ConstructionSector.None; float dist2 = float.MaxValue;
 
             for (int j = 0; j < sectorInfos.Count; j++)
             {
@@ -959,7 +978,15 @@ public sealed class SectorManager : MonoBehaviour
         }
 
         if (sectorLog)
-            Debug.Log($"[SectorManager] rebuild reason={reason ?? "none"} sectors={sectorInfos.Count} bases={baseInfos.Count} constructions={constructions.Count}");
+        {
+            // semSetor conta capturaveis que ficaram FORA do grafo. Zero e o normal
+            // num mapa terminado; qualquer numero ali e prédio que o autor esqueceu
+            // de rotular — antes isso virava um setor fantasma e ninguem via.
+            string unassignedDetail = unassignedCapturables > 0 && unassignedNames != null
+                ? $" [{string.Join(", ", unassignedNames)}]"
+                : string.Empty;
+            Debug.Log($"[SectorManager] rebuild reason={reason ?? "none"} sectors={sectorInfos.Count} bases={baseInfos.Count} constructions={constructions.Count} semSetor={unassignedCapturables}{unassignedDetail}");
+        }
 
         double neighborPassMs =
             (Time.realtimeSinceStartupAsDouble - neighborPassStartMs) * 1000d;
