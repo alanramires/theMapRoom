@@ -519,8 +519,34 @@ precisa reescrevê-la.
 > *"Tá difícil seguir em frente? Me chama — eu rompo barreiras, seja em terra ou
 > no ar!"*
 
-`Assalto` (chão) e `AtaqueAereo` (ar) são o **mesmo papel**. A função das unidades
-de alcance 1 é partir pra briga.
+`Assalto` (chão), `AtaqueAereo` (ar contra chão) e **`Interceptador`** (*"um
+assalto que atira pra cima"*) são o **mesmo papel**. A função das unidades de
+alcance 1 é partir pra briga.
+
+### A linha que separa os papéis é a MODALIDADE, não o alvo
+
+Com esta ficha e a de `FireSupport.md` na mesa, a taxonomia fecha:
+
+```text
+modalidade COMBATENTE   contato, alcance mín 1     Assalto, AtaqueAereo, Interceptador
+modalidade ARTILHEIRO   parado, alcance mín > 1    FogoIndireto, Antiaereo (SAM), Destroyer
+```
+
+E a **camada-alvo é ortogonal** — é dado da arma, não identidade de papel:
+
+|  | alvo no chão | alvo no ar |
+|---|---|---|
+| **combatente** | `Assalto` | `Interceptador` / `AtaqueAereo` |
+| **artilheiro** | `FogoIndireto` | `Antiaereo` |
+
+**Seis valores do enum, UMA distinção de comportamento.** O resto é a arma
+dizendo para onde atira — mesma conclusão dos papéis-fantasma
+(`Shopping.md` §2), agora generalizada para a família inteira.
+
+**Consequência:** os candidatos a sair do enum não são três (12, 13, 14); são
+mais. Mas a ordem segura continua a do `Shopping.md` §3.1, e o passo que não pode
+faltar é dar ao shopping um gancho de **preferência por capacidade** antes de
+remover qualquer nome.
 
 | eixo | valor |
 |---|---|
