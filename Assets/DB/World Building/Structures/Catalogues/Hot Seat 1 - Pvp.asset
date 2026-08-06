@@ -381,7 +381,6 @@ MonoBehaviour:
     - routeName: Train Auridia 1
       ownerDatabase: {fileID: 11400000}
       cells:
-      - {x: 2, y: 2, z: 0}
       - {x: 2, y: 1, z: 0}
       - {x: 3, y: 0, z: 0}
       - {x: 2, y: -1, z: 0}

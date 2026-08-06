@@ -2020,6 +2020,8 @@ MonoBehaviour:
   hasFiredThisTurn: 0
   receivedSuppliesThisTurn: 0
   tookOffRecently: 0
+  surfacedForSupplyThisTurn: 0
+  aircraftForcedLandingAwaitingRefuel: 0
   isUnderRepair: 0
   hasMerged: 0
   aiForcedToRepair: 0
@@ -2046,6 +2048,8 @@ MonoBehaviour:
   flagEmbarkedAtUnit: 
   flagReceivedSupplies: 0
   flagTookOffRecently: 0
+  flagSurfacedForSupplyThisTurn: 0
+  flagAircraftForcedLandingAwaitingRefuel: 0
   flagHasMerged: 0
   flagMergedWhenTurn: -1
   flagMergedWithUnit: 
@@ -2111,6 +2115,7 @@ MonoBehaviour:
   forcedLayerLockDomain: 0
   forcedLayerLockHeight: 3
   forcedLayerLockTurnsRemaining: 0
+  layerLockCountdownStarted: 0
   transportedUnitSlots: []
   embarkedTransporter: {fileID: 0}
   embarkedTransporterSlotIndex: -1
@@ -2121,6 +2126,16 @@ MonoBehaviour:
   aiAssignedPlanBadge: 
   aiAssignedPlanRole: 2
   aiAssignedPlanBadgeVisible: 0
+  aiHasDesignatedCaptureTarget: 0
+  aiDesignatedCaptureTargetInstanceId: -1
+  aiDesignatedCaptureTargetCell: {x: 0, y: 0, z: 0}
+  aiHasDesignatedMission: 0
+  aiDesignatedMissionIntent: 0
+  aiDesignatedMissionTargetUnitInstanceId: -1
+  aiDesignatedMissionTargetConstructionInstanceId: -1
+  aiDesignatedMissionTargetCell: {x: 0, y: 0, z: 0}
+  aiDesignatedMissionSector: 0
+  aiRideWaitSinceTurn: 0
   aiEixo: 0
   aiHasStance: 0
   aiStance: 0
@@ -2239,6 +2254,10 @@ MonoBehaviour:
   autoSnapWhenMovedInEditor: 1
   currentCellPosition: {x: 8, y: 1, z: 0}
   teamId: -1
+  supplyTop: {fileID: 0}
+  supplyMiddle: {fileID: 0}
+  supplyBottom: {fileID: 0}
+  supplierStockAlertThreshold: 0.5
   slotIndex: -1
   sector: 0
   eixoOverrides: []
@@ -2262,14 +2281,18 @@ MonoBehaviour:
     offeredSupplies:
     - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
       quantity: 40
+      peakQuantity: 40
     - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
-      quantity: 20
+      quantity: 10
+      peakQuantity: 10
     - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
-      quantity: 30
+      quantity: 20
+      peakQuantity: 20
     offeredServices:
     - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
     - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
     - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+    - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
   hasSiteRuntimeOverride: 0
   currentCapturePoints: 5
   hasInfiniteSuppliesOverride: 0
@@ -2752,7 +2775,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e19747de3f5aca642ab2be37e372fb86, type: 3}
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Outline
-  m_EffectColor: {r: 1, g: 0.2, b: 0.2, a: 0.33089042}
+  m_EffectColor: {r: 1, g: 0.2, b: 0.2, a: 0.20893314}
   m_EffectDistance: {x: 1, y: -1}
   m_UseGraphicAlpha: 1
 --- !u!114 &209785257
@@ -2824,6 +2847,7 @@ Transform:
   m_Children:
   - {fileID: 1918856646}
   - {fileID: 1941195759}
+  - {fileID: 527927318}
   m_Father: {fileID: 1307941790}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &229785267
@@ -3078,6 +3102,30 @@ PrefabInstance:
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 7849784935024710869, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
+      propertyPath: m_AnchoredPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8207324134304621415, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
+      propertyPath: m_AnchorMax.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8207324134304621415, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
+      propertyPath: m_AnchorMin.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8207324134304621415, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
+      propertyPath: m_SizeDelta.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8207324134304621415, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
+      propertyPath: m_SizeDelta.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8207324134304621415, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
+      propertyPath: m_AnchoredPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8207324134304621415, guid: f5b55f41b9008384b8c9bd913951b382, type: 3}
       propertyPath: m_AnchoredPosition.y
       value: 0
       objectReference: {fileID: 0}
@@ -3591,6 +3639,9 @@ MonoBehaviour:
     flipX: 0
     flipXOverride: 1
     isAI: 0
+    isRebelRuntime: 0
+    isLocal: 1
+    localityConfigured: 1
     commandServiceAutomatic: 0
     defeated: 0
     startMoney: 0
@@ -3601,6 +3652,9 @@ MonoBehaviour:
     flipX: 1
     flipXOverride: 2
     isAI: 0
+    isRebelRuntime: 0
+    isLocal: 1
+    localityConfigured: 1
     commandServiceAutomatic: 0
     defeated: 0
     startMoney: 0
@@ -3608,6 +3662,7 @@ MonoBehaviour:
     incomePerTurn: 0
     startMoneyApplied: 0
   includeNeutralTeam: 0
+  capturedBuildingHistory: []
   economyEnabled: 1
   fogOfWar: 1
   autoFlipXFromHqPositions: 1
@@ -3635,24 +3690,31 @@ MonoBehaviour:
   victoryStarsToWin: 1
   freezeTurnAdvanceAfterVictory: 1
   victoryStarsByTeam:
-  - teamId: 0
+  - slotIndex: 0
+    teamId: 0
     stars: 0
-  - teamId: 1
+  - slotIndex: 1
+    teamId: 1
     stars: 0
   hasVictoryWinner: 0
   victoryWinnerTeam: -1
+  victoryWinnerSlotIndex: -1
   fogOfWarController: {fileID: 984791707}
   fogOfWarTilemap: {fileID: 2015085660}
+  fogOfWarMemoryTilemap: {fileID: 0}
+  fogOfWarBreakwaterMemoryTilemap: {fileID: 0}
   fogOfWarOverlayTile: {fileID: 11400000, guid: a9d34637cfec5f34f85ff83701fe1885, type: 2}
   fogOfWarTerrainDatabase: {fileID: 11400000, guid: af24f1a2f28971f498767ede9f9cfba1, type: 2}
   fogOfWarDpqAirHeightConfig: {fileID: 11400000, guid: 74c8a09efff211941b27a37f6bb948f1, type: 2}
   fogOfWarAlpha: 0.8
   fogOfWarVisionMode: 0
+  fogRoundZeroBakes: []
   showVictoryOverlay: 1
   victoryOverlayTilemap: {fileID: 1323160040}
   victoryOverlayTile: {fileID: 11400000, guid: dd2174cfa0a10cc4a9cb658af194727c, type: 2}
   victoryOverlayAlpha: 0.8
   activePlayerListIndex: 0
+  appliedActivePlayerListIndex: 0
   appliedActiveTeamId: 0
   pendingTurnStartUpkeep: 1
   pendingTurnStartEconomy: 1
@@ -3680,6 +3742,7 @@ MonoBehaviour:
   enablePodeEnxergarRuntimeLogs: 0
   enableTurnPerfLogs: 0
   fogStepPerfTopUnits: 3
+  fogWarmupFrameBudgetMs: 40
 --- !u!1 &337511629
 GameObject:
   m_ObjectHideFlags: 0
@@ -3827,6 +3890,7 @@ MonoBehaviour:
   playbackMode: 1
   playOnStart: 1
   musicVolume: 1
+  roundMusicVolume: 1
   shuffleFreeMode: 0
   neutralMusicVolume: 0.4
   team0MusicVolume: 0.4
@@ -4105,6 +4169,8 @@ MonoBehaviour:
   replayManager: {fileID: 0}
   planningManager: {fileID: 0}
   aiController: {fileID: 0}
+  panelRodada: {fileID: 0}
+  matchMusicAudioManager: {fileID: 0}
   enableHotkeys: 1
   quickSaveKey: 105
   quickLoadKey: 111
@@ -4113,6 +4179,7 @@ MonoBehaviour:
   customSaveDirectory: C:/Users/Alan/AppData/LocalLow/Sistemas Info/The Map Room
   blockCrossSceneLoad: 1
   verboseLogs: 1
+  showSaveLoadLogs: 0
   forceLoadWhenBusy: 1
   saveReplayData: 1
   enableThreatCacheWarmupOnLoad: 0
@@ -5031,6 +5098,8 @@ MonoBehaviour:
   hasFiredThisTurn: 0
   receivedSuppliesThisTurn: 0
   tookOffRecently: 0
+  surfacedForSupplyThisTurn: 0
+  aircraftForcedLandingAwaitingRefuel: 0
   isUnderRepair: 0
   hasMerged: 0
   aiForcedToRepair: 0
@@ -5057,6 +5126,8 @@ MonoBehaviour:
   flagEmbarkedAtUnit: 
   flagReceivedSupplies: 0
   flagTookOffRecently: 0
+  flagSurfacedForSupplyThisTurn: 0
+  flagAircraftForcedLandingAwaitingRefuel: 0
   flagHasMerged: 0
   flagMergedWhenTurn: -1
   flagMergedWithUnit: 
@@ -5115,6 +5186,7 @@ MonoBehaviour:
   forcedLayerLockDomain: 0
   forcedLayerLockHeight: 3
   forcedLayerLockTurnsRemaining: 0
+  layerLockCountdownStarted: 0
   transportedUnitSlots: []
   embarkedTransporter: {fileID: 0}
   embarkedTransporterSlotIndex: -1
@@ -5125,6 +5197,16 @@ MonoBehaviour:
   aiAssignedPlanBadge: 
   aiAssignedPlanRole: 2
   aiAssignedPlanBadgeVisible: 0
+  aiHasDesignatedCaptureTarget: 0
+  aiDesignatedCaptureTargetInstanceId: -1
+  aiDesignatedCaptureTargetCell: {x: 0, y: 0, z: 0}
+  aiHasDesignatedMission: 0
+  aiDesignatedMissionIntent: 0
+  aiDesignatedMissionTargetUnitInstanceId: -1
+  aiDesignatedMissionTargetConstructionInstanceId: -1
+  aiDesignatedMissionTargetCell: {x: 0, y: 0, z: 0}
+  aiDesignatedMissionSector: 0
+  aiRideWaitSinceTurn: 0
   aiEixo: 0
   aiHasStance: 0
   aiStance: 0
@@ -5215,12 +5297,12 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 527927317}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: -0.72318995, y: -2.93467, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 1307941790}
+  m_Father: {fileID: 216098414}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &527927319
 MonoBehaviour:
@@ -5237,6 +5319,38 @@ MonoBehaviour:
   structureDatabase: {fileID: 11400000, guid: d5df53f63d8aa864096c0a10f618484f, type: 2}
   boardTilemap: {fileID: 142842121}
   terrainDatabase: {fileID: 11400000, guid: af24f1a2f28971f498767ede9f9cfba1, type: 2}
+  roadRoutesByStructure:
+  - structure: {fileID: 11400000, guid: 2c50b52605f4f1c4ca013ba4bd7acee3, type: 2}
+    routes:
+    - routeName: Route 1
+      ownerDatabase: {fileID: 11400000, guid: d5df53f63d8aa864096c0a10f618484f, type: 2}
+      cells:
+      - {x: -1, y: 0, z: 0}
+      - {x: 0, y: 0, z: 0}
+      - {x: 1, y: 0, z: 0}
+      - {x: 1, y: -1, z: 0}
+      - {x: 2, y: -1, z: 0}
+      - {x: 3, y: -1, z: 0}
+      - {x: 4, y: -1, z: 0}
+      - {x: 5, y: 0, z: 0}
+      - {x: 5, y: 1, z: 0}
+      - {x: 6, y: 1, z: 0}
+      - {x: 7, y: 1, z: 0}
+      - {x: 8, y: 1, z: 0}
+      - {x: 9, y: 1, z: 0}
+      - {x: 10, y: 1, z: 0}
+      - {x: 11, y: 1, z: 0}
+  - structure: {fileID: 11400000, guid: 7933d65148f7b884c895240966ea81b1, type: 2}
+    routes:
+    - routeName: Ponte de Rammelle
+      ownerDatabase: {fileID: 11400000, guid: d5df53f63d8aa864096c0a10f618484f, type: 2}
+      cells:
+      - {x: 23, y: 1, z: 0}
+      - {x: 24, y: 1, z: 0}
+      - {x: 25, y: 1, z: 0}
+      - {x: 26, y: 1, z: 0}
+      - {x: 27, y: 1, z: 0}
+  routesMigratedToScene: 1
   roadSegmentSprite: {fileID: 21300000, guid: 03650c0a2457e5046b8234d0bc968b5a, type: 3}
   roadColor: {r: 0.9607844, g: 0.9607844, b: 0.9607844, a: 1}
   roadWidth: 0.16
@@ -8066,6 +8180,8 @@ MonoBehaviour:
   hasFiredThisTurn: 0
   receivedSuppliesThisTurn: 0
   tookOffRecently: 0
+  surfacedForSupplyThisTurn: 0
+  aircraftForcedLandingAwaitingRefuel: 0
   isUnderRepair: 0
   hasMerged: 0
   aiForcedToRepair: 0
@@ -8092,6 +8208,8 @@ MonoBehaviour:
   flagEmbarkedAtUnit: 
   flagReceivedSupplies: 0
   flagTookOffRecently: 0
+  flagSurfacedForSupplyThisTurn: 0
+  flagAircraftForcedLandingAwaitingRefuel: 0
   flagHasMerged: 0
   flagMergedWhenTurn: -1
   flagMergedWithUnit: 
@@ -8150,6 +8268,7 @@ MonoBehaviour:
   forcedLayerLockDomain: 0
   forcedLayerLockHeight: 3
   forcedLayerLockTurnsRemaining: 0
+  layerLockCountdownStarted: 0
   transportedUnitSlots: []
   embarkedTransporter: {fileID: 0}
   embarkedTransporterSlotIndex: -1
@@ -8160,6 +8279,16 @@ MonoBehaviour:
   aiAssignedPlanBadge: 
   aiAssignedPlanRole: 2
   aiAssignedPlanBadgeVisible: 0
+  aiHasDesignatedCaptureTarget: 0
+  aiDesignatedCaptureTargetInstanceId: -1
+  aiDesignatedCaptureTargetCell: {x: 0, y: 0, z: 0}
+  aiHasDesignatedMission: 0
+  aiDesignatedMissionIntent: 0
+  aiDesignatedMissionTargetUnitInstanceId: -1
+  aiDesignatedMissionTargetConstructionInstanceId: -1
+  aiDesignatedMissionTargetCell: {x: 0, y: 0, z: 0}
+  aiDesignatedMissionSector: 0
+  aiRideWaitSinceTurn: 0
   aiEixo: 0
   aiHasStance: 0
   aiStance: 0
@@ -8707,6 +8836,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::FogOfWarController
   matchController: {fileID: 327617512}
   fogOfWarAlpha: 0.8
+  exploredFogAlphaMultiplier: 0.8
   fogOfWarAlphaInitialized: 1
   autoRefreshOnFogUpdate: 0
   includeInvisibleTargets: 1
@@ -9917,6 +10047,8 @@ MonoBehaviour:
   hasFiredThisTurn: 0
   receivedSuppliesThisTurn: 0
   tookOffRecently: 0
+  surfacedForSupplyThisTurn: 0
+  aircraftForcedLandingAwaitingRefuel: 0
   isUnderRepair: 0
   hasMerged: 0
   aiForcedToRepair: 0
@@ -9943,6 +10075,8 @@ MonoBehaviour:
   flagEmbarkedAtUnit: 
   flagReceivedSupplies: 0
   flagTookOffRecently: 0
+  flagSurfacedForSupplyThisTurn: 0
+  flagAircraftForcedLandingAwaitingRefuel: 0
   flagHasMerged: 0
   flagMergedWhenTurn: -1
   flagMergedWithUnit: 
@@ -10001,11 +10135,13 @@ MonoBehaviour:
   forcedLayerLockDomain: 0
   forcedLayerLockHeight: 3
   forcedLayerLockTurnsRemaining: 0
+  layerLockCountdownStarted: 0
   transportedUnitSlots:
   - slotIndex: 0
     slotId: passageiro
     seatIndex: 0
     embarkedUnit: {fileID: 0}
+    embarkedOnTurn: -1
   embarkedTransporter: {fileID: 0}
   embarkedTransporterSlotIndex: -1
   currentlyObservedByTeamIds: 
@@ -10015,6 +10151,16 @@ MonoBehaviour:
   aiAssignedPlanBadge: 
   aiAssignedPlanRole: 0
   aiAssignedPlanBadgeVisible: 0
+  aiHasDesignatedCaptureTarget: 0
+  aiDesignatedCaptureTargetInstanceId: -1
+  aiDesignatedCaptureTargetCell: {x: 0, y: 0, z: 0}
+  aiHasDesignatedMission: 0
+  aiDesignatedMissionIntent: 0
+  aiDesignatedMissionTargetUnitInstanceId: -1
+  aiDesignatedMissionTargetConstructionInstanceId: -1
+  aiDesignatedMissionTargetCell: {x: 0, y: 0, z: 0}
+  aiDesignatedMissionSector: 0
+  aiRideWaitSinceTurn: 0
   aiEixo: 0
   aiHasStance: 0
   aiStance: 0
@@ -11045,7 +11191,6 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 216098414}
-  - {fileID: 527927318}
   - {fileID: 327617511}
   - {fileID: 1900915755}
   - {fileID: 58026846}
@@ -16492,11 +16637,15 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::TurnStateManager
   turnStartAutonomyHelperDurationFallbackSeconds: 6
   enableTurnStateRuntimeLogs: 0
+  showMovementLogs: 0
   enableRangeCacheDebugLogs: 0
   showPerfRangeLine: 0
   showPerfSensorsLine: 0
   showPerfSelectionLine: 0
   showPerfTakeoffPrepLine: 0
+  showFrameSpikeLogs: 0
+  showClickSpikeLogs: 0
+  frameSpikeThresholdMs: 250
   matchController: {fileID: 327617512}
   cursorController: {fileID: 154002953}
   animationManager: {fileID: 58026847}
@@ -16647,6 +16796,7 @@ MonoBehaviour:
   unitDatabase: {fileID: 11400000, guid: cdf6e440f0cf670498b40416fd0dc926, type: 2}
   matchController: {fileID: 327617512}
   currentId: 9
+  showUnitSpawnerLogs: 0
   unitPrefab: {fileID: 1817672200303259516, guid: 530b4fee239c9904cbceb477236210f2, type: 3}
   boardTilemap: {fileID: 1566606925}
   spawnWithHasActedFalse: 0
@@ -16761,6 +16911,10 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 1026740965}
     m_Modifications:
+    - target: {fileID: 1348457725607290348, guid: f7e44d7c210a32d4ba630ba660da88a1, type: 3}
+      propertyPath: m_text
+      value: 0 / turn
+      objectReference: {fileID: 0}
     - target: {fileID: 6655781950631596657, guid: f7e44d7c210a32d4ba630ba660da88a1, type: 3}
       propertyPath: m_Name
       value: Panel_money
@@ -17052,6 +17206,7 @@ MonoBehaviour:
     - ActionType: 0
       TurnNumber: 0
       ActingTeam: 0
+      ActingSlotIndex: -1
       CursorHex: {x: 0, y: 0, z: 0}
       HasCursorHex: 0
       UnitInstanceId: 
@@ -17084,6 +17239,7 @@ MonoBehaviour:
       Snapshot:
         TurnNumber: 0
         ActiveTeam: 0
+        ActiveSlotIndex: -1
         SnapshotTag: 
         HasCursorCell: 0
         CursorCell: {x: 0, y: 0, z: 0}
@@ -17111,25 +17267,48 @@ MonoBehaviour:
           hasActed: 0
           receivedSuppliesThisTurn: 0
           tookOffRecently: 0
+          surfacedForSupplyThisTurn: 0
+          aircraftForcedLandingAwaitingRefuel: 0
           isUnderRepair: 0
           isEmbarked: 0
           transporterInstanceId: 0
           transporterSlotIndex: 0
+          hasEmbarkedOnTurn: 0
+          embarkedOnTurn: -1
           domain: 0
           heightLevel: 0
           isAircraftGrounded: 0
           aircraftOperationLockTurns: 0
+          hasForcedLayerLock: 0
+          forcedLayerLockDomain: 0
+          forcedLayerLockHeight: 0
+          forcedLayerLockTurns: 0
+          hasLayerLockCountdownState: 0
+          layerLockCountdownStarted: 0
           aiHasAssignedPlan: 0
           aiAssignedPlanKey: 
           aiAssignedPlanName: 
           aiAssignedPlanBadge: 
           aiAssignedPlanRole: 0
           aiAssignedPlanBadgeVisible: 0
+          aiHasDesignatedCaptureTarget: 0
+          aiDesignatedCaptureTargetInstanceId: -1
+          aiDesignatedCaptureTargetCellX: 0
+          aiDesignatedCaptureTargetCellY: 0
+          aiHasDesignatedMission: 0
+          aiDesignatedMissionIntent: 0
+          aiDesignatedMissionTargetUnitInstanceId: -1
+          aiDesignatedMissionTargetConstructionInstanceId: -1
+          aiDesignatedMissionTargetCellX: 0
+          aiDesignatedMissionTargetCellY: 0
+          aiDesignatedMissionSector: 0
+          aiRideWaitSinceTurn: 0
           aiEixo: 0
           embarkedWeaponAmmo: 00000000
           embarkedSupplies:
           - supplyId: 
             quantity: 0
+            peakQuantity: 0
         Constructions:
         - instanceId: 0
           constructionId: 
@@ -17168,12 +17347,17 @@ MonoBehaviour:
         MatchState:
           currentTurn: 0
           activeTeamId: 0
+          activeSlotIndex: -1
           includeNeutralTeam: 0
           economyEnabled: 0
           victoryStarsEnabled: 0
           victoryStarsToWin: 0
           hasVictoryWinner: 0
           victoryWinnerTeamId: 0
+          victoryWinnerSlotIndex: -1
+          cursorSaved: 0
+          cursorCellX: 0
+          cursorCellY: 0
           players: []
           victoryStars: []
       IsTurnMarker: 0
@@ -17182,6 +17366,7 @@ MonoBehaviour:
     ActionType: 0
     TurnNumber: 0
     ActingTeam: 0
+    ActingSlotIndex: -1
     CursorHex: {x: 0, y: 0, z: 0}
     HasCursorHex: 0
     UnitInstanceId: 
@@ -17214,6 +17399,7 @@ MonoBehaviour:
     Snapshot:
       TurnNumber: 0
       ActiveTeam: 0
+      ActiveSlotIndex: -1
       SnapshotTag: 
       HasCursorCell: 0
       CursorCell: {x: 0, y: 0, z: 0}
@@ -17222,12 +17408,17 @@ MonoBehaviour:
       MatchState:
         currentTurn: 0
         activeTeamId: 0
+        activeSlotIndex: -1
         includeNeutralTeam: 0
         economyEnabled: 1
         victoryStarsEnabled: 1
         victoryStarsToWin: 5
         hasVictoryWinner: 0
         victoryWinnerTeamId: -1
+        victoryWinnerSlotIndex: -1
+        cursorSaved: 0
+        cursorCellX: 0
+        cursorCellY: 0
         players: []
         victoryStars: []
     IsTurnMarker: 0
@@ -17235,9 +17426,11 @@ MonoBehaviour:
   currentRecord:
     TurnNumber: 0
     ActingTeam: 0
+    ActingSlotIndex: -1
     StartSnapshot:
       TurnNumber: 0
       ActiveTeam: 0
+      ActiveSlotIndex: -1
       SnapshotTag: 
       HasCursorCell: 0
       CursorCell: {x: 0, y: 0, z: 0}
@@ -17246,18 +17439,24 @@ MonoBehaviour:
       MatchState:
         currentTurn: 0
         activeTeamId: 0
+        activeSlotIndex: -1
         includeNeutralTeam: 0
         economyEnabled: 1
         victoryStarsEnabled: 1
         victoryStarsToWin: 5
         hasVictoryWinner: 0
         victoryWinnerTeamId: -1
+        victoryWinnerSlotIndex: -1
+        cursorSaved: 0
+        cursorCellX: 0
+        cursorCellY: 0
         players: []
         victoryStars: []
     Steps: []
   matchHistory: []
   selectedTurnIndex: -1
   observerTeam: -1
+  observerSlotIndex: -1
   visionMode: 0
   currentStepIndex: 0
   isPlaying: 0
@@ -18238,6 +18437,8 @@ MonoBehaviour:
   hasFiredThisTurn: 0
   receivedSuppliesThisTurn: 0
   tookOffRecently: 0
+  surfacedForSupplyThisTurn: 0
+  aircraftForcedLandingAwaitingRefuel: 0
   isUnderRepair: 0
   hasMerged: 0
   aiForcedToRepair: 0
@@ -18264,6 +18465,8 @@ MonoBehaviour:
   flagEmbarkedAtUnit: 
   flagReceivedSupplies: 0
   flagTookOffRecently: 0
+  flagSurfacedForSupplyThisTurn: 0
+  flagAircraftForcedLandingAwaitingRefuel: 0
   flagHasMerged: 0
   flagMergedWhenTurn: -1
   flagMergedWithUnit: 
@@ -18329,6 +18532,7 @@ MonoBehaviour:
   forcedLayerLockDomain: 0
   forcedLayerLockHeight: 3
   forcedLayerLockTurnsRemaining: 0
+  layerLockCountdownStarted: 0
   transportedUnitSlots: []
   embarkedTransporter: {fileID: 0}
   embarkedTransporterSlotIndex: -1
@@ -18339,6 +18543,16 @@ MonoBehaviour:
   aiAssignedPlanBadge: 
   aiAssignedPlanRole: 2
   aiAssignedPlanBadgeVisible: 0
+  aiHasDesignatedCaptureTarget: 0
+  aiDesignatedCaptureTargetInstanceId: -1
+  aiDesignatedCaptureTargetCell: {x: 0, y: 0, z: 0}
+  aiHasDesignatedMission: 0
+  aiDesignatedMissionIntent: 0
+  aiDesignatedMissionTargetUnitInstanceId: -1
+  aiDesignatedMissionTargetConstructionInstanceId: -1
+  aiDesignatedMissionTargetCell: {x: 0, y: 0, z: 0}
+  aiDesignatedMissionSector: 0
+  aiRideWaitSinceTurn: 0
   aiEixo: 0
   aiHasStance: 0
   aiStance: 0

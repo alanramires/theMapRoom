@@ -1668,6 +1668,9 @@ MonoBehaviour:
     flipX: 0
     flipXOverride: 1
     isAI: 0
+    isRebelRuntime: 0
+    isLocal: 1
+    localityConfigured: 1
     commandServiceAutomatic: 0
     defeated: 0
     startMoney: 0
@@ -1678,6 +1681,9 @@ MonoBehaviour:
     flipX: 1
     flipXOverride: 2
     isAI: 0
+    isRebelRuntime: 0
+    isLocal: 1
+    localityConfigured: 1
     commandServiceAutomatic: 0
     defeated: 0
     startMoney: 0
@@ -1731,6 +1737,7 @@ MonoBehaviour:
   fogOfWarDpqAirHeightConfig: {fileID: 11400000, guid: 74c8a09efff211941b27a37f6bb948f1, type: 2}
   fogOfWarAlpha: 1
   fogOfWarVisionMode: 0
+  fogRoundZeroBakes: []
   showVictoryOverlay: 1
   victoryOverlayTilemap: {fileID: 1323160040}
   victoryOverlayTile: {fileID: 11400000, guid: dd2174cfa0a10cc4a9cb658af194727c, type: 2}
@@ -1740,7 +1747,7 @@ MonoBehaviour:
   appliedActiveTeamId: 0
   pendingTurnStartUpkeep: 1
   pendingTurnStartEconomy: 1
-  cachedConstructionIncomeSignature: -426508594
+  cachedConstructionIncomeSignature: -426538384
   cachedConstructionIncomeCount: 2
   constructionIncomeRefreshIntervalSeconds: 0.35
   continuousEditorRefresh: 0
@@ -1764,6 +1771,7 @@ MonoBehaviour:
   enablePodeEnxergarRuntimeLogs: 0
   enableTurnPerfLogs: 0
   fogStepPerfTopUnits: 3
+  fogWarmupFrameBudgetMs: 40
 --- !u!1 &328633919
 GameObject:
   m_ObjectHideFlags: 0
@@ -2674,6 +2682,34 @@ MonoBehaviour:
   structureDatabase: {fileID: 11400000, guid: 9356155b91c91e441860605550a4b3c0, type: 2}
   boardTilemap: {fileID: 1566606925}
   terrainDatabase: {fileID: 11400000, guid: af24f1a2f28971f498767ede9f9cfba1, type: 2}
+  roadRoutesByStructure:
+  - structure: {fileID: 11400000, guid: 2c50b52605f4f1c4ca013ba4bd7acee3, type: 2}
+    routes:
+    - routeName: Route 1
+      ownerDatabase: {fileID: 11400000, guid: 9356155b91c91e441860605550a4b3c0, type: 2}
+      cells:
+      - {x: -2, y: -2, z: 0}
+      - {x: -1, y: -2, z: 0}
+      - {x: 0, y: -2, z: 0}
+      - {x: 1, y: -2, z: 0}
+      - {x: 2, y: -2, z: 0}
+      - {x: 2, y: -3, z: 0}
+      - {x: 3, y: -3, z: 0}
+      - {x: 4, y: -2, z: 0}
+      - {x: 5, y: -2, z: 0}
+      - {x: 6, y: -2, z: 0}
+      - {x: 7, y: -2, z: 0}
+  - structure: {fileID: 11400000, guid: 7933d65148f7b884c895240966ea81b1, type: 2}
+    routes:
+    - routeName: Ponte de Rammelle
+      ownerDatabase: {fileID: 11400000, guid: 9356155b91c91e441860605550a4b3c0, type: 2}
+      cells:
+      - {x: 23, y: 1, z: 0}
+      - {x: 24, y: 1, z: 0}
+      - {x: 25, y: 1, z: 0}
+      - {x: 26, y: 1, z: 0}
+      - {x: 27, y: 1, z: 0}
+  routesMigratedToScene: 1
   roadSegmentSprite: {fileID: 21300000, guid: 03650c0a2457e5046b8234d0bc968b5a, type: 3}
   roadColor: {r: 0.9607844, g: 0.9607844, b: 0.9607844, a: 1}
   roadWidth: 0.16
@@ -7460,6 +7496,7 @@ MonoBehaviour:
   showPerfSelectionLine: 0
   showPerfTakeoffPrepLine: 0
   showFrameSpikeLogs: 0
+  showClickSpikeLogs: 0
   frameSpikeThresholdMs: 250
   matchController: {fileID: 327617512}
   cursorController: {fileID: 1082359631}
@@ -7816,10 +7853,14 @@ MonoBehaviour:
           hasActed: 0
           receivedSuppliesThisTurn: 0
           tookOffRecently: 0
+          surfacedForSupplyThisTurn: 0
+          aircraftForcedLandingAwaitingRefuel: 0
           isUnderRepair: 0
           isEmbarked: 0
           transporterInstanceId: 0
           transporterSlotIndex: 0
+          hasEmbarkedOnTurn: 0
+          embarkedOnTurn: -1
           domain: 0
           heightLevel: 0
           isAircraftGrounded: 0
@@ -7836,6 +7877,18 @@ MonoBehaviour:
           aiAssignedPlanBadge: 
           aiAssignedPlanRole: 0
           aiAssignedPlanBadgeVisible: 0
+          aiHasDesignatedCaptureTarget: 0
+          aiDesignatedCaptureTargetInstanceId: -1
+          aiDesignatedCaptureTargetCellX: 0
+          aiDesignatedCaptureTargetCellY: 0
+          aiHasDesignatedMission: 0
+          aiDesignatedMissionIntent: 0
+          aiDesignatedMissionTargetUnitInstanceId: -1
+          aiDesignatedMissionTargetConstructionInstanceId: -1
+          aiDesignatedMissionTargetCellX: 0
+          aiDesignatedMissionTargetCellY: 0
+          aiDesignatedMissionSector: 0
+          aiRideWaitSinceTurn: 0
           aiEixo: 0
           embarkedWeaponAmmo: 00000000
           embarkedSupplies:
@@ -7888,6 +7941,9 @@ MonoBehaviour:
           hasVictoryWinner: 0
           victoryWinnerTeamId: 0
           victoryWinnerSlotIndex: -1
+          cursorSaved: 0
+          cursorCellX: 0
+          cursorCellY: 0
           players: []
           victoryStars: []
       IsTurnMarker: 0
@@ -7946,6 +8002,9 @@ MonoBehaviour:
         hasVictoryWinner: 0
         victoryWinnerTeamId: -1
         victoryWinnerSlotIndex: -1
+        cursorSaved: 0
+        cursorCellX: 0
+        cursorCellY: 0
         players: []
         victoryStars: []
     IsTurnMarker: 0
@@ -7974,6 +8033,9 @@ MonoBehaviour:
         hasVictoryWinner: 0
         victoryWinnerTeamId: -1
         victoryWinnerSlotIndex: -1
+        cursorSaved: 0
+        cursorCellX: 0
+        cursorCellY: 0
         players: []
         victoryStars: []
     Steps: []
