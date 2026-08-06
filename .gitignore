@@ -42,3 +42,10 @@ desktop.ini
 # Design sources (Photoshop) — fontes de design, nao fazem parte do projeto
 *.psd
 *.psd.meta
+
+# Despejos de crash da Unity — ela salva a cena aberta antes de morrer e volta
+# ao ultimo save point. Sao artefato transitorio da maquina, nao dado do projeto.
+#
+# ATENCAO: os 28 arquivos ja rastreados continuam rastreados — .gitignore nao
+# desfaz o que ja esta no indice. Isto so impede que despejos NOVOS entrem.
+Assets/_Recovery/
