@@ -357,6 +357,8 @@ public static class MelhorEmbarqueService
         var passengerReach =
             new Dictionary<UnitManager, PassengerReachProfile>(
                 passengers.Count);
+        var acceptedPassengers =
+            new List<UnitManager>(passengers.Count);
         using (new AIDecisionPerfScope(
                    request.transporter,
                    "melhorEmbarque.passengerReach"))
@@ -367,23 +369,61 @@ public static class MelhorEmbarqueService
                 PassengerReachProfile reachProfile =
                     BuildPassengerReachProfile(
                         request, passenger, topology);
-                passengerReach[passenger] = reachProfile;
-                passengerRideNeed[passenger] =
+                QueroCaronaResult rideNeed =
                     request.evaluateRideNeedWithOperationalReach != null
                         ? request.evaluateRideNeedWithOperationalReach(
                             passenger,
                             reachProfile.laterStops,
                             reachProfile.laterStopsBudget)
                         : request.evaluateRideNeed?.Invoke(passenger);
+
+                // "NAO SE APLICA" NAO E "NAO QUER".
+                //
+                // Quem nao responde a pergunta da carona por este canal nao e
+                // passageiro desta varredura: sai antes de virar par no produto
+                // cartesiano, em vez de disputar uma vaga que nunca pediu e
+                // perder por -5000.
+                //
+                // O descarte mora AQUI, e nao no allowPassenger do consumidor,
+                // porque aquele callback e consultado dentro de
+                // TryResolvePassengerSlot ANTES do teste de vaga — la, submarino
+                // e trem de carga pagariam a avaliacao tambem. Neste ponto a
+                // lista ja e so de quem cabe no transporte.
+                //
+                // A emergencia atravessa: quem precisa de recuperacao continua
+                // candidato, porque essa necessidade o transportador enxerga
+                // sozinho.
+                if (rideNeed != null
+                    && rideNeed.captureQuestionInapplicable
+                    && !rideNeed.isEmergency)
+                {
+                    AIDecisionPerf.AddCount(
+                        "MelhorEmbarqueRideQuestionInapplicable");
+                    request.diagnosticLog?.Invoke(
+                        $"DESCARTA pax=#{passenger.InstanceId}: a pergunta " +
+                        "da carona nao e respondida por este canal " +
+                        "(sem emergencia).");
+                    continue;
+                }
+
+                acceptedPassengers.Add(passenger);
+                passengerReach[passenger] = reachProfile;
+                passengerRideNeed[passenger] = rideNeed;
                 request.diagnosticLog?.Invoke(
                     $"ACCEPT pax=#{passenger.InstanceId} " +
                     $"slot={passengerSlots[passenger]} " +
-                    FormatRideNeedDiagnostic(
-                        passengerRideNeed[passenger]));
+                    FormatRideNeedDiagnostic(rideNeed));
             }
         }
+        passengers = acceptedPassengers;
         AIDecisionPerf.AddCount(
             "MelhorEmbarquePassengers", passengers.Count);
+        if (passengers.Count == 0)
+        {
+            AIDecisionPerf.AddCount(
+                "MelhorEmbarqueRideQuestionEarlyOuts");
+            return result;
+        }
 
         // Quem suspende o encerramento antecipado da varredura. Era so
         // emergencia de reparo; passou a incluir quem nao tem rota propria e ja
@@ -460,10 +500,33 @@ public static class MelhorEmbarqueService
             }
 
             topologyCellsVisited++;
+
+            // REJEICAO BARATA ANTES DA SONDA CARA.
+            //
+            // Estes dois continues ja existiam — moravam DEPOIS do portao. Uma
+            // celula Tactical fora dos Caminhos Validos pagava ~1,3 ms de
+            // sensor para ser descartada por um ContainsKey na linha seguinte,
+            // e com o encerramento antecipado quase toda celula visitada e
+            // Tactical: era o caso comum, nao o raro. Medido em dois Chinooks,
+            // o portao rejeitava 77-82% do que sondava.
+            //
+            // Reordenacao pura: os tres sao continue, nenhum tem efeito
+            // colateral, e topologyCellsVisited++ continua contando todas.
+            if (tier == MelhorEmbarqueTier.Strategic
+                && !request.includeStrategic)
+                continue;
+            // Distância cúbica classifica o setor, mas não prova um caminho.
+            // Uma opção Tactical só pode decidir a rodada quando Caminhos
+            // Válidos realmente alcança a LZ.
+            if (tier == MelhorEmbarqueTier.Tactical
+                && (tacticalPaths == null
+                    || !tacticalPaths.ContainsKey(cell)))
+                continue;
+
             // Sonda de tabuleiro POR LZ CANDIDATA — a irma da sonda por par.
             // Depois que a inversao do par derrubou resolveMeeting, e ela que
-            // domina o laco (no Suprimentos#24 sobraram ~82 ms de 91 aqui).
-            // Medida a parte porque atribuir por deducao ja errou uma vez.
+            // domina o laco. O contador de probes passa a medir so o que foi
+            // efetivamente pago, que e o numero que interessa.
             float lzGateStartedAt = Time.realtimeSinceStartup;
             bool lzGateOk =
                 request.map.HasTile(cell)
@@ -482,17 +545,6 @@ public static class MelhorEmbarqueService
                 AIDecisionPerf.AddCount("MelhorEmbarqueLzGateRejects");
                 continue;
             }
-
-            if (tier == MelhorEmbarqueTier.Strategic
-                && !request.includeStrategic)
-                continue;
-            // Distância cúbica classifica o setor, mas não prova um caminho.
-            // Uma opção Tactical só pode decidir a rodada quando Caminhos
-            // Válidos realmente alcança a LZ.
-            if (tier == MelhorEmbarqueTier.Tactical
-                && (tacticalPaths == null
-                    || !tacticalPaths.ContainsKey(cell)))
-                continue;
 
             var lz = new MelhorEmbarqueLzScore
             {

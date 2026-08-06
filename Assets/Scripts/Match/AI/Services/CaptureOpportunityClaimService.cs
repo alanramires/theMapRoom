@@ -659,6 +659,25 @@ public static class CaptureOpportunityClaimService
         return ThreatRevisionTracker.GlobalBoardRevision;
     }
 
+    /// <summary>
+    /// Assinatura do estado que decide a alocacao de oportunidades de captura.
+    ///
+    /// A populacao aqui e a MESMA que o <see cref="Build"/> usa para montar as
+    /// candidaturas: capturadores elegiveis. Antes esta varredura dobrava todas
+    /// as unidades do slot — as 66 —, inclusive o <c>HasActed</c> de cada uma, e
+    /// isso fazia o hash mudar a cada acao de QUALQUER peca.
+    ///
+    /// O efeito nao era no hash: era no cache do QueroCarona, que carrega este
+    /// valor na chave. Um Chinook esperando parado derrubava a resposta de todo
+    /// capturador do time, e cada transportador seguinte recalculava os ~820 ms
+    /// de necessidade de carona do zero. A prova estava no log: o segundo
+    /// Chinook acertou o cache UMA vez em 17 perguntas, e a unica foi a do APC —
+    /// justamente quem nao satisfaz Capturador e por isso tem hash 0 aqui.
+    ///
+    /// Ocupacao continua invalidando por outro canal: a chave do QueroCarona ja
+    /// carrega <c>occupancyRevision</c> em campo separado. Um transporte parado
+    /// em cima de um predio segue sendo visto — so nao passa mais por aqui.
+    /// </summary>
     private static int BuildStateHash(
         int slotIndex,
         TeamObjectivePlan plan)
@@ -669,11 +688,8 @@ public static class CaptureOpportunityClaimService
             foreach (UnitManager unit
                      in UnitManager.AllActive)
             {
-                if (unit == null
-                    || unit.SlotIndex != slotIndex)
-                {
+                if (!IsEligibleCapturer(unit, slotIndex))
                     continue;
-                }
                 Vector3Int cell =
                     unit.CurrentCellPosition;
                 cell.z = 0;
@@ -683,14 +699,14 @@ public static class CaptureOpportunityClaimService
                     + unit.RemainingMovementPoints;
                 hash = (hash * 31)
                     + unit.MaxMovementPoints;
+                // HasActed fica: um capturador que agiu pode ter tomado o
+                // predio, e isso remaneja as oportunidades de verdade.
                 hash = (hash * 31)
                     + (unit.HasActed ? 1 : 0);
-                hash = (hash * 31)
-                    + (unit.IsDead ? 1 : 0);
-                hash = (hash * 31)
-                    + (unit.IsEmbarked ? 1 : 0);
-                hash = (hash * 31)
-                    + (unit.IsUnderRepair ? 1 : 0);
+                // IsDead / IsEmbarked / IsUnderRepair sairam: o filtro acima ja
+                // exclui os tres, entao aqui eles eram constante. A transicao
+                // continua sendo detectada — quem morre ou embarca DESAPARECE
+                // do laco, e o hash muda por perder os termos dele.
                 hash = (hash * 31)
                     + (unit.AIHasDesignatedCaptureTarget
                         ? 1

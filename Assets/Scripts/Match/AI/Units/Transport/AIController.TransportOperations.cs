@@ -890,45 +890,68 @@ public partial class AIController
             && passenger.GetAircraftType() != AircraftType.None;
     }
 
+    /// <summary>
+    /// A PERGUNTA DA CARONA TEM DONO DECLARADO.
+    ///
+    /// O QueroCarona terrestre mede necessidade pelo envelope de CAPTURA
+    /// (Intent=Capture, SubStep=Terrestre). Ele so responde por quem captura.
+    /// Perguntado a outra peca, devolve sempre a mesma coisa e sempre falsa —
+    /// "sem predio capturavel alcancavel" — porque nao existe predio que ela
+    /// capture. Foi assim que um caca de tanque cheio e um APC com missao
+    /// propria entraram na fila da carona na frente da infantaria encalhada.
+    ///
+    /// Aeronave fica de fora mesmo que satisfaca Capturador: rebasing e decisao
+    /// dela, no turno dela, pelo QueroCaronaAerea — que compara a plataforma
+    /// com a MISSAO dela, algo que o transportador nao tem como saber.
+    ///
+    /// Sem dono, a resposta e "nao se aplica" — NUNCA "sim".
+    /// </summary>
+    private static bool ClaimsGroundCaptureRideQuestion(
+        UnitManager passenger)
+    {
+        return passenger != null
+            && !IsAircraftPassenger(passenger)
+            && passenger.TryGetUnitData(out UnitData data)
+            && data != null
+            && UnitRoleCompatibility.CanSatisfy(
+                data,
+                UnitRole.Capturador);
+    }
+
     private QueroCaronaResult EvaluatePickupRideNeed(
         UnitManager passenger,
         TeamObjectivePlan plan,
         int operationalTurns)
     {
-        // AERONAVE NAO RESPONDE A PERGUNTA TERRESTRE.
-        //
-        // O QueroCarona mede necessidade de carona pelo envelope de CAPTURA
-        // (Intent=Capture, SubStep=Terrestre). Um caca nunca captura, entao a
-        // resposta era sempre a mesma e sempre falsa: "sem predio capturavel
-        // alcancavel, SEM ROTA PROPRIA (so chega de carona)" — dito de uma
-        // aeronave com 9 MP e tanque cheio, que voa o mapa inteiro. Com score
-        // 1500 ela entrava na fila do transportador na frente de quem estava
-        // de fato encalhado.
-        //
-        // Quem decide rebasing e a propria aeronave, no turno dela, pelo
-        // QueroCaronaAerea — que compara a plataforma com a MISSAO dela, algo
-        // que o transportador nao tem como saber. Do lado do transportador
-        // sobra a unica necessidade que ele consegue enxergar sozinho: a
-        // emergencia de recuperacao. Embarque e acao do passageiro; a carona
-        // aerea nao se planeja de fora.
-        if (IsAircraftPassenger(passenger))
+        // Sem dono para a pergunta, sobra a unica necessidade que o
+        // transportador enxerga sozinho: a emergencia de recuperacao. Ela
+        // continua valendo para TODA peca — artilharia ferida sendo evacuada
+        // nao depende de capturar coisa nenhuma.
+        if (!ClaimsGroundCaptureRideQuestion(passenger))
         {
-            return QueroCaronaService.EvaluateEmergencyOnly(
-                new QueroCaronaRequest
-                {
-                    unit = passenger,
-                    map = boardTilemap,
-                    terrainDatabase = terrainDatabase,
-                    context = QueroCaronaContext.RogueOuRebelde,
-                    operationalTurns = Mathf.Max(
-                        1, operationalTurns),
-                    emulateUnderRepairFromUnitData = true,
-                    diagnosticLog = showAILogs
-                        ? message => Debug.Log(
-                            $"{TL("Transporte")}[QueroCaronaAerea] " +
-                            $"pax=#{passenger.InstanceId} {message}")
-                        : null
-                });
+            string tag = IsAircraftPassenger(passenger)
+                ? "[QueroCaronaAerea]"
+                : "[QueroCarona]";
+            QueroCaronaResult emergencyOnly =
+                QueroCaronaService.EvaluateEmergencyOnly(
+                    new QueroCaronaRequest
+                    {
+                        unit = passenger,
+                        map = boardTilemap,
+                        terrainDatabase = terrainDatabase,
+                        context = QueroCaronaContext.RogueOuRebelde,
+                        operationalTurns = Mathf.Max(
+                            1, operationalTurns),
+                        emulateUnderRepairFromUnitData = true,
+                        diagnosticLog = showAILogs
+                            ? message => Debug.Log(
+                                $"{TL("Transporte")}{tag} " +
+                                $"pax=#{passenger.InstanceId} {message}")
+                            : null
+                    });
+            if (emergencyOnly != null)
+                emergencyOnly.captureQuestionInapplicable = true;
+            return emergencyOnly;
         }
 
         SectorObjective assigned = plan != null
@@ -957,6 +980,11 @@ public partial class AIController
             });
     }
 
+    // ESTRUTURAL, e so. Este callback e consultado dentro de
+    // TryResolvePassengerSlot ANTES do teste de slot compativel, entao tudo que
+    // custa caro aqui e pago tambem por submarino, fragata e trem de carga —
+    // gente que jamais caberia no hangar. A necessidade de carona (consulta de
+    // envelope) mora no MelhorEmbarque, depois do filtro de vaga.
     private bool IsStructurallyEligiblePickupCandidate(
         UnitManager transporter,
         UnitManager candidate,

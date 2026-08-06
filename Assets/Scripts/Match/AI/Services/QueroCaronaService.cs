@@ -51,6 +51,14 @@ public sealed class QueroCaronaResult
     public bool isStranded;
 
     /// <summary>
+    /// A pergunta da captura nao se aplica a esta peca: ela nao captura nada,
+    /// em lugar nenhum. Diferente de <see cref="isStranded"/>, que e falta de
+    /// ROTA — aqui falta ASSUNTO. Sem esta distincao, quem nao captura era
+    /// declarado encalhado por verdade vazia e furava a fila da carona.
+    /// </summary>
+    public bool captureQuestionInapplicable;
+
+    /// <summary>
     /// Ha quantos turnos esta unidade esta na fila da carona. Preenchido pela
     /// IA (o servico e puro e nao conhece turno); zero quando consultado por
     /// ferramenta de Editor.
@@ -855,6 +863,22 @@ public static class QueroCaronaService
                 captureReach,
                 gate: null,
                 includeBeyondOperational: true);
+
+        // GATE INAPLICAVEL: lista vazia nao conclui encalhamento.
+        //
+        // O laco abaixo prova "existe capturavel no meu componente" achando um.
+        // Com a lista VAZIA ele nunca acha, e o encalhamento virava verdade
+        // vazia — dito de quem simplesmente NAO CAPTURA. Um APC de 6 MP, com
+        // missao propria, entrava na fila da carona com a nota mais alta que
+        // existe (StrandedRideNeedScore), acima da infantaria que precisava de
+        // verdade. "Nao existe alvo que eu capture" nao e "nao tenho rota para
+        // lugar nenhum": e a pergunta nao se aplicar a esta peca.
+        if (candidates.Count == 0)
+        {
+            result.captureQuestionInapplicable = true;
+            return;
+        }
+
         for (int i = 0; i < candidates.Count; i++)
         {
             if (component.ContainsKey(candidates[i].cell))
@@ -868,9 +892,13 @@ public static class QueroCaronaService
     /// <summary>Sufixo de diagnostico da fome estrutural.</summary>
     private static string FormatStrandedSuffix(QueroCaronaResult result)
     {
-        return result.isStranded
-            ? " SEM ROTA PRÓPRIA (só chega de carona)"
-            : string.Empty;
+        if (result.isStranded)
+            return " SEM ROTA PRÓPRIA (só chega de carona)";
+        // Falta assunto, nao rota — e o log tem de dizer qual dos dois, senao a
+        // proxima leitura repete a confusao que este campo existe para desfazer.
+        if (result.captureQuestionInapplicable)
+            return " (não captura: a pergunta da captura não se aplica a ela)";
+        return string.Empty;
     }
 
     /// <summary>
@@ -1186,6 +1214,8 @@ public static class QueroCaronaService
             repairEvaluation = source.repairEvaluation,
             isInfantry = source.isInfantry,
             isStranded = source.isStranded,
+            captureQuestionInapplicable =
+                source.captureQuestionInapplicable,
             rideWaitTurns = source.rideWaitTurns,
             reach = source.reach,
             evaluatedTarget = source.evaluatedTarget,
