@@ -1,4 +1,4 @@
-# Ideias Futuras
+﻿# Ideias Futuras
 
 Backlog de design — sugestões discutidas mas **não implementadas**. Cada item registra a motivação e as regras esboçadas, pra retomar sem reconstruir o raciocínio. (Origem: conversas de design de logística, jul/2026.)
 
@@ -287,3 +287,31 @@ resolver um deles deve resolver o outro com a mesma peça.
 
 É **X ou Y** pelo esquema do autor: sensor novo mexe em regra de jogo, e a
 terceira resposta do planner é mudança de arquitetura.
+
+#### A estrofe que a Marcha do Capturador vai ganhar
+
+Escrita em 2026-08-06 e **mantida fora da canção de propósito** — verso não é
+lugar de hipótese, e a marcha vale como especificação (*"onde o código divergir
+de um verso, o código está errado"*). Entra no apêndice de
+`docs/AI Behavior/Capturador.md` no dia em que field medic e engenheiro
+existirem, fechando as duas casas que hoje faltam (`Suprir` e `Transferir`).
+
+> **[Passagem — especialistas]**
+>
+> Se eu levo remédio, / cuido de quem vai tomar; / um soldado recuperado / volta
+> cedo a capturar.
+>
+> Se eu carrego ferramentas, / faço o estoque circular; / o engenheiro abre o
+> caminho / para a renda não parar.
+>
+> Mas serviço não me prende, / nem me faz esquecer: / quando a luz roxa chama, /
+> minha ordem é fazer render!
+
+A última quadra é a que importa como doutrina: ela declara que `Suprir` e
+`Transferir` são as casas **8 e 9**, abaixo até do `Fundir`. Um field medic
+capturador não é um médico que às vezes captura — é um **capturador que por acaso
+carrega remédio**, e larga a maleta quando a captura aparece.
+
+E a primeira quadra fecha com *"o HP é o relógio"*: curar restaura o relógio de
+quem vai capturar. É por isso que o remédio serve à renda, e não à sobrevivência
+por si.
