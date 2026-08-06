@@ -107,6 +107,65 @@ flag silently deleted the sea from a submarine's vision that way. If you find
 yourself turning a flag off to make one of the two behave, the entity is wrong,
 not the flag.
 
+## Subir pra cima — o que propaga, o que sobrevive, o que é da cena
+
+The game will grow to many maps sharing the same content. That only works if
+every piece of data knows **which of three tiers it belongs to**, and the
+direction of the fix is always *upward*: a thing that must reach every map has
+to **climb** to the tier that propagates — never be copied sideways into each
+scene, and never squat in a catalogue that fifty maps read.
+
+| tier | lives in | holds | survives scene load |
+|---|---|---|---|
+| **global** | manager with `DontDestroyOnLoad` | services and cross-match state | yes — **and must prove it should** |
+| **catálogo** | `ScriptableObject` asset | **what exists**: types, costs, keys, topological family | n/a — shared by every map |
+| **cena** | scene objects and their components | **what is in the field**: this board's instances and layout | no, and that is the point |
+
+**The one sentence that decides every case:**
+
+> *O catálogo diz o que uma coisa **É**. A cena diz **onde ela ESTÁ**.*
+
+A `StructureData` says what a highway is. Which hexes that highway runs through
+is this board's business. A `ConstructionData` says what a city is. Which cell
+holds a city is this board's business. Absolute cell coordinates inside a
+catalogue asset is always the same bug.
+
+### The acceptance test — it is one gesture
+
+> **Duplicate a scene, point it at the three catalogues, and the new map must be
+> born EMPTY.** Not one road, not one construction you did not place.
+
+If anything appears, some map's layout is living in a shared asset. Run this
+before believing any claim that the tiers are clean.
+
+### The failure mode is silence, not noise
+
+Map A's layout reaching map B produces **errors only when the coordinates do not
+exist there**. Two boards with overlapping coordinate ranges apply each other's
+roads with no warning at all. Loud failures here are luck; do not treat "no
+errors" as proof.
+
+And the mirror image is just as real: a manager that is `DontDestroyOnLoad`
+**with no `sceneLoaded` hook** carries the previous match's state into the next
+map. Too global is a contamination too — it just travels through time instead of
+through assets.
+
+### Known state (2026-08-06)
+
+```text
+UnitDatabase           types only                                  clean
+ConstructionDatabase   fieldEntries — layout, ZERO runtime readers  authoring-only violation
+StructureDatabase      roadRoutes  — layout, 5 runtime readers      being moved to the scene
+ObjectiveManager       DontDestroyOnLoad, no sceneLoaded hook       verify who clears it
+```
+
+Route reading now has a single point — `RoadNetworkManager.GetRoadRoutes` —
+with the pre-migration fallback chain resolved once in a lookup, gated by
+`routesMigratedToScene`. The flag exists to separate *"empty because I have not
+migrated"* from *"empty because there is no road of this type **here**"*. Do not
+delete the catalogue section until every map carries the flag: the catalogue is
+the shared fallback, and clearing it strands any map that has not migrated.
+
 ## Distribution state — nothing is shipped yet
 
 The game **is not on Steam**. It exists only on the author's machine, and release

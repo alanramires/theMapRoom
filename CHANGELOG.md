@@ -1,4 +1,4 @@
-# Changelog
+﻿# Changelog
 
 Índice das versões do projeto. Cada versão tem um relatório próprio explicando
 **o porquê**, não só o que mudou.
@@ -16,7 +16,19 @@ major fecha, os relatórios dele são arquivados em `docs/Versões/`.
 
 ---
 
-## v7 — Terminais burros e desacoplamento da IA *(em curso)*
+## v8 — Onde o dado mora *(em curso)*
+
+O catálogo diz o que uma coisa **É**; a cena diz **onde ela ESTÁ**. Este major
+separa os três andares — global, catálogo e cena — para que um mapa novo nasça
+vazio e nenhum tabuleiro herde o layout de outro.
+
+| versão | título | relatório |
+|---|---|---|
+| v8.0.0 | A ausência precisa de nome próprio | [relatório](docs/relatorio_v8.0.0.md) |
+
+---
+
+## v7 — Terminais burros e desacoplamento da IA *(fechado)*
 
 A arquitetura da IA deixa de ser "cada papel resolve o seu alcance" e passa a ser
 uma **escada**: sensores `PodeX` → serviços de área → consumidores `Melhor*` →
@@ -29,16 +41,19 @@ intactos.
 
 | versão | título | relatório |
 |---|---|---|
-| v7.0.0 | Fundação, desacoplamento e generalização do uso dos sensores | [relatório](docs/relatorio_v7.0.0.md) |
-| v7.0.1 | O alvo de captura tem um dono, e o desembarque tem um preço | [relatório](docs/relatorio_v7.0.1.md) |
-| v7.0.2 | A habilidade é uma chave, e o capitão virou dado | [relatório](docs/relatorio_v7.0.2.md) |
-| v7.0.3 | A camada virou parâmetro, e a taxonomia destrancou | [relatório](docs/relatorio_v7.0.3.md) |
-| v7.0.4 | A partida começou a caber no Scene View | [relatório](docs/relatorio_v7.0.4.md) |
-| v7.1.0 | Enxergar e detectar deixaram de ser a mesma pergunta | [relatório](docs/relatorio_v7.1.0.md) |
-| v7.1.1 | Uma pergunta, uma implementação | [relatório](docs/relatorio_v7.1.1.md) |
-| v7.1.2 | A reta virou uma só | [relatório](docs/relatorio_v7.1.2.md) |
-| v7.2.0 | Apagar também é publicar | [relatório](docs/relatorio_v7.2.0.md) |
-| v7.2.1 | A pergunta errada também responde | [relatório](docs/relatorio_v7.2.1.md) |
+| v7.0.0 | Fundação, desacoplamento e generalização do uso dos sensores | [relatório](docs/Versões/relatorio_v7.0.0.md) |
+| v7.0.1 | O alvo de captura tem um dono, e o desembarque tem um preço | [relatório](docs/Versões/relatorio_v7.0.1.md) |
+| v7.0.2 | A habilidade é uma chave, e o capitão virou dado | [relatório](docs/Versões/relatorio_v7.0.2.md) |
+| v7.0.3 | A camada virou parâmetro, e a taxonomia destrancou | [relatório](docs/Versões/relatorio_v7.0.3.md) |
+| v7.0.4 | A partida começou a caber no Scene View | [relatório](docs/Versões/relatorio_v7.0.4.md) |
+| v7.1.0 | Enxergar e detectar deixaram de ser a mesma pergunta | [relatório](docs/Versões/relatorio_v7.1.0.md) |
+| v7.1.1 | Uma pergunta, uma implementação | [relatório](docs/Versões/relatorio_v7.1.1.md) |
+| v7.1.2 | A reta virou uma só | [relatório](docs/Versões/relatorio_v7.1.2.md) |
+| v7.2.0 | Apagar também é publicar | [relatório](docs/Versões/relatorio_v7.2.0.md) |
+| v7.2.1 | A pergunta errada também responde | [relatório](docs/Versões/relatorio_v7.2.1.md) |
+
+10 versões, de `v7.0.0` a `v7.2.1`. Relatórios arquivados em
+[`docs/Versões/`](docs/Versões/).
 
 ### Documentos normativos criados neste major
 

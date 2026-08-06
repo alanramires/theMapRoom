@@ -169,6 +169,42 @@ validada antes — hoje só o lado do jogador foi testado.
 
 ---
 
+## Percepção
+
+### 12. Sensor com duas especializações de detecção (ar **e** submarino)
+
+**Hoje nenhuma ficha tem dupla função.** A ideia é a aeronave de patrulha
+marítima que varre o céu *e* a água — o P-3/P-8 do jogo. Registrado agora porque
+o desenho do `MelhorDeteccao` esbarrou nela e a resposta do autor foi *"ainda não
+fiz"*, não *"não existe"*.
+
+**O que trava hoje:** `SurveillanceProfile` (`AIController.Vigilancia.cs:6-21`)
+guarda **uma** `VisionCoverageLayer`, e `TryResolveSurveillanceProfile` devolve
+uma só. A camada vai como parâmetro único para o `MelhorVisaoRequest.Layer`. Uma
+ficha com duas entradas de detecção teria uma delas silenciosamente ignorada pela
+vigilância — e o modo da falha é o pior possível: a unidade patrulha, o log diz
+`layer=Air/AirHigh`, e ninguém percebe que a metade submarina nunca foi
+consultada.
+
+**As perguntas que ficam abertas:**
+
+- **Uma varredura ou duas?** Duas chamadas de cobertura por célula candidata
+  dobram o custo — e o censo de vigilância do turno 1 já mostrou ~10-21 ms por
+  chamada, com o EWACS gastando 2 s em 95 delas.
+- **Como se soma?** Duas redes de camadas diferentes não são comparáveis célula a
+  célula: a mesma posição pode ser ótima para o sonar e medíocre para o radar. Ou
+  se escolhe a camada por prioridade (e aí a prioridade mora na ficha), ou se
+  soma com peso (e aí o peso é política da IA, não do serviço).
+- **A postura vale para as duas?** Se a apetite de névoa vem de
+  `playConservative`, uma ficha só tem um flag para duas missões.
+
+**O caminho provável, quando existir:** a camada deixa de ser campo e vira lista,
+e a vigilância trata cada especialização como uma **agenda** separada, ranqueada
+entre si — que é o mesmo formato que `MelhorDesembarque` já usa para cruzar um
+serviço burro consultado uma vez por sujeito.
+
+---
+
 ## Engenharia
 
 ### 11. O capturador engenheiro — a raça que muda o mapa
