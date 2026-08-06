@@ -1,0 +1,321 @@
+﻿# Ficha do papel — a matriz das capacidades e o questionário padrão
+
+**Estado:** desenho do autor, capturado em 2026-08-06. A **matriz** (§2) é
+inventário verificado do código. A **ficha** (§4), a **ordem** (§5) e o
+**RoleData** (§7) são contrato de desenho, sem uma linha de implementação. O
+único item em aberto é o §7.6.
+
+> **HOJE** = verificado no código. **CONTRATO** = decidido, não escrito.
+> **ABERTO** = ninguém decidiu.
+
+---
+
+## 1. Por que existe
+
+É o **degrau 3 da escada** — *"papéis → só POLÍTICA"* — ganhando forma. Se todo
+papel responde o **mesmo questionário**, a diferença entre papéis passa a ser a
+política, por construção. Não sobra lugar para um papel esconder regra própria.
+
+E as categorias não foram inventadas: elas **são a família `Pode*`**. Isso é a
+doutrina se mostrando — o sensor é a fonte de verdade das ações legais, então a
+IA se organiza pelo sensor, não por uma taxonomia paralela.
+
+---
+
+## 2. A matriz — três colunas por categoria
+
+**HOJE.** Inventário do que existe:
+
+| categoria | sensor | consumidor | verbo de missão |
+|---|---|---|---|
+| **capture** | `PodeCapturar` | `MelhorCaptura` | `Capture` ✅ |
+| combat | `PodeMirar` | `MelhorCombate` | `Pressure` + `FireSupport` + `AntiAir` |
+| embark | `PodeEmbarcar` | `MelhorEmbarque` | — |
+| disembark | `PodeDesembarcar` | `MelhorDesembarque` | — |
+| fuse | `PodeFundir` | — | — |
+| supply | `PodeSuprir` | `MelhorEstoque` | `Supply` + `Restock` |
+| transfer | `PodeTransferir` | — | — |
+| fow | `PodeEnxergar` + `PodeDetectar` | `MelhorVisao` | `AirSurveillance` |
+| camada | `PodePousar` / `PodeDecolar` / `PodeEmergir` / `PodeSubmergir` / `PodeMudarAltitude` | `MelhorPouso` | — |
+| *(sem categoria)* | — | `MelhorCapitao` | — |
+
+**Uma linha só está de pé quando as três colunas existem.** Hoje isso vale para
+**capture**, e há poucas horas — a unificação que fez o alvo de captura virar
+missão está na árvore, **compilada e ainda não commitada**. Até ela,
+`AIPlanRuntimeIntent.Capture` era o verbo nº 1 do enum com **zero ocorrências no
+código**.
+
+Use a linha de capture como referência de como uma linha completa se parece.
+
+---
+
+## 3. As três assimetrias que a matriz expõe
+
+**Combat tem três verbos para uma categoria.** `Pressure`, `FireSupport` e
+`AntiAir` não são coisas diferentes de **fazer** — são o **papel** disfarçado de
+verbo. Se o padrão continuar, o enum cresce por papel novo em vez de por ação
+nova. O verbo deveria ser um, e o papel dizer como.
+
+**Embark e disembark não têm verbo do lado do passageiro.** `Transport` é do
+**transportador** — é a promessa dele, com o passageiro em
+`AIDesignatedMissionTargetUnitInstanceId`. Quem levanta a mão não tem missão
+nenhuma, e é exatamente por isso que ele pede carona sem destino:
+
+> **Ninguém pede táxi sem saber para onde vai.**
+
+Com a missão de captura escrita, o pedido passa a ser medido contra ela — ver
+`contrato_missao_captura.md`.
+
+**Fuse e transfer têm sensor e mais nada.** A IA nunca funde; e a cadeia
+logística está registrada em `ideias_futuras.md` (item 3) como frente própria.
+
+E `MelhorCapitao` é **consumidor sem consumidor**: falta o tradutor
+`AICaptainData → List<MelhorCapitaoAttraction>`.
+
+---
+
+## 4. A ficha padrão do papel
+
+**CONTRATO.** Todo papel expõe as mesmas entradas:
+
+```text
+AIController.<papel>
+    Capture
+    Aim
+    Embark
+    Disembark
+    Fuse
+    Supply
+    Transfer
+    Enxergar          ← duas linhas, nunca uma: ver §7.5
+    Detectar
+    Repositioning     ← acao nula, SEMPRE por ultimo: ver §6
+```
+
+### 4.1 Célula vazia precisa de TRÊS estados
+
+Ficha padrão só funciona se "vazio" não for ambíguo:
+
+```text
+política própria   este papel decide diferente do genérico
+padrão             cai no comportamento genérico
+NÃO SE APLICA      o sensor nunca devolve opção para esta peça
+```
+
+Sem o terceiro, a matriz repete o defeito que a `v8.0.0` nomeou — *"não
+respondi"* e *"a pergunta não é minha"* virando a mesma célula em branco. Um
+submarino na linha `capture` não é buraco: é inaplicável, e a ficha tem que
+dizer isso em vez de deixar em silêncio.
+
+### 4.2 O gate da categoria é o sensor, não a etiqueta
+
+**CONTRATO — e é a formulação que evita o erro mais caro do projeto.**
+
+```text
+ERRADO   tenho a etiqueta X  →  faço X
+CERTO    o sensor devolveu opção não-vazia  →  tenho assunto
+         →  o papel decide se vale o turno
+```
+
+A chave não é poder da unidade. Para captura, quem lista a chave é a
+**construção** (`ConstructionData.requiredSkillsToCapture`), não a ficha da
+unidade. A diferença entre as duas formulações é a diferença entre **consultar o
+sensor** e **reimplementar a regra dele** — e reimplementar é como a tabela de
+flags cresceu da primeira vez.
+
+Corolário: gates de papel usam `UnitRoleCompatibility.CanSatisfy`, nunca
+`roles.Contains` estrito, senão `CapturadorAgressivo` e parentes são barrados
+por variação de nome.
+
+---
+
+## 5. A ordem da ficha é o papel
+
+**CONTRATO.** **HOJE** o roteador tem ordem fixa e global
+(`AIController.Router.cs`): rebelde → capturador → assalto → transportador →
+fallback do `HexEvaluator`. A ordem é a mesma para todo mundo, e cada papel se
+defende com guardas internas.
+
+Com ficha padrão, a ordem passa a ser **de cada papel**:
+
+```text
+Capturador      Capture → Embark → Aim → Repositioning
+Artilheiro      Aim → Supply → Repositioning   (Capture NÃO SE APLICA)
+Transportador   Embark → Disembark → Repositioning
+```
+
+**Isso não pede refactor de arquivo.** Os ~20 partials podem continuar nomeados
+por papel; o que muda é cada um expor as mesmas entradas e uma ordem declarada.
+Reorganizar por categoria, se um dia valer, vem depois.
+
+### 5.1 A ideia certa que estava no lugar errado
+
+O campo `aiSensorPriority` (`UnitData`, marcado `LEGADO AI_Legacy`, apagado na
+`v8.0.0`) tentava exatamente isto: uma lista ordenada de ações por unidade.
+Estava errado em **dois** pontos, e vale registrar para não ressuscitar a forma
+junto com a ideia:
+
+```text
+na ficha da UNIDADE   prioridade de ação é do PAPEL, não da peça
+consumido por um orquestrador que hoje não compila (AI_Legacy~)
+```
+
+A ideia renasce como **ordem do questionário do papel**, em código, versionada
+com ele — não como campo serializado que ninguém lê.
+
+---
+
+## 6. `move / magnético` — RESOLVIDO: ação nula, e por último
+
+Todas as demais categorias têm um `Pode*` que devolve opções. Movimento não:
+`UnitMovementPathRules` não é sensor, e o magnético é doutrina
+(`MelhorCapitao`, o capitão que a peça orbita).
+
+Duas leituras, e elas mudam o desenho:
+
+**(a) substrato.** Movimento sai da lista e vira **coluna**: o *"para onde"* de
+cada categoria. `capture = mover + capturar`, `combat = mover + atirar`,
+`embark = mover + embarcar`. O magnético é a âncora quando a categoria não tem
+alvo próprio.
+
+**(b) ação nula.** Movimento fica na lista como *"o que eu faço quando nenhuma
+outra categoria respondeu"* — que é o rogue de hoje
+(`[Rogue] 1 marcha para âncora (0,0,0)`).
+
+Se for **(a)**, `Move` nunca compete com `Capture`. Se for **(b)**, compete — e
+aí precisa ser sempre o último da ordem, senão engole as outras.
+
+**CONTRATO — o autor decidiu (b)**, e já a colocou onde ela precisa estar: o
+nome vira `Repositioning` e é o **último item** da prioridade. É o rogue de hoje
+(`[Rogue] 1 marcha para âncora (0,0,0)`) ganhando lugar declarado em vez de ser
+fallback implícito do roteador.
+
+**E `camada` sai da lista de vez.** Pouso e decolagem **não são chamados como
+serviço** — são consequência de evento. `PodePousar` aparece no upkeep (pouso de
+emergência com 0 de combustível) e o `MelhorPouso` no rebasing. Ninguém "decide
+pousar" como decide capturar, então não há linha de questionário para eles.
+
+---
+
+## 7. A ficha como dado — `RoleData` e `RoleDatabase`
+
+**CONTRATO.** Desenho do autor. Nada existe.
+
+### 7.1 O motivo, que também é o critério de sucesso
+
+> *"Hoje o código que você faz no `AIController.Capturer` para mim é uma
+> caixinha de surpresas. Com esses data, eu creio que eles ficarão visíveis."*
+
+Isso não é conveniência — é a **medida** do desenho. É o mesmo movimento que a
+Hotzone e a janela de Shopping Pressure já fizeram: tornar visível o que só
+existia como decisão enterrada. **Se o asset não tornar visível o que hoje está
+escondido, ele falhou** — e vira só mais um lugar para procurar.
+
+E é o que decide a fronteira do §7.3: o que se expõe é exatamente o que hoje é
+invisível — **ordem e peso**. O que fica em código é o que é genuinamente
+algoritmo.
+
+### 7.2 O formato
+
+Segue o padrão da casa (`UnitData`/`UnitDatabase`, `ConstructionData`,
+`StructureData`) — seria o quarto da família:
+
+```text
+RoleData
+    id
+    role          (o enum UnitRole que ja existe)
+    descricao
+
+    SensorPriority   (lista ORDENADA)
+        Capture, Aim, Embark, Disembark, Fuse, Supply, Transfer,
+        Enxergar, Detectar, Repositioning
+
+    Politica por categoria
+        Capture:   ...
+        Aim:       ...
+        Embark:    ...
+```
+
+### 7.3 A fronteira — o que a célula pode carregar
+
+**CONTRATO, e é aqui que o desenho vive ou morre.**
+
+```text
+PODE    ordem              a prioridade do questionario
+PODE    pesos e limiares   apetite, banda minima, required, aderencia
+PODE    admissibilidade    esta categoria nao se aplica a este papel
+─────────────────────────────────────────────────────────────────────
+NAO     o codigo que decide  fica no AIController.<papel>
+```
+
+> **O asset carrega o questionário e o peso das respostas. Nunca o responder.**
+
+Concretamente: a célula `Capture` do Capturador pode dizer *"ordem 1, aderência
+ao objetivo anterior −15, banda de aquisição Operacional"*. **Não** pode dizer
+*como* escolher entre dois prédios — isso é o `MelhorCaptura`, e ele é serviço.
+
+Sem essa linha, o asset vira linguagem de script no inspector e o teste da chave
+falha: *renomear o papel quebra alguma coisa?*
+
+### 7.4 Identidade: o enum continua mandando
+
+`id` **e** `role` são duas identidades para a mesma coisa, e é o **enum** que vai
+no save (`UnitData.roles`, `aiAssignedPlanRole` como int).
+
+**CONTRATO:** o enum continua sendo a identidade e o `RoleData` é resolvido por
+ele — igual ao `ConstructionData.id`. O asset acrescenta política sem disputar
+identidade. E herda a regra do `AIPlanRuntimeIntent`: **valor novo entra no fim;
+renumerar não migra papel antigo, troca papel antigo.**
+
+### 7.5 `Fow and Detect` são DUAS linhas
+
+**CONTRATO.** A `v7.1.0` inteira foi para separá-las:
+
+```text
+PodeEnxergar   revela HEXAGONOS
+PodeDetectar   faz UNIDADES aparecerem
+```
+
+Uma célula só no questionário é o primeiro passo para elas voltarem a
+compartilhar resposta — que é exatamente o defeito que custou dias. Duas linhas,
+cada uma com seu consumidor: `MelhorVisao` de um lado, o `MelhorDeteccao` que
+ainda falta do outro.
+
+`Aim` está melhor que `combat`, porque casa 1:1 com `PodeMirar`. Sobra o
+consumidor chamado `MelhorCombate` — desalinhado no nome, e só isso.
+
+### 7.6 ABERTO — "não se aplica" é autorado ou derivado?
+
+Um submarino não captura, mas ele também **não tem o papel Capturador**. Então a
+inaplicabilidade já se resolve por *quais papéis a peça tem* × *o sensor
+devolveu vazio* — sem campo nenhum.
+
+Se for assim, o terceiro estado da §4.1 é **leitura**, não dado: menos coisa
+autorada é menos coisa para envelhecer. Falta conferir se existe papel que se
+aplica a uma categoria e não a outra de um jeito que o sensor não pegue. Se
+existir, o campo se justifica.
+
+---
+
+## 8. O que este documento NÃO cobre
+
+- **Variações de papel** (degrau 4): `CapturadorAgressivo` e parentes viram
+  perfil/trait depois da extração das linhas. Ver `docs/revisao_papeis.md`.
+- **A política de cada célula.** Esta é a forma da ficha, não o conteúdo. O que
+  um Artilheiro faz na linha `combat` mora em `docs/AI Behavior/` por papel.
+- **Plano × sem plano.** É eixo do **organizador**, e hoje o curto-circuito
+  rebelde existe **só para captura** (`Router.cs:107`). As outras categorias não
+  têm rebelde: caem no `plan != null` e simplesmente não rodam para uma facção
+  sem QG.
+
+---
+
+## 9. Leituras
+
+| documento | por quê |
+|---|---|
+| `CLAUDE.md`, "A skill is a key" | por que o gate é o sensor e não a etiqueta |
+| `CLAUDE.md`, "As três camadas" | serviço burro / consumidor / organizador |
+| `contrato_missao_captura.md` | a linha completa da matriz, e as condições de baixa |
+| `contrato_envelope_alcance.md` | banda, âncora e camada são parâmetro da unidade avaliada |
+| `docs/revisao_papeis.md` | a matriz de papéis e a taxonomia que ainda não foi extraída |
