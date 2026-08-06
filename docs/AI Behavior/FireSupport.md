@@ -1,4 +1,4 @@
-# Fire Support — doutrina
+﻿# Fire Support — doutrina
 
 Doutrina definida pelo autor. Onde o código divergir dela, o código está errado.
 
@@ -294,3 +294,138 @@ porta-aviões é caso citado dela, mas a IA ainda não opera a cadeia.
 | F8 | não desembarcar sem vanguarda / em capturável | `Assalto.md` S6, `Transporte.md` §2 |
 | — | skill "captura construções" como capacidade | `Assalto.md` M7 |
 | — | `roles[0] == X` em vez de `CanSatisfy` | `Assalto.md` S11 |
+
+---
+
+# Apêndice — A ficha do papel (2026-08-06)
+
+**Descrição do autor:**
+
+> *"A morte vem do alto, e você nem verá de onde veio. Ou, se conseguir ver, boa
+> sorte pra esquivar!"*
+
+`Destroyer` (marinha), obuses, artilharia de campanha e `SAM` representam a
+categoria.
+
+| eixo | valor |
+|---|---|
+| **modalidade** | **artilheiro** — atira **parado**, segurando a posição. **Sem armas de contato** (alcance mín > 1) |
+| **retaguarda** | entre a massa oponente e o capitão, **atrás dele** |
+| **flancos** | esquerda e direita do capitão, como **cobertura de fogo** |
+| **atração** | fogo de suporte fica com o **capitão**; antiaéreos ficam com as **vigilâncias aéreas** |
+
+## Prioridade de sensor
+
+```text
+Detectar, Enxergar, Mirar, Reposicionar, Embarcar,
+Transferir, Suprir, Desembarcar, Capturar, Fundir
+```
+
+## A moeda deste papel é a FORMAÇÃO — e ela não está na peça
+
+> *"3 canhões juntos, basta 1 assalto para acabar com a festa. 3 canhões em
+> deltas cobrindo os pontos cegos uns dos outros e nada entra!"*
+
+É o **primeiro papel cujo valor é relacional**. Os outros três guardam valor na
+própria peça; este guarda na **posição relativa entre as peças**.
+
+| papel | onde o valor mora | fundir |
+|---|---|---|
+| capturador | o **corpo** — HP é a taxa | **ganha** |
+| transportador | as **vagas** | perde |
+| assalto | a **arma** — cada casco é ameaça | perde |
+| **fogo de suporte** | a **formação** — cones cobrindo pontos cegos | perde — **e agrupar também** |
+
+**Daí o `auto repelir`:** uma unidade de fogo de suporte **repele as suas** dentro
+do próprio tático. Amontoar destrói o ativo tanto quanto fundir destruiria.
+**Nunca fundem, jamais.**
+
+## Tático e Operacional são INVERTIDOS e sempre CÚBICOS
+
+```text
+Tático        alcance da ARMA (min e max)
+Operacional   o dobro do tático
+              ignoram geografia — sempre cúbicos
+```
+
+> **O movimento não serve para medir a cobertura.**
+
+✅ Já é doutrina registrada: `CLAUDE.md` ("Known inversion") e
+`contrato_envelope_alcance.md`. A banda é da **arma**, não do movimento — um obus
+de 1 MP com banda de movimento teria Operacional no hex 2. E a banda **exclui a
+zona morta de alcance mínimo**: um obus 3-4 tem Tático `{3, 4}`, e os hexes 0, 1
+e 2 voltam vazios.
+
+## 1. `Detectar` no topo — o QUARTO sentido desta casa
+
+> *"Artilharia não consegue atirar no que não vê, especialmente no alcance máximo
+> de 4 hexes, que exige oponente detectado."*
+
+```text
+capturador       "quem ocupa o prédio que eu quero?"    precondição
+assalto          "onde está o elite que eu cacei?"       aquisição de alvo
+fogo de suporte  "eu não atiro no que não vejo"          HABILITAÇÃO DA ARMA
+```
+
+Sem detecção, o alcance máximo **não existe**. Este papel é o **cliente mais
+forte** do `SpottingDeCobertura` (`contrato_missoes.md`) — ❌ que não existe no
+runtime.
+
+Serve também ao **cone de cobertura da vanguarda**: libera a unidade a se mover
+quando a força principal ocupa o cone.
+
+## 2. `Enxergar` em segundo — estender o cone
+
+Para o cone virar **semicírculo**, cobrindo flancos e vanguarda da formação.
+
+> *"Se a artilharia detectar e enxergar e estiver atrás de montanha, o inimigo nem
+> saberá o que o atingiu."*
+
+## 3-4. `Mirar`, depois `Reposicionar` — e ela quase não se move
+
+Só reposiciona **quando esgota** as anteriores. E **raramente reposiciona para
+mirar o inimigo no tático**.
+
+```text
+sozinha na vanguarda        RECUA
+reparo na vanguarda         NUNCA (ao contrário do assalto, que não liga)
+em colapso                  o melhor lugar é o HQ, com a melhor defesa —
+                            de preferência uma artilharia de campanha
+```
+
+Algumas artilharias têm **requisito de reboque** para serem movidas.
+
+## 5-10. O resto quase não acontece
+
+Raramente capturam, carregam estoque ou prestam serviço. **Sequer levam carona.**
+E não fundem, jamais.
+
+## O Destroyer vira capitão do mar
+
+> *"Em modo de rally no mar (invasão), o Destroyer se torna o **capitão do mar** e
+> temporariamente assume a **vanguarda** do grupo naval (destroyer, porta-aviões,
+> subs, navio de transporte e fragatas)."*
+
+**É a única inversão de posicionamento do papel:** um artilheiro de retaguarda
+que passa a ocupar a vanguarda, e passa a ser o **magnético** dos outros. Ele
+segue o capitão pela praia com suas duas armas de superfície (cruise) ou o canhão
+antiaéreo — **as duas são fogo de suporte**, porque o navio não tem arma de
+contato.
+
+## Em colapso — o core defensivo básico
+
+> *"O foco é a artilharia de campanha, mas apenas se houverem blindados o
+> bastante. **Pelo menos 1 artilharia de campanha e 1 SAM constitui o core
+> defensivo básico**, que pode ser comprado mesmo em even ou advantage."*
+
+É um **piso de compra**, não uma preferência — e vale fora de Collapsing. Ver
+`Shopping.md` §6 (gestão de exército) e o `+16000` de `Demand.cs:3092`, que já dá
+peso a `FogoIndireto` e `Antiaereo` quando o time perde o mapa.
+
+## Variantes pendentes
+
+`ArtilheiroCombatente` e `AntiaereoCombatente` — os dois que **compartilham um
+único predicado** no código (`AIController.FireSupport.Combatant.cs:8-9`). Com
+esta ficha escrita, a diferença deles fica nomeável: são unidades que **têm arma
+de contato**, ao contrário do artilheiro puro definido aqui. Ver `Shopping.md`
+§2.2.
