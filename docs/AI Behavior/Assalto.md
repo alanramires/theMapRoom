@@ -608,6 +608,40 @@ O segundo motivo do assalto (*não encolher o exército*) é diferente dos outro
 dois: trata **contagem de unidades** como grandeza estratégica por si — o mesmo
 raciocínio da doutrina de conscrição em Collapsing (`Shopping.md` §6).
 
+## O papel estratégico — o que o assalto é para o exército
+
+Estas duas linhas não são comportamento de turno: são a função do papel na
+economia da partida.
+
+### Em defesa, elite e massa coexistem
+
+> *"A produção segue tentando chegar no elite junto com o recrutamento avançado,
+> mas cada política pode variar dependendo da IA."*
+
+É exatamente a forma do **imposto de conscrição** (`Shopping.md` §6.1): massa
+garantida primeiro, elite **com o que couber por cima**. Não é escolher entre os
+dois — é uma barra dupla, e o que varia por dificuldade é onde fica o fiel.
+
+E casa com a regra viva de Collapsing (`Demand.cs:3092`), que dá **+16000** a
+`Assalto` / `FogoIndireto` / `Antiaereo` quando o time perde o mapa. Para o
+assalto, essa regra **está certa** — o que está errado é ela **negar** o bônus ao
+capturador, que defende a linha de renda (`Capturador.md` §0).
+
+### Assalto é pré-requisito da invasão final
+
+> *"Unidades de assalto e ataque aéreo também são pré-requisitos para
+> concentração de força antes de uma invasão final."*
+
+A invasão da base inimiga só é alocada quando um **rally atinge GoGreen** — o
+portão de massa. **O assalto é a massa que abre esse portão.**
+
+Consequência para o shopping: a demanda por assalto **não é só defensiva**. Ela é
+a precondição do fim de jogo, e cortá-la em nome de outra urgência adia a
+invasão inteira. Ver `project_invasion_gated_by_rally` e o macro-estado de
+invasão, que persiste no save por `rallyGoGreenTurns`.
+
+---
+
 ## Variantes pendentes
 
 `ArtilheiroCombatente` e `AntiaereoCombatente`. **O autor precisa explicar fogo
