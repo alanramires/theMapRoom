@@ -24,20 +24,51 @@ IA se organiza pelo sensor, não por uma taxonomia paralela.
 
 ## 2. A matriz — três colunas por categoria
 
-**HOJE.** Inventário do que existe:
+**Pareamento definido pelo autor em 2026-08-06.** A primeira versão desta tabela,
+montada por listagem de arquivo, errava **quatro** linhas — as correções estão
+marcadas.
 
-| categoria | sensor | consumidor | verbo de missão |
+| # | `Pode*` | `Melhor*` | o que o consumidor resolve |
 |---|---|---|---|
-| **capture** | `PodeCapturar` | `MelhorCaptura` | `Capture` ✅ |
-| combat | `PodeMirar` | `MelhorCombate` | `Pressure` + `FireSupport` + `AntiAir` |
-| embark | `PodeEmbarcar` | `MelhorEmbarque` | — |
-| disembark | `PodeDesembarcar` | `MelhorDesembarque` | — |
-| fuse | `PodeFundir` | — | — |
-| supply | `PodeSuprir` | `MelhorEstoque` | `Supply` + `Restock` |
-| transfer | `PodeTransferir` | — | — |
-| fow | `PodeEnxergar` + `PodeDetectar` | `MelhorVisao` | `AirSurveillance` |
-| camada | `PodePousar` / `PodeDecolar` / `PodeEmergir` / `PodeSubmergir` / `PodeMudarAltitude` | `MelhorPouso` | — |
-| *(sem categoria)* | — | `MelhorCapitao` | — |
+| 1 | `PodeCapturar` | `MelhorCaptura` | capturáveis e **recapturáveis** na proximidade, ou pela força do plano atribuído |
+| 2 | **Reposicionamento** | `MelhorEmbarque`, `MelhorCapitao` | a atração de **onde você tem que estar** ⬅ *corrigido* |
+| 3 | `PodeEmbarcar` | `QueroCarona` | o momento de **atrair transportadores** para embarcar neles ⬅ *ausente antes* |
+| 4 | `PodeDesembarcar` | `MelhorDesembarque` | interseção das zonas operacionais das cargas, para liberar **todos** nos melhores locais |
+| 5 | `PodeMirar` | `MelhorCombate` | a guerra |
+| 6 | `PodeDetectar` | `MelhorDeteccao`, `MelhorSpotting` | encontrar inimigos |
+| 7 | `PodeEnxergar` | `MelhorVisao` | **revelação pura de hexágonos** |
+| 8 | `PodeTransferir` | `MelhorEstoque` | quem precisa de recursos ⬅ *corrigido* |
+| 9 | `PodeSuprir` | — | ❌ sem serviço. Quando desmembrar do AI Suprir: **criticidade, peso por elite, manutenção preventiva** |
+| 10 | `PodeFundir` | — | ❌ sem serviço. A única regra é **fundir na retaguarda**, e mora no `AIRepair` |
+
+### Os quatro erros da primeira versão, e o que cada um ensinou
+
+```text
+MelhorEmbarque em "embark"    ele devolve "uma combinacao passageiro-LZ" —
+                              LZ e LUGAR. E reposicionamento, nao o ato
+QueroCarona ausente           eu o tratava como consumidor do envelope de
+                              CAPTURA; ele e o lado-passageiro do embarque
+MelhorEstoque em "supply"     "usa a consulta prospectiva do PodeTransferir" —
+                              e a rede de estoque, nao o ato de suprir
+MelhorCapitao "sem categoria" e o outro consumidor do reposicionamento
+```
+
+Listar arquivo por nome pareia errado. **O que decide o par é a pergunta que o
+consumidor responde**, e ela está na docstring dele.
+
+### O que a tabela corrigida mostra
+
+**Quatro `Melhor*` faltam:** os de `Suprir` e `Fundir` (o autor já disse o que
+farão), e `MelhorDeteccao` e `MelhorSpotting` — desenhados em
+`contrato_recencia_de_cobertura.md`, sem uma linha de código.
+
+**`MelhorPouso` sai da lista.** Pouso e decolagem **não são chamados como
+serviço** — são consequência de evento (upkeep, rebasing). Ver §6.
+
+**E `MelhorVisao` tem o trabalho certo escrito aqui:** *revelação pura de
+hexágonos*. É exatamente o que ele **deveria** fazer, e hoje o ramo `IsAll` dele
+responde por detecção — a divergência está registrada em
+`contrato_recencia_de_cobertura.md` §4.2.
 
 **Uma linha só está de pé quando as três colunas existem.** Hoje isso vale para
 **capture**, e há poucas horas — a unificação que fez o alvo de captura virar
@@ -56,7 +87,8 @@ Use a linha de capture como referência de como uma linha completa se parece.
 verbo. Se o padrão continuar, o enum cresce por papel novo em vez de por ação
 nova. O verbo deveria ser um, e o papel dizer como.
 
-**Embark e disembark não têm verbo do lado do passageiro.** `Transport` é do
+**Embark e disembark não têm verbo do lado do passageiro** — e agora sabe-se
+qual consumidor faz essa pergunta: `QueroCarona` (linha 3 da matriz). `Transport` é do
 **transportador** — é a promessa dele, com o passageiro em
 `AIDesignatedMissionTargetUnitInstanceId`. Quem levanta a mão não tem missão
 nenhuma, e é exatamente por isso que ele pede carona sem destino:
