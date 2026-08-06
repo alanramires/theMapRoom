@@ -519,8 +519,8 @@ precisa reescrevê-la.
 > *"Tá difícil seguir em frente? Me chama — eu rompo barreiras, seja em terra ou
 > no ar!"*
 
-`Assalto` (chão), `AtaqueAereo` (ar contra chão) e **`Interceptador`** (*"um
-assalto que atira pra cima"*) são o **mesmo papel**. A função das unidades de
+`Assalto` (chão), `AtaqueAereo` (ar contra chão) e **`Interceptador`** — os
+**caças**, *"um assalto que atira pra cima"* — são o **mesmo papel**. A função das unidades de
 alcance 1 é partir pra briga.
 
 ### A linha que separa os papéis é a MODALIDADE, não o alvo
