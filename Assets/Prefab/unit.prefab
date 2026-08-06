@@ -616,9 +616,6 @@ MonoBehaviour:
   aiAssignedPlanBadge: 
   aiAssignedPlanRole: 2
   aiAssignedPlanBadgeVisible: 0
-  aiHasDesignatedCaptureTarget: 0
-  aiDesignatedCaptureTargetInstanceId: -1
-  aiDesignatedCaptureTargetCell: {x: 0, y: 0, z: 0}
   aiHasDesignatedMission: 0
   aiDesignatedMissionIntent: 0
   aiDesignatedMissionTargetUnitInstanceId: -1

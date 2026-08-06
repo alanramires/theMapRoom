@@ -34,7 +34,7 @@ MonoBehaviour:
     vision: 6
     detectUnitsWithFollowingSkills:
     - {fileID: 11400000, guid: bd65f7348de04da4681b0f7387af6998, type: 2}
-    losPolicy: 2
+    detectionMethod: 2
   movementCategory: 5
   militaryForce: 2
   unitClass: 8
@@ -67,7 +67,7 @@ MonoBehaviour:
   repairTriggerAmmoEnabled: 1
   repairTriggerAmmoPct: 0
   repairRecoverHpAbove: 8
-  fuseWhileInRepair: 1
+  fuseWhileInRepair: 0
   restockTriggerGallonPct: 10
   restockTriggerAmmoBoxPct: 10
   restockTriggerToolsPct: 10

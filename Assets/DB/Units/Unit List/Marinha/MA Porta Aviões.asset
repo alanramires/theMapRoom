@@ -55,9 +55,9 @@ MonoBehaviour:
   attackMustSurvive: 1
   ignoreAttackDecisionWhenDefending: 0
   defensiveAttackExtraHpLossPercent: 20
-  repairTriggerHpBelow: 0
+  repairTriggerHpBelow: 5
   repairTriggerAutonomyPct: 0
-  repairTriggerAmmoEnabled: 0
+  repairTriggerAmmoEnabled: 1
   repairTriggerAmmoPct: 0
   repairRecoverHpAbove: 8
   fuseWhileInRepair: 0
