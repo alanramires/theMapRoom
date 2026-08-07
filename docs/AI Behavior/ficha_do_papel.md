@@ -537,12 +537,33 @@ verdades no projeto. Ficha completa em `Vigilancia.md`.
 
 ---
 
+## Logística — *"está ferido? acabou a bala? aguenta aí que eu tô chegando!"*
+
+**Subpapéis:** Logística de Campo (o serviço), Estoque (o movimento)
+
+```text
+Enxergar, Suprir, Transferir, Reposicionar, Embarcar,
+Desembarcar, Mirar, Fundir, Capturar, Detectar
+```
+
+**É o espelho exato da Vigilância** — `Enxergar` 1º e `Detectar` 10º, contra
+`Detectar` 1º e `Enxergar` 10º. Os dois papéis ocupam as pontas opostas da
+doutrina das duas verdades, e isso é a melhor prova de que os dois sensores
+respondem perguntas diferentes: **um papel inteiro só precisa de um deles.**
+
+> *"Não se preocupam em detectar o inimigo, pois se ele está tão perto já é tarde
+> demais."*
+
+Ficha completa em `Logistica.md`.
+
+---
+
 ## O que este quadro fixa
 
 ```text
 3 modalidades    combatente, artilheiro, HÍBRIDA
-5 papéis         questionário, moeda, posicionamento, marcha
-15 subpapéis     o que o shopping pede e o que a ficha declara
+6 papéis         questionário, moeda, posicionamento, marcha
+17 subpapéis     o que o shopping pede e o que a ficha declara
 ```
 
 E as quatro moedas, que respondem sozinhas se uma peça funde:
@@ -554,6 +575,12 @@ E as quatro moedas, que respondem sozinhas se uma peça funde:
 | Assalto | a **arma** — cada casco é ameaça | perde |
 | Fogo de Suporte | a **formação** — cones cobrindo pontos cegos | perde, e **agrupar também** |
 | Vigilância | a **área coberta e a idade dela** | perde — *menos cobertura do tabuleiro* |
+| **Logística** | o **estoque** | **ganha** — a média ponderada conserva tudo |
+
+**Só dois papéis fundem**, e por razões diferentes: no Capturador o HP **é** a
+taxa, então concentrar acelera; na Logística o estoque é **conservado** na fusão,
+então o casco novo dura mais sem perder nada. Os outros quatro perdem algo
+insubstituível — uma vaga, uma arma, um nó da malha, um pedaço de área.
 
 ---
 
