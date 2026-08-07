@@ -1,14 +1,110 @@
 ﻿# Resumo — onde estamos e o que vem
 
-Ponto de retomada. Escrito em 2026-08-07, **depois** da tag `v8.1.0`. Leia isto
+Ponto de retomada. Escrito em 2026-08-07, **depois** da tag `v8.1.1`. Leia isto
 primeiro.
 
 ---
 
 ## Estado
 
-`v8.1.0` tagueada e publicada. Relatório:
-[`relatorio_v8.1.0.md`](relatorio_v8.1.0.md).
+`v8.1.1` tagueada e publicada. Relatório:
+[`relatorio_v8.1.1.md`](relatorio_v8.1.1.md).
+
+**Cinco portas em série, todas validadas em campo**, e a cadeia de resgate
+multimodal anda até ao penúltimo passo:
+
+```text
+Soldado#1 embarca no APC#8  →  APC#8 (carregado) pede carona pelo destino da
+carga  →  Navio#5 promete resgate ao APC e zarpa (rotaPax=ReachableStrategic)
+```
+
+O fio, e ele repete-se cinco vezes:
+
+> **O que barrava era prazo, política ou formação vestidos de fato — sempre
+> dentro de um teste que se chamava estrutural.**
+
+```text
+MeetingWalkTurns = 2        prazo no filtro topológico
+âncora só de capturável     política no lugar da coordenada
+horizonte por tier          o Strategic negava o próprio horizonte
+flags invertidas            pedia LZ estratégica, recusava rota estratégica
+InRearSlice no resgate      formação onde o ofício é sair da formação
+```
+
+### ⚠️ O que a v8.1.1 QUEBROU — e é a primeira coisa a consertar
+
+**As cinco correções somadas fizeram o navio vaguear.** Elas abriram o oceano
+inteiro como lista de candidatos e **nenhuma deu ao navio motivo para ficar**:
+
+```text
+1. navio promete #8 e navega até o encontro
+2. #8 chega a sua vez e escolhe Delivery — dirige para longe
+3. o encontro evapora; a opção de #8 sai da lista
+4. o farol da promessa não a acha, e cai para o próximo passageiro
+5. repete
+```
+
+**O navio não tem histerese** — mesmo defeito que o capturador já teve
+(otimizador global sem aderência ao objetivo anterior). A promessa devia ser a
+histerese, mas o farol só pesa quando a opção do prometido **está na lista**;
+fora dela, ela não perde para nada, ela não existe.
+
+### As duas metades do mesmo aperto de mão
+
+Nenhuma das duas sozinha fecha o ciclo:
+
+| # | onde | o quê |
+|---|---|---|
+| 1 | `TryQueryTransportPickupOperation` | promessa pendente cujo passageiro não é materializável **hoje** deve **segurar posição**, não trocar de passageiro |
+| 2 | `TransportOperationsService.BuildAttempts` | `HasCargo` devolve cedo (`Courier; Delivery; return`) — falta a tentativa **`Embark`** no topo, que a ficha manda ser o topo nos dois modos (aninhamento) |
+
+⚠️ **`Embarcar` do transportador ≠ `embarcar` da unidade.** O primeiro é
+aninhar-se noutro veículo; o segundo é o passageiro subir. Confundi os dois numa
+sessão inteira — a que falta é a primeira, feita ao APC carregado.
+
+### O defer da iniciativa — compilado, NUNCA rodado
+
+`ShouldDeferPassengerForIncomingTransport` ([`AIController.Phase2.cs`](../Assets/Scripts/Match/AI/1.%20Phases/AIController.Phase2.cs)):
+quem está na fila de carona cede a vez a um transportador que ainda não agiu,
+tem vaga, está a ≤ MP+1 e encosta por topologia. Guarda `!secondPass` contra a
+cessão mútua com o `cede destino`.
+
+Sinal esperado: `Fase2 — Soldado#N espera carona e cede vez para APC#M encostar
+primeiro.`
+
+### Doutrina nova, escrita e sem código
+
+O autor desceu o modal de sensores à mão para quatro casos do capturador e três
+do transportador. **O modal não é uma cadeia "o primeiro que responde ganha" — é
+um funil que preenche quatro campos**, e essa forma já é o `PlayerAction`:
+
+```text
+âncora       PARA ONDE            Capturar, Enxergar, Detectar
+movimento    ATÉ ONDE hoje        Reposicionar
+etiqueta     O QUE fazer lá       Capturar, Mirar, Desembarcar, Suprir, Fundir
+publicação   o que fica no mundo  Embarcar → "quero carona"
+```
+
+Consequências, todas no `relatorio_v8.1.1.md` §Doutrina:
+
+- **subpapéis terrestre/aéreo/naval não devem existir** — o mesmo funil serve
+  trem e hidroavião. Teste: *se um passo responderia diferente para os dois, não
+  é passo, é resposta de sensor*
+- **`TouchesComponent` é a forma geral de "praia"** — estação, helipad, convés e
+  praia são a mesma pergunta
+- **a escada de âncora é compartilhada:** EVAC → casa → retaguarda da massa →
+  fica. O vazio pula do 2 para o 4 porque o 3 exige direção de frente conhecida
+- **`publicação` é o barramento entre papéis** — quatro moradores; nenhum papel
+  chama outro
+- **`isStranded` só é medido contra capturáveis** — quem não captura não tem
+  sujeito para o encalhamento
+- **publicação só vale se o solicitante puder aceitar** — soldado com 0 de
+  autonomia não embarca nem com o transporte ao lado, e o anti-fome promove esse
+  pedido a inegociável em 3 turnos
+
+---
+
+## Estado anterior — v8.1.0
 
 **34 commits, e o transporte inteiro remexido.** Mas o fio do dia não é nenhuma
 das mudanças — é uma constatação que apareceu **três vezes**:
@@ -359,6 +455,12 @@ existe, e nenhuma das ~20 exceções do capturador foi re-derivada ainda.
 | **dividir commit por hunk sem rede** | guarde o arquivo final, aplique a frente A, **restaure**, e o resto é a frente B |
 | **`git add .`** | só no passo de churn do fechamento |
 | **tag antes do commit final** | tag é a última coisa da versão |
+| **teste que se chama "estrutural" e mede prazo** | cinco vezes na v8.1.1. Estrutural é topologia: *"algum dia, a qualquer distância"*. Orçamento de turnos é ranking, uma camada acima. Se o nome do teste promete estrutura, ele não pode ter constante de tempo dentro |
+| **duas flags que deviam andar juntas e não andam** | `includeStrategic = true` com `resolveLongRangePassengerMeeting = false` fazia o tier Strategic negar o próprio horizonte. Quando um pedido tem dois eixos (o que produzir × o que calcular), conferir se algum caller os separou |
+| **cinco cláusulas, um só `false`** | o `isMaterializable` do Pickup recusava 48 opções com log idêntico ao de zero opções. Adivinhei duas vezes; à segunda errei. **Contador por motivo antes do terceiro palpite** — custa nada e transforma a corrida seguinte em resposta |
+| **alargar o conjunto de candidatos sem dar razão para ficar** | as cinco correções somadas fizeram o navio trocar de passageiro todo turno. Quem passa a ver mais opções precisa de **histerese** na mesma passada, senão vira otimizador global — exatamente o que já mordeu o capturador |
+| **`alvo=(0,0,0)` não é "sem alvo"** | é a célula (0,0,0). Li como ausência e construí meia teoria em cima. Coordenada nula e coordenada zero são indistinguíveis no log — conferir no Inspector antes de concluir |
+| **"não era o bloqueio" ≠ "não era necessário"** | classifiquei o horizonte por tier como decoração porque não destravou sozinho. A opção vencedora do navio é `ReachableStrategic` — era carga. Numa série de portas, cada uma é necessária e nenhuma é suficiente |
 
 ---
 
