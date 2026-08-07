@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -105,14 +105,16 @@ public partial class AIController
         Vector3Int movementAnchor = primaryTarget;
         if (TryResolveDeliveryZoneAnchor(
                 unit, primaryPassenger, primaryTarget, fromCell,
-                out Vector3Int deliveryAnchor, out int anchorPassengerCost))
+                out Vector3Int deliveryAnchor, out int anchorPassengerCost,
+                out bool anchorIsTactical))
         {
             movementAnchor = deliveryAnchor;
             if (movementAnchor != primaryTarget)
                 Debug.Log(
                     $"{TL("Transporte")} {unit.InstanceId} ancora de entrega "
-                    + $"{movementAnchor} (alvo {primaryTarget}; passageiro anda "
-                    + $"{anchorPassengerCost} de la) — mira a ZONA, nao o predio.");
+                    + $"{movementAnchor} ({(anchorIsTactical ? "Tactical" : "Operational")}; "
+                    + $"alvo {primaryTarget}; passageiro anda {anchorPassengerCost} "
+                    + "de la) — mira a ZONA, nao o predio.");
         }
 
         Vector3Int moveTarget = FindTransportMove(unit, fromCell, movementAnchor, paths, occupied, snapshot.AITeam);

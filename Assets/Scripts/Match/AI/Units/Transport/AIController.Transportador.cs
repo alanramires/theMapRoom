@@ -72,10 +72,12 @@ public partial class AIController
         Vector3Int targetCell,
         Vector3Int transporterCell,
         out Vector3Int anchorCell,
-        out int passengerWalkCost)
+        out int passengerWalkCost,
+        out bool anchorIsTactical)
     {
         anchorCell = targetCell;
         passengerWalkCost = 0;
+        anchorIsTactical = false;
         if (transporter == null || passenger == null || boardTilemap == null)
             return false;
 
@@ -104,7 +106,33 @@ public partial class AIController
             UnitMovementPathRules.CalculateMovementCostMap(
                 boardTilemap, transporter, transporterCell, 120, terrainDatabase);
 
+        // BORDA E PARA EMBARQUE. ENTREGA E PARA DENTRO.
+        //
+        //   "borda do tatico e para EMBARQUE (para ir rapidamente para o
+        //    destino); dentro do tatico ou em cima do objetivo e para
+        //    DESEMBARQUE (para desembarcar rapidamente na captura)"
+        //   (autor, 2026-08-07)
+        //
+        // Sao duas geometrias opostas para a mesma banda, e confundi-las inverte
+        // o resultado. No ENCONTRO o passageiro caminha para FORA, na direcao do
+        // destino, entao a borda economiza turno dos dois. Na ENTREGA quem anda
+        // depois e so ele, e cada hex que sobra e turno perdido antes de
+        // capturar — a entrega quer o FUNDO da zona, colada no objetivo.
+        //
+        // Minha primeira versao ordenava por custo do transportador, que dentro
+        // de qualquer faixa aponta sempre para a borda externa. Isso e a regra do
+        // embarque aplicada ao desembarque: o APC pararia a 6 hexes do predio em
+        // campo aberto e largaria o soldado a duas rodadas de marcha.
+        //
+        // Criterio correto, nesta ordem:
+        //   1. a faixa           Tactical vence Operational, sempre
+        //   2. marcha do PASSAGEIRO   menor e melhor — colado no objetivo
+        //   3. custo do transportador  so como desempate
+        int tacticalRange = ResolvePassengerDropOffRange(
+            passenger, operationalFallback: false);
+
         bool found = false;
+        int bestTier = int.MaxValue;
         int bestTransporterCost = int.MaxValue;
         int bestWalk = int.MaxValue;
 
@@ -116,18 +144,26 @@ public partial class AIController
                 || !transporterCost.TryGetValue(cell, out int driveCost))
                 continue;
 
-            // Empate no custo de dirigir: prefere deixar o passageiro mais perto.
-            if (driveCost < bestTransporterCost
-                || (driveCost == bestTransporterCost && entry.Value < bestWalk))
-            {
-                bestTransporterCost = driveCost;
-                bestWalk = entry.Value;
-                anchorCell = cell;
-                passengerWalkCost = entry.Value;
-                found = true;
-            }
+            int tier = entry.Value <= tacticalRange ? 0 : 1;
+
+            bool better =
+                tier < bestTier
+                || (tier == bestTier
+                    && (entry.Value < bestWalk
+                        || (entry.Value == bestWalk
+                            && driveCost < bestTransporterCost)));
+            if (!better)
+                continue;
+
+            bestTier = tier;
+            bestTransporterCost = driveCost;
+            bestWalk = entry.Value;
+            anchorCell = cell;
+            passengerWalkCost = entry.Value;
+            found = true;
         }
 
+        anchorIsTactical = found && bestTier == 0;
         return found;
     }
 
