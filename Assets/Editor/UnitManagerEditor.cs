@@ -409,6 +409,21 @@ public class UnitManagerEditor : Editor
             EditorGUILayout.PropertyField(aiDesignatedMissionTargetConstructionInstanceIdProp, new GUIContent("Mission Target Construction ID"));
         if (aiDesignatedMissionTargetCellProp != null)
             DrawMissionTargetCellWithPicker();
+        // Derivado, como o Has Designated Mission: bater o olho na ficha tem que
+        // responder "esse cara queria carona?" sem abrir log. NAO vira campo —
+        // um bool armazenado nao sabe quando envelheceu, e o QueroCarona depende
+        // de coisas que mudam no meio do turno (posicao, banda, predio tomado).
+        using (new EditorGUI.DisabledScope(true))
+        {
+            EditorGUILayout.Toggle(
+                new GUIContent(
+                    "Wants Ride (auto)",
+                    "Derivado: Ride Wait Since Turn > 0. Entrar na fila É ter "
+                    + "respondido que quer carona."),
+                target is UnitManager rideInspected
+                && rideInspected.AIIsWaitingForRide);
+        }
+
         if (aiRideWaitSinceTurnProp != null)
         {
             EditorGUILayout.PropertyField(
