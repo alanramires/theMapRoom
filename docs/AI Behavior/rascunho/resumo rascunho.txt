@@ -9,22 +9,64 @@ Capturador 		 	 |	Capturador, Capturador Agressivo
 Transportador		 | 	Transportador Terrestre, Transportador Aereo, Transportador Naval
 Assalto				 |	Assalto, Caça Interceptador, Ataque Aereo 
 Fogo de Suporte		 |	Fogo de Suporte, Antiaereo, Artilheiro Combatente, Antiaereo Combatente 
+Vigilancia 			 |	Aérea, Anti-Sub
+
 	
 	
 	
 Capturador
+subpapeis: capturador (Soldados), capturador combatente (Bazookas, Metranca)
 "converter $ pro exercito"
 prioridades: Enxergar, Detectar, Capturar, Embarcar, Reposicionar, Mirar, Fundir, Suprir,Transferir, Desembarcar, 
-
-Em resumo: o soldado capturador precisa enxergar a construção alvo pra não perder uma rodada de aproximação (Enxergar: nevoa de guerra); detectar quem está nela ou pedir pra alguem detectar se esta vazia (Detectar); pra só então Capturar; caso esteja muito longe deve pedir carona a um transportador (Embarcar); Reposicionando no tabuleiro para o rendevous  (Reposicionar); Evitando lutas pra não diminuir seu hp capture rate (Mirar); mesclando com outros esquadrões enfraquecidos para aumentar o capture rate (Fundir); prestar serviços médicos se field medic (Suprir); mover estoque entre locais (transferir) e deixar os feridos no hospital (desembarcar)
 
 ---
 
 Transportador
+subpapeis: terrestre (APC), aereo (Chinook), naval (Porta Aviões)
 "leva e traz unidades"
 	Pickup (vazio): Embarcar, Reposicionar, Enxergar, Detectar, Mirar, Transferir, Suprir, Capturar, Desembarcar,Fundir
 	Courier (entregas): Embarcar, Reposicionar, Enxergar, Detectar, Suprir, Transferir, Desembarcar,  Mirar, Capturar, Fundir
 
-O transportador vazio (ex: Humvee) pode alavancar sua distancia embarcando em outros transportadores para ir ate quem precisa ou vai até quem precisa de carona (resposiciona) e oferece o embarque/EVAC, enxerga ou detecta para mirar enquanto a unidade precisa de evac ou setor livre (Enxergar, Detectar, Mirar), Transfere recursos, presta serviços ou captura oportunista se der mas não é o foco, como está vazio o desembarque é vetado e não funde pq o foco está em representação no tabuleiro
+---
 
-o transportador carregado (ex: humvee) muda de politica para garantir a sobrevivencia da carga durante a entrega:  ele embarca aninhado para longas distancias (humvee embarca em trem ou navio), ou resposiciona viajando, enxerga e detecta para desviar de ameaças, supre passageiros a bordo, transfere recursos para passageiros abordo, e só entao os desembarca na LZ, nao entra em combate enquanto com carga, nao captura e não funde.
+Assalto
+subpapeis: Assalto (tanques), Interceptadores (caças) e Ataque Aereo (bombardeiros)
+"eu rompo barreiras, seja em terra ou no ar!"
+
+Sensor: Detectar, Mirar, Embarcar, Reposicionar, Capturar, Transferir, Suprir, Desembarcar, Enxergar, Fundir	
+Modalidade - combatente: feito para combate em contato, mover e atacar em alcance de contato. (alcance min 1)	
+Posicionamento - vanguarda: a posição entre a massa oponente e o capitão eleito "a frente" dele
+
+---
+
+Fogo de Suporte 
+subpapeis: Fogo de Suporte (Art. Campanha), Bombarda Naval (Destroyer), Antiaereo (SAM), Antiaereo Combatente (AAA com lagarta), Artilheiro Combatente (Morteiro)
+"A morte vem do alto, e você nem verá de onde veio"
+
+Sensor: Detectar, Enxergar, Mirar, Reposicionar, Embarcar, Transferir, Suprir, Desembarcar, Capturar, Fundir,
+Modalidade artilheiro: feito para atirar parado segurando a posição. nao tem armas de contato. (alcance min > 1)
+Modalidade hibrida ( x combatente): tenta os 3 primeiros sensores no fire support, se falhar, vai pro assault.
+	
+Posicionamento
+	retaguarda: a posição entre a massa oponente e o capitão eleito "atras" dele. 
+	flancos: a esquerda e direita do capitao, mas usado como cobertura de fogo (ver justificativa)
+	auto repelir: uma unidade de fogo de suporte repele os seus em taticos, 3 canhoes juntos basta 1 assalto para acabar com a festa. 3 canhoes em deltas cobrindo os pontos cegos uns dos outros e nada entra!
+	atração: fogo de suporte fica junto com o capitao, antiaereos junto com as vigilancias aereas!
+	
+Tatico e Operacional são invertidos e sempre cubicos (ignorando geografia)
+	Tatico: alcance da arma min e max
+	Operacional: dobro do tatico
+	O movimento não serve para medir a cobertura.
+	
+--
+Role: Vigilancia
+Subpapeis: Aerea, anti-sub
+description: Tem uma guerra acontecendo em algum lugar e eu não me importo, contanto que eu ache minha presa.
+
+Sensor: Detectar, Mirar, Reposicionar, Suprir, Transferir, Desembarcar, Embarcar, Fundir, Enxergar, Capturar
+
+Posicionamento: Algumas unidades tem "play conservative" e outras não, as que tiverem, procuram a retaguarda como um FS faria, as que não tiverem, não tem magnetico! só se forem alocadas em algum plano.
+
+Chave e Fechadura
+	Caças/Bombardeiros "AR Stealth" são detectados pelos sensores "Aeronave Furtiva"
+	Submarinos "Sub Ops" são detectados por sonoboias "Detect Sub"	

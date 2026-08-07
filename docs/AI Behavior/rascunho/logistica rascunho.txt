@@ -1,0 +1,12 @@
+Role: Logistica
+Subpapeis: Logistica de Campo, Estoque
+description: Está ferido? acabou a bala? aguenta ai que eu to chegando!
+
+Sensor: Enxergar, Suprir, Transferir, Reposicionar, Embarcar, Desembarcar, Mirar, Fundir, Capturar, Detectar,
+
+Posicionamento: Algumas unidades tem "play conservative" e outras não, as que tiverem, procuram a retaguarda como um FS faria e tentam atender ou recusam atendimento, as que não tiverem, procuram a unidade critica, em manutenção preventiva ou EVAC.
+
+Jogo de Logistica: converte galoes, caixas e peças em serviços em campo de reabastecimento, rearmamento e cura por um preço. Sem materia prima, sem serviço.
+Estoque: movimenta galoes, caixas e peças de e para unidades e construções. Hubs movimentam entre si e para recebedores. Recebedores só recebem.
+
+Justificativa: Essas unidades precisam enxergar o caminho ate o cliente e medir o perigo, pois são extremamente frageis, se uma unidade de logistica avançar pelo terreno preto ela está sendo imprudente! (vai que tem um monte de tropas ali) a primeira coisa q fazem é suprir o alido ferido, ou transferir recursos para um supridor prestar serviço em campo. Reposicionam na direção do ferido podendo pedir carona embarcando em navios. Se transportando seguem a agenda do transportador apenas se nao houver serviço de suprimento por fazer. Embora possam lutar raramente o fazem. Aceitam fundir pra produzir uma unidade nova pra durar mais tempo já q os estoques são distribuidos para a nova unidade por media ponderada, raramente capturam e nao se preocupam em detectar o inimigo, pois se ele está tão perto já é tarde demais.

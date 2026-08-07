@@ -1,0 +1,22 @@
+Role: Vigilancia
+Subpapeis: Aerea, anti-sub
+description: Tem uma guerra acontecendo em algum lugar e eu não me importo, contanto que eu ache minha presa.
+
+Sensor: Detectar, Mirar, Reposicionar, Suprir, Transferir, Desembarcar, Embarcar, Fundir, Enxergar, Capturar
+
+Posicionamento: Algumas unidades tem "play conservative" e outras não, as que tiverem, procuram a retaguarda como um FS faria, as que não tiverem, não tem magnetico! só se forem alocadas em algum plano.
+
+Chave e Fechadura
+	Caças/Bombardeiros "AR Stealth" são detectados pelos sensores "Aeronave Furtiva"
+	Submarinos "Sub Ops" são detectados por sonoboias "Detect Sub"
+	
+Detectar Range é diferente de Enxergar: Uma unidade de vigilancia consegue detectar unidades ha 6+ hexagonos mesmo sobre hexes não descobertos (a visão tradicional gira entre 1 a 4). entao as unidades detectadas aparecem desfoadas por cima da nevoa e o jogador sabe onde ela está, mas nao o que está embaixo ou quem mais esta abaixo.
+
+esse é o papel do EWACS, do Radar Movel (vigilancia aerea) no ar enquanto procuram por F-22 e B-2
+SuperTucano (patrulha naval), Fragata ASW e do proprio Submarino enquanto procuram por outros submarinos
+
+Repulsa dos vigilantes aereos: as unidades de vigilancia aerea se repelem no tabuleiro afim de ocupar a maior area detectavel que vai "degradando" com o tempo, forçando o patrulhamento  (2 radar moveis que foram comprados juntos = 1 vai para o norte e outro pro sul) isso tambem ocorre com EWACS e Radar Movel e EWACS com EWACS. 
+Ataque em vantagem: as unidades furtivas aereas podem ignorar combates no caminho ate seus objetivos se nao estiverem em vantagem numerica ou oportunistica. atacar é revelar a posição para todos por x rodadas.
+Caça submarina: as unidades anti-sub andam em grupos ao contrario da vigilancia aerea. o que atrai as unidades anti-sub é o leito do fundo do oceano ou dos canais, eles não "give a shit" para a guerra q acontece na superficie entao é possivel ver 2 subs e 1 fragata navegando juntos. o oponente vai com 1 sub crente q é uma presa e nao faz ideia q tem um supertucano por perto.
+
+Justificativa: Detectar é tudo! Mirar para as unidades que podem fazer algo na mesma rodada (ewacs e radar movel pulam o sensor), todas as unidades de vigilancia seguem a linha do artilheiro combatente (primeiro FS, depois Assault). Eles podem suprir unidades embarcadas e obter estoques (a Fragata transporta apaches) e os liberam qdo curados (desembarque). Raramente capturam, não se fundem (menos cobertura do tabuleiro), não ligam pra mergulhar na nevoa preta (detectar é mais importante do que saber o que está ali) e embarcam em ultimo caso (ewacs e supertucano em porta avioes por exemplo)
