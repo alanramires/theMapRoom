@@ -390,7 +390,54 @@ Duas cláusulas, e elas se aplicam aos dois ramos furtivos:
 | cláusula | consequência para a IA |
 |---|---|
 | **ignorar combate no caminho** | a missão vence o alvo de oportunidade — só desvia com vantagem numérica ou oportunística |
-| **atirar revela por X rodadas** | o primeiro tiro tem preço; escolher o instante é parte da arma |
+| **atirar revela por 1 rodada** | o primeiro tiro tem preço; escolher o instante é parte da arma |
+
+### O preço tem número, e ele NÃO é o mesmo para todos
+
+> *"O caça / bombardeiro furtivo que ataca também é revelado, **por 1 rodada**;
+> o submarino, **por 2**."* — autor, 2026-08-06
+
+```text
+furtivo aereo   1 rodada exposto
+submarino       2 rodadas exposto      -> o DOBRO
+```
+
+**Consequência direta para a IA, e ela não é simétrica:** o limiar de *"vale
+atirar"* do submarino tem de ser **estritamente mais alto** que o do furtivo
+aéreo. Não por doutrina naval — por **aritmética**: ele compra o mesmo tiro pagando
+duas janelas de exposição.
+
+E o aéreo tem como gastar a janela que o submarino não tem: com 1 rodada, um caça
+de movimento alto **sai do próprio raio de revelação** antes que a resposta
+chegue. O submarino, mais lento e com 2 rodadas, tende a ser encontrado **onde
+atirou**.
+
+### A diferença não é de grau — é de natureza
+
+> *"E o sub **ainda emerge**."* — autor, 2026-08-06
+
+```text
+furtivo aereo   perde o ATRIBUTO (stealth)   e MANTEM a camada
+submarino       perde a CAMADA               e ali o atributo nem importa mais
+```
+
+O caça revelado continua em `Air/High`: quem quiser alcançá-lo ainda precisa de
+arma que suba. **O submarino que atira sobe para a superfície** — e na superfície
+não existe mais a pergunta *"tenho sonar?"*. Ele simplesmente **está lá**, num
+lugar que todo mundo lê, ao alcance de armas que nunca chegariam ao fundo.
+
+Por isso a mesma frase — *"atacar revela o caçador"* — não gera a mesma política:
+
+| | o que o tiro custa |
+|---|---|
+| furtivo aéreo | **ser visto** por 1 rodada |
+| submarino | **estar em outro lugar** por 2, e ser alcançável |
+
+O aéreo compra um *debuff*. O submarino compra uma **mudança de endereço**.
+
+Doutrina do submarino mora em `Vigilancia.md` §5 — ele é Vigilância, não Assalto.
+
+❌ Nenhum dos dois números está na IA hoje.
 
 **Casa com a regra do F-22** de `docs/deteccao e caca.md` §10.1: detectado, ele
 perde o Elite 2 e vira um caça comum; **atacando primeiro**, usa a camuflagem e o

@@ -233,8 +233,43 @@ submarinos"*). Para ele, atirar revela quem estava caçando.
 É o que a Ponte da Marcha diz — *"não disparo por vaidade"*. A Ponte está certa
 **pelo motivo naval**, não pelo aéreo.
 
-❓ Não conferido. Existe precedente na mecânica de emersão forçada do submarino
-(lock pendente, tempo revelado) — ver `project_pending_forced_layer`.
+### 5.1 O preço do tiro submarino são TRÊS coisas, não uma
+
+> *"O caça / bombardeiro furtivo que ataca também é revelado, por 1 rodada; **o
+> submarino, por 2**."* / *"E o sub **ainda emerge**."* — autor, 2026-08-06
+
+```text
+1. revelado                     2 rodadas — o DOBRO do furtivo aereo
+2. EMERGE                       sai de Naval/Deep para a superficie
+3. logo, alcancavel             por arma que nunca chegaria ao fundo
+```
+
+**O item 2 é o que domina.** O caça revelado continua em `Air/High` — quem quiser
+alcançá-lo ainda precisa de arma que suba. O submarino que atira **muda de
+camada**, e na superfície ninguém precisa perguntar *"tenho sonar?"*: ele está num
+lugar que todo mundo lê.
+
+> A furtividade dele não foi **vencida** — foi **abandonada**. A chave continua
+> na ficha; ele é que saiu da fechadura.
+
+⚠️ Existe precedente direto na mecânica de **emersão forçada** (lock pendente
+derivado: revelado, tempo não corre, upkeep e movimento aplicam) — ver
+`project_pending_forced_layer`. ❓ Não conferido se o tiro usa o mesmo caminho.
+
+### O que isso obriga a IA a fazer
+
+O limiar de *"vale atirar"* do submarino é **estritamente mais alto**, e não por
+doutrina naval — por aritmética. Mas a conta certa **não é sobre o alvo**:
+
+```text
+errado   "esse alvo vale o tiro?"
+certo    "esse alvo vale o tiro E eu sobrevivo a 2 rodadas na superficie AQUI?"
+```
+
+A segunda pergunta é sobre a **célula**, não sobre a presa. Um alvo excelente com
+uma fragata ASW a três hexes é um tiro ruim; um alvo medíocre em mar vazio pode
+ser um tiro ótimo. **É a única decisão de ataque do projeto em que o custo é
+pago no terreno e não no alvo.**
 
 ---
 
@@ -300,10 +335,37 @@ define contra o jogo inteiro em vez de contra um vizinho.
 |---|---|
 | *"não preciso ver o terreno / para o alvo revelar"* | `Detectar` 1º e `Enxergar` 10º, literal |
 | *"não conheço o chão abaixo, / mas já sei onde você está"* | a regra de jogo do §2 — desfocado por cima da névoa |
-| *"cobertura envelhecida / já não vale proteção"* | o **ledger de idade**, e a repulsa como **consequência** dele, não como regra separada |
+| *"cobertura envelhecida / já não vale proteção"* | o **ledger de idade** — e, junto com a repulsa, **consequência da §2.1** (detecção total), não uma da outra |
 | *"o canal atrai a matilha, / o fundo dita a direção"* | a âncora anti-sub decidida no mesmo dia (§4.2) |
-| *"atacar revela o caçador"* | §5, e a mesma doutrina do Caça F em `deteccao e caca.md` §10.1 |
+| *"atacar revela o caçador"* | **corrigido** — vale pelo **submarino** (§5), não pelo furtivo aéreo, que mudou para `Assalto.md` §5.1 |
 | *"cada casco é nova origem, / cada origem, outro setor"* | **a moeda**, melhor dita do que na §6: o valor não é a unidade, é o **ponto de origem de um cone** |
+
+### Duas linhas desta tabela nasceram erradas — e por quê
+
+Vale mais que as corrigidas.
+
+**A Ponte levou um ✅ falso.** Na conferência original, *"atacar revela o
+caçador"* foi carimbado contra a §5 — e a §5 era exatamente a cláusula que estava
+no **documento errado** (saiu para `Assalto.md` §5.1 no mesmo dia). Bater com uma
+referência torta é o **sintoma**, não a prova:
+
+> **Conferir coerência não é conferir correção.** Quando o doc de referência está
+> errado, o ✅ que ele produz é o resultado mais perigoso possível — parece
+> verificação e é eco.
+
+O verso sobreviveu, mas por outro motivo (o submarino é furtivo **e** caçador). A
+sorte não conserta o método.
+
+**A causalidade estava invertida.** Dizia-se que a repulsa era consequência do
+ledger. É falso: as duas são consequência da **detecção total** (§2.1) e nenhuma
+gera a outra. Só apareceu quando o autor declarou que o EWACS *"vê tudo"* — ou
+seja, **a causa foi escrita depois dos dois efeitos**, e por isso a relação entre
+eles foi chutada.
+
+> Regra prática: quando dois fatos aparecem juntos e um parece explicar o outro,
+> desconfie de que **ainda falta o terceiro**, que explica os dois.
+
+---
 
 > ## Eu não sigo onde há combate. Sigo onde não há explicação.
 
