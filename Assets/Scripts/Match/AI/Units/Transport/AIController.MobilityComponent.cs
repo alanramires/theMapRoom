@@ -16,18 +16,19 @@ public partial class AIController
     // componente completo em cada par. Com 32 candidatos isso custou 43
     // SEGUNDOS num turno que rodava em 852ms.
     //
-    // O desenho atual e assimetrico de proposito:
-    //   transportador -> componente completo. E ele que viaja longe, e a
-    //                    pergunta de conectividade e dele. Um flood por perfil
-    //                    de movimento, compartilhado entre unidades iguais.
-    //   passageiro    -> alcance LIMITADO (malha de custo de ~2 turnos, que
-    //                    passa pelo MovementReachCache). Encontro nao e "ele
-    //                    caminha meio mapa ate a praia": e "ele chega ao ponto
-    //                    de encontro em tempo util".
+    // A assimetria ANTERIOR (transportador com componente completo, passageiro
+    // com malha de ~2 turnos) media outra coisa: "ele chega ao encontro em
+    // tempo util". Isso e POLITICA — e num naval ela decidia por geometria, nao
+    // por doutrina: o Chinook passava porque o componente aereo encosta em
+    // todos, e o navio reprovava porque a praia ficava a 3 turnos de caminhada.
+    // Filtro chamado ESTRUTURAL responde estrutura: os dois se tocam, algum
+    // dia? Prazo e ranking, uma camada acima.
+    //
+    // O custo dos 43 SEGUNDOS era do flood fill SEM CACHE, feito por par. Nao
+    // e mais o caso: GetOrBuildMobilityComponent e por PERFIL de movimento, e
+    // o memo abaixo e por PAR DE COMPONENTES — quatro soldados iguais na mesma
+    // ilha sao uma pergunta so, nao quatro.
     // ------------------------------------------------------------------
-
-    /// <summary>Turnos de caminhada que o passageiro pode gastar rumo ao encontro.</summary>
-    private const int MeetingWalkTurns = 2;
 
     private sealed class MobilityComponent
     {
@@ -101,16 +102,17 @@ public partial class AIController
     }
 
     // (componente do transportador, componente do passageiro) -> se encontram.
-    // Chaveado por COMPONENTE, nao por unidade: 32 passageiros do mesmo perfil
-    // na mesma massa de terra sao uma pergunta so.
+    // Chaveado pelos DOIS componentes, nao pela unidade: 32 passageiros do
+    // mesmo perfil na mesma massa de terra sao uma pergunta so.
     private readonly Dictionary<long, bool> transporterMeetCache =
         new Dictionary<long, bool>();
 
     /// <summary>
-    /// Existe encontro possivel entre estes dois?
+    /// Existe encontro possivel entre estes dois? Pergunta TOPOLOGICA: algum
+    /// dia, a qualquer distancia. Quao longe fica a praia nao entra aqui.
     ///
-    ///   - infantaria no continente + navio: ela caminha ate a praia, que e
-    ///     vizinha de agua. Encontro existe.
+    ///   - infantaria no continente + navio: o componente dela chega a praia,
+    ///     que e vizinha de agua. Encontro existe — a 2 ou a 30 hexes.
     ///   - infantaria na ilha + APC terrestre: o componente dela e a ilha, o
     ///     dele e o continente, e nenhum hex vizinho pertence aos dois.
     ///   - qualquer um + aeronave: o componente da aeronave e o tabuleiro.
@@ -133,51 +135,51 @@ public partial class AIController
         Vector3Int passengerCell = passenger.CurrentCellPosition;
         passengerCell.z = 0;
 
-        // Caminho curto, sem cache nenhum: o transportador ja encosta no
-        // passageiro. Resolve a maioria esmagadora dos pares.
+        // Caminho curto: o transportador ja encosta no passageiro onde ele
+        // esta. Resolve a maioria esmagadora dos pares sem tocar no memo.
         if (TouchesComponent(transporterComponent.Cells, passengerCell))
             return true;
 
-        // O passageiro NAO ganha componente proprio: seria um flood fill do
-        // tabuleiro inteiro so para virar chave de memo. Basta o alcance
-        // limitado dele, que ja passa por cache.
+        // O passageiro ganha componente proprio — pelo MESMO cache por perfil
+        // do transportador. Sem isso a pergunta ficava presa a "quanto ele
+        // anda em 2 turnos", que e prazo, nao topologia.
+        MobilityComponent passengerComponent =
+            GetOrBuildMobilityComponent(passenger);
+        if (passengerComponent?.Cells == null
+            || passengerComponent.Cells.Count == 0)
+        {
+            return false;
+        }
+
         long pairKey = ((long)transporterComponent.Id << 32)
-                       ^ (uint)passenger.InstanceId;
+                       ^ (uint)passengerComponent.Id;
         if (transporterMeetCache.TryGetValue(pairKey, out bool memo))
             return memo;
 
-        bool result = ResolveMeetingByPassengerWalk(
-            transporterComponent.Cells, passenger, passengerCell);
+        bool result = ComponentsTouch(
+            transporterComponent.Cells, passengerComponent.Cells);
         transporterMeetCache[pairKey] = result;
         return result;
     }
 
     /// <summary>
-    /// O passageiro caminha ate o ponto de encontro — mas dentro de um
-    /// orcamento, nao pelo componente inteiro. A malha de custo limitada passa
-    /// pelo MovementReachCache; o componente inteiro nao passa por cache algum
-    /// e foi o que custou os 43 segundos.
+    /// Os dois componentes tem alguma celula em comum, ou adjacente?
+    ///
+    /// Varre o MENOR dos dois: a resposta e simetrica, e a praia costuma ser
+    /// a borda do conjunto pequeno. Roda uma vez por PAR DE COMPONENTES,
+    /// nunca por par de unidades — e essa e a diferenca dos 43 segundos.
     /// </summary>
-    private bool ResolveMeetingByPassengerWalk(
-        Dictionary<Vector3Int, int> transporterCells,
-        UnitManager passenger,
-        Vector3Int passengerCell)
+    private bool ComponentsTouch(
+        Dictionary<Vector3Int, int> a,
+        Dictionary<Vector3Int, int> b)
     {
-        int walkBudget = Mathf.Max(1, passenger.MaxMovementPoints)
-                         * MeetingWalkTurns;
-        Dictionary<Vector3Int, int> walkable =
-            UnitMovementPathRules.CalculateMovementCostMap(
-                boardTilemap,
-                passenger,
-                passengerCell,
-                walkBudget,
-                terrainDatabase);
-        if (walkable == null)
-            return false;
+        Dictionary<Vector3Int, int> smaller = a.Count <= b.Count ? a : b;
+        Dictionary<Vector3Int, int> larger = smaller == a ? b : a;
 
-        foreach (Vector3Int cell in walkable.Keys)
+        AIDecisionPerf.AddCount("MobilityComponentTouchTests");
+        foreach (Vector3Int cell in smaller.Keys)
         {
-            if (TouchesComponent(transporterCells, cell))
+            if (TouchesComponent(larger, cell))
                 return true;
         }
         return false;
