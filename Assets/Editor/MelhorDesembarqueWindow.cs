@@ -31,6 +31,11 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
     // Teto duro: uma ferramenta de diagnóstico pode devolver resultado parcial,
     // mas não pode pendurar o editor. Fica exposto porque quem conhece o mapa
     // sabe quantos alvos ele tem.
+    // Nevoa: mesmo par do Melhor Captura. Sem isto a bancada respondia com o
+    // tabuleiro inteiro enquanto o runtime recusava tudo por preto — duas
+    // ferramentas dando respostas opostas sobre a mesma cena.
+    [SerializeField] private bool applyFogOfWar;
+    [SerializeField] private MatchController matchController;
     [SerializeField] private int maxRouteFloods = 256;
     private int routeFloods;
     private bool routeBudgetExhausted;
@@ -133,7 +138,22 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
             AutoDetectRuntimeSelection();
         if (GUILayout.Button("Limpar", GUILayout.Width(70f)))
             ClearAll();
+        using (new EditorGUI.DisabledScope(
+                   Application.isPlaying || matchController == null))
+        {
+            if (GUILayout.Button("Cozinhar FOW 0", GUILayout.Width(110f)))
+                CookRoundZeroFog();
+        }
         EditorGUILayout.EndHorizontal();
+
+        applyFogOfWar = EditorGUILayout.Toggle(
+            new GUIContent(
+                "Aplicar névoa",
+                "No Edit Mode usa o bake manual da rodada 0 para o slot do "
+                + "transportador. No runtime usa o snapshot confirmado do "
+                + "mesmo slot. Desligado, a bancada enxerga o tabuleiro todo — "
+                + "util para ver a zona teorica, enganoso para prever a IA."),
+            applyFogOfWar);
 
         DrawEmbarkedPassengerGrid();
 
@@ -515,6 +535,10 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
             return;
         }
 
+        FogKnowledgeSnapshot fogKnowledge = null;
+        if (applyFogOfWar && !TryCopyFogKnowledge(out fogKnowledge))
+            return;
+
         MelhorDesembarqueResult result;
         try
         {
@@ -526,7 +550,13 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
                     map = map,
                     terrainDatabase = terrainDatabase,
                     movementBudget = transporter.RemainingMovementPoints,
-                    resolvePassengerTarget = TryResolvePassengerTargetAndRoute
+                    resolvePassengerTarget = TryResolvePassengerTargetAndRoute,
+                    // A MESMA regra do runtime (IsConfirmedVisibleOrExploredCellForAI):
+                    // o transportador pode terminar em terreno visivel OU ja
+                    // explorado; preto nao. Sem este gate a bancada aprovava LZ
+                    // que o jogo recusa — duas ferramentas discordando da mesma
+                    // cena, que e o pior resultado possivel para um diagnostico.
+                    allowTransporterCell = BuildTransporterCellGate(fogKnowledge)
                 });
         }
         finally
@@ -967,6 +997,107 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
     /// facil de ler um resultado como se fosse de outro tabuleiro — e a janela
     /// guarda cache de rota, que sobrevive a troca de unidade.
     /// </summary>
+    /// <summary>
+    /// Copia o conhecimento de nevoa do slot do TRANSPORTADOR — e do
+    /// transportador de proposito: e ele quem precisa terminar o movimento numa
+    /// celula legal. O passageiro nao escolhe onde o casco para.
+    /// </summary>
+    /// <summary>
+    /// Portao de celula do transportador, espelhando o runtime.
+    ///
+    /// <para>Em Play chama os MESMOS metodos do MatchController que a IA chama —
+    /// paridade garantida, nao aproximada. Em Edit Mode nao existe estado
+    /// corrente, entao usa o bake da rodada 0: <c>KnownCells</c> e o que aquele
+    /// slot ja conhecia quando o tabuleiro foi cozido.</para>
+    ///
+    /// <para>Sem nevoa aplicada devolve <c>null</c>, e o servico deixa passar
+    /// tudo — util para ver a zona teorica, enganoso para prever a IA.</para>
+    /// </summary>
+    private System.Func<Vector3Int, bool> BuildTransporterCellGate(
+        FogKnowledgeSnapshot fogKnowledge)
+    {
+        if (!applyFogOfWar)
+            return null;
+
+        if (Application.isPlaying && matchController != null)
+            return cell =>
+            {
+                cell.z = 0;
+                return matchController.IsCellVisibleForActiveTeam(cell)
+                    || matchController.IsCellExploredBySlot(
+                        matchController.ActiveSlotId, cell);
+            };
+
+        if (fogKnowledge == null)
+            return null;
+
+        return cell =>
+        {
+            cell.z = 0;
+            return fogKnowledge.KnownCells.Contains(cell)
+                || fogKnowledge.GeographicallyVisibleCells.Contains(cell);
+        };
+    }
+
+    private bool TryCopyFogKnowledge(out FogKnowledgeSnapshot fogKnowledge)
+    {
+        fogKnowledge = null;
+        if (matchController == null)
+            matchController = FindAnyObjectByType<MatchController>();
+        if (matchController == null)
+        {
+            status = "MatchController indisponivel para consultar a nevoa.";
+            return false;
+        }
+
+        PlayerSlotId observerSlot = PlayerSlotId.FromIndex(transporter.SlotIndex);
+        bool copied = Application.isPlaying
+            ? matchController.TryCopyConfirmedFogKnowledgeSnapshotForSlot(
+                observerSlot, map, out fogKnowledge, out string reason)
+            : matchController.TryCopyRoundZeroFogKnowledgeSnapshotForSlot(
+                observerSlot, map, out fogKnowledge, out reason);
+        if (!copied || fogKnowledge == null)
+        {
+            status = reason;
+            return false;
+        }
+        return true;
+    }
+
+    private void CookRoundZeroFog()
+    {
+        if (Application.isPlaying)
+        {
+            status = "O FOW da rodada 0 so pode ser cozido no Edit Mode.";
+            return;
+        }
+        if (matchController == null)
+            matchController = FindAnyObjectByType<MatchController>();
+        if (matchController == null)
+        {
+            status = "MatchController nao encontrado na Scene.";
+            return;
+        }
+
+        Undo.RecordObject(matchController, "Cozinhar FOW da Rodada 0");
+        if (!matchController.TryCookRoundZeroFogForAllSlots(out string bakeResult))
+        {
+            status = bakeResult;
+            Debug.LogError($"[FoW][RoundZeroBake] {bakeResult}", matchController);
+            return;
+        }
+
+        EditorUtility.SetDirty(matchController);
+        UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(
+            matchController.gameObject.scene);
+        ranking.Clear();
+        selected = null;
+        status = bakeResult
+            + " O Melhor Desembarque usara este bake com 'Aplicar névoa' ligado.";
+        SceneView.RepaintAll();
+        Repaint();
+    }
+
     private void ClearAll()
     {
         passenger = null;
