@@ -1108,12 +1108,22 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
         if (!string.IsNullOrEmpty(triageStatus))
             EditorGUILayout.HelpBox(triageStatus, MessageType.None);
 
+        bool bandsPainted = bandTactical.Count > 0 || bandOperational.Count > 0;
         using (new EditorGUI.DisabledScope(map == null))
         {
+            // Alterna: o overlay tapa o ranking, e olhar um DEPOIS do outro no
+            // mesmo tabuleiro e a comparacao que interessa.
             if (GUILayout.Button(
-                    "2) Pintar Tactical/Operational da entrega",
+                    bandsPainted
+                        ? "2) Apagar Tactical/Operational da entrega"
+                        : "2) Pintar Tactical/Operational da entrega",
                     GUILayout.Height(22f)))
-                PaintDeliveryBands();
+            {
+                if (bandsPainted)
+                    ClearDeliveryBands();
+                else
+                    PaintDeliveryBands();
+            }
         }
         if (!string.IsNullOrEmpty(bandStatus))
             EditorGUILayout.HelpBox(bandStatus, MessageType.None);
@@ -1135,6 +1145,15 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
     private readonly List<Vector3Int> bandTactical = new List<Vector3Int>();
     private readonly List<Vector3Int> bandOperational = new List<Vector3Int>();
     [SerializeField] private string bandStatus = string.Empty;
+
+    private void ClearDeliveryBands()
+    {
+        bandTactical.Clear();
+        bandOperational.Clear();
+        bandStatus = string.Empty;
+        SceneView.RepaintAll();
+        Repaint();
+    }
 
     private void PaintDeliveryBands()
     {
