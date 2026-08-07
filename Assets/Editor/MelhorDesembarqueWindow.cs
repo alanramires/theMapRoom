@@ -40,6 +40,12 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
     // do alvo — resposta que o jogo nunca daria. -1 = automatico (Operational
     // do passageiro), como o courier faz.
     [SerializeField] private int dropOffRangeOverride = -1;
+    // LZ recusadas pelo teto de rota. Guardadas de proposito: filtro mudo e o
+    // inimigo de ferramenta de diagnostico — some do desenho e some da
+    // explicacao junto. O runtime ignora estas celulas; a bancada MOSTRA que as
+    // ignorou, e por que.
+    private readonly List<Vector3Int> rejectedByRange = new List<Vector3Int>();
+    [SerializeField] private bool showRejectedByRange = true;
     [SerializeField] private MatchController matchController;
     [SerializeField] private int maxRouteFloods = 256;
     private int routeFloods;
@@ -158,6 +164,13 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
                 + "largado. -1 usa o automatico: Operational do passageiro "
                 + "(MaxMovementPoints x 2), que e o que o courier usa."),
             dropOffRangeOverride);
+        showRejectedByRange = EditorGUILayout.Toggle(
+            new GUIContent(
+                "Mostrar recusadas pelo teto",
+                "Anéis vermelhos: LZs que o passageiro alcançaria, mas com "
+                + "rota restante acima do teto. O runtime também as ignora — "
+                + "aqui elas aparecem para explicar por que o ranking encolheu."),
+            showRejectedByRange);
         applyFogOfWar = EditorGUILayout.Toggle(
             new GUIContent(
                 "Aplicar névoa",
@@ -524,6 +537,7 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
         SyncEditorUnitRegistryForSensors();
         ranking.Clear();
         selected = null;
+        rejectedByRange.Clear();
         // O memo vale por cálculo: entre um clique e outro o tabuleiro pode ter
         // mudado, e uma rota velha seria uma resposta provisória disfarçada de
         // confirmada.
@@ -623,7 +637,13 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
         // passa dropOffRange como maxRemainingRouteCost e recusa qualquer rota
         // acima dele (AIController.MelhorDesembarque.cs:163).
         if (ok && routeCost > ResolveBenchDropOffRange())
+        {
+            Vector3Int rejected = from;
+            rejected.z = 0;
+            if (!rejectedByRange.Contains(rejected))
+                rejectedByRange.Add(rejected);
             return false;
+        }
         return ok;
     }
 
@@ -1161,6 +1181,7 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
         ranking.Clear();
         selected = null;
         routeCache.Clear();
+        rejectedByRange.Clear();
         routeFloods = 0;
         routeBudgetExhausted = false;
 
@@ -1439,6 +1460,17 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
         // Amarelo ficou livre quando o neutro do ranking virou cinza. Aqui ele
         // ganha sentido proprio: "esta na zona, mas hoje nao da".
         DrawBand(bandFogged, new Color(1f, 0.9f, 0.15f, 0.5f));
+
+        // Anel, nao disco: elas NAO sao candidatas. O contorno diz "olhei e
+        // descartei", que e diferente de "nunca existiu".
+        if (showRejectedByRange)
+        {
+            Handles.color = new Color(1f, 0.3f, 0.25f, 0.8f);
+            for (int i = 0; i < rejectedByRange.Count; i++)
+                Handles.DrawWireDisc(
+                    map.GetCellCenterWorld(rejectedByRange[i]),
+                    Vector3.forward, 0.26f);
+        }
     }
 
     private void DrawBand(List<Vector3Int> cells, Color color)
