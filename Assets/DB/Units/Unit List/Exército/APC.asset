@@ -154,7 +154,6 @@ MonoBehaviour:
   allowedEmbarkWhenTransporterAtFacilities: -1
   allowedDisembarkWhenTransporterAtTerrains:
   - {fileID: 11400000, guid: f8bd8dc9dbe197d4f828ad72d3d90df6, type: 2}
-  - {fileID: 11400000, guid: 75d32a51167ec98409039b6f5d4d287f, type: 2}
   - {fileID: 11400000, guid: f00a773f2a7664042bbabe8e117528f7, type: 2}
   allowedDisembarkWhenTransporterAtTerrainStructures:
   - structure: {fileID: 11400000, guid: 2c50b52605f4f1c4ca013ba4bd7acee3, type: 2}

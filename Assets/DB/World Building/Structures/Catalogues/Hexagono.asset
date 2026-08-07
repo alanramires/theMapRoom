@@ -14,4 +14,5 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::StructureDatabase
   structures:
   - {fileID: 11400000, guid: 2c50b52605f4f1c4ca013ba4bd7acee3, type: 2}
+  - {fileID: 11400000, guid: e0adc11a0eac5bc42811605fe2a45f9f, type: 2}
   roadRoutesByStructure: []
