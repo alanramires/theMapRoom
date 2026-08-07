@@ -582,7 +582,13 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
                     // explorado; preto nao. Sem este gate a bancada aprovava LZ
                     // que o jogo recusa — duas ferramentas discordando da mesma
                     // cena, que e o pior resultado possivel para um diagnostico.
-                    allowTransporterCell = BuildTransporterCellGate(fogKnowledge)
+                    allowTransporterCell = BuildTransporterCellGate(fogKnowledge),
+                    // O ponto de QUEDA tambem respeita o conhecimento quando a
+                    // nevoa esta ligada. Sem isto a janela desenhava o
+                    // passageiro caindo em cima do objetivo mesmo com o
+                    // objetivo no escuro — e a diferenca entre as duas leituras
+                    // e justamente o que se quer ver.
+                    allowDisembarkCell = BuildTransporterCellGate(fogKnowledge)
                 });
         }
         finally
@@ -910,15 +916,14 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
         MelhorDesembarqueLzScore shown = selected ?? ranking[0];
         // REGRA SIMPLES, e ela e a doutrina desta janela:
         //
-        //   sem nevoa   mostra LZ E desembarque
-        //   com nevoa   mostra LZ, SEM a bolinha do desembarque
+        //   sem nevoa   LZ + desembarque EM CIMA do objetivo
+        //   com nevoa   LZ + desembarque em terreno VISIVEL proximo do objetivo
         //
-        // O motivo: com nevoa ligada a janela responde "esta LZ e admissivel
-        // hoje". ONDE o passageiro cai depende de sensores avaliados na hora,
-        // com o casco ja parado ali — desenhar o ponto de queda seria promessa
-        // que a bancada nao tem como fazer. Sem nevoa a consulta e teorica e o
-        // desembarque completa o quadro.
-        if (view != DebugView.MelhorLZ && shown != null && !applyFogOfWar)
+        // A bolinha nao some com nevoa — ela MUDA DE LUGAR, e e essa diferenca
+        // que a janela existe para mostrar. Quem faz a bolinha andar e o
+        // allowDisembarkCell la na request: com nevoa ligada, so celula
+        // conhecida serve de ponto de queda.
+        if (view != DebugView.MelhorLZ && shown != null)
         {
             for (int i = 0; i < shown.spots.Count; i++)
             {
