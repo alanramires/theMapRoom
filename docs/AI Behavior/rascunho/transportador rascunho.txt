@@ -2,8 +2,8 @@ Role: Transporter
 description: Eu sou o Taxi! eu acelero a sua missão e eu quero chegar o mais rapido possivel onde sou necessario!
 
 Sensor Priority Modal: 
-	Pickup (vazio): Embarcar, Reposicionar, Enxergar, Detectar, Mirar, Desembarcar, Transferir, Suprir, Capturar, Fundir
-	Courier (entregas): Embarcar, Reposicionar, Enxergar, Suprir, Transferir, Desembarcar, Detectar, Mirar, Capturar, Fundir
+	Pickup (vazio): Embarcar, Reposicionar, Detectar, Mirar, Transferir, Suprir, Capturar, Enxergar,Desembarcar, Fundir
+	Courier (entregas): Embarcar, Reposicionar, Suprir, Transferir,Enxergar, Desembarcar, Detectar, Mirar, Capturar, Fundir
 
 Existem 3 tipos de transporte e cada um tem uma variante:
 	transporte terrestre: linhas de trem ou sobre rodas, focam em reposicionamento de unidades em superficie.

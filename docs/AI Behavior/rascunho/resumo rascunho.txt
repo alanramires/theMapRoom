@@ -17,15 +17,15 @@ Vigilancia 			 |	Aérea, Anti-Sub
 Capturador
 subpapeis: capturador (Soldados), capturador combatente (Bazookas, Metranca)
 "converter $ pro exercito"
-prioridades: Enxergar, Detectar, Capturar, Embarcar, Reposicionar, Mirar, Fundir, Suprir,Transferir, Desembarcar, 
+prioridades: Capturar, Enxergar, Detectar, Embarcar, Reposicionar, Mirar, Fundir, Suprir, Transferir, Desembarcar, 
 
 ---
 
 Transportador
-subpapeis: terrestre (APC), aereo (Chinook), naval (Porta Aviões)
+subpapeis: terrestre (APC, trem), aereo (Chinook, hidroaviao), naval (Porta Aviões)
 "leva e traz unidades"
-	Pickup (vazio): Embarcar, Reposicionar, Enxergar, Detectar, Mirar, Transferir, Suprir, Capturar, Desembarcar,Fundir
-	Courier (entregas): Embarcar, Reposicionar, Enxergar, Detectar, Suprir, Transferir, Desembarcar,  Mirar, Capturar, Fundir
+	Pickup (vazio): Embarcar, Reposicionar, Detectar, Mirar, Transferir, Suprir, Capturar, Enxergar,Desembarcar, Fundir
+	Courier (entregas): Embarcar, Reposicionar, Suprir, Transferir,Enxergar, Desembarcar, Detectar, Mirar, Capturar, Fundir
 
 ---
 
@@ -34,8 +34,8 @@ subpapeis: Assalto (tanques), Interceptadores (caças) e Ataque Aereo (bombardei
 "eu rompo barreiras, seja em terra ou no ar!"
 
 Sensor: Detectar, Mirar, Embarcar, Reposicionar, Capturar, Transferir, Suprir, Desembarcar, Enxergar, Fundir	
-Modalidade - combatente: feito para combate em contato, mover e atacar em alcance de contato. (alcance min 1)	
-Posicionamento - vanguarda: a posição entre a massa oponente e o capitão eleito "a frente" dele
+	Modalidade - combatente: feito para combate em contato, mover e atacar em alcance de contato. (alcance min 1)	
+	Posicionamento - vanguarda: a posição entre a massa oponente e o capitão eleito "a frente" dele
 
 ---
 
@@ -44,9 +44,9 @@ subpapeis: Fogo de Suporte (Art. Campanha), Bombarda Naval (Destroyer), Antiaere
 "A morte vem do alto, e você nem verá de onde veio"
 
 Sensor: Detectar, Enxergar, Mirar, Reposicionar, Embarcar, Transferir, Suprir, Desembarcar, Capturar, Fundir,
-Modalidade artilheiro: feito para atirar parado segurando a posição. nao tem armas de contato. (alcance min > 1)
-Modalidade hibrida ( x combatente): tenta os 3 primeiros sensores no fire support, se falhar, vai pro assault.
-	
+	Modalidade artilheiro: feito para atirar parado segurando a posição. nao tem armas de contato. (alcance min > 1)
+	Modalidade hibrida ( x combatente): tenta os 3 primeiros sensores no fire support, se falhar, vai pro assault.
+		
 Posicionamento
 	retaguarda: a posição entre a massa oponente e o capitão eleito "atras" dele. 
 	flancos: a esquerda e direita do capitao, mas usado como cobertura de fogo (ver justificativa)
@@ -70,3 +70,15 @@ Posicionamento: Algumas unidades tem "play conservative" e outras não, as que t
 Chave e Fechadura
 	Caças/Bombardeiros "AR Stealth" são detectados pelos sensores "Aeronave Furtiva"
 	Submarinos "Sub Ops" são detectados por sonoboias "Detect Sub"	
+	
+----
+Role: Logistica
+Subpapeis: Logistica de Campo, Estoque
+description: Está ferido? acabou a bala? aguenta ai que eu to chegando!
+
+Sensor: Enxergar, Suprir, Transferir, Reposicionar, Embarcar, Desembarcar, Mirar, Fundir, Capturar, Detectar,
+
+Posicionamento: Algumas unidades tem "play conservative" e outras não, as que tiverem, procuram a retaguarda como um FS faria e tentam atender ou recusam atendimento, as que não tiverem, procuram a unidade critica, em manutenção preventiva ou EVAC.
+
+Jogo de Logistica: converte galoes, caixas e peças em serviços em campo de reabastecimento, rearmamento e cura por um preço. Sem materia prima, sem serviço.
+Estoque: movimenta galoes, caixas e peças de e para unidades e construções. Hubs movimentam entre si e para recebedores. Recebedores só recebem.	
