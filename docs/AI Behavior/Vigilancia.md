@@ -110,6 +110,48 @@ A unidade detectada aparece **desfocada por cima da névoa**: o jogador sabe
 Super Tucano (patrulha naval), Fragata ASW e o **próprio submarino** procurando
 outros submarinos.
 
+### 2.1 Dentro do alcance, a detecção é TOTAL — e isso gera a §4.1
+
+> *"EWACS e Radar Móvel detectam **qualquer aeronave** no range, **inclusive as
+> stealth**. Ele vê tudo."* — autor, 2026-08-06
+
+**Não há chance de detecção. Não há resistência. Não há grau.** Dentro do
+alcance da exceção de visão aérea, o resultado é binário e completo:
+
+```text
+aeronave comum    detectada pelo alcance normal da excecao
+aeronave stealth  detectada porque a lista detectUnitsWithFollowingSkills a cobre
+─────────────────────────────────────────────────────────────────────────────
+dentro do cone    NADA aereo se esconde
+```
+
+✅ Coerente com o escopo de LoS já registrado: para alvo em **Air/High** a
+oclusão é escopada pela **camada-alvo** — a serra sombreia o chão, não o céu.
+
+### O que essa totalidade decide na IA
+
+**Ela é a razão de existir do ledger de idade, e da repulsa da §4.1.** A cadeia é
+esta, e vale a pena segui-la inteira:
+
+```text
+1. dentro do cone a resposta e COMPLETA
+2. logo, varrer duas vezes a MESMA area nao acrescenta nada
+3. logo, o unico valor novo esta em area NAO coberta ou coberta HA MUITO TEMPO
+4. logo, dois sensores juntos desperdicam um deles     -> REPELIR
+5. logo, a unica variavel que sobra e a IDADE          -> LEDGER
+```
+
+Se a detecção fosse probabilística, a doutrina seria **oposta**: valeria
+concentrar sensores e varrer a mesma área repetidas vezes até o acúmulo revelar.
+**É porque é total que os olhos se afastam.**
+
+> Confirma em verso o que a Marcha já dizia:
+> *"quanto maior for o silêncio, / mais terreno há para varrer."*
+
+⚠️ **A totalidade vale para dentro do alcance — e só.** Fora dele o EWACS não é
+fraco, é **cego**. A borda do cone não degrada: ela corta. Política de IA que
+tratar "quase no alcance" como "meio detectado" está errada.
+
 ---
 
 ## 3. Chave e fechadura
@@ -143,6 +185,11 @@ Vale entre **Radar↔Radar, EWACS↔EWACS e EWACS↔Radar**.
 **A degradação é o ledger de idade** de `contrato_recencia_de_cobertura.md` —
 desenhado no mesmo dia, e aqui declarado como **regra de posicionamento** e não
 só como serviço. ❌ Não existe no código.
+
+**Por que a repulsa é obrigatória e não uma preferência:** ela é *derivada* da
+totalidade da detecção (§2.1). Dois radares no mesmo cone não somam certeza —
+**a certeza já era 100%**. O segundo radar só produz valor em outro lugar, e é
+por isso que *um vai para o norte, outro para o sul* é regra e não estilo.
 
 ### 4.2 Anti-sub — AGRUPA, e a âncora é o leito
 
