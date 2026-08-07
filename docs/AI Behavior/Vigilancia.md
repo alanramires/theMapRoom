@@ -337,24 +337,42 @@ define contra o jogo inteiro em vez de contra um vizinho.
 | *"não conheço o chão abaixo, / mas já sei onde você está"* | a regra de jogo do §2 — desfocado por cima da névoa |
 | *"cobertura envelhecida / já não vale proteção"* | o **ledger de idade** — e, junto com a repulsa, **consequência da §2.1** (detecção total), não uma da outra |
 | *"o canal atrai a matilha, / o fundo dita a direção"* | a âncora anti-sub decidida no mesmo dia (§4.2) |
-| *"atacar revela o caçador"* | **corrigido** — vale pelo **submarino** (§5), não pelo furtivo aéreo, que mudou para `Assalto.md` §5.1 |
+| *"atacar revela o caçador"* | **o verso sempre esteve certo** — é o invariante *"furtivo só ataca em vantagem"*, que vale para **os dois ramos**. Quem bifurca é o custo: §5.1 (sub) e `Assalto.md` §5.1 (aéreo) |
 | *"cada casco é nova origem, / cada origem, outro setor"* | **a moeda**, melhor dita do que na §6: o valor não é a unidade, é o **ponto de origem de um cone** |
 
 ### Duas linhas desta tabela nasceram erradas — e por quê
 
 Vale mais que as corrigidas.
 
-**A Ponte levou um ✅ falso.** Na conferência original, *"atacar revela o
-caçador"* foi carimbado contra a §5 — e a §5 era exatamente a cláusula que estava
-no **documento errado** (saiu para `Assalto.md` §5.1 no mesmo dia). Bater com uma
-referência torta é o **sintoma**, não a prova:
+**A Ponte levou um ✅ falso — e o verso nunca esteve errado.** Errou a
+justificativa, duas vezes seguidas:
+
+```text
+1a leitura   "vale pela clausula aerea da §5"     -> a §5 estava no doc errado
+2a leitura   "vale pelo submarino, nao pelo aereo" -> trocou um estreitamento por outro
+3a leitura   "furtivo so ataca em vantagem"        -> INVARIANTE, vale para os dois
+```
 
 > **Conferir coerência não é conferir correção.** Quando o doc de referência está
 > errado, o ✅ que ele produz é o resultado mais perigoso possível — parece
 > verificação e é eco.
 
-O verso sobreviveu, mas por outro motivo (o submarino é furtivo **e** caçador). A
-sorte não conserta o método.
+**E o sinal estava à vista.** O verso diz *"**se** eu sou furtivo"* — condicional,
+cobre dois ramos. A cláusula dizia *"unidades furtivas **aéreas**"* — cobre um.
+
+> Quando o texto novo cobre **mais casos** que a regra contra a qual você o está
+> conferindo, o descompasso **é a evidência**: a regra é que está incompleta. Um
+> ✅ ali está lendo sintoma como acerto.
+
+Daí a divisão que ficou:
+
+```text
+verso      "furtivo so ataca em vantagem"    INVARIANTE — os dois ramos
+clausula   o custo e o limiar                BIFURCA — 1 rodada / 2 + emerge
+```
+
+A marcha guarda o que é **comum**; a ficha guarda o que **difere**. É por isso que
+as marchas envelhecem melhor que as seções.
 
 **A causalidade estava invertida.** Dizia-se que a repulsa era consequência do
 ledger. É falso: as duas são consequência da **detecção total** (§2.1) e nenhuma
