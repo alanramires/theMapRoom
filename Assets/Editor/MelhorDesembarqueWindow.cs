@@ -1169,6 +1169,7 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
         triageStatus = string.Empty;
         bandTactical.Clear();
         bandOperational.Clear();
+        bandFogged.Clear();
         bandStatus = string.Empty;
 
         scroll = Vector2.zero;
@@ -1287,7 +1288,9 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
         if (!string.IsNullOrEmpty(triageStatus))
             EditorGUILayout.HelpBox(triageStatus, MessageType.None);
 
-        bool bandsPainted = bandTactical.Count > 0 || bandOperational.Count > 0;
+        bool bandsPainted = bandTactical.Count > 0
+            || bandOperational.Count > 0
+            || bandFogged.Count > 0;
         using (new EditorGUI.DisabledScope(map == null))
         {
             // Alterna: o overlay tapa o ranking, e olhar um DEPOIS do outro no
@@ -1323,12 +1326,18 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
     // =====================================================================
     private readonly List<Vector3Int> bandTactical = new List<Vector3Int>();
     private readonly List<Vector3Int> bandOperational = new List<Vector3Int>();
+    // Celulas DA ZONA que o transportador nao conhece. Geometricamente serviriam
+    // de LZ; hoje nao servem, porque o casco nao pode terminar movimento no
+    // preto. E a previsao que o autor pediu: "onde ele vai entrar na nevoa e
+    // nao fara a entrega".
+    private readonly List<Vector3Int> bandFogged = new List<Vector3Int>();
     [SerializeField] private string bandStatus = string.Empty;
 
     private void ClearDeliveryBands()
     {
         bandTactical.Clear();
         bandOperational.Clear();
+        bandFogged.Clear();
         bandStatus = string.Empty;
         SceneView.RepaintAll();
         Repaint();
@@ -1338,6 +1347,7 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
     {
         bandTactical.Clear();
         bandOperational.Clear();
+        bandFogged.Clear();
         bandStatus = string.Empty;
 
         if (passenger == null || map == null || terrainDatabase == null)
@@ -1369,21 +1379,40 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
             return;
         }
 
+        // A zona e geometria do PASSAGEIRO; a usabilidade e conhecimento do
+        // TRANSPORTADOR — e o casco que precisa terminar o movimento ali. Por
+        // isso o filtro de nevoa e o do transportador, o mesmo que o runtime usa.
+        FogKnowledgeSnapshot bandFog = null;
+        if (applyFogOfWar && transporter != null)
+            TryCopyFogKnowledge(out bandFog);
+        System.Func<Vector3Int, bool> knows = BuildTransporterCellGate(bandFog);
+
         foreach (KeyValuePair<Vector3Int, int> entry in reach)
         {
             Vector3Int cell = entry.Key;
             cell.z = 0;
+            if (knows != null && !knows(cell))
+            {
+                bandFogged.Add(cell);
+                continue;
+            }
             if (entry.Value <= tactical)
                 bandTactical.Add(cell);
             else
                 bandOperational.Add(cell);
         }
 
+        int zoneTotal =
+            bandTactical.Count + bandOperational.Count + bandFogged.Count;
         bandStatus =
-            $"Alvo {targetCell} · Tactical={tactical} ({bandTactical.Count} hexes, "
-            + $"verde) · Operational={operational} ({bandOperational.Count} hexes, "
-            + "azul). Largar no verde entrega em uma rodada de marcha; no azul, "
-            + "em duas.";
+            $"Alvo {targetCell} · Tactical={tactical} ({bandTactical.Count} verde) "
+            + $"· Operational={operational} ({bandOperational.Count} azul)";
+        bandStatus += knows == null
+            ? " · névoa DESLIGADA: a zona teórica inteira. Ligue para ver o que "
+              + "ele pode mesmo usar hoje."
+            : $" · {bandFogged.Count} de {zoneTotal} NO ESCURO (amarelo) — "
+              + "geometricamente serviriam, mas o casco não pode terminar "
+              + "movimento no preto, então não há entrega ali hoje.";
         Debug.Log($"[BandasEntrega] {bandStatus}");
         SceneView.RepaintAll();
         Repaint();
@@ -1407,6 +1436,9 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
             return;
         DrawBand(bandTactical, new Color(0.25f, 1f, 0.35f, 0.55f));
         DrawBand(bandOperational, new Color(0.35f, 0.6f, 1f, 0.45f));
+        // Amarelo ficou livre quando o neutro do ranking virou cinza. Aqui ele
+        // ganha sentido proprio: "esta na zona, mas hoje nao da".
+        DrawBand(bandFogged, new Color(1f, 0.9f, 0.15f, 0.5f));
     }
 
     private void DrawBand(List<Vector3Int> cells, Color color)
