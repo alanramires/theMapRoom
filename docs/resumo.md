@@ -1,65 +1,50 @@
 ﻿# Resumo — onde estamos e o que vem
 
-Ponto de retomada. Escrito em 2026-08-06, **depois** da tag `v8.0.1`. Leia isto
+Ponto de retomada. Escrito em 2026-08-07, **depois** da tag `v8.1.0`. Leia isto
 primeiro.
 
 ---
 
 ## Estado
 
-`v8.0.1` tagueada e publicada. Relatório:
-[`relatorio_v8.0.1.md`](relatorio_v8.0.1.md).
+`v8.1.0` tagueada e publicada. Relatório:
+[`relatorio_v8.1.0.md`](relatorio_v8.1.0.md).
 
-**A versão é inteiramente doutrina — zero linhas de C#.** O autor resumiu sem
-cerimônia: *"agente mais bateu papo e ficou planejando"*.
+**34 commits, e o transporte inteiro remexido.** Mas o fio do dia não é nenhuma
+das mudanças — é uma constatação que apareceu **três vezes**:
 
-O que se planejou é o pré-requisito do **degrau 3 inteiro**, que estava em `❌`
-**sem vocabulário**: não havia como descrever o que um papel é, nem como decidir
-se uma unidade pertence a ele. Agora há.
+> **Quando um comportamento parece "esquecido", conferir se ele não está apenas
+> depois de um `return`.**
 
 ```text
-6 papeis        ficha: questionario, moeda, posicionamento
-6 marchas       o conjunto esta COMPLETO
-3 modalidades   combatente, artilheiro, hibrida
-17 rotulos      o que o shopping pede e a ficha declara
-10 sensores     as mesmas dez perguntas para todos
- 7 ordenacoes   o Transportador precisou de duas: Pickup e Courier
+skip do Tactical      estava no organizador; procurei no serviço
+MelhorCapturaCalls:3  o alvo é resolvido 3× por decisão
+largar × avançar      decidido pela posição do if, não por comparação
 ```
 
-### As duas descobertas que organizam o que vem
+Nas três o conteúdo estava certo e **a ordem estava errada**.
 
-**1. O papel é DERIVÁVEL, não declarado.** O critério é do autor e já existe como
-predicado:
+### O que rodou e o que não rodou
 
-```csharp
-// UnitData.cs:612 — quem passa nisto é Vigilância; quem não passa, não é
-HasStealthDetectionFor(domain, height)
-    => TryGetVisionException(...) && entry.detectUnitsWithFollowingSkills.Count > 0;
+**A fatia 1 passou** (atravessou duas versões compilada). O ciclo `T1→T6` fechou
+e a missão morre limpa quando o objetivo é tomado.
+
+⚠️ **Depois disso, 34 commits e nenhuma corrida de aceitação fechada.** O que se
+sabe é que **em gameplay o comportamento está certo** — o APC escolhe hex no
+Tactical fora da névoa e desembarca. O que **não** se sabe é se cada mudança
+individual está certa: elas nunca foram exercitadas uma de cada vez.
+
+### O sinal de log de cada mudança sem teste
+
+```text
+[Missao] ... (adquirida) já no T1              missão antes dos atalhos
+PassengerTarget #N MISSAO (x,y) verbo=         courier lê a coordenada
+ancora entrega (x,y) (Tactical; ...)           mira a zona, não o prédio
+ancora avancar (x,y)                           sem célula conhecida, entra no escuro
+larga no TACTICAL / ADIA a largada / OPERACIONAL   os três tempos
+range=6 (Operational; Tactical=3)              banda do passageiro
+fila de carona pede Transportador xN           demanda derivada (só sem APC no mapa)
 ```
-
-Não é *"tem exceção de visão"* — o F-22 tem, e enxerga bem. É *"a exceção carrega
-**lista de detecção**"*. Carregar `AR Stealth` é ser **fechadura**; listar
-`AR Stealth` é ser **chave**. Mesmo formato de *facção sem QG*, derivada de **não
-possuir** `isPlayerHeadQuarter`.
-
-**2. O que comprimiu não foram os papéis — foi o questionário ser fixo.** Se cada
-papel tivesse a sua lista de perguntas, não haveria economia: seria o mesmo caos
-com nomes bonitos. O papel responde a **ordem**; a ficha responde a
-**capacidade**. E `6` só fechou porque o **Artilheiro Combatente não coube** e
-forçou a modalidade híbrida a existir.
-
-> Quando aparecer a próxima unidade que não encaixa, a pergunta certa é
-> **"que eixo falta?"**, não *"que papel falta?"*.
-
-### A heurística de busca da v8.0.0 continua valendo
-
-> **A peça certa aparece encostada na errada.** Antes de escrever a peça nova,
-> procurar a que já faz isso para outro dono.
-
-Oito casos estão listados no [`relatorio_v8.0.0.md`](relatorio_v8.0.0.md). O
-`HasStealthDetectionFor` de hoje é o nono.
-
----
 
 ## A FATIA 1 PASSOU — 2026-08-06, depois da v8.0.1
 
@@ -341,6 +326,9 @@ existe, e nenhuma das ~20 exceções do capturador foi re-derivada ainda.
 
 | armadilha | lição |
 |---|---|
+| **compilar não prova que o arquivo mudou** | um script que aborta antes de gravar deixa a árvore idêntica, e o `git commit` passa se outro arquivo mudou junto. Aconteceu: um commit meu descrevia trabalho que não existia. Conferir o alvo, não só o build |
+| **ferramenta que discorda do jogo é pior que ferramenta faltando** | duas vezes num dia: a bancada não passava `allowTransporterCell` nem `maxRemainingRouteCost`, e aprovava LZ que o runtime recusa. A resposta errada parece legítima. Se a pergunta é a mesma, o código tem que ser o mesmo — `TryResolveDeliveryZoneAnchor` virou estática por isso |
+| **conclusão sem abrir o que existe** | quatro vezes hoje: disse que o Tactical não era skip (estava no organizador), que nada valorizava subir a montanha (a ferramenta dá +15,6), que o APC não sobe (tem `OFF Road` no asset), e que o Strategic cúbico era defeito (é projeto). **Antes de afirmar ausência: abrir a ferramenta, o asset, e a camada de cima** |
 | **conferir coerência não é conferir correção** | carimbei um verso da Marcha contra `Vigilancia.md` §5 — e a §5 era justamente a cláusula que estava no **documento errado**. Os dois erros se cancelaram num ✅. Quando a referência está torta, bater com ela é **sintoma**, não prova. O ✅ só vale se o doc de referência também já foi conferido |
 | **descompasso de generalidade É a evidência** | o verso dizia *"**SE** eu sou furtivo"* (dois ramos); a cláusula dizia *"unidades furtivas **AÉREAS**"* (um). Estreitei o verso **duas vezes seguidas** para caber. Quando o texto novo cobre **mais** casos que a regra contra a qual se confere, **a regra é que está incompleta** |
 | **causa escrita depois dos efeitos** | documentei repulsa e ledger como duas decisões lado a lado; as duas são consequência da **detecção ser total**, fato declarado depois. Quando dois fatos aparecem juntos e um parece explicar o outro, desconfie de que **falta o terceiro** |
@@ -435,56 +423,41 @@ o asset, e a camada de cima.**
 
 ## Critério de retomada
 
-**A fatia 1 passou.** O bloqueio que atravessou duas versões acabou.
+**Rodar as mudanças uma de cada vez.** São sete no caminho do transporte, todas
+compiladas e nenhuma validada isoladamente — só o gameplay solto mostrou que o
+conjunto se comporta. Os sinais de log de cada uma estão na seção Estado.
 
 A fila curta:
 
 ```text
-1. fatia 2 — levar MelhorCapturaCalls de 3 para 1 no turno de AQUISICAO
-2. limpar a origem das rotas (destravado; ownerDatabase por último)
-3. a lista MUDA REGRA — cinco divergências doc × código
-4. abrir o capturador: quantas das ~20 excecoes sobrevivem como POLITICA
+1. validar as sete, uma por vez, com o sinal de log de cada
+2. o fallback silencioso do ProgressionSelector.cs:108   ← bug com endereço
+3. Mission Intent = None quando o transportador está à toa (RidePromise)
+4. a triagem de entregáveis virar consulta de runtime (hoje só na bancada)
+5. abrir o capturador: quantas das ~20 exceções sobrevivem como POLÍTICA
 ```
 
-### Achados menores do ciclo T1→T6, para não se perderem
+### O item 2 tem evidência gravada
 
-| achado | onde |
-|---|---|
-| `[FoW][RoundZeroBake] restored` deu **0/2** numa corrida e **1/2** noutra — o item pendente é **não-determinístico** | mesmo mapa, mesma cena |
-| `[FoW][LoadCacheRestore] slot=0 success=false` com motivos **diferentes** (`construction_validation:Construction:1`, `split_gameplay_presentation`) — e o `LoadCacheVerify` diz `exact=True` no mesmo load | os dois não podem estar certos |
-| shopping diz *"nenhuma oferta elegível ... **com gastoLivre=1993**"* quando o problema é **não ter fábrica**, não dinheiro | gate inaplicável de novo: não separa "não posso pagar" de "não tenho onde comprar" |
-| `PreventiveDefense` pede `Artilleryx1` todo turno; shopping nega por *"doutrina rebelde: só Capturador"* | o Ops não sabe que o slot é rebelde |
-| carimbo da Fase 0 lê o turno **antes** de avançar: `[AI ][T0] Fase0 concluída` no turno 1 | cosmético, mas faz ler log errado |
-| `action=wait` no turno em que a unidade **capturou** | idem |
+```csharp
+// ProgressionSelector.cs:108 — célula fora do mapa de rota recebe LINHA RETA
+? routeCost                                     // custo de ROTA
+: SectorManager.HexDistance(cell, targetCell);  // ← fallback silencioso
+```
 
-### O item 1, medido no tabuleiro isolado
+`firstTurnProgress` acaba subtraindo custo de rota de distância em hex. Com serra
+os dois divergem 3× e o sinal inverte — é o ping-pong `(19,2)↔(18,2)` do
+[`docs/gamelog/log.md`](gamelog/log.md). Sem montanha os números coincidem e isso
+nunca aparece.
 
-Com 1 HQ, 1 cidade, 1 capturador rogue e **zero transportadores**, o portão
-`Embarcar` rodou inteiro e **mutou estado**:
+### O modelo da missão do transportador, escrito e com uma perna faltando
 
 ```text
-[FilaCarona] #1 entra na fila no turno 1 — fora das bandas (score=1000)
-[Capturador] 1 QueroCarona=SIM ... envelope=BeyondOperational
-[Capturador] 1 embarque scan: ... nenhum transporte aliado <=8h
-queroCarona: 14,1ms   melhorCaptura: 16,5ms/3 chamadas
+Transport + carga a bordo      Delivery   alvo = objetivo da carga     ✅
+Transport + vazio + promessa   Pickup     alvo = o passageiro          ✅
+None                           nada a fazer                            ❌
 ```
 
-Perguntou *"quero carona?"*, respondeu **sim**, varreu, não achou nada — e entrou
-na fila. **A resposta não podia ser outra**, e mesmo assim pagou o custo e
-escreveu estado.
-
-Os outros três portões do topo ficaram inertes como previsto (reparo, handoff,
-swap). O tabuleiro mínimo **apaga as exceções em vez de exigir que a gente as
-desmonte** — é a única configuração em que a célula `Capturador × Capturar`
-aparece sozinha.
-
-**O item 4 é o degrau 3 de verdade**, e é o que o autor chamou de *"o grande
-refactor das 6 armas"*. As vozes acabaram; o código não começou.
-
-⚠️ **Os docs estão à frente do código em muitos pontos agora.** As marcas
-`✅⚠️❌❓` das seis fichas só continuam úteis se alguém as mexer quando o código
-alcançar. A `v8.0.1` sozinha adicionou sete linhas `❌`.
-
-E a pergunta que fecha o major continua sendo um gesto: **duplicar uma cena,
-apontar os catálogos, e o mapa novo nascer vazio.** Hoje isso vale para estrada.
-Ainda não vale para construção.
+Delivery × Pickup é **derivável** da carga — não precisa de valor novo no enum. O
+buraco é o terceiro: vazio, sem promessa, com missão velha pendurada. O navio
+leria um encontro que já não existe, que é pior que ler nada.
