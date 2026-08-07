@@ -2,6 +2,7 @@
 using UnityEngine;
 using UnityEditor.SceneManagement;
 using System.Collections.Generic;
+using UnityEngine.Tilemaps;
 
 [CustomEditor(typeof(UnitManager))]
 public class UnitManagerEditor : Editor
@@ -361,49 +362,84 @@ public class UnitManagerEditor : Editor
             "AI Plan Runtime",
             EditorStyles.boldLabel);
 
-        using (new EditorGUI.DisabledScope(true))
+        // BLOCO EDITAVEL — ferramenta de bancada, nao caminho de jogo.
+        //
+        // Ate 2026-08-07 tudo aqui era so-leitura e so o Mission Intent abria. O
+        // autor precisa PLANTAR uma missao a mao para ver como os consumidores
+        // reagem a um passageiro que ja declarou destino — sem isso, testar o
+        // courier depende de esperar a IA gravar a missao sozinha, e ela so
+        // grava no fim de uma acao commitada.
+        //
+        // O runtime continua sendo dono: o proximo commit de missao reescreve o
+        // que for plantado aqui. Isto nao cria um segundo caminho de escrita, cria
+        // um ponto de partida para observacao.
+        EditorGUILayout.HelpBox(
+            "Campos editáveis para bancada de teste. O runtime reescreve no "
+            + "próximo commit de missão — plante o valor, rode UM passo, e leia.",
+            MessageType.None);
+
+        EditorGUILayout.PropertyField(aiHasAssignedPlanProp, new GUIContent("Has Assigned Plan"));
+        if (aiAssignedPlanKeyProp != null)
+            EditorGUILayout.PropertyField(aiAssignedPlanKeyProp, new GUIContent("Plan Key"));
+        if (aiAssignedPlanNameProp != null)
+            EditorGUILayout.PropertyField(aiAssignedPlanNameProp, new GUIContent("Plan Name"));
+        if (aiAssignedPlanRoleProp != null)
+            EditorGUILayout.PropertyField(aiAssignedPlanRoleProp, new GUIContent("Plan Role"));
+        if (aiAssignedPlanBadgeProp != null)
+            EditorGUILayout.PropertyField(aiAssignedPlanBadgeProp, new GUIContent("Plan Badge"));
+        if (aiAssignedPlanBadgeVisibleProp != null)
+            EditorGUILayout.PropertyField(aiAssignedPlanBadgeVisibleProp, new GUIContent("Badge Visible"));
+        if (aiHasDesignatedMissionProp != null)
+            EditorGUILayout.PropertyField(aiHasDesignatedMissionProp, new GUIContent("Has Designated Mission"));
+        if (aiDesignatedMissionIntentProp != null)
+            EditorGUILayout.PropertyField(
+                aiDesignatedMissionIntentProp,
+                new GUIContent("Mission Intent"));
+        if (aiDesignatedMissionTargetUnitInstanceIdProp != null)
+            EditorGUILayout.PropertyField(aiDesignatedMissionTargetUnitInstanceIdProp, new GUIContent("Mission Target Unit ID"));
+        if (aiDesignatedMissionTargetConstructionInstanceIdProp != null)
+            EditorGUILayout.PropertyField(aiDesignatedMissionTargetConstructionInstanceIdProp, new GUIContent("Mission Target Construction ID"));
+        if (aiDesignatedMissionTargetCellProp != null)
+            DrawMissionTargetCellWithPicker();
+        if (aiDesignatedMissionSectorProp != null)
+            EditorGUILayout.PropertyField(aiDesignatedMissionSectorProp, new GUIContent("Mission Sector"));
+        if (aiRideWaitSinceTurnProp != null)
         {
-            EditorGUILayout.PropertyField(aiHasAssignedPlanProp, new GUIContent("Has Assigned Plan"));
-            if (aiAssignedPlanKeyProp != null)
-                EditorGUILayout.PropertyField(aiAssignedPlanKeyProp, new GUIContent("Plan Key"));
-            if (aiAssignedPlanNameProp != null)
-                EditorGUILayout.PropertyField(aiAssignedPlanNameProp, new GUIContent("Plan Name"));
-            if (aiAssignedPlanRoleProp != null)
-                EditorGUILayout.PropertyField(aiAssignedPlanRoleProp, new GUIContent("Plan Role"));
-            if (aiAssignedPlanBadgeProp != null)
-                EditorGUILayout.PropertyField(aiAssignedPlanBadgeProp, new GUIContent("Plan Badge"));
-            if (aiAssignedPlanBadgeVisibleProp != null)
-                EditorGUILayout.PropertyField(aiAssignedPlanBadgeVisibleProp, new GUIContent("Badge Visible"));
-            if (aiHasDesignatedMissionProp != null)
-                EditorGUILayout.PropertyField(aiHasDesignatedMissionProp, new GUIContent("Has Designated Mission"));
-            // Unico editavel do bloco: o autor precisa abrir o dropdown para ver
-            // os verbos que existem. Editar aqui e ferramenta de inspecao, nao
-            // caminho de jogo — o runtime reescreve no proximo commit de missao.
-            if (aiDesignatedMissionIntentProp != null)
+            EditorGUILayout.PropertyField(
+                aiRideWaitSinceTurnProp,
+                new GUIContent(
+                    "Ride Wait Since Turn",
+                    "Turno em que entrou na fila da carona. 0 = não espera. " +
+                    "A espera é derivada (turno atual − carimbo), não incrementada."));
+        }
+
+        // Atalho: plantar missao de captura exige tres campos concordando, e
+        // errar um deles produz um estado que o runtime rejeita em silencio.
+        if (aiHasDesignatedMissionProp != null
+            && aiDesignatedMissionIntentProp != null
+            && aiDesignatedMissionTargetCellProp != null)
+        {
+            using (new EditorGUILayout.HorizontalScope())
             {
-                using (new EditorGUI.DisabledScope(false))
+                if (GUILayout.Button("Plantar missão Capture na célula acima"))
                 {
-                    EditorGUILayout.PropertyField(
-                        aiDesignatedMissionIntentProp,
-                        new GUIContent("Mission Intent"));
+                    aiHasDesignatedMissionProp.boolValue = true;
+                    aiDesignatedMissionIntentProp.enumValueIndex =
+                        (int)AIPlanRuntimeIntent.Capture;
                 }
-            }
-            if (aiDesignatedMissionTargetUnitInstanceIdProp != null)
-                EditorGUILayout.PropertyField(aiDesignatedMissionTargetUnitInstanceIdProp, new GUIContent("Mission Target Unit ID"));
-            if (aiDesignatedMissionTargetConstructionInstanceIdProp != null)
-                EditorGUILayout.PropertyField(aiDesignatedMissionTargetConstructionInstanceIdProp, new GUIContent("Mission Target Construction ID"));
-            if (aiDesignatedMissionTargetCellProp != null)
-                EditorGUILayout.PropertyField(aiDesignatedMissionTargetCellProp, new GUIContent("Mission Target Cell"));
-            if (aiDesignatedMissionSectorProp != null)
-                EditorGUILayout.PropertyField(aiDesignatedMissionSectorProp, new GUIContent("Mission Sector"));
-            if (aiRideWaitSinceTurnProp != null)
-            {
-                EditorGUILayout.PropertyField(
-                    aiRideWaitSinceTurnProp,
-                    new GUIContent(
-                        "Ride Wait Since Turn",
-                        "Turno em que entrou na fila da carona. 0 = não espera. " +
-                        "A espera é derivada (turno atual − carimbo), não incrementada."));
+                if (GUILayout.Button("Limpar missão", GUILayout.Width(110)))
+                {
+                    aiHasDesignatedMissionProp.boolValue = false;
+                    aiDesignatedMissionIntentProp.enumValueIndex =
+                        (int)AIPlanRuntimeIntent.None;
+                    aiDesignatedMissionTargetCellProp.vector3IntValue =
+                        Vector3Int.zero;
+                    if (aiDesignatedMissionTargetConstructionInstanceIdProp != null)
+                        aiDesignatedMissionTargetConstructionInstanceIdProp.intValue = -1;
+                    if (aiDesignatedMissionTargetUnitInstanceIdProp != null)
+                        aiDesignatedMissionTargetUnitInstanceIdProp.intValue = -1;
+                    pickingMissionCell = false;
+                }
             }
         }
 
@@ -1048,5 +1084,103 @@ public class UnitManagerEditor : Editor
         PrefabUtility.RecordPrefabInstancePropertyModifications(unit);
         if (unit.gameObject.scene.IsValid())
             EditorSceneManager.MarkSceneDirty(unit.gameObject.scene);
+    }
+
+    // ---------------------------------------------------------------------
+    // Seletor de celula da missao — mesmo gesto das janelas Pode*/Caminhos:
+    // botao alterna o modo, clique na SceneView grava a celula.
+    // ---------------------------------------------------------------------
+    private bool pickingMissionCell;
+
+    private void DrawMissionTargetCellWithPicker()
+    {
+        using (new EditorGUILayout.HorizontalScope())
+        {
+            EditorGUILayout.PropertyField(
+                aiDesignatedMissionTargetCellProp,
+                new GUIContent("Mission Target Cell"));
+
+            Color previous = GUI.backgroundColor;
+            GUI.backgroundColor = pickingMissionCell ? Color.magenta : previous;
+            if (GUILayout.Button(
+                    pickingMissionCell ? "■" : "↖",
+                    GUILayout.Width(28)))
+            {
+                pickingMissionCell = !pickingMissionCell;
+                SceneView.RepaintAll();
+            }
+            GUI.backgroundColor = previous;
+        }
+
+        if (pickingMissionCell)
+        {
+            EditorGUILayout.HelpBox(
+                "Clique um hex na Scene View para gravar a célula. "
+                + "Clique no botão de novo (ou ESC) para sair do modo.",
+                MessageType.Info);
+        }
+    }
+
+    private void OnSceneGUI()
+    {
+        if (!pickingMissionCell || aiDesignatedMissionTargetCellProp == null)
+            return;
+
+        Event e = Event.current;
+
+        if (e.type == EventType.KeyDown && e.keyCode == KeyCode.Escape)
+        {
+            pickingMissionCell = false;
+            e.Use();
+            Repaint();
+            return;
+        }
+
+        // Segura o clique para a SceneView nao trocar a selecao enquanto o modo
+        // esta ligado — senao o primeiro clique perde o Inspector do alvo.
+        if (e.type == EventType.Layout)
+        {
+            HandleUtility.AddDefaultControl(
+                GUIUtility.GetControlID(FocusType.Passive));
+            return;
+        }
+
+        if (e.type != EventType.MouseDown || e.button != 0 || e.alt)
+            return;
+
+        Tilemap map = ResolveSceneTilemapForPicking();
+        if (map == null)
+        {
+            Debug.LogWarning(
+                "[UnitManagerEditor] Sem Tilemap na cena para converter o "
+                + "clique em celula.");
+            pickingMissionCell = false;
+            e.Use();
+            return;
+        }
+
+        Ray ray = HandleUtility.GUIPointToWorldRay(e.mousePosition);
+        float t = ray.direction.z != 0f ? -ray.origin.z / ray.direction.z : 0f;
+        Vector3Int cell = map.WorldToCell(ray.origin + ray.direction * t);
+        cell.z = 0;
+
+        serializedObject.Update();
+        aiDesignatedMissionTargetCellProp.vector3IntValue = cell;
+        serializedObject.ApplyModifiedProperties();
+
+        e.Use();
+        Repaint();
+    }
+
+    private static Tilemap ResolveSceneTilemapForPicking()
+    {
+        Tilemap[] maps = Object.FindObjectsByType<Tilemap>(
+            FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        if (maps == null || maps.Length == 0)
+            return null;
+        for (int i = 0; i < maps.Length; i++)
+            if (maps[i] != null && maps[i].name == "TileMap")
+                return maps[i];
+        return maps[0];
     }
 }
