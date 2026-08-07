@@ -783,21 +783,39 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
         {
             foreach (MelhorDesembarqueLzScore lz in ranking)
             {
+                // Paleta com CINCO significados e cinco cores que nao brigam.
+                //
+                // Antes a rampa negativa comecava em LARANJA, o neutro era
+                // AMARELO e o vencedor era OURO — tres sentidos dentro da mesma
+                // faixa de matiz, num overlay que se le de relance. O laranja
+                // ja e do vencedor; a rampa do "pior" sai dele.
+                //
+                // E o neutro perdeu a cor de propósito: routeProgress == 0 e
+                // "nao tenho opiniao", nao um alerta. Cinza diz isso; amarelo
+                // saturado competia com o que importa.
+                //
+                //   verde     aproxima do alvo
+                //   cinza     indiferente
+                //   vermelho  afasta
+                //   ouro      o vencedor do ranking
+                //   ciano     preview de onde o passageiro cai
                 Color color = lz.routeProgress > 0
-                    ? Color.Lerp(new Color(0.3f, 0.85f, 0.3f, 0.65f),
+                    ? Color.Lerp(new Color(0.35f, 0.85f, 0.35f, 0.6f),
                         new Color(0f, 0.6f, 0f, 0.9f),
                         lz.routeProgress / (float)maxAbsProgress)
                     : lz.routeProgress < 0
-                        ? Color.Lerp(new Color(0.9f, 0.45f, 0.1f, 0.65f),
-                            new Color(0.8f, 0.1f, 0.1f, 0.9f),
+                        ? Color.Lerp(new Color(1f, 0.45f, 0.45f, 0.6f),
+                            new Color(0.65f, 0f, 0f, 0.9f),
                             -lz.routeProgress / (float)maxAbsProgress)
-                        : new Color(0.9f, 0.85f, 0.1f, 0.75f);
+                        : new Color(0.62f, 0.62f, 0.62f, 0.45f);
                 if (lz == ranking[0])
                     color = new Color(1f, 0.75f, 0.05f, 0.95f);
                 Handles.color = color;
                 Vector3 world = map.GetCellCenterWorld(lz.cell);
                 Handles.DrawSolidDisc(world, Vector3.back, lz == ranking[0] ? 0.32f : 0.24f);
-                Color textColor = lz == ranking[0] || lz.routeProgress == 0
+                // O neutro deixou de ser amarelo claro, entao texto preto nele
+                // virou ilegivel. So o vencedor (ouro) ainda pede preto.
+                Color textColor = lz == ranking[0]
                     ? Color.black
                     : Color.white;
                 Handles.Label(
