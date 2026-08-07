@@ -25,6 +25,7 @@ vazio e nenhum tabuleiro herde o layout de outro.
 | versão | título | relatório |
 |---|---|---|
 | v8.0.0 | A ausência precisa de nome próprio | [relatório](docs/relatorio_v8.0.0.md) |
+| v8.0.1 | As seis armas: o vocabulário fecha, o código não começou | [relatório](docs/relatorio_v8.0.1.md) |
 
 ---
 
