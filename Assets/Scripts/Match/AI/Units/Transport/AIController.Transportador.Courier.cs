@@ -46,6 +46,38 @@ public partial class AIController
                 : $" (Operational; Tactical={passengerTactical})")
             + $" distAtual={SectorManager.HexDistance(fromCell, primaryTarget):F0}h");
 
+        // O TRANSPORTADOR TAMBEM DECLARA MISSAO — e com o objetivo da CARGA.
+        //
+        //   "o transportador tambem precisa da missao transport com o objetivo
+        //    do carona. pq se ele for pegar outro transportador como um navio, o
+        //    navio vai ler dele" (autor, 2026-08-07)
+        //
+        // Transporte aninhado: navio carrega APC carrega soldado. O navio
+        // pergunta para onde a carga dele quer ir e le o APC — exatamente como o
+        // APC le o soldado. Se o APC nao declarou, o navio inventa, e o defeito
+        // que a gente acabou de consertar um nivel abaixo reaparece um nivel
+        // acima.
+        //
+        // A promessa de coleta (RidePromise) ja grava Transport, mas com a
+        // celula de ENCONTRO. Depois que a carga esta a bordo o destino e outro:
+        // o objetivo do passageiro. Aqui o pendente e reescrito com ele.
+        //
+        // Pendente e nao escrita direta pelo invariante transacional: quem
+        // confirma e CommitPendingAIDesignatedMission, na Fase 2, depois do
+        // batch dar certo.
+        if (primaryTargetFound)
+        {
+            Vector3Int cargoTarget = primaryTarget;
+            cargoTarget.z = 0;
+            pendingAIDesignatedMissions[unit.InstanceId] =
+                new PendingAIDesignatedMission(
+                    AIPlanRuntimeIntent.Transport,
+                    cargoTarget,
+                    primaryPassenger != null ? primaryPassenger.InstanceId : -1,
+                    -1,
+                    0);
+        }
+
         Dictionary<Vector3Int, List<Vector3Int>> paths =
             UnitMovementPathRules.CalcularCaminhosValidos(
                 boardTilemap, unit, Mathf.Max(0, unit.RemainingMovementPoints), terrainDatabase);
