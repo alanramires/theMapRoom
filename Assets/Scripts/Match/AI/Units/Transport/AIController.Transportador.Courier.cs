@@ -76,19 +76,6 @@ public partial class AIController
                 allowAssignedPassengers: true))
             return assignedLocalOpportunity;
 
-        if (TryBuildBestCourierDisembarkAction(
-                unit,
-                passengers,
-                plan,
-                snapshot,
-                assignedSectorTarget,
-                paths,
-                dropOffRange,
-                false,
-                "Terrestre",
-                out PlayerAction bestDropAction))
-            return bestDropAction;
-
         // ANCORA NA ZONA DE ENTREGA, nao no alvo.
         //
         // O courier nao precisa chegar no predio — precisa chegar a um lugar de
@@ -103,10 +90,12 @@ public partial class AIController
         // perseguir. Ver docs/AI Behavior/Transporte.md e a nota do CLAUDE.md
         // ("reverse: teleport the unit onto the target, that area is the drop zone").
         Vector3Int movementAnchor = primaryTarget;
+        bool anchorIsTactical = false;
+        string anchorMode = "entrega";
         if (TryResolveDeliveryZoneAnchor(
                 unit, primaryPassenger, primaryTarget, fromCell,
                 out Vector3Int deliveryAnchor, out int anchorPassengerCost,
-                out bool anchorIsTactical, out string anchorMode))
+                out anchorIsTactical, out anchorMode))
         {
             movementAnchor = deliveryAnchor;
             if (movementAnchor != primaryTarget)
@@ -122,7 +111,76 @@ public partial class AIController
                           + "nao o predio."));
         }
 
+        // -------------------------------------------------------------------
+        // LARGAR AGORA x ANDAR E LARGAR MELHOR AMANHA
+        //
+        // Ate 2026-08-07 isto nao era uma escolha: a largada era o if de cima e
+        // o movimento o de baixo, entao qualquer LZ admissivel encerrava o turno
+        // e a ancora nem rodava. "Nao era pra ele ter avancado pro operacional
+        // com delay de desembarque?" — nao era, porque a decisao nao existia.
+        //
+        // Agora existe, e em tres tempos:
+        //
+        //   1. TACTICAL       largada boa: o passageiro chega no turno seguinte.
+        //                     Se ha uma, pega e acabou.
+        //   2. ADIAR          nao ha Tactical hoje, mas ha ancora Tactical
+        //                     CONHECIDA e o casco realmente se move ate la.
+        //                     Andar hoje vale mais que largar mal.
+        //   3. OPERACIONAL    nem Tactical hoje nem melhora amanha. Ai a
+        //                     reserva vale — e e o caso do navio, que nao chega
+        //                     mais perto da praia por decreto.
+        //
+        // Fogo de suporte nao entra: a banda dele e a da ARMA, e o teto legado
+        // continua ate existir o resolver proprio.
+        // -------------------------------------------------------------------
+        if (fireSupportPassenger)
+        {
+            if (TryBuildBestCourierDisembarkAction(
+                    unit, passengers, plan, snapshot, assignedSectorTarget,
+                    paths, dropOffRange, false, "Terrestre",
+                    out PlayerAction fireSupportDrop))
+                return fireSupportDrop;
+        }
+        else if (TryBuildBestCourierDisembarkAction(
+                     unit, passengers, plan, snapshot, assignedSectorTarget,
+                     paths, passengerTactical, false, "Terrestre",
+                     out PlayerAction tacticalDrop))
+        {
+            Debug.Log(
+                $"{TL("Transporte")} {unit.InstanceId} larga no TACTICAL "
+                + $"(rota restante <= {passengerTactical}).");
+            return tacticalDrop;
+        }
+
         Vector3Int moveTarget = FindTransportMove(unit, fromCell, movementAnchor, paths, occupied, snapshot.AITeam);
+
+        // O adiamento so vale se o casco REALMENTE anda. Sem esta guarda, um APC
+        // bloqueado adiaria a largada para sempre esperando um amanha que nao vem.
+        bool advancingImprovesDelivery =
+            !fireSupportPassenger
+            && anchorMode == "entrega"
+            && anchorIsTactical
+            && moveTarget != fromCell;
+
+        if (!fireSupportPassenger && !advancingImprovesDelivery
+            && TryBuildBestCourierDisembarkAction(
+                unit, passengers, plan, snapshot, assignedSectorTarget,
+                paths, dropOffRange, false, "Terrestre",
+                out PlayerAction operationalDrop))
+        {
+            Debug.Log(
+                $"{TL("Transporte")} {unit.InstanceId} larga no OPERACIONAL "
+                + $"(reserva: sem Tactical hoje e andar nao melhora; "
+                + $"ancora={anchorMode} tactical={anchorIsTactical} "
+                + $"move={(moveTarget != fromCell ? "sim" : "nao")}).");
+            return operationalDrop;
+        }
+
+        if (advancingImprovesDelivery)
+            Debug.Log(
+                $"{TL("Transporte")} {unit.InstanceId} ADIA a largada: anda ate "
+                + $"{moveTarget} porque a ancora {movementAnchor} e Tactical "
+                + "conhecida — largar hoje custaria um turno de marcha a mais.");
 
         // If FindTransportMove landed on the objective building itself, redirect to an adjacent
         // reachable cell so the passenger can be disembarked directly onto the building.
