@@ -346,10 +346,12 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
                 GUI.backgroundColor = active
                     ? new Color(0.25f, 0.9f, 1f)
                     : Color.white;
+                // Verbo + coordenada. O id do predio saiu junto com o filtro de
+                // captura: o transportador nao pergunta O QUE a carga vai fazer.
                 string designation =
-                    embarked.AIHasDesignatedCaptureTarget
-                        ? $"\nAlvo #{embarked.AIDesignatedCaptureTargetInstanceId} " +
-                          $"{embarked.AIDesignatedCaptureTargetCell}"
+                    embarked.AIHasDesignatedMission
+                        ? $"\n{embarked.AIDesignatedMissionIntent} " +
+                          $"{embarked.AIDesignatedMissionTargetCell}"
                         : "\nSem destino designado";
                 if (GUILayout.Button(
                         $"Destino {index + 1} | " +
