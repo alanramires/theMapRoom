@@ -68,6 +68,8 @@ public class UnitManagerEditor : Editor
 
     private void OnEnable()
     {
+        SceneView.duringSceneGui -= OnSceneGuiPick;
+        SceneView.duringSceneGui += OnSceneGuiPick;
         spriteRendererProp = serializedObject.FindProperty("spriteRenderer");
         unitHudProp = serializedObject.FindProperty("unitHud");
         unitDatabaseProp = serializedObject.FindProperty("unitDatabase");
@@ -1092,6 +1094,12 @@ public class UnitManagerEditor : Editor
     // ---------------------------------------------------------------------
     private bool pickingMissionCell;
 
+    private void OnDisable()
+    {
+        SceneView.duringSceneGui -= OnSceneGuiPick;
+        pickingMissionCell = false;
+    }
+
     private void DrawMissionTargetCellWithPicker()
     {
         using (new EditorGUILayout.HorizontalScope())
@@ -1121,10 +1129,19 @@ public class UnitManagerEditor : Editor
         }
     }
 
-    private void OnSceneGUI()
+    // Inscrito em SceneView.duringSceneGui, e NAO o OnSceneGUI() automatico do
+    // Editor: aquele roda depois do picking nativo da SceneView, entao o clique
+    // trocava a selecao (destruindo este Editor) antes de virar celula. E o mesmo
+    // caminho que CaminhosValidosWindow e as janelas Pode* ja usam.
+    private void OnSceneGuiPick(SceneView sceneView)
     {
         if (!pickingMissionCell || aiDesignatedMissionTargetCellProp == null)
             return;
+        if (target == null)
+        {
+            pickingMissionCell = false;
+            return;
+        }
 
         Event e = Event.current;
 
@@ -1145,6 +1162,25 @@ public class UnitManagerEditor : Editor
             return;
         }
 
+        // Realce sob o cursor. Serve de feedback e de diagnostico: se o circulo
+        // nao aparece, o handler nao esta recebendo eventos e o problema e de
+        // inscricao, nao de conversao de coordenada.
+        if (e.type == EventType.Repaint)
+        {
+            Tilemap hoverMap = ResolveSceneTilemapForPicking();
+            if (hoverMap != null)
+            {
+                Vector3Int hover = ScreenPointToCell(hoverMap, e.mousePosition);
+                Handles.color = new Color(1f, 0.35f, 1f, 0.95f);
+                Handles.DrawWireDisc(
+                    hoverMap.GetCellCenterWorld(hover), Vector3.forward, 0.45f);
+                Handles.DrawWireDisc(
+                    hoverMap.GetCellCenterWorld(hover), Vector3.forward, 0.38f);
+            }
+            sceneView.Repaint();
+            return;
+        }
+
         if (e.type != EventType.MouseDown || e.button != 0 || e.alt)
             return;
 
@@ -1159,10 +1195,7 @@ public class UnitManagerEditor : Editor
             return;
         }
 
-        Ray ray = HandleUtility.GUIPointToWorldRay(e.mousePosition);
-        float t = ray.direction.z != 0f ? -ray.origin.z / ray.direction.z : 0f;
-        Vector3Int cell = map.WorldToCell(ray.origin + ray.direction * t);
-        cell.z = 0;
+        Vector3Int cell = ScreenPointToCell(map, e.mousePosition);
 
         serializedObject.Update();
         aiDesignatedMissionTargetCellProp.vector3IntValue = cell;
@@ -1170,6 +1203,15 @@ public class UnitManagerEditor : Editor
 
         e.Use();
         Repaint();
+    }
+
+    private static Vector3Int ScreenPointToCell(Tilemap map, Vector2 screenPoint)
+    {
+        Ray ray = HandleUtility.GUIPointToWorldRay(screenPoint);
+        float t = ray.direction.z != 0f ? -ray.origin.z / ray.direction.z : 0f;
+        Vector3Int cell = map.WorldToCell(ray.origin + ray.direction * t);
+        cell.z = 0;
+        return cell;
     }
 
     private static Tilemap ResolveSceneTilemapForPicking()
