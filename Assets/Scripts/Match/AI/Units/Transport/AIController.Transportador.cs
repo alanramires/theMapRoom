@@ -3,6 +3,10 @@ using UnityEngine;
 
 public partial class AIController
 {
+    // LEGADO. Numero fixo de antes de o envelope existir, e ele e MAIS FROUXO que
+    // a doutrina: um soldado move 3 e o teto e 4, entao um drop no limite custa
+    // um turno extra ao passageiro sem ninguem registrar a perda.
+    // Nao usar em codigo novo — ver ResolvePassengerDropOffRange abaixo.
     private const int TransportDropOffRange = 4;
     // Passageiro que alcança o objetivo em ate duas rodadas completas nao
     // precisa ocupar transporte. O orçamento concreto depende do movimento
@@ -16,6 +20,33 @@ public partial class AIController
     // Persiste entre as decisoes dos APCs para que, depois que um APC se move, o recalculo do
     // proximo NAO realoque o mesmo passageiro (evita 2 APCs no mesmo cara). Limpo a cada Phase 2.
     private readonly Dictionary<int, int> assignedTransportClaims = new Dictionary<int, int>();
+
+    /// <summary>
+    /// Banda de desembarque do PASSAGEIRO — nao constante do papel.
+    ///
+    /// <para><b>Tactical primeiro.</b> Largar dentro do Tactical significa que o
+    /// passageiro materializa no alvo na rodada seguinte, sozinho. E a unica
+    /// entrega que nao cobra um turno de ninguem.</para>
+    ///
+    /// <para><b>Operational e FALLBACK, nao alternativa.</b> So vale quando nada
+    /// no Tactical serve: cerco, montanha, LZ sem rota, hex ocupado. Ai duas
+    /// rodadas de marcha ainda sao melhores que continuar a bordo.</para>
+    ///
+    /// O orcamento e <c>MaxMovementPoints</c>, nao o restante: a marcha do
+    /// passageiro comeca num turno novo, entao o que ele gastou embarcado nao
+    /// conta. Ver <c>docs/AI Behavior/contrato_envelope_alcance.md</c> e a secao
+    /// "Ranges are bands, not hex numbers" do CLAUDE.md.
+    /// </summary>
+    private static int ResolvePassengerDropOffRange(
+        UnitManager passenger, bool operationalFallback)
+    {
+        int tactical = Mathf.Max(0, passenger != null ? passenger.MaxMovementPoints : 0);
+        if (tactical <= 0)
+            return 0;
+        return operationalFallback
+            ? tactical * Mathf.Max(1, TransportPassengerWalkTurns)
+            : tactical;
+    }
 
     private static int ResolvePassengerWalkWithoutTransportBudget(
         UnitManager passenger)

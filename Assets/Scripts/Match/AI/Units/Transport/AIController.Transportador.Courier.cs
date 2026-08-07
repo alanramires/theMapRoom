@@ -24,8 +24,27 @@ public partial class AIController
         UnitManager primaryPassenger = ResolvePrimaryPassenger(unit, passengers, plan);
         bool primaryTargetFound = TryResolveCourierPassengerTarget(primaryPassenger, plan, snapshot, assignedSectorTarget, fromCell, out Vector3Int primaryTarget);
         if (!primaryTargetFound) primaryTarget = fromCell;
-        int dropOffRange = IsFireSupportUnit(primaryPassenger) ? FireSupportDropOffRange : TransportDropOffRange;
-        Debug.Log($"{TL("Transporte")} {unit.InstanceId} courier — passageiro #{primaryPassenger.InstanceId} alvo={primaryTarget} range={dropOffRange} distAtual={SectorManager.HexDistance(fromCell, primaryTarget):F0}h");
+        // A banda e do PASSAGEIRO, nao do papel. O teto vai ate o Operational
+        // porque cerco, montanha ou LZ sem rota podem nao deixar nenhum spot no
+        // Tactical — e duas rodadas de marcha ainda batem continuar a bordo.
+        // Quem garante a preferencia pelo Tactical e o RANKING do
+        // MelhorDesembarque, que ja escolhe a rota mais curta: no teste de
+        // 2026-08-06 ele aceitou R2, R3 e R4 e ficou com o R2.
+        //
+        // Fogo de suporte fica no numero antigo de proposito: a banda dele e a da
+        // ARMA, nao a do movimento (CLAUDE.md, "Known inversion"), e esse resolver
+        // ainda nao existe.
+        bool fireSupportPassenger = IsFireSupportUnit(primaryPassenger);
+        int passengerTactical = ResolvePassengerDropOffRange(
+            primaryPassenger, operationalFallback: false);
+        int dropOffRange = fireSupportPassenger
+            ? FireSupportDropOffRange
+            : ResolvePassengerDropOffRange(primaryPassenger, operationalFallback: true);
+        Debug.Log($"{TL("Transporte")} {unit.InstanceId} courier — passageiro #{primaryPassenger.InstanceId} alvo={primaryTarget} range={dropOffRange}"
+            + (fireSupportPassenger
+                ? " (fogo de suporte: constante legada)"
+                : $" (Operational; Tactical={passengerTactical})")
+            + $" distAtual={SectorManager.HexDistance(fromCell, primaryTarget):F0}h");
 
         Dictionary<Vector3Int, List<Vector3Int>> paths =
             UnitMovementPathRules.CalcularCaminhosValidos(
