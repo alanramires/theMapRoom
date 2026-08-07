@@ -437,32 +437,50 @@ public partial class AIController
                 : requestedTier == AIReachDecisionTier.Operational
                     ? MelhorEmbarqueTier.Operational
                     : MelhorEmbarqueTier.Strategic;
+        // O FUNIL PRECISA DIZER ONDE CADA OPCAO MORREU.
+        //
+        // Sao cinco clausulas e todas somem pelo mesmo `false`. Com 48 opcoes
+        // recusadas e seis tiers em miss, o log dizia exatamente o mesmo que
+        // diria se nao houvesse opcao nenhuma — e auditar isso virava chute.
+        // O contador por motivo custa nada e transforma a proxima corrida em
+        // resposta. Mesma ordem, mesmas condicoes, zero mudanca de regra.
+        string ResolveRejection(MelhorEmbarqueOption option)
+        {
+            if (option == null)
+                return "nula";
+            if (option.transporterTier != serviceTier)
+                return $"tier={option.transporterTier}!={serviceTier}";
+            if (!CanMaterializePickupRendezvous(option, serviceTier))
+                return $"rotaPax={option.passengerRouteState}";
+            // Um primeiro candidato Strategic inseguro nao pode encerrar
+            // a onda inteira: continue procurando o proximo pedido que
+            // seja materializavel e seguro.
+            if (requestedTier == AIReachDecisionTier.Strategic
+                && !IsTransportStrategicTargetSafe(
+                    unit, option.lzCell, snapshot))
+                return $"lzInsegura={option.lzCell}";
+            if (requiredDisposition.HasValue
+                && option.rideDisposition != requiredDisposition.Value)
+                return $"carona={option.rideDisposition}" +
+                       $"!={requiredDisposition.Value}";
+            if (!includeOpportunisticPickup
+                && option.rideDisposition ==
+                    MelhorEmbarqueRideDisposition.OpportunisticFallback)
+                return "carona=OpportunisticFallback";
+            // Exclusividade de VIAGEM, nao de passageiro: dois veiculos
+            // cruzando o mapa pelo mesmo cara e desperdicio. Coleta que
+            // termina nesta rodada ignora a regra — recusar um embarque
+            // que esta acontecendo porque "outro prometeu" seria a fome
+            // outra vez, so que com dono.
+            if (serviceTier != MelhorEmbarqueTier.Tactical
+                && IsPassengerPromisedToAnotherTransporter(
+                    unit, option.passenger))
+                return "prometido a outro transportador";
+            return null;
+        }
+
         System.Predicate<MelhorEmbarqueOption> isMaterializable =
-            option =>
-                option != null
-                && option.transporterTier == serviceTier
-                && CanMaterializePickupRendezvous(option, serviceTier)
-                // Um primeiro candidato Strategic inseguro nao pode encerrar
-                // a onda inteira: continue procurando o proximo pedido que
-                // seja materializavel e seguro.
-                && (requestedTier != AIReachDecisionTier.Strategic
-                    || IsTransportStrategicTargetSafe(
-                        unit, option.lzCell, snapshot))
-                && (!requiredDisposition.HasValue
-                    || option.rideDisposition ==
-                        requiredDisposition.Value)
-                && (includeOpportunisticPickup
-                    || option.rideDisposition !=
-                        MelhorEmbarqueRideDisposition
-                            .OpportunisticFallback)
-                // Exclusividade de VIAGEM, nao de passageiro: dois veiculos
-                // cruzando o mapa pelo mesmo cara e desperdicio. Coleta que
-                // termina nesta rodada ignora a regra — recusar um embarque
-                // que esta acontecendo porque "outro prometeu" seria a fome
-                // outra vez, so que com dono.
-                && (serviceTier == MelhorEmbarqueTier.Tactical
-                    || !IsPassengerPromisedToAnotherTransporter(
-                        unit, option.passenger));
+            option => ResolveRejection(option) == null;
 
         // O FAROL. Se este transportador tem viagem devida e ela e
         // materializavel neste tier, ela vem primeiro — mas so isso. Nao ha
@@ -479,7 +497,31 @@ public partial class AIController
 
         selectedOption ??= pickup.options.Find(isMaterializable);
         if (selectedOption?.passenger == null)
+        {
+            if (showAILogs && pickup.options.Count > 0)
+            {
+                var byReason = new Dictionary<string, int>();
+                for (int i = 0; i < pickup.options.Count; i++)
+                {
+                    string why = ResolveRejection(pickup.options[i])
+                                 ?? "aceita";
+                    byReason.TryGetValue(why, out int count);
+                    byReason[why] = count + 1;
+                }
+                var sb = new System.Text.StringBuilder();
+                foreach (KeyValuePair<string, int> entry in byReason)
+                {
+                    if (sb.Length > 0)
+                        sb.Append(" · ");
+                    sb.Append($"{entry.Key}={entry.Value}");
+                }
+                Debug.Log(
+                    $"{TL("Transporte")} {unit.InstanceId} " +
+                    $"Pickup[{serviceTier}] recusa " +
+                    $"{pickup.options.Count} opcoes: {sb}");
+            }
             return false;
+        }
 
         Vector3Int servicePassengerCell =
             selectedOption.passenger.CurrentCellPosition;
@@ -662,6 +704,13 @@ public partial class AIController
                     // Uma coleta produz Tactical, Operational e Strategic.
                     // EVAC/Pickup apenas filtram esta mesma lista.
                     includeStrategic = true,
+                    // ANDAM JUNTAS. Produzir LZ de tier Strategic e recusar
+                    // calcular a rota Strategic do passageiro fazia o tier
+                    // negar a si mesmo: as LZs distantes existiam, e todo
+                    // passageiro fora do orcamento now/later voltava
+                    // NoCurrentRoute — 48 opcoes, 48 recusas, no mapa do canal.
+                    // Quem pede alcance estrategico paga o mapa estrategico.
+                    resolveLongRangePassengerMeeting = true,
                     stopAfterDecisiveTactical = true,
                     transporterPaths = planning.TransporterReach,
                     allowPassenger = candidate =>
@@ -761,7 +810,8 @@ public partial class AIController
         QueroCaronaResult evaluated = EvaluatePickupRideNeed(
             passenger,
             plan,
-            operationalTurns);
+            operationalTurns,
+            planning.WorldSnapshot);
         ApplyRideWaitStamp(passenger, evaluated);
         planning.RideNeedByPassenger[passenger.InstanceId] =
             evaluated;
@@ -867,18 +917,37 @@ public partial class AIController
         if (passengerIsAircraft)
             return true;
 
+        // SEM ROTA e impossibilidade; ReachableStrategic e DISTANCIA.
+        //
+        // Os dois eram recusados juntos, e isso fazia o tier Strategic negar o
+        // proprio horizonte: com orcamento infinito, ele so aceitava estados de
+        // rota que cabem no Operational. Um navio nunca buscava infantaria a
+        // 30 hexes da praia — nao por alcance, mas porque a unica classificacao
+        // que aquela infantaria podia ter era a proibida.
+        //
+        // NoCurrentRoute continua fora: ali o mapa de longo alcance NAO achou
+        // encontro nenhum, e LZ na outra ilha segue sendo destino impossivel.
         if (option.passengerRouteState ==
-                MelhorEmbarquePassengerRouteState.NoCurrentRoute
-            || option.passengerRouteState ==
-                MelhorEmbarquePassengerRouteState.ReachableStrategic)
+                MelhorEmbarquePassengerRouteState.NoCurrentRoute)
             return false;
 
-        // Pickup Tactical significa embarque possivel nesta rodada. Um
-        // passageiro terrestre que so chega no Operational nao pode puxar o
-        // transportador para uma praia que ele ainda nao alcanca.
-        return serviceTier != MelhorEmbarqueTier.Tactical
-            || option.passengerRouteState ==
-                MelhorEmbarquePassengerRouteState.ReachableNow;
+        // Cada tier aceita ate o SEU horizonte, e nao alem:
+        //   Tactical    embarque nesta rodada
+        //   Operational o passageiro chega andando nos proximos turnos
+        //   Strategic   vale o encontro de longo alcance — e so aqui
+        switch (serviceTier)
+        {
+            case MelhorEmbarqueTier.Tactical:
+                return option.passengerRouteState ==
+                    MelhorEmbarquePassengerRouteState.ReachableNow;
+            case MelhorEmbarqueTier.Operational:
+                return option.passengerRouteState ==
+                        MelhorEmbarquePassengerRouteState.ReachableNow
+                    || option.passengerRouteState ==
+                        MelhorEmbarquePassengerRouteState.ReachableLater;
+            default:
+                return true;
+        }
     }
 
     // Classificacao ESTRUTURAL, nao por altura: uma aeronave pousada continua
@@ -918,11 +987,93 @@ public partial class AIController
                 UnitRole.Capturador);
     }
 
+    /// <summary>
+    /// A CARONA NAO PERGUNTA A MISSAO — PERGUNTA A COORDENADA.
+    ///
+    /// Um transportador carregado tem destino: o da carga. Antes disto, ele
+    /// caia no ramo "nao captura nada, logo nao tem assunto" e ficava MUDO —
+    /// e um APC cheio de soldados no lado errado do canal nunca pedia o navio,
+    /// porque a unica fonte de coordenada embutida na pergunta era "capturavel
+    /// que EU capturo".
+    ///
+    /// A fonte da ancora e de quem pergunta, nao da pergunta. Com a celula em
+    /// maos, o ApplyBeyondReachRideNeed responde por topologia pura: esta fora
+    /// do meu componente? entao so chego de carona.
+    /// </summary>
+    private bool TryResolveCargoDestinationAnchor(
+        UnitManager passenger,
+        TeamObjectivePlan plan,
+        AIWorldSnapshot snapshot,
+        out Vector3Int anchor)
+    {
+        anchor = Vector3Int.zero;
+        if (passenger == null
+            || snapshot == null
+            || !HasTransportCargo(passenger))
+        {
+            return false;
+        }
+
+        List<UnitManager> cargo = CollectPassengers(passenger);
+        UnitManager primary =
+            ResolvePrimaryPassenger(passenger, cargo, plan);
+        if (primary == null)
+            return false;
+
+        Vector3Int fromCell = passenger.CurrentCellPosition;
+        fromCell.z = 0;
+        if (!TryResolveCourierPassengerTarget(
+                primary, plan, snapshot,
+                Vector3Int.zero, fromCell,
+                out Vector3Int resolved))
+        {
+            return false;
+        }
+
+        resolved.z = 0;
+        // Destino igual a posicao atual nao e destino: nao ha para onde pedir
+        // carona, e publicar isso encheria a fila de pedido vazio.
+        if (resolved == fromCell)
+            return false;
+
+        anchor = resolved;
+        return true;
+    }
+
     private QueroCaronaResult EvaluatePickupRideNeed(
         UnitManager passenger,
         TeamObjectivePlan plan,
-        int operationalTurns)
+        int operationalTurns,
+        AIWorldSnapshot snapshot)
     {
+        // ANTES do dono da pergunta: quem carrega tem coordenada propria, e a
+        // coordenada dispensa a pergunta de captura inteira.
+        if (!ClaimsGroundCaptureRideQuestion(passenger)
+            && TryResolveCargoDestinationAnchor(
+                passenger, plan, snapshot, out Vector3Int cargoAnchor))
+        {
+            return QueroCaronaService.Evaluate(
+                new QueroCaronaRequest
+                {
+                    unit = passenger,
+                    map = boardTilemap,
+                    terrainDatabase = terrainDatabase,
+                    context = QueroCaronaContext.RogueOuRebelde,
+                    useExplicitTarget = true,
+                    explicitTarget = cargoAnchor,
+                    explicitTargetLabel =
+                        $"destino da carga {cargoAnchor}",
+                    operationalTurns = Mathf.Max(1, operationalTurns),
+                    emulateUnderRepairFromUnitData = true,
+                    diagnosticLog = showAILogs
+                        ? message => Debug.Log(
+                            $"{TL("Transporte")}[QueroCarona] " +
+                            $"pax=#{passenger.InstanceId} (carregado) " +
+                            $"{message}")
+                        : null
+                });
+        }
+
         // Sem dono para a pergunta, sobra a unica necessidade que o
         // transportador enxerga sozinho: a emergencia de recuperacao. Ela
         // continua valendo para TODA peca — artilharia ferida sendo evacuada
@@ -1253,12 +1404,31 @@ public partial class AIController
             return true;
 
         targetCell.z = 0;
-        if (!IsCellInSafeRear(transporter, snapshot, targetCell))
-            return false;
 
-        return !transporter.TryGetUnitData(out UnitData data)
+        // A PRUDENCIA E DE QUEM PEDE A PRUDENCIA.
+        //
+        // Retaguarda e ameaca nasceram para proteger a artilharia de campanha
+        // que andava de caminhao: a carga e que era fragil, nao o oficio. Mas
+        // a regra estava no PAPEL, entao valia para todo transportador — e
+        // exigir InRearSlice de uma LZ estrategica torna o resgate
+        // estruturalmente impossivel, porque o ponto de recolha esta, por
+        // definicao, onde a tropa ficou: fora da linha. No mapa do canal as
+        // 36 opcoes estrategicas eram recusadas TODAS, turno apos turno.
+        //
+        // Agora quem responde e a ficha. Porta-Avioes e caminhao de
+        // suprimentos declaram playConservative e continuam presos a
+        // retaguarda e ao hex sem ameaca. Chinook, hidroaviao, APC, trem de
+        // carga e navio de desembarque nao declaram nada — e nao lhes e
+        // perguntado. A Marcha ja tinha decidido: "Nao fico esperando a tropa
+        // me encontrar; eu vou ao encontro de quem precisa embarcar."
+        if (!transporter.TryGetUnitData(out UnitData data)
             || data == null
-            || !data.playConservative
-            || CalculateThreatLevel(targetCell, snapshot.AITeam) <= 0f;
+            || !data.playConservative)
+        {
+            return true;
+        }
+
+        return IsCellInSafeRear(transporter, snapshot, targetCell)
+            && CalculateThreatLevel(targetCell, snapshot.AITeam) <= 0f;
     }
 }
