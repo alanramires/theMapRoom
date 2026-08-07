@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
@@ -201,6 +201,18 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
             GUI.backgroundColor = Color.white;
         }
         EditorGUILayout.EndHorizontal();
+
+        using (new EditorGUI.DisabledScope(
+                   transporter == null
+                   || map == null))
+        {
+            if (GUILayout.Button(
+                    "1) Triagem — locais que ACEITAM entrega",
+                    GUILayout.Height(24f)))
+                RunDeliverableLocationTriage();
+        }
+        if (!string.IsNullOrEmpty(triageStatus))
+            EditorGUILayout.HelpBox(triageStatus, MessageType.None);
 
         using (new EditorGUI.DisabledScope(
                    transporter == null
@@ -793,6 +805,7 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
     private void OnSceneGUI(SceneView sceneView)
     {
         HandleTargetCellPicking();
+        DrawTriageGizmos();
         if (map == null || ranking.Count == 0)
             return;
 
@@ -942,4 +955,121 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
             fontStyle = FontStyle.Bold,
             normal = { textColor = color }
         };
+
+    // =====================================================================
+    // TRIAGEM DE LOCAIS ENTREGAVEIS
+    //
+    // Pergunta, para cada construcao registrada no mapa: "se o transportador
+    // ESTIVESSE aqui, ele conseguiria desembarcar um passageiro?"
+    //
+    // Nao teleporta nada — PodeDesembarcarSensor.CollectOptionsFromCell ja
+    // aceita uma celula hipotetica, entao a consulta e pura e nao mexe no
+    // tabuleiro.
+    //
+    // Por que isto e a PRIMEIRA triagem, e nao um filtro no fim: desembarque
+    // e sempre no hex ADJACENTE (nao existe desembarque de movimento zero no
+    // mesmo hex). Entao uma construcao cujos vizinhos todos recusam o
+    // passageiro nao e "dificil de entregar" — ela e INENTREGAVEL por
+    // transporte, e so pode ser alcancada a pe. Gastar ranking, rota e
+    // envelope com ela e trabalho jogado fora.
+    //
+    // Duas construcoes lado a lado se aceitam mutuamente: de cima de uma, a
+    // outra e vizinha e vale como destino. Uma construcao cercada de terreno
+    // que o passageiro nao entra nao aceita ninguem.
+    // =====================================================================
+    [SerializeField] private string triageStatus = string.Empty;
+    private readonly List<Vector3Int> triageDeliverable = new List<Vector3Int>();
+    private readonly List<Vector3Int> triageRejected = new List<Vector3Int>();
+
+    private void RunDeliverableLocationTriage()
+    {
+        triageDeliverable.Clear();
+        triageRejected.Clear();
+        triageStatus = string.Empty;
+
+        if (transporter == null || map == null)
+        {
+            triageStatus = "Sem transportador ou tilemap.";
+            return;
+        }
+        if (transporter.IsEmbarked)
+        {
+            triageStatus =
+                "Transportador esta embarcado; a consulta exige casco solto.";
+            return;
+        }
+
+        TerrainDatabase terrain = terrainDatabase;
+        if (terrain == null)
+        {
+            triageStatus = "Sem Terrain Database.";
+            return;
+        }
+
+        var options = new List<PodeDesembarcarOption>();
+        var seen = new HashSet<Vector3Int>();
+        int scanned = 0;
+
+        for (int i = 0; i < ConstructionManager.AllActive.Count; i++)
+        {
+            ConstructionManager construction = ConstructionManager.AllActive[i];
+            if (construction == null)
+                continue;
+
+            Vector3Int cell = construction.CurrentCellPosition;
+            cell.z = 0;
+            if (!seen.Add(cell))
+                continue;
+            scanned++;
+
+            bool ok = PodeDesembarcarSensor.CollectOptionsFromCell(
+                          transporter,
+                          cell,
+                          map,
+                          terrain,
+                          options,
+                          out string reason)
+                      && options.Count > 0;
+
+            if (ok)
+                triageDeliverable.Add(cell);
+            else
+            {
+                triageRejected.Add(cell);
+                if (triageRejected.Count <= 8)
+                    Debug.Log(
+                        $"[TriagemLZ] {cell} REJEITADO — so alcancavel a pe. "
+                        + $"motivo={reason}");
+            }
+        }
+
+        triageStatus =
+            $"{scanned} construcao(oes) no mapa · "
+            + $"{triageDeliverable.Count} ACEITAM entrega · "
+            + $"{triageRejected.Count} so a pe. "
+            + "Verde na Scene View = aceita. Vermelho = descartar antes de "
+            + "qualquer ranking.";
+
+        Debug.Log("[TriagemLZ] " + triageStatus);
+        SceneView.RepaintAll();
+        Repaint();
+    }
+
+    private void DrawTriageGizmos()
+    {
+        if (map == null)
+            return;
+        for (int i = 0; i < triageDeliverable.Count; i++)
+            DrawTriageCell(triageDeliverable[i], new Color(0.2f, 1f, 0.3f, 0.9f));
+        for (int i = 0; i < triageRejected.Count; i++)
+            DrawTriageCell(triageRejected[i], new Color(1f, 0.25f, 0.2f, 0.9f));
+    }
+
+    private void DrawTriageCell(Vector3Int cell, Color color)
+    {
+        Vector3 center = map.GetCellCenterWorld(cell);
+        Handles.color = color;
+        Handles.DrawWireDisc(center, Vector3.forward, 0.42f);
+        Handles.DrawWireDisc(center, Vector3.forward, 0.36f);
+    }
 }
