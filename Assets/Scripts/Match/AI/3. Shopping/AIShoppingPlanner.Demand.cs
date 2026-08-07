@@ -2559,9 +2559,24 @@ public partial class AIShoppingPlanner
             var rebelDemands = new List<AIShoppingDemand>();
             EnsureRoleDemand(rebelDemands, UnitRole.Capturador, 6, 30,
                 "rebel-insurgency", "doutrina rebelde: so capturador (sem composicao/elite/ar)");
+
+            // ...MENOS transporte, e transporte NAO e constante: e a FILA DE CARONA.
+            //
+            // A versao anterior desta funcao devolvia so a linha acima. O efeito era
+            // um rebelde dono de uma garagem de APC, com caixa cheio, com um
+            // capturador na fila de carona gritando BeyondOperational — e carrinho
+            // vazio, todo turno. A demanda existia, medida, e nao chegava aqui.
+            //
+            // Aqui ela chega. E a fila e a fonte certa por tres razoes:
+            //   - nasce da UNIDADE, nao do plano (o rebelde nao tem plano)
+            //   - ja carrega score, motivo e antiguidade, e sobrevive ao save
+            //   - ESVAZIA sozinha quando o transporte chega. Constante nao faz isso.
+            AppendRideQueueTransportDemand(rebelDemands, snapshot, log);
+
             if (log)
                 Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] "
-                    + "doutrina rebelde: demanda so Capturador — sem pacote 2/2/1 / elite / ar");
+                    + "doutrina rebelde: Capturador + transporte derivado da fila de carona "
+                    + "— sem pacote 2/2/1 / elite / ar");
             return rebelDemands;
         }
 
@@ -2884,6 +2899,78 @@ public partial class AIShoppingPlanner
         demand.MinEliteLevel = minElite;
         demand.MaxEliteLevel = maxElite;
         return true;
+    }
+
+    /// <summary>
+    /// Demanda de transporte DERIVADA da fila de carona.
+    ///
+    /// Nao e uma constante e nao depende de plano: le quantos passageiros estao
+    /// esperando carona agora e desconta os transportadores que o time ja tem.
+    /// Zero esperando (ou frota suficiente) = nenhuma demanda, e a linha some do
+    /// log sozinha.
+    ///
+    /// A antiguidade da fila vira PRIORIDADE: quem espera ha mais tempo empurra a
+    /// compra para cima. E o mesmo sinal que o QueroCarona/RideWait ja usa para
+    /// ordenar coleta — aqui ele so atravessa para o shopping.
+    ///
+    /// Hoje so o caminho rebelde chama isto. A IA com plano tem os seus dois
+    /// sistemas de demanda de transporte (ambos gateados por slot de plano); ligar
+    /// este terceiro sinal la exige reconcilia-los primeiro, e isso e frente
+    /// propria — ver project_dual_transport_demand.
+    /// </summary>
+    private static void AppendRideQueueTransportDemand(
+        List<AIShoppingDemand> demands, AIWorldSnapshot snapshot, bool log)
+    {
+        if (demands == null || snapshot?.MyUnits == null) return;
+
+        int waiting = 0;
+        int transporters = 0;
+        int oldestWait = 0;
+
+        for (int i = 0; i < snapshot.MyUnits.Count; i++)
+        {
+            UnitManager unit = snapshot.MyUnits[i];
+            if (unit == null || unit.IsDead) continue;
+            if (!unit.TryGetUnitData(out UnitData data) || data == null) continue;
+
+            // Transportador em campo conta como frota, inclusive o que esta a
+            // caminho de uma coleta. Embarcado nao conta: ele e carga de outro.
+            if (data.isTransporter && !unit.IsEmbarked)
+            {
+                transporters++;
+                continue;
+            }
+
+            if (!unit.AIIsWaitingForRide) continue;
+            waiting++;
+            oldestWait = Mathf.Max(
+                oldestWait, unit.ResolveAIRideWaitTurns(snapshot.TurnNumber));
+        }
+
+        int gap = waiting - transporters;
+        if (gap <= 0)
+        {
+            if (log && waiting > 0)
+                Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] "
+                    + $"fila de carona: {waiting} esperando e {transporters} transportador(es) "
+                    + "em campo — sem demanda de transporte.");
+            return;
+        }
+
+        // Prioridade sobe com a espera. Base abaixo do capturador (30): o rebelde
+        // ainda prefere mais capturador com a primeira nota. Passou de tres turnos
+        // na fila, a carona vira o gargalo e passa na frente.
+        int priority = oldestWait >= 3 ? 34 : 26;
+
+        EnsureRoleDemand(demands, UnitRole.Transportador, gap, priority,
+            "rebel-ride-queue",
+            $"fila de carona: {waiting} esperando, {transporters} em campo, "
+            + $"espera mais antiga {oldestWait} turno(s)");
+
+        if (log)
+            Debug.Log($"[AI Shopping Roles][T{snapshot.TurnNumber}][{snapshot.AITeam}] "
+                + $"fila de carona pede Transportador x{gap} pri={priority} "
+                + $"(esperando={waiting} emCampo={transporters} esperaMaisAntiga={oldestWait}).");
     }
 
     private static void EnsureRoleDemand(List<AIShoppingDemand> demands, UnitRole role,
