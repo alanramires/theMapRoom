@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -46,6 +46,89 @@ public partial class AIController
         return operationalFallback
             ? tactical * Mathf.Max(1, TransportPassengerWalkTurns)
             : tactical;
+    }
+
+    /// <summary>
+    /// ZONA DE ENTREGA — a banda do passageiro medida A PARTIR DO ALVO, e a
+    /// celula dela mais barata para o transportador alcancar.
+    ///
+    /// <para>A zona e propriedade do DESTINO e do PASSAGEIRO. Ela nao encolhe
+    /// quando o transportador se enrosca, e por isso serve de ancora estavel
+    /// para o movimento — ao contrario do alvo cru, que fica atras do obstaculo
+    /// e produz progresso zero.</para>
+    ///
+    /// <para>Duas medidas, e cada uma com a unidade certa:
+    /// o raio da zona sai do <b>movimento do passageiro</b> (ele e quem anda o
+    /// resto); a escolha de qual celula da zona mirar sai do <b>movimento do
+    /// transportador</b> (ele e quem dirige). Misturar as duas foi a causa do
+    /// vaivem no pe da serra.</para>
+    ///
+    /// <para>Devolve <c>false</c> quando nao ha zona alcancavel a pe — e ai o
+    /// chamador mantem o alvo cru, que e o comportamento antigo.</para>
+    /// </summary>
+    private bool TryResolveDeliveryZoneAnchor(
+        UnitManager transporter,
+        UnitManager passenger,
+        Vector3Int targetCell,
+        Vector3Int transporterCell,
+        out Vector3Int anchorCell,
+        out int passengerWalkCost)
+    {
+        anchorCell = targetCell;
+        passengerWalkCost = 0;
+        if (transporter == null || passenger == null || boardTilemap == null)
+            return false;
+
+        targetCell.z = 0;
+        transporterCell.z = 0;
+
+        // Raio da zona: Operational do passageiro. Tactical seria a entrega
+        // ideal, mas como ancora de MOVIMENTO o Operational e o certo — o
+        // transportador mira a borda util e o ranking do MelhorDesembarque
+        // continua preferindo o ponto mais perto na hora de largar.
+        int passengerBudget = ResolvePassengerDropOffRange(
+            passenger, operationalFallback: true);
+        if (passengerBudget <= 0)
+            return false;
+
+        Dictionary<Vector3Int, int> zone =
+            UnitMovementPathRules.CalculateMovementCostMap(
+                boardTilemap, passenger, targetCell, passengerBudget,
+                terrainDatabase);
+        if (zone == null || zone.Count == 0)
+            return false;
+
+        // Custo do TRANSPORTADOR ate cada celula da zona. Horizonte generoso:
+        // a ancora pode estar a varios turnos, e o que importa e a direcao.
+        Dictionary<Vector3Int, int> transporterCost =
+            UnitMovementPathRules.CalculateMovementCostMap(
+                boardTilemap, transporter, transporterCell, 120, terrainDatabase);
+
+        bool found = false;
+        int bestTransporterCost = int.MaxValue;
+        int bestWalk = int.MaxValue;
+
+        foreach (KeyValuePair<Vector3Int, int> entry in zone)
+        {
+            Vector3Int cell = entry.Key;
+            cell.z = 0;
+            if (transporterCost == null
+                || !transporterCost.TryGetValue(cell, out int driveCost))
+                continue;
+
+            // Empate no custo de dirigir: prefere deixar o passageiro mais perto.
+            if (driveCost < bestTransporterCost
+                || (driveCost == bestTransporterCost && entry.Value < bestWalk))
+            {
+                bestTransporterCost = driveCost;
+                bestWalk = entry.Value;
+                anchorCell = cell;
+                passengerWalkCost = entry.Value;
+                found = true;
+            }
+        }
+
+        return found;
     }
 
     private static int ResolvePassengerWalkWithoutTransportBudget(

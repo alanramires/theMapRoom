@@ -89,7 +89,33 @@ public partial class AIController
                 out PlayerAction bestDropAction))
             return bestDropAction;
 
-        Vector3Int moveTarget = FindTransportMove(unit, fromCell, primaryTarget, paths, occupied, snapshot.AITeam);
+        // ANCORA NA ZONA DE ENTREGA, nao no alvo.
+        //
+        // O courier nao precisa chegar no predio — precisa chegar a um lugar de
+        // onde o PASSAGEIRO alcanca o predio sozinho. Essa zona e uma propriedade
+        // do destino e do passageiro; nao encolhe quando o transportador se
+        // enrosca, e e ela que o movimento deve perseguir.
+        //
+        // Mirar o alvo cru e o que produzia o vaivem: com serra no meio, o alvo
+        // fica atras de terreno caro, o progresso empata em zero e o APC oscila
+        // entre duas celulas baratas. A zona fica DESTE lado do obstaculo sempre
+        // que houver caminho a pe do outro lado — e ai existe progresso real a
+        // perseguir. Ver docs/AI Behavior/Transporte.md e a nota do CLAUDE.md
+        // ("reverse: teleport the unit onto the target, that area is the drop zone").
+        Vector3Int movementAnchor = primaryTarget;
+        if (TryResolveDeliveryZoneAnchor(
+                unit, primaryPassenger, primaryTarget, fromCell,
+                out Vector3Int deliveryAnchor, out int anchorPassengerCost))
+        {
+            movementAnchor = deliveryAnchor;
+            if (movementAnchor != primaryTarget)
+                Debug.Log(
+                    $"{TL("Transporte")} {unit.InstanceId} ancora de entrega "
+                    + $"{movementAnchor} (alvo {primaryTarget}; passageiro anda "
+                    + $"{anchorPassengerCost} de la) — mira a ZONA, nao o predio.");
+        }
+
+        Vector3Int moveTarget = FindTransportMove(unit, fromCell, movementAnchor, paths, occupied, snapshot.AITeam);
 
         // If FindTransportMove landed on the objective building itself, redirect to an adjacent
         // reachable cell so the passenger can be disembarked directly onto the building.
