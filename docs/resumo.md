@@ -1,52 +1,63 @@
 ﻿# Resumo — onde estamos e o que vem
 
-Ponto de retomada. Escrito em 2026-08-06, **depois** da tag `v8.0.0` e de dez
-commits que vieram depois dela. Leia isto primeiro.
+Ponto de retomada. Escrito em 2026-08-06, **depois** da tag `v8.0.1`. Leia isto
+primeiro.
 
 ---
 
 ## Estado
 
-`v8.0.0` tagueada e publicada. Relatório: [`relatorio_v8.0.0.md`](relatorio_v8.0.0.md).
+`v8.0.1` tagueada e publicada. Relatório:
+[`relatorio_v8.0.1.md`](relatorio_v8.0.1.md).
 
-**Depois da tag vieram dez commits, nenhum com tag** — não há relatório novo, e
-pela regra do projeto isso é só commit. O dia pós-tag foi **quase todo desenho**:
-uma fatia de código (compilada, não rodada) e sete documentos.
+**A versão é inteiramente doutrina — zero linhas de C#.** O autor resumiu sem
+cerimônia: *"agente mais bateu papo e ficou planejando"*.
 
-### O que passou em jogo hoje
-
-**O teste do capturador PASSOU.** Era o critério de retomada anterior e ele foi
-feito:
-
-```text
-save → FECHAR o jogo → abrir → carregar
-Inspector, ANTES de a IA pensar:
-   Has Designated Capture Target  ✔   ID 2   Cell (0,0)
-turno 2: origemAlvo=servico → origemAlvo=reserva, envelope=Operational
-         [FilaCarona] #1 sai da fila — nao quer mais carona
-```
-
-**Conclusão: a alocação pegajosa é PROMOÇÃO, não construção.** O mecanismo já
-existia inteiro — só no caminho rebelde.
-
-### A descoberta que organiza o dia
-
-> **A peça certa aparece encostada na errada.**
-
-Sete vezes, e em subsistemas que não se falam:
+O que se planejou é o pré-requisito do **degrau 3 inteiro**, que estava em `❌`
+**sem vocabulário**: não havia como descrever o que um papel é, nem como decidir
+se uma unidade pertence a ele. Agora há.
 
 ```text
-DesignatedCaptureTarget    alocação pegajosa completa — só no rebelde
-CounterPressure            canal por capacidade existe — o Demand usa nome de papel
-imposto de conscrição      a barra dupla existe — presa à dificuldade, não à postura
-modo hospital              SameHexOrEmbarked já explicava a assimetria do Suprir
-nested transporters        o motor suporta; falta o Courier pedir carona
-FilaCarona + RidePromise   o anti-fome já está lá, antiguidade que não zera
-isSupplier / Logistica     "ninguém apenas lhe pergunta nada" (ideias_futuras §11)
+6 papeis        ficha: questionario, moeda, posicionamento
+6 marchas       o conjunto esta COMPLETO
+3 modalidades   combatente, artilheiro, hibrida
+17 rotulos      o que o shopping pede e a ficha declara
+10 sensores     as mesmas dez perguntas para todos
+ 7 ordenacoes   o Transportador precisou de duas: Pickup e Courier
 ```
 
-**Vira heurística de busca:** antes de escrever a peça nova, procurar a que já faz
-isso para outro dono.
+### As duas descobertas que organizam o que vem
+
+**1. O papel é DERIVÁVEL, não declarado.** O critério é do autor e já existe como
+predicado:
+
+```csharp
+// UnitData.cs:612 — quem passa nisto é Vigilância; quem não passa, não é
+HasStealthDetectionFor(domain, height)
+    => TryGetVisionException(...) && entry.detectUnitsWithFollowingSkills.Count > 0;
+```
+
+Não é *"tem exceção de visão"* — o F-22 tem, e enxerga bem. É *"a exceção carrega
+**lista de detecção**"*. Carregar `AR Stealth` é ser **fechadura**; listar
+`AR Stealth` é ser **chave**. Mesmo formato de *facção sem QG*, derivada de **não
+possuir** `isPlayerHeadQuarter`.
+
+**2. O que comprimiu não foram os papéis — foi o questionário ser fixo.** Se cada
+papel tivesse a sua lista de perguntas, não haveria economia: seria o mesmo caos
+com nomes bonitos. O papel responde a **ordem**; a ficha responde a
+**capacidade**. E `6` só fechou porque o **Artilheiro Combatente não coube** e
+forçou a modalidade híbrida a existir.
+
+> Quando aparecer a próxima unidade que não encaixa, a pergunta certa é
+> **"que eixo falta?"**, não *"que papel falta?"*.
+
+### A heurística de busca da v8.0.0 continua valendo
+
+> **A peça certa aparece encostada na errada.** Antes de escrever a peça nova,
+> procurar a que já faz isso para outro dono.
+
+Oito casos estão listados no [`relatorio_v8.0.0.md`](relatorio_v8.0.0.md). O
+`HasStealthDetectionFor` de hoje é o nono.
 
 ---
 
@@ -93,18 +104,31 @@ E o teste que ele produz, que hoje é critério de aceitação de regra nova:
 > As que adiantam renda viram **termo do score**. As que existem por posse
 > **dissolvem**. O que sobrar é **gosto** — e só isso vira política.
 
-O transportador ganhou a dele:
+**As seis vozes estão escritas.** Cada papel tem lema, ficha e marcha:
 
-> **O transportador serve a carga.**
-> **Chegar cedo é entregar; o casco é a capacidade, e o destino nunca é meu.**
+| papel | a moeda — *onde mora o valor da peça* | funde |
+|---|---|---|
+| Capturador | o **corpo** — HP **é** a taxa | **ganha** |
+| Transportador | as **vagas** | perde |
+| Assalto | a **arma** — cada casco é ameaça | perde |
+| Fogo de Suporte | a **formação** — cones cruzados | perde, e agrupar também |
+| Vigilância | a **origem do cone** | perde |
+| Logística | o **estoque** — média ponderada conserva | **ganha** |
 
-**Faltam:** Assalto, Fire Support, Logística, Vigilância.
+> **Cada papel tem uma moeda, e a moeda decide sozinha se fundir é ganho ou
+> perda.** Seis papéis, seis acertos — inclusive nas duas vezes em que a resposta
+> contraria a intuição de HP.
 
-E o princípio que saiu da comparação entre os dois, e que vale para o próximo:
+### Onde mora o quê — a divisão que apareceu ao errar
 
-> **Cada papel tem uma moeda, e a moeda decide se fundir é ganho ou perda.**
-> Capturador: HP é o relógio → concentrar acelera → fundir ganha.
-> Transportador: o casco é a capacidade → concentrar destrói → fundir perde.
+```text
+marcha   o INVARIANTE — o que os ramos compartilham
+ficha    o PARAMETRO  — 1 rodada / 2 rodadas + emerge
+```
+
+**As marchas envelhecem melhor que as seções** porque foram escritas no nível
+certo. Se um verso parecer contradizer uma seção, **testar primeiro se o verso
+está um nível acima dela** — errei isso duas vezes seguidas na mesma tarde.
 
 ---
 
@@ -118,7 +142,12 @@ E o princípio que saiu da comparação entre os dois, e que vale para o próxim
 | `Match/AI/3. Shopping/Shopping.md` | **novo** — o buraco elegibilidade × preferência, e os três papéis-fantasma |
 | [`AI Behavior/contrato_missao_captura.md`](AI%20Behavior/contrato_missao_captura.md) | alocação pegajosa e as condições de baixa |
 | [`AI Behavior/contrato_recencia_de_cobertura.md`](AI%20Behavior/contrato_recencia_de_cobertura.md) | ledger de idade da vigilância |
+| [`AI Behavior/Assalto.md`](AI%20Behavior/Assalto.md) | a ficha; §5.1 **novo** — furtividade aérea, 1 rodada, e por que o custo é de outra natureza que o do sub |
+| [`AI Behavior/FireSupport.md`](AI%20Behavior/FireSupport.md) | a ficha; a modalidade **híbrida**; o auto-repelir como consequência da moeda |
+| [`AI Behavior/Vigilancia.md`](AI%20Behavior/Vigilancia.md) | **novo** — §0 o teste de pertencimento; §2.1 detecção total; §5.1 o preço do tiro submarino |
+| [`AI Behavior/Logistica.md`](AI%20Behavior/Logistica.md) | **novo** — o espelho da Vigilância; §5.1 a triagem que lê a moeda de quem pede |
 | `Units/Capturer/Capturer.md` | o código: a ordem real, os seis mecanismos de ceder, o inventário |
+| `docs/AI Behavior/rascunho/` | **a fonte** — o que o autor escreveu antes das fichas. Quando uma ficha divergir, confere-se aqui |
 
 **Dívida declarada:** o `Capturer.md` é quatro documentos grampeados. A fronteira
 com a doutrina está escrita, mas a ordem interna não ajuda quem lê do começo.
@@ -214,12 +243,20 @@ religa `debugFogOfWarEnabled = true` e parece conserto.
  0. sensores PodeX                ⚠️ o laço de HEX ainda mora no PodeDetectar
  1. serviços de área (Hotzone)    ⚠️ falta o de cobertura de DETECÇÃO
  2. consumidores Melhor*          ⚠️ faltam quatro (§ Buracos estruturais)
- 3. papéis → só POLÍTICA          ⚠️ a ficha está escrita; RoleData não existe
+ 3. papéis → só POLÍTICA          ⚠️ as SEIS fichas escritas; RoleData não existe
  4. variações de papel            perfil/trait depois da extração
 ```
 
-O degrau 3 **saiu do zero hoje**: `ficha_do_papel.md` descreve a forma, e dois
-papéis já têm voz.
+O degrau 3 tem **vocabulário completo e zero código**. As seis fichas descrevem a
+forma; `RoleData`/`RoleDatabase` (o `ScriptableObject` que o autor desenhou) não
+existe, e nenhuma das ~20 exceções do capturador foi re-derivada ainda.
+
+**O teste do degrau 3** — e ele ainda não pode ser feito:
+
+> Cada exceção nomeada (*ponta de lança, handover, sai do meu prédio, ceder para
+> o capturador x*) ou se re-deriva de `(papel, modalidade, banda, âncora)`, ou
+> vira **política declarada** em `Match/AI/Service/Capture_Policy`. O que não for
+> nem uma nem outra é resíduo.
 
 ---
 
@@ -249,6 +286,9 @@ papéis já têm voz.
 
 | armadilha | lição |
 |---|---|
+| **conferir coerência não é conferir correção** | carimbei um verso da Marcha contra `Vigilancia.md` §5 — e a §5 era justamente a cláusula que estava no **documento errado**. Os dois erros se cancelaram num ✅. Quando a referência está torta, bater com ela é **sintoma**, não prova. O ✅ só vale se o doc de referência também já foi conferido |
+| **descompasso de generalidade É a evidência** | o verso dizia *"**SE** eu sou furtivo"* (dois ramos); a cláusula dizia *"unidades furtivas **AÉREAS**"* (um). Estreitei o verso **duas vezes seguidas** para caber. Quando o texto novo cobre **mais** casos que a regra contra a qual se confere, **a regra é que está incompleta** |
+| **causa escrita depois dos efeitos** | documentei repulsa e ledger como duas decisões lado a lado; as duas são consequência da **detecção ser total**, fato declarado depois. Quando dois fatos aparecem juntos e um parece explicar o outro, desconfie de que **falta o terceiro** |
 | **listar arquivo por nome pareia errado** | montei a matriz `Pode*`→`Melhor*` por `find -name` e errei **quatro** linhas. Bastou abrir duas docstrings: *"uma combinação passageiro-**LZ**"* e *"usa a consulta prospectiva do **PodeTransferir**"*. O que decide o par é a **pergunta que o consumidor responde** |
 | **checar um leitor não prova onde o dado mora** | afirmei que o `ConstructionDatabase` estava limpo porque o builder de topologia itera instâncias da cena. Havia uma seção `Field Entries (Map Scope)` que eu não procurei |
 | **doutrina no doc de implementação** | escrevi o lema no `Capturer.md` (ao lado do código) sem checar que existia `docs/AI Behavior/Capturador.md`. Doutrina e comportamento têm casas diferentes, e a fronteira precisa estar escrita nos dois |
@@ -289,8 +329,15 @@ Depois dela, a fila curta:
 1. fatia 2 — a inversão do táxi (missão no topo, carona medida contra ela)
 2. limpar a origem das rotas (destravado; ownerDatabase por último)
 3. a lista MUDA REGRA — cinco divergências doc × código
-4. as vozes que faltam: Assalto, Fire Support, Logística, Vigilância
+4. abrir o capturador: quantas das ~20 excecoes sobrevivem como POLITICA
 ```
+
+**O item 4 é o degrau 3 de verdade**, e é o que o autor chamou de *"o grande
+refactor das 6 armas"*. As vozes acabaram; o código não começou.
+
+⚠️ **Os docs estão à frente do código em muitos pontos agora.** As marcas
+`✅⚠️❌❓` das seis fichas só continuam úteis se alguém as mexer quando o código
+alcançar. A `v8.0.1` sozinha adicionou sete linhas `❌`.
 
 E a pergunta que fecha o major continua sendo um gesto: **duplicar uma cena,
 apontar os catálogos, e o mapa novo nascer vazio.** Hoje isso vale para estrada.
