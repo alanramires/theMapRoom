@@ -568,10 +568,11 @@ Ficha completa em `Logistica.md`.
 3 modalidades    combatente, artilheiro, HÍBRIDA
 6 papéis         questionário, moeda, posicionamento
 17 subpapéis     o que o shopping pede e o que a ficha declara
-5 marchas        Capturador, Transportador, Assalto, Fogo de Suporte, Vigilância
+6 marchas        uma por papel — o conjunto está COMPLETO
 ```
 
-Faltam as marchas de **Logística** e a do rótulo que ainda não tem voz.
+A sexta (Logística) é a única que **descreve os outros cinco**: ela triage lendo
+a moeda de quem pede. Ver `Logistica.md` §5.1.
 
 E as **seis moedas**, que respondem sozinhas se uma peça funde:
 
