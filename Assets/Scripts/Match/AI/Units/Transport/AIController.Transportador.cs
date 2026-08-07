@@ -73,11 +73,13 @@ public partial class AIController
         Vector3Int transporterCell,
         out Vector3Int anchorCell,
         out int passengerWalkCost,
-        out bool anchorIsTactical)
+        out bool anchorIsTactical,
+        out string anchorMode)
     {
         anchorCell = targetCell;
         passengerWalkCost = 0;
         anchorIsTactical = false;
+        anchorMode = "entrega";
         if (transporter == null || passenger == null || boardTilemap == null)
             return false;
 
@@ -131,6 +133,21 @@ public partial class AIController
         int tacticalRange = ResolvePassengerDropOffRange(
             passenger, operationalFallback: false);
 
+        // SO CELULA CONHECIDA VALE COMO ENTREGA.
+        //
+        // "Parar no Operational revelando hexes e uma coisa. No Tactical nao
+        //  precisa, pois se tiver alguma area visivel, no proximo turno e ali
+        //  que voce larga." (autor, 2026-08-07)
+        //
+        // E a razao e o INVARIANTE TRANSACIONAL: o FoW so recalcula depois de
+        // voltar ao Neutral. O log mostra a ordem — MoveuAndando -> Neutral,
+        // e SO ENTAO [FoW][CommittedDelta] revela 37 celulas. Logo nao existe
+        // mover-e-largar no mesmo turno atravessando nevoa: a decisao de largar
+        // e sempre tomada com o conhecimento de ANTES do passo.
+        //
+        // Entao mirar uma celula preta como "zona de entrega" e uma promessa que
+        // o proprio motor nao deixa cumprir. Ela pode ser destino de EXPLORACAO
+        // — o que e outra coisa, e o log tem que dizer qual das duas.
         bool found = false;
         int bestTier = int.MaxValue;
         int bestTransporterCost = int.MaxValue;
@@ -142,6 +159,8 @@ public partial class AIController
             cell.z = 0;
             if (transporterCost == null
                 || !transporterCost.TryGetValue(cell, out int driveCost))
+                continue;
+            if (!IsConfirmedVisibleOrExploredCellForAI(cell))
                 continue;
 
             int tier = entry.Value <= tacticalRange ? 0 : 1;
@@ -163,7 +182,48 @@ public partial class AIController
             found = true;
         }
 
-        anchorIsTactical = found && bestTier == 0;
+        if (found)
+        {
+            anchorIsTactical = bestTier == 0;
+            anchorMode = "entrega";
+            return true;
+        }
+
+        // MODO REVELAR. Nenhuma celula conhecida da zona: o passo deste turno
+        // nao entrega nada, ele COMPRA INFORMACAO. A ancora vira a fronteira do
+        // que ja se conhece na direcao do alvo — dali o proximo commit revela, e
+        // a zona passa a existir de verdade.
+        //
+        // Distancia cubica de proposito: nao da para rotear por dentro do que
+        // nao se conhece, e aqui so importa a DIRECAO.
+        int bestFrontierDistance = int.MaxValue;
+        int bestFrontierDrive = int.MaxValue;
+        if (transporterCost != null)
+        {
+            foreach (KeyValuePair<Vector3Int, int> entry in transporterCost)
+            {
+                Vector3Int cell = entry.Key;
+                cell.z = 0;
+                if (!IsConfirmedVisibleOrExploredCellForAI(cell))
+                    continue;
+
+                int distance = Mathf.RoundToInt(
+                    SectorManager.HexDistance(cell, targetCell));
+                if (distance < bestFrontierDistance
+                    || (distance == bestFrontierDistance
+                        && entry.Value < bestFrontierDrive))
+                {
+                    bestFrontierDistance = distance;
+                    bestFrontierDrive = entry.Value;
+                    anchorCell = cell;
+                    passengerWalkCost = -1;
+                    found = true;
+                }
+            }
+        }
+
+        anchorIsTactical = false;
+        anchorMode = found ? "revelar" : "entrega";
         return found;
     }
 

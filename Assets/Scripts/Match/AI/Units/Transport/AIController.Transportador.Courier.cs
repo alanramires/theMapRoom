@@ -106,15 +106,20 @@ public partial class AIController
         if (TryResolveDeliveryZoneAnchor(
                 unit, primaryPassenger, primaryTarget, fromCell,
                 out Vector3Int deliveryAnchor, out int anchorPassengerCost,
-                out bool anchorIsTactical))
+                out bool anchorIsTactical, out string anchorMode))
         {
             movementAnchor = deliveryAnchor;
             if (movementAnchor != primaryTarget)
                 Debug.Log(
-                    $"{TL("Transporte")} {unit.InstanceId} ancora de entrega "
-                    + $"{movementAnchor} ({(anchorIsTactical ? "Tactical" : "Operational")}; "
-                    + $"alvo {primaryTarget}; passageiro anda {anchorPassengerCost} "
-                    + "de la) — mira a ZONA, nao o predio.");
+                    $"{TL("Transporte")} {unit.InstanceId} ancora {anchorMode} "
+                    + $"{movementAnchor} "
+                    + (anchorMode == "revelar"
+                        ? $"— nenhuma celula CONHECIDA na zona de {primaryTarget}; "
+                          + "este passo compra informacao, nao entrega."
+                        : $"({(anchorIsTactical ? "Tactical" : "Operational")}; "
+                          + $"alvo {primaryTarget}; passageiro anda "
+                          + $"{anchorPassengerCost} de la) — mira a ZONA, "
+                          + "nao o predio."));
         }
 
         Vector3Int moveTarget = FindTransportMove(unit, fromCell, movementAnchor, paths, occupied, snapshot.AITeam);
