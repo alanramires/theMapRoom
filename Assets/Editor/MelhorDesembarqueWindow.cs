@@ -35,6 +35,11 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
     // tabuleiro inteiro enquanto o runtime recusava tudo por preto — duas
     // ferramentas dando respostas opostas sobre a mesma cena.
     [SerializeField] private bool applyFogOfWar;
+    // Teto de rota restante do passageiro, o mesmo que o runtime chama de
+    // dropOffRange. Sem ele a bancada ranqueava LZ com o passageiro a 15 hexes
+    // do alvo — resposta que o jogo nunca daria. -1 = automatico (Operational
+    // do passageiro), como o courier faz.
+    [SerializeField] private int dropOffRangeOverride = -1;
     [SerializeField] private MatchController matchController;
     [SerializeField] private int maxRouteFloods = 256;
     private int routeFloods;
@@ -146,6 +151,13 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
         }
         EditorGUILayout.EndHorizontal();
 
+        dropOffRangeOverride = EditorGUILayout.IntField(
+            new GUIContent(
+                "Teto de rota (drop range)",
+                "Quanto o passageiro ainda pode ter que andar DEPOIS de "
+                + "largado. -1 usa o automatico: Operational do passageiro "
+                + "(MaxMovementPoints x 2), que e o que o courier usa."),
+            dropOffRangeOverride);
         applyFogOfWar = EditorGUILayout.Toggle(
             new GUIContent(
                 "Aplicar névoa",
@@ -601,6 +613,26 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
         out Vector3Int target,
         out int routeCost)
     {
+        bool ok = TryResolvePassengerTargetAndRouteUncapped(
+            passenger, from, out target, out routeCost);
+
+        // TETO DE ROTA RESTANTE — o mesmo corte que o courier aplica.
+        //
+        // Sem ele a bancada ranqueava LZ com o passageiro ainda a 15 hexes do
+        // alvo, e o vencedor da janela nao era o vencedor do jogo. O runtime
+        // passa dropOffRange como maxRemainingRouteCost e recusa qualquer rota
+        // acima dele (AIController.MelhorDesembarque.cs:163).
+        if (ok && routeCost > ResolveBenchDropOffRange())
+            return false;
+        return ok;
+    }
+
+    private bool TryResolvePassengerTargetAndRouteUncapped(
+        UnitManager passenger,
+        Vector3Int from,
+        out Vector3Int target,
+        out int routeCost)
+    {
         target = Vector3Int.zero;
         routeCost = int.MaxValue;
         if (TryResolveManualTargetForPassenger(
@@ -1013,6 +1045,22 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
     /// <para>Sem nevoa aplicada devolve <c>null</c>, e o servico deixa passar
     /// tudo — util para ver a zona teorica, enganoso para prever a IA.</para>
     /// </summary>
+    /// <summary>
+    /// Mesmo teto que o courier aplica: Operational do passageiro. A bancada
+    /// existe para prever a IA — sem este corte ela ranqueava LZ que o jogo
+    /// recusa, e o vencedor da janela nao era o vencedor do jogo.
+    /// </summary>
+    private int ResolveBenchDropOffRange()
+    {
+        if (dropOffRangeOverride >= 0)
+            return dropOffRangeOverride;
+        UnitManager reference = passenger ?? ResolvePassengerAtSeat(0);
+        int tactical = reference != null
+            ? Mathf.Max(1, reference.MaxMovementPoints)
+            : 3;
+        return tactical * 2;
+    }
+
     private System.Func<Vector3Int, bool> BuildTransporterCellGate(
         FogKnowledgeSnapshot fogKnowledge)
     {
