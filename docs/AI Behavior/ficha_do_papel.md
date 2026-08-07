@@ -363,6 +363,10 @@ RÓTULO   identidade       o que o shopping pede, o que a ficha declara,
 **Quatro papéis. Onze rótulos.** Quatro questionários, quatro moedas, quatro
 marchas — e onze nomes para o shopping distinguir demanda.
 
+> Escrito quando só quatro papéis tinham ficha. O quadro fechado é o de §7.8:
+> **seis papéis, seis moedas, dezessete rótulos, cinco marchas.** Este parágrafo
+> fica como marco de onde a contagem estava.
+
 ### A tradução JÁ EXISTE, e mora no mesmo arquivo do enum
 
 ```csharp
@@ -562,11 +566,14 @@ Ficha completa em `Logistica.md`.
 
 ```text
 3 modalidades    combatente, artilheiro, HÍBRIDA
-6 papéis         questionário, moeda, posicionamento, marcha
+6 papéis         questionário, moeda, posicionamento
 17 subpapéis     o que o shopping pede e o que a ficha declara
+5 marchas        Capturador, Transportador, Assalto, Fogo de Suporte, Vigilância
 ```
 
-E as quatro moedas, que respondem sozinhas se uma peça funde:
+Faltam as marchas de **Logística** e a do rótulo que ainda não tem voz.
+
+E as **seis moedas**, que respondem sozinhas se uma peça funde:
 
 | papel | onde o valor mora | fundir |
 |---|---|---|
@@ -574,7 +581,7 @@ E as quatro moedas, que respondem sozinhas se uma peça funde:
 | Transportador | as **vagas** | perde |
 | Assalto | a **arma** — cada casco é ameaça | perde |
 | Fogo de Suporte | a **formação** — cones cobrindo pontos cegos | perde, e **agrupar também** |
-| Vigilância | a **área coberta e a idade dela** | perde — *menos cobertura do tabuleiro* |
+| Vigilância | a **origem do cone** — *"cada casco é nova origem"* | perde — fundir **apaga uma origem** |
 | **Logística** | o **estoque** | **ganha** — a média ponderada conserva tudo |
 
 **Só dois papéis fundem**, e por razões diferentes: no Capturador o HP **é** a

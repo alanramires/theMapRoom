@@ -149,6 +149,16 @@ equivalente aéreo não foi procurado.
 A quinta moeda, e a única com **duas geometrias opostas para o mesmo valor**:
 espalhar maximiza área (aérea); agrupar protege quem caça a presa (anti-sub).
 
+**A formulação exata está na Marcha** (apêndice), e é melhor que a desta seção:
+
+> *Cada casco é nova origem, / cada origem, outro setor;*
+> *dois caçadores separados / valem mais que um só melhor.*
+
+O valor não é a **unidade** — é o **ponto de origem de um cone**. Fundir dois
+sensores avariados não soma cobertura: **apaga uma origem**. Por isso *"dois
+sensores avariados ainda cobrem dois lugares"* é argumento suficiente contra a
+fusão, mesmo quando o HP diz o contrário.
+
 ---
 
 ## 7. O resto quase não acontece
@@ -170,3 +180,172 @@ estoque — *"a Fragata transporta Apaches"* — e os **liberam quando curados**
 | `ficha_do_papel.md` §7.8 | o quadro canônico dos papéis e as três modalidades |
 | `CLAUDE.md`, "As duas verdades" | por que `Detectar` em 1º e `Enxergar` em 10º não é contradição |
 | `FireSupport.md` | a modalidade híbrida, que este papel também usa |
+
+---
+
+# Apêndice — Marcha da Vigilância
+
+Escrita pelo autor em 2026-08-06. **Ela é a doutrina**, e vale a regra do
+cabeçalho: **onde o código divergir de um verso, o código está errado.**
+
+Quinta marcha do projeto, e a **única que não se compara a outro papel** — ela se
+compara à guerra. *"A guerra que espere."* Coerente: é o único papel que se
+define contra o jogo inteiro em vez de contra um vizinho.
+
+| verso | o que ele fixa |
+|---|---|
+| *"não preciso ver o terreno / para o alvo revelar"* | `Detectar` 1º e `Enxergar` 10º, literal |
+| *"não conheço o chão abaixo, / mas já sei onde você está"* | a regra de jogo do §2 — desfocado por cima da névoa |
+| *"cobertura envelhecida / já não vale proteção"* | o **ledger de idade**, e a repulsa como **consequência** dele, não como regra separada |
+| *"o canal atrai a matilha, / o fundo dita a direção"* | a âncora anti-sub decidida no mesmo dia (§4.2) |
+| *"atacar revela o caçador"* | §5, e a mesma doutrina do Caça F em `deteccao e caca.md` §10.1 |
+| *"cada casco é nova origem, / cada origem, outro setor"* | **a moeda**, melhor dita do que na §6: o valor não é a unidade, é o **ponto de origem de um cone** |
+
+> ## Eu não sigo onde há combate. Sigo onde não há explicação.
+
+A heurística de patrulha inteira em oito palavras: **vá onde a cobertura
+envelheceu** — que é, por definição, onde não se sabe de nada.
+
+---
+
+**[Introdução — metais graves, pulso lento]**
+
+Silêncio no rádio... / Atenção ao setor...
+
+*Ping...*
+
+Nenhum contato.
+
+*Ping...*
+
+A presa se moveu.
+
+**[Estrofe 1]**
+
+Há uma guerra ao longe, / há fumaça sobre o chão; / mas não sigo o estampido, / nem a voz do capitão.
+
+Tenho olhos para o invisível, / tenho a chave da prisão; / onde todos veem o vazio, / eu procuro a posição.
+
+Não me importa a grande batalha, / nem quem vence a progressão; / se minha presa está oculta, / ela será minha missão.
+
+**[Refrão]**
+
+Ping... / Escuta... / Marca o contato!
+
+Ping... / Procura... / Fecha o espaço!
+
+A guerra que espere, / eu não sigo a multidão: / eu encontro o que se esconde / fora de toda visão!
+
+Radar no céu! / Sonar no mar! / A presa pode fugir, / mas não pode se apagar!
+
+**[Estrofe 2 — detectar]**
+
+Detectar é minha ordem, / antes mesmo de atacar; / não preciso ver o terreno / para o alvo revelar.
+
+Sobre a névoa ainda fechada, / um sinal começa a arder; / não conheço o chão abaixo, / mas já sei onde você está.
+
+Furtivo cruza o céu escuro, / submarino o fundo do mar; / cada presa tem fechadura, / cada sensor sabe encontrar.
+
+**[Refrão]**
+
+Ping... / Escuta... / Marca o contato!
+
+Ping... / Procura... / Fecha o espaço!
+
+Radar no céu! / Sonar no mar! / O invisível tem um nome / quando eu começo a caçar!
+
+**[Estrofe 3 — vigilância aérea]**
+
+Dois radares lado a lado / veem o mesmo corredor; / um vai ao norte, outro ao sul, / cada qual abre um setor.
+
+EWACS gira sobre as nuvens, / Radar Móvel muda o chão; / cobertura envelhecida / já não vale proteção.
+
+O espaço antes patrulhado / pode ocultar nova invasão; / por isso os olhos se afastam / e renovam a detecção.
+
+Não concentro meus sensores, / quero a rede se estender: / quanto maior for o silêncio, / mais terreno há para varrer.
+
+**[Ponte — furtividade]**
+
+Se eu sou furtivo e vejo a presa, / não disparo por vaidade; / atacar revela o caçador / e entrega minha identidade.
+
+Só abandono o esconderijo / com vantagem ou precisão; / não troco a minha sombra / por qualquer oportunidade.
+
+Vejo. / Espero. / Calculo a ocasião.
+
+Então a noite se ilumina / com um único clarão.
+
+**[Estrofe 4 — caça submarina]**
+
+Sob as ondas é diferente: / não disperso a formação; / o canal atrai a matilha, / o fundo dita a direção.
+
+Duas sombras submarinas, / uma Fragata ASW; / e no alto um Super Tucano / que você jamais previu.
+
+Você chega acreditando / ter encontrado uma presa só; / mas o sonar chama os outros / e a armadilha fecha o nó.
+
+Na superfície há uma guerra? / Que prossiga sem meu olhar. / Minha batalha está no fundo, / onde ninguém pode enxergar.
+
+**[Refrão forte]**
+
+Ping... / Contato! / Todos em posição!
+
+Ping... / Contato! / Fechem a direção!
+
+A guerra que espere, / minha presa apareceu; / o que antes era invisível / agora o exército já viu!
+
+Radar no céu! / Sonar no mar! / Depois que eu encontro a presa, / o resto vem para matar!
+
+**[Estrofe 5 — posicionamento]**
+
+Se carrego o modo prudente, / vou atrás da formação; / preservo o olho que enxerga / sem aceitar aproximação.
+
+Mas sem ordem e sem cautela, / não me prende o capitão; / sigo apenas os caminhos / da provável infiltração.
+
+Não procuro a linha aliada, / não me chama a construção; / só um plano pode dar-me / outro eixo de patrulhamento.
+
+**Eu não sigo onde há combate. / Sigo onde não há explicação.**
+
+**[Estrofe 6 — serviço e fusão]**
+
+Fragata cuida dos Apaches, / dá estoque e manutenção; / quando estão prontos para a caça, / abre o convés para a missão.
+
+Posso embarcar em outra base / para mudar de operação; / mas não abandono a busca / por conforto ou distração.
+
+Dois sensores avariados / ainda cobrem dois lugares; / não me funda, não apague / um dos olhos dos radares.
+
+Cada casco é nova origem, / cada origem, outro setor; / dois caçadores separados / valem mais que um só melhor.
+
+**[Chamada e resposta]**
+
+— Quem vê além da névoa? / — A Vigilância!
+
+— Quem encontra o furtivo? / — A Vigilância!
+
+— Quem escuta sob as ondas? / — A Vigilância!
+
+— E quando a presa aparece? / — Contato confirmado!
+
+**[Refrão final]**
+
+Ping... / Escuta... / Algo está passando.
+
+Ping... / Procura... / O sinal está voltando.
+
+A guerra que espere, / não me importa a confusão: / eu encontro o que se esconde / e entrego sua posição!
+
+Radar no céu! / Sonar no mar! / Pode correr na escuridão, / pode tentar se camuflar!
+
+Eu não sigo a guerra. / Eu sigo o que ela não viu.
+
+E quando encontro minha presa...
+
+o invisível já caiu.
+
+**[Coda — quase em silêncio]**
+
+*Ping...*
+
+Contato.
+
+Coordenada confirmada.
+
+**Agora chamem as armas.**
