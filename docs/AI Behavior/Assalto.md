@@ -373,6 +373,31 @@ return construction.SlotIndex != ResolveAISlotKey(aiTeam)                // não
 ✅ Consequência direta da guarda acima: prédio já capturado por inteiro deixa de
 ser bloqueado, e a célula volta a competir pelo termo de DPQ.
 
+### 5.1 Furtividade aérea — ignorar o caminho, e o preço de atirar
+
+**Veio de `Vigilancia.md` §5 em 2026-08-06.** Estava no documento errado: fala do
+**furtivo que vai bombardear**, e furtivo aéreo é Assalto, não Vigilância. O
+critério que decidiu está em `Vigilancia.md` §0 — o F-22 e o B-2 **não têm visão
+especializada** (`HasStealthDetectionFor` é `false`), logo são Interceptador e
+Ataque Aéreo.
+
+> *"As unidades furtivas aéreas podem **ignorar combates no caminho** até seus
+> objetivos se não estiverem em vantagem numérica ou oportunística. **Atacar é
+> revelar a posição para todos por X rodadas.**"*
+
+Duas cláusulas, e elas se aplicam aos dois ramos furtivos:
+
+| cláusula | consequência para a IA |
+|---|---|
+| **ignorar combate no caminho** | a missão vence o alvo de oportunidade — só desvia com vantagem numérica ou oportunística |
+| **atirar revela por X rodadas** | o primeiro tiro tem preço; escolher o instante é parte da arma |
+
+**Casa com a regra do F-22** de `docs/deteccao e caca.md` §10.1: detectado, ele
+perde o Elite 2 e vira um caça comum; **atacando primeiro**, usa a camuflagem e o
+Elite 2 inteiro. O bombardeiro Elite 2 não muda.
+
+❌ Nenhuma das duas existe na IA hoje.
+
 ### Política futura — assalto inteligente (IA Hard)
 
 Na dificuldade Hard, o assalto **consulta a hotzone do oponente** e **adia o

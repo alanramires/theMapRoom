@@ -17,6 +17,55 @@ está errado.
 
 ---
 
+## 0. Quem é Vigilância — o teste é VISÃO ESPECIALIZADA, e ele já existe
+
+> *"O F-22 e o B-2 são Interceptador e Ataque Aéreo, **porque não têm visão
+> especializada**."* — autor, 2026-08-06
+
+**O papel é derivável, não declarado.** O predicado já está no código:
+
+```csharp
+// UnitData.cs:612
+public bool HasStealthDetectionFor(Domain targetDomain, HeightLevel targetHeightLevel)
+    => TryGetVisionException(targetDomain, targetHeightLevel, out UnitVisionException entry)
+       && entry != null
+       && entry.detectUnitsWithFollowingSkills != null
+       && entry.detectUnitsWithFollowingSkills.Count > 0;
+```
+
+Visão especializada é uma `UnitVisionException` **que carrega lista de
+detecção** (`UnitData.cs:113`). Não basta ter exceção de visão — o F-22 tem, e
+enxerga bem. O que decide é a **lista estar preenchida**.
+
+✅ `VisionCoverageService.cs:122` já escolhe candidatos por essa mesma forma.
+
+### Por que este teste, e não a moeda ou o comportamento
+
+```text
+carregar AR Stealth   -> voce e a FECHADURA. Nao muda seu papel.
+listar AR Stealth     -> voce e a CHAVE. ISSO e Vigilancia.
+```
+
+É a doutrina da chave (`CLAUDE.md`) aplicada à classificação de papel, e é o
+melhor tipo de critério que este projeto aceita: **um campo da ficha**, não uma
+inferência de doutrina. Renomeie a skill para *"sai que isso é meu"* e o teste
+continua respondendo certo.
+
+| unidade | tem exceção de visão | lista de detecção | papel |
+|---|---|---|---|
+| EWACS, Radar Móvel | sim | **preenchida** | **Vigilância** |
+| Super Tucano, Fragata ASW, submarino | sim | **preenchida** | **Vigilância** |
+| **Caça F-22** | sim | vazia | **Assalto** (Interceptador) |
+| **Bombardeiro B-2** | sim | vazia | **Ataque Aéreo** |
+
+O F-22 e o B-2 são **a presa deste papel** — §3. A Vigilância existe por causa
+deles.
+
+⚠️ Precedente do mesmo formato: *facção sem QG* é derivada de **não possuir**
+`isPlayerHeadQuarter`, não de um booleano `isRebel`.
+
+---
+
 ## 1. A prioridade
 
 ```text
@@ -122,15 +171,23 @@ passa pelo motivo errado.
 
 ---
 
-## 5. Ataque em vantagem — e o preço de atirar
+## 5. Ataque em vantagem — só o caso NAVAL mora aqui
 
-> *"As unidades furtivas aéreas podem **ignorar combates no caminho** até seus
-> objetivos se não estiverem em vantagem numérica ou oportunística. **Atacar é
-> revelar a posição para todos por X rodadas.**"*
+> **A cláusula aérea saiu deste documento em 2026-08-06.** Ela descrevia
+> *"unidades furtivas aéreas ignorando combates no caminho **até seus
+> objetivos**"* — isso é a **presa** indo bombardear, não o caçador. Mudou para
+> `Assalto.md` §5.1, junto com a regra do F-22 de `deteccao e caca.md` §10.1.
+> O §0 explica por quê: quem carrega `AR Stealth` é fechadura, não chave.
+
+**O que sobrevive aqui é o submarino** — e sobrevive porque ele é o único que é
+furtivo **e** caçador ao mesmo tempo (§2: *"o próprio submarino procurando outros
+submarinos"*). Para ele, atirar revela quem estava caçando.
+
+É o que a Ponte da Marcha diz — *"não disparo por vaidade"*. A Ponte está certa
+**pelo motivo naval**, não pelo aéreo.
 
 ❓ Não conferido. Existe precedente na mecânica de emersão forçada do submarino
-(lock pendente, tempo revelado) — ver `project_pending_forced_layer` —, mas o
-equivalente aéreo não foi procurado.
+(lock pendente, tempo revelado) — ver `project_pending_forced_layer`.
 
 ---
 
