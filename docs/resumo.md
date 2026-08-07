@@ -374,6 +374,65 @@ existe, e nenhuma das ~20 exceções do capturador foi re-derivada ainda.
 
 ---
 
+## RETOMADA — 2026-08-07
+
+### Três mudanças compiladas, NENHUMA rodou
+
+Todas em `Hot Seat 0 - Treino`, que agora tem **duas faixas de montanha** entre o
+APC e o objetivo, e uma **LZ de grama do outro lado**. Atravessar a serra é o
+desafio: o APC tem `OFF Road` e **sobe** (custo 6, MP 6 = um hex por turno).
+
+| commit | o que muda | como saber que funcionou |
+|---|---|---|
+| `e75f308` | demanda de transporte do rebelde vem da **fila de carona** | tirar o APC da cena; o shopping tem que pedir `Transportador` |
+| `303ce58` | `dropOffRange` do courier vira **banda do passageiro** | o log diz `range=6 (Operational; Tactical=3)` em vez de `range=4` |
+| `8dc7ef1` | **missão no topo** + o APC obedece a missão | `PassengerTarget #1 MISSAO (x,y)` em vez de `capturavel proximo` |
+
+**Rodar uma de cada vez.** As três mexem no mesmo caminho e empilhá-las esconde
+qual regrediu.
+
+### O bug que ficou aberto, e ele tem endereço
+
+```csharp
+// ProgressionSelector.cs:108
+return distanceToTargetMap.TryGetValue(cell, out int routeCost)
+    ? routeCost                                     // custo de ROTA
+    : SectorManager.HexDistance(cell, targetCell);  // ← fallback SILENCIOSO
+```
+
+Célula fora do mapa de rota não é marcada inalcançável: recebe linha reta. Aí
+`firstTurnProgress = originDistance − cellDistance` **subtrai custo de rota de
+distância em hex**. Com montanha os dois divergem 3× e o sinal inverte:
+
+```text
+origem  (19,2)  fora do mapa  → hex  4
+serra   (19,3)  no mapa       → rota 12
+progresso = 4 − 12 = −8      (a ferramenta dá +15,6 no mesmo hex)
+```
+
+Resultado: platô de zeros, `tool = −moveCost`, e o hex mais caro — o único que
+resolve — fica em último. **É o ping-pong `(19,2)↔(18,2)` do `log.md`.**
+
+O log já dizia, em toda linha: `route=?` é `RouteFound == false`, e o `next=4,0`
+ao lado é o fallback. Sem montanha os dois números coincidem e isso nunca
+aparece.
+
+### A ferramenta é a fonte, não o meu raciocínio
+
+`Tools > Transporte > Caminhos Válidos > Progressão` calcula **a fórmula runtime
+do intent** e mostra `FinalScore/1000`. Onde ela e o log discordarem, é diferença
+de **entrada** — e o painel expõe origem, PM do turno, PM dos seguintes,
+horizonte e intent.
+
+⚠️ **Errei quatro vezes hoje concluindo sem abrir o que existia:** disse que
+Tactical não era skip (o skip estava no organizador, não no serviço), que nada
+valorizava subir a montanha (a ferramenta dá +15,6), que o APC não subia (tem
+`OFF Road`, e o custo está no `Montanha.asset`), e que o Strategic cúbico era
+defeito (é projeto). **Antes de afirmar que algo não existe: abrir a ferramenta,
+o asset, e a camada de cima.**
+
+---
+
 ## Critério de retomada
 
 **A fatia 1 passou.** O bloqueio que atravessou duas versões acabou.
