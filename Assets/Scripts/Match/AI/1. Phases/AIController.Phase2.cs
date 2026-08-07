@@ -227,6 +227,21 @@ public partial class AIController
                 continue;
             }
 
+            if (!secondPass
+                && ShouldDeferPassengerForIncomingTransport(
+                    unit, action, units, out UnitManager incomingTransporter))
+            {
+                deferredUnitIds.Add(unit.InstanceId);
+                Debug.Log(
+                    $"{TL()} Fase2 — {FormatInitiativeUnitName(unit)} espera " +
+                    $"carona e cede vez para " +
+                    $"{FormatInitiativeUnitName(incomingTransporter)} " +
+                    "encostar primeiro.");
+                cursor++;
+                yield return null;
+                continue;
+            }
+
             if (!secondPass && IsNoOpUnitAction(action) && ShouldDeferIdleAssaultForSectorCapturer(unit, activePlan, aiTeam))
             {
                 SectorObjective obj = ResolveAssignedAssaultObjective(unit, activePlan);
@@ -649,6 +664,86 @@ public partial class AIController
         }
 
         return worldCell;
+    }
+
+    /// <summary>
+    /// QUEM ESPERA CARONA NAO ANDA NA FRENTE DO TAXI.
+    ///
+    /// O passageiro na fila agia primeiro, marchava para longe, e so entao o
+    /// transportador chegava — os dois perdiam a rodada em que o embarque
+    /// caberia. Sinergia desfeita pela ORDEM, nao pela decisao: cada um
+    /// escolheu certo, na hora errada.
+    ///
+    /// Cede a vez a um transportador que ainda nao agiu, tem vaga, encosta
+    /// nele por topologia e esta perto o bastante para chegar NESTA rodada
+    /// (MP + 1, o anel de embarque). Depois do transportador andar, o
+    /// passageiro reavalia da posicao nova e o embarque vira Tactical.
+    ///
+    /// Nao cede quem ja vai embarcar, nem quem tem tiro ou captura no batch:
+    /// ceder ali trocaria a sinergia por uma acao perdida. E o chamador so
+    /// consulta com !secondPass, entao a segunda passada nunca adia — o que
+    /// fecha a porta da cessao mutua com o "cede destino" do bloqueio.
+    /// </summary>
+    private bool ShouldDeferPassengerForIncomingTransport(
+        UnitManager unit,
+        PlayerAction action,
+        List<UnitManager> units,
+        out UnitManager incomingTransporter)
+    {
+        incomingTransporter = null;
+        if (unit == null
+            || units == null
+            || unit.IsEmbarked
+            || unit.IsDead
+            || !unit.AIIsWaitingForRide)
+        {
+            return false;
+        }
+
+        if (action != null
+            && action.SensorAction != SensorActionType.None)
+        {
+            return false;
+        }
+
+        Vector3Int passengerCell = unit.CurrentCellPosition;
+        passengerCell.z = 0;
+        for (int i = 0; i < units.Count; i++)
+        {
+            UnitManager candidate = units[i];
+            if (candidate == null
+                || candidate == unit
+                || candidate.IsDead
+                || candidate.IsEmbarked
+                || candidate.HasActed
+                || candidate.SlotIndex != unit.SlotIndex
+                || !candidate.TryGetUnitData(out UnitData candidateData)
+                || candidateData == null
+                || !candidateData.isTransporter
+                || IsTransporterAtCapacity(candidate, candidateData))
+            {
+                continue;
+            }
+
+            Vector3Int transporterCell = candidate.CurrentCellPosition;
+            transporterCell.z = 0;
+            // Barato antes de caro: so pergunta topologia de quem ja podia
+            // chegar hoje. Sem este corte, um navio do outro lado do mapa
+            // faria o soldado adiar todo turno sem nunca ganhar carona.
+            if (SectorManager.HexDistance(passengerCell, transporterCell)
+                > Mathf.Max(0, candidate.RemainingMovementPoints) + 1)
+            {
+                continue;
+            }
+
+            if (!CanTransporterMeetPassenger(candidate, unit))
+                continue;
+
+            incomingTransporter = candidate;
+            return true;
+        }
+
+        return false;
     }
 
     private bool ShouldDeferIdleAssaultForSectorCapturer(UnitManager unit, TeamObjectivePlan plan, TeamId aiTeam)
