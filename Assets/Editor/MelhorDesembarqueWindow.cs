@@ -908,7 +908,17 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
         }
 
         MelhorDesembarqueLzScore shown = selected ?? ranking[0];
-        if (view != DebugView.MelhorLZ && shown != null)
+        // REGRA SIMPLES, e ela e a doutrina desta janela:
+        //
+        //   sem nevoa   mostra LZ E desembarque
+        //   com nevoa   mostra LZ, SEM a bolinha do desembarque
+        //
+        // O motivo: com nevoa ligada a janela responde "esta LZ e admissivel
+        // hoje". ONDE o passageiro cai depende de sensores avaliados na hora,
+        // com o casco ja parado ali — desenhar o ponto de queda seria promessa
+        // que a bancada nao tem como fazer. Sem nevoa a consulta e teorica e o
+        // desembarque completa o quadro.
+        if (view != DebugView.MelhorLZ && shown != null && !applyFogOfWar)
         {
             for (int i = 0; i < shown.spots.Count; i++)
             {
