@@ -137,41 +137,12 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
 
         DrawEmbarkedPassengerGrid();
 
-        EditorGUILayout.BeginHorizontal();
-        using (new EditorGUI.DisabledScope(true))
-            EditorGUILayout.Vector3IntField(
-                "Hex desejado — vaga 1",
-                hasPickedTargetCell ? pickedTargetCell : Vector3Int.zero);
-        using (new EditorGUI.DisabledScope(!hasPickedTargetCell))
-        {
-            if (GUILayout.Button("Limpar", GUILayout.Width(55f)))
-            {
-                hasPickedTargetCell = false;
-                ranking.Clear();
-                selected = null;
-                SceneView.RepaintAll();
-            }
-        }
-        EditorGUILayout.EndHorizontal();
-
-        EditorGUILayout.BeginHorizontal();
-        using (new EditorGUI.DisabledScope(true))
-            EditorGUILayout.Vector3IntField(
-                "Hex desejado — vaga 2",
-                hasSecondPickedTargetCell
-                    ? secondPickedTargetCell
-                    : Vector3Int.zero);
-        using (new EditorGUI.DisabledScope(!hasSecondPickedTargetCell))
-        {
-            if (GUILayout.Button("Limpar", GUILayout.Width(55f)))
-            {
-                hasSecondPickedTargetCell = false;
-                ranking.Clear();
-                selected = null;
-                SceneView.RepaintAll();
-            }
-        }
-        EditorGUILayout.EndHorizontal();
+        DrawDesiredHexRow(
+            "Hex desejado — vaga 1", 0,
+            ref hasPickedTargetCell, ref pickedTargetCell);
+        DrawDesiredHexRow(
+            "Hex desejado — vaga 2", 1,
+            ref hasSecondPickedTargetCell, ref secondPickedTargetCell);
 
         EditorGUILayout.BeginHorizontal();
         using (new EditorGUI.DisabledScope(transporter == null))
@@ -208,21 +179,11 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
                    transporter == null
                    || map == null))
         {
-            if (GUILayout.Button(
-                    "1) Triagem — locais que ACEITAM entrega",
-                    GUILayout.Height(24f)))
-                RunDeliverableLocationTriage();
-        }
-        if (!string.IsNullOrEmpty(triageStatus))
-            EditorGUILayout.HelpBox(triageStatus, MessageType.None);
-
-        using (new EditorGUI.DisabledScope(
-                   transporter == null
-                   || map == null))
-        {
             if (GUILayout.Button("Calcular Melhor LZ de Desembarque", GUILayout.Height(28f)))
                 Calculate();
         }
+
+        DrawValidationsSection();
 
         EditorGUILayout.Space(4f);
         EditorGUILayout.LabelField(status, EditorStyles.wordWrappedLabel);
@@ -621,7 +582,7 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
                 out target, out routeCost);
         }
 
-        if (TryResolveDesignatedCaptureTarget(
+        if (TryResolveDesignatedMissionTarget(
                 passenger,
                 out Vector3Int designatedTarget)
             && TryRouteTo(
@@ -774,42 +735,39 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
         return false;
     }
 
-    private static bool TryResolveDesignatedCaptureTarget(
+    /// <summary>
+    /// Destino declarado do passageiro — SO A COORDENADA.
+    ///
+    /// <para>"O transportador e alheio a missao da carga. Nao importa se ela vai
+    /// capturar, fazer pressao, etc. Ele so quer saber da coordenada."
+    /// (autor, 2026-08-07)</para>
+    ///
+    /// <para>A versao anterior fazia tres coisas que nao sao da conta do
+    /// transporte: exigia o verbo <c>Capture</c>, procurava uma construcao que
+    /// casasse com o id ou a celula, e ainda checava o DONO dessa construcao.
+    /// Com <c>Mission Intent = Pressure</c> e alvo (20,6) declarado no
+    /// Inspector, a janela dizia "Sem destino designado" — porque nenhuma das
+    /// tres condicoes tinha a ver com a pergunta que estava sendo feita.</para>
+    /// </summary>
+    private static bool TryResolveDesignatedMissionTarget(
         UnitManager selectedPassenger,
         out Vector3Int target)
     {
         target = Vector3Int.zero;
         if (selectedPassenger == null
-            || !selectedPassenger.AIHasDesignatedCaptureTarget)
+            || !selectedPassenger.AIHasDesignatedMission)
             return false;
 
-        int instanceId =
-            selectedPassenger.AIDesignatedCaptureTargetInstanceId;
-        Vector3Int designatedCell =
-            selectedPassenger.AIDesignatedCaptureTargetCell;
-        designatedCell.z = 0;
-        foreach (ConstructionManager construction
-                 in ConstructionManager.AllActive)
-        {
-            if (construction == null)
-                continue;
-            Vector3Int cell = construction.CurrentCellPosition;
-            cell.z = 0;
-            if (construction.InstanceId != instanceId
-                && cell != designatedCell)
-                continue;
-            if (construction.TeamId == selectedPassenger.TeamId)
-                return false;
-            target = cell;
-            return true;
-        }
-        return false;
+        target = selectedPassenger.AIDesignatedMissionTargetCell;
+        target.z = 0;
+        return true;
     }
 
     private void OnSceneGUI(SceneView sceneView)
     {
         HandleTargetCellPicking();
         DrawTriageGizmos();
+        DrawDeliveryBandGizmos();
         if (map == null || ranking.Count == 0)
             return;
 
@@ -1012,12 +970,235 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
         triageDeliverable.Clear();
         triageRejected.Clear();
         triageStatus = string.Empty;
+        bandTactical.Clear();
+        bandOperational.Clear();
+        bandStatus = string.Empty;
 
         scroll = Vector2.zero;
         status = "Selecione o passageiro; o hex desejado e opcional.";
 
         SceneView.RepaintAll();
         Repaint();
+    }
+
+    /// <summary>
+    /// O hex desejado ESPELHA a missao do passageiro daquela vaga.
+    ///
+    /// <para>"No hex desejado tem que auto-espelhar a missao do cara. Se ele
+    /// realmente nao tinha destino — 'ah, eu pedi taxi porque estava a toa' —
+    /// entao o transportador usa o Melhor LZ para achar um para ele."
+    /// (autor, 2026-08-07)</para>
+    ///
+    /// <para>Tres estados, e o rotulo diz qual e qual:
+    /// <b>(missao)</b> o passageiro declarou destino e a bancada obedece;
+    /// <b>(manual)</b> alguem escolheu um hex a mao, e a escolha vence a missao
+    /// — e para isso que o modo de picking existe; <b>(livre)</b> ninguem sabe
+    /// para onde, e o ranking procura o melhor destino sozinho.</para>
+    ///
+    /// <para>O pick manual NAO sobrescreve a missao da unidade: ele so manda
+    /// nesta consulta. Limpar volta para o espelho.</para>
+    /// </summary>
+    private void DrawDesiredHexRow(
+        string label,
+        int seatIndex,
+        ref bool hasManualPick,
+        ref Vector3Int manualCell)
+    {
+        UnitManager seatPassenger = ResolvePassengerAtSeat(seatIndex);
+        Vector3Int missionCell = Vector3Int.zero;
+        bool hasMission =
+            !hasManualPick
+            && TryResolveDesignatedMissionTarget(
+                seatPassenger, out missionCell);
+
+        string origin = hasManualPick
+            ? " (manual)"
+            : hasMission ? " (missão)" : " (livre)";
+
+        EditorGUILayout.BeginHorizontal();
+        using (new EditorGUI.DisabledScope(true))
+            EditorGUILayout.Vector3IntField(
+                label + origin,
+                hasManualPick
+                    ? manualCell
+                    : hasMission ? missionCell : Vector3Int.zero);
+        using (new EditorGUI.DisabledScope(!hasManualPick))
+        {
+            if (GUILayout.Button("Limpar", GUILayout.Width(55f)))
+            {
+                hasManualPick = false;
+                manualCell = Vector3Int.zero;
+                ranking.Clear();
+                selected = null;
+                SceneView.RepaintAll();
+            }
+        }
+        EditorGUILayout.EndHorizontal();
+    }
+
+    private UnitManager ResolvePassengerAtSeat(int seatIndex)
+    {
+        if (transporter == null)
+            return null;
+        // Mesma ordem da grade de vagas: so embarcados, ordenados por turno de
+        // embarque e depois por slot. Se divergir da grade, o rotulo mostra a
+        // missao de um passageiro e o calculo usa a de outro.
+        IReadOnlyList<UnitTransportSeatRuntime> seats =
+            transporter.TransportedUnitSlots;
+        if (seats == null)
+            return null;
+
+        var embarked = new List<UnitTransportSeatRuntime>();
+        for (int i = 0; i < seats.Count; i++)
+        {
+            UnitTransportSeatRuntime seat = seats[i];
+            if (seat?.embarkedUnit != null && seat.embarkedUnit.IsEmbarked)
+                embarked.Add(seat);
+        }
+        embarked.Sort((a, b) =>
+        {
+            int byTurn = ResolveEmbarkedTurn(a).CompareTo(ResolveEmbarkedTurn(b));
+            return byTurn != 0
+                ? byTurn
+                : a.slotIndex.CompareTo(b.slotIndex);
+        });
+
+        if (seatIndex < 0 || seatIndex >= embarked.Count)
+            return null;
+        return embarked[seatIndex].embarkedUnit;
+    }
+
+    // =====================================================================
+    // VALIDACOES — perguntas que se responde ANTES de acreditar no ranking.
+    //
+    // Ficam depois do calculo de proposito: cada uma checa uma premissa que o
+    // ranking assume em silencio. Quando o ranking devolve resultado estranho,
+    // a ordem de investigacao e descer por aqui, nao reler a nota.
+    // =====================================================================
+    private void DrawValidationsSection()
+    {
+        EditorGUILayout.Space(6f);
+        EditorGUILayout.LabelField("Validações", EditorStyles.boldLabel);
+
+        using (new EditorGUI.DisabledScope(transporter == null || map == null))
+        {
+            if (GUILayout.Button(
+                    "1) Triagem — locais que ACEITAM entrega",
+                    GUILayout.Height(22f)))
+                RunDeliverableLocationTriage();
+        }
+        if (!string.IsNullOrEmpty(triageStatus))
+            EditorGUILayout.HelpBox(triageStatus, MessageType.None);
+
+        using (new EditorGUI.DisabledScope(map == null))
+        {
+            if (GUILayout.Button(
+                    "2) Pintar Tactical/Operational da entrega",
+                    GUILayout.Height(22f)))
+                PaintDeliveryBands();
+        }
+        if (!string.IsNullOrEmpty(bandStatus))
+            EditorGUILayout.HelpBox(bandStatus, MessageType.None);
+    }
+
+    // =====================================================================
+    // BANDAS DA ENTREGA
+    //
+    // Emula o teleporte: poe o PASSAGEIRO no destino e pergunta de onde ele
+    // chegaria ali sozinho. E a zona de entrega — "reverse: teleport the unit
+    // onto the target, that area is the drop zone" (CLAUDE.md).
+    //
+    // Nao move nada. CalculateMovementCostMap e um flood reverso a partir do
+    // alvo com o movimento do passageiro; o teleporte e figura de linguagem.
+    //
+    // Cores: as do projeto, verde = Tactical (uma rodada), azul = Operational
+    // (duas). Nao inventar cor nova nem reusar uma que ja tem outro sentido.
+    // =====================================================================
+    private readonly List<Vector3Int> bandTactical = new List<Vector3Int>();
+    private readonly List<Vector3Int> bandOperational = new List<Vector3Int>();
+    [SerializeField] private string bandStatus = string.Empty;
+
+    private void PaintDeliveryBands()
+    {
+        bandTactical.Clear();
+        bandOperational.Clear();
+        bandStatus = string.Empty;
+
+        if (passenger == null || map == null || terrainDatabase == null)
+        {
+            bandStatus = "Sem passageiro, tilemap ou Terrain Database.";
+            return;
+        }
+
+        if (!TryResolveEffectiveDeliveryTarget(out Vector3Int targetCell))
+        {
+            bandStatus =
+                "Sem destino: o passageiro nao tem missao e nenhum hex foi "
+                + "escolhido a mao. Escolha um destino para pintar a zona.";
+            return;
+        }
+
+        int tactical = Mathf.Max(1, passenger.MaxMovementPoints);
+        int operational = tactical * 2;
+
+        Dictionary<Vector3Int, int> reach =
+            UnitMovementPathRules.CalculateMovementCostMap(
+                map, passenger, targetCell, operational, terrainDatabase);
+        if (reach == null || reach.Count == 0)
+        {
+            bandStatus =
+                $"Alvo {targetCell}: o passageiro nao alcanca NENHUMA celula a "
+                + "pe a partir dali. Entrega impossivel por transporte.";
+            SceneView.RepaintAll();
+            return;
+        }
+
+        foreach (KeyValuePair<Vector3Int, int> entry in reach)
+        {
+            Vector3Int cell = entry.Key;
+            cell.z = 0;
+            if (entry.Value <= tactical)
+                bandTactical.Add(cell);
+            else
+                bandOperational.Add(cell);
+        }
+
+        bandStatus =
+            $"Alvo {targetCell} · Tactical={tactical} ({bandTactical.Count} hexes, "
+            + $"verde) · Operational={operational} ({bandOperational.Count} hexes, "
+            + "azul). Largar no verde entrega em uma rodada de marcha; no azul, "
+            + "em duas.";
+        Debug.Log($"[BandasEntrega] {bandStatus}");
+        SceneView.RepaintAll();
+        Repaint();
+    }
+
+    /// <summary>Destino efetivo: pick manual vence, senao a missao da vaga 1.</summary>
+    private bool TryResolveEffectiveDeliveryTarget(out Vector3Int targetCell)
+    {
+        if (hasPickedTargetCell)
+        {
+            targetCell = pickedTargetCell;
+            targetCell.z = 0;
+            return true;
+        }
+        return TryResolveDesignatedMissionTarget(passenger, out targetCell);
+    }
+
+    private void DrawDeliveryBandGizmos()
+    {
+        if (map == null)
+            return;
+        DrawBand(bandTactical, new Color(0.25f, 1f, 0.35f, 0.55f));
+        DrawBand(bandOperational, new Color(0.35f, 0.6f, 1f, 0.45f));
+    }
+
+    private void DrawBand(List<Vector3Int> cells, Color color)
+    {
+        Handles.color = color;
+        for (int i = 0; i < cells.Count; i++)
+            Handles.DrawSolidDisc(
+                map.GetCellCenterWorld(cells[i]), Vector3.forward, 0.30f);
     }
 
     private void RunDeliverableLocationTriage()
