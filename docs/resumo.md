@@ -84,6 +84,52 @@ passou a ter escritor **e** leitor que atravessa o save.
 ação, nunca na decisão. É o invariante transacional. Não adianta conferir o
 Inspector antes de a unidade agir no turno 1: não há missão ainda.
 
+### O ciclo completo T1→T6 — corrido em 2026-08-06, log em `docs/gamelog/log.md`
+
+| turno | dist | banda | QueroCarona | `MelhorCapturaCalls` | `decision` | estágios |
+|---|---|---|---|---|---|---|
+| T1 | 7h | BeyondOperational | **SIM** | **3** | 136ms | 8 |
+| T2 | 4h | Operational | NAO | 1 | 25ms | 7 |
+| T3 | 1h | *pulado* | — | 0 | 7ms | 1 |
+| T4 | 0h | *pulado* | — | **0** | **1ms** | **0** |
+| T5 | 7h | BeyondOperational | **SIM** | **3** | 84ms | 8 |
+| T6 | 5h | Operational | NAO | 1 | 24ms | 7 |
+
+**A missão morre limpa** — era a única incógnita do teste:
+
+```text
+T1 predio=#2 (adquirida)  ·  T2 (mantida)  ·  T4 capturado
+T5 predio=#1 (ADQUIRIDA — nova, sozinha)  ·  T6 (mantida)
+```
+
+Sem resíduo e sem baixa forçada. O `[SemPlano]` reancorou no HQ inimigo quando o
+serviço não achou mais capturável em banda.
+
+**O T3 pula o `QueroCarona` — e o skip já existia.** Não no serviço: em
+`TryDecideCapturerAction`, via `[Oportunista] captura local ... antes de embarcar`,
+que retorna **antes** do gate de embarque. ⚠️ Eu procurei no `QueroCaronaService`,
+não achei early-out e concluí "não existe" — **camada errada**.
+
+**O T4 é o chão absoluto:** `stages=- metrics=-`. Em cima do próprio alvo, a IA
+não consulta o tabuleiro uma única vez.
+
+### Fatia 2 — o alvo agora está MEDIDO
+
+```text
+MelhorCapturaCalls   3 · 1 · 0 · 0 · 3 · 1
+                     ↑           ↑
+                     descobre    descobre
+```
+
+**3 quando descobre o alvo, 1 quando lembra dele.** A missão já corta 3→1 nos
+turnos seguintes; a fatia 2 é levar o **turno de aquisição** de 3 para 1 também.
+Turno mais caro da partida: T5, `routeDistance:50,9ms/39`,
+`MovementQueryCachesBuilt:940`.
+
+⚠️ **`ms` entre corridas não vale sem a contagem ao lado.** O mesmo T2 mediu
+125ms logo após um load e 25ms em corrida seca — **contagens idênticas** (`/39`,
+`/5`, `/1`). Era JIT, não lógica. As contagens não mentem; o relógio mente.
+
 ### Fatia 2 — medir antes de escrever
 
 Ela ia inverter o táxi (missão no topo, carona medida contra ela). **Parte disso
@@ -335,12 +381,22 @@ existe, e nenhuma das ~20 exceções do capturador foi re-derivada ainda.
 A fila curta:
 
 ```text
-1. o portao Embarcar rodando no vazio — o primeiro alvo real do refactor
-2. medir o que sobra da fatia 2 (parte ja funciona no caminho rebelde)
-3. limpar a origem das rotas (destravado; ownerDatabase por último)
-4. a lista MUDA REGRA — cinco divergências doc × código
-5. abrir o capturador: quantas das ~20 excecoes sobrevivem como POLITICA
+1. fatia 2 — levar MelhorCapturaCalls de 3 para 1 no turno de AQUISICAO
+2. limpar a origem das rotas (destravado; ownerDatabase por último)
+3. a lista MUDA REGRA — cinco divergências doc × código
+4. abrir o capturador: quantas das ~20 excecoes sobrevivem como POLITICA
 ```
+
+### Achados menores do ciclo T1→T6, para não se perderem
+
+| achado | onde |
+|---|---|
+| `[FoW][RoundZeroBake] restored` deu **0/2** numa corrida e **1/2** noutra — o item pendente é **não-determinístico** | mesmo mapa, mesma cena |
+| `[FoW][LoadCacheRestore] slot=0 success=false` com motivos **diferentes** (`construction_validation:Construction:1`, `split_gameplay_presentation`) — e o `LoadCacheVerify` diz `exact=True` no mesmo load | os dois não podem estar certos |
+| shopping diz *"nenhuma oferta elegível ... **com gastoLivre=1993**"* quando o problema é **não ter fábrica**, não dinheiro | gate inaplicável de novo: não separa "não posso pagar" de "não tenho onde comprar" |
+| `PreventiveDefense` pede `Artilleryx1` todo turno; shopping nega por *"doutrina rebelde: só Capturador"* | o Ops não sabe que o slot é rebelde |
+| carimbo da Fase 0 lê o turno **antes** de avançar: `[AI ][T0] Fase0 concluída` no turno 1 | cosmético, mas faz ler log errado |
+| `action=wait` no turno em que a unidade **capturou** | idem |
 
 ### O item 1, medido no tabuleiro isolado
 
