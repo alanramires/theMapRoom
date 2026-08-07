@@ -61,30 +61,39 @@ Oito casos estão listados no [`relatorio_v8.0.0.md`](relatorio_v8.0.0.md). O
 
 ---
 
-## O PRÓXIMO PASSO — e é curto
+## A FATIA 1 PASSOU — 2026-08-06, depois da v8.0.1
 
-**Rodar a fatia 1.** O commit `3e0565d` unificou o alvo de captura na missão
-(`AIPlanRuntimeIntent.Capture` finalmente tem quem o escreva). Ele **compila nas
-duas assemblies e nunca rodou**.
+O commit `3e0565d` atravessou duas versões compilado e sem rodar. **Rodou, e
+passou.** `Hot Seat 0 - Treino`, com `Reload Domain and Scene` ligado:
 
 ```text
-1. o save do teste anterior NÃO carrega mais o alvo (os campos saíram do DTO)
-2. refazer os dois turnos no Hot Seat 0 - Treino
-3. turno 1: [Missao] 1 Capture -> (0,0,0) predio=#2 (adquirida)
-            Inspector: Mission Intent = Capture, Has Designated Mission ✔
-4. salvar, fechar, abrir, carregar
-5. turno 2: [Missao] ... (mantida)  e ele sai de (4,0) para (1,0)
+T1   origemAlvo=servico   envelope=BeyondOperational   QueroCarona=SIM   (7,0)→(4,0)
+     [Missao] 1 Capture -> (0,0,0) predio=#2 (adquirida)
+────────────── salvar · Stop · Play · carregar ──────────────
+T2   origemAlvo=reserva   envelope=Operational  custo=4  QueroCarona=NAO  (4,0)→(1,0)
+     [Missao] 1 Capture -> (0,0,0) predio=#2 (mantida)
+     [FilaCarona] #1 sai da fila apos 1 turno(s)
 ```
 
-**O comportamento tem que ficar IDÊNTICO.** A fatia é subtração — se mudar, está
-errada.
+Bate **linha por linha** com o traço pré-fatia do relatório da v8.0.0. A fatia é
+subtração, então **igualdade É o resultado correto**: os três campos
+`aiDesignatedCaptureTarget*` sumiram, saíram do DTO, e `AIPlanRuntimeIntent.Capture`
+passou a ter escritor **e** leitor que atravessa o save.
 
-Antes de rodar, conferir `Project Settings > Editor > Enter Play Mode Settings`:
-com **Reload Domain desligado**, os estáticos sobrevivem ao stop e o teste passa
-pelo motivo errado.
+**Onde a missão é escrita — e por que isso está certo:** depois do commit da
+ação, nunca na decisão. É o invariante transacional. Não adianta conferir o
+Inspector antes de a unidade agir no turno 1: não há missão ainda.
 
-**Fatia 2, depois:** a inversão do táxi — missão pendente resolvida no topo,
-carona medida contra ela, latch da missão, nota proporcional ao excedente.
+### Fatia 2 — medir antes de escrever
+
+Ela ia inverter o táxi (missão no topo, carona medida contra ela). **Parte disso
+já funciona no caminho rebelde** — o log do T2 mostra a reserva alimentando a
+recusa de carona:
+
+> *"alcança alvo reservado Cidade@(0,0,0) no Operational: custo=4 no turno 2 de
+> 2. **Recusa carona**."*
+
+Levantar o que sobra da fatia 2 antes de abrir editor.
 
 ---
 
@@ -309,7 +318,8 @@ existe, e nenhuma das ~20 exceções do capturador foi re-derivada ainda.
 | **hit e miss de cache logam igual** | não dá para auditar cache pelo texto; só pelo contador |
 | **verdade vazia em laço de prova** | `for (...) if (achou) return;` conclui o pior quando a lista está **vazia** |
 | **doc que envelhece e vira fato** | e agora os docs estão **à frente** do código em vários pontos: as marcas `HOJE/CONTRATO/ABERTO` e `✅⚠️❌❓` só funcionam se alguém as mexer quando o código alcançar |
-| **recompile em Play parece conserto** | salvar `.cs` religa `debugFogOfWarEnabled = true` |
+| **recompile em Play parece conserto** | salvar `.cs` religa `debugFogOfWarEnabled = true`. A configuração que causa isso é `Preferences > General > Script Changes While Playing`, **não** o `Enter Play Mode Settings` — são duas coisas diferentes e é fácil trocar |
+| **estático que sobrevive ao Stop** | com `Enter Play Mode = Do not reload Domain or Scene`, um teste de save/load pode passar porque o estático **nunca morreu**. Para testar persistência: `Reload Domain and Scene`, ou fechar a Unity |
 | **posição hipotética criando conhecimento** | movimento no cálculo não permite detectar antes do compromisso |
 | **foco tratado como gate** | `FocusCells` só soma pontos; admissibilidade precisa ser explícita |
 | **dividir commit por hunk sem rede** | guarde o arquivo final, aplique a frente A, **restaure**, e o resto é a frente B |
@@ -320,17 +330,38 @@ existe, e nenhuma das ~20 exceções do capturador foi re-derivada ainda.
 
 ## Critério de retomada
 
-**Rodar a fatia 1** — dois F11, um save/fecha/abre, e conferir que o
-comportamento não mudou. É subtração; qualquer mudança é defeito.
+**A fatia 1 passou.** O bloqueio que atravessou duas versões acabou.
 
-Depois dela, a fila curta:
+A fila curta:
 
 ```text
-1. fatia 2 — a inversão do táxi (missão no topo, carona medida contra ela)
-2. limpar a origem das rotas (destravado; ownerDatabase por último)
-3. a lista MUDA REGRA — cinco divergências doc × código
-4. abrir o capturador: quantas das ~20 excecoes sobrevivem como POLITICA
+1. o portao Embarcar rodando no vazio — o primeiro alvo real do refactor
+2. medir o que sobra da fatia 2 (parte ja funciona no caminho rebelde)
+3. limpar a origem das rotas (destravado; ownerDatabase por último)
+4. a lista MUDA REGRA — cinco divergências doc × código
+5. abrir o capturador: quantas das ~20 excecoes sobrevivem como POLITICA
 ```
+
+### O item 1, medido no tabuleiro isolado
+
+Com 1 HQ, 1 cidade, 1 capturador rogue e **zero transportadores**, o portão
+`Embarcar` rodou inteiro e **mutou estado**:
+
+```text
+[FilaCarona] #1 entra na fila no turno 1 — fora das bandas (score=1000)
+[Capturador] 1 QueroCarona=SIM ... envelope=BeyondOperational
+[Capturador] 1 embarque scan: ... nenhum transporte aliado <=8h
+queroCarona: 14,1ms   melhorCaptura: 16,5ms/3 chamadas
+```
+
+Perguntou *"quero carona?"*, respondeu **sim**, varreu, não achou nada — e entrou
+na fila. **A resposta não podia ser outra**, e mesmo assim pagou o custo e
+escreveu estado.
+
+Os outros três portões do topo ficaram inertes como previsto (reparo, handoff,
+swap). O tabuleiro mínimo **apaga as exceções em vez de exigir que a gente as
+desmonte** — é a única configuração em que a célula `Capturador × Capturar`
+aparece sozinha.
 
 **O item 4 é o degrau 3 de verdade**, e é o que o autor chamou de *"o grande
 refactor das 6 armas"*. As vozes acabaram; o código não começou.
