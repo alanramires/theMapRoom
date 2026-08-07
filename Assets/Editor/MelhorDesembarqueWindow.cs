@@ -1192,6 +1192,8 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
         bandOperational.Clear();
         bandFogged.Clear();
         bandStatus = string.Empty;
+        hasAnchor = false;
+        anchorStatus = string.Empty;
 
         scroll = Vector2.zero;
         status = "Selecione o passageiro; o hex desejado e opcional.";
@@ -1330,6 +1332,75 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
         }
         if (!string.IsNullOrEmpty(bandStatus))
             EditorGUILayout.HelpBox(bandStatus, MessageType.None);
+
+        using (new EditorGUI.DisabledScope(
+                   transporter == null || passenger == null || map == null))
+        {
+            if (GUILayout.Button(
+                    "3) Âncora do courier — para onde ele vai",
+                    GUILayout.Height(22f)))
+                ResolveCourierAnchor();
+        }
+        if (!string.IsNullOrEmpty(anchorStatus))
+            EditorGUILayout.HelpBox(anchorStatus, MessageType.None);
+    }
+
+    /// <summary>
+    /// A ancora e ATRIBUICAO DA IA, nao da ferramenta — por isso esta janela
+    /// nao a recalcula: chama o mesmo
+    /// <c>AIController.TryResolveDeliveryZoneAnchor</c> que o courier chama, com
+    /// o mesmo predicado de nevoa. Reimplementar aqui daria duas respostas para
+    /// a mesma pergunta, que e o defeito que a nevoa e o teto de rota ja
+    /// expuseram duas vezes hoje.
+    /// </summary>
+    private void ResolveCourierAnchor()
+    {
+        hasAnchor = false;
+        anchorStatus = string.Empty;
+
+        if (!TryResolveEffectiveDeliveryTarget(out Vector3Int targetCell))
+        {
+            anchorStatus =
+                "Sem destino: o passageiro nao tem missao e nenhum hex foi "
+                + "escolhido a mao.";
+            SceneView.RepaintAll();
+            return;
+        }
+
+        FogKnowledgeSnapshot fog = null;
+        if (applyFogOfWar && !TryCopyFogKnowledge(out fog))
+            return;
+
+        Vector3Int from = transporter.CurrentCellPosition;
+        from.z = 0;
+
+        hasAnchor = AIController.TryResolveDeliveryZoneAnchor(
+            map,
+            terrainDatabase,
+            transporter,
+            passenger,
+            targetCell,
+            from,
+            BuildTransporterCellGate(fog),
+            out anchorCell,
+            out int walkCost,
+            out bool isTactical,
+            out string mode);
+
+        anchorStatus = hasAnchor
+            ? mode == "revelar"
+                ? $"REVELAR → {anchorCell} (magenta). Nenhuma celula CONHECIDA "
+                  + $"na zona de {targetCell}: este passo compra informacao, "
+                  + "nao entrega."
+                : $"ENTREGA → {anchorCell} (magenta), "
+                  + $"{(isTactical ? "Tactical" : "Operational")}; o passageiro "
+                  + $"anda {walkCost} de la ate {targetCell}."
+            : $"Nenhuma ancora para {targetCell}: nem zona conhecida nem "
+              + "fronteira alcancavel.";
+
+        Debug.Log($"[AncoraCourier] {anchorStatus}");
+        SceneView.RepaintAll();
+        Repaint();
     }
 
     // =====================================================================
@@ -1352,6 +1423,11 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
     // preto. E a previsao que o autor pediu: "onde ele vai entrar na nevoa e
     // nao fara a entrega".
     private readonly List<Vector3Int> bandFogged = new List<Vector3Int>();
+    // Ancora do courier: PARA ONDE ele vai este turno. Nao e calculada aqui —
+    // vem do mesmo metodo que o jogo chama.
+    private bool hasAnchor;
+    private Vector3Int anchorCell;
+    [SerializeField] private string anchorStatus = string.Empty;
     [SerializeField] private string bandStatus = string.Empty;
 
     private void ClearDeliveryBands()
@@ -1463,6 +1539,15 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
 
         // Anel, nao disco: elas NAO sao candidatas. O contorno diz "olhei e
         // descartei", que e diferente de "nunca existiu".
+        if (hasAnchor)
+        {
+            Vector3 world = map.GetCellCenterWorld(anchorCell);
+            Handles.color = new Color(1f, 0.2f, 1f, 0.95f);
+            Handles.DrawSolidDisc(world, Vector3.forward, 0.20f);
+            Handles.DrawWireDisc(world, Vector3.forward, 0.44f);
+            Handles.DrawWireDisc(world, Vector3.forward, 0.40f);
+        }
+
         if (showRejectedByRange)
         {
             Handles.color = new Color(1f, 0.3f, 0.25f, 0.8f);

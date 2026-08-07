@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Tilemaps;
 
 public partial class AIController
 {
@@ -76,11 +77,50 @@ public partial class AIController
         out bool anchorIsTactical,
         out string anchorMode)
     {
+        return TryResolveDeliveryZoneAnchor(
+            boardTilemap,
+            terrainDatabase,
+            transporter,
+            passenger,
+            targetCell,
+            transporterCell,
+            IsConfirmedVisibleOrExploredCellForAI,
+            out anchorCell,
+            out passengerWalkCost,
+            out anchorIsTactical,
+            out anchorMode);
+    }
+
+    /// <summary>
+    /// A MESMA resolucao, exposta para a bancada.
+    ///
+    /// <para>Estatica e com tudo por parametro de proposito: a janela do Melhor
+    /// LZ precisa desenhar a ancora que o jogo vai usar, e duas implementacoes
+    /// da mesma pergunta divergem — foi o defeito que a nevoa e o teto de rota
+    /// expuseram duas vezes hoje. Uma implementacao, dois chamadores.</para>
+    ///
+    /// <para><paramref name="isCellKnown"/> e o predicado de conhecimento do
+    /// TRANSPORTADOR. No jogo e IsConfirmedVisibleOrExploredCellForAI; na
+    /// bancada e o bake da rodada 0. Nulo = enxerga tudo (zona teorica).</para>
+    /// </summary>
+    public static bool TryResolveDeliveryZoneAnchor(
+        Tilemap boardMap,
+        TerrainDatabase terrainDb,
+        UnitManager transporter,
+        UnitManager passenger,
+        Vector3Int targetCell,
+        Vector3Int transporterCell,
+        System.Func<Vector3Int, bool> isCellKnown,
+        out Vector3Int anchorCell,
+        out int passengerWalkCost,
+        out bool anchorIsTactical,
+        out string anchorMode)
+    {
         anchorCell = targetCell;
         passengerWalkCost = 0;
         anchorIsTactical = false;
         anchorMode = "entrega";
-        if (transporter == null || passenger == null || boardTilemap == null)
+        if (transporter == null || passenger == null || boardMap == null)
             return false;
 
         targetCell.z = 0;
@@ -97,8 +137,8 @@ public partial class AIController
 
         Dictionary<Vector3Int, int> zone =
             UnitMovementPathRules.CalculateMovementCostMap(
-                boardTilemap, passenger, targetCell, passengerBudget,
-                terrainDatabase);
+                boardMap, passenger, targetCell, passengerBudget,
+                terrainDb);
         if (zone == null || zone.Count == 0)
             return false;
 
@@ -106,7 +146,7 @@ public partial class AIController
         // a ancora pode estar a varios turnos, e o que importa e a direcao.
         Dictionary<Vector3Int, int> transporterCost =
             UnitMovementPathRules.CalculateMovementCostMap(
-                boardTilemap, transporter, transporterCell, 120, terrainDatabase);
+                boardMap, transporter, transporterCell, 120, terrainDb);
 
         // BORDA E PARA EMBARQUE. ENTREGA E PARA DENTRO.
         //
@@ -160,7 +200,7 @@ public partial class AIController
             if (transporterCost == null
                 || !transporterCost.TryGetValue(cell, out int driveCost))
                 continue;
-            if (!IsConfirmedVisibleOrExploredCellForAI(cell))
+            if (isCellKnown != null && !isCellKnown(cell))
                 continue;
 
             int tier = entry.Value <= tacticalRange ? 0 : 1;
@@ -204,7 +244,7 @@ public partial class AIController
             {
                 Vector3Int cell = entry.Key;
                 cell.z = 0;
-                if (!IsConfirmedVisibleOrExploredCellForAI(cell))
+                if (isCellKnown != null && !isCellKnown(cell))
                     continue;
 
                 int distance = Mathf.RoundToInt(
