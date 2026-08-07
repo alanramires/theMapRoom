@@ -46,6 +46,30 @@ public partial class AIController
             || !UnitRoleCompatibility.CanSatisfy(unitData, UnitRole.Capturador))
             return null;
 
+        // MISSAO ANTES DOS ATALHOS.
+        //
+        // Ate 2026-08-06 o alvo so era gravado dentro do caminho rogue (o unico
+        // lugar que preenche pendingRebelCaptureTargets). Quem saia por um atalho
+        // — captura oportunista, embarque, handoff, swap — agia SEM DECLARAR
+        // DESTINO. No teste do tabuleiro de treino o soldado capturou uma garagem
+        // pelo Oportunista, embarcou no turno seguinte com Mission Intent = None,
+        // e o APC teve que inventar para onde levar.
+        //
+        // Aqui a pergunta e "PARA ONDE eu quero ir", nao "consigo marchar ate la":
+        // por isso requireOwnMovementReach fica FALSO. Justamente quando ele NAO
+        // alcanca a pe e que ele pede carona — e e nesse turno que o transportador
+        // precisa da missao. O caminho rogue regrava com o criterio dele (a pe)
+        // quando chega a rodar, e o commit valida antes de escrever.
+        if (!pendingRebelCaptureTargets.ContainsKey(unit.InstanceId))
+        {
+            Vector3Int missionFrom = unit.CurrentCellPosition;
+            missionFrom.z = 0;
+            ConstructionManager missionTarget =
+                FindNearestPlanlessCaptureTarget(unit, snapshot, missionFrom);
+            if (missionTarget != null)
+                pendingRebelCaptureTargets[unit.InstanceId] = missionTarget;
+        }
+
         // ROTEADOR, e so isso. Passa plano NULO de proposito: faccao sem QG nao
         // tem plano, e "sem plano" e um modo do capturador — nao outra IA.
         //

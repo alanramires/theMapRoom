@@ -160,6 +160,28 @@ public partial class AIController
         // so precisa saber PARA ONDE levar.
         if (ConstructionManager.IsHeadQuarterlessTeam(snapshot.AITeam))
         {
+            // A MISSAO DO PASSAGEIRO MANDA. Se ele ja declarou para onde vai, o
+            // transporte serve esse destino — nao escolhe outro.
+            //
+            // Sem isto o courier chamava FindNearestPlanlessCaptureTarget a
+            // partir da CELULA DO TRANSPORTADOR e inventava um alvo. No teste de
+            // 2026-08-06 o soldado embarcou com Mission Intent = None e o APC
+            // decidiu por ele: "capturavel proximo (20,6)". Funcionou por acaso,
+            // porque era a mesma regiao — com missao em outro setor teria levado
+            // a tropa para o lugar errado, e o lema do papel e "o destino nunca
+            // e meu".
+            if (passenger.AIHasDesignatedCaptureTarget)
+            {
+                Vector3Int missionCell = passenger.AIDesignatedCaptureTargetCell;
+                missionCell.z = 0;
+                resolvedTarget = missionCell;
+                Debug.Log(
+                    $"{TL("Transporte")} PassengerTarget #{passenger.InstanceId} "
+                    + $"MISSAO {missionCell} "
+                    + $"predio=#{passenger.AIDesignatedCaptureTargetInstanceId}");
+                return true;
+            }
+
             ConstructionManager rebelTarget = FindNearestPlanlessCaptureTarget(passenger, snapshot, fallbackCell);
             if (rebelTarget != null)
             {
