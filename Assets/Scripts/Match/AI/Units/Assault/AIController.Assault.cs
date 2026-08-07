@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -232,9 +232,7 @@ public partial class AIController
             intent,
             targetCell,
             targetUnitInstanceId:
-                captain != null ? captain.InstanceId : -1,
-            sector:
-                assigned != null ? (int)assigned.Sector : 0);
+                captain != null ? captain.InstanceId : -1);
         Debug.Log(
             $"{TL("Transporte")} passageiro #{passenger.InstanceId} " +
             $"registra missao {intent}: alvoUnidade=" +

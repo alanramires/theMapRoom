@@ -160,25 +160,30 @@ public partial class AIController
         // so precisa saber PARA ONDE levar.
         if (ConstructionManager.IsHeadQuarterlessTeam(snapshot.AITeam))
         {
-            // A MISSAO DO PASSAGEIRO MANDA. Se ele ja declarou para onde vai, o
-            // transporte serve esse destino — nao escolhe outro.
+            // A MISSAO DO PASSAGEIRO MANDA — E O VERBO NAO IMPORTA.
             //
-            // Sem isto o courier chamava FindNearestPlanlessCaptureTarget a
-            // partir da CELULA DO TRANSPORTADOR e inventava um alvo. No teste de
-            // 2026-08-06 o soldado embarcou com Mission Intent = None e o APC
-            // decidiu por ele: "capturavel proximo (20,6)". Funcionou por acaso,
-            // porque era a mesma regiao — com missao em outro setor teria levado
-            // a tropa para o lugar errado, e o lema do papel e "o destino nunca
-            // e meu".
-            if (passenger.AIHasDesignatedCaptureTarget)
+            // "O transportador e alheio a missao do passageiro. Nao importa se
+            // ele vai capturar, fazer pressao, etc. Ele so quer saber da
+            // coordenada." (autor, 2026-08-07)
+            //
+            // A primeira versao disto perguntava AIHasDesignatedCaptureTarget e
+            // so atendia Capture. Trocar o intent para Pressure no Inspector
+            // fazia o casamento falhar, o courier caia no
+            // FindNearestPlanlessCaptureTarget, nao achava capturavel, e o alvo
+            // virava a propria celula do APC — "a carga nao vai a lugar nenhum".
+            //
+            // Sem missao declarada o courier ainda inventa um alvo (o capturavel
+            // proximo abaixo), e e por isso que a missao precisa nascer antes dos
+            // atalhos do capturador. Ver AIController.Rebel.
+            if (passenger.AIHasDesignatedMission)
             {
-                Vector3Int missionCell = passenger.AIDesignatedCaptureTargetCell;
+                Vector3Int missionCell = passenger.AIDesignatedMissionTargetCell;
                 missionCell.z = 0;
                 resolvedTarget = missionCell;
                 Debug.Log(
                     $"{TL("Transporte")} PassengerTarget #{passenger.InstanceId} "
                     + $"MISSAO {missionCell} "
-                    + $"predio=#{passenger.AIDesignatedCaptureTargetInstanceId}");
+                    + $"verbo={passenger.AIDesignatedMissionIntent}");
                 return true;
             }
 

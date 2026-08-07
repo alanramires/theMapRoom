@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -386,8 +386,7 @@ public partial class AIController
             pending.Intent,
             pending.TargetCell,
             pending.TargetUnitInstanceId,
-            pending.TargetConstructionInstanceId,
-            pending.Sector);
+            pending.TargetConstructionInstanceId);
         Debug.Log(
             $"{TL("Stock")} {unit.InstanceId} confirma missao " +
             $"{pending.Intent} destino={pending.TargetCell} " +

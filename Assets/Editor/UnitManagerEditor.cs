@@ -62,7 +62,6 @@ public class UnitManagerEditor : Editor
     private SerializedProperty aiDesignatedMissionTargetUnitInstanceIdProp;
     private SerializedProperty aiDesignatedMissionTargetConstructionInstanceIdProp;
     private SerializedProperty aiDesignatedMissionTargetCellProp;
-    private SerializedProperty aiDesignatedMissionSectorProp;
     private SerializedProperty aiRideWaitSinceTurnProp;
 
     private void OnEnable()
@@ -124,7 +123,6 @@ public class UnitManagerEditor : Editor
         aiDesignatedMissionTargetUnitInstanceIdProp = serializedObject.FindProperty("aiDesignatedMissionTargetUnitInstanceId");
         aiDesignatedMissionTargetConstructionInstanceIdProp = serializedObject.FindProperty("aiDesignatedMissionTargetConstructionInstanceId");
         aiDesignatedMissionTargetCellProp = serializedObject.FindProperty("aiDesignatedMissionTargetCell");
-        aiDesignatedMissionSectorProp = serializedObject.FindProperty("aiDesignatedMissionSector");
         aiRideWaitSinceTurnProp = serializedObject.FindProperty("aiRideWaitSinceTurn");
     }
 
@@ -411,8 +409,6 @@ public class UnitManagerEditor : Editor
             EditorGUILayout.PropertyField(aiDesignatedMissionTargetConstructionInstanceIdProp, new GUIContent("Mission Target Construction ID"));
         if (aiDesignatedMissionTargetCellProp != null)
             DrawMissionTargetCellWithPicker();
-        if (aiDesignatedMissionSectorProp != null)
-            EditorGUILayout.PropertyField(aiDesignatedMissionSectorProp, new GUIContent("Mission Sector"));
         if (aiRideWaitSinceTurnProp != null)
         {
             EditorGUILayout.PropertyField(

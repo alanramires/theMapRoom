@@ -248,8 +248,6 @@ public static class SaveDataMapper
                 unit.AIDesignatedMissionTargetCell.x,
             aiDesignatedMissionTargetCellY =
                 unit.AIDesignatedMissionTargetCell.y,
-            aiDesignatedMissionSector =
-                unit.AIDesignatedMissionSector,
             aiRideWaitSinceTurn =
                 unit.AIRideWaitSinceTurn,
             aiEixo = unit.AIEixo
@@ -378,8 +376,7 @@ public static class SaveDataMapper
                     saved.aiDesignatedMissionTargetCellY,
                     0),
                 saved.aiDesignatedMissionTargetUnitInstanceId,
-                saved.aiDesignatedMissionTargetConstructionInstanceId,
-                saved.aiDesignatedMissionSector);
+                saved.aiDesignatedMissionTargetConstructionInstanceId);
         }
         else
         {

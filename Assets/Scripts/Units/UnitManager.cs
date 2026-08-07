@@ -174,7 +174,6 @@ public class UnitManager : MonoBehaviour
     [SerializeField] private int aiDesignatedMissionTargetUnitInstanceId = -1;
     [SerializeField] private int aiDesignatedMissionTargetConstructionInstanceId = -1;
     [SerializeField] private Vector3Int aiDesignatedMissionTargetCell = Vector3Int.zero;
-    [SerializeField] private int aiDesignatedMissionSector;
     [Tooltip("Turno em que a unidade comecou a esperar por uma carona que nao veio. 0 = nao esta esperando. E CARIMBO, nao contador: a espera e derivada (turno atual - carimbo), entao ler mil vezes no mesmo turno da o mesmo numero. Zero como sentinela mantem save antigo correto, porque turno comeca em 1.")]
     [SerializeField] private int aiRideWaitSinceTurn;
     [Header("AI Eixo Runtime")]
@@ -307,7 +306,6 @@ public class UnitManager : MonoBehaviour
     public int AIDesignatedMissionTargetUnitInstanceId => aiDesignatedMissionTargetUnitInstanceId;
     public int AIDesignatedMissionTargetConstructionInstanceId => aiDesignatedMissionTargetConstructionInstanceId;
     public Vector3Int AIDesignatedMissionTargetCell => aiDesignatedMissionTargetCell;
-    public int AIDesignatedMissionSector => aiDesignatedMissionSector;
 
     /// <summary>
     /// Turno em que esta unidade comecou a esperar por carona. 0 = nao espera.
@@ -455,15 +453,13 @@ public class UnitManager : MonoBehaviour
         AIPlanRuntimeIntent intent,
         Vector3Int targetCell,
         int targetUnitInstanceId = -1,
-        int targetConstructionInstanceId = -1,
-        int sector = 0)
+        int targetConstructionInstanceId = -1)
     {
         targetCell.z = 0;
         aiDesignatedMissionIntent = intent;
         aiDesignatedMissionTargetUnitInstanceId = targetUnitInstanceId;
         aiDesignatedMissionTargetConstructionInstanceId = targetConstructionInstanceId;
         aiDesignatedMissionTargetCell = targetCell;
-        aiDesignatedMissionSector = sector;
     }
 
     public void ClearAIDesignatedMission()
@@ -472,7 +468,6 @@ public class UnitManager : MonoBehaviour
         aiDesignatedMissionTargetUnitInstanceId = -1;
         aiDesignatedMissionTargetConstructionInstanceId = -1;
         aiDesignatedMissionTargetCell = Vector3Int.zero;
-        aiDesignatedMissionSector = 0;
     }
 
     public void SetAIStance(int stance, Sprite icon = null, bool visible = false)
