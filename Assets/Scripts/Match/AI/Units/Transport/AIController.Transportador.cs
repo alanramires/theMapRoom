@@ -229,41 +229,48 @@ public partial class AIController
             return true;
         }
 
-        // MODO REVELAR. Nenhuma celula conhecida da zona: o passo deste turno
-        // nao entrega nada, ele COMPRA INFORMACAO. A ancora vira a fronteira do
-        // que ja se conhece na direcao do alvo — dali o proximo commit revela, e
-        // a zona passa a existir de verdade.
+        // NAO HA CELULA CONHECIDA NA ZONA -> AVANCA PARA O ESCURO MESMO.
         //
-        // Distancia cubica de proposito: nao da para rotear por dentro do que
-        // nao se conhece, e aqui so importa a DIRECAO.
-        int bestFrontierDistance = int.MaxValue;
-        int bestFrontierDrive = int.MaxValue;
-        if (transporterCost != null)
+        // "ele nao e passivo, ele vai entrar na nevoa caramba! a AI courier ja
+        //  decide que ele entra na nevoa em direcao a LZ" (autor, 2026-08-07)
+        //
+        // A versao anterior ancorava na FRONTEIRA do que se conhece, o que
+        // deixava o casco parado na beira esperando informacao chegar sozinha.
+        // Informacao nao chega sozinha: ela chega porque ele ANDA (e o commit
+        // revela). Entao aqui a nevoa deixa de filtrar e a ancora volta a ser a
+        // melhor celula da zona, preta ou nao.
+        //
+        // O filtro de conhecimento continua valendo no PRIMEIRO passe, e e la
+        // que ele importa: havendo celula clara na zona, e nela que se para —
+        // encostar no escuro tendo alternativa clara so adia a entrega.
+        foreach (KeyValuePair<Vector3Int, int> entry in zone)
         {
-            foreach (KeyValuePair<Vector3Int, int> entry in transporterCost)
-            {
-                Vector3Int cell = entry.Key;
-                cell.z = 0;
-                if (isCellKnown != null && !isCellKnown(cell))
-                    continue;
+            Vector3Int cell = entry.Key;
+            cell.z = 0;
+            if (transporterCost == null
+                || !transporterCost.TryGetValue(cell, out int driveCost))
+                continue;
 
-                int distance = Mathf.RoundToInt(
-                    SectorManager.HexDistance(cell, targetCell));
-                if (distance < bestFrontierDistance
-                    || (distance == bestFrontierDistance
-                        && entry.Value < bestFrontierDrive))
-                {
-                    bestFrontierDistance = distance;
-                    bestFrontierDrive = entry.Value;
-                    anchorCell = cell;
-                    passengerWalkCost = -1;
-                    found = true;
-                }
-            }
+            int tier = entry.Value <= tacticalRange ? 0 : 1;
+            bool better =
+                tier < bestTier
+                || (tier == bestTier
+                    && (entry.Value < bestWalk
+                        || (entry.Value == bestWalk
+                            && driveCost < bestTransporterCost)));
+            if (!better)
+                continue;
+
+            bestTier = tier;
+            bestTransporterCost = driveCost;
+            bestWalk = entry.Value;
+            anchorCell = cell;
+            passengerWalkCost = entry.Value;
+            found = true;
         }
 
-        anchorIsTactical = false;
-        anchorMode = found ? "revelar" : "entrega";
+        anchorIsTactical = found && bestTier == 0;
+        anchorMode = "avancar";
         return found;
     }
 

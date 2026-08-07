@@ -1388,10 +1388,9 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
             out string mode);
 
         anchorStatus = hasAnchor
-            ? mode == "revelar"
-                ? $"REVELAR → {anchorCell} (magenta). Nenhuma celula CONHECIDA "
-                  + $"na zona de {targetCell}: este passo compra informacao, "
-                  + "nao entrega."
+            ? mode == "avancar"
+                ? $"AVANÇAR → {anchorCell} (magenta). Nenhuma celula CONHECIDA "
+                  + $"na zona de {targetCell}: entra no escuro na direcao dela."
                 : $"ENTREGA → {anchorCell} (magenta), "
                   + $"{(isTactical ? "Tactical" : "Operational")}; o passageiro "
                   + $"anda {walkCost} de la ate {targetCell}."

@@ -102,9 +102,9 @@ public partial class AIController
                 Debug.Log(
                     $"{TL("Transporte")} {unit.InstanceId} ancora {anchorMode} "
                     + $"{movementAnchor} "
-                    + (anchorMode == "revelar"
+                    + (anchorMode == "avancar"
                         ? $"— nenhuma celula CONHECIDA na zona de {primaryTarget}; "
-                          + "este passo compra informacao, nao entrega."
+                          + "avanca para o escuro na direcao dela."
                         : $"({(anchorIsTactical ? "Tactical" : "Operational")}; "
                           + $"alvo {primaryTarget}; passageiro anda "
                           + $"{anchorPassengerCost} de la) — mira a ZONA, "
