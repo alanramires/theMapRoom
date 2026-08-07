@@ -58,7 +58,6 @@ public class UnitManagerEditor : Editor
     private SerializedProperty aiAssignedPlanBadgeProp;
     private SerializedProperty aiAssignedPlanRoleProp;
     private SerializedProperty aiAssignedPlanBadgeVisibleProp;
-    private SerializedProperty aiHasDesignatedMissionProp;
     private SerializedProperty aiDesignatedMissionIntentProp;
     private SerializedProperty aiDesignatedMissionTargetUnitInstanceIdProp;
     private SerializedProperty aiDesignatedMissionTargetConstructionInstanceIdProp;
@@ -121,7 +120,6 @@ public class UnitManagerEditor : Editor
         aiAssignedPlanBadgeProp = serializedObject.FindProperty("aiAssignedPlanBadge");
         aiAssignedPlanRoleProp = serializedObject.FindProperty("aiAssignedPlanRole");
         aiAssignedPlanBadgeVisibleProp = serializedObject.FindProperty("aiAssignedPlanBadgeVisible");
-        aiHasDesignatedMissionProp = serializedObject.FindProperty("aiHasDesignatedMission");
         aiDesignatedMissionIntentProp = serializedObject.FindProperty("aiDesignatedMissionIntent");
         aiDesignatedMissionTargetUnitInstanceIdProp = serializedObject.FindProperty("aiDesignatedMissionTargetUnitInstanceId");
         aiDesignatedMissionTargetConstructionInstanceIdProp = serializedObject.FindProperty("aiDesignatedMissionTargetConstructionInstanceId");
@@ -391,8 +389,18 @@ public class UnitManagerEditor : Editor
             EditorGUILayout.PropertyField(aiAssignedPlanBadgeProp, new GUIContent("Plan Badge"));
         if (aiAssignedPlanBadgeVisibleProp != null)
             EditorGUILayout.PropertyField(aiAssignedPlanBadgeVisibleProp, new GUIContent("Badge Visible"));
-        if (aiHasDesignatedMissionProp != null)
-            EditorGUILayout.PropertyField(aiHasDesignatedMissionProp, new GUIContent("Has Designated Mission"));
+        // Derivado do verbo, nao editavel: escolher um Mission Intent JA designa a
+        // missao. Fica visivel so como leitura porque a pergunta "tem missao?" e
+        // usada em varios lugares e ajuda a ler o estado de relance.
+        using (new EditorGUI.DisabledScope(true))
+        {
+            EditorGUILayout.Toggle(
+                new GUIContent(
+                    "Has Designated Mission",
+                    "Derivado: Mission Intent != None."),
+                target is UnitManager inspected
+                && inspected.AIHasDesignatedMission);
+        }
         if (aiDesignatedMissionIntentProp != null)
             EditorGUILayout.PropertyField(
                 aiDesignatedMissionIntentProp,
@@ -415,33 +423,23 @@ public class UnitManagerEditor : Editor
                     "A espera é derivada (turno atual − carimbo), não incrementada."));
         }
 
-        // Atalho: plantar missao de captura exige tres campos concordando, e
-        // errar um deles produz um estado que o runtime rejeita em silencio.
-        if (aiHasDesignatedMissionProp != null
-            && aiDesignatedMissionIntentProp != null
+        // "Plantar missao" saiu: com Has Designated Mission derivado nao ha mais
+        // tres campos para conciliar — escolher o intent e a celula ja e plantar.
+        // Limpar continua util porque zera alvo e ids de uma vez.
+        if (aiDesignatedMissionIntentProp != null
             && aiDesignatedMissionTargetCellProp != null)
         {
-            using (new EditorGUILayout.HorizontalScope())
+            if (GUILayout.Button("Limpar missão", GUILayout.Width(130f)))
             {
-                if (GUILayout.Button("Plantar missão Capture na célula acima"))
-                {
-                    aiHasDesignatedMissionProp.boolValue = true;
-                    aiDesignatedMissionIntentProp.enumValueIndex =
-                        (int)AIPlanRuntimeIntent.Capture;
-                }
-                if (GUILayout.Button("Limpar missão", GUILayout.Width(110)))
-                {
-                    aiHasDesignatedMissionProp.boolValue = false;
-                    aiDesignatedMissionIntentProp.enumValueIndex =
-                        (int)AIPlanRuntimeIntent.None;
-                    aiDesignatedMissionTargetCellProp.vector3IntValue =
-                        Vector3Int.zero;
-                    if (aiDesignatedMissionTargetConstructionInstanceIdProp != null)
-                        aiDesignatedMissionTargetConstructionInstanceIdProp.intValue = -1;
-                    if (aiDesignatedMissionTargetUnitInstanceIdProp != null)
-                        aiDesignatedMissionTargetUnitInstanceIdProp.intValue = -1;
-                    pickingMissionCell = false;
-                }
+                aiDesignatedMissionIntentProp.enumValueIndex =
+                    (int)AIPlanRuntimeIntent.None;
+                aiDesignatedMissionTargetCellProp.vector3IntValue =
+                    Vector3Int.zero;
+                if (aiDesignatedMissionTargetConstructionInstanceIdProp != null)
+                    aiDesignatedMissionTargetConstructionInstanceIdProp.intValue = -1;
+                if (aiDesignatedMissionTargetUnitInstanceIdProp != null)
+                    aiDesignatedMissionTargetUnitInstanceIdProp.intValue = -1;
+                pickingMissionCell = false;
             }
         }
 

@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
@@ -170,7 +170,6 @@ public class UnitManager : MonoBehaviour
     // "estou capturando (0,0)" num campo e "Mission Intent: None" no outro, na
     // mesma tela — duas verdades sobre o que a unidade esta fazendo.
     [Tooltip("Missao individual persistente: captura, transporte, agenda retomada apos desembarque.")]
-    [SerializeField] private bool aiHasDesignatedMission;
     [SerializeField] private AIPlanRuntimeIntent aiDesignatedMissionIntent = AIPlanRuntimeIntent.None;
     [SerializeField] private int aiDesignatedMissionTargetUnitInstanceId = -1;
     [SerializeField] private int aiDesignatedMissionTargetConstructionInstanceId = -1;
@@ -290,8 +289,7 @@ public class UnitManager : MonoBehaviour
     public bool AIAssignedPlanBadgeVisible => aiAssignedPlanBadgeVisible;
     // Derivados da missao. Nao ha o que sincronizar porque nao ha dois donos.
     public bool AIHasDesignatedCaptureTarget =>
-        aiHasDesignatedMission
-        && aiDesignatedMissionIntent == AIPlanRuntimeIntent.Capture;
+        aiDesignatedMissionIntent == AIPlanRuntimeIntent.Capture;
     public int AIDesignatedCaptureTargetInstanceId =>
         AIHasDesignatedCaptureTarget
             ? aiDesignatedMissionTargetConstructionInstanceId
@@ -300,7 +298,11 @@ public class UnitManager : MonoBehaviour
         AIHasDesignatedCaptureTarget
             ? aiDesignatedMissionTargetCell
             : Vector3Int.zero;
-    public bool AIHasDesignatedMission => aiHasDesignatedMission;
+    // DERIVADO do verbo, nao armazenado. O enum ja tem o valor None, entao um
+    // bool separado seria uma segunda verdade para o mesmo fato — e duas verdades
+    // acabam divergindo. Escolher um intent JA e designar a missao.
+    public bool AIHasDesignatedMission =>
+        aiDesignatedMissionIntent != AIPlanRuntimeIntent.None;
     public AIPlanRuntimeIntent AIDesignatedMissionIntent => aiDesignatedMissionIntent;
     public int AIDesignatedMissionTargetUnitInstanceId => aiDesignatedMissionTargetUnitInstanceId;
     public int AIDesignatedMissionTargetConstructionInstanceId => aiDesignatedMissionTargetConstructionInstanceId;
@@ -420,7 +422,7 @@ public class UnitManager : MonoBehaviour
         int constructionInstanceId,
         Vector3Int cell)
     {
-        if (aiHasDesignatedMission
+        if (AIHasDesignatedMission
             && aiDesignatedMissionIntent != AIPlanRuntimeIntent.Capture)
         {
             return false;
@@ -457,7 +459,6 @@ public class UnitManager : MonoBehaviour
         int sector = 0)
     {
         targetCell.z = 0;
-        aiHasDesignatedMission = intent != AIPlanRuntimeIntent.None;
         aiDesignatedMissionIntent = intent;
         aiDesignatedMissionTargetUnitInstanceId = targetUnitInstanceId;
         aiDesignatedMissionTargetConstructionInstanceId = targetConstructionInstanceId;
@@ -467,7 +468,6 @@ public class UnitManager : MonoBehaviour
 
     public void ClearAIDesignatedMission()
     {
-        aiHasDesignatedMission = false;
         aiDesignatedMissionIntent = AIPlanRuntimeIntent.None;
         aiDesignatedMissionTargetUnitInstanceId = -1;
         aiDesignatedMissionTargetConstructionInstanceId = -1;

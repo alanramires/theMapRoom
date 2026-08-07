@@ -303,7 +303,6 @@ public class UnitSaveData
     public string aiAssignedPlanBadge;
     public int aiAssignedPlanRole = 0;
     public bool aiAssignedPlanBadgeVisible;
-    public bool aiHasDesignatedMission;
     public int aiDesignatedMissionIntent;
     public int aiDesignatedMissionTargetUnitInstanceId = -1;
     public int aiDesignatedMissionTargetConstructionInstanceId = -1;

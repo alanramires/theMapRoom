@@ -238,8 +238,6 @@ public static class SaveDataMapper
             aiAssignedPlanBadge = unit.AIAssignedPlanBadge,
             aiAssignedPlanRole = unit.AIAssignedPlanRole,
             aiAssignedPlanBadgeVisible = unit.AIAssignedPlanBadgeVisible,
-            aiHasDesignatedMission =
-                unit.AIHasDesignatedMission,
             aiDesignatedMissionIntent =
                 (int)unit.AIDesignatedMissionIntent,
             aiDesignatedMissionTargetUnitInstanceId =
@@ -370,7 +368,8 @@ public static class SaveDataMapper
         else
             unit.ClearAIAssignedPlan();
 
-        if (saved.aiHasDesignatedMission)
+        if ((AIPlanRuntimeIntent)saved.aiDesignatedMissionIntent
+            != AIPlanRuntimeIntent.None)
         {
             unit.SetAIDesignatedMission(
                 (AIPlanRuntimeIntent)saved.aiDesignatedMissionIntent,
