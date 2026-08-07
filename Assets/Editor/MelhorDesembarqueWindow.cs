@@ -131,6 +131,8 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
             TryUseCurrentSelectionAsTransporter();
         if (GUILayout.Button("Auto Detect"))
             AutoDetectRuntimeSelection();
+        if (GUILayout.Button("Limpar", GUILayout.Width(70f)))
+            ClearAll();
         EditorGUILayout.EndHorizontal();
 
         DrawEmbarkedPassengerGrid();
@@ -980,6 +982,41 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
     [SerializeField] private string triageStatus = string.Empty;
     private readonly List<Vector3Int> triageDeliverable = new List<Vector3Int>();
     private readonly List<Vector3Int> triageRejected = new List<Vector3Int>();
+
+    /// <summary>
+    /// Zera a bancada inteira: contexto, resultados, triagem, caches e modos de
+    /// selecao. Existe porque estado sobrando entre dois cenarios e a forma mais
+    /// facil de ler um resultado como se fosse de outro tabuleiro — e a janela
+    /// guarda cache de rota, que sobrevive a troca de unidade.
+    /// </summary>
+    private void ClearAll()
+    {
+        passenger = null;
+        transporter = null;
+
+        hasPickedTargetCell = false;
+        pickedTargetCell = Vector3Int.zero;
+        hasSecondPickedTargetCell = false;
+        secondPickedTargetCell = Vector3Int.zero;
+        pickingTargetCell = false;
+        pickingSecondTargetCell = false;
+
+        ranking.Clear();
+        selected = null;
+        routeCache.Clear();
+        routeFloods = 0;
+        routeBudgetExhausted = false;
+
+        triageDeliverable.Clear();
+        triageRejected.Clear();
+        triageStatus = string.Empty;
+
+        scroll = Vector2.zero;
+        status = "Selecione o passageiro; o hex desejado e opcional.";
+
+        SceneView.RepaintAll();
+        Repaint();
+    }
 
     private void RunDeliverableLocationTriage()
     {
