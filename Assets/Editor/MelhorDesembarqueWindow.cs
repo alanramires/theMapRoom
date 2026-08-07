@@ -34,7 +34,16 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
     // Nevoa: mesmo par do Melhor Captura. Sem isto a bancada respondia com o
     // tabuleiro inteiro enquanto o runtime recusava tudo por preto — duas
     // ferramentas dando respostas opostas sobre a mesma cena.
-    [SerializeField] private bool applyFogOfWar;
+    // SEM NEVOA NESTA JANELA, de proposito.
+    //
+    //   "no fundo a ferramenta devolve o mapa alheio a fow e a AI courier
+    //    decide, ne?" (autor, 2026-08-07)
+    //
+    // E a divisao de camadas do projeto: a bancada responde GEOMETRIA —
+    // onde daria para entregar, quanto o passageiro andaria, qual a banda.
+    // Conhecimento e decisao sao do organizador. Tentar prever com nevoa
+    // aqui nunca ia bater com o jogo: o commit e que revela, entao a
+    // bancada sempre olharia com a informacao de ANTES do passo.
     // Teto de rota restante do passageiro, o mesmo que o runtime chama de
     // dropOffRange. Sem ele a bancada ranqueava LZ com o passageiro a 15 hexes
     // do alvo — resposta que o jogo nunca daria. -1 = automatico (Operational
@@ -149,12 +158,6 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
             AutoDetectRuntimeSelection();
         if (GUILayout.Button("Limpar", GUILayout.Width(70f)))
             ClearAll();
-        using (new EditorGUI.DisabledScope(
-                   Application.isPlaying || matchController == null))
-        {
-            if (GUILayout.Button("Cozinhar FOW 0", GUILayout.Width(110f)))
-                CookRoundZeroFog();
-        }
         EditorGUILayout.EndHorizontal();
 
         dropOffRangeOverride = EditorGUILayout.IntField(
@@ -171,14 +174,6 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
                 + "rota restante acima do teto. O runtime também as ignora — "
                 + "aqui elas aparecem para explicar por que o ranking encolheu."),
             showRejectedByRange);
-        applyFogOfWar = EditorGUILayout.Toggle(
-            new GUIContent(
-                "Aplicar névoa",
-                "No Edit Mode usa o bake manual da rodada 0 para o slot do "
-                + "transportador. No runtime usa o snapshot confirmado do "
-                + "mesmo slot. Desligado, a bancada enxerga o tabuleiro todo — "
-                + "util para ver a zona teorica, enganoso para prever a IA."),
-            applyFogOfWar);
 
         DrawEmbarkedPassengerGrid();
 
@@ -562,8 +557,6 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
         }
 
         FogKnowledgeSnapshot fogKnowledge = null;
-        if (applyFogOfWar && !TryCopyFogKnowledge(out fogKnowledge))
-            return;
 
         MelhorDesembarqueResult result;
         try
@@ -1099,8 +1092,10 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
     private System.Func<Vector3Int, bool> BuildTransporterCellGate(
         FogKnowledgeSnapshot fogKnowledge)
     {
-        if (!applyFogOfWar)
+        // Sempre nulo: a bancada nao filtra por conhecimento.
+        {
             return null;
+        }
 
         if (Application.isPlaying && matchController != null)
             return cell =>
@@ -1383,8 +1378,6 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
         }
 
         FogKnowledgeSnapshot fog = null;
-        if (applyFogOfWar && !TryCopyFogKnowledge(out fog))
-            return;
 
         Vector3Int from = transporter.CurrentCellPosition;
         from.z = 0;
@@ -1494,8 +1487,6 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
         // TRANSPORTADOR — e o casco que precisa terminar o movimento ali. Por
         // isso o filtro de nevoa e o do transportador, o mesmo que o runtime usa.
         FogKnowledgeSnapshot bandFog = null;
-        if (applyFogOfWar && transporter != null)
-            TryCopyFogKnowledge(out bandFog);
         System.Func<Vector3Int, bool> knows = BuildTransporterCellGate(bandFog);
 
         foreach (KeyValuePair<Vector3Int, int> entry in reach)
@@ -1547,9 +1538,6 @@ public sealed class MelhorDesembarqueWindow : EditorWindow
             return;
         DrawBand(bandTactical, new Color(0.25f, 1f, 0.35f, 0.55f));
         DrawBand(bandOperational, new Color(0.35f, 0.6f, 1f, 0.45f));
-        // Amarelo ficou livre quando o neutro do ranking virou cinza. Aqui ele
-        // ganha sentido proprio: "esta na zona, mas hoje nao da".
-        DrawBand(bandFogged, new Color(1f, 0.9f, 0.15f, 0.5f));
 
         // Anel, nao disco: elas NAO sao candidatas. O contorno diz "olhei e
         // descartei", que e diferente de "nunca existiu".
