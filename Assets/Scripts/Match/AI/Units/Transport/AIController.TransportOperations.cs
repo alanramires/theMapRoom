@@ -33,6 +33,15 @@ public partial class AIController
         if (criticalStockAction != null)
             return criticalStockAction;
 
+        // A ficha poe Embarcar no topo dos DOIS modos. Fica aqui, e nao acima
+        // do estoque critico, porque reordenar uma preempcao que ja existe e
+        // mudanca de outra frente — e um APC nao e supridor, entao na pratica
+        // as duas nunca disputam.
+        PlayerAction nestedEmbarkAction =
+            TryDecideNestedTransportEmbarkAction(unit, snapshot);
+        if (nestedEmbarkAction != null)
+            return nestedEmbarkAction;
+
         // Esta autorizacao precisa viver antes do roteador Courier: do
         // contrario, "carga embarcada" vence e transforma a aeronave pronta
         // em uma missao de entrega. Havendo paciente ainda em UnderRepair, o
@@ -161,6 +170,81 @@ public partial class AIController
             $"estoque critico preempta EVAC/Pickup " +
             $"({restockReason}; {need.reason}; {stockReason})");
         return action;
+    }
+
+    /// <summary>
+    /// ANINHAMENTO — o transportador tambem e passageiro.
+    ///
+    /// "O Soldado no APC, o APC no navio; um carrega o outro para atravessar o
+    /// rio." A ficha poe Embarcar no TOPO dos dois modos justamente por isto:
+    /// um transportador que sabe que nao entrega sozinho pede carona tambem.
+    ///
+    /// A GUARDA DA FICHA JA ESTA PUBLICADA. O verso diz que ele so sobe se isso
+    /// encurtar a missao — "nao o faria, pois ja esta no tatico dos passageiros"
+    /// — e e exatamente o que o QueroCarona responde: um APC que alcanca o
+    /// destino da carga devolve wantsRide=false e nunca entra na fila. Entao o
+    /// gate e a propria fila, e nao uma regra nova.
+    ///
+    /// Irmao de TryEvacEmbarkAction, com tres filtros trocados: vaga em vez de
+    /// casco vazio (o navio pode ja levar alguem), a fila como necessidade, e a
+    /// guarda contra subir em quem esta embarcado — inclusive dentro de mim.
+    /// </summary>
+    private PlayerAction TryDecideNestedTransportEmbarkAction(
+        UnitManager unit,
+        AIWorldSnapshot snapshot)
+    {
+        if (unit == null
+            || snapshot == null
+            || unit.IsEmbarked
+            || unit.IsDead
+            || !HasTransportCargo(unit)
+            || !unit.AIIsWaitingForRide)
+        {
+            return null;
+        }
+
+        int budget = Mathf.Max(0, unit.RemainingMovementPoints);
+        var options = new List<PodeEmbarcarOption>();
+        PodeEmbarcarSensor.CollectOptions(
+            unit, boardTilemap, terrainDatabase, budget, options);
+        if (options.Count == 0)
+            return null;
+
+        Vector3Int fromCell = unit.CurrentCellPosition;
+        fromCell.z = 0;
+        Dictionary<Vector3Int, List<Vector3Int>> paths =
+            UnitMovementPathRules.CalcularCaminhosValidos(
+                boardTilemap, unit, budget, terrainDatabase);
+
+        for (int i = 0; i < options.Count; i++)
+        {
+            PodeEmbarcarOption option = options[i];
+            UnitManager host = option?.transporterUnit;
+            if (host == null
+                || host == unit
+                || host.IsDead
+                || host.IsUnderRepair
+                // Embarcado cobre os dois casos de aninhamento mutuo: quem ja
+                // esta dentro de outro, e quem esta dentro de MIM.
+                || host.IsEmbarked
+                || host.SlotIndex != unit.SlotIndex
+                || !host.TryGetUnitData(out UnitData hostData)
+                || hostData == null
+                || IsTransporterAtCapacity(host, hostData))
+            {
+                continue;
+            }
+
+            Debug.Log(
+                $"{TL("Transporte")} {unit.InstanceId} ANINHA — embarca em " +
+                $"#{host.InstanceId} slot {option.transporterSlotIndex} " +
+                $"levando a carga junto.");
+            return BuildEmbarcarBatch(
+                unit, snapshot.AITeam, fromCell,
+                host, option.transporterSlotIndex, paths);
+        }
+
+        return null;
     }
 
     /// <summary>
