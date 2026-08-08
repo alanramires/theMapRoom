@@ -49,28 +49,97 @@ inteiro como lista de candidatos e **nenhuma deu ao navio motivo para ficar**:
 histerese, mas o farol só pesa quando a opção do prometido **está na lista**;
 fora dela, ela não perde para nada, ela não existe.
 
-### As duas metades do mesmo aperto de mão
+### ✅ Resolvido depois da tag — o aninhamento
 
-Nenhuma das duas sozinha fecha o ciclo:
+`abd5d91` (fora da v8.1.1): `TryDecideNestedTransportEmbarkAction`, irmão do
+`TryEvacEmbarkAction`, no topo de `TryDecideTransportOperationsAction`. **T15
+fechada.** Validado em campo no T4:
 
-| # | onde | o quê |
-|---|---|---|
-| 1 | `TryQueryTransportPickupOperation` | promessa pendente cujo passageiro não é materializável **hoje** deve **segurar posição**, não trocar de passageiro |
-| 2 | `TransportOperationsService.BuildAttempts` | `HasCargo` devolve cedo (`Courier; Delivery; return`) — falta a tentativa **`Embark`** no topo, que a ficha manda ser o topo nos dois modos (aninhamento) |
+```text
+[Transporte] 8 ANINHA — embarca em #9 slot 1 levando a carga junto.
+```
+
+O gate é a própria fila de carona: quem alcança o destino da carga devolve
+`wantsRide = false` e nunca sobe. A guarda da ficha já estava publicada.
 
 ⚠️ **`Embarcar` do transportador ≠ `embarcar` da unidade.** O primeiro é
 aninhar-se noutro veículo; o segundo é o passageiro subir. Confundi os dois numa
-sessão inteira — a que falta é a primeira, feita ao APC carregado.
+sessão inteira.
 
-### O defer da iniciativa — compilado, NUNCA rodado
+### ❌ E a promessa NÃO precisa de conserto — a proposta anterior estava errada
+
+O que estava escrito aqui — *"promessa pendente deve segurar posição"* —
+transformava o farol em lock, e o cabeçalho do `RidePromise.cs` proíbe isso:
+*"promessa NÃO é preempção; ela pesa na escolha, não sequestra o veículo"*.
+
+A baixa por terceiro **já funciona**: `#9 baixa a promessa a pax=#1: passageiro
+embarcou`, e promete a outro no turno seguinte. O navio a vaguear era sintoma do
+aninhamento em falta, não de lock em falta. **Não implementar.**
+
+---
+
+## ⏭️ O PRÓXIMO ITEM — o peso da vaga
+
+Com o aninhamento a funcionar, apareceu o que estava por baixo. Ficha do Chinook:
+
+```yaml
+- slotId: passageiros   capacity: 2   exclusiveSlot: 0
+- slotId: APC           capacity: 1   exclusiveSlot: 1   ← ocupa o casco inteiro
+```
+
+`exclusiveSlot` tem **zero leitores na IA** — só `UnitManager.cs:2506-2510`, o
+motor. O `MelhorEmbarque` oferece o mesmo Chinook a quatro passageiros ao mesmo
+tempo (`slot=0` a dois soldados, `slot=1` a dois APCs) e o motor recusa depois.
+
+**A conta que a IA não sabe fazer:**
+
+```text
+Chinook com APC carregado (1 soldado)  →  2 unidades, casco inteiro
+Chinook com 2 soldados                 →  2 unidades, casco inteiro
+                                          ─────────── EMPATE
+```
+
+E o navio já vinha buscar aquele APC. O aninhamento no Chinook não ganhou nada,
+custou a carga do navio e deixou dois soldados na ilha.
+
+> **A IA não sabe o que uma vaga custa nem o que ela carrega.** Exclusividade e
+> carga aninhada são a mesma dimensão ausente, vista de dois lados.
+
+**Um termo, não dois itens:**
+
+```text
+peso da opção = unidades que traz − capacidade que desloca
+                                     ↑ é aqui que exclusiveSlot entra
+```
+
+Casa: `MelhorEmbarqueService`, o `optionScore` do laço de pares.
+
+⚠️ **É o laço mais caro do transporte** — 2356 pares e ~700ms no Chinook. Não
+abrir com pouca margem de contexto. E não escrever "ler `exclusiveSlot`" como
+gate isolado: isso não resolve nada; o que resolve é o termo.
+
+### Ainda em aberto, e independente
+
+`BuildAttempts` devolve cedo com carga (`Courier; Delivery; return`). Com vaga
+livre e alguém na fila, o transportador **não parte para entregar**: ou aproxima
+do tático do segundo caroneiro, ou segura. A guarda natural é o próprio Pickup —
+se ninguém está materializável, a escada cai sozinha para Courier. Sem constante
+nova. Decisão do autor, já tomada.
+
+### O defer da iniciativa — ✅ validado no T2
 
 `ShouldDeferPassengerForIncomingTransport` ([`AIController.Phase2.cs`](../Assets/Scripts/Match/AI/1.%20Phases/AIController.Phase2.cs)):
 quem está na fila de carona cede a vez a um transportador que ainda não agiu,
 tem vaga, está a ≤ MP+1 e encosta por topologia. Guarda `!secondPass` contra a
 cessão mútua com o `cede destino`.
 
-Sinal esperado: `Fase2 — Soldado#N espera carona e cede vez para APC#M encostar
-primeiro.`
+**Rodou e passou** — três cessões no T2:
+
+```text
+Fase2 — Soldado#4 espera carona e cede vez para APC#3 encostar primeiro.
+Fase2 — Soldado#11 espera carona e cede vez para APC#3 encostar primeiro.
+Fase2 — APC#8 espera carona e cede vez para APC#3 encostar primeiro.
+```
 
 ### Doutrina nova, escrita e sem código
 
