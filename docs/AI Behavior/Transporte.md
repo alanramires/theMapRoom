@@ -122,9 +122,16 @@ impede outros de embarcar no meio do caminho**.
 | o próximo da fila vira referência | ✅ — emergente: o principal é recalculado a cada decisão a partir de quem ainda está a bordo |
 | promessa não bloqueia embarque de terceiros | ✅ |
 | promessa persistente no `AIDesignatedMission` do transportador | ✅ `AIController.RidePromise.cs` |
-| com carga, o transportador herda o **destino da carga** no AI Plan Runtime | ⚠️ hoje a promessa guarda o **alvo do resgate** (`AIDesignatedMissionTargetUnitInstanceId`) e é **limpa** ao embarcar, em vez de virar o destino da carga |
+| outros transportadores leem a promessa como **farol distributivo** | ✅ preferem passageiros ainda sem farol; se não houver alternativa, atendem o mesmo passageiro |
+| com carga, o transportador herda o **destino da carga** no AI Plan Runtime | ✅ o courier publica `Transport` para o objetivo do passageiro; a promessa não recebe baixa quando a carga embarca no próprio casco |
 | encher a vaga livre no caminho | ❌ |
-| promessa reserva **uma vaga**, não o veículo | ❌ |
+| promessa reserva passageiro, vaga ou veículo | **não é doutrina** — promessa é farol, nunca lock |
+
+A distribuição tem duas memórias que formam um único sinal: os faróis
+provisórios da Fase 2 e a promessa persistida no `Mission Intent`. Um casco
+prefere carga ainda não apontada por outro, mas o filtro sempre possui fallback
+para os apontados. Assim três APCs podem convergir ao mesmo soldado quando ele é
+a única demanda; havendo três soldados equivalentes, tendem a se distribuir.
 
 ⚠️ **Cascata registrada:** implementar "encher a vaga livre" sozinho **piora** a
 fome do passageiro esquecido — o veículo fica ocupado mais tempo. Só entra junto

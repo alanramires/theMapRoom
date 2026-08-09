@@ -1495,6 +1495,24 @@ public partial class AIController
             }
         }
 
+        // Os dicionarios acima so vivem durante a Phase 2 atual. A promessa
+        // gravada no Mission Intent sobrevive entre turnos e precisa participar
+        // da mesma distribuicao; caso contrario, todo transportador que decide
+        // antes/depois em outra rodada enxerga a fila como se fosse o primeiro.
+        // Continua sendo farol, nao lock: os chamadores primeiro preferem um
+        // passageiro sem farol e depois fazem fallback para qualquer candidato.
+        foreach (UnitManager other in UnitManager.AllActive)
+        {
+            if (other == null
+                || other == transporter)
+            {
+                continue;
+            }
+
+            if (HasActiveRidePromiseFor(other, passenger))
+                return true;
+        }
+
         return false;
     }
 

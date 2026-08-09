@@ -53,6 +53,43 @@ public partial class AIController
     }
 
     /// <summary>
+    /// Leitura publica dentro do controller do farol persistido por um casco.
+    /// Nao reserva o passageiro e nao impede outro transporte de atende-lo;
+    /// serve apenas para distribuir a primeira escolha entre cascos que ainda
+    /// possuem alternativas equivalentes.
+    /// </summary>
+    private bool HasActiveRidePromiseFor(
+        UnitManager transporter,
+        UnitManager passenger)
+    {
+        if (transporter == null
+            || passenger == null
+            || passenger.IsEmbarked
+            || transporter == passenger
+            || transporter.IsDead
+            || transporter.IsEmbarked
+            || transporter.IsUnderRepair
+            || !PlayerSlotRelations.AreAllies(
+                transporter,
+                passenger)
+            || !transporter.TryGetUnitData(
+                out UnitData transporterData)
+            || transporterData == null
+            || !transporterData.isTransporter
+            || !TryGetRidePromise(
+                transporter,
+                out UnitManager promisedPassenger)
+            || promisedPassenger != passenger)
+        {
+            return false;
+        }
+
+        return CanTransporterMeetPassenger(
+            transporter,
+            passenger);
+    }
+
+    /// <summary>
     /// Registra a viagem devida. So e chamada quando a coleta NAO se resolve
     /// nesta rodada — pickup que termina hoje nao tem o que prometer, e
     /// transformar toda avaliacao em promessa encheria o Mission Intent de
