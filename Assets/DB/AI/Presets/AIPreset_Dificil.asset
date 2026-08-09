@@ -18,7 +18,7 @@ MonoBehaviour:
     respeitarListaBanida: 1
     projetarProducaoInimiga: 1
     aberturaBlindadoPrimeiro: 0
-    limitarLogistica: 0
+    limitarLogistica: 1
     dobrarSlotsCapturadorPorSetor: 1
     handoffEmProfundidade: 1
     conscricaoSempre: 1
