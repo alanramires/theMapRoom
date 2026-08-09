@@ -244,6 +244,92 @@ public partial class AIController
         return null;
     }
 
+    /// <summary>
+    /// Materializa a ordem do PLANO no Mission Intent do capturador formal.
+    ///
+    /// O planner ja decidiu unidade + setor; portanto esta etapa nao consulta
+    /// MelhorCaptura nem coloca a unidade no leilao residual dos rogues. Apenas
+    /// resolve o endereco que o comportamento formal ja usaria dentro daquele
+    /// setor e o publica para a propria unidade, carona, transporte e save.
+    ///
+    /// IA sem HQ nao tem plano e nunca passa por aqui: todos os capturadores
+    /// dela seguem para o matching rogue compartilhado.
+    /// </summary>
+    private void PublishPlannedCapturerMissionIntents(
+        TeamObjectivePlan plan,
+        TeamId aiTeam)
+    {
+        if (plan?.Objectives == null)
+            return;
+
+        foreach (SectorObjective objective in plan.Objectives)
+        {
+            if (objective?.Slots == null)
+                continue;
+
+            foreach (SlotNeed slot in objective.Slots)
+            {
+                if (slot == null
+                    || !slot.Filled
+                    || slot.Role != UnitRole.Capturador)
+                {
+                    continue;
+                }
+
+                UnitManager unit = FindActiveUnit(
+                    slot.AssignedUnitId,
+                    aiTeam);
+                if (unit == null || unit.IsDead)
+                    continue;
+
+                ConstructionManager target =
+                    FindCapturableInSector(
+                        objective.Sector,
+                        aiTeam,
+                        unit.CurrentCellPosition);
+                if (target == null)
+                {
+                    if (unit.AIHasDesignatedCaptureTarget)
+                    {
+                        int previous = unit
+                            .AIDesignatedCaptureTargetInstanceId;
+                        unit.ClearAIDesignatedCaptureTarget();
+                        Debug.Log(
+                            $"{TL("Missao")} {unit.InstanceId} Capture " +
+                            $"predio=#{previous} BAIXA: plano " +
+                            $"{objective.Sector} sem capturavel.");
+                    }
+                    continue;
+                }
+
+                Vector3Int cell = target.CurrentCellPosition;
+                cell.z = 0;
+                bool kept = unit.AIHasDesignatedCaptureTarget
+                    && unit.AIDesignatedCaptureTargetInstanceId
+                        == target.InstanceId
+                    && unit.AIDesignatedCaptureTargetCell == cell;
+                if (!unit.SetAIDesignatedCaptureTarget(
+                        target.InstanceId,
+                        cell))
+                {
+                    Debug.LogWarning(
+                        $"{TL("Missao")} {unit.InstanceId} nao publica " +
+                        $"Capture do plano {objective.Sector}: preserva " +
+                        $"{unit.AIDesignatedMissionIntent}.");
+                    continue;
+                }
+
+                if (!kept)
+                {
+                    Debug.Log(
+                        $"{TL("Missao")} {unit.InstanceId} Capture -> " +
+                        $"{cell} predio=#{target.InstanceId} " +
+                        $"(plano {objective.Sector}).");
+                }
+            }
+        }
+    }
+
     private bool SimulateCaptureSensor(UnitManager unit, Vector3Int simulatedCell,
         out ConstructionManager targetConstruction)
     {

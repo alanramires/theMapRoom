@@ -88,6 +88,12 @@ public partial class AIController
             foreach (SectorObjective objective in previousPlan.Objectives)
                 ClearObjectiveHUD(objective);
             ObjectiveManager.ClearPlanForSlot(aiSlot);
+            CaptureOpportunityClaimService.PublishForPlan(
+                aiSlot,
+                boardTilemap,
+                terrainDatabase,
+                CapturerRideOperationalTurns,
+                plan: null);
             currentAxisMap = null;
             Debug.Log($"{TL("Plan")} slot={aiSlot.Value} rebelde runtime: BuildObjectivePlan ignorado; distribuicao sera unidade-a-unidade por distancia.");
             return;
@@ -1650,6 +1656,22 @@ public partial class AIController
         // Passo 8: atualiza dist�ncias reais de cada slot at� seu objetivo
         RefreshSlotDistances(plan, aiTeam);
 
+        // O planner ja distribuiu unidade + setor aos capturadores formais.
+        // Publica essas ordens diretamente; MelhorCaptura fica reservado aos
+        // capturadores SEM plano, que disputam apenas o resto da refeicao.
+        PublishPlannedCapturerMissionIntents(plan, aiTeam);
+
+        // Atribuicao residual N rogues x M construcoes restantes. O solve
+        // acontece uma vez depois que o plano terminou; Phase2 e transporte
+        // apenas leem esta fotografia e nao permutam conforme cada unidade age.
+        CaptureOpportunityClaimSnapshot captureClaims =
+            CaptureOpportunityClaimService.PublishForPlan(
+                aiSlot,
+                boardTilemap,
+                terrainDatabase,
+                CapturerRideOperationalTurns,
+                plan);
+
         int totalAssigned = 0;
         var planLog = new System.Text.StringBuilder();
         planLog.AppendLine($"{TL("Plan")} {aiTeam} � {plan.Objectives.Count} objetivos:");
@@ -1670,6 +1692,9 @@ public partial class AIController
             }
         }
         planLog.Append($"  ? {totalAssigned} atribu�dos | {plan.RogueUnitIds.Count} rogues");
+        planLog.Append(
+            $" | captura rogue {captureClaims.Claims.Count} pares" +
+            $" / {captureClaims.Unmatched.Count} sem par");
         Debug.Log(planLog.ToString());
 
         AISectorIntentAnalyzer.RebuildAndLog(snapshot, plan, intel, "Plan");

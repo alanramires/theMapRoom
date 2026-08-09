@@ -103,8 +103,6 @@ public partial class AIController
 
         // Celulas onde ja ha aliado parado — proxy de "predio ja sendo capturado por nos".
         HashSet<Vector3Int> allyCells = new HashSet<Vector3Int>();
-        HashSet<int> designatedByOtherCapturers =
-            new HashSet<int>();
         if (snapshot.MyUnits != null)
         {
             for (int i = 0; i < snapshot.MyUnits.Count; i++)
@@ -114,13 +112,6 @@ public partial class AIController
                     continue;
                 Vector3Int ac = ally.CurrentCellPosition; ac.z = 0;
                 allyCells.Add(ac);
-                if (TryResolveUnitDesignatedCaptureTarget(
-                        ally,
-                        out ConstructionManager allyDesignated))
-                {
-                    designatedByOtherCapturers.Add(
-                        allyDesignated.InstanceId);
-                }
             }
         }
 
@@ -142,6 +133,17 @@ public partial class AIController
                     emulateUnderRepairFromUnitData =
                         false
                 });
+        if (hasDesignated
+            && collectiveClaims.TryGetClaim(
+                designated,
+                out CaptureOpportunityClaim designatedClaim)
+            && designatedClaim.Capturer != null
+            && designatedClaim.Capturer != unit)
+        {
+            // Farol antigo perdeu o pareamento coletivo: nao vira lock.
+            hasDesignated = false;
+            designated = null;
+        }
 
         foreach (ConstructionManager construction in ConstructionManager.AllActive)
         {
@@ -175,8 +177,6 @@ public partial class AIController
                 && collectiveClaim.Capturer != unit;
             if (claimedByAlliedCapturer ||
                 claimedByOtherCollectiveCapturer ||
-                designatedByOtherCapturers.Contains(
-                    construction.InstanceId) ||
                 rebelCaptureTargetReservations.Contains(cell))
                 continue;
 

@@ -752,8 +752,12 @@ Três linhas merecem leitura:
 
 **Melhor Captura existe.** Ele classifica construções para uma unidade sem
 decidir a distribuição global. `CaptureOpportunityClaimService` consome esses
-rankings para resolver o matching 1:1 compartilhado. Essa divisão preserva a
-regra de que consulta individual não pode reservar alvo por conta própria.
+rankings para resolver o matching 1:1 compartilhado **dos capturadores sem
+plano**. Com HQ, o planner publica primeiro as ordens formais e os
+`RogueUnitIds` dividem o que sobrou. Sem HQ não existe plano: todos entram como
+rogues no mesmo serviço. Essa divisão preserva a regra de que consulta
+individual não pode reservar alvo por conta própria e impede a criação de uma
+“IA rebelde” paralela.
 
 **Melhor Estoque está feito.** O cabeçalho dele descreve o
 contrato quase palavra por palavra: *"a onda nasce na unidade que tomará a
@@ -777,6 +781,13 @@ Serviço principal do papel **Capturador**.
 Para unidades sem plano — **Rogues** —, procura a construção capturável mais
 próxima alcançável dentro das bandas Tática ou Operacional. Unidades com plano já
 têm construção ou setor atribuído pelas ordens.
+
+**Diretriz compartilhada HQ/sem HQ.** `MelhorCapturaService` não pertence a uma
+facção: pertence ao estado **sem plano**. Numa IA com HQ, somente os rogues o
+usam, depois de os alvos formais serem retirados do conjunto. Numa IA sem HQ,
+todos os capturadores são rogues e usam exatamente o mesmo caminho. Alvo formal
+pode continuar como magnético para uma sobra, mas não volta ao matching como
+oportunidade livre.
 
 O serviço também considera **construções aliadas que não estejam com os pontos de
 captura no máximo**: isso indica que estão sob captura e precisam ser defendidas

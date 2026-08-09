@@ -1,8 +1,16 @@
 # Contrato — missão de captura (alocação pegajosa)
 
-**Estado:** desenho para revisão do autor, **nada escrito no runtime**. Escopo
-deste documento: o **básico** — só soldados, sem transporte, sem elite, sem
-suporte de fogo. O que depender de carona está marcado como fora de escopo.
+**Estado:** contrato histórico, parcialmente implementado e parcialmente
+supersedido. Escopo original: o **básico** — só soldados, sem transporte, sem
+elite, sem suporte de fogo. Use as atualizações datadas para distinguir o
+runtime atual do desenho antigo.
+
+> **ATUALIZAÇÃO VINCULANTE — 2026-08-09.** A população da aquisição foi
+> decidida depois deste rascunho: capturador **com plano não entra** no matching
+> do Melhor Captura. Com HQ, o planner publica as missões formais e somente os
+> `RogueUnitIds` dividem o restante; sem HQ, todos são rogues e usam o mesmo
+> matching residual. Toda passagem abaixo que põe formal + rogue no mesmo
+> leilão está supersedida por esta regra e por `Capturador.md` §2.
 
 > **HOJE** = código verificado. **CONTRATO** = decisão tomada, não escrita.
 > **ABERTO** = ninguém decidiu.
@@ -46,11 +54,10 @@ camada compartilhada** e parar de ter três representações.
 
 ## 1. O que muda
 
-**HOJE** `CaptureOpportunityClaimService` faz matching 1:1 sobre **todos** os
-capturadores e **todas** as construções alcançáveis, toda vez que o snapshot
-confirmado muda. A docstring é explícita: *"não sobrevive à mudança do snapshot
-confirmado"*. E `AIPlanRuntimeIntent.Capture` — verbo nº 1 do enum — tem **zero
-ocorrências no código**.
+**HOJE** `CaptureOpportunityClaimService` faz matching 1:1 somente sobre os
+capturadores **sem plano**. Endereços formais são publicados diretamente pelo
+planner em `AIPlanRuntimeIntent.Capture` e retirados do conjunto antes de os
+rogues dividirem o restante.
 
 **CONTRATO** A reivindicação vira missão:
 
@@ -97,10 +104,10 @@ e o conjunto de alvos ocupados se reconstrói dela na carga.
 
 ## 2. Aquisição
 
-**CONTRATO.** Sem mudança de critério: o matcher 1:1 determinístico continua como
-está — plano formal vence oportunidade, prioridade estável do capturador
-desempata antes do custo. A única diferença é a **população**: entram só quem não
-tem missão e prédios sem dono.
+**CONTRATO ATUAL.** O matcher 1:1 determinístico continua com a prioridade
+estável do capturador antes do custo, mas sua população é exclusivamente rogue.
+O plano formal não “vence” dentro do matcher: ele acontece antes e remove seus
+endereços. Entram depois os `RogueUnitIds`; sem plano, entram todos.
 
 **HOJE** a banda de aquisição é o **Operacional** (`CacheKey.OperationalTurns`;
 no log: *"alcança prédio capturável próximo no Operational: custo=5 no turno 2 de

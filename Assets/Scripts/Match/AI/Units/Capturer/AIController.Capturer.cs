@@ -188,7 +188,24 @@ public partial class AIController
     private PlayerAction DecideAssignedCapturerAction(UnitManager unit, AIWorldSnapshot snapshot, SectorObjective assigned)
     {
         Vector3Int fromCell = unit.CurrentCellPosition; fromCell.z = 0;
-        ConstructionManager target = FindCapturableInSector(assigned.Sector, snapshot.AITeam, fromCell);
+        // O plano ja materializou o endereco no inicio do turno. Consumir a
+        // missao evita escolher novamente por outra metrica depois que carona
+        // e transporte ja leram a ordem. O fallback cobre save antigo ou alvo
+        // que deixou de ser valido depois da publicacao.
+        ConstructionManager target = null;
+        if (TryResolveUnitDesignatedCaptureTarget(
+                unit, out ConstructionManager designated)
+            && designated.Sector == assigned.Sector)
+        {
+            target = designated;
+        }
+        else
+        {
+            target = FindCapturableInSector(
+                assigned.Sector,
+                snapshot.AITeam,
+                fromCell);
+        }
 
         // (C) Setor ja conquistado - modo Defensor
         if (target == null)
@@ -528,27 +545,35 @@ public partial class AIController
         return BuildMoveBatch(unit, snapshot.AITeam, fromCell, bestMove, paths);
     }
 
-    // Retorna true se `cell` é o alvo de captura de OUTRO setor com capturador ativo designado.
-    // Usado para evitar que um capturador avance para o objetivo alheio e bloqueie seu designado.
+    // A exclusividade vem da tabela 1:1 publicada pelo plano. Setor e farol
+    // designado nao criam uma segunda reserva em paralelo ao claim.
     private bool IsOtherAssignedCapturerTarget(Vector3Int cell, UnitManager unit, SectorObjective ownObjective, TeamObjectivePlan plan, TeamId aiTeam)
     {
-        if (plan == null) return false;
-        foreach (SectorObjective obj in plan.Objectives)
+        ConstructionManager construction =
+            ConstructionOccupancyRules.GetConstructionAtCell(
+                boardTilemap, cell);
+        if (construction == null
+            || !CaptureOpportunityClaimService
+                .TryGetPublishedForSlot(
+                    PlayerSlotId.FromIndex(ResolveAISlotKey(aiTeam)),
+                    out CaptureOpportunityClaimSnapshot claims)
+            || !claims.TryGetClaim(
+                construction, out CaptureOpportunityClaim claim))
         {
-            if (obj == ownObjective) continue;
-            if (obj.Status == ObjectiveStatus.Defending) continue;
-            ConstructionManager tgt = FindCapturableInSector(obj.Sector, aiTeam);
-            if (tgt == null) continue;
-            Vector3Int tgtCell = tgt.CurrentCellPosition; tgtCell.z = 0;
-            if (tgtCell != cell) continue;
-            foreach (SlotNeed slot in obj.Slots)
-            {
-                if (!slot.Filled || slot.Role != UnitRole.Capturador) continue;
-                UnitManager capturer = FindActiveUnit(slot.AssignedUnitId, aiTeam);
-                if (capturer != null) return true;
-            }
+            return false;
         }
-        return false;
+        // Sem par nao ganhou exclusividade, mas tambem nao perde iniciativa:
+        // cai no magnetico e pode convergir para o trabalho de outro. Claim e
+        // pareamento/endereco, nao propriedade do predio.
+        if (unit != null
+            && claims.TryGetUnmatched(
+                unit, out CaptureOpportunityUnmatched _))
+        {
+            return false;
+        }
+        return claim.Capturer != null
+            && (unit == null
+                || claim.Capturer.InstanceId != unit.InstanceId);
     }
 
     private bool TryFindRecommendedCapturerAdvanceCell(

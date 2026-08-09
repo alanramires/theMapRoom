@@ -5,27 +5,69 @@ using UnityEngine.Tilemaps;
 
 /// <summary>
 /// Reivindicacao provisoria produzida pelo planejamento coletivo de captura.
-/// Nao ocupa construcao, nao altera objetivo e nao sobrevive a mudanca do
-/// snapshot confirmado.
+/// Nao ocupa construcao nem altera a verdade confirmada do tabuleiro. Vive na
+/// fotografia do plano e e substituida somente quando o plano e republicado.
 /// </summary>
 public readonly struct CaptureOpportunityClaim
 {
     public readonly ConstructionManager Construction;
     public readonly UnitManager Capturer;
     public readonly int RouteCost;
+    public readonly int AssignmentCost;
+    public readonly int SwitchCost;
     public readonly bool FormalPlan;
 
     public CaptureOpportunityClaim(
         ConstructionManager construction,
         UnitManager capturer,
         int routeCost,
+        int assignmentCost,
+        int switchCost,
         bool formalPlan)
     {
         Construction = construction;
         Capturer = capturer;
         RouteCost = routeCost;
+        AssignmentCost = assignmentCost;
+        SwitchCost = switchCost;
         FormalPlan = formalPlan;
     }
+}
+
+public enum CaptureOpportunityUnmatchedReason
+{
+    NoReachableOpportunity,
+    ReservedByOtherCapturer,
+    BlockedByFormalPlan
+}
+
+public readonly struct CaptureOpportunityUnmatched
+{
+    public readonly UnitManager Capturer;
+    public readonly CaptureOpportunityUnmatchedReason Reason;
+    public readonly ConstructionManager MagneticTarget;
+
+    public CaptureOpportunityUnmatched(
+        UnitManager capturer,
+        CaptureOpportunityUnmatchedReason reason,
+        ConstructionManager magneticTarget)
+    {
+        Capturer = capturer;
+        Reason = reason;
+        MagneticTarget = magneticTarget;
+    }
+}
+
+/// <summary>
+/// Entrada ja avaliada pelo MelhorCaptura. O solve coletivo nao mede alcance:
+/// recebe uma lista de preferencias por sujeito e apenas faz o pareamento 1:1.
+/// </summary>
+public sealed class CaptureOpportunityGroupCandidate
+{
+    public UnitManager Unit;
+    public bool FormalPlan;
+    public ConstructionSector FormalSector;
+    public IReadOnlyList<MelhorCapturaAlvoScore> Ranking;
 }
 
 public sealed class CaptureOpportunityClaimSnapshot
@@ -37,12 +79,20 @@ public sealed class CaptureOpportunityClaimSnapshot
         claimsByConstructionId;
     private readonly Dictionary<int, CaptureOpportunityClaim>
         claimsByCapturerId;
+    private readonly List<CaptureOpportunityClaim> claims;
+    private readonly Dictionary<int, CaptureOpportunityUnmatched>
+        unmatchedByCapturerId;
+    private readonly List<CaptureOpportunityUnmatched> unmatched;
+
+    public IReadOnlyList<CaptureOpportunityClaim> Claims => claims;
+    public IReadOnlyList<CaptureOpportunityUnmatched> Unmatched => unmatched;
 
     internal CaptureOpportunityClaimSnapshot(
         int stateHash,
         int confirmedRevision,
         Dictionary<int, CaptureOpportunityClaim>
-            claimsByConstructionId)
+            claimsByConstructionId,
+        IEnumerable<CaptureOpportunityUnmatched> unmatched = null)
     {
         StateHash = stateHash;
         ConfirmedRevision = confirmedRevision;
@@ -62,6 +112,42 @@ public sealed class CaptureOpportunityClaimSnapshot
         {
             if (claim.Capturer != null)
                 claimsByCapturerId[claim.Capturer.InstanceId] = claim;
+        }
+
+        claims = new List<CaptureOpportunityClaim>(
+            this.claimsByConstructionId.Values);
+        claims.Sort((left, right) =>
+        {
+            int leftId = left.Capturer != null
+                ? left.Capturer.InstanceId
+                : int.MaxValue;
+            int rightId = right.Capturer != null
+                ? right.Capturer.InstanceId
+                : int.MaxValue;
+            return leftId.CompareTo(rightId);
+        });
+
+        this.unmatched = unmatched != null
+            ? new List<CaptureOpportunityUnmatched>(unmatched)
+            : new List<CaptureOpportunityUnmatched>();
+        this.unmatched.Sort((left, right) =>
+        {
+            int leftId = left.Capturer != null
+                ? left.Capturer.InstanceId
+                : int.MaxValue;
+            int rightId = right.Capturer != null
+                ? right.Capturer.InstanceId
+                : int.MaxValue;
+            return leftId.CompareTo(rightId);
+        });
+        unmatchedByCapturerId =
+            new Dictionary<int, CaptureOpportunityUnmatched>(
+                this.unmatched.Count);
+        for (int i = 0; i < this.unmatched.Count; i++)
+        {
+            CaptureOpportunityUnmatched item = this.unmatched[i];
+            if (item.Capturer != null)
+                unmatchedByCapturerId[item.Capturer.InstanceId] = item;
         }
     }
 
@@ -92,24 +178,49 @@ public sealed class CaptureOpportunityClaimSnapshot
                 construction.InstanceId,
                 out claim);
     }
+
+    public bool TryGetUnmatched(
+        UnitManager unit,
+        out CaptureOpportunityUnmatched item)
+    {
+        item = default;
+        return unit != null
+            && unmatchedByCapturerId.TryGetValue(
+                unit.InstanceId, out item);
+    }
 }
 
 /// <summary>
-/// Distribui construcoes alcancaveis entre capturadores do mesmo slot.
-/// Plano formal vence oportunidade; dentro de cada grupo, um matching
-/// deterministico maximiza o numero de capturadores com alvo. A prioridade
-/// estavel do capturador vence o desempate antes do custo: o claim representa
-/// a intencao do passageiro e o transporte apenas a consulta.
+/// Distribui construcoes alcancaveis entre capturadores SEM PLANO do mesmo
+/// slot. A IA com HQ publica primeiro as ordens formais e entrega a este
+/// servico apenas os RogueUnitIds; a IA sem HQ nao produz plano, portanto todos
+/// os seus capturadores entram pelo mesmo caminho rogue. Alvos formais ja
+/// publicados saem do conjunto antes do matching, mas podem continuar servindo
+/// como referencia magnetica para quem ficou sem par.
 ///
-/// POLITICA, NAO ALCANCE. Elegibilidade, precedencia plano-formal-vence-
-/// oportunidade, matching 1:1 e desempate sao deste servico. Quao longe cada
-/// capturador chega e de quanto custa a rota vem do UnitReachEnvelopeService,
-/// na intencao Capture: o envelope devolve so alcance, sem consultar
-/// PodeCapturar. Ver docs/contrato_envelope_alcance.md.
+/// O matching deterministico maximiza o numero de rogues com alvo e, nessa
+/// cardinalidade, minimiza o custo total. Permanecer no alvo anterior recebe
+/// histerese; papel e identidade servem apenas como desempate estavel.
+///
+/// POLITICA, NAO ALCANCE. Elegibilidade rogue, matching 1:1 e desempate sao
+/// deste servico. Quao longe cada capturador chega e de quanto custa a rota vem
+/// do UnitReachEnvelopeService, na intencao Capture: o envelope devolve so
+/// alcance, sem consultar PodeCapturar. Ver docs/contrato_envelope_alcance.md.
 /// </summary>
 public static class CaptureOpportunityClaimService
 {
     private const int MaxCacheEntries = 8;
+    private const int CaptureTargetSwitchCost = 15;
+    private const long PrimaryCostScale = 1000000L;
+
+    private sealed class PublishedClaims
+    {
+        public int MapObjectId;
+        public int TerrainDatabaseObjectId;
+        public int OperationalTurns;
+        public TeamObjectivePlan Plan;
+        public CaptureOpportunityClaimSnapshot Snapshot;
+    }
 
     private readonly struct CacheKey : IEquatable<CacheKey>
     {
@@ -171,6 +282,8 @@ public static class CaptureOpportunityClaimService
     {
         public ConstructionManager Construction;
         public int RouteCost;
+        public int AssignmentCost;
+        public int SwitchCost;
     }
 
     private sealed class Candidate
@@ -178,6 +291,7 @@ public static class CaptureOpportunityClaimService
         public UnitManager Unit;
         public bool FormalPlan;
         public ConstructionSector FormalSector;
+        public ConstructionManager MagneticTarget;
         public readonly List<Edge> Edges = new List<Edge>();
     }
 
@@ -187,6 +301,8 @@ public static class CaptureOpportunityClaimService
             new Dictionary<
                 CacheKey,
                 CaptureOpportunityClaimSnapshot>();
+    private static readonly Dictionary<int, PublishedClaims>
+        PublishedBySlot = new Dictionary<int, PublishedClaims>();
 
     /// <summary>
     /// <paramref name="requestReach"/> e o envelope de Captura que o chamador
@@ -213,6 +329,17 @@ public static class CaptureOpportunityClaimService
         TeamObjectivePlan plan =
             ObjectiveManager.GetPlanForSlot(
                 PlayerSlotId.FromIndex(request.unit.SlotIndex));
+        if (TryGetPublished(
+                request.unit.SlotIndex,
+                request.map,
+                request.terrainDatabase,
+                request.operationalTurns,
+                plan,
+                out CaptureOpportunityClaimSnapshot published))
+        {
+            AIDecisionPerf.AddCount("CaptureClaimPublishedHits");
+            return published;
+        }
         int stateHash = BuildStateHash(
             request.unit.SlotIndex,
             plan);
@@ -236,11 +363,230 @@ public static class CaptureOpportunityClaimService
             plan,
             confirmedRevision,
             stateHash,
-            requestReach);
+            requestReach,
+            previousSnapshot: null);
         if (Cache.Count >= MaxCacheEntries)
             Cache.Clear();
         Cache[key] = built;
         return built;
+    }
+
+    /// <summary>
+    /// Resolve e publica UMA tabela para o plano terminado. Consumidores da
+    /// fase leem esta fotografia mesmo que unidades ajam depois: movimento e
+    /// HasActed nao podem permutar as N reservas no meio da execucao.
+    /// </summary>
+    public static CaptureOpportunityClaimSnapshot PublishForPlan(
+        PlayerSlotId slot,
+        Tilemap map,
+        TerrainDatabase terrainDatabase,
+        int operationalTurns,
+        TeamObjectivePlan plan)
+    {
+        if (map == null || terrainDatabase == null)
+        {
+            ClearPublishedForSlot(slot);
+            return new CaptureOpportunityClaimSnapshot(0, -1, null);
+        }
+
+        UnitManager subject = null;
+        foreach (UnitManager unit in UnitManager.AllActive)
+        {
+            if (IsEligibleCapturer(unit, slot.Value))
+            {
+                subject = unit;
+                break;
+            }
+        }
+
+        int stateHash = BuildStateHash(slot.Value, plan);
+        int confirmedRevision = ResolveConfirmedRevision(map);
+        PublishedBySlot.TryGetValue(
+            slot.Value, out PublishedClaims previousPublication);
+        int mapObjectId = map.GetEntityId().GetHashCode();
+        int terrainDatabaseObjectId =
+            terrainDatabase.GetEntityId().GetHashCode();
+        CaptureOpportunityClaimSnapshot previous =
+            previousPublication != null
+            && previousPublication.MapObjectId == mapObjectId
+            && previousPublication.TerrainDatabaseObjectId
+                == terrainDatabaseObjectId
+                ? previousPublication.Snapshot
+                : null;
+
+        CaptureOpportunityClaimSnapshot snapshot;
+        if (subject == null)
+        {
+            snapshot = new CaptureOpportunityClaimSnapshot(
+                stateHash, confirmedRevision, null);
+        }
+        else
+        {
+            var request = new QueroCaronaRequest
+            {
+                unit = subject,
+                map = map,
+                terrainDatabase = terrainDatabase,
+                operationalTurns = Mathf.Max(1, operationalTurns)
+            };
+            snapshot = Build(
+                request,
+                plan,
+                confirmedRevision,
+                stateHash,
+                requestReach: null,
+                previousSnapshot: previous);
+        }
+
+        PublishedBySlot[slot.Value] = new PublishedClaims
+        {
+            MapObjectId = mapObjectId,
+            TerrainDatabaseObjectId = terrainDatabaseObjectId,
+            OperationalTurns = Mathf.Max(1, operationalTurns),
+            Plan = plan,
+            Snapshot = snapshot
+        };
+        PublishCaptureMissionIntents(slot.Value, snapshot);
+        return snapshot;
+    }
+
+    /// <summary>
+    /// Materializa a fotografia coletiva na ficha de cada capturador. Claim e
+    /// missao sao a mesma decisao vista por dois consumidores: o matching usa
+    /// a tabela 1:1; transporte, save e iniciativa leem Mission Intent.
+    ///
+    /// Isto roda no planejamento do turno, sobre estado confirmado, antes de
+    /// qualquer preview de acao. Nao ocupa construcao, nao move unidade e nao
+    /// altera a verdade do tabuleiro.
+    ///
+    /// Quem ficou sem par perde SOMENTE uma antiga missao Capture. Outros
+    /// verbos pertencem a outros fluxos e nunca sao apagados aqui. Unidade
+    /// embarcada/repair nao participa do novo solve e conserva sua missao para
+    /// que a entrega possa continuar apontando ao destino original.
+    /// </summary>
+    private static void PublishCaptureMissionIntents(
+        int slotIndex,
+        CaptureOpportunityClaimSnapshot snapshot)
+    {
+        if (snapshot == null)
+            return;
+
+        IReadOnlyList<CaptureOpportunityClaim> claims =
+            snapshot.Claims;
+        for (int i = 0; i < claims.Count; i++)
+        {
+            CaptureOpportunityClaim claim = claims[i];
+            UnitManager unit = claim.Capturer;
+            ConstructionManager construction = claim.Construction;
+            if (unit == null
+                || construction == null
+                || unit.SlotIndex != slotIndex
+                || unit.IsDead)
+            {
+                continue;
+            }
+
+            Vector3Int cell = construction.CurrentCellPosition;
+            cell.z = 0;
+            bool kept = unit.AIHasDesignatedCaptureTarget
+                && unit.AIDesignatedCaptureTargetInstanceId
+                    == construction.InstanceId
+                && unit.AIDesignatedCaptureTargetCell == cell;
+            if (!unit.SetAIDesignatedCaptureTarget(
+                    construction.InstanceId,
+                    cell))
+            {
+                // IsEligibleCapturer exclui outro verbo antes do matching. A
+                // guarda fica para proteger contra mudanca de estado entre o
+                // solve e a publicacao.
+                Debug.LogWarning(
+                    $"[CaptureClaim] unidade #{unit.InstanceId} recebeu " +
+                    $"claim de {construction.ConstructionDisplayName}@{cell}, " +
+                    $"mas preservou missao {unit.AIDesignatedMissionIntent}.");
+                continue;
+            }
+
+            if (!kept)
+            {
+                Debug.Log(
+                    $"[Missao] #{unit.InstanceId} Capture -> {cell} " +
+                    $"predio=#{construction.InstanceId} " +
+                    $"({(claim.FormalPlan ? "plano" : "oportunidade")}, " +
+                    $"matcher 1:1, custo={claim.RouteCost}).");
+            }
+        }
+
+        IReadOnlyList<CaptureOpportunityUnmatched> unmatched =
+            snapshot.Unmatched;
+        for (int i = 0; i < unmatched.Count; i++)
+        {
+            CaptureOpportunityUnmatched item = unmatched[i];
+            UnitManager unit = item.Capturer;
+            if (unit == null
+                || unit.SlotIndex != slotIndex
+                || !unit.AIHasDesignatedCaptureTarget)
+            {
+                continue;
+            }
+
+            int previousTarget =
+                unit.AIDesignatedCaptureTargetInstanceId;
+            unit.ClearAIDesignatedCaptureTarget();
+            string magnetic = item.MagneticTarget != null
+                ? $" magnetico=#{item.MagneticTarget.InstanceId}"
+                : string.Empty;
+            Debug.Log(
+                $"[Missao] #{unit.InstanceId} Capture predio=" +
+                $"#{previousTarget} BAIXA: sem par ({item.Reason});" +
+                magnetic);
+        }
+    }
+
+    public static bool TryGetPublishedForSlot(
+        PlayerSlotId slot,
+        out CaptureOpportunityClaimSnapshot snapshot)
+    {
+        snapshot = null;
+        if (!PublishedBySlot.TryGetValue(
+                slot.Value, out PublishedClaims published)
+            || published?.Snapshot == null)
+        {
+            return false;
+        }
+        snapshot = published.Snapshot;
+        return true;
+    }
+
+    public static void ClearPublishedForSlot(PlayerSlotId slot)
+    {
+        PublishedBySlot.Remove(slot.Value);
+    }
+
+    private static bool TryGetPublished(
+        int slotIndex,
+        Tilemap map,
+        TerrainDatabase terrainDatabase,
+        int operationalTurns,
+        TeamObjectivePlan plan,
+        out CaptureOpportunityClaimSnapshot snapshot)
+    {
+        snapshot = null;
+        if (!PublishedBySlot.TryGetValue(
+                slotIndex, out PublishedClaims published)
+            || published == null
+            || published.Snapshot == null
+            || published.Plan != plan
+            || published.MapObjectId
+                != map.GetEntityId().GetHashCode()
+            || published.TerrainDatabaseObjectId
+                != terrainDatabase.GetEntityId().GetHashCode()
+            || published.OperationalTurns
+                != Mathf.Max(1, operationalTurns))
+        {
+            return false;
+        }
+        snapshot = published.Snapshot;
+        return true;
     }
 
     public static int ResolveStateHash(
@@ -261,13 +607,39 @@ public static class CaptureOpportunityClaimService
         TeamObjectivePlan plan,
         int confirmedRevision,
         int stateHash,
-        UnitReachProfile requestReach)
+        UnitReachProfile requestReach,
+        CaptureOpportunityClaimSnapshot previousSnapshot)
     {
-        var formalCandidates = new List<Candidate>();
         var rogueCandidates = new List<Candidate>();
+        var formallyReservedConstructionIds = new HashSet<int>();
 
         foreach (UnitManager unit in UnitManager.AllActive)
         {
+            if (unit == null
+                || unit.SlotIndex != request.unit.SlotIndex
+                || unit.IsDead)
+            {
+                continue;
+            }
+
+            // Capturador formal ja recebeu unidade + setor do planner e teve o
+            // endereco materializado em Mission Intent. Ele NAO participa do
+            // MelhorCaptura residual; apenas retira sua refeicao da mesa antes
+            // de os rogues dividirem o que sobrou.
+            bool formal = TryResolveFormalCaptureSector(
+                unit,
+                plan,
+                out _);
+            if (formal)
+            {
+                if (unit.AIHasDesignatedCaptureTarget)
+                {
+                    formallyReservedConstructionIds.Add(
+                        unit.AIDesignatedCaptureTargetInstanceId);
+                }
+                continue;
+            }
+
             if (!IsEligibleCapturer(
                     unit,
                     request.unit.SlotIndex))
@@ -275,30 +647,24 @@ public static class CaptureOpportunityClaimService
                 continue;
             }
 
-            // O PLANO E DAQUI, O ALVO NAO E. Saber se esta unidade tem vaga
-            // formal, e em que setor, e leitura de plano — coisa de organizador.
-            // Qual construcao daquele conjunto vale mais e consulta, e mora no
-            // MelhorCapturaService.
-            bool formal = TryResolveFormalCaptureSector(
-                unit,
-                plan,
-                out ConstructionSector formalSector);
+            // IA com HQ declara explicitamente quem sobrou como rogue. Unidade
+            // sem slot de Capturador mas alocada a outro papel nao pode entrar
+            // escondida no leilao. Sem plano (IA sem HQ), todos sao rogues.
+            if (plan != null
+                && (plan.RogueUnitIds == null
+                    || !plan.RogueUnitIds.Contains(unit.InstanceId)))
+            {
+                continue;
+            }
 
-            // O setor desce como FILTRO sobre o conjunto, nunca como "o setor
-            // C": a consulta recebe construcoes, nao nomes de setor. Junto vai
-            // o teste de ocupacao aliada, que e a mesma pergunta de sempre —
-            // "eu consigo parar ali?" — e continua sendo politica de quem
-            // organiza, nao regra de captura.
+            // O teste de ocupacao aliada e a mesma pergunta de sempre — "eu
+            // consigo parar ali?" — e continua sendo politica de quem organiza,
+            // nao regra de captura.
             Tilemap map = request.map;
             UnitManager evaluated = unit;
-            ConstructionSector wantedSector = formalSector;
-            bool formalOnly = formal;
             Func<ConstructionManager, bool> gate = construction =>
             {
                 if (construction == null)
-                    return false;
-                if (formalOnly
-                    && construction.Sector != wantedSector)
                     return false;
                 Vector3Int cell =
                     construction.CurrentCellPosition;
@@ -337,33 +703,29 @@ public static class CaptureOpportunityClaimService
                     // ficha da construcao e a penalidade de pre-requisito de
                     // todo predio do mapa para jogar fora.
                     includeCaptureEffort = false,
-                    // Fora do envelope nao vira aresta logo abaixo. Pedir para
-                    // nem avaliar poupa a pergunta ao sensor nas dezenas de
-                    // construcoes distantes do mapa, por capturador.
-                    includeBeyondOperational = false
+                    // Beyond tambem participa: no endgame um predio distante
+                    // ainda recebe UM rogue; os demais conservam a mesma
+                    // referencia apenas como magnetico.
+                    includeBeyondOperational = true
                 });
 
             var candidate = new Candidate
             {
                 Unit = unit,
-                FormalPlan = formal,
-                FormalSector = formalSector
+                FormalPlan = false,
+                FormalSector = ConstructionSector.None,
+                MagneticTarget = captura.best?.construction
             };
 
             for (int i = 0; i < captura.ranking.Count; i++)
             {
                 MelhorCapturaAlvoScore alvo = captura.ranking[i];
-                // FORA DO ENVELOPE NAO VIRA ARESTA. A consulta pontua o que
-                // esta longe para responder "para que lado", com distancia
-                // cubica; reivindicar isso seria prometer um predio que a
-                // unidade nao alcanca em duas rodadas.
-                if (alvo.tier == MelhorCapturaTier.BeyondOperational)
-                    continue;
                 candidate.Edges.Add(
                     new Edge
                     {
                         Construction = alvo.construction,
-                        RouteCost = alvo.effectiveCost
+                        RouteCost = alvo.effectiveCost,
+                        AssignmentCost = alvo.effectiveCost
                     });
             }
 
@@ -375,31 +737,25 @@ public static class CaptureOpportunityClaimService
             // deixaria qualquer diferenca em jogo sem causa identificavel.
             // Trocar o criterio e passo proprio.
             candidate.Edges.Sort(CompareEdges);
-            if (candidate.Edges.Count == 0)
-                continue;
-            if (formal)
-                formalCandidates.Add(candidate);
-            else
-                rogueCandidates.Add(candidate);
+            rogueCandidates.Add(candidate);
         }
 
-        SortCandidates(formalCandidates);
         SortCandidates(rogueCandidates);
+
+        ApplySwitchCosts(
+            rogueCandidates,
+            previousSnapshot,
+            rogueCandidates.Count > 1);
 
         var claims =
             new Dictionary<int, CaptureOpportunityClaim>();
-        var formallyClaimedConstructionIds =
-            new HashSet<int>();
-        MatchCandidates(
-            formalCandidates,
-            claims,
-            blockedConstructionIds: null);
-        foreach (int constructionId in claims.Keys)
-            formallyClaimedConstructionIds.Add(constructionId);
+        var unmatched = new List<CaptureOpportunityUnmatched>();
         MatchCandidates(
             rogueCandidates,
             claims,
-            formallyClaimedConstructionIds);
+            unmatched,
+            formallyReservedConstructionIds,
+            blockedMeansFormal: true);
 
         AIDecisionPerf.AddCount(
             "CaptureClaimAssignments",
@@ -407,116 +763,397 @@ public static class CaptureOpportunityClaimService
         return new CaptureOpportunityClaimSnapshot(
             stateHash,
             confirmedRevision,
-            claims);
+            claims,
+            unmatched);
     }
 
+    private sealed class FlowArc
+    {
+        public int To;
+        public int Reverse;
+        public int Capacity;
+        public long Cost;
+        public Candidate Candidate;
+        public Edge Assignment;
+    }
+
+    /// <summary>
+    /// Max-flow de custo minimo: primeiro acha o maior numero de pares; entre
+    /// todos os pareamentos dessa cardinalidade escolhe o menor custo global.
+    /// Assim uma unidade so fica com o alvo disputado quando perder esse alvo
+    /// custa mais ao conjunto do que entrega-lo a outra unidade.
+    /// </summary>
     private static void MatchCandidates(
         List<Candidate> candidates,
         Dictionary<int, CaptureOpportunityClaim> claims,
-        HashSet<int> blockedConstructionIds)
+        List<CaptureOpportunityUnmatched> unmatched,
+        HashSet<int> blockedConstructionIds,
+        bool blockedMeansFormal)
     {
         if (candidates == null || candidates.Count == 0)
             return;
 
-        var candidatesByUnitId =
-            new Dictionary<int, Candidate>();
-        var ownerByConstructionId =
-            new Dictionary<int, int>();
+        var constructions = new List<ConstructionManager>();
+        var seenConstructionIds = new HashSet<int>();
         for (int i = 0; i < candidates.Count; i++)
         {
             Candidate candidate = candidates[i];
-            candidatesByUnitId[candidate.Unit.InstanceId] =
-                candidate;
+            for (int e = 0; e < candidate.Edges.Count; e++)
+            {
+                ConstructionManager construction =
+                    candidate.Edges[e]?.Construction;
+                if (construction == null)
+                    continue;
+                int id = construction.InstanceId;
+                if (blockedConstructionIds != null
+                    && blockedConstructionIds.Contains(id))
+                {
+                    continue;
+                }
+                if (seenConstructionIds.Add(id))
+                    constructions.Add(construction);
+            }
+        }
+        constructions.Sort((left, right) =>
+            left.InstanceId.CompareTo(right.InstanceId));
+
+        int source = 0;
+        int candidateStart = 1;
+        int constructionStart = candidateStart + candidates.Count;
+        int sink = constructionStart + constructions.Count;
+        var graph = new List<FlowArc>[sink + 1];
+        for (int i = 0; i < graph.Length; i++)
+            graph[i] = new List<FlowArc>();
+
+        var constructionNodeById = new Dictionary<int, int>();
+        for (int i = 0; i < constructions.Count; i++)
+        {
+            constructionNodeById[constructions[i].InstanceId] =
+                constructionStart + i;
+            AddFlowArc(graph, constructionStart + i, sink, 1, 0L);
         }
 
         for (int i = 0; i < candidates.Count; i++)
         {
-            TryAssign(
-                candidates[i],
-                candidatesByUnitId,
-                ownerByConstructionId,
-                blockedConstructionIds,
-                new HashSet<int>());
+            Candidate candidate = candidates[i];
+            int candidateNode = candidateStart + i;
+            AddFlowArc(graph, source, candidateNode, 1, 0L);
+            for (int e = 0; e < candidate.Edges.Count; e++)
+            {
+                Edge edge = candidate.Edges[e];
+                if (edge?.Construction == null
+                    || !constructionNodeById.TryGetValue(
+                        edge.Construction.InstanceId,
+                        out int constructionNode))
+                {
+                    continue;
+                }
+
+                // Tudo abaixo de PrimaryCostScale e apenas desempate. O custo
+                // de rota + troca sempre decide antes de papel/ordem estavel.
+                long tieCost =
+                    ResolveCapturerRolePrecedence(candidate.Unit) * 10000L
+                    + e;
+                AddFlowArc(
+                    graph,
+                    candidateNode,
+                    constructionNode,
+                    1,
+                    (long)Mathf.Max(0, edge.AssignmentCost)
+                        * PrimaryCostScale
+                        + tieCost,
+                    candidate,
+                    edge);
+            }
         }
 
-        foreach (KeyValuePair<int, int> pair
-                 in ownerByConstructionId)
+        RunMinCostMaxFlow(graph, source, sink);
+
+        var matchedUnitIds = new HashSet<int>();
+        for (int i = 0; i < candidates.Count; i++)
         {
-            if (!candidatesByUnitId.TryGetValue(
-                    pair.Value,
-                    out Candidate owner))
+            int candidateNode = candidateStart + i;
+            foreach (FlowArc arc in graph[candidateNode])
             {
-                continue;
+                if (arc.Assignment == null
+                    || arc.Candidate == null
+                    || arc.Capacity != 0)
+                {
+                    continue;
+                }
+                Candidate owner = arc.Candidate;
+                Edge edge = arc.Assignment;
+                matchedUnitIds.Add(owner.Unit.InstanceId);
+                claims[edge.Construction.InstanceId] =
+                    new CaptureOpportunityClaim(
+                        edge.Construction,
+                        owner.Unit,
+                        edge.RouteCost,
+                        edge.AssignmentCost,
+                        edge.SwitchCost,
+                        owner.FormalPlan);
+                break;
             }
-            Edge edge = owner.Edges.Find(candidateEdge =>
-                candidateEdge.Construction != null
-                && candidateEdge.Construction.InstanceId
-                    == pair.Key);
-            if (edge == null)
+        }
+
+        for (int i = 0; i < candidates.Count; i++)
+        {
+            Candidate candidate = candidates[i];
+            if (matchedUnitIds.Contains(candidate.Unit.InstanceId))
                 continue;
-            claims[pair.Key] =
-                new CaptureOpportunityClaim(
-                    edge.Construction,
-                    owner.Unit,
-                    edge.RouteCost,
-                    owner.FormalPlan);
+            bool hasUnblocked = false;
+            bool hasBlocked = false;
+            for (int e = 0; e < candidate.Edges.Count; e++)
+            {
+                Edge edge = candidate.Edges[e];
+                if (edge?.Construction == null)
+                    continue;
+                if (blockedConstructionIds != null
+                    && blockedConstructionIds.Contains(
+                        edge.Construction.InstanceId))
+                    hasBlocked = true;
+                else
+                    hasUnblocked = true;
+            }
+            CaptureOpportunityUnmatchedReason reason =
+                hasUnblocked
+                    ? CaptureOpportunityUnmatchedReason
+                        .ReservedByOtherCapturer
+                    : hasBlocked && blockedMeansFormal
+                        ? CaptureOpportunityUnmatchedReason
+                            .BlockedByFormalPlan
+                        : CaptureOpportunityUnmatchedReason
+                            .NoReachableOpportunity;
+            unmatched.Add(new CaptureOpportunityUnmatched(
+                candidate.Unit,
+                reason,
+                candidate.MagneticTarget));
         }
     }
 
-    private static bool TryAssign(
-        Candidate candidate,
-        Dictionary<int, Candidate> candidatesByUnitId,
-        Dictionary<int, int> ownerByConstructionId,
-        HashSet<int> blockedConstructionIds,
-        HashSet<int> visitedConstructionIds)
+    private static void AddFlowArc(
+        List<FlowArc>[] graph,
+        int from,
+        int to,
+        int capacity,
+        long cost,
+        Candidate candidate = null,
+        Edge assignment = null)
     {
-        for (int i = 0; i < candidate.Edges.Count; i++)
+        var forward = new FlowArc
         {
-            Edge edge = candidate.Edges[i];
-            if (edge?.Construction == null)
-                continue;
-            int constructionId =
-                edge.Construction.InstanceId;
-            if (blockedConstructionIds != null
-                && blockedConstructionIds.Contains(
-                    constructionId))
+            To = to,
+            Reverse = graph[to].Count,
+            Capacity = capacity,
+            Cost = cost,
+            Candidate = candidate,
+            Assignment = assignment
+        };
+        var reverse = new FlowArc
+        {
+            To = from,
+            Reverse = graph[from].Count,
+            Capacity = 0,
+            Cost = -cost
+        };
+        graph[from].Add(forward);
+        graph[to].Add(reverse);
+    }
+
+    private static void RunMinCostMaxFlow(
+        List<FlowArc>[] graph,
+        int source,
+        int sink)
+    {
+        int nodeCount = graph.Length;
+        var distance = new long[nodeCount];
+        var previousNode = new int[nodeCount];
+        var previousArc = new int[nodeCount];
+        var queued = new bool[nodeCount];
+        var queue = new Queue<int>();
+        const long infinity = long.MaxValue / 4L;
+
+        while (true)
+        {
+            for (int i = 0; i < nodeCount; i++)
             {
-                continue;
+                distance[i] = infinity;
+                previousNode[i] = -1;
+                previousArc[i] = -1;
+                queued[i] = false;
             }
-            if (!visitedConstructionIds.Add(
-                    constructionId))
+            distance[source] = 0L;
+            queue.Clear();
+            queue.Enqueue(source);
+            queued[source] = true;
+
+            while (queue.Count > 0)
             {
-                continue;
+                int node = queue.Dequeue();
+                queued[node] = false;
+                for (int i = 0; i < graph[node].Count; i++)
+                {
+                    FlowArc arc = graph[node][i];
+                    if (arc.Capacity <= 0
+                        || distance[node] + arc.Cost
+                            >= distance[arc.To])
+                    {
+                        continue;
+                    }
+                    distance[arc.To] = distance[node] + arc.Cost;
+                    previousNode[arc.To] = node;
+                    previousArc[arc.To] = i;
+                    if (!queued[arc.To])
+                    {
+                        queued[arc.To] = true;
+                        queue.Enqueue(arc.To);
+                    }
+                }
             }
 
-            if (!ownerByConstructionId.TryGetValue(
-                    constructionId,
-                    out int previousOwnerId))
+            if (previousNode[sink] < 0)
+                return;
+            for (int node = sink; node != source;
+                 node = previousNode[node])
             {
-                ownerByConstructionId[constructionId] =
-                    candidate.Unit.InstanceId;
-                return true;
+                FlowArc arc =
+                    graph[previousNode[node]][previousArc[node]];
+                arc.Capacity--;
+                graph[node][arc.Reverse].Capacity++;
             }
+        }
+    }
 
-            if (!candidatesByUnitId.TryGetValue(
-                    previousOwnerId,
-                    out Candidate previousOwner)
-                || !TryAssign(
-                    previousOwner,
-                    candidatesByUnitId,
-                    ownerByConstructionId,
-                    blockedConstructionIds,
-                    visitedConstructionIds))
+    /// <summary>
+    /// Solve puro usado por ferramentas e testes. Cada ranking continua sendo
+    /// produzido uma vez por sujeito pelo MelhorCaptura; este metodo somente
+    /// agrega. Com um sujeito nao existe custo de troca, preservando a escolha
+    /// unitária anterior exatamente.
+    /// </summary>
+    public static CaptureOpportunityClaimSnapshot SolveGroup(
+        IReadOnlyList<CaptureOpportunityGroupCandidate> inputs,
+        CaptureOpportunityClaimSnapshot previousSnapshot = null)
+    {
+        var formalCandidates = new List<Candidate>();
+        var rogueCandidates = new List<Candidate>();
+        if (inputs != null)
+        {
+            var seenUnits = new HashSet<int>();
+            for (int i = 0; i < inputs.Count; i++)
             {
-                continue;
+                CaptureOpportunityGroupCandidate input = inputs[i];
+                if (input?.Unit == null
+                    || !seenUnits.Add(input.Unit.InstanceId))
+                {
+                    continue;
+                }
+                var candidate = new Candidate
+                {
+                    Unit = input.Unit,
+                    FormalPlan = input.FormalPlan,
+                    FormalSector = input.FormalSector,
+                    MagneticTarget = input.Ranking != null
+                        && input.Ranking.Count > 0
+                            ? input.Ranking[0]?.construction
+                            : null
+                };
+                if (input.Ranking != null)
+                {
+                    for (int r = 0; r < input.Ranking.Count; r++)
+                    {
+                        MelhorCapturaAlvoScore target = input.Ranking[r];
+                        if (target?.construction == null)
+                        {
+                            continue;
+                        }
+                        candidate.Edges.Add(new Edge
+                        {
+                            Construction = target.construction,
+                            RouteCost = target.effectiveCost,
+                            AssignmentCost = target.effectiveCost
+                        });
+                    }
+                }
+                candidate.Edges.Sort(CompareEdges);
+                if (candidate.FormalPlan)
+                    formalCandidates.Add(candidate);
+                else
+                    rogueCandidates.Add(candidate);
             }
-
-            ownerByConstructionId[constructionId] =
-                candidate.Unit.InstanceId;
-            return true;
         }
 
-        return false;
+        SortCandidates(formalCandidates);
+        SortCandidates(rogueCandidates);
+        int totalCandidates =
+            formalCandidates.Count + rogueCandidates.Count;
+        ApplySwitchCosts(
+            formalCandidates, previousSnapshot, totalCandidates > 1);
+        ApplySwitchCosts(
+            rogueCandidates, previousSnapshot, totalCandidates > 1);
+
+        var claims = new Dictionary<int, CaptureOpportunityClaim>();
+        var unmatched = new List<CaptureOpportunityUnmatched>();
+        var formalIds = new HashSet<int>();
+        MatchCandidates(
+            formalCandidates,
+            claims,
+            unmatched,
+            blockedConstructionIds: null,
+            blockedMeansFormal: false);
+        foreach (int id in claims.Keys)
+            formalIds.Add(id);
+        MatchCandidates(
+            rogueCandidates,
+            claims,
+            unmatched,
+            formalIds,
+            blockedMeansFormal: true);
+        return new CaptureOpportunityClaimSnapshot(
+            0, -1, claims, unmatched);
+    }
+
+    private static void ApplySwitchCosts(
+        List<Candidate> candidates,
+        CaptureOpportunityClaimSnapshot previousSnapshot,
+        bool enabled)
+    {
+        for (int i = 0; i < candidates.Count; i++)
+        {
+            Candidate candidate = candidates[i];
+            int previousConstructionId = -1;
+            if (enabled
+                && previousSnapshot != null
+                && previousSnapshot.TryGetClaimForUnit(
+                    candidate.Unit,
+                    out CaptureOpportunityClaim previousClaim)
+                && previousClaim.Construction != null)
+            {
+                previousConstructionId =
+                    previousClaim.Construction.InstanceId;
+            }
+            else if (enabled
+                     && candidate.Unit.AIHasDesignatedCaptureTarget)
+            {
+                previousConstructionId = candidate.Unit
+                    .AIDesignatedCaptureTargetInstanceId;
+            }
+
+            for (int e = 0; e < candidate.Edges.Count; e++)
+            {
+                Edge edge = candidate.Edges[e];
+                edge.SwitchCost = previousConstructionId >= 0
+                    && edge.Construction != null
+                    && edge.Construction.InstanceId
+                        != previousConstructionId
+                        ? CaptureTargetSwitchCost
+                        : 0;
+                edge.AssignmentCost = edge.RouteCost
+                    >= int.MaxValue - edge.SwitchCost
+                        ? int.MaxValue
+                        : Mathf.Max(
+                            0, edge.RouteCost + edge.SwitchCost);
+            }
+        }
     }
 
     private static bool IsEligibleCapturer(
@@ -528,6 +1165,12 @@ public static class CaptureOpportunityClaimService
             && !unit.IsDead
             && !unit.IsEmbarked
             && !unit.IsUnderRepair
+            // Missao de outro verbo manda ate o dono dela dar baixa. Se ela
+            // entrasse no matching, produziria um claim impossivel de publicar
+            // porque SetAIDesignatedCaptureTarget protege essa mesma agenda.
+            && (!unit.AIHasDesignatedMission
+                || unit.AIDesignatedMissionIntent
+                    == AIPlanRuntimeIntent.Capture)
             && unit.TryGetUnitData(out UnitData data)
             && data != null
             && UnitRoleCompatibility.CanSatisfy(
@@ -586,8 +1229,9 @@ public static class CaptureOpportunityClaimService
     /// puro distante nao rouba predio que ele nao quer — ele pega o dele. A
     /// precedencia so decide o desempate quando ha disputa pelo mesmo alvo.
     ///
-    /// Vale igual com e sem plano: as duas listas (formal e rogue) passam por
-    /// esta mesma ordenacao.
+    /// No runtime esta precedencia atua somente entre rogues. O SolveGroup
+    /// puro conserva o campo FormalPlan para ferramentas/testes que queiram
+    /// comparar grupos explicitamente montados, sem mudar a doutrina runtime.
     /// </summary>
     private static int ResolveCapturerRolePrecedence(UnitManager unit)
     {
@@ -624,6 +1268,8 @@ public static class CaptureOpportunityClaimService
                     right.Edges.Count);
             if (compare != 0)
                 return compare;
+            if (left.Edges.Count == 0)
+                return 0;
             compare =
                 left.Edges[0].RouteCost.CompareTo(
                     right.Edges[0].RouteCost);

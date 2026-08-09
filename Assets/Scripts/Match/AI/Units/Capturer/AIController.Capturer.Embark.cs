@@ -170,6 +170,21 @@ public partial class AIController
                 allowOverflow: true);
         if (extendedEmbark != null) return extendedEmbark;
 
+        // Nao existe embarque materializavel neste turno. A partir daqui o
+        // capturador que ja provou precisar de carona nao pode voltar a usar o
+        // predio do outro lado da agua como ancora de movimento. Pergunta ao
+        // MelhorEmbarque qual e o lado terrestre do encontro e passa a
+        // facilitar a coleta.
+        PlayerAction lzRendezvous =
+            TryBuildCapturerLzRendezvousAction(
+                unit,
+                snapshot,
+                rideNeed,
+                fromCell,
+                paths);
+        if (lzRendezvous != null)
+            return lzRendezvous;
+
         // Rogue capturer: extended embark failed — move toward nearest rogue transporter so
         // it enters embark range next turn. Only applies when there is no sector assignment
         // (rogues march to enemy HQ; boarding any rogue transport accelerates the push).
@@ -195,9 +210,205 @@ public partial class AIController
     }
 
     /// <summary>
+    /// Perspectiva Passageiro do MelhorEmbarque. O alvo de movimento e sempre
+    /// passengerMeetingCell (terra), nunca lzCell (que pode ser agua).
+    ///
+    /// Uma promessa persistida da preferencia ao casco prometido dentro da
+    /// mesma banda, mas nao o transforma em dono do passageiro: uma solucao
+    /// Tactical de outro casco vence uma promessa Operational/Strategic, e na
+    /// ausencia de solucao prometida qualquer transportador compativel serve.
+    /// </summary>
+    private PlayerAction TryBuildCapturerLzRendezvousAction(
+        UnitManager passenger,
+        AIWorldSnapshot snapshot,
+        QueroCaronaResult rideNeed,
+        Vector3Int fromCell,
+        Dictionary<Vector3Int, List<Vector3Int>> paths)
+    {
+        if (passenger == null
+            || snapshot == null
+            || rideNeed == null
+            || !rideNeed.wantsRide)
+        {
+            return null;
+        }
+
+        MelhorEmbarqueResult evaluated =
+            MelhorEmbarqueService.EvaluateForPassenger(
+                new MelhorEmbarquePassengerRequest
+                {
+                    passenger = passenger,
+                    // Vazio de proposito: o passageiro nao escolhe um dono.
+                    // O farol persistido entra apenas na preferencia abaixo.
+                    transporter = null,
+                    map = boardTilemap,
+                    terrainDatabase = terrainDatabase,
+                    operationalTurns = CapturerRideOperationalTurns,
+                    includeStrategic = true,
+                    evaluateRideNeed = candidate =>
+                        candidate == passenger ? rideNeed : null,
+                    diagnosticLog = showAILogs
+                        ? (System.Action<string>)(message =>
+                            Debug.Log(message))
+                        : null
+                });
+
+        MelhorEmbarqueOption best = null;
+        MelhorEmbarqueOption promised = null;
+        for (int i = 0; i < evaluated.options.Count; i++)
+        {
+            MelhorEmbarqueOption option = evaluated.options[i];
+            if (option == null
+                || option.passenger != passenger
+                || option.transporter == null
+                || !option.hasPassengerMeetingCell
+                || option.passengerRouteState ==
+                    MelhorEmbarquePassengerRouteState.NoCurrentRoute)
+            {
+                continue;
+            }
+
+            if (best == null)
+                best = option;
+            if (promised == null
+                && HasActiveRidePromiseFor(
+                    option.transporter,
+                    passenger))
+            {
+                promised = option;
+            }
+        }
+
+        if (promised != null
+            && (best == null
+                || promised.transporterTier <= best.transporterTier))
+        {
+            best = promised;
+        }
+
+        if (best == null)
+        {
+            Debug.Log(
+                $"{TL("Capturador")} {passenger.InstanceId} " +
+                "MelhorEmbarque nao encontrou encontro terrestre " +
+                $"materializavel (opcoes={evaluated.options.Count}).");
+
+            // Sem rota propria, voltar ao magnetico recria exatamente o bug:
+            // a unidade anda na direcao cubica de um destino pertencente a
+            // outro componente. Segura e continua emitindo demanda de carona.
+            if (rideNeed.isStranded)
+            {
+                PlayerAction hold = BuildMoveBatch(
+                    passenger,
+                    snapshot.AITeam,
+                    fromCell,
+                    fromCell,
+                    paths);
+                hold.DebugLabel =
+                    "aguarda Melhor LZ de Embarque; sem rota propria " +
+                    "e sem encontro terrestre materializavel";
+                return hold;
+            }
+
+            return null;
+        }
+
+        Vector3Int meetingCell = best.passengerMeetingCell;
+        meetingCell.z = 0;
+        Vector3Int transporterLz = best.lzCell;
+        transporterLz.z = 0;
+        bool followsPromise = HasActiveRidePromiseFor(
+            best.transporter,
+            passenger);
+
+        // Farol provisorio desta Phase 2. Ajuda o casco que ainda vai decidir,
+        // sem criar reserva nem alterar a missao confirmada do passageiro.
+        transportPickupBeacons[best.transporter.InstanceId] =
+            passenger.InstanceId;
+
+        PlayerAction action;
+        string verb;
+        if (meetingCell == fromCell)
+        {
+            action = BuildMoveBatch(
+                passenger,
+                snapshot.AITeam,
+                fromCell,
+                fromCell,
+                paths);
+            verb = "aguarda no encontro";
+        }
+        else if (paths != null && paths.ContainsKey(meetingCell))
+        {
+            action = BuildMoveBatch(
+                passenger,
+                snapshot.AITeam,
+                fromCell,
+                meetingCell,
+                paths);
+            verb = "vai ao encontro";
+        }
+        else
+        {
+            HashSet<Vector3Int> occupied = BuildOccupied(passenger);
+            if (TryFindBestToolProgressionCell(
+                    passenger,
+                    snapshot,
+                    fromCell,
+                    meetingCell,
+                    paths,
+                    occupied,
+                    ToolProgressionIntent.TransportRendezvous,
+                    out Vector3Int progressionCell,
+                    out _,
+                    out string progressionReason)
+                && progressionCell != fromCell)
+            {
+                action = BuildMoveBatch(
+                    passenger,
+                    snapshot.AITeam,
+                    fromCell,
+                    progressionCell,
+                    paths);
+                verb = $"progride ao encontro ({progressionReason})";
+            }
+            else
+            {
+                // A LZ existe e continua sendo a ancora correta. Se nenhuma
+                // progressao e materializavel agora, esperar e melhor que
+                // abandonar o encontro e voltar a perseguir o predio remoto.
+                action = BuildMoveBatch(
+                    passenger,
+                    snapshot.AITeam,
+                    fromCell,
+                    fromCell,
+                    paths);
+                verb = "aguarda progressao ao encontro";
+            }
+        }
+
+        action.DebugLabel =
+            $"{verb} do transportador " +
+            $"{best.transporter.UnitDisplayName}" +
+            $"#{best.transporter.InstanceId}; " +
+            $"encontroPax={meetingCell}, LZTransport={transporterLz}, " +
+            $"tier={best.transporterTier}, " +
+            $"promessa={(followsPromise ? "sim" : "nao")}";
+        Debug.Log(
+            $"{TL("Capturador")} {passenger.InstanceId} " +
+            $"MelhorEmbarque: {verb}; encontroPax={meetingCell} " +
+            $"LZTransport={transporterLz} " +
+            $"transportador=#{best.transporter.InstanceId} " +
+            $"tier={best.transporterTier} " +
+            $"route={best.passengerRouteState} " +
+            $"promessa={(followsPromise ? "sim" : "nao")}.");
+        return action;
+    }
+
+    /// <summary>
     /// Um lugar so descreve o pedido de carona do capturador. Os dois pontos
-    /// que precisam da reivindicacao — a avaliacao de carona e a ancora do
-    /// rogue — tem que montar o MESMO pedido, senao caem em entradas
+    /// que precisam da reivindicacao - a avaliacao de carona e a ancora do
+    /// rogue - tem que montar o MESMO pedido, senao caem em entradas
     /// diferentes do cache e voltam a divergir por outro caminho.
     /// </summary>
     private QueroCaronaRequest BuildCapturerRideRequest(
@@ -242,20 +453,55 @@ public partial class AIController
         QueroCaronaRequest request =
             BuildCapturerRideRequest(unit, assigned);
 
-        if (CaptureOpportunityClaimService
-                .GetOrBuild(request)
-                .TryGetClaimForUnit(
-                    unit, out CaptureOpportunityClaim claim)
-            && claim.Construction != null)
+        // Com plano, o endereco veio do planner e ja esta no Mission Intent.
+        // MelhorCaptura pertence somente ao ramo sem plano. Ambos terminam no
+        // mesmo request explicito, entao o QueroCarona mede alcance sem escolher
+        // outro predio por conta propria.
+        if (assigned != null
+            && TryResolveUnitDesignatedCaptureTarget(
+                unit, out ConstructionManager plannedTarget))
         {
-            Vector3Int claimed = claim.Construction.CurrentCellPosition;
-            claimed.z = 0;
+            Vector3Int planned = plannedTarget.CurrentCellPosition;
+            planned.z = 0;
             request.useExplicitTarget = true;
-            request.explicitTarget = claimed;
+            request.explicitTarget = planned;
             request.explicitTargetLabel =
-                $"alvo reservado {claim.Construction.ConstructionDisplayName}" +
-                $"@{claimed}" +
-                (claim.FormalPlan ? " (plano)" : " (oportunidade)");
+                $"alvo do plano {assigned.Sector} " +
+                $"{plannedTarget.ConstructionDisplayName}@{planned}";
+        }
+        else
+        {
+            CaptureOpportunityClaimSnapshot allocation =
+                CaptureOpportunityClaimService.GetOrBuild(request);
+            if (allocation.TryGetClaimForUnit(
+                    unit, out CaptureOpportunityClaim claim)
+                && claim.Construction != null)
+            {
+                Vector3Int claimed =
+                    claim.Construction.CurrentCellPosition;
+                claimed.z = 0;
+                request.useExplicitTarget = true;
+                request.explicitTarget = claimed;
+                request.explicitTargetLabel =
+                    $"alvo rogue reservado " +
+                    $"{claim.Construction.ConstructionDisplayName}" +
+                    $"@{claimed}";
+            }
+            else if (allocation.TryGetUnmatched(
+                         unit,
+                         out CaptureOpportunityUnmatched unmatched)
+                     && unmatched.MagneticTarget != null)
+            {
+                Vector3Int magnetic =
+                    unmatched.MagneticTarget.CurrentCellPosition;
+                magnetic.z = 0;
+                request.useExplicitTarget = true;
+                request.explicitTarget = magnetic;
+                request.explicitTargetLabel =
+                    $"magnetico sem reserva " +
+                    $"{unmatched.MagneticTarget.ConstructionDisplayName}" +
+                    $"@{magnetic} ({unmatched.Reason})";
+            }
         }
 
         QueroCaronaResult result = QueroCaronaService.Evaluate(request);

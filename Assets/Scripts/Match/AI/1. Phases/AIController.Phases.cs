@@ -83,6 +83,13 @@ public partial class AIController
             float tAnalyzerResume = Time.realtimeSinceStartup;
             TeamObjectivePlan savedPlan = ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(ResolveAISlotKey(aiTeam)));
             RefreshRestoredRallyObjectiveStates(savedPlan, snapshot);
+            PublishPlannedCapturerMissionIntents(savedPlan, aiTeam);
+            CaptureOpportunityClaimService.PublishForPlan(
+                aiSlot,
+                boardTilemap,
+                terrainDatabase,
+                CapturerRideOperationalTurns,
+                savedPlan);
             AITacticalAnalyzer.Instance.Rebuild(snapshot, savedPlan);
             Debug.Log($"[AI Perf] TacticalAnalyzer.Rebuild (resume): {(Time.realtimeSinceStartup - tAnalyzerResume) * 1000f:F0}ms");
         }

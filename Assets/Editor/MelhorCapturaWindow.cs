@@ -6,6 +6,8 @@ using UnityEngine.Tilemaps;
 public sealed class MelhorCapturaWindow : EditorWindow
 {
     [SerializeField] private UnitManager unit;
+    [SerializeField] private List<UnitManager> additionalUnits =
+        new List<UnitManager>();
     [SerializeField] private Tilemap tilemap;
     [SerializeField] private TerrainDatabase terrainDatabase;
     [SerializeField] private ConstructionSector sectorFilter =
@@ -20,6 +22,9 @@ public sealed class MelhorCapturaWindow : EditorWindow
     [SerializeField] private int listFontSize = 12;
 
     private MelhorCapturaResult result;
+    private CaptureOpportunityClaimSnapshot groupResult;
+    private readonly Dictionary<int, MelhorCapturaResult> resultsByUnitId =
+        new Dictionary<int, MelhorCapturaResult>();
     private MelhorCapturaAlvoScore selected;
     private string status = "Selecione um capturador em campo.";
     private Vector2 scroll;
@@ -41,7 +46,10 @@ public sealed class MelhorCapturaWindow : EditorWindow
 
     private void OnSelectionChange()
     {
-        TryUseSelection(silent: true);
+        // Depois que existe Unidade 1, selecionar outra peca nao pode apagar
+        // a primeira antes de o usuario clicar "Adicionar Selecionado".
+        if (unit == null)
+            TryUseSelection(silent: true);
         Repaint();
     }
 
@@ -50,7 +58,7 @@ public sealed class MelhorCapturaWindow : EditorWindow
         EditorGUILayout.LabelField(
             "Melhor Captura", EditorStyles.boldLabel);
         EditorGUILayout.HelpBox(
-            "Consulta pura: dada UMA unidade, quais construções ela pode " +
+            "Consulta pura: dada uma unidade, quais construções ela pode " +
             "capturar e em que ordem. Tactical e Operational vêm do envelope; " +
             "fora das duas bandas a distância é cúbica, porque a essa altura " +
             "a resposta útil é 'para que lado'.\n\n" +
@@ -59,12 +67,16 @@ public sealed class MelhorCapturaWindow : EditorWindow
             "sobre o conjunto de candidatas.\n\n" +
             "A névoa vem desligada. Ligada, ela separa o que pode ser capturado " +
             "agora do objetivo conhecido que ainda precisa ser revelado. O " +
-            "segundo continua no ranking como captura da próxima rodada.",
+            "segundo continua no ranking como captura da próxima rodada.\n\n" +
+            "Pendure outras unidades abaixo para resolver o pareamento 1:1 " +
+            "por menor custo global. Com uma unidade, o comportamento e a " +
+            "lista permanecem exatamente os atuais.",
             MessageType.Info);
 
         EditorGUI.BeginChangeCheck();
         unit = (UnitManager)EditorGUILayout.ObjectField(
-            "Unidade", unit, typeof(UnitManager), true);
+            "Unidade 1", unit, typeof(UnitManager), true);
+        DrawAdditionalUnits();
         tilemap = (Tilemap)EditorGUILayout.ObjectField(
             "Tabuleiro", tilemap, typeof(Tilemap), true);
         terrainDatabase = (TerrainDatabase)EditorGUILayout.ObjectField(
@@ -80,6 +92,7 @@ public sealed class MelhorCapturaWindow : EditorWindow
         {
             AutoDetect();
             result = null;
+            groupResult = null;
             selected = null;
             SceneView.RepaintAll();
         }
@@ -87,6 +100,8 @@ public sealed class MelhorCapturaWindow : EditorWindow
         EditorGUILayout.BeginHorizontal();
         if (GUILayout.Button("Usar Selecionado"))
             TryUseSelection(silent: false);
+        if (GUILayout.Button("Adicionar Selecionado"))
+            TryAddSelection();
         if (GUILayout.Button("Auto Detect"))
             AutoDetect();
         if (GUILayout.Button("Limpar"))
@@ -98,6 +113,12 @@ public sealed class MelhorCapturaWindow : EditorWindow
                 CookRoundZeroFog();
         }
         EditorGUILayout.EndHorizontal();
+        if (GUILayout.Button(
+                "Adicionar todos com a skill de captura " +
+                "(ConstructionData.requiredSkillsToCapture)"))
+        {
+            AddAllCaptureSkilledUnits();
+        }
 
         EditorGUILayout.LabelField(
             "Filtros do sensor (a ferramenta passa tudo por padrão)",
@@ -122,7 +143,7 @@ public sealed class MelhorCapturaWindow : EditorWindow
             "Fonte da lista", listFontSize, 9, 22);
 
         using (new EditorGUI.DisabledScope(
-                   unit == null
+                   GetEvaluationUnits().Count == 0
                    || tilemap == null
                    || terrainDatabase == null))
         {
@@ -133,6 +154,7 @@ public sealed class MelhorCapturaWindow : EditorWindow
 
         EditorGUILayout.Space(4f);
         EditorGUILayout.HelpBox(status, MessageType.None);
+        DrawGroupResult();
         if (result == null)
             return;
 
@@ -331,6 +353,58 @@ public sealed class MelhorCapturaWindow : EditorWindow
 
     private void Evaluate()
     {
+        List<UnitManager> subjects = GetEvaluationUnits();
+        if (subjects.Count == 0)
+        {
+            result = null;
+            groupResult = null;
+            status = "Adicione pelo menos uma unidade.";
+            return;
+        }
+        int slotIndex = subjects[0].SlotIndex;
+        for (int i = 1; i < subjects.Count; i++)
+        {
+            if (subjects[i].SlotIndex == slotIndex)
+                continue;
+            result = null;
+            groupResult = null;
+            status = "O solve conjunto aceita unidades do mesmo slot.";
+            return;
+        }
+
+        UnitManager primary = subjects[0];
+        resultsByUnitId.Clear();
+        var inputs =
+            new List<CaptureOpportunityGroupCandidate>(subjects.Count);
+        for (int i = 0; i < subjects.Count; i++)
+        {
+            unit = subjects[i];
+            EvaluateSingle();
+            if (result == null)
+                continue;
+            resultsByUnitId[unit.InstanceId] = result;
+            inputs.Add(new CaptureOpportunityGroupCandidate
+            {
+                Unit = unit,
+                Ranking = result.ranking
+            });
+        }
+
+        unit = primary;
+        resultsByUnitId.TryGetValue(primary.InstanceId, out result);
+        groupResult = CaptureOpportunityClaimService.SolveGroup(inputs);
+        if (subjects.Count > 1)
+        {
+            status =
+                $"Solve conjunto: {groupResult.Claims.Count} par(es), " +
+                $"{groupResult.Unmatched.Count} sem par. " +
+                "A lista abaixo detalha a Unidade 1.";
+        }
+        SceneView.RepaintAll();
+    }
+
+    private void EvaluateSingle()
+    {
         AutoDetect();
         selected = null;
         List<ConstructionManager> constructions = CollectConstructions();
@@ -487,9 +561,95 @@ public sealed class MelhorCapturaWindow : EditorWindow
         Debug.Log($"[FoW][RoundZeroBake] {bakeResult}", matchController);
     }
 
+    private void DrawAdditionalUnits()
+    {
+        for (int i = 0; i < additionalUnits.Count; i++)
+        {
+            EditorGUILayout.BeginHorizontal();
+            additionalUnits[i] =
+                (UnitManager)EditorGUILayout.ObjectField(
+                    $"Unidade {i + 2}",
+                    additionalUnits[i],
+                    typeof(UnitManager),
+                    true);
+            if (GUILayout.Button("-", GUILayout.Width(24f)))
+            {
+                additionalUnits.RemoveAt(i);
+                GUI.changed = true;
+                i--;
+            }
+            EditorGUILayout.EndHorizontal();
+        }
+        if (GUILayout.Button("+ Unidade", EditorStyles.miniButton))
+        {
+            additionalUnits.Add(null);
+            GUI.changed = true;
+        }
+    }
+
+    private List<UnitManager> GetEvaluationUnits()
+    {
+        var subjects = new List<UnitManager>();
+        var seen = new HashSet<int>();
+        if (unit != null && seen.Add(unit.InstanceId))
+            subjects.Add(unit);
+        for (int i = 0; i < additionalUnits.Count; i++)
+        {
+            UnitManager candidate = additionalUnits[i];
+            if (candidate != null && seen.Add(candidate.InstanceId))
+                subjects.Add(candidate);
+        }
+        return subjects;
+    }
+
+    private void DrawGroupResult()
+    {
+        if (groupResult == null || GetEvaluationUnits().Count <= 1)
+            return;
+
+        EditorGUILayout.LabelField(
+            "Pareamento conjunto", EditorStyles.boldLabel);
+        for (int i = 0; i < groupResult.Claims.Count; i++)
+        {
+            CaptureOpportunityClaim claim = groupResult.Claims[i];
+            EditorGUILayout.BeginHorizontal();
+            EditorGUILayout.ObjectField(
+                claim.Capturer, typeof(UnitManager), true);
+            EditorGUILayout.LabelField("->", GUILayout.Width(20f));
+            EditorGUILayout.ObjectField(
+                claim.Construction, typeof(ConstructionManager), true);
+            EditorGUILayout.LabelField(
+                $"rota {claim.RouteCost}" +
+                (claim.SwitchCost > 0
+                    ? $" + troca {claim.SwitchCost}"
+                    : string.Empty),
+                GUILayout.Width(105f));
+            EditorGUILayout.EndHorizontal();
+        }
+        for (int i = 0; i < groupResult.Unmatched.Count; i++)
+        {
+            CaptureOpportunityUnmatched item =
+                groupResult.Unmatched[i];
+            EditorGUILayout.BeginHorizontal();
+            EditorGUILayout.ObjectField(
+                item.Capturer, typeof(UnitManager), true);
+            EditorGUILayout.LabelField(
+                $"SEM PAR: {item.Reason}" +
+                (item.MagneticTarget != null
+                    ? $" | magnetico: " +
+                      item.MagneticTarget.ConstructionDisplayName
+                    : string.Empty),
+                EditorStyles.miniBoldLabel);
+            EditorGUILayout.EndHorizontal();
+        }
+        EditorGUILayout.Space(4f);
+    }
+
     private void ClearEvaluation()
     {
         result = null;
+        groupResult = null;
+        resultsByUnitId.Clear();
         selected = null;
         status = unit != null
             ? $"Unidade: {unit.name}. Resultado limpo."
@@ -513,15 +673,181 @@ public sealed class MelhorCapturaWindow : EditorWindow
 
         unit = picked;
         result = null;
+        groupResult = null;
         AutoDetect();
         status = $"Unidade: {picked.name}.";
         SceneView.RepaintAll();
+    }
+
+    private void TryAddSelection()
+    {
+        UnitManager picked =
+            Selection.activeGameObject != null
+                ? Selection.activeGameObject.GetComponent<UnitManager>()
+                : null;
+        if (picked == null)
+        {
+            status = "O objeto selecionado nao possui UnitManager.";
+            return;
+        }
+        CollectConstructions();
+        if (!PodeCapturarSensor.HasAnyCaptureKey(picked))
+        {
+            status =
+                $"{picked.name} nao possui nenhuma skill exigida por " +
+                "ConstructionData.requiredSkillsToCapture nesta cena" +
+                BuildCaptureSkillRequirementSuffix() + ".";
+            return;
+        }
+        AddUnitToRoster(picked);
+        result = null;
+        groupResult = null;
+        AutoDetect();
+        status = $"Unidade adicionada: {picked.name}.";
+        Repaint();
+        SceneView.RepaintAll();
+    }
+
+    private void AddAllCaptureSkilledUnits()
+    {
+        CollectConstructions();
+        List<UnitManager> candidates = CollectSceneUnits();
+        candidates.Sort((left, right) =>
+            left.InstanceId.CompareTo(right.InstanceId));
+
+        int wantedSlot = unit != null ? unit.SlotIndex : int.MinValue;
+        if (wantedSlot == int.MinValue)
+        {
+            for (int i = 0; i < candidates.Count; i++)
+            {
+                if (!PodeCapturarSensor.HasAnyCaptureKey(candidates[i]))
+                    continue;
+                wantedSlot = candidates[i].SlotIndex;
+                break;
+            }
+        }
+
+        int added = 0;
+        int withoutCaptureKey = 0;
+        int otherSlot = 0;
+        for (int i = 0; i < candidates.Count; i++)
+        {
+            UnitManager candidate = candidates[i];
+            if (!PodeCapturarSensor.HasAnyCaptureKey(candidate))
+            {
+                withoutCaptureKey++;
+                continue;
+            }
+            // O pareamento e por slot. Com Unidade 1 preenchida, ela define
+            // qual exercito sera coletado; sem ela, o primeiro elegivel define.
+            if (wantedSlot != int.MinValue
+                && candidate.SlotIndex != wantedSlot)
+            {
+                otherSlot++;
+                continue;
+            }
+            if (AddUnitToRoster(candidate))
+                added++;
+        }
+
+        result = null;
+        groupResult = null;
+        resultsByUnitId.Clear();
+        status = wantedSlot == int.MinValue
+            ? "Nenhuma unidade possui uma skill de captura exigida pelas " +
+              "construcoes desta cena" +
+              BuildCaptureSkillRequirementSuffix() + "."
+            : $"Adicionadas {added} unidade(s) com chave de captura do " +
+              $"slot {wantedSlot}. Ignoradas: {withoutCaptureKey} sem chave" +
+              (otherSlot > 0 ? $", {otherSlot} de outro slot" : string.Empty) +
+              ".";
+        Repaint();
+        SceneView.RepaintAll();
+    }
+
+    private bool AddUnitToRoster(UnitManager candidate)
+    {
+        if (candidate == null)
+            return false;
+        if (unit == candidate || additionalUnits.Contains(candidate))
+            return false;
+        if (unit == null)
+            unit = candidate;
+        else
+            additionalUnits.Add(candidate);
+        return true;
+    }
+
+    private List<UnitManager> CollectSceneUnits()
+    {
+        var units = new List<UnitManager>();
+        if (Application.isPlaying)
+        {
+            foreach (UnitManager active in UnitManager.AllActive)
+            {
+                if (active != null && !active.IsDead)
+                    units.Add(active);
+            }
+            return units;
+        }
+
+        UnitManager[] found = FindObjectsByType<UnitManager>(
+            FindObjectsInactive.Include,
+            FindObjectsSortMode.None);
+        for (int i = 0; i < found.Length; i++)
+        {
+            if (found[i] != null && found[i].gameObject.activeInHierarchy)
+                units.Add(found[i]);
+        }
+        return units;
+    }
+
+    private string BuildCaptureSkillRequirementSuffix()
+    {
+        var skills = new HashSet<SkillData>();
+        foreach (ConstructionManager construction
+                 in ConstructionManager.AllActive)
+        {
+            if (construction == null
+                || !construction.TryResolveConstructionData(
+                    out ConstructionData data)
+                || data?.requiredSkillsToCapture == null)
+            {
+                continue;
+            }
+            for (int i = 0; i < data.requiredSkillsToCapture.Count; i++)
+            {
+                CaptureSkillEfficiency entry =
+                    data.requiredSkillsToCapture[i];
+                if (entry?.skill != null && entry.efficiency > 0f)
+                    skills.Add(entry.skill);
+            }
+        }
+        if (skills.Count == 0)
+            return "; nenhuma chave valida foi configurada";
+        var labels = new List<string>(skills.Count);
+        foreach (SkillData skill in skills)
+        {
+            labels.Add(!string.IsNullOrWhiteSpace(skill.displayName)
+                ? skill.displayName
+                : !string.IsNullOrWhiteSpace(skill.id)
+                    ? skill.id
+                    : skill.name);
+        }
+        labels.Sort(System.StringComparer.OrdinalIgnoreCase);
+        return $" (aceitas: {string.Join(", ", labels)})";
     }
 
     private void OnSceneGUI(SceneView sceneView)
     {
         if (result == null || unit == null || tilemap == null)
             return;
+
+        if (groupResult != null && GetEvaluationUnits().Count > 1)
+        {
+            DrawGroupScene();
+            return;
+        }
 
         // Recusadas primeiro, para os alvos pontuados desenharem por cima.
         if (drawRejected)
@@ -590,6 +916,67 @@ public sealed class MelhorCapturaWindow : EditorWindow
                 ScoreLabelStyle(
                     alvo.blockedByFog ? Color.white : Color.black,
                     champion ? 14 : 12));
+        }
+    }
+
+    private void DrawGroupScene()
+    {
+        for (int i = 0; i < groupResult.Claims.Count; i++)
+        {
+            CaptureOpportunityClaim claim = groupResult.Claims[i];
+            if (claim.Capturer == null || claim.Construction == null)
+                continue;
+            Vector3Int fromCell = claim.Capturer.CurrentCellPosition;
+            fromCell.z = 0;
+            Vector3Int toCell = claim.Construction.CurrentCellPosition;
+            toCell.z = 0;
+            Vector3 from = tilemap.GetCellCenterWorld(fromCell);
+            Vector3 to = tilemap.GetCellCenterWorld(toCell);
+            Color color = Color.HSVToRGB(
+                Mathf.Repeat(i * 0.173f, 1f), 0.75f, 1f);
+            Handles.color = color;
+            Handles.DrawAAPolyLine(5f, from, to);
+            Handles.DrawSolidDisc(to, Vector3.back, 0.30f);
+            Handles.DrawWireDisc(from, Vector3.back, 0.28f);
+            Handles.Label(
+                Vector3.Lerp(from, to, 0.5f),
+                $"U{claim.Capturer.InstanceId} -> " +
+                $"{claim.Construction.ConstructionDisplayName}\n" +
+                $"R{claim.RouteCost}" +
+                (claim.SwitchCost > 0
+                    ? $" +T{claim.SwitchCost}"
+                    : string.Empty),
+                ScoreLabelStyle(Color.white, 12));
+        }
+
+        for (int i = 0; i < groupResult.Unmatched.Count; i++)
+        {
+            CaptureOpportunityUnmatched item = groupResult.Unmatched[i];
+            if (item.Capturer == null)
+                continue;
+            Vector3Int cell = item.Capturer.CurrentCellPosition;
+            cell.z = 0;
+            Vector3 world = tilemap.GetCellCenterWorld(cell);
+            Handles.color = Color.gray;
+            Handles.DrawWireDisc(world, Vector3.back, 0.34f);
+            Handles.Label(
+                world + new Vector3(0f, 0.34f, 0f),
+                $"SEM PAR\n{item.Reason}" +
+                (item.MagneticTarget != null
+                    ? $"\nMAG -> " +
+                      item.MagneticTarget.ConstructionDisplayName
+                    : string.Empty),
+                ScoreLabelStyle(Color.white, 10));
+            if (item.MagneticTarget != null)
+            {
+                Vector3Int targetCell =
+                    item.MagneticTarget.CurrentCellPosition;
+                targetCell.z = 0;
+                Handles.DrawDottedLine(
+                    world,
+                    tilemap.GetCellCenterWorld(targetCell),
+                    4f);
+            }
         }
     }
 

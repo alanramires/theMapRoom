@@ -262,17 +262,41 @@ public partial class AIController
         // re-derivar aqui era o segundo lado da divergencia, com a unidade
         // recusando carona por um predio e marchando para outro.
         //
-        // A busca continua como reserva, e nao por seguranca: o claim so cobre
-        // as duas bandas, e um capturavel a muitos turnos de caminhada nao
-        // aparece nele. Para esse caso a resposta certa continua sendo "ande
-        // naquela direcao".
+        // A busca continua apenas como tolerancia para uma consulta vazia
+        // (filtro/estado transitório). Tactical, Operational e Beyond entram no
+        // pareamento; portanto o caminho normal sempre recebe claim ou magnetico.
         ConstructionManager target = null;
-        if (CaptureOpportunityClaimService
-                .GetOrBuild(BuildCapturerRideRequest(unit))
-                .TryGetClaimForUnit(
-                    unit, out CaptureOpportunityClaim claim))
+        CaptureOpportunityClaimSnapshot allocation =
+            CaptureOpportunityClaimService
+                .GetOrBuild(BuildCapturerRideRequest(unit));
+        if (allocation.TryGetClaimForUnit(
+                unit, out CaptureOpportunityClaim claim))
         {
             target = claim.Construction;
+        }
+        else if (allocation.TryGetUnmatched(
+                     unit,
+                     out CaptureOpportunityUnmatched unmatched)
+                 && unmatched.Reason
+                    != CaptureOpportunityUnmatchedReason
+                        .NoReachableOpportunity)
+        {
+            pendingRebelCaptureTargets[unit.InstanceId] = null;
+            if (unmatched.MagneticTarget != null)
+            {
+                anchorCell = unmatched.MagneticTarget.CurrentCellPosition;
+                anchorCell.z = 0;
+                Debug.Log(
+                    $"{TL("SemPlano")} {unit.InstanceId} sem par " +
+                    $"({unmatched.Reason}); magnetico -> " +
+                    $"{unmatched.MagneticTarget.ConstructionDisplayName}" +
+                    $"@{anchorCell}, mesmo com claim alheio.");
+                return true;
+            }
+            Debug.Log(
+                $"{TL("SemPlano")} {unit.InstanceId} reserva de captura " +
+                $"sem par ({unmatched.Reason}) e sem referencia magnetica.");
+            return false;
         }
         if (target == null)
         {

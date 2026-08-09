@@ -118,18 +118,28 @@ Ver `Assets/Scripts/Match/AI/3. Shopping/Shopping.md` (o gancho de compra) e
 
 ## 2. Alocação de capturas
 
-**a) Com plano:** capturador tem preferência; capturador combatente é **backup**.
-Distância exatamente igual ao objetivo ⇒ **o agressivo cede a vez**.
+**a) Com plano:** o planner já distribuiu unidade + setor. O endereço da
+construção é materializado diretamente em `MissionIntent.Capture`; essa unidade
+não entra no matching do Melhor Captura.
 
-**b) Sem plano (atribuição rebelde):** capturador tem preferência sobre
-capturador combatente. Distância exatamente igual ⇒ **o agressivo cede a vez**.
+**b) Sem plano:** o capturador entra no matching residual do Melhor Captura.
+Capturador puro tem preferência sobre capturador combatente; no empate, o
+agressivo cede a vez.
 
 ✅ `SortCandidates` ordena por **papel primeiro** — capturador puro antes de
 agressivo — depois `InstanceId`, arestas e custo.
 
-Vale para os dois casos pela mesma linha: o `CaptureOpportunityClaimService`
-separa candidatos em lista **formal** (com plano) e **rogue** (sem plano), e as
-duas passam pela mesma ordenação. Não há caminho separado para facção sem QG.
+O corte é por **estado de planejamento**, não por facção:
+
+```text
+IA com HQ     planner publica formais → RogueUnitIds dividem o restante
+IA sem HQ     não há plano            → todos dividem o restante como rogues
+```
+
+Não há caminho separado para facção sem QG. O
+`CaptureOpportunityClaimService` recebe somente capturadores sem plano; os
+endereços formais já publicados são retirados antes do matching e permanecem,
+no máximo, como referência magnética para uma sobra.
 
 Por que ordem de escolha basta, e distância não precisou entrar: cada candidato
 já tem as arestas ordenadas por custo de rota (`CompareEdges`), então cada um
@@ -238,6 +248,29 @@ dentro do meu componente de movimento?").
 Complementos da mesma entrega: fila de espera por antiguidade (`isStranded`,
 carimbo de turno, urgência crescente) e teste de encontro transportador ×
 passageiro.
+
+### 6.1 Quando a carona ainda não pode ser materializada
+
+Depois que `QueroCarona` responde **SIM**, falhar no scan de embarque deste turno
+não devolve o capturador ao movimento magnético. Isso seria uma contradição:
+`isStranded` acabou de provar que o prédio pertence a outro componente de
+movimento, portanto avançar pela distância cúbica só faz a infantaria acompanhar
+a margem ou apontar para dentro do canal.
+
+O controller consulta `MelhorEmbarqueService.EvaluateForPassenger` com:
+
+- o capturador como passageiro;
+- transportador vazio, para comparar todos os aliados compatíveis;
+- Strategic habilitado;
+- o resultado já calculado de `QueroCarona`.
+
+O capturador anda para `passengerMeetingCell`, que é o lado terrestre do
+encontro. Ele nunca usa `lzCell` como destino próprio, pois a LZ do navio pode
+ser água. Se um transportador prometeu buscá-lo, essa solução ganha preferência
+dentro da mesma banda; continua sem lock, portanto uma solução Tactical de outro
+casco vence uma promessa Operational ou Strategic. Se já estiver no encontro,
+aguarda. Se não existir encontro materializável e ele estiver sem rota própria,
+também aguarda em vez de retomar a marcha impossível.
 
 ---
 
