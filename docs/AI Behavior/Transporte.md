@@ -338,6 +338,240 @@ aninhamento, mais capturadores um único tiro desacelera.
 
 ---
 
+### 7.1 Os quatro estados do transportador — e não há enum novo
+
+Desenhado pelo autor em 2026-08-08. O `intent` continua `Transport` nos quatro; o
+estado sai de **dois fatos que a unidade já publica**.
+
+| `HasCargo` | `wantsRide` | estado | âncora — **para onde** | degrau | hoje |
+|---|---|---|---|---|---|
+| false | false | **pickup** | hex provável de LZ — está *procurando* passageiro | Evac / Pickup | ✅ existe |
+| true | false | **courier** | a coordenada da carga | Courier / Delivery | ✅ existe |
+| true | true | **need a lift** | a coordenada da carga, **longe ou atrás de travessia** | Courier / Delivery *far far away* | ⚠️ cai em courier |
+| false | true | **ASAP** | **quem ele prometeu**, além-mar ou muito longe | Evac / Pickup *far far away* | ❌ inalcançável |
+
+**O comportamento não é o mesmo nos quatro**, e a divisão cai da carga:
+
+| estado | combate |
+|---|---|
+| **pickup** | **pode entrar em combate** — está vazio, não há o que proteger |
+| **courier** | **cuida da carga.** Não é "ataca menos", é outro ofício |
+| **need a lift** | carregado ⇒ mesma regra do courier |
+| **ASAP** | ❓ vazio como o pickup, mas com urgência. Combate atrasa o resgate |
+
+✅ **Isto já é o que o código faz** — conferido em 2026-08-08:
+
+```text
+vazio      Shuttle.cs:787   "Opportunistic attack (shuttle, empty) — max 1h deviation"   LIVE
+carregado  Courier.Passengers.cs:325   cabeçalho de seção com CORPO VAZIO
+           Courier.Attack.cs → TryFindTransportCourierAttack, 0 chamadores externos      MORTO
+```
+
+⚠️ **`CLAUDE.md` está desatualizado neste ponto.** Ele lista, como prioridade 3 do
+courier, *"Opportunistic attack — near-dead enemies (HP ≤ 2), ≤2h route
+deviation"*. Essa regra **não existe**: sobrou o comentário e o arquivo morto
+(T7). Corrigir lá, ou alguém vai reimplementá-la achando que regrediu.
+
+⚠️ **`need a lift` tem duas causas, e elas não são a mesma pergunta:**
+
+```text
+muito longe        orçamento — alcançaria, não neste horizonte    ReachableStrategic
+requer travessia   topologia — não alcança nunca, a pé            NoCurrentRoute
+```
+
+Misturar as duas é a armadilha registrada no resumo (*"teste que se chama
+estrutural e mede prazo"*). A segunda é `isStranded`, e é a que **não melhora
+esperando** — nenhum turno a mais faz um APC atravessar água. Se as duas caírem no
+mesmo score, o que precisa de navio perde para quem só precisa de tempo.
+
+**O degrau não muda — a banda muda.** `wantsRide` não pede escada nova: ele diz
+que a âncora está fora do envelope próprio, que é literalmente o que a palavra
+significa. As duas linhas de baixo são as duas de cima com o alvo longe.
+
+> **Para o transportador, `Embarcar` é o sensor número 1** — embarcar para
+> alavancar, e para acelerar tanto a carona quanto a aproximação até o caroneiro.
+
+E é por isso que **nenhum valor novo entra no enum**: `Delivery × Pickup` deriva
+da carga, `need a lift × delivery` deriva do booleano. Dois bits, quatro estados.
+
+⚠️ Isto só funciona com `wantsRide` **publicado e estável**. Enquanto ele era
+resposta de pergunta alheia — `QueroCarona` é par a par, cada transportador com a
+sua banda — o estado do transportador oscilava dentro do mesmo turno. A
+publicação (§7.3) é pré-requisito do modelo, não faxina.
+
+### 7.2 O pior caso — o resgate na ilha, ida e volta
+
+Critério de aceitação do papel inteiro. **Percorre as quatro células, na ordem, e
+volta.**
+
+```text
+ida    APC vazio sobe no navio                    ASAP
+       navio cruza, desembarca o APC
+       APC atravessa o território até o soldado   pickup
+volta  APC carregado espera na praia              need a lift
+       navio recebe, cruza, desembarca
+       APC termina o resgate                      courier
+```
+
+**Ida e volta são a mesma viagem, e a única coisa que muda é um bit.** Se a volta
+exigisse estado novo, a fatoração da §7.1 estaria errada — é este o teste dela.
+
+O que o cenário cobra e a tabela não previa:
+
+| # | o que falta | por que não está na tabela |
+|---|---|---|
+| A | o navio **desembarcando um transportador** | é `MelhorDesembarque` com transportador como carga: a LZ tem de largar o APC dentro do Tactical dele **em direção ao soldado**, não em qualquer praia |
+| B | "vai até a praia" | `need a lift` precisa de âncora **própria** — o ponto de encontro, não o destino da carga. É a pergunta que o resumo chama de `TouchesComponent` (estação, helipad, convés e praia são a mesma) |
+| C | cadeia de três elos | soldado → APC → navio. Pela doutrina resolve sozinho (publicação é barramento, nenhum papel chama outro), mas nunca foi exercitada |
+
+⚠️ **Aposta de onde falha primeiro: o item A.** A regra oficial da LZ é *"terreno
+visível ou já explorado"*, e no log de 2026-08-08 essa é a rejeição mais volumosa
+do transporte inteiro — 394 ocorrências de
+`REJECT reason=transporter_cell_not_visible_or_explored`. O cenário tem **duas**
+atracagens. A praia perto do soldado provavelmente está explorada (o soldado é
+nosso e revela em volta); a de chegada não necessariamente. **Conferir isso antes
+de culpar a IA** — não é problema de modelo de carona, é a regra da LZ.
+
+### 7.3 Os dois furos medidos — e eles são de naturezas diferentes
+
+```text
+need a lift   passa no gate, mas Embarcar só enxerga Tactical      →  a BANDA
+ASAP          nunca passa no gate: wantsRide é sempre false        →  a PERGUNTA
+```
+
+**A banda.** `Embarcar` é o único degrau da escada **sem banda**:
+
+```csharp
+// AIController.TransportOperations.cs:206 — TryDecideNestedTransportEmbarkAction
+int budget = Mathf.Max(0, unit.RemainingMovementPoints);
+PodeEmbarcarSensor.CollectOptions(unit, boardTilemap, terrainDatabase, budget, options);
+if (options.Count == 0) return null;      // silencioso: nem hit nem miss no log
+```
+
+Todos os outros correm `Tactical → Operational → Strategic`. Este corre `Tactical`
+e acabou. Ele só sabe dizer *"o navio está colado em mim neste turno"* — e nos
+dois estados para os quais foi criado, o navio está a dois turnos. Cala, e o
+`Strategic` do `Delivery`, que sempre acerta, leva a decisão. É a doutrina de novo:
+*banda é parâmetro da unidade avaliada, nunca constante do papel.*
+
+Traço do T4 em `docs/gamelog/log.md`, os dois lados na mesma corrida:
+
+```text
+Embarcar                          Tactical apenas, silêncio
+[AI Reach][TransportDelivery:8]   Tactical:miss
+                                  Operational:miss  budget=12
+                                  Strategic:HIT     budget=120  cubic=24   ← o "far far away"
+```
+
+O estado `need a lift` **já existe no alcance**. Falta o sensor número 1 poder
+responder na banda em que o estado vive.
+
+**A pergunta.** `EvaluatePickupRideNeed` manda transportador vazio para o ramo
+"emergência apenas" (sem carga → não resolve âncora de destino; não é capturador
+terrestre → sem pergunta de captura). Ele devolve `wantsRide=false` **sempre**, e
+como o aninhamento tranca em `!AIIsWaitingForRide`, `ASAP` não chega a ser
+tentado. A linha não está errada — está inalcançável.
+
+**❓ Em aberto, e decide o item 1 da ordem abaixo: a banda do `Embarcar` é de
+quem?** Do transportador que sobe (*"eu alcanço o navio"*) ou do **encontro**
+(*"nós dois nos encontramos em N turnos"*)? Os outros degraus perguntam do próprio
+sujeito, mas carona é a única situação em que **os dois lados andam** — e o
+`MelhorEmbarque` já responde banda de encontro em `rotaPax`
+(`ReachableNow / Later / Strategic`). Talvez `Embarcar` deva ler dali em vez de
+calcular a sua.
+
+E a pergunta que vem colada: **se `Embarcar` ganhar banda, ele continua sendo o
+número 1?** No Tactical sim — subir hoje bate qualquer coisa. No Strategic ele
+passa a competir com um `Delivery` que também acerta lá. Ali "primeiro" precisa
+querer dizer *ganha o empate*, não *responde antes* — senão um navio a cinco
+turnos congela um APC que podia estar andando.
+
+### 7.4 Ordem proposta
+
+```text
+1. banda do Embarcar     destrava need a lift   ← é o APC parado no mapa de hoje
+2. a pergunta do vazio   destrava ASAP          ← é a perna de ida do cenário
+3. âncora de praia       dá comportamento ao need a lift (item B da §7.2)
+4. LZ em névoa           conferir antes de culpar a IA (item A da §7.2)
+```
+
+Só o 1 muda o que se vê na partida de hoje. Os outros três aparecem quando o
+cenário da ilha existir no mapa.
+
+### 7.5 ✅ Resolvido — um campo, dois significados
+
+`intent=Transport` com alvo `#N` tinha **dois donos e a mesma forma**, e a
+condição de baixa de um era a condição de início do outro:
+
+```text
+PROMESSA   "vou buscar #N"        acaba QUANDO #N embarca
+HERANÇA    "levo #N até (x,y)"    COMEÇA quando #N embarca
+```
+
+`UpdateRidePromiseState` roda no setup da Fase 2, lia a missão herdada como
+promessa, via a carga embarcada — **dentro do próprio transportador** — e dava
+baixa. Resultado: o APC agia com `intent=None` todo turno e só reescrevia depois
+de agir. E como o navio decide antes dele na iniciativa (`grp=2` contra `grp=4`),
+o navio lia a ficha exatamente na janela em que ela estava zerada. *A missão
+herdada existia; nunca no instante em que alguém olhava.*
+
+O discriminador: embarcou em **outro** veículo é baixa (promessa cumprida por
+terceiro, o caso para o qual a regra nasceu); embarcou em **mim** é o começo da
+entrega.
+
+### 7.6 ✅ Quando a missão é publicada — e por que não é depois de agir
+
+> *"Não acha estranho registrar onde você quer ir **depois** de ter agido?"*
+
+Sim, e a objeção estava certa. O invariante transacional protege o **tabuleiro**
+— FoW, ocupação, recurso gasto, unidade marcada como agida. **Missão é intenção**,
+e intenção só serve para uma coisa: coordenar. Publicada depois da ação, ela não
+serve para nada, porque ninguém pôde ler enquanto decidia.
+
+O corte cai na própria tabela da §7.1 — **o que é fato publica cedo, o que é
+decisão publica no commit:**
+
+| estado | âncora | é o quê | quando publica |
+|---|---|---|---|
+| **courier** / **need a lift** | destino da carga | **fato** — quem está a bordo e para onde vai não depende de decidir nada | setup da Fase 2, antes da 1ª seleção |
+| **pickup** / **ASAP** | o encontro | **é a decisão** — não existe antes de ser tomada | commit pós-ação, como sempre |
+
+```text
+setup da Fase 2, para toda unidade viva, antes de ninguém agir:
+    1. PublishInheritedMissionIntent   PARA ONDE eu vou
+    2. PublishRideNeed                 CONSIGO chegar?
+    3. UpdateRidePromiseState
+
+na seleção de cada unidade, antes de DecideUnitAction:
+    PublishInheritedMissionIntent      RE-CHECK
+```
+
+**Os dois bits que definem os quatro estados passam a ser publicados no mesmo
+instante.** Antes, `wantsRide` era adiantado e uniforme e `intent` era atrasado e
+desigual — os estados existiam em tempos diferentes.
+
+⚠️ **O re-check na seleção não é redundante.** O setup fotografa o **início** do
+turno, mas a carga muda **dentro** dele: o passageiro embarca na vez dele, e o
+transportador pode decidir depois disso. Sem republicar, um APC que virou
+`courier` no meio do turno decidiria — e seria lido — como o `pickup` que era.
+
+**A linha da iniciativa passou a carregar o estado inteiro**, porque `target` e
+`missao` são coisas diferentes e era fácil ler uma pela outra:
+
+```text
+[grp=4] APC#8 @ (49,-2,0) target=null missao=Transport(25,-2,0) carona=SIM(3t)
+                          └ objetivo   └ ficha da unidade        └ o 2º bit
+                            do PLANO
+```
+
+⚠️ **Nada disso conserta o embarque.** O comportamento já estava certo — a escada
+gateia em `context.HasCargo`, estado vivo, então o transportador sempre soube que
+tinha carga. Quem lia errado era **de fora**: o navio, a iniciativa, o Inspector.
+É leitura que ficou certa, não decisão. `need a lift` continua caindo em
+`courier` enquanto `Embarcar` não tiver banda (§7.3, passo 1 da §7.4).
+
+---
+
 ## 8. EVAC
 
 Levam a carga para a **retaguarda**, numa construção aliada controlada — ou o
@@ -579,11 +813,13 @@ decisão de decolar deveria acontecer ao **detectar** o caça, não ao ser ataca
 | T8 | consulta a perna de Assault/Fire Support com prioridade menor | ❌ o roteador consulta transporte antes do combate e não volta |
 | T9 | naval só atira vazio | ❌ e **conflita** com o rascunho do porta-aviões, mantido na §16 |
 | T10 | caças decolam sem Melhor LZ | ❌ `HasEmbarkedAircraft` alarga a LZ em vez de pular a consulta |
-| T11 | com carga, herda o destino da carga no AI Plan Runtime | ⚠️ a promessa guarda o alvo do **resgate** e é limpa ao embarcar |
+| T11 | com carga, herda o destino da carga no AI Plan Runtime | ✅ herdada, publicada no setup + re-check na seleção, e a baixa indevida corrigida — §7.5 e §7.6. ⚠️ ainda **write-only**: `TryResolveCargoDestinationAnchor` escava o passageiro primário em vez de ler a ficha do transportador |
 | T12 | não pousa em capturável / sobe na iniciativa | ❌ nenhuma das duas |
 | T13 | iniciativa média-alta, abaixo de FS e Assault | ⚠️ não existe ordenação por papel; os grupos são situacionais |
 | T14 | espera vira pressão de compra | ❌ |
-| T15 | carona aninhada (APC em navio/trem/Chinook) | ❌ nenhuma política busca isso |
+| T15 | carona aninhada (APC em navio/trem/Chinook) | ⚠️ `TryDecideNestedTransportEmbarkAction` existe e já subiu em campo. Mas **sem banda**: só enxerga Tactical, e sai calado quando não acha — §7.3 |
+| T18 | os quatro estados (`HasCargo` × `wantsRide`) | ⚠️ dois rodam, `need a lift` cai em delivery, `ASAP` é inalcançável — §7.1 |
+| T19 | `wantsRide` é fato publicado pela unidade | ✅ publicado uma vez por turno na Fase 2 contra a própria missão. ⚠️ os quatro pontos antigos ainda podem **levantar** (nunca baixar): a zona do Radar e o alvo reservado do capturador não estão na missão |
 | T16 | transportadores não fundem | ❓ bloqueio não localizado — a conferir no sensor de fusão |
 | T17 | hub busca suprimento | ❌ cadeia existe, IA não opera |
 
@@ -599,7 +835,8 @@ trabalho** — porque metade destas pendências não é trabalho próprio.
 | **Independentes e pequenas** | T3, T7 | T7 é apagar arquivo morto. T3 é um `else` que contradiz o comentário acima dele — e **provavelmente já acontece em jogo sem ninguém notar** |
 | **Precisam de decisão antes de código** | T8, T9, T13 | a ordem do roteador (transporte antes ou depois do combate), qual regra do porta-aviões sobrevive, e se iniciativa passa a ordenar por papel. Nada disso se decide lendo código |
 | **Pergunta em aberto** | T16 | não é pendência até se confirmar que falta. Pode já existir onde não procurei |
-| **Doutrina nova, sem base** | T4, T11, T12, T14, T15, T17 | trabalho de verdade, do zero |
+| **Doutrina nova, sem base** | T4, T12, T14, T17 | trabalho de verdade, do zero |
+| **A frente da travessia** | T11, T15, T18, T19 | um bloco só, e a ordem está na §7.4. Banda do `Embarcar` primeiro — é a única que muda o que se vê hoje |
 
 ---
 
