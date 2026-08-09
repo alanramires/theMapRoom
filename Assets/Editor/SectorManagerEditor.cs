@@ -85,6 +85,7 @@ public class SectorManagerEditor : Editor
     private SerializedProperty neighborDistanceVehicleUnitDataProp;
     private SerializedProperty neighborDistanceNavalUnitDataProp;
     private SerializedProperty navalApproachSearchRadiusProp;
+    private SerializedProperty beachManagerProp;
     private SerializedProperty sectorInfosProp;
     private SerializedProperty baseInfosProp;
     private static readonly System.Collections.Generic.List<SectorEdgeLine> drawnLines = new System.Collections.Generic.List<SectorEdgeLine>();
@@ -130,6 +131,7 @@ public class SectorManagerEditor : Editor
         neighborDistanceVehicleUnitDataProp = serializedObject.FindProperty("neighborDistanceVehicleUnitData");
         neighborDistanceNavalUnitDataProp = serializedObject.FindProperty("neighborDistanceNavalUnitData");
         navalApproachSearchRadiusProp = serializedObject.FindProperty("navalApproachSearchRadius");
+        beachManagerProp = serializedObject.FindProperty("beachManager");
         sectorInfosProp = serializedObject.FindProperty("sectorInfos");
         baseInfosProp   = serializedObject.FindProperty("baseInfos");
         if (useTerrainCostForNeighborDistancesProp != null && !useTerrainCostForNeighborDistancesProp.boolValue)
@@ -169,9 +171,18 @@ public class SectorManagerEditor : Editor
                 "Raio de Aproximação Naval",
                 "Até quantos hexes procurar água em volta do QG/fábrica e do setor. Sem água nesse raio, a distância naval sai como '--'."));
 
+        if (beachManagerProp != null)
+            EditorGUILayout.PropertyField(
+                beachManagerProp,
+                new GUIContent(
+                    "Beach Manager",
+                    "Catalogo separado de praias militares nomeadas. Em runtime e resolvido automaticamente quando vazio."));
+
         EditorGUILayout.Space(4f);
 
         SectorManager manager = (SectorManager)target;
+        EditorGUILayout.LabelField(
+            $"Praias militares lidas: {manager.MilitaryBeachInfos.Count}");
         if (GUILayout.Button("Rebuild From Active Constructions"))
         {
             serializedObject.ApplyModifiedProperties();

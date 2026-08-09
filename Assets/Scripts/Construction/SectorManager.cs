@@ -368,6 +368,8 @@ public sealed class SectorManager : MonoBehaviour
     [SerializeField] private UnitData neighborDistanceVehicleUnitData;    // vehicle reference (APC)
     [SerializeField] private UnitData neighborDistanceNavalUnitData;      // naval reference (navio)
     [SerializeField] private int      navalApproachSearchRadius = 6;      // até onde procurar água em volta do QG/setor
+    [Header("Named Beaches")]
+    [SerializeField] private BeachManager beachManager;
     [SerializeField] private List<SectorInfo> sectorInfos = new List<SectorInfo>();
     [SerializeField] private List<SectorInfo> baseInfos   = new List<SectorInfo>();
 
@@ -380,6 +382,17 @@ public sealed class SectorManager : MonoBehaviour
     public static SectorManager Instance => EnsureInstance();
     public IReadOnlyList<SectorInfo> SectorInfos => sectorInfos;
     public IReadOnlyList<SectorInfo> BaseInfos   => baseInfos;
+    public BeachManager BeachManagerRef => ResolveBeachManager();
+    public IReadOnlyList<BeachManager.BeachInfo> MilitaryBeachInfos
+    {
+        get
+        {
+            BeachManager manager = ResolveBeachManager();
+            return manager != null
+                ? manager.Beaches
+                : System.Array.Empty<BeachManager.BeachInfo>();
+        }
+    }
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void BootstrapAfterSceneLoad()
@@ -494,6 +507,30 @@ public sealed class SectorManager : MonoBehaviour
         return manager.baseInfoBySector.TryGetValue(sector, out info);
     }
 
+    /// <summary>
+    /// Praias militares nomeadas do mapa. O SectorManager apenas consulta o
+    /// catalogo; conectividade, divisao e identidade pertencem ao BeachManager.
+    /// </summary>
+    public static IReadOnlyList<BeachManager.BeachInfo> GetAllMilitaryBeachInfos()
+    {
+        SectorManager manager = EnsureInstance();
+        return manager != null
+            ? manager.MilitaryBeachInfos
+            : System.Array.Empty<BeachManager.BeachInfo>();
+    }
+
+    public static bool TryGetMilitaryBeachAtCell(
+        Vector3Int cell,
+        out BeachManager.BeachInfo beach)
+    {
+        beach = null;
+        SectorManager manager = EnsureInstance();
+        BeachManager catalog = manager != null
+            ? manager.ResolveBeachManager()
+            : null;
+        return catalog != null && catalog.TryGetAtCell(cell, out beach);
+    }
+
     public static bool RequestRebuildFromActiveConstructions(string reason = null)
     {
         SectorManager manager = EnsureInstance();
@@ -551,6 +588,7 @@ public sealed class SectorManager : MonoBehaviour
         SceneManager.sceneLoaded += HandleSceneLoaded;
         MatchController.OnActiveTeamChanged += HandleActiveTeamChanged;
         SaveGameManager.OnAfterLoadSuccess += HandleAfterLoadSuccess;
+        ResolveBeachManager();
         QueueRebuild("on-enable");
     }
 
@@ -634,6 +672,51 @@ public sealed class SectorManager : MonoBehaviour
         pendingRebuildRoutine = null;
         pendingRebuildBoardRevision = int.MinValue;
         RebuildFromActiveConstructions(reason);
+    }
+
+    private BeachManager ResolveBeachManager()
+    {
+        if (beachManager == null)
+        {
+            // No setup recomendado, o BeachManager vive como filho deste
+            // objeto. GetComponentInChildren tambem o encontra se estiver
+            // inativo no Editor.
+            beachManager = GetComponentInChildren<BeachManager>(
+                includeInactive: true);
+
+            if (beachManager == null)
+            {
+                BeachManager[] candidates =
+                    FindObjectsByType<BeachManager>(
+                        FindObjectsInactive.Include);
+                for (int i = 0; i < candidates.Length; i++)
+                {
+                    BeachManager candidate = candidates[i];
+                    if (candidate == null
+                        || candidate.gameObject.scene != gameObject.scene)
+                    {
+                        continue;
+                    }
+                    beachManager = candidate;
+                    break;
+                }
+            }
+
+            if (beachManager == null && Application.isPlaying)
+            {
+                beachManager = BeachManager.GetOrCreate(
+                    neighborDistanceTilemap,
+                    neighborDistanceTerrainDatabase);
+            }
+        }
+
+        if (beachManager != null)
+        {
+            beachManager.ConfigureSources(
+                neighborDistanceTilemap,
+                neighborDistanceTerrainDatabase);
+        }
+        return beachManager;
     }
 
     // Distância em passos de hex (pointy-top, even-r offset — Unity m_CellLayout=1, cellSize.x≈0.866).
@@ -763,6 +846,36 @@ public sealed class SectorManager : MonoBehaviour
     private void RebuildFromActiveConstructions(string reason)
     {
         double rebuildStart = Time.realtimeSinceStartupAsDouble;
+        // Consulta sem copiar a verdade do catalogo. Os servicos de LZ podem
+        // usar a mesma instancia e os mesmos BeachIds.
+        BeachManager namedBeachCatalog = ResolveBeachManager();
+        if (namedBeachCatalog != null
+            && string.Equals(
+                reason,
+                "manual",
+                System.StringComparison.Ordinal))
+        {
+            // O botao manual do SectorManager e tambem uma auditoria dos
+            // catalogos dos quais ele depende. Forca a releitura dos tiles de
+            // praia antes de publicar a contagem, mesmo se o fingerprint do
+            // BoardTopology ainda for igual ao catalogo serializado anterior.
+            namedBeachCatalog.RebuildMilitaryBeaches();
+        }
+        else if (namedBeachCatalog == null
+                 && string.Equals(
+                     reason,
+                     "manual",
+                     System.StringComparison.Ordinal))
+        {
+            Debug.LogError(
+                "[SectorManager] BeachManager nao encontrado nesta cena. " +
+                "Coloque-o como filho do SectorManager ou atribua a " +
+                "referencia serializada.",
+                this);
+        }
+        int namedBeachCount = namedBeachCatalog != null
+            ? namedBeachCatalog.Beaches.Count
+            : 0;
         sectorInfos.Clear();
         sectorInfoBySector.Clear();
         baseInfos.Clear();
@@ -985,7 +1098,7 @@ public sealed class SectorManager : MonoBehaviour
             string unassignedDetail = unassignedCapturables > 0 && unassignedNames != null
                 ? $" [{string.Join(", ", unassignedNames)}]"
                 : string.Empty;
-            Debug.Log($"[SectorManager] rebuild reason={reason ?? "none"} sectors={sectorInfos.Count} bases={baseInfos.Count} constructions={constructions.Count} semSetor={unassignedCapturables}{unassignedDetail}");
+            Debug.Log($"[SectorManager] rebuild reason={reason ?? "none"} sectors={sectorInfos.Count} bases={baseInfos.Count} praias={namedBeachCount} constructions={constructions.Count} semSetor={unassignedCapturables}{unassignedDetail}");
         }
 
         double neighborPassMs =

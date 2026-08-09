@@ -3,6 +3,308 @@ using UnityEngine;
 
 public partial class AIController
 {
+    private const int SurfaceRepairAutonomyReserve = 2;
+
+    private Dictionary<Vector3Int, List<Vector3Int>> ApplySurfaceRepairAutonomyReserve(
+        UnitManager unit,
+        Dictionary<Vector3Int, List<Vector3Int>> paths)
+    {
+        if (!IsSurfaceRepairAutonomyReserveApplicable(unit)
+            || paths == null
+            || paths.Count == 0)
+        {
+            return paths;
+        }
+
+        int currentFuel = Mathf.Max(0, unit.CurrentFuel);
+        int spendableFuel = Mathf.Max(0, currentFuel - SurfaceRepairAutonomyReserve);
+        var filtered = new Dictionary<Vector3Int, List<Vector3Int>>(paths.Count);
+        int removed = 0;
+
+        foreach (KeyValuePair<Vector3Int, List<Vector3Int>> pair in paths)
+        {
+            int autonomyCost = UnitMovementPathRules.CalculateAutonomyCostForPath(
+                boardTilemap,
+                unit,
+                pair.Value,
+                terrainDatabase,
+                applyOperationalAutonomyModifier: true);
+            if (autonomyCost <= spendableFuel)
+                filtered[pair.Key] = pair.Value;
+            else
+                removed++;
+        }
+
+        // A origem precisa continuar materializavel mesmo quando a unidade ja
+        // entrou no Repair com menos que a reserva.
+        Vector3Int origin = unit.CurrentCellPosition;
+        origin.z = 0;
+        if (paths.TryGetValue(origin, out List<Vector3Int> originPath))
+            filtered[origin] = originPath;
+
+        if (removed > 0)
+        {
+            Debug.Log(
+                $"{TL("Repair")} {unit.InstanceId} preserva " +
+                $"{SurfaceRepairAutonomyReserve} autonomia: fuel={currentFuel} " +
+                $"orcamento={spendableFuel} caminhos={paths.Count}->{filtered.Count}");
+        }
+
+        return filtered;
+    }
+
+    private static bool IsSurfaceRepairAutonomyReserveApplicable(UnitManager unit)
+    {
+        return unit != null
+            && unit.GetDomain() == Domain.Land
+            && unit.GetHeightLevel() == HeightLevel.Surface
+            && OperationalAutonomyRules.HasOperationalAutonomy(unit);
+    }
+
+    private bool TryBuildSurfaceRepairSupplierArrivalAction(
+        UnitManager unit,
+        AIWorldSnapshot snapshot,
+        Vector3Int fromCell,
+        Dictionary<Vector3Int, List<Vector3Int>> fullPaths,
+        Dictionary<Vector3Int, List<Vector3Int>> reservedPaths,
+        HashSet<Vector3Int> occupied,
+        out PlayerAction action)
+    {
+        action = null;
+        if (!IsSurfaceRepairAutonomyReserveApplicable(unit)
+            || snapshot == null
+            || fullPaths == null
+            || fullPaths.Count == 0
+            || snapshot.MyUnits == null)
+        {
+            return false;
+        }
+
+        Vector3Int bestCell = fromCell;
+        UnitManager bestSupplier = null;
+        int bestAutonomyCost = int.MaxValue;
+        float bestThreat = float.MaxValue;
+
+        for (int supplierIndex = 0; supplierIndex < snapshot.MyUnits.Count; supplierIndex++)
+        {
+            UnitManager supplier = snapshot.MyUnits[supplierIndex];
+            if (!CanSurfaceRepairUnitServe(supplier, unit))
+                continue;
+
+            Vector3Int supplierCell = supplier.CurrentCellPosition;
+            supplierCell.z = 0;
+            foreach (KeyValuePair<Vector3Int, List<Vector3Int>> pair in fullPaths)
+            {
+                Vector3Int cell = pair.Key;
+                cell.z = 0;
+                if (cell == fromCell
+                    || (occupied != null && occupied.Contains(cell))
+                    || (reservedPaths != null && reservedPaths.ContainsKey(cell))
+                    || !IsSurfaceRepairUnitServiceCell(supplier, supplierCell, cell))
+                {
+                    continue;
+                }
+
+                int autonomyCost = UnitMovementPathRules.CalculateAutonomyCostForPath(
+                    boardTilemap,
+                    unit,
+                    pair.Value,
+                    terrainDatabase,
+                    applyOperationalAutonomyModifier: true);
+                float threat = CalculateThreatLevel(cell, snapshot.AITeam);
+                bool better = autonomyCost < bestAutonomyCost
+                    || (autonomyCost == bestAutonomyCost && threat < bestThreat - 0.01f)
+                    || (autonomyCost == bestAutonomyCost
+                        && Mathf.Abs(threat - bestThreat) <= 0.01f
+                        && (bestSupplier == null || supplier.InstanceId < bestSupplier.InstanceId));
+                if (!better)
+                    continue;
+
+                bestCell = cell;
+                bestSupplier = supplier;
+                bestAutonomyCost = autonomyCost;
+                bestThreat = threat;
+            }
+        }
+
+        if (bestSupplier == null)
+            return false;
+
+        int fuelAfter = Mathf.Max(0, unit.CurrentFuel - bestAutonomyCost);
+        Debug.Log(
+            $"{TL("Repair")} {unit.InstanceId} usa reserva de autonomia para alcancar " +
+            $"supridor #{bestSupplier.InstanceId} via {bestCell} " +
+            $"fuel={unit.CurrentFuel}->{fuelAfter}");
+        action = BuildMoveBatch(
+            unit,
+            snapshot.AITeam,
+            fromCell,
+            bestCell,
+            fullPaths);
+        return true;
+    }
+
+    private static bool CanSurfaceRepairUnitServe(UnitManager supplier, UnitManager target)
+    {
+        if (supplier == null
+            || target == null
+            || supplier == target
+            || supplier.IsDead
+            || supplier.IsEmbarked
+            || !supplier.gameObject.activeInHierarchy
+            || !PlayerSlotRelations.AreAllies(supplier, target)
+            || target.ReceivedSuppliesThisTurn
+            || !supplier.TryGetUnitData(out UnitData supplierData)
+            || supplierData == null
+            || !supplierData.isSupplier
+            || supplierData.maxUnitsServedPerTurn <= 0
+            || supplierData.serviceRange == SupplierRangeMode.SameHexOrEmbarked
+            || !PodeSuprirSensor.SupportsOperationDomain(
+                supplierData, Domain.Land, HeightLevel.Surface))
+        {
+            return false;
+        }
+
+        Dictionary<SupplyData, int> stock = BuildSurfaceRepairUnitStock(supplier);
+        IReadOnlyList<ServiceData> services = supplier.GetEmbarkedServices();
+        if (services == null)
+            return false;
+
+        for (int i = 0; i < services.Count; i++)
+        {
+            ServiceData service = services[i];
+            if (service == null
+                || !service.isService
+                || (service.apenasEntreSupridores && !PodeSuprirSensor.IsSupplier(target))
+                || !PodeSuprirSensor.UnitNeedsService(target, service))
+            {
+                continue;
+            }
+
+            if (PodeSuprirSensor.HasSupplyForService(service, stock))
+                return true;
+        }
+
+        return false;
+    }
+
+    private static bool IsSurfaceRepairUnitServiceCell(
+        UnitManager supplier,
+        Vector3Int supplierCell,
+        Vector3Int targetCell)
+    {
+        if (supplier == null
+            || !supplier.TryGetUnitData(out UnitData data)
+            || data == null)
+        {
+            return false;
+        }
+
+        float distance = SectorManager.HexDistance(supplierCell, targetCell);
+        switch (data.serviceRange)
+        {
+            case SupplierRangeMode.Hybrid0Or1Hex:
+                return distance <= 1f;
+            case SupplierRangeMode.Adjacent1Hex:
+                return Mathf.Approximately(distance, 1f);
+            default:
+                return false;
+        }
+    }
+
+    private static Dictionary<SupplyData, int> BuildSurfaceRepairUnitStock(UnitManager supplier)
+    {
+        var stock = new Dictionary<SupplyData, int>();
+        IReadOnlyList<UnitEmbarkedSupply> resources = supplier != null
+            ? supplier.GetEmbarkedResources()
+            : null;
+        if (resources == null)
+            return stock;
+
+        for (int i = 0; i < resources.Count; i++)
+        {
+            UnitEmbarkedSupply resource = resources[i];
+            if (resource == null || resource.supply == null || resource.amount <= 0)
+                continue;
+            if (stock.TryGetValue(resource.supply, out int current))
+                stock[resource.supply] = current + resource.amount;
+            else
+                stock.Add(resource.supply, resource.amount);
+        }
+
+        return stock;
+    }
+
+    private static bool CanSurfaceRepairConstructionServe(
+        ConstructionManager construction,
+        UnitManager target,
+        TeamId aiTeam)
+    {
+        if (construction == null
+            || target == null
+            || construction.SlotIndex != ResolveAISlotKey(aiTeam)
+            || construction.CurrentCapturePoints < construction.CapturePointsMax
+            || !construction.CanProvideSupplies
+            || !construction.TryResolveConstructionData(out ConstructionData data)
+            || data == null
+            || !data.isSupplier
+            || data.maxUnitsServedPerTurn <= 0
+            || target.ReceivedSuppliesThisTurn)
+        {
+            return false;
+        }
+
+        IReadOnlyList<ServiceData> services = construction.OfferedServices;
+        if (services == null)
+            return false;
+        for (int i = 0; i < services.Count; i++)
+        {
+            ServiceData service = services[i];
+            if (service == null
+                || !service.isService
+                || (service.apenasEntreSupridores && !PodeSuprirSensor.IsSupplier(target))
+                || !PodeSuprirSensor.UnitNeedsService(target, service))
+            {
+                continue;
+            }
+
+            if (SurfaceRepairConstructionHasSupply(construction, service))
+                return true;
+        }
+
+        return false;
+    }
+
+    private static bool SurfaceRepairConstructionHasSupply(
+        ConstructionManager construction,
+        ServiceData service)
+    {
+        if (construction == null || service == null)
+            return false;
+        if (service.suppliesUsed == null || service.suppliesUsed.Count == 0)
+            return true;
+
+        IReadOnlyList<ConstructionSupplyOffer> offers = construction.OfferedSupplies;
+        for (int supplyIndex = 0; supplyIndex < service.suppliesUsed.Count; supplyIndex++)
+        {
+            SupplyData required = service.suppliesUsed[supplyIndex];
+            if (required == null)
+                continue;
+            if (construction.HasInfiniteSuppliesFor(required))
+                return true;
+            if (offers == null)
+                continue;
+            for (int offerIndex = 0; offerIndex < offers.Count; offerIndex++)
+            {
+                ConstructionSupplyOffer offer = offers[offerIndex];
+                if (offer != null && offer.supply == required && offer.quantity > 0)
+                    return true;
+            }
+        }
+
+        return false;
+    }
+
     private Vector3Int FindRepairApproachStep(
         UnitManager unit,
         TeamId aiTeam,

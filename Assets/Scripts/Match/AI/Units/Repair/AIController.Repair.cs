@@ -310,7 +310,8 @@ public partial class AIController
             if (artPassenger != null)
             {
                 Vector3Int towFrom = unit.CurrentCellPosition; towFrom.z = 0;
-                Dictionary<Vector3Int, List<Vector3Int>> towPaths = BuildLogisticsPaths(unit);
+                Dictionary<Vector3Int, List<Vector3Int>> towPaths =
+                    ApplySurfaceRepairAutonomyReserve(unit, BuildLogisticsPaths(unit));
                 HashSet<Vector3Int> towOccupied = BuildOccupied(unit);
                 PlayerAction dropOff = TryDropArtilleryAtSafeConstruction(
                     unit, artPassenger, towPassengers, snapshot, towFrom, towPaths, towOccupied);
@@ -321,9 +322,11 @@ public partial class AIController
         Vector3Int fromCell = unit.CurrentCellPosition; fromCell.z = 0;
         TeamId aiTeam = snapshot.AITeam;
 
-        Dictionary<Vector3Int, List<Vector3Int>> paths =
+        Dictionary<Vector3Int, List<Vector3Int>> fullRepairPaths =
             UnitMovementPathRules.CalcularCaminhosValidos(
                 boardTilemap, unit, Mathf.Max(0, unit.RemainingMovementPoints), terrainDatabase);
+        Dictionary<Vector3Int, List<Vector3Int>> paths =
+            ApplySurfaceRepairAutonomyReserve(unit, fullRepairPaths);
         bool aircraftRepair = unit.GetAircraftType() != AircraftType.None;
         // Reparo NÃO conta produtor fechado pela conscrição como "ocupado" — o ban é aplicado pelo
         // check explícito (que o elite fura como último recurso). Sem isto, a célula fechada saía
@@ -484,6 +487,22 @@ public partial class AIController
                 Debug.Log($"{TL("Repair")} {unit.InstanceId} segura {fromCell} sem substituto");
                 return BuildMoveBatch(unit, aiTeam, fromCell, fromCell);
             }
+        }
+
+        // Land/Surface preserva 2 pontos de autonomia durante a marcha de
+        // manutencao. A unica excecao movel e materializar o atendimento nesta
+        // rodada: se um supridor aliado pode atender a unidade a partir de uma
+        // celula que exige gastar a reserva, chega ate ele e para.
+        if (TryBuildSurfaceRepairSupplierArrivalAction(
+                unit,
+                snapshot,
+                fromCell,
+                fullRepairPaths,
+                paths,
+                occupied,
+                out PlayerAction supplierArrival))
+        {
+            return supplierArrival;
         }
 
         // 2. Fusão: libera o hex e recupera a unidade ao mesmo tempo
@@ -873,8 +892,21 @@ public partial class AIController
             Vector3Int hc = snapshot.MyHQ.CurrentCellPosition; hc.z = 0;
             if (hc != destCell) hqAlt = hc;
         }
+        Dictionary<Vector3Int, List<Vector3Int>> repairApproachPaths = paths;
+        if (IsSurfaceRepairAutonomyReserveApplicable(unit)
+            && fullRepairPaths != null
+            && fullRepairPaths.ContainsKey(destCell)
+            && (paths == null || !paths.ContainsKey(destCell))
+            && CanSurfaceRepairConstructionServe(repairDest, unit, aiTeam))
+        {
+            // A construcao supridora e alcancavel agora. Neste caso chegar e
+            // melhor que conservar os 2 pontos e ficar sem atendimento.
+            repairApproachPaths = fullRepairPaths;
+            Debug.Log($"{TL("Repair")} {unit.InstanceId} usa reserva de autonomia para chegar ao supridor {destCell}");
+        }
+
         Vector3Int bestStep = FindRepairApproachStep(
-            unit, aiTeam, fromCell, destCell, repairDest, paths, occupied, hqAlt, out bool usedEmergencyFlee);
+            unit, aiTeam, fromCell, destCell, repairDest, repairApproachPaths, occupied, hqAlt, out bool usedEmergencyFlee);
 
         if (bestStep == destCell
             && TryBuildAirTransportRepairArrivalRelease(
@@ -882,7 +914,7 @@ public partial class AIController
                 snapshot,
                 fromCell,
                 destCell,
-                paths,
+                repairApproachPaths,
                 out PlayerAction arrivalRelease))
         {
             return arrivalRelease;
@@ -893,7 +925,7 @@ public partial class AIController
                 unit,
                 snapshot,
                 fromCell,
-                paths,
+                repairApproachPaths,
                 occupied,
                 out PlayerAction blockedAnchorsFight,
                 out string blockedAnchorsFightReason))
@@ -903,7 +935,7 @@ public partial class AIController
         }
 
         Debug.Log($"{TL("Repair")} {unit.InstanceId} marcha para reparo em {destCell} via {bestStep}");
-        return BuildMoveBatch(unit, aiTeam, fromCell, bestStep, paths);
+        return BuildMoveBatch(unit, aiTeam, fromCell, bestStep, repairApproachPaths);
     }
 
     private static bool IsPotentialRepairFusionTarget(UnitManager receiver, UnitManager candidate)

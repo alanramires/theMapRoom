@@ -117,6 +117,8 @@ public sealed class MelhorEmbarqueWindow : EditorWindow
         {
             AutoDetectRuntimeSelection();
         }
+        if (GUILayout.Button("Limpar", GUILayout.Width(70f)))
+            ClearAll();
         EditorGUILayout.EndHorizontal();
 
         using (new EditorGUI.DisabledScope(
@@ -454,6 +456,27 @@ public sealed class MelhorEmbarqueWindow : EditorWindow
               $"({selectedOption.passengerRouteState})."
             : "Nenhum encontro válido encontrado.";
         SceneView.RepaintAll();
+    }
+
+    private void ClearAll()
+    {
+        passenger = null;
+        transporter = null;
+        map = null;
+
+        result = null;
+        runtimePolicyResult = null;
+        selected = null;
+        selectedOption = null;
+        runtimePolicyOption = null;
+        probableDirection = null;
+        comparisonCapturedWhileRunning = false;
+
+        scroll = Vector2.zero;
+        status = "Selecione o passageiro; o transportador é opcional.";
+
+        SceneView.RepaintAll();
+        Repaint();
     }
 
     private MelhorEmbarqueResult Evaluate(bool includeStrategic) =>
