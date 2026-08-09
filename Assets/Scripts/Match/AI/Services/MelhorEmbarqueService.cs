@@ -50,6 +50,11 @@ public sealed class MelhorEmbarqueOption
         MelhorEmbarqueRideDisposition.NotEvaluated;
     public QueroCaronaResult rideNeed;
     public float rideNeedAdjustment;
+    // Peso da vaga: unidades que a opcao TRAZ menos capacidade que ela
+    // DESLOCA. Ver ResolveOptionSlotWeight.
+    public int unitsBrought = 1;
+    public int seatsDisplaced;
+    public int slotWeight;
     public float score;
     public string reason;
 }
@@ -425,6 +430,56 @@ public static class MelhorEmbarqueService
             return result;
         }
 
+        // ── O peso da vaga ────────────────────────────────────────────────
+        // O casco nao e uma lista de assentos independentes. Uma vaga
+        // exclusiva ocupada apaga todas as outras — e, no espelho, um
+        // soldado numa vaga comum apaga a vaga exclusiva.
+        //
+        // Ate aqui a IA so sabia perguntar "posso usar esta vaga AGORA?",
+        // contra quem JA esta a bordo. Com o casco vazio a resposta e sim
+        // para todo mundo, e o mesmo Chinook era oferecido a quatro
+        // passageiros ao mesmo tempo (slot 0 a dois soldados, slot 1 a dois
+        // APCs); o motor recusava depois. A pergunta que faltava nao e sobre
+        // o estado do casco, e sobre o que uma opcao CUSTA as outras.
+        //
+        //     peso = unidades que traz − assentos que desloca
+        //
+        // "Traz" conta a carga aninhada: um APC com um soldado dentro entrega
+        // duas unidades numa vaga so. "Desloca" conta apenas assentos que
+        // outro candidato do mesmo pedido de fato disputa — casco sem fila,
+        // aninhar sai de graca. Sem essa clausula um APC sozinho recusaria
+        // um Chinook vazio, que e regressao no cenario do canal.
+        //
+        // Depende de (passageiro, slot) e NAO da LZ: fica FORA do laco de
+        // pares, que e o mais caro do transporte.
+        //
+        // E mora DEPOIS da poda de acceptedPassengers, nao antes: quem foi
+        // DESCARTADO pela pergunta da carona nunca vira opcao, logo nao
+        // disputa assento nenhum. Contado antes, ele viraria concorrente
+        // fantasma e encareceria a vaga exclusiva contra ninguem.
+        var slotDemand = new Dictionary<int, int>();
+        for (int i = 0; i < passengers.Count; i++)
+        {
+            int slot = passengerSlots[passengers[i]];
+            slotDemand.TryGetValue(slot, out int demand);
+            slotDemand[slot] = demand + 1;
+        }
+
+        var passengerUnitsBrought = new Dictionary<UnitManager, int>();
+        var passengerSeatsDisplaced = new Dictionary<UnitManager, int>();
+        for (int i = 0; i < passengers.Count; i++)
+        {
+            UnitManager candidate = passengers[i];
+            passengerUnitsBrought[candidate] =
+                CountUnitsBrought(candidate);
+            passengerSeatsDisplaced[candidate] =
+                ResolveSeatsDisplaced(
+                    request.transporter,
+                    transporterData,
+                    passengerSlots[candidate],
+                    slotDemand);
+        }
+
         // Quem suspende o encerramento antecipado da varredura. Era so
         // emergencia de reparo; passou a incluir quem nao tem rota propria e ja
         // esperou demais. Sem isso o ilhado nao perdia a disputa — ele nao
@@ -656,11 +711,16 @@ public static class MelhorEmbarqueService
                     routePenalty = 0f;
                 }
 
+                int unitsBrought = passengerUnitsBrought[passenger];
+                int seatsDisplaced = passengerSeatsDisplaced[passenger];
+                int slotWeight = unitsBrought - seatsDisplaced;
+
                 float optionScore = 100000f
                     - distance * 100f
                     - routePenalty
                     - rescueApproachPenalty
-                    + rideNeedAdjustment;
+                    + rideNeedAdjustment
+                    + slotWeight * SlotWeightScale;
                 var option = new MelhorEmbarqueOption
                 {
                     transporter = request.transporter,
@@ -689,6 +749,9 @@ public static class MelhorEmbarqueService
                     rideDisposition = disposition,
                     rideNeed = rideNeed,
                     rideNeedAdjustment = rideNeedAdjustment,
+                    unitsBrought = unitsBrought,
+                    seatsDisplaced = seatsDisplaced,
+                    slotWeight = slotWeight,
                     score = optionScore,
                     reason =
                         $"slot={slotIndex} LZ={cell} " +
@@ -703,7 +766,10 @@ public static class MelhorEmbarqueService
                         $"distTransport={distance} " +
                         $"aproxPax={passengerMeetingDistance:F0} " +
                         $"carona={disposition} " +
-                        $"ajusteCarona={rideNeedAdjustment:0}"
+                        $"ajusteCarona={rideNeedAdjustment:0} " +
+                        $"peso={slotWeight:+0;-0;0} " +
+                        $"(traz={unitsBrought} " +
+                        $"desloca={seatsDisplaced})"
                 };
                 result.options.Add(option);
                 if (tier == MelhorEmbarqueTier.Tactical
@@ -1282,6 +1348,12 @@ public static class MelhorEmbarqueService
     /// </summary>
     private const int NonNegotiableRideWaitTurns = 3;
 
+    // Calibre do peso da vaga. O termo ordena PARES — entre duas opcoes da
+    // mesma disposicao de carona — e nunca atropela um resgate: a faixa util
+    // do peso e ~[-3, +2], logo ate 900, abaixo dos 1000 que separam
+    // Requested de Emergency.
+    private const float SlotWeightScale = 300f;
+
     /// <summary>
     /// Pedido que a esteira nao pode mais adiar: emergencia de reparo, ou
     /// alguem sem rota propria que ja esperou demais.
@@ -1299,6 +1371,89 @@ public static class MelhorEmbarqueService
             return true;
         return rideNeed.isStranded
                && rideNeed.rideWaitTurns >= NonNegotiableRideWaitTurns;
+    }
+
+    /// <summary>
+    /// Quantas unidades a opcao entrega de fato. Um APC com um soldado dentro
+    /// vale duas: a carga aninhada sobe junto e ocupa uma vaga so.
+    /// </summary>
+    private static int CountUnitsBrought(UnitManager passenger)
+    {
+        if (passenger == null)
+            return 0;
+
+        int total = 1;
+        IReadOnlyList<UnitTransportSeatRuntime> seats =
+            passenger.TransportedUnitSlots;
+        if (seats == null)
+            return total;
+
+        for (int i = 0; i < seats.Count; i++)
+        {
+            UnitTransportSeatRuntime seat = seats[i];
+            if (seat == null
+                || seat.embarkedUnit == null
+                || !seat.embarkedUnit.IsEmbarked)
+                continue;
+            total += CountUnitsBrought(seat.embarkedUnit);
+        }
+        return total;
+    }
+
+    /// <summary>
+    /// Assentos que esta opcao tira dos OUTROS candidatos do mesmo pedido.
+    /// So conta assento disputado: capacidade que ninguem quer nao e custo.
+    /// </summary>
+    private static int ResolveSeatsDisplaced(
+        UnitManager transporter,
+        UnitData transporterData,
+        int chosenSlotIndex,
+        Dictionary<int, int> slotDemand)
+    {
+        List<UnitTransportSlotRule> slots =
+            transporterData?.transportSlots;
+        if (transporter == null
+            || slots == null
+            || chosenSlotIndex < 0
+            || chosenSlotIndex >= slots.Count
+            || slots[chosenSlotIndex] == null)
+            return 0;
+
+        bool chosenIsExclusive = slots[chosenSlotIndex].exclusiveSlot;
+        int displaced = 0;
+        for (int i = 0; i < slots.Count; i++)
+        {
+            UnitTransportSlotRule slot = slots[i];
+            if (slot == null)
+                continue;
+
+            slotDemand.TryGetValue(i, out int demand);
+            // O proprio candidato nao disputa consigo mesmo.
+            if (i == chosenSlotIndex)
+                demand--;
+            if (demand <= 0)
+                continue;
+
+            int free = Mathf.Max(
+                0,
+                Mathf.Max(1, slot.capacity)
+                - transporter.GetOccupiedTransportSeatCountForSlot(i));
+            if (free <= 0)
+                continue;
+
+            // Na propria vaga some o assento ocupado. Nas demais some a vaga
+            // inteira quando a exclusividade morde — dos dois lados, porque
+            // CanUseTransportSlotExclusivity recusa tanto entrar numa vaga
+            // exclusiva com carga alheia quanto entrar numa vaga comum
+            // havendo exclusiva ocupada.
+            int lost = i == chosenSlotIndex
+                ? 1
+                : chosenIsExclusive || slot.exclusiveSlot
+                    ? free
+                    : 0;
+            displaced += Mathf.Min(lost, demand);
+        }
+        return displaced;
     }
 
     private static float ResolveRideNeedAdjustment(
