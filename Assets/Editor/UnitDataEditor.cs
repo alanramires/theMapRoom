@@ -696,18 +696,19 @@ public class UnitDataEditor : Editor
             if (transportSlots != null)
             {
                 EditorGUI.indentLevel++;
-                SerializedProperty size = transportSlots.FindPropertyRelative("Array.size");
-                if (size != null)
-                    EditorGUILayout.PropertyField(size, new GUIContent("Size"));
-
-                for (int i = 0; i < transportSlots.arraySize; i++)
-                {
-                    SerializedProperty slot = transportSlots.GetArrayElementAtIndex(i);
-                    EditorGUILayout.PropertyField(
-                        slot,
-                        new GUIContent($"Element {i}"),
-                        includeChildren: true);
-                }
+                // O array e desenhado INTEIRO, num PropertyField so. E o drawer
+                // padrao da Unity que traz "+", "-", arrastar para reordenar e o
+                // "Delete Array Element" do botao direito.
+                //
+                // Desenhar elemento por elemento num laco nunca invoca esse
+                // drawer, e os controles somem junto: sobra o campo Size, que so
+                // corta do fim da lista. Foi o que 639c02e fez sem querer ao
+                // embrulhar a secao no foldout — o commit era sobre locais de
+                // desembarque e levou os slots de transporte de arrasto.
+                EditorGUILayout.PropertyField(
+                    transportSlots,
+                    new GUIContent("Slots"),
+                    includeChildren: true);
                 EditorGUI.indentLevel--;
             }
         }
