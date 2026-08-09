@@ -1124,6 +1124,81 @@ public partial class AIController
         return true;
     }
 
+    /// <summary>
+    /// A missao herdada do transportador CARREGADO, publicada no setup da Fase
+    /// 2 — antes de qualquer unidade agir.
+    ///
+    /// Plano escrito depois de executar nao coordena ninguem, que e a unica
+    /// funcao dele. O invariante transacional protege o TABULEIRO (FoW,
+    /// ocupacao, recurso, unidade marcada como agida); missao e intencao, e
+    /// intencao tem de estar publicada quando os outros olham.
+    ///
+    /// E ela NAO depende de decidir nada: quem esta a bordo e para onde essa
+    /// carga vai sao fatos, sabiveis antes da primeira selecao. Comparar com a
+    /// promessa, que E a decisao e por isso continua no commit pos-acao:
+    ///
+    ///     courier / need a lift   ancora = destino da carga   -> aqui, cedo
+    ///     pickup  / ASAP          ancora = o encontro         -> commit pos-acao
+    ///
+    /// Sem isto o navio (grp=2) lia a ficha do APC (grp=4) exatamente na janela
+    /// em que ela descrevia o turno anterior.
+    ///
+    /// ❓ Carga E vaga livre com alguem na fila e o caso que a tabela de quatro
+    /// estados nao resolve: aqui a carga ganha, porque courier e o estado que a
+    /// unidade ja esta vivendo.
+    /// </summary>
+    private void PublishInheritedMissionIntent(
+        UnitManager unit,
+        TeamObjectivePlan plan,
+        AIWorldSnapshot snapshot)
+    {
+        if (unit == null
+            || unit.IsDead
+            || unit.IsEmbarked
+            || !HasTransportCargo(unit))
+        {
+            return;
+        }
+
+        // Nao piso em missao de outro dono (Restock, por exemplo) — mesma
+        // guarda que CommitRidePromise usa.
+        if (unit.AIHasDesignatedMission
+            && unit.AIDesignatedMissionIntent
+                != AIPlanRuntimeIntent.Transport)
+        {
+            return;
+        }
+
+        List<UnitManager> cargo = CollectPassengers(unit);
+        UnitManager primary =
+            ResolvePrimaryPassenger(unit, cargo, plan);
+        if (primary == null
+            || !TryResolveCargoDestinationAnchor(
+                unit, plan, snapshot, out Vector3Int anchor))
+        {
+            return;
+        }
+
+        bool changed =
+            !unit.AIHasDesignatedMission
+            || unit.AIDesignatedMissionTargetCell != anchor
+            || unit.AIDesignatedMissionTargetUnitInstanceId
+                != primary.InstanceId;
+
+        unit.SetAIDesignatedMission(
+            AIPlanRuntimeIntent.Transport,
+            anchor,
+            targetUnitInstanceId: primary.InstanceId);
+
+        if (changed && showAILogs)
+        {
+            Debug.Log(
+                $"{TL("Missao")} {unit.InstanceId} HERDA da carga " +
+                $"#{primary.InstanceId} -> Transport {anchor} " +
+                "(publicada no setup).");
+        }
+    }
+
     private QueroCaronaResult EvaluatePickupRideNeed(
         UnitManager passenger,
         TeamObjectivePlan plan,

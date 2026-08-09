@@ -70,10 +70,29 @@ public partial class AIController
     }
 
     /// <summary>
-    /// Carimba, ou tira da fila, a partir de um pedido de carona JA avaliado.
+    /// Decora um pedido de carona JA avaliado com a espera publicada. NAO
+    /// escreve estado na unidade.
     ///
-    /// Nao avalia nada por conta propria: so e chamado onde o resultado ja
-    /// existe na mao, para nao pagar um envelope a mais por unidade.
+    /// Antes escrevia: era este metodo que colocava e tirava a unidade da fila,
+    /// e ele roda dentro do planejamento de QUEM PERGUNTA. Como o QueroCarona e
+    /// par a par — cada transportador com a sua banda e o seu horizonte —, dois
+    /// transportadores davam respostas opostas sobre a mesma unidade no mesmo
+    /// turno e o ultimo a perguntar gravava a ficha. Dai a dança no Inspector, e
+    /// dai o aninhamento depender da ordem de iniciativa: o degrau gateia em
+    /// AIIsWaitingForRide.
+    ///
+    /// O DEFEITO ERA A BAIXA, NAO A SUBIDA. Quem responde "sim" sabe de um
+    /// caminho real; quem responde "nao" so sabe que ELE nao serve. Tirar da
+    /// fila a partir de um "nao" alheio e que fazia o campo oscilar.
+    ///
+    /// Entao aqui ficou monotono dentro do turno: pode LEVANTAR, nunca baixar.
+    /// Quem baixa e PublishRideNeed, uma vez por turno, e o embarque.
+    ///
+    /// Isso preserva os alvos que a publicacao ainda nao sabe formular — a zona
+    /// de vigilancia do Radar e o alvo reservado do capturador nao estao na
+    /// missao da unidade, e cortar estes pontos derrubaria essas pecas da fila.
+    /// Fatia 2: dobrar esses dois alvos na missao, e ai a publicacao vira
+    /// escritora unica de verdade.
     /// </summary>
     private void ApplyRideWaitStamp(
         UnitManager unit,
@@ -82,42 +101,77 @@ public partial class AIController
         if (unit == null || rideNeed == null)
             return;
 
-        bool wasWaiting = unit.AIIsWaitingForRide;
         int currentTurn = ResolveCurrentTurnNumber();
-
-        // Embarcou (conseguiu a carona) ou parou de querer: sai da fila.
-        if (unit.IsEmbarked || !rideNeed.wantsRide)
+        if (rideNeed.wantsRide && !unit.IsEmbarked)
         {
-            if (wasWaiting)
+            bool wasWaiting = unit.AIIsWaitingForRide;
+            unit.PublishAIRideNeed(true, currentTurn);
+            if (!wasWaiting && showAILogs)
             {
-                int waited = unit.ResolveAIRideWaitTurns(currentTurn);
-                unit.ClearAIRideWait();
-                if (showAILogs)
-                {
-                    Debug.Log(
-                        $"{TL("FilaCarona")} #{unit.InstanceId} sai da fila " +
-                        $"apos {waited} turno(s) — " +
-                        (unit.IsEmbarked
-                            ? "embarcou."
-                            : "nao quer mais carona."));
-                }
+                Debug.Log(
+                    $"{TL("FilaCarona")} #{unit.InstanceId} entra na fila no " +
+                    $"turno {currentTurn} — " +
+                    $"{(rideNeed.isStranded ? "SEM ROTA PRÓPRIA" : "fora das bandas")} " +
+                    $"(score={rideNeed.rideNeedScore}).");
             }
-            return;
         }
 
-        // Idempotente de proposito: quem ja estava na fila MANTEM a
-        // antiguidade. Reiniciar aqui zeraria a espera a cada reavaliacao — e o
-        // pedido e reavaliado dezenas de vezes por turno, uma vez por
-        // transportador que planeja coleta.
-        unit.MarkAIRideWaitStart(currentTurn);
         ApplyRideWaitUrgency(unit, rideNeed, currentTurn);
-        if (!wasWaiting && showAILogs)
+    }
+
+    /// <summary>
+    /// O ESCRITOR UNICO do par (quero carona, ha quanto tempo). Uma vez por
+    /// unidade por turno, no setup da Fase 2.
+    ///
+    /// A pergunta e sempre a mesma, e e o que prova que o nivel esta certo:
+    /// *alcanco a minha propria missao sozinho?* Sem ramo por papel —
+    ///
+    ///     soldado         intent capture   (0,0)     nao alcanco  ->  quer
+    ///     APC vazio       intent transport (20,5)    alcanco      ->  nao quer
+    ///     APC carregado   intent transport (0,0)     nao alcanco  ->  quer
+    ///                               ^ herdada da carga
+    ///
+    /// EvaluatePickupRideNeed ja faz esse despacho (destino da carga para quem
+    /// carrega, pergunta de captura para quem captura, emergencia para o
+    /// resto). Reusar e deliberado: esta fatia muda QUEM escreve e QUANDO, nao
+    /// o conteudo da resposta.
+    /// </summary>
+    private void PublishRideNeed(
+        UnitManager unit,
+        TeamObjectivePlan plan,
+        AIWorldSnapshot snapshot)
+    {
+        if (unit == null || unit.IsDead)
+            return;
+
+        int currentTurn = ResolveCurrentTurnNumber();
+        bool wasWaiting = unit.AIIsWaitingForRide;
+
+        // Embarcado ja conseguiu o que pedia. Nao gasta envelope para descobrir
+        // isso, e a saida da fila e registrada por UpdateRideWaitState.
+        if (unit.IsEmbarked)
+            return;
+
+        QueroCaronaResult rideNeed =
+            EvaluatePickupRideNeed(unit, plan, 2, snapshot);
+        bool wantsRide = rideNeed != null && rideNeed.wantsRide;
+        unit.PublishAIRideNeed(wantsRide, currentTurn);
+
+        if (!showAILogs || wantsRide == wasWaiting)
+            return;
+
+        if (wantsRide)
         {
             Debug.Log(
                 $"{TL("FilaCarona")} #{unit.InstanceId} entra na fila no turno " +
                 $"{currentTurn} — {(rideNeed.isStranded ? "SEM ROTA PRÓPRIA" : "fora das bandas")} " +
                 $"(score={rideNeed.rideNeedScore}).");
+            return;
         }
+
+        Debug.Log(
+            $"{TL("FilaCarona")} #{unit.InstanceId} sai da fila — " +
+            "nao quer mais carona.");
     }
 
     /// <summary>

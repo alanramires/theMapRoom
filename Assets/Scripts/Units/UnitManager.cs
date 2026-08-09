@@ -176,6 +176,10 @@ public class UnitManager : MonoBehaviour
     [SerializeField] private Vector3Int aiDesignatedMissionTargetCell = Vector3Int.zero;
     [Tooltip("Turno em que a unidade comecou a esperar por uma carona que nao veio. 0 = nao esta esperando. E CARIMBO, nao contador: a espera e derivada (turno atual - carimbo), entao ler mil vezes no mesmo turno da o mesmo numero. Zero como sentinela mantem save antigo correto, porque turno comeca em 1.")]
     [SerializeField] private int aiRideWaitSinceTurn;
+    [Tooltip("Quero carona? Fato publicado pela propria unidade, uma vez por turno, contra a propria missao. Nao e resposta de pergunta de transportador — o QueroCarona e par a par e cada transportador responde diferente.")]
+    [SerializeField] private bool aiWantsRide;
+    [Tooltip("Ha quantos turnos ela espera. Espelho legivel do carimbo acima, materializado na publicacao: o carimbo sozinho mostra o TURNO de entrada, que se le errado como contagem.")]
+    [SerializeField] private int aiRideWaitTurns;
     [Header("AI Eixo Runtime")]
     [Tooltip("Eixo ao qual a unidade pertence: 1, 2 ou 3 = eixos regulares; 4 = invasão final. 0 = nenhum (rogue / fora de eixo).")]
     [Range(0, 4)]
@@ -312,8 +316,54 @@ public class UnitManager : MonoBehaviour
     /// </summary>
     public int AIRideWaitSinceTurn => aiRideWaitSinceTurn;
 
+    /// <summary>
+    /// Esta unidade quer carona? FATO PUBLICADO pela propria unidade, uma vez
+    /// por turno, contra a PROPRIA missao — nunca resposta de pergunta alheia.
+    ///
+    /// Antes disto o valor era efeito colateral do planejamento dos outros: o
+    /// QueroCarona e uma pergunta par a par (cada transportador com a sua
+    /// banda, o seu horizonte, o seu tier) e quem perguntasse por ultimo
+    /// gravava a ficha. Dois transportadores davam respostas diferentes sobre a
+    /// mesma unidade no mesmo turno, e o campo dancava no Inspector.
+    ///
+    /// Nao era cosmetico: o degrau de aninhamento gateia aqui, entao a
+    /// capacidade de um APC subir no navio dependia de qual transportador o
+    /// tinha avaliado antes na ordem de iniciativa.
+    /// </summary>
+    public bool AIWantsRide => aiWantsRide;
+
     /// <summary>Esta unidade esta na fila da carona?</summary>
-    public bool AIIsWaitingForRide => aiRideWaitSinceTurn > 0;
+    public bool AIIsWaitingForRide => aiWantsRide;
+
+    /// <summary>
+    /// Ha quantos turnos ela espera, MATERIALIZADO na publicacao para ser
+    /// legivel no Inspector. O carimbo (aiRideWaitSinceTurn) continua sendo a
+    /// verdade da antiguidade; este campo e o espelho dele.
+    ///
+    /// Existe porque o carimbo sozinho engana quem le a ficha: esperando desde
+    /// o turno 1, no turno 4 ele mostra "1", que se le como "esperei 1 turno"
+    /// quando sao 3.
+    /// </summary>
+    public int AIRideWaitTurns => aiRideWaitTurns;
+
+    /// <summary>
+    /// Publica a resposta do turno. Unico escritor do par (quero, ha quanto
+    /// tempo); a antiguidade continua idempotente, entao republicar "sim" no
+    /// turno seguinte NAO reinicia a espera.
+    /// </summary>
+    public void PublishAIRideNeed(bool wantsRide, int currentTurn)
+    {
+        aiWantsRide = wantsRide;
+        if (!wantsRide)
+        {
+            aiRideWaitSinceTurn = 0;
+            aiRideWaitTurns = 0;
+            return;
+        }
+
+        MarkAIRideWaitStart(currentTurn);
+        aiRideWaitTurns = ResolveAIRideWaitTurns(currentTurn);
+    }
 
     /// <summary>
     /// Ha quantos turnos ela espera. Zero quando nao esta na fila.
@@ -348,12 +398,22 @@ public class UnitManager : MonoBehaviour
     public void ClearAIRideWait()
     {
         aiRideWaitSinceTurn = 0;
+        aiWantsRide = false;
+        aiRideWaitTurns = 0;
     }
 
-    /// <summary>Restauracao de save. Nao passa pela regra de idempotencia.</summary>
+    /// <summary>
+    /// Restauracao de save. Nao passa pela regra de idempotencia.
+    ///
+    /// Só o carimbo é serializado: "quero carona" deriva dele (esperando =
+    /// queria), e a contagem é republicada na primeira Fase 2 depois do load.
+    /// Nada de campo novo no DTO para um valor que o carimbo já contém.
+    /// </summary>
     public void RestoreAIRideWaitSinceTurn(int sinceTurn)
     {
         aiRideWaitSinceTurn = Mathf.Max(0, sinceTurn);
+        aiWantsRide = aiRideWaitSinceTurn > 0;
+        aiRideWaitTurns = 0;
     }
 
     public int AIEixo => aiEixo;

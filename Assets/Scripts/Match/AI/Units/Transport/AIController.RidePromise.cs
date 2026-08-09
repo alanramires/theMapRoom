@@ -130,7 +130,22 @@ public partial class AIController
         }
 
         string dischargeReason = null;
-        if (passenger.IsEmbarked)
+        // EMBARCOU EM MIM NAO E BAIXA — E O COMECO DA ENTREGA.
+        //
+        // Intent=Transport com alvo #N tem dois donos e a mesma forma:
+        //
+        //     PROMESSA  "vou buscar #N"        acaba quando #N embarca
+        //     HERANCA   "levo #N ate (x,y)"    COMECA quando #N embarca
+        //
+        // Sem distinguir, o setup da Fase 2 apagava a missao herdada todo
+        // turno: o APC agia com intent=None e so a reescrevia depois de agir.
+        // E como o navio decide antes dele na iniciativa, o navio lia None —
+        // a missao herdada existia, mas nunca no instante em que alguem olhava.
+        //
+        // Quem embarcou em OUTRO veiculo continua dando baixa: ali a promessa
+        // foi cumprida por terceiro, que e o caso para o qual a regra nasceu.
+        if (passenger.IsEmbarked
+            && passenger.EmbarkedTransporter != transporter)
             dischargeReason = "passageiro embarcou";
         else if (passenger.IsDead)
             dischargeReason = "passageiro morreu";

@@ -55,6 +55,15 @@ public partial class AIController
             {
                 UpdateRepairState(u, activePlan);
                 UpdateRideWaitState(u);
+                // A ORDEM AQUI E A DOUTRINA, nesta sequencia:
+                //   1. PARA ONDE eu vou   (missao herdada da carga)
+                //   2. CONSIGO chegar?    (quero carona, contra essa missao)
+                // Os dois fatos que definem os quatro estados do transportador
+                // passam a ser publicados no mesmo instante, antes de qualquer
+                // unidade ser selecionada. Plano escrito depois de agir nao
+                // coordena ninguem.
+                PublishInheritedMissionIntent(u, activePlan, current);
+                PublishRideNeed(u, activePlan, current);
                 UpdateRidePromiseState(u);
             }
         }
@@ -81,7 +90,19 @@ public partial class AIController
             Vector3Int uc = u.CurrentCellPosition; uc.z = 0;
             Vector3Int? tgt = GetAssignedTargetCell(u, activePlan);
             string tgtStr = tgt.HasValue ? tgt.Value.ToString() : "null";
-            _initLogBuilder.AppendLine($"  [grp={g}] {FormatInitiativeUnitName(u)} @ {uc} target={tgtStr}");
+            // target = objetivo do PLANO. missao = a ficha da propria unidade —
+            // sao coisas diferentes, e sem as duas lado a lado e facil ler uma
+            // pela outra. Com carona ao lado, a linha mostra o estado inteiro do
+            // transportador (HasCargo x wantsRide) de relance.
+            string missaoStr = u.AIHasDesignatedMission
+                ? $"{u.AIDesignatedMissionIntent}{u.AIDesignatedMissionTargetCell}"
+                : "None";
+            string caronaStr = u.AIWantsRide
+                ? $"SIM({u.AIRideWaitTurns}t)"
+                : "nao";
+            _initLogBuilder.AppendLine(
+                $"  [grp={g}] {FormatInitiativeUnitName(u)} @ {uc} " +
+                $"target={tgtStr} missao={missaoStr} carona={caronaStr}");
         }
         Debug.Log(_initLogBuilder.ToString());
         _initLogBuilder.Clear();
@@ -159,6 +180,15 @@ public partial class AIController
             try
             {
                 PrepareAIThreatEnvelope(unit);
+                // RE-CHECK NA SELECAO. O setup publica o estado do INICIO do
+                // turno, mas a carga muda DENTRO dele: o passageiro embarca na
+                // vez dele, e o transportador pode decidir depois disso. Sem
+                // republicar aqui, um APC que virou courier no meio do turno
+                // decidiria — e seria lido — como o pickup que ele era.
+                //
+                // Idempotente e barato: sai cedo para quem nao tem carga, e
+                // para quem tem, so reescreve se a ancora mudou.
+                PublishInheritedMissionIntent(unit, activePlan, current);
                 action = DecideUnitAction(unit, current);
             }
             catch (System.Exception ex)
