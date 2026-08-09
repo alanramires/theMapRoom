@@ -621,6 +621,8 @@ MonoBehaviour:
   aiDesignatedMissionTargetConstructionInstanceId: -1
   aiDesignatedMissionTargetCell: {x: 0, y: 0, z: 0}
   aiRideWaitSinceTurn: 0
+  aiWantsRide: 0
+  aiRideWaitTurns: 0
   aiEixo: 0
   aiHasStance: 0
   aiStance: 0
