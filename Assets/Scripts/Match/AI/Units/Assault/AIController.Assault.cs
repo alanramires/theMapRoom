@@ -93,7 +93,7 @@ public partial class AIController
                 && option.transporterSlotIndex == decision.option.slotIndex);
             if (legal != null)
             {
-                ClaimCombatPassengerTransportDecision(decision);
+                PublishCombatPassengerTransportBeacon(decision);
                 string roleLabel;
                 switch (policy)
                 {
@@ -276,7 +276,7 @@ public partial class AIController
                         out int embarkCost,
                         out string embarkReason))
                 {
-                    ClaimCombatPassengerTransportDecision(decision);
+                    PublishCombatPassengerTransportBeacon(decision);
                     Debug.Log(
                         $"{TL("Transporte")} passageiro #{passenger.InstanceId} " +
                         $"policy={decision.policy} move e embarca: encontroPax=" +
@@ -304,7 +304,7 @@ public partial class AIController
                     $"{embarkReason}");
             }
 
-            ClaimCombatPassengerTransportDecision(decision);
+            PublishCombatPassengerTransportBeacon(decision);
             Debug.Log(
                 $"{TL("Transporte")} passageiro #{passenger.InstanceId} " +
                 $"policy={decision.policy} segue para encontroPax=" +
@@ -323,7 +323,7 @@ public partial class AIController
 
         if (passengerMeeting == fromCell)
         {
-            ClaimCombatPassengerTransportDecision(decision);
+            PublishCombatPassengerTransportBeacon(decision);
             Debug.Log(
                 $"{TL("Transporte")} passageiro #{passenger.InstanceId} " +
                 $"policy={decision.policy} aguarda no encontroPax=" +
@@ -354,7 +354,7 @@ public partial class AIController
                 out string progressionReason)
             && progressionCell != fromCell)
         {
-            ClaimCombatPassengerTransportDecision(decision);
+            PublishCombatPassengerTransportBeacon(decision);
             Debug.Log(
                 $"{TL("Transporte")} passageiro #{passenger.InstanceId} " +
                 $"policy={decision.policy} progride para encontroPax=" +
@@ -406,15 +406,15 @@ public partial class AIController
         return action;
     }
 
-    private void ClaimCombatPassengerTransportDecision(
+    private void PublishCombatPassengerTransportBeacon(
         CombatPassengerTransportDecision decision)
     {
         if (decision?.transporter == null || decision.option?.passenger == null)
             return;
 
-        // Reserva apenas a decisão desta passada da Phase 2. Não altera unidade,
-        // ocupação ou qualquer verdade confirmada do tabuleiro.
-        assignedTransportClaims[decision.transporter.InstanceId] =
+        // Publica o farol deste casco para a Phase 2. Nao bloqueia nenhum outro
+        // transportador de escolher o mesmo passageiro.
+        transportPickupBeacons[decision.transporter.InstanceId] =
             decision.option.passenger.InstanceId;
     }
 
@@ -477,10 +477,8 @@ public partial class AIController
                 || transporterData == null
                 || !transporterData.isTransporter)
                 continue;
-            if (assignedTransportClaims.TryGetValue(
-                    transporter.InstanceId, out int claimedPassengerId)
-                && claimedPassengerId != unit.InstanceId)
-                continue;
+            bool pickupBeaconTransport =
+                IsTransportPickupBeaconFor(transporter, unit);
 
             if (!MelhorEmbarqueService
                     .TryResolveCompatiblePassengerSlot(
@@ -558,7 +556,8 @@ public partial class AIController
 
             float policyScore = option.score
                 + ResolveCombatPassengerTransportPolicyAdjustment(
-                    transporter, assigned, plan);
+                    transporter, assigned, plan)
+                + (pickupBeaconTransport ? 10000000f : 0f);
             if (best == null
                 || IsBetterCombatPassengerTransportOption(
                     option, policyScore,

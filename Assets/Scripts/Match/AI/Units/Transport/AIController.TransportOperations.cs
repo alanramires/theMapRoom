@@ -551,27 +551,113 @@ public partial class AIController
                 && option.rideDisposition ==
                     MelhorEmbarqueRideDisposition.OpportunisticFallback)
                 return "carona=OpportunisticFallback";
-            // Exclusividade de VIAGEM, nao de passageiro: dois veiculos
-            // cruzando o mapa pelo mesmo cara e desperdicio. Coleta que
-            // termina nesta rodada ignora a regra — recusar um embarque
-            // que esta acontecendo porque "outro prometeu" seria a fome
-            // outra vez, so que com dono.
-            if (serviceTier != MelhorEmbarqueTier.Tactical
-                && IsPassengerPromisedToAnotherTransporter(
-                    unit, option.passenger))
-                return "prometido a outro transportador";
             return null;
         }
 
         System.Predicate<MelhorEmbarqueOption> isMaterializable =
             option => ResolveRejection(option) == null;
 
+        bool IsTacticalGroupManifest(
+            MelhorEmbarqueManifestScore manifest)
+        {
+            if (requestedTier != AIReachDecisionTier.Tactical
+                || requiredDisposition.HasValue
+                || manifest == null
+                || manifest.tier != MelhorEmbarqueTier.Tactical
+                || manifest.passengers.Count < 2)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < manifest.passengers.Count; i++)
+            {
+                MelhorEmbarqueOption passengerOption =
+                    manifest.passengers[i];
+                if (passengerOption == null
+                    || passengerOption.passenger == null
+                    || passengerOption.passenger.HasActed
+                    || passengerOption.passengerRouteState !=
+                        MelhorEmbarquePassengerRouteState.ReachableNow
+                    || !isMaterializable(passengerOption))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        int CountUnbeaconedManifestPassengers(
+            MelhorEmbarqueManifestScore manifest)
+        {
+            int count = 0;
+            for (int i = 0; i < manifest.passengers.Count; i++)
+            {
+                UnitManager passenger = manifest.passengers[i]?.passenger;
+                if (passenger != null
+                    && !IsPickupBeaconedByOtherTransport(unit, passenger))
+                {
+                    count++;
+                }
+            }
+            return count;
+        }
+
+        MelhorEmbarqueManifestScore FindDistributedManifest(
+            UnitManager requiredPassenger)
+        {
+            MelhorEmbarqueManifestScore best = null;
+            int bestUnbeaconed = -1;
+            for (int i = 0; i < pickup.manifests.Count; i++)
+            {
+                MelhorEmbarqueManifestScore manifest = pickup.manifests[i];
+                if (!IsTacticalGroupManifest(manifest)
+                    || (requiredPassenger != null
+                        && !manifest.passengers.Exists(option =>
+                            option?.passenger == requiredPassenger)))
+                {
+                    continue;
+                }
+
+                int unbeaconed = CountUnbeaconedManifestPassengers(manifest);
+                if (unbeaconed <= bestUnbeaconed)
+                    continue;
+                best = manifest;
+                bestUnbeaconed = unbeaconed;
+            }
+            return best;
+        }
+
         // O FAROL. Se este transportador tem viagem devida e ela e
         // materializavel neste tier, ela vem primeiro — mas so isso. Nao ha
         // preempcao: promessa que nao se materializa agora nao trava o veiculo,
         // que segue com a coleta normal e volta a puxar no proximo turno.
+        // Uma intersecao Tactical comprovada e consumida como grupo. Nao se
+        // procura grupo em Operational/Strategic; sem P2+ ReachableNow na
+        // mesma LZ, o funil individual abaixo permanece inalterado.
+        TryGetRidePromise(
+            unit, out UnitManager promisedPassenger);
+        MelhorEmbarqueManifestScore selectedManifest = null;
+        if (promisedPassenger != null)
+        {
+            selectedManifest = FindDistributedManifest(promisedPassenger);
+        }
+        selectedManifest ??= FindDistributedManifest(null);
+
         MelhorEmbarqueOption selectedOption = null;
-        if (TryGetRidePromise(unit, out UnitManager promisedPassenger))
+        if (selectedManifest != null)
+        {
+            selectedOption = promisedPassenger != null
+                ? selectedManifest.passengers.Find(option =>
+                    option?.passenger == promisedPassenger)
+                : null;
+            selectedOption ??= selectedManifest.passengers.Find(option =>
+                option?.passenger != null
+                && !IsPickupBeaconedByOtherTransport(
+                    unit, option.passenger));
+            selectedOption ??= selectedManifest.passengers[0];
+        }
+        else if (promisedPassenger != null)
         {
             selectedOption = pickup.options.Find(option =>
                 option != null
@@ -579,6 +665,10 @@ public partial class AIController
                 && isMaterializable(option));
         }
 
+        selectedOption ??= pickup.options.Find(option =>
+            isMaterializable(option)
+            && !IsPickupBeaconedByOtherTransport(
+                unit, option.passenger));
         selectedOption ??= pickup.options.Find(isMaterializable);
         if (selectedOption?.passenger == null)
         {
@@ -614,8 +704,15 @@ public partial class AIController
             selectedOption.passenger,
             servicePassengerCell,
             movementBudget,
-            selectedOption.score,
-            $"passageiro=#{selectedOption.passenger.InstanceId} " +
+            selectedManifest != null
+                ? selectedManifest.score
+                : selectedOption.score,
+            (selectedManifest != null
+                ? $"manifestoPax={selectedManifest.passengers.Count} " +
+                  $"passageiros={FormatPickupManifestPassengerIds(selectedManifest)} " +
+                  $"coberturaNova={CountUnbeaconedManifestPassengers(selectedManifest)} "
+                : $"passageiro=#{selectedOption.passenger.InstanceId} " +
+                  $"farol={(IsPickupBeaconedByOtherTransport(unit, selectedOption.passenger) ? "compartilhado" : "novo")} ") +
             $"encontro={selectedOption.lzCell} " +
             $"tier={selectedOption.transporterTier} " +
             $"carona={selectedOption.rideDisposition} " +
@@ -626,6 +723,7 @@ public partial class AIController
             $"dist={selectedOption.transporterDistance}",
             selectedOption.lzCell);
         decision.PickupOption = selectedOption;
+        decision.PickupManifest = selectedManifest;
         decision.RideDisposition = selectedOption.rideDisposition;
         decision.PassengerRouteState =
             selectedOption.passengerRouteState;
@@ -646,6 +744,26 @@ public partial class AIController
 
         return true;
 
+    }
+
+    private static string FormatPickupManifestPassengerIds(
+        MelhorEmbarqueManifestScore manifest)
+    {
+        if (manifest == null || manifest.passengers.Count == 0)
+            return "[]";
+
+        var builder = new System.Text.StringBuilder("[");
+        for (int i = 0; i < manifest.passengers.Count; i++)
+        {
+            if (i > 0)
+                builder.Append(',');
+            UnitManager passenger = manifest.passengers[i]?.passenger;
+            builder.Append(passenger != null
+                ? $"#{passenger.InstanceId}"
+                : "?");
+        }
+        builder.Append(']');
+        return builder.ToString();
     }
 
     private TransportPlanningSnapshot
@@ -796,10 +914,15 @@ public partial class AIController
                     // Quem pede alcance estrategico paga o mapa estrategico.
                     resolveLongRangePassengerMeeting = true,
                     stopAfterDecisiveTactical = true,
+                    // O runtime agrega apenas para descobrir uma coleta
+                    // conjunta que se resolve AGORA. O consumidor ignora
+                    // manifestos Operational/Strategic e conserva o fluxo
+                    // individual nesses horizontes.
+                    buildTransporterManifests = true,
                     transporterPaths = planning.TransporterReach,
                     allowPassenger = candidate =>
                         IsStructurallyEligiblePickupCandidate(
-                            unit, candidate, snapshot, plan),
+                            unit, candidate, snapshot),
                     includeInLegacyRanking = _ => false,
                     // O Quero Carona monta o proprio envelope de Captura
                     // (turnos encadeados). A malha do MelhorEmbarque continua
@@ -827,6 +950,7 @@ public partial class AIController
                 $"reach={planning.TransporterReach?.Count ?? 0} " +
                 $"rideNeeds={planning.RideNeedByPassenger.Count} " +
                 $"tiers=3 options={planning.Pickup.options.Count} " +
+                $"manifests={planning.Pickup.manifests.Count} " +
                 $"ranking={planning.Pickup.ranking.Count}");
         }
     }
@@ -1298,25 +1422,20 @@ public partial class AIController
     private bool IsStructurallyEligiblePickupCandidate(
         UnitManager transporter,
         UnitManager candidate,
-        AIWorldSnapshot snapshot,
-        TeamObjectivePlan plan)
+        AIWorldSnapshot snapshot)
     {
         if (candidate == null
             || candidate == transporter
             || candidate.SlotIndex != snapshot.AISlotIndex
             || candidate.IsDead
-            || candidate.IsEmbarked
-            || IsTransportPassengerClaimedByOther(transporter, candidate)
-            || IsAlreadyFormalPassenger(candidate, transporter, plan))
+            || candidate.IsEmbarked)
         {
             return false;
         }
 
-        // Promessa que o veiculo nao pode cumprir e pior do que promessa
-        // nenhuma: ela reserva o passageiro, gasta o turno do transportador e
-        // ainda suspende o encerramento antecipado da varredura por causa de
-        // alguem que este APC jamais alcancara. Se os componentes de movimento
-        // nao se tocam, este par nao existe.
+        // Farol impossivel nao orienta: se os componentes de movimento nao se
+        // tocam, este par fisico nao existe. Isso nao diz nada sobre os outros
+        // transportadores, que avaliam o mesmo passageiro independentemente.
         if (!CanTransporterMeetPassenger(transporter, candidate))
         {
             if (showAILogs)
@@ -1332,36 +1451,89 @@ public partial class AIController
         return true;
     }
 
-    private bool IsTransportPassengerClaimedByOther(
+    private bool IsTransportPickupBeaconFor(
+        UnitManager transporter,
+        UnitManager passenger)
+    {
+        return transporter != null
+            && passenger != null
+            && ((transportPickupBeacons.TryGetValue(
+                     transporter.InstanceId,
+                     out int primaryPassengerId)
+                 && primaryPassengerId == passenger.InstanceId)
+                || (tacticalPickupManifestBeacons.TryGetValue(
+                        transporter.InstanceId,
+                        out HashSet<int> manifestPassengers)
+                    && manifestPassengers != null
+                    && manifestPassengers.Contains(passenger.InstanceId)));
+    }
+
+    private bool IsPickupBeaconedByOtherTransport(
         UnitManager transporter,
         UnitManager passenger)
     {
         if (transporter == null || passenger == null)
             return false;
 
-        foreach (KeyValuePair<int, int> claim in assignedTransportClaims)
+        foreach (KeyValuePair<int, int> beacon in transportPickupBeacons)
         {
-            if (claim.Key != transporter.InstanceId
-                && claim.Value == passenger.InstanceId)
+            if (beacon.Key != transporter.InstanceId
+                && beacon.Value == passenger.InstanceId)
+            {
                 return true;
+            }
+        }
+
+        foreach (KeyValuePair<int, HashSet<int>> beacon
+                 in tacticalPickupManifestBeacons)
+        {
+            if (beacon.Key != transporter.InstanceId
+                && beacon.Value != null
+                && beacon.Value.Contains(passenger.InstanceId))
+            {
+                return true;
+            }
         }
 
         return false;
     }
 
-    private PlayerAction BuildClaimedTransportPickupMove(
+    private PlayerAction BuildTransportPickupMove(
         UnitManager transporter,
         UnitManager passenger,
         TeamId team,
         Vector3Int fromCell,
         Vector3Int destination,
-        Dictionary<Vector3Int, List<Vector3Int>> paths)
+        Dictionary<Vector3Int, List<Vector3Int>> paths,
+        MelhorEmbarqueManifestScore manifest = null)
     {
-        // Reserva de planejamento da Phase 2. Nao altera unidade, tabuleiro
-        // nem recurso confirmado; apenas impede outro transportador de
-        // materializar, na mesma passada, uma ordem para o mesmo passageiro.
-        assignedTransportClaims[transporter.InstanceId] =
-            passenger.InstanceId;
+        // Farol de planejamento da Phase 2. Nao altera unidade, tabuleiro nem
+        // recurso confirmado e, principalmente, nao bloqueia outro veiculo de
+        // escolher os mesmos passageiros. Se o batch abortar, Phase2 remove o
+        // farol deste transportador.
+        if (passenger != null)
+        {
+            transportPickupBeacons[transporter.InstanceId] =
+                passenger.InstanceId;
+        }
+
+        if (manifest != null)
+        {
+            var manifestPassengers = new HashSet<int>();
+            for (int i = 0; i < manifest.passengers.Count; i++)
+            {
+                UnitManager manifestPassenger =
+                    manifest.passengers[i]?.passenger;
+                if (manifestPassenger != null)
+                    manifestPassengers.Add(manifestPassenger.InstanceId);
+            }
+            tacticalPickupManifestBeacons[transporter.InstanceId] =
+                manifestPassengers;
+        }
+        else
+        {
+            tacticalPickupManifestBeacons.Remove(transporter.InstanceId);
+        }
         return BuildMoveBatch(
             transporter, team, fromCell, destination, paths);
     }
@@ -1425,6 +1597,9 @@ public partial class AIController
             : BuildOccupied(unit);
         Vector3Int serviceRendezvous = decision.RendezvousCell;
         serviceRendezvous.z = 0;
+        string pickupTargets = decision.PickupManifest != null
+            ? $"manifesto={FormatPickupManifestPassengerIds(decision.PickupManifest)}"
+            : $"passageiro=#{decision.TargetUnit.InstanceId}";
 
         if (paths != null
             && paths.ContainsKey(serviceRendezvous)
@@ -1432,11 +1607,11 @@ public partial class AIController
         {
             Debug.Log($"{TL("Transporte")} {unit.InstanceId} pickup " +
                       $"{decision.ReachTier}: segue MelhorEmbarque " +
-                      $"LZ={serviceRendezvous} passageiro=" +
-                      $"#{decision.TargetUnit.InstanceId}.");
-            return BuildClaimedTransportPickupMove(
+                      $"LZ={serviceRendezvous} {pickupTargets}.");
+            return BuildTransportPickupMove(
                 unit, decision.TargetUnit, snapshot.AITeam,
-                fromCell, serviceRendezvous, paths);
+                fromCell, serviceRendezvous, paths,
+                decision.PickupManifest);
         }
 
         if (serviceRendezvous != fromCell
@@ -1456,24 +1631,25 @@ public partial class AIController
             Debug.Log($"{TL("Transporte")} {unit.InstanceId} pickup " +
                       $"{decision.ReachTier}: progride para MelhorEmbarque " +
                       $"LZ={serviceRendezvous} via={progressionCell} " +
-                      $"passageiro=#{decision.TargetUnit.InstanceId} " +
+                      $"{pickupTargets} " +
                       $"({progressionReason}).");
-            return BuildClaimedTransportPickupMove(
+            return BuildTransportPickupMove(
                 unit, decision.TargetUnit, snapshot.AITeam,
-                fromCell, progressionCell, paths);
+                fromCell, progressionCell, paths,
+                decision.PickupManifest);
         }
 
         if (serviceRendezvous == fromCell)
         {
             Debug.Log($"{TL("Transporte")} {unit.InstanceId} pickup " +
                       $"{decision.ReachTier}: aguarda na LZ " +
-                      $"{serviceRendezvous} passageiro=" +
-                      $"#{decision.TargetUnit.InstanceId} " +
+                      $"{serviceRendezvous} {pickupTargets} " +
                       $"carona={decision.RideDisposition} " +
                       $"rotaPax={decision.PassengerRouteState}.");
-            return BuildClaimedTransportPickupMove(
+            return BuildTransportPickupMove(
                 unit, decision.TargetUnit, snapshot.AITeam,
-                fromCell, fromCell, paths);
+                fromCell, fromCell, paths,
+                decision.PickupManifest);
         }
 
         Debug.Log($"{TL("Transporte")} {unit.InstanceId} pickup " +

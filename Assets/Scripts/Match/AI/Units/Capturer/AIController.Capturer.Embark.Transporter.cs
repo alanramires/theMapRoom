@@ -90,6 +90,8 @@ public partial class AIController
         // Secondary capturer: also accepts an APC with no formal passenger (shuttle mode).
         // Rogue capturer (no assigned sector): accepts any APC with no formal passenger.
         SectorObjective tObj = ResolveAssignedTransportObjective(transporter, plan);
+        bool pickupBeaconMatch =
+            IsTransportPickupBeaconFor(transporter, unit);
         bool isPrimary = UnitRoleCompatibility.ResolveCompositionRole(unitData) == UnitRole.Capturador;
         bool sameSector = assigned != null && tObj != null && tObj.Sector == assigned.Sector;
         bool compatibleSector = assigned != null && tObj != null
@@ -119,22 +121,33 @@ public partial class AIController
             ? (tObj == null || assignedRogueExtra)
             : (tObj == null || (compatibleTransportObjective && formalPassenger == null));
         bool rogueEmbark = assigned == null && shuttleFree;
-        if (requireFormalPassenger && !formalMatch) return false;
+        if (requireFormalPassenger
+            && !formalMatch
+            && !pickupBeaconMatch) return false;
         // requireSectorMatch: called from the first preference pass — only accept the plan-assigned transporter.
-        if (requireSectorMatch && !sameSector) return false;
+        if (requireSectorMatch
+            && !sameSector
+            && !pickupBeaconMatch) return false;
         if (assigned != null && tObj != null
             && !compatibleTransportObjective
-            && !queuedPassengerSeat)
+            && !queuedPassengerSeat
+            && !pickupBeaconMatch)
         {
             Debug.Log($"{TL(logCategory)} {unit.InstanceId} TryEmbarkFromHex BLOQUEADO setor distante: assigned={assigned.Sector} tObj={tObj.Sector} transporter={transporter.InstanceId}");
             return false;
         }
-        if (assigned == null && tObj != null && !shuttleFree)
+        if (assigned == null
+            && tObj != null
+            && !shuttleFree
+            && !pickupBeaconMatch)
         {
             Debug.Log($"{TL(logCategory)} {unit.InstanceId} TryEmbarkFromHex BLOQUEADO reserva: rogue nao usa transporter={transporter.InstanceId} reservado para {tObj.Sector}");
             return false;
         }
-        if (!sameSector && !shuttleFree && !queuedPassengerSeat)
+        if (!sameSector
+            && !shuttleFree
+            && !queuedPassengerSeat
+            && !pickupBeaconMatch)
         {
             if (!allowOverflow)
             {
@@ -169,14 +182,16 @@ public partial class AIController
             ? FindFittingSecondarySlotIndex(transporter, tData, unit, unitData)
             : FindFittingSlotIndex(transporter, tData, unit, unitData);
         if (slotIdx < 0 && assignedRogueExtra)
-            slotIdx = FindFittingSlotIndexRespectingFormalReservation(transporter, tData, unit, unitData, formalPassenger);
+            slotIdx = FindFittingSlotIndex(
+                transporter, tData, unit, unitData);
         if (slotIdx < 0)
         {
             Debug.Log($"{TL(logCategory)} {unit.InstanceId} TryEmbarkFromHex BLOQUEADO slot: sem slot disponível em transporter={transporter.InstanceId}");
             return false;
         }
 
-        if (ShouldYieldEmbarkToNeedierCapturer(
+        if (!pickupBeaconMatch
+            && ShouldYieldEmbarkToNeedierCapturer(
                 unit, transporter, assigned, plan))
             return false;
 
@@ -248,32 +263,9 @@ public partial class AIController
     {
         if (passenger == null || transporter == null || transportObjective == null)
             return false;
-
-        UnitManager formalPassenger = ResolveAssignedPassengerSlotUnit(transportObjective, aiTeam);
-        if (formalPassenger == null)
-            return CountAvailableSeatsForPassenger(transporter, passenger) > 0;
-        if (formalPassenger == passenger)
-            return true;
-
-        if (IsPassengerAlreadyOnboard(transporter, formalPassenger))
-            return CountAvailableSeatsForPassenger(transporter, passenger) > 0;
-
-        // Formal passenger already acted this turn without embarking — reservation is void.
-        if (formalPassenger.HasActed)
-            return CountAvailableSeatsForPassenger(transporter, passenger) > 0;
-
-        if (!passenger.TryGetUnitData(out UnitData passengerData) || passengerData == null)
-            return false;
-        if (!transporter.TryGetUnitData(out UnitData transporterData) || transporterData == null)
-            return false;
-
-        // A reserva do plano cobre o slot primario. Slot secundario fisicamente
-        // livre continua disponivel para rogue/oportunista.
-        if (FindFittingSecondarySlotIndex(transporter, transporterData, passenger, passengerData) >= 0)
-            return true;
-
-        return FindFittingSlotIndexRespectingFormalReservation(
-            transporter, transporterData, passenger, passengerData, formalPassenger) >= 0;
+        // Passageiro formal e promessa aumentam prioridade, mas nao reservam
+        // banco. A unica trava aqui e capacidade fisica compativel.
+        return CountAvailableSeatsForPassenger(transporter, passenger) > 0;
     }
 
 
@@ -298,68 +290,6 @@ public partial class AIController
         }
 
         return -1;
-    }
-
-
-    private static int FindFittingSlotIndexRespectingFormalReservation(
-        UnitManager transporter,
-        UnitData transporterData,
-        UnitManager passenger,
-        UnitData passengerData,
-        UnitManager formalPassenger)
-    {
-        if (formalPassenger == null || formalPassenger == passenger || IsPassengerAlreadyOnboard(transporter, formalPassenger))
-            return FindFittingSlotIndex(transporter, transporterData, passenger, passengerData);
-        if (transporter == null || transporterData == null || transporterData.transportSlots == null)
-            return -1;
-        if (!formalPassenger.TryGetUnitData(out UnitData formalData) || formalData == null)
-            return FindFittingSlotIndex(transporter, transporterData, passenger, passengerData);
-
-        int bestSlot = -1;
-        int bestReservedSlot = -1;
-        int bestScore = int.MinValue;
-
-        for (int reserveIdx = 0; reserveIdx < transporterData.transportSlots.Count; reserveIdx++)
-        {
-            UnitTransportSlotRule reserveSlot = transporterData.transportSlots[reserveIdx];
-            if (reserveSlot == null) continue;
-            if (!PodeEmbarcarSensor.CanUseSlot(formalPassenger, formalData, reserveSlot, out _)) continue;
-
-            int reserveCapacity = Mathf.Max(1, reserveSlot.capacity);
-            int reserveOccupied = transporter.GetOccupiedTransportSeatCountForSlot(reserveIdx);
-            if (reserveOccupied >= reserveCapacity) continue;
-
-            for (int passengerIdx = 0; passengerIdx < transporterData.transportSlots.Count; passengerIdx++)
-            {
-                UnitTransportSlotRule passengerSlot = transporterData.transportSlots[passengerIdx];
-                if (passengerSlot == null) continue;
-                if (!PodeEmbarcarSensor.CanUseSlot(passenger, passengerData, passengerSlot, out _)) continue;
-
-                int passengerCapacity = Mathf.Max(1, passengerSlot.capacity);
-                int passengerOccupied = transporter.GetOccupiedTransportSeatCountForSlot(passengerIdx);
-                if (passengerIdx == reserveIdx)
-                    passengerOccupied++;
-                if (passengerOccupied >= passengerCapacity) continue;
-
-                // Prefer preserving the formal slot untouched; if both must share,
-                // prefer the arrangement with more remaining slack.
-                int score = passengerIdx == reserveIdx ? 0 : 1000;
-                score += passengerCapacity - passengerOccupied;
-                score += reserveCapacity - reserveOccupied;
-                if (score <= bestScore) continue;
-
-                bestScore = score;
-                bestSlot = passengerIdx;
-                bestReservedSlot = reserveIdx;
-            }
-        }
-
-        if (bestSlot >= 0)
-            return bestSlot;
-
-        // If no formal-compatible physical seat is currently open, do not consume
-        // a reserved transporter opportunistically; that would hide the real issue.
-        return bestReservedSlot >= 0 ? bestSlot : -1;
     }
 
 

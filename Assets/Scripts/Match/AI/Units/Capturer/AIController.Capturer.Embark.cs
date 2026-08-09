@@ -131,9 +131,11 @@ public partial class AIController
         if (assigned == null && ShouldRogueCapturerFightBeforeTransport(unit, snapshot, fromCell, paths))
             return null;
 
-        if (best != null && bestPriority == 0)
+        if (best != null && bestPriority <= 0)
         {
-            if (ShouldYieldEmbarkToNeedierCapturer(
+            if (!IsTransportPickupBeaconFor(
+                    best.transporterUnit, unit)
+                && ShouldYieldEmbarkToNeedierCapturer(
                     unit, best.transporterUnit, assigned, plan))
                 return null;
             Debug.Log($"{TL("Capturador")} {unit.InstanceId} embarca → {best.transporterUnit.InstanceId} slot {best.transporterSlotIndex}");

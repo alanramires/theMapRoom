@@ -548,39 +548,44 @@ public partial class AIController
         Debug.Log($"{TL("Transporte")} matching {assigned.Sector} APC {transporter.InstanceId}: needy={passengers.Count} thr=2turnosPorUnidade obj={(objBldg != null ? objCell.ToString() : "null")} caps:{diag}");
         if (passengers.Count == 0) return null;
 
-        // Reserva PERSISTENTE entre os APCs nesta passada da Phase 2 (assignedTransportClaims):
-        // se este APC ja reservou um passageiro ainda needy, mantem (estavel mesmo depois de
-        // outro APC se mover). Senao, pega o needy mais proximo que NAO esteja reservado por
-        // outro APC, e registra a reserva — assim o proximo APC nao realoca o mesmo cara.
-        if (assignedTransportClaims.TryGetValue(transporter.InstanceId, out int prevPid))
+        // O farol e estavel para ESTE APC durante a Phase 2, mas nao possui o
+        // passageiro. Outro APC pode escolher exatamente o mesmo P1.
+        if (transportPickupBeacons.TryGetValue(transporter.InstanceId, out int prevPid))
         {
             foreach (UnitManager p in passengers)
                 if (p.InstanceId == prevPid) return p;
-            assignedTransportClaims.Remove(transporter.InstanceId); // reserva anterior nao e mais needy
+            transportPickupBeacons.Remove(transporter.InstanceId);
         }
 
         Vector3Int tc = transporter.CurrentCellPosition; tc.z = 0;
         UnitManager best = null;
         float bestD = float.MaxValue;
+        bool duplicatedBeacon = false;
         foreach (UnitManager p in passengers)
         {
-            bool claimedByOther = false;
-            foreach (KeyValuePair<int, int> kv in assignedTransportClaims)
-                if (kv.Value == p.InstanceId && kv.Key != transporter.InstanceId) { claimedByOther = true; break; }
-            if (claimedByOther) continue;
+            if (IsPickupBeaconedByOtherTransport(transporter, p))
+                continue;
             Vector3Int pc = p.CurrentCellPosition; pc.z = 0;
             float d = SectorManager.HexDistance(tc, pc);
             if (d < bestD) { bestD = d; best = p; }
         }
 
+        // Todos ja iluminados: duplica o melhor em vez de ficar parado.
         if (best == null)
         {
-            Debug.Log($"{TL("Transporte")} matching {assigned.Sector}: APC {transporter.InstanceId} sem passageiro (needy={passengers.Count}, todos ja reservados por outros APCs)");
-            return null;
+            duplicatedBeacon = true;
+            foreach (UnitManager p in passengers)
+            {
+                Vector3Int pc = p.CurrentCellPosition; pc.z = 0;
+                float d = SectorManager.HexDistance(tc, pc);
+                if (d < bestD) { bestD = d; best = p; }
+            }
         }
 
-        assignedTransportClaims[transporter.InstanceId] = best.InstanceId;
-        Debug.Log($"{TL("Transporte")} matching {assigned.Sector}: APC {transporter.InstanceId}@{tc} reserva passageiro {best.InstanceId} dist={bestD:F0} (needy={passengers.Count})");
+        if (best == null) return null;
+
+        transportPickupBeacons[transporter.InstanceId] = best.InstanceId;
+        Debug.Log($"{TL("Transporte")} matching {assigned.Sector}: APC {transporter.InstanceId}@{tc} segue farol passageiro {best.InstanceId} dist={bestD:F0} cobertura={(duplicatedBeacon ? "compartilhada" : "nova")} (needy={passengers.Count})");
         return best;
     }
 

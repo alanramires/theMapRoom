@@ -87,22 +87,12 @@ public partial class AIController
 
             if (FindFittingSlotIndex(transporter, transporterData, candidate, candidateData) < 0) continue;
 
-            // Skip candidates that are already the formal passenger of another transporter.
-            // A candidate is "taken" when both conditions hold in the same SectorObjective:
-            //   1. they occupy a filled Capturador slot, AND
-            //   2. a different transporter occupies a filled Transportador slot.
-            if (IsAlreadyFormalPassenger(candidate, transporter, plan)) continue;
-
-            // Transporte sem objetivo formal pode atender um capturador planejado:
-            // o embarque atual classifica esse caso como freeTransport. A reserva de
-            // passageiro de OUTRO transportador ja foi protegida acima por
-            // IsAlreadyFormalPassenger; portanto nao descarte toda unidade com plano.
+            // Passageiro formal de outro casco continua visivel. Designacao e
+            // farol de prioridade, nao propriedade da unidade.
             SectorObjective candidateAssigned = plan != null ? ResolveAssignedObjective(candidate, plan) : null;
-            if (assignedSector != null && plan != null)
-            {
-                // Assigned shuttle: only candidates heading to the same sector will accept.
-                if (candidateAssigned == null || candidateAssigned.Sector != assignedSector.Sector) continue;
-            }
+            bool followsAssignedBeacon = assignedSector != null
+                && candidateAssigned != null
+                && candidateAssigned.Sector == assignedSector.Sector;
 
             if (IsPassengerAlreadyAtCaptureObjective(candidate, snapshot.AITeam)) continue;
 
@@ -190,7 +180,11 @@ public partial class AIController
             // Não o descarte só porque o planner o classificou como rogue/target=null.
             float score = (hasResolvedObjective ? objectiveDist * 100f : 250f)
                 - transportDist * 50f
-                - rolePriority * 10f;
+                - rolePriority * 10f
+                + (followsAssignedBeacon ? 5000f : 0f)
+                - (IsPickupBeaconedByOtherTransport(transporter, candidate)
+                    ? TransportPickupDistributionPenalty
+                    : 0f);
             if (score > bestScore)
             {
                 bestScore = score;
@@ -266,26 +260,6 @@ public partial class AIController
         }
 
         return bestDistance < float.MaxValue;
-    }
-
-    private static bool IsAlreadyFormalPassenger(UnitManager candidate, UnitManager thisTransporter, TeamObjectivePlan plan)
-    {
-        if (plan == null) return false;
-        foreach (SectorObjective obj in plan.Objectives)
-        {
-            bool candidateIsPassenger = false;
-            bool otherTransporterAssigned = false;
-            foreach (SlotNeed slot in obj.Slots)
-            {
-                if (IsGroundTransportPassengerSlot(obj, slot, candidate.TeamId)
-                    && slot.AssignedUnitId == candidate.InstanceId)
-                    candidateIsPassenger = true;
-                if (slot.Role == UnitRole.Transportador && slot.Filled && slot.AssignedUnitId != thisTransporter.InstanceId)
-                    otherTransporterAssigned = true;
-            }
-            if (candidateIsPassenger && otherTransporterAssigned) return true;
-        }
-        return false;
     }
 
     private static int FindFittingSlotIndex(UnitManager transporter, UnitData transporterData, UnitManager candidate, UnitData candidateData)

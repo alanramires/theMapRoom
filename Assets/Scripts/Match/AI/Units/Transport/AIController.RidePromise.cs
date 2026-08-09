@@ -7,14 +7,9 @@ public partial class AIController
     //
     // "Eu vou buscar voce, mas tem esses caras aqui — aguenta ai!"
     //
-    // Ate aqui, reservado e prometido eram coisas DIFERENTES: o plano marcava o
-    // passageiro como servico de um transportador (bloqueando os outros) e
-    // nenhum codigo obrigava esse transportador a ir. Plaquinha de reservado
-    // sem ninguem no volante — o passageiro ficava isolado dos dois lados.
-    //
     // A promessa mora no transportador, no AIDesignatedMission que ja existia e
-    // ja persiste no save. Com ela, reservado e prometido viram o MESMO objeto:
-    // so esta reservado quem tem alguem que prometeu.
+    // ja persiste no save. Ela e um FAROL: obriga quem prometeu a continuar
+    // considerando P1, mas nao torna P1 propriedade desse transportador.
     //
     // AS REGRAS, e elas nao sao simetricas:
     //
@@ -23,9 +18,9 @@ public partial class AIController
     //   NAO vincula quem espera  — qualquer carona que aparecer serve. Recusar
     //                              um embarque que esta ali porque "outro
     //                              prometeu" seria a fome de novo, fantasiada.
-    //   exclusividade de VIAGEM  — impede outro transportador de comprometer
-    //                              viagem para o mesmo cara; nunca impede um
-    //                              embarque imediato.
+    //   SEM exclusividade        — varios transportadores podem convergir para
+    //                              o mesmo passageiro. O primeiro embarque
+    //                              confirmado apaga a necessidade dos demais.
     //   promessa NAO e preempcao — ela pesa na escolha, nao sequestra o
     //                              veiculo. Avanco tatico do grupo continua
     //                              mandando.
@@ -164,38 +159,4 @@ public partial class AIController
         }
     }
 
-    /// <summary>
-    /// Este passageiro ja tem viagem comprometida por OUTRO transportador?
-    ///
-    /// Bloqueia planejamento duplicado — dois veiculos cruzando o mapa pelo
-    /// mesmo cara — e nada alem disso. O chamador so consulta quando esta
-    /// prestes a COMPROMETER viagem; coleta que se resolve na rodada ignora
-    /// esta regra de proposito.
-    /// </summary>
-    private bool IsPassengerPromisedToAnotherTransporter(
-        UnitManager transporter,
-        UnitManager passenger)
-    {
-        if (transporter == null || passenger == null)
-            return false;
-
-        foreach (UnitManager candidate in UnitManager.AllActive)
-        {
-            if (candidate == null
-                || candidate == transporter
-                || candidate.IsDead
-                || candidate.TeamId != transporter.TeamId)
-            {
-                continue;
-            }
-
-            if (TryGetRidePromise(candidate, out UnitManager promised)
-                && promised == passenger)
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
 }

@@ -480,16 +480,16 @@ public partial class AIController
             if (!candidate.TryGetUnitData(out UnitData candidateData)) continue;
             if (!UnitRoleCompatibility.ParticipatesInBattle(candidateData)) continue;
             if (FindFittingSlotIndex(transporter, transporterData, candidate, candidateData) < 0) continue;
-            if (IsAlreadyFormalPassenger(candidate, transporter, plan)) continue;
+            // Passageiro formal de outro casco nao e excluido: o primeiro
+            // embarque confirmado resolve a disputa naturalmente.
 
             SectorObjective candidateAssigned = plan != null ? ResolveAssignedObjective(candidate, plan) : null;
-            if (assignedSector != null)
-            {
-                if (candidateAssigned == null) continue;
-                if (candidateAssigned.Sector != assignedSector.Sector
-                    && !AreEmbarkSectorsCompatible(candidateAssigned.Sector, assignedSector.Sector))
-                    continue;
-            }
+            bool followsAssignedBeacon = assignedSector != null
+                && candidateAssigned != null
+                && (candidateAssigned.Sector == assignedSector.Sector
+                    || AreEmbarkSectorsCompatible(
+                        candidateAssigned.Sector,
+                        assignedSector.Sector));
 
             Vector3Int objectiveCell = ResolveUnitObjectiveCell(candidate, plan, snapshot);
             if (objectiveCell == Vector3Int.zero) continue;
@@ -523,7 +523,13 @@ public partial class AIController
             float transportDist = SectorManager.HexDistance(transporterCell, candidateCell);
             int rolePriority = candidateData.roles != null && candidateData.roles.Count > 0
                 ? (int)candidateData.roles[0] : 99;
-            float score = objectiveDist * 100f - transportDist * 50f - rolePriority * 10f;
+            float score = objectiveDist * 100f
+                - transportDist * 50f
+                - rolePriority * 10f
+                + (followsAssignedBeacon ? 5000f : 0f)
+                - (IsPickupBeaconedByOtherTransport(transporter, candidate)
+                    ? TransportPickupDistributionPenalty
+                    : 0f);
 
             if (score > bestScore)
             {

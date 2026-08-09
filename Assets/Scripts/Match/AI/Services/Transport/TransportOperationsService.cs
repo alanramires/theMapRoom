@@ -64,6 +64,9 @@ public sealed class TransportOperationDecision
     public float Score;
     public string Reason;
     public MelhorEmbarqueOption PickupOption;
+    // Presente apenas quando uma coleta Tactical pode atender dois ou mais
+    // passageiros ReachableNow na mesma LZ. Operational permanece 1:1.
+    public MelhorEmbarqueManifestScore PickupManifest;
     public MelhorEmbarqueRideDisposition RideDisposition =
         MelhorEmbarqueRideDisposition.NotEvaluated;
     public MelhorEmbarquePassengerRouteState PassengerRouteState;

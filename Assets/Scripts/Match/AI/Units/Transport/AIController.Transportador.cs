@@ -16,11 +16,21 @@ public partial class AIController
     // Delivery range, not weapon range: artillery should be carried to the sector front
     // before DPQ decides the exact landing hex.
     private const int FireSupportDropOffRange = 3;
+    // Preferencia forte por ampliar cobertura. Nao e rejeicao: quando todos
+    // os passageiros ja tem farol, o melhor duplicado continua vencendo.
+    private const float TransportPickupDistributionPenalty = 1000000f;
 
-    // Reserva de passageiro por APC dentro de UMA passada da Phase 2 (transporterId -> passengerId).
-    // Persiste entre as decisoes dos APCs para que, depois que um APC se move, o recalculo do
-    // proximo NAO realoque o mesmo passageiro (evita 2 APCs no mesmo cara). Limpo a cada Phase 2.
-    private readonly Dictionary<int, int> assignedTransportClaims = new Dictionary<int, int>();
+    // Farol primario escolhido por cada transportador nesta passada da Phase 2
+    // (transporterId -> passengerId). Varios transportadores podem apontar para
+    // o mesmo passageiro: escolha e promessa orientam, mas nunca possuem P1.
+    private readonly Dictionary<int, int> transportPickupBeacons =
+        new Dictionary<int, int>();
+    // Passageiros P2+ que tambem alcancam a LZ Tactical escolhida por cada
+    // transportador. E um farol de encontro para o passageiro, nao um lock:
+    // o mesmo passageiro pode aparecer nos manifestos de varios cascos.
+    private readonly Dictionary<int, HashSet<int>>
+        tacticalPickupManifestBeacons =
+            new Dictionary<int, HashSet<int>>();
 
     /// <summary>
     /// Banda de desembarque do PASSAGEIRO — nao constante do papel.

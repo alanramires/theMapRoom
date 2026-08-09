@@ -119,6 +119,10 @@ public sealed class MelhorEmbarqueRequest
     public int operationalTurns = 2;
     public bool includeStrategic;
     public bool resolveLongRangePassengerMeeting;
+    // Consumidores centrados no transportador podem pedir a agregacao pura
+    // das opcoes por LZ. O controller runtime usa somente os manifestos
+    // Tactical; os pares Operational/Strategic continuam 1:1.
+    public bool buildTransporterManifests;
     // Consumidores runtime podem encerrar a coleta depois de provar uma
     // solução Requested + ReachableNow no Tactical, desde que nenhuma carga
     // esteja em emergência. Ferramentas/editor mantêm o ranking integral.
@@ -1003,6 +1007,13 @@ public static class MelhorEmbarqueService
         }
         result.ranking.Sort(Compare);
         result.options.Sort(CompareOptions);
+        if (request.buildTransporterManifests)
+        {
+            BuildTransporterManifests(
+                request.transporter,
+                result,
+                explicitManifest: false);
+        }
         return result;
     }
 

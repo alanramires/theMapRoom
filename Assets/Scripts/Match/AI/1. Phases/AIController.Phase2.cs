@@ -33,7 +33,8 @@ public partial class AIController
         rebelCaptureTargetReservations.Clear();
         pendingRebelCaptureTargets.Clear();
         pendingAIDesignatedMissions.Clear();
-        assignedTransportClaims.Clear();
+        transportPickupBeacons.Clear();
+        tacticalPickupManifestBeacons.Clear();
         transportPlanningSnapshots.Clear();
         disembarkPassengerRouteCache.Clear();
         // Componente de movimento nao muda quando a unidade anda — andar so
@@ -296,7 +297,8 @@ public partial class AIController
             {
                 Vector3Int blockedDestination = action.MoveTo;
                 blockedDestination.z = 0;
-                assignedTransportClaims.Remove(unit.InstanceId);
+                transportPickupBeacons.Remove(unit.InstanceId);
+                tacticalPickupManifestBeacons.Remove(unit.InstanceId);
                 rebelCaptureTargetReservations.Remove(
                     blockedDestination);
 
@@ -357,7 +359,8 @@ public partial class AIController
                     unit.InstanceId);
                 pendingAIDesignatedMissions.Remove(
                     unit.InstanceId);
-                assignedTransportClaims.Remove(unit.InstanceId);
+                transportPickupBeacons.Remove(unit.InstanceId);
+                tacticalPickupManifestBeacons.Remove(unit.InstanceId);
                 unitMoved = false;
                 unitAttacked = false;
                 Debug.LogWarning(

@@ -78,6 +78,14 @@ public partial class AIController
         Vector3Int transporterCell = transporter.CurrentCellPosition; transporterCell.z = 0;
         distance = SectorManager.HexDistance(unitCell, transporterCell);
 
+        // O farol deste casco torna o encontro preferencial, nunca exclusivo.
+        // Varios transportadores podem apontar para a mesma unidade.
+        if (IsTransportPickupBeaconFor(transporter, unit))
+        {
+            priority = -1;
+            return true;
+        }
+
         if (assigned == null)
         {
             if (transporterObjective != null
