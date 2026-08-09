@@ -886,7 +886,24 @@ public class MatchController : MonoBehaviour
     public bool IsTutorialMode => activeTutorial != null;
     public TerrainDatabase TerrainDatabaseRef => ResolveFogTerrainDatabase();
     public bool IsFogOfWarDebugEnabled => debugFogOfWarEnabled;
-    public bool IsFogOfWarDebugPartial => debugFogOfWarPartial;
+    public bool IsFogOfWarDebugPartial => IsFogPartialObserverActive;
+
+    /// <summary>
+    /// Perspectiva parcial: o observador acompanha a IA da vez.
+    ///
+    /// DERIVADA, nao configurada. Sem nenhum humano na partida nao existe a
+    /// quem fixar a camera — somos observadores, e o unico ponto de vista
+    /// possivel e o de quem esta jogando. Exigir o comando de debug fazia AI vs
+    /// AI comecar sem observador nenhum: o range e a linha iam para a camada
+    /// SFX, debaixo da nevoa, e nada aparecia.
+    ///
+    /// O campo continua valendo como override manual, e so soma: ligar a mao
+    /// numa partida com humano segue sendo possivel; desligar numa partida sem
+    /// humano nao faz sentido, porque nao ha outro observador para assumir.
+    /// </summary>
+    private bool IsFogPartialObserverActive =>
+        debugFogOfWarPartial
+        || (players != null && players.Count > 0 && !AnyHumanPlayerExists());
     public FogOfWarVisionMode FogOfWarVisionMode => fogOfWarVisionMode;
     public int MaxUnitsPerTeam => Mathf.Max(1, maxUnitsPerTeam);
     public AutonomyDatabase AutonomyDatabase => autonomyDatabase;
@@ -7406,7 +7423,7 @@ public class MatchController : MonoBehaviour
 
     public bool ShouldHideActiveAiActionPresentation()
     {
-        return !debugFogOfWarPartial && TryResolveFogPresentationSlot(out _);
+        return !IsFogPartialObserverActive && TryResolveFogPresentationSlot(out _);
     }
 
     /// <summary>
@@ -7460,7 +7477,7 @@ public class MatchController : MonoBehaviour
             || !Enum.IsDefined(typeof(TeamId), activeTeamId))
             return false;
 
-        if (debugFogOfWarPartial &&
+        if (IsFogPartialObserverActive &&
             TryResolveFogPresentationSlot(out PlayerSlotId aiPresentationSlot))
             return ActiveSlotId == aiPresentationSlot;
         if (!IsPlayerAI(ActiveSlotId))
@@ -7484,7 +7501,7 @@ public class MatchController : MonoBehaviour
             gameSetup != GameSetupPreset.FogOfWarTotal || players == null)
             return false;
 
-        bool requireAI = debugFogOfWarPartial;
+        bool requireAI = IsFogPartialObserverActive;
 
         // No modo PARTIAL, a perspectiva acompanha a IA que realmente esta jogando.
         // Escolher apenas "a primeira IA" fazia outros slots AI receberem a visao,
@@ -8694,7 +8711,7 @@ public class MatchController : MonoBehaviour
             && !IsPlayerAI(ActiveSlotId);
         bool showCursorAboveFog = ShouldPresentActiveActionToLocalObserver();
         bool showHumanTurnTools = playerTurn
-            || (debugFogOfWarPartial && showCursorAboveFog);
+            || (IsFogPartialObserverActive && showCursorAboveFog);
 
         // FogOfWar/FogOfWarTile pertencem exclusivamente ao preset Total.
         // Nos demais presets restaura cursor e ferramentas ao pipeline legado SFX,
@@ -10797,7 +10814,8 @@ public class MatchController : MonoBehaviour
 
         Debug.Log(
             $"[FoW][Estado][{tag}] slotApresentacao={slotIndex} slotAtivo={ActiveSlotId.Value} " +
-            $"debugLigado={debugFogOfWarEnabled} parcial={debugFogOfWarPartial} totalWar={enableTotalWar} | " +
+            $"debugLigado={debugFogOfWarEnabled} parcial={IsFogPartialObserverActive}" +
+            $"(manual={debugFogOfWarPartial}) totalWar={enableTotalWar} | " +
             $"explorado={exploredCount} nevoaTiles={fogTiles} celulasTabuleiro={fogBoardCellsBuffer.Count} " +
             $"displayVisivel={fogDisplayVisibleCellsBuffer.Count} | " +
             $"bakes={(fogRoundZeroBakes != null ? fogRoundZeroBakes.Count : 0)} " +
