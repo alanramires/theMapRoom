@@ -1,299 +1,200 @@
-﻿# Resumo — onde estamos e o que vem
+# Resumo — onde estamos e o que vem
 
-Ponto de retomada. Escrito em 2026-08-07, **depois** da tag `v8.1.1`. Leia isto
+Ponto de retomada. Escrito em 2026-08-08, **depois** da tag `v8.1.2`. Leia isto
 primeiro.
 
 ---
 
 ## Estado
 
-`v8.1.1` tagueada e publicada. Relatório:
-[`relatorio_v8.1.1.md`](relatorio_v8.1.1.md).
+`v8.1.2` tagueada e publicada. Relatório:
+[`relatorio_v8.1.2.md`](relatorio_v8.1.2.md).
 
-**Cinco portas em série, todas validadas em campo**, e a cadeia de resgate
-multimodal anda até ao penúltimo passo:
-
-```text
-Soldado#1 embarca no APC#8  →  APC#8 (carregado) pede carona pelo destino da
-carga  →  Navio#5 promete resgate ao APC e zarpa (rotaPax=ReachableStrategic)
-```
-
-O fio, e ele repete-se cinco vezes:
-
-> **O que barrava era prazo, política ou formação vestidos de fato — sempre
-> dentro de um teste que se chamava estrutural.**
+**Seis defeitos corrigidos, e nenhum era informação faltando.** Em todos, o dado
+existia e o problema era de **publicação** — quem escreve, quando, e em que
+camada:
 
 ```text
-MeetingWalkTurns = 2        prazo no filtro topológico
-âncora só de capturável     política no lugar da coordenada
-horizonte por tier          o Strategic negava o próprio horizonte
-flags invertidas            pedia LZ estratégica, recusava rota estratégica
-InRearSlice no resgate      formação onde o ofício é sair da formação
+exclusiveSlot       tinha 4 leitores. Todos perguntando "posso AGORA?"
+                    contra quem já está a bordo — nunca contra as outras opções
+missão herdada      escrita e apagada todo turno. Existia; nunca no instante
+                    em que alguém olhava
+wantsRide           não era fato da unidade: era resposta da pergunta alheia
+range da IA         pintado — na camada SFX, debaixo de 261 tiles de névoa
+lista de slots      o drawer da Unity existia; o laço manual não o invocava
+parcial=False       sem indicador na tela; só aparecia no log
 ```
 
-### ⚠️ O que a v8.1.1 QUEBROU — e é a primeira coisa a consertar
+### ⚠️ Nada disso destravou a travessia
 
-**As cinco correções somadas fizeram o navio vaguear.** Elas abriram o oceano
-inteiro como lista de candidatos e **nenhuma deu ao navio motivo para ficar**:
-
-```text
-1. navio promete #8 e navega até o encontro
-2. #8 chega a sua vez e escolhe Delivery — dirige para longe
-3. o encontro evapora; a opção de #8 sai da lista
-4. o farol da promessa não a acha, e cai para o próximo passageiro
-5. repete
-```
-
-**O navio não tem histerese** — mesmo defeito que o capturador já teve
-(otimizador global sem aderência ao objetivo anterior). A promessa devia ser a
-histerese, mas o farol só pesa quando a opção do prometido **está na lista**;
-fora dela, ela não perde para nada, ela não existe.
-
-### ✅ Resolvido depois da tag — o aninhamento
-
-`abd5d91` (fora da v8.1.1): `TryDecideNestedTransportEmbarkAction`, irmão do
-`TryEvacEmbarkAction`, no topo de `TryDecideTransportOperationsAction`. **T15
-fechada.** Validado em campo no T4:
-
-```text
-[Transporte] 8 ANINHA — embarca em #9 slot 1 levando a carga junto.
-```
-
-O gate é a própria fila de carona: quem alcança o destino da carga devolve
-`wantsRide = false` e nunca sobe. A guarda da ficha já estava publicada.
-
-⚠️ **`Embarcar` do transportador ≠ `embarcar` da unidade.** O primeiro é
-aninhar-se noutro veículo; o segundo é o passageiro subir. Confundi os dois numa
-sessão inteira.
-
-### ❌ E a promessa NÃO precisa de conserto — a proposta anterior estava errada
-
-O que estava escrito aqui — *"promessa pendente deve segurar posição"* —
-transformava o farol em lock, e o cabeçalho do `RidePromise.cs` proíbe isso:
-*"promessa NÃO é preempção; ela pesa na escolha, não sequestra o veículo"*.
-
-A baixa por terceiro **já funciona**: `#9 baixa a promessa a pax=#1: passageiro
-embarcou`, e promete a outro no turno seguinte. O navio a vaguear era sintoma do
-aninhamento em falta, não de lock em falta. **Não implementar.**
+**O APC continua sem embarcar no navio.** O que a v8.1.2 fez foi tirar seis
+coisas que faziam a investigação mentir. A decisão não mudou.
 
 ---
 
-## ⏭️ O PRÓXIMO ITEM — o peso da vaga
+## ⏭️ O PRÓXIMO ITEM — a banda do `Embarcar`
 
-Com o aninhamento a funcionar, apareceu o que estava por baixo. Ficha do Chinook:
+`Embarcar` é o **único degrau da escada sem banda**:
 
-```yaml
-- slotId: passageiros   capacity: 2   exclusiveSlot: 0
-- slotId: APC           capacity: 1   exclusiveSlot: 1   ← ocupa o casco inteiro
+```csharp
+// AIController.TransportOperations.cs:206 — TryDecideNestedTransportEmbarkAction
+int budget = Mathf.Max(0, unit.RemainingMovementPoints);
+PodeEmbarcarSensor.CollectOptions(unit, boardTilemap, terrainDatabase, budget, options);
+if (options.Count == 0) return null;      // silencioso: nem hit nem miss no log
 ```
 
-`exclusiveSlot` tem **zero leitores na IA** — só `UnitManager.cs:2506-2510`, o
-motor. O `MelhorEmbarque` oferece o mesmo Chinook a quatro passageiros ao mesmo
-tempo (`slot=0` a dois soldados, `slot=1` a dois APCs) e o motor recusa depois.
+Todos os outros correm `Tactical → Operational → Strategic`. Este corre
+`Tactical` e acabou. Ele só sabe dizer *"o navio está colado em mim neste
+turno"* — e nos dois estados para os quais foi criado, o navio está a dois
+turnos. Cala, e o `Strategic` do `Delivery`, que sempre acerta, leva a decisão.
 
-**A conta que a IA não sabe fazer:**
+É a doutrina de novo: *banda é parâmetro da unidade avaliada, nunca constante do
+papel.*
+
+### ❓ E ele precisa de UMA decisão do autor antes do código
+
+**A banda do `Embarcar` é de quem?**
 
 ```text
-Chinook com APC carregado (1 soldado)  →  2 unidades, casco inteiro
-Chinook com 2 soldados                 →  2 unidades, casco inteiro
-                                          ─────────── EMPATE
+do transportador que sobe    "eu alcanço o navio"
+do encontro                  "nós dois nos encontramos em N turnos"
 ```
 
-E o navio já vinha buscar aquele APC. O aninhamento no Chinook não ganhou nada,
-custou a carga do navio e deixou dois soldados na ilha.
+Os outros degraus perguntam do próprio sujeito. Mas carona é a única situação em
+que **os dois lados andam** — e o `MelhorEmbarque` já responde banda de encontro
+em `rotaPax` (`ReachableNow / Later / Strategic`). Talvez `Embarcar` deva ler
+dali em vez de calcular a sua.
 
-> **A IA não sabe o que uma vaga custa nem o que ela carrega.** Exclusividade e
-> carga aninhada são a mesma dimensão ausente, vista de dois lados.
-
-**Um termo, não dois itens:**
-
-```text
-peso da opção = unidades que traz − capacidade que desloca
-                                     ↑ é aqui que exclusiveSlot entra
-```
-
-Casa: `MelhorEmbarqueService`, o `optionScore` do laço de pares.
-
-⚠️ **É o laço mais caro do transporte** — 2356 pares e ~700ms no Chinook. Não
-abrir com pouca margem de contexto. E não escrever "ler `exclusiveSlot`" como
-gate isolado: isso não resolve nada; o que resolve é o termo.
-
-### Ainda em aberto, e independente
-
-`BuildAttempts` devolve cedo com carga (`Courier; Delivery; return`). Com vaga
-livre e alguém na fila, o transportador **não parte para entregar**: ou aproxima
-do tático do segundo caroneiro, ou segura. A guarda natural é o próprio Pickup —
-se ninguém está materializável, a escada cai sozinha para Courier. Sem constante
-nova. Decisão do autor, já tomada.
-
-### O defer da iniciativa — ✅ validado no T2
-
-`ShouldDeferPassengerForIncomingTransport` ([`AIController.Phase2.cs`](../Assets/Scripts/Match/AI/1.%20Phases/AIController.Phase2.cs)):
-quem está na fila de carona cede a vez a um transportador que ainda não agiu,
-tem vaga, está a ≤ MP+1 e encosta por topologia. Guarda `!secondPass` contra a
-cessão mútua com o `cede destino`.
-
-**Rodou e passou** — três cessões no T2:
-
-```text
-Fase2 — Soldado#4 espera carona e cede vez para APC#3 encostar primeiro.
-Fase2 — Soldado#11 espera carona e cede vez para APC#3 encostar primeiro.
-Fase2 — APC#8 espera carona e cede vez para APC#3 encostar primeiro.
-```
-
-### Doutrina nova, escrita e sem código
-
-O autor desceu o modal de sensores à mão para quatro casos do capturador e três
-do transportador. **O modal não é uma cadeia "o primeiro que responde ganha" — é
-um funil que preenche quatro campos**, e essa forma já é o `PlayerAction`:
-
-```text
-âncora       PARA ONDE            Capturar, Enxergar, Detectar
-movimento    ATÉ ONDE hoje        Reposicionar
-etiqueta     O QUE fazer lá       Capturar, Mirar, Desembarcar, Suprir, Fundir
-publicação   o que fica no mundo  Embarcar → "quero carona"
-```
-
-Consequências, todas no `relatorio_v8.1.1.md` §Doutrina:
-
-- **subpapéis terrestre/aéreo/naval não devem existir** — o mesmo funil serve
-  trem e hidroavião. Teste: *se um passo responderia diferente para os dois, não
-  é passo, é resposta de sensor*
-- **`TouchesComponent` é a forma geral de "praia"** — estação, helipad, convés e
-  praia são a mesma pergunta
-- **a escada de âncora é compartilhada:** EVAC → casa → retaguarda da massa →
-  fica. O vazio pula do 2 para o 4 porque o 3 exige direção de frente conhecida
-- **`publicação` é o barramento entre papéis** — quatro moradores; nenhum papel
-  chama outro
-- **`isStranded` só é medido contra capturáveis** — quem não captura não tem
-  sujeito para o encalhamento
-- **publicação só vale se o solicitante puder aceitar** — soldado com 0 de
-  autonomia não embarca nem com o transporte ao lado, e o anti-fome promove esse
-  pedido a inegociável em 3 turnos
+E a pergunta colada: **se ganhar banda, continua sendo o número 1?** No Tactical
+sim. No Strategic ele disputa com um `Delivery` que também acerta lá — ali
+"primeiro" precisa querer dizer *ganha o empate*, não *responde antes*, senão um
+navio a cinco turnos congela um APC que podia estar andando.
 
 ---
 
-## Estado anterior — v8.1.0
+## Os quatro estados do transportador — o modelo que organiza o resto
 
-**34 commits, e o transporte inteiro remexido.** Mas o fio do dia não é nenhuma
-das mudanças — é uma constatação que apareceu **três vezes**:
+Desenho do autor, escrito em [`AI Behavior/Transporte.md`](AI%20Behavior/Transporte.md)
+§7.1 a §7.6. **Nenhum valor novo no enum:** o estado sai de dois fatos que a
+unidade já publica.
 
-> **Quando um comportamento parece "esquecido", conferir se ele não está apenas
-> depois de um `return`.**
+| `HasCargo` | `wantsRide` | estado | âncora | combate | hoje |
+|---|---|---|---|---|---|
+| false | false | **pickup** | hex provável de LZ | **pode combater** | ✅ |
+| true | false | **courier** | a coordenada da carga | **cuida dela** | ✅ |
+| true | true | **need a lift** | a carga, longe **ou atrás de travessia** | como courier | ⚠️ cai em courier |
+| false | true | **ASAP** | **quem ele prometeu** | ❓ | ❌ inalcançável |
 
-```text
-skip do Tactical      estava no organizador; procurei no serviço
-MelhorCapturaCalls:3  o alvo é resolvido 3× por decisão
-largar × avançar      decidido pela posição do if, não por comparação
-```
+**O degrau não muda — a banda muda.** As duas linhas de baixo são as duas de cima
+com o alvo longe. E para o transportador, **`Embarcar` é o sensor número 1**.
 
-Nas três o conteúdo estava certo e **a ordem estava errada**.
+### O critério de aceitação — o resgate na ilha
 
-### O que rodou e o que não rodou
-
-**A fatia 1 passou** (atravessou duas versões compilada). O ciclo `T1→T6` fechou
-e a missão morre limpa quando o objetivo é tomado.
-
-⚠️ **Depois disso, 34 commits e nenhuma corrida de aceitação fechada.** O que se
-sabe é que **em gameplay o comportamento está certo** — o APC escolhe hex no
-Tactical fora da névoa e desembarca. O que **não** se sabe é se cada mudança
-individual está certa: elas nunca foram exercitadas uma de cada vez.
-
-### O sinal de log de cada mudança sem teste
+Percorre as quatro células, na ordem, e volta:
 
 ```text
-[Missao] ... (adquirida) já no T1              missão antes dos atalhos
-PassengerTarget #N MISSAO (x,y) verbo=         courier lê a coordenada
-ancora entrega (x,y) (Tactical; ...)           mira a zona, não o prédio
-ancora avancar (x,y)                           sem célula conhecida, entra no escuro
-larga no TACTICAL / ADIA a largada / OPERACIONAL   os três tempos
-range=6 (Operational; Tactical=3)              banda do passageiro
-fila de carona pede Transportador xN           demanda derivada (só sem APC no mapa)
+ida    APC vazio sobe no navio                    ASAP
+       navio cruza, desembarca o APC
+       APC atravessa o território até o soldado   pickup
+volta  APC carregado espera na praia              need a lift
+       navio recebe, cruza, desembarca
+       APC termina o resgate                      courier
 ```
 
-## A FATIA 1 PASSOU — 2026-08-06, depois da v8.0.1
+**Ida e volta são a mesma viagem, e a única coisa que muda é um bit.** Se a volta
+exigisse estado novo, a fatoração estaria errada.
 
-O commit `3e0565d` atravessou duas versões compilado e sem rodar. **Rodou, e
-passou.** `Hot Seat 0 - Treino`, com `Reload Domain and Scene` ligado:
+### A fila, em ordem
 
 ```text
-T1   origemAlvo=servico   envelope=BeyondOperational   QueroCarona=SIM   (7,0)→(4,0)
-     [Missao] 1 Capture -> (0,0,0) predio=#2 (adquirida)
-────────────── salvar · Stop · Play · carregar ──────────────
-T2   origemAlvo=reserva   envelope=Operational  custo=4  QueroCarona=NAO  (4,0)→(1,0)
-     [Missao] 1 Capture -> (0,0,0) predio=#2 (mantida)
-     [FilaCarona] #1 sai da fila apos 1 turno(s)
+1. banda do Embarcar     destrava need a lift   ← o único que muda o que se vê hoje
+2. a pergunta do vazio   destrava ASAP          ← transportador vazio nunca publica
+                                                  wantsRide (cai em "emergência apenas")
+3. âncora de praia       need a lift precisa de âncora PRÓPRIA — o ponto de
+                         encontro, não o destino da carga (TouchesComponent)
+4. LZ em névoa           conferir antes de culpar a IA
 ```
 
-Bate **linha por linha** com o traço pré-fatia do relatório da v8.0.0. A fatia é
-subtração, então **igualdade É o resultado correto**: os três campos
-`aiDesignatedCaptureTarget*` sumiram, saíram do DTO, e `AIPlanRuntimeIntent.Capture`
-passou a ter escritor **e** leitor que atravessa o save.
-
-**Onde a missão é escrita — e por que isso está certo:** depois do commit da
-ação, nunca na decisão. É o invariante transacional. Não adianta conferir o
-Inspector antes de a unidade agir no turno 1: não há missão ainda.
-
-### O ciclo completo T1→T6 — corrido em 2026-08-06, log em `docs/gamelog/log.md`
-
-| turno | dist | banda | QueroCarona | `MelhorCapturaCalls` | `decision` | estágios |
-|---|---|---|---|---|---|---|
-| T1 | 7h | BeyondOperational | **SIM** | **3** | 136ms | 8 |
-| T2 | 4h | Operational | NAO | 1 | 25ms | 7 |
-| T3 | 1h | *pulado* | — | 0 | 7ms | 1 |
-| T4 | 0h | *pulado* | — | **0** | **1ms** | **0** |
-| T5 | 7h | BeyondOperational | **SIM** | **3** | 84ms | 8 |
-| T6 | 5h | Operational | NAO | 1 | 24ms | 7 |
-
-**A missão morre limpa** — era a única incógnita do teste:
-
-```text
-T1 predio=#2 (adquirida)  ·  T2 (mantida)  ·  T4 capturado
-T5 predio=#1 (ADQUIRIDA — nova, sozinha)  ·  T6 (mantida)
-```
-
-Sem resíduo e sem baixa forçada. O `[SemPlano]` reancorou no HQ inimigo quando o
-serviço não achou mais capturável em banda.
-
-**O T3 pula o `QueroCarona` — e o skip já existia.** Não no serviço: em
-`TryDecideCapturerAction`, via `[Oportunista] captura local ... antes de embarcar`,
-que retorna **antes** do gate de embarque. ⚠️ Eu procurei no `QueroCaronaService`,
-não achei early-out e concluí "não existe" — **camada errada**.
-
-**O T4 é o chão absoluto:** `stages=- metrics=-`. Em cima do próprio alvo, a IA
-não consulta o tabuleiro uma única vez.
-
-### Fatia 2 — o alvo agora está MEDIDO
-
-```text
-MelhorCapturaCalls   3 · 1 · 0 · 0 · 3 · 1
-                     ↑           ↑
-                     descobre    descobre
-```
-
-**3 quando descobre o alvo, 1 quando lembra dele.** A missão já corta 3→1 nos
-turnos seguintes; a fatia 2 é levar o **turno de aquisição** de 3 para 1 também.
-Turno mais caro da partida: T5, `routeDistance:50,9ms/39`,
-`MovementQueryCachesBuilt:940`.
-
-⚠️ **`ms` entre corridas não vale sem a contagem ao lado.** O mesmo T2 mediu
-125ms logo após um load e 25ms em corrida seca — **contagens idênticas** (`/39`,
-`/5`, `/1`). Era JIT, não lógica. As contagens não mentem; o relógio mente.
-
-### Fatia 2 — medir antes de escrever
-
-Ela ia inverter o táxi (missão no topo, carona medida contra ela). **Parte disso
-já funciona no caminho rebelde** — o log do T2 mostra a reserva alimentando a
-recusa de carona:
-
-> *"alcança alvo reservado Cidade@(0,0,0) no Operational: custo=4 no turno 2 de
-> 2. **Recusa carona**."*
-
-Levantar o que sobra da fatia 2 antes de abrir editor.
+⚠️ **O item 4 é a aposta de onde o cenário da ilha falha primeiro.** A regra
+oficial da LZ é *"terreno visível ou já explorado"*, e no log de 2026-08-08 essa
+é a rejeição mais volumosa do transporte inteiro — 394 ocorrências de
+`REJECT reason=transporter_cell_not_visible_or_explored`. O cenário tem **duas**
+atracagens. Não é problema de modelo de carona; é a regra da LZ.
 
 ---
 
-## A voz dos papéis — o método que apareceu hoje
+## Onde eu parei — o que ficou pela metade
+
+- **`parcial=True` não foi visto em jogo.** A derivação (`MatchController.IsFogPartialObserverActive`)
+  compila e a lógica está auditada nos quatro cenários, mas ninguém rodou uma
+  partida AI vs AI depois da mudança.
+- **A janela do range é curta.** Mesmo com o observador certo, o range é pintado
+  em `SetSelectedUnit` e apagado quando a unidade anda. As duas pausas do F11
+  caem **fora** dessa janela (`Preparando próximo batch` é antes da seleção;
+  `Executando batch` é depois do movimento). Falta um ponto de parada entre
+  `SetSelectedUnit` e a execução — proposto, não decidido.
+- **O painel mostra `Move: 3`** — o atributo, não o restante. Foi essa lacuna que
+  fez "0 de movimento" parecer "range quebrado". `HP` e `Autonomia` já vêm com
+  fração.
+- **Exclusividade × vaga livre.** Carga *e* assento livre com alguém na fila é o
+  caso que a tabela de quatro estados não resolve: os estados são exclusivos e a
+  unidade está em dois. Marcado com ❓ em `PublishInheritedMissionIntent`; a carga
+  ganha por ora. É o mesmo `return` de `BuildAttempts:283`.
+- **A missão herdada continua write-only.** `TryResolveCargoDestinationAnchor`
+  escava o passageiro primário em vez de ler a ficha do transportador. É a fatia
+  2 — e agora ela é possível, porque a ficha finalmente está certa no instante da
+  leitura.
+- **Metade do peso da vaga nasceu dormente.** Com o slot `APC` do Chinook
+  removido, o catálogo ficou sem nenhum `exclusiveSlot` e a metade *"desloca"* é
+  sempre 1. A metade *"traz"* serve o canal e está viva.
+- **`CLAUDE.md` está desatualizado.** Lista o ataque oportunista do courier
+  (HP≤2, ≤2h) como prioridade viva; a regra só existe como cabeçalho de seção
+  vazio e `Courier.Attack.cs` com zero chamadores. A doutrina do autor já é o que
+  o código faz. Uma linha, quando ele quiser.
+
+---
+
+## A dívida de validação em jogo
+
+Da lista da `v7.2.1`, continuam sem partida:
+
+```text
+1. as duas janelas lado a lado         o teste do relatorio unificado
+2. radar movido duas vezes             delta do som: toca na primeira, cala na segunda
+3. aeronave em voo -> fow off          deve RECUSAR; depois nevoaTiles ~1700
+5. turno com 2+ cidades vazias         as duas no Jornal
+6. hot seat DEMORANDO na cortina       o Jornal abre inteiro
+7. menu > resumo do turno              o botao movido abre o Jornal
+9. linha [AI Perf][Unit] do APC #31    nunca chegou
+12. Suprimentos #24 e #73 buscando artilharia
+```
+
+**Protocolo de névoa:** com a partida em Play, ninguém salva `.cs` — recompile
+religa `debugFogOfWarEnabled = true` e parece conserto.
+
+---
+
+## Onde eu parei — os documentos
+
+| documento | o que é |
+|---|---|
+| [`AI Behavior/Transporte.md`](AI%20Behavior/Transporte.md) | **§7.1–7.6 novas** — os quatro estados, o resgate na ilha, os dois furos, quando a missão é publicada |
+| [`AI Behavior/ficha_do_papel.md`](AI%20Behavior/ficha_do_papel.md) | a matriz `Pode*` → `Melhor*` **pareada pelo autor**, o questionário padrão, `RoleData` como dado |
+| [`AI Behavior/Capturador.md`](AI%20Behavior/Capturador.md) | §0 o lema; §1 e §3 revistos; apêndice com a **Marcha do Capturador** |
+| `Match/AI/3. Shopping/Shopping.md` | o buraco elegibilidade × preferência, e os três papéis-fantasma |
+| [`AI Behavior/contrato_missao_captura.md`](AI%20Behavior/contrato_missao_captura.md) | alocação pegajosa e as condições de baixa |
+| [`AI Behavior/contrato_recencia_de_cobertura.md`](AI%20Behavior/contrato_recencia_de_cobertura.md) | ledger de idade da vigilância |
+| [`AI Behavior/Assalto.md`](AI%20Behavior/Assalto.md) | a ficha; §5.1 furtividade aérea |
+| [`AI Behavior/FireSupport.md`](AI%20Behavior/FireSupport.md) | a ficha; a modalidade **híbrida**; o auto-repelir |
+| [`AI Behavior/Vigilancia.md`](AI%20Behavior/Vigilancia.md) | §0 o teste de pertencimento; §2.1 detecção total; §5.1 o preço do tiro submarino |
+| [`AI Behavior/Logistica.md`](AI%20Behavior/Logistica.md) | o espelho da Vigilância; §5.1 a triagem que lê a moeda de quem pede |
+| `Units/Capturer/Capturer.md` | o código: a ordem real, os seis mecanismos de ceder, o inventário |
+| `docs/AI Behavior/rascunho/` | **a fonte** — o que o autor escreveu antes das fichas |
+
+**Dívida declarada:** o `Capturer.md` é quatro documentos grampeados.
+
+---
+## A voz dos papéis — o método, e o teste que ele produz
 
 O capturador tinha ~20 exceções que pareciam arbitrárias. Elas ficaram legíveis no
 instante em que o **lema** apareceu:
@@ -334,28 +235,6 @@ ficha    o PARAMETRO  — 1 rodada / 2 rodadas + emerge
 **As marchas envelhecem melhor que as seções** porque foram escritas no nível
 certo. Se um verso parecer contradizer uma seção, **testar primeiro se o verso
 está um nível acima dela** — errei isso duas vezes seguidas na mesma tarde.
-
----
-
-## Onde eu parei — os documentos
-
-| documento | o que é |
-|---|---|
-| [`AI Behavior/ficha_do_papel.md`](AI%20Behavior/ficha_do_papel.md) | a matriz `Pode*` → `Melhor*` **pareada pelo autor**, o questionário padrão, `RoleData` como dado |
-| [`AI Behavior/Capturador.md`](AI%20Behavior/Capturador.md) | §0 o lema; §1 e §3 revistos; apêndice com a **Marcha do Capturador** |
-| [`AI Behavior/Transporte.md`](AI%20Behavior/Transporte.md) | §0.1 a ficha; §7 aninhamento; §12 a moeda; §13 limiar de reparo; §15.1 postura ❓ |
-| `Match/AI/3. Shopping/Shopping.md` | **novo** — o buraco elegibilidade × preferência, e os três papéis-fantasma |
-| [`AI Behavior/contrato_missao_captura.md`](AI%20Behavior/contrato_missao_captura.md) | alocação pegajosa e as condições de baixa |
-| [`AI Behavior/contrato_recencia_de_cobertura.md`](AI%20Behavior/contrato_recencia_de_cobertura.md) | ledger de idade da vigilância |
-| [`AI Behavior/Assalto.md`](AI%20Behavior/Assalto.md) | a ficha; §5.1 **novo** — furtividade aérea, 1 rodada, e por que o custo é de outra natureza que o do sub |
-| [`AI Behavior/FireSupport.md`](AI%20Behavior/FireSupport.md) | a ficha; a modalidade **híbrida**; o auto-repelir como consequência da moeda |
-| [`AI Behavior/Vigilancia.md`](AI%20Behavior/Vigilancia.md) | **novo** — §0 o teste de pertencimento; §2.1 detecção total; §5.1 o preço do tiro submarino |
-| [`AI Behavior/Logistica.md`](AI%20Behavior/Logistica.md) | **novo** — o espelho da Vigilância; §5.1 a triagem que lê a moeda de quem pede |
-| `Units/Capturer/Capturer.md` | o código: a ordem real, os seis mecanismos de ceder, o inventário |
-| `docs/AI Behavior/rascunho/` | **a fonte** — o que o autor escreveu antes das fichas. Quando uma ficha divergir, confere-se aqui |
-
-**Dívida declarada:** o `Capturer.md` é quatro documentos grampeados. A fronteira
-com a doutrina está escrita, mas a ordem interna não ajuda quem lê do começo.
 
 ---
 
@@ -421,32 +300,14 @@ mapa B.
 
 ---
 
-## A dívida de validação em jogo
-
-Da lista da `v7.2.1`, continuam sem partida:
-
-```text
-1. as duas janelas lado a lado         o teste do relatorio unificado
-2. radar movido duas vezes             delta do som: toca na primeira, cala na segunda
-3. aeronave em voo -> fow off          deve RECUSAR; depois nevoaTiles ~1700
-5. turno com 2+ cidades vazias         as duas no Jornal
-6. hot seat DEMORANDO na cortina       o Jornal abre inteiro
-7. menu > resumo do turno              o botao movido abre o Jornal
-9. linha [AI Perf][Unit] do APC #31    nunca chegou
-12. Suprimentos #24 e #73 buscando artilharia
-```
-
-**Protocolo de névoa:** com a partida em Play, ninguém salva `.cs` — recompile
-religa `debugFogOfWarEnabled = true` e parece conserto.
-
----
-
 ## A escada
 
 ```text
 -1. serviços burros do tabuleiro  ✅
  0. sensores PodeX                ⚠️ o laço de HEX ainda mora no PodeDetectar
  1. serviços de área (Hotzone)    ⚠️ falta o de cobertura de DETECÇÃO
+                                  ⚠️ e o degrau `Embarcar` do transporte não
+                                     consome banda nenhuma — Tactical fixo
  2. consumidores Melhor*          ⚠️ faltam quatro (§ Buracos estruturais)
  3. papéis → só POLÍTICA          ⚠️ as SEIS fichas escritas; RoleData não existe
  4. variações de papel            perfil/trait depois da extração
@@ -530,105 +391,15 @@ existe, e nenhuma das ~20 exceções do capturador foi re-derivada ainda.
 | **alargar o conjunto de candidatos sem dar razão para ficar** | as cinco correções somadas fizeram o navio trocar de passageiro todo turno. Quem passa a ver mais opções precisa de **histerese** na mesma passada, senão vira otimizador global — exatamente o que já mordeu o capturador |
 | **`alvo=(0,0,0)` não é "sem alvo"** | é a célula (0,0,0). Li como ausência e construí meia teoria em cima. Coordenada nula e coordenada zero são indistinguíveis no log — conferir no Inspector antes de concluir |
 | **"não era o bloqueio" ≠ "não era necessário"** | classifiquei o horizonte por tier como decoração porque não destravou sozinho. A opção vencedora do navio é `ReachableStrategic` — era carga. Numa série de portas, cada uma é necessária e nenhuma é suficiente |
+| **pedir estado ao humano em vez de ler o log** | perguntei *"o preset é Total?"* e *"o observador é o slot ativo?"*. Ele respondeu sim de boa-fé e eu segui por um caminho errado. `parcial=False` estava impresso no log dele o tempo todo, vindo direto do campo. **Se existe linha que imprime o campo, ela é a fonte — sim/não é trocar medição por lembrança** |
+| **busca vazia não prova ausência; o diff prova** | o autor disse que a lista de slots era editável antes. Rodei `git log -S`, achei só a *adição* do laço manual e afirmei que os botões nunca existiram. Não abri o diff para ver **o que aquele laço substituiu**. Era um `PropertyField` no array inteiro. Regressão de `639c02e` |
+| **overlay não some — desce de camada** | procurei um `if` que desligasse a pintura do range; não havia. `sortingLayerName = playerTurn ? "FogOfWar" : "SFX"`. Estava pintado embaixo de 261 tiles pretos. **Antes de procurar o gate que desliga, conferir se o que sumiu não está atrás de outra coisa** |
+| **campo booleano sem indicador é indistinguível de si mesmo** | "liguei a névoa" e "liguei o parcial" pareciam iguais no jogo. Estado que só aparece no log só existe quando alguém roda o comando que o imprime |
+| **defender o invariante onde ele não se aplica** | o autor achou estranho a missão ser registrada depois de agir; respondi "é o invariante transacional" como se fosse fim de discussão. O invariante protege o **tabuleiro**. Missão é **intenção**, e intenção publicada depois da ação não serve para a única coisa que ela faz. Ele estava certo; levei duas voltas |
+| **a condição de baixa de um significado é a de início do outro** | `intent=Transport → #N` servia à promessa **e** à herança. Quando um campo tem dois donos, procure a transição onde um termina exatamente onde o outro começa — foi ela que apagou a missão do APC todo turno |
+| **"não" alheio não é informação sobre mim** | quem responde sim sabe de um caminho real; quem responde não só sabe que **ele** não serve. Publicação vinda de terceiro pode **levantar**, nunca baixar |
+| **o degrau que não loga é o que decide** | `Courier`, `Delivery` e `Pickup` logam hit/miss com motivo. `Embarcar` sai por `options.Count == 0` calado — e foi ele que segurou o APC em **duas** sessões seguidas |
+| **um único asset pagando por uma dimensão inteira** | o Chinook era o **único** `exclusiveSlot` do catálogo, e obrigava serviço, sensores, motor e score a carregar o caso. Contar os portadores antes de generalizar |
+| **regra nova mais estreita que a que substitui** | ia deixar `PublishRideNeed` como escritora única e derrubaria o Radar da fila — a zona de vigilância não está na missão. Só não aconteceu porque fui conferir os quatro pontos antes de cortar |
 
 ---
-
-## RETOMADA — 2026-08-07
-
-### Três mudanças compiladas, NENHUMA rodou
-
-Todas em `Hot Seat 0 - Treino`, que agora tem **duas faixas de montanha** entre o
-APC e o objetivo, e uma **LZ de grama do outro lado**. Atravessar a serra é o
-desafio: o APC tem `OFF Road` e **sobe** (custo 6, MP 6 = um hex por turno).
-
-| commit | o que muda | como saber que funcionou |
-|---|---|---|
-| `e75f308` | demanda de transporte do rebelde vem da **fila de carona** | tirar o APC da cena; o shopping tem que pedir `Transportador` |
-| `303ce58` | `dropOffRange` do courier vira **banda do passageiro** | o log diz `range=6 (Operational; Tactical=3)` em vez de `range=4` |
-| `8dc7ef1` | **missão no topo** + o APC obedece a missão | `PassengerTarget #1 MISSAO (x,y)` em vez de `capturavel proximo` |
-
-**Rodar uma de cada vez.** As três mexem no mesmo caminho e empilhá-las esconde
-qual regrediu.
-
-### O bug que ficou aberto, e ele tem endereço
-
-```csharp
-// ProgressionSelector.cs:108
-return distanceToTargetMap.TryGetValue(cell, out int routeCost)
-    ? routeCost                                     // custo de ROTA
-    : SectorManager.HexDistance(cell, targetCell);  // ← fallback SILENCIOSO
-```
-
-Célula fora do mapa de rota não é marcada inalcançável: recebe linha reta. Aí
-`firstTurnProgress = originDistance − cellDistance` **subtrai custo de rota de
-distância em hex**. Com montanha os dois divergem 3× e o sinal inverte:
-
-```text
-origem  (19,2)  fora do mapa  → hex  4
-serra   (19,3)  no mapa       → rota 12
-progresso = 4 − 12 = −8      (a ferramenta dá +15,6 no mesmo hex)
-```
-
-Resultado: platô de zeros, `tool = −moveCost`, e o hex mais caro — o único que
-resolve — fica em último. **É o ping-pong `(19,2)↔(18,2)` do `log.md`.**
-
-O log já dizia, em toda linha: `route=?` é `RouteFound == false`, e o `next=4,0`
-ao lado é o fallback. Sem montanha os dois números coincidem e isso nunca
-aparece.
-
-### A ferramenta é a fonte, não o meu raciocínio
-
-`Tools > Transporte > Caminhos Válidos > Progressão` calcula **a fórmula runtime
-do intent** e mostra `FinalScore/1000`. Onde ela e o log discordarem, é diferença
-de **entrada** — e o painel expõe origem, PM do turno, PM dos seguintes,
-horizonte e intent.
-
-⚠️ **Errei quatro vezes hoje concluindo sem abrir o que existia:** disse que
-Tactical não era skip (o skip estava no organizador, não no serviço), que nada
-valorizava subir a montanha (a ferramenta dá +15,6), que o APC não subia (tem
-`OFF Road`, e o custo está no `Montanha.asset`), e que o Strategic cúbico era
-defeito (é projeto). **Antes de afirmar que algo não existe: abrir a ferramenta,
-o asset, e a camada de cima.**
-
----
-
-## Critério de retomada
-
-**Rodar as mudanças uma de cada vez.** São sete no caminho do transporte, todas
-compiladas e nenhuma validada isoladamente — só o gameplay solto mostrou que o
-conjunto se comporta. Os sinais de log de cada uma estão na seção Estado.
-
-A fila curta:
-
-```text
-1. validar as sete, uma por vez, com o sinal de log de cada
-2. o fallback silencioso do ProgressionSelector.cs:108   ← bug com endereço
-3. Mission Intent = None quando o transportador está à toa (RidePromise)
-4. a triagem de entregáveis virar consulta de runtime (hoje só na bancada)
-5. abrir o capturador: quantas das ~20 exceções sobrevivem como POLÍTICA
-```
-
-### O item 2 tem evidência gravada
-
-```csharp
-// ProgressionSelector.cs:108 — célula fora do mapa de rota recebe LINHA RETA
-? routeCost                                     // custo de ROTA
-: SectorManager.HexDistance(cell, targetCell);  // ← fallback silencioso
-```
-
-`firstTurnProgress` acaba subtraindo custo de rota de distância em hex. Com serra
-os dois divergem 3× e o sinal inverte — é o ping-pong `(19,2)↔(18,2)` do
-[`docs/gamelog/log.md`](gamelog/log.md). Sem montanha os números coincidem e isso
-nunca aparece.
-
-### O modelo da missão do transportador, escrito e com uma perna faltando
-
-```text
-Transport + carga a bordo      Delivery   alvo = objetivo da carga     ✅
-Transport + vazio + promessa   Pickup     alvo = o passageiro          ✅
-None                           nada a fazer                            ❌
-```
-
-Delivery × Pickup é **derivável** da carga — não precisa de valor novo no enum. O
-buraco é o terceiro: vazio, sem promessa, com missão velha pendurada. O navio
-leria um encontro que já não existe, que é pior que ler nada.
