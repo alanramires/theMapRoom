@@ -94,6 +94,7 @@ public partial class AIController
                 tacticalBudget,
                 unit.MaxMovementPoints * 3);
             SectorManager.TryBuildLandMovementDistanceToTargetMap(
+                unit.BoardTilemap,
                 targetCell,
                 progressionUnitData,
                 out distanceToTargetMap,

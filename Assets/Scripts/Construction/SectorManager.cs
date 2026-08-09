@@ -357,7 +357,10 @@ public sealed class SectorManager : MonoBehaviour
         }
     }
 
-    private static SectorManager instance;
+    // Cada Scene representa um mapa. O registro por cena impede que mapas
+    // aditivos compartilhem setores, bases ou o catalogo de praias.
+    private static readonly Dictionary<ulong, SectorManager> InstancesByScene =
+        new Dictionary<ulong, SectorManager>();
 
     [SerializeField] private bool sectorLog;
     [Header("Neighbor Distance")]
@@ -379,7 +382,8 @@ public sealed class SectorManager : MonoBehaviour
     private int lastCompletedBoardRevision = int.MinValue;
     private int pendingRebuildBoardRevision = int.MinValue;
 
-    public static SectorManager Instance => EnsureInstance();
+    public static SectorManager Instance => EnsureDefaultInstance();
+    public Scene MapScene => gameObject.scene;
     public IReadOnlyList<SectorInfo> SectorInfos => sectorInfos;
     public IReadOnlyList<SectorInfo> BaseInfos   => baseInfos;
     public BeachManager BeachManagerRef => ResolveBeachManager();
@@ -397,12 +401,59 @@ public sealed class SectorManager : MonoBehaviour
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void BootstrapAfterSceneLoad()
     {
-        EnsureInstance();
+        Scene activeScene = SceneManager.GetActiveScene();
+        SectorManager[] managers =
+            FindObjectsByType<SectorManager>(FindObjectsInactive.Include);
+        for (int i = 0; i < managers.Length; i++)
+        {
+            SectorManager manager = managers[i];
+            if (manager != null
+                && manager.gameObject.scene == activeScene)
+            {
+                InstancesByScene[GetSceneKey(activeScene)] = manager;
+                return;
+            }
+        }
+
+        Tilemap[] tilemaps =
+            FindObjectsByType<Tilemap>(FindObjectsInactive.Include);
+        for (int i = 0; i < tilemaps.Length; i++)
+        {
+            Tilemap tilemap = tilemaps[i];
+            if (tilemap != null
+                && tilemap.gameObject.scene == activeScene)
+            {
+                EnsureInstance(activeScene);
+                return;
+            }
+        }
     }
 
+    public static SectorManager GetForScene(Scene scene) =>
+        EnsureInstance(scene);
+
+    public static SectorManager GetForTilemap(Tilemap tilemap) =>
+        tilemap != null
+            ? EnsureInstance(tilemap.gameObject.scene)
+            : EnsureDefaultInstance();
+
+    public static SectorManager GetForComponent(Component context) =>
+        context != null
+            ? EnsureInstance(context.gameObject.scene)
+            : EnsureDefaultInstance();
+
     public static IReadOnlyList<SectorInfo> GetAllSectorInfos()
+        => GetAllSectorInfos(EnsureDefaultInstance());
+
+    public static IReadOnlyList<SectorInfo> GetAllSectorInfos(Scene scene)
+        => GetAllSectorInfos(EnsureInstance(scene));
+
+    public static IReadOnlyList<SectorInfo> GetAllSectorInfos(Tilemap tilemap)
+        => GetAllSectorInfos(GetForTilemap(tilemap));
+
+    private static IReadOnlyList<SectorInfo> GetAllSectorInfos(
+        SectorManager manager)
     {
-        SectorManager manager = EnsureInstance();
         if (manager == null)
             return System.Array.Empty<SectorInfo>();
 
@@ -413,8 +464,34 @@ public sealed class SectorManager : MonoBehaviour
     }
 
     public static bool TryGetSectorInfo(ConstructionSector sector, out SectorInfo info)
+        => TryGetSectorInfo(
+            EnsureDefaultInstance(),
+            sector,
+            out info);
+
+    public static bool TryGetSectorInfo(
+        Scene scene,
+        ConstructionSector sector,
+        out SectorInfo info)
+        => TryGetSectorInfo(
+            EnsureInstance(scene),
+            sector,
+            out info);
+
+    public static bool TryGetSectorInfo(
+        Tilemap tilemap,
+        ConstructionSector sector,
+        out SectorInfo info)
+        => TryGetSectorInfo(
+            GetForTilemap(tilemap),
+            sector,
+            out info);
+
+    private static bool TryGetSectorInfo(
+        SectorManager manager,
+        ConstructionSector sector,
+        out SectorInfo info)
     {
-        SectorManager manager = EnsureInstance();
         if (manager == null)
         {
             info = null;
@@ -428,12 +505,29 @@ public sealed class SectorManager : MonoBehaviour
     }
 
     public static bool TryBuildNeighborDistanceDebug(ConstructionSector sector, List<SectorNeighborDistanceDebugEntry> entries)
+        => TryBuildNeighborDistanceDebug(
+            EnsureDefaultInstance(),
+            sector,
+            entries);
+
+    public static bool TryBuildNeighborDistanceDebug(
+        Scene scene,
+        ConstructionSector sector,
+        List<SectorNeighborDistanceDebugEntry> entries)
+        => TryBuildNeighborDistanceDebug(
+            EnsureInstance(scene),
+            sector,
+            entries);
+
+    private static bool TryBuildNeighborDistanceDebug(
+        SectorManager manager,
+        ConstructionSector sector,
+        List<SectorNeighborDistanceDebugEntry> entries)
     {
         if (entries == null)
             return false;
 
         entries.Clear();
-        SectorManager manager = EnsureInstance();
         if (manager == null)
             return false;
 
@@ -481,8 +575,17 @@ public sealed class SectorManager : MonoBehaviour
     }
 
     public static IReadOnlyList<SectorInfo> GetAllBaseInfos()
+        => GetAllBaseInfos(EnsureDefaultInstance());
+
+    public static IReadOnlyList<SectorInfo> GetAllBaseInfos(Scene scene)
+        => GetAllBaseInfos(EnsureInstance(scene));
+
+    public static IReadOnlyList<SectorInfo> GetAllBaseInfos(Tilemap tilemap)
+        => GetAllBaseInfos(GetForTilemap(tilemap));
+
+    private static IReadOnlyList<SectorInfo> GetAllBaseInfos(
+        SectorManager manager)
     {
-        SectorManager manager = EnsureInstance();
         if (manager == null)
             return System.Array.Empty<SectorInfo>();
 
@@ -493,8 +596,34 @@ public sealed class SectorManager : MonoBehaviour
     }
 
     public static bool TryGetBaseInfo(ConstructionSector sector, out SectorInfo info)
+        => TryGetBaseInfo(
+            EnsureDefaultInstance(),
+            sector,
+            out info);
+
+    public static bool TryGetBaseInfo(
+        Scene scene,
+        ConstructionSector sector,
+        out SectorInfo info)
+        => TryGetBaseInfo(
+            EnsureInstance(scene),
+            sector,
+            out info);
+
+    public static bool TryGetBaseInfo(
+        Tilemap tilemap,
+        ConstructionSector sector,
+        out SectorInfo info)
+        => TryGetBaseInfo(
+            GetForTilemap(tilemap),
+            sector,
+            out info);
+
+    private static bool TryGetBaseInfo(
+        SectorManager manager,
+        ConstructionSector sector,
+        out SectorInfo info)
     {
-        SectorManager manager = EnsureInstance();
         if (manager == null)
         {
             info = null;
@@ -512,8 +641,19 @@ public sealed class SectorManager : MonoBehaviour
     /// catalogo; conectividade, divisao e identidade pertencem ao BeachManager.
     /// </summary>
     public static IReadOnlyList<BeachManager.BeachInfo> GetAllMilitaryBeachInfos()
+        => GetAllMilitaryBeachInfos(EnsureDefaultInstance());
+
+    public static IReadOnlyList<BeachManager.BeachInfo>
+        GetAllMilitaryBeachInfos(Scene scene)
+        => GetAllMilitaryBeachInfos(EnsureInstance(scene));
+
+    public static IReadOnlyList<BeachManager.BeachInfo>
+        GetAllMilitaryBeachInfos(Tilemap tilemap)
+        => GetAllMilitaryBeachInfos(GetForTilemap(tilemap));
+
+    private static IReadOnlyList<BeachManager.BeachInfo>
+        GetAllMilitaryBeachInfos(SectorManager manager)
     {
-        SectorManager manager = EnsureInstance();
         return manager != null
             ? manager.MilitaryBeachInfos
             : System.Array.Empty<BeachManager.BeachInfo>();
@@ -522,9 +662,35 @@ public sealed class SectorManager : MonoBehaviour
     public static bool TryGetMilitaryBeachAtCell(
         Vector3Int cell,
         out BeachManager.BeachInfo beach)
+        => TryGetMilitaryBeachAtCell(
+            EnsureDefaultInstance(),
+            cell,
+            out beach);
+
+    public static bool TryGetMilitaryBeachAtCell(
+        Scene scene,
+        Vector3Int cell,
+        out BeachManager.BeachInfo beach)
+        => TryGetMilitaryBeachAtCell(
+            EnsureInstance(scene),
+            cell,
+            out beach);
+
+    public static bool TryGetMilitaryBeachAtCell(
+        Tilemap tilemap,
+        Vector3Int cell,
+        out BeachManager.BeachInfo beach)
+        => TryGetMilitaryBeachAtCell(
+            GetForTilemap(tilemap),
+            cell,
+            out beach);
+
+    private static bool TryGetMilitaryBeachAtCell(
+        SectorManager manager,
+        Vector3Int cell,
+        out BeachManager.BeachInfo beach)
     {
         beach = null;
-        SectorManager manager = EnsureInstance();
         BeachManager catalog = manager != null
             ? manager.ResolveBeachManager()
             : null;
@@ -532,8 +698,28 @@ public sealed class SectorManager : MonoBehaviour
     }
 
     public static bool RequestRebuildFromActiveConstructions(string reason = null)
+        => RequestRebuildFromActiveConstructions(
+            EnsureDefaultInstance(),
+            reason);
+
+    public static bool RequestRebuildFromActiveConstructions(
+        Scene scene,
+        string reason = null)
+        => RequestRebuildFromActiveConstructions(
+            EnsureInstance(scene),
+            reason);
+
+    public static bool RequestRebuildFromActiveConstructions(
+        Tilemap tilemap,
+        string reason = null)
+        => RequestRebuildFromActiveConstructions(
+            GetForTilemap(tilemap),
+            reason);
+
+    private static bool RequestRebuildFromActiveConstructions(
+        SectorManager manager,
+        string reason)
     {
-        SectorManager manager = EnsureInstance();
         if (manager == null)
             return false;
 
@@ -541,8 +727,28 @@ public sealed class SectorManager : MonoBehaviour
     }
 
     public static void RebuildNowFromActiveConstructions(string reason = null)
+        => RebuildNowFromActiveConstructions(
+            EnsureDefaultInstance(),
+            reason);
+
+    public static void RebuildNowFromActiveConstructions(
+        Scene scene,
+        string reason = null)
+        => RebuildNowFromActiveConstructions(
+            EnsureInstance(scene),
+            reason);
+
+    public static void RebuildNowFromActiveConstructions(
+        Tilemap tilemap,
+        string reason = null)
+        => RebuildNowFromActiveConstructions(
+            GetForTilemap(tilemap),
+            reason);
+
+    private static void RebuildNowFromActiveConstructions(
+        SectorManager manager,
+        string reason)
     {
-        SectorManager manager = EnsureInstance();
         if (manager == null)
             return;
 
@@ -555,36 +761,132 @@ public sealed class SectorManager : MonoBehaviour
         manager.RebuildFromActiveConstructions(reason);
     }
 
-    private static SectorManager EnsureInstance()
+    private static SectorManager EnsureDefaultInstance()
     {
-        if (instance != null)
-            return instance;
+        Scene activeScene = SceneManager.GetActiveScene();
+        if (TryFindRegistered(activeScene, out SectorManager active))
+            return active;
 
-        SectorManager existing = FindAnyObjectByType<SectorManager>();
-        if (existing != null)
+        SectorManager[] candidates =
+            FindObjectsByType<SectorManager>(FindObjectsInactive.Include);
+        SectorManager only = null;
+        int count = 0;
+        for (int i = 0; i < candidates.Length; i++)
         {
-            instance = existing;
-            return instance;
+            SectorManager candidate = candidates[i];
+            if (candidate == null)
+                continue;
+            if (candidate.gameObject.scene == activeScene)
+            {
+                InstancesByScene[GetSceneKey(activeScene)] = candidate;
+                return candidate;
+            }
+            only = candidate;
+            count++;
         }
 
-        GameObject go = new GameObject(nameof(SectorManager));
-        instance = go.AddComponent<SectorManager>();
-        return instance;
+        if (count == 1)
+        {
+            InstancesByScene[GetSceneKey(only.gameObject.scene)] = only;
+            return only;
+        }
+        if (count > 1)
+        {
+            Debug.LogError(
+                "[SectorManager] consulta sem contexto com varios mapas " +
+                "carregados. Informe a Scene, o Tilemap ou um Component.");
+            return null;
+        }
+
+        return EnsureInstance(activeScene);
     }
+
+    private static SectorManager EnsureInstance(Scene targetScene)
+    {
+        if (!targetScene.IsValid())
+            targetScene = SceneManager.GetActiveScene();
+        if (TryFindRegistered(targetScene, out SectorManager registered))
+            return registered;
+
+        SectorManager[] candidates =
+            FindObjectsByType<SectorManager>(FindObjectsInactive.Include);
+        for (int i = 0; i < candidates.Length; i++)
+        {
+            SectorManager existing = candidates[i];
+            if (existing == null
+                || existing.gameObject.scene != targetScene)
+            {
+                continue;
+            }
+            InstancesByScene[GetSceneKey(targetScene)] = existing;
+            return existing;
+        }
+
+        GameObject host = new GameObject(nameof(SectorManager));
+        if (targetScene.IsValid()
+            && targetScene.isLoaded
+            && host.scene != targetScene)
+        {
+            SceneManager.MoveGameObjectToScene(host, targetScene);
+        }
+        SectorManager created = host.AddComponent<SectorManager>();
+        InstancesByScene[GetSceneKey(created.gameObject.scene)] = created;
+        return created;
+    }
+
+    private static bool TryFindRegistered(
+        Scene scene,
+        out SectorManager manager)
+    {
+        manager = null;
+        if (!scene.IsValid())
+            return false;
+        ulong key = GetSceneKey(scene);
+        if (!InstancesByScene.TryGetValue(key, out manager))
+            return false;
+        if (manager != null && manager.gameObject.scene == scene)
+            return true;
+        InstancesByScene.Remove(key);
+        manager = null;
+        return false;
+    }
+
+    private static ulong GetSceneKey(Scene scene) =>
+        scene.handle.GetRawData();
 
     private void Awake()
     {
-        if (instance != null && instance != this)
+        ulong key = GetSceneKey(gameObject.scene);
+        if (InstancesByScene.TryGetValue(
+                key,
+                out SectorManager existing)
+            && existing != null
+            && existing != this)
         {
-            Destroy(gameObject);
+            if (Application.isPlaying)
+                Destroy(gameObject);
+            else
+                Debug.LogError(
+                    $"[SectorManager] mais de um manager na cena " +
+                    $"'{gameObject.scene.name}'. Mantenha somente um.",
+                    this);
             return;
         }
-
-        instance = this;
+        InstancesByScene[key] = this;
     }
 
     private void OnEnable()
     {
+        ulong key = GetSceneKey(gameObject.scene);
+        if (InstancesByScene.TryGetValue(
+                key,
+                out SectorManager existing)
+            && existing != null
+            && existing != this)
+        {
+            return;
+        }
+        InstancesByScene[key] = this;
         SceneManager.sceneLoaded += HandleSceneLoaded;
         MatchController.OnActiveTeamChanged += HandleActiveTeamChanged;
         SaveGameManager.OnAfterLoadSuccess += HandleAfterLoadSuccess;
@@ -601,8 +903,14 @@ public sealed class SectorManager : MonoBehaviour
 
     private void OnDestroy()
     {
-        if (instance == this)
-            instance = null;
+        ulong key = GetSceneKey(gameObject.scene);
+        if (InstancesByScene.TryGetValue(
+                key,
+                out SectorManager registered)
+            && registered == this)
+        {
+            InstancesByScene.Remove(key);
+        }
     }
 
 #if UNITY_EDITOR
@@ -624,6 +932,8 @@ public sealed class SectorManager : MonoBehaviour
 
     private void HandleSceneLoaded(Scene scene, LoadSceneMode mode)
     {
+        if (gameObject.scene != scene)
+            return;
         QueueRebuild($"scene-loaded:{scene.name}");
     }
 
@@ -676,6 +986,17 @@ public sealed class SectorManager : MonoBehaviour
 
     private BeachManager ResolveBeachManager()
     {
+        if (beachManager != null
+            && beachManager.gameObject.scene != gameObject.scene)
+        {
+            Debug.LogError(
+                $"[SectorManager] ignorou BeachManager da cena " +
+                $"'{beachManager.gameObject.scene.name}': este manager " +
+                $"pertence a '{gameObject.scene.name}'.",
+                this);
+            beachManager = null;
+        }
+
         if (beachManager == null)
         {
             // No setup recomendado, o BeachManager vive como filho deste
@@ -704,7 +1025,8 @@ public sealed class SectorManager : MonoBehaviour
 
             if (beachManager == null && Application.isPlaying)
             {
-                beachManager = BeachManager.GetOrCreate(
+                beachManager = BeachManager.GetOrCreateForScene(
+                    gameObject.scene,
                     neighborDistanceTilemap,
                     neighborDistanceTerrainDatabase);
             }
@@ -734,26 +1056,58 @@ public sealed class SectorManager : MonoBehaviour
 
     // Distância com custo de terreno usando o contexto já configurado no Inspector.
     // Retorna false se o contexto não estiver disponível; nesse caso usa HexDistance como fallback.
-    public static bool TryGetLandMovementDistance(Vector3Int from, Vector3Int to, out int cost)
-    {
-        cost = 0;
-        SectorManager manager = EnsureInstance();
-        if (manager == null) return false;
-        SectorNeighborDistanceContext ctx = manager.BuildNeighborDistanceContext();
-        if (!ctx.IsValid) return false;
-        from.z = 0; to.z = 0;
-        return TryComputeLandMovementDistance(from, to, ctx, out cost, null);
-    }
+    public static bool TryGetLandMovementDistance(
+        Vector3Int from,
+        Vector3Int to,
+        out int cost) =>
+        TryGetLandMovementDistance(
+            EnsureDefaultInstance(), from, to, null, out cost);
 
-    public static bool TryGetLandMovementDistance(Vector3Int from, Vector3Int to, UnitData referenceUnitData, out int cost)
+    public static bool TryGetLandMovementDistance(
+        Tilemap tilemap,
+        Vector3Int from,
+        Vector3Int to,
+        out int cost) =>
+        TryGetLandMovementDistance(
+            GetForTilemap(tilemap), from, to, null, out cost);
+
+    public static bool TryGetLandMovementDistance(
+        Vector3Int from,
+        Vector3Int to,
+        UnitData referenceUnitData,
+        out int cost) =>
+        TryGetLandMovementDistance(
+            EnsureDefaultInstance(),
+            from, to, referenceUnitData, out cost);
+
+    public static bool TryGetLandMovementDistance(
+        Tilemap tilemap,
+        Vector3Int from,
+        Vector3Int to,
+        UnitData referenceUnitData,
+        out int cost) =>
+        TryGetLandMovementDistance(
+            GetForTilemap(tilemap),
+            from, to, referenceUnitData, out cost);
+
+    private static bool TryGetLandMovementDistance(
+        SectorManager manager,
+        Vector3Int from,
+        Vector3Int to,
+        UnitData referenceUnitData,
+        out int cost)
     {
         cost = 0;
-        SectorManager manager = EnsureInstance();
-        if (manager == null) return false;
-        SectorNeighborDistanceContext ctx = manager.BuildNeighborDistanceContext(referenceUnitData);
-        if (!ctx.IsValid) return false;
-        from.z = 0; to.z = 0;
-        return TryComputeLandMovementDistance(from, to, ctx, out cost, null);
+        if (manager == null)
+            return false;
+        SectorNeighborDistanceContext context =
+            manager.BuildNeighborDistanceContext(referenceUnitData);
+        if (!context.IsValid)
+            return false;
+        from.z = 0;
+        to.z = 0;
+        return TryComputeLandMovementDistance(
+            from, to, context, out cost, null);
     }
 
     // Distancia de movimento terrestre das celulas ATE 'target', numa unica
@@ -770,10 +1124,35 @@ public sealed class SectorManager : MonoBehaviour
         Vector3Int target,
         UnitData referenceUnitData,
         out Dictionary<Vector3Int, int> distanceToTarget,
-        int maxCost = int.MaxValue)
+        int maxCost = int.MaxValue) =>
+        TryBuildLandMovementDistanceToTargetMap(
+            EnsureDefaultInstance(),
+            target,
+            referenceUnitData,
+            out distanceToTarget,
+            maxCost);
+
+    public static bool TryBuildLandMovementDistanceToTargetMap(
+        Tilemap tilemap,
+        Vector3Int target,
+        UnitData referenceUnitData,
+        out Dictionary<Vector3Int, int> distanceToTarget,
+        int maxCost = int.MaxValue) =>
+        TryBuildLandMovementDistanceToTargetMap(
+            GetForTilemap(tilemap),
+            target,
+            referenceUnitData,
+            out distanceToTarget,
+            maxCost);
+
+    private static bool TryBuildLandMovementDistanceToTargetMap(
+        SectorManager manager,
+        Vector3Int target,
+        UnitData referenceUnitData,
+        out Dictionary<Vector3Int, int> distanceToTarget,
+        int maxCost)
     {
         distanceToTarget = null;
-        SectorManager manager = EnsureInstance();
         if (manager == null) return false;
         SectorNeighborDistanceContext ctx = manager.BuildNeighborDistanceContext(referenceUnitData);
         if (!ctx.IsValid || ctx.Tilemap == null) return false;
@@ -849,23 +1228,11 @@ public sealed class SectorManager : MonoBehaviour
         // Consulta sem copiar a verdade do catalogo. Os servicos de LZ podem
         // usar a mesma instancia e os mesmos BeachIds.
         BeachManager namedBeachCatalog = ResolveBeachManager();
-        if (namedBeachCatalog != null
+        if (namedBeachCatalog == null
             && string.Equals(
                 reason,
                 "manual",
                 System.StringComparison.Ordinal))
-        {
-            // O botao manual do SectorManager e tambem uma auditoria dos
-            // catalogos dos quais ele depende. Forca a releitura dos tiles de
-            // praia antes de publicar a contagem, mesmo se o fingerprint do
-            // BoardTopology ainda for igual ao catalogo serializado anterior.
-            namedBeachCatalog.RebuildMilitaryBeaches();
-        }
-        else if (namedBeachCatalog == null
-                 && string.Equals(
-                     reason,
-                     "manual",
-                     System.StringComparison.Ordinal))
         {
             Debug.LogError(
                 "[SectorManager] BeachManager nao encontrado nesta cena. " +
@@ -1142,13 +1509,17 @@ public sealed class SectorManager : MonoBehaviour
         if (!useTerrainCostForNeighborDistances)
             return default;
 
-        Tilemap map = neighborDistanceTilemap != null ? neighborDistanceTilemap : ResolveNeighborDistanceTilemap();
+        Tilemap map = neighborDistanceTilemap != null
+            && neighborDistanceTilemap.gameObject.scene == gameObject.scene
+                ? neighborDistanceTilemap
+                : ResolveNeighborDistanceTilemap();
         TerrainDatabase terrainDb = neighborDistanceTerrainDatabase != null ? neighborDistanceTerrainDatabase : ResolveNeighborDistanceTerrainDatabase();
         if (map == null || terrainDb == null)
             return default;
 
         var constructionsByCell = new Dictionary<Vector3Int, ConstructionManager>();
-        IReadOnlyList<ConstructionManager> constructions = GetTrackedConstructions();
+        IReadOnlyList<ConstructionManager> constructions =
+            GetTrackedConstructions();
         for (int i = 0; i < constructions.Count; i++)
         {
             ConstructionManager construction = constructions[i];
@@ -1167,7 +1538,19 @@ public sealed class SectorManager : MonoBehaviour
             ? map.layoutGrid.GetComponentsInChildren<Tilemap>(includeInactive: true)
             : System.Array.Empty<Tilemap>();
 
-        RoadNetworkManager[] roadNetworks = Object.FindObjectsByType<RoadNetworkManager>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        RoadNetworkManager[] allRoadNetworks =
+            Object.FindObjectsByType<RoadNetworkManager>(
+                FindObjectsInactive.Include);
+        var localRoadNetworks = new List<RoadNetworkManager>();
+        for (int i = 0; i < allRoadNetworks.Length; i++)
+        {
+            RoadNetworkManager road = allRoadNetworks[i];
+            if (road != null
+                && road.gameObject.scene == gameObject.scene)
+            {
+                localRoadNetworks.Add(road);
+            }
+        }
         UnitData referenceUnitData = referenceUnitOverride != null
             ? referenceUnitOverride
             : neighborDistanceReferenceUnitData != null
@@ -1182,7 +1565,7 @@ public sealed class SectorManager : MonoBehaviour
             Tilemap = map,
             TerrainDatabase = terrainDb,
             GridTilemaps = gridMaps,
-            RoadNetworks = roadNetworks,
+            RoadNetworks = localRoadNetworks.ToArray(),
             Topology = topology,
             ConstructionsByCell = constructionsByCell,
             ReferenceUnitData = referenceUnitData,
@@ -1201,13 +1584,18 @@ public sealed class SectorManager : MonoBehaviour
         return navalUnitData != null ? BuildNeighborDistanceContext(navalUnitData) : default;
     }
 
-    private static UnitData ResolveNeighborDistanceNavalUnitData()
+    private UnitData ResolveNeighborDistanceNavalUnitData()
     {
-        UnitManager[] units = Object.FindObjectsByType<UnitManager>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        UnitManager[] units = Object.FindObjectsByType<UnitManager>(
+            FindObjectsInactive.Include);
         for (int i = 0; i < units.Length; i++)
         {
             UnitManager unit = units[i];
-            if (unit != null && unit.TryGetUnitData(out UnitData data) && data != null && data.domain == Domain.Naval)
+            if (unit != null
+                && unit.gameObject.scene == gameObject.scene
+                && unit.TryGetUnitData(out UnitData data)
+                && data != null
+                && data.domain == Domain.Naval)
                 return data;
         }
 
@@ -1326,13 +1714,15 @@ public sealed class SectorManager : MonoBehaviour
         }
     }
 
-    private static UnitData ResolveNeighborDistanceReferenceUnitData()
+    private UnitData ResolveNeighborDistanceReferenceUnitData()
     {
-        UnitManager[] units = Object.FindObjectsByType<UnitManager>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        UnitManager[] units = Object.FindObjectsByType<UnitManager>(
+            FindObjectsInactive.Include);
         for (int i = 0; i < units.Length; i++)
         {
             UnitManager unit = units[i];
-            if (unit == null)
+            if (unit == null
+                || unit.gameObject.scene != gameObject.scene)
                 continue;
             if (unit.TryGetUnitData(out UnitData data) && data != null && data.unitClass == GameUnitClass.Infantry)
                 return data;
@@ -1341,40 +1731,93 @@ public sealed class SectorManager : MonoBehaviour
         for (int i = 0; i < units.Length; i++)
         {
             UnitManager unit = units[i];
-            if (unit != null && unit.TryGetUnitData(out UnitData data) && data != null && data.domain == Domain.Land)
+            if (unit != null
+                && unit.gameObject.scene == gameObject.scene
+                && unit.TryGetUnitData(out UnitData data)
+                && data != null
+                && data.domain == Domain.Land)
                 return data;
         }
 
         return null;
     }
 
-    private static Tilemap ResolveNeighborDistanceTilemap()
+    private Tilemap ResolveNeighborDistanceTilemap()
     {
-        CursorController cursor = Object.FindAnyObjectByType<CursorController>();
-        if (cursor != null && cursor.BoardTilemap != null)
-            return cursor.BoardTilemap;
+        CursorController[] cursors =
+            Object.FindObjectsByType<CursorController>(
+                FindObjectsInactive.Include);
+        for (int i = 0; i < cursors.Length; i++)
+        {
+            CursorController cursor = cursors[i];
+            if (cursor != null
+                && cursor.gameObject.scene == gameObject.scene
+                && cursor.BoardTilemap != null)
+            {
+                return cursor.BoardTilemap;
+            }
+        }
 
-        ConstructionManager construction = Object.FindAnyObjectByType<ConstructionManager>();
-        if (construction != null && construction.BoardTilemap != null)
-            return construction.BoardTilemap;
+        IReadOnlyList<ConstructionManager> constructions =
+            GetTrackedConstructions();
+        for (int i = 0; i < constructions.Count; i++)
+        {
+            ConstructionManager construction = constructions[i];
+            if (construction != null && construction.BoardTilemap != null)
+                return construction.BoardTilemap;
+        }
 
-        Tilemap[] maps = Object.FindObjectsByType<Tilemap>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        Tilemap[] maps = Object.FindObjectsByType<Tilemap>(
+            FindObjectsInactive.Include);
         for (int i = 0; i < maps.Length; i++)
-            if (maps[i] != null && string.Equals(maps[i].name, "TileMap", System.StringComparison.OrdinalIgnoreCase))
+            if (maps[i] != null
+                && maps[i].gameObject.scene == gameObject.scene
+                && string.Equals(
+                    maps[i].name,
+                    "TileMap",
+                    System.StringComparison.OrdinalIgnoreCase))
                 return maps[i];
 
-        return maps != null && maps.Length > 0 ? maps[0] : null;
+        for (int i = 0; i < maps.Length; i++)
+        {
+            if (maps[i] != null
+                && maps[i].gameObject.scene == gameObject.scene)
+            {
+                return maps[i];
+            }
+        }
+        return null;
     }
 
-    private static TerrainDatabase ResolveNeighborDistanceTerrainDatabase()
+    private TerrainDatabase ResolveNeighborDistanceTerrainDatabase()
     {
-        TurnStateManager turnState = Object.FindAnyObjectByType<TurnStateManager>();
-        if (turnState != null && turnState.TerrainDatabaseRef != null)
-            return turnState.TerrainDatabaseRef;
+        TurnStateManager[] turnStates =
+            Object.FindObjectsByType<TurnStateManager>(
+                FindObjectsInactive.Include);
+        for (int i = 0; i < turnStates.Length; i++)
+        {
+            TurnStateManager turnState = turnStates[i];
+            if (turnState != null
+                && turnState.gameObject.scene == gameObject.scene
+                && turnState.TerrainDatabaseRef != null)
+            {
+                return turnState.TerrainDatabaseRef;
+            }
+        }
 
-        MatchController match = Object.FindAnyObjectByType<MatchController>();
-        if (match != null && match.TerrainDatabaseRef != null)
-            return match.TerrainDatabaseRef;
+        MatchController[] matches =
+            Object.FindObjectsByType<MatchController>(
+                FindObjectsInactive.Include);
+        for (int i = 0; i < matches.Length; i++)
+        {
+            MatchController match = matches[i];
+            if (match != null
+                && match.gameObject.scene == gameObject.scene
+                && match.TerrainDatabaseRef != null)
+            {
+                return match.TerrainDatabaseRef;
+            }
+        }
 
 #if UNITY_EDITOR
         string[] guids = AssetDatabase.FindAssets("t:TerrainDatabase");
@@ -1510,6 +1953,41 @@ public sealed class SectorManager : MonoBehaviour
         }
     }
 
+    private readonly struct CellContextCacheKey :
+        System.IEquatable<CellContextCacheKey>
+    {
+        private readonly int x;
+        private readonly int y;
+        private readonly int contextId;
+
+        public CellContextCacheKey(Vector3Int cell, int contextId)
+        {
+            x = cell.x;
+            y = cell.y;
+            this.contextId = contextId;
+        }
+
+        public bool Equals(CellContextCacheKey other) =>
+            x == other.x
+            && y == other.y
+            && contextId == other.contextId;
+
+        public override bool Equals(object obj) =>
+            obj is CellContextCacheKey other && Equals(other);
+
+        public override int GetHashCode()
+        {
+            unchecked
+            {
+                int hash = 17;
+                hash = (hash * 31) + x;
+                hash = (hash * 31) + y;
+                hash = (hash * 31) + contextId;
+                return hash;
+            }
+        }
+    }
+
     private const int LandDistanceUnreachable = int.MinValue;
     private static readonly Dictionary<LandDistanceCacheKey, int> landDistanceCache =
         new Dictionary<LandDistanceCacheKey, int>(512);
@@ -1543,10 +2021,12 @@ public sealed class SectorManager : MonoBehaviour
     private static readonly Dictionary<LandDistanceCacheKey, RouteEnterCostResult> routeEnterCostCache =
         new Dictionary<LandDistanceCacheKey, RouteEnterCostResult>();
 
-    private static readonly Dictionary<Vector3Int, TerrainTypeData> terrainByCellCache =
-        new Dictionary<Vector3Int, TerrainTypeData>();
-    private static readonly Dictionary<Vector3Int, bool> paintedByCellCache =
-        new Dictionary<Vector3Int, bool>();
+    private static readonly Dictionary<CellContextCacheKey, TerrainTypeData>
+        terrainByCellCache =
+            new Dictionary<CellContextCacheKey, TerrainTypeData>();
+    private static readonly Dictionary<CellContextCacheKey, bool>
+        paintedByCellCache =
+            new Dictionary<CellContextCacheKey, bool>();
     private static int searchDebugHits;
 
     public static void InvalidateLandDistanceCache()
@@ -1562,15 +2042,25 @@ public sealed class SectorManager : MonoBehaviour
     {
         unchecked
         {
+            int hash = BuildMapContextId(context);
+            hash = (hash * 31) + (context.ReferenceUnitData != null
+                ? context.ReferenceUnitData.GetEntityId().GetHashCode()
+                : 0);
+            return hash;
+        }
+    }
+
+    private static int BuildMapContextId(
+        SectorNeighborDistanceContext context)
+    {
+        unchecked
+        {
             int hash = 17;
             hash = (hash * 31) + (context.Tilemap != null
                 ? context.Tilemap.GetEntityId().GetHashCode()
                 : 0);
             hash = (hash * 31) + (context.TerrainDatabase != null
                 ? context.TerrainDatabase.GetEntityId().GetHashCode()
-                : 0);
-            hash = (hash * 31) + (context.ReferenceUnitData != null
-                ? context.ReferenceUnitData.GetEntityId().GetHashCode()
                 : 0);
             return hash;
         }
@@ -1581,7 +2071,8 @@ public sealed class SectorManager : MonoBehaviour
     // por isso cada construcao contribui via soma comutativa.
     private static int BuildLandDistanceLayoutFingerprint()
     {
-        IReadOnlyList<ConstructionManager> constructions = GetTrackedConstructions();
+        IReadOnlyList<ConstructionManager> constructions =
+            GetAllTrackedConstructions();
         unchecked
         {
             int accumulated = 0;
@@ -1596,6 +2087,8 @@ public sealed class SectorManager : MonoBehaviour
                 int entry = 17;
                 entry = (entry * 31) + cell.x;
                 entry = (entry * 31) + cell.y;
+                entry = (entry * 31) +
+                    GetSceneKey(construction.gameObject.scene).GetHashCode();
                 entry = (entry * 31) + construction.GetBaseMovementCost();
                 // Sem a identidade, trocar um predio por outro de mesmo custo no
                 // mesmo hex passaria batido, e SupportsLayerMode/InheritsTerrainRules
@@ -2680,14 +3173,19 @@ public sealed class SectorManager : MonoBehaviour
             return null;
 
         cell.z = 0;
-        if (terrainByCellCache.TryGetValue(cell, out TerrainTypeData cached))
+        var cacheKey = new CellContextCacheKey(
+            cell,
+            BuildMapContextId(context));
+        if (terrainByCellCache.TryGetValue(
+                cacheKey,
+                out TerrainTypeData cached))
         {
             searchDebugTerrainCacheHits++;
             return cached;
         }
         searchDebugTerrainResolves++;
         TerrainTypeData resolved = ResolveTerrainAtCellUncached(cell, context);
-        terrainByCellCache[cell] = resolved;
+        terrainByCellCache[cacheKey] = resolved;
         return resolved;
     }
 
@@ -2718,14 +3216,17 @@ public sealed class SectorManager : MonoBehaviour
     private static bool HasAnyPaintedTileAtCell(Vector3Int cell, SectorNeighborDistanceContext context)
     {
         cell.z = 0;
-        if (paintedByCellCache.TryGetValue(cell, out bool cached))
+        var cacheKey = new CellContextCacheKey(
+            cell,
+            BuildMapContextId(context));
+        if (paintedByCellCache.TryGetValue(cacheKey, out bool cached))
         {
             searchDebugPaintedCacheHits++;
             return cached;
         }
         searchDebugPaintedResolves++;
         bool painted = HasAnyPaintedTileAtCellUncached(cell, context);
-        paintedByCellCache[cell] = painted;
+        paintedByCellCache[cacheKey] = painted;
         return painted;
     }
 
@@ -2803,7 +3304,25 @@ public sealed class SectorManager : MonoBehaviour
         public UnitData ReferenceUnitData;
     }
 
-    private static IReadOnlyList<ConstructionManager> GetTrackedConstructions()
+    private IReadOnlyList<ConstructionManager> GetTrackedConstructions()
+    {
+        IReadOnlyList<ConstructionManager> all =
+            GetAllTrackedConstructions();
+        var local = new List<ConstructionManager>();
+        for (int i = 0; i < all.Count; i++)
+        {
+            ConstructionManager construction = all[i];
+            if (construction != null
+                && construction.gameObject.scene == gameObject.scene)
+            {
+                local.Add(construction);
+            }
+        }
+        return local;
+    }
+
+    private static IReadOnlyList<ConstructionManager>
+        GetAllTrackedConstructions()
     {
         if (ConstructionManager.AllActive != null && ConstructionManager.AllActive.Count > 0)
             return ConstructionManager.AllActive;
@@ -2811,12 +3330,16 @@ public sealed class SectorManager : MonoBehaviour
 #if UNITY_EDITOR
         if (!Application.isPlaying)
         {
-            ConstructionManager[] editorConstructions = Object.FindObjectsByType<ConstructionManager>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            ConstructionManager[] editorConstructions =
+                Object.FindObjectsByType<ConstructionManager>(
+                    FindObjectsInactive.Include);
             return editorConstructions ?? System.Array.Empty<ConstructionManager>();
         }
 #endif
 
-        ConstructionManager[] runtimeConstructions = Object.FindObjectsByType<ConstructionManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        ConstructionManager[] runtimeConstructions =
+            Object.FindObjectsByType<ConstructionManager>(
+                FindObjectsInactive.Exclude);
         return runtimeConstructions ?? System.Array.Empty<ConstructionManager>();
     }
 

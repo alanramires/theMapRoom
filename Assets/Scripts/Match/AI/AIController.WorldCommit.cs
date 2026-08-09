@@ -216,6 +216,7 @@ public partial class AIController
 
         bool sectorRebuildPending =
             SectorManager.RequestRebuildFromActiveConstructions(
+                gameObject.scene,
                 $"ai-commit:{reason}");
 
         float tYield = Time.realtimeSinceStartup;

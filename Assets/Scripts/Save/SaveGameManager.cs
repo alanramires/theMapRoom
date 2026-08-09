@@ -1804,7 +1804,18 @@ public class SaveGameManager : MonoBehaviour
         // Setores dependem apenas das construcoes confirmadas. Consolide ainda
         // sob o painel de load; after-load e o commit da IA reutilizam a mesma
         // revisao em vez de cobrar duas passadas nos frames seguintes.
+        Scene restoredMapScene = matchController != null
+            ? matchController.gameObject.scene
+            : gameObject.scene;
+        foreach (ConstructionManager restored in restoredConstructions)
+        {
+            if (restored == null)
+                continue;
+            restoredMapScene = restored.gameObject.scene;
+            break;
+        }
         SectorManager.RebuildNowFromActiveConstructions(
+            restoredMapScene,
             "post-restore-constructions");
 
         if (string.IsNullOrEmpty(batchedRestoreError))

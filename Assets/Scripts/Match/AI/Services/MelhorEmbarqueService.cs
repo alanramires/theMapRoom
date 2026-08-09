@@ -82,6 +82,28 @@ public sealed class MelhorEmbarqueLzScore
         new List<MelhorEmbarquePassengerScore>();
 }
 
+/// <summary>
+/// Conjunto simultaneamente transportavel escolhido para uma LZ. Diferente
+/// da opcao passageiro-LZ, este resultado respeita capacidade e exclusividade
+/// entre slots do mesmo casco.
+/// </summary>
+public sealed class MelhorEmbarqueManifestScore
+{
+    public UnitManager transporter;
+    public Vector3Int lzCell;
+    public MelhorEmbarqueTier tier;
+    public int transporterDistance;
+    public int transporterRouteCost;
+    public int emergencyCount;
+    public int requestedCount;
+    public int totalUnitsBrought;
+    public int totalPassengerRouteCost;
+    public float score;
+    public string reason;
+    public readonly List<MelhorEmbarqueOption> passengers =
+        new List<MelhorEmbarqueOption>();
+}
+
 public sealed class MelhorEmbarqueReject
 {
     public UnitManager passenger;
@@ -130,12 +152,31 @@ public sealed class MelhorEmbarquePassengerRequest
     public Action<string> diagnosticLog;
 }
 
+/// <summary>
+/// Consulta transportador-centrica. Uma lista vazia descobre automaticamente
+/// passageiros compativeis que pediram carona; uma lista preenchida funciona
+/// como manifesto explicito.
+/// </summary>
+public sealed class MelhorEmbarqueTransporterRequest
+{
+    public UnitManager transporter;
+    public IReadOnlyList<UnitManager> passengers;
+    public Tilemap map;
+    public TerrainDatabase terrainDatabase;
+    public int operationalTurns = 2;
+    public bool includeStrategic;
+    public Func<UnitManager, QueroCaronaResult> evaluateRideNeed;
+    public Action<string> diagnosticLog;
+}
+
 public sealed class MelhorEmbarqueResult
 {
     public readonly List<MelhorEmbarqueOption> options =
         new List<MelhorEmbarqueOption>();
     public readonly List<MelhorEmbarqueLzScore> ranking =
         new List<MelhorEmbarqueLzScore>();
+    public readonly List<MelhorEmbarqueManifestScore> manifests =
+        new List<MelhorEmbarqueManifestScore>();
     public readonly List<MelhorEmbarqueReject> rejectedPassengers =
         new List<MelhorEmbarqueReject>();
 
@@ -143,6 +184,8 @@ public sealed class MelhorEmbarqueResult
         ranking.Count > 0 ? ranking[0] : null;
     public MelhorEmbarqueOption bestOption =>
         options.Count > 0 ? options[0] : null;
+    public MelhorEmbarqueManifestScore bestManifest =>
+        manifests.Count > 0 ? manifests[0] : null;
 }
 
 /// <summary>
@@ -250,6 +293,98 @@ public static class MelhorEmbarqueService
         merged.ranking.Sort(Compare);
         merged.options.Sort(CompareOptions);
         return merged;
+    }
+
+    public static MelhorEmbarqueResult EvaluateForTransporter(
+        MelhorEmbarqueTransporterRequest request)
+    {
+        var empty = new MelhorEmbarqueResult();
+        if (request?.transporter == null
+            || request.map == null
+            || request.terrainDatabase == null)
+        {
+            return empty;
+        }
+
+        var explicitPassengers = new HashSet<UnitManager>();
+        if (request.passengers != null)
+        {
+            for (int i = 0; i < request.passengers.Count; i++)
+            {
+                UnitManager passenger = request.passengers[i];
+                if (passenger != null && passenger != request.transporter)
+                    explicitPassengers.Add(passenger);
+            }
+        }
+        bool hasExplicitManifest = explicitPassengers.Count > 0;
+
+        QueroCaronaResult EvaluateManifestRideNeed(UnitManager passenger)
+        {
+            QueroCaronaResult evaluated =
+                request.evaluateRideNeed?.Invoke(passenger);
+            if (!hasExplicitManifest
+                || passenger == null
+                || !explicitPassengers.Contains(passenger)
+                || (evaluated != null && evaluated.isEmergency))
+            {
+                return evaluated;
+            }
+
+            // O manifesto explicito e uma ordem de coleta, portanto prevalece
+            // sobre a pergunta autonoma "quero carona?". A emergencia ainda
+            // atravessa intacta para conservar sua prioridade superior.
+            return new QueroCaronaResult
+            {
+                wantsRide = true,
+                isEstimate = evaluated?.isEstimate ?? true,
+                isEmergency = false,
+                isUnderRepairRuntime =
+                    evaluated?.isUnderRepairRuntime ?? false,
+                isUnderRepairEmulated =
+                    evaluated?.isUnderRepairEmulated ?? false,
+                repairEvaluation = evaluated?.repairEvaluation,
+                isInfantry = evaluated?.isInfantry ?? false,
+                isStranded = evaluated?.isStranded ?? false,
+                captureQuestionInapplicable = false,
+                rideWaitTurns = evaluated?.rideWaitTurns ?? 0,
+                reach = evaluated?.reach ?? default,
+                evaluatedTarget = evaluated?.evaluatedTarget ?? default,
+                evaluatedConstruction = evaluated?.evaluatedConstruction,
+                tacticalBudget = evaluated?.tacticalBudget ?? 0,
+                operationalBudget = evaluated?.operationalBudget ?? 0,
+                routeCost = evaluated?.routeCost ?? int.MaxValue,
+                rideNeedScore = evaluated?.rideNeedScore ?? 0,
+                captureClaimsBlocked =
+                    evaluated?.captureClaimsBlocked ?? 0,
+                captureClaimOwnerUnitId =
+                    evaluated?.captureClaimOwnerUnitId ?? -1,
+                reason = "manifesto explicito"
+            };
+        }
+
+        MelhorEmbarqueResult result = Evaluate(
+            new MelhorEmbarqueRequest
+            {
+                transporter = request.transporter,
+                map = request.map,
+                terrainDatabase = request.terrainDatabase,
+                tacticalBudget = Mathf.Max(
+                    0,
+                    request.transporter.RemainingMovementPoints),
+                operationalTurns = Mathf.Max(1, request.operationalTurns),
+                includeStrategic = request.includeStrategic,
+                resolveLongRangePassengerMeeting = true,
+                allowPassenger = hasExplicitManifest
+                    ? candidate => explicitPassengers.Contains(candidate)
+                    : null,
+                evaluateRideNeed = EvaluateManifestRideNeed,
+                diagnosticLog = request.diagnosticLog
+            });
+        BuildTransporterManifests(
+            request.transporter,
+            result,
+            hasExplicitManifest);
+        return result;
     }
 
     public static MelhorEmbarqueResult Evaluate(
@@ -1492,6 +1627,270 @@ public static class MelhorEmbarqueService
                    : string.Empty) +
                $"motivo={rideNeed.reason}";
     }
+
+    private static void BuildTransporterManifests(
+        UnitManager transporter,
+        MelhorEmbarqueResult result,
+        bool explicitManifest)
+    {
+        if (transporter == null
+            || result == null
+            || !transporter.TryGetUnitData(out UnitData transporterData)
+            || transporterData == null
+            || transporterData.transportSlots == null)
+        {
+            return;
+        }
+
+        var optionsByLz =
+            new Dictionary<Vector3Int, List<MelhorEmbarqueOption>>();
+        for (int i = 0; i < result.options.Count; i++)
+        {
+            MelhorEmbarqueOption option = result.options[i];
+            if (!IsManifestCandidate(option, explicitManifest))
+                continue;
+            if (!optionsByLz.TryGetValue(
+                    option.lzCell,
+                    out List<MelhorEmbarqueOption> atLz))
+            {
+                atLz = new List<MelhorEmbarqueOption>();
+                optionsByLz.Add(option.lzCell, atLz);
+            }
+            atLz.Add(option);
+        }
+
+        foreach (KeyValuePair<Vector3Int, List<MelhorEmbarqueOption>> pair
+                 in optionsByLz)
+        {
+            List<MelhorEmbarqueOption> atLz = pair.Value;
+            MelhorEmbarqueManifestScore best = BuildManifestCandidate(
+                transporter,
+                transporterData,
+                atLz,
+                exclusiveSlotIndex: -1);
+
+            for (int slotIndex = 0;
+                 slotIndex < transporterData.transportSlots.Count;
+                 slotIndex++)
+            {
+                UnitTransportSlotRule slot =
+                    transporterData.transportSlots[slotIndex];
+                if (slot == null || !slot.exclusiveSlot)
+                    continue;
+                MelhorEmbarqueManifestScore exclusive =
+                    BuildManifestCandidate(
+                        transporter,
+                        transporterData,
+                        atLz,
+                        slotIndex);
+                if (exclusive != null
+                    && (best == null
+                        || CompareManifests(exclusive, best) < 0))
+                {
+                    best = exclusive;
+                }
+            }
+
+            if (best != null && best.passengers.Count > 0)
+                result.manifests.Add(best);
+        }
+        result.manifests.Sort(CompareManifests);
+    }
+
+    private static bool IsManifestCandidate(
+        MelhorEmbarqueOption option,
+        bool explicitManifest)
+    {
+        if (option?.passenger == null
+            || option.transporter == null
+            || !option.hasPassengerMeetingCell
+            || option.passengerRouteState ==
+                MelhorEmbarquePassengerRouteState.NoCurrentRoute)
+        {
+            return false;
+        }
+        if (!explicitManifest
+            && option.rideDisposition !=
+                MelhorEmbarqueRideDisposition.Emergency
+            && option.rideDisposition !=
+                MelhorEmbarqueRideDisposition.Requested)
+        {
+            return false;
+        }
+        return option.transporterTier != MelhorEmbarqueTier.Tactical
+            || (option.transporterRouteCost >= 0
+                && option.passengerRouteState ==
+                    MelhorEmbarquePassengerRouteState.ReachableNow);
+    }
+
+    private static MelhorEmbarqueManifestScore BuildManifestCandidate(
+        UnitManager transporter,
+        UnitData transporterData,
+        List<MelhorEmbarqueOption> atLz,
+        int exclusiveSlotIndex)
+    {
+        if (atLz == null || atLz.Count == 0)
+            return null;
+
+        MelhorEmbarqueOption seed = atLz[0];
+        var manifest = new MelhorEmbarqueManifestScore
+        {
+            transporter = transporter,
+            lzCell = seed.lzCell,
+            tier = seed.transporterTier,
+            transporterDistance = seed.transporterDistance,
+            transporterRouteCost = seed.transporterRouteCost
+        };
+
+        for (int slotIndex = 0;
+             slotIndex < transporterData.transportSlots.Count;
+             slotIndex++)
+        {
+            UnitTransportSlotRule slot =
+                transporterData.transportSlots[slotIndex];
+            if (slot == null)
+                continue;
+            bool includeSlot = exclusiveSlotIndex >= 0
+                ? slotIndex == exclusiveSlotIndex
+                : !slot.exclusiveSlot;
+            if (!includeSlot)
+                continue;
+
+            int freeSeats = Mathf.Max(
+                0,
+                Mathf.Max(1, slot.capacity)
+                - transporter.GetOccupiedTransportSeatCountForSlot(
+                    slotIndex));
+            if (freeSeats <= 0)
+                continue;
+
+            var slotOptions = new List<MelhorEmbarqueOption>();
+            for (int i = 0; i < atLz.Count; i++)
+            {
+                MelhorEmbarqueOption option = atLz[i];
+                if (option != null && option.slotIndex == slotIndex)
+                    slotOptions.Add(option);
+            }
+            slotOptions.Sort(CompareManifestPassengers);
+            int take = Mathf.Min(freeSeats, slotOptions.Count);
+            for (int i = 0; i < take; i++)
+                manifest.passengers.Add(slotOptions[i]);
+        }
+
+        if (manifest.passengers.Count == 0)
+            return null;
+
+        for (int i = 0; i < manifest.passengers.Count; i++)
+        {
+            MelhorEmbarqueOption option = manifest.passengers[i];
+            if (option.rideDisposition ==
+                MelhorEmbarqueRideDisposition.Emergency)
+            {
+                manifest.emergencyCount++;
+            }
+            else if (option.rideDisposition ==
+                     MelhorEmbarqueRideDisposition.Requested)
+            {
+                manifest.requestedCount++;
+            }
+            manifest.totalUnitsBrought += Mathf.Max(
+                1,
+                option.unitsBrought);
+            manifest.totalPassengerRouteCost += Mathf.Max(
+                0,
+                option.passengerTotalCost);
+        }
+        manifest.score = manifest.emergencyCount * 1000000f
+            + manifest.requestedCount * 100000f
+            + manifest.passengers.Count * 10000f
+            + manifest.totalUnitsBrought * 1000f
+            - manifest.totalPassengerRouteCost * 10f
+            - Mathf.Max(0, manifest.transporterDistance);
+        manifest.reason =
+            $"tier={manifest.tier} " +
+            $"emergencias={manifest.emergencyCount} " +
+            $"pedidos={manifest.requestedCount} " +
+            $"pax={manifest.passengers.Count} " +
+            $"unidades={manifest.totalUnitsBrought} " +
+            $"custoPax={manifest.totalPassengerRouteCost} " +
+            $"distTransport={manifest.transporterDistance}";
+        return manifest;
+    }
+
+    private static int CompareManifestPassengers(
+        MelhorEmbarqueOption a,
+        MelhorEmbarqueOption b)
+    {
+        int byDisposition = ManifestDispositionPriority(a).CompareTo(
+            ManifestDispositionPriority(b));
+        if (byDisposition != 0)
+            return byDisposition;
+        int byUnits = b.unitsBrought.CompareTo(a.unitsBrought);
+        if (byUnits != 0)
+            return byUnits;
+        int byRoute = Mathf.Max(0, a.passengerTotalCost).CompareTo(
+            Mathf.Max(0, b.passengerTotalCost));
+        if (byRoute != 0)
+            return byRoute;
+        return b.score.CompareTo(a.score);
+    }
+
+    private static int ManifestDispositionPriority(
+        MelhorEmbarqueOption option)
+    {
+        if (option == null)
+            return int.MaxValue;
+        switch (option.rideDisposition)
+        {
+            case MelhorEmbarqueRideDisposition.Emergency:
+                return 0;
+            case MelhorEmbarqueRideDisposition.Requested:
+                return 1;
+            case MelhorEmbarqueRideDisposition.NotEvaluated:
+                return 2;
+            default:
+                return 3;
+        }
+    }
+
+    private static int CompareManifests(
+        MelhorEmbarqueManifestScore a,
+        MelhorEmbarqueManifestScore b)
+    {
+        int byTier = a.tier.CompareTo(b.tier);
+        if (byTier != 0)
+            return byTier;
+        int byEmergency = b.emergencyCount.CompareTo(a.emergencyCount);
+        if (byEmergency != 0)
+            return byEmergency;
+        int byRequested = b.requestedCount.CompareTo(a.requestedCount);
+        if (byRequested != 0)
+            return byRequested;
+        int byPassengers = b.passengers.Count.CompareTo(a.passengers.Count);
+        if (byPassengers != 0)
+            return byPassengers;
+        int byUnits = b.totalUnitsBrought.CompareTo(a.totalUnitsBrought);
+        if (byUnits != 0)
+            return byUnits;
+        int byPassengerCost = a.totalPassengerRouteCost.CompareTo(
+            b.totalPassengerRouteCost);
+        if (byPassengerCost != 0)
+            return byPassengerCost;
+        int byTransporterRoute =
+            NormalizeRouteCost(a.transporterRouteCost).CompareTo(
+                NormalizeRouteCost(b.transporterRouteCost));
+        if (byTransporterRoute != 0)
+            return byTransporterRoute;
+        int byDistance = a.transporterDistance.CompareTo(
+            b.transporterDistance);
+        if (byDistance != 0)
+            return byDistance;
+        int byX = a.lzCell.x.CompareTo(b.lzCell.x);
+        return byX != 0 ? byX : a.lzCell.y.CompareTo(b.lzCell.y);
+    }
+
+    private static int NormalizeRouteCost(int value) =>
+        value >= 0 ? value : int.MaxValue;
 
     private static int Compare(
         MelhorEmbarqueLzScore a,

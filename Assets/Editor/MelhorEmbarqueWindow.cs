@@ -5,8 +5,17 @@ using UnityEngine.Tilemaps;
 
 public sealed class MelhorEmbarqueWindow : EditorWindow
 {
+    private enum Perspective
+    {
+        Passageiro,
+        Transportador
+    }
+
+    [SerializeField] private Perspective perspective = Perspective.Passageiro;
     [SerializeField] private UnitManager passenger;
     [SerializeField] private UnitManager transporter;
+    [SerializeField] private List<UnitManager> targetPassengers =
+        new List<UnitManager>();
     [SerializeField] private TerrainDatabase terrainDatabase;
     [SerializeField] private int operationalTurns = 2;
     [SerializeField] private bool includeStrategic;
@@ -19,6 +28,7 @@ public sealed class MelhorEmbarqueWindow : EditorWindow
     private MelhorEmbarqueOption selectedOption;
     private MelhorEmbarqueOption runtimePolicyOption;
     private MelhorEmbarqueLzScore probableDirection;
+    private MelhorEmbarqueManifestScore selectedManifest;
     private bool comparisonCapturedWhileRunning;
     private Vector2 scroll;
     private string status =
@@ -44,12 +54,32 @@ public sealed class MelhorEmbarqueWindow : EditorWindow
 
     private void AutoDetect()
     {
-        if (passenger != null && transporter == passenger)
+        if (perspective == Perspective.Passageiro
+            && passenger != null
+            && transporter == passenger)
+        {
             transporter = null;
-        if (passenger != null)
+        }
+        if (perspective == Perspective.Passageiro
+            && passenger != null)
+        {
             map = passenger.BoardTilemap;
+        }
         else if (transporter != null)
+        {
             map = transporter.BoardTilemap;
+        }
+        else if (perspective == Perspective.Transportador
+                 && targetPassengers != null)
+        {
+            for (int i = 0; i < targetPassengers.Count; i++)
+            {
+                if (targetPassengers[i] == null)
+                    continue;
+                map = targetPassengers[i].BoardTilemap;
+                break;
+            }
+        }
         if (terrainDatabase != null)
             return;
         string[] guids =
@@ -66,22 +96,36 @@ public sealed class MelhorEmbarqueWindow : EditorWindow
     {
         EditorGUILayout.LabelField(
             "Melhor LZ de Embarque", EditorStyles.boldLabel);
+        Perspective previousPerspective = perspective;
+        perspective = (Perspective)EditorGUILayout.EnumPopup(
+            "Perspectiva",
+            perspective);
         EditorGUILayout.HelpBox(
-            "Consulta pura centrada no passageiro. Sem filtro, compara " +
-            "todos os transportadores aliados compatíveis; com um " +
-            "transportador informado, responde somente para ele. A LZ " +
-            "vem de UnitData > Transport > Allow Embark When " +
-            "Transporter At; Encontro Pax é o hex onde o passageiro " +
-            "realmente consegue parar.",
+            perspective == Perspective.Passageiro
+                ? "Consulta pura centrada no passageiro. Sem filtro, " +
+                  "compara todos os transportadores aliados compatíveis; " +
+                  "com transportador informado, responde somente para ele."
+                : "Consulta pura centrada no transportador. Passageiros " +
+                  "alvo vazios descobrem automaticamente quem pediu carona; " +
+                  "a lista preenchida é um manifesto explícito. O ranking " +
+                  "respeita capacidade e exclusividade dos slots.",
             MessageType.Info);
 
         EditorGUI.BeginChangeCheck();
-        passenger = (UnitManager)EditorGUILayout.ObjectField(
-            "Passageiro", passenger,
-            typeof(UnitManager), true);
+        if (perspective == Perspective.Passageiro)
+        {
+            passenger = (UnitManager)EditorGUILayout.ObjectField(
+                "Passageiro", passenger,
+                typeof(UnitManager), true);
+        }
         transporter = (UnitManager)EditorGUILayout.ObjectField(
-            "Transportador (opcional)", transporter,
+            perspective == Perspective.Passageiro
+                ? "Transportador (opcional)"
+                : "Transportador",
+            transporter,
             typeof(UnitManager), true);
+        if (perspective == Perspective.Transportador)
+            DrawTargetPassengerList();
         terrainDatabase =
             (TerrainDatabase)EditorGUILayout.ObjectField(
                 "Terrain Database", terrainDatabase,
@@ -91,13 +135,17 @@ public sealed class MelhorEmbarqueWindow : EditorWindow
                 "Turnos operacionais", operationalTurns));
         includeStrategic = EditorGUILayout.Toggle(
             "Incluir Strategic", includeStrategic);
-        showProbableDirection = EditorGUILayout.Toggle(
-            new GUIContent(
-                "Ver direção provável",
-                "Diagnóstico opcional e mais caro. Não participa da decisão; " +
-                "a orientação de gameplay pertence aos sensores PodeX."),
-            showProbableDirection);
-        if (EditorGUI.EndChangeCheck())
+        if (perspective == Perspective.Passageiro)
+        {
+            showProbableDirection = EditorGUILayout.Toggle(
+                new GUIContent(
+                    "Ver direção provável",
+                    "Diagnóstico opcional e mais caro. Não participa da decisão; " +
+                    "a orientação de gameplay pertence aos sensores PodeX."),
+                showProbableDirection);
+        }
+        if (EditorGUI.EndChangeCheck()
+            || previousPerspective != perspective)
         {
             AutoDetect();
             result = null;
@@ -106,10 +154,14 @@ public sealed class MelhorEmbarqueWindow : EditorWindow
             selectedOption = null;
             runtimePolicyOption = null;
             probableDirection = null;
+            selectedManifest = null;
         }
 
         EditorGUILayout.BeginHorizontal();
-        if (GUILayout.Button("Usar Selecionado"))
+        if (GUILayout.Button(
+                perspective == Perspective.Passageiro
+                    ? "Usar Selecionado"
+                    : "Adicionar Passageiro"))
             TryUseSelection(silent: false);
         if (GUILayout.Button("Usar como Transportador"))
             TryUseSelectionAsTransporter();
@@ -122,7 +174,9 @@ public sealed class MelhorEmbarqueWindow : EditorWindow
         EditorGUILayout.EndHorizontal();
 
         using (new EditorGUI.DisabledScope(
-                   passenger == null
+                   (perspective == Perspective.Passageiro
+                        ? passenger == null
+                        : transporter == null)
                    || map == null
                    || terrainDatabase == null))
         {
@@ -152,6 +206,8 @@ public sealed class MelhorEmbarqueWindow : EditorWindow
         }
 
         scroll = EditorGUILayout.BeginScrollView(scroll);
+        if (perspective == Perspective.Transportador)
+            DrawTransporterManifests();
         EditorGUILayout.LabelField(
             $"Opções passageiro–LZ ({result.options.Count})",
             EditorStyles.boldLabel);
@@ -181,10 +237,25 @@ public sealed class MelhorEmbarqueWindow : EditorWindow
                     $"{option.passengerRouteState}",
                     EditorStyles.miniButton))
             {
-                selectedOption = option;
-                selected = result.ranking.Find(
-                    lz => lz.cell == option.lzCell
-                        && lz.transporter == option.transporter);
+                if (perspective == Perspective.Transportador)
+                {
+                    MelhorEmbarqueManifestScore manifest =
+                        result.manifests.Find(
+                            candidate =>
+                                candidate.lzCell == option.lzCell
+                                && candidate.transporter ==
+                                    option.transporter
+                                && candidate.passengers.Contains(option));
+                    if (manifest != null)
+                        SelectManifest(manifest);
+                }
+                else
+                {
+                    selectedOption = option;
+                    selected = result.ranking.Find(
+                        lz => lz.cell == option.lzCell
+                            && lz.transporter == option.transporter);
+                }
                 SceneView.RepaintAll();
             }
             GUI.backgroundColor = Color.white;
@@ -219,7 +290,9 @@ public sealed class MelhorEmbarqueWindow : EditorWindow
 
         EditorGUILayout.Space(8f);
         EditorGUILayout.LabelField(
-            $"LZs válidos legados ({result.ranking.Count})",
+            perspective == Perspective.Transportador
+                ? $"LZs ReachableNow legados ({result.ranking.Count})"
+                : $"LZs válidos legados ({result.ranking.Count})",
             EditorStyles.boldLabel);
         for (int i = 0; i < result.ranking.Count; i++)
         {
@@ -276,6 +349,122 @@ public sealed class MelhorEmbarqueWindow : EditorWindow
         EditorGUILayout.EndScrollView();
     }
 
+    private void DrawTargetPassengerList()
+    {
+        if (targetPassengers == null)
+            targetPassengers = new List<UnitManager>();
+
+        EditorGUILayout.LabelField(
+            "Passageiros-alvo",
+            EditorStyles.boldLabel);
+        for (int i = 0; i < targetPassengers.Count; i++)
+        {
+            EditorGUILayout.BeginHorizontal();
+            targetPassengers[i] =
+                (UnitManager)EditorGUILayout.ObjectField(
+                    $"Passageiro {i + 1}",
+                    targetPassengers[i],
+                    typeof(UnitManager),
+                    true);
+            if (GUILayout.Button("−", GUILayout.Width(24f)))
+            {
+                targetPassengers.RemoveAt(i);
+                GUI.changed = true;
+                i--;
+            }
+            EditorGUILayout.EndHorizontal();
+        }
+        if (GUILayout.Button("Adicionar campo de passageiro"))
+        {
+            targetPassengers.Add(null);
+            GUI.changed = true;
+        }
+        if (!HasExplicitTargetPassengers())
+        {
+            EditorGUILayout.HelpBox(
+                "Lista vazia: seleção automática entre aliados compatíveis " +
+                "que pediram carona.",
+                MessageType.None);
+        }
+    }
+
+    private void DrawTransporterManifests()
+    {
+        EditorGUILayout.Space(6f);
+        EditorGUILayout.LabelField(
+            $"Manifestos viáveis por LZ ({result.manifests.Count})",
+            EditorStyles.boldLabel);
+        if (result.manifests.Count == 0)
+        {
+            EditorGUILayout.HelpBox(
+                "Nenhuma LZ comporta um manifesto materializável.",
+                MessageType.Warning);
+            return;
+        }
+
+        for (int i = 0; i < result.manifests.Count; i++)
+        {
+            MelhorEmbarqueManifestScore manifest = result.manifests[i];
+            bool active = selectedManifest == manifest;
+            GUI.backgroundColor = active
+                ? new Color(1f, 0.8f, 0.2f)
+                : Color.white;
+            if (GUILayout.Button(
+                    $"#{i + 1} {manifest.tier} LZ={manifest.lzCell} | " +
+                    $"pax={manifest.passengers.Count} " +
+                    $"unidades={manifest.totalUnitsBrought} " +
+                    $"emergências={manifest.emergencyCount}",
+                    EditorStyles.miniButton))
+            {
+                SelectManifest(manifest);
+            }
+            GUI.backgroundColor = Color.white;
+            if (!active)
+                continue;
+
+            EditorGUILayout.LabelField(
+                manifest.reason,
+                EditorStyles.wordWrappedMiniLabel);
+            for (int p = 0; p < manifest.passengers.Count; p++)
+            {
+                MelhorEmbarqueOption option = manifest.passengers[p];
+                EditorGUILayout.LabelField(
+                    $"  {option.passenger?.name ?? "?"} → " +
+                    $"encontro={option.passengerMeetingCell} " +
+                    $"slot={option.slotIndex} " +
+                    $"custo={FormatCost(option.passengerTotalCost)} " +
+                    $"{option.rideDisposition}",
+                    EditorStyles.miniLabel);
+            }
+        }
+    }
+
+    private bool HasExplicitTargetPassengers()
+    {
+        if (targetPassengers == null)
+            return false;
+        for (int i = 0; i < targetPassengers.Count; i++)
+        {
+            if (targetPassengers[i] != null)
+                return true;
+        }
+        return false;
+    }
+
+    private void SelectManifest(MelhorEmbarqueManifestScore manifest)
+    {
+        selectedManifest = manifest;
+        selectedOption = manifest != null && manifest.passengers.Count > 0
+            ? manifest.passengers[0]
+            : null;
+        selected = manifest != null
+            ? result.ranking.Find(
+                lz => lz.cell == manifest.lzCell
+                    && lz.transporter == manifest.transporter)
+            : null;
+        SceneView.RepaintAll();
+    }
+
     private void TryUseSelection(bool silent)
     {
         UnitManager picked =
@@ -290,15 +479,29 @@ public sealed class MelhorEmbarqueWindow : EditorWindow
                     "O objeto selecionado não possui UnitManager.";
             return;
         }
+        if (perspective == Perspective.Transportador)
+        {
+            if (picked == transporter)
+            {
+                status =
+                    "O transportador não pode entrar como passageiro-alvo.";
+                return;
+            }
+            if (targetPassengers == null)
+                targetPassengers = new List<UnitManager>();
+            if (!targetPassengers.Contains(picked))
+                targetPassengers.Add(picked);
+            AutoDetect();
+            ResetResults();
+            status = $"Passageiro-alvo adicionado: {picked.name}.";
+            SceneView.RepaintAll();
+            return;
+        }
         passenger = picked;
         if (transporter == picked)
             transporter = null;
         AutoDetect();
-        result = null;
-        runtimePolicyResult = null;
-        selected = null;
-        selectedOption = null;
-        runtimePolicyOption = null;
+        ResetResults();
         status = $"Passageiro: {picked.name}.";
         SceneView.RepaintAll();
     }
@@ -316,7 +519,8 @@ public sealed class MelhorEmbarqueWindow : EditorWindow
                 "O objeto selecionado não possui UnitManager.";
             return;
         }
-        if (picked == passenger)
+        if (perspective == Perspective.Passageiro
+            && picked == passenger)
         {
             status =
                 "Passageiro e transportador não podem ser a mesma unidade.";
@@ -332,13 +536,9 @@ public sealed class MelhorEmbarqueWindow : EditorWindow
         }
 
         transporter = picked;
+        targetPassengers?.RemoveAll(candidate => candidate == picked);
         AutoDetect();
-        result = null;
-        runtimePolicyResult = null;
-        selected = null;
-        selectedOption = null;
-        runtimePolicyOption = null;
-        probableDirection = null;
+        ResetResults();
         status = $"Transportador: {picked.name}.";
         SceneView.RepaintAll();
     }
@@ -367,16 +567,30 @@ public sealed class MelhorEmbarqueWindow : EditorWindow
             }
             if (runtimeUnit != null)
             {
-                passenger = runtimeUnit;
-                if (transporter == runtimeUnit)
-                    transporter = null;
+                if (perspective == Perspective.Transportador
+                    && runtimeUnit.TryGetUnitData(out UnitData runtimeData)
+                    && runtimeData != null
+                    && runtimeData.isTransporter)
+                {
+                    transporter = runtimeUnit;
+                    targetPassengers?.RemoveAll(
+                        candidate => candidate == runtimeUnit);
+                }
+                else if (perspective == Perspective.Transportador)
+                {
+                    if (targetPassengers == null)
+                        targetPassengers = new List<UnitManager>();
+                    if (!targetPassengers.Contains(runtimeUnit))
+                        targetPassengers.Add(runtimeUnit);
+                }
+                else
+                {
+                    passenger = runtimeUnit;
+                    if (transporter == runtimeUnit)
+                        transporter = null;
+                }
                 AutoDetect();
-                result = null;
-                runtimePolicyResult = null;
-                selected = null;
-                selectedOption = null;
-                runtimePolicyOption = null;
-                probableDirection = null;
+                ResetResults();
 
                 Selection.activeGameObject =
                     runtimeUnit.gameObject;
@@ -384,10 +598,13 @@ public sealed class MelhorEmbarqueWindow : EditorWindow
                 SceneView.FrameLastActiveSceneView();
                 SceneView.RepaintAll();
 
-                status =
-                    $"Passageiro runtime da IA ({runtimeSource}): " +
-                    $"{runtimeUnit.name}. Selecionado e enquadrado na " +
-                    "Scene View; o filtro de transportador foi preservado.";
+                status = perspective == Perspective.Transportador
+                    ? $"Unidade runtime da IA ({runtimeSource}): " +
+                      $"{runtimeUnit.name}. Contexto da perspectiva " +
+                      "Transportador atualizado."
+                    : $"Passageiro runtime da IA ({runtimeSource}): " +
+                      $"{runtimeUnit.name}. Selecionado e enquadrado na " +
+                      "Scene View; o filtro de transportador foi preservado.";
                 return;
             }
         }
@@ -406,55 +623,55 @@ public sealed class MelhorEmbarqueWindow : EditorWindow
         SyncRegistry();
         AutoDetect();
         comparisonCapturedWhileRunning =
-            Application.isPlaying && !EditorApplication.isPaused;
-        result = MelhorEmbarqueService.EvaluateForPassenger(
-            new MelhorEmbarquePassengerRequest
-            {
-                passenger = passenger,
-                transporter = transporter,
-                map = map,
-                terrainDatabase = terrainDatabase,
-                operationalTurns = operationalTurns,
-                includeStrategic = includeStrategic,
-                evaluateRideNeed = EvaluateRideNeed
-            });
-        selected = result.best;
-        selectedOption = result.bestOption;
+            perspective == Perspective.Passageiro
+            && Application.isPlaying
+            && !EditorApplication.isPaused;
+        result = EvaluateCurrentPerspective(includeStrategic);
+        selectedManifest = perspective == Perspective.Transportador
+            ? result.bestManifest
+            : null;
+        if (selectedManifest != null)
+        {
+            SelectManifest(selectedManifest);
+        }
+        else
+        {
+            selected = result.best;
+            selectedOption = result.bestOption;
+        }
         runtimePolicyResult = null;
         runtimePolicyOption = null;
         if (comparisonCapturedWhileRunning)
         {
-            runtimePolicyResult = Evaluate(includeStrategic: true);
+            runtimePolicyResult = EvaluateCurrentPerspective(
+                includeStrategic: true);
             runtimePolicyOption =
                 SelectRuntimePickupOption(runtimePolicyResult);
         }
         probableDirection = null;
-        if (showProbableDirection && !includeStrategic)
+        if (perspective == Perspective.Passageiro
+            && showProbableDirection
+            && !includeStrategic)
         {
             MelhorEmbarqueResult directionProbe =
                 runtimePolicyResult ??
-                MelhorEmbarqueService.EvaluateForPassenger(
-                    new MelhorEmbarquePassengerRequest
-                    {
-                        passenger = passenger,
-                        transporter = transporter,
-                        map = map,
-                        terrainDatabase = terrainDatabase,
-                        operationalTurns = operationalTurns,
-                        includeStrategic = true,
-                        evaluateRideNeed = EvaluateRideNeed
-                    });
+                EvaluateCurrentPerspective(includeStrategic: true);
             probableDirection = directionProbe.ranking.Find(
                 lz => lz.tier == MelhorEmbarqueTier.Strategic);
         }
-        status = selectedOption != null
-            ? $"Melhor opção: {selectedOption.transporterTier} " +
-              $"{selectedOption.passenger?.name} → " +
-              $"{selectedOption.transporter?.name} | encontro " +
-              $"{selectedOption.passengerMeetingCell} | LZ " +
-              $"{selectedOption.lzCell} " +
-              $"({selectedOption.passengerRouteState})."
-            : "Nenhum encontro válido encontrado.";
+        status = selectedManifest != null
+            ? $"Melhor LZ do transportador: {selectedManifest.tier} " +
+              $"LZ {selectedManifest.lzCell} | " +
+              $"{selectedManifest.passengers.Count} passageiro(s), " +
+              $"{selectedManifest.totalUnitsBrought} unidade(s)."
+            : selectedOption != null
+                ? $"Melhor opção: {selectedOption.transporterTier} " +
+                  $"{selectedOption.passenger?.name} → " +
+                  $"{selectedOption.transporter?.name} | encontro " +
+                  $"{selectedOption.passengerMeetingCell} | LZ " +
+                  $"{selectedOption.lzCell} " +
+                  $"({selectedOption.passengerRouteState})."
+                : "Nenhum encontro válido encontrado.";
         SceneView.RepaintAll();
     }
 
@@ -462,6 +679,7 @@ public sealed class MelhorEmbarqueWindow : EditorWindow
     {
         passenger = null;
         transporter = null;
+        targetPassengers?.Clear();
         map = null;
 
         result = null;
@@ -470,17 +688,49 @@ public sealed class MelhorEmbarqueWindow : EditorWindow
         selectedOption = null;
         runtimePolicyOption = null;
         probableDirection = null;
+        selectedManifest = null;
         comparisonCapturedWhileRunning = false;
 
         scroll = Vector2.zero;
-        status = "Selecione o passageiro; o transportador é opcional.";
+        status = perspective == Perspective.Passageiro
+            ? "Selecione o passageiro; o transportador é opcional."
+            : "Selecione o transportador; passageiros-alvo são opcionais.";
 
         SceneView.RepaintAll();
         Repaint();
     }
 
-    private MelhorEmbarqueResult Evaluate(bool includeStrategic) =>
-        MelhorEmbarqueService.EvaluateForPassenger(
+    private void ResetResults()
+    {
+        result = null;
+        runtimePolicyResult = null;
+        selected = null;
+        selectedOption = null;
+        runtimePolicyOption = null;
+        probableDirection = null;
+        selectedManifest = null;
+        comparisonCapturedWhileRunning = false;
+    }
+
+    private MelhorEmbarqueResult EvaluateCurrentPerspective(
+        bool includeStrategic)
+    {
+        if (perspective == Perspective.Transportador)
+        {
+            return MelhorEmbarqueService.EvaluateForTransporter(
+                new MelhorEmbarqueTransporterRequest
+                {
+                    transporter = transporter,
+                    passengers = targetPassengers,
+                    map = map,
+                    terrainDatabase = terrainDatabase,
+                    operationalTurns = operationalTurns,
+                    includeStrategic = includeStrategic,
+                    evaluateRideNeed = EvaluateRideNeed
+                });
+        }
+
+        return MelhorEmbarqueService.EvaluateForPassenger(
             new MelhorEmbarquePassengerRequest
             {
                 passenger = passenger,
@@ -491,6 +741,7 @@ public sealed class MelhorEmbarqueWindow : EditorWindow
                 includeStrategic = includeStrategic,
                 evaluateRideNeed = EvaluateRideNeed
             });
+    }
 
     private void DrawAnalysisMode()
     {
@@ -687,8 +938,13 @@ public sealed class MelhorEmbarqueWindow : EditorWindow
 
     private void OnSceneGUI(SceneView sceneView)
     {
-        if (result == null)
+        if (result == null || map == null)
             return;
+        if (perspective == Perspective.Transportador)
+        {
+            DrawTransporterManifestScene();
+            return;
+        }
         for (int i = 0; i < result.ranking.Count; i++)
         {
             MelhorEmbarqueLzScore lz = result.ranking[i];
@@ -797,6 +1053,72 @@ public sealed class MelhorEmbarqueWindow : EditorWindow
             Handles.Label(
                 Vector3.Lerp(from, to, 0.5f),
                 "Direção provável (debug)");
+        }
+    }
+
+    private void DrawTransporterManifestScene()
+    {
+        for (int i = 0; i < result.manifests.Count; i++)
+        {
+            MelhorEmbarqueManifestScore manifest = result.manifests[i];
+            Vector3 world = map.GetCellCenterWorld(manifest.lzCell);
+            Color color = manifest == selectedManifest
+                ? Color.yellow
+                : manifest.tier == MelhorEmbarqueTier.Tactical
+                    ? Color.green
+                    : manifest.tier == MelhorEmbarqueTier.Operational
+                        ? new Color(0.2f, 0.7f, 1f)
+                        : new Color(1f, 0.3f, 0.8f);
+            Handles.color = color;
+            Handles.DrawWireDisc(
+                world,
+                Vector3.forward,
+                manifest == selectedManifest ? 0.52f : 0.30f);
+            Handles.Label(
+                world + Vector3.up * 0.34f,
+                $"{manifest.tier} P{manifest.passengers.Count} " +
+                $"U{manifest.totalUnitsBrought}");
+        }
+
+        if (selectedManifest == null
+            || selectedManifest.passengers.Count == 0)
+        {
+            return;
+        }
+
+        Vector3 lzWorld = map.GetCellCenterWorld(
+            selectedManifest.lzCell);
+        MelhorEmbarqueOption routeReference =
+            selectedManifest.passengers[0];
+        DrawTransporterOriginToLz(
+            routeReference,
+            lzWorld,
+            Color.yellow,
+            "TRANSPORTADOR AGORA",
+            "ROTA → LZ DE COLETA");
+
+        for (int i = 0; i < selectedManifest.passengers.Count; i++)
+        {
+            MelhorEmbarqueOption option =
+                selectedManifest.passengers[i];
+            if (option == null || !option.hasPassengerMeetingCell)
+                continue;
+            Vector3 meetingWorld = map.GetCellCenterWorld(
+                option.passengerMeetingCell);
+            Color passengerColor = Color.HSVToRGB(
+                Mathf.Repeat(i * 0.173f + 0.32f, 1f),
+                0.75f,
+                1f);
+            Handles.color = passengerColor;
+            Handles.DrawWireDisc(
+                meetingWorld,
+                Vector3.forward,
+                0.44f);
+            Handles.DrawDottedLine(meetingWorld, lzWorld, 4f);
+            Handles.Label(
+                meetingWorld + Vector3.up * 0.46f,
+                $"PAX {option.passenger?.name ?? "?"} " +
+                $"S{option.slotIndex}");
         }
     }
 

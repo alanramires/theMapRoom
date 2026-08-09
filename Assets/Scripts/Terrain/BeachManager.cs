@@ -98,7 +98,11 @@ public sealed class BeachManager : MonoBehaviour, ISerializationCallbackReceiver
         "Uncle", "Victor", "William", "X-ray", "Yoke", "Zebra"
     };
 
-    private static BeachManager instance;
+    // Cada cena e um mapa. Um singleton global permitiria que uma consulta
+    // feita durante carregamento aditivo recebesse as praias de outra cena.
+    // A identidade do catalogo, portanto, e o handle da Scene que o contem.
+    private static readonly Dictionary<ulong, BeachManager> InstancesByScene =
+        new Dictionary<ulong, BeachManager>();
     private static readonly IReadOnlyList<BeachInfo> EmptyBeaches =
         Array.Empty<BeachInfo>();
 
@@ -138,7 +142,9 @@ public sealed class BeachManager : MonoBehaviour, ISerializationCallbackReceiver
     private readonly Dictionary<string, BeachInfo> beachById =
         new Dictionary<string, BeachInfo>(StringComparer.Ordinal);
 
-    public static BeachManager Instance => EnsureInstance(createAtRuntime: true);
+    public static BeachManager Instance => EnsureInstance(
+        SceneManager.GetActiveScene(),
+        createAtRuntime: true);
     public Tilemap BoardTilemap => boardTilemap;
     public TerrainDatabase TerrainDatabase => terrainDatabase;
     public TerrainTypeData BeachTerrainType => beachTerrainType;
@@ -158,14 +164,40 @@ public sealed class BeachManager : MonoBehaviour, ISerializationCallbackReceiver
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void BootstrapAfterSceneLoad()
     {
-        EnsureInstance(createAtRuntime: true);
+        Scene activeScene = SceneManager.GetActiveScene();
+        Tilemap[] tilemaps =
+            FindObjectsByType<Tilemap>(FindObjectsInactive.Include);
+        for (int i = 0; i < tilemaps.Length; i++)
+        {
+            Tilemap tilemap = tilemaps[i];
+            if (tilemap == null
+                || tilemap.gameObject.scene != activeScene)
+            {
+                continue;
+            }
+            EnsureInstance(activeScene, createAtRuntime: true);
+            return;
+        }
     }
 
     public static BeachManager GetOrCreate(
         Tilemap tilemap = null,
         TerrainDatabase database = null)
     {
-        BeachManager manager = EnsureInstance(createAtRuntime: true);
+        Scene targetScene = tilemap != null
+            ? tilemap.gameObject.scene
+            : SceneManager.GetActiveScene();
+        return GetOrCreateForScene(targetScene, tilemap, database);
+    }
+
+    public static BeachManager GetOrCreateForScene(
+        Scene targetScene,
+        Tilemap tilemap = null,
+        TerrainDatabase database = null)
+    {
+        BeachManager manager = EnsureInstance(
+            targetScene,
+            createAtRuntime: true);
         if (manager == null)
             return null;
 
@@ -215,6 +247,21 @@ public sealed class BeachManager : MonoBehaviour, ISerializationCallbackReceiver
         Tilemap tilemap,
         TerrainDatabase database)
     {
+        if (tilemap != null
+            && gameObject.scene.IsValid()
+            && tilemap.gameObject.scene != gameObject.scene)
+        {
+            if (beachLog)
+            {
+                Debug.LogError(
+                    $"[BeachManager] recusou Tilemap da cena " +
+                    $"'{tilemap.gameObject.scene.name}': este catalogo " +
+                    $"pertence a '{gameObject.scene.name}'.",
+                    this);
+            }
+            return;
+        }
+
         bool changed = false;
         if (tilemap != null && tilemap != boardTilemap)
         {
@@ -236,20 +283,36 @@ public sealed class BeachManager : MonoBehaviour, ISerializationCallbackReceiver
         Rebuild("manual", forceLog: true);
     }
 
-    private static BeachManager EnsureInstance(bool createAtRuntime)
+    private static BeachManager EnsureInstance(
+        Scene targetScene,
+        bool createAtRuntime)
     {
-        if (instance != null)
-            return instance;
+        if (!targetScene.IsValid())
+            targetScene = SceneManager.GetActiveScene();
+
+        ulong sceneHandle = GetSceneKey(targetScene);
+        if (InstancesByScene.TryGetValue(
+                sceneHandle,
+                out BeachManager registered))
+        {
+            if (registered != null
+                && registered.gameObject.scene == targetScene)
+            {
+                return registered;
+            }
+            InstancesByScene.Remove(sceneHandle);
+        }
 
         BeachManager[] candidates =
             FindObjectsByType<BeachManager>(FindObjectsInactive.Include);
         for (int i = 0; i < candidates.Length; i++)
         {
             BeachManager existing = candidates[i];
-            if (existing == null)
+            if (existing == null
+                || existing.gameObject.scene != targetScene)
                 continue;
-            instance = existing;
-            return instance;
+            InstancesByScene[sceneHandle] = existing;
+            return existing;
         }
 
         // Consultas de Inspector nao devem sujar a cena criando objetos.
@@ -257,25 +320,53 @@ public sealed class BeachManager : MonoBehaviour, ISerializationCallbackReceiver
             return null;
 
         GameObject host = new GameObject(nameof(BeachManager));
-        instance = host.AddComponent<BeachManager>();
-        return instance;
+        if (targetScene.IsValid()
+            && targetScene.isLoaded
+            && host.scene != targetScene)
+        {
+            SceneManager.MoveGameObjectToScene(host, targetScene);
+        }
+        BeachManager created = host.AddComponent<BeachManager>();
+        InstancesByScene[GetSceneKey(created.gameObject.scene)] = created;
+        return created;
     }
+
+    private static ulong GetSceneKey(Scene scene) =>
+        scene.handle.GetRawData();
 
     private void Awake()
     {
-        if (instance != null && instance != this)
+        ulong sceneHandle = GetSceneKey(gameObject.scene);
+        if (InstancesByScene.TryGetValue(
+                sceneHandle,
+                out BeachManager existing)
+            && existing != null
+            && existing != this)
         {
             if (Application.isPlaying)
                 Destroy(gameObject);
+            else
+                Debug.LogError(
+                    $"[BeachManager] mais de um catalogo na cena " +
+                    $"'{gameObject.scene.name}'. Mantenha somente um.",
+                    this);
             return;
         }
-        instance = this;
+        InstancesByScene[sceneHandle] = this;
     }
 
     private void OnEnable()
     {
-        if (instance == null)
-            instance = this;
+        ulong sceneHandle = GetSceneKey(gameObject.scene);
+        if (InstancesByScene.TryGetValue(
+                sceneHandle,
+                out BeachManager existing)
+            && existing != null
+            && existing != this)
+        {
+            return;
+        }
+        InstancesByScene[sceneHandle] = this;
         SceneManager.sceneLoaded += HandleSceneLoaded;
         Hydrate();
         EnsureCurrent();
@@ -288,8 +379,14 @@ public sealed class BeachManager : MonoBehaviour, ISerializationCallbackReceiver
 
     private void OnDestroy()
     {
-        if (instance == this)
-            instance = null;
+        ulong sceneHandle = GetSceneKey(gameObject.scene);
+        if (InstancesByScene.TryGetValue(
+                sceneHandle,
+                out BeachManager registered)
+            && registered == this)
+        {
+            InstancesByScene.Remove(sceneHandle);
+        }
     }
 
     public void OnBeforeSerialize()
