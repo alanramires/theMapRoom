@@ -10,7 +10,7 @@ Transportador		 | 	Transportador Terrestre, Transportador Aereo, Transportador N
 Assalto				 |	Assalto, Caça Interceptador, Ataque Aereo 
 Fogo de Suporte		 |	Fogo de Suporte, Antiaereo, Artilheiro Combatente, Antiaereo Combatente 
 Vigilancia 			 |	Aérea, Anti-Sub
-
+Logistica 			 | 	Logística, Estoque 
 	
 	
 	

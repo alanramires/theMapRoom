@@ -160,18 +160,5 @@ MonoBehaviour:
     allowedClasses: 00000000
     requiredSkills: []
     blockedSkills: []
-  - slotId: APC
-    capacity: 1
-    exclusiveSlot: 1
-    allowedLayerModes:
-    - domain: 0
-      heightLevel: 3
-    legacyAllowedDomain: 0
-    legacyAllowedHeight: 3
-    legacyAllowedLayerModes: []
-    allowedClasses: 
-    requiredSkills:
-    - {fileID: 11400000, guid: 8bfcf50a7b4285c4cad503493431fb4b, type: 2}
-    blockedSkills: []
   autonomia: 60
   cost: 4500

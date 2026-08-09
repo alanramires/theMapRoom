@@ -10,13 +10,13 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: f8252d3c804d93142a44e5d5ab37e579, type: 3}
-  m_Name: AIPreset_Gastadora
+  m_Name: AIPreset_Dificil
   m_EditorClassIdentifier: Assembly-CSharp::AIPresetData
-  nomeExibido: "Padr\xE3o"
+  nomeExibido: Dificil
   doutrina: Baseline gerado da cena. A dificuldade liga toggles por cima.
   capacidades:
-    respeitarListaBanida: 0
-    projetarProducaoInimiga: 0
+    respeitarListaBanida: 1
+    projetarProducaoInimiga: 1
     aberturaBlindadoPrimeiro: 0
     limitarLogistica: 0
     dobrarSlotsCapturadorPorSetor: 1
@@ -101,6 +101,6 @@ MonoBehaviour:
     minCacaBPresence: 1
     minApachePresence: 1
     minBombaPresence: 0
-    minTurnForIntel: 4
-    maxAirIntel: 1
-    maxMobileAirIntel: 1
+    minTurnForAirSurveillance: 4
+    maxAirSurveillance: 1
+    maxMobileAirSurveillance: 1
