@@ -135,6 +135,10 @@ completamente controlada pelo time.
 - O capturador mais proximo pode reservar a oportunidade.
 - A unidade atual cede quando outro capturador atribuido consegue atende-la
   melhor.
+- A reserva publica `Mission Intent`: e farol distributivo, nao lock.
+- Nao existe classificacao persistida de origem da missao. O matching coletivo
+  conhece o plano atual e aplica histerese pelo alvo anterior, sem gravar uma
+  segunda taxonomia na unidade.
 - Alvos formais de outro capturador ativo nao devem ser roubados.
 - A regra e usada no fluxo atribuido, no defensor, no rogue e antes do embarque.
 - Rally Points proximos recebem prioridade adicional antes do embarque.

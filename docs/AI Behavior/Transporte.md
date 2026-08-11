@@ -228,15 +228,24 @@ largada. "0" é válido — em cima do alvo é o melhor caso, não exceção.
 
 ### 6.2 As combinações
 
-| | **sem atribuição** | **com atribuição** |
-|---|---|---|
-| **passageiro rogue** | alvo = capturável livre mais próximo | alvo = a coordenada da atribuição |
-| **passageiro com plano** | alvo = o RepCell / capturável do setor dele | alvo = a coordenada da atribuição (pode ser outro prédio do plano, não só o RepCell) |
+O desembarque tem somente uma pergunta por passageiro: **há `Mission Intent`?**
 
-Nas quatro, o mecanismo depois é o mesmo: **Melhor LZ de Desembarque** para achar
-onde largar. A atribuição muda a **âncora**, não o mecanismo. Espera-se que a IA
-que atribui coordenadas saiba organizar isso — o desembarque não conserta
-atribuição ruim, só a executa.
+| carga | endereço usado |
+|---|---|
+| P1 sem missão | oportunidade escolhida pelo Melhor LZ |
+| P2 sem missão | outra oportunidade útil do mesmo matching |
+| P1 com missão | coordenada da missão |
+| P2 com missão | coordenada da missão, mas só desembarca se a LZ de P1 também a atender no Tactical/Operational |
+| lote híbrido | quem tem missão conserva a coordenada; quem não tem tenta uma oportunidade compatível com a LZ principal |
+
+P1 é o passageiro principal pela fila FIFO de embarque. A LZ precisa servi-lo;
+P2 nunca cria uma entrega independente enquanto P1 permanece a bordo. Se a
+mesma LZ servir os dois, ambos desembarcam. Caso contrário, somente P1 desce e
+P2 continua como carga.
+
+Não existe classificação persistida de origem da missão. Para o transportador,
+um endereço publicado é um endereço; o verbo também não altera a geometria do
+desembarque.
 
 ### 6.3 Tático ou Operacional
 
@@ -244,14 +253,16 @@ O transportador pode largar no **Tactical** ou no **Operational** do passageiro
 em relação a onde ele quer ir. Verde = fecha no mesmo turno; azul = fecha no
 turno seguinte.
 
-**Dois passageiros:** tenta o principal primeiro (Tactical **ou** Operational) e
-o carona **apenas no Tactical**, se houver envelope que atenda ambos.
+**Dois passageiros:** tenta o principal primeiro. O segundo desembarca somente
+se a mesma LZ também deixar o objetivo dele no Tactical **ou** Operational do
+passe que está sendo avaliado.
 
 | regra | estado |
 |---|---|
 | principal aceita Tactical ou Operational | ✅ dois passes de avaliação |
 | carona só entra se a LZ atender ambos | ✅ `SearchMatching` maximiza entregues, depois minimiza rota |
-| **carona limitado ao Tactical** | ❌ regra nova — hoje `BuildPassengerRouteLimits` aplica o mesmo teto a todos; o tier é do **passe**, não do papel do passageiro |
+| LZ precisa conter o passageiro principal/FIFO | ✅ matching exige P1; P2 não cria desembarque independente |
+| P2 aceita Tactical ou Operational | ✅ `BuildPassengerRouteLimits` aplica a banda do passe a cada passageiro |
 
 O que hoje separa principal de carona é outra coisa:
 `ApplyOperationalDisembarkCapacity` — dois passageiros mirando o **mesmo** alvo,
@@ -270,16 +281,20 @@ e o alvo não estando sob pressão confirmada, o não-principal fica a bordo.
 > ninguém embarca nem desembarca em montanha. *"Vai ficar assim por enquanto."*
 > Larga a carga e ela vai a pé, ou usa estruturas na montanha.
 
-### 6.5 Transporte não pousa em prédio capturável
+### 6.5 Transporte não estaciona em prédio capturável
 
-O veículo **nunca** larga âncora em cima de um capturável: ocupa a célula que o
-capturador precisa e trava a captura que ele veio viabilizar. Sem alternativa,
-**sobe na iniciativa** para sair de lá primeiro na rodada seguinte.
+Porto/praia pode obrigar o veículo a terminar o desembarque em cima de um
+capturável. O que ele não pode fazer é transformar essa LZ em estacionamento:
+depois de esvaziar, **sobe na iniciativa** e sai antes do capturador na rodada
+seguinte.
 
-❌ Nenhuma das duas existe. A iniciativa tem a regra espelhada só para o outro
-lado (grupo 0 inclui *"blocker sobre o objetivo de outro capturador"*), e o teste
-exige `CanSatisfy(targetData, UnitRole.Capturador)` — então um transportador
-parado em cima do prédio **não é reconhecido como bloqueador**.
+✅ O blocker consulta o `Mission Intent` de capturadores ainda não agidos, sem
+depender de `TeamObjectivePlan`, inclusive na IA sem HQ. Transportador vazio e
+não-capturador recebe grupo 0 e executa um `vacate` obrigatório antes de Pickup.
+A célula de saída não pode ser outra construção reservada nem produtora aliada.
+O matching de captura conserva o endereço quando seu único bloqueador é esse
+transportador vazio: ocupação temporária significa “aguarda vacate”, não
+“abandona a missão”.
 
 ---
 
@@ -498,8 +513,8 @@ turnos congela um APC que podia estar andando.
 ```text
 1. banda do Embarcar     destrava need a lift   ← é o APC parado no mapa de hoje
 2. a pergunta do vazio   destrava ASAP          ← é a perna de ida do cenário
-3. âncora de praia       dá comportamento ao need a lift (item B da §7.2)
-4. LZ em névoa           conferir antes de culpar a IA (item A da §7.2)
+3. âncora de praia       ✅ BeachManager publica o endereço estratégico
+4. LZ em névoa           ✅ conhece a praia; só executa a LZ quando autorizada
 ```
 
 Só o 1 muda o que se vê na partida de hoje. Os outros três aparecem quando o
@@ -623,20 +638,35 @@ pickup no alcance). Não existe "abaixo de Fire Support e Assault".
 ## 11. Leitura de FoW
 
 > A IA pode não saber onde estão unidades e hexes revelados, mas **sempre sabe
-> onde estão todas as construções**. Caso contrário o jogo vira um eterno
-> explora-voa-explora-voa. É o **único vazamento autorizado** do jogo, e é para
-> os transportadores.
+> onde estão todas as construções e as praias militares do BeachManager**.
+> Caso contrário o jogo vira um eterno explora-voa-explora-voa.
 
 ✅ de facto: a resolução de alvo lê `ConstructionManager.AllActive` direto, sem
 filtro de visibilidade.
+
+✅ a praia também é geografia estratégica conhecida. `BeachRepCell` é o
+**endereço** usado para escolher a identidade da praia mais próxima do objetivo,
+mesmo sob FoW preto. O representante não é uma LZ fixa: o naval projeta esse
+endereço sobre uma célula compatível da faixa inteira e entrega essa célula ao
+Caminhos Válidos como alvo de progressão.
+
+Essa autorização não revela ocupantes, ameaças ou contatos. Ao se aproximar, o
+MelhorDesembarque continua escolhendo a LZ concreta a partir do estado confirmado
+atual.
 
 O transportador **não tem opção de desembarque** se voar para célula em FoW
 fechado; se voar para *explored* ou *revealed*, segue a política de
 `unitData > transport > allow disembark when...`.
 
 ✅ a LZ do transportador já exige visível-ou-explorado
-(`allowTransporterCell = IsConfirmedVisibleOrExploredCellForAI`). ❓ o
-chaveamento pela política da ficha não foi conferido.
+(`allowTransporterCell = IsConfirmedVisibleOrExploredCellForAI`). A distinção é:
+
+```text
+FoW preto      permite navegar até o endereço estratégico da praia
+visível/explored permite afirmar e executar uma LZ concreta
+```
+
+❓ o chaveamento pela política da ficha não foi conferido.
 
 ---
 
