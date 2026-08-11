@@ -108,7 +108,8 @@ public partial class AIController
         int maxRemainingRouteCost = int.MaxValue,
         Dictionary<Vector3Int, List<Vector3Int>> pathsByDestination = null,
         IReadOnlyDictionary<int, int> passengerPriorityByInstanceId = null,
-        IReadOnlyDictionary<int, int> passengerRouteLimitByInstanceId = null)
+        IReadOnlyDictionary<int, int> passengerRouteLimitByInstanceId = null,
+        int requiredPassengerInstanceId = -1)
     {
         result = new MelhorDesembarqueResult();
         if (transporter == null
@@ -186,6 +187,8 @@ public partial class AIController
                 resolvePassengerTarget = ResolveTarget,
                 passengerPriorityByInstanceId =
                     passengerPriorityByInstanceId,
+                requiredPassengerInstanceId =
+                    requiredPassengerInstanceId,
                 // Regra oficial da LZ: o transportador pode terminar em
                 // terreno atualmente visível ou já explorado. Preto
                 // desconhecido continua proibido.
@@ -317,7 +320,8 @@ public partial class AIController
             maxRemainingRouteCost,
             pathsByDestination,
             passengerPriorityByInstanceId,
-            passengerRouteLimitByInstanceId);
+            passengerRouteLimitByInstanceId,
+            passenger != null ? passenger.InstanceId : -1);
     }
 
     private bool TryBuildBestCourierDisembarkAction(
@@ -349,6 +353,12 @@ public partial class AIController
                 snapshot,
                 assignedSectorTarget,
                 out Dictionary<int, Vector3Int> targets))
+            return false;
+
+        // Passageiro 1/FIFO e o dono da LZ. Sem endereco planejado nem
+        // oportunidade para ele, nao se escolhe uma LZ independente so para
+        // uma carga secundaria.
+        if (!targets.ContainsKey(primary.InstanceId))
             return false;
 
         ApplyOperationalDisembarkCapacity(
@@ -400,7 +410,9 @@ public partial class AIController
                         BuildPassengerDeliveryPriority(
                             transporter, passengers),
                     passengerRouteLimitByInstanceId:
-                        tacticalPassengerRouteLimits)
+                        tacticalPassengerRouteLimits,
+                    requiredPassengerInstanceId:
+                        primary.InstanceId)
                 || immediateEvaluation.best == null)
                 return false;
 
@@ -737,7 +749,10 @@ public partial class AIController
                         BuildPassengerDeliveryPriority(
                             transporter, passengers),
                     passengerRouteLimitByInstanceId:
-                        passengerRouteLimitByInstanceId)
+                        passengerRouteLimitByInstanceId,
+                    requiredPassengerInstanceId:
+                        ResolvePrimaryPassenger(
+                            transporter, passengers)?.InstanceId ?? -1)
                 || tierEvaluation.best == null
                 || tierEvaluation.best.delivered
                     < requiredJointDeliveries)
@@ -1147,6 +1162,23 @@ public partial class AIController
                 UnitManager passenger = orderedPassengers[i];
                 if (passenger == null)
                     continue;
+
+                // O desembarque so distingue duas coisas: o passageiro trouxe
+                // um endereco (Mission Intent) ou precisa que a propria LZ
+                // encontre uma oportunidade. Quem publicou a missao nao muda
+                // nem a coordenada nem a prioridade FIFO da carga.
+                if (TryResolvePassengerDesignatedMissionTarget(
+                        passenger,
+                        out Vector3Int missionTarget))
+                {
+                    targets[passenger.InstanceId] = missionTarget;
+                    Debug.Log(
+                        $"{TL("Transporte")} alvo conjunto por missao: " +
+                        $"passageiro #{passenger.InstanceId} intent=" +
+                        $"{passenger.AIDesignatedMissionIntent} -> " +
+                        $"{missionTarget}.");
+                    continue;
+                }
 
                 // Rogue dentro de uma IA com HQ continua sem eixo/slot formal.
                 // Para desembarque ele é irmão da IA rebelde: escolhe o

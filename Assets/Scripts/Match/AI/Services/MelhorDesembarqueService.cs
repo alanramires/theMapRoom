@@ -41,6 +41,9 @@ public sealed class MelhorDesembarqueRequest
     public Dictionary<Vector3Int, List<Vector3Int>> pathsByDestination;
     public MelhorDesembarqueTargetResolver resolvePassengerTarget;
     public IReadOnlyDictionary<int, int> passengerPriorityByInstanceId;
+    // Quando definido, a LZ pertence a este passageiro principal. Os demais
+    // apenas pegam carona no mesmo desembarque se o matching tambem os servir.
+    public int requiredPassengerInstanceId = -1;
     public Func<Vector3Int, bool> allowTransporterCell;
     public Func<Vector3Int, bool> allowDisembarkCell;
     public Func<UnitManager, Vector3Int, bool> allowPassengerDisembarkCell;
@@ -398,6 +401,22 @@ public static class MelhorDesembarqueService
     {
         if (passengerIndex >= passengers.Count)
         {
+            if (request.requiredPassengerInstanceId >= 0)
+            {
+                bool containsRequired = false;
+                for (int i = 0; i < current.Count; i++)
+                {
+                    if (current[i].option.passengerUnit.InstanceId
+                        == request.requiredPassengerInstanceId)
+                    {
+                        containsRequired = true;
+                        break;
+                    }
+                }
+                if (!containsRequired)
+                    return;
+            }
+
             int count = current.Count;
             int cost = 0;
             int priorityCost = 0;
