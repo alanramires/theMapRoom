@@ -1,14 +1,40 @@
 # Resumo — onde estamos e o que vem
 
-Ponto de retomada. Atualizado em 2026-08-09, **depois** da tag `v8.2.0`.
+Ponto de retomada. Atualizado em 2026-08-09, **depois** da tag `v8.2.1`.
 Leia isto primeiro.
 
 ---
 
 ## Estado
 
-`v8.2.0` tagueada e publicada. Relatório:
-[`relatorio_v8.2.0.md`](relatorio_v8.2.0.md).
+`v8.2.1` tagueada e publicada. Relatório:
+[`relatorio_v8.2.1.md`](relatorio_v8.2.1.md) — fecha o trabalho feito sobre a
+`v8.2.0` ([relatório](relatorio_v8.2.0.md)).
+
+### O que a v8.2.1 acrescentou — uma frase, dois lados
+
+> **Quem viabiliza uma coisa não pode ser o que a impede.**
+
+```text
+bloqueio FÍSICO   o táxi entregava o capturador no porto e ficava em cima do
+                  prédio, bloqueando a captura que ele acabou de viabilizar.
+                  Pior: o claim via a célula ocupada e APAGAVA O FAROL —
+                  o sucesso da entrega destruía a reserva
+
+bloqueio de ORDEM a fila cortava por "o navio sozinho alcança o passageiro"
+                  (MP+1). Agora o critério é o ENCONTRO: os dois lados andam,
+                  e o fato vem congelado do mesmo TransportPlanningSnapshot
+```
+
+⚠️ **Isto responde, em princípio, a pergunta que a `v8.1.2` deixou aberta:** a
+banda do `Embarcar` é **do encontro**, não do transportador. Mas a forma entrou
+pela **iniciativa**, não pelo degrau — `Embarcar` continua sem banda, e agora
+tem de onde copiar.
+
+E o naval passou a consumir o `BeachManager` como catálogo estratégico:
+`BeachRepCell` dá **identidade** e nunca vira LZ fixa; a LZ nasce da borda naval
+da faixa. Não consulta FoW de propósito — geografia de praia é mapa conhecido,
+e isso não revela ocupante nem contato.
 
 O refactor fechou uma parte grande da família do capturador e montou as peças
 necessárias para o cenário de evacuação naval:
@@ -155,6 +181,21 @@ como cais obrigatório.
 - `parcial=True` da névoa ainda não foi observado numa partida AI vs AI.
 - A pausa visual do F11 continua fora da janela curta entre seleção e movimento;
   o range da IA pode estar correto e ainda assim não permanecer visível.
+- **Nada da `v8.2.1` foi validado em jogo.** Cinco arquivos de lógica mudaram e a
+  árvore compila (0 erros); nenhuma corrida de aceitação consta. Os cenários
+  existem escritos — `PLANO_INICIATIVA_POR_DEPENDENCIAS.md` §Cenários e
+  `CAPTURER_ANALISE.md` §11 — e não foram corridos.
+- **Os dois planos novos não têm código.** A Fase 1 do de iniciativa (tornar a
+  fila explicável **sem mudar comportamento**) é a entrada barata.
+- **A promoção genérica de helicóptero continua no runtime** — Fase 3 do plano.
+  Hoje todo `GameUnitClass.Helicopter` ganha precedência mesmo sem preparar ação
+  de ninguém.
+- **A célula `ASAP` segue inalcançável:** transportador vazio nunca publica
+  `wantsRide` (cai no ramo "emergência apenas"). É o que trava o deadlock do
+  soldado com 2 de autonomia — ele depende disso e não se mexeu.
+- **`CLAUDE.md` continua desatualizado** sobre o ataque oportunista do courier
+  (HP≤2, ≤2h): a regra só existe como cabeçalho de seção vazio e
+  `Courier.Attack.cs` com zero chamadores.
 
 ---
 
@@ -270,6 +311,10 @@ E a imagem operacional continua correta:
 | busca vazia tomada como prova de ausência | abrir o diff histórico e o consumidor real |
 | alargar candidatos sem razão para ficar | toda expansão de horizonte precisa de aderência/histerese na mesma mudança |
 | posição hipotética criando verdade | nenhum cálculo provisório atualiza FOW, ocupação, recursos ou caches confirmados |
+| **`git status` respondendo "o que existe"** | ele responde **o que mudou**. Afirmei que não havia `BeachManager.cs` na árvore olhando os arquivos *modificados*; ele está commitado desde a `v8.2.0`. Para ausência, a pergunta é `git ls-files` |
+| **"não é meu trabalho" usado como "não posso fechar"** | de quem é o trabalho não importa — o ritual prevê fechar o que o autor fez em paralelo. O que importa é **ter lido o diff**. Trocar uma objeção pela outra é se esconder atrás da regra errada |
+| **arquivo no `git status` sem diferença de conteúdo** | oito arquivos entraram por *line-ending* apenas, incluindo os de persistência. `git diff -U0` separa churn de mudança real antes de escrever qualquer coisa sobre eles |
+| **o sucesso de uma operação apagando a reserva dela** | o claim via a célula ocupada pelo próprio táxi que acabou de entregar. Quando um efeito colateral do sucesso parece falha, procurar quem lê ocupação como veto |
 
 ---
 
