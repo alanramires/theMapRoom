@@ -314,7 +314,8 @@ public partial class AIController
             || unit.IsDead
             || !IsRebelCapturable(unit, target))
         {
-            unit.ClearAIDesignatedCaptureTarget();
+            if (unit.AIHasDesignatedCaptureTarget)
+                unit.ClearAIDesignatedCaptureTarget();
             return;
         }
 
@@ -322,7 +323,9 @@ public partial class AIController
         cell.z = 0;
         bool kept = unit.AIHasDesignatedCaptureTarget
             && unit.AIDesignatedCaptureTargetInstanceId == target.InstanceId;
-        if (!unit.SetAIDesignatedCaptureTarget(target.InstanceId, cell))
+        if (!unit.SetAIDesignatedCaptureTarget(
+                target.InstanceId,
+                cell))
         {
             // A unidade ja carrega missao de outro verbo e ela manda. Antes de
             // a captura virar missao isto nao podia acontecer, porque os dois

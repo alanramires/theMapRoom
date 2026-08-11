@@ -34,6 +34,18 @@ public partial class AIController
             return regularProductionUnlockAction;
         }
 
+        // A entrega terminou; o taxi nao pode continuar estacionado sobre a
+        // renda que acabou de viabilizar. Vem antes de Pickup e Repair pela
+        // mesma razao do blocker de iniciativa: primeiro libera a verdade
+        // economica do passageiro, depois escolhe o proximo servico.
+        if (TryBuildEmptyTransportCaptureTargetVacateAction(
+                unit,
+                snapshot,
+                out PlayerAction captureTargetVacateAction))
+        {
+            return captureTargetVacateAction;
+        }
+
         // Reparos sao uma necessidade da propria unidade, inclusive quando ela
         // tambem possui slots de transporte. Sem este gate um Hidroaviao quase
         // sem autonomia entra primeiro na varredura de Pickup e pode ficar

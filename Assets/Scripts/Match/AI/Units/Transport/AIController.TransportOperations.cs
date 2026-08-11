@@ -8,6 +8,121 @@ public partial class AIController
     private readonly Dictionary<int, TransportPlanningSnapshot>
         transportPlanningSnapshots =
             new Dictionary<int, TransportPlanningSnapshot>();
+    // Fato puro, congelado junto com a fila da Fase 2: quais passageiros
+    // formam um encontro Tactical materializavel AGORA com cada casco.
+    // Nasce do mesmo TransportPlanningSnapshot consumido pela decisao do
+    // transportador; iniciativa e cessao de vez nao mantem um segundo modelo
+    // de distancia ao lado do MelhorEmbarque.
+    private readonly Dictionary<int, HashSet<int>>
+        tacticalPickupInitiativePassengers =
+            new Dictionary<int, HashSet<int>>();
+
+    private void BuildTacticalPickupInitiativeFacts(
+        List<UnitManager> units,
+        AIWorldSnapshot snapshot,
+        TeamObjectivePlan plan)
+    {
+        tacticalPickupInitiativePassengers.Clear();
+        if (units == null || snapshot == null)
+            return;
+
+        for (int i = 0; i < units.Count; i++)
+        {
+            UnitManager transporter = units[i];
+            if (transporter == null
+                || transporter.IsDead
+                || transporter.IsEmbarked
+                || transporter.HasActed
+                || !transporter.TryGetUnitData(out UnitData data)
+                || data == null
+                || !data.isTransporter
+                || HasTransportCargo(transporter)
+                || IsTransporterAtCapacity(transporter, data))
+            {
+                continue;
+            }
+
+            TransportPlanningSnapshot planning =
+                GetOrCreateTransportPlanningSnapshot(
+                    transporter, snapshot, plan);
+            EnsureTransportPickupPlanning(planning, snapshot, plan);
+            MelhorEmbarqueResult pickup = planning?.Pickup;
+            if (pickup?.options == null)
+                continue;
+
+            HashSet<int> passengerIds = null;
+            for (int optionIndex = 0;
+                 optionIndex < pickup.options.Count;
+                 optionIndex++)
+            {
+                MelhorEmbarqueOption option = pickup.options[optionIndex];
+                UnitManager passenger = option?.passenger;
+                if (passenger == null
+                    || passenger.IsDead
+                    || passenger.IsEmbarked
+                    || passenger.HasActed
+                    || option.transporter != transporter
+                    || option.transporterTier != MelhorEmbarqueTier.Tactical
+                    || option.passengerRouteState !=
+                        MelhorEmbarquePassengerRouteState.ReachableNow
+                    || (option.rideDisposition !=
+                            MelhorEmbarqueRideDisposition.Requested
+                        && option.rideDisposition !=
+                            MelhorEmbarqueRideDisposition.Emergency)
+                    || !CanMaterializePickupRendezvous(
+                        option, MelhorEmbarqueTier.Tactical))
+                {
+                    continue;
+                }
+
+                passengerIds ??= new HashSet<int>();
+                passengerIds.Add(passenger.InstanceId);
+            }
+
+            if (passengerIds == null || passengerIds.Count == 0)
+                continue;
+
+            tacticalPickupInitiativePassengers[
+                transporter.InstanceId] = passengerIds;
+
+            if (showAILogs)
+            {
+                var orderedIds = new List<int>(passengerIds);
+                orderedIds.Sort();
+                Debug.Log(
+                    $"{TL("Iniciativa")}[MelhorEmbarque] " +
+                    $"transportador=#{transporter.InstanceId} sobe com " +
+                    "encontro Tactical ReachableNow para pax=" +
+                    $"[{string.Join(",", orderedIds)}].");
+            }
+        }
+    }
+
+    private bool HasTacticalPickupInitiativeFact(
+        UnitManager transporter,
+        UnitManager passenger = null)
+    {
+        if (transporter == null
+            || transporter.IsDead
+            || transporter.IsEmbarked
+            || transporter.HasActed
+            || !tacticalPickupInitiativePassengers.TryGetValue(
+                transporter.InstanceId,
+                out HashSet<int> passengerIds)
+            || passengerIds == null
+            || passengerIds.Count == 0)
+        {
+            return false;
+        }
+
+        if (passenger == null)
+            return true;
+
+        return !passenger.IsDead
+            && !passenger.IsEmbarked
+            && !passenger.HasActed
+            && passengerIds.Contains(passenger.InstanceId);
+    }
 
     private PlayerAction TryDecideTransportOperationsAction(
         UnitManager unit,
@@ -106,6 +221,137 @@ public partial class AIController
             TransportOperationsService.Evaluate(context);
         return MaterializeTransportOperation(
             unit, snapshot, plan, selected);
+    }
+
+    /// <summary>
+    /// Transportador vazio nao transforma a cabeca de praia em estacionamento.
+    /// Se ocupa a construcao de uma missao Capture ainda nao agida, libera o
+    /// hex antes de avaliar Pickup — inclusive na IA sem HQ, onde nao existe
+    /// TeamObjectivePlan.
+    /// </summary>
+    private bool TryBuildEmptyTransportCaptureTargetVacateAction(
+        UnitManager unit,
+        AIWorldSnapshot snapshot,
+        out PlayerAction action)
+    {
+        action = null;
+        if (unit == null
+            || snapshot == null
+            || HasTransportCargo(unit)
+            || !unit.TryGetUnitData(out UnitData data)
+            || data == null
+            || !data.isTransporter
+            || !UnitRoleCompatibility.CanSatisfy(
+                data, UnitRole.Transportador)
+            // Se a propria ficha captura, o controlador do Capturador decide
+            // entre tomar e ceder; esta regra e para o taxi alheio a captura.
+            || UnitRoleCompatibility.CanSatisfy(
+                data, UnitRole.Capturador))
+        {
+            return false;
+        }
+
+        Vector3Int fromCell = unit.CurrentCellPosition;
+        fromCell.z = 0;
+        if (!TryResolveUnactedCaptureMissionAtCell(
+                fromCell,
+                unit.SlotIndex,
+                unit.InstanceId,
+                out UnitManager capturer,
+                out ConstructionManager blockedConstruction))
+        {
+            return false;
+        }
+
+        Dictionary<Vector3Int, List<Vector3Int>> paths =
+            UnitMovementPathRules.CalcularCaminhosValidos(
+                boardTilemap,
+                unit,
+                Mathf.Max(0, unit.RemainingMovementPoints),
+                terrainDatabase);
+        if (paths == null || paths.Count <= 1)
+        {
+            Debug.LogWarning(
+                $"{TL("Transporte")} {unit.InstanceId} bloqueia Capture " +
+                $"de #{capturer.InstanceId} em {fromCell}, mas nao possui " +
+                "celula valida para liberar o alvo.");
+            return false;
+        }
+
+        HashSet<Vector3Int> occupied = BuildOccupied(unit);
+        Vector3Int bestCell = fromCell;
+        int bestConstructionRank = int.MaxValue;
+        int bestPathCost = int.MaxValue;
+        float bestThreat = float.MaxValue;
+        foreach (Vector3Int rawCell in paths.Keys)
+        {
+            Vector3Int cell = rawCell;
+            cell.z = 0;
+            if (cell == fromCell
+                || (occupied != null && occupied.Contains(cell))
+                // Nao resolve um bloqueio criando o mesmo bloqueio para outro
+                // capturador do lote.
+                || TryResolveUnactedCaptureMissionAtCell(
+                    cell,
+                    unit.SlotIndex,
+                    unit.InstanceId,
+                    out _,
+                    out _))
+            {
+                continue;
+            }
+
+            ConstructionManager candidateConstruction =
+                ConstructionOccupancyRules.GetConstructionAtCell(
+                    boardTilemap, cell);
+            if (candidateConstruction != null
+                && candidateConstruction.CanProduceUnitsForSlot(
+                    snapshot.AISlotIndex))
+            {
+                continue;
+            }
+
+            int constructionRank =
+                candidateConstruction == null ? 0 : 1;
+            int pathCost = GetPathStepCount(paths, cell);
+            float threat = CalculateThreatLevel(
+                cell, snapshot.AITeam);
+            bool better =
+                constructionRank < bestConstructionRank
+                || (constructionRank == bestConstructionRank
+                    && pathCost < bestPathCost)
+                || (constructionRank == bestConstructionRank
+                    && pathCost == bestPathCost
+                    && threat < bestThreat - 0.001f)
+                || (constructionRank == bestConstructionRank
+                    && pathCost == bestPathCost
+                    && Mathf.Abs(threat - bestThreat) <= 0.001f
+                    && (cell.x < bestCell.x
+                        || (cell.x == bestCell.x
+                            && cell.y < bestCell.y)));
+            if (!better)
+                continue;
+
+            bestConstructionRank = constructionRank;
+            bestPathCost = pathCost;
+            bestThreat = threat;
+            bestCell = cell;
+        }
+
+        if (bestCell == fromCell)
+            return false;
+
+        string constructionName = blockedConstruction != null
+            ? blockedConstruction.ConstructionDisplayName
+            : "construcao";
+        Debug.Log(
+            $"{TL("Transporte")} {unit.InstanceId} libera " +
+            $"{constructionName}@{fromCell} para capturador " +
+            $"#{capturer.InstanceId}: " +
+            $"vacate {fromCell}->{bestCell} antes de Pickup.");
+        action = BuildMoveBatch(
+            unit, snapshot.AITeam, fromCell, bestCell, paths);
+        return true;
     }
 
     /// <summary>

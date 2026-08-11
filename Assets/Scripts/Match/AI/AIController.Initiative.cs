@@ -59,7 +59,7 @@ public partial class AIController
 
         if (groupA != groupB) return groupA.CompareTo(groupB);
 
-        if (groupA == 0 && _sortActivePlan != null)
+        if (groupA == 0)
         {
             if (factsA.IsBlocker != factsB.IsBlocker)
                 return factsA.IsBlocker ? -1 : 1;
@@ -136,7 +136,7 @@ public partial class AIController
                 EffectiveInitiative = GetEffectiveAiInitiative(unit)
             };
 
-            if (group == 0 && activePlan != null)
+            if (group == 0)
                 facts.IsBlocker = IsBlockingCaptureTarget(unit, activePlan, aiTeam);
 
             if (group == 0 || group == 2)
@@ -232,7 +232,7 @@ public partial class AIController
 
         // Blocker: unidade está sobre o objetivo de captura de outro capturador designado.
         // Age primeiro (grupo 0) para liberar o hex — com ou sem inimigos adjacentes.
-        if (plan != null && IsBlockingCaptureTarget(unit, plan, aiTeam)) return 0;
+        if (IsBlockingCaptureTarget(unit, plan, aiTeam)) return 0;
 
         // Transportador com passageiro formal ainda nao agido precisa se posicionar
         // antes do capturador, para que o embarque seja avaliado no turno do passageiro.
@@ -298,9 +298,11 @@ public partial class AIController
             if (IsAssaultEscortInCapturerCorridor(unit, escortCell, plan, aiTeam)) return 2;
         }
 
-        // Transportador rogue vazio com candidato de pickup no alcance →
-        // age antes dos capturadores (grupo 1) para se posicionar adjacente.
-        if (!unit.IsUnderRepair && IsTransporterWithValidPickupCandidate(unit, plan, aiTeam)) return 2;
+        // Transportador rogue vazio com encontro conjunto Tactical provado
+        // pelo MelhorEmbarque age antes dos capturadores. O fato considera o
+        // movimento dos DOIS lados; distancia atual <= MP+1 nao considera.
+        if (!unit.IsUnderRepair
+            && HasTacticalPickupInitiativeFact(unit)) return 2;
 
         // Capturador cujo objetivo tem um transportador designado vivo e vazio:
         // o transportador age no grupo 0; o capturador age logo em seguida (grupo 1)
@@ -560,30 +562,6 @@ public partial class AIController
             && construction.IsCapturable
             && construction.SlotIndex == ResolveAISlotKey(aiTeam)
             && construction.CurrentCapturePoints < construction.CapturePointsMax;
-    }
-
-    private bool IsTransporterWithValidPickupCandidate(UnitManager unit, TeamObjectivePlan plan, TeamId aiTeam)
-    {
-        if (!unit.TryGetUnitData(out UnitData data) || data == null
-            || !UnitRoleCompatibility.CanSatisfy(data, UnitRole.Transportador)) return false;
-
-        if (HasTransportCargo(unit)) return false;
-
-        Vector3Int transporterCell = unit.CurrentCellPosition; transporterCell.z = 0;
-        float reach = Mathf.Max(0, unit.RemainingMovementPoints) + 1f;
-
-        foreach (UnitManager candidate in UnitManager.AllActive)
-        {
-            if (candidate == unit) continue;
-            if (candidate.SlotIndex != ResolveAISlotKey(aiTeam) || candidate.IsDead || candidate.IsEmbarked || candidate.HasActed) continue;
-            if (!candidate.TryGetUnitData(out UnitData candidateData)) continue;
-            Vector3Int cc = candidate.CurrentCellPosition; cc.z = 0;
-            if (SectorManager.HexDistance(transporterCell, cc) > reach) continue;
-            if (FindFittingSlotIndex(unit, data, candidate, candidateData) < 0) continue;
-            return true;
-        }
-
-        return false;
     }
 
     // Retorna true se este capturador tem um slot de transportador preenchido no seu objetivo
@@ -972,7 +950,26 @@ public partial class AIController
 
     {
 
+        if (unit == null)
+            return false;
+
         Vector3Int cell = unit.CurrentCellPosition; cell.z = 0;
+
+        // Mission Intent tambem existe na IA sem HQ. Ele e a fonte primaria;
+        // o plano abaixo permanece como compatibilidade para uma ordem formal
+        // ainda nao materializada na ficha.
+        if (TryResolveUnactedCaptureMissionAtCell(
+                cell,
+                unit.SlotIndex,
+                unit.InstanceId,
+                out _,
+                out _))
+        {
+            return true;
+        }
+
+        if (plan?.Objectives == null)
+            return false;
 
         foreach (SectorObjective obj in plan.Objectives)
 
@@ -994,6 +991,62 @@ public partial class AIController
 
         return false;
 
+    }
+
+    /// <summary>
+    /// Encontra a ordem de captura ainda nao agida que precisa desta celula.
+    /// Ocupacao nao e filtro: a pergunta e justamente se o bloqueador deve
+    /// sair. A validade da captura continua vindo do PodeCapturarSensor por
+    /// meio de IsRebelCapturable.
+    /// </summary>
+    private bool TryResolveUnactedCaptureMissionAtCell(
+        Vector3Int cell,
+        int slotIndex,
+        int excludedUnitInstanceId,
+        out UnitManager capturer,
+        out ConstructionManager construction)
+    {
+        capturer = null;
+        construction = null;
+        cell.z = 0;
+
+        ConstructionManager atCell =
+            ConstructionOccupancyRules.GetConstructionAtCell(
+                boardTilemap, cell);
+        if (atCell == null)
+            return false;
+
+        int bestInstanceId = int.MaxValue;
+        foreach (UnitManager candidate in UnitManager.AllActive)
+        {
+            if (candidate == null
+                || candidate.InstanceId == excludedUnitInstanceId
+                || candidate.SlotIndex != slotIndex
+                || candidate.IsDead
+                || candidate.IsEmbarked
+                || candidate.HasActed
+                || !candidate.AIHasDesignatedCaptureTarget
+                || candidate.AIDesignatedCaptureTargetCell != cell
+                || !candidate.TryGetUnitData(out UnitData data)
+                || data == null
+                || !UnitRoleCompatibility.CanSatisfy(
+                    data, UnitRole.Capturador)
+                || !IsRebelCapturable(candidate, atCell))
+            {
+                continue;
+            }
+
+            if (candidate.InstanceId >= bestInstanceId)
+            {
+                continue;
+            }
+
+            bestInstanceId = candidate.InstanceId;
+            capturer = candidate;
+            construction = atCell;
+        }
+
+        return capturer != null;
     }
 
     private static SectorObjective ResolveAnyAssignedObjective(UnitManager unit, TeamObjectivePlan plan)

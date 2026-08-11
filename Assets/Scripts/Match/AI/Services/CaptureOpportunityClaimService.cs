@@ -669,12 +669,24 @@ public static class CaptureOpportunityClaimService
                 Vector3Int cell =
                     construction.CurrentCellPosition;
                 cell.z = 0;
-                return !UnitOccupancyRules
+                bool blockedByAlly = UnitOccupancyRules
                     .HasBlockingOccupantForUnitAtCell(
                         map,
                         cell,
                         evaluated,
                         alliedOnly: true);
+                if (!blockedByAlly)
+                    return true;
+
+                // Um taxi vazio sobre o endereco que o proprio passageiro ja
+                // carregava nao invalida a refeicao. Ele e um bloqueador
+                // temporario que a iniciativa manda sair antes da captura.
+                // Sem esta excecao, o solve seguinte apaga o farol exatamente
+                // porque o transporte terminou a entrega no porto.
+                return IsExistingCaptureTargetBlockedOnlyByEmptyAlliedTransport(
+                    evaluated,
+                    construction,
+                    map);
             };
 
             // Reuso por identidade: mesma unidade, mesma intencao, mesmas
@@ -765,6 +777,82 @@ public static class CaptureOpportunityClaimService
             confirmedRevision,
             claims,
             unmatched);
+    }
+
+    private static bool IsExistingCaptureTargetBlockedOnlyByEmptyAlliedTransport(
+        UnitManager capturer,
+        ConstructionManager construction,
+        Tilemap map)
+    {
+        if (capturer == null
+            || construction == null
+            || map == null
+            || !capturer.AIHasDesignatedCaptureTarget
+            || capturer.AIDesignatedCaptureTargetInstanceId
+                != construction.InstanceId)
+        {
+            return false;
+        }
+
+        Vector3Int cell = construction.CurrentCellPosition;
+        cell.z = 0;
+        List<UnitManager> occupants =
+            UnitOccupancyRules.GetUnitsAtCell(map, cell, capturer);
+        bool foundBlockingTransport = false;
+        for (int i = 0; i < occupants.Count; i++)
+        {
+            UnitManager occupant = occupants[i];
+            if (occupant == null
+                || occupant.IsDead
+                || occupant.IsEmbarked
+                || !PlayerSlotRelations.AreAllies(capturer, occupant))
+            {
+                continue;
+            }
+
+            var singleOccupant = new List<UnitManager>(1) { occupant };
+            if (OccupancyResolver.CanEndMove(
+                    capturer, cell, singleOccupant))
+            {
+                continue;
+            }
+
+            if (!occupant.TryGetUnitData(out UnitData occupantData)
+                || occupantData == null
+                || !occupantData.isTransporter
+                || !UnitRoleCompatibility.CanSatisfy(
+                    occupantData, UnitRole.Transportador)
+                || UnitRoleCompatibility.CanSatisfy(
+                    occupantData, UnitRole.Capturador)
+                || HasAnyEmbarkedPassenger(occupant))
+            {
+                return false;
+            }
+
+            foundBlockingTransport = true;
+        }
+
+        return foundBlockingTransport;
+    }
+
+    private static bool HasAnyEmbarkedPassenger(UnitManager transporter)
+    {
+        if (transporter?.TransportedUnitSlots == null)
+            return false;
+
+        IReadOnlyList<UnitTransportSeatRuntime> seats =
+            transporter.TransportedUnitSlots;
+        for (int i = 0; i < seats.Count; i++)
+        {
+            UnitTransportSeatRuntime seat = seats[i];
+            if (seat?.embarkedUnit != null
+                && seat.embarkedUnit.IsEmbarked)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private sealed class FlowArc
@@ -1165,9 +1253,9 @@ public static class CaptureOpportunityClaimService
             && !unit.IsDead
             && !unit.IsEmbarked
             && !unit.IsUnderRepair
-            // Missao de outro verbo manda ate o dono dela dar baixa. Se ela
-            // entrasse no matching, produziria um claim impossivel de publicar
-            // porque SetAIDesignatedCaptureTarget protege essa mesma agenda.
+            // Missao de outro verbo manda ate o dono dela dar baixa. Capture
+            // continua sendo farol distributivo e pode participar do novo
+            // matching coletivo.
             && (!unit.AIHasDesignatedMission
                 || unit.AIDesignatedMissionIntent
                     == AIPlanRuntimeIntent.Capture)

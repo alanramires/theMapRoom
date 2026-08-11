@@ -36,6 +36,7 @@ public partial class AIController
         transportPickupBeacons.Clear();
         tacticalPickupManifestBeacons.Clear();
         transportPlanningSnapshots.Clear();
+        tacticalPickupInitiativePassengers.Clear();
         disembarkPassengerRouteCache.Clear();
         // Componente de movimento nao muda quando a unidade anda — andar so
         // acontece dentro dele. Limpar por fase basta, e evita reconstruir o
@@ -70,6 +71,13 @@ public partial class AIController
         }
         double repairDone = Time.realtimeSinceStartupAsDouble;
 
+        // A fila consome o mesmo panorama do MelhorEmbarque usado depois pela
+        // decisao do transportador. Assim, "os dois chegam ao encontro agora"
+        // substitui o corte antigo "o navio sozinho alcanca o passageiro".
+        BuildTacticalPickupInitiativeFacts(
+            units, current, activePlan);
+        double pickupFactsDone = Time.realtimeSinceStartupAsDouble;
+
         _sortIsInvading = snapshot.IsInvading;
         _groupCache.Clear();
         foreach (UnitManager u in units)
@@ -96,7 +104,8 @@ public partial class AIController
             // pela outra. Com carona ao lado, a linha mostra o estado inteiro do
             // transportador (HasCargo x wantsRide) de relance.
             string missaoStr = u.AIHasDesignatedMission
-                ? $"{u.AIDesignatedMissionIntent}{u.AIDesignatedMissionTargetCell}"
+                ? $"{u.AIDesignatedMissionIntent}" +
+                  $"{u.AIDesignatedMissionTargetCell}"
                 : "None";
             string caronaStr = u.AIWantsRide
                 ? $"SIM({u.AIRideWaitTurns}t)"
@@ -113,7 +122,8 @@ public partial class AIController
             $"available={(availableDone - setupStart) * 1000d:F1}ms " +
             $"snapshot={(snapshotDone - availableDone) * 1000d:F1}ms " +
             $"repair={(repairDone - snapshotDone) * 1000d:F1}ms " +
-            $"groups={(groupsDone - repairDone) * 1000d:F1}ms " +
+            $"pickupFacts={(pickupFactsDone - repairDone) * 1000d:F1}ms " +
+            $"groups={(groupsDone - pickupFactsDone) * 1000d:F1}ms " +
             $"facts={(factsDone - groupsDone) * 1000d:F1}ms " +
             $"sort={(sortDone - factsDone) * 1000d:F1}ms " +
             $"log={(logDone - sortDone) * 1000d:F1}ms");
@@ -707,10 +717,10 @@ public partial class AIController
     /// caberia. Sinergia desfeita pela ORDEM, nao pela decisao: cada um
     /// escolheu certo, na hora errada.
     ///
-    /// Cede a vez a um transportador que ainda nao agiu, tem vaga, encosta
-    /// nele por topologia e esta perto o bastante para chegar NESTA rodada
-    /// (MP + 1, o anel de embarque). Depois do transportador andar, o
-    /// passageiro reavalia da posicao nova e o embarque vira Tactical.
+    /// Cede a vez a um transportador que ainda nao agiu, tem vaga e para o
+    /// qual o MelhorEmbarque provou um encontro Tactical ReachableNow dos
+    /// DOIS lados. Depois do transportador andar, o passageiro reavalia da
+    /// posicao nova e o embarque vira Tactical.
     ///
     /// Nao cede quem ja vai embarcar, nem quem tem tiro ou captura no batch:
     /// ceder ali trocaria a sinergia por uma acao perdida. E o chamador so
@@ -739,8 +749,6 @@ public partial class AIController
             return false;
         }
 
-        Vector3Int passengerCell = unit.CurrentCellPosition;
-        passengerCell.z = 0;
         for (int i = 0; i < units.Count; i++)
         {
             UnitManager candidate = units[i];
@@ -758,18 +766,10 @@ public partial class AIController
                 continue;
             }
 
-            Vector3Int transporterCell = candidate.CurrentCellPosition;
-            transporterCell.z = 0;
-            // Barato antes de caro: so pergunta topologia de quem ja podia
-            // chegar hoje. Sem este corte, um navio do outro lado do mapa
-            // faria o soldado adiar todo turno sem nunca ganhar carona.
-            if (SectorManager.HexDistance(passengerCell, transporterCell)
-                > Mathf.Max(0, candidate.RemainingMovementPoints) + 1)
-            {
-                continue;
-            }
-
-            if (!CanTransporterMeetPassenger(candidate, unit))
+            // Fato conjunto congelado no setup: o MelhorEmbarque ja provou
+            // que transportador E passageiro chegam a celulas adjacentes
+            // nesta rodada. Nao repete o velho corte unilateral MP+1.
+            if (!HasTacticalPickupInitiativeFact(candidate, unit))
                 continue;
 
             incomingTransporter = candidate;
