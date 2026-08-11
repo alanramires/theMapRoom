@@ -832,10 +832,11 @@ public partial class AIController
     }
 
     // Praia conhecida mais perto do objetivo, usada como destino intermediario quando
-    // nenhum ponto de desembarque esta ao alcance neste turno. A busca nasce NO
-    // objetivo e expande em bolhas ate encontrar a primeira faixa de praias/LZs
-    // validas. Assim um mapa oceanico nao paga PodeDesembarcar em cada celula
-    // alcancavel entre a origem e o extremo oposto do tabuleiro.
+    // nenhum ponto de desembarque esta ao alcance neste turno. O BeachManager e o
+    // catalogo estrategico: sua BeachRepCell identifica a praia mesmo sob FoW preto,
+    // enquanto a faixa fornece uma celula naval concreta para a progressao. Sem
+    // catalogo, a busca legada nasce NO objetivo e expande em bolhas ate encontrar a
+    // primeira praia/LZ visivel ou explorada.
     private Vector3Int ResolveNavalApproachTarget(UnitManager unit, Vector3Int objective, Vector3Int fromCell)
     {
         Dictionary<Vector3Int, int> reachable = UnitMovementPathRules.CalculateMovementCostMap(
@@ -845,6 +846,30 @@ public partial class AIController
 
         objective.z = 0;
         fromCell.z = 0;
+
+        if (TryResolveKnownMilitaryBeachApproach(
+                unit,
+                objective,
+                fromCell,
+                reachable,
+                out Vector3Int knownBeachLz,
+                out BeachManager.BeachInfo knownBeach,
+                out int knownBeachRouteCost,
+                out float knownBeachObjectiveDistance))
+        {
+            Debug.Log(
+                $"{TL("NavalTransport")} ancora praia militar " +
+                $"objetivo={objective} " +
+                $"praia={knownBeach.DisplayName} " +
+                $"id={knownBeach.BeachId} " +
+                $"rep={knownBeach.BeachRepCell} " +
+                $"LZ={knownBeachLz} " +
+                $"distRepObjetivo={knownBeachObjectiveDistance:F0} " +
+                $"rota={knownBeachRouteCost} " +
+                "conhecimento=estrategico(fow-ignorado).");
+            return knownBeachLz;
+        }
+
         Vector3Int best = fromCell;
         int bestRouteCost = int.MaxValue;
         int bestBubbleDepth = int.MaxValue;
@@ -911,6 +936,142 @@ public partial class AIController
                   $"rota={(bestRouteCost < int.MaxValue ? bestRouteCost.ToString() : "?")} " +
                   $"visitadas={depthByCell.Count}.");
         return best;
+    }
+
+    /// <summary>
+    /// Traduz o ENDERECO estrategico de uma praia em uma celula que o navio
+    /// consegue perseguir. BeachRepCell escolhe a identidade; nunca vira LZ
+    /// fixa. A LZ vem da borda naval da faixa inteira e permanece sujeita ao
+    /// MelhorDesembarque/PodeDesembarcar quando a execucao estiver proxima.
+    ///
+    /// Nao consulta FoW de proposito. Assim como o endereco das construcoes, a
+    /// geografia das praias militares pertence ao mapa conhecido. Isto nao
+    /// revela ocupantes, ameacas ou contatos escondidos.
+    /// </summary>
+    private bool TryResolveKnownMilitaryBeachApproach(
+        UnitManager unit,
+        Vector3Int objective,
+        Vector3Int fromCell,
+        IReadOnlyDictionary<Vector3Int, int> reachable,
+        out Vector3Int bestLz,
+        out BeachManager.BeachInfo bestBeach,
+        out int bestRouteCost,
+        out float bestObjectiveDistance)
+    {
+        bestLz = fromCell;
+        bestBeach = null;
+        bestRouteCost = int.MaxValue;
+        bestObjectiveDistance = float.MaxValue;
+        if (unit == null
+            || boardTilemap == null
+            || reachable == null
+            || reachable.Count == 0)
+        {
+            return false;
+        }
+
+        IReadOnlyList<BeachManager.BeachInfo> beaches =
+            SectorManager.GetAllMilitaryBeachInfos(boardTilemap);
+        if (beaches == null || beaches.Count == 0)
+            return false;
+
+        objective.z = 0;
+        fromCell.z = 0;
+        float bestShoreObjectiveDistance = float.MaxValue;
+        string bestBeachId = null;
+        var neighbors = new List<Vector3Int>(6);
+
+        for (int beachIndex = 0; beachIndex < beaches.Count; beachIndex++)
+        {
+            BeachManager.BeachInfo beach = beaches[beachIndex];
+            if (beach == null || beach.Cells == null || beach.Cells.Count == 0)
+                continue;
+
+            Vector3Int repCell = beach.BeachRepCell;
+            repCell.z = 0;
+            float repObjectiveDistance =
+                SectorManager.HexDistance(repCell, objective);
+
+            for (int cellIndex = 0; cellIndex < beach.Cells.Count; cellIndex++)
+            {
+                Vector3Int shoreCell = beach.Cells[cellIndex];
+                shoreCell.z = 0;
+                float shoreObjectiveDistance =
+                    SectorManager.HexDistance(shoreCell, objective);
+                neighbors.Clear();
+                UnitMovementPathRules.GetImmediateHexNeighbors(
+                    boardTilemap, shoreCell, neighbors);
+                // O caso comum do navio de desembarque e ocupar a propria
+                // Praia (a ficha declara allowedEmbark...=Praia). Preserve
+                // tambem vizinhos para portos/docas ou futuros cascos cuja
+                // celula de encontro fique projetada ao lado da faixa.
+                neighbors.Add(shoreCell);
+
+                for (int neighborIndex = 0;
+                     neighborIndex < neighbors.Count;
+                     neighborIndex++)
+                {
+                    Vector3Int candidate = neighbors[neighborIndex];
+                    candidate.z = 0;
+                    if (!reachable.TryGetValue(
+                            candidate, out int routeCost)
+                        || !IsNavalPickupCell(unit, candidate))
+                    {
+                        continue;
+                    }
+
+                    bool better = bestBeach == null
+                        || repObjectiveDistance
+                            < bestObjectiveDistance - 0.001f
+                        || (Mathf.Abs(
+                                repObjectiveDistance
+                                - bestObjectiveDistance) <= 0.001f
+                            && shoreObjectiveDistance
+                                < bestShoreObjectiveDistance - 0.001f)
+                        || (Mathf.Abs(
+                                repObjectiveDistance
+                                - bestObjectiveDistance) <= 0.001f
+                            && Mathf.Abs(
+                                shoreObjectiveDistance
+                                - bestShoreObjectiveDistance) <= 0.001f
+                            && routeCost < bestRouteCost)
+                        || (Mathf.Abs(
+                                repObjectiveDistance
+                                - bestObjectiveDistance) <= 0.001f
+                            && Mathf.Abs(
+                                shoreObjectiveDistance
+                                - bestShoreObjectiveDistance) <= 0.001f
+                            && routeCost == bestRouteCost
+                            && string.CompareOrdinal(
+                                beach.BeachId, bestBeachId) < 0)
+                        || (Mathf.Abs(
+                                repObjectiveDistance
+                                - bestObjectiveDistance) <= 0.001f
+                            && Mathf.Abs(
+                                shoreObjectiveDistance
+                                - bestShoreObjectiveDistance) <= 0.001f
+                            && routeCost == bestRouteCost
+                            && string.Equals(
+                                beach.BeachId,
+                                bestBeachId,
+                                System.StringComparison.Ordinal)
+                            && (candidate.x < bestLz.x
+                                || (candidate.x == bestLz.x
+                                    && candidate.y < bestLz.y)));
+                    if (!better)
+                        continue;
+
+                    bestBeach = beach;
+                    bestBeachId = beach.BeachId;
+                    bestLz = candidate;
+                    bestRouteCost = routeCost;
+                    bestObjectiveDistance = repObjectiveDistance;
+                    bestShoreObjectiveDistance = shoreObjectiveDistance;
+                }
+            }
+        }
+
+        return bestBeach != null;
     }
 
     private UnitManager FindNavalPickupCandidate(UnitManager unit, AIWorldSnapshot snapshot, TeamObjectivePlan plan)
