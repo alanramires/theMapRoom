@@ -207,9 +207,18 @@ Três cenas em `Assets/Scenes/Autoria/` (nenhuma entra no build) e um
 estrada — `roadRoutesByStructure` vazio, o traçado mora na cena.
 
 ```text
-Fixture.unity     37 × 19 = 703 tiles, sólido · serra ao centro · 1 rota (Cruzamento)
-Mundo.unity       vazio, esperando os continentes
-Campanha.unity    vazio
+Autoria/Fixture.unity   37 × 19 = 703 tiles, sólido · serra ao centro · 1 rota
+Autoria/Mundo.unity     vazio, esperando os continentes
+```
+
+E as duas **cenas de execução**, criadas durante o próprio fechamento, ao lado da
+Tela de Entrada — vazias, com os 41 managers e o Grid idêntico ao das demais
+(`CellLayout` hexagonal, `Swizzle 0`), porque nasceram de duplicação de cena que
+já funciona:
+
+```text
+Campanha.unity    o bigview — NÃO é o mesmo que Autoria/Mundo: um é fonte, o outro vitrine
+Batalha.unity     a cena única onde todo quadrante é pintado
 ```
 
 O `Cruzamento` atravessa de `x −17` a `x 17` na linha `y 0`, pelo passo aberto na
@@ -239,12 +248,10 @@ própria.
 
 - **Nada da campanha tem uma linha de código.** Existem 1120 linhas de plano e
   zero de implementação. O plano é **carga**, não verdade validada.
-- **A `Batalha.unity` não existe.** Uma tentativa (`ata.unity`, cópia do `Mundo`
-  com o nome quebrado) foi apagada em vez de renomeada.
-- **`Campanha.unity` está em `Autoria/`, pasta errada** — ela é cena de
-  *execução*, vai para o build. Precisa subir para `Assets/Scenes/`.
-- **Nenhuma cena de execução foi adicionada ao Build Settings**, o que hoje é
-  proteção e amanhã é pendência.
+- **As cenas de execução estão vazias e desligadas.** `Campanha.unity` e
+  `Batalha.unity` nasceram durante o fechamento, com os 41 managers e o Grid
+  certo, mas **nenhuma foi adicionada ao Build Settings** — hoje isso é proteção,
+  amanhã é pendência. Nada as pinta ainda.
 - **A frente D não teve corrida de aceitação.** O diff foi lido por inteiro; o
   comportamento não foi exercitado em partida. É mudança na fila de iniciativa, e
   o `resumo.md` já avisa que defers ali podem gerar cessão mútua.
