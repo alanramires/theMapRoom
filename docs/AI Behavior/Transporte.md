@@ -633,6 +633,12 @@ transportador aparece em dois deles: grupo 0 (transportador atribuído com
 passageiro formal ainda não agido) e grupo 2 (rogue vazio com candidato de
 pickup no alcance). Não existe "abaixo de Fire Support e Assault".
 
+O fato do grupo 2 usa uma sonda própria e barata: considera somente passageiros
+que publicaram `Wants Ride`, LZ Tactical e rota `ReachableNow`. Não calcula
+Operational/Strategic, manifestos nem diagnóstico por par. O Melhor Embarque
+completo continua preguiçoso e só é construído quando chega a vez do
+transportador decidir.
+
 ---
 
 ## 11. Leitura de FoW

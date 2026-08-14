@@ -42,11 +42,18 @@ public partial class AIController
                 continue;
             }
 
+            if (!HasStructurallyEligiblePublishedRideCandidate(
+                    transporter, snapshot))
+            {
+                continue;
+            }
+
             TransportPlanningSnapshot planning =
                 GetOrCreateTransportPlanningSnapshot(
                     transporter, snapshot, plan);
-            EnsureTransportPickupPlanning(planning, snapshot, plan);
-            MelhorEmbarqueResult pickup = planning?.Pickup;
+            MelhorEmbarqueResult pickup =
+                EvaluateTacticalPickupInitiativeFact(
+                    planning, snapshot, plan);
             if (pickup?.options == null)
                 continue;
 
@@ -96,6 +103,80 @@ public partial class AIController
                     $"[{string.Join(",", orderedIds)}].");
             }
         }
+    }
+
+    private bool HasStructurallyEligiblePublishedRideCandidate(
+        UnitManager transporter,
+        AIWorldSnapshot snapshot)
+    {
+        if (transporter == null || snapshot == null)
+            return false;
+
+        foreach (UnitManager candidate in UnitManager.AllActive)
+        {
+            if (candidate != null
+                && candidate.AIWantsRide
+                && IsStructurallyEligiblePickupCandidate(
+                    transporter, candidate, snapshot))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Prova somente o fato consumido pela iniciativa: encontro Tactical,
+    /// ReachableNow e carona publicada. Nao marca PickupEvaluated e nao
+    /// preenche planning.Pickup; portanto a decisao posterior ainda constroi,
+    /// preguiçosamente, o snapshot completo Operational/Strategic.
+    /// </summary>
+    private MelhorEmbarqueResult EvaluateTacticalPickupInitiativeFact(
+        TransportPlanningSnapshot planning,
+        AIWorldSnapshot snapshot,
+        TeamObjectivePlan plan)
+    {
+        UnitManager transporter = planning?.Transporter;
+        if (transporter == null
+            || snapshot == null)
+        {
+            return new MelhorEmbarqueResult();
+        }
+
+        return MelhorEmbarqueService.Evaluate(
+            new MelhorEmbarqueRequest
+            {
+                transporter = transporter,
+                map = boardTilemap,
+                terrainDatabase = terrainDatabase,
+                tacticalBudget = planning.MovementBudget,
+                operationalTurns = 1,
+                includeStrategic = false,
+                resolveLongRangePassengerMeeting = false,
+                buildTransporterManifests = false,
+                tacticalOnly = true,
+                stopAfterDecisiveTactical = true,
+                transporterPaths = planning.TransporterReach,
+                // PublishRideNeed acabou de publicar o farol uma vez por
+                // unidade. Quem respondeu nao nao entra no produto cartesiano
+                // de cada transportador apenas para receber -5000 depois.
+                allowPassenger = candidate =>
+                    candidate != null
+                    && candidate.AIWantsRide
+                    && IsStructurallyEligiblePickupCandidate(
+                        transporter, candidate, snapshot),
+                includeInLegacyRanking = _ => false,
+                evaluateRideNeed = candidate =>
+                    GetOrEvaluateTransportRideNeed(
+                        planning,
+                        candidate,
+                        plan,
+                        TransportPlanningOperationalTurns),
+                // Setup de iniciativa nunca emite diagnostico por par. O
+                // snapshot completo conserva os logs quando a unidade decide.
+                diagnosticLog = null
+            });
     }
 
     private bool HasTacticalPickupInitiativeFact(

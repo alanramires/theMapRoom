@@ -123,6 +123,10 @@ public sealed class MelhorEmbarqueRequest
     // das opcoes por LZ. O controller runtime usa somente os manifestos
     // Tactical; os pares Operational/Strategic continuam 1:1.
     public bool buildTransporterManifests;
+    // Sondagem curta para consumidores que so precisam provar um encontro
+    // materializavel nesta rodada. Nao constroi a segunda onda do passageiro
+    // nem visita LZ fora do alcance Tactical do transportador.
+    public bool tacticalOnly;
     // Consumidores runtime podem encerrar a coleta depois de provar uma
     // solução Requested + ReachableNow no Tactical, desde que nenhuma carga
     // esteja em emergência. Ferramentas/editor mantêm o ranking integral.
@@ -455,7 +459,9 @@ public static class MelhorEmbarqueService
         Vector3Int origin = request.transporter.CurrentCellPosition;
         origin.z = 0;
         int tactical = Mathf.Max(0, request.tacticalBudget);
-        int operational = tactical * Mathf.Max(1, request.operationalTurns);
+        int operational = request.tacticalOnly
+            ? tactical
+            : tactical * Mathf.Max(1, request.operationalTurns);
         Dictionary<Vector3Int, List<Vector3Int>> tacticalPaths;
         using (new AIDecisionPerfScope(
                    request.transporter,
@@ -683,6 +689,16 @@ public static class MelhorEmbarqueService
                 : distance <= operational
                     ? MelhorEmbarqueTier.Operational
                     : MelhorEmbarqueTier.Strategic;
+
+            // orderedCandidateCells esta em ordem de distancia. Depois que a
+            // primeira celula sai do Tactical, nenhuma posterior pode voltar
+            // para ele. A iniciativa nao paga Operational/Strategic para
+            // produzir um simples fato ReachableNow.
+            if (request.tacticalOnly
+                && tier != MelhorEmbarqueTier.Tactical)
+            {
+                break;
+            }
 
             if (tier != MelhorEmbarqueTier.Tactical
                 && request.stopAfterDecisiveTactical
@@ -1157,24 +1173,31 @@ public static class MelhorEmbarqueService
             UnitMovementPathRules.CalculateMovementCostMap(
                 request.map, passenger, origin, nowBudget,
                 request.terrainDatabase);
-        Dictionary<Vector3Int, int> laterStops =
-            UnitMovementPathRules.CalculateMovementCostMap(
+        Dictionary<Vector3Int, int> laterStops = request.tacticalOnly
+            ? nowStops
+            : UnitMovementPathRules.CalculateMovementCostMap(
                 request.map, passenger, origin, laterBudget,
                 request.terrainDatabase);
+        Dictionary<Vector3Int, PassengerMeeting> nowMeeting =
+            BuildMeetingCostMap(
+                request.map, topology, nowStops);
         return new PassengerReachProfile
         {
             // A consulta seguinte pergunta pela LZ, nao pela celula final
             // do passageiro. Expandir cada parada uma unica vez para ela
             // mesma e seus seis vizinhos troca a busca linear repetida por
             // uma consulta O(1), preservando o mesmo encontro a distancia 1.
-            now = BuildMeetingCostMap(
-                request.map, topology, nowStops),
-            later = BuildMeetingCostMap(
-                request.map, topology, laterStops),
+            now = nowMeeting,
+            later = request.tacticalOnly
+                ? nowMeeting
+                : BuildMeetingCostMap(
+                    request.map, topology, laterStops),
             laterStops = laterStops,
             topology = topology,
             nowBudget = nowBudget,
-            laterStopsBudget = laterBudget
+            laterStopsBudget = request.tacticalOnly
+                ? nowBudget
+                : laterBudget
         };
     }
 
