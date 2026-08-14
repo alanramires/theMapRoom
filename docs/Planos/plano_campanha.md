@@ -227,6 +227,31 @@ com o vocabulário **do próprio jogo**: `ConstructionData`, `ConstructionManage
 
 **`Batalha`.**
 
+### Onde os arquivos ficam
+
+```text
+Assets/Scenes/Tela de Entrada.unity     execução  · build
+Assets/Scenes/Campanha.unity            execução  · build
+Assets/Scenes/Batalha.unity             execução  · build · nasce VAZIA de tabuleiro
+Assets/Scenes/Autoria/Mundo.unity       autoria   · NUNCA no build
+Assets/Scenes/Autoria/Fixture.unity     autoria   · NUNCA no build · fixture de regressão
+```
+
+⚠️ **A pasta não é o que protege.** Em Unity, uma cena entra no build por estar em
+**Build Settings**, não pela pasta. `Autoria/` organiza e sinaliza intenção — quem
+protege é não adicionar à lista.
+
+⚠️ **"Batalha vazia" quer dizer sem tabuleiro, não sem managers.** Ela precisa de
+`MatchController`, `CursorController`, `UnitSpawner`, `ConstructionSpawner`,
+`FogOfWarController`, `SectorManager`, `RoadNetworkManager`, `TurnStateManager`,
+`Canvas`, `Grid` + `Tilemap`. O jeito barato de nascer com tudo isso e com o Grid
+**idêntico** ao das outras cenas é **duplicar uma cena que já funciona e limpar o
+tabuleiro** — nunca criar do zero.
+
+⚠️ Se o Grid da cena de autoria e o da `Batalha` divergirem em *cell size*, *cell
+layout* ou *cell swizzle*, **toda tradução de coordenada sai errada** — e sai
+errada parecendo bug de recorte, não de configuração.
+
 ---
 
 ## Fluxo
@@ -367,6 +392,27 @@ maior por cima. Arbitrário e inofensivo, porque sobreposição é exceção.
 
 > **Sobreposição é decisão de autoria, nunca resultado da regra de seleção.**
 
+#### Dica de design: a sobreposição é para o CHÃO
+
+O construtor lê **tudo** que está no retângulo. Terreno compartilhado é o recurso;
+**peça** compartilhada nasce duas vezes — uma em cada batalha.
+
+> **Não deixe construções na interseção de quadrantes.**
+
+```text
+terreno na faixa      serra, estrada, rio          ← é o ponto. Os dois lados veem
+construção na faixa   QG, cidade, fábrica          ← nasce nos DOIS quadrantes
+```
+
+Para QG é erro puro: um quadrante nasceria com três ou quatro QGs, e a contagem por
+slot quebra. Para cidade é confusão de renda e de captura — a mesma cidade
+capturável em duas lutas independentes, com a mesma identidade visual e nenhuma
+relação entre elas.
+
+A faixa de fronteira quer ser **geografia**, não patrimônio: serra, mata, rio,
+estrada. Se algo capturável precisa ficar perto da fronteira, coloque-o **dentro**
+de um dos quadrantes, fora da interseção.
+
 ### Não existem saídas — o quadrante é fechado
 
 Dentro da partida você está **preso ao quadrante**. A única saída é ganhar ou
@@ -396,6 +442,23 @@ Duas consequências que valem escrito:
 - **As posições de QG são sempre conhecidas**, porque vêm da foto maior. É isso
   que permite a tela de detalhes mostrar onde ficam os QGs e as cidades **antes**
   de aceitar a luta, sem construir nada.
+
+#### O pintor nunca escreve na cena de autoria
+
+O construtor tem **origem** e **destino**, e eles nunca podem ser o mesmo arquivo:
+
+```text
+lê   de   Autoria/Mundo.unity      a fonte
+escreve  em   Batalha.unity        descartável, sempre repintada
+```
+
+⚠️ Vale igual para o botão **"pintar este quadrante agora"** do Editor (fase 2):
+ele também precisa de uma cena de destino aberta. Pintar o recorte de volta na
+cena de autoria **corrompe a própria fonte** — e de um jeito difícil de perceber,
+porque o resultado *parece* um mapa válido.
+
+É a classe do "arquivo gerado que alguém editou", ao contrário: o gerador
+escrevendo em cima da origem.
 
 ### O que o recorte produz
 
@@ -845,11 +908,49 @@ E a falha é **muda**: as coordenadas são locais nos dois casos, então as unid
 caem em células que existem. Exército do mapa errado, terreno errado, zero erro —
 o parágrafo do `CLAUDE.md` sobre faixas de coordenada sobrepostas, ao pé da letra.
 
-> **Correção:** a identidade do save migra de `sceneName` para
-> `(campanha, quadrante)`. Mesma guarda, chave diferente.
+#### A correção não é uma guarda melhor — é não precisar de guarda
 
-⚠️ Tem que entrar **junto** com a cena única, na mesma frente — não depois.
-Enquanto não entrar, a proteção que existe hoje já foi embora e ninguém percebe.
+A primeira reação é trocar a chave: comparar `(campanha, quadrante)` em vez de
+`sceneName`. Funciona, mas continua sendo **validação** — alguém compara duas
+coisas que poderiam divergir, e torce para o `if` estar certo.
+
+A cena única permite algo melhor: **o save deixa de ser conferido e passa a
+mandar.**
+
+```text
+GUARDA (fraco)      a cena já existe → compara com o save → aceita ou recusa
+DRIVER (forte)      a cena nasce vazia → o save DIZ o que pintar → pinta → restaura
+```
+
+O `.tmrsave` carrega `(campanha, quadrante)`. A `Batalha` nasce sem tabuleiro. O
+carregamento **lê a identidade do save e pinta aquele quadrante**, e só então
+restaura peças. Não existe "save no mapa errado" porque **não existe mapa antes do
+save dizer qual é** — a divergência deixa de ser representável.
+
+Isso também apaga o `PendingMainMenuLoadRequest`, que hoje existe só pra carregar
+a cena certa antes de aplicar o save: passa a haver uma cena só.
+
+**A ordem do carregamento vira contrato:**
+
+```text
+1. carrega a cena Batalha (vazia)
+2. lê (campanha, quadrante) do save
+3. PINTA o quadrante
+4. portão: "pintura terminou"        ← o mesmo da fase 2
+5. restaura unidades e construções
+```
+
+⚠️ O passo 4 não é enfeite. Restaurar peças antes de a pintura acabar coloca
+unidade em tabuleiro que ainda não existe, e o `SectorManager` assa vazio e cacheia
+— sem erro nenhum no console.
+
+⚠️ Isso tem que entrar **junto** com a cena única, na mesma frente. Enquanto a
+`Batalha` for única e o save não carregar a identidade, a proteção de hoje já foi
+embora e nada ocupou o lugar dela.
+
+✅ **Não é preciso back-compat.** O jogo não está publicado
+(`CLAUDE.md` § *Distribution state*): saves antigos não têm dívida, o formato pode
+mudar de forma.
 
 ---
 
@@ -882,7 +983,7 @@ Ordem escolhida pelo que **destrava** e pelo que **cega** se ficar pra depois.
 | **2** | botão "pintar agora" no Editor **+ portão de "pintura terminou"** | **mesma frente que 1.** A bancada não pode cegar, e nada pode consultar o tabuleiro antes da tinta secar |
 | **3** | recorte de rotas (filtrar `cells` + transladar) | aqui os 10 catálogos por mapa começam a morrer |
 | **4** | spawn de peças reusando os spawners | já pronto, é ligar |
-| **4b** | identidade do save vira `(campanha, quadrante)` | **mesma frente que a cena única.** Antes disso, `blockCrossSceneLoad` ainda protege; depois, não protege mais |
+| **4b** | save carrega `(campanha, quadrante)` e **dirige** a pintura no load | **mesma frente que a cena única.** Não é guarda melhor: é a divergência deixar de ser representável. Mata também o `PendingMainMenuLoadRequest` |
 | **5** | `GameSettings` estático + `settings.json` | preferências; primeiro trabalho é **remover** as duas cópias de fullscreen que já existem |
 | **6** | `CampaignData` + arquivo de progresso | depende de 0a para saber quando marcar |
 | **7** | painéis Campanhas e SlotSetup na Tela de Entrada | UI sobre modelo pronto |
@@ -969,6 +1070,10 @@ em vez de dez.
 | gravar o gesto em vez do retângulo de células | o arrasto é pixel e aproximado; guardar linhas de larguras diferentes **quebra os 4 inteiros** e força lista de células |
 | pertencimento por "qualquer toque" | a largura gravada ≠ a arrastada. **Centro dentro**, sempre — sobreposição se faz arrastando, não arredondando |
 | tratar sobreposição como bug | é recurso: a faixa de fronteira do Game Boy Wars. O dono é por **quadrante**, não por célula |
+| **construção na interseção de quadrantes** | a faixa é para o **chão**. Peça ali nasce nos dois: QG duplicado quebra a contagem por slot, cidade duplicada confunde renda e captura |
+| pintor escrevendo na cena de autoria | origem e destino nunca são o mesmo arquivo — corrompe a fonte e o resultado *parece* válido |
+| criar a `Batalha` do zero | Grid divergente em cell size/layout/swizzle torce **toda** tradução de coordenada, parecendo bug de recorte. Duplicar cena que funciona e limpar |
+| achar que a pasta `Autoria/` mantém fora do build | quem decide é **Build Settings**; a pasta só sinaliza |
 | sinalizar saída para o quadrante vizinho | não há travessia — preso até ganhar ou perder. Seta prometeria mecanismo inexistente |
 | criar flag de "tem unidades iniciais" | se está pintado no retângulo, vem. A escolha é o desenho |
 | uma cena de autoria por campanha | mata a fronteira contínua entre continentes, que é o motivo de tudo. **Uma** cena de mundo |
