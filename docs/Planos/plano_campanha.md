@@ -82,12 +82,80 @@ quarto, e quase toda pergunta de "onde isso mora?" se responde com esta tabela:
 | dono | onde | o que guarda | vive quanto |
 |---|---|---|---|
 | **catálogo** | `ScriptableObject` | o que EXISTE: unidades, terrenos, custos | do jogo, versionado |
-| **cena de autoria** | cena que **não entra no build** | o tabuleiro gigante da campanha | do jogo, versionado |
+| **cena de autoria** | **uma** cena de mundo, que **não entra no build** | o tabuleiro gigante com todas as campanhas | do jogo, versionado |
 | **do jogador** | `persistentDataPath` | preferências **e** campanhas em curso | do jogador, fora do git |
 | **cena de execução** | Entrada / Campanha / Batalha | nada autoral — tudo pintado | efêmero |
 
 A distinção **cena de autoria ≠ cena de execução** é a que faz a conta de cenas
-fechar: você duplica cenas de autoria à vontade, elas nunca entram no build.
+fechar: a cena de mundo nunca entra no build.
+
+---
+
+## O mundo, as campanhas e os quadrantes
+
+### Uma cena de mundo, não uma por campanha
+
+As campanhas são **contíguas**: Europa faz fronteira com África, que faz com
+Ásia. Elas moram todas no **mesmo tilemap**, no mesmo espaço de coordenada.
+
+O argumento é curto e decide sozinho:
+
+> **Não dá para desenhar uma fronteira contínua entre Europa e África se elas
+> estão em cenas diferentes.**
+
+Separar impediria exatamente o que a continuidade existe para dar. Cena única
+não é concessão, é requisito.
+
+⚠️ **O que isso custa e precisa ser medido cedo:** 4 continentes ≈ 92.000 tiles
+numa cena só. Não é bloqueio — a cena de mundo **não é jogável**, então nada de
+FoW, pathfinding ou sensores roda nela, e o Tilemap da Unity é fragmentado. Mas
+operações de pintura em área grande podem arrastar. **Medir, não assumir.**
+
+⚠️ E uma consequência de responsabilidade: a cena de mundo passa a ser **o
+arquivo mais valioso do projeto** — todo mapa jogável de toda campanha deriva
+dela. É o ponto único de falha para backup, e não é para abrir junto com o
+Inspector de um `.asset`.
+
+### A recursão — campanha e quadrante são o mesmo gesto
+
+```text
+cena de mundo
+ └── Campanha = retângulo GRANDE      Europa, África, Ásia, Oceania
+      └── Quadrante = retângulo pequeno   onde se luta
+```
+
+**Campanha é um retângulo. Quadrante é um retângulo.** A mesma ferramenta de
+arrasto serve aos dois níveis, com as mesmas regras — centro-dentro, normalizar
+para célula, mostrar os números, perguntar antes de gravar.
+
+Disso sai uma economia: **a "foto" da campanha não precisa ser arte.** É o
+retângulo dela, enquadrado pela câmera. A tela de campanhas mostra o mundo com o
+zoom na Europa.
+
+### A estrutura de assets
+
+```text
+CampaignDatabase (SO)                a lista — irmão de UnitDatabase/ConstructionDatabase
+  └── CampaignData "Europa" (SO)
+        ├── id · nome · descrição
+        ├── retângulo { originX, originY, width, height }   ← o enquadramento
+        ├── destravadaPor[]  ← campanhas que precisam estar concluídas; vazio = livre
+        └── QuadranteData[]
+              { id, nome, originX, originY, width, height }
+```
+
+A cena de mundo **não é campo de campanha nenhuma** — é uma só, e o retângulo diz
+onde cada campanha está dentro dela.
+
+### Ordem: parcial fora, livre dentro
+
+```text
+entre campanhas     ordem PARCIAL     terminar a Europa libera a África
+dentro da campanha  ordem LIVRE       faz o quadrante 4, depois o 2, tanto faz
+```
+
+Curva de dificuldade autorada onde importa (qual continente), liberdade onde é
+divertido (qual quadrante). Nenhum dos dois níveis precisa do mecanismo do outro.
 
 ---
 
@@ -567,6 +635,21 @@ Consequências aceitas de propósito:
   carimbada. Basta reconquistar. Se isso incomodar no playtest, a correção é
   visual (mostrar o carimbo com destaque), **não** uma exceção na regra.
 
+### Destrave entre campanhas
+
+Acima do quadrante existe um segundo nível de progresso: `CampaignData.destravadaPor[]`.
+Uma campanha só aparece disponível quando todas as campanhas listadas estiverem
+concluídas. Vazio = disponível desde o começo.
+
+```text
+entre campanhas     ordem PARCIAL     terminar a Europa libera a África
+dentro da campanha  ordem LIVRE       faz o quadrante 4, depois o 2, tanto faz
+```
+
+O estado "concluída" é o mesmo carimbo da seção acima — registro, não estado do
+mundo. Perder território numa campanha já concluída **não retranca** as campanhas
+que ela destravou.
+
 Se um dia o duelo precisar de fim, existe precedente pronto de forma:
 `victoryStarsToWin` ([`MatchController.cs:430`](../../Assets/Scripts/Match/MatchController.cs),
 `1..12`, padrão 5) — a mesma forma um andar acima.
@@ -663,18 +746,49 @@ que a cena de batalha vira única, e por isso tem que viajar junto com ela.
 
 ### 1. Fim de partida não tem ponto único
 
-`hasVictoryWinner = true` é escrito em **oito lugares** do `MatchController`
-(linhas 1250, 2352, 2363, 2391, 2747, 2765, 7250, 11440, 11496) e volta a `false`
-na linha 2998. **Não existe nenhum evento.**
-
-A campanha precisa do fato "a partida acabou, fulano ganhou, em N turnos"
-entregue **exatamente uma vez**. Sem evento, sobra `Update` perguntando
-`HasVictoryWinner` todo frame — o padrão que já fritou o FPS neste projeto uma
-vez (a cicatriz é o `MaxResolveAttemptsBeforeSelfDisable` em
+`hasVictoryWinner = true` é escrito em nove lugares do `MatchController` e volta a
+`false` na linha 2998. **Não existe nenhum evento** — e sem ele sobra `Update`
+perguntando `HasVictoryWinner` todo frame, o padrão que já fritou o FPS neste
+projeto uma vez (a cicatriz é o `MaxResolveAttemptsBeforeSelfDisable` em
 [`MainMenuStateController.cs:36-42`](../../Assets/Scripts/UI/MainMenuStateController.cs)).
 
-Precisa de um `OnMatchConcluded(winner, slot, turno)` disparado de um lugar só,
-no molde do `SaveGameManager.OnAfterLoadSuccess`, que já existe.
+**Mas o trabalho é bem menor do que "consolidar nove escritas": o funil já
+existe.**
+
+```csharp
+// MatchController.cs:3025 — a taxonomia já está pronta
+private enum VictoryReason
+{
+    HeadQuarterCaptured,   ← MVP
+    ArmyEliminated,        ← MVP
+    Surrender,
+    VictoryStars           ← adiado, ver abaixo
+}
+
+// MatchController.cs:3033 — e a assinatura é exatamente a que a campanha precisa
+HandleVictoryAestheticPresentation(TeamId winnerTeam, TeamId defeatedTeam, VictoryReason reason)
+```
+
+Chamado de 2355 (estrelas), 2751 e 2770 (eliminação), 7253 (rendição) e 11444 — e
+a captura de QG chega lá via `DeclareEliminationVictory`. **Os dois motivos do MVP
+já passam pelo funil.**
+
+O que falta:
+
+| # | trabalho |
+|---|---|
+| 1 | o funil tem nome de **estética** e nenhum evento — publicar `OnMatchConcluded(vencedor, derrotado, motivo, turno)` dali, no molde do `SaveGameManager.OnAfterLoadSuccess` |
+| 2 | **três caminhos o contornam**: `DeclareTutorialVictory` (2358), `DeclareTutorialDefeat` (11491), `DeclareDefeat` (2391) |
+| 3 | ⚠️ a linha **1250 é `ImportVictoryState`** — restauração, não conclusão. **Nunca pode disparar** |
+
+⚠️ O item 3 é a armadilha real: carregar um save de partida já concluída
+reescreve a flag como `true`. Um evento ingênuo dispara no *load*, e a campanha
+marca a vitória de novo toda vez que o save for aberto.
+
+**Escopo do MVP:** vitória só por `HeadQuarterCaptured` e `ArmyEliminated`, como
+no Game Boy Wars. As **estrelas ficam para depois do MVP** — e o funil é
+justamente o que torna isso barato: acrescentar um motivo depois é uma chamada, não
+um sistema novo.
 
 ### 2. Quatro managers vazam entre cenas
 
@@ -762,7 +876,7 @@ Ordem escolhida pelo que **destrava** e pelo que **cega** se ficar pra depois.
 
 | # | frente | por que nesta posição |
 |---|---|---|
-| **0a** | evento único de fim de partida | bloqueio; vale sozinho |
+| **0a** | evento no funil `HandleVictoryAestheticPresentation` + 3 caminhos que o contornam | bloqueio; vale sozinho. **Menor do que parece** — o funil e o `VictoryReason` já existem |
 | **0b** | `sceneLoaded` nos 4 managers | bloqueio; vale sozinho |
 | **1** | pintor de terreno em runtime | único código realmente novo |
 | **2** | botão "pintar agora" no Editor **+ portão de "pintura terminou"** | **mesma frente que 1.** A bancada não pode cegar, e nada pode consultar o tabuleiro antes da tinta secar |
@@ -857,6 +971,9 @@ em vez de dez.
 | tratar sobreposição como bug | é recurso: a faixa de fronteira do Game Boy Wars. O dono é por **quadrante**, não por célula |
 | sinalizar saída para o quadrante vizinho | não há travessia — preso até ganhar ou perder. Seta prometeria mecanismo inexistente |
 | criar flag de "tem unidades iniciais" | se está pintado no retângulo, vem. A escolha é o desenho |
+| uma cena de autoria por campanha | mata a fronteira contínua entre continentes, que é o motivo de tudo. **Uma** cena de mundo |
+| disparar o evento de conclusão no load | `ImportVictoryState` (linha 1250) reescreve a flag; save de partida concluída marcaria vitória de novo a cada abertura |
+| tratar campanha e quadrante como conceitos diferentes na ferramenta | são o **mesmo retângulo** em dois níveis; uma ferramenta, duas escalas |
 | tint sobreposto por ordem de iteração | a mesma campanha pintaria diferente entre aberturas. **Ordem determinística de id** |
 | confirmar quadrante só pela cor | alinhamento de origem e altura é o que o teste de aceitação exige; erro de 1 célula é invisível na cor |
 | reaproveitar mapa existente como fixture | traz QG, equilíbrio e posicionamento que viram ruído no diagnóstico. Fixture é desenhado pro teste, não herdado |
