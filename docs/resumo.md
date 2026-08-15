@@ -1,167 +1,146 @@
 # Resumo — onde estamos e o que vem
 
-Ponto de retomada. Atualizado em 2026-08-14, **depois** da tag `v8.2.2`.
+Ponto de retomada. Atualizado em 2026-08-14, **depois** da tag `v8.3.0`.
 Leia isto primeiro.
 
 ---
 
 ## Estado
 
-`v8.2.2` tagueada e publicada. Relatório:
-[`relatorio_v8.2.2.md`](relatorio_v8.2.2.md).
+`v8.3.0` tagueada e publicada. Relatório:
+[`relatorio_v8.3.0.md`](relatorio_v8.3.0.md).
 
-### O que mudou de rumo
-
-O projeto ganhou um **tronco mestre**:
-[`Planos/plano_campanha.md`](Planos/plano_campanha.md), 1120 linhas de desenho
-com **zero linhas de código**.
-
-Até aqui todos os planos eram internos à IA — iniciativa, transportador,
-capturador. Este é o primeiro que descreve **o que o jogador faz com o jogo**, e
-por isso é o primeiro que *puxa* arquitetura em vez de empurrar.
-
-Isso é o que ele muda na prática: várias pendências estavam paradas **por serem
-higiene sem consumidor**. A campanha não descobriu nenhuma delas — ela deu
-**motivo** a todas.
+**A campanha saiu do papel.** Uma cena de batalha vazia recebe um endereço, lê o
+que está assado e desenha o tabuleiro:
 
 ```text
-fim de partida sem evento          conhecido, parado
-4 managers DontDestroyOnLoad       CLAUDE.md já suspeitava, parado
-10 catálogos de estrutura por mapa doc já chamava de violação, parado
-routesMigratedToScene sem prazo    a flag existe PORQUE não havia prazo
-zero persistência de preferência   fullscreen duplicado em 2 lugares
+[Quadrante] 'campanha A1/QA1' construido: 361 tiles, 0 buraco(s), 19x19
+            origem local 0,0 · origem de autoria -18,-9 · em 2 ms
 ```
 
-### As duas frases que organizam a campanha
-
-> **O mapa grande governa os pequenos. Não é zoom, é recorte** — o hexágono tem o
-> mesmo tamanho nos dois lugares; o que muda é a janela.
-
-> **O recorte é imutável.** A única coisa que muda entre jogadas é *de quem é o
-> quadrante*, e isso mora no arquivo de progresso, nunca no mapa.
-
-Disso sai de graça a feature que justifica tudo: a estrada que cruza a fronteira
-**não precisa ser sincronizada**, porque são os mesmos tiles no mesmo sistema de
-coordenadas.
-
-### O achado que veio do autor
-
-> **Com uma cena de batalha única, o save deixa de ser conferido e passa a
-> mandar.**
-
-A primeira reação foi trocar a chave da guarda (`sceneName` → `(campanha,
-quadrante)`). Continua sendo **validação**: alguém compara duas coisas que
-poderiam divergir.
-
-O melhor é outro: a `Batalha` nasce vazia, o save **diz** que quadrante pintar,
-pinta, e só então restaura as peças. Save no mapa errado deixa de ser detectável
-porque deixa de ser **representável**. Mata também o `PendingMainMenuLoadRequest`.
+O recorte está provado — **e a prova não precisou de partida, QG nem unidade.**
 
 ---
 
-## Vocabulário — fixe isto antes de ler o plano
+## Vocabulário — fixe isto antes de qualquer coisa
+
+```text
+MUNDO       uma cena de autoria + UM asset. O globo inteiro, desenhado de uma vez
+ └─ BLOCO       Europeu · América do Norte · Rússia    ← o jogador escolhe
+     └─ CAMPANHA    Europa · África
+         └─ QUADRANTE   Inglaterra · Congo...          ← aqui se luta
+```
 
 | termo | é |
 |---|---|
-| **quadrante** | o retângulo recortável do mapa de campanha, onde se luta |
-| **setor** | `ConstructionSector` — rótulo estratégico numa construção (Alpha… + Base0..4) |
+| **quadrante** | o retângulo recortável onde se joga |
+| **setor** | `ConstructionSector` — rótulo estratégico numa construção (Alpha… Base0..4) |
 
-Um quadrante **contém** setores. O enum já usava a palavra "campanha" no próprio
-comentário, e carrega `ARMADILHA PERMANENTE` na documentação — não é vizinho com
-quem valha confundir nome.
+Um quadrante **contém** setores. Não confundir.
+
+**Uma cena só para o mundo inteiro**, porque tudo encosta em tudo: Europa faz
+fronteira com África *e* com a Rússia. Não se desenha fronteira contínua entre
+dois arquivos, e é a continuidade que faz o mapa acender por região.
+
+---
+
+## O que existe e funciona
+
+```text
+Assets/Scripts/Campanha/       MundoData · BlocoData · CampanhaData
+                               QuadranteData · INoDoMapa · QuadranteController
+Assets/Editor/MapHelperWindow.cs        o editor de campanha (1562 linhas)
+Assets/Editor/SceneSanitizerWindow.cs   Faxina de Cena
+Assets/DB/Campanha/Mundo Fixture.asset  2 blocos · 2 campanhas · 3 quadrantes assados
+Assets/Scenes/Autoria/Fixture.unity     950 tiles, 50 colunas, com ilha
+Assets/Scenes/Batalha.unity             + Quadrante Controller
+```
+
+O fixture está assim, e as costuras caíram em cima de feições geográficas:
+
+```text
+bloco A  (-18,-9) 37×19   QA1 x -18..0    QA2 x 0..18     emenda em x=0  → SERRA
+bloco B  ( 18,-9) 14×19   QB1 x 18..31                    emenda em x=18 → MAR
+```
 
 ---
 
 ## Onde eu parei
 
-### Existe e está commitado
+### ⚠️ Primeira coisa a arrumar
 
-```text
-docs/Planos/plano_campanha.md          o tronco — 1120 linhas, zero código
-Assets/Editor/MapHelperWindow.cs       Tools > Utils > Map Helper
-Assets/Editor/SceneSanitizerWindow.cs  Tools > Utils > Faxina de Cena
-Assets/Scenes/Autoria/Fixture.unity    37×19, sólido, serra + passo + 1 rota
-Assets/Scenes/Autoria/Mundo.unity      vazio
-Assets/Scenes/Campanha.unity           vazio, execução
-Assets/Scenes/Batalha.unity            vazio, execução
-```
+**A `Batalha.unity` está commitada com um endereço que não resolve:**
+`campanhaId: fixture`, `quadranteId: Q1`. O teste rodou com `campanha A1` /
+`QA1` — foi mudado no Inspector e a cena não foi salva. Abrir, corrigir, salvar.
 
-### Não existe
+### Falta
 
-- **Nenhuma linha de código de campanha.** Nem bake, nem pintor, nem
-  `CampaignData`, nem arquivo de progresso.
-- **As duas cenas de execução não estão no Build Settings.** Hoje é proteção;
-  vira pendência quando alguém tentar carregá-las.
+- **Estruturas e construções.** O recorte só leva **terreno**. A estrada não é
+  recortada nem pintada, e por isso **o teste de aceitação do plano não foi
+  feito**.
+- ⚠️ **Quando o recorte de rotas for escrito, ele tem de ler pelo caminho
+  filtrado (`RoadNetworkManager.GetRoadRoutes`), nunca pela lista crua
+  (`RoadRoutesByStructure`)** — senão pega rota estrangeira que o runtime já
+  ignora.
+- **`BoardReady` não tem leitor.** O portão existe e ninguém consulta.
+- **A avaliação de destrave não existe.** Só os campos (`destravadoPor`,
+  `exigeIrmaos`).
+- **As duas cenas de execução seguem fora do Build Settings.**
 
-### Não foi validado
+### Dá para fechar metade do teste sem escrever nada
 
-- A frente de **sondagem curta na iniciativa** (`085a74b`) teve o diff lido por
-  inteiro e **nenhuma corrida em partida**. É mudança na fila, e defers ali já
-  geraram cessão mútua antes.
-- **Map Helper e Faxina de Cena só rodaram em 703 células.** Os três gates de
-  performance do rótulo por hexágono foram desenhados para dezenas de milhares.
-- Os **~92.000 tiles** da cena de Mundo são estimativa. *Medir, não assumir.*
-- **19×19 = 361 células por quadrante** está acima das ~196 já provadas.
+`QA1` já mostra a serra e o passo na **borda leste**, em local `x=18`, `y=9`.
+Trocar o `quadranteId` para `QA2` e dar Play: a mesma serra e o mesmo passo têm
+de aparecer na **borda oeste**, em local `x=0`, **na mesma linha 9**. Se bater, a
+translação está provada nos dois sentidos.
+
+### Dívida com gatilho conhecido
+
+**Identidade por string vai quebrar save.** Renomear uma campanha invalida o
+endereço. A saída é um `guid` estável separado do nome editável.
+
+> **Tem de entrar antes do primeiro arquivo de progresso.** Depois disso custa
+> migração; antes, custa dez linhas.
+
+O projeto já aprendeu isso no `ConstructionSector` (*"os ints são contrato de
+serialização; nunca reaproveitar um número já usado"*).
+
+Menor: `mundoId` está como `mundo fixture`, **com espaço**.
+
+### Não medido
+
+- Bancada e pintor rodaram sobre **950 células**. Os três gates do rótulo por
+  hexágono foram desenhados para dezenas de milhares.
+- Os `FrameSpike` de 5 s e 14 s **são anteriores a este trabalho** — apareciam no
+  Play da cena vazia. O pintor custou 2 ms.
 
 ---
 
-## Próximo passo — e ele não depende de nenhuma decisão
+## Os dois bloqueios continuam de pé
 
-O plano define oito fases. As duas primeiras **valem por si mesmas** e não
-dependem de nada em aberto:
+Herdados da `v8.2.2`, **intocados**, e nenhum depende de decisão em aberto:
 
-| # | frente | por que agora |
+| # | frente | por que ainda importa |
 |---|---|---|
 | **0a** | evento no funil de vitória | conserta um beco sem saída que **já existe hoje** |
-| **0b** | `sceneLoaded` nos 4 managers | testável agora, sem campanha nenhuma |
+| **0b** | `sceneLoaded` nos 4 managers | a campanha **vai** encadear cenas |
 
 **A 0a é menor do que parece.** O funil já existe:
 
 ```csharp
-// MatchController.cs:3025 — a taxonomia está pronta
+// MatchController.cs:3025
 enum VictoryReason { HeadQuarterCaptured, ArmyEliminated, Surrender, VictoryStars }
-
-// MatchController.cs:3033 — a assinatura já é a que a campanha precisa
+// MatchController.cs:3033 — a assinatura ja e a que a campanha precisa
 HandleVictoryAestheticPresentation(TeamId winner, TeamId defeated, VictoryReason reason)
 ```
 
-Os dois motivos do MVP já passam por lá. Falta: publicar o evento, rotear os
-**três caminhos que o contornam** (`DeclareTutorialVictory`,
-`DeclareTutorialDefeat`, `DeclareDefeat`), e ⚠️ **blindar `ImportVictoryState`
-(`:1250`)** — restauração não é conclusão, e um evento ingênuo dispara no *load*.
+Os dois motivos do MVP já passam por lá. Falta: publicar o evento, rotear os três
+caminhos que o contornam (`DeclareTutorialVictory`, `DeclareTutorialDefeat`,
+`DeclareDefeat`), e ⚠️ **blindar `ImportVictoryState` (`:1250`)** — restauração
+não é conclusão, e um evento ingênuo dispara no *load*.
 
-E `freezeTurnAdvanceAfterVictory` (`:431`) não é obra inacabada: é um campo
-deliberado, ligado por padrão, esperando a camada que agora existe no papel.
-
-**Teste da 0b, hoje, sem campanha:** menu → mapa A → jogue até o turno 5 → menu →
-mapa B. No turno 1 do mapa B, o plano tem que nascer **vazio**.
-
-### Depois, a máquina de recorte
-
-Ordem refinada em relação à tabela do plano — **a leitura vem antes da pintura**,
-porque não se pinta o que ainda não se sabe ler:
-
-```text
-C1  seleção que só LÊ (já meio-feita no Map Helper)
-C2  o bake: retângulo → terreno + rotas filtradas e transladadas
-C3  botão "pintar agora" no Editor  +  o portão de "pintura terminou"
-►   TESTE DE ACEITAÇÃO — sem Play
-C4  pintor em runtime na Batalha
-C5  save carrega (campanha, quadrante) e DIRIGE a pintura
-```
-
-⚠️ **O C2 tem de ler as rotas pelo caminho filtrado (`GetRoadRoutes`), nunca pela
-lista crua (`RoadRoutesByStructure`)** — senão pega rota estrangeira que o runtime
-já ignora.
-
-### Teste de aceitação
-
-> Pinte a estrada cruzando o passo no mapa de autoria. Regere os dois quadrantes.
-> Sem tocar em nenhuma cena de batalha: a estrada entra no **Q1 pela borda leste,
-> na linha R**, e no **Q2 pela borda oeste, na MESMA linha R**.
-
-Confere-se em cinco segundos. Se a linha não bater, o erro é de **translação de
-origem** — não precisa investigar mais nada.
+**Teste da 0b, hoje:** menu → mapa A → jogue até o turno 5 → menu → mapa B. No
+turno 1 do mapa B, o plano tem de nascer **vazio**.
 
 ---
 
@@ -172,14 +151,10 @@ origem** — não precisa investigar mais nada.
  0. sensores PodeX                ⚠️ o laço de HEX ainda mora no PodeDetectar
  1. serviços de área (Hotzone)    ⚠️ falta cobertura de DETECÇÃO
  2. consumidores Melhor*          ⚠️ faltam Suprir, Fundir, Detecção e Spotting
-                                  ✅ MelhorEmbarque ganhou sondagem curta
  3. papéis → somente POLÍTICA     ⚠️ as seis fichas existem; RoleData ainda não
  4. variações de papel            perfil/trait depois da extração
- 5. CAMPANHA                      📄 planejada, zero código
+ 5. CAMPANHA                      🟡 terreno pinta; estruturas e peças faltam
 ```
-
-O degrau 5 é novo. Ele não é continuação dos outros — é o primeiro que tem um
-jogador dentro.
 
 ---
 
@@ -187,24 +162,26 @@ jogador dentro.
 
 | armadilha | regra |
 |---|---|
-| **`git status` limpo confundido com cena limpa** | rodei o teste "nasceu vazia?" olhando tiles, construções e unidades — e **não olhei rotas**. Havia 46 estrangeiras. O teste do `CLAUDE.md` inclui estradas |
-| **contaminação inerte descrita como ativa** | `IsRouteAllowedForCurrentDatabase` (`:361`) barra rota de outro catálogo. Conferir o filtro **antes** de descrever o efeito |
-| **rota com `ownerDatabase` nulo** | tratada como legado/global, **passa** no filtro. Única classe estrangeira que age |
-| **retângulo de célula desenhado a olho** | grade hexagonal tem borda serrilhada; pintar pelo que "parece reto" fura linha sim, linha não. Aconteceu **duas vezes no mesmo dia** |
-| **script de Editor culpado por build lento** | `Assets/Editor/` não entra em player build. Quem mexe no build é runtime |
-| **`Assets/Resources/` como pasta neutra** | embarca **inteira** em todo build; um build cancelado deixou dois JSON ali |
-| **duplicar cena esperando cópia limpa** | duplicação copia o layout que a cena legitimamente possui. Faltava a operação de esvaziar, não mais desacoplamento |
-| **derivado não invalidado** | remover rota sem `InvalidateRoutesLookup` + `RebuildRoadVisuals` deixa a cena desenhando estrada que já não existe |
-| **construção na interseção de quadrantes** | a faixa é para o **chão**. Peça ali nasce nos dois: QG duplicado quebra a contagem por slot |
-| **pintor escrevendo na cena de autoria** | origem e destino nunca são o mesmo arquivo — corrompe a fonte, e o resultado *parece* válido |
-| **`Grid` divergente entre autoria e Batalha** | cell size/layout/swizzle diferentes torcem **toda** tradução de coordenada, parecendo bug de recorte |
-| farol tratado como lock | promessa e claim distribuem preferência; nunca proíbem outro candidato de ajudar |
-| destino confundido com âncora imediata | o prédio permanece a missão; a LZ só substitui o próximo passo quando não há rota própria |
-| matcher global sem histerese | custo de troca nasce junto com o eixo N; hoje vale `15` |
-| singleton de mapa atravessando cenas | `BeachManager` e `SectorManager` pertencem à cena/tilemap corrente |
-| posição hipotética criando verdade | nenhum cálculo provisório atualiza FOW, ocupação, recursos ou caches confirmados |
-| compilar não prova que o arquivo mudou | conferir o diff e o arquivo-alvo antes do commit |
-| busca vazia tomada como prova de ausência | para ausência, a pergunta é `git ls-files`, não `git status` |
+| **aplicar o padrão da casa sem checar a razão dele** | `Database → Data` como assets vale porque `UnitData` é **compartilhado**. Campanha pertence a um mundo só. Generalizar sem verificar a razão errou **três vezes** num dia |
+| **parse frágil de `.asset` virando afirmação** | errei a leitura do arquivo **três vezes** (`awk` cortando em espaço; indentação a mais do nível novo). Contagem por faixa de linha é confiável; `$3` não é |
+| **`.asset` em disco tomado como estado atual** | edição no Inspector marca `dirty` e **não grava**. Disco e tela divergem até alguém salvar |
+| **id repetido** | `TryGet*` devolve o **primeiro**. O segundo existe no asset e é inalcançável, sem erro nenhum |
+| **assar com a cena errada aberta** | grava tiles nulos, e o sintoma parece "bake não rodou" |
+| **consulta antes da pintura terminar** | `SectorManager` assa o vazio e **cacheia**. Daí o `-9000` e o portão |
+| **listar irmãos na mão** | quebra em silêncio quando se acrescenta um irmão. `exigeIrmaos` é flag |
+| **identidade de serialização igual ao nome editável** | renomear invalida save |
+| **retângulo de célula desenhado a olho** | grade hexagonal tem borda serrilhada. Aconteceu **três vezes** no mesmo dia |
+| **construção na interseção de quadrantes** | a faixa é para o **chão**. Peça ali nasce nos dois |
+| **pintor escrevendo na cena de autoria** | origem e destino nunca são o mesmo arquivo |
+| **`Grid` divergente entre autoria e Batalha** | cell size/layout/swizzle diferentes torcem **toda** tradução de coordenada |
+| **`git status` limpo confundido com cena limpa** | o teste "nasceu vazia?" tem de olhar **rotas** também — 46 estrangeiras passaram por isso |
+| **contaminação inerte descrita como ativa** | `IsRouteAllowedForCurrentDatabase` (`:361`) barra rota de outro catálogo. Conferir o filtro antes de descrever o efeito |
+| **script de Editor culpado por build lento** | `Assets/Editor/` não entra em player build |
+| **`Assets/Resources/` como pasta neutra** | embarca **inteira** em todo build |
+| farol tratado como lock | promessa e claim distribuem preferência; nunca proíbem outro de ajudar |
+| singleton de mapa atravessando cenas | `BeachManager` e `SectorManager` pertencem à cena corrente |
+| posição hipotética criando verdade | nenhum cálculo provisório atualiza FOW, ocupação, recursos ou caches |
+| busca vazia tomada como prova de ausência | para ausência, a pergunta é `git ls-files` |
 
 ---
 
@@ -213,21 +190,20 @@ jogador dentro.
 | documento | uso |
 |---|---|
 | [`Planos/plano_campanha.md`](Planos/plano_campanha.md) | **o tronco** — autoria, recorte, progresso, cenas, bloqueios, teste |
-| [`relatorio_v8.2.2.md`](relatorio_v8.2.2.md) | o dia de hoje, e duas correções de afirmação minha |
-| [`relatorio_v8.2.1.md`](relatorio_v8.2.1.md) | a travessia naval e o táxi que bloqueava a própria entrega |
-| [`AI Behavior/Transporte.md`](AI%20Behavior/Transporte.md) | estados, promessas, coleta e entrega — §10 tem a sondagem curta |
-| [`AI Behavior/Capturador.md`](AI%20Behavior/Capturador.md) | doutrina e voz da família do capturador |
+| [`relatorio_v8.3.0.md`](relatorio_v8.3.0.md) | o dia em que o dado achou a forma na terceira tentativa |
+| [`relatorio_v8.2.2.md`](relatorio_v8.2.2.md) | o plano nasce, e as duas bancadas |
+| [`AI Behavior/Transporte.md`](AI%20Behavior/Transporte.md) | estados, promessas, coleta e entrega |
+| [`AI Behavior/Capturador.md`](AI%20Behavior/Capturador.md) | doutrina da família do capturador |
 | [`arquitetura/acoes_transacionais.md`](arquitetura/acoes_transacionais.md) | lei de compromisso e rollback |
 
 ---
 
 ## Regras de trabalho
 
-- **Nada no jogo é definitivo antes do compromisso da ação.** Toda ação começa e
-  termina em `CursorState.Neutral`; o meio é cancelável.
-- **Plano pedido não autoriza implementação.** Avaliar e executar são trabalhos
-  diferentes.
-- **Verificar antes de documentar.** Busca vazia não prova ausência.
+- **Nada no jogo é definitivo antes do compromisso da ação.**
+- **Plano pedido não autoriza implementação.**
+- **Verificar antes de documentar.** Busca vazia não prova ausência, e `.asset`
+  em disco não prova estado.
 - **Uma frente por commit.** `git add .` só no churn.
 - **Não editar `.asset` no disco com o Inspector aberto.**
 - **Não salvar `.cs` enquanto o autor testa em Play.**
