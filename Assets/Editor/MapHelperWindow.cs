@@ -1064,7 +1064,18 @@ public class MapHelperWindow : EditorWindow
                 // degenerado.
                 sector = c.Sector,
                 isAnchorSector = c.IsAnchorSector,
-                initialCapturePoints = c.CurrentCapturePoints,
+                // -1 quando o valor e so o maximo do tipo. Assim o assado carrega
+                // INTENCAO ("comeca meio capturado") e nao coincidencia — e mudar
+                // o HQ de 60 pra 80 no catalogo passa a valer nos quadrantes ja
+                // assados, em vez de congelar o numero velho.
+                initialCapturePoints = c.CurrentCapturePoints == c.CapturePointsMax
+                    ? -1
+                    : c.CurrentCapturePoints,
+                // A CENA DE AUTORIA E A LEI. Sem levar a configuracao desta
+                // instancia, o spawn cai na do TIPO e toda fabrica do mapa vira
+                // igual — uma fabrica leve autorada SEM radar movel nasceria
+                // vendendo radar movel, sem erro nenhum.
+                siteRuntime = c.GetSiteRuntimeSnapshot(),
                 displayName = c.ConstructionDisplayName
             });
 

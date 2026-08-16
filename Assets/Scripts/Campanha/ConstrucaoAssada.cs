@@ -35,6 +35,14 @@ public class ConstrucaoAssada
     [Tooltip("Pontos de captura iniciais. -1 usa o maximo da configuracao do tipo.")]
     public int initialCapturePoints = -1;
 
+    [Tooltip(
+        "Configuracao DESTA instancia: o que ela vende, que servicos oferece, se e QG, "
+        + "se e capturavel. A cena de autoria e a lei — uma fabrica leve que NAO vende "
+        + "radar movel tem de nascer sem radar movel.\n\n"
+        + "Sem isto o spawn cai na configuracao do TIPO, e toda fabrica do mapa vira "
+        + "igual: a customizacao por instancia some sem erro nenhum.")]
+    public ConstructionSiteRuntime siteRuntime = new ConstructionSiteRuntime();
+
     [Tooltip("So pra log e Inspector; o spawner nao usa.")]
     public string displayName;
 

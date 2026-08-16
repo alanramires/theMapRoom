@@ -22,11 +22,16 @@ using Debug = UnityEngine.Debug;
 /// primeira consulta, assa o vazio e CACHEIA. Sem erro nenhum no console; so um
 /// plano degenerado.
 ///
-/// Por isso existe <see cref="BoardReady"/>. Hoje ninguem le esse portao: a cena
-/// de batalha sempre nasceu pronta, entao a garantia era acidental. Com a cena
-/// vazia ela desaparece, e o portao e o que a substitui.
+/// Por isso existe <see cref="BoardReady"/>. A cena de batalha sempre nasceu
+/// pronta, entao a garantia era acidental; com a cena vazia ela desaparece, e o
+/// portao e o que a substitui.
 ///
-/// Etapa 1 pinta SO TILES. Construcoes e estruturas vem depois, nessa ordem.
+/// O primeiro consumidor dele e o refresh visual das construcoes: elas nascem
+/// durante este Awake e cacheiam um estado calculado contra managers que ainda nao
+/// inicializaram. Quem mais depender de "o tabuleiro ja existe" entra no FIM do
+/// Build, e nao espalhado pelo Start de cada um.
+///
+/// Etapa 1 pinta terreno e construcoes. Estruturas e unidades vem depois.
 /// </summary>
 [DefaultExecutionOrder(-9000)]
 public class QuadranteController : MonoBehaviour
@@ -71,6 +76,25 @@ public class QuadranteController : MonoBehaviour
     {
         active = this;
         built = false;
+
+        // O ENDERECO VEM DE FORA QUANDO ALGUEM O MANDOU.
+        //
+        // A cena Campanha publica (campanhaId, quadranteId) no PartidaConfig antes
+        // de carregar esta cena. Consumir aqui, no Awake, e antes do Build, e o que
+        // faz o save/menu MANDAR no que e pintado em vez de ser conferido depois —
+        // "quadrante errado" deixa de ser representavel porque nao existe tabuleiro
+        // antes de alguem dizer qual e.
+        //
+        // Sem pedido pendente, valem os campos do Inspector: e assim que se testa
+        // um quadrante direto, sem passar pelo menu.
+        if (PartidaConfig.TryConsumeQuadrante(out string pedidoCampanha, out string pedidoQuadrante))
+        {
+            campanhaId = pedidoCampanha;
+            quadranteId = pedidoQuadrante;
+
+            if (logBuild)
+                Debug.Log($"[Quadrante] Endereco recebido do PartidaConfig: '{campanhaId}/{quadranteId}'.", this);
+        }
 
         if (buildOnAwake)
             Build();
@@ -178,6 +202,21 @@ public class QuadranteController : MonoBehaviour
         watch.Stop();
         built = true;
 
+        // O PORTAO GANHA SEU PRIMEIRO CONSUMIDOR.
+        //
+        // As construcoes nascem aqui, no Awake em -9000 — ANTES do Awake do
+        // MatchController. Cada uma calcula seu estado visual nesse instante e
+        // GUARDA EM CACHE (cachedOccupantShouldDarken e amigos). Os refreshes
+        // seguintes chegam com force:false e retornam cedo quando o cache "bate",
+        // entao um valor calculado contra um MatchController ainda nao
+        // inicializado pode ficar congelado.
+        //
+        // Numa cena que nascia pronta isso nunca acontecia: a construcao ja estava
+        // la quando tudo inicializou. Com o quadrante pintado em runtime, a
+        // garantia sumiu — e este e o tipo de coisa que o BoardReady existe pra
+        // substituir.
+        ConstructionManager.RefreshAllOccupancyVisuals();
+
         if (logBuild)
         {
             Debug.Log(
@@ -249,6 +288,7 @@ public class QuadranteController : MonoBehaviour
             return 0;
         }
 
+        MatchController match = FindAnyObjectByType<MatchController>();
         int planted = 0;
 
         for (int i = 0; i < quadrante.bakedConstrucoes.Count; i++)
@@ -272,23 +312,94 @@ public class QuadranteController : MonoBehaviour
             ConstructionManager manager = go.GetComponent<ConstructionManager>();
             if (manager != null)
             {
-                // O spawn so recebe o TIME. Slot, setor e ancora vem a parte — e
-                // nenhum deles e cosmetico:
-                //   slot   decide producao, renda e vitoria
-                //   setor  e por onde o planner da IA le o tabuleiro, e o default do
-                //          enum e Alpha (nao None), entao omitir nao da erro: da
-                //          plano degenerado, em silencio
+                // A CELULA LOGICA VEM DAQUI, nao da ida-e-volta pelo mundo.
+                //
+                // SpawnAtCell converte celula -> centro do mundo, e o Spawn converte
+                // de volta mundo -> celula. Se a volta cair num vizinho, o predio
+                // FICA VISUALMENTE CERTO e passa a achar que mora noutro hex — e ai
+                // HandleUnitOccupancyChanged compara contra a celula errada e nunca
+                // dispara. O sintoma e exatamente "o predio nao reage a unidade que
+                // entra nem a que sai", com todo o resto parecendo normal.
+                Vector3Int derivada = manager.CurrentCellPosition;
+                derivada.z = 0;
+                if (derivada != cell)
+                {
+                    Debug.LogWarning(
+                        $"[Quadrante] '{c.constructionId}': o spawn derivou a celula {derivada} " +
+                        $"mas a assada e {cell}. A ida-e-volta celula->mundo->celula nao fechou; " +
+                        "corrigindo para a assada.",
+                        this);
+                }
+
+                manager.SetCurrentCellPosition(cell);
+
+                // O spawn so recebe o TIME. Slot, setor, ancora e pontos de captura
+                // vem a parte — e nenhum deles e cosmetico:
+                //   slot     decide producao, renda e vitoria
+                //   setor    e por onde o planner da IA le o tabuleiro, e o default
+                //            do enum e Alpha (nao None): omitir nao da erro, da
+                //            plano degenerado em silencio
+                //   captura  o PREFAB molde carrega 40 gravado, e nem Setup nem
+                //            Apply o corrigem. Todo caminho de spawn nasce com 40; o
+                //            de save so nao mostra porque aplica o estado depois
                 if (c.slotIndex >= 0)
+                {
+                    AvisarSlotInexistente(c, match);
                     manager.SetSlotIndex(c.slotIndex);
+                }
 
                 manager.SetSector(c.sector);
                 manager.SetAnchorSector(c.isAnchorSector);
+
+                // ANTES dos pontos de captura: o siteRuntime traz o
+                // capturePointsMax, e "-1 = usa o maximo" precisa do maximo certo
+                // ja no lugar.
+                if (c.siteRuntime != null)
+                    manager.ApplySiteRuntime(c.siteRuntime);
+
+                AplicarPontosDeCaptura(manager, c);
             }
 
             planted++;
         }
 
         return planted;
+    }
+
+    /// <summary>
+    /// A cena de AUTORIA e a de BATALHA tem listas de jogadores diferentes, e nada
+    /// compara as duas. Construcao assada num slot que a partida nao tem nasce
+    /// NEUTRA em silencio — e junto some o QG do jogador, o foco do cursor nele, a
+    /// renda e a condicao de vitoria. Um aviso custa nada e entrega os tres
+    /// sintomas de uma vez.
+    /// </summary>
+    private void AvisarSlotInexistente(ConstrucaoAssada c, MatchController match)
+    {
+        if (match == null || match.IsValidPlayerSlotIndex(c.slotIndex))
+            return;
+
+        Debug.LogWarning(
+            $"[Quadrante] '{c.constructionId}' assado no slot {c.slotIndex}, que NAO EXISTE nesta " +
+            "partida. Vai nascer Neutral — sem dono, sem renda, e o cursor nao vai achar QG " +
+            "desse jogador. Repinte na cena de autoria com um slot valido e asse de novo.",
+            this);
+    }
+
+    /// <summary>
+    /// -1 significa "usa o maximo do tipo" — a mesma convencao do antigo
+    /// ConstructionFieldEntry. Valor >= 0 e intencao de autoria: predio comecando
+    /// meio capturado.
+    ///
+    /// Isto precisa ser aplicado porque o PREFAB molde carrega 40 gravado e nem
+    /// Setup nem Apply o corrigem: sem esta linha um QG de 60 nasce com 40.
+    /// </summary>
+    private static void AplicarPontosDeCaptura(ConstructionManager manager, ConstrucaoAssada c)
+    {
+        int alvo = c.initialCapturePoints >= 0
+            ? c.initialCapturePoints
+            : manager.CapturePointsMax;
+
+        manager.SetCurrentCapturePoints(alvo);
     }
 
     private string DescreverCampanhas()
