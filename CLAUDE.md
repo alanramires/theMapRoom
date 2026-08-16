@@ -8,6 +8,45 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Read `docs/arquitetura/acoes_transacionais.md` before changing TurnState, movement, FOW, sensors, combat, capture, transport, supply, merge, replay or AI action execution.
 
+### O mundo só recalcula no Neutral
+
+A frase acima é uma **proibição** — não recalcule antes do compromisso. Esta é a
+**obrigação**, e é a metade que já foi esquecida:
+
+> **Se o seu estado deriva do tabuleiro, você TEM de recalcular ao voltar para
+> `Neutral` — e com `force`, furando cache.**
+
+`Neutral` é o único instante em que nada é provisório: nenhuma animação correndo,
+nenhuma ação pela metade, nenhuma posição a caminho. Qualquer outro gatilho é uma
+foto tirada no meio do movimento.
+
+```csharp
+CursorController.OnCursorReturnedToNeutral += … ;   // no OnEnable
+RefreshAlgumaCoisa(force: true);                    // e SEMPRE com force
+```
+
+**O modo de falha, que já aconteceu:** o escurecimento de construção ocupada era
+mantido só por `UnitOccupancyRules.OnUnitOccupancyChanged`, que dispara **junto**
+com a troca de célula. Nesse instante a unidade que saiu ainda está animando por
+cima do hex, e `TryGetOccupantOnTop` deriva a célula do ocupante da **posição
+visual** — então ainda a encontra, marca escurecido e **cacheia**. Como todo
+refresh seguinte chega com `force: false` e o cache "bate", o prédio ficava escuro
+**para sempre**. Nenhum erro, nenhum log: só um prédio preto.
+
+Três coisas conspiraram, e nenhuma delas é errada sozinha:
+
+```text
+evento disparado no meio da animação
+estado derivado da POSIÇÃO em vez da célula lógica
+cache que economiza refresh comparando o valor errado
+```
+
+`force: true` é obrigatório justamente porque o cache é o que trava: reconferir sem
+furar o cache não reconfere nada.
+
+Precedente: `HexCohabitationVisualManager` já adiava rescan até o Neutral confirmado
+(`rescanWhenNeutralPending`). `ConstructionManager` estava de fora e pagou por isso.
+
 ## Start here
 
 `docs/resumo.md` is the handoff: current state, the five-rung architecture ladder,

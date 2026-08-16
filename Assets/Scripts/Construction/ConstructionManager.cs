@@ -393,6 +393,7 @@ public class ConstructionManager : MonoBehaviour
         MatchController.OnUnitActedStateChanged += HandleUnitActedStateChanged;
         MatchController.OnSlotConfigChanged += HandleSlotConfigChanged;
         UnitOccupancyRules.OnUnitOccupancyChanged += HandleUnitOccupancyChanged;
+        CursorController.OnCursorReturnedToNeutral += HandleCursorReturnedToNeutral;
         RefreshRuntimeVisualState(force: true);
 #if UNITY_EDITOR
         RegisterEditorTick();
@@ -407,9 +408,33 @@ public class ConstructionManager : MonoBehaviour
         MatchController.OnUnitActedStateChanged -= HandleUnitActedStateChanged;
         MatchController.OnSlotConfigChanged -= HandleSlotConfigChanged;
         UnitOccupancyRules.OnUnitOccupancyChanged -= HandleUnitOccupancyChanged;
+        CursorController.OnCursorReturnedToNeutral -= HandleCursorReturnedToNeutral;
 #if UNITY_EDITOR
         UnregisterEditorTick();
 #endif
+    }
+
+    /// <summary>
+    /// NEUTRAL E O INSTANTE EM QUE O TABULEIRO E VERDADE.
+    ///
+    /// O escurecimento por ocupante era mantido so pelo OnUnitOccupancyChanged, que
+    /// dispara junto com a troca de celula — e nesse instante a unidade que SAIU
+    /// ainda pode estar animando por cima do hex. O fallback de TryGetOccupantOnTop
+    /// deriva a celula da POSICAO VISUAL, entao ele ainda a encontra, marca
+    /// escurecido, e CACHEIA. Como os refreshes seguintes chegam com force:false e o
+    /// cache "bate", o predio fica escuro para sempre.
+    ///
+    /// Voltar ao Neutral e o unico momento em que nada esta provisorio: nenhuma
+    /// animacao correndo, nenhuma acao pela metade. Reconferir aqui com force:true
+    /// e o que a lei transacional ja diz — so depois do compromisso o tabuleiro
+    /// confirmado e recalculado.
+    ///
+    /// Mesmo padrao que o HexCohabitationVisualManager ja usa (ele adia rescan ate
+    /// o Neutral confirmado); a construcao e que estava de fora.
+    /// </summary>
+    private void HandleCursorReturnedToNeutral()
+    {
+        RefreshRuntimeVisualState(force: true);
     }
 
 #if UNITY_EDITOR
