@@ -913,19 +913,6 @@ MonoBehaviour:
     actualMoney: 0
     incomePerTurn: 0
     startMoneyApplied: 1
-  - teamId: 1
-    flipX: 1
-    flipXOverride: 0
-    isAI: 1
-    isRebelRuntime: 0
-    isLocal: 0
-    localityConfigured: 1
-    commandServiceAutomatic: 1
-    defeated: 0
-    startMoney: 0
-    actualMoney: 0
-    incomePerTurn: 0
-    startMoneyApplied: 0
   includeNeutralTeam: 0
   capturedBuildingHistory:
   - slotIndex: 0
@@ -935,12 +922,12 @@ MonoBehaviour:
   economyEnabled: 1
   fogOfWar: 1
   autoFlipXFromHqPositions: 1
-  gameSetup: 4
-  enableLdtValidation: 1
-  enableLosValidation: 1
-  enableSpotter: 1
-  enableStealthValidation: 1
-  enableTotalWar: 1
+  gameSetup: 0
+  enableLdtValidation: 0
+  enableLosValidation: 0
+  enableSpotter: 0
+  enableStealthValidation: 0
+  enableTotalWar: 0
   atalhoContextual: 0
   atalhoRPassarTurnoUsaConfirmacao: 1
   allowDefeatForZeroUnits: 1
@@ -964,9 +951,6 @@ MonoBehaviour:
     stars: 0
   - slotIndex: 1
     teamId: 3
-    stars: 0
-  - slotIndex: 2
-    teamId: 1
     stars: 0
   hasVictoryWinner: 0
   victoryWinnerTeam: -1
@@ -9399,7 +9383,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: cd12603ec1f6f9840b99990e0ebcd96c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::RoadNetworkManager
-  structureDatabase: {fileID: 0}
+  structureDatabase: {fileID: 11400000, guid: db7a20bdbd574bd408e02a940b66e687, type: 2}
   boardTilemap: {fileID: 1566606925}
   terrainDatabase: {fileID: 11400000, guid: af24f1a2f28971f498767ede9f9cfba1, type: 2}
   roadRoutesByStructure:
@@ -9411,7 +9395,6 @@ MonoBehaviour:
     routes: []
   - structure: {fileID: 11400000, guid: 32bd7b500bf78b64a95d16600a68909d, type: 2}
     routes: []
-  routesMigratedToScene: 1
   roadSegmentSprite: {fileID: 21300000, guid: 03650c0a2457e5046b8234d0bc968b5a, type: 3}
   roadColor: {r: 0.9607844, g: 0.9607844, b: 0.9607844, a: 1}
   roadWidth: 0.16
@@ -12074,7 +12057,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 43a4d50dbb5dea445b5855ceedaf468c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::UnitSpawner
-  unitDatabase: {fileID: 0}
+  unitDatabase: {fileID: 11400000, guid: e8814965e8c2b764c881f833b39e19f1, type: 2}
   matchController: {fileID: 327617512}
   currentId: 1
   showUnitSpawnerLogs: 0
@@ -12167,7 +12150,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e35d6374245efa14c96f91150a34e26e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ConstructionSpawner
-  constructionDatabase: {fileID: 0}
+  constructionDatabase: {fileID: 11400000, guid: a3b9ad47181534c4e92a0205460608a5, type: 2}
   matchController: {fileID: 327617512}
   currentId: 1
   constructionPrefab: {fileID: 6576751892175530090, guid: 13117a41645b28b4fba41de10ae420eb, type: 3}
@@ -12259,8 +12242,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::QuadranteController
   mundo: {fileID: 11400000, guid: 3c4f3be48f318fb4fb30ae0166700a28, type: 2}
-  campanhaId: campanha A1
-  quadranteId: QA1
+  campanhaId: A_IA
+  quadranteId: A_IA_Q1
   targetTilemap: {fileID: 1566606925}
   paintOrigin: {x: 0, y: 0}
   buildOnAwake: 1
