@@ -675,8 +675,7 @@ public class RoadRoutePainterWindow : EditorWindow
             if (candidate == null)
                 continue;
 
-            if (roadNetworkManager.StructureDatabase.HasAnyRoadRoutesForStructure(candidate) ||
-                (candidate.roadRoutes != null && candidate.roadRoutes.Count > 0))
+            if (roadNetworkManager.HasAnyRoadRoutesForStructure(candidate))
                 return candidate;
         }
 
@@ -853,16 +852,12 @@ public class RoadRoutePainterWindow : EditorWindow
     }
 
     /// <summary>
-    /// Onde a rota e GRAVADA. Depois da migracao e a CENA (o RoadNetworkManager);
-    /// antes dela, ainda o catalogo — para o pintor nao parar de funcionar no
-    /// meio da transicao.
+    /// Onde a rota e GRAVADA: sempre a CENA. O catalogo nao guarda mais tracado —
+    /// ele diz o que uma rodovia E, e cinquenta mapas compartilham o mesmo.
     /// </summary>
     private UnityEngine.Object GetRouteWriteTarget()
     {
-        if (roadNetworkManager != null && roadNetworkManager.RoutesMigratedToScene)
-            return roadNetworkManager;
-
-        return GetContextDatabase();
+        return roadNetworkManager;
     }
 
     // Asset suja com SetDirty; componente de cena precisa da CENA suja tambem,
@@ -885,49 +880,20 @@ public class RoadRoutePainterWindow : EditorWindow
         if (structureData == null)
             return null;
 
-        if (roadNetworkManager != null && roadNetworkManager.RoutesMigratedToScene)
-        {
-            IReadOnlyList<RoadRouteDefinition> sceneRoutes =
-                roadNetworkManager.GetRoadRoutes(structureData);
-            if (sceneRoutes is List<RoadRouteDefinition> sceneList)
-                return sceneList;
-
-            return createIfMissing
-                ? roadNetworkManager.GetOrCreateRoadRoutes(structureData)
-                : null;
-        }
-
-        StructureDatabase db = GetContextDatabase();
-        if (db == null)
+        // A cena e a unica fonte. Antes daqui saia uma cadeia de tres — cena,
+        // catalogo, e StructureData.roadRoutes — com migracao automatica do legado
+        // na primeira edicao. As duas ultimas camadas foram removidas.
+        if (roadNetworkManager == null)
             return null;
 
-        IReadOnlyList<RoadRouteDefinition> existing = db.GetRoadRoutes(structureData);
-        if (existing is List<RoadRouteDefinition> existingList)
-            return existingList;
+        IReadOnlyList<RoadRouteDefinition> sceneRoutes =
+            roadNetworkManager.GetRoadRoutes(structureData);
+        if (sceneRoutes is List<RoadRouteDefinition> sceneList)
+            return sceneList;
 
-        if (!createIfMissing)
-            return structureData.roadRoutes;
-
-        List<RoadRouteDefinition> created = db.GetOrCreateRoadRoutes(structureData);
-        if (created == null)
-            return null;
-
-        // Migra legado automaticamente na primeira edicao pelo painter.
-        if (created.Count == 0 && structureData.roadRoutes != null && structureData.roadRoutes.Count > 0)
-        {
-            for (int i = 0; i < structureData.roadRoutes.Count; i++)
-            {
-                RoadRouteDefinition legacy = structureData.roadRoutes[i];
-                if (legacy == null)
-                    continue;
-                if (legacy.ownerDatabase != db)
-                    continue;
-
-                created.Add(CloneRoute(legacy));
-            }
-        }
-
-        return created;
+        return createIfMissing
+            ? roadNetworkManager.GetOrCreateRoadRoutes(structureData)
+            : null;
     }
 
     private static RoadRouteDefinition CloneRoute(RoadRouteDefinition source)

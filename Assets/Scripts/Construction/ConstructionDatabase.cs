@@ -1,18 +1,33 @@
 using System.Collections.Generic;
 using UnityEngine;
 
+/// <summary>
+/// Catalogo de construcoes: diz o que uma construcao E. Irmao do UnitDatabase e do
+/// TerrainDatabase.
+///
+/// NAO carrega layout, de proposito. Ele ja carregou — o campo fieldEntries dizia
+/// "esta construcao esta nesta celula, deste dono", e era isso que obrigava a
+/// existir um catalogo POR MAPA (eram sete). Layout e da cena; catalogo e
+/// compartilhado e agrupado por conteudo ("basico", "com naval"), como o
+/// UnitDatabase sempre foi.
+///
+/// O campo tinha ZERO leitores em runtime. Quem o alimentava era o
+/// ConstructionPainterWindow, espelhando no catalogo o que ja plantava na cena —
+/// o proprio nome do flag, persistToFieldDatabase, dizia quem era a fonte.
+///
+/// Sob o modelo de campanha isso quebraria de vez: a cena de Batalha e UMA so
+/// para todos os quadrantes de todos os mundos, e um catalogo por mapa nao cabe
+/// nela. Layout de quadrante mora em QuadranteData.bakedConstrucoes.
+/// </summary>
 [CreateAssetMenu(menuName = "Game/Construction/Construction Database", fileName = "ConstructionDatabase")]
 public class ConstructionDatabase : ScriptableObject
 {
-    [Tooltip("Lista manual das construcoes que realmente fazem parte do jogo/mapa.")]
+    [Tooltip("Lista manual das construcoes que realmente fazem parte do jogo.")]
     [SerializeField] private List<ConstructionData> constructions = new List<ConstructionData>();
-    [Tooltip("Construcoes instanciadas neste mapa (layout de campo) centralizadas no proprio catalogo.")]
-    [SerializeField] private List<ConstructionFieldEntry> fieldEntries = new List<ConstructionFieldEntry>();
 
     private readonly Dictionary<string, ConstructionData> byId = new Dictionary<string, ConstructionData>();
 
     public IReadOnlyList<ConstructionData> Constructions => constructions;
-    public IReadOnlyList<ConstructionFieldEntry> FieldEntries => fieldEntries;
 
     private void OnEnable()
     {
@@ -58,8 +73,6 @@ public class ConstructionDatabase : ScriptableObject
     private void RebuildLookup()
     {
         byId.Clear();
-        if (fieldEntries == null)
-            fieldEntries = new List<ConstructionFieldEntry>();
 
         for (int i = 0; i < constructions.Count; i++)
         {
@@ -89,20 +102,6 @@ public class ConstructionDatabase : ScriptableObject
             }
 
             byId.Add(key, def);
-        }
-
-        for (int i = 0; i < fieldEntries.Count; i++)
-        {
-            ConstructionFieldEntry entry = fieldEntries[i];
-            if (entry == null)
-                continue;
-
-            if (entry.initialCapturePoints < -1)
-                entry.initialCapturePoints = -1;
-
-            if (entry.constructionConfiguration == null)
-                entry.constructionConfiguration = new ConstructionSiteRuntime();
-            entry.constructionConfiguration.Sanitize();
         }
     }
 }

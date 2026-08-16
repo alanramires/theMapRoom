@@ -13,7 +13,6 @@ public class ConstructionPainterWindow : EditorWindow
     private int selectedConstructionIndex;
     private bool isPainting;
     private bool replaceExisting = true;
-    [SerializeField] private bool persistToFieldDatabase = true;
     [SerializeField] private bool useSiteConfigurationOverride;
     [SerializeField] private int initialCapturePoints = -1;
     [SerializeField] private ConstructionSiteRuntime brushSiteRuntime = new ConstructionSiteRuntime();
@@ -90,7 +89,6 @@ public class ConstructionPainterWindow : EditorWindow
         TryGetSelectedConstruction(out ConstructionData selectedConstruction);
         SyncBrushWithSelection(selectedConstruction);
         replaceExisting = EditorGUILayout.ToggleLeft("Replace Existing Construction On Cell", replaceExisting);
-        persistToFieldDatabase = EditorGUILayout.ToggleLeft("Persist To Construction Database Field Entries", persistToFieldDatabase);
 
         EditorGUILayout.Space(6f);
         EditorGUILayout.LabelField("Instance Configuration", EditorStyles.boldLabel);
@@ -210,9 +208,9 @@ public class ConstructionPainterWindow : EditorWindow
         {
             ApplySpawnOverrides(spawned, selectedSlotIndex);
 
-            if (persistToFieldDatabase && constructionDatabase != null)
-                UpsertFieldEntry(cell, selectedConstruction, spawned.GetComponent<ConstructionManager>(), selectedSlotIndex);
-
+            // Layout mora na CENA — o spawn acima JA e a verdade. Aqui saia um
+            // espelho pro ConstructionDatabase.fieldEntries, e era esse espelho que
+            // obrigava a existir um catalogo por mapa. O campo foi removido.
             Undo.RegisterCreatedObjectUndo(spawned, "Paint Construction");
             EditorSceneManager.MarkSceneDirty(spawned.scene);
         }
@@ -247,8 +245,6 @@ public class ConstructionPainterWindow : EditorWindow
                 EditorSceneManager.MarkSceneDirty(scene);
         }
 
-        if (persistToFieldDatabase && constructionDatabase != null)
-            RemoveFieldEntryAtCell(cell);
     }
 
     private Tilemap GetSpawnerBoardTilemap()
@@ -365,196 +361,6 @@ public class ConstructionPainterWindow : EditorWindow
         int capture = initialCapturePoints >= 0 ? initialCapturePoints : manager.CapturePointsMax;
         manager.SetCurrentCapturePoints(capture);
         EditorUtility.SetDirty(manager);
-    }
-
-    private void UpsertFieldEntry(Vector3Int cell, ConstructionData selectedConstruction, ConstructionManager spawnedManager, int slotIdx)
-    {
-        if (constructionDatabase == null || selectedConstruction == null)
-            return;
-
-        Undo.RecordObject(constructionDatabase, "Paint Construction Field Entry");
-
-        SerializedObject fieldDbSerialized = new SerializedObject(constructionDatabase);
-        fieldDbSerialized.Update();
-
-        SerializedProperty entriesProp = fieldDbSerialized.FindProperty("fieldEntries");
-        if (entriesProp == null)
-            return;
-
-        int index = FindEntryIndexByCell(entriesProp, cell);
-        if (index < 0)
-        {
-            index = entriesProp.arraySize;
-            entriesProp.arraySize += 1;
-        }
-
-        SerializedProperty entry = entriesProp.GetArrayElementAtIndex(index);
-        if (entry == null)
-            return;
-
-        SerializedProperty idProp = entry.FindPropertyRelative("id");
-        SerializedProperty constructionProp = entry.FindPropertyRelative("construction");
-        SerializedProperty teamProp = entry.FindPropertyRelative("initialSlotIndex");
-        SerializedProperty cellProp = entry.FindPropertyRelative("cellPosition");
-        SerializedProperty captureProp = entry.FindPropertyRelative("initialCapturePoints");
-        SerializedProperty useOverrideProp = entry.FindPropertyRelative("useConstructionConfigurationOverride");
-        SerializedProperty configProp = entry.FindPropertyRelative("constructionConfiguration");
-
-        TeamId resolvedTeam = ResolveTeamFromSlot(slotIdx);
-        if (idProp != null)
-            idProp.stringValue = BuildFieldEntryId(selectedConstruction, resolvedTeam, spawnedManager);
-
-        if (constructionProp != null)
-            constructionProp.objectReferenceValue = selectedConstruction;
-        if (teamProp != null)
-            teamProp.intValue = slotIdx;
-        if (cellProp != null)
-            cellProp.vector3IntValue = new Vector3Int(cell.x, cell.y, 0);
-        if (captureProp != null)
-            captureProp.intValue = initialCapturePoints;
-        if (useOverrideProp != null)
-            useOverrideProp.boolValue = useSiteConfigurationOverride;
-        if (configProp != null)
-            CopySiteRuntimeToProperty(brushSiteRuntime, configProp);
-
-        fieldDbSerialized.ApplyModifiedProperties();
-        EditorUtility.SetDirty(constructionDatabase);
-    }
-
-    private static string BuildFieldEntryId(ConstructionData selectedConstruction, TeamId resolvedTeam, ConstructionManager manager)
-    {
-        string baseName = manager != null
-            ? (!string.IsNullOrWhiteSpace(manager.ConstructionDisplayName) ? manager.ConstructionDisplayName : manager.ConstructionId)
-            : (selectedConstruction != null
-                ? (!string.IsNullOrWhiteSpace(selectedConstruction.displayName) ? selectedConstruction.displayName : selectedConstruction.id)
-                : "Construction");
-
-        int instanceId = manager != null ? Mathf.Max(0, manager.InstanceId) : 0;
-        string sanitized = string.IsNullOrWhiteSpace(baseName) ? "Construction" : baseName.Replace(" ", string.Empty);
-        int slot = manager != null ? manager.SlotIndex : -1;
-        string slotPart = slot < 0 ? "Neutral" : $"S{slot}";
-        return $"{sanitized}_{slotPart}_C{instanceId}";
-    }
-
-    private void RemoveFieldEntryAtCell(Vector3Int cell)
-    {
-        if (constructionDatabase == null)
-            return;
-
-        Undo.RecordObject(constructionDatabase, "Remove Construction Field Entry");
-
-        SerializedObject fieldDbSerialized = new SerializedObject(constructionDatabase);
-        fieldDbSerialized.Update();
-
-        SerializedProperty entriesProp = fieldDbSerialized.FindProperty("fieldEntries");
-        if (entriesProp == null)
-            return;
-
-        int index = FindEntryIndexByCell(entriesProp, cell);
-        if (index < 0)
-            return;
-
-        entriesProp.DeleteArrayElementAtIndex(index);
-        fieldDbSerialized.ApplyModifiedProperties();
-        EditorUtility.SetDirty(constructionDatabase);
-    }
-
-    private static int FindEntryIndexByCell(SerializedProperty entriesProp, Vector3Int cell)
-    {
-        if (entriesProp == null)
-            return -1;
-
-        Vector3Int fixedCell = new Vector3Int(cell.x, cell.y, 0);
-        for (int i = 0; i < entriesProp.arraySize; i++)
-        {
-            SerializedProperty entry = entriesProp.GetArrayElementAtIndex(i);
-            if (entry == null)
-                continue;
-
-            SerializedProperty cellProp = entry.FindPropertyRelative("cellPosition");
-            if (cellProp == null)
-                continue;
-
-            Vector3Int entryCell = cellProp.vector3IntValue;
-            entryCell.z = 0;
-            if (entryCell == fixedCell)
-                return i;
-        }
-
-        return -1;
-    }
-
-    private static void CopySiteRuntimeToProperty(ConstructionSiteRuntime source, SerializedProperty destination)
-    {
-        if (source == null || destination == null)
-            return;
-
-        ConstructionSiteRuntime copy = source.Clone();
-
-        SetBool(destination, "isPlayerHeadQuarter", copy.isPlayerHeadQuarter);
-        SetBool(destination, "isCapturable", copy.isCapturable);
-        SetInt(destination, "capturePointsMax", copy.capturePointsMax);
-        SetInt(destination, "capturedIncoming", copy.capturedIncoming);
-        SetBool(destination, "canProvideSupplies", copy.canProvideSupplies);
-        SetEnum(destination, "sellingRule", (int)copy.sellingRule);
-        CopyObjectList(destination.FindPropertyRelative("offeredUnits"), copy.offeredUnits);
-        CopyObjectList(destination.FindPropertyRelative("offeredServices"), copy.offeredServices);
-        CopySupplyList(destination.FindPropertyRelative("offeredSupplies"), copy.offeredSupplies);
-    }
-
-    private static void SetBool(SerializedProperty parent, string name, bool value)
-    {
-        SerializedProperty prop = parent.FindPropertyRelative(name);
-        if (prop != null)
-            prop.boolValue = value;
-    }
-
-    private static void SetInt(SerializedProperty parent, string name, int value)
-    {
-        SerializedProperty prop = parent.FindPropertyRelative(name);
-        if (prop != null)
-            prop.intValue = value;
-    }
-
-    private static void SetEnum(SerializedProperty parent, string name, int enumValueIndex)
-    {
-        SerializedProperty prop = parent.FindPropertyRelative(name);
-        if (prop != null)
-            prop.enumValueIndex = enumValueIndex;
-    }
-
-    private static void CopyObjectList<T>(SerializedProperty destination, List<T> values) where T : Object
-    {
-        if (destination == null)
-            return;
-
-        destination.arraySize = values != null ? values.Count : 0;
-        for (int i = 0; i < destination.arraySize; i++)
-            destination.GetArrayElementAtIndex(i).objectReferenceValue = values[i];
-    }
-
-    private static void CopySupplyList(SerializedProperty destination, List<ConstructionSupplyOffer> values)
-    {
-        if (destination == null)
-            return;
-
-        destination.arraySize = values != null ? values.Count : 0;
-        for (int i = 0; i < destination.arraySize; i++)
-        {
-            SerializedProperty item = destination.GetArrayElementAtIndex(i);
-            if (item == null)
-                continue;
-
-            SerializedProperty supplyProp = item.FindPropertyRelative("supply");
-            SerializedProperty quantityProp = item.FindPropertyRelative("quantity");
-            ConstructionSupplyOffer offer = values[i];
-
-            if (supplyProp != null)
-                supplyProp.objectReferenceValue = offer != null ? offer.supply : null;
-            if (quantityProp != null)
-                quantityProp.intValue = offer != null ? Mathf.Max(0, offer.quantity) : 0;
-        }
-
     }
 
     private void DrawSlotSelector()

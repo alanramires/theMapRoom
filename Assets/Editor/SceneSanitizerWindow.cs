@@ -114,7 +114,8 @@ public class SceneSanitizerWindow : EditorWindow
 
         EditorGUILayout.LabelField("catálogo do manager",
             roadManager.StructureDatabase != null ? roadManager.StructureDatabase.name : "— nenhum —");
-        EditorGUILayout.LabelField("rotas migradas p/ cena", roadManager.RoutesMigratedToScene ? "sim" : "não");
+        // A flag routesMigratedToScene sumiu junto com o catalogo de rotas: sem
+        // duas fontes, nao ha o que migrar nem o que conferir.
 
         EditorGUILayout.LabelField("desta cena (own)", ownCount.ToString());
         EditorGUILayout.LabelField("de outro catálogo", foreignCount.ToString());

@@ -218,9 +218,13 @@ public class StructureData : ScriptableObject
     private Dictionary<TerrainTypeData, List<SkillData>>
         combinedBlockedSkillsByTerrain;
 
-    [Header("Road Routes")]
-    [Tooltip("Rotas de rodovia desta estrutura (centro-a-centro dos hexes).")]
-    public List<RoadRouteDefinition> roadRoutes = new List<RoadRouteDefinition>();
+    // NAO existe roadRoutes aqui, de proposito. Existia — e era layout no TIPO
+    // COMPARTILHADO: o asset "Rodovias", que diz o que uma rodovia E, carregava 11
+    // tracados concretos. Toda cena que usasse o tipo herdava os tracados de
+    // outro mapa, e isso e a contaminacao mais global que o projeto tinha.
+    //
+    // Layout de estrada mora na CENA (RoadNetworkManager) e, no modelo de
+    // campanha, no bake do quadrante.
 
     private void OnValidate()
     {

@@ -13,20 +13,21 @@ public class RoadNetworkManager : MonoBehaviour
     [SerializeField] private Tilemap boardTilemap;
     [SerializeField] private TerrainDatabase terrainDatabase;
 
-    // LAYOUT DE CAMPO PERTENCE A CENA.
+    // LAYOUT DE CAMPO PERTENCE A CENA, e agora e a UNICA fonte.
     //
     // O StructureDatabase e CATALOGO: diz o que uma rodovia E (custo, chaves,
     // familia topologica), e cinquenta mapas compartilham o mesmo. Onde a
     // rodovia ESTA e deste tabuleiro, e por isso mora aqui.
     //
-    // Enquanto routesMigratedToScene for false, a leitura ainda cai no catalogo
-    // — e por isso a migracao e verificavel mapa a mapa em vez de um flag day.
+    // A migracao terminou. Existia uma cadeia de fallback — catalogo, e depois
+    // StructureData.roadRoutes — atras da flag routesMigratedToScene. As duas
+    // camadas foram removidas: 93 rotas em 16 catalogos e 16 no proprio TIPO
+    // ("Rodovias" carregava 11 tracados). Era o que fazia duplicar cena trazer
+    // estrada de outro mapa, e o que impediria a cena de Batalha unica.
     [Header("Road Routes (Map Scope)")]
-    [Tooltip("Rotas deste tabuleiro, por estrutura. Layout de campo e da CENA; o StructureDatabase e catalogo compartilhado.")]
+    [Tooltip("Rotas deste tabuleiro, por estrutura. Unica fonte de layout de estrada.")]
     [SerializeField] private List<StructureRoadRouteBucket> roadRoutesByStructure =
         new List<StructureRoadRouteBucket>();
-    [Tooltip("Marcado pela migracao. Enquanto false, rotas ainda sao lidas do StructureDatabase/StructureData; true torna a cena a unica fonte.")]
-    [SerializeField] private bool routesMigratedToScene;
 
     [Header("Default Road Visual")]
     [SerializeField] private Sprite roadSegmentSprite;
@@ -840,8 +841,6 @@ public class RoadNetworkManager : MonoBehaviour
             : null;
     }
 
-    public bool RoutesMigratedToScene => routesMigratedToScene;
-
     public IReadOnlyList<StructureRoadRouteBucket> RoadRoutesByStructure =>
         roadRoutesByStructure;
 
@@ -907,11 +906,6 @@ public class RoadNetworkManager : MonoBehaviour
         InvalidateRoutesLookup();
     }
 
-    public void MarkRoutesMigratedToScene(bool migrated)
-    {
-        routesMigratedToScene = migrated;
-        InvalidateRoutesLookup();
-    }
 
     public void InvalidateRoutesLookup()
     {
@@ -950,53 +944,7 @@ public class RoadNetworkManager : MonoBehaviour
             }
         }
 
-        if (!routesMigratedToScene)
-            AppendPreMigrationFallback();
-
         routesLookupBuilt = true;
-    }
-
-    /// <summary>
-    /// Cadeia de compatibilidade, resolvida UMA vez no lookup e nao a cada
-    /// leitura — o custo de movimento consulta rota celula a celula.
-    ///
-    /// A rota legada do StructureData e filtrada por ownerDatabase aqui, no
-    /// unico lugar que le. Rota autorada para OUTRO catalogo nao e rota
-    /// quebrada: ela simplesmente nao se aplica a este tabuleiro, e quem a
-    /// deixava passar produzia erro de validacao em mapa que nunca a teve.
-    /// </summary>
-    private void AppendPreMigrationFallback()
-    {
-        IReadOnlyList<StructureData> catalogue =
-            structureDatabase != null ? structureDatabase.Structures : null;
-        if (catalogue == null)
-            return;
-
-        for (int i = 0; i < catalogue.Count; i++)
-        {
-            StructureData structure = catalogue[i];
-            if (structure == null
-                || routesByStructure.ContainsKey(structure))
-            {
-                continue;
-            }
-
-            IReadOnlyList<RoadRouteDefinition> dbRoutes =
-                structureDatabase.GetRoadRoutes(structure);
-            if (dbRoutes != null)
-            {
-                routesByStructure[structure] =
-                    FilterRoutesOwnedByThisNetwork(dbRoutes);
-                continue;
-            }
-
-            if (structure.roadRoutes != null
-                && structure.roadRoutes.Count > 0)
-            {
-                routesByStructure[structure] =
-                    FilterRoutesOwnedByThisNetwork(structure.roadRoutes);
-            }
-        }
     }
 
     private List<RoadRouteDefinition> FilterRoutesOwnedByThisNetwork(
