@@ -1059,7 +1059,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &131527563
 RectTransform:
   m_ObjectHideFlags: 0
@@ -1075,10 +1075,10 @@ RectTransform:
   - {fileID: 1702945000}
   m_Father: {fileID: 446971284}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 0, y: 0}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 275, y: -106}
+  m_SizeDelta: {x: 550, y: 64}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &131527564
 MonoBehaviour:
@@ -8397,7 +8397,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &1073542088
 RectTransform:
   m_ObjectHideFlags: 0
@@ -8413,10 +8413,10 @@ RectTransform:
   - {fileID: 1947915142}
   m_Father: {fileID: 446971284}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 0, y: 0}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 275, y: -254}
+  m_SizeDelta: {x: 550, y: 64}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1073542089
 MonoBehaviour:
@@ -10481,6 +10481,9 @@ MonoBehaviour:
     flipX: 0
     flipXOverride: 0
     isAI: 0
+    isRebelRuntime: 0
+    isLocal: 1
+    localityConfigured: 1
     commandServiceAutomatic: 0
     defeated: 0
     startMoney: 0
@@ -10488,6 +10491,7 @@ MonoBehaviour:
     incomePerTurn: 0
     startMoneyApplied: 0
   includeNeutralTeam: 0
+  capturedBuildingHistory: []
   economyEnabled: 1
   fogOfWar: 1
   autoFlipXFromHqPositions: 1
@@ -10515,22 +10519,28 @@ MonoBehaviour:
   victoryStarsToWin: 5
   freezeTurnAdvanceAfterVictory: 1
   victoryStarsByTeam:
-  - teamId: 0
+  - slotIndex: 0
+    teamId: 0
     stars: 0
   hasVictoryWinner: 0
   victoryWinnerTeam: -1
+  victoryWinnerSlotIndex: -1
   fogOfWarController: {fileID: 0}
   fogOfWarTilemap: {fileID: 0}
+  fogOfWarMemoryTilemap: {fileID: 0}
+  fogOfWarBreakwaterMemoryTilemap: {fileID: 0}
   fogOfWarOverlayTile: {fileID: 11400000, guid: a9d34637cfec5f34f85ff83701fe1885, type: 2}
   fogOfWarTerrainDatabase: {fileID: 11400000, guid: af24f1a2f28971f498767ede9f9cfba1, type: 2}
   fogOfWarDpqAirHeightConfig: {fileID: 11400000, guid: 74c8a09efff211941b27a37f6bb948f1, type: 2}
   fogOfWarAlpha: 0.65
   fogOfWarVisionMode: 0
+  fogRoundZeroBakes: []
   showVictoryOverlay: 1
   victoryOverlayTilemap: {fileID: 0}
   victoryOverlayTile: {fileID: 0}
   victoryOverlayAlpha: 1
   activePlayerListIndex: 0
+  appliedActivePlayerListIndex: 0
   appliedActiveTeamId: 0
   pendingTurnStartUpkeep: 0
   pendingTurnStartEconomy: 1
@@ -10558,6 +10568,7 @@ MonoBehaviour:
   enablePodeEnxergarRuntimeLogs: 0
   enableTurnPerfLogs: 1
   fogStepPerfTopUnits: 3
+  fogWarmupFrameBudgetMs: 40
 --- !u!4 &1450452853
 Transform:
   m_ObjectHideFlags: 0
@@ -10957,6 +10968,7 @@ MonoBehaviour:
   playbackMode: 2
   playOnStart: 0
   musicVolume: 0.7
+  roundMusicVolume: 1
   shuffleFreeMode: 0
   neutralMusicVolume: 1
   team0MusicVolume: 1
@@ -14111,6 +14123,8 @@ MonoBehaviour:
   replayManager: {fileID: 0}
   planningManager: {fileID: 0}
   aiController: {fileID: 0}
+  panelRodada: {fileID: 0}
+  matchMusicAudioManager: {fileID: 0}
   enableHotkeys: 1
   quickSaveKey: 105
   quickLoadKey: 111
@@ -14119,6 +14133,7 @@ MonoBehaviour:
   customSaveDirectory: C:/Users/Alan/AppData/LocalLow/Sistemas Info/The Map Room
   blockCrossSceneLoad: 1
   verboseLogs: 1
+  showSaveLoadLogs: 0
   forceLoadWhenBusy: 1
   saveReplayData: 1
   enableThreatCacheWarmupOnLoad: 0
@@ -15396,6 +15411,7 @@ MonoBehaviour:
   showCoordinates: 1
   coordinateOverlayLabelWidth: 220
   audioSource: {fileID: 2016726194}
+  masterSfxVolume: 1
   moveSfx: {fileID: 8300000, guid: a41f648fa5bef3a428eae958c53878b4, type: 3}
   confirmSfx: {fileID: 8300000, guid: c908a364d2d06904c85aaa044bbe3d78, type: 3}
   cancelSfx: {fileID: 8300000, guid: 8609a6a83a3aad644a9866b7c96d54ba, type: 3}
@@ -15433,7 +15449,6 @@ MonoBehaviour:
     clip: {fileID: 8300000, guid: a9e6ab4fda2a15c4c97b21d78a86d332, type: 3}
   - category: 6
     clip: {fileID: 8300000, guid: f05a1ee32ccbad4418ec5ed3ee11b217, type: 3}
-  sonarSkillSfx: {fileID: 8300000, guid: de3184acf86542e40ae0d8f84f185976, type: 3}
   skillSfxBindings:
   - skills: []
     clip: {fileID: 8300000, guid: de3184acf86542e40ae0d8f84f185976, type: 3}
@@ -15445,6 +15460,8 @@ MonoBehaviour:
   explosionSfxVolume: 1
   endingTurnSfxVolume: 1
   skillSfxVolume: 1
+  menuOpenSfxVolume: 1
+  menuCloseSfxVolume: 1
   cursorRenderer: {fileID: 0}
   cursorColorA: {r: 1, g: 1, b: 1, a: 1}
   cursorColorB: {r: 0, g: 0, b: 0, a: 1}
