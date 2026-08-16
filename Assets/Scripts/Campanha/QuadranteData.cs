@@ -40,6 +40,7 @@ public class QuadranteData : INoDoMapa
 
     string INoDoMapa.Id { get => quadranteId; set => quadranteId = value; }
     string INoDoMapa.Nome { get => displayName; set => displayName = value; }
+    string INoDoMapa.Descricao { get => descricao; set => descricao = value; }
     int INoDoMapa.OriginX { get => originX; set => originX = value; }
     int INoDoMapa.OriginY { get => originY; set => originY = value; }
     int INoDoMapa.Width { get => width; set => width = value; }
@@ -50,6 +51,8 @@ public class QuadranteData : INoDoMapa
     [Header("Assado — artefato, nao editar a mao")]
     [Tooltip("Row-major: indice = (y * width) + x. Null significa buraco, e buraco e valido.")]
     public List<TileBase> bakedTiles = new List<TileBase>();
+    [Tooltip("Construcoes dentro do retangulo, em coordenada LOCAL.")]
+    public List<ConstrucaoAssada> bakedConstrucoes = new List<ConstrucaoAssada>();
     [Tooltip("De qual cena de autoria este bake saiu. So documentacao.")]
     public string bakedFromScene;
     public long bakedAtUtcTicks;

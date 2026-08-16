@@ -147,7 +147,10 @@ public class QuadranteController : MonoBehaviour
         Stopwatch watch = Stopwatch.StartNew();
 
         if (clearBeforeBuild)
+        {
             map.ClearAllTiles();
+            ClearConstrucoes();
+        }
 
         for (int localY = 0; localY < quadrante.height; localY++)
         {
@@ -168,6 +171,10 @@ public class QuadranteController : MonoBehaviour
             }
         }
 
+        // Construcoes DEPOIS do terreno, sempre: o spawner recusa celula ocupada e
+        // precisa do tabuleiro no lugar pra converter celula em posicao de mundo.
+        int construcoes = BuildConstrucoes(quadrante, map);
+
         watch.Stop();
         built = true;
 
@@ -175,7 +182,7 @@ public class QuadranteController : MonoBehaviour
         {
             Debug.Log(
                 $"[Quadrante] '{campanha.displayName}/{quadrante.displayName}' construido: " +
-                $"{paintedCells} tiles, {holeCells} buraco(s), " +
+                $"{paintedCells} tiles, {holeCells} buraco(s), {construcoes} construcao(oes), " +
                 $"{quadrante.width}x{quadrante.height} em '{map.name}' " +
                 $"(origem local {paintOrigin.x},{paintOrigin.y}; " +
                 $"origem de autoria {quadrante.originX},{quadrante.originY}) " +
@@ -184,6 +191,104 @@ public class QuadranteController : MonoBehaviour
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// Sem isto o build nao e repetivel: ClearAllTiles limpa o chao, mas as
+    /// construcoes ficariam, e o SpawnAtCell RECUSA celula ocupada — o segundo
+    /// build viraria uma fila de avisos em vez de um tabuleiro.
+    /// </summary>
+    private void ClearConstrucoes()
+    {
+        ConstructionManager[] all =
+            FindObjectsByType<ConstructionManager>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+
+        for (int i = 0; i < all.Length; i++)
+        {
+            ConstructionManager c = all[i];
+            if (c == null || c.gameObject.scene != gameObject.scene)
+                continue;
+
+            if (Application.isPlaying)
+                Destroy(c.gameObject);
+            else
+                DestroyImmediate(c.gameObject);
+        }
+    }
+
+    /// <summary>
+    /// Planta as construcoes assadas. Reusa <see cref="ConstructionSpawner"/> — o
+    /// mesmo caminho que todo carregamento de save ja exercita, entao nao e codigo
+    /// novo de spawn, e o caminho que ja roda.
+    /// </summary>
+    private int BuildConstrucoes(QuadranteData quadrante, Tilemap map)
+    {
+        if (quadrante.bakedConstrucoes == null || quadrante.bakedConstrucoes.Count == 0)
+            return 0;
+
+        ConstructionSpawner spawner = FindAnyObjectByType<ConstructionSpawner>();
+        if (spawner == null)
+        {
+            Debug.LogError(
+                "[Quadrante] Sem ConstructionSpawner nesta cena — as construcoes assadas nao " +
+                "podem ser plantadas. O tabuleiro pinta, mas nao joga.",
+                this);
+            return 0;
+        }
+
+        // O catalogo e da CENA e e compartilhado, como o UnitDatabase: ele diz o
+        // que uma construcao E, e um QG e um QG em qualquer mapa. Nao ha catalogo
+        // por mundo nem por quadrante.
+        if (spawner.ConstructionDatabase == null)
+        {
+            Debug.LogError(
+                "[Quadrante] O ConstructionSpawner desta cena esta sem ConstructionDatabase. " +
+                "Aponte-o pro catalogo compartilhado de construcoes — sem ele nenhum id resolve, " +
+                "e o quadrante pinta o chao e nasce sem QG.",
+                this);
+            return 0;
+        }
+
+        int planted = 0;
+
+        for (int i = 0; i < quadrante.bakedConstrucoes.Count; i++)
+        {
+            ConstrucaoAssada c = quadrante.bakedConstrucoes[i];
+            if (c == null || string.IsNullOrWhiteSpace(c.constructionId))
+                continue;
+
+            Vector3Int cell = new Vector3Int(
+                paintOrigin.x + c.localX,
+                paintOrigin.y + c.localY,
+                0);
+
+            GameObject go = spawner.SpawnAtCell(c.constructionId, c.teamId, cell);
+            if (go == null)
+            {
+                Debug.LogWarning($"[Quadrante] Nao plantou '{c}' na celula {cell}.", this);
+                continue;
+            }
+
+            ConstructionManager manager = go.GetComponent<ConstructionManager>();
+            if (manager != null)
+            {
+                // O spawn so recebe o TIME. Slot, setor e ancora vem a parte — e
+                // nenhum deles e cosmetico:
+                //   slot   decide producao, renda e vitoria
+                //   setor  e por onde o planner da IA le o tabuleiro, e o default do
+                //          enum e Alpha (nao None), entao omitir nao da erro: da
+                //          plano degenerado, em silencio
+                if (c.slotIndex >= 0)
+                    manager.SetSlotIndex(c.slotIndex);
+
+                manager.SetSector(c.sector);
+                manager.SetAnchorSector(c.isAnchorSector);
+            }
+
+            planted++;
+        }
+
+        return planted;
     }
 
     private string DescreverCampanhas()

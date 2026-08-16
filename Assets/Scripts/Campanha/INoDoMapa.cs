@@ -15,8 +15,19 @@ using System.Collections.Generic;
 /// </summary>
 public interface INoDoMapa
 {
+    /// <summary>
+    /// Contrato de serializacao: e o que o save grava e o que TryGet* casa.
+    /// Tecnico — sem acento, sem espaco. O YAML escapa acento
+    /// (campanhaId: "Feij\xE3o Torto") e o mesmo texto e digitado a mao em dois
+    /// lugares que precisam bater.
+    /// </summary>
     string Id { get; set; }
+
+    /// <summary>O que o jogador le. Livre, e trocavel sem quebrar endereco.</summary>
     string Nome { get; set; }
+
+    /// <summary>Texto de apresentacao — briefing, sabor, o que for.</summary>
+    string Descricao { get; set; }
 
     int OriginX { get; set; }
     int OriginY { get; set; }

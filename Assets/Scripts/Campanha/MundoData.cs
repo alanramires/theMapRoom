@@ -29,6 +29,10 @@ public class MundoData : ScriptableObject
     [Tooltip("Cena de autoria onde este mundo e desenhado. Documentacao — nao e carregada em runtime.")]
     public string authoringSceneName;
 
+    // NAO existe catalogo aqui, de proposito. Catalogo diz o que uma coisa E, e
+    // isso nao e do mundo: um QG e um QG em qualquer lugar. A cena aponta pro
+    // catalogo compartilhado, como o UnitDatabase sempre fez.
+
     [Header("Blocos")]
     public List<BlocoData> blocos = new List<BlocoData>();
 

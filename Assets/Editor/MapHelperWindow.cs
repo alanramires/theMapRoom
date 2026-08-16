@@ -428,7 +428,7 @@ public class MapHelperWindow : EditorWindow
             if (!selected)
                 return false;
 
-            DrawNoBody(b, PickLevel.Bloco, index);
+            DrawNoBody(b, PickLevel.Bloco, index, pai: null, paiRotulo: "caixa desenhada");
 
             EditorGUILayout.Space(4f);
             EditorGUILayout.BeginHorizontal();
@@ -486,7 +486,7 @@ public class MapHelperWindow : EditorWindow
             if (!selected)
                 return false;
 
-            DrawNoBody(c, PickLevel.Campanha, index);
+            DrawNoBody(c, PickLevel.Campanha, index, pai: parent, paiRotulo: "caixa do bloco");
 
             EditorGUILayout.Space(4f);
             EditorGUILayout.BeginHorizontal();
@@ -514,7 +514,7 @@ public class MapHelperWindow : EditorWindow
             {
                 QuadranteData q = c.quadrantes[i];
                 if (q == null) continue;
-                if (DrawQuadranteRow(i, q))
+                if (DrawQuadranteRow(i, q, c))
                     removeQ = i;
             }
             EditorGUI.indentLevel--;
@@ -526,7 +526,7 @@ public class MapHelperWindow : EditorWindow
         return false;
     }
 
-    private bool DrawQuadranteRow(int index, QuadranteData q)
+    private bool DrawQuadranteRow(int index, QuadranteData q, CampanhaData parent)
     {
         bool selected = index == selectedQuadrante;
 
@@ -544,7 +544,7 @@ public class MapHelperWindow : EditorWindow
             if (!selected)
                 return false;
 
-            DrawNoBody(q, PickLevel.Quadrante, index);
+            DrawNoBody(q, PickLevel.Quadrante, index, pai: parent, paiRotulo: "caixa da campanha");
 
             EditorGUILayout.LabelField(
                 "células",
@@ -587,11 +587,13 @@ public class MapHelperWindow : EditorWindow
     /// O corpo de qualquer nivel — identidade, retangulo, desenho e destrave.
     /// Um codigo so pros tres, que e o ponto do INoDoMapa.
     /// </summary>
-    private void DrawNoBody(INoDoMapa no, PickLevel level, int index)
+    private void DrawNoBody(INoDoMapa no, PickLevel level, int index, INoDoMapa pai, string paiRotulo)
     {
         EditorGUI.BeginChangeCheck();
         string id = EditorGUILayout.TextField("id", no.Id);
         string nome = EditorGUILayout.TextField("nome", no.Nome);
+        EditorGUILayout.LabelField("descrição");
+        string desc = EditorGUILayout.TextArea(no.Descricao ?? string.Empty, GUILayout.MinHeight(38f));
         Vector2Int origin = EditorGUILayout.Vector2IntField("origem", new Vector2Int(no.OriginX, no.OriginY));
         Vector2Int size = EditorGUILayout.Vector2IntField("tamanho", new Vector2Int(no.Width, no.Height));
         if (EditorGUI.EndChangeCheck())
@@ -599,6 +601,7 @@ public class MapHelperWindow : EditorWindow
             Undo.RecordObject(mundo, "Editar nó");
             no.Id = id;
             no.Nome = nome;
+            no.Descricao = desc;
             no.OriginX = origin.x;
             no.OriginY = origin.y;
             no.Width = Mathf.Max(1, size.x);
@@ -608,20 +611,50 @@ public class MapHelperWindow : EditorWindow
             SceneView.RepaintAll();
         }
 
+        // O id e contrato de serializacao E e digitado a mao em dois lugares que
+        // precisam bater (o asset e o QuadranteController). Acento o YAML escapa
+        // ("Feij\xE3o Torto"); espaco so espera um erro de digitacao silencioso.
+        string problema = DescreverIdNaoTecnico(no.Id);
+        if (problema != null)
+        {
+            EditorGUILayout.HelpBox(
+                $"id '{no.Id}' {problema}.\n\n"
+                + "O id é o que o save grava e o que o endereço casa — mantenha técnico "
+                + "(feijao-torto). O nome bonito vai em 'nome'.",
+                MessageType.Warning);
+        }
+
         bool picking = pickLevel == level && pickIndex == index;
 
         EditorGUILayout.BeginHorizontal();
         if (GUILayout.Button(picking ? "…clicando" : "Desenhar no Scene"))
             BeginPick(level, index);
-        using (new EditorGUI.DisabledScope(!hasScan))
+        // Filho preenche o PAI, nao o mapa inteiro: campanha nasce do tamanho do
+        // bloco, quadrante do tamanho da campanha. So o bloco — que nao tem pai —
+        // cai na caixa desenhada. Assim o filho ja nasce contido, e a validacao de
+        // continencia nunca dispara por causa do valor inicial.
+        bool podeHerdar = pai != null || hasScan;
+        using (new EditorGUI.DisabledScope(!podeHerdar))
         {
-            if (GUILayout.Button("Usar a caixa desenhada"))
+            if (GUILayout.Button($"Usar a {paiRotulo}"))
             {
-                Undo.RecordObject(mundo, "Nó = caixa desenhada");
-                no.OriginX = scanMin.x;
-                no.OriginY = scanMin.y;
-                no.Width = scanMax.x - scanMin.x + 1;
-                no.Height = scanMax.y - scanMin.y + 1;
+                Undo.RecordObject(mundo, $"Nó = {paiRotulo}");
+
+                if (pai != null)
+                {
+                    no.OriginX = pai.OriginX;
+                    no.OriginY = pai.OriginY;
+                    no.Width = pai.Width;
+                    no.Height = pai.Height;
+                }
+                else
+                {
+                    no.OriginX = scanMin.x;
+                    no.OriginY = scanMin.y;
+                    no.Width = scanMax.x - scanMin.x + 1;
+                    no.Height = scanMax.y - scanMin.y + 1;
+                }
+
                 EditorUtility.SetDirty(mundo);
                 RecomputeOverlap();
                 SceneView.RepaintAll();
@@ -638,6 +671,36 @@ public class MapHelperWindow : EditorWindow
         }
 
         DrawDestraves(no);
+    }
+
+    /// <summary>
+    /// Devolve o que ha de errado com o id, ou null se ele estiver limpo. Nao
+    /// corrige sozinho: mudar id e mudar endereco, e isso e decisao de autoria.
+    /// </summary>
+    private static string DescreverIdNaoTecnico(string id)
+    {
+        if (string.IsNullOrWhiteSpace(id))
+            return "está vazio";
+
+        bool temEspaco = id.IndexOf(' ') >= 0;
+        bool temNaoAscii = false;
+        for (int i = 0; i < id.Length; i++)
+        {
+            if (id[i] > 127)
+            {
+                temNaoAscii = true;
+                break;
+            }
+        }
+
+        if (temEspaco && temNaoAscii)
+            return "tem espaço e acento";
+        if (temEspaco)
+            return "tem espaço";
+        if (temNaoAscii)
+            return "tem acento";
+
+        return null;
     }
 
     /// <summary>
@@ -940,12 +1003,84 @@ public class MapHelperWindow : EditorWindow
             }
         }
 
+        int construcoes = BakeConstrucoes(q);
+
         EditorUtility.SetDirty(mundo);
         AssetDatabase.SaveAssetIfDirty(mundo);
 
         status = $"'{q.quadranteId}' assado de '{q.bakedFromScene}': ({q.originX},{q.originY}) "
-               + $"{w}×{h} = {w * h} células · {painted} tiles, {holeCount} buraco(s).";
+               + $"{w}×{h} = {w * h} células · {painted} tiles, {holeCount} buraco(s), "
+               + $"{construcoes} construção(ões).";
         Repaint();
+    }
+
+    /// <summary>
+    /// Varre as construcoes da cena de autoria e guarda as que caem DENTRO do
+    /// retangulo, ja em coordenada local.
+    ///
+    /// O dono vem junto: a construcao nasce da cor com que foi pintada. E a mesma
+    /// regra das unidades — "se esta no retangulo, vem como esta" — e por isso nao
+    /// existe flag de "tem QG": a escolha e o desenho.
+    ///
+    /// ⚠️ Construcao na SOBREPOSICAO entre quadrantes cai nos dois bakes e nasce
+    /// duas vezes. A faixa de fronteira e pro CHAO; QG duplicado quebra a contagem
+    /// por slot. O aviso sai no log deste metodo.
+    /// </summary>
+    private int BakeConstrucoes(QuadranteData q)
+    {
+        if (q.bakedConstrucoes == null)
+            q.bakedConstrucoes = new List<ConstrucaoAssada>();
+        q.bakedConstrucoes.Clear();
+
+        Scene active = SceneManager.GetActiveScene();
+        ConstructionManager[] all =
+            FindObjectsByType<ConstructionManager>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+
+        int maxX = q.originX + Mathf.Max(1, q.width) - 1;
+        int maxY = q.originY + Mathf.Max(1, q.height) - 1;
+        int hqs = 0;
+
+        for (int i = 0; i < all.Length; i++)
+        {
+            ConstructionManager c = all[i];
+            if (c == null || c.gameObject.scene != active)
+                continue;
+
+            Vector3Int cell = c.CurrentCellPosition;
+            cell.z = 0;
+
+            if (cell.x < q.originX || cell.x > maxX || cell.y < q.originY || cell.y > maxY)
+                continue;
+
+            q.bakedConstrucoes.Add(new ConstrucaoAssada
+            {
+                constructionId = c.ConstructionId,
+                localX = cell.x - q.originX,
+                localY = cell.y - q.originY,
+                teamId = c.TeamId,
+                slotIndex = c.SlotIndex,
+                // O SETOR tem de vir junto: o planner da IA le por ele, e o default
+                // do enum e Alpha (nao None), entao esquecer nao da erro — da plano
+                // degenerado.
+                sector = c.Sector,
+                isAnchorSector = c.IsAnchorSector,
+                initialCapturePoints = c.CurrentCapturePoints,
+                displayName = c.ConstructionDisplayName
+            });
+
+            if (c.SlotIndex >= 0)
+                hqs++;
+        }
+
+        if (hqs == 0 && q.bakedConstrucoes.Count > 0)
+        {
+            Debug.LogWarning(
+                $"[Map Helper] '{q.quadranteId}' assou {q.bakedConstrucoes.Count} construção(ões) e "
+                + "NENHUMA com dono. Sem QG de slot não há spawn, renda nem vitória — o quadrante "
+                + "pinta mas não joga.");
+        }
+
+        return q.bakedConstrucoes.Count;
     }
 
     private void BakeAll()

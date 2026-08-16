@@ -14,6 +14,8 @@ public class ConstructionSpawner : MonoBehaviour
     [SerializeField] private Tilemap boardTilemap;
     [SerializeField] private Transform spawnParent;
 
+    public ConstructionDatabase ConstructionDatabase => constructionDatabase;
+
     private void Start()
     {
         TryAutoAssignMatchController();

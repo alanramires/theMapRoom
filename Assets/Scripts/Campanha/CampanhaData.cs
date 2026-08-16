@@ -33,6 +33,7 @@ public class CampanhaData : INoDoMapa
 
     string INoDoMapa.Id { get => campanhaId; set => campanhaId = value; }
     string INoDoMapa.Nome { get => displayName; set => displayName = value; }
+    string INoDoMapa.Descricao { get => descricao; set => descricao = value; }
     int INoDoMapa.OriginX { get => originX; set => originX = value; }
     int INoDoMapa.OriginY { get => originY; set => originY = value; }
     int INoDoMapa.Width { get => width; set => width = value; }
