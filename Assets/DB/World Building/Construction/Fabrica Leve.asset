@@ -101,8 +101,8 @@ MonoBehaviour:
     - {fileID: 11400000, guid: 70b7ea3ddea78fc4e9d744cee13b053a, type: 2}
     - {fileID: 11400000, guid: 3dc9b119819519440820c81f5db4fdce, type: 2}
     - {fileID: 11400000, guid: 70b98199c49882e44892f7ca76df6b33, type: 2}
-    - {fileID: 11400000, guid: 99b30df53878c69499853a4ef3cb5f81, type: 2}
     - {fileID: 11400000, guid: 8c89f5278e312ad46af401333934721b, type: 2}
+    - {fileID: 11400000, guid: 99b30df53878c69499853a4ef3cb5f81, type: 2}
     - {fileID: 11400000, guid: 5e69516e1944ffc43bae1a7cd3c7c69c, type: 2}
     canProvideSupplies: 1
     offeredSupplies:
