@@ -3326,15 +3326,25 @@ public class MatchController : MonoBehaviour
         ApplyTeamFlipSettingsToSceneObjects();
     }
 
-    // Calcula flipX de cada slot comparando a posicao X do HQ com o centro do mapa.
-    // HQ a direita do centro => flipX true. A esquerda => flipX false.
+    // A unidade olha para o INIMIGO. A referencia e o QG adversario, nao o centro
+    // do mapa.
+    //
+    // Antes era o centro, e funcionava por acidente: os mapas eram desenhados em
+    // torno da origem, entao "zero" era o meio de verdade. Com o quadrante da
+    // campanha pintado em (0,0)..(w-1,h-1), o tabuleiro fica inteiro do lado
+    // positivo e todo QG cai a direita do "centro" — todo mundo recebia o mesmo
+    // flip. Pior: GetMapCenterWorldX le o tilemap de FoW, que nesta hora ainda
+    // esta VAZIO, entao o centro vinha de bounds degenerado.
+    //
+    // O QG inimigo nao depende de origem, de tamanho nem de ordem de
+    // inicializacao — e sempre foi o que a regra do centro APROXIMAVA.
+    //
     // PRIVADO de proposito: sozinho ele ignora os overrides — use RecomputeTeamFlips().
     private void AutoComputeFlipXFromHqPositions()
     {
         if (players == null || players.Count == 0)
             return;
 
-        float mapCenterX = GetMapCenterWorldX();
         ConstructionManager[] managers = FindObjectsByType<ConstructionManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
 
         for (int i = 0; i < players.Count; i++)
@@ -3344,9 +3354,54 @@ public class MatchController : MonoBehaviour
                 continue;
 
             PlayerEntry entry = players[i];
-            entry.flipX = hqPos.Value.x > mapCenterX;
+
+            if (TryGetEnemyHqAverageX(managers, i, out float enemyX))
+            {
+                // Inimigo a esquerda => espelha, e o sprite passa a olhar pra la.
+                entry.flipX = enemyX < hqPos.Value.x;
+            }
+            else
+            {
+                // Sem adversario com QG (mapa de um slot so, tutorial): cai na
+                // regra velha em vez de inventar orientacao.
+                entry.flipX = hqPos.Value.x > GetMapCenterWorldX();
+            }
+
             players[i] = entry;
         }
+    }
+
+    /// <summary>
+    /// X medio dos QGs adversarios. Media e nao "o mais proximo" porque flip e uma
+    /// decisao BINARIA: com tres inimigos nao da pra olhar para dois lados, e a
+    /// media responde "onde a oposicao esta, no conjunto" sem depender de desempate.
+    /// </summary>
+    private bool TryGetEnemyHqAverageX(ConstructionManager[] managers, int mySlotIndex, out float averageX)
+    {
+        averageX = 0f;
+        if (managers == null)
+            return false;
+
+        float sum = 0f;
+        int count = 0;
+
+        for (int i = 0; i < managers.Length; i++)
+        {
+            ConstructionManager cm = managers[i];
+            if (cm == null || !cm.IsPlayerHeadQuarter)
+                continue;
+            if (cm.SlotIndex < 0 || cm.SlotIndex == mySlotIndex)
+                continue;
+
+            sum += cm.transform.position.x;
+            count++;
+        }
+
+        if (count == 0)
+            return false;
+
+        averageX = sum / count;
+        return true;
     }
 
     // Aplica o override manual de orientacao por slot por cima do calculo automatico
