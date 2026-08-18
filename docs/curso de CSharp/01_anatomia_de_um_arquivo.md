@@ -58,9 +58,19 @@ Repare no que você escreveu ali dentro:
 /// NAO confundir com <see cref="ConstructionSector"/> — "setor" ali e rotulo
 ```
 
-`<see cref="…"/>` vira **link clicável** no tooltip. E mais: se alguém renomear
-`ConstructionSector`, o compilador avisa que o `cref` quebrou. É o único tipo de
-comentário que o compilador confere.
+`<see cref="…"/>` marca que aquilo é um **símbolo**, não texto solto. No VS
+Code ele **não** vira link clicável — para visitar, o caminho é o `F12` em cima
+do nome, igual a qualquer outro. (Em Visual Studio cheio, aí sim é link.)
+
+O que o `cref` te dá aqui é mais discreto: **o `F2` (renomear símbolo) atualiza
+o `cref` junto**, então o comentário não envelhece quando o tipo muda de nome.
+Teste em 10 segundos se quiser conferir — é o tipo de afirmação que vale medir
+em vez de aceitar.
+
+> Uma ressalva que vale saber: existe um aviso de compilação para `cref`
+> quebrado (`CS1574`), mas ele **só aparece com a geração de XML doc ligada**, e
+> o `.csproj` que a Unity gera não liga. Ligar não adianta — a próxima
+> regeneração apaga. Então, neste projeto, ninguém confere o `cref` por você.
 
 **Isto aqui é uma força sua, e vale nomear.** A maioria dos programadores
 documenta *o quê*. Você documenta *por quê*:
@@ -333,7 +343,7 @@ convertido. `$"{width}x{height}"` é o mesmo que
 
 ```text
 using               atalho de nome, custo zero
-///                 documentação; <see cref=""/> é conferido pelo compilador
+///                 documentação; <see cref=""/> marca símbolo (F2 renomeia junto)
 [Atributo]          metadado; alguém lê depois e muda de comportamento
 class : Contrato    implementa interface — só crie uma quando houver N iguais
 campo               guarda valor; sem inicializador, referência nasce null
