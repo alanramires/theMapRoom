@@ -67,5 +67,5 @@
         "*.sln": "*.csproj",
         "*.slnx": "*.csproj"
     },
-    "dotnet.defaultSolution": "The Map Room.slnx"
+    "dotnet.defaultSolution": "The Map Room.sln"
 }
