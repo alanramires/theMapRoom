@@ -248,6 +248,95 @@ todo `[SerializeField]`, e cada nome ali é uma amarra com a cena.
 
 ---
 
+## Serializar não é compartilhar — o resumo
+
+A tabela acima diz *o que* serializa. Esta seção diz *o que isso significa*, e é
+a parte que confunde todo mundo, porque envolve **dois eixos independentes**:
+
+| eixo | pergunta que responde | quem controla |
+|---|---|---|
+| **acesso** | quem no código pode ler/escrever? | `public` / `private` |
+| **serialização** | com que valor o objeto nasce? | `public` **ou** `[SerializeField]` |
+
+`public` e `[SerializeField] private` serializam **exatamente igual**. A diferença
+entre os dois é só o acesso — `public` não torna nada global, compartilhado nem
+permanente. É uma porta, não um cofre.
+
+### O que serializar significa
+
+O valor é gravado **dentro** do arquivo da cena (ou do prefab, ou do asset). Um
+valor por cena. A preposição é o conceito inteiro: não *entre* cenas, **dentro**
+de cada uma.
+
+> **Serializar não é compartilhar — é o oposto. É dar a cada cena a sua própria
+> cópia.**
+
+### O ciclo de vida do valor
+
+```text
+arquivo da cena      permanente, no disco      ← o valor de NASCIMENTO
+      ↓ carrega
+objeto na memória    nasce copiando o arquivo
+      ↓ runtime
+mudança em jogo      só no objeto vivo         → EVAPORA com a cena
+```
+
+Trocar de cena não transporta nada: é um **objeto novo**, lendo o arquivo **dele**.
+
+E a pegadinha nº 1 da Unity: **mudanças feitas durante o Play são descartadas no
+Stop** — inclusive as que você faz na mão, no Inspector. Para persistir, ajuste
+com o Play desligado.
+
+### O caso real: o volume da música
+
+```csharp
+// Assets/Scripts/Audio/MatchMusicAudioManager.cs:28
+[SerializeField] [Range(0f, 1f)] private float musicVolume = 0.7f;
+```
+
+O `MatchMusicAudioManager` é um `MonoBehaviour` comum — sem singleton, sem
+`DontDestroyOnLoad` — e está em **25 cenas** deste projeto.
+
+Logo: 25 objetos independentes, 25 valores gravados separadamente. Ajustar o
+volume na `Tela de Entrada` e entrar num mapa devolve o volume daquele mapa. E
+não é que o valor foi *sobrescrito* — é que o AudioManager do mapa **nunca soube**
+que o outro existiu. Dois objetos que não se falam.
+
+Trocar o campo para `public` não mudaria nada disso. O eixo errado.
+
+### Persistência de verdade vem de fora
+
+| mecanismo | atravessa cena | atravessa sessão |
+|---|---|---|
+| `DontDestroyOnLoad` | sim | não |
+| `PlayerPrefs` / arquivo próprio | sim | **sim** |
+| `ScriptableObject` | sim | só no Editor (ver acima) |
+
+Para **preferência do jogador**, a resposta é a segunda — ninguém aceita
+reajustar o volume toda vez que abre o jogo. Hoje o projeto tem **zero
+`PlayerPrefs`**.
+
+E note que preferência **não** pertence ao `SaveGameManager`: save de partida é
+*"onde eu parei nesta partida"*, preferência é *"como eu gosto de jogar"*. Vidas
+diferentes — se o volume entrasse no save, carregar uma partida antiga mudaria
+seu volume.
+
+O desenho que resolve sem manager global nenhum: cada AudioManager, ao nascer,
+pergunta a preferência em vez de confiar no próprio número, usando o valor
+serializado como padrão de fábrica —
+
+```csharp
+musicVolume = PlayerPrefs.GetFloat("masterMusicVolume", musicVolume);
+//                                                       ↑
+//                        o que VOCÊ ajustou no Inspector, usado só
+//                        enquanto o jogador não tiver escolhido
+```
+
+As 25 cópias deixam de ser problema e viram 25 leitores da mesma fonte. Nenhum
+estado atravessando cena, e o bloqueio **0b** do `resumo.md` não é tocado.
+
+---
+
 ## Exercício
 
 **E16.** Abra [Assets/Scripts/Skills/SkillData.cs](Assets/Scripts/Skills/SkillData.cs)
