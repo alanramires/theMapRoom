@@ -128,6 +128,30 @@ o que você consegue fazer sozinho na semana seguinte.
 
 ---
 
+## Suas notas ficam em `notas/`
+
+O curso tem dois donos, e a divisão é explícita:
+
+```text
+docs/curso de CSharp/*.md          as AULAS — do Claude. Ele corrige e melhora.
+docs/curso de CSharp/notas/*.md    suas NOTAS — suas. Ele nunca edita.
+```
+
+**Por quê:** na primeira semana os dois editaram o mesmo arquivo ao mesmo tempo, e
+o último save ganhou — uma correção já acordada foi desfeita sem ninguém notar.
+Um arquivo, um dono, e o problema some.
+
+Você pode pedir a qualquer momento: *"olha minhas notas"* — para revisão,
+correção, ou para promover uma nota sua ao corpo da aula. O caminho é sempre esse
+sentido, das notas para a aula, nunca o contrário.
+
+**Uma armadilha prática:** salve sempre em **UTF-8**. Um editor gravou a aula 1 em
+ANSI e todo acento virou byte inválido para o git e para o GitHub. No VS Code a
+codificação aparece no canto inferior direito — se não disser `UTF-8`, clique nela
+e use *Save with Encoding*.
+
+---
+
 ## Duas regras de segurança
 
 Você vai estudar mexendo num projeto de anos. Então:
