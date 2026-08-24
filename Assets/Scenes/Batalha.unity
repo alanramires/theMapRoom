@@ -884,7 +884,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7fcde2c74636d6642bd8469a938b62e2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MatchController
-  currentTurn: 1
+  currentTurn: 0
   activeTeamId: 2
   players:
   - teamId: 2
@@ -13451,7 +13451,7 @@ PrefabInstance:
       objectReference: {fileID: 327617512}
     - target: {fileID: 4702684852002017877, guid: 41718aa68dd0b8d44bbba1b60b8a9c2b, type: 3}
       propertyPath: m_text
-      value: Turno 1
+      value: Turno 0
       objectReference: {fileID: 0}
     - target: {fileID: 4702684852002017877, guid: 41718aa68dd0b8d44bbba1b60b8a9c2b, type: 3}
       propertyPath: m_fontColor.b
