@@ -10968,13 +10968,13 @@ MonoBehaviour:
   playbackMode: 2
   playOnStart: 0
   musicVolume: 0.7
-  roundMusicVolume: 1
+  roundMusicVolume: 0.4
   shuffleFreeMode: 0
-  neutralMusicVolume: 1
-  team0MusicVolume: 1
-  team1MusicVolume: 1
-  team2MusicVolume: 1
-  team3MusicVolume: 1
+  neutralMusicVolume: 0.4
+  team0MusicVolume: 0.4
+  team1MusicVolume: 0.3
+  team2MusicVolume: 0.4
+  team3MusicVolume: 0.3
   freeModePlaylist:
   - {fileID: 8300000, guid: 925bcdd11607749408f6249d8fd23511, type: 3}
   - {fileID: 8300000, guid: 7e3c1a1ea9ceef04bb982c79621c45e4, type: 3}
