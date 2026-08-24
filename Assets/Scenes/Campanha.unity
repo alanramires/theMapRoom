@@ -9415,7 +9415,6 @@ MonoBehaviour:
     routes: []
   - structure: {fileID: 11400000, guid: 32bd7b500bf78b64a95d16600a68909d, type: 2}
     routes: []
-  routesMigratedToScene: 1
   roadSegmentSprite: {fileID: 21300000, guid: 03650c0a2457e5046b8234d0bc968b5a, type: 3}
   roadColor: {r: 0.9607844, g: 0.9607844, b: 0.9607844, a: 1}
   roadWidth: 0.16
@@ -10182,7 +10181,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 238660159411391967, guid: 0aab900f996a7724fa007c68e9d39283, type: 3}
       propertyPath: m_IsActive
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 390642609684352355, guid: 0aab900f996a7724fa007c68e9d39283, type: 3}
       propertyPath: m_Pivot.x
@@ -10457,6 +10456,10 @@ PrefabInstance:
     - target: {fileID: 4604079353111473916, guid: bbd1302fcb61c7d49ac7944eafbfdede, type: 3}
       propertyPath: m_Name
       value: Panel_remaining
+      objectReference: {fileID: 0}
+    - target: {fileID: 4604079353111473916, guid: bbd1302fcb61c7d49ac7944eafbfdede, type: 3}
+      propertyPath: m_IsActive
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 7653284495940490440, guid: bbd1302fcb61c7d49ac7944eafbfdede, type: 3}
       propertyPath: m_fontColor32.rgba
@@ -12686,6 +12689,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Panel_money
       objectReference: {fileID: 0}
+    - target: {fileID: 6655781950631596657, guid: f7e44d7c210a32d4ba630ba660da88a1, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 8527446738489952372, guid: f7e44d7c210a32d4ba630ba660da88a1, type: 3}
       propertyPath: matchController
       value: 
@@ -13500,6 +13507,14 @@ PrefabInstance:
       propertyPath: m_Name
       value: Panel_turn
       objectReference: {fileID: 0}
+    - target: {fileID: 5064091523980034032, guid: 41718aa68dd0b8d44bbba1b60b8a9c2b, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7028244828956582981, guid: 41718aa68dd0b8d44bbba1b60b8a9c2b, type: 3}
+      propertyPath: m_SizeDelta.x
+      value: 503.97
+      objectReference: {fileID: 0}
     - target: {fileID: 7267817996577112625, guid: 41718aa68dd0b8d44bbba1b60b8a9c2b, type: 3}
       propertyPath: m_Pivot.x
       value: 0.5
@@ -13526,7 +13541,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7267817996577112625, guid: 41718aa68dd0b8d44bbba1b60b8a9c2b, type: 3}
       propertyPath: m_SizeDelta.x
-      value: 350
+      value: 503.965
       objectReference: {fileID: 0}
     - target: {fileID: 7267817996577112625, guid: 41718aa68dd0b8d44bbba1b60b8a9c2b, type: 3}
       propertyPath: m_SizeDelta.y
@@ -13562,7 +13577,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7267817996577112625, guid: 41718aa68dd0b8d44bbba1b60b8a9c2b, type: 3}
       propertyPath: m_AnchoredPosition.x
-      value: 0
+      value: -10.041
       objectReference: {fileID: 0}
     - target: {fileID: 7267817996577112625, guid: 41718aa68dd0b8d44bbba1b60b8a9c2b, type: 3}
       propertyPath: m_AnchoredPosition.y
