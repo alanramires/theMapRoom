@@ -8,6 +8,8 @@ public class PanelTurnController : MonoBehaviour
     [SerializeField] private MatchController matchController;
     [SerializeField] private TurnStateManager turnStateManager;
     [SerializeField] private TMP_Text textTurn;
+    [Tooltip("Texto fixo para cenas que reutilizam o painel sem representar uma partida.")]
+    [SerializeField] private string presentationTextOverride;
 
     [Header("Match statistics")]
     [SerializeField] private GameObject panelEstatisticas;
@@ -75,7 +77,9 @@ public class PanelTurnController : MonoBehaviour
         int turn = matchController != null ? Mathf.Max(0, matchController.CurrentTurn) : 0;
         TeamId activeTeam = matchController != null ? matchController.ActiveTeam : TeamId.Neutral;
 
-        string next = $"Turno {turn}";
+        string next = string.IsNullOrWhiteSpace(presentationTextOverride)
+            ? $"Turno {turn}"
+            : presentationTextOverride;
         Color color = TeamUtils.GetColor(activeTeam);
         if (!force && next == lastValue && color == lastColor)
             return;

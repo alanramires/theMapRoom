@@ -14,6 +14,12 @@ public static class PartidaConfig
     // do MatchController.Awake ja ter chamado Apply()+Clear().
     private static AIDifficulty? pendingDifficulty;
 
+    // Endereco do quadrante escolhido na cena Campanha. Assim como a dificuldade,
+    // usa consumo proprio porque o QuadranteController constroi o tabuleiro antes
+    // de o MatchController consumir e limpar a configuracao geral da partida.
+    private static string pendingCampanhaId;
+    private static string pendingQuadranteId;
+
     public static void SetDifficulty(AIDifficulty difficulty) => pendingDifficulty = difficulty;
 
     public static bool TryConsumeDifficulty(out AIDifficulty difficulty)
@@ -26,6 +32,24 @@ public static class PartidaConfig
         }
         difficulty = AIDifficulty.Facil;
         return false;
+    }
+
+    public static void SetQuadrante(string campanhaId, string quadranteId)
+    {
+        pendingCampanhaId = campanhaId;
+        pendingQuadranteId = quadranteId;
+    }
+
+    public static bool TryConsumeQuadrante(out string campanhaId, out string quadranteId)
+    {
+        campanhaId = pendingCampanhaId;
+        quadranteId = pendingQuadranteId;
+        if (string.IsNullOrWhiteSpace(campanhaId) || string.IsNullOrWhiteSpace(quadranteId))
+            return false;
+
+        pendingCampanhaId = null;
+        pendingQuadranteId = null;
+        return true;
     }
 
     // Cor escolhida pelo jogador ao iniciar um tutorial pela Tela de Entrada.

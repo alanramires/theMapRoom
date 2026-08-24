@@ -3022,7 +3022,7 @@ public class MatchController : MonoBehaviour
         return Mathf.Clamp(value, 1, MaxVictoryStarsGoal);
     }
 
-    private enum VictoryReason
+    public enum VictoryReason
     {
         HeadQuarterCaptured,
         ArmyEliminated,
@@ -3030,8 +3030,14 @@ public class MatchController : MonoBehaviour
         VictoryStars
     }
 
+    public static event Action<TeamId, TeamId, VictoryReason, int> OnMatchConcluded;
+
     private void HandleVictoryAestheticPresentation(TeamId winnerTeam, TeamId defeatedTeam, VictoryReason reason)
     {
+        // Conclusao nasce do funil real da partida. ImportVictoryState nao passa
+        // por aqui, portanto carregar um save concluido nao registra outra vitoria.
+        OnMatchConcluded?.Invoke(winnerTeam, defeatedTeam, reason, currentTurn);
+
         Debug.Log($"[Victory] Vitoria de {TeamUtils.GetName(winnerTeam)} " +
                   $"({reason}{(defeatedTeam != TeamId.Neutral ? $" | derrotado: {TeamUtils.GetName(defeatedTeam)}" : string.Empty)}).");
 

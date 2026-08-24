@@ -64,14 +64,47 @@ public class PanelMenu : MonoBehaviour
     private int newGameWizardFocusIndex;
     private TeamId newGameHumanTeam = TeamId.Green;
     private TeamId newGameAiTeam = TeamId.Red;
-    private AIDifficulty newGameDifficulty = AIDifficulty.Facil;
-    private MatchController.GameSetupPreset newGamePreset = MatchController.GameSetupPreset.FogOfWarTotal;
+    private AIDifficulty newGameDifficulty = AIDifficulty.Iniciante;
+    private MatchController.GameSetupPreset newGamePreset = MatchController.GameSetupPreset.GameBoyClassic;
 
     private static readonly TeamId[] NewGameTeams = { TeamId.Green, TeamId.Red, TeamId.Blue, TeamId.Yellow };
-    private static readonly AIDifficulty[] NewGameDifficulties =
+    private readonly struct CampaignDifficultyOption
     {
-        AIDifficulty.Iniciante, AIDifficulty.Facil, AIDifficulty.Medio,
-        AIDifficulty.Formigueiro, AIDifficulty.Competitiva, AIDifficulty.Agressiva
+        public readonly string Label;
+        public readonly string Description;
+        public readonly AIDifficulty AiDifficulty;
+        public readonly MatchController.GameSetupPreset Preset;
+
+        public CampaignDifficultyOption(
+            string label,
+            string description,
+            AIDifficulty aiDifficulty,
+            MatchController.GameSetupPreset preset)
+        {
+            Label = label;
+            Description = description;
+            AiDifficulty = aiDifficulty;
+            Preset = preset;
+        }
+    }
+
+    private static readonly CampaignDifficultyOption[] CampaignDifficulties =
+    {
+        new CampaignDifficultyOption(
+            "FÁCIL",
+            "AI Easy + Game Boy Clássico",
+            AIDifficulty.Iniciante,
+            MatchController.GameSetupPreset.GameBoyClassic),
+        new CampaignDifficultyOption(
+            "MÉDIO",
+            "AI Normal + Neblina Leve",
+            AIDifficulty.Facil,
+            MatchController.GameSetupPreset.NeblinaLeve),
+        new CampaignDifficultyOption(
+            "DIFÍCIL",
+            "AI Difícil + Fog of War Total",
+            AIDifficulty.Competitiva,
+            MatchController.GameSetupPreset.FogOfWarTotal)
     };
     private static readonly MatchController.GameSetupPreset[] NewGamePresets =
     {
@@ -96,12 +129,12 @@ public class PanelMenu : MonoBehaviour
 
     public string GetNewGameWizardConfirmationSummary()
     {
-        string targetMap = newGameHotSeat ? "Hot Seat 1 - Pvp" : "Battle Map 1 - Ground";
+        string targetMap = newGameHotSeat ? "Hot Seat 1 - Pvp" : "Campanha";
         string humanColor = ColorUtility.ToHtmlStringRGB(TeamUtils.GetColor(newGameHumanTeam));
         string aiColor = ColorUtility.ToHtmlStringRGB(TeamUtils.GetColor(newGameAiTeam));
         return $"MAPA: {targetMap}\n" +
                $"SETUP: {ResolvePresetLabel(newGamePreset)}\n" +
-               (newGameHotSeat ? string.Empty : $"DIFICULDADE: {ResolveDifficultyLabel(newGameDifficulty)}\n") +
+               (newGameHotSeat ? string.Empty : $"DIFICULDADE: {ResolveCampaignDifficultyLabel(newGameDifficulty)}\n") +
                $"JOGADOR 1: <color=#{humanColor}>{ResolveTeamLabel(newGameHumanTeam)}</color>\n" +
                $"JOGADOR 2: <color=#{aiColor}>{ResolveTeamLabel(newGameAiTeam)}</color>{(newGameHotSeat ? string.Empty : " (IA)")}\n\n" +
                $"REGRAS\n{NewGamePanelController.BuildDescricao(newGamePreset)}";
@@ -116,7 +149,7 @@ public class PanelMenu : MonoBehaviour
         if (!newGameWizardOpen) return 0;
         if (newGameWizardStep == 0) return NewGameTeams.Length + 1;
         if (newGameWizardStep == 1) return NewGameTeams.Length;
-        if (newGameWizardStep == 2) return NewGameDifficulties.Length + 1;
+        if (newGameWizardStep == 2) return CampaignDifficulties.Length + 1;
         if (newGameWizardStep == 3) return NewGamePresets.Length + 1;
         return 2;
     }
@@ -133,7 +166,7 @@ public class PanelMenu : MonoBehaviour
                 : "VOLTAR";
         }
         if (newGameWizardStep == 2)
-            return index < NewGameDifficulties.Length ? ResolveDifficultyLabel(NewGameDifficulties[index]) : "VOLTAR";
+            return index < CampaignDifficulties.Length ? CampaignDifficulties[index].Label : "VOLTAR";
         if (newGameWizardStep == 3)
             return index < NewGamePresets.Length ? ResolvePresetLabel(NewGamePresets[index]) : "VOLTAR";
         return index == 0 ? "INICIAR JOGO" : "VOLTAR";
@@ -186,8 +219,14 @@ public class PanelMenu : MonoBehaviour
         }
         else if (newGameWizardStep == 2)
         {
-            if (index >= NewGameDifficulties.Length) { newGameWizardStep = 1; }
-            else { newGameDifficulty = NewGameDifficulties[index]; newGameWizardStep = 3; }
+            if (index >= CampaignDifficulties.Length) { newGameWizardStep = 1; }
+            else
+            {
+                CampaignDifficultyOption option = CampaignDifficulties[index];
+                newGameDifficulty = option.AiDifficulty;
+                newGamePreset = option.Preset;
+                newGameWizardStep = 4;
+            }
         }
         else if (newGameWizardStep == 3)
         {
@@ -199,7 +238,7 @@ public class PanelMenu : MonoBehaviour
             StartConfiguredNewGame();
             return;
         }
-        else newGameWizardStep = 3;
+        else newGameWizardStep = newGameHotSeat ? 3 : 2;
 
         newGameWizardFocusIndex = 0;
         RefreshNewGameWizardHelper();
@@ -214,7 +253,10 @@ public class PanelMenu : MonoBehaviour
         if (newGameWizardStep <= 0) CloseNewGameWizard();
         else
         {
-            newGameWizardStep = newGameHotSeat && newGameWizardStep == 3 ? 1 : newGameWizardStep - 1;
+            if (newGameWizardStep == 4)
+                newGameWizardStep = newGameHotSeat ? 3 : 2;
+            else
+                newGameWizardStep = newGameHotSeat && newGameWizardStep == 3 ? 1 : newGameWizardStep - 1;
             newGameWizardFocusIndex = 0;
             RefreshNewGameWizardHelper();
             cursorController?.PlayCancelSfx();
@@ -844,8 +886,8 @@ public class PanelMenu : MonoBehaviour
         newGameWizardFocusIndex = 0;
         newGameHumanTeam = TeamId.Green;
         newGameAiTeam = TeamId.Red;
-        newGameDifficulty = AIDifficulty.Facil;
-        newGamePreset = MatchController.GameSetupPreset.FogOfWarTotal;
+        newGameDifficulty = AIDifficulty.Iniciante;
+        newGamePreset = MatchController.GameSetupPreset.GameBoyClassic;
         RefreshNewGameWizardHelper();
     }
 
@@ -874,11 +916,11 @@ public class PanelMenu : MonoBehaviour
         string body = newGameWizardStep == 4
             ? (newGameHotSeat
                 ? $"Jogador 1: {ResolveTeamLabel(newGameHumanTeam)}\nJogador 2: {ResolveTeamLabel(newGameAiTeam)}\nRegras: {ResolvePresetLabel(newGamePreset)}"
-                : $"Você: {ResolveTeamLabel(newGameHumanTeam)}\nIA adversária: {ResolveTeamLabel(newGameAiTeam)}\nDificuldade: {ResolveDifficultyLabel(newGameDifficulty)}\nRegras: {ResolvePresetLabel(newGamePreset)}")
+                : $"Você: {ResolveTeamLabel(newGameHumanTeam)}\nIA adversária: {ResolveTeamLabel(newGameAiTeam)}\nDificuldade: {ResolveCampaignDifficultyLabel(newGameDifficulty)}\nRegras: {ResolvePresetLabel(newGamePreset)}")
             : (newGameWizardStep == 1
                 ? (newGameHotSeat ? "Escolha a cor do segundo jogador." : "Slot 1 será controlado pela IA.")
-                : newGameWizardStep == 2 && newGameWizardFocusIndex < NewGameDifficulties.Length
-                    ? ResolveDifficultyDescription(NewGameDifficulties[newGameWizardFocusIndex])
+                : newGameWizardStep == 2 && newGameWizardFocusIndex < CampaignDifficulties.Length
+                    ? CampaignDifficulties[newGameWizardFocusIndex].Description
                     : string.Empty);
         PanelHelperController.TrySetExternalText(title, body);
     }
@@ -915,7 +957,7 @@ public class PanelMenu : MonoBehaviour
 
     private void StartConfiguredNewGame()
     {
-        string target = newGameHotSeat ? "Hot Seat 1 - Pvp" : "Battle Map 1 - Ground";
+        string target = newGameHotSeat ? "Hot Seat 1 - Pvp" : "Campanha";
         TeamId[] teams = { newGameHumanTeam, newGameAiTeam };
         bool[] isAI = { false, !newGameHotSeat };
         bool[] flipX = { IsTeamFlipped(newGameHumanTeam), IsTeamFlipped(newGameAiTeam) };
@@ -933,26 +975,12 @@ public class PanelMenu : MonoBehaviour
     {
         TeamId.Green => "VERDE", TeamId.Red => "VERMELHO", TeamId.Blue => "AZUL", TeamId.Yellow => "AMARELO", _ => team.ToString().ToUpperInvariant()
     };
-    private static string ResolveDifficultyLabel(AIDifficulty difficulty) => difficulty switch
+    private static string ResolveCampaignDifficultyLabel(AIDifficulty difficulty) => difficulty switch
     {
-        AIDifficulty.Iniciante => "INICIANTE",
-        AIDifficulty.Facil => "FÁCIL",
-        AIDifficulty.Medio => "MÉDIO",
-        AIDifficulty.Formigueiro => "FORMIGUEIRO",
-        AIDifficulty.Competitiva => "COMPETITIVA",
-        AIDifficulty.Agressiva => "AGRESSIVA",
+        AIDifficulty.Iniciante => "FÁCIL",
+        AIDifficulty.Facil => "MÉDIO",
+        AIDifficulty.Competitiva => "DIFÍCIL",
         _ => "FÁCIL"
-    };
-
-    private static string ResolveDifficultyDescription(AIDifficulty difficulty) => difficulty switch
-    {
-        AIDifficulty.Iniciante => "Renda reduzida fora das cidades. Sem pacote Hard, banimentos ou recrutamento forçado.",
-        AIDifficulty.Facil => "Renda e regras normais. Sem pacote Hard, banimentos ou recrutamento forçado.",
-        AIDifficulty.Medio => "Regras normais e todas as unidades. Recrutamento forçado somente quando estiver perdendo.",
-        AIDifficulty.Formigueiro => "Regras normais e todas as unidades. Recrutamento forçado em todos os turnos.",
-        AIDifficulty.Competitiva => "Pacote Hard e unidades banidas. Recrutamento forçado somente quando estiver perdendo.",
-        AIDifficulty.Agressiva => "Pacote Hard e unidades banidas. Recrutamento forçado em todos os turnos.",
-        _ => string.Empty
     };
     private static string ResolvePresetLabel(MatchController.GameSetupPreset preset) => preset switch
     {

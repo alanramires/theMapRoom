@@ -9050,6 +9050,10 @@ MonoBehaviour:
   playGameOpenOnStart: 0
   playGameOpenOnlyInSpecificScene: 0
   gameOpenSceneName: Tela de Entrada
+  mapSelectionTrack: {fileID: 8300000, guid: c613746b41903784eb7f2ba353c6100d, type: 3}
+  mapSelectionMusicVolume: 1
+  playMapSelectionOnStart: 1
+  mapSelectionSceneName: Campanha
   menuLoadTransitionMusicVolume: 0.1
   previewTeamId: 0
   previewLoop: 1
@@ -12450,6 +12454,61 @@ RectTransform:
   m_CorrespondingSourceObject: {fileID: 1002355237582946797, guid: 0fd70fab51b395b4fbb47f10b06167cc, type: 3}
   m_PrefabInstance: {fileID: 4641348038426839271}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &2123456701
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2123456702}
+  - component: {fileID: 2123456703}
+  m_Layer: 0
+  m_Name: Campaign Selection Controller
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &2123456702
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2123456701}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &2123456703
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2123456701}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 64fd5ae4c2b84ed1ac3f25e41534fb2a, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::CampaignSelectionController
+  mundo: {fileID: 11400000, guid: 3c4f3be48f318fb4fb30ae0166700a28, type: 2}
+  constructionDatabase: {fileID: 11400000, guid: a3b9ad47181534c4e92a0205460608a5, type: 2}
+  battleSceneName: Batalha
+  worldTilemap: {fileID: 0}
+  cursorController: {fileID: 0}
+  matchController: {fileID: 0}
+  aiController: {fileID: 0}
+  unfocusedQuadrantTint: {r: 0.62, g: 0.66, b: 0.7, a: 1}
+  winnerTintStrength: 0.7
+  unfocusedWinnerBrightness: 0.82
+  unfocusedConstructionBrightness: 0.62
 --- !u!1001 &26833424128513065
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -13413,9 +13472,13 @@ PrefabInstance:
       propertyPath: matchController
       value: 
       objectReference: {fileID: 327617512}
+    - target: {fileID: 3692576095271723370, guid: 41718aa68dd0b8d44bbba1b60b8a9c2b, type: 3}
+      propertyPath: presentationTextOverride
+      value: Selecione o mapa
+      objectReference: {fileID: 0}
     - target: {fileID: 4702684852002017877, guid: 41718aa68dd0b8d44bbba1b60b8a9c2b, type: 3}
       propertyPath: m_text
-      value: Turno 1
+      value: Selecione o mapa
       objectReference: {fileID: 0}
     - target: {fileID: 4702684852002017877, guid: 41718aa68dd0b8d44bbba1b60b8a9c2b, type: 3}
       propertyPath: m_fontColor.b
@@ -14008,3 +14071,4 @@ SceneRoots:
   - {fileID: 1336167666}
   - {fileID: 2029232291}
   - {fileID: 1570356384}
+  - {fileID: 2123456702}

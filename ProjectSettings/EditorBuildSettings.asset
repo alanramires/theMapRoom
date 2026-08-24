@@ -8,6 +8,12 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/Tela de Entrada.unity
     guid: ec8aff1d73d71884caebcaf97919f2ed
+  - enabled: 1
+    path: Assets/Scenes/Campanha.unity
+    guid: 3dcf32381aae88e4bb9725f71fc277b1
+  - enabled: 1
+    path: Assets/Scenes/Batalha.unity
+    guid: f5882a7aa05c8cf46b9f776680024591
   - enabled: 0
     path: Assets/Scenes/Em dev/Team Island.unity
     guid: d195c2d48f08e5f4f842d2b940b90f57

@@ -50,6 +50,11 @@ public class MatchMusicAudioManager : MonoBehaviour
     [SerializeField] private bool playGameOpenOnStart = true;
     [SerializeField] private bool playGameOpenOnlyInSpecificScene = true;
     [SerializeField] private string gameOpenSceneName = "Tela de Entrada";
+    [Header("Map Selection Track")]
+    [SerializeField] private AudioClip mapSelectionTrack;
+    [SerializeField] [Range(0f, 2f)] private float mapSelectionMusicVolume = 1f;
+    [SerializeField] private bool playMapSelectionOnStart = true;
+    [SerializeField] private string mapSelectionSceneName = "Campanha";
     [Header("Transitions")]
     [SerializeField] [Range(0f, 1f)] private float menuLoadTransitionMusicVolume = 0.1f;
     [Header("Preview")]
@@ -88,6 +93,9 @@ public class MatchMusicAudioManager : MonoBehaviour
         }
 
         if (TryPlayGameOpenTrackForMenuScene())
+            return;
+
+        if (TryPlayMapSelectionTrackForScene())
             return;
 
         if (playOnStart)
@@ -416,9 +424,28 @@ public class MatchMusicAudioManager : MonoBehaviour
         return true;
     }
 
+    public bool PlayMapSelectionTrack(bool loop = true, bool forceRestart = true)
+    {
+        EnsureReferences();
+        if (audioSource == null || mapSelectionTrack == null)
+            return false;
+
+        isPausedByUser = false;
+        pausedByTurnTransition = false;
+        suppressPlaybackForTurnTransition = false;
+        PlayClip(mapSelectionTrack, loop, forceRestart);
+        return true;
+    }
+
     private void EnsurePlayback()
     {
         if (audioSource == null)
+            return;
+
+        // Faixas proprias de cena tem precedencia sobre ByTeam/Free/Loop. Sem
+        // isto, uma cena configurada como ByTeam substituiria a faixa especial
+        // no primeiro Update depois do Start.
+        if (TryEnsureSceneTrackPlayback())
             return;
 
         if (playbackMode == MusicPlaybackMode.Loop)
@@ -656,6 +683,54 @@ public class MatchMusicAudioManager : MonoBehaviour
         return PlayGameOpenTrack(loop: true, forceRestart: true);
     }
 
+    private bool TryPlayMapSelectionTrackForScene()
+    {
+        if (!playMapSelectionOnStart || mapSelectionTrack == null)
+            return false;
+
+        if (!IsActiveSceneNamed(mapSelectionSceneName))
+            return false;
+
+        return PlayMapSelectionTrack(loop: true, forceRestart: true);
+    }
+
+    private bool TryEnsureSceneTrackPlayback()
+    {
+        if (audioSource == null || audioSource.clip == null)
+            return false;
+
+        bool isGameOpenTrack =
+            gameOpenTrack != null &&
+            audioSource.clip == gameOpenTrack &&
+            playGameOpenOnStart &&
+            (!playGameOpenOnlyInSpecificScene || IsActiveSceneNamed(gameOpenSceneName));
+
+        bool isMapSelectionTrack =
+            mapSelectionTrack != null &&
+            audioSource.clip == mapSelectionTrack &&
+            playMapSelectionOnStart &&
+            IsActiveSceneNamed(mapSelectionSceneName);
+
+        if (!isGameOpenTrack && !isMapSelectionTrack)
+            return false;
+
+        if (!audioSource.isPlaying)
+            PlayClip(audioSource.clip, loop: true, forceRestart: false);
+        return true;
+    }
+
+    private static bool IsActiveSceneNamed(string configuredName)
+    {
+        Scene activeScene = SceneManager.GetActiveScene();
+        if (!activeScene.IsValid() || string.IsNullOrWhiteSpace(configuredName))
+            return false;
+
+        return string.Equals(
+            activeScene.name,
+            configuredName.Trim(),
+            System.StringComparison.OrdinalIgnoreCase);
+    }
+
     private void EnsureReferences()
     {
         if (matchController == null)
@@ -697,6 +772,7 @@ public class MatchMusicAudioManager : MonoBehaviour
         team2MusicVolume = Mathf.Clamp(team2MusicVolume, 0f, 2f);
         team3MusicVolume = Mathf.Clamp(team3MusicVolume, 0f, 2f);
         gameOpenMusicVolume = Mathf.Clamp(gameOpenMusicVolume, 0f, 2f);
+        mapSelectionMusicVolume = Mathf.Clamp(mapSelectionMusicVolume, 0f, 2f);
     }
 
     private void ApplyAudioSourceDefaults()
@@ -721,12 +797,19 @@ public class MatchMusicAudioManager : MonoBehaviour
 
     private float ResolveCurrentClipVolumeMultiplier()
     {
-        if (playbackMode == MusicPlaybackMode.ByTeam)
-            return ResolveTeamVolumeMultiplier(observedTeamId);
-
         AudioClip currentClip = audioSource != null ? audioSource.clip : null;
         if (currentClip == null)
             return 1f;
+
+        // Faixas de cena nao pertencem a um time. Seus sliders precisam vencer o
+        // modo ByTeam, inclusive em cenas-base reutilizadas como Campanha.
+        if (gameOpenTrack != null && currentClip == gameOpenTrack)
+            return gameOpenMusicVolume;
+        if (mapSelectionTrack != null && currentClip == mapSelectionTrack)
+            return mapSelectionMusicVolume;
+
+        if (playbackMode == MusicPlaybackMode.ByTeam)
+            return ResolveTeamVolumeMultiplier(observedTeamId);
 
         if (neutralTrack != null && currentClip == neutralTrack)
             return neutralMusicVolume;
@@ -738,9 +821,6 @@ public class MatchMusicAudioManager : MonoBehaviour
             return team2MusicVolume;
         if (team3Track != null && currentClip == team3Track)
             return team3MusicVolume;
-        if (gameOpenTrack != null && currentClip == gameOpenTrack)
-            return gameOpenMusicVolume;
-
         return 1f;
     }
 

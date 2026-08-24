@@ -34,6 +34,7 @@ public class PanelHelperController : MonoBehaviour
     [SerializeField] private MainMenuTutorialPanelController mainMenuTutorialPanelController;
     [SerializeField] private PanelMenu mainMenuPanel;
     [SerializeField] private BattleMapMenuRootController battleMapMenuController;
+    [SerializeField] private CampaignSelectionController campaignSelectionController;
     [SerializeField] private HelperDatabase helperDatabase;
     [SerializeField] private GameObject panelHelper;
     [SerializeField] private TMP_Text helperTitle;
@@ -400,6 +401,8 @@ public class PanelHelperController : MonoBehaviour
             mainMenuPanel = FindAnyObjectByType<PanelMenu>();
         if (battleMapMenuController == null)
             battleMapMenuController = FindAnyObjectByType<BattleMapMenuRootController>();
+        if (campaignSelectionController == null)
+            campaignSelectionController = FindAnyObjectByType<CampaignSelectionController>();
 
         EnsureCancelControl();
         EnsureExecuteCommandServiceControl();
@@ -3566,6 +3569,7 @@ public class PanelHelperController : MonoBehaviour
         bool menuAboutActive = mainMenuPanel != null && mainMenuPanel.IsAboutOpen;
         bool newGameWizardActive = mainMenuPanel != null && mainMenuPanel.IsNewGameWizardOpen;
         bool tutorialColorActive = mainMenuTutorialPanelController != null && mainMenuTutorialPanelController.IsColorStepOpen;
+        bool campaignConfirmationActive = campaignSelectionController != null && campaignSelectionController.IsConfirmationOpen;
         bool battleExitActive = battleMapMenuController != null && battleMapMenuController.IsExitConfirmationOpen;
         bool battleSurrenderActive = battleMapMenuController != null && battleMapMenuController.IsSurrenderConfirmationOpen;
         bool battleEndTurnActive = battleMapMenuController != null && battleMapMenuController.IsEndTurnConfirmationOpen;
@@ -3573,7 +3577,7 @@ public class PanelHelperController : MonoBehaviour
         bool savePromptActive = saveGameManager != null &&
                                 (saveGameManager.IsPersistenceSlotSelectionActive ||
                                  saveGameManager.IsPersistenceOverwriteConfirmationActive);
-        bool active = panelVisible && (menuDeleteActive || menuQuitActive || menuAboutActive || newGameWizardActive || tutorialColorActive || battleExitActive || battleSurrenderActive || battleEndTurnActive || battleLayerActive || savePromptActive);
+        bool active = panelVisible && (menuDeleteActive || menuQuitActive || menuAboutActive || newGameWizardActive || tutorialColorActive || campaignConfirmationActive || battleExitActive || battleSurrenderActive || battleEndTurnActive || battleLayerActive || savePromptActive);
         if (!active)
         {
             if (persistenceActionsRoot != null)
@@ -3588,6 +3592,7 @@ public class PanelHelperController : MonoBehaviour
             menuAboutActive ? "main_menu_about" :
             newGameWizardActive ? $"new_game_{mainMenuPanel.NewGameWizardStep}" :
             tutorialColorActive ? "tutorial_color" :
+            campaignConfirmationActive ? "campaign_confirmation" :
             battleExitActive ? "battle_exit" :
             battleSurrenderActive ? "battle_surrender" :
             battleEndTurnActive ? "battle_end_turn" :
@@ -3598,7 +3603,7 @@ public class PanelHelperController : MonoBehaviour
                 saveGameManager.GetPersistenceSlotButtonLabel(2), saveGameManager.GetPersistenceSlotButtonLabel(3));
         if (signature != persistenceActionsSignature)
         {
-            RebuildPersistenceActionButtons(menuDeleteActive, menuQuitActive, menuAboutActive, newGameWizardActive, tutorialColorActive, battleExitActive, battleSurrenderActive, battleEndTurnActive, battleLayerActive);
+            RebuildPersistenceActionButtons(menuDeleteActive, menuQuitActive, menuAboutActive, newGameWizardActive, tutorialColorActive, campaignConfirmationActive, battleExitActive, battleSurrenderActive, battleEndTurnActive, battleLayerActive);
             persistenceActionsSignature = signature;
         }
 
@@ -3636,7 +3641,7 @@ public class PanelHelperController : MonoBehaviour
         persistenceActionsRoot.SetActive(false);
     }
 
-    private void RebuildPersistenceActionButtons(bool menuDeleteActive, bool menuQuitActive, bool menuAboutActive, bool newGameWizardActive, bool tutorialColorActive, bool battleExitActive, bool battleSurrenderActive, bool battleEndTurnActive, bool battleLayerActive)
+    private void RebuildPersistenceActionButtons(bool menuDeleteActive, bool menuQuitActive, bool menuAboutActive, bool newGameWizardActive, bool tutorialColorActive, bool campaignConfirmationActive, bool battleExitActive, bool battleSurrenderActive, bool battleEndTurnActive, bool battleLayerActive)
     {
         // Destroi todos os filhos (botoes, spacers de rodape e detalhes de confirmacao) de uma vez.
         RectTransform persistenceRootRect = persistenceActionsRoot.GetComponent<RectTransform>();
@@ -3697,6 +3702,13 @@ public class PanelHelperController : MonoBehaviour
                     () => mainMenuTutorialPanelController?.InvokeColorStepOption(selected),
                     hasTeamColor ? teamColor : (Color?)null);
             }
+        }
+        else if (campaignConfirmationActive)
+        {
+            CreateNewGameConfirmationDetails(campaignSelectionController.GetConfirmationSummary());
+            CreatePersistenceButton("JOGAR", () => campaignSelectionController?.InvokeConfirmationOption(0));
+            CreatePersistenceFooterSpacer(PersistenceFooterGap);
+            CreatePersistenceButton("CANCELAR", () => campaignSelectionController?.InvokeConfirmationOption(1));
         }
         else if (battleExitActive)
         {
@@ -3812,25 +3824,29 @@ public class PanelHelperController : MonoBehaviour
     // Destaca o botao de save/load em foco (mesmo visual do preview do Servico do Comando).
     private void RefreshPersistencePromptFocusHighlight()
     {
-        int focus = mainMenuLoadPanelController != null && mainMenuLoadPanelController.IsDeleteConfirmationOpen
-            ? mainMenuLoadPanelController.DeleteConfirmationFocusIndex
-            : (mainMenuPanel != null && mainMenuPanel.IsQuitConfirmationOpen
-                ? mainMenuPanel.QuitConfirmationFocusIndex
-                : (mainMenuPanel != null && mainMenuPanel.IsAboutOpen
-                    ? 0
-                : (mainMenuPanel != null && mainMenuPanel.IsNewGameWizardOpen
-                    ? mainMenuPanel.NewGameWizardFocusIndex
-                    : (mainMenuTutorialPanelController != null && mainMenuTutorialPanelController.IsColorStepOpen
-                    ? mainMenuTutorialPanelController.ColorStepFocusIndex
-                    : (battleMapMenuController != null && battleMapMenuController.IsExitConfirmationOpen
-                        ? battleMapMenuController.ExitConfirmationFocusIndex
-                        : (battleMapMenuController != null && battleMapMenuController.IsSurrenderConfirmationOpen
-                            ? battleMapMenuController.SurrenderConfirmationFocusIndex
-                            : (battleMapMenuController != null && battleMapMenuController.IsEndTurnConfirmationOpen
-                                ? battleMapMenuController.EndTurnConfirmationFocusIndex
-                                : (battleMapMenuController != null && battleMapMenuController.IsLayerSelectionOpen
-                                    ? battleMapMenuController.LayerSelectionFocusIndex
-                                : (saveGameManager != null ? saveGameManager.PersistencePromptFocusIndex : -1)))))))));
+        int focus = -1;
+        if (mainMenuLoadPanelController != null && mainMenuLoadPanelController.IsDeleteConfirmationOpen)
+            focus = mainMenuLoadPanelController.DeleteConfirmationFocusIndex;
+        else if (mainMenuPanel != null && mainMenuPanel.IsQuitConfirmationOpen)
+            focus = mainMenuPanel.QuitConfirmationFocusIndex;
+        else if (mainMenuPanel != null && mainMenuPanel.IsAboutOpen)
+            focus = 0;
+        else if (mainMenuPanel != null && mainMenuPanel.IsNewGameWizardOpen)
+            focus = mainMenuPanel.NewGameWizardFocusIndex;
+        else if (mainMenuTutorialPanelController != null && mainMenuTutorialPanelController.IsColorStepOpen)
+            focus = mainMenuTutorialPanelController.ColorStepFocusIndex;
+        else if (campaignSelectionController != null && campaignSelectionController.IsConfirmationOpen)
+            focus = campaignSelectionController.ConfirmationFocusIndex;
+        else if (battleMapMenuController != null && battleMapMenuController.IsExitConfirmationOpen)
+            focus = battleMapMenuController.ExitConfirmationFocusIndex;
+        else if (battleMapMenuController != null && battleMapMenuController.IsSurrenderConfirmationOpen)
+            focus = battleMapMenuController.SurrenderConfirmationFocusIndex;
+        else if (battleMapMenuController != null && battleMapMenuController.IsEndTurnConfirmationOpen)
+            focus = battleMapMenuController.EndTurnConfirmationFocusIndex;
+        else if (battleMapMenuController != null && battleMapMenuController.IsLayerSelectionOpen)
+            focus = battleMapMenuController.LayerSelectionFocusIndex;
+        else if (saveGameManager != null)
+            focus = saveGameManager.PersistencePromptFocusIndex;
         for (int i = 0; i < persistenceActionButtons.Count; i++)
         {
             Image image = i < persistenceActionImages.Count ? persistenceActionImages[i] : null;

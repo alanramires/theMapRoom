@@ -66,16 +66,29 @@ public class QuadranteController : MonoBehaviour
     private bool built;
     private int paintedCells;
     private int holeCells;
+    private bool recordsCampaignResult;
 
     public bool Built => built;
     public int PaintedCells => paintedCells;
+    public string MundoId => mundo != null ? mundo.mundoId : string.Empty;
     public string CampanhaId => campanhaId;
     public string QuadranteId => quadranteId;
+
+    private void OnEnable()
+    {
+        MatchController.OnMatchConcluded += HandleMatchConcluded;
+    }
+
+    private void OnDisable()
+    {
+        MatchController.OnMatchConcluded -= HandleMatchConcluded;
+    }
 
     private void Awake()
     {
         active = this;
         built = false;
+        recordsCampaignResult = false;
 
         // O ENDERECO VEM DE FORA QUANDO ALGUEM O MANDOU.
         //
@@ -91,6 +104,7 @@ public class QuadranteController : MonoBehaviour
         {
             campanhaId = pedidoCampanha;
             quadranteId = pedidoQuadrante;
+            recordsCampaignResult = true;
 
             if (logBuild)
                 Debug.Log($"[Quadrante] Endereco recebido do PartidaConfig: '{campanhaId}/{quadranteId}'.", this);
@@ -104,6 +118,23 @@ public class QuadranteController : MonoBehaviour
     {
         if (active == this)
             active = null;
+    }
+
+    private void HandleMatchConcluded(
+        TeamId winnerTeam,
+        TeamId defeatedTeam,
+        MatchController.VictoryReason reason,
+        int turn)
+    {
+        if (active != this || !built || !recordsCampaignResult || winnerTeam == TeamId.Neutral)
+            return;
+
+        CampaignProgressStore.RecordOwner(
+            MundoId,
+            campanhaId,
+            quadranteId,
+            winnerTeam,
+            turn);
     }
 
     /// <summary>Endereco vindo de fora (save, tela de campanha). Nao pinta sozinho.</summary>
