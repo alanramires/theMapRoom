@@ -23,6 +23,26 @@ public interface INoDoMapa
     /// </summary>
     string Id { get; set; }
 
+    /// <summary>
+    /// A identidade ESTAVEL. Atribuido na criacao pela bancada, nunca editado,
+    /// nunca reusado — nem depois de o no ser apagado.
+    ///
+    /// Existe porque <see cref="Id"/> e um campo de texto livre e VAI ser
+    /// renomeado. Todo endereco que sobrevive a sessao — o arquivo de progresso e
+    /// o grafo de <see cref="DestravadoPor"/> — aponta pra ca, e nao pro texto.
+    ///
+    /// A falha que ele evita e muda: renomear um no faz o TryGet nao achar, e
+    /// entao o quadrante le como neutro e o destrave simplesmente nao destrava.
+    /// Nenhum erro, nenhum log — um progresso que zerou sozinho e um portao que
+    /// nao abre.
+    ///
+    /// ⚠️ O CONTADOR SO SOBE. Nao recalcule do maior serial em uso, como o
+    /// UnitSpawner faz: la os ids morrem com a partida, aqui o REGISTRO sobrevive
+    /// ao no. Apagar o ultimo quadrante e criar outro devolveria o serial do morto,
+    /// e um arquivo de progresso antigo grudaria a marca de um lugar noutro.
+    /// </summary>
+    int IdSerial { get; set; }
+
     /// <summary>O que o jogador le. Livre, e trocavel sem quebrar endereco.</summary>
     string Nome { get; set; }
 

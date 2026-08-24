@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Diagnostics;
 using UnityEngine;
 using UnityEngine.Tilemaps;
@@ -31,7 +32,12 @@ using Debug = UnityEngine.Debug;
 /// inicializaram. Quem mais depender de "o tabuleiro ja existe" entra no FIM do
 /// Build, e nao espalhado pelo Start de cada um.
 ///
-/// Etapa 1 pinta terreno e construcoes. Estruturas e unidades vem depois.
+/// Pinta terreno, camadas decorativas, construcoes e rotas. Unidades vem depois.
+///
+/// SO EM PLAY. Tudo que ele escreve e serializado, e a Batalha e uma cena so pra
+/// todos os quadrantes: construir no Editor e salvar gravaria o layout de UM
+/// quadrante na cena compartilhada. "Limpar tabuleiro" e a saida se isso ja
+/// aconteceu.
 /// </summary>
 [DefaultExecutionOrder(-9000)]
 public class QuadranteController : MonoBehaviour
@@ -152,6 +158,32 @@ public class QuadranteController : MonoBehaviour
         paintedCells = 0;
         holeCells = 0;
 
+        // NAO CONSTROI FORA DO PLAY, e o motivo e o teste de aceitacao do projeto:
+        // "duplique uma cena, aponte pros catalogos, e o mapa nasce VAZIO".
+        //
+        // A Batalha e UMA cena pra todos os quadrantes de todos os mundos, e TUDO
+        // que o Build escreve e serializado — tiles, construcoes, camadas e rotas.
+        // Construir no Editor e salvar grava o layout de UM quadrante na cena
+        // compartilhada, e a partir dai todo quadrante nasce com a sobra do
+        // anterior.
+        //
+        // E o modo de falha e o silencioso: so da erro onde as coordenadas nao
+        // existirem no outro quadrante. Q1 e Q2 aqui compartilham faixa de x
+        // ([-18,-3] e [-18,0]) — um contaminaria o outro sem UM aviso sequer.
+        //
+        // Pra ver um quadrante, entre em Play: buildOnAwake ja faz o trabalho. Pra
+        // desfazer uma contaminacao que ja aconteceu, use "Limpar tabuleiro".
+        if (!Application.isPlaying)
+        {
+            Debug.LogError(
+                "[Quadrante] Build so roda em Play. Fora do Play ele gravaria o layout deste "
+                + "quadrante DENTRO da cena de Batalha, que e compartilhada por todos os "
+                + "quadrantes — e a contaminacao seguinte seria silenciosa. Entre em Play "
+                + "(buildOnAwake ja constroi) ou use 'Limpar tabuleiro'.",
+                this);
+            return false;
+        }
+
         if (mundo == null)
         {
             Debug.LogError("[Quadrante] Sem MundoData atribuido.", this);
@@ -226,9 +258,17 @@ public class QuadranteController : MonoBehaviour
             }
         }
 
+        int camadas = BuildCamadas(quadrante, map);
+
         // Construcoes DEPOIS do terreno, sempre: o spawner recusa celula ocupada e
         // precisa do tabuleiro no lugar pra converter celula em posicao de mundo.
         int construcoes = BuildConstrucoes(quadrante, map);
+
+        // Rotas por ULTIMO entre os dados de tabuleiro: RebuildRoadVisuals valida
+        // cada celula contra o terreno pintado (enforceLandSurfaceCells), entao
+        // rodar antes da tinta secar reprovaria a rodovia inteira — IsRouteValid e
+        // tudo-ou-nada.
+        int trechos = BuildRotas(quadrante);
 
         watch.Stop();
         built = true;
@@ -253,6 +293,7 @@ public class QuadranteController : MonoBehaviour
             Debug.Log(
                 $"[Quadrante] '{campanha.displayName}/{quadrante.displayName}' construido: " +
                 $"{paintedCells} tiles, {holeCells} buraco(s), {construcoes} construcao(oes), " +
+                $"{camadas} camada(s), {trechos} trecho(s) de rota, " +
                 $"{quadrante.width}x{quadrante.height} em '{map.name}' " +
                 $"(origem local {paintOrigin.x},{paintOrigin.y}; " +
                 $"origem de autoria {quadrante.originX},{quadrante.originY}) " +
@@ -261,6 +302,282 @@ public class QuadranteController : MonoBehaviour
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// Pinta as camadas decorativas — quebra-mar e o que mais o mundo listar.
+    ///
+    /// Enfeite: se a camada nao existir nesta cena, avisa e segue. O quadrante joga
+    /// igual sem ela; so fica seco. Nao e motivo pra abortar o build.
+    ///
+    /// ⚠️ 'quebraMar' e o unico nome que a NEVOA fotografa
+    /// (MatchController.RenderFogBreakwaterMemory). Outra camada aparece onde esta
+    /// visivel e some onde esta so explorado.
+    /// </summary>
+    private int BuildCamadas(QuadranteData quadrante, Tilemap terreno)
+    {
+        if (quadrante.bakedCamadas == null || quadrante.bakedCamadas.Count == 0)
+            return 0;
+
+        int w = Mathf.Max(1, quadrante.width);
+        int h = Mathf.Max(1, quadrante.height);
+        int pintadas = 0;
+
+        for (int i = 0; i < quadrante.bakedCamadas.Count; i++)
+        {
+            CamadaAssada camadaAssada = quadrante.bakedCamadas[i];
+            if (camadaAssada == null || string.IsNullOrWhiteSpace(camadaAssada.tilemapName))
+                continue;
+
+            Tilemap destino = FindTilemapByNameOnGrid(camadaAssada.tilemapName, terreno);
+            if (destino == null)
+            {
+                Debug.LogWarning(
+                    $"[Quadrante] Camada '{camadaAssada.tilemapName}' nao existe nesta cena " +
+                    "(mesmo Grid do tabuleiro). O quadrante joga sem ela.",
+                    this);
+                continue;
+            }
+
+            if (clearBeforeBuild)
+                destino.ClearAllTiles();
+
+            // Esparsa: so as celulas marcadas. Buraco nao aparece na lista — nao ha
+            // o que pular, e por isso a camada pode ser rala do jeito que for sem
+            // custar nada por celula vazia.
+            int fora = 0;
+            for (int m = 0; m < camadaAssada.marcas.Count; m++)
+            {
+                CamadaAssada.Marca marca = camadaAssada.marcas[m];
+                if (marca.tile == null)
+                    continue;
+
+                // Marca fora do retangulo = bake anterior a um resize do quadrante.
+                // Pintar assim vazaria enfeite pra fora do tabuleiro.
+                if (marca.localX < 0 || marca.localX >= w
+                    || marca.localY < 0 || marca.localY >= h)
+                {
+                    fora++;
+                    continue;
+                }
+
+                Vector3Int cell =
+                    new Vector3Int(paintOrigin.x + marca.localX, paintOrigin.y + marca.localY, 0);
+
+                destino.SetTile(cell, marca.tile);
+
+                // DESTRAVAR ANTES DE ORIENTAR. Um tile pode declarar LockTransform ou
+                // LockColor, e nesse caso o tilemap IGNORA SetTransformMatrix e
+                // SetColor calado — a peca nasceria apontando pro lado errado sem uma
+                // linha de aviso. Como o valor assado ja e o EFETIVO (foi lido da cena
+                // de autoria com os locks dela aplicados), destravar e reaplicar
+                // reproduz o que o autor desenhou, e nao algo diferente.
+                destino.SetTileFlags(cell, TileFlags.None);
+                destino.SetTransformMatrix(cell, camadaAssada.GetMatriz(marca.transformIndex));
+                destino.SetColor(cell, marca.cor);
+            }
+
+            if (fora > 0)
+            {
+                Debug.LogWarning(
+                    $"[Quadrante] Camada '{camadaAssada.tilemapName}': {fora} marca(s) fora " +
+                    $"do retangulo {w}x{h} — bake anterior a um resize. Asse de novo.",
+                    this);
+            }
+
+            pintadas++;
+        }
+
+        return pintadas;
+    }
+
+    /// <summary>
+    /// Devolve as rotas deste quadrante ao RoadNetworkManager da cena.
+    ///
+    /// SUBSTITUI, nunca empilha: ClearSceneRoadRoutes primeiro. Construir duas
+    /// vezes tem de dar o mesmo numero de rotas, nao o dobro — e como a cena de
+    /// Batalha e UMA so pra todos os quadrantes, "construir de novo" e o caso
+    /// comum, nao a excecao.
+    ///
+    /// Resolve a estrutura POR ID no catalogo do proprio manager, e nao guarda
+    /// referencia direta no assado: o catalogo diz o que uma rodovia E, e cinquenta
+    /// mapas compartilham o mesmo. E a mesma escolha do ConstrucaoAssada.
+    /// </summary>
+    private int BuildRotas(QuadranteData quadrante)
+    {
+        bool temRotas = quadrante.bakedRotas != null && quadrante.bakedRotas.Count > 0;
+
+        RoadNetworkManager network = FindFirstObjectByType<RoadNetworkManager>(FindObjectsInactive.Include);
+        if (network == null)
+        {
+            if (!temRotas)
+                return 0;
+
+            Debug.LogWarning(
+                $"[Quadrante] {quadrante.bakedRotas.Count} trecho(s) de rota assado(s), mas nao ha "
+                + "RoadNetworkManager nesta cena. O quadrante joga SEM estrada — e sem erro, "
+                + "porque estrada ausente so deixa o mapa mais lento.",
+                this);
+            return 0;
+        }
+
+        StructureDatabase catalogo = network.StructureDatabase;
+        if (catalogo == null)
+        {
+            Debug.LogError(
+                "[Quadrante] RoadNetworkManager sem StructureDatabase. Sem catalogo nao ha como "
+                + "resolver id de estrutura, e nenhuma rota volta.",
+                network);
+            return 0;
+        }
+
+        // LIMPAR VEM ANTES DE SABER SE HA O QUE ESCREVER.
+        //
+        // A Batalha e UMA cena pra todos os quadrantes, e o Build e repetivel de
+        // proposito. Sair cedo por "este quadrante nao tem estrada" deixaria as
+        // rotas do quadrante ANTERIOR pintadas neste — o mapa A vazando pro mapa B,
+        // sem erro nenhum, porque estrada sobrando so faz o mapa andar mais rapido.
+        network.ClearSceneRoadRoutes();
+
+        if (!temRotas)
+        {
+            network.RebuildRoadVisuals();
+            return 0;
+        }
+
+        int aplicados = 0;
+        int perdidos = 0;
+
+        for (int i = 0; i < quadrante.bakedRotas.Count; i++)
+        {
+            RotaAssada trecho = quadrante.bakedRotas[i];
+            if (trecho == null || trecho.celulas == null || trecho.celulas.Count == 0)
+                continue;
+
+            if (!catalogo.TryGetById(trecho.structureId, out StructureData estrutura)
+                || estrutura == null)
+            {
+                perdidos++;
+                Debug.LogWarning(
+                    $"[Quadrante] Estrutura '{trecho.structureId}' (rota '{trecho.routeName}') nao "
+                    + $"existe em '{catalogo.name}'. Trecho descartado.",
+                    this);
+                continue;
+            }
+
+            List<RoadRouteDefinition> destino = network.GetOrCreateRoadRoutes(estrutura);
+            if (destino == null)
+                continue;
+
+            List<Vector3Int> celulas = new List<Vector3Int>(trecho.celulas.Count);
+            for (int c = 0; c < trecho.celulas.Count; c++)
+            {
+                Vector3Int local = trecho.celulas[c];
+                celulas.Add(new Vector3Int(paintOrigin.x + local.x, paintOrigin.y + local.y, 0));
+            }
+
+            destino.Add(new RoadRouteDefinition
+            {
+                routeName = trecho.routeName,
+                // Sem dono a rota e tratada como legado/global e passa pelo filtro
+                // de qualquer jeito; com dono ela declara de onde veio.
+                ownerDatabase = catalogo,
+                cells = celulas
+            });
+
+            aplicados++;
+        }
+
+        if (perdidos > 0)
+        {
+            Debug.LogError(
+                $"[Quadrante] {perdidos} trecho(s) de rota perdido(s) por id nao encontrado. "
+                + "O mapa joga sem essas estradas.",
+                this);
+        }
+
+        // O lookup e cacheado na primeira consulta; escrever no bucket serializado
+        // sem invalidar deixaria os consumidores lendo o mapa anterior.
+        network.InvalidateRoutesLookup();
+        network.RebuildRoadVisuals();
+
+        return aplicados;
+    }
+
+    private static Tilemap FindTilemapByNameOnGrid(string targetName, Tilemap boardMap)
+    {
+        if (string.IsNullOrWhiteSpace(targetName) || boardMap == null)
+            return null;
+
+        Tilemap[] all = FindObjectsByType<Tilemap>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        for (int i = 0; i < all.Length; i++)
+        {
+            Tilemap t = all[i];
+            if (t == null
+                || t.gameObject.scene != boardMap.gameObject.scene
+                || t.layoutGrid != boardMap.layoutGrid)
+            {
+                continue;
+            }
+
+            if (string.Equals(t.name, targetName, System.StringComparison.OrdinalIgnoreCase))
+                return t;
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Devolve a cena ao estado de nascenca: sem tile, sem construcao, sem enfeite,
+    /// sem rota.
+    ///
+    /// Existe pelo mesmo motivo do guarda no Build — e a saida pra uma cena que JA
+    /// foi contaminada, seja por um build no Editor de antes do guarda, seja por
+    /// qualquer coisa colada ali a mao. Roda no Editor de proposito: e exatamente
+    /// onde o estrago mora, e depois dela a Batalha volta a passar no teste de
+    /// aceitacao ("duplique a cena e ela nasce vazia").
+    /// </summary>
+    [ContextMenu("Limpar tabuleiro")]
+    public void LimparTabuleiro()
+    {
+        Tilemap map = ResolveTargetTilemap();
+        if (map != null)
+            map.ClearAllTiles();
+
+        ClearConstrucoes();
+
+        // As camadas decorativas sao tilemaps IRMAOS: ClearAllTiles no tabuleiro nao
+        // toca nelas, e enfeite orfao sobreviveria a limpeza sem chamar atencao.
+        int camadasLimpas = 0;
+        if (mundo?.camadasDecorativas != null && map != null)
+        {
+            for (int i = 0; i < mundo.camadasDecorativas.Count; i++)
+            {
+                Tilemap camada = FindTilemapByNameOnGrid(mundo.camadasDecorativas[i], map);
+                if (camada == null)
+                    continue;
+
+                camada.ClearAllTiles();
+                camadasLimpas++;
+            }
+        }
+
+        RoadNetworkManager network =
+            FindFirstObjectByType<RoadNetworkManager>(FindObjectsInactive.Include);
+        if (network != null)
+        {
+            network.ClearSceneRoadRoutes();
+            network.RebuildRoadVisuals();
+        }
+
+        built = false;
+        paintedCells = 0;
+        holeCells = 0;
+
+        Debug.Log(
+            $"[Quadrante] Tabuleiro limpo: tiles, construcoes, {camadasLimpas} camada(s) "
+            + "decorativa(s) e rotas. A cena voltou a nascer vazia — salve para gravar isso.",
+            this);
     }
 
     /// <summary>

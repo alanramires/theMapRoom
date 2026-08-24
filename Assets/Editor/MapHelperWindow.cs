@@ -87,6 +87,9 @@ public class MapHelperWindow : EditorWindow
     private GUIStyle rulerStyle;
     private GUIStyle cellStyle;
     private GUIStyle rectStyle;
+    private GUIStyle blocoStyle;
+    private GUIStyle blocoSubStyle;
+    private GUIStyle quadranteStyle;
 
     private BlocoData CurrentBloco =>
         mundo?.blocos != null && selectedBloco >= 0 && selectedBloco < mundo.blocos.Count
@@ -227,6 +230,31 @@ public class MapHelperWindow : EditorWindow
                 status = $"'{mundo.name}' gravado em disco.";
             }
         }
+        int semSerial = 0;
+        foreach (INoDoMapa n in mundo.TodosOsNos())
+        {
+            if (n.IdSerial <= 0)
+                semSerial++;
+        }
+
+        if (semSerial > 0)
+        {
+            EditorGUILayout.HelpBox(
+                $"{semSerial} nó(s) sem identidade estável.\n\n"
+                + "O 'id' é texto livre e vai ser renomeado — e é ele que o progresso e o "
+                + "grafo de destrave endereçam hoje. Renomear quebraria os dois em silêncio: "
+                + "a busca não acha, o quadrante lê como neutro e o portão não abre.\n\n"
+                + "Sele antes de existir o primeiro arquivo de progresso.",
+                MessageType.Warning);
+
+            if (GUILayout.Button($"Selar {semSerial} nó(s)"))
+            {
+                Undo.RecordObject(mundo, "Selar nós");
+                GarantirSeriais();
+                status = $"{semSerial} nó(s) selado(s).";
+            }
+        }
+
         if (GUILayout.Button("Assar TODOS os quadrantes"))
             BakeAll();
         EditorGUILayout.EndHorizontal();
@@ -338,6 +366,17 @@ public class MapHelperWindow : EditorWindow
         {
             EditorGUILayout.HelpBox("Caixa sólida — nenhum buraco.", MessageType.Info);
         }
+
+        // A CAIXA INTEIRA TAMBEM PRECISA DE SAIDA, e nao e duplicata dos botoes do
+        // no: eles trabalham num retangulo JA declarado, e este trabalha no que foi
+        // desenhado. Antes do primeiro bloco existir nao ha no nenhum — sem isto,
+        // um mundo novo nao teria como sair pra uma IA externa desenhar.
+        EditorGUILayout.BeginHorizontal();
+        if (GUILayout.Button("Exportar terreno (JSON)"))
+            ExportarTerreno("mundo", scanMin.x, scanMin.y, w, h);
+        if (GUILayout.Button("Importar terreno (JSON)"))
+            ImportarTerreno("mundo", scanMin.x, scanMin.y, w, h);
+        EditorGUILayout.EndHorizontal();
     }
 
     private void DrawOverlayToggles()
@@ -589,8 +628,19 @@ public class MapHelperWindow : EditorWindow
     /// </summary>
     private void DrawNoBody(INoDoMapa no, PickLevel level, int index, INoDoMapa pai, string paiRotulo)
     {
+        // O serial ao lado do id, cinza. Ver os dois juntos e o que ensina a
+        // diferenca: um voce troca a vontade, o outro e o endereco.
+        EditorGUILayout.BeginHorizontal();
         EditorGUI.BeginChangeCheck();
         string id = EditorGUILayout.TextField("id", no.Id);
+        using (new EditorGUI.DisabledScope(true))
+        {
+            EditorGUILayout.LabelField(
+                no.IdSerial > 0 ? $"#{no.IdSerial}" : "sem serial",
+                GUILayout.Width(74f));
+        }
+        EditorGUILayout.EndHorizontal();
+
         string nome = EditorGUILayout.TextField("nome", no.Nome);
         EditorGUILayout.LabelField("descrição");
         string desc = EditorGUILayout.TextArea(no.Descricao ?? string.Empty, GUILayout.MinHeight(38f));
@@ -670,7 +720,196 @@ public class MapHelperWindow : EditorWindow
                 MessageType.Warning);
         }
 
+        DrawTerrenoJson(no);
+
         DrawDestraves(no);
+    }
+
+    /// <summary>
+    /// Exporta o retangulo deste no como JSON de terreno puro, e importa de volta.
+    ///
+    /// Serve os TRES niveis porque mora no corpo comum: exportar o bloco da o mundo
+    /// inteiro pra IA externa ver o contexto; exportar um quadrante da so o campo de
+    /// batalha. E o mesmo retangulo em escalas diferentes, que e o ponto do INoDoMapa.
+    ///
+    /// Nao mexe em bake. O import pinta a CENA DE AUTORIA, e dai o Assar de sempre
+    /// leva pro quadrante — um caminho so pro mesmo destino. Escrever direto no
+    /// QuadranteData criaria um segundo, e um dos dois divergiria.
+    /// </summary>
+    private void DrawTerrenoJson(INoDoMapa no)
+    {
+        EditorGUILayout.Space(2f);
+        EditorGUILayout.BeginHorizontal();
+
+        if (GUILayout.Button("Exportar terreno (JSON)"))
+            ExportarTerreno(no);
+
+        if (GUILayout.Button("Importar terreno (JSON)"))
+            ImportarTerreno(no);
+
+        EditorGUILayout.EndHorizontal();
+    }
+
+    private void ExportarTerreno(INoDoMapa no)
+    {
+        ExportarTerreno(no.Id, no.OriginX, no.OriginY, no.Width, no.Height);
+    }
+
+    private void ExportarTerreno(string rotulo, int origemX, int origemY, int largura, int altura)
+    {
+        Tilemap map = ResolveTilemap();
+        if (map == null)
+        {
+            status = "Sem tilemap nesta cena.";
+            return;
+        }
+
+        TerrainDatabase catalogo = ResolveTerrainDatabase();
+        if (catalogo == null)
+        {
+            status = "Sem TerrainDatabase na cena — nada a exportar.";
+            return;
+        }
+
+        string json = MapaTerrenoJson.Exportar(
+            map, catalogo, origemX, origemY, largura, altura, out int desconhecidos);
+
+        if (string.IsNullOrEmpty(json))
+        {
+            status = "Falha ao exportar.";
+            return;
+        }
+
+        string caminho = EditorUtility.SaveFilePanel(
+            "Exportar terreno",
+            Application.dataPath,
+            $"{rotulo}-terreno.json",
+            "json");
+
+        if (string.IsNullOrEmpty(caminho))
+            return;
+
+        System.IO.File.WriteAllText(caminho, json, System.Text.Encoding.UTF8);
+
+        status = $"'{rotulo}' exportado: {largura}x{altura} para '{System.IO.Path.GetFileName(caminho)}'.";
+
+        // Tile pintado que o catalogo nao conhece vira buraco no texto — e reimportar
+        // esse texto APAGARIA o hex. Nao e detalhe de log: e perda de desenho.
+        if (desconhecidos > 0)
+        {
+            status += $"  ATENÇÃO: {desconhecidos} hex com tile fora do catálogo virou buraco.";
+            Debug.LogWarning(
+                $"[Map Helper] {desconhecidos} hex de '{rotulo}' tem tile que o TerrainDatabase "
+                + "nao reconhece. No JSON viraram buraco, e reimportar esse arquivo APAGA esses "
+                + "hexagonos. Confira a paleta antes de usar o arquivo como fonte.");
+        }
+    }
+
+    private void ImportarTerreno(INoDoMapa no)
+    {
+        ImportarTerreno(no.Id, no.OriginX, no.OriginY, no.Width, no.Height);
+    }
+
+    private void ImportarTerreno(string rotulo, int origemX, int origemY, int largura, int altura)
+    {
+        Tilemap map = ResolveTilemap();
+        if (map == null)
+        {
+            status = "Sem tilemap nesta cena.";
+            return;
+        }
+
+        TerrainDatabase catalogo = ResolveTerrainDatabase();
+        if (catalogo == null)
+        {
+            status = "Sem TerrainDatabase na cena — nao ha como resolver os simbolos.";
+            return;
+        }
+
+        string caminho = EditorUtility.OpenFilePanel("Importar terreno", Application.dataPath, "json");
+        if (string.IsNullOrEmpty(caminho))
+            return;
+
+        MapaTerrenoJson.Resultado r =
+            MapaTerrenoJson.Interpretar(System.IO.File.ReadAllText(caminho), catalogo);
+
+        if (!r.ok)
+        {
+            status = $"Import recusado: {r.erro}";
+            EditorUtility.DisplayDialog("Import recusado", r.erro, "ok");
+            return;
+        }
+
+        // ORIGEM: manda a do NO, nao a do arquivo.
+        //
+        // O documento carrega a origem de onde saiu, so que o autor pode ter movido o
+        // retangulo desde entao — ou estar colando um mapa desenhado noutro lugar. O
+        // que ele ve na bancada e onde ele espera que caia.
+        bool origemDiferente = r.documento.origemX != origemX || r.documento.origemY != origemY;
+        bool tamanhoDiferente = r.documento.largura != largura || r.documento.altura != altura;
+
+        string aviso =
+            $"Vai pintar {r.documento.largura}x{r.documento.altura} hexágonos em "
+            + $"({origemX},{origemY}), por cima do que houver ali.";
+
+        if (origemDiferente)
+        {
+            aviso +=
+                $"\n\nO arquivo foi exportado de ({r.documento.origemX},{r.documento.origemY}). "
+                + "Vale a origem mostrada aqui, não a do arquivo.";
+        }
+
+        if (tamanhoDiferente)
+        {
+            aviso +=
+                $"\n\nO retângulo tem {largura}x{altura} e o arquivo tem "
+                + $"{r.documento.largura}x{r.documento.altura}. Vale o do arquivo — o que sobrar "
+                + "cai fora do retângulo mostrado aqui.";
+        }
+
+        if (!EditorUtility.DisplayDialog("Importar terreno", aviso, "pintar", "cancelar"))
+            return;
+
+        Undo.RegisterCompleteObjectUndo(map, $"Importar terreno em {rotulo}");
+        MapaTerrenoJson.Aplicar(r, map, catalogo, origemX, origemY);
+        EditorUtility.SetDirty(map);
+        SceneView.RepaintAll();
+
+        status =
+            $"'{rotulo}' importado: {r.pintados} hex pintado(s), {r.buracos} buraco(s). "
+            + "Assar para levar ao quadrante.";
+    }
+
+    /// <summary>
+    /// O catalogo de terreno da CENA, nao um achado no projeto. Cena diferente pode
+    /// usar catalogo diferente, e pegar o primeiro do disco resolveria simbolo contra
+    /// um vocabulario que este tabuleiro nao usa.
+    /// </summary>
+    private TerrainDatabase ResolveTerrainDatabase()
+    {
+        RoadNetworkManager network = FindAnyObjectByType<RoadNetworkManager>();
+        if (network != null && network.TerrainDatabase != null)
+            return network.TerrainDatabase;
+
+        // Fallback pelo disco, e SO com um candidato. Com dois catalogos no projeto,
+        // escolher um sozinho resolveria simbolo contra um vocabulario que este
+        // tabuleiro nao usa — e o resultado seria terreno errado sem erro nenhum.
+        string[] guids = AssetDatabase.FindAssets("t:TerrainDatabase");
+        if (guids.Length == 1)
+        {
+            return AssetDatabase.LoadAssetAtPath<TerrainDatabase>(
+                AssetDatabase.GUIDToAssetPath(guids[0]));
+        }
+
+        if (guids.Length > 1)
+        {
+            Debug.LogWarning(
+                $"[Map Helper] Nao ha RoadNetworkManager nesta cena e existem {guids.Length} "
+                + "TerrainDatabase no projeto. Nao da pra escolher: ligue um "
+                + "RoadNetworkManager na cena para dizer qual catalogo e o desta.");
+        }
+
+        return null;
     }
 
     /// <summary>
@@ -771,11 +1010,43 @@ public class MapHelperWindow : EditorWindow
 
     // ──────────────────────────────────────────────────────── mutacoes ──
 
+    /// <summary>
+    /// Sela todo no que ainda nao tem serial. Chamado depois de CADA criacao.
+    ///
+    /// Chamar a varredura inteira em vez de selar so o no recem-criado e de
+    /// proposito: sao dezenas de nos, custa nada, e assim um caminho de criacao que
+    /// eu esqueca de instrumentar — hoje sao quatro — nao deixa um no sem
+    /// identidade. Esquecer aqui nao daria erro; daria um no invisivel pro
+    /// progresso.
+    ///
+    /// Tambem e onde duplicata de copiar/colar e desfeita.
+    /// </summary>
+    private void GarantirSeriais()
+    {
+        if (mundo == null)
+            return;
+
+        int dados = mundo.RepararSeriais(out int duplicados);
+        if (dados == 0)
+            return;
+
+        EditorUtility.SetDirty(mundo);
+
+        if (duplicados > 0)
+        {
+            Debug.LogWarning(
+                $"[Map Helper] {duplicados} nó(s) com serial repetido em '{mundo.name}' "
+                + "ganharam serial novo. Repetido costuma vir de copiar/colar — o clone "
+                + "herdaria o progresso do original.");
+        }
+    }
+
     private void AddBloco()
     {
         Undo.RecordObject(mundo, "Novo bloco");
         string id = $"bloco{mundo.blocos.Count + 1}";
         BlocoData b = mundo.GetOrCreateBloco(id);
+        GarantirSeriais();
         FitToScan(b);
         EditorUtility.SetDirty(mundo);
         selectedBloco = mundo.blocos.Count - 1;
@@ -789,6 +1060,7 @@ public class MapHelperWindow : EditorWindow
         Undo.RecordObject(mundo, "Nova campanha");
         string id = $"campanha{(parent.campanhas?.Count ?? 0) + 1}";
         CampanhaData c = parent.GetOrCreateCampanha(id);
+        GarantirSeriais();
         c.originX = parent.originX;
         c.originY = parent.originY;
         c.width = parent.width;
@@ -806,6 +1078,7 @@ public class MapHelperWindow : EditorWindow
         Undo.RecordObject(mundo, "Novo quadrante");
         string id = $"Q{(parent.quadrantes?.Count ?? 0) + 1}";
         QuadranteData q = parent.GetOrCreateQuadrante(id);
+        GarantirSeriais();
         q.originX = parent.originX;
         q.originY = parent.originY;
         q.width = Mathf.Min(splitWidth, parent.width);
@@ -891,6 +1164,7 @@ public class MapHelperWindow : EditorWindow
         for (int i = 0; i < n; i++)
         {
             QuadranteData q = c.GetOrCreateQuadrante($"Q{i + 1}");
+            GarantirSeriais();
             q.originX = n == 1
                 ? c.originX
                 : Mathf.RoundToInt(Mathf.Lerp(c.originX, maxX - w + 1, i / (float)(n - 1)));
@@ -1004,14 +1278,202 @@ public class MapHelperWindow : EditorWindow
         }
 
         int construcoes = BakeConstrucoes(q);
+        int camadas = BakeCamadas(q, map);
+        // DEPOIS do terreno, sempre: o corte de rota consulta GetBakedTile pra
+        // saber onde ha buraco, e antes do loop acima nao ha bake pra consultar.
+        int trechos = BakeRotas(q);
 
         EditorUtility.SetDirty(mundo);
         AssetDatabase.SaveAssetIfDirty(mundo);
 
+        // Camada esparsa nao tem tamanho esperado pra conferir, entao o numero de
+        // marcas E a unica prova de que ela veio. Quadrante sem enfeite nenhum e
+        // legitimo — mas tem que dar pra ver a diferenca entre isso e um bake que
+        // achou o Tilemap vazio.
         status = $"'{q.quadranteId}' assado de '{q.bakedFromScene}': ({q.originX},{q.originY}) "
                + $"{w}×{h} = {w * h} células · {painted} tiles, {holeCount} buraco(s), "
-               + $"{construcoes} construção(ões).";
+               + $"{construcoes} construção(ões), {DescreveCamadas(q, camadas)}, "
+               + $"{trechos} trecho(s) de rota.";
         Repaint();
+    }
+
+    private static bool JaAssada(QuadranteData q, string nome)
+    {
+        if (q.bakedCamadas == null)
+            return false;
+
+        for (int i = 0; i < q.bakedCamadas.Count; i++)
+        {
+            CamadaAssada c = q.bakedCamadas[i];
+            if (c != null
+                && string.Equals(c.tilemapName, nome, System.StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// "2 camada(s): quebraMar 6, dunas 0" — o nome e a contagem de cada uma.
+    /// </summary>
+    private static string DescreveCamadas(QuadranteData q, int camadas)
+    {
+        if (camadas <= 0 || q.bakedCamadas == null || q.bakedCamadas.Count == 0)
+            return "0 camada(s) decorativa(s)";
+
+        var sb = new System.Text.StringBuilder();
+        sb.Append(camadas).Append(" camada(s): ");
+
+        for (int i = 0; i < q.bakedCamadas.Count; i++)
+        {
+            CamadaAssada c = q.bakedCamadas[i];
+            if (c == null)
+                continue;
+            if (i > 0)
+                sb.Append(", ");
+            sb.Append(c.tilemapName).Append(' ').Append(c.Count);
+            int giros = (c.transformacoes != null ? c.transformacoes.Count : 1) - 1;
+            if (giros > 0)
+                sb.Append(" (").Append(giros).Append(" giro(s))");
+        }
+
+        return sb.ToString();
+    }
+
+    /// <summary>
+    /// Copia as camadas decorativas listadas no MundoData — o mesmo retangulo do
+    /// terreno, no mesmo Grid, alinhado celula a celula.
+    ///
+    /// Diferente do terreno em UMA coisa: guarda ESPARSO. O terreno preenche quase
+    /// toda celula, entao array row-major e a forma certa. Enfeite e rala e cheia de
+    /// buraco — e a camada cresce com o mundo, nao com o quadrante. Cada quadrante
+    /// leva so as marcas que caem dentro dele; um quebra-mar que percorra o globo
+    /// inteiro nao cobra nada de quem nao tem costa.
+    /// </summary>
+    /// <summary>
+    /// Acha ou cria a orientacao na paleta da camada. Sao poucas e distintas — no
+    /// mapa de teste, 10 para 39 celulas — entao a busca linear e mais barata que
+    /// manter um dicionario, e Matrix4x4 nao tem hash confiavel para chave.
+    /// </summary>
+    private static int IndiceDaTransformacao(CamadaAssada camada, Matrix4x4 matriz)
+    {
+        for (int i = 0; i < camada.transformacoes.Count; i++)
+        {
+            if (camada.transformacoes[i].Igual(matriz))
+                return i;
+        }
+
+        camada.transformacoes.Add(CamadaAssada.Transformacao.De(matriz));
+        return camada.transformacoes.Count - 1;
+    }
+
+    private int BakeCamadas(QuadranteData q, Tilemap terreno)
+    {
+        if (q.bakedCamadas == null)
+            q.bakedCamadas = new List<CamadaAssada>();
+        q.bakedCamadas.Clear();
+
+        if (mundo?.camadasDecorativas == null || terreno == null)
+            return 0;
+
+        int w = Mathf.Max(1, q.width);
+        int h = Mathf.Max(1, q.height);
+
+        for (int i = 0; i < mundo.camadasDecorativas.Count; i++)
+        {
+            string nome = mundo.camadasDecorativas[i];
+            if (string.IsNullOrWhiteSpace(nome))
+                continue;
+
+            // Nome repetido na lista assaria duas entradas pro MESMO Tilemap, e o
+            // build limpa a camada antes de pintar cada uma — a segunda apagaria a
+            // primeira em silencio. Erro de digitacao na lista, nao do bake.
+            if (JaAssada(q, nome))
+            {
+                Debug.LogWarning(
+                    $"[Map Helper] Camada decorativa '{nome}' aparece mais de uma vez em "
+                    + $"'{mundo.name}'. Assando so a primeira.");
+                continue;
+            }
+
+            Tilemap camada = FindTilemapByNameOnGrid(nome, terreno);
+            if (camada == null)
+            {
+                Debug.LogWarning(
+                    $"[Map Helper] Camada decorativa '{nome}' nao existe nesta cena (mesmo Grid de "
+                    + $"'{terreno.name}'). '{q.quadranteId}' vai sem ela.");
+                continue;
+            }
+
+            // ESPARSA: so o que tem tile. Camada decorativa e ~2% densa, e o array
+            // do retangulo inteiro seria quase todo nulo — multiplicado por
+            // quadrante e por camada.
+            CamadaAssada assada = new CamadaAssada { tilemapName = nome };
+
+            // Indice 0 reservado pra identidade: camada sem giro nenhum custa uma
+            // entrada, e "sem transformacao" nunca vira um caso especial no leitor.
+            assada.transformacoes.Add(CamadaAssada.Transformacao.De(Matrix4x4.identity));
+
+            for (int localY = 0; localY < h; localY++)
+            {
+                for (int localX = 0; localX < w; localX++)
+                {
+                    Vector3Int cell = new Vector3Int(q.originX + localX, q.originY + localY, 0);
+                    TileBase tile = camada.GetTile(cell);
+                    if (tile == null)
+                        continue;
+
+                    // A ORIENTACAO E METADE DO DESENHO, e nao vem no tile.
+                    //
+                    // O quebra-mar e UM sprite girado de 60 em 60 graus pra acompanhar
+                    // a costa: 39 celulas, 10 orientacoes. Copiar so o TileBase poe as
+                    // pecas certas nos lugares certos apontando todas pro mesmo lado —
+                    // sem erro no console, so um desenho irreconhecivel.
+                    assada.marcas.Add(new CamadaAssada.Marca
+                    {
+                        localX = localX,
+                        localY = localY,
+                        tile = tile,
+                        transformIndex = IndiceDaTransformacao(assada, camada.GetTransformMatrix(cell)),
+                        cor = camada.GetColor(cell)
+                    });
+                }
+            }
+
+            q.bakedCamadas.Add(assada);
+        }
+
+        return q.bakedCamadas.Count;
+    }
+
+    /// <summary>
+    /// Mesmo criterio de MatchController.FindTilemapByNameOnBoard: mesma cena,
+    /// mesmo Grid, nome ignorando maiuscula. Nao reusa o metodo porque la ele e
+    /// privado — se um dia virar publico, esta copia sai.
+    /// </summary>
+    private static Tilemap FindTilemapByNameOnGrid(string targetName, Tilemap boardMap)
+    {
+        if (string.IsNullOrWhiteSpace(targetName) || boardMap == null)
+            return null;
+
+        Tilemap[] all = FindObjectsByType<Tilemap>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        for (int i = 0; i < all.Length; i++)
+        {
+            Tilemap t = all[i];
+            if (t == null
+                || t.gameObject.scene != boardMap.gameObject.scene
+                || t.layoutGrid != boardMap.layoutGrid)
+            {
+                continue;
+            }
+
+            if (string.Equals(t.name, targetName, System.StringComparison.OrdinalIgnoreCase))
+                return t;
+        }
+
+        return null;
     }
 
     /// <summary>
@@ -1026,6 +1488,192 @@ public class MapHelperWindow : EditorWindow
     /// duas vezes. A faixa de fronteira e pro CHAO; QG duplicado quebra a contagem
     /// por slot. O aviso sai no log deste metodo.
     /// </summary>
+    /// <summary>
+    /// Recorta as rotas da cena de autoria para o retangulo do quadrante.
+    ///
+    /// UNICO bake que PARTE o que copia. Construcao e enfeite se recortam por
+    /// pertencimento — dentro vem, fora fica. Rota e sequencia ordenada: o autor
+    /// desenhou arestas, "daqui pra ali", e tirar uma celula do meio COLA as duas
+    /// vizinhas dela numa aresta que ninguem tracou. Ver RotaAssada para os tres
+    /// consumidores que leem pares consecutivos.
+    ///
+    /// Quebra em dois casos, e o segundo nao e obvio:
+    ///
+    ///   FORA DO RETANGULO   a celula nao e deste quadrante
+    ///   BURACO              a celula e do quadrante mas nao tem tile assado.
+    ///                       IsRouteValid e tudo-ou-nada: uma celula invalida
+    ///                       descarta o desenho da rota INTEIRA. Partindo, os dois
+    ///                       lados do buraco continuam aparecendo
+    ///
+    /// Nao precisa de geometria de hexagono: a quebra e sempre "perdi uma celula",
+    /// e as arestas sao as do autor, nao adjacencia calculada.
+    /// </summary>
+    private int BakeRotas(QuadranteData q)
+    {
+        if (q.bakedRotas == null)
+            q.bakedRotas = new List<RotaAssada>();
+        q.bakedRotas.Clear();
+
+        Scene active = SceneManager.GetActiveScene();
+        RoadNetworkManager network = null;
+        RoadNetworkManager[] networks =
+            FindObjectsByType<RoadNetworkManager>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        for (int i = 0; i < networks.Length; i++)
+        {
+            if (networks[i] != null && networks[i].gameObject.scene == active)
+            {
+                network = networks[i];
+                break;
+            }
+        }
+
+        if (network == null || network.RoadRoutesByStructure == null)
+            return 0;
+
+        int maxX = q.originX + Mathf.Max(1, q.width) - 1;
+        int maxY = q.originY + Mathf.Max(1, q.height) - 1;
+        int partidas = 0;
+
+        IReadOnlyList<StructureRoadRouteBucket> buckets = network.RoadRoutesByStructure;
+        for (int b = 0; b < buckets.Count; b++)
+        {
+            StructureRoadRouteBucket bucket = buckets[b];
+            if (bucket == null || bucket.structure == null || bucket.routes == null)
+                continue;
+
+            if (string.IsNullOrWhiteSpace(bucket.structure.id))
+            {
+                Debug.LogWarning(
+                    $"[Map Helper] Estrutura '{bucket.structure.name}' sem id. O build resolve "
+                    + "estrutura POR ID — sem ele a rota nao volta. Rotas dela ficam de fora.");
+                continue;
+            }
+
+            for (int r = 0; r < bucket.routes.Count; r++)
+            {
+                RoadRouteDefinition rota = bucket.routes[r];
+                if (rota == null || rota.cells == null || rota.cells.Count == 0)
+                    continue;
+
+                int antes = q.bakedRotas.Count;
+                RecortarRota(q, bucket.structure.id, rota, maxX, maxY);
+                int trechos = q.bakedRotas.Count - antes;
+
+                if (trechos > 1)
+                    partidas++;
+            }
+        }
+
+        // Sufixo so quando REALMENTE partiu. Uma rota que atravessou inteira mantem
+        // o nome do autor, e assim o nome com "#" e sinal de corte, nao ruido.
+        RenomearTrechosPartidos(q);
+
+        if (partidas > 0)
+        {
+            Debug.Log(
+                $"[Map Helper] '{q.quadranteId}': {partidas} rota(s) partida(s) pelo recorte "
+                + "(borda ou buraco). Trechos separados de proposito — juntar criaria aresta "
+                + "de estrada nao desenhada.");
+        }
+
+        return q.bakedRotas.Count;
+    }
+
+    /// <summary>
+    /// Varre a rota uma vez, acumulando o trecho corrente e fechando-o na primeira
+    /// celula perdida. Trecho de UMA celula e mantido: nao tem aresta, mas ainda
+    /// marca o hex como estrada para o custo de movimento.
+    /// </summary>
+    private void RecortarRota(
+        QuadranteData q,
+        string structureId,
+        RoadRouteDefinition rota,
+        int maxX,
+        int maxY)
+    {
+        List<Vector3Int> corrente = null;
+
+        for (int c = 0; c < rota.cells.Count; c++)
+        {
+            Vector3Int cell = rota.cells[c];
+            cell.z = 0;
+
+            bool dentro = cell.x >= q.originX && cell.x <= maxX
+                       && cell.y >= q.originY && cell.y <= maxY;
+
+            int localX = cell.x - q.originX;
+            int localY = cell.y - q.originY;
+
+            // Buraco conta como perda: a rota inteira sumiria por causa dele.
+            bool temChao = dentro && q.GetBakedTile(localX, localY) != null;
+
+            if (!dentro || !temChao)
+            {
+                FecharTrecho(q, structureId, rota, ref corrente);
+                continue;
+            }
+
+            if (corrente == null)
+                corrente = new List<Vector3Int>();
+
+            corrente.Add(new Vector3Int(localX, localY, 0));
+        }
+
+        FecharTrecho(q, structureId, rota, ref corrente);
+    }
+
+    private static void FecharTrecho(
+        QuadranteData q,
+        string structureId,
+        RoadRouteDefinition rota,
+        ref List<Vector3Int> corrente)
+    {
+        if (corrente == null || corrente.Count == 0)
+        {
+            corrente = null;
+            return;
+        }
+
+        q.bakedRotas.Add(new RotaAssada
+        {
+            structureId = structureId,
+            routeName = rota.routeName,
+            celulas = corrente
+        });
+
+        corrente = null;
+    }
+
+    /// <summary>
+    /// "Cruzamento" continua "Cruzamento" se veio inteira; vira "Cruzamento #1" e
+    /// "Cruzamento #2" se o recorte partiu. O sufixo e diagnostico: no Inspector,
+    /// "#" significa que a rodovia sai do quadrante ou cruza um buraco.
+    /// </summary>
+    private static void RenomearTrechosPartidos(QuadranteData q)
+    {
+        Dictionary<string, int> totais = new Dictionary<string, int>();
+        for (int i = 0; i < q.bakedRotas.Count; i++)
+        {
+            string chave = q.bakedRotas[i].structureId + "\u0000" + q.bakedRotas[i].routeName;
+            totais.TryGetValue(chave, out int n);
+            totais[chave] = n + 1;
+        }
+
+        Dictionary<string, int> vistos = new Dictionary<string, int>();
+        for (int i = 0; i < q.bakedRotas.Count; i++)
+        {
+            RotaAssada trecho = q.bakedRotas[i];
+            string chave = trecho.structureId + "\u0000" + trecho.routeName;
+            if (totais[chave] <= 1)
+                continue;
+
+            vistos.TryGetValue(chave, out int n);
+            n++;
+            vistos[chave] = n;
+            trecho.routeName = $"{trecho.routeName} #{n}";
+        }
+    }
+
     private int BakeConstrucoes(QuadranteData q)
     {
         if (q.bakedConstrucoes == null)
@@ -1155,7 +1803,7 @@ public class MapHelperWindow : EditorWindow
             bool blocoAtivo = selectedBloco < 0 || selectedBloco == bi;
 
             if (showBlocos)
-                DrawNo(map, b, NivelColor(0, bi), 7f, "BLOCO", blocoAtivo);
+                DrawNo(map, b, NivelColor(0, bi), 7f, "BLOCO", blocoAtivo, noCentro: true);
 
             if (b.campanhas == null) continue;
 
@@ -1176,19 +1824,34 @@ public class MapHelperWindow : EditorWindow
                     QuadranteData q = c.quadrantes[qi];
                     if (q == null) continue;
                     DrawNo(map, q, NivelColor(2, qi), 2.5f, string.Empty,
-                           campAtiva && (selectedQuadrante < 0 || selectedQuadrante == qi));
+                           campAtiva && (selectedQuadrante < 0 || selectedQuadrante == qi),
+                           noCentro: true, rotuloGrande: false);
                 }
             }
         }
     }
 
-    private void DrawNo(Tilemap map, INoDoMapa no, Color color, float thickness, string prefixo, bool ativo)
+    private void DrawNo(
+        Tilemap map,
+        INoDoMapa no,
+        Color color,
+        float thickness,
+        string prefixo,
+        bool ativo,
+        bool noCentro = false,
+        bool rotuloGrande = true)
     {
         if (!ativo) color.a *= 0.25f;
 
         int maxX = no.OriginX + Mathf.Max(1, no.Width) - 1;
         int maxY = no.OriginY + Mathf.Max(1, no.Height) - 1;
         DrawCellRectOutline(map, no.OriginX, no.OriginY, maxX, maxY, color, thickness);
+
+        if (noCentro)
+        {
+            DrawRotuloCentral(map, no, color, prefixo, rotuloGrande);
+            return;
+        }
 
         Vector3 corner = map.GetCellCenterWorld(new Vector3Int(no.OriginX, maxY, 0));
         float step = HandleUtility.GetHandleSize(corner) * (0.6f + thickness * 0.08f);
@@ -1198,6 +1861,76 @@ public class MapHelperWindow : EditorWindow
             $"{(string.IsNullOrEmpty(prefixo) ? string.Empty : prefixo + " ")}{no.Id}  "
             + $"({no.OriginX},{no.OriginY})  {no.Width}x{no.Height}",
             rectStyle);
+    }
+
+    /// <summary>
+    /// Rotulo no MEIO do retangulo, em tamanho de leitura. Duas linhas: o nome
+    /// grande, o retangulo pequeno embaixo — o numero continua ali, mas para de
+    /// competir com o nome.
+    ///
+    /// Desenhado em espaco de TELA (Handles.BeginGUI + WorldToGUIPoint) e nao com
+    /// Handles.Label, porque centrar de verdade exige medir o texto: Handles.Label
+    /// ancora pelo canto e o alignment do estilo nao tem rect pra agir dentro.
+    ///
+    /// A sombra existe porque o fundo e mapa: verde claro e ciano. Texto colorido
+    /// sem contorno some justamente nas cores que mais aparecem aqui.
+    /// </summary>
+    private void DrawRotuloCentral(
+        Tilemap map, INoDoMapa no, Color color, string prefixo, bool grande)
+    {
+        int centroX = no.OriginX + Mathf.Max(1, no.Width) / 2;
+        int centroY = no.OriginY + Mathf.Max(1, no.Height) / 2;
+        Vector3 centroWorld = map.GetCellCenterWorld(new Vector3Int(centroX, centroY, 0));
+
+        // O NOME, nao o id. O id e endereco tecnico — e o que o save grava e o que o
+        // QuadranteController casa — e por isso vive sem acento e sem espaco. Quem le
+        // o mapa quer "Auridia", nao "A". Cai no id so se o nome estiver vazio, pra
+        // etiqueta nunca sair em branco.
+        string nome = string.IsNullOrWhiteSpace(no.Nome) ? no.Id : no.Nome;
+        string titulo = string.IsNullOrEmpty(prefixo) ? nome : $"{prefixo} {nome}";
+        // O ID VAI JUNTO, na linha pequena. Sair do canto pro centro nao pode custar
+        // o endereco: e o id que se digita no QuadranteController e o que aparece no
+        // erro quando o endereco nao casa. So e omitido quando o nome ESTA vazio e o
+        // titulo ja e o proprio id — repetir nao informa.
+        string sub = nome == no.Id
+            ? $"({no.OriginX},{no.OriginY})  {no.Width}x{no.Height}"
+            : $"{no.Id}  ·  ({no.OriginX},{no.OriginY})  {no.Width}x{no.Height}";
+
+        Handles.BeginGUI();
+        Vector2 ponto = HandleUtility.WorldToGUIPoint(centroWorld);
+
+        GUIStyle estiloTitulo = grande ? blocoStyle : quadranteStyle;
+
+        DesenharTextoCentrado(titulo, ponto, estiloTitulo, color);
+        DesenharTextoCentrado(
+            sub,
+            ponto + new Vector2(0f, estiloTitulo.fontSize * 1.05f),
+            blocoSubStyle,
+            color);
+
+        Handles.EndGUI();
+    }
+
+    private static void DesenharTextoCentrado(string texto, Vector2 ponto, GUIStyle estilo, Color color)
+    {
+        GUIContent conteudo = new GUIContent(texto);
+        Vector2 tamanho = estilo.CalcSize(conteudo);
+        Rect rect = new Rect(ponto.x - tamanho.x * 0.5f, ponto.y - tamanho.y * 0.5f, tamanho.x, tamanho.y);
+
+        Color sombra = new Color(0f, 0f, 0f, color.a * 0.9f);
+        estilo.normal.textColor = sombra;
+        for (int dx = -1; dx <= 1; dx++)
+        {
+            for (int dy = -1; dy <= 1; dy++)
+            {
+                if (dx == 0 && dy == 0)
+                    continue;
+                GUI.Label(new Rect(rect.x + dx, rect.y + dy, rect.width, rect.height), conteudo, estilo);
+            }
+        }
+
+        estilo.normal.textColor = color;
+        GUI.Label(rect, conteudo, estilo);
     }
 
     /// <summary>Cor estavel por nivel e indice — angulo aureo, vizinhos nunca colidem.</summary>
@@ -1549,6 +2282,35 @@ public class MapHelperWindow : EditorWindow
 
         if (rectStyle == null)
             rectStyle = new GUIStyle(EditorStyles.miniBoldLabel);
+
+        // Rotulo de BLOCO e o unico em tamanho de leitura: ele nomeia uma REGIAO
+        // inteira, nao marca um canto. Fica no meio do proprio retangulo, e o
+        // tamanho e de tela (Handles nao escala com zoom) — entao continua legivel
+        // com o mapa todo enquadrado, que e quando ele serve pra alguma coisa.
+        if (blocoStyle == null)
+        {
+            blocoStyle = new GUIStyle(EditorStyles.boldLabel);
+            blocoStyle.fontSize = 22;
+            blocoStyle.alignment = TextAnchor.MiddleCenter;
+        }
+
+        // Quadrante tambem e LUGAR, entao tambem ganha nome no meio — so que menor:
+        // cabem varios na tela ao mesmo tempo, e no mesmo corpo do bloco eles
+        // brigariam entre si. Campanha fica de fora por nao ser lugar nenhum: e a
+        // organizacao dos quadrantes, e o canto basta.
+        if (quadranteStyle == null)
+        {
+            quadranteStyle = new GUIStyle(EditorStyles.boldLabel);
+            quadranteStyle.fontSize = 15;
+            quadranteStyle.alignment = TextAnchor.MiddleCenter;
+        }
+
+        if (blocoSubStyle == null)
+        {
+            blocoSubStyle = new GUIStyle(EditorStyles.boldLabel);
+            blocoSubStyle.fontSize = 11;
+            blocoSubStyle.alignment = TextAnchor.MiddleCenter;
+        }
     }
 
     // ─────────────────────────────────────────────────────────── varredura ──

@@ -38,7 +38,13 @@ public class QuadranteData : INoDoMapa
     [Tooltip("Exige todos os quadrantes irmaos concluidos. E o 'last map' da campanha.")]
     public bool exigeIrmaos;
 
+    [SerializeField, HideInInspector] private int idSerial;
+
+    /// <summary>Identidade estavel. Ver INoDoMapa.IdSerial.</summary>
+    public int IdSerial => idSerial;
+
     string INoDoMapa.Id { get => quadranteId; set => quadranteId = value; }
+    int INoDoMapa.IdSerial { get => idSerial; set => idSerial = value; }
     string INoDoMapa.Nome { get => displayName; set => displayName = value; }
     string INoDoMapa.Descricao { get => descricao; set => descricao = value; }
     int INoDoMapa.OriginX { get => originX; set => originX = value; }
@@ -53,6 +59,20 @@ public class QuadranteData : INoDoMapa
     public List<TileBase> bakedTiles = new List<TileBase>();
     [Tooltip("Construcoes dentro do retangulo, em coordenada LOCAL.")]
     public List<ConstrucaoAssada> bakedConstrucoes = new List<ConstrucaoAssada>();
+    [Tooltip(
+        "Camadas decorativas (quebraMar e o que mais vier), uma entrada por Tilemap.\n\n"
+        + "Esparsas, ao contrario do terreno: guardam so as celulas marcadas. A camada "
+        + "cresce com o MUNDO, nao com o quadrante — cada quadrante leva apenas o que "
+        + "cai dentro do seu retangulo, e buraco nao ocupa lugar.")]
+    public List<CamadaAssada> bakedCamadas = new List<CamadaAssada>();
+    [Tooltip(
+        "Trechos de rota (rodovia, ferrovia, rio) em coordenada LOCAL.\n\n"
+        + "TRECHOS, nao rotas: recortar uma sequencia ordenada parte ela. Cada pedaco "
+        + "contiguo vira uma entrada propria, porque os consumidores leem PARES "
+        + "consecutivos — juntar dois pedacos numa lista so criaria uma aresta de "
+        + "estrada que o autor nunca desenhou.")]
+    public List<RotaAssada> bakedRotas = new List<RotaAssada>();
+
     [Tooltip("De qual cena de autoria este bake saiu. So documentacao.")]
     public string bakedFromScene;
     public long bakedAtUtcTicks;

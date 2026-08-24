@@ -31,7 +31,13 @@ public class CampanhaData : INoDoMapa
     [Header("Quadrantes")]
     public List<QuadranteData> quadrantes = new List<QuadranteData>();
 
+    [SerializeField, HideInInspector] private int idSerial;
+
+    /// <summary>Identidade estavel. Ver INoDoMapa.IdSerial.</summary>
+    public int IdSerial => idSerial;
+
     string INoDoMapa.Id { get => campanhaId; set => campanhaId = value; }
+    int INoDoMapa.IdSerial { get => idSerial; set => idSerial = value; }
     string INoDoMapa.Nome { get => displayName; set => displayName = value; }
     string INoDoMapa.Descricao { get => descricao; set => descricao = value; }
     int INoDoMapa.OriginX { get => originX; set => originX = value; }
