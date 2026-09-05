@@ -26,6 +26,7 @@ vazio e nenhum tabuleiro herde o layout de outro.
 |---|---|---|
 | v8.0.0 | A ausência precisa de nome próprio | [relatório](docs/relatorio_v8.0.0.md) |
 | v8.0.1 | As seis armas: o vocabulário fecha, o código não começou | [relatório](docs/relatorio_v8.0.1.md) |
+| v8.5.0 | O laço fecha, e o dono deixa de ser uma cor | [relatório](docs/relatorio_v8.5.0.md) |
 | v8.4.1 | O recorte aprende que a peça tem lado | [relatório](docs/relatorio_v8.4.1.md) |
 | v8.4.0 | O catálogo diz o que uma coisa É, e hoje parou de dizer onde ela está | [relatório](docs/relatorio_v8.4.0.md) |
 | v8.3.0 | Três formas erradas até o dado caber, e o primeiro quadrante em 2 ms | [relatório](docs/relatorio_v8.3.0.md) |
