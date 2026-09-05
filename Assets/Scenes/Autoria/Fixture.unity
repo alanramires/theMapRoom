@@ -4711,13 +4711,13 @@ MonoBehaviour:
     defeated: 0
     startMoney: 0
     actualMoney: 0
-    incomePerTurn: 3000
+    incomePerTurn: 6000
     startMoneyApplied: 1
   - teamId: 3
     flipX: 1
     flipXOverride: 0
     isAI: 0
-    isRebelRuntime: 0
+    isRebelRuntime: 1
     isLocal: 1
     localityConfigured: 1
     commandServiceAutomatic: 0
@@ -12652,7 +12652,7 @@ MonoBehaviour:
   appliedActiveTeamId: 2
   pendingTurnStartUpkeep: 1
   pendingTurnStartEconomy: 1
-  cachedConstructionIncomeSignature: -1264364574
+  cachedConstructionIncomeSignature: -1602322014
   cachedConstructionIncomeCount: 13
   constructionIncomeRefreshIntervalSeconds: 0.35
   continuousEditorRefresh: 0
@@ -14335,13 +14335,6 @@ MonoBehaviour:
     - routeName: Euro Road
       ownerDatabase: {fileID: 11400000, guid: 82ff47f9ef992184f977e1cef89c1f4f, type: 2}
       cells:
-      - {x: -6, y: 14, z: 0}
-      - {x: -5, y: 14, z: 0}
-      - {x: -5, y: 13, z: 0}
-      - {x: -5, y: 12, z: 0}
-      - {x: -5, y: 11, z: 0}
-      - {x: -4, y: 10, z: 0}
-      - {x: -4, y: 9, z: 0}
       - {x: -3, y: 9, z: 0}
       - {x: -2, y: 8, z: 0}
       - {x: -2, y: 7, z: 0}
@@ -34432,8 +34425,8 @@ Tilemap:
   - first: {x: -4, y: 10, z: 0}
     second:
       serializedVersion: 2
-      m_TileIndex: 0
-      m_TileSpriteIndex: 2
+      m_TileIndex: 2
+      m_TileSpriteIndex: 1
       m_TileMatrixIndex: 0
       m_TileColorIndex: 0
       m_TileObjectToInstantiateIndex: 65535
@@ -34442,8 +34435,8 @@ Tilemap:
   - first: {x: -3, y: 10, z: 0}
     second:
       serializedVersion: 2
-      m_TileIndex: 0
-      m_TileSpriteIndex: 2
+      m_TileIndex: 2
+      m_TileSpriteIndex: 1
       m_TileMatrixIndex: 0
       m_TileColorIndex: 0
       m_TileObjectToInstantiateIndex: 65535
@@ -34912,8 +34905,8 @@ Tilemap:
   - first: {x: -6, y: 11, z: 0}
     second:
       serializedVersion: 2
-      m_TileIndex: 0
-      m_TileSpriteIndex: 2
+      m_TileIndex: 2
+      m_TileSpriteIndex: 1
       m_TileMatrixIndex: 0
       m_TileColorIndex: 0
       m_TileObjectToInstantiateIndex: 65535
@@ -34922,8 +34915,8 @@ Tilemap:
   - first: {x: -5, y: 11, z: 0}
     second:
       serializedVersion: 2
-      m_TileIndex: 0
-      m_TileSpriteIndex: 2
+      m_TileIndex: 2
+      m_TileSpriteIndex: 1
       m_TileMatrixIndex: 0
       m_TileColorIndex: 0
       m_TileObjectToInstantiateIndex: 65535
@@ -34932,8 +34925,8 @@ Tilemap:
   - first: {x: -4, y: 11, z: 0}
     second:
       serializedVersion: 2
-      m_TileIndex: 0
-      m_TileSpriteIndex: 2
+      m_TileIndex: 2
+      m_TileSpriteIndex: 1
       m_TileMatrixIndex: 0
       m_TileColorIndex: 0
       m_TileObjectToInstantiateIndex: 65535
@@ -34942,8 +34935,8 @@ Tilemap:
   - first: {x: -3, y: 11, z: 0}
     second:
       serializedVersion: 2
-      m_TileIndex: 0
-      m_TileSpriteIndex: 2
+      m_TileIndex: 2
+      m_TileSpriteIndex: 1
       m_TileMatrixIndex: 0
       m_TileColorIndex: 0
       m_TileObjectToInstantiateIndex: 65535
@@ -35422,8 +35415,8 @@ Tilemap:
   - first: {x: -5, y: 12, z: 0}
     second:
       serializedVersion: 2
-      m_TileIndex: 0
-      m_TileSpriteIndex: 2
+      m_TileIndex: 2
+      m_TileSpriteIndex: 1
       m_TileMatrixIndex: 0
       m_TileColorIndex: 0
       m_TileObjectToInstantiateIndex: 65535
@@ -35432,8 +35425,8 @@ Tilemap:
   - first: {x: -4, y: 12, z: 0}
     second:
       serializedVersion: 2
-      m_TileIndex: 0
-      m_TileSpriteIndex: 2
+      m_TileIndex: 2
+      m_TileSpriteIndex: 1
       m_TileMatrixIndex: 0
       m_TileColorIndex: 0
       m_TileObjectToInstantiateIndex: 65535
@@ -35442,8 +35435,8 @@ Tilemap:
   - first: {x: -3, y: 12, z: 0}
     second:
       serializedVersion: 2
-      m_TileIndex: 0
-      m_TileSpriteIndex: 2
+      m_TileIndex: 2
+      m_TileSpriteIndex: 1
       m_TileMatrixIndex: 0
       m_TileColorIndex: 0
       m_TileObjectToInstantiateIndex: 65535
@@ -35922,8 +35915,8 @@ Tilemap:
   - first: {x: -5, y: 13, z: 0}
     second:
       serializedVersion: 2
-      m_TileIndex: 0
-      m_TileSpriteIndex: 2
+      m_TileIndex: 2
+      m_TileSpriteIndex: 1
       m_TileMatrixIndex: 0
       m_TileColorIndex: 0
       m_TileObjectToInstantiateIndex: 65535
@@ -35932,8 +35925,8 @@ Tilemap:
   - first: {x: -4, y: 13, z: 0}
     second:
       serializedVersion: 2
-      m_TileIndex: 0
-      m_TileSpriteIndex: 2
+      m_TileIndex: 2
+      m_TileSpriteIndex: 1
       m_TileMatrixIndex: 0
       m_TileColorIndex: 0
       m_TileObjectToInstantiateIndex: 65535
@@ -36432,8 +36425,8 @@ Tilemap:
   - first: {x: -4, y: 14, z: 0}
     second:
       serializedVersion: 2
-      m_TileIndex: 0
-      m_TileSpriteIndex: 2
+      m_TileIndex: 2
+      m_TileSpriteIndex: 1
       m_TileMatrixIndex: 0
       m_TileColorIndex: 0
       m_TileObjectToInstantiateIndex: 65535
@@ -42792,13 +42785,13 @@ Tilemap:
   m_AnimatedTiles: {}
   m_TileAssetArray:
   - serializedVersion: 2
-    m_RefCount: 609
+    m_RefCount: 597
     m_Data: {fileID: 11400000, guid: 8e8a1b5164a85a542aa94afb63767c2d, type: 2}
   - serializedVersion: 2
     m_RefCount: 140
     m_Data: {fileID: 11400000, guid: 989688aecc1c71149bf0412799bbfe7a, type: 2}
   - serializedVersion: 2
-    m_RefCount: 911
+    m_RefCount: 923
     m_Data: {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
   - serializedVersion: 2
     m_RefCount: 140
@@ -42811,10 +42804,10 @@ Tilemap:
     m_RefCount: 140
     m_Data: {fileID: 21300000, guid: a2e4edc57c7cb044b936dcf5bd68af31, type: 3}
   - serializedVersion: 2
-    m_RefCount: 911
+    m_RefCount: 923
     m_Data: {fileID: 21300000, guid: ea08babb4b97b6b4b8f13b2944bb35eb, type: 3}
   - serializedVersion: 2
-    m_RefCount: 609
+    m_RefCount: 597
     m_Data: {fileID: 21300000, guid: 012c16dcc3f28014fb342a4ab5175e20, type: 3}
   - serializedVersion: 2
     m_RefCount: 140
@@ -46706,17 +46699,17 @@ MonoBehaviour:
         NavalDistance: 3.4028235e+38
         IsHQ: 1
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 2
-        Distance: 3
-        VehicleDistance: 3
-        AirDistance: 3
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
         InstanceId: 3
         Distance: 2
         VehicleDistance: 2
         AirDistance: 2
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 2
+        Distance: 3
+        VehicleDistance: 3
+        AirDistance: 3
         NavalDistance: 3.4028235e+38
         IsHQ: 0
     - SlotIndex: 1
@@ -46730,17 +46723,17 @@ MonoBehaviour:
         NavalDistance: 3.4028235e+38
         IsHQ: 1
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 19
-        Distance: 12
-        VehicleDistance: 12
-        AirDistance: 12
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
         InstanceId: 20
         Distance: 11
         VehicleDistance: 11
         AirDistance: 11
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 19
+        Distance: 12
+        VehicleDistance: 12
+        AirDistance: 12
         NavalDistance: 3.4028235e+38
         IsHQ: 0
     closestNeighbor1: 1
@@ -46790,17 +46783,17 @@ MonoBehaviour:
         NavalDistance: 3.4028235e+38
         IsHQ: 1
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 2
-        Distance: 5
-        VehicleDistance: 5
-        AirDistance: 5
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
         InstanceId: 3
         Distance: 6
         VehicleDistance: 6
         AirDistance: 6
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 2
+        Distance: 5
+        VehicleDistance: 5
+        AirDistance: 5
         NavalDistance: 3.4028235e+38
         IsHQ: 0
     - SlotIndex: 1
@@ -46814,17 +46807,17 @@ MonoBehaviour:
         NavalDistance: 3.4028235e+38
         IsHQ: 1
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 19
-        Distance: 12
-        VehicleDistance: 12
-        AirDistance: 11
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
         InstanceId: 20
         Distance: 11
         VehicleDistance: 11
         AirDistance: 10
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 19
+        Distance: 12
+        VehicleDistance: 12
+        AirDistance: 11
         NavalDistance: 3.4028235e+38
         IsHQ: 0
     closestNeighbor1: 0
@@ -46874,17 +46867,17 @@ MonoBehaviour:
         NavalDistance: 3.4028235e+38
         IsHQ: 1
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 2
-        Distance: 8
-        VehicleDistance: 8
-        AirDistance: 8
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
         InstanceId: 3
         Distance: 7
         VehicleDistance: 7
         AirDistance: 7
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 2
+        Distance: 8
+        VehicleDistance: 8
+        AirDistance: 8
         NavalDistance: 3.4028235e+38
         IsHQ: 0
     - SlotIndex: 1
@@ -46898,17 +46891,17 @@ MonoBehaviour:
         NavalDistance: 3.4028235e+38
         IsHQ: 1
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 19
-        Distance: 8
-        VehicleDistance: 8
-        AirDistance: 8
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
         InstanceId: 20
         Distance: 9
         VehicleDistance: 9
         AirDistance: 9
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 19
+        Distance: 8
+        VehicleDistance: 8
+        AirDistance: 8
         NavalDistance: 3.4028235e+38
         IsHQ: 0
     closestNeighbor1: 3
@@ -46958,17 +46951,17 @@ MonoBehaviour:
         NavalDistance: 3.4028235e+38
         IsHQ: 1
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 2
-        Distance: 11
-        VehicleDistance: 11
-        AirDistance: 11
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
         InstanceId: 3
         Distance: 10
         VehicleDistance: 10
         AirDistance: 10
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 2
+        Distance: 11
+        VehicleDistance: 11
+        AirDistance: 11
         NavalDistance: 3.4028235e+38
         IsHQ: 0
     - SlotIndex: 1
@@ -46982,17 +46975,17 @@ MonoBehaviour:
         NavalDistance: 3.4028235e+38
         IsHQ: 1
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 19
-        Distance: 5
-        VehicleDistance: 5
-        AirDistance: 5
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
         InstanceId: 20
         Distance: 6
         VehicleDistance: 6
         AirDistance: 6
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 19
+        Distance: 5
+        VehicleDistance: 5
+        AirDistance: 5
         NavalDistance: 3.4028235e+38
         IsHQ: 0
     closestNeighbor1: 2
@@ -47042,17 +47035,17 @@ MonoBehaviour:
         NavalDistance: 3.4028235e+38
         IsHQ: 1
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 2
-        Distance: 9
-        VehicleDistance: 9
-        AirDistance: 9
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
         InstanceId: 3
         Distance: 8
         VehicleDistance: 8
         AirDistance: 8
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 2
+        Distance: 9
+        VehicleDistance: 9
+        AirDistance: 9
         NavalDistance: 3.4028235e+38
         IsHQ: 0
     - SlotIndex: 1
@@ -47066,17 +47059,17 @@ MonoBehaviour:
         NavalDistance: 3.4028235e+38
         IsHQ: 1
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 19
-        Distance: 6
-        VehicleDistance: 6
-        AirDistance: 6
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
         InstanceId: 20
         Distance: 5
         VehicleDistance: 5
         AirDistance: 5
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 19
+        Distance: 6
+        VehicleDistance: 6
+        AirDistance: 6
         NavalDistance: 3.4028235e+38
         IsHQ: 0
     closestNeighbor1: 6
@@ -47126,17 +47119,17 @@ MonoBehaviour:
         NavalDistance: 3.4028235e+38
         IsHQ: 1
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 2
-        Distance: 10
-        VehicleDistance: 10
-        AirDistance: 10
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
         InstanceId: 3
         Distance: 11
         VehicleDistance: 11
         AirDistance: 11
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 2
+        Distance: 10
+        VehicleDistance: 10
+        AirDistance: 10
         NavalDistance: 3.4028235e+38
         IsHQ: 0
     - SlotIndex: 1
@@ -47150,17 +47143,17 @@ MonoBehaviour:
         NavalDistance: 3.4028235e+38
         IsHQ: 1
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 19
-        Distance: 7
-        VehicleDistance: 7
-        AirDistance: 7
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
         InstanceId: 20
         Distance: 6
         VehicleDistance: 6
         AirDistance: 6
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 19
+        Distance: 7
+        VehicleDistance: 7
+        AirDistance: 7
         NavalDistance: 3.4028235e+38
         IsHQ: 0
     closestNeighbor1: 1
@@ -47210,17 +47203,17 @@ MonoBehaviour:
         NavalDistance: 3.4028235e+38
         IsHQ: 1
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 2
-        Distance: 12
-        VehicleDistance: 12
-        AirDistance: 12
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
         InstanceId: 3
         Distance: 11
         VehicleDistance: 11
         AirDistance: 11
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 2
+        Distance: 12
+        VehicleDistance: 12
+        AirDistance: 12
         NavalDistance: 3.4028235e+38
         IsHQ: 0
     - SlotIndex: 1
@@ -47234,17 +47227,17 @@ MonoBehaviour:
         NavalDistance: 3.4028235e+38
         IsHQ: 1
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 19
-        Distance: 3
-        VehicleDistance: 3
-        AirDistance: 3
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
         InstanceId: 20
         Distance: 2
         VehicleDistance: 2
         AirDistance: 2
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 19
+        Distance: 3
+        VehicleDistance: 3
+        AirDistance: 3
         NavalDistance: 3.4028235e+38
         IsHQ: 0
     closestNeighbor1: 4
@@ -47311,14 +47304,14 @@ MonoBehaviour:
         NavalDistance: 3.4028235e+38
         IsHQ: 1
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 2
+        InstanceId: 3
         Distance: 1
         VehicleDistance: 1
         AirDistance: 1
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 3
+        InstanceId: 2
         Distance: 1
         VehicleDistance: 1
         AirDistance: 1
@@ -47335,17 +47328,17 @@ MonoBehaviour:
         NavalDistance: 3.4028235e+38
         IsHQ: 1
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 19
-        Distance: 14
-        VehicleDistance: 14
-        AirDistance: 14
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
         InstanceId: 20
         Distance: 13
         VehicleDistance: 13
         AirDistance: 13
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 19
+        Distance: 14
+        VehicleDistance: 14
+        AirDistance: 14
         NavalDistance: 3.4028235e+38
         IsHQ: 0
     closestNeighbor1: -1
@@ -47411,17 +47404,17 @@ MonoBehaviour:
         NavalDistance: 3.4028235e+38
         IsHQ: 1
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 2
-        Distance: 14
-        VehicleDistance: 14
-        AirDistance: 14
-        NavalDistance: 3.4028235e+38
-        IsHQ: 0
-      - ConstructionName: "F\xE1brica Leve"
         InstanceId: 3
         Distance: 13
         VehicleDistance: 13
         AirDistance: 13
+        NavalDistance: 3.4028235e+38
+        IsHQ: 0
+      - ConstructionName: "F\xE1brica Leve"
+        InstanceId: 2
+        Distance: 14
+        VehicleDistance: 14
+        AirDistance: 14
         NavalDistance: 3.4028235e+38
         IsHQ: 0
     - SlotIndex: 1
@@ -47435,14 +47428,14 @@ MonoBehaviour:
         NavalDistance: 3.4028235e+38
         IsHQ: 1
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 19
+        InstanceId: 20
         Distance: 1
         VehicleDistance: 1
         AirDistance: 1
         NavalDistance: 3.4028235e+38
         IsHQ: 0
       - ConstructionName: "F\xE1brica Leve"
-        InstanceId: 20
+        InstanceId: 19
         Distance: 1
         VehicleDistance: 1
         AirDistance: 1
@@ -50117,7 +50110,7 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 1348457725607290348, guid: f7e44d7c210a32d4ba630ba660da88a1, type: 3}
       propertyPath: m_text
-      value: 3000 / turn
+      value: 6000 / turn
       objectReference: {fileID: 0}
     - target: {fileID: 4985144350662451516, guid: f7e44d7c210a32d4ba630ba660da88a1, type: 3}
       propertyPath: m_Enabled

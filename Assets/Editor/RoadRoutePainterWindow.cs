@@ -155,16 +155,22 @@ public class RoadRoutePainterWindow : EditorWindow
         EditorGUILayout.BeginHorizontal();
         using (new EditorGUI.DisabledScope(!HasValidSelectedRoute()))
         {
+            if (GUILayout.Button("Remove Start Point"))
+                RemoveStartPoint();
+        }
+
+        using (new EditorGUI.DisabledScope(!HasValidSelectedRoute()))
+        {
             if (GUILayout.Button("Remove Last Point"))
                 RemoveLastPoint();
         }
+        EditorGUILayout.EndHorizontal();
 
         using (new EditorGUI.DisabledScope(!HasValidSelectedRoute()))
         {
             if (GUILayout.Button("Delete Route"))
                 DeleteSelectedRoute();
         }
-        EditorGUILayout.EndHorizontal();
     }
 
     private void DrawRouteNameEditor()
@@ -450,6 +456,25 @@ public class RoadRoutePainterWindow : EditorWindow
         roadNetworkManager?.RebuildRoadVisuals();
     }
 
+    private void RemoveStartPoint()
+    {
+        if (!HasValidSelectedRoute())
+            return;
+
+        RoadRouteDefinition route = GetSelectedRoute();
+        if (route == null || route.cells == null || route.cells.Count == 0)
+            return;
+
+        UnityEngine.Object target = GetRouteWriteTarget();
+        if (target == null)
+            return;
+
+        Undo.RecordObject(target, "Remove Road Route Start Point");
+        route.cells.RemoveAt(0);
+        MarkRouteTargetDirty(target);
+        roadNetworkManager?.RebuildRoadVisuals();
+    }
+
     private void RemoveLastPoint()
     {
         if (!HasValidSelectedRoute())
@@ -463,7 +488,7 @@ public class RoadRoutePainterWindow : EditorWindow
         if (target == null)
             return;
 
-        Undo.RecordObject(target, "Remove Road Route Point");
+        Undo.RecordObject(target, "Remove Road Route Last Point");
         route.cells.RemoveAt(route.cells.Count - 1);
         MarkRouteTargetDirty(target);
         roadNetworkManager?.RebuildRoadVisuals();

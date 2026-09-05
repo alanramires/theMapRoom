@@ -19,6 +19,7 @@ MonoBehaviour:
   authoringSceneName: Fixture
   camadasDecorativas:
   - quebraMar
+  proximoSerial: 7
   blocos:
   - blocoId: A
     displayName: Auridia
@@ -50,6 +51,7 @@ MonoBehaviour:
         height: 17
         destravadoPor: []
         exigeIrmaos: 0
+        idSerial: 3
         bakedTiles:
         - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
         - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
@@ -65,24 +67,38 @@ MonoBehaviour:
         - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
         - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
         - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
+        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
+        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
+        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
+        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
+        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
+        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
+        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
+        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
+        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
+        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
+        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
+        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
+        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
+        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
+        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
+        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
+        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
+        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
+        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
+        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
+        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
+        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
+        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
+        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
+        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
+        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
+        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
+        - {fileID: 11400000, guid: 474aa6f1deb7f064fbbe2a7ff46a4dfe, type: 2}
         - {fileID: 11400000, guid: 8e8a1b5164a85a542aa94afb63767c2d, type: 2}
         - {fileID: 11400000, guid: 8e8a1b5164a85a542aa94afb63767c2d, type: 2}
-        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
-        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
-        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
-        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
-        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
-        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
-        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
-        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
-        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
-        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
-        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
-        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
         - {fileID: 11400000, guid: 8e8a1b5164a85a542aa94afb63767c2d, type: 2}
-        - {fileID: 11400000, guid: 8e8a1b5164a85a542aa94afb63767c2d, type: 2}
-        - {fileID: 11400000, guid: 8e8a1b5164a85a542aa94afb63767c2d, type: 2}
-        - {fileID: 11400000, guid: 8e8a1b5164a85a542aa94afb63767c2d, type: 2}
+        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
         - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
         - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
         - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
@@ -93,27 +109,13 @@ MonoBehaviour:
         - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
         - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
         - {fileID: 11400000, guid: 474aa6f1deb7f064fbbe2a7ff46a4dfe, type: 2}
-        - {fileID: 11400000, guid: 8e8a1b5164a85a542aa94afb63767c2d, type: 2}
-        - {fileID: 11400000, guid: 8e8a1b5164a85a542aa94afb63767c2d, type: 2}
-        - {fileID: 11400000, guid: 8e8a1b5164a85a542aa94afb63767c2d, type: 2}
-        - {fileID: 11400000, guid: 8e8a1b5164a85a542aa94afb63767c2d, type: 2}
-        - {fileID: 11400000, guid: 8e8a1b5164a85a542aa94afb63767c2d, type: 2}
-        - {fileID: 11400000, guid: 8e8a1b5164a85a542aa94afb63767c2d, type: 2}
-        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
-        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
-        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
-        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
-        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
-        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
-        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
-        - {fileID: 11400000, guid: 474aa6f1deb7f064fbbe2a7ff46a4dfe, type: 2}
         - {fileID: 11400000, guid: 474aa6f1deb7f064fbbe2a7ff46a4dfe, type: 2}
         - {fileID: 11400000, guid: 8e8a1b5164a85a542aa94afb63767c2d, type: 2}
         - {fileID: 11400000, guid: 8e8a1b5164a85a542aa94afb63767c2d, type: 2}
         - {fileID: 11400000, guid: 8e8a1b5164a85a542aa94afb63767c2d, type: 2}
         - {fileID: 11400000, guid: 8e8a1b5164a85a542aa94afb63767c2d, type: 2}
-        - {fileID: 11400000, guid: 8e8a1b5164a85a542aa94afb63767c2d, type: 2}
-        - {fileID: 11400000, guid: 8e8a1b5164a85a542aa94afb63767c2d, type: 2}
+        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
+        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
         - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
         - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
         - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
@@ -129,7 +131,7 @@ MonoBehaviour:
         - {fileID: 11400000, guid: 8e8a1b5164a85a542aa94afb63767c2d, type: 2}
         - {fileID: 11400000, guid: 8e8a1b5164a85a542aa94afb63767c2d, type: 2}
         - {fileID: 11400000, guid: 8e8a1b5164a85a542aa94afb63767c2d, type: 2}
-        - {fileID: 11400000, guid: 8e8a1b5164a85a542aa94afb63767c2d, type: 2}
+        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
         - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
         - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
         - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
@@ -325,153 +327,6 @@ MonoBehaviour:
         - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
         bakedConstrucoes:
         - constructionId: cidade
-          localX: 9
-          localY: 8
-          teamId: -1
-          slotIndex: -1
-          sector: 4
-          isAnchorSector: 0
-          initialCapturePoints: -1
-          siteRuntime:
-            isPlayerHeadQuarter: 0
-            isVictoryBuilding: 0
-            isCapturable: 1
-            capturePointsMax: 20
-            capturedIncoming: 1000
-            sellingRule: 3
-            legacyCanProduceAndSellUnits: 
-            offeredUnits: []
-            canProvideSupplies: 1
-            offeredSupplies:
-            - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
-              quantity: 40
-              peakQuantity: 40
-            - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
-              quantity: 10
-              peakQuantity: 10
-            - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
-              quantity: 20
-              peakQuantity: 20
-            offeredServices:
-            - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
-            - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
-            - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
-            - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
-          displayName: Cidade
-        - constructionId: cidade
-          localX: 6
-          localY: 4
-          teamId: -1
-          slotIndex: -1
-          sector: 5
-          isAnchorSector: 0
-          initialCapturePoints: -1
-          siteRuntime:
-            isPlayerHeadQuarter: 0
-            isVictoryBuilding: 0
-            isCapturable: 1
-            capturePointsMax: 20
-            capturedIncoming: 1000
-            sellingRule: 3
-            legacyCanProduceAndSellUnits: 
-            offeredUnits: []
-            canProvideSupplies: 1
-            offeredSupplies:
-            - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
-              quantity: 40
-              peakQuantity: 40
-            - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
-              quantity: 10
-              peakQuantity: 10
-            - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
-              quantity: 20
-              peakQuantity: 20
-            offeredServices:
-            - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
-            - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
-            - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
-            - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
-          displayName: Cidade
-        - constructionId: hq
-          localX: 4
-          localY: 14
-          teamId: 2
-          slotIndex: 0
-          sector: 100
-          isAnchorSector: 0
-          initialCapturePoints: -1
-          siteRuntime:
-            isPlayerHeadQuarter: 1
-            isVictoryBuilding: 0
-            isCapturable: 1
-            capturePointsMax: 60
-            capturedIncoming: 3000
-            sellingRule: 1
-            legacyCanProduceAndSellUnits: 
-            offeredUnits:
-            - {fileID: 11400000, guid: 4a3afdea0950dfc46a48dd7a659563ee, type: 2}
-            - {fileID: 11400000, guid: b28c15593869dae419f9b58292ef4845, type: 2}
-            - {fileID: 11400000, guid: c0e59b3e4bf2e4c49a67906805e43801, type: 2}
-            canProvideSupplies: 1
-            offeredSupplies:
-            - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
-              quantity: 2147483647
-              peakQuantity: 2147483647
-            - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
-              quantity: 2147483647
-              peakQuantity: 2147483647
-            - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
-              quantity: 2147483647
-              peakQuantity: 2147483647
-            offeredServices:
-            - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
-            - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
-            - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
-            - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
-          displayName: HQ
-        - constructionId: fabricaL
-          localX: 13
-          localY: 4
-          teamId: 3
-          slotIndex: 1
-          sector: 101
-          isAnchorSector: 0
-          initialCapturePoints: -1
-          siteRuntime:
-            isPlayerHeadQuarter: 0
-            isVictoryBuilding: 0
-            isCapturable: 1
-            capturePointsMax: 30
-            capturedIncoming: 1500
-            sellingRule: 1
-            legacyCanProduceAndSellUnits: 
-            offeredUnits:
-            - {fileID: 11400000, guid: 4a3afdea0950dfc46a48dd7a659563ee, type: 2}
-            - {fileID: 11400000, guid: b28c15593869dae419f9b58292ef4845, type: 2}
-            - {fileID: 11400000, guid: c0e59b3e4bf2e4c49a67906805e43801, type: 2}
-            - {fileID: 11400000, guid: a5d9d72a15e061a4cbaf125b2b6b9d48, type: 2}
-            - {fileID: 11400000, guid: 70b7ea3ddea78fc4e9d744cee13b053a, type: 2}
-            - {fileID: 11400000, guid: 3dc9b119819519440820c81f5db4fdce, type: 2}
-            - {fileID: 11400000, guid: 70b98199c49882e44892f7ca76df6b33, type: 2}
-            - {fileID: 11400000, guid: 8c89f5278e312ad46af401333934721b, type: 2}
-            canProvideSupplies: 1
-            offeredSupplies:
-            - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
-              quantity: 20
-              peakQuantity: 20
-            - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
-              quantity: 10
-              peakQuantity: 10
-            - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
-              quantity: 40
-              peakQuantity: 40
-            offeredServices:
-            - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
-            - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
-            - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
-            - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
-          displayName: "F\xE1brica Leve"
-        - constructionId: cidade
           localX: 10
           localY: 12
           teamId: -1
@@ -505,48 +360,6 @@ MonoBehaviour:
             - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
             - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
           displayName: Cidade
-        - constructionId: fabricaL
-          localX: 10
-          localY: 5
-          teamId: -1
-          slotIndex: -1
-          sector: 6
-          isAnchorSector: 0
-          initialCapturePoints: -1
-          siteRuntime:
-            isPlayerHeadQuarter: 0
-            isVictoryBuilding: 0
-            isCapturable: 1
-            capturePointsMax: 30
-            capturedIncoming: 1500
-            sellingRule: 1
-            legacyCanProduceAndSellUnits: 
-            offeredUnits:
-            - {fileID: 11400000, guid: 4a3afdea0950dfc46a48dd7a659563ee, type: 2}
-            - {fileID: 11400000, guid: b28c15593869dae419f9b58292ef4845, type: 2}
-            - {fileID: 11400000, guid: c0e59b3e4bf2e4c49a67906805e43801, type: 2}
-            - {fileID: 11400000, guid: a5d9d72a15e061a4cbaf125b2b6b9d48, type: 2}
-            - {fileID: 11400000, guid: 70b7ea3ddea78fc4e9d744cee13b053a, type: 2}
-            - {fileID: 11400000, guid: 3dc9b119819519440820c81f5db4fdce, type: 2}
-            - {fileID: 11400000, guid: 70b98199c49882e44892f7ca76df6b33, type: 2}
-            - {fileID: 11400000, guid: 8c89f5278e312ad46af401333934721b, type: 2}
-            canProvideSupplies: 1
-            offeredSupplies:
-            - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
-              quantity: 20
-              peakQuantity: 20
-            - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
-              quantity: 10
-              peakQuantity: 10
-            - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
-              quantity: 40
-              peakQuantity: 40
-            offeredServices:
-            - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
-            - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
-            - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
-            - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
-          displayName: "F\xE1brica Leve"
         - constructionId: cidade
           localX: 4
           localY: 9
@@ -582,11 +395,11 @@ MonoBehaviour:
             - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
           displayName: Cidade
         - constructionId: fabricaL
-          localX: 3
-          localY: 14
-          teamId: 2
-          slotIndex: 0
-          sector: 100
+          localX: 5
+          localY: 13
+          teamId: -1
+          slotIndex: -1
+          sector: 0
           isAnchorSector: 0
           initialCapturePoints: -1
           siteRuntime:
@@ -623,12 +436,46 @@ MonoBehaviour:
             - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
             - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
           displayName: "F\xE1brica Leve"
-        - constructionId: fabricaL
-          localX: 5
-          localY: 13
+        - constructionId: cidade
+          localX: 11
+          localY: 9
           teamId: -1
           slotIndex: -1
-          sector: 0
+          sector: 3
+          isAnchorSector: 0
+          initialCapturePoints: -1
+          siteRuntime:
+            isPlayerHeadQuarter: 0
+            isVictoryBuilding: 0
+            isCapturable: 1
+            capturePointsMax: 20
+            capturedIncoming: 1000
+            sellingRule: 3
+            legacyCanProduceAndSellUnits: 
+            offeredUnits: []
+            canProvideSupplies: 1
+            offeredSupplies:
+            - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+              quantity: 40
+              peakQuantity: 40
+            - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+              quantity: 10
+              peakQuantity: 10
+            - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+              quantity: 20
+              peakQuantity: 20
+            offeredServices:
+            - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+            - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+            - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+            - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
+          displayName: Cidade
+        - constructionId: fabricaL
+          localX: 10
+          localY: 5
+          teamId: -1
+          slotIndex: -1
+          sector: 6
           isAnchorSector: 0
           initialCapturePoints: -1
           siteRuntime:
@@ -702,12 +549,54 @@ MonoBehaviour:
             - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
             - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
           displayName: HQ
+        - constructionId: fabricaL
+          localX: 4
+          localY: 15
+          teamId: 2
+          slotIndex: 0
+          sector: 100
+          isAnchorSector: 0
+          initialCapturePoints: -1
+          siteRuntime:
+            isPlayerHeadQuarter: 0
+            isVictoryBuilding: 0
+            isCapturable: 1
+            capturePointsMax: 30
+            capturedIncoming: 1500
+            sellingRule: 1
+            legacyCanProduceAndSellUnits: 
+            offeredUnits:
+            - {fileID: 11400000, guid: 4a3afdea0950dfc46a48dd7a659563ee, type: 2}
+            - {fileID: 11400000, guid: b28c15593869dae419f9b58292ef4845, type: 2}
+            - {fileID: 11400000, guid: c0e59b3e4bf2e4c49a67906805e43801, type: 2}
+            - {fileID: 11400000, guid: a5d9d72a15e061a4cbaf125b2b6b9d48, type: 2}
+            - {fileID: 11400000, guid: 70b7ea3ddea78fc4e9d744cee13b053a, type: 2}
+            - {fileID: 11400000, guid: 3dc9b119819519440820c81f5db4fdce, type: 2}
+            - {fileID: 11400000, guid: 70b98199c49882e44892f7ca76df6b33, type: 2}
+            - {fileID: 11400000, guid: 8c89f5278e312ad46af401333934721b, type: 2}
+            canProvideSupplies: 1
+            offeredSupplies:
+            - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+              quantity: 20
+              peakQuantity: 20
+            - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+              quantity: 10
+              peakQuantity: 10
+            - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+              quantity: 40
+              peakQuantity: 40
+            offeredServices:
+            - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+            - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+            - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+            - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
+          displayName: "F\xE1brica Leve"
         - constructionId: cidade
-          localX: 11
-          localY: 9
+          localX: 9
+          localY: 8
           teamId: -1
           slotIndex: -1
-          sector: 3
+          sector: 4
           isAnchorSector: 0
           initialCapturePoints: -1
           siteRuntime:
@@ -736,6 +625,43 @@ MonoBehaviour:
             - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
             - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
           displayName: Cidade
+        - constructionId: hq
+          localX: 4
+          localY: 14
+          teamId: 2
+          slotIndex: 0
+          sector: 100
+          isAnchorSector: 0
+          initialCapturePoints: -1
+          siteRuntime:
+            isPlayerHeadQuarter: 1
+            isVictoryBuilding: 0
+            isCapturable: 1
+            capturePointsMax: 60
+            capturedIncoming: 3000
+            sellingRule: 1
+            legacyCanProduceAndSellUnits: 
+            offeredUnits:
+            - {fileID: 11400000, guid: 4a3afdea0950dfc46a48dd7a659563ee, type: 2}
+            - {fileID: 11400000, guid: b28c15593869dae419f9b58292ef4845, type: 2}
+            - {fileID: 11400000, guid: c0e59b3e4bf2e4c49a67906805e43801, type: 2}
+            canProvideSupplies: 1
+            offeredSupplies:
+            - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+              quantity: 2147483647
+              peakQuantity: 2147483647
+            - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+              quantity: 2147483647
+              peakQuantity: 2147483647
+            - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+              quantity: 2147483647
+              peakQuantity: 2147483647
+            offeredServices:
+            - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+            - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+            - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+            - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
+          displayName: HQ
         - constructionId: fabricaL
           localX: 11
           localY: 3
@@ -779,8 +705,8 @@ MonoBehaviour:
             - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
           displayName: "F\xE1brica Leve"
         - constructionId: fabricaL
-          localX: 4
-          localY: 15
+          localX: 3
+          localY: 14
           teamId: 2
           slotIndex: 0
           sector: 100
@@ -820,136 +746,306 @@ MonoBehaviour:
             - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
             - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
           displayName: "F\xE1brica Leve"
+        - constructionId: cidade
+          localX: 6
+          localY: 4
+          teamId: -1
+          slotIndex: -1
+          sector: 5
+          isAnchorSector: 0
+          initialCapturePoints: -1
+          siteRuntime:
+            isPlayerHeadQuarter: 0
+            isVictoryBuilding: 0
+            isCapturable: 1
+            capturePointsMax: 20
+            capturedIncoming: 1000
+            sellingRule: 3
+            legacyCanProduceAndSellUnits: 
+            offeredUnits: []
+            canProvideSupplies: 1
+            offeredSupplies:
+            - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+              quantity: 40
+              peakQuantity: 40
+            - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+              quantity: 10
+              peakQuantity: 10
+            - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+              quantity: 20
+              peakQuantity: 20
+            offeredServices:
+            - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+            - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+            - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+            - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
+          displayName: Cidade
+        - constructionId: fabricaL
+          localX: 13
+          localY: 4
+          teamId: 3
+          slotIndex: 1
+          sector: 101
+          isAnchorSector: 0
+          initialCapturePoints: -1
+          siteRuntime:
+            isPlayerHeadQuarter: 0
+            isVictoryBuilding: 0
+            isCapturable: 1
+            capturePointsMax: 30
+            capturedIncoming: 1500
+            sellingRule: 1
+            legacyCanProduceAndSellUnits: 
+            offeredUnits:
+            - {fileID: 11400000, guid: 4a3afdea0950dfc46a48dd7a659563ee, type: 2}
+            - {fileID: 11400000, guid: b28c15593869dae419f9b58292ef4845, type: 2}
+            - {fileID: 11400000, guid: c0e59b3e4bf2e4c49a67906805e43801, type: 2}
+            - {fileID: 11400000, guid: a5d9d72a15e061a4cbaf125b2b6b9d48, type: 2}
+            - {fileID: 11400000, guid: 70b7ea3ddea78fc4e9d744cee13b053a, type: 2}
+            - {fileID: 11400000, guid: 3dc9b119819519440820c81f5db4fdce, type: 2}
+            - {fileID: 11400000, guid: 70b98199c49882e44892f7ca76df6b33, type: 2}
+            - {fileID: 11400000, guid: 8c89f5278e312ad46af401333934721b, type: 2}
+            canProvideSupplies: 1
+            offeredSupplies:
+            - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+              quantity: 20
+              peakQuantity: 20
+            - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+              quantity: 10
+              peakQuantity: 10
+            - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+              quantity: 40
+              peakQuantity: 40
+            offeredServices:
+            - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+            - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+            - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+            - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
+          displayName: "F\xE1brica Leve"
         bakedCamadas:
         - tilemapName: quebraMar
+          transformacoes:
+          - c0: {x: 1, y: 0, z: 0, w: 0}
+            c1: {x: 0, y: 1, z: 0, w: 0}
+            c2: {x: 0, y: 0, z: 1, w: 0}
+            c3: {x: 0, y: 0, z: 0, w: 1}
+          - c0: {x: 0.49999997, y: 0.86602545, z: 0, w: 0}
+            c1: {x: -0.86602545, y: 0.49999997, z: 0, w: 0}
+            c2: {x: 0, y: 0, z: 1, w: 0}
+            c3: {x: 0, y: 0, z: 0, w: 1}
+          - c0: {x: 0.49999997, y: -0.86602545, z: 0, w: 0}
+            c1: {x: 0.86602545, y: 0.49999997, z: 0, w: 0}
+            c2: {x: 0, y: 0, z: 1, w: 0}
+            c3: {x: 0, y: 0, z: 0, w: 1}
+          - c0: {x: -0.49999988, y: 0.8660256, z: 0, w: 0}
+            c1: {x: -0.8660256, y: -0.49999988, z: 0, w: 0}
+            c2: {x: 0, y: 0, z: 1, w: 0}
+            c3: {x: 0, y: 0, z: 0, w: 1}
+          - c0: {x: -0.5000001, y: -0.8660254, z: 0, w: 0}
+            c1: {x: 0.8660254, y: -0.5000001, z: 0, w: 0}
+            c2: {x: 0, y: 0, z: 1, w: 0}
+            c3: {x: 0, y: 0, z: 0, w: 1}
+          - c0: {x: -1.0000001, y: 0.00000015885017, z: 0, w: 0}
+            c1: {x: -0.00000015885017, y: -1.0000001, z: 0, w: 0}
+            c2: {x: 0, y: 0, z: 1, w: 0}
+            c3: {x: 0, y: 0, z: 0, w: 1}
           marcas:
           - localX: 9
             localY: 2
             tile: {fileID: 11400000, guid: 555dbf6160238b349830893c14cda1e3, type: 2}
+            transformIndex: 0
+            cor: {r: 1, g: 1, b: 1, a: 1}
           - localX: 10
             localY: 2
             tile: {fileID: 11400000, guid: 0e9488cb434eec343bb011247068a620, type: 2}
+            transformIndex: 0
+            cor: {r: 1, g: 1, b: 1, a: 1}
           - localX: 11
             localY: 2
             tile: {fileID: 11400000, guid: 0e9488cb434eec343bb011247068a620, type: 2}
+            transformIndex: 0
+            cor: {r: 1, g: 1, b: 1, a: 1}
           - localX: 12
             localY: 2
             tile: {fileID: 11400000, guid: 555dbf6160238b349830893c14cda1e3, type: 2}
+            transformIndex: 1
+            cor: {r: 1, g: 1, b: 1, a: 1}
           - localX: 7
             localY: 3
             tile: {fileID: 11400000, guid: 555dbf6160238b349830893c14cda1e3, type: 2}
+            transformIndex: 0
+            cor: {r: 1, g: 1, b: 1, a: 1}
           - localX: 8
             localY: 3
             tile: {fileID: 11400000, guid: 5ce90b8ffcede3e4d8ae80ea2cc80d86, type: 2}
+            transformIndex: 2
+            cor: {r: 1, g: 1, b: 1, a: 1}
           - localX: 12
             localY: 3
             tile: {fileID: 11400000, guid: 0e9488cb434eec343bb011247068a620, type: 2}
+            transformIndex: 1
+            cor: {r: 1, g: 1, b: 1, a: 1}
           - localX: 5
             localY: 4
             tile: {fileID: 11400000, guid: 555dbf6160238b349830893c14cda1e3, type: 2}
+            transformIndex: 0
+            cor: {r: 1, g: 1, b: 1, a: 1}
           - localX: 6
             localY: 4
             tile: {fileID: 11400000, guid: 0e9488cb434eec343bb011247068a620, type: 2}
+            transformIndex: 0
+            cor: {r: 1, g: 1, b: 1, a: 1}
           - localX: 7
             localY: 4
             tile: {fileID: 11400000, guid: 5ce90b8ffcede3e4d8ae80ea2cc80d86, type: 2}
+            transformIndex: 2
+            cor: {r: 1, g: 1, b: 1, a: 1}
           - localX: 13
             localY: 4
             tile: {fileID: 11400000, guid: 0e9488cb434eec343bb011247068a620, type: 2}
+            transformIndex: 1
+            cor: {r: 1, g: 1, b: 1, a: 1}
           - localX: 3
             localY: 5
             tile: {fileID: 11400000, guid: 555dbf6160238b349830893c14cda1e3, type: 2}
+            transformIndex: 0
+            cor: {r: 1, g: 1, b: 1, a: 1}
           - localX: 4
             localY: 5
             tile: {fileID: 11400000, guid: 5ce90b8ffcede3e4d8ae80ea2cc80d86, type: 2}
+            transformIndex: 2
+            cor: {r: 1, g: 1, b: 1, a: 1}
           - localX: 13
             localY: 5
             tile: {fileID: 11400000, guid: 555dbf6160238b349830893c14cda1e3, type: 2}
+            transformIndex: 3
+            cor: {r: 1, g: 1, b: 1, a: 1}
           - localX: 3
             localY: 6
             tile: {fileID: 11400000, guid: 555dbf6160238b349830893c14cda1e3, type: 2}
+            transformIndex: 2
+            cor: {r: 1, g: 1, b: 1, a: 1}
           - localX: 13
             localY: 6
             tile: {fileID: 11400000, guid: 0e9488cb434eec343bb011247068a620, type: 2}
+            transformIndex: 3
+            cor: {r: 1, g: 1, b: 1, a: 1}
           - localX: 3
             localY: 7
             tile: {fileID: 11400000, guid: 5ce90b8ffcede3e4d8ae80ea2cc80d86, type: 2}
+            transformIndex: 4
+            cor: {r: 1, g: 1, b: 1, a: 1}
           - localX: 12
             localY: 7
             tile: {fileID: 11400000, guid: 0e9488cb434eec343bb011247068a620, type: 2}
+            transformIndex: 3
+            cor: {r: 1, g: 1, b: 1, a: 1}
           - localX: 3
             localY: 8
             tile: {fileID: 11400000, guid: 0e9488cb434eec343bb011247068a620, type: 2}
+            transformIndex: 2
+            cor: {r: 1, g: 1, b: 1, a: 1}
           - localX: 12
             localY: 8
             tile: {fileID: 11400000, guid: 5ce90b8ffcede3e4d8ae80ea2cc80d86, type: 2}
+            transformIndex: 1
+            cor: {r: 1, g: 1, b: 1, a: 1}
           - localX: 2
             localY: 9
             tile: {fileID: 11400000, guid: 0e9488cb434eec343bb011247068a620, type: 2}
+            transformIndex: 2
+            cor: {r: 1, g: 1, b: 1, a: 1}
           - localX: 12
             localY: 9
             tile: {fileID: 11400000, guid: 555dbf6160238b349830893c14cda1e3, type: 2}
+            transformIndex: 3
+            cor: {r: 1, g: 1, b: 1, a: 1}
           - localX: 2
             localY: 10
             tile: {fileID: 11400000, guid: 555dbf6160238b349830893c14cda1e3, type: 2}
+            transformIndex: 2
+            cor: {r: 1, g: 1, b: 1, a: 1}
           - localX: 12
             localY: 10
             tile: {fileID: 11400000, guid: 0e9488cb434eec343bb011247068a620, type: 2}
+            transformIndex: 3
+            cor: {r: 1, g: 1, b: 1, a: 1}
           - localX: 2
             localY: 11
             tile: {fileID: 11400000, guid: 0e9488cb434eec343bb011247068a620, type: 2}
+            transformIndex: 4
+            cor: {r: 1, g: 1, b: 1, a: 1}
           - localX: 10
             localY: 11
             tile: {fileID: 11400000, guid: 5ce90b8ffcede3e4d8ae80ea2cc80d86, type: 2}
+            transformIndex: 3
+            cor: {r: 1, g: 1, b: 1, a: 1}
           - localX: 11
             localY: 11
             tile: {fileID: 11400000, guid: 555dbf6160238b349830893c14cda1e3, type: 2}
+            transformIndex: 5
+            cor: {r: 1, g: 1, b: 1, a: 1}
           - localX: 3
             localY: 12
             tile: {fileID: 11400000, guid: 5ce90b8ffcede3e4d8ae80ea2cc80d86, type: 2}
+            transformIndex: 4
+            cor: {r: 1, g: 1, b: 1, a: 1}
           - localX: 9
             localY: 12
             tile: {fileID: 11400000, guid: 5ce90b8ffcede3e4d8ae80ea2cc80d86, type: 2}
+            transformIndex: 3
+            cor: {r: 1, g: 1, b: 1, a: 1}
           - localX: 10
             localY: 12
             tile: {fileID: 11400000, guid: 555dbf6160238b349830893c14cda1e3, type: 2}
+            transformIndex: 5
+            cor: {r: 1, g: 1, b: 1, a: 1}
           - localX: 2
             localY: 13
             tile: {fileID: 11400000, guid: 555dbf6160238b349830893c14cda1e3, type: 2}
+            transformIndex: 2
+            cor: {r: 1, g: 1, b: 1, a: 1}
           - localX: 8
             localY: 13
             tile: {fileID: 11400000, guid: 0e9488cb434eec343bb011247068a620, type: 2}
+            transformIndex: 3
+            cor: {r: 1, g: 1, b: 1, a: 1}
           - localX: 3
             localY: 14
             tile: {fileID: 11400000, guid: 0e9488cb434eec343bb011247068a620, type: 2}
+            transformIndex: 4
+            cor: {r: 1, g: 1, b: 1, a: 1}
           - localX: 8
             localY: 14
             tile: {fileID: 11400000, guid: 0e9488cb434eec343bb011247068a620, type: 2}
+            transformIndex: 3
+            cor: {r: 1, g: 1, b: 1, a: 1}
           - localX: 3
             localY: 15
             tile: {fileID: 11400000, guid: 555dbf6160238b349830893c14cda1e3, type: 2}
+            transformIndex: 4
+            cor: {r: 1, g: 1, b: 1, a: 1}
           - localX: 4
             localY: 15
             tile: {fileID: 11400000, guid: 0e9488cb434eec343bb011247068a620, type: 2}
+            transformIndex: 5
+            cor: {r: 1, g: 1, b: 1, a: 1}
           - localX: 5
             localY: 15
             tile: {fileID: 11400000, guid: 0e9488cb434eec343bb011247068a620, type: 2}
+            transformIndex: 5
+            cor: {r: 1, g: 1, b: 1, a: 1}
           - localX: 6
             localY: 15
             tile: {fileID: 11400000, guid: 0e9488cb434eec343bb011247068a620, type: 2}
+            transformIndex: 5
+            cor: {r: 1, g: 1, b: 1, a: 1}
           - localX: 7
             localY: 15
             tile: {fileID: 11400000, guid: 555dbf6160238b349830893c14cda1e3, type: 2}
+            transformIndex: 5
+            cor: {r: 1, g: 1, b: 1, a: 1}
         bakedRotas:
-        - structureId: road
-          routeName: Euro Road
-          celulas:
-          - {x: 12, y: 4, z: 0}
-          - {x: 13, y: 4, z: 0}
-          - {x: 13, y: 3, z: 0}
-          - {x: 13, y: 2, z: 0}
-          - {x: 13, y: 1, z: 0}
-          - {x: 14, y: 0, z: 0}
         - structureId: road
           routeName: "Feij\xE3o Torto Road"
           celulas:
@@ -988,7 +1084,7 @@ MonoBehaviour:
           - {x: 4, y: 13, z: 0}
           - {x: 4, y: 14, z: 0}
         bakedFromScene: Fixture
-        bakedAtUtcTicks: 639231948477501061
+        bakedAtUtcTicks: 639242117665715210
       - quadranteId: A_IA_Q2
         displayName: Terra Firme
         descricao: 
@@ -998,6 +1094,7 @@ MonoBehaviour:
         height: 20
         destravadoPor: []
         exigeIrmaos: 0
+        idSerial: 4
         bakedTiles:
         - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
         - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
@@ -1412,8 +1509,8 @@ MonoBehaviour:
         - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
         - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
         - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
-        - {fileID: 11400000, guid: 8e8a1b5164a85a542aa94afb63767c2d, type: 2}
-        - {fileID: 11400000, guid: 8e8a1b5164a85a542aa94afb63767c2d, type: 2}
+        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
+        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
         - {fileID: 11400000, guid: 8e8a1b5164a85a542aa94afb63767c2d, type: 2}
         - {fileID: 11400000, guid: 8e8a1b5164a85a542aa94afb63767c2d, type: 2}
         - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
@@ -1422,13 +1519,16 @@ MonoBehaviour:
         bakedConstrucoes: []
         bakedCamadas:
         - tilemapName: quebraMar
+          transformacoes:
+          - c0: {x: 1, y: 0, z: 0, w: 0}
+            c1: {x: 0, y: 1, z: 0, w: 0}
+            c2: {x: 0, y: 0, z: 1, w: 0}
+            c3: {x: 0, y: 0, z: 0, w: 1}
           marcas: []
         bakedRotas:
         - structureId: road
           routeName: Euro Road
           celulas:
-          - {x: 14, y: 19, z: 0}
-          - {x: 14, y: 18, z: 0}
           - {x: 15, y: 18, z: 0}
           - {x: 16, y: 17, z: 0}
           - {x: 16, y: 16, z: 0}
@@ -1485,7 +1585,7 @@ MonoBehaviour:
           - {x: 15, y: 18, z: 0}
           - {x: 16, y: 19, z: 0}
         bakedFromScene: Fixture
-        bakedAtUtcTicks: 639231948481294012
+        bakedAtUtcTicks: 639242117670135469
       - quadranteId: A_IA_Q3
         displayName: Peixe Pequeno
         descricao: Ponte Norte
@@ -1495,46 +1595,12 @@ MonoBehaviour:
         height: 17
         destravadoPor: []
         exigeIrmaos: 0
+        idSerial: 5
         bakedTiles:
-        - {fileID: 11400000, guid: 8e8a1b5164a85a542aa94afb63767c2d, type: 2}
-        - {fileID: 11400000, guid: 8e8a1b5164a85a542aa94afb63767c2d, type: 2}
-        - {fileID: 11400000, guid: 8e8a1b5164a85a542aa94afb63767c2d, type: 2}
-        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
-        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
-        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
-        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
-        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
-        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
-        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
-        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
-        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
-        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
-        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
-        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
-        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
-        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
-        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
-        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
         - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
         - {fileID: 11400000, guid: 8e8a1b5164a85a542aa94afb63767c2d, type: 2}
         - {fileID: 11400000, guid: 8e8a1b5164a85a542aa94afb63767c2d, type: 2}
-        - {fileID: 11400000, guid: 8e8a1b5164a85a542aa94afb63767c2d, type: 2}
         - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
-        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
-        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
-        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
-        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
-        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
-        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
-        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
-        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
-        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
-        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
-        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
-        - {fileID: 11400000, guid: 8e8a1b5164a85a542aa94afb63767c2d, type: 2}
-        - {fileID: 11400000, guid: 8e8a1b5164a85a542aa94afb63767c2d, type: 2}
-        - {fileID: 11400000, guid: 8e8a1b5164a85a542aa94afb63767c2d, type: 2}
-        - {fileID: 11400000, guid: 8e8a1b5164a85a542aa94afb63767c2d, type: 2}
         - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
         - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
         - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
@@ -1566,7 +1632,42 @@ MonoBehaviour:
         - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
         - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
         - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
+        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
         - {fileID: 11400000, guid: 8e8a1b5164a85a542aa94afb63767c2d, type: 2}
+        - {fileID: 11400000, guid: 8e8a1b5164a85a542aa94afb63767c2d, type: 2}
+        - {fileID: 11400000, guid: 8e8a1b5164a85a542aa94afb63767c2d, type: 2}
+        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
+        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
+        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
+        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
+        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
+        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
+        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
+        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
+        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
+        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
+        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
+        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
+        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
+        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
+        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
+        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
+        - {fileID: 11400000, guid: 8e8a1b5164a85a542aa94afb63767c2d, type: 2}
+        - {fileID: 11400000, guid: 8e8a1b5164a85a542aa94afb63767c2d, type: 2}
+        - {fileID: 11400000, guid: 8e8a1b5164a85a542aa94afb63767c2d, type: 2}
+        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
+        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
+        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
+        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
+        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
+        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
+        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
+        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
+        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
+        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
+        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
+        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
+        - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
         - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
         - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
         - {fileID: 11400000, guid: 8e8a1b5164a85a542aa94afb63767c2d, type: 2}
@@ -2094,6 +2195,11 @@ MonoBehaviour:
         bakedConstrucoes: []
         bakedCamadas:
         - tilemapName: quebraMar
+          transformacoes:
+          - c0: {x: 1, y: 0, z: 0, w: 0}
+            c1: {x: 0, y: 1, z: 0, w: 0}
+            c2: {x: 0, y: 0, z: 1, w: 0}
+            c3: {x: 0, y: 0, z: 0, w: 1}
           marcas: []
         bakedRotas:
         - structureId: road
@@ -2155,7 +2261,7 @@ MonoBehaviour:
           - {x: 8, y: 6, z: 0}
           - {x: 9, y: 6, z: 0}
         bakedFromScene: Fixture
-        bakedAtUtcTicks: 639231948481879102
+        bakedAtUtcTicks: 639242117670985634
       - quadranteId: A_IA_Q4
         displayName: "Tubar\xE3o Branco"
         descricao: 
@@ -2165,6 +2271,7 @@ MonoBehaviour:
         height: 20
         destravadoPor: []
         exigeIrmaos: 0
+        idSerial: 6
         bakedTiles:
         - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
         - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
@@ -2769,6 +2876,11 @@ MonoBehaviour:
         bakedConstrucoes: []
         bakedCamadas:
         - tilemapName: quebraMar
+          transformacoes:
+          - c0: {x: 1, y: 0, z: 0, w: 0}
+            c1: {x: 0, y: 1, z: 0, w: 0}
+            c2: {x: 0, y: 0, z: 1, w: 0}
+            c3: {x: 0, y: 0, z: 0, w: 1}
           marcas: []
         bakedRotas:
         - structureId: road
@@ -2828,4 +2940,6 @@ MonoBehaviour:
           - {x: 16, y: 18, z: 0}
           - {x: 17, y: 19, z: 0}
         bakedFromScene: Fixture
-        bakedAtUtcTicks: 639231948482462957
+        bakedAtUtcTicks: 639242117671935683
+      idSerial: 2
+    idSerial: 1
