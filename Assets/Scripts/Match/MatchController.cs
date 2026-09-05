@@ -1321,15 +1321,35 @@ public class MatchController : MonoBehaviour
         TurnStateManager.OnUnitDestroyed -= HandleUnitDestroyed;
     }
 
+    /// <summary>
+    /// PONTO UNICO de consumo da configuracao de partida (cores dos slots, IA,
+    /// preset, servico do comando) publicada pela Tela de Entrada e repassada pela
+    /// cena Campanha.
+    ///
+    /// E publico porque o <see cref="QuadranteController"/> PRECISA chamar isto
+    /// antes de pintar. Ele roda em -9000 e este Awake em 0: enquanto o consumo
+    /// morava so aqui, a construcao assada nascia resolvendo o dono contra a lista
+    /// de jogadores SERIALIZADA na cena Batalha, e nao contra a que o jogador
+    /// escolheu. O sintoma e o QG do jogador na cor da cena de AUTORIA com o cursor
+    /// e o HUD ja na cor escolhida — tudo certo menos o tabuleiro.
+    ///
+    /// Idempotente de graca: Apply consome e Clear derruba HasPending, entao a
+    /// segunda chamada nao entra. Quem chamar duas vezes nao paga nada.
+    /// </summary>
+    public void EnsurePartidaConfigApplied()
+    {
+        if (!PartidaConfig.HasPending)
+            return;
+
+        PartidaConfig.Apply(this);
+        PartidaConfig.Clear();
+    }
+
     private void Awake()
     {
         fogVisionModeByPlayerIndex.Clear();
         fogOfWarVisionMode = FogOfWarVisionMode.All;
-        if (PartidaConfig.HasPending)
-        {
-            PartidaConfig.Apply(this);
-            PartidaConfig.Clear();
-        }
+        EnsurePartidaConfigApplied();
         if (PartidaConfig.TryConsumeTutorialPlayerTeam(out TeamId tutorialPlayerTeam))
             ApplyTutorialPlayerTeamChoice(tutorialPlayerTeam);
         ApplyGameSetupPreset();
@@ -3030,13 +3050,29 @@ public class MatchController : MonoBehaviour
         VictoryStars
     }
 
-    public static event Action<TeamId, TeamId, VictoryReason, int> OnMatchConcluded;
+    /// <summary>
+    /// Conclusao da partida. O primeiro parametro e o SLOT vencedor, e e ele que
+    /// quem registra progresso deve usar — a cor vem junto so para apresentacao,
+    /// porque ela e escolhida por partida e nao identifica ninguem entre elas.
+    ///
+    /// Slot invalido = encerrou sem vencedor para coroar (rendicao sem oponente
+    /// vivo). Nao e "o neutro venceu": e ausencia de vencedor.
+    /// </summary>
+    public static event Action<PlayerSlotId, TeamId, TeamId, VictoryReason, int> OnMatchConcluded;
 
     private void HandleVictoryAestheticPresentation(TeamId winnerTeam, TeamId defeatedTeam, VictoryReason reason)
     {
         // Conclusao nasce do funil real da partida. ImportVictoryState nao passa
         // por aqui, portanto carregar um save concluido nao registra outra vitoria.
-        OnMatchConcluded?.Invoke(winnerTeam, defeatedTeam, reason, currentTurn);
+        //
+        // victoryWinnerSlotIndex ja foi escrito por TODOS os caminhos que chegam
+        // aqui, antes da chamada — conferido um por um.
+        OnMatchConcluded?.Invoke(
+            PlayerSlotId.FromIndex(victoryWinnerSlotIndex),
+            winnerTeam,
+            defeatedTeam,
+            reason,
+            currentTurn);
 
         Debug.Log($"[Victory] Vitoria de {TeamUtils.GetName(winnerTeam)} " +
                   $"({reason}{(defeatedTeam != TeamId.Neutral ? $" | derrotado: {TeamUtils.GetName(defeatedTeam)}" : string.Empty)}).");

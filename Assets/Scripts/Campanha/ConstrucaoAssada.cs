@@ -8,8 +8,10 @@ using UnityEngine;
 /// esta", a mesma regra das unidades. Nao existe flag de "tem QG": a escolha e o
 /// desenho.
 ///
-/// Guarda o dono junto porque a construcao ja nasce da cor com que foi pintada.
-/// Um QG neutro nao seria QG de ninguem.
+/// Guarda o dono junto porque um QG neutro nao seria QG de ninguem — mas o dono e
+/// o SLOT, nao a cor. A cor da autoria e so registro: quem joga escolhe as duas
+/// cores no menu, e assar Azul no slot 0 nao pode fazer o QG nascer Azul numa
+/// partida Amarelo contra Vermelho.
 /// </summary>
 [System.Serializable]
 public class ConstrucaoAssada
@@ -21,7 +23,15 @@ public class ConstrucaoAssada
     public int localX;
     public int localY;
 
+    [Tooltip(
+        "A cor com que a peca foi PINTADA na autoria. E registro, nao fonte: quem manda "
+        + "no dono e o slotIndex, porque as cores da partida sao escolhidas no menu e nao "
+        + "tem relacao com as da cena de autoria.\n\n"
+        + "So vale como cor de verdade quando slotIndex e -1 — conteudo de time FIXO, que "
+        + "por definicao nao acompanha slot nenhum.")]
     public TeamId teamId = TeamId.Neutral;
+
+    [Tooltip("Slot logico do dono, e a VERDADE sobre de quem a peca e. -1 = sem slot.")]
     public int slotIndex = -1;
 
     [Tooltip(
