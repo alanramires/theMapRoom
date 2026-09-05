@@ -72,6 +72,13 @@ public class QuadranteData : INoDoMapa
         + "consecutivos — juntar dois pedacos numa lista so criaria uma aresta de "
         + "estrada que o autor nunca desenhou.")]
     public List<RotaAssada> bakedRotas = new List<RotaAssada>();
+    [Tooltip(
+        "Unidades ja em campo quando o quadrante abre, em coordenada LOCAL.\n\n"
+        + "Vazia significa 'os dois lados comecam comprando' — e o caso dos quadrantes "
+        + "do fixture hoje. Para dar tropa inicial a alguem, pinte na cena de autoria "
+        + "dentro do retangulo e asse: a regra e a mesma das construcoes, 'se esta no "
+        + "retangulo, vem como esta'.")]
+    public List<UnidadeAssada> bakedUnidades = new List<UnidadeAssada>();
 
     [Tooltip("De qual cena de autoria este bake saiu. So documentacao.")]
     public string bakedFromScene;

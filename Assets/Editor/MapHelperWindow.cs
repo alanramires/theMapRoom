@@ -1278,6 +1278,7 @@ public class MapHelperWindow : EditorWindow
         }
 
         int construcoes = BakeConstrucoes(q);
+        int unidades = BakeUnidades(q);
         int camadas = BakeCamadas(q, map);
         // DEPOIS do terreno, sempre: o corte de rota consulta GetBakedTile pra
         // saber onde ha buraco, e antes do loop acima nao ha bake pra consultar.
@@ -1292,8 +1293,8 @@ public class MapHelperWindow : EditorWindow
         // achou o Tilemap vazio.
         status = $"'{q.quadranteId}' assado de '{q.bakedFromScene}': ({q.originX},{q.originY}) "
                + $"{w}×{h} = {w * h} células · {painted} tiles, {holeCount} buraco(s), "
-               + $"{construcoes} construção(ões), {DescreveCamadas(q, camadas)}, "
-               + $"{trechos} trecho(s) de rota.";
+               + $"{construcoes} construção(ões), {unidades} unidade(s), "
+               + $"{DescreveCamadas(q, camadas)}, {trechos} trecho(s) de rota.";
         Repaint();
     }
 
@@ -1740,6 +1741,66 @@ public class MapHelperWindow : EditorWindow
         }
 
         return q.bakedConstrucoes.Count;
+    }
+
+    /// <summary>
+    /// Unidades ja em campo. Mesma regra das construcoes: o que esta dentro do
+    /// retangulo vem, do jeito que foi pintado.
+    ///
+    /// Lista vazia e resultado legitimo, e e o dos quatro quadrantes de hoje — o
+    /// quadrante abre sem tropa e os dois lados comecam comprando. Assar zero nao
+    /// e sinal de erro; assar zero DEPOIS de o autor ter pintado, sim, e por isso
+    /// o status mostra o numero.
+    /// </summary>
+    private int BakeUnidades(QuadranteData q)
+    {
+        if (q.bakedUnidades == null)
+            q.bakedUnidades = new List<UnidadeAssada>();
+        q.bakedUnidades.Clear();
+
+        Scene active = SceneManager.GetActiveScene();
+        UnitManager[] all =
+            FindObjectsByType<UnitManager>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+
+        int maxX = q.originX + Mathf.Max(1, q.width) - 1;
+        int maxY = q.originY + Mathf.Max(1, q.height) - 1;
+        int semDono = 0;
+
+        for (int i = 0; i < all.Length; i++)
+        {
+            UnitManager u = all[i];
+            if (u == null || u.gameObject.scene != active)
+                continue;
+
+            Vector3Int cell = u.CurrentCellPosition;
+            cell.z = 0;
+
+            if (cell.x < q.originX || cell.x > maxX || cell.y < q.originY || cell.y > maxY)
+                continue;
+
+            if (u.SlotIndex < 0)
+                semDono++;
+
+            q.bakedUnidades.Add(new UnidadeAssada
+            {
+                unitId = u.UnitId,
+                localX = cell.x - q.originX,
+                localY = cell.y - q.originY,
+                teamId = u.TeamId,
+                slotIndex = u.SlotIndex,
+                displayName = u.UnitId
+            });
+        }
+
+        if (semDono > 0)
+        {
+            Debug.LogWarning(
+                $"[Map Helper] '{q.quadranteId}' assou {semDono} unidade(s) SEM slot. Elas vao "
+                + "nascer com a cor da cena de autoria e não acompanham as cores escolhidas no "
+                + "menu — é o que se espera de tropa de facção fixa, e é bug em tropa de jogador.");
+        }
+
+        return q.bakedUnidades.Count;
     }
 
     private void BakeAll()
