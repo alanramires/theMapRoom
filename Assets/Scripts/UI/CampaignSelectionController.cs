@@ -31,6 +31,7 @@ public class CampaignSelectionController : MonoBehaviour
     [Header("Data")]
     [SerializeField] private MundoData mundo;
     [SerializeField] private ConstructionDatabase constructionDatabase;
+    [SerializeField] private StructureDatabase structureDatabase;
     [SerializeField] private string battleSceneName = "Batalha";
 
     [Header("Scene References")]
@@ -55,6 +56,17 @@ public class CampaignSelectionController : MonoBehaviour
     private readonly List<QuadrantEntry> quadrants = new List<QuadrantEntry>();
     private readonly List<ConstructionPreviewEntry> constructionPreviews = new List<ConstructionPreviewEntry>();
     private Transform constructionPreviewRoot;
+    private sealed class MapDetailPreview
+    {
+        public readonly HashSet<int> Quadrants = new HashSet<int>();
+        public SpriteRenderer Renderer;
+        public Tilemap Map;
+        public Vector3Int Cell;
+        public Color BaseColor;
+    }
+
+    private readonly List<MapDetailPreview> mapDetails = new List<MapDetailPreview>();
+    private Transform roadPreviewRoot;
     private QuadrantEntry hovered;
     private QuadrantEntry pending;
     private int selectedQuadrantIndex = -1;
@@ -73,6 +85,9 @@ public class CampaignSelectionController : MonoBehaviour
     {
         ResolveReferences();
         DisableGameplayFogPresentation();
+        // O mosaico nasce antes do Awake do MatchController. Aplica o contrato
+        // confirmado no menu antes de resolver as cores dos slots dos predios.
+        matchController?.EnsurePartidaConfigApplied();
         BuildWorldMosaic();
     }
 
@@ -434,14 +449,135 @@ public class CampaignSelectionController : MonoBehaviour
         }
 
         int constructionPreviews = BuildConstructionPreviews();
+        BuildMapDetails(out int decorationCount, out int roadSegmentCount);
         RefreshQuadrantPresentation();
         worldTilemap.CompressBounds();
         FrameWorldInCamera();
         Debug.Log(
             $"[Campanha] Mosaico '{mundo.displayName}' construído: {quadrants.Count} quadrantes, " +
-            $"{painted} tiles, {constructionPreviews} construções visuais.",
+            $"{painted} tiles, {constructionPreviews} construções visuais, " +
+            $"{decorationCount} enfeites, {roadSegmentCount} segmentos de estrada.",
             this);
     }
+
+    // Apenas apresentacao: nao registra rotas no RoadNetworkManager nem altera o bake.
+    private void BuildMapDetails(out int decorationCount, out int roadSegmentCount)
+    {
+        foreach (MapDetailPreview detail in mapDetails)
+            if (detail.Map != null) detail.Map.SetTile(detail.Cell, null);
+        mapDetails.Clear();
+        if (roadPreviewRoot != null)
+        {
+            roadPreviewRoot.gameObject.SetActive(false);
+            Destroy(roadPreviewRoot.gameObject);
+        }
+        roadPreviewRoot = new GameObject("Campaign Road Previews").transform;
+        roadPreviewRoot.SetParent(transform, false);
+        decorationCount = roadSegmentCount = 0;
+
+        var layers = new Dictionary<string, Tilemap>(StringComparer.Ordinal);
+        Transform grid = worldTilemap.layoutGrid != null ? worldTilemap.layoutGrid.transform : worldTilemap.transform.parent;
+        foreach (Tilemap map in grid.GetComponentsInChildren<Tilemap>(true))
+            if (map != worldTilemap) layers.TryAdd(map.name, map);
+        var clearedLayers = new HashSet<Tilemap>();
+        var marks = new Dictionary<(Tilemap, Vector3Int), MapDetailPreview>();
+        var edges = new Dictionary<(string, Vector3Int, Vector3Int), MapDetailPreview>();
+        var missingStructures = new HashSet<string>();
+
+        for (int i = 0; i < quadrants.Count; i++)
+        {
+            QuadranteData q = quadrants[i].Quadrante;
+            if (!q.HasBake) continue;
+            if (q.bakedCamadas != null)
+            foreach (CamadaAssada layer in q.bakedCamadas)
+            {
+                if (layer == null || string.IsNullOrWhiteSpace(layer.tilemapName) || layer.marcas == null) continue;
+                if (!layers.TryGetValue(layer.tilemapName, out Tilemap map))
+                {
+                    var go = new GameObject(layer.tilemapName, typeof(Tilemap), typeof(TilemapRenderer));
+                    go.transform.SetParent(grid, false);
+                    map = go.GetComponent<Tilemap>();
+                    map.tileAnchor = worldTilemap.tileAnchor;
+                    go.GetComponent<TilemapRenderer>().sortingLayerName = "Estruturas";
+                    layers.Add(layer.tilemapName, map);
+                }
+                if (clearedLayers.Add(map)) map.ClearAllTiles();
+                map.gameObject.SetActive(true);
+                foreach (CamadaAssada.Marca mark in layer.marcas)
+                {
+                    if (mark.tile == null || !IsInsideQuadrant(q, mark.localX, mark.localY)) continue;
+                    Vector3Int cell = new Vector3Int(q.originX + mark.localX, q.originY + mark.localY, 0);
+                    if (marks.TryGetValue((map, cell), out MapDetailPreview shared))
+                    {
+                        shared.Quadrants.Add(i);
+                        continue;
+                    }
+                    map.SetTile(cell, mark.tile);
+                    map.SetTileFlags(cell, TileFlags.None);
+                    map.SetTransformMatrix(cell, layer.GetMatriz(mark.transformIndex));
+                    map.SetColor(cell, mark.cor);
+                    var detail = new MapDetailPreview { Map = map, Cell = cell, BaseColor = mark.cor };
+                    detail.Quadrants.Add(i);
+                    marks.Add((map, cell), detail);
+                    mapDetails.Add(detail);
+                    decorationCount++;
+                }
+            }
+
+            if (q.bakedRotas == null) continue;
+            foreach (RotaAssada route in q.bakedRotas)
+            {
+                if (route?.celulas == null || route.celulas.Count < 2) continue;
+                if (structureDatabase == null ||
+                    !structureDatabase.TryGetById(route.structureId, out StructureData structure) ||
+                    structure == null || structure.roadSegmentSprite == null)
+                {
+                    if (missingStructures.Add(route.structureId ?? string.Empty))
+                        Debug.LogWarning($"[Campanha] Estrada '{route.structureId}' sem catalogo ou sprite visual.", this);
+                    continue;
+                }
+                for (int c = 0; c < route.celulas.Count - 1; c++)
+                {
+                    Vector3Int a = route.celulas[c], b = route.celulas[c + 1];
+                    // Nunca filtra e cola a sequencia: um par invalido e simplesmente ignorado.
+                    if (!IsInsideQuadrant(q, a.x, a.y) || !IsInsideQuadrant(q, b.x, b.y)) continue;
+                    a = new Vector3Int(q.originX + a.x, q.originY + a.y, 0);
+                    b = new Vector3Int(q.originX + b.x, q.originY + b.y, 0);
+                    if (a == b || !worldTilemap.HasTile(a) || !worldTilemap.HasTile(b)) continue;
+                    var key = a.x < b.x || (a.x == b.x && a.y < b.y)
+                        ? (route.structureId, a, b) : (route.structureId, b, a);
+                    if (edges.TryGetValue(key, out MapDetailPreview shared))
+                    {
+                        shared.Quadrants.Add(i);
+                        continue;
+                    }
+                    Vector3 from = worldTilemap.GetCellCenterWorld(a), to = worldTilemap.GetCellCenterWorld(b);
+                    Vector3 delta = to - from;
+                    var go = new GameObject($"{route.structureId} {a} - {b}");
+                    go.transform.SetParent(roadPreviewRoot, false);
+                    go.transform.position = (from + to) * 0.5f;
+                    go.transform.rotation = Quaternion.Euler(0, 0, Vector2.SignedAngle(Vector2.up, delta));
+                    SpriteRenderer renderer = go.AddComponent<SpriteRenderer>();
+                    renderer.sprite = structure.roadSegmentSprite;
+                    renderer.color = structure.roadColor;
+                    renderer.sortingLayerName = "Estruturas";
+                    renderer.sortingOrder = 20;
+                    Vector3 size = renderer.sprite.bounds.size;
+                    go.transform.localScale = new Vector3(
+                        Mathf.Clamp(structure.roadWidth, 0.03f, 0.6f) / Mathf.Max(0.0001f, size.x),
+                        (delta.magnitude + Mathf.Clamp(structure.segmentOverlap, 0f, 0.3f)) / Mathf.Max(0.0001f, size.y), 1);
+                    var detail = new MapDetailPreview { Renderer = renderer, BaseColor = structure.roadColor };
+                    detail.Quadrants.Add(i);
+                    edges.Add(key, detail);
+                    mapDetails.Add(detail);
+                    roadSegmentCount++;
+                }
+            }
+        }
+    }
+
+    private static bool IsInsideQuadrant(QuadranteData q, int x, int y)
+        => x >= 0 && y >= 0 && x < q.width && y < q.height;
 
     /// <summary>
     /// Representa as construcoes assadas no mapa de selecao sem instanciar o
@@ -511,7 +647,11 @@ public class CampaignSelectionController : MonoBehaviour
                     continue;
                 }
 
-                Sprite sprite = TeamUtils.GetTeamSprite(data, baked.teamId);
+                // O slot define o dono; a cor do bake so vale para conteudo sem slot.
+                TeamId ownerTeam = baked.slotIndex >= 0 && matchController != null
+                    ? matchController.GetTeamIdForSlot(baked.slotIndex)
+                    : baked.teamId;
+                Sprite sprite = TeamUtils.GetTeamSprite(data, ownerTeam);
                 if (sprite == null)
                 {
                     if (missingIds.Add(baked.constructionId + "#sprite"))
@@ -541,9 +681,9 @@ public class CampaignSelectionController : MonoBehaviour
 
                 SpriteRenderer renderer = preview.AddComponent<SpriteRenderer>();
                 renderer.sprite = sprite;
-                Color baseColor = TeamUtils.GetColor(baked.teamId);
+                Color baseColor = TeamUtils.GetColor(ownerTeam);
                 renderer.color = baseColor;
-                renderer.flipX = TeamUtils.ShouldFlipX(baked.teamId);
+                renderer.flipX = TeamUtils.ShouldFlipX(ownerTeam);
                 renderer.sortingLayerName = "Construcao";
                 renderer.sortingOrder = 5;
                 constructionPreviews.Add(new ConstructionPreviewEntry
@@ -684,6 +824,14 @@ public class CampaignSelectionController : MonoBehaviour
                 : hasOwner ? unfocusedWinnerBrightness : unfocusedConstructionBrightness;
             preview.Renderer.color = ScaleRgb(preview.BaseColor, brightness);
         }
+
+        foreach (MapDetailPreview detail in mapDetails)
+        {
+            Color color = detail.Quadrants.Contains(selectedQuadrantIndex)
+                ? detail.BaseColor : ScaleRgb(detail.BaseColor, unfocusedConstructionBrightness);
+            if (detail.Renderer != null) detail.Renderer.color = color;
+            if (detail.Map != null) detail.Map.SetColor(detail.Cell, color);
+        }
     }
 
     private Color ResolveQuadrantTerrainTint(int index)
@@ -696,6 +844,12 @@ public class CampaignSelectionController : MonoBehaviour
         return focused ? winnerTint : ScaleRgb(winnerTint, unfocusedWinnerBrightness);
     }
 
+    /// <summary>
+    /// O progresso guarda o SLOT que tomou o quadrante; a cor sai do slot agora,
+    /// contra as cores DESTA sessao. Quem venceu como Amarelo ontem e joga de
+    /// Vermelho hoje ve o seu quadrante em vermelho — que e o certo: a cor
+    /// responde "quem sou eu nesta partida", nao "que cor eu era naquela".
+    /// </summary>
     private bool TryGetQuadrantOwner(int index, out TeamId owner)
     {
         owner = TeamId.Neutral;
@@ -703,11 +857,20 @@ public class CampaignSelectionController : MonoBehaviour
             return false;
 
         QuadrantEntry entry = quadrants[index];
-        return CampaignProgressStore.TryGetOwner(
-            mundo.mundoId,
-            entry.Campanha.campanhaId,
-            entry.Quadrante.quadranteId,
-            out owner);
+        if (!CampaignProgressStore.TryGetOwner(
+                mundo.mundoId,
+                entry.Campanha.campanhaId,
+                entry.Quadrante.quadranteId,
+                out PlayerSlotId ownerSlot))
+        {
+            return false;
+        }
+
+        if (matchController == null)
+            return false;
+
+        owner = matchController.GetTeamIdForSlot(ownerSlot.Value);
+        return owner != TeamId.Neutral;
     }
 
     private static Color ScaleRgb(Color color, float scale)

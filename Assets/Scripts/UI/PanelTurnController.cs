@@ -131,7 +131,12 @@ public class PanelTurnController : MonoBehaviour
         // Mapa de tutorial: o painel de turno fica só com o contador. Placar de unidades/território
         // não tem sentido num mapa roteirizado e ainda compete com o passo a passo pela atenção.
         bool tutorial = matchController != null && matchController.IsTutorialMode;
-        bool shouldShow = !tutorial && hasTwoSlots && (!fogOfWarTotal || aiVersusAi);
+        // Um texto de apresentacao significa que este prefab esta sendo reutilizado fora de
+        // uma partida (por exemplo, "Selecione o mapa" na cena Campanha). Nesse contexto o
+        // subpainel nao representa estatisticas confirmadas e deve permanecer oculto,
+        // independentemente do contrato de slots/IA que continua vivo entre as cenas.
+        bool isPresentationOnly = !string.IsNullOrWhiteSpace(presentationTextOverride);
+        bool shouldShow = !isPresentationOnly && !tutorial && hasTwoSlots && (!fogOfWarTotal || aiVersusAi);
 
         if (panelEstatisticas.activeSelf != shouldShow)
         {
