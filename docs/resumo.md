@@ -1,52 +1,47 @@
 # Resumo — onde estamos e o que vem
 
-Ponto de retomada. Atualizado em 2026-08-24, **depois** da tag `v8.4.1`.
+Ponto de retomada. Atualizado em 2026-09-05, **depois** da tag `v8.5.0`.
 Leia isto primeiro.
 
 ---
 
 ## Estado
 
-`v8.4.1` tagueada e publicada. Relatório:
-[`relatorio_v8.4.1.md`](relatorio_v8.4.1.md).
+`v8.5.0` tagueada e publicada. Relatório:
+[`relatorio_v8.5.0.md`](relatorio_v8.5.0.md).
 
 ```text
 v8.3.0   o primeiro quadrante pintou      361 tiles, 2 ms, cena vazia
 v8.4.0   o catálogo parou de dizer ONDE   três camadas de layout removidas
 v8.4.1   a peça tem lado                  orientação, rotas partidas, identidade
+v8.5.0   o laço fecha                     volta, dono por slot, tropa inicial
 ```
 
-**Duas frentes correm em paralelo.** Esta (o recorte do quadrante) e a da cena
-de seleção de campanha, briefada em
-[`Planos/briefing_cena_campanha.md`](Planos/briefing_cena_campanha.md). Elas se
-encontraram, e o encontro é o que mais muda a retomada — ver "O 0a chegou".
+**O fluxo existe ponta a ponta e volta.** Menu → Campanha → Batalha → Campanha.
 
 ### A descoberta que organiza o resto
 
-> **Copiar uma peça sem o lado dela não é copiar.**
+> **Cor não é identidade. É uma fantasia que o slot veste por uma partida.**
 
-`Tilemap.SetTile` leva o tile e **descarta rotação, espelho e cor** — a Unity
-guarda isso em arrays paralelos. O quebra-mar é um sprite só, girado de 60 em 60
-graus para acompanhar a costa:
+As duas cores são escolhidas no menu. Tudo que atravessa a fronteira entre
+autoria e partida — ou entre uma partida e a seguinte — endereça por **slot**, e
+a cor se resolve só na hora de pintar, por `GetTeamIdForSlot`.
+
+A regra já estava escrita no briefing da cena de campanha (*"cor de time nunca
+sai do slot direto"*). O dia mostrou que ela vale muito além dali: foi violada em
+**três** pontos independentes, e os três sintomas eram silenciosos.
 
 ```text
-quebraMar     39 células   →  10 matrizes distintas
-terreno     1800 células   →   1 (identidade)
+1. construção assada nascia com a cor da AUTORIA      → azul num jogo amarelo
+2. progresso gravava a COR do vencedor                → dono que some se você troca de cor
+3. a volta não republicava a config                   → quadrante pintado na cor de outro
 ```
 
-Por isso o recorte de terreno funcionava havia dias: terreno é o caso em que o
-defeito é **invisível**. Hexágono de planície fica igual girado.
-
-### O 0a chegou — e trouxe uma colisão
-
-A frente paralela publicou `MatchController.OnMatchConcluded(vencedor,
-derrotado, motivo, turno)` de dentro do funil real. **Verificado:**
-`ImportVictoryState` não passa por lá, então carregar save concluído não
-registra outra vitória. O bloqueio 0a está **fechado**.
-
-Mas o `CampaignProgressStore` que veio junto diverge do plano em três pontos —
-decisões, não consertos. Está detalhado no relatório e repetido em "Onde eu
-parei".
+E o nº 1 tinha um segundo defeito embaixo: ler do slot na hora errada. O
+`QuadranteController` roda em `-9000` e o `Awake` do `MatchController` em `0`, e é
+lá que o `PartidaConfig` era aplicado. **Pintar antes da configuração chegar** — a
+armadilha do projeto espelhada. Daí o `EnsurePartidaConfigApplied`, ponto único e
+idempotente, que quem pinta antes chama primeiro.
 
 ---
 
@@ -63,6 +58,7 @@ MUNDO       uma cena de autoria + UM asset. O globo inteiro, desenhado de uma ve
 |---|---|
 | **quadrante** | o retângulo recortável onde se joga |
 | **setor** | `ConstructionSector` — rótulo estratégico numa construção |
+| **slot** | quem é o dono. Slot 0, slot 1. **A cor é roupa dele nesta partida** |
 
 Um quadrante **contém** setores.
 
@@ -72,21 +68,42 @@ espaço.
 
 ---
 
+## O fluxo, e onde cada peça mora
+
+```text
+Tela de Entrada   PanelMenu:980   cor, cor, dificuldade, preset → PartidaConfig
+      ↓           espera o SFX de confirmação terminar (WaitForSecondsRealtime)
+Campanha          CampaignSelectionController   mosaico, setas, tint por dono
+      ↓           Set(...) + SetDifficulty + SetQuadrante → LoadScene("Batalha")
+Batalha           QuadranteController (-9000)   pinta terreno, construções,
+      ↓                                          camadas, rotas e TROPA INICIAL
+                  MatchController (0)            aplica a config (ou já foi aplicada)
+      ↓           vitória/derrota → grava o SLOT vencedor → Enter
+Campanha          republica a config na volta, e o quadrante aparece na cor do dono
+```
+
+**Toda a travessia é `PartidaConfig`.** Ele é de **consumo único**: quem produz
+chama `Set`, quem consome chama `Apply` + `Clear`. Por isso a volta tem de
+republicar — foi o que quase quebrou o laço em silêncio.
+
+---
+
 ## O que existe
 
 ```text
 Assets/Scripts/Campanha/    MundoData · BlocoData · CampanhaData · QuadranteData
                             INoDoMapa · QuadranteController
-                            ConstrucaoAssada · CamadaAssada · RotaAssada
-                            CampaignProgressStore        ← da frente paralela
+                            ConstrucaoAssada · UnidadeAssada · CamadaAssada · RotaAssada
+                            CampaignProgressStore        ← agora por SLOT
 Assets/Editor/              MapHelperWindow (a bancada) · MapaTerrenoJson
-                            SceneSanitizerWindow
+                            RoadRoutePainterWindow · SceneSanitizerWindow
 Assets/DB/Campanha/         Mundo Fixture.asset
-Assets/Scenes/Autoria/      Fixture (13 construções, 3 rotas) · Mundo
-Assets/Scenes/              Campanha (com seleção) · Batalha (vazia)
+Assets/Prefab/Managers/     AudioManager.prefab          ← nas 3 cenas do fluxo
+Assets/Scenes/Autoria/      Fixture (13 construções, 6 trechos) · Mundo
+Assets/Scenes/              Campanha · Batalha           ← as duas no Build Settings
 ```
 
-O fixture, agora com quatro quadrantes de tamanhos diferentes:
+O fixture, quatro quadrantes de tamanhos diferentes:
 
 ```text
 bloco A · Auridia
@@ -97,81 +114,77 @@ bloco A · Auridia
      └─ A_IA_Q4  Tubarão Branco     (2,-9)  30×20   600 tiles
 ```
 
-**Terreno, construções, camadas decorativas e rotas entram. Unidades não.**
-
-A "Euro Road" cruza os **quatro** quadrantes e foi cortada na borda de cada um —
-sete trechos assados. É o recorte de rota exercitado em dado real.
+**Terreno, construções, camadas, rotas e unidades entram.** As listas de unidade
+estão vazias de propósito — o mecanismo existe, falta você pintar.
 
 ---
 
 ## Onde eu parei
 
-### ⚠️ Duas coisas que precisam de um clique na Unity
+### ⚠️ Nada da `v8.5.0` foi compilado
 
-**1. Reassar os quatro quadrantes.** O asset está com `transformacoes: 0` — o
-bake do quebra-mar rodou **antes** do conserto de orientação. Até reassar, o
-enfeite continua torto. O status da bancada vai passar a dizer
-`quebraMar 39 (9 giro(s))`; se disser `0 giro(s)`, o bake pegou a camada errada.
+Não há build por linha de comando. Todo o código foi escrito contra as APIs
+lidas. **Confira o Console antes de concluir qualquer coisa.**
 
-**2. Selar os nós.** A seção Mundo vai mostrar `Selar 6 nó(s)`. O `idSerial`
-ainda não existe no asset.
+O teste que fecha o laço: menu → Amarelo vs Vermelho → quadrante → perder de
+propósito (rendição serve) → Enter → o mapa volta com aquele quadrante pintado na
+cor do slot 1.
 
-⚠️ **Nada da `v8.4.1` foi compilado.** O código foi escrito contra as APIs lidas,
-sem passar pelo compilador. Confira o Console antes de concluir qualquer coisa.
+### O `0b` mudou de conta — revisado, não consertado
 
-### A colisão do progresso — decisão, não conserto
+O resumo antigo dizia "`sceneLoaded` nos 4 managers". **Eles não são o mesmo
+problema:**
 
-`CampaignProgressStore` (frente paralela) guarda:
-
-```csharp
-public string quadranteId;   // endereça pelo texto EDITÁVEL
-public int ownerTeamId;
-public int lastTurn;         // sobrescrito sempre, e mora junto do dono
-```
-
-| # | divergência do plano | consequência |
+| manager | o que carrega | veredito |
 |---|---|---|
-| 1 | endereça pelo `id` editável | é o que o `idSerial` desta versão existe para evitar. Renomear órfã o progresso em silêncio. Agora é barato de consertar |
-| 2 | `lastTurn` é *último*, não *melhor*, e mora junto do dono | o plano separa `dono` (estado, muda sempre) de `marca` (registro, nunca piora). Colapsados, perder o quadrante apaga que você o tomou em 11 turnos |
-| 3 | `schemaVersion` | inofensivo, mas nada foi distribuído — migração não compra nada hoje |
+| `AITacticalAnalyzer` | `operationsBySlot` | limpar. Estado indexado por slot, e o slot 0 da próxima é outra pessoa |
+| `ObjectiveManager` | `plans` | limpar. Quem limpa hoje é **só o `RestoreSaveData`** — carregar save limpa, começar partida nova não |
+| `HexCohabitationVisualManager` | `cachedTurnStateManager`, `cachedMatchController` | limpar, mas é outro bug: referências a objetos da cena anterior, já destruídos |
+| `AIShoppingPlanner` | quase tudo é *tunable* serializado | **provavelmente NÃO deve limpar** — configuração deve atravessar cenas |
 
-O **2** primeiro: é o único que exige decisão de design.
+**Próximo passo concreto:** ir campo a campo no `AIShoppingPlanner` separando
+tunável de estado, **antes** de escrever qualquer hook. Um `Clear()` ali apagaria
+configuração, não contaminação.
+
+### A decisão de economia que ninguém tomou
+
+`Batalha.unity` serializa `startMoney: 0` e `actualMoney: 0` nos dois slots, com
+`allowDefeatForZeroUnits: 1`. A derrota por zero unidades roda a partir do **turno
+2**. A renda chega no turno 1 e dá pra comprar — mas **quem não comprar perde no
+turno 2 sem entender por quê.**
+
+Três saídas, e é escolha de design:
+
+```text
+1. assar unidades iniciais            já é possível — só pintar e assar
+2. dar caixa inicial ao bake          campo novo, precisa de leitor
+3. dar carência à derrota por 0       já existe o toggle
+```
 
 ### Depois
 
 ```text
-1. bake de unidades iniciais (mesmo molde do bakedConstrucoes)
+1. o 0b, começando pelo AIShoppingPlanner
 2. destravadoPor passa a guardar idSerial em vez de texto
-3. sceneLoaded nos 4 managers  (o 0b, único bloqueio que sobrou)
-4. avaliação de destrave — hoje só existem os campos
+3. avaliação de destrave — hoje só existem os campos
+4. lastTurn: separar dono (muda sempre) de marca (nunca piora)
 ```
 
 ### Dívidas com gatilho conhecido
 
-- ~~**`guid` estável**~~ ✅ virou `idSerial`, nos três níveis via `INoDoMapa`.
-  **Falta selar**, e falta o `destravadoPor` passar a usá-lo.
+- **O silêncio entre menu e campanha continua.** Duas causas, as duas de pé: o
+  `MatchMusicAudioManager` **não** é `DontDestroyOnLoad` (a música da cena que sai
+  morre com ela), e o `BuildWorldMosaic()` roda no `Awake` da
+  `CampaignSelectionController` em ordem `-10000` — todo `Awake` roda antes de
+  qualquer `Start`, então o mosaico trava o frame e a música é a última da fila.
+  Virar prefab não resolveu isso; resolveu compartilhamento de configuração.
+- **`lastTurn` é *último*, não *melhor*, e mora junto do dono.** Perder o
+  quadrante apaga que você o tomou em 11 turnos.
 - **`BoardReady` tem um leitor** (`RefreshAllOccupancyVisuals`); os demais
   consumidores ainda não consultam.
-- **As cenas de execução seguem fora do Build Settings.**
 - **Nada foi medido em escala.** A bancada e o pintor rodaram sobre 1800 células.
-- **A lógica de rota partida não foi exercitada.** As três rotas caem inteiras em
-  seus quadrantes. Só uma que saia e volte prova.
 - **`.vscode/settings.json` voltou para `.slnx`**, desfazendo o `769a3dc`. O
   `.sln` é gerado pela Unity e não existe no disco. Deixado sujo de propósito.
-
----
-
-## O bloqueio que sobrou
-
-`0a` **fechado** pela frente paralela (`OnMatchConcluded`, verificado contra
-`ImportVictoryState`). Resta um:
-
-| # | frente | por que ainda importa |
-|---|---|---|
-| **0b** | `sceneLoaded` nos 4 managers | a campanha **vai** encadear cenas, e agora ela existe |
-
-**Teste da 0b, hoje:** menu → mapa A → turno 5 → menu → mapa B. No turno 1 do B,
-o plano tem de nascer **vazio**.
 
 ---
 
@@ -184,8 +197,8 @@ o plano tem de nascer **vazio**.
  2. consumidores Melhor*          ⚠️ faltam Suprir, Fundir, Detecção e Spotting
  3. papéis → somente POLÍTICA     ⚠️ as seis fichas existem; RoleData ainda não
  4. variações de papel            perfil/trait depois da extração
- 5. CAMPANHA                      🟡 terreno, construções, enfeite e rotas entram;
-                                     faltam unidades e o progresso endereçado por serial
+ 5. CAMPANHA                      🟡 o laço fecha e o progresso é por slot;
+                                     falta o 0b e a decisão de economia
 ```
 
 ---
@@ -194,29 +207,27 @@ o plano tem de nascer **vazio**.
 
 | armadilha | regra |
 |---|---|
-| **`SetTile` tomado como cópia** | leva o tile e **descarta rotação, espelho e cor** — a Unity guarda em arrays paralelos. Só aparece em arte que tem lado; terreno é o caso em que o defeito é invisível |
+| **cor tomada como identidade** | a cor é escolhida no menu, por partida. Dono, progresso e tropa endereçam por **slot**; a cor se resolve na hora de pintar. Violado em 3 pontos independentes num dia só, e nenhum deu erro |
+| **`SetSlotIndex` tomado como "mudar de dono"** | ele só escreve o campo e **deixa a cor como estava**. Quem muda dono é `SetOwnerSlot` (construção) ou `SpawnAtCellForSlot` (unidade) — os mesmos caminhos da captura |
+| **pintar antes da configuração chegar** | `QuadranteController` é `-9000`; o `Awake` do `MatchController` é `0`. Quem pinta antes tem de chamar `EnsurePartidaConfigApplied` primeiro |
+| **`PartidaConfig` tomado como estado** | é de **consumo único**. Quem volta pra uma cena tem de republicar, senão a cena nasce com as cores serializadas nela |
+| **`SetTile` tomado como cópia** | leva o tile e **descarta rotação, espelho e cor**. Só aparece em arte que tem lado; terreno é o caso em que o defeito é invisível |
 | **`SetTransformMatrix` ignorado calado** | um tile com `LockTransform` faz o tilemap descartar a matriz sem avisar. Destravar (`SetTileFlags(None)`) antes de orientar |
-| **recortar uma sequência como se fosse conjunto** | rota é ordenada, e os consumidores leem PARES. Tirar uma célula do meio COLA as vizinhas numa aresta que ninguém desenhou — e se elas forem adjacentes de verdade, vira atalho com bônus, sem erro |
-| **`IsRouteValid` é tudo-ou-nada** | uma célula inválida descarta o desenho da rota INTEIRA. Por isso o recorte quebra em buraco, não só na borda |
+| **recortar uma sequência como se fosse conjunto** | rota é ordenada e os consumidores leem PARES. Tirar uma célula do meio COLA as vizinhas numa aresta que ninguém desenhou |
+| **`IsRouteValid` é tudo-ou-nada** | uma célula inválida descarta o desenho da rota INTEIRA |
 | **`Build` fora do Play** | tudo que ele escreve é serializado. Numa cena compartilhada por todos os quadrantes, salvar grava o layout de um dentro dos outros |
-| **camada decorativa é tilemap IRMÃO** | `ClearAllTiles` no tabuleiro não encosta nela. Enfeite órfão sobrevive a uma limpeza inteira |
-| **contador de id recalculado do máximo** | certo no `UnitSpawner` (ids morrem com a partida), **errado** no mundo (o registro sobrevive ao nó). Serial queimado fica queimado |
-| **hexágono tratado como grade quadrada** | é odd-r: linha ímpar desloca meia célula. Verificado contra o traçado da rodovia — 33/33 pares contra 24/33 |
-| **escape `
-` em geração de código por script** | a ferramenta processa a barra antes do Python, e o literal C# quebra em duas linhas. Usar `chr(92)` |
-| **generalizar do que se encontra sem checar a razão** | quatro vezes em dois dias: padrão `Database→Data`, nível de bloco ausente, "um mundo por cena", catálogo por mapa. **Perguntar por que aquilo existe antes de construir em cima** |
-| **catálogo por mapa tomado como padrão** | existia só porque o catálogo carregava layout. O `TerrainDatabase` — 1 asset — provava o contrário |
-| **layout no TIPO compartilhado** | "Rodovias" carregava 11 traçados. Toda cena que usasse o tipo herdava |
-| **campo sem leitor tomado como inofensivo** | `fieldEntries` tinha zero leitores **e** obrigava sete catálogos a existir |
+| **camada decorativa é tilemap IRMÃO** | `ClearAllTiles` no tabuleiro não encosta nela |
+| **contador de id recalculado do máximo** | certo no `UnitSpawner` (ids morrem com a partida), **errado** no mundo (o registro sobrevive ao nó) |
+| **hexágono tratado como grade quadrada** | é odd-r: linha ímpar desloca meia célula |
+| **campo sem leitor tomado como inofensivo** | `fieldEntries` tinha zero leitores **e** obrigava sete catálogos a existir. Por isso `UnidadeAssada` nasceu **sem** HP, combustível e elite |
+| **generalizar do que se encontra sem checar a razão** | **perguntar por que aquilo existe antes de construir em cima** |
 | **`ConstructionSector` default** | é `Alpha = 0`, não `None = -1`. Esquecer o setor não dá erro: dá plano degenerado |
-| **build não idempotente** | limpar tiles sem limpar construções faz o segundo build virar fila de avisos |
 | **id com acento ou espaço** | o YAML escapa (`"Feij\xE3o Torto"`) e o texto é digitado em dois lugares que precisam bater |
-| **parse frágil de `.asset` virando afirmação** | errei três vezes. Contagem por faixa de linha é confiável; `$3` de `awk` não |
+| **parse frágil de `.asset` virando afirmação** | contagem por faixa de linha é confiável; `$3` de `awk` não |
 | **`.asset` em disco tomado como estado atual** | Inspector marca `dirty` e **não grava** |
 | **`sed` em C# sem conferir chaves** | comeu um `}` de fechamento. Contar profundidade antes de seguir |
-| **apagar dado do autor sem perguntar** | 1058 entradas e 3 rotas de tutorial. Perguntar, sempre |
+| **apagar dado do autor sem perguntar** | perguntar, sempre |
 | **consulta antes da pintura terminar** | `SectorManager` assa o vazio e **cacheia**. Daí o `-9000` e o portão |
-| **retângulo de célula desenhado a olho** | grade hexagonal tem borda serrilhada |
 | **construção na interseção de quadrantes** | a faixa é para o **chão**. Peça ali nasce nos dois |
 | **`Grid` divergente entre autoria e Batalha** | cell size/layout/swizzle diferentes torcem toda tradução de coordenada |
 | farol tratado como lock | promessa e claim distribuem preferência; nunca proíbem |
@@ -230,9 +241,10 @@ o plano tem de nascer **vazio**.
 | documento | uso |
 |---|---|
 | [`Planos/plano_campanha.md`](Planos/plano_campanha.md) | **o tronco** — autoria, recorte, progresso, cenas, bloqueios, teste |
+| [`Planos/briefing_cena_campanha.md`](Planos/briefing_cena_campanha.md) | o contrato entre as duas frentes |
+| [`relatorio_v8.5.0.md`](relatorio_v8.5.0.md) | o laço fecha, e o dono deixa de ser uma cor |
 | [`relatorio_v8.4.1.md`](relatorio_v8.4.1.md) | orientação, rotas partidas e identidade estável |
 | [`relatorio_v8.4.0.md`](relatorio_v8.4.0.md) | o dia em que o catálogo parou de dizer onde |
-| [`relatorio_v8.3.0.md`](relatorio_v8.3.0.md) | o dado achou a forma na terceira tentativa |
 | [`AI Behavior/Transporte.md`](AI%20Behavior/Transporte.md) | estados, promessas, coleta e entrega |
 | [`arquitetura/acoes_transacionais.md`](arquitetura/acoes_transacionais.md) | lei de compromisso e rollback |
 
