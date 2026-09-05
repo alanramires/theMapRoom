@@ -59,6 +59,7 @@ public class PanelMenu : MonoBehaviour
     private int ignoreInputUntilFrame = -1;
     private int lastLoadOpenRequestFrame = -1;
     private bool newGameWizardOpen;
+    private bool startingNewGame;
     private bool newGameHotSeat;
     private int newGameWizardStep;
     private int newGameWizardFocusIndex;
@@ -192,7 +193,7 @@ public class PanelMenu : MonoBehaviour
 
     public bool NavigateNewGameWizard(int direction)
     {
-        if (!newGameWizardOpen || direction == 0) return false;
+        if (!newGameWizardOpen || startingNewGame || direction == 0) return false;
         int count = GetNewGameWizardOptionCount();
         newGameWizardFocusIndex = (newGameWizardFocusIndex + (direction > 0 ? 1 : -1) + count) % count;
         if (newGameWizardStep == 2)
@@ -203,7 +204,13 @@ public class PanelMenu : MonoBehaviour
 
     public void InvokeNewGameWizardOption(int index)
     {
-        if (!newGameWizardOpen || index < 0 || index >= GetNewGameWizardOptionCount()) return;
+        if (!newGameWizardOpen || startingNewGame || index < 0 || index >= GetNewGameWizardOptionCount()) return;
+        // A ultima opcao de cada passo e CANCELAR/VOLTAR, tanto no mouse quanto no teclado.
+        if (index == GetNewGameWizardOptionCount() - 1)
+        {
+            CancelNewGameWizardStep();
+            return;
+        }
         newGameWizardFocusIndex = index;
         if (newGameWizardStep == 0)
         {
@@ -249,7 +256,7 @@ public class PanelMenu : MonoBehaviour
 
     public void CancelNewGameWizardStep()
     {
-        if (!newGameWizardOpen) return;
+        if (!newGameWizardOpen || startingNewGame) return;
         if (newGameWizardStep <= 0) CloseNewGameWizard();
         else
         {
@@ -957,6 +964,19 @@ public class PanelMenu : MonoBehaviour
 
     private void StartConfiguredNewGame()
     {
+        if (startingNewGame) return;
+        startingNewGame = true;
+        StartCoroutine(StartConfiguredNewGameAfterSfx());
+    }
+
+    private System.Collections.IEnumerator StartConfiguredNewGameAfterSfx()
+    {
+        cursorController?.PlayDoneSfx();
+        float soundDuration = cursorController != null ? cursorController.GetDoneSfxDuration() : 0f;
+        // Aguarda em tempo real: o menu pode estar com o tempo de jogo pausado.
+        if (soundDuration > 0f)
+            yield return new WaitForSecondsRealtime(soundDuration);
+
         string target = newGameHotSeat ? "Hot Seat 1 - Pvp" : "Campanha";
         TeamId[] teams = { newGameHumanTeam, newGameAiTeam };
         bool[] isAI = { false, !newGameHotSeat };

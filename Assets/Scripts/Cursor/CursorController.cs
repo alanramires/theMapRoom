@@ -2203,6 +2203,12 @@ public class CursorController : MonoBehaviour
     public void PlayDoneSfx() => PlayUiSfx(doneSfx);
     public void PlayLoadSfx() => PlayUiSfx(loadSfx);
     public void PlayCursorMoveSfx() => PlayMoveSfx();
+    public float GetDoneSfxDuration()
+    {
+        if (doneSfx == null || audioSource == null) return 0f;
+        float pitch = audioSource != null ? Mathf.Abs(audioSource.pitch) : 1f;
+        return doneSfx.length / Mathf.Max(0.01f, pitch);
+    }
 
     private float ApplyMasterSfxVolume(float categoryVolume)
     {
