@@ -6,6 +6,17 @@ using UnityEngine;
 /// <summary>
 /// Estado do jogador entre batalhas. O mapa assado continua imutavel; este
 /// arquivo guarda somente quem controla cada quadrante e o ultimo resultado.
+///
+/// O DONO E O SLOT, NUNCA A COR.
+///
+/// A cor de cada slot e escolhida no menu, uma vez por partida: hoje o jogador e
+/// Amarelo, amanha e Vermelho. Gravar "este quadrante e do Amarelo" grava uma
+/// fantasia, nao um dono — na partida seguinte a cor pode nao estar em campo, e
+/// a pergunta que importa ("fui EU que tomei este?") deixa de ter resposta.
+///
+/// Gravando o slot, a pergunta continua respondivel para sempre, e a cor volta a
+/// ser o que ela e: apresentacao, resolvida na hora de pintar por
+/// <c>MatchController.GetTeamIdForSlot</c>.
 /// </summary>
 public static class CampaignProgressStore
 {
@@ -22,7 +33,7 @@ public static class CampaignProgressStore
     private sealed class QuadrantOwnershipData
     {
         public string quadranteId;
-        public int ownerTeamId = (int)TeamId.Neutral;
+        public int ownerSlotIndex = PlayerSlotId.InvalidValue;
         public int lastTurn;
         public string updatedAtUtc;
     }
@@ -31,33 +42,37 @@ public static class CampaignProgressStore
     private static readonly Dictionary<string, CampaignProgressData> Cache =
         new Dictionary<string, CampaignProgressData>(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// Slot que controla o quadrante. Devolve false quando ninguem o tomou ainda —
+    /// e "ninguem" nao e um slot neutro, e a ausencia de registro.
+    /// </summary>
     public static bool TryGetOwner(
         string mundoId,
         string campanhaId,
         string quadranteId,
-        out TeamId owner)
+        out PlayerSlotId owner)
     {
-        owner = TeamId.Neutral;
+        owner = PlayerSlotId.Invalid;
         if (!HasAddress(mundoId, campanhaId, quadranteId))
             return false;
 
         CampaignProgressData data = Load(mundoId, campanhaId);
         QuadrantOwnershipData quadrant = FindQuadrant(data, quadranteId);
-        if (quadrant == null || !IsPlayableTeam(quadrant.ownerTeamId))
+        if (quadrant == null)
             return false;
 
-        owner = (TeamId)quadrant.ownerTeamId;
-        return true;
+        owner = PlayerSlotId.FromIndex(quadrant.ownerSlotIndex);
+        return owner.IsValid;
     }
 
     public static bool RecordOwner(
         string mundoId,
         string campanhaId,
         string quadranteId,
-        TeamId owner,
+        PlayerSlotId owner,
         int turn)
     {
-        if (!HasAddress(mundoId, campanhaId, quadranteId) || !IsPlayableTeam((int)owner))
+        if (!HasAddress(mundoId, campanhaId, quadranteId) || !owner.IsValid)
             return false;
 
         CampaignProgressData data = Load(mundoId, campanhaId);
@@ -68,7 +83,7 @@ public static class CampaignProgressStore
             data.quadrantes.Add(quadrant);
         }
 
-        quadrant.ownerTeamId = (int)owner;
+        quadrant.ownerSlotIndex = owner.Value;
         quadrant.lastTurn = Mathf.Max(0, turn);
         quadrant.updatedAtUtc = DateTime.UtcNow.ToString("O");
 
@@ -77,7 +92,7 @@ public static class CampaignProgressStore
 
         Debug.Log(
             $"[Campanha] '{campanhaId}/{quadranteId}' agora pertence ao " +
-            $"time {TeamUtils.GetName(owner)} (turno {quadrant.lastTurn}).");
+            $"{owner} (turno {quadrant.lastTurn}).");
         return true;
     }
 
@@ -158,11 +173,6 @@ public static class CampaignProgressStore
         return !string.IsNullOrWhiteSpace(mundoId)
             && !string.IsNullOrWhiteSpace(campanhaId)
             && !string.IsNullOrWhiteSpace(quadranteId);
-    }
-
-    private static bool IsPlayableTeam(int teamId)
-    {
-        return teamId >= (int)TeamId.Green && teamId <= (int)TeamId.Yellow;
     }
 
     private static string BuildCacheKey(string mundoId, string campanhaId)
