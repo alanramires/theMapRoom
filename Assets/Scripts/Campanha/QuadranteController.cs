@@ -1,7 +1,11 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.Tilemaps;
+#if ENABLE_INPUT_SYSTEM
+using UnityEngine.InputSystem;
+#endif
 using Debug = UnityEngine.Debug;
 
 /// <summary>
@@ -63,6 +67,13 @@ public class QuadranteController : MonoBehaviour
     [Tooltip("Onde a celula local (0,0) cai no tilemap. O dado e sempre local; isto e so enquadramento.")]
     [SerializeField] private Vector2Int paintOrigin = Vector2Int.zero;
 
+    [Header("Volta")]
+    [Tooltip(
+        "Cena para onde o jogador volta quando a partida termina — mas SO se ela "
+        + "tiver comecado na campanha. Partida aberta direto pela Batalha nao volta "
+        + "pra lugar nenhum.")]
+    [SerializeField] private string campaignSceneName = "Campanha";
+
     [Header("Comportamento")]
     [SerializeField] private bool buildOnAwake = true;
     [Tooltip("Apaga o tilemap de destino antes de pintar. A Batalha nasce vazia, mas isto torna o build repetivel.")]
@@ -73,6 +84,9 @@ public class QuadranteController : MonoBehaviour
     private int paintedCells;
     private int holeCells;
     private bool recordsCampaignResult;
+    private bool aguardandoVolta;
+    private bool voltando;
+    private int frameDaConclusao;
 
     public bool Built => built;
     public int PaintedCells => paintedCells;
@@ -127,20 +141,166 @@ public class QuadranteController : MonoBehaviour
     }
 
     private void HandleMatchConcluded(
+        PlayerSlotId winnerSlot,
         TeamId winnerTeam,
         TeamId defeatedTeam,
         MatchController.VictoryReason reason,
         int turn)
     {
-        if (active != this || !built || !recordsCampaignResult || winnerTeam == TeamId.Neutral)
+        if (active != this || !built || !recordsCampaignResult)
             return;
 
-        CampaignProgressStore.RecordOwner(
-            MundoId,
-            campanhaId,
-            quadranteId,
-            winnerTeam,
-            turn);
+        // O SLOT, nao o time. A cor com que este slot lutou hoje nao volta amanha,
+        // e o quadrante continua sendo dele.
+        //
+        // Sem vencedor para coroar (rendicao sem oponente vivo) nao ha dono novo —
+        // mas a partida acabou do mesmo jeito, e a volta e armada de qualquer forma.
+        if (winnerSlot.IsValid)
+        {
+            CampaignProgressStore.RecordOwner(
+                MundoId,
+                campanhaId,
+                quadranteId,
+                winnerSlot,
+                turn);
+        }
+
+        aguardandoVolta = true;
+        frameDaConclusao = Time.frameCount;
+    }
+
+    /// <summary>
+    /// A VOLTA. Vitoria ou derrota, o painel aparece e o Enter devolve o jogador ao
+    /// mapa de campanha.
+    ///
+    /// Mora aqui, e nao num controlador de UI, porque a pergunta que decide se ha
+    /// volta e "esta partida veio da campanha?" — e quem sabe isso e quem recebeu o
+    /// endereco (<see cref="recordsCampaignResult"/>). Partida aberta direto na
+    /// Batalha, para testar um quadrante, nao volta pra lugar nenhum: continua
+    /// terminando na tela de vitoria, como sempre terminou.
+    /// </summary>
+    private void Update()
+    {
+        if (!aguardandoVolta || voltando)
+            return;
+
+        // O mesmo Enter que confirmou a ultima acao nao pode ser o que sai da tela
+        // de vitoria — a tela apareceria e sumiria no mesmo frame. Exige tecla nova.
+        if (Time.frameCount <= frameDaConclusao || IsSubmitHeldNow())
+            return;
+
+        if (!WasSubmitPressedThisFrame())
+            return;
+
+        VoltarParaCampanha();
+    }
+
+    private void VoltarParaCampanha()
+    {
+        if (voltando)
+            return;
+
+        if (string.IsNullOrWhiteSpace(campaignSceneName))
+        {
+            Debug.LogError(
+                "[Quadrante] A partida veio da campanha mas 'campaignSceneName' esta vazio — "
+                + "nao ha para onde voltar. O jogador fica preso na tela de vitoria.",
+                this);
+            return;
+        }
+
+        voltando = true;
+        RepublicarConfiguracaoDaPartida();
+
+        Debug.Log($"[Quadrante] Partida encerrada; voltando para '{campaignSceneName}'.", this);
+        SceneManager.LoadScene(campaignSceneName);
+    }
+
+    /// <summary>
+    /// A IDA CONSOME A CONFIGURACAO; A VOLTA TEM DE REPUBLICA-LA.
+    ///
+    /// PartidaConfig e de consumo unico: o Awake do MatchController da Batalha ja
+    /// aplicou e limpou. Voltar sem republicar faz a cena Campanha nascer com as
+    /// cores SERIALIZADAS nela — e ai o quadrante que voce acabou de conquistar
+    /// aparece pintado na cor de outra pessoa, porque o tint resolve o slot contra
+    /// a lista errada.
+    ///
+    /// E a mesma travessia que a CampaignSelectionController faz na ida, so que ao
+    /// contrario: exporta o estado desta partida e publica de novo.
+    /// </summary>
+    private void RepublicarConfiguracaoDaPartida()
+    {
+        MatchController match = FindAnyObjectByType<MatchController>();
+        if (match == null)
+        {
+            Debug.LogWarning(
+                "[Quadrante] Sem MatchController para exportar a configuracao da partida. "
+                + "A cena Campanha vai nascer com as cores serializadas nela.",
+                this);
+            return;
+        }
+
+        List<int> teamIds = new List<int>();
+        List<bool> flipXs = new List<bool>();
+        List<bool> isAIs = new List<bool>();
+        List<int> startMoneys = new List<int>();
+        List<int> actualMoneys = new List<int>();
+        List<int> incomePerTurns = new List<int>();
+        List<bool> startMoneyApplied = new List<bool>();
+        match.ExportPlayersState(
+            teamIds, flipXs, isAIs, startMoneys, actualMoneys, incomePerTurns, startMoneyApplied);
+
+        if (teamIds.Count < 2)
+        {
+            Debug.LogWarning(
+                $"[Quadrante] A partida exportou {teamIds.Count} jogador(es); a volta nao "
+                + "republica configuracao com menos de dois.",
+                this);
+            return;
+        }
+
+        TeamId[] teams = new TeamId[teamIds.Count];
+        bool[] commandsAutomatic = new bool[teamIds.Count];
+        for (int i = 0; i < teamIds.Count; i++)
+        {
+            teams[i] = (TeamId)teamIds[i];
+            commandsAutomatic[i] = match.IsPlayerCommandServiceAutomatic(PlayerSlotId.FromIndex(i));
+        }
+
+        PartidaConfig.Set(
+            teamIds.Count,
+            teams,
+            isAIs.ToArray(),
+            flipXs.ToArray(),
+            match.GameSetup,
+            commandsAutomatic,
+            campaignSceneName);
+
+        AIController ai = FindAnyObjectByType<AIController>();
+        if (ai != null)
+            PartidaConfig.SetDifficulty(ai.AppliedDifficulty);
+    }
+
+    private static bool WasSubmitPressedThisFrame()
+    {
+        if (RemoteInput.ConfirmDownThisFrame())
+            return true;
+#if ENABLE_INPUT_SYSTEM
+        if (Keyboard.current != null &&
+            (Keyboard.current.enterKey.wasPressedThisFrame || Keyboard.current.numpadEnterKey.wasPressedThisFrame))
+            return true;
+#endif
+        return Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter);
+    }
+
+    private static bool IsSubmitHeldNow()
+    {
+#if ENABLE_INPUT_SYSTEM
+        if (Keyboard.current != null &&
+            (Keyboard.current.enterKey.isPressed || Keyboard.current.numpadEnterKey.isPressed))
+            return true;
+#endif
+        return Input.GetKey(KeyCode.Return) || Input.GetKey(KeyCode.KeypadEnter);
     }
 
     /// <summary>Endereco vindo de fora (save, tela de campanha). Nao pinta sozinho.</summary>
@@ -270,6 +430,10 @@ public class QuadranteController : MonoBehaviour
         // tudo-ou-nada.
         int trechos = BuildRotas(quadrante);
 
+        // Unidades DEPOIS das construcoes: o spawner recusa celula ocupada, e uma
+        // tropa inicial em cima do proprio QG e desenho legitimo na autoria.
+        int unidades = BuildUnidades(quadrante);
+
         watch.Stop();
         built = true;
 
@@ -293,7 +457,7 @@ public class QuadranteController : MonoBehaviour
             Debug.Log(
                 $"[Quadrante] '{campanha.displayName}/{quadrante.displayName}' construido: " +
                 $"{paintedCells} tiles, {holeCells} buraco(s), {construcoes} construcao(oes), " +
-                $"{camadas} camada(s), {trechos} trecho(s) de rota, " +
+                $"{unidades} unidade(s), {camadas} camada(s), {trechos} trecho(s) de rota, " +
                 $"{quadrante.width}x{quadrante.height} em '{map.name}' " +
                 $"(origem local {paintOrigin.x},{paintOrigin.y}; " +
                 $"origem de autoria {quadrante.originX},{quadrante.originY}) " +
@@ -637,6 +801,15 @@ public class QuadranteController : MonoBehaviour
         }
 
         MatchController match = FindAnyObjectByType<MatchController>();
+
+        // A CONFIGURACAO DA PARTIDA TEM DE CHEGAR ANTES DA TINTA.
+        //
+        // Este componente roda em -9000 e o Awake do MatchController em 0, entao
+        // sem esta chamada a lista de jogadores aqui ainda e a SERIALIZADA na cena
+        // Batalha — e todo dono resolvido abaixo sai com a cor errada. Idempotente:
+        // o Awake dele chama de novo e nao entra.
+        match?.EnsurePartidaConfigApplied();
+
         int planted = 0;
 
         for (int i = 0; i < quadrante.bakedConstrucoes.Count; i++)
@@ -650,7 +823,21 @@ public class QuadranteController : MonoBehaviour
                 paintOrigin.y + c.localY,
                 0);
 
-            GameObject go = spawner.SpawnAtCell(c.constructionId, c.teamId, cell);
+            // O DONO SAI DO SLOT, NUNCA DA COR ASSADA.
+            //
+            // O bake grava a cor com que a peca foi PINTADA na cena de autoria, e
+            // essa cor nao e a da partida: o jogador escolhe as duas cores no menu.
+            // Assar Azul e nascer Azul e o mesmo bug que a regra da casa ja nomeia —
+            // "cor de time nunca sai do slot direto".
+            //
+            // slotIndex -1 e conteudo de time FIXO e nao acompanha o slot (a mesma
+            // regra do recolorir do tutorial): ai vale a cor assada, que para toda
+            // construcao neutra ja e Neutral.
+            TeamId dono = c.slotIndex >= 0 && match != null
+                ? match.GetTeamIdForSlot(c.slotIndex)
+                : c.teamId;
+
+            GameObject go = spawner.SpawnAtCell(c.constructionId, dono, cell);
             if (go == null)
             {
                 Debug.LogWarning($"[Quadrante] Nao plantou '{c}' na celula {cell}.", this);
@@ -693,7 +880,18 @@ public class QuadranteController : MonoBehaviour
                 if (c.slotIndex >= 0)
                 {
                     AvisarSlotInexistente(c, match);
-                    manager.SetSlotIndex(c.slotIndex);
+
+                    // SetOwnerSlot, nao SetSlotIndex: o segundo so escreve o campo e
+                    // deixa a cor como estava, entao slot e time podiam divergir. Este
+                    // deriva o time do slot, e e o mesmo caminho que a captura usa.
+                    //
+                    // Sem MatchController na cena ele resolveria TUDO como Neutral —
+                    // um tabuleiro inteiro sem dono, sem erro. Ai vale o campo cru e a
+                    // cor assada, que e o que havia antes.
+                    if (match != null)
+                        manager.SetOwnerSlot(c.slotIndex);
+                    else
+                        manager.SetSlotIndex(c.slotIndex);
                 }
 
                 manager.SetSector(c.sector);
@@ -712,6 +910,108 @@ public class QuadranteController : MonoBehaviour
         }
 
         return planted;
+    }
+
+    /// <summary>
+    /// Tropa inicial. Lista vazia e o caso normal hoje — os quadrantes do fixture
+    /// abrem sem ninguem em campo e os dois lados comecam comprando. Isto existe
+    /// para o autor poder dar tropa a um lado (ou aos dois) so pintando na cena de
+    /// autoria, sem nenhuma configuracao a parte.
+    ///
+    /// O DONO SAI DO SLOT, como em tudo mais que atravessa autoria e partida:
+    /// SpawnAtCellForSlot resolve o time visual do slot e ja aplica o slotIndex —
+    /// e o caminho que o proprio spawner usa e o unico em que cor e slot nao podem
+    /// divergir. Unidade sem slot (facção de time fixo) cai no caminho por cor.
+    /// </summary>
+    private int BuildUnidades(QuadranteData quadrante)
+    {
+        if (quadrante.bakedUnidades == null || quadrante.bakedUnidades.Count == 0)
+            return 0;
+
+        UnitSpawner spawner = FindAnyObjectByType<UnitSpawner>();
+        if (spawner == null)
+        {
+            Debug.LogError(
+                "[Quadrante] Ha unidades assadas mas a cena nao tem UnitSpawner. O quadrante "
+                + "pinta e nasce sem a tropa inicial que o autor desenhou.",
+                this);
+            return 0;
+        }
+
+        UnitDatabase database = spawner.UnitDatabase;
+        if (database == null)
+        {
+            Debug.LogError(
+                "[Quadrante] O UnitSpawner desta cena esta sem UnitDatabase — nenhum id de "
+                + "unidade resolve, e a tropa inicial nao nasce.",
+                this);
+            return 0;
+        }
+
+        MatchController match = FindAnyObjectByType<MatchController>();
+        int spawned = 0;
+
+        for (int i = 0; i < quadrante.bakedUnidades.Count; i++)
+        {
+            UnidadeAssada u = quadrante.bakedUnidades[i];
+            if (u == null || string.IsNullOrWhiteSpace(u.unitId))
+                continue;
+
+            if (!database.TryGetById(u.unitId, out UnitData data) || data == null)
+            {
+                Debug.LogWarning(
+                    $"[Quadrante] Unidade assada '{u.unitId}' nao existe no UnitDatabase. Pulada.",
+                    this);
+                continue;
+            }
+
+            Vector3Int cell = new Vector3Int(
+                paintOrigin.x + u.localX,
+                paintOrigin.y + u.localY,
+                0);
+
+            GameObject go;
+            if (u.slotIndex >= 0 && match != null)
+            {
+                AvisarSlotDeUnidadeInexistente(u, match);
+                go = spawner.SpawnAtCellForSlot(data, PlayerSlotId.FromIndex(u.slotIndex), cell);
+            }
+            else
+            {
+                // Sem slot: time fixo, a cor assada e a verdade — a mesma excecao das
+                // construcoes.
+                go = spawner.SpawnAtCell(data, u.teamId, cell);
+            }
+
+            if (go == null)
+            {
+                Debug.LogWarning($"[Quadrante] Nao nasceu '{u}' na celula {cell}.", this);
+                continue;
+            }
+
+            spawned++;
+        }
+
+        return spawned;
+    }
+
+    /// <summary>
+    /// Mesmo aviso das construcoes, e pelo mesmo motivo: a cena de autoria e a
+    /// partida tem listas de jogadores diferentes e nada compara as duas. Unidade
+    /// assada num slot que a partida nao tem simplesmente nao nasce — o
+    /// SpawnAtCellForSlot recusa slot invalido e devolve null, e sem este aviso o
+    /// sintoma seria "a tropa da IA sumiu" sem uma linha no Console.
+    /// </summary>
+    private void AvisarSlotDeUnidadeInexistente(UnidadeAssada u, MatchController match)
+    {
+        if (match == null || match.IsValidPlayerSlotIndex(u.slotIndex))
+            return;
+
+        Debug.LogWarning(
+            $"[Quadrante] '{u.unitId}' assada no slot {u.slotIndex}, que NAO EXISTE nesta "
+            + "partida. Ela nao vai nascer. Repinte na cena de autoria com um slot valido "
+            + "e asse de novo.",
+            this);
     }
 
     /// <summary>
