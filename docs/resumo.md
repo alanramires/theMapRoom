@@ -167,7 +167,7 @@ Três saídas, e é escolha de design:
 1. o 0b, começando pelo AIShoppingPlanner
 2. destravadoPor passa a guardar idSerial em vez de texto
 3. avaliação de destrave — hoje só existem os campos
-4. lastTurn: separar dono (muda sempre) de marca (nunca piora)
+4. progresso derivado: campanha/bloco vencidos saem da contagem, não de campo gravado
 ```
 
 ### Dívidas com gatilho conhecido
@@ -178,8 +178,10 @@ Três saídas, e é escolha de design:
   `CampaignSelectionController` em ordem `-10000` — todo `Awake` roda antes de
   qualquer `Start`, então o mosaico trava o frame e a música é a última da fila.
   Virar prefab não resolveu isso; resolveu compartilhamento de configuração.
-- **`lastTurn` é *último*, não *melhor*, e mora junto do dono.** Perder o
-  quadrante apaga que você o tomou em 11 turnos.
+- ~~**`lastTurn` é *último*, não *melhor***~~ ✅ **não era dívida, era o desenho.**
+  O autor confirmou em 2026-09-07: o registro do quadrante é o retrato da **última**
+  tentativa, e rejogar pode piorá-lo. O `CampaignProgressStore` já está certo nisso.
+  Histórico de tentativas fica para o futuro. Ver [`Planos/plano_mvp.md`](Planos/plano_mvp.md) §7.
 - **`BoardReady` tem um leitor** (`RefreshAllOccupancyVisuals`); os demais
   consumidores ainda não consultam.
 - **Nada foi medido em escala.** A bancada e o pintor rodaram sobre 1800 células.

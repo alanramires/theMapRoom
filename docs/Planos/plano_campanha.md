@@ -664,39 +664,58 @@ da campanha.
 
 - **A marca é por quadrante.** Quadrantes de tamanhos diferentes geram partidas de
   durações diferentes; turnos não são comparáveis entre quadrantes, e tudo bem.
-- **Só marca melhor sobrescreve.** Vencer de novo em mais turnos não piora o
-  registro.
+- **O registro é a ÚLTIMA tentativa, não a melhor.** ⚠️ *Revisado pelo autor em
+  2026-09-07, invertendo a regra anterior ("só marca melhor sobrescreve").*
+  Rejogar e vencer em mais turnos **piora** o registro, e é para ser assim: não
+  existe histórico de tentativas, existe um retrato do que aconteceu por último.
+  Histórico fica para o futuro, se algum dia fizer falta.
 - **O duelo não tem fim** e não precisa de condição de vitória. Zero trabalho.
-- **Caçar marca é aposta.** Rejogar um quadrante que já é meu só pra melhorar o
-  tempo e perder **entrega o quadrante ao adversário**, igual a qualquer outra
-  derrota. Não existe "meu e imperdível".
-- **Campanha vencida fica vencida.** O carimbo de conclusão é registro do que
-  aconteceu, não estado do mundo. Depois dele, rejogar é treino.
+- **Caçar marca é aposta dupla.** Rejogar um quadrante que já é meu arrisca o
+  território **e** o registro. Não existe "meu e imperdível", nem "marca
+  imperdível".
+- **Não existe carimbo.** ⚠️ *Revisado em 2026-09-07, removendo a regra
+  "campanha vencida fica vencida".* Todo progresso acima do quadrante é
+  **derivado** da última tentativa de cada quadrante, recalculado sempre:
+
+  ```text
+  campanha vencida  =  todo quadrante dela tem vencedor == meu slot
+  bloco vencido     =  toda campanha dele está vencida
+  jogo zerado       =  todo bloco está vencido
+  ```
+
+  A razão é a de sempre: um campo gravado seria um **segundo lugar da verdade**,
+  e divergiria dos registros na primeira vez que alguém rejogasse e perdesse.
+  Sem ele, não existe um só `if (campanhaConcluida)` em lugar nenhum — e a
+  derivação é a mesma regra nos três níveis, escrita uma vez sobre `INoDoMapa`.
 
 ### O que essas duas regras produzem juntas
 
-Elas parecem opostas — uma diz "o território sempre se move", a outra diz "a
-conclusão nunca se move". Mas se apoiam na mesma divisão, que já vale para a
-marca:
+⚠️ *Esta seção foi reescrita em 2026-09-07: a versão anterior apoiava as regras
+numa divisão entre ESTADO (muda) e REGISTRO (nunca piora). Essa divisão saiu
+junto com o carimbo.*
+
+Agora existe **um** tipo de dado gravado, e ele é o mais simples possível:
 
 ```text
-ESTADO      dono do quadrante            muda sempre, sem exceção
-REGISTRO    marca · carimbo          nunca piora, nunca se apaga
+por quadrante   { vencedor (slot), turno, quando }   sobrescrito ao fim de cada luta
+tudo o mais     derivado, recalculado sempre
 ```
 
-O resultado é um modelo **sem nenhum caso especial**: nenhuma regra muda depois
-da conclusão, nenhum "modo pós-jogo" existe no código. O que muda é só o
-significado — o território continua trocando de mão, mas não gateia mais nada, e
-por isso *parece* treino. Zero `if (campanhaConcluida)` em qualquer lugar.
+O resultado continua sendo um modelo **sem nenhum caso especial** — e por um
+motivo mais forte que antes. Não existe "modo pós-jogo" porque não existe nada
+que registre que o pós-jogo começou. Zero `if (campanhaConcluida)` em qualquer
+lugar, porque não existe `campanhaConcluida` para consultar: existe uma
+contagem, e ela responde a pergunta toda vez que alguém faz.
 
 Consequências aceitas de propósito:
 
-- **A campanha solo anda pra trás.** Dá pra estar em 9/10 e voltar pra 8/10.
-  Não existe ponto sem retorno.
-- **O mapa perfeito pode ser sujado depois de vencer.** Rejogar um quadrante por
-  esporte e perder pinta ele com a cor do adversário — mesmo com a campanha já
-  carimbada. Basta reconquistar. Se isso incomodar no playtest, a correção é
-  visual (mostrar o carimbo com destaque), **não** uma exceção na regra.
+- **A campanha anda pra trás.** Dá pra estar em 4/4 e voltar pra 3/4. Não existe
+  ponto sem retorno.
+- **O mapa perfeito pode ser sujado depois de vencer**, e a campanha des-vencida
+  junto. Basta reconquistar. Se isso incomodar no playtest, a correção é visual
+  (mostrar em algum lugar que você já chegou lá), **não** uma exceção na regra —
+  e essa correção visual precisaria de um dado novo, que é exatamente o carimbo
+  que acabou de sair. Pense duas vezes antes de trazê-lo de volta.
 
 ### Destrave entre campanhas
 
@@ -709,9 +728,16 @@ entre campanhas     ordem PARCIAL     terminar a Europa libera a África
 dentro da campanha  ordem LIVRE       faz o quadrante 4, depois o 2, tanto faz
 ```
 
-O estado "concluída" é o mesmo carimbo da seção acima — registro, não estado do
-mundo. Perder território numa campanha já concluída **não retranca** as campanhas
-que ela destravou.
+⚠️ *Revisado em 2026-09-07.* "Concluída" é o mesmo estado **derivado** da seção
+acima — todos os quadrantes com vencedor igual ao meu slot. Como não existe mais
+carimbo, perder território numa campanha já concluída **retranca** as campanhas
+que ela destravou, e é a consequência honesta de derivar tudo.
+
+Isso é aceitável enquanto o destrave não existir (hoje `destravadoPor` e
+`exigeIrmaos` têm **zero leitores**). Quando existir, é a primeira coisa a testar
+no playtest: se retrancar incomodar, a resposta **não** é ressuscitar o carimbo —
+é fazer o destrave olhar para "já esteve concluída", que aí sim é um dado novo, e
+que precisa ser justificado na hora, não agora.
 
 Se um dia o duelo precisar de fim, existe precedente pronto de forma:
 `victoryStarsToWin` ([`MatchController.cs:430`](../../Assets/Scripts/Match/MatchController.cs),
@@ -791,13 +817,16 @@ dono    ESTADO      de quem é AGORA          muda sempre
 marca   REGISTRO    o que eu já fiz aqui     nunca piora
 ```
 
-Perder um quadrante que era seu numa rejogada tira o `dono` e **não toca na marca**.
-Continua registrado que você tomou aquilo em 11 turnos. É a mesma natureza do
-carimbo de conclusão da campanha.
+⚠️ *Revisado em 2026-09-07.* Perder um quadrante que era seu numa rejogada
+**sobrescreve o registro inteiro** — dono e turno juntos, porque eles são a mesma
+coisa: o retrato da última partida ali. Não fica registrado que você tomou aquilo
+em 11 turnos; fica registrado que você perdeu em 18.
 
-⚠️ Não colapsar os dois num campo só ("vencido: sim/não"). É o que obrigaria a
-escolher entre apagar história e congelar território — e as duas saídas já foram
-recusadas.
+Isso é o colapso que a versão anterior desta seção proibia. Ele foi escolhido de
+propósito: sem histórico de tentativas, "melhor marca" e "última marca" custam o
+mesmo em tela e a segunda é a única que não mente sobre o que acabou de
+acontecer. Histórico de tentativas fica para quando fizer falta — e aí ele
+resolve os dois casos de uma vez, sem campo especial.
 
 ---
 
@@ -1106,7 +1135,8 @@ preço conhecido, não surpresa.
 | 2 | ~~o mapa de autoria guarda as unidades iniciais, ou vêm do `CampaignData`?~~ **resolvido: do mapa de autoria.** O builder lê tudo que está no retângulo. Sem flag de "tem unidades" — a escolha é o desenho | — |
 | 3 | ~~o tint mostra só "conquistado"?~~ **resolvido:** três estados — neutro · meu · do adversário | — |
 | 4 | ~~rejogar um quadrante já meu: se eu perder, o adversário toma?~~ **resolvido: toma.** Caçar marca é aposta, e a campanha pode andar pra trás | — |
-| 5 | ~~depois da campanha concluída, rejogar arrisca o território?~~ **resolvido:** o carimbo de conclusão não se desfaz; o território continua se movendo. Nenhuma regra muda, rejogar vira treino | — |
+| 5 | ~~depois da campanha concluída, rejogar arrisca o território?~~ **resolvido (revisto em 2026-09-07):** arrisca, e arrisca a conclusão junto. Não existe carimbo — campanha vencida é estado derivado da última tentativa de cada quadrante, e des-vence | — |
+| 6 | ~~a marca guarda a melhor tentativa ou a última?~~ **resolvido: a última.** Rejogar pode piorar o registro, e é para ser assim. Histórico de tentativas fica para o futuro | — |
 
 ---
 
