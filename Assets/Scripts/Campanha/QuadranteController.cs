@@ -64,7 +64,12 @@ public class QuadranteController : MonoBehaviour
     [Header("Destino")]
     [Tooltip("Se vazio, resolve pelo CursorController.BoardTilemap da cena.")]
     [SerializeField] private Tilemap targetTilemap;
-    [Tooltip("Onde a celula local (0,0) cai no tilemap. O dado e sempre local; isto e so enquadramento.")]
+    [Tooltip(
+        "Enquadramento PEDIDO: onde a celula local (0,0) deveria cair no tilemap.\n\n"
+        + "O y pode sair uma linha adiante do pedido, e nao e bug: o tabuleiro e odd-r, "
+        + "linha impar desloca meia celula, e um quadrante autorado em y impar tem de "
+        + "ser pintado em y impar ou o recorte sai cisalhado. Quem decide a origem "
+        + "efetiva e o ResolverOrigemDaPintura, e o log do build mostra as duas.")]
     [SerializeField] private Vector2Int paintOrigin = Vector2Int.zero;
 
     [Header("Volta")]
@@ -79,6 +84,16 @@ public class QuadranteController : MonoBehaviour
     [Tooltip("Apaga o tilemap de destino antes de pintar. A Batalha nasce vazia, mas isto torna o build repetivel.")]
     [SerializeField] private bool clearBeforeBuild = true;
     [SerializeField] private bool logBuild = true;
+
+    /// <summary>
+    /// A origem REALMENTE usada para pintar, derivada do <see cref="paintOrigin"/>
+    /// e da paridade de linha do quadrante. Ver <see cref="ResolverOrigemDaPintura"/>.
+    ///
+    /// Tudo que traduz local -> celula usa ESTA, nunca o campo do Inspector: se
+    /// terreno, camada, construcao, rota e unidade nao usarem a mesma origem, o
+    /// tabuleiro nasce coerente por fora e desalinhado por dentro.
+    /// </summary>
+    private Vector2Int origemDaPintura;
 
     private bool built;
     private int paintedCells;
@@ -470,6 +485,9 @@ public class QuadranteController : MonoBehaviour
         // jogadores e sobrescreveria a caixa do quadrante com os zeros da cena.
         AplicarEconomiaInicial(quadrante, match);
 
+        // A PARIDADE DA LINHA E PARTE DO RECORTE, NAO ENQUADRAMENTO.
+        origemDaPintura = ResolverOrigemDaPintura(quadrante);
+
         if (clearBeforeBuild)
         {
             map.ClearAllTiles();
@@ -489,7 +507,7 @@ public class QuadranteController : MonoBehaviour
                 }
 
                 map.SetTile(
-                    new Vector3Int(paintOrigin.x + localX, paintOrigin.y + localY, 0),
+                    new Vector3Int(origemDaPintura.x + localX, origemDaPintura.y + localY, 0),
                     tile);
                 paintedCells++;
             }
@@ -536,7 +554,8 @@ public class QuadranteController : MonoBehaviour
                 $"{paintedCells} tiles, {holeCells} buraco(s), {construcoes} construcao(oes), " +
                 $"{unidades} unidade(s), {camadas} camada(s), {trechos} trecho(s) de rota, " +
                 $"{quadrante.width}x{quadrante.height} em '{map.name}' " +
-                $"(origem local {paintOrigin.x},{paintOrigin.y}; " +
+                $"(origem de pintura {origemDaPintura.x},{origemDaPintura.y}; " +
+                $"enquadramento pedido {paintOrigin.x},{paintOrigin.y}; " +
                 $"origem de autoria {quadrante.originX},{quadrante.originY}) " +
                 $"em {watch.ElapsedMilliseconds} ms.",
                 this);
@@ -603,7 +622,7 @@ public class QuadranteController : MonoBehaviour
                 }
 
                 Vector3Int cell =
-                    new Vector3Int(paintOrigin.x + marca.localX, paintOrigin.y + marca.localY, 0);
+                    new Vector3Int(origemDaPintura.x + marca.localX, origemDaPintura.y + marca.localY, 0);
 
                 destino.SetTile(cell, marca.tile);
 
@@ -714,7 +733,7 @@ public class QuadranteController : MonoBehaviour
             for (int c = 0; c < trecho.celulas.Count; c++)
             {
                 Vector3Int local = trecho.celulas[c];
-                celulas.Add(new Vector3Int(paintOrigin.x + local.x, paintOrigin.y + local.y, 0));
+                celulas.Add(new Vector3Int(origemDaPintura.x + local.x, origemDaPintura.y + local.y, 0));
             }
 
             destino.Add(new RoadRouteDefinition
@@ -890,8 +909,8 @@ public class QuadranteController : MonoBehaviour
                 continue;
 
             Vector3Int cell = new Vector3Int(
-                paintOrigin.x + c.localX,
-                paintOrigin.y + c.localY,
+                origemDaPintura.x + c.localX,
+                origemDaPintura.y + c.localY,
                 0);
 
             // O DONO SAI DO SLOT, NUNCA DA COR ASSADA.
@@ -982,6 +1001,57 @@ public class QuadranteController : MonoBehaviour
 
         return planted;
     }
+
+    /// <summary>
+    /// O RECORTE NAO PODE MUDAR A PARIDADE DA LINHA.
+    ///
+    /// O tabuleiro e ODD-R: linha IMPAR desloca meia celula na horizontal. Entao a
+    /// posicao de mundo de uma linha depende da PARIDADE do seu y, e nao so da
+    /// diferenca entre dois y.
+    ///
+    /// Traduzir um retangulo autorado em y=-9 (impar) para y=0 (par) inverte a
+    /// paridade de TODAS as linhas: o que era deslocado deixa de ser e vice-versa.
+    /// O tile continua na celula logica certa — por isso nada reclama — mas a
+    /// linha inteira anda meia celula, e numa costa serrilhada isso le como "uma
+    /// fileira transladada".
+    ///
+    /// FOI ASSIM QUE APARECEU: o A_IA_Q2 (origem -18,-9) e o A_IA_Q4 (2,-9) tem
+    /// originY IMPAR e saiam cisalhados na Batalha; o A_IA_Q1 e o A_IA_Q3 (originY
+    /// 10, par) saiam perfeitos. E o mosaico da cena Campanha nunca mostrou o
+    /// defeito porque ele pinta em coordenada GLOBAL, na origem de autoria — ou
+    /// seja, na paridade original.
+    ///
+    /// Deslocar uma linha e inofensivo: a cena nasce vazia e a camera enquadra o
+    /// que existe. O que NAO e inofensivo e o Inspector mentir — por isso o campo
+    /// paintOrigin passa a ser ENQUADRAMENTO PEDIDO, e esta e a origem efetiva.
+    /// O save grava o pedido, nunca o derivado: derivado se recalcula, e gravar os
+    /// dois criaria a segunda fonte para divergir.
+    /// </summary>
+    private Vector2Int ResolverOrigemDaPintura(QuadranteData quadrante)
+    {
+        if (Paridade(quadrante.originY) == Paridade(paintOrigin.y))
+            return paintOrigin;
+
+        Vector2Int corrigida = new Vector2Int(paintOrigin.x, paintOrigin.y + 1);
+        if (logBuild)
+        {
+            Debug.Log(
+                $"[Quadrante] '{quadrante.quadranteId}' foi autorado em y={quadrante.originY} "
+                + $"(paridade {Paridade(quadrante.originY)}) e o enquadramento pedido e "
+                + $"y={paintOrigin.y}. Pintando em y={corrigida.y} para preservar a paridade "
+                + "odd-r — sem isso o recorte sai cisalhado meia celula por linha.",
+                this);
+        }
+
+        return corrigida;
+    }
+
+    /// <summary>
+    /// 0 ou 1, inclusive para negativo. Em C# <c>-9 % 2</c> e <c>-1</c>, e comparar
+    /// -1 com 1 diria que -9 e 10 tem paridades diferentes... o que por acaso ate
+    /// acerta aqui, mas erraria em -9 contra 11.
+    /// </summary>
+    private static int Paridade(int valor) => ((valor % 2) + 2) % 2;
 
     /// <summary>
     /// Caixa inicial por slot. Lista vazia e o caso normal: o quadrante comeca so
@@ -1093,8 +1163,8 @@ public class QuadranteController : MonoBehaviour
             }
 
             Vector3Int cell = new Vector3Int(
-                paintOrigin.x + u.localX,
-                paintOrigin.y + u.localY,
+                origemDaPintura.x + u.localX,
+                origemDaPintura.y + u.localY,
                 0);
 
             GameObject go;
