@@ -13974,7 +13974,6 @@ MonoBehaviour:
   fileNameDefault: quicksave
   useSceneSpecificSlot: 0
   customSaveDirectory: C:/Users/Alan/AppData/LocalLow/Sistemas Info/The Map Room
-  blockCrossSceneLoad: 1
   verboseLogs: 1
   showSaveLoadLogs: 0
   forceLoadWhenBusy: 1
@@ -15963,6 +15962,14 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 1307941790}
     m_Modifications:
+    - target: {fileID: 3898832375795807818, guid: 76a6abc9e5b4cda43ac276c04f3c5ef1, type: 3}
+      propertyPath: m_Volume
+      value: 0.3
+      objectReference: {fileID: 0}
+    - target: {fileID: 4254574150553539861, guid: 76a6abc9e5b4cda43ac276c04f3c5ef1, type: 3}
+      propertyPath: musicVolume
+      value: 0.3
+      objectReference: {fileID: 0}
     - target: {fileID: 4254574150553539861, guid: 76a6abc9e5b4cda43ac276c04f3c5ef1, type: 3}
       propertyPath: matchController
       value: 
