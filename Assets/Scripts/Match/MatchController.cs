@@ -376,6 +376,9 @@ public class MatchController : MonoBehaviour
     }
 
     [Header("Match State (MVP)")]
+    [Tooltip("Desative em cenas de selecao: mantem o contrato dos jogadores, sem iniciar turnos ou cortina de hot seat.")]
+    [SerializeField] private bool isPlayable = true;
+    public bool IsPlayable => isPlayable;
     [SerializeField] private int currentTurn = 0;
     [SerializeField] private int activeTeamId = (int)TeamId.Green;
     [FormerlySerializedAs("playerEconomy")]
@@ -926,7 +929,7 @@ public class MatchController : MonoBehaviour
     public bool IsTurnBoardReadyForHumanConfirmation() =>
         !IsActiveTeamAI() && IsTurnBoardReady;
     public bool IsTurnPanelPresentationEnabled =>
-        debugPanelRodadaEnabled &&
+        isPlayable && debugPanelRodadaEnabled &&
         !DebugManager.IsPanelRodadaDisabledForHotSeat();
 
     // O load iniciado pela Tela de Entrada substitui a inicializacao normal da
@@ -1071,6 +1074,30 @@ public class MatchController : MonoBehaviour
             return false;
         PlayerEntry entry = players[slotId.Value];
         entry.actualMoney = Mathf.Max(0, value);
+        players[slotId.Value] = entry;
+        return true;
+    }
+
+    /// <summary>
+    /// Define a caixa inicial do slot — o valor creditado UMA vez, no primeiro
+    /// inicio de turno dele, somado a renda das construcoes.
+    ///
+    /// Existe para o quadrante de campanha poder dizer "aqui o slot 0 comeca com
+    /// 100k". Nao mexe no caixa atual: quem credita e
+    /// ApplyEconomyAtTurnStartForActiveTeam, no turno 1, e e ele quem marca o
+    /// startMoneyApplied.
+    ///
+    /// ⚠️ ORDEM. PartidaConfig.Apply preserva de proposito a economia da cena-base
+    /// ("a economia da cena-base pertence ao slot logico, nao a cor escolhida") e
+    /// reimporta a lista inteira de jogadores. Chamar isto ANTES do Apply nao
+    /// adianta nada — o valor e sobrescrito pelos zeros da cena. Chame depois.
+    /// </summary>
+    public bool TrySetStartMoney(PlayerSlotId slotId, int value)
+    {
+        if (!IsValidPlayerSlot(slotId))
+            return false;
+        PlayerEntry entry = players[slotId.Value];
+        entry.startMoney = Mathf.Max(0, value);
         players[slotId.Value] = entry;
         return true;
     }
@@ -1356,6 +1383,12 @@ public class MatchController : MonoBehaviour
         SyncThreatRevisionFlags();
         NormalizeState();
         hotSeatGateActive = Application.isPlaying && IsHotSeatPrivacyRequired();
+        if (!isPlayable)
+        {
+            appliedActivePlayerListIndex = activePlayerListIndex;
+            appliedActiveTeamId = activeTeamId;
+            return;
+        }
         TryRefreshIncomeFromConstructions(markDirtyInEditor: false);
         TryAutoAssignCursorController();
         TryAutoAssignTurnStateManager();
@@ -1380,6 +1413,7 @@ public class MatchController : MonoBehaviour
 
     private void Start()
     {
+        if (!isPlayable) return;
         if (Application.isPlaying)
             StartCoroutine(InitializeMatchAfterHotSeatGate());
         else
@@ -1391,6 +1425,7 @@ public class MatchController : MonoBehaviour
 
     private IEnumerator InitializeMatchAfterHotSeatGate()
     {
+        if (!isPlayable) yield break;
         // Ao entrar numa cena para carregar um save do menu, o SaveGameManager
         // assume o PanelRodada e restaura o snapshot. Nao inicializa uma partida
         // nova em paralelo, pois isso aplicaria turno/FOW/camera antes do load.
@@ -1648,6 +1683,7 @@ public class MatchController : MonoBehaviour
 
     private void Update()
     {
+        if (!isPlayable) return;
         if (Application.isPlaying)
         {
             runtimeConstructionIncomeRefreshTimer += Mathf.Max(0f, Time.unscaledDeltaTime);
@@ -1952,7 +1988,7 @@ public class MatchController : MonoBehaviour
     }
 
     public bool IsHotSeatPrivacyRequired() =>
-        CountActiveLocalHumanPlayers() >= 2;
+        isPlayable && CountActiveLocalHumanPlayers() >= 2;
 
     public bool ShouldUseHotSeatPrivacyCurtain() =>
         IsTurnPanelPresentationEnabled &&
@@ -2124,6 +2160,7 @@ public class MatchController : MonoBehaviour
     // Avanca para o proximo membro da lista. So incrementa currentTurn ao "fechar ciclo".
     public void AdvanceTurn()
     {
+        if (!isPlayable) return;
         if (freezeTurnAdvanceAfterVictory && hasVictoryWinner)
             return;
         // Defesa contra qualquer preview de movimento que tenha sido interrompido:
@@ -2201,6 +2238,7 @@ public class MatchController : MonoBehaviour
 
     public void AdvanceTurnWithTransition()
     {
+        if (!isPlayable) return;
         if (!Application.isPlaying)
         {
             AdvanceTurn();
@@ -3208,6 +3246,7 @@ public class MatchController : MonoBehaviour
 
     private void ApplyActiveTeamIfChanged(bool force, bool applyTurnStartEffects = true)
     {
+        if (!isPlayable) return;
         if (!force && appliedActivePlayerListIndex == activePlayerListIndex)
             return;
 

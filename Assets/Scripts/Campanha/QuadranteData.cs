@@ -38,6 +38,36 @@ public class QuadranteData : INoDoMapa
     [Tooltip("Exige todos os quadrantes irmaos concluidos. E o 'last map' da campanha.")]
     public bool exigeIrmaos;
 
+    [Header("Economia — autoral, sobrevive ao bake")]
+    [Tooltip(
+        "Caixa inicial por slot. Slot ausente da lista = 0, que e o caso normal: o "
+        + "quadrante comeca so com a renda das construcoes.\n\n"
+        + "Fica AQUI, e nao entre os campos assados, porque dinheiro nao e espacial — "
+        + "e porque quem limpar a secao 'artefato' um dia nao pode levar o numero do "
+        + "autor junto.\n\n"
+        + "A renda POR RODADA nao mora aqui: e a soma do capturedIncoming das "
+        + "construcoes controladas, e o quadrante ja manda nela pelos predios que assa.")]
+    public List<EconomiaInicialSlot> economiaInicial = new List<EconomiaInicialSlot>();
+
+    /// <summary>
+    /// Caixa inicial do slot, ou 0 se o autor nao declarou nada para ele. Entrada
+    /// duplicada vence a primeira — a bancada avisa, aqui so nao explode.
+    /// </summary>
+    public int GetStartMoneyForSlot(int slotIndex)
+    {
+        if (slotIndex < 0 || economiaInicial == null)
+            return 0;
+
+        for (int i = 0; i < economiaInicial.Count; i++)
+        {
+            EconomiaInicialSlot entrada = economiaInicial[i];
+            if (entrada != null && entrada.slotIndex == slotIndex)
+                return Mathf.Max(0, entrada.startMoney);
+        }
+
+        return 0;
+    }
+
     [SerializeField, HideInInspector] private int idSerial;
 
     /// <summary>Identidade estavel. Ver INoDoMapa.IdSerial.</summary>

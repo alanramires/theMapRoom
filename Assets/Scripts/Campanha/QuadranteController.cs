@@ -393,6 +393,23 @@ public class QuadranteController : MonoBehaviour
 
         Stopwatch watch = Stopwatch.StartNew();
 
+        // A CONFIGURACAO DA PARTIDA CHEGA ANTES DE QUALQUER TINTA.
+        //
+        // Este componente roda em -9000 e o Awake do MatchController em 0. Sem
+        // esta chamada, tudo que resolver dono abaixo le a lista de jogadores
+        // SERIALIZADA na cena Batalha em vez da que o jogador escolheu.
+        //
+        // Fica AQUI, e nao dentro do BuildConstrucoes onde nasceu, porque la ela
+        // morava atras de dois returns antecipados (sem spawner, sem catalogo) —
+        // e a chegada do contrato nao pode depender de existir um spawner. E
+        // idempotente: o Awake do MatchController chama de novo e nao entra.
+        MatchController match = FindAnyObjectByType<MatchController>();
+        match?.EnsurePartidaConfigApplied();
+
+        // DEPOIS do Apply, nunca antes: o Apply reimporta a lista inteira de
+        // jogadores e sobrescreveria a caixa do quadrante com os zeros da cena.
+        AplicarEconomiaInicial(quadrante, match);
+
         if (clearBeforeBuild)
         {
             map.ClearAllTiles();
@@ -800,15 +817,9 @@ public class QuadranteController : MonoBehaviour
             return 0;
         }
 
+        // O contrato ja chegou: quem o aplica e o Build, antes de qualquer tinta.
+        // Aqui o GetTeamIdForSlot ja responde com as cores escolhidas no menu.
         MatchController match = FindAnyObjectByType<MatchController>();
-
-        // A CONFIGURACAO DA PARTIDA TEM DE CHEGAR ANTES DA TINTA.
-        //
-        // Este componente roda em -9000 e o Awake do MatchController em 0, entao
-        // sem esta chamada a lista de jogadores aqui ainda e a SERIALIZADA na cena
-        // Batalha — e todo dono resolvido abaixo sai com a cor errada. Idempotente:
-        // o Awake dele chama de novo e nao entra.
-        match?.EnsurePartidaConfigApplied();
 
         int planted = 0;
 
@@ -910,6 +921,62 @@ public class QuadranteController : MonoBehaviour
         }
 
         return planted;
+    }
+
+    /// <summary>
+    /// Caixa inicial por slot. Lista vazia e o caso normal: o quadrante comeca so
+    /// com a renda das construcoes, e o credito do turno 1 e "0 + predios
+    /// controlados". Alguns mapas somam um extra por cima.
+    ///
+    /// SO O startMoney. Quem credita e o MatchController no primeiro inicio de
+    /// turno do slot (ApplyEconomyAtTurnStartForActiveTeam soma renda +
+    /// startMoney e marca startMoneyApplied), entao mexer no caixa ATUAL aqui
+    /// daria dinheiro duas vezes.
+    ///
+    /// ⚠️ Roda DEPOIS do EnsurePartidaConfigApplied, sempre. O Apply reimporta a
+    /// lista inteira de jogadores para preservar a economia da cena-base — se
+    /// isto rodasse antes, o valor do autor sairia sobrescrito pelos zeros da
+    /// Batalha.unity, sem erro nenhum.
+    /// </summary>
+    private void AplicarEconomiaInicial(QuadranteData quadrante, MatchController match)
+    {
+        if (quadrante.economiaInicial == null || quadrante.economiaInicial.Count == 0)
+            return;
+
+        if (match == null)
+        {
+            Debug.LogWarning(
+                "[Quadrante] O quadrante declara caixa inicial mas nao ha MatchController "
+                + "nesta cena. Os slots comecam so com a renda das construcoes.",
+                this);
+            return;
+        }
+
+        for (int i = 0; i < quadrante.economiaInicial.Count; i++)
+        {
+            EconomiaInicialSlot entrada = quadrante.economiaInicial[i];
+            if (entrada == null || entrada.slotIndex < 0)
+                continue;
+
+            // Mesmo aviso das construcoes e das unidades: a cena de autoria e a
+            // partida tem listas de jogadores diferentes, e nada compara as duas.
+            if (!match.IsValidPlayerSlotIndex(entrada.slotIndex))
+            {
+                Debug.LogWarning(
+                    $"[Quadrante] Caixa inicial declarada para o slot {entrada.slotIndex}, "
+                    + "que NAO EXISTE nesta partida. Ignorada.",
+                    this);
+                continue;
+            }
+
+            if (match.TrySetStartMoney(PlayerSlotId.FromIndex(entrada.slotIndex), entrada.startMoney)
+                && logBuild)
+            {
+                Debug.Log(
+                    $"[Quadrante] Caixa inicial do slot {entrada.slotIndex}: {entrada.startMoney}.",
+                    this);
+            }
+        }
     }
 
     /// <summary>
