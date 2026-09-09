@@ -77,6 +77,15 @@ public class CampaignSelectionController : MonoBehaviour
     private bool confirmationSubmitArmed;
     private int sceneOpenedFrame;
     private int confirmationOpenedFrame;
+    private GameObject campaignMenuRoot;
+    private GameObject campaignMenuPanel;
+    private bool campaignMenuOpen;
+    private GameObject lastCampaignMenuSelection;
+    private SaveGameManager campaignSaveManager;
+    private bool waitingForPersistence;
+    private bool campaignStatusOpen;
+    private AIDifficulty? loadedDifficulty;
+    private string persistenceFeedback;
 
     public bool IsConfirmationOpen => confirmationOpen;
     public int ConfirmationFocusIndex => confirmationFocusIndex;
@@ -94,6 +103,7 @@ public class CampaignSelectionController : MonoBehaviour
     private void Start()
     {
         ResolveReferences();
+        InitializeCampaignMenu();
         if (cursorController != null)
             cursorController.enabled = false;
         FocusInitialQuadrant();
@@ -110,6 +120,36 @@ public class CampaignSelectionController : MonoBehaviour
     {
         if (launching)
             return;
+
+        if (waitingForPersistence || SaveGameManager.IsAnyLoadInProgress ||
+            (campaignSaveManager != null && campaignSaveManager.IsPersistencePromptActive))
+        {
+            UiInputBlocker.SuppressGameplayInputForFrames(1);
+            if (!SaveGameManager.IsAnyLoadInProgress && campaignSaveManager != null &&
+                !campaignSaveManager.IsPersistencePromptActive)
+            {
+                waitingForPersistence = false;
+                RefreshHoveredQuadrant(force: true);
+                SetCampaignMenuOpen(true);
+                if (!string.IsNullOrEmpty(persistenceFeedback))
+                {
+                    PanelHelperController.TrySetExternalText("CAMPANHA", persistenceFeedback);
+                    persistenceFeedback = null;
+                }
+            }
+            return;
+        }
+        if (campaignStatusOpen)
+        {
+            UiInputBlocker.SuppressGameplayInputForFrames(1);
+            if (WasCancelPressedThisFrame() || RemoteInput.RightClickCancelDownThisFrame())
+            {
+                campaignStatusOpen = false;
+                RefreshHoveredQuadrant(force: true);
+                SetCampaignMenuOpen(true);
+            }
+            return;
+        }
 
         if (!selectionInputArmed)
         {
@@ -138,7 +178,7 @@ public class CampaignSelectionController : MonoBehaviour
                 return;
             }
 
-            if (WasCancelPressedThisFrame())
+            if (WasCancelPressedThisFrame() || RemoteInput.RightClickCancelDownThisFrame())
             {
                 CancelConfirmation();
                 return;
@@ -157,6 +197,20 @@ public class CampaignSelectionController : MonoBehaviour
             return;
         }
 
+        if (campaignMenuOpen)
+        {
+            UiInputBlocker.SuppressGameplayInputForFrames(1);
+            if (WasCancelPressedThisFrame() || RemoteInput.RightClickCancelDownThisFrame())
+                SetCampaignMenuOpen(false);
+            return;
+        }
+
+        if (WasCancelPressedThisFrame())
+        {
+            SetCampaignMenuOpen(true);
+            return;
+        }
+
         if (WasQuadrantDirectionPressedThisFrame(out Vector2 direction))
         {
             MoveQuadrantSelection(direction);
@@ -170,6 +224,195 @@ public class CampaignSelectionController : MonoBehaviour
         // TurnStateManager que existe na cena-base de Campanha.
         UiInputBlocker.SuppressGameplayInputForFrames(1);
         OpenConfirmation();
+    }
+
+    private void LateUpdate()
+    {
+        // O EventSystem navega depois do Update deste controller (-10000).
+        // Observa o foco efetivo para incluir teclado/controle e repeticao de seta.
+        if (!campaignMenuOpen || campaignMenuPanel == null) return;
+        var events = UnityEngine.EventSystems.EventSystem.current;
+        GameObject selected = events != null ? events.currentSelectedGameObject : null;
+        if (selected == null || !selected.transform.IsChildOf(campaignMenuPanel.transform)) return;
+        var button = selected.GetComponent<UnityEngine.UI.Button>();
+        if (button == null || !button.isActiveAndEnabled || !button.IsInteractable()) return;
+        if (selected == lastCampaignMenuSelection) return;
+        lastCampaignMenuSelection = selected;
+        cursorController?.PlayCursorMoveSfx();
+    }
+
+    private void InitializeCampaignMenu()
+    {
+        foreach (GameObject root in gameObject.scene.GetRootGameObjects())
+        foreach (Transform candidate in root.GetComponentsInChildren<Transform>(true))
+        {
+            if (!string.Equals(candidate.name, "MenuRoot", StringComparison.OrdinalIgnoreCase)) continue;
+            campaignMenuRoot = candidate.gameObject;
+            foreach (Transform child in candidate.GetComponentsInChildren<Transform>(true))
+                if (string.Equals(child.name, "Panel_campanha", StringComparison.OrdinalIgnoreCase))
+                    campaignMenuPanel = child.gameObject;
+            break;
+        }
+        if (campaignMenuRoot == null || campaignMenuPanel == null)
+        {
+            Debug.LogWarning("[Campanha] MenuRoot ou Panel_campanha nao encontrado.", this);
+            return;
+        }
+        campaignMenuRoot.SetActive(false);
+        campaignSaveManager = FindAnyObjectByType<SaveGameManager>();
+        foreach (var button in campaignMenuPanel.GetComponentsInChildren<UnityEngine.UI.Button>(true))
+        {
+            string action = button.name.ToLowerInvariant();
+            button.onClick.AddListener(() => InvokeCampaignMenuAction(action));
+        }
+    }
+
+    private void InvokeCampaignMenuAction(string action)
+    {
+        if (!campaignMenuOpen || waitingForPersistence || SaveGameManager.IsAnyLoadInProgress) return;
+        switch (action)
+        {
+            case "button_save":
+            case "button_load":
+                if (campaignSaveManager == null) { cursorController?.PlayErrorSfx(); return; }
+                persistenceFeedback = null;
+                SetCampaignMenuOpen(false, playSound: false);
+                if (action == "button_save") campaignSaveManager.OpenSaveSlotPromptFromMenu();
+                else campaignSaveManager.OpenLoadSlotPromptFromMenu();
+                waitingForPersistence = campaignSaveManager.IsPersistencePromptActive;
+                if (!waitingForPersistence) SetCampaignMenuOpen(true);
+                break;
+            case "button_situacao":
+                SetCampaignMenuOpen(false, playSound: false);
+                cursorController?.PlayConfirmSfx();
+                campaignStatusOpen = true;
+                int conquered = 0;
+                for (int i = 0; i < quadrants.Count; i++)
+                    if (TryGetQuadrantOwner(i, out _)) conquered++;
+                PanelHelperController.TrySetExternalText("SITUAÇÃO DA CAMPANHA",
+                    $"{mundo.displayName}\nQuadrantes: {quadrants.Count}\nCom domínio registrado: {conquered}\n\nESC: VOLTAR");
+                break;
+            case "button_minimapa":
+                SetCampaignMenuOpen(false, playSound: false);
+                cursorController?.PlayConfirmSfx();
+                FindAnyObjectByType<CameraController>()?.ToggleQuickZoomFromMenu();
+                break;
+            case "button_voltar":
+                launching = true;
+                PanelHelperController.ClearExternalText();
+                SceneManager.LoadScene("Tela de Entrada");
+                break;
+        }
+    }
+
+    public CampaignSelectionSaveData CaptureSelectionForSave()
+    {
+        var ids = new List<int>(); var flips = new List<bool>(); var ai = new List<bool>();
+        matchController.ExportPlayersState(ids, flips, ai, new List<int>(), new List<int>(), new List<int>(), new List<bool>());
+        var data = new CampaignSelectionSaveData
+        {
+            mundoId = mundo.mundoId, teams = new TeamId[ids.Count], isAI = ai.ToArray(), flipX = flips.ToArray(),
+            commandAutomatic = new bool[ids.Count], preset = matchController.GameSetup, difficulty = ResolveDifficulty()
+        };
+        for (int i = 0; i < ids.Count; i++)
+        {
+            data.teams[i] = (TeamId)ids[i];
+            data.commandAutomatic[i] = matchController.IsPlayerCommandServiceAutomatic(PlayerSlotId.FromIndex(i));
+        }
+        if (selectedQuadrantIndex >= 0 && selectedQuadrantIndex < quadrants.Count)
+        {
+            var entry = quadrants[selectedQuadrantIndex];
+            data.campanhaId = entry.Campanha.campanhaId;
+            data.quadranteId = entry.Quadrante.quadranteId;
+            data.quadranteSerial = entry.Quadrante.IdSerial;
+        }
+        return data;
+    }
+
+    public bool RestoreSelectionFromSave(SaveGameData save)
+    {
+        CampaignSelectionSaveData data = save.campaignSelection;
+        if (data == null || mundo == null || data.mundoId != mundo.mundoId ||
+            data.teams == null || data.teams.Length < 2 || data.teams.Length > 4)
+        {
+            Debug.LogWarning("[Campanha] Save sem contrato de seleção válido ou de outro mundo.", this);
+            SetPersistenceFeedback("Este save não contém uma seleção de campanha compatível com este mundo.");
+            return false;
+        }
+        int focus = quadrants.FindIndex(entry => data.quadranteSerial > 0
+            ? entry.Quadrante.IdSerial == data.quadranteSerial
+            : entry.Campanha.campanhaId == data.campanhaId && entry.Quadrante.quadranteId == data.quadranteId);
+        if (focus < 0)
+        {
+            SetPersistenceFeedback("O quadrante deste save não existe mais neste mundo.");
+            return false;
+        }
+        PartidaConfig.Set(data.teams.Length, data.teams, data.isAI, data.flipX, data.preset,
+            data.commandAutomatic, gameObject.scene.name);
+        matchController.EnsurePartidaConfigApplied();
+        loadedDifficulty = data.difficulty;
+        CampaignProgressStore.ImportSnapshot(save.campaignProgress);
+        confirmationOpen = false;
+        pending = null;
+        BuildWorldMosaic();
+        SelectQuadrant(focus, playMoveSfx: false, adjustCamera: false);
+        return true;
+    }
+
+    public void SetPersistenceFeedback(string message)
+    {
+        persistenceFeedback = message;
+        PanelHelperController.TrySetExternalText("CAMPANHA", message);
+    }
+
+    public bool TryToggleCampaignMenuFromShortcut()
+    {
+        if (waitingForPersistence || SaveGameManager.IsAnyLoadInProgress ||
+            (campaignSaveManager != null && campaignSaveManager.IsPersistencePromptActive)) return false;
+        if (campaignStatusOpen)
+        {
+            campaignStatusOpen = false;
+            RefreshHoveredQuadrant(force: true);
+            SetCampaignMenuOpen(true);
+            return true;
+        }
+        if (launching || !selectionInputArmed || campaignMenuRoot == null || campaignMenuPanel == null)
+            return false;
+        if (confirmationOpen)
+        {
+            CancelConfirmation();
+            return true;
+        }
+        SetCampaignMenuOpen(!campaignMenuOpen);
+        return true;
+    }
+
+    private void SetCampaignMenuOpen(bool open, bool playSound = true)
+    {
+        if (campaignMenuRoot == null || campaignMenuPanel == null) return;
+        campaignMenuOpen = open;
+        if (open)
+        {
+            foreach (Transform child in campaignMenuRoot.transform)
+                child.gameObject.SetActive(child.gameObject == campaignMenuPanel);
+            campaignMenuPanel.SetActive(true);
+        }
+        campaignMenuRoot.SetActive(open);
+        lastCampaignMenuSelection = null;
+        UnityEngine.EventSystems.EventSystem events = UnityEngine.EventSystems.EventSystem.current;
+        if (events != null)
+        {
+            var first = open ? campaignMenuPanel.GetComponentInChildren<UnityEngine.UI.Button>() : null;
+            events.SetSelectedGameObject(first != null ? first.gameObject : null);
+            lastCampaignMenuSelection = events.currentSelectedGameObject;
+        }
+        UiInputBlocker.SuppressGameplayInputForFrames(2);
+        BattleMapMenuRootController.SuppressMenuOpenForCurrentFrame();
+        if (playSound)
+        {
+            if (open) cursorController?.PlayConfirmSfx();
+            else cursorController?.PlayCancelSfx();
+        }
     }
 
     public void NavigateConfirmation(int direction)
@@ -330,6 +573,7 @@ public class CampaignSelectionController : MonoBehaviour
 
     private AIDifficulty ResolveDifficulty()
     {
+        if (loadedDifficulty.HasValue) return loadedDifficulty.Value;
         if (aiController != null)
             return aiController.AppliedDifficulty;
 
@@ -833,6 +1077,8 @@ public class CampaignSelectionController : MonoBehaviour
             if (detail.Map != null) detail.Map.SetColor(detail.Cell, color);
         }
     }
+
+    public void RefreshCampaignProgressPresentation() => RefreshQuadrantPresentation();
 
     private Color ResolveQuadrantTerrainTint(int index)
     {
