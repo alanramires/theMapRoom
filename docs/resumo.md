@@ -1,25 +1,46 @@
 # Resumo — onde estamos e o que vem
 
-Ponto de retomada. Atualizado em 2026-09-05, **depois** da tag `v8.5.0`.
+Ponto de retomada. Atualizado em 2026-09-09, **depois** da tag `v8.5.1`.
 Leia isto primeiro.
 
 ---
 
 ## Estado
 
-`v8.5.0` tagueada e publicada. Relatório:
-[`relatorio_v8.5.0.md`](relatorio_v8.5.0.md).
+`v8.5.1` tagueada e publicada. Relatório:
+[`relatorio_v8.5.1.md`](relatorio_v8.5.1.md).
 
 ```text
 v8.3.0   o primeiro quadrante pintou      361 tiles, 2 ms, cena vazia
 v8.4.0   o catálogo parou de dizer ONDE   três camadas de layout removidas
 v8.4.1   a peça tem lado                  orientação, rotas partidas, identidade
 v8.5.0   o laço fecha                     volta, dono por slot, tropa inicial
+v8.5.1   o que atravessa a cena            save por endereço, isPlayable, 0b
 ```
 
-**O fluxo existe ponta a ponta e volta.** Menu → Campanha → Batalha → Campanha.
+**O fluxo existe ponta a ponta, volta, e agora sobrevive a um save.**
+Menu → Campanha → Batalha → Campanha.
 
 ### A descoberta que organiza o resto
+
+> **A cena `Campanha` parece uma partida e não é.**
+
+Ela tem `MatchController`, `TurnStateManager`, lista de jogadores e cursor —
+porque foi construída sobre a cena-base de batalha. Tudo que pergunta *"estou
+numa partida?"* olhando para o que **existe** na cena responde **sim**, e age
+errado. Num dia só isso apareceu em quatro lugares independentes:
+
+```text
+cortina de hot seat ao carregar save      MatchController.isPlayable
+apresentação de rodada na seleção         PanelRodadaController
+menu de batalha no mapa de campanha       BattleMapMenuRootController
+música do time na seleção                 MatchMusicAudioManager
+```
+
+Nenhum era bug do save, da música ou do menu: eram todos a mesma pergunta mal
+formulada.
+
+### A descoberta da versão anterior, que segue valendo
 
 > **Cor não é identidade. É uma fantasia que o slot veste por uma partida.**
 
@@ -94,12 +115,14 @@ republicar — foi o que quase quebrou o laço em silêncio.
 Assets/Scripts/Campanha/    MundoData · BlocoData · CampanhaData · QuadranteData
                             INoDoMapa · QuadranteController
                             ConstrucaoAssada · UnidadeAssada · CamadaAssada · RotaAssada
-                            CampaignProgressStore        ← agora por SLOT
+                            EconomiaInicialSlot          ← caixa inicial, autoral
+                            ProgressoDaCampanha          ← Concluido() nos 3 níveis
+                            CampaignProgressStore        ← por SLOT, e dentro do save
 Assets/Editor/              MapHelperWindow (a bancada) · MapaTerrenoJson
                             RoadRoutePainterWindow · SceneSanitizerWindow
 Assets/DB/Campanha/         Mundo Fixture.asset
 Assets/Prefab/Managers/     AudioManager.prefab          ← nas 3 cenas do fluxo
-Assets/Scenes/Autoria/      Fixture (13 construções, 6 trechos) · Mundo
+Assets/Scenes/Autoria/      Fixture (26 construções, 6 trechos) · Mundo
 Assets/Scenes/              Campanha · Batalha           ← as duas no Build Settings
 ```
 
@@ -108,85 +131,111 @@ O fixture, quatro quadrantes de tamanhos diferentes:
 ```text
 bloco A · Auridia
  └─ campanha A_IA · "A invasão a Auridia"
-     ├─ A_IA_Q1  Feijão Torto     (-18,10)  16×17   272 tiles · 13 construções
+     ├─ A_IA_Q1  Feijão Torto     (-18,10)  16×17   272 tiles
      ├─ A_IA_Q2  Terra Firme      (-18,-9)  21×20   420 tiles
      ├─ A_IA_Q3  Peixe Pequeno     (-3,10)  35×17   595 tiles
      └─ A_IA_Q4  Tubarão Branco     (2,-9)  30×20   600 tiles
 ```
 
-**Terreno, construções, camadas, rotas e unidades entram.** As listas de unidade
-estão vazias de propósito — o mecanismo existe, falta você pintar.
+26 construções assadas nos quatro. **Terreno, construções, camadas, rotas e
+unidades entram.** `bakedUnidades` e `economiaInicial` seguem **vazios** — os dois
+mecanismos existem, falta o autor querer usá-los.
 
 ---
 
 ## Onde eu parei
 
-### ⚠️ Nada da `v8.5.0` foi compilado
+### ⚠️ Nem a v8.5.0 nem a v8.5.1 foram compiladas
 
-Não há build por linha de comando. Todo o código foi escrito contra as APIs
-lidas. **Confira o Console antes de concluir qualquer coisa.**
+Não há build por linha de comando. **Duas versões inteiras escritas contra as
+APIs lidas**, incluindo assinaturas novas: `TrySetStartMoney`, `IsPlayable`,
+`ProgressoDaCampanha`, `OnMatchConcluded` com `PlayerSlotId`, os DTOs de save.
 
-O teste que fecha o laço: menu → Amarelo vs Vermelho → quadrante → perder de
-propósito (rendição serve) → Enter → o mapa volta com aquele quadrante pintado na
-cor do slot 1.
+**Confira o Console antes de qualquer coisa.** É a dívida mais cara aberta.
 
-### O `0b` mudou de conta — revisado, não consertado
-
-O resumo antigo dizia "`sceneLoaded` nos 4 managers". **Eles não são o mesmo
-problema:**
-
-| manager | o que carrega | veredito |
-|---|---|---|
-| `AITacticalAnalyzer` | `operationsBySlot` | limpar. Estado indexado por slot, e o slot 0 da próxima é outra pessoa |
-| `ObjectiveManager` | `plans` | limpar. Quem limpa hoje é **só o `RestoreSaveData`** — carregar save limpa, começar partida nova não |
-| `HexCohabitationVisualManager` | `cachedTurnStateManager`, `cachedMatchController` | **NÃO limpar.** São `UnityEngine.Object`: o `== null` da Unity é true para destruído, e o `if (cached == null) Find...` se auto-cura. Guardam referência, não dado |
-| `AIShoppingPlanner` | quase tudo é *tunable* serializado | **provavelmente NÃO deve limpar** — configuração deve atravessar cenas |
-
-**Próximo passo concreto:** ir campo a campo no `AIShoppingPlanner` separando
-tunável de estado, **antes** de escrever qualquer hook. Um `Clear()` ali apagaria
-configuração, não contaminação.
-
-### A decisão de economia que ninguém tomou
-
-`Batalha.unity` serializa `startMoney: 0` e `actualMoney: 0` nos dois slots, com
-`allowDefeatForZeroUnits: 1`. A derrota por zero unidades roda a partir do **turno
-2**. A renda chega no turno 1 e dá pra comprar — mas **quem não comprar perde no
-turno 2 sem entender por quê.**
-
-Três saídas, e é escolha de design:
+Os três testes que valem, em ordem:
 
 ```text
-1. assar unidades iniciais            já é possível — só pintar e assar
-2. dar caixa inicial ao bake          campo novo, precisa de leitor
-3. dar carência à derrota por 0       já existe o toggle
+laço      menu → Amarelo vs Vermelho → quadrante → render → Enter
+          → volta ao mapa com aquele quadrante em vermelho
+0b        menu → mapa A → turno 5 → menu → mapa B
+          → no turno 1 do B o plano nasce VAZIO
+save      salvar numa batalha do Q3 → Tela de Entrada → Load
+          → abre o Q3, não o Q1
 ```
+
+### O contador 1/4 não tem tela
+
+`ProgressoDaCampanha` responde e ninguém pergunta. Falta o consumo na cena
+Campanha (frente paralela), e são três chamadas:
+
+```csharp
+ProgressoDaCampanha.FormatarProgresso(mundo, campanha, meuSlot)   // "1/4"
+ProgressoDaCampanha.Concluida(mundo, campanha, meuSlot)           // reconhecimento
+matchController.TryGetSingleActiveLocalHumanSlot(out meuSlot)     // quem sou eu
+```
+
+Campanha vencida **oferece** a saída para a Tela de Entrada — não expulsa.
+
+### O portão de destrave não existe, e saiu do caminho crítico
+
+`Liberado()` é a recursão que **desce** (bloco → campanha → quadrante) e precisa
+de navegação de **pai e de irmãos**, que o `MundoData` não expõe: só há
+`TryGetBloco/Campanha/Quadrante` por id e `TryGetPorSerial`.
+
+`Concluido()` só **sobe**, e subir é de graça porque as listas de filhos já
+existem — por isso ele existe e o portão não. No MVP os quatro quadrantes têm
+`destravadoPor` vazio: o portão responderia "liberado" para tudo e **nenhuma tela
+mudaria**.
+
+### O progresso só persiste se houver save
+
+O `CampaignProgressStore` deixou de gravar arquivo próprio: virou snapshot dentro
+do save. `RecordOwner` escreve no cache estático, e o cache morre com a sessão.
+O teste de aceitação do MVP — *sair, voltar, e o mapa continuar contando a mesma
+história* — passa a depender de ter havido save.
+
+### A mixagem de SFX está espalhada por três cenas
+
+| cena | cursor vem de | master | ui | move |
+|---|---|---|---|---|
+| Tela de Entrada | **inline, não é o prefab** | 0.4 | 1 | 1 |
+| Campanha | `Cursor.prefab` + override | 0.4 | 0.3 | 0.3 |
+| Batalha | `Cursor.prefab` + override | 0.4 | 0.3 | 0.3 |
+
+Os SFX de cursor do menu tocam a **três vezes** o volume das outras cenas, e como
+o cursor de lá é inline, mexer no prefab não o alcança. Tudo que seria preciso
+para mixar já existe (master + 10 categorias de SFX; master + volume por faixa de
+música) — falta **um lugar só** para mexer.
+
+### Volume não é preferência de verdade
+
+**Zero `PlayerPrefs` na árvore inteira**, verificado. Nada sobrevive à troca de
+cena, quanto mais a fechar o jogo. Começado e parado para não sair do MVP.
 
 ### Depois
 
 ```text
-1. o 0b, começando pelo AIShoppingPlanner
-2. destravadoPor passa a guardar idSerial em vez de texto
-3. avaliação de destrave — hoje só existem os campos
-4. progresso derivado: campanha/bloco vencidos saem da contagem, não de campo gravado
+1. o contador 1/4 e o fim da campanha (consumo na cena)
+2. um lugar só para a mixagem de SFX
+3. o portão de destrave — depois de existir uma segunda campanha
+4. destravadoPor passa a guardar idSerial em vez de texto
 ```
 
 ### Dívidas com gatilho conhecido
 
-- **O silêncio entre menu e campanha continua.** Duas causas, as duas de pé: o
-  `MatchMusicAudioManager` **não** é `DontDestroyOnLoad` (a música da cena que sai
-  morre com ela), e o `BuildWorldMosaic()` roda no `Awake` da
-  `CampaignSelectionController` em ordem `-10000` — todo `Awake` roda antes de
-  qualquer `Start`, então o mosaico trava o frame e a música é a última da fila.
-  Virar prefab não resolveu isso; resolveu compartilhamento de configuração.
-- ~~**`lastTurn` é *último*, não *melhor***~~ ✅ **não era dívida, era o desenho.**
-  O autor confirmou em 2026-09-07: o registro do quadrante é o retrato da **última**
-  tentativa, e rejogar pode piorá-lo. O `CampaignProgressStore` já está certo nisso.
-  Histórico de tentativas fica para o futuro. Ver [`Planos/plano_mvp.md`](Planos/plano_mvp.md) §7.
+- **O silêncio entre menu e campanha continua.** O `MatchMusicAudioManager` não é
+  `DontDestroyOnLoad` (a música da cena que sai morre com ela) e o
+  `BuildWorldMosaic()` roda no `Awake` em ordem `-10000`, travando o frame antes
+  de qualquer `Start`. Virar prefab resolveu compartilhamento, não persistência.
+- **`MatchController.cs` carrega duas frentes.** `isPlayable` (frente paralela) e
+  `TrySetStartMoney` (minha) entraram no mesmo arquivo no commit `aac0c48`.
+  Reverter um sem o outro é edição manual.
 - **`BoardReady` tem um leitor** (`RefreshAllOccupancyVisuals`); os demais
   consumidores ainda não consultam.
 - **Nada foi medido em escala.** A bancada e o pintor rodaram sobre 1800 células.
-- **`.vscode/settings.json` voltou para `.slnx`**, desfazendo o `769a3dc`. O
-  `.sln` é gerado pela Unity e não existe no disco. Deixado sujo de propósito.
+- **`.vscode/settings.json`** aponta pro `.slnx`, e o `.sln` é gerado pela Unity e
+  não existe no disco. Sujo de propósito.
 
 ---
 
@@ -199,8 +248,9 @@ Três saídas, e é escolha de design:
  2. consumidores Melhor*          ⚠️ faltam Suprir, Fundir, Detecção e Spotting
  3. papéis → somente POLÍTICA     ⚠️ as seis fichas existem; RoleData ainda não
  4. variações de papel            perfil/trait depois da extração
- 5. CAMPANHA                      🟡 o laço fecha e o progresso é por slot;
-                                     falta o 0b e a decisão de economia
+ 5. CAMPANHA                      🟡 laço, save por endereço, progresso por slot,
+                                     0b e economia inicial prontos (não compilados);
+                                     falta a TELA do 1/4 e o portão de destrave
 ```
 
 ---
@@ -209,6 +259,11 @@ Três saídas, e é escolha de design:
 
 | armadilha | regra |
 |---|---|
+| **cena que parece partida** | a `Campanha` tem `MatchController`, `TurnStateManager` e lista de jogadores porque nasceu da cena-base de batalha. Perguntar "estou numa partida?" olhando o que EXISTE na cena responde sim e age errado. Pergunte ao `MatchController.IsPlayable` — e ao **da própria cena**, não a qualquer um |
+| **`== null` da Unity em cache estático** | referência a objeto destruído responde `true` para `== null`. O padrão `if (cached == null) cached = Find(...)` **se auto-cura** entre cenas. "É estático e sobrevive à cena" NÃO é o teste de contaminação; o teste é **"guarda dado ou guarda referência?"** — dado contamina, referência morta se denuncia sozinha |
+| **prefab compartilhado levando config de uma cena** | o `AudioManager` virou prefab das três cenas carregando o `playbackMode` da Tela de Entrada, e a Batalha passou a tocar a música do menu. O que é IGUAL nas cenas vai no prefab; o que é DIFERENTE deriva da cena ou vira override |
+| **guarda que só sabe MANTER, não iniciar** | `TryEnsureSceneTrackPlayback` exigia que a faixa já estivesse tocando para protegê-la — confiava no `Start`, que tem saídas antecipadas. Guarda de invariante tem de perguntar "esta cena tem faixa própria?", não "a faixa própria já está tocando?" |
+| **nome de cena como identidade de save** | o save gravava só o nome da cena, e toda partida de campanha é "Batalha". Carregar um save do Q3 pintava o Q1 com as peças do Q3 — e **funcionava** se o save viesse do Q1 |
 | **cor tomada como identidade** | a cor é escolhida no menu, por partida. Dono, progresso e tropa endereçam por **slot**; a cor se resolve na hora de pintar. Violado em 3 pontos independentes num dia só, e nenhum deu erro |
 | **`SetSlotIndex` tomado como "mudar de dono"** | ele só escreve o campo e **deixa a cor como estava**. Quem muda dono é `SetOwnerSlot` (construção) ou `SpawnAtCellForSlot` (unidade) — os mesmos caminhos da captura |
 | **pintar antes da configuração chegar** | `QuadranteController` é `-9000`; o `Awake` do `MatchController` é `0`. Quem pinta antes tem de chamar `EnsurePartidaConfigApplied` primeiro |
@@ -244,6 +299,7 @@ Três saídas, e é escolha de design:
 |---|---|
 | [`Planos/plano_campanha.md`](Planos/plano_campanha.md) | **o tronco** — autoria, recorte, progresso, cenas, bloqueios, teste |
 | [`Planos/briefing_cena_campanha.md`](Planos/briefing_cena_campanha.md) | o contrato entre as duas frentes |
+| [`relatorio_v8.5.1.md`](relatorio_v8.5.1.md) | o que atravessa a cena — save por endereço, isPlayable, o 0b |
 | [`relatorio_v8.5.0.md`](relatorio_v8.5.0.md) | o laço fecha, e o dono deixa de ser uma cor |
 | [`relatorio_v8.4.1.md`](relatorio_v8.4.1.md) | orientação, rotas partidas e identidade estável |
 | [`relatorio_v8.4.0.md`](relatorio_v8.4.0.md) | o dia em que o catálogo parou de dizer onde |
