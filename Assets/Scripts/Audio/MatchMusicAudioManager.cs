@@ -544,7 +544,10 @@ public class MatchMusicAudioManager : MonoBehaviour
         if (audioSource != null && audioSource.clip != null)
             return audioSource.clip;
         if (gameOpenTrack != null)
+        {
+            AvisarLoopCaiuNaAbertura();
             return gameOpenTrack;
+        }
 
         List<AudioClip> valid = GetValidFreePlaylist();
         if (valid.Count > 0)
@@ -552,6 +555,37 @@ public class MatchMusicAudioManager : MonoBehaviour
 
         return team0Track;
     }
+
+    /// <summary>
+    /// ESTE FALLBACK JA ESCONDEU UM BUG, e o aviso existe por causa dele.
+    ///
+    /// Quando o AudioManager virou prefab compartilhado pelas tres cenas do fluxo,
+    /// ele levou junto o playbackMode da Tela de Entrada — Loop. Na Batalha, que
+    /// precisa de ByTeam, o modo Loop caia aqui, achava o audioSource sem clip, e
+    /// devolvia a faixa de ABERTURA. O sintoma foi "a musica da partida e a do
+    /// menu", que parece bug de musica e nao de configuracao de modo.
+    ///
+    /// Silencio teria apontado pro problema em dois minutos; musica errada custou
+    /// uma investigacao inteira. Entao: continua tocando (nao piorar o que ja
+    /// funciona em quem depende disso), mas avisa uma vez.
+    ///
+    /// So avisa FORA da cena de abertura: la o gameOpenTrack e a resposta certa.
+    /// </summary>
+    private void AvisarLoopCaiuNaAbertura()
+    {
+        if (avisouLoopSemClipe || IsActiveSceneNamed(gameOpenSceneName))
+            return;
+
+        avisouLoopSemClipe = true;
+        Debug.LogWarning(
+            $"[Musica] Modo Loop na cena '{SceneManager.GetActiveScene().name}' sem clipe no "
+            + "AudioSource: caindo na faixa de ABERTURA do jogo. Quase sempre isto e modo "
+            + "errado, nao faixa errada — uma cena de batalha quer ByTeam. Confira o "
+            + "Playback Mode deste AudioManager.",
+            this);
+    }
+
+    [System.NonSerialized] private bool avisouLoopSemClipe;
 
     private void PlayTeamTrack(int teamId, bool forceRestart)
     {
@@ -694,29 +728,63 @@ public class MatchMusicAudioManager : MonoBehaviour
         return PlayMapSelectionTrack(loop: true, forceRestart: true);
     }
 
+    /// <summary>
+    /// A CENA MANDA NA FAIXA, e a regra do jogo e de tres linhas:
+    ///
+    ///   Tela de Entrada   musica de abertura
+    ///   Campanha          musica de selecao de mapa
+    ///   Batalha           musica dos slots (ByTeam)
+    ///
+    /// Isto responde as duas primeiras. Quem nao e nenhuma das duas cai no
+    /// playbackMode, e ai a batalha pega o ByTeam do prefab.
+    ///
+    /// ⚠️ A VERSAO ANTERIOR SO SABIA MANTER, NAO INICIAR: ela exigia que o clipe
+    /// da cena JA estivesse carregado no AudioSource ("audioSource.clip ==
+    /// mapSelectionTrack") e, se estivesse, o segurava. Isso confia em o Start ter
+    /// acertado — e o Start tem saidas antecipadas (o portao de privacidade e o de
+    /// carregamento de save) que o fazem retornar sem tocar nada. Quando isso
+    /// acontecia, o clipe ficava nulo, esta guarda respondia "nao e faixa de cena",
+    /// e o ByTeam assumia a cena de Campanha sem nunca mais devolver.
+    ///
+    /// Agora a pergunta e "ESTA CENA tem faixa propria?", nao "a faixa propria ja
+    /// esta tocando?". Idempotente: PlayClip com forceRestart:false sai na hora
+    /// quando o clipe certo ja esta rodando, entao chamar todo Update nao custa
+    /// nada e conserta sozinho qualquer Start que tenha escapado.
+    ///
+    /// Nao mexe em pausa: o Update so chega aqui quando isPausedByUser e
+    /// suppressPlaybackForTurnTransition estao ambos falsos.
+    /// </summary>
     private bool TryEnsureSceneTrackPlayback()
     {
-        if (audioSource == null || audioSource.clip == null)
+        if (audioSource == null)
             return false;
 
-        bool isGameOpenTrack =
-            gameOpenTrack != null &&
-            audioSource.clip == gameOpenTrack &&
-            playGameOpenOnStart &&
-            (!playGameOpenOnlyInSpecificScene || IsActiveSceneNamed(gameOpenSceneName));
-
-        bool isMapSelectionTrack =
+        // Selecao de mapa primeiro: e a unica que exige nome de cena sempre, entao
+        // ela nao pode perder para um game-open configurado como "toque em toda
+        // cena" (playGameOpenOnlyInSpecificScene desligado).
+        // PlayClip direto, e nao os wrappers publicos: eles chamam EnsureReferences,
+        // que faz FindAnyObjectByType<MatchController> quando a referencia esta
+        // nula. Numa cena sem MatchController — a Tela de Entrada — isso viraria
+        // uma varredura POR FRAME. O PlayClip ja cuida do volume (RefreshOutputVolume)
+        // e as flags de pausa que os wrappers limpam ja estao falsas: o Update so
+        // chega aqui depois de conferir as duas.
+        if (playMapSelectionOnStart &&
             mapSelectionTrack != null &&
-            audioSource.clip == mapSelectionTrack &&
-            playMapSelectionOnStart &&
-            IsActiveSceneNamed(mapSelectionSceneName);
+            IsActiveSceneNamed(mapSelectionSceneName))
+        {
+            PlayClip(mapSelectionTrack, loop: true, forceRestart: false);
+            return true;
+        }
 
-        if (!isGameOpenTrack && !isMapSelectionTrack)
-            return false;
+        if (playGameOpenOnStart &&
+            gameOpenTrack != null &&
+            (!playGameOpenOnlyInSpecificScene || IsActiveSceneNamed(gameOpenSceneName)))
+        {
+            PlayClip(gameOpenTrack, loop: true, forceRestart: false);
+            return true;
+        }
 
-        if (!audioSource.isPlaying)
-            PlayClip(audioSource.clip, loop: true, forceRestart: false);
-        return true;
+        return false;
     }
 
     private static bool IsActiveSceneNamed(string configuredName)

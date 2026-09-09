@@ -47,8 +47,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MatchMusicAudioManager
   matchController: {fileID: 0}
   audioSource: {fileID: 3898832375795807818}
-  playbackMode: 2
-  playOnStart: 0
+  playbackMode: 1
+  playOnStart: 1
   musicVolume: 0.7
   roundMusicVolume: 0.4
   shuffleFreeMode: 0
