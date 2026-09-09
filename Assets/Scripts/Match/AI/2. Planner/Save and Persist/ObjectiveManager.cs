@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 // --------------------------------------------------------------------------------------------
 // Gerencia os objetivos de captura para cada equipe, incluindo status, slots de unidade e orçamento reservado.
 // O ObjectiveManager é um singleton acessível globalmente, permitindo que os sistemas
@@ -161,9 +162,52 @@ public class ObjectiveManager : MonoBehaviour
         DontDestroyOnLoad(gameObject);
     }
 
+    private void OnEnable()
+    {
+        SceneManager.sceneLoaded += HandleSceneLoaded;
+    }
+
+    private void OnDisable()
+    {
+        SceneManager.sceneLoaded -= HandleSceneLoaded;
+    }
+
     private void OnDestroy()
     {
         if (instance == this) instance = null;
+    }
+
+    /// <summary>
+    /// O PLANO E DA PARTIDA, E ESTE OBJETO SOBREVIVE A ELA.
+    ///
+    /// Este manager e DontDestroyOnLoad porque a IA precisa dele antes de qualquer
+    /// cena de batalha existir. O efeito colateral e que os planos atravessam a
+    /// troca de cena: com a campanha encadeando partidas — mapa A, volta ao mapa
+    /// de campanha, mapa B — o turno 1 do B nascia com os objetivos do A, sobre
+    /// setores que nao existem ali.
+    ///
+    /// O modo de falha e silencioso e vem em dobro, porque o plano e indexado por
+    /// SLOT: o slot 0 da proxima partida pode ser outra pessoa, e herda o plano da
+    /// anterior sem um aviso.
+    ///
+    /// Ate agora quem limpava era so o RestoreSaveData — ou seja, carregar save
+    /// limpava e comecar partida nova nao. Este e o outro caminho.
+    ///
+    /// Limpa em QUALQUER cena carregada, de proposito: um plano de objetivos so
+    /// faz sentido dentro da partida que o construiu, e o BuildObjectivePlan
+    /// reconstroi no topo de todo turno. Jogar fora nunca custa mais que um turno.
+    ///
+    /// NAO ATRAPALHA CARREGAR SAVE, e vale saber por que: o SaveGameManager nao
+    /// escuta sceneLoaded — ele troca de cena e so entao aplica o snapshot, por
+    /// coroutine/pendencia. Entao a ordem e sempre limpar-e-depois-restaurar, e o
+    /// RestoreSaveData repovoa o que este metodo acabou de esvaziar.
+    /// </summary>
+    private void HandleSceneLoaded(Scene scene, LoadSceneMode mode)
+    {
+        if (plans == null || plans.Count == 0)
+            return;
+
+        plans.Clear();
     }
 
     public static TeamObjectivePlan GetPlanForSlot(PlayerSlotId slot)

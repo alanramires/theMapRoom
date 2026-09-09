@@ -44,9 +44,42 @@ public partial class AITacticalAnalyzer : MonoBehaviour
         DontDestroyOnLoad(gameObject);
     }
 
+    private void OnEnable()
+    {
+        UnityEngine.SceneManagement.SceneManager.sceneLoaded += HandleSceneLoaded;
+    }
+
+    private void OnDisable()
+    {
+        UnityEngine.SceneManagement.SceneManager.sceneLoaded -= HandleSceneLoaded;
+    }
+
     private void OnDestroy()
     {
         if (instance == this) instance = null;
+    }
+
+    /// <summary>
+    /// AS NECESSIDADES SAO DA PARTIDA, E ESTE OBJETO SOBREVIVE A ELA.
+    ///
+    /// operationsBySlot e indexado por SLOT, e o slot 0 da proxima partida pode
+    /// ser outra pessoa. Sem esta limpeza, a campanha encadeando partidas — mapa
+    /// A, volta ao mapa de campanha, mapa B — faz o shopping do B ler necessidades
+    /// calculadas sobre um tabuleiro que nao existe mais. Sem erro, sem log: so
+    /// compras que nao fazem sentido no mapa em que estao sendo feitas.
+    ///
+    /// O nextId NAO e zerado de proposito. Ele nao custa nada crescendo, e zerar
+    /// abriria a chance de um id reaproveitado casar com uma referencia velha —
+    /// contador que so sobe nunca colide, e a colisao seria do tipo silencioso.
+    /// </summary>
+    private void HandleSceneLoaded(
+        UnityEngine.SceneManagement.Scene scene,
+        UnityEngine.SceneManagement.LoadSceneMode mode)
+    {
+        if (operationsBySlot.Count == 0)
+            return;
+
+        operationsBySlot.Clear();
     }
 
     public void Rebuild(AIWorldSnapshot snapshot, TeamObjectivePlan plan)

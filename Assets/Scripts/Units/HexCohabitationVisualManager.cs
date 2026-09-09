@@ -48,6 +48,23 @@ public static class HexCohabitationVisualManager
     // (ex.: dois caças de times diferentes em hex contestado).
     public static float IntraLayerSpread = 0.18f;
     private static bool rescanWhenNeutralPending;
+
+    // ESTES DOIS CACHES NAO PRECISAM DE sceneLoaded, e o motivo nao e obvio.
+    //
+    // Sao referencias a objetos DA CENA guardadas num estatico que sobrevive a
+    // troca de cena — o que normalmente e contaminacao. Aqui nao e: os dois sao
+    // UnityEngine.Object, e o == null da Unity responde TRUE para objeto
+    // destruido. Depois da troca de cena a proxima chamada cai no
+    // "if (cached == null)" e re-encontra o da cena nova. Se auto-curam.
+    //
+    // Foi conferido de proposito quando o 0b (limpar estado global entre
+    // partidas) foi implementado: ObjectiveManager e AITacticalAnalyzer
+    // ganharam hook porque guardam DADO da partida; estes guardam so uma
+    // referencia, e referencia morta ja se anuncia sozinha.
+    //
+    // rescanWhenNeutralPending pode atravessar como true, e tambem tudo bem: o
+    // pior que acontece e um ScanAllCells a mais na cena nova, que e idempotente
+    // e que o CohabitationBootstrap ja faria de qualquer jeito.
     private static TurnStateManager cachedTurnStateManager;
     private static MatchController cachedMatchController;
 
