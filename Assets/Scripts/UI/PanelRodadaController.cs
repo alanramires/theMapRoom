@@ -8,6 +8,7 @@ using UnityEngine.Video;
 public sealed class PanelRodadaController : MonoBehaviour
 {
     private static int gameplayInputBlockCount;
+    private MatchController sceneMatchController;
 
     [SerializeField] private Button botaoRodada;
     [SerializeField] private TMP_Text textoJogador;
@@ -92,10 +93,30 @@ public sealed class PanelRodadaController : MonoBehaviour
         EnsureTeamVideoPlayer();
         if (botaoRodada != null)
             botaoRodada.onClick.AddListener(Confirmar);
+        EnsurePresentationAllowed();
+    }
+
+    private void OnEnable() => EnsurePresentationAllowed();
+
+    private bool EnsurePresentationAllowed()
+    {
+        if (sceneMatchController == null)
+        {
+            foreach (MatchController match in FindObjectsByType<MatchController>(FindObjectsInactive.Include))
+                if (match.gameObject.scene == gameObject.scene)
+                {
+                    sceneMatchController = match;
+                    break;
+                }
+        }
+        if (sceneMatchController == null || sceneMatchController.IsPlayable) return true;
+        CancelLoadingPresentation();
+        return false;
     }
 
     private void Update()
     {
+        if (!EnsurePresentationAllowed()) return;
         ApplyCurrentClipVolume();
         if (aguardandoConfirmacao && (Input.GetKeyDown(KeyCode.Return)
             || Input.GetKeyDown(KeyCode.KeypadEnter)))
@@ -126,6 +147,7 @@ public sealed class PanelRodadaController : MonoBehaviour
         int turno,
         Func<bool> isBoardReady = null)
     {
+        if (!EnsurePresentationAllowed()) yield break;
         int version = ++presentationVersion;
         IsPrivacyCurtainActive = false;
         IsPresenting = true;
@@ -221,6 +243,7 @@ public sealed class PanelRodadaController : MonoBehaviour
 
     public void CoverImmediatelyForPrivateTurnTransition()
     {
+        if (!EnsurePresentationAllowed()) return;
         presentationVersion++;
         IsPresenting = true;
         IsPrivacyCurtainActive = true;
@@ -240,6 +263,7 @@ public sealed class PanelRodadaController : MonoBehaviour
 
     public void ShowPrivacyCurtain(TeamId activeTeam, int turno, bool isAI)
     {
+        if (!EnsurePresentationAllowed()) return;
         CoverImmediatelyForPrivateTurnTransition();
         SetButtonVisible(!isAI);
         RestorePlayerTextPosition();
@@ -281,6 +305,7 @@ public sealed class PanelRodadaController : MonoBehaviour
 
     public void BeginLoadingPresentation()
     {
+        if (!EnsurePresentationAllowed()) return;
         presentationVersion++;
         IsPresenting = true;
         IsPrivacyCurtainActive = false;
@@ -317,6 +342,7 @@ public sealed class PanelRodadaController : MonoBehaviour
 
     public void SetLoadingTeam(TeamId team, int turno)
     {
+        if (!EnsurePresentationAllowed()) return;
         if (!IsPresenting)
             BeginLoadingPresentation();
 
@@ -343,6 +369,7 @@ public sealed class PanelRodadaController : MonoBehaviour
         Action onButtonReady = null,
         Func<bool> isBoardReady = null)
     {
+        if (!EnsurePresentationAllowed()) yield break;
         int version = presentationVersion;
         if (!IsPresenting)
             BeginLoadingPresentation();
@@ -430,13 +457,19 @@ public sealed class PanelRodadaController : MonoBehaviour
             StopCoroutine(loadingOpeningAudioRoutine);
             loadingOpeningAudioRoutine = null;
         }
-        audioSource.Stop();
-        audioSource.loop = false;
+        if (audioSource != null)
+        {
+            audioSource.Stop();
+            audioSource.loop = false;
+        }
         StopTeamVideo();
         SetButtonEnabled(false);
-        canvasGroup.alpha = 0f;
-        canvasGroup.blocksRaycasts = false;
-        canvasGroup.interactable = false;
+        if (canvasGroup != null)
+        {
+            canvasGroup.alpha = 0f;
+            canvasGroup.blocksRaycasts = false;
+            canvasGroup.interactable = false;
+        }
         IsPresenting = false;
         IsPrivacyCurtainActive = false;
         ReleaseGameplayInputBlock();

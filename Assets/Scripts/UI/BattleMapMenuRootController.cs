@@ -54,6 +54,7 @@ public class BattleMapMenuRootController : MonoBehaviour
     [SerializeField] private GameObject panelMenu;
     [SerializeField] private GameObject panelOptions;
     [SerializeField] private GameObject panelGerenciar;
+    private GameObject panelCampanha;
 
     [SerializeField] private Button btnStatus;
     [SerializeField] private Button btnComando;
@@ -295,6 +296,10 @@ public class BattleMapMenuRootController : MonoBehaviour
 
     public bool TryToggleMenuFromShortcut()
     {
+        CampaignSelectionController campaign = FindAnyObjectByType<CampaignSelectionController>();
+        if (campaign != null)
+            return campaign.TryToggleCampaignMenuFromShortcut();
+
         if (PanelRodadaController.IsGameplayInputBlocked)
             return false;
 
@@ -395,6 +400,12 @@ public class BattleMapMenuRootController : MonoBehaviour
 
     private void Awake()
     {
+        // A selecao de campanha controla seu proprio menu, sem estados de batalha.
+        if (FindAnyObjectByType<CampaignSelectionController>() != null)
+        {
+            enabled = false;
+            return;
+        }
         TryAutoAssignReferences();
         EnsureButtonsCache();
         ForceCloseMenuState();
@@ -904,6 +915,7 @@ public class BattleMapMenuRootController : MonoBehaviour
     private void SetPanel(MenuPanel panel, bool resetIndex)
     {
         activePanel = panel;
+        if (panelCampanha != null) panelCampanha.SetActive(false);
         if (panelMenu != null) panelMenu.SetActive(panel == MenuPanel.Menu);
         if (panelOptions != null) panelOptions.SetActive(panel == MenuPanel.Options);
         if (panelGerenciar != null) panelGerenciar.SetActive(panel == MenuPanel.Gerenciar);
@@ -1573,6 +1585,10 @@ public class BattleMapMenuRootController : MonoBehaviour
             panelOptions = FindChildByName(menuRoot != null ? menuRoot.transform : null, "panel_options")?.gameObject;
         if (panelGerenciar == null)
             panelGerenciar = FindChildByName(menuRoot != null ? menuRoot.transform : null, "panel_gerenciar")?.gameObject;
+        if (panelCampanha == null)
+            panelCampanha = FindChildByName(menuRoot != null ? menuRoot.transform : null, "panel_campanha")?.gameObject;
+        if (panelCampanha != null)
+            panelCampanha.SetActive(false);
 
         if (menuRoot != null && !menuInitialized)
         {
