@@ -589,7 +589,7 @@ public class MainMenuLoadPanelController : MonoBehaviour
             return;
         }
 
-        if (saveGameManager.TryGetSlotSceneName(slotIndex, out string sceneName))
+        if (saveGameManager.TryGetSlotDisplayName(slotIndex, out string sceneName))
         {
             label.text = $"#{slotIndex} {sceneName}";
             return;
@@ -716,7 +716,7 @@ public class MainMenuLoadPanelController : MonoBehaviour
             return;
         }
 
-        string sceneName = saveGameManager.TryGetSlotSceneName(slot, out string scene) ? scene : "game nao encontrado";
+        string sceneName = saveGameManager.TryGetSlotDisplayName(slot, out string scene) ? scene : "game nao encontrado";
         deleteConfirmOpen = true;
         deleteConfirmSlot = slot;
         deleteConfirmFocusIndex = 0;

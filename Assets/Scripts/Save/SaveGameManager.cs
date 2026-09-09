@@ -19,15 +19,20 @@ public class SaveGameManager : MonoBehaviour
     // Disparado apos o load ser concluido com sucesso (independente do time ativo).
     public static event Action OnAfterLoadSuccess;
     public static bool IsAnyLoadInProgress { get; private set; }
+    public bool IsPersistencePromptActive => promptState != SlotPromptState.None;
+    private CampaignSelectionController CampaignSelection => FindAnyObjectByType<CampaignSelectionController>();
     public static bool HasPendingMainMenuLoadRequest => mainMenuLoadTransitionActive || pendingMainMenuLoad != null;
 
     private sealed class PendingMainMenuLoadRequest
     {
         public int slotIndex;
         public string sceneName;
+        public string savePath;
+        public BattleMapSaveData battleMap;
     }
 
     private static PendingMainMenuLoadRequest pendingMainMenuLoad;
+    public static BattleMapSaveData PendingBattleMap => pendingMainMenuLoad?.battleMap;
     private static bool mainMenuLoadTransitionActive;
     private static bool suppressNextLoadConfirmSfx;
     private static string pendingNewGameSaveDirectory;
@@ -65,7 +70,6 @@ public class SaveGameManager : MonoBehaviour
     [Header("Save Path")]
     [Tooltip("Diretorio atual de save (editavel). Se vazio, usa Application.persistentDataPath.")]
     [SerializeField] private string customSaveDirectory = string.Empty;
-    [SerializeField] private bool blockCrossSceneLoad = true;
     [SerializeField] private bool verboseLogs = true;
     [Tooltip("Exibe no Console traces detalhados de entrada nos fluxos de Save/Load.")]
     [InspectorName("Show SaveLoad Logs")]
@@ -94,6 +98,8 @@ public class SaveGameManager : MonoBehaviour
         public int slotIndex;
         public bool exists;
         public string sceneName;
+        public string mapDisplayName;
+        public BattleMapSaveData battleMap;
         public DateTime savedAtLocal;
         public string path;
     }
@@ -104,6 +110,8 @@ public class SaveGameManager : MonoBehaviour
         public int containerVersion = 1;
         public int saveVersion;
         public string sceneName;
+        public string mapDisplayName;
+        public BattleMapSaveData battleMap;
         public long savedAtUtcTicks;
         public bool hasReplay;
         public bool hasJogadas;
@@ -730,7 +738,8 @@ public class SaveGameManager : MonoBehaviour
                 new Dictionary<string, string> { { "slot", metadata.slotIndex.ToString() } });
         }
 
-        string scene = string.IsNullOrWhiteSpace(metadata.sceneName) ? "Mapa desconhecido" : metadata.sceneName.Trim();
+        string scene = !string.IsNullOrWhiteSpace(metadata.mapDisplayName) ? metadata.mapDisplayName.Trim() :
+            string.IsNullOrWhiteSpace(metadata.sceneName) ? "Mapa desconhecido" : metadata.sceneName.Trim();
         string date = metadata.savedAtLocal.ToString("dd-MM-yy HH'h'mm");
         return ResolveHelper(
             "helper.slot.line.filled",
@@ -854,6 +863,7 @@ public class SaveGameManager : MonoBehaviour
                 ResolveHelper("helper.save_status.success", "Jogo salvo no slot <slot>"),
                 new Dictionary<string, string> { { "slot", normalizedSlot.ToString() } });
             PanelDialogController.TrySetTransientText(savedText, 2.2f);
+            CampaignSelection?.SetPersistenceFeedback(savedText);
             if (showSaveLoadLogs)
                 Debug.Log($"[SaveGame] Slot {normalizedSlot} salvo em: {path}");
 #endif
@@ -861,6 +871,7 @@ public class SaveGameManager : MonoBehaviour
         catch (Exception ex)
         {
             Debug.LogError($"[SaveGame] Falha ao salvar: {ex.Message}\n{ex.StackTrace}");
+            CampaignSelection?.SetPersistenceFeedback("Não foi possível salvar. Consulte o Console para ver o erro.");
         }
     }
 
@@ -923,6 +934,14 @@ public class SaveGameManager : MonoBehaviour
         return File.Exists(path);
     }
 
+    public bool TryGetSlotDisplayName(int slotIndex, out string displayName)
+    {
+        SaveSlotMetadata metadata = ReadSlotMetadata(NormalizeSlot(slotIndex));
+        displayName = metadata != null && metadata.exists
+            ? (string.IsNullOrWhiteSpace(metadata.mapDisplayName) ? metadata.sceneName : metadata.mapDisplayName) : string.Empty;
+        return !string.IsNullOrWhiteSpace(displayName);
+    }
+
     public bool TryGetSlotSceneName(int slotIndex, out string sceneName)
     {
         sceneName = string.Empty;
@@ -968,20 +987,38 @@ public class SaveGameManager : MonoBehaviour
             return false;
         }
 
+        return BeginSceneLoadForSave(normalizedSlot, targetScene, metadata.path, metadata.battleMap,
+            reloadCurrentScene: metadata.battleMap != null);
+    }
+
+    private bool BeginSceneLoadForSave(int normalizedSlot, string targetScene, string savePath,
+        BattleMapSaveData battleMap = null, bool reloadCurrentScene = false)
+    {
+        if (string.IsNullOrWhiteSpace(savePath) || !File.Exists(savePath) ||
+            !Application.CanStreamedLevelBeLoaded(targetScene))
+        {
+            cursorController?.PlayErrorSfx();
+            Debug.LogWarning($"[SaveGame] Arquivo ou cena indisponivel para carregar: '{targetScene}', '{savePath}'.");
+            return false;
+        }
+
         pendingMainMenuLoad = new PendingMainMenuLoadRequest
         {
             slotIndex = normalizedSlot,
-            sceneName = targetScene
+            sceneName = targetScene,
+            savePath = Path.GetFullPath(savePath),
+            battleMap = battleMap
         };
         mainMenuLoadTransitionActive = true;
         suppressNextLoadConfirmSfx = true;
 
         string currentScene = SceneManager.GetActiveScene().name;
-        if (string.Equals(currentScene, targetScene, StringComparison.Ordinal))
+        if (!reloadCurrentScene && string.Equals(currentScene, targetScene, StringComparison.Ordinal))
         {
             if (verboseLogs)
                 Debug.Log($"[SaveGame] MainMenu load: slot {normalizedSlot} na mesma cena '{targetScene}'.");
-            StartCoroutine(LoadPendingMainMenuSlotNextFrame(normalizedSlot, targetScene));
+            StartCoroutine(LoadPendingMainMenuSlotNextFrame(normalizedSlot, targetScene, pendingMainMenuLoad.savePath));
+            pendingMainMenuLoad = null;
             return true;
         }
 
@@ -1002,7 +1039,9 @@ public class SaveGameManager : MonoBehaviour
         }
     }
 
-    public void LoadSlot(int slotIndex)
+    public void LoadSlot(int slotIndex) => LoadSlotFromPath(slotIndex, null);
+
+    private void LoadSlotFromPath(int slotIndex, string selectedPath)
     {
         if (!IsWebGLStorageAvailable(showFeedback: true))
             return;
@@ -1046,13 +1085,13 @@ public class SaveGameManager : MonoBehaviour
         else
             cursorController?.PlayConfirmSfx();
         TryAutoAssignReferences();
-        if (unitSpawner == null || constructionSpawner == null)
+        if (CampaignSelection == null && (unitSpawner == null || constructionSpawner == null))
         {
             Debug.LogError("[SaveGame] UnitSpawner/ConstructionSpawner nao encontrados na cena.");
             return;
         }
         int normalizedSlot = NormalizeSlot(slotIndex);
-        string path = ResolveReadableSlotPath(normalizedSlot);
+        string path = string.IsNullOrWhiteSpace(selectedPath) ? ResolveReadableSlotPath(normalizedSlot) : selectedPath;
         if (!File.Exists(path))
         {
             cursorController?.PlayErrorSfx();
@@ -1155,6 +1194,7 @@ public class SaveGameManager : MonoBehaviour
 
     private bool EnterSavingStateForPersistencePrompt()
     {
+        if (CampaignSelection != null) return true;
         if (turnStateManager == null)
             return true;
 
@@ -1179,6 +1219,7 @@ public class SaveGameManager : MonoBehaviour
 
     private bool EnterLoadingStateForPersistencePrompt()
     {
+        if (CampaignSelection != null) return true;
         if (turnStateManager == null)
             return true;
 
@@ -1221,6 +1262,7 @@ public class SaveGameManager : MonoBehaviour
 
     private IEnumerator LoadSlotAsync(string path, int normalizedSlot)
     {
+        CampaignSelectionController campaign = CampaignSelection;
         loadInProgress = true;
         IsAnyLoadInProgress = true;
         lastLoadRoutineSucceeded = false;
@@ -1228,12 +1270,12 @@ public class SaveGameManager : MonoBehaviour
             panelRodada = FindAnyObjectByType<PanelRodadaController>(FindObjectsInactive.Include);
         if (matchMusicAudioManager == null)
             matchMusicAudioManager = FindAnyObjectByType<MatchMusicAudioManager>();
-        if (matchMusicAudioManager != null)
+        if (campaign == null && matchMusicAudioManager != null)
         {
             matchMusicAudioManager.BeginTurnTransition();
             matchMusicAudioManager.StopForTurnTransition();
         }
-        panelRodada?.BeginLoadingPresentation();
+        if (campaign == null) panelRodada?.BeginLoadingPresentation();
         bool loadingPresentationReleased = false;
         double asyncStartMs = PerfNowMs();
         LogLoadPerf(normalizedSlot, "load_async.start", asyncStartMs, 0d);
@@ -1314,17 +1356,44 @@ public class SaveGameManager : MonoBehaviour
             panelRodada?.SetLoadingTeam((TeamId)data.activeTeamId, data.currentTurn);
 
             string currentScene = SceneManager.GetActiveScene().name;
-            if (!string.IsNullOrWhiteSpace(data.sceneName) && !string.Equals(data.sceneName, currentScene, StringComparison.Ordinal))
+            string savedScene = data.sceneName?.Trim();
+            if (!string.IsNullOrWhiteSpace(savedScene) && !string.Equals(savedScene, currentScene, StringComparison.Ordinal))
             {
-                if (blockCrossSceneLoad)
+                // O snapshot so pode ser aplicado na cena que o produziu.
+                // Encaminha o mesmo arquivo e encerra este carregamento antes de limpar o tabuleiro.
+                BeginSceneLoadForSave(normalizedSlot, savedScene, path, data.battleMap);
+                yield break;
+            }
+
+            QuadranteController board = QuadranteController.Active;
+            if (board != null)
+            {
+                if (!board.Built || !board.CanRestoreMap(data.battleMap))
                 {
                     cursorController?.PlayErrorSfx();
-                    Debug.LogWarning($"[SaveGame] Load bloqueado: save da cena '{data.sceneName}', cena atual '{currentScene}'.");
-                    PanelDialogController.ClearExternalText();
+                    Debug.LogError("[SaveGame] Save sem endereco de quadrante valido. Nao sera aplicado sobre outro recorte.");
+                    PanelDialogController.TrySetTransientText("Save sem quadrante valido ou sem bake. Crie um novo save com o mapa correto.", 4f);
                     yield break;
                 }
+                if (!board.MatchesSavedMap(data.battleMap))
+                {
+                    BeginSceneLoadForSave(normalizedSlot, savedScene, path, data.battleMap, reloadCurrentScene: true);
+                    yield break;
+                }
+            }
 
-                Debug.LogWarning($"[SaveGame] Save foi criado na cena '{data.sceneName}', cena atual: '{currentScene}'.");
+            if (campaign != null)
+            {
+                lastLoadRoutineSucceeded = campaign.RestoreSelectionFromSave(data);
+                if (lastLoadRoutineSucceeded)
+                {
+                    cursorController?.PlayLoadSfx();
+                    campaign.SetPersistenceFeedback($"Campanha carregada do slot {normalizedSlot}.");
+                    OnAfterLoadSuccess?.Invoke();
+                    Debug.Log($"[SaveGame] Campanha restaurada do slot {normalizedSlot}.");
+                }
+                else cursorController?.PlayErrorSfx();
+                yield break;
             }
 
             double prepareStartMs = PerfNowMs();
@@ -1406,14 +1475,14 @@ public class SaveGameManager : MonoBehaviour
         }
         finally
         {
-            if (!loadingPresentationReleased && panelRodada != null && panelRodada.IsPresenting)
+            if (campaign == null && !loadingPresentationReleased && panelRodada != null && panelRodada.IsPresenting)
                 panelRodada.CancelLoadingPresentation();
-            if (!loadingPresentationReleased)
+            if (campaign == null && !loadingPresentationReleased)
                 matchMusicAudioManager?.EndTurnTransition();
             // Em casos de erro antes de entrar no LoadRoutine, garante desbloqueio.
             loadInProgress = false;
             IsAnyLoadInProgress = false;
-            mainMenuLoadTransitionActive = false;
+            if (pendingMainMenuLoad == null) mainMenuLoadTransitionActive = false;
         }
     }
 
@@ -1567,11 +1636,12 @@ public class SaveGameManager : MonoBehaviour
 
         int pendingSlot = pendingMainMenuLoad.slotIndex;
         string pendingScene = pendingMainMenuLoad.sceneName;
+        string pendingPath = pendingMainMenuLoad.savePath;
         pendingMainMenuLoad = null;
-        StartCoroutine(LoadPendingMainMenuSlotNextFrame(pendingSlot, pendingScene));
+        StartCoroutine(LoadPendingMainMenuSlotNextFrame(pendingSlot, pendingScene, pendingPath));
     }
 
-    private IEnumerator LoadPendingMainMenuSlotNextFrame(int slotIndex, string sceneName)
+    private IEnumerator LoadPendingMainMenuSlotNextFrame(int slotIndex, string sceneName, string savePath)
     {
         // Aguarda 1 frame para garantir inicializacao dos managers da cena destino.
         yield return null;
@@ -1579,7 +1649,7 @@ public class SaveGameManager : MonoBehaviour
         if (verboseLogs)
             Debug.Log($"[SaveGame] MainMenu pending load: slot {slotIndex} na cena '{sceneName}'.");
 
-        LoadSlot(slotIndex);
+        LoadSlotFromPath(slotIndex, savePath);
     }
 
     private IEnumerator RestoreConstructionsBatched(
@@ -2110,6 +2180,8 @@ public class SaveGameManager : MonoBehaviour
             // redispara FOW/eventos globais e exige uma segunda restauracao inteira.
             double afterLoadEventsStartMs = PerfNowMs();
             LogLoadPerf(loadedSlot, "after_load_events.begin", afterLoadEventsStartMs, afterLoadEventsStartMs - routineStartMs);
+            CampaignProgressStore.ImportSnapshot(data.campaignProgress);
+            FindAnyObjectByType<CampaignSelectionController>()?.RefreshCampaignProgressPresentation();
             OnAfterLoadSuccess?.Invoke();
             LogLoadPerf(loadedSlot, "after_load_events.end", afterLoadEventsStartMs, PerfNowMs() - routineStartMs);
             lastLoadRoutineSucceeded = true;
@@ -2171,10 +2243,15 @@ public class SaveGameManager : MonoBehaviour
     private SaveGameData BuildSaveData()
     {
         Scene activeScene = SceneManager.GetActiveScene();
+        BattleMapSaveData battleMap = QuadranteController.Active?.CaptureMapForSave();
         MatchStateSaveData matchState = SaveDataMapper.BuildMatchStateSaveData(matchController);
         SaveGameData data = new SaveGameData
         {
             sceneName = activeScene.name,
+            mapDisplayName = !string.IsNullOrWhiteSpace(battleMap?.displayName) ? battleMap.displayName : activeScene.name,
+            battleMap = battleMap,
+            campaignProgress = CampaignProgressStore.ExportSnapshot(),
+            campaignSelection = CampaignSelection != null ? CampaignSelection.CaptureSelectionForSave() : null,
             savedAtUtcTicks = DateTime.UtcNow.Ticks,
             cursorSaved = matchState.cursorSaved,
             cursorCellX = matchState.cursorCellX,
@@ -2597,6 +2674,8 @@ public class SaveGameManager : MonoBehaviour
         string template = string.IsNullOrWhiteSpace(fileNameDefault) ? "<Map>_<date>_<hour>" : fileNameDefault.Trim();
         Scene activeScene = SceneManager.GetActiveScene();
         string mapName = string.IsNullOrWhiteSpace(activeScene.name) ? "Map" : activeScene.name.Trim();
+        string quadrantName = QuadranteController.Active?.CaptureMapForSave()?.displayName;
+        if (!string.IsNullOrWhiteSpace(quadrantName)) mapName = quadrantName.Trim();
         DateTime localNow = DateTime.Now;
         string dateTag = localNow.ToString("yyyy-MM-dd");
         string hourTag = localNow.ToString("HH-mm");
@@ -2670,6 +2749,7 @@ public class SaveGameManager : MonoBehaviour
     /// </summary>
     public static void SetupForNewGame(string saveDirectory)
     {
+        CampaignProgressStore.BeginNewGame();
         pendingNewGameSaveDirectory = string.IsNullOrWhiteSpace(saveDirectory)
             ? string.Empty
             : saveDirectory.Trim();
@@ -2742,6 +2822,8 @@ public class SaveGameManager : MonoBehaviour
         if (TryReadContainerManifest(metadata.path, out SaveContainerManifest manifest, out string manifestError))
         {
             metadata.sceneName = manifest.sceneName ?? string.Empty;
+            metadata.mapDisplayName = manifest.mapDisplayName;
+            metadata.battleMap = manifest.battleMap;
             if (manifest.savedAtUtcTicks > 0L)
             {
                 DateTime utc = new DateTime(manifest.savedAtUtcTicks, DateTimeKind.Utc);
@@ -2804,6 +2886,8 @@ public class SaveGameManager : MonoBehaviour
             {
                 saveVersion = data != null ? data.version : 0,
                 sceneName = data?.sceneName ?? string.Empty,
+                mapDisplayName = data?.mapDisplayName ?? string.Empty,
+                battleMap = data?.battleMap,
                 savedAtUtcTicks = data?.savedAtUtcTicks ?? 0L,
                 hasReplay = !string.IsNullOrWhiteSpace(replayJson),
                 hasJogadas = !string.IsNullOrWhiteSpace(jogadasJson),

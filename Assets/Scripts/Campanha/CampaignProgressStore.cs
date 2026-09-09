@@ -1,17 +1,16 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using UnityEngine;
 
 /// <summary>
 /// Estado do jogador entre batalhas. O mapa assado continua imutavel; este
-/// arquivo guarda somente quem controla cada quadrante e o ultimo resultado.
+/// snapshot do save guarda quem controla cada quadrante e o ultimo resultado.
 ///
 /// O DONO E O SLOT, NUNCA A COR.
 ///
 /// A cor de cada slot e escolhida no menu, uma vez por partida: hoje o jogador e
 /// Amarelo, amanha e Vermelho. Gravar "este quadrante e do Amarelo" grava uma
-/// fantasia, nao um dono — na partida seguinte a cor pode nao estar em campo, e
+/// fantasia, nao um dono — na outra configuracao a cor pode nao estar em campo, e
 /// a pergunta que importa ("fui EU que tomei este?") deixa de ter resposta.
 ///
 /// Gravando o slot, a pergunta continua respondivel para sempre, e a cor volta a
@@ -21,7 +20,7 @@ using UnityEngine;
 public static class CampaignProgressStore
 {
     [Serializable]
-    private sealed class CampaignProgressData
+    public sealed class CampaignProgressData
     {
         public int schemaVersion = 1;
         public string mundoId;
@@ -30,7 +29,7 @@ public static class CampaignProgressStore
     }
 
     [Serializable]
-    private sealed class QuadrantOwnershipData
+    public sealed class QuadrantOwnershipData
     {
         public string quadranteId;
         public int ownerSlotIndex = PlayerSlotId.InvalidValue;
@@ -38,7 +37,6 @@ public static class CampaignProgressStore
         public string updatedAtUtc;
     }
 
-    private const string DirectoryName = "CampaignProgress";
     private static readonly Dictionary<string, CampaignProgressData> Cache =
         new Dictionary<string, CampaignProgressData>(StringComparer.OrdinalIgnoreCase);
 
@@ -87,9 +85,6 @@ public static class CampaignProgressStore
         quadrant.lastTurn = Mathf.Max(0, turn);
         quadrant.updatedAtUtc = DateTime.UtcNow.ToString("O");
 
-        if (!Save(data))
-            return false;
-
         Debug.Log(
             $"[Campanha] '{campanhaId}/{quadranteId}' agora pertence ao " +
             $"{owner} (turno {quadrant.lastTurn}).");
@@ -102,28 +97,11 @@ public static class CampaignProgressStore
         if (Cache.TryGetValue(cacheKey, out CampaignProgressData cached))
             return cached;
 
-        string path = GetPath(mundoId, campanhaId);
-        CampaignProgressData data = null;
-        if (File.Exists(path))
+        CampaignProgressData data = new CampaignProgressData
         {
-            try
-            {
-                data = JsonUtility.FromJson<CampaignProgressData>(File.ReadAllText(path));
-            }
-            catch (Exception exception)
-            {
-                Debug.LogWarning($"[Campanha] Progresso ilegivel em '{path}': {exception.Message}");
-            }
-        }
-
-        if (data == null)
-        {
-            data = new CampaignProgressData
-            {
-                mundoId = mundoId.Trim(),
-                campanhaId = campanhaId.Trim()
-            };
-        }
+            mundoId = mundoId.Trim(),
+            campanhaId = campanhaId.Trim()
+        };
 
         if (data.quadrantes == null)
             data.quadrantes = new List<QuadrantOwnershipData>();
@@ -132,19 +110,35 @@ public static class CampaignProgressStore
         return data;
     }
 
-    private static bool Save(CampaignProgressData data)
+    [Serializable]
+    public sealed class Snapshot
     {
-        string path = GetPath(data.mundoId, data.campanhaId);
-        try
+        public List<CampaignProgressData> campanhas = new List<CampaignProgressData>();
+    }
+
+    // A sessao atravessa cenas, mas nunca herda conquistas de outro Novo Jogo.
+    public static void BeginNewGame() => Cache.Clear();
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetRuntime() => Cache.Clear();
+
+    public static Snapshot ExportSnapshot()
+    {
+        var snapshot = new Snapshot();
+        foreach (CampaignProgressData data in Cache.Values)
+            snapshot.campanhas.Add(JsonUtility.FromJson<CampaignProgressData>(JsonUtility.ToJson(data)));
+        return snapshot;
+    }
+
+    public static void ImportSnapshot(Snapshot snapshot)
+    {
+        Cache.Clear();
+        if (snapshot?.campanhas == null) return;
+        foreach (CampaignProgressData data in snapshot.campanhas)
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(path));
-            File.WriteAllText(path, JsonUtility.ToJson(data, prettyPrint: true));
-            return true;
-        }
-        catch (Exception exception)
-        {
-            Debug.LogError($"[Campanha] Nao foi possivel salvar progresso em '{path}': {exception.Message}");
-            return false;
+            if (data == null || string.IsNullOrWhiteSpace(data.mundoId) || string.IsNullOrWhiteSpace(data.campanhaId)) continue;
+            Cache[BuildCacheKey(data.mundoId, data.campanhaId)] =
+                JsonUtility.FromJson<CampaignProgressData>(JsonUtility.ToJson(data));
         }
     }
 
@@ -180,18 +174,4 @@ public static class CampaignProgressStore
         return $"{mundoId.Trim()}::{campanhaId.Trim()}";
     }
 
-    private static string GetPath(string mundoId, string campanhaId)
-    {
-        string fileName = $"{MakeFileSafe(mundoId)}__{MakeFileSafe(campanhaId)}.json";
-        return Path.Combine(Application.persistentDataPath, DirectoryName, fileName);
-    }
-
-    private static string MakeFileSafe(string value)
-    {
-        string safe = value.Trim();
-        char[] invalid = Path.GetInvalidFileNameChars();
-        for (int i = 0; i < invalid.Length; i++)
-            safe = safe.Replace(invalid[i], '_');
-        return safe;
-    }
 }

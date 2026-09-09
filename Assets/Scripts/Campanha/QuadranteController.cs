@@ -94,6 +94,50 @@ public class QuadranteController : MonoBehaviour
     public string CampanhaId => campanhaId;
     public string QuadranteId => quadranteId;
 
+    public BattleMapSaveData CaptureMapForSave()
+    {
+        if (!built || mundo == null || !mundo.TryGetQuadrante(campanhaId, quadranteId, out _, out _, out QuadranteData q))
+            return null;
+        return new BattleMapSaveData
+        {
+            mundoId = MundoId, campanhaId = campanhaId, quadranteId = quadranteId,
+            quadranteSerial = q.IdSerial, displayName = q.displayName,
+            paintOriginX = paintOrigin.x, paintOriginY = paintOrigin.y,
+            recordsCampaignResult = recordsCampaignResult
+        };
+    }
+
+    public bool CanRestoreMap(BattleMapSaveData data)
+        => TryResolveSavedMap(data, out _, out _);
+
+    public bool MatchesSavedMap(BattleMapSaveData data)
+        => built && TryResolveSavedMap(data, out CampanhaData c, out QuadranteData q) &&
+           campanhaId == c.campanhaId && quadranteId == q.quadranteId &&
+           paintOrigin.x == data.paintOriginX && paintOrigin.y == data.paintOriginY &&
+           recordsCampaignResult == data.recordsCampaignResult;
+
+    private bool TryResolveSavedMap(BattleMapSaveData data, out CampanhaData campaign, out QuadranteData quadrant)
+    {
+        campaign = null;
+        quadrant = null;
+        if (data == null || mundo == null || data.mundoId != MundoId) return false;
+        foreach (CampanhaData c in mundo.AllCampanhas())
+        {
+            if (c.quadrantes == null) continue;
+            foreach (QuadranteData q in c.quadrantes)
+            {
+                if (q == null) continue;
+                bool matches = data.quadranteSerial > 0 ? q.IdSerial == data.quadranteSerial :
+                    c.campanhaId == data.campanhaId && q.quadranteId == data.quadranteId;
+                if (!matches) continue;
+                campaign = c;
+                quadrant = q;
+                return q.HasBake;
+            }
+        }
+        return false;
+    }
+
     private void OnEnable()
     {
         MatchController.OnMatchConcluded += HandleMatchConcluded;
@@ -130,7 +174,23 @@ public class QuadranteController : MonoBehaviour
                 Debug.Log($"[Quadrante] Endereco recebido do PartidaConfig: '{campanhaId}/{quadranteId}'.", this);
         }
 
-        if (buildOnAwake)
+        // O save manda antes da primeira pintura, inclusive ao recarregar Batalha
+        // para trocar de quadrante. Nao reconstrua caches sobre o recorte do Inspector.
+        BattleMapSaveData savedMap = SaveGameManager.PendingBattleMap;
+        if (savedMap != null)
+        {
+            if (!TryResolveSavedMap(savedMap, out CampanhaData savedCampaign, out QuadranteData savedQuadrant))
+            {
+                Debug.LogError("[Quadrante] Mundo/quadrante do save indisponivel ou sem bake.", this);
+                return;
+            }
+            campanhaId = savedCampaign.campanhaId;
+            quadranteId = savedQuadrant.quadranteId;
+            paintOrigin = new Vector2Int(savedMap.paintOriginX, savedMap.paintOriginY);
+            recordsCampaignResult = savedMap.recordsCampaignResult;
+        }
+
+        if (buildOnAwake || savedMap != null)
             Build();
     }
 

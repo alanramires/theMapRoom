@@ -3,10 +3,42 @@ using System.Collections.Generic;
 using UnityEngine;
 
 [Serializable]
+public class CampaignSelectionSaveData
+{
+    public string mundoId;
+    public string campanhaId;
+    public string quadranteId;
+    public int quadranteSerial;
+    public TeamId[] teams;
+    public bool[] isAI;
+    public bool[] flipX;
+    public bool[] commandAutomatic;
+    public MatchController.GameSetupPreset preset;
+    public AIDifficulty difficulty;
+}
+
+[Serializable]
+public class BattleMapSaveData
+{
+    public string mundoId;
+    public string campanhaId;
+    public string quadranteId;
+    public int quadranteSerial;
+    public string displayName;
+    public int paintOriginX;
+    public int paintOriginY;
+    public bool recordsCampaignResult;
+}
+
+[Serializable]
 public class SaveGameData
 {
     public int version = 19;
     public string sceneName;
+    public string mapDisplayName;
+    public BattleMapSaveData battleMap;
+    public CampaignProgressStore.Snapshot campaignProgress;
+    public CampaignSelectionSaveData campaignSelection;
     public long savedAtUtcTicks;
 
     // Ver MatchStateSaveData.cursorSaved. version 19 introduziu estes campos;
