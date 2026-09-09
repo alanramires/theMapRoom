@@ -145,24 +145,34 @@ mecanismos existem, falta o autor querer usá-los.
 
 ## Onde eu parei
 
-### ⚠️ Nem a v8.5.0 nem a v8.5.1 foram compiladas
+### Compila e roda — falta exercitar
 
-Não há build por linha de comando. **Duas versões inteiras escritas contra as
-APIs lidas**, incluindo assinaturas novas: `TrySetStartMoney`, `IsPlayable`,
-`ProgressoDaCampanha`, `OnMatchConcluded` com `PlayerSlotId`, os DTOs de save.
-
-**Confira o Console antes de qualquer coisa.** É a dívida mais cara aberta.
-
-Os três testes que valem, em ordem:
+A `v8.5.0` e a `v8.5.1` foram escritas contra as APIs lidas, sem build por linha
+de comando. Em 2026-09-09 o autor abriu o Q2 na Batalha e ele montou **idêntico
+ao mosaico**, o que derruba a dívida para os caminhos exercitados:
 
 ```text
-laço      menu → Amarelo vs Vermelho → quadrante → render → Enter
-          → volta ao mapa com aquele quadrante em vermelho
+✅ QuadranteController.Build      terreno, camadas, rotas, construções
+✅ paridade odd-r                 o Q2 (originY ímpar) sai igual ao mosaico
+✅ EnsurePartidaConfigApplied     as cores saem do slot, e os prédios batem
+✅ áudio                          chega na Batalha sem reclamar
+```
+
+**O que ainda ninguém exercitou**, em ordem de risco:
+
+```text
 0b        menu → mapa A → turno 5 → menu → mapa B
           → no turno 1 do B o plano nasce VAZIO
 save      salvar numa batalha do Q3 → Tela de Entrada → Load
           → abre o Q3, não o Q1
+volta     ganhar ou perder → Enter → volta ao mapa com o quadrante pintado
+          na cor do slot vencedor
+economia  autorar 100000 no slot 0 de um quadrante e ver no painel no turno 1
 ```
+
+⚠️ **A armadilha do turno 2 continua de pé** enquanto `bakedUnidades` e
+`economiaInicial` estiverem vazios: os dois lados abrem sem tropa, e quem não
+comprar no turno 1 perde no turno 2. O mecanismo existe; falta autorar.
 
 ### O contador 1/4 não tem tela
 
@@ -259,6 +269,7 @@ cena, quanto mais a fechar o jogo. Começado e parado para não sair do MVP.
 
 | armadilha | regra |
 |---|---|
+| **translação de recorte em grade hexagonal** | odd-r: a posição de mundo de uma linha depende da PARIDADE do y, não da diferença entre dois y. Traduzir um retângulo autorado em y ímpar para y par inverte a paridade de todas as linhas e cisalha o recorte meia célula — e **nada reclama**, porque o tile continua na célula lógica certa. Se um recorte precisa mudar de y, a paridade tem de sobreviver |
 | **cena que parece partida** | a `Campanha` tem `MatchController`, `TurnStateManager` e lista de jogadores porque nasceu da cena-base de batalha. Perguntar "estou numa partida?" olhando o que EXISTE na cena responde sim e age errado. Pergunte ao `MatchController.IsPlayable` — e ao **da própria cena**, não a qualquer um |
 | **`== null` da Unity em cache estático** | referência a objeto destruído responde `true` para `== null`. O padrão `if (cached == null) cached = Find(...)` **se auto-cura** entre cenas. "É estático e sobrevive à cena" NÃO é o teste de contaminação; o teste é **"guarda dado ou guarda referência?"** — dado contamina, referência morta se denuncia sozinha |
 | **prefab compartilhado levando config de uma cena** | o `AudioManager` virou prefab das três cenas carregando o `playbackMode` da Tela de Entrada, e a Batalha passou a tocar a música do menu. O que é IGUAL nas cenas vai no prefab; o que é DIFERENTE deriva da cena ou vira override |
