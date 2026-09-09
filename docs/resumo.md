@@ -139,7 +139,7 @@ problema:**
 |---|---|---|
 | `AITacticalAnalyzer` | `operationsBySlot` | limpar. Estado indexado por slot, e o slot 0 da próxima é outra pessoa |
 | `ObjectiveManager` | `plans` | limpar. Quem limpa hoje é **só o `RestoreSaveData`** — carregar save limpa, começar partida nova não |
-| `HexCohabitationVisualManager` | `cachedTurnStateManager`, `cachedMatchController` | limpar, mas é outro bug: referências a objetos da cena anterior, já destruídos |
+| `HexCohabitationVisualManager` | `cachedTurnStateManager`, `cachedMatchController` | **NÃO limpar.** São `UnityEngine.Object`: o `== null` da Unity é true para destruído, e o `if (cached == null) Find...` se auto-cura. Guardam referência, não dado |
 | `AIShoppingPlanner` | quase tudo é *tunable* serializado | **provavelmente NÃO deve limpar** — configuração deve atravessar cenas |
 
 **Próximo passo concreto:** ir campo a campo no `AIShoppingPlanner` separando

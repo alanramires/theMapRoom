@@ -186,14 +186,26 @@ tropa, dinheiro, ou os dois.
 
 ## 4. Etapa 2 — o `0b`, que a repetição torna obrigatório
 
-O fluxo é **jogar quadrantes em sequência**. Três managers globais carregam
+⚠️ *Corrigido em 2026-09-09, na implementação: são **dois**, não três nem quatro.*
+
+O fluxo é **jogar quadrantes em sequência**. Dois managers globais carregam
 estado de uma partida para a seguinte:
 
 | manager | o que atravessa |
 |---|---|
-| `ObjectiveManager` | `plans`. Hoje quem limpa é **só o `RestoreSaveData`** — carregar save limpa, começar partida nova não |
+| `ObjectiveManager` | `plans`. Quem limpava era **só o `RestoreSaveData`** — carregar save limpava, começar partida nova não |
 | `AITacticalAnalyzer` | `operationsBySlot` — estado indexado por slot, e o slot 0 da próxima é outra pessoa |
-| `HexCohabitationVisualManager` | `cachedTurnStateManager`, `cachedMatchController` — referências a objetos da cena anterior, já destruídos |
+
+E dois que **não** entram, cada um por um motivo diferente:
+
+| manager | por que não |
+|---|---|
+| `AIShoppingPlanner` | conferido campo a campo: é tudo `public` sob `[Header]`, com `[Range]` e `[Tooltip]`. Configuração, e configuração **deve** atravessar cenas. O único estático é o próprio singleton |
+| `HexCohabitationVisualManager` | **eu tinha errado.** `cachedTurnStateManager` e `cachedMatchController` são `UnityEngine.Object`, e o `== null` da Unity responde **true** para objeto destruído. O padrão `if (cached == null) cached = Find...` se auto-cura na primeira chamada depois da troca de cena. Guardam *referência*, não dado — e referência morta se anuncia sozinha |
+
+A lição que sobra: **"é estático e sobrevive à cena" não é o teste.** O teste é
+*"guarda dado ou guarda referência?"* — dado contamina, referência morta se
+denuncia.
 
 **Começar pelo `AIShoppingPlanner`, que é o que provavelmente NÃO muda.**
 Conferido: é tudo `public` sob `[Header]` — Economia Exército, Defesa de Base,
