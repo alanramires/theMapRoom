@@ -237,38 +237,125 @@ public class BattleMapMenuRootController : MonoBehaviour
         RestoreDefaultDialogForCurrentPanel();
     }
 
+    /// <summary>
+    /// Entrada para o Button do Panel_vitoria: arraste este componente para o
+    /// OnClick e escolha este metodo.
+    ///
+    /// Mora aqui porque quem conhece <see cref="mainMenuSceneName"/> e este
+    /// componente. O par — voltar ao mapa de campanha — mora no
+    /// QuadranteController, que conhece a cena DELE. Cada um dono do seu destino.
+    ///
+    /// Sai sem registrar nada, como o Esc sempre saiu: se a partida terminou, o
+    /// dono ja foi gravado pelo funil de vitoria antes de qualquer botao aparecer.
+    /// </summary>
+    public void BotaoVoltarAoMenuPrincipal()
+    {
+        PanelHelperController.ClearExternalText();
+        SceneManager.LoadScene(mainMenuSceneName);
+    }
+
+    /// <summary>
+    /// Os destinos de "SAIR DA PARTIDA", em ordem de tela.
+    ///
+    /// A lista e DERIVADA, nao fixa: "voltar a campanha" so existe depois que o
+    /// resultado saiu numa partida que veio da campanha. Antes disso o menu tem os
+    /// tres de sempre.
+    ///
+    /// Existe porque o rotulo e a acao moravam em arquivos diferentes — o
+    /// PanelHelperController escrevia os textos e chamava
+    /// InvokeExitConfirmationOption(0/1/2) na mao, e o indice era conhecimento
+    /// duplicado. Com a lista variando de tamanho, duplicar viraria bug na
+    /// primeira vez que alguem esquecesse de mexer nos dois.
+    /// </summary>
+    private enum DestinoDeSaida { Campanha, MenuPrincipal, Windows, Cancelar }
+
+    private static readonly List<DestinoDeSaida> destinosDeSaida = new List<DestinoDeSaida>();
+
+    private static void ColetarDestinosDeSaida()
+    {
+        destinosDeSaida.Clear();
+
+        // Primeiro de proposito: depois de um resultado, voltar ao mapa e a coisa
+        // natural, e o primeiro item e onde o foco nasce.
+        if (QuadranteController.PodeVoltarParaCampanha)
+            destinosDeSaida.Add(DestinoDeSaida.Campanha);
+
+        destinosDeSaida.Add(DestinoDeSaida.MenuPrincipal);
+        destinosDeSaida.Add(DestinoDeSaida.Windows);
+        destinosDeSaida.Add(DestinoDeSaida.Cancelar);
+    }
+
+    public int GetExitConfirmationOptionCount()
+    {
+        ColetarDestinosDeSaida();
+        return destinosDeSaida.Count;
+    }
+
+    /// <summary>O texto do botao no indice dado. Vazio se o indice nao existe.</summary>
+    public string GetExitConfirmationLabel(int index)
+    {
+        ColetarDestinosDeSaida();
+        if (index < 0 || index >= destinosDeSaida.Count)
+            return string.Empty;
+
+        switch (destinosDeSaida[index])
+        {
+            case DestinoDeSaida.Campanha:      return "VOLTAR À CAMPANHA";
+            case DestinoDeSaida.MenuPrincipal: return "VOLTAR AO MENU PRINCIPAL";
+            case DestinoDeSaida.Windows:       return "SAIR PARA O WINDOWS";
+            default:                           return "CANCELAR";
+        }
+    }
+
     public bool NavigateExitConfirmation(int direction)
     {
         if (!exitConfirmOpen || direction == 0) return false;
-        exitConfirmFocusIndex = (exitConfirmFocusIndex + (direction > 0 ? 1 : -1) + 3) % 3;
+        int total = GetExitConfirmationOptionCount();
+        exitConfirmFocusIndex = (exitConfirmFocusIndex + (direction > 0 ? 1 : -1) + total) % total;
         cursorController?.PlayCursorMoveSfx();
         return true;
     }
 
     public void InvokeExitConfirmationOption(int index)
     {
-        if (!exitConfirmOpen || index < 0 || index > 2) return;
+        if (!exitConfirmOpen) return;
+
+        ColetarDestinosDeSaida();
+        if (index < 0 || index >= destinosDeSaida.Count) return;
         exitConfirmFocusIndex = index;
-        if (index == 0)
+
+        DestinoDeSaida destino = destinosDeSaida[index];
+        if (destino == DestinoDeSaida.Cancelar)
         {
-            exitConfirmOpen = false;
-            PanelHelperController.ClearExternalText();
-            PlayConfirmSfxOncePerFrame();
-            SceneManager.LoadScene(mainMenuSceneName);
-        }
-        else if (index == 1)
-        {
-            exitConfirmOpen = false;
-            PanelHelperController.ClearExternalText();
-            PlayConfirmSfxOncePerFrame();
-#if UNITY_EDITOR
-            UnityEditor.EditorApplication.isPlaying = false;
-#else
-            Application.Quit();
-#endif
-        }
-        else
             CancelExitConfirmation();
+            return;
+        }
+
+        exitConfirmOpen = false;
+        PanelHelperController.ClearExternalText();
+        PlayConfirmSfxOncePerFrame();
+
+        switch (destino)
+        {
+            case DestinoDeSaida.Campanha:
+                // Se por algum motivo a volta nao acontecer, cair no menu principal
+                // e melhor que deixar o jogador preso na tela de resultado.
+                if (!QuadranteController.TryVoltarParaCampanha())
+                    SceneManager.LoadScene(mainMenuSceneName);
+                break;
+
+            case DestinoDeSaida.MenuPrincipal:
+                SceneManager.LoadScene(mainMenuSceneName);
+                break;
+
+            default:
+#if UNITY_EDITOR
+                UnityEditor.EditorApplication.isPlaying = false;
+#else
+                Application.Quit();
+#endif
+                break;
+        }
     }
 
     public void InvokeFocusedExitConfirmationOption() => InvokeExitConfirmationOption(exitConfirmFocusIndex);

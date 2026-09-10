@@ -3712,9 +3712,23 @@ public class PanelHelperController : MonoBehaviour
         }
         else if (battleExitActive)
         {
-            CreatePersistenceButton("VOLTAR AO MENU PRINCIPAL", () => battleMapMenuController?.InvokeExitConfirmationOption(0));
-            CreatePersistenceButton("SAIR PARA O WINDOWS", () => battleMapMenuController?.InvokeExitConfirmationOption(1));
-            CreatePersistenceButton("CANCELAR", () => battleMapMenuController?.InvokeExitConfirmationOption(2));
+            // A LISTA VEM DE QUEM AGE, nao daqui.
+            //
+            // Os destinos variam: depois de um resultado numa partida de campanha
+            // aparece "VOLTAR A CAMPANHA" na frente dos outros. Enquanto o rotulo
+            // morava aqui e o indice era digitado na mao (0/1/2), rotulo e acao
+            // eram conhecimento duplicado em arquivos diferentes — e um botao que
+            // diz um destino e leva a outro e pior que qualquer um dos dois errado.
+            int totalDeSaidas = battleMapMenuController != null
+                ? battleMapMenuController.GetExitConfirmationOptionCount()
+                : 0;
+            for (int i = 0; i < totalDeSaidas; i++)
+            {
+                int indice = i; // captura por valor: o lambda roda depois do laco
+                CreatePersistenceButton(
+                    battleMapMenuController.GetExitConfirmationLabel(indice),
+                    () => battleMapMenuController?.InvokeExitConfirmationOption(indice));
+            }
         }
         else if (battleSurrenderActive)
         {

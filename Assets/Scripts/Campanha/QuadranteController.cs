@@ -270,6 +270,69 @@ public class QuadranteController : MonoBehaviour
         VoltarParaCampanha();
     }
 
+    /// <summary>
+    /// A partida ACABOU e existe um mapa de campanha para onde voltar.
+    ///
+    /// Exige a partida ENCERRADA de proposito: no meio da batalha, sair pelo menu
+    /// significa sair pro menu principal, e isso e o desenho — nao se volta ao
+    /// mapa sem resolver. Depois do resultado, voltar ao mapa passa a ser a coisa
+    /// natural, e e ai que esta pergunta comeca a responder true.
+    ///
+    /// Partida aberta direto na Batalha (para testar um quadrante) nunca responde
+    /// true: ela nao veio da campanha, entao <see cref="recordsCampaignResult"/> e
+    /// falso e nem a vitoria registra dono.
+    ///
+    /// Quem pergunta sao DUAS superficies, e por isso isto e publico: o botao do
+    /// Panel_vitoria e o menu do Esc — o unico alcancavel depois que o resultado
+    /// congela o tabuleiro.
+    /// </summary>
+    public static bool PodeVoltarParaCampanha =>
+        active != null &&
+        active.recordsCampaignResult &&
+        active.aguardandoVolta &&
+        !string.IsNullOrWhiteSpace(active.campaignSceneName);
+
+    /// <summary>
+    /// Volta ao mapa de campanha. Devolve false quando nao ha para onde voltar —
+    /// ai quem chamou segue com o destino dele.
+    ///
+    /// Para ligar num Button do Inspector, use <see cref="BotaoVoltarParaCampanha"/>:
+    /// o UnityEvent do Inspector nao enxerga metodo estatico.
+    /// </summary>
+    public static bool TryVoltarParaCampanha()
+    {
+        if (!PodeVoltarParaCampanha)
+            return false;
+
+        // Ja esta indo: responder true impede o chamador de disparar um segundo
+        // LoadScene por cima do primeiro.
+        if (active.voltando)
+            return true;
+
+        active.VoltarParaCampanha();
+        return true;
+    }
+
+    /// <summary>
+    /// Entrada para o Button do Panel_vitoria: arraste este componente para o
+    /// OnClick e escolha este metodo.
+    ///
+    /// O par dele — voltar ao menu principal — mora no
+    /// BattleMapMenuRootController, que e quem conhece o nome daquela cena. Cada
+    /// um e dono do seu destino; duplicar o nome da cena aqui criaria a segunda
+    /// fonte para divergir.
+    /// </summary>
+    public void BotaoVoltarParaCampanha()
+    {
+        if (!TryVoltarParaCampanha())
+        {
+            Debug.LogWarning(
+                "[Quadrante] Botao de voltar a campanha acionado, mas nao ha para onde "
+                + "voltar: ou a partida nao veio da campanha, ou ela ainda nao terminou.",
+                this);
+        }
+    }
+
     private void VoltarParaCampanha()
     {
         if (voltando)
