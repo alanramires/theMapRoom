@@ -179,11 +179,20 @@ public class PanelTurnController : MonoBehaviour
         // Mapa de tutorial: o painel de turno fica só com o contador. Placar de unidades/território
         // não tem sentido num mapa roteirizado e ainda compete com o passo a passo pela atenção.
         bool tutorial = matchController != null && matchController.IsTutorialMode;
-        // Um texto de apresentacao significa que este prefab esta sendo reutilizado fora de
-        // uma partida (por exemplo, "Selecione o mapa" na cena Campanha). Nesse contexto o
-        // subpainel nao representa estatisticas confirmadas e deve permanecer oculto,
-        // independentemente do contrato de slots/IA que continua vivo entre as cenas.
-        bool isPresentationOnly = !string.IsNullOrWhiteSpace(presentationTextOverride);
+        // Um texto de apresentacao significa que este prefab esta sendo reutilizado fora
+        // de uma partida. Sem estatistica de partida para mostrar, o subpainel some.
+        //
+        // ⚠️ A CAMPANHA E A EXCECAO, e ela nasceu depois desta regra. La o subpainel
+        // mostra conquistas CONFIRMADAS — os quadradinhos por quadrante — e o titulo
+        // e "Selecione o Mapa" ao mesmo tempo. Sao duas coisas que estavam amarradas
+        // no mesmo campo e precisaram divergir.
+        //
+        // Hoje isto nem chega a rodar na campanha: o RefreshStatsIfConfirmed retorna
+        // antes, no ramo do CampanhaManager. A excecao esta escrita mesmo assim,
+        // porque depender da ORDEM de duas coisas distantes e como o titulo se perdeu
+        // em primeiro lugar — alguem apagou o texto para o placar aparecer.
+        bool campanha = campanhaManager != null;
+        bool isPresentationOnly = !campanha && !string.IsNullOrWhiteSpace(presentationTextOverride);
         bool shouldShow = !isPresentationOnly && !tutorial && hasTwoSlots && (!fogOfWarTotal || aiVersusAi);
 
         if (panelEstatisticas.activeSelf != shouldShow)
