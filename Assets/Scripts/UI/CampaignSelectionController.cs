@@ -385,6 +385,12 @@ public class CampaignSelectionController : MonoBehaviour
         PanelHelperController.TrySetExternalText("CAMPANHA", message);
     }
 
+    public void RestoreFocusedQuadrantHelper()
+    {
+        persistenceFeedback = null;
+        RefreshHoveredQuadrant(force: true);
+    }
+
     public bool TryToggleCampaignMenuFromShortcut()
     {
         if (waitingForPersistence || SaveGameManager.IsAnyLoadInProgress ||
@@ -419,6 +425,8 @@ public class CampaignSelectionController : MonoBehaviour
             campaignMenuPanel.SetActive(true);
         }
         campaignMenuRoot.SetActive(open);
+        if (!open)
+            RestoreFocusedQuadrantHelper();
         lastCampaignMenuSelection = null;
         UnityEngine.EventSystems.EventSystem events = UnityEngine.EventSystems.EventSystem.current;
         if (events != null)

@@ -1388,8 +1388,8 @@ public class SaveGameManager : MonoBehaviour
                 if (lastLoadRoutineSucceeded)
                 {
                     cursorController?.PlayLoadSfx();
-                    campaign.SetPersistenceFeedback($"Campanha carregada do slot {normalizedSlot}.");
                     OnAfterLoadSuccess?.Invoke();
+                    campaign.RestoreFocusedQuadrantHelper();
                     Debug.Log($"[SaveGame] Campanha restaurada do slot {normalizedSlot}.");
                 }
                 else cursorController?.PlayErrorSfx();
