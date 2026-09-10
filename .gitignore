@@ -49,3 +49,6 @@ desktop.ini
 # ATENCAO: os 28 arquivos ja rastreados continuam rastreados — .gitignore nao
 # desfaz o que ja esta no indice. Isto so impede que despejos NOVOS entrem.
 Assets/_Recovery/
+
+# Saida de ferramenta de geracao de imagem. Artefato da maquina, nao do projeto.
+output/
