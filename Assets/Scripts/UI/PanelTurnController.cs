@@ -33,6 +33,7 @@ public class PanelTurnController : MonoBehaviour
     [SerializeField] private BarraVencedorController barraVencedor;
 
     private readonly List<PlayerSlotId> donosDeQuadrante = new List<PlayerSlotId>();
+    private bool avisouPecaFaltando;
     private CampanhaManager campanhaManager;
 
     private void Awake()
@@ -78,6 +79,8 @@ public class PanelTurnController : MonoBehaviour
             barVencedor = FindNamedChild("bar_vencedor")?.gameObject;
         if (barraVencedor == null && barVencedor != null)
             barraVencedor = barVencedor.GetComponent<BarraVencedorController>();
+
+        AvisarPecaFaltando();
         if (slot0Count == null)
             slot0Count = FindNamedTmpText("slot0_count");
         if (slot1Count == null)
@@ -301,6 +304,42 @@ public class PanelTurnController : MonoBehaviour
     {
         Transform local = FindNamedChild(name);
         return local != null ? local.GetComponent<Image>() : null;
+    }
+
+    /// <summary>
+    /// BUSCA POR NOME QUE FALHA TEM DE FALAR.
+    ///
+    /// As referencias sao achadas por nome entre os filhos, e um nome errado no
+    /// prefab fazia o painel simplesmente nao desenhar — sem erro, sem log, sem
+    /// pista. Ja custou uma investigacao: 'bar_tvencedor' com um t a mais.
+    ///
+    /// Avisa UMA vez por execucao, porque o TryAutoAssignReferences roda a cada
+    /// refresh e um aviso por frame afogaria o Console.
+    /// </summary>
+    private void AvisarPecaFaltando()
+    {
+        if (avisouPecaFaltando)
+            return;
+
+        if (barVencedor != null && barraVencedor != null)
+            return;
+
+        avisouPecaFaltando = true;
+
+        if (barVencedor == null)
+        {
+            Debug.LogWarning(
+                $"[PainelTurno] Nao achei um filho chamado 'bar_vencedor' em '{name}'. "
+                + "A barra de quadrantes da campanha nao vai aparecer. Confira o nome no "
+                + "prefab ou arraste o objeto no campo Bar Vencedor.",
+                this);
+            return;
+        }
+
+        Debug.LogWarning(
+            $"[PainelTurno] '{barVencedor.name}' existe mas nao tem o "
+            + "BarraVencedorController. Os quadrantes nao vao ser desenhados.",
+            this);
     }
 
     /// <summary>
