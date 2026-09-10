@@ -1,14 +1,14 @@
 # Resumo — onde estamos e o que vem
 
-Ponto de retomada. Atualizado em 2026-09-09, **depois** da tag `v8.5.1`.
+Ponto de retomada. Atualizado em 2026-09-10, **depois** da tag `v8.5.2`.
 Leia isto primeiro.
 
 ---
 
 ## Estado
 
-`v8.5.1` tagueada e publicada. Relatório:
-[`relatorio_v8.5.1.md`](relatorio_v8.5.1.md).
+`v8.5.2` tagueada e publicada. Relatório:
+[`relatorio_v8.5.2.md`](relatorio_v8.5.2.md).
 
 ```text
 v8.3.0   o primeiro quadrante pintou      361 tiles, 2 ms, cena vazia
@@ -16,53 +16,49 @@ v8.4.0   o catálogo parou de dizer ONDE   três camadas de layout removidas
 v8.4.1   a peça tem lado                  orientação, rotas partidas, identidade
 v8.5.0   o laço fecha                     volta, dono por slot, tropa inicial
 v8.5.1   o que atravessa a cena            save por endereço, isPlayable, 0b
+v8.5.2   a forma casa com o dado           quadradinhos, paridade, fim de partida
 ```
 
-**O fluxo existe ponta a ponta, volta, e agora sobrevive a um save.**
-Menu → Campanha → Batalha → Campanha.
+**O MVP virou tela.** Menu → Campanha → Batalha → volta → o mapa pintado, o
+placar, e o registro de quem tomou o quê em quantas rodadas.
 
 ### A descoberta que organiza o resto
 
-> **A cena `Campanha` parece uma partida e não é.**
+> **A forma tem que casar com o dado.** Contável vira quadrado; contínuo vira
+> barra.
 
-Ela tem `MatchController`, `TurnStateManager`, lista de jogadores e cursor —
-porque foi construída sobre a cena-base de batalha. Tudo que pergunta *"estou
-numa partida?"* olhando para o que **existe** na cena responde **sim**, e age
-errado. Num dia só isso apareceu em quatro lugares independentes:
+Um contador de campanha desenhado como barra forçava o jogador a extrair uma
+**contagem** de uma **proporção** — e o autor teve que explicar o que o cinza
+significava. Trocado por quatro quadradinhos, o denominador parou de precisar de
+explicação porque passou a estar desenhado.
 
-```text
-cortina de hot seat ao carregar save      MatchController.isPlayable
-apresentação de rodada na seleção         PanelRodadaController
-menu de batalha no mapa de campanha       BattleMapMenuRootController
-música do time na seleção                 MatchMusicAudioManager
-```
-
-Nenhum era bug do save, da música ou do menu: eram todos a mesma pergunta mal
-formulada.
-
-### A descoberta da versão anterior, que segue valendo
-
-> **Cor não é identidade. É uma fantasia que o slot veste por uma partida.**
-
-As duas cores são escolhidas no menu. Tudo que atravessa a fronteira entre
-autoria e partida — ou entre uma partida e a seguinte — endereça por **slot**, e
-a cor se resolve só na hora de pintar, por `GetTeamIdForSlot`.
-
-A regra já estava escrita no briefing da cena de campanha (*"cor de time nunca
-sai do slot direto"*). O dia mostrou que ela vale muito além dali: foi violada em
-**três** pontos independentes, e os três sintomas eram silenciosos.
+A mesma régua, aplicada à batalha, responde o contrário: lá o dado é
+`controlledCapturePoints / total`, com captura **parcial** entrando na conta. Um
+prédio meio capturado não é meio cubinho.
 
 ```text
-1. construção assada nascia com a cor da AUTORIA      → azul num jogo amarelo
-2. progresso gravava a COR do vencedor                → dono que some se você troca de cor
-3. a volta não republicava a config                   → quadrante pintado na cor de outro
+campanha   ■ meu  ■ dele  □ em aberto     contável   → quadrados
+batalha    ▓ meu  ▓ dele  ░ em aberto     contínuo   → barra
 ```
 
-E o nº 1 tinha um segundo defeito embaixo: ler do slot na hora errada. O
-`QuadranteController` roda em `-9000` e o `Awake` do `MatchController` em `0`, e é
-lá que o `PartidaConfig` era aplicado. **Pintar antes da configuração chegar** — a
-armadilha do projeto espelhada. Daí o `EnsurePartidaConfigApplied`, ponto único e
-idempotente, que quem pinta antes chama primeiro.
+As duas telas contam a mesma história, cada uma na forma que o dado dela merece.
+
+### As descobertas anteriores, que seguem valendo
+
+> **v8.5.1 — a cena `Campanha` parece uma partida e não é.**
+
+Ela tem `MatchController`, `TurnStateManager` e lista de jogadores porque nasceu
+da cena-base de batalha. Perguntar *"estou numa partida?"* olhando o que **existe**
+na cena responde sim e age errado. Pergunte ao `MatchController.IsPlayable` — e ao
+**da própria cena**, não a qualquer um.
+
+> **v8.5.0 — cor não é identidade. É uma fantasia que o slot veste por uma
+> partida.**
+
+As duas cores são escolhidas no menu. Tudo que atravessa a fronteira entre autoria
+e partida — ou entre uma partida e a seguinte — endereça por **slot**, e a cor se
+resolve só na hora de pintar, por `GetTeamIdForSlot`. Vale para o tint do mapa, os
+quadradinhos, o registro do vencedor e o dono de cada construção.
 
 ---
 
@@ -118,11 +114,15 @@ Assets/Scripts/Campanha/    MundoData · BlocoData · CampanhaData · QuadranteD
                             ConstrucaoAssada · UnidadeAssada · CamadaAssada · RotaAssada
                             EconomiaInicialSlot          ← caixa inicial, autoral
                             ProgressoDaCampanha          ← Concluido() nos 3 níveis
+                            CampanhaManager              ← ponte da cena p/ o placar
                             CampaignProgressStore        ← por SLOT, e dentro do save
 Assets/Editor/              MapHelperWindow (a bancada) · MapaTerrenoJson
                             RoadRoutePainterWindow · SceneSanitizerWindow
 Assets/DB/Campanha/         Mundo Fixture.asset
+Assets/Scripts/UI/          BarraVencedorController      ← um quadrado por quadrante
+                            PanelVitoriaController       ← os botões do fim de partida
 Assets/Prefab/Managers/     AudioManager.prefab          ← nas 3 cenas do fluxo
+Assets/Prefab/              Panel_turn · Panel_vitoria · MenuRoot · Cursor
 Assets/Scenes/Autoria/      Fixture (26 construções, 6 trechos) · Mundo
 Assets/Scenes/              Campanha · Batalha           ← as duas no Build Settings
 ```
@@ -138,115 +138,86 @@ bloco A · Auridia
      └─ A_IA_Q4  Tubarão Branco     (2,-9)  30×20   600 tiles
 ```
 
-26 construções assadas nos quatro. **Terreno, construções, camadas, rotas e
-unidades entram.** `bakedUnidades` e `economiaInicial` seguem **vazios** — os dois
-mecanismos existem, falta o autor querer usá-los.
+26 construções assadas. **O `A_IA_Q2` é o único autorado por inteiro:** caixa
+inicial de 10000 para cada slot e um `chinook` no slot 0. Os outros três seguem
+sem tropa e sem caixa — o padrão, e o que o campo significa quando ausente.
 
 ---
 
 ## Onde eu parei
 
-### Compila e roda — falta exercitar
+### O que o autor exercitou jogando
 
-A `v8.5.0` e a `v8.5.1` foram escritas contra as APIs lidas, sem build por linha
-de comando. Em 2026-09-09 o autor abriu o Q2 na Batalha e ele montou **idêntico
-ao mosaico**, o que derruba a dívida para os caminhos exercitados:
-
-```text
-✅ QuadranteController.Build      terreno, camadas, rotas, construções
-✅ paridade odd-r                 o Q2 (originY ímpar) sai igual ao mosaico
-✅ EnsurePartidaConfigApplied     as cores saem do slot, e os prédios batem
-✅ áudio                          chega na Batalha sem reclamar
-```
-
-**O que ainda ninguém exercitou**, em ordem de risco:
+Não há build por linha de comando: o que foi provado, foi ele jogando. E foi
+assim que a paridade do Q2, o título perdido e o `bar_tvencedor` apareceram.
 
 ```text
-0b        menu → mapa A → turno 5 → menu → mapa B
-          → no turno 1 do B o plano nasce VAZIO
-save      salvar numa batalha do Q3 → Tela de Entrada → Load
-          → abre o Q3, não o Q1
-volta     ganhar ou perder → Enter → volta ao mapa com o quadrante pintado
-          na cor do slot vencedor
-economia  autorar 100000 no slot 0 de um quadrante e ver no painel no turno 1
+✅ o laço inteiro        menu → campanha → batalha → volta → mapa pintado
+✅ paridade odd-r        o Q2 (originY ímpar) monta idêntico ao mosaico
+✅ cores pelo slot       tint, quadradinhos e registro concordam
+✅ tropa e caixa inicial  A_IA_Q2 tem chinook no slot 0 e 10000 para cada lado
+✅ save/load de campanha  volta ao quadrante em foco
 ```
 
-⚠️ **A armadilha do turno 2 continua de pé** enquanto `bakedUnidades` e
-`economiaInicial` estiverem vazios: os dois lados abrem sem tropa, e quem não
-comprar no turno 1 perde no turno 2. O mecanismo existe; falta autorar.
+### O `0b` NUNCA rodou
 
-### O contador 1/4 não tem tela
+Os hooks de `sceneLoaded` do `ObjectiveManager` e do `AITacticalAnalyzer` estão
+escritos desde a `v8.5.1` e ninguém exercitou. É o tipo de bug que só aparece na
+segunda partida, e nenhuma sessão chegou lá.
 
-`ProgressoDaCampanha` responde e ninguém pergunta. Falta o consumo na cena
-Campanha (frente paralela), e são três chamadas:
+> mapa A → turno 5 → menu → mapa B. No turno 1 do B, o plano da IA tem de nascer
+> **vazio**.
 
-```csharp
-ProgressoDaCampanha.FormatarProgresso(mundo, campanha, meuSlot)   // "1/4"
-ProgressoDaCampanha.Concluida(mundo, campanha, meuSlot)           // reconhecimento
-matchController.TryGetSingleActiveLocalHumanSlot(out meuSlot)     // quem sou eu
+Sintoma se falhar: a IA do segundo mapa persegue setor que não existe ali.
+
+### O progresso tem um registro de mentira dentro
+
+O `RODADAS: 3` do Terra Firme veio da **armadilha do turno 2** — a partida que
+acabou por zero unidades, não por jogo. Agora que o Q2 tem caixa inicial e tropa,
+**limpar o progresso antes de testar para valer**, senão as anotações misturam
+resultado real com resultado do setup.
+
+### Três lugares respondem "de quem é este quadrante"
+
+```text
+CampaignSelectionController.GetWonSectorCounts    conta por slot
+CampaignSelectionController.GetQuadrantOwners     lista por quadrante
+ProgressoDaCampanha                               a versão que sobe a hierarquia
 ```
 
-Campanha vencida **oferece** a saída para a Tela de Entrada — não expulsa.
+Concordam hoje porque todos consultam o `CampaignProgressStore`. Vão discordar no
+dia em que "concluído" virar recursivo — *campanha concluída = todos os quadrantes
+dela* — que é o que o portão de destrave vai precisar. Gatilho conhecido, conserto
+conhecido: os dois primeiros delegam ao terceiro.
 
-### O portão de destrave não existe, e saiu do caminho crítico
+### Arestas de tela, todas conhecidas
 
-`Liberado()` é a recursão que **desce** (bloco → campanha → quadrante) e precisa
-de navegação de **pai e de irmãos**, que o `MundoData` não expõe: só há
-`TryGetBloco/Campanha/Quadrante` por id e `TryGetPorSerial`.
-
-`Concluido()` só **sobe**, e subir é de graça porque as listas de filhos já
-existem — por isso ele existe e o portão não. No MVP os quatro quadrantes têm
-`destravadoPor` vazio: o portão responderia "liberado" para tudo e **nenhuma tela
-mudaria**.
-
-### O progresso só persiste se houver save
-
-O `CampaignProgressStore` deixou de gravar arquivo próprio: virou snapshot dentro
-do save. `RecordOwner` escreve no cache estático, e o cache morre com a sessão.
-O teste de aceitação do MVP — *sair, voltar, e o mapa continuar contando a mesma
-história* — passa a depender de ter havido save.
-
-### A mixagem de SFX está espalhada por três cenas
-
-| cena | cursor vem de | master | ui | move |
-|---|---|---|---|---|
-| Tela de Entrada | **inline, não é o prefab** | 0.4 | 1 | 1 |
-| Campanha | `Cursor.prefab` + override | 0.4 | 0.3 | 0.3 |
-| Batalha | `Cursor.prefab` + override | 0.4 | 0.3 | 0.3 |
-
-Os SFX de cursor do menu tocam a **três vezes** o volume das outras cenas, e como
-o cursor de lá é inline, mexer no prefab não o alcança. Tudo que seria preciso
-para mixar já existe (master + 10 categorias de SFX; master + volume por faixa de
-música) — falta **um lugar só** para mexer.
-
-### Volume não é preferência de verdade
-
-**Zero `PlayerPrefs` na árvore inteira**, verificado. Nada sobrevive à troca de
-cena, quanto mais a fechar o jogo. Começado e parado para não sair do MVP.
+- **O painel de inspeção tapa a borda direita do mapa.** Navegar até um quadrante
+  de lá é inspecionar algo que não se vê. Ideia parqueada: o painel escolher o
+  lado oposto ao quadrante em foco.
+- **Sem o `presentationTextOverride`, a campanha cai no "Turno {n}"** do ramo de
+  batalha. Visível, então não é falha silenciosa — mas turno não significa nada
+  numa tela de seleção.
+- **Os números laterais e os quadradinhos dizem a mesma coisa** com 4 quadrantes.
+  Ganham utilidade quando uma campanha tiver 12.
+- **A mixagem de SFX segue espalhada** por três cenas, uma delas com cursor
+  inline, e o menu toca a 3× o volume das outras.
+- **O silêncio entre menu e campanha** continua: `MatchMusicAudioManager` sem
+  `DontDestroyOnLoad`, e `BuildWorldMosaic` no `Awake` em ordem `-10000`.
 
 ### Depois
 
 ```text
-1. o contador 1/4 e o fim da campanha (consumo na cena)
-2. um lugar só para a mixagem de SFX
-3. o portão de destrave — depois de existir uma segunda campanha
-4. destravadoPor passa a guardar idSerial em vez de texto
+1. testar o 0b — é o único bloqueio do MVP que nunca foi exercitado
+2. o fim da campanha: 4/4 oferece a volta à Tela de Entrada
+3. unificar as três contagens (gatilho: o portão de destrave)
+4. o portão hierárquico — Liberado() precisa de pai e irmãos, que o MundoData
+   não expõe
 ```
 
-### Dívidas com gatilho conhecido
-
-- **O silêncio entre menu e campanha continua.** O `MatchMusicAudioManager` não é
-  `DontDestroyOnLoad` (a música da cena que sai morre com ela) e o
-  `BuildWorldMosaic()` roda no `Awake` em ordem `-10000`, travando o frame antes
-  de qualquer `Start`. Virar prefab resolveu compartilhamento, não persistência.
-- **`MatchController.cs` carrega duas frentes.** `isPlayable` (frente paralela) e
-  `TrySetStartMoney` (minha) entraram no mesmo arquivo no commit `aac0c48`.
-  Reverter um sem o outro é edição manual.
-- **`BoardReady` tem um leitor** (`RefreshAllOccupancyVisuals`); os demais
-  consumidores ainda não consultam.
-- **Nada foi medido em escala.** A bancada e o pintor rodaram sobre 1800 células.
-- **`.vscode/settings.json`** aponta pro `.slnx`, e o `.sln` é gerado pela Unity e
-  não existe no disco. Sujo de propósito.
+⚠️ **`MatchController.cs` carrega duas frentes.** `isPlayable` (paralela) e
+`TrySetStartMoney` (minha) entraram no mesmo arquivo no `aac0c48`. Reverter um sem
+o outro é edição manual.
 
 ---
 
@@ -259,9 +230,8 @@ cena, quanto mais a fechar o jogo. Começado e parado para não sair do MVP.
  2. consumidores Melhor*          ⚠️ faltam Suprir, Fundir, Detecção e Spotting
  3. papéis → somente POLÍTICA     ⚠️ as seis fichas existem; RoleData ainda não
  4. variações de papel            perfil/trait depois da extração
- 5. CAMPANHA                      🟡 laço, save por endereço, progresso por slot,
-                                     0b e economia inicial prontos (não compilados);
-                                     falta a TELA do 1/4 e o portão de destrave
+ 5. CAMPANHA                      🟡 o laço roda de ponta a ponta e tem tela;
+                                     falta EXERCITAR o 0b e o portão de destrave
 ```
 
 ---
@@ -270,6 +240,11 @@ cena, quanto mais a fechar o jogo. Começado e parado para não sair do MVP.
 
 | armadilha | regra |
 |---|---|
+| **forma que não casa com o dado** | contável desenhado como barra obriga o jogador a extrair contagem de proporção; contínuo desenhado como quadrado finge discreto o que é fracionário. Antes de escolher barra ou quadrado, pergunte se o dado é contável |
+| **busca por nome que falha calada** | `FindNamedChild("bar_vencedor")` com o objeto chamado `bar_tvencedor` não desenhou nada, sem erro nem log. Busca por nome dispensa arrastar referência, e o preço é falhar em silêncio — **toda busca por nome tem de avisar quando não acha** |
+| **duas coisas amarradas no mesmo campo** | o `presentationTextOverride` decidia o título E se o placar aparecia. Quando a campanha precisou dos dois, alguém apagou o texto para o placar voltar, e o título se perdeu. Campo que decide duas coisas separa no dia em que elas divergirem |
+| **escape `
+` em script que gera código** | a ferramenta processa a barra antes do Python e o literal C# não casa. Usar `chr(92)`. **Está nesta tabela e eu tropecei duas vezes antes de olhar** |
 | **`currentTurn` lido como jogada individual** | ele conta **rodadas**: só sobe quando o índice de jogador dá a volta. Passar a vez de um jogador ao outro não mexe nele. Todo número de "turno" que atravessa telas ou vira registro precisa dizer qual dos dois é |
 | **translação de recorte em grade hexagonal** | odd-r: a posição de mundo de uma linha depende da PARIDADE do y, não da diferença entre dois y. Traduzir um retângulo autorado em y ímpar para y par inverte a paridade de todas as linhas e cisalha o recorte meia célula — e **nada reclama**, porque o tile continua na célula lógica certa. Se um recorte precisa mudar de y, a paridade tem de sobreviver |
 | **cena que parece partida** | a `Campanha` tem `MatchController`, `TurnStateManager` e lista de jogadores porque nasceu da cena-base de batalha. Perguntar "estou numa partida?" olhando o que EXISTE na cena responde sim e age errado. Pergunte ao `MatchController.IsPlayable` — e ao **da própria cena**, não a qualquer um |
@@ -312,6 +287,7 @@ cena, quanto mais a fechar o jogo. Começado e parado para não sair do MVP.
 |---|---|
 | [`Planos/plano_campanha.md`](Planos/plano_campanha.md) | **o tronco** — autoria, recorte, progresso, cenas, bloqueios, teste |
 | [`Planos/briefing_cena_campanha.md`](Planos/briefing_cena_campanha.md) | o contrato entre as duas frentes |
+| [`relatorio_v8.5.2.md`](relatorio_v8.5.2.md) | a forma tem que casar com o dado — quadradinhos, paridade, fim de partida |
 | [`relatorio_v8.5.1.md`](relatorio_v8.5.1.md) | o que atravessa a cena — save por endereço, isPlayable, o 0b |
 | [`relatorio_v8.5.0.md`](relatorio_v8.5.0.md) | o laço fecha, e o dono deixa de ser uma cor |
 | [`relatorio_v8.4.1.md`](relatorio_v8.4.1.md) | orientação, rotas partidas e identidade estável |
