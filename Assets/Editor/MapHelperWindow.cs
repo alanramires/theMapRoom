@@ -585,6 +585,8 @@ public class MapHelperWindow : EditorWindow
 
             DrawNoBody(q, PickLevel.Quadrante, index, pai: parent, paiRotulo: "caixa da campanha");
 
+            DrawEconomiaInicial(q);
+
             EditorGUILayout.LabelField(
                 "células",
                 $"{q.width * q.height}"
@@ -947,6 +949,75 @@ public class MapHelperWindow : EditorWindow
     /// (campanha concluida = todos os quadrantes dela), e e isso que faz um campo
     /// so resolver os tres niveis. A avaliacao ainda nao existe — so o dado.
     /// </summary>
+    /// <summary>
+    /// Caixa inicial por slot — o que o MatchController credita UMA vez, no
+    /// primeiro inicio de turno daquele slot, somado a renda das construcoes.
+    ///
+    /// NAO SAI DO BAKE, e por isso mora aqui e nao no botao Assar: dinheiro nao e
+    /// espacial. Tropa inicial vem do bake porque ESTA no retangulo; cem mil no
+    /// bolso nao esta em lugar nenhum da cena, e um "Assar" nao poderia descobri-lo.
+    ///
+    /// Quatro linhas fixas porque a partida tem no maximo quatro slots. So grava
+    /// quem tem valor: slot ausente da lista vale zero, entao zerar remove a
+    /// entrada e o .asset nao enche de zeros.
+    /// </summary>
+    private void DrawEconomiaInicial(QuadranteData q)
+    {
+        if (q.economiaInicial == null)
+            q.economiaInicial = new List<EconomiaInicialSlot>();
+
+        int declarados = 0;
+        for (int i = 0; i < q.economiaInicial.Count; i++)
+            if (q.economiaInicial[i] != null && q.economiaInicial[i].startMoney > 0)
+                declarados++;
+
+        EditorGUILayout.LabelField(
+            declarados == 0
+                ? "caixa inicial: (só a renda dos prédios)"
+                : $"caixa inicial ({declarados} slot(s))");
+
+        EditorGUI.indentLevel++;
+        for (int slot = 0; slot < 4; slot++)
+        {
+            int atual = q.GetStartMoneyForSlot(slot);
+
+            EditorGUI.BeginChangeCheck();
+            int novo = EditorGUILayout.IntField($"slot {slot}", atual);
+            if (!EditorGUI.EndChangeCheck())
+                continue;
+
+            novo = Mathf.Max(0, novo);
+            if (novo == atual)
+                continue;
+
+            Undo.RecordObject(mundo, "Caixa inicial");
+            AplicarCaixaInicial(q, slot, novo);
+            EditorUtility.SetDirty(mundo);
+        }
+        EditorGUI.indentLevel--;
+    }
+
+    private static void AplicarCaixaInicial(QuadranteData q, int slot, int valor)
+    {
+        for (int i = 0; i < q.economiaInicial.Count; i++)
+        {
+            EconomiaInicialSlot entrada = q.economiaInicial[i];
+            if (entrada == null || entrada.slotIndex != slot)
+                continue;
+
+            // Zerar REMOVE em vez de gravar zero: ausente ja significa zero, e a
+            // entrada morta so faria o asset crescer e o diff mentir.
+            if (valor <= 0)
+                q.economiaInicial.RemoveAt(i);
+            else
+                entrada.startMoney = valor;
+            return;
+        }
+
+        if (valor > 0)
+            q.economiaInicial.Add(new EconomiaInicialSlot { slotIndex = slot, startMoney = valor });
+    }
+
     private void DrawDestraves(INoDoMapa no)
     {
         List<string> lista = no.DestravadoPor;
