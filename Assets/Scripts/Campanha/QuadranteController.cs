@@ -259,6 +259,15 @@ public class QuadranteController : MonoBehaviour
         if (!aguardandoVolta || voltando)
             return;
 
+        // QUEM TEM BOTAO MANDA.
+        //
+        // Este Enter escondido existe para as cenas em que o Panel_vitoria e so
+        // texto. Onde ele tem botoes, o PanelVitoriaController conduz o teclado — e
+        // sem esta guarda o MESMO Enter acionaria o botao E esta volta, disparando
+        // dois LoadScene no mesmo frame.
+        if (PanelVitoriaController.EstaConduzindo)
+            return;
+
         // O mesmo Enter que confirmou a ultima acao nao pode ser o que sai da tela
         // de vitoria — a tela apareceria e sumiria no mesmo frame. Exige tecla nova.
         if (Time.frameCount <= frameDaConclusao || IsSubmitHeldNow())
