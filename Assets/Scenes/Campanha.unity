@@ -10091,6 +10091,62 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 0aab900f996a7724fa007c68e9d39283, type: 3}
+--- !u!1 &909433432
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 909433433}
+  - component: {fileID: 909433434}
+  m_Layer: 0
+  m_Name: Campanha Controller
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &909433433
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 909433432}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1307941790}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &909433434
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 909433432}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 64fd5ae4c2b84ed1ac3f25e41534fb2a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CampaignSelectionController
+  mundo: {fileID: 11400000, guid: 3c4f3be48f318fb4fb30ae0166700a28, type: 2}
+  constructionDatabase: {fileID: 11400000, guid: a3b9ad47181534c4e92a0205460608a5, type: 2}
+  structureDatabase: {fileID: 11400000, guid: db7a20bdbd574bd408e02a940b66e687, type: 2}
+  unitDatabase: {fileID: 11400000, guid: e8814965e8c2b764c881f833b39e19f1, type: 2}
+  battleSceneName: Batalha
+  worldTilemap: {fileID: 0}
+  cursorController: {fileID: 0}
+  matchController: {fileID: 0}
+  aiController: {fileID: 0}
+  unfocusedQuadrantTint: {r: 0.62, g: 0.66, b: 0.7, a: 1}
+  unfocusedWinnerBrightness: 0.82
+  unfocusedConstructionBrightness: 0.62
 --- !u!1 &930836404
 GameObject:
   m_ObjectHideFlags: 0
@@ -10548,6 +10604,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1307941790}
+  - component: {fileID: 1307941791}
   m_Layer: 0
   m_Name: Managers
   m_TagString: Untagged
@@ -10580,8 +10637,23 @@ Transform:
   - {fileID: 1679592217}
   - {fileID: 677354449}
   - {fileID: 1986179052}
+  - {fileID: 909433433}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1307941791
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1307941789}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d709d9947d014f449fe4c3d887fa3031, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CampanhaManager
+  winnerTintStrength: 1
+  selectionController: {fileID: 909433434}
 --- !u!1 &1310407250
 GameObject:
   m_ObjectHideFlags: 0
@@ -12365,62 +12437,6 @@ RectTransform:
   m_CorrespondingSourceObject: {fileID: 1002355237582946797, guid: 0fd70fab51b395b4fbb47f10b06167cc, type: 3}
   m_PrefabInstance: {fileID: 4641348038426839271}
   m_PrefabAsset: {fileID: 0}
---- !u!1 &2123456701
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 2123456702}
-  - component: {fileID: 2123456703}
-  m_Layer: 0
-  m_Name: Campaign Selection Controller
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &2123456702
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2123456701}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &2123456703
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2123456701}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 64fd5ae4c2b84ed1ac3f25e41534fb2a, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::CampaignSelectionController
-  mundo: {fileID: 11400000, guid: 3c4f3be48f318fb4fb30ae0166700a28, type: 2}
-  constructionDatabase: {fileID: 11400000, guid: a3b9ad47181534c4e92a0205460608a5, type: 2}
-  structureDatabase: {fileID: 11400000, guid: db7a20bdbd574bd408e02a940b66e687, type: 2}
-  battleSceneName: Batalha
-  worldTilemap: {fileID: 0}
-  cursorController: {fileID: 0}
-  matchController: {fileID: 0}
-  aiController: {fileID: 0}
-  unfocusedQuadrantTint: {r: 0.62, g: 0.66, b: 0.7, a: 1}
-  winnerTintStrength: 0.7
-  unfocusedWinnerBrightness: 0.82
-  unfocusedConstructionBrightness: 0.62
 --- !u!1001 &26833424128513065
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -14167,4 +14183,3 @@ SceneRoots:
   - {fileID: 1336167666}
   - {fileID: 2029232291}
   - {fileID: 1570356384}
-  - {fileID: 2123456702}

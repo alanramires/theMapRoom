@@ -421,6 +421,14 @@ public class PanelHelperController : MonoBehaviour
 
     private void Refresh(bool force)
     {
+        // O menu ocupa a mesma area do helper. Preserva o conteudo para a volta;
+        // salvar/carregar/estatisticas fecham o menu e podem usar o painel normalmente.
+        if (campaignSelectionController != null && campaignSelectionController.IsCampaignMenuOpen)
+        {
+            HideAll(force);
+            return;
+        }
+
         if (hasExternalOverrideText &&
             externalOverrideUntilUnscaledTime > 0f &&
             Time.unscaledTime >= externalOverrideUntilUnscaledTime)

@@ -63,6 +63,22 @@ public static class CampaignProgressStore
         return owner.IsValid;
     }
 
+    public static bool TryGetResult(
+        string mundoId, string campanhaId, string quadranteId,
+        out PlayerSlotId owner, out int turn)
+    {
+        owner = PlayerSlotId.Invalid;
+        turn = 0;
+        if (!HasAddress(mundoId, campanhaId, quadranteId)) return false;
+        if (!Cache.TryGetValue(BuildCacheKey(mundoId, campanhaId), out CampaignProgressData data))
+            return false;
+        QuadrantOwnershipData quadrant = FindQuadrant(data, quadranteId);
+        if (quadrant == null) return false;
+        owner = PlayerSlotId.FromIndex(quadrant.ownerSlotIndex);
+        turn = quadrant.lastTurn;
+        return owner.IsValid;
+    }
+
     public static bool RecordOwner(
         string mundoId,
         string campanhaId,
