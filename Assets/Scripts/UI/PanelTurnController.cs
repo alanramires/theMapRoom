@@ -1,4 +1,5 @@
 using TMPro;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -24,6 +25,15 @@ public class PanelTurnController : MonoBehaviour
     private bool statsInitialized;
     private bool wasNeutral;
     private int lastStatsTurn = -1;
+    [Header("Barras — a cena decide qual das duas aparece")]
+    [Tooltip("Proporção de território da BATALHA. Escondida na seleção de mapa.")]
+    [SerializeField] private GameObject barTerritory;
+    [Tooltip("Um quadradinho por quadrante, da CAMPANHA. Escondida na batalha.")]
+    [SerializeField] private GameObject barVencedor;
+    [SerializeField] private BarraVencedorController barraVencedor;
+
+    private readonly List<PlayerSlotId> donosDeQuadrante = new List<PlayerSlotId>();
+    private CampanhaManager campanhaManager;
 
     private void Awake()
     {
@@ -49,6 +59,8 @@ public class PanelTurnController : MonoBehaviour
 
     private void TryAutoAssignReferences()
     {
+        if (campanhaManager == null)
+            campanhaManager = FindAnyObjectByType<CampanhaManager>();
         if (matchController == null)
             matchController = FindAnyObjectByType<MatchController>();
 
@@ -60,6 +72,12 @@ public class PanelTurnController : MonoBehaviour
 
         if (panelEstatisticas == null)
             panelEstatisticas = FindNamedChild("panel_estatisticas")?.gameObject;
+        if (barTerritory == null)
+            barTerritory = FindNamedChild("bar_territory")?.gameObject;
+        if (barVencedor == null)
+            barVencedor = FindNamedChild("bar_vencedor")?.gameObject;
+        if (barraVencedor == null && barVencedor != null)
+            barraVencedor = barVencedor.GetComponent<BarraVencedorController>();
         if (slot0Count == null)
             slot0Count = FindNamedTmpText("slot0_count");
         if (slot1Count == null)
@@ -98,6 +116,33 @@ public class PanelTurnController : MonoBehaviour
     {
         if (!Application.isPlaying)
             return;
+
+        if (campanhaManager != null)
+        {
+            // Selecao de mapa: usa somente conquistas confirmadas, inclusive apos load.
+            if (panelEstatisticas != null) panelEstatisticas.SetActive(true);
+
+            // AS DUAS BARRAS CONTAM COISAS DIFERENTES, e o painel e o mesmo prefab
+            // nas duas cenas. Territorio e proporcao de hexagonos DESTA partida;
+            // vencedor e quantos quadrantes de quantos na campanha. Mostrar as duas
+            // juntas seria pedir que o jogador adivinhe qual e qual.
+            TrocarBarras(mostrarVencedor: true);
+            if (matchController == null) return;
+
+            if (barraVencedor != null)
+            {
+                campanhaManager.GetQuadrantOwners(donosDeQuadrante);
+                barraVencedor.Mostrar(donosDeQuadrante);
+            }
+
+            campanhaManager.GetSectorCounts(out int won0, out int won1, out int total);
+            ApplyStatsPresentation(won0, won1,
+                total > 0 ? won0 * 100f / total : 0f,
+                total > 0 ? won1 * 100f / total : 0f);
+            return;
+        }
+
+        TrocarBarras(mostrarVencedor: false);
 
         bool isNeutral = turnStateManager == null ||
                          turnStateManager.CurrentCursorState == TurnStateManager.CursorState.Neutral;
@@ -188,16 +233,21 @@ public class PanelTurnController : MonoBehaviour
             percent0 = percent0 * 100f / ownedTotal;
             percent1 = percent1 * 100f / ownedTotal;
         }
+        ApplyStatsPresentation(units0, units1, percent0, percent1);
+    }
+
+    private void ApplyStatsPresentation(int count0, int count1, float percent0, float percent1)
+    {
         Color color0 = TeamUtils.GetColor(matchController.GetVisualTeamForSlot(PlayerSlotId.FromIndex(0)));
         Color color1 = TeamUtils.GetColor(matchController.GetVisualTeamForSlot(PlayerSlotId.FromIndex(1)));
         if (slot0Count != null)
         {
-            slot0Count.text = units0.ToString();
+            slot0Count.SetText("{0}", count0);
             slot0Count.color = color0;
         }
         if (slot1Count != null)
         {
-            slot1Count.text = units1.ToString();
+            slot1Count.SetText("{0}", count1);
             slot1Count.color = color1;
         }
         if (slot0Bar != null) slot0Bar.color = color0;
@@ -251,6 +301,20 @@ public class PanelTurnController : MonoBehaviour
     {
         Transform local = FindNamedChild(name);
         return local != null ? local.GetComponent<Image>() : null;
+    }
+
+    /// <summary>
+    /// Uma barra por vez. Chamado nos dois ramos do refresh, e nao so quando muda,
+    /// porque o prefab e compartilhado: uma cena carregada com a barra errada
+    /// visivel se corrige no primeiro refresh em vez de ficar mentindo.
+    /// </summary>
+    private void TrocarBarras(bool mostrarVencedor)
+    {
+        if (barTerritory != null && barTerritory.activeSelf == mostrarVencedor)
+            barTerritory.SetActive(!mostrarVencedor);
+
+        if (barVencedor != null && barVencedor.activeSelf != mostrarVencedor)
+            barVencedor.SetActive(mostrarVencedor);
     }
 
     private Transform FindNamedChild(string name)

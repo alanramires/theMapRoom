@@ -1190,6 +1190,38 @@ public class CampaignSelectionController : MonoBehaviour
 
     public void RefreshCampaignProgressPresentation() => RefreshQuadrantPresentation();
 
+    /// <summary>
+    /// Um dono por quadrante, na MESMA ordem e sobre a MESMA lista que o
+    /// GetWonSectorCounts percorre. Slot invalido = ninguem tomou ainda.
+    ///
+    /// Compartilhar a lista nao e detalhe: os quadradinhos e o contador mostram a
+    /// mesma coisa de dois jeitos, e se lessem fontes diferentes poderiam
+    /// discordar na tela sem ninguem entender por que.
+    ///
+    /// Reusa a lista recebida para nao alocar a cada refresh.
+    /// </summary>
+    public void GetQuadrantOwners(List<PlayerSlotId> destino)
+    {
+        if (destino == null)
+            return;
+
+        destino.Clear();
+        if (mundo == null)
+            return;
+
+        foreach (QuadrantEntry entry in quadrants)
+        {
+            destino.Add(
+                CampaignProgressStore.TryGetOwner(
+                    mundo.mundoId,
+                    entry.Campanha.campanhaId,
+                    entry.Quadrante.quadranteId,
+                    out PlayerSlotId owner)
+                    ? owner
+                    : PlayerSlotId.Invalid);
+        }
+    }
+
     public void GetWonSectorCounts(out int slot0, out int slot1, out int total)
     {
         slot0 = slot1 = 0;
