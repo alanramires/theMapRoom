@@ -32,6 +32,7 @@ public class CampaignSelectionController : MonoBehaviour
     [SerializeField] private MundoData mundo;
     [SerializeField] private ConstructionDatabase constructionDatabase;
     [SerializeField] private StructureDatabase structureDatabase;
+    [SerializeField] private UnitDatabase unitDatabase;
     [SerializeField] private string battleSceneName = "Batalha";
 
     [Header("Scene References")]
@@ -43,9 +44,6 @@ public class CampaignSelectionController : MonoBehaviour
     [Header("Quadrant Presentation")]
     [Tooltip("Multiplicador aplicado ao terreno dos quadrantes que nao estao em foco.")]
     [SerializeField] private Color unfocusedQuadrantTint = new Color(0.62f, 0.66f, 0.70f, 1f);
-    [Tooltip("Quanto a cor do vencedor substitui o branco do terreno conquistado.")]
-    [Range(0f, 1f)]
-    [SerializeField] private float winnerTintStrength = 0.7f;
     [Tooltip("Brilho de um territorio conquistado quando ele nao esta em foco.")]
     [Range(0f, 1f)]
     [SerializeField] private float unfocusedWinnerBrightness = 0.82f;
@@ -67,6 +65,7 @@ public class CampaignSelectionController : MonoBehaviour
 
     private readonly List<MapDetailPreview> mapDetails = new List<MapDetailPreview>();
     private Transform roadPreviewRoot;
+    private Transform unitPreviewRoot;
     private QuadrantEntry hovered;
     private QuadrantEntry pending;
     private int selectedQuadrantIndex = -1;
@@ -86,12 +85,25 @@ public class CampaignSelectionController : MonoBehaviour
     private bool campaignStatusOpen;
     private AIDifficulty? loadedDifficulty;
     private string persistenceFeedback;
+    private CampanhaManager campanhaManager;
+    private Color appliedUnfocusedQuadrantTint;
+    private float appliedUnfocusedWinnerBrightness = -1f;
+    private float appliedUnfocusedConstructionBrightness = -1f;
 
     public bool IsConfirmationOpen => confirmationOpen;
+    public bool IsCampaignMenuOpen => campaignMenuOpen;
     public int ConfirmationFocusIndex => confirmationFocusIndex;
 
     private void Awake()
     {
+        campanhaManager = GetComponent<CampanhaManager>();
+        if (campanhaManager == null)
+            foreach (CampanhaManager manager in FindObjectsByType<CampanhaManager>(FindObjectsSortMode.None))
+                if (manager.gameObject.scene == gameObject.scene)
+                {
+                    campanhaManager = manager;
+                    break;
+                }
         ResolveReferences();
         DisableGameplayFogPresentation();
         // O mosaico nasce antes do Awake do MatchController. Aplica o contrato
@@ -130,7 +142,8 @@ public class CampaignSelectionController : MonoBehaviour
             {
                 waitingForPersistence = false;
                 RefreshHoveredQuadrant(force: true);
-                SetCampaignMenuOpen(true);
+                // O prompt ja toca o som de cancelar, salvar ou carregar.
+                SetCampaignMenuOpen(true, playSound: false);
                 if (!string.IsNullOrEmpty(persistenceFeedback))
                 {
                     PanelHelperController.TrySetExternalText("CAMPANHA", persistenceFeedback);
@@ -146,7 +159,8 @@ public class CampaignSelectionController : MonoBehaviour
             {
                 campaignStatusOpen = false;
                 RefreshHoveredQuadrant(force: true);
-                SetCampaignMenuOpen(true);
+                SetCampaignMenuOpen(true, playSound: false);
+                cursorController?.PlayCancelSfx();
             }
             return;
         }
@@ -228,6 +242,12 @@ public class CampaignSelectionController : MonoBehaviour
 
     private void LateUpdate()
     {
+        // Ajustes no Inspector tambem precisam repintar, mesmo com o menu aberto.
+        if (appliedUnfocusedQuadrantTint != unfocusedQuadrantTint ||
+            appliedUnfocusedWinnerBrightness != unfocusedWinnerBrightness ||
+            appliedUnfocusedConstructionBrightness != unfocusedConstructionBrightness)
+            RefreshQuadrantPresentation();
+
         // O EventSystem navega depois do Update deste controller (-10000).
         // Observa o foco efetivo para incluir teclado/controle e repeticao de seta.
         if (!campaignMenuOpen || campaignMenuPanel == null) return;
@@ -280,7 +300,7 @@ public class CampaignSelectionController : MonoBehaviour
                 if (action == "button_save") campaignSaveManager.OpenSaveSlotPromptFromMenu();
                 else campaignSaveManager.OpenLoadSlotPromptFromMenu();
                 waitingForPersistence = campaignSaveManager.IsPersistencePromptActive;
-                if (!waitingForPersistence) SetCampaignMenuOpen(true);
+                if (!waitingForPersistence) SetCampaignMenuOpen(true, playSound: false);
                 break;
             case "button_situacao":
                 SetCampaignMenuOpen(false, playSound: false);
@@ -294,7 +314,7 @@ public class CampaignSelectionController : MonoBehaviour
                 break;
             case "button_minimapa":
                 SetCampaignMenuOpen(false, playSound: false);
-                cursorController?.PlayConfirmSfx();
+                // A camera toca o beep da alternancia do minimapa.
                 FindAnyObjectByType<CameraController>()?.ToggleQuickZoomFromMenu();
                 break;
             case "button_voltar":
@@ -373,7 +393,8 @@ public class CampaignSelectionController : MonoBehaviour
         {
             campaignStatusOpen = false;
             RefreshHoveredQuadrant(force: true);
-            SetCampaignMenuOpen(true);
+            SetCampaignMenuOpen(true, playSound: false);
+            cursorController?.PlayCancelSfx();
             return true;
         }
         if (launching || !selectionInputArmed || campaignMenuRoot == null || campaignMenuPanel == null)
@@ -402,6 +423,28 @@ public class CampaignSelectionController : MonoBehaviour
         UnityEngine.EventSystems.EventSystem events = UnityEngine.EventSystems.EventSystem.current;
         if (events != null)
         {
+            if (open)
+            {
+                // A Campanha tambem pode iniciar diretamente pelo Editor, sem
+                // passar pelos controllers de entrada que habilitam a UI.
+                events.sendNavigationEvents = true;
+#if ENABLE_INPUT_SYSTEM
+                var module = events.GetComponent<UnityEngine.InputSystem.UI.InputSystemUIInputModule>();
+                if (module != null)
+                {
+                    if (module.actionsAsset == null)
+                        module.AssignDefaultActions();
+                    module.enabled = true;
+                    module.move?.action?.Enable();
+                    module.submit?.action?.Enable();
+                    module.cancel?.action?.Enable();
+                    module.point?.action?.Enable();
+                    module.leftClick?.action?.Enable();
+                    module.rightClick?.action?.Enable();
+                    module.scrollWheel?.action?.Enable();
+                }
+#endif
+            }
             var first = open ? campaignMenuPanel.GetComponentInChildren<UnityEngine.UI.Button>() : null;
             events.SetSelectedGameObject(first != null ? first.gameObject : null);
             lastCampaignMenuSelection = events.currentSelectedGameObject;
@@ -694,13 +737,14 @@ public class CampaignSelectionController : MonoBehaviour
 
         int constructionPreviews = BuildConstructionPreviews();
         BuildMapDetails(out int decorationCount, out int roadSegmentCount);
+        int unitCount = BuildUnitPreviews();
         RefreshQuadrantPresentation();
         worldTilemap.CompressBounds();
         FrameWorldInCamera();
         Debug.Log(
             $"[Campanha] Mosaico '{mundo.displayName}' construído: {quadrants.Count} quadrantes, " +
             $"{painted} tiles, {constructionPreviews} construções visuais, " +
-            $"{decorationCount} enfeites, {roadSegmentCount} segmentos de estrada.",
+            $"{decorationCount} enfeites, {roadSegmentCount} segmentos de estrada, {unitCount} unidades visuais.",
             this);
     }
 
@@ -943,6 +987,68 @@ public class CampaignSelectionController : MonoBehaviour
         return built;
     }
 
+    private int BuildUnitPreviews()
+    {
+        if (unitPreviewRoot != null)
+        {
+            unitPreviewRoot.gameObject.SetActive(false);
+            Destroy(unitPreviewRoot.gameObject);
+        }
+        unitPreviewRoot = new GameObject("Campaign Unit Previews").transform;
+        unitPreviewRoot.SetParent(constructionPreviewRoot.parent, false);
+        int built = 0;
+        var previews = new Dictionary<string, MapDetailPreview>();
+        for (int i = 0; i < quadrants.Count; i++)
+        {
+            QuadranteData q = quadrants[i].Quadrante;
+            if (!q.HasBake || q.bakedUnidades == null) continue;
+            foreach (UnidadeAssada baked in q.bakedUnidades)
+            {
+                if (baked == null) continue;
+                if (baked.localX < 0 || baked.localX >= q.width ||
+                    baked.localY < 0 || baked.localY >= q.height) continue;
+                Vector3Int cell = new Vector3Int(q.originX + baked.localX, q.originY + baked.localY, 0);
+                if (!worldTilemap.HasTile(cell)) continue;
+                if (unitDatabase == null || !unitDatabase.TryGetById(baked.unitId, out UnitData data))
+                {
+                    Debug.LogWarning($"[Campanha] Unidade '{baked.unitId}' sem catalogo visual.", this);
+                    continue;
+                }
+                TeamId team = baked.slotIndex >= 0 && matchController != null
+                    ? matchController.GetTeamIdForSlot(baked.slotIndex) : baked.teamId;
+                Sprite sprite = TeamUtils.GetTeamSprite(data, team);
+                if (sprite == null)
+                {
+                    Debug.LogWarning($"[Campanha] Unidade '{baked.unitId}' sem sprite.", data);
+                    continue;
+                }
+                string key = $"{cell}:{baked.unitId}:{baked.slotIndex}:{team}";
+                if (previews.TryGetValue(key, out MapDetailPreview existing))
+                {
+                    existing.Quadrants.Add(i);
+                    continue;
+                }
+                // Somente imagem: nao instancia UnitManager nem registra ocupacao/sensores.
+                var visual = new GameObject($"{baked.unitId} @ {cell.x},{cell.y}");
+                visual.transform.SetParent(unitPreviewRoot, false);
+                visual.transform.position = worldTilemap.GetCellCenterWorld(cell);
+                var renderer = visual.AddComponent<SpriteRenderer>();
+                renderer.sprite = sprite;
+                renderer.color = TeamUtils.GetColor(team);
+                renderer.flipX = matchController != null
+                    ? matchController.GetTeamFlipX(team) : TeamUtils.ShouldFlipX(team);
+                renderer.sortingLayerName = "Unidade";
+                renderer.sortingOrder = 10;
+                var preview = new MapDetailPreview { Renderer = renderer, BaseColor = renderer.color };
+                preview.Quadrants.Add(i);
+                previews.Add(key, preview);
+                mapDetails.Add(preview);
+                built++;
+            }
+        }
+        return built;
+    }
+
     private void ResetConstructionPreviewRoot()
     {
         constructionPreviews.Clear();
@@ -1032,6 +1138,10 @@ public class CampaignSelectionController : MonoBehaviour
         if (worldTilemap == null)
             return;
 
+        appliedUnfocusedQuadrantTint = unfocusedQuadrantTint;
+        appliedUnfocusedWinnerBrightness = unfocusedWinnerBrightness;
+        appliedUnfocusedConstructionBrightness = unfocusedConstructionBrightness;
+
         for (int i = 0; i < quadrants.Count; i++)
         {
             QuadranteData q = quadrants[i].Quadrante;
@@ -1080,13 +1190,29 @@ public class CampaignSelectionController : MonoBehaviour
 
     public void RefreshCampaignProgressPresentation() => RefreshQuadrantPresentation();
 
+    public void GetWonSectorCounts(out int slot0, out int slot1, out int total)
+    {
+        slot0 = slot1 = 0;
+        total = quadrants.Count;
+        if (mundo == null) return;
+        foreach (QuadrantEntry entry in quadrants)
+        {
+            if (!CampaignProgressStore.TryGetOwner(mundo.mundoId,
+                entry.Campanha.campanhaId, entry.Quadrante.quadranteId, out PlayerSlotId owner))
+                continue;
+            if (owner.Value == 0) slot0++;
+            else if (owner.Value == 1) slot1++;
+        }
+    }
+
     private Color ResolveQuadrantTerrainTint(int index)
     {
         bool focused = index == selectedQuadrantIndex;
         if (!TryGetQuadrantOwner(index, out TeamId owner))
             return focused ? Color.white : unfocusedQuadrantTint;
 
-        Color winnerTint = Color.Lerp(Color.white, TeamUtils.GetColor(owner), winnerTintStrength);
+        float strength = campanhaManager != null ? campanhaManager.WinnerTintStrength : 0.7f;
+        Color winnerTint = Color.Lerp(Color.white, TeamUtils.GetColor(owner), strength);
         return focused ? winnerTint : ScaleRgb(winnerTint, unfocusedWinnerBrightness);
     }
 
@@ -1184,10 +1310,32 @@ public class CampaignSelectionController : MonoBehaviour
         }
 
         QuadranteData q = hovered.Quadrante;
+        // RODADAS, nao "turnos": o currentTurn do MatchController so incrementa
+        // em CloseRoundAndAdvanceToFirstPlayer, ou seja quando o indice de jogador
+        // DA A VOLTA. Passar a vez de um jogador ao outro nao mexe nele.
+        //
+        // O codigo chama isso de "turno" em todo lugar (HUD da batalha, cortina de
+        // privacidade), mas o autor chama de RODADA e reserva "turno" para a jogada
+        // individual. Aqui vale o vocabulario do autor, porque este numero e a
+        // MARCA: o jogador compara ao rejogar, sem tela nenhuma por perto para dar
+        // contexto.
         string bake = q.HasBake ? string.Empty : "\n<color=#FF8888>SEM BAKE</color>";
+        string result = "VENCEDOR: Nenhum\nRODADAS: —";
+        if (mundo != null && CampaignProgressStore.TryGetResult(
+            mundo.mundoId, hovered.Campanha.campanhaId, q.quadranteId,
+            out PlayerSlotId winner, out int turn))
+        {
+            TeamId team = matchController != null
+                ? matchController.GetTeamIdForSlot(winner.Value) : TeamId.Neutral;
+            string winnerName = $"Jogador {winner.Value + 1}";
+            if (team != TeamId.Neutral)
+                winnerName += $" ({TeamUtils.GetName(team)})";
+            string color = ColorUtility.ToHtmlStringRGB(TeamUtils.GetColor(team));
+            result = $"VENCEDOR: <color=#{color}>{winnerName}</color>\nRODADAS: {turn}";
+        }
         PanelHelperController.TrySetExternalText(
             hovered.Bloco.displayName.ToUpperInvariant(),
-            $"{hovered.Campanha.displayName}\n\nQUADRANTE: {q.displayName}\n{q.descricao}{bake}\n\nSETAS: MUDAR QUADRANTE | ENTER: SELECIONAR");
+            $"{hovered.Campanha.displayName}\n\nQUADRANTE: {q.displayName}\n{q.descricao}{bake}\n\n{result}\n\nSETAS: MUDAR QUADRANTE | ENTER: SELECIONAR");
     }
 
     private void FrameWorldInCamera()
