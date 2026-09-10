@@ -2299,7 +2299,28 @@ public class MatchController : MonoBehaviour
         AdvanceTurn();
         TurnPerfLog("AdvanceTurn", advanceTurnStartMs);
 
-        if (useHotSeatPanel && !hasVictoryWinner)
+        // A PARTIDA PODE TER ACABADO ATRAS DA CORTINA.
+        //
+        // O AdvanceTurn acima resolve o inicio do turno inteiro — economia, upkeep
+        // e a derrota por zero unidades — e faz isso COBERTO, de proposito: e assim
+        // que o hot seat protege a privacidade do jogador que entra.
+        //
+        // Mas se a partida terminar ali dentro, o bloco abaixo era pulado inteiro
+        // (a condicao e "!hasVictoryWinner"), e ninguem mais abaixava a cortina. O
+        // sintoma era TELA PRETA com o som da derrota tocando por baixo, e so o Esc
+        // respondendo — porque o CancelLoadingPresentation tambem e quem devolve o
+        // input do gameplay.
+        //
+        // Encerrou? A cortina desce, e o painel de vitoria (ja ativado por dentro do
+        // AdvanceTurn) aparece.
+        if (useHotSeatPanel && hasVictoryWinner)
+        {
+            panelRodada.CancelLoadingPresentation();
+            Debug.Log(
+                "[PrivacyCurtain] a partida terminou durante a transicao; cortina " +
+                "abaixada para a tela de resultado aparecer.");
+        }
+        else if (useHotSeatPanel)
         {
             if (ShouldUseHotSeatPrivacyCurtain())
             {
