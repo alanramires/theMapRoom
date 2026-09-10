@@ -957,10 +957,25 @@ public class MapHelperWindow : EditorWindow
     /// espacial. Tropa inicial vem do bake porque ESTA no retangulo; cem mil no
     /// bolso nao esta em lugar nenhum da cena, e um "Assar" nao poderia descobri-lo.
     ///
-    /// Quatro linhas fixas porque a partida tem no maximo quatro slots. So grava
-    /// quem tem valor: slot ausente da lista vale zero, entao zerar remove a
-    /// entrada e o .asset nao enche de zeros.
+    /// E ADICIONAL, nao substituto: na primeira rodada o slot recebe a renda dos
+    /// predios MAIS este valor. Renda 6000 com caixa inicial 14000 abre com 20000,
+    /// e as rodadas seguintes voltam a 6000.
+    ///
+    /// So grava quem tem valor: slot ausente da lista vale zero, entao zerar
+    /// remove a entrada e o .asset nao enche de zeros.
+    ///
+    /// SEM PREVIA DA CONTA. Seria facil somar aqui o capturedIncoming dos predios
+    /// assados e mostrar "6000 + 14000 = 20000" — e seria uma SEGUNDA CONTINHA. A
+    /// regra de renda vive no MatchController e depende de coisas que a bancada
+    /// nao sabe: no modo facil a renda da IA e dividida por tres em predio que nao
+    /// e cidade. O numero mentiria exatamente nos mapas em que mais importa.
     /// </summary>
+    /// <summary>
+    /// Quantos slots a bancada oferece. O jogo e de dois jogadores hoje; se um dia
+    /// virar quatro, e aqui que muda — o dado ja aguenta qualquer slotIndex.
+    /// </summary>
+    private const int SlotsJogaveis = 2;
+
     private void DrawEconomiaInicial(QuadranteData q)
     {
         if (q.economiaInicial == null)
@@ -973,11 +988,32 @@ public class MapHelperWindow : EditorWindow
 
         EditorGUILayout.LabelField(
             declarados == 0
-                ? "caixa inicial: (só a renda dos prédios)"
-                : $"caixa inicial ({declarados} slot(s))");
+                ? "caixa inicial: (nenhuma — só a renda dos prédios)"
+                : $"caixa inicial ({declarados} slot(s))",
+            EditorStyles.boldLabel);
+        EditorGUILayout.LabelField(
+            " ",
+            "extra na 1ª rodada, somado à renda dos prédios",
+            EditorStyles.miniLabel);
+
+        // Entrada para um slot que a bancada nao desenha ficaria INVISIVEL e sem
+        // como apagar — e continuaria valendo em jogo. Avisa em vez de esconder.
+        for (int i = 0; i < q.economiaInicial.Count; i++)
+        {
+            EconomiaInicialSlot fora = q.economiaInicial[i];
+            if (fora == null || fora.slotIndex < SlotsJogaveis)
+                continue;
+
+            EditorGUILayout.HelpBox(
+                $"Há caixa inicial declarada para o slot {fora.slotIndex}, acima dos "
+                + $"{SlotsJogaveis} que o jogo usa hoje. Ela continua valendo e não "
+                + "aparece abaixo para editar.",
+                MessageType.Warning);
+            break;
+        }
 
         EditorGUI.indentLevel++;
-        for (int slot = 0; slot < 4; slot++)
+        for (int slot = 0; slot < SlotsJogaveis; slot++)
         {
             int atual = q.GetStartMoneyForSlot(slot);
 
