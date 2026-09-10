@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 /// <summary>
 /// Responde "isto esta concluido?" nos tres niveis do mapa, e conta o progresso.
 ///
@@ -52,6 +54,50 @@ public static class ProgressoDaCampanha
         }
 
         return dono == slot;
+    }
+
+    /// <summary>
+    /// Um dono por quadrante da campanha, NA ORDEM DA LISTA do asset. Slot
+    /// invalido = ninguem tomou ainda.
+    ///
+    /// Ao contrario do ContarConquistados, isto nao pergunta "de quem?" — devolve
+    /// o dono de CADA um, que e o que uma tela precisa para desenhar um simbolo
+    /// por quadrante.
+    ///
+    /// A ORDEM E A DO AUTOR. O asset guarda os quadrantes numa lista, e e ela que
+    /// sai daqui — sem ordenar, sem inventar criterio. Num mundo cujo layout e
+    /// caotico nao existe ordem espacial que sirva, entao quem consome NAO deve
+    /// prometer posicao: o mapa e quem mostra onde cada um fica.
+    ///
+    /// Reusa a lista recebida para nao alocar a cada frame.
+    /// </summary>
+    public static void ColetarDonos(
+        MundoData mundo,
+        CampanhaData campanha,
+        List<PlayerSlotId> destino)
+    {
+        if (destino == null)
+            return;
+
+        destino.Clear();
+        if (mundo == null || campanha?.quadrantes == null)
+            return;
+
+        for (int i = 0; i < campanha.quadrantes.Count; i++)
+        {
+            QuadranteData quadrante = campanha.quadrantes[i];
+            if (quadrante == null)
+                continue;
+
+            destino.Add(
+                CampaignProgressStore.TryGetOwner(
+                    mundo.mundoId,
+                    campanha.campanhaId,
+                    quadrante.quadranteId,
+                    out PlayerSlotId dono)
+                    ? dono
+                    : PlayerSlotId.Invalid);
+        }
     }
 
     /// <summary>
