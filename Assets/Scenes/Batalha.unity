@@ -8984,7 +8984,7 @@ MonoBehaviour:
   boardTilemap: {fileID: 1566606925}
   terrainDatabase: {fileID: 11400000, guid: af24f1a2f28971f498767ede9f9cfba1, type: 2}
   showAILogs: 1
-  showAIUnitHUD: 0
+  showAIUnitHUD: 1
   startOnPause: 1
   iaRapida: 0
   hardMode: 0
