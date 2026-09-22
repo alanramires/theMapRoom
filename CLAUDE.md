@@ -116,7 +116,29 @@ them all; the current major is detailed and closed majors are pointers.
 
 ## Build & Run
 
-This is a Unity project — there is no CLI build. Open in Unity Editor (Windows) and use Play mode to test. Scripts auto-compile when files are saved. Check the Unity Console for compilation errors and runtime logs.
+**Compile from the command line before handing code over:**
+
+```bash
+bash tools/compilar.sh
+```
+
+It builds `Assembly-CSharp` and `Assembly-CSharp-Editor` with `dotnet build`
+against the `.csproj` files Unity generates (~45 s total), with the editor open
+or closed — it only reads the project files and writes to `Temp/`. Exit 0 means
+it compiles; exit 1 lists the errors with file and line.
+
+It also fails when a `.cs` in `Assets/` is **missing from the `.csproj`**. The
+`.csproj` is a file list Unity writes when the editor opens, so a script created
+afterwards is silently left out and the build goes green without compiling it.
+If that happens, the author opens Unity once to regenerate the list. Folders
+ending in `~` (such as `AI_Legacy~`) are ignored by Unity on purpose.
+
+**Compiling proves the types line up, not that the game works.** Behavior is
+only proven in Play mode, by the author. Open the Unity Editor (Windows), use
+Play mode, and read the Console for runtime logs.
+
+This used to say "there is no CLI build", and for weeks every change reached the
+author uncompiled — the author became the compiler.
 
 ## The two truths: `PodeEnxergar` and `PodeDetectar`
 
