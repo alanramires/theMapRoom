@@ -26,6 +26,7 @@ vazio e nenhum tabuleiro herde o layout de outro.
 |---|---|---|
 | v8.0.0 | A ausência precisa de nome próprio | [relatório](docs/relatorio_v8.0.0.md) |
 | v8.0.1 | As seis armas: o vocabulário fecha, o código não começou | [relatório](docs/relatorio_v8.0.1.md) |
+| v8.6.0 | A etiqueta muda de dono | [relatório](docs/relatorio_v8.6.0.md) |
 | v8.5.2 | A forma tem que casar com o dado | [relatório](docs/relatorio_v8.5.2.md) |
 | v8.5.1 | O que atravessa a cena | [relatório](docs/relatorio_v8.5.1.md) |
 | v8.5.0 | O laço fecha, e o dono deixa de ser uma cor | [relatório](docs/relatorio_v8.5.0.md) |
