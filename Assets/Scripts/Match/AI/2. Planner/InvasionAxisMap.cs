@@ -120,6 +120,11 @@ public class InvasionAxisMap
         foreach (ConstructionManager c in GetConstructions())
         {
             if (c == null) continue;
+            // O recorte de autoria (so fora de Play) ja filtrou os SETORES no rebuild do
+            // SectorManager; os QGs e rallies vem daqui, entao passam pelo mesmo crivo —
+            // senao o leque do quadrante vizinho entrava por esta porta.
+            Vector3Int cell = c.CurrentCellPosition; cell.z = 0;
+            if (!SectorManager.IsInsideAuthoringClip(cell)) continue;
             if (c.IsPlayerHeadQuarter) allHqs.Add(c);
             if (c.IsRallyPoint) rallies.Add(c);
         }
@@ -152,7 +157,7 @@ public class InvasionAxisMap
         // existem justamente pra aproximar o que aqui ja esta dito. A numeracao segue
         // a ordem da lista, nao o angulo. So o eixo de invasao continua sintetico.
         var autorados = new List<EixoAutorado>();
-        if (QuadranteController.TryGetEixosAutorados(slotId.Value, autorados)
+        if (TryGetEixosAutorados(slotId.Value, autorados)
             && map.BuildFromAuthored(board, slotId, allHqs, rallies, autorados))
         {
             map.AppendInvasionAxis(board, slotId, team, allHqs);
@@ -203,6 +208,30 @@ public class InvasionAxisMap
         map.AppendInvasionAxis(board, slotId, team, allHqs);
 
         return map;
+    }
+
+    /// <summary>
+    /// Quadrante em foco na cena de AUTORIA, onde nada esta pintado — quem sabe qual e
+    /// o Map Helper, que ja e quem manda no recorte do SectorManager.
+    ///
+    /// Sem isto, o desenho do editor so tinha o leque por angulo para mostrar: voce
+    /// mudava o eixo de uma construcao e o Scene View continuava desenhando o antigo,
+    /// porque ele nunca leu a sua lista. Editor mostrando uma coisa e jogo rodando
+    /// outra e pior que editor sem desenho nenhum.
+    /// </summary>
+    public static QuadranteData AuthoringQuadrante;
+
+    private static bool TryGetEixosAutorados(int slotIndex, List<EixoAutorado> destino)
+    {
+        // Em Play manda o quadrante PINTADO, sempre: um foco de autoria esquecido nao
+        // pode escolher o eixo de uma partida.
+        if (!Application.isPlaying && AuthoringQuadrante != null)
+        {
+            AuthoringQuadrante.CollectEixosDoSlot(slotIndex, destino);
+            return destino.Count > 0;
+        }
+
+        return QuadranteController.TryGetEixosAutorados(slotIndex, destino);
     }
 
     // Monta os eixos do slot a partir do que o autor escreveu no quadrante. Falso = nada

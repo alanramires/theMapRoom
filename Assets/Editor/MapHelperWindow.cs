@@ -122,12 +122,61 @@ public class MapHelperWindow : EditorWindow
     {
         SceneView.duringSceneGui -= OnSceneGUI;
         CancelPickSilently();
+        // Fechar a janela devolve a cena inteira: recorte esquecido ligado e um
+        // SectorManager que responde por meio mapa sem ninguem pedir.
+        SectorManager.ClearAuthoringClip();
+        InvasionAxisMap.AuthoringQuadrante = null;
+    }
+
+    // O quadrante selecionado aqui e o MESMO que o SectorManager enxerga. Um segundo
+    // seletor so criaria a chance de os dois discordarem — e a divergencia apareceria
+    // como um eixo torto, nao como um erro.
+    //
+    // Sincronizado a cada repaint em vez de em cada ponto que mexe na selecao: sao dez
+    // deles, e esquecer um deixaria o recorte preso no quadrante anterior. Trocar por
+    // igual nao custa nada: o SectorManager sai cedo quando o retangulo nao mudou.
+    private void SincronizarRecorteDeAutoria()
+    {
+        QuadranteData q = QuadranteSelecionado();
+        // O mesmo quadrante manda nas duas coisas: no que o SectorManager enxerga e no
+        // eixo que o desenho segue. Separar as duas fontes deixaria o Scene View
+        // desenhando o quadrante certo com o eixo errado.
+        InvasionAxisMap.AuthoringQuadrante = q;
+
+        if (q == null)
+        {
+            SectorManager.ClearAuthoringClip();
+            return;
+        }
+
+        SectorManager.SetAuthoringClip(
+            new RectInt(q.originX, q.originY, Mathf.Max(1, q.width), Mathf.Max(1, q.height)));
+    }
+
+    private QuadranteData QuadranteSelecionado()
+    {
+        if (mundo == null || selectedBloco < 0 || selectedCampanha < 0 || selectedQuadrante < 0)
+            return null;
+        if (mundo.blocos == null || selectedBloco >= mundo.blocos.Count)
+            return null;
+
+        BlocoData bloco = mundo.blocos[selectedBloco];
+        if (bloco?.campanhas == null || selectedCampanha >= bloco.campanhas.Count)
+            return null;
+
+        CampanhaData campanha = bloco.campanhas[selectedCampanha];
+        if (campanha?.quadrantes == null || selectedQuadrante >= campanha.quadrantes.Count)
+            return null;
+
+        return campanha.quadrantes[selectedQuadrante];
     }
 
     // ────────────────────────────────────────────────────────────── janela ──
 
     private void OnGUI()
     {
+        SincronizarRecorteDeAutoria();
+
         EditorGUILayout.LabelField("Map Helper", EditorStyles.boldLabel);
 
         EditorGUI.BeginChangeCheck();

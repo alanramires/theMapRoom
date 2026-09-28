@@ -1222,6 +1222,84 @@ public sealed class SectorManager : MonoBehaviour
         return true;
     }
 
+    // ──────────────────────────────────────────── recorte de autoria ──
+    //
+    // O setor e identificado pelo NOME (o enum), e so por ele. Numa cena de partida
+    // isso basta, porque ha um tabuleiro. Na cena de AUTORIA ha varios quadrantes lado
+    // a lado, cada um com o direito de ter o seu Alpha — e ai os dois Alphas caem no
+    // mesmo balde, com uma celula representativa no meio do caminho entre eles. Nada
+    // quebra: so sai um setor que nao existe e um eixo atravessando o mapa.
+    //
+    // O recorte resolve na RAIZ: construcao fora do retangulo nao entra no rebuild.
+    // Assim agrupamento, representante, vizinhos, distancias e desenho passam todos a
+    // enxergar um quadrante — sem nenhuma dessas contas ser duplicada.
+    //
+    // ESTATICO E NAO SERIALIZADO de proposito: nao suja a cena, nao vai junto num
+    // prefab e nao tem como chegar a uma build. E IGNORADO EM PLAY pelo mesmo motivo —
+    // um filtro ligado em partida apagaria metade do tabuleiro sem erro nenhum.
+    private static RectInt authoringClip;
+    private static bool hasAuthoringClip;
+
+    public static bool HasAuthoringClip => hasAuthoringClip && !Application.isPlaying;
+
+    /// <summary>Limita o rebuild ao retangulo (em celulas). So vale fora de Play.</summary>
+    public static void SetAuthoringClip(RectInt rect)
+    {
+        if (hasAuthoringClip && authoringClip.Equals(rect))
+            return;
+
+        authoringClip = rect;
+        hasAuthoringClip = true;
+        ReapplyAuthoringClip();
+    }
+
+    public static void ClearAuthoringClip()
+    {
+        if (!hasAuthoringClip)
+            return;
+
+        hasAuthoringClip = false;
+        ReapplyAuthoringClip();
+    }
+
+    /// <summary>Verdadeiro sem recorte: quem filtra nao precisa saber se ele existe.</summary>
+    public static bool IsInsideAuthoringClip(Vector3Int cell)
+    {
+        if (!HasAuthoringClip)
+            return true;
+
+        return cell.x >= authoringClip.xMin && cell.x < authoringClip.xMax
+            && cell.y >= authoringClip.yMin && cell.y < authoringClip.yMax;
+    }
+
+    // Trocar o recorte sem refazer as contas deixaria a proxima consulta respondendo
+    // pelo quadrante anterior — e o cache de distancia e justamente o que nao repara
+    // que o mundo mudou.
+    private static IReadOnlyList<ConstructionManager> ClipToAuthoringArea(
+        IReadOnlyList<ConstructionManager> todas)
+    {
+        if (!HasAuthoringClip || todas == null)
+            return todas;
+
+        var dentro = new List<ConstructionManager>(todas.Count);
+        for (int i = 0; i < todas.Count; i++)
+        {
+            ConstructionManager c = todas[i];
+            if (c == null)
+                continue;
+            Vector3Int cell = c.CurrentCellPosition; cell.z = 0;
+            if (IsInsideAuthoringClip(cell))
+                dentro.Add(c);
+        }
+        return dentro;
+    }
+
+    private static void ReapplyAuthoringClip()
+    {
+        InvalidateLandDistanceCache();
+        RebuildNowFromActiveConstructions("recorte de autoria");
+    }
+
     private void RebuildFromActiveConstructions(string reason)
     {
         double rebuildStart = Time.realtimeSinceStartupAsDouble;
@@ -1248,7 +1326,9 @@ public sealed class SectorManager : MonoBehaviour
         baseInfos.Clear();
         baseInfoBySector.Clear();
 
-        IReadOnlyList<ConstructionManager> allConstructions = GetTrackedConstructions();
+        // Ponto unico do recorte: tudo neste rebuild sai daqui — HQs, fabricas e setores.
+        IReadOnlyList<ConstructionManager> allConstructions =
+            ClipToAuthoringArea(GetTrackedConstructions());
 
         // Coleta HQs e fábricas antes de processar setores
         var hqBySlot = new Dictionary<int, (TeamId team, string name, Vector3Int cell)>();

@@ -199,6 +199,19 @@ public class SectorManagerEditor : Editor
             "Esconde no desenho o eixo sintético HQ→QG inimigo, mostrando só os eixos principais (rally)."));
         EditorGUILayout.EndHorizontal();
 
+        // Sem este aviso, uma lista de setores vazia porque o recorte esta ligado parece
+        // um bug — e o autor vai procurar o problema no lugar errado.
+        if (SectorManager.HasAuthoringClip)
+        {
+            EditorGUILayout.HelpBox(
+                "Recorte de autoria ligado: este SectorManager esta vendo SO o quadrante "
+                + "selecionado no Map Helper. Setor e eixo de fora dele nao existem aqui. "
+                + "Em Play o recorte e ignorado.",
+                MessageType.Info);
+            if (GUILayout.Button("Ver a cena inteira"))
+                SectorManager.ClearAuthoringClip();
+        }
+
         EditorGUILayout.BeginHorizontal();
         if (GUILayout.Button("Desenhar todas as linhas"))
             DrawAllSectorNeighborLines(manager);
