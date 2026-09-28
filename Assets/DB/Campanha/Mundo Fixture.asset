@@ -52,7 +52,19 @@ MonoBehaviour:
         destravadoPor: []
         exigeIrmaos: 0
         economiaInicial: []
-        eixos: []
+        eixos:
+        - slotIndex: 0
+          caminho: 0200000003000000
+        - slotIndex: 0
+          caminho: 0100000005000000
+        - slotIndex: 0
+          caminho: 0000000004000000
+        - slotIndex: 1
+          caminho: 0500000001000000
+        - slotIndex: 1
+          caminho: 0600000004000000
+        - slotIndex: 1
+          caminho: 0300000002000000
         idSerial: 3
         bakedTiles:
         - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
@@ -334,9 +346,9 @@ MonoBehaviour:
           teamId: -1
           slotIndex: -1
           sector: 0
-          isAnchorSector: 0
+          isAnchorSector: 1
           isRallyPoint: 0
-          rallyOwnerSlotIndex: -1
+          rallyOwnerSlots: 
           initialCapturePoints: -1
           siteRuntime:
             isPlayerHeadQuarter: 0
@@ -380,7 +392,7 @@ MonoBehaviour:
           sector: 100
           isAnchorSector: 0
           isRallyPoint: 0
-          rallyOwnerSlotIndex: -1
+          rallyOwnerSlots: 
           initialCapturePoints: -1
           siteRuntime:
             isPlayerHeadQuarter: 0
@@ -424,7 +436,7 @@ MonoBehaviour:
           sector: 101
           isAnchorSector: 0
           isRallyPoint: 0
-          rallyOwnerSlotIndex: -1
+          rallyOwnerSlots: 
           initialCapturePoints: -1
           siteRuntime:
             isPlayerHeadQuarter: 0
@@ -467,8 +479,8 @@ MonoBehaviour:
           slotIndex: -1
           sector: 4
           isAnchorSector: 0
-          isRallyPoint: 0
-          rallyOwnerSlotIndex: -1
+          isRallyPoint: 1
+          rallyOwnerSlots: 00000000
           initialCapturePoints: -1
           siteRuntime:
             isPlayerHeadQuarter: 0
@@ -503,8 +515,8 @@ MonoBehaviour:
           slotIndex: -1
           sector: 5
           isAnchorSector: 0
-          isRallyPoint: 0
-          rallyOwnerSlotIndex: -1
+          isRallyPoint: 1
+          rallyOwnerSlots: 00000000
           initialCapturePoints: -1
           siteRuntime:
             isPlayerHeadQuarter: 0
@@ -540,7 +552,7 @@ MonoBehaviour:
           sector: 2
           isAnchorSector: 0
           isRallyPoint: 0
-          rallyOwnerSlotIndex: -1
+          rallyOwnerSlots: 
           initialCapturePoints: -1
           siteRuntime:
             isPlayerHeadQuarter: 0
@@ -574,9 +586,9 @@ MonoBehaviour:
           teamId: -1
           slotIndex: -1
           sector: 6
-          isAnchorSector: 0
+          isAnchorSector: 1
           isRallyPoint: 0
-          rallyOwnerSlotIndex: -1
+          rallyOwnerSlots: 
           initialCapturePoints: -1
           siteRuntime:
             isPlayerHeadQuarter: 0
@@ -620,7 +632,7 @@ MonoBehaviour:
           sector: 101
           isAnchorSector: 0
           isRallyPoint: 0
-          rallyOwnerSlotIndex: -1
+          rallyOwnerSlots: 
           initialCapturePoints: -1
           siteRuntime:
             isPlayerHeadQuarter: 0
@@ -663,8 +675,8 @@ MonoBehaviour:
           slotIndex: -1
           sector: 1
           isAnchorSector: 0
-          isRallyPoint: 0
-          rallyOwnerSlotIndex: -1
+          isRallyPoint: 1
+          rallyOwnerSlots: 01000000
           initialCapturePoints: -1
           siteRuntime:
             isPlayerHeadQuarter: 0
@@ -700,7 +712,7 @@ MonoBehaviour:
           sector: 100
           isAnchorSector: 0
           isRallyPoint: 0
-          rallyOwnerSlotIndex: -1
+          rallyOwnerSlots: 
           initialCapturePoints: -1
           siteRuntime:
             isPlayerHeadQuarter: 0
@@ -743,8 +755,8 @@ MonoBehaviour:
           slotIndex: -1
           sector: 3
           isAnchorSector: 0
-          isRallyPoint: 0
-          rallyOwnerSlotIndex: -1
+          isRallyPoint: 1
+          rallyOwnerSlots: 00000000
           initialCapturePoints: -1
           siteRuntime:
             isPlayerHeadQuarter: 0
@@ -780,7 +792,7 @@ MonoBehaviour:
           sector: 101
           isAnchorSector: 0
           isRallyPoint: 0
-          rallyOwnerSlotIndex: -1
+          rallyOwnerSlots: 
           initialCapturePoints: -1
           siteRuntime:
             isPlayerHeadQuarter: 1
@@ -819,7 +831,7 @@ MonoBehaviour:
           sector: 100
           isAnchorSector: 0
           isRallyPoint: 0
-          rallyOwnerSlotIndex: -1
+          rallyOwnerSlots: 
           initialCapturePoints: -1
           siteRuntime:
             isPlayerHeadQuarter: 1
@@ -1113,7 +1125,7 @@ MonoBehaviour:
           - {x: 4, y: 14, z: 0}
         bakedUnidades: []
         bakedFromScene: Fixture
-        bakedAtUtcTicks: 639261931102370835
+        bakedAtUtcTicks: 639261970711940491
       - quadranteId: A_IA_Q2
         displayName: Terra Firme
         descricao: 
@@ -1128,7 +1140,19 @@ MonoBehaviour:
           startMoney: 10000
         - slotIndex: 1
           startMoney: 10000
-        eixos: []
+        eixos:
+        - slotIndex: 0
+          caminho: 00000000020000000300000008000000
+        - slotIndex: 0
+          caminho: 04000000
+        - slotIndex: 0
+          caminho: 010000000500000009000000
+        - slotIndex: 1
+          caminho: 090000000500000001000000
+        - slotIndex: 1
+          caminho: 0600000004000000
+        - slotIndex: 1
+          caminho: 07000000080000000300000002000000
         idSerial: 4
         bakedTiles:
         - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
@@ -1560,7 +1584,7 @@ MonoBehaviour:
           sector: 7
           isAnchorSector: 0
           isRallyPoint: 0
-          rallyOwnerSlotIndex: -1
+          rallyOwnerSlots: 
           initialCapturePoints: -1
           siteRuntime:
             isPlayerHeadQuarter: 0
@@ -1596,7 +1620,7 @@ MonoBehaviour:
           sector: 6
           isAnchorSector: 0
           isRallyPoint: 0
-          rallyOwnerSlotIndex: -1
+          rallyOwnerSlots: 
           initialCapturePoints: -1
           siteRuntime:
             isPlayerHeadQuarter: 0
@@ -1635,7 +1659,7 @@ MonoBehaviour:
           sector: 100
           isAnchorSector: 0
           isRallyPoint: 0
-          rallyOwnerSlotIndex: -1
+          rallyOwnerSlots: 
           initialCapturePoints: -1
           siteRuntime:
             isPlayerHeadQuarter: 1
@@ -1674,7 +1698,7 @@ MonoBehaviour:
           sector: 3
           isAnchorSector: 0
           isRallyPoint: 0
-          rallyOwnerSlotIndex: -1
+          rallyOwnerSlots: 
           initialCapturePoints: -1
           siteRuntime:
             isPlayerHeadQuarter: 0
@@ -1707,10 +1731,10 @@ MonoBehaviour:
           localY: 16
           teamId: 3
           slotIndex: 1
-          sector: 0
+          sector: 101
           isAnchorSector: 0
           isRallyPoint: 0
-          rallyOwnerSlotIndex: -1
+          rallyOwnerSlots: 
           initialCapturePoints: -1
           siteRuntime:
             isPlayerHeadQuarter: 0
@@ -1756,7 +1780,7 @@ MonoBehaviour:
           sector: 2
           isAnchorSector: 0
           isRallyPoint: 0
-          rallyOwnerSlotIndex: -1
+          rallyOwnerSlots: 
           initialCapturePoints: -1
           siteRuntime:
             isPlayerHeadQuarter: 0
@@ -1789,10 +1813,10 @@ MonoBehaviour:
           localY: 15
           teamId: 3
           slotIndex: 1
-          sector: 0
+          sector: 101
           isAnchorSector: 0
           isRallyPoint: 0
-          rallyOwnerSlotIndex: -1
+          rallyOwnerSlots: 
           initialCapturePoints: -1
           siteRuntime:
             isPlayerHeadQuarter: 0
@@ -1835,10 +1859,10 @@ MonoBehaviour:
           localY: 16
           teamId: 3
           slotIndex: 1
-          sector: 0
+          sector: 101
           isAnchorSector: 0
           isRallyPoint: 0
-          rallyOwnerSlotIndex: -1
+          rallyOwnerSlots: 
           initialCapturePoints: -1
           siteRuntime:
             isPlayerHeadQuarter: 1
@@ -1874,10 +1898,10 @@ MonoBehaviour:
           localY: 11
           teamId: 3
           slotIndex: 1
-          sector: 0
+          sector: 8
           isAnchorSector: 0
           isRallyPoint: 0
-          rallyOwnerSlotIndex: -1
+          rallyOwnerSlots: 
           initialCapturePoints: -1
           siteRuntime:
             isPlayerHeadQuarter: 0
@@ -1912,6 +1936,42 @@ MonoBehaviour:
             - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
             - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
           displayName: Aeroporto
+        - constructionId: cidade
+          localX: 11
+          localY: 16
+          teamId: -1
+          slotIndex: -1
+          sector: 9
+          isAnchorSector: 0
+          isRallyPoint: 0
+          rallyOwnerSlots: 
+          initialCapturePoints: -1
+          siteRuntime:
+            isPlayerHeadQuarter: 0
+            isVictoryBuilding: 0
+            isCapturable: 1
+            capturePointsMax: 20
+            capturedIncoming: 1000
+            sellingRule: 3
+            legacyCanProduceAndSellUnits: 
+            offeredUnits: []
+            canProvideSupplies: 1
+            offeredSupplies:
+            - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+              quantity: 40
+              peakQuantity: 40
+            - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+              quantity: 10
+              peakQuantity: 10
+            - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+              quantity: 20
+              peakQuantity: 20
+            offeredServices:
+            - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+            - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+            - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+            - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
+          displayName: Cidade
         - constructionId: fabrica
           localX: 6
           localY: 3
@@ -1920,7 +1980,7 @@ MonoBehaviour:
           sector: 0
           isAnchorSector: 0
           isRallyPoint: 0
-          rallyOwnerSlotIndex: -1
+          rallyOwnerSlots: 
           initialCapturePoints: -1
           siteRuntime:
             isPlayerHeadQuarter: 0
@@ -1959,7 +2019,7 @@ MonoBehaviour:
           sector: 1
           isAnchorSector: 0
           isRallyPoint: 0
-          rallyOwnerSlotIndex: -1
+          rallyOwnerSlots: 
           initialCapturePoints: -1
           siteRuntime:
             isPlayerHeadQuarter: 0
@@ -1995,7 +2055,7 @@ MonoBehaviour:
           sector: 4
           isAnchorSector: 0
           isRallyPoint: 0
-          rallyOwnerSlotIndex: -1
+          rallyOwnerSlots: 
           initialCapturePoints: -1
           siteRuntime:
             isPlayerHeadQuarter: 0
@@ -2038,7 +2098,7 @@ MonoBehaviour:
           sector: 100
           isAnchorSector: 0
           isRallyPoint: 0
-          rallyOwnerSlotIndex: -1
+          rallyOwnerSlots: 
           initialCapturePoints: -1
           siteRuntime:
             isPlayerHeadQuarter: 0
@@ -2084,7 +2144,7 @@ MonoBehaviour:
           sector: 5
           isAnchorSector: 0
           isRallyPoint: 0
-          rallyOwnerSlotIndex: -1
+          rallyOwnerSlots: 
           initialCapturePoints: -1
           siteRuntime:
             isPlayerHeadQuarter: 0
@@ -2120,7 +2180,7 @@ MonoBehaviour:
           sector: 100
           isAnchorSector: 0
           isRallyPoint: 0
-          rallyOwnerSlotIndex: -1
+          rallyOwnerSlots: 
           initialCapturePoints: -1
           siteRuntime:
             isPlayerHeadQuarter: 0
@@ -2233,7 +2293,7 @@ MonoBehaviour:
           slotIndex: 0
           displayName: chinook
         bakedFromScene: Fixture
-        bakedAtUtcTicks: 639261931104223820
+        bakedAtUtcTicks: 639261970712924217
       - quadranteId: A_IA_Q3
         displayName: Peixe Pequeno
         descricao: Ponte Norte
@@ -2912,7 +2972,7 @@ MonoBehaviour:
           - {x: 9, y: 6, z: 0}
         bakedUnidades: []
         bakedFromScene: Fixture
-        bakedAtUtcTicks: 639261931104857971
+        bakedAtUtcTicks: 639261970713541789
       - quadranteId: A_IA_Q4
         displayName: "Tubar\xE3o Branco"
         descricao: 
@@ -3594,6 +3654,6 @@ MonoBehaviour:
           - {x: 17, y: 19, z: 0}
         bakedUnidades: []
         bakedFromScene: Fixture
-        bakedAtUtcTicks: 639261931105476480
+        bakedAtUtcTicks: 639261970714152893
       idSerial: 2
     idSerial: 1

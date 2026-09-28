@@ -1094,6 +1094,7 @@ MonoBehaviour:
   isForwardObserverSpot: 0
   forwardObserverSpotUsage: 0
   isRallyPoint: 0
+  rallyOwnerSlots: 
   rallyOwnerSlotIndex: -1
   isAnchorSector: 0
   anchorSectorSlotIndex: -1
