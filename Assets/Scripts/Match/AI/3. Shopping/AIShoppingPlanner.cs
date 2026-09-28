@@ -548,7 +548,7 @@ public partial class AIShoppingPlanner : MonoBehaviour
         // Hard: o primeiro elite terrestre � a pe�a de ruptura (MBT), n�o o Obus M�dio.
         // Defesa antia�rea emergencial continua podendo furar esta regra mais abaixo.
         if (AIController.Instance != null
-            && AIController.Instance.HardMode
+            && AIController.Instance.AbreComBlindado
             && activeEliteAssaultCount == 0
             && eliteAssaultTargetForReserve != null
             && eliteFireSupportTarget != null

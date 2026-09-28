@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 // --------------------------------------------------------------------------------------------
@@ -302,7 +302,7 @@ public partial class AIController
         // HARD: projeta a ONDA de produção inimiga do próximo turno — o inimigo compra em cada produtor
         // antes da AI agir de novo, então a análise de força reage à ameaça de AMANHÃ, não só à foto de
         // hoje. Normal/Easy ficam no retrato atual (comportamento validado, INTOCADO).
-        int enemyProducers = hardMode ? CountEnemyProductionBuildings(aiTeam) : 0;
+        int enemyProducers = ProjetaProducaoInimiga ? CountEnemyProductionBuildings(aiTeam) : 0;
         int macroEnemyForce = knownEnemyForce + enemyProducers;
         AIMacroTerritoryContext macro = BuildMacroTerritoryContext(aiTeam, allSectors, maxObj, macroOwnForce, macroEnemyForce, enemyProducers);
         string macroForceTxt = enemyProducers > 0
@@ -442,7 +442,7 @@ public partial class AIController
             int slots = Mathf.Clamp(Mathf.CeilToInt(info.ConstructionCount / 2f), 1, 4);
             bool highRisk = info.GetRiskLevelFor(PlayerSlotId.FromIndex(AIController.ResolveAISlotKey(aiTeam))) >= SectorManager.SectorRiskLevel.High;
             if (highRisk) slots = Mathf.Max(slots, 2);
-            if (hardMode) slots = Mathf.Min(slots * 2, HardModeCapturerSlotCap); // Hard Mode: dobra a demanda de capturadores por setor (com teto)
+            if (DobraSlotsDeCapturador) slots = Mathf.Min(slots * 2, HardModeCapturerSlotCap); // Hard Mode: dobra a demanda de capturadores por setor (com teto)
             if (!isRallyAssemblySector)
             {
                 for (int s = 0; s < slots; s++)
@@ -614,7 +614,7 @@ public partial class AIController
             // com a base; Hard Mode dobra): o que sobra do orçamento depois das elites inunda
             // capturador, transporte e logística. Slot vazio não custa nada.
             int massCapturerSlots = Mathf.Max(2, baseInfo.ConstructionCount);
-            if (hardMode) massCapturerSlots *= 2;
+            if (DobraSlotsDeCapturador) massCapturerSlots *= 2;
             var baseObj = new SectorObjective
             {
                 Sector       = baseInfo.Sector,
@@ -873,7 +873,7 @@ public partial class AIController
         // o 2º slot de setores já iniciados (que costumam estar mais perto da base). As 2ªs vagas
         // enchem depois, com o excedente. Mantém o "feel" do normal mode mesmo com capacidade dobrada.
         bool anyFirstCapturerPending = false;
-        if (hardMode)
+        if (DobraSlotsDeCapturador)
         {
             foreach (SectorObjective o in plan.Objectives)
             {
@@ -946,7 +946,7 @@ public partial class AIController
 
             int openCapturerSlots = CountOpenSlots(obj, UnitRole.Capturador);
             int exposedCapturerSlots;
-            if (!hardMode)
+            if (!DobraSlotsDeCapturador)
             {
                 exposedCapturerSlots = openCapturerSlots;
             }

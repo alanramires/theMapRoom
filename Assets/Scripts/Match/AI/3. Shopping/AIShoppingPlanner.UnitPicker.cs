@@ -443,7 +443,7 @@ public partial class AIShoppingPlanner
         return unit != null
             && unit.bannedOnHardMode
             && AIController.Instance != null
-            && AIController.Instance.HardMode;
+            && AIController.Instance.RespeitaListaBanida;
     }
 
     private static bool IsAirTankerPurchase(UnitData unit)

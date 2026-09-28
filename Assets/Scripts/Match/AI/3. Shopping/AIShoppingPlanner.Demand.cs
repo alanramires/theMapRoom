@@ -372,7 +372,7 @@ public partial class AIShoppingPlanner
     private static void ApplyHardModeLogisticsCap(AIWorldSnapshot snapshot, List<AIShoppingDemand> demands)
     {
         if (snapshot == null || demands == null
-            || AIController.Instance == null || !AIController.Instance.HardMode)
+            || AIController.Instance == null || !AIController.Instance.LimitaLogistica)
             return;
 
         int cap = AIController.Instance.MaxLogisticUnitsOnHardMode;
@@ -416,7 +416,7 @@ public partial class AIShoppingPlanner
         desiredLogistics = Mathf.Min(desiredLogistics, logisticsCap);
 
         // Hard Mode: limita o total de unidades de logística mantidas em campo.
-        if (AIController.Instance != null && AIController.Instance.HardMode)
+        if (AIController.Instance != null && AIController.Instance.LimitaLogistica)
             desiredLogistics = Mathf.Min(desiredLogistics, AIController.Instance.MaxLogisticUnitsOnHardMode);
 
         int demand = Mathf.Max(0, desiredLogistics - activeLogisticsCount);
@@ -2231,7 +2231,7 @@ public partial class AIShoppingPlanner
         buyNow = false;
         if (snapshot == null || demands == null || remaining <= 0)
             return 0;
-        if (AIController.Instance == null || !AIController.Instance.HardMode)
+        if (AIController.Instance == null || !AIController.Instance.AbreComBlindado)
             return 0;
         if (CountActiveEliteAssaultUnits(snapshot) > 0)
             return 0;
@@ -3583,7 +3583,7 @@ public partial class AIShoppingPlanner
         // inobtenível de propósito — libera a cadeia pra a AI comprar o elite direto (senão o ban
         // do básico travaria também o elite, e a AI cairia em counters baratos).
         if (unit.eliteFrom.bannedOnHardMode
-            && AIController.Instance != null && AIController.Instance.HardMode)
+            && AIController.Instance != null && AIController.Instance.RespeitaListaBanida)
             return true;
         foreach (UnitManager owned in snapshot.MyUnits)
             if (owned != null && owned.TryGetUnitData(out UnitData data) && data == unit.eliteFrom)

@@ -4168,17 +4168,20 @@ public class MatchController : MonoBehaviour
             return 0;
 
         int baseIncome = Mathf.Max(0, construction.CapturedIncoming);
-        bool easyAiEconomy = player.isAI &&
-                             AIController.Instance != null &&
-                             AIController.Instance.EasyMode;
-        if (!easyAiEconomy)
+        if (!player.isAI || AIController.Instance == null)
+            return baseIncome;
+
+        // O NUMERO vem do perfil da IA; o "quem recebe menos" continua aqui, que e regra
+        // de partida. Cidade nunca e cortada: e a renda que sustenta o jogo dela.
+        float fracao = AIController.Instance.FracaoRendaForaDeCidades;
+        if (fracao >= 1f)
             return baseIncome;
 
         if (construction.TryResolveConstructionData(out ConstructionData data) &&
             data != null && data.isCity)
             return baseIncome;
 
-        return baseIncome / 3;
+        return Mathf.Max(0, Mathf.FloorToInt(baseIncome * fracao));
     }
 
     private void ApplyEconomyAtTurnStartForActiveTeam(List<ConstructionManager> constructions = null)
@@ -4259,8 +4262,12 @@ public class MatchController : MonoBehaviour
         signature = 17;
         unchecked
         {
+            // A FRACAO entra na assinatura, nao mais o "sou facil?": trocar o perfil muda a
+            // renda, e um cache que so olhava o flag continuaria servindo o numero velho.
             signature = (signature * 31) +
-                        (AIController.Instance != null && AIController.Instance.EasyMode ? 1 : 0);
+                        (AIController.Instance != null
+                            ? Mathf.RoundToInt(AIController.Instance.FracaoRendaForaDeCidades * 1000f)
+                            : 1000);
         }
         count = 0;
         ConstructionManager[] constructions = FindObjectsByType<ConstructionManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);

@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -22,7 +22,7 @@ public partial class AIController
 
         // No Hard, a retaguarda pode j� estar preenchendo o segundo slot do mesmo objetivo.
         // Portanto, aus�ncia de capturadores livres n�o significa aus�ncia de sucessor.
-        if (freeCapturers.Count == 0 && !hardMode) return;
+        if (freeCapturers.Count == 0 && !FazHandoffEmProfundidade) return;
 
         for (int i = 0; i < plan.Objectives.Count; i++)
         {
@@ -55,7 +55,7 @@ public partial class AIController
             // aceitamos um seguidor que alcance um VIZINHO do prédio: ele entra assim que a ponta
             // vaga a célula (grp=0), e a ponta segue o eixo. Sem seguidor, mantém o fallback.
             Vector3Int assignedPos0 = assignedUnit.CurrentCellPosition; assignedPos0.z = 0;
-            bool frontBlocksTarget = hardMode && assignedPos0 == targetCell
+            bool frontBlocksTarget = FazHandoffEmProfundidade && assignedPos0 == targetCell
                 && ComputeBlitzkriegForwardSector(obj.Sector, aiTeam) != ConstructionSector.None;
 
             UnitManager substitute   = null;
@@ -63,7 +63,7 @@ public partial class AIController
             float       bestSubScore = float.MinValue;
 
             var handoffCandidates = new List<UnitManager>(freeCapturers);
-            if (hardMode)
+            if (FazHandoffEmProfundidade)
             {
                 foreach (SlotNeed slot in obj.Slots)
                 {

@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 public partial class AIController
@@ -31,7 +31,7 @@ public partial class AIController
 
     private void RememberHardBlitzkriegCapture(UnitManager unit, TeamId team, Vector3Int cell)
     {
-        if (!hardMode || unit == null || team == TeamId.Neutral)
+        if (!FazHandoffEmProfundidade || unit == null || team == TeamId.Neutral)
             return;
 
         cell.z = 0;
@@ -49,7 +49,7 @@ public partial class AIController
         out PlayerAction action)
     {
         action = null;
-        if (!hardMode || unit == null || snapshot == null)
+        if (!FazHandoffEmProfundidade || unit == null || snapshot == null)
             return false;
 
         bool plannedHandoff = TryGetPlannedHardHandoff(plan, unit, out SectorObjective handoffObjective);
