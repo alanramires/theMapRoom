@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.IO;
 using UnityEditor;
 using UnityEngine;
@@ -26,12 +26,9 @@ public class AIPresetGeneratorWindow : EditorWindow
 
     private static readonly AIDifficulty[] AllDifficulties =
     {
-        AIDifficulty.Iniciante,
         AIDifficulty.Facil,
         AIDifficulty.Medio,
-        AIDifficulty.Formigueiro,
-        AIDifficulty.Competitiva,
-        AIDifficulty.Agressiva
+        AIDifficulty.Dificil
     };
 
     [MenuItem("Tools/AI/Gerar Presets a partir da cena")]
@@ -60,7 +57,8 @@ public class AIPresetGeneratorWindow : EditorWindow
         EditorGUILayout.LabelField("Fase 1 da migração para AIPresetData", EditorStyles.boldLabel);
         EditorGUILayout.HelpBox(
             "Fotografa os valores NORMAIS da CENA ABERTA e grava UM baseline (capacidades desligadas).\n" +
-            "A dificuldade liga toggles por cima via código — não gera asset por dificuldade.\n" +
+            "Com CATÁLOGO, cada dificuldade usa o seu próprio perfil e a overlay de código não roda;\n" +
+            "sem catálogo, vale o modelo antigo — este baseline mais os toggles da dificuldade.\n" +
             "Nenhuma decisão da IA lê deste asset ainda — comportamento inalterado.\n\n" +
             "Gere a partir da cena mais calibrada (normalmente Battle Map 1 - Ground). " +
             "Cenas antigas podem não ter todos os campos serializados e cairiam nos defaults do código.",
@@ -71,9 +69,27 @@ public class AIPresetGeneratorWindow : EditorWindow
         shopping = (AIShoppingPlanner)EditorGUILayout.ObjectField("Shopping Planner", shopping, typeof(AIShoppingPlanner), true);
         targetFolder = EditorGUILayout.TextField("Pasta de destino", targetFolder);
 
+        // ANTES do early return: o catalogo so mexe em assets, entao funciona com a cena
+        // de autoria aberta — que e justamente onde nao ha AIController. Deixa-lo depois
+        // escondia o botao exatamente de quem precisava dele.
+        EditorGUILayout.Space();
+        EditorGUILayout.LabelField("Catálogo — que perfil cada dificuldade usa", EditorStyles.boldLabel);
+        EditorGUILayout.HelpBox(
+            "Liga as três dificuldades da Tela de Entrada aos três presets, casando pelo RÓTULO DO "
+            + "JOGADOR: o botão MÉDIO é AIDifficulty.Facil, então ligar pelo nome do enum erraria "
+            + "a linha. Com catálogo, o perfil ativo é o asset autorado e a overlay de código não "
+            + "roda. Linha já ligada à mão é respeitada.",
+            MessageType.Info);
+        if (GUILayout.Button("Criar/atualizar catálogo (dificuldade → perfil)", GUILayout.Height(26f)))
+            SyncCatalog();
+
         if (controller == null)
         {
-            EditorGUILayout.HelpBox("Nenhum AIController na cena aberta. Abra um mapa antes de gerar.", MessageType.Warning);
+            EditorGUILayout.Space();
+            EditorGUILayout.HelpBox(
+                "Nenhum AIController na cena aberta. Abra um mapa antes de GERAR O BASELINE — "
+                + "o catálogo acima não precisa de cena.",
+                MessageType.Warning);
             EditorGUILayout.EndScrollView();
             return;
         }
@@ -103,6 +119,88 @@ public class AIPresetGeneratorWindow : EditorWindow
             AuditScenes();
 
         EditorGUILayout.EndScrollView();
+    }
+
+    // -------------------------------------------------------------------------------
+    // Catalogo: uma linha por dificuldade OFERECIDA, apontando o asset do perfil.
+    //
+    // Preenche sozinho porque a ligacao e onde o erro mora: o enum nao casa com o botao
+    // (o "MEDIO" da tela e AIDifficulty.Facil), entao arrastar a mao acerta o nome e
+    // erra a dificuldade — e o sintoma seria o perfil errado numa partida, sem log.
+    // Por isso casa pelo ROTULO DO JOGADOR: AIPreset_Medio vai na linha do botao MEDIO.
+    private void SyncCatalog()
+    {
+        EnsureFolder(targetFolder);
+        string path = $"{targetFolder}/AIPresetCatalog.asset";
+
+        AIPresetCatalog catalogo = AssetDatabase.LoadAssetAtPath<AIPresetCatalog>(path);
+        bool criou = catalogo == null;
+        if (criou)
+        {
+            catalogo = CreateInstance<AIPresetCatalog>();
+            AssetDatabase.CreateAsset(catalogo, path);
+        }
+
+        Undo.RecordObject(catalogo, "Catalogo de presets");
+
+        // Entrada de dificuldade que nao existe mais (o catalogo gerado antes da reducao
+        // de seis para tres guardou o DIFICIL como 4) nao casa com nada e cai no caminho
+        // antigo SEM DIZER NADA. Some aqui, avisando qual era.
+        int removidas = catalogo.entradas.RemoveAll(e =>
+            e == null || System.Array.IndexOf(AIPresetCatalog.OferecidasAoJogador, e.dificuldade) < 0);
+        var log = new System.Text.StringBuilder(
+            criou ? "[AIPreset] catálogo criado em " : "[AIPreset] catálogo atualizado em ");
+        log.AppendLine(path);
+        if (removidas > 0)
+            log.AppendLine($"   {removidas} entrada(s) de dificuldade extinta removida(s) — religue o perfil abaixo.");
+
+        foreach (AIDifficulty dif in AIPresetCatalog.OferecidasAoJogador)
+        {
+            AIPresetCatalog.Entrada entrada = catalogo.entradas.Find(e => e != null && e.dificuldade == dif);
+            if (entrada == null)
+            {
+                entrada = new AIPresetCatalog.Entrada { dificuldade = dif };
+                catalogo.entradas.Add(entrada);
+            }
+
+            // Ja ligado a mao? Respeita — o autor manda mais que o palpite por nome.
+            if (entrada.preset == null)
+                entrada.preset = FindPresetByLabel(AIPresetCatalog.RotuloDoJogador(dif));
+
+            log.AppendLine($"   botão {AIPresetCatalog.RotuloDoJogador(dif),-8} (enum {dif,-12}) → "
+                + (entrada.preset != null ? entrada.preset.name : "VAZIO — cai na overlay antiga"));
+        }
+
+        EditorUtility.SetDirty(catalogo);
+        AssetDatabase.SaveAssets();
+        Selection.activeObject = catalogo;
+        Debug.Log(log.ToString(), catalogo);
+    }
+
+    private AIPresetData FindPresetByLabel(string rotulo)
+    {
+        string[] guids = AssetDatabase.FindAssets("t:AIPresetData", new[] { targetFolder });
+        foreach (string guid in guids)
+        {
+            string p = AssetDatabase.GUIDToAssetPath(guid);
+            string nome = System.IO.Path.GetFileNameWithoutExtension(p);
+            // "AIPreset_Dificil" casa com o rotulo "DIFICIL"; acento e caixa fora da conta.
+            if (Normalizar(nome).EndsWith(Normalizar(rotulo)))
+                return AssetDatabase.LoadAssetAtPath<AIPresetData>(p);
+        }
+        return null;
+    }
+
+    private static string Normalizar(string valor)
+    {
+        if (string.IsNullOrEmpty(valor))
+            return string.Empty;
+        string s = valor.ToUpperInvariant();
+        s = s.Replace("Á", "A").Replace("À", "A").Replace("Ã", "A").Replace("Â", "A");
+        s = s.Replace("É", "E").Replace("Ê", "E");
+        s = s.Replace("Í", "I").Replace("Ó", "O").Replace("Ô", "O").Replace("Õ", "O");
+        s = s.Replace("Ú", "U").Replace("Ç", "C");
+        return s;
     }
 
     // -------------------------------------------------------------------------------
@@ -333,10 +431,11 @@ public class AIPresetGeneratorWindow : EditorWindow
     }
 
     // -------------------------------------------------------------------------------
-    private static bool IsHard(AIDifficulty d) => d == AIDifficulty.Competitiva || d == AIDifficulty.Agressiva;
-    private static bool IsEasy(AIDifficulty d) => d == AIDifficulty.Iniciante;
-    private static bool IsDoctrine(AIDifficulty d) => d == AIDifficulty.Formigueiro || d == AIDifficulty.Agressiva;
-    private static bool IsWhenLosing(AIDifficulty d) => d == AIDifficulty.Medio || d == AIDifficulty.Competitiva;
+    private static bool IsHard(AIDifficulty d) => d == AIDifficulty.Dificil;
+    private static bool IsEasy(AIDifficulty d) => d == AIDifficulty.Facil;
+    // A conscricao deixou de ser escolhida pela dificuldade: virou toggle do perfil.
+    private static bool IsDoctrine(AIDifficulty d) => false;
+    private static bool IsWhenLosing(AIDifficulty d) => d == AIDifficulty.Dificil;
 
     private static int Int(SerializedObject so, string field)
     {

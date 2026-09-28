@@ -360,10 +360,10 @@ public class AIPresetData : ScriptableObject
         if (target == null)
             return;
 
-        bool hard = difficulty == AIDifficulty.Competitiva || difficulty == AIDifficulty.Agressiva;
-        bool easy = difficulty == AIDifficulty.Iniciante;
-        bool conscricaoSempre = difficulty == AIDifficulty.Formigueiro || difficulty == AIDifficulty.Agressiva;
-        bool conscricaoPerdendo = difficulty == AIDifficulty.Medio || difficulty == AIDifficulty.Competitiva;
+        bool hard = difficulty == AIDifficulty.Dificil;
+        bool easy = difficulty == AIDifficulty.Facil;
+        bool conscricaoSempre = false;                 // nao vem mais da dificuldade
+        bool conscricaoPerdendo = difficulty == AIDifficulty.Dificil;
 
         // --- capacidades (os toggles que o hardMode antes acendia em bloco) ---
         target.capacidades.respeitarListaBanida = hard;
