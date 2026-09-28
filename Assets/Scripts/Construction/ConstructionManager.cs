@@ -84,7 +84,13 @@ public class ConstructionManager : MonoBehaviour
     [Tooltip("Este pr�dio serve como ponto de reuni�o (Rally Point) para unidades rec�m-compradas.")]
     [SerializeField] private bool isRallyPoint;
     [Tooltip("Slot que usa este Rally Point como ponto de invas�o. -1 = nenhum slot.")]
-    [SerializeField] private int rallyOwnerSlotIndex = -1;
+    [SerializeField] private List<int> rallyOwnerSlots = new List<int>();
+    // LEGADO. O dono virou LISTA quando apareceu o predio que e rally dos DOIS lados:
+    // um int so sabe responder um dono, e "-1" ja significava "sem dono explicito" —
+    // reaproveitar o -1 como "de todos" so empilharia um segundo sentido sobre o
+    // primeiro. Migra sozinho em SanitizeRallyOwnerSlot, entao as cenas antigas
+    // (Battle Map 1, Hot Seat) nao perdem o dono que voce calibrou.
+    [SerializeField, HideInInspector] private int rallyOwnerSlotIndex = -1;
     [Tooltip("Este pr�dio marca o setor como funda��o econ�mica/territorial para a AI de um slot.")]
     [SerializeField] private bool isAnchorSector;
     [Tooltip("Slot da AI para o qual este setor funciona como Anchor Sector. -1 = nenhum slot.")]
@@ -142,7 +148,57 @@ public class ConstructionManager : MonoBehaviour
     public bool IsOperationalForwardObserverSpot =>
         isForwardObserverSpot && forwardObserverSpotUsage == ForwardObserverSpotUsage.Operational;
     public bool IsRallyPoint => isRallyPoint;
-    public int RallyOwnerSlotIndex => rallyOwnerSlotIndex;
+    /// <summary>Slots que usam este predio como ponto de reuniao. Vazio = nenhum.</summary>
+    public IReadOnlyList<int> RallyOwnerSlots => rallyOwnerSlots;
+
+    /// <summary>
+    /// Designacao, nao posse: "aqui EU paro antes de invadir". Continua valendo depois
+    /// que o outro lado conquista o predio — e por isso que a AI captura o rally antes
+    /// de lancar a invasao em vez de desistir dele.
+    /// </summary>
+    public bool IsRallyForSlot(int slot)
+        => isRallyPoint && slot >= 0 && rallyOwnerSlots != null && rallyOwnerSlots.Contains(slot);
+
+    /// <summary>
+    /// Primeiro dono da lista. So para o que e visual e singular — cor do HUD, chave de
+    /// cache. Decisao de AI usa <see cref="IsRallyForSlot"/>: um rally compartilhado e
+    /// dos dois, e escolher "o primeiro" ali daria a resposta errada pro outro slot.
+    /// </summary>
+    public int PrimaryRallyOwnerSlot
+        => rallyOwnerSlots != null && rallyOwnerSlots.Count > 0 ? rallyOwnerSlots[0] : -1;
+
+    /// <summary>
+    /// O dono designado que CONTROLA o predio agora, se algum. E quem manda na luz: para
+    /// quem nao controla o rally, a cor dele nao significa nada — e como se nao estivesse
+    /// aceso. Quando o predio troca de mao, a luz passa a ler o estado do novo dono
+    /// sozinha, sem ninguem reemitir nada.
+    /// </summary>
+    /// <summary>Atalho para o cache do HUD: o dono que controla, ou -1.</summary>
+    private int ControllingRallyOwnerSlotOrNone
+        => TryGetControllingRallyOwnerSlot(out int owner) ? owner : -1;
+
+    public bool TryGetControllingRallyOwnerSlot(out int owner)
+    {
+        owner = -1;
+        if (!isRallyPoint || rallyOwnerSlots == null || rallyOwnerSlots.Count == 0)
+            return false;
+
+        TryAutoAssignMatchController();
+        for (int i = 0; i < rallyOwnerSlots.Count; i++)
+        {
+            int candidato = rallyOwnerSlots[i];
+            bool controla = matchController != null
+                ? teamId == matchController.GetTeamIdForSlot(candidato)
+                : slotIndex == candidato;
+            if (controla)
+            {
+                owner = candidato;
+                return true;
+            }
+        }
+
+        return false;
+    }
     public bool IsAnchorSector => isAnchorSector;
     public int AnchorSectorSlotIndex => anchorSectorSlotIndex;
 
@@ -560,7 +616,16 @@ public class ConstructionManager : MonoBehaviour
 
     public void SetRallyOwnerSlotIndex(int value)
     {
-        rallyOwnerSlotIndex = Mathf.Max(-1, value);
+        rallyOwnerSlots = value >= 0 ? new List<int> { value } : new List<int>();
+        rallyOwnerSlotIndex = -1;
+        RefreshRuntimeVisualState(force: true);
+    }
+
+    public void SetRallyOwnerSlots(IEnumerable<int> slots)
+    {
+        rallyOwnerSlots = slots != null ? new List<int>(slots) : new List<int>();
+        rallyOwnerSlotIndex = -1;
+        SanitizeRallyOwnerSlot();
         RefreshRuntimeVisualState(force: true);
     }
 
@@ -1244,7 +1309,23 @@ public class ConstructionManager : MonoBehaviour
 
     private void SanitizeRallyOwnerSlot()
     {
-        rallyOwnerSlotIndex = Mathf.Max(-1, rallyOwnerSlotIndex);
+        if (rallyOwnerSlots == null)
+            rallyOwnerSlots = new List<int>();
+
+        // Migracao do campo unico: roda no load da cena e no OnValidate, entao mapa
+        // antigo chega inteiro sem ninguem reabrir e salvar cena por cena.
+        if (rallyOwnerSlotIndex >= 0)
+        {
+            if (!rallyOwnerSlots.Contains(rallyOwnerSlotIndex))
+                rallyOwnerSlots.Add(rallyOwnerSlotIndex);
+            rallyOwnerSlotIndex = -1;
+        }
+
+        for (int i = rallyOwnerSlots.Count - 1; i >= 0; i--)
+            if (rallyOwnerSlots[i] < 0 || rallyOwnerSlots.IndexOf(rallyOwnerSlots[i]) != i)
+                rallyOwnerSlots.RemoveAt(i);
+
+        rallyOwnerSlots.Sort();
     }
 
     private void SanitizeAnchorSectorSlot()
@@ -1615,7 +1696,7 @@ public class ConstructionManager : MonoBehaviour
         AIRallyAssemblyState state = ResolveRallyHudState(out bool isMain);
         bool showAIHud = AIController.ShowAIHUD;
         if (cachedRallyHudIsRally == isRallyPoint
-            && cachedRallyHudOwnerSlot == rallyOwnerSlotIndex
+            && cachedRallyHudOwnerSlot == ControllingRallyOwnerSlotOrNone
             && cachedRallyHudTeam == teamId
             && cachedRallyHudSector == sector
             && cachedRallyHudState == state
@@ -1624,7 +1705,7 @@ public class ConstructionManager : MonoBehaviour
             return;
 
         cachedRallyHudIsRally = isRallyPoint;
-        cachedRallyHudOwnerSlot = rallyOwnerSlotIndex;
+        cachedRallyHudOwnerSlot = ControllingRallyOwnerSlotOrNone;
         cachedRallyHudTeam = teamId;
         cachedRallyHudSector = sector;
         cachedRallyHudState = state;
@@ -1643,7 +1724,7 @@ public class ConstructionManager : MonoBehaviour
             ConstructionManager construction = AllActive[i];
             if (construction == null || !construction.IsRallyPoint)
                 continue;
-            if (construction.Sector != sector || construction.RallyOwnerSlotIndex != rallyOwnerSlotIndex)
+            if (construction.Sector != sector || !construction.IsRallyForSlot(rallyOwnerSlotIndex))
                 continue;
 
             construction.RefreshRuntimeVisualState(force: true);
@@ -1652,14 +1733,7 @@ public class ConstructionManager : MonoBehaviour
 
     private bool IsOwnedByRallyOwnerSlot()
     {
-        if (!isRallyPoint || rallyOwnerSlotIndex < 0)
-            return false;
-
-        TryAutoAssignMatchController();
-        if (matchController != null)
-            return teamId == matchController.GetTeamIdForSlot(rallyOwnerSlotIndex);
-
-        return slotIndex == rallyOwnerSlotIndex;
+        return TryGetControllingRallyOwnerSlot(out _);
     }
 
     private AIRallyAssemblyState ResolveRallyHudState() => ResolveRallyHudState(out _);
@@ -1667,11 +1741,11 @@ public class ConstructionManager : MonoBehaviour
     private AIRallyAssemblyState ResolveRallyHudState(out bool isMain)
     {
         isMain = false;
-        if (!isRallyPoint || !IsOwnedByRallyOwnerSlot())
+        if (!isRallyPoint || !TryGetControllingRallyOwnerSlot(out int dono))
             return AIRallyAssemblyState.None;
 
         bool hasState = AIController.TryGetRallyHudState(
-            rallyOwnerSlotIndex, sector, out AIRallyAssemblyState state, out _, out isMain);
+            dono, sector, out AIRallyAssemblyState state, out _, out isMain);
 
         // A luz segue a OPERA��O, n�o a massa parada no ancoradouro: enquanto a invas�o lan�ada
         // est� em voo (supress�o ativa), mostra verde � mesmo sem rally objective ativo e mesmo

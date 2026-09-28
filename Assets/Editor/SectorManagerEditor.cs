@@ -443,7 +443,7 @@ public class SectorManagerEditor : Editor
         {
             Vector3Int rallyCell = rally.CurrentCellPosition; rallyCell.z = 0;
 
-            int ownerSlot = rally.RallyOwnerSlotIndex;
+            int ownerSlot = rally.PrimaryRallyOwnerSlot;
             AddRallyOwnerLine(rallyCell, hqs, ownerSlot, explicitOwner: ownerSlot >= 0);
         }
     }

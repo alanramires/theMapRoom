@@ -519,7 +519,9 @@ public static class SaveDataMapper
             teamId = (int)construction.TeamId,
             slotIndex = construction.SlotIndex,
             sector = (int)construction.Sector,
-            rallyOwnerSlotIndex = construction.IsRallyPoint ? construction.RallyOwnerSlotIndex : -1,
+            rallyOwnerSlots = construction.IsRallyPoint
+                ? new List<int>(construction.RallyOwnerSlots)
+                : new List<int>(),
             isAnchorSector = construction.IsAnchorSector,
             anchorSectorSlotIndex = construction.AnchorSectorSlotIndex,
             cellX = construction.CurrentCellPosition.x,
@@ -554,9 +556,11 @@ public static class SaveDataMapper
                 : ForwardObserverSpotUsage.Operational);
         manager.SetRallyPoint(saved.isRallyPoint);
         if (!saved.isRallyPoint)
-            manager.SetRallyOwnerSlotIndex(-1);
+            manager.SetRallyOwnerSlots(null);
+        else if (saved.rallyOwnerSlots != null && saved.rallyOwnerSlots.Count > 0)
+            manager.SetRallyOwnerSlots(saved.rallyOwnerSlots);
         else
-            manager.SetRallyOwnerSlotIndex(saved.rallyOwnerSlotIndex);
+            manager.SetRallyOwnerSlotIndex(saved.rallyOwnerSlotIndex);   // save antigo
         manager.SetAnchorSector(saved.isAnchorSector);
         manager.SetAnchorSectorSlotIndex(saved.anchorSectorSlotIndex);
         if (saved.slotIndex >= 0)

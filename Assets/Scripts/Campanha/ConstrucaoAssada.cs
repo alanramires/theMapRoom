@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
@@ -41,6 +42,17 @@ public class ConstrucaoAssada
 
     [Tooltip("Ancora de setor — o planner usa pra escolher para onde o eixo avanca.")]
     public bool isAnchorSector;
+
+    [Tooltip(
+        "Ponto de reuniao: onde a tropa para e junta massa antes de invadir. O planner "
+        + "le a marca no predio (montagem, GoGreen, blitz), e o eixo autorado termina "
+        + "no setor dele.")]
+    public bool isRallyPoint;
+
+    [Tooltip(
+        "Slots que param neste rally. Lista, e nao um slot: o mesmo predio pode ser o "
+        + "ultimo ponto de reuniao dos DOIS lados. Vazia = resolve pelo QG mais proximo.")]
+    public List<int> rallyOwnerSlots = new List<int>();
 
     [Tooltip("Pontos de captura iniciais. -1 usa o maximo da configuracao do tipo.")]
     public int initialCapturePoints = -1;

@@ -141,7 +141,12 @@ public partial class AIController
 
             context.TargetingEnemyHQ.Add(rally.Sector);
             context.RallyPointCount++;
-            LogRallyReadiness(rally, rally.RallyOwnerSlotIndex, aiTeam, turnNumber, intel);
+            // Num rally compartilhado o dono que interessa no log e QUEM ESTA PLANEJANDO,
+            // nao o primeiro da lista: os dois lados param no mesmo predio.
+            LogRallyReadiness(
+                rally,
+                aiSlotIndex >= 0 ? aiSlotIndex : rally.PrimaryRallyOwnerSlot,
+                aiTeam, turnNumber, intel);
         }
 
         return context;
@@ -193,7 +198,7 @@ public partial class AIController
         if (aiSlot < 0)
             return false;
 
-        return rally.RallyOwnerSlotIndex == aiSlot;
+        return rally.IsRallyForSlot(aiSlot);
     }
 
     private static bool IsValidRallyAssemblySectorForSlot(ConstructionSector sector, TeamId aiTeam, int aiSlotIndex)
@@ -216,10 +221,13 @@ public partial class AIController
     private static bool TryGetOwnedRallySlot(ConstructionManager rally, TeamId aiTeam, out int ownerSlot)
     {
         ownerSlot = -1;
-        if (!IsRallyOwnedBySlot(rally, aiTeam, ResolveAISlotIndex(aiTeam, GetMatchController())))
+        int aiSlot = ResolveAISlotIndex(aiTeam, GetMatchController());
+        if (!IsRallyOwnedBySlot(rally, aiTeam, aiSlot))
             return false;
 
-        ownerSlot = rally.RallyOwnerSlotIndex;
+        // O slot de QUEM PERGUNTOU, nao o primeiro da lista: a pergunta e "este rally e
+        // meu?", e num rally dos dois lados o primeiro da lista pode ser o outro.
+        ownerSlot = aiSlot;
         return true;
     }
 
@@ -245,7 +253,8 @@ public partial class AIController
         string rallyName = rally != null ? rally.name : "(null)";
         ConstructionSector sector = rally != null ? rally.Sector : ConstructionSector.None;
         PublishRallyHudState(rally, readiness.State, readiness.Status, turnNumber,
-            sector != ConstructionSector.None && sector == readiness.FocusSector);
+            sector != ConstructionSector.None && sector == readiness.FocusSector,
+            ownerSlot);
 
         Debug.Log(
             $"[AI Rally][T{turnNumber}][{aiTeam}] {sector} via {rallyName} owner={ownerSlot} " +
@@ -1079,12 +1088,19 @@ public partial class AIController
         AIRallyAssemblyState state,
         string reason,
         int turnNumber,
-        bool isMain)
+        bool isMain,
+        int ownerSlot)
     {
-        if (rally == null || !rally.IsRallyPoint || rally.RallyOwnerSlotIndex < 0 || rally.Sector == ConstructionSector.None)
+        // A luz e guardada por SLOT, e quem escreve e quem esta planejando. Num rally dos
+        // dois lados isso da duas leituras guardadas para o mesmo predio, e a lampada
+        // acende a de quem CONTROLA o predio (ConstructionManager.ResolveRallyHudState):
+        // para o lado que nao o controla, a cor dele nao diz nada. Na captura, a lampada
+        // passa a ler a leitura do novo dono sozinha.
+        if (rally == null || !rally.IsRallyPoint || ownerSlot < 0
+            || rally.Sector == ConstructionSector.None)
             return;
 
-        string key = BuildRallyHudKey(rally.RallyOwnerSlotIndex, rally.Sector);
+        string key = BuildRallyHudKey(ownerSlot, rally.Sector);
         bool changed = !rallyHudStates.TryGetValue(key, out AIRallyHudSnapshot previous)
             || previous.State != state
             || previous.Reason != reason
@@ -1099,7 +1115,7 @@ public partial class AIController
         };
 
         if (changed)
-            ConstructionManager.RefreshRallyHudVisuals(rally.Sector, rally.RallyOwnerSlotIndex);
+            ConstructionManager.RefreshRallyHudVisuals(rally.Sector, ownerSlot);
     }
 
     private static string BuildRallyHudKey(int rallyOwnerSlotIndex, ConstructionSector sector)
@@ -1915,7 +1931,7 @@ public partial class AIController
         {
             ConstructionManager c = all[i];
             if (c == null || !c.IsRallyPoint) continue;
-            if (slotUnknown || c.RallyOwnerSlotIndex < 0 || c.RallyOwnerSlotIndex == aiSlotIndex)
+            if (slotUnknown || c.RallyOwnerSlots.Count == 0 || c.IsRallyForSlot(aiSlotIndex))
                 return true;
         }
         return false;

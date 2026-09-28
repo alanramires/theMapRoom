@@ -37,7 +37,7 @@ public class ConstructionManagerEditor : Editor
     private SerializedProperty isForwardObserverSpotProp;
     private SerializedProperty forwardObserverSpotUsageProp;
     private SerializedProperty isRallyPointProp;
-    private SerializedProperty rallyOwnerSlotIndexProp;
+    private SerializedProperty rallyOwnerSlotsProp;
     private SerializedProperty isAnchorSectorProp;
     private SerializedProperty anchorSectorSlotIndexProp;
     private ForceCopyFilter forceCopyFilter = ForceCopyFilter.Army;
@@ -109,7 +109,7 @@ public class ConstructionManagerEditor : Editor
         isForwardObserverSpotProp = serializedObject.FindProperty("isForwardObserverSpot");
         forwardObserverSpotUsageProp = serializedObject.FindProperty("forwardObserverSpotUsage");
         isRallyPointProp = serializedObject.FindProperty("isRallyPoint");
-        rallyOwnerSlotIndexProp = serializedObject.FindProperty("rallyOwnerSlotIndex");
+        rallyOwnerSlotsProp = serializedObject.FindProperty("rallyOwnerSlots");
         isAnchorSectorProp = serializedObject.FindProperty("isAnchorSector");
         anchorSectorSlotIndexProp = serializedObject.FindProperty("anchorSectorSlotIndex");
     }
@@ -261,9 +261,11 @@ public class ConstructionManagerEditor : Editor
         }
     }
 
+    // Um checkbox por slot, e nao um dropdown: o mesmo predio pode ser o ultimo ponto de
+    // reuniao dos DOIS lados â€” no mapa simetrico o centro e onde os dois param.
     private void DrawRallyOwnerSlot()
     {
-        if (rallyOwnerSlotIndexProp == null)
+        if (rallyOwnerSlotsProp == null)
             return;
 
         using (new EditorGUI.DisabledScope(isRallyPointProp != null && !isRallyPointProp.boolValue))
@@ -272,22 +274,42 @@ public class ConstructionManagerEditor : Editor
             int slotCount = mc != null ? mc.SlotCount : 0;
             if (slotCount <= 0)
             {
-                EditorGUILayout.PropertyField(rallyOwnerSlotIndexProp, new GUIContent("Rally Owner Slot"));
+                EditorGUILayout.PropertyField(rallyOwnerSlotsProp, new GUIContent("Rally Owner Slots"), true);
                 return;
             }
 
-            string[] labels = new string[slotCount + 1];
-            labels[0] = "None";
-            for (int i = 0; i < slotCount; i++)
+            EditorGUILayout.LabelField("Rally Owner Slots");
+            EditorGUI.indentLevel++;
+            for (int slot = 0; slot < slotCount; slot++)
             {
-                TeamId team = mc.GetTeamIdForSlot(i);
-                labels[i + 1] = $"Slot {i} - {TeamUtils.GetName(team)}";
-            }
+                bool tinha = IndiceDoSlotNaLista(rallyOwnerSlotsProp, slot) >= 0;
+                bool tem = EditorGUILayout.ToggleLeft(
+                    $"Slot {slot} - {TeamUtils.GetName(mc.GetTeamIdForSlot(slot))}", tinha);
 
-            int currentOption = Mathf.Clamp(rallyOwnerSlotIndexProp.intValue + 1, 0, slotCount);
-            int selectedOption = EditorGUILayout.Popup("Rally Owner Slot", currentOption, labels);
-            rallyOwnerSlotIndexProp.intValue = selectedOption - 1;
+                if (tem == tinha)
+                    continue;
+
+                if (tem)
+                {
+                    int idx = rallyOwnerSlotsProp.arraySize;
+                    rallyOwnerSlotsProp.InsertArrayElementAtIndex(idx);
+                    rallyOwnerSlotsProp.GetArrayElementAtIndex(idx).intValue = slot;
+                }
+                else
+                {
+                    rallyOwnerSlotsProp.DeleteArrayElementAtIndex(IndiceDoSlotNaLista(rallyOwnerSlotsProp, slot));
+                }
+            }
+            EditorGUI.indentLevel--;
         }
+    }
+
+    private static int IndiceDoSlotNaLista(SerializedProperty lista, int slot)
+    {
+        for (int i = 0; i < lista.arraySize; i++)
+            if (lista.GetArrayElementAtIndex(i).intValue == slot)
+                return i;
+        return -1;
     }
 
     private void DrawSectorPopup()

@@ -1820,6 +1820,10 @@ public class MapHelperWindow : EditorWindow
                 // degenerado.
                 sector = c.Sector,
                 isAnchorSector = c.IsAnchorSector,
+                // O rally tambem: sem ele o eixo autorado chega na Batalha sem
+                // ponto de reuniao, e a massa nunca se forma.
+                isRallyPoint = c.IsRallyPoint,
+                rallyOwnerSlots = new List<int>(c.RallyOwnerSlots),
                 // -1 quando o valor e so o maximo do tipo. Assim o assado carrega
                 // INTENCAO ("comeca meio capturado") e nao coincidencia — e mudar
                 // o HQ de 60 pra 80 no catalogo passa a valer nos quadrantes ja

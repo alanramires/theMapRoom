@@ -385,6 +385,9 @@ public class ConstructionSaveData
     public int teamId;
     public int slotIndex = -1;
     public int sector;
+    public List<int> rallyOwnerSlots = new List<int>();
+    // Legado: save gravado antes de o rally poder ser dos dois lados. Lido quando a
+    // lista vem vazia, e nunca mais escrito.
     public int rallyOwnerSlotIndex = -1;
     public bool isAnchorSector;
     public int anchorSectorSlotIndex = -1;

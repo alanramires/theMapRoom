@@ -1058,6 +1058,8 @@ public class QuadranteController : MonoBehaviour
 
                 manager.SetSector(c.sector);
                 manager.SetAnchorSector(c.isAnchorSector);
+                manager.SetRallyPoint(c.isRallyPoint);
+                manager.SetRallyOwnerSlots(c.rallyOwnerSlots);
 
                 // ANTES dos pontos de captura: o siteRuntime traz o
                 // capturePointsMax, e "-1 = usa o maximo" precisa do maximo certo

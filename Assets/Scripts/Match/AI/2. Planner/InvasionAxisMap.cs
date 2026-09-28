@@ -131,7 +131,11 @@ public class InvasionAxisMap
         var porHQ = new Dictionary<ConstructionManager, List<ConstructionManager>>();
         foreach (ConstructionManager rally in rallies)
         {
-            ConstructionManager hq = FindAxisHQ(allHqs, rally, rally.RallyOwnerSlotIndex);
+            // Rally dos dois lados entra nos DOIS leques: se ele e meu, o apice e o MEU QG.
+            // Perguntar pelo primeiro da lista prenderia o rally compartilhado ao leque do
+            // outro slot, e o meu ficaria sem ponta.
+            int dono = rally.IsRallyForSlot(slotId.Value) ? slotId.Value : rally.PrimaryRallyOwnerSlot;
+            ConstructionManager hq = FindAxisHQ(allHqs, rally, dono);
             if (hq == null) continue;
             if (hq.SlotIndex != slotId.Value) continue;
             if (!porHQ.TryGetValue(hq, out List<ConstructionManager> lista)) { lista = new List<ConstructionManager>(); porHQ[hq] = lista; }
@@ -381,7 +385,7 @@ public class InvasionAxisMap
             {
                 RallyOwnerSlotIndex = ownerSlotOverride >= 0
                     ? ownerSlotOverride
-                    : rallies[i].RallyOwnerSlotIndex,
+                    : rallies[i].PrimaryRallyOwnerSlot,
                 Team = Team,
                 RallySector = rallies[i].Sector,
                 HqCell = hqCell,
