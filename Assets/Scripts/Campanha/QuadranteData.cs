@@ -49,6 +49,34 @@ public class QuadranteData : INoDoMapa
         + "construcoes controladas, e o quadrante ja manda nela pelos predios que assa.")]
     public List<EconomiaInicialSlot> economiaInicial = new List<EconomiaInicialSlot>();
 
+    [Header("Eixos da IA — autoral, sobrevive ao bake")]
+    [Tooltip(
+        "O caminho de pao de cada slot: setores na ordem de avanco, o ultimo e o rally.\n\n"
+        + "Vazio para um slot = a IA monta o leque automatico por angulo, como sempre. "
+        + "Com eixo autorado, ela segue EXATAMENTE o que esta aqui, e setor fora de "
+        + "todos os eixos do slot fica fora de eixo.\n\n"
+        + "Sao rotulos (Alpha, Bravo...) deste quadrante — outro quadrante pode repetir "
+        + "os mesmos nomes sem conflito.")]
+    public List<EixoAutorado> eixos = new List<EixoAutorado>();
+
+    /// <summary>
+    /// Eixos autorados do slot, na ordem em que o autor escreveu. Vazio = o slot
+    /// usa o leque automatico.
+    /// </summary>
+    public void CollectEixosDoSlot(int slotIndex, List<EixoAutorado> destino)
+    {
+        destino.Clear();
+        if (eixos == null)
+            return;
+
+        for (int i = 0; i < eixos.Count; i++)
+        {
+            EixoAutorado eixo = eixos[i];
+            if (eixo != null && eixo.slotIndex == slotIndex && eixo.IsValid)
+                destino.Add(eixo);
+        }
+    }
+
     /// <summary>
     /// Caixa inicial do slot, ou 0 se o autor nao declarou nada para ele. Entrada
     /// duplicada vence a primeira — a bancada avisa, aqui so nao explode.

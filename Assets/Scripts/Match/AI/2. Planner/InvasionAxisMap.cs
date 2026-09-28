@@ -147,6 +147,18 @@ public class InvasionAxisMap
             if (info != null && !ConstructionSectorHelper.IsBase(info.Sector))
                 setores.Add(info);
 
+        // EIXO AUTORADO: o quadrante pintado traz o caminho de pao deste slot escrito
+        // pelo autor. Ele MANDA — sem leque por angulo e sem override, porque os dois
+        // existem justamente pra aproximar o que aqui ja esta dito. A numeracao segue
+        // a ordem da lista, nao o angulo. So o eixo de invasao continua sintetico.
+        var autorados = new List<EixoAutorado>();
+        if (QuadranteController.TryGetEixosAutorados(slotId.Value, autorados)
+            && map.BuildFromAuthored(board, slotId, allHqs, rallies, autorados))
+        {
+            map.AppendInvasionAxis(board, slotId, team, allHqs);
+            return map;
+        }
+
         // Roda o leque por grupo de HQ e acumula eixos crus.
         foreach (var kv in porHQ)
             map.BuildFan(board, kv.Key, kv.Value, setores);
@@ -191,6 +203,119 @@ public class InvasionAxisMap
         map.AppendInvasionAxis(board, slotId, team, allHqs);
 
         return map;
+    }
+
+    // Monta os eixos do slot a partir do que o autor escreveu no quadrante. Falso = nada
+    // aproveitavel (sem QG do slot, ou todo eixo citava setor que nao existe) — o chamador
+    // cai no leque automatico em vez de deixar a IA sem eixo nenhum.
+    //
+    // Setor citado que nao existe no tabuleiro e PULADO com aviso, nao derruba o eixo: um
+    // rotulo errado no meio do caminho nao deve apagar o resto dele.
+    private bool BuildFromAuthored(
+        Tilemap board,
+        PlayerSlotId slotId,
+        List<ConstructionManager> allHqs,
+        List<ConstructionManager> rallies,
+        List<EixoAutorado> autorados)
+    {
+        ConstructionManager hq = null;
+        foreach (ConstructionManager h in allHqs)
+            if (h != null && h.SlotIndex == slotId.Value) { hq = h; break; }
+        if (hq == null)
+            return false;
+
+        Vector3Int hqCell = hq.CurrentCellPosition; hqCell.z = 0;
+        Vector3 hqW = board.GetCellCenterWorld(hqCell);
+
+        foreach (EixoAutorado autorado in autorados)
+        {
+            ConstructionSector rallySector = autorado.Rally;
+            if (!SectorManager.TryGetSectorInfo(rallySector, out SectorManager.SectorInfo rallyInfo) || rallyInfo == null)
+            {
+                AvisarUmaVez($"rally:{slotId.Value}:{rallySector}",
+                    $"[Eixo] Eixo autorado ({autorado}) termina em {rallySector}, que nao existe neste "
+                    + "quadrante. O eixo foi ignorado.");
+                continue;
+            }
+
+            ConstructionManager rally = FindRallyInSector(rallies, rallySector, slotId.Value);
+            if (rally == null)
+                AvisarUmaVez($"semrally:{slotId.Value}:{rallySector}",
+                    $"[Eixo] Eixo autorado ({autorado}) termina em {rallySector}, mas nenhum predio de "
+                    + "la e rally deste slot. O eixo vale, mas a tropa nao tem onde juntar massa.");
+
+            Vector3Int rallyCell = rally != null ? rally.CurrentCellPosition : rallyInfo.RepresentativeCell;
+            rallyCell.z = 0;
+
+            var axis = new Axis
+            {
+                RallyOwnerSlotIndex = slotId.Value,
+                Team = Team,
+                RallySector = rallySector,
+                HqCell = hqCell,
+                RallyCell = rallyCell,
+                RallyAngleDeg = AngleDeg(hqW, board.GetCellCenterWorld(rallyCell)),
+            };
+
+            for (int i = 0; i < autorado.caminho.Count - 1; i++)
+            {
+                ConstructionSector sec = autorado.caminho[i];
+                if (sec == rallySector || axis.Corridor.Contains(sec))
+                    continue;
+                if (!SectorManager.TryGetSectorInfo(sec, out SectorManager.SectorInfo info) || info == null)
+                {
+                    AvisarUmaVez($"setor:{slotId.Value}:{sec}",
+                        $"[Eixo] Eixo autorado ({autorado}) cita {sec}, que nao existe neste quadrante. "
+                        + "O setor foi pulado; o resto do caminho vale.");
+                    continue;
+                }
+                axis.Corridor.Add(sec);
+            }
+
+            axes.Add(axis);
+        }
+
+        if (axes.Count == 0)
+            return false;
+
+        // Numeracao na ordem do AUTOR. Um setor citado em dois eixos fica com o primeiro.
+        for (int i = 0; i < axes.Count; i++)
+        {
+            Axis axis = axes[i];
+            axis.EixoIndex = i + 1;
+            if (!sectorToEixo.ContainsKey(axis.RallySector))
+                sectorToEixo[axis.RallySector] = axis.EixoIndex;
+            foreach (ConstructionSector sec in axis.Corridor)
+                if (!sectorToEixo.ContainsKey(sec))
+                    sectorToEixo[sec] = axis.EixoIndex;
+            ComputeFront(axis, slotId);
+        }
+
+        return true;
+    }
+
+    private static ConstructionManager FindRallyInSector(
+        List<ConstructionManager> rallies, ConstructionSector sector, int slot)
+    {
+        ConstructionManager semDono = null;
+        foreach (ConstructionManager r in rallies)
+        {
+            if (r == null || r.Sector != sector) continue;
+            if (r.IsRallyForSlot(slot)) return r;
+            if (r.RallyOwnerSlots.Count == 0 && semDono == null) semDono = r;
+        }
+        return semDono;
+    }
+
+    // Build roda todo turno e a cada refresh do HUD: sem isto o mesmo aviso encheria o Console.
+    private static readonly HashSet<string> avisados = new HashSet<string>();
+
+    private static void AvisarUmaVez(string chave, string mensagem)
+    {
+        // O quadrante entra na chave: o mesmo rotulo errado em outro mapa e outro erro.
+        QuadranteController q = QuadranteController.Active;
+        if (avisados.Add((q != null ? q.QuadranteId : string.Empty) + "|" + chave))
+            Debug.LogWarning(mensagem);
     }
 
     // Eixo sintetico da captura final: existe desde o inicio como geometria HQ -> QG inimigo.

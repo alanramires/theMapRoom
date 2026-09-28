@@ -133,6 +133,7 @@ public class ConstructionManagerEditor : Editor
         EditorGUILayout.PropertyField(currentCellPositionProp, new GUIContent("Cell Position"));
         DrawSlotAndTeamBlock();
         DrawSectorPopup();
+        DrawEixoDoQuadranteBlock();
         DrawEixoOverrideBlock();
 
         DrawRoleBlock();
@@ -262,7 +263,7 @@ public class ConstructionManagerEditor : Editor
     }
 
     // Um checkbox por slot, e nao um dropdown: o mesmo predio pode ser o ultimo ponto de
-    // reuniao dos DOIS lados â€” no mapa simetrico o centro e onde os dois param.
+    // reuniao dos DOIS lados — no mapa simetrico o centro e onde os dois param.
     private void DrawRallyOwnerSlot()
     {
         if (rallyOwnerSlotsProp == null)
@@ -339,6 +340,240 @@ public class ConstructionManagerEditor : Editor
             ConstructionSectorOrder.WriteSector(
                 sectorProp, ConstructionSectorOrder.SectorAtDisplayIndex(next));
         }
+    }
+
+    // ─────────────────────────────────────── eixo do quadrante (autoria) ──
+    //
+    // O caminho de pao do slot, escrito DAQUI mas gravado no QuadranteData — que
+    // continua sendo a unica verdade. Esta ficha e so o gesto: voce clica o predio
+    // e diz de que eixo o setor dele e.
+    //
+    // Por que nao reusar o "Override Eixo" logo abaixo: aquele corrige um leque que
+    // o jogo JA calculou por angulo, entao so oferece eixo que ja existe — num mapa
+    // sem rally, como os quadrantes da autoria, ele nao tem nada pra oferecer. Aqui
+    // o eixo nao precisa existir pra ser escolhido: escolher E CRIAR.
+    //
+    // So aparece quando o predio cai dentro de um quadrante de algum MundoData. Nas
+    // cenas de mapa fixo (Battle Map 1, Hot Seat) o bloco some e o override antigo
+    // segue mandando, como sempre.
+    private void DrawEixoDoQuadranteBlock()
+    {
+        ConstructionManager cm = target as ConstructionManager;
+        if (cm == null)
+            return;
+
+        Vector3Int cell = cm.CurrentCellPosition; cell.z = 0;
+        if (!TryResolveQuadranteDaCelula(cell, out MundoData mundo, out QuadranteData quadrante))
+            return;
+
+        EditorGUILayout.Space(2f);
+        EditorGUILayout.LabelField(
+            $"Eixo do quadrante — {quadrante.displayName} ({mundo.displayName})", EditorStyles.boldLabel);
+
+        if (cm.Sector == ConstructionSector.None)
+        {
+            EditorGUILayout.LabelField("   (dê um Sector ao prédio primeiro — o eixo é feito de setores)");
+            return;
+        }
+
+        if (ConstructionSectorHelper.IsBase(cm.Sector))
+        {
+            EditorGUILayout.LabelField("   (base não entra em eixo — ela é o ponto de partida)");
+            return;
+        }
+
+        MatchController mc = Object.FindAnyObjectByType<MatchController>();
+        int slotCount = mc != null ? mc.SlotCount : 2;
+
+        EditorGUI.indentLevel++;
+        for (int slot = 0; slot < slotCount; slot++)
+        {
+            var doSlot = new List<EixoAutorado>();
+            quadrante.CollectEixosDoSlot(slot, doSlot);
+
+            // Opcoes: fora de eixo, os eixos que ja existem, e SEMPRE um eixo novo a
+            // mais — e o "mesmo que ainda nao tenha" — com o minimo de tres, que e o
+            // numero de frentes que um quadrante costuma ter.
+            int quantos = Mathf.Max(3, doSlot.Count + 1);
+            var labels = new List<string> { "0 — fora de eixo" };
+            for (int e = 1; e <= quantos; e++)
+            {
+                labels.Add(e <= doSlot.Count
+                    ? $"E{e}: {DescreverCaminho(doSlot[e - 1])}"
+                    : $"E{e} — novo");
+            }
+
+            int atual = 0;
+            for (int e = 0; e < doSlot.Count; e++)
+                if (doSlot[e].caminho.Contains(cm.Sector)) { atual = e + 1; break; }
+
+            string nomeSlot = mc != null
+                ? $"Slot {slot} - {TeamUtils.GetName(mc.GetTeamIdForSlot(slot))}"
+                : $"Slot {slot}";
+
+            EditorGUI.BeginChangeCheck();
+            int escolhido = EditorGUILayout.Popup(nomeSlot, atual, labels.ToArray());
+            if (EditorGUI.EndChangeCheck() && escolhido != atual)
+                EscreverEixo(mundo, quadrante, slot, cm.Sector, escolhido);
+        }
+        EditorGUI.indentLevel--;
+
+        EditorGUILayout.LabelField(
+            "   grava no asset do mundo — Ctrl+S pra salvar", EditorStyles.miniLabel);
+    }
+
+    private static string DescreverCaminho(EixoAutorado eixo)
+    {
+        var sb = new System.Text.StringBuilder();
+        for (int i = 0; i < eixo.caminho.Count; i++)
+        {
+            if (i > 0) sb.Append('-');
+            sb.Append(ConstructionSectorHelper.GetBadge(eixo.caminho[i]));
+        }
+        return sb.ToString();
+    }
+
+    // Tira o setor de qualquer eixo do slot e, se o destino nao for "fora", poe no
+    // escolhido. Eixo que fica vazio e REMOVIDO: o numero do eixo e a posicao dele na
+    // lista, entao deixar buraco faria o E3 daqui virar o E2 do jogo.
+    private static void EscreverEixo(
+        MundoData mundo, QuadranteData quadrante, int slot, ConstructionSector setor, int eixoEscolhido)
+    {
+        Undo.RecordObject(mundo, "Eixo do quadrante");
+
+        if (quadrante.eixos == null)
+            quadrante.eixos = new List<EixoAutorado>();
+
+        foreach (EixoAutorado e in quadrante.eixos)
+            if (e != null && e.slotIndex == slot && e.caminho != null)
+                e.caminho.Remove(setor);
+
+        quadrante.eixos.RemoveAll(e => e == null || e.caminho == null || e.caminho.Count == 0);
+
+        if (eixoEscolhido > 0)
+        {
+            var doSlot = new List<EixoAutorado>();
+            quadrante.CollectEixosDoSlot(slot, doSlot);
+
+            EixoAutorado destino;
+            if (eixoEscolhido <= doSlot.Count)
+            {
+                destino = doSlot[eixoEscolhido - 1];
+            }
+            else
+            {
+                destino = new EixoAutorado { slotIndex = slot };
+                quadrante.eixos.Add(destino);
+            }
+
+            // Uma varredura de cena so para a escrita inteira: a ordenacao consulta
+            // rally e distancia setor a setor, e refazer o Find a cada consulta varria
+            // a cena dezenas de vezes por clique.
+            var pecas = new List<ConstructionManager>(ConstrucoesDoQuadrante(quadrante));
+            destino.caminho.Insert(PosicaoNoCaminho(pecas, slot, destino, setor), setor);
+        }
+
+        EditorUtility.SetDirty(mundo);
+    }
+
+    // Onde o setor entra no caminho. A ordem e a distancia ao QG do slot — o corredor
+    // anda do QG pra fora —, e o setor que tem o RALLY vai pro fim, porque o rally e
+    // onde a tropa para. Sem QG na cena, entra no fim e o autor reordena na lista.
+    private static int PosicaoNoCaminho(
+        List<ConstructionManager> pecas, int slot, EixoAutorado eixo, ConstructionSector setor)
+    {
+        if (TemRallyDoSlot(pecas, slot, setor))
+            return eixo.caminho.Count;
+
+        float d = DistanciaAoQG(pecas, slot, setor);
+        if (float.IsPositiveInfinity(d))
+            return eixo.caminho.Count;
+
+        int i = 0;
+        while (i < eixo.caminho.Count
+               && !TemRallyDoSlot(pecas, slot, eixo.caminho[i])
+               && DistanciaAoQG(pecas, slot, eixo.caminho[i]) <= d)
+            i++;
+        return i;
+    }
+
+    private static bool TemRallyDoSlot(
+        List<ConstructionManager> pecas, int slot, ConstructionSector setor)
+    {
+        foreach (ConstructionManager c in pecas)
+            if (c.Sector == setor && c.IsRallyPoint
+                && (c.IsRallyForSlot(slot) || c.RallyOwnerSlots.Count == 0))
+                return true;
+        return false;
+    }
+
+    // Distancia do QG do slot ao predio MAIS PROXIMO daquele setor: um setor e um
+    // punhado de predios, e o que interessa e por onde a tropa encosta nele.
+    private static float DistanciaAoQG(
+        List<ConstructionManager> pecas, int slot, ConstructionSector setor)
+    {
+        ConstructionManager hq = null;
+        foreach (ConstructionManager c in pecas)
+            if (c.IsPlayerHeadQuarter && c.SlotIndex == slot) { hq = c; break; }
+        if (hq == null)
+            return float.PositiveInfinity;
+
+        Vector3Int hqCell = hq.CurrentCellPosition; hqCell.z = 0;
+        float melhor = float.PositiveInfinity;
+        foreach (ConstructionManager c in pecas)
+        {
+            if (c.Sector != setor) continue;
+            Vector3Int cell = c.CurrentCellPosition; cell.z = 0;
+            melhor = Mathf.Min(melhor, SectorManager.HexDistance(cell, hqCell));
+        }
+        return melhor;
+    }
+
+    private static IEnumerable<ConstructionManager> ConstrucoesDoQuadrante(QuadranteData quadrante)
+    {
+        ConstructionManager[] todas = Object.FindObjectsByType<ConstructionManager>(
+            FindObjectsInactive.Include, FindObjectsSortMode.None);
+        foreach (ConstructionManager c in todas)
+        {
+            if (c == null) continue;
+            Vector3Int cell = c.CurrentCellPosition; cell.z = 0;
+            if (quadrante.ContainsCampaignCell(cell))
+                yield return c;
+        }
+    }
+
+    // Procura em todos os MundoData do projeto o quadrante cujo retangulo contem a
+    // celula. Prefere o mundo cuja cena de autoria e a que esta aberta: dois mundos
+    // podem ter retangulos que se sobrepoem, e o desta cena e o que o autor quer.
+    private static bool TryResolveQuadranteDaCelula(
+        Vector3Int cell, out MundoData mundo, out QuadranteData quadrante)
+    {
+        mundo = null;
+        quadrante = null;
+
+        string cenaAberta = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
+        string[] guids = AssetDatabase.FindAssets("t:MundoData");
+        foreach (string guid in guids)
+        {
+            var candidato = AssetDatabase.LoadAssetAtPath<MundoData>(AssetDatabase.GUIDToAssetPath(guid));
+            if (candidato == null) continue;
+
+            foreach (QuadranteData q in candidato.AllQuadrantes())
+            {
+                if (!q.ContainsCampaignCell(cell)) continue;
+
+                bool daCenaAberta = candidato.authoringSceneName == cenaAberta;
+                if (mundo == null || daCenaAberta)
+                {
+                    mundo = candidato;
+                    quadrante = q;
+                }
+                if (daCenaAberta) return true;
+                break;
+            }
+        }
+
+        return quadrante != null;
     }
 
     private void DrawEixoOverrideBlock()

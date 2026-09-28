@@ -96,6 +96,7 @@ public class QuadranteController : MonoBehaviour
     private Vector2Int origemDaPintura;
 
     private bool built;
+    private QuadranteData quadranteConstruido;
     private int paintedCells;
     private int holeCells;
     private bool recordsCampaignResult;
@@ -108,6 +109,21 @@ public class QuadranteController : MonoBehaviour
     public string MundoId => mundo != null ? mundo.mundoId : string.Empty;
     public string CampanhaId => campanhaId;
     public string QuadranteId => quadranteId;
+
+    /// <summary>
+    /// Eixos autorados do slot no quadrante que ESTA pintado. Falso = nao ha
+    /// quadrante construido (cenas de mapa fixo) ou o autor nao escreveu eixo para
+    /// este slot — nos dois casos a IA monta o leque automatico.
+    /// </summary>
+    public static bool TryGetEixosAutorados(int slotIndex, List<EixoAutorado> destino)
+    {
+        destino.Clear();
+        if (active == null || !active.built || active.quadranteConstruido == null)
+            return false;
+
+        active.quadranteConstruido.CollectEixosDoSlot(slotIndex, destino);
+        return destino.Count > 0;
+    }
 
     public BattleMapSaveData CaptureMapForSave()
     {
@@ -602,6 +618,7 @@ public class QuadranteController : MonoBehaviour
         int unidades = BuildUnidades(quadrante);
 
         watch.Stop();
+        quadranteConstruido = quadrante;
         built = true;
 
         // O PORTAO GANHA SEU PRIMEIRO CONSUMIDOR.
