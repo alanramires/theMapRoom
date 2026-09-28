@@ -726,18 +726,25 @@ public partial class AIController
             $"packages={readiness.RequiredPackages} force={readiness.ForceScore}/{readiness.RequiredForce} " +
             $"missing={readiness.Missing}";
         PublishRallyHudState(rally, readiness.State, obj.RallyReadinessReason, turnNumber,
-            rally != null && rally.Sector != ConstructionSector.None && rally.Sector == readiness.FocusSector);
+            rally != null && rally.Sector != ConstructionSector.None && rally.Sector == readiness.FocusSector,
+            ResolveAISlotKey(aiTeam));
 
         if (readiness.GoGreen && obj.RallyGoGreenTurn < 0)
         {
             obj.RallyGoGreenTurn = turnNumber;
             // O Go Green pertence a operacao, nao a um predio isolado. Suprime todos os
-            // rallies assegurados para que feeders nao iniciem uma segunda montagem paralela.
+            // rallies DESIGNADOS para este slot, para que feeders nao iniciem uma segunda
+            // montagem paralela.
+            //
+            // Designacao, nao posse: antes isto exigia tambem que o predio ja fosse meu, e
+            // ai um rally meu ainda por conquistar ficava de fora da supressao — justamente
+            // o candidato a virar a segunda montagem, porque a montagem so pede designacao
+            // (IsValidRallyAssemblySectorForSlot). Mesma distincao que o resto do arquivo
+            // ja faz: rally e onde eu PAROU, nao o que esta na minha mao hoje.
             int slot = ResolveAISlotIndex(aiTeam, GetMatchController());
-            foreach (ConstructionManager heldRally in ConstructionManager.AllActive)
-                if (heldRally != null && heldRally.IsRallyPoint && heldRally.SlotIndex == ResolveAISlotKey(aiTeam)
-                    && IsRallyOwnedBySlot(heldRally, aiTeam, slot))
-                    RememberRallyGoGreen(aiTeam, heldRally.Sector, turnNumber);
+            foreach (ConstructionManager designado in ConstructionManager.AllActive)
+                if (designado != null && IsRallyOwnedBySlot(designado, aiTeam, slot))
+                    RememberRallyGoGreen(aiTeam, designado.Sector, turnNumber);
         }
     }
 
@@ -759,7 +766,11 @@ public partial class AIController
             if (obj == null || obj.ObjectiveType != AIObjectiveType.RallyAssembly)
                 continue;
 
-            string goGreenKey = $"{(int)snapshot.AITeam}:{obj.Sector}";
+            // SLOT, nao time: quem escreve a chave e RememberRallyGoGreen, com
+            // ResolveAISlotKey. Com o numero do time aqui, este Remove so acertava quando
+            // time e slot calhavam de ter o mesmo numero — e nos outros casos apagava
+            // a entrada de ninguem, calado.
+            string goGreenKey = $"{ResolveAISlotKey(snapshot.AITeam)}:{obj.Sector}";
             rallyGoGreenTurns.Remove(goGreenKey);
             if (obj.RallyGoGreenTurn >= 0)
                 RememberRallyGoGreen(snapshot.AITeam, obj.Sector, obj.RallyGoGreenTurn);
