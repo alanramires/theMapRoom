@@ -1,14 +1,14 @@
-# Resumo — onde estamos e o que vem
+﻿# Resumo — onde estamos e o que vem
 
-Ponto de retomada. Atualizado em 2026-09-10, **depois** da tag `v8.5.2`.
+Ponto de retomada. Atualizado em 2026-09-28, **depois** da tag `v8.6.0`.
 Leia isto primeiro.
 
 ---
 
 ## Estado
 
-`v8.5.2` tagueada e publicada. Relatório:
-[`relatorio_v8.5.2.md`](relatorio_v8.5.2.md).
+`v8.6.0` tagueada e publicada. Relatório:
+[`relatorio_v8.6.0.md`](relatorio_v8.6.0.md).
 
 ```text
 v8.3.0   o primeiro quadrante pintou      361 tiles, 2 ms, cena vazia
@@ -17,12 +17,33 @@ v8.4.1   a peça tem lado                  orientação, rotas partidas, identid
 v8.5.0   o laço fecha                     volta, dono por slot, tropa inicial
 v8.5.1   o que atravessa a cena            save por endereço, isPlayable, 0b
 v8.5.2   a forma casa com o dado           quadradinhos, paridade, fim de partida
+v8.6.0   a etiqueta muda de dono          rally em lista, eixo escrito, 3 perfis
 ```
 
 **O MVP virou tela.** Menu → Campanha → Batalha → volta → o mapa pintado, o
 placar, e o registro de quem tomou o quê em quantas rodadas.
 
 ### A descoberta que organiza o resto
+
+> **Uma resposta só não serve a mais de um respondente.**
+
+Três coisas tropeçaram nisso na mesma versão, e nenhuma delas dava erro:
+
+```text
+rally         um int   respondia "de quem e"      e o predio era dos DOIS lados
+eixo          o angulo respondia "por onde vou"   e o autor queria escolher
+dificuldade   hardMode respondia "o que eu faco"  seis lampadas, uma chave so
+```
+
+O remédio foi o mesmo nas três: **a etiqueta muda de dono**. O rally passou a ter
+lista de slots, o eixo virou grafo escrito no quadrante, e cada portão de
+comportamento voltou a perguntar o que ele queria saber — `FazHandoffEmProfundidade`,
+`RespeitaListaBanida` — em vez de "eu sou o difícil?".
+
+E o teste que denuncia o caso: se você precisa **desligar** uma parte da resposta
+para a outra metade se comportar, a entidade está errada, não o flag.
+
+### A descoberta da v8.5.2, que segue valendo
 
 > **A forma tem que casar com o dado.** Contável vira quadrado; contínuo vira
 > barra.
@@ -159,6 +180,39 @@ assim que a paridade do Q2, o título perdido e o `bar_tvencedor` apareceram.
 ✅ save/load de campanha  volta ao quadrante em foco
 ```
 
+### Dois cliques separam a IA de obedecer o perfil
+
+Está tudo escrito e compilando, e **nada disso foi jogado**:
+
+1. na janela **Tools ▸ AI ▸ Gerar Presets**, botão *"Criar/atualizar catálogo"* —
+   o catálogo atual foi gerado antes de a dificuldade cair de seis para três e
+   guarda o DIFÍCIL como `dificuldade: 4`, número que hoje não existe. Ele **não
+   casa**, e o difícil cai na overlay antiga **sem avisar**. O botão agora remove
+   entrada extinta e diz que removeu.
+2. arrastar o catálogo para o campo **Preset Catalog** do `AIController` na cena
+   Batalha.
+
+Depois disso, ligar `handoffEmProfundidade` no `AIPreset_Medio` é o primeiro
+comportamento que passa a ser do autor e não do `hardMode`: *"a média também parte
+pra frente"*.
+
+Os **valores** ainda não vêm do preset (`EliteRatio*`, `EliteSaveTurns`,
+`CoreMin*` seguem no `AIController`) — é a fase 2 da migração, e enquanto isso
+médio e difícil dividem a mesma tabela de números.
+
+### O eixo autorado precisa de uma ferramenta melhor
+
+Escrever o grafo funciona: ficha do prédio → dropdown → grava na lista do
+quadrante, e o desenho no Scene View mostra o que o jogo vai seguir. O veredito
+do autor:
+
+> *"não é prático pra dar manutenção, mas resolve, e é o que temos no momento"*
+
+O gargalo é montar o grafo prédio por prédio sem ver a linha se formando.
+Melhorar o dropdown é polir o gesto errado — o caminho é desenhar no Scene View:
+clicar o QG, clicar os setores na ordem. E lembrar: **o desenho só se refaz quando
+se aperta "Desenhar eixos" de novo.**
+
 ### O `0b` NUNCA rodou
 
 Os hooks de `sceneLoaded` do `ObjectiveManager` e do `AITacticalAnalyzer` estão
@@ -234,6 +288,11 @@ o outro é edição manual.
                                      falta EXERCITAR o 0b e o portão de destrave
 ```
 
+O degrau 3 ganhou vizinho na v8.6.0: a **doutrina** saiu do `hardMode` e virou
+capacidade nomeada, lida de um perfil autorado. É o mesmo movimento do degrau —
+política deixando de ser `if` espalhado — só que na camada do general, não na do
+papel. Os *valores* ainda não fizeram essa viagem.
+
 ---
 
 ## Armadilhas que importam nesta retomada
@@ -247,6 +306,11 @@ o outro é edição manual.
 ` em script que gera código** | a ferramenta processa a barra antes do Python e o literal C# não casa. Usar `chr(92)`. **Está nesta tabela e eu tropecei duas vezes antes de olhar** |
 | **`currentTurn` lido como jogada individual** | ele conta **rodadas**: só sobe quando o índice de jogador dá a volta. Passar a vez de um jogador ao outro não mexe nele. Todo número de "turno" que atravessa telas ou vira registro precisa dizer qual dos dois é |
 | **translação de recorte em grade hexagonal** | odd-r: a posição de mundo de uma linha depende da PARIDADE do y, não da diferença entre dois y. Traduzir um retângulo autorado em y ímpar para y par inverte a paridade de todas as linhas e cisalha o recorte meia célula — e **nada reclama**, porque o tile continua na célula lógica certa. Se um recorte precisa mudar de y, a paridade tem de sobreviver |
+| **nome interno que não casa com o botão** | a Tela de Entrada mostrava FÁCIL/MÉDIO/DIFÍCIL e o enum era Iniciante/Facil/Competitiva — o perfil chamado "facil" mudava o botão MÉDIO. Resolvido na v8.6.0 reduzindo a três com os nomes do jogador. Quando um rótulo de tela e um identificador interno convivem, **mostre os dois lado a lado na ferramenta** |
+| **entrada de enum extinta num asset** | catálogo gravado com `dificuldade: 4` (o antigo `Competitiva`) não casa com nada depois da redução, e o perfil cai no caminho de reserva **calado**. Toda tabela dificuldade→asset precisa podar entrada que não existe mais, e dizer que podou |
+| **reassar não conserta autoria** | a lista de eixos mora fora da seção assada de propósito; o bake não a toca. "Mudei e reassei e não mudou" é sintoma de estar olhando a fonte errada, não de bake quebrado |
+| **o recorte de autoria vaza para o arquivo da cena** | não o recorte — o efeito dele. O `SectorManager` serializa `sectorInfos`, então salvar a Fixture com um quadrante em foco grava a lista **truncada**. Na autoria é cache e se refaz; mas é por isso que a `Fixture.unity` encolheu ~600 linhas na v8.6.0, e **não é regressão** |
+| **editor que desenha o que o jogo não vai rodar** | o desenho de eixos só lia o quadrante que a Batalha pintou, e na autoria nada está pintado — mostrava sempre o leque automático. Editor divergindo do jogo é pior que editor sem desenho: a ferramenta passa a ensinar errado |
 | **cena que parece partida** | a `Campanha` tem `MatchController`, `TurnStateManager` e lista de jogadores porque nasceu da cena-base de batalha. Perguntar "estou numa partida?" olhando o que EXISTE na cena responde sim e age errado. Pergunte ao `MatchController.IsPlayable` — e ao **da própria cena**, não a qualquer um |
 | **`== null` da Unity em cache estático** | referência a objeto destruído responde `true` para `== null`. O padrão `if (cached == null) cached = Find(...)` **se auto-cura** entre cenas. "É estático e sobrevive à cena" NÃO é o teste de contaminação; o teste é **"guarda dado ou guarda referência?"** — dado contamina, referência morta se denuncia sozinha |
 | **prefab compartilhado levando config de uma cena** | o `AudioManager` virou prefab das três cenas carregando o `playbackMode` da Tela de Entrada, e a Batalha passou a tocar a música do menu. O que é IGUAL nas cenas vai no prefab; o que é DIFERENTE deriva da cena ou vira override |
