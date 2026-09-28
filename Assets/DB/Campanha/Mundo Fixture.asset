@@ -52,6 +52,7 @@ MonoBehaviour:
         destravadoPor: []
         exigeIrmaos: 0
         economiaInicial: []
+        eixos: []
         idSerial: 3
         bakedTiles:
         - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
@@ -327,239 +328,15 @@ MonoBehaviour:
         - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
         - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
         bakedConstrucoes:
-        - constructionId: cidade
-          localX: 10
-          localY: 11
+        - constructionId: fabricaL
+          localX: 5
+          localY: 13
           teamId: -1
           slotIndex: -1
-          sector: 2
+          sector: 0
           isAnchorSector: 0
-          initialCapturePoints: -1
-          siteRuntime:
-            isPlayerHeadQuarter: 0
-            isVictoryBuilding: 0
-            isCapturable: 1
-            capturePointsMax: 20
-            capturedIncoming: 1000
-            sellingRule: 3
-            legacyCanProduceAndSellUnits: 
-            offeredUnits: []
-            canProvideSupplies: 1
-            offeredSupplies:
-            - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
-              quantity: 40
-              peakQuantity: 40
-            - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
-              quantity: 10
-              peakQuantity: 10
-            - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
-              quantity: 20
-              peakQuantity: 20
-            offeredServices:
-            - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
-            - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
-            - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
-            - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
-          displayName: Cidade
-        - constructionId: fabricaL
-          localX: 10
-          localY: 5
-          teamId: -1
-          slotIndex: -1
-          sector: 6
-          isAnchorSector: 0
-          initialCapturePoints: -1
-          siteRuntime:
-            isPlayerHeadQuarter: 0
-            isVictoryBuilding: 0
-            isCapturable: 1
-            capturePointsMax: 30
-            capturedIncoming: 1500
-            sellingRule: 1
-            legacyCanProduceAndSellUnits: 
-            offeredUnits:
-            - {fileID: 11400000, guid: 4a3afdea0950dfc46a48dd7a659563ee, type: 2}
-            - {fileID: 11400000, guid: b28c15593869dae419f9b58292ef4845, type: 2}
-            - {fileID: 11400000, guid: c0e59b3e4bf2e4c49a67906805e43801, type: 2}
-            - {fileID: 11400000, guid: a5d9d72a15e061a4cbaf125b2b6b9d48, type: 2}
-            - {fileID: 11400000, guid: 70b7ea3ddea78fc4e9d744cee13b053a, type: 2}
-            - {fileID: 11400000, guid: 3dc9b119819519440820c81f5db4fdce, type: 2}
-            - {fileID: 11400000, guid: 70b98199c49882e44892f7ca76df6b33, type: 2}
-            - {fileID: 11400000, guid: 8c89f5278e312ad46af401333934721b, type: 2}
-            canProvideSupplies: 1
-            offeredSupplies:
-            - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
-              quantity: 20
-              peakQuantity: 20
-            - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
-              quantity: 10
-              peakQuantity: 10
-            - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
-              quantity: 40
-              peakQuantity: 40
-            offeredServices:
-            - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
-            - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
-            - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
-            - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
-          displayName: "F\xE1brica Leve"
-        - constructionId: hq
-          localX: 12
-          localY: 4
-          teamId: 3
-          slotIndex: 1
-          sector: 101
-          isAnchorSector: 0
-          initialCapturePoints: -1
-          siteRuntime:
-            isPlayerHeadQuarter: 1
-            isVictoryBuilding: 0
-            isCapturable: 1
-            capturePointsMax: 60
-            capturedIncoming: 3000
-            sellingRule: 1
-            legacyCanProduceAndSellUnits: 
-            offeredUnits:
-            - {fileID: 11400000, guid: 4a3afdea0950dfc46a48dd7a659563ee, type: 2}
-            - {fileID: 11400000, guid: b28c15593869dae419f9b58292ef4845, type: 2}
-            - {fileID: 11400000, guid: c0e59b3e4bf2e4c49a67906805e43801, type: 2}
-            canProvideSupplies: 1
-            offeredSupplies:
-            - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
-              quantity: 2147483647
-              peakQuantity: 2147483647
-            - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
-              quantity: 2147483647
-              peakQuantity: 2147483647
-            - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
-              quantity: 2147483647
-              peakQuantity: 2147483647
-            offeredServices:
-            - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
-            - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
-            - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
-            - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
-          displayName: HQ
-        - constructionId: hq
-          localX: 4
-          localY: 14
-          teamId: 2
-          slotIndex: 0
-          sector: 100
-          isAnchorSector: 0
-          initialCapturePoints: -1
-          siteRuntime:
-            isPlayerHeadQuarter: 1
-            isVictoryBuilding: 0
-            isCapturable: 1
-            capturePointsMax: 60
-            capturedIncoming: 3000
-            sellingRule: 1
-            legacyCanProduceAndSellUnits: 
-            offeredUnits:
-            - {fileID: 11400000, guid: 4a3afdea0950dfc46a48dd7a659563ee, type: 2}
-            - {fileID: 11400000, guid: b28c15593869dae419f9b58292ef4845, type: 2}
-            - {fileID: 11400000, guid: c0e59b3e4bf2e4c49a67906805e43801, type: 2}
-            canProvideSupplies: 1
-            offeredSupplies:
-            - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
-              quantity: 2147483647
-              peakQuantity: 2147483647
-            - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
-              quantity: 2147483647
-              peakQuantity: 2147483647
-            - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
-              quantity: 2147483647
-              peakQuantity: 2147483647
-            offeredServices:
-            - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
-            - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
-            - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
-            - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
-          displayName: HQ
-        - constructionId: fabricaL
-          localX: 4
-          localY: 15
-          teamId: 2
-          slotIndex: 0
-          sector: 100
-          isAnchorSector: 0
-          initialCapturePoints: -1
-          siteRuntime:
-            isPlayerHeadQuarter: 0
-            isVictoryBuilding: 0
-            isCapturable: 1
-            capturePointsMax: 30
-            capturedIncoming: 1500
-            sellingRule: 1
-            legacyCanProduceAndSellUnits: 
-            offeredUnits:
-            - {fileID: 11400000, guid: 4a3afdea0950dfc46a48dd7a659563ee, type: 2}
-            - {fileID: 11400000, guid: b28c15593869dae419f9b58292ef4845, type: 2}
-            - {fileID: 11400000, guid: c0e59b3e4bf2e4c49a67906805e43801, type: 2}
-            - {fileID: 11400000, guid: a5d9d72a15e061a4cbaf125b2b6b9d48, type: 2}
-            - {fileID: 11400000, guid: 70b7ea3ddea78fc4e9d744cee13b053a, type: 2}
-            - {fileID: 11400000, guid: 3dc9b119819519440820c81f5db4fdce, type: 2}
-            - {fileID: 11400000, guid: 70b98199c49882e44892f7ca76df6b33, type: 2}
-            - {fileID: 11400000, guid: 8c89f5278e312ad46af401333934721b, type: 2}
-            canProvideSupplies: 1
-            offeredSupplies:
-            - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
-              quantity: 20
-              peakQuantity: 20
-            - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
-              quantity: 10
-              peakQuantity: 10
-            - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
-              quantity: 40
-              peakQuantity: 40
-            offeredServices:
-            - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
-            - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
-            - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
-            - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
-          displayName: "F\xE1brica Leve"
-        - constructionId: cidade
-          localX: 4
-          localY: 6
-          teamId: -1
-          slotIndex: -1
-          sector: 5
-          isAnchorSector: 0
-          initialCapturePoints: -1
-          siteRuntime:
-            isPlayerHeadQuarter: 0
-            isVictoryBuilding: 0
-            isCapturable: 1
-            capturePointsMax: 20
-            capturedIncoming: 1000
-            sellingRule: 3
-            legacyCanProduceAndSellUnits: 
-            offeredUnits: []
-            canProvideSupplies: 1
-            offeredSupplies:
-            - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
-              quantity: 40
-              peakQuantity: 40
-            - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
-              quantity: 10
-              peakQuantity: 10
-            - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
-              quantity: 20
-              peakQuantity: 20
-            offeredServices:
-            - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
-            - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
-            - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
-            - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
-          displayName: Cidade
-        - constructionId: fabricaL
-          localX: 13
-          localY: 4
-          teamId: 3
-          slotIndex: 1
-          sector: 101
-          isAnchorSector: 0
+          isRallyPoint: 0
+          rallyOwnerSlotIndex: -1
           initialCapturePoints: -1
           siteRuntime:
             isPlayerHeadQuarter: 0
@@ -602,6 +379,52 @@ MonoBehaviour:
           slotIndex: 0
           sector: 100
           isAnchorSector: 0
+          isRallyPoint: 0
+          rallyOwnerSlotIndex: -1
+          initialCapturePoints: -1
+          siteRuntime:
+            isPlayerHeadQuarter: 0
+            isVictoryBuilding: 0
+            isCapturable: 1
+            capturePointsMax: 30
+            capturedIncoming: 1500
+            sellingRule: 1
+            legacyCanProduceAndSellUnits: 
+            offeredUnits:
+            - {fileID: 11400000, guid: 4a3afdea0950dfc46a48dd7a659563ee, type: 2}
+            - {fileID: 11400000, guid: b28c15593869dae419f9b58292ef4845, type: 2}
+            - {fileID: 11400000, guid: c0e59b3e4bf2e4c49a67906805e43801, type: 2}
+            - {fileID: 11400000, guid: a5d9d72a15e061a4cbaf125b2b6b9d48, type: 2}
+            - {fileID: 11400000, guid: 70b7ea3ddea78fc4e9d744cee13b053a, type: 2}
+            - {fileID: 11400000, guid: 3dc9b119819519440820c81f5db4fdce, type: 2}
+            - {fileID: 11400000, guid: 70b98199c49882e44892f7ca76df6b33, type: 2}
+            - {fileID: 11400000, guid: 8c89f5278e312ad46af401333934721b, type: 2}
+            canProvideSupplies: 1
+            offeredSupplies:
+            - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+              quantity: 20
+              peakQuantity: 20
+            - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+              quantity: 10
+              peakQuantity: 10
+            - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+              quantity: 40
+              peakQuantity: 40
+            offeredServices:
+            - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+            - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+            - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+            - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
+          displayName: "F\xE1brica Leve"
+        - constructionId: fabricaL
+          localX: 11
+          localY: 3
+          teamId: 3
+          slotIndex: 1
+          sector: 101
+          isAnchorSector: 0
+          isRallyPoint: 0
+          rallyOwnerSlotIndex: -1
           initialCapturePoints: -1
           siteRuntime:
             isPlayerHeadQuarter: 0
@@ -638,12 +461,86 @@ MonoBehaviour:
             - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
           displayName: "F\xE1brica Leve"
         - constructionId: cidade
-          localX: 8
+          localX: 9
           localY: 8
           teamId: -1
           slotIndex: -1
           sector: 4
           isAnchorSector: 0
+          isRallyPoint: 0
+          rallyOwnerSlotIndex: -1
+          initialCapturePoints: -1
+          siteRuntime:
+            isPlayerHeadQuarter: 0
+            isVictoryBuilding: 0
+            isCapturable: 1
+            capturePointsMax: 20
+            capturedIncoming: 1000
+            sellingRule: 3
+            legacyCanProduceAndSellUnits: 
+            offeredUnits: []
+            canProvideSupplies: 1
+            offeredSupplies:
+            - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+              quantity: 40
+              peakQuantity: 40
+            - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+              quantity: 10
+              peakQuantity: 10
+            - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+              quantity: 20
+              peakQuantity: 20
+            offeredServices:
+            - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+            - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+            - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+            - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
+          displayName: Cidade
+        - constructionId: cidade
+          localX: 6
+          localY: 4
+          teamId: -1
+          slotIndex: -1
+          sector: 5
+          isAnchorSector: 0
+          isRallyPoint: 0
+          rallyOwnerSlotIndex: -1
+          initialCapturePoints: -1
+          siteRuntime:
+            isPlayerHeadQuarter: 0
+            isVictoryBuilding: 0
+            isCapturable: 1
+            capturePointsMax: 20
+            capturedIncoming: 1000
+            sellingRule: 3
+            legacyCanProduceAndSellUnits: 
+            offeredUnits: []
+            canProvideSupplies: 1
+            offeredSupplies:
+            - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+              quantity: 40
+              peakQuantity: 40
+            - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+              quantity: 10
+              peakQuantity: 10
+            - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+              quantity: 20
+              peakQuantity: 20
+            offeredServices:
+            - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+            - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+            - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+            - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
+          displayName: Cidade
+        - constructionId: cidade
+          localX: 10
+          localY: 12
+          teamId: -1
+          slotIndex: -1
+          sector: 2
+          isAnchorSector: 0
+          isRallyPoint: 0
+          rallyOwnerSlotIndex: -1
           initialCapturePoints: -1
           siteRuntime:
             isPlayerHeadQuarter: 0
@@ -672,12 +569,14 @@ MonoBehaviour:
             - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
           displayName: Cidade
         - constructionId: fabricaL
-          localX: 11
-          localY: 3
-          teamId: 3
-          slotIndex: 1
-          sector: 101
+          localX: 10
+          localY: 5
+          teamId: -1
+          slotIndex: -1
+          sector: 6
           isAnchorSector: 0
+          isRallyPoint: 0
+          rallyOwnerSlotIndex: -1
           initialCapturePoints: -1
           siteRuntime:
             isPlayerHeadQuarter: 0
@@ -714,12 +613,14 @@ MonoBehaviour:
             - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
           displayName: "F\xE1brica Leve"
         - constructionId: fabricaL
-          localX: 5
-          localY: 13
-          teamId: -1
-          slotIndex: -1
-          sector: 0
+          localX: 13
+          localY: 4
+          teamId: 3
+          slotIndex: 1
+          sector: 101
           isAnchorSector: 0
+          isRallyPoint: 0
+          rallyOwnerSlotIndex: -1
           initialCapturePoints: -1
           siteRuntime:
             isPlayerHeadQuarter: 0
@@ -755,6 +656,200 @@ MonoBehaviour:
             - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
             - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
           displayName: "F\xE1brica Leve"
+        - constructionId: cidade
+          localX: 4
+          localY: 9
+          teamId: -1
+          slotIndex: -1
+          sector: 1
+          isAnchorSector: 0
+          isRallyPoint: 0
+          rallyOwnerSlotIndex: -1
+          initialCapturePoints: -1
+          siteRuntime:
+            isPlayerHeadQuarter: 0
+            isVictoryBuilding: 0
+            isCapturable: 1
+            capturePointsMax: 20
+            capturedIncoming: 1000
+            sellingRule: 3
+            legacyCanProduceAndSellUnits: 
+            offeredUnits: []
+            canProvideSupplies: 1
+            offeredSupplies:
+            - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+              quantity: 40
+              peakQuantity: 40
+            - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+              quantity: 10
+              peakQuantity: 10
+            - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+              quantity: 20
+              peakQuantity: 20
+            offeredServices:
+            - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+            - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+            - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+            - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
+          displayName: Cidade
+        - constructionId: fabricaL
+          localX: 4
+          localY: 15
+          teamId: 2
+          slotIndex: 0
+          sector: 100
+          isAnchorSector: 0
+          isRallyPoint: 0
+          rallyOwnerSlotIndex: -1
+          initialCapturePoints: -1
+          siteRuntime:
+            isPlayerHeadQuarter: 0
+            isVictoryBuilding: 0
+            isCapturable: 1
+            capturePointsMax: 30
+            capturedIncoming: 1500
+            sellingRule: 1
+            legacyCanProduceAndSellUnits: 
+            offeredUnits:
+            - {fileID: 11400000, guid: 4a3afdea0950dfc46a48dd7a659563ee, type: 2}
+            - {fileID: 11400000, guid: b28c15593869dae419f9b58292ef4845, type: 2}
+            - {fileID: 11400000, guid: c0e59b3e4bf2e4c49a67906805e43801, type: 2}
+            - {fileID: 11400000, guid: a5d9d72a15e061a4cbaf125b2b6b9d48, type: 2}
+            - {fileID: 11400000, guid: 70b7ea3ddea78fc4e9d744cee13b053a, type: 2}
+            - {fileID: 11400000, guid: 3dc9b119819519440820c81f5db4fdce, type: 2}
+            - {fileID: 11400000, guid: 70b98199c49882e44892f7ca76df6b33, type: 2}
+            - {fileID: 11400000, guid: 8c89f5278e312ad46af401333934721b, type: 2}
+            canProvideSupplies: 1
+            offeredSupplies:
+            - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+              quantity: 20
+              peakQuantity: 20
+            - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+              quantity: 10
+              peakQuantity: 10
+            - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+              quantity: 40
+              peakQuantity: 40
+            offeredServices:
+            - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+            - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+            - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+            - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
+          displayName: "F\xE1brica Leve"
+        - constructionId: cidade
+          localX: 11
+          localY: 9
+          teamId: -1
+          slotIndex: -1
+          sector: 3
+          isAnchorSector: 0
+          isRallyPoint: 0
+          rallyOwnerSlotIndex: -1
+          initialCapturePoints: -1
+          siteRuntime:
+            isPlayerHeadQuarter: 0
+            isVictoryBuilding: 0
+            isCapturable: 1
+            capturePointsMax: 20
+            capturedIncoming: 1000
+            sellingRule: 3
+            legacyCanProduceAndSellUnits: 
+            offeredUnits: []
+            canProvideSupplies: 1
+            offeredSupplies:
+            - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+              quantity: 40
+              peakQuantity: 40
+            - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+              quantity: 10
+              peakQuantity: 10
+            - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+              quantity: 20
+              peakQuantity: 20
+            offeredServices:
+            - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+            - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+            - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+            - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
+          displayName: Cidade
+        - constructionId: hq
+          localX: 12
+          localY: 4
+          teamId: 3
+          slotIndex: 1
+          sector: 101
+          isAnchorSector: 0
+          isRallyPoint: 0
+          rallyOwnerSlotIndex: -1
+          initialCapturePoints: -1
+          siteRuntime:
+            isPlayerHeadQuarter: 1
+            isVictoryBuilding: 0
+            isCapturable: 1
+            capturePointsMax: 60
+            capturedIncoming: 3000
+            sellingRule: 1
+            legacyCanProduceAndSellUnits: 
+            offeredUnits:
+            - {fileID: 11400000, guid: 4a3afdea0950dfc46a48dd7a659563ee, type: 2}
+            - {fileID: 11400000, guid: b28c15593869dae419f9b58292ef4845, type: 2}
+            - {fileID: 11400000, guid: c0e59b3e4bf2e4c49a67906805e43801, type: 2}
+            canProvideSupplies: 1
+            offeredSupplies:
+            - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+              quantity: 2147483647
+              peakQuantity: 2147483647
+            - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+              quantity: 2147483647
+              peakQuantity: 2147483647
+            - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+              quantity: 2147483647
+              peakQuantity: 2147483647
+            offeredServices:
+            - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+            - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+            - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+            - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
+          displayName: HQ
+        - constructionId: hq
+          localX: 4
+          localY: 14
+          teamId: 2
+          slotIndex: 0
+          sector: 100
+          isAnchorSector: 0
+          isRallyPoint: 0
+          rallyOwnerSlotIndex: -1
+          initialCapturePoints: -1
+          siteRuntime:
+            isPlayerHeadQuarter: 1
+            isVictoryBuilding: 0
+            isCapturable: 1
+            capturePointsMax: 60
+            capturedIncoming: 3000
+            sellingRule: 1
+            legacyCanProduceAndSellUnits: 
+            offeredUnits:
+            - {fileID: 11400000, guid: 4a3afdea0950dfc46a48dd7a659563ee, type: 2}
+            - {fileID: 11400000, guid: b28c15593869dae419f9b58292ef4845, type: 2}
+            - {fileID: 11400000, guid: c0e59b3e4bf2e4c49a67906805e43801, type: 2}
+            canProvideSupplies: 1
+            offeredSupplies:
+            - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+              quantity: 2147483647
+              peakQuantity: 2147483647
+            - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+              quantity: 2147483647
+              peakQuantity: 2147483647
+            - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+              quantity: 2147483647
+              peakQuantity: 2147483647
+            offeredServices:
+            - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+            - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+            - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+            - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
+          displayName: HQ
         bakedCamadas:
         - tilemapName: quebraMar
           transformacoes:
@@ -1018,7 +1113,7 @@ MonoBehaviour:
           - {x: 4, y: 14, z: 0}
         bakedUnidades: []
         bakedFromScene: Fixture
-        bakedAtUtcTicks: 639246572967580300
+        bakedAtUtcTicks: 639261931102370835
       - quadranteId: A_IA_Q2
         displayName: Terra Firme
         descricao: 
@@ -1033,6 +1128,7 @@ MonoBehaviour:
           startMoney: 10000
         - slotIndex: 1
           startMoney: 10000
+        eixos: []
         idSerial: 4
         bakedTiles:
         - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
@@ -1457,162 +1553,14 @@ MonoBehaviour:
         - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
         bakedConstrucoes:
         - constructionId: cidade
-          localX: 4
-          localY: 6
-          teamId: -1
-          slotIndex: -1
-          sector: 0
-          isAnchorSector: 0
-          initialCapturePoints: -1
-          siteRuntime:
-            isPlayerHeadQuarter: 0
-            isVictoryBuilding: 0
-            isCapturable: 1
-            capturePointsMax: 20
-            capturedIncoming: 1000
-            sellingRule: 3
-            legacyCanProduceAndSellUnits: 
-            offeredUnits: []
-            canProvideSupplies: 1
-            offeredSupplies:
-            - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
-              quantity: 40
-              peakQuantity: 40
-            - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
-              quantity: 10
-              peakQuantity: 10
-            - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
-              quantity: 20
-              peakQuantity: 20
-            offeredServices:
-            - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
-            - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
-            - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
-            - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
-          displayName: Cidade
-        - constructionId: cidade
-          localX: 15
-          localY: 5
-          teamId: -1
-          slotIndex: -1
-          sector: 0
-          isAnchorSector: 0
-          initialCapturePoints: -1
-          siteRuntime:
-            isPlayerHeadQuarter: 0
-            isVictoryBuilding: 0
-            isCapturable: 1
-            capturePointsMax: 20
-            capturedIncoming: 1000
-            sellingRule: 3
-            legacyCanProduceAndSellUnits: 
-            offeredUnits: []
-            canProvideSupplies: 1
-            offeredSupplies:
-            - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
-              quantity: 40
-              peakQuantity: 40
-            - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
-              quantity: 10
-              peakQuantity: 10
-            - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
-              quantity: 20
-              peakQuantity: 20
-            offeredServices:
-            - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
-            - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
-            - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
-            - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
-          displayName: Cidade
-        - constructionId: aeroporto
           localX: 18
-          localY: 11
-          teamId: 3
-          slotIndex: 1
-          sector: 0
-          isAnchorSector: 0
-          initialCapturePoints: -1
-          siteRuntime:
-            isPlayerHeadQuarter: 0
-            isVictoryBuilding: 0
-            isCapturable: 1
-            capturePointsMax: 30
-            capturedIncoming: 1500
-            sellingRule: 1
-            legacyCanProduceAndSellUnits: 
-            offeredUnits:
-            - {fileID: 11400000, guid: 55cd1f4769313c14a99e623384d368e2, type: 2}
-            - {fileID: 11400000, guid: eb2fdf3f9331b4648af28377f6083658, type: 2}
-            - {fileID: 11400000, guid: 4712157db5587b64c99690ba148b4b80, type: 2}
-            - {fileID: 11400000, guid: f818fb00e3afbc64baa48f18f9d88465, type: 2}
-            - {fileID: 11400000, guid: 5d423c80fa8a66241a1c616051de6ca2, type: 2}
-            - {fileID: 11400000, guid: 68658bfb5d8329a46ae3d991cc94ccd7, type: 2}
-            - {fileID: 11400000, guid: 212e0e436c7e0834780a712787e61eba, type: 2}
-            canProvideSupplies: 1
-            offeredSupplies:
-            - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
-              quantity: 70
-              peakQuantity: 70
-            - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
-              quantity: 10
-              peakQuantity: 10
-            - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
-              quantity: 10
-              peakQuantity: 10
-            offeredServices:
-            - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
-            - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
-            - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
-            - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
-          displayName: Aeroporto
-        - constructionId: aeroporto
-          localX: 9
-          localY: 8
-          teamId: -1
-          slotIndex: -1
-          sector: 0
-          isAnchorSector: 0
-          initialCapturePoints: -1
-          siteRuntime:
-            isPlayerHeadQuarter: 0
-            isVictoryBuilding: 0
-            isCapturable: 1
-            capturePointsMax: 30
-            capturedIncoming: 1500
-            sellingRule: 1
-            legacyCanProduceAndSellUnits: 
-            offeredUnits:
-            - {fileID: 11400000, guid: 55cd1f4769313c14a99e623384d368e2, type: 2}
-            - {fileID: 11400000, guid: eb2fdf3f9331b4648af28377f6083658, type: 2}
-            - {fileID: 11400000, guid: 4712157db5587b64c99690ba148b4b80, type: 2}
-            - {fileID: 11400000, guid: f818fb00e3afbc64baa48f18f9d88465, type: 2}
-            - {fileID: 11400000, guid: 5d423c80fa8a66241a1c616051de6ca2, type: 2}
-            - {fileID: 11400000, guid: 68658bfb5d8329a46ae3d991cc94ccd7, type: 2}
-            - {fileID: 11400000, guid: 212e0e436c7e0834780a712787e61eba, type: 2}
-            canProvideSupplies: 1
-            offeredSupplies:
-            - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
-              quantity: 70
-              peakQuantity: 70
-            - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
-              quantity: 10
-              peakQuantity: 10
-            - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
-              quantity: 10
-              peakQuantity: 10
-            offeredServices:
-            - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
-            - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
-            - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
-            - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
-          displayName: Aeroporto
-        - constructionId: cidade
-          localX: 7
           localY: 13
           teamId: -1
           slotIndex: -1
-          sector: 0
+          sector: 7
           isAnchorSector: 0
+          isRallyPoint: 0
+          rallyOwnerSlotIndex: -1
           initialCapturePoints: -1
           siteRuntime:
             isPlayerHeadQuarter: 0
@@ -1640,145 +1588,15 @@ MonoBehaviour:
             - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
             - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
           displayName: Cidade
-        - constructionId: fabricaL
-          localX: 4
-          localY: 3
-          teamId: 2
-          slotIndex: 0
-          sector: 0
-          isAnchorSector: 0
-          initialCapturePoints: -1
-          siteRuntime:
-            isPlayerHeadQuarter: 0
-            isVictoryBuilding: 0
-            isCapturable: 1
-            capturePointsMax: 30
-            capturedIncoming: 1500
-            sellingRule: 1
-            legacyCanProduceAndSellUnits: 
-            offeredUnits:
-            - {fileID: 11400000, guid: 4a3afdea0950dfc46a48dd7a659563ee, type: 2}
-            - {fileID: 11400000, guid: b28c15593869dae419f9b58292ef4845, type: 2}
-            - {fileID: 11400000, guid: c0e59b3e4bf2e4c49a67906805e43801, type: 2}
-            - {fileID: 11400000, guid: a5d9d72a15e061a4cbaf125b2b6b9d48, type: 2}
-            - {fileID: 11400000, guid: 70b7ea3ddea78fc4e9d744cee13b053a, type: 2}
-            - {fileID: 11400000, guid: 3dc9b119819519440820c81f5db4fdce, type: 2}
-            - {fileID: 11400000, guid: 70b98199c49882e44892f7ca76df6b33, type: 2}
-            - {fileID: 11400000, guid: 8c89f5278e312ad46af401333934721b, type: 2}
-            - {fileID: 11400000, guid: 99b30df53878c69499853a4ef3cb5f81, type: 2}
-            - {fileID: 11400000, guid: 5e69516e1944ffc43bae1a7cd3c7c69c, type: 2}
-            canProvideSupplies: 1
-            offeredSupplies:
-            - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
-              quantity: 20
-              peakQuantity: 20
-            - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
-              quantity: 10
-              peakQuantity: 10
-            - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
-              quantity: 40
-              peakQuantity: 40
-            offeredServices:
-            - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
-            - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
-            - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
-            - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
-          displayName: "F\xE1brica Leve"
-        - constructionId: fabricaL
-          localX: 2
-          localY: 4
-          teamId: 2
-          slotIndex: 0
-          sector: 0
-          isAnchorSector: 0
-          initialCapturePoints: -1
-          siteRuntime:
-            isPlayerHeadQuarter: 0
-            isVictoryBuilding: 0
-            isCapturable: 1
-            capturePointsMax: 30
-            capturedIncoming: 1500
-            sellingRule: 1
-            legacyCanProduceAndSellUnits: 
-            offeredUnits:
-            - {fileID: 11400000, guid: 4a3afdea0950dfc46a48dd7a659563ee, type: 2}
-            - {fileID: 11400000, guid: b28c15593869dae419f9b58292ef4845, type: 2}
-            - {fileID: 11400000, guid: c0e59b3e4bf2e4c49a67906805e43801, type: 2}
-            - {fileID: 11400000, guid: a5d9d72a15e061a4cbaf125b2b6b9d48, type: 2}
-            - {fileID: 11400000, guid: 70b7ea3ddea78fc4e9d744cee13b053a, type: 2}
-            - {fileID: 11400000, guid: 3dc9b119819519440820c81f5db4fdce, type: 2}
-            - {fileID: 11400000, guid: 70b98199c49882e44892f7ca76df6b33, type: 2}
-            - {fileID: 11400000, guid: 8c89f5278e312ad46af401333934721b, type: 2}
-            - {fileID: 11400000, guid: 99b30df53878c69499853a4ef3cb5f81, type: 2}
-            - {fileID: 11400000, guid: 5e69516e1944ffc43bae1a7cd3c7c69c, type: 2}
-            canProvideSupplies: 1
-            offeredSupplies:
-            - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
-              quantity: 20
-              peakQuantity: 20
-            - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
-              quantity: 10
-              peakQuantity: 10
-            - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
-              quantity: 40
-              peakQuantity: 40
-            offeredServices:
-            - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
-            - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
-            - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
-            - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
-          displayName: "F\xE1brica Leve"
-        - constructionId: fabricaL
-          localX: 16
-          localY: 15
-          teamId: 3
-          slotIndex: 1
-          sector: 0
-          isAnchorSector: 0
-          initialCapturePoints: -1
-          siteRuntime:
-            isPlayerHeadQuarter: 0
-            isVictoryBuilding: 0
-            isCapturable: 1
-            capturePointsMax: 30
-            capturedIncoming: 1500
-            sellingRule: 1
-            legacyCanProduceAndSellUnits: 
-            offeredUnits:
-            - {fileID: 11400000, guid: 4a3afdea0950dfc46a48dd7a659563ee, type: 2}
-            - {fileID: 11400000, guid: b28c15593869dae419f9b58292ef4845, type: 2}
-            - {fileID: 11400000, guid: c0e59b3e4bf2e4c49a67906805e43801, type: 2}
-            - {fileID: 11400000, guid: a5d9d72a15e061a4cbaf125b2b6b9d48, type: 2}
-            - {fileID: 11400000, guid: 70b7ea3ddea78fc4e9d744cee13b053a, type: 2}
-            - {fileID: 11400000, guid: 3dc9b119819519440820c81f5db4fdce, type: 2}
-            - {fileID: 11400000, guid: 70b98199c49882e44892f7ca76df6b33, type: 2}
-            - {fileID: 11400000, guid: 8c89f5278e312ad46af401333934721b, type: 2}
-            - {fileID: 11400000, guid: 99b30df53878c69499853a4ef3cb5f81, type: 2}
-            - {fileID: 11400000, guid: 5e69516e1944ffc43bae1a7cd3c7c69c, type: 2}
-            canProvideSupplies: 1
-            offeredSupplies:
-            - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
-              quantity: 20
-              peakQuantity: 20
-            - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
-              quantity: 10
-              peakQuantity: 10
-            - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
-              quantity: 40
-              peakQuantity: 40
-            offeredServices:
-            - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
-            - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
-            - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
-            - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
-          displayName: "F\xE1brica Leve"
         - constructionId: fabrica
-          localX: 6
-          localY: 3
+          localX: 14
+          localY: 13
           teamId: -1
           slotIndex: -1
-          sector: 0
+          sector: 6
           isAnchorSector: 0
+          isRallyPoint: 0
+          rallyOwnerSlotIndex: -1
           initialCapturePoints: -1
           siteRuntime:
             isPlayerHeadQuarter: 0
@@ -1809,6 +1627,81 @@ MonoBehaviour:
             - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
             - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
           displayName: "F\xE1brica"
+        - constructionId: hq
+          localX: 3
+          localY: 3
+          teamId: 2
+          slotIndex: 0
+          sector: 100
+          isAnchorSector: 0
+          isRallyPoint: 0
+          rallyOwnerSlotIndex: -1
+          initialCapturePoints: -1
+          siteRuntime:
+            isPlayerHeadQuarter: 1
+            isVictoryBuilding: 0
+            isCapturable: 1
+            capturePointsMax: 60
+            capturedIncoming: 3000
+            sellingRule: 1
+            legacyCanProduceAndSellUnits: 
+            offeredUnits:
+            - {fileID: 11400000, guid: 4a3afdea0950dfc46a48dd7a659563ee, type: 2}
+            - {fileID: 11400000, guid: b28c15593869dae419f9b58292ef4845, type: 2}
+            - {fileID: 11400000, guid: c0e59b3e4bf2e4c49a67906805e43801, type: 2}
+            canProvideSupplies: 1
+            offeredSupplies:
+            - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+              quantity: 2147483647
+              peakQuantity: 2147483647
+            - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+              quantity: 2147483647
+              peakQuantity: 2147483647
+            - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+              quantity: 2147483647
+              peakQuantity: 2147483647
+            offeredServices:
+            - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+            - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+            - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+            - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
+          displayName: HQ
+        - constructionId: cidade
+          localX: 15
+          localY: 5
+          teamId: -1
+          slotIndex: -1
+          sector: 3
+          isAnchorSector: 0
+          isRallyPoint: 0
+          rallyOwnerSlotIndex: -1
+          initialCapturePoints: -1
+          siteRuntime:
+            isPlayerHeadQuarter: 0
+            isVictoryBuilding: 0
+            isCapturable: 1
+            capturePointsMax: 20
+            capturedIncoming: 1000
+            sellingRule: 3
+            legacyCanProduceAndSellUnits: 
+            offeredUnits: []
+            canProvideSupplies: 1
+            offeredSupplies:
+            - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+              quantity: 40
+              peakQuantity: 40
+            - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+              quantity: 10
+              peakQuantity: 10
+            - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+              quantity: 20
+              peakQuantity: 20
+            offeredServices:
+            - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+            - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+            - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+            - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
+          displayName: Cidade
         - constructionId: fabricaL
           localX: 14
           localY: 16
@@ -1816,6 +1709,8 @@ MonoBehaviour:
           slotIndex: 1
           sector: 0
           isAnchorSector: 0
+          isRallyPoint: 0
+          rallyOwnerSlotIndex: -1
           initialCapturePoints: -1
           siteRuntime:
             isPlayerHeadQuarter: 0
@@ -1858,8 +1753,10 @@ MonoBehaviour:
           localY: 2
           teamId: -1
           slotIndex: -1
-          sector: 0
+          sector: 2
           isAnchorSector: 0
+          isRallyPoint: 0
+          rallyOwnerSlotIndex: -1
           initialCapturePoints: -1
           siteRuntime:
             isPlayerHeadQuarter: 0
@@ -1887,40 +1784,52 @@ MonoBehaviour:
             - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
             - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
           displayName: Cidade
-        - constructionId: cidade
-          localX: 18
-          localY: 13
-          teamId: -1
-          slotIndex: -1
+        - constructionId: fabricaL
+          localX: 16
+          localY: 15
+          teamId: 3
+          slotIndex: 1
           sector: 0
           isAnchorSector: 0
+          isRallyPoint: 0
+          rallyOwnerSlotIndex: -1
           initialCapturePoints: -1
           siteRuntime:
             isPlayerHeadQuarter: 0
             isVictoryBuilding: 0
             isCapturable: 1
-            capturePointsMax: 20
-            capturedIncoming: 1000
-            sellingRule: 3
+            capturePointsMax: 30
+            capturedIncoming: 1500
+            sellingRule: 1
             legacyCanProduceAndSellUnits: 
-            offeredUnits: []
+            offeredUnits:
+            - {fileID: 11400000, guid: 4a3afdea0950dfc46a48dd7a659563ee, type: 2}
+            - {fileID: 11400000, guid: b28c15593869dae419f9b58292ef4845, type: 2}
+            - {fileID: 11400000, guid: c0e59b3e4bf2e4c49a67906805e43801, type: 2}
+            - {fileID: 11400000, guid: a5d9d72a15e061a4cbaf125b2b6b9d48, type: 2}
+            - {fileID: 11400000, guid: 70b7ea3ddea78fc4e9d744cee13b053a, type: 2}
+            - {fileID: 11400000, guid: 3dc9b119819519440820c81f5db4fdce, type: 2}
+            - {fileID: 11400000, guid: 70b98199c49882e44892f7ca76df6b33, type: 2}
+            - {fileID: 11400000, guid: 8c89f5278e312ad46af401333934721b, type: 2}
+            - {fileID: 11400000, guid: 99b30df53878c69499853a4ef3cb5f81, type: 2}
+            - {fileID: 11400000, guid: 5e69516e1944ffc43bae1a7cd3c7c69c, type: 2}
             canProvideSupplies: 1
             offeredSupplies:
             - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
-              quantity: 40
-              peakQuantity: 40
+              quantity: 20
+              peakQuantity: 20
             - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
               quantity: 10
               peakQuantity: 10
             - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
-              quantity: 20
-              peakQuantity: 20
+              quantity: 40
+              peakQuantity: 40
             offeredServices:
             - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
             - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
             - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
             - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
-          displayName: Cidade
+          displayName: "F\xE1brica Leve"
         - constructionId: hq
           localX: 15
           localY: 16
@@ -1928,6 +1837,8 @@ MonoBehaviour:
           slotIndex: 1
           sector: 0
           isAnchorSector: 0
+          isRallyPoint: 0
+          rallyOwnerSlotIndex: -1
           initialCapturePoints: -1
           siteRuntime:
             isPlayerHeadQuarter: 1
@@ -1958,13 +1869,58 @@ MonoBehaviour:
             - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
             - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
           displayName: HQ
+        - constructionId: aeroporto
+          localX: 18
+          localY: 11
+          teamId: 3
+          slotIndex: 1
+          sector: 0
+          isAnchorSector: 0
+          isRallyPoint: 0
+          rallyOwnerSlotIndex: -1
+          initialCapturePoints: -1
+          siteRuntime:
+            isPlayerHeadQuarter: 0
+            isVictoryBuilding: 0
+            isCapturable: 1
+            capturePointsMax: 30
+            capturedIncoming: 1500
+            sellingRule: 1
+            legacyCanProduceAndSellUnits: 
+            offeredUnits:
+            - {fileID: 11400000, guid: 55cd1f4769313c14a99e623384d368e2, type: 2}
+            - {fileID: 11400000, guid: eb2fdf3f9331b4648af28377f6083658, type: 2}
+            - {fileID: 11400000, guid: 4712157db5587b64c99690ba148b4b80, type: 2}
+            - {fileID: 11400000, guid: f818fb00e3afbc64baa48f18f9d88465, type: 2}
+            - {fileID: 11400000, guid: 5d423c80fa8a66241a1c616051de6ca2, type: 2}
+            - {fileID: 11400000, guid: 68658bfb5d8329a46ae3d991cc94ccd7, type: 2}
+            - {fileID: 11400000, guid: 212e0e436c7e0834780a712787e61eba, type: 2}
+            canProvideSupplies: 1
+            offeredSupplies:
+            - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+              quantity: 70
+              peakQuantity: 70
+            - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+              quantity: 10
+              peakQuantity: 10
+            - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+              quantity: 10
+              peakQuantity: 10
+            offeredServices:
+            - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+            - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+            - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+            - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
+          displayName: Aeroporto
         - constructionId: fabrica
-          localX: 14
-          localY: 13
+          localX: 6
+          localY: 3
           teamId: -1
           slotIndex: -1
           sector: 0
           isAnchorSector: 0
+          isRallyPoint: 0
+          rallyOwnerSlotIndex: -1
           initialCapturePoints: -1
           siteRuntime:
             isPlayerHeadQuarter: 0
@@ -1995,43 +1951,213 @@ MonoBehaviour:
             - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
             - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
           displayName: "F\xE1brica"
-        - constructionId: hq
-          localX: 3
+        - constructionId: cidade
+          localX: 4
+          localY: 6
+          teamId: -1
+          slotIndex: -1
+          sector: 1
+          isAnchorSector: 0
+          isRallyPoint: 0
+          rallyOwnerSlotIndex: -1
+          initialCapturePoints: -1
+          siteRuntime:
+            isPlayerHeadQuarter: 0
+            isVictoryBuilding: 0
+            isCapturable: 1
+            capturePointsMax: 20
+            capturedIncoming: 1000
+            sellingRule: 3
+            legacyCanProduceAndSellUnits: 
+            offeredUnits: []
+            canProvideSupplies: 1
+            offeredSupplies:
+            - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+              quantity: 40
+              peakQuantity: 40
+            - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+              quantity: 10
+              peakQuantity: 10
+            - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+              quantity: 20
+              peakQuantity: 20
+            offeredServices:
+            - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+            - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+            - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+            - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
+          displayName: Cidade
+        - constructionId: aeroporto
+          localX: 9
+          localY: 8
+          teamId: -1
+          slotIndex: -1
+          sector: 4
+          isAnchorSector: 0
+          isRallyPoint: 0
+          rallyOwnerSlotIndex: -1
+          initialCapturePoints: -1
+          siteRuntime:
+            isPlayerHeadQuarter: 0
+            isVictoryBuilding: 0
+            isCapturable: 1
+            capturePointsMax: 30
+            capturedIncoming: 1500
+            sellingRule: 1
+            legacyCanProduceAndSellUnits: 
+            offeredUnits:
+            - {fileID: 11400000, guid: 55cd1f4769313c14a99e623384d368e2, type: 2}
+            - {fileID: 11400000, guid: eb2fdf3f9331b4648af28377f6083658, type: 2}
+            - {fileID: 11400000, guid: 4712157db5587b64c99690ba148b4b80, type: 2}
+            - {fileID: 11400000, guid: f818fb00e3afbc64baa48f18f9d88465, type: 2}
+            - {fileID: 11400000, guid: 5d423c80fa8a66241a1c616051de6ca2, type: 2}
+            - {fileID: 11400000, guid: 68658bfb5d8329a46ae3d991cc94ccd7, type: 2}
+            - {fileID: 11400000, guid: 212e0e436c7e0834780a712787e61eba, type: 2}
+            canProvideSupplies: 1
+            offeredSupplies:
+            - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+              quantity: 70
+              peakQuantity: 70
+            - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+              quantity: 10
+              peakQuantity: 10
+            - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+              quantity: 10
+              peakQuantity: 10
+            offeredServices:
+            - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+            - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+            - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+            - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
+          displayName: Aeroporto
+        - constructionId: fabricaL
+          localX: 4
           localY: 3
           teamId: 2
           slotIndex: 0
-          sector: 0
+          sector: 100
           isAnchorSector: 0
+          isRallyPoint: 0
+          rallyOwnerSlotIndex: -1
           initialCapturePoints: -1
           siteRuntime:
-            isPlayerHeadQuarter: 1
+            isPlayerHeadQuarter: 0
             isVictoryBuilding: 0
             isCapturable: 1
-            capturePointsMax: 60
-            capturedIncoming: 3000
+            capturePointsMax: 30
+            capturedIncoming: 1500
             sellingRule: 1
             legacyCanProduceAndSellUnits: 
             offeredUnits:
             - {fileID: 11400000, guid: 4a3afdea0950dfc46a48dd7a659563ee, type: 2}
             - {fileID: 11400000, guid: b28c15593869dae419f9b58292ef4845, type: 2}
             - {fileID: 11400000, guid: c0e59b3e4bf2e4c49a67906805e43801, type: 2}
+            - {fileID: 11400000, guid: a5d9d72a15e061a4cbaf125b2b6b9d48, type: 2}
+            - {fileID: 11400000, guid: 70b7ea3ddea78fc4e9d744cee13b053a, type: 2}
+            - {fileID: 11400000, guid: 3dc9b119819519440820c81f5db4fdce, type: 2}
+            - {fileID: 11400000, guid: 70b98199c49882e44892f7ca76df6b33, type: 2}
+            - {fileID: 11400000, guid: 8c89f5278e312ad46af401333934721b, type: 2}
+            - {fileID: 11400000, guid: 99b30df53878c69499853a4ef3cb5f81, type: 2}
+            - {fileID: 11400000, guid: 5e69516e1944ffc43bae1a7cd3c7c69c, type: 2}
             canProvideSupplies: 1
             offeredSupplies:
-            - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
-              quantity: 2147483647
-              peakQuantity: 2147483647
             - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
-              quantity: 2147483647
-              peakQuantity: 2147483647
+              quantity: 20
+              peakQuantity: 20
             - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
-              quantity: 2147483647
-              peakQuantity: 2147483647
+              quantity: 10
+              peakQuantity: 10
+            - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+              quantity: 40
+              peakQuantity: 40
             offeredServices:
-            - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
-            - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
             - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+            - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+            - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
             - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
-          displayName: HQ
+          displayName: "F\xE1brica Leve"
+        - constructionId: cidade
+          localX: 7
+          localY: 13
+          teamId: -1
+          slotIndex: -1
+          sector: 5
+          isAnchorSector: 0
+          isRallyPoint: 0
+          rallyOwnerSlotIndex: -1
+          initialCapturePoints: -1
+          siteRuntime:
+            isPlayerHeadQuarter: 0
+            isVictoryBuilding: 0
+            isCapturable: 1
+            capturePointsMax: 20
+            capturedIncoming: 1000
+            sellingRule: 3
+            legacyCanProduceAndSellUnits: 
+            offeredUnits: []
+            canProvideSupplies: 1
+            offeredSupplies:
+            - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+              quantity: 40
+              peakQuantity: 40
+            - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+              quantity: 10
+              peakQuantity: 10
+            - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+              quantity: 20
+              peakQuantity: 20
+            offeredServices:
+            - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+            - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+            - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+            - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
+          displayName: Cidade
+        - constructionId: fabricaL
+          localX: 2
+          localY: 4
+          teamId: 2
+          slotIndex: 0
+          sector: 100
+          isAnchorSector: 0
+          isRallyPoint: 0
+          rallyOwnerSlotIndex: -1
+          initialCapturePoints: -1
+          siteRuntime:
+            isPlayerHeadQuarter: 0
+            isVictoryBuilding: 0
+            isCapturable: 1
+            capturePointsMax: 30
+            capturedIncoming: 1500
+            sellingRule: 1
+            legacyCanProduceAndSellUnits: 
+            offeredUnits:
+            - {fileID: 11400000, guid: 4a3afdea0950dfc46a48dd7a659563ee, type: 2}
+            - {fileID: 11400000, guid: b28c15593869dae419f9b58292ef4845, type: 2}
+            - {fileID: 11400000, guid: c0e59b3e4bf2e4c49a67906805e43801, type: 2}
+            - {fileID: 11400000, guid: a5d9d72a15e061a4cbaf125b2b6b9d48, type: 2}
+            - {fileID: 11400000, guid: 70b7ea3ddea78fc4e9d744cee13b053a, type: 2}
+            - {fileID: 11400000, guid: 3dc9b119819519440820c81f5db4fdce, type: 2}
+            - {fileID: 11400000, guid: 70b98199c49882e44892f7ca76df6b33, type: 2}
+            - {fileID: 11400000, guid: 8c89f5278e312ad46af401333934721b, type: 2}
+            - {fileID: 11400000, guid: 99b30df53878c69499853a4ef3cb5f81, type: 2}
+            - {fileID: 11400000, guid: 5e69516e1944ffc43bae1a7cd3c7c69c, type: 2}
+            canProvideSupplies: 1
+            offeredSupplies:
+            - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+              quantity: 20
+              peakQuantity: 20
+            - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+              quantity: 10
+              peakQuantity: 10
+            - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+              quantity: 40
+              peakQuantity: 40
+            offeredServices:
+            - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+            - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+            - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+            - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
+          displayName: "F\xE1brica Leve"
         bakedCamadas:
         - tilemapName: quebraMar
           transformacoes:
@@ -2107,7 +2233,7 @@ MonoBehaviour:
           slotIndex: 0
           displayName: chinook
         bakedFromScene: Fixture
-        bakedAtUtcTicks: 639246592837406421
+        bakedAtUtcTicks: 639261931104223820
       - quadranteId: A_IA_Q3
         displayName: Peixe Pequeno
         descricao: Ponte Norte
@@ -2118,6 +2244,7 @@ MonoBehaviour:
         destravadoPor: []
         exigeIrmaos: 0
         economiaInicial: []
+        eixos: []
         idSerial: 5
         bakedTiles:
         - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
@@ -2785,7 +2912,7 @@ MonoBehaviour:
           - {x: 9, y: 6, z: 0}
         bakedUnidades: []
         bakedFromScene: Fixture
-        bakedAtUtcTicks: 639246572970959749
+        bakedAtUtcTicks: 639261931104857971
       - quadranteId: A_IA_Q4
         displayName: "Tubar\xE3o Branco"
         descricao: 
@@ -2796,6 +2923,7 @@ MonoBehaviour:
         destravadoPor: []
         exigeIrmaos: 0
         economiaInicial: []
+        eixos: []
         idSerial: 6
         bakedTiles:
         - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
@@ -3466,6 +3594,6 @@ MonoBehaviour:
           - {x: 17, y: 19, z: 0}
         bakedUnidades: []
         bakedFromScene: Fixture
-        bakedAtUtcTicks: 639246572971557788
+        bakedAtUtcTicks: 639261931105476480
       idSerial: 2
     idSerial: 1
