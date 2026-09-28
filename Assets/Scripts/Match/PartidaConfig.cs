@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
@@ -30,7 +30,8 @@ public static class PartidaConfig
             pendingDifficulty = null;
             return true;
         }
-        difficulty = AIDifficulty.Facil;
+        // MEDIO e o "nada ligado": e o que a partida usa quando ninguem escolheu.
+        difficulty = AIDifficulty.Medio;
         return false;
     }
 

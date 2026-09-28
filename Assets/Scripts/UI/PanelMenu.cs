@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
@@ -65,7 +65,7 @@ public class PanelMenu : MonoBehaviour
     private int newGameWizardFocusIndex;
     private TeamId newGameHumanTeam = TeamId.Green;
     private TeamId newGameAiTeam = TeamId.Red;
-    private AIDifficulty newGameDifficulty = AIDifficulty.Iniciante;
+    private AIDifficulty newGameDifficulty = AIDifficulty.Facil;
     private MatchController.GameSetupPreset newGamePreset = MatchController.GameSetupPreset.GameBoyClassic;
 
     private static readonly TeamId[] NewGameTeams = { TeamId.Green, TeamId.Red, TeamId.Blue, TeamId.Yellow };
@@ -94,17 +94,17 @@ public class PanelMenu : MonoBehaviour
         new CampaignDifficultyOption(
             "FÁCIL",
             "AI Easy + Game Boy Clássico",
-            AIDifficulty.Iniciante,
+            AIDifficulty.Facil,
             MatchController.GameSetupPreset.GameBoyClassic),
         new CampaignDifficultyOption(
             "MÉDIO",
             "AI Normal + Neblina Leve",
-            AIDifficulty.Facil,
+            AIDifficulty.Medio,
             MatchController.GameSetupPreset.NeblinaLeve),
         new CampaignDifficultyOption(
             "DIFÍCIL",
             "AI Difícil + Fog of War Total",
-            AIDifficulty.Competitiva,
+            AIDifficulty.Dificil,
             MatchController.GameSetupPreset.FogOfWarTotal)
     };
     private static readonly MatchController.GameSetupPreset[] NewGamePresets =
@@ -893,7 +893,7 @@ public class PanelMenu : MonoBehaviour
         newGameWizardFocusIndex = 0;
         newGameHumanTeam = TeamId.Green;
         newGameAiTeam = TeamId.Red;
-        newGameDifficulty = AIDifficulty.Iniciante;
+        newGameDifficulty = AIDifficulty.Facil;
         newGamePreset = MatchController.GameSetupPreset.GameBoyClassic;
         RefreshNewGameWizardHelper();
     }
@@ -997,9 +997,9 @@ public class PanelMenu : MonoBehaviour
     };
     private static string ResolveCampaignDifficultyLabel(AIDifficulty difficulty) => difficulty switch
     {
-        AIDifficulty.Iniciante => "FÁCIL",
-        AIDifficulty.Facil => "MÉDIO",
-        AIDifficulty.Competitiva => "DIFÍCIL",
+        AIDifficulty.Facil => "FÁCIL",
+        AIDifficulty.Medio => "MÉDIO",
+        AIDifficulty.Dificil => "DIFÍCIL",
         _ => "FÁCIL"
     };
     private static string ResolvePresetLabel(MatchController.GameSetupPreset preset) => preset switch

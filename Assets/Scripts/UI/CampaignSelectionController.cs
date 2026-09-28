@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -631,11 +631,11 @@ public class CampaignSelectionController : MonoBehaviour
         switch (matchController.GameSetup)
         {
             case MatchController.GameSetupPreset.GameBoyClassic:
-                return AIDifficulty.Iniciante;
-            case MatchController.GameSetupPreset.NeblinaLeve:
                 return AIDifficulty.Facil;
+            case MatchController.GameSetupPreset.NeblinaLeve:
+                return AIDifficulty.Medio;
             default:
-                return AIDifficulty.Competitiva;
+                return AIDifficulty.Dificil;
         }
     }
 

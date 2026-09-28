@@ -12,14 +12,16 @@ using UnityEngine.Tilemaps;
 //   Formigueiro = regras normais; doutrina do enxame (conscricao SEMPRE), sem pacote hard
 //   Competitiva = pacote hard (lista banida, projecao, blitz reserve); conscricao SO perdendo
 //   Agressiva   = pacote hard + doutrina do enxame (conscricao SEMPRE)
+// Tres, e os mesmos nomes que o jogador le. Eram seis, e os nomes nao casavam com os
+// botoes: a Tela de Entrada oferecia tres e a do MEIO era "Facil" — editar o perfil
+// "facil" mudava o botao MEDIO. As tres orfas (Medio antigo, Formigueiro, Agressiva)
+// nunca foram oferecidas; a conscricao que elas ligavam continua existindo como toggle
+// do AIController e do preset, so nao e mais escolhida pela dificuldade.
 public enum AIDifficulty
 {
-    Iniciante,
-    Facil,
-    Medio,
-    Formigueiro,
-    Competitiva,
-    Agressiva
+    Facil = 0,
+    Medio = 1,
+    Dificil = 2
 }
 
 /// <summary>
@@ -99,12 +101,12 @@ public partial class AIController : MonoBehaviour
     // liga hard + conscricao; Normal desliga tudo.
     public void ApplyDifficulty(AIDifficulty difficulty)
     {
-        easyMode = difficulty == AIDifficulty.Iniciante;
-        hardMode = difficulty == AIDifficulty.Competitiva || difficulty == AIDifficulty.Agressiva;
-        conscriptionWhenLosing = difficulty == AIDifficulty.Medio
-            || difficulty == AIDifficulty.Competitiva;
-        conscriptionDoctrine = difficulty == AIDifficulty.Formigueiro
-            || difficulty == AIDifficulty.Agressiva;
+        // Mesmos flags de antes, botao a botao: FACIL era Iniciante, MEDIO era Facil
+        // (tudo desligado) e DIFICIL era Competitiva.
+        easyMode = difficulty == AIDifficulty.Facil;
+        hardMode = difficulty == AIDifficulty.Dificil;
+        conscriptionWhenLosing = difficulty == AIDifficulty.Dificil;
+        conscriptionDoctrine = false;
 
         // FASE 1 da migração para AIPresetData: resolve e guarda o preset correspondente.
         // Nenhuma decisão lê dele ainda — os flags acima continuam sendo a fonte de verdade.
