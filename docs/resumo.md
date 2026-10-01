@@ -217,9 +217,18 @@ com spam de soldado e os números do lado hard.
 
 O que falta, em ordem:
 
-1. **Decidir `poupaPraElite` × `eliteSaveTurns`.** O Difícil tem "poupa"
-   desligado e poupança de 2 turnos. A proposta é o toggle desligado zerar a
-   poupança.
+1. **A poupança está decidida (autor, pós-v8.6.1): as três dificuldades poupam
+   para elite.** O que muda é o piso:
+   ```text
+   Fácil/Médio  compram pelo plano e podem deixar produtor vazio enquanto poupam
+   Difícil      compra o básico em CADA fábrica (conscrição sempre); a sobra vai
+                para o elite que ela persegue, senão compra mais básico
+   ```
+   No 2×2 do `AICapabilityPreset`, isso é Fácil/Médio = teto sem piso, e
+   Difícil = piso + teto. O tooltip do 2×2 diz que, sem alvo elite, a sobra do
+   Difícil compra "unidades do plano"; o autor descreve "o básico". Conferir
+   qual dos dois o código faz quando a fase 2 ligar o `poupaPraElite`, que hoje
+   não tem leitor.
 2. **Fase 2, os números.** Nenhum dos ~70 valores do perfil é lido:
    - ~20 getters do `AIController`, cada um num ponto único (fácil);
    - ~50 campos públicos do `AIShoppingPlanner`, que viram campo privado com
@@ -285,9 +294,8 @@ Jogo, e só vai para o disco dentro do `.tmrsave`. Não há o que "limpar". Para
 jogar os quatro quadrantes e manter o placar, é uma sessão só, ou salvar e
 carregar.
 
-Arquivo órfão de versão antiga, que o código não lê:
-`AppData/LocalLow/Sistemas Info/The Map Room/CampaignProgress/mundo fixture__A_IA.json`.
-Apagar só com o autor confirmando.
+A pasta `CampaignProgress/` de uma versão antiga, que ficava em `LocalLow`, foi
+apagada com o autor confirmando. O código atual não a lia.
 
 ### Três lugares respondem "de quem é este quadrante"
 
@@ -320,18 +328,18 @@ conhecido: os dois primeiros delegam ao terceiro.
 ### Depois
 
 ```text
-1. construções no Q3 e no Q4 — sem elas, metade da campanha não se joga
-2. testar o 0b — jogar dois quadrantes em sequência já é o teste
-3. o fim da campanha: 4/4 oferece a volta à Tela de Entrada
-4. unificar as três contagens (gatilho: o portão de destrave)
-5. o portão hierárquico — Liberado() precisa de pai e irmãos, que o MundoData
+1. testar o 0b — jogar o Q1 e o Q2 em sequência já é o teste
+2. o fim da campanha: 4/4 oferece a volta à Tela de Entrada
+3. unificar as três contagens (gatilho: o portão de destrave)
+4. o portão hierárquico — Liberado() precisa de pai e irmãos, que o MundoData
    não expõe
 ```
 
-Pequenos, conhecidos:
-- **"Oububro/2026"** no rótulo da Campanha e da Batalha. A Tela de Entrada diz
-  "Outubro".
-- **`Papeis.md` está em Windows-1252**; os acentos aparecem quebrados no git.
+**O Q3 e o Q4 ficam vazios por enquanto, por decisão do autor.** A campanha se
+joga no Q1 e no Q2.
+
+O rótulo "ALPHA BUILD v0.3" é indicativo: a grafia diferente entre as cenas fica
+como está.
 
 Pós-MVP, com rascunho feito: o **Quero Spotting**
 ([QueroSpottingWindow.cs](../Assets/Editor/QueroSpottingWindow.cs)) e o "quadro de
