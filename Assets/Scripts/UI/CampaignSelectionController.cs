@@ -614,11 +614,25 @@ public class CampaignSelectionController : MonoBehaviour
         PartidaConfig.SetQuadrante(pending.Campanha.campanhaId, pending.Quadrante.quadranteId);
 
         launching = true;
-        cursorController?.PlayConfirmSfx();
         PanelHelperController.ClearExternalText();
         Debug.Log(
             $"[Campanha] JOGAR confirmado para '{pending.Campanha.campanhaId}/{pending.Quadrante.quadranteId}'. Abrindo '{battleSceneName}'.",
             this);
+        StartCoroutine(LoadBattleAfterDoneSfx());
+    }
+
+    // O mesmo fecho do contrato da Tela de Entrada (PanelMenu.StartConfiguredNewGameAfterSfx):
+    // toca o "done" e so troca de cena quando ele termina — o AudioSource mora no cursor
+    // desta cena, e um LoadScene imediato cortaria o som. `launching` ja bloqueia input e
+    // reentrada durante a espera.
+    private System.Collections.IEnumerator LoadBattleAfterDoneSfx()
+    {
+        cursorController?.PlayDoneSfx();
+        float soundDuration = cursorController != null ? cursorController.GetDoneSfxDuration() : 0f;
+        // Tempo real: a cena de campanha pode estar com o tempo de jogo pausado.
+        if (soundDuration > 0f)
+            yield return new WaitForSecondsRealtime(soundDuration);
+
         SceneManager.LoadScene(battleSceneName);
     }
 
