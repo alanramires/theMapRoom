@@ -23,7 +23,7 @@ MonoBehaviour:
     handoffEmProfundidade: 1
     conscricaoSempre: 1
     conscricaoQuandoPerdendo: 1
-    poupaPraElite: 0
+    poupaPraElite: 1
     politicaLadoForteFraco: 1
     gateNucleoSuave: 1
   economia:
