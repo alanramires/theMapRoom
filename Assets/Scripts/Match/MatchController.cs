@@ -4132,7 +4132,6 @@ public class MatchController : MonoBehaviour
         if (players == null)
             return;
 
-        bool anyOwnedHeadQuarter = false;
         var slotsWithHeadQuarter = new HashSet<int>();
         if (constructions != null)
         {
@@ -4145,7 +4144,6 @@ public class MatchController : MonoBehaviour
                 if (!IsValidPlayerSlotIndex(ownerSlot))
                     continue;
 
-                anyOwnedHeadQuarter = true;
                 slotsWithHeadQuarter.Add(ownerSlot);
             }
         }
@@ -4153,8 +4151,10 @@ public class MatchController : MonoBehaviour
         for (int i = 0; i < players.Count; i++)
         {
             PlayerEntry entry = players[i];
+            // A classificacao depende apenas do HQ deste jogador. Em cenarios
+            // sem nenhum HQ, todos os jogadores ativos sao rebeldes tambem.
+            // Isso informa a disponibilidade de base/plano, nao outro tipo de IA.
             entry.isRebelRuntime =
-                anyOwnedHeadQuarter &&
                 entry.teamId != TeamId.Neutral &&
                 !entry.defeated &&
                 !slotsWithHeadQuarter.Contains(i);
