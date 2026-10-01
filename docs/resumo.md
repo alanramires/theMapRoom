@@ -1,88 +1,68 @@
 ﻿# Resumo — onde estamos e o que vem
 
-Ponto de retomada. Atualizado em 2026-10-01, **depois** da tag `v8.6.1`.
+Ponto de retomada. Atualizado em 2026-10-01, **depois** da tag `v9.0.0`.
 Leia isto primeiro.
 
 ---
 
 ## Estado
 
-`v8.6.1` tagueada e publicada. Relatório:
-[`relatorio_v8.6.1.md`](relatorio_v8.6.1.md).
+`v9.0.0` tagueada e publicada. Relatório:
+[`relatorio_v9.0.0.md`](relatorio_v9.0.0.md). A v8 fechou; os relatórios dela
+estão em [`Versões/`](Versões/).
 
 ```text
-v8.4.0   o catálogo parou de dizer ONDE   três camadas de layout removidas
-v8.4.1   a peça tem lado                  orientação, rotas partidas, identidade
 v8.5.0   o laço fecha                     volta, dono por slot, tropa inicial
 v8.5.1   o que atravessa a cena            save por endereço, isPlayable, 0b
 v8.5.2   a forma casa com o dado           quadradinhos, paridade, fim de partida
 v8.6.0   a etiqueta muda de dono          rally em lista, eixo escrito, 3 perfis
 v8.6.1   configurado ≠ valendo            perfis autorados, portões fechados
+v9.0.0   a mesma linha                    visão de regra única; Save Inspector
 ```
 
 **O MVP virou tela.** Menu → Campanha → Batalha → volta → o mapa pintado, o
-placar, e o registro de quem tomou o quê em quantas rodadas. O autor jogou o Q1
-até a rodada 3 com o perfil Médio.
+placar, e o registro de quem tomou o quê, em quantas rodadas e **por quê**. O
+autor jogou o Q1 até a rodada 3 com o perfil Médio.
 
-### A descoberta da v8.6.1, e a direção que ela dá
+**O major v9 se chama "Auditável".** O que está configurado tem de ser o que está
+valendo, e dá para provar olhando. A direção vem do
+[guia de modding](modding/guia%20de%20modding.md) do autor.
+
+### A regra da visão (v9.0.0) — uma só, para ver, detectar e atirar
+
+```text
+ORIGEM   o terreno empresta EV a quem o ocupa?  sim → o emprestado   não → 0
+         aeronave / submerso                     → EV da camada (DPQ para Ar)
+ALVO     enxergar → cume do hex     detectar → camada da unidade
+CONSTRUÇÃO  ocupante com altura: terreno empresta → emprestado, senão EV Base
+            com Block LoS SUBSTITUI o EV do hex (cidade na montanha = 2)
+            revela com a MESMA linha, partindo da altura dela; detecta só o próprio hex
+```
+
+Antes havia duas regras de origem, a construção não tinha altura (morava numa
+lista do terreno) e revelava o disco inteiro sem linha. O autor definiu a regra
+em quatro frases; a mais importante foi *"não tem essa salada"*. Se uma regra de
+jogo parece pedir dois caminhos, **pergunte qual é a regra antes de oferecer
+opções.**
+
+### A descoberta da v8.6.1, que deu nome ao major
 
 > **O que está configurado não é o que está valendo.**
 
 Cinco vezes num dia, uma tela, um asset ou uma lembrança mostrava uma coisa e o
-jogo fazia outra, e nenhuma deu erro:
+jogo fazia outra, e nenhuma deu erro: o Base Preset no Inspector, perfis copiados
+do Gulosa, números do perfil que ninguém lia, a âncora da Retaguarda lendo tropa
+real, e o "limpar o progresso" (que existe, sim: está no save do slot 1; ver a
+errata no relatório v9.0.0).
 
-```text
-Inspector "Base Preset: Difícil"     o jogo usava o catálogo
-perfis Fácil/Médio "como a média"    eram cópia do perfil de teste Gulosa
-números do perfil Difícil            ninguém lê número nenhum, e eram os do normal
-Retaguarda "massa inimiga"           posição REAL das tropas, sob névoa
-"limpar o progresso"                 o progresso nunca foi para o disco
-```
+### As descobertas da v8, comprimidas
 
-A direção, tirada do [guia de modding](modding/guia%20de%20modding.md) do autor:
-deixar o jogo **auditável**. Cada valor sabe dizer de onde veio, e cada save se
-lê sem arqueologia.
-
-### A descoberta da v8.6.0, que segue valendo
-
-> **Uma resposta só não serve a mais de um respondente.**
-
-Três coisas tropeçaram nisso na mesma versão, e nenhuma delas dava erro:
-
-```text
-rally         um int   respondia "de quem e"      e o predio era dos DOIS lados
-eixo          o angulo respondia "por onde vou"   e o autor queria escolher
-dificuldade   hardMode respondia "o que eu faco"  seis lampadas, uma chave so
-```
-
-O remédio foi o mesmo nas três: **a etiqueta muda de dono**. O rally passou a ter
-lista de slots, o eixo virou grafo escrito no quadrante, e cada portão de
-comportamento voltou a perguntar o que ele queria saber — `FazHandoffEmProfundidade`,
-`RespeitaListaBanida` — em vez de "eu sou o difícil?".
-
-E o teste que denuncia o caso: se você precisa **desligar** uma parte da resposta
-para a outra metade se comportar, a entidade está errada, não o flag.
-
-### A descoberta da v8.5.2, que segue valendo
-
-> **A forma tem que casar com o dado.** Contável vira quadrado; contínuo vira
-> barra.
-
-Um contador de campanha desenhado como barra forçava o jogador a extrair uma
-**contagem** de uma **proporção** — e o autor teve que explicar o que o cinza
-significava. Trocado por quatro quadradinhos, o denominador parou de precisar de
-explicação porque passou a estar desenhado.
-
-A mesma régua, aplicada à batalha, responde o contrário: lá o dado é
-`controlledCapturePoints / total`, com captura **parcial** entrando na conta. Um
-prédio meio capturado não é meio cubinho.
-
-```text
-campanha   ■ meu  ■ dele  □ em aberto     contável   → quadrados
-batalha    ▓ meu  ▓ dele  ░ em aberto     contínuo   → barra
-```
-
-As duas telas contam a mesma história, cada uma na forma que o dado dela merece.
+- **v8.6.0, uma resposta só não serve a mais de um respondente:** a etiqueta muda
+  de dono (rally em lista, eixo escrito, portões por capacidade). Se é preciso
+  **desligar** metade da resposta para a outra funcionar, a entidade está errada,
+  não o flag.
+- **v8.5.2, a forma casa com o dado:** contável vira quadrado, contínuo vira
+  barra.
 
 ### As descobertas anteriores, que seguem valendo
 
@@ -206,7 +186,11 @@ foi assim que a paridade do Q2, o título perdido e o `bar_tvencedor` apareceram
 ✅ tropa e caixa inicial  A_IA_Q2 tem chinook no slot 0 e 10000 para cada lado
 ✅ save/load de campanha  volta ao quadrante em foco
 ✅ perfil Médio           Q1 até a rodada 3, pelo menu (save do slot 2)
+✅ cenários de visão      soldado na mata, montanhas A-B-C-D, HQ atrás da serra
 ```
+
+Não visto em partida ainda: a construção revelando com linha, o Play direto com
+perfil, a linha MOTIVO no painel (pode não caber), os perfis Fácil e Difícil.
 
 ### A IA obedece o perfil, mas só nos toggles
 
@@ -237,22 +221,30 @@ O que falta, em ordem:
    O mapa campo a campo está no gerador
    ([AIPresetGeneratorWindow.cs:275](../Assets/Editor/AI/AIPresetGeneratorWindow.cs)).
    Use ele, e não busca por nome.
-3. **"Perfil em uso" no Inspector**, e **resolver o perfil no Play direto**. Hoje,
-   abrir a Batalha no editor e dar Play roda **sem perfil** (os flags antigos da
-   cena). Só o menu e o load de save resolvem o perfil
-   ([AIController.Lifecycle.cs:167](../Assets/Scripts/Match/AI/AIController.Lifecycle.cs)).
+3. ~~Perfil em uso e Play direto~~ — feitos na v9.0.0. O Inspector do
+   `AIController` mostra o perfil e as capacidades efetivas; o Play direto resolve
+   o perfil pelos flags da cena.
 
 ### Auditável: a direção que o autor escolheu
 
-Do guia de modding, o que se aplica ao jogo antes de ter mod nenhum, em ordem de
-custo:
+Feito na v9.0.0:
 
-1. **Inspetor de save** (`Tools ▸ Save Inspector`). O `.tmrsave` é um zip com
-   `manifest.json`, `game.json`, `replay.json` e `jogadas.json`; hoje lê-lo
-   exige extrair à mão.
-2. **Valor efetivo com a origem** (perfil, cena ou reserva). Vira obrigatório
-   quando a fase 2 religar os números.
-3. **Resultado com motivo** no progresso (HQ, eliminação, zero unidades).
+```text
+Save Inspector          Tools ▸ Auditoria ▸ Save Inspector — lê pelo mesmo caminho do load
+perfil em uso           quadro no fim do Inspector do AIController
+resultado com motivo    o progresso grava o VictoryReason; placar com MOTIVO
+regra de sensor única   visão: FogKnowledgeSnapshotBuilder.CollectConstructionVisibleCells
+```
+
+O que vem, em ordem de custo:
+
+1. **Diff de dois saves** no Save Inspector. Foi comparar saves que revelou o bug
+   no mod do CK3.
+2. **Valor efetivo dos NÚMEROS** com a origem (perfil, cena ou reserva). Vira
+   obrigatório quando a fase 2 religar os números; hoje só as capacidades mostram.
+3. **A regra de inclusão da construção no FOW de runtime** (quem é dono, HQ como
+   marco global) ainda é cópia própria em `ApplyFriendlyConstructionVision`. A
+   linha foi unificada; a inclusão, não.
 
 ### O teste da blitzkrieg reprova no código atual
 
@@ -287,15 +279,17 @@ segunda partida, e nenhuma sessão chegou lá.
 
 Sintoma se falhar: a IA do segundo mapa persegue setor que não existe ali.
 
-### O progresso só existe dentro de um save
+### O progresso só existe dentro de um save — e o slot 1 tem o falso
 
 O `CampaignProgressStore` vive em memória, é zerado a cada Play e a cada Novo
-Jogo, e só vai para o disco dentro do `.tmrsave`. Não há o que "limpar". Para
-jogar os quatro quadrantes e manter o placar, é uma sessão só, ou salvar e
-carregar.
+Jogo, e só vai para o disco dentro do `.tmrsave`.
 
-A pasta `CampaignProgress/` de uma versão antiga, que ficava em `LocalLow`, foi
-apagada com o autor confirmando. O código atual não a lia.
+**O save do slot 1** (cena Campanha, 10/09) guarda o `RODADAS: 3` falso: Q2 no
+slot 1 em 3 rodadas, Q1 no slot 0 em 2. Carregá-lo traz o placar falso de volta.
+Apagar ou não é decisão do autor. O mesmo save tem um `capturedBuildingHistory`
+estranho (slot 0 com `teamId: 2` numa cena sem construção), não investigado.
+
+A pasta `CampaignProgress/` de uma versão antiga foi apagada; o código não a lia.
 
 ### Três lugares respondem "de quem é este quadrante"
 
@@ -338,6 +332,14 @@ conhecido: os dois primeiros delegam ao terceiro.
 **O Q3 e o Q4 ficam vazios por enquanto, por decisão do autor.** A campanha se
 joga no Q1 e no Q2.
 
+Da visão (v9.0.0), pequenos e conhecidos:
+- **EV padrão das construções** é 1 / bloqueia (a flag, 0 / não). Docas,
+  Hidrobase, Estação de Trem e Terminal talvez queiram outro valor.
+- **O `Planicie.asset` ainda guarda a lista antiga** `constructionVisionOverrides`
+  em YAML. O código não lê; a Unity descarta no próximo save do asset.
+- **O bake da rodada 0 está desatualizado** (cache na versão 4). Não precisa para
+  jogar: no Play é só atalho de partida. Só as ferramentas no Edit Mode pedem.
+
 O rótulo "ALPHA BUILD v0.3" é indicativo: a grafia diferente entre as cenas fica
 como está.
 
@@ -359,7 +361,8 @@ o outro é edição manual.
 
 ```text
 -1. serviços burros do tabuleiro  ✅
- 0. sensores PodeX                ⚠️ o laço de HEX ainda mora no PodeDetectar
+ 0. sensores PodeX                ⚠️ o laço de HEX ainda mora no PodeDetectar;
+                                     a LINHA tem regra única desde a v9.0.0
  1. serviços de área (Hotzone)    ⚠️ falta cobertura de DETECÇÃO
  2. consumidores Melhor*          ⚠️ faltam Suprir, Fundir, Detecção e Spotting
  3. papéis → somente POLÍTICA     ⚠️ as seis fichas existem; RoleData ainda não
@@ -374,12 +377,22 @@ política deixando de ser `if` espalhado — só que na camada do general, não 
 papel. Na v8.6.1 a viagem das **capacidades** terminou; os *valores* ainda não
 saíram do lugar.
 
+O degrau 0 ficou mais firme na v9.0.0: a linha de visão, de detecção e de tiro
+parte de uma regra só, e a construção usa a mesma reta que a unidade.
+
 ---
 
 ## Armadilhas que importam nesta retomada
 
 | armadilha | regra |
 |---|---|
+| **`.tmrsave` é zip** | `grep` direto no arquivo não enxerga o texto comprimido e volta vazio. Foi assim que o relatório v8.6.1 afirmou que nenhum save tinha progresso, e o slot 1 tinha. Buscar em save pelo Save Inspector ou por `zipfile` |
+| **nome do arquivo de save** | carrega a cena em que o slot foi criado: `quicksave_slot1_Battle Map 1 - Groud` é um save da Campanha. A cena vem do **manifesto** |
+| **abrir opções para uma regra de jogo** | perguntado por que o soldado da mata herdava EV, eu ofereci três caminhos; a regra era uma só (*"não tem essa salada"*). Antes de propor alternativas, perguntar qual é a regra |
+| **origem × alvo da linha** | são perguntas diferentes. Origem: o terreno decide se empresta EV (aeronave: camada). Alvo: enxergar = cume do hex, detectar = camada da unidade. Unificar uma não mexe na outra |
+| **construção que ocupa substitui o hex** | com Block LoS, a altura dela é a do hex (cidade na montanha = 2, não 2,25). Sem Block LoS (flag) é marcador e o terreno fica |
+| **cache que não vê mudança de regra** | o hash de config do FOW cobre mapa e flags, não regra. Mudou regra de visão? Suba `FogSourceCacheFormatVersion` e `FogRoundZeroSlotBake.CurrentFormatVersion` |
+| **`git mv` já põe no índice** | um `git commit` seguinte leva as renomeações junto, mesmo sem `git add`. Separe antes de commitar outra coisa |
 | **configurado tomado como valendo** | o Inspector mostra o campo, não o que o jogo usa. O `Base Preset` dizia Difícil e era só a reserva de um catálogo que cobre tudo. Antes de concluir pelo que a tela mostra, pergunte **quem responde em runtime** |
 | **perfil copiado de um perfil de teste** | o Médio era o `AIPreset_Gulosa` renomeado, e o Fácil uma cópia dele: herdaram toggles de teste que contradiziam a doutrina escrita no próprio asset. Asset renomeado carrega o passado; confira contra a doutrina |
 | **gerador que copia só um lado do par** | o gerador de preset copia o lado **normal** dos pares normal/hard. Os três perfis tinham os mesmos ~70 números. Religar leitura de valor sem comparar antes enfraquece o Difícil calado |
@@ -438,15 +451,16 @@ saíram do lugar.
 |---|---|
 | [`Planos/plano_campanha.md`](Planos/plano_campanha.md) | **o tronco** — autoria, recorte, progresso, cenas, bloqueios, teste |
 | [`Planos/briefing_cena_campanha.md`](Planos/briefing_cena_campanha.md) | o contrato entre as duas frentes |
-| [`relatorio_v8.6.1.md`](relatorio_v8.6.1.md) | configurado ≠ valendo — perfis, portões, auditável |
+| [`relatorio_v9.0.0.md`](relatorio_v9.0.0.md) | a mesma linha — visão de regra única, construção com altura, auditável |
+| [`Versões/relatorio_v8.6.1.md`](Versões/relatorio_v8.6.1.md) | configurado ≠ valendo — perfis, portões (com errata na v9.0.0) |
 | [`modding/guia de modding.md`](modding/guia%20de%20modding.md) | o guia do autor; a direção "auditável" sai dele |
 | [`AI Behavior/capturador_politicas.md`](AI%20Behavior/capturador_politicas.md) | as quatro políticas do capturador, e o [teste da blitzkrieg](AI%20Behavior/teste_blitzkrieg.md) |
 | [`AI Behavior/contrato_missoes.md`](AI%20Behavior/contrato_missoes.md) | missões (brainstorming da v7.2.1) — ler antes de retomar o quadro de missões |
-| [`relatorio_v8.5.2.md`](relatorio_v8.5.2.md) | a forma tem que casar com o dado — quadradinhos, paridade, fim de partida |
-| [`relatorio_v8.5.1.md`](relatorio_v8.5.1.md) | o que atravessa a cena — save por endereço, isPlayable, o 0b |
-| [`relatorio_v8.5.0.md`](relatorio_v8.5.0.md) | o laço fecha, e o dono deixa de ser uma cor |
-| [`relatorio_v8.4.1.md`](relatorio_v8.4.1.md) | orientação, rotas partidas e identidade estável |
-| [`relatorio_v8.4.0.md`](relatorio_v8.4.0.md) | o dia em que o catálogo parou de dizer onde |
+| [`Versões/relatorio_v8.5.2.md`](Versões/relatorio_v8.5.2.md) | a forma tem que casar com o dado — quadradinhos, paridade, fim de partida |
+| [`Versões/relatorio_v8.5.1.md`](Versões/relatorio_v8.5.1.md) | o que atravessa a cena — save por endereço, isPlayable, o 0b |
+| [`Versões/relatorio_v8.5.0.md`](Versões/relatorio_v8.5.0.md) | o laço fecha, e o dono deixa de ser uma cor |
+| [`Versões/relatorio_v8.4.1.md`](Versões/relatorio_v8.4.1.md) | orientação, rotas partidas e identidade estável |
+| [`Versões/relatorio_v8.4.0.md`](Versões/relatorio_v8.4.0.md) | o dia em que o catálogo parou de dizer onde |
 | [`AI Behavior/Transporte.md`](AI%20Behavior/Transporte.md) | estados, promessas, coleta e entrega |
 | [`arquitetura/acoes_transacionais.md`](arquitetura/acoes_transacionais.md) | lei de compromisso e rollback |
 
