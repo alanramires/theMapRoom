@@ -19,12 +19,12 @@ MonoBehaviour:
     projetarProducaoInimiga: 0
     aberturaBlindadoPrimeiro: 0
     limitarLogistica: 0
-    dobrarSlotsCapturadorPorSetor: 1
+    dobrarSlotsCapturadorPorSetor: 0
     handoffEmProfundidade: 1
-    conscricaoSempre: 1
+    conscricaoSempre: 0
     conscricaoQuandoPerdendo: 0
-    poupaPraElite: 0
-    politicaLadoForteFraco: 1
+    poupaPraElite: 1
+    politicaLadoForteFraco: 0
     gateNucleoSuave: 1
   economia:
     fracaoRendaForaDeCidades: 1

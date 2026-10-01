@@ -17,5 +17,5 @@ MonoBehaviour:
     preset: {fileID: 11400000, guid: 31c30eca455805340ae28ebd035000d8, type: 2}
   - dificuldade: 1
     preset: {fileID: 11400000, guid: 6c30985c371b9174a80a70d5b4efc846, type: 2}
-  - dificuldade: 4
+  - dificuldade: 2
     preset: {fileID: 11400000, guid: b82e8ba60f1d7e94a8315bf2dfa93732, type: 2}

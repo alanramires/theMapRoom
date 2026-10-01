@@ -22,22 +22,22 @@ MonoBehaviour:
     dobrarSlotsCapturadorPorSetor: 1
     handoffEmProfundidade: 1
     conscricaoSempre: 1
-    conscricaoQuandoPerdendo: 0
+    conscricaoQuandoPerdendo: 1
     poupaPraElite: 0
     politicaLadoForteFraco: 1
     gateNucleoSuave: 1
   economia:
     fracaoRendaForaDeCidades: 1
-    eliteSaveTurns: 1
-    eliteMaintenanceReservePercent: 20
+    eliteSaveTurns: 2
+    eliteMaintenanceReservePercent: 30
     savingPercentualForElite: 10
     counterEliteEscalationPressure: 3.2
   composicao:
-    coreMinInfantry: 2
-    coreMinAssault: 2
-    coreMinArtillery: 1
-    eliteRatioPressure: 0.33
-    eliteRatioSafe: 0.5
+    coreMinInfantry: 4
+    coreMinAssault: 0
+    coreMinArtillery: 0
+    eliteRatioPressure: 0.6
+    eliteRatioSafe: 0.8
     eliteCapturerFillRatio: 0.6
     minFilledAssaultSlots: 1
     minTurnForFireSupport: 3
@@ -59,8 +59,8 @@ MonoBehaviour:
     massacreUnitCapFillRatio: 0.85
   plano:
     maxActiveObjectives: 4
-    capturerSlotsPerSectorMultiplier: 1
-    capturerSlotCap: 4
+    capturerSlotsPerSectorMultiplier: 2
+    capturerSlotCap: 6
     minDistanceForTransportSlot: 7
   tatica:
     riskDecisionImpact: 0.5
