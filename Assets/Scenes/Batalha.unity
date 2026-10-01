@@ -892,7 +892,7 @@ MonoBehaviour:
     flipX: 0
     flipXOverride: 0
     isAI: 0
-    isRebelRuntime: 0
+    isRebelRuntime: 1
     isLocal: 1
     localityConfigured: 1
     commandServiceAutomatic: 0
@@ -905,7 +905,7 @@ MonoBehaviour:
     flipX: 1
     flipXOverride: 0
     isAI: 0
-    isRebelRuntime: 0
+    isRebelRuntime: 1
     isLocal: 1
     localityConfigured: 1
     commandServiceAutomatic: 0
@@ -8840,7 +8840,7 @@ MonoBehaviour:
   appliedActiveTeamId: 2
   pendingTurnStartUpkeep: 1
   pendingTurnStartEconomy: 1
-  cachedConstructionIncomeSignature: 527
+  cachedConstructionIncomeSignature: 1527
   cachedConstructionIncomeCount: 0
   constructionIncomeRefreshIntervalSeconds: 0.35
   continuousEditorRefresh: 0
@@ -9028,6 +9028,7 @@ MonoBehaviour:
   currentAITeam: -1
   currentAISlotIndex: -1
   basePreset: {fileID: 11400000, guid: b82e8ba60f1d7e94a8315bf2dfa93732, type: 2}
+  presetCatalog: {fileID: 11400000, guid: 9b3a2d9b1c3d4ed48a5455d3cc0b45ea, type: 2}
 --- !u!1001 &509373116
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -9038,11 +9039,11 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 3898832375795807818, guid: 76a6abc9e5b4cda43ac276c04f3c5ef1, type: 3}
       propertyPath: m_Volume
-      value: 0.3
+      value: 0.8
       objectReference: {fileID: 0}
     - target: {fileID: 4254574150553539861, guid: 76a6abc9e5b4cda43ac276c04f3c5ef1, type: 3}
       propertyPath: musicVolume
-      value: 0.3
+      value: 0.8
       objectReference: {fileID: 0}
     - target: {fileID: 4254574150553539861, guid: 76a6abc9e5b4cda43ac276c04f3c5ef1, type: 3}
       propertyPath: matchController
@@ -11998,7 +11999,7 @@ MonoBehaviour:
   neighborDistanceVehicleUnitData: {fileID: 0}
   neighborDistanceNavalUnitData: {fileID: 0}
   navalApproachSearchRadius: 6
-  beachManager: {fileID: 0}
+  beachManager: {fileID: 1483871541}
   sectorInfos: []
   baseInfos: []
 --- !u!1 &1900915754
@@ -12693,6 +12694,12 @@ PrefabInstance:
     - target: {fileID: 1348457725607290348, guid: f7e44d7c210a32d4ba630ba660da88a1, type: 3}
       propertyPath: m_text
       value: 0 / turn
+      objectReference: {fileID: 0}
+    - target: {fileID: 3105420475645158433, guid: f7e44d7c210a32d4ba630ba660da88a1, type: 3}
+      propertyPath: m_text
+      value: 'ALPHA BUILD v0.3 - Oububro/2026
+
+        EM DESENVOLVIMENTO'
       objectReference: {fileID: 0}
     - target: {fileID: 4985144350662451516, guid: f7e44d7c210a32d4ba630ba660da88a1, type: 3}
       propertyPath: m_Enabled
@@ -13986,11 +13993,19 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7288480064611631759, guid: c581f95dac3200e4eaea0675bbff53d0, type: 3}
       propertyPath: uiSfxVolume
-      value: 0.3
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 7288480064611631759, guid: c581f95dac3200e4eaea0675bbff53d0, type: 3}
+      propertyPath: boardTilemap
+      value: 
+      objectReference: {fileID: 1566606925}
+    - target: {fileID: 7288480064611631759, guid: c581f95dac3200e4eaea0675bbff53d0, type: 3}
+      propertyPath: boardCollider
+      value: 
+      objectReference: {fileID: 1566606923}
+    - target: {fileID: 7288480064611631759, guid: c581f95dac3200e4eaea0675bbff53d0, type: 3}
       propertyPath: moveSfxVolume
-      value: 0.3
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 7288480064611631759, guid: c581f95dac3200e4eaea0675bbff53d0, type: 3}
       propertyPath: replayManager
@@ -13998,15 +14013,15 @@ PrefabInstance:
       objectReference: {fileID: 1679592218}
     - target: {fileID: 7288480064611631759, guid: c581f95dac3200e4eaea0675bbff53d0, type: 3}
       propertyPath: skillSfxVolume
-      value: 0.3
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 7288480064611631759, guid: c581f95dac3200e4eaea0675bbff53d0, type: 3}
       propertyPath: stateSfxVolume
-      value: 0.3
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 7288480064611631759, guid: c581f95dac3200e4eaea0675bbff53d0, type: 3}
       propertyPath: combatSfxVolume
-      value: 0.3
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 7288480064611631759, guid: c581f95dac3200e4eaea0675bbff53d0, type: 3}
       propertyPath: masterSfxVolume
@@ -14026,24 +14041,28 @@ PrefabInstance:
       objectReference: {fileID: 1900915756}
     - target: {fileID: 7288480064611631759, guid: c581f95dac3200e4eaea0675bbff53d0, type: 3}
       propertyPath: menuOpenSfxVolume
-      value: 0.3
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 7288480064611631759, guid: c581f95dac3200e4eaea0675bbff53d0, type: 3}
       propertyPath: unitMoveSfxVolume
-      value: 0.3
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 7288480064611631759, guid: c581f95dac3200e4eaea0675bbff53d0, type: 3}
       propertyPath: explosionSfxVolume
-      value: 0.3
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 7288480064611631759, guid: c581f95dac3200e4eaea0675bbff53d0, type: 3}
       propertyPath: menuCloseSfxVolume
-      value: 0.3
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 7288480064611631759, guid: c581f95dac3200e4eaea0675bbff53d0, type: 3}
       propertyPath: endingTurnSfxVolume
-      value: 0.3
+      value: 1
       objectReference: {fileID: 0}
+    - target: {fileID: 7288480064611631759, guid: c581f95dac3200e4eaea0675bbff53d0, type: 3}
+      propertyPath: battleMapMenuRootController
+      value: 
+      objectReference: {fileID: 1749783164260394206}
     - target: {fileID: 7288480064611631759, guid: c581f95dac3200e4eaea0675bbff53d0, type: 3}
       propertyPath: skillSfxBindings.Array.size
       value: 2

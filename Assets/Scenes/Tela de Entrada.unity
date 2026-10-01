@@ -4316,7 +4316,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: Alpha Build v0.2 - Julho/2026
+  m_text: Alpha Build v0.3 - Outubro/2026
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 3cb5543ccd204d54c9c34b6008539c4d, type: 2}
   m_sharedMaterial: {fileID: -7834541552760396438, guid: 3cb5543ccd204d54c9c34b6008539c4d, type: 2}
@@ -10474,6 +10474,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7fcde2c74636d6642bd8469a938b62e2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MatchController
+  isPlayable: 1
   currentTurn: 0
   activeTeamId: 0
   players:
@@ -10481,7 +10482,7 @@ MonoBehaviour:
     flipX: 0
     flipXOverride: 0
     isAI: 0
-    isRebelRuntime: 0
+    isRebelRuntime: 1
     isLocal: 1
     localityConfigured: 1
     commandServiceAutomatic: 0
@@ -10544,7 +10545,7 @@ MonoBehaviour:
   appliedActiveTeamId: 0
   pendingTurnStartUpkeep: 0
   pendingTurnStartEconomy: 1
-  cachedConstructionIncomeSignature: 527
+  cachedConstructionIncomeSignature: 1527
   cachedConstructionIncomeCount: 0
   constructionIncomeRefreshIntervalSeconds: 0.35
   continuousEditorRefresh: 0
@@ -15964,11 +15965,11 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 3898832375795807818, guid: 76a6abc9e5b4cda43ac276c04f3c5ef1, type: 3}
       propertyPath: m_Volume
-      value: 0.3
+      value: 0.8
       objectReference: {fileID: 0}
     - target: {fileID: 4254574150553539861, guid: 76a6abc9e5b4cda43ac276c04f3c5ef1, type: 3}
       propertyPath: musicVolume
-      value: 0.3
+      value: 0.8
       objectReference: {fileID: 0}
     - target: {fileID: 4254574150553539861, guid: 76a6abc9e5b4cda43ac276c04f3c5ef1, type: 3}
       propertyPath: matchController
