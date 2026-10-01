@@ -14,6 +14,7 @@ public class PodeEnxergarSensorDebugWindow : EditorWindow
         public HeightLevel heightLevel;
         public string layerSource;
         public bool rangeOnlyMode;
+        public string rangeOnlyReason;
 
         /// <summary>
         /// A reta inteira, do jeito que o traçado a viu. A janela nao guarda
@@ -32,6 +33,7 @@ public class PodeEnxergarSensorDebugWindow : EditorWindow
         public int range;
         public bool forcedLayer;
         public bool baseVisionOnly;
+        public string note;
         public bool detailsExpanded;
         public bool validListExpanded;
         public bool invalidListExpanded;
@@ -48,6 +50,10 @@ public class PodeEnxergarSensorDebugWindow : EditorWindow
     }
 
     [SerializeField] private UnitManager selectedUnit;
+    // Construcao tambem libera hex (raio `visao`, com linha de visao). Quando ela
+    // esta selecionada, a janela mostra a regra do bake para o dono e para o
+    // inimigo, pela mesma funcao (FogKnowledgeSnapshotBuilder.TryCollectConstructionKnowledge).
+    [SerializeField] private ConstructionManager selectedConstruction;
     [SerializeField] private TurnStateManager turnStateManager;
     [SerializeField] private MatchController matchController;
     [SerializeField] private Tilemap overrideTilemap;
@@ -112,10 +118,14 @@ public class PodeEnxergarSensorDebugWindow : EditorWindow
         EditorGUILayout.HelpBox(
             "Irmao do Pode Detectar focado em revelacao de hexagonos nas camadas "
             + "de */surface. Obtem o EV da unidade e traca a linha descendente "
-            + "dentro de seu raio de visao.",
+            + "dentro de seu raio de visao. Com uma CONSTRUCAO (e nenhuma unidade), "
+            + "mostra o que ela revela ao dono e ao inimigo: linha de visao a partir da altura dela.",
             MessageType.Info);
 
         selectedUnit = (UnitManager)EditorGUILayout.ObjectField("Unidade", selectedUnit, typeof(UnitManager), true);
+        selectedConstruction = (ConstructionManager)EditorGUILayout.ObjectField(
+            new GUIContent("Construcao", "Usada quando nao ha unidade: mostra o que a construcao revela ao dono e ao inimigo."),
+            selectedConstruction, typeof(ConstructionManager), true);
         turnStateManager = (TurnStateManager)EditorGUILayout.ObjectField("TurnStateManager", turnStateManager, typeof(TurnStateManager), true);
         matchController = (MatchController)EditorGUILayout.ObjectField("MatchController", matchController, typeof(MatchController), true);
         overrideTilemap = (Tilemap)EditorGUILayout.ObjectField("Tilemap (opcional)", overrideTilemap, typeof(Tilemap), true);
@@ -201,7 +211,11 @@ public class PodeEnxergarSensorDebugWindow : EditorWindow
 
         if (item.rangeOnlyMode)
         {
-            EditorGUILayout.LabelField("LoS", "Range only (AirHigh blockLoS=false)");
+            EditorGUILayout.LabelField(
+                "LoS",
+                string.IsNullOrEmpty(item.rangeOnlyReason)
+                    ? "Range only (AirHigh blockLoS=false)"
+                    : item.rangeOnlyReason);
             return;
         }
 
@@ -218,7 +232,130 @@ public class PodeEnxergarSensorDebugWindow : EditorWindow
         if (unit == null)
             unit = Selection.activeGameObject.GetComponentInParent<UnitManager>();
         if (unit != null)
+        {
             selectedUnit = unit;
+            selectedConstruction = null;
+            return;
+        }
+
+        ConstructionManager construction = Selection.activeGameObject.GetComponent<ConstructionManager>();
+        if (construction == null)
+            construction = Selection.activeGameObject.GetComponentInParent<ConstructionManager>();
+        if (construction != null)
+        {
+            selectedConstruction = construction;
+            selectedUnit = null;
+        }
+    }
+
+    /// <summary>De onde partem as linhas desenhadas: a unidade, ou a construcao.</summary>
+    private bool TryResolveObserverCell(out Vector3Int cell)
+    {
+        if (selectedUnit != null)
+            cell = selectedUnit.CurrentCellPosition;
+        else if (selectedConstruction != null)
+            cell = selectedConstruction.CurrentCellPosition;
+        else
+        {
+            cell = default;
+            return false;
+        }
+        cell.z = 0;
+        return true;
+    }
+
+    private void RunConstructionSimulation()
+    {
+        Tilemap map = ResolveBoardTilemapForSimulation();
+        if (map == null)
+        {
+            statusMessage = "Tilemap do tabuleiro nao encontrado.";
+            return;
+        }
+
+        int ownerSlot = selectedConstruction.SlotIndex;
+        // Um slot que nao e o dono: basta o "outro" (0 ou 1) para responder a
+        // pergunta do inimigo. Construcao neutra nao tem dono — o cenario do
+        // dono responde "nada", e o do inimigo so ve se for HQ.
+        int enemySlot = ownerSlot == 0 ? 1 : 0;
+
+        string name = selectedConstruction.name;
+        scenarioResults.Add(BuildConstructionScenario(
+            map,
+            ownerSlot >= 0 ? $"Dono (slot {ownerSlot})" : "Dono (neutra: nenhum)",
+            ownerSlot));
+        scenarioResults.Add(BuildConstructionScenario(
+            map,
+            $"Inimigo (slot {enemySlot})",
+            enemySlot));
+
+        for (int i = 0; i < scenarioResults.Count; i++)
+            visibleHexes.AddRange(scenarioResults[i].visibleHexes);
+        SortVisibleHexEntries(visibleHexes);
+
+        statusMessage =
+            $"Construcao {name}: dono revela {scenarioResults[0].visibleHexes.Count} hex(es), "
+            + $"inimigo {scenarioResults[1].visibleHexes.Count}. Construcao olha como unidade, da altura dela; "
+            + "detecta so quem esta no proprio hex.";
+
+        if (logToConsole)
+            Debug.Log($"[PodeEnxergarSensorDebug] Construcao={name} | {statusMessage}");
+    }
+
+    private TerrainDatabase ResolveTerrainDatabaseForSimulation() =>
+        terrainDatabase != null ? terrainDatabase : FindFirstAsset<TerrainDatabase>();
+
+    private DPQAirHeightConfig ResolveDpqForSimulation() =>
+        dpqAirHeightConfig != null ? dpqAirHeightConfig : FindFirstAsset<DPQAirHeightConfig>();
+
+    private bool ResolveLosForSimulation() =>
+        !useGameplaySensorContext || matchController == null || matchController.EnableLosValidation;
+
+    private VisionScenarioResult BuildConstructionScenario(Tilemap map, string label, int observerSlot)
+    {
+        var revealed = new HashSet<Vector3Int>();
+        bool detectsOwnCell = false;
+        string reason = "construcao neutra: nao revela para ninguem";
+        if (observerSlot >= 0
+            && !FogKnowledgeSnapshotBuilder.TryCollectConstructionKnowledge(
+                map, ResolveTerrainDatabaseForSimulation(), ResolveDpqForSimulation(), ResolveLosForSimulation(),
+                selectedConstruction, observerSlot, revealed, out detectsOwnCell, out reason))
+        {
+            detectsOwnCell = false;
+        }
+
+        int range = 0;
+        if (selectedConstruction.TryResolveConstructionData(out ConstructionData data) && data != null)
+            range = Mathf.Max(0, data.visao);
+
+        var scenario = new VisionScenarioResult
+        {
+            label = label,
+            domain = Domain.Land,
+            heightLevel = HeightLevel.Surface,
+            range = range,
+            baseVisionOnly = true,
+            note = $"{reason}. Deteccao: {(detectsOwnCell ? "so o proprio hex" : "nenhuma")}."
+        };
+
+        Vector3Int origin = selectedConstruction.CurrentCellPosition;
+        origin.z = 0;
+        foreach (Vector3Int cell in revealed)
+        {
+            scenario.visibleHexes.Add(new VisibleHexEntry
+            {
+                scenarioLabel = label,
+                cell = cell,
+                distance = AIActionReachCoordinator.CubicDistance(origin, cell),
+                domain = Domain.Land,
+                heightLevel = HeightLevel.Surface,
+                layerSource = "construcao",
+                rangeOnlyMode = true,
+                rangeOnlyReason = "Construcao: linha de visao partindo da altura dela (cada hex listado passou)"
+            });
+        }
+        SortVisibleHexEntries(scenario.visibleHexes);
+        return scenario;
     }
 
     private void RunSimulation()
@@ -230,7 +367,12 @@ public class PodeEnxergarSensorDebugWindow : EditorWindow
 
         if (selectedUnit == null)
         {
-            statusMessage = "Selecione uma unidade valida.";
+            if (selectedConstruction != null)
+            {
+                RunConstructionSimulation();
+                return;
+            }
+            statusMessage = "Selecione uma unidade ou uma construcao.";
             return;
         }
 
@@ -326,15 +468,13 @@ public class PodeEnxergarSensorDebugWindow : EditorWindow
 
     private void SelectLineForDrawing(VisibleHexEntry item, Color color, string labelPrefix)
     {
-        if (item == null || selectedUnit == null)
+        if (item == null || !TryResolveObserverCell(out Vector3Int originCell))
             return;
 
         Tilemap map = ResolveBoardTilemapForSimulation();
         if (map == null)
             return;
 
-        Vector3Int originCell = selectedUnit.CurrentCellPosition;
-        originCell.z = 0;
         Vector3Int targetCell = item.cell;
         targetCell.z = 0;
 
@@ -391,7 +531,7 @@ public class PodeEnxergarSensorDebugWindow : EditorWindow
 
     private void DrawAllLinesFromEntries(List<VisibleHexEntry> entries, Color color, string tag)
     {
-        if (selectedUnit == null)
+        if (!TryResolveObserverCell(out Vector3Int originCell))
             return;
 
         Tilemap map = ResolveBoardTilemapForSimulation();
@@ -399,8 +539,6 @@ public class PodeEnxergarSensorDebugWindow : EditorWindow
             return;
 
         sceneLines.Clear();
-        Vector3Int originCell = selectedUnit.CurrentCellPosition;
-        originCell.z = 0;
         Vector3 originWorld = map.GetCellCenterWorld(originCell);
         for (int i = 0; i < entries.Count; i++)
         {
@@ -635,6 +773,8 @@ public class PodeEnxergarSensorDebugWindow : EditorWindow
         EditorGUILayout.LabelField("Camada virtual", $"{scenario.domain}/{scenario.heightLevel}");
         EditorGUILayout.LabelField("Range aplicado", scenario.range.ToString());
         EditorGUILayout.LabelField("Modo", scenario.baseVisionOnly ? "Visao base (nao especializado)" : "Especializado/forcado");
+        if (!string.IsNullOrEmpty(scenario.note))
+            EditorGUILayout.HelpBox(scenario.note, MessageType.None);
         EditorGUILayout.LabelField("Hexes visiveis", scenario.visibleHexes.Count.ToString());
         EditorGUILayout.LabelField("Hexes invalidos", scenario.invalidHexes.Count.ToString());
         EditorGUILayout.BeginHorizontal();
@@ -712,7 +852,7 @@ public class PodeEnxergarSensorDebugWindow : EditorWindow
         // No Edit Mode nao existe unidade ativa de partida, mas existe a
         // selecao da Scene. Auto Detect passa a aproveita-la, para o botao
         // significar a mesma coisa nos dois modos.
-        if (selectedUnit == null)
+        if (selectedUnit == null && selectedConstruction == null)
             TryUseCurrentSelection();
     }
 
@@ -752,6 +892,8 @@ public class PodeEnxergarSensorDebugWindow : EditorWindow
 
         if (selectedUnit != null && selectedUnit.BoardTilemap != null)
             return selectedUnit.BoardTilemap;
+        if (selectedUnit == null && selectedConstruction != null && selectedConstruction.BoardTilemap != null)
+            return selectedConstruction.BoardTilemap;
 
         return FindPreferredTilemap();
     }

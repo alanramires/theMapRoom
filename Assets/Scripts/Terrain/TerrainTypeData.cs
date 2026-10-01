@@ -4,19 +4,6 @@ using UnityEngine.Serialization;
 using UnityEngine.Tilemaps;
 
 [System.Serializable]
-public class TerrainConstructionVisionOverride
-{
-    [Tooltip("Construcao alvo desta excecao de visao/LoS.")]
-    public ConstructionData construction;
-
-    [Tooltip("EV aplicado quando esta construcao estiver neste terreno.")]
-    public int ev = 0;
-
-    [Tooltip("Block LoS aplicado quando esta construcao estiver neste terreno.")]
-    public bool blockLoS = true;
-}
-
-[System.Serializable]
 public class TerrainStructureVisionOverride
 {
     [Tooltip("Estrutura alvo desta excecao de visao/LoS.")]
@@ -105,10 +92,10 @@ public class TerrainTypeData : ScriptableObject
     [Tooltip("Se true, este terreno bloqueia linha de visada por padrao.")]
     public bool blockLoS = true;
 
+    // A altura das CONSTRUCOES nao mora mais aqui: e EV Base + Block LoS na
+    // ConstructionData, e o terreno so decide se empresta o EV dele a quem o ocupa
+    // (TerrainVisionResolver.ResolveConstructionHeight). Estruturas continuam aqui.
     [Header("Vision Specializations")]
-    [Tooltip("Excecoes de EV/Block LoS para construcoes sobre este terreno.")]
-    public List<TerrainConstructionVisionOverride> constructionVisionOverrides = new List<TerrainConstructionVisionOverride>();
-
     [Tooltip("Excecoes de EV/Block LoS para estruturas sobre este terreno.")]
     public List<TerrainStructureVisionOverride> structureVisionOverrides = new List<TerrainStructureVisionOverride>();
 
@@ -120,27 +107,6 @@ public class TerrainTypeData : ScriptableObject
 
     [Tooltip("Overrides opcionais de custo de autonomia por skill.")]
     public List<TerrainSkillCostOverride> skillCostOverrides = new List<TerrainSkillCostOverride>();
-
-    public bool TryGetConstructionVisionOverride(ConstructionData constructionData, out int overrideEv, out bool overrideBlockLoS)
-    {
-        overrideEv = 0;
-        overrideBlockLoS = true;
-        if (constructionData == null || constructionVisionOverrides == null)
-            return false;
-
-        for (int i = 0; i < constructionVisionOverrides.Count; i++)
-        {
-            TerrainConstructionVisionOverride item = constructionVisionOverrides[i];
-            if (item == null || item.construction != constructionData)
-                continue;
-
-            overrideEv = Mathf.Max(0, item.ev);
-            overrideBlockLoS = item.blockLoS;
-            return true;
-        }
-
-        return false;
-    }
 
     public bool TryGetStructureVisionOverride(StructureData structureData, out int overrideEv, out bool overrideBlockLoS)
     {
@@ -183,8 +149,6 @@ public class TerrainTypeData : ScriptableObject
             forceEndMovementOnTerrainDomainForDomains = new List<TerrainLayerMode>();
         if (forceDetectUnitsWithFollowingStealthSkills == null)
             forceDetectUnitsWithFollowingStealthSkills = new List<SkillData>();
-        if (constructionVisionOverrides == null)
-            constructionVisionOverrides = new List<TerrainConstructionVisionOverride>();
         if (structureVisionOverrides == null)
             structureVisionOverrides = new List<TerrainStructureVisionOverride>();
         if (requiredSkillsToEnter == null)

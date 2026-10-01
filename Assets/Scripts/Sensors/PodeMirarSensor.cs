@@ -1580,8 +1580,7 @@ public static class PodeMirarSensor
             originCell,
             attacker,
             dpqAirHeightConfig,
-            originEv,
-            OriginEvRule.ShooterInheritsWhenTerrainAllows);
+            originEv);
 
         if (!TryResolveCellVision(
                 tilemap,
@@ -1669,8 +1668,7 @@ public static class PodeMirarSensor
         return ObservationLineService.TryTrace(
             tilemap, terrainDatabase, originCell, targetCell, observer, target,
             dpqAirHeightConfig, out intermediateCells, out evPath, out blockedCell,
-            enableLosValidation, forcedTargetDomain: null, forcedTargetHeightLevel: null,
-            OriginEvRule.InheritTerrain);
+            enableLosValidation, forcedTargetDomain: null, forcedTargetHeightLevel: null);
     }
 
     private static bool TerrainAllowsWeaponTrajectory(TerrainTypeData terrain, WeaponData weapon)

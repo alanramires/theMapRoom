@@ -223,10 +223,13 @@ public static class ObservationLineReport
                     constructionData.displayName,
                     constructionData.id,
                     constructionData.name);
-                float displayEv = hasTerrain &&
-                    terrain.TryGetConstructionVisionOverride(constructionData, out int constructionOverrideEv, out _)
-                    ? Mathf.Max(0, constructionOverrideEv)
-                    : (hasTerrain ? Mathf.Max(0, terrain.ev) : Mathf.Max(0f, fallbackEv));
+                // Mesma composicao do TerrainVisionResolver: construcao que
+                // bloqueia ocupa o hex e substitui o EV do terreno; marcador
+                // (sem Block LoS) deixa o terreno como esta.
+                float terrainEv = hasTerrain ? Mathf.Max(0f, terrain.ev) : Mathf.Max(0f, fallbackEv);
+                float displayEv = constructionData.blockLoS
+                    ? TerrainVisionResolver.ResolveConstructionHeight(hasTerrain ? terrain : null, constructionData)
+                    : terrainEv;
                 return $"{constructionName} (EV: {displayEv})";
             }
 

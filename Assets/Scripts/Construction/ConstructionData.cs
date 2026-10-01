@@ -82,6 +82,21 @@ public class ConstructionData : ScriptableObject
     [Min(0)]
     [Tooltip("Alcance de visao da construcao. Zero permite observar apenas alvos no proprio hex.")]
     public int visao = 0;
+
+    // A construcao e um OCUPANTE do hex, como a unidade — e tem altura propria.
+    // Regra unica (TerrainVisionResolver): se o terreno empresta EV a quem o ocupa,
+    // vale o EV emprestado (cidade na base da montanha = 2); senao vale este EV base
+    // (cidade na planicie ou na floresta = 1). Com Block LoS, a construcao OCUPA o
+    // hex e a altura dela substitui a do terreno; sem Block LoS (flag) e marcador e
+    // o terreno fica como esta. Antes, a altura morava numa lista do terreno, e toda
+    // construcao fora dela nascia fantasma (EV 0).
+    [Header("Vision")]
+    [Min(0f)]
+    [InspectorName("EV Base")]
+    [Tooltip("Altura da construcao quando o terreno nao empresta EV a quem o ocupa. Cidade, fabrica, HQ: 1. Flag e marcos sem altura: 0.")]
+    public float ev = 1f;
+    [Tooltip("Se true, a construcao bloqueia linha de visada (quando tem EV acima de 0).")]
+    public bool blockLoS = true;
     [Tooltip("Custo basico de movimento/autonomia para entrar neste hex de construcao. Minimo 1.")]
     [Min(1)]
     public int baseMovementCost = 1;

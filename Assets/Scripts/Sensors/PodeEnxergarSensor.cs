@@ -151,7 +151,6 @@ public static class PodeEnxergarSensor
             enableLosValidation,
             forcedTargetDomain,
             forcedTargetHeightLevel,
-            OriginEvRule.InheritTerrain,
             profile);
     }
 }

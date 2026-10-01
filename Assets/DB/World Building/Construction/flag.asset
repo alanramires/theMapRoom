@@ -28,6 +28,8 @@ MonoBehaviour:
   spriteBlue: {fileID: 0}
   spriteYellow: {fileID: 0}
   visao: 0
+  ev: 0
+  blockLoS: 0
   baseMovementCost: 1
   isFakeBuilding: 1
   dpqData: {fileID: 11400000, guid: 151bdc82ef06071449424d30a1d567a5, type: 2}

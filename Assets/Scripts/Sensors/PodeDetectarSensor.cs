@@ -2051,7 +2051,7 @@ public static class PodeDetectarSensor
             tilemap, terrainDatabase, originCell, targetCell, observer, target,
             dpqAirHeightConfig, out intermediateCells, out evPath, out blockedCell,
             enableLosValidation, forcedTargetDomain, forcedTargetHeightLevel,
-            OriginEvRule.InheritTerrain, profile);
+            profile);
     }
 
     private static float ResolveOriginEvForLos(

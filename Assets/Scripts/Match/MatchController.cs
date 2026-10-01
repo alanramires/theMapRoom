@@ -179,7 +179,12 @@ public sealed class CommittedBoardDelta
 public class MatchController : MonoBehaviour
 {
     private const int MaxVictoryStarsGoal = 12;
-    private const int FogSourceCacheFormatVersion = 1;
+    // 2: a origem da linha virou regra unica (visao = tiro, o terreno decide se a
+    // unidade herda o EV). Fotografia gravada com a regra antiga e descartada e
+    // recalculada — o hash de config nao enxerga mudanca de regra, so de mapa.
+    // 3: construcao ganhou altura propria (EV Base na ConstructionData).
+    // 4: construcao propria revela com linha de visao, nao o disco inteiro.
+    private const int FogSourceCacheFormatVersion = 4;
     public static event Action<PlayerSlotId, PlayerSlotId> OnActiveSlotChanged;
     // Compatibilidade temporária: novos sistemas devem assinar OnActiveSlotChanged.
     public static event Action<int> OnActiveTeamChanged;
@@ -6672,6 +6677,23 @@ public class MatchController : MonoBehaviour
         return observerTeamIds.Count > 0;
     }
 
+    // O que uma construcao PROPRIA revela: a mesma regra do bake e das ferramentas
+    // (FogKnowledgeSnapshotBuilder.CollectConstructionVisibleCells) — linha de
+    // visao partindo da altura da construcao, nao o disco inteiro.
+    private HashSet<Vector3Int> CollectConstructionVisibleCells(Tilemap boardMap, Vector3Int origin, int visionRange)
+    {
+        var cells = new HashSet<Vector3Int>();
+        FogKnowledgeSnapshotBuilder.CollectConstructionVisibleCells(
+            boardMap,
+            ResolveFogTerrainDatabase(),
+            ResolveFogDpqAirHeightConfig(),
+            enableLosValidation,
+            origin,
+            visionRange,
+            cells);
+        return cells;
+    }
+
     private static HashSet<Vector3Int> BuildCellsInRadius(Tilemap map, Vector3Int origin, int radius)
     {
         HashSet<Vector3Int> visited = new HashSet<Vector3Int>();
@@ -8591,7 +8613,7 @@ public class MatchController : MonoBehaviour
         int visionRange = 0;
         if (construction.TryResolveConstructionData(out ConstructionData data) && data != null)
             visionRange = Mathf.Max(0, data.visao);
-        HashSet<Vector3Int> expectedGeographic = BuildCellsInRadius(boardMap, origin, visionRange);
+        HashSet<Vector3Int> expectedGeographic = CollectConstructionVisibleCells(boardMap, origin, visionRange);
         return expectedGeographic.SetEquals(saved.geographicCells) &&
                saved.sensorCells.Count == 1 &&
                saved.sensorCells[0] == origin;
@@ -10286,7 +10308,7 @@ public class MatchController : MonoBehaviour
                 visionRange = Mathf.Max(0, constructionData.visao);
             }
 
-            HashSet<Vector3Int> visibleCells = BuildCellsInRadius(boardMap, cell, visionRange);
+            HashSet<Vector3Int> visibleCells = CollectConstructionVisibleCells(boardMap, cell, visionRange);
             foreach (Vector3Int visibleCell in visibleCells)
                 output.Add(visibleCell);
         }
@@ -10646,7 +10668,7 @@ public class MatchController : MonoBehaviour
             if (ShouldLogPodeEnxergarRuntime)
                 Debug.Log($"[FoW][Construction][Use] {construction.name} cell={cell.x},{cell.y} vision={visionRange}");
 
-            HashSet<Vector3Int> visibleCells = BuildCellsInRadius(boardMap, cell, visionRange);
+            HashSet<Vector3Int> visibleCells = CollectConstructionVisibleCells(boardMap, cell, visionRange);
             foreach (Vector3Int visibleCell in visibleCells)
                 AddFogSourceGeographicContribution(sourceEntry, visibleCell, boardMap, updateVisual);
 

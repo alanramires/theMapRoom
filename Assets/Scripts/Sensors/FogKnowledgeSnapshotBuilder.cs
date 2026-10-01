@@ -17,7 +17,11 @@ public sealed class FogRoundZeroDetectionBake
 [Serializable]
 public sealed class FogRoundZeroSlotBake
 {
-    public const int CurrentFormatVersion = 1;
+    // 2: origem da linha unificada (ver ObservationLineService.ResolveOriginEv).
+    // Bake da rodada 0 cozido antes disso e rejeitado: recozinhe nas cenas.
+    // 3: construcao com altura propria (EV Base na ConstructionData).
+    // 4: construcao propria revela com linha de visao.
+    public const int CurrentFormatVersion = 4;
 
     public int formatVersion = CurrentFormatVersion;
     public int observerSlotIndex = -1;
@@ -374,36 +378,139 @@ public static class FogKnowledgeSnapshotBuilder
             if (!IsConstructionOnBoard(construction, request.BoardMap))
                 continue;
 
-            bool owned = construction.SlotIndex == request.ObserverSlot.Value;
-            if (!owned && !construction.IsPlayerHeadQuarter)
-                continue;
-
-            Vector3Int cell = construction.CurrentCellPosition;
-            cell.z = 0;
-            if (!request.BoardMap.HasTile(cell))
-                continue;
-
-            if (!owned)
+            var revealed = new HashSet<Vector3Int>();
+            if (!TryCollectConstructionKnowledge(
+                    request.BoardMap,
+                    request.TerrainDatabase,
+                    request.DpqAirHeightConfig,
+                    request.EnableLos,
+                    construction,
+                    request.ObserverSlot.Value,
+                    revealed,
+                    out bool detectsOwnCell,
+                    out _))
             {
-                snapshot.GeographicallyVisibleCells.Add(cell);
-                snapshot.KnownCells.Add(cell);
                 continue;
             }
 
-            int range = 0;
-            if (construction.TryResolveConstructionData(
-                    out ConstructionData data) && data != null)
+            snapshot.GeographicallyVisibleCells.UnionWith(revealed);
+            snapshot.KnownCells.UnionWith(revealed);
+            if (detectsOwnCell)
             {
-                range = Mathf.Max(0, data.visao);
+                Vector3Int cell = construction.CurrentCellPosition;
+                cell.z = 0;
+                snapshot.SensorCoveredCells.Add(cell);
+            }
+        }
+    }
+
+    /// <summary>
+    /// O que UMA construcao entrega ao slot observador. Regra unica do bake, do
+    /// runtime (MatchController) e das ferramentas (Pode Enxergar):
+    ///
+    ///   propria       revela o que enxerga no raio `visao` — com a MESMA linha da
+    ///                 unidade, partindo da altura dela — e detecta so o proprio hex
+    ///   HQ inimigo    revela so o proprio hex: marco global do tabuleiro
+    ///   outra         nada
+    /// </summary>
+    public static bool TryCollectConstructionKnowledge(
+        Tilemap boardMap,
+        TerrainDatabase terrainDatabase,
+        DPQAirHeightConfig dpqAirHeightConfig,
+        bool enableLos,
+        ConstructionManager construction,
+        int observerSlotIndex,
+        HashSet<Vector3Int> revealedCells,
+        out bool detectsOwnCell,
+        out string reason)
+    {
+        detectsOwnCell = false;
+        if (construction == null || boardMap == null || revealedCells == null)
+        {
+            reason = "construcao ou tabuleiro ausente";
+            return false;
+        }
+
+        Vector3Int cell = construction.CurrentCellPosition;
+        cell.z = 0;
+        if (!boardMap.HasTile(cell))
+        {
+            reason = "hex da construcao fora do tabuleiro";
+            return false;
+        }
+
+        bool owned = construction.SlotIndex == observerSlotIndex;
+        if (!owned)
+        {
+            if (!construction.IsPlayerHeadQuarter)
+            {
+                reason = "construcao de outro dono: nao revela nada";
+                return false;
             }
 
-            HashSet<Vector3Int> cells = BuildCellsInRadius(
-                request.BoardMap,
-                cell,
-                range);
-            snapshot.GeographicallyVisibleCells.UnionWith(cells);
-            snapshot.KnownCells.UnionWith(cells);
-            snapshot.SensorCoveredCells.Add(cell);
+            revealedCells.Add(cell);
+            reason = "HQ de outro dono: marco global, so o proprio hex";
+            return true;
+        }
+
+        int range = 0;
+        if (construction.TryResolveConstructionData(out ConstructionData data) && data != null)
+            range = Mathf.Max(0, data.visao);
+
+        CollectConstructionVisibleCells(
+            boardMap, terrainDatabase, dpqAirHeightConfig, enableLos, cell, range, revealedCells);
+        detectsOwnCell = true;
+        reason = $"propria: raio {range} com linha de visao; detecta so o proprio hex";
+        return true;
+    }
+
+    /// <summary>
+    /// A construcao olha como um soldado: a mesma reta do ObservationLineService,
+    /// partindo do EV da celula dela (a altura da construcao — HQ na planicie 1,
+    /// cidade na montanha 2) ate o cume de cada hex do raio. O proprio hex e os
+    /// vizinhos sempre aparecem: nao ha nada entre os dois.
+    ///
+    /// Antes revelava o disco inteiro, sem linha: o HQ de visao 2 enxergava o hex
+    /// atras da montanha vizinha.
+    /// </summary>
+    public static void CollectConstructionVisibleCells(
+        Tilemap boardMap,
+        TerrainDatabase terrainDatabase,
+        DPQAirHeightConfig dpqAirHeightConfig,
+        bool enableLos,
+        Vector3Int origin,
+        int range,
+        HashSet<Vector3Int> output)
+    {
+        if (boardMap == null || output == null)
+            return;
+
+        origin.z = 0;
+        foreach (Vector3Int cell in BuildCellsInRadius(boardMap, origin, range))
+        {
+            if (cell == origin || !enableLos || terrainDatabase == null)
+            {
+                output.Add(cell);
+                continue;
+            }
+
+            // Sem observador: a origem e o EV da celula da construcao, e o alvo e
+            // o cume do hex — o mesmo par de pontas do PodeEnxergar.
+            if (ObservationLineService.TryTrace(
+                    boardMap,
+                    terrainDatabase,
+                    origin,
+                    cell,
+                    observer: null,
+                    target: null,
+                    dpqAirHeightConfig,
+                    out _,
+                    out _,
+                    out _,
+                    enableLosValidation: true))
+            {
+                output.Add(cell);
+            }
         }
     }
 
