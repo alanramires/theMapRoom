@@ -44,7 +44,7 @@ public partial class AIController
     {
         axisSideByEixo.Clear();
         axisSidePoliticUndecided = true;
-        if (!strongWeakSidePolitic || snapshot == null)
+        if (!StrongWeakSidePolitic || snapshot == null)
             return;
 
         AIShoppingPlanner.OperationalPressureInspection pressure =
@@ -87,14 +87,14 @@ public partial class AIController
 
     public AxisSide GetAxisSide(int eixo)
     {
-        if (!strongWeakSidePolitic || axisSidePoliticUndecided)
+        if (!StrongWeakSidePolitic || axisSidePoliticUndecided)
             return AxisSide.Balanced;
         return axisSideByEixo.TryGetValue(eixo, out AxisSide side) ? side : AxisSide.Balanced;
     }
 
     public AxisSide GetSectorSide(ConstructionSector sector)
     {
-        if (!strongWeakSidePolitic || currentAxisMap == null)
+        if (!StrongWeakSidePolitic || currentAxisMap == null)
             return AxisSide.Balanced;
         return GetAxisSide(currentAxisMap.GetEixo(sector));
     }

@@ -6,12 +6,11 @@ using UnityEngine;
 // Modelo: UM baseline (editável como um UnitData) + a dificuldade como atalho que liga
 // toggles por cima de uma CÓPIA do baseline. Não há asset por dificuldade.
 //
-// FASE 1: o preset ativo é RESOLVIDO e fica disponível para inspeção, mas nenhuma decisão
-// lê dele. Os 4 booleanos legados continuam sendo a fonte de verdade do runtime — assim a
-// fase 1 não muda comportamento, e uma regressão futura é rastreável ao passo que a causou.
+// CAPACIDADES (os toggles): todas leem do preset ativo, com o campo da cena como reserva
+// quando nao ha preset. Nenhum portao de comportamento pergunta mais "sou o dificil?".
 //
-// Fase 2: os getters de valor do AIController passam a ler de ActivePreset, com fallback
-// para o campo da cena quando basePreset for null (cenas antigas continuam idênticas).
+// VALORES (fase 2, pendente): os numeros do preset ainda nao sao lidos. Os getters de
+// valor do AIController e os campos do AIShoppingPlanner seguem vindo da cena.
 // =====================================================================================
 public partial class AIController
 {
@@ -97,7 +96,7 @@ public partial class AIController
             {
                 Debug.Log($"[AI][Preset] dificuldade={difficulty} " +
                           $"({AIPresetCatalog.RotuloDoJogador(difficulty)}) → perfil '{doCatalogo.name}' " +
-                          "do catalogo, sem overlay (fase 1: só inspeção; runtime ainda usa os flags)");
+                          "do catalogo, sem overlay (capacidades do perfil; valores ainda da cena)");
             }
             return;
         }
@@ -113,12 +112,21 @@ public partial class AIController
         // cobrir a dificuldade — cena sem catalogo continua identica.
         activePreset = basePreset.CloneRuntime();
         AIPresetData.ApplyDifficultyOverlay(activePreset, difficulty);
+
+        // A overlay nao sabe destes quatro: eram toggles da CENA, nao da dificuldade.
+        // Sem copiar, o caminho de reserva passaria a obedecer o asset baseline e mudaria
+        // comportamento de quem nem usa catalogo. Aqui os campos ja refletem
+        // ApplyDifficulty ou o save restaurado.
+        activePreset.capacidades.conscricaoSempre = conscriptionDoctrine;
+        activePreset.capacidades.conscricaoQuandoPerdendo = conscriptionWhenLosing;
+        activePreset.capacidades.politicaLadoForteFraco = strongWeakSidePolitic;
+        activePreset.capacidades.gateNucleoSuave = softCoreGate;
         presetSource = basePreset.name + " + overlay";
 
         if (showAILogs)
         {
             Debug.Log($"[AI][Preset] baseline={basePreset.name} dificuldade={difficulty} " +
-                      $"→ preset ativo montado (fase 1: só inspeção; runtime ainda usa os flags)");
+                      $"→ preset ativo montado (capacidades da overlay + toggles da cena; valores ainda da cena)");
         }
     }
 

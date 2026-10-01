@@ -64,11 +64,15 @@ public partial class AIController : MonoBehaviour
 
     [Tooltip("Strong/Weak Side Politic (PROTOTIPO, off por padrao): classifica os eixos em forte/equilibrado/fraco (com histerese) e enviesa a distribuicao de elite (fire support) para o lado forte, aliviando o fraco. Doutrina de concentracao de forca ao estilo AWBW. So mexe na priorizacao do elite existente — nao infla demanda de slots.")]
     [SerializeField] private bool strongWeakSidePolitic = false;
-    public bool StrongWeakSidePolitic => strongWeakSidePolitic;
+    // Com perfil ativo, quem responde e o perfil; o campo da cena e a reserva de quem
+    // nao tem preset. Mesmo padrao das capacidades em AIController.Preset.cs.
+    public bool StrongWeakSidePolitic =>
+        activePreset != null ? activePreset.capacidades.politicaLadoForteFraco : strongWeakSidePolitic;
 
     [Tooltip("Doutrina da Conscricao (tatica do enxame): todo produtor do exercito compra o corpo mais barato TODO turno; demandas/elite so gastam por cima da massa garantida (imposto de conscricao no shopping). Desenhada pro Hard (Agressivo), mas pode ser ligada avulsa pra experimentar um Normal mais dificil.")]
     [SerializeField] private bool conscriptionDoctrine = false;
-    public bool ConscriptionDoctrine => conscriptionDoctrine;
+    public bool ConscriptionDoctrine =>
+        activePreset != null ? activePreset.capacidades.conscricaoSempre : conscriptionDoctrine;
 
     [Tooltip("Fase de Massacre (valvula da conscricao): com clara vantagem numerica a doutrina cessa a massa e o caixa volta pro elite. Entra quando o ForceRatio macro atinge este valor (0.66 = ~2:1).")]
     [SerializeField, Range(0.5f, 1f)] private float massacreEnterForceRatio = 0.66f;
@@ -94,7 +98,8 @@ public partial class AIController : MonoBehaviour
 
     [Tooltip("Recrutamento forcado emergencial quando a IA esta perdendo. Independente do pacote Hard.")]
     [SerializeField] private bool conscriptionWhenLosing = false;
-    public bool ConscriptionWhenLosing => conscriptionWhenLosing;
+    public bool ConscriptionWhenLosing =>
+        activePreset != null ? activePreset.capacidades.conscricaoQuandoPerdendo : conscriptionWhenLosing;
 
     // Aplica a dificuldade escolhida na Tela de Entrada. Os flags sao mutuamente
     // exclusivos por combinacao: Facil liga easy; Competitivo liga hard; Agressivo
@@ -228,7 +233,8 @@ public partial class AIController : MonoBehaviour
 
     [Tooltip("Gate de núcleo SUAVE: em vez de banir elite até a composição mínima fechar (muro), a maturidade do núcleo (0..1) vira PESO no score. Corrige o incentivo perverso do gate duro, que ao mesmo tempo bane o elite E desliga a penalidade anti-barato — fazendo a IA comprar a artilharia mais fraca só para 'pagar o imposto' e destravar a cancela. Off = comportamento atual.")]
     [SerializeField] private bool softCoreGate = false;
-    public bool SoftCoreGate => softCoreGate;
+    public bool SoftCoreGate =>
+        activePreset != null ? activePreset.capacidades.gateNucleoSuave : softCoreGate;
 
     [Header("Plano de Objetivos")]
     [Tooltip("M�ximo de objetivos ofensivos simult�neos (Pending/Pursuing/Capturing). Limita demand de capturadores em mapas grandes.")]

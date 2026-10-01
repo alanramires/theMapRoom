@@ -167,7 +167,7 @@ public partial class AIController
                 filledSlot.AssignedUnitId = -1;
                 assignedUnit.ClearAIAssignedPlan();
                 plan.HandoffVacaterIds.Add(assignedUnit.InstanceId);
-                ConstructionSector fwdSec = hardMode
+                ConstructionSector fwdSec = FazHandoffEmProfundidade
                     ? ComputeBlitzkriegForwardSector(obj.Sector, aiTeam)
                     : ComputeForwardNeighborSector(obj.Sector, aiTeam);
                 // None, nao default: Compute*ForwardSector devolve None quando nao acha,
@@ -207,7 +207,9 @@ public partial class AIController
             filledSlot.AssignedUnitId = -1;
             assignedUnit.ClearAIAssignedPlan();
             plan.HandoffVacaterIds.Add(assignedUnit.InstanceId);
-            ConstructionSector fwdSector = hardMode
+            // Para onde a ponta segue depois de ceder e parte da mesma capacidade que a
+            // deixou ceder — nao da dificuldade.
+            ConstructionSector fwdSector = FazHandoffEmProfundidade
                 ? ComputeBlitzkriegForwardSector(obj.Sector, aiTeam)
                 : ComputeForwardNeighborSector(obj.Sector, aiTeam);
             if (fwdSector != ConstructionSector.None) plan.VacaterForwardSectors.Add(fwdSector);

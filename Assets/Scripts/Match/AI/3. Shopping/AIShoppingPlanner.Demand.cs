@@ -2768,7 +2768,10 @@ public partial class AIShoppingPlanner
     {
         if (snapshot == null || demands == null || demands.Count == 0)
             return;
-        if (AIController.Instance == null || !AIController.Instance.HardMode)
+        // Pergunta a capacidade, nao a dificuldade: e a mesma chave que a poupanca do
+        // 1o MBT (ComputeBlitzFirstArmorReserve) ja le. Com HardMode aqui, desligar
+        // "abertura blindado primeiro" no perfil apagava so metade da regra.
+        if (AIController.Instance == null || !AIController.Instance.AbreComBlindado)
             return;
         if (CountActiveEliteAssaultUnits(snapshot) > 0)
             return;
