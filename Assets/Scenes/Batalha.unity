@@ -923,12 +923,12 @@ MonoBehaviour:
   economyEnabled: 1
   fogOfWar: 1
   autoFlipXFromHqPositions: 1
-  gameSetup: 0
-  enableLdtValidation: 0
-  enableLosValidation: 0
-  enableSpotter: 0
-  enableStealthValidation: 0
-  enableTotalWar: 0
+  gameSetup: 4
+  enableLdtValidation: 1
+  enableLosValidation: 1
+  enableSpotter: 1
+  enableStealthValidation: 1
+  enableTotalWar: 1
   atalhoContextual: 0
   atalhoRPassarTurnoUsaConfirmacao: 1
   allowDefeatForZeroUnits: 1
