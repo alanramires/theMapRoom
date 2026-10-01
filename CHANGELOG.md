@@ -16,7 +16,20 @@ major fecha, os relatórios dele são arquivados em `docs/Versões/`.
 
 ---
 
-## v8 — Onde o dado mora *(em curso)*
+## v9 — Auditável *(em curso)*
+
+O que está configurado tem de ser o que está valendo, e dá para provar olhando.
+Cada valor sabe dizer de onde veio, cada save se lê sem arqueologia, e as regras
+de sensor têm uma fonte só. A direção vem do guia de modding do autor
+(`docs/modding/guia de modding.md`): antes de ter mod, o jogo tem de ser legível.
+
+| versão | título | relatório |
+|---|---|---|
+| v9.0.0 | Ver, detectar e atirar partem da mesma linha | [relatório](docs/relatorio_v9.0.0.md) |
+
+---
+
+## v8 — Onde o dado mora *(fechado)*
 
 O catálogo diz o que uma coisa **É**; a cena diz **onde ela ESTÁ**. Este major
 separa os três andares — global, catálogo e cena — para que um mapa novo nasça
@@ -24,22 +37,22 @@ vazio e nenhum tabuleiro herde o layout de outro.
 
 | versão | título | relatório |
 |---|---|---|
-| v8.0.0 | A ausência precisa de nome próprio | [relatório](docs/relatorio_v8.0.0.md) |
-| v8.0.1 | As seis armas: o vocabulário fecha, o código não começou | [relatório](docs/relatorio_v8.0.1.md) |
-| v8.6.1 | O que está configurado não é o que está valendo | [relatório](docs/relatorio_v8.6.1.md) |
-| v8.6.0 | A etiqueta muda de dono | [relatório](docs/relatorio_v8.6.0.md) |
-| v8.5.2 | A forma tem que casar com o dado | [relatório](docs/relatorio_v8.5.2.md) |
-| v8.5.1 | O que atravessa a cena | [relatório](docs/relatorio_v8.5.1.md) |
-| v8.5.0 | O laço fecha, e o dono deixa de ser uma cor | [relatório](docs/relatorio_v8.5.0.md) |
-| v8.4.1 | O recorte aprende que a peça tem lado | [relatório](docs/relatorio_v8.4.1.md) |
-| v8.4.0 | O catálogo diz o que uma coisa É, e hoje parou de dizer onde ela está | [relatório](docs/relatorio_v8.4.0.md) |
-| v8.3.0 | Três formas erradas até o dado caber, e o primeiro quadrante em 2 ms | [relatório](docs/relatorio_v8.3.0.md) |
-| v8.2.2 | O tronco existe no papel, e a bancada aprendeu a ver o mapa | [relatório](docs/relatorio_v8.2.2.md) |
-| v8.2.1 | O taxi nao estaciona na renda que ele mesmo viabilizou | [relatório](docs/relatorio_v8.2.1.md) |
-| v8.2.0 | O plano dá o endereço; os rogues dividem o resto | [relatório](docs/relatorio_v8.2.0.md) |
-| v8.1.2 | O dado existia; faltava estar publicado no instante em que alguém olha | [relatório](docs/relatorio_v8.1.2.md) |
-| v8.1.1 | Cinco portas em série, e a última é um aperto de mão pela metade | [relatório](docs/relatorio_v8.1.1.md) |
-| v8.1.0 | O comportamento estava certo; a ordem dos `if` é que não estava | [relatório](docs/relatorio_v8.1.0.md) |
+| v8.0.0 | A ausência precisa de nome próprio | [relatório](docs/Versões/relatorio_v8.0.0.md) |
+| v8.0.1 | As seis armas: o vocabulário fecha, o código não começou | [relatório](docs/Versões/relatorio_v8.0.1.md) |
+| v8.6.1 | O que está configurado não é o que está valendo | [relatório](docs/Versões/relatorio_v8.6.1.md) |
+| v8.6.0 | A etiqueta muda de dono | [relatório](docs/Versões/relatorio_v8.6.0.md) |
+| v8.5.2 | A forma tem que casar com o dado | [relatório](docs/Versões/relatorio_v8.5.2.md) |
+| v8.5.1 | O que atravessa a cena | [relatório](docs/Versões/relatorio_v8.5.1.md) |
+| v8.5.0 | O laço fecha, e o dono deixa de ser uma cor | [relatório](docs/Versões/relatorio_v8.5.0.md) |
+| v8.4.1 | O recorte aprende que a peça tem lado | [relatório](docs/Versões/relatorio_v8.4.1.md) |
+| v8.4.0 | O catálogo diz o que uma coisa É, e hoje parou de dizer onde ela está | [relatório](docs/Versões/relatorio_v8.4.0.md) |
+| v8.3.0 | Três formas erradas até o dado caber, e o primeiro quadrante em 2 ms | [relatório](docs/Versões/relatorio_v8.3.0.md) |
+| v8.2.2 | O tronco existe no papel, e a bancada aprendeu a ver o mapa | [relatório](docs/Versões/relatorio_v8.2.2.md) |
+| v8.2.1 | O taxi nao estaciona na renda que ele mesmo viabilizou | [relatório](docs/Versões/relatorio_v8.2.1.md) |
+| v8.2.0 | O plano dá o endereço; os rogues dividem o resto | [relatório](docs/Versões/relatorio_v8.2.0.md) |
+| v8.1.2 | O dado existia; faltava estar publicado no instante em que alguém olha | [relatório](docs/Versões/relatorio_v8.1.2.md) |
+| v8.1.1 | Cinco portas em série, e a última é um aperto de mão pela metade | [relatório](docs/Versões/relatorio_v8.1.1.md) |
+| v8.1.0 | O comportamento estava certo; a ordem dos `if` é que não estava | [relatório](docs/Versões/relatorio_v8.1.0.md) |
 
 ---
 
