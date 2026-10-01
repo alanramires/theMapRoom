@@ -35,6 +35,13 @@ public static class CampaignProgressStore
         public int ownerSlotIndex = PlayerSlotId.InvalidValue;
         public int lastTurn;
         public string updatedAtUtc;
+
+        // COMO a partida acabou: o nome de MatchController.VictoryReason. Sem ele,
+        // uma vitoria por "exercito eliminado" na rodada 2 do setup era igual a uma
+        // vitoria jogada — foi assim que o RODADAS: 3 falso passou por registro
+        // real. Gravado como nome, nao int, para o save ser legivel e sobreviver a
+        // reordenacao do enum. Vazio = registrado antes do campo existir.
+        public string reason;
     }
 
     private static readonly Dictionary<string, CampaignProgressData> Cache =
@@ -65,10 +72,11 @@ public static class CampaignProgressStore
 
     public static bool TryGetResult(
         string mundoId, string campanhaId, string quadranteId,
-        out PlayerSlotId owner, out int turn)
+        out PlayerSlotId owner, out int turn, out string reason)
     {
         owner = PlayerSlotId.Invalid;
         turn = 0;
+        reason = string.Empty;
         if (!HasAddress(mundoId, campanhaId, quadranteId)) return false;
         if (!Cache.TryGetValue(BuildCacheKey(mundoId, campanhaId), out CampaignProgressData data))
             return false;
@@ -76,7 +84,26 @@ public static class CampaignProgressStore
         if (quadrant == null) return false;
         owner = PlayerSlotId.FromIndex(quadrant.ownerSlotIndex);
         turn = quadrant.lastTurn;
+        reason = quadrant.reason ?? string.Empty;
         return owner.IsValid;
+    }
+
+    /// <summary>
+    /// Texto do motivo para o jogador. Mora aqui, junto do dado, para o placar da
+    /// campanha e o Save Inspector dizerem a mesma coisa.
+    /// </summary>
+    public static string DescreverMotivo(string reason)
+    {
+        switch (reason)
+        {
+            case nameof(MatchController.VictoryReason.HeadQuarterCaptured): return "QG capturado";
+            case nameof(MatchController.VictoryReason.ArmyEliminated): return "exército eliminado";
+            case nameof(MatchController.VictoryReason.Surrender): return "rendição";
+            case nameof(MatchController.VictoryReason.VictoryStars): return "estrelas de vitória";
+            case null:
+            case "": return "—";
+            default: return reason;
+        }
     }
 
     public static bool RecordOwner(
@@ -84,7 +111,8 @@ public static class CampaignProgressStore
         string campanhaId,
         string quadranteId,
         PlayerSlotId owner,
-        int turn)
+        int turn,
+        string reason)
     {
         if (!HasAddress(mundoId, campanhaId, quadranteId) || !owner.IsValid)
             return false;
@@ -100,10 +128,11 @@ public static class CampaignProgressStore
         quadrant.ownerSlotIndex = owner.Value;
         quadrant.lastTurn = Mathf.Max(0, turn);
         quadrant.updatedAtUtc = DateTime.UtcNow.ToString("O");
+        quadrant.reason = reason ?? string.Empty;
 
         Debug.Log(
             $"[Campanha] '{campanhaId}/{quadranteId}' agora pertence ao " +
-            $"{owner} (turno {quadrant.lastTurn}).");
+            $"{owner} (rodada {quadrant.lastTurn}, {DescreverMotivo(quadrant.reason)}).");
         return true;
     }
 

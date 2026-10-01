@@ -253,7 +253,8 @@ public class QuadranteController : MonoBehaviour
                 campanhaId,
                 quadranteId,
                 winnerSlot,
-                turn);
+                turn,
+                reason.ToString());
         }
 
         aguardandoVolta = true;

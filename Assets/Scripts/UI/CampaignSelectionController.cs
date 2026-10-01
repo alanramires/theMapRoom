@@ -1360,10 +1360,10 @@ public class CampaignSelectionController : MonoBehaviour
         // MARCA: o jogador compara ao rejogar, sem tela nenhuma por perto para dar
         // contexto.
         string bake = q.HasBake ? string.Empty : "\n<color=#FF8888>SEM BAKE</color>";
-        string result = "VENCEDOR: Nenhum\nRODADAS: —";
+        string result = "VENCEDOR: Nenhum\nRODADAS: —\nMOTIVO: —";
         if (mundo != null && CampaignProgressStore.TryGetResult(
             mundo.mundoId, hovered.Campanha.campanhaId, q.quadranteId,
-            out PlayerSlotId winner, out int turn))
+            out PlayerSlotId winner, out int turn, out string reason))
         {
             TeamId team = matchController != null
                 ? matchController.GetTeamIdForSlot(winner.Value) : TeamId.Neutral;
@@ -1371,7 +1371,10 @@ public class CampaignSelectionController : MonoBehaviour
             if (team != TeamId.Neutral)
                 winnerName += $" ({TeamUtils.GetName(team)})";
             string color = ColorUtility.ToHtmlStringRGB(TeamUtils.GetColor(team));
-            result = $"VENCEDOR: <color=#{color}>{winnerName}</color>\nRODADAS: {turn}";
+            // O MOTIVO separa vitoria jogada de vitoria por setup: "exercito
+            // eliminado" na rodada 2 e o sintoma de quadrante sem tropa nem caixa.
+            result = $"VENCEDOR: <color=#{color}>{winnerName}</color>\nRODADAS: {turn}" +
+                     $"\nMOTIVO: {CampaignProgressStore.DescreverMotivo(reason).ToUpperInvariant()}";
         }
         PanelHelperController.TrySetExternalText(
             hovered.Bloco.displayName.ToUpperInvariant(),
