@@ -166,6 +166,13 @@ public partial class AIController
         // Dificuldade escolhida na Tela de Entrada (consumida uma vez por partida nova).
         if (PartidaConfig.TryConsumeDifficulty(out AIDifficulty pendingDifficulty))
             ApplyDifficulty(pendingDifficulty);
+        // Play direto na cena (sem menu): nenhuma dificuldade chega. Antes, o perfil
+        // nunca era resolvido e a IA rodava com os flags antigos da cena — o "medio"
+        // de teste nao era o AIPreset_Medio. Agora os flags da cena escolhem a
+        // dificuldade e o catalogo responde, como responderia vindo do menu. Load de
+        // save continua resolvendo de novo em RestoreDifficultyFromSave.
+        else if (!hasAppliedDifficulty)
+            ResolveActivePreset(InferDifficultyFromFlags());
 
         if (matchController == null)  matchController  = FindAnyObjectByType<MatchController>();
 

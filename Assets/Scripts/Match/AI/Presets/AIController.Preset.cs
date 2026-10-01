@@ -15,7 +15,8 @@ using UnityEngine;
 public partial class AIController
 {
     [Header("Perfil de IA (Preset)")]
-    [Tooltip("Baseline único da doutrina da IA (toggles + valores). A dificuldade liga toggles por cima. FASE 1: só inspeção — nenhuma decisão lê deste asset ainda.")]
+    [Tooltip("RESERVA: usado só quando o catálogo não tem entrada para a dificuldade (ou não há catálogo). Aí vira baseline + overlay de código. Com o catálogo cobrindo as três dificuldades, este campo não é consultado — o perfil em uso aparece no quadro do fim do Inspector.")]
+    [InspectorName("Reserva (sem catálogo)")]
     [SerializeField] private AIPresetData basePreset;
 
     [Tooltip("Catalogo que diz qual perfil cada dificuldade usa. Com ele, o preset e AUTORADO por dificuldade e a overlay nao roda. Vazio = comportamento antigo (baseline + overlay).")]
@@ -135,12 +136,34 @@ public partial class AIController
     /// escolhida na Tela de Entrada não existe como campo — só como combinação de flags —
     /// e cenas abertas direto no Editor nunca passam por ApplyDifficulty.
     /// </summary>
-    private AIDifficulty InferDifficultyFromFlags()
+    private AIDifficulty InferDifficultyFromFlags() => InferDifficulty(easyMode, hardMode);
+
+    /// <summary>Dificuldade que os flags desta cena significam: o que o Play direto usa.</summary>
+    public AIDifficulty SceneFlagsDifficulty => InferDifficultyFromFlags();
+
+    /// <summary>
+    /// De onde viria o perfil desta dificuldade, sem resolver nada. Mesma ordem de
+    /// ResolveActivePreset: catalogo, depois reserva, depois nenhum.
+    /// </summary>
+    public string PreviewPresetSource(AIDifficulty difficulty)
+    {
+        if (presetCatalog != null && presetCatalog.TryGetPreset(difficulty, out AIPresetData doCatalogo))
+            return $"{doCatalogo.name} (catálogo)";
+        if (basePreset != null)
+            return $"{basePreset.name} + overlay (reserva)";
+        return "nenhum — flags da cena";
+    }
+
+    /// <summary>
+    /// A regra unica de "que dificuldade estes flags significam". Publica para que
+    /// ferramentas de auditoria (Save Inspector) respondam o mesmo que o load.
+    /// </summary>
+    public static AIDifficulty InferDifficulty(bool easy, bool hard)
     {
         // conscriptionDoctrine nao e mais escolhida por dificuldade: quem a liga na cena
         // esta somando doutrina a um perfil, nao trocando de perfil.
-        if (hardMode) return AIDifficulty.Dificil;
-        if (easyMode) return AIDifficulty.Facil;
+        if (hard) return AIDifficulty.Dificil;
+        if (easy) return AIDifficulty.Facil;
         return AIDifficulty.Medio;
     }
 }
