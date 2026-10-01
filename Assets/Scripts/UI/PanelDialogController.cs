@@ -301,7 +301,12 @@ public class PanelDialogController : MonoBehaviour
             case TurnStateManager.CursorState.Mirando:
                 return ResolvePanelMessage("panel_dialog.sensor.aim", "Aim");
             case TurnStateManager.CursorState.Capturando:
-                return ResolvePanelMessage("panel_dialog.sensor.capture", "Capture");
+                if (turnStateManager != null
+                    && turnStateManager.CanUnitCaptureFromCurrentPosition(
+                        ResolveSelectedUnit(), out _, out var captureOperation, out _)
+                    && captureOperation == PodeCapturarSensor.CaptureOperationType.RecoverAlly)
+                    return ResolvePanelMessage("panel_dialog.sensor.recover_control", "Reforçar controle");
+                return ResolvePanelMessage("panel_dialog.sensor.capture", "Conquistar");
             case TurnStateManager.CursorState.Embarcando:
                 return ResolvePanelMessage("panel_dialog.sensor.embark", "Embark");
             case TurnStateManager.CursorState.Desembarcando:

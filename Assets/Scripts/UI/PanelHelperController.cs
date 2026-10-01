@@ -1464,7 +1464,12 @@ public class PanelHelperController : MonoBehaviour
             case "disembark":
                 return ResolveMessage("helper.sensors.label.disembark", "Disembark");
             case "capture":
-                return ResolveMessage("helper.sensors.label.capture", "Capture");
+                if (turnStateManager != null
+                    && turnStateManager.CanUnitCaptureFromCurrentPosition(
+                        turnStateManager.SelectedUnit, out _, out var captureOperation, out _)
+                    && captureOperation == PodeCapturarSensor.CaptureOperationType.RecoverAlly)
+                    return ResolveMessage("helper.sensors.label.recover_control", "Reforçar controle");
+                return ResolveMessage("helper.sensors.label.capture", "Conquistar");
             case "fuse":
                 return ResolveMessage("helper.sensors.label.fuse", "Fuse units");
             case "supply":
