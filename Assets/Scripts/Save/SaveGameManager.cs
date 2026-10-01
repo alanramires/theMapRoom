@@ -1621,6 +1621,105 @@ public class SaveGameManager : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// O que o Save Inspector enxerga de um .tmrsave: o manifesto e o mesmo
+    /// SaveGameData que o load monta. So leitura.
+    /// </summary>
+    public sealed class SaveAuditRead
+    {
+        public string path;
+        public int containerVersion;
+        public int saveVersion;
+        public string stateHash;
+        public bool hasReplay;
+        public bool hasJogadas;
+        public long savedAtUtcTicks;
+        public int containerBytes;
+        public int gameJsonBytes;
+        public string manifestJson;
+        public string gameJson;
+        public SaveGameData data;
+    }
+
+    /// <summary>
+    /// Le um save pelos MESMOS passos do load — container, versao do manifesto,
+    /// desserializacao e migracao de identidade do FOW — sem tocar em cena.
+    ///
+    /// Existe para auditoria: uma ferramenta com leitor proprio responderia o
+    /// que o leitor dela entende, nao o que o jogo carregaria. Se um campo nao
+    /// aparece aqui, o load tambem nao o ve.
+    /// </summary>
+    /// <summary>
+    /// So o manifesto (cena, mapa, data), pelo mesmo leitor do jogo. Barato: serve
+    /// para listar saves sem abrir o game.json de cada um.
+    /// </summary>
+    public static bool TryReadSaveManifestForAudit(
+        string path,
+        out string sceneName,
+        out string mapDisplayName,
+        out long savedAtUtcTicks,
+        out string error)
+    {
+        sceneName = string.Empty;
+        mapDisplayName = string.Empty;
+        savedAtUtcTicks = 0;
+        if (!TryReadContainerManifest(path, out SaveContainerManifest manifest, out error))
+            return false;
+        sceneName = manifest.sceneName ?? string.Empty;
+        mapDisplayName = manifest.mapDisplayName ?? string.Empty;
+        savedAtUtcTicks = manifest.savedAtUtcTicks;
+        return true;
+    }
+
+    public static bool TryReadSaveForAudit(string path, out SaveAuditRead read, out string error)
+    {
+        read = null;
+        if (!TryReadSaveContainer(
+                path,
+                out string manifestJson,
+                out string gameJson,
+                out string replayJson,
+                out string jogadasJson,
+                out int containerBytes,
+                out int uncompressedBytes,
+                out error))
+        {
+            return false;
+        }
+
+        try
+        {
+            SaveContainerManifest manifest = JsonUtility.FromJson<SaveContainerManifest>(manifestJson);
+            if (manifest == null || manifest.containerVersion != 1)
+                throw new InvalidDataException("Versao de container ausente ou nao suportada.");
+
+            SaveGameData data = JsonUtility.FromJson<SaveGameData>(gameJson);
+            MigrateFogObserverSlotIdentity(data);
+
+            read = new SaveAuditRead
+            {
+                path = path,
+                containerVersion = manifest.containerVersion,
+                saveVersion = manifest.saveVersion,
+                stateHash = manifest.stateHash,
+                hasReplay = manifest.hasReplay && !string.IsNullOrEmpty(replayJson),
+                hasJogadas = manifest.hasJogadas && !string.IsNullOrEmpty(jogadasJson),
+                savedAtUtcTicks = manifest.savedAtUtcTicks,
+                containerBytes = containerBytes,
+                gameJsonBytes = uncompressedBytes,
+                manifestJson = manifestJson,
+                gameJson = gameJson,
+                data = data
+            };
+            return true;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+            return false;
+        }
+    }
+
     private void TryStartPendingMainMenuLoadForActiveScene()
     {
 #if UNITY_WEBGL && !UNITY_EDITOR
