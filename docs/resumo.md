@@ -1,29 +1,49 @@
 ﻿# Resumo — onde estamos e o que vem
 
-Ponto de retomada. Atualizado em 2026-09-28, **depois** da tag `v8.6.0`.
+Ponto de retomada. Atualizado em 2026-10-01, **depois** da tag `v8.6.1`.
 Leia isto primeiro.
 
 ---
 
 ## Estado
 
-`v8.6.0` tagueada e publicada. Relatório:
-[`relatorio_v8.6.0.md`](relatorio_v8.6.0.md).
+`v8.6.1` tagueada e publicada. Relatório:
+[`relatorio_v8.6.1.md`](relatorio_v8.6.1.md).
 
 ```text
-v8.3.0   o primeiro quadrante pintou      361 tiles, 2 ms, cena vazia
 v8.4.0   o catálogo parou de dizer ONDE   três camadas de layout removidas
 v8.4.1   a peça tem lado                  orientação, rotas partidas, identidade
 v8.5.0   o laço fecha                     volta, dono por slot, tropa inicial
 v8.5.1   o que atravessa a cena            save por endereço, isPlayable, 0b
 v8.5.2   a forma casa com o dado           quadradinhos, paridade, fim de partida
 v8.6.0   a etiqueta muda de dono          rally em lista, eixo escrito, 3 perfis
+v8.6.1   configurado ≠ valendo            perfis autorados, portões fechados
 ```
 
 **O MVP virou tela.** Menu → Campanha → Batalha → volta → o mapa pintado, o
-placar, e o registro de quem tomou o quê em quantas rodadas.
+placar, e o registro de quem tomou o quê em quantas rodadas. O autor jogou o Q1
+até a rodada 3 com o perfil Médio.
 
-### A descoberta que organiza o resto
+### A descoberta da v8.6.1, e a direção que ela dá
+
+> **O que está configurado não é o que está valendo.**
+
+Cinco vezes num dia, uma tela, um asset ou uma lembrança mostrava uma coisa e o
+jogo fazia outra, e nenhuma deu erro:
+
+```text
+Inspector "Base Preset: Difícil"     o jogo usava o catálogo
+perfis Fácil/Médio "como a média"    eram cópia do perfil de teste Gulosa
+números do perfil Difícil            ninguém lê número nenhum, e eram os do normal
+Retaguarda "massa inimiga"           posição REAL das tropas, sob névoa
+"limpar o progresso"                 o progresso nunca foi para o disco
+```
+
+A direção, tirada do [guia de modding](modding/guia%20de%20modding.md) do autor:
+deixar o jogo **auditável**. Cada valor sabe dizer de onde veio, e cada save se
+lê sem arqueologia.
+
+### A descoberta da v8.6.0, que segue valendo
 
 > **Uma resposta só não serve a mais de um respondente.**
 
@@ -159,9 +179,16 @@ bloco A · Auridia
      └─ A_IA_Q4  Tubarão Branco     (2,-9)  30×20   600 tiles
 ```
 
-26 construções assadas. **O `A_IA_Q2` é o único autorado por inteiro:** caixa
-inicial de 10000 para cada slot e um `chinook` no slot 0. Os outros três seguem
-sem tropa e sem caixa — o padrão, e o que o campo significa quando ausente.
+29 construções assadas, **todas no Q1 e no Q2**:
+
+```text
+A_IA_Q1  HQ + fábricas cada lado    sem caixa: jogável, a renda do HQ (6000) entra antes da 1ª compra
+A_IA_Q2  HQ + fábricas cada lado    10000 por slot, chinook no slot 0
+A_IA_Q3  NENHUMA construção         2000 no slot 1, que não compra nada
+A_IA_Q4  NENHUMA construção         2000 no slot 0, que não compra nada
+```
+
+Sem HQ, os dois lados do Q3 e do Q4 entram no modo rebelde (v8.6.1, Frente 4).
 
 ---
 
@@ -169,8 +196,8 @@ sem tropa e sem caixa — o padrão, e o que o campo significa quando ausente.
 
 ### O que o autor exercitou jogando
 
-Não há build por linha de comando: o que foi provado, foi ele jogando. E foi
-assim que a paridade do Q2, o título perdido e o `bar_tvencedor` apareceram.
+`bash tools/compilar.sh` prova que compila. Comportamento só se prova jogando, e
+foi assim que a paridade do Q2, o título perdido e o `bar_tvencedor` apareceram.
 
 ```text
 ✅ o laço inteiro        menu → campanha → batalha → volta → mapa pintado
@@ -178,27 +205,54 @@ assim que a paridade do Q2, o título perdido e o `bar_tvencedor` apareceram.
 ✅ cores pelo slot       tint, quadradinhos e registro concordam
 ✅ tropa e caixa inicial  A_IA_Q2 tem chinook no slot 0 e 10000 para cada lado
 ✅ save/load de campanha  volta ao quadrante em foco
+✅ perfil Médio           Q1 até a rodada 3, pelo menu (save do slot 2)
 ```
 
-### Dois cliques separam a IA de obedecer o perfil
+### A IA obedece o perfil, mas só nos toggles
 
-Está tudo escrito e compilando, e **nada disso foi jogado**:
+O catálogo está ligado na Batalha, e **nenhum portão pergunta mais "sou o
+difícil?"**. Os três perfis foram montados a partir das frases do autor (v8.6.1,
+Frente 2): Fácil com ⅓ da renda e sem blitzkrieg, Médio com blitzkrieg, Difícil
+com spam de soldado e os números do lado hard.
 
-1. na janela **Tools ▸ AI ▸ Gerar Presets**, botão *"Criar/atualizar catálogo"* —
-   o catálogo atual foi gerado antes de a dificuldade cair de seis para três e
-   guarda o DIFÍCIL como `dificuldade: 4`, número que hoje não existe. Ele **não
-   casa**, e o difícil cai na overlay antiga **sem avisar**. O botão agora remove
-   entrada extinta e diz que removeu.
-2. arrastar o catálogo para o campo **Preset Catalog** do `AIController` na cena
-   Batalha.
+O que falta, em ordem:
 
-Depois disso, ligar `handoffEmProfundidade` no `AIPreset_Medio` é o primeiro
-comportamento que passa a ser do autor e não do `hardMode`: *"a média também parte
-pra frente"*.
+1. **Decidir `poupaPraElite` × `eliteSaveTurns`.** O Difícil tem "poupa"
+   desligado e poupança de 2 turnos. A proposta é o toggle desligado zerar a
+   poupança.
+2. **Fase 2, os números.** Nenhum dos ~70 valores do perfil é lido:
+   - ~20 getters do `AIController`, cada um num ponto único (fácil);
+   - ~50 campos públicos do `AIShoppingPlanner`, que viram campo privado com
+     `FormerlySerializedAs`, mais getter.
 
-Os **valores** ainda não vêm do preset (`EliteRatio*`, `EliteSaveTurns`,
-`CoreMin*` seguem no `AIController`) — é a fase 2 da migração, e enquanto isso
-médio e difícil dividem a mesma tabela de números.
+   O mapa campo a campo está no gerador
+   ([AIPresetGeneratorWindow.cs:275](../Assets/Editor/AI/AIPresetGeneratorWindow.cs)).
+   Use ele, e não busca por nome.
+3. **"Perfil em uso" no Inspector**, e **resolver o perfil no Play direto**. Hoje,
+   abrir a Batalha no editor e dar Play roda **sem perfil** (os flags antigos da
+   cena). Só o menu e o load de save resolvem o perfil
+   ([AIController.Lifecycle.cs:167](../Assets/Scripts/Match/AI/AIController.Lifecycle.cs)).
+
+### Auditável: a direção que o autor escolheu
+
+Do guia de modding, o que se aplica ao jogo antes de ter mod nenhum, em ordem de
+custo:
+
+1. **Inspetor de save** (`Tools ▸ Save Inspector`). O `.tmrsave` é um zip com
+   `manifest.json`, `game.json`, `replay.json` e `jogadas.json`; hoje lê-lo
+   exige extrair à mão.
+2. **Valor efetivo com a origem** (perfil, cena ou reserva). Vira obrigatório
+   quando a fase 2 religar os números.
+3. **Resultado com motivo** no progresso (HQ, eliminação, zero unidades).
+
+### O teste da blitzkrieg reprova no código atual
+
+O [`teste_blitzkrieg.md`](AI%20Behavior/teste_blitzkrieg.md) do autor pede troca
+sem plano, mas a troca mora no planner. Os casos C, E e F falham em
+[Handoff.cs:97](../Assets/Scripts/Match/AI/2.%20Planner/AIController.PlanEvaluator.Handoff.cs):
+- substituto que não alcança o prédio é aceito;
+- o vizinho do prédio conta como chegar nele;
+- ninguém confere se o substituto já agiu.
 
 ### O eixo autorado precisa de uma ferramenta melhor
 
@@ -224,12 +278,16 @@ segunda partida, e nenhuma sessão chegou lá.
 
 Sintoma se falhar: a IA do segundo mapa persegue setor que não existe ali.
 
-### O progresso tem um registro de mentira dentro
+### O progresso só existe dentro de um save
 
-O `RODADAS: 3` do Terra Firme veio da **armadilha do turno 2** — a partida que
-acabou por zero unidades, não por jogo. Agora que o Q2 tem caixa inicial e tropa,
-**limpar o progresso antes de testar para valer**, senão as anotações misturam
-resultado real com resultado do setup.
+O `CampaignProgressStore` vive em memória, é zerado a cada Play e a cada Novo
+Jogo, e só vai para o disco dentro do `.tmrsave`. Não há o que "limpar". Para
+jogar os quatro quadrantes e manter o placar, é uma sessão só, ou salvar e
+carregar.
+
+Arquivo órfão de versão antiga, que o código não lê:
+`AppData/LocalLow/Sistemas Info/The Map Room/CampaignProgress/mundo fixture__A_IA.json`.
+Apagar só com o autor confirmando.
 
 ### Três lugares respondem "de quem é este quadrante"
 
@@ -262,12 +320,26 @@ conhecido: os dois primeiros delegam ao terceiro.
 ### Depois
 
 ```text
-1. testar o 0b — é o único bloqueio do MVP que nunca foi exercitado
-2. o fim da campanha: 4/4 oferece a volta à Tela de Entrada
-3. unificar as três contagens (gatilho: o portão de destrave)
-4. o portão hierárquico — Liberado() precisa de pai e irmãos, que o MundoData
+1. construções no Q3 e no Q4 — sem elas, metade da campanha não se joga
+2. testar o 0b — jogar dois quadrantes em sequência já é o teste
+3. o fim da campanha: 4/4 oferece a volta à Tela de Entrada
+4. unificar as três contagens (gatilho: o portão de destrave)
+5. o portão hierárquico — Liberado() precisa de pai e irmãos, que o MundoData
    não expõe
 ```
+
+Pequenos, conhecidos:
+- **"Oububro/2026"** no rótulo da Campanha e da Batalha. A Tela de Entrada diz
+  "Outubro".
+- **`Papeis.md` está em Windows-1252**; os acentos aparecem quebrados no git.
+
+Pós-MVP, com rascunho feito: o **Quero Spotting**
+([QueroSpottingWindow.cs](../Assets/Editor/QueroSpottingWindow.cs)) e o "quadro de
+missões". **Antes de retomar missões, ler o
+[`contrato_missoes.md`](AI%20Behavior/contrato_missoes.md)** (v7.2.1): ele já
+desenha `SpottingDeCobertura`, e a conversa da v8.6.1 redescobriu partes dele sem
+saber. O `IsForwardObserverSpot` vai cair, porque o autor não quer lugar
+autorado de spotting.
 
 ⚠️ **`MatchController.cs` carrega duas frentes.** `isPlayable` (paralela) e
 `TrySetStartMoney` (minha) entraram no mesmo arquivo no `aac0c48`. Reverter um sem
@@ -291,7 +363,8 @@ o outro é edição manual.
 O degrau 3 ganhou vizinho na v8.6.0: a **doutrina** saiu do `hardMode` e virou
 capacidade nomeada, lida de um perfil autorado. É o mesmo movimento do degrau —
 política deixando de ser `if` espalhado — só que na camada do general, não na do
-papel. Os *valores* ainda não fizeram essa viagem.
+papel. Na v8.6.1 a viagem das **capacidades** terminou; os *valores* ainda não
+saíram do lugar.
 
 ---
 
@@ -299,6 +372,12 @@ papel. Os *valores* ainda não fizeram essa viagem.
 
 | armadilha | regra |
 |---|---|
+| **configurado tomado como valendo** | o Inspector mostra o campo, não o que o jogo usa. O `Base Preset` dizia Difícil e era só a reserva de um catálogo que cobre tudo. Antes de concluir pelo que a tela mostra, pergunte **quem responde em runtime** |
+| **perfil copiado de um perfil de teste** | o Médio era o `AIPreset_Gulosa` renomeado, e o Fácil uma cópia dele: herdaram toggles de teste que contradiziam a doutrina escrita no próprio asset. Asset renomeado carrega o passado; confira contra a doutrina |
+| **gerador que copia só um lado do par** | o gerador de preset copia o lado **normal** dos pares normal/hard. Os três perfis tinham os mesmos ~70 números. Religar leitura de valor sem comparar antes enfraquece o Difícil calado |
+| **busca por nome tomada como ausência** | `intel.lookbackTurns` "sem leitor" se chama `IntelShoppingLookbackTurns` no shopping. Para mapear preset → cena, o gerador é o mapa; grep por nome não é |
+| **Play direto na Batalha** | sem menu e sem save, a dificuldade não chega e a IA roda **sem perfil**, com os flags antigos da cena. Teste de perfil se faz pelo menu |
+| **ferramenta que lê o fato em vez do observador** | a Retaguarda tira a "massa inimiga" da posição real das tropas. Para geografia o autor aceita; para decidir onde pedir olho é wallhack por procuração |
 | **forma que não casa com o dado** | contável desenhado como barra obriga o jogador a extrair contagem de proporção; contínuo desenhado como quadrado finge discreto o que é fracionário. Antes de escolher barra ou quadrado, pergunte se o dado é contável |
 | **busca por nome que falha calada** | `FindNamedChild("bar_vencedor")` com o objeto chamado `bar_tvencedor` não desenhou nada, sem erro nem log. Busca por nome dispensa arrastar referência, e o preço é falhar em silêncio — **toda busca por nome tem de avisar quando não acha** |
 | **duas coisas amarradas no mesmo campo** | o `presentationTextOverride` decidia o título E se o placar aparecia. Quando a campanha precisou dos dois, alguém apagou o texto para o placar voltar, e o título se perdeu. Campo que decide duas coisas separa no dia em que elas divergirem |
@@ -351,6 +430,10 @@ papel. Os *valores* ainda não fizeram essa viagem.
 |---|---|
 | [`Planos/plano_campanha.md`](Planos/plano_campanha.md) | **o tronco** — autoria, recorte, progresso, cenas, bloqueios, teste |
 | [`Planos/briefing_cena_campanha.md`](Planos/briefing_cena_campanha.md) | o contrato entre as duas frentes |
+| [`relatorio_v8.6.1.md`](relatorio_v8.6.1.md) | configurado ≠ valendo — perfis, portões, auditável |
+| [`modding/guia de modding.md`](modding/guia%20de%20modding.md) | o guia do autor; a direção "auditável" sai dele |
+| [`AI Behavior/capturador_politicas.md`](AI%20Behavior/capturador_politicas.md) | as quatro políticas do capturador, e o [teste da blitzkrieg](AI%20Behavior/teste_blitzkrieg.md) |
+| [`AI Behavior/contrato_missoes.md`](AI%20Behavior/contrato_missoes.md) | missões (brainstorming da v7.2.1) — ler antes de retomar o quadro de missões |
 | [`relatorio_v8.5.2.md`](relatorio_v8.5.2.md) | a forma tem que casar com o dado — quadradinhos, paridade, fim de partida |
 | [`relatorio_v8.5.1.md`](relatorio_v8.5.1.md) | o que atravessa a cena — save por endereço, isPlayable, o 0b |
 | [`relatorio_v8.5.0.md`](relatorio_v8.5.0.md) | o laço fecha, e o dono deixa de ser uma cor |
