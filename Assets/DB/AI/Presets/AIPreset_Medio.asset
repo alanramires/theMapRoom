@@ -21,6 +21,7 @@ MonoBehaviour:
     limitarLogistica: 0
     dobrarSlotsCapturadorPorSetor: 0
     handoffEmProfundidade: 1
+    fusaoEmReparo: 1
     conscricaoSempre: 0
     conscricaoQuandoPerdendo: 0
     poupaPraElite: 1
