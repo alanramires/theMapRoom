@@ -379,7 +379,13 @@ public class BattleMapMenuRootController : MonoBehaviour
     private int restoredFromStateStackFrame = -1;
     private static int suppressMenuOpenFrame = -1;
 
+    private const float PendingOpenGiveUpSeconds = 3f;
+    private float pendingOpenRequestedAt;
+
     public bool IsMenuOpen => menuOpen;
+
+    /// <summary>ESC na vez da IA pediu o menu; ele abre no proximo Neutral seguro.</summary>
+    public bool IsOpenPending => pendingOpenOnNextNeutral;
 
     public bool TryToggleMenuFromShortcut()
     {
@@ -523,6 +529,24 @@ public class BattleMapMenuRootController : MonoBehaviour
                     return true;
                 }
 
+                // Rede de seguranca: a IA ja parou num ponto seguro e o Neutral nao veio.
+                // Esperar mais so congela a partida; desiste do pedido, e a pausa (derivada
+                // do pedido em AIController.PlayerPauseHolds) solta sozinha.
+                // O relogio so corre com a IA de fato parada: batch longo (animacao, combate)
+                // e espera legitima e reinicia a contagem.
+                bool aiBatchRunning =
+                    (replayManager != null && replayManager.IsStepExecutionBusy) ||
+                    (turnStateManager != null && turnStateManager.IsScannerActionExecutionInProgress);
+                if (aiBatchRunning)
+                    pendingOpenRequestedAt = Time.realtimeSinceStartup;
+                else if (Time.realtimeSinceStartup - pendingOpenRequestedAt > PendingOpenGiveUpSeconds)
+                {
+                    pendingOpenOnNextNeutral = false;
+                    PanelDialogController.TrySetTransientText("Menu indisponivel neste momento. A IA segue o turno.", 2.4f);
+                    cursorController?.PlayErrorSfx();
+                    return true;
+                }
+
                 // Mantem o pedido pendente ate o proximo estado neutro.
                 UiInputBlocker.SuppressGameplayInputForFrames(1);
                 return true;
@@ -561,6 +585,7 @@ public class BattleMapMenuRootController : MonoBehaviour
                     return false;
 
                 pendingOpenOnNextNeutral = true;
+                pendingOpenRequestedAt = Time.realtimeSinceStartup;
                 // Pausa a IA imediatamente (ponto seguro, igual ao F10): ela termina o batch atual e
                 // para antes do proximo. Sem isso a IA continuaria iniciando batches e o menu so abriria
                 // numa janela curta entre eles. O resume acontece ao fechar o menu (TryExitPlayerMenuStateToNeutral).

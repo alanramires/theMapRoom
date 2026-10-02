@@ -193,7 +193,11 @@ public class PanelDialogController : MonoBehaviour
             externalPreviewColor = Color.white;
         }
 
-        if (matchController != null && matchController.ShouldHideActiveAiActionPresentation())
+        // Menu/Salvar/Carregar no turno da IA sao do jogador (IA pausada):
+        // o retorno deles ("salvo", erro de slot) tem de aparecer.
+        bool playerMenuScope = turnStateManager != null && turnStateManager.IsInPlayerMenuScope;
+        if (!playerMenuScope &&
+            matchController != null && matchController.ShouldHideActiveAiActionPresentation())
         {
             HideAll(force);
             return;

@@ -81,17 +81,19 @@ public partial class AIController
             if (ShouldStopAIForMatchEnd("phase3_apos_batch"))
                 yield break;
 
-            yield return WaitIfDebugPaused();
-            if (ShouldStopAIForMatchEnd("phase3_apos_pause_batch"))
-                yield break;
-
-            // Segurança: fecha o menu de shopping se ficou aberto (compra falhou)
+            // Segurança: fecha o menu de shopping se ficou aberto (compra falhou).
+            // ANTES da pausa: o menu do jogador so abre em Neutral, e uma pausa com o
+            // shopping da IA aberto segurava a IA esperando um menu que nunca abria.
             if (turnStateManager != null &&
                 turnStateManager.CurrentCursorState == TurnStateManager.CursorState.ShoppingAndServices)
             {
                 Debug.LogWarning($"{TL("Shopping")} Menu ficou aberto — fechando.");
                 turnStateManager.HandleCancel();
             }
+
+            yield return WaitIfDebugPaused();
+            if (ShouldStopAIForMatchEnd("phase3_apos_pause_batch"))
+                yield break;
 
             float delay = GetBatchDelay();
             if (delay > 0f) yield return new WaitForSecondsRealtime(delay);

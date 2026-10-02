@@ -1471,6 +1471,16 @@ public partial class TurnStateManager
         Retreat();
     }
 
+    /// <summary>
+    /// O jogador esta dentro do proprio menu: o menu, ou Salvar/Carregar abertos
+    /// por ele. No turno da IA isso e do JOGADOR (a IA fica pausada), entao nao e
+    /// apresentacao de acao da IA e tem de aparecer. Fonte unica dessa lista.
+    /// </summary>
+    public bool IsInPlayerMenuScope =>
+        CurrentCursorState == CursorState.PlayerMenu ||
+        CurrentCursorState == CursorState.Saving ||
+        CurrentCursorState == CursorState.Loading;
+
     public bool TryEnterPlayerMenuState()
     {
         if (CurrentCursorState != CursorState.Neutral)

@@ -467,8 +467,13 @@ public class PanelHelperController : MonoBehaviour
     // No turno normal da IA o helper acompanha a politica de apresentacao oculta.
     // F10, porem, entrega a tela ao desenvolvedor para inspecao: assim como o
     // menuRoot volta a responder, o panel_helper deve voltar a renderizar o estado.
+    // Menu, Salvar e Carregar sao do JOGADOR, com a IA pausada: nao sao
+    // apresentacao de acao da IA (ex.: "SAIR DA PARTIDA" e desenhado aqui).
     private bool ShouldHideForActiveAI()
     {
+        if (turnStateManager != null && turnStateManager.IsInPlayerMenuScope)
+            return false;
+
         return matchController != null
             && matchController.ShouldHideActiveAiActionPresentation()
             && !AIController.IsDebugPaused;

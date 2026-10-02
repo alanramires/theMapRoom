@@ -35,6 +35,37 @@ public partial class AIController
     /// da IA. Limpo — sem AI STEP/RESUME nem texto externo (isso é do pause de DEV/F10). Retomado
     /// automaticamente quando o menu fecha. Não cancela o batch em andamento (espera ponto seguro).
     /// </summary>
+    [System.NonSerialized] private BattleMapMenuRootController playerMenuForPause;
+
+    /// <summary>
+    /// A pausa de jogador e DERIVADA do menu, nao uma flag que alguem tem de lembrar
+    /// de desligar. Ela segura a IA enquanto o jogador SEGURA o menu: aberto,
+    /// pedido (abre no proximo Neutral), ou nas telas de Salvar/Carregar que saem
+    /// dele. Saiu por qualquer caminho, solta sozinha.
+    ///
+    /// Antes so soltava se o fechamento passasse por TryExitPlayerMenuStateToNeutral
+    /// com o cursor exatamente em PlayerMenu. Outro caminho (submenu de Opcoes,
+    /// Salvar/Carregar, menu que nem chegou a abrir) deixava a IA parada para sempre.
+    /// </summary>
+    private bool PlayerPauseHolds()
+    {
+        if (!isPlayerPaused)
+            return false;
+
+        if (playerMenuForPause == null)
+            playerMenuForPause = FindAnyObjectByType<BattleMapMenuRootController>(FindObjectsInactive.Include);
+        bool menuHolds = playerMenuForPause != null &&
+                         (playerMenuForPause.IsMenuOpen || playerMenuForPause.IsOpenPending);
+
+        bool stateHolds = turnStateManager != null && turnStateManager.IsInPlayerMenuScope;
+
+        if (menuHolds || stateHolds)
+            return true;
+
+        SetPlayerPaused(false);
+        return false;
+    }
+
     public void SetPlayerPaused(bool paused)
     {
         if (isPlayerPaused == paused)
@@ -225,7 +256,7 @@ public partial class AIController
         // Pause de jogador é hold ABSOLUTO (sem AI STEP): só retoma quando o menu fecha. Pause de
         // debug mantém a semântica de STEP. Resume = NÃO player-paused E (NÃO debug-paused OU step).
         yield return new WaitUntil(() =>
-            !isPlayerPaused && (!isDebugPaused || debugStepRequest != DebugStepRequest.None));
+            !PlayerPauseHolds() && (!isDebugPaused || debugStepRequest != DebugStepRequest.None));
         if (ShouldStopAIForMatchEnd("debug_pause_end"))
             yield break;
         if (showAILogs && !isDebugPaused && !isPlayerPaused)
@@ -281,9 +312,9 @@ public partial class AIController
             yield break;
 
         // Pause de jogador: não inicia um batch enquanto o menu in-game do jogador estiver aberto.
-        if (isPlayerPaused)
+        if (PlayerPauseHolds())
         {
-            yield return new WaitUntil(() => !isPlayerPaused);
+            yield return new WaitUntil(() => !PlayerPauseHolds());
             if (ShouldStopAIForMatchEnd("batch_player_pause"))
                 yield break;
         }

@@ -1118,10 +1118,7 @@ public class SaveGameManager : MonoBehaviour
     private bool IsPersistenceBlockedByActiveAI(bool showFeedback = false)
     {
         TryAutoAssignReferences();
-        bool playerMenuScoped = turnStateManager != null &&
-            (turnStateManager.CurrentCursorState == TurnStateManager.CursorState.PlayerMenu ||
-             turnStateManager.CurrentCursorState == TurnStateManager.CursorState.Saving ||
-             turnStateManager.CurrentCursorState == TurnStateManager.CursorState.Loading);
+        bool playerMenuScoped = turnStateManager != null && turnStateManager.IsInPlayerMenuScope;
         if (playerMenuScoped)
             return false;
 
