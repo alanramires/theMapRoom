@@ -212,8 +212,6 @@ unidades próximas pra voltar, também muda as condições do reparo."*
 **Nada foi visto em Play.** As cinco frentes compilaram; nenhuma rodou. Antes
 de confiar em qualquer uma, jogar.
 
-- **Os perfis do Médio e do Difícil** precisam ter `fusaoEmReparo` salvo em
-  disco (ver o fim desta seção).
 - **O observador cobre só o Capturador**, e só duas políticas (pedido de
   spotting, cessão do prédio pela regra de hoje). Blitz, Swap, Vacate,
   montanha, Defensiva e Rally aparecem como "não ligadas".
@@ -234,8 +232,16 @@ de confiar em qualquer uma, jogar.
 - **O `MelhorCombateService` existe e nenhuma IA o chama** — o contrato o
   marcava como inexistente; corrigido.
 
-**O estado dos perfis em disco, no fechamento:** os quatro
-`Assets/DB/AI/Presets/AIPreset_*.asset` não tinham o campo `fusaoEmReparo`. O
-autor configurou no Inspector, mas a Unity só grava ao salvar o projeto. Se o
-commit de churn desta versão não trouxer os perfis, o Médio e o Difícil rodam
-como **Todos** — a regra antiga.
+### Os perfis quase saíram sem a configuração
+
+No fechamento, os quatro `Assets/DB/AI/Presets/AIPreset_*.asset` **não tinham o
+campo** `fusaoEmReparo` em disco. O autor tinha configurado no Inspector, e o
+Inspector marca o asset sem gravar. A árvore estava limpa — nenhum sinal de que
+faltava algo. Se a versão fosse tagueada ali, o Médio e o Difícil rodariam como
+**Todos**, a regra antiga, sem erro nenhum.
+
+Só apareceu porque o fechamento foi conferir o campo nos `.asset`. Depois do
+*File ▸ Save Project*: Médio `1` (só capturador), Difícil `2` (desligado), e o
+Fácil sem o campo, de propósito (`0` = todos). É a armadilha *"`.asset` em disco
+tomado como estado atual"* pelo outro lado: **árvore limpa não prova que o
+Inspector foi salvo**.
