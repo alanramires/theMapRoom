@@ -477,6 +477,42 @@ public partial class AIController
         return role == UnitRole.Capturador || role == UnitRole.Assalto;
     }
 
+    // O ferido está à FRENTE da linha de combatentes sãos? Mesma régua da ferramenta
+    // Tools ▸ Utils ▸ Retaguarda (AIBacklineAnalyzer), alimentada só com o que o slot
+    // detecta (snapshot.EnemyUnits). A linha exclui os feridos por construção, então um
+    // ferido na ponta, com tanques sãos atrás, é vanguarda. Sem inimigo conhecido, sem
+    // HQ inimigo ou sem linha de combatentes, não há frente: responde false e a ordem
+    // antiga vale.
+    private bool IsWoundedInVanguard(UnitManager unit, AIWorldSnapshot snapshot)
+    {
+        if (unit == null || snapshot == null || unit.IsEmbarked)
+            return false;
+
+        bool hasKnownEnemy = false;
+        if (snapshot.EnemyUnits != null)
+        {
+            foreach (UnitManager enemy in snapshot.EnemyUnits)
+            {
+                if (enemy == null || enemy.IsDead || enemy.IsEmbarked)
+                    continue;
+                hasKnownEnemy = true;
+                break;
+            }
+        }
+        if (!hasKnownEnemy && snapshot.EnemyHQ == null)
+            return false;
+
+        Vector3Int cell = unit.CurrentCellPosition;
+        cell.z = 0;
+        Vector3Int anchor = snapshot.EnemyHQ != null
+            ? snapshot.EnemyHQ.CurrentCellPosition
+            : cell;
+        anchor.z = 0;
+
+        return TryScoreBacklineCell(unit, snapshot, cell, anchor, out AIBacklineScore score)
+            && score.IsVanguard;
+    }
+
     // A célula está na RETAGUARDA SEGURA (atrás da linha de combate, não na vanguarda / raio do HQ
     // inimigo)? Usa a ferramenta de retaguarda com o HQ inimigo como referência de "frente". Sem
     // linha de combatentes ou sem HQ inimigo conhecido, não restringe (retorna true) — o chamador

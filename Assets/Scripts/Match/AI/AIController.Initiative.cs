@@ -261,7 +261,13 @@ public partial class AIController
         // coluna pathear pelo hex dela. "Ferida" é o estado IsUnderRepair (definido pelo repair
         // decision no unit data) — não fração de HP. Aqui só antecipamos a ORDEM da ação dela;
         // recuar/curar/seguir continua sendo decidido pelo handler dela.
-        if (unit.IsUnderRepair) return _sortIsInvading ? 1 : 5;
+        //
+        // E fora da invasao, o ferido na VANGUARDA tambem. Visto em partida: a IA manda a
+        // linha de soldados, o jogador atira nos da frente, e no turno seguinte os feridos
+        // continuam la — agiam por ultimo — enquanto os tanques de tras jogavam antes, com
+        // as celulas de ataque ocupadas pelos proprios feridos. Sair primeiro abre a linha.
+        if (unit.IsUnderRepair)
+            return _sortIsInvading || IsWoundedInVanguard(unit, _sortSnapshot) ? 1 : 5;
 
         // Vigilancia (EWACS, radar movel, Super Tucano, fragata e submarino)
         // age cedo para iluminar alvos na camada especializada da ficha

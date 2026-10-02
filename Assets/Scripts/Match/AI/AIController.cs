@@ -302,6 +302,8 @@ public partial class AIController : MonoBehaviour
     private TeamObjectivePlan _sortActivePlan;
     // Contexto de invasão para a ordenação de iniciativa: durante a invasão, feridas saem na frente.
     private bool _sortIsInvading;
+    // Snapshot da ordenação: o ferido na VANGUARDA também sai na frente (ver GetInitiativeGroup).
+    private AIWorldSnapshot _sortSnapshot;
 
     private sealed class InitiativeSortFacts
     {

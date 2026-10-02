@@ -79,9 +79,11 @@ public partial class AIController
         double pickupFactsDone = Time.realtimeSinceStartupAsDouble;
 
         _sortIsInvading = snapshot.IsInvading;
+        _sortSnapshot = snapshot;
         _groupCache.Clear();
         foreach (UnitManager u in units)
             _groupCache[u.InstanceId] = GetInitiativeGroup(u, activePlan, aiTeam);
+        _sortSnapshot = null;
         double groupsDone = Time.realtimeSinceStartupAsDouble;
 
         _sortAiTeam = aiTeam;

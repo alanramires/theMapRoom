@@ -435,7 +435,7 @@ frentes que tocam o capturador.
 | # | o que falta | onde | tamanho |
 |---|---|---|---|
 | **C4** | agressivo **larga a captura para lutar** — hoje a captura oportunista é avaliada antes do ramo agressivo (§3) | `Capturer.cs:241-244` | M |
-| **C6** | ferido na vanguarda **ganha iniciativa** para recuar e liberar espaço; hoje reparo age por último, grupo 5 (§5) | `Initiative.cs` | M |
+| **C6** | ferido na vanguarda **ganha iniciativa** para recuar e liberar espaço; hoje reparo age por último, grupo 5 (§5) — **escrito em 2026-10-02, só compilou**: ferido em reparo à frente da linha de combatentes sãos vai para o grupo 1, pela régua da ferramenta Retaguarda (`IsWoundedInVanguard`, `AIController.Backline.cs`) | `Initiative.cs` | M |
 | **C7** | zona de largada = **banda da unidade**, não hex fixo (§7) | `MelhorDesembarque`, `Courier`, `Assigned` | M |
 | **C8** | destino de unidade **sem plano**: gate por facção, efeito praia, embarcado (§11) | `Courier.Passengers`, `Courier.Invasion` ×2, `Naval`, `QueroCarona` | M |
 | **C9** | transporte **não pousa em capturável**; se for inevitável, sobe na iniciativa para sair | LZ + `Initiative.cs` | M |
