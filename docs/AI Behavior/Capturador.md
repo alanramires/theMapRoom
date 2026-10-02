@@ -179,6 +179,16 @@ O passo 3 pergunta *"há alvo no meu Tático?"* — que é **fato**, respondido 
 casas. O gate fica auto-contido e o questionário continua **primeira não-nula
 ganha**.
 
+> **⚠️ SUPERADO em 2026-10-02** pelo
+> [`contrato_questionario.md`](contrato_questionario.md). Duas mudanças:
+>
+> - O questionário deixa de ser *primeira não-nula ganha*: a primeira casa de
+>   ação com SIM é só a decisão **preliminar**, e as políticas a revisam (§5).
+> - O `Capturador Combatente` não declina por alvo no Tático. Ele é **rótulo de
+>   consulta que classifica para baixo**: entre os que chegam ao prédio, o
+>   Capturador puro tem preferência, e o combatente cedido segue o questionário
+>   (§6.8). O passo 3 acima cai.
+
 ---
 
 ## 4. Combate

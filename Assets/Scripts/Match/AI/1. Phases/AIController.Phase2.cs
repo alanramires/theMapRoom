@@ -223,6 +223,10 @@ public partial class AIController
                     unit, aiTeam, heldCell, heldCell);
             }
 
+            // Degrau 1 do questionario: so anota, ao lado do que o codigo decidiu,
+            // sobre o mesmo estado que a decisao viu. Fica fora da medicao de tempo.
+            ObservarQuestionario(unit, current, action, secondPass);
+
             if (!secondPass
                 && ShouldDeferCapturerForAirTransportVacate(unit, action, activePlan, aiTeam,
                     out UnitManager airTransporter))

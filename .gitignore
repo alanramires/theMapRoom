@@ -56,3 +56,7 @@ output/
 # Gerados pelo pacote Performance Testing durante o build
 /Assets/Resources/PerformanceTestRun*.json
 /Assets/Resources/PerformanceTestRun*.json.meta
+
+# Saida do observador do questionario da IA (degrau 1). Reescrito a cada Play,
+# so no Editor. Diagnostico da maquina, nao dado do projeto.
+/questionario_observador.log

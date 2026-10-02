@@ -225,6 +225,12 @@ Nenhuma referência a `PodeFundirSensor` em 5.823 linhas. Não é "não se aplic
 infantaria fundir para se curar é mecânica central. É **ninguém decidiu ainda**,
 que é exatamente o que a matriz quer tornar visível.
 
+> **⚠️ CORRIGIDO em 2026-10-02.** O levantamento contou só os arquivos do
+> Capturador. A IA **funde**, sim: no passo 2 do reparo
+> (`AIController.Repair.cs`, linhas 508–641), para quem tem `fuseWhileInRepair`
+> na ficha. O branco real é a fusão **fora** do reparo, a de trabalho. Ver o
+> §6.4 do [`contrato_questionario.md`](AI%20Behavior/contrato_questionario.md).
+
 **5. Quatro colunas são "(não se aplica)" legítimas.**
 `Suprir` e `Transferir` (o capturador não tem capacidade logística), `Pousar`
 (não é aeronave) e `Desembarcar` — esta última por doutrina: *desembarque é

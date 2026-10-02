@@ -416,6 +416,13 @@ peça de volta sem código novo.
 divergir das fichas por papel, **este vale** — as divergências estão marcadas em
 `⚠️ DELTA` e as fichas precisam ser corrigidas.
 
+> **⚠️ SUPERADO em 2026-10-02 nas ORDENS.** O desenho do autor que originou o
+> [`contrato_questionario.md`](contrato_questionario.md) (§7) é agora a ordem
+> canônica dos seis papéis, e diverge deste quadro em cinco colunas (Capturador,
+> Pickup, Courier, Vigilância, Logística). A tabela de diferenças está no §7.4 do
+> contrato. Lema, posicionamento e moeda daqui continuam valendo, **exceto a
+> fusão da Logística** (ver a tabela das moedas, no fim).
+
 ---
 
 ## Capturador — *"converter $ pro exército"*
@@ -583,12 +590,18 @@ E as **seis moedas**, que respondem sozinhas se uma peça funde:
 | Assalto | a **arma** — cada casco é ameaça | perde |
 | Fogo de Suporte | a **formação** — cones cobrindo pontos cegos | perde, e **agrupar também** |
 | Vigilância | a **origem do cone** — *"cada casco é nova origem"* | perde — fundir **apaga uma origem** |
-| **Logística** | o **estoque** | **ganha** — a média ponderada conserva tudo |
+| **Logística** | o **estoque** | ~~**ganha** — a média ponderada conserva tudo~~ **não funde** (2026-10-02) |
 
-**Só dois papéis fundem**, e por razões diferentes: no Capturador o HP **é** a
+~~**Só dois papéis fundem**, e por razões diferentes: no Capturador o HP **é** a
 taxa, então concentrar acelera; na Logística o estoque é **conservado** na fusão,
-então o casco novo dura mais sem perder nada. Os outros quatro perdem algo
+então o casco novo dura mais sem perder nada.~~ Os outros quatro perdem algo
 insubstituível — uma vaga, uma arma, um nó da malha, um pedaço de área.
+
+> **⚠️ CORRIGIDO em 2026-10-02.** O autor decidiu: **só o Capturador vale a pena
+> fundir**, porque nele o HP é a taxa de captura. Nos outros papéis a fusão
+> aumenta o dano e diminui a presença, e sob invasão abre lacuna na defesa. Ver
+> o §6.4 do [`contrato_questionario.md`](contrato_questionario.md), que também
+> separa a fusão de reparo (capacidade do perfil) da fusão de trabalho.
 
 ---
 

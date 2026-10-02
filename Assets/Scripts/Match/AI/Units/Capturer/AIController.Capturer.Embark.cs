@@ -451,6 +451,44 @@ public partial class AIController
         SectorObjective assigned)
     {
         QueroCaronaRequest request =
+            BuildCapturerRideRequestWithTarget(unit, assigned);
+
+        QueroCaronaResult result = QueroCaronaService.Evaluate(request);
+
+        ApplyRideWaitStamp(unit, result);
+
+        string target = result.evaluatedConstruction != null
+            ? $"{result.evaluatedConstruction.name}@{result.evaluatedTarget}"
+            : result.evaluatedTarget.ToString();
+        string routeCost = result.routeCost == int.MaxValue
+            ? "-"
+            : result.routeCost.ToString();
+        Debug.Log(
+            $"{TL("Capturador")} {unit.InstanceId} QueroCarona=" +
+            $"{(result.wantsRide ? "SIM" : "NAO")} " +
+            $"contexto={request.context} setor={request.plannedSector} " +
+            // De onde veio o alvo. "reserva" = leu a alocacao do matching;
+            // "servico" = nao havia alocacao e o QueroCarona resolveu sozinho.
+            // Se isto disser "servico" para um capturador que deveria ter alvo,
+            // o problema esta no matching, nao aqui.
+            $"origemAlvo={(request.useExplicitTarget ? "reserva" : "servico")} " +
+            $"emergencia={result.isEmergency} " +
+            $"envelope={result.reach} custo={routeCost} " +
+            $"alvo={target} motivo={result.reason}");
+        return result;
+    }
+
+    /// <summary>
+    /// O pedido de carona com o alvo ja resolvido, sem consultar nem carimbar
+    /// nada. Separado do EvaluateCapturerRideNeed porque o observador do
+    /// questionario precisa do MESMO pedido — o mesmo alvo e a mesma entrada de
+    /// cache — e o carimbo de espera e efeito colateral que ele nao pode fazer.
+    /// </summary>
+    private QueroCaronaRequest BuildCapturerRideRequestWithTarget(
+        UnitManager unit,
+        SectorObjective assigned)
+    {
+        QueroCaronaRequest request =
             BuildCapturerRideRequest(unit, assigned);
 
         // Com plano, o endereco veio do planner e ja esta no Mission Intent.
@@ -504,29 +542,7 @@ public partial class AIController
             }
         }
 
-        QueroCaronaResult result = QueroCaronaService.Evaluate(request);
-
-        ApplyRideWaitStamp(unit, result);
-
-        string target = result.evaluatedConstruction != null
-            ? $"{result.evaluatedConstruction.name}@{result.evaluatedTarget}"
-            : result.evaluatedTarget.ToString();
-        string routeCost = result.routeCost == int.MaxValue
-            ? "-"
-            : result.routeCost.ToString();
-        Debug.Log(
-            $"{TL("Capturador")} {unit.InstanceId} QueroCarona=" +
-            $"{(result.wantsRide ? "SIM" : "NAO")} " +
-            $"contexto={request.context} setor={request.plannedSector} " +
-            // De onde veio o alvo. "reserva" = leu a alocacao do matching;
-            // "servico" = nao havia alocacao e o QueroCarona resolveu sozinho.
-            // Se isto disser "servico" para um capturador que deveria ter alvo,
-            // o problema esta no matching, nao aqui.
-            $"origemAlvo={(request.useExplicitTarget ? "reserva" : "servico")} " +
-            $"emergencia={result.isEmergency} " +
-            $"envelope={result.reach} custo={routeCost} " +
-            $"alvo={target} motivo={result.reason}");
-        return result;
+        return request;
     }
 
     private bool ShouldRogueCapturerFightBeforeTransport(
