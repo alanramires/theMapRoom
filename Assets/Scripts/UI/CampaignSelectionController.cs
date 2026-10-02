@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
 using UnityEngine.Tilemaps;
 #if ENABLE_INPUT_SYSTEM
@@ -216,6 +217,13 @@ public class CampaignSelectionController : MonoBehaviour
             UiInputBlocker.SuppressGameplayInputForFrames(1);
             if (WasCancelPressedThisFrame() || RemoteInput.RightClickCancelDownThisFrame())
                 SetCampaignMenuOpen(false);
+            // No celular nao ha ESC: toque fora do painel fecha, como o clique fora
+            // no menu da batalha.
+            else if (TryGetMapTapThisFrame(out Vector2 outsideTap) && IsTapOutsideCampaignMenu(outsideTap))
+            {
+                SetCampaignMenuOpen(false);
+                cursorController?.PlayCancelSfx();
+            }
             return;
         }
 
@@ -224,6 +232,12 @@ public class CampaignSelectionController : MonoBehaviour
             SetCampaignMenuOpen(true);
             return;
         }
+
+        // Toque/clique no mapa: o primeiro seleciona, o segundo no mesmo quadrante
+        // confirma (o mesmo par de toques do cursor da batalha). Antes o quadrante
+        // so andava por setas, e no celular nao havia como escolher nada.
+        if (TryGetMapTapThisFrame(out Vector2 tapScreen) && HandleMapTap(tapScreen))
+            return;
 
         if (WasQuadrantDirectionPressedThisFrame(out Vector2 direction))
         {
@@ -1334,6 +1348,177 @@ public class CampaignSelectionController : MonoBehaviour
         cursorController.transform.position = worldTilemap.GetCellCenterWorld(centerCell);
         if (adjustCamera)
             cursorController.TryAdjustCameraToCursor();
+    }
+
+    // --- Toque e clique no mapa ------------------------------------------------
+    // Mesma regra do CursorController (WasPrimaryTouchTapReleasedThisFrame): no
+    // toque, vale o RELEASE sem arrasto e com um dedo so; um press imediato
+    // confundiria toque com arrasto.
+    private const float MapTapMaxTravelPixels = 24f;
+    // Navegador de celular gera um clique de mouse sintetico depois do toque. Sem
+    // esta janela, um toque so selecionava E confirmava o quadrante.
+    private const float MouseIgnoreAfterTouchSeconds = 0.6f;
+
+    private bool mapTouchTracking;
+    private bool mapTouchSuppressed;
+    private Vector2 mapTouchDownScreen;
+    private float lastTouchActivityTime = -10f;
+
+    private bool TryGetMapTapThisFrame(out Vector2 screen)
+    {
+        screen = default;
+#if ENABLE_INPUT_SYSTEM
+        Touchscreen touchscreen = Touchscreen.current;
+        if (touchscreen != null)
+        {
+            var primary = touchscreen.primaryTouch;
+            if (primary.press.isPressed || primary.press.wasReleasedThisFrame)
+                lastTouchActivityTime = Time.unscaledTime;
+
+            if (primary.press.wasPressedThisFrame)
+            {
+                mapTouchTracking = true;
+                mapTouchSuppressed = false;
+                mapTouchDownScreen = primary.position.ReadValue();
+            }
+
+            if (mapTouchTracking)
+            {
+                int active = 0;
+                var touches = touchscreen.touches;
+                for (int i = 0; i < touches.Count; i++)
+                    if (touches[i].press.isPressed)
+                        active++;
+                if (active >= 2)
+                    mapTouchSuppressed = true;
+
+                float dpiScale = Screen.dpi > 0f ? Mathf.Max(1f, Screen.dpi / 160f) : 1f;
+                if (Vector2.Distance(primary.position.ReadValue(), mapTouchDownScreen) >
+                    MapTapMaxTravelPixels * dpiScale)
+                    mapTouchSuppressed = true;
+            }
+
+            if (primary.press.wasReleasedThisFrame)
+            {
+                bool isTap = mapTouchTracking && !mapTouchSuppressed;
+                mapTouchTracking = false;
+                mapTouchSuppressed = false;
+                if (isTap)
+                {
+                    screen = mapTouchDownScreen;
+                    return true;
+                }
+            }
+        }
+
+        if (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame &&
+            Time.unscaledTime - lastTouchActivityTime > MouseIgnoreAfterTouchSeconds)
+        {
+            screen = Mouse.current.position.ReadValue();
+            return true;
+        }
+        return false;
+#else
+        if (Input.GetMouseButtonDown(0))
+        {
+            screen = Input.mousePosition;
+            return true;
+        }
+        return false;
+#endif
+    }
+
+    private bool HandleMapTap(Vector2 screen)
+    {
+        if (IsScreenPointOverUi(screen) || worldTilemap == null)
+            return false;
+
+        Camera cam = Camera.main;
+        if (cam == null)
+            return false;
+
+        Vector3 world = cam.ScreenToWorldPoint(new Vector3(screen.x, screen.y, -cam.transform.position.z));
+        Vector3Int cell = worldTilemap.WorldToCell(world);
+        cell.z = 0;
+
+        int index = FindQuadrantAtCell(cell);
+        if (index < 0)
+            return false;
+
+        if (index == selectedQuadrantIndex)
+        {
+            UiInputBlocker.SuppressGameplayInputForFrames(1);
+            OpenConfirmation();
+        }
+        else
+        {
+            SelectQuadrant(index, playMoveSfx: true, adjustCamera: false);
+        }
+        return true;
+    }
+
+    // Quadrantes vizinhos podem dividir a faixa da borda: vence o de centro mais
+    // proximo da celula tocada.
+    private int FindQuadrantAtCell(Vector3Int cell)
+    {
+        int best = -1;
+        float bestDistance = float.PositiveInfinity;
+        for (int i = 0; i < quadrants.Count; i++)
+        {
+            QuadranteData q = quadrants[i].Quadrante;
+            if (q == null)
+                continue;
+            if (cell.x < q.originX || cell.x >= q.originX + q.width ||
+                cell.y < q.originY || cell.y >= q.originY + q.height)
+                continue;
+
+            float distance = Vector2.Distance(GetQuadrantCenter(q), new Vector2(cell.x + 0.5f, cell.y + 0.5f));
+            if (distance < bestDistance)
+            {
+                bestDistance = distance;
+                best = i;
+            }
+        }
+        return best;
+    }
+
+    private static readonly List<RaycastResult> uiRaycastBuffer = new List<RaycastResult>();
+
+    // Fora = no mapa (nenhuma UI) ou no fundo do proprio menu. Um toque em outro
+    // botao NAO conta: o toque que abriu o menu solta em cima do botao de abrir, e
+    // fecharia o menu no mesmo gesto.
+    private bool IsTapOutsideCampaignMenu(Vector2 screen)
+    {
+        EventSystem eventSystem = EventSystem.current;
+        if (eventSystem == null || campaignMenuPanel == null)
+            return false;
+
+        uiRaycastBuffer.Clear();
+        eventSystem.RaycastAll(new PointerEventData(eventSystem) { position = screen }, uiRaycastBuffer);
+        if (uiRaycastBuffer.Count == 0)
+            return true;
+
+        Transform panel = campaignMenuPanel.transform;
+        for (int i = 0; i < uiRaycastBuffer.Count; i++)
+        {
+            GameObject hit = uiRaycastBuffer[i].gameObject;
+            if (hit != null && hit.transform.IsChildOf(panel))
+                return false;
+        }
+
+        GameObject top = uiRaycastBuffer[0].gameObject;
+        return campaignMenuRoot != null && top != null && top.transform.IsChildOf(campaignMenuRoot.transform);
+    }
+
+    private static bool IsScreenPointOverUi(Vector2 screen)
+    {
+        EventSystem eventSystem = EventSystem.current;
+        if (eventSystem == null)
+            return false;
+
+        uiRaycastBuffer.Clear();
+        eventSystem.RaycastAll(new PointerEventData(eventSystem) { position = screen }, uiRaycastBuffer);
+        return uiRaycastBuffer.Count > 0;
     }
 
     private static Vector2 GetQuadrantCenter(QuadranteData q)
