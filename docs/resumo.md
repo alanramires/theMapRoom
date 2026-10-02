@@ -1,15 +1,26 @@
 ﻿# Resumo — onde estamos e o que vem
 
-Ponto de retomada. Atualizado em 2026-10-02, **depois** da tag `v9.2.0`.
+Ponto de retomada. Atualizado em 2026-10-02, **depois** da tag `v9.2.1`.
 Leia isto primeiro.
 
 ---
 
 ## Estado
 
-`v9.2.0` tagueada e publicada. **O primeiro MVP estável está no ar**, no Unity
-Play, e já tem gente testando. Relatório: [`relatorio_v9.2.0.md`](relatorio_v9.2.0.md). A v8 fechou; os relatórios dela
+`v9.2.1` tagueada e publicada. **O primeiro MVP estável está no ar** (v9.2.0),
+no Unity Play, e já tem gente testando. Relatório do dia:
+[`relatorio_v9.2.1.md`](relatorio_v9.2.1.md). A v8 fechou; os relatórios dela
 estão em [`Versões/`](Versões/).
+
+**A descoberta da v9.2.1: a IA "decide e se manda".** O `DecideUnitAction` é uma
+cascata em que a primeira resposta não-nula ganha. O autor desenhou o
+substituto, e ele está em
+[`AI Behavior/contrato_questionario.md`](AI%20Behavior/contrato_questionario.md):
+todo papel responde as **mesmas nove casas**, numa ordem própria; a primeira
+ação com SIM é só a **preliminar**, e as políticas revisam. A **missão** é outra
+coluna do mesmo papel (Reparo, SOS, Guarnição...). O motor não pode conhecer
+papel, senão o n × n volta. O degrau 1 (o observador, que só anota) está em
+código; **nada do dia foi visto em Play**.
 
 ```text
 v8.5.0   o laço fecha                     volta, dono por slot, tropa inicial
@@ -20,6 +31,7 @@ v8.6.1   configurado ≠ valendo            perfis autorados, portões fechados
 v9.0.0   a mesma linha                    visão de regra única; Save Inspector
 v9.1.0   o save manda na partida          load aplica o save; menu no turno da IA
 v9.2.0   aguenta o celular de quem testa  toque, áudio/texturas web, sem LTO
+v9.2.1   a IA pergunta antes de decidir   contrato do questionário; reparo pela linha
 ```
 
 **A descoberta da v9.2.0:** o Simulator da Unity não reproduz o navegador do
@@ -187,6 +199,44 @@ Sem HQ, os dois lados do Q3 e do Q4 entram no modo rebelde (v8.6.1, Frente 4).
 ---
 
 ## Onde eu parei
+
+### O questionário — o tronco da IA agora
+
+O contrato é o mapa; leia antes de mexer em decisão de papel. Estado:
+
+```text
+degrau 1  observador do Capturador        ESCRITO, só compilou, nunca rodou
+          Assets/Scripts/Match/AI/Questionario/ → questionario_observador.log (raiz, só Editor)
+degrau 2  Capturador decide pelo questionário, atrás de toggle   NÃO COMEÇOU
+degrau 3  os outros cinco papéis                                 NÃO COMEÇOU
+```
+
+**Primeiro passo da retomada: jogar com o observador ligado** (Inspector do
+`AIController`, *Questionário (observador)*) e ler o log. Procurar `<< DIVERGE`
+(onde o código de hoje e o questionário discordam) e "prédio no tático, mas
+PRETO" (rodadas perdidas por névoa).
+
+O que foi decidido e espera código: o pedido de spotting (§6.3), Swap/Blitz/
+Vacate como políticas (§6.7), quem fica com o prédio — com plano → Capturador
+antes de Combatente → quem **fecha** primeiro (§6.8). Os quadros "Papéis em
+condições normais" e "Missões" são do autor; o Reparo está desenhado (§11.1), as
+outras seis missões têm só o nome.
+
+**Abertos que dependem do autor:** #12 (qual missão ganha quando duas disputam a
+peça) e #13 (o reparo ainda tira tanque e soldado de prédio ameaçado quando há
+aliado são por perto — pela regra do autor, sair é só do SOS).
+
+**Só compilou (v9.2.1)**, além do observador:
+
+```text
+fusão em reparo no perfil   Fácil todos · Médio só capturador · Difícil ninguém (perfis salvos)
+ferido na vanguarda         sai primeiro na iniciativa (IsWoundedInVanguard, régua da Retaguarda)
+reparo pela linha           não-elite recusa prédio à frente da linha, aceita atrás (sem voltar ao HQ)
+fogo de suporte em reparo   atira de volta parado no prédio, em vez de sair
+```
+
+Os três últimos usam a mesma linha de combatentes: um cenário testa os três.
+Mexer na iniciativa muda a ordem da Fase 2 inteira.
 
 ### O que o autor exercitou jogando
 
@@ -398,7 +448,8 @@ o outro é edição manual.
                                      a LINHA tem regra única desde a v9.0.0
  1. serviços de área (Hotzone)    ⚠️ falta cobertura de DETECÇÃO
  2. consumidores Melhor*          ⚠️ faltam Suprir, Fundir, Detecção e Spotting
- 3. papéis → somente POLÍTICA     ⚠️ as seis fichas existem; RoleData ainda não
+ 3. papéis → somente POLÍTICA     ⚠️ as seis fichas existem; o QUESTIONÁRIO tem contrato
+                                     e observador (v9.2.1); RoleData ainda não
  4. variações de papel            perfil/trait depois da extração
  5. CAMPANHA                      🟡 o laço roda de ponta a ponta e tem tela;
                                      falta EXERCITAR o 0b e o portão de destrave
@@ -419,6 +470,10 @@ parte de uma regra só, e a construção usa a mesma reta que a unidade.
 
 | armadilha | regra |
 |---|---|
+| **árvore limpa tomada como Inspector salvo** | no fechamento da v9.2.1 o `git status` estava limpo e os perfis do Médio e do Difícil **não tinham o campo** em disco: o Inspector marca e não grava. Antes de taguear configuração, conferir o campo no `.asset` (grep) e pedir *File ▸ Save Project* |
+| **afirmar a direção de um movimento lendo meia execução** | eu disse que na fusão o parceiro anda até o receptor; é o contrário — a **selecionada** anda até o parceiro e o consome (`TurnStateManager.Merge.cs`, 592–669). Li a linha que nomeia o receptor, não a que move. Ler a execução até o `SetCurrentCellPosition` |
+| **"o papel X não faz Y" contado só nos arquivos do papel** | a revisão de papéis afirmou que a IA nunca funde; a fusão morava no **reparo**. Comportamento de papel pode estar num handler transversal (Repair, Logistics, Router) |
+| **frente que mistura arquivo no commit** | `git add -p` não roda aqui (interativo). Monta-se o índice do arquivo como HEAD + só os blocos da frente (`git hash-object -w --path` + `update-index --cacheinfo`). Foi assim que a v9.2.1 saiu em cinco commits |
 | **"funciona no Simulator"** | o Simulator renderiza pelo Editor: não mede memória nem o navegador. Teste real = build servido na LAN (`npx http-server -a 0.0.0.0 -p 8000`) com o celular na **claro5** (subrede 192.168.1.x do PC) + `chrome://inspect` |
 | **medir memória por dentro da aba** | `Runtime.queryObjects` varre o heap e DERRUBOU a aba. Use `adb shell dumpsys meminfo` e leia o **PSS**, não o RSS |
 | **LTO na Web** | "Runtime Speed with LTO" travou o Carregar Jogo (`RuntimeError: unreachable`); sem LTO funciona. Para testar LTO de novo, gerar com Debug Symbols Embedded |
@@ -492,6 +547,8 @@ parte de uma regra só, e a construção usa a mesma reta que a unidade.
 |---|---|
 | [`Planos/plano_campanha.md`](Planos/plano_campanha.md) | **o tronco** — autoria, recorte, progresso, cenas, bloqueios, teste |
 | [`Planos/briefing_cena_campanha.md`](Planos/briefing_cena_campanha.md) | o contrato entre as duas frentes |
+| [`AI Behavior/contrato_questionario.md`](AI%20Behavior/contrato_questionario.md) | **o questionário** — casas, duas etapas, o Capturador, as ordens, as missões, os abertos |
+| [`relatorio_v9.2.1.md`](relatorio_v9.2.1.md) | a IA pergunta antes de decidir — questionário, fusão no perfil, reparo pela linha |
 | [`relatorio_v9.2.0.md`](relatorio_v9.2.0.md) | aguenta o celular — memória medida, áudio/texturas web, LTO, toque |
 | [`relatorio_v9.1.0.md`](relatorio_v9.1.0.md) | o save manda na partida — load, estado fora da cena, menu no turno da IA |
 | [`relatorio_v9.0.0.md`](relatorio_v9.0.0.md) | a mesma linha — visão de regra única, construção com altura, auditável |
