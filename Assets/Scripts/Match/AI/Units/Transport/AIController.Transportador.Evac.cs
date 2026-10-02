@@ -26,7 +26,8 @@ public partial class AIController
         if (evacuee == null) return null;
 
         Vector3Int evacueeCell = evacuee.CurrentCellPosition; evacueeCell.z = 0;
-        ConstructionManager repairDest = FindRepairConstruction(evacuee, evacueeCell, snapshot.AITeam, BuildOccupied(evacuee));
+        ConstructionManager repairDest = FindRepairConstruction(
+            evacuee, evacueeCell, snapshot.AITeam, BuildOccupied(evacuee), lineSnapshot: snapshot);
         Vector3Int objective = repairDest != null ? repairDest.CurrentCellPosition : FindTransportWaitTarget(snapshot.AITeam, evacueeCell);
         objective.z = 0;
         HashSet<Vector3Int> passengerReachable = BuildPassengerReachableSet(evacuee);
@@ -128,7 +129,8 @@ public partial class AIController
         HashSet<Vector3Int> occupied)
     {
         // Reuse the same destination logic as the repair system
-        ConstructionManager repairDest = FindRepairConstruction(evacuee, fromCell, snapshot.AITeam, new HashSet<Vector3Int>(occupied));
+        ConstructionManager repairDest = FindRepairConstruction(
+            evacuee, fromCell, snapshot.AITeam, new HashSet<Vector3Int>(occupied), lineSnapshot: snapshot);
         Vector3Int target = repairDest != null ? repairDest.CurrentCellPosition : fromCell;
         target.z = 0;
 

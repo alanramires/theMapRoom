@@ -477,6 +477,90 @@ public partial class AIController
         return role == UnitRole.Capturador || role == UnitRole.Assalto;
     }
 
+    // Onde uma célula fica em relação à linha de combatentes sãos. "Atrás" é profundidade,
+    // não a fatia lateral da retaguarda: um prédio no meio do mapa atrás da linha conta,
+    // mesmo fora do cone que a ferramenta pinta.
+    private enum PosicaoNaLinha
+    {
+        SemLinha,
+        Vanguarda,
+        NaLinha,
+        AtrasDaLinha,
+    }
+
+    private sealed class LinhaDeCombate
+    {
+        public List<Vector3Int> Combatentes;
+        public List<Vector3Int> Inimigos;
+        public Vector3Int Ancora;
+        public AIBacklineSettings Settings;
+        public AIBacklineResult Geometria;
+    }
+
+    // Monta a linha UMA vez para classificar várias células (a busca de reparo varre
+    // todos os prédios). Mesmo contexto e mesma âncora do IsWoundedInVanguard.
+    private bool TryMontarLinhaDeCombate(
+        UnitManager unit,
+        AIWorldSnapshot snapshot,
+        out LinhaDeCombate linha)
+    {
+        linha = null;
+        if (unit == null || snapshot == null)
+            return false;
+
+        bool hasKnownEnemy = false;
+        if (snapshot.EnemyUnits != null)
+        {
+            foreach (UnitManager enemy in snapshot.EnemyUnits)
+            {
+                if (enemy == null || enemy.IsDead || enemy.IsEmbarked)
+                    continue;
+                hasKnownEnemy = true;
+                break;
+            }
+        }
+        if (!hasKnownEnemy && snapshot.EnemyHQ == null)
+            return false;
+
+        if (!TryBuildBacklineContext(unit, snapshot, out List<Vector3Int> combatants, out List<Vector3Int> enemies))
+            return false;
+
+        Vector3Int fallback = snapshot.EnemyHQ != null
+            ? snapshot.EnemyHQ.CurrentCellPosition
+            : unit.CurrentCellPosition;
+        fallback.z = 0;
+        Vector3Int anchor = ResolveBacklineAnchor(enemies, fallback);
+        AIBacklineSettings settings = BuildBacklineSettings();
+        AIBacklineResult geometry = AIBacklineAnalyzer.Analyze(combatants, enemies, anchor, settings);
+        if (geometry == null || !geometry.Success)
+            return false;
+
+        linha = new LinhaDeCombate
+        {
+            Combatentes = combatants,
+            Inimigos = enemies,
+            Ancora = anchor,
+            Settings = settings,
+            Geometria = geometry,
+        };
+        return true;
+    }
+
+    private static PosicaoNaLinha ClassificarNaLinha(LinhaDeCombate linha, Vector3Int cell)
+    {
+        if (linha == null)
+            return PosicaoNaLinha.SemLinha;
+
+        cell.z = 0;
+        AIBacklineScore score = AIBacklineAnalyzer.ScoreCell(
+            linha.Combatentes, linha.Inimigos, cell, linha.Ancora, linha.Settings, linha.Geometria);
+        if (score.IsVanguard)
+            return PosicaoNaLinha.Vanguarda;
+        return score.Depth >= 0.5f
+            ? PosicaoNaLinha.AtrasDaLinha
+            : PosicaoNaLinha.NaLinha;
+    }
+
     // O ferido está à FRENTE da linha de combatentes sãos? Mesma régua da ferramenta
     // Tools ▸ Utils ▸ Retaguarda (AIBacklineAnalyzer), alimentada só com o que o slot
     // detecta (snapshot.EnemyUnits). A linha exclui os feridos por construção, então um

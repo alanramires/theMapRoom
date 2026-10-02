@@ -792,7 +792,8 @@ public partial class AIController
         }
 
         ConstructionManager repairDest = FindRepairConstruction(
-            unit, fromCell, aiTeam, occupiedForRepair, rejectBaseCluster, defenseReservedCells);
+            unit, fromCell, aiTeam, occupiedForRepair, rejectBaseCluster, defenseReservedCells,
+            lineSnapshot: snapshot);
 
         // VTOL tambem pode recolher para um convoo aliado. A plataforma naval
         // participa do mesmo fallback dos predios pousaveis, mas a conclusao

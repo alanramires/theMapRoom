@@ -541,13 +541,28 @@ public partial class AIController
         TeamId aiTeam,
         HashSet<Vector3Int> occupied,
         bool rejectBaseCluster = false,
-        Dictionary<Vector3Int, int> defenseReservedCells = null)
+        Dictionary<Vector3Int, int> defenseReservedCells = null,
+        AIWorldSnapshot lineSnapshot = null)
     {
         ConstructionManager best = null;
         float bestScore = float.MinValue;
         bool conscriptionProducerBan = IsConscriptionParkingBanActive();
         bool logisticsProducerBan = IsPrimaryLogisticsUnit(unit);
         bool eliteRelaxSafety = EliteHoldsDangerousRepair(unit);
+
+        // NAO-ELITE TERRESTRE mede o prédio pela LINHA de combatentes (a régua da ferramenta
+        // Tools ▸ Utils ▸ Retaguarda), nos dois sentidos. À frente da linha: recusa — ele
+        // recua para trás dela. Atrás da linha: aceita mesmo com inimigo a N hexes, porque a
+        // força de combate está segurando a frente e o prédio no meio do mapa serve; não
+        // precisa voltar ao HQ. Sem linha (ou na linha), vale a régua antiga de raio fixo.
+        // Elite segura o reparo avançado por conta própria; aeronave e navio têm a sua lógica.
+        LinhaDeCombate repairLine = null;
+        bool useRepairLine = lineSnapshot != null
+            && !eliteRelaxSafety
+            && unit != null
+            && unit.GetAircraftType() == AircraftType.None
+            && unit.GetDomain() != Domain.Naval
+            && TryMontarLinhaDeCombate(unit, lineSnapshot, out repairLine);
         // Rebelde nao possui uma retaguarda territorial consolidada. O setor
         // marcado como inseguro nao pode impedir que ela use uma instalacao
         // aliada de reparo; os demais gates (dono, captura completa, ocupacao,
@@ -599,9 +614,20 @@ public partial class AIController
                 Debug.Log($"[Repair] skip {cc} cap={c.CurrentCapturePoints}/{c.CapturePointsMax} (incompleto) dist={dist:F1}");
                 continue;
             }
+            PosicaoNaLinha linePosition = useRepairLine && !isHomeRepair
+                ? ClassificarNaLinha(repairLine, cc)
+                : PosicaoNaLinha.SemLinha;
+            if (linePosition == PosicaoNaLinha.Vanguarda)
+            {
+                Debug.Log($"[Repair] skip {cc} à frente da linha de combatentes (não-elite recua) dist={dist:F1}");
+                continue;
+            }
+            bool behindLine = linePosition == PosicaoNaLinha.AtrasDaLinha;
+
             if (!isHomeRepair
                 && !eliteRelaxSafety
                 && !rebelIgnoresSectorSafety
+                && !behindLine
                 && !IsRepairConstructionSectorSafe(c, aiTeam))
             {
                 Debug.Log($"[Repair] skip {cc} setor inseguro sector={c.Sector} dist={dist:F1}");
@@ -619,7 +645,16 @@ public partial class AIController
                 Debug.Log($"[Repair] home {cc} ocupado, mantendo como fallback de reparo dist={dist:F1}");
 
             bool safe = !HasNearbyVisibleEnemy(cc, aiTeam, DefenseEnemyRange);
-            if (!safe && !isHomeRepair && !eliteRelaxSafety)
+            if (!safe && !isHomeRepair && !eliteRelaxSafety && behindLine)
+            {
+                if (HasNearbyVisibleEnemy(cc, aiTeam, 1))
+                {
+                    Debug.Log($"[Repair] skip {cc} atrás da linha, mas com inimigo encostado dist={dist:F1}");
+                    continue;
+                }
+                Debug.Log($"[Repair] {cc} atrás da linha de combatentes: ELEGÍVEL apesar de inimigo a ≤{DefenseEnemyRange} dist={dist:F1}");
+            }
+            else if (!safe && !isHomeRepair && !eliteRelaxSafety)
             {
                 Debug.Log($"[Repair] skip {cc} unsafe (não-home) dist={dist:F1}");
                 continue;
