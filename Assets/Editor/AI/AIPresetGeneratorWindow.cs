@@ -285,6 +285,7 @@ public class AIPresetGeneratorWindow : EditorWindow
         preset.capacidades.limitarLogistica = false;
         preset.capacidades.dobrarSlotsCapturadorPorSetor = false;
         preset.capacidades.handoffEmProfundidade = false;
+        preset.capacidades.fusaoEmReparo = AIFusaoEmReparo.Todos;
         preset.capacidades.conscricaoSempre = false;
         preset.capacidades.conscricaoQuandoPerdendo = false;
         preset.capacidades.politicaLadoForteFraco = Bool(so, "strongWeakSidePolitic");

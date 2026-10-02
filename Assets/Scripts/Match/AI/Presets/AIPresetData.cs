@@ -21,6 +21,21 @@ using UnityEngine.Serialization;
 // =====================================================================================
 
 // -------------------------------------------------------------------------------------
+// Quem pode fundir DURANTE o reparo. A fusao de reparo e a decisao de reparo falando
+// (retaguarda, longe de inimigo); a fusao de TRABALHO, fora do reparo, e do questionario
+// do Capturador e nao passa por aqui. Ver docs/AI Behavior/contrato_questionario.md §6.4.
+//
+// O valor 0 e a regra antiga de proposito: perfil autorado antes deste campo nasce
+// com "Todos" e nao muda de comportamento ate alguem escolher outra coisa.
+// -------------------------------------------------------------------------------------
+public enum AIFusaoEmReparo
+{
+    [InspectorName("Todos (regra antiga)")] Todos = 0,
+    [InspectorName("Só capturador")] SoCapturador = 1,
+    [InspectorName("Desligado")] Desligado = 2,
+}
+
+// -------------------------------------------------------------------------------------
 // Capacidades: as portas que hoje perguntam "eu sou o difícil?" quando queriam perguntar
 // "eu faço tal coisa?". Enquanto forem derivadas de hardMode, nenhum perfil pode ter uma
 // sem ter todas — é isso que impede um general que abre com blindado mas não projeta
@@ -68,6 +83,15 @@ public class AICapabilityPreset
              "Ligado mantém o avanço fluido; desligado consolida antes de seguir.\n\n" +
              "(código: PlanEvaluator.Handoff)")]
     public bool handoffEmProfundidade = false;
+
+    [Header("Reparo")]
+    [Tooltip("Quem pode FUNDIR enquanto está em reparo (fusão na retaguarda, longe de inimigo).\n" +
+             "TODOS: qualquer unidade com 'Fuse While In Repair' na ficha. É a regra antiga, e erra: funde tanque, artilharia e EWACS, encolhendo a presença do exército.\n" +
+             "SÓ CAPTURADOR: só quem satisfaz o papel Capturador (e tem a flag na ficha). No capturador o HP é a taxa de captura, então concentrar acelera.\n" +
+             "DESLIGADO: ninguém funde no reparo. Sob invasão, a massa segura o atraso do inimigo; fundir abre lacuna na defesa.\n" +
+             "A fusão FORA do reparo (para capturar mais rápido) é outra decisão e não passa por aqui.\n\n" +
+             "(código: AIController.PermiteFusaoEmReparo)")]
+    public AIFusaoEmReparo fusaoEmReparo = AIFusaoEmReparo.Todos;
 
     // -------------------------------------------------------------------------------
     // POLÍTICA DE ORÇAMENTO — o 2×2 (PISO × TETO)
@@ -372,6 +396,9 @@ public class AIPresetData : ScriptableObject
         target.capacidades.limitarLogistica = hard;
         target.capacidades.dobrarSlotsCapturadorPorSetor = hard;
         target.capacidades.handoffEmProfundidade = hard;
+        target.capacidades.fusaoEmReparo = hard
+            ? AIFusaoEmReparo.Desligado
+            : easy ? AIFusaoEmReparo.Todos : AIFusaoEmReparo.SoCapturador;
         target.capacidades.conscricaoSempre = conscricaoSempre;
         target.capacidades.conscricaoQuandoPerdendo = conscricaoPerdendo;
         // TETO do 2×2: derivado da magnitude de poupança que a overlay/baseline já definiu.

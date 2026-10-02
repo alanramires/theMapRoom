@@ -1206,7 +1206,7 @@ public partial class AIController
         if (HasLogisticsRole(data, UnitRole.Assalto))
             score += 1800f;
 
-        bool mergeableInfantry = data.fuseWhileInRepair
+        bool mergeableInfantry = PermiteFusaoEmReparo(data)
             && data.unitClass == GameUnitClass.Infantry
             && HasNearbyFusionCandidate(snapshot, target, data);
         if (mergeableInfantry)

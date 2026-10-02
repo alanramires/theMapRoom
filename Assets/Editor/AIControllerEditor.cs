@@ -57,6 +57,9 @@ public sealed class AIControllerEditor : Editor
             Capacity("Lado forte/fraco", controller.StrongWeakSidePolitic);
             Capacity("Núcleo suave", controller.SoftCoreGate);
             EditorGUILayout.LabelField(
+                "Fusão em reparo",
+                ObjectNames.NicifyVariableName(controller.FusaoEmReparo.ToString()));
+            EditorGUILayout.LabelField(
                 "Renda fora de cidades",
                 $"{controller.FracaoRendaForaDeCidades:P0}");
             EditorGUI.indentLevel--;

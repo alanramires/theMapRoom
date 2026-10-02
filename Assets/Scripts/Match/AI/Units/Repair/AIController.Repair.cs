@@ -507,7 +507,7 @@ public partial class AIController
 
         // 2. Fusão: libera o hex e recupera a unidade ao mesmo tempo
         // Scoring: candidato em repCell defensivo (+20) > em prédio (+10) > campo (0); desempate por HP combinado
-        if (unit.TryGetUnitData(out UnitData fuseData) && fuseData.fuseWhileInRepair)
+        if (unit.TryGetUnitData(out UnitData fuseData) && PermiteFusaoEmReparo(fuseData))
         {
             var defensiveRepCells = new HashSet<Vector3Int>();
             TeamObjectivePlan fusePlan = ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(ResolveAISlotKey(aiTeam)));

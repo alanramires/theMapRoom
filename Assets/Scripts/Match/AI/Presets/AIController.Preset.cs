@@ -63,6 +63,33 @@ public partial class AIController
     public bool FazHandoffEmProfundidade =>
         activePreset != null ? activePreset.capacidades.handoffEmProfundidade : hardMode;
 
+    /// <summary>Quem pode fundir durante o reparo. Sem preset, a regra antiga: todos.</summary>
+    public AIFusaoEmReparo FusaoEmReparo =>
+        activePreset != null ? activePreset.capacidades.fusaoEmReparo : AIFusaoEmReparo.Todos;
+
+    /// <summary>
+    /// A pergunta unica de "esta unidade funde no reparo?". A flag da ficha continua
+    /// sendo a permissao da peca; o perfil decide quem, dentre as permitidas, usa.
+    /// Quem pondera fusao (o proprio reparo, e a logistica que adia quem vai fundir)
+    /// pergunta aqui — duas respostas diferentes fariam o caminhao esperar uma fusao
+    /// que o reparo nunca vai fazer.
+    /// </summary>
+    private bool PermiteFusaoEmReparo(UnitData data)
+    {
+        if (data == null || !data.fuseWhileInRepair)
+            return false;
+
+        switch (FusaoEmReparo)
+        {
+            case AIFusaoEmReparo.SoCapturador:
+                return UnitRoleCompatibility.CanSatisfy(data, UnitRole.Capturador);
+            case AIFusaoEmReparo.Desligado:
+                return false;
+            default:
+                return true;
+        }
+    }
+
     /// <summary>
     /// Quanto da renda de predios FORA das cidades esta IA recebe. 1 = tudo. O perfil
     /// facil historicamente recebia 1/3, e era o unico jeito de dizer isso — agora e um
