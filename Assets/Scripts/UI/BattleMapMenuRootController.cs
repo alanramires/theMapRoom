@@ -440,6 +440,24 @@ public class BattleMapMenuRootController : MonoBehaviour
         if (turnStateManager == null)
             return false;
 
+        // Turno da IA: o botao e o ESC do dedo e segue o mesmo caminho (pausa e
+        // abre no proximo Neutral). NUNCA ForceNeutral aqui: no meio de um batch da
+        // IA isso desfaria a acao dela por fora da transacao.
+        if (matchController != null && matchController.IsPlayerInputLockedByActiveAI() &&
+            !AIController.IsDebugPaused)
+        {
+            if (pendingOpenOnNextNeutral)
+            {
+                // Segundo toque com o pedido ainda pendente: desiste. A pausa e
+                // derivada do pedido e solta sozinha.
+                pendingOpenOnNextNeutral = false;
+                PlayCancelSfx();
+                return true;
+            }
+            RequestMenuDuringAiTurn();
+            return true;
+        }
+
         if (turnStateManager.CurrentCursorState != TurnStateManager.CursorState.Neutral)
             turnStateManager.ForceNeutral();
 
@@ -455,6 +473,27 @@ public class BattleMapMenuRootController : MonoBehaviour
 
         PlayConfirmSfxOncePerFrame();
         return true;
+    }
+
+    // Pedido de menu no turno da IA, comum ao ESC e ao botao de menu (o ESC do dedo).
+    // Abre ja se for um Neutral seguro; senao pausa a IA (ponto seguro, igual ao F10:
+    // ela termina o batch atual e para antes do proximo) e abre no proximo Neutral.
+    // A pausa e derivada do pedido (AIController.PlayerPauseHolds).
+    private void RequestMenuDuringAiTurn()
+    {
+        if (CanOpenMenuNow())
+        {
+            OpenMenu();
+            if (menuOpen)
+                PlayConfirmSfxOncePerFrame();
+            return;
+        }
+
+        pendingOpenOnNextNeutral = true;
+        pendingOpenRequestedAt = Time.realtimeSinceStartup;
+        AIController.Instance?.SetPlayerPaused(true);
+        PanelDialogController.TrySetTransientText("Pausa da simulacao solicitada. Abrindo menu no proximo Neutral.", 2.4f);
+        cursorController?.PlayBeepSfx();
     }
 
     public static bool TryRestoreMenuFromStateStack(TurnStateManager.CursorState exitedState = TurnStateManager.CursorState.Neutral)
@@ -584,14 +623,7 @@ public class BattleMapMenuRootController : MonoBehaviour
                 if (!aiTurn)
                     return false;
 
-                pendingOpenOnNextNeutral = true;
-                pendingOpenRequestedAt = Time.realtimeSinceStartup;
-                // Pausa a IA imediatamente (ponto seguro, igual ao F10): ela termina o batch atual e
-                // para antes do proximo. Sem isso a IA continuaria iniciando batches e o menu so abriria
-                // numa janela curta entre eles. O resume acontece ao fechar o menu (TryExitPlayerMenuStateToNeutral).
-                AIController.Instance?.SetPlayerPaused(true);
-                PanelDialogController.TrySetTransientText("Pausa da simulacao solicitada. Abrindo menu no proximo Neutral.", 2.4f);
-                cursorController?.PlayBeepSfx();
+                RequestMenuDuringAiTurn();
                 return true;
             }
 
@@ -912,6 +944,9 @@ public class BattleMapMenuRootController : MonoBehaviour
     {
         bool isAiTurn = matchController != null && matchController.IsPlayerInputLockedByActiveAI();
         SetButtonInteractable(btnStatus,   !isAiTurn && !TutorialManager.IsStatusSummaryBlockedByTutorial);
+        // O jornal reabrivel e o do jogador da vez; no turno da IA ele foi limpo de
+        // proposito (a IA nao recebe a tela de intel), entao nao ha o que abrir.
+        SetButtonInteractable(btnConsumo,  !isAiTurn);
         SetButtonInteractable(btnComando,  !isAiTurn && !TutorialManager.IsCommandServiceBlockedByTutorial);
         SetButtonInteractable(btnRodada,   !isAiTurn && !TutorialManager.IsEndTurnLockedByTutorial);
         SetButtonInteractable(btnDestruir, !isAiTurn && !TutorialManager.IsRemoveUnitBlockedByTutorial);
@@ -1401,9 +1436,18 @@ public class BattleMapMenuRootController : MonoBehaviour
                 ScheduleRestoreSelectionNextFrame();
                 break;
             case MenuAction.Consumo:
-                if (turnStateManager == null || !turnStateManager.HasTurnStartAutonomyReport)
+                if (turnStateManager == null)
                 {
                     cursorController?.PlayErrorSfx();
+                    break;
+                }
+                // Turno sem nada a relatar nao e erro: o jornal so nao foi escrito.
+                // Antes caia no PlayErrorSfx, que sem texto proprio mostra o
+                // generico "Invalid action".
+                if (!turnStateManager.HasTurnStartAutonomyReport)
+                {
+                    // Sem som proprio: o OnButtonClicked ja tocou o confirm de todo item.
+                    PanelDialogController.TrySetTransientText("Jornal do Comandante: nada a relatar neste turno.", 2.4f);
                     break;
                 }
                 if (!TryCloseMenuForSaveLoadDispatch())
