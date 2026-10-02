@@ -1,14 +1,14 @@
 ﻿# Resumo — onde estamos e o que vem
 
-Ponto de retomada. Atualizado em 2026-10-01, **depois** da tag `v9.1.0`.
+Ponto de retomada. Atualizado em 2026-10-02, **depois** da tag `v9.2.0`.
 Leia isto primeiro.
 
 ---
 
 ## Estado
 
-`v9.1.0` tagueada e publicada. É a versão do **primeiro build de publicação**.
-Relatório: [`relatorio_v9.1.0.md`](relatorio_v9.1.0.md). A v8 fechou; os relatórios dela
+`v9.2.0` tagueada e publicada. **O primeiro MVP estável está no ar**, no Unity
+Play, e já tem gente testando. Relatório: [`relatorio_v9.2.0.md`](relatorio_v9.2.0.md). A v8 fechou; os relatórios dela
 estão em [`Versões/`](Versões/).
 
 ```text
@@ -19,7 +19,15 @@ v8.6.0   a etiqueta muda de dono          rally em lista, eixo escrito, 3 perfis
 v8.6.1   configurado ≠ valendo            perfis autorados, portões fechados
 v9.0.0   a mesma linha                    visão de regra única; Save Inspector
 v9.1.0   o save manda na partida          load aplica o save; menu no turno da IA
+v9.2.0   aguenta o celular de quem testa  toque, áudio/texturas web, sem LTO
 ```
+
+**A descoberta da v9.2.0:** o Simulator da Unity não reproduz o navegador do
+celular. "Funciona no Editor" não diz nada sobre memória. O celular morria **por
+memória, sem erro no log**: música decodificada inteira, texturas DXT
+descomprimidas no processador e logs. Mede-se pelo cabo (`adb` + DevTools
+Protocol, `dumpsys meminfo` PSS), nunca por dentro da aba. Toda tela nova se
+valida em **teclado, mouse e dedo**.
 
 **A descoberta da v9.1.0:** a cena guardava estado de partida. Os flags de
 início de turno, salvos como `1` na Batalha, prendiam a cortina depois do load.
@@ -196,7 +204,15 @@ foi assim que a paridade do Q2, o título perdido e o `bar_tvencedor` apareceram
 ✅ load pelo contrato     o save manda, não a cena; cortina só no load
 ✅ cursor depois do load  passa a vez e vai direto ao QG da IA
 ✅ captura = HP           Bazooka 10 numa cidade de 0,5 causa 5
+✅ celular (Unity Play)   25 unidades em combate, ~660 MB, status normal, sem erro
+✅ dedo na Campanha       seleciona quadrante e abre o menu pelo toque
+✅ Carregar Jogo na web   abre (o build com LTO travava)
 ```
+
+**Só compilou (v9.2.0):** o APC deixando de esperar soldado ferido e o botão de
+menu da Batalha pausando a IA. **Aberto:** o planejador da IA leva 7–9 s por
+turno no celular (105 ms no PC) e há ~1 s de atraso ao selecionar quadrante; os
+dois pedem Profiler, não palpite.
 
 **Só compilou (v9.1.0):** a IA retomando depois de sair do menu com ESC no
 turno dela, o load de um save feito no turno da IA, o deadlock do shopping da IA
@@ -403,6 +419,11 @@ parte de uma regra só, e a construção usa a mesma reta que a unidade.
 
 | armadilha | regra |
 |---|---|
+| **"funciona no Simulator"** | o Simulator renderiza pelo Editor: não mede memória nem o navegador. Teste real = build servido na LAN (`npx http-server -a 0.0.0.0 -p 8000`) com o celular na **claro5** (subrede 192.168.1.x do PC) + `chrome://inspect` |
+| **medir memória por dentro da aba** | `Runtime.queryObjects` varre o heap e DERRUBOU a aba. Use `adb shell dumpsys meminfo` e leia o **PSS**, não o RSS |
+| **LTO na Web** | "Runtime Speed with LTO" travou o Carregar Jogo (`RuntimeError: unreachable`); sem LTO funciona. Para testar LTO de novo, gerar com Debug Symbols Embedded |
+| **override de áudio na aba Web** | não existe taxa de amostragem nem nada além de formato e qualidade; Force To Mono vale para todas as plataformas. Taxa e canais se mudam no ARQUIVO |
+| **campo autoatribuído por nome** | um `OnValidate` que reatribui pelo nome do arquivo desfaz a escolha do autor a cada edição. Autopreencher só o que estiver vazio |
 | **estado de partida serializado na cena** | um campo do `MatchController` que muda em jogo, se for serializado, a cena salva com o valor do último teste. Os flags de início de turno em `1` prenderam a cortina do load. Campo de partida é `[NonSerialized]`; quem persiste é o save |
 | **pausa como flag que alguém desliga** | a pausa do menu só soltava por um caminho de fechamento, e a IA parava para sempre pelos outros. Pausa é derivada (`PlayerPauseHolds`); nunca dependa de lembrar de desligar |
 | **lista de estados copiada** | "o jogador está no menu" estava em três lugares, cada um com estados diferentes, e a mesma tela sumiu duas vezes. É `TurnStateManager.IsInPlayerMenuScope` |
@@ -471,6 +492,7 @@ parte de uma regra só, e a construção usa a mesma reta que a unidade.
 |---|---|
 | [`Planos/plano_campanha.md`](Planos/plano_campanha.md) | **o tronco** — autoria, recorte, progresso, cenas, bloqueios, teste |
 | [`Planos/briefing_cena_campanha.md`](Planos/briefing_cena_campanha.md) | o contrato entre as duas frentes |
+| [`relatorio_v9.2.0.md`](relatorio_v9.2.0.md) | aguenta o celular — memória medida, áudio/texturas web, LTO, toque |
 | [`relatorio_v9.1.0.md`](relatorio_v9.1.0.md) | o save manda na partida — load, estado fora da cena, menu no turno da IA |
 | [`relatorio_v9.0.0.md`](relatorio_v9.0.0.md) | a mesma linha — visão de regra única, construção com altura, auditável |
 | [`Versões/relatorio_v8.6.1.md`](Versões/relatorio_v8.6.1.md) | configurado ≠ valendo — perfis, portões (com errata na v9.0.0) |
