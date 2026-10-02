@@ -33,9 +33,16 @@ public class QuadranteData : INoDoMapa
     [Min(1)] public int width = 18;
     [Min(1)] public int height = 18;
 
+    [Header("Estado")]
+    [Tooltip(
+        "Em desenvolvimento: o quadrante aparece e pode ser selecionado na Campanha, " +
+        "mas o JOGAR recusa — o autor ainda esta montando. Autoral, sobrevive ao bake.")]
+    public bool emDesenvolvimento;
+
     [Header("Destrave")]
     public List<string> destravadoPor = new List<string>();
-    [Tooltip("Exige todos os quadrantes irmaos concluidos. E o 'last map' da campanha.")]
+    [Tooltip("Mapa final da campanha: so abre com os outros quadrantes dela concluidos. Ainda sem efeito em jogo (portao de destrave nao construido).")]
+    [InspectorName("Mapa final da campanha")]
     public bool exigeIrmaos;
 
     [Header("Economia — autoral, sobrevive ao bake")]

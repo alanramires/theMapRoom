@@ -511,7 +511,8 @@ public class CampaignSelectionController : MonoBehaviour
                $"QUADRANTE: {q.displayName}\n" +
                $"TAMANHO: {q.width} x {q.height}\n" +
                $"CONSTRUÇÕES: {constructionCount}\n" +
-               $"BAKE: {(q.HasBake ? "PRONTO" : "INDISPONÍVEL")}";
+               $"BAKE: {(q.HasBake ? "PRONTO" : "INDISPONÍVEL")}" +
+               (q.emDesenvolvimento ? "\nEM DESENVOLVIMENTO" : string.Empty);
     }
 
     private void OpenConfirmation()
@@ -554,6 +555,19 @@ public class CampaignSelectionController : MonoBehaviour
                 "QUADRANTE INDISPONÍVEL",
                 "Este quadrante ainda não possui bake para iniciar a batalha.");
             cursorController?.PlayCancelSfx();
+            confirmationOpen = false;
+            pending = null;
+            return;
+        }
+
+        // Em desenvolvimento: selecionavel, mas nao abre. Marcado na bancada
+        // (Tools > Utils > Map Helper), enquanto o autor monta o quadrante.
+        if (pending.Quadrante.emDesenvolvimento)
+        {
+            PanelHelperController.TrySetExternalText(
+                "EM DESENVOLVIMENTO",
+                "Este quadrante ainda está sendo construído. Volte em breve!");
+            cursorController?.PlayErrorSfx();
             confirmationOpen = false;
             pending = null;
             return;
@@ -1374,6 +1388,8 @@ public class CampaignSelectionController : MonoBehaviour
         // MARCA: o jogador compara ao rejogar, sem tela nenhuma por perto para dar
         // contexto.
         string bake = q.HasBake ? string.Empty : "\n<color=#FF8888>SEM BAKE</color>";
+        if (q.emDesenvolvimento)
+            bake += "\n<color=#FFD166>EM DESENVOLVIMENTO</color>";
         string result = "VENCEDOR: Nenhum\nRODADAS: —\nMOTIVO: —";
         if (mundo != null && CampaignProgressStore.TryGetResult(
             mundo.mundoId, hovered.Campanha.campanhaId, q.quadranteId,

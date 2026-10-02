@@ -621,6 +621,8 @@ public class MapHelperWindow : EditorWindow
         using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
         {
             string estado = q.HasBake ? $"assado {q.bakedTiles.Count}" : "SEM BAKE";
+            if (q.emDesenvolvimento)
+                estado += " · EM DEV";
             if (DrawNoHeader(index, q, NivelColor(2, index), estado, selected, out bool remove))
             {
                 selectedQuadrante = selected ? -1 : index;
@@ -633,6 +635,21 @@ public class MapHelperWindow : EditorWindow
                 return false;
 
             DrawNoBody(q, PickLevel.Quadrante, index, pai: parent, paiRotulo: "caixa da campanha");
+
+            // Em desenvolvimento: selecionavel na Campanha, mas o JOGAR recusa.
+            // Autoral e fora do bake, como a caixa inicial.
+            EditorGUI.BeginChangeCheck();
+            bool emDev = EditorGUILayout.Toggle(
+                new GUIContent(
+                    "em desenvolvimento",
+                    "O jogador vê e seleciona o quadrante, mas não consegue abrir a batalha."),
+                q.emDesenvolvimento);
+            if (EditorGUI.EndChangeCheck())
+            {
+                Undo.RecordObject(mundo, "Quadrante em desenvolvimento");
+                q.emDesenvolvimento = emDev;
+                EditorUtility.SetDirty(mundo);
+            }
 
             DrawEconomiaInicial(q);
 
@@ -1109,8 +1126,29 @@ public class MapHelperWindow : EditorWindow
         if (lista == null)
             return;
 
+        // ExigeIrmaos e o "final": so abre com todos os irmaos concluidos. O nome
+        // depende do nivel — quem sao os irmaos de um quadrante e a campanha dele.
+        string rotuloFinal;
+        string dicaFinal;
+        switch (no)
+        {
+            case QuadranteData _:
+                rotuloFinal = "mapa final da campanha";
+                dicaFinal = "Só abre depois que os outros quadrantes desta campanha forem concluídos.";
+                break;
+            case CampanhaData _:
+                rotuloFinal = "campanha final do bloco";
+                dicaFinal = "Só abre depois que as outras campanhas deste bloco forem concluídas.";
+                break;
+            default:
+                rotuloFinal = "bloco final do mundo";
+                dicaFinal = "Só abre depois que os outros blocos do mundo forem concluídos.";
+                break;
+        }
+        dicaFinal += "\n\nAinda sem efeito em jogo: o portão de destrave não foi construído.";
+
         EditorGUI.BeginChangeCheck();
-        bool irmaos = EditorGUILayout.Toggle("exige irmãos (last map)", no.ExigeIrmaos);
+        bool irmaos = EditorGUILayout.Toggle(new GUIContent(rotuloFinal, dicaFinal), no.ExigeIrmaos);
         if (EditorGUI.EndChangeCheck())
         {
             Undo.RecordObject(mundo, "Destrave");

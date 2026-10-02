@@ -27,7 +27,8 @@ public class BlocoData : INoDoMapa
 
     [Header("Destrave")]
     public List<string> destravadoPor = new List<string>();
-    [Tooltip("Exige todos os blocos irmaos concluidos. O caso 'last map', um nivel acima.")]
+    [Tooltip("Bloco final do mundo: so abre com os outros blocos concluidos. Ainda sem efeito em jogo.")]
+    [InspectorName("Bloco final do mundo")]
     public bool exigeIrmaos;
 
     [Header("Campanhas")]

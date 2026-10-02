@@ -3723,7 +3723,9 @@ public class PanelHelperController : MonoBehaviour
         }
         else if (campaignConfirmationActive)
         {
-            CreateNewGameConfirmationDetails(campaignSelectionController.GetConfirmationSummary());
+            // Cor do jogador (resolvida por ResolveActiveTeamColor: na Campanha, o
+            // humano local), nao o verde fixo de reserva.
+            CreateNewGameConfirmationDetails(campaignSelectionController.GetConfirmationSummary(), currentTeamColor);
             CreatePersistenceButton("JOGAR", () => campaignSelectionController?.InvokeConfirmationOption(0));
             CreatePersistenceFooterSpacer(PersistenceFooterGap);
             CreatePersistenceButton("CANCELAR", () => campaignSelectionController?.InvokeConfirmationOption(1));
@@ -3794,7 +3796,7 @@ public class PanelHelperController : MonoBehaviour
             new Vector2(0f, persistenceActionButtons.Count * (PersistenceActionButtonHeight + 10f) + detailsHeight + persistenceFooterSpacerHeight);
     }
 
-    private void CreateNewGameConfirmationDetails(string text)
+    private void CreateNewGameConfirmationDetails(string text, Color? textColor = null)
     {
         persistenceConfirmationDetails = new GameObject(
             "new_game_confirmation_details",
@@ -3813,7 +3815,7 @@ public class PanelHelperController : MonoBehaviour
         label.richText = true;
         label.fontSize = 18f;
         label.fontStyle = FontStyles.Bold;
-        label.color = FooterLabelIdleColor;
+        label.color = textColor ?? FooterLabelIdleColor;
         label.alignment = TextAlignmentOptions.TopLeft;
         label.textWrappingMode = TextWrappingModes.Normal;
         label.raycastTarget = false;
@@ -4507,6 +4509,15 @@ public class PanelHelperController : MonoBehaviour
         TeamId team = TeamId.Neutral;
         if (data != null && data.SubjectTeamId != int.MinValue)
             team = (TeamId)data.SubjectTeamId;
+        else if (matchController != null &&
+                 !matchController.IsPlayable &&
+                 matchController.TryGetSingleActiveLocalHumanSlot(out PlayerSlotId localSlot))
+        {
+            // Fora da partida (Campanha) nao existe "jogador da vez": a cena nao
+            // roda turno, e o ActiveTeam dela e o que sobrou. A pergunta certa numa
+            // tela de selecao e "quem e o jogador aqui" — o humano local.
+            team = matchController.GetTeamIdForSlot(localSlot.Value);
+        }
         else if (matchController != null)
             team = matchController.ActiveTeam;
 

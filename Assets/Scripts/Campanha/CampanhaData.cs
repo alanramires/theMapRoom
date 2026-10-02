@@ -25,7 +25,8 @@ public class CampanhaData : INoDoMapa
 
     [Header("Destrave")]
     public List<string> destravadoPor = new List<string>();
-    [Tooltip("Exige todas as campanhas irmas concluidas.")]
+    [Tooltip("Campanha final do bloco: so abre com as outras campanhas dele concluidas. Ainda sem efeito em jogo.")]
+    [InspectorName("Campanha final do bloco")]
     public bool exigeIrmaos;
 
     [Header("Quadrantes")]
