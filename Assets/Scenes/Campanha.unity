@@ -892,7 +892,6 @@ MonoBehaviour:
     flipX: 0
     flipXOverride: 0
     isAI: 0
-    isRebelRuntime: 1
     isLocal: 1
     localityConfigured: 1
     commandServiceAutomatic: 0
@@ -905,7 +904,6 @@ MonoBehaviour:
     flipX: 1
     flipXOverride: 0
     isAI: 0
-    isRebelRuntime: 1
     isLocal: 1
     localityConfigured: 1
     commandServiceAutomatic: 0
@@ -918,7 +916,6 @@ MonoBehaviour:
     flipX: 1
     flipXOverride: 0
     isAI: 1
-    isRebelRuntime: 1
     isLocal: 0
     localityConfigured: 1
     commandServiceAutomatic: 1
@@ -928,11 +925,6 @@ MonoBehaviour:
     incomePerTurn: 0
     startMoneyApplied: 0
   includeNeutralTeam: 0
-  capturedBuildingHistory:
-  - slotIndex: 0
-    teamId: 2
-    buildingKeys:
-    - Fabrica Leve
   economyEnabled: 1
   fogOfWar: 1
   autoFlipXFromHqPositions: 1
@@ -8854,15 +8846,11 @@ MonoBehaviour:
   activePlayerListIndex: 0
   appliedActivePlayerListIndex: 0
   appliedActiveTeamId: 2
-  pendingTurnStartUpkeep: 1
-  pendingTurnStartEconomy: 1
-  cachedConstructionIncomeSignature: 1527
-  cachedConstructionIncomeCount: 0
   constructionIncomeRefreshIntervalSeconds: 0.35
   continuousEditorRefresh: 0
   enableFogSourceDebugLogs: 0
-  enableFogStepPerfLogs: 1
-  enableFogValidationLogs: 1
+  enableFogStepPerfLogs: 0
+  enableFogValidationLogs: 0
   enableSensorsRuntimeLogs: 0
   enablePodeMirarSensorLogs: 0
   enablePodeEmbarcarSensorLogs: 0
@@ -8878,7 +8866,7 @@ MonoBehaviour:
   enableAindaMeVeRuntimeLogs: 0
   enablePodeDetectarRuntimeLogs: 0
   enablePodeEnxergarRuntimeLogs: 0
-  enableTurnPerfLogs: 1
+  enableTurnPerfLogs: 0
   fogStepPerfTopUnits: 3
   fogWarmupFrameBudgetMs: 40
 --- !u!1 &350734193
@@ -8999,10 +8987,10 @@ MonoBehaviour:
   turnStateManager: {fileID: 1900915756}
   boardTilemap: {fileID: 1566606925}
   terrainDatabase: {fileID: 11400000, guid: af24f1a2f28971f498767ede9f9cfba1, type: 2}
-  showAILogs: 1
+  showAILogs: 0
   showAIUnitHUD: 0
-  startOnPause: 1
-  iaRapida: 1
+  startOnPause: 0
+  iaRapida: 0
   hardMode: 0
   easyMode: 0
   strongWeakSidePolitic: 0
@@ -10678,10 +10666,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 57204a2b092e5ec468746a6a29c85a52, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DebugManager
-  aiDebugShortcutsEnabled: 1
-  debugShortcutsEnabled: 1
-  resetPlanOnDebugStage: 1
-  panelRodadaDesativadoPvpDebug: 1
+  aiDebugShortcutsEnabled: 0
+  debugShortcutsEnabled: 0
+  resetPlanOnDebugStage: 0
+  panelRodadaDesativadoPvpDebug: 0
 --- !u!1 &1087893317
 GameObject:
   m_ObjectHideFlags: 0
@@ -11306,14 +11294,6 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 1307941790}
     m_Modifications:
-    - target: {fileID: 3898832375795807818, guid: 76a6abc9e5b4cda43ac276c04f3c5ef1, type: 3}
-      propertyPath: m_Volume
-      value: 0.8
-      objectReference: {fileID: 0}
-    - target: {fileID: 4254574150553539861, guid: 76a6abc9e5b4cda43ac276c04f3c5ef1, type: 3}
-      propertyPath: musicVolume
-      value: 0.8
-      objectReference: {fileID: 0}
     - target: {fileID: 4254574150553539861, guid: 76a6abc9e5b4cda43ac276c04f3c5ef1, type: 3}
       propertyPath: matchController
       value: 
@@ -12283,14 +12263,14 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TurnStateManager
   turnStartAutonomyHelperDurationFallbackSeconds: 6
-  enableTurnStateRuntimeLogs: 1
-  showMovementLogs: 1
-  enableRangeCacheDebugLogs: 1
-  showPerfRangeLine: 1
+  enableTurnStateRuntimeLogs: 0
+  showMovementLogs: 0
+  enableRangeCacheDebugLogs: 0
+  showPerfRangeLine: 0
   showPerfSensorsLine: 0
   showPerfSelectionLine: 0
   showPerfTakeoffPrepLine: 0
-  showFrameSpikeLogs: 1
+  showFrameSpikeLogs: 0
   showClickSpikeLogs: 0
   frameSpikeThresholdMs: 250
   matchController: {fileID: 327617512}
@@ -14157,25 +14137,9 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: 739518134611210207, guid: c581f95dac3200e4eaea0675bbff53d0, type: 3}
-      propertyPath: m_SortingLayer
-      value: 5
-      objectReference: {fileID: 0}
-    - target: {fileID: 739518134611210207, guid: c581f95dac3200e4eaea0675bbff53d0, type: 3}
-      propertyPath: m_SortingOrder
-      value: 20
-      objectReference: {fileID: 0}
-    - target: {fileID: 739518134611210207, guid: c581f95dac3200e4eaea0675bbff53d0, type: 3}
-      propertyPath: m_SortingLayerID
-      value: 519888321
-      objectReference: {fileID: 0}
     - target: {fileID: 908282808231925515, guid: c581f95dac3200e4eaea0675bbff53d0, type: 3}
       propertyPath: m_Name
       value: Cursor
-      objectReference: {fileID: 0}
-    - target: {fileID: 7288480064611631759, guid: c581f95dac3200e4eaea0675bbff53d0, type: 3}
-      propertyPath: uiSfxVolume
-      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 7288480064611631759, guid: c581f95dac3200e4eaea0675bbff53d0, type: 3}
       propertyPath: boardTilemap
@@ -14186,29 +14150,9 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 1566606923}
     - target: {fileID: 7288480064611631759, guid: c581f95dac3200e4eaea0675bbff53d0, type: 3}
-      propertyPath: moveSfxVolume
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 7288480064611631759, guid: c581f95dac3200e4eaea0675bbff53d0, type: 3}
       propertyPath: replayManager
       value: 
       objectReference: {fileID: 1679592218}
-    - target: {fileID: 7288480064611631759, guid: c581f95dac3200e4eaea0675bbff53d0, type: 3}
-      propertyPath: skillSfxVolume
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 7288480064611631759, guid: c581f95dac3200e4eaea0675bbff53d0, type: 3}
-      propertyPath: stateSfxVolume
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 7288480064611631759, guid: c581f95dac3200e4eaea0675bbff53d0, type: 3}
-      propertyPath: combatSfxVolume
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 7288480064611631759, guid: c581f95dac3200e4eaea0675bbff53d0, type: 3}
-      propertyPath: masterSfxVolume
-      value: 1
-      objectReference: {fileID: 0}
     - target: {fileID: 7288480064611631759, guid: c581f95dac3200e4eaea0675bbff53d0, type: 3}
       propertyPath: matchController
       value: 
@@ -14222,45 +14166,9 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 1900915756}
     - target: {fileID: 7288480064611631759, guid: c581f95dac3200e4eaea0675bbff53d0, type: 3}
-      propertyPath: menuOpenSfxVolume
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 7288480064611631759, guid: c581f95dac3200e4eaea0675bbff53d0, type: 3}
-      propertyPath: unitMoveSfxVolume
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 7288480064611631759, guid: c581f95dac3200e4eaea0675bbff53d0, type: 3}
-      propertyPath: explosionSfxVolume
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 7288480064611631759, guid: c581f95dac3200e4eaea0675bbff53d0, type: 3}
-      propertyPath: menuCloseSfxVolume
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 7288480064611631759, guid: c581f95dac3200e4eaea0675bbff53d0, type: 3}
-      propertyPath: endingTurnSfxVolume
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 7288480064611631759, guid: c581f95dac3200e4eaea0675bbff53d0, type: 3}
       propertyPath: battleMapMenuRootController
       value: 
       objectReference: {fileID: 1749783164260394206}
-    - target: {fileID: 7288480064611631759, guid: c581f95dac3200e4eaea0675bbff53d0, type: 3}
-      propertyPath: skillSfxBindings.Array.size
-      value: 2
-      objectReference: {fileID: 0}
-    - target: {fileID: 7288480064611631759, guid: c581f95dac3200e4eaea0675bbff53d0, type: 3}
-      propertyPath: skillSfxBindings.Array.data[1].clip
-      value: 
-      objectReference: {fileID: 8300000, guid: a6dbe44c738371a4a84a178b21579463, type: 3}
-    - target: {fileID: 7288480064611631759, guid: c581f95dac3200e4eaea0675bbff53d0, type: 3}
-      propertyPath: skillSfxBindings.Array.data[1].skills.Array.size
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 7288480064611631759, guid: c581f95dac3200e4eaea0675bbff53d0, type: 3}
-      propertyPath: 'skillSfxBindings.Array.data[1].skills.Array.data[0]'
-      value: 
-      objectReference: {fileID: 11400000, guid: 3ae2d2213e72ea144a307a743470d032, type: 2}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []

@@ -17,10 +17,10 @@ EditorBuildSettings:
   - enabled: 0
     path: Assets/Scenes/Em dev/Team Island.unity
     guid: d195c2d48f08e5f4f842d2b940b90f57
-  - enabled: 1
+  - enabled: 0
     path: Assets/Scenes/Mapas/Battle Map 1 - Ground.unity
     guid: 6f3c08b20d025f84baa7c6cf0eca3e72
-  - enabled: 1
+  - enabled: 0
     path: Assets/Scenes/Mapas/Hot Seat 1 - Pvp.unity
     guid: 95f9efe279a43c4439f438fa7fd50ed5
   - enabled: 0
@@ -29,19 +29,19 @@ EditorBuildSettings:
   - enabled: 0
     path: Assets/Scenes/Em dev/AI Ground.unity
     guid: 3f127f32d3f14b844b2b9680a7f9fc6e
-  - enabled: 1
+  - enabled: 0
     path: "Assets/Scenes/Tutoriais/Hist\xF3ria 1 - Aprendendo a Atirar.unity"
     guid: 0d4a00b859c17ca4c944aaaae32a701f
-  - enabled: 1
+  - enabled: 0
     path: "Assets/Scenes/Tutoriais/Hist\xF3ria 2 - A Arma certa.unity"
     guid: 897faace3f1a5d74994abd3790885cb8
-  - enabled: 1
+  - enabled: 0
     path: "Assets/Scenes/Tutoriais/Hist\xF3ria 3 - Resgate Off Road.unity"
     guid: 1356aa41dd8e9b447936f795ccac62a5
-  - enabled: 1
+  - enabled: 0
     path: "Assets/Scenes/Tutoriais/Hist\xF3ria 4 - Sem Combustivel.unity"
     guid: 71d9b96b4ccde5b4a9a380ed57368b16
-  - enabled: 1
+  - enabled: 0
     path: "Assets/Scenes/Tutoriais/Hist\xF3ria 5 - Defenda a Ponte.unity"
     guid: 06e48bc0727c4c34d9d718d2cc6c56b8
   m_configObjects:
