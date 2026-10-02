@@ -937,6 +937,11 @@ public class MatchMusicAudioManager : MonoBehaviour
     }
 
 #if UNITY_EDITOR
+    // Preenche SO o que estiver vazio. Antes sobrescrevia pelo nome do arquivo a
+    // cada OnValidate (toda edicao no Inspector): arrastar "team0_mono" para Team0
+    // voltava sozinho para "team0", e a playlist era refeita com TODO audio da
+    // pasta (original e mono juntos, os dois no build). O configurado tem de ser
+    // o que vale.
     private void TryAutoAssignMusicClipsInEditor()
     {
         const string musicFolder = "Assets/audio/music";
@@ -955,22 +960,24 @@ public class MatchMusicAudioManager : MonoBehaviour
             discovered.Add(clip);
             string name = clip.name.ToLowerInvariant();
             if (name == "neutraltrack" || name == "neutral")
-                neutralTrack = clip;
+                { if (neutralTrack == null) neutralTrack = clip; }
             else if (name == "gameopentrack" || name == "gameopen")
-                gameOpenTrack = clip;
+                { if (gameOpenTrack == null) gameOpenTrack = clip; }
             else if (name == "team0")
-                team0Track = clip;
+                { if (team0Track == null) team0Track = clip; }
             else if (name == "team1")
-                team1Track = clip;
+                { if (team1Track == null) team1Track = clip; }
             else if (name == "team2")
-                team2Track = clip;
+                { if (team2Track == null) team2Track = clip; }
             else if (name == "team3")
-                team3Track = clip;
+                { if (team3Track == null) team3Track = clip; }
         }
 
         if (freeModePlaylist == null)
             freeModePlaylist = new List<AudioClip>();
-        freeModePlaylist.Clear();
+        // Playlist autorada nao e refeita; so nasce da pasta se estiver vazia.
+        if (freeModePlaylist.Count > 0)
+            return;
         for (int i = 0; i < discovered.Count; i++)
             AddIfNotNull(discovered[i]);
     }

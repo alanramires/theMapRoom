@@ -58,22 +58,22 @@ MonoBehaviour:
   team2MusicVolume: 0.4
   team3MusicVolume: 0.3
   freeModePlaylist:
-  - {fileID: 8300000, guid: 925bcdd11607749408f6249d8fd23511, type: 3}
-  - {fileID: 8300000, guid: 7e3c1a1ea9ceef04bb982c79621c45e4, type: 3}
-  - {fileID: 8300000, guid: a7bbc1a67b1e8494f8409da3c773cd8a, type: 3}
-  - {fileID: 8300000, guid: b231f99cf0cbeef48827091689424b08, type: 3}
-  - {fileID: 8300000, guid: dfba9aaa915b9164fbae2ffca78465d3, type: 3}
-  neutralTrack: {fileID: 8300000, guid: 925bcdd11607749408f6249d8fd23511, type: 3}
-  team0Track: {fileID: 8300000, guid: 7e3c1a1ea9ceef04bb982c79621c45e4, type: 3}
-  team1Track: {fileID: 8300000, guid: a7bbc1a67b1e8494f8409da3c773cd8a, type: 3}
-  team2Track: {fileID: 8300000, guid: b231f99cf0cbeef48827091689424b08, type: 3}
-  team3Track: {fileID: 8300000, guid: dfba9aaa915b9164fbae2ffca78465d3, type: 3}
-  gameOpenTrack: {fileID: 8300000, guid: 286187c8b046f7e4183124115b8cc6ec, type: 3}
+  - {fileID: 8300000, guid: d3667115eeb44754796d5098b3b76762, type: 3}
+  - {fileID: 8300000, guid: b57718baadea63848b801a039b3ebced, type: 3}
+  - {fileID: 8300000, guid: 80240578cdbe149408c87cb441df456c, type: 3}
+  - {fileID: 8300000, guid: 7e43f7f819e7f904f9586b0700cf812d, type: 3}
+  - {fileID: 8300000, guid: fff59848131b0084eaac57544348d77f, type: 3}
+  neutralTrack: {fileID: 8300000, guid: d3667115eeb44754796d5098b3b76762, type: 3}
+  team0Track: {fileID: 8300000, guid: b57718baadea63848b801a039b3ebced, type: 3}
+  team1Track: {fileID: 8300000, guid: 80240578cdbe149408c87cb441df456c, type: 3}
+  team2Track: {fileID: 8300000, guid: 7e43f7f819e7f904f9586b0700cf812d, type: 3}
+  team3Track: {fileID: 8300000, guid: fff59848131b0084eaac57544348d77f, type: 3}
+  gameOpenTrack: {fileID: 8300000, guid: aae461c6f85dece4998e6684b5fb8768, type: 3}
   gameOpenMusicVolume: 0.4
   playGameOpenOnStart: 1
   playGameOpenOnlyInSpecificScene: 1
   gameOpenSceneName: Tela de Entrada
-  mapSelectionTrack: {fileID: 8300000, guid: c613746b41903784eb7f2ba353c6100d, type: 3}
+  mapSelectionTrack: {fileID: 8300000, guid: 1185e1c24f1ef264088245af983cbdb6, type: 3}
   mapSelectionMusicVolume: 0.3
   playMapSelectionOnStart: 1
   mapSelectionSceneName: Campanha
