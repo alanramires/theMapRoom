@@ -36,7 +36,7 @@ Transform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!212 &739518134611210207
 SpriteRenderer:
-  serializedVersion: 2
+  serializedVersion: 3
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
@@ -80,7 +80,7 @@ SpriteRenderer:
   m_LightmapParameters: {fileID: 0}
   m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: 388763641
-  m_SortingLayer: 6
+  m_SortingLayer: 0
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_Sprite: {fileID: 21300000, guid: 765427175bcea324084fcd7b59e94f4e, type: 3}
@@ -93,6 +93,7 @@ SpriteRenderer:
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
   m_SpriteSortPoint: 0
+  m_BlendShapeWeights: []
 --- !u!114 &7288480064611631759
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -124,6 +125,7 @@ MonoBehaviour:
   showCoordinates: 1
   coordinateOverlayLabelWidth: 150
   audioSource: {fileID: 2539074687571231318}
+  masterSfxVolume: 0.8
   moveSfx: {fileID: 8300000, guid: a41f648fa5bef3a428eae958c53878b4, type: 3}
   confirmSfx: {fileID: 8300000, guid: c908a364d2d06904c85aaa044bbe3d78, type: 3}
   cancelSfx: {fileID: 8300000, guid: 8609a6a83a3aad644a9866b7c96d54ba, type: 3}
@@ -161,7 +163,6 @@ MonoBehaviour:
     clip: {fileID: 8300000, guid: a9e6ab4fda2a15c4c97b21d78a86d332, type: 3}
   - category: 6
     clip: {fileID: 8300000, guid: f05a1ee32ccbad4418ec5ed3ee11b217, type: 3}
-  sonarSkillSfx: {fileID: 8300000, guid: de3184acf86542e40ae0d8f84f185976, type: 3}
   skillSfxBindings:
   - skills:
     - {fileID: 11400000, guid: bd65f7348de04da4681b0f7387af6998, type: 2}
@@ -174,6 +175,8 @@ MonoBehaviour:
   explosionSfxVolume: 1
   endingTurnSfxVolume: 1
   skillSfxVolume: 1
+  menuOpenSfxVolume: 1
+  menuCloseSfxVolume: 1
   cursorRenderer: {fileID: 739518134611210207}
   cursorColorA: {r: 1, g: 1, b: 1, a: 1}
   cursorColorB: {r: 0, g: 0, b: 0, a: 1}
