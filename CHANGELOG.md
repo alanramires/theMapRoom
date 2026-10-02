@@ -26,6 +26,7 @@ de sensor têm uma fonte só. A direção vem do guia de modding do autor
 | versão | título | relatório |
 |---|---|---|
 | v9.0.0 | Ver, detectar e atirar partem da mesma linha | [relatório](docs/relatorio_v9.0.0.md) |
+| v9.1.0 | O save manda na partida | [relatório](docs/relatorio_v9.1.0.md) |
 
 ---
 
