@@ -1178,8 +1178,11 @@ public partial class TurnStateManager
         // Enter com o slot CANCELAR em foco sai da loja em vez de comprar.
         if (ShoppingCancelFocused)
             return HandleCancelWhileShoppingAndServices();
+        // A compra e dona do proprio som de erro (cada falha em
+        // TryPurchaseShoppingUnitByIndex toca o seu). Devolver Error aqui tocava
+        // o error.mp3 de novo, sobreposto, no Enter sem dinheiro.
         if (!TryConfirmSelectedShoppingOption())
-            return ActionSfx.Error;
+            return ActionSfx.None;
         if (ConsumeShoppingSuppressDefaultConfirmSfxOnce())
             return ActionSfx.None;
         return ActionSfx.Confirm;

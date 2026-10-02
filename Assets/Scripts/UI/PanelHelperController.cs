@@ -3538,10 +3538,24 @@ public class PanelHelperController : MonoBehaviour
             {
                 Image image = shoppingButton.GetComponent<Image>();
                 TMP_Text label = shoppingButton.GetComponentInChildren<TMP_Text>(true);
+                Color unavailableBackground = new Color(0.12f, 0.12f, 0.12f, 0.88f);
+                bool focused = i == focusedShoppingIndex;
+                // Focado E indisponivel: o cursor tem de continuar visivel. O cinza
+                // apagado sobrescrevia o foco e o jogador perdia onde estava. Fica o
+                // fundo do foco escurecido pela metade, com o texto em cinza claro:
+                // "estou aqui, mas nao da". Enter nele toca erro e mostra o motivo.
                 if (image != null)
-                    image.color = new Color(0.12f, 0.12f, 0.12f, 0.88f);
+                {
+                    image.color = focused
+                        ? Color.Lerp(TeamButtonBackground(currentTeamColor, true), unavailableBackground, 0.5f)
+                        : unavailableBackground;
+                }
                 if (label != null)
-                    label.color = new Color(0.52f, 0.52f, 0.52f, 1f);
+                {
+                    label.color = focused
+                        ? new Color(0.82f, 0.82f, 0.82f, 1f)
+                        : new Color(0.52f, 0.52f, 0.52f, 1f);
+                }
             }
         }
         if (helperTxt != null)

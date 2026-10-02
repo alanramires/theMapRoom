@@ -116,11 +116,17 @@ public partial class TurnStateManager
         if (CurrentCursorState != CursorState.ShoppingAndServices)
             return false;
         if (shoppingConstruction == null || shoppingUnitsForSale.Count <= 0)
+        {
+            cursorController?.PlayErrorSfx();
             return false;
+        }
 
         int index = ClampShoppingSelectedIndex();
         if (index < 0 || index >= shoppingUnitsForSale.Count)
+        {
+            cursorController?.PlayErrorSfx();
             return false;
+        }
 
         return TryPurchaseShoppingUnitByIndex(index);
     }
@@ -235,14 +241,18 @@ public partial class TurnStateManager
             return false;
 
         UnitData unit = shoppingUnitsForSale[index];
+        // Toda falha daqui toca o erro UMA vez: quem chama (Enter, clique, numero)
+        // nao toca de novo.
         if (unit == null)
         {
+            cursorController?.PlayErrorSfx();
             Debug.LogWarning("[Shopping] Unidade selecionada esta nula.");
             return false;
         }
 
         if (unitSpawner == null)
         {
+            cursorController?.PlayErrorSfx();
             Debug.LogWarning("[Shopping] UnitSpawner nao encontrado na cena.");
             return false;
         }
