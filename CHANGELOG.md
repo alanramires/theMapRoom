@@ -28,6 +28,7 @@ de sensor têm uma fonte só. A direção vem do guia de modding do autor
 | v9.0.0 | Ver, detectar e atirar partem da mesma linha | [relatório](docs/relatorio_v9.0.0.md) |
 | v9.1.0 | O save manda na partida | [relatório](docs/relatorio_v9.1.0.md) |
 | v9.2.0 | O jogo aguenta o celular de quem testa (primeiro MVP no ar) | [relatório](docs/relatorio_v9.2.0.md) |
+| v9.2.1 | A IA pergunta antes de decidir (contrato do questionário) | [relatório](docs/relatorio_v9.2.1.md) |
 
 ---
 
