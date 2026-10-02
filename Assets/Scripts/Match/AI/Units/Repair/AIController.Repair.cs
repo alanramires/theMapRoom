@@ -446,6 +446,23 @@ public partial class AIController
                 return BuildMoveBatch(unit, aiTeam, fromCell, fromCell);
             }
 
+            // Fogo de suporte (e híbridos) no prédio de reparo NÃO repara passivo: atira de
+            // volta parado, mesmo com ameaça e mesmo havendo substituto por perto. Antes,
+            // o raio fixo marcava "ameaçado" justamente quando o obus tinha alvo (inimigo
+            // a 3–4 hexes), e o teste do substituto o tirava do prédio sem disparar. A
+            // vacância do SOS continua valendo: este ramo nem roda para o não-elite numa
+            // base sob pressão (rejectBaseCluster, no if acima). Sem tiro — inimigo
+            // encostado, dentro do alcance mínimo —, segue a regra de baixo.
+            if (!isBlockingCapTarget
+                && !aircraftShouldSeekPreferredRepair
+                && IsFireSupportUnit(unit)
+                && TryBuildRepairFireSupportHoldAttack(unit, snapshot, fromCell, occupied,
+                    out PlayerAction threatenedHoldAction, out string threatenedHoldReason))
+            {
+                Debug.Log($"{TL("Repair")} {unit.InstanceId} repara em {fromCell} sob ameaça e atira de volta {threatenedHoldReason}");
+                return threatenedHoldAction;
+            }
+
             // Com ameaça: só sai se houver aliado saudável próximo que pode substituir
             bool hasReplacement = false;
             foreach (UnitManager ally in UnitManager.AllActive)
