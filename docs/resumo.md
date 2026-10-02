@@ -1,14 +1,14 @@
 ﻿# Resumo — onde estamos e o que vem
 
-Ponto de retomada. Atualizado em 2026-10-01, **depois** da tag `v9.0.0`.
+Ponto de retomada. Atualizado em 2026-10-01, **depois** da tag `v9.1.0`.
 Leia isto primeiro.
 
 ---
 
 ## Estado
 
-`v9.0.0` tagueada e publicada. Relatório:
-[`relatorio_v9.0.0.md`](relatorio_v9.0.0.md). A v8 fechou; os relatórios dela
+`v9.1.0` tagueada e publicada. É a versão do **primeiro build de publicação**.
+Relatório: [`relatorio_v9.1.0.md`](relatorio_v9.1.0.md). A v8 fechou; os relatórios dela
 estão em [`Versões/`](Versões/).
 
 ```text
@@ -18,7 +18,13 @@ v8.5.2   a forma casa com o dado           quadradinhos, paridade, fim de partid
 v8.6.0   a etiqueta muda de dono          rally em lista, eixo escrito, 3 perfis
 v8.6.1   configurado ≠ valendo            perfis autorados, portões fechados
 v9.0.0   a mesma linha                    visão de regra única; Save Inspector
+v9.1.0   o save manda na partida          load aplica o save; menu no turno da IA
 ```
+
+**A descoberta da v9.1.0:** a cena guardava estado de partida. Os flags de
+início de turno, salvos como `1` na Batalha, prendiam a cortina depois do load.
+Agora esses campos são `[NonSerialized]`. Se um campo do `MatchController`
+muda durante a partida, ele não pode estar na cena.
 
 **O MVP virou tela.** Menu → Campanha → Batalha → volta → o mapa pintado, o
 placar, e o registro de quem tomou o quê, em quantas rodadas e **por quê**. O
@@ -187,7 +193,18 @@ foi assim que a paridade do Q2, o título perdido e o `bar_tvencedor` apareceram
 ✅ save/load de campanha  volta ao quadrante em foco
 ✅ perfil Médio           Q1 até a rodada 3, pelo menu (save do slot 2)
 ✅ cenários de visão      soldado na mata, montanhas A-B-C-D, HQ atrás da serra
+✅ load pelo contrato     o save manda, não a cena; cortina só no load
+✅ cursor depois do load  passa a vez e vai direto ao QG da IA
+✅ captura = HP           Bazooka 10 numa cidade de 0,5 causa 5
 ```
+
+**Só compilou (v9.1.0):** a IA retomando depois de sair do menu com ESC no
+turno dela, o load de um save feito no turno da IA, o deadlock do shopping da IA
+e a rede de 3 s do pedido de menu. **Fora do MVP:** hot seat humano × humano e
+os tutoriais, que estão no build profile mas sem entrada no menu principal.
+Ainda em aberto: o panel_dialog no menu do turno da IA mostra o que está sob o
+cursor (onde a IA agia). Respeita a névoa, mas o autor ainda não decidiu se quer
+isso.
 
 Não visto em partida ainda: a construção revelando com linha, o Play direto com
 perfil, a linha MOTIVO no painel (pode não caber), os perfis Fácil e Difícil.
@@ -386,6 +403,9 @@ parte de uma regra só, e a construção usa a mesma reta que a unidade.
 
 | armadilha | regra |
 |---|---|
+| **estado de partida serializado na cena** | um campo do `MatchController` que muda em jogo, se for serializado, a cena salva com o valor do último teste. Os flags de início de turno em `1` prenderam a cortina do load. Campo de partida é `[NonSerialized]`; quem persiste é o save |
+| **pausa como flag que alguém desliga** | a pausa do menu só soltava por um caminho de fechamento, e a IA parava para sempre pelos outros. Pausa é derivada (`PlayerPauseHolds`); nunca dependa de lembrar de desligar |
+| **lista de estados copiada** | "o jogador está no menu" estava em três lugares, cada um com estados diferentes, e a mesma tela sumiu duas vezes. É `TurnStateManager.IsInPlayerMenuScope` |
 | **`.tmrsave` é zip** | `grep` direto no arquivo não enxerga o texto comprimido e volta vazio. Foi assim que o relatório v8.6.1 afirmou que nenhum save tinha progresso, e o slot 1 tinha. Buscar em save pelo Save Inspector ou por `zipfile` |
 | **nome do arquivo de save** | carrega a cena em que o slot foi criado: `quicksave_slot1_Battle Map 1 - Groud` é um save da Campanha. A cena vem do **manifesto** |
 | **abrir opções para uma regra de jogo** | perguntado por que o soldado da mata herdava EV, eu ofereci três caminhos; a regra era uma só (*"não tem essa salada"*). Antes de propor alternativas, perguntar qual é a regra |
@@ -451,6 +471,7 @@ parte de uma regra só, e a construção usa a mesma reta que a unidade.
 |---|---|
 | [`Planos/plano_campanha.md`](Planos/plano_campanha.md) | **o tronco** — autoria, recorte, progresso, cenas, bloqueios, teste |
 | [`Planos/briefing_cena_campanha.md`](Planos/briefing_cena_campanha.md) | o contrato entre as duas frentes |
+| [`relatorio_v9.1.0.md`](relatorio_v9.1.0.md) | o save manda na partida — load, estado fora da cena, menu no turno da IA |
 | [`relatorio_v9.0.0.md`](relatorio_v9.0.0.md) | a mesma linha — visão de regra única, construção com altura, auditável |
 | [`Versões/relatorio_v8.6.1.md`](Versões/relatorio_v8.6.1.md) | configurado ≠ valendo — perfis, portões (com errata na v9.0.0) |
 | [`modding/guia de modding.md`](modding/guia%20de%20modding.md) | o guia do autor; a direção "auditável" sai dele |
