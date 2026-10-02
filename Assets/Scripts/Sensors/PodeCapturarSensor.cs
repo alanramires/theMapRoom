@@ -141,20 +141,13 @@ public static class PodeCapturarSensor
         if (unit == null || unit.IsDead)
             return 0;
 
-        int hp = Mathf.Max(0, unit.CurrentHP);
-        if (hp <= 0)
-            return 0;
-
-        if (unit.TryGetUnitData(out UnitData unitData)
-            && unitData != null
-            && unitData.roles != null
-            && unitData.roles.Count > 0
-            && unitData.roles[0] == UnitRole.CapturadorCombatente)
-        {
-            return Mathf.Max(1, Mathf.CeilToInt(hp / 2f));
-        }
-
-        return hp;
+        // O poder base e o HP. Quanto ele vale em cada construcao e decisao do
+        // ALVO: a eficiencia que a construcao da a cada skill (Required Skills To
+        // Capture). Ja houve aqui uma metade extra para quem tinha o PAPEL
+        // CapturadorCombatente — papel e politica da IA, nao regra de jogo, e ela
+        // se somava a eficiencia do Capturador Alternativo: Bazooka HP 10 numa
+        // cidade de 0,5 causava 3 em vez de 5.
+        return Mathf.Max(0, unit.CurrentHP);
     }
 
     /// <summary>
