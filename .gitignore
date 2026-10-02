@@ -52,3 +52,7 @@ Assets/_Recovery/
 
 # Saida de ferramenta de geracao de imagem. Artefato da maquina, nao do projeto.
 output/
+
+# Gerados pelo pacote Performance Testing durante o build
+/Assets/Resources/PerformanceTestRun*.json
+/Assets/Resources/PerformanceTestRun*.json.meta

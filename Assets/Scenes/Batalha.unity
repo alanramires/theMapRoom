@@ -8972,9 +8972,9 @@ MonoBehaviour:
   turnStateManager: {fileID: 1900915756}
   boardTilemap: {fileID: 1566606925}
   terrainDatabase: {fileID: 11400000, guid: af24f1a2f28971f498767ede9f9cfba1, type: 2}
-  showAILogs: 1
-  showAIUnitHUD: 1
-  startOnPause: 1
+  showAILogs: 0
+  showAIUnitHUD: 0
+  startOnPause: 0
   iaRapida: 0
   hardMode: 0
   easyMode: 0
@@ -10535,9 +10535,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 57204a2b092e5ec468746a6a29c85a52, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DebugManager
-  aiDebugShortcutsEnabled: 1
-  debugShortcutsEnabled: 1
-  resetPlanOnDebugStage: 1
+  aiDebugShortcutsEnabled: 0
+  debugShortcutsEnabled: 0
+  resetPlanOnDebugStage: 0
   panelRodadaDesativadoPvpDebug: 0
 --- !u!1 &1213214726
 GameObject:
