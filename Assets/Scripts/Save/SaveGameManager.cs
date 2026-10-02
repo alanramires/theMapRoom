@@ -1026,11 +1026,13 @@ public class SaveGameManager : MonoBehaviour
         {
             if (verboseLogs)
                 Debug.Log($"[SaveGame] MainMenu load: trocando para cena '{targetScene}' para carregar slot {normalizedSlot}.");
+            ArmSaveContractForSceneLoad(pendingMainMenuLoad.savePath, targetScene);
             SceneManager.LoadScene(targetScene);
             return true;
         }
         catch (Exception ex)
         {
+            PartidaConfig.Clear();
             pendingMainMenuLoad = null;
             mainMenuLoadTransitionActive = false;
             suppressNextLoadConfirmSfx = false;
@@ -1438,6 +1440,24 @@ public class SaveGameManager : MonoBehaviour
                         PerfNowMs() - asyncStartMs);
                 }
                 else if (matchController != null &&
+                    !matchController.IsHotSeatPrivacyRequired() &&
+                    matchController.IsActiveTeamAI())
+                {
+                    // Sem hot seat (contra IA, humano remoto, ou IA x IA) e na vez da
+                    // IA: a tela some e a IA joga. O botao esperaria um humano
+                    // (IsTurnBoardReadyForHumanConfirmation) e travaria aqui.
+                    panelRodada.CancelLoadingPresentation();
+                    LogLoadPerf(
+                        normalizedSlot,
+                        "turn_presentation.no_hot_seat_ai",
+                        presentationStartMs,
+                        PerfNowMs() - asyncStartMs);
+                }
+                // Sem hot seat e na vez de um humano: cai no "Iniciar Turno" abaixo.
+                // E so do load — um "aperte para continuar" que acende quando o
+                // tabuleiro termina de montar. Nas trocas de turno a cortina continua
+                // exclusiva de humano LOCAL x humano LOCAL.
+                else if (matchController != null &&
                     (matchController.IsActiveTeamAI() ||
                      matchController.ShouldUseHotSeatPrivacyCurtain()))
                 {
@@ -1479,6 +1499,10 @@ public class SaveGameManager : MonoBehaviour
                 panelRodada.CancelLoadingPresentation();
             if (campaign == null && !loadingPresentationReleased)
                 matchMusicAudioManager?.EndTurnTransition();
+            // A supressao do teleport de QG pertence ao load. Se ninguem a
+            // consumiu ate aqui, desarma: senao a primeira virada de turno
+            // pulava o teleport e o cursor ia casa a casa ate o QG.
+            matchController?.EndLoadHeadQuarterCursorSuppression();
             // Em casos de erro antes de entrar no LoadRoutine, garante desbloqueio.
             loadInProgress = false;
             IsAnyLoadInProgress = false;
@@ -1717,6 +1741,67 @@ public class SaveGameManager : MonoBehaviour
         {
             error = ex.Message;
             return false;
+        }
+    }
+
+    /// <summary>
+    /// O contrato do save vale sobre o da cena, e precisa chegar ANTES de ela
+    /// carregar: o MatchController aplica o contrato pendente no Awake e, na
+    /// sequencia, decide se abre a cortina de hot seat. Sem isto, uma Batalha
+    /// autorada como humano x humano abria a cortina, iniciava o turno com o
+    /// contrato de teste e travava antes de o load restaurar os jogadores.
+    ///
+    /// Le pelo mesmo caminho do load. Jogadores, regras (gameSetup, quando o save
+    /// tem) e dificuldade. O resto do estado continua vindo do load em si.
+    /// </summary>
+    private void ArmSaveContractForSceneLoad(string savePath, string targetScene)
+    {
+        if (!TryReadSaveForAudit(savePath, out SaveAuditRead read, out string error) || read?.data == null)
+        {
+            Debug.LogWarning($"[SaveGame] Contrato do save nao lido ({error}); a cena usara o contrato dela ate o load.");
+            return;
+        }
+
+        SaveGameData data = read.data;
+        if (data.players == null || data.players.Count < 2)
+            return;
+
+        var players = new List<MatchPlayerSaveData>(data.players);
+        players.RemoveAll(p => p == null);
+        players.Sort((a, b) => a.slotIndex.CompareTo(b.slotIndex));
+        if (players.Count < 2)
+            return;
+
+        int count = Mathf.Clamp(players.Count, 2, 4);
+        var teams = new TeamId[count];
+        var isAI = new bool[count];
+        var flipX = new bool[count];
+        var commandAutomatic = new bool[count];
+        for (int i = 0; i < count; i++)
+        {
+            teams[i] = (TeamId)players[i].teamId;
+            isAI[i] = players[i].isAI;
+            flipX[i] = players[i].flipX;
+            commandAutomatic[i] = players[i].commandServiceAutomatic;
+        }
+
+        MatchController.GameSetupPreset? preset = null;
+        if (data.gameSetupSaved &&
+            Enum.IsDefined(typeof(MatchController.GameSetupPreset), data.gameSetupPreset))
+        {
+            preset = (MatchController.GameSetupPreset)data.gameSetupPreset;
+        }
+
+        PartidaConfig.SetFromSave(count, teams, isAI, flipX, preset, commandAutomatic, targetScene);
+        if (data.aiDifficultySaved)
+            PartidaConfig.SetDifficulty(AIController.InferDifficulty(data.aiEasyMode, data.aiHardMode));
+
+        if (verboseLogs)
+        {
+            Debug.Log(
+                $"[SaveGame] Contrato do save armado para '{targetScene}': " +
+                $"jogadores={count} ia=[{string.Join(",", isAI)}] " +
+                $"regras={(preset.HasValue ? preset.Value.ToString() : "da cena")}");
         }
     }
 
@@ -2035,6 +2120,8 @@ public class SaveGameManager : MonoBehaviour
                 // Reaplica economia/flip apos SetActiveTeamIdWithoutTurnStart para evitar side effects
                 // de credito no inicio do turno sobrescrever o snapshot salvo.
                 RestoreMatchPlayers(data);
+                // O turno salvo ja tinha comecado: nada de inicio de turno pendente.
+                matchController.MarkTurnStartEffectsAppliedForLoad();
                 matchController.RegisterCurrentlyOwnedBuildings();
             }
             LogLoadPerf(loadedSlot, "restore_match_state.end", restoreMatchStartMs, PerfNowMs() - routineStartMs);
@@ -2401,6 +2488,12 @@ public class SaveGameManager : MonoBehaviour
             data.aiMassacrePhase = aiController.MassacrePhaseActive;
         }
 
+        if (matchController != null)
+        {
+            data.gameSetupSaved = true;
+            data.gameSetupPreset = (int)matchController.GameSetup;
+        }
+
         // Jornal do Comandante: eventos pendentes entre turnos sao estado.
         if (matchController != null && matchController.TurnBriefingLedger != null)
             data.turnBriefingEvents.AddRange(matchController.TurnBriefingLedger);
@@ -2507,6 +2600,18 @@ public class SaveGameManager : MonoBehaviour
     {
         if (data == null)
             return;
+
+        // O contrato do save vale sobre o da cena. O setup (regras de FOW/LoS/spotter)
+        // vai primeiro: a restauracao do cache de FOW confere estas regras. So reaplica
+        // quando difere, porque este metodo roda mais de uma vez por load e trocar o
+        // setup reinicia o FOW.
+        if (matchController != null &&
+            data.gameSetupSaved &&
+            System.Enum.IsDefined(typeof(MatchController.GameSetupPreset), data.gameSetupPreset) &&
+            (int)matchController.GameSetup != data.gameSetupPreset)
+        {
+            matchController.SetGameSetupPreset((MatchController.GameSetupPreset)data.gameSetupPreset);
+        }
 
         MatchStateSaveData matchState = new MatchStateSaveData
         {

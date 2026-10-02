@@ -363,7 +363,6 @@ public class MatchControllerEditor : Editor
             SerializedProperty flipXProp = player.FindPropertyRelative("flipX");
             SerializedProperty flipXOverrideProp = player.FindPropertyRelative("flipXOverride");
             SerializedProperty isAIProp = player.FindPropertyRelative("isAI");
-            SerializedProperty isRebelRuntimeProp = player.FindPropertyRelative("isRebelRuntime");
             SerializedProperty isLocalProp = player.FindPropertyRelative("isLocal");
             SerializedProperty localityConfiguredProp = player.FindPropertyRelative("localityConfigured");
             SerializedProperty commandServiceAutomaticProp = player.FindPropertyRelative("commandServiceAutomatic");
@@ -404,10 +403,10 @@ public class MatchControllerEditor : Editor
                 EditorGUILayout.PropertyField(isAIProp, new GUIContent("Is AI"));
             using (new EditorGUI.DisabledScope(true))
             {
-                if (isRebelRuntimeProp != null)
-                    EditorGUILayout.Toggle(
-                        new GUIContent("Is Rebel (runtime)", "Derivado: o SlotID participa da partida, mas nao possui QG."),
-                        isRebelRuntimeProp.boolValue);
+                // Derivado e nao serializado: consulta ao vivo, a mesma que o jogo faz.
+                EditorGUILayout.Toggle(
+                    new GUIContent("Is Rebel (runtime)", "Derivado: o SlotID participa da partida, mas nao possui QG."),
+                    ((MatchController)target).IsSlotRebel(PlayerSlotId.FromIndex(i)));
             }
             if (isLocalProp != null)
             {

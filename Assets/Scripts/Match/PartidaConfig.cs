@@ -94,9 +94,37 @@ public static class PartidaConfig
         IsAI = isAI;
         FlipX = flipX;
         Preset = preset;
+        PresetIsSet = true;
         CommandServiceAutomatic = commandServiceAutomatic;
         TargetScene = targetScene;
         HasPending = true;
+    }
+
+    /// <summary>
+    /// False quando o contrato nao traz regras de partida (save antigo, sem
+    /// gameSetup gravado): o Apply mantem o setup da cena em vez de impor um.
+    /// </summary>
+    public static bool PresetIsSet { get; private set; } = true;
+
+    /// <summary>
+    /// O contrato que um SAVE carrega, entregue antes de a cena carregar — o mesmo
+    /// caminho do contrato da Tela de Entrada. Sem isto a cena nascia com o contrato
+    /// dela (ex.: humano x humano na Batalha), abria a cortina de hot seat e travava
+    /// antes de o load restaurar os jogadores.
+    /// </summary>
+    public static void SetFromSave(
+        int playerCount,
+        TeamId[] teams,
+        bool[] isAI,
+        bool[] flipX,
+        MatchController.GameSetupPreset? preset,
+        bool[] commandServiceAutomatic,
+        string targetScene)
+    {
+        Set(playerCount, teams, isAI, flipX,
+            preset ?? MatchController.GameSetupPreset.FogOfWarTotal,
+            commandServiceAutomatic, targetScene);
+        PresetIsSet = preset.HasValue;
     }
 
     public static void Apply(MatchController mc)
@@ -150,7 +178,8 @@ public static class PartidaConfig
         // depois que construcoes e unidades ja resolveram seus slotIndex.
         if (teamIds.Count > 0)
             mc.SetActiveTeamIdWithoutTurnStart(teamIds[0]);
-        mc.SetGameSetupPreset(Preset);
+        if (PresetIsSet)
+            mc.SetGameSetupPreset(Preset);
         for (int i = 0; i < PlayerCount; i++)
         {
             bool cmdAuto = (CommandServiceAutomatic != null && i < CommandServiceAutomatic.Length) ? CommandServiceAutomatic[i] : false;
@@ -161,6 +190,7 @@ public static class PartidaConfig
     public static void Clear()
     {
         HasPending = false;
+        PresetIsSet = true;
         Teams = null;
         IsAI = null;
         FlipX = null;

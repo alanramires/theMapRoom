@@ -254,6 +254,9 @@ public sealed class SaveInspectorWindow : EditorWindow
         // currentTurn so sobe quando a vez volta ao primeiro jogador: conta RODADAS.
         Row("Rodada", d.currentTurn.ToString());
         Row("Vez de", $"slot {d.activeSlotIndex} ({TeamName(d.activeTeamId)})");
+        Row("Regras (gameSetup)", d.gameSetupSaved
+            ? EnumName<MatchController.GameSetupPreset>(d.gameSetupPreset)
+            : "save antigo: vale o setup da cena");
         Row("Vencedor", d.hasVictoryWinner
             ? $"slot {d.victoryWinnerSlotIndex} ({TeamName(d.victoryWinnerTeamId)})"
             : "nenhum ainda");

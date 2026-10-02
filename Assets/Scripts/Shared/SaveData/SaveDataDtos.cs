@@ -107,6 +107,12 @@ public class SaveGameData
     // antigo e inofensivo: a fase reentra na proxima avaliacao de shopping se o
     // ratio ainda estiver acima do limiar de entrada.
     public bool aiMassacrePhase;
+    // Regras da partida escolhidas no contrato (MatchController.GameSetupPreset: FOW,
+    // LoS, spotter, furtividade). Sem isto o load caia no setup serializado na CENA,
+    // e uma partida em "Neblina Leve" voltava em "FOW total". gameSetupSaved separa
+    // save novo de save antigo (que mantem o setup da cena, como antes).
+    public bool gameSetupSaved;
+    public int gameSetupPreset;
     // Jornal do Comandante: eventos acumulados entre os turnos de cada time
     // (contato perdido, tiro da nevoa, conquista perdida...), drenados no
     // inicio do turno do time destinatario. Ordem cronologica (deterministica).

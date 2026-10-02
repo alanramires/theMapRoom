@@ -10482,7 +10482,6 @@ MonoBehaviour:
     flipX: 0
     flipXOverride: 0
     isAI: 0
-    isRebelRuntime: 1
     isLocal: 1
     localityConfigured: 1
     commandServiceAutomatic: 0
@@ -10492,7 +10491,6 @@ MonoBehaviour:
     incomePerTurn: 0
     startMoneyApplied: 0
   includeNeutralTeam: 0
-  capturedBuildingHistory: []
   economyEnabled: 1
   fogOfWar: 1
   autoFlipXFromHqPositions: 1
@@ -10543,10 +10541,6 @@ MonoBehaviour:
   activePlayerListIndex: 0
   appliedActivePlayerListIndex: 0
   appliedActiveTeamId: 0
-  pendingTurnStartUpkeep: 0
-  pendingTurnStartEconomy: 1
-  cachedConstructionIncomeSignature: 1527
-  cachedConstructionIncomeCount: 0
   constructionIncomeRefreshIntervalSeconds: 0.35
   continuousEditorRefresh: 0
   enableFogSourceDebugLogs: 0

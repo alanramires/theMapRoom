@@ -343,7 +343,9 @@ public class MatchController : MonoBehaviour
         [HideInInspector] public bool flipX;
         public FlipXOverrideMode flipXOverride;
         public bool isAI;
-        [SerializeField, HideInInspector] public bool isRebelRuntime;
+        // Derivado (recalculado da cena a cada IsSlotRebel). Nao serializado: a cena
+        // guardava o valor da ultima vez que alguem olhou, e isso era so churn.
+        [System.NonSerialized] public bool isRebelRuntime;
         [Tooltip("Este slot humano pertence a esta maquina/tela. Ignorado para AI.")]
         public bool isLocal;
         [SerializeField, HideInInspector] public bool localityConfigured;
@@ -395,7 +397,8 @@ public class MatchController : MonoBehaviour
         new PlayerEntry { teamId = TeamId.Yellow, flipX = true, isLocal = true, localityConfigured = true, defeated = false, startMoney = 0, actualMoney = 0, incomePerTurn = 0, startMoneyApplied = false }
     };
     [SerializeField] private bool includeNeutralTeam = false;
-    [SerializeField, HideInInspector] private List<TeamCapturedBuildingHistory> capturedBuildingHistory = new List<TeamCapturedBuildingHistory>();
+    // Estado de partida: nasce vazio a cada Play, persiste so pelo save.
+    [System.NonSerialized] private List<TeamCapturedBuildingHistory> capturedBuildingHistory = new List<TeamCapturedBuildingHistory>();
     [SerializeField] private bool economyEnabled = true;
     // Placeholder para futura pintura de visibilidade no mapa (nao governa regras de combate no momento).
     [SerializeField, HideInInspector] private bool fogOfWar = true;
@@ -462,10 +465,18 @@ public class MatchController : MonoBehaviour
     [SerializeField] private int activePlayerListIndex = 0;
     [SerializeField, HideInInspector] private int appliedActivePlayerListIndex = int.MinValue;
     [SerializeField, HideInInspector] private int appliedActiveTeamId = int.MinValue;
-    [SerializeField, HideInInspector] private bool pendingTurnStartUpkeep;
-    [SerializeField, HideInInspector] private bool pendingTurnStartEconomy = true;
-    [SerializeField, HideInInspector] private int cachedConstructionIncomeSignature;
-    [SerializeField, HideInInspector] private int cachedConstructionIncomeCount;
+    // ESTADO DE PARTIDA, NAO DE CENA. Estes campos eram serializados na cena e
+    // carregavam o resto da ultima vez que ela rodou: as flags de inicio de turno
+    // travaram o "Iniciar Turno" depois de um load, e o historico de capturas de
+    // um teste antigo aparecia em todo save da Campanha. Agora nascem do codigo a
+    // cada Play e persistem so pelo save.
+    //
+    // A partida nasce com o inicio de turno pendente (renda E manutencao), que e
+    // o que as cenas tinham gravado — nenhum comportamento muda.
+    [System.NonSerialized] private bool pendingTurnStartUpkeep = true;
+    [System.NonSerialized] private bool pendingTurnStartEconomy = true;
+    [System.NonSerialized] private int cachedConstructionIncomeSignature;
+    [System.NonSerialized] private int cachedConstructionIncomeCount;
     [Header("Runtime Perf")]
     [SerializeField] [Range(0.05f, 2f)] private float constructionIncomeRefreshIntervalSeconds = 0.35f;
     [Header("Editor")]
@@ -943,6 +954,19 @@ public class MatchController : MonoBehaviour
     public void ReleaseHotSeatGateAfterLoad()
     {
         hotSeatGateActive = false;
+    }
+
+    /// <summary>
+    /// O load restaura um turno que JA comecou: renda e manutencao da vez ativa
+    /// foram aplicadas antes do save, e o dinheiro salvo ja as inclui. As flags
+    /// pendentes que vierem da cena (a Batalha as serializa ligadas) seguravam
+    /// IsTurnBoardReady em false para sempre — o botao "Iniciar Turno" nunca
+    /// acendia — e, se processadas, creditariam a renda duas vezes.
+    /// </summary>
+    public void MarkTurnStartEffectsAppliedForLoad()
+    {
+        pendingTurnStartUpkeep = false;
+        pendingTurnStartEconomy = false;
     }
 
     public void PrepareFogCachesForTurnPresentation()
@@ -1963,6 +1987,19 @@ public class MatchController : MonoBehaviour
     /// save carregado no turno de uma AI (ou de um humano remoto) sob sigilo, a
     /// posicao volta mas a camera nao vai atras revelar onde ela estava.
     /// </summary>
+    /// <summary>
+    /// Desarma a supressao do teleport de QG ao FIM do load. ImportCursorCell a
+    /// arma para engolir um teleport que viria dentro do proprio load — mas o load
+    /// troca o jogador ativo sem iniciar turno, e nenhum teleport vinha. A trava
+    /// sobrava e era consumida na PRIMEIRA virada de turno de verdade: o teleport
+    /// era pulado e o cursor ia casa a casa ate o QG do oponente. Uma vez so,
+    /// porque depois a trava ja estava gasta.
+    /// </summary>
+    public void EndLoadHeadQuarterCursorSuppression()
+    {
+        suppressNextHeadQuarterCursorFocus = false;
+    }
+
     public void ImportCursorCell(Vector3Int cell)
     {
         suppressNextHeadQuarterCursorFocus = true;
@@ -2652,37 +2689,6 @@ public class MatchController : MonoBehaviour
         }
     }
 
-    private void RegisterCapturedBuilding(TeamId team, ConstructionData building)
-    {
-        string key = ResolveProgressionBuildingKey(building);
-        if (team == TeamId.Neutral || string.IsNullOrWhiteSpace(key))
-            return;
-        if (capturedBuildingHistory == null)
-            capturedBuildingHistory = new List<TeamCapturedBuildingHistory>();
-
-        TeamCapturedBuildingHistory teamHistory = null;
-        for (int i = 0; i < capturedBuildingHistory.Count; i++)
-        {
-            if (capturedBuildingHistory[i] != null && capturedBuildingHistory[i].teamId == team)
-            {
-                teamHistory = capturedBuildingHistory[i];
-                break;
-            }
-        }
-
-        if (teamHistory == null)
-        {
-            teamHistory = new TeamCapturedBuildingHistory { teamId = team };
-            capturedBuildingHistory.Add(teamHistory);
-        }
-        if (teamHistory.buildingKeys == null)
-            teamHistory.buildingKeys = new List<string>();
-        for (int i = 0; i < teamHistory.buildingKeys.Count; i++)
-            if (string.Equals(teamHistory.buildingKeys[i], key, StringComparison.OrdinalIgnoreCase))
-                return;
-        teamHistory.buildingKeys.Add(key);
-    }
-
     private void RegisterCapturedBuilding(PlayerSlotId slotId, ConstructionData building)
     {
         string key = ResolveProgressionBuildingKey(building);
@@ -2746,13 +2752,23 @@ public class MatchController : MonoBehaviour
         for (int i = 0; i < source.Count; i++)
         {
             TeamCapturedBuildingSaveData saved = source[i];
-            if (saved == null || !Enum.IsDefined(typeof(TeamId), saved.teamId) || (TeamId)saved.teamId == TeamId.Neutral)
+            if (saved == null)
+                continue;
+            // A chave e o SLOT. A cor (teamId) e so a fantasia que o slot vestia; so
+            // serve para achar o slot em save antigo, gravado antes do campo existir.
+            int slotIndex = saved.slotIndex;
+            if (slotIndex < 0 &&
+                Enum.IsDefined(typeof(TeamId), saved.teamId) &&
+                (TeamId)saved.teamId != TeamId.Neutral &&
+                TryGetUniqueSlotForTeam((TeamId)saved.teamId, out PlayerSlotId migratedSlot))
+            {
+                slotIndex = migratedSlot.Value;
+            }
+            if (!IsValidPlayerSlot(PlayerSlotId.FromIndex(slotIndex)))
                 continue;
             capturedBuildingHistory.Add(new TeamCapturedBuildingHistory
             {
-                slotIndex = saved.slotIndex >= 0
-                    ? saved.slotIndex
-                    : (TryGetUniqueSlotForTeam((TeamId)saved.teamId, out PlayerSlotId migratedSlot) ? migratedSlot.Value : -1),
+                slotIndex = slotIndex,
                 teamId = (TeamId)saved.teamId,
                 buildingKeys = saved.buildingKeys != null ? new List<string>(saved.buildingKeys) : new List<string>()
             });
