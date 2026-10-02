@@ -62,6 +62,21 @@ public partial class AIController
     // Candidate selection
     // -------------------------------------------------------------------------
 
+    // O ferido so embarca em EVAC: inimigo visivel por perto (TryDecideRepairAction ->
+    // TryEvacEmbarkAction). Fora disso ele cura parado no predio e nunca decide
+    // embarcar, porque o reparo decide antes do embarque. O APC faz a MESMA pergunta
+    // que o passageiro faz; sem ela, esperava para sempre ao lado do ferido, em cima
+    // dos predios da base, e ainda bloqueava a producao.
+    private bool WillShuttleCandidateBoard(UnitManager candidate, TeamId aiTeam)
+    {
+        if (candidate == null || !candidate.IsUnderRepair)
+            return true;
+
+        Vector3Int cell = candidate.CurrentCellPosition;
+        cell.z = 0;
+        return HasNearbyVisibleEnemy(cell, aiTeam, DefenseEnemyRange);
+    }
+
     private UnitManager FindBestShuttleCandidate(
         UnitManager transporter,
         AIWorldSnapshot snapshot,
@@ -82,6 +97,7 @@ public partial class AIController
         {
             if (candidate == transporter) continue;
             if (candidate.SlotIndex != snapshot.AISlotIndex || candidate.IsDead || candidate.IsEmbarked || candidate.HasActed) continue;
+            if (!WillShuttleCandidateBoard(candidate, snapshot.AITeam)) continue;
             if (!candidate.TryGetUnitData(out UnitData candidateData)) continue;
             if (!UnitRoleCompatibility.ParticipatesInBattle(candidateData)) continue;
 

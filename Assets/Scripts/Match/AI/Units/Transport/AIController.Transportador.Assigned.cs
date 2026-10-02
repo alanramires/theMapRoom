@@ -603,6 +603,7 @@ public partial class AIController
             if (!IsGroundTransportPassengerSlot(assigned, slot, aiTeam)) continue;
             UnitManager cap = FindActiveUnit(slot.AssignedUnitId, aiTeam);
             if (cap == null || cap.IsEmbarked || cap.HasActed) continue;
+            if (!WillShuttleCandidateBoard(cap, aiTeam)) continue;
             if (IsPassengerAlreadyAtCaptureObjective(cap, aiTeam)) continue;
             Vector3Int cc = cap.CurrentCellPosition; cc.z = 0;
             float d = SectorManager.HexDistance(fromCell, cc);
