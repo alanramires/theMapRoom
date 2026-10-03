@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Tilemaps;
@@ -1498,9 +1498,9 @@ public partial class TurnStateManager
     {
         List<string> segments = new List<string>();
         if (hp > 0)
-            segments.Add($"HP +{hp}");
+            segments.Add(PanelMessage.Helper("helper.gain.hp", ("value", hp)));
         if (fuel > 0)
-            segments.Add($"FUEL +{fuel}");
+            segments.Add(PanelMessage.Helper("helper.gain.fuel", ("value", fuel)));
         if (ammoByWeapon != null)
         {
             for (int i = 0; i < ammoByWeapon.Count; i++)
@@ -1509,7 +1509,7 @@ public partial class TurnStateManager
                 if (amount <= 0)
                     continue;
 
-                string slotLabel = $"W{i + 1}";
+                string slotLabel = PanelMessage.Helper("helper.gain.weapon_slot", ("index", i + 1));
                 segments.Add($"{slotLabel}+{amount}");
             }
         }

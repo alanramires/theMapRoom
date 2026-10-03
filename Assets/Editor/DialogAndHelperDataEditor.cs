@@ -1,77 +1,45 @@
-using UnityEditor;
+﻿using UnityEditor;
 using UnityEngine;
 
 [CustomEditor(typeof(DialogData))]
+[CanEditMultipleObjects]
 public class DialogDataEditor : Editor
 {
-    private const string DialogMessageTooltip =
-        "Tokens disponiveis: <unit>, <state>, <sensor>.\n\n" +
-        "Uso por ID:\n" +
-        "- panel_dialog.state.moving -> <unit>, <state>\n" +
-        "- panel_dialog.label.moving -> sem token\n" +
-        "- panel_dialog.state.sensor -> <unit>, <sensor>\n" +
-        "- panel_dialog.state.sensor_confirm -> <unit>, <sensor>\n" +
-        "- panel_dialog.sensor.* -> sem token";
-
-    public override void OnInspectorGUI()
-    {
-        serializedObject.Update();
-
-        EditorGUILayout.PropertyField(serializedObject.FindProperty("id"));
-        EditorGUILayout.PropertyField(serializedObject.FindProperty("condition"));
-        DrawMessageWithHelp(serializedObject.FindProperty("message"), DialogMessageTooltip);
-
-        serializedObject.ApplyModifiedProperties();
-    }
-
-    private static void DrawMessageWithHelp(SerializedProperty messageProperty, string tooltip)
-    {
-        EditorGUILayout.LabelField(messageProperty.displayName);
-        messageProperty.stringValue = EditorGUILayout.TextArea(
-            messageProperty.stringValue ?? string.Empty,
-            GUILayout.MinHeight(72f));
-        EditorGUILayout.HelpBox(tooltip, MessageType.Info);
-    }
+    public override void OnInspectorGUI() => PanelMessageDataInspector.Draw(serializedObject);
 }
 
 [CustomEditor(typeof(HelperData))]
+[CanEditMultipleObjects]
 public class HelperDataEditor : Editor
 {
-    private const string HelperMessageTooltip =
-        "Tokens comuns: <action>, <label>, <index>, <unit>, <valor>, <stats>, <terrain>.\n\n" +
-        "Uso por ID:\n" +
-        "- helper.shopping.line.with_cost -> <index>, <unit>, <valor>\n" +
-        "- helper.shopping.line.no_cost -> <index>, <unit>\n" +
-        "- helper.sensors.line.format -> <action>, <label>\n" +
-        "- helper.sensors.line.move_only -> <action>, <label>\n" +
-        "- helper.disembark.order.line -> <index>, <unit>, <stats>, <terrain>\n" +
-        "- helper.disembark.passenger.line -> <index>, <unit>, <stats>\n" +
-        "- helper.command_service.targets -> <targets>\n" +
-        "- helper.command_service.targets.estimate -> <targets>\n" +
-        "- helper.command_service.gains -> <hp>, <fuel>, <ammo>\n" +
-        "- helper.command_service.gains.estimate -> <hp>, <fuel>, <ammo>\n" +
-        "- helper.command_service.total_cost -> <valor>\n" +
-        "- helper.command_service.total_cost.estimate -> <valor>\n" +
-        "- helper.command_service.balance.estimate -> <before>, <after>\n" +
-        "- demais IDs de titulo/label -> sem token";
+    public override void OnInspectorGUI() => PanelMessageDataInspector.Draw(serializedObject);
+}
 
-    public override void OnInspectorGUI()
+internal static class PanelMessageDataInspector
+{
+    public static void Draw(SerializedObject data)
     {
-        serializedObject.Update();
-
-        EditorGUILayout.PropertyField(serializedObject.FindProperty("id"));
-        EditorGUILayout.PropertyField(serializedObject.FindProperty("condition"));
-        DrawMessageWithHelp(serializedObject.FindProperty("message"), HelperMessageTooltip);
-
-        serializedObject.ApplyModifiedProperties();
+        data.Update();
+        EditorGUILayout.PropertyField(data.FindProperty("id"));
+        EditorGUILayout.PropertyField(data.FindProperty("condition"));
+        EditorGUILayout.PropertyField(data.FindProperty("message"), new GUIContent("Message (Português — Brasil)"));
+        EditorGUILayout.PropertyField(data.FindProperty("messageEnglish"), new GUIContent("Message (English)"));
+        EditorGUILayout.HelpBox(
+            "Inglês vazio usa a mensagem em português. Preserve os nomes dos tokens <unit>, <domain>, etc.; você pode mudar sua ordem. " +
+            "Selecione o idioma antes do Play em Tools > Messages > Idioma dos paineis.", MessageType.Info);
+        data.ApplyModifiedProperties();
     }
 
-    private static void DrawMessageWithHelp(SerializedProperty messageProperty, string tooltip)
+    [MenuItem("Tools/Messages/Idioma dos paineis")]
+    public static void SelectLanguageSettings()
     {
-        EditorGUILayout.LabelField(messageProperty.displayName);
-        messageProperty.stringValue = EditorGUILayout.TextArea(
-            messageProperty.stringValue ?? string.Empty,
-            GUILayout.MinHeight(72f));
-        EditorGUILayout.HelpBox(tooltip, MessageType.Info);
+        var settings = Resources.Load<PanelMessageLanguageSettings>(PanelMessageLanguageSettings.ResourceName);
+        if (settings == null)
+        {
+            Debug.LogError("Configuração ausente: Assets/DB/Messages/Resources/Panel Message Language.asset");
+            return;
+        }
+        Selection.activeObject = settings;
+        EditorGUIUtility.PingObject(settings);
     }
 }

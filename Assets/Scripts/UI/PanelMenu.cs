@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.SceneManagement;
@@ -71,8 +71,10 @@ public class PanelMenu : MonoBehaviour
     private static readonly TeamId[] NewGameTeams = { TeamId.Green, TeamId.Red, TeamId.Blue, TeamId.Yellow };
     private readonly struct CampaignDifficultyOption
     {
-        public readonly string Label;
-        public readonly string Description;
+        private readonly string labelId;
+        public string Label => PanelMessage.Helper(labelId);
+        private readonly string descriptionId;
+        public string Description => PanelMessage.Helper(descriptionId);
         public readonly AIDifficulty AiDifficulty;
         public readonly MatchController.GameSetupPreset Preset;
 
@@ -82,8 +84,8 @@ public class PanelMenu : MonoBehaviour
             AIDifficulty aiDifficulty,
             MatchController.GameSetupPreset preset)
         {
-            Label = label;
-            Description = description;
+            labelId = label;
+            descriptionId = description;
             AiDifficulty = aiDifficulty;
             Preset = preset;
         }
@@ -92,18 +94,18 @@ public class PanelMenu : MonoBehaviour
     private static readonly CampaignDifficultyOption[] CampaignDifficulties =
     {
         new CampaignDifficultyOption(
-            "FÁCIL",
-            "AI Easy + Game Boy Clássico",
+            "helper.difficulty.easy",
+            "helper.difficulty.description_easy",
             AIDifficulty.Facil,
             MatchController.GameSetupPreset.GameBoyClassic),
         new CampaignDifficultyOption(
-            "MÉDIO",
-            "AI Normal + Neblina Leve",
+            "helper.difficulty.medium",
+            "helper.difficulty.description_medium",
             AIDifficulty.Medio,
             MatchController.GameSetupPreset.NeblinaLeve),
         new CampaignDifficultyOption(
-            "DIFÍCIL",
-            "AI Difícil + Fog of War Total",
+            "helper.difficulty.hard",
+            "helper.difficulty.description_hard",
             AIDifficulty.Dificil,
             MatchController.GameSetupPreset.FogOfWarTotal)
     };
@@ -122,23 +124,14 @@ public class PanelMenu : MonoBehaviour
     public int NewGameWizardStep => newGameWizardStep;
     public bool IsAboutOpen => aboutOpen;
     public string AboutBody =>
-        "Um wargame tático em hexágonos, por turnos, onde nada é definitivo até você confirmar.\n\n" +
-        "Mova, mire, planeje e cancele quando quiser. Só quando você diz sim é que a guerra acontece.\n\n" +
-        "Comande infantaria, blindados, transportes e apoio de fogo através da neblina da guerra. " +
-        "Capture território, sustente sua logística e escolha entre golpes ousados ou avanços cautelosos.\n\n" +
-        "Enfrente uma IA com tática própria ou desafie um amigo no mesmo dispositivo em modo hot seat.";
+        PanelMessage.Helper("helper.about.body");
 
     public string GetNewGameWizardConfirmationSummary()
     {
         string targetMap = newGameHotSeat ? "Hot Seat 1 - Pvp" : "Campanha";
         string humanColor = ColorUtility.ToHtmlStringRGB(TeamUtils.GetColor(newGameHumanTeam));
         string aiColor = ColorUtility.ToHtmlStringRGB(TeamUtils.GetColor(newGameAiTeam));
-        return $"MAPA: {targetMap}\n" +
-               $"SETUP: {ResolvePresetLabel(newGamePreset)}\n" +
-               (newGameHotSeat ? string.Empty : $"DIFICULDADE: {ResolveCampaignDifficultyLabel(newGameDifficulty)}\n") +
-               $"JOGADOR 1: <color=#{humanColor}>{ResolveTeamLabel(newGameHumanTeam)}</color>\n" +
-               $"JOGADOR 2: <color=#{aiColor}>{ResolveTeamLabel(newGameAiTeam)}</color>{(newGameHotSeat ? string.Empty : " (IA)")}\n\n" +
-               $"REGRAS\n{NewGamePanelController.BuildDescricao(newGamePreset)}";
+        return PanelMessage.Helper("helper.new_game.confirmation", ("map", targetMap), ("setup", ResolvePresetLabel(newGamePreset)), ("difficulty", newGameHotSeat ? string.Empty : PanelMessage.Helper("helper.new_game.difficulty_line", ("difficulty", ResolveCampaignDifficultyLabel(newGameDifficulty)))), ("human_color", humanColor), ("human", ResolveTeamLabel(newGameHumanTeam)), ("opponent_color", aiColor), ("opponent", ResolveTeamLabel(newGameAiTeam)), ("ai", newGameHotSeat ? string.Empty : PanelMessage.Helper("helper.new_game.ai_suffix")), ("rules", NewGamePanelController.BuildDescricao(newGamePreset)));
     }
 
     // Passo 4 = CONFIRMAR PARTIDA. Exposto para o PanelHelper montar os detalhes de confirmacao
@@ -158,19 +151,19 @@ public class PanelMenu : MonoBehaviour
     public string GetNewGameWizardOptionLabel(int index)
     {
         if (newGameWizardStep == 0)
-            return index < NewGameTeams.Length ? ResolveTeamLabel(NewGameTeams[index]) : "CANCELAR";
+            return index < NewGameTeams.Length ? ResolveTeamLabel(NewGameTeams[index]) : PanelMessage.Helper("helper.action.cancel");
         if (newGameWizardStep == 1)
         {
             List<TeamId> opponents = BuildAvailableOpponentTeams();
             return index < opponents.Count
-                ? $"{(newGameHotSeat ? "JOGADOR 2" : "IA")} {ResolveTeamLabel(opponents[index])}"
-                : "VOLTAR";
+                ? PanelMessage.Helper(newGameHotSeat ? "helper.new_game.opponent_player" : "helper.new_game.opponent_ai", ("team", ResolveTeamLabel(opponents[index])))
+                : PanelMessage.Helper("helper.action.back");
         }
         if (newGameWizardStep == 2)
-            return index < CampaignDifficulties.Length ? CampaignDifficulties[index].Label : "VOLTAR";
+            return index < CampaignDifficulties.Length ? CampaignDifficulties[index].Label : PanelMessage.Helper("helper.action.back");
         if (newGameWizardStep == 3)
-            return index < NewGamePresets.Length ? ResolvePresetLabel(NewGamePresets[index]) : "VOLTAR";
-        return index == 0 ? "INICIAR JOGO" : "VOLTAR";
+            return index < NewGamePresets.Length ? ResolvePresetLabel(NewGamePresets[index]) : PanelMessage.Helper("helper.action.back");
+        return index == 0 ? PanelMessage.Helper("helper.action.start") : PanelMessage.Helper("helper.action.back");
     }
 
     public bool TryGetNewGameWizardOptionColor(int index, out Color color)
@@ -916,16 +909,16 @@ public class PanelMenu : MonoBehaviour
 
     private void RefreshNewGameWizardHelper()
     {
-        string title = newGameWizardStep == 0 ? "ESCOLHA SUA COR" :
-                       newGameWizardStep == 1 ? (newGameHotSeat ? "ESCOLHA O JOGADOR 2" : "ESCOLHA A IA ADVERSÁRIA") :
-                       newGameWizardStep == 2 ? "ESCOLHA A DIFICULDADE" :
-                       newGameWizardStep == 3 ? "CONFIGURE O JOGO" : "CONFIRMAR PARTIDA";
+        string title = newGameWizardStep == 0 ? PanelMessage.Helper("helper.new_game.color") :
+                       newGameWizardStep == 1 ? (newGameHotSeat ? PanelMessage.Helper("helper.new_game.player_two") : PanelMessage.Helper("helper.new_game.opponent")) :
+                       newGameWizardStep == 2 ? PanelMessage.Helper("helper.new_game.difficulty") :
+                       newGameWizardStep == 3 ? PanelMessage.Helper("helper.new_game.configure") : PanelMessage.Helper("helper.new_game.confirm");
         string body = newGameWizardStep == 4
             ? (newGameHotSeat
-                ? $"Jogador 1: {ResolveTeamLabel(newGameHumanTeam)}\nJogador 2: {ResolveTeamLabel(newGameAiTeam)}\nRegras: {ResolvePresetLabel(newGamePreset)}"
-                : $"Você: {ResolveTeamLabel(newGameHumanTeam)}\nIA adversária: {ResolveTeamLabel(newGameAiTeam)}\nDificuldade: {ResolveCampaignDifficultyLabel(newGameDifficulty)}\nRegras: {ResolvePresetLabel(newGamePreset)}")
+                ? PanelMessage.Helper("helper.new_game.hotseat_summary", ("human", ResolveTeamLabel(newGameHumanTeam)), ("opponent", ResolveTeamLabel(newGameAiTeam)), ("rules", ResolvePresetLabel(newGamePreset)))
+                : PanelMessage.Helper("helper.new_game.ai_summary", ("human", ResolveTeamLabel(newGameHumanTeam)), ("opponent", ResolveTeamLabel(newGameAiTeam)), ("difficulty", ResolveCampaignDifficultyLabel(newGameDifficulty)), ("rules", ResolvePresetLabel(newGamePreset))))
             : (newGameWizardStep == 1
-                ? (newGameHotSeat ? "Escolha a cor do segundo jogador." : "Slot 1 será controlado pela IA.")
+                ? (newGameHotSeat ? PanelMessage.Helper("helper.new_game.choose_second_color") : PanelMessage.Helper("helper.new_game.ai_slot"))
                 : newGameWizardStep == 2 && newGameWizardFocusIndex < CampaignDifficulties.Length
                     ? CampaignDifficulties[newGameWizardFocusIndex].Description
                     : string.Empty);
@@ -993,22 +986,22 @@ public class PanelMenu : MonoBehaviour
     private static bool IsTeamFlipped(TeamId team) => team == TeamId.Red || team == TeamId.Yellow;
     private static string ResolveTeamLabel(TeamId team) => team switch
     {
-        TeamId.Green => "VERDE", TeamId.Red => "VERMELHO", TeamId.Blue => "AZUL", TeamId.Yellow => "AMARELO", _ => team.ToString().ToUpperInvariant()
+        TeamId.Green => PanelMessage.Helper("helper.team.green"), TeamId.Red => PanelMessage.Helper("helper.team.red"), TeamId.Blue => PanelMessage.Helper("helper.team.blue"), TeamId.Yellow => PanelMessage.Helper("helper.team.yellow"), _ => team.ToString().ToUpperInvariant()
     };
     private static string ResolveCampaignDifficultyLabel(AIDifficulty difficulty) => difficulty switch
     {
-        AIDifficulty.Facil => "FÁCIL",
-        AIDifficulty.Medio => "MÉDIO",
-        AIDifficulty.Dificil => "DIFÍCIL",
-        _ => "FÁCIL"
+        AIDifficulty.Facil => PanelMessage.Helper("helper.difficulty.easy"),
+        AIDifficulty.Medio => PanelMessage.Helper("helper.difficulty.medium"),
+        AIDifficulty.Dificil => PanelMessage.Helper("helper.difficulty.hard"),
+        _ => PanelMessage.Helper("helper.difficulty.easy")
     };
     private static string ResolvePresetLabel(MatchController.GameSetupPreset preset) => preset switch
     {
-        MatchController.GameSetupPreset.GameBoyClassic => "GAME BOY CLÁSSICO",
-        MatchController.GameSetupPreset.FisicaBasica => "FÍSICA BÁSICA",
-        MatchController.GameSetupPreset.AMontanhaAvacalha => "A MONTANHA AVACALHA",
-        MatchController.GameSetupPreset.NeblinaLeve => "NEBLINA LEVE",
-        _ => "FOG OF WAR TOTAL"
+        MatchController.GameSetupPreset.GameBoyClassic => PanelMessage.Helper("helper.setup.classic"),
+        MatchController.GameSetupPreset.FisicaBasica => PanelMessage.Helper("helper.setup.physics"),
+        MatchController.GameSetupPreset.AMontanhaAvacalha => PanelMessage.Helper("helper.setup.mountain"),
+        MatchController.GameSetupPreset.NeblinaLeve => PanelMessage.Helper("helper.setup.light_fog"),
+        _ => PanelMessage.Helper("helper.setup.total_fog")
     };
 
     private void OnLoadButtonClicked()
@@ -1060,7 +1053,7 @@ public class PanelMenu : MonoBehaviour
 
         PlayConfirmSfxOncePerFrame();
         aboutOpen = true;
-        PanelHelperController.TrySetExternalText("Sobre o jogo", string.Empty);
+        PanelHelperController.TrySetExternalText(PanelMessage.Helper("helper.about.title"), string.Empty);
         PanelHelperController.SetExternalWideMode(true);
     }
 
@@ -1188,7 +1181,7 @@ public class PanelMenu : MonoBehaviour
         ignoreInputUntilFrame = Time.frameCount + 1;
         previousUiSubmitPressed = true;
         PanelDialogController.ClearExternalText();
-        PanelHelperController.TrySetExternalText("SAIR", "Sair e voltar para o Windows?");
+        PanelHelperController.TrySetExternalText(PanelMessage.Helper("helper.exit.quit"), PanelMessage.Helper("helper.exit.quit_prompt"));
         cursorController?.PlayBeepSfx();
     }
 

@@ -30,7 +30,7 @@ public partial class TurnStateManager
         }
 
         Advance(CursorState.Planning, "enter");
-        PanelDialogController.TrySetExternalText("Planning ativo: clique no mapa para destino / unidade. P ou ESC para sair.");
+        PanelDialogController.TrySetExternalText(PanelMessage.Dialog("panel_dialog.planning.active"));
         return true;
     }
 

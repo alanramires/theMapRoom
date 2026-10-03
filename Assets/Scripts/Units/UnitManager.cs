@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
@@ -940,8 +940,8 @@ public class UnitManager : MonoBehaviour
         cell.z = 0;
         string detail = killer != null &&
                         matchController.IsUnitVisibleForSlot(killer, PlayerSlotId.FromIndex(SlotIndex))
-            ? $"abatida por {(!string.IsNullOrWhiteSpace(killer.UnitDisplayName) ? killer.UnitDisplayName : killer.name)}"
-            : "sem contato visual com o atacante";
+            ? PanelMessage.Helper("helper.journal.destroyed_by", ("unit", !string.IsNullOrWhiteSpace(killer.UnitDisplayName) ? killer.UnitDisplayName : killer.name))
+            : PanelMessage.Helper("helper.journal.attacker_unknown");
         matchController.ReportTurnBriefingEvent(
             PlayerSlotId.FromIndex(SlotIndex),
             MatchController.TurnBriefingCategory.ContactLost,

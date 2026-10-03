@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -147,7 +147,7 @@ public class CampaignSelectionController : MonoBehaviour
                 SetCampaignMenuOpen(true, playSound: false);
                 if (!string.IsNullOrEmpty(persistenceFeedback))
                 {
-                    PanelHelperController.TrySetExternalText("CAMPANHA", persistenceFeedback);
+                    PanelHelperController.TrySetExternalText(PanelMessage.Helper("helper.campaign.title"), persistenceFeedback);
                     persistenceFeedback = null;
                 }
             }
@@ -323,8 +323,8 @@ public class CampaignSelectionController : MonoBehaviour
                 int conquered = 0;
                 for (int i = 0; i < quadrants.Count; i++)
                     if (TryGetQuadrantOwner(i, out _)) conquered++;
-                PanelHelperController.TrySetExternalText("SITUAÇÃO DA CAMPANHA",
-                    $"{mundo.displayName}\nQuadrantes: {quadrants.Count}\nCom domínio registrado: {conquered}\n\nESC: VOLTAR");
+                PanelHelperController.TrySetExternalText(PanelMessage.Helper("helper.campaign.status_title"),
+                    PanelMessage.Helper("helper.campaign.status", ("world", mundo.displayName), ("total", quadrants.Count), ("conquered", conquered)));
                 break;
             case "button_minimapa":
                 SetCampaignMenuOpen(false, playSound: false);
@@ -370,7 +370,7 @@ public class CampaignSelectionController : MonoBehaviour
             data.teams == null || data.teams.Length < 2 || data.teams.Length > 4)
         {
             Debug.LogWarning("[Campanha] Save sem contrato de seleção válido ou de outro mundo.", this);
-            SetPersistenceFeedback("Este save não contém uma seleção de campanha compatível com este mundo.");
+            SetPersistenceFeedback(PanelMessage.Helper("helper.campaign.incompatible_save"));
             return false;
         }
         int focus = quadrants.FindIndex(entry => data.quadranteSerial > 0
@@ -378,7 +378,7 @@ public class CampaignSelectionController : MonoBehaviour
             : entry.Campanha.campanhaId == data.campanhaId && entry.Quadrante.quadranteId == data.quadranteId);
         if (focus < 0)
         {
-            SetPersistenceFeedback("O quadrante deste save não existe mais neste mundo.");
+            SetPersistenceFeedback(PanelMessage.Helper("helper.campaign.missing_quadrant"));
             return false;
         }
         PartidaConfig.Set(data.teams.Length, data.teams, data.isAI, data.flipX, data.preset,
@@ -396,7 +396,7 @@ public class CampaignSelectionController : MonoBehaviour
     public void SetPersistenceFeedback(string message)
     {
         persistenceFeedback = message;
-        PanelHelperController.TrySetExternalText("CAMPANHA", message);
+        PanelHelperController.TrySetExternalText(PanelMessage.Helper("helper.campaign.title"), message);
     }
 
     public void RestoreFocusedQuadrantHelper()
@@ -520,13 +520,7 @@ public class CampaignSelectionController : MonoBehaviour
 
         QuadranteData q = pending.Quadrante;
         int constructionCount = q.bakedConstrucoes != null ? q.bakedConstrucoes.Count : 0;
-        return $"BLOCO: {pending.Bloco.displayName}\n" +
-               $"CAMPANHA: {pending.Campanha.displayName}\n" +
-               $"QUADRANTE: {q.displayName}\n" +
-               $"TAMANHO: {q.width} x {q.height}\n" +
-               $"CONSTRUÇÕES: {constructionCount}\n" +
-               $"BAKE: {(q.HasBake ? "PRONTO" : "INDISPONÍVEL")}" +
-               (q.emDesenvolvimento ? "\nEM DESENVOLVIMENTO" : string.Empty);
+        return PanelMessage.Helper("helper.campaign.confirm", ("block", pending.Bloco.displayName), ("campaign", pending.Campanha.displayName), ("quadrant", q.displayName), ("width", q.width), ("height", q.height), ("buildings", constructionCount), ("bake", PanelMessage.Helper(q.HasBake ? "helper.campaign.bake_ready" : "helper.campaign.bake_unavailable")), ("development", q.emDesenvolvimento ? PanelMessage.Helper("helper.campaign.development_suffix") : string.Empty));
     }
 
     private void OpenConfirmation()
@@ -541,7 +535,7 @@ public class CampaignSelectionController : MonoBehaviour
         confirmationSubmitArmed = false;
         confirmationOpenedFrame = Time.frameCount;
         cursorController?.PlayConfirmSfx();
-        PanelHelperController.TrySetExternalText("CONFIRMAR QUADRANTE", string.Empty);
+        PanelHelperController.TrySetExternalText(PanelMessage.Helper("helper.campaign.confirm_title"), string.Empty);
     }
 
     private void CancelConfirmation()
@@ -566,8 +560,8 @@ public class CampaignSelectionController : MonoBehaviour
         if (!pending.Quadrante.HasBake)
         {
             PanelHelperController.TrySetExternalText(
-                "QUADRANTE INDISPONÍVEL",
-                "Este quadrante ainda não possui bake para iniciar a batalha.");
+                PanelMessage.Helper("helper.campaign.unavailable_title"),
+                PanelMessage.Helper("helper.campaign.no_bake"));
             cursorController?.PlayCancelSfx();
             confirmationOpen = false;
             pending = null;
@@ -579,8 +573,8 @@ public class CampaignSelectionController : MonoBehaviour
         if (pending.Quadrante.emDesenvolvimento)
         {
             PanelHelperController.TrySetExternalText(
-                "EM DESENVOLVIMENTO",
-                "Este quadrante ainda está sendo construído. Volte em breve!");
+                PanelMessage.Helper("helper.campaign.development_title"),
+                PanelMessage.Helper("helper.campaign.development_body"));
             cursorController?.PlayErrorSfx();
             confirmationOpen = false;
             pending = null;
@@ -591,8 +585,8 @@ public class CampaignSelectionController : MonoBehaviour
         if (matchController == null)
         {
             PanelHelperController.TrySetExternalText(
-                "ERRO DE CONFIGURAÇÃO",
-                "MatchController não encontrado na cena Campanha.");
+                PanelMessage.Helper("helper.campaign.error_title"),
+                PanelMessage.Helper("helper.campaign.missing_controller"));
             cursorController?.PlayCancelSfx();
             return;
         }
@@ -616,8 +610,8 @@ public class CampaignSelectionController : MonoBehaviour
         if (teamIds.Count < 2)
         {
             PanelHelperController.TrySetExternalText(
-                "ERRO DE CONFIGURAÇÃO",
-                "A configuração copiada possui menos de dois jogadores.");
+                PanelMessage.Helper("helper.campaign.error_title"),
+                PanelMessage.Helper("helper.campaign.missing_players"));
             cursorController?.PlayCancelSfx();
             return;
         }
@@ -1557,8 +1551,8 @@ public class CampaignSelectionController : MonoBehaviour
         if (hovered == null)
         {
             PanelHelperController.TrySetExternalText(
-                mundo != null ? mundo.displayName.ToUpperInvariant() : "CAMPANHA",
-                "Navegue até um quadrante disponível.");
+                mundo != null ? mundo.displayName.ToUpperInvariant() : PanelMessage.Helper("helper.campaign.title"),
+                PanelMessage.Helper("helper.campaign.navigate"));
             return;
         }
 
@@ -1572,28 +1566,27 @@ public class CampaignSelectionController : MonoBehaviour
         // individual. Aqui vale o vocabulario do autor, porque este numero e a
         // MARCA: o jogador compara ao rejogar, sem tela nenhuma por perto para dar
         // contexto.
-        string bake = q.HasBake ? string.Empty : "\n<color=#FF8888>SEM BAKE</color>";
+        string bake = q.HasBake ? string.Empty : PanelMessage.Helper("helper.campaign.no_bake_badge");
         if (q.emDesenvolvimento)
-            bake += "\n<color=#FFD166>EM DESENVOLVIMENTO</color>";
-        string result = "VENCEDOR: Nenhum\nRODADAS: —\nMOTIVO: —";
+            bake += PanelMessage.Helper("helper.campaign.development_badge");
+        string result = PanelMessage.Helper("helper.campaign.no_result");
         if (mundo != null && CampaignProgressStore.TryGetResult(
             mundo.mundoId, hovered.Campanha.campanhaId, q.quadranteId,
             out PlayerSlotId winner, out int turn, out string reason))
         {
             TeamId team = matchController != null
                 ? matchController.GetTeamIdForSlot(winner.Value) : TeamId.Neutral;
-            string winnerName = $"Jogador {winner.Value + 1}";
+            string winnerName = PanelMessage.Helper("helper.campaign.player", ("number", winner.Value + 1));
             if (team != TeamId.Neutral)
                 winnerName += $" ({TeamUtils.GetName(team)})";
             string color = ColorUtility.ToHtmlStringRGB(TeamUtils.GetColor(team));
             // O MOTIVO separa vitoria jogada de vitoria por setup: "exercito
             // eliminado" na rodada 2 e o sintoma de quadrante sem tropa nem caixa.
-            result = $"VENCEDOR: <color=#{color}>{winnerName}</color>\nRODADAS: {turn}" +
-                     $"\nMOTIVO: {CampaignProgressStore.DescreverMotivo(reason).ToUpperInvariant()}";
+            result = PanelMessage.Helper("helper.campaign.result", ("color", color), ("winner", winnerName), ("round", turn), ("reason", CampaignProgressStore.DescreverMotivo(reason).ToUpperInvariant()));
         }
         PanelHelperController.TrySetExternalText(
             hovered.Bloco.displayName.ToUpperInvariant(),
-            $"{hovered.Campanha.displayName}\n\nQUADRANTE: {q.displayName}\n{q.descricao}{bake}\n\n{result}\n\nSETAS: MUDAR QUADRANTE | ENTER: SELECIONAR");
+            PanelMessage.Helper("helper.campaign.quadrant", ("campaign", hovered.Campanha.displayName), ("quadrant", q.displayName), ("description", q.descricao), ("availability", bake), ("result", result)));
     }
 
     private void FrameWorldInCamera()

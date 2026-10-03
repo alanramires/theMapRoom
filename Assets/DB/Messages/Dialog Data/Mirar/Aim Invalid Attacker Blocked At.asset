@@ -15,3 +15,4 @@ MonoBehaviour:
   id: aim.invalid.attacker_blocked_at
   condition: Unidade atacante bloqueada no dominio/altura atual.
   message: <unit> nao atira quando em <domain>/<height>
+  messageEnglish: "<unit> cannot fire at <domain>/<height>"

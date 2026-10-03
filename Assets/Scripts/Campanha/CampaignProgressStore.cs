@@ -96,10 +96,10 @@ public static class CampaignProgressStore
     {
         switch (reason)
         {
-            case nameof(MatchController.VictoryReason.HeadQuarterCaptured): return "QG capturado";
-            case nameof(MatchController.VictoryReason.ArmyEliminated): return "exército eliminado";
-            case nameof(MatchController.VictoryReason.Surrender): return "rendição";
-            case nameof(MatchController.VictoryReason.VictoryStars): return "estrelas de vitória";
+            case nameof(MatchController.VictoryReason.HeadQuarterCaptured): return PanelHelperController.ResolveHelperMessage("helper.campaign.reason.hq", "QG capturado");
+            case nameof(MatchController.VictoryReason.ArmyEliminated): return PanelHelperController.ResolveHelperMessage("helper.campaign.reason.army", "exército eliminado");
+            case nameof(MatchController.VictoryReason.Surrender): return PanelHelperController.ResolveHelperMessage("helper.campaign.reason.surrender", "rendição");
+            case nameof(MatchController.VictoryReason.VictoryStars): return PanelHelperController.ResolveHelperMessage("helper.campaign.reason.stars", "estrelas de vitória");
             case null:
             case "": return "—";
             default: return reason;

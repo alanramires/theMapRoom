@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -629,9 +629,9 @@ public partial class TurnStateManager
                 WeaponData selectedWeapon = selectedEntry.isValid
                     ? selectedEntry.validOption != null ? selectedEntry.validOption.weapon : null
                     : selectedEntry.invalidOption != null ? selectedEntry.invalidOption.weapon : null;
-                data.AimConfirmTargetName = target != null ? ResolveDebugUnitName(target) : "Alvo";
+                data.AimConfirmTargetName = target != null ? ResolveDebugUnitName(target) : PanelMessage.Helper("helper.fallback.target_name");
                 data.AimConfirmWeaponName = selectedWeapon != null
-                    ? ResolveWeaponName(selectedWeapon, "Arma")
+                    ? ResolveWeaponName(selectedWeapon, PanelMessage.Helper("helper.fallback.weapon"))
                     : string.Empty;
                 if (target != null)
                 {
@@ -664,12 +664,12 @@ public partial class TurnStateManager
             data.AimTargetLines.Add(new HelperAimTargetLine
             {
                 index = i,
-                unitName = target != null ? ResolveDebugUnitName(target) : "Alvo invalido",
+                unitName = target != null ? ResolveDebugUnitName(target) : PanelMessage.Helper("helper.fallback.invalid_target"),
                 isValid = entry.isValid,
                 isFocused = !mirandoCancelFocused && scannerSelectedTargetIndex == i,
                 hp = target != null ? Mathf.Max(0, target.CurrentHP) : 0,
                 terrainLabel = target != null ? ResolveUnitLocalLabel(target) : string.Empty,
-                weaponName = weapon != null ? ResolveWeaponName(weapon, "Arma") : string.Empty,
+                weaponName = weapon != null ? ResolveWeaponName(weapon, PanelMessage.Helper("helper.fallback.weapon")) : string.Empty,
                 weaponCategoryLabel = weapon != null
                     ? WeaponCategoryLabels.GetAlias(weapon.WeaponCategory).ToUpperInvariant()
                     : string.Empty,
@@ -683,7 +683,7 @@ public partial class TurnStateManager
         data.AimTargetLines.Add(new HelperAimTargetLine
         {
             index = -1,
-            unitName = "CANCELAR",
+            unitName = PanelMessage.Helper("helper.action.cancel"),
             isValid = true,
             isFocused = mirandoCancelFocused,
             isCancel = true
@@ -742,9 +742,9 @@ public partial class TurnStateManager
         bool masculineTerrain = terrainName.Equals("Mar", System.StringComparison.OrdinalIgnoreCase);
 
         if (isBridge)
-            return $"{structureName} sobre {(masculineTerrain ? "o" : "a")} {terrainName}";
+            return PanelMessage.Helper(masculineTerrain ? "helper.local.bridge_masculine" : "helper.local.bridge_feminine", ("structure", structureName), ("terrain", terrainName));
 
-        return $"{structureName} {(masculineTerrain ? "no" : "na")} {terrainName}";
+        return PanelMessage.Helper(masculineTerrain ? "helper.local.structure_masculine" : "helper.local.structure_feminine", ("structure", structureName), ("terrain", terrainName));
     }
 
     // Visual do LOCAL: a construcao ocupa o hex visualmente e tem prioridade sobre o terreno.
@@ -1198,8 +1198,7 @@ public partial class TurnStateManager
                     ? overflownConstruction.ConstructionDisplayName
                     : overflownConstruction.name;
                 if (!string.IsNullOrWhiteSpace(constructionName))
-                    data.UnitStatsConstructionStockLine = data.UnitStatsConstructionStockLine.Replace(
-                        "ESTOQUE:", $"{constructionName}:");
+                    data.UnitStatsConstructionStockLine = BuildConstructionStockLineAtCell(unitCell, constructionName);
             }
         }
 
@@ -1259,7 +1258,7 @@ public partial class TurnStateManager
         return data.UnitStatsLines.Count > 0;
     }
 
-    private string BuildConstructionStockLineAtCell(Vector3Int cell)
+    private string BuildConstructionStockLineAtCell(Vector3Int cell, string title = null)
     {
         Tilemap board = terrainTilemap;
         if (board == null)
@@ -1284,7 +1283,7 @@ public partial class TurnStateManager
                 continue;
 
             string amount = construction.HasInfiniteSuppliesFor(offer.supply)
-                ? "INF"
+                ? PanelMessage.Helper("helper.value.infinite")
                 : Mathf.Max(0, offer.quantity).ToString();
             string supplyId = offer.supply.id ?? string.Empty;
             if (supplyId.Equals("gasolina", StringComparison.OrdinalIgnoreCase))
@@ -1295,7 +1294,7 @@ public partial class TurnStateManager
                 parts = amount;
         }
 
-        return $"ESTOQUE:\n{gallons} galões | {ammoBoxes} caixas | {parts} peças";
+        return PanelMessage.Helper("helper.stock.summary", ("title", title ?? PanelMessage.Helper("helper.stock.title")), ("fuel", gallons), ("ammo", ammoBoxes), ("parts", parts));
     }
 
     private void ResolveUnitActiveLocalVisual(
@@ -1364,7 +1363,7 @@ public partial class TurnStateManager
 
         lines.Add(string.Empty);
         lines.Add("SECTION:Vision");
-        lines.Add($"Alcance: {Mathf.Max(1, unitData.visao)}");
+        lines.Add(PanelMessage.Helper("helper.vision.range", ("range", Mathf.Max(1, unitData.visao))));
 
         IReadOnlyList<UnitVisionException> specializations = unitData.visionSpecializations;
         if (specializations == null)
@@ -1380,23 +1379,23 @@ public partial class TurnStateManager
             string detection = ResolveVisionDetectionSkillsLabel(entry.detectUnitsWithFollowingSkills);
             lines.Add(string.IsNullOrWhiteSpace(detection)
                 ? $"- {layer}: {Mathf.Max(0, entry.vision)}"
-                : $"- {layer}: {Mathf.Max(0, entry.vision)} | Detecta: {detection}");
+                : PanelMessage.Helper("helper.vision.detection", ("layer", layer), ("vision", Mathf.Max(0, entry.vision)), ("detection", detection)));
         }
     }
 
     private static string ResolveVisionLayerLabel(UnitVisionException entry)
     {
         if (entry == null)
-            return "Especial";
+            return PanelMessage.Helper("helper.vision.special");
 
         switch (entry.domain)
         {
-            case Domain.Land: return entry.allHeights ? "Terrestre" : "Terrestre/Superficie";
-            case Domain.Naval: return entry.allHeights ? "Naval" : "Naval/Superficie";
-            case Domain.Submarine: return entry.allHeights ? "Submarino" : "Submarino/Submerso";
+            case Domain.Land: return entry.allHeights ? PanelMessage.Helper("helper.vision.land") : PanelMessage.Helper("helper.vision.land_surface");
+            case Domain.Naval: return entry.allHeights ? PanelMessage.Helper("helper.vision.naval") : PanelMessage.Helper("helper.vision.naval_surface");
+            case Domain.Submarine: return entry.allHeights ? PanelMessage.Helper("helper.vision.submarine") : PanelMessage.Helper("helper.vision.submerged");
             case Domain.Air:
-                if (entry.allHeights) return "Aereo";
-                return entry.heightLevel == HeightLevel.AirHigh ? "Aereo/Alto" : "Aereo/Baixo";
+                if (entry.allHeights) return PanelMessage.Helper("helper.vision.air");
+                return entry.heightLevel == HeightLevel.AirHigh ? PanelMessage.Helper("helper.vision.air_high") : PanelMessage.Helper("helper.vision.air_low");
             default: return entry.domain.ToString();
         }
     }
@@ -1483,7 +1482,7 @@ public partial class TurnStateManager
             int max = embarked.GetRangeMax();
             string range = min == max ? min.ToString() : $"{min} ~ {max}";
             string categoryAlias = WeaponCategoryLabels.GetAlias(embarked.weapon.WeaponCategory);
-            lines.Add($"{weaponCounter}: {weaponName} ({ammo}) R:{range} {{{categoryAlias}}}");
+            lines.Add(PanelMessage.Helper("helper.weapon.line", ("index", weaponCounter), ("weapon", weaponName), ("ammo", ammo), ("range", range), ("category", categoryAlias)));
         }
     }
 
@@ -1573,15 +1572,15 @@ public partial class TurnStateManager
         ResolveCellLocalVisual(constructionCell, out data.UnitStatsLocalSprite, out data.UnitStatsLocalColor);
         ResolveCellLocalStructureVisual(constructionCell, out data.UnitStatsStructureSprite, out data.UnitStatsStructureColor);
         data.UnitStatsDefensePoints = ResolveCellDefensePoints(constructionCell);
-        data.ConstructionStatsLines.Add($"Dono Atual: {TeamUtils.GetName(construction.TeamId)} ({(int)construction.TeamId})");
-        data.ConstructionStatsLines.Add($"Capture: {construction.CurrentCapturePoints}/{construction.CapturePointsMax}");
+        data.ConstructionStatsLines.Add(PanelMessage.Helper("helper.construction.owner", ("team", TeamUtils.GetName(construction.TeamId)), ("id", (int)construction.TeamId)));
+        data.ConstructionStatsLines.Add(PanelMessage.Helper("helper.construction.capture", ("current", construction.CurrentCapturePoints), ("max", construction.CapturePointsMax)));
 
         IReadOnlyList<ConstructionSupplyOffer> offers = construction.OfferedSupplies;
         data.ConstructionStatsLines.Add(string.Empty);
-        data.ConstructionStatsLines.Add("Estoques");
+        data.ConstructionStatsLines.Add(PanelMessage.Helper("helper.construction.stocks"));
         if (offers == null || offers.Count <= 0)
         {
-            data.ConstructionStatsLines.Add("- nenhum");
+            data.ConstructionStatsLines.Add(PanelMessage.Helper("helper.construction.none"));
         }
         else
         {
@@ -1596,22 +1595,22 @@ public partial class TurnStateManager
                 int current = Mathf.Max(0, offer.quantity);
                 int maximum = Mathf.Max(current, offer.peakQuantity);
                 string amount = construction.HasInfiniteSuppliesFor(offer.supply)
-                    ? "INF"
+                    ? PanelMessage.Helper("helper.value.infinite")
                     : $"{current}/{maximum}";
                 data.ConstructionStatsLines.Add($"- {name}: {amount}");
                 addedAny = true;
             }
 
             if (!addedAny)
-                data.ConstructionStatsLines.Add("- nenhum");
+                data.ConstructionStatsLines.Add(PanelMessage.Helper("helper.construction.none"));
         }
 
         IReadOnlyList<ServiceData> services = construction.OfferedServices;
         data.ConstructionStatsLines.Add(string.Empty);
-        data.ConstructionStatsLines.Add("Servicos");
+        data.ConstructionStatsLines.Add(PanelMessage.Helper("helper.construction.services"));
         if (services == null || services.Count <= 0)
         {
-            data.ConstructionStatsLines.Add("- nenhum");
+            data.ConstructionStatsLines.Add(PanelMessage.Helper("helper.construction.none"));
         }
         else
         {
@@ -1636,7 +1635,7 @@ public partial class TurnStateManager
             }
 
             if (!addedAnyService)
-                data.ConstructionStatsLines.Add("- nenhum");
+                data.ConstructionStatsLines.Add(PanelMessage.Helper("helper.construction.none"));
         }
 
         return data.ConstructionStatsLines.Count > 0;
@@ -1670,7 +1669,7 @@ public partial class TurnStateManager
         PopulateInspectionTimeoutProgress(data);
         data.UnitStatsLocalLabel = ResolveCellTerrainLabel(cell);
         data.TerrainStatsName = string.IsNullOrWhiteSpace(data.UnitStatsLocalLabel)
-            ? "LOCAL"
+            ? PanelMessage.Helper("helper.local.name")
             : data.UnitStatsLocalLabel;
         ResolveCellLocalVisual(cell, out data.UnitStatsLocalSprite, out data.UnitStatsLocalColor);
         ResolveCellLocalStructureVisual(cell, out data.UnitStatsStructureSprite, out data.UnitStatsStructureColor);
@@ -3299,7 +3298,7 @@ public partial class TurnStateManager
             {
                 string planLabel = BuildTransportPassengerAIPlanLabel(passenger);
                 passengerName += string.IsNullOrWhiteSpace(planLabel)
-                    ? " (SEM PLANO)"
+                    ? PanelMessage.Helper("helper.unit.no_plan")
                     : $" ({planLabel})";
             }
             data.UnitStatsLines.Add($"{indent}{passengerName} ({stats})||SUPPLIES||{supplies}");
@@ -3336,7 +3335,7 @@ public partial class TurnStateManager
                 PlayerSlotId.FromIndex(passenger.SlotIndex));
             if (plan?.RogueUnitIds != null
                 && plan.RogueUnitIds.Contains(passenger.InstanceId))
-                return "ROGUE";
+                return PanelMessage.Helper("helper.unit.rogue");
 
             if (plan?.Objectives != null)
             {
@@ -3427,7 +3426,7 @@ public partial class TurnStateManager
     private static string ResolveSupplyDisplayName(SupplyData supply)
     {
         if (supply == null)
-            return "Supply";
+            return PanelMessage.Helper("helper.fallback.supply");
         if (!string.IsNullOrWhiteSpace(supply.displayName))
             return supply.displayName;
         if (!string.IsNullOrWhiteSpace(supply.id))
@@ -3441,12 +3440,12 @@ public partial class TurnStateManager
             return string.Empty;
 
         if (data.supplierTier == SupplierTier.Receiver)
-            return "Transferir - Recebedor";
+            return PanelMessage.Helper("helper.transfer.receiver");
         if (data.supplierTier != SupplierTier.Hub)
             return string.Empty;
         if (construction.HasInfiniteSuppliesFor())
-            return "Transferir - Fornecedor";
-        return "Transferir - Recebedor/Fornecedor";
+            return PanelMessage.Helper("helper.transfer.supplier");
+        return PanelMessage.Helper("helper.transfer.both");
     }
 
     private bool TryBuildCommandServiceHelperPanelData(HelperPanelData data)
@@ -3655,7 +3654,7 @@ public partial class TurnStateManager
         data.ShoppingLines.Add(new HelperShoppingLine
         {
             index = -1,
-            unitName = "CANCELAR",
+            unitName = PanelMessage.Helper("helper.action.cancel"),
             cost = null,
             isFocused = shoppingCancelFocused,
             isCancel = true
@@ -3884,7 +3883,7 @@ public partial class TurnStateManager
             {
                 PodeEmbarcarOption selected = cachedPodeEmbarcarTargets[scannerSelectedEmbarkIndex];
                 UnitManager transporter = selected != null ? selected.transporterUnit : null;
-                data.AimConfirmTargetName = transporter != null ? ResolveUnitRuntimeName(transporter) : "Transportador";
+                data.AimConfirmTargetName = transporter != null ? ResolveUnitRuntimeName(transporter) : PanelMessage.Helper("helper.fallback.transporter");
                 if (transporter != null)
                 {
                     SpriteRenderer renderer = transporter.GetMainSpriteRenderer();
@@ -3942,7 +3941,7 @@ public partial class TurnStateManager
         data.AimTargetLines.Add(new HelperAimTargetLine
         {
             index = -1,
-            unitName = "CANCELAR",
+            unitName = PanelMessage.Helper("helper.action.cancel"),
             isValid = true,
             isFocused = embarkCancelFocused,
             isCancel = true
@@ -4142,7 +4141,7 @@ public partial class TurnStateManager
     private static string ResolveTransferOptionTargetName(PodeTransferirOption option)
     {
         if (option == null)
-            return "(invalido)";
+            return PanelMessage.Helper("helper.fallback.invalid_parenthesized");
 
         if (option.targetUnit != null)
             return ResolveUnitRuntimeName(option.targetUnit);
@@ -4150,7 +4149,7 @@ public partial class TurnStateManager
         if (option.targetConstruction != null)
             return ResolveConstructionName(option.targetConstruction);
 
-        return "(sem alvo)";
+        return PanelMessage.Helper("helper.fallback.no_target");
     }
 
     private void BuildSupplyResourcePreviewLines(HelperPanelData data, UnitManager supplier, List<UnitManager> executionOrder)
@@ -4331,11 +4330,11 @@ public partial class TurnStateManager
     {
         List<string> segments = new List<string>();
         if (hp > 0)
-            segments.Add($"HP +{hp}");
+            segments.Add(PanelMessage.Helper("helper.gain.hp", ("value", hp)));
         if (fuel > 0)
-            segments.Add($"FUEL +{fuel}");
+            segments.Add(PanelMessage.Helper("helper.gain.fuel", ("value", fuel)));
         if (ammo > 0)
-            segments.Add($"AMMO +{ammo}");
+            segments.Add(PanelMessage.Helper("helper.gain.ammo", ("value", ammo)));
         return segments.Count > 0 ? string.Join(" | ", segments) : "-";
     }
 
@@ -4539,8 +4538,8 @@ public partial class TurnStateManager
 
         List<string> segments = new List<string>
         {
-            $"{resultHp}HP",
-            $"{resultAutonomy}F"
+            PanelMessage.Helper("helper.unit_stats.inline.hp", ("value", resultHp)),
+            PanelMessage.Helper("helper.unit_stats.inline.fuel", ("value", resultAutonomy))
         };
 
         AppendMergeResultWeaponSegments(segments, selectedUnit, resultHp, projectilesByWeapon);
@@ -4572,7 +4571,7 @@ public partial class TurnStateManager
             int projectedAmmo = 0;
             if (projectilesByWeapon.TryGetValue(runtime.weapon, out int totalProjectiles) && resultHp > 0)
                 projectedAmmo = Mathf.Max(0, totalProjectiles / resultHp);
-            segments.Add($"W{weaponCounter}:{projectedAmmo}");
+            segments.Add(PanelMessage.Helper("helper.unit_stats.inline.weapon", ("index", weaponCounter), ("value", projectedAmmo)));
         }
     }
 
@@ -4600,7 +4599,7 @@ public partial class TurnStateManager
             int projectedAmount = 0;
             if (supplyStepsByType.TryGetValue(runtime.supply, out int totalSteps) && resultHp > 0)
                 projectedAmount = Mathf.Max(0, totalSteps / resultHp);
-            segments.Add($"R{supplyCounter}:{projectedAmount}");
+            segments.Add(PanelMessage.Helper("helper.unit_stats.inline.supply", ("index", supplyCounter), ("value", projectedAmount)));
         }
     }
 

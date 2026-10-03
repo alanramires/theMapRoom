@@ -496,24 +496,24 @@ public class PanelHelperController : MonoBehaviour
                     new Dictionary<string, string>
                     {
                         ["Construction"] = string.IsNullOrWhiteSpace(data.ShoppingConstructionName)
-                            ? "Construction"
+                            ? PanelMessage.Helper("helper.fallback.construction")
                             : data.ShoppingConstructionName
                     });
                 body = BuildShoppingBody(data);
                 return;
 
             case TurnStateManager.HelperPanelKind.RemovingUnit:
-                title = "REMOVER UNIDADE";
-                body = $"A unidade {data.RemovingUnitName} vai ser removida.";
+                title = PanelMessage.Helper("helper.title.remove_unit");
+                body = PanelMessage.Helper("helper.remove_unit.confirm", ("unit", data.RemovingUnitName));
                 return;
 
             case TurnStateManager.HelperPanelKind.AimTargets:
-                title = "ESCOLHER ALVO";
+                title = PanelMessage.Helper("helper.title.choose_target");
                 body = string.Empty;
                 return;
 
             case TurnStateManager.HelperPanelKind.AimConfirm:
-                title = "CONFIRMAR ATAQUE";
+                title = PanelMessage.Helper("helper.title.confirm_attack");
                 body = string.Empty;
                 return;
 
@@ -525,13 +525,13 @@ public class PanelHelperController : MonoBehaviour
                 return;
 
             case TurnStateManager.HelperPanelKind.Disembark:
-                title = data.DisembarkStep == 0 ? "ESCOLHER UNIDADE" :
-                        data.DisembarkStep == 1 ? "ESCOLHER LOCAL" : "CONFIRMAR DESEMBARQUE";
+                title = data.DisembarkStep == 0 ? PanelMessage.Helper("helper.title.choose_unit") :
+                        data.DisembarkStep == 1 ? PanelMessage.Helper("helper.title.choose_location") : PanelMessage.Helper("helper.title.confirm_disembark");
                 body = string.Empty;
                 return;
 
             case TurnStateManager.HelperPanelKind.Merge:
-                title = data.IsMergeConfirmStep ? "CONFIRMAR FUSÃO" : "ESCOLHER UNIDADE";
+                title = data.IsMergeConfirmStep ? PanelMessage.Helper("helper.title.confirm_merge") : PanelMessage.Helper("helper.title.choose_unit");
                 body = string.Empty;
                 return;
 
@@ -541,17 +541,17 @@ public class PanelHelperController : MonoBehaviour
                 return;
 
             case TurnStateManager.HelperPanelKind.EmbarkConfirm:
-                title = "CONFIRMAR EMBARQUE";
+                title = PanelMessage.Helper("helper.title.confirm_embark");
                 body = string.Empty;
                 return;
 
             case TurnStateManager.HelperPanelKind.Supply:
-                title = data.SupplyIsConfirmStep ? "CONFIRMAR SUPRIMENTO" : "ESCOLHER UNIDADE";
+                title = data.SupplyIsConfirmStep ? PanelMessage.Helper("helper.title.confirm_supply") : PanelMessage.Helper("helper.title.choose_unit");
                 body = BuildSupplyBody(data);
                 return;
 
             case TurnStateManager.HelperPanelKind.Transfer:
-                title = data.TransferIsConfirmStep ? "CONFIRMAR TRANSFERÊNCIA" : "ESCOLHER DESTINO";
+                title = data.TransferIsConfirmStep ? PanelMessage.Helper("helper.title.confirm_transfer") : PanelMessage.Helper("helper.title.choose_destination");
                 body = string.Empty;
                 return;
 
@@ -571,7 +571,7 @@ public class PanelHelperController : MonoBehaviour
                 return;
 
             case TurnStateManager.HelperPanelKind.TerrainStats:
-                title = data.TerrainStatsName ?? "TERRENO";
+                title = data.TerrainStatsName ?? PanelMessage.Helper("helper.title.terrain");
                 body = BuildTerrainStatsBody(data);
                 return;
 
@@ -1006,7 +1006,7 @@ public class PanelHelperController : MonoBehaviour
                         { "index", line.index.ToString() },
                         { "unit", line.unitName ?? string.Empty },
                         { "stats", line.stats ?? string.Empty },
-                        { "reason", string.IsNullOrWhiteSpace(line.invalidReason) ? "invalido" : line.invalidReason }
+                        { "reason", string.IsNullOrWhiteSpace(line.invalidReason) ? PanelMessage.Helper("helper.fallback.invalid") : line.invalidReason }
                     }));
             }
         }
@@ -1102,7 +1102,7 @@ public class PanelHelperController : MonoBehaviour
         if (data.CommandServiceIsEstimate && data.CommandServiceSkippedUnitLines != null && data.CommandServiceSkippedUnitLines.Count > 0)
         {
             sb.AppendLine(ResolveMessage("helper.merge.separator", "----------------"));
-            sb.AppendLine($"<color=#FFB347>Unidades nao atendidas: {data.CommandServiceSkippedUnitLines.Count}</color>");
+            sb.AppendLine(PanelMessage.Helper("helper.command_service.skipped", ("count", data.CommandServiceSkippedUnitLines.Count)));
             for (int i = 0; i < data.CommandServiceSkippedUnitLines.Count; i++)
             {
                 TurnStateManager.HelperCommandServiceSkippedUnitLine line = data.CommandServiceSkippedUnitLines[i];
@@ -1163,7 +1163,7 @@ public class PanelHelperController : MonoBehaviour
                         { "prefix", prefix },
                         { "unit", line.unitName ?? string.Empty },
                         { "stats", line.stats ?? string.Empty },
-                        { "reason", string.IsNullOrWhiteSpace(line.invalidReason) ? "invalido" : line.invalidReason }
+                        { "reason", string.IsNullOrWhiteSpace(line.invalidReason) ? PanelMessage.Helper("helper.fallback.invalid") : line.invalidReason }
                     }));
             }
         }
@@ -1184,18 +1184,16 @@ public class PanelHelperController : MonoBehaviour
             {
                 { "targets", Mathf.Max(0, data.SupplyServedTargets).ToString() }
             }));
-        string gainsLine = ResolveMessage(
-            "helper.supply.gains",
-            "Ganhos: HP +<hp> | FUEL +<fuel> | AMMO +<ammo>",
-            new Dictionary<string, string>
-            {
-                { "hp", Mathf.Max(0, data.SupplyRecoveredHp).ToString() },
-                { "fuel", Mathf.Max(0, data.SupplyRecoveredFuel).ToString() },
-                { "ammo", Mathf.Max(0, data.SupplyRecoveredAmmo).ToString() }
-            });
-        gainsLine = RemoveZeroGainSegments(gainsLine);
-        if (!string.IsNullOrWhiteSpace(gainsLine))
-            sb.AppendLine(gainsLine);
+        var gains = new List<string>();
+        if (data.SupplyRecoveredHp > 0)
+            gains.Add(PanelMessage.Helper("helper.gain.hp", ("value", data.SupplyRecoveredHp)));
+        if (data.SupplyRecoveredFuel > 0)
+            gains.Add(PanelMessage.Helper("helper.gain.fuel", ("value", data.SupplyRecoveredFuel)));
+        if (data.SupplyRecoveredAmmo > 0)
+            gains.Add(PanelMessage.Helper("helper.gain.ammo", ("value", data.SupplyRecoveredAmmo)));
+        if (gains.Count > 0)
+            sb.AppendLine(PanelMessage.Helper("helper.supply.gains.summary",
+                ("gains", string.Join(ResolveMessage("helper.unit_stats.inline.separator", " | "), gains))));
         sb.AppendLine(ResolveMessage(
             "helper.supply.total_cost",
             "Custo estimado: $<valor>",
@@ -1247,7 +1245,7 @@ public class PanelHelperController : MonoBehaviour
                     "<supply>: <before> - <consumed> -> <after>",
                     new Dictionary<string, string>
                     {
-                        { "supply", line.supplyName ?? "Supply" },
+                        { "supply", line.supplyName ?? PanelMessage.Helper("helper.fallback.supply") },
                         { "before", Mathf.Max(0, line.beforeAmount).ToString() },
                         { "consumed", consumed.ToString() },
                         { "after", Mathf.Max(0, line.afterAmount).ToString() }
@@ -1262,46 +1260,6 @@ public class PanelHelperController : MonoBehaviour
         }
 
         return sb.ToString().TrimEnd();
-    }
-
-    private static string RemoveZeroGainSegments(string line)
-    {
-        if (string.IsNullOrWhiteSpace(line))
-            return string.Empty;
-
-        string[] segments = line.Split('|');
-        if (segments.Length <= 1)
-            return ContainsStandalonePlusZero(line) ? string.Empty : line.Trim();
-
-        List<string> kept = new List<string>(segments.Length);
-        for (int i = 0; i < segments.Length; i++)
-        {
-            string segment = segments[i].Trim();
-            if (string.IsNullOrWhiteSpace(segment))
-                continue;
-            if (ContainsStandalonePlusZero(segment))
-                continue;
-            kept.Add(segment);
-        }
-
-        return kept.Count <= 0 ? string.Empty : string.Join(" | ", kept);
-    }
-
-    private static bool ContainsStandalonePlusZero(string text)
-    {
-        if (string.IsNullOrEmpty(text))
-            return false;
-
-        int index = text.IndexOf("+0", System.StringComparison.Ordinal);
-        while (index >= 0)
-        {
-            int next = index + 2;
-            if (next >= text.Length || !char.IsDigit(text[next]))
-                return true;
-            index = text.IndexOf("+0", next, System.StringComparison.Ordinal);
-        }
-
-        return false;
     }
 
     private string BuildTransferBody(TurnStateManager.HelperPanelData data)
@@ -1330,7 +1288,7 @@ public class PanelHelperController : MonoBehaviour
                     {
                         { "number", line.index.ToString() },
                         { "transfer_type", transferType },
-                        { "unit_name", line.unitName ?? "(alvo)" }
+                        { "unit_name", line.unitName ?? PanelMessage.Helper("helper.fallback.target") }
                     }));
             }
 
@@ -1362,7 +1320,7 @@ public class PanelHelperController : MonoBehaviour
                 {
                     { "number", selectedLine.index.ToString() },
                     { "transfer_type", transferType },
-                    { "unit_name", selectedLine.unitName ?? "(alvo)" }
+                    { "unit_name", selectedLine.unitName ?? PanelMessage.Helper("helper.fallback.target") }
                 }));
         }
         else if (!string.IsNullOrWhiteSpace(data.TransferSelectedLabel))
@@ -1396,7 +1354,7 @@ public class PanelHelperController : MonoBehaviour
                             "- <supply>: <moved>",
                             new Dictionary<string, string>
                             {
-                                { "supply", line.supplyName ?? "Supply" },
+                                { "supply", line.supplyName ?? PanelMessage.Helper("helper.fallback.supply") },
                                 { "moved", Mathf.Max(0, line.movedAmount).ToString() }
                             }));
                     }
@@ -1407,7 +1365,7 @@ public class PanelHelperController : MonoBehaviour
                             "- <supply>: <before> - <moved> -> <after>",
                             new Dictionary<string, string>
                             {
-                                { "supply", line.supplyName ?? "Supply" },
+                                { "supply", line.supplyName ?? PanelMessage.Helper("helper.fallback.supply") },
                                 { "before", Mathf.Max(0, line.sourceBefore).ToString() },
                                 { "moved", Mathf.Max(0, line.movedAmount).ToString() },
                                 { "after", Mathf.Max(0, line.sourceAfter).ToString() }
@@ -1434,14 +1392,14 @@ public class PanelHelperController : MonoBehaviour
                 if (line == null)
                     continue;
 
-                string dstBefore = line.destinationBefore >= int.MaxValue ? "INF" : Mathf.Max(0, line.destinationBefore).ToString();
-                string dstAfter = line.destinationAfter >= int.MaxValue ? "INF" : Mathf.Max(0, line.destinationAfter).ToString();
+                string dstBefore = line.destinationBefore >= int.MaxValue ? PanelMessage.Helper("helper.value.infinite") : Mathf.Max(0, line.destinationBefore).ToString();
+                string dstAfter = line.destinationAfter >= int.MaxValue ? PanelMessage.Helper("helper.value.infinite") : Mathf.Max(0, line.destinationAfter).ToString();
                 sb.AppendLine(ResolveMessage(
                     "helper.transfer.destination.line",
                     "- <supply>: <before> + <moved> -> <after>",
                     new Dictionary<string, string>
                     {
-                        { "supply", line.supplyName ?? "Supply" },
+                        { "supply", line.supplyName ?? PanelMessage.Helper("helper.fallback.supply") },
                         { "before", dstBefore },
                         { "moved", Mathf.Max(0, line.movedAmount).ToString() },
                         { "after", dstAfter }
@@ -1478,7 +1436,7 @@ public class PanelHelperController : MonoBehaviour
             case "fuse":
                 return ResolveMessage("helper.sensors.label.fuse", "Fuse units");
             case "supply":
-                return ResolveMessage("helper.sensors.label.supply", "Supply");
+                return ResolveMessage("helper.sensors.label.supply", PanelMessage.Helper("helper.fallback.supply"));
             case "transfer":
                 return ResolveMessage("helper.sensors.label.transfer", "Transfer");
             case "layer":
@@ -1512,29 +1470,7 @@ public class PanelHelperController : MonoBehaviour
 
     private static string ApplyInlineTokens(string template, IReadOnlyDictionary<string, string> tokens)
     {
-        if (string.IsNullOrEmpty(template) || tokens == null || tokens.Count == 0)
-            return template ?? string.Empty;
-
-        string output = template;
-        foreach (KeyValuePair<string, string> pair in tokens)
-        {
-            if (string.IsNullOrWhiteSpace(pair.Key))
-                continue;
-
-            string key = pair.Key.Trim();
-            string val = pair.Value ?? string.Empty;
-            
-            output = output.Replace($"<{key}>", val);
-            output = output.Replace($"<{key.ToLowerInvariant()}>", val);
-            output = output.Replace($"<{key.ToUpperInvariant()}>", val);
-            if (key.Length > 0)
-            {
-                string titleCase = char.ToUpperInvariant(key[0]) + (key.Length > 1 ? key.Substring(1).ToLowerInvariant() : string.Empty);
-                output = output.Replace($"<{titleCase}>", val);
-            }
-        }
-
-        return output;
+        return MessageTemplate.Apply(template, tokens);
     }
 
     private void HideAll(bool force)
@@ -1864,7 +1800,7 @@ public class PanelHelperController : MonoBehaviour
             Destroy(commandServiceRowsRoot.transform.GetChild(i).gameObject);
         commandServiceRows.Clear();
 
-        commandServiceSummaryLabel.text = $"Previstos: {data.CommandServiceServedTargets}\nCusto previsto: ${data.CommandServiceTotalCost}\nRestante: ${data.CommandServiceMoneyAfter}";
+        commandServiceSummaryLabel.text = PanelMessage.Helper("helper.command_service.summary", ("targets", data.CommandServiceServedTargets), ("cost", data.CommandServiceTotalCost), ("balance", data.CommandServiceMoneyAfter));
         commandServiceSummaryLabel.color = currentTeamColor;
 
         for (int i = 0; i < data.CommandServiceTargetLines.Count; i++)
@@ -1878,7 +1814,7 @@ public class PanelHelperController : MonoBehaviour
         {
             var line = data.CommandServiceSkippedUnitLines[i];
             if (line == null) continue;
-            CreateCommandServiceUnitRow(line.unitName, $"Não atendida — {line.sourceLabel}", line.unitSprite,
+            CreateCommandServiceUnitRow(line.unitName, PanelMessage.Helper("helper.command_service.not_served", ("source", line.sourceLabel)), line.unitSprite,
                 line.unitColor, line.cell, false, i, line.isFocused, new Color(0.58f, 0.58f, 0.58f));
         }
         float contentHeight = commandServiceRows.Count * (CommandServiceRowHeight + 4f);
@@ -2165,8 +2101,8 @@ public class PanelHelperController : MonoBehaviour
             }
             else
             {
-                string unitName = string.IsNullOrWhiteSpace(line.unitName) ? "Unidade" : line.unitName;
-                label.text = $"{unitName}\nCombustível {Mathf.Max(0, line.fuelBefore)} − {Mathf.Max(0, line.autonomyConsumed)} = {Mathf.Max(0, line.fuelAfter)}\n{FormatMapCell(line.cell)}";
+                string unitName = string.IsNullOrWhiteSpace(line.unitName) ? PanelMessage.Helper("helper.fallback.unit") : line.unitName;
+                label.text = PanelMessage.Helper("helper.journal.fuel", ("unit", unitName), ("before", Mathf.Max(0, line.fuelBefore)), ("consumed", Mathf.Max(0, line.autonomyConsumed)), ("after", Mathf.Max(0, line.fuelAfter)), ("cell", FormatMapCell(line.cell)));
             }
             label.fontStyle = FontStyles.Bold;
             label.fontSize = 18f;
@@ -2191,8 +2127,8 @@ public class PanelHelperController : MonoBehaviour
         // — sem isso o corte da mascara parece o fim do relatorio.
         if (autonomyUpkeepTitleLabel != null)
             autonomyUpkeepTitleLabel.text = autonomyUpkeepContentHeight > autonomyUpkeepViewportHeight + 0.5f
-                ? $"Jornal do Comandante ({autonomyUpkeepRows.Count} notícias)"
-                : "Jornal do Comandante";
+                ? PanelMessage.Helper("helper.journal.title_count", ("count", autonomyUpkeepRows.Count))
+                : PanelMessage.Helper("helper.journal.title");
 
         EnsureFocusedAutonomyUpkeepRowVisible();
         ApplyAutonomyUpkeepScrollPosition();
@@ -2260,15 +2196,15 @@ public class PanelHelperController : MonoBehaviour
         switch (tier)
         {
             case 0:
-                label = "!! CRÍTICO";
+                label = PanelMessage.Helper("helper.journal.critical");
                 color = new Color(1f, 0.42f, 0.38f); // vermelho
                 break;
             case 1:
-                label = "! ATENÇÃO";
+                label = PanelMessage.Helper("helper.journal.warning");
                 color = new Color(1f, 0.80f, 0.32f); // ambar
                 break;
             default:
-                label = "- INFORMATIVO";
+                label = PanelMessage.Helper("helper.journal.info");
                 color = new Color(0.62f, 0.85f, 1f); // azul claro
                 break;
         }
@@ -2504,14 +2440,14 @@ public class PanelHelperController : MonoBehaviour
         aimConfirmTargetIcon.sprite = data.AimConfirmTargetSprite;
         aimConfirmTargetIcon.enabled = data.AimConfirmTargetSprite != null;
         aimConfirmTargetIcon.color = data.AimConfirmTargetColor;
-        aimConfirmHpText.text = $"HP: {data.AimConfirmHp}";
+        aimConfirmHpText.text = PanelMessage.Helper("helper.aim.hp", ("hp", data.AimConfirmHp));
         bool showWeapon = data.Kind == TurnStateManager.HelperPanelKind.AimConfirm;
         aimConfirmWeaponText.text = string.IsNullOrWhiteSpace(data.AimConfirmWeaponName)
-            ? "ARMA: —"
-            : $"ARMA: {data.AimConfirmWeaponName}";
+            ? PanelMessage.Helper("helper.aim.weapon_empty")
+            : PanelMessage.Helper("helper.aim.weapon", ("weapon", data.AimConfirmWeaponName));
         aimConfirmWeaponText.gameObject.SetActive(showWeapon);
         aimConfirmLocalText.text = string.IsNullOrWhiteSpace(data.AimConfirmTerrainLabel)
-            ? "LOCAL:" : $"LOCAL: {data.AimConfirmTerrainLabel}";
+            ? PanelMessage.Helper("helper.local.title") : PanelMessage.Helper("helper.local.label", ("location", data.AimConfirmTerrainLabel));
         aimConfirmLocalIcon.sprite = data.AimConfirmLocalSprite;
         aimConfirmLocalIcon.enabled = data.AimConfirmLocalSprite != null;
         aimConfirmLocalIcon.color = data.AimConfirmLocalColor;
@@ -2544,9 +2480,9 @@ public class PanelHelperController : MonoBehaviour
             return;
 
         unitStatsLocalText.text = string.IsNullOrWhiteSpace(data.UnitStatsLocalLabel)
-            ? "LOCAL: —"
-            : $"LOCAL: {data.UnitStatsLocalLabel}";
-        unitStatsDefenseText.text = $"DEFESA: {data.UnitStatsDefensePoints}";
+            ? PanelMessage.Helper("helper.local.empty")
+            : PanelMessage.Helper("helper.local.label", ("location", data.UnitStatsLocalLabel));
+        unitStatsDefenseText.text = PanelMessage.Helper("helper.local.defense", ("defense", data.UnitStatsDefensePoints));
         bool showConstructionStock = data.Kind == TurnStateManager.HelperPanelKind.UnitStats &&
                                      !string.IsNullOrWhiteSpace(data.UnitStatsConstructionStockLine);
         unitStatsConstructionStockText.text = data.UnitStatsConstructionStockLine ?? string.Empty;
@@ -3055,17 +2991,17 @@ public class PanelHelperController : MonoBehaviour
                     flexibleTextHeight: true);
             }
             if (data.HasQueuedDisembarkOrders)
-                CreateDisembarkButton("EXECUTAR FILA", () => turnStateManager?.TryExecuteDisembarkQueueFromPointer(), true,
+                CreateDisembarkButton(PanelMessage.Helper("helper.action.execute_queue"), () => turnStateManager?.TryExecuteDisembarkQueueFromPointer(), true,
                     data.DisembarkPassengerLines.Count);
         }
         else
         {
             string passenger = string.IsNullOrWhiteSpace(data.DisembarkSelectedPassengerName)
-                ? "Unidade" : data.DisembarkSelectedPassengerName;
+                ? PanelMessage.Helper("helper.fallback.unit") : data.DisembarkSelectedPassengerName;
             string landing = string.IsNullOrWhiteSpace(data.DisembarkSelectedLandingLabel)
-                ? "Local não selecionado" : data.DisembarkSelectedLandingLabel;
+                ? PanelMessage.Helper("helper.disembark.no_location") : data.DisembarkSelectedLandingLabel;
             CreateDisembarkButton($"{passenger} → {landing}", null, false, -1);
-            string action = data.DisembarkStep == 1 ? "CONFIRMAR LOCAL" : "ADICIONAR À FILA";
+            string action = data.DisembarkStep == 1 ? PanelMessage.Helper("helper.action.confirm_location") : PanelMessage.Helper("helper.action.add_queue");
             CreateDisembarkButton(action, () => turnStateManager?.TryAdvanceDisembarkFromPointer(), true, -1);
         }
 
@@ -3109,7 +3045,7 @@ public class PanelHelperController : MonoBehaviour
                 }
             }
             if (data.SupplyHasQueuedOrders)
-                CreateDisembarkButton("EXECUTAR FILA", () => turnStateManager?.TryExecuteSupplyQueueFromPointer(), true,
+                CreateDisembarkButton(PanelMessage.Helper("helper.action.execute_queue"), () => turnStateManager?.TryExecuteSupplyQueueFromPointer(), true,
                     data.SupplyCandidateLines.Count);
         }
         // O passo de CONFIRMAR suprimento nao passa mais por aqui: as infos (consumo/carroceria)
@@ -3172,10 +3108,10 @@ public class PanelHelperController : MonoBehaviour
             ConfigureLastDisembarkRowLayout(82f, 18f);
             if (!string.IsNullOrWhiteSpace(data.MergeConfirmPreview))
             {
-                CreateDisembarkButton($"RESULTADO: {data.MergeConfirmPreview}", null, false, -1);
+                CreateDisembarkButton(PanelMessage.Helper("helper.merge.result", ("preview", data.MergeConfirmPreview)), null, false, -1);
                 ConfigureLastDisembarkRowLayout(76f, 17f);
             }
-            CreateDisembarkButton("CONFIRMAR FUSÃO", () => turnStateManager?.TryAdvanceMergeFromPointer(), true, -1);
+            CreateDisembarkButton(PanelMessage.Helper("helper.title.confirm_merge"), () => turnStateManager?.TryAdvanceMergeFromPointer(), true, -1);
             ConfigureLastDisembarkRowLayout(58f, 20f);
         }
 
@@ -3238,7 +3174,7 @@ public class PanelHelperController : MonoBehaviour
                 }
 
             string target = selected != null ? selected.unitName : data.TransferSelectedLabel;
-            CreateDisembarkButton($"DOAR → {target}", null, false, -1,
+            CreateDisembarkButton(PanelMessage.Helper("helper.transfer.donate_target", ("target", target)), null, false, -1,
                 selected != null ? selected.targetSprite : null,
                 selected != null ? selected.targetColor : Color.white);
             TintLastSupplyInformationRow(currentTeamColor);
@@ -3258,7 +3194,7 @@ public class PanelHelperController : MonoBehaviour
             {
                 TurnStateManager.HelperTransferCandidateLine candidate = data.TransferCandidateLines[i];
                 int optionIndex = i;
-                string mode = candidate.isDonate ? "DOAR" : "RECEBER";
+                string mode = candidate.isDonate ? PanelMessage.Helper("helper.transfer.action.donate") : PanelMessage.Helper("helper.transfer.action.receive");
                 CreateDisembarkButton($"{candidate.index} - {mode} → {candidate.unitName}",
                     () => turnStateManager?.TrySelectTransferOptionFromPointer(optionIndex), true, i,
                     candidate.targetSprite, candidate.targetColor);
@@ -3273,7 +3209,7 @@ public class PanelHelperController : MonoBehaviour
                     selected = data.TransferCandidateLines[i];
                     break;
                 }
-            string mode = selected != null && selected.isDonate ? "DOAR" : "RECEBER";
+            string mode = selected != null && selected.isDonate ? PanelMessage.Helper("helper.transfer.action.donate") : PanelMessage.Helper("helper.transfer.action.receive");
             if (selected != null && selected.isDonate)
                 mode += $" {data.TransferDonationPercent}%";
             string target = selected != null ? selected.unitName : data.TransferSelectedLabel;
@@ -3286,16 +3222,16 @@ public class PanelHelperController : MonoBehaviour
             {
                 TurnStateManager.HelperTransferResourceLine line = data.TransferResourceLines[i];
                 if (line == null) continue;
-                string sourceBefore = line.sourceIsInfinite ? "INF" : line.sourceBefore.ToString();
-                string sourceAfter = line.sourceIsInfinite ? "INF" : line.sourceAfter.ToString();
-                string destinationBefore = line.destinationIsInfinite ? "INF" : line.destinationBefore.ToString();
-                string destinationAfter = line.destinationIsInfinite ? "INF" : line.destinationAfter.ToString();
+                string sourceBefore = line.sourceIsInfinite ? PanelMessage.Helper("helper.value.infinite") : line.sourceBefore.ToString();
+                string sourceAfter = line.sourceIsInfinite ? PanelMessage.Helper("helper.value.infinite") : line.sourceAfter.ToString();
+                string destinationBefore = line.destinationIsInfinite ? PanelMessage.Helper("helper.value.infinite") : line.destinationBefore.ToString();
+                string destinationAfter = line.destinationIsInfinite ? PanelMessage.Helper("helper.value.infinite") : line.destinationAfter.ToString();
                 CreateDisembarkButton(
                     $"{line.supplyName}: {sourceBefore} - {line.movedAmount} → {sourceAfter} | {destinationBefore} + {line.movedAmount} → {destinationAfter}",
                     null, false, -1);
                 TintLastSupplyInformationRow(currentTeamColor);
             }
-            CreateDisembarkButton("CONFIRMAR TRANSFERÊNCIA",
+            CreateDisembarkButton(PanelMessage.Helper("helper.title.confirm_transfer"),
                 () => turnStateManager?.TryConfirmTransferFromPointer(), true, 0);
         }
 
@@ -3438,7 +3374,7 @@ public class PanelHelperController : MonoBehaviour
                 // Linha 1: alvo/HP. Linha 2: camada/local. Linha 3: arma concreta e
                 // categoria. O motivo detalhado da opcao invalida permanece no
                 // PanelDialog quando o jogador tenta confirma-la.
-                string head = $"{i + 1} - {line.unitName} (Hp: {line.hp})";
+                string head = PanelMessage.Helper("helper.aim.target", ("index", i + 1), ("unit", line.unitName), ("hp", line.hp));
                 string targetContext = string.IsNullOrWhiteSpace(line.terrainLabel)
                     ? head
                     : $"{head}\n{line.terrainLabel}";
@@ -3689,18 +3625,18 @@ public class PanelHelperController : MonoBehaviour
 
         if (menuDeleteActive)
         {
-            CreatePersistenceButton("CONFIRMAR EXCLUSÃO", () => mainMenuLoadPanelController?.ConfirmDeleteFromPointer());
-            CreatePersistenceButton("CANCELAR", () => mainMenuLoadPanelController?.CancelDeleteFromPointer());
+            CreatePersistenceButton(PanelMessage.Helper("helper.action.confirm_delete"), () => mainMenuLoadPanelController?.ConfirmDeleteFromPointer());
+            CreatePersistenceButton(PanelMessage.Helper("helper.action.cancel"), () => mainMenuLoadPanelController?.CancelDeleteFromPointer());
         }
         else if (menuQuitActive)
         {
-            CreatePersistenceButton("SAIR PARA O WINDOWS", () => mainMenuPanel?.ConfirmQuitFromPointer());
-            CreatePersistenceButton("CANCELAR", () => mainMenuPanel?.CancelQuitFromPointer());
+            CreatePersistenceButton(PanelMessage.Helper("helper.action.quit_windows"), () => mainMenuPanel?.ConfirmQuitFromPointer());
+            CreatePersistenceButton(PanelMessage.Helper("helper.action.cancel"), () => mainMenuPanel?.CancelQuitFromPointer());
         }
         else if (menuAboutActive)
         {
             CreateAboutDetails(mainMenuPanel.AboutBody);
-            CreatePersistenceButton("OK", () => mainMenuPanel?.ConfirmAboutFromPointer());
+            CreatePersistenceButton(PanelMessage.Helper("helper.action.ok"), () => mainMenuPanel?.ConfirmAboutFromPointer());
         }
         else if (newGameWizardActive)
         {
@@ -3740,9 +3676,9 @@ public class PanelHelperController : MonoBehaviour
             // Cor do jogador (resolvida por ResolveActiveTeamColor: na Campanha, o
             // humano local), nao o verde fixo de reserva.
             CreateNewGameConfirmationDetails(campaignSelectionController.GetConfirmationSummary(), currentTeamColor);
-            CreatePersistenceButton("JOGAR", () => campaignSelectionController?.InvokeConfirmationOption(0));
+            CreatePersistenceButton(PanelMessage.Helper("helper.action.play"), () => campaignSelectionController?.InvokeConfirmationOption(0));
             CreatePersistenceFooterSpacer(PersistenceFooterGap);
-            CreatePersistenceButton("CANCELAR", () => campaignSelectionController?.InvokeConfirmationOption(1));
+            CreatePersistenceButton(PanelMessage.Helper("helper.action.cancel"), () => campaignSelectionController?.InvokeConfirmationOption(1));
         }
         else if (battleExitActive)
         {
@@ -3766,13 +3702,13 @@ public class PanelHelperController : MonoBehaviour
         }
         else if (battleSurrenderActive)
         {
-            CreatePersistenceButton("CONFIRMAR RENDIÇÃO", () => battleMapMenuController?.InvokeSurrenderConfirmationOption(0));
-            CreatePersistenceButton("CANCELAR", () => battleMapMenuController?.InvokeSurrenderConfirmationOption(1));
+            CreatePersistenceButton(PanelMessage.Helper("helper.action.confirm_surrender"), () => battleMapMenuController?.InvokeSurrenderConfirmationOption(0));
+            CreatePersistenceButton(PanelMessage.Helper("helper.action.cancel"), () => battleMapMenuController?.InvokeSurrenderConfirmationOption(1));
         }
         else if (battleEndTurnActive)
         {
-            CreatePersistenceButton("PASSAR A VEZ", () => battleMapMenuController?.InvokeEndTurnConfirmationOption(0));
-            CreatePersistenceButton("CANCELAR", () => battleMapMenuController?.InvokeEndTurnConfirmationOption(1));
+            CreatePersistenceButton(PanelMessage.Helper("helper.action.end_turn"), () => battleMapMenuController?.InvokeEndTurnConfirmationOption(0));
+            CreatePersistenceButton(PanelMessage.Helper("helper.action.cancel"), () => battleMapMenuController?.InvokeEndTurnConfirmationOption(1));
         }
         else if (battleLayerActive)
         {
@@ -3788,8 +3724,8 @@ public class PanelHelperController : MonoBehaviour
         }
         else if (saveGameManager.IsPersistenceOverwriteConfirmationActive)
         {
-            CreatePersistenceButton("CONFIRMAR SOBRESCRITA", () => saveGameManager.TryConfirmPersistenceOverwriteFromPointer());
-            CreatePersistenceButton("VOLTAR", () => saveGameManager.TryCancelPersistencePromptFromPointer());
+            CreatePersistenceButton(PanelMessage.Helper("helper.action.confirm_overwrite"), () => saveGameManager.TryConfirmPersistenceOverwriteFromPointer());
+            CreatePersistenceButton(PanelMessage.Helper("helper.action.back"), () => saveGameManager.TryCancelPersistencePromptFromPointer());
         }
         else
         {
@@ -3799,7 +3735,7 @@ public class PanelHelperController : MonoBehaviour
                 CreatePersistenceButton(saveGameManager.GetPersistenceSlotButtonLabel(slot),
                     () => saveGameManager.TryChoosePersistenceSlotFromPointer(selectedSlot));
             }
-            CreatePersistenceButton("CANCELAR", () => saveGameManager.TryCancelPersistencePromptFromPointer());
+            CreatePersistenceButton(PanelMessage.Helper("helper.action.cancel"), () => saveGameManager.TryCancelPersistencePromptFromPointer());
         }
 
         LayoutElement detailsLayout = persistenceConfirmationDetails != null
@@ -4025,7 +3961,7 @@ public class PanelHelperController : MonoBehaviour
                 string cost = line.cost.HasValue ? $" (${line.cost.Value})" : string.Empty;
                 string locked = line.requirementMet
                     ? string.Empty
-                    : $"\n<size=70%>[REQUER: {line.requiredBuildingName}]</size>";
+                    : PanelMessage.Helper("helper.shopping.requires", ("building", line.requiredBuildingName));
                 label.text = $"{line.index} - {line.unitName}{cost}{locked}";
             }
             label.fontSize = 20f;
@@ -4147,7 +4083,7 @@ public class PanelHelperController : MonoBehaviour
         labelRect.offsetMin = Vector2.zero;
         labelRect.offsetMax = Vector2.zero;
         TMP_Text label = labelObject.GetComponent<TMP_Text>();
-        label.text = "CANCELAR";
+        label.text = PanelMessage.Helper("helper.action.cancel");
         label.fontSize = 20f;
         label.fontStyle = FontStyles.Bold;
         label.color = FooterLabelIdleColor;
@@ -4213,7 +4149,7 @@ public class PanelHelperController : MonoBehaviour
         labelRect.offsetMin = Vector2.zero;
         labelRect.offsetMax = Vector2.zero;
         TMP_Text label = labelObject.GetComponent<TMP_Text>();
-        label.text = "EXECUTAR";
+        label.text = PanelMessage.Helper("helper.action.execute");
         // Auto-size para caber rotulos mais longos (ex.: "ADICIONAR À FILA") sem estourar a largura.
         label.enableAutoSizing = true;
         label.fontSizeMin = 12f;
@@ -4287,8 +4223,8 @@ public class PanelHelperController : MonoBehaviour
         if (executeCommandServiceButton != null)
             executeCommandServiceButton.interactable = active;
         if (executeCommandServiceLabel != null)
-            executeCommandServiceLabel.text = supplyConfirm ? "ADICIONAR À FILA"
-                : (removingUnit || aiming || embarking) ? "CONFIRMAR" : "EXECUTAR";
+            executeCommandServiceLabel.text = supplyConfirm ? PanelMessage.Helper("helper.action.add_queue")
+                : (removingUnit || aiming || embarking) ? PanelMessage.Helper("helper.action.confirm") : PanelMessage.Helper("helper.action.execute");
 
         if (active && panelHelper == gameObject && selfPanelCanvasGroup != null)
         {
@@ -4349,7 +4285,7 @@ public class PanelHelperController : MonoBehaviour
         labelRect.offsetMin = Vector2.zero;
         labelRect.offsetMax = Vector2.zero;
         keepPositionLabel = labelObject.GetComponent<TMP_Text>();
-        keepPositionLabel.text = "MANTER POSIÇÃO";
+        keepPositionLabel.text = PanelMessage.Helper("helper.action.keep_position");
         keepPositionLabel.fontSize = 20f;
         keepPositionLabel.fontStyle = FontStyles.Bold;
         keepPositionLabel.color = FooterLabelIdleColor;
@@ -4402,7 +4338,7 @@ public class PanelHelperController : MonoBehaviour
         labelRect.offsetMin = Vector2.zero;
         labelRect.offsetMax = Vector2.zero;
         cycleSelectionLabel = labelObject.GetComponent<TMP_Text>();
-        cycleSelectionLabel.text = "TROCAR UNIDADE";
+        cycleSelectionLabel.text = PanelMessage.Helper("helper.action.cycle_unit");
         cycleSelectionLabel.fontSize = 20f;
         cycleSelectionLabel.fontStyle = FontStyles.Bold;
         cycleSelectionLabel.color = FooterLabelIdleColor;
@@ -4435,7 +4371,7 @@ public class PanelHelperController : MonoBehaviour
         if (active)
         {
             if (cycleSelectionLabel != null)
-                cycleSelectionLabel.text = $"TROCAR UNIDADE {cyclePosition}/{cycleTotal}";
+                cycleSelectionLabel.text = PanelMessage.Helper("helper.action.cycle_unit_count", ("index", cyclePosition), ("total", cycleTotal));
             TintScriptButtonToTeamIdle(cycleSelectionButton);
             if (panelHelper == gameObject && selfPanelCanvasGroup != null)
             {
@@ -5330,7 +5266,7 @@ public class PanelHelperController : MonoBehaviour
         {
             showCoordinateOverlay = !showCoordinateOverlay;
             string state = showCoordinateOverlay ? "ON" : "OFF";
-            PanelDialogController.TrySetTransientText($"Coordinate Overlay: {state}", 1.6f);
+            PanelDialogController.TrySetTransientText(PanelMessage.Dialog("panel_dialog.debug.coordinates", ("state", state)), 1.6f);
         }
     }
 
@@ -5347,7 +5283,7 @@ public class PanelHelperController : MonoBehaviour
         coordinateOverlayLabels.Add(new CoordinateOverlayLabel
         {
             cell = cursorCell,
-            text = $"CUR {FormatMapCell(cursorCell)}",
+            text = PanelMessage.Helper("helper.debug.cursor", ("cell", FormatMapCell(cursorCell))),
             color = cursorCoordinateColor
         });
 
@@ -5358,7 +5294,7 @@ public class PanelHelperController : MonoBehaviour
             coordinateOverlayLabels.Add(new CoordinateOverlayLabel
             {
                 cell = selectedCell,
-                text = $"SEL {FormatMapCell(selectedCell)}",
+                text = PanelMessage.Helper("helper.debug.selected", ("cell", FormatMapCell(selectedCell))),
                 color = selectedCoordinateColor
             });
         }
@@ -5385,7 +5321,7 @@ public class PanelHelperController : MonoBehaviour
             coordinateOverlayLabels.Add(new CoordinateOverlayLabel
             {
                 cell = cell,
-                text = $"EV {FormatMapCell(cell)}",
+                text = PanelMessage.Helper("helper.debug.event", ("cell", FormatMapCell(cell))),
                 color = eventCoordinateColor
             });
         }
@@ -5434,7 +5370,7 @@ public class PanelHelperController : MonoBehaviour
 
     private static string FormatMapCell(Vector3Int cell)
     {
-        return $"C{cell.x},L{cell.y}";
+        return PanelMessage.Helper("helper.cell.coordinates", ("x", cell.x), ("y", cell.y));
     }
 
     private void EnsureCoordinateOverlayStyles()

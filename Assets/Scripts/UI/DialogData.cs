@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 
 [CreateAssetMenu(menuName = "Game/UI/Dialog Data", fileName = "Dialog Data_")]
 public class DialogData : ScriptableObject
@@ -22,5 +22,13 @@ public class DialogData : ScriptableObject
         "- panel_dialog.state.sensor_confirm -> <unit>, <sensor>\n" +
         "- panel_dialog.sensor.* -> sem token")]
     public string message;
+
+    [TextArea(3, 10)]
+    [Tooltip("Traducao em ingles. Vazio usa Message (portugues). Preserve os nomes dos tokens.")]
+    public string messageEnglish;
+
+    public string LocalizedMessage => MessageTemplate.SelectLanguage(
+        message, messageEnglish, PanelMessageLanguageSettings.CurrentLanguage == PanelMessageLanguage.English);
+
 }
 

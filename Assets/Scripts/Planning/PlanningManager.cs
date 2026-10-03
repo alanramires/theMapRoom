@@ -728,7 +728,7 @@ public class PlanningManager : MonoBehaviour
         }
 
         SetPendingDestination(cell);
-        PanelDialogController.TrySetTransientText($"Planning: destino pendente em ({cell.x},{cell.y})", 1.8f);
+        PanelDialogController.TrySetTransientText(PanelMessage.Dialog("panel_dialog.planning.destination", ("x", cell.x), ("y", cell.y)), 1.8f);
     }
 
     private void CleanupInvisibleAssignments()

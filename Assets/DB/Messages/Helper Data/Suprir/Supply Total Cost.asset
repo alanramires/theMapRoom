@@ -14,4 +14,4 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::HelperData
   id: helper.supply.total_cost
   condition: Linha de custo total estimado no helper de suprimento.
-  message: 
+  message: "Custo estimado: $<valor>"

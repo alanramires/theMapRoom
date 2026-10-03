@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
@@ -1854,7 +1854,7 @@ public partial class TurnStateManager : MonoBehaviour
                         Label = "TurnStartEmergencyLandingConfirm"
                     });
 
-                    PanelDialogController.TrySetTransientText("pouso de emergencia: sem combustivel", 2.6f);
+                    PanelDialogController.TrySetTransientText(PanelMessage.Dialog("panel_dialog.fuel.emergency_landing"), 2.6f);
                     yield return ExecuteTurnStartEmergencyLandingPresentation(target);
                     cursorController?.PlayLoadSfx();
 
@@ -1874,7 +1874,7 @@ public partial class TurnStateManager : MonoBehaviour
                 target.SetCurrentHP(0);
                 target.MarkDead("morto por falta de combustivel/ queda aerea");
                 KillEmbarkedChildrenChain(target);
-                PanelDialogController.TrySetTransientText("caiu por falta de combustivel", 2.6f);
+                PanelDialogController.TrySetTransientText(PanelMessage.Dialog("panel_dialog.fuel.crash"), 2.6f);
                 yield return ExecuteUnitDeathPresentation(
                     target,
                     targetCell,

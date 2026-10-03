@@ -1128,7 +1128,7 @@ public class SaveGameManager : MonoBehaviour
         if (showFeedback)
         {
             cursorController?.PlayErrorSfx();
-            PanelDialogController.TrySetTransientText("Turno da IA em execucao: save/load bloqueado.", 2.4f);
+            PanelDialogController.TrySetTransientText(PanelMessage.Dialog("panel_dialog.save.ai_busy"), 2.4f);
         }
 
         return true;
@@ -1183,7 +1183,7 @@ public class SaveGameManager : MonoBehaviour
         if (showFeedback)
         {
             cursorController?.PlayErrorSfx();
-            PanelDialogController.TrySetTransientText($"Save/Load bloqueado em {state}: volte ao Neutral.", 2.4f);
+            PanelDialogController.TrySetTransientText(PanelMessage.Dialog("panel_dialog.save.invalid_state", ("state", state)), 2.4f);
         }
 
         if (showFeedback)
@@ -1211,7 +1211,7 @@ public class SaveGameManager : MonoBehaviour
 
         cursorController?.PlayErrorSfx();
         PanelDialogController.TrySetTransientText(
-            string.IsNullOrWhiteSpace(message) ? "Save/Load bloqueado no estado atual." : message,
+            string.IsNullOrWhiteSpace(message) ? PanelMessage.Dialog("panel_dialog.save.blocked") : message,
             2.4f);
         return false;
     }
@@ -1236,7 +1236,7 @@ public class SaveGameManager : MonoBehaviour
 
         cursorController?.PlayErrorSfx();
         PanelDialogController.TrySetTransientText(
-            string.IsNullOrWhiteSpace(message) ? "Save/Load bloqueado no estado atual." : message,
+            string.IsNullOrWhiteSpace(message) ? PanelMessage.Dialog("panel_dialog.save.blocked") : message,
             2.4f);
         return false;
     }
@@ -1371,7 +1371,7 @@ public class SaveGameManager : MonoBehaviour
                 {
                     cursorController?.PlayErrorSfx();
                     Debug.LogError("[SaveGame] Save sem endereco de quadrante valido. Nao sera aplicado sobre outro recorte.");
-                    PanelDialogController.TrySetTransientText("Save sem quadrante valido ou sem bake. Crie um novo save com o mapa correto.", 4f);
+                    PanelDialogController.TrySetTransientText(PanelMessage.Dialog("panel_dialog.save.invalid_quadrant"), 4f);
                     yield break;
                 }
                 if (!board.MatchesSavedMap(data.battleMap))

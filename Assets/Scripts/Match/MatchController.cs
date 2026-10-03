@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using System.Collections.Generic;
 using System.Collections;
 using System;
@@ -2524,7 +2524,7 @@ public class MatchController : MonoBehaviour
             cursor.PlayDefeatSfx();
         }
 
-        PanelDialogController.TrySetExternalText("DERROTA! VOCÊ FICOU SEM UNIDADES.");
+        PanelDialogController.TrySetExternalText(PanelMessage.Dialog("panel_dialog.defeat.no_units"));
 
         // Busca o painel
         foreach (GameObject go in Resources.FindObjectsOfTypeAll<GameObject>())
@@ -3643,7 +3643,7 @@ public class MatchController : MonoBehaviour
             PlayerSlotId.FromIndex(unit.SlotIndex),
             TurnBriefingCategory.ForcedSurfaceApplied,
             ResolveRuntimeUnitName(unit),
-            $"camada aplicada automaticamente: {lockDomain}/{lockHeight}",
+            PanelMessage.Helper("helper.journal.layer_detail", ("domain", lockDomain), ("height", lockHeight)),
             cell);
         return true;
     }
@@ -3737,7 +3737,7 @@ public class MatchController : MonoBehaviour
                                 PlayerSlotId.FromIndex(unit.SlotIndex),
                                 willLand ? TurnBriefingCategory.EmergencyLanding : TurnBriefingCategory.FuelCrash,
                                 ResolveRuntimeUnitName(unit),
-                                willLand ? "pousou sem combustível — reabasteça ou remova" : "perdida por exaustão de combustível",
+                                willLand ? PanelMessage.Helper("helper.journal.landing_detail") : PanelMessage.Helper("helper.journal.crash_detail"),
                                 fuelCell);
                         }
                     }
@@ -3889,17 +3889,17 @@ public class MatchController : MonoBehaviour
     {
         switch (category)
         {
-            case TurnBriefingCategory.ContactLost: return "CONTATO PERDIDO";
-            case TurnBriefingCategory.FogFire: return "TIRO DA NÉVOA";
-            case TurnBriefingCategory.ConstructionLost: return "CONQUISTA PERDIDA";
-            case TurnBriefingCategory.CaptureInProgress: return "SOB CAPTURA";
-            case TurnBriefingCategory.EmergencyLanding: return "POUSO DE EMERGÊNCIA";
-            case TurnBriefingCategory.FuelCrash: return "QUEDA (COMBUSTÍVEL)";
-            case TurnBriefingCategory.ForcedSurfaceApplied: return "EMERSÃO AUTOMÁTICA";
-            case TurnBriefingCategory.NewContact: return "NOVO CONTATO";
-            case TurnBriefingCategory.SupplyDepleted: return "ESTOQUE ZERADO";
-            case TurnBriefingCategory.EnemyOccupation: return "OCUPAÇÃO INIMIGA";
-            default: return "EVENTO";
+            case TurnBriefingCategory.ContactLost: return PanelMessage.Helper("helper.journal.category.contact_lost");
+            case TurnBriefingCategory.FogFire: return PanelMessage.Helper("helper.journal.category.fog_fire");
+            case TurnBriefingCategory.ConstructionLost: return PanelMessage.Helper("helper.journal.category.construction_lost");
+            case TurnBriefingCategory.CaptureInProgress: return PanelMessage.Helper("helper.journal.category.capture");
+            case TurnBriefingCategory.EmergencyLanding: return PanelMessage.Helper("helper.journal.category.landing");
+            case TurnBriefingCategory.FuelCrash: return PanelMessage.Helper("helper.journal.category.crash");
+            case TurnBriefingCategory.ForcedSurfaceApplied: return PanelMessage.Helper("helper.journal.category.surfacing");
+            case TurnBriefingCategory.NewContact: return PanelMessage.Helper("helper.journal.category.contact_new");
+            case TurnBriefingCategory.SupplyDepleted: return PanelMessage.Helper("helper.journal.category.depleted");
+            case TurnBriefingCategory.EnemyOccupation: return PanelMessage.Helper("helper.journal.category.occupation");
+            default: return PanelMessage.Helper("helper.journal.category.event");
         }
     }
 
@@ -3950,7 +3950,7 @@ public class MatchController : MonoBehaviour
             {
                 unitName = evt.subjectName,
                 cell = cell,
-                customText = $"{label}\n{body}\n({cell.x},{cell.y}) — T{evt.turnNumber}",
+                customText = PanelMessage.Helper("helper.journal.event", ("category", label), ("body", body), ("x", cell.x), ("y", cell.y), ("round", evt.turnNumber)),
                 severityTier = (int)ResolveBriefingSeverity(category)
             });
         }
@@ -3983,7 +3983,7 @@ public class MatchController : MonoBehaviour
                 {
                     unitName = name,
                     cell = cell,
-                    customText = $"{ResolveBriefingCategoryLabel(TurnBriefingCategory.CaptureInProgress)}\n{name} ({construction.CurrentCapturePoints}/{construction.CapturePointsMax})\n({cell.x},{cell.y})",
+                    customText = PanelMessage.Helper("helper.journal.capture", ("category", ResolveBriefingCategoryLabel(TurnBriefingCategory.CaptureInProgress)), ("building", name), ("current", construction.CurrentCapturePoints), ("max", construction.CapturePointsMax), ("x", cell.x), ("y", cell.y)),
                     severityTier = (int)ResolveBriefingSeverity(TurnBriefingCategory.CaptureInProgress)
                 });
             }
@@ -4020,7 +4020,7 @@ public class MatchController : MonoBehaviour
                     {
                         unitName = name,
                         cell = cell,
-                        customText = $"{ResolveBriefingCategoryLabel(TurnBriefingCategory.EnemyOccupation)}\n{name}: {string.Join(", ", occupantNames)} no local\n({cell.x},{cell.y})",
+                        customText = PanelMessage.Helper("helper.journal.occupation", ("category", ResolveBriefingCategoryLabel(TurnBriefingCategory.EnemyOccupation)), ("building", name), ("units", string.Join(", ", occupantNames)), ("x", cell.x), ("y", cell.y)),
                         severityTier = (int)ResolveBriefingSeverity(TurnBriefingCategory.EnemyOccupation)
                     });
                 }
@@ -4047,7 +4047,7 @@ public class MatchController : MonoBehaviour
 
                 if (depletedSupplyNames.Count > 0)
                 {
-                    string missing = "sem " + string.Join(", sem ", depletedSupplyNames);
+                    string missing = PanelMessage.Helper("helper.journal.missing_supplies", ("supplies", string.Join(PanelMessage.Helper("helper.journal.missing_separator"), depletedSupplyNames)));
                     lines.Add(new TurnStateManager.HelperTurnStartAutonomyLine
                     {
                         unitName = name,
@@ -6370,7 +6370,7 @@ public class MatchController : MonoBehaviour
                     observerSlot,
                     TurnBriefingCategory.NewContact,
                     ResolveRuntimeUnitName(target),
-                    $"detectado por {ResolveRuntimeUnitName(observer)}",
+                    PanelMessage.Helper("helper.journal.detected_by", ("unit", ResolveRuntimeUnitName(observer))),
                     contactCell);
             }
         }

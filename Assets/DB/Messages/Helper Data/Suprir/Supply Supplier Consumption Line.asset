@@ -14,4 +14,4 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::HelperData
   id: helper.supply.supplier_consumption.line
   condition: Linha de consumo por recurso no helper de suprimento.
-  message: 
+  message: "<supply>: <before> - <consumed> -> <after>"

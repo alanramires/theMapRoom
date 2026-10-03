@@ -1449,7 +1449,7 @@ public partial class TurnStateManager
             return false;
 
         string targetName = ResolveDebugUnitName(target);
-        PanelDialogController.TrySetExternalText($"Destroy Unit :: {targetName} {FormatMapCellWithZ(cursorCell)} :: Confirm");
+        PanelDialogController.TrySetExternalText(PanelMessage.Dialog("panel_dialog.remove_unit.confirm", ("unit", targetName), ("cell", FormatMapCellWithZ(cursorCell))));
         Advance(CursorState.RemovingUnit);
         return true;
     }

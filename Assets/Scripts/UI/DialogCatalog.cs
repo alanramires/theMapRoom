@@ -36,30 +36,7 @@ public class DialogCatalog : ScriptableObject
 
     public string Resolve(string id, string fallback, IReadOnlyDictionary<string, string> tokens)
     {
-        string template = Resolve(id, fallback);
-        if (tokens == null || tokens.Count == 0 || string.IsNullOrEmpty(template))
-            return template;
-
-        string output = template;
-        foreach (KeyValuePair<string, string> pair in tokens)
-        {
-            if (string.IsNullOrWhiteSpace(pair.Key))
-                continue;
-
-            string key = pair.Key.Trim();
-            string val = pair.Value ?? string.Empty;
-            
-            output = output.Replace($"<{key}>", val);
-            output = output.Replace($"<{key.ToLowerInvariant()}>", val);
-            output = output.Replace($"<{key.ToUpperInvariant()}>", val);
-            if (key.Length > 0)
-            {
-                string titleCase = char.ToUpperInvariant(key[0]) + (key.Length > 1 ? key.Substring(1).ToLowerInvariant() : string.Empty);
-                output = output.Replace($"<{titleCase}>", val);
-            }
-        }
-
-        return output;
+        return MessageTemplate.Apply(Resolve(id, fallback), tokens);
     }
 
     private void RebuildIndexIfNeeded()

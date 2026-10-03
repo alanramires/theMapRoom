@@ -39,7 +39,7 @@ public static class TutorialRules
             // Início da rodada (turno do jogador)
             if (pendingHpResetTutorial1 && teamId == playerTeamId)
             {
-                ExecuteRestoreAllUnitsHp(10, "TUTORIAL: A diferença entre terrenos foi aplicada!");
+                ExecuteRestoreAllUnitsHp(10, PanelMessage.Dialog("panel_dialog.tutorial.terrain_difference"));
                 pendingHpResetTutorial1 = false;
             }
         }

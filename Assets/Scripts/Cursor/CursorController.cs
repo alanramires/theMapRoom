@@ -498,7 +498,7 @@ public class CursorController : MonoBehaviour
 
         if (!TryCycleToReadyUnit(direction))
         {
-            PanelDialogController.TrySetTransientText("Sem unidades prontas", 2.2f);
+            PanelDialogController.TrySetTransientText(PanelMessage.Dialog("panel_dialog.units.none_ready"), 2.2f);
             PlayUiSfx(errorSfx);
         }
     }
@@ -1378,7 +1378,7 @@ public class CursorController : MonoBehaviour
         // em TryOpenEndingTurnConfirmation, para soar tambem quando a IA abre o mesmo painel.
         if (turnStateManager == null)
         {
-            PanelDialogController.TrySetExternalText("End Turn :: Confirm");
+            PanelDialogController.TrySetExternalText(PanelMessage.Dialog("panel_dialog.end_turn.confirm"));
             PlayBeepSfx();
         }
         return true;
@@ -2190,7 +2190,7 @@ public class CursorController : MonoBehaviour
         if (clip == null) return;
         
         if (clip == errorSfx && !PanelDialogController.HasActiveExternalText())
-            PanelDialogController.TrySetTransientText("Invalid action", 2f);
+            PanelDialogController.TrySetTransientText(PanelMessage.Dialog("panel_dialog.action.invalid"), 2f);
 
         if (audioSource != null)
             audioSource.PlayOneShot(clip, ApplyMasterSfxVolume(uiSfxVolume));

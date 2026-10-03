@@ -604,7 +604,7 @@ public partial class TurnStateManager
                 transferPromptDonationPercentagePending = true;
                 transferHelperFocusIndex = transferDonationPercentIndex;
                 transferPreviewLines.Clear();
-                PanelDialogController.TrySetExternalText("Transferir :: escolha quanto doar");
+                PanelDialogController.TrySetExternalText(PanelMessage.Dialog("panel_dialog.transfer.amount"));
                 return true;
             }
 
@@ -834,7 +834,7 @@ public partial class TurnStateManager
             transferDonationPercentIndex = TransferDonationPercentOptions.Length - 1;
             transferHelperFocusIndex = transferDonationPercentIndex;
             transferPreviewLines.Clear();
-            PanelDialogController.TrySetExternalText("Transferir :: escolha quanto doar");
+            PanelDialogController.TrySetExternalText(PanelMessage.Dialog("panel_dialog.transfer.amount"));
             return;
         }
 

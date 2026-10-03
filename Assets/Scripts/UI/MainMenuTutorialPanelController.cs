@@ -250,7 +250,7 @@ public class MainMenuTutorialPanelController : MonoBehaviour
         colorStepFocusIndex = 0;
         UiInputBlocker.SuppressGameplayInputForFrames(2);
         string storyLabel = GetStorySceneName(storyIndex);
-        PanelHelperController.TrySetExternalText("ESCOLHA SUA COR", storyLabel ?? string.Empty);
+        PanelHelperController.TrySetExternalText(PanelMessage.Helper("helper.new_game.color"), storyLabel ?? string.Empty);
         cursorController?.PlayConfirmSfx();
     }
 

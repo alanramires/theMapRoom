@@ -14,4 +14,4 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::HelperData
   id: helper.supply.targets.confirm
   condition: Resumo de alvos previstos no passo de confirmacao do suprimento.
-  message: 
+  message: "Previstos: <targets>"

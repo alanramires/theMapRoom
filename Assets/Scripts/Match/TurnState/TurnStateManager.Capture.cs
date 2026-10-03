@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using UnityEngine;
 using UnityEngine.Tilemaps;
 
@@ -154,7 +154,7 @@ public partial class TurnStateManager
                             PlayerSlotId.FromIndex(previousOwnerSlot),
                             MatchController.TurnBriefingCategory.ConstructionLost,
                             targetConstruction.ConstructionDisplayName,
-                            $"capturada por {TeamUtils.GetName(capturer.TeamId)}",
+                            PanelMessage.Helper("helper.journal.captured_by", ("team", TeamUtils.GetName(capturer.TeamId))),
                             capturedCell);
                     }
                     RuntimeLog(

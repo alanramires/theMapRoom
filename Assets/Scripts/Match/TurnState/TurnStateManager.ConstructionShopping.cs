@@ -285,7 +285,7 @@ public partial class TurnStateManager
             int currentMoney = matchController.GetActualMoney(buyerSlot);
             if (currentMoney < unitCost)
             {
-                PushPanelUnitMessage("Sem dinheiro suficiente", 2.6f);
+                PushPanelUnitMessage(PanelMessage.Dialog("panel_dialog.shopping.insufficient_money"), 2.6f);
                 cursorController?.PlayErrorSfx();
                 Debug.LogWarning($"[Shopping] Dinheiro insuficiente para comprar {ResolveUnitName(unit)}. Custo=${unitCost}, saldo=${currentMoney}.");
                 return false;

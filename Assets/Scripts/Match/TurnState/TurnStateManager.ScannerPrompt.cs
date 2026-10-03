@@ -476,7 +476,7 @@ public partial class TurnStateManager
         // depender de Enable TurnState Runtime Logs, senão as linhas escolhidas
         // no Inspector são silenciosamente descartadas pelo RuntimeLog().
         Debug.Log(sb.ToString());
-        PanelDialogController.TrySetTransientText("Perf snapshot logged (F8)", 1.8f);
+        PanelDialogController.TrySetTransientText(PanelMessage.Dialog("panel_dialog.debug.perf_snapshot"), 1.8f);
     }
 
     private void TrackRuntimeDebugLogs()
@@ -586,7 +586,7 @@ public partial class TurnStateManager
         }
 
         string targetName = ResolveDebugUnitName(target);
-        PanelDialogController.TrySetExternalText($"Destroy Unit :: {targetName} {FormatMapCellWithZ(cursorCell)} :: Confirm");
+        PanelDialogController.TrySetExternalText(PanelMessage.Dialog("panel_dialog.remove_unit.confirm", ("unit", targetName), ("cell", FormatMapCellWithZ(cursorCell))));
         removingUnitFocusIndex = RemovingUnitConfirmFocusIndex;
         Advance(CursorState.RemovingUnit);
         cursorController?.PlayConfirmSfx();
@@ -635,7 +635,7 @@ public partial class TurnStateManager
         }
 
         string targetName = ResolveDebugUnitName(target);
-        PanelDialogController.TrySetExternalText($"Destroy Unit :: {targetName} {FormatMapCellWithZ(cursorCell)} :: Confirm");
+        PanelDialogController.TrySetExternalText(PanelMessage.Dialog("panel_dialog.remove_unit.confirm", ("unit", targetName), ("cell", FormatMapCellWithZ(cursorCell))));
         removingUnitFocusIndex = RemovingUnitConfirmFocusIndex;
         Advance(CursorState.RemovingUnit);
         message = "[Destroy Unit] Confirmar com Enter | Cancelar com ESC.";
@@ -3286,7 +3286,7 @@ public partial class TurnStateManager
         if (option == null || option.attackerUnit == null || option.targetUnit == null)
         {
             RuntimeLog("Falha ao confirmar ataque: opcao invalida.");
-            PushPanelUnitMessage("Aim: falha ao confirmar", 2.4f);
+            PushPanelUnitMessage(PanelMessage.Dialog("panel_dialog.aim.confirm_failed"), 2.4f);
             scannerPromptStep = ScannerPromptStep.MirandoCycleTarget;
             scannerSelectedTargetIndex = 0;
             FocusCurrentMirandoTarget(logDetails: true);
@@ -3299,7 +3299,7 @@ public partial class TurnStateManager
         if (!combat.success)
         {
             RuntimeLog("[Combate] Falha ao resolver combate. Retornando para selecao de alvo.");
-            PushPanelUnitMessage("Combate: falha ao resolver", 2.6f);
+            PushPanelUnitMessage(PanelMessage.Dialog("panel_dialog.combat.resolve_failed"), 2.6f);
             scannerPromptStep = ScannerPromptStep.MirandoCycleTarget;
             FocusCurrentMirandoTarget(logDetails: true);
             LogTargetSelectionPanel();
@@ -3617,7 +3617,7 @@ public partial class TurnStateManager
                     PlayerSlotId.FromIndex(defender.SlotIndex),
                     MatchController.TurnBriefingCategory.FogFire,
                     ResolveDebugUnitName(defender),
-                    $"atingida (−{fogFireDamage} PV) por atacante não identificado",
+                    PanelMessage.Helper("helper.journal.fog_damage", ("damage", fogFireDamage)),
                     fogFireCell);
             }
         }

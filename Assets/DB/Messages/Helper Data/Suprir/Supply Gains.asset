@@ -14,4 +14,4 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::HelperData
   id: helper.supply.gains
   condition: Linha de ganhos totais estimados no helper de suprimento.
-  message: 
+  message: "Ganhos: HP +<hp> | FUEL +<fuel> | AMMO +<ammo>"

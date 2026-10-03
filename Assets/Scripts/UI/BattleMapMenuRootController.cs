@@ -124,12 +124,12 @@ public class BattleMapMenuRootController : MonoBehaviour
         if (index >= 0 && index < layerSelectionModes.Count)
             return layerSelectionModes[index] switch
             {
-                FogOfWarVisionMode.Air => "AÉREA",
-                FogOfWarVisionMode.Surface => "SUPERFÍCIE",
-                FogOfWarVisionMode.Sub => "SUBMARINA",
-                _ => "TODAS"
+                FogOfWarVisionMode.Air => PanelMessage.Helper("helper.layer.air"),
+                FogOfWarVisionMode.Surface => PanelMessage.Helper("helper.layer.surface"),
+                FogOfWarVisionMode.Sub => PanelMessage.Helper("helper.layer.sub"),
+                _ => PanelMessage.Helper("helper.layer.all")
             };
-        return "CANCELAR";
+        return PanelMessage.Helper("helper.action.cancel");
     }
 
     public void InvokeLayerSelectionOption(int index)
@@ -300,10 +300,10 @@ public class BattleMapMenuRootController : MonoBehaviour
 
         switch (destinosDeSaida[index])
         {
-            case DestinoDeSaida.Campanha:      return "VOLTAR À CAMPANHA";
-            case DestinoDeSaida.MenuPrincipal: return "VOLTAR AO MENU PRINCIPAL";
-            case DestinoDeSaida.Windows:       return "SAIR PARA O WINDOWS";
-            default:                           return "CANCELAR";
+            case DestinoDeSaida.Campanha:      return PanelMessage.Helper("helper.action.return_campaign");
+            case DestinoDeSaida.MenuPrincipal: return PanelMessage.Helper("helper.action.return_menu");
+            case DestinoDeSaida.Windows:       return PanelMessage.Helper("helper.action.quit_windows");
+            default:                           return PanelMessage.Helper("helper.action.cancel");
         }
     }
 
@@ -492,7 +492,7 @@ public class BattleMapMenuRootController : MonoBehaviour
         pendingOpenOnNextNeutral = true;
         pendingOpenRequestedAt = Time.realtimeSinceStartup;
         AIController.Instance?.SetPlayerPaused(true);
-        PanelDialogController.TrySetTransientText("Pausa da simulacao solicitada. Abrindo menu no proximo Neutral.", 2.4f);
+        PanelDialogController.TrySetTransientText(PanelMessage.Dialog("panel_dialog.menu.pause_requested"), 2.4f);
         cursorController?.PlayBeepSfx();
     }
 
@@ -581,7 +581,7 @@ public class BattleMapMenuRootController : MonoBehaviour
                 else if (Time.realtimeSinceStartup - pendingOpenRequestedAt > PendingOpenGiveUpSeconds)
                 {
                     pendingOpenOnNextNeutral = false;
-                    PanelDialogController.TrySetTransientText("Menu indisponivel neste momento. A IA segue o turno.", 2.4f);
+                    PanelDialogController.TrySetTransientText(PanelMessage.Dialog("panel_dialog.menu.unavailable"), 2.4f);
                     cursorController?.PlayErrorSfx();
                     return true;
                 }
@@ -1404,7 +1404,7 @@ public class BattleMapMenuRootController : MonoBehaviour
                 layerSelectionOpen = true;
                 layerSelectionFocusIndex = 0;
                 PanelDialogController.ClearExternalText();
-                PanelHelperController.TrySetExternalText("CAMADA (LAYER)", "Escolha a visualização:");
+                PanelHelperController.TrySetExternalText(PanelMessage.Helper("helper.layer.title"), PanelMessage.Helper("helper.layer.prompt"));
                 break;
             case MenuAction.Opcoes:
                 SetPanel(MenuPanel.Options, resetIndex: true);
@@ -1419,7 +1419,7 @@ public class BattleMapMenuRootController : MonoBehaviour
                 cameraController?.ToggleQuickZoomFromMenu();
                 break;
             case MenuAction.Config:
-                PanelDialogController.TrySetTransientText("Config de partida: em desenvolvimento.", 2.4f);
+                PanelDialogController.TrySetTransientText(PanelMessage.Dialog("panel_dialog.menu.config_pending"), 2.4f);
                 break;
             case MenuAction.Save:
                 if (!TryCloseMenuForSaveLoadDispatch())
@@ -1447,7 +1447,7 @@ public class BattleMapMenuRootController : MonoBehaviour
                 if (!turnStateManager.HasTurnStartAutonomyReport)
                 {
                     // Sem som proprio: o OnButtonClicked ja tocou o confirm de todo item.
-                    PanelDialogController.TrySetTransientText("Jornal do Comandante: nada a relatar neste turno.", 2.4f);
+                    PanelDialogController.TrySetTransientText(PanelMessage.Dialog("panel_dialog.journal.empty"), 2.4f);
                     break;
                 }
                 if (!TryCloseMenuForSaveLoadDispatch())
@@ -1483,14 +1483,14 @@ public class BattleMapMenuRootController : MonoBehaviour
                 surrenderConfirmFocusIndex = 0;
                 HideMenuForModalPrompt();
                 PanelDialogController.ClearExternalText();
-                PanelHelperController.TrySetExternalText("RENDER-SE", "Confirmar rendição? A partida será perdida.");
+                PanelHelperController.TrySetExternalText(PanelMessage.Helper("helper.surrender.title"), PanelMessage.Helper("helper.surrender.prompt"));
                 break;
             case MenuAction.Sair:
                 exitConfirmOpen = true;
                 exitConfirmFocusIndex = 0;
                 HideMenuForModalPrompt();
                 PanelDialogController.ClearExternalText();
-                PanelHelperController.TrySetExternalText("SAIR DA PARTIDA", "Escolha o destino:");
+                PanelHelperController.TrySetExternalText(PanelMessage.Helper("helper.exit.title"), PanelMessage.Helper("helper.exit.prompt"));
                 break;
             case MenuAction.VoltarGerenciar:
                 SetPanel(MenuPanel.Options, resetIndex: false);
@@ -1578,8 +1578,8 @@ public class BattleMapMenuRootController : MonoBehaviour
         string treasury = matchController != null && matchController.ShouldHideActiveAiActionPresentation()
             ? "----"
             : Mathf.Max(0, money).ToString();
-        string message = $"Status da partida\nRodada: {turnNumber}\nTime ativo: {TeamUtils.GetName(activeTeam)}\nTesouro: ${treasury}";
-        PanelDialogController.TrySetExternalText(message + "\nESC: voltar");
+        string message = PanelMessage.Dialog("panel_dialog.menu.status", ("round", turnNumber), ("team", TeamUtils.GetName(activeTeam)), ("money", treasury));
+        PanelDialogController.TrySetExternalText(PanelMessage.Dialog("panel_dialog.menu.with_back", ("message", message)));
     }
 
     private bool TryCloseMenuForDispatchAndEnsureNeutral()
@@ -1592,7 +1592,7 @@ public class BattleMapMenuRootController : MonoBehaviour
             turnStateManager.CurrentCursorState == TurnStateManager.CursorState.PlayerMenu)
             return true;
 
-        string message = $"Menu do jogador: estado nao normalizado para Neutral (atual: {turnStateManager.CurrentCursorState}).";
+        string message = PanelMessage.Dialog("panel_dialog.menu.invalid_neutral", ("state", turnStateManager.CurrentCursorState));
         PanelDialogController.TrySetTransientText(message, 2.8f);
         cursorController?.PlayErrorSfx();
         return false;
@@ -1609,7 +1609,7 @@ public class BattleMapMenuRootController : MonoBehaviour
             state == TurnStateManager.CursorState.Neutral)
             return true;
 
-        string message = $"Menu do jogador: estado invalido para Servico do Comando (atual: {state}).";
+        string message = PanelMessage.Dialog("panel_dialog.menu.invalid_command", ("state", state));
         PanelDialogController.TrySetTransientText(message, 2.8f);
         cursorController?.PlayErrorSfx();
         return false;
@@ -1626,7 +1626,7 @@ public class BattleMapMenuRootController : MonoBehaviour
             state == TurnStateManager.CursorState.Neutral)
             return true;
 
-        string message = $"Menu do jogador: estado invalido para Destroy Unit (atual: {state}).";
+        string message = PanelMessage.Dialog("panel_dialog.menu.invalid_destroy", ("state", state));
         PanelDialogController.TrySetTransientText(message, 2.8f);
         cursorController?.PlayErrorSfx();
         return false;
@@ -1643,7 +1643,7 @@ public class BattleMapMenuRootController : MonoBehaviour
             state == TurnStateManager.CursorState.Neutral)
             return true;
 
-        string message = $"Menu do jogador: estado invalido para Passar a Vez (atual: {state}).";
+        string message = PanelMessage.Dialog("panel_dialog.menu.invalid_end_turn", ("state", state));
         PanelDialogController.TrySetTransientText(message, 2.8f);
         cursorController?.PlayErrorSfx();
         return false;
@@ -1661,7 +1661,7 @@ public class BattleMapMenuRootController : MonoBehaviour
             state == TurnStateManager.CursorState.Neutral)
             return true;
 
-        string message = $"Menu do jogador: estado invalido para Save/Load (atual: {state}).";
+        string message = PanelMessage.Dialog("panel_dialog.menu.invalid_save_load", ("state", state));
         PanelDialogController.TrySetTransientText(message, 2.8f);
         cursorController?.PlayErrorSfx();
         return false;

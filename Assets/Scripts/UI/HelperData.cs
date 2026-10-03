@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 
 [CreateAssetMenu(menuName = "Game/UI/Helper Data", fileName = "Helper Data_")]
 public class HelperData : ScriptableObject
@@ -37,5 +37,13 @@ public class HelperData : ScriptableObject
         "- helper.command_service.balance.estimate -> <before>, <after>\n" +
         "- demais IDs de titulo/label -> sem token")]
     public string message;
+
+    [TextArea(3, 10)]
+    [Tooltip("Traducao em ingles. Vazio usa Message (portugues). Preserve os nomes dos tokens.")]
+    public string messageEnglish;
+
+    public string LocalizedMessage => MessageTemplate.SelectLanguage(
+        message, messageEnglish, PanelMessageLanguageSettings.CurrentLanguage == PanelMessageLanguage.English);
+
 }
 

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
@@ -723,7 +723,7 @@ public class MainMenuLoadPanelController : MonoBehaviour
         // Enter/click de UI nao deve disparar feedback paralelo de gameplay.
         UiInputBlocker.SuppressGameplayInputForFrames(2);
         PanelDialogController.ClearExternalText();
-        PanelHelperController.TrySetExternalText("DELETAR SAVE", $"#{slot} {sceneName}\nDeletar este save?");
+        PanelHelperController.TrySetExternalText(PanelMessage.Helper("helper.load.delete_title"), PanelMessage.Helper("helper.load.delete_confirm", ("slot", slot), ("scene", sceneName)));
         cursorController?.PlayBeepSfx();
     }
 

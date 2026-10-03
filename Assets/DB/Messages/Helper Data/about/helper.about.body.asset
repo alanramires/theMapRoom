@@ -1,0 +1,17 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d2b57db8ec7f4f83a2ce0c69df6e6a2e, type: 3}
+  m_Name: helper.about.body
+  m_EditorClassIdentifier: Assembly-CSharp::HelperData
+  id: helper.about.body
+  condition: "Exibida em Assets/Scripts/UI/PanelMenu.cs. Tokens: nenhum."
+  message: "Um wargame tático em hexágonos, por turnos, onde nada é definitivo até você confirmar.\n\nMova, mire, planeje e cancele quando quiser. Só quando você diz sim é que a guerra acontece.\n\nComande infantaria, blindados, transportes e apoio de fogo através da neblina da guerra. Capture território, sustente sua logística e escolha entre golpes ousados ou avanços cautelosos.\n\nEnfrente uma IA com tática própria ou desafie um amigo no mesmo dispositivo em modo hot seat."

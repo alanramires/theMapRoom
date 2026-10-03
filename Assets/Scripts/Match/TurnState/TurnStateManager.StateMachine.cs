@@ -810,7 +810,7 @@ public partial class TurnStateManager
         {
             if (!CanSelectedUnitEndMoveAtCell(cursorCell, GetOccupantsAtCellForConfirm(cursorCell, selectedUnit, occupancyMap)))
             {
-                PushPanelUnitMessage("Hex ocupado", 2.4f);
+                PushPanelUnitMessage(PanelMessage.Dialog("panel_dialog.movement.occupied"), 2.4f);
                 Debug.Log("unidade selecionada, escolha um local valido para movimento");
                 return ActionSfx.Error;
             }
@@ -836,7 +836,7 @@ public partial class TurnStateManager
             UnitManager unit = FindUnitAtCell(cursorCell);
             if (unit != null && unit != selectedUnit)
             {
-                PushPanelUnitMessage("Hex ocupado", 2.4f);
+                PushPanelUnitMessage(PanelMessage.Dialog("panel_dialog.movement.occupied"), 2.4f);
                 Debug.Log("unidade selecionada, escolha um local valido para movimento");
                 return ActionSfx.Error;
             }
@@ -1354,14 +1354,14 @@ public partial class TurnStateManager
         }
         if (CurrentCursorState != CursorState.Neutral)
         {
-            message = $"Ending Turn exige cursor em Neutral (atual: {CurrentCursorState}).";
+            message = PanelMessage.Dialog("panel_dialog.end_turn.neutral_required", ("state", CurrentCursorState));
             return false;
         }
 
         Advance(CursorState.EndingTurn);
         // Confirmacao clicavel/tocavel no helper panel, mesmo tratamento de Render-se/Sair.
         PanelDialogController.ClearExternalText();
-        PanelHelperController.TrySetExternalText("PASSAR A VEZ", "Encerrar seu turno agora?");
+        PanelHelperController.TrySetExternalText(PanelMessage.Helper("helper.action.end_turn"), PanelMessage.Helper("helper.end_turn.confirm"));
         // O beep pertence a ABERTURA do painel, nao a quem pediu: no modo visivel a IA abre
         // esta mesma confirmacao (TryOpenRodadaConfirmationForAI) chamando este metodo direto,
         // sem passar pelo wrapper do CursorController. Com o som aqui, painel aberto sempre
@@ -1386,7 +1386,7 @@ public partial class TurnStateManager
         message = string.Empty;
         if (CurrentCursorState != CursorState.EndingTurn)
         {
-            message = $"Ending Turn confirmation exige estado EndingTurn (atual: {CurrentCursorState}).";
+            message = PanelMessage.Dialog("panel_dialog.end_turn.confirmation_required", ("state", CurrentCursorState));
             return false;
         }
 
@@ -1404,7 +1404,7 @@ public partial class TurnStateManager
         }
         if (CurrentCursorState != CursorState.PlayerMenu && CurrentCursorState != CursorState.Neutral)
         {
-            message = $"Passar a vez exige PlayerMenu/Neutral (atual: {CurrentCursorState}).";
+            message = PanelMessage.Dialog("panel_dialog.end_turn.menu_required", ("state", CurrentCursorState));
             return false;
         }
 
@@ -1416,7 +1416,7 @@ public partial class TurnStateManager
         message = string.Empty;
         if (matchController == null)
         {
-            message = "MatchController ausente para passar a vez.";
+            message = PanelMessage.Dialog("panel_dialog.end_turn.no_controller");
             PanelDialogController.ClearExternalText();
             PanelHelperController.ClearExternalText();
             if (CurrentCursorState == CursorState.EndingTurn)
@@ -1442,7 +1442,7 @@ public partial class TurnStateManager
 
         if (CurrentCursorState != CursorState.Neutral && CurrentCursorState != CursorState.PlayerMenu)
         {
-            message = $"Saving exige Neutral/PlayerMenu (atual: {CurrentCursorState}).";
+            message = PanelMessage.Dialog("panel_dialog.save.neutral_required", ("state", CurrentCursorState));
             return false;
         }
 
@@ -1458,7 +1458,7 @@ public partial class TurnStateManager
 
         if (CurrentCursorState != CursorState.Neutral && CurrentCursorState != CursorState.PlayerMenu)
         {
-            message = $"Loading exige Neutral/PlayerMenu (atual: {CurrentCursorState}).";
+            message = PanelMessage.Dialog("panel_dialog.load.neutral_required", ("state", CurrentCursorState));
             return false;
         }
 

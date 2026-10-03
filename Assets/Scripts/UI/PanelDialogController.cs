@@ -726,9 +726,9 @@ public class PanelDialogController : MonoBehaviour
             new Vector2(0f, 0.16f), new Vector2(0.15f, 0.88f));
         shoppingNextButton = CreateShoppingButton("shopping_next", ">>", rootRect,
             new Vector2(0.85f, 0.16f), new Vector2(1f, 0.88f));
-        shoppingBuyButton = CreateShoppingButton("shopping_buy", "COMPRAR", rootRect,
+        shoppingBuyButton = CreateShoppingButton("shopping_buy", PanelMessage.Dialog("panel_dialog.shopping.buy"), rootRect,
             new Vector2(0.18f, 0.02f), new Vector2(0.75f, 0.15f));
-        shoppingExitButton = CreateShoppingButton("shopping_exit", "SAIR", rootRect,
+        shoppingExitButton = CreateShoppingButton("shopping_exit", PanelMessage.Dialog("panel_dialog.shopping.exit"), rootRect,
             new Vector2(0.77f, 0.02f), new Vector2(0.98f, 0.15f));
 
         shoppingCounterText = CreateShoppingLabel("shopping_counter", rootRect,
@@ -845,7 +845,7 @@ public class PanelDialogController : MonoBehaviour
         int index = turnStateManager.ShoppingSelectedOptionIndex;
         int cost = turnStateManager.ShoppingSelectedOptionCost;
         shoppingCounterText.text = count > 0 ? $"{index + 1} / {count}" : string.Empty;
-        shoppingBuyText.text = $"COMPRAR  $ {cost.ToString("N0", CultureInfo.GetCultureInfo("pt-BR"))}";
+        shoppingBuyText.text = PanelMessage.Dialog("panel_dialog.shopping.buy_cost", ("cost", cost.ToString("N0", CultureInfo.GetCultureInfo("pt-BR"))));
         shoppingBuyButton.interactable = turnStateManager.ShoppingSelectedOptionCanPurchase;
 
         // Botoes seguem a cor do time ativo (virou tudo slot de jogador).
@@ -1105,29 +1105,7 @@ public class PanelDialogController : MonoBehaviour
 
     private static string ApplyInlineTokens(string template, IReadOnlyDictionary<string, string> tokens)
     {
-        if (string.IsNullOrEmpty(template) || tokens == null || tokens.Count == 0)
-            return template ?? string.Empty;
-
-        string output = template;
-        foreach (KeyValuePair<string, string> pair in tokens)
-        {
-            if (string.IsNullOrWhiteSpace(pair.Key))
-                continue;
-
-            string key = pair.Key.Trim();
-            string val = pair.Value ?? string.Empty;
-            
-            output = output.Replace($"<{key}>", val);
-            output = output.Replace($"<{key.ToLowerInvariant()}>", val);
-            output = output.Replace($"<{key.ToUpperInvariant()}>", val);
-            if (key.Length > 0)
-            {
-                string titleCase = char.ToUpperInvariant(key[0]) + (key.Length > 1 ? key.Substring(1).ToLowerInvariant() : string.Empty);
-                output = output.Replace($"<{titleCase}>", val);
-            }
-        }
-
-        return output;
+        return MessageTemplate.Apply(template, tokens);
     }
 
 #if UNITY_EDITOR

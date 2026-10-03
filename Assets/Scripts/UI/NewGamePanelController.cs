@@ -382,16 +382,16 @@ public class NewGamePanelController : MonoBehaviour
         List<string> on  = new List<string>();
         List<string> off = new List<string>();
 
-        Classify(ldt,     "Linha de Tiro",  on, off);
-        Classify(los,     "Linha de Visão", on, off);
-        Classify(spotter, "Spotter",        on, off);
-        Classify(stealth, "Stealth",        on, off);
-        Classify(fow,     "Nevoa de Guerra", on, off);
+        Classify(ldt,     PanelMessage.Helper("helper.rules.line_fire"),  on, off);
+        Classify(los,     PanelMessage.Helper("helper.rules.line_sight"), on, off);
+        Classify(spotter, PanelMessage.Helper("helper.rules.spotter"),        on, off);
+        Classify(stealth, PanelMessage.Helper("helper.rules.stealth"),        on, off);
+        Classify(fow,     PanelMessage.Helper("helper.rules.fog"), on, off);
 
-        string onPart  = on.Count  > 0 ? string.Join(", ", on)  : "nenhum";
-        string offPart = off.Count > 0 ? string.Join(", ", off) : "nenhum";
+        string onPart  = on.Count  > 0 ? string.Join(", ", on)  : PanelMessage.Helper("helper.rules.none");
+        string offPart = off.Count > 0 ? string.Join(", ", off) : PanelMessage.Helper("helper.rules.none");
 
-        return $"Ativado: {onPart}\nDesativado: {offPart}";
+        return PanelMessage.Helper("helper.rules.summary", ("enabled", onPart), ("disabled", offPart));
     }
 
     private static void Classify(bool active, string label, List<string> on, List<string> off)
