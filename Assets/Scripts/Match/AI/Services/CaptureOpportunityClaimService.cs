@@ -1321,7 +1321,10 @@ public static class CaptureOpportunityClaimService
     /// puro conserva o campo FormalPlan para ferramentas/testes que queiram
     /// comparar grupos explicitamente montados, sem mudar a doutrina runtime.
     /// </summary>
-    private static int ResolveCapturerRolePrecedence(UnitManager unit)
+    /// Lida também pela cessão do oportunista (AIController.Capturer.Helpers): uma
+    /// regra só para "o puro antes do Combatente", nos dois lugares que decidem
+    /// quem fica com o prédio (contrato_questionario.md §6.8).
+    internal static int ResolveCapturerRolePrecedence(UnitManager unit)
     {
         if (unit == null
             || !unit.TryGetUnitData(out UnitData data)

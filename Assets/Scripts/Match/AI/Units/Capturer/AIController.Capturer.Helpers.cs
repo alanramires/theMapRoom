@@ -141,7 +141,8 @@ public partial class AIController
         if (!SimulateCaptureSensor(opportunist, captureCell, out ConstructionManager captureTarget))
             return false;
 
-        int opportunistCost = GetPathStepCount(opportunistPaths, captureCell);
+        int opportunistRank = CaptureOpportunityClaimService.ResolveCapturerRolePrecedence(opportunist);
+        int opportunistRounds = RodadasAteFechar(opportunist, captureTarget);
         TeamObjectivePlan plan = ObjectiveManager.GetPlanForSlot(PlayerSlotId.FromIndex(ResolveAISlotKey(aiTeam)));
 
         if (TryFindAssignedCapturerForCaptureTarget(
@@ -162,10 +163,30 @@ public partial class AIController
                     boardTilemap, candidate, Mathf.Max(0, candidate.RemainingMovementPoints), terrainDatabase);
             if (candidatePaths == null || !candidatePaths.ContainsKey(captureCell)) continue;
 
-            int candidateCost = GetPathStepCount(candidatePaths, captureCell);
+            // Quem fica com o prédio (contrato §6.8): o dono do setor; depois o
+            // Capturador antes do Combatente (o rótulo); no empate, quem FECHA
+            // primeiro. Antes era "quem chega em menos passos", que não diz nada
+            // sobre quem termina a captura. Empate total: o oportunista fica — ele
+            // já está decidindo, e ceder por nada é só trocar de lugar.
             bool candidateOwnsTarget = IsAssignedToCaptureTarget(candidate, plan, captureTarget, aiTeam);
+            if (candidateOwnsTarget)
+            {
+                reservedFor = candidate;
+                return true;
+            }
 
-            if (candidateCost < opportunistCost || (candidateOwnsTarget && candidateCost <= opportunistCost))
+            int candidateRank = CaptureOpportunityClaimService.ResolveCapturerRolePrecedence(candidate);
+            if (candidateRank != opportunistRank)
+            {
+                if (candidateRank < opportunistRank)
+                {
+                    reservedFor = candidate;
+                    return true;
+                }
+                continue;
+            }
+
+            if (RodadasAteFechar(candidate, captureTarget) < opportunistRounds)
             {
                 reservedFor = candidate;
                 return true;
@@ -215,6 +236,35 @@ public partial class AIController
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// "Quem fecha primeiro" — a régua única de quem fica com um prédio
+    /// (contrato_questionario.md §6.8). Rodadas para o prédio cair (ou encher, na
+    /// reconquista) com o cap power desta unidade NESTE prédio: HP × eficiência da
+    /// chave, com a penalidade de pré-requisito, pela conta do próprio sensor.
+    ///
+    /// Substitui HP cru e passos até chegar. Com HP cru, um bazooka de 6 HP numa
+    /// cidade de chave 0.5 (cap power 3) passava na frente de um soldado de 5.
+    /// Sem chave para esta construção: int.MaxValue — nunca fecha.
+    /// </summary>
+    private int RodadasAteFechar(UnitManager unit, ConstructionManager construction)
+    {
+        if (unit == null || construction == null || unit.IsDead)
+            return int.MaxValue;
+        if (!construction.TryResolveConstructionData(out ConstructionData constructionData)
+            || PodeCapturarSensor.ResolveCaptureEfficiency(unit, constructionData) <= 0f)
+            return int.MaxValue;
+
+        bool reconquista = PlayerSlotRelations.AreAllies(unit.SlotIndex, construction.SlotIndex);
+        int faltam = reconquista
+            ? construction.CapturePointsMax - construction.CurrentCapturePoints
+            : construction.CurrentCapturePoints;
+        if (faltam <= 0)
+            return 0;
+
+        int capPower = PodeCapturarSensor.GetCapturePower(unit, construction, matchController);
+        return capPower > 0 ? (faltam + capPower - 1) / capPower : int.MaxValue;
     }
 
     private static int GetPathStepCount(Dictionary<Vector3Int, List<Vector3Int>> paths, Vector3Int cell)

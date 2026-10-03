@@ -5,9 +5,13 @@ public partial class AIController
 {
     // -------------------------------------------------------------------------
     // Capturer Swap
-    // Quando um capturador fraco está sobre o edificio do seu objetivo e outro
-    // capturador do MESMO objetivo (HP maior) consegue chegar este turno,
-    // o fraco cede o hex e o forte captura no lugar.
+    // Quando um capturador está sobre o edificio do seu objetivo e outro
+    // capturador do MESMO objetivo que FECHA o prédio em menos rodadas consegue
+    // chegar este turno, o primeiro cede o hex e o outro captura no lugar.
+    //
+    // A régua é RodadasAteFechar (cap power neste prédio), não HP: com HP cru, um
+    // bazooka de 6 HP em cidade de chave 0.5 (cap power 3) tomava o lugar de um
+    // soldado de 5. Empate em rodadas não troca — ceder sem ganho só mexe peça.
     // -------------------------------------------------------------------------
 
     // Versão rápida (sem pathfinding) usada na ordenação de iniciativa.
@@ -38,7 +42,7 @@ public partial class AIController
         if (occCell != capCell) return null;
 
         UnitManager best  = null;
-        int         bestHP = occupant.CurrentHP;
+        int         bestRounds = RodadasAteFechar(occupant, capturable);
 
         foreach (SlotNeed slot in objective.Slots)
         {
@@ -47,7 +51,8 @@ public partial class AIController
 
             UnitManager candidate = FindActiveUnit(slot.AssignedUnitId, aiTeam);
             if (candidate == null || candidate.HasActed || candidate.IsDead || candidate.IsEmbarked) continue;
-            if (candidate.CurrentHP <= bestHP) continue;
+            int candidateRounds = RodadasAteFechar(candidate, capturable);
+            if (candidateRounds >= bestRounds) continue;
 
             Vector3Int candCell = candidate.CurrentCellPosition; candCell.z = 0;
             float hexDist = SectorManager.HexDistance(candCell, capCell);
@@ -63,8 +68,8 @@ public partial class AIController
                 if (candPaths == null || !candPaths.ContainsKey(capCell)) continue;
             }
 
-            best   = candidate;
-            bestHP = candidate.CurrentHP;
+            best       = candidate;
+            bestRounds = candidateRounds;
         }
 
         return best;
