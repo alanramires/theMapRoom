@@ -276,7 +276,9 @@ public partial class AIController
 
         if (IsHelicopterInitiativeUnit(unit)) return 1;
 
-        if (HasFireSupportAttackInCurrentPosition(unit, aiTeam)) return 2;
+        // Fogo de preparação (Papeis > Fogo de Suporte): desligado, o FS com tiro
+        // não passa na frente — cada peça ataca na sua vez.
+        if (FazFogoDePreparacao && HasFireSupportAttackInCurrentPosition(unit, aiTeam)) return 2;
 
         // Combate local de assalto preempta progressao/revelacao: se ha um tanque/APC
         // capaz de resolver a ameaca agora, nao puxa infantaria distante para esse duelo.

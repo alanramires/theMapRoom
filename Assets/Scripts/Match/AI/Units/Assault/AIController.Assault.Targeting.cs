@@ -21,11 +21,17 @@ public partial class AIController
     }
 
 
-    private static BazookaTargetPriority ResolveAssaultTargetPreference(UnitManager attacker, UnitManager target)
+    private BazookaTargetPriority ResolveAssaultTargetPreference(UnitManager attacker, UnitManager target)
     {
         if (attacker == null || target == null)
             return BazookaTargetPriority.Tertiary;
         if (!attacker.TryGetUnitData(out UnitData attackerData) || attackerData == null)
+            return BazookaTargetPriority.Tertiary;
+        // Política do perfil (Papeis > Assalto). Desligada, a família Assalto atira
+        // no que está na frente: toda presa vale o mesmo e decide a conta tática.
+        // Os outros papéis seguem com a presa da ficha.
+        if (!FazCacarAlvoPreferido
+            && UnitRoleCompatibility.ResolveFamily(attackerData) == UnitRoleFamily.Assalto)
             return BazookaTargetPriority.Tertiary;
         if (!target.TryGetUnitData(out UnitData targetData) || targetData == null)
             return BazookaTargetPriority.Tertiary;

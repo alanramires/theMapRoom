@@ -17,6 +17,9 @@ public partial class AIController
         bool allowAssignedPassengers = false)
     {
         action = null;
+        // Política do perfil (Papeis > Transportador): desligada, entrega onde mandaram.
+        if (!FazDesembarcarCapturadorNoCaminho)
+            return false;
         if (transporter == null || passengers == null || passengers.Count == 0 || snapshot == null)
             return false;
 

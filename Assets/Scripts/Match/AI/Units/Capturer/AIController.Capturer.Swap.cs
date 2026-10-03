@@ -28,6 +28,9 @@ public partial class AIController
 
     private UnitManager FindSwapIncomingCapturer(UnitManager occupant, TeamObjectivePlan plan, TeamId aiTeam, bool fullPathCheck)
     {
+        // Política do perfil (Papeis > Capturador). Desligada, a iniciativa e a
+        // decisão deixam de ver o Swap juntas: as duas passam por aqui.
+        if (!FazSubstituicaoPorEficiencia) return null;
         if (occupant == null || plan == null) return null;
         if (!occupant.TryGetUnitData(out UnitData data) || data == null
             || UnitRoleCompatibility.ResolveCompositionRole(data) != UnitRole.Capturador) return null;

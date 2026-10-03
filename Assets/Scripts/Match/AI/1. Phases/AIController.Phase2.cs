@@ -821,6 +821,10 @@ public partial class AIController
 
         if (attacker == null || action == null)
             return false;
+        // Fogo de preparação (Papeis > Fogo de Suporte): desligado, o assalto não
+        // espera a artilharia preparar.
+        if (!FazFogoDePreparacao)
+            return false;
         if (action.SensorAction != SensorActionType.Attack || string.IsNullOrEmpty(action.TargetInstanceId))
             return false;
         if (IsFireSupportUnit(attacker))

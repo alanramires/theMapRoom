@@ -51,7 +51,15 @@ public sealed class AIControllerEditor : Editor
             Capacity("Abre com blindado", controller.AbreComBlindado);
             Capacity("Limita logística", controller.LimitaLogistica);
             Capacity("Dobra slots de capturador", controller.DobraSlotsDeCapturador);
-            Capacity("Blitzkrieg (handoff em profundidade)", controller.FazHandoffEmProfundidade);
+            Capacity("Capturador: blitzkrieg", controller.FazHandoffEmProfundidade);
+            Capacity("Capturador: substituição por eficiência", controller.FazSubstituicaoPorEficiencia);
+            Capacity("Capturador: captura oportunista", controller.FazCapturaOportunista);
+            Capacity("Assalto: caçar o alvo preferido", controller.FazCacarAlvoPreferido);
+            Capacity("Fogo de Suporte: fogo de preparação", controller.FazFogoDePreparacao);
+            Capacity("Transportador: ataque oportunista (vazio)", controller.FazAtaqueOportunistaTransporte);
+            Capacity("Transportador: desembarca capturador no caminho", controller.FazDesembarcarCapturadorNoCaminho);
+            Capacity("Transportador: atender EVAC", controller.FazAtenderEvac);
+            Capacity("Transportador: modo hospital", controller.FazModoHospital);
             Capacity("Conscrição sempre", controller.ConscriptionDoctrine);
             Capacity("Conscrição quando perdendo", controller.ConscriptionWhenLosing);
             Capacity("Lado forte/fraco", controller.StrongWeakSidePolitic);

@@ -72,6 +72,10 @@ public partial class AIController
     {
         using var perf = new AIDecisionPerfScope(unit, "opportunistic");
         captureCell = Vector3Int.zero;
+        // Política do perfil (Papeis > Capturador). Ponto único: todos os
+        // chamadores, com e sem plano, passam por aqui.
+        if (!FazCapturaOportunista)
+            return false;
         Vector3Int currentCell = unit.CurrentCellPosition; currentCell.z = 0;
         foreach (Vector3Int cell in paths.Keys)
         {

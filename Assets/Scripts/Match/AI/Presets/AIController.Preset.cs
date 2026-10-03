@@ -61,11 +61,43 @@ public partial class AIController
 
     /// <summary>O "blitzkrieg": a ponta nao para para terminar a captura, passa e segue.</summary>
     public bool FazHandoffEmProfundidade =>
-        activePreset != null ? activePreset.capacidades.handoffEmProfundidade : hardMode;
+        activePreset != null ? activePreset.papeis.capturador.blitzkrieg : hardMode;
+
+    /// <summary>Swap: cede o predio a quem fecha em menos rodadas. Sem preset, ligado (a regra antiga).</summary>
+    public bool FazSubstituicaoPorEficiencia =>
+        activePreset == null || activePreset.papeis.capturador.substituicaoPorEficiencia;
+
+    /// <summary>Captura o predio livre no caminho e cede ao responsavel. Sem preset, ligado (a regra antiga).</summary>
+    public bool FazCapturaOportunista =>
+        activePreset == null || activePreset.papeis.capturador.capturaOportunista;
+
+    /// <summary>Assalto persegue a presa da ficha. Sem preset, ligado (a regra antiga).</summary>
+    public bool FazCacarAlvoPreferido =>
+        activePreset == null || activePreset.papeis.assalto.cacarAlvoPreferido;
+
+    /// <summary>FS age antes e o assalto espera a preparação. Sem preset, ligado (a regra antiga).</summary>
+    public bool FazFogoDePreparacao =>
+        activePreset == null || activePreset.papeis.fogoDeSuporte.fogoDePreparacao;
+
+    /// <summary>Transportador vazio ataca no caminho. Sem preset, ligado (a regra antiga).</summary>
+    public bool FazAtaqueOportunistaTransporte =>
+        activePreset == null || activePreset.papeis.transportador.ataqueOportunistaVazio;
+
+    /// <summary>Courier larga o capturador num prédio livre do caminho. Sem preset, ligado.</summary>
+    public bool FazDesembarcarCapturadorNoCaminho =>
+        activePreset == null || activePreset.papeis.transportador.desembarcaCapturadorNoCaminho;
+
+    /// <summary>Transportador vazio vai buscar ferido. Sem preset, ligado.</summary>
+    public bool FazAtenderEvac =>
+        activePreset == null || activePreset.papeis.transportador.atenderEvac;
+
+    /// <summary>Supridor que transporta cuida do ferido a bordo. Sem preset, ligado.</summary>
+    public bool FazModoHospital =>
+        activePreset == null || activePreset.papeis.transportador.modoHospital;
 
     /// <summary>Quem pode fundir durante o reparo. Sem preset, a regra antiga: todos.</summary>
     public AIFusaoEmReparo FusaoEmReparo =>
-        activePreset != null ? activePreset.capacidades.fusaoEmReparo : AIFusaoEmReparo.Todos;
+        activePreset != null ? activePreset.missoes.reparo.fusaoEmReparo : AIFusaoEmReparo.Todos;
 
     /// <summary>
     /// A pergunta unica de "esta unidade funde no reparo?". A flag da ficha continua

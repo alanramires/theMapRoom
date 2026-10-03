@@ -63,6 +63,10 @@ public partial class AIController
     {
         if (unit == null || snapshot == null || !IsSupplyCapableTransporter(unit))
             return null;
+        // Política do perfil (Papeis > Transportador): desligada, o ferido a bordo é
+        // carga comum e o EVAC normal o desembarca.
+        if (!FazModoHospital)
+            return null;
 
         // O proprio transportador em reparo tem prioridade sobre a enfermaria: um navio
         // que esta se perdendo leva o paciente junto no recuo. Quem decide isso e o

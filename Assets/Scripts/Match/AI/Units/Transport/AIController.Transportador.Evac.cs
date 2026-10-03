@@ -73,6 +73,10 @@ public partial class AIController
         Dictionary<Vector3Int, List<Vector3Int>> transporterPaths,
         float maxTransportDistance = -1f)
     {
+        // A mesma política do serviço de operações (Papeis > Transportador): esta
+        // é a porta do shuttle e do naval para o EVAC.
+        if (!FazAtenderEvac)
+            return null;
         if (!transporter.TryGetUnitData(out UnitData transporterData) || transporterData == null)
             return null;
 

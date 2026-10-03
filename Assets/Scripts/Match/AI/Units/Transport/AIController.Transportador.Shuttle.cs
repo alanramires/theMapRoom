@@ -802,6 +802,9 @@ public partial class AIController
     {
         bestCell = fromCell;
         bestTarget = null;
+        // Política do perfil (Papeis > Transportador). Ponto único: o Shuttle e o
+        // Assigned, os dois que atacam vazios, passam por aqui.
+        if (!FazAtaqueOportunistaTransporte) return false;
 
         List<UnitManager> enemies = CollectVisibleAssaultEnemies(snapshot.AITeam);
         if (enemies == null || enemies.Count == 0) return false;

@@ -78,21 +78,6 @@ public class AICapabilityPreset
              "(código: slots*2 no PlanEvaluator)")]
     public bool dobrarSlotsCapturadorPorSetor = false;
 
-    [Tooltip("LIGADO: a unidade da ponta NÃO para para terminar a captura — ela passa o prédio para um seguidor e segue avançando no eixo.\n" +
-             "DESLIGADO: quem chega no prédio fica ali até capturar.\n" +
-             "Ligado mantém o avanço fluido; desligado consolida antes de seguir.\n\n" +
-             "(código: PlanEvaluator.Handoff)")]
-    public bool handoffEmProfundidade = false;
-
-    [Header("Reparo")]
-    [Tooltip("Quem pode FUNDIR enquanto está em reparo (fusão na retaguarda, longe de inimigo).\n" +
-             "TODOS: qualquer unidade com 'Fuse While In Repair' na ficha. É a regra antiga, e erra: funde tanque, artilharia e EWACS, encolhendo a presença do exército.\n" +
-             "SÓ CAPTURADOR: só quem satisfaz o papel Capturador (e tem a flag na ficha). No capturador o HP é a taxa de captura, então concentrar acelera.\n" +
-             "DESLIGADO: ninguém funde no reparo. Sob invasão, a massa segura o atraso do inimigo; fundir abre lacuna na defesa.\n" +
-             "A fusão FORA do reparo (para capturar mais rápido) é outra decisão e não passa por aqui.\n\n" +
-             "(código: AIController.PermiteFusaoEmReparo)")]
-    public AIFusaoEmReparo fusaoEmReparo = AIFusaoEmReparo.Todos;
-
     // -------------------------------------------------------------------------------
     // POLÍTICA DE ORÇAMENTO — o 2×2 (PISO × TETO)
     //
@@ -147,6 +132,121 @@ public class AICapabilityPreset
              "Recomendado LIGADO: o modo duro tem esse efeito perverso conhecido.\n\n" +
              "(código: AIController.softCoreGate)")]
     public bool gateNucleoSuave = false;
+}
+
+// -------------------------------------------------------------------------------------
+// PAPÉIS — as políticas de cada papel que o perfil liga ou desliga. Só ESPERTEZA vai
+// aqui: o que separa um general bom de um simples. HIGIENE (sair do hex que outro
+// precisa, liberar a produtora) fica sempre ligada e não aparece no perfil: desligada,
+// a IA não joga mal, ela trava. Ver docs/AI Behavior/capturador_politicas.md.
+// -------------------------------------------------------------------------------------
+[Serializable]
+public class AICapturadorPoliticas
+{
+    [Tooltip("BLITZKRIEG — revezamento ao longo do eixo.\n" +
+             "LIGADO: a ponta NÃO para para terminar a captura — passa o prédio a um capturador que vem de trás e o alcança no tático, e segue avançando.\n" +
+             "DESLIGADO: quem chega no prédio fica ali até capturar (persistência).\n\n" +
+             "(código: PlanEvaluator.Handoff, Capturer.Blitzkrieg)")]
+    public bool blitzkrieg = false;
+
+    [Tooltip("SUBSTITUIÇÃO POR EFICIÊNCIA (Swap).\n" +
+             "LIGADO: o capturador no prédio cede a outro do mesmo objetivo que chega neste turno e FECHA o prédio em menos rodadas (cap power neste prédio, não HP), e segue a agenda.\n" +
+             "DESLIGADO: fica e captura, mesmo havendo alguém que fecharia antes.\n\n" +
+             "(código: AIController.FindSwapIncomingCapturer)")]
+    public bool substituicaoPorEficiencia = true;
+
+    [Tooltip("CAPTURA OPORTUNISTA — antes do tiro vem o dinheiro.\n" +
+             "LIGADO: no caminho do objetivo, captura o prédio livre que alcança no tático, e cede ao responsável quando ele chega.\n" +
+             "DESLIGADO: ignora prédio no caminho. CUIDADO: o capturador sem plano também captura por aqui; desligar tira dele a captura no tático.\n\n" +
+             "(código: AIController.TryFindOpportunisticCapture)")]
+    public bool capturaOportunista = true;
+}
+
+[Serializable]
+public class AIAssaltoPoliticas
+{
+    [Tooltip("CAÇAR O ALVO PREFERIDO.\n" +
+             "LIGADO: o assalto persegue a presa da ficha (Ai Target Preference By Class): o tanque caça o canhão elite, o bombardeiro caça a artilharia. A presa primária vale mais que ocupar o objetivo.\n" +
+             "DESLIGADO: atira no que está na frente, pela conta tática comum (HP baixo, distância). Simples, não quebrado.\n" +
+             "Vale para a família Assalto (assalto, interceptador, ataque aéreo, artilheiro combatente).\n\n" +
+             "(código: AIController.ResolveAssaultTargetPreference)")]
+    public bool cacarAlvoPreferido = true;
+}
+
+[Serializable]
+public class AIFogoDeSuportePoliticas
+{
+    [Tooltip("FOGO DE PREPARAÇÃO antes do assalto.\n" +
+             "LIGADO: o fogo de suporte com tiro já no lugar age antes (iniciativa), e o ataque do assalto contra o mesmo alvo espera a artilharia preparar.\n" +
+             "DESLIGADO: cada peça ataca na sua vez, sem combinar.\n\n" +
+             "(código: Initiative grupo 2 + Phase2.ShouldDeferAttackForFireSupportPrep)")]
+    public bool fogoDePreparacao = true;
+}
+
+[Serializable]
+public class AITransportadorPoliticas
+{
+    [Tooltip("ATAQUE OPORTUNISTA (vazio).\n" +
+             "LIGADO: o transportador VAZIO, a caminho de buscar alguém, ataca um alvo no caminho com pouco desvio.\n" +
+             "DESLIGADO: vai buscar e pronto.\n" +
+             "Com carga ele não ataca nunca — perder o casco perde todos os passageiros. Isso não é política, é regra.\n\n" +
+             "(código: AIController.TryFindTransportBreakerAttack)")]
+    public bool ataqueOportunistaVazio = true;
+
+    // "Desembarca tropas no local" (não estacionar em cima do alvo de captura) NÃO é
+    // política do perfil: é higiene, sempre ligada. Desligada, o transportador
+    // atrapalha o próprio capturador. Ver AIController.AddCapturableParkingBans.
+
+    [Tooltip("DESEMBARCA CAPTURADOR NO CAMINHO.\n" +
+             "LIGADO: com um capturador a bordo, larga-o num prédio livre do caminho, ANTES do destino que o plano deu.\n" +
+             "DESLIGADO: só entrega no destino.\n" +
+             "É o táxi mudando o plano do passageiro — por isso é coordenação de duas peças.\n\n" +
+             "(código: AIController.TryBuildRogueCourierLocalOpportunityDrop)")]
+    [FormerlySerializedAs("capturaLocalNaEntrega")]
+    public bool desembarcaCapturadorNoCaminho = true;
+
+    [Tooltip("ATENDER EVAC — ir buscar o ferido.\n" +
+             "LIGADO: o transportador vazio atende o pedido de emergência de quem está em reparo e o leva para o reparo.\n" +
+             "DESLIGADO: não sai para buscar ferido. Se o ferido embarcar por conta própria, ainda é levado ao reparo.\n\n" +
+             "(código: TryQueryTransportEvacOperation, FindBestEvacCandidate)")]
+    public bool atenderEvac = true;
+
+    [Tooltip("MODO HOSPITAL — o supridor que também transporta cuida do ferido a bordo antes de entregar.\n" +
+             "LIGADO: supre o paciente embarcado, recarrega mantendo-o a bordo, segura posição; só desembarca quando não consegue atender.\n" +
+             "DESLIGADO: trata o ferido como carga comum (EVAC normal).\n" +
+             "A ficha ainda pode desligar por unidade (Ai Disembark When Cannot Supply).\n\n" +
+             "(código: AIController.TryDecideSupplierHospitalAction)")]
+    public bool modoHospital = true;
+}
+
+[Serializable]
+public class AIPapeisPreset
+{
+    public AICapturadorPoliticas capturador = new AICapturadorPoliticas();
+    public AIAssaltoPoliticas assalto = new AIAssaltoPoliticas();
+    public AIFogoDeSuportePoliticas fogoDeSuporte = new AIFogoDeSuportePoliticas();
+    public AITransportadorPoliticas transportador = new AITransportadorPoliticas();
+}
+
+// -------------------------------------------------------------------------------------
+// MISSÕES — o que muda enquanto a peça cumpre uma missão (a coluna que substitui a do
+// papel). Ver docs/AI Behavior/contrato_questionario.md §11.
+// -------------------------------------------------------------------------------------
+[Serializable]
+public class AIReparoMissao
+{
+    [Tooltip("Quem pode FUNDIR enquanto está em reparo (fusão na retaguarda, longe de inimigo).\n" +
+             "TODOS: qualquer unidade com 'Fuse While In Repair' na ficha. É a regra antiga, e erra: funde tanque, artilharia e EWACS, encolhendo a presença do exército.\n" +
+             "SÓ CAPTURADOR: só quem satisfaz o papel Capturador (e tem a flag na ficha). No capturador o HP é a taxa de captura, então concentrar acelera.\n" +
+             "DESLIGADO: ninguém funde no reparo. Sob invasão, a massa segura o atraso do inimigo; fundir abre lacuna na defesa.\n\n" +
+             "(código: AIController.PermiteFusaoEmReparo)")]
+    public AIFusaoEmReparo fusaoEmReparo = AIFusaoEmReparo.Todos;
+}
+
+[Serializable]
+public class AIMissoesPreset
+{
+    public AIReparoMissao reparo = new AIReparoMissao();
 }
 
 // -------------------------------------------------------------------------------------
@@ -352,6 +452,8 @@ public class AIPresetData : ScriptableObject
 
     [Header("Seções")]
     public AICapabilityPreset capacidades = new AICapabilityPreset();
+    public AIPapeisPreset papeis = new AIPapeisPreset();
+    public AIMissoesPreset missoes = new AIMissoesPreset();
     public AIEconomyPreset economia = new AIEconomyPreset();
     public AICompositionPreset composicao = new AICompositionPreset();
     public AIConscriptionPreset conscricao = new AIConscriptionPreset();
@@ -395,8 +497,16 @@ public class AIPresetData : ScriptableObject
         target.capacidades.aberturaBlindadoPrimeiro = hard;
         target.capacidades.limitarLogistica = hard;
         target.capacidades.dobrarSlotsCapturadorPorSetor = hard;
-        target.capacidades.handoffEmProfundidade = hard;
-        target.capacidades.fusaoEmReparo = hard
+        target.papeis.capturador.blitzkrieg = hard;
+        target.papeis.capturador.substituicaoPorEficiencia = !easy;
+        target.papeis.capturador.capturaOportunista = true;
+        target.papeis.assalto.cacarAlvoPreferido = !easy;
+        target.papeis.fogoDeSuporte.fogoDePreparacao = !easy;
+        target.papeis.transportador.ataqueOportunistaVazio = !easy;
+        target.papeis.transportador.desembarcaCapturadorNoCaminho = hard;
+        target.papeis.transportador.atenderEvac = true;
+        target.papeis.transportador.modoHospital = !easy;
+        target.missoes.reparo.fusaoEmReparo = hard
             ? AIFusaoEmReparo.Desligado
             : easy ? AIFusaoEmReparo.Todos : AIFusaoEmReparo.SoCapturador;
         target.capacidades.conscricaoSempre = conscricaoSempre;

@@ -764,6 +764,12 @@ public partial class AIController
         Func<TransportPlanningSnapshot> getPlanningSnapshot,
         out TransportOperationDecision decision)
     {
+        // Política do perfil (Papeis > Transportador): desligada, ninguém sai para
+        // buscar ferido. Quem embarca por conta própria ainda é levado ao reparo.
+        decision = null;
+        if (!FazAtenderEvac)
+            return false;
+
         bool found = TryQueryTransportPickupOperation(
             unit, snapshot, plan, requestedTier, movementBudget,
             includeOpportunisticPickup: false,
