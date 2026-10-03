@@ -545,9 +545,18 @@ construção.
 | onde | regra de hoje | contrato |
 |---|---|---|
 | `CaptureOpportunityClaimService.SortCandidates` (casamento de sem-planos) | rótulo ✅, empate por `InstanceId` | empate por rodadas até cair |
-| `ShouldReserveOpportunisticCaptureForCloserUnit` (cessão do oportunista) | com plano ✅, depois **menos passos**, sem rótulo | rótulo, depois rodadas até cair |
+| `ShouldReserveOpportunisticCaptureForCloserUnit` (cessão do oportunista) | ✅ só compilou (2026-10-03): com plano → rótulo → rodadas até fechar; empate total, o oportunista fica | — |
+| `FindSwapIncomingCapturer` (Swap) | ✅ só compilou (2026-10-03): troca só se o candidato fecha em **menos** rodadas; empate não troca | — |
 
 O passo 3 é o verso *"não disputa a cidade com quem fecha primeiro"*.
+
+**A régua é `RodadasAteFechar`** (`Capturer.Helpers.cs`): pontos que faltam ÷
+cap power **neste prédio**, pela conta do sensor (`PodeCapturarSensor.GetCapturePower`:
+HP × eficiência da chave, com a penalidade de pré-requisito). Sem chave para a
+construção, nunca fecha. Vale igual em todos os perfis: é correção, não
+esperteza. Falta o casamento de sem-planos, cujo desempate segue `InstanceId`:
+lá a ordenação é por unidade, não por prédio, e a régua por prédio não cabe sem
+mexer no algoritmo.
 
 ### 6.9 Defensor e Rally são políticas que leem a postura
 
@@ -614,6 +623,50 @@ Nove casas: Fundir saiu de todas (§6.4).
 9   Desembarcar   Desembarcar   Capturar      Enxergar      Capturar      Capturar      Detectar
 ```
 
+### 7.2b O Transportador: dois MODOS, não dois papéis
+
+**CONTRATO, desenho do autor em 2026-10-03.** Pickup (vazio) e Courier (com
+carga) são o **mesmo papel** em dois estados. É o mesmo mecanismo das missões: o
+estado da peça troca a coluna, com as mesmas casas. O modo sai de um **fato** (tem
+carga ou não), não de um campo.
+
+| | Pickup (vazio) | Courier (com carga) |
+|---|---|---|
+| magnético | quem pede carona, ou o capitão | o local da entrega |
+| especial | só entra em reparo por falta de autonomia ou munição | idem |
+
+**A casa Embarcar do transportador é ele mesmo embarcando num transporte maior**
+— o embarque aninhado. Pela regra do jogo, embarcar é sempre ação de quem
+embarca: o APC ao lado de um soldado não o recolhe; quem escolhe embarcar é o
+soldado. O exemplo do autor:
+
+> *O APC está na ilha, pega um ferido (EVAC), vai até a praia e EMBARCA no navio
+> de transporte. O navio entra em modo hospital, porque nos passageiros
+> aninhados há um ferido dentro de outro transportador, e cruza o canal de
+> volta para a base.*
+
+(A fragata leva os Apaches; quem leva o APC é o navio de transporte, `MA Desembarque`.)
+
+**O modo é um fato da carga INTEIRA, em todos os níveis.** Ferido em qualquer
+ponto da carga = modo hospital; carga em qualquer nível = Courier.
+
+**HOJE, pela metade:** o EVAC procura o ferido só entre os passageiros
+**diretos** (`passengers.Find(p => p.IsUnderRepair)`, `Transportador.Courier.cs:91`
+e `Transportador.Air.cs:65`) — o navio vê um APC são e não entra em modo
+hospital. O **destino** sobe por herança: *"o navio lê do APC, exatamente como o
+APC lê o soldado"* (`Courier.cs`, comentário do autor de 2026-08-07). Se o APC em
+EVAC declarar o hospital como destino, o navio leva até lá — mas viajando como
+táxi comum, sem a prioridade e a cautela de hospital. Não conferido se o APC em
+EVAC declara esse destino.
+
+**O Courier com Suprir em 3º é o modo hospital** do supridor que também
+transporta (CLAUDE.md, "Hospital mode"): a exceção que hoje mora no topo do
+Router é, no desenho, só a ordem natural da coluna.
+
+**Com carga, não entra em combate; com ameaça, foge** (autor, sobre o
+porta-aviões): dois caças de 1 HP lá dentro valem mais que o tiro no
+bombardeiro — perder o casco perde todos. A moeda do papel são as vagas.
+
 ### 7.3 Os híbridos são cadeia, não papel
 
 ```text
@@ -624,6 +677,85 @@ Fogo de Suporte híbrido   Detectar → Enxergar → Mirar (como FS)
 É a cadeia dentro da coluna da [`revisao_papeis.md`](../revisao_papeis.md)
 (o "Labradoodle"). O turno seguinte roda o questionário do começo, então **não é
 preciso caminho de volta**.
+
+**CONTRATO, decidido com o autor em 2026-10-03.** Dois eixos, e a seta só mexe
+num deles:
+
+```text
+COMO LUTA   vem da ARMA       combatente · artilheiro · híbrida (a seta)
+ONDE FICA   vem da ESSÊNCIA   o magnético da própria coluna; a seta nunca muda isso
+```
+
+- **Assalto híbrido** (Obus Leve, Tanque Z): as três casas do FS (Detectar,
+  Enxergar, Mirar **parado**) e, falhando, a coluna do Assalto. Mora na vanguarda.
+- **FS híbrido**: a coluna do FS e, no Mirar, a perna do contato. Mora na
+  retaguarda e flancos.
+- **O AAA** mora com o que protege e sai para o bombardeiro que entra no tático
+  **dele** (movimento + alcance 1). Com arma 1~1 ele **não é híbrido**: é
+  combatente puro com endereço de antiaéreo. O rótulo decide o endereço; a arma
+  decide como luta. Com 1~2, vira híbrido pela ficha da arma, sem código.
+
+**Cada perna usa a sua banda:** a perna FS, a da **arma** (min–max, a inversão
+do artilheiro); a perna Assalto, a do **movimento** (MP + alcance).
+
+**A modalidade vem da arma, não de campo da ficha** (`UnitCombatModalityRules`):
+
+```text
+alcança o contato (mín ≤ 1) E a distância (máx ≥ 2)   → Híbrida   (numa arma ou somando armas)
+só a distância                                        → Artilheiro
+só o contato                                          → Combatente
+```
+
+Lê o **mesmo alcance do `PodeMirar`** (`UnitEmbarkedWeapon.GetRangeMin/Max`, o da
+unidade, não o default da `WeaponData`). A munição não entra: ela muda a resposta
+do Mirar no turno, não a identidade.
+
+**A perna FS pergunta "tiro parado que VALE", não "tiro parado possível".** O
+Tanque Z (canhão 1~2, metralhadora 1) é péssimo de canhão contra infantaria: com
+um infante a 2, ele não atira de longe — vai para cima com a metralhadora.
+Quem compara é o `MelhorCombateService`, que já mantém os dois rankings
+separados (`StationaryRanking` × andar-e-atirar, modo `Hybrid`). Dar alcance 2 à
+metralhadora mudaria a **regra do jogo** para consertar a **IA**: descartado.
+A cadeia do híbrido **depende** do MelhorCombate; sem ele, o FS-primeiro faria o
+Tanque Z gastar o canhão no infante.
+
+**A prévia (lida das fichas em disco em 2026-10-03; a fonte é a janela Tools ▸
+Auditoria ▸ Papéis e Capacidades):**
+
+| achado | fichas | leitura |
+|---|---|---|
+| híbridas **sem** o campo "FS antes" | Bombardeiro F (1~2), Caça F (1~2), Submarino (1~3) | **mudariam de comportamento** com a troca — testar uma a uma |
+| campo "FS antes" **sem** arma de distância | Bazooka, Metranca | campo inerte: sem arma ≥2 a perna FS não tem o que dar |
+| híbridas **com** o campo | Obus Leve, Tanque Z | não mudam |
+| `longRangeStationary` ≠ artilheiro | Astros, Obus Médio, SAM, Destroyer, Porta-Aviões (artilheiros sem o campo); Radar Móvel (com o campo, sem arma) | **o campo não é a modalidade**: ele diz "não reposiciona depois de comprado" — a Artilharia de Campanha (rebocada) e o Radar Móvel. É mobilidade, não arma. **Não substituir** |
+
+Conclusão: só `preferArtilleryModeBeforeCombatant` é candidato a virar leitura da
+arma. `longRangeStationary` fica como está.
+
+**FEITO em 2026-10-03 (só compilou):** o campo saiu do `UnitData`, e os leitores
+perguntam `UnitCombatModalityRules.IsHybrid`. O autor confirmou a causa do
+Bazooka e da Metranca: *foram nerfados de 1~2 para 1 e o campo ficou esquecido* —
+nerfou a arma, o comportamento não mudou, sem erro nenhum. Agora **nerfou a arma,
+mudou o comportamento.**
+
+⚠️ **A previsão de que os três furtivos mudariam estava errada.** A cadeia do
+híbrido no Router só roda para quem **satisfaz Fogo de Suporte**
+(`PreferFireSupportBeforeAssault`): o Obus Leve e o Tanque Z são
+`ArtilheiroCombatente` e satisfazem; o Caça F (Interceptador), o Bombardeiro F
+(Ataque Aéreo) e o Submarino (Vigilância), não. Na tática, **nada muda**.
+
+Onde muda: o "é fogo de suporte?" do shopping (`AIShoppingPlanner.Demand.cs`, duas
+contagens) e da logística (`Logistics.Supply.cs`, dois bônus de prioridade). Ali a
+pergunta virou "híbrido **e** satisfaz Fogo de Suporte" — o mesmo conjunto que o
+campo marcava, **menos o Bazooka e a Metranca**, que deixam de contar como fogo
+de suporte. Sem o "e satisfaz", os três furtivos entrariam nessas contas sem
+ninguém pedir.
+
+Consequência para o desenho do autor: a seta *"o assalto puxa as pernas do FS"*
+**ainda não existe para o Assalto puro híbrido** — só para o rótulo
+`ArtilheiroCombatente`. Um Caça F que tente o tiro a 2 antes do contato precisa
+da cadeia valendo pela **modalidade**, não pelo rótulo, e isso depende do
+MelhorCombate (a perna FS que pergunta "vale?").
 
 ### 7.4 O que mudou em relação ao §7.8 da ficha
 
@@ -710,6 +842,34 @@ O observador vem primeiro por três razões:
   celular. Medir, não supor.
 - **Mostra as casas que não sabem responder.** A grade de "NÃO SEI RESPONDER" é
   a lista ordenada dos consumidores que faltam.
+
+---
+
+## 10b. As políticas no perfil — a escada das três IAs
+
+**CONTRATO, decidido pelo autor em 2026-10-03.** O critério: **esperteza** vai
+para o perfil (`AIPresetData` ▸ Papeis / Missoes); **higiene** (Vacate, liberar
+produtora) e **correção** (a régua de quem fecha primeiro, o tiro que vale)
+ficam sempre ligadas. *"A IA Fácil joga simples: toma decisões elementares."*
+
+| | Fácil | Médio | Difícil |
+|---|---|---|---|
+| Capturador: Blitzkrieg | off | off | **on** |
+| Capturador: Substituição por eficiência | off | **on** | on |
+| Capturador: Captura oportunista | on | on | on |
+| Assalto: Caçar o alvo preferido | off | **on** | on |
+| Fogo de Suporte: Fogo de preparação | off | off | **on** |
+| Reparo: Fusão em reparo | Todos | **Só capturador** | **Desligado** |
+
+A escada: do Fácil para o Médio entram as políticas de **uma peça** (trocar pelo
+mais eficiente, caçar a presa certa); do Médio para o Difícil, as de **duas
+peças** (revezamento no eixo, artilharia preparando antes do assalto).
+
+**O Médio perdeu o Blitzkrieg de propósito** (tinha desde a v8.6.1): *"o médio
+fazer blitzkrieg é inteligente demais pra ele."*
+
+O Oportunista fica ligado no Fácil: desligado, o soldado passaria ao lado de um
+prédio vazio no caminho, e isso parece bug, não simplicidade.
 
 ---
 

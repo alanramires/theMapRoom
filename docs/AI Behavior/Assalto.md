@@ -527,7 +527,7 @@ Não se aplica ao papel.
 | **S3** | carona por **combustível**, com preferência a trem e barco, aceita no Operational | `Assault.Embark`, `QueroCarona` | M |
 | **S4** | elite fica no prédio conquistado para reparo, mesmo na vanguarda | `Repair.cs` | P |
 | **S5** | evacuar a vanguarda **antes de todos** (hoje reparo age por último) | `Initiative.cs` | M |
-| **S6** | não desembarcar em capturável | `MelhorDesembarque` | M |
+| **S6** | não desembarcar em capturável — **lado do transporte escrito em 2026-10-03** (o transportador não estaciona em capturável que importa; ver C9 do `Capturador.md`). O assalto passageiro **descer** em cima do capturável é outra pergunta, ainda aberta | `MelhorDesembarque` | M |
 | **S7** | Hard: consultar hotzone do oponente, adiar e recuar 1 hex atrás do Tactical dele | novo | G |
 | **S8** | tirar o resíduo de AA de dentro do `Assault.cs` — o antiaéreo já é só um filtro de alvo de 4 linhas no Fire Support | `Assault.cs:1224,1495-1502` | P |
 | **S10** | dividir os arquivos como a doutrina pede: `Assault.ArtilheiroCombatente`, `Assault.AntiAereoCombatente`, `FireSupport.ArtilheiroCombatente`, `FireSupport.AntiAereoCombatente`, `FireSupport.Naval` | estrutura | G |

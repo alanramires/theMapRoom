@@ -436,9 +436,9 @@ frentes que tocam o capturador.
 |---|---|---|---|
 | **C4** | agressivo **larga a captura para lutar** — hoje a captura oportunista é avaliada antes do ramo agressivo (§3) | `Capturer.cs:241-244` | M |
 | **C6** | ferido na vanguarda **ganha iniciativa** para recuar e liberar espaço; hoje reparo age por último, grupo 5 (§5) — **escrito em 2026-10-02, só compilou**: ferido em reparo à frente da linha de combatentes sãos vai para o grupo 1, pela régua da ferramenta Retaguarda (`IsWoundedInVanguard`, `AIController.Backline.cs`) | `Initiative.cs` | M |
-| **C7** | zona de largada = **banda da unidade**, não hex fixo (§7) | `MelhorDesembarque`, `Courier`, `Assigned` | M |
+| **C7** | zona de largada = **banda da unidade**, não hex fixo (§7) — **escrito em 2026-10-03, só compilou**: uma função só, `PassageiroChegaAoAlvo` (custo de rota do passageiro até o alvo ≤ o movimento dele; artilheiro pela arma, até o alcance máximo). Courier, helicóptero, naval, EVAC, rebelde, captura no caminho e o tier da carga perguntam a ela. `AirDropOffRange` e `FireSupportDropOffRange` saíram; `TransportDropOffRange` sobra só em 4 heurísticas que não são largada (corredor, "alvo local", passageiro avançado, rally) | `Transportador.cs` | M |
 | **C8** | destino de unidade **sem plano**: gate por facção, efeito praia, embarcado (§11) | `Courier.Passengers`, `Courier.Invasion` ×2, `Naval`, `QueroCarona` | M |
-| **C9** | transporte **não pousa em capturável**; se for inevitável, sobe na iniciativa para sair | LZ + `Initiative.cs` | M |
+| **C9** | transporte **não pousa em capturável**; se for inevitável, sobe na iniciativa para sair — **1ª metade escrita em 2026-10-03, só compilou**: o Courier (terrestre e aéreo) não estaciona no prédio que um capturador nosso vai tomar, salvo se for a única saída por perto (o porto do navio sem praia) — higiene sempre ligada, fora do perfil (`AddCapturableParkingBans`). A saída no turno seguinte já existia (`TryBuildEmptyTransportCaptureTargetVacateAction`) | LZ + `Initiative.cs` | M |
 
 ### Herança do refactor do sem-plano
 
