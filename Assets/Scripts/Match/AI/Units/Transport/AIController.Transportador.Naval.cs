@@ -92,8 +92,8 @@ public partial class AIController
                 snapshot,
                 Vector3Int.zero,
                 paths,
-                TransportDropOffRange,
-                false,
+                ResolveCargoDropOffRouteCap(carriedPassengers),
+                true,
                 "Naval",
                 out PlayerAction bestDropAction))
             return bestDropAction;
@@ -106,7 +106,7 @@ public partial class AIController
             List<PodeDesembarcarOption> passengers =
                 SelectNavalDisembarkOrders(here, plan, snapshot);
             float hereDistance = FindBestNavalDropDistance(passengers, objective);
-            if (passengers.Count > 0 && hereDistance <= TransportDropOffRange)
+            if (passengers.Count > 0 && AlgumPassageiroChega(passengers, objective))
             {
                 Debug.Log($"{TL("NavalTransport")} {unit.InstanceId} desembarca em {fromCell} " +
                           $"({passengers.Count} passageiro(s)) — objetivo {objective}, dist={hereDistance:F0}h.");
@@ -120,7 +120,7 @@ public partial class AIController
                 out Vector3Int landingCell, out List<PodeDesembarcarOption> landingPassengers,
                 out float landingDistance))
         {
-            if (landingDistance <= TransportDropOffRange)
+            if (AlgumPassageiroChega(landingPassengers, objective))
             {
                 Debug.Log($"{TL("NavalTransport")} {unit.InstanceId} move {fromCell}->{landingCell} e desembarca " +
                           $"({landingPassengers.Count} passageiro(s)) — objetivo {objective}, dist={landingDistance:F0}h.");
@@ -348,7 +348,7 @@ public partial class AIController
                 Vector3Int dropCell = selected[0].disembarkCell;
                 dropCell.z = 0;
                 float dropDistance = SectorManager.HexDistance(dropCell, target);
-                if (dropDistance <= TransportDropOffRange)
+                if (PassageiroChegaAoAlvo(evacuee, dropCell, target))
                 {
                     Debug.Log($"{TL("NavalTransport")} {unit.InstanceId} EVAC desembarca #{evacuee.InstanceId} " +
                               $"em {dropCell} — reparo {target}, dist={dropDistance:F0}h.");
@@ -394,7 +394,8 @@ public partial class AIController
             }
         }
 
-        if (bestSelection != null && bestDistance <= TransportDropOffRange)
+        if (bestSelection != null
+            && PassageiroChegaAoAlvo(evacuee, bestSelection[0].disembarkCell, target))
         {
             Debug.Log($"{TL("NavalTransport")} {unit.InstanceId} EVAC move {fromCell}->{bestCell} e desembarca " +
                       $"#{evacuee.InstanceId} — reparo {target}, dist={bestDistance:F0}h.");
@@ -1137,7 +1138,7 @@ public partial class AIController
         {
             List<PodeDesembarcarOption> rebelOrders =
                 SelectRebelDisembarkOrdersByDistinctTargets(
-                options, snapshot, TransportDropOffRange);
+                options, snapshot);
             UnitManager rebelTransporter = options.Find(
                 option => option?.transporterUnit != null)?.transporterUnit;
             List<UnitManager> rebelPassengers =
@@ -1188,7 +1189,7 @@ public partial class AIController
 
             if (best == null)
                 continue;
-            if (targetFound && bestDistance > TransportDropOffRange)
+            if (targetFound && !PassageiroChegaAoAlvo(passenger, best.disembarkCell, target))
             {
                 Debug.Log($"{TL("NavalTransport")} passageiro #{passenger.InstanceId} permanece a bordo: " +
                           $"melhor desembarque {best.disembarkCell} ainda esta " +

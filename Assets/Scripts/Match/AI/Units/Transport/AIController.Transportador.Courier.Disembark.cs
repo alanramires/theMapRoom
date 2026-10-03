@@ -55,7 +55,7 @@ public partial class AIController
         {
             List<PodeDesembarcarOption> rebelSelected =
                 SelectRebelDisembarkOrdersByDistinctTargets(
-                options, snapshot, TransportDropOffRange);
+                options, snapshot);
             UnitManager rebelTransporter = options != null
                 ? options.Find(option => option?.transporterUnit != null)
                     ?.transporterUnit
@@ -130,7 +130,7 @@ public partial class AIController
     private List<PodeDesembarcarOption> SelectRebelDisembarkOrdersByDistinctTargets(
         List<PodeDesembarcarOption> options,
         AIWorldSnapshot snapshot,
-        int range)
+        int unusedLegacyRange = 0)
     {
         var result = new List<PodeDesembarcarOption>();
         if (options == null || snapshot == null)
@@ -166,9 +166,11 @@ public partial class AIController
 
         var claimedTargets = new HashSet<ConstructionManager>();
         var claimedDropCells = new HashSet<Vector3Int>();
-        int safeRange = Mathf.Max(1, range);
         foreach (UnitManager passenger in passengers)
         {
+            // A faixa é a do PASSAGEIRO (C7): o custo de rota até o prédio cabe no
+            // movimento dele — não o TransportDropOffRange fixo de antes.
+            int safeRange = Mathf.Max(1, passenger.GetMovementRange());
             PodeDesembarcarOption bestOption = null;
             ConstructionManager bestTarget = null;
             int bestCost = int.MaxValue;
@@ -274,7 +276,6 @@ public partial class AIController
         List<PodeDesembarcarOption> options,
         TeamObjectivePlan plan,
         AIWorldSnapshot snapshot,
-        int dropOffRange,
         bool allowStuck = false)
     {
         if (allowStuck || options.Count <= 1) return options;
@@ -287,16 +288,18 @@ public partial class AIController
             if (!targetFound) { filtered.Add(opt); continue; }
             Vector3Int dc = opt.disembarkCell; dc.z = 0;
             float dist = SectorManager.HexDistance(dc, target);
-            if (dist <= dropOffRange)
+            // A faixa é do PASSAGEIRO a partir do alvo (PassageiroChegaAoAlvo), não o
+            // número fixo do transportador (C7).
+            if (PassageiroChegaAoAlvo(opt.passengerUnit, dc, target))
                 filtered.Add(opt);
             else if (IsRogueCapturerPassenger(opt.passengerUnit, plan)
-                     && IsUsefulRogueDropCell(opt.passengerUnit, dc, snapshot, dropOffRange))
+                     && IsUsefulRogueDropCell(opt.passengerUnit, dc, snapshot))
             {
                 filtered.Add(opt);
                 Debug.Log($"{TL("Transporte")} partial_disembark: #{opt.passengerUnit.InstanceId} rogue DESCE oportunista dc={dc} alvoOriginal={target} dist={dist:F0}h");
             }
             else
-                Debug.Log($"{TL("Transporte")} partial_disembark: #{opt.passengerUnit.InstanceId} FICA — dc={dc} alvo={target} dist={dist:F0}h > {dropOffRange}h");
+                Debug.Log($"{TL("Transporte")} partial_disembark: #{opt.passengerUnit.InstanceId} FICA — dc={dc} alvo={target} dist={dist:F0}h fora da faixa do passageiro");
         }
         // Safety: never return empty — if every passenger is out of range keep all.
         // This prevents the helicopter from carrying cargo forever when it gets stuck.
@@ -316,7 +319,7 @@ public partial class AIController
     }
 
 
-    private bool IsUsefulRogueDropCell(UnitManager passenger, Vector3Int dropCell, AIWorldSnapshot snapshot, int range)
+    private bool IsUsefulRogueDropCell(UnitManager passenger, Vector3Int dropCell, AIWorldSnapshot snapshot)
     {
         if (passenger == null || snapshot == null) return false;
 
@@ -339,7 +342,10 @@ public partial class AIController
 
             Vector3Int bc = b.CurrentCellPosition;
             bc.z = 0;
-            if (SectorManager.HexDistance(dropCell, bc) <= range)
+            // Pré-filtro barato antes da rota: longe demais em hexes não chega.
+            if (SectorManager.HexDistance(dropCell, bc) > Mathf.Max(1, passenger.GetMovementRange()) * 2)
+                continue;
+            if (PassageiroChegaAoAlvo(passenger, dropCell, bc))
                 return true;
         }
 

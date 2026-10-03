@@ -32,6 +32,24 @@ public partial class AIController
         Vector3Int fromCell = unit.CurrentCellPosition;
         fromCell.z = 0;
 
+        // O ACORDO: o caminhão oferece, mas a artilharia recusa se houver inimigo
+        // detectado no OPERACIONAL DA ARMA dela (até 2× o alcance máximo de uma arma
+        // que o atinge). Ele está vindo para dentro do alcance: embarcar agora é
+        // perder o tiro e ser pega embarcada (autor, 2026-10-03). Decisão do
+        // PASSAGEIRO; o transportador segue oferecendo. Só para quem atira de longe —
+        // o combatente puro não tem banda de arma para esperar.
+        UnitCombatModality modalidade = UnitCombatModalityRules.Resolve(unit);
+        if ((modalidade == UnitCombatModality.Artilheiro || modalidade == UnitCombatModality.Hibrida)
+            && FaixaDeEntregaService.HaInimigoNoOperacionalDaArma(
+                unit, snapshot.EnemyUnits, out UnitManager inimigoChegando))
+        {
+            Debug.Log(
+                $"{TL("FireSupport")} {unit.InstanceId} recusa carona: " +
+                $"{inimigoChegando.UnitDisplayName}#{inimigoChegando.InstanceId} no operacional da arma " +
+                $"— espera ele entrar no alcance.");
+            return FireSupportTransportOutcome.TransportRejected;
+        }
+
         if (assigned != null)
         {
             if (!TryGetAnySectorInfo(assigned.Sector, out SectorManager.SectorInfo info))

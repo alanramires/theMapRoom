@@ -211,7 +211,7 @@ public partial class AIController
                     Vector3Int targetCell = target.CurrentCellPosition;
                     targetCell.z = 0;
                     float dropDist = SectorManager.HexDistance(dropCell, targetCell);
-                    if (dropDist > TransportDropOffRange)
+                    if (!PassageiroChegaAoAlvo(passenger, dropCell, targetCell))
                     {
                         rangeRejected++;
                         continue;
@@ -232,7 +232,7 @@ public partial class AIController
 
         if (bestOption == null || bestPassenger == null || bestTarget == null)
         {
-            Debug.Log($"{TL("Transporte")} {transporter.InstanceId} courier invasao-rendezvous sem drop util: passageirosSkip={passengerRejected} optsSkip={optionRejected} targetsSkip={targetRejected} rangeSkip={rangeRejected} range={TransportDropOffRange} assignedOk={allowAssignedPassengers} rallyNaoControlado={requireUnheldRallyPoint}");
+            Debug.Log($"{TL("Transporte")} {transporter.InstanceId} courier invasao-rendezvous sem drop util: passageirosSkip={passengerRejected} optsSkip={optionRejected} targetsSkip={targetRejected} rangeSkip={rangeRejected} (faixa do passageiro) assignedOk={allowAssignedPassengers} rallyNaoControlado={requireUnheldRallyPoint}");
             return false;
         }
 

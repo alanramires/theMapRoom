@@ -4,18 +4,19 @@ using UnityEngine.Tilemaps;
 
 public partial class AIController
 {
-    // LEGADO. Numero fixo de antes de o envelope existir, e ele e MAIS FROUXO que
-    // a doutrina: um soldado move 3 e o teto e 4, entao um drop no limite custa
-    // um turno extra ao passageiro sem ninguem registrar a perda.
-    // Nao usar em codigo novo — ver ResolvePassengerDropOffRange abaixo.
+    // LEGADO. NÃO é mais a faixa de largada: essa é do passageiro, a partir do alvo
+    // (PassageiroChegaAoAlvo — pendência C7, fechada em 2026-10-03). O número
+    // sobrevive só como régua de quatro heurísticas que não são largada: o desvio
+    // máximo do corredor e o "alvo local" do MelhorDesembarque, o "passageiro
+    // avançado" e a atração de rally do transportador designado.
+    // Não usar em código novo.
     private const int TransportDropOffRange = 4;
     // Passageiro que alcança o objetivo em ate duas rodadas completas nao
     // precisa ocupar transporte. O orçamento concreto depende do movimento
     // da própria unidade: move 3 => 6 MP; move 2 => 4 MP.
     private const int TransportPassengerWalkTurns = 2;
-    // Delivery range, not weapon range: artillery should be carried to the sector front
-    // before DPQ decides the exact landing hex.
-    private const int FireSupportDropOffRange = 3;
+    // FireSupportDropOffRange (3, fixo) saiu: a faixa do fogo de suporte é a da ARMA
+    // do passageiro — ResolveFireSupportDropOffRange e PassageiroChegaAoAlvo.
     // Preferencia forte por ampliar cobertura. Nao e rejeicao: quando todos
     // os passageiros ja tem farol, o melhor duplicado continua vencendo.
     private const float TransportPickupDistributionPenalty = 1000000f;
@@ -48,6 +49,24 @@ public partial class AIController
     /// conta. Ver <c>docs/AI Behavior/contrato_envelope_alcance.md</c> e a secao
     /// "Ranges are bands, not hex numbers" do CLAUDE.md.
     /// </summary>
+    // ─────────────────────────────────────────────────── faixa de entrega ──
+    //
+    // A pergunta "descendo aqui, o passageiro alcança o alvo?" é um SERVIÇO BURRO:
+    // FaixaDeEntregaService (Services/). Estes atalhos só passam o mapa e o banco de
+    // terrenos, para os trinta lugares do transporte que perguntam não mudarem.
+
+    private bool PassageiroChegaAoAlvo(UnitManager passenger, Vector3Int dropCell, Vector3Int target, int turns = 1)
+        => FaixaDeEntregaService.PassageiroChegaAoAlvo(passenger, dropCell, target, boardTilemap, terrainDatabase, turns);
+
+    private bool AlgumPassageiroChega(List<PodeDesembarcarOption> options, Vector3Int target, int turns = 1)
+        => FaixaDeEntregaService.AlgumPassageiroChega(options, target, boardTilemap, terrainDatabase, turns);
+
+    private static int ResolveCargoDropOffRouteCap(List<UnitManager> passengers)
+        => FaixaDeEntregaService.TetoDeEntregaDaCarga(passengers);
+
+    private static int ResolveFireSupportDropOffRange(UnitManager passenger)
+        => FaixaDeEntregaService.TetoDeEntregaFogoDeSuporte(passenger);
+
     private static int ResolvePassengerDropOffRange(
         UnitManager passenger, bool operationalFallback)
     {
@@ -390,6 +409,173 @@ public partial class AIController
             return false;
 
         return data.roles[0] == UnitRole.Transportador;
+    }
+
+    /// <summary>
+    /// DESEMBARCA TROPAS NO LOCAL — HIGIENE, sempre ligada; não é política do perfil
+    /// (desligada, o transportador atrapalha o próprio capturador). O transportador não
+    /// estaciona em cima do prédio que um capturador nosso vai tomar. O prédio entra
+    /// como OCUPADO só para onde o TRANSPORTADOR PARA; a célula onde o passageiro
+    /// desce vem do PodeDesembarcar e não lê este conjunto — o capturador continua
+    /// podendo descer em cima dele.
+    ///
+    /// Proibido só quando as três valem:
+    ///   1. ainda importa — não é nosso, ou é nosso e incompleto (o critério do
+    ///      assalto, IsReservedAssaultEscortCaptureCell);
+    ///   2. é ALVO de captura de alguém nosso (missão designada de um capturador, ou
+    ///      de um passageiro a bordo). Prédio que ninguém quer fica livre;
+    ///   3. NÃO é a única saída: existe outra parada alcançável perto dele de onde
+    ///      dá para desembarcar.
+    ///
+    /// O 3 é o caso naval do autor: o navio com dois soldados cuja única saída por
+    /// perto é o próprio porto que se quer capturar atraca nele, larga no hex ao
+    /// lado, e cai fora no turno seguinte (TryBuildEmptyTransportCaptureTargetVacateAction,
+    /// no topo do Router) — a captura acontece depois. Cobre também o Trem de Carga,
+    /// que só larga carga em estação.
+    ///
+    /// Antes ele parava em cima do prédio, e o capturador que vinha não tinha onde
+    /// pisar (C9 do Capturador.md, S6 do Assalto.md). Os testes de ocupado do courier
+    /// deixam a célula ATUAL passar (cell != fromCell).
+    /// </summary>
+    private void AddCapturableParkingBans(
+        HashSet<Vector3Int> occupied,
+        AIWorldSnapshot snapshot,
+        UnitManager transporter,
+        Dictionary<Vector3Int, List<Vector3Int>> paths)
+    {
+        if (occupied == null || snapshot == null || transporter == null)
+            return;
+
+        HashSet<Vector3Int> alvos = CollectFriendlyCaptureTargetCells(snapshot, transporter);
+        if (alvos.Count == 0)
+            return;
+
+        // As paradas alternativas são testadas contra o ocupado ORIGINAL (aliados),
+        // antes de qualquer proibição desta função.
+        var ocupadoOriginal = new HashSet<Vector3Int>(occupied);
+        int aiSlot = ResolveAISlotKey(snapshot.AITeam);
+
+        IReadOnlyList<ConstructionManager> construcoes = ConstructionManager.AllActive;
+        for (int i = 0; construcoes != null && i < construcoes.Count; i++)
+        {
+            ConstructionManager construcao = construcoes[i];
+            if (construcao == null || !construcao.IsCapturable || construcao.CapturePointsMax <= 0)
+                continue;
+            if (construcao.SlotIndex == aiSlot
+                && construcao.CurrentCapturePoints >= construcao.CapturePointsMax)
+                continue;
+
+            Vector3Int cell = construcao.CurrentCellPosition;
+            cell.z = 0;
+            if (!alvos.Contains(cell))
+                continue;
+
+            if (paths != null
+                && paths.ContainsKey(cell)
+                && IsOnlyDisembarkStopNear(transporter, cell, paths, ocupadoOriginal))
+            {
+                Debug.Log($"{TL("Transporte")} {transporter.InstanceId} atraca no alvo de captura {cell}: única saída por perto; larga ao lado e sai no turno seguinte");
+                continue;
+            }
+
+            occupied.Add(cell);
+        }
+    }
+
+    // Prédios que um capturador nosso vai tomar: a missão designada de cada peça do
+    // slot e a de cada passageiro a bordo deste transportador.
+    private HashSet<Vector3Int> CollectFriendlyCaptureTargetCells(AIWorldSnapshot snapshot, UnitManager transporter)
+    {
+        var alvos = new HashSet<Vector3Int>();
+        void Adicionar(UnitManager unit)
+        {
+            if (unit != null && TryResolveUnitDesignatedCaptureTarget(unit, out ConstructionManager alvo) && alvo != null)
+            {
+                Vector3Int cell = alvo.CurrentCellPosition;
+                cell.z = 0;
+                alvos.Add(cell);
+            }
+        }
+
+        if (snapshot.MyUnits != null)
+            foreach (UnitManager unit in snapshot.MyUnits)
+                Adicionar(unit);
+        foreach (UnitManager passenger in CollectPassengers(transporter))
+            Adicionar(passenger);
+        return alvos;
+    }
+
+    // Existe outra parada alcançável, perto do prédio, de onde algum passageiro desce
+    // e CHEGA ao prédio com o próprio movimento? Se não, o prédio é a única saída.
+    // Usa a mesma simulação do courier (síncrona, restaura a posição).
+    //
+    // A faixa de entrega é o TÁTICO DO PASSAGEIRO a partir do destino — a régua da
+    // entrega principal (MelhorDesembarque, BuildPassengerRouteLimits: custo de rota
+    // até o alvo ≤ movimento do passageiro). O soldado que anda 3 pode descer até 3 de
+    // rota do prédio; o bazooka que anda 2, até 2. Não o TransportDropOffRange fixo,
+    // que sobrevive nos atalhos do transporte (pendência C7).
+    //
+    // "Alguma opção de desembarque" não basta: uma praia de onde o soldado desceria
+    // fora do alcance dele contaria como alternativa, o porto ficaria proibido, o
+    // courier recusaria a praia e o navio ficaria rodando sem largar ninguém.
+    private bool IsOnlyDisembarkStopNear(
+        UnitManager transporter,
+        Vector3Int buildingCell,
+        Dictionary<Vector3Int, List<Vector3Int>> paths,
+        HashSet<Vector3Int> ocupado)
+    {
+        List<UnitManager> passageiros = CollectPassengers(transporter);
+        if (passageiros == null || passageiros.Count == 0)
+            return false;
+
+        // Custo de rota de cada passageiro até o prédio, calculado de trás para
+        // frente a partir dele, uma vez por passageiro.
+        var custoAtePredio = new Dictionary<int, Dictionary<Vector3Int, int>>();
+        var tatico = new Dictionary<int, int>();
+        int maiorTatico = 1;
+        foreach (UnitManager passageiro in passageiros)
+        {
+            if (passageiro == null)
+                continue;
+            int mp = Mathf.Max(1, passageiro.GetMovementRange());
+            tatico[passageiro.InstanceId] = mp;
+            maiorTatico = Mathf.Max(maiorTatico, mp);
+            custoAtePredio[passageiro.InstanceId] = UnitMovementPathRules.CalculateMovementCostMap(
+                boardTilemap, passageiro, buildingCell, mp, terrainDatabase);
+        }
+
+        Vector3Int fromCell = transporter.CurrentCellPosition;
+        fromCell.z = 0;
+        foreach (Vector3Int raw in paths.Keys)
+        {
+            Vector3Int cell = raw;
+            cell.z = 0;
+            if (cell == buildingCell)
+                continue;
+            if (cell != fromCell && ocupado.Contains(cell))
+                continue;
+            // O passageiro desce ao lado da parada: a parada útil está a, no máximo,
+            // o maior tático + 1 do prédio.
+            if (SectorManager.HexDistance(cell, buildingCell) > maiorTatico + 1)
+                continue;
+
+            List<PodeDesembarcarOption> opcoes = SimulateDisembarkFromCell(transporter, cell);
+            for (int i = 0; opcoes != null && i < opcoes.Count; i++)
+            {
+                PodeDesembarcarOption opcao = opcoes[i];
+                if (opcao?.passengerUnit == null)
+                    continue;
+                int id = opcao.passengerUnit.InstanceId;
+                if (!custoAtePredio.TryGetValue(id, out Dictionary<Vector3Int, int> custos) || custos == null)
+                    continue;
+
+                Vector3Int desce = opcao.disembarkCell;
+                desce.z = 0;
+                if (custos.TryGetValue(desce, out int custo) && custo <= tatico[id])
+                    return false;
+            }
+        }
+        return true;
     }
 
     private PlayerAction DecideIdleTransportReturnAction(UnitManager unit, AIWorldSnapshot snapshot)

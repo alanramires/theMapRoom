@@ -38,11 +38,14 @@ public partial class AIController
         int passengerTactical = ResolvePassengerDropOffRange(
             primaryPassenger, operationalFallback: false);
         int dropOffRange = fireSupportPassenger
-            ? FireSupportDropOffRange
+            ? ResolveFireSupportDropOffRange(primaryPassenger)
             : ResolvePassengerDropOffRange(primaryPassenger, operationalFallback: true);
+        // O mesmo operacional (duas rodadas de caminhada) do dropOffRange acima, agora
+        // medido em ROTA pelo PassageiroChegaAoAlvo; o fogo de suporte usa a arma.
+        int passengerWalkTurns = fireSupportPassenger ? 1 : TransportPassengerWalkTurns;
         Debug.Log($"{TL("Transporte")} {unit.InstanceId} courier — passageiro #{primaryPassenger.InstanceId} alvo={primaryTarget} range={dropOffRange}"
             + (fireSupportPassenger
-                ? " (fogo de suporte: constante legada)"
+                ? " (fogo de suporte: alcance da arma)"
                 : $" (Operational; Tactical={passengerTactical})")
             + $" distAtual={SectorManager.HexDistance(fromCell, primaryTarget):F0}h");
 
@@ -82,6 +85,8 @@ public partial class AIController
             UnitMovementPathRules.CalcularCaminhosValidos(
                 boardTilemap, unit, Mathf.Max(0, unit.RemainingMovementPoints), terrainDatabase);
         HashSet<Vector3Int> occupied = BuildOccupied(unit);
+        // Na entrega, o transportador não estaciona em cima do capturável (perfil).
+        AddCapturableParkingBans(occupied, snapshot, unit, paths);
 
 
         if (paths == null || paths.Count == 0)
@@ -291,7 +296,7 @@ public partial class AIController
                         // Drop if the artillery lands near the target OR if the truck itself
                         // is already close enough (artillery can walk the remaining distance).
                         float truckDistAfterMove = SectorManager.HexDistance(moveTarget, primaryTarget);
-                        if (dcDist <= FireSupportDropOffRange || truckDistAfterMove <= FireSupportDropOffRange)
+                        if (PassageiroChegaAoAlvo(primaryPassenger, dc, primaryTarget) || PassageiroChegaAoAlvo(primaryPassenger, moveTarget, primaryTarget))
                         {
                             float score = ScoreCourierDisembarkOption(primaryPassenger, dc, primaryTarget, snapshot.AITeam,
                                 dcDist, CalculateThreatLevel(dc, snapshot.AITeam));
@@ -316,7 +321,7 @@ public partial class AIController
                         Vector3Int dc = primaryOpt.disembarkCell; dc.z = 0;
                         float dcDist = SectorManager.HexDistance(dc, primaryTarget);
                         // Also drop in place when the truck itself is within drop range.
-                        if (dcDist <= FireSupportDropOffRange || distToTarget <= FireSupportDropOffRange)
+                        if (PassageiroChegaAoAlvo(primaryPassenger, dc, primaryTarget) || PassageiroChegaAoAlvo(primaryPassenger, fromCell, primaryTarget))
                         {
                             float score = ScoreCourierDisembarkOption(primaryPassenger, dc, primaryTarget, snapshot.AITeam,
                                 dcDist, CalculateThreatLevel(dc, snapshot.AITeam));
@@ -383,8 +388,8 @@ public partial class AIController
                 if (primaryOpt != null)
                 {
                     Vector3Int dc = primaryOpt.disembarkCell; dc.z = 0;
-                    bool dcInRange = SectorManager.HexDistance(dc, primaryTarget) <= dropOffRange;
-                    bool truckInRange = SectorManager.HexDistance(moveTarget, primaryTarget) <= dropOffRange;
+                    bool dcInRange = PassageiroChegaAoAlvo(primaryPassenger, dc, primaryTarget, passengerWalkTurns);
+                    bool truckInRange = PassageiroChegaAoAlvo(primaryPassenger, moveTarget, primaryTarget, passengerWalkTurns);
                     if (dcInRange || truckInRange)
                     {
                         if (invasionDelivery && !IsTransportInvasionDropAllowed(unit, snapshot, moveTarget, dc, primaryTarget))
@@ -419,8 +424,8 @@ public partial class AIController
                 {
                     Vector3Int dc = primaryOption.disembarkCell; dc.z = 0;
                     bool inRangeP2 = isStuck
-                        || SectorManager.HexDistance(dc, primaryTarget) <= dropOffRange
-                        || SectorManager.HexDistance(fromCell, primaryTarget) <= dropOffRange;
+                        || PassageiroChegaAoAlvo(primaryPassenger, dc, primaryTarget, passengerWalkTurns)
+                        || PassageiroChegaAoAlvo(primaryPassenger, fromCell, primaryTarget, passengerWalkTurns);
                     if (inRangeP2)
                     {
                         if (invasionDelivery && !IsTransportInvasionDropAllowed(unit, snapshot, fromCell, dc, primaryTarget))

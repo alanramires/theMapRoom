@@ -3,7 +3,8 @@ using UnityEngine;
 
 public partial class AIController
 {
-    private const int AirDropOffRange = 2;
+    // AirDropOffRange (2, fixo) saiu: o helicóptero larga pela faixa do PASSAGEIRO
+    // (PassageiroChegaAoAlvo). O soldado que anda 3 desce até 3 de rota do alvo.
 
     // -------------------------------------------------------------------------
     // Air transport entry — called from TryDecideTransportadorAction when
@@ -42,7 +43,7 @@ public partial class AIController
     // -------------------------------------------------------------------------
     // Air Courier — helicopter with passengers, delivering to objective.
     // Differences from APC courier:
-    //   • Uses AirDropOffRange (tighter — helicopter flies precisely to target).
+    //   • Drop band is the PASSENGER's, from the target (PassageiroChegaAoAlvo, C7).
     //   • Does NOT redirect away from the target building; helicopters can
     //     hover directly on construction cells to disembark passengers there.
     //   • No conservative FireSupport tow logic.
@@ -87,6 +88,8 @@ public partial class AIController
             UnitMovementPathRules.CalcularCaminhosValidos(
                 boardTilemap, unit, remainingMP, terrainDatabase);
         HashSet<Vector3Int> occupied = BuildAirOccupied(unit);
+        // O helicóptero também não pousa em cima do capturável na entrega (perfil).
+        AddCapturableParkingBans(occupied, snapshot, unit, paths);
 
         Debug.Log($"{TL("Transporte")} heli {unit.InstanceId} courier — MP={remainingMP} grounded={unit.IsAircraftGrounded} domain={unit.GetDomain()} paths={paths?.Count ?? 0} occupied={occupied.Count}");
 
@@ -100,7 +103,7 @@ public partial class AIController
                 snapshot,
                 assignedSectorTarget,
                 paths,
-                AirDropOffRange,
+                ResolveCargoDropOffRouteCap(passengers),
                 true,
                 "Aereo",
                 out PlayerAction bestDropAction))
@@ -122,7 +125,7 @@ public partial class AIController
                               - CalculateRouteDistanceOrHex(unit, moveTarget, primaryTarget);
 
         // Priority 1: move + disembark when moving gains ground AND the simulated
-        // drop-off from the new position lands within AirDropOffRange.
+        // drop-off from the new position lands within the passenger's band (C7).
         // When moveTarget is blocked by a ground unit (can't land there), scan all reachable
         // hexes by improvement order and pick the best landable hex that allows disembark.
         {
@@ -146,16 +149,17 @@ public partial class AIController
 
                 List<PodeDesembarcarOption> selectedFromMove =
                     SelectBestDisembarkPerPassenger(optsFromMove, passengers, plan, snapshot);
-                // Partial disembark: drop only passengers whose target is within AirDropOffRange.
-                selectedFromMove = FilterDisembarkByTargetRange(selectedFromMove, plan, snapshot, AirDropOffRange);
+                // Partial disembark: drop only passengers within their own band of the target (C7).
+                selectedFromMove = FilterDisembarkByTargetRange(selectedFromMove, plan, snapshot);
 
                 PodeDesembarcarOption primaryOpt = selectedFromMove.Count > 0
                     ? selectedFromMove.Find(o => o.passengerUnit == primaryPassenger) : null;
                 if (primaryOpt == null) continue;
 
                 Vector3Int dc = primaryOpt.disembarkCell; dc.z = 0;
-                bool dcInRange   = SectorManager.HexDistance(dc, primaryTarget) <= AirDropOffRange;
-                bool heliInRange = SectorManager.HexDistance(candidate, primaryTarget) <= AirDropOffRange;
+                // Faixa do passageiro (C7): onde ele desce, ou a própria célula do heli.
+                bool dcInRange   = PassageiroChegaAoAlvo(primaryPassenger, dc, primaryTarget);
+                bool heliInRange = PassageiroChegaAoAlvo(primaryPassenger, candidate, primaryTarget);
                 if (dcInRange || heliInRange)
                 {
                     paths.TryGetValue(candidate, out List<Vector3Int> movePath);
@@ -176,7 +180,7 @@ public partial class AIController
             List<PodeDesembarcarOption> selected =
                 SelectBestDisembarkPerPassenger(disembarkOptions, passengers, plan, snapshot);
             // Partial disembark — when stuck, release all; otherwise only passengers in range of their target.
-            selected = FilterDisembarkByTargetRange(selected, plan, snapshot, AirDropOffRange, allowStuck: isStuck);
+            selected = FilterDisembarkByTargetRange(selected, plan, snapshot, allowStuck: isStuck);
             if (selected.Count > 0)
             {
                 PodeDesembarcarOption primaryOption = selected.Find(o => o.passengerUnit == primaryPassenger);
@@ -184,8 +188,8 @@ public partial class AIController
                 {
                     Vector3Int dc = primaryOption.disembarkCell; dc.z = 0;
                     bool inRange = isStuck
-                        || SectorManager.HexDistance(dc, primaryTarget) <= AirDropOffRange
-                        || SectorManager.HexDistance(fromCell, primaryTarget) <= AirDropOffRange;
+                        || PassageiroChegaAoAlvo(primaryPassenger, dc, primaryTarget)
+                        || PassageiroChegaAoAlvo(primaryPassenger, fromCell, primaryTarget);
                     if (inRange)
                     {
                         int dropping = selected.Count, keeping = passengers.Count - dropping;
@@ -261,7 +265,7 @@ public partial class AIController
                 continue;
 
             List<PodeDesembarcarOption> selected = SelectBestDisembarkPerPassenger(opts, passengers, plan, snapshot);
-            selected = FilterDisembarkByTargetRange(selected, plan, snapshot, AirDropOffRange + 1);
+            selected = FilterDisembarkByTargetRange(selected, plan, snapshot);
             PodeDesembarcarOption primaryOpt = selected.Find(o => o.passengerUnit == primaryPassenger);
             if (primaryOpt == null)
                 continue;
@@ -270,7 +274,9 @@ public partial class AIController
             dropCell.z = 0;
             float dropDist = SectorManager.HexDistance(dropCell, primaryTarget);
             float heliDist = SectorManager.HexDistance(candidate, primaryTarget);
-            if (dropDist > AirDropOffRange + 1 && heliDist > AirDropOffRange + 1)
+            // Faixa do passageiro (C7), não AirDropOffRange + 1.
+            if (!PassageiroChegaAoAlvo(primaryPassenger, dropCell, primaryTarget)
+                && !PassageiroChegaAoAlvo(primaryPassenger, candidate, primaryTarget))
                 continue;
 
             float threat = CalculateThreatLevel(dropCell, snapshot.AITeam);

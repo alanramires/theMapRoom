@@ -157,7 +157,8 @@ public partial class AIController
             }
         }
 
-        int dropOffRange = airTransport ? AirDropOffRange : TransportDropOffRange;
+        // A faixa de entrega é a do FERIDO a partir do reparo (PassageiroChegaAoAlvo),
+        // não o número fixo do transportador (C7).
 
         // Priority 1: move + disembark when making progress
         if (moveTarget != fromCell && moveImprovement > 0f)
@@ -169,7 +170,7 @@ public partial class AIController
                 if (primaryOpt != null)
                 {
                     Vector3Int dc = primaryOpt.disembarkCell; dc.z = 0;
-                    if (SectorManager.HexDistance(dc, target) <= dropOffRange
+                    if (PassageiroChegaAoAlvo(evacuee, dc, target)
                         && IsEvacDropCellSafe(dc, snapshot.AITeam))
                     {
                         List<PodeDesembarcarOption> selected = SelectEvacDisembarkForPassenger(opts, evacuee, target, snapshot.AITeam);
@@ -194,7 +195,7 @@ public partial class AIController
             if (primaryOpt != null)
             {
                 Vector3Int dc = primaryOpt.disembarkCell; dc.z = 0;
-                if (SectorManager.HexDistance(dc, target) <= dropOffRange
+                if (PassageiroChegaAoAlvo(evacuee, dc, target)
                     && IsEvacDropCellSafe(dc, snapshot.AITeam))
                 {
                     List<PodeDesembarcarOption> selected = SelectEvacDisembarkForPassenger(disembarkOpts, evacuee, target, snapshot.AITeam);

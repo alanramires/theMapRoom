@@ -697,7 +697,10 @@ public partial class AIController
                 AIReachDecisionTier cargoTier =
                     cargoDistance
                     <= Mathf.Max(0, unit.RemainingMovementPoints)
-                       + TransportDropOffRange
+                       // a faixa do PASSAGEIRO principal (C7), não o número fixo
+                       + (IsFireSupportUnit(primary)
+                           ? ResolveFireSupportDropOffRange(primary)
+                           : ResolvePassengerDropOffRange(primary, operationalFallback: false))
                         ? AIReachDecisionTier.Tactical
                         : AIReachDecisionTier.Operational;
                 if (cargoTier != tier)
