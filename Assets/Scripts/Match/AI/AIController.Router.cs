@@ -628,7 +628,8 @@ public partial class AIController
     {
         if (unit == null || !unit.TryGetUnitData(out UnitData data) || data == null)
             return false;
-        return data.preferArtilleryModeBeforeCombatant
+        // Híbrido pela ARMA da peça (alcança contato e distância), não por campo da ficha.
+        return UnitCombatModalityRules.IsHybrid(unit)
             && UnitRoleCompatibility.CanSatisfy(data, UnitRole.FogoIndireto);
     }
 

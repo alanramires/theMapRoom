@@ -110,7 +110,6 @@ public class UnitDataEditor : Editor
             "preferMaxDisplacement",
             "longRangeStationary",
             "preferRepositionAtWeaponMaxRange",
-            "preferArtilleryModeBeforeCombatant",
             "useAttackDecision",
             "attackAcceptHpLossPercent",
             "attackEliminationMinPercent",
@@ -231,14 +230,20 @@ public class UnitDataEditor : Editor
 
         SerializedProperty stationaryProp = serializedObject.FindProperty("longRangeStationary");
         SerializedProperty maxRangeProp = serializedObject.FindProperty("preferRepositionAtWeaponMaxRange");
-        SerializedProperty artilleryFirstProp = serializedObject.FindProperty("preferArtilleryModeBeforeCombatant");
-
         if (stationaryProp != null)
             EditorGUILayout.PropertyField(stationaryProp, new GUIContent("Stationary", "A IA nao reposiciona esta unidade apos compra/spawn. Outros casos especiais podem mover a unidade em regras futuras."));
         if (maxRangeProp != null)
             EditorGUILayout.PropertyField(maxRangeProp, new GUIContent("Prefer Reposition At Weapon Max Range", "Prefere reposicionar para manter o alvo no alcance maximo da arma em vez de se aproximar do alvo."));
-        if (artilleryFirstProp != null)
-            EditorGUILayout.PropertyField(artilleryFirstProp, new GUIContent("Prefer Artillery Mode Before Combatant", "Unidades hibridas tentam agir primeiro como artilheiro/fogo indireto; se nao houver acao valida, caem para comportamento combatente."));
+        // Não é mais campo: a modalidade sai das armas (UnitCombatModalityRules). O
+        // campo antigo ficava preso quando a arma mudava. Aqui só se MOSTRA.
+        if (target is UnitData modalityData)
+        {
+            EditorGUILayout.LabelField(
+                new GUIContent("Modalidade (das armas)",
+                    "Lida das armas embarcadas: Híbrida tenta o tiro parado do Fogo de Suporte antes do contato. " +
+                    "Para mudar, mude o alcance da arma. Auditoria: Tools ▸ Auditoria ▸ Papéis e Capacidades."),
+                new GUIContent(UnitCombatModalityRules.Resolve(modalityData).ToString()));
+        }
 
         EditorGUILayout.Space(4f);
         EditorGUILayout.LabelField("Attack Decision", EditorStyles.boldLabel);

@@ -43,6 +43,25 @@ public enum UnitRole
     TransportadorAereo = 15
 }
 
+/// <summary>
+/// A GRANDE FAMÍLIA — o papel no sentido de COMPORTAMENTO: a coluna do questionário,
+/// a ordem das casas, o magnético. Seis, e só seis. Os valores de UnitRole viram
+/// RÓTULOS dentro de uma família: o que o shopping pede e o que a ficha declara.
+/// Contrato: docs/AI Behavior/contrato_questionario.md §7.1; ficha_do_papel.md §7.7.
+///
+/// Não é serializado em lugar nenhum: deriva sempre do rótulo (roles[0], a essência).
+/// </summary>
+public enum UnitRoleFamily
+{
+    Nenhuma = 0,
+    Capturador = 1,
+    Assalto = 2,
+    FogoDeSuporte = 3,
+    Transportador = 4,
+    Vigilancia = 5,
+    Logistica = 6,
+}
+
 public enum UnitBattleParticipation
 {
     None = 0,
@@ -52,6 +71,59 @@ public enum UnitBattleParticipation
 
 public static class UnitRoleCompatibility
 {
+    /// <summary>
+    /// Rótulo → família (autor, 2026-10-03). Os rótulos ficaram por conta do shopping;
+    /// o comportamento é da família.
+    ///
+    /// NÃO substitui ResolveCompositionRole, e diverge dele de propósito num ponto: lá o
+    /// ArtilheiroCombatente é Assalto só se for blindado (senão Fogo Indireto), porque
+    /// aquilo conta COMPOSIÇÃO para a compra. Aqui é sempre Assalto — o Obus Leve é
+    /// "uma unidade de assalto do exército". Como ele luta (a seta do híbrido) vem da
+    /// arma, não daqui (UnitCombatModalityRules).
+    /// </summary>
+    public static UnitRoleFamily ResolveFamily(UnitRole role)
+    {
+        switch (role)
+        {
+            case UnitRole.Capturador:
+            case UnitRole.CapturadorCombatente:
+                return UnitRoleFamily.Capturador;
+
+            case UnitRole.Assalto:
+            case UnitRole.AtaqueAereo:
+            case UnitRole.Interceptador:
+            case UnitRole.ArtilheiroCombatente:
+                return UnitRoleFamily.Assalto;
+
+            case UnitRole.FogoIndireto:
+            case UnitRole.Antiaereo:
+            case UnitRole.AntiaereoCombatente:
+                return UnitRoleFamily.FogoDeSuporte;
+
+            case UnitRole.Transportador:
+            case UnitRole.TransportadorAereo:
+                return UnitRoleFamily.Transportador;
+
+            case UnitRole.Vigilancia:
+                return UnitRoleFamily.Vigilancia;
+
+            case UnitRole.Logistica:
+            case UnitRole.Estoque:
+                return UnitRoleFamily.Logistica;
+
+            default:
+                return UnitRoleFamily.Nenhuma;
+        }
+    }
+
+    /// <summary>A família da essência: roles[0]. Ficha sem papel não tem família.</summary>
+    public static UnitRoleFamily ResolveFamily(UnitData data)
+    {
+        return data != null && data.roles != null && data.roles.Count > 0
+            ? ResolveFamily(data.roles[0])
+            : UnitRoleFamily.Nenhuma;
+    }
+
     public static UnitBattleParticipation ResolveBattleParticipation(
         UnitRole role)
     {

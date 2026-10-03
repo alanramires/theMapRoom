@@ -24,7 +24,7 @@ public partial class AIController
             return combatantAction;
 
         // Artillery mode: prefer max-range fire, then close-range (combatant), then reposition.
-        // "preferArtilleryModeBeforeCombatant" means the order of preference, not exclusivity.
+        // Hybrid modality (UnitCombatModalityRules) means the order of preference, not exclusivity.
         // Normal mode: attack immediately if any target is available.
         if (!IsCombatantFireSupport(unit) && artilleryOnly)
         {

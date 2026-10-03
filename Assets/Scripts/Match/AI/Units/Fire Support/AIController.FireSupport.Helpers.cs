@@ -47,7 +47,7 @@ public partial class AIController
             && unit.TryGetUnitData(out UnitData data)
             && data != null
             && (data.preferRepositionAtWeaponMaxRange
-                || data.preferArtilleryModeBeforeCombatant
+                || UnitCombatModalityRules.IsHybrid(unit)
                 || IsCombatantFireSupport(unit)
                 || IsRangedAntiAirFireSupport(unit));
     }
@@ -57,7 +57,7 @@ public partial class AIController
         return unit != null
             && unit.TryGetUnitData(out UnitData data)
             && data != null
-            && data.preferArtilleryModeBeforeCombatant;
+            && UnitCombatModalityRules.IsHybrid(unit);
     }
 
     private static int GetUnitIndirectWeaponMinRange(UnitManager unit)

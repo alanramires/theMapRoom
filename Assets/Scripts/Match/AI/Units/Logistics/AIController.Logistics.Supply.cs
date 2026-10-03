@@ -1189,7 +1189,8 @@ public partial class AIController
         score += Mathf.Max(0, data.eliteLevel) * 3000f;
 
         bool fireSupport = HasLogisticsRole(data, UnitRole.FogoIndireto) || data.unitClass == GameUnitClass.Artillery
-            || data.preferArtilleryModeBeforeCombatant || data.longRangeStationary;
+            || (UnitCombatModalityRules.IsHybrid(target) && UnitRoleCompatibility.CanSatisfy(data, UnitRole.FogoIndireto))
+            || data.longRangeStationary;
         if (fireSupport)
         {
             score += 6500f;
@@ -1222,7 +1223,8 @@ public partial class AIController
 
         float score = data.cost / 25f + Mathf.Max(0, data.eliteLevel) * 900f;
         bool fireSupport = HasLogisticsRole(data, UnitRole.FogoIndireto) || data.unitClass == GameUnitClass.Artillery
-            || data.preferArtilleryModeBeforeCombatant || data.longRangeStationary;
+            || (UnitCombatModalityRules.IsHybrid(target) && UnitRoleCompatibility.CanSatisfy(data, UnitRole.FogoIndireto))
+            || data.longRangeStationary;
         if (fireSupport)
         {
             if (HasAnyWeaponAmmoAtOrBelow(target, 0))

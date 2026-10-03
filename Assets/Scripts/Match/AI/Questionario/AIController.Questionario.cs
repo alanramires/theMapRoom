@@ -377,10 +377,16 @@ public partial class AIController
 
         try
         {
+            // A coluna sai da FAMÍLIA da essência (roles[0]), não de quem "satisfaz"
+            // o papel: um Assalto que também captura continua sendo Assalto.
             // Degrau 1: só o Capturador tem questionário. Os outros cinco entram na
-            // mesma forma, papel por papel (§9).
-            if (UnitRoleCompatibility.CanSatisfy(data, UnitRole.Capturador))
-                ObservarQuestionarioCapturador(unit, data, snapshot, codigoFez, secondPass);
+            // mesma forma, família por família (§9).
+            switch (UnitRoleCompatibility.ResolveFamily(data))
+            {
+                case UnitRoleFamily.Capturador:
+                    ObservarQuestionarioCapturador(unit, data, snapshot, codigoFez, secondPass);
+                    break;
+            }
         }
         catch (Exception ex)
         {

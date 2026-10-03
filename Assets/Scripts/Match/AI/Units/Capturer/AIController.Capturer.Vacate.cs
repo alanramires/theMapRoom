@@ -286,7 +286,7 @@ public partial class AIController
     {
         if (snapshot?.MyUnits == null) return true;
         int myElite = unitData != null ? unitData.eliteLevel : 0;
-        bool myArtilleryMode = unitData != null && unitData.preferArtilleryModeBeforeCombatant;
+        bool myArtilleryMode = UnitCombatModalityRules.IsHybrid(unit);
         foreach (UnitManager other in snapshot.MyUnits)
         {
             if (other == null || other == unit) continue;
@@ -299,7 +299,7 @@ public partial class AIController
             if (bldg == null || !bldg.CanProduceUnitsForSlot(AIController.ResolveAISlotKey(aiTeam))) continue;
             if (otherData.eliteLevel < myElite) return false;
             if (otherData.eliteLevel > myElite) continue;
-            if (otherData.preferArtilleryModeBeforeCombatant && !myArtilleryMode) return false;
+            if (UnitCombatModalityRules.IsHybrid(other) && !myArtilleryMode) return false;
         }
         return true;
     }

@@ -199,8 +199,8 @@ public class UnitData : ScriptableObject
     [Tooltip("Se ativo, a IA prefere reposicionar para manter o alvo no alcance maximo da arma em vez de se aproximar do alvo.")]
     [FormerlySerializedAs("preferRepositionToMaxRange")]
     public bool preferRepositionAtWeaponMaxRange = false;
-    [Tooltip("Se ativo, unidades hibridas tentam agir primeiro como artilheiro/fogo indireto; se nao houver acao valida, caem para comportamento combatente.")]
-    public bool preferArtilleryModeBeforeCombatant = false;
+    // "Híbrida tenta o FS antes do contato" não é mais campo: sai das armas
+    // (UnitCombatModalityRules.IsHybrid). O campo ficava preso quando a arma mudava.
 
     [Header("Attack Decision")]
     [Tooltip("Se ativo, a IA usa simulacao da Matriz de HP para decidir se esta unidade deve aceitar um combate.")]

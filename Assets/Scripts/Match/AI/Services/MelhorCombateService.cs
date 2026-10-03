@@ -250,7 +250,7 @@ public static class MelhorCombateService
         bool preferStationary = request.Mode == MelhorCombateMode.Stationary
             || ((request.Mode == MelhorCombateMode.AutoFromUnitData
                  || request.Mode == MelhorCombateMode.Hybrid)
-                && unitData.preferArtilleryModeBeforeCombatant);
+                && UnitCombatModalityRules.IsHybrid(request.Unit));
         result.PreferredMode = preferStationary
             ? MelhorCombateCandidateMode.Stationary
             : MelhorCombateCandidateMode.MoveAndAttack;

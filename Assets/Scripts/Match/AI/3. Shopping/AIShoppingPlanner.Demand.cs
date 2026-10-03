@@ -820,7 +820,8 @@ public partial class AIShoppingPlanner
 
             bool fireSupport = data.roles != null && data.roles.Contains(UnitRole.FogoIndireto)
                 || data.unitClass == GameUnitClass.Artillery
-                || data.preferArtilleryModeBeforeCombatant
+                || (UnitCombatModalityRules.IsHybrid(unit)
+                    && UnitRoleCompatibility.CanSatisfy(data, UnitRole.FogoIndireto))
                 || data.longRangeStationary;
             if (!fireSupport)
                 continue;
@@ -1179,7 +1180,8 @@ public partial class AIShoppingPlanner
 
             bool fireSupport = data.roles != null && data.roles.Contains(UnitRole.FogoIndireto)
                 || data.unitClass == GameUnitClass.Artillery
-                || data.preferArtilleryModeBeforeCombatant
+                || (UnitCombatModalityRules.IsHybrid(unit)
+                    && UnitRoleCompatibility.CanSatisfy(data, UnitRole.FogoIndireto))
                 || data.longRangeStationary;
             if (fireSupport)
                 count++;

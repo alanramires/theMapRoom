@@ -327,7 +327,7 @@ public sealed class MelhorCombateWindow : EditorWindow
             "Preferências",
             $"alvo por classe | DPQ={(data.prioritizeDpqAtBattle ? "sim" : "não")} | "
             + $"alcance máximo={(data.preferRepositionAtWeaponMaxRange ? "sim" : "não")} | "
-            + $"artilheiro primeiro={(data.preferArtilleryModeBeforeCombatant ? "sim" : "não")}",
+            + $"modalidade={UnitCombatModalityRules.Resolve(data)}",
             EditorStyles.wordWrappedMiniLabel);
     }
 
