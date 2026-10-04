@@ -44,7 +44,13 @@ public partial class TurnStateManager
         ScannerPromptStep previousMirandoStep = scannerPromptStep;
         int previousTargetIndex = scannerSelectedTargetIndex;
 
-        ThreatRevisionTracker.ForceInvalidateAll();
+        // A revisão global é "verdade confirmada" (contrato transacional): bumpá-la
+        // com uma ação em andamento faria os caches confirmados se recalcularem a
+        // partir da posição provisória. Fora do Neutral, a ferramenta só refaz os
+        // sensores da etapa atual.
+        bool isNeutral = CurrentCursorState == CursorState.Neutral;
+        if (isNeutral)
+            ThreatRevisionTracker.ForceInvalidateAll();
         PodeDetectarSensor.ClearRefreshScopedTerrainCache();
         ClearThreatLayerHotzoneCache();
 
@@ -55,7 +61,7 @@ public partial class TurnStateManager
         // turno faz. Somente em Neutral: com acao em andamento, publicar
         // recalcularia o tabuleiro confirmado a partir de posicao provisoria.
         bool fogRepublished = false;
-        if (CurrentCursorState == CursorState.Neutral && matchController != null)
+        if (isNeutral && matchController != null)
         {
             matchController.RefreshFogOfWarForActiveTeam(FogOfWarRefreshMode.FullVisual);
             fogRepublished = true;
@@ -186,7 +192,8 @@ public partial class TurnStateManager
             movementMode,
             out cachedPodeCapturarConstruction,
             out cachedPodeCapturarReason,
-            matchController);
+            matchController,
+            respectFogMemory: true);
         availableSensorActionCodes.Remove('C');
         // Mantem Capturar visivel quando existe alvo, mesmo se um requisito de progressao o bloquear.
         if (canCapture || cachedPodeCapturarConstruction != null)
@@ -428,7 +435,8 @@ public partial class TurnStateManager
             movementMode,
             out cachedPodeCapturarConstruction,
             out cachedPodeCapturarReason,
-            matchController);
+            matchController,
+            respectFogMemory: true);
         availableSensorActionCodes.Remove('C');
         if (canCapture || cachedPodeCapturarConstruction != null)
             availableSensorActionCodes.Add('C');

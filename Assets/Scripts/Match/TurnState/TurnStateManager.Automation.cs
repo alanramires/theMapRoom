@@ -652,7 +652,8 @@ public partial class TurnStateManager
         UnitManager unit,
         out ConstructionManager targetConstruction,
         out PodeCapturarSensor.CaptureOperationType operationType,
-        out string reason)
+        out string reason,
+        bool respectFogMemory = false)
     {
         targetConstruction = null;
         operationType = PodeCapturarSensor.CaptureOperationType.None;
@@ -669,7 +670,8 @@ public partial class TurnStateManager
             out targetConstruction,
             out operationType,
             out reason,
-            matchController);
+            matchController,
+            respectFogMemory);
     }
 
     // Retorna os alvos de suprimento validos para 'supplier' na posicao atual.

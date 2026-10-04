@@ -502,6 +502,9 @@ public class FogConstructionMemorySaveData
     public string constructionDataId;
     public int knownOwnerTeamId;
     public bool flipX;
+    // true = relato do Jornal ainda não gravado na memória (dono conhecido novo,
+    // pendente até o próximo registro confirmado do fog deste time).
+    public bool isOwnerReport;
 }
 
 

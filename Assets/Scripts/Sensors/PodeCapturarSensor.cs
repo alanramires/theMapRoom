@@ -225,7 +225,8 @@ public static class PodeCapturarSensor
         SensorMovementMode movementMode,
         out ConstructionManager targetConstruction,
         out string reason,
-        MatchController matchController = null)
+        MatchController matchController = null,
+        bool respectFogMemory = false)
     {
         return TryGetCaptureTarget(
             selectedUnit,
@@ -234,7 +235,8 @@ public static class PodeCapturarSensor
             out targetConstruction,
             out _,
             out reason,
-            matchController);
+            matchController,
+            respectFogMemory);
     }
 
     public static bool TryGetCaptureTarget(
@@ -244,7 +246,8 @@ public static class PodeCapturarSensor
         out ConstructionManager targetConstruction,
         out CaptureOperationType operationType,
         out string reason,
-        MatchController matchController = null)
+        MatchController matchController = null,
+        bool respectFogMemory = false)
     {
         Vector3Int evaluatedCell = selectedUnit != null
             ? selectedUnit.CurrentCellPosition
@@ -257,7 +260,8 @@ public static class PodeCapturarSensor
             out targetConstruction,
             out operationType,
             out reason,
-            matchController);
+            matchController,
+            respectFogMemory: respectFogMemory);
     }
 
     /// <summary>
@@ -286,6 +290,13 @@ public static class PodeCapturarSensor
     /// está no veículo — "este prédio serve de destino para ele?" —, porque
     /// projetar a unidade numa célula já pressupõe que ela desembarcou lá. Com
     /// o portão ligado essa pergunta não tem resposta possível.
+    ///
+    /// `respectFogMemory` é o filtro do MENU do jogador (pendencias do mvp.md,
+    /// captura): em hex explorado e fora da visão, quem decide se é aliado ou não é
+    /// o dono LEMBRADO (a mesma memória que o mapa pinta e que o Jornal atualiza),
+    /// não o dono real. Menu, mapa e Jornal não podem saber mais um que o outro.
+    /// OFF por padrão: a execução revalida pelo estado real no compromisso, e a IA
+    /// segue com a consulta de sempre.
     /// </summary>
     public static bool TryGetCaptureTargetAtCell(
         UnitManager selectedUnit,
@@ -298,7 +309,8 @@ public static class PodeCapturarSensor
         MatchController matchController = null,
         bool applyFogOfWar = true,
         ConstructionManager knownConstruction = null,
-        bool applyEmbarkedGate = true)
+        bool applyEmbarkedGate = true,
+        bool respectFogMemory = false)
     {
         targetConstruction = null;
         operationType = CaptureOperationType.None;
@@ -368,6 +380,22 @@ public static class PodeCapturarSensor
             }
         }
 
+        // Fora da visão, o menu responde pela memória do time: se o mapa ainda
+        // pinta o prédio como "meu", o menu não pode oferecer "Capturar" só porque
+        // a realidade mudou sem ninguém ver. Chegar com intel velha custa um turno.
+        bool decideByMemory = false;
+        TeamId rememberedOwner = TeamId.Neutral;
+        if (respectFogMemory && applyFogOfWar)
+        {
+            if (matchController == null)
+                matchController = Object.FindAnyObjectByType<MatchController>();
+            decideByMemory = matchController != null
+                && matchController.IsFogOfWarDebugEnabled
+                && !matchController.IsCellVisibleForActiveTeam(cell)
+                && matchController.TryGetKnownConstructionAtCell(
+                    PlayerSlotId.FromIndex(selectedUnit.SlotIndex), cell, out _, out rememberedOwner);
+        }
+
         // A construcao pode vir do chamador. Quem varre candidatas JA a tem na
         // mao, e GetConstructionAtCell faz um FindObjectsByType da cena inteira
         // por chamada — num laco por candidata isso vira O(n²) varreduras de
@@ -424,7 +452,18 @@ public static class PodeCapturarSensor
             return false;
         }
 
-        if (PlayerSlotRelations.AreAllies(selectedUnit.SlotIndex, construction.SlotIndex))
+        bool allied = decideByMemory
+            ? rememberedOwner != TeamId.Neutral && rememberedOwner == selectedUnit.TeamId
+            : PlayerSlotRelations.AreAllies(selectedUnit.SlotIndex, construction.SlotIndex);
+        if (allied && decideByMemory)
+        {
+            // A memória guarda o dono, não os pontos: não dá para saber se o
+            // prédio está ferido, então "Recuperar" espera o hex ser visto.
+            reason = "Pela última informação, esta construção é sua.";
+            return false;
+        }
+
+        if (allied)
         {
             if (construction.CurrentCapturePoints < construction.CapturePointsMax)
             {

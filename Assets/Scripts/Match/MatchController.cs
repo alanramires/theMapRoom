@@ -598,6 +598,11 @@ public class MatchController : MonoBehaviour
         new Dictionary<int, HashSet<Vector3Int>>();
     [System.NonSerialized] private readonly Dictionary<int, Dictionary<Vector3Int, FogConstructionMemoryEntry>> fogConstructionMemoryBySlot =
         new Dictionary<int, Dictionary<Vector3Int, FogConstructionMemoryEntry>>();
+    // Donos relatados pelo Jornal (o prédio deste time foi capturado), ainda não
+    // gravados na memória: a escrita só pode acontecer no Neutral e para o time
+    // cujo fog está sendo calculado — e a perda acontece no turno de OUTRO.
+    [System.NonSerialized] private readonly Dictionary<int, Dictionary<Vector3Int, TeamId>> fogConstructionOwnerReportsBySlot =
+        new Dictionary<int, Dictionary<Vector3Int, TeamId>>();
     [System.NonSerialized] private readonly List<SpriteRenderer> fogConstructionMemoryRenderers =
         new List<SpriteRenderer>();
     [System.NonSerialized] private readonly List<SpriteRenderer> fogStructureMemoryRenderers =
@@ -1406,6 +1411,9 @@ public class MatchController : MonoBehaviour
         fogVisionModeByPlayerIndex.Clear();
         fogOfWarVisionMode = FogOfWarVisionMode.All;
         EnsurePartidaConfigApplied();
+        // Preferencia do jogador (Acao Direta) vence o default da cena, se ja foi escolhida.
+        // O tutorial ainda desliga no inicio da aula (TutorialManager).
+        atalhoContextual = PreferenciasDoJogador.AcaoDireta(atalhoContextual);
         if (PartidaConfig.TryConsumeTutorialPlayerTeam(out TeamId tutorialPlayerTeam))
             ApplyTutorialPlayerTeamChoice(tutorialPlayerTeam);
         ApplyGameSetupPreset();
@@ -9388,6 +9396,18 @@ public class MatchController : MonoBehaviour
         }
     }
 
+    // Read only: never rebuild vision from a provisional unit position.
+    public bool IsCellVisibleOrExploredForSlot(PlayerSlotId slot, Vector3Int cell)
+    {
+        if (!debugFogOfWarEnabled || !enableTotalWar)
+            return true;
+        cell.z = 0;
+        return IsCellExploredBySlot(slot, cell)
+            || (IsValidPlayerSlot(slot)
+                && TryGetFogGameplaySnapshot(slot.Value, out FogSlotGameplaySnapshot snapshot)
+                && snapshot.knownCells.Contains(cell));
+    }
+
     public bool IsCellExploredBySlot(PlayerSlotId slot, Vector3Int cell)
     {
         cell.z = 0;
@@ -9411,6 +9431,9 @@ public class MatchController : MonoBehaviour
             memory = new Dictionary<Vector3Int, FogConstructionMemoryEntry>();
             fogConstructionMemoryBySlot[observerSlotIndex] = memory;
         }
+
+        // Primeiro o que o Jornal contou; depois o que se VÊ agora, que vence.
+        ApplyPendingConstructionOwnerReports(observerSlotIndex, boardMap, memory);
 
         List<ConstructionManager> constructions = ConstructionManager.AllActive;
         for (int i = 0; i < constructions.Count; i++)
@@ -9439,6 +9462,58 @@ public class MatchController : MonoBehaviour
                 flipX = sourceRenderer != null && sourceRenderer.flipX
             };
         }
+    }
+
+    /// <summary>
+    /// O Jornal relatou a este time que o prédio em <paramref name="cell"/> passou a
+    /// <paramref name="newOwner"/>. Fica pendente até o próximo registro confirmado
+    /// do fog deste time (Neutral), que o grava na memória — e então mapa e menu
+    /// concordam com o Jornal.
+    /// </summary>
+    public void ReportConstructionOwnerToSlot(PlayerSlotId observerSlot, Vector3Int cell, TeamId newOwner)
+    {
+        if (!IsValidPlayerSlot(observerSlot))
+            return;
+        cell.z = 0;
+        if (!fogConstructionOwnerReportsBySlot.TryGetValue(observerSlot.Value, out Dictionary<Vector3Int, TeamId> reports))
+        {
+            reports = new Dictionary<Vector3Int, TeamId>();
+            fogConstructionOwnerReportsBySlot[observerSlot.Value] = reports;
+        }
+        reports[cell] = newOwner;
+    }
+
+    private void ApplyPendingConstructionOwnerReports(
+        int observerSlotIndex,
+        Tilemap boardMap,
+        Dictionary<Vector3Int, FogConstructionMemoryEntry> memory)
+    {
+        if (!fogConstructionOwnerReportsBySlot.TryGetValue(observerSlotIndex, out Dictionary<Vector3Int, TeamId> reports)
+            || reports.Count == 0)
+            return;
+
+        foreach (KeyValuePair<Vector3Int, TeamId> report in reports)
+        {
+            if (memory.TryGetValue(report.Key, out FogConstructionMemoryEntry entry) && entry != null && entry.data != null)
+            {
+                entry.knownOwner = report.Value;
+                continue;
+            }
+
+            ConstructionManager construction = ConstructionOccupancyRules.GetConstructionAtCell(boardMap, report.Key);
+            if (construction == null ||
+                !construction.TryResolveConstructionData(out ConstructionData data) || data == null)
+                continue;
+
+            SpriteRenderer sourceRenderer = construction.GetMainSpriteRenderer();
+            memory[report.Key] = new FogConstructionMemoryEntry
+            {
+                data = data,
+                knownOwner = report.Value,
+                flipX = sourceRenderer != null && sourceRenderer.flipX
+            };
+        }
+        reports.Clear();
     }
 
     public bool TryGetKnownConstructionAtCell(
@@ -9488,6 +9563,24 @@ public class MatchController : MonoBehaviour
             }
         }
 
+        // Relatos do Jornal ainda não gravados: salvar no meio do turno de quem
+        // capturou não pode apagar o que o Jornal vai contar ao dono anterior.
+        foreach (KeyValuePair<int, Dictionary<Vector3Int, TeamId>> slotPair in fogConstructionOwnerReportsBySlot)
+        {
+            foreach (KeyValuePair<Vector3Int, TeamId> report in slotPair.Value)
+            {
+                destination.Add(new FogConstructionMemorySaveData
+                {
+                    observerSlotIndex = slotPair.Key,
+                    observerTeamId = (int)GetVisualTeamForSlot(PlayerSlotId.FromIndex(slotPair.Key)),
+                    x = report.Key.x,
+                    y = report.Key.y,
+                    knownOwnerTeamId = (int)report.Value,
+                    isOwnerReport = true
+                });
+            }
+        }
+
         destination.Sort((a, b) =>
         {
             int teamCompare = a.observerTeamId.CompareTo(b.observerTeamId);
@@ -9500,6 +9593,7 @@ public class MatchController : MonoBehaviour
     public void ImportFogConstructionMemory(IList<FogConstructionMemorySaveData> source)
     {
         fogConstructionMemoryBySlot.Clear();
+        fogConstructionOwnerReportsBySlot.Clear();
         if (source == null)
             return;
 
@@ -9510,6 +9604,16 @@ public class MatchController : MonoBehaviour
             if (saved == null || !Enum.IsDefined(typeof(TeamId), saved.observerTeamId) ||
                 !Enum.IsDefined(typeof(TeamId), saved.knownOwnerTeamId))
             {
+                continue;
+            }
+
+            if (saved.isOwnerReport)
+            {
+                if (IsValidPlayerSlotIndex(saved.observerSlotIndex))
+                    ReportConstructionOwnerToSlot(
+                        PlayerSlotId.FromIndex(saved.observerSlotIndex),
+                        new Vector3Int(saved.x, saved.y, 0),
+                        (TeamId)saved.knownOwnerTeamId);
                 continue;
             }
 

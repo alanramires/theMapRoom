@@ -18,6 +18,8 @@ public partial class TurnStateManager
         Tilemap boardMap = terrainTilemap != null ? terrainTilemap : selectedUnit.BoardTilemap;
         string reason = cachedPodeCapturarReason;
 
+        // O pedido ainda é MENU: mesma memória que ofereceu o "C". A execução
+        // (ExecuteCaptureSequence) revalida pelo estado real no compromisso.
         if (!canCapture || !PodeCapturarSensor.TryGetCaptureTarget(
                 selectedUnit,
                 boardMap,
@@ -25,7 +27,8 @@ public partial class TurnStateManager
                 out ConstructionManager target,
                 out _,
                 out reason,
-                matchController))
+                matchController,
+                respectFogMemory: true))
         {
             if (!string.IsNullOrWhiteSpace(reason))
             {
@@ -156,6 +159,13 @@ public partial class TurnStateManager
                             targetConstruction.ConstructionDisplayName,
                             PanelMessage.Helper("helper.journal.captured_by", ("team", TeamUtils.GetName(capturer.TeamId))),
                             capturedCell);
+                        // O que o Jornal conta, a memória sabe: senão o mapa
+                        // seguiria pintando como "seu" o prédio que o Jornal deu
+                        // como perdido, e o menu concordaria com o mapa.
+                        matchController.ReportConstructionOwnerToSlot(
+                            PlayerSlotId.FromIndex(previousOwnerSlot),
+                            capturedCell,
+                            capturer.TeamId);
                     }
                     RuntimeLog(
                         $"[Captura] Construcao capturada por {TeamUtils.GetName(capturer.TeamId)}. " +
