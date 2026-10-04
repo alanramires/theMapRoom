@@ -2206,7 +2206,10 @@ public class ReplayManager : MonoBehaviour
         currentBuffer.LayerBefore = layerBefore;
         currentBuffer.LayerAfter = layerAfter;
         currentBuffer.ActionType = PlayerActionType.UnitAction;
-        currentBuffer.MovementPath = movementPath;
+        // CÓPIA, não a lista do chamador: o TurnStateManager passa o
+        // committedMovementPath, que ClearCommittedMovement esvazia antes de o
+        // buffer ser promovido — o replay ficava com o trajeto vazio.
+        currentBuffer.MovementPath = movementPath != null ? new List<Vector3Int>(movementPath) : null;
     }
 
     public void UpdateCurrentBufferSensorAction(SensorActionType sensorAction, string subStepLabel = null)

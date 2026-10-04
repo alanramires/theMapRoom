@@ -1063,11 +1063,18 @@ public partial class TurnStateManager
         RestorePreparedMovementCostIfAny();
         if (!BeginRollbackToSelection())
         {
-            RuntimeLog("[Rollback] Falha ao iniciar animacao de rollback. Fallback para UnitSelected.");
-            Retreat("rollback animation failed");
-            ClearCommittedMovement();
-            ClearSensorResults();
-            PaintSelectedUnitMovementRange();
+            // Sem animação de volta, a unidade ficava no DESTINO com o movimento já
+            // devolvido: deslocamento de graça. Agora ela é posta na origem e o
+            // retorno segue o MESMO caminho do fim da animação de rollback
+            // (camada forçada, rastro, cursor, Retreat, área pintada).
+            RuntimeLog("[Rollback] Falha ao iniciar animacao de rollback. Reposicionando na origem.");
+            Vector3Int origin = committedOriginCell;
+            origin.z = 0;
+            Vector3Int current = selectedUnit.CurrentCellPosition;
+            current.z = 0;
+            if (current != origin)
+                selectedUnit.SetCurrentCellPosition(origin, enforceFinalOccupancyRule: false);
+            HandleMovementAnimationCompleted(CursorState.UnitSelected);
         }
         else
         {

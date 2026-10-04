@@ -228,7 +228,31 @@ public class TutorialManager : MonoBehaviour
         for (int i = 0; i < tutorial.objectives.Count; i++)
         {
             TutorialObjective obj = tutorial.objectives[i];
-            if (obj == null || obj.id != "UNIT_AT_HEX" || !obj.isVisible || !IsObjectivePending(obj))
+            if (obj == null || !obj.isVisible || !IsObjectivePending(obj))
+                continue;
+
+            // USED_ROAD_BOOST também só conta comprometido: a unidade AGIU e o
+            // último movimento usou a estrada. Parameters: token da unidade (ex.:
+            // APC); vazio = qualquer unidade.
+            if (obj.id == "USED_ROAD_BOOST")
+            {
+                List<UnitManager> movers = UnitManager.AllActive;
+                for (int u = 0; u < movers.Count; u++)
+                {
+                    UnitManager unit = movers[u];
+                    if (unit == null || unit.IsDead || !unit.HasActed || unit.TeamId != playerTeam)
+                        continue;
+                    if (!unit.UsedRoadBoostOnLastMove)
+                        continue;
+                    if (!string.IsNullOrWhiteSpace(obj.parameters) && !UnitMatchesTargetToken(unit, obj.parameters))
+                        continue;
+                    MarkObjectiveComplete(obj);
+                    break;
+                }
+                continue;
+            }
+
+            if (obj.id != "UNIT_AT_HEX")
                 continue;
 
             List<UnitManager> units = UnitManager.AllActive;
@@ -1800,17 +1824,11 @@ public class TutorialManager : MonoBehaviour
         for (int i = 0; i < tutorial.objectives.Count; i++)
         {
             TutorialObjective obj = tutorial.objectives[i];
-            if (obj.id == "USED_ROAD_BOOST" && obj.isVisible && IsObjectivePending(obj))
-            {
-                // Parameters esperado: token da unidade (ex.: APC). Vazio = qualquer unidade.
-                if (unit.UsedRoadBoostOnLastMove &&
-                    (string.IsNullOrWhiteSpace(obj.parameters) || UnitMatchesTargetToken(unit, obj.parameters)))
-                {
-                    MarkObjectiveComplete(obj);
-                }
-            }
+            // USED_ROAD_BOOST saiu daqui pelo mesmo motivo do UNIT_AT_HEX: este
+            // evento dispara com o movimento ainda cancelável. O poll valida no fim
+            // da ação (CheckUnitAtHexObjectives).
             // NOVO: Verifica UNIT_DEAD por autonomia durante movimento
-            else if (obj.id == "UNIT_DEAD" && obj.isVisible && IsObjectivePending(obj))
+            if (obj.id == "UNIT_DEAD" && obj.isVisible && IsObjectivePending(obj))
             {
                 if (EvaluateUnitCondition(unit, obj, isDeathEvent: false))
                 {
