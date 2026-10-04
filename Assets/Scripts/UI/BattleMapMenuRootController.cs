@@ -1419,7 +1419,13 @@ public class BattleMapMenuRootController : MonoBehaviour
                 cameraController?.ToggleQuickZoomFromMenu();
                 break;
             case MenuAction.Config:
-                PanelDialogController.TrySetTransientText(PanelMessage.Dialog("panel_dialog.menu.config_pending"), 2.4f);
+                // A tela de Configurações é um prefab presente na cena. Fecha o menu
+                // (de volta ao Neutral) e abre a tela; enquanto ela estiver aberta,
+                // o tabuleiro não recebe input.
+                if (!TryCloseMenuForDispatchAndEnsureNeutral())
+                    break;
+                if (!PainelConfiguracoesController.AbrirNaCena(null))
+                    PanelDialogController.TrySetTransientText(PanelMessage.Dialog("panel_dialog.menu.config_pending"), 2.4f);
                 break;
             case MenuAction.Save:
                 if (!TryCloseMenuForSaveLoadDispatch())
@@ -1768,6 +1774,8 @@ public class BattleMapMenuRootController : MonoBehaviour
 
         if (btnMinimapa == null) btnMinimapa = FindMenuButtonByNames(panelOptions, "btn_minimapa", "button_minimapa", "button_miniMapa");
         if (btnConfig == null) btnConfig = FindMenuButtonByNames(panelOptions, "btn_config", "button_config");
+        // O botao de Configuracoes mudou do Panel_options para o Panel_gerenciar.
+        if (btnConfig == null) btnConfig = FindMenuButtonByNames(panelGerenciar, "btn_config", "button_config");
         if (btnSave == null) btnSave = FindMenuButtonByNames(panelOptions, "button_save", "btn_save");
         if (btnLoad == null) btnLoad = FindMenuButtonByNames(panelOptions, "button_load", "btn_load");
         if (btnGerenciar == null) btnGerenciar = FindMenuButtonByNames(panelOptions, "btn_gerenciar", "button_gerenciar");

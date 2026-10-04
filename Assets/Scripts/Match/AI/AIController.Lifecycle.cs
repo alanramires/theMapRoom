@@ -152,6 +152,8 @@ public partial class AIController
     {
 
         _instance = this;
+        // Preferencia do jogador (Modo Turbo) vence o default da cena, se ja foi escolhida.
+        iaRapida = PreferenciasDoJogador.ModoTurbo(iaRapida);
         MatchController.OnActiveTeamChanged += HandleTeamChanged;
         SaveGameManager.OnAfterLoadSuccess += HandleAfterLoadSuccess;
         _availableUnitsComparison = CompareAvailableUnits;

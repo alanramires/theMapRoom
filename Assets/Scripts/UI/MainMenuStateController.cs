@@ -188,6 +188,10 @@ public class MainMenuStateController : MonoBehaviour
 
             case MainMenuState.Config:
                 EnterSimplePanelState(panelConfigRoot);
+                // Como nos outros paineis do menu: navegacao propria (RouteConfigMenuInput),
+                // nao a nativa da Unity, que EnterSimplePanelState liga.
+                if (EventSystem.current != null)
+                    EventSystem.current.sendNavigationEvents = false;
                 break;
 
             case MainMenuState.Cinematic:
@@ -316,6 +320,10 @@ public class MainMenuStateController : MonoBehaviour
 
             case MainMenuState.Tutorial:
                 RouteTutorialMenuInput();
+                break;
+
+            case MainMenuState.Config:
+                RouteConfigMenuInput();
                 break;
 
             case MainMenuState.Cinematic:
@@ -496,6 +504,56 @@ public class MainMenuStateController : MonoBehaviour
             loadPanelController.CloseLoadPanel();
     }
 
+    // Mesmo padrao do RouteTutorialMenuInput. Com o Sobre aberto, Esc/Enter fecham SO o
+    // Sobre — senao o mesmo Esc fecharia o texto e a tela juntos.
+    private void RouteConfigMenuInput()
+    {
+        PainelConfiguracoesController config =
+            panelConfigRoot != null ? panelConfigRoot.GetComponent<PainelConfiguracoesController>() : null;
+
+        UiInputBlocker.SuppressGameplayInputForFrames(1);
+        if (Time.frameCount <= ignoreInputUntilFrame)
+            return;
+        if (IsAnyTextInputFocusedInUi())
+            return;
+
+        if (config == null)
+        {
+            if (WasCancelPressed())
+                RequestState(MainMenuState.RootMenu);
+            return;
+        }
+
+        if (config.SobreAberto)
+        {
+            if (WasConfirmPressed() || WasCancelPressed())
+                config.FecharSobre();
+            return;
+        }
+
+        if (WasUpPressed() || WasLeftPressed())
+        {
+            config.Navigate(-1);
+            return;
+        }
+
+        if (WasDownPressed() || WasRightPressed())
+        {
+            config.Navigate(+1);
+            return;
+        }
+
+        if (WasConfirmPressed())
+        {
+            UiInputBlocker.SuppressGameplayInputForFrames(2);
+            config.ConfirmCurrentSelection();
+            return;
+        }
+
+        if (WasCancelPressed())
+            config.Fechar();
+    }
+
     private void RouteTutorialMenuInput()
     {
         if (tutorialPanelController == null || !tutorialPanelController.IsOpen)
@@ -604,7 +662,7 @@ public class MainMenuStateController : MonoBehaviour
 
         if (panelConfigRoot == null)
         {
-            Transform t = FindTransformByName("Panel_Config");
+            Transform t = FindTransformByName("Panel_Configuracoes") ?? FindTransformByName("Panel_Config");
             if (t != null)
                 panelConfigRoot = t.gameObject;
         }

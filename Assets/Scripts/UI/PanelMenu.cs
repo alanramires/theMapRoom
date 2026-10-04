@@ -642,7 +642,8 @@ public class PanelMenu : MonoBehaviour
         AddIfActive(list, buttonHotseat);
         AddIfActive(list, buttonLoad);
         AddIfActive(list, buttonConfig);
-        AddIfActive(list, buttonAbout);
+        if (!IsAboutOwnedByConfig())
+            AddIfActive(list, buttonAbout);
         AddIfActive(list, buttonCinematic);
         AddIfActive(list, buttonFullscreen);
         AddIfActive(list, buttonTutorial);
@@ -689,7 +690,7 @@ public class PanelMenu : MonoBehaviour
 
         if (panelConfigRoot == null)
         {
-            Transform t = FindTransformByName("Panel_Config");
+            Transform t = FindTransformByName("Panel_Configuracoes") ?? FindTransformByName("Panel_Config");
             if (t != null)
                 panelConfigRoot = t.gameObject;
         }
@@ -851,10 +852,18 @@ public class PanelMenu : MonoBehaviour
             buttonTutorial.onClick.AddListener(OnTutorialButtonClicked);
         }
 
-        if (buttonAbout != null)
+        // O Sobre que mora no Panel_Configuracoes e daquela tela (ela decide o Esc);
+        // aqui so o Sobre que ainda estiver no menu raiz.
+        if (buttonAbout != null && !IsAboutOwnedByConfig())
         {
-            buttonAbout.onClick.RemoveListener(OnConfigButtonClicked);
-            buttonAbout.onClick.AddListener(OnConfigButtonClicked);
+            buttonAbout.onClick.RemoveListener(OnAboutButtonClicked);
+            buttonAbout.onClick.AddListener(OnAboutButtonClicked);
+        }
+
+        if (buttonConfig != null)
+        {
+            buttonConfig.onClick.RemoveListener(OnConfigButtonClicked);
+            buttonConfig.onClick.AddListener(OnConfigButtonClicked);
         }
 
         if (buttonCinematic != null)
@@ -1046,7 +1055,24 @@ public class PanelMenu : MonoBehaviour
         OpenPanelAndHideMenu(panelTutorialRoot, "Panel_Tutorial");
     }
 
+    // Abre o Panel_Configuracoes (estado Config). O nome OnConfigButtonClicked ja
+    // pertenceu ao Sobre, de quando "config" era o Sobre; agora cada um tem o seu.
     private void OnConfigButtonClicked()
+    {
+        if (buttonConfig != null)
+            SyncCurrentIndexWithButton(buttonConfig);
+
+        PlayConfirmSfxOncePerFrame();
+        if (stateController != null)
+        {
+            stateController.RequestState(MainMenuState.Config);
+            return;
+        }
+
+        OpenPanelAndHideMenu(panelConfigRoot, "Panel_Configuracoes");
+    }
+
+    private void OnAboutButtonClicked()
     {
         if (buttonAbout != null)
             SyncCurrentIndexWithButton(buttonAbout);
@@ -1058,6 +1084,13 @@ public class PanelMenu : MonoBehaviour
     }
 
     public void ConfirmAboutFromPointer() => CloseAbout();
+
+    /// <summary>Abre o texto do Sobre no helper. Usado pelo Panel_Configuracoes, dono do botao.</summary>
+    public void OpenAbout() => OnAboutButtonClicked();
+
+    private bool IsAboutOwnedByConfig() =>
+        buttonAbout != null
+        && buttonAbout.GetComponentInParent<PainelConfiguracoesController>(true) != null;
 
     public void CloseAbout()
     {

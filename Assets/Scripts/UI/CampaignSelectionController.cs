@@ -84,6 +84,8 @@ public class CampaignSelectionController : MonoBehaviour
     private SaveGameManager campaignSaveManager;
     private bool waitingForPersistence;
     private bool campaignStatusOpen;
+    private bool configOpen;
+    private int configClosedFrame = -1;
     private AIDifficulty? loadedDifficulty;
     private string persistenceFeedback;
     private CampanhaManager campanhaManager;
@@ -153,6 +155,14 @@ public class CampaignSelectionController : MonoBehaviour
             }
             return;
         }
+        // Tela de Configurações aberta pelo menu: ela roteia o próprio teclado. No
+        // quadro em que fecha, o mesmo Esc não pode fechar também o menu que reabriu.
+        if (configOpen || Time.frameCount == configClosedFrame)
+        {
+            UiInputBlocker.SuppressGameplayInputForFrames(1);
+            return;
+        }
+
         if (campaignStatusOpen)
         {
             UiInputBlocker.SuppressGameplayInputForFrames(1);
@@ -198,6 +208,13 @@ public class CampaignSelectionController : MonoBehaviour
                 CancelConfirmation();
                 return;
             }
+
+            // Ação Direta: tocar de novo no MESMO quadrante confirma — o mesmo "toque
+            // de novo no mesmo lugar" da batalha. A preferência é do jogador
+            // (PreferenciasDoJogador), não da partida — vale em qualquer cena, sem
+            // depender de qual controlador a cena-base carregou.
+            if (TryGetMapTapThisFrame(out Vector2 confirmTap) && TryConfirmByTappingPendingQuadrant(confirmTap))
+                return;
 
             if (!confirmationSubmitArmed)
             {
@@ -325,6 +342,25 @@ public class CampaignSelectionController : MonoBehaviour
                     if (TryGetQuadrantOwner(i, out _)) conquered++;
                 PanelHelperController.TrySetExternalText(PanelMessage.Helper("helper.campaign.status_title"),
                     PanelMessage.Helper("helper.campaign.status", ("world", mundo.displayName), ("total", quadrants.Count), ("conquered", conquered)));
+                break;
+            case "button_config":
+                SetCampaignMenuOpen(false, playSound: false);
+                configOpen = PainelConfiguracoesController.AbrirNaCena(() =>
+                {
+                    configOpen = false;
+                    configClosedFrame = Time.frameCount;
+                    RefreshHoveredQuadrant(force: true);
+                    SetCampaignMenuOpen(true, playSound: false);
+                });
+                if (configOpen)
+                {
+                    cursorController?.PlayConfirmSfx();
+                }
+                else
+                {
+                    cursorController?.PlayErrorSfx();
+                    SetCampaignMenuOpen(true, playSound: false);
+                }
                 break;
             case "button_minimapa":
                 SetCampaignMenuOpen(false, playSound: false);
@@ -1424,18 +1460,7 @@ public class CampaignSelectionController : MonoBehaviour
 
     private bool HandleMapTap(Vector2 screen)
     {
-        if (IsScreenPointOverUi(screen) || worldTilemap == null)
-            return false;
-
-        Camera cam = Camera.main;
-        if (cam == null)
-            return false;
-
-        Vector3 world = cam.ScreenToWorldPoint(new Vector3(screen.x, screen.y, -cam.transform.position.z));
-        Vector3Int cell = worldTilemap.WorldToCell(world);
-        cell.z = 0;
-
-        int index = FindQuadrantAtCell(cell);
+        int index = FindQuadrantAtScreen(screen);
         if (index < 0)
             return false;
 
@@ -1448,6 +1473,40 @@ public class CampaignSelectionController : MonoBehaviour
         {
             SelectQuadrant(index, playMoveSfx: true, adjustCamera: false);
         }
+        return true;
+    }
+
+    private int FindQuadrantAtScreen(Vector2 screen)
+    {
+        if (IsScreenPointOverUi(screen) || worldTilemap == null)
+            return -1;
+
+        Camera cam = Camera.main;
+        if (cam == null)
+            return -1;
+
+        Vector3 world = cam.ScreenToWorldPoint(new Vector3(screen.x, screen.y, -cam.transform.position.z));
+        Vector3Int cell = worldTilemap.WorldToCell(world);
+        cell.z = 0;
+        return FindQuadrantAtCell(cell);
+    }
+
+    private bool TryConfirmByTappingPendingQuadrant(Vector2 screen)
+    {
+        if (!PreferenciasDoJogador.AcaoDireta(false) || pending == null)
+            return false;
+        // O toque que ABRIU a confirmação não pode ser também o que a confirma.
+        if (Time.frameCount <= confirmationOpenedFrame)
+            return false;
+
+        int index = FindQuadrantAtScreen(screen);
+        if (index < 0 || index >= quadrants.Count || quadrants[index] != pending)
+            return false;
+
+        UiInputBlocker.SuppressGameplayInputForFrames(2);
+        // Um toque deliberado no mapa não é Enter residual: arma direto.
+        confirmationSubmitArmed = true;
+        InvokeConfirmationOption(0);
         return true;
     }
 

@@ -53,6 +53,8 @@ public partial class AIController : MonoBehaviour
     [InspectorName("IA Rapida")]
     [SerializeField] private bool iaRapida = true;
     public bool IARapida => iaRapida;
+    // Modo Turbo da tela de Configuracoes (PreferenciasDoJogador).
+    public void SetIARapida(bool value) => iaRapida = value;
 
     [Tooltip("Modo difícil. Por enquanto: dobra os slots de capturador por setor e habilita os limites/banimentos espec�ficos de hard mode (log�stica e unidades banidas).")]
     [SerializeField] private bool hardMode = false;
