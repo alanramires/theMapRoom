@@ -1,16 +1,25 @@
 ﻿# Resumo — onde estamos e o que vem
 
-Ponto de retomada. Atualizado em 2026-10-02, **depois** da tag `v9.2.1`.
+Ponto de retomada. Atualizado em 2026-10-04, **depois** da tag `v9.2.2`.
 Leia isto primeiro.
 
 ---
 
 ## Estado
 
-`v9.2.1` tagueada e publicada. **O primeiro MVP estável está no ar** (v9.2.0),
-no Unity Play, e já tem gente testando. Relatório do dia:
-[`relatorio_v9.2.1.md`](relatorio_v9.2.1.md). A v8 fechou; os relatórios dela
+`v9.2.2` tagueada e publicada. **O primeiro MVP estável está no ar** (v9.2.0),
+no Unity Play, e **o primeiro estranho já zerou uma fase**. Relatório do dia:
+[`relatorio_v9.2.2.md`](relatorio_v9.2.2.md). A v8 fechou; os relatórios dela
 estão em [`Versões/`](Versões/).
+
+**A descoberta da v9.2.2: "lento" é duas coisas.** O testador (Easy, celular,
+uma tarde num mapa de ~1 h) disse que o jogo "é lento". Tempo de **decisão** é
+identidade (ritmo de xadrez); tempo de **execução** é atrito de toques, e só ele
+se mexe. Daí a tela de Configurações (Partida × Preferências, Modo Turbo, Ação
+Direta, Tela Cheia), a Ação Direta a partir da seleção (tocar no alvo anda até a
+célula legal e para na confirmação) e, de tabela, o inventário do que ainda vaza
+na névoa ([`pendencias do mvp.md`](pendencias%20do%20mvp.md)): **menu, mapa e
+Jornal leem a mesma memória**. Nada disso foi visto em Play no fechamento.
 
 **A descoberta da v9.2.1: a IA "decide e se manda".** O `DecideUnitAction` é uma
 cascata em que a primeira resposta não-nula ganha. O autor desenhou o
@@ -32,6 +41,7 @@ v9.0.0   a mesma linha                    visão de regra única; Save Inspector
 v9.1.0   o save manda na partida          load aplica o save; menu no turno da IA
 v9.2.0   aguenta o celular de quem testa  toque, áudio/texturas web, sem LTO
 v9.2.1   a IA pergunta antes de decidir   contrato do questionário; reparo pela linha
+v9.2.2   o primeiro estranho jogou         Configurações, Ação Direta, névoa com uma memória
 ```
 
 **A descoberta da v9.2.0:** o Simulator da Unity não reproduz o navegador do
@@ -199,6 +209,34 @@ Sem HQ, os dois lados do Q3 e do Q4 entram no modo rebelde (v8.6.1, Frente 4).
 ---
 
 ## Onde eu parei
+
+### O que a v9.2.2 deixou — primeiro jogar, depois o replay
+
+**Só compilou.** Roteiro de Play, na ordem que mais rende:
+
+```text
+Configurações   abre pela Tela de Entrada, pelo Gerenciar da Batalha e pelo menu da
+                Campanha; setas com destaque verde; Sobre na frente; Tela Cheia na Web
+Ação Direta     tanque anda até o morro e mira; artilharia só atira parada; embarque
+                num caminhão a 2–3 hexes; cancelar no meio desfaz tudo
+captura         prédio seu capturado longe: antes do seu turno o menu NÃO oferece
+                captura; depois do Jornal, o mapa pinta inimigo e oferece
+transacional    cancelar movimento pela estrada não completa objetivo do tutorial;
+                MovementPath do replay não vem vazio
+```
+
+**Próximo código: o descarte do replay ao voltar de submenu.** `HandleCancel`
+(`TurnStateManager.StateMachine.cs`) e `HandleScannerPromptCancel`
+(`TurnStateManager.ScannerPrompt.cs`) chamam `DiscardPendingCombatCinematicTrack`
+no **topo**, antes de saber se é "voltar uma etapa" ou "cancelar a ação". Mover o
+descarte para os ramos que voltam à seleção ou ao `Neutral`, lendo um a um.
+
+**Decisão pendente do autor:** "falhou depois do compromisso = conclui e marca
+como agiu" (como a captura já faz) para transferência e suprimento — entra no
+contrato transacional se ele aprovar.
+
+**Fora do MVP:** Zona de Controle, medida em
+[`implementação pós mvp.md`](implementação%20pós%20mvp.md).
 
 ### O questionário — o tronco da IA agora
 
@@ -473,7 +511,10 @@ parte de uma regra só, e a construção usa a mesma reta que a unidade.
 | **árvore limpa tomada como Inspector salvo** | no fechamento da v9.2.1 o `git status` estava limpo e os perfis do Médio e do Difícil **não tinham o campo** em disco: o Inspector marca e não grava. Antes de taguear configuração, conferir o campo no `.asset` (grep) e pedir *File ▸ Save Project* |
 | **afirmar a direção de um movimento lendo meia execução** | eu disse que na fusão o parceiro anda até o receptor; é o contrário — a **selecionada** anda até o parceiro e o consome (`TurnStateManager.Merge.cs`, 592–669). Li a linha que nomeia o receptor, não a que move. Ler a execução até o `SetCurrentCellPosition` |
 | **"o papel X não faz Y" contado só nos arquivos do papel** | a revisão de papéis afirmou que a IA nunca funde; a fusão morava no **reparo**. Comportamento de papel pode estar num handler transversal (Repair, Logistics, Router) |
-| **frente que mistura arquivo no commit** | `git add -p` não roda aqui (interativo). Monta-se o índice do arquivo como HEAD + só os blocos da frente (`git hash-object -w --path` + `update-index --cacheinfo`). Foi assim que a v9.2.1 saiu em cinco commits |
+| **frente que mistura arquivo no commit** | `git add -p` não roda aqui (interativo). Monta-se o índice do arquivo como HEAD + só os blocos da frente (`git hash-object -w --path` + `update-index --cacheinfo`). Foi assim que a v9.2.1 saiu em cinco commits. **Na v9.2.2 o atalho de aplicar blocos de `git diff -U0` falhou duas vezes:** em modo texto o Python perde o CRLF, e chaves `{` soltas viram blocos que nenhuma palavra-chave pega. O arquivo misto foi inteiro para a frente dominante, com a mensagem dizendo o que ele carrega da outra |
+| **Toggle que "não navega"** | navegava: o Toggle padrão seleciona com (245,245,245) sobre o quadradinho branco. O `Panel_NewGame` já resolvia com `ApplySelectionHighlight` (`#4A5A43`). Antes de depurar a navegação, conferir se a seleção é **visível** |
+| **texto escrito uma vez, na criação** | os botões do helper gravavam `[helper.action.cancel]` para sempre porque eram montados antes de o banco de mensagens ser achado. Rótulo que depende de banco (ou de idioma) se resolve ao **aparecer**, não ao nascer |
+| **busca de botão presa a um painel** | o `Button_config` mudou do `Panel_options` para o `Panel_gerenciar` e o menu só procurava no primeiro: o botão não abria, sem erro. Quando o autor move um botão de painel, conferir **onde** o código o procura |
 | **"funciona no Simulator"** | o Simulator renderiza pelo Editor: não mede memória nem o navegador. Teste real = build servido na LAN (`npx http-server -a 0.0.0.0 -p 8000`) com o celular na **claro5** (subrede 192.168.1.x do PC) + `chrome://inspect` |
 | **medir memória por dentro da aba** | `Runtime.queryObjects` varre o heap e DERRUBOU a aba. Use `adb shell dumpsys meminfo` e leia o **PSS**, não o RSS |
 | **LTO na Web** | "Runtime Speed with LTO" travou o Carregar Jogo (`RuntimeError: unreachable`); sem LTO funciona. Para testar LTO de novo, gerar com Debug Symbols Embedded |
@@ -548,6 +589,9 @@ parte de uma regra só, e a construção usa a mesma reta que a unidade.
 | [`Planos/plano_campanha.md`](Planos/plano_campanha.md) | **o tronco** — autoria, recorte, progresso, cenas, bloqueios, teste |
 | [`Planos/briefing_cena_campanha.md`](Planos/briefing_cena_campanha.md) | o contrato entre as duas frentes |
 | [`AI Behavior/contrato_questionario.md`](AI%20Behavior/contrato_questionario.md) | **o questionário** — casas, duas etapas, o Capturador, as ordens, as missões, os abertos |
+| [`relatorio_v9.2.2.md`](relatorio_v9.2.2.md) | o primeiro estranho jogou — Configurações, Ação Direta, a névoa com uma memória só |
+| [`pendencias do mvp.md`](pendencias%20do%20mvp.md) | o inventário transacional: o que vaza na névoa, o que foi decidido, o que falta testar |
+| [`playtest de 3 de outubro 2026.md`](playtest%20de%203%20de%20outubro%202026.md) | o primeiro playtest externo e o que saiu dele |
 | [`relatorio_v9.2.1.md`](relatorio_v9.2.1.md) | a IA pergunta antes de decidir — questionário, fusão no perfil, reparo pela linha |
 | [`relatorio_v9.2.0.md`](relatorio_v9.2.0.md) | aguenta o celular — memória medida, áudio/texturas web, LTO, toque |
 | [`relatorio_v9.1.0.md`](relatorio_v9.1.0.md) | o save manda na partida — load, estado fora da cena, menu no turno da IA |
