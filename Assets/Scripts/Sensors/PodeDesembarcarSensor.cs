@@ -30,6 +30,12 @@ public static class PodeDesembarcarSensor
         }
 
         transporterCell.z = 0;
+        MatchController match = ResolveMatchController();
+        if (!IsCellKnownForDisembark(match, selectedTransporter, transporterCell))
+        {
+            contextReason = "Terreno ainda desconhecido.";
+            return false;
+        }
         if (!CanTransporterDisembarkAtCellContext(
                 selectedTransporter, transporterData, transporterCell,
                 map, terrainDatabase, out contextReason))
@@ -55,6 +61,10 @@ public static class PodeDesembarcarSensor
             {
                 Vector3Int targetCell = neighbors[n];
                 targetCell.z = 0;
+                // Filter before terrain/occupancy probes, including invalid-option reports.
+                // The provisional move must not disclose anything in unexplored cells.
+                if (!IsCellKnownForDisembark(match, selectedTransporter, targetCell))
+                    continue;
                 if (!CanDisembarkAtCell(
                         selectedTransporter, transporterData, passenger,
                         map, terrainDatabase, transporterCell, targetCell,
@@ -186,6 +196,13 @@ public static class PodeDesembarcarSensor
             return false;
         }
 
+        MatchController match = ResolveMatchController();
+        if (!IsCellKnownForDisembark(match, selectedTransporter, selectedTransporter.CurrentCellPosition))
+        {
+            landingStatus.explanation = "Terreno ainda desconhecido.";
+            return false;
+        }
+
         landingStatus = EvaluateLandingStatus(selectedTransporter, map, terrainDatabase);
 
         if (!CanTransporterDisembarkAtCurrentContext(selectedTransporter, transporterData, map, terrainDatabase, out string transporterContextReason))
@@ -230,6 +247,10 @@ public static class PodeDesembarcarSensor
             {
                 Vector3Int targetCell = neighbors[n];
                 targetCell.z = 0;
+                // Filter before terrain/occupancy probes, including invalid-option reports.
+                // The provisional move must not disclose anything in unexplored cells.
+                if (!IsCellKnownForDisembark(match, selectedTransporter, targetCell))
+                    continue;
 
                 if (!CanDisembarkAtCell(
                         selectedTransporter,
@@ -287,6 +308,28 @@ public static class PodeDesembarcarSensor
         if (sensorLogs)
             SensorLogGate.Log("PodeDesembarcarSensor", $"result valid={output.Count} invalid={(invalidOutput != null ? invalidOutput.Count : 0)} hasAny={hasAny} landingOk={(landingStatus != null && landingStatus.isValid)}");
         return hasAny;
+    }
+
+    // O MatchController é procurado UMA vez por cena, não a cada chamada: a IA chama
+    // este sensor em laço (simula o desembarque célula por célula no courier, no
+    // naval, no teste da única saída), e FindAnyObjectByType varre a cena inteira.
+    // Guarda o OBJETO, não a resposta: a névoa continua lida ao vivo a cada chamada,
+    // então o recálculo do Neutral vale na hora. Troca de cena se cura sozinha: a
+    // referência ao objeto destruído responde true para == null e a busca refaz.
+    private static MatchController cachedMatchController;
+
+    private static MatchController ResolveMatchController()
+    {
+        if (cachedMatchController == null)
+            cachedMatchController = Object.FindAnyObjectByType<MatchController>();
+        return cachedMatchController;
+    }
+
+    private static bool IsCellKnownForDisembark(
+        MatchController match, UnitManager transporter, Vector3Int cell)
+    {
+        return match == null || match.IsCellVisibleOrExploredForSlot(
+            PlayerSlotId.FromIndex(transporter.SlotIndex), cell);
     }
 
     private static List<Vector3Int> BuildDisembarkCandidateCells(
