@@ -29,6 +29,7 @@ de sensor têm uma fonte só. A direção vem do guia de modding do autor
 | v9.1.0 | O save manda na partida | [relatório](docs/relatorio_v9.1.0.md) |
 | v9.2.0 | O jogo aguenta o celular de quem testa (primeiro MVP no ar) | [relatório](docs/relatorio_v9.2.0.md) |
 | v9.2.1 | A IA pergunta antes de decidir (contrato do questionário) | [relatório](docs/relatorio_v9.2.1.md) |
+| v9.2.2 | O primeiro estranho jogou (Configurações, Ação Direta, a névoa com uma memória só) | [relatório](docs/relatorio_v9.2.2.md) |
 
 ---
 
