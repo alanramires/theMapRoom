@@ -4838,6 +4838,24 @@ Referências:
 
 - `Assets/Scripts/Match/TurnState/TurnStateManager.ScannerPrompt.cs:3881`
 
+## menu.button.campaign
+
+Asset: [menu.button.campaign.asset](../../Assets/DB/Messages/UI%20Text%20Data/menu.button.campaign.asset)
+
+```text
+Campanha vs IA
+```
+
+Referências:
+
+- Sem referência literal encontrada.
+
+English:
+
+```text
+Campaign vs AI
+```
+
 ## panel_dialog.action.invalid
 
 Asset: [panel_dialog.action.invalid.asset](../../Assets/DB/Messages/Dialog%20Data/action/panel_dialog.action.invalid.asset)

@@ -78,3 +78,17 @@ Antes de publicar, conferir em Play:
 - uma mensagem temporariamente mais longa no asset, por teclado, mouse e toque.
 
 Compilação e testes estáticos não substituem essa verificação visual.
+
+## Rótulos criados no design da Unity
+
+No filho **Text (TMP)** do botão, use **Add Component > Localized Text**.
+Arraste uma ficha de `Assets/DB/Messages/UI Text Data` para **Text Data**.
+A ficha `menu.button.campaign` já contém “Campanha vs IA” / “Campaign vs AI”.
+Crie outras por **Create > Game > UI > UI Text Data**; não é necessário registrá-las numa Database.
+
+O texto é aplicado ao habilitar o objeto e ao iniciar a cena, preservando fonte,
+cor e layout. Sem ficha, o texto original do TMP é preservado. Inglês vazio usa
+português. Escolha o idioma antes do Play no menu de idioma dos painéis.
+O Editor continua mostrando o texto que você escreveu no TMP; a tradução aparece
+em Play. Use este componente para textos fixos, sem outro script sobrescrevendo o
+mesmo TMP. Para reaplicar por código, chame `LocalizedText.Refresh()`.

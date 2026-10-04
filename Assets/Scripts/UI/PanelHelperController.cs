@@ -404,6 +404,12 @@ public class PanelHelperController : MonoBehaviour
         if (campaignSelectionController == null)
             campaignSelectionController = FindAnyObjectByType<CampaignSelectionController>();
 
+        // O banco de mensagens vem ANTES dos controles: eles resolvem o texto ao nascer.
+#if UNITY_EDITOR
+        if (helperDatabase == null)
+            helperDatabase = FindFirstAssetEditor<HelperDatabase>();
+#endif
+
         EnsureCancelControl();
         EnsureExecuteCommandServiceControl();
         EnsureKeepPositionControl();
@@ -412,11 +418,6 @@ public class PanelHelperController : MonoBehaviour
         EnsurePersistenceActionsRoot();
         EnsureTimeoutProgressBar();
         EnsureDragHandle();
-
-#if UNITY_EDITOR
-        if (helperDatabase == null)
-            helperDatabase = FindFirstAssetEditor<HelperDatabase>();
-#endif
     }
 
     private void Refresh(bool force)
@@ -1428,8 +1429,11 @@ public class PanelHelperController : MonoBehaviour
                 return ResolveMessage("helper.sensors.label.disembark", "Disembark");
             case "capture":
                 if (turnStateManager != null
+                    // O rótulo é menu: a mesma memória da névoa que ofereceu o "C",
+                    // senão "Reforçar controle" entregaria que o prédio é seu.
                     && turnStateManager.CanUnitCaptureFromCurrentPosition(
-                        turnStateManager.SelectedUnit, out _, out var captureOperation, out _)
+                        turnStateManager.SelectedUnit, out _, out var captureOperation, out _,
+                        respectFogMemory: true)
                     && captureOperation == PodeCapturarSensor.CaptureOperationType.RecoverAlly)
                     return ResolveMessage("helper.sensors.label.recover_control", "Reforçar controle");
                 return ResolveMessage("helper.sensors.label.capture", "Conquistar");
@@ -4391,7 +4395,11 @@ public class PanelHelperController : MonoBehaviour
                       turnStateManager != null &&
                       turnStateManager.CurrentCursorState == TurnStateManager.CursorState.UnitSelected;
         if (keepPositionControlRoot.activeSelf != active)
+        {
             keepPositionControlRoot.SetActive(active);
+            if (active && keepPositionLabel != null)
+                keepPositionLabel.text = PanelMessage.Helper("helper.action.keep_position");
+        }
         if (keepPositionButton != null)
             // Tutorial: antes da ordem de marcha, o MANTER POSICAO fica cinza.
             keepPositionButton.interactable = active && !TutorialManager.IsMovementLockedByTutorial;
@@ -4413,7 +4421,14 @@ public class PanelHelperController : MonoBehaviour
 
         bool active = panelVisible && CanCancelCurrentStateFromHelper();
         if (cancelControlRoot.activeSelf != active)
+        {
             cancelControlRoot.SetActive(active);
+            // Resolve ao APARECER, não só ao nascer: o texto gravado na criação ficava
+            // "[helper.action.cancel]" para sempre se o banco ainda não estivesse
+            // ligado, e não acompanharia a troca de idioma.
+            if (active && cancelActionLabel != null)
+                cancelActionLabel.text = PanelMessage.Helper("helper.action.cancel");
+        }
 
         if (panelHelper == gameObject && selfPanelCanvasGroup != null)
         {
@@ -4481,6 +4496,19 @@ public class PanelHelperController : MonoBehaviour
 
         instance.SetExternalText(title, body, 0f, timed: false);
         return true;
+    }
+
+    /// <summary>O retângulo do panel_helper, para quem precisa trazê-lo à frente de outro painel.</summary>
+    public static RectTransform PanelRect
+    {
+        get
+        {
+            if (instance == null)
+                return null;
+            if (instance.helperRect == null)
+                instance.TryAutoAssignReferences();
+            return instance.helperRect;
+        }
     }
 
     public static void SetExternalWideMode(bool wide)

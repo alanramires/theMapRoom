@@ -87,6 +87,8 @@ def audit(write_index=False):
             continue
         guid = guid_match.group(1)
         catalog_guids[guid] = key
+        if 'UI Text Data' in path.parts:
+            continue  # Fixed TMP labels reference assets directly, without a database.
         kind = 'Helper' if 'Helper Data' in path.parts else 'Dialog'
         if databases[kind].count('guid: ' + guid + ',') != 1:
             errors.append('Must be registered exactly once in ' + kind + ' Database: ' + key)

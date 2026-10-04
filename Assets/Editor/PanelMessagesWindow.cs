@@ -58,13 +58,15 @@ public class PanelMessagesWindow : EditorWindow
                 entry = new Entry { asset = asset, id = helper.id, condition = helper.condition, message = helper.message, messageEnglish = helper.messageEnglish, path = path };
             else if (asset is DialogData dialog)
                 entry = new Entry { asset = asset, id = dialog.id, condition = dialog.condition, message = dialog.message, messageEnglish = dialog.messageEnglish, path = path };
+            else if (asset is UITextData ui)
+                entry = new Entry { asset = asset, id = ui.id, condition = ui.condition, message = ui.message, messageEnglish = ui.messageEnglish, path = path };
             else continue;
             entries.Add(entry);
             if (string.IsNullOrWhiteSpace(entry.id)) issues.Add(path + ": ID vazio.");
             else if (byId.ContainsKey(entry.id)) issues.Add(entry.id + ": ID duplicado (" + path + ").");
             else byId.Add(entry.id, entry);
             if (string.IsNullOrWhiteSpace(entry.message)) issues.Add(entry.id + ": mensagem vazia.");
-            if (!registered.Contains(asset)) issues.Add(entry.id + ": nao registrada em um Database.");
+            if (!(asset is UITextData) && !registered.Contains(asset)) issues.Add(entry.id + ": nao registrada em um Database.");
         }
         foreach (string path in Directory.EnumerateFiles("Assets/Scripts", "*.cs", SearchOption.AllDirectories))
         {
@@ -91,7 +93,7 @@ public class PanelMessagesWindow : EditorWindow
             search = EditorGUILayout.TextField("Buscar", search);
             if (GUILayout.Button("Atualizar / validar", GUILayout.Width(145))) RefreshCatalog();
         }
-        kind = GUILayout.Toolbar(kind, new[] { "Todos", "Dialog", "Helper" });
+        kind = GUILayout.Toolbar(kind, new[] { "Todos", "Dialog", "Helper", "UI Text" });
         EditorGUILayout.LabelField(entries.Count + " mensagens | " + entries.Count(e => !string.IsNullOrWhiteSpace(e.messageEnglish)) + " com ingles | " + issues.Count + " problemas de cadastro");
         scroll = EditorGUILayout.BeginScrollView(scroll);
         foreach (string issue in issues) EditorGUILayout.HelpBox(issue, MessageType.Warning);
@@ -99,6 +101,7 @@ public class PanelMessagesWindow : EditorWindow
         {
             if (kind == 1 && !(entry.asset is DialogData)) continue;
             if (kind == 2 && !(entry.asset is HelperData)) continue;
+            if (kind == 3 && !(entry.asset is UITextData)) continue;
             string haystack = entry.id + " " + entry.messageEnglish + " " + entry.message + " " + entry.condition + " " + entry.path + " " + string.Join(" ", entry.usages.Select(u => u.path));
             if (!string.IsNullOrWhiteSpace(search) && haystack.IndexOf(search, StringComparison.OrdinalIgnoreCase) < 0) continue;
             using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
