@@ -24,6 +24,8 @@ public partial class TurnStateManager
         RefreshSensorsForCurrentState();
     }
 
+    private bool usedRoadBoostBeforeMove;
+
     private void BeginMovementToSelectedCell(List<Vector3Int> path)
     {
         LogStateStep();
@@ -34,6 +36,7 @@ public partial class TurnStateManager
         committedMovementPath.AddRange(path);
         committedOriginCell = path[0];
         committedDestinationCell = path[path.Count - 1];
+        usedRoadBoostBeforeMove = selectedUnit.UsedRoadBoostOnLastMove;
         committedMovementLayerBeforeDomain = selectedUnit.GetDomain();
         committedMovementLayerBeforeHeight = selectedUnit.GetHeightLevel();
         hasCommittedMovementLayerBefore = true;
@@ -66,6 +69,8 @@ public partial class TurnStateManager
 
     private bool BeginRollbackToSelection()
     {
+        // Cancelou antes de a Ação Direta mirar: o alvo pendente morre junto.
+        ClearPendingContextualMove();
         LogStateStep(rollback: true);
         if (selectedUnit == null || !TryGetCommittedMovementPath(out List<Vector3Int> committedPath, out Vector3Int originCell, out Vector3Int destinationCell))
         {
@@ -130,6 +135,10 @@ public partial class TurnStateManager
         if (onCompleteState == CursorState.UnitSelected)
         {
             RestoreForcedLayerAfterRollbackIfNeeded();
+            // O indicador de estrada foi gravado no fim da animação PROVISÓRIA;
+            // cancelar devolve o valor de antes do movimento.
+            if (selectedUnit != null && hasCommittedMovement)
+                selectedUnit.SetUsedRoadBoostOnLastMove(usedRoadBoostBeforeMove);
             ClearCommittedMovement();
             if (cursorController != null && selectedUnit != null)
             {

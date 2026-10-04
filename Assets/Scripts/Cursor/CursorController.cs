@@ -759,7 +759,19 @@ public class CursorController : MonoBehaviour
             return;
         }
 
+        // Ação Direta: tocar num inimigo ou num transporte com a unidade selecionada
+        // move até onde a ação é legal e já mira o alvo (o confirm é o segundo toque).
+        // A célula onde o cursor está é a preferida: quem já alcança daqui não anda.
+        bool contextualMove = false;
         if (state == TurnStateManager.CursorState.UnitSelected &&
+            turnStateManager.TryResolveContextualMoveToTarget(targetCell, currentCell, out Vector3Int contextualArrival))
+        {
+            targetCell = contextualArrival;
+            contextualMove = true;
+        }
+
+        if (!contextualMove &&
+            state == TurnStateManager.CursorState.UnitSelected &&
             !turnStateManager.IsPointerMovementTargetSelectable(targetCell))
             return;
 
@@ -777,6 +789,8 @@ public class CursorController : MonoBehaviour
         // O clique direto equivale a posicionar o cursor no hex e apertar Enter.
         double confirmStart = traceNeutralPointer ? Time.realtimeSinceStartupAsDouble : 0d;
         TurnStateManager.ActionSfx feedback = turnStateManager.HandleConfirm();
+        if (contextualMove && feedback == TurnStateManager.ActionSfx.Error)
+            turnStateManager.ClearPendingContextualMove();
         double confirmMs = traceNeutralPointer
             ? (Time.realtimeSinceStartupAsDouble - confirmStart) * 1000d
             : 0d;

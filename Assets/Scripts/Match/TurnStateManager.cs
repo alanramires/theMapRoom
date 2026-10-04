@@ -499,6 +499,7 @@ public partial class TurnStateManager : MonoBehaviour
         if (replayManager != null && replayManager.RuntimeLogsEnabled)
             Debug.Log($"[Replay][Dispatch] OnSensorsReady fired state={CurrentCursorState} selected={selectedId}");
         OnSensorsReady?.Invoke();
+        MarkPendingContextualSensorsReady();
     }
 
     private bool IsInspectingState(CursorState state)

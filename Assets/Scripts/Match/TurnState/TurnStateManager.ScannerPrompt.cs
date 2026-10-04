@@ -248,6 +248,7 @@ public partial class TurnStateManager
         ProcessDestroyUnitHotkeyInput();
         ProcessConstructionShoppingInput();
         UpdateShoppingPreviewPersistence();
+        ProcessPendingContextualMove();
         ProcessScannerPromptInput();
         ProcessCommandServiceHotkeyInput();
         ProcessPlanningHotkeyInput();
