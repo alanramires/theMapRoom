@@ -117,6 +117,10 @@ com várias do mesmo tipo, os tipos sem parâmetro (como `ATTACK_UNIT`) completa
 | `USED_ROAD_BOOST` | uma unidade do slot 0 terminou a ação e o último movimento usou estrada | vazio = qualquer; token |
 | `CAPTURE_CONSTRUCTION` | o jogador (slot 0) **termina** uma captura: o prédio muda de dono | vazio = qualquer; `Bandeira`, `60,32`, `Bandeira \|\| 60,32` ou `SD && Bandeira` |
 | `CAPTURE_PROGRESS` | o jogador (slot 0) **age capturando**, mesmo sem terminar | idem |
+
+As duas tarefas de captura mostram na lista a **resistência** do prédio, `(20/30)`:
+o mesmo número da plaquinha, **decrescente** (o prédio cai quando chega a 0). O
+contador acha o prédio dentro de `SD && PortoFerro` sozinho.
 | `ENEMY_CAPTURE` | um slot **que não é o aluno** toma um prédio (muda de dono). Use como derrota | igual ao `CAPTURE_CONSTRUCTION` |
 | `PLAYER_ELIMINATED` | o aluno (slot 0) fica **sem nenhuma unidade**, contando as embarcadas. Avaliado só quando uma unidade morre. Use como derrota | — |
 | `PURCHASE_UNIT` | qualquer compra | — |
@@ -176,6 +180,13 @@ O roteiro é a lista `script`, em ordem. Cada fala:
 
 `No Effect` mantém · `Locked` trava · `Unlocked` libera.
 
+A trava é **só do aluno**: no turno da IA ela não vale (a IA passa a vez pelo
+mesmo caminho do humano e ficaria presa). O mesmo vale para os `block*` da seção 6.
+
+**Não trave sem saída.** Se a ordem pode ficar impossível de cumprir no turno
+(desembarcar um passageiro só deixa o transporte "já agiu" com o outro a bordo),
+deixe o passar a vez **liberado** naquela fala: vira um dia a mais, não um impasse.
+
 ### `movement`
 
 | valor | o jogador pode |
@@ -187,6 +198,22 @@ O roteiro é a lista `script`, em ordem. Cada fala:
 | `Unlocked` | tudo |
 
 Se **qualquer** fala usar `Unlocked`, a aula **começa travada**.
+
+**A fala 0 roda depois do início do turno 1.** O início de turno zera "já agiu" e
+cobra o upkeep; por isso um `acted CH` na abertura funciona, e por isso uma
+aeronave assada com 32 de combustível aparece com 30 (o turno 1 já cobrou).
+
+### O truque de esconder o Sargento
+
+Ordem que dura vários turnos ("passe a vez", "segure a fábrica") não pode deixar o
+balão aberto. Faça em duas falas:
+
+```text
+fala A  texto da ordem      advance = Enemy Turn Started   turn = Unlocked
+fala B  (texto vazio)       advance = o gatilho real       (Player Turn Started, Objective Completed...)
+```
+
+A fala muda esconde o balão e espera. É o que a História 1 já fazia.
 Se **qualquer** fala revelar tarefa, o painel **começa vazio** e só mostra o que for
 revelado. Sem nenhuma revelação, todas as tarefas não ocultas aparecem.
 
@@ -241,6 +268,11 @@ slot1 SD @flag; slot1 SD @flag       dois soldados: o 2º pega outra, porque a 1
 autoria** e refaça o bake. O bake guarda o passageiro preso ao transporte, e a
 Batalha embarca de novo ao montar o quadrante.
 
+**HP e combustível também vêm da autoria.** Pinte a unidade ferida ou com o tanque
+pela metade e refaça o bake; ela nasce assim (o bake só guarda o que difere do
+cheio). Não precisa de `CH fuel=30` no roteiro — e com ele o jogador vê o tanque
+cair no meio da fala.
+
 ### `statCommand`
 
 | comando | efeito |
@@ -276,7 +308,7 @@ slot1 SD move 64,33                  sem destino: avança pelo AutomataData
 | campo | efeito |
 |---|---|
 | `alwaysActedUnits` | tokens (`;`) que amanhecem "já agiram" em todo turno do jogador: figurantes |
-| `blockCommandService` | trava o Serviço do Comando (X) |
+| `blockCommandService` | trava o Serviço do Comando (X). **Todos os `block*` valem só no turno do aluno**: a IA usa o kit inteiro |
 | `blockRemoveUnit` | trava dispensar/destruir (U) |
 | `blockSurrender` | trava render-se |
 | `blockStatusSummary` | trava a Situação do menu |
