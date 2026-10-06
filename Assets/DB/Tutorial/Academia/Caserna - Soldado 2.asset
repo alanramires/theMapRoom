@@ -1,0 +1,52 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fa3089f4c9cbdf6489740b351203c6a0, type: 3}
+  m_Name: Caserna - Soldado 2
+  m_EditorClassIdentifier: Assembly-CSharp::TutorialData
+  id: Caserna - Soldado 2
+  description: "Reabaste\xE7a o Helicoptero e saia pelo mar ao norte"
+  objectives: []
+  script: []
+  dialogFlowMigrated: 1
+  scoldEndTurnLocked:
+    text: 
+    voice: {fileID: 0}
+  scoldCommandService:
+    text: 
+    voice: {fileID: 0}
+  scoldRemoveUnit:
+    text: 
+    voice: {fileID: 0}
+  scoldSurrender:
+    text: 
+    voice: {fileID: 0}
+  scoldStatusSummary:
+    text: 
+    voice: {fileID: 0}
+  scoldMovementLocked:
+    text: 
+    voice: {fileID: 0}
+  scoldHoldPosition:
+    text: 
+    voice: {fileID: 0}
+  scoldAttackOrder:
+    text: 
+    voice: {fileID: 0}
+  alwaysActedUnits: 
+  inimigo: 0
+  forcarRegras: 0
+  regras: 2
+  blockCommandService: 0
+  blockRemoveUnit: 0
+  blockSurrender: 0
+  blockStatusSummary: 0
+  victoryDialog: {fileID: 0}
