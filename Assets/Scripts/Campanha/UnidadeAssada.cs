@@ -47,6 +47,16 @@ public class UnidadeAssada
     [Tooltip("Compartimento de carga do transporte em que ela estava. So vale embarcada.")]
     public int transportadorSlot = -1;
 
+    [Tooltip(
+        "HP com que a unidade estava na autoria. -1 = cheio (o maximo do tipo). So e "
+        + "assado quando difere do maximo.")]
+    public int hp = -1;
+
+    [Tooltip(
+        "Combustivel com que a unidade estava na autoria (ex.: Chinook pela metade numa "
+        + "aula). -1 = cheio. So e assado quando difere do maximo.")]
+    public int combustivel = -1;
+
     public Vector3Int LocalCell => new Vector3Int(localX, localY, 0);
 
     public override string ToString()

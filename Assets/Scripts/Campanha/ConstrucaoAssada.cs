@@ -65,6 +65,11 @@ public class ConstrucaoAssada
     public string nomeAutorado;
 
     [Tooltip(
+        "isVisible desligado na autoria (ex.: bandeira de spawn de aula). Nasce oculta na "
+        + "Batalha e nao aparece no mosaico da Campanha.")]
+    public bool oculta;
+
+    [Tooltip(
         "Configuracao DESTA instancia: o que ela vende, que servicos oferece, se e QG, "
         + "se e capturavel. A cena de autoria e a lei — uma fabrica leve que NAO vende "
         + "radar movel tem de nascer sem radar movel.\n\n"

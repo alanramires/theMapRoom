@@ -55,6 +55,7 @@ public class QuadranteController : MonoBehaviour
     public static bool BoardReady => active != null && active.built;
 
     public static QuadranteController Active => active;
+    public MundoData Mundo => mundo;
 
     /// <summary>
     /// Quanto somar a uma coordenada do MUNDO DE AUTORIA para cair no tabuleiro da
@@ -1086,6 +1087,8 @@ public class QuadranteController : MonoBehaviour
                 // predio por ele, e o jogador o ve.
                 if (!string.IsNullOrWhiteSpace(c.nomeAutorado))
                     manager.SetAuthoredDisplayName(c.nomeAutorado);
+                if (c.oculta)
+                    manager.SetVisible(false);
 
                 // O spawn so recebe o TIME. Slot, setor, ancora e pontos de captura
                 // vem a parte — e nenhum deles e cosmetico:
@@ -1322,6 +1325,15 @@ public class QuadranteController : MonoBehaviour
 
             spawned++;
             nascidas[i] = go.GetComponent<UnitManager>();
+
+            // Estado da autoria: o Chinook pintado pela metade nasce pela metade.
+            if (nascidas[i] != null)
+            {
+                if (u.hp > 0)
+                    nascidas[i].SetCurrentHP(u.hp);
+                if (u.combustivel > 0)
+                    nascidas[i].SetCurrentFuel(u.combustivel);
+            }
 
             // EMBARCADA NA AUTORIA: entra no transporte pelo mesmo caminho que o
             // load usa para restaurar passageiros.

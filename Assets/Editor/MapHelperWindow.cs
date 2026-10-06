@@ -576,6 +576,18 @@ public class MapHelperWindow : EditorWindow
 
             DrawNoBody(c, PickLevel.Campanha, index, pai: parent, paiRotulo: "caixa do bloco");
 
+            // FUNDO: o terreno do retangulo inteiro da campanha, para o mosaico da
+            // Campanha mostrar o territorio que nenhum quadrante cobre (paisagem).
+            EditorGUILayout.BeginHorizontal();
+            EditorGUILayout.LabelField(
+                c.HasFundo ? $"fundo assado ({c.width}×{c.height})" : "fundo: não assado",
+                EditorStyles.miniLabel);
+            if (GUILayout.Button(new GUIContent("Assar fundo",
+                    "Grava o terreno de todo o retângulo da campanha (da cena aberta). A Campanha pinta isso apagado por baixo dos quadrantes."),
+                    GUILayout.Width(100f)))
+                BakeFundo(c);
+            EditorGUILayout.EndHorizontal();
+
             EditorGUILayout.Space(4f);
             EditorGUILayout.BeginHorizontal();
             EditorGUILayout.LabelField($"Quadrantes ({c.quadrantes?.Count ?? 0})", EditorStyles.miniBoldLabel);
@@ -1164,7 +1176,10 @@ public class MapHelperWindow : EditorWindow
                 dicaFinal = "Só abre depois que os outros blocos do mundo forem concluídos.";
                 break;
         }
-        dicaFinal += "\n\nAinda sem efeito em jogo: o portão de destrave não foi construído.";
+        // O portao existe para QUADRANTE (cena Campanha: cadeado e JOGAR recusado).
+        // Campanha e bloco ainda nao leem isto.
+        if (!(no is QuadranteData))
+            dicaFinal += "\n\nAinda sem efeito em jogo neste nível: o portão só existe para quadrante.";
 
         EditorGUI.BeginChangeCheck();
         bool irmaos = EditorGUILayout.Toggle(new GUIContent(rotuloFinal, dicaFinal), no.ExigeIrmaos);
@@ -1455,6 +1470,41 @@ public class MapHelperWindow : EditorWindow
     /// (TerrainDatabase.TryGetByPaletteTile), entao uma tabela de traducao no meio
     /// so criaria uma segunda fonte pra divergir.
     /// </summary>
+    // Fundo da campanha: so terreno, o retangulo inteiro. Os quadrantes por cima
+    // continuam vindo dos bakes deles; o fundo e paisagem.
+    private void BakeFundo(CampanhaData c)
+    {
+        if (mundo == null || c == null) return;
+
+        Tilemap map = ResolveTilemap();
+        if (map == null)
+        {
+            status = "Fundo abortado: nenhum tilemap nesta cena.";
+            return;
+        }
+
+        int w = Mathf.Max(1, c.width);
+        int h = Mathf.Max(1, c.height);
+        Undo.RecordObject(mundo, $"Assar fundo {c.campanhaId}");
+        if (c.bakedFundo == null)
+            c.bakedFundo = new List<TileBase>(w * h);
+        c.bakedFundo.Clear();
+
+        int pintados = 0;
+        for (int y = 0; y < h; y++)
+        {
+            for (int x = 0; x < w; x++)
+            {
+                TileBase tile = map.GetTile(new Vector3Int(c.originX + x, c.originY + y, 0));
+                c.bakedFundo.Add(tile);
+                if (tile != null) pintados++;
+            }
+        }
+
+        EditorUtility.SetDirty(mundo);
+        status = $"Fundo de '{c.campanhaId}' assado: {pintados} de {w * h} células com terreno.";
+    }
+
     private void Bake(QuadranteData q)
     {
         if (mundo == null || q == null) return;
@@ -1941,6 +1991,9 @@ public class MapHelperWindow : EditorWindow
                 // tutorial acha o predio ("show Bandeira"). Sem isto a Batalha
                 // nasce com "Fabrica_T-1_C16" e o roteiro procura em vao.
                 nomeAutorado = c.HasAuthoredDisplayName ? c.ConstructionDisplayName : string.Empty,
+                // OCULTA tambem: isVisible e do ConstructionManager, nao do siteRuntime,
+                // e a bandeira de spawn escondida nascia visivel na Batalha e no mosaico.
+                oculta = !c.IsVisible,
                 // A CENA DE AUTORIA E A LEI. Sem levar a configuracao desta
                 // instancia, o spawn cai na do TIPO e toda fabrica do mapa vira
                 // igual — uma fabrica leve autorada SEM radar movel nasceria
@@ -1973,6 +2026,23 @@ public class MapHelperWindow : EditorWindow
     /// e sinal de erro; assar zero DEPOIS de o autor ter pintado, sim, e por isso
     /// o status mostra o numero.
     /// </summary>
+    // HP/combustivel da autoria: so assa o que difere do cheio (-1 = cheio). Valor
+    // <= 0 tambem vira -1 — unidade de cena nunca inicializada le 0, e nascer com
+    // tanque seco derrubaria o helicoptero no primeiro upkeep.
+    private static int AssarHp(UnitManager u)
+    {
+        int max = u.GetMaxHP();
+        int atual = u.CurrentHP;
+        return atual > 0 && atual < max ? atual : -1;
+    }
+
+    private static int AssarCombustivel(UnitManager u)
+    {
+        int max = u.GetMaxFuel();
+        int atual = u.CurrentFuel;
+        return atual > 0 && atual < max ? atual : -1;
+    }
+
     private int BakeUnidades(QuadranteData q)
     {
         if (q.bakedUnidades == null)
@@ -2023,7 +2093,9 @@ public class MapHelperWindow : EditorWindow
                 localY = cell.y - q.originY,
                 teamId = u.TeamId,
                 slotIndex = u.SlotIndex,
-                displayName = u.UnitId
+                displayName = u.UnitId,
+                hp = AssarHp(u),
+                combustivel = AssarCombustivel(u)
             });
         }
 
@@ -2053,7 +2125,9 @@ public class MapHelperWindow : EditorWindow
                     slotIndex = u.SlotIndex,
                     displayName = u.UnitId,
                     transportadorIndice = transportador,
-                    transportadorSlot = u.EmbarkedTransporterSlotIndex
+                    transportadorSlot = u.EmbarkedTransporterSlotIndex,
+                    hp = AssarHp(u),
+                    combustivel = AssarCombustivel(u)
                 });
                 embarcadas.RemoveAt(i);
                 progrediu = true;
