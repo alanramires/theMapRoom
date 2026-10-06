@@ -427,13 +427,14 @@ public class MatchMusicAudioManager : MonoBehaviour
     public bool PlayMapSelectionTrack(bool loop = true, bool forceRestart = true)
     {
         EnsureReferences();
-        if (audioSource == null || mapSelectionTrack == null)
+        AudioClip selection = EffectiveMapSelectionTrack;
+        if (audioSource == null || selection == null)
             return false;
 
         isPausedByUser = false;
         pausedByTurnTransition = false;
         suppressPlaybackForTurnTransition = false;
-        PlayClip(mapSelectionTrack, loop, forceRestart);
+        PlayClip(selection, loop, forceRestart);
         return true;
     }
 
@@ -537,6 +538,53 @@ public class MatchMusicAudioManager : MonoBehaviour
         }
 
         PlayClip(clip, loop: true, forceRestart: forceRestart);
+    }
+
+    // ---------------------------------------------------------------------
+    // TRILHA DO MUNDO, so na tela de escolher o mapa (cena Campanha). O catalogo
+    // diz o que um mundo E, e a trilha faz parte disso: a Academia toca o dobrado,
+    // o Fixture a selecao de sempre. A batalha segue com as trilhas de time.
+    // O mundo ativo vem do contrato (PartidaConfig.MundoAtivo) ou, sem ele, do
+    // mundo serializado na cena (Campanha ou quadrante da Batalha). Cache por
+    // cena: o Update consulta isto e nao pode varrer a cena a cada frame.
+    // ---------------------------------------------------------------------
+    [System.NonSerialized] private MundoData cachedSceneWorld;
+    [System.NonSerialized] private string cachedSceneWorldPath;
+
+    private MundoData ResolveActiveWorld()
+    {
+        if (PartidaConfig.MundoAtivo != null)
+            return PartidaConfig.MundoAtivo;
+
+        string scenePath = SceneManager.GetActiveScene().path;
+        if (scenePath == cachedSceneWorldPath)
+            return cachedSceneWorld;
+
+        cachedSceneWorldPath = scenePath;
+        cachedSceneWorld = null;
+        QuadranteController quadrante = QuadranteController.Active;
+        if (quadrante != null && quadrante.Mundo != null)
+        {
+            cachedSceneWorld = quadrante.Mundo;
+        }
+        else
+        {
+            CampaignSelectionController campanha = FindAnyObjectByType<CampaignSelectionController>();
+            if (campanha != null)
+                cachedSceneWorld = campanha.Mundo;
+        }
+
+        return cachedSceneWorld;
+    }
+
+    // Musica da tela de escolher o mapa: a do mundo, senao a padrao deste AudioManager.
+    private AudioClip EffectiveMapSelectionTrack
+    {
+        get
+        {
+            MundoData world = ResolveActiveWorld();
+            return world != null && world.musicaSelecao != null ? world.musicaSelecao : mapSelectionTrack;
+        }
     }
 
     private AudioClip ResolveLoopClipCandidate()
@@ -719,7 +767,7 @@ public class MatchMusicAudioManager : MonoBehaviour
 
     private bool TryPlayMapSelectionTrackForScene()
     {
-        if (!playMapSelectionOnStart || mapSelectionTrack == null)
+        if (!playMapSelectionOnStart || EffectiveMapSelectionTrack == null)
             return false;
 
         if (!IsActiveSceneNamed(mapSelectionSceneName))
@@ -768,11 +816,12 @@ public class MatchMusicAudioManager : MonoBehaviour
         // uma varredura POR FRAME. O PlayClip ja cuida do volume (RefreshOutputVolume)
         // e as flags de pausa que os wrappers limpam ja estao falsas: o Update so
         // chega aqui depois de conferir as duas.
+        AudioClip selectionTrack = EffectiveMapSelectionTrack;
         if (playMapSelectionOnStart &&
-            mapSelectionTrack != null &&
+            selectionTrack != null &&
             IsActiveSceneNamed(mapSelectionSceneName))
         {
-            PlayClip(mapSelectionTrack, loop: true, forceRestart: false);
+            PlayClip(selectionTrack, loop: true, forceRestart: false);
             return true;
         }
 
@@ -873,7 +922,8 @@ public class MatchMusicAudioManager : MonoBehaviour
         // modo ByTeam, inclusive em cenas-base reutilizadas como Campanha.
         if (gameOpenTrack != null && currentClip == gameOpenTrack)
             return gameOpenMusicVolume;
-        if (mapSelectionTrack != null && currentClip == mapSelectionTrack)
+        AudioClip selectionClip = EffectiveMapSelectionTrack;
+        if (selectionClip != null && currentClip == selectionClip)
             return mapSelectionMusicVolume;
 
         if (playbackMode == MusicPlaybackMode.ByTeam)

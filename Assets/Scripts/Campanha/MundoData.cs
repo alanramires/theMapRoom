@@ -29,6 +29,10 @@ public class MundoData : ScriptableObject
     [Tooltip("Cena de autoria onde este mundo e desenhado. Documentacao — nao e carregada em runtime.")]
     public string authoringSceneName;
 
+    [Header("Trilha")]
+    [Tooltip("Musica da tela de escolher o mapa (cena Campanha) neste mundo. Vazio = a musica de selecao padrao do AudioManager. A batalha continua com as trilhas de time.")]
+    public AudioClip musicaSelecao;
+
     [Header("Camadas decorativas")]
     [Tooltip(
         "Nomes de Tilemap, no mesmo Grid do tabuleiro, que o bake copia junto com o "

@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Tilemaps;
 
 /// <summary>
 /// Uma campanha dentro de um bloco: Europa, Africa.
@@ -31,6 +32,22 @@ public class CampanhaData : INoDoMapa
 
     [Header("Quadrantes")]
     public List<QuadranteData> quadrantes = new List<QuadranteData>();
+
+    [Header("Fundo — assado (paisagem da Campanha)")]
+    [Tooltip(
+        "Terreno do retangulo INTEIRO da campanha, assado pelo Map Helper (\"Assar fundo\"). "
+        + "A cena Campanha o pinta por baixo dos quadrantes, apagado: e paisagem, nao e "
+        + "jogavel nem selecionavel. Vazio = so os quadrantes aparecem. Row-major, y crescendo.")]
+    public List<TileBase> bakedFundo = new List<TileBase>();
+
+    public bool HasFundo => bakedFundo != null && bakedFundo.Count == Mathf.Max(1, width) * Mathf.Max(1, height);
+
+    public TileBase GetFundoTile(int localX, int localY)
+    {
+        if (!HasFundo || localX < 0 || localY < 0 || localX >= width || localY >= height)
+            return null;
+        return bakedFundo[(localY * width) + localX];
+    }
 
     [SerializeField, HideInInspector] private int idSerial;
 

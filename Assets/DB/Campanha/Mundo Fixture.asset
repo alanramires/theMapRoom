@@ -17,6 +17,7 @@ MonoBehaviour:
   descricao: 
   foto: {fileID: 0}
   authoringSceneName: Fixture
+  musicaSelecao: {fileID: 8300000, guid: 1185e1c24f1ef264088245af983cbdb6, type: 3}
   camadasDecorativas:
   - quebraMar
   proximoSerial: 7

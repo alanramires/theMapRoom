@@ -31,10 +31,21 @@ public class CampaignSelectionController : MonoBehaviour
 
     [Header("Data")]
     [SerializeField] private MundoData mundo;
+    public MundoData Mundo => mundo;
     [SerializeField] private ConstructionDatabase constructionDatabase;
     [SerializeField] private StructureDatabase structureDatabase;
     [SerializeField] private UnitDatabase unitDatabase;
     [SerializeField] private string battleSceneName = "Batalha";
+
+    [Header("Fundo da campanha")]
+    [Tooltip("Cor do terreno que nenhum quadrante cobre (fundo assado da campanha). Paisagem: mais apagada que um quadrante sem foco.")]
+    [SerializeField] private Color fundoTint = new Color(0.42f, 0.45f, 0.50f, 1f);
+
+    [Header("Destrave")]
+    [Tooltip("Icone desenhado sobre o quadrante TRANCADO (destravadoPor ainda nao concluido). Ex.: img/icones/cadeado.png. Vazio = sem icone (o portao vale do mesmo jeito).")]
+    [SerializeField] private Sprite cadeadoSprite;
+    [Tooltip("Escala do cadeado sobre o quadrante.")]
+    [SerializeField] private float cadeadoEscala = 1f;
 
     [Header("Scene References")]
     [SerializeField] private Tilemap worldTilemap;
@@ -609,6 +620,19 @@ public class CampaignSelectionController : MonoBehaviour
 
         // Em desenvolvimento: selecionavel, mas nao abre. Marcado na bancada
         // (Tools > Utils > Map Helper), enquanto o autor monta o quadrante.
+        // PORTAO DE DESTRAVE: quadrante com 'destravadoPor' so abre depois que os
+        // pre-requisitos foram concluidos por um humano.
+        if (!IsQuadrantUnlocked(pending, out string faltando))
+        {
+            PanelHelperController.TrySetExternalText(
+                PanelHelperController.ResolveHelperMessage("helper.campaign.locked_title", "QUADRANTE TRANCADO"),
+                PanelHelperController.ResolveHelperMessage("helper.campaign.locked_body", "Conclua antes: ") + faltando);
+            cursorController?.PlayErrorSfx();
+            confirmationOpen = false;
+            pending = null;
+            return;
+        }
+
         if (pending.Quadrante.emDesenvolvimento)
         {
             PanelHelperController.TrySetExternalText(
@@ -796,6 +820,11 @@ public class CampaignSelectionController : MonoBehaviour
 
         worldTilemap.ClearAllTiles();
         int painted = 0;
+
+        // FUNDO PRIMEIRO: o territorio da campanha que nenhum quadrante cobre. Os
+        // quadrantes pintam por cima (e o RefreshQuadrantPresentation pinta a cor
+        // deles); o que sobra com a cor do fundo e paisagem, nao selecionavel.
+        PaintCampaignBackgrounds();
         for (int i = 0; i < quadrants.Count; i++)
         {
             QuadranteData q = quadrants[i].Quadrante;
@@ -821,6 +850,7 @@ public class CampaignSelectionController : MonoBehaviour
         int constructionPreviews = BuildConstructionPreviews();
         BuildMapDetails(out int decorationCount, out int roadSegmentCount);
         int unitCount = BuildUnitPreviews();
+        BuildLockMarkers();
         RefreshQuadrantPresentation();
         worldTilemap.CompressBounds();
         FrameWorldInCamera();
@@ -982,6 +1012,9 @@ public class CampaignSelectionController : MonoBehaviour
                 ConstrucaoAssada baked = q.bakedConstrucoes[c];
                 if (baked == null || string.IsNullOrWhiteSpace(baked.constructionId))
                     continue;
+                // Oculta na autoria (bandeira de spawn): nao e paisagem.
+                if (baked.oculta)
+                    continue;
 
                 if (baked.localX < 0 || baked.localX >= q.width ||
                     baked.localY < 0 || baked.localY >= q.height)
@@ -1070,6 +1103,126 @@ public class CampaignSelectionController : MonoBehaviour
         return built;
     }
 
+    // ---------------------------------------------------------------------
+    // DESTRAVE. 'destravadoPor' (QuadranteData) lista quadranteIds que precisam
+    // estar CONCLUIDOS — conquistados por um humano — antes deste abrir. O dado ja
+    // existia no Map Helper; faltava o jogo le-lo.
+    // ---------------------------------------------------------------------
+    private bool IsQuadrantUnlocked(QuadrantEntry entry, out string faltando)
+    {
+        faltando = string.Empty;
+        if (entry == null || entry.Quadrante == null || entry.Quadrante.destravadoPor == null)
+            return true;
+
+        var pendentes = new List<string>();
+        foreach (string requisito in entry.Quadrante.destravadoPor)
+        {
+            if (string.IsNullOrWhiteSpace(requisito))
+                continue;
+            QuadrantEntry alvo = FindQuadrantEntryById(requisito.Trim(), entry.Campanha);
+            if (alvo == null)
+                continue; // requisito que nao existe neste mundo nao tranca ninguem
+            if (!IsConqueredByHuman(alvo))
+                pendentes.Add(alvo.Quadrante.displayName);
+        }
+
+        // MAPA FINAL DA CAMPANHA (exigeIrmaos): todos os outros quadrantes da mesma
+        // campanha precisam estar concluidos.
+        if (entry.Quadrante.exigeIrmaos)
+        {
+            for (int i = 0; i < quadrants.Count; i++)
+            {
+                QuadrantEntry irmao = quadrants[i];
+                if (irmao == null || irmao == entry || irmao.Campanha != entry.Campanha)
+                    continue;
+                if (!IsConqueredByHuman(irmao) && !pendentes.Contains(irmao.Quadrante.displayName))
+                    pendentes.Add(irmao.Quadrante.displayName);
+            }
+        }
+
+        faltando = string.Join(", ", pendentes);
+        return pendentes.Count == 0;
+    }
+
+    // Mesma campanha primeiro (ids costumam se repetir entre campanhas); depois o mundo todo.
+    private QuadrantEntry FindQuadrantEntryById(string quadranteId, CampanhaData preferida)
+    {
+        QuadrantEntry fallback = null;
+        for (int i = 0; i < quadrants.Count; i++)
+        {
+            QuadrantEntry e = quadrants[i];
+            if (e?.Quadrante == null || !string.Equals(e.Quadrante.quadranteId, quadranteId, StringComparison.OrdinalIgnoreCase))
+                continue;
+            if (e.Campanha == preferida)
+                return e;
+            fallback ??= e;
+        }
+        return fallback;
+    }
+
+    private bool IsConqueredByHuman(QuadrantEntry e)
+    {
+        if (mundo == null || e == null)
+            return false;
+        if (!CampaignProgressStore.TryGetOwner(mundo.mundoId, e.Campanha.campanhaId, e.Quadrante.quadranteId, out PlayerSlotId owner))
+            return false;
+        return matchController == null || !matchController.IsPlayerAI(owner);
+    }
+
+    private void PaintCampaignBackgrounds()
+    {
+        if (mundo?.blocos == null)
+            return;
+
+        foreach (BlocoData bloco in mundo.blocos)
+        {
+            if (bloco?.campanhas == null)
+                continue;
+            foreach (CampanhaData campanha in bloco.campanhas)
+            {
+                if (campanha == null || !campanha.HasFundo)
+                    continue;
+                for (int y = 0; y < campanha.height; y++)
+                {
+                    for (int x = 0; x < campanha.width; x++)
+                    {
+                        TileBase tile = campanha.GetFundoTile(x, y);
+                        if (tile == null)
+                            continue;
+                        Vector3Int cell = new Vector3Int(campanha.originX + x, campanha.originY + y, 0);
+                        worldTilemap.SetTile(cell, tile);
+                        worldTilemap.SetTileFlags(cell, TileFlags.None);
+                        worldTilemap.SetColor(cell, fundoTint);
+                    }
+                }
+            }
+        }
+    }
+
+    private void BuildLockMarkers()
+    {
+        if (cadeadoSprite == null || worldTilemap == null || constructionPreviewRoot == null)
+            return;
+
+        for (int i = 0; i < quadrants.Count; i++)
+        {
+            QuadrantEntry e = quadrants[i];
+            if (e?.Quadrante == null || IsQuadrantUnlocked(e, out _))
+                continue;
+
+            QuadranteData q = e.Quadrante;
+            Vector3Int center = new Vector3Int(q.originX + q.width / 2, q.originY + q.height / 2, 0);
+            var marker = new GameObject($"cadeado {q.quadranteId}");
+            marker.transform.SetParent(constructionPreviewRoot, worldPositionStays: false);
+            marker.transform.position = worldTilemap.GetCellCenterWorld(center);
+            marker.transform.localScale = Vector3.one * Mathf.Max(0.05f, cadeadoEscala);
+            SpriteRenderer renderer = marker.AddComponent<SpriteRenderer>();
+            renderer.sprite = cadeadoSprite;
+            renderer.sortingLayerName = "Construcao";
+            renderer.sortingOrder = 20;
+        }
+    }
+
     private int BuildUnitPreviews()
     {
         if (unitPreviewRoot != null)
@@ -1088,6 +1241,8 @@ public class CampaignSelectionController : MonoBehaviour
             foreach (UnidadeAssada baked in q.bakedUnidades)
             {
                 if (baked == null) continue;
+                // Embarcada: esta dentro do transporte, nao no hex.
+                if (baked.transportadorIndice >= 0) continue;
                 if (baked.localX < 0 || baked.localX >= q.width ||
                     baked.localY < 0 || baked.localY >= q.height) continue;
                 Vector3Int cell = new Vector3Int(q.originX + baked.localX, q.originY + baked.localY, 0);
@@ -1631,6 +1786,8 @@ public class CampaignSelectionController : MonoBehaviour
         string bake = q.HasBake ? string.Empty : PanelMessage.Helper("helper.campaign.no_bake_badge");
         if (q.emDesenvolvimento)
             bake += PanelMessage.Helper("helper.campaign.development_badge");
+        if (!IsQuadrantUnlocked(hovered, out string faltandoHover))
+            bake += "\n<color=#FFB347>" + PanelHelperController.ResolveHelperMessage("helper.campaign.locked_badge", "TRANCADO — conclua: ") + faltandoHover + "</color>";
         string result = PanelMessage.Helper("helper.campaign.no_result");
         if (mundo != null && CampaignProgressStore.TryGetResult(
             mundo.mundoId, hovered.Campanha.campanhaId, q.quadranteId,
