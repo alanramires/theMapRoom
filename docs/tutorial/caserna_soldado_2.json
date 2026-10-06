@@ -1,6 +1,7 @@
 {
     "id": "Caserna - Soldado 2",
     "description": "Extração: escoltar o suprimento até o Chinook, reabastecer, embarcar e sair antes dos Apaches.",
+    "victoryText": "Rodas fora do chão e ilha pra trás. Bem-vindos de volta, recrutas.",
     "objectives": [
         {
             "id": "SUPPLY_UNIT",
@@ -10,17 +11,21 @@
             "startHidden": true,
             "isOptional": false,
             "isDefeatCondition": false,
-            "defeatText": ""
+            "defeatText": "",
+            "isInternal": false,
+            "activeUntilKey": ""
         },
         {
             "id": "HAS_EMBARKED_UNIT",
             "key": "ex_02",
-            "parameters": "CH",
-            "description": "Embarque a tropa no Chinook",
+            "parameters": "CH && SD",
+            "description": "Embarque toda a tropa no Chinook",
             "startHidden": true,
             "isOptional": false,
             "isDefeatCondition": false,
-            "defeatText": ""
+            "defeatText": "",
+            "isInternal": false,
+            "activeUntilKey": ""
         },
         {
             "id": "UNIT_AT_HEX",
@@ -30,7 +35,9 @@
             "startHidden": true,
             "isOptional": false,
             "isDefeatCondition": false,
-            "defeatText": ""
+            "defeatText": "",
+            "isInternal": false,
+            "activeUntilKey": ""
         },
         {
             "id": "UNIT_DEAD",
@@ -40,7 +47,9 @@
             "startHidden": true,
             "isOptional": false,
             "isDefeatCondition": true,
-            "defeatText": "Derrubaram o Chinook... poxa, soldado, perdemos nossa carona pra casa."
+            "defeatText": "Derrubaram o Chinook... poxa, soldado, perdemos nossa carona pra casa.",
+            "isInternal": false,
+            "activeUntilKey": ""
         },
         {
             "id": "PLAYER_ELIMINATED",
@@ -50,7 +59,21 @@
             "startHidden": true,
             "isOptional": false,
             "isDefeatCondition": true,
-            "defeatText": ""
+            "defeatText": "Mais uma derrota para Auridia. Melhor sorte na próxima.",
+            "isInternal": false,
+            "activeUntilKey": ""
+        },
+        {
+            "id": "UNIT_DEAD",
+            "key": "ex_06",
+            "parameters": "ST",
+            "description": "Não perca o caminhão antes de reabastecer",
+            "startHidden": true,
+            "isOptional": false,
+            "isInternal": false,
+            "isDefeatCondition": true,
+            "defeatText": "Perdemos o caminhão... sem combustível, o Chinook não sai mais do chão.",
+            "activeUntilKey": "ex_01"
         }
     ],
     "script": [
@@ -83,21 +106,33 @@
             "turn": "NoEffect",
             "movement": "NoEffect",
             "interactionType": "Auto",
-            "objectiveKey": "",
-            "revealObjective": false,
+            "objectiveKey": "ex_06",
+            "revealObjective": true,
             "text": "O combustível está aqui, no caminhão. E entre ele e o Chinook tem soldado da Metalion. [enfase]O caminhão não atira[/enfase]: quem protege ele são vocês.",
             "voicePath": "",
             "spawnCommand": "",
             "statCommand": "pan ST; cursor ST"
         },
         {
-            "advance": "ObjectiveCompleted",
+            "advance": "EnemyTurnStarted",
             "turn": "Unlocked",
             "movement": "Unlocked",
             "interactionType": "Auto",
             "objectiveKey": "ex_01",
             "revealObjective": true,
             "text": "[ordem]Escolte o caminhão até o Chinook e reabasteça.[/ordem] Sem o caminhão, o Chinook não sai mais do chão.",
+            "voicePath": "",
+            "spawnCommand": "",
+            "statCommand": ""
+        },
+        {
+            "advance": "ObjectiveCompleted",
+            "turn": "NoEffect",
+            "movement": "NoEffect",
+            "interactionType": "Auto",
+            "objectiveKey": "ex_01",
+            "revealObjective": false,
+            "text": "",
             "voicePath": "",
             "spawnCommand": "",
             "statCommand": ""
@@ -115,27 +150,15 @@
             "statCommand": "pan CH"
         },
         {
-            "advance": "Immediate",
-            "turn": "NoEffect",
-            "movement": "NoEffect",
-            "interactionType": "Auto",
-            "objectiveKey": "",
-            "revealObjective": false,
-            "text": "Rotor ligado e... [vermelho]Apaches no radar![/vermelho] A Metalion mandou caça atrás de vocês.",
-            "voicePath": "",
-            "spawnCommand": "slot1 AP @Apache; slot1 AP @Apache",
-            "statCommand": "pan Apache#1"
-        },
-        {
             "advance": "ObjectiveCompleted",
             "turn": "NoEffect",
             "movement": "NoEffect",
             "interactionType": "Auto",
             "objectiveKey": "ex_03",
             "revealObjective": true,
-            "text": "A zona de extração é ao norte. [ordem]Leve o Chinook até uma das marcas e caia fora.[/ordem]",
+            "text": "Rotor ligado e... [vermelho]Apaches no radar![/vermelho] A Metalion mandou caça atrás de vocês. A zona de extração é ao norte. [ordem]Leve o Chinook até uma das marcas e caia fora.[/ordem]",
             "voicePath": "",
-            "spawnCommand": "",
+            "spawnCommand": "slot1 AP @Apache; slot1 AP @Apache",
             "statCommand": "show exit#1; show exit#2; show exit#3; victory exit#1 on; victory exit#2 on; victory exit#3 on; pan exit#2"
         }
     ]

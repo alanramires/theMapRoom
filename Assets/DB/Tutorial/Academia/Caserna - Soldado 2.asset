@@ -20,22 +20,26 @@ MonoBehaviour:
     parameters: CH
     description: "Escolte o caminh\xE3o e reabaste\xE7a o Chinook"
     startHidden: 1
-    isVisible: 0
+    isVisible: 1
     isCompleted: 0
     isOptional: 0
+    isInternal: 0
     isDefeatCondition: 0
     defeatText: 
+    activeUntilKey: 
     hasFailed: 0
   - id: HAS_EMBARKED_UNIT
     key: ex_02
-    parameters: CH
-    description: Embarque a tropa no Chinook
+    parameters: CH && SD
+    description: Embarque toda a tropa no Chinook
     startHidden: 1
     isVisible: 0
     isCompleted: 0
     isOptional: 0
+    isInternal: 0
     isDefeatCondition: 0
     defeatText: 
+    activeUntilKey: 
     hasFailed: 0
   - id: UNIT_AT_HEX
     key: ex_03
@@ -45,31 +49,51 @@ MonoBehaviour:
     isVisible: 0
     isCompleted: 0
     isOptional: 0
+    isInternal: 0
     isDefeatCondition: 0
     defeatText: 
+    activeUntilKey: 
     hasFailed: 0
   - id: UNIT_DEAD
     key: ex_04
     parameters: CH
     description: "N\xE3o perca o Chinook"
     startHidden: 1
-    isVisible: 0
-    isCompleted: 0
+    isVisible: 1
+    isCompleted: 1
     isOptional: 0
+    isInternal: 0
     isDefeatCondition: 1
     defeatText: Derrubaram o Chinook... poxa, soldado, perdemos nossa carona pra
       casa.
+    activeUntilKey: 
     hasFailed: 0
   - id: PLAYER_ELIMINATED
     key: ex_05
     parameters: 
     description: "N\xE3o perca todas as unidades"
     startHidden: 1
-    isVisible: 0
-    isCompleted: 0
+    isVisible: 1
+    isCompleted: 1
     isOptional: 0
+    isInternal: 0
     isDefeatCondition: 1
-    defeatText: 
+    defeatText: "Mais uma derrota para Auridia. Melhor sorte na pr\xF3xima."
+    activeUntilKey: 
+    hasFailed: 0
+  - id: UNIT_DEAD
+    key: ex_06
+    parameters: ST
+    description: "N\xE3o perca o caminh\xE3o antes de reabastecer"
+    startHidden: 1
+    isVisible: 1
+    isCompleted: 1
+    isOptional: 0
+    isInternal: 0
+    isDefeatCondition: 1
+    defeatText: "Perdemos o caminh\xE3o... sem combust\xEDvel, o Chinook n\xE3o sai
+      mais do ch\xE3o."
+    activeUntilKey: ex_01
     hasFailed: 0
   script:
   - advance: 0
@@ -110,8 +134,8 @@ MonoBehaviour:
     revealObjectiveKey: 
     revealObjectiveIndex: -1
   - advance: 0
-    objectiveKey: 
-    revealObjective: 0
+    objectiveKey: ex_06
+    revealObjective: 1
     waitObjectiveKey: 
     waitObjectiveIndex: -1
     waitAllUnitsActed: 0
@@ -128,7 +152,7 @@ MonoBehaviour:
     unlockMovement: 0
     revealObjectiveKey: 
     revealObjectiveIndex: -1
-  - advance: 1
+  - advance: 4
     objectiveKey: ex_01
     revealObjective: 1
     waitObjectiveKey: 
@@ -142,6 +166,23 @@ MonoBehaviour:
     statCommand: 
     turn: 2
     movement: 3
+    interactionType: 0
+    unlockMovement: 0
+    revealObjectiveKey: 
+    revealObjectiveIndex: -1
+  - advance: 1
+    objectiveKey: ex_01
+    revealObjective: 0
+    waitObjectiveKey: 
+    waitObjectiveIndex: -1
+    waitAllUnitsActed: 0
+    waitPlayerTurnStart: 0
+    text: 
+    voice: {fileID: 0}
+    spawnCommand: 
+    statCommand: 
+    turn: 0
+    movement: 0
     interactionType: 0
     unlockMovement: 0
     revealObjectiveKey: 
@@ -163,24 +204,6 @@ MonoBehaviour:
     unlockMovement: 0
     revealObjectiveKey: 
     revealObjectiveIndex: -1
-  - advance: 0
-    objectiveKey: 
-    revealObjective: 0
-    waitObjectiveKey: 
-    waitObjectiveIndex: -1
-    waitAllUnitsActed: 0
-    waitPlayerTurnStart: 0
-    text: "Rotor ligado e... [vermelho]Apaches no radar![/vermelho] A Metalion mandou
-      ca\xE7a atr\xE1s de voc\xEAs."
-    voice: {fileID: 0}
-    spawnCommand: slot1 AP @Apache; slot1 AP @Apache
-    statCommand: pan Apache#1
-    turn: 0
-    movement: 0
-    interactionType: 0
-    unlockMovement: 0
-    revealObjectiveKey: 
-    revealObjectiveIndex: -1
   - advance: 1
     objectiveKey: ex_03
     revealObjective: 1
@@ -188,10 +211,11 @@ MonoBehaviour:
     waitObjectiveIndex: -1
     waitAllUnitsActed: 0
     waitPlayerTurnStart: 0
-    text: "A zona de extra\xE7\xE3o \xE9 ao norte. [ordem]Leve o Chinook at\xE9 uma
-      das marcas e caia fora.[/ordem]"
+    text: "Rotor ligado e... [vermelho]Apaches no radar![/vermelho] A Metalion mandou
+      ca\xE7a atr\xE1s de voc\xEAs. A zona de extra\xE7\xE3o \xE9 ao norte. [ordem]Leve
+      o Chinook at\xE9 uma das marcas e caia fora.[/ordem]"
     voice: {fileID: 0}
-    spawnCommand: 
+    spawnCommand: slot1 AP @Apache; slot1 AP @Apache
     statCommand: show exit#1; show exit#2; show exit#3; victory exit#1 on; victory
       exit#2 on; victory exit#3 on; pan exit#2
     turn: 0
@@ -226,13 +250,14 @@ MonoBehaviour:
     text: 
     voice: {fileID: 0}
   alwaysActedUnits: 
-  inimigo: 0
-  forcarRegras: 0
-  regras: 2
+  inimigo: 1
+  forcarRegras: 1
+  regras: 3
   forcarDificuldade: 1
   dificuldade: 0
-  blockCommandService: 0
-  blockRemoveUnit: 0
-  blockSurrender: 0
-  blockStatusSummary: 0
+  blockCommandService: 1
+  blockRemoveUnit: 1
+  blockSurrender: 1
+  blockStatusSummary: 1
   victoryDialog: {fileID: 0}
+  victoryText: "Rodas fora do ch\xE3o e ilha pra tr\xE1s. Bem-vindos de volta, recrutas."

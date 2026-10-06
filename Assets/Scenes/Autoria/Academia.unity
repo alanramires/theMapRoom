@@ -4618,7 +4618,7 @@ SpriteRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 1963848180}
+  - {fileID: 2093361997}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -18091,7 +18091,7 @@ SpriteRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 1963848180}
+  - {fileID: 2093361997}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -19949,7 +19949,7 @@ MonoBehaviour:
   eixoOverrides: []
   constructionId: flag
   instanceId: 2
-  currentPosition: {x: -2.5979295, y: 3, z: 0}
+  currentPosition: {x: -2.5979297, y: 3, z: 0}
   constructionDisplayName: Flag#1
   lastAutoConstructionDisplayName: Flag
   isVisible: 0
@@ -22953,7 +22953,7 @@ SpriteRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 1963848180}
+  - {fileID: 2093361997}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -27523,7 +27523,7 @@ SpriteRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 1963848180}
+  - {fileID: 2093361997}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -28663,7 +28663,7 @@ MonoBehaviour:
   flagMergedWithUnit: 
   currentAmmo: 3
   maxAmmo: 3
-  currentFuel: 6
+  currentFuel: 5
   maxFuel: 60
   remainingMovementPoints: 6
   usedRoadBoostOnLastMove: 0
@@ -32684,7 +32684,7 @@ MonoBehaviour:
   eixoOverrides: []
   constructionId: fabricaL
   instanceId: 1
-  currentPosition: {x: -2.5979295, y: -1.5, z: 0}
+  currentPosition: {x: -2.5979297, y: -1.5, z: 0}
   constructionDisplayName: Porto Ferro
   lastAutoConstructionDisplayName: "F\xE1brica Leve"
   isVisible: 1
@@ -34242,7 +34242,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: 6/60
+  m_text: 5/60
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 3cb5543ccd204d54c9c34b6008539c4d, type: 2}
   m_sharedMaterial: {fileID: -7834541552760396438, guid: 3cb5543ccd204d54c9c34b6008539c4d, type: 2}
@@ -36958,7 +36958,7 @@ MonoBehaviour:
   m_PreserveAspect: 0
   m_FillCenter: 1
   m_FillMethod: 0
-  m_FillAmount: 0.1
+  m_FillAmount: 0.083333336
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
@@ -49321,42 +49321,6 @@ Canvas:
   m_SortingLayerID: -1721051581
   m_SortingOrder: 500
   m_TargetDisplay: 0
---- !u!21 &1963848180
-Material:
-  serializedVersion: 8
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: Runtime_UnitActedGlow
-  m_Shader: {fileID: 4800000, guid: 1601771c0533c1946bb776c9688f0186, type: 3}
-  m_Parent: {fileID: 0}
-  m_ModifiedSerializedProperties: 0
-  m_ValidKeywords: []
-  m_InvalidKeywords: []
-  m_LightmapFlags: 4
-  m_EnableInstancingVariants: 0
-  m_DoubleSidedGI: 0
-  m_CustomRenderQueue: -1
-  stringTagMap: {}
-  disabledShaderPasses: []
-  m_LockedProperties: 
-  m_SavedProperties:
-    serializedVersion: 3
-    m_TexEnvs:
-    - _MainTex:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    m_Ints: []
-    m_Floats:
-    - _GlowSize: 1.5
-    - _GlowStrength: 1.25
-    m_Colors:
-    - _Color: {r: 1, g: 1, b: 1, a: 1}
-    - _GlowColor: {r: 1, g: 1, b: 1, a: 1}
-  m_BuildTextureStacks: []
-  m_AllowLocking: 1
 --- !u!224 &1967136497 stripped
 RectTransform:
   m_CorrespondingSourceObject: {fileID: 7267817996577112625, guid: 41718aa68dd0b8d44bbba1b60b8a9c2b, type: 3}
@@ -51830,6 +51794,42 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2090131638}
   m_CullTransparentMesh: 1
+--- !u!21 &2093361997
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: Runtime_UnitActedGlow
+  m_Shader: {fileID: 4800000, guid: 1601771c0533c1946bb776c9688f0186, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _MainTex:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _GlowSize: 1.5
+    - _GlowStrength: 1.25
+    m_Colors:
+    - _Color: {r: 1, g: 1, b: 1, a: 1}
+    - _GlowColor: {r: 1, g: 1, b: 1, a: 1}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1
 --- !u!1 &2099713635
 GameObject:
   m_ObjectHideFlags: 0

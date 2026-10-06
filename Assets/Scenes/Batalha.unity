@@ -12789,6 +12789,8 @@ MonoBehaviour:
   mundo: {fileID: 11400000, guid: 3c4f3be48f318fb4fb30ae0166700a28, type: 2}
   campanhaId: A_IA
   quadranteId: A_IA_Q1
+  mundosConhecidos:
+  - {fileID: 11400000, guid: 5401ad1240f096b4cab210a757057edf, type: 2}
   targetTilemap: {fileID: 1566606925}
   paintOrigin: {x: 0, y: 0}
   campaignSceneName: Campanha

@@ -157,54 +157,43 @@ MonoBehaviour:
         - {fileID: 11400000, guid: 474aa6f1deb7f064fbbe2a7ff46a4dfe, type: 2}
         - {fileID: 11400000, guid: 474aa6f1deb7f064fbbe2a7ff46a4dfe, type: 2}
         bakedConstrucoes:
-        - constructionId: fabricaL
+        - constructionId: flag
           localX: 4
-          localY: 4
-          teamId: -1
-          slotIndex: -1
+          localY: 3
+          teamId: 0
+          slotIndex: 0
           sector: 0
           isAnchorSector: 0
           isRallyPoint: 0
           rallyOwnerSlots: 
           initialCapturePoints: -1
-          nomeAutorado: Porto Ferro
-          oculta: 0
+          nomeAutorado: LZ
+          oculta: 1
           siteRuntime:
             isPlayerHeadQuarter: 0
             isVictoryBuilding: 0
-            isCapturable: 1
-            capturePointsMax: 30
-            capturedIncoming: 1500
-            sellingRule: 1
+            isCapturable: 0
+            capturePointsMax: 0
+            capturedIncoming: 0
+            sellingRule: 3
             legacyCanProduceAndSellUnits: 
-            offeredUnits:
-            - {fileID: 11400000, guid: 4a3afdea0950dfc46a48dd7a659563ee, type: 2}
-            - {fileID: 11400000, guid: b28c15593869dae419f9b58292ef4845, type: 2}
-            - {fileID: 11400000, guid: c0e59b3e4bf2e4c49a67906805e43801, type: 2}
-            - {fileID: 11400000, guid: a5d9d72a15e061a4cbaf125b2b6b9d48, type: 2}
-            - {fileID: 11400000, guid: 70b7ea3ddea78fc4e9d744cee13b053a, type: 2}
-            - {fileID: 11400000, guid: 3dc9b119819519440820c81f5db4fdce, type: 2}
-            - {fileID: 11400000, guid: 70b98199c49882e44892f7ca76df6b33, type: 2}
-            - {fileID: 11400000, guid: 8c89f5278e312ad46af401333934721b, type: 2}
-            - {fileID: 11400000, guid: 99b30df53878c69499853a4ef3cb5f81, type: 2}
-            - {fileID: 11400000, guid: 5e69516e1944ffc43bae1a7cd3c7c69c, type: 2}
+            offeredUnits: []
             canProvideSupplies: 1
             offeredSupplies:
-            - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+            - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
               quantity: 20
               peakQuantity: 20
-            - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
-              quantity: 10
-              peakQuantity: 10
+            - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+              quantity: 50
+              peakQuantity: 50
             - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
-              quantity: 40
-              peakQuantity: 40
+              quantity: 12
+              peakQuantity: 12
             offeredServices:
             - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
             - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
             - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
-            - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
-          displayName: Porto Ferro
+          displayName: LZ
         - constructionId: flag
           localX: 8
           localY: 3
@@ -279,43 +268,54 @@ MonoBehaviour:
             - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
             - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
           displayName: Flag#1
-        - constructionId: flag
+        - constructionId: fabricaL
           localX: 4
-          localY: 3
-          teamId: 0
-          slotIndex: 0
+          localY: 4
+          teamId: -1
+          slotIndex: -1
           sector: 0
           isAnchorSector: 0
           isRallyPoint: 0
           rallyOwnerSlots: 
           initialCapturePoints: -1
-          nomeAutorado: LZ
-          oculta: 1
+          nomeAutorado: Porto Ferro
+          oculta: 0
           siteRuntime:
             isPlayerHeadQuarter: 0
             isVictoryBuilding: 0
-            isCapturable: 0
-            capturePointsMax: 0
-            capturedIncoming: 0
-            sellingRule: 3
+            isCapturable: 1
+            capturePointsMax: 30
+            capturedIncoming: 1500
+            sellingRule: 1
             legacyCanProduceAndSellUnits: 
-            offeredUnits: []
+            offeredUnits:
+            - {fileID: 11400000, guid: 4a3afdea0950dfc46a48dd7a659563ee, type: 2}
+            - {fileID: 11400000, guid: b28c15593869dae419f9b58292ef4845, type: 2}
+            - {fileID: 11400000, guid: c0e59b3e4bf2e4c49a67906805e43801, type: 2}
+            - {fileID: 11400000, guid: a5d9d72a15e061a4cbaf125b2b6b9d48, type: 2}
+            - {fileID: 11400000, guid: 70b7ea3ddea78fc4e9d744cee13b053a, type: 2}
+            - {fileID: 11400000, guid: 3dc9b119819519440820c81f5db4fdce, type: 2}
+            - {fileID: 11400000, guid: 70b98199c49882e44892f7ca76df6b33, type: 2}
+            - {fileID: 11400000, guid: 8c89f5278e312ad46af401333934721b, type: 2}
+            - {fileID: 11400000, guid: 99b30df53878c69499853a4ef3cb5f81, type: 2}
+            - {fileID: 11400000, guid: 5e69516e1944ffc43bae1a7cd3c7c69c, type: 2}
             canProvideSupplies: 1
             offeredSupplies:
-            - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+            - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
               quantity: 20
               peakQuantity: 20
-            - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
-              quantity: 50
-              peakQuantity: 50
+            - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+              quantity: 10
+              peakQuantity: 10
             - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
-              quantity: 12
-              peakQuantity: 12
+              quantity: 40
+              peakQuantity: 40
             offeredServices:
             - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
             - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
             - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
-          displayName: LZ
+            - {fileID: 11400000, guid: 024a7fea036173a459bb63726cf5ed06, type: 2}
+          displayName: Porto Ferro
         bakedCamadas:
         - tilemapName: quebraMar
           transformacoes:
@@ -357,7 +357,7 @@ MonoBehaviour:
           hp: -1
           combustivel: -1
         bakedFromScene: Academia
-        bakedAtUtcTicks: 639269085803206900
+        bakedAtUtcTicks: 639269157280531656
       - quadranteId: SD_A2
         displayName: 'Soldado: Aula 2'
         descricao: "Reabaste\xE7a o helic\xF3ptero, embarque e fuja da ilha"
@@ -601,6 +601,43 @@ MonoBehaviour:
         - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
         bakedConstrucoes:
         - constructionId: flag
+          localX: 14
+          localY: 0
+          teamId: 1
+          slotIndex: 1
+          sector: 0
+          isAnchorSector: 0
+          isRallyPoint: 0
+          rallyOwnerSlots: 
+          initialCapturePoints: -1
+          nomeAutorado: Apache#2
+          oculta: 1
+          siteRuntime:
+            isPlayerHeadQuarter: 0
+            isVictoryBuilding: 0
+            isCapturable: 0
+            capturePointsMax: 0
+            capturedIncoming: 0
+            sellingRule: 3
+            legacyCanProduceAndSellUnits: 
+            offeredUnits: []
+            canProvideSupplies: 1
+            offeredSupplies:
+            - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+              quantity: 20
+              peakQuantity: 20
+            - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+              quantity: 50
+              peakQuantity: 50
+            - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+              quantity: 12
+              peakQuantity: 12
+            offeredServices:
+            - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+            - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+            - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+          displayName: Apache#2
+        - constructionId: flag
           localX: 7
           localY: 14
           teamId: 0
@@ -637,43 +674,6 @@ MonoBehaviour:
             - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
             - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
           displayName: exit#1
-        - constructionId: flag
-          localX: 9
-          localY: 14
-          teamId: 0
-          slotIndex: 0
-          sector: 0
-          isAnchorSector: 0
-          isRallyPoint: 0
-          rallyOwnerSlots: 
-          initialCapturePoints: -1
-          nomeAutorado: exit#3
-          oculta: 1
-          siteRuntime:
-            isPlayerHeadQuarter: 0
-            isVictoryBuilding: 0
-            isCapturable: 0
-            capturePointsMax: 0
-            capturedIncoming: 0
-            sellingRule: 3
-            legacyCanProduceAndSellUnits: 
-            offeredUnits: []
-            canProvideSupplies: 1
-            offeredSupplies:
-            - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
-              quantity: 20
-              peakQuantity: 20
-            - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
-              quantity: 50
-              peakQuantity: 50
-            - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
-              quantity: 12
-              peakQuantity: 12
-            offeredServices:
-            - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
-            - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
-            - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
-          displayName: exit#3
         - constructionId: flag
           localX: 13
           localY: 0
@@ -712,43 +712,6 @@ MonoBehaviour:
             - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
           displayName: Apache#1
         - constructionId: flag
-          localX: 14
-          localY: 0
-          teamId: 1
-          slotIndex: 1
-          sector: 0
-          isAnchorSector: 0
-          isRallyPoint: 0
-          rallyOwnerSlots: 
-          initialCapturePoints: -1
-          nomeAutorado: Apache#2
-          oculta: 1
-          siteRuntime:
-            isPlayerHeadQuarter: 0
-            isVictoryBuilding: 0
-            isCapturable: 0
-            capturePointsMax: 0
-            capturedIncoming: 0
-            sellingRule: 3
-            legacyCanProduceAndSellUnits: 
-            offeredUnits: []
-            canProvideSupplies: 1
-            offeredSupplies:
-            - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
-              quantity: 20
-              peakQuantity: 20
-            - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
-              quantity: 50
-              peakQuantity: 50
-            - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
-              quantity: 12
-              peakQuantity: 12
-            offeredServices:
-            - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
-            - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
-            - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
-          displayName: Apache#2
-        - constructionId: flag
           localX: 8
           localY: 14
           teamId: 0
@@ -785,6 +748,43 @@ MonoBehaviour:
             - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
             - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
           displayName: exit#2
+        - constructionId: flag
+          localX: 9
+          localY: 14
+          teamId: 0
+          slotIndex: 0
+          sector: 0
+          isAnchorSector: 0
+          isRallyPoint: 0
+          rallyOwnerSlots: 
+          initialCapturePoints: -1
+          nomeAutorado: exit#3
+          oculta: 1
+          siteRuntime:
+            isPlayerHeadQuarter: 0
+            isVictoryBuilding: 0
+            isCapturable: 0
+            capturePointsMax: 0
+            capturedIncoming: 0
+            sellingRule: 3
+            legacyCanProduceAndSellUnits: 
+            offeredUnits: []
+            canProvideSupplies: 1
+            offeredSupplies:
+            - supply: {fileID: 11400000, guid: 6201ff6e4835d544a99fdcdd873f7d12, type: 2}
+              quantity: 20
+              peakQuantity: 20
+            - supply: {fileID: 11400000, guid: 52e1545c1bdddb54db48ae20748a3137, type: 2}
+              quantity: 50
+              peakQuantity: 50
+            - supply: {fileID: 11400000, guid: 912f53a4f6558e74299b4465a2136db9, type: 2}
+              quantity: 12
+              peakQuantity: 12
+            offeredServices:
+            - {fileID: 11400000, guid: 87157caff9f42f443a998413a63a2bea, type: 2}
+            - {fileID: 11400000, guid: 7ad3bea4661b76f488b676f9b2b067bd, type: 2}
+            - {fileID: 11400000, guid: 5fab5c2f11daa1c4482a982d1d26abcf, type: 2}
+          displayName: exit#3
         bakedCamadas:
         - tilemapName: quebraMar
           transformacoes:
@@ -796,10 +796,10 @@ MonoBehaviour:
         bakedRotas: []
         bakedUnidades:
         - unitId: Soldado
-          localX: 11
-          localY: 3
-          teamId: 1
-          slotIndex: 1
+          localX: 13
+          localY: 7
+          teamId: 0
+          slotIndex: 0
           displayName: Soldado
           transportadorIndice: -1
           transportadorSlot: -1
@@ -816,8 +816,8 @@ MonoBehaviour:
           hp: -1
           combustivel: -1
         - unitId: Soldado
-          localX: 12
-          localY: 2
+          localX: 11
+          localY: 3
           teamId: 1
           slotIndex: 1
           displayName: Soldado
@@ -844,19 +844,19 @@ MonoBehaviour:
           transportadorIndice: -1
           transportadorSlot: -1
           hp: -1
-          combustivel: 6
+          combustivel: 5
         - unitId: Soldado
-          localX: 13
-          localY: 7
-          teamId: 0
-          slotIndex: 0
+          localX: 12
+          localY: 2
+          teamId: 1
+          slotIndex: 1
           displayName: Soldado
           transportadorIndice: -1
           transportadorSlot: -1
           hp: -1
           combustivel: -1
         bakedFromScene: Academia
-        bakedAtUtcTicks: 639269085805343723
+        bakedAtUtcTicks: 639269157283008442
       bakedFundo:
       - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}
       - {fileID: 11400000, guid: bf709de7ebea50f4dba5a624c09e57eb, type: 2}

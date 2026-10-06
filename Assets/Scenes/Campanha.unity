@@ -10367,10 +10367,15 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CampaignSelectionController
   mundo: {fileID: 11400000, guid: 3c4f3be48f318fb4fb30ae0166700a28, type: 2}
+  mundosConhecidos:
+  - {fileID: 11400000, guid: 5401ad1240f096b4cab210a757057edf, type: 2}
   constructionDatabase: {fileID: 11400000, guid: a3b9ad47181534c4e92a0205460608a5, type: 2}
   structureDatabase: {fileID: 11400000, guid: db7a20bdbd574bd408e02a940b66e687, type: 2}
   unitDatabase: {fileID: 11400000, guid: e8814965e8c2b764c881f833b39e19f1, type: 2}
   battleSceneName: Batalha
+  fundoTint: {r: 0.42, g: 0.45, b: 0.5, a: 1}
+  cadeadoSprite: {fileID: 0}
+  cadeadoEscala: 1
   worldTilemap: {fileID: 0}
   cursorController: {fileID: 0}
   matchController: {fileID: 0}
