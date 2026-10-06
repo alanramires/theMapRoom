@@ -208,6 +208,11 @@ public class QuadranteController : MonoBehaviour
         built = false;
         recordsCampaignResult = false;
 
+        // O MUNDO VEM DO MENU, como o endereco. Sem isto uma aula da Academia chegava
+        // aqui procurando a campanha "soldado" dentro do mundo serializado na cena.
+        if (PartidaConfig.MundoAtivo != null)
+            mundo = PartidaConfig.MundoAtivo;
+
         // O ENDERECO VEM DE FORA QUANDO ALGUEM O MANDOU.
         //
         // A cena Campanha publica (campanhaId, quadranteId) no PartidaConfig antes

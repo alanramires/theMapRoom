@@ -99,6 +99,9 @@ public class CampaignSelectionController : MonoBehaviour
 
     private void Awake()
     {
+        // O mundo escolhido no menu (Tutorial = Academia) vence o serializado na cena.
+        if (PartidaConfig.MundoAtivo != null)
+            mundo = PartidaConfig.MundoAtivo;
         campanhaManager = GetComponent<CampanhaManager>();
         if (campanhaManager == null)
             foreach (CampanhaManager manager in FindObjectsByType<CampanhaManager>(FindObjectsSortMode.None))

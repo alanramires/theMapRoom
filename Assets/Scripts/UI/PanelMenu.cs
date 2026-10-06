@@ -35,6 +35,11 @@ public class PanelMenu : MonoBehaviour
     [SerializeField] private GameObject panelTutorialRoot;
     [SerializeField] private GameObject panelConfigRoot;
 
+    [Header("Mundos")]
+    [Tooltip("Mundo das aulas (Academia). Com ele ligado, o botao Tutorial abre o assistente " +
+             "(cor do aluno, cor do inimigo) e leva a Campanha com este mundo. Vazio = painel de tutoriais antigo.")]
+    [SerializeField] private MundoData mundoAcademia;
+
     [Header("Compass Cursor")]
     [SerializeField] private RectTransform compassCursor;
     [SerializeField] private float compassOffsetX = -80f;
@@ -61,6 +66,9 @@ public class PanelMenu : MonoBehaviour
     private bool newGameWizardOpen;
     private bool startingNewGame;
     private bool newGameHotSeat;
+    // Assistente aberto pelo botao Tutorial: cor do aluno -> cor do inimigo ->
+    // confirmar. Sem dificuldade (e da licao) e sem regras (a licao impoe).
+    private bool newGameAcademia;
     private int newGameWizardStep;
     private int newGameWizardFocusIndex;
     private TeamId newGameHumanTeam = TeamId.Green;
@@ -128,10 +136,10 @@ public class PanelMenu : MonoBehaviour
 
     public string GetNewGameWizardConfirmationSummary()
     {
-        string targetMap = newGameHotSeat ? "Hot Seat 1 - Pvp" : "Campanha";
+        string targetMap = newGameHotSeat ? "Hot Seat 1 - Pvp" : newGameAcademia ? "Academia" : "Campanha";
         string humanColor = ColorUtility.ToHtmlStringRGB(TeamUtils.GetColor(newGameHumanTeam));
         string aiColor = ColorUtility.ToHtmlStringRGB(TeamUtils.GetColor(newGameAiTeam));
-        return PanelMessage.Helper("helper.new_game.confirmation", ("map", targetMap), ("setup", ResolvePresetLabel(newGamePreset)), ("difficulty", newGameHotSeat ? string.Empty : PanelMessage.Helper("helper.new_game.difficulty_line", ("difficulty", ResolveCampaignDifficultyLabel(newGameDifficulty)))), ("human_color", humanColor), ("human", ResolveTeamLabel(newGameHumanTeam)), ("opponent_color", aiColor), ("opponent", ResolveTeamLabel(newGameAiTeam)), ("ai", newGameHotSeat ? string.Empty : PanelMessage.Helper("helper.new_game.ai_suffix")), ("rules", NewGamePanelController.BuildDescricao(newGamePreset)));
+        return PanelMessage.Helper("helper.new_game.confirmation", ("map", targetMap), ("setup", ResolvePresetLabel(newGamePreset)), ("difficulty", newGameHotSeat || newGameAcademia ? string.Empty : PanelMessage.Helper("helper.new_game.difficulty_line", ("difficulty", ResolveCampaignDifficultyLabel(newGameDifficulty)))), ("human_color", humanColor), ("human", ResolveTeamLabel(newGameHumanTeam)), ("opponent_color", aiColor), ("opponent", ResolveTeamLabel(newGameAiTeam)), ("ai", newGameHotSeat ? string.Empty : PanelMessage.Helper("helper.new_game.ai_suffix")), ("rules", NewGamePanelController.BuildDescricao(newGamePreset)));
     }
 
     // Passo 4 = CONFIRMAR PARTIDA. Exposto para o PanelHelper montar os detalhes de confirmacao
@@ -215,7 +223,7 @@ public class PanelMenu : MonoBehaviour
         {
             List<TeamId> opponents = BuildAvailableOpponentTeams();
             if (index >= opponents.Count) { newGameWizardStep = 0; }
-            else { newGameAiTeam = opponents[index]; newGameWizardStep = newGameHotSeat ? 3 : 2; }
+            else { newGameAiTeam = opponents[index]; newGameWizardStep = newGameHotSeat ? 3 : newGameAcademia ? 4 : 2; }
         }
         else if (newGameWizardStep == 2)
         {
@@ -254,7 +262,7 @@ public class PanelMenu : MonoBehaviour
         else
         {
             if (newGameWizardStep == 4)
-                newGameWizardStep = newGameHotSeat ? 3 : 2;
+                newGameWizardStep = newGameHotSeat ? 3 : newGameAcademia ? 1 : 2;
             else
                 newGameWizardStep = newGameHotSeat && newGameWizardStep == 3 ? 1 : newGameWizardStep - 1;
             newGameWizardFocusIndex = 0;
@@ -890,6 +898,7 @@ public class PanelMenu : MonoBehaviour
         PlayConfirmSfxOncePerFrame();
 
         newGameHotSeat = false;
+        newGameAcademia = false;
         newGameWizardOpen = true;
         newGameWizardStep = 0;
         newGameWizardFocusIndex = 0;
@@ -907,6 +916,7 @@ public class PanelMenu : MonoBehaviour
 
         PlayConfirmSfxOncePerFrame();
         newGameHotSeat = true;
+        newGameAcademia = false;
         newGameWizardOpen = true;
         newGameWizardStep = 0;
         newGameWizardFocusIndex = 0;
@@ -985,6 +995,8 @@ public class PanelMenu : MonoBehaviour
         bool[] flipX = { IsTeamFlipped(newGameHumanTeam), IsTeamFlipped(newGameAiTeam) };
         bool[] cmdAuto = { false, !newGameHotSeat };
         SaveGameManager.SetupForNewGame(string.Empty);
+        // Qual mundo a Campanha abre: Academia pelo Tutorial; null = o da cena.
+        PartidaConfig.SetMundo(newGameAcademia ? mundoAcademia : null);
         PartidaConfig.Set(2, teams, isAI, flipX, newGamePreset, cmdAuto, target);
         PartidaConfig.SetDifficulty(newGameDifficulty);
         newGameWizardOpen = false;
@@ -1046,6 +1058,24 @@ public class PanelMenu : MonoBehaviour
             SyncCurrentIndexWithButton(buttonTutorial);
 
         PlayConfirmSfxOncePerFrame();
+
+        // ACADEMIA: o mesmo assistente do "Campanha vs AI", pulando dificuldade e
+        // regras (as duas sao da licao), e abrindo a Campanha com o mundo da Academia.
+        if (mundoAcademia != null)
+        {
+            newGameHotSeat = false;
+            newGameAcademia = true;
+            newGameWizardOpen = true;
+            newGameWizardStep = 0;
+            newGameWizardFocusIndex = 0;
+            newGameHumanTeam = TeamId.Green;
+            newGameAiTeam = TeamId.Red;
+            newGameDifficulty = AIDifficulty.Facil;
+            newGamePreset = MatchController.GameSetupPreset.AMontanhaAvacalha;
+            RefreshNewGameWizardHelper();
+            return;
+        }
+
         if (stateController != null)
         {
             stateController.RequestState(MainMenuState.Tutorial);

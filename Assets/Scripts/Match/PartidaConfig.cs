@@ -22,6 +22,13 @@ public static class PartidaConfig
 
     public static void SetDifficulty(AIDifficulty difficulty) => pendingDifficulty = difficulty;
 
+    // QUAL MUNDO a Campanha mostra e em qual a Batalha procura o quadrante. NAO e
+    // consumido nem limpo pelo Clear(): precisa sobreviver as idas e voltas
+    // Campanha -> Batalha -> Campanha. Quem decide e o botao do menu (Campanha vs AI
+    // poe null = o mundo serializado na cena; Tutorial poe a Academia).
+    public static MundoData MundoAtivo { get; private set; }
+    public static void SetMundo(MundoData mundo) => MundoAtivo = mundo;
+
     public static bool TryConsumeDifficulty(out AIDifficulty difficulty)
     {
         if (pendingDifficulty.HasValue)
