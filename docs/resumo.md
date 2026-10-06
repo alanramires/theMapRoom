@@ -1,15 +1,23 @@
 ﻿# Resumo — onde estamos e o que vem
 
-Ponto de retomada. Atualizado em 2026-10-05, **depois** da tag `v9.3.0`.
+Ponto de retomada. Atualizado em 2026-10-06, **depois** da tag `v9.3.1`.
 Leia isto primeiro.
 
 ---
 
 ## Estado
 
-`v9.3.0` tagueada e publicada. **O primeiro MVP estável está no ar** (v9.2.0),
+`v9.3.1` tagueada e publicada. **O primeiro MVP estável está no ar** (v9.2.0),
 no Unity Play, e **o primeiro estranho já zerou uma fase**. Relatório do dia:
-[`relatorio_v9.3.0.md`](relatorio_v9.3.0.md).
+[`relatorio_v9.3.1.md`](relatorio_v9.3.1.md).
+
+**A descoberta da v9.3.1: tutorial se testa tentando quebrar.** O autor jogou a
+aula 1 da Caserna de ponta a ponta e cada atalho de aluno virou trava ou regra:
+desembarcar um soldado só (impasse), capturar antes da hora, voar sem fazer
+nada. Duas regras saíram: **bloqueio de roteiro é do aluno** (a IA levou bronca do
+Sargento e ficou presa) e **a fala 0 roda depois do turno 1** (o início do turno
+apagava o `acted CH`). A aula 1 fecha com fala final e volta automática à
+Campanha; a aula 2 ainda não foi jogada.
 
 **A descoberta da v9.3.0: a aula já era dado; só o palco era cena.** O
 `TutorialData` carregava falas, tarefas, comandos e travas, e a cena só servia de
@@ -53,6 +61,7 @@ v9.2.0   aguenta o celular de quem testa  toque, áudio/texturas web, sem LTO
 v9.2.1   a IA pergunta antes de decidir   contrato do questionário; reparo pela linha
 v9.2.2   o primeiro estranho jogou         Configurações, Ação Direta, névoa com uma memória
 v9.3.0   a aula vira um quadrante          Academia, regras de fim da aula, captura/spawn no roteiro
+v9.3.1   a primeira aula fecha             travas só do aluno, atalhos fechados, fala final, volta automática
 ```
 
 **A descoberta da v9.2.0:** o Simulator da Unity não reproduz o navegador do
@@ -221,17 +230,19 @@ Sem HQ, os dois lados do Q3 e do Q4 entram no modo rebelde (v8.6.1, Frente 4).
 
 ## Onde eu parei
 
-### O que a v9.3.0 deixou — a primeira aula em Play
+### O que a v9.3.1 deixou — aula 1 jogada, aula 2 não
 
-1. **Preencher a Operação Cabeça de Ponte** em `DB/Tutorial/Academia/Caserna -
-   Soldado 1` a partir de `docs/tutorial/aulas_caserna.md`. Na autoria: fábrica
-   `Porto Ferro` com **setor**, bandeiras `flag#1`/`flag#2` não capturáveis e
-   ocultas, Chinook com 2 soldados embarcados; depois o **bake**.
-2. **Jogar pelo botão Tutorial** e conferir: o Chinook nasce **no ar**? (o bake não
-   guarda camada); os soldados nascem embarcados? (o Console avisa se não); a IA
-   rebelde vai até a fábrica? (depende do setor); a vitória volta para a Campanha
-   com "aula concluída"?
-3. **Abertos conhecidos:**
+O roteiro é o JSON em `docs/tutorial/` (fonte de verdade); **todo ajuste exige
+Importar no asset** — o jogo lê o asset, não o JSON.
+
+1. **Rejogar a aula 1** depois das últimas mudanças (nenhuma foi vista em Play):
+   contador de captura decrescente, `op_01` como gatilho interno, fala de vitória
+   com o painel esperando 3,5 s, barra de 6 s voltando à Campanha.
+2. **Jogar a aula 2** (`caserna_soldado_2.json`) com a mesma bateria de atalhos da
+   aula 1: o que o aluno faz sem querer que trava o roteiro?
+3. O rebelde que nasce **fora da tela** é intencional. Se ele atirar sem nunca ter
+   entrado no enquadramento, pôr um `pan` no turno inimigo.
+4. **Abertos conhecidos:**
    - o save no meio da aula não guarda o passo do roteiro;
    - um save da Academia carregado pelo menu abre no Fixture;
    - o aluno é sempre o slot 0;
@@ -536,6 +547,10 @@ parte de uma regra só, e a construção usa a mesma reta que a unidade.
 
 | armadilha | regra |
 |---|---|
+| **trava de roteiro valendo para a IA** | o "passar a vez" travado por uma fala muda pegou a IA, que passa a vez pelo mesmo caminho do humano: bronca do Sargento na IA e turno preso. Toda trava de aula pergunta `IsActiveTeamAI` |
+| **fala de abertura antes do turno 1** | `acted CH` na fala 0 era apagado pelo `ResetForTeamTurnStart`, que roda frames depois numa coroutine. Estado inicial de aula espera `MatchController.MatchStartApplied` |
+| **painel que monta botão no `OnEnable`** | o `Panel_vitoria` pergunta `PodeVoltarParaCampanha` ao ligar; quem arma a volta é o `OnMatchConcluded`. Aviso **antes** do painel, senão o botão nasce escondido |
+| **objetivo novo que já existia** | escrevi `UNIT_OUT_OF_FUEL`; o `UNIT_DEAD` já aceitava `TOKEN \|\| AUT=X`. Antes de criar objetivo/comando, ler a lista de ids no `TutorialManager` e a [`sintaxe.md`](tutorial/sintaxe.md) |
 | **"só roda na cena de tutorial"** | componentes nascidos para cenas próprias (`TutorialManager`, automata) assumiam que estar presentes = estar numa aula. Na Batalha eles vivem em **toda** partida: o automata dirigiria o turno da IA. Ao mover um componente para uma cena compartilhada, procurar o que ele faz **sem** o dado que o justificava |
 | **regra normal de fim numa partida especial** | eliminação, QG e estrelas rodavam nas aulas: a facção que só nasce no meio da lição era eliminada no turno 2. Partida especial declara o seu grupo de regras de fim (`UsesMatchEndRules`) |
 | **mundo fixo em mais de uma cena** | o mundo estava serializado na Campanha **e** no `QuadranteController` da Batalha. Trocar de mundo só numa delas manda a Batalha procurar a campanha no mundo errado. O mundo viaja no contrato (`PartidaConfig.MundoAtivo`) |
@@ -621,6 +636,7 @@ parte de uma regra só, e a construção usa a mesma reta que a unidade.
 | [`Planos/plano_campanha.md`](Planos/plano_campanha.md) | **o tronco** — autoria, recorte, progresso, cenas, bloqueios, teste |
 | [`Planos/briefing_cena_campanha.md`](Planos/briefing_cena_campanha.md) | o contrato entre as duas frentes |
 | [`AI Behavior/contrato_questionario.md`](AI%20Behavior/contrato_questionario.md) | **o questionário** — casas, duas etapas, o Capturador, as ordens, as missões, os abertos |
+| [`relatorio_v9.3.1.md`](relatorio_v9.3.1.md) | a primeira aula fecha — travas só do aluno, atalhos fechados, fala final, volta automática |
 | [`relatorio_v9.3.0.md`](relatorio_v9.3.0.md) | a aula vira um quadrante — Academia, regras de fim da aula, tarefas de captura, bake embarcado |
 | [`tutorial/sintaxe.md`](tutorial/sintaxe.md) | **como escrever uma aula** — comandos, tarefas, parâmetros, convenções |
 | [`relatorio_v9.2.2.md`](relatorio_v9.2.2.md) | o primeiro estranho jogou — Configurações, Ação Direta, a névoa com uma memória só |
