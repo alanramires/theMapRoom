@@ -84,6 +84,7 @@ Cada tarefa tem:
 | `isInternal` | **gatilho do roteiro**: é checada normalmente (depois de revelada), mas não aparece na lista, não entra no "x/y completos" e não apita. Ex.: "começou a capturar", só para disparar o spawn do inimigo. ⚠️ Não confundir com `isVisible`: esse é estado de runtime, e tarefa invisível **não é checada** |
 | `isDefeatCondition` | **inverte**: o evento acontecer é **derrota** |
 | `defeatText` | só em derrota: a **fala final do Sargento** (o balão fica com ela, com o retrato de bronca) e o texto do painel DERROTA, que espera ~3,5 s para ela ser lida. Vazio = usa a `description` |
+| `activeUntilKey` | só em derrota: ela **deixa de valer** quando a tarefa com esta key completa. Ex.: `UNIT_DEAD ST` com `activeUntilKey = ex_01` — perder o caminhão só é derrota até o Chinook ser reabastecido. Vazio = vale a aula toda |
 
 **Vitória** = todas as tarefas não opcionais e não de derrota completas.
 **Derrota** = qualquer tarefa `isDefeatCondition` acontecer.
@@ -112,7 +113,7 @@ com várias do mesmo tipo, os tipos sem parâmetro (como `ATTACK_UNIT`) completa
 | `DESTROY_ENEMY_UNIT` | uma unidade de **outro slot que não o da vez** é destruída | — |
 | `UNIT_DEAD` / `DEAD_UNIT` | morre uma unidade que casa com o token | `TOKEN` ou `TOKEN \|\| TOKEN2` |
 | `UNIT_DEAD` com autonomia | a unidade fica com combustível `<= X` (checado ao mover e no início do turno) | `TOKEN \|\| AUT=X` |
-| `HAS_EMBARKED_UNIT` | alguém embarca num transporte que casa com o token | token do **transporte** (ex.: `APC`) |
+| `HAS_EMBARKED_UNIT` | `APC`: **alguém** embarca no transporte. `CH && SD`: **todo** `SD` vivo do aluno está a bordo do `CH` (dois soldados = os dois; se um morreu, basta o outro). A lista mostra `(1/2)` | token do **transporte**, ou `TRANSPORTE && PASSAGEIRO` |
 | `SUPPLY_UNIT` | um suprimento é feito | vazio = qualquer; token do **supridor ou do alvo** |
 | `USED_ROAD_BOOST` | uma unidade do slot 0 terminou a ação e o último movimento usou estrada | vazio = qualquer; token |
 | `CAPTURE_CONSTRUCTION` | o jogador (slot 0) **termina** uma captura: o prédio muda de dono | vazio = qualquer; `Bandeira`, `60,32`, `Bandeira \|\| 60,32` ou `SD && Bandeira` |
@@ -343,8 +344,11 @@ Fora de aula ele não age.
   não joga e o automata move e passa a vez; unidade inimiga sem `AutomataData` fica
   parada. Com **IA de verdade**, o automata fica de fora e a IA joga com o perfil do
   contrato. Nos dois casos o aluno fica travado no turno inimigo.
-- **Não salve no meio da aula.** O save não guarda em que fala o roteiro estava;
-  carregar recomeça o roteiro e repete os spawns.
+- **Salvar no meio da aula funciona.** O save guarda a fala em que o roteiro
+  estava, o que já rodou (spawn e comando não se repetem), o estado das tarefas,
+  as travas de passar a vez, movimento e captura, e o contador de desembarque.
+  Save de outra aula, ou sem aula, recomeça o roteiro. Mudar o roteiro de uma aula
+  invalida os saves dela no meio: o índice da fala salva passa a apontar outra fala.
 - A vitória da aula registra o quadrante na Campanha com o motivo "aula concluída"
   e volta para o mapa. A derrota volta sem registrar.
 - `TutorialRules` tem uma regra presa ao id `tutorial 1 - soldado` (restaura o HP

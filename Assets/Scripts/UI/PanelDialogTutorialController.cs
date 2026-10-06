@@ -51,6 +51,8 @@ public class PanelDialogTutorialController : MonoBehaviour
     private int currentIndex = -1;
     private int furthestShownIndex = -1;
     private bool scriptFinished;
+    // O roteiro ja foi posto no lugar por um load: a abertura normal (fala 0) nao roda.
+    private bool startedByRestore;
 
     private void Awake()
     {
@@ -124,14 +126,114 @@ public class PanelDialogTutorialController : MonoBehaviour
     // jogavel nunca levantam a flag: o teto de tempo cobre os dois.
     private IEnumerator BeginScriptAfterMatchStart()
     {
-        float limite = Time.unscaledTime + 5f;
-        while (matchController != null &&
+        // Cena aberta para carregar save: quem poe o roteiro no lugar e o load
+        // (RestoreFromSave), que pode levar alguns segundos. O teto so evita que um
+        // load que falhou deixe a aula muda para sempre.
+        bool carregando = SaveGameManager.HasPendingMainMenuLoadRequest;
+        float limite = Time.unscaledTime + (carregando ? 30f : 5f);
+        while (!startedByRestore &&
+               matchController != null &&
                !matchController.MatchStartApplied &&
-               !SaveGameManager.HasPendingMainMenuLoadRequest &&
                Time.unscaledTime < limite)
             yield return null;
 
+        if (startedByRestore)
+            yield break;
         TryAdvanceToNext();
+    }
+
+    public static void CaptureForSave(TutorialSaveData data)
+    {
+        PanelDialogTutorialController p = activeInstance;
+        if (p == null || data == null)
+            return;
+        // Salva a FRONTEIRA, nao a fala do historico que o jogador estiver relendo.
+        data.currentIndex = p.furthestShownIndex;
+        data.furthestShownIndex = p.furthestShownIndex;
+        data.scriptFinished = p.scriptFinished;
+        data.completedObjectiveIndices = new List<int>(p.completedObjectiveIndices);
+        data.executedSpawnEntries = new List<int>(p.executedSpawnEntries);
+        data.executedStatEntries = new List<int>(p.executedStatEntries);
+        data.playerTurnStartCount = p.playerTurnStartCount;
+        data.turnStartCountAtFrontierShow = p.turnStartCountAtFrontierShow;
+        data.enemyTurnStartCount = p.enemyTurnStartCount;
+        data.enemyTurnCountAtFrontierShow = p.enemyTurnCountAtFrontierShow;
+    }
+
+    // data null = recomeca da fala 0. Senao volta para a fronteira salva sem
+    // repetir spawn/comando (os conjuntos de "ja executado" vem do save antes).
+    public static void RestoreFromSave(TutorialSaveData data)
+    {
+        PanelDialogTutorialController p = activeInstance;
+        if (p == null)
+            return;
+        p.ResolveReferences();
+        TutorialData tutorial = p.matchController != null ? p.matchController.ActiveTutorial : null;
+        if (tutorial == null || tutorial.script == null || tutorial.script.Count <= 0)
+            return;
+
+        if (p.scoldRoutine != null)
+        {
+            p.StopCoroutine(p.scoldRoutine);
+            p.scoldRoutine = null;
+        }
+        p.ApplyScoldPortrait(false);
+        p.startedByRestore = true;
+        p.script = tutorial.script;
+        p.completedObjectiveIndices.Clear();
+        p.executedSpawnEntries.Clear();
+        p.executedStatEntries.Clear();
+        p.aimOpenedAtFrontier = false;
+
+        if (data == null)
+        {
+            p.currentIndex = -1;
+            p.furthestShownIndex = -1;
+            p.scriptFinished = false;
+            p.playerTurnStartCount = 0;
+            p.turnStartCountAtFrontierShow = 0;
+            p.enemyTurnStartCount = 0;
+            p.enemyTurnCountAtFrontierShow = 0;
+            p.TryAdvanceToNext();
+            return;
+        }
+
+        if (data.completedObjectiveIndices != null)
+            p.completedObjectiveIndices.UnionWith(data.completedObjectiveIndices);
+        if (data.executedSpawnEntries != null)
+            p.executedSpawnEntries.UnionWith(data.executedSpawnEntries);
+        if (data.executedStatEntries != null)
+            p.executedStatEntries.UnionWith(data.executedStatEntries);
+        p.playerTurnStartCount = data.playerTurnStartCount;
+        p.enemyTurnStartCount = data.enemyTurnStartCount;
+        p.scriptFinished = data.scriptFinished;
+
+        int index = Mathf.Clamp(data.furthestShownIndex, -1, p.script.Count - 1);
+        if (p.scriptFinished || index < 0)
+        {
+            p.currentIndex = index;
+            p.furthestShownIndex = index;
+            p.SetPanelVisible(false);
+            if (!p.scriptFinished && index < 0)
+                p.TryAdvanceToNext();
+            return;
+        }
+
+        // ShowEntry carimba os gates de turno com a contagem atual quando a fala e a
+        // fronteira; repoe os carimbos salvos logo depois, para "espera o proximo
+        // turno" continuar esperando o MESMO turno que esperava ao salvar.
+        p.currentIndex = index;
+        p.furthestShownIndex = index;
+        p.ShowEntry(index);
+        p.turnStartCountAtFrontierShow = data.turnStartCountAtFrontierShow;
+        p.enemyTurnCountAtFrontierShow = data.enemyTurnCountAtFrontierShow;
+
+        // Tarefa que completou entre a fala aparecer e o save: o evento ja passou,
+        // entao o gate e conferido aqui uma vez.
+        TutorialDialogEntry atual = p.script[index];
+        if (atual != null && atual.advance == TutorialAdvanceCondition.ObjectiveCompleted &&
+            !p.IsAdvanceBlocked(atual))
+            p.TryAdvanceToNext();
     }
 
     private void ResolveReferences()

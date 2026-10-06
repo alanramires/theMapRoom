@@ -225,6 +225,65 @@ public class TutorialManager : MonoBehaviour
         {
             unitAtHexPollTimer = 0f;
             CheckUnitAtHexObjectives();
+            CheckEmbarkAllObjectives();
+        }
+    }
+
+    // HAS_EMBARKED_UNIT na forma "CH && SD": completa quando TODO SD vivo do aluno
+    // esta a bordo do CH (dois soldados = os dois; se um morreu, basta o outro).
+    // Poll, e nao evento: a morte de quem ficou de fora tambem pode completar.
+    // So no Neutral — no meio da animacao o embarque ainda e provisorio.
+    private static bool IsEmbarkAllForm(TutorialObjective obj)
+    {
+        return obj != null && obj.id == "HAS_EMBARKED_UNIT" &&
+               obj.parameters != null && obj.parameters.Contains("&&");
+    }
+
+    private bool TryCountEmbarkAll(TutorialObjective obj, out int aboard, out int total)
+    {
+        aboard = 0;
+        total = 0;
+        if (!IsEmbarkAllForm(obj) || matchController == null)
+            return false;
+        string[] parts = obj.parameters.Split(new[] { "&&" }, System.StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length < 2)
+            return false;
+        string transporterToken = parts[0].Trim();
+        string passengerToken = parts[1].Trim();
+
+        TeamId playerTeam = matchController.GetTeamIdForSlot(0);
+        List<UnitManager> units = UnitManager.AllActive;
+        for (int i = 0; i < units.Count; i++)
+        {
+            UnitManager unit = units[i];
+            if (unit == null || unit.IsDead || unit.TeamId != playerTeam)
+                continue;
+            if (!UnitMatchesTargetToken(unit, passengerToken))
+                continue;
+            total++;
+            if (unit.IsEmbarked && UnitMatchesTargetToken(unit.EmbarkedTransporter, transporterToken))
+                aboard++;
+        }
+        return true;
+    }
+
+    private void CheckEmbarkAllObjectives()
+    {
+        TutorialData tutorial = GetActiveTutorial();
+        if (tutorial == null || tutorial.objectives == null || matchController == null)
+            return;
+        if (turnStateManager == null)
+            turnStateManager = FindAnyObjectByType<TurnStateManager>();
+        if (turnStateManager != null && turnStateManager.CurrentCursorState != TurnStateManager.CursorState.Neutral)
+            return;
+
+        for (int i = 0; i < tutorial.objectives.Count; i++)
+        {
+            TutorialObjective obj = tutorial.objectives[i];
+            if (!IsEmbarkAllForm(obj) || !obj.isVisible || !IsObjectivePending(obj))
+                continue;
+            if (TryCountEmbarkAll(obj, out int aboard, out int total) && aboard > 0 && aboard == total)
+                MarkObjectiveComplete(obj);
         }
     }
 
@@ -464,6 +523,97 @@ public class TutorialManager : MonoBehaviour
         }
     }
 
+    // ===== Save da aula =====
+    // O tabuleiro o save ja guardava; o ROTEIRO nao. Sem isto, carregar no meio da
+    // luta recomecava da fala 0 e repetia os spawns por cima do tabuleiro salvo.
+
+    public static TutorialSaveData CaptureForSave()
+    {
+        if (activeInstance == null)
+            return null;
+        TutorialData tutorial = activeInstance.GetActiveTutorial();
+        if (tutorial == null)
+            return null;
+
+        var data = new TutorialSaveData
+        {
+            tutorialId = tutorial.id,
+            endTurnLocked = activeInstance.endTurnLockedByScript,
+            movementState = (int)activeInstance.movementState,
+        };
+        if (tutorial.objectives != null)
+        {
+            for (int i = 0; i < tutorial.objectives.Count; i++)
+            {
+                TutorialObjective obj = tutorial.objectives[i];
+                if (obj == null)
+                    continue;
+                activeInstance.disembarkProgressTotals.TryGetValue(obj, out int total);
+                data.objectives.Add(new TutorialObjectiveStateSaveData
+                {
+                    key = obj.key,
+                    index = i,
+                    isVisible = obj.isVisible,
+                    isCompleted = obj.isCompleted,
+                    hasFailed = obj.hasFailed,
+                    disembarkTotal = total,
+                });
+            }
+        }
+        PanelDialogTutorialController.CaptureForSave(data);
+        return data;
+    }
+
+    // data null (save sem aula, ou de outra aula) = recomeca do zero. Vale tanto
+    // para o load vindo do menu (cena nova) quanto para o load na mesma cena, com o
+    // roteiro ja andando.
+    public static void RestoreFromSave(TutorialSaveData data)
+    {
+        if (activeInstance == null)
+            return;
+        TutorialData tutorial = activeInstance.GetActiveTutorial();
+        if (tutorial == null)
+            return;
+
+        activeInstance.disembarkProgressTotals.Clear();
+        activeInstance.captureProgressTargets.Clear();
+        activeInstance.automataCommandInProgress = false;
+
+        if (data == null || data.tutorialId != tutorial.id)
+        {
+            activeInstance.ResetTutorialObjectives();
+            activeInstance.InitializeEndTurnLockFromScript();
+            activeInstance.endTurnLockedByScript = false;
+            PanelDialogTutorialController.RestoreFromSave(null);
+            return;
+        }
+
+        activeInstance.endTurnLockedByScript = data.endTurnLocked;
+        activeInstance.movementState = (TutorialMovementEffect)data.movementState;
+        if (tutorial.objectives != null && data.objectives != null)
+        {
+            for (int i = 0; i < data.objectives.Count; i++)
+            {
+                TutorialObjectiveStateSaveData saved = data.objectives[i];
+                if (saved == null)
+                    continue;
+                int index = !string.IsNullOrWhiteSpace(saved.key)
+                    ? tutorial.FindObjectiveIndexByKey(saved.key)
+                    : saved.index;
+                if (index < 0 || index >= tutorial.objectives.Count || tutorial.objectives[index] == null)
+                    continue;
+                TutorialObjective obj = tutorial.objectives[index];
+                obj.isVisible = saved.isVisible;
+                obj.isCompleted = saved.isCompleted;
+                obj.hasFailed = saved.hasFailed;
+                if (saved.disembarkTotal > 0)
+                    activeInstance.disembarkProgressTotals[obj] = saved.disembarkTotal;
+            }
+        }
+        PanelDialogTutorialController.RestoreFromSave(data);
+        Debug.Log($"[TutorialManager] Aula '{tutorial.id}' restaurada do save na fala {data.furthestShownIndex}.");
+    }
+
     private void ResetTutorialObjectives()
     {
         TutorialRules.ResetAllStates();
@@ -576,6 +726,7 @@ public class TutorialManager : MonoBehaviour
             isInternal = o.isInternal,
             isDefeatCondition = o.isDefeatCondition,
             defeatText = o.defeatText,
+            activeUntilKey = o.activeUntilKey,
         };
     }
 
@@ -666,8 +817,8 @@ public class TutorialManager : MonoBehaviour
 
         if (obj.isDefeatCondition)
         {
-            // Se já falhou, ignora
-            if (obj.hasFailed) return;
+            // Se já falhou, ignora. Aposentada (activeUntilKey completou) tambem.
+            if (obj.hasFailed || IsDefeatRetired(obj)) return;
 
             // FALHA: Marca como falhou e desmarca o check visual de OK
             obj.hasFailed = true;
@@ -701,6 +852,18 @@ public class TutorialManager : MonoBehaviour
         ProcessObjectiveSpawns();
     }
 
+    // Derrota com prazo: "perder o caminhao" so vale ate o Chinook ser reabastecido.
+    private bool IsDefeatRetired(TutorialObjective obj)
+    {
+        if (obj == null || string.IsNullOrWhiteSpace(obj.activeUntilKey))
+            return false;
+        TutorialData tutorial = GetActiveTutorial();
+        if (tutorial == null)
+            return false;
+        int index = tutorial.FindObjectiveIndexByKey(obj.activeUntilKey);
+        return index >= 0 && tutorial.objectives[index] != null && tutorial.objectives[index].isCompleted;
+    }
+
     private bool IsObjectivePending(TutorialObjective obj)
     {
         if (obj == null) return false;
@@ -708,8 +871,9 @@ public class TutorialManager : MonoBehaviour
         // Se já falhou, não está mais pendente
         if (obj.hasFailed) return false;
 
-        // Se é derrota e está como "concluído" (OK), ele ainda pode falhar
-        if (obj.isDefeatCondition) return obj.isCompleted;
+        // Se é derrota e está como "concluído" (OK), ele ainda pode falhar —
+        // a menos que tenha sido aposentada (activeUntilKey completou).
+        if (obj.isDefeatCondition) return obj.isCompleted && !IsDefeatRetired(obj);
         
         // Se é comum e não está concluído, ele ainda pode ser realizado
         return !obj.isCompleted;
@@ -1842,6 +2006,9 @@ public class TutorialManager : MonoBehaviour
             return string.Empty;
         if (obj.id == "UNIT_DISEMBARKED")
             return activeInstance.BuildDisembarkProgressSuffix(obj);
+        if (IsEmbarkAllForm(obj) && !obj.isCompleted &&
+            activeInstance.TryCountEmbarkAll(obj, out int aboard, out int total) && total > 0)
+            return $" ({aboard}/{total})";
         if (obj.id == "CAPTURE_CONSTRUCTION" || obj.id == "CAPTURE_PROGRESS")
             return activeInstance.BuildCaptureProgressSuffix(obj);
         return string.Empty;
@@ -2214,7 +2381,8 @@ public class TutorialManager : MonoBehaviour
         for (int i = 0; i < tutorial.objectives.Count; i++)
         {
             TutorialObjective obj = tutorial.objectives[i];
-            if (obj.id == "HAS_EMBARKED_UNIT" && obj.isVisible && IsObjectivePending(obj))
+            if (obj.id == "HAS_EMBARKED_UNIT" && obj.isVisible && IsObjectivePending(obj) &&
+                !IsEmbarkAllForm(obj))
             {
                 if (MatchesUnitType(transporter, obj.parameters))
                 {

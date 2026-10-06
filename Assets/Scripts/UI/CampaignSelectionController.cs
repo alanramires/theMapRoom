@@ -32,6 +32,36 @@ public class CampaignSelectionController : MonoBehaviour
     [Header("Data")]
     [SerializeField] private MundoData mundo;
     public MundoData Mundo => mundo;
+
+    [Header("Mundos conhecidos")]
+    [Tooltip(
+        "Todo mundo que um save desta tela pode pedir (Fixture, Academia...). Um save "
+        + "de outro mundo troca o mundo e recarrega a cena; sem o mundo nesta lista, o "
+        + "save e recusado como incompativel.")]
+    [SerializeField] private List<MundoData> mundosConhecidos = new List<MundoData>();
+
+    /// <summary>
+    /// O save pede outro mundo que esta cena conhece? Entao o mosaico atual nao
+    /// serve: quem chamou publica o mundo no contrato e recarrega a cena.
+    /// </summary>
+    public bool TryResolveOtherWorldForSave(SaveGameData save, out MundoData outro)
+    {
+        outro = null;
+        string id = save?.campaignSelection?.mundoId;
+        if (string.IsNullOrWhiteSpace(id) || (mundo != null && mundo.mundoId == id))
+            return false;
+        if (mundosConhecidos == null)
+            return false;
+        for (int i = 0; i < mundosConhecidos.Count; i++)
+        {
+            if (mundosConhecidos[i] != null && mundosConhecidos[i].mundoId == id)
+            {
+                outro = mundosConhecidos[i];
+                return true;
+            }
+        }
+        return false;
+    }
     [SerializeField] private ConstructionDatabase constructionDatabase;
     [SerializeField] private StructureDatabase structureDatabase;
     [SerializeField] private UnitDatabase unitDatabase;

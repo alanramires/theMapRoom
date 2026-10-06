@@ -85,6 +85,13 @@ public class QuadranteController : MonoBehaviour
     [SerializeField] private string campanhaId = "fixture";
     [SerializeField] private string quadranteId = "Quadrante A";
 
+    [Header("Mundos conhecidos")]
+    [Tooltip(
+        "Todo mundo que um save pode pedir (Fixture, Academia...). O load acha o mundo "
+        + "pelo mundoId gravado no save: sem isto um save da Academia carregado pelo menu "
+        + "procurava a aula dentro do mundo serializado nesta cena e falhava.")]
+    [SerializeField] private List<MundoData> mundosConhecidos = new List<MundoData>();
+
     [Header("Destino")]
     [Tooltip("Se vazio, resolve pelo CursorController.BoardTilemap da cena.")]
     [SerializeField] private Tilemap targetTilemap;
@@ -162,11 +169,32 @@ public class QuadranteController : MonoBehaviour
         };
     }
 
+    // Mundo pelo id gravado: o da cena, o do contrato (menu) ou um dos conhecidos.
+    private MundoData ResolveMundo(string mundoId)
+    {
+        if (string.IsNullOrWhiteSpace(mundoId))
+            return null;
+        if (mundo != null && mundo.mundoId == mundoId)
+            return mundo;
+        if (PartidaConfig.MundoAtivo != null && PartidaConfig.MundoAtivo.mundoId == mundoId)
+            return PartidaConfig.MundoAtivo;
+        if (mundosConhecidos != null)
+        {
+            for (int i = 0; i < mundosConhecidos.Count; i++)
+            {
+                if (mundosConhecidos[i] != null && mundosConhecidos[i].mundoId == mundoId)
+                    return mundosConhecidos[i];
+            }
+        }
+        return null;
+    }
+
     public bool CanRestoreMap(BattleMapSaveData data)
         => TryResolveSavedMap(data, out _, out _);
 
     public bool MatchesSavedMap(BattleMapSaveData data)
-        => built && TryResolveSavedMap(data, out CampanhaData c, out QuadranteData q) &&
+        => built && data != null && data.mundoId == MundoId &&
+           TryResolveSavedMap(data, out CampanhaData c, out QuadranteData q) &&
            campanhaId == c.campanhaId && quadranteId == q.quadranteId &&
            paintOrigin.x == data.paintOriginX && paintOrigin.y == data.paintOriginY &&
            recordsCampaignResult == data.recordsCampaignResult;
@@ -175,8 +203,9 @@ public class QuadranteController : MonoBehaviour
     {
         campaign = null;
         quadrant = null;
-        if (data == null || mundo == null || data.mundoId != MundoId) return false;
-        foreach (CampanhaData c in mundo.AllCampanhas())
+        MundoData alvo = data != null ? ResolveMundo(data.mundoId) : null;
+        if (alvo == null) return false;
+        foreach (CampanhaData c in alvo.AllCampanhas())
         {
             if (c.quadrantes == null) continue;
             foreach (QuadranteData q in c.quadrantes)
@@ -239,6 +268,15 @@ public class QuadranteController : MonoBehaviour
         BattleMapSaveData savedMap = SaveGameManager.PendingBattleMap;
         if (savedMap != null)
         {
+            // O MUNDO DO SAVE manda, nao o da cena nem o ultimo do menu. E publicado no
+            // contrato para a volta a Campanha abrir o mesmo mundo.
+            MundoData mundoDoSave = ResolveMundo(savedMap.mundoId);
+            if (mundoDoSave != null)
+            {
+                mundo = mundoDoSave;
+                PartidaConfig.SetMundo(mundoDoSave);
+            }
+
             if (!TryResolveSavedMap(savedMap, out CampanhaData savedCampaign, out QuadranteData savedQuadrant))
             {
                 Debug.LogError("[Quadrante] Mundo/quadrante do save indisponivel ou sem bake.", this);

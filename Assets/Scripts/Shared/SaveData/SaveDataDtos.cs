@@ -120,6 +120,43 @@ public class SaveGameData
     // Ultimo Jornal ja apresentado por equipe. Diferente do ledger pendente:
     // serve apenas para reabrir o mesmo resumo depois de salvar/carregar.
     public List<TurnBriefingReportLineSaveData> turnBriefingReportLines = new List<TurnBriefingReportLineSaveData>();
+    // Aula em andamento: em que fala o roteiro esta, o que ja rodou, estado das
+    // tarefas e das travas. tutorialSaved separa "sem aula" de "aula": JsonUtility
+    // nao grava null em classe serializavel, devolve um objeto vazio.
+    public bool tutorialSaved;
+    public TutorialSaveData tutorial = new TutorialSaveData();
+}
+
+[Serializable]
+public class TutorialObjectiveStateSaveData
+{
+    public string key;
+    public int index;
+    public bool isVisible;
+    public bool isCompleted;
+    public bool hasFailed;
+    public int disembarkTotal;   // contador (1/2): total memorizado de passageiros
+}
+
+[Serializable]
+public class TutorialSaveData
+{
+    public string tutorialId;
+    public bool endTurnLocked;
+    public int movementState;
+    public List<TutorialObjectiveStateSaveData> objectives = new List<TutorialObjectiveStateSaveData>();
+
+    // Painel de dialogo (PanelDialogTutorialController).
+    public int currentIndex = -1;
+    public int furthestShownIndex = -1;
+    public bool scriptFinished;
+    public List<int> completedObjectiveIndices = new List<int>();
+    public List<int> executedSpawnEntries = new List<int>();
+    public List<int> executedStatEntries = new List<int>();
+    public int playerTurnStartCount;
+    public int turnStartCountAtFrontierShow;
+    public int enemyTurnStartCount;
+    public int enemyTurnCountAtFrontierShow;
 }
 
 [Serializable]
@@ -407,6 +444,7 @@ public class ConstructionSaveData
     public int firstOwnerSlotIndex = -1;
     public bool hasFirstOwner;
     public bool hasInfiniteSuppliesOverride;
+    public bool captureLockedByScript;   // trava de aula (capturable PREDIO off)
     public ConstructionSiteRuntimeSaveData siteRuntime;
 }
 

@@ -534,6 +534,7 @@ public static class SaveDataMapper
             firstOwnerSlotIndex = construction.FirstOwnerSlotIndex,
             hasFirstOwner = construction.HasFirstOwner,
             hasInfiniteSuppliesOverride = construction.HasInfiniteSuppliesOverride,
+            captureLockedByScript = construction.CaptureLockedByScript,
             siteRuntime = BuildConstructionSiteRuntimeSaveData(construction.GetSiteRuntimeSnapshot())
         };
     }
@@ -613,6 +614,7 @@ public static class SaveDataMapper
 
         manager.SetCurrentCapturePoints(currentCapturePoints);
         manager.SetInfiniteSuppliesOverride(saved.hasInfiniteSuppliesOverride);
+        manager.SetCaptureLockedByScript(saved.captureLockedByScript);
     }
 
     public static ConstructionSiteRuntimeSaveData BuildConstructionSiteRuntimeSaveData(ConstructionSiteRuntime runtime)

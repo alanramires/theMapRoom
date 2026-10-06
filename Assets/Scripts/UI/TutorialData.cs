@@ -25,6 +25,9 @@ public class TutorialObjective
     [Tooltip("So para condicao de derrota: a fala do Sargento quando ela dispara (ex.: \"Poxa, soldado, perdemos nossa carona pra casa.\"). Vazio = usa a description.")]
     public string defeatText;
 
+    [Tooltip("So para condicao de derrota: ela deixa de valer quando a tarefa com esta KEY completa (ex.: perder o caminhao so e derrota ate o Chinook ser reabastecido). Vazio = vale a aula toda.")]
+    public string activeUntilKey;
+
     public bool hasFailed = false;
 }
 
@@ -197,6 +200,7 @@ public class TutorialObjectiveDto
     public bool isInternal;    // gatilho do roteiro: checado, mas fora da lista do jogador
     public bool isDefeatCondition;
     public string defeatText;  // fala do Sargento quando a derrota dispara (vazio = description)
+    public string activeUntilKey; // derrota aposentada quando esta tarefa completar (vazio = aula toda)
 }
 
 [System.Serializable]

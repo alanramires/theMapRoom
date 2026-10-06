@@ -1383,6 +1383,15 @@ public class SaveGameManager : MonoBehaviour
 
             if (campaign != null)
             {
+                // Save de OUTRO mundo (ex.: Academia aberto na Campanha do Fixture): o
+                // mosaico desta cena e de outro mundo. Publica o mundo do save e
+                // recarrega a cena; o Awake dela pega o mundo do contrato.
+                if (campaign.TryResolveOtherWorldForSave(data, out MundoData outroMundo))
+                {
+                    PartidaConfig.SetMundo(outroMundo);
+                    BeginSceneLoadForSave(normalizedSlot, savedScene, path, data.battleMap, reloadCurrentScene: true);
+                    yield break;
+                }
                 lastLoadRoutineSucceeded = campaign.RestoreSelectionFromSave(data);
                 if (lastLoadRoutineSucceeded)
                 {
@@ -2365,6 +2374,9 @@ public class SaveGameManager : MonoBehaviour
             LogLoadPerf(loadedSlot, "after_load_events.begin", afterLoadEventsStartMs, afterLoadEventsStartMs - routineStartMs);
             CampaignProgressStore.ImportSnapshot(data.campaignProgress);
             FindAnyObjectByType<CampaignSelectionController>()?.RefreshCampaignProgressPresentation();
+            // Aula: volta para a fala em que estava, sem repetir spawn nem comando.
+            // Save sem aula (ou de outra aula) recomeca o roteiro do zero.
+            TutorialManager.RestoreFromSave(data.tutorialSaved ? data.tutorial : null);
             OnAfterLoadSuccess?.Invoke();
             LogLoadPerf(loadedSlot, "after_load_events.end", afterLoadEventsStartMs, PerfNowMs() - routineStartMs);
             lastLoadRoutineSucceeded = true;
@@ -2553,6 +2565,10 @@ public class SaveGameManager : MonoBehaviour
         // if (aiPlayerController != null)
         //     data.aiPlannerState = aiPlayerController.BuildPlannerSaveData();
 
+        TutorialSaveData tutorialState = TutorialManager.CaptureForSave();
+        data.tutorialSaved = tutorialState != null;
+        if (tutorialState != null)
+            data.tutorial = tutorialState;
         return data;
     }
 

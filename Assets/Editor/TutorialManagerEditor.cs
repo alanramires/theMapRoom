@@ -136,6 +136,7 @@ public class TutorialManagerEditor : Editor
                     isInternal = o.isInternal,
                     isDefeatCondition = o.isDefeatCondition,
                     defeatText = o.defeatText,
+                    activeUntilKey = o.activeUntilKey,
                     // Estado de runtime reinicializado — o asset de design nao carrega progresso.
                     isVisible = !o.startHidden,
                     isCompleted = false,
