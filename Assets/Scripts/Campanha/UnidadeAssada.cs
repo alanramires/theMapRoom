@@ -39,6 +39,14 @@ public class UnidadeAssada
     [Tooltip("So pra log e Inspector; o spawner nao usa.")]
     public string displayName;
 
+    [Tooltip(
+        "Embarcada na autoria: indice, NESTA MESMA LISTA, do transporte em que ela nasce "
+        + "(sempre antes dela). -1 = nasce no chao, na propria celula.")]
+    public int transportadorIndice = -1;
+
+    [Tooltip("Compartimento de carga do transporte em que ela estava. So vale embarcada.")]
+    public int transportadorSlot = -1;
+
     public Vector3Int LocalCell => new Vector3Int(localX, localY, 0);
 
     public override string ToString()

@@ -1987,11 +1987,24 @@ public class MapHelperWindow : EditorWindow
         int maxY = q.originY + Mathf.Max(1, q.height) - 1;
         int semDono = 0;
 
+        // Indice de cada unidade ja assada: e por ele que o embarcado acha o seu
+        // transporte. Transporte entra ANTES do passageiro, para nascer antes.
+        var indicePorUnidade = new Dictionary<UnitManager, int>();
+        var embarcadas = new List<UnitManager>();
+
         for (int i = 0; i < all.Length; i++)
         {
             UnitManager u = all[i];
             if (u == null || u.gameObject.scene != active)
                 continue;
+
+            // EMBARCADA vai na segunda passada, presa ao transporte. Assada pela
+            // celula, nasceria solta no hex do transporte — um soldado no mar.
+            if (u.IsEmbarked && u.EmbarkedTransporter != null)
+            {
+                embarcadas.Add(u);
+                continue;
+            }
 
             Vector3Int cell = u.CurrentCellPosition;
             cell.z = 0;
@@ -2002,6 +2015,7 @@ public class MapHelperWindow : EditorWindow
             if (u.SlotIndex < 0)
                 semDono++;
 
+            indicePorUnidade[u] = q.bakedUnidades.Count;
             q.bakedUnidades.Add(new UnidadeAssada
             {
                 unitId = u.UnitId,
@@ -2011,6 +2025,46 @@ public class MapHelperWindow : EditorWindow
                 slotIndex = u.SlotIndex,
                 displayName = u.UnitId
             });
+        }
+
+        // Passageiros. Repete enquanto houver progresso: transporte dentro de
+        // transporte so resolve depois que o de fora entrou na lista.
+        bool progrediu = true;
+        while (embarcadas.Count > 0 && progrediu)
+        {
+            progrediu = false;
+            for (int i = embarcadas.Count - 1; i >= 0; i--)
+            {
+                UnitManager u = embarcadas[i];
+                if (!indicePorUnidade.TryGetValue(u.EmbarkedTransporter, out int transportador))
+                    continue;
+
+                UnidadeAssada t = q.bakedUnidades[transportador];
+                if (u.SlotIndex < 0)
+                    semDono++;
+
+                indicePorUnidade[u] = q.bakedUnidades.Count;
+                q.bakedUnidades.Add(new UnidadeAssada
+                {
+                    unitId = u.UnitId,
+                    localX = t.localX,
+                    localY = t.localY,
+                    teamId = u.TeamId,
+                    slotIndex = u.SlotIndex,
+                    displayName = u.UnitId,
+                    transportadorIndice = transportador,
+                    transportadorSlot = u.EmbarkedTransporterSlotIndex
+                });
+                embarcadas.RemoveAt(i);
+                progrediu = true;
+            }
+        }
+
+        if (embarcadas.Count > 0)
+        {
+            Debug.LogWarning(
+                $"[Map Helper] '{q.quadranteId}': {embarcadas.Count} unidade(s) embarcada(s) em "
+                + "transporte FORA do quadrante (ou que nao foi assado). Nao foram assadas.");
         }
 
         if (semDono > 0)

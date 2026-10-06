@@ -1273,6 +1273,9 @@ public class QuadranteController : MonoBehaviour
 
         MatchController match = FindAnyObjectByType<MatchController>();
         int spawned = 0;
+        // Quem nasceu em cada indice da lista: o passageiro acha o seu transporte
+        // por aqui (o bake garante transporte antes do passageiro).
+        var nascidas = new UnitManager[quadrante.bakedUnidades.Count];
 
         for (int i = 0; i < quadrante.bakedUnidades.Count; i++)
         {
@@ -1313,6 +1316,23 @@ public class QuadranteController : MonoBehaviour
             }
 
             spawned++;
+            nascidas[i] = go.GetComponent<UnitManager>();
+
+            // EMBARCADA NA AUTORIA: entra no transporte pelo mesmo caminho que o
+            // load usa para restaurar passageiros.
+            if (u.transportadorIndice >= 0 && nascidas[i] != null)
+            {
+                UnitManager transporte = u.transportadorIndice < i ? nascidas[u.transportadorIndice] : null;
+                string motivo = "transporte nao nasceu";
+                if (transporte == null ||
+                    !transporte.TryEmbarkPassengerInSlot(nascidas[i], Mathf.Max(0, u.transportadorSlot), out motivo))
+                {
+                    Debug.LogWarning(
+                        $"[Quadrante] '{u}' deveria nascer embarcada (transporte #{u.transportadorIndice}) "
+                        + $"e nao embarcou: {motivo}.",
+                        this);
+                }
+            }
         }
 
         return spawned;
