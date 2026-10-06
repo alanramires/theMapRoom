@@ -39,6 +39,17 @@ public class QuadranteData : INoDoMapa
         "mas o JOGAR recusa — o autor ainda esta montando. Autoral, sobrevive ao bake.")]
     public bool emDesenvolvimento;
 
+    [Header("Aula — autoral, sobrevive ao bake")]
+    [Tooltip(
+        "Roteiro de tutorial desta missao. Vazio = partida normal.\n\n"
+        + "O quadrante e o mapa e o TutorialData e a aula; o par e a missao da "
+        + "Academia. As coordenadas do roteiro (spawn, move, pan, cursor, UNIT_AT_HEX...) "
+        + "sao as do MUNDO DE AUTORIA, as que aparecem na cena: a Batalha converte. "
+        + "Expandir, encolher ou mover o canto do retangulo NAO quebra o roteiro (o "
+        + "hex do mundo continua o mesmo), desde que os hexes que ele usa fiquem "
+        + "dentro. Quebra: levar o DESENHO da aula para outro lugar do mundo.")]
+    public TutorialData tutorial;
+
     [Header("Destrave")]
     public List<string> destravadoPor = new List<string>();
     [Tooltip("Mapa final da campanha: so abre com os outros quadrantes dela concluidos. Ainda sem efeito em jogo (portao de destrave nao construido).")]

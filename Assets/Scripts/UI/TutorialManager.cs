@@ -341,11 +341,10 @@ public class TutorialManager : MonoBehaviour
         worldCenter = Vector3.zero;
         hexSpacing = 1f;
 
-        string[] xy = coords.Split(',');
-        if (xy.Length < 2)
+        if (!TryParseScriptCell(coords, out Vector3Int scriptCell))
             return false;
-        if (!int.TryParse(xy[0].Trim(), out int x) || !int.TryParse(xy[1].Trim(), out int y))
-            return false;
+        int x = scriptCell.x;
+        int y = scriptCell.y;
 
         Tilemap tilemap = null;
         List<UnitManager> units = UnitManager.AllActive;
@@ -484,6 +483,7 @@ public class TutorialManager : MonoBehaviour
         TurnStateManager.OnUnitEmbarked += HandleUnitEmbarked;
         TurnStateManager.OnUnitDisembarked += HandleUnitDisembarked;
         TurnStateManager.OnUnitSupplied += HandleUnitSupplied;
+        TurnStateManager.OnCaptureResolved += HandleCaptureResolved;
         MatchController.OnBeforeAdvanceTurn += HandleTurnEnded;
         MatchController.OnActiveTeamChanged += HandleActiveTeamChanged;
     }
@@ -502,6 +502,7 @@ public class TutorialManager : MonoBehaviour
         TurnStateManager.OnUnitEmbarked -= HandleUnitEmbarked;
         TurnStateManager.OnUnitDisembarked -= HandleUnitDisembarked;
         TurnStateManager.OnUnitSupplied -= HandleUnitSupplied;
+        TurnStateManager.OnCaptureResolved -= HandleCaptureResolved;
         MatchController.OnBeforeAdvanceTurn -= HandleTurnEnded;
         MatchController.OnActiveTeamChanged -= HandleActiveTeamChanged;
     }
@@ -888,6 +889,7 @@ public class TutorialManager : MonoBehaviour
             bool markActed = false;
             bool moveCursorToSpawn = false;
             string customName = null;
+            string spawnNear = null;
             for (int i = 3; i < parts.Length; i++)
             {
                 string option = parts[i];
@@ -897,14 +899,39 @@ public class TutorialManager : MonoBehaviour
                     moveCursorToSpawn = true;
                 else if (option.StartsWith("name=", System.StringComparison.OrdinalIgnoreCase))
                     customName = option.Substring(5).Replace('_', ' ');
+                else if (option.StartsWith("perto=", System.StringComparison.OrdinalIgnoreCase))
+                    spawnNear = option.Substring(6).Replace('_', ' ');
             }
 
-            string[] xy = coords.Split(',');
-            if (xy.Length < 2) return false;
-            if (!int.TryParse(xy[0].Trim(), out int x) || !int.TryParse(xy[1].Trim(), out int y))
-                return false;
+            Vector3Int cell;
+            if (coords.StartsWith("@"))
+            {
+                // PONTO DE SPAWN POR BANDEIRA: "@flag" = qualquer construcao cujo nome
+                // contem "flag" (flag#1, flag#2... ocultas com isVisible desligado).
+                // Sorteia uma LIVRE; com perto=ALVO, a livre mais proxima do alvo.
+                // O mapa diz onde ficam; o roteiro so diz "nasce num spawn".
+                if (!TryPickSpawnFlagCell(coords.Substring(1), spawnNear, out cell))
+                {
+                    Debug.Log($"[TutorialManager] Spawn '{command}' nao executado: nenhuma bandeira '{coords.Substring(1)}' livre.");
+                    return false;
+                }
+            }
+            else
+            {
+                if (!TryParseScriptCell(coords, out cell))
+                    return false;
 
-            Vector3Int cell = new Vector3Int(x, y, 0);
+                // HEX OCUPADO = NAO NASCE. O spawn da cena nao confere ocupacao e
+                // empilharia a unidade em cima de outra. Na aula isto e regra de design:
+                // quem guarda o ponto de spawn ("o caixao") impede o reforco de nascer ali.
+                UnitManager occupant = FindGroundOccupantAtCell(cell);
+                if (occupant != null)
+                {
+                    Debug.Log($"[TutorialManager] Spawn '{command}' nao executado: hex {cell} ocupado por {occupant.name}.");
+                    return false;
+                }
+            }
+
             if (turnStateManager.TrySpawnUnitAtCell(unitToken, teamId, cell, out string message))
             {
                 UnitManager spawned = FindNewestActiveUnitAtCell(cell, (TeamId)teamId);
@@ -1387,17 +1414,41 @@ public class TutorialManager : MonoBehaviour
 
     private static bool TryParseTutorialCell(string value, out Vector3Int cell)
     {
+        return TryParseScriptCell(value, out cell);
+    }
+
+    // COORDENADA DO ROTEIRO -> CELULA DO TABULEIRO, num lugar so. Todo "x,y" do
+    // roteiro (spawn, move, wake, cursor, pan, show/hide, UNIT_AT_HEX, CAMERA_PAN)
+    // passa por aqui.
+    //
+    // Numa missao da Academia o roteiro e escrito na coordenada do MUNDO DE AUTORIA
+    // — a que o autor ve na cena (ex.: "move 60,32 63,33"). A Batalha pinta o
+    // quadrante em outro lugar; o deslocamento vem do QuadranteController e e a
+    // mesma conta do bake (tabuleiro = mundo - canto + origemDaPintura). Cena de
+    // tutorial antiga, sem quadrante: deslocamento zero, coordenada da propria cena.
+    //
+    // Ajustar o RETANGULO do quadrante (expandir, encolher, mover o canto) NAO quebra
+    // o roteiro: o hex do mundo e o mesmo e o deslocamento se recalcula — desde que
+    // os hexes usados fiquem dentro. Quebra: levar o DESENHO para outro lugar do mundo.
+    //
+    // Era lido em seis lugares, tres deles copias inline: somar a origem so nas
+    // funcoes deixaria o roteiro meio dentro, meio fora do mapa.
+    private static bool TryParseScriptCell(string value, out Vector3Int cell)
+    {
         cell = default;
         if (string.IsNullOrWhiteSpace(value))
             return false;
 
-        string[] coordinates = value.Trim().Split(',');
-        if (coordinates.Length < 2 ||
-            !int.TryParse(coordinates[0], out int x) ||
-            !int.TryParse(coordinates[1], out int y))
+        string[] xy = value.Trim().Split(',');
+        if (xy.Length < 2 ||
+            !int.TryParse(xy[0].Trim(), out int x) ||
+            !int.TryParse(xy[1].Trim(), out int y))
             return false;
 
-        cell = new Vector3Int(x, y, 0);
+        Vector2Int offset = QuadranteController.TryGetAuthoringToBoardOffset(out Vector2Int toBoard)
+            ? toBoard
+            : Vector2Int.zero;
+        cell = new Vector3Int(x + offset.x, y + offset.y, 0);
         return true;
     }
 
@@ -1432,16 +1483,13 @@ public class TutorialManager : MonoBehaviour
         string last = parts[parts.Length - 1];
         if (last.Contains(","))
         {
-            string[] xy = last.Split(',');
-            if (xy.Length < 2 ||
-                !int.TryParse(xy[0].Trim(), out int x) ||
-                !int.TryParse(xy[1].Trim(), out int y))
+            if (!TryParseScriptCell(last, out Vector3Int wakeCell))
             {
                 Debug.LogWarning($"[TutorialManager] wake invalido: '{command}' (celula ilegivel).");
                 return false;
             }
 
-            unit = FindActiveUnitAtCell(new Vector3Int(x, y, 0));
+            unit = FindActiveUnitAtCell(wakeCell);
             if (unit != null && parts.Length > 2 && !UnitMatchesTargetToken(unit, parts[1]))
             {
                 Debug.LogWarning($"[TutorialManager] wake: unidade em {last} nao casa com o token '{parts[1]}'.");
@@ -1599,16 +1647,11 @@ public class TutorialManager : MonoBehaviour
 
         if (arg.Contains(","))
         {
-            string[] xy = arg.Split(',');
-            if (xy.Length < 2 ||
-                !int.TryParse(xy[0].Trim(), out int x) ||
-                !int.TryParse(xy[1].Trim(), out int y))
+            if (!TryParseScriptCell(arg, out Vector3Int cell))
             {
                 Debug.LogWarning($"[TutorialManager] {parts[0]} invalido: '{command}' (celula ilegivel).");
                 return false;
             }
-
-            Vector3Int cell = new Vector3Int(x, y, 0);
             for (int i = 0; i < constructions.Length; i++)
             {
                 ConstructionManager cm = constructions[i];
@@ -1661,6 +1704,78 @@ public class TutorialManager : MonoBehaviour
         }
 
         return null;
+    }
+
+    // Quem impede um spawn de nascer: unidade viva NO CHAO (ou no mar) no hex.
+    // Aeronave no ar passa por cima e nao bloqueia — senao um helicoptero pairando
+    // sobre o spawn seria um jeito gratis de impedir o reforco.
+    private static UnitManager FindGroundOccupantAtCell(Vector3Int cell)
+    {
+        cell.z = 0;
+        List<UnitManager> units = UnitManager.AllActive;
+        for (int i = 0; i < units.Count; i++)
+        {
+            UnitManager unit = units[i];
+            if (unit == null || unit.IsDead || unit.IsEmbarked)
+                continue;
+            if (unit.GetCurrentLayerMode().domain == Domain.Air)
+                continue;
+
+            Vector3Int unitCell = unit.CurrentCellPosition;
+            unitCell.z = 0;
+            if (unitCell == cell)
+                return unit;
+        }
+
+        return null;
+    }
+
+    // Escolhe o hex de uma bandeira de spawn livre. Bandeira = construcao cujo nome
+    // contem o token (por *contem*, como o resto do roteiro). Com 'near' (x,y ou
+    // nome de construcao), a livre mais proxima; sem, sorteio entre as livres —
+    // e a rejogabilidade: com mais bandeiras que soldados, cada partida sai outra.
+    private bool TryPickSpawnFlagCell(string token, string near, out Vector3Int cell)
+    {
+        cell = default;
+        if (string.IsNullOrWhiteSpace(token))
+            return false;
+
+        var free = new List<Vector3Int>();
+        ConstructionManager[] constructions =
+            FindObjectsByType<ConstructionManager>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        for (int i = 0; i < constructions.Length; i++)
+        {
+            ConstructionManager cm = constructions[i];
+            if (cm == null || !cm.name.Contains(token.Trim(), System.StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            Vector3Int flagCell = cm.CurrentCellPosition;
+            flagCell.z = 0;
+            if (!free.Contains(flagCell) && FindGroundOccupantAtCell(flagCell) == null)
+                free.Add(flagCell);
+        }
+
+        if (free.Count == 0)
+            return false;
+
+        if (!string.IsNullOrWhiteSpace(near) && TryResolveCellReference(near, out Vector2Int nearCell))
+        {
+            Vector3Int target = new Vector3Int(nearCell.x, nearCell.y, 0);
+            float best = float.MaxValue;
+            for (int i = 0; i < free.Count; i++)
+            {
+                float d = SectorManager.HexDistance(free[i], target);
+                if (d < best)
+                {
+                    best = d;
+                    cell = free[i];
+                }
+            }
+            return true;
+        }
+
+        cell = free[UnityEngine.Random.Range(0, free.Count)];
+        return true;
     }
 
     private static UnitManager FindActiveUnitAtCell(Vector3Int cell)
@@ -1810,6 +1925,8 @@ public class TutorialManager : MonoBehaviour
                 }
             }
         }
+
+        CheckPlayerEliminatedObjectives();
     }
 
     private void HandleUnitMoved(UnitManager unit)
@@ -1906,6 +2023,95 @@ public class TutorialManager : MonoBehaviour
             if (UnitMatchesTargetToken(supplier, token) || UnitMatchesTargetToken(target, token))
                 MarkObjectiveComplete(obj);
         }
+    }
+
+    // CAPTURE_CONSTRUCTION: o predio mudou de dono pela mao do aluno (slot 0).
+    // CAPTURE_PROGRESS:     o aluno agiu capturando, mesmo sem terminar — e o
+    //                       "capturar leva mais de um turno" da aula.
+    // parameters (os dois): vazio = qualquer predio; senao "Bandeira", "60,32",
+    // "Bandeira || 60,32" ou "SD && Bandeira" (com token do capturador).
+    // Vem do OnCaptureResolved, que so dispara na captura CONFIRMADA.
+    private void HandleCaptureResolved(UnitManager capturer, ConstructionManager construction, bool ownershipChanged)
+    {
+        if (capturer == null || construction == null)
+            return;
+
+        TutorialData tutorial = GetActiveTutorial();
+        if (tutorial == null || tutorial.objectives == null)
+            return;
+
+        bool byStudent = matchController == null || capturer.TeamId == matchController.GetTeamIdForSlot(0);
+
+        Vector3Int cell = construction.CurrentCellPosition;
+        cell.z = 0;
+
+        for (int i = 0; i < tutorial.objectives.Count; i++)
+        {
+            TutorialObjective obj = tutorial.objectives[i];
+            if (obj == null || !obj.isVisible || !IsObjectivePending(obj))
+                continue;
+
+            bool matches;
+            if (byStudent)
+            {
+                bool isComplete = obj.id == "CAPTURE_CONSTRUCTION";
+                bool isProgress = obj.id == "CAPTURE_PROGRESS";
+                matches = (isComplete && ownershipChanged) || isProgress;
+            }
+            else
+            {
+                // ENEMY_CAPTURE: o inimigo TOMOU o predio (mudou de dono). Normalmente
+                // e condicao de derrota ("a Metalion tomou a fabrica").
+                matches = obj.id == "ENEMY_CAPTURE" && ownershipChanged;
+            }
+
+            if (matches && CaptureMatchesParameters(capturer, cell, obj.parameters))
+                MarkObjectiveComplete(obj);
+        }
+    }
+
+    // PLAYER_ELIMINATED: o aluno (slot 0) ficou sem nenhuma unidade, contando as
+    // embarcadas. Normalmente condicao de derrota. So e avaliado quando uma unidade
+    // morre — nunca no inicio da aula, quando a tropa ainda pode estar nascendo.
+    private void CheckPlayerEliminatedObjectives()
+    {
+        TutorialData tutorial = GetActiveTutorial();
+        if (tutorial == null || tutorial.objectives == null || matchController == null)
+            return;
+
+        int studentSlot = 0;
+        List<UnitManager> units = UnitManager.AllActive;
+        for (int u = 0; u < units.Count; u++)
+        {
+            UnitManager unit = units[u];
+            if (unit != null && !unit.IsDead && unit.SlotIndex == studentSlot)
+                return;
+        }
+
+        for (int i = 0; i < tutorial.objectives.Count; i++)
+        {
+            TutorialObjective obj = tutorial.objectives[i];
+            if (obj != null && obj.id == "PLAYER_ELIMINATED" && obj.isVisible && IsObjectivePending(obj))
+                MarkObjectiveComplete(obj);
+        }
+    }
+
+    private bool CaptureMatchesParameters(UnitManager capturer, Vector3Int constructionCell, string parameters)
+    {
+        if (string.IsNullOrWhiteSpace(parameters))
+            return true;
+
+        string raw = parameters.Trim();
+        int andIndex = raw.IndexOf("&&", System.StringComparison.Ordinal);
+        if (andIndex >= 0)
+        {
+            string unitToken = raw.Substring(0, andIndex).Trim();
+            if (!string.IsNullOrWhiteSpace(unitToken) && !UnitMatchesTargetToken(capturer, unitToken))
+                return false;
+            raw = TrimOuterParentheses(raw.Substring(andIndex + 2).Trim());
+        }
+
+        return CoordinatesExpressionContainsCell(raw, constructionCell);
     }
 
     private bool IsUnitAtCoordinates(UnitManager unit, string parameters)
@@ -2044,17 +2250,10 @@ public class TutorialManager : MonoBehaviour
     private static bool TryParseCoordinate(string input, out Vector2Int cell)
     {
         cell = default;
-        if (string.IsNullOrWhiteSpace(input))
+        if (!TryParseScriptCell(input, out Vector3Int board))
             return false;
 
-        string[] xy = input.Trim().Split(',');
-        if (xy.Length < 2)
-            return false;
-
-        if (!int.TryParse(xy[0].Trim(), out int x) || !int.TryParse(xy[1].Trim(), out int y))
-            return false;
-
-        cell = new Vector2Int(x, y);
+        cell = new Vector2Int(board.x, board.y);
         return true;
     }
 
@@ -2272,6 +2471,15 @@ public class TutorialManager : MonoBehaviour
         // e ela quem devolve o turno (senao um time vermelho vazio pendura a partida).
         // O database so da comportamento as unidades — sem ele, ficam paradas.
         if (!enableTutorialAutomata)
+            return;
+        // SEM AULA, SEM AUTOMATA. Nas cenas antigas o TutorialManager so existia em
+        // cena de tutorial, entao "rodar sempre" era seguro. Na Batalha ele vive em
+        // TODA partida: sem esta guarda, o automata dirigia o turno da IA de verdade
+        // e devolvia a vez antes dela jogar.
+        if (tutorial == null)
+            return;
+        // Aula com a IA de verdade como inimigo: o automata fica de fora.
+        if (tutorial.inimigo == TutorialEnemyController.IA)
             return;
         // O automata dirige qualquer time que nao seja o do jogador (slot 0).
         // Nao comparar com cor fixa: a cor do jogador pode ter sido escolhida na Tela de Entrada.
@@ -2516,7 +2724,11 @@ public class TutorialManager : MonoBehaviour
         if (unit == null || automata == null || unit.BoardTilemap == null)
             return false;
 
+        // O hex-alvo do AutomataData e autorado no MESMO referencial do roteiro
+        // (mundo de autoria numa missao da Academia): passa pela mesma conversao.
         Vector3Int target = automata.moveTargetCell;
+        if (QuadranteController.TryGetAuthoringToBoardOffset(out Vector2Int toBoard))
+            target = new Vector3Int(target.x + toBoard.x, target.y + toBoard.y, 0);
         target.z = 0;
         Vector3Int current = NormalizeCell(unit.CurrentCellPosition);
         int stopDistance = Mathf.Max(0, automata.stopDistance);

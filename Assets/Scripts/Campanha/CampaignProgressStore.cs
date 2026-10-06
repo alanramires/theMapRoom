@@ -100,6 +100,7 @@ public static class CampaignProgressStore
             case nameof(MatchController.VictoryReason.ArmyEliminated): return PanelHelperController.ResolveHelperMessage("helper.campaign.reason.army", "exército eliminado");
             case nameof(MatchController.VictoryReason.Surrender): return PanelHelperController.ResolveHelperMessage("helper.campaign.reason.surrender", "rendição");
             case nameof(MatchController.VictoryReason.VictoryStars): return PanelHelperController.ResolveHelperMessage("helper.campaign.reason.stars", "estrelas de vitória");
+            case nameof(MatchController.VictoryReason.TutorialCompleted): return PanelHelperController.ResolveHelperMessage("helper.campaign.reason.tutorial", "aula concluída");
             case null:
             case "": return "—";
             default: return reason;

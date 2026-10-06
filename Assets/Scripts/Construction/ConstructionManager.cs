@@ -213,6 +213,25 @@ public class ConstructionManager : MonoBehaviour
     public int InstanceId => instanceId;
     public Vector3 CurrentPosition => currentPosition;
     public string ConstructionDisplayName => constructionDisplayName;
+
+    // Nome dado pelo autor nesta instancia, diferente do nome do tipo. O Apply
+    // so troca o displayName quando ele ainda e o automatico (igual ao
+    // lastAuto), entao "autorado" e exatamente o que o Apply preserva.
+    public bool HasAuthoredDisplayName =>
+        !string.IsNullOrWhiteSpace(constructionDisplayName) &&
+        !string.Equals(constructionDisplayName, lastAutoConstructionDisplayName, System.StringComparison.Ordinal);
+
+    // Devolve o nome autorado a uma construcao que nasceu do bake. O nome do
+    // GameObject e derivado dele (UpdateDynamicName), e e por esse nome que o
+    // roteiro de tutorial acha o predio.
+    public void SetAuthoredDisplayName(string authoredName)
+    {
+        if (string.IsNullOrWhiteSpace(authoredName))
+            return;
+
+        constructionDisplayName = authoredName.Trim();
+        UpdateDynamicName();
+    }
     public SpriteRenderer GetMainSpriteRenderer()
     {
         if (spriteRenderer == null)

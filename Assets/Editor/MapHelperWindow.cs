@@ -623,6 +623,8 @@ public class MapHelperWindow : EditorWindow
             string estado = q.HasBake ? $"assado {q.bakedTiles.Count}" : "SEM BAKE";
             if (q.emDesenvolvimento)
                 estado += " · EM DEV";
+            if (q.tutorial != null)
+                estado += " · AULA";
             if (DrawNoHeader(index, q, NivelColor(2, index), estado, selected, out bool remove))
             {
                 selectedQuadrante = selected ? -1 : index;
@@ -648,6 +650,23 @@ public class MapHelperWindow : EditorWindow
             {
                 Undo.RecordObject(mundo, "Quadrante em desenvolvimento");
                 q.emDesenvolvimento = emDev;
+                EditorUtility.SetDirty(mundo);
+            }
+
+            // Aula: o roteiro que transforma este quadrante numa missao de tutorial.
+            // Autoral e fora do bake — refazer o bake nao desliga a aula.
+            EditorGUI.BeginChangeCheck();
+            TutorialData aula = (TutorialData)EditorGUILayout.ObjectField(
+                new GUIContent(
+                    "aula (tutorial)",
+                    "Roteiro desta missão. Vazio = partida normal. As coordenadas do roteiro são as desta cena de autoria."),
+                q.tutorial,
+                typeof(TutorialData),
+                false);
+            if (EditorGUI.EndChangeCheck())
+            {
+                Undo.RecordObject(mundo, "Aula do quadrante");
+                q.tutorial = aula;
                 EditorUtility.SetDirty(mundo);
             }
 
@@ -1918,6 +1937,10 @@ public class MapHelperWindow : EditorWindow
                 initialCapturePoints = c.CurrentCapturePoints == c.CapturePointsMax
                     ? -1
                     : c.CurrentCapturePoints,
+                // O NOME QUE O AUTOR DEU vai junto: e por ele que o roteiro de
+                // tutorial acha o predio ("show Bandeira"). Sem isto a Batalha
+                // nasce com "Fabrica_T-1_C16" e o roteiro procura em vao.
+                nomeAutorado = c.HasAuthoredDisplayName ? c.ConstructionDisplayName : string.Empty,
                 // A CENA DE AUTORIA E A LEI. Sem levar a configuracao desta
                 // instancia, o spawn cai na do TIPO e toda fabrica do mapa vira
                 // igual — uma fabrica leve autorada SEM radar movel nasceria

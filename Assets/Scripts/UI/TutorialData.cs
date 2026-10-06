@@ -33,6 +33,15 @@ public enum TutorialScoldKind
     AttackOrdered = 7
 }
 
+// Quem joga pelo inimigo numa aula. Ver TutorialData.inimigo.
+public enum TutorialEnemyController
+{
+    [InspectorName("Automata (roteirizado)")]
+    Automata = 0,
+    [InspectorName("IA de verdade")]
+    IA = 1
+}
+
 public enum TutorialEndTurnEffect
 {
     [InspectorName("No Effect (default)")]
@@ -334,6 +343,25 @@ public class TutorialData : ScriptableObject
     [Header("Figurantes")]
     [Tooltip("Unidades que amanhecem 'ja agiram' em todo turno do jogador (tokens separados por ';'). Ex.: Mathias; Dias — ficam na fila sem nunca poder agir.")]
     public string alwaysActedUnits;
+
+    [Header("Partida da aula")]
+    [Tooltip("Quem joga pelos slots que nao sao o aluno (slot 0).\n\n" +
+             "Automata: o inimigo roteirizado (AutomataData) — previsivel, para aulas de mecanica.\n" +
+             "IA: a IA de verdade, com o perfil do contrato. Faccao sem QG no quadrante = rebelde " +
+             "(nunca produz), puxada pelo magnetico do capitao.")]
+    public TutorialEnemyController inimigo = TutorialEnemyController.Automata;
+
+    [Tooltip("Se marcado, a aula impoe as regras abaixo e ignora as escolhidas no menu.")]
+    public bool forcarRegras;
+
+    [Tooltip("Regras da aula (so vale com 'Forcar Regras'). Ex.: A Montanha Avacalha = tudo ligado exceto nevoa.")]
+    public MatchController.GameSetupPreset regras = MatchController.GameSetupPreset.AMontanhaAvacalha;
+
+    [Tooltip("Se marcado, a aula impoe a dificuldade da IA abaixo. O menu da Academia nao pergunta dificuldade: ela e da licao.")]
+    public bool forcarDificuldade = true;
+
+    [Tooltip("Dificuldade da IA nesta aula (so vale com 'Forcar Dificuldade' e inimigo = IA).")]
+    public AIDifficulty dificuldade = AIDifficulty.Facil;
 
     [Header("Bloqueios")]
     [Tooltip("Bloqueia o Servico do Comando (Reabastecer, atalho X) durante este tutorial.")]

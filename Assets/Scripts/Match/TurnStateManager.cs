@@ -28,6 +28,9 @@ public partial class TurnStateManager : MonoBehaviour
     public static event Action<UnitManager, UnitManager> OnUnitEmbarked;
     public static event Action<UnitManager, UnitManager> OnUnitDisembarked;
     public static event Action<UnitManager, UnitManager> OnUnitSupplied;
+    // Captura CONFIRMADA (roda no ExecuteCaptureSequence, depois do commit).
+    // bool = o predio mudou de dono nesta acao; false = captura parcial ou recuperacao.
+    public static event Action<UnitManager, ConstructionManager, bool> OnCaptureResolved;
 
     public static void NotifyUnitRevealedFromFog(UnitManager unit)
     {

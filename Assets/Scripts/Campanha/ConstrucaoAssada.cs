@@ -58,6 +58,13 @@ public class ConstrucaoAssada
     public int initialCapturePoints = -1;
 
     [Tooltip(
+        "Nome que o autor deu a esta construcao na cena de autoria (\"Bandeira\", "
+        + "\"Ramelle\"). Vazio = nome do tipo. E por ele que o roteiro de tutorial "
+        + "acha o predio (show/hide/pan/cursor e UNIT_AT_HEX por nome), e e o nome "
+        + "que o jogador ve.")]
+    public string nomeAutorado;
+
+    [Tooltip(
         "Configuracao DESTA instancia: o que ela vende, que servicos oferece, se e QG, "
         + "se e capturavel. A cena de autoria e a lei — uma fabrica leve que NAO vende "
         + "radar movel tem de nascer sem radar movel.\n\n"

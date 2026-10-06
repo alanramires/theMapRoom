@@ -56,6 +56,29 @@ public class QuadranteController : MonoBehaviour
 
     public static QuadranteController Active => active;
 
+    /// <summary>
+    /// Quanto somar a uma coordenada do MUNDO DE AUTORIA para cair no tabuleiro da
+    /// Batalha: <c>origemDaPintura - (originX, originY)</c>.
+    ///
+    /// O roteiro de tutorial fala na coordenada que o autor ve na cena de autoria
+    /// (ex.: "move 60,32 63,33" num quadrante que comeca em 60,30). O bake guarda
+    /// local = mundo - canto; a Batalha pinta em origemDaPintura + local. Juntas,
+    /// tabuleiro = mundo + este deslocamento — a mesma conta do bake, nas duas pontas.
+    ///
+    /// Falso sem quadrante montado (cena de tutorial antiga): o roteiro fala na
+    /// coordenada da propria cena, deslocamento zero.
+    /// </summary>
+    public static bool TryGetAuthoringToBoardOffset(out Vector2Int offset)
+    {
+        offset = Vector2Int.zero;
+        if (active == null || !active.built || active.quadranteConstruido == null)
+            return false;
+
+        offset = active.origemDaPintura
+            - new Vector2Int(active.quadranteConstruido.originX, active.quadranteConstruido.originY);
+        return true;
+    }
+
     [Header("Endereco")]
     [SerializeField] private MundoData mundo;
     [SerializeField] private string campanhaId = "fixture";
@@ -570,6 +593,12 @@ public class QuadranteController : MonoBehaviour
         MatchController match = FindAnyObjectByType<MatchController>();
         match?.EnsurePartidaConfigApplied();
 
+        // A AULA VEM DO QUADRANTE, como o mapa. O par quadrante + roteiro e a missao
+        // da Academia; o contrato so carrega o endereco, e quem resolve o endereco
+        // entrega os dois. Atribui SEMPRE, inclusive null: quadrante sem aula nao
+        // pode herdar o roteiro que a cena Batalha tenha serializado.
+        match?.SetActiveTutorialFromQuadrant(quadrante.tutorial);
+
         // DEPOIS do Apply, nunca antes: o Apply reimporta a lista inteira de
         // jogadores e sobrescreveria a caixa do quadrante com os zeros da cena.
         AplicarEconomiaInicial(quadrante, match);
@@ -1047,6 +1076,11 @@ public class QuadranteController : MonoBehaviour
                 }
 
                 manager.SetCurrentCellPosition(cell);
+
+                // O nome autorado volta ("Bandeira"): o roteiro de tutorial acha o
+                // predio por ele, e o jogador o ve.
+                if (!string.IsNullOrWhiteSpace(c.nomeAutorado))
+                    manager.SetAuthoredDisplayName(c.nomeAutorado);
 
                 // O spawn so recebe o TIME. Slot, setor, ancora e pontos de captura
                 // vem a parte — e nenhum deles e cosmetico:

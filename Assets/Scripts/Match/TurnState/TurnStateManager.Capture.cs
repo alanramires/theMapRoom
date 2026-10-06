@@ -193,6 +193,7 @@ public partial class TurnStateManager
                     captureCompletedForReplay,
                     newOwnerForReplay);
 
+                OnCaptureResolved?.Invoke(capturer, targetConstruction, captureCompletedForReplay);
                 FinalizeCaptureAction(capturer);
                 yield break;
             }
@@ -209,6 +210,7 @@ public partial class TurnStateManager
                 captureCompleted: false,
                 newOwner: targetConstruction.TeamId);
 
+            OnCaptureResolved?.Invoke(capturer, targetConstruction, false);
             FinalizeCaptureAction(capturer);
         }
         finally

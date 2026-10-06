@@ -305,6 +305,8 @@ public partial class AIController
         TeamId activeTeam = matchController.ActiveTeam;
         if (!matchController.IsActiveTeamAI())
             yield break;
+        if (matchController.TutorialEnemyIsAutomata)
+            yield break;
 
         // O load ja restaurou time, turno, stage, plano e snapshot confirmado. Reiniciamos
         // somente a coroutine operacional; nao reaplicamos inicio de turno nem seus efeitos.
@@ -351,6 +353,18 @@ public partial class AIController
                 if (aiCoroutine != null) { StopCoroutine(aiCoroutine); aiCoroutine = null; }
                 if (showAILogs)
                     Debug.Log("[AI] HandleTeamChanged adiado: load em andamento; turno (re)inicia pos-restauracao.");
+                return;
+            }
+
+            // AULA COM INIMIGO ROTEIRIZADO (TutorialData.inimigo = Automata): o turno
+            // e do automata do TutorialManager, nao da IA. O slot continua marcado como IA — o humano fica travado no
+            // turno inimigo, como deve —, mas quem joga e devolve a vez e o automata.
+            // Sem esta guarda os dois dirigiam o mesmo turno.
+            if (matchController != null && matchController.TutorialEnemyIsAutomata)
+            {
+                if (aiCoroutine != null) { StopCoroutine(aiCoroutine); aiCoroutine = null; }
+                if (showAILogs)
+                    Debug.Log("[AI] Aula em andamento: o turno inimigo e do roteiro (automata), a IA nao joga.");
                 return;
             }
 

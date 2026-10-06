@@ -908,6 +908,36 @@ public class MatchController : MonoBehaviour
     public bool EnablePodeEmergirSensorLogs => enableSensorsRuntimeLogs || enablePodeEmergirSensorLogs;
     public TutorialData ActiveTutorial => activeTutorial;
     public bool IsTutorialMode => activeTutorial != null;
+
+    // Missao da Academia: o QuadranteController monta o mapa e entrega a aula do
+    // mesmo quadrante. Roda antes do Start do TutorialManager, que e quem le.
+    public void SetActiveTutorialFromQuadrant(TutorialData tutorial)
+    {
+        activeTutorial = tutorial;
+        // A aula pode exigir as suas regras (ex.: "A Montanha Avacalha" sem nevoa).
+        // Roda DEPOIS do contrato (o QuadranteController chama apos o Apply), entao
+        // vence a escolha do menu — a aula foi desenhada para aquelas regras.
+        if (tutorial != null && tutorial.forcarRegras)
+            SetGameSetupPreset(tutorial.regras);
+        // A dificuldade tambem e da licao (o menu da Academia nem pergunta). O
+        // AIController.Start consome a pendente depois deste ponto.
+        if (tutorial != null && tutorial.forcarDificuldade)
+            PartidaConfig.SetDifficulty(tutorial.dificuldade);
+    }
+
+    // REGRAS DE FIM: dois grupos que nunca se misturam.
+    //   partida  QG capturado, exercito eliminado, estrelas de vitoria, rendicao
+    //   aula     as tarefas do TutorialData (vitoria = todas as tarefas; derrota =
+    //            tarefa isDefeatCondition, inclusive PLAYER_ELIMINATED)
+    // Numa aula o grupo da partida nao decide nada. Sem isto, a faccao inimiga que
+    // so nasce no meio da aula era dada como eliminada no turno 2 e o aluno vencia
+    // sem fazer a licao.
+    public bool UsesMatchEndRules => !IsTutorialMode;
+
+    // Aula com inimigo roteirizado: a IA nao joga, o automata dirige. Aula com
+    // inimigo "IA de verdade": a IA joga normalmente e o automata fica parado.
+    public bool TutorialEnemyIsAutomata =>
+        activeTutorial != null && activeTutorial.inimigo == TutorialEnemyController.Automata;
     public TerrainDatabase TerrainDatabaseRef => ResolveFogTerrainDatabase();
     public bool IsFogOfWarDebugEnabled => debugFogOfWarEnabled;
     public bool IsFogOfWarDebugPartial => IsFogPartialObserverActive;
@@ -2426,7 +2456,7 @@ public class MatchController : MonoBehaviour
 
     private void EvaluateVictoryStarsAtTurnStartForActiveTeam(List<ConstructionManager> constructions = null)
     {
-        if (!enableVictoryStars)
+        if (!enableVictoryStars || !UsesMatchEndRules)
             return;
         if (hasVictoryWinner)
             return;
@@ -2488,9 +2518,14 @@ public class MatchController : MonoBehaviour
     {
         if (hasVictoryWinner) return;
 
-        TeamId winnerTeam = GetTeamIdForSlot(0);
+        // O ALUNO e o humano local, nao o slot 0: numa missao da Academia o humano
+        // pode estar em qualquer slot. Slot 0 so como reserva das cenas antigas.
+        PlayerSlotId winnerSlot = TryGetSingleActiveLocalHumanSlot(out PlayerSlotId humanSlot)
+            ? humanSlot
+            : PlayerSlotId.FromIndex(0);
+        TeamId winnerTeam = GetTeamIdForSlot(winnerSlot.Value);
         hasVictoryWinner = true;
-        victoryWinnerSlotIndex = 0;
+        victoryWinnerSlotIndex = winnerSlot.Value;
         victoryWinnerTeam = winnerTeam;
 
         Debug.Log($"[Victory] Tutorial concluido: vitoria do {TeamUtils.GetName(winnerTeam)}.");
@@ -2511,6 +2546,10 @@ public class MatchController : MonoBehaviour
             : "TREINAMENTO CONCLUÍDO";
         string descricao = $"TIME {ColorizeTeamName(winnerTeam)} — {motivo}";
         ShowVictoryPanel("VITÓRIA!", TeamUtils.GetColor(winnerTeam), descricao);
+
+        // A aula concluida e uma partida concluida: sem este aviso a Campanha nao
+        // registra a missao como vencida e o jogo nao volta para o mapa.
+        OnMatchConcluded?.Invoke(winnerSlot, winnerTeam, TeamId.Neutral, VictoryReason.TutorialCompleted, currentTurn);
     }
 
     private void DeclareDefeat()
@@ -2590,6 +2629,10 @@ public class MatchController : MonoBehaviour
 
     private bool TryDefeatSlotIfZeroUnits(PlayerSlotId slotId)
     {
+        // Antes de marcar o slot como derrotado: numa aula isso tiraria o slot da
+        // rotacao de turnos mesmo sem declarar vencedor.
+        if (!UsesMatchEndRules)
+            return false;
         if (!IsValidPlayerSlot(slotId))
             return false;
         int playerIndex = slotId.Value;
@@ -2633,7 +2676,7 @@ public class MatchController : MonoBehaviour
 
         if (!Application.isPlaying || hasVictoryWinner)
             return;
-        if (!allowDefeatForHeadQuarterCapture)
+        if (!allowDefeatForHeadQuarterCapture || !UsesMatchEndRules)
             return;
         if (construction == null || !IsHeadQuarterConstruction(construction))
             return;
@@ -2867,6 +2910,8 @@ public class MatchController : MonoBehaviour
     {
         if (hasVictoryWinner)
             return true;
+        if (!UsesMatchEndRules)
+            return DeclareMatchEndDuringTutorial(reason);
         if (winnerTeam == TeamId.Neutral || winnerTeam == defeatedTeam)
             return false;
 
@@ -3135,7 +3180,11 @@ public class MatchController : MonoBehaviour
         HeadQuarterCaptured,
         ArmyEliminated,
         Surrender,
-        VictoryStars
+        VictoryStars,
+        // Academia: o fim vem dos objetivos do roteiro, nao do QG nem do exercito.
+        // No FIM do enum: o nome vai para o registro da Campanha e para o save.
+        TutorialCompleted,
+        TutorialFailed
     }
 
     /// <summary>
@@ -11740,6 +11789,8 @@ public class MatchController : MonoBehaviour
     {
         if (hasVictoryWinner)
             return true;
+        if (!UsesMatchEndRules)
+            return DeclareMatchEndDuringTutorial(reason);
         if (!IsValidPlayerSlot(winnerSlot) || winnerSlot == defeatedSlot)
             return false;
 
@@ -11794,6 +11845,17 @@ public class MatchController : MonoBehaviour
         return true;
     }
 
+    // Fim de partida pedido durante uma aula. So a rendicao tem sentido aqui: vira
+    // derrota da aula. Eliminacao e QG nao decidem nada (ver UsesMatchEndRules).
+    private bool DeclareMatchEndDuringTutorial(VictoryReason reason)
+    {
+        if (reason != VictoryReason.Surrender)
+            return false;
+
+        DeclareTutorialDefeat(activeTutorial, "Rendição");
+        return hasVictoryWinner;
+    }
+
     public void DeclareTutorialDefeat(TutorialData tutorial, string reason = "")
     {
         if (tutorial == null || hasVictoryWinner)
@@ -11816,11 +11878,15 @@ public class MatchController : MonoBehaviour
             cursorController.PlayDefeatSfx();
         }
 
-        // Busca o painel pelo nome (como no DeclareDefeat original)
+        // Busca o painel pelo nome (como no DeclareDefeat original). Panel_endGame
+        // so existe nas cenas de tutorial antigas; na Batalha a derrota usa o mesmo
+        // Panel_vitoria das partidas normais.
+        bool legacyPanelShown = false;
         foreach (GameObject go in Resources.FindObjectsOfTypeAll<GameObject>())
         {
             if (go.name == "Panel_endGame" && go.scene.name != null)
             {
+                legacyPanelShown = true;
                 go.SetActive(true);
                 // Busca todos os textos para atualizar titulo e descricao
                 var texts = go.GetComponentsInChildren<TMPro.TextMeshProUGUI>(true);
@@ -11838,6 +11904,13 @@ public class MatchController : MonoBehaviour
                 break;
             }
         }
+
+        if (!legacyPanelShown)
+            ShowVictoryPanel("DERROTA!", new Color(0.85f, 0.2f, 0.2f), reason);
+
+        // Aula perdida tambem encerra a partida: arma a volta para a Campanha, mas
+        // sem vencedor para coroar (slot invalido nao pinta o quadrante).
+        OnMatchConcluded?.Invoke(PlayerSlotId.Invalid, TeamId.Neutral, TeamId.Neutral, VictoryReason.TutorialFailed, currentTurn);
     }
 
     private static bool IsHeadQuarterConstruction(ConstructionManager construction)
