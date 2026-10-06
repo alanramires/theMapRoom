@@ -1,15 +1,25 @@
 ﻿# Resumo — onde estamos e o que vem
 
-Ponto de retomada. Atualizado em 2026-10-04, **depois** da tag `v9.2.2`.
+Ponto de retomada. Atualizado em 2026-10-05, **depois** da tag `v9.3.0`.
 Leia isto primeiro.
 
 ---
 
 ## Estado
 
-`v9.2.2` tagueada e publicada. **O primeiro MVP estável está no ar** (v9.2.0),
+`v9.3.0` tagueada e publicada. **O primeiro MVP estável está no ar** (v9.2.0),
 no Unity Play, e **o primeiro estranho já zerou uma fase**. Relatório do dia:
-[`relatorio_v9.2.2.md`](relatorio_v9.2.2.md). A v8 fechou; os relatórios dela
+[`relatorio_v9.3.0.md`](relatorio_v9.3.0.md).
+
+**A descoberta da v9.3.0: a aula já era dado; só o palco era cena.** O
+`TutorialData` carregava falas, tarefas, comandos e travas, e a cena só servia de
+palco. A aula virou **um quadrante do mundo Academia** (Caserna → Soldado/Cabo →
+aula), lançado pelo botão **Tutorial**. Numa aula, **só as tarefas decidem o fim**
+(`UsesMatchEndRules`). O inimigo é escolha da aula (automata ou IA rebelde). O
+roteiro fala na **coordenada do mundo de autoria**. Escrever aula:
+[`tutorial/sintaxe.md`](tutorial/sintaxe.md) e
+[`tutorial/aulas_caserna.md`](tutorial/aulas_caserna.md). **Nada rodou em Play
+ainda**, e as duas aulas criadas estão vazias. A v8 fechou; os relatórios dela
 estão em [`Versões/`](Versões/).
 
 **A descoberta da v9.2.2: "lento" é duas coisas.** O testador (Easy, celular,
@@ -42,6 +52,7 @@ v9.1.0   o save manda na partida          load aplica o save; menu no turno da I
 v9.2.0   aguenta o celular de quem testa  toque, áudio/texturas web, sem LTO
 v9.2.1   a IA pergunta antes de decidir   contrato do questionário; reparo pela linha
 v9.2.2   o primeiro estranho jogou         Configurações, Ação Direta, névoa com uma memória
+v9.3.0   a aula vira um quadrante          Academia, regras de fim da aula, captura/spawn no roteiro
 ```
 
 **A descoberta da v9.2.0:** o Simulator da Unity não reproduz o navegador do
@@ -209,6 +220,23 @@ Sem HQ, os dois lados do Q3 e do Q4 entram no modo rebelde (v8.6.1, Frente 4).
 ---
 
 ## Onde eu parei
+
+### O que a v9.3.0 deixou — a primeira aula em Play
+
+1. **Preencher a Operação Cabeça de Ponte** em `DB/Tutorial/Academia/Caserna -
+   Soldado 1` a partir de `docs/tutorial/aulas_caserna.md`. Na autoria: fábrica
+   `Porto Ferro` com **setor**, bandeiras `flag#1`/`flag#2` não capturáveis e
+   ocultas, Chinook com 2 soldados embarcados; depois o **bake**.
+2. **Jogar pelo botão Tutorial** e conferir: o Chinook nasce **no ar**? (o bake não
+   guarda camada); os soldados nascem embarcados? (o Console avisa se não); a IA
+   rebelde vai até a fábrica? (depende do setor); a vitória volta para a Campanha
+   com "aula concluída"?
+3. **Abertos conhecidos:**
+   - o save no meio da aula não guarda o passo do roteiro;
+   - um save da Academia carregado pelo menu abre no Fixture;
+   - o aluno é sempre o slot 0;
+   - o eixo do slot 0 do Fixture mudou (`0,2,3,8 → 2,3,8`) sem autor conhecido:
+     conferir.
 
 ### O que a v9.2.2 deixou — primeiro jogar, depois o replay
 
@@ -508,6 +536,10 @@ parte de uma regra só, e a construção usa a mesma reta que a unidade.
 
 | armadilha | regra |
 |---|---|
+| **"só roda na cena de tutorial"** | componentes nascidos para cenas próprias (`TutorialManager`, automata) assumiam que estar presentes = estar numa aula. Na Batalha eles vivem em **toda** partida: o automata dirigiria o turno da IA. Ao mover um componente para uma cena compartilhada, procurar o que ele faz **sem** o dado que o justificava |
+| **regra normal de fim numa partida especial** | eliminação, QG e estrelas rodavam nas aulas: a facção que só nasce no meio da lição era eliminada no turno 2. Partida especial declara o seu grupo de regras de fim (`UsesMatchEndRules`) |
+| **mundo fixo em mais de uma cena** | o mundo estava serializado na Campanha **e** no `QuadranteController` da Batalha. Trocar de mundo só numa delas manda a Batalha procurar a campanha no mundo errado. O mundo viaja no contrato (`PartidaConfig.MundoAtivo`) |
+| **coordenada lida em vários lugares** | o `x,y` do roteiro era lido em seis lugares (três cópias). Conversão de referencial só vale se todos passarem pelo mesmo leitor (`TryParseScriptCell`) |
 | **árvore limpa tomada como Inspector salvo** | no fechamento da v9.2.1 o `git status` estava limpo e os perfis do Médio e do Difícil **não tinham o campo** em disco: o Inspector marca e não grava. Antes de taguear configuração, conferir o campo no `.asset` (grep) e pedir *File ▸ Save Project* |
 | **afirmar a direção de um movimento lendo meia execução** | eu disse que na fusão o parceiro anda até o receptor; é o contrário — a **selecionada** anda até o parceiro e o consome (`TurnStateManager.Merge.cs`, 592–669). Li a linha que nomeia o receptor, não a que move. Ler a execução até o `SetCurrentCellPosition` |
 | **"o papel X não faz Y" contado só nos arquivos do papel** | a revisão de papéis afirmou que a IA nunca funde; a fusão morava no **reparo**. Comportamento de papel pode estar num handler transversal (Repair, Logistics, Router) |
@@ -589,6 +621,8 @@ parte de uma regra só, e a construção usa a mesma reta que a unidade.
 | [`Planos/plano_campanha.md`](Planos/plano_campanha.md) | **o tronco** — autoria, recorte, progresso, cenas, bloqueios, teste |
 | [`Planos/briefing_cena_campanha.md`](Planos/briefing_cena_campanha.md) | o contrato entre as duas frentes |
 | [`AI Behavior/contrato_questionario.md`](AI%20Behavior/contrato_questionario.md) | **o questionário** — casas, duas etapas, o Capturador, as ordens, as missões, os abertos |
+| [`relatorio_v9.3.0.md`](relatorio_v9.3.0.md) | a aula vira um quadrante — Academia, regras de fim da aula, tarefas de captura, bake embarcado |
+| [`tutorial/sintaxe.md`](tutorial/sintaxe.md) | **como escrever uma aula** — comandos, tarefas, parâmetros, convenções |
 | [`relatorio_v9.2.2.md`](relatorio_v9.2.2.md) | o primeiro estranho jogou — Configurações, Ação Direta, a névoa com uma memória só |
 | [`pendencias do mvp.md`](pendencias%20do%20mvp.md) | o inventário transacional: o que vaza na névoa, o que foi decidido, o que falta testar |
 | [`playtest de 3 de outubro 2026.md`](playtest%20de%203%20de%20outubro%202026.md) | o primeiro playtest externo e o que saiu dele |
