@@ -58,7 +58,13 @@ Apelidos do catálogo (os mais úteis):
 
 **Construção** (`FindConstructionByName`): casa pelo nome do GameObject, por
 *contém*. O nome do GameObject vem do **nome de exibição autorado**
-(`Bandeira` → `Bandeira_T-1_C5`). Para uma construção ser achada pelo roteiro numa
+(`Bandeira` → `Bandeira_T-1_C5`).
+
+**⚠️ O nome do GameObject perde os espaços**: "Porto Ferro" vira
+`PortoFerro_T-1_C5`. No roteiro, escreva o nome **sem espaço** (`pan PortoFerro`,
+`SD && PortoFerro`). O jogador continua vendo "Porto Ferro". Escrever com espaço
+quebra duas vezes: o comando é dividido por espaços, e "Porto Ferro" nunca casa
+com `PortoFerro_...`. Para uma construção ser achada pelo roteiro numa
 missão da Academia:
 1. dê o nome dela na cena de autoria (nome de exibição do `ConstructionManager`);
 2. **refaça o bake**: o nome viaja no campo `nomeAutorado` do bake.
@@ -75,7 +81,9 @@ Cada tarefa tem:
 | `description` | texto na lista de tarefas, e na derrota se for condição de derrota |
 | `startHidden` | começa oculta; uma fala revela |
 | `isOptional` | não conta para a vitória |
+| `isInternal` | **gatilho do roteiro**: é checada normalmente (depois de revelada), mas não aparece na lista, não entra no "x/y completos" e não apita. Ex.: "começou a capturar", só para disparar o spawn do inimigo. ⚠️ Não confundir com `isVisible`: esse é estado de runtime, e tarefa invisível **não é checada** |
 | `isDefeatCondition` | **inverte**: o evento acontecer é **derrota** |
+| `defeatText` | só em derrota: a **fala final do Sargento** (o balão fica com ela, com o retrato de bronca) e o texto do painel DERROTA, que espera ~3,5 s para ela ser lida. Vazio = usa a `description` |
 
 **Vitória** = todas as tarefas não opcionais e não de derrota completas.
 **Derrota** = qualquer tarefa `isDefeatCondition` acontecer.
@@ -94,6 +102,8 @@ com várias do mesmo tipo, os tipos sem parâmetro (como `ATTACK_UNIT`) completa
 | `id` | completa quando | `parameters` |
 |---|---|---|
 | `UNIT_AT_HEX` | uma unidade **do slot 0** terminou a ação (agiu, sem estar embarcada) num dos hexes | expressão de hex (ver abaixo) |
+| `UNIT_LANDED` | como o `UNIT_AT_HEX`, mas a unidade precisa estar **fora do ar** (pousou). Helicóptero pairando não conta. **Não existe ação "pousar"**: o pouso é etapa de animação (o desembarque desce, solta e decola de volta — termina no ar) ou o **pouso de emergência** por combustível zerado. Na prática, este objetivo serve para o pouso forçado | expressão de hex (ex.: `CH && pouso`) |
+| `UNIT_DISEMBARKED` | o aluno **desembarca** alguém (no commit do desembarque) | vazio = qualquer; token do **passageiro** = ele saiu; token do **transporte** (ex.: `CH`) = o transporte ficou **vazio** (todos desembarcaram); a lista de tarefas mostra o contador `(1/2)` sozinha |
 | `UNIT_SELECTED` | uma unidade é selecionada num dos hexes | expressão de hex |
 | `HOLD_POSITION` | o jogador (slot 0) mantém posição | vazio = qualquer; token ou expressão de hex |
 | `ATTACK_UNIT` | qualquer ataque é resolvido | — |
@@ -217,7 +227,7 @@ no hex, o comando não executa (registra no log). **Aeronave no ar não bloqueia
 
 ```text
 slot1 SD @flag                       sorteia uma bandeira LIVRE cujo nome contém "flag"
-slot1 SD @flag perto=Porto_Ferro     a bandeira livre mais próxima do alvo (x,y ou construção)
+slot1 SD @flag perto=PortoFerro      a bandeira livre mais próxima do alvo (x,y ou construção)
 slot1 SD @flag; slot1 SD @flag       dois soldados: o 2º pega outra, porque a 1ª ficou ocupada
 ```
 
@@ -237,6 +247,9 @@ Batalha embarca de novo ao montar o quadrante.
 |---|---|
 | `Ryan hp=5` · `SD fuel=2` · `APC ammo=0` | ajusta HP, combustível (`fuel`/`autonomia`) ou munição (`ammo`/`municao`) |
 | `wake 60,32` · `wake SD 60,32` · `wake Ryan` | reativa a unidade (limpa "já agiu") |
+| `victory LZ on` · `victory exit#1 off` | liga/desliga a marca de **prédio de vitória** (a área amarela em volta). Numa aula vale só pelo visual: as estrelas de vitória não decidem nada. ⚠️ A área amarela aparece mesmo com o prédio **oculto**: autore desligada e ligue pelo roteiro na hora de mostrar |
+| `capturable PortoFerro off` · `capturable PortoFerro on` | trava/libera só a **ação** de capturar o prédio: o soldado sobe nele e a opção não aparece. Para o mundo (IA, setores, painel) o prédio continua capturável. Serve para fechar o atalho de capturar antes da hora que a aula pede. Estado de runtime, não vai pro save |
+| `acted CH` · `acted 60,32` | o oposto do `wake`: a unidade fica "já agiu" (cinza) até um `wake`. Ex.: o Chinook desativado no briefing |
 | `complete sold_1_04` | completa a tarefa por key. Se for a última, **vence a aula** |
 | `show Bandeira` · `hide 5,4` | mostra/oculta uma construção |
 | `pan Bandeira` · `pan Ryan` · `pan 60,32` | desliza **só a câmera** |
@@ -269,6 +282,7 @@ slot1 SD move 64,33                  sem destino: avança pelo AutomataData
 | `blockStatusSummary` | trava a Situação do menu |
 | broncas (`scold...`) | texto e voz do Sargento ao tentar ação travada. Vazio = texto padrão |
 | `victoryDialog` | mensagem da vitória. Vazio = "TREINAMENTO CONCLUÍDO" |
+| `victoryText` | **fala final do Sargento** na vitória (vai no JSON, no topo, ao lado de `description`). O painel VITÓRIA espera ~3,5 s para ela ser lida. Vazio = painel na hora. A derrota faz o mesmo com o `defeatText` da tarefa |
 | `inimigo` | quem joga pelos slots ≠ 0: **Automata** (roteirizado) ou **IA de verdade** (perfil do contrato; facção sem QG no quadrante = rebelde, puxada pelo magnético do capitão) |
 | `forcarRegras` + `regras` | a aula impõe o preset de regras (ex.: `A Montanha Avacalha` = tudo ligado exceto névoa), ignorando o menu |
 

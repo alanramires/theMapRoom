@@ -14,8 +14,192 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::TutorialData
   id: Caserna - Soldado 2
   description: "Reabaste\xE7a o Helicoptero e saia pelo mar ao norte"
-  objectives: []
-  script: []
+  objectives:
+  - id: SUPPLY_UNIT
+    key: ex_01
+    parameters: CH
+    description: "Escolte o caminh\xE3o e reabaste\xE7a o Chinook"
+    startHidden: 1
+    isVisible: 0
+    isCompleted: 0
+    isOptional: 0
+    isDefeatCondition: 0
+    defeatText: 
+    hasFailed: 0
+  - id: HAS_EMBARKED_UNIT
+    key: ex_02
+    parameters: CH
+    description: Embarque a tropa no Chinook
+    startHidden: 1
+    isVisible: 0
+    isCompleted: 0
+    isOptional: 0
+    isDefeatCondition: 0
+    defeatText: 
+    hasFailed: 0
+  - id: UNIT_AT_HEX
+    key: ex_03
+    parameters: CH && (exit#1 || exit#2 || exit#3)
+    description: "Leve o Chinook at\xE9 a zona de extra\xE7\xE3o"
+    startHidden: 1
+    isVisible: 0
+    isCompleted: 0
+    isOptional: 0
+    isDefeatCondition: 0
+    defeatText: 
+    hasFailed: 0
+  - id: UNIT_DEAD
+    key: ex_04
+    parameters: CH
+    description: "N\xE3o perca o Chinook"
+    startHidden: 1
+    isVisible: 0
+    isCompleted: 0
+    isOptional: 0
+    isDefeatCondition: 1
+    defeatText: Derrubaram o Chinook... poxa, soldado, perdemos nossa carona pra
+      casa.
+    hasFailed: 0
+  - id: PLAYER_ELIMINATED
+    key: ex_05
+    parameters: 
+    description: "N\xE3o perca todas as unidades"
+    startHidden: 1
+    isVisible: 0
+    isCompleted: 0
+    isOptional: 0
+    isDefeatCondition: 1
+    defeatText: 
+    hasFailed: 0
+  script:
+  - advance: 0
+    objectiveKey: ex_05
+    revealObjective: 1
+    waitObjectiveKey: 
+    waitObjectiveIndex: -1
+    waitAllUnitsActed: 0
+    waitPlayerTurnStart: 0
+    text: "A f\xE1brica caiu, mas a Metalion fechou o cerco. Hora de sair desta ilha.
+      A Capit\xE3 Moura est\xE1 esperando voc\xEAs do outro lado."
+    voice: {fileID: 0}
+    spawnCommand: 
+    statCommand: CH fuel=6; pan CH
+    turn: 1
+    movement: 1
+    interactionType: 0
+    unlockMovement: 0
+    revealObjectiveKey: 
+    revealObjectiveIndex: -1
+  - advance: 0
+    objectiveKey: ex_04
+    revealObjective: 1
+    waitObjectiveKey: 
+    waitObjectiveIndex: -1
+    waitAllUnitsActed: 0
+    waitPlayerTurnStart: 0
+    text: "Problema: o Chinook est\xE1 [enfase]quase seco[/enfase]. Helic\xF3ptero
+      queima combust\xEDvel todo turno. Quando zerar, ele faz [enfase]pouso for\xE7ado[/enfase]
+      onde estiver, e n\xE3o decola mais sem reabastecer."
+    voice: {fileID: 0}
+    spawnCommand: 
+    statCommand: 
+    turn: 0
+    movement: 0
+    interactionType: 0
+    unlockMovement: 0
+    revealObjectiveKey: 
+    revealObjectiveIndex: -1
+  - advance: 0
+    objectiveKey: 
+    revealObjective: 0
+    waitObjectiveKey: 
+    waitObjectiveIndex: -1
+    waitAllUnitsActed: 0
+    waitPlayerTurnStart: 0
+    text: "O combust\xEDvel est\xE1 aqui, no caminh\xE3o. E entre ele e o Chinook
+      tem soldado da Metalion. [enfase]O caminh\xE3o n\xE3o atira[/enfase]: quem
+      protege ele s\xE3o voc\xEAs."
+    voice: {fileID: 0}
+    spawnCommand: 
+    statCommand: pan ST; cursor ST
+    turn: 0
+    movement: 0
+    interactionType: 0
+    unlockMovement: 0
+    revealObjectiveKey: 
+    revealObjectiveIndex: -1
+  - advance: 1
+    objectiveKey: ex_01
+    revealObjective: 1
+    waitObjectiveKey: 
+    waitObjectiveIndex: -1
+    waitAllUnitsActed: 0
+    waitPlayerTurnStart: 0
+    text: "[ordem]Escolte o caminh\xE3o at\xE9 o Chinook e reabaste\xE7a.[/ordem]
+      Sem o caminh\xE3o, o Chinook n\xE3o sai mais do ch\xE3o."
+    voice: {fileID: 0}
+    spawnCommand: 
+    statCommand: 
+    turn: 2
+    movement: 3
+    interactionType: 0
+    unlockMovement: 0
+    revealObjectiveKey: 
+    revealObjectiveIndex: -1
+  - advance: 1
+    objectiveKey: ex_02
+    revealObjective: 1
+    waitObjectiveKey: 
+    waitObjectiveIndex: -1
+    waitAllUnitsActed: 0
+    waitPlayerTurnStart: 0
+    text: 'Tanque cheio. [ordem]Agora embarque a tropa no Chinook.[/ordem]'
+    voice: {fileID: 0}
+    spawnCommand: 
+    statCommand: pan CH
+    turn: 0
+    movement: 0
+    interactionType: 0
+    unlockMovement: 0
+    revealObjectiveKey: 
+    revealObjectiveIndex: -1
+  - advance: 0
+    objectiveKey: 
+    revealObjective: 0
+    waitObjectiveKey: 
+    waitObjectiveIndex: -1
+    waitAllUnitsActed: 0
+    waitPlayerTurnStart: 0
+    text: "Rotor ligado e... [vermelho]Apaches no radar![/vermelho] A Metalion mandou
+      ca\xE7a atr\xE1s de voc\xEAs."
+    voice: {fileID: 0}
+    spawnCommand: slot1 AP @Apache; slot1 AP @Apache
+    statCommand: pan Apache#1
+    turn: 0
+    movement: 0
+    interactionType: 0
+    unlockMovement: 0
+    revealObjectiveKey: 
+    revealObjectiveIndex: -1
+  - advance: 1
+    objectiveKey: ex_03
+    revealObjective: 1
+    waitObjectiveKey: 
+    waitObjectiveIndex: -1
+    waitAllUnitsActed: 0
+    waitPlayerTurnStart: 0
+    text: "A zona de extra\xE7\xE3o \xE9 ao norte. [ordem]Leve o Chinook at\xE9 uma
+      das marcas e caia fora.[/ordem]"
+    voice: {fileID: 0}
+    spawnCommand: 
+    statCommand: show exit#1; show exit#2; show exit#3; victory exit#1 on; victory
+      exit#2 on; victory exit#3 on; pan exit#2
+    turn: 0
+    movement: 0
+    interactionType: 0
+    unlockMovement: 0
+    revealObjectiveKey: 
+    revealObjectiveIndex: -1
   dialogFlowMigrated: 1
   scoldEndTurnLocked:
     text: 
@@ -45,6 +229,8 @@ MonoBehaviour:
   inimigo: 0
   forcarRegras: 0
   regras: 2
+  forcarDificuldade: 1
+  dificuldade: 0
   blockCommandService: 0
   blockRemoveUnit: 0
   blockSurrender: 0

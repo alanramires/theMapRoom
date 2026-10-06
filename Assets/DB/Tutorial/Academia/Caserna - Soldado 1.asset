@@ -14,8 +14,247 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::TutorialData
   id: Caserna - Soldado 1
   description: "Desembarque na praia e capture a fabrica. sobreviva a retalha\xE7\xE3o"
-  objectives: []
-  script: []
+  objectives:
+  - id: UNIT_DISEMBARKED
+    key: op_11
+    parameters: CH
+    description: Desembarque todos os recrutas do Chinook
+    startHidden: 1
+    isVisible: 0
+    isCompleted: 0
+    isOptional: 0
+    isInternal: 0
+    isDefeatCondition: 0
+    defeatText: 
+    hasFailed: 0
+  - id: CAPTURE_PROGRESS
+    key: op_01
+    parameters: SD && PortoFerro
+    description: "Comece a capturar a F\xE1brica de Porto Ferro"
+    startHidden: 0
+    isVisible: 1
+    isCompleted: 0
+    isOptional: 0
+    isInternal: 1
+    isDefeatCondition: 0
+    defeatText: 
+    hasFailed: 0
+  - id: CAPTURE_CONSTRUCTION
+    key: op_02
+    parameters: PortoFerro
+    description: "Tome a F\xE1brica de Porto Ferro (resist\xEAncia cai at\xE9 0)"
+    startHidden: 1
+    isVisible: 0
+    isCompleted: 0
+    isOptional: 0
+    isInternal: 0
+    isDefeatCondition: 0
+    defeatText: 
+    hasFailed: 0
+  - id: PLAYER_ELIMINATED
+    key: op_03
+    parameters: 
+    description: "N\xE3o perca todas as unidades"
+    startHidden: 1
+    isVisible: 0
+    isCompleted: 0
+    isOptional: 0
+    isInternal: 0
+    isDefeatCondition: 1
+    defeatText: "Mais uma derrota para Auridia. Melhor sorte na pr\xF3xima."
+    hasFailed: 0
+  - id: ENEMY_CAPTURE
+    key: op_04
+    parameters: PortoFerro
+    description: "N\xE3o deixe a Metalion tomar a f\xE1brica"
+    startHidden: 1
+    isVisible: 0
+    isCompleted: 0
+    isOptional: 0
+    isInternal: 0
+    isDefeatCondition: 1
+    defeatText: "A Metalion recuperou a f\xE1brica, e a vit\xF3ria \xE9 deles."
+    hasFailed: 0
+  - id: UNIT_DEAD
+    key: op_05
+    parameters: CH || AUT=0
+    description: "N\xE3o perca o Chinook (abatido ou sem combust\xEDvel)"
+    startHidden: 1
+    isVisible: 0
+    isCompleted: 0
+    isOptional: 0
+    isInternal: 0
+    isDefeatCondition: 1
+    defeatText: Poxa, soldado... perdemos nossa carona pra casa.
+    hasFailed: 0
+  script:
+  - advance: 0
+    objectiveKey: op_03
+    revealObjective: 1
+    waitObjectiveKey: 
+    waitObjectiveIndex: -1
+    waitAllUnitsActed: 0
+    waitPlayerTurnStart: 0
+    text: "Aten\xE7\xE3o, recrutas. A F\xE1brica de Porto Ferro produz os blindados
+      que a Metalion joga contra n\xF3s no continente."
+    voice: {fileID: 0}
+    spawnCommand: 
+    statCommand: acted CH; capturable PortoFerro off
+    turn: 1
+    movement: 1
+    interactionType: 0
+    unlockMovement: 0
+    revealObjectiveKey: 
+    revealObjectiveIndex: -1
+  - advance: 0
+    objectiveKey: op_05
+    revealObjective: 1
+    waitObjectiveKey: 
+    waitObjectiveIndex: -1
+    waitAllUnitsActed: 0
+    waitPlayerTurnStart: 0
+    text: "Do mar ela \xE9 intoc\xE1vel: a costa \xE9 mata fechada. Voc\xEAs v\xE3o
+      entrar por onde ningu\xE9m espera."
+    voice: {fileID: 0}
+    spawnCommand: 
+    statCommand: pan PortoFerro
+    turn: 0
+    movement: 0
+    interactionType: 0
+    unlockMovement: 0
+    revealObjectiveKey: 
+    revealObjectiveIndex: -1
+  - advance: 0
+    objectiveKey: 
+    revealObjective: 0
+    waitObjectiveKey: 
+    waitObjectiveIndex: -1
+    waitAllUnitsActed: 0
+    waitPlayerTurnStart: 0
+    text: "Est\xE1 vendo a \xE1rea amarela na plan\xEDcie, perto da f\xE1brica? \xC9
+      a [enfase]zona de pouso (LZ)[/enfase]. Terreno firme e longe da guarni\xE7\xE3o:
+      \xE9 ali que o Chinook vai descer."
+    voice: {fileID: 0}
+    spawnCommand: 
+    statCommand: victory LZ on; pan LZ; cursor LZ
+    turn: 0
+    movement: 0
+    interactionType: 0
+    unlockMovement: 0
+    revealObjectiveKey: 
+    revealObjectiveIndex: -1
+  - advance: 1
+    objectiveKey: op_11
+    revealObjective: 1
+    waitObjectiveKey: 
+    waitObjectiveIndex: -1
+    waitAllUnitsActed: 0
+    waitPlayerTurnStart: 0
+    text: "A Capit\xE3 Moura leva voc\xEAs no Chinook. O tanque est\xE1 pela [enfase]metade[/enfase]:
+      voem direto, sem passeio. [ordem]Leve o Chinook at\xE9 a zona de pouso e desembarque
+      todos os recrutas.[/ordem] Ele desce, solta a tropa e sobe de novo sozinho.
+      A LZ \xE9 o caminho mais seguro, mas n\xE3o o \xFAnico."
+    voice: {fileID: 0}
+    spawnCommand: 
+    statCommand: wake CH; pan CH; cursor CH
+    turn: 2
+    movement: 3
+    interactionType: 0
+    unlockMovement: 0
+    revealObjectiveKey: 
+    revealObjectiveIndex: -1
+  - advance: 4
+    objectiveKey: op_04
+    revealObjective: 1
+    waitObjectiveKey: 
+    waitObjectiveIndex: -1
+    waitAllUnitsActed: 0
+    waitPlayerTurnStart: 0
+    text: "Todos em terra. Quem desembarca n\xE3o anda mais hoje. [ordem]Passe a
+      vez[/ordem] para encerrar o dia."
+    voice: {fileID: 0}
+    spawnCommand: 
+    statCommand: victory LZ off
+    turn: 2
+    movement: 0
+    interactionType: 0
+    unlockMovement: 0
+    revealObjectiveKey: 
+    revealObjectiveIndex: -1
+  - advance: 3
+    objectiveKey: op_02
+    revealObjective: 1
+    waitObjectiveKey: 
+    waitObjectiveIndex: -1
+    waitAllUnitsActed: 0
+    waitPlayerTurnStart: 0
+    text: 
+    voice: {fileID: 0}
+    spawnCommand: 
+    statCommand: 
+    turn: 1
+    movement: 0
+    interactionType: 0
+    unlockMovement: 0
+    revealObjectiveKey: 
+    revealObjectiveIndex: -1
+  - advance: 1
+    objectiveKey: op_01
+    revealObjective: 0
+    waitObjectiveKey: 
+    waitObjectiveIndex: -1
+    waitAllUnitsActed: 0
+    waitPlayerTurnStart: 0
+    text: "Dia novo, pernas descansadas. [ordem]Mova um soldado at\xE9 a f\xE1brica
+      e inicie a captura.[/ordem] O n\xFAmero embaixo da f\xE1brica \xE9 a [enfase]resist\xEAncia[/enfase]
+      dela: come\xE7a em 30 e cada turno de captura derruba 10. [enfase]Quando chegar
+      a 0, ela \xE9 nossa.[/enfase]"
+    voice: {fileID: 0}
+    spawnCommand: 
+    statCommand: capturable PortoFerro on; pan PortoFerro
+    turn: 2
+    movement: 0
+    interactionType: 0
+    unlockMovement: 0
+    revealObjectiveKey: 
+    revealObjectiveIndex: -1
+  - advance: 4
+    objectiveKey: 
+    revealObjective: 0
+    waitObjectiveKey: 
+    waitObjectiveIndex: -1
+    waitAllUnitsActed: 0
+    waitPlayerTurnStart: 0
+    text: "Contato! A guarni\xE7\xE3o da Metalion acordou. [enfase]Quem captura n\xE3o
+      atira[/enfase]: o outro recruta cobre. [ordem]Segure a f\xE1brica e termine
+      a captura.[/ordem] Soldado ferido captura menos: n\xE3o deixe o capturador
+      apanhar."
+    voice: {fileID: 0}
+    spawnCommand: slot1 SD @flag; slot1 SD @flag
+    statCommand: pan PortoFerro
+    turn: 2
+    movement: 0
+    interactionType: 0
+    unlockMovement: 0
+    revealObjectiveKey: 
+    revealObjectiveIndex: -1
+  - advance: 1
+    objectiveKey: op_02
+    revealObjective: 0
+    waitObjectiveKey: 
+    waitObjectiveIndex: -1
+    waitAllUnitsActed: 0
+    waitPlayerTurnStart: 0
+    text: 
+    voice: {fileID: 0}
+    spawnCommand: 
+    statCommand: 
+    turn: 0
+    movement: 0
+    interactionType: 0
+    unlockMovement: 0
+    revealObjectiveKey: 
+    revealObjectiveIndex: -1
   dialogFlowMigrated: 1
   scoldEndTurnLocked:
     text: 
@@ -42,11 +281,15 @@ MonoBehaviour:
     text: 
     voice: {fileID: 0}
   alwaysActedUnits: 
-  inimigo: 0
-  forcarRegras: 0
-  regras: 2
-  blockCommandService: 0
-  blockRemoveUnit: 0
-  blockSurrender: 0
-  blockStatusSummary: 0
+  inimigo: 1
+  forcarRegras: 1
+  regras: 3
+  forcarDificuldade: 1
+  dificuldade: 0
+  blockCommandService: 1
+  blockRemoveUnit: 1
+  blockSurrender: 1
+  blockStatusSummary: 1
   victoryDialog: {fileID: 0}
+  victoryText: "A f\xE1brica \xE9 nossa! Porto Ferro n\xE3o fabrica mais blindado
+    pra Metalion. Bom trabalho, recrutas."

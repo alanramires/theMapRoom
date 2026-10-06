@@ -1,0 +1,183 @@
+{
+    "id": "Caserna - Soldado 1",
+    "description": "Operação Cabeça de Ponte: transporte aéreo, desembarque, captura sob pressão.",
+    "victoryText": "A fábrica é nossa! Porto Ferro não fabrica mais blindado pra Metalion. Bom trabalho, recrutas.",
+    "objectives": [
+        {
+            "id": "UNIT_DISEMBARKED",
+            "key": "op_11",
+            "parameters": "CH",
+            "description": "Desembarque todos os recrutas do Chinook",
+            "startHidden": true,
+            "isOptional": false,
+            "isDefeatCondition": false,
+            "defeatText": "",
+            "isInternal": false
+        },
+        {
+            "id": "CAPTURE_PROGRESS",
+            "key": "op_01",
+            "parameters": "SD && PortoFerro",
+            "description": "Comece a capturar a Fábrica de Porto Ferro",
+            "startHidden": false,
+            "isOptional": false,
+            "isDefeatCondition": false,
+            "defeatText": "",
+            "isInternal": true
+        },
+        {
+            "id": "CAPTURE_CONSTRUCTION",
+            "key": "op_02",
+            "parameters": "PortoFerro",
+            "description": "Tome a Fábrica de Porto Ferro (resistência cai até 0)",
+            "startHidden": true,
+            "isOptional": false,
+            "isDefeatCondition": false,
+            "defeatText": "",
+            "isInternal": false
+        },
+        {
+            "id": "PLAYER_ELIMINATED",
+            "key": "op_03",
+            "parameters": "",
+            "description": "Não perca todas as unidades",
+            "startHidden": true,
+            "isOptional": false,
+            "isDefeatCondition": true,
+            "defeatText": "Mais uma derrota para Auridia. Melhor sorte na próxima.",
+            "isInternal": false
+        },
+        {
+            "id": "ENEMY_CAPTURE",
+            "key": "op_04",
+            "parameters": "PortoFerro",
+            "description": "Não deixe a Metalion tomar a fábrica",
+            "startHidden": true,
+            "isOptional": false,
+            "isDefeatCondition": true,
+            "defeatText": "A Metalion recuperou a fábrica, e a vitória é deles.",
+            "isInternal": false
+        },
+        {
+            "id": "UNIT_DEAD",
+            "key": "op_05",
+            "parameters": "CH || AUT=0",
+            "description": "Não perca o Chinook (abatido ou sem combustível)",
+            "startHidden": true,
+            "isOptional": false,
+            "isDefeatCondition": true,
+            "defeatText": "Poxa, soldado... perdemos nossa carona pra casa.",
+            "isInternal": false
+        }
+    ],
+    "script": [
+        {
+            "advance": "Immediate",
+            "turn": "Locked",
+            "movement": "Locked",
+            "interactionType": "Auto",
+            "objectiveKey": "op_03",
+            "revealObjective": true,
+            "text": "Atenção, recrutas. A Fábrica de Porto Ferro produz os blindados que a Metalion joga contra nós no continente.",
+            "voicePath": "",
+            "spawnCommand": "",
+            "statCommand": "acted CH; capturable PortoFerro off"
+        },
+        {
+            "advance": "Immediate",
+            "turn": "NoEffect",
+            "movement": "NoEffect",
+            "interactionType": "Auto",
+            "objectiveKey": "op_05",
+            "revealObjective": true,
+            "text": "Do mar ela é intocável: a costa é mata fechada. Vocês vão entrar por onde ninguém espera.",
+            "voicePath": "",
+            "spawnCommand": "",
+            "statCommand": "pan PortoFerro"
+        },
+        {
+            "advance": "Immediate",
+            "turn": "NoEffect",
+            "movement": "NoEffect",
+            "interactionType": "Auto",
+            "objectiveKey": "",
+            "revealObjective": false,
+            "text": "Está vendo a área amarela na planície, perto da fábrica? É a [enfase]zona de pouso (LZ)[/enfase]. Terreno firme e longe da guarnição: é ali que o Chinook vai descer.",
+            "voicePath": "",
+            "spawnCommand": "",
+            "statCommand": "victory LZ on; pan LZ; cursor LZ"
+        },
+        {
+            "advance": "ObjectiveCompleted",
+            "turn": "Unlocked",
+            "movement": "Unlocked",
+            "interactionType": "Auto",
+            "objectiveKey": "op_11",
+            "revealObjective": true,
+            "text": "A Capitã Moura leva vocês no Chinook. O tanque está pela [enfase]metade[/enfase]: voem direto, sem passeio. [ordem]Leve o Chinook até a zona de pouso e desembarque todos os recrutas.[/ordem] Ele desce, solta a tropa e sobe de novo sozinho. A LZ é o caminho mais seguro, mas não o único.",
+            "voicePath": "",
+            "spawnCommand": "",
+            "statCommand": "wake CH; pan CH; cursor CH"
+        },
+        {
+            "advance": "EnemyTurnStarted",
+            "turn": "Unlocked",
+            "movement": "NoEffect",
+            "interactionType": "Auto",
+            "objectiveKey": "op_04",
+            "revealObjective": true,
+            "text": "Todos em terra. Quem desembarca não anda mais hoje. [ordem]Passe a vez[/ordem] para encerrar o dia.",
+            "voicePath": "",
+            "spawnCommand": "",
+            "statCommand": "victory LZ off"
+        },
+        {
+            "advance": "PlayerTurnStarted",
+            "turn": "Locked",
+            "movement": "NoEffect",
+            "interactionType": "Auto",
+            "objectiveKey": "op_02",
+            "revealObjective": true,
+            "text": "",
+            "voicePath": "",
+            "spawnCommand": "",
+            "statCommand": ""
+        },
+        {
+            "advance": "ObjectiveCompleted",
+            "turn": "Unlocked",
+            "movement": "NoEffect",
+            "interactionType": "Auto",
+            "objectiveKey": "op_01",
+            "revealObjective": false,
+            "text": "Dia novo, pernas descansadas. [ordem]Mova um soldado até a fábrica e inicie a captura.[/ordem] O número embaixo da fábrica é a [enfase]resistência[/enfase] dela: começa em 30 e cada turno de captura derruba 10. [enfase]Quando chegar a 0, ela é nossa.[/enfase]",
+            "voicePath": "",
+            "spawnCommand": "",
+            "statCommand": "capturable PortoFerro on; pan PortoFerro"
+        },
+        {
+            "advance": "EnemyTurnStarted",
+            "turn": "Unlocked",
+            "movement": "NoEffect",
+            "interactionType": "Auto",
+            "objectiveKey": "",
+            "revealObjective": false,
+            "text": "Contato! A guarnição da Metalion acordou. [enfase]Quem captura não atira[/enfase]: o outro recruta cobre. [ordem]Segure a fábrica e termine a captura.[/ordem] Soldado ferido captura menos: não deixe o capturador apanhar.",
+            "voicePath": "",
+            "spawnCommand": "slot1 SD @flag; slot1 SD @flag",
+            "statCommand": "pan PortoFerro"
+        },
+        {
+            "advance": "ObjectiveCompleted",
+            "turn": "NoEffect",
+            "movement": "NoEffect",
+            "interactionType": "Auto",
+            "objectiveKey": "op_02",
+            "revealObjective": false,
+            "text": "",
+            "voicePath": "",
+            "spawnCommand": "",
+            "statCommand": ""
+        }
+    ]
+}
