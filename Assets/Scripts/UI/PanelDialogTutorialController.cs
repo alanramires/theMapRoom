@@ -114,6 +114,23 @@ public class PanelDialogTutorialController : MonoBehaviour
 
         script = tutorial.script;
         tutorial.MigrateLegacyDialogFlow();
+        SetPanelVisible(false);
+        StartCoroutine(BeginScriptAfterMatchStart());
+    }
+
+    // A fala 0 so roda depois do inicio do turno 1. Antes disso, o
+    // ReleaseUnitsForActiveTeam ainda vai rodar e zerar o HasActed — um 'acted CH'
+    // na abertura da aula era apagado sem log nenhum. Load de save e cena nao
+    // jogavel nunca levantam a flag: o teto de tempo cobre os dois.
+    private IEnumerator BeginScriptAfterMatchStart()
+    {
+        float limite = Time.unscaledTime + 5f;
+        while (matchController != null &&
+               !matchController.MatchStartApplied &&
+               !SaveGameManager.HasPendingMainMenuLoadRequest &&
+               Time.unscaledTime < limite)
+            yield return null;
+
         TryAdvanceToNext();
     }
 
@@ -526,6 +543,30 @@ public class PanelDialogTutorialController : MonoBehaviour
 
         // Sem painel de tutorial na cena: cai no panel_dialog normal.
         PanelDialogController.TrySetTransientText(text, 2.6f);
+    }
+
+    // Fala final (derrota da aula): como a bronca, mas nao restaura — o roteiro
+    // acabou, o balao fica com esta fala ate a cena sair.
+    public static void ShowFinalLine(string text, bool bronca)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return;
+        if (activeInstance == null || activeInstance.speechText == null)
+        {
+            PanelDialogController.TrySetTransientText(text, 6f);
+            return;
+        }
+
+        PanelDialogTutorialController p = activeInstance;
+        if (p.scoldRoutine != null)
+        {
+            p.StopCoroutine(p.scoldRoutine);
+            p.scoldRoutine = null;
+        }
+        p.scriptFinished = true;
+        p.SetPanelVisible(true);
+        p.speechText.text = FormatSpeechText(text);
+        p.ApplyScoldPortrait(bronca);
     }
 
     private bool TryShowScold(string text, AudioClip voice)

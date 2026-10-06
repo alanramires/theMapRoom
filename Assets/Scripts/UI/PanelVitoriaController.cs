@@ -50,6 +50,14 @@ public class PanelVitoriaController : MonoBehaviour
         + "nao leva a lugar nenhum e pior que botao nenhum.")]
     [SerializeField] private bool esconderCampanhaQuandoIndisponivel = true;
 
+    [Header("Volta automatica")]
+    [Tooltip(
+        "Segundos ate voltar sozinho para a Campanha, com a barra de tempo igual a do "
+        + "panel_helper. So conta quando a partida veio da campanha; 0 desliga. Os "
+        + "botoes continuam valendo durante a contagem.")]
+    [SerializeField] private float segundosParaVoltar = 6f;
+    [SerializeField] private Color corDaBarra = new Color(1f, 0.85f, 0.2f, 1f);
+
     private Button botaoCampanha;
     private Button botaoMenuPrincipal;
     private readonly System.Collections.Generic.List<Button> foco =
@@ -58,6 +66,10 @@ public class PanelVitoriaController : MonoBehaviour
     private int frameDeAbertura;
     private bool acionado;
     private CursorController cursor;
+
+    private float voltaAutomaticaEm = -1f;
+    private GameObject barraRaiz;
+    private RectTransform barraFill;
 
     private void OnEnable()
     {
@@ -70,11 +82,79 @@ public class PanelVitoriaController : MonoBehaviour
 
         EstaConduzindo = foco.Count > 0;
         AplicarDestaque();
+
+        // Mesma pergunta do botao "Campanha": sem para onde voltar, nao ha contagem.
+        voltaAutomaticaEm = segundosParaVoltar > 0f && QuadranteController.PodeVoltarParaCampanha
+            ? Time.unscaledTime + segundosParaVoltar
+            : -1f;
+        GarantirBarra();
+        if (barraRaiz != null)
+            barraRaiz.SetActive(voltaAutomaticaEm > 0f);
     }
 
     private void OnDisable()
     {
         EstaConduzindo = false;
+        voltaAutomaticaEm = -1f;
+    }
+
+    // A barra do panel_helper, refeita aqui: fina, no pe do painel, esvaziando.
+    // Criada em runtime para valer em todo Panel_vitoria sem mexer no prefab.
+    private void GarantirBarra()
+    {
+        if (barraRaiz != null)
+            return;
+        RectTransform painel = transform as RectTransform;
+        if (painel == null)
+            return;
+
+        barraRaiz = new GameObject("vitoria_timeout_progress", typeof(RectTransform), typeof(Image));
+        RectTransform raiz = barraRaiz.GetComponent<RectTransform>();
+        raiz.SetParent(painel, false);
+        raiz.anchorMin = new Vector2(0.02f, 0f);
+        raiz.anchorMax = new Vector2(0.98f, 0f);
+        raiz.pivot = new Vector2(0.5f, 0f);
+        raiz.anchoredPosition = new Vector2(0f, 8f);
+        raiz.sizeDelta = new Vector2(0f, 5f);
+        raiz.SetAsLastSibling();
+        Image fundo = barraRaiz.GetComponent<Image>();
+        fundo.color = new Color(0f, 0f, 0f, 0.65f);
+        fundo.raycastTarget = false;
+
+        GameObject fill = new GameObject("fill", typeof(RectTransform), typeof(Image));
+        barraFill = fill.GetComponent<RectTransform>();
+        barraFill.SetParent(raiz, false);
+        barraFill.anchorMin = Vector2.zero;
+        barraFill.anchorMax = Vector2.one;
+        barraFill.offsetMin = Vector2.zero;
+        barraFill.offsetMax = Vector2.zero;
+        Image imagem = fill.GetComponent<Image>();
+        imagem.color = corDaBarra;
+        imagem.raycastTarget = false;
+        barraRaiz.SetActive(false);
+    }
+
+    private void AtualizarVoltaAutomatica()
+    {
+        if (voltaAutomaticaEm <= 0f || acionado)
+            return;
+
+        float restante = voltaAutomaticaEm - Time.unscaledTime;
+        if (barraFill != null)
+        {
+            barraFill.anchorMax = new Vector2(Mathf.Clamp01(restante / Mathf.Max(0.1f, segundosParaVoltar)), 1f);
+            barraFill.offsetMin = Vector2.zero;
+            barraFill.offsetMax = Vector2.zero;
+        }
+
+        if (restante > 0f)
+            return;
+
+        voltaAutomaticaEm = -1f;
+        if (botaoCampanha != null && foco.Contains(botaoCampanha))
+            AcionarCampanha();
+        else
+            QuadranteController.TryVoltarParaCampanha();
     }
 
     private void ResolverBotoes()
@@ -170,6 +250,8 @@ public class PanelVitoriaController : MonoBehaviour
 
     private void Update()
     {
+        AtualizarVoltaAutomatica();
+
         if (acionado || foco.Count == 0)
             return;
 

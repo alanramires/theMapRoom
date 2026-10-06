@@ -861,6 +861,17 @@ public class ConstructionManager : MonoBehaviour
         RefreshRuntimeVisualState(force: true);
     }
 
+    // Trava de ROTEIRO (aula): o predio continua capturavel para o mundo — IA,
+    // setores, painel — e so a ACAO de capturar e negada (PodeCapturarSensor). Nao
+    // mexe no siteRuntime.isCapturable de proposito: isso mudaria o plano da IA.
+    // Estado de runtime, nao persiste no save.
+    public bool CaptureLockedByScript { get; private set; }
+
+    public void SetCaptureLockedByScript(bool locked)
+    {
+        CaptureLockedByScript = locked;
+    }
+
     public bool GetVictoryBuildingRuntimeFlag()
     {
         return siteRuntime != null && siteRuntime.isVictoryBuilding;

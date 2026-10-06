@@ -16,7 +16,15 @@ public class TutorialObjective
     public bool isVisible = true;
     public bool isCompleted = false;
     public bool isOptional = false;
+
+    [Tooltip("Gatilho interno: a tarefa e checada normalmente (depois de revelada pelo roteiro) mas NUNCA aparece na lista do jogador. Para controle do roteiro, ex.: 'comecou a capturar' so para disparar o spawn do inimigo.")]
+    public bool isInternal = false;
+
     public bool isDefeatCondition = false;
+
+    [Tooltip("So para condicao de derrota: a fala do Sargento quando ela dispara (ex.: \"Poxa, soldado, perdemos nossa carona pra casa.\"). Vazio = usa a description.")]
+    public string defeatText;
+
     public bool hasFailed = false;
 }
 
@@ -186,7 +194,9 @@ public class TutorialObjectiveDto
     public string description; // label da lista de tarefas / mensagem de derrota
     public bool startHidden;
     public bool isOptional;
+    public bool isInternal;    // gatilho do roteiro: checado, mas fora da lista do jogador
     public bool isDefeatCondition;
+    public string defeatText;  // fala do Sargento quando a derrota dispara (vazio = description)
 }
 
 [System.Serializable]
@@ -221,6 +231,7 @@ public class TutorialExportDto
 {
     public string id;
     public string description;
+    public string victoryText;  // fala final do Sargento na vitoria (vazio = sem fala, painel na hora)
     public List<TutorialObjectiveDto> objectives = new List<TutorialObjectiveDto>();
     public List<TutorialStepDto> script = new List<TutorialStepDto>();
 }
@@ -379,6 +390,10 @@ public class TutorialData : ScriptableObject
     [Header("Victory")]
     [Tooltip("Dialogo exibido ao completar todos os objetivos.")]
     public DialogData victoryDialog;
+
+    [Tooltip("Fala final do Sargento quando a aula e vencida (ex.: \"A fabrica e nossa. Bom trabalho, recrutas.\"). O painel de vitoria espera alguns segundos para ela ser lida. Vazio = sem fala, painel na hora.")]
+    [TextArea(2, 4)]
+    public string victoryText;
 
     // Resolve a key unica (hist_Y_XX) para o indice na lista de objectives. -1 se nao achar.
     public int FindObjectiveIndexByKey(string key)

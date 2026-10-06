@@ -1181,6 +1181,42 @@ public partial class TurnStateManager : MonoBehaviour
         return true;
     }
 
+    // Spawn DIRETO NO SLOT pedido (roteiro de tutorial: "slot1 SD @flag"). O
+    // TrySpawnUnitAtCell acima e do debug e grava o slot DA VEZ na unidade (e a
+    // recolore): a guarnicao da Metalion, que nasce no turno do aluno, nascia
+    // dele. Este usa o mesmo caminho da tropa inicial do quadrante.
+    public bool TrySpawnUnitAtCellForSlot(string unitToken, PlayerSlotId slot, Vector3Int cell, out UnitManager spawnedUnit, out string message)
+    {
+        spawnedUnit = null;
+        message = string.Empty;
+        cell.z = 0;
+
+        if (unitSpawner == null)
+        {
+            message = "UnitSpawner nao encontrado.";
+            return false;
+        }
+
+        if (!unitSpawner.TryResolveUnitDataByToken(unitToken, out UnitData unitData, out string resolveReason) || unitData == null)
+        {
+            message = resolveReason;
+            return false;
+        }
+
+        GameObject spawned = unitSpawner.SpawnAtCellForSlot(unitData, slot, cell);
+        if (spawned == null)
+        {
+            message = $"Falha ao spawnar {unitToken} em {cell} para o slot {slot.Value}.";
+            return false;
+        }
+
+        EnsureDebugSpawnRegisteredInAllActive(spawned);
+        spawnedUnit = spawned.GetComponent<UnitManager>();
+        ThreatRevisionTracker.NotifyUnitSpawned(spawnedUnit);
+        message = $"Spawnado: {unitToken} em {cell} no slot {slot.Value}.";
+        return true;
+    }
+
     private static void EnsureDebugSpawnRegisteredInAllActive(GameObject spawned)
     {
         if (spawned == null)

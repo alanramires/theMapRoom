@@ -127,7 +127,8 @@ public class PanelTutorialController : MonoBehaviour
             for (int i = 0; i < data.objectives.Count; i++)
             {
                 TutorialObjective obj = data.objectives[i];
-                if (obj == null || !obj.isVisible)
+                // Gatilho interno: o roteiro usa, o jogador nao ve (nem no "x/y completos").
+                if (obj == null || !obj.isVisible || obj.isInternal)
                     continue;
 
                 totalCount++;
@@ -140,7 +141,8 @@ public class PanelTutorialController : MonoBehaviour
                 string texColor = (obj.isCompleted || obj.hasFailed) ? "<color=#AAAAAA>" : "<color=#FFFFFF>";
                 string optionalSuffix = obj.isOptional ? " <color=#77DDEE>(opcional)</color>" : string.Empty;
                 
-                sb.AppendLine($"{checkMark} {texColor}{obj.description}</color>{optionalSuffix}");
+                string progressSuffix = TutorialManager.GetObjectiveProgressSuffix(obj);
+                sb.AppendLine($"{checkMark} {texColor}{obj.description}{progressSuffix}</color>{optionalSuffix}");
             }
 
             if (totalCount <= 0)

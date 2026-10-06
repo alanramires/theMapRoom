@@ -84,6 +84,16 @@ public class TutorialManagerEditor : Editor
             return;
         }
 
+        ImportTutorialJsonInto(asset);
+    }
+
+    // Import para um TutorialData qualquer — usado tambem pelo botao do proprio asset
+    // (TutorialDataEditor), que nao depende de aula rodando.
+    internal static void ImportTutorialJsonInto(TutorialData asset)
+    {
+        if (asset == null)
+            return;
+
         string path = EditorUtility.OpenFilePanel("Importar Tutorial (JSON)", "", "json");
         if (string.IsNullOrEmpty(path))
             return;
@@ -123,7 +133,9 @@ public class TutorialManagerEditor : Editor
                     description = o.description,
                     startHidden = o.startHidden,
                     isOptional = o.isOptional,
+                    isInternal = o.isInternal,
                     isDefeatCondition = o.isDefeatCondition,
+                    defeatText = o.defeatText,
                     // Estado de runtime reinicializado — o asset de design nao carrega progresso.
                     isVisible = !o.startHidden,
                     isCompleted = false,
@@ -186,6 +198,7 @@ public class TutorialManagerEditor : Editor
         Undo.RecordObject(asset, "Importar Tutorial JSON");
         asset.objectives = objectives;
         asset.script = script;
+        asset.victoryText = dto.victoryText;
         EditorUtility.SetDirty(asset);
         AssetDatabase.SaveAssets();
 
@@ -210,6 +223,14 @@ public class TutorialManagerEditor : Editor
                 "Nenhum tutorial ativo. Garanta MatchController.ActiveTutorial (ou rode em Play).", "OK");
             return;
         }
+
+        ValidateTutorialAsset(asset);
+    }
+
+    internal static void ValidateTutorialAsset(TutorialData asset)
+    {
+        if (asset == null)
+            return;
 
         List<string> report = TutorialManager.LintTutorial(asset.objectives, asset.script);
         LogLintReport(asset.name, report);
@@ -243,4 +264,52 @@ public class TutorialManagerEditor : Editor
     // Converte o nome do enum (string do JSON) de volta ao valor; fallback se vazio/desconhecido.
     private static T ParseEnum<T>(string s, T fallback) where T : struct
         => Enum.TryParse(s, true, out T v) ? v : fallback;
+}
+
+// Botoes de JSON no PROPRIO asset da aula. O import/export do TutorialManager
+// exige a aula rodando (tutorial ativo); para escrever uma aula da Academia antes
+// de jogar, o autor importa direto aqui.
+[CustomEditor(typeof(TutorialData))]
+public class TutorialDataEditor : Editor
+{
+    public override void OnInspectorGUI()
+    {
+        DrawDefaultInspector();
+
+        EditorGUILayout.Space();
+        bool doExport, doImport, doValidate;
+        // Clique capturado dentro do scope e tratado depois: janela modal dentro do
+        // HorizontalScope quebra o layout do IMGUI.
+        using (new EditorGUILayout.HorizontalScope())
+        {
+            doExport = GUILayout.Button("Exportar JSON...", GUILayout.Height(26));
+            doImport = GUILayout.Button("Importar JSON...", GUILayout.Height(26));
+            doValidate = GUILayout.Button("Validar", GUILayout.Height(26));
+        }
+        EditorGUILayout.HelpBox(
+            "Importar SUBSTITUI tarefas e roteiro desta aula (com Undo). Sintaxe: docs/tutorial/sintaxe.md.",
+            MessageType.Info);
+
+        TutorialData asset = (TutorialData)target;
+        if (doExport)
+            ExportAsset(asset);
+        if (doImport)
+            TutorialManagerEditor.ImportTutorialJsonInto(asset);
+        if (doValidate)
+            TutorialManagerEditor.ValidateTutorialAsset(asset);
+    }
+
+    private static void ExportAsset(TutorialData asset)
+    {
+        string json = TutorialManager.BuildTutorialJson(asset);
+        if (string.IsNullOrEmpty(json))
+            return;
+
+        string path = EditorUtility.SaveFilePanel("Exportar Tutorial (JSON)", "", asset.name, "json");
+        if (string.IsNullOrEmpty(path))
+            return;
+
+        File.WriteAllText(path, json, new System.Text.UTF8Encoding(true));
+        Debug.Log($"[TutorialData] Exportado: {path}");
+    }
 }

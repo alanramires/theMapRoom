@@ -1490,6 +1490,12 @@ public class MatchController : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// True depois que a partida NOVA aplicou o inicio do primeiro turno. Fica false
+    /// numa cena aberta para carregar save (o load assume) e em cena nao jogavel.
+    /// </summary>
+    public bool MatchStartApplied { get; private set; }
+
     private IEnumerator InitializeMatchAfterHotSeatGate()
     {
         if (!isPlayable) yield break;
@@ -1543,6 +1549,10 @@ public class MatchController : MonoBehaviour
         ResetUnfundedStartMoneyFlagsForFreshMatch();
         RestoreRoundZeroFogBakesForRuntime();
         ApplyActiveTeamIfChanged(force: true);
+        // Inicio do turno 1 aplicado (ReleaseUnitsForActiveTeam ja zerou HasActed,
+        // consumiu upkeep). Quem quer mexer no estado inicial — a fala 0 de uma aula
+        // com 'acted CH' — espera por isto, senao o reset apaga o que ela fez.
+        MatchStartApplied = true;
         // Neste ponto todos os objetos da cena ja passaram por OnEnable.
         // Reaplica SFX nos presets sem FOW Total caso o cursor ainda nao
         // estivesse disponivel durante o Awake/ApplyGameSetupPreset.
@@ -2514,7 +2524,7 @@ public class MatchController : MonoBehaviour
         HandleVictoryAestheticPresentation(activeTeam, TeamId.Neutral, VictoryReason.VictoryStars);
     }
 
-    public void DeclareTutorialVictory(TutorialData tutorial = null)
+    public void DeclareTutorialVictory(TutorialData tutorial = null, float panelDelaySeconds = 0f)
     {
         if (hasVictoryWinner) return;
 
@@ -2545,11 +2555,32 @@ public class MatchController : MonoBehaviour
             ? tutorial.victoryDialog.message
             : "TREINAMENTO CONCLUÍDO";
         string descricao = $"TIME {ColorizeTeamName(winnerTeam)} — {motivo}";
-        ShowVictoryPanel("VITÓRIA!", TeamUtils.GetColor(winnerTeam), descricao);
-
         // A aula concluida e uma partida concluida: sem este aviso a Campanha nao
         // registra a missao como vencida e o jogo nao volta para o mapa.
+        //
+        // ANTES do painel, como na partida normal: o PanelVitoriaController monta os
+        // botoes no OnEnable perguntando PodeVoltarParaCampanha, e quem arma a volta
+        // e este aviso. Na ordem inversa o botao "Campanha" nascia escondido.
         OnMatchConcluded?.Invoke(winnerSlot, winnerTeam, TeamId.Neutral, VictoryReason.TutorialCompleted, currentTurn);
+        ShowVictoryPanelAfter(panelDelaySeconds, "VITÓRIA!", TeamUtils.GetColor(winnerTeam), descricao);
+    }
+
+    // Painel de resultado com espera: a partida ja acabou (hasVictoryWinner, aviso
+    // disparado), so a TELA aguarda a fala final do Sargento ser lida.
+    private void ShowVictoryPanelAfter(float delaySeconds, string titulo, Color tituloColor, string descricao)
+    {
+        if (delaySeconds <= 0f || !isActiveAndEnabled)
+        {
+            ShowVictoryPanel(titulo, tituloColor, descricao);
+            return;
+        }
+        StartCoroutine(ShowVictoryPanelAfterRoutine(delaySeconds, titulo, tituloColor, descricao));
+    }
+
+    private IEnumerator ShowVictoryPanelAfterRoutine(float delaySeconds, string titulo, Color tituloColor, string descricao)
+    {
+        yield return new WaitForSecondsRealtime(delaySeconds);
+        ShowVictoryPanel(titulo, tituloColor, descricao);
     }
 
     private void DeclareDefeat()
@@ -11856,7 +11887,7 @@ public class MatchController : MonoBehaviour
         return hasVictoryWinner;
     }
 
-    public void DeclareTutorialDefeat(TutorialData tutorial, string reason = "")
+    public void DeclareTutorialDefeat(TutorialData tutorial, string reason = "", float panelDelaySeconds = 0f)
     {
         if (tutorial == null || hasVictoryWinner)
             return;
@@ -11877,6 +11908,12 @@ public class MatchController : MonoBehaviour
         {
             cursorController.PlayDefeatSfx();
         }
+
+        // Aula perdida tambem encerra a partida: arma a volta para a Campanha, mas
+        // sem vencedor para coroar (slot invalido nao pinta o quadrante). ANTES do
+        // painel — ver DeclareTutorialVictory: o botao "Campanha" pergunta pela volta
+        // no OnEnable do painel.
+        OnMatchConcluded?.Invoke(PlayerSlotId.Invalid, TeamId.Neutral, TeamId.Neutral, VictoryReason.TutorialFailed, currentTurn);
 
         // Busca o painel pelo nome (como no DeclareDefeat original). Panel_endGame
         // so existe nas cenas de tutorial antigas; na Batalha a derrota usa o mesmo
@@ -11906,11 +11943,7 @@ public class MatchController : MonoBehaviour
         }
 
         if (!legacyPanelShown)
-            ShowVictoryPanel("DERROTA!", new Color(0.85f, 0.2f, 0.2f), reason);
-
-        // Aula perdida tambem encerra a partida: arma a volta para a Campanha, mas
-        // sem vencedor para coroar (slot invalido nao pinta o quadrante).
-        OnMatchConcluded?.Invoke(PlayerSlotId.Invalid, TeamId.Neutral, TeamId.Neutral, VictoryReason.TutorialFailed, currentTurn);
+            ShowVictoryPanelAfter(panelDelaySeconds, "DERROTA!", new Color(0.85f, 0.2f, 0.2f), reason);
     }
 
     private static bool IsHeadQuarterConstruction(ConstructionManager construction)

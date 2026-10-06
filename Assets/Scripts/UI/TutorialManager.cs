@@ -16,9 +16,14 @@ public class TutorialManager : MonoBehaviour
 
     // Passar a vez travado pelo estado persistente definido no roteiro do tutorial.
     // Sem TutorialManager na cena => nunca trava (partidas normais ilesas).
+    // A trava do roteiro e regra do ALUNO: no turno da IA ela nao vale — a IA passa a
+    // vez pelo mesmo TryOpenEndingTurnConfirmation e levava bronca do Sargento (e
+    // ficava presa) quando a fala "Passe a vez" ja tinha travado de novo no turno dela.
     public static bool IsEndTurnLockedByTutorial =>
         activeInstance != null &&
-        (activeInstance.endTurnLockedByScript || activeInstance.automataCommandInProgress);
+        (activeInstance.automataCommandInProgress ||
+         (activeInstance.endTurnLockedByScript &&
+          (activeInstance.matchController == null || !activeInstance.matchController.IsActiveTeamAI())));
 
     private void BeginAutomataCommand()
     {
@@ -93,24 +98,32 @@ public class TutorialManager : MonoBehaviour
 
     // Bloqueios declarados no TutorialData ativo (valem a cena inteira, nao destravam
     // com o roteiro). Sem TutorialManager/tutorial na cena => nada bloqueado.
+    // Os bloqueios da aula sao regra do ALUNO: a IA inimiga joga com o kit inteiro
+    // (Servico do Comando incluso), como na trava do passar a vez.
+    private static bool IsActiveTurnAI()
+    {
+        MatchController mc = activeInstance != null ? activeInstance.matchController : null;
+        return mc != null && mc.IsActiveTeamAI();
+    }
+
     public static bool IsCommandServiceBlockedByTutorial
     {
-        get { TutorialData t = GetActiveTutorialStatic(); return t != null && t.blockCommandService; }
+        get { TutorialData t = GetActiveTutorialStatic(); return t != null && t.blockCommandService && !IsActiveTurnAI(); }
     }
 
     public static bool IsRemoveUnitBlockedByTutorial
     {
-        get { TutorialData t = GetActiveTutorialStatic(); return t != null && t.blockRemoveUnit; }
+        get { TutorialData t = GetActiveTutorialStatic(); return t != null && t.blockRemoveUnit && !IsActiveTurnAI(); }
     }
 
     public static bool IsSurrenderBlockedByTutorial
     {
-        get { TutorialData t = GetActiveTutorialStatic(); return t != null && t.blockSurrender; }
+        get { TutorialData t = GetActiveTutorialStatic(); return t != null && t.blockSurrender && !IsActiveTurnAI(); }
     }
 
     public static bool IsStatusSummaryBlockedByTutorial
     {
-        get { TutorialData t = GetActiveTutorialStatic(); return t != null && t.blockStatusSummary; }
+        get { TutorialData t = GetActiveTutorialStatic(); return t != null && t.blockStatusSummary && !IsActiveTurnAI(); }
     }
 
     private static TutorialData GetActiveTutorialStatic()
@@ -252,7 +265,10 @@ public class TutorialManager : MonoBehaviour
                 continue;
             }
 
-            if (obj.id != "UNIT_AT_HEX")
+            // UNIT_LANDED: como o UNIT_AT_HEX, mas a unidade tem de estar FORA do ar
+            // (pousou). Helicoptero pairando em cima da bandeira nao conta.
+            bool requireLanded = obj.id == "UNIT_LANDED";
+            if (obj.id != "UNIT_AT_HEX" && !requireLanded)
                 continue;
 
             List<UnitManager> units = UnitManager.AllActive;
@@ -262,6 +278,8 @@ public class TutorialManager : MonoBehaviour
                 if (unit == null || unit.IsDead || unit.IsEmbarked || !unit.HasActed)
                     continue;
                 if (unit.TeamId != playerTeam)
+                    continue;
+                if (requireLanded && unit.GetCurrentLayerMode().domain == Domain.Air)
                     continue;
                 if (!IsUnitAtCoordinates(unit, obj.parameters))
                     continue;
@@ -522,13 +540,16 @@ public class TutorialManager : MonoBehaviour
     // botoes de Save/Open estao no TutorialManagerEditor.
 
     // Monta o JSON do tutorial ATIVO. null se nao ha tutorial.
-    public string BuildActiveTutorialJson()
+    public string BuildActiveTutorialJson() => BuildTutorialJson(GetActiveTutorial());
+
+    // Export de QUALQUER TutorialData (o botao do proprio asset usa isto; nao exige
+    // aula rodando).
+    public static string BuildTutorialJson(TutorialData tutorial)
     {
-        TutorialData tutorial = GetActiveTutorial();
         if (tutorial == null)
             return null;
 
-        var dto = new TutorialExportDto { id = tutorial.id, description = tutorial.description };
+        var dto = new TutorialExportDto { id = tutorial.id, description = tutorial.description, victoryText = tutorial.victoryText };
         if (tutorial.objectives != null)
             for (int i = 0; i < tutorial.objectives.Count; i++)
                 if (tutorial.objectives[i] != null)
@@ -552,7 +573,9 @@ public class TutorialManager : MonoBehaviour
             description = o.description,
             startHidden = o.startHidden,
             isOptional = o.isOptional,
+            isInternal = o.isInternal,
             isDefeatCondition = o.isDefeatCondition,
+            defeatText = o.defeatText,
         };
     }
 
@@ -663,8 +686,8 @@ public class TutorialManager : MonoBehaviour
             obj.isCompleted = true;
             Debug.Log($"[TutorialManager] Objetivo '{obj.id}' completado!");
 
-            // Tocar beep
-            CursorController cursor = FindAnyObjectByType<CursorController>();
+            // Tocar beep (gatilho interno e invisivel: nao apita tarefa que o jogador nao ve)
+            CursorController cursor = obj.isInternal ? null : FindAnyObjectByType<CursorController>();
             if (cursor != null) cursor.PlayBeepSfx();
 
             OnObjectiveCompleted?.Invoke(obj);
@@ -932,9 +955,25 @@ public class TutorialManager : MonoBehaviour
                 }
             }
 
-            if (turnStateManager.TrySpawnUnitAtCell(unitToken, teamId, cell, out string message))
+            // Com slot (o caso normal), nasce DIRETO no slot pedido. Por numero de
+            // time (legado), o caminho antigo do debug.
+            UnitManager spawned = null;
+            string message;
+            bool ok;
+            if (logicalSlotIndex >= 0)
             {
-                UnitManager spawned = FindNewestActiveUnitAtCell(cell, (TeamId)teamId);
+                ok = turnStateManager.TrySpawnUnitAtCellForSlot(
+                    unitToken, PlayerSlotId.FromIndex(logicalSlotIndex), cell, out spawned, out message);
+            }
+            else
+            {
+                ok = turnStateManager.TrySpawnUnitAtCell(unitToken, teamId, cell, out message);
+                if (ok)
+                    spawned = FindNewestActiveUnitAtCell(cell, (TeamId)teamId);
+            }
+
+            if (ok)
+            {
                 if (spawned != null)
                 {
                     if (logicalSlotIndex >= 0)
@@ -1197,6 +1236,24 @@ public class TutorialManager : MonoBehaviour
         // do debug "wake unit" — limpa fusao e o estado de "ja agiu").
         if (parts[0].Equals("wake", System.StringComparison.OrdinalIgnoreCase))
             return TryExecuteWakeCommand(command, parts);
+
+        // "acted CH" / "acted 60,32": o oposto do wake — a unidade fica "ja agiu"
+        // (cinza, sem acao) ate um wake. Ex.: o Chinook desativado durante o
+        // briefing, acordado so na ordem de voo.
+        if (parts[0].Equals("acted", System.StringComparison.OrdinalIgnoreCase))
+            return TryExecuteActedCommand(command, parts);
+
+        // "victory LZ off" / "victory exit#1 on": liga/desliga a marca de predio de
+        // vitoria, que desenha a AREA AMARELA em volta dele. Numa aula as estrelas de
+        // vitoria nao decidem nada (UsesMatchEndRules), entao a marca vale so pelo
+        // visual: "pouse aqui", "saia por aqui".
+        if (parts[0].Equals("victory", System.StringComparison.OrdinalIgnoreCase))
+            return TryExecuteVictoryMarkCommand(command, parts);
+
+        // capturable PREDIO on|off: trava so a ACAO de capturar (o soldado sobe no
+        // predio e nao ganha a opcao). Fecha o atalho de capturar antes da hora.
+        if (parts[0].Equals("capturable", System.StringComparison.OrdinalIgnoreCase))
+            return TryExecuteCapturableCommand(command, parts);
 
         // "complete hist_1_08": completa um objetivo por KEY a partir do roteiro.
         // E o fim de tutorial scriptado: tarefas sem evento de jogo (ex.: ENDING)
@@ -1515,6 +1572,87 @@ public class TutorialManager : MonoBehaviour
         return true;
     }
 
+    private bool TryExecuteVictoryMarkCommand(string command, string[] parts)
+    {
+        if (parts.Length != 3 ||
+            !(parts[2].Equals("on", System.StringComparison.OrdinalIgnoreCase) ||
+              parts[2].Equals("off", System.StringComparison.OrdinalIgnoreCase)))
+        {
+            Debug.LogWarning($"[TutorialManager] victory invalido: '{command}' (use 'victory LZ on' ou 'victory LZ off').");
+            return false;
+        }
+
+        ConstructionManager target = FindConstructionByName(parts[1]);
+        if (target == null)
+        {
+            Debug.LogWarning($"[TutorialManager] victory: construcao '{parts[1]}' nao encontrada.");
+            return false;
+        }
+
+        bool on = parts[2].Equals("on", System.StringComparison.OrdinalIgnoreCase);
+        target.SetVictoryBuildingRuntimeFlag(on);
+        Debug.Log($"[TutorialManager] victory: '{target.name}' marca de vitoria = {on}.");
+        return true;
+    }
+
+    private bool TryExecuteCapturableCommand(string command, string[] parts)
+    {
+        if (parts.Length != 3 ||
+            !(parts[2].Equals("on", System.StringComparison.OrdinalIgnoreCase) ||
+              parts[2].Equals("off", System.StringComparison.OrdinalIgnoreCase)))
+        {
+            Debug.LogWarning($"[TutorialManager] capturable invalido: '{command}' (use 'capturable PortoFerro off' ou 'on').");
+            return false;
+        }
+
+        ConstructionManager target = FindConstructionByName(parts[1]);
+        if (target == null)
+        {
+            Debug.LogWarning($"[TutorialManager] capturable: construcao '{parts[1]}' nao encontrada.");
+            return false;
+        }
+
+        bool on = parts[2].Equals("on", System.StringComparison.OrdinalIgnoreCase);
+        target.SetCaptureLockedByScript(!on);
+        Debug.Log($"[TutorialManager] capturable: '{target.name}' captura {(on ? "liberada" : "travada")}.");
+        return true;
+    }
+
+    private bool TryExecuteActedCommand(string command, string[] parts)
+    {
+        if (parts.Length < 2)
+        {
+            Debug.LogWarning($"[TutorialManager] acted invalido: '{command}' (use 'acted CH' ou 'acted 60,32').");
+            return false;
+        }
+
+        UnitManager unit;
+        string last = parts[parts.Length - 1];
+        if (last.Contains(","))
+        {
+            if (!TryParseScriptCell(last, out Vector3Int cell))
+            {
+                Debug.LogWarning($"[TutorialManager] acted invalido: '{command}' (celula ilegivel).");
+                return false;
+            }
+            unit = FindActiveUnitAtCell(cell);
+        }
+        else
+        {
+            unit = FindActiveUnitByToken(parts[1]);
+        }
+
+        if (unit == null)
+        {
+            Debug.LogWarning($"[TutorialManager] acted: unidade nao encontrada para '{command}'.");
+            return false;
+        }
+
+        unit.MarkAsActed();
+        Debug.Log($"[TutorialManager] acted: {unit.name} marcada como ja agiu.");
+        return true;
+    }
+
     private CameraController panCameraController;
 
     private bool TryExecuteCursorCommand(string command, string[] parts)
@@ -1691,6 +1829,84 @@ public class TutorialManager : MonoBehaviour
         return true;
     }
 
+    // Contador da lista de tarefas: " (1/2)". Hoje so o UNIT_DISEMBARKED com token de
+    // TRANSPORTE tem progresso — o total e o maior numero de passageiros ja visto a
+    // bordo (memorizado: depois de desembarcar, o "2" nao pode virar "1").
+    // A lista redesenha todo frame, entao isto tem de ser barato: uma busca por token.
+    private readonly Dictionary<TutorialObjective, int> disembarkProgressTotals =
+        new Dictionary<TutorialObjective, int>();
+
+    public static string GetObjectiveProgressSuffix(TutorialObjective obj)
+    {
+        if (activeInstance == null || obj == null || obj.hasFailed)
+            return string.Empty;
+        if (obj.id == "UNIT_DISEMBARKED")
+            return activeInstance.BuildDisembarkProgressSuffix(obj);
+        if (obj.id == "CAPTURE_CONSTRUCTION" || obj.id == "CAPTURE_PROGRESS")
+            return activeInstance.BuildCaptureProgressSuffix(obj);
+        return string.Empty;
+    }
+
+    // CAPTURE_CONSTRUCTION: " (20/30)" — os pontos de captura que o predio ainda tem.
+    // DECRESCENTE: e o mesmo numero da plaquinha do predio, e ele cai ate 0.
+    // O predio e cacheado por objetivo: achar por nome custa FindObjectsByType e a
+    // lista redesenha todo frame.
+    private readonly Dictionary<TutorialObjective, ConstructionManager> captureProgressTargets =
+        new Dictionary<TutorialObjective, ConstructionManager>();
+
+    private string BuildCaptureProgressSuffix(TutorialObjective obj)
+    {
+        if (obj.isCompleted)
+            return string.Empty;
+
+        if (!captureProgressTargets.TryGetValue(obj, out ConstructionManager target) || target == null)
+        {
+            // CAPTURE_PROGRESS vem como "SD && PortoFerro": o predio e a parte que
+            // casa com uma construcao (a unidade nao casa com nenhuma).
+            string raw = obj.parameters != null ? obj.parameters : string.Empty;
+            string[] parts = raw.Split(new[] { "&&" }, System.StringSplitOptions.RemoveEmptyEntries);
+            for (int i = 0; i < parts.Length && target == null; i++)
+            {
+                string token = parts[i].Trim();
+                if (token.Length > 0)
+                    target = FindConstructionByName(token);
+            }
+            if (target == null)
+                return string.Empty;
+            captureProgressTargets[obj] = target;
+        }
+
+        if (target.CapturePointsMax <= 0)
+            return string.Empty;
+        return $" ({Mathf.Max(0, target.CurrentCapturePoints)}/{target.CapturePointsMax})";
+    }
+
+    private string BuildDisembarkProgressSuffix(TutorialObjective obj)
+    {
+        disembarkProgressTotals.TryGetValue(obj, out int total);
+        if (obj.isCompleted)
+            return total > 0 ? $" ({total}/{total})" : string.Empty;
+
+        string token = obj.parameters != null ? obj.parameters.Trim() : string.Empty;
+        if (token.Length == 0)
+            return string.Empty;
+
+        UnitManager transporter = FindActiveUnitByToken(token);
+        if (transporter == null)
+            return string.Empty;
+
+        int aboard = transporter.GetEmbarkedPassengerCount();
+        if (aboard > total)
+        {
+            total = aboard;
+            disembarkProgressTotals[obj] = total;
+        }
+        if (total <= 0)
+            return string.Empty;
+
+        return $" ({total - aboard}/{total})";
+    }
+
     private UnitManager FindActiveUnitByToken(string token)
     {
         List<UnitManager> units = UnitManager.AllActive;
@@ -1833,18 +2049,31 @@ public class TutorialManager : MonoBehaviour
 
         if (matchController != null && !matchController.HasVictoryWinner)
         {
-            matchController.DeclareTutorialVictory(tutorial);
+            // Fala final do Sargento ANTES do painel: a partida acaba agora, mas o
+            // painel espera a fala ser lida — senao ele cobre o balao no mesmo frame.
+            bool temFala = !string.IsNullOrWhiteSpace(tutorial.victoryText);
+            if (temFala)
+                PanelDialogTutorialController.ShowFinalLine(tutorial.victoryText, bronca: false);
+            matchController.DeclareTutorialVictory(tutorial, temFala ? FinalLinePanelDelaySeconds : 0f);
         }
     }
 
     private void DeclareDefeat(TutorialData tutorial, TutorialObjective objective)
     {
         Debug.Log($"[TutorialManager] Derrota disparada pelo objetivo: {objective.id}");
+        string fala = !string.IsNullOrWhiteSpace(objective.defeatText)
+            ? objective.defeatText
+            : objective.description;
+        // O Sargento fala por ultimo e fica: e o fim da aula, nao uma bronca.
+        PanelDialogTutorialController.ShowFinalLine(fala, bronca: true);
         if (matchController != null)
         {
-            matchController.DeclareTutorialDefeat(tutorial, objective.description);
+            matchController.DeclareTutorialDefeat(tutorial, fala, FinalLinePanelDelaySeconds);
         }
     }
+
+    // Quanto o painel de vitoria/derrota espera a fala final do Sargento ser lida.
+    private const float FinalLinePanelDelaySeconds = 3.5f;
 
     private void HandleUnitPurchased(UnitManager unit)
     {
@@ -1997,6 +2226,33 @@ public class TutorialManager : MonoBehaviour
 
     private void HandleUnitDisembarked(UnitManager passenger, UnitManager transporter)
     {
+        // UNIT_DISEMBARKED: o aluno desembarcou alguem. parameters: vazio = qualquer;
+        // token do PASSAGEIRO (SD) = ele saiu; token do TRANSPORTE (CH) = o transporte
+        // ficou vazio (todos a bordo desembarcaram). Dispara no
+        // commit do desembarque (TurnStateManager.Disembark, depois do replay).
+        TutorialData tutorial = GetActiveTutorial();
+        if (tutorial != null && tutorial.objectives != null && passenger != null &&
+            (matchController == null || passenger.TeamId == matchController.GetTeamIdForSlot(0)))
+        {
+            for (int i = 0; i < tutorial.objectives.Count; i++)
+            {
+                TutorialObjective obj = tutorial.objectives[i];
+                if (obj == null || obj.id != "UNIT_DISEMBARKED" || !obj.isVisible || !IsObjectivePending(obj))
+                    continue;
+                string token = obj.parameters != null ? obj.parameters.Trim() : string.Empty;
+                // Token do TRANSPORTE = "esvazie o transporte": so completa quando nao
+                // sobra ninguem a bordo. O passageiro ja saiu do assento antes do evento
+                // (TryDisembarkPassengerFromSeat), entao a contagem ja e a de depois.
+                bool transporterEmptied = transporter != null &&
+                    UnitMatchesTargetToken(transporter, token) &&
+                    transporter.GetEmbarkedPassengerCount() == 0;
+                if (token.Length == 0 ||
+                    UnitMatchesTargetToken(passenger, token) ||
+                    transporterEmptied)
+                    MarkObjectiveComplete(obj);
+            }
+        }
+
         // UNIT_AT_HEX por desembarque tambem e coberto pelo poll CheckUnitAtHexObjectives
         // (passageiro desembarcado fica HasActed na celula de destino).
     }

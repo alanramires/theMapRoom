@@ -426,6 +426,12 @@ public static class PodeCapturarSensor
             return false;
         }
 
+        if (construction.CaptureLockedByScript)
+        {
+            reason = "Captura travada pelo roteiro da aula.";
+            return false;
+        }
+
         // AGORA da para perguntar pela chave: existe alvo, e e o alvo que diz
         // qual etiqueta abre. Antes disso a pergunta nao tinha a quem ser feita.
         if (!construction.TryResolveConstructionData(
