@@ -3234,6 +3234,15 @@ public partial class TurnStateManager
         if (Time.frameCount <= turnStartAutonomyHelperActivatedFrame)
             return;
 
+        // OU 6s, OU o jogador comecou a jogar: unidade selecionada (cursor saiu do
+        // Neutral) derruba o relatorio automatico na hora. Vale para teclado, mouse
+        // e dedo, porque olha o estado, nao o dispositivo. O aberto pelo menu fica.
+        if (!turnStartAutonomyHelperOpenedFromMenu && CurrentCursorState != CursorState.Neutral)
+        {
+            ClearTurnStartAutonomyHelper();
+            return;
+        }
+
         if (!turnStartAutonomyHelperOpenedFromMenu
             && PanelHelperController
                 .IsCurrentPointerOverHelperPanel())
