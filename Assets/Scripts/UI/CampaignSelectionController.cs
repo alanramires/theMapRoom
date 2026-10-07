@@ -50,17 +50,24 @@ public class CampaignSelectionController : MonoBehaviour
         string id = save?.campaignSelection?.mundoId;
         if (string.IsNullOrWhiteSpace(id) || (mundo != null && mundo.mundoId == id))
             return false;
+        outro = FindKnownWorld(id);
+        return outro != null;
+    }
+
+    private MundoData FindKnownWorld(string id)
+    {
+        if (string.IsNullOrWhiteSpace(id))
+            return null;
+        if (mundo != null && mundo.mundoId == id)
+            return mundo;
         if (mundosConhecidos == null)
-            return false;
+            return null;
         for (int i = 0; i < mundosConhecidos.Count; i++)
         {
             if (mundosConhecidos[i] != null && mundosConhecidos[i].mundoId == id)
-            {
-                outro = mundosConhecidos[i];
-                return true;
-            }
+                return mundosConhecidos[i];
         }
-        return false;
+        return null;
     }
     [SerializeField] private ConstructionDatabase constructionDatabase;
     [SerializeField] private StructureDatabase structureDatabase;
@@ -143,6 +150,15 @@ public class CampaignSelectionController : MonoBehaviour
         // O mundo escolhido no menu (Tutorial = Academia) vence o serializado na cena.
         if (PartidaConfig.MundoAtivo != null)
             mundo = PartidaConfig.MundoAtivo;
+
+        // E o mundo do SAVE sendo aberto vence os dois: o mosaico e montado logo
+        // abaixo, e montar o mundo errado pisca na tela antes da recarga.
+        MundoData mundoDoSave = FindKnownWorld(SaveGameManager.PendingMundoId);
+        if (mundoDoSave != null)
+        {
+            mundo = mundoDoSave;
+            PartidaConfig.SetMundo(mundoDoSave);
+        }
         campanhaManager = GetComponent<CampanhaManager>();
         if (campanhaManager == null)
             foreach (CampanhaManager manager in FindObjectsByType<CampanhaManager>(FindObjectsSortMode.None))

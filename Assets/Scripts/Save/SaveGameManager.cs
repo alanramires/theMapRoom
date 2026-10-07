@@ -29,10 +29,31 @@ public class SaveGameManager : MonoBehaviour
         public string sceneName;
         public string savePath;
         public BattleMapSaveData battleMap;
+        public string mundoId;
     }
 
     private static PendingMainMenuLoadRequest pendingMainMenuLoad;
     public static BattleMapSaveData PendingBattleMap => pendingMainMenuLoad?.battleMap;
+
+    /// <summary>
+    /// Mundo do save que esta sendo aberto, conhecido ANTES da cena montar o mapa.
+    /// A Campanha le no Awake: sem isto ela nascia no mundo da cena, aparecia por um
+    /// instante e so entao recarregava no mundo do save.
+    /// </summary>
+    public static string PendingMundoId =>
+        pendingMainMenuLoad == null ? null
+        : !string.IsNullOrWhiteSpace(pendingMainMenuLoad.mundoId) ? pendingMainMenuLoad.mundoId
+        : pendingMainMenuLoad.battleMap?.mundoId;
+
+    // Batalha grava o mundo no endereco do mapa; a tela de Campanha, na selecao.
+    private static string MundoIdOf(SaveGameData data)
+    {
+        if (data == null)
+            return null;
+        if (!string.IsNullOrWhiteSpace(data.battleMap?.mundoId))
+            return data.battleMap.mundoId;
+        return data.campaignSelection?.mundoId;
+    }
     private static bool mainMenuLoadTransitionActive;
     private static bool suppressNextLoadConfirmSfx;
     private static string pendingNewGameSaveDirectory;
@@ -100,6 +121,7 @@ public class SaveGameManager : MonoBehaviour
         public string sceneName;
         public string mapDisplayName;
         public BattleMapSaveData battleMap;
+        public string mundoId;
         public DateTime savedAtLocal;
         public string path;
     }
@@ -112,6 +134,9 @@ public class SaveGameManager : MonoBehaviour
         public string sceneName;
         public string mapDisplayName;
         public BattleMapSaveData battleMap;
+        // Mundo do save (Batalha ou Campanha). Save antigo: vazio, e a Campanha
+        // descobre no load e recarrega uma vez.
+        public string mundoId;
         public long savedAtUtcTicks;
         public bool hasReplay;
         public bool hasJogadas;
@@ -988,11 +1013,11 @@ public class SaveGameManager : MonoBehaviour
         }
 
         return BeginSceneLoadForSave(normalizedSlot, targetScene, metadata.path, metadata.battleMap,
-            reloadCurrentScene: metadata.battleMap != null);
+            reloadCurrentScene: metadata.battleMap != null, mundoId: metadata.mundoId);
     }
 
     private bool BeginSceneLoadForSave(int normalizedSlot, string targetScene, string savePath,
-        BattleMapSaveData battleMap = null, bool reloadCurrentScene = false)
+        BattleMapSaveData battleMap = null, bool reloadCurrentScene = false, string mundoId = null)
     {
         if (string.IsNullOrWhiteSpace(savePath) || !File.Exists(savePath) ||
             !Application.CanStreamedLevelBeLoaded(targetScene))
@@ -1007,7 +1032,8 @@ public class SaveGameManager : MonoBehaviour
             slotIndex = normalizedSlot,
             sceneName = targetScene,
             savePath = Path.GetFullPath(savePath),
-            battleMap = battleMap
+            battleMap = battleMap,
+            mundoId = mundoId
         };
         mainMenuLoadTransitionActive = true;
         suppressNextLoadConfirmSfx = true;
@@ -1360,7 +1386,7 @@ public class SaveGameManager : MonoBehaviour
             {
                 // O snapshot so pode ser aplicado na cena que o produziu.
                 // Encaminha o mesmo arquivo e encerra este carregamento antes de limpar o tabuleiro.
-                BeginSceneLoadForSave(normalizedSlot, savedScene, path, data.battleMap);
+                BeginSceneLoadForSave(normalizedSlot, savedScene, path, data.battleMap, mundoId: MundoIdOf(data));
                 yield break;
             }
 
@@ -1376,7 +1402,7 @@ public class SaveGameManager : MonoBehaviour
                 }
                 if (!board.MatchesSavedMap(data.battleMap))
                 {
-                    BeginSceneLoadForSave(normalizedSlot, savedScene, path, data.battleMap, reloadCurrentScene: true);
+                    BeginSceneLoadForSave(normalizedSlot, savedScene, path, data.battleMap, reloadCurrentScene: true, mundoId: MundoIdOf(data));
                     yield break;
                 }
             }
@@ -1389,7 +1415,7 @@ public class SaveGameManager : MonoBehaviour
                 if (campaign.TryResolveOtherWorldForSave(data, out MundoData outroMundo))
                 {
                     PartidaConfig.SetMundo(outroMundo);
-                    BeginSceneLoadForSave(normalizedSlot, savedScene, path, data.battleMap, reloadCurrentScene: true);
+                    BeginSceneLoadForSave(normalizedSlot, savedScene, path, data.battleMap, reloadCurrentScene: true, mundoId: MundoIdOf(data));
                     yield break;
                 }
                 lastLoadRoutineSucceeded = campaign.RestoreSelectionFromSave(data);
@@ -3041,6 +3067,7 @@ public class SaveGameManager : MonoBehaviour
             metadata.sceneName = manifest.sceneName ?? string.Empty;
             metadata.mapDisplayName = manifest.mapDisplayName;
             metadata.battleMap = manifest.battleMap;
+            metadata.mundoId = manifest.mundoId;
             if (manifest.savedAtUtcTicks > 0L)
             {
                 DateTime utc = new DateTime(manifest.savedAtUtcTicks, DateTimeKind.Utc);
@@ -3105,6 +3132,7 @@ public class SaveGameManager : MonoBehaviour
                 sceneName = data?.sceneName ?? string.Empty,
                 mapDisplayName = data?.mapDisplayName ?? string.Empty,
                 battleMap = data?.battleMap,
+                mundoId = MundoIdOf(data),
                 savedAtUtcTicks = data?.savedAtUtcTicks ?? 0L,
                 hasReplay = !string.IsNullOrWhiteSpace(replayJson),
                 hasJogadas = !string.IsNullOrWhiteSpace(jogadasJson),

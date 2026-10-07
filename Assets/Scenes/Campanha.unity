@@ -10368,6 +10368,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CampaignSelectionController
   mundo: {fileID: 11400000, guid: 3c4f3be48f318fb4fb30ae0166700a28, type: 2}
   mundosConhecidos:
+  - {fileID: 11400000, guid: 3c4f3be48f318fb4fb30ae0166700a28, type: 2}
   - {fileID: 11400000, guid: 5401ad1240f096b4cab210a757057edf, type: 2}
   constructionDatabase: {fileID: 11400000, guid: a3b9ad47181534c4e92a0205460608a5, type: 2}
   structureDatabase: {fileID: 11400000, guid: db7a20bdbd574bd408e02a940b66e687, type: 2}
