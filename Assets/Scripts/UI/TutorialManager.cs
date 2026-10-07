@@ -226,6 +226,9 @@ public class TutorialManager : MonoBehaviour
             unitAtHexPollTimer = 0f;
             CheckUnitAtHexObjectives();
             CheckEmbarkAllObjectives();
+            CheckFuelObjectives();
+            CheckUnitsNearObjectives();
+            CheckTurnReachedObjectives();
         }
     }
 
@@ -233,6 +236,43 @@ public class TutorialManager : MonoBehaviour
     // esta a bordo do CH (dois soldados = os dois; se um morreu, basta o outro).
     // Poll, e nao evento: a morte de quem ficou de fora tambem pode completar.
     // So no Neutral — no meio da animacao o embarque ainda e provisorio.
+    // UNIT_DEAD com AUT=X tambem por poll, no Neutral. A checagem de inicio de
+    // turno (HandleActiveTeamChanged) roda ANTES do upkeep do turno — o
+    // OnActiveTeamChanged dispara antes do ReleaseUnitsForActiveTeam —, entao o
+    // pouso forcado so era notado um turno depois. No Neutral o upkeep ja passou
+    // e nenhum gasto de movimento e provisorio.
+    private void CheckFuelObjectives()
+    {
+        TutorialData tutorial = GetActiveTutorial();
+        if (tutorial == null || tutorial.objectives == null)
+            return;
+        if (turnStateManager == null)
+            turnStateManager = FindAnyObjectByType<TurnStateManager>();
+        if (turnStateManager != null && turnStateManager.CurrentCursorState != TurnStateManager.CursorState.Neutral)
+            return;
+
+        for (int i = 0; i < tutorial.objectives.Count; i++)
+        {
+            TutorialObjective obj = tutorial.objectives[i];
+            if (obj == null || obj.id != "UNIT_DEAD" || !obj.isVisible || !IsObjectivePending(obj))
+                continue;
+            if (obj.parameters == null || obj.parameters.IndexOf("AUT", System.StringComparison.OrdinalIgnoreCase) < 0)
+                continue;
+            List<UnitManager> units = UnitManager.AllActive;
+            for (int u = 0; u < units.Count; u++)
+            {
+                UnitManager unit = units[u];
+                if (unit == null || unit.IsDead)
+                    continue;
+                if (EvaluateUnitCondition(unit, obj, isDeathEvent: false))
+                {
+                    MarkObjectiveComplete(obj);
+                    break;
+                }
+            }
+        }
+    }
+
     private static bool IsEmbarkAllForm(TutorialObjective obj)
     {
         return obj != null && obj.id == "HAS_EMBARKED_UNIT" &&
@@ -727,6 +767,8 @@ public class TutorialManager : MonoBehaviour
             isDefeatCondition = o.isDefeatCondition,
             defeatText = o.defeatText,
             activeUntilKey = o.activeUntilKey,
+            announceText = o.announceText,
+            completeCommand = o.completeCommand,
         };
     }
 
@@ -830,8 +872,8 @@ public class TutorialManager : MonoBehaviour
         }
         else
         {
-            // Se já completou ou falhou, ignora
-            if (obj.isCompleted || obj.hasFailed) return;
+            // Se já completou ou falhou, ignora. Desarmada (activeUntilKey) tambem.
+            if (obj.isCompleted || obj.hasFailed || IsDefeatRetired(obj)) return;
 
             // SUCESSO: Marca como completo
             obj.isCompleted = true;
@@ -842,6 +884,17 @@ public class TutorialManager : MonoBehaviour
             if (cursor != null) cursor.PlayBeepSfx();
 
             OnObjectiveCompleted?.Invoke(obj);
+
+            // Fala avulsa: o recado sai na hora em que o fato acontece, sem
+            // depender de em que fala o roteiro esta.
+            if (!string.IsNullOrWhiteSpace(obj.announceText))
+                PanelDialogTutorialController.ShowAnnouncement(obj.announceText);
+
+            // Consequencia da tarefa (premio, disparar outra tarefa). Roda uma vez:
+            // tarefa ja completa nao volta aqui.
+            if (!string.IsNullOrWhiteSpace(obj.completeCommand))
+                ExecuteStatCommands(obj.completeCommand);
+
             CheckTutorialCompletion();
         }
 
@@ -875,8 +928,10 @@ public class TutorialManager : MonoBehaviour
         // a menos que tenha sido aposentada (activeUntilKey completou).
         if (obj.isDefeatCondition) return obj.isCompleted && !IsDefeatRetired(obj);
         
-        // Se é comum e não está concluído, ele ainda pode ser realizado
-        return !obj.isCompleted;
+        // Se é comum e não está concluído, ele ainda pode ser realizado — a menos
+        // que tenha sido desarmado (activeUntilKey completou: o relogio dos Apaches
+        // nao toca de novo se eles ja chegaram pelo embarque).
+        return !obj.isCompleted && !IsDefeatRetired(obj);
     }
 
     private void MarkObjectiveCompleteById(string id)
@@ -1386,6 +1441,12 @@ public class TutorialManager : MonoBehaviour
     private bool TryExecuteSingleStatCommand(string command)
     {
         string[] parts = command.Split(new[] { ' ' }, System.StringSplitOptions.RemoveEmptyEntries);
+
+        // "spawn slot1 AP @Apache": spawn de dentro de um statCommand/completeCommand,
+        // com a sintaxe do spawnCommand. E o que deixa uma TAREFA fazer nascer tropa
+        // (ex.: o relogio dos Apaches), sem depender de em que fala o roteiro esta.
+        if (parts.Length >= 2 && parts[0].Equals("spawn", System.StringComparison.OrdinalIgnoreCase))
+            return ExecuteSpawnCommands(command.Substring(command.IndexOf(' ') + 1));
         if (parts.Length >= 4 && parts[0].StartsWith("slot", System.StringComparison.OrdinalIgnoreCase) &&
             parts[2].Equals("move", System.StringComparison.OrdinalIgnoreCase))
             return TryExecuteMoveCommand(command, parts);
@@ -1425,6 +1486,10 @@ public class TutorialManager : MonoBehaviour
         // dispara a vitoria do tutorial normalmente.
         if (parts[0].Equals("complete", System.StringComparison.OrdinalIgnoreCase))
             return TryExecuteCompleteCommand(command, parts);
+
+        // money +200 (soma) | money -50 | money 500 (define): caixa do aluno.
+        if (parts[0].Equals("money", System.StringComparison.OrdinalIgnoreCase))
+            return TryExecuteMoneyCommand(command, parts);
 
         // "show Bandeira" / "hide Bandeira" / "show 5,4": alterna o isVisible de uma
         // construcao (ex.: revelar a bandeira da montanha no momento certo do roteiro).
@@ -1670,6 +1735,33 @@ public class TutorialManager : MonoBehaviour
             ? toBoard
             : Vector2Int.zero;
         cell = new Vector3Int(x + offset.x, y + offset.y, 0);
+        return true;
+    }
+
+    private bool TryExecuteMoneyCommand(string command, string[] parts)
+    {
+        if (parts.Length != 2 || matchController == null)
+        {
+            Debug.LogWarning($"[TutorialManager] money invalido: '{command}' (use 'money +200', 'money -50' ou 'money 500').");
+            return false;
+        }
+
+        string arg = parts[1].Trim();
+        bool relative = arg.StartsWith("+") || arg.StartsWith("-");
+        if (!int.TryParse(arg.TrimStart('+'), out int value))
+        {
+            Debug.LogWarning($"[TutorialManager] money invalido: '{command}' (valor nao numerico).");
+            return false;
+        }
+
+        PlayerSlotId slot = PlayerSlotId.FromIndex(0);
+        int before = matchController.GetActualMoney(slot);
+        int after = Mathf.Max(0, relative ? before + value : value);
+        if (!matchController.TrySetActualMoney(slot, after))
+            return false;
+
+        PanelMoneyController.PushContextualUpdate(matchController.GetTeamIdForSlot(0), after, "Bônus", after - before);
+        Debug.Log($"[TutorialManager] money: caixa do aluno {before} -> {after}.");
         return true;
     }
 
@@ -2138,6 +2230,19 @@ public class TutorialManager : MonoBehaviour
                 free.Add(flagCell);
         }
 
+        // ESCOLHA x BLOQUEIO. Aeronave no ar nao BLOQUEIA o spawn (helicoptero
+        // inimigo pairando nao impede reforco) — mas na hora de ESCOLHER a bandeira,
+        // prefere a que nao tem unidade nenhuma. Sem isto, o 1o Apache nascia no ar,
+        // a bandeira dele seguia "livre" e o 2o podia sortear a mesma.
+        var empty = new List<Vector3Int>();
+        for (int i = 0; i < free.Count; i++)
+        {
+            if (FindActiveUnitAtCell(free[i]) == null)
+                empty.Add(free[i]);
+        }
+        if (empty.Count > 0)
+            free = empty;
+
         if (free.Count == 0)
             return false;
 
@@ -2503,6 +2608,8 @@ public class TutorialManager : MonoBehaviour
         if (tutorial == null || tutorial.objectives == null || matchController == null)
             return;
 
+        CheckEnemyEliminatedObjectives(tutorial);
+
         int studentSlot = 0;
         List<UnitManager> units = UnitManager.AllActive;
         for (int u = 0; u < units.Count; u++)
@@ -2516,6 +2623,114 @@ public class TutorialManager : MonoBehaviour
         {
             TutorialObjective obj = tutorial.objectives[i];
             if (obj != null && obj.id == "PLAYER_ELIMINATED" && obj.isVisible && IsObjectivePending(obj))
+                MarkObjectiveComplete(obj);
+        }
+    }
+
+    // ENEMY_ELIMINATED: nao sobrou nenhuma unidade viva fora do slot do aluno
+    // (embarcadas contam). Avaliado quando uma unidade morre. Inimigo que ainda vai
+    // nascer pelo roteiro nao conta — ele nao existe ate nascer.
+    private void CheckEnemyEliminatedObjectives(TutorialData tutorial)
+    {
+        int studentSlot = 0;
+        List<UnitManager> units = UnitManager.AllActive;
+        for (int u = 0; u < units.Count; u++)
+        {
+            UnitManager unit = units[u];
+            if (unit != null && !unit.IsDead && unit.SlotIndex != studentSlot)
+                return;
+        }
+
+        for (int i = 0; i < tutorial.objectives.Count; i++)
+        {
+            TutorialObjective obj = tutorial.objectives[i];
+            if (obj != null && obj.id == "ENEMY_ELIMINATED" && obj.isVisible && IsObjectivePending(obj))
+                MarkObjectiveComplete(obj);
+        }
+    }
+
+    // UNITS_NEAR "ST && CH && 2": as duas unidades do aluno a no maximo N hexes uma
+    // da outra. Poll no Neutral (posicao confirmada, nunca a de uma animacao).
+    private void CheckUnitsNearObjectives()
+    {
+        TutorialData tutorial = GetActiveTutorial();
+        if (tutorial == null || tutorial.objectives == null)
+            return;
+        if (turnStateManager == null)
+            turnStateManager = FindAnyObjectByType<TurnStateManager>();
+        if (turnStateManager != null && turnStateManager.CurrentCursorState != TurnStateManager.CursorState.Neutral)
+            return;
+
+        for (int i = 0; i < tutorial.objectives.Count; i++)
+        {
+            TutorialObjective obj = tutorial.objectives[i];
+            if (obj == null || obj.id != "UNITS_NEAR" || !obj.isVisible || !IsObjectivePending(obj))
+                continue;
+            string[] parts = (obj.parameters ?? string.Empty).Split(new[] { "&&" }, System.StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length != 3)
+                continue;
+            UnitManager a = FindActiveUnitByToken(parts[0].Trim());
+            UnitManager b = FindActiveUnitByToken(parts[1].Trim());
+            if (a == null || b == null)
+                continue;
+            Vector3Int ca = a.CurrentCellPosition; ca.z = 0;
+            Vector3Int cb = b.CurrentCellPosition; cb.z = 0;
+
+            string range = parts[2].Trim();
+            bool near;
+            if (int.TryParse(range, out int maxDistance))
+            {
+                near = SectorManager.HexDistance(ca, cb) <= maxDistance;
+            }
+            else if (range.Equals("servico", System.StringComparison.OrdinalIgnoreCase) ||
+                     range.Equals("service", System.StringComparison.OrdinalIgnoreCase))
+            {
+                // "ST && CH && servico": B esta no TATICO DE SERVICO de A — o que A
+                // alcanca neste turno (movimento + raio de servico do supridor). E a
+                // banda do envelope, nao um numero de hexes: um caminhao de 4 MP e
+                // um de 6 nao servem a mesma distancia.
+                UnitReachEnvelope envelope = UnitReachEnvelopeService.Build(new UnitReachRequest
+                {
+                    Unit = a,
+                    BoardMap = a.BoardTilemap,
+                    TerrainDatabase = matchController != null ? matchController.TerrainDatabaseRef : null,
+                    Intent = ReachIntent.Service,
+                    Band = ReachBand.Tactical,
+                });
+                near = envelope != null && envelope.CanAct(cb);
+            }
+            else
+            {
+                continue;
+            }
+
+            if (near)
+                MarkObjectiveComplete(obj);
+        }
+    }
+
+    // TURN_REACHED N: comecou o turno N do aluno (rodada N, com o time do aluno
+    // ativo e o cursor no Neutral — o inicio de turno ja foi aplicado). O relogio
+    // das aulas: "em 5 rodadas os Apaches chegam".
+    private void CheckTurnReachedObjectives()
+    {
+        TutorialData tutorial = GetActiveTutorial();
+        if (tutorial == null || tutorial.objectives == null || matchController == null)
+            return;
+        if (matchController.ActiveTeamId != (int)matchController.GetTeamIdForSlot(0))
+            return;
+        if (turnStateManager == null)
+            turnStateManager = FindAnyObjectByType<TurnStateManager>();
+        if (turnStateManager != null && turnStateManager.CurrentCursorState != TurnStateManager.CursorState.Neutral)
+            return;
+
+        for (int i = 0; i < tutorial.objectives.Count; i++)
+        {
+            TutorialObjective obj = tutorial.objectives[i];
+            if (obj == null || obj.id != "TURN_REACHED" || !obj.isVisible || !IsObjectivePending(obj))
+                continue;
+            if (int.TryParse((obj.parameters ?? string.Empty).Trim(), out int turn) &&
+                matchController.CurrentTurn >= turn)
                 MarkObjectiveComplete(obj);
         }
     }
@@ -2711,14 +2926,29 @@ public class TutorialManager : MonoBehaviour
     {
         if (unit == null || string.IsNullOrWhiteSpace(obj.parameters)) return false;
 
+        // Sufixo "&& LANDED": a condicao de autonomia so vale com a unidade NO CHAO.
+        // O tanque zera ainda no ar; o pouso de emergencia vem no upkeep seguinte —
+        // sem isto o recado "tive que descer" saia com o helicoptero voando.
+        string parameters = obj.parameters;
+        bool requireLanded = false;
+        int landedAt = parameters.IndexOf("&& LANDED", System.StringComparison.OrdinalIgnoreCase);
+        if (landedAt >= 0)
+        {
+            requireLanded = true;
+            parameters = parameters.Remove(landedAt, "&& LANDED".Length).Trim();
+        }
+
         // Split por || para suportar múltiplos critérios ou NOME || CONDICAO
-        string[] parts = obj.parameters.Split(new[] { "||" }, System.StringSplitOptions.RemoveEmptyEntries);
+        string[] parts = parameters.Split(new[] { "||" }, System.StringSplitOptions.RemoveEmptyEntries);
         
         // Se for um evento de morte, qualquer parte que bata com o tipo/nome ja valida
         if (isDeathEvent)
         {
-            return MatchesUnitType(unit, obj.parameters);
+            return MatchesUnitType(unit, parameters);
         }
+
+        if (requireLanded && unit.GetCurrentLayerMode().domain == Domain.Air)
+            return false;
 
         // Se nao for morte, procuramos por critério de autonomia: AUT = X
         string unitIdOrName = parts[0].Trim();

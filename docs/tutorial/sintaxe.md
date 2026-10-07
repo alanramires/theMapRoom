@@ -84,7 +84,9 @@ Cada tarefa tem:
 | `isInternal` | **gatilho do roteiro**: é checada normalmente (depois de revelada), mas não aparece na lista, não entra no "x/y completos" e não apita. Ex.: "começou a capturar", só para disparar o spawn do inimigo. ⚠️ Não confundir com `isVisible`: esse é estado de runtime, e tarefa invisível **não é checada** |
 | `isDefeatCondition` | **inverte**: o evento acontecer é **derrota** |
 | `defeatText` | só em derrota: a **fala final do Sargento** (o balão fica com ela, com o retrato de bronca) e o texto do painel DERROTA, que espera ~3,5 s para ela ser lida. Vazio = usa a `description` |
-| `activeUntilKey` | só em derrota: ela **deixa de valer** quando a tarefa com esta key completa. Ex.: `UNIT_DEAD ST` com `activeUntilKey = ex_01` — perder o caminhão só é derrota até o Chinook ser reabastecido. Vazio = vale a aula toda |
+| `activeUntilKey` | a tarefa **deixa de valer** quando a tarefa com esta key completa. Vale para derrota e para gatilho (ex.: relógio `TURN_REACHED 10` com `activeUntilKey = ex_08` não toca se os Apaches já chegaram). Ex.: `UNIT_DEAD ST` com `activeUntilKey = ex_01` — perder o caminhão só é derrota até o Chinook ser reabastecido. Vazio = vale a aula toda |
+| `announceText` | **fala avulsa** do Sargento quando a tarefa completa: sai fora da fila do roteiro, como a bronca (retrato normal, some sozinha e o balão volta ao que estava). Para fato que pode ou não acontecer, em qualquer momento — ex.: gatilho interno e opcional `UNIT_DEAD CH \|\| AUT=0` com o recado do pouso forçado. **Não use uma fala do roteiro esperando esse tipo de tarefa**: se ela nunca completar, o roteiro trava |
+| `completeCommand` | comandos de roteiro (sintaxe do `statCommand`, separados por `;`) que rodam **uma vez** quando a tarefa completa. Ex.: `money +200`; `complete ex_08`. **Bônus por "um OU outro"**: uma tarefa interna e opcional `BONUS` com `completeCommand = money +200`, e cada gatilho com `completeCommand = complete <key do bônus>` — tarefa já completa não paga de novo |
 
 **Vitória** = todas as tarefas não opcionais e não de derrota completas.
 **Derrota** = qualquer tarefa `isDefeatCondition` acontecer.
@@ -112,7 +114,7 @@ com várias do mesmo tipo, os tipos sem parâmetro (como `ATTACK_UNIT`) completa
 | `ATTACK_UNIT_PLAINS` | idem, `plain`/`planicie`/`grass` | — |
 | `DESTROY_ENEMY_UNIT` | uma unidade de **outro slot que não o da vez** é destruída | — |
 | `UNIT_DEAD` / `DEAD_UNIT` | morre uma unidade que casa com o token | `TOKEN` ou `TOKEN \|\| TOKEN2` |
-| `UNIT_DEAD` com autonomia | a unidade fica com combustível `<= X` (checado ao mover e no início do turno) | `TOKEN \|\| AUT=X` |
+| `UNIT_DEAD` com autonomia | a unidade fica com combustível `<= X` (checado continuamente no `Neutral`, depois do consumo do turno). Sufixo `&& LANDED`: só vale com a unidade **no chão** — o tanque zera no ar e o pouso de emergência vem no turno seguinte | `TOKEN \|\| AUT=X`, `TOKEN \|\| AUT=0 && LANDED` |
 | `HAS_EMBARKED_UNIT` | `APC`: **alguém** embarca no transporte. `CH && SD`: **todo** `SD` vivo do aluno está a bordo do `CH` (dois soldados = os dois; se um morreu, basta o outro). A lista mostra `(1/2)` | token do **transporte**, ou `TRANSPORTE && PASSAGEIRO` |
 | `SUPPLY_UNIT` | um suprimento é feito | vazio = qualquer; token do **supridor ou do alvo** |
 | `USED_ROAD_BOOST` | uma unidade do slot 0 terminou a ação e o último movimento usou estrada | vazio = qualquer; token |
@@ -124,6 +126,9 @@ o mesmo número da plaquinha, **decrescente** (o prédio cai quando chega a 0). 
 contador acha o prédio dentro de `SD && PortoFerro` sozinho.
 | `ENEMY_CAPTURE` | um slot **que não é o aluno** toma um prédio (muda de dono). Use como derrota | igual ao `CAPTURE_CONSTRUCTION` |
 | `PLAYER_ELIMINATED` | o aluno (slot 0) fica **sem nenhuma unidade**, contando as embarcadas. Avaliado só quando uma unidade morre. Use como derrota | — |
+| `ENEMY_ELIMINATED` | não sobra **nenhuma unidade viva fora do slot do aluno** (embarcadas contam). Avaliado quando uma unidade morre. Inimigo que o roteiro ainda vai fazer nascer não conta | — |
+| `UNITS_NEAR` | `… && 2`: duas unidades a no máximo N hexes. `… && servico`: B está no **tático de serviço** de A — o que A alcança neste turno, movimento + raio de serviço (envelope, não número fixo). Checado no `Neutral` | `ST && CH && 2`, `ST && CH && servico` |
+| `TURN_REACHED` | começou a rodada N do aluno (time dele ativo, no `Neutral`). O relógio da aula. Ex.: Apaches chegam na rodada 5 se o aluno ainda não tiver ligado o rotor | `5` |
 | `PURCHASE_UNIT` | qualquer compra | — |
 | `INSPECT_ALLY_UNIT` | inspecionar unidade do slot **da vez** | — |
 | `INSPECT_ENEMY_UNIT` | inspecionar unidade de **outro** slot | — |
@@ -284,6 +289,8 @@ cair no meio da fala.
 | `capturable PortoFerro off` · `capturable PortoFerro on` | trava/libera só a **ação** de capturar o prédio: o soldado sobe nele e a opção não aparece. Para o mundo (IA, setores, painel) o prédio continua capturável. Serve para fechar o atalho de capturar antes da hora que a aula pede. Estado de runtime, não vai pro save |
 | `acted CH` · `acted 60,32` | o oposto do `wake`: a unidade fica "já agiu" (cinza) até um `wake`. Ex.: o Chinook desativado no briefing |
 | `complete sold_1_04` | completa a tarefa por key. Se for a última, **vence a aula** |
+| `money +200` · `money -50` · `money 500` | soma, tira ou define a **caixa do aluno** (slot 0), com o aviso no painel de dinheiro |
+| `spawn slot1 AP @Apache` | spawn **de dentro** de um `statCommand` ou `completeCommand`, com a sintaxe do `spawnCommand`. É o que deixa uma tarefa fazer nascer tropa. Padrão "o que vier primeiro": tarefa interna com o spawn no `completeCommand`, e cada gatilho (fala, relógio) manda `complete <key>` — tarefa já completa não nasce de novo |
 | `show Bandeira` · `hide 5,4` | mostra/oculta uma construção |
 | `pan Bandeira` · `pan Ryan` · `pan 60,32` | desliza **só a câmera** |
 | `cursor Ryan` · `cursor 60,32` | move **só o cursor**, sem selecionar |
@@ -318,6 +325,7 @@ slot1 SD move 64,33                  sem destino: avança pelo AutomataData
 | `victoryText` | **fala final do Sargento** na vitória (vai no JSON, no topo, ao lado de `description`). O painel VITÓRIA espera ~3,5 s para ela ser lida. Vazio = painel na hora. A derrota faz o mesmo com o `defeatText` da tarefa |
 | `inimigo` | quem joga pelos slots ≠ 0: **Automata** (roteirizado) ou **IA de verdade** (perfil do contrato; facção sem QG no quadrante = rebelde, puxada pelo magnético do capitão) |
 | `forcarRegras` + `regras` | a aula impõe o preset de regras (ex.: `A Montanha Avacalha` = tudo ligado exceto névoa), ignorando o menu |
+| `semEconomia` | desliga a economia na aula: suprir, reparar e o Serviço do Comando custam 0. Use quando a aula **depende** de um serviço (reabastecer o Chinook) e o aluno poderia gastar o dinheiro antes — sem isto a aula trava sem vitória nem derrota |
 
 ## 7. Inimigo roteirizado (`AutomataData`)
 

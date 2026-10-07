@@ -25,7 +25,14 @@ public class TutorialObjective
     [Tooltip("So para condicao de derrota: a fala do Sargento quando ela dispara (ex.: \"Poxa, soldado, perdemos nossa carona pra casa.\"). Vazio = usa a description.")]
     public string defeatText;
 
-    [Tooltip("So para condicao de derrota: ela deixa de valer quando a tarefa com esta KEY completa (ex.: perder o caminhao so e derrota ate o Chinook ser reabastecido). Vazio = vale a aula toda.")]
+    [Tooltip("Fala AVULSA do Sargento quando esta tarefa completa (fora da fila do roteiro, como a bronca, sem travar nada). Ex.: gatilho interno 'Chinook em pouso forcado' -> recado da Capita. Vazio = sem fala.")]
+    [TextArea(2, 4)]
+    public string announceText;
+
+    [Tooltip("Comandos de roteiro (mesma sintaxe do statCommand, separados por ';') que rodam quando esta tarefa completa. Ex.: 'money +200' para premiar, 'complete ex_08' para disparar outra tarefa.")]
+    public string completeCommand;
+
+    [Tooltip("A tarefa deixa de valer quando a tarefa com esta KEY completa. Derrota: 'perder o caminhao so e derrota ate o Chinook ser reabastecido'. Gatilho: 'o relogio dos Apaches desarma se eles ja chegaram pelo embarque'. Vazio = vale a aula toda.")]
     public string activeUntilKey;
 
     public bool hasFailed = false;
@@ -201,6 +208,8 @@ public class TutorialObjectiveDto
     public bool isDefeatCondition;
     public string defeatText;  // fala do Sargento quando a derrota dispara (vazio = description)
     public string activeUntilKey; // derrota aposentada quando esta tarefa completar (vazio = aula toda)
+    public string announceText;   // fala avulsa do Sargento quando a tarefa completa
+    public string completeCommand; // statCommand executado quando a tarefa completa
 }
 
 [System.Serializable]
@@ -377,6 +386,11 @@ public class TutorialData : ScriptableObject
 
     [Tooltip("Dificuldade da IA nesta aula (so vale com 'Forcar Dificuldade' e inimigo = IA).")]
     public AIDifficulty dificuldade = AIDifficulty.Facil;
+
+    [Tooltip("Desliga a economia nesta aula: suprir, reparar e o Servico do Comando custam 0. " +
+             "Use quando a aula depende de um servico (ex.: reabastecer o Chinook) e o aluno " +
+             "poderia gastar o dinheiro antes — sem isto a aula trava sem vitoria nem derrota.")]
+    public bool semEconomia;
 
     [Header("Bloqueios")]
     [Tooltip("Bloqueia o Servico do Comando (Reabastecer, atalho X) durante este tutorial.")]

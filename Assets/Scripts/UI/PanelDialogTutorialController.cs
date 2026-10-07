@@ -671,7 +671,18 @@ public class PanelDialogTutorialController : MonoBehaviour
         p.ApplyScoldPortrait(bronca);
     }
 
-    private bool TryShowScold(string text, AudioClip voice)
+    // Fala avulsa (announceText de uma tarefa): o mesmo balao transiente da bronca,
+    // com o retrato normal e tempo de leitura proporcional ao texto. Volta ao que o
+    // roteiro pedia quando acaba.
+    public static void ShowAnnouncement(string text)
+    {
+        if (activeInstance == null || string.IsNullOrWhiteSpace(text))
+            return;
+        float leitura = Mathf.Clamp(text.Length / 15f, 4f, 10f);
+        activeInstance.TryShowScold(text, null, bronca: false, minDuration: leitura);
+    }
+
+    private bool TryShowScold(string text, AudioClip voice, bool bronca = true, float minDuration = 2.6f)
     {
         if (script == null || speechText == null || string.IsNullOrWhiteSpace(text))
             return false;
@@ -680,19 +691,19 @@ public class PanelDialogTutorialController : MonoBehaviour
             StopCoroutine(scoldRoutine);
 
         // Com voz gravada, o balao segura ate a fala terminar.
-        float duration = 2.6f;
+        float duration = minDuration;
         if (voice != null)
             duration = Mathf.Max(duration, voice.length + 0.4f);
 
-        scoldRoutine = StartCoroutine(RunScold(text, voice, duration));
+        scoldRoutine = StartCoroutine(RunScold(text, voice, duration, bronca));
         return true;
     }
 
-    private IEnumerator RunScold(string text, AudioClip voice, float duration)
+    private IEnumerator RunScold(string text, AudioClip voice, float duration, bool bronca = true)
     {
         SetPanelVisible(true);
         speechText.text = FormatSpeechText(text);
-        ApplyScoldPortrait(true);
+        ApplyScoldPortrait(bronca);
 
         if (voiceSource != null)
         {

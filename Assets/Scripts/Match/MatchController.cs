@@ -923,6 +923,10 @@ public class MatchController : MonoBehaviour
         // AIController.Start consome a pendente depois deste ponto.
         if (tutorial != null && tutorial.forcarDificuldade)
             PartidaConfig.SetDifficulty(tutorial.dificuldade);
+        // Servico de graca: a aula que depende de reabastecer nao pode deixar o aluno
+        // gastar o dinheiro antes (ResolveEconomyCost devolve 0 sem economia).
+        if (tutorial != null && tutorial.semEconomia)
+            SetEconomyEnabled(false);
     }
 
     // REGRAS DE FIM: dois grupos que nunca se misturam.
