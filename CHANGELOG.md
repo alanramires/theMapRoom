@@ -32,6 +32,7 @@ de sensor têm uma fonte só. A direção vem do guia de modding do autor
 | v9.2.2 | O primeiro estranho jogou (Configurações, Ação Direta, a névoa com uma memória só) | [relatório](docs/relatorio_v9.2.2.md) |
 | v9.3.0 | A aula vira um quadrante (Academia: tutorial como mundo, regras de fim da aula, tarefas de captura) | [relatório](docs/relatorio_v9.3.0.md) |
 | v9.3.1 | A primeira aula fecha de ponta a ponta (travas só do aluno, atalhos fechados, fala final, volta automática) | [relatório](docs/relatorio_v9.3.1.md) |
+| v9.3.2 | A aula 2 joga contra uma IA que briga (save da aula e do mundo, rebelde caça, peças de roteiro) | [relatório](docs/relatorio_v9.3.2.md) |
 
 ---
 
