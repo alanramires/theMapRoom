@@ -20,12 +20,14 @@ MonoBehaviour:
     parameters: CH
     description: "Escolte o caminh\xE3o e reabaste\xE7a o Chinook"
     startHidden: 1
-    isVisible: 1
+    isVisible: 0
     isCompleted: 0
     isOptional: 0
     isInternal: 0
     isDefeatCondition: 0
     defeatText: 
+    announceText: 
+    completeCommand: 
     activeUntilKey: 
     hasFailed: 0
   - id: HAS_EMBARKED_UNIT
@@ -39,6 +41,8 @@ MonoBehaviour:
     isInternal: 0
     isDefeatCondition: 0
     defeatText: 
+    announceText: 
+    completeCommand: complete ex_08
     activeUntilKey: 
     hasFailed: 0
   - id: UNIT_AT_HEX
@@ -52,6 +56,8 @@ MonoBehaviour:
     isInternal: 0
     isDefeatCondition: 0
     defeatText: 
+    announceText: 
+    completeCommand: 
     activeUntilKey: 
     hasFailed: 0
   - id: UNIT_DEAD
@@ -59,13 +65,15 @@ MonoBehaviour:
     parameters: CH
     description: "N\xE3o perca o Chinook"
     startHidden: 1
-    isVisible: 1
-    isCompleted: 1
+    isVisible: 0
+    isCompleted: 0
     isOptional: 0
     isInternal: 0
     isDefeatCondition: 1
     defeatText: Derrubaram o Chinook... poxa, soldado, perdemos nossa carona pra
       casa.
+    announceText: 
+    completeCommand: 
     activeUntilKey: 
     hasFailed: 0
   - id: PLAYER_ELIMINATED
@@ -73,12 +81,14 @@ MonoBehaviour:
     parameters: 
     description: "N\xE3o perca todas as unidades"
     startHidden: 1
-    isVisible: 1
-    isCompleted: 1
+    isVisible: 0
+    isCompleted: 0
     isOptional: 0
     isInternal: 0
     isDefeatCondition: 1
     defeatText: "Mais uma derrota para Auridia. Melhor sorte na pr\xF3xima."
+    announceText: 
+    completeCommand: 
     activeUntilKey: 
     hasFailed: 0
   - id: UNIT_DEAD
@@ -86,14 +96,80 @@ MonoBehaviour:
     parameters: ST
     description: "N\xE3o perca o caminh\xE3o antes de reabastecer"
     startHidden: 1
-    isVisible: 1
-    isCompleted: 1
+    isVisible: 0
+    isCompleted: 0
     isOptional: 0
     isInternal: 0
     isDefeatCondition: 1
     defeatText: "Perdemos o caminh\xE3o... sem combust\xEDvel, o Chinook n\xE3o sai
       mais do ch\xE3o."
+    announceText: 
+    completeCommand: 
     activeUntilKey: ex_01
+    hasFailed: 0
+  - id: UNIT_DEAD
+    key: ex_07
+    parameters: CH || AUT=0 && LANDED
+    description: "Chinook em pouso for\xE7ado"
+    startHidden: 0
+    isVisible: 1
+    isCompleted: 0
+    isOptional: 1
+    isInternal: 1
+    isDefeatCondition: 0
+    defeatText: 
+    announceText: "[vermelho]R\xE1dio da Capit\xE3 Moura:[/vermelho] \"Secou o tanque,
+      tive que descer! No ch\xE3o a metralhadora n\xE3o dispara e o Chinook vira
+      alvo f\xE1cil. [ordem]Tragam esse combust\xEDvel r\xE1pido![/ordem]\""
+    completeCommand: 
+    activeUntilKey: 
+    hasFailed: 0
+  - id: APACHES
+    key: ex_08
+    parameters: 
+    description: Apaches chegam (uma vez)
+    startHidden: 0
+    isVisible: 1
+    isCompleted: 0
+    isOptional: 1
+    isInternal: 1
+    isDefeatCondition: 0
+    defeatText: 
+    announceText: 
+    completeCommand: spawn slot1 AP @Apache; spawn slot1 AP @Apache; pan Apache#1
+    activeUntilKey: 
+    hasFailed: 0
+  - id: TURN_REACHED
+    key: ex_09
+    parameters: 10
+    description: "Rel\xF3gio: Apaches na rodada 10"
+    startHidden: 0
+    isVisible: 1
+    isCompleted: 0
+    isOptional: 1
+    isInternal: 1
+    isDefeatCondition: 0
+    defeatText: 
+    announceText: "[vermelho]Apaches no radar![/vermelho] A Metalion mandou helic\xF3ptero
+      atr\xE1s de voc\xEAs. [enfase]Tropa no ch\xE3o \xE9 presa f\xE1cil para eles.[/enfase]"
+    completeCommand: complete ex_08
+    activeUntilKey: ex_08
+    hasFailed: 0
+  - id: UNITS_NEAR
+    key: ex_10
+    parameters: ST && CH && servico
+    description: "Chinook no alcance de servi\xE7o do caminh\xE3o"
+    startHidden: 0
+    isVisible: 1
+    isCompleted: 0
+    isOptional: 1
+    isInternal: 1
+    isDefeatCondition: 0
+    defeatText: 
+    announceText: "[amarelo]O Comando liberou 240 para o reabastecimento.[/amarelo]
+      [enfase]O combust\xEDvel do Chinook vem antes de tudo.[/enfase]"
+    completeCommand: money +240
+    activeUntilKey: 
     hasFailed: 0
   script:
   - advance: 0
@@ -107,7 +183,7 @@ MonoBehaviour:
       A Capit\xE3 Moura est\xE1 esperando voc\xEAs do outro lado."
     voice: {fileID: 0}
     spawnCommand: 
-    statCommand: CH fuel=6; pan CH
+    statCommand: acted CH; cursor CH
     turn: 1
     movement: 1
     interactionType: 0
@@ -145,7 +221,7 @@ MonoBehaviour:
       protege ele s\xE3o voc\xEAs."
     voice: {fileID: 0}
     spawnCommand: 
-    statCommand: pan ST; cursor ST
+    statCommand: cursor ST; wake CH
     turn: 0
     movement: 0
     interactionType: 0
@@ -160,10 +236,12 @@ MonoBehaviour:
     waitAllUnitsActed: 0
     waitPlayerTurnStart: 0
     text: "[ordem]Escolte o caminh\xE3o at\xE9 o Chinook e reabaste\xE7a.[/ordem]
-      Sem o caminh\xE3o, o Chinook n\xE3o sai mais do ch\xE3o."
+      Sem o caminh\xE3o, o Chinook n\xE3o sai mais do ch\xE3o. [azul]Dica: use a
+      montanha pr\xF3xima. L\xE1 em cima voc\xEAs t\xEAm uma posi\xE7\xE3o defensiva
+      melhor contra as tropas da Metalion.[/azul]"
     voice: {fileID: 0}
     spawnCommand: 
-    statCommand: 
+    statCommand: victory morro#1 on; victory morro#2 on
     turn: 2
     movement: 3
     interactionType: 0
@@ -180,7 +258,7 @@ MonoBehaviour:
     text: 
     voice: {fileID: 0}
     spawnCommand: 
-    statCommand: 
+    statCommand: victory morro#1 off; victory morro#2 off
     turn: 0
     movement: 0
     interactionType: 0
@@ -197,7 +275,27 @@ MonoBehaviour:
     text: 'Tanque cheio. [ordem]Agora embarque a tropa no Chinook.[/ordem]'
     voice: {fileID: 0}
     spawnCommand: 
-    statCommand: pan CH
+    statCommand: cursor CH
+    turn: 0
+    movement: 0
+    interactionType: 0
+    unlockMovement: 0
+    revealObjectiveKey: 
+    revealObjectiveIndex: -1
+  - advance: 4
+    objectiveKey: ex_03
+    revealObjective: 1
+    waitObjectiveKey: 
+    waitObjectiveIndex: -1
+    waitAllUnitsActed: 0
+    waitPlayerTurnStart: 0
+    text: "Rotor ligado! [vermelho]Os Apaches da Metalion est\xE3o vindo.[/vermelho]
+      A zona de extra\xE7\xE3o \xE9 ao norte. [ordem]Leve o Chinook at\xE9 uma das
+      marcas e caia fora.[/ordem]"
+    voice: {fileID: 0}
+    spawnCommand: 
+    statCommand: complete ex_08; victory exit#1 on; victory exit#2 on; victory exit#3
+      on; pan exit#2
     turn: 0
     movement: 0
     interactionType: 0
@@ -206,18 +304,15 @@ MonoBehaviour:
     revealObjectiveIndex: -1
   - advance: 1
     objectiveKey: ex_03
-    revealObjective: 1
+    revealObjective: 0
     waitObjectiveKey: 
     waitObjectiveIndex: -1
     waitAllUnitsActed: 0
     waitPlayerTurnStart: 0
-    text: "Rotor ligado e... [vermelho]Apaches no radar![/vermelho] A Metalion mandou
-      ca\xE7a atr\xE1s de voc\xEAs. A zona de extra\xE7\xE3o \xE9 ao norte. [ordem]Leve
-      o Chinook at\xE9 uma das marcas e caia fora.[/ordem]"
+    text: 
     voice: {fileID: 0}
-    spawnCommand: slot1 AP @Apache; slot1 AP @Apache
-    statCommand: show exit#1; show exit#2; show exit#3; victory exit#1 on; victory
-      exit#2 on; victory exit#3 on; pan exit#2
+    spawnCommand: 
+    statCommand: 
     turn: 0
     movement: 0
     interactionType: 0
@@ -255,6 +350,7 @@ MonoBehaviour:
   regras: 3
   forcarDificuldade: 1
   dificuldade: 0
+  semEconomia: 0
   blockCommandService: 1
   blockRemoveUnit: 1
   blockSurrender: 1
