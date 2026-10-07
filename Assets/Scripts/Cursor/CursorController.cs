@@ -1490,7 +1490,7 @@ public class CursorController : MonoBehaviour
         int activeTeam = matchController != null ? matchController.ActiveTeamId : -1;
         if (activeTeam < 0)
             return false;
-        if (!TeamAnchorResolver.TryResolveAnchorCell(activeTeam, out Vector3Int anchorCell))
+        if (!TeamAnchorResolver.TryResolveAnchorCell(activeTeam, out Vector3Int anchorCell, currentCell))
             return false;
 
         if (!SetCell(anchorCell, playMoveSfx: false))
@@ -2252,7 +2252,9 @@ public class CursorController : MonoBehaviour
 
 public static class TeamAnchorResolver
 {
-    public static bool TryResolveAnchorCell(int teamId, out Vector3Int anchorCell)
+    // near: com construcao nenhuma (ou so ocultas), a unidade aliada MAIS PROXIMA
+    // deste hex (o cursor) — sem ele, a de menor id, como antes.
+    public static bool TryResolveAnchorCell(int teamId, out Vector3Int anchorCell, Vector3Int? near = null)
     {
         anchorCell = Vector3Int.zero;
         if (teamId < 0)
@@ -2265,6 +2267,9 @@ public static class TeamAnchorResolver
         {
             ConstructionManager construction = constructions[i];
             if (construction == null || !construction.gameObject.activeInHierarchy)
+                continue;
+            // Oculta (isVisible off: bandeira de spawn de aula) nao e casa de ninguem.
+            if (!construction.IsVisible)
                 continue;
             if ((int)construction.TeamId != teamId)
                 continue;
@@ -2289,13 +2294,30 @@ public static class TeamAnchorResolver
 
         UnitManager[] units = Object.FindObjectsByType<UnitManager>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
         UnitManager firstTeamUnit = null;
+        float bestDistance = float.MaxValue;
         for (int i = 0; i < units.Length; i++)
         {
             UnitManager unit = units[i];
-            if (unit == null || !unit.gameObject.activeInHierarchy || unit.IsEmbarked)
+            if (unit == null || !unit.gameObject.activeInHierarchy || unit.IsEmbarked || unit.IsDead)
                 continue;
             if ((int)unit.TeamId != teamId)
                 continue;
+
+            if (near.HasValue)
+            {
+                Vector3Int unitCell = unit.CurrentCellPosition;
+                unitCell.z = 0;
+                Vector3Int origin = near.Value;
+                origin.z = 0;
+                float distance = SectorManager.HexDistance(origin, unitCell);
+                if (firstTeamUnit == null || distance < bestDistance ||
+                    (distance == bestDistance && unit.InstanceId < firstTeamUnit.InstanceId))
+                {
+                    firstTeamUnit = unit;
+                    bestDistance = distance;
+                }
+                continue;
+            }
 
             if (firstTeamUnit == null || unit.InstanceId < firstTeamUnit.InstanceId)
                 firstTeamUnit = unit;
