@@ -86,13 +86,19 @@ public partial class AIController
                 return null;
             }
 
+            bool hunting = false;
             if (!TryResolvePlanlessCapturerAnchor(
                     unit, snapshot, out Vector3Int anchorCell))
             {
-                return null;
+                // Faccao sem plano (rebelde) sem nada para capturar parte para a
+                // briga: a ancora vira o inimigo visivel mais proximo. A IA com QG
+                // (plan != null) nao entra aqui — o rogue dela segue o fluxo normal.
+                if (plan != null || !TryResolveRebelHuntAnchor(unit, snapshot, out anchorCell))
+                    return null;
+                hunting = true;
             }
 
-            return DecideRogueCapturerAction(unit, snapshot, anchorCell);
+            return DecideRogueCapturerAction(unit, snapshot, anchorCell, hunting);
         }
 
         return DecideAssignedCapturerAction(unit, snapshot, assigned);

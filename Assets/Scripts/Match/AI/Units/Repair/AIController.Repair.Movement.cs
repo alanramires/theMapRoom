@@ -238,7 +238,8 @@ public partial class AIController
     private static bool CanSurfaceRepairConstructionServe(
         ConstructionManager construction,
         UnitManager target,
-        TeamId aiTeam)
+        TeamId aiTeam,
+        bool ignoreTurnLimit = false)
     {
         if (construction == null
             || target == null
@@ -249,7 +250,7 @@ public partial class AIController
             || data == null
             || !data.isSupplier
             || data.maxUnitsServedPerTurn <= 0
-            || target.ReceivedSuppliesThisTurn)
+            || (!ignoreTurnLimit && target.ReceivedSuppliesThisTurn))
         {
             return false;
         }

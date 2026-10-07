@@ -22,15 +22,33 @@ public partial class AIController
         if (wasGrounded)
             unit.SetAircraftGrounded(false);
 
+        PlayerAction repairAction;
         try
         {
-            return DecideUnderRepairAction(unit, snapshot);
+            repairAction = DecideUnderRepairAction(unit, snapshot);
         }
         finally
         {
             if (wasGrounded)
                 unit.SetAircraftGrounded(true);
         }
+
+        // ULTIMO RECURSO: sem predio do time que conserte, o reparo so tem uma
+        // saida, a FUSAO. Se a decisao de reparo nao achou fusao, recuar nao leva a
+        // lugar nenhum (marchava ate uma bandeira do proprio time e ficava la).
+        // Sai do reparo e devolve null: o papel da unidade decide, e ferido ou nao
+        // ele parte para a briga.
+        if ((repairAction == null || repairAction.SensorAction != SensorActionType.Merge)
+            && !HasAnyOwnRepairFacilityFor(unit))
+        {
+            unit.SetIsUnderRepair(false);
+            unit.SetAIMaintenanceActive(false);
+            Debug.Log($"{TL("Repair")} {unit.InstanceId} sem predio que conserte e sem fusao a vista " +
+                      $"(hp={unit.CurrentHP}): ultimo recurso, volta ao combate.");
+            return null;
+        }
+
+        return repairAction;
     }
 
     private void UpdateRepairState(UnitManager unit, TeamObjectivePlan plan)
@@ -67,6 +85,39 @@ public partial class AIController
             unit.SetAIMaintenanceActive(false);
             Debug.Log($"{TL("Repair")} {unit.InstanceId} saiu do reparo hp={unit.CurrentHP}");
         }
+        else if (unit.IsUnderRepair && !anyTrigger && !HasAnyOwnRepairFacilityFor(unit))
+        {
+            // A FAIXA ENTRE O GATILHO E A RECUPERACAO so faz sentido se existe onde
+            // recuperar. Sem predio do time que conserte esta unidade (nenhum predio,
+            // nenhum do time, ou so bandeira), segurar a unidade ate repairRecoverHpAbove
+            // e prende-la para sempre: dois soldados fundidos em HP 6 ficavam parados
+            // esperando um 8 que nunca vem. A entrada em reparo (abaixo do gatilho)
+            // continua valendo — e ela que permite a fusao na retaguarda.
+            unit.SetIsUnderRepair(false);
+            unit.SetAIMaintenanceActive(false);
+            Debug.Log($"{TL("Repair")} {unit.InstanceId} saiu do reparo hp={unit.CurrentHP} " +
+                      $"(sem predio do time que conserte; volta a acao abaixo de {data.repairRecoverHpAbove})");
+        }
+    }
+
+    /// <summary>
+    /// O time tem ALGUM predio que conserta esta unidade? Pergunta de existencia, nao
+    /// de destino: ignora distancia, ocupacao, ameaca e o limite de servico do turno —
+    /// esses decidem PARA ONDE ir, nao SE existe para onde ir.
+    /// </summary>
+    private bool HasAnyOwnRepairFacilityFor(UnitManager unit)
+    {
+        if (unit == null)
+            return false;
+        int slot = ResolveAISlotKey(unit.TeamId);
+        foreach (ConstructionManager c in ConstructionManager.AllActive)
+        {
+            if (c == null || c.SlotIndex != slot)
+                continue;
+            if (CanSurfaceRepairConstructionServe(c, unit, unit.TeamId, ignoreTurnLimit: true))
+                return true;
+        }
+        return false;
     }
 
     private static int IncrementRepairActivationCount(TeamId team)

@@ -18,7 +18,8 @@ public partial class AIController
     private PlayerAction DecideRogueCapturerAction(
         UnitManager unit,
         AIWorldSnapshot snapshot,
-        Vector3Int anchorCell)
+        Vector3Int anchorCell,
+        bool hunting = false)
     {
         Vector3Int from   = unit.CurrentCellPosition; from.z = 0;
         Vector3Int target = anchorCell; target.z = 0;
@@ -56,7 +57,11 @@ public partial class AIController
             }
         }
 
-        if (HasEnemyInEngageRadius(unit, from, snapshot.AITeam))
+        // Cacando, a varredura de tiro roda sempre: HasEnemyInEngageRadius mede com
+        // Vector3Int.Distance (reta na grade, nao hex) e deixava de fora inimigo que
+        // estava no tatico real. A varredura abaixo usa as celulas de movimento e o
+        // PodeMirar — e ela que sabe se ha tiro.
+        if (hunting || HasEnemyInEngageRadius(unit, from, snapshot.AITeam))
         {
             Dictionary<Vector3Int, List<Vector3Int>> engagePaths =
                 UnitMovementPathRules.CalcularCaminhosValidos(
@@ -109,7 +114,49 @@ public partial class AIController
                     bestEngageTarget.InstanceId.ToString(), btCell, engagePaths);
             }
 
-            return null; // inimigos próximos, sem captura nem ataque → HexEvaluator
+            // CACA E ULTIMO RECURSO: a decisao de ataque recusou toda troca (unidade
+            // ferida, revide caro) — mas quem caca nao tem predio para recuar nem
+            // fusao a vista. Segunda passada SEM o filtro de decisao: o melhor alvo
+            // que o sensor permite, da celula de melhor DPQ. Sem isto o soldado
+            // ferido via o inimigo no proprio tatico e ficava parado.
+            if (hunting)
+            {
+                UnitManager lastResortTarget = null;
+                Vector3Int lastResortCell = from;
+                float lastResortDpq = float.MinValue;
+                foreach (Vector3Int cell in engagePaths.Keys)
+                {
+                    if (engageOccupied.Contains(cell)) continue;
+                    engageBuffer.Clear();
+                    PodeMirarSensor.CollectTargets(unit, boardTilemap, terrainDatabase,
+                        cell == from ? SensorMovementMode.MoveuParado : SensorMovementMode.MoveuAndando,
+                        engageBuffer, fromCell: cell);
+                    UnitManager candidate = PickBestRogueTarget(engageBuffer, snapshot.AITeam);
+                    if (candidate == null) continue;
+                    float dpq = GetTerrainDpqPontos(cell);
+                    if (lastResortTarget == null || dpq > lastResortDpq)
+                    {
+                        lastResortDpq = dpq;
+                        lastResortTarget = candidate;
+                        lastResortCell = cell;
+                    }
+                }
+                if (lastResortTarget != null)
+                {
+                    Vector3Int lrCell = lastResortTarget.CurrentCellPosition; lrCell.z = 0;
+                    Debug.Log($"{TL("Rogue")} {unit.InstanceId} caca (ultimo recurso, ignora decisao de ataque) " +
+                              $"move+ataca {lastResortTarget.UnitDisplayName}#{lastResortTarget.InstanceId} via {lastResortCell} (dpq={lastResortDpq:F0})");
+                    return BuildAttackBatch(unit, snapshot.AITeam, from, lastResortCell,
+                        lastResortTarget.InstanceId.ToString(), lrCell, engagePaths);
+                }
+            }
+
+            // Inimigos proximos, sem captura nem ataque. Capturando, o HexEvaluator
+            // resolve. CACANDO, desistir e o contrario do pedido: segue para a marcha
+            // ate o alvo (o inimigo esta perto, mas fora do tiro neste turno).
+            if (!hunting)
+                return null; // → HexEvaluator
+            Debug.Log($"{TL("Rogue")} {unit.InstanceId} caca: sem tiro neste turno, fecha distancia ate {target}");
         }
 
         Dictionary<Vector3Int, List<Vector3Int>> paths =
@@ -245,6 +292,58 @@ public partial class AIController
     /// papel do objetivo: é o que o Quero Carona e o transporte leem para saber
     /// para onde a unidade quer ir.
     /// </summary>
+    /// <summary>
+    /// Rebelde sem capturavel: CACA. A ancora e o inimigo visivel mais proximo, e o
+    /// mesmo DecideRogueCapturerAction (ataque do lugar, move+ataca, marcha) leva a
+    /// unidade ate ele. Fog-honesto: so conta inimigo que este slot enxerga agora;
+    /// sem ninguem visivel, fica onde esta (null no chamador, como antes).
+    ///
+    /// Prefere alvo fora do ar: um soldado marchando atras de helicoptero nunca
+    /// alcanca. Aeronave so vira ancora quando nao ha mais nada visivel.
+    /// </summary>
+    private bool TryResolveRebelHuntAnchor(
+        UnitManager unit,
+        AIWorldSnapshot snapshot,
+        out Vector3Int anchorCell)
+    {
+        anchorCell = Vector3Int.zero;
+        if (unit == null || snapshot == null)
+            return false;
+
+        Vector3Int from = unit.CurrentCellPosition; from.z = 0;
+        MatchController mc = GetMatchController();
+        PlayerSlotId slot = PlayerSlotId.FromIndex(snapshot.AISlotIndex);
+
+        UnitManager best = null;
+        int bestScore = int.MaxValue;
+        foreach (UnitManager enemy in UnitManager.AllActive)
+        {
+            if (enemy == null || enemy.IsDead || enemy.IsEmbarked || enemy.SlotIndex == snapshot.AISlotIndex)
+                continue;
+            if (mc != null && !mc.IsUnitVisibleForSlot(enemy, slot))
+                continue;
+            Vector3Int cell = enemy.CurrentCellPosition; cell.z = 0;
+            int score = Mathf.RoundToInt(SectorManager.HexDistance(from, cell));
+            if (enemy.GetCurrentLayerMode().domain == Domain.Air)
+                score += 1000;
+            if (score < bestScore)
+            {
+                bestScore = score;
+                best = enemy;
+            }
+        }
+
+        if (best == null)
+            return false;
+
+        anchorCell = best.CurrentCellPosition;
+        anchorCell.z = 0;
+        Debug.Log(
+            $"{TL("SemPlano")} {unit.InstanceId} sem capturavel: caca " +
+            $"{best.UnitDisplayName}#{best.InstanceId}@{anchorCell}.");
+        return true;
+    }
+
     private bool TryResolvePlanlessCapturerAnchor(
         UnitManager unit,
         AIWorldSnapshot snapshot,
