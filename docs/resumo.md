@@ -1,15 +1,23 @@
 ﻿# Resumo — onde estamos e o que vem
 
-Ponto de retomada. Atualizado em 2026-10-06, **depois** da tag `v9.3.1`.
+Ponto de retomada. Atualizado em 2026-10-07, **depois** da tag `v9.3.2`.
 Leia isto primeiro.
 
 ---
 
 ## Estado
 
-`v9.3.1` tagueada e publicada. **O primeiro MVP estável está no ar** (v9.2.0),
+`v9.3.2` tagueada e publicada. **O primeiro MVP estável está no ar** (v9.2.0),
 no Unity Play, e **o primeiro estranho já zerou uma fase**. Relatório do dia:
-[`relatorio_v9.3.1.md`](relatorio_v9.3.1.md).
+[`relatorio_v9.3.2.md`](relatorio_v9.3.2.md).
+
+**A descoberta da v9.3.2: aula sem prédio é o primeiro mapa em que a IA rebelde não
+tem âncora.** O capturador desistia, o reparo marchava para a bandeira do próprio
+time e o Apache orbitava o soldado aliado. Agora o rebelde **caça** o inimigo
+visível (com último recurso que ignora a decisão de ataque), o reparo sem prédio
+que conserte cai, e o Apache caça no Operacional. O save passou a guardar a aula e
+o mundo (o manifesto leva o `mundoId`). O motor das aulas ganhou fala avulsa,
+`completeCommand`, relógio (`TURN_REACHED`) e alcance de serviço.
 
 **A descoberta da v9.3.1: tutorial se testa tentando quebrar.** O autor jogou a
 aula 1 da Caserna de ponta a ponta e cada atalho de aluno virou trava ou regra:
@@ -62,6 +70,7 @@ v9.2.1   a IA pergunta antes de decidir   contrato do questionário; reparo pela
 v9.2.2   o primeiro estranho jogou         Configurações, Ação Direta, névoa com uma memória
 v9.3.0   a aula vira um quadrante          Academia, regras de fim da aula, captura/spawn no roteiro
 v9.3.1   a primeira aula fecha             travas só do aluno, atalhos fechados, fala final, volta automática
+v9.3.2   a aula 2 contra IA que briga      save da aula e do mundo, rebelde caça, peças de roteiro
 ```
 
 **A descoberta da v9.2.0:** o Simulator da Unity não reproduz o navegador do
@@ -229,6 +238,18 @@ Sem HQ, os dois lados do Q3 e do Q4 entram no modo rebelde (v8.6.1, Frente 4).
 ---
 
 ## Onde eu parei
+
+### O que a v9.3.2 deixou — a caça rebelde ainda não foi vista atirando
+
+1. **Ver a caça em Play.** As duas últimas correções (segunda passada sem
+   `PassesAttackDecision`; varredura de tiro sempre, porque `HasEnemyInEngageRadius`
+   mede com `Vector3Int.Distance`) não voltaram testadas. Log a procurar:
+   `caca (ultimo recurso…) move+ataca` ou `caca: sem tiro… fecha distancia`
+   (`AIController.Capturer.Rogue.cs`).
+2. **`HasEnemyInEngageRadius` segue em reta na grade** para os capturadores com
+   plano. Corrigir muda a IA com QG: decidir com o autor.
+3. **Save de aula**: carregar no meio, pela aula aberta e pelo menu, ainda não foi
+   visto. Saves anteriores à v9.3.2 não têm `mundoId` no manifesto (dançam uma vez).
 
 ### O que a v9.3.1 deixou — aula 1 jogada, aula 2 não
 
@@ -547,6 +568,10 @@ parte de uma regra só, e a construção usa a mesma reta que a unidade.
 
 | armadilha | regra |
 |---|---|
+| **Importar com a Unity compilando** | o campo novo chega VAZIO no asset: ele já conhece o campo, o importador ainda é o antigo (a fala da Capitã chegou muda). Importar só sem a rodinha de compilação |
+| **checagem no início do turno** | `OnActiveTeamChanged` dispara ANTES do `ReleaseUnitsForActiveTeam` (upkeep). Quem lê combustível ali vê o valor de antes do consumo; leia no `Neutral` |
+| **"escolher" e "bloquear" com a mesma regra** | aeronave no ar não bloqueia spawn, e a escolha da bandeira herdou isso: dois Apaches na mesma bandeira. Separar a regra de bloqueio da de preferência |
+| **IA assumindo que sempre há prédio** | sem capturável e sem prédio que conserte, três ramos desistiam em silêncio. Mapa de aula/teste é o caso que os expõe |
 | **trava de roteiro valendo para a IA** | o "passar a vez" travado por uma fala muda pegou a IA, que passa a vez pelo mesmo caminho do humano: bronca do Sargento na IA e turno preso. Toda trava de aula pergunta `IsActiveTeamAI` |
 | **fala de abertura antes do turno 1** | `acted CH` na fala 0 era apagado pelo `ResetForTeamTurnStart`, que roda frames depois numa coroutine. Estado inicial de aula espera `MatchController.MatchStartApplied` |
 | **painel que monta botão no `OnEnable`** | o `Panel_vitoria` pergunta `PodeVoltarParaCampanha` ao ligar; quem arma a volta é o `OnMatchConcluded`. Aviso **antes** do painel, senão o botão nasce escondido |
@@ -636,6 +661,7 @@ parte de uma regra só, e a construção usa a mesma reta que a unidade.
 | [`Planos/plano_campanha.md`](Planos/plano_campanha.md) | **o tronco** — autoria, recorte, progresso, cenas, bloqueios, teste |
 | [`Planos/briefing_cena_campanha.md`](Planos/briefing_cena_campanha.md) | o contrato entre as duas frentes |
 | [`AI Behavior/contrato_questionario.md`](AI%20Behavior/contrato_questionario.md) | **o questionário** — casas, duas etapas, o Capturador, as ordens, as missões, os abertos |
+| [`relatorio_v9.3.2.md`](relatorio_v9.3.2.md) | a aula 2 contra IA que briga — save da aula e do mundo, rebelde caça, fala avulsa, relógio |
 | [`relatorio_v9.3.1.md`](relatorio_v9.3.1.md) | a primeira aula fecha — travas só do aluno, atalhos fechados, fala final, volta automática |
 | [`relatorio_v9.3.0.md`](relatorio_v9.3.0.md) | a aula vira um quadrante — Academia, regras de fim da aula, tarefas de captura, bake embarcado |
 | [`tutorial/sintaxe.md`](tutorial/sintaxe.md) | **como escrever uma aula** — comandos, tarefas, parâmetros, convenções |
