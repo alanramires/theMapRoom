@@ -31,13 +31,19 @@ public partial class TurnStateManager
         return state == CursorState.MoveuAndando || state == CursorState.MoveuParado;
     }
 
+    // Estados que so terminam por ExecuteAndReset. Suprindo/Desembarcando/
+    // EmbarcandoExecuting ficam de fora de proposito: abortam por Retreat
+    // (retry de camada, pouso abortado, embarque falho).
     private static bool IsResetOnlyState(CursorState state)
     {
         return state == CursorState.AircraftFuelDepletionQueue ||
                state == CursorState.TurnStartRallyQueue ||
                state == CursorState.CommandServiceExecuting ||
                state == CursorState.RemovingUnitExecuting ||
-               state == CursorState.EndingTurnExecuting;
+               state == CursorState.EndingTurnExecuting ||
+               state == CursorState.CapturandoExecuting ||
+               state == CursorState.FundindoExecuting ||
+               state == CursorState.AttackingExecuting;
     }
 
     private void ValidateStateStack(string reason)

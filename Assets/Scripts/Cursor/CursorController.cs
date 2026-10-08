@@ -17,6 +17,18 @@ public class CursorController : MonoBehaviour
         OnCursorReturnedToNeutral?.Invoke();
     }
 
+    // Dois momentos do Neutral, nesta ordem:
+    //   OnCursorReturnedToNeutral — a FSM chegou. O indice de ocupacao confirmada
+    //     reconcilia aqui; a nevoa AINDA nao aplicou o delta da acao.
+    //   OnBoardSettledAtNeutral   — o delta confirmado (FOW/deteccao) ja foi
+    //     aplicado. Quem deriva estado da nevoa ou da deteccao escuta este.
+    public static event Action OnBoardSettledAtNeutral;
+
+    public static void NotifyBoardSettledAtNeutral()
+    {
+        OnBoardSettledAtNeutral?.Invoke();
+    }
+
     [System.Serializable]
     private class MovementCategorySfxBinding
     {

@@ -10637,14 +10637,16 @@ public class MatchController : MonoBehaviour
         OnFogOfWarUpdated?.Invoke();
     }
 
-    public void NotifyTurnStateReturnedToNeutral()
+    // Retorna true se havia delta pendente e ele foi aplicado.
+    public bool NotifyTurnStateReturnedToNeutral()
     {
         CommittedBoardDelta delta = pendingCommittedBoardDelta;
         pendingCommittedBoardDelta = null;
         if (delta == null || delta.IsEmpty)
-            return;
+            return false;
 
         ApplyCommittedBoardDelta(delta);
+        return true;
     }
 
     private void RemoveFogSpecializedViewCacheForUnit(int unitIndex)

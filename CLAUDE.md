@@ -47,6 +47,23 @@ furar o cache não reconfere nada.
 Precedente: `HexCohabitationVisualManager` já adiava rescan até o Neutral confirmado
 (`rescanWhenNeutralPending`). `ConstructionManager` estava de fora e pagou por isso.
 
+#### O Neutral tem dois momentos — escolha o certo
+
+```text
+OnCursorReturnedToNeutral   a FSM chegou. ConfirmedOccupancyIndex reconcilia aqui.
+                            A névoa AINDA NÃO aplicou o delta da ação.
+OnBoardSettledAtNeutral     delta confirmado (FOW/detecção) aplicado. Mundo pronto.
+```
+
+Os dois vivem em `CursorController`. Estado derivado de **ocupação** pode escutar o
+primeiro; estado derivado de **névoa ou detecção** (quem está visível, quem foi
+spottado) escuta o segundo — no primeiro ele lê a foto de antes da ação.
+
+Não inverta a ordem dentro de `ExecuteAndReset`: o delta da névoa pode depender do
+índice de ocupação já reconciliado. Os listeners antigos (`HexCohabitationVisualManager`,
+`ConstructionManager`) contornam isso escutando também `OnFogOfWarUpdated`; código
+novo usa `OnBoardSettledAtNeutral`.
+
 ## Start here
 
 `docs/resumo.md` is the handoff: current state, the five-rung architecture ladder,

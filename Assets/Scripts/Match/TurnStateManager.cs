@@ -319,6 +319,16 @@ public partial class TurnStateManager : MonoBehaviour
         HandleStateRevealedByRetreat(previous, revealed, reason);
         ValidateStateStack(reason);
         RefreshFsmDebugText();
+
+        if (revealed == CursorState.Neutral && previous != CursorState.Neutral)
+        {
+            // Volta por Retreat e cancelamento: nao deveria haver delta confirmado
+            // pendente. Se houver, aplica (o mundo so recalcula no Neutral) e avisa,
+            // porque algum commit terminou pelo caminho de rollback.
+            if (matchController != null && matchController.NotifyTurnStateReturnedToNeutral())
+                Debug.LogWarning($"[FSM] Delta confirmado pendente aplicado numa volta ao Neutral por Retreat ({reason}, de {previous}).");
+            CursorController.NotifyBoardSettledAtNeutral();
+        }
     }
 
     private void ExecuteAndReset(
@@ -334,6 +344,8 @@ public partial class TurnStateManager : MonoBehaviour
         ValidateStateStack(reason);
         RefreshFsmDebugText();
         matchController?.NotifyTurnStateReturnedToNeutral();
+        if (previous != CursorState.Neutral)
+            CursorController.NotifyBoardSettledAtNeutral();
     }
 
     private void EnsureStateStackInitialized()
