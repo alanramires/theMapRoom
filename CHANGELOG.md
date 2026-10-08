@@ -33,6 +33,7 @@ de sensor têm uma fonte só. A direção vem do guia de modding do autor
 | v9.3.0 | A aula vira um quadrante (Academia: tutorial como mundo, regras de fim da aula, tarefas de captura) | [relatório](docs/relatorio_v9.3.0.md) |
 | v9.3.1 | A primeira aula fecha de ponta a ponta (travas só do aluno, atalhos fechados, fala final, volta automática) | [relatório](docs/relatorio_v9.3.1.md) |
 | v9.3.2 | A aula 2 joga contra uma IA que briga (save da aula e do mundo, rebelde caça, peças de roteiro) | [relatório](docs/relatorio_v9.3.2.md) |
+| v9.4.0 | Revisão do Motor (fórmula e DPQ de combate em fonte única, IA só simula o que o sensor oferece, Neutral com dois momentos) | [relatório](docs/relatorio_v9.4.0.md) |
 
 ---
 
