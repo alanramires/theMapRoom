@@ -1988,6 +1988,27 @@ public class MatchController : MonoBehaviour
         players[slotId.Value] = entry;
     }
 
+    // Oponente do aluno numa aula: o primeiro slot valido que nao e o humano local
+    // (preferindo IA). Invalid se nao houver.
+    private PlayerSlotId ResolveTutorialOpponentSlot()
+    {
+        PlayerSlotId student = TryGetSingleActiveLocalHumanSlot(out PlayerSlotId human)
+            ? human
+            : PlayerSlotId.FromIndex(0);
+        PlayerSlotId fallback = PlayerSlotId.Invalid;
+        for (int i = 0; players != null && i < players.Count; i++)
+        {
+            PlayerSlotId slot = PlayerSlotId.FromIndex(i);
+            if (slot.Value == student.Value || !IsValidPlayerSlot(slot))
+                continue;
+            if (IsPlayerAI(slot))
+                return slot;
+            if (!fallback.IsValid)
+                fallback = slot;
+        }
+        return fallback;
+    }
+
     public bool IsPlayerAI(PlayerSlotId slotId) =>
         IsValidPlayerSlot(slotId) && players[slotId.Value].isAI;
 
@@ -11915,11 +11936,16 @@ public class MatchController : MonoBehaviour
             cursorController.PlayDefeatSfx();
         }
 
-        // Aula perdida tambem encerra a partida: arma a volta para a Campanha, mas
-        // sem vencedor para coroar (slot invalido nao pinta o quadrante). ANTES do
-        // painel — ver DeclareTutorialVictory: o botao "Campanha" pergunta pela volta
-        // no OnEnable do painel.
-        OnMatchConcluded?.Invoke(PlayerSlotId.Invalid, TeamId.Neutral, TeamId.Neutral, VictoryReason.TutorialFailed, currentTurn);
+        // Aula perdida tambem encerra a partida e arma a volta para a Campanha. ANTES
+        // do painel — ver DeclareTutorialVictory: o botao "Campanha" pergunta pela
+        // volta no OnEnable do painel.
+        //
+        // O vencedor e o OPONENTE do aluno: a Campanha mostra "venceu: <inimigo>"
+        // em vez de "Nenhum". Quem decide se isso sobrescreve uma aula ja concluida
+        // e o QuadranteController (nao sobrescreve).
+        PlayerSlotId tutorialWinner = ResolveTutorialOpponentSlot();
+        TeamId tutorialWinnerTeam = tutorialWinner.IsValid ? GetTeamIdForSlot(tutorialWinner.Value) : TeamId.Neutral;
+        OnMatchConcluded?.Invoke(tutorialWinner, tutorialWinnerTeam, TeamId.Neutral, VictoryReason.TutorialFailed, currentTurn);
 
         // Busca o painel pelo nome (como no DeclareDefeat original). Panel_endGame
         // so existe nas cenas de tutorial antigas; na Batalha a derrota usa o mesmo

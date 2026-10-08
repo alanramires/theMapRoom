@@ -313,7 +313,19 @@ public class QuadranteController : MonoBehaviour
         //
         // Sem vencedor para coroar (rendicao sem oponente vivo) nao ha dono novo —
         // mas a partida acabou do mesmo jeito, e a volta e armada de qualquer forma.
-        if (winnerSlot.IsValid)
+        // Aula perdida NAO desfaz aula ja vencida: refazer e perder nao pode trancar
+        // de novo as aulas que ela destravou. So registra a derrota quando o
+        // quadrante nao e de um humano.
+        bool keepHumanConquest = false;
+        if (reason == MatchController.VictoryReason.TutorialFailed &&
+            CampaignProgressStore.TryGetOwner(MundoId, campanhaId, quadranteId, out PlayerSlotId currentOwner) &&
+            currentOwner.IsValid)
+        {
+            MatchController matchForOwner = FindAnyObjectByType<MatchController>();
+            keepHumanConquest = matchForOwner != null && !matchForOwner.IsPlayerAI(currentOwner);
+        }
+
+        if (winnerSlot.IsValid && !keepHumanConquest)
         {
             CampaignProgressStore.RecordOwner(
                 MundoId,
